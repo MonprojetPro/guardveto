@@ -158,6 +158,19 @@ export function estEnVacancesScolaires(date: string): boolean {
   return VACANCES_SCOLAIRES.some(({ debut, fin }) => dateEntre(date, debut, fin))
 }
 
+// ── Fêtes de fin d'année ─────────────────────────────────
+
+/**
+ * Retourne true pour les 4 jours de fêtes de fin d'année :
+ * 24-25 décembre (Noël) et 31 décembre - 1er janvier (Nouvel An).
+ * Dec 25 et Jan 1 sont déjà des jours fériés officiels.
+ * Dec 24 et Dec 31 sont des veilles de fête (soirs sensibles).
+ */
+export function estFeteFinAnnee(date: string): boolean {
+  const mmjj = date.substring(5) // MM-DD
+  return mmjj === '12-24' || mmjj === '12-25' || mmjj === '12-31' || mmjj === '01-01'
+}
+
 // ── Helpers planning ────────────────────────────────────
 
 /** La date est-elle un week-end (sam ou dim) ? */

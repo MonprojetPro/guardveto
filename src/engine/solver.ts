@@ -142,6 +142,7 @@ function scorerCandidat(
   const pen = penalite(
     { date: step.date, type: step.type, saison: step.saison },
     vet,
+    step.role,
     planning
   )
 

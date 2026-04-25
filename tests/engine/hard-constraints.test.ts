@@ -163,6 +163,44 @@ describe('R3/R5 — Repos conditionnel', () => {
     expect(result.valid).toBe(false)
     expect(result.raison).toMatch(/R3|R5/)
   })
+
+  // ── Fix R3 : vendredi_soir traité comme garde WE ───────
+  // Sans ce fix, Victor/Antoine/Manon/Jean étaient bloqués de tous les WE
+  // car leur contrainte "sinon: vendredi" bloquait le vendredi soir (WE pas encore planifié).
+
+  it('Victor : autorise vendredi_soir même sans WE planifié (vendredi_soir = garde WE)', () => {
+    // Victor a "sinon: vendredi". Sans le fix, il serait bloqué.
+    const result = isValid(slot('2026-05-08', 'vendredi_soir'), VICTOR, 'premier', ALL_VETS, planningVide)
+    expect(result.valid).toBe(true)
+  })
+
+  it('Antoine : autorise vendredi_soir même sans WE planifié', () => {
+    const result = isValid(slot('2026-05-08', 'vendredi_soir'), ANTOINE, 'premier', ALL_VETS, planningVide)
+    expect(result.valid).toBe(true)
+  })
+
+  it('Manon : autorise vendredi_soir même sans WE planifié', () => {
+    const result = isValid(slot('2026-05-08', 'vendredi_soir'), MANON, 'premier', ALL_VETS, planningVide)
+    expect(result.valid).toBe(true)
+  })
+
+  it('Jean : autorise vendredi_soir même sans WE planifié', () => {
+    const result = isValid(slot('2026-05-08', 'vendredi_soir'), JEAN, 'premier', ALL_VETS, planningVide)
+    expect(result.valid).toBe(true)
+  })
+
+  it('Victor : repos jeudi reste bloqué une fois vendredi_soir planifié (gardeWe=true)', () => {
+    // vendredi_soir 8 mai → Victor "si_garde_we: jeudi" → jeudi 7 mai bloqué
+    const planning: PlanningPartiel = {
+      attributions: [{
+        date: '2026-05-08', type: 'vendredi_soir',
+        premier_id: VICTOR.id, second_id: FANNY.id,
+      }],
+    }
+    const result = isValid(slot('2026-05-07', 'semaine_soir'), VICTOR, 'premier', ALL_VETS, planning)
+    expect(result.valid).toBe(false)
+    expect(result.raison).toMatch(/R3|R5/)
+  })
 })
 
 // ── R6 : Duo interdit Manon + Antoine ───────────────────

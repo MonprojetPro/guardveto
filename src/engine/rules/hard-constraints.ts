@@ -31,7 +31,8 @@ function getAttribution(
 
 /** Vérifie si le véto a une garde WE liée à cette semaine.
  *  Lun/Mar/Mer → le WE pertinent est celui de la semaine précédente (le WE vient de se terminer).
- *  Jeu/Ven/Sam/Dim → le WE pertinent est celui de la semaine courante (le WE arrive). */
+ *  Jeu/Ven/Sam/Dim → le WE pertinent est celui de la semaine courante (le WE arrive).
+ *  Vérifie aussi vendredi_soir car R9 garantit que ven soir = même duo que le WE. */
 function aGardeWeekendCetteSemaine(
   vetId: string,
   date: string,
@@ -46,8 +47,13 @@ function aGardeWeekendCetteSemaine(
   } else {
     sam = samediDeSemaine(date)
   }
-  const a = getAttribution(planning, sam, 'weekend')
-  return a?.premier_id === vetId || a?.second_id === vetId
+  // Vérifie la garde weekend (samedi)
+  const aWE = getAttribution(planning, sam, 'weekend')
+  if (aWE?.premier_id === vetId || aWE?.second_id === vetId) return true
+  // Vérifie aussi vendredi_soir (lié au même WE par R9)
+  const ven = addDays(sam, -1)
+  const aVen = getAttribution(planning, ven, 'vendredi_soir')
+  return aVen?.premier_id === vetId || aVen?.second_id === vetId
 }
 
 /** Vérifie si le véto est déjà de garde vendredi soir cette semaine */
