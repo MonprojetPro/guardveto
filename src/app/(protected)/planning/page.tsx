@@ -98,6 +98,7 @@ export default async function PlanningPage({
         gardes={(gardesDb as GardeDenormalisee[]) ?? []}
         periodes={(periodesDb as Periode[]) ?? []}
         anneeMois={anneeMois}
+        isAdmin={isAdmin}
       />
     </div>
   )

@@ -2,12 +2,12 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, List, Grid3x3, Star, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, List, Grid3x3, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DayCell } from './DayCell'
 import { GardeBadge } from './GardeBadge'
+import { GardeDetailModal } from '@/components/planning/GardeDetailModal'
 import { usePeriodeActuelle } from '@/hooks/usePeriode'
 import { estJourFerie } from '@/engine/utils'
 import type { GardeDenormalisee, Periode } from '@/types'
@@ -19,6 +19,7 @@ interface MonthViewProps {
   periodes: Periode[]
   /** Format "YYYY-MM" (ex : "2026-09") */
   anneeMois: string
+  isAdmin?: boolean
 }
 
 // ── Helpers calendrier ───────────────────────────────────
@@ -71,30 +72,10 @@ function estAujourdhui(dateISO: string): boolean {
   return dateISO === today
 }
 
-function formatDateLongue(dateISO: string): string {
-  return new Date(dateISO + 'T12:00:00Z').toLocaleDateString('fr-FR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
-}
-
-function labelTypeGarde(type: string): string {
-  if (type === 'weekend') return 'Week-end (sam → lun)'
-  if (type === 'ferie') return 'Jour férié'
-  return 'Garde de semaine (soir)'
-}
-
-function labelStatutPeriode(statut: string) {
-  if (statut === 'publie') return <Badge variant="default">Publié</Badge>
-  if (statut === 'verrouille') return <Badge variant="secondary">Verrouillé</Badge>
-  return <Badge variant="outline">Brouillon</Badge>
-}
 
 // ── Composant principal ──────────────────────────────────
 
-export function MonthView({ gardes, periodes, anneeMois }: MonthViewProps) {
+export function MonthView({ gardes, periodes, anneeMois, isAdmin = false }: MonthViewProps) {
   const router = useRouter()
   const [vueListeMobile, setVueListeMobile] = useState(false)
   const [gardeModal, setGardeModal] = useState<GardeDenormalisee | null>(null)
@@ -176,7 +157,12 @@ export function MonthView({ gardes, periodes, anneeMois }: MonthViewProps) {
             {new Date(periode.date_fin).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
           </span>
           <span>·</span>
-          {labelStatutPeriode(periode.statut)}
+          {periode.statut === 'publie'
+            ? <Badge variant="default">Publié</Badge>
+            : periode.statut === 'verrouille'
+              ? <Badge variant="secondary">Verrouillé</Badge>
+              : <Badge variant="outline">Brouillon</Badge>
+          }
         </div>
       )}
 
@@ -254,7 +240,7 @@ export function MonthView({ gardes, periodes, anneeMois }: MonthViewProps) {
                   <div className="flex-1 min-w-0 space-y-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-xs text-muted-foreground">
-                        {labelTypeGarde(garde.type)}
+                        {garde.type === 'weekend' ? 'Week-end' : garde.type === 'ferie' ? 'Jour férié' : 'Soir semaine'}
                       </span>
                       {estJourFerie(garde.date) && (
                         <Star className="w-3 h-3 text-amber-500 fill-amber-400" />
@@ -305,73 +291,14 @@ export function MonthView({ gardes, periodes, anneeMois }: MonthViewProps) {
         </div>
       )}
 
-      {/* ── Modale de détail ─────────────────────────────── */}
-      <Dialog open={dateModal !== null} onOpenChange={(open) => { if (!open) { setDateModal(null); setGardeModal(null) } }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="font-heading text-base capitalize">
-              {dateModal && formatDateLongue(dateModal)}
-            </DialogTitle>
-          </DialogHeader>
-
-          {gardeModal ? (
-            <div className="space-y-4 pt-1">
-              {/* Type de garde */}
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                {labelTypeGarde(gardeModal.type)}
-                {dateModal && estJourFerie(dateModal) && (
-                  <span className="flex items-center gap-1 text-amber-600">
-                    <Star className="w-3.5 h-3.5 fill-amber-400" />
-                    Jour férié
-                  </span>
-                )}
-              </div>
-
-              {/* Vétérinaires */}
-              <div className="space-y-2">
-                {gardeModal.premier_prenom && (
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-medium text-muted-foreground w-12 shrink-0">1er</span>
-                    <GardeBadge
-                      prenom={gardeModal.premier_prenom}
-                      nom={gardeModal.premier_nom}
-                      couleur={gardeModal.premier_couleur}
-                      role="premier"
-                    />
-                    <span className="text-sm text-foreground">
-                      {gardeModal.premier_prenom} {gardeModal.premier_nom}
-                    </span>
-                  </div>
-                )}
-                {gardeModal.second_prenom && (
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-medium text-muted-foreground w-12 shrink-0">2nd</span>
-                    <GardeBadge
-                      prenom={gardeModal.second_prenom}
-                      nom={gardeModal.second_nom}
-                      couleur={gardeModal.second_couleur}
-                      role="second"
-                    />
-                    <span className="text-sm text-foreground">
-                      {gardeModal.second_prenom} {gardeModal.second_nom}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Statut */}
-              <div className="flex items-center gap-2 pt-1 border-t border-border/50">
-                <span className="text-xs text-muted-foreground">Statut période :</span>
-                {labelStatutPeriode(gardeModal.periode_statut)}
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground pt-1">
-              Aucune garde planifiée ce jour.
-            </p>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* ── Modale de détail / édition ───────────────────── */}
+      <GardeDetailModal
+        garde={gardeModal}
+        date={dateModal}
+        isAdmin={isAdmin}
+        onClose={() => { setDateModal(null); setGardeModal(null) }}
+        onSaved={() => router.refresh()}
+      />
     </div>
   )
 }
