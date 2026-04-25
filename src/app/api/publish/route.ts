@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { syncCalendrier } from '@/lib/sync-calendrier'
+import { sendPlanningPublie } from '@/lib/notifications'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -116,5 +117,16 @@ export async function POST(req: NextRequest) {
     calendarSync = { synced: 0, errors: [msg], skipped: false }
   }
 
-  return NextResponse.json({ success: true, calendarSync })
+  // ── Notifications email (best-effort) ──────────────────────
+  // Envoyées après la synchro agenda — une erreur ne bloque pas la réponse.
+  let emailNotif: { sent: number; errors: number } | null = null
+  try {
+    emailNotif = await sendPlanningPublie(supabase, periodeId)
+  } catch (notifErr) {
+    const msg = notifErr instanceof Error ? notifErr.message : String(notifErr)
+    console.error('[publish] Erreur notifications email:', msg)
+    emailNotif = { sent: 0, errors: 1 }
+  }
+
+  return NextResponse.json({ success: true, calendarSync, emailNotif })
 }

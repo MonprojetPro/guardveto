@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/server'
 import { queryCompteurs, queryTotalWE } from '@/hooks/useCompteurs'
 import { calculerBilans } from '@/engine/bilan'
 import { syncGardeIndividuelle } from '@/lib/sync-calendrier'
+import { sendGardeModifiee } from '@/lib/notifications'
 
 export async function PATCH(
   req: NextRequest,
@@ -51,7 +52,12 @@ export async function PATCH(
   // ── Vérification de la garde ────────────────────────────
   const { data: garde } = await supabase
     .from('gardes')
-    .select('id, verrouille, periode_id, premier_id, second_id, modifie_manuellement')
+    .select(`
+      id, verrouille, periode_id, modifie_manuellement,
+      premier_id, second_id,
+      oldPremier:premier_id(id, nom, prenom, email),
+      oldSecond:second_id(id, nom, prenom, email)
+    `)
     .eq('id', gardeId)
     .single()
 
@@ -135,6 +141,14 @@ export async function PATCH(
   // Ne bloque pas la réponse en cas d'erreur Google
   syncGardeIndividuelle(supabase, gardeId).catch(() => {
     // Échec silencieux — la modification garde est enregistrée
+  })
+
+  // ── Notifications email (best-effort) ─────────────────────
+  // Envoyées aux vétos concernés (anciens + nouveaux assignés)
+  const oldPremier = (garde as Record<string, unknown>).oldPremier as { id: string; nom: string; prenom: string; email: string } | null
+  const oldSecond  = (garde as Record<string, unknown>).oldSecond  as { id: string; nom: string; prenom: string; email: string } | null
+  sendGardeModifiee(supabase, gardeId, oldPremier, oldSecond).catch((err) => {
+    console.error('[gardes] Erreur notifications email:', err instanceof Error ? err.message : String(err))
   })
 
   return NextResponse.json({ success: true })
