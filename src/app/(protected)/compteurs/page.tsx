@@ -1,29 +1,129 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { BarChart3 } from 'lucide-react'
+// ============================================================
+// GUARDVETO — Page /compteurs
+// ============================================================
+// Affiche les compteurs individuels de gardes par période.
+// La ligne du véto connecté est mise en avant.
+// L'admin voit en plus : colonne BM hérité + carte bilan.
+// ============================================================
 
-export default function CompteursPage() {
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import { BarChart3 } from 'lucide-react'
+import { CompteursClient } from '@/components/compteurs/CompteursClient'
+import { BonusMalusCard } from '@/components/compteurs/BonusMalusCard'
+import {
+  queryCompteurs,
+  queryTotalWE,
+  queryBonusMalusHeritage,
+  queryBonusMalusCourant,
+  queryVetsInfo,
+} from '@/hooks/useCompteurs'
+import type { Periode } from '@/types'
+
+// ── Page ─────────────────────────────────────────────────
+
+export default async function CompteursPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ periodeId?: string }>
+}) {
+  const supabase = await createClient()
+
+  // ── Auth ─────────────────────────────────────────────────
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: currentVet } = await supabase
+    .from('veterinaires')
+    .select('id, role_app')
+    .eq('user_id', user.id)
+    .single()
+
+  const isAdmin = currentVet?.role_app === 'admin'
+  const currentVetId = currentVet?.id ?? null
+
+  // ── Chargement des périodes ──────────────────────────────
+  const { data: periodesDb } = await supabase
+    .from('periodes')
+    .select('*')
+    .order('date_debut', { ascending: false })
+    .limit(20)
+
+  const periodes = (periodesDb as Periode[] | null) ?? []
+
+  if (periodes.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="font-heading text-2xl font-bold text-foreground">Compteurs</h1>
+          <p className="text-muted-foreground text-sm mt-1">Suivi des gardes et bilan d&apos;équité</p>
+        </div>
+        <p className="text-sm text-muted-foreground">Aucune période de planification trouvée.</p>
+      </div>
+    )
+  }
+
+  // ── Sélection de la période ──────────────────────────────
+  const { periodeId: periodeIdParam } = await searchParams
+  const periodeSelectionnee =
+    periodes.find((p) => p.id === periodeIdParam) ?? periodes[0]
+
+  // ── Chargement parallèle ─────────────────────────────────
+  const [compteurs, totalWE, bonusMalusHeritage, bonusMalusCourant, vetsInfo] =
+    await Promise.all([
+      queryCompteurs(supabase, periodeSelectionnee.id),
+      queryTotalWE(supabase, periodeSelectionnee.id),
+      isAdmin
+        ? queryBonusMalusHeritage(supabase, periodeSelectionnee, periodes)
+        : Promise.resolve([]),
+      isAdmin
+        ? queryBonusMalusCourant(supabase, periodeSelectionnee.id)
+        : Promise.resolve([]),
+      isAdmin
+        ? queryVetsInfo(supabase)
+        : Promise.resolve([]),
+    ])
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-bold text-foreground">Compteurs</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Suivi des gardes et bilan d&apos;équité
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="font-heading text-2xl font-bold text-foreground flex items-center gap-2">
+            <BarChart3 className="w-6 h-6 text-primary" />
+            Compteurs
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Suivi des gardes et bilan d&apos;équité
+          </p>
+        </div>
+        {!isAdmin && currentVetId && (
+          <p className="text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
+            Votre ligne est surlignée
+          </p>
+        )}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-heading flex items-center gap-2 text-base">
-            <BarChart3 className="w-5 h-5 text-primary" />
-            Compteurs — Sprint 5
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-sm">
-            Les compteurs individuels et le bilan bonus/malus (STORY-015 à 017) seront disponibles au Sprint 5.
-          </p>
-        </CardContent>
-      </Card>
+      {/* Compteurs par catégorie */}
+      <CompteursClient
+        periodes={periodes}
+        periodeId={periodeSelectionnee.id}
+        compteurs={compteurs}
+        totalWE={totalWE}
+        isAdmin={isAdmin}
+        currentVetId={currentVetId}
+        bonusMalusHeritage={bonusMalusHeritage}
+      />
+
+      {/* Bilan bonus/malus — admin, périodes publiées ou verrouillées */}
+      {isAdmin && periodeSelectionnee.statut !== 'brouillon' && (
+        <BonusMalusCard
+          periodeId={periodeSelectionnee.id}
+          periodeStatut={periodeSelectionnee.statut}
+          existingBilan={bonusMalusCourant}
+          heritage={bonusMalusHeritage}
+          vetsInfo={vetsInfo}
+        />
+      )}
     </div>
   )
 }

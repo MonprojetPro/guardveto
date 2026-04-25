@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { ActionBar } from '@/components/planning/ActionBar'
+import { AlerteBandeau } from '@/components/planning/AlerteBandeau'
 import { MonthView } from '@/components/calendar/MonthView'
 import type { GardeDenormalisee, Periode } from '@/types'
 
@@ -76,6 +77,20 @@ export default async function PlanningPage({
     ? [...new Set((periodesAvecGardesDb.data ?? []).map((g: { periode_id: string }) => g.periode_id))]
     : []
 
+  // ── Rappel de publication (admin) ─────────────────────
+  // Si une période brouillon commence dans moins de 15 jours → bandeau orange
+  const rappelPublication = isAdmin
+    ? (() => {
+        const today = new Date()
+        const limite = new Date(today.getTime() + 15 * 24 * 60 * 60 * 1000)
+        return toutesLesPeriodes.find((p) => {
+          if (p.statut !== 'brouillon') return false
+          const debut = new Date(p.date_debut + 'T12:00:00')
+          return debut >= today && debut <= limite
+        }) ?? null
+      })()
+    : null
+
   return (
     <div className="space-y-6">
       <div>
@@ -84,6 +99,18 @@ export default async function PlanningPage({
           Vue mensuelle des gardes
         </p>
       </div>
+
+      {/* Rappel de publication — période brouillon < 15 jours */}
+      {rappelPublication && (
+        <AlerteBandeau
+          variante="warning"
+          titre="Rappel : publication à venir"
+          description={`La période ${rappelPublication.saison === 'ete' ? 'Été' : 'Hiver'}${rappelPublication.numero ? ` — Période ${rappelPublication.numero}` : ''} commence le ${new Date(rappelPublication.date_debut + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} et est encore en brouillon.`}
+          actions={[
+            { label: 'Voir les périodes', href: '/admin/periodes' },
+          ]}
+        />
+      )}
 
       {/* Barre d'actions — admin uniquement */}
       {isAdmin && (

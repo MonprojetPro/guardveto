@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import { Loader2, Wand2, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -233,6 +234,28 @@ export function GenerateurPlanning({ periodes }: GenerateurPlanningProps) {
                 )}
               </div>
             )}
+
+            {/* Suggestions d'assouplissement */}
+            <div className="border-t border-destructive/20 pt-3 space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">Suggestions pour débloquer l'impasse :</p>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/conges"
+                  className="text-xs text-destructive hover:text-destructive/80 underline underline-offset-2"
+                >
+                  Modifier les congés des vétérinaires →
+                </Link>
+                <Link
+                  href="/admin/veterinaires"
+                  className="text-xs text-destructive hover:text-destructive/80 underline underline-offset-2"
+                >
+                  Réviser les contraintes individuelles →
+                </Link>
+                <span className="text-xs text-muted-foreground">
+                  ou forcer manuellement via le calendrier
+                </span>
+              </div>
+            </div>
           </div>
         )}
       </CardContent>

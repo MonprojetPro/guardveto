@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import type { GardeDenormalisee } from '@/types'
 import type { VetDispo, DisponibilitesData } from '@/app/api/gardes/[id]/disponibilites/route'
+import { ViolationDialog } from './ViolationDialog'
 
 // ── Types ────────────────────────────────────────────────
 
@@ -224,6 +225,12 @@ export function GardeDetailModal({ garde, date, isAdmin, onClose, onSaved }: Gar
   const [secondSel, setSecondSel] = useState<string | null>(null)
   const [correctionMode, setCorrectionMode] = useState(false)
   const [showCorriger, setShowCorriger] = useState(false)
+  // Violation de règle à confirmer avant sauvegarde
+  const [violation, setViolation] = useState<{
+    type: 'dure' | 'souple'
+    message: string
+    vetPrenom: string
+  } | null>(null)
 
   const isOpen = date !== null
 
@@ -250,7 +257,56 @@ export function GardeDetailModal({ garde, date, isAdmin, onClose, onSaved }: Gar
     onClose()
   }
 
-  async function handleSave() {
+  /** Vérifie si un vet sélectionné viole une règle (comparé à l'attribution originale) */
+  function detecterViolation(): { type: 'dure' | 'souple'; message: string; vetPrenom: string } | null {
+    if (!data) return null
+
+    // Vérification premier de garde
+    if (premierSel && premierSel !== data.garde.premier_id) {
+      const vet = data.vets.find((v) => v.id === premierSel)
+      if (vet) {
+        if (!vet.dispo_premier.ok && vet.dispo_premier.raison) {
+          return {
+            type: 'dure',
+            message: vet.dispo_premier.raison.replace(/^R\d+ : /, ''),
+            vetPrenom: vet.prenom,
+          }
+        }
+        if (vet.dispo_premier.warning) {
+          return {
+            type: 'souple',
+            message: vet.dispo_premier.warning.replace(/^R\d+ : /, ''),
+            vetPrenom: vet.prenom,
+          }
+        }
+      }
+    }
+
+    // Vérification second de garde (si visible)
+    if (!masquerSecond && secondSel && secondSel !== data.garde.second_id) {
+      const vet = data.vets.find((v) => v.id === secondSel)
+      if (vet) {
+        if (!vet.dispo_second.ok && vet.dispo_second.raison) {
+          return {
+            type: 'dure',
+            message: vet.dispo_second.raison.replace(/^R\d+ : /, ''),
+            vetPrenom: vet.prenom,
+          }
+        }
+        if (vet.dispo_second.warning) {
+          return {
+            type: 'souple',
+            message: vet.dispo_second.warning.replace(/^R\d+ : /, ''),
+            vetPrenom: vet.prenom,
+          }
+        }
+      }
+    }
+
+    return null
+  }
+
+  async function performSave() {
     if (!garde) return
     setSaving(true)
     try {
@@ -270,6 +326,15 @@ export function GardeDetailModal({ garde, date, isAdmin, onClose, onSaved }: Gar
     } finally {
       setSaving(false)
     }
+  }
+
+  async function handleSave() {
+    const v = detecterViolation()
+    if (v) {
+      setViolation(v)
+      return
+    }
+    await performSave()
   }
 
   const masquerSecond = data?.garde.saison === 'ete' && data?.garde.type === 'semaine'
@@ -393,6 +458,21 @@ export function GardeDetailModal({ garde, date, isAdmin, onClose, onSaved }: Gar
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Violation de règle ──────────────────────────── */}
+      {violation && (
+        <ViolationDialog
+          open={!!violation}
+          type={violation.type}
+          message={violation.message}
+          vetPrenom={violation.vetPrenom}
+          onAccept={async () => {
+            setViolation(null)
+            await performSave()
+          }}
+          onAnnuler={() => setViolation(null)}
+        />
+      )}
 
       {/* ── Confirmation "Corriger" ──────────────────────── */}
       <Dialog open={showCorriger} onOpenChange={(open) => { if (!open) setShowCorriger(false) }}>
