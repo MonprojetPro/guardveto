@@ -3,11 +3,14 @@
 // ============================================================
 // Modification manuelle d'une garde (admin uniquement).
 // Marque la garde comme modifie_manuellement=true.
-// Si force=true : déverrouille la garde (verrouille=false).
+// Si force=true : déverrouille la garde, logue dans audit_log
+//                et recalcule les bonus/malus de la période.
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { queryCompteurs, queryTotalWE } from '@/hooks/useCompteurs'
+import { calculerBilans } from '@/engine/bilan'
 
 export async function PATCH(
   req: NextRequest,
@@ -22,7 +25,7 @@ export async function PATCH(
 
   const { data: vet } = await supabase
     .from('veterinaires')
-    .select('role_app')
+    .select('id, role_app')
     .eq('user_id', user.id)
     .single()
 
@@ -47,7 +50,7 @@ export async function PATCH(
   // ── Vérification de la garde ────────────────────────────
   const { data: garde } = await supabase
     .from('gardes')
-    .select('id, verrouille, periode_id')
+    .select('id, verrouille, periode_id, premier_id, second_id, modifie_manuellement')
     .eq('id', gardeId)
     .single()
 
@@ -82,6 +85,49 @@ export async function PATCH(
       { error: `Erreur lors de la mise à jour : ${error.message}` },
       { status: 500 }
     )
+  }
+
+  // ── Audit log (correction d'une garde verrouillée) ──────
+  if (force) {
+    await supabase.from('audit_log').insert({
+      table_name: 'gardes',
+      record_id: gardeId,
+      action: 'update',
+      old_data: {
+        premier_id: garde.premier_id,
+        second_id: garde.second_id,
+        verrouille: true,
+        modifie_manuellement: garde.modifie_manuellement,
+      },
+      new_data: {
+        premier_id,
+        second_id,
+        verrouille: false,
+        modifie_manuellement: true,
+      },
+      user_id: vet.id,
+    })
+
+    // ── Recalcul des bonus/malus de la période ───────────
+    const [compteurs, totalWE] = await Promise.all([
+      queryCompteurs(supabase, garde.periode_id),
+      queryTotalWE(supabase, garde.periode_id),
+    ])
+
+    if (compteurs.length > 0) {
+      const bilans = calculerBilans(compteurs, totalWE)
+      const rows = bilans.map((b) => ({
+        veterinaire_id: b.veterinaire_id,
+        periode_id: garde.periode_id,
+        ecart_we: b.ecart_we,
+        ecart_semaine: b.ecart_semaine,
+        ecart_feries: b.ecart_feries,
+        ecart_grands_we: b.ecart_grands_we,
+      }))
+      await supabase
+        .from('bonus_malus')
+        .upsert(rows, { onConflict: 'veterinaire_id,periode_id' })
+    }
   }
 
   return NextResponse.json({ success: true })

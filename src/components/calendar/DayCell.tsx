@@ -1,6 +1,6 @@
 'use client'
 
-import { Star } from 'lucide-react'
+import { Lock, Star } from 'lucide-react'
 import { GardeBadge } from './GardeBadge'
 import type { GardeDenormalisee } from '@/types'
 
@@ -55,7 +55,7 @@ export function DayCell({
 
   return (
     <div className={classFond} onClick={garde ? onClick : undefined} role={garde ? 'button' : undefined}>
-      {/* En-tête : numéro + icône férié */}
+      {/* En-tête : numéro + icônes */}
       <div className="flex items-center justify-between">
         <span
           className={[
@@ -66,12 +66,20 @@ export function DayCell({
         >
           {jour}
         </span>
-        {estFerie && (
-          <Star
-            className="w-3 h-3 text-amber-500 fill-amber-400 shrink-0"
-            aria-label="Jour férié"
-          />
-        )}
+        <div className="flex items-center gap-0.5">
+          {garde?.verrouille && (
+            <Lock
+              className="w-3 h-3 text-muted-foreground/50 shrink-0"
+              aria-label="Garde verrouillée"
+            />
+          )}
+          {estFerie && (
+            <Star
+              className="w-3 h-3 text-amber-500 fill-amber-400 shrink-0"
+              aria-label="Jour férié"
+            />
+          )}
+        </div>
       </div>
 
       {/* Badges gardes */}
