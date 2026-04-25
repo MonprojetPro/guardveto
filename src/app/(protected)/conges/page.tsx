@@ -1,29 +1,35 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { CalendarOff } from 'lucide-react'
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import { CongesList } from '@/components/conges/CongesList'
+import type { Conge, Veterinaire } from '@/types'
 
-export default function CongesPage() {
+export default async function CongesPage() {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: currentVeto } = await supabase
+    .from('veterinaires')
+    .select('id, role_app')
+    .eq('user_id', user.id)
+    .single()
+
+  if (!currentVeto || currentVeto.role_app === 'secretaire') redirect('/planning')
+
+  const [{ data: vets }, { data: conges }] = await Promise.all([
+    supabase.from('veterinaires').select('*').order('nom'),
+    supabase.from('conges').select('*').order('date_debut'),
+  ])
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-bold text-foreground">Congés</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Gestion des congés et indisponibilités
-        </p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-heading flex items-center gap-2 text-base">
-            <CalendarOff className="w-5 h-5 text-primary" />
-            Module congés — Sprint 2
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-sm">
-            La gestion des congés (STORY-004 à 006) sera disponible au Sprint 2.
-          </p>
-        </CardContent>
-      </Card>
+      <CongesList
+        conges={(conges as Conge[]) ?? []}
+        vets={(vets as Veterinaire[]) ?? []}
+        currentUserId={currentVeto.id}
+        isAdmin={currentVeto.role_app === 'admin'}
+      />
     </div>
   )
 }

@@ -1,0 +1,52 @@
+{
+  "description": "Été avec congés lourds — 4 semaines, 3 vétos absents les 2 dernières semaines",
+  "periode": {
+    "dateDebut": "2026-06-01",
+    "dateFin": "2026-06-28",
+    "saison": "ete"
+  },
+  "bonusMalus": {
+    "e-v1": 1,
+    "e-v2": -1
+  },
+  "vets": [
+    {
+      "id": "e-v1", "nom": "Azur", "prenom": "Ana",
+      "statut": "associe", "dernier_recours": false,
+      "contraintes": [], "conges": []
+    },
+    {
+      "id": "e-v2", "nom": "Bleu", "prenom": "Ben",
+      "statut": "associe", "dernier_recours": false,
+      "contraintes": [],
+      "conges": [{ "date_debut": "2026-06-15", "date_fin": "2026-06-28" }]
+    },
+    {
+      "id": "e-v3", "nom": "Ciel", "prenom": "Cara",
+      "statut": "salarie", "dernier_recours": false,
+      "contraintes": [],
+      "conges": [{ "date_debut": "2026-06-15", "date_fin": "2026-06-28" }]
+    },
+    {
+      "id": "e-v4", "nom": "Dune", "prenom": "Dan",
+      "statut": "salarie", "dernier_recours": false,
+      "contraintes": [],
+      "conges": [{ "date_debut": "2026-06-22", "date_fin": "2026-06-28" }]
+    },
+    {
+      "id": "e-v5", "nom": "Eden", "prenom": "Éva",
+      "statut": "associe", "dernier_recours": false,
+      "contraintes": [], "conges": []
+    },
+    {
+      "id": "e-v6", "nom": "Flux", "prenom": "Finn",
+      "statut": "salarie", "dernier_recours": false,
+      "contraintes": [], "conges": []
+    },
+    {
+      "id": "e-v7", "nom": "Gris", "prenom": "Gael",
+      "statut": "associe", "dernier_recours": true,
+      "contraintes": [], "conges": []
+    }
+  ]
+}

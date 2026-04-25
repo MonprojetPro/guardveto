@@ -1,0 +1,28 @@
+{
+  "description": "Impasse volontaire — seul 1 véto disponible pour le WE qui nécessite 2 gardes",
+  "periode": {
+    "dateDebut": "2026-09-07",
+    "dateFin": "2026-09-13",
+    "saison": "hiver"
+  },
+  "bonusMalus": {},
+  "vets": [
+    {
+      "id": "i-v1", "nom": "Libre", "prenom": "Leo",
+      "statut": "associe", "dernier_recours": false,
+      "contraintes": [], "conges": []
+    },
+    {
+      "id": "i-v2", "nom": "Absent", "prenom": "Ada",
+      "statut": "associe", "dernier_recours": false,
+      "contraintes": [],
+      "conges": [{ "date_debut": "2026-09-11", "date_fin": "2026-09-13" }]
+    },
+    {
+      "id": "i-v3", "nom": "Conge", "prenom": "Carl",
+      "statut": "salarie", "dernier_recours": false,
+      "contraintes": [],
+      "conges": [{ "date_debut": "2026-09-11", "date_fin": "2026-09-13" }]
+    }
+  ]
+}

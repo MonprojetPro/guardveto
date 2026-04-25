@@ -1,0 +1,46 @@
+{
+  "description": "Hiver standard — 4 semaines, 7 vétos sans contraintes majeures, pas de congés",
+  "periode": {
+    "dateDebut": "2026-09-07",
+    "dateFin": "2026-10-04",
+    "saison": "hiver"
+  },
+  "bonusMalus": {},
+  "vets": [
+    {
+      "id": "h-v1", "nom": "Martin", "prenom": "Alice",
+      "statut": "associe", "dernier_recours": false,
+      "contraintes": [], "conges": []
+    },
+    {
+      "id": "h-v2", "nom": "Durand", "prenom": "Bruno",
+      "statut": "associe", "dernier_recours": false,
+      "contraintes": [], "conges": []
+    },
+    {
+      "id": "h-v3", "nom": "Petit", "prenom": "Claire",
+      "statut": "associe", "dernier_recours": false,
+      "contraintes": [], "conges": []
+    },
+    {
+      "id": "h-v4", "nom": "Grand", "prenom": "David",
+      "statut": "associe", "dernier_recours": false,
+      "contraintes": [], "conges": []
+    },
+    {
+      "id": "h-v5", "nom": "Leroy", "prenom": "Emma",
+      "statut": "salarie", "dernier_recours": false,
+      "contraintes": [], "conges": []
+    },
+    {
+      "id": "h-v6", "nom": "Moreau", "prenom": "Félix",
+      "statut": "salarie", "dernier_recours": false,
+      "contraintes": [], "conges": []
+    },
+    {
+      "id": "h-v7", "nom": "Simon", "prenom": "Gina",
+      "statut": "associe", "dernier_recours": true,
+      "contraintes": [], "conges": []
+    }
+  ]
+}

@@ -26,15 +26,24 @@ export default async function ProtectedLayout({
     .single()
 
   if (!veterinaire) {
-    // Compte auth sans profil vétérinaire lié
     await supabase.auth.signOut()
     redirect('/login')
+  }
+
+  // Compteur souhaits en attente (admin uniquement)
+  let nbSouhaits = 0
+  if (veterinaire.role_app === 'admin') {
+    const { count } = await supabase
+      .from('conges')
+      .select('*', { count: 'exact', head: true })
+      .eq('statut', 'souhait')
+    nbSouhaits = count ?? 0
   }
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       {/* Sidebar desktop */}
-      <Sidebar veterinaire={veterinaire as Veterinaire} />
+      <Sidebar veterinaire={veterinaire as Veterinaire} nbSouhaits={nbSouhaits} />
 
       {/* Zone principale */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">

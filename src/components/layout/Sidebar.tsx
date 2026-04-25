@@ -22,9 +22,10 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
 
 interface SidebarProps {
   veterinaire: Veterinaire
+  nbSouhaits?: number
 }
 
-export function Sidebar({ veterinaire }: SidebarProps) {
+export function Sidebar({ veterinaire, nbSouhaits = 0 }: SidebarProps) {
   const pathname = usePathname()
 
   const visibleItems = NAV_ITEMS.filter(item =>
@@ -43,6 +44,7 @@ export function Sidebar({ veterinaire }: SidebarProps) {
         {visibleItems.map(item => {
           const Icon = ICONS[item.icon]
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+          const showBadge = item.href === '/conges' && nbSouhaits > 0
           return (
             <Link
               key={item.href}
@@ -55,7 +57,12 @@ export function Sidebar({ veterinaire }: SidebarProps) {
               )}
             >
               {Icon && <Icon className="w-4 h-4 shrink-0" />}
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {showBadge && (
+                <span className="ml-auto min-w-[1.25rem] h-5 px-1 rounded-full bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center">
+                  {nbSouhaits > 9 ? '9+' : nbSouhaits}
+                </span>
+              )}
             </Link>
           )
         })}

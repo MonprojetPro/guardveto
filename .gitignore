@@ -17,6 +17,9 @@ mcp.json
 # testing
 /coverage
 
+# Playwright MCP (outil local, pas de code source)
+.playwright-mcp/
+
 # next.js
 /.next/
 /out/
