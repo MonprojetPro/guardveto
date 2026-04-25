@@ -1,15 +1,80 @@
 import { createClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Calendar } from 'lucide-react'
+import { redirect } from 'next/navigation'
+import { ActionBar } from '@/components/planning/ActionBar'
+import { MonthView } from '@/components/calendar/MonthView'
+import type { GardeDenormalisee, Periode } from '@/types'
 
-export default async function PlanningPage() {
+// ── Helpers ──────────────────────────────────────────────
+
+function moisCourantISO(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function debutFinMois(anneeMois: string): { debut: string; fin: string } {
+  const [annee, mois] = anneeMois.split('-').map(Number)
+  const debut = `${annee}-${String(mois).padStart(2, '0')}-01`
+  // Dernier jour du mois
+  const dernierJour = new Date(Date.UTC(annee, mois, 0)).getUTCDate()
+  const fin = `${annee}-${String(mois).padStart(2, '0')}-${String(dernierJour).padStart(2, '0')}`
+  return { debut, fin }
+}
+
+// ── Page ─────────────────────────────────────────────────
+
+export default async function PlanningPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mois?: string }>
+}) {
   const supabase = await createClient()
 
-  const { data: periodes } = await supabase
-    .from('periodes')
-    .select('*')
-    .order('date_debut', { ascending: false })
-    .limit(5)
+  // Authentification
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: currentVeto } = await supabase
+    .from('veterinaires')
+    .select('role_app')
+    .eq('user_id', user.id)
+    .single()
+
+  const isAdmin = currentVeto?.role_app === 'admin'
+
+  // Mois à afficher (searchParam ou mois courant)
+  const { mois: moisParam } = await searchParams
+  const anneeMois = moisParam && /^\d{4}-\d{2}$/.test(moisParam)
+    ? moisParam
+    : moisCourantISO()
+
+  const { debut, fin } = debutFinMois(anneeMois)
+
+  // Chargement parallèle : gardes du mois + toutes les périodes + périodes avec gardes (admin)
+  const [{ data: gardesDb }, { data: periodesDb }, periodesAvecGardesDb] = await Promise.all([
+    supabase
+      .from('planning_semaine')
+      .select('*')
+      .gte('date', debut)
+      .lte('date', fin)
+      .order('date'),
+    supabase
+      .from('periodes')
+      .select('*')
+      .order('date_debut', { ascending: false })
+      .limit(20),
+    // Pour l'admin : quelles périodes ont déjà des gardes générées
+    isAdmin
+      ? supabase.from('gardes').select('periode_id').limit(500)
+      : Promise.resolve({ data: null }),
+  ])
+
+  // Périodes disponibles pour ActionBar (toutes, admin uniquement)
+  const toutesLesPeriodes = isAdmin ? ((periodesDb as Periode[]) ?? []) : []
+
+  // Liste dédupliquée des periode_ids qui ont au moins une garde
+  const periodesAvecGardes = isAdmin
+    ? [...new Set((periodesAvecGardesDb.data ?? []).map((g: { periode_id: string }) => g.periode_id))]
+    : []
 
   return (
     <div className="space-y-6">
@@ -20,36 +85,20 @@ export default async function PlanningPage() {
         </p>
       </div>
 
-      {/* Placeholder — STORY-011 implémentera la vraie vue calendrier */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-heading flex items-center gap-2 text-base">
-            <Calendar className="w-5 h-5 text-primary" />
-            Planning en cours de construction
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-sm">
-            La vue mensuelle du planning sera disponible après les Sprints 3 et 4.
-          </p>
-          {periodes && periodes.length > 0 && (
-            <div className="mt-4 space-y-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Périodes créées
-              </p>
-              {periodes.map(p => (
-                <div key={p.id} className="flex items-center gap-2 text-sm">
-                  <span className="capitalize">{p.saison}</span>
-                  <span className="text-muted-foreground">
-                    {new Date(p.date_debut).toLocaleDateString('fr-FR')} →{' '}
-                    {new Date(p.date_fin).toLocaleDateString('fr-FR')}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Barre d'actions — admin uniquement */}
+      {isAdmin && (
+        <ActionBar
+          periodes={toutesLesPeriodes}
+          periodesAvecGardes={periodesAvecGardes}
+        />
+      )}
+
+      {/* Calendrier mensuel */}
+      <MonthView
+        gardes={(gardesDb as GardeDenormalisee[]) ?? []}
+        periodes={(periodesDb as Periode[]) ?? []}
+        anneeMois={anneeMois}
+      />
     </div>
   )
 }
