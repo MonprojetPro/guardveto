@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { queryCompteurs, queryTotalWE } from '@/hooks/useCompteurs'
 import { calculerBilans } from '@/engine/bilan'
+import { syncGardeIndividuelle } from '@/lib/sync-calendrier'
 
 export async function PATCH(
   req: NextRequest,
@@ -129,6 +130,12 @@ export async function PATCH(
         .upsert(rows, { onConflict: 'veterinaire_id,periode_id' })
     }
   }
+
+  // ── Synchronisation Google Agenda (best-effort) ─────────
+  // Ne bloque pas la réponse en cas d'erreur Google
+  syncGardeIndividuelle(supabase, gardeId).catch(() => {
+    // Échec silencieux — la modification garde est enregistrée
+  })
 
   return NextResponse.json({ success: true })
 }

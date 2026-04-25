@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { syncCalendrier } from '@/lib/sync-calendrier'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -104,5 +105,16 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  return NextResponse.json({ success: true })
+  // ── Synchronisation Google Agenda ───────────────────────
+  // Exécutée en best-effort : si la synchro échoue, le planning
+  // reste publié et l'admin reçoit les détails dans la réponse.
+  let calendarSync: { synced: number; errors: string[]; skipped: boolean } | null = null
+  try {
+    calendarSync = await syncCalendrier(supabase, periodeId)
+  } catch (syncErr) {
+    const msg = syncErr instanceof Error ? syncErr.message : String(syncErr)
+    calendarSync = { synced: 0, errors: [msg], skipped: false }
+  }
+
+  return NextResponse.json({ success: true, calendarSync })
 }
