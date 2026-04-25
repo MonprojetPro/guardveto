@@ -157,7 +157,12 @@ function checkR3ReposConditionnel(
     const siGardeWe = cfg.si_garde_we as string | undefined
     const sinon = cfg.sinon as string | undefined
 
-    const gardeWe = aGardeWeekendCetteSemaine(vet.id, slot.date, planning)
+    // vendredi_soir EST une garde WE par définition (R9 lie ven soir + sam).
+    // Si on évalue vendredi_soir, le samedi n'est pas encore planifié →
+    // on considère gardeWe = true pour éviter de bloquer à tort.
+    const gardeWe = slot.type === 'vendredi_soir'
+      ? true
+      : aGardeWeekendCetteSemaine(vet.id, slot.date, planning)
 
     if (gardeWe && siGardeWe === jour) {
       return invalid(`R3/R5 : ${vet.prenom} est en repos le ${jour} (garde WE cette semaine)`)
