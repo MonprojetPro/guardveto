@@ -43,8 +43,12 @@ COMMENT ON VIEW compteurs_gardes IS 'Compteurs de gardes par vétérinaire et pa
 -- ============================================================
 -- VUE : planning_semaine
 -- Vue hebdomadaire dénormalisée (utile pour l'affichage)
+-- Les gardes de week-end (samedi) génèrent aussi une ligne
+-- pour le vendredi (veille) et le dimanche (lendemain) afin
+-- que le calendrier affiche les badges sur les 3 jours.
 -- ============================================================
 CREATE OR REPLACE VIEW planning_semaine AS
+-- Ligne native (date réelle de la garde)
 SELECT
   g.id,
   g.periode_id,
@@ -52,23 +56,73 @@ SELECT
   g.type,
   g.verrouille,
   g.modifie_manuellement,
-  -- 1er de garde
   vp.id      AS premier_id,
   vp.prenom  AS premier_prenom,
   vp.nom     AS premier_nom,
   vp.couleur AS premier_couleur,
-  -- 2nd de garde
   vs.id      AS second_id,
   vs.prenom  AS second_prenom,
   vs.nom     AS second_nom,
   vs.couleur AS second_couleur,
-  -- Infos période
   p.saison,
   p.statut   AS periode_statut
 FROM gardes g
 JOIN periodes p ON p.id = g.periode_id
 LEFT JOIN veterinaires vp ON vp.id = g.premier_id
 LEFT JOIN veterinaires vs ON vs.id = g.second_id
-ORDER BY g.date;
 
-COMMENT ON VIEW planning_semaine IS 'Planning dénormalisé pour affichage calendrier — noms + couleurs des vétos inclus';
+UNION ALL
+
+-- Vendredi : veille du samedi de garde de week-end
+SELECT
+  g.id,
+  g.periode_id,
+  (g.date - INTERVAL '1 day')::date AS date,
+  g.type,
+  g.verrouille,
+  g.modifie_manuellement,
+  vp.id      AS premier_id,
+  vp.prenom  AS premier_prenom,
+  vp.nom     AS premier_nom,
+  vp.couleur AS premier_couleur,
+  vs.id      AS second_id,
+  vs.prenom  AS second_prenom,
+  vs.nom     AS second_nom,
+  vs.couleur AS second_couleur,
+  p.saison,
+  p.statut   AS periode_statut
+FROM gardes g
+JOIN periodes p ON p.id = g.periode_id
+LEFT JOIN veterinaires vp ON vp.id = g.premier_id
+LEFT JOIN veterinaires vs ON vs.id = g.second_id
+WHERE g.type = 'weekend'
+
+UNION ALL
+
+-- Dimanche : lendemain du samedi de garde de week-end
+SELECT
+  g.id,
+  g.periode_id,
+  (g.date + INTERVAL '1 day')::date AS date,
+  g.type,
+  g.verrouille,
+  g.modifie_manuellement,
+  vp.id      AS premier_id,
+  vp.prenom  AS premier_prenom,
+  vp.nom     AS premier_nom,
+  vp.couleur AS premier_couleur,
+  vs.id      AS second_id,
+  vs.prenom  AS second_prenom,
+  vs.nom     AS second_nom,
+  vs.couleur AS second_couleur,
+  p.saison,
+  p.statut   AS periode_statut
+FROM gardes g
+JOIN periodes p ON p.id = g.periode_id
+LEFT JOIN veterinaires vp ON vp.id = g.premier_id
+LEFT JOIN veterinaires vs ON vs.id = g.second_id
+WHERE g.type = 'weekend'
+
+ORDER BY date;
+
+COMMENT ON VIEW planning_semaine IS 'Planning dénormalisé pour affichage calendrier — noms + couleurs des vétos inclus. Les week-ends génèrent 3 lignes (ven/sam/dim).';

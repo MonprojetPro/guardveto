@@ -131,7 +131,12 @@ export function ActionBar({ periodes, periodesAvecGardes }: ActionBarProps) {
         {/* Sélecteur de période */}
         <Select value={periodeId} onValueChange={(v) => { if (v) { setPeriodeId(v); setImpasse(null) } }}>
           <SelectTrigger className="w-[300px]">
-            <SelectValue placeholder="Choisir une période…" />
+            <span className="flex-1 text-left truncate text-sm">
+              {periodeId && periodes.find((p) => p.id === periodeId)
+                ? labelPeriode(periodes.find((p) => p.id === periodeId)!)
+                : <span className="text-muted-foreground">Choisir une période…</span>
+              }
+            </span>
           </SelectTrigger>
           <SelectContent>
             {periodes.map((p) => (
