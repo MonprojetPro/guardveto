@@ -185,7 +185,7 @@ export function ActionBar({ periodes, periodesAvecGardes }: ActionBarProps) {
           <Button
             variant="outline"
             disabled={!aDesGardes}
-            onClick={() => window.open(`/export-pdf?periodeId=${periodeId}`, '_blank')}
+            onClick={() => { window.location.href = `/api/export-pdf?periodeId=${periodeId}` }}
           >
             <FileText className="w-4 h-4 mr-2" />
             Exporter PDF

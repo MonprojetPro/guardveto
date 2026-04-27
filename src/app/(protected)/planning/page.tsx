@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { ActionBar } from '@/components/planning/ActionBar'
 import { AlerteBandeau } from '@/components/planning/AlerteBandeau'
 import { MonthView } from '@/components/calendar/MonthView'
+import { ExportPdfButton } from '@/components/planning/ExportPdfButton'
 import type { GardeDenormalisee, Periode } from '@/types'
 
 // ── Helpers ──────────────────────────────────────────────
@@ -41,6 +42,7 @@ export default async function PlanningPage({
     .single()
 
   const isAdmin = currentVeto?.role_app === 'admin'
+  const isSecretaire = currentVeto?.role_app === 'secretaire'
 
   // Mois à afficher (searchParam ou mois courant)
   const { mois: moisParam } = await searchParams
@@ -68,6 +70,11 @@ export default async function PlanningPage({
       ? supabase.from('gardes').select('periode_id').limit(500)
       : Promise.resolve({ data: null }),
   ])
+
+  // Période active du mois affiché (pour le bouton export secrétaire)
+  const periodesMois = (periodesDb as Periode[] ?? []).filter((p) => {
+    return p.date_debut <= fin && p.date_fin >= debut
+  })
 
   // Périodes disponibles pour ActionBar (toutes, admin uniquement)
   const toutesLesPeriodes = isAdmin ? ((periodesDb as Periode[]) ?? []) : []
@@ -118,6 +125,11 @@ export default async function PlanningPage({
           periodes={toutesLesPeriodes}
           periodesAvecGardes={periodesAvecGardes}
         />
+      )}
+
+      {/* Bouton export PDF — secrétaire */}
+      {isSecretaire && periodesMois.length > 0 && (
+        <ExportPdfButton periodeId={periodesMois[0].id} />
       )}
 
       {/* Calendrier mensuel */}
