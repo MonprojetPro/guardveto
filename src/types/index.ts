@@ -120,9 +120,8 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { label: 'Planning',   href: '/planning',           icon: 'Calendar',      roles: ['admin', 'veto', 'secretaire'] },
-  { label: 'Congés',     href: '/conges',             icon: 'CalendarOff',   roles: ['admin', 'veto'] },
-  { label: 'Compteurs',  href: '/compteurs',          icon: 'BarChart3',     roles: ['admin', 'veto'] },
-  { label: 'Admin',      href: '/admin/veterinaires', icon: 'Settings',      roles: ['admin'] },
-  { label: 'Export PDF', href: '/export-pdf',         icon: 'FileText',      roles: ['admin', 'secretaire'] },
+  { label: 'Planning',  href: '/planning',           icon: 'Calendar',    roles: ['admin', 'veto', 'secretaire'] },
+  { label: 'Congés',   href: '/conges',             icon: 'CalendarOff', roles: ['admin', 'veto'] },
+  { label: 'Compteurs', href: '/compteurs',          icon: 'BarChart3',   roles: ['admin', 'veto'] },
+  { label: 'Admin',    href: '/admin/veterinaires', icon: 'Settings',    roles: ['admin'] },
 ]

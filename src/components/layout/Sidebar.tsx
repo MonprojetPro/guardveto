@@ -8,7 +8,6 @@ import {
   CalendarOff,
   BarChart3,
   Settings,
-  FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -17,7 +16,6 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   CalendarOff,
   BarChart3,
   Settings,
-  FileText,
 }
 
 interface SidebarProps {
