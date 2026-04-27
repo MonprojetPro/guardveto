@@ -2,14 +2,10 @@
 // GUARDVETO — Génération PDF planning des gardes
 // ============================================================
 // STORY-020 — Export PDF A4 paysage via @react-pdf/renderer.
-//
-// Fonction exportée :
-//   genererPdfPlanning(data) → Buffer
 // ============================================================
 
 import {
   Document,
-  Font,
   Page,
   StyleSheet,
   Text,
@@ -20,8 +16,8 @@ import {
 // ── Types ─────────────────────────────────────────────────────
 export interface GardePdf {
   id: string
-  date: string          // "YYYY-MM-DD"
-  type: string          // semaine | weekend | ferie
+  date: string
+  type: string
   premier_prenom: string | null
   premier_nom: string | null
   premier_couleur: string | null
@@ -49,18 +45,16 @@ export interface PlanningPdfData {
   periode: PeriodePdf
   gardes: GardePdf[]
   vets: VetoPdf[]
-  jours_feries: string[]   // ["YYYY-MM-DD", ...]
+  jours_feries: Array<{ date: string; nom: string }>
 }
 
-// ── Helpers ───────────────────────────────────────────────────
-
+// ── Constantes ────────────────────────────────────────────────
 const MOIS_NOMS = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
   'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
 ]
 
-const JOURS_COURTS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
-
+// ── Helpers ───────────────────────────────────────────────────
 function formatDateCourt(dateISO: string): string {
   const d = new Date(dateISO + 'T12:00:00Z')
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
@@ -78,70 +72,70 @@ function estWeekend(dateISO: string): boolean {
   return j === 0 || j === 6
 }
 
-/** Retourne les mois (YYYY-MM) couverts par la période */
+function estVendredi(dateISO: string): boolean {
+  return new Date(dateISO + 'T12:00:00Z').getUTCDay() === 5
+}
+
 function moisDePeriode(debut: string, fin: string): Array<{ annee: number; mois: number }> {
   const mois: Array<{ annee: number; mois: number }> = []
   const d = new Date(debut + 'T12:00:00Z')
   const f = new Date(fin + 'T12:00:00Z')
   while (d <= f) {
     const m = { annee: d.getUTCFullYear(), mois: d.getUTCMonth() + 1 }
-    if (!mois.find((x) => x.annee === m.annee && x.mois === m.mois)) {
-      mois.push(m)
-    }
+    if (!mois.find((x) => x.annee === m.annee && x.mois === m.mois)) mois.push(m)
     d.setUTCDate(d.getUTCDate() + 1)
   }
   return mois
 }
 
-/** Génère la grille de cellules pour un mois donné */
+/** Génère la grille de cellules : 7 cases par semaine, null = padding */
 function grilleCalendrier(annee: number, mois: number): Array<string | null> {
   const premier = new Date(Date.UTC(annee, mois - 1, 1))
   const nbJours = new Date(Date.UTC(annee, mois, 0)).getUTCDate()
-  const offset = (premier.getUTCDay() + 6) % 7 // 0=Lun
-
+  const offset = (premier.getUTCDay() + 6) % 7
   const cellules: Array<string | null> = Array(offset).fill(null)
   for (let d = 1; d <= nbJours; d++) {
-    cellules.push(
-      `${annee}-${String(mois).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-    )
+    cellules.push(`${annee}-${String(mois).padStart(2, '0')}-${String(d).padStart(2, '0')}`)
   }
   while (cellules.length % 7 !== 0) cellules.push(null)
   return cellules
 }
 
-// ── Styles ────────────────────────────────────────────────────
+/** Ajoute N jours à une date ISO */
+function addJours(dateISO: string, n: number): string {
+  const d = new Date(dateISO + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
 
+// ── Styles ────────────────────────────────────────────────────
 const S = StyleSheet.create({
   page: {
     fontFamily: 'Helvetica',
     fontSize: 8,
-    padding: 24,
+    padding: '20 24 28 24',
     backgroundColor: '#ffffff',
   },
+
   // En-tête
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    marginBottom: 10,
+    marginBottom: 8,
     paddingBottom: 6,
     borderBottomWidth: 1.5,
     borderBottomColor: '#1d4ed8',
   },
-  headerLeft: { flexDirection: 'column', gap: 2 },
-  headerTitle: {
-    fontSize: 13,
-    fontFamily: 'Helvetica-Bold',
-    color: '#1d4ed8',
-  },
-  headerSubtitle: { fontSize: 8, color: '#6b7280' },
+  headerTitle: { fontSize: 13, fontFamily: 'Helvetica-Bold', color: '#1d4ed8' },
+  headerSubtitle: { fontSize: 8, color: '#6b7280', marginTop: 2 },
   headerRight: { flexDirection: 'column', alignItems: 'flex-end', gap: 2 },
   headerPeriode: { fontSize: 8, color: '#374151' },
   headerPublie: { fontSize: 7, color: '#9ca3af' },
 
   // En-têtes colonnes
+  row: { flexDirection: 'row' },
   jourHeader: {
-    flex: 1,
     textAlign: 'center',
     fontSize: 7,
     fontFamily: 'Helvetica-Bold',
@@ -152,147 +146,200 @@ const S = StyleSheet.create({
     borderColor: '#e5e7eb',
   },
   jourHeaderWE: {
-    flex: 1,
     textAlign: 'center',
     fontSize: 7,
     fontFamily: 'Helvetica-Bold',
     color: '#1d4ed8',
     paddingVertical: 3,
-    backgroundColor: '#eff6ff',
+    backgroundColor: '#dbeafe',
     borderWidth: 0.5,
-    borderColor: '#e5e7eb',
+    borderColor: '#93c5fd',
   },
 
-  // Grille
-  row: { flexDirection: 'row' },
+  // Cellules semaine
   cell: {
-    flex: 1,
-    minHeight: 56,
+    minHeight: 52,
     borderWidth: 0.5,
     borderColor: '#e5e7eb',
     padding: 3,
     backgroundColor: '#ffffff',
   },
-  cellWE: {
-    flex: 1,
-    minHeight: 56,
-    borderWidth: 0.5,
-    borderColor: '#e5e7eb',
-    padding: 3,
-    backgroundColor: '#f8faff',
-  },
   cellFerie: {
-    flex: 1,
-    minHeight: 56,
+    minHeight: 52,
     borderWidth: 0.5,
-    borderColor: '#e5e7eb',
+    borderColor: '#fcd34d',
     padding: 3,
     backgroundColor: '#fef9c3',
   },
   cellEmpty: {
-    flex: 1,
-    minHeight: 56,
+    minHeight: 52,
     borderWidth: 0,
-    padding: 3,
-    backgroundColor: '#fafafa',
-  },
-  cellNumero: {
-    fontSize: 7,
-    color: '#9ca3af',
-    marginBottom: 2,
-  },
-  cellNumeroFerie: {
-    fontSize: 7,
-    color: '#92400e',
-    marginBottom: 2,
-  },
-  vetNom: {
-    fontSize: 7.5,
-    color: '#374151',
-    lineHeight: 1.3,
-  },
-  vetNomBold: {
-    fontSize: 7.5,
-    fontFamily: 'Helvetica-Bold',
-    color: '#111827',
-    lineHeight: 1.3,
-  },
-  rolesLabel: {
-    fontSize: 6,
-    color: '#9ca3af',
-    marginTop: 1,
-  },
-  ferieLabel: {
-    fontSize: 6,
-    color: '#92400e',
-    fontFamily: 'Helvetica-Bold',
-    marginBottom: 2,
+    backgroundColor: '#f9fafb',
   },
 
+  // Bloc WEEK-END (Ven/Sam/Dim)
+  weBlock: {
+    flex: 3,
+    flexDirection: 'column',
+    borderWidth: 1.5,
+    borderColor: '#2563eb',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  weBlockHeader: {
+    backgroundColor: '#1d4ed8',
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  weBlockHeaderLabel: {
+    fontSize: 6,
+    fontFamily: 'Helvetica-Bold',
+    color: '#ffffff',
+    letterSpacing: 0.5,
+  },
+  weBlockGardeNom: {
+    fontSize: 6.5,
+    color: '#bfdbfe',
+  },
+  weRow: {
+    flexDirection: 'row',
+    flex: 1,
+  },
+  weCellVen: {
+    flex: 1,
+    minHeight: 42,
+    borderRightWidth: 0.5,
+    borderRightColor: '#93c5fd',
+    padding: 3,
+    backgroundColor: '#eff6ff',
+  },
+  weCellSam: {
+    flex: 1,
+    minHeight: 42,
+    borderRightWidth: 0.5,
+    borderRightColor: '#93c5fd',
+    padding: 3,
+    backgroundColor: '#eff6ff',
+  },
+  weCellDim: {
+    flex: 1,
+    minHeight: 42,
+    padding: 3,
+    backgroundColor: '#eff6ff',
+  },
+  weCellFerie: {
+    flex: 1,
+    minHeight: 42,
+    borderRightWidth: 0.5,
+    borderRightColor: '#fcd34d',
+    padding: 3,
+    backgroundColor: '#fef9c3',
+  },
+  weCellFerieLast: {
+    flex: 1,
+    minHeight: 42,
+    padding: 3,
+    backgroundColor: '#fef9c3',
+  },
+
+  // Contenu cellule
+  cellNumero: { fontSize: 7, color: '#9ca3af', marginBottom: 2 },
+  cellNumeroFerie: { fontSize: 7, color: '#b45309', marginBottom: 1, fontFamily: 'Helvetica-Bold' },
+  ferieName: { fontSize: 6, color: '#92400e', marginBottom: 2 },
+
+  // Ligne vétérinaire (point couleur + nom)
+  vetRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 1.5 },
+  vetDot: { width: 5, height: 5, borderRadius: 2.5, marginRight: 3 },
+  vetNom: { fontSize: 7.5, color: '#1f2937', flex: 1 },
+  vetNomGras: { fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: '#111827', flex: 1 },
+
   // Légende
-  legendeSection: {
-    marginTop: 10,
-    paddingTop: 6,
+  legendSection: {
+    marginTop: 8,
+    paddingTop: 5,
     borderTopWidth: 0.5,
     borderTopColor: '#e5e7eb',
-    flexDirection: 'column',
-    gap: 4,
   },
-  legendeTitre: {
-    fontSize: 7,
+  legendTitre: {
+    fontSize: 6.5,
     fontFamily: 'Helvetica-Bold',
     color: '#6b7280',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 3,
+    marginBottom: 4,
   },
-  legendeItems: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  legendeItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    marginRight: 8,
-  },
-  legendePoint: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  legendeNom: {
-    fontSize: 7,
-    color: '#374151',
-  },
-  legendeNote: {
-    fontSize: 6.5,
-    color: '#6b7280',
-    marginTop: 4,
-  },
+  legendItems: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', marginRight: 10 },
+  legendDot: { width: 7, height: 7, borderRadius: 3.5, marginRight: 3 },
+  legendNom: { fontSize: 7, color: '#374151' },
+  legendNote: { fontSize: 6, color: '#9ca3af', marginTop: 4 },
 
   // Pied de page
   footer: {
     position: 'absolute',
-    bottom: 16,
+    bottom: 12,
     left: 24,
     right: 24,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  footerText: { fontSize: 6.5, color: '#9ca3af' },
+  footerText: { fontSize: 6, color: '#9ca3af' },
 })
 
-// ── Composant page du calendrier ─────────────────────────────
+// ── Sous-composant : contenu d'une cellule (semaine) ─────────
+function CellContent({
+  date,
+  garde,
+  ferieNom,
+  style,
+  numStyle,
+}: {
+  date: string | null
+  garde: GardePdf | null
+  ferieNom?: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  style: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  numStyle: any
+}) {
+  if (!date) return <View style={S.cellEmpty} />
 
+  const jourNum = parseInt(date.split('-')[2])
+
+  return (
+    <View style={style}>
+      <Text style={numStyle}>{jourNum}</Text>
+      {ferieNom && <Text style={S.ferieName}>{ferieNom}</Text>}
+      {garde?.premier_prenom && (
+        <View style={S.vetRow}>
+          <View style={[S.vetDot, { backgroundColor: garde.premier_couleur ?? '#6b7280' }]} />
+          <Text style={S.vetNomGras}>
+            {garde.premier_prenom} {garde.premier_nom?.charAt(0)}.
+          </Text>
+        </View>
+      )}
+      {garde?.second_prenom && (
+        <View style={S.vetRow}>
+          <View style={[S.vetDot, { backgroundColor: garde.second_couleur ?? '#6b7280' }]} />
+          <Text style={S.vetNom}>
+            {garde.second_prenom} {garde.second_nom?.charAt(0)}.
+          </Text>
+        </View>
+      )}
+    </View>
+  )
+}
+
+// ── Page calendrier ───────────────────────────────────────────
 interface PageCalendrierProps {
   annee: number
   mois: number
   periode: PeriodePdf
   gardes: GardePdf[]
   vets: VetoPdf[]
-  jours_feries: string[]
+  jours_feries: Array<{ date: string; nom: string }>
   pageIndex: number
   totalPages: number
 }
@@ -315,18 +362,24 @@ function PageCalendrier({
   const gardesParDate = new Map<string, GardePdf>()
   for (const g of gardes) gardesParDate.set(g.date, g)
 
-  const periodesFerriesSet = new Set(jours_feries)
+  const feriesMap = new Map<string, string>()
+  for (const f of jours_feries) feriesMap.set(f.date, f.nom)
+
   const cellules = grilleCalendrier(annee, mois)
+  // Découper en semaines de 7
   const semaines: Array<Array<string | null>> = []
-  for (let i = 0; i < cellules.length; i += 7) {
-    semaines.push(cellules.slice(i, i + 7))
-  }
+  for (let i = 0; i < cellules.length; i += 7) semaines.push(cellules.slice(i, i + 7))
+
+  // En-têtes : 4 colonnes semaine + 3 colonnes WE
+  // flex sur les 4 premières = 1 each, WE block = flex:3 (même largeur totale)
+  const JOURS_SEMAINE = ['Lun', 'Mar', 'Mer', 'Jeu']
+  const JOURS_WE = ['Ven', 'Sam', 'Dim']
 
   return (
     <Page size="A4" orientation="landscape" style={S.page}>
       {/* En-tête */}
       <View style={S.header}>
-        <View style={S.headerLeft}>
+        <View>
           <Text style={S.headerTitle}>GuardVeto — Planning des gardes</Text>
           <Text style={S.headerSubtitle}>{titre}</Text>
         </View>
@@ -342,73 +395,158 @@ function PageCalendrier({
 
       {/* En-têtes colonnes */}
       <View style={S.row}>
-        {JOURS_COURTS.map((j, i) => (
-          <Text key={i} style={i >= 5 ? S.jourHeaderWE : S.jourHeader}>{j}</Text>
+        {JOURS_SEMAINE.map((j) => (
+          <Text key={j} style={[S.jourHeader, { flex: 1 }]}>{j}</Text>
         ))}
+        {/* Bloc WE header : même largeur que flex:3 */}
+        <View style={{ flex: 3, flexDirection: 'row' }}>
+          {JOURS_WE.map((j) => (
+            <Text key={j} style={[S.jourHeaderWE, { flex: 1 }]}>{j}</Text>
+          ))}
+        </View>
       </View>
 
       {/* Semaines */}
-      {semaines.map((semaine, si) => (
-        <View key={si} style={S.row}>
-          {semaine.map((date, di) => {
-            if (!date) return <View key={di} style={S.cellEmpty} />
-            const garde = gardesParDate.get(date) ?? null
-            const we = estWeekend(date)
-            const ferie = periodesFerriesSet.has(date)
-            const cellStyle = ferie ? S.cellFerie : we ? S.cellWE : S.cell
-            const jourNum = parseInt(date.split('-')[2])
+      {semaines.map((semaine, si) => {
+        // Cellules Lun → Jeu (index 0-3)
+        const joursSemaine = semaine.slice(0, 4)
+        // Cellules Ven/Sam/Dim (index 4-6)
+        const [ven, sam, dim] = semaine.slice(4, 7)
 
-            return (
-              <View key={di} style={cellStyle}>
-                <Text style={ferie ? S.cellNumeroFerie : S.cellNumero}>
-                  {jourNum}{ferie ? ' ★' : ''}
-                </Text>
-                {garde?.premier_prenom && (
-                  <Text style={S.vetNomBold}>
-                    1. {garde.premier_prenom} {garde.premier_nom?.charAt(0)}.
-                  </Text>
-                )}
-                {garde?.second_prenom && (
-                  <Text style={S.vetNom}>
-                    2. {garde.second_prenom} {garde.second_nom?.charAt(0)}.
-                  </Text>
-                )}
-              </View>
-            )
-          })}
-        </View>
-      ))}
+        // Garde du week-end : chercher sur Sam d'abord, sinon Ven, sinon Dim
+        const gardeWE =
+          (sam ? gardesParDate.get(sam) : null) ??
+          (ven ? gardesParDate.get(ven) : null) ??
+          (dim ? gardesParDate.get(dim) : null) ??
+          null
+        const gardeWEestWeekend = gardeWE?.type === 'weekend'
 
-      {/* Légende (dernière page uniquement) */}
-      {pageIndex === totalPages - 1 && (
-        <View style={S.legendeSection}>
-          <Text style={S.legendeTitre}>Légende</Text>
-          <View style={S.legendeItems}>
-            {vets.map((v) => (
-              <View key={v.id} style={S.legendeItem}>
-                <View style={[S.legendePoint, { backgroundColor: v.couleur }]} />
-                <Text style={S.legendeNom}>{v.prenom} {v.nom}</Text>
+        // Nom vétos pour le header WE
+        const weHeaderNom = gardeWEestWeekend && gardeWE
+          ? [gardeWE.premier_prenom, gardeWE.second_prenom]
+              .filter(Boolean)
+              .map((p, i) => {
+                const nom = i === 0 ? gardeWE.premier_nom : gardeWE.second_nom
+                return `${p} ${nom?.charAt(0) ?? ''}.`
+              })
+              .join(' · ')
+          : ''
+
+        return (
+          <View key={si} style={S.row}>
+            {/* Lun → Jeu */}
+            {joursSemaine.map((date, di) => {
+              const garde = date ? (gardesParDate.get(date) ?? null) : null
+              const ferieNom = date ? feriesMap.get(date) : undefined
+              return (
+                <View key={di} style={{ flex: 1 }}>
+                  <CellContent
+                    date={date}
+                    garde={garde}
+                    ferieNom={ferieNom}
+                    style={ferieNom ? S.cellFerie : S.cell}
+                    numStyle={ferieNom ? S.cellNumeroFerie : S.cellNumero}
+                  />
+                </View>
+              )
+            })}
+
+            {/* Bloc WEEK-END (Ven/Sam/Dim) */}
+            <View style={S.weBlock}>
+              {/* Header bleu avec label + noms des vétos WE */}
+              <View style={S.weBlockHeader}>
+                <Text style={S.weBlockHeaderLabel}>WEEK-END</Text>
+                {weHeaderNom ? (
+                  <Text style={S.weBlockGardeNom}>{weHeaderNom}</Text>
+                ) : null}
               </View>
-            ))}
+
+              {/* 3 cellules V/S/D */}
+              <View style={S.weRow}>
+                {[ven, sam, dim].map((date, wi) => {
+                  const estDerniere = wi === 2
+                  const garde = date ? (gardesParDate.get(date) ?? null) : null
+                  const ferieNom = date ? feriesMap.get(date) : undefined
+                  // Si c'est la garde WE (stockée sur Sam), on l'affiche dans la case Sam
+                  // Sur Ven/Dim : afficher uniquement le numéro + "↕ WE" si la garde WE couvre
+                  const gardeAffichee = gardeWEestWeekend
+                    ? (wi === 0 || wi === 2 ? null : garde) // Sur Ven/Dim, pas de détail
+                    : garde
+                  const baseStyle = ferieNom
+                    ? (estDerniere ? S.weCellFerieLast : S.weCellFerie)
+                    : (estDerniere ? S.weCellDim : wi === 0 ? S.weCellVen : S.weCellSam)
+
+                  const jourNum = date ? parseInt(date.split('-')[2]) : null
+
+                  return (
+                    <View key={wi} style={baseStyle}>
+                      {jourNum && (
+                        <Text style={ferieNom ? S.cellNumeroFerie : S.cellNumero}>
+                          {jourNum}
+                        </Text>
+                      )}
+                      {ferieNom && <Text style={S.ferieName}>{ferieNom}</Text>}
+                      {/* Sur Ven/Dim avec garde WE : juste un indicateur */}
+                      {gardeWEestWeekend && (wi === 0 || wi === 2) && jourNum && !ferieNom && (
+                        <Text style={{ fontSize: 6, color: '#93c5fd', marginTop: 2 }}>↕ week-end</Text>
+                      )}
+                      {/* Sur Sam (ou si pas de WE) : détail complet */}
+                      {gardeAffichee?.premier_prenom && (
+                        <View style={S.vetRow}>
+                          <View style={[S.vetDot, { backgroundColor: gardeAffichee.premier_couleur ?? '#6b7280' }]} />
+                          <Text style={S.vetNomGras}>
+                            {gardeAffichee.premier_prenom} {gardeAffichee.premier_nom?.charAt(0)}.
+                          </Text>
+                        </View>
+                      )}
+                      {gardeAffichee?.second_prenom && (
+                        <View style={S.vetRow}>
+                          <View style={[S.vetDot, { backgroundColor: gardeAffichee.second_couleur ?? '#6b7280' }]} />
+                          <Text style={S.vetNom}>
+                            {gardeAffichee.second_prenom} {gardeAffichee.second_nom?.charAt(0)}.
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  )
+                })}
+              </View>
+            </View>
           </View>
-          <Text style={S.legendeNote}>
-            1. = 1er de garde (responsable principal) · 2. = 2ème de garde ·
-            {' '}Fond jaune = jour férié · Fond bleu clair = week-end
-          </Text>
+        )
+      })}
+
+      {/* Légende — sur chaque page */}
+      <View style={S.legendSection}>
+        <Text style={S.legendTitre}>Légende</Text>
+        <View style={S.legendItems}>
+          {vets.map((v) => (
+            <View key={v.id} style={S.legendItem}>
+              <View style={[S.legendDot, { backgroundColor: v.couleur }]} />
+              <Text style={S.legendNom}>{v.prenom} {v.nom}</Text>
+            </View>
+          ))}
         </View>
-      )}
+        <Text style={S.legendNote}>
+          Point coloré = couleur du vétérinaire · Gras = 1er de garde · Normal = 2ème de garde ·
+          {' '}Fond jaune = jour férié · Bloc bleu = week-end (Ven soir → Lun matin)
+        </Text>
+      </View>
 
       {/* Pied de page */}
       <View style={S.footer}>
-        <Text style={S.footerText}>GuardVeto — document généré le {new Date().toLocaleDateString('fr-FR')}</Text>
-        <Text style={S.footerText}>Page {pageIndex + 1} / {totalPages}</Text>
+        <Text style={S.footerText}>
+          GuardVeto — généré le {new Date().toLocaleDateString('fr-FR')}
+        </Text>
+        <Text style={S.footerText}>
+          Page {pageIndex + 1} / {totalPages}
+        </Text>
       </View>
     </Page>
   )
 }
 
 // ── Document PDF ──────────────────────────────────────────────
-
 function PlanningDocument({ data }: { data: PlanningPdfData }) {
   const moisList = moisDePeriode(data.periode.date_debut, data.periode.date_fin)
 
@@ -435,8 +573,7 @@ function PlanningDocument({ data }: { data: PlanningPdfData }) {
   )
 }
 
-// ── Export : rendu vers Buffer ────────────────────────────────
-
+// ── Export ────────────────────────────────────────────────────
 export async function genererPdfPlanning(data: PlanningPdfData): Promise<Buffer> {
   const buffer = await renderToBuffer(<PlanningDocument data={data} />)
   return Buffer.from(buffer)

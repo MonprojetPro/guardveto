@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
 
       supabase
         .from('jours_feries')
-        .select('date'),
+        .select('date, nom'),
     ])
 
   if (!periode) {
@@ -107,7 +107,9 @@ export async function GET(req: NextRequest) {
     couleur: v.couleur ?? '#6b7280',
   }))
 
-  const jours_feries: string[] = (feriesDb ?? []).map((f: { date: string }) => f.date)
+  const jours_feries: Array<{ date: string; nom: string }> = (feriesDb ?? []).map(
+    (f: { date: string; nom: string }) => ({ date: f.date, nom: f.nom })
+  )
 
   // ── Génération PDF ──────────────────────────────────────────
   let pdfBuffer: Buffer
