@@ -1,7 +1,7 @@
 // ============================================================
-// GUARDVETO — Notifications email (Resend)
+// GUARDVETO — Notifications email (Brevo)
 // ============================================================
-// STORY-019 — Envoi d'emails aux vétérinaires via Resend.
+// STORY-019 — Envoi d'emails aux vétérinaires via Brevo (ex-Sendinblue).
 //
 // Fonctions exportées :
 //   sendPlanningPublie(supabase, periodeId)
@@ -9,24 +9,18 @@
 //   sendGardeModifiee(supabase, gardeId, oldPremier, oldSecond)
 //     → Email aux vétos concernés (ancien + nouveau) lors d'une modif
 //
+// Variables d'env requises :
+//   BREVO_API_KEY       — Clé API Brevo (Paramètres > SMTP & API > API)
+//   BREVO_FROM_EMAIL    — Email expéditeur vérifié dans Brevo
+//   BREVO_FROM_NAME     — Nom affiché (optionnel, défaut : "GuardVeto")
+//
 // Comportement : best-effort — les erreurs d'envoi sont loguées
 // dans la table email_log mais ne bloquent JAMAIS la publication.
 // ============================================================
 
-import { Resend } from 'resend'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-// ── Configuration ────────────────────────────────────────────
-const FROM_EMAIL = 'GuardVeto <noreply@guardveto.com>'
-
-function getResend(): Resend | null {
-  const key = process.env.RESEND_API_KEY
-  if (!key) {
-    console.warn('[notifications] RESEND_API_KEY non définie — envoi désactivé')
-    return null
-  }
-  return new Resend(key)
-}
+const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
 
 // ── Types internes ────────────────────────────────────────────
 interface Veterinaire {
@@ -65,6 +59,48 @@ function typeLabel(type: string): string {
 
 function appUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL ?? 'https://guardveto.vercel.app'
+}
+
+// ── Envoi via API Brevo (fetch) ───────────────────────────────
+async function sendViaBrevo(params: {
+  to: { email: string; name: string }[]
+  subject: string
+  html: string
+}): Promise<string | null> {
+  const apiKey = process.env.BREVO_API_KEY
+  if (!apiKey) {
+    throw new Error('BREVO_API_KEY non définie')
+  }
+
+  const fromEmail = process.env.BREVO_FROM_EMAIL
+  if (!fromEmail) {
+    throw new Error('BREVO_FROM_EMAIL non définie')
+  }
+
+  const fromName = process.env.BREVO_FROM_NAME ?? 'GuardVeto'
+
+  const res = await fetch(BREVO_API_URL, {
+    method: 'POST',
+    headers: {
+      'accept':       'application/json',
+      'api-key':      apiKey,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      sender:  { name: fromName, email: fromEmail },
+      to:      params.to,
+      subject: params.subject,
+      htmlContent: params.html,
+    }),
+  })
+
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Brevo HTTP ${res.status}: ${body}`)
+  }
+
+  const json = await res.json() as { messageId?: string }
+  return json.messageId ?? null
 }
 
 // ── Email : Nouveau planning publié ──────────────────────────
@@ -215,8 +251,6 @@ export async function sendPlanningPublie(
   supabase: SupabaseClient,
   periodeId: string
 ): Promise<{ sent: number; errors: number }> {
-  const resend = getResend()
-
   // Récupérer la période
   const { data: periode } = await supabase
     .from('periodes')
@@ -253,9 +287,9 @@ export async function sendPlanningPublie(
     .order('date')
 
   const gardes: Garde[] = (gardesRaw ?? []).map((g: Record<string, unknown>) => ({
-    id:     g.id as string,
-    date:   g.date as string,
-    type:   g.type as string,
+    id:      g.id as string,
+    date:    g.date as string,
+    type:    g.type as string,
     premier: g.premier as Veterinaire | null,
     second:  g.second  as Veterinaire | null,
   }))
@@ -264,45 +298,26 @@ export async function sendPlanningPublie(
   let errors = 0
 
   for (const vet of vets) {
-    // Gardes de ce vétérinaire
     const mesGardes = gardes.filter(
       (g) => g.premier?.id === vet.id || g.second?.id === vet.id
     )
 
-    const html = buildPlanningPublieHtml(vet, periode, mesGardes)
+    const html    = buildPlanningPublieHtml(vet, periode, mesGardes)
     const subject = `[GuardVeto] Nouveau planning — ${periodeLabel}`
 
-    if (!resend) {
-      // Mode dégradé : log uniquement
-      console.log(`[notifications] (dry-run) Email planning_publie → ${vet.email}`)
-      await logEmail(supabase, {
-        type: 'planning_publie',
-        destinataire: vet.email,
-        veterinaire_id: vet.id,
-        periode_id: periodeId,
-        statut: 'erreur',
-        erreur: 'RESEND_API_KEY non définie',
-      })
-      errors++
-      continue
-    }
-
     try {
-      const { data, error } = await resend.emails.send({
-        from:    FROM_EMAIL,
-        to:      vet.email,
+      const messageId = await sendViaBrevo({
+        to:      [{ email: vet.email, name: `${vet.prenom} ${vet.nom}` }],
         subject,
         html,
       })
 
-      if (error) throw new Error(error.message)
-
       await logEmail(supabase, {
         type: 'planning_publie',
         destinataire: vet.email,
         veterinaire_id: vet.id,
         periode_id: periodeId,
-        resend_id: data?.id ?? null,
+        resend_id: messageId,
         statut: 'envoye',
       })
       sent++
@@ -332,8 +347,6 @@ export async function sendGardeModifiee(
   oldPremier: Veterinaire | null,
   oldSecond: Veterinaire | null,
 ): Promise<{ sent: number; errors: number }> {
-  const resend = getResend()
-
   // Récupérer la garde avec les nouveaux assignés
   const { data: gardeRaw } = await supabase
     .from('gardes')
@@ -382,36 +395,19 @@ export async function sendGardeModifiee(
       garde.second,
     )
 
-    if (!resend) {
-      console.log(`[notifications] (dry-run) Email garde_modifiee → ${vet.email}`)
-      await logEmail(supabase, {
-        type: 'garde_modifiee',
-        destinataire: vet.email,
-        veterinaire_id: vet.id,
-        garde_id: gardeId,
-        statut: 'erreur',
-        erreur: 'RESEND_API_KEY non définie',
-      })
-      errors++
-      continue
-    }
-
     try {
-      const { data, error } = await resend.emails.send({
-        from:    FROM_EMAIL,
-        to:      vet.email,
+      const messageId = await sendViaBrevo({
+        to:      [{ email: vet.email, name: `${vet.prenom} ${vet.nom}` }],
         subject,
         html,
       })
 
-      if (error) throw new Error(error.message)
-
       await logEmail(supabase, {
         type: 'garde_modifiee',
         destinataire: vet.email,
         veterinaire_id: vet.id,
         garde_id: gardeId,
-        resend_id: data?.id ?? null,
+        resend_id: messageId,
         statut: 'envoye',
       })
       sent++
