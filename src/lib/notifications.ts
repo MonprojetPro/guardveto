@@ -220,11 +220,143 @@ function buildGardeModifieeHtml(
 </html>`
 }
 
+// ── Email : Rappel de publication ────────────────────────────
+function buildRappelPublicationHtml(
+  admin: Veterinaire,
+  periode: { saison: string; numero: number | null; date_debut: string },
+  joursRestants: number,
+): string {
+  const periodeLabel = periode.saison === 'ete'
+    ? 'Été'
+    : `Hiver — Période ${periode.numero}`
+
+  const urgence = joursRestants <= 7
+
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:sans-serif;">
+  <div style="max-width:600px;margin:32px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+    <div style="background:${urgence ? '#dc2626' : '#d97706'};padding:24px 32px;">
+      <h1 style="margin:0;color:#fff;font-size:20px;">GuardVeto</h1>
+      <p style="margin:8px 0 0;color:${urgence ? '#fecaca' : '#fde68a'};font-size:14px;">
+        ${urgence ? '⚠️ Rappel urgent — publication requise' : '🔔 Rappel de publication'}
+      </p>
+    </div>
+    <div style="padding:32px;">
+      <p style="color:#374151;">Bonjour ${admin.prenom},</p>
+      <p style="color:#374151;">
+        La période <strong>${periodeLabel}</strong> commence le
+        <strong>${formatDate(periode.date_debut)}</strong>
+        et <strong>le planning n'est pas encore publié</strong>.
+      </p>
+
+      <div style="background:${urgence ? '#fef2f2' : '#fffbeb'};border:1px solid ${urgence ? '#fca5a5' : '#fcd34d'};border-radius:6px;padding:16px;margin:24px 0;">
+        <p style="margin:0;color:${urgence ? '#991b1b' : '#92400e'};font-weight:bold;font-size:15px;">
+          ⏰ Il reste <strong>${joursRestants} jour${joursRestants > 1 ? 's' : ''}</strong> avant le début de la période.
+        </p>
+      </div>
+
+      <p style="color:#374151;">
+        Pensez à générer et publier le planning dès que possible afin que les vétérinaires puissent en prendre connaissance.
+      </p>
+
+      <div style="margin-top:32px;text-align:center;">
+        <a href="${appUrl()}/planning" style="background:${urgence ? '#dc2626' : '#d97706'};color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-size:14px;display:inline-block;">
+          Aller au planning
+        </a>
+      </div>
+
+      <p style="color:#9ca3af;font-size:12px;margin-top:32px;">
+        Cet email est envoyé automatiquement par GuardVeto.
+      </p>
+    </div>
+  </div>
+</body>
+</html>`
+}
+
+// ── Export : Rappel de publication (admin uniquement) ─────────
+export async function sendRappelPublication(
+  supabase: SupabaseClient,
+  periodeId: string,
+  joursRestants: number,
+): Promise<{ sent: number; errors: number }> {
+  const { data: periode } = await supabase
+    .from('periodes')
+    .select('id, saison, numero, date_debut')
+    .eq('id', periodeId)
+    .single()
+
+  if (!periode) {
+    console.error('[notifications] Période introuvable pour rappel:', periodeId)
+    return { sent: 0, errors: 0 }
+  }
+
+  const periodeLabel = periode.saison === 'ete'
+    ? 'Été'
+    : `Hiver — Période ${periode.numero}`
+
+  // Uniquement les admins actifs
+  const { data: admins } = await supabase
+    .from('veterinaires')
+    .select('id, nom, prenom, email')
+    .eq('role_app', 'admin')
+    .eq('actif', true)
+
+  if (!admins || admins.length === 0) return { sent: 0, errors: 0 }
+
+  const urgence = joursRestants <= 7
+  const subject = urgence
+    ? `[GuardVeto] ⚠️ Urgent — Planning ${periodeLabel} non publié (J-${joursRestants})`
+    : `[GuardVeto] Rappel — Planning ${periodeLabel} non publié (J-${joursRestants})`
+
+  let sent = 0
+  let errors = 0
+
+  for (const admin of admins) {
+    const html = buildRappelPublicationHtml(admin, periode, joursRestants)
+
+    try {
+      const messageId = await sendViaBrevo({
+        to:      [{ email: admin.email, name: `${admin.prenom} ${admin.nom}` }],
+        subject,
+        html,
+      })
+
+      await logEmail(supabase, {
+        type: 'rappel_publication',
+        destinataire: admin.email,
+        veterinaire_id: admin.id,
+        periode_id: periodeId,
+        resend_id: messageId,
+        statut: 'envoye',
+      })
+      sent++
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error(`[notifications] Erreur rappel_publication → ${admin.email}:`, msg)
+      await logEmail(supabase, {
+        type: 'rappel_publication',
+        destinataire: admin.email,
+        veterinaire_id: admin.id,
+        periode_id: periodeId,
+        statut: 'erreur',
+        erreur: msg,
+      })
+      errors++
+    }
+  }
+
+  console.log(`[notifications] Rappel publication (J-${joursRestants}) — ${periodeLabel}: ${sent} envoyés, ${errors} erreurs`)
+  return { sent, errors }
+}
+
 // ── Logger interne ────────────────────────────────────────────
 async function logEmail(
   supabase: SupabaseClient,
   params: {
-    type: 'planning_publie' | 'garde_modifiee'
+    type: 'planning_publie' | 'garde_modifiee' | 'rappel_publication'
     destinataire: string
     veterinaire_id: string | null
     periode_id?: string | null
