@@ -6,6 +6,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
+import { CreerPeriodeDialog } from '@/components/admin/CreerPeriodeDialog'
+import { SupprimerPeriodeButton } from '@/components/admin/SupprimerPeriodeButton'
 import type { Periode } from '@/types'
 
 // ── Helpers ──────────────────────────────────────────────
@@ -41,6 +43,11 @@ function DureeBadge({ debut, fin }: { debut: string; fin: string }) {
   )
 }
 
+function periodLabel(p: Periode) {
+  if (p.saison === 'ete') return 'Été'
+  return `Hiver P${p.numero ?? ''}`
+}
+
 // ── Page ─────────────────────────────────────────────────
 
 export default async function PeriodesPage() {
@@ -65,29 +72,32 @@ export default async function PeriodesPage() {
   const liste = (periodes as Periode[]) ?? []
 
   const stats = {
-    total: liste.length,
-    publie: liste.filter((p) => p.statut === 'publie').length,
-    brouillon: liste.filter((p) => p.statut === 'brouillon').length,
+    total:      liste.length,
+    publie:     liste.filter((p) => p.statut === 'publie').length,
+    brouillon:  liste.filter((p) => p.statut === 'brouillon').length,
     verrouille: liste.filter((p) => p.statut === 'verrouille').length,
   }
 
   return (
     <div className="space-y-6">
       {/* En-tête */}
-      <div>
-        <h1 className="font-heading text-2xl font-bold text-foreground">Périodes</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Toutes les périodes de planification
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-2xl font-bold text-foreground">Périodes</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Toutes les périodes de planification
+          </p>
+        </div>
+        <CreerPeriodeDialog />
       </div>
 
       {/* Stats rapides */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total', value: stats.total, color: 'text-foreground' },
-          { label: 'Publiées', value: stats.publie, color: 'text-green-600' },
-          { label: 'Brouillons', value: stats.brouillon, color: 'text-muted-foreground' },
-          { label: 'Verrouillées', value: stats.verrouille, color: 'text-muted-foreground' },
+          { label: 'Total',       value: stats.total,      color: 'text-foreground' },
+          { label: 'Publiées',    value: stats.publie,     color: 'text-green-600' },
+          { label: 'Brouillons',  value: stats.brouillon,  color: 'text-muted-foreground' },
+          { label: 'Verrouillées',value: stats.verrouille, color: 'text-muted-foreground' },
         ].map((s) => (
           <div key={s.label} className="rounded-lg border bg-card p-4">
             <p className="text-xs text-muted-foreground">{s.label}</p>
@@ -108,6 +118,7 @@ export default async function PeriodesPage() {
               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Durée</th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Statut</th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Publié le</th>
+              <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -130,11 +141,19 @@ export default async function PeriodesPage() {
                 <td className="px-4 py-3 text-muted-foreground">
                   {p.publie_at ? formatDate(p.publie_at) : '—'}
                 </td>
+                <td className="px-4 py-3 text-right">
+                  {p.statut === 'brouillon' && (
+                    <SupprimerPeriodeButton
+                      periodeId={p.id}
+                      label={periodLabel(p)}
+                    />
+                  )}
+                </td>
               </tr>
             ))}
             {liste.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
                   Aucune période créée.
                 </td>
               </tr>
