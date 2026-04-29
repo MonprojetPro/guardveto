@@ -3,18 +3,22 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
+// Détection automatique de la saison depuis la date de début
+// Mai (5) → Août (8) = été, le reste = hiver
+function detecterSaison(dateDebut: string): 'ete' | 'hiver' {
+  const mois = new Date(dateDebut + 'T12:00:00Z').getUTCMonth() + 1
+  return mois >= 5 && mois <= 8 ? 'ete' : 'hiver'
+}
+
 export async function creerPeriode(formData: FormData) {
   const supabase = await createClient()
 
-  const saison    = formData.get('saison') as string
-  const numero    = formData.get('numero') ? Number(formData.get('numero')) : null
-  const libelle   = (formData.get('libelle') as string | null) || null
+  const libelle   = (formData.get('libelle') as string | null)?.trim() || null
   const dateDebut = formData.get('date_debut') as string
   const dateFin   = formData.get('date_fin') as string
 
-  if (!saison || !dateDebut || !dateFin) {
-    return { error: 'Tous les champs sont requis.' }
-  }
+  if (!libelle) return { error: 'Le titre est obligatoire.' }
+  if (!dateDebut || !dateFin) return { error: 'Les dates de début et de fin sont requises.' }
 
   // Vérification : date_debut doit être un lundi
   const jour = new Date(dateDebut + 'T12:00:00Z').getUTCDay()
@@ -25,7 +29,7 @@ export async function creerPeriode(formData: FormData) {
   // Vérification : chevauchement avec une période existante
   const { data: chevauchements } = await supabase
     .from('periodes')
-    .select('id, saison, numero, libelle, date_debut, date_fin')
+    .select('id, libelle, saison, numero, date_debut, date_fin')
     .lte('date_debut', dateFin)
     .gte('date_fin', dateDebut)
 
@@ -35,10 +39,12 @@ export async function creerPeriode(formData: FormData) {
     return { error: `Les dates chevauchent la période "${label}" (${c.date_debut} → ${c.date_fin}).` }
   }
 
+  const saison = detecterSaison(dateDebut)
+
   const { error } = await supabase.from('periodes').insert({
     saison,
-    numero:     saison === 'hiver' ? numero : null,
-    libelle:    libelle?.trim() || null,
+    numero:     null,
+    libelle,
     date_debut: dateDebut,
     date_fin:   dateFin,
     statut:     'brouillon',

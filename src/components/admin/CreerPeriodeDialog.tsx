@@ -5,7 +5,6 @@ import { creerPeriode } from '@/app/(protected)/admin/periodes/actions'
 
 export function CreerPeriodeDialog() {
   const [open, setOpen]       = useState(false)
-  const [saison, setSaison]   = useState<'ete' | 'hiver'>('ete')
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState<string | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
@@ -22,13 +21,11 @@ export function CreerPeriodeDialog() {
     } else {
       setOpen(false)
       formRef.current?.reset()
-      setSaison('ete')
     }
   }
 
   return (
     <>
-      {/* Bouton déclencheur */}
       <button
         onClick={() => setOpen(true)}
         className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
@@ -36,70 +33,26 @@ export function CreerPeriodeDialog() {
         + Créer une période
       </button>
 
-      {/* Modal */}
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          {/* Overlay */}
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setOpen(false)}
-          />
+          <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
 
-          {/* Contenu */}
           <div className="relative z-10 w-full max-w-md rounded-xl border bg-card shadow-lg mx-4">
             <div className="p-6">
-              <h2 className="text-lg font-semibold text-foreground mb-4">
-                Nouvelle période
-              </h2>
+              <h2 className="text-lg font-semibold text-foreground mb-4">Nouvelle période</h2>
 
               <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
-                {/* Saison */}
+                {/* Titre */}
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">
-                    Saison
-                  </label>
-                  <select
-                    name="saison"
-                    value={saison}
-                    onChange={(e) => setSaison(e.target.value as 'ete' | 'hiver')}
-                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    required
-                  >
-                    <option value="ete">Été</option>
-                    <option value="hiver">Hiver</option>
-                  </select>
-                </div>
-
-                {/* Titre personnalisé */}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">
-                    Titre <span className="text-muted-foreground font-normal">(optionnel)</span>
-                  </label>
+                  <label className="block text-sm font-medium text-foreground mb-1">Titre</label>
                   <input
                     type="text"
                     name="libelle"
-                    placeholder="ex. Été 2027, Hiver P1 2026-2027…"
+                    placeholder="ex. Été 2027, Hiver P1 2027-2028…"
                     className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    required
                   />
                 </div>
-
-                {/* Numéro (hiver uniquement) */}
-                {saison === 'hiver' && (
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">
-                      Numéro de période
-                    </label>
-                    <select
-                      name="numero"
-                      className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                      required
-                    >
-                      <option value="1">Période 1</option>
-                      <option value="2">Période 2</option>
-                      <option value="3">Période 3</option>
-                    </select>
-                  </div>
-                )}
 
                 {/* Date début */}
                 <div>
@@ -116,9 +69,7 @@ export function CreerPeriodeDialog() {
 
                 {/* Date fin */}
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">
-                    Date de fin
-                  </label>
+                  <label className="block text-sm font-medium text-foreground mb-1">Date de fin</label>
                   <input
                     type="date"
                     name="date_fin"
@@ -128,9 +79,7 @@ export function CreerPeriodeDialog() {
                 </div>
 
                 {error && (
-                  <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
-                    {error}
-                  </p>
+                  <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
                 )}
 
                 <div className="flex gap-3 pt-2">
