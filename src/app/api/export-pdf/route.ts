@@ -100,7 +100,8 @@ export async function GET(req: NextRequest) {
     second_couleur: g.second?.couleur ?? null,
   }))
 
-  const vets: VetoPdf[] = (vetsDb ?? []).map((v) => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const vets: VetoPdf[] = (vetsDb ?? []).map((v: any) => ({
     id:     v.id,
     prenom: v.prenom,
     nom:    v.nom,

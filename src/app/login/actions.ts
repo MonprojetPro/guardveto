@@ -4,6 +4,11 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
 export async function login(formData: FormData) {
+  // Mode dev : accès direct sans mot de passe
+  if (process.env.DEV_BYPASS_AUTH === 'true') {
+    redirect('/planning')
+  }
+
   const supabase = await createClient()
 
   const email = formData.get('email') as string

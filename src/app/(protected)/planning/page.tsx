@@ -53,35 +53,28 @@ export default async function PlanningPage({
   const { debut, fin } = debutFinMois(anneeMois)
 
   // Chargement parallèle : gardes du mois + toutes les périodes + périodes avec gardes (admin)
-  const [{ data: gardesDb }, { data: periodesDb }, periodesAvecGardesDb] = await Promise.all([
-    supabase
-      .from('planning_semaine')
-      .select('*')
-      .gte('date', debut)
-      .lte('date', fin)
-      .order('date'),
-    supabase
-      .from('periodes')
-      .select('*')
-      .order('date_debut', { ascending: false })
-      .limit(20),
-    // Pour l'admin : quelles périodes ont déjà des gardes générées
-    isAdmin
-      ? supabase.from('gardes').select('periode_id').limit(500)
-      : Promise.resolve({ data: null }),
-  ])
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [gardesResult, periodesResult, periodesGardesResult] = await Promise.all([
+    supabase.from('planning_semaine').select('*').gte('date', debut).lte('date', fin).order('date'),
+    supabase.from('periodes').select('*').order('date_debut', { ascending: false }).limit(20),
+    isAdmin ? supabase.from('gardes').select('periode_id').limit(500) : Promise.resolve({ data: null }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ]) as any[]
+
+  const gardesDb = gardesResult?.data
+  const periodesDb = periodesResult?.data
 
   // Période active du mois affiché (pour le bouton export secrétaire)
-  const periodesMois = (periodesDb as Periode[] ?? []).filter((p) => {
+  const periodesMois = ((periodesDb as Periode[]) ?? []).filter((p) => {
     return p.date_debut <= fin && p.date_fin >= debut
   })
 
   // Périodes disponibles pour ActionBar (toutes, admin uniquement)
-  const toutesLesPeriodes = isAdmin ? ((periodesDb as Periode[]) ?? []) : []
+  const toutesLesPeriodes: Periode[] = isAdmin ? ((periodesDb as Periode[]) ?? []) : []
 
   // Liste dédupliquée des periode_ids qui ont au moins une garde
-  const periodesAvecGardes = isAdmin
-    ? [...new Set((periodesAvecGardesDb.data ?? []).map((g: { periode_id: string }) => g.periode_id))]
+  const periodesAvecGardes: string[] = isAdmin
+    ? [...new Set(((periodesGardesResult?.data ?? []) as { periode_id: string }[]).map((g) => g.periode_id))]
     : []
 
   // ── Rappel de publication (admin) ─────────────────────
