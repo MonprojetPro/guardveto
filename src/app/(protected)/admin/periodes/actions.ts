@@ -22,6 +22,19 @@ export async function creerPeriode(formData: FormData) {
     return { error: 'La date de début doit être un lundi.' }
   }
 
+  // Vérification : chevauchement avec une période existante
+  const { data: chevauchements } = await supabase
+    .from('periodes')
+    .select('id, saison, numero, libelle, date_debut, date_fin')
+    .lte('date_debut', dateFin)
+    .gte('date_fin', dateDebut)
+
+  if (chevauchements && chevauchements.length > 0) {
+    const c = chevauchements[0]
+    const label = c.libelle ?? (c.saison === 'ete' ? 'Été' : `Hiver P${c.numero ?? ''}`)
+    return { error: `Les dates chevauchent la période "${label}" (${c.date_debut} → ${c.date_fin}).` }
+  }
+
   const { error } = await supabase.from('periodes').insert({
     saison,
     numero:     saison === 'hiver' ? numero : null,
