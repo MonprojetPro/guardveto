@@ -6,16 +6,18 @@ import { NAV_ITEMS, type Veterinaire } from '@/types'
 import {
   Calendar,
   CalendarOff,
+  CalendarRange,
   BarChart3,
-  Settings,
+  Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   Calendar,
   CalendarOff,
+  CalendarRange,
   BarChart3,
-  Settings,
+  Users,
 }
 
 interface SidebarProps {
