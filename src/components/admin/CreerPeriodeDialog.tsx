@@ -70,6 +70,19 @@ export function CreerPeriodeDialog() {
                   </select>
                 </div>
 
+                {/* Titre personnalisé */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    Titre <span className="text-muted-foreground font-normal">(optionnel)</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="libelle"
+                    placeholder="ex. Été 2027, Hiver P1 2026-2027…"
+                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+
                 {/* Numéro (hiver uniquement) */}
                 {saison === 'hiver' && (
                   <div>

@@ -28,6 +28,7 @@ export interface Periode {
   id: string
   saison: Saison
   numero: number | null
+  libelle: string | null
   date_debut: string
   date_fin: string
   statut: StatutPeriode

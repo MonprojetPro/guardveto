@@ -8,6 +8,7 @@ export async function creerPeriode(formData: FormData) {
 
   const saison    = formData.get('saison') as string
   const numero    = formData.get('numero') ? Number(formData.get('numero')) : null
+  const libelle   = (formData.get('libelle') as string | null) || null
   const dateDebut = formData.get('date_debut') as string
   const dateFin   = formData.get('date_fin') as string
 
@@ -24,6 +25,7 @@ export async function creerPeriode(formData: FormData) {
   const { error } = await supabase.from('periodes').insert({
     saison,
     numero:     saison === 'hiver' ? numero : null,
+    libelle:    libelle?.trim() || null,
     date_debut: dateDebut,
     date_fin:   dateFin,
     statut:     'brouillon',

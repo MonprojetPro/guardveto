@@ -124,8 +124,11 @@ export default async function PeriodesPage() {
           <tbody className="divide-y">
             {liste.map((p) => (
               <tr key={p.id} className="hover:bg-muted/30 transition-colors">
-                <td className="px-4 py-3 font-medium">
-                  {p.saison === 'ete' ? 'Été' : 'Hiver'}
+                <td className="px-4 py-3">
+                  <span className="font-medium">{p.saison === 'ete' ? 'Été' : 'Hiver'}</span>
+                  {p.libelle && (
+                    <span className="block text-xs text-muted-foreground">{p.libelle}</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">
                   {p.numero ? `P${p.numero}` : '—'}
