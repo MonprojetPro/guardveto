@@ -65,8 +65,15 @@ export default async function CompteursPage({
 
   // ── Sélection de la période ──────────────────────────────
   const { periodeId: periodeIdParam } = await searchParams
+  const today = new Date().toISOString().split('T')[0]
+  // periodes est en DESC — on inverse pour trouver la plus proche chronologiquement
+  const periodesAsc = [...periodes].reverse()
+  const periodeCourante =
+    periodes.find(p => p.date_debut <= today && p.date_fin >= today) ??  // période en cours
+    periodesAsc.find(p => p.date_debut >= today) ??                       // prochaine à venir (la plus proche)
+    periodes[0]                                                            // fallback : la plus récente
   const periodeSelectionnee =
-    periodes.find((p) => p.id === periodeIdParam) ?? periodes[0]
+    periodes.find((p) => p.id === periodeIdParam) ?? periodeCourante
 
   // ── Chargement parallèle ─────────────────────────────────
   const [compteurs, totalWE, bonusMalusHeritage, bonusMalusCourant, vetsInfo] =
