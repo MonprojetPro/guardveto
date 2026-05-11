@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 import type { StatutVeto, UserRole } from '@/types'
 
@@ -80,6 +81,43 @@ export async function updateVeterinaire(id: string, data: VeterinaireFormData) {
 
   revalidatePath('/admin/veterinaires')
   return { success: true }
+}
+
+export async function inviterVeterinaire(id: string) {
+  // Récupère l'email du véto
+  const supabase = await createClient()
+  const { data: vet } = await supabase
+    .from('veterinaires')
+    .select('email, prenom, nom, user_id')
+    .eq('id', id)
+    .single()
+
+  if (!vet) return { error: 'Vétérinaire introuvable.' }
+  if (vet.user_id) return { error: 'Ce vétérinaire a déjà un compte.' }
+
+  // Client admin avec service_role pour créer l'utilisateur
+  const adminClient = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
+    vet.email,
+    { data: { veterinaire_id: id } }
+  )
+
+  if (inviteError) return { error: inviteError.message }
+
+  // Lie immédiatement le user_id au véto
+  const { error: updateError } = await adminClient
+    .from('veterinaires')
+    .update({ user_id: inviteData.user.id })
+    .eq('id', id)
+
+  if (updateError) return { error: updateError.message }
+
+  revalidatePath('/admin/veterinaires')
+  return { success: true, email: vet.email }
 }
 
 export async function toggleVeterinaireActif(id: string, actif: boolean) {

@@ -14,13 +14,18 @@ import { deleteConge, refuserConge } from '@/app/(protected)/conges/actions'
 import type { Conge, StatutConge, TypeConge, Veterinaire } from '@/types'
 
 const TYPE_LABELS: Record<TypeConge, string> = {
-  vacances: 'Vacances', formation: 'Formation', sante: 'Santé', autre: 'Autre',
+  vacances: 'Vacances', formation: 'Formation', sante: 'Santé',
+  indisponibilite: 'Indisponibilité', autre: 'Autre',
 }
 const TYPE_COLORS: Record<TypeConge, string> = {
-  vacances: 'bg-blue-100 text-blue-700 border-blue-200',
-  formation: 'bg-purple-100 text-purple-700 border-purple-200',
-  sante: 'bg-red-100 text-red-700 border-red-200',
-  autre: 'bg-gray-100 text-gray-600 border-gray-200',
+  vacances:        'bg-blue-100 text-blue-700 border-blue-200',
+  formation:       'bg-purple-100 text-purple-700 border-purple-200',
+  sante:           'bg-red-100 text-red-700 border-red-200',
+  indisponibilite: 'bg-orange-100 text-orange-700 border-orange-200',
+  autre:           'bg-gray-100 text-gray-600 border-gray-200',
+}
+const CRENEAU_LABELS: Record<string, string> = {
+  journee: 'Journée', matin: 'Matin', 'apres-midi': 'Après-midi', soiree: 'Soirée',
 }
 const STATUT_CONFIG: Record<StatutConge, { label: string; className: string }> = {
   souhait: { label: 'Souhait',  className: 'bg-orange-100 text-orange-700 border-orange-200' },
@@ -120,9 +125,12 @@ export function CongesList({ conges, vets, currentUserId, isAdmin }: CongesListP
             </p>
           )}
           <p className={`text-xs text-muted-foreground ${!isAdmin ? 'text-sm font-medium text-foreground' : ''}`}>
-            {formatDate(c.date_debut)} → {formatDate(c.date_fin)}
-            <span className="mx-1.5 opacity-30">·</span>
-            {sem} sem.
+            {c.type === 'indisponibilite'
+              ? formatDate(c.date_debut)
+              : <>{formatDate(c.date_debut)} → {formatDate(c.date_fin)}<span className="mx-1.5 opacity-30">·</span>{sem} sem.</>}
+            {c.creneau && c.type === 'indisponibilite' && (
+              <><span className="mx-1.5 opacity-30">·</span>{CRENEAU_LABELS[c.creneau] ?? c.creneau}</>
+            )}
             {c.commentaire && <><span className="mx-1.5 opacity-30">·</span><span className="italic">{c.commentaire}</span></>}
           </p>
         </div>

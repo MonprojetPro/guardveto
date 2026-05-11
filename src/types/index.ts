@@ -2,11 +2,12 @@
 // GUARDVETO — Types TypeScript partagés
 // ============================================================
 
-export type UserRole = 'admin' | 'veto' | 'secretaire'
+export type UserRole = 'admin' | 'veto'
 export type StatutVeto = 'associe' | 'salarie'
 export type StatutPeriode = 'brouillon' | 'publie' | 'verrouille'
 export type TypeGarde = 'semaine' | 'weekend' | 'ferie'
-export type TypeConge = 'vacances' | 'formation' | 'sante' | 'autre'
+export type TypeConge = 'vacances' | 'formation' | 'sante' | 'autre' | 'indisponibilite'
+export type CreneauConge = 'journee' | 'matin' | 'apres-midi' | 'soiree'
 export type StatutConge = 'souhait' | 'valide' | 'refuse'
 export type Saison = 'ete' | 'hiver'
 
@@ -66,6 +67,7 @@ export interface Conge {
   date_debut: string
   date_fin: string
   type: TypeConge
+  creneau: CreneauConge | null
   statut: StatutConge
   commentaire: string | null
   saisi_par: string | null
@@ -121,9 +123,10 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { label: 'Planning',    href: '/planning',           icon: 'Calendar',    roles: ['admin', 'veto', 'secretaire'] },
-  { label: 'Congés',     href: '/conges',             icon: 'CalendarOff', roles: ['admin', 'veto'] },
-  { label: 'Compteurs',  href: '/compteurs',          icon: 'BarChart3',   roles: ['admin', 'veto'] },
-  { label: 'Périodes',   href: '/admin/periodes',     icon: 'CalendarRange', roles: ['admin'] },
-  { label: 'Vétérinaires', href: '/admin/veterinaires', icon: 'Users',     roles: ['admin'] },
+  { label: 'Planning',      href: '/planning',            icon: 'Calendar',     roles: ['admin', 'veto'] },
+  { label: 'Congés',        href: '/conges',              icon: 'CalendarOff',  roles: ['admin', 'veto'] },
+  { label: 'Compteurs',     href: '/compteurs',           icon: 'BarChart3',    roles: ['admin', 'veto'] },
+  { label: 'Demandes',      href: '/admin/demandes',      icon: 'Inbox',        roles: ['admin'] },
+  { label: 'Périodes',      href: '/admin/periodes',      icon: 'CalendarRange', roles: ['admin'] },
+  { label: 'Vétérinaires',  href: '/admin/veterinaires',  icon: 'Users',        roles: ['admin'] },
 ]

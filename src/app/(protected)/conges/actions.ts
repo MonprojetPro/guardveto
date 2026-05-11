@@ -2,13 +2,14 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import type { TypeConge } from '@/types'
+import type { CreneauConge, TypeConge } from '@/types'
 
 export interface CongeFormData {
   veterinaire_id: string
   date_debut: string
   date_fin: string
   type: TypeConge
+  creneau: CreneauConge | null
   commentaire: string
 }
 
@@ -20,6 +21,7 @@ export async function createConge(data: CongeFormData, saisi_par: string, isAdmi
     date_debut: data.date_debut,
     date_fin: data.date_fin,
     type: data.type,
+    creneau: data.creneau || null,
     statut: isAdmin ? 'valide' : 'souhait',
     commentaire: data.commentaire || null,
     saisi_par,
@@ -28,6 +30,7 @@ export async function createConge(data: CongeFormData, saisi_par: string, isAdmi
 
   if (error) return { error: error.message }
   revalidatePath('/conges')
+  revalidatePath('/admin/demandes')
   return { success: true }
 }
 
@@ -41,12 +44,14 @@ export async function updateConge(id: string, data: CongeFormData) {
       date_debut: data.date_debut,
       date_fin: data.date_fin,
       type: data.type,
+      creneau: data.creneau || null,
       commentaire: data.commentaire || null,
     })
     .eq('id', id)
 
   if (error) return { error: error.message }
   revalidatePath('/conges')
+  revalidatePath('/admin/demandes')
   return { success: true }
 }
 
@@ -55,6 +60,7 @@ export async function deleteConge(id: string) {
   const { error } = await supabase.from('conges').delete().eq('id', id)
   if (error) return { error: error.message }
   revalidatePath('/conges')
+  revalidatePath('/admin/demandes')
   return { success: true }
 }
 
@@ -72,6 +78,7 @@ export async function validerConge(
   const { error } = await supabase.from('conges').update(update).eq('id', id)
   if (error) return { error: error.message }
   revalidatePath('/conges')
+  revalidatePath('/admin/demandes')
   return { success: true }
 }
 
@@ -83,5 +90,6 @@ export async function refuserConge(id: string) {
     .eq('id', id)
   if (error) return { error: error.message }
   revalidatePath('/conges')
+  revalidatePath('/admin/demandes')
   return { success: true }
 }

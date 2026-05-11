@@ -9,6 +9,7 @@ import {
   CalendarRange,
   BarChart3,
   Users,
+  Inbox,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -18,6 +19,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   CalendarRange,
   BarChart3,
   Users,
+  Inbox,
 }
 
 interface SidebarProps {
@@ -44,7 +46,7 @@ export function Sidebar({ veterinaire, nbSouhaits = 0 }: SidebarProps) {
         {visibleItems.map(item => {
           const Icon = ICONS[item.icon]
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-          const showBadge = item.href === '/conges' && nbSouhaits > 0
+          const showBadge = (item.href === '/admin/demandes' || item.href === '/conges') && nbSouhaits > 0
           return (
             <Link
               key={item.href}

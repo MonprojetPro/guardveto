@@ -2,11 +2,11 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Pencil, PowerOff, Power, ChevronDown, ChevronUp, ShieldCheck, Star, UserX, CircleOff, Briefcase, Users } from 'lucide-react'
+import { Pencil, PowerOff, Power, ChevronDown, ChevronUp, ShieldCheck, Star, UserX, CircleOff, Briefcase, Users, MailPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { VeterinaireForm } from './VeterinaireForm'
 import { ContraintesSection } from './ContraintesSection'
-import { toggleVeterinaireActif } from '@/app/(protected)/admin/veterinaires/actions'
+import { inviterVeterinaire, toggleVeterinaireActif } from '@/app/(protected)/admin/veterinaires/actions'
 import type { ContrainteVeto, Veterinaire } from '@/types'
 
 interface VeterinaireCardProps {
@@ -19,6 +19,14 @@ export function VeterinaireCard({ veterinaire, contraintes, vets }: VeterinaireC
   const [editOpen, setEditOpen] = useState(false)
   const [contraintesOpen, setContraintesOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
+
+  const handleInviter = () => {
+    startTransition(async () => {
+      const result = await inviterVeterinaire(veterinaire.id)
+      if (result.error) { toast.error(result.error); return }
+      toast.success(`Invitation envoyée à ${result.email}`)
+    })
+  }
 
   const handleToggleActif = () => {
     startTransition(async () => {
@@ -90,10 +98,15 @@ export function VeterinaireCard({ veterinaire, contraintes, vets }: VeterinaireC
                   )}
                   {/* Sans compte */}
                   {!veterinaire.user_id && (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-medium leading-none">
-                      <UserX className="w-3 h-3" />
-                      Sans compte
-                    </span>
+                    <button
+                      onClick={handleInviter}
+                      disabled={isPending}
+                      title="Envoyer une invitation par email"
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-medium leading-none hover:bg-amber-100 transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                      <MailPlus className="w-3 h-3" />
+                      Inviter
+                    </button>
                   )}
                 </div>
               </div>
