@@ -24,11 +24,7 @@ export function VeterinaireCard({ veterinaire, contraintes, vets }: VeterinaireC
     startTransition(async () => {
       const result = await inviterVeterinaire(veterinaire.id)
       if (result.error) { toast.error(result.error); return }
-      if (result.alreadyExists) {
-        toast.success(`Compte existant lié à ${result.email}`)
-      } else {
-        toast.success(`Invitation envoyée à ${result.email}`)
-      }
+      toast.success(`Invitation envoyée à ${result.email}`)
     })
   }
 
@@ -114,10 +110,10 @@ export function VeterinaireCard({ veterinaire, contraintes, vets }: VeterinaireC
           <div className="flex items-center gap-1 px-2 bg-muted/40 border-l border-border shrink-0">
             <Button
               variant="ghost" size="icon"
-              className={`h-8 w-8 ${!veterinaire.user_id ? 'text-amber-600 hover:text-amber-600 hover:bg-amber-50' : 'text-muted-foreground/30 cursor-default'}`}
-              onClick={!veterinaire.user_id ? handleInviter : undefined}
-              disabled={isPending || !!veterinaire.user_id}
-              title={!veterinaire.user_id ? 'Envoyer une invitation par email' : 'Compte déjà créé'}
+              className="h-8 w-8 text-amber-600 hover:text-amber-600 hover:bg-amber-50"
+              onClick={handleInviter}
+              disabled={isPending}
+              title="Envoyer (ou renvoyer) une invitation par email"
             >
               <MailPlus className="w-3.5 h-3.5" />
             </Button>

@@ -108,8 +108,17 @@ export async function inviterVeterinaire(id: string) {
   let authUserId: string
 
   if (existingUser) {
-    // Compte existant → on le lie sans ré-envoyer d'invitation
-    authUserId = existingUser.id
+    if (existingUser.confirmed_at) {
+      // Compte déjà confirmé et actif → rien à faire
+      return { error: 'Ce compte est déjà actif.' }
+    }
+    // Compte invité mais non confirmé → renvoie l'invitation
+    const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
+      vet.email,
+      { data: { veterinaire_id: id } }
+    )
+    if (inviteError) return { error: inviteError.message }
+    authUserId = inviteData?.user?.id ?? existingUser.id
   } else {
     // Nouveau compte → envoie l'invitation par email
     const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
@@ -120,16 +129,17 @@ export async function inviterVeterinaire(id: string) {
     authUserId = inviteData.user.id
   }
 
-  // Lie le user_id au vétérinaire
-  const { error: updateError } = await adminClient
-    .from('veterinaires')
-    .update({ user_id: authUserId })
-    .eq('id', id)
-
-  if (updateError) return { error: updateError.message }
+  // Lie le user_id au vétérinaire (si pas encore lié)
+  if (!vet.user_id) {
+    const { error: updateError } = await adminClient
+      .from('veterinaires')
+      .update({ user_id: authUserId })
+      .eq('id', id)
+    if (updateError) return { error: updateError.message }
+  }
 
   revalidatePath('/admin/veterinaires')
-  return { success: true, email: vet.email, alreadyExists: !!existingUser }
+  return { success: true, email: vet.email }
 }
 
 export async function toggleVeterinaireActif(id: string, actif: boolean) {
