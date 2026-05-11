@@ -98,21 +98,27 @@ export function VeterinaireCard({ veterinaire, contraintes, vets }: VeterinaireC
                   )}
                   {/* Sans compte */}
                   {!veterinaire.user_id && (
-                    <button
-                      onClick={handleInviter}
-                      disabled={isPending}
-                      title="Envoyer une invitation par email"
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-medium leading-none hover:bg-amber-100 transition-colors disabled:opacity-50 cursor-pointer"
-                    >
-                      <MailPlus className="w-3 h-3" />
-                      Inviter
-                    </button>
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-medium leading-none">
+                      <UserX className="w-3 h-3" />
+                      Sans compte
+                    </span>
                   )}
                 </div>
               </div>
             </div>
           </div>
           <div className="flex items-center gap-1 px-2 bg-muted/40 border-l border-border shrink-0">
+            {!veterinaire.user_id && (
+              <Button
+                variant="ghost" size="icon"
+                className="h-8 w-8 text-amber-600 hover:text-amber-600 hover:bg-amber-50"
+                onClick={handleInviter}
+                disabled={isPending}
+                title="Envoyer une invitation par email"
+              >
+                <MailPlus className="w-3.5 h-3.5" />
+              </Button>
+            )}
             <Button
               variant="ghost" size="icon"
               className="h-8 w-8 relative"
