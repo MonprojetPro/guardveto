@@ -209,7 +209,6 @@ export function VeterinaireForm({ open, onClose, veterinaire }: VeterinaireFormP
                 <SelectContent>
                   <SelectItem value="veto">Véto</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="secretaire">Secrétaire</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -24,7 +24,11 @@ export function VeterinaireCard({ veterinaire, contraintes, vets }: VeterinaireC
     startTransition(async () => {
       const result = await inviterVeterinaire(veterinaire.id)
       if (result.error) { toast.error(result.error); return }
-      toast.success(`Invitation envoyée à ${result.email}`)
+      if (result.alreadyExists) {
+        toast.success(`Compte existant lié à ${result.email}`)
+      } else {
+        toast.success(`Invitation envoyée à ${result.email}`)
+      }
     })
   }
 

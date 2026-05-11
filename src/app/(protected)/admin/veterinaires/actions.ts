@@ -95,29 +95,41 @@ export async function inviterVeterinaire(id: string) {
   if (!vet) return { error: 'Vétérinaire introuvable.' }
   if (vet.user_id) return { error: 'Ce vétérinaire a déjà un compte.' }
 
-  // Client admin avec service_role pour créer l'utilisateur
+  // Client admin avec service_role
   const adminClient = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
-    vet.email,
-    { data: { veterinaire_id: id } }
-  )
+  // Vérifie si un compte auth existe déjà pour cet email
+  const { data: existingUsers } = await adminClient.auth.admin.listUsers()
+  const existingUser = existingUsers?.users?.find((u) => u.email === vet.email)
 
-  if (inviteError) return { error: inviteError.message }
+  let authUserId: string
 
-  // Lie immédiatement le user_id au véto
+  if (existingUser) {
+    // Compte existant → on le lie sans ré-envoyer d'invitation
+    authUserId = existingUser.id
+  } else {
+    // Nouveau compte → envoie l'invitation par email
+    const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
+      vet.email,
+      { data: { veterinaire_id: id } }
+    )
+    if (inviteError) return { error: inviteError.message }
+    authUserId = inviteData.user.id
+  }
+
+  // Lie le user_id au vétérinaire
   const { error: updateError } = await adminClient
     .from('veterinaires')
-    .update({ user_id: inviteData.user.id })
+    .update({ user_id: authUserId })
     .eq('id', id)
 
   if (updateError) return { error: updateError.message }
 
   revalidatePath('/admin/veterinaires')
-  return { success: true, email: vet.email }
+  return { success: true, email: vet.email, alreadyExists: !!existingUser }
 }
 
 export async function toggleVeterinaireActif(id: string, actif: boolean) {
