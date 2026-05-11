@@ -57,7 +57,8 @@ function genererGrille(annee: number, mois: number): Array<string | null> {
 
 function estWeekend(dateISO: string): boolean {
   const j = new Date(dateISO + 'T12:00:00Z').getUTCDay()
-  return j === 0 || j === 6
+  // Vendredi (5) + Samedi (6) + Dimanche (0) — le vendredi soir fait partie du bloc WE
+  return j === 0 || j === 5 || j === 6
 }
 
 function estPasse(dateISO: string): boolean {
@@ -148,20 +149,22 @@ export function MonthView({ gardes, periodes, anneeMois, isAdmin = false }: Mont
 
       {/* Info période */}
       {periode && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
-          <span className="capitalize">{periode.saison}</span>
-          <span>·</span>
-          <span>
-            {new Date(periode.date_debut).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-            {' → '}
-            {new Date(periode.date_fin).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+        <div className="flex items-center gap-3 rounded-lg bg-primary/6 border border-primary/15 px-3 py-2 flex-wrap">
+          <span className="text-sm font-medium text-foreground capitalize">
+            {periode.saison === 'ete' ? 'Été' : 'Hiver'}
+            {periode.numero ? ` — Période ${periode.numero}` : ''}
           </span>
-          <span>·</span>
+          <span className="text-muted-foreground/60 text-xs hidden sm:block">|</span>
+          <span className="text-sm text-muted-foreground">
+            {new Date(periode.date_debut + 'T12:00:00Z').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+            {' → '}
+            {new Date(periode.date_fin + 'T12:00:00Z').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </span>
           {periode.statut === 'publie'
-            ? <Badge variant="default">Publié</Badge>
+            ? <Badge className="bg-green-100 text-green-800 border border-green-200 ml-auto">Publié</Badge>
             : periode.statut === 'verrouille'
-              ? <Badge variant="secondary">Verrouillé</Badge>
-              : <Badge variant="outline">Brouillon</Badge>
+              ? <Badge variant="secondary" className="ml-auto">Verrouillé</Badge>
+              : <Badge variant="outline" className="ml-auto">Brouillon</Badge>
           }
         </div>
       )}

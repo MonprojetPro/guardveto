@@ -20,8 +20,9 @@ export function Header({ veterinaire }: HeaderProps) {
   return (
     <header className="h-14 border-b border-border bg-card flex items-center justify-between px-4 shrink-0">
       {/* Titre page — remplacé dynamiquement par chaque page si besoin */}
+      {/* Logo — visible uniquement sur mobile (la sidebar l'affiche sur desktop) */}
       <div className="flex items-center gap-2">
-        <span className="font-heading font-semibold text-foreground text-lg hidden sm:block">
+        <span className="font-heading font-bold text-primary text-xl block md:hidden">
           GuardVeto
         </span>
       </div>

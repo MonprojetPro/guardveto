@@ -159,7 +159,7 @@ export function ActionBar({ periodes, periodesAvecGardes }: ActionBarProps) {
           <Button
             onClick={handleGenerer}
             disabled={generating || !periodeId}
-            className="bg-cyan-600 hover:bg-cyan-700 text-white"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             {generating ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -172,7 +172,7 @@ export function ActionBar({ periodes, periodesAvecGardes }: ActionBarProps) {
           <Button
             onClick={handlePublier}
             disabled={publishing || !peutPublier}
-            className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
+            className="bg-accent hover:bg-accent/90 text-accent-foreground disabled:opacity-50"
           >
             {publishing ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />

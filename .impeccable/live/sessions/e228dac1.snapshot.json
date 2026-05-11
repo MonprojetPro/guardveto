@@ -1,0 +1,24 @@
+{
+  "id": "e228dac1",
+  "phase": "accept_requested",
+  "pageUrl": "/admin/veterinaires",
+  "sourceFile": null,
+  "expectedVariants": 3,
+  "arrivedVariants": 3,
+  "visibleVariant": 3,
+  "paramValues": {},
+  "pendingEventSeq": 10,
+  "pendingEvent": {
+    "type": "accept",
+    "id": "e228dac1",
+    "variantId": "3"
+  },
+  "deliveryLease": null,
+  "checkpointRevision": 21,
+  "activeOwner": "90f27f67",
+  "sourceMarkers": {},
+  "fallbackMode": null,
+  "annotationArtifacts": [],
+  "diagnostics": [],
+  "updatedAt": "2026-05-11T08:36:25.274Z"
+}

@@ -2,8 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Pencil, PowerOff, Power, ChevronDown, ChevronUp } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { Pencil, PowerOff, Power, ChevronDown, ChevronUp, ShieldCheck, Star, UserX, CircleOff, Briefcase, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { VeterinaireForm } from './VeterinaireForm'
 import { ContraintesSection } from './ContraintesSection'
@@ -36,85 +35,87 @@ export function VeterinaireCard({ veterinaire, contraintes, vets }: VeterinaireC
   return (
     <>
       <div
-        className={`rounded-lg border bg-background transition-opacity ${
+        className={`rounded-lg border bg-card transition-opacity ${
           veterinaire.actif ? 'border-border opacity-100' : 'border-border/50 opacity-60'
         }`}
       >
         {/* Ligne principale */}
-        <div className="flex items-center gap-3 p-3">
-          {/* Avatar couleur */}
-          <div
-            className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
-            style={{ backgroundColor: veterinaire.couleur }}
-          >
-            {veterinaire.prenom.charAt(0)}
-          </div>
-
-          {/* Infos */}
-          <div className="flex-1 min-w-0">
-            <p className="font-medium text-sm text-foreground">
-              {veterinaire.prenom} {veterinaire.nom}
-            </p>
-            <p className="text-xs text-muted-foreground truncate">{veterinaire.email}</p>
-          </div>
-
-          {/* Badges */}
-          <div className="hidden sm:flex items-center gap-2 shrink-0">
-            <Badge variant="outline" className="text-xs capitalize">
-              {veterinaire.statut === 'associe' ? 'Associé' : 'Salarié'}
-            </Badge>
-            <Badge
-              variant={veterinaire.role_app === 'admin' ? 'default' : 'secondary'}
-              className="text-xs capitalize"
+        <div className="flex items-stretch gap-0">
+          <div className="flex items-center gap-3 px-3 py-2.5 flex-1 min-w-0">
+            <div
+              className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
+              style={{ backgroundColor: veterinaire.couleur }}
             >
-              {veterinaire.role_app}
-            </Badge>
-            {veterinaire.dernier_recours && (
-              <Badge variant="outline" className="text-xs text-muted-foreground">
-                Dernier recours
-              </Badge>
-            )}
-            {!veterinaire.actif && (
-              <Badge variant="destructive" className="text-xs">Inactif</Badge>
-            )}
-            {!veterinaire.user_id && (
-              <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">
-                Sans compte
-              </Badge>
-            )}
+              {veterinaire.prenom.charAt(0)}
+            </div>
+            <div className="flex-1 min-w-0 space-y-0.5">
+              <p className="font-semibold text-sm text-foreground leading-snug truncate">
+                {veterinaire.prenom} {veterinaire.nom}
+              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-xs text-muted-foreground">{veterinaire.email}</p>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {/* Statut contrat */}
+                  {veterinaire.statut === 'associe' ? (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-[11px] font-medium leading-none">
+                      <Users className="w-3 h-3" />
+                      Associé
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground text-[11px] font-medium leading-none">
+                      <Briefcase className="w-3 h-3" />
+                      Salarié
+                    </span>
+                  )}
+                  {/* Rôle admin */}
+                  {veterinaire.role_app === 'admin' && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-primary text-primary-foreground text-[11px] font-semibold leading-none">
+                      <ShieldCheck className="w-3 h-3" />
+                      Admin
+                    </span>
+                  )}
+                  {/* Dernier recours */}
+                  {veterinaire.dernier_recours && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-violet-100 text-violet-700 text-[11px] font-medium leading-none">
+                      <Star className="w-3 h-3" />
+                      Dernier recours
+                    </span>
+                  )}
+                  {/* Inactif */}
+                  {!veterinaire.actif && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-destructive/10 text-destructive text-[11px] font-medium leading-none">
+                      <CircleOff className="w-3 h-3" />
+                      Inactif
+                    </span>
+                  )}
+                  {/* Sans compte */}
+                  {!veterinaire.user_id && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-medium leading-none">
+                      <UserX className="w-3 h-3" />
+                      Sans compte
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-
-          {/* Actions */}
-          <div className="flex items-center gap-1 shrink-0">
-            {/* Toggle contraintes */}
+          <div className="flex items-center gap-1 px-2 bg-muted/40 border-l border-border shrink-0">
             <Button
-              variant="ghost"
-              size="icon"
+              variant="ghost" size="icon"
               className="h-8 w-8 relative"
               onClick={() => setContraintesOpen((o) => !o)}
               title={`Contraintes (${contraintes.length})`}
             >
-              {contraintesOpen ? (
-                <ChevronUp className="w-3.5 h-3.5" />
-              ) : (
-                <ChevronDown className="w-3.5 h-3.5" />
-              )}
+              {contraintesOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               {contraintes.length > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-primary text-[9px] text-primary-foreground flex items-center justify-center font-bold">
                   {contraintes.length}
                 </span>
               )}
             </Button>
-
-            <Button
-              variant="ghost" size="icon"
-              className="h-8 w-8"
-              onClick={() => setEditOpen(true)}
-              title="Modifier"
-            >
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditOpen(true)} title="Modifier">
               <Pencil className="w-3.5 h-3.5" />
             </Button>
-
             <Button
               variant="ghost" size="icon"
               className={`h-8 w-8 ${veterinaire.actif ? 'text-destructive hover:text-destructive' : 'text-emerald-600 hover:text-emerald-600'}`}

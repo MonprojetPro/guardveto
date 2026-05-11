@@ -57,9 +57,14 @@ export function Sidebar({ veterinaire, nbSouhaits = 0 }: SidebarProps) {
               )}
             >
               {Icon && <Icon className="w-4 h-4 shrink-0" />}
+
               <span className="flex-1">{item.label}</span>
+
               {showBadge && (
-                <span className="ml-auto min-w-[1.25rem] h-5 px-1 rounded-full bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center">
+                <span
+                  className="ml-auto min-w-[1.25rem] h-5 px-1 rounded-full text-white text-[10px] font-bold flex items-center justify-center"
+                  style={{ backgroundColor: 'var(--warning)' }}
+                >
                   {nbSouhaits > 9 ? '9+' : nbSouhaits}
                 </span>
               )}

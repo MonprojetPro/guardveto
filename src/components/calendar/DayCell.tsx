@@ -45,7 +45,7 @@ export function DayCell({
   // Classes de fond selon l'état
   const classFond = [
     'min-h-[64px] md:min-h-[80px] rounded-lg border p-1.5 md:p-2 flex flex-col gap-1 transition-colors',
-    estWeekend && !estPasse ? 'bg-primary/4 border-border/60' : '',
+    estWeekend && !estPasse ? 'bg-primary/10 border-primary/20' : '',
     estWeekend && estPasse ? 'bg-muted/30 border-border/30' : '',
     !estWeekend && estPasse ? 'bg-muted/20 border-border/30' : '',
     !estWeekend && !estPasse ? 'bg-card border-border/50' : '',

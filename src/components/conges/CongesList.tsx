@@ -101,7 +101,7 @@ export function CongesList({ conges, vets, currentUserId, isAdmin }: CongesListP
     const statutCfg = STATUT_CONFIG[c.statut]
 
     return (
-      <div className="flex items-center gap-3 p-3.5 rounded-lg border border-border bg-background">
+      <div className="flex items-center gap-3 p-3.5 rounded-lg border border-border bg-card">
         {isAdmin && showVet ? (
           <div
             className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
@@ -219,7 +219,7 @@ export function CongesList({ conges, vets, currentUserId, isAdmin }: CongesListP
             <button
               key={vet.id}
               onClick={() => { setAddDefaultVet(vet.id); setAddOpen(true) }}
-              className="flex items-center gap-2.5 p-3 rounded-lg border border-border bg-background hover:bg-muted/40 transition-colors text-left"
+              className="flex items-center gap-2.5 p-3 rounded-lg border border-border bg-card hover:bg-muted/40 transition-colors text-left"
             >
               <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: vet.couleur }}>
                 {vet.prenom.charAt(0)}

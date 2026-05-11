@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-11T00:00:00.000Z",
+  "title": "Design System: GuardVeto",
+  "extensions": {
+    "colorMeta": {
+      "primary":       { "role": "primary",   "displayName": "Cyan Profond",       "canonical": "oklch(0.565 0.155 212.6)", "tonalRamp": ["oklch(0.15 0.040 212)","oklch(0.25 0.070 212)","oklch(0.38 0.110 212)","oklch(0.47 0.135 212)","oklch(0.565 0.155 212)","oklch(0.68 0.120 210)","oklch(0.80 0.080 210)","oklch(0.93 0.030 210)"] },
+      "primary-light": { "role": "secondary",  "displayName": "Cyan Vif",           "canonical": "oklch(0.804 0.144 210.4)", "tonalRamp": ["oklch(0.30 0.100 210)","oklch(0.45 0.130 210)","oklch(0.60 0.145 210)","oklch(0.70 0.145 210)","oklch(0.804 0.144 210)","oklch(0.87 0.100 210)","oklch(0.92 0.060 210)","oklch(0.97 0.020 210)"] },
+      "background":    { "role": "neutral",    "displayName": "Fond Cyan Pâle",     "canonical": "oklch(0.975 0.019 207.1)", "tonalRamp": ["oklch(0.80 0.019 207)","oklch(0.85 0.019 207)","oklch(0.89 0.019 207)","oklch(0.92 0.019 207)","oklch(0.950 0.019 207)","oklch(0.963 0.019 207)","oklch(0.975 0.019 207)","oklch(0.990 0.010 207)"] },
+      "surface":       { "role": "neutral",    "displayName": "Blanc Surface",      "canonical": "oklch(1 0 0)",             "tonalRamp": ["oklch(0.90 0 0)","oklch(0.93 0 0)","oklch(0.95 0 0)","oklch(0.97 0 0)","oklch(0.985 0 0)","oklch(0.993 0 0)","oklch(0.997 0 0)","oklch(1 0 0)"] },
+      "foreground":    { "role": "neutral",    "displayName": "Cyan Très Foncé",    "canonical": "oklch(0.333 0.094 212.8)", "tonalRamp": ["oklch(0.15 0.094 212)","oklch(0.22 0.094 212)","oklch(0.280 0.094 212)","oklch(0.333 0.094 212)","oklch(0.43 0.070 212)","oklch(0.55 0.050 212)","oklch(0.70 0.030 212)","oklch(0.85 0.015 212)"] },
+      "muted-text":    { "role": "neutral",    "displayName": "Gris Ardoise",       "canonical": "oklch(0.452 0.028 261.1)", "tonalRamp": ["oklch(0.20 0.028 261)","oklch(0.30 0.028 261)","oklch(0.380 0.028 261)","oklch(0.452 0.028 261)","oklch(0.55 0.020 261)","oklch(0.65 0.015 261)","oklch(0.78 0.010 261)","oklch(0.91 0.005 261)"] },
+      "accent-cta":    { "role": "tertiary",   "displayName": "Vert Émeraude",      "canonical": "oklch(0.558 0.169 162.5)", "tonalRamp": ["oklch(0.18 0.060 162)","oklch(0.28 0.090 162)","oklch(0.40 0.130 162)","oklch(0.50 0.155 162)","oklch(0.558 0.169 162)","oklch(0.67 0.130 162)","oklch(0.78 0.090 162)","oklch(0.91 0.040 162)"] },
+      "danger":        { "role": "tertiary",   "displayName": "Rouge Vif",          "canonical": "oklch(0.577 0.245 27.3)",  "tonalRamp": ["oklch(0.20 0.100 27)","oklch(0.30 0.150 27)","oklch(0.42 0.200 27)","oklch(0.52 0.230 27)","oklch(0.577 0.245 27)","oklch(0.68 0.200 27)","oklch(0.79 0.140 27)","oklch(0.91 0.070 27)"] },
+      "warning":       { "role": "tertiary",   "displayName": "Ambre Chaud",        "canonical": "oklch(0.705 0.190 75.2)",  "tonalRamp": ["oklch(0.25 0.080 75)","oklch(0.35 0.110 75)","oklch(0.47 0.150 75)","oklch(0.580 0.175 75)","oklch(0.705 0.190 75)","oklch(0.80 0.150 75)","oklch(0.88 0.100 75)","oklch(0.95 0.040 75)"] },
+      "border":        { "role": "neutral",    "displayName": "Bordure Cyan Pâle",  "canonical": "oklch(0.900 0.030 207.1)", "tonalRamp": ["oklch(0.60 0.030 207)","oklch(0.70 0.030 207)","oklch(0.78 0.030 207)","oklch(0.84 0.030 207)","oklch(0.900 0.030 207)","oklch(0.930 0.025 207)","oklch(0.955 0.020 207)","oklch(0.975 0.015 207)"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display",  "purpose": "Titres de pages. Un seul par écran, en haut de la zone de contenu." },
+      "headline": { "displayName": "Headline", "purpose": "Titres de sections et de cartes." },
+      "body":     { "displayName": "Body",     "purpose": "Texte courant, données, descriptions. Max 65ch." },
+      "label":    { "displayName": "Label",    "purpose": "Labels de champs, textes de boutons, navigation." },
+      "badge":    { "displayName": "Badge",    "purpose": "Noms dans les badges de calendrier. Lisible à 10-11px." }
+    },
+    "shadows": [
+      { "name": "ambient-subtle", "value": "0 1px 2px oklch(0 0 0 / 0.05)", "purpose": "Cartes d'action uniquement (ActionBar, cartes admin). Séparation subtile du fond, pas de flottement." }
+    ],
+    "motion": [
+      { "name": "ease-state",    "value": "cubic-bezier(0.0, 0.0, 0.2, 1.0)", "purpose": "Transitions d'état (hover, active, focus). 150ms." },
+      { "name": "ease-enter",    "value": "cubic-bezier(0.0, 0.0, 0.2, 1.0)", "purpose": "Éléments qui entrent dans la vue (toasts, modales). 200ms." },
+      { "name": "ease-exit",     "value": "cubic-bezier(0.4, 0.0, 1.0, 1.0)", "purpose": "Éléments qui quittent la vue. 150ms." }
+    ],
+    "breakpoints": [
+      { "name": "mobile",  "value": "0px",    "note": "Mobile-first. Bottom nav, calendrier compact, badges initiaux." },
+      { "name": "sm",      "value": "640px",  "note": "Textes de nav visibles dans le header." },
+      { "name": "md",      "value": "768px",  "note": "Sidebar desktop visible, bottom nav masquée." },
+      { "name": "lg",      "value": "1024px", "note": "Sidebar étendue (240px), contenu max-width 1200px." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Bouton Primary",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Action principale. Un seul par zone d'écran. Ex: Générer le planning.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"margin-right:6px\"><path d=\"M15 4V2\"/><path d=\"M15 16v-2\"/><path d=\"M8 9h2\"/><path d=\"M20 9h2\"/><path d=\"m19 4-1.5 1.5\"/><path d=\"m13 9.5 1 1\"/><path d=\"m19 14-1.5-1.5\"/><path d=\"M13 4.5 11.5 6\"/><path d=\"M3 21c.83-2.33 2.67-2.33 3.5-4a4.002 4.002 0 0 0-7 0c.83 1.67 2.67 1.67 3.5 4Z\"/><path d=\"M6.5 16.5v2\"/></svg>Générer le planning</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; background: #0891B2; color: #ffffff; padding: 10px 16px; border-radius: 8px; border: none; font-family: 'Noto Sans', sans-serif; font-size: 0.875rem; font-weight: 500; line-height: 1.4; cursor: pointer; transition: background 150ms cubic-bezier(0,0,0.2,1), opacity 150ms cubic-bezier(0,0,0.2,1); } .ds-btn-primary:hover { background: #0772a1; } .ds-btn-primary:focus-visible { outline: 2px solid #0891B2; outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Bouton CTA (Publier)",
+      "kind": "button",
+      "refersTo": "button-cta",
+      "description": "Confirmation et publication uniquement. Vert émeraude = action irréversible positive.",
+      "html": "<button class=\"ds-btn-cta\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"margin-right:6px\"><path d=\"m22 2-7 20-4-9-9-4Z\"/><path d=\"M22 2 11 13\"/></svg>Publier</button>",
+      "css": ".ds-btn-cta { display: inline-flex; align-items: center; background: #059669; color: #ffffff; padding: 10px 16px; border-radius: 8px; border: none; font-family: 'Noto Sans', sans-serif; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: background 150ms cubic-bezier(0,0,0.2,1), opacity 150ms; } .ds-btn-cta:hover { background: #047857; } .ds-btn-cta:focus-visible { outline: 2px solid #059669; outline-offset: 2px; } .ds-btn-cta:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Bouton Outline",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Actions secondaires (Exporter PDF, Annuler).",
+      "html": "<button class=\"ds-btn-outline\">Exporter PDF</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; background: transparent; color: #164E63; padding: 10px 16px; border-radius: 8px; border: 1px solid #CCE8EF; font-family: 'Noto Sans', sans-serif; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: background 150ms cubic-bezier(0,0,0.2,1), color 150ms; } .ds-btn-outline:hover { background: #ECFEFF; color: #0891B2; border-color: #0891B2; } .ds-btn-outline:focus-visible { outline: 2px solid #0891B2; outline-offset: 2px; }"
+    },
+    {
+      "name": "Input texte",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Champ de formulaire standard (email, mot de passe, commentaire).",
+      "html": "<div class=\"ds-field\"><label class=\"ds-label\" for=\"ds-input-demo\">Email</label><input class=\"ds-input\" id=\"ds-input-demo\" type=\"email\" placeholder=\"prenom@cabinet.fr\" /></div>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 6px; } .ds-label { font-family: 'Noto Sans', sans-serif; font-size: 0.875rem; font-weight: 500; color: #164E63; } .ds-input { background: #ffffff; color: #164E63; border: 1px solid #CCE8EF; border-radius: 8px; padding: 8px 12px; font-family: 'Noto Sans', sans-serif; font-size: 1rem; font-weight: 400; width: 100%; transition: border-color 150ms cubic-bezier(0,0,0.2,1), box-shadow 150ms; } .ds-input::placeholder { color: #475569; opacity: 0.6; } .ds-input:focus { outline: none; border-color: #0891B2; box-shadow: 0 0 0 2px oklch(0.565 0.155 212.6 / 0.2); } .ds-input:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Carte standard",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Conteneur de section. Fond blanc sur fond cyan pâle. Pas de cartes imbriquées.",
+      "html": "<div class=\"ds-card\"><p class=\"ds-card-title\">Souhaits en attente</p><p class=\"ds-card-body\">Fanny — 10-16 mars — Vacances</p></div>",
+      "css": ".ds-card { background: #ffffff; border: 1px solid #CCE8EF; border-radius: 14px; padding: 16px; } .ds-card-title { font-family: 'Figtree', sans-serif; font-size: 1.25rem; font-weight: 600; color: #164E63; margin: 0 0 8px 0; } .ds-card-body { font-family: 'Noto Sans', sans-serif; font-size: 1rem; color: #475569; margin: 0; }"
+    },
+    {
+      "name": "Garde Badge — 1er",
+      "kind": "custom",
+      "refersTo": "garde-badge-premier",
+      "description": "Badge vétérinaire dans le calendrier. Couleur personnelle + prénom + rang. 1er de garde = opacity 100%.",
+      "html": "<span class=\"ds-garde-badge ds-garde-premier\" style=\"background:#3B82F6\">Anne-So <span class=\"ds-garde-rank\">1</span></span>",
+      "css": ".ds-garde-badge { display: inline-flex; align-items: center; gap: 3px; border-radius: 4px; padding: 2px 6px; color: #ffffff; font-family: 'Noto Sans', sans-serif; font-size: 11px; font-weight: 600; line-height: 1; max-width: 100%; } .ds-garde-premier { opacity: 1; } .ds-garde-rank { color: rgba(255,255,255,0.70); font-weight: 400; flex-shrink: 0; }"
+    },
+    {
+      "name": "Garde Badge — 2nd",
+      "kind": "custom",
+      "refersTo": "garde-badge-second",
+      "description": "Badge vétérinaire 2nd de garde. Opacity 82% pour distinguer visuellement du 1er.",
+      "html": "<span class=\"ds-garde-badge ds-garde-second\" style=\"background:#8B5CF6\">Fanny <span class=\"ds-garde-rank\">2</span></span>",
+      "css": ".ds-garde-badge { display: inline-flex; align-items: center; gap: 3px; border-radius: 4px; padding: 2px 6px; color: #ffffff; font-family: 'Noto Sans', sans-serif; font-size: 11px; font-weight: 600; line-height: 1; } .ds-garde-second { opacity: 0.82; } .ds-garde-rank { color: rgba(255,255,255,0.70); font-weight: 400; flex-shrink: 0; }"
+    },
+    {
+      "name": "Cellule Calendrier — Week-end",
+      "kind": "custom",
+      "description": "Cellule de jour vendredi/samedi/dimanche. Fond cyan teinté pour signaler le bloc de garde WE.",
+      "html": "<div class=\"ds-day-cell ds-day-weekend\"><div class=\"ds-day-header\"><span class=\"ds-day-num\">11</span></div><span class=\"ds-garde-badge\" style=\"background:#10B981\">Jean <span class=\"ds-garde-rank\">1</span></span><span class=\"ds-garde-badge ds-garde-second\" style=\"background:#3B82F6\">Anne-So <span class=\"ds-garde-rank\">2</span></span></div>",
+      "css": ".ds-day-cell { min-height: 80px; border-radius: 10px; border: 1px solid; padding: 6px 8px; display: flex; flex-direction: column; gap: 3px; transition: background 150ms; } .ds-day-weekend { background: oklch(0.565 0.155 212.6 / 0.10); border-color: oklch(0.565 0.155 212.6 / 0.20); } .ds-day-header { display: flex; align-items: center; justify-content: space-between; } .ds-day-num { font-family: 'Noto Sans', sans-serif; font-size: 12px; font-weight: 600; color: #164E63; } .ds-garde-badge { display: inline-flex; align-items: center; gap: 3px; border-radius: 4px; padding: 2px 6px; color: #fff; font-size: 11px; font-weight: 600; line-height: 1; margin-top: 2px; } .ds-garde-second { opacity: 0.82; } .ds-garde-rank { color: rgba(255,255,255,0.70); font-weight: 400; }"
+    },
+    {
+      "name": "Bandeau Info Période",
+      "kind": "custom",
+      "description": "Ligne d'info période au-dessus du calendrier. Fond primary/6 avec bordure primary/15.",
+      "html": "<div class=\"ds-periode-band\"><span class=\"ds-periode-label\">Hiver — Période 2</span><span class=\"ds-periode-sep\">|</span><span class=\"ds-periode-dates\">1 déc → 23 fév 2027</span><span class=\"ds-periode-badge ds-badge-publie\">Publié</span></div>",
+      "css": ".ds-periode-band { display: flex; align-items: center; gap: 12px; border-radius: 10px; background: oklch(0.565 0.155 212.6 / 0.06); border: 1px solid oklch(0.565 0.155 212.6 / 0.15); padding: 8px 12px; flex-wrap: wrap; } .ds-periode-label { font-family: 'Noto Sans', sans-serif; font-size: 0.875rem; font-weight: 500; color: #164E63; } .ds-periode-sep { color: #CCE8EF; font-size: 0.75rem; } .ds-periode-dates { font-family: 'Noto Sans', sans-serif; font-size: 0.875rem; color: #475569; } .ds-periode-badge { margin-left: auto; font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 9999px; } .ds-badge-publie { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "L'Agenda Vivant",
+    "overview": "GuardVeto ressemble à l'agenda papier accroché derrière la porte de la salle de repos — celui que tout le monde connaît, que personne n'a besoin d'apprendre, et auquel on fait confiance sans se poser de questions. Il respire. Il est toujours à jour. Il reconnaît les gens par leur prénom et leur couleur, pas par un matricule.\n\nLe système est Restrained (tinted neutrals + accent cyan sur max 15% de la surface) avec une exception délibérée : le calendrier, Full palette par nécessité fonctionnelle. Chaque vétérinaire a une couleur attribuée — pas décorative, fonctionnelle.\n\nCe système rejette deux esthétiques : le blanc aseptisé des logiciels médicaux et le gris poussiéreux des vieux ERP.",
+    "keyCharacteristics": [
+      "Cyan comme couleur principale : chaleureux mais professionnel",
+      "Typographie mixte : Figtree (ronde, amicale) pour les titres, Noto Sans (neutre, lisible) pour les données",
+      "Espacement généreux : app consultée sur mobile entre deux urgences",
+      "Couleurs personnelles : chaque vétérinaire reconnu par sa couleur partout",
+      "Feedback immédiat : chaque action produit un retour visible"
+    ],
+    "rules": [
+      { "name": "La Règle du Fond Teinté",        "body": "Jamais de blanc pur (#FFFFFF) comme fond d'app. Le fond principal est toujours le Fond Cyan Pâle (#ECFEFF). Le blanc surface est réservé aux cartes et éléments qui s'élèvent.", "section": "colors" },
+      { "name": "La Règle du Cyan Concentré",      "body": "Le Cyan Profond n'apparaît que là où il y a une décision à prendre ou une information critique. Pas de titres colorés, pas de bordures décoratives. Sa rareté est son signal.", "section": "colors" },
+      { "name": "La Règle du Contraste de Hiérarchie", "body": "Chaque niveau de titre est au moins 1.25× plus grand que le niveau suivant. Pas d'échelle plate.", "section": "typography" },
+      { "name": "La Règle du Plat par Défaut",     "body": "Pas d'ombres sur les éléments de navigation, badges, inputs, cellules calendrier. La hiérarchie vient de la couche de fond, pas de l'élévation.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do utiliser le Fond Cyan Pâle (#ECFEFF) comme fond d'app, jamais le blanc pur.",
+      "Do réserver le Cyan Profond aux éléments interactifs uniquement.",
+      "Do afficher chaque vétérinaire avec sa couleur personnelle partout où il apparaît.",
+      "Do indiquer le rang (1 ou 2) dans chaque badge de garde.",
+      "Do utiliser Figtree pour les titres, Noto Sans pour le texte courant.",
+      "Do respecter les cibles tactiles minimum 44×44px sur mobile.",
+      "Do colorer vendredi + samedi + dimanche avec le fond weekend (bg-primary/10)."
+    ],
+    "donts": [
+      "Don't utiliser un fond blanc pur comme fond principal d'écran (look médical/clinique rejeté).",
+      "Don't créer un look logiciel d'entreprise vieillissant : pas de tableaux gris, pas d'Arial, pas de menus imbriqués.",
+      "Don't utiliser des gradient texts (background-clip: text).",
+      "Don't utiliser des border-left/right colorées (>1px) comme accent décoratif.",
+      "Don't imbriquer des cartes.",
+      "Don't afficher les vétérinaires sans leur couleur personnelle.",
+      "Don't utiliser le Vert Émeraude pour autre chose que Publié/Confirmé/Succès.",
+      "Don't utiliser le Rouge Vif pour des informations non critiques.",
+      "Don't ajouter des ombres dramatiques.",
+      "Don't réduire les cibles tactiles sous 44×44px sur mobile."
+    ]
+  }
+}
