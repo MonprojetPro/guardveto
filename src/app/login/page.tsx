@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { login } from './actions'
+import { login, resetPassword } from './actions'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,7 @@ import { Stethoscope, Calendar, Shield } from 'lucide-react'
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
+  const [resetSent, setResetSent] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -136,7 +137,23 @@ export default function LoginPage() {
           </Card>
 
           <p className="text-center text-xs text-muted-foreground mt-6">
-            Problème de connexion ? Contactez Anne-Sophie.
+            {resetSent ? (
+              <span className="text-emerald-600">Email de réinitialisation envoyé.</span>
+            ) : (
+              <button
+                className="underline underline-offset-2 hover:text-foreground transition-colors"
+                onClick={() => {
+                  const email = (document.getElementById('email') as HTMLInputElement)?.value
+                  if (!email) { setError('Entrez votre email puis cliquez sur ce lien.'); return }
+                  startTransition(async () => {
+                    await resetPassword(email)
+                    setResetSent(true)
+                  })
+                }}
+              >
+                Mot de passe oublié ?
+              </button>
+            )}
           </p>
         </div>
       </div>

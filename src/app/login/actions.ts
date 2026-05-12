@@ -43,3 +43,12 @@ export async function logout() {
   await supabase.auth.signOut()
   redirect('/login')
 }
+
+export async function resetPassword(email: string) {
+  const supabase = await createClient()
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://guardveto.vercel.app'}/set-password`,
+  })
+  if (error) return { error: error.message }
+  return { success: true }
+}
