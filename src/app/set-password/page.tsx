@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -12,7 +12,15 @@ export default function SetPasswordPage() {
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
   const [isPending, startTransition] = useTransition()
+  const [debugEmail, setDebugEmail] = useState<string>('chargement...')
   const router = useRouter()
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      setDebugEmail(data.user?.email ?? 'aucun utilisateur trouvé')
+    })
+  }, [])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -54,6 +62,9 @@ export default function SetPasswordPage() {
         <div className="text-center space-y-1">
           <h1 className="font-heading text-2xl font-bold text-foreground">Bienvenue sur GuardVeto</h1>
           <p className="text-sm text-muted-foreground">Créez votre mot de passe pour accéder à votre compte</p>
+          <p className="text-xs font-mono bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+            DEBUG session : {debugEmail}
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
