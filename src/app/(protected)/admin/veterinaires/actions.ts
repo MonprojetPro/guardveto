@@ -111,22 +111,17 @@ export async function inviterVeterinaire(id: string) {
       // Compte déjà confirmé et actif → rien à faire
       return { error: 'Ce compte est déjà actif.' }
     }
-    // Compte invité mais non confirmé → renvoie l'invitation
-    const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
-      vet.email,
-      { data: { veterinaire_id: id } }
-    )
-    if (inviteError) return { error: inviteError.message }
-    authUserId = inviteData?.user?.id ?? existingUser.id
-  } else {
-    // Nouveau compte → envoie l'invitation par email
-    const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
-      vet.email,
-      { data: { veterinaire_id: id } }
-    )
-    if (inviteError) return { error: inviteError.message }
-    authUserId = inviteData.user.id
+    // Compte invité mais non confirmé → supprime et ré-invite pour générer un nouveau lien
+    await adminClient.auth.admin.deleteUser(existingUser.id)
   }
+
+  // Invite (nouveau ou après suppression)
+  const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
+    vet.email,
+    { data: { veterinaire_id: id } }
+  )
+  if (inviteError) return { error: inviteError.message }
+  authUserId = inviteData.user.id
 
   // Lie le user_id au vétérinaire (si pas encore lié)
   if (!vet.user_id) {
