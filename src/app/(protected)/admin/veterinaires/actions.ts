@@ -123,17 +123,12 @@ export async function inviterVeterinaire(id: string) {
   if (inviteError) return { error: inviteError.message }
   authUserId = inviteData.user.id
 
-  // Lie le user_id au vétérinaire (si pas encore lié)
-  if (!vet.user_id) {
-    const { error: updateError } = await adminClient
-      .from('veterinaires')
-      .update({ user_id: authUserId })
-      .eq('id', id)
-    if (updateError) return { error: updateError.message }
-  }
-
-  // Marque l'invitation comme en attente
-  await adminClient.from('veterinaires').update({ invite_pending: true }).eq('id', id)
+  // Met à jour user_id et invite_pending (toujours, car l'auth user peut avoir changé)
+  const { error: updateError } = await adminClient
+    .from('veterinaires')
+    .update({ user_id: authUserId, invite_pending: true })
+    .eq('id', id)
+  if (updateError) return { error: updateError.message }
 
   revalidatePath('/admin/veterinaires')
   return { success: true, email: vet.email }
