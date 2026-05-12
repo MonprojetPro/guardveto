@@ -14,6 +14,7 @@ export type Saison = 'ete' | 'hiver'
 export interface Veterinaire {
   id: string
   user_id: string | null
+  invite_pending: boolean
   nom: string
   prenom: string
   email: string

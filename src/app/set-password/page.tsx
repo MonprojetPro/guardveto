@@ -29,11 +29,20 @@ export default function SetPasswordPage() {
 
     startTransition(async () => {
       const supabase = createClient()
-      const { error } = await supabase.auth.updateUser({ password })
-      if (error) {
-        setError(error.message)
-        return
+
+      // Définit le mot de passe
+      const { error: updateError } = await supabase.auth.updateUser({ password })
+      if (updateError) { setError(updateError.message); return }
+
+      // Récupère l'utilisateur pour retrouver sa fiche véto et lever invite_pending
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await supabase
+          .from('veterinaires')
+          .update({ invite_pending: false })
+          .eq('user_id', user.id)
       }
+
       router.push('/planning')
     })
   }

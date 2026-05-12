@@ -132,6 +132,9 @@ export async function inviterVeterinaire(id: string) {
     if (updateError) return { error: updateError.message }
   }
 
+  // Marque l'invitation comme en attente
+  await adminClient.from('veterinaires').update({ invite_pending: true }).eq('id', id)
+
   revalidatePath('/admin/veterinaires')
   return { success: true, email: vet.email }
 }

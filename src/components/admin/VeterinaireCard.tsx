@@ -96,11 +96,17 @@ export function VeterinaireCard({ veterinaire, contraintes, vets }: VeterinaireC
                       Inactif
                     </span>
                   )}
-                  {/* Sans compte */}
+                  {/* Sans compte / Invitation en attente */}
                   {!veterinaire.user_id && (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-medium leading-none">
                       <UserX className="w-3 h-3" />
                       Sans compte
+                    </span>
+                  )}
+                  {veterinaire.user_id && veterinaire.invite_pending && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-orange-50 text-orange-600 border border-orange-200 text-[11px] font-medium leading-none">
+                      <MailPlus className="w-3 h-3" />
+                      Invitation envoyée
                     </span>
                   )}
                 </div>
