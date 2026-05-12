@@ -43,7 +43,8 @@ export default function SetPasswordPage() {
           .eq('user_id', user.id)
       }
 
-      router.push('/planning')
+      // Rechargement complet pour que le serveur lise les nouveaux cookies de session
+      window.location.href = '/planning'
     })
   }
 
