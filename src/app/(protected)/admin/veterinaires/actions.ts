@@ -93,7 +93,6 @@ export async function inviterVeterinaire(id: string) {
     .single()
 
   if (!vet) return { error: 'Vétérinaire introuvable.' }
-  if (vet.user_id) return { error: 'Ce vétérinaire a déjà un compte.' }
 
   // Client admin avec service_role
   const adminClient = createAdminClient(
