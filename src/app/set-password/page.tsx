@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useTransition, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,14 +10,40 @@ export default function SetPasswordPage() {
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
+  const [ready, setReady] = useState(false)
   const [isPending, startTransition] = useTransition()
-  const [debugEmail, setDebugEmail] = useState<string>('chargement...')
-  const router = useRouter()
 
   useEffect(() => {
     const supabase = createClient()
+    const hash = window.location.hash
+
+    // Cas 1 : hash avec access_token (reset direct ou fallback)
+    if (hash && hash.includes('access_token')) {
+      const params = new URLSearchParams(hash.slice(1))
+      const access_token = params.get('access_token') ?? ''
+      const refresh_token = params.get('refresh_token') ?? ''
+
+      if (access_token && refresh_token) {
+        supabase.auth.setSession({ access_token, refresh_token }).then(({ error: err }) => {
+          if (err) {
+            window.location.href = '/login?error=' + encodeURIComponent(err.message)
+            return
+          }
+          // Nettoie le hash de l'URL
+          window.history.replaceState({}, '', window.location.pathname)
+          setReady(true)
+        })
+        return
+      }
+    }
+
+    // Cas 2 : session déjà en cookie (venant de /auth/callback ou /auth/confirm)
     supabase.auth.getUser().then(({ data }) => {
-      setDebugEmail(data.user?.email ?? 'aucun utilisateur trouvé')
+      if (!data.user) {
+        window.location.href = '/login'
+        return
+      }
+      setReady(true)
     })
   }, [])
 
@@ -38,11 +63,9 @@ export default function SetPasswordPage() {
     startTransition(async () => {
       const supabase = createClient()
 
-      // Définit le mot de passe
       const { error: updateError } = await supabase.auth.updateUser({ password })
       if (updateError) { setError(updateError.message); return }
 
-      // Récupère l'utilisateur pour retrouver sa fiche véto et lever invite_pending
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         await supabase
@@ -51,20 +74,24 @@ export default function SetPasswordPage() {
           .eq('user_id', user.id)
       }
 
-      // Rechargement complet pour que le serveur lise les nouveaux cookies de session
       window.location.href = '/planning'
     })
+  }
+
+  if (!ready) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <p className="text-sm text-muted-foreground">Connexion en cours…</p>
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-1">
-          <h1 className="font-heading text-2xl font-bold text-foreground">Bienvenue sur GuardVeto</h1>
-          <p className="text-sm text-muted-foreground">Créez votre mot de passe pour accéder à votre compte</p>
-          <p className="text-xs font-mono bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-            DEBUG session : {debugEmail}
-          </p>
+          <h1 className="font-heading text-2xl font-bold text-foreground">Définir mon mot de passe</h1>
+          <p className="text-sm text-muted-foreground">Choisissez un mot de passe pour accéder à GuardVeto</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -98,7 +125,7 @@ export default function SetPasswordPage() {
           )}
 
           <Button type="submit" className="w-full" disabled={isPending}>
-            {isPending ? 'Enregistrement...' : 'Créer mon compte'}
+            {isPending ? 'Enregistrement...' : 'Valider le mot de passe'}
           </Button>
         </form>
       </div>
