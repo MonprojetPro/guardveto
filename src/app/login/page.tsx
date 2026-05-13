@@ -146,7 +146,8 @@ export default function LoginPage() {
                   const email = (document.getElementById('email') as HTMLInputElement)?.value
                   if (!email) { setError('Entrez votre email puis cliquez sur ce lien.'); return }
                   startTransition(async () => {
-                    await resetPassword(email)
+                    const result = await resetPassword(email)
+                    if (result?.error) { setError(result.error); return }
                     setResetSent(true)
                   })
                 }}
