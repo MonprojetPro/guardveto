@@ -9,7 +9,10 @@ import { Label } from '@/components/ui/label'
 import { Stethoscope, Calendar, Shield } from 'lucide-react'
 
 export default function LoginPage() {
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return new URLSearchParams(window.location.search).get('error')
+  })
   const [resetSent, setResetSent] = useState(false)
   const [isPending, startTransition] = useTransition()
 
