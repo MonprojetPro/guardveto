@@ -35,7 +35,12 @@ export async function proxy(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
   const isLoginPage = pathname === '/login'
-  const isPublicPath = isLoginPage || pathname.startsWith('/_next') || pathname.startsWith('/api')
+  const isPublicPath = isLoginPage
+    || pathname === '/'
+    || pathname.startsWith('/_next')
+    || pathname.startsWith('/api')
+    || pathname.startsWith('/auth/')
+    || pathname === '/set-password'
 
   // Non authentifié → redirige vers /login
   if (!user && !isPublicPath) {
