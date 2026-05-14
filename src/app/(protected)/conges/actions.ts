@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sendBrevoEmail, emailCongeValide, emailCongeRefuse } from '@/lib/brevo'
 import type { CreneauConge, TypeConge } from '@/types'
 
 export interface CongeFormData {
@@ -71,24 +72,92 @@ export async function validerConge(
   date_fin?: string
 ) {
   const supabase = await createClient()
+
+  // Récupère les données du congé + vet AVANT la mise à jour (pour l'email)
+  const { data: conge } = await supabase
+    .from('conges')
+    .select('veterinaire_id, date_debut, date_fin, type, creneau')
+    .eq('id', id)
+    .single()
+
   const update: Record<string, unknown> = { statut: 'valide', valide_par }
   if (date_debut) update.date_debut = date_debut
   if (date_fin) update.date_fin = date_fin
 
   const { error } = await supabase.from('conges').update(update).eq('id', id)
   if (error) return { error: error.message }
+
+  // Notification email (fire-and-forget — n'échoue pas le process principal)
+  if (conge) {
+    const { data: vet } = await supabase
+      .from('veterinaires')
+      .select('email, prenom, nom')
+      .eq('id', conge.veterinaire_id)
+      .single()
+
+    if (vet) {
+      sendBrevoEmail({
+        to: vet.email,
+        toName: `${vet.prenom} ${vet.nom}`,
+        subject: 'Votre demande a été validée — GuardVeto',
+        htmlContent: emailCongeValide({
+          prenom: vet.prenom,
+          type: conge.type,
+          creneau: conge.creneau,
+          date_debut: date_debut ?? conge.date_debut,
+          date_fin: date_fin ?? conge.date_fin,
+        }),
+      }).catch(console.error)
+    }
+  }
+
   revalidatePath('/conges')
   revalidatePath('/admin/demandes')
   return { success: true }
 }
 
-export async function refuserConge(id: string) {
+export async function refuserConge(id: string, raison?: string) {
   const supabase = await createClient()
+
+  // Récupère les données du congé + vet AVANT la mise à jour (pour l'email)
+  const { data: conge } = await supabase
+    .from('conges')
+    .select('veterinaire_id, date_debut, date_fin, type, creneau')
+    .eq('id', id)
+    .single()
+
   const { error } = await supabase
     .from('conges')
-    .update({ statut: 'refuse' })
+    .update({ statut: 'refuse', raison_refus: raison ?? null })
     .eq('id', id)
+
   if (error) return { error: error.message }
+
+  // Notification email
+  if (conge) {
+    const { data: vet } = await supabase
+      .from('veterinaires')
+      .select('email, prenom, nom')
+      .eq('id', conge.veterinaire_id)
+      .single()
+
+    if (vet) {
+      sendBrevoEmail({
+        to: vet.email,
+        toName: `${vet.prenom} ${vet.nom}`,
+        subject: 'Votre demande n\'a pas pu être acceptée — GuardVeto',
+        htmlContent: emailCongeRefuse({
+          prenom: vet.prenom,
+          type: conge.type,
+          creneau: conge.creneau,
+          date_debut: conge.date_debut,
+          date_fin: conge.date_fin,
+          raison: raison ?? null,
+        }),
+      }).catch(console.error)
+    }
+  }
+
   revalidatePath('/conges')
   revalidatePath('/admin/demandes')
   return { success: true }

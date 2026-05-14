@@ -71,6 +71,7 @@ export interface Conge {
   creneau: CreneauConge | null
   statut: StatutConge
   commentaire: string | null
+  raison_refus: string | null
   saisi_par: string | null
   valide_par: string | null
   created_at: string

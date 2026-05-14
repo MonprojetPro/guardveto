@@ -1,11 +1,10 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { toast } from 'sonner'
 import { Check, X, Inbox, CalendarOff, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ValiderCongeDialog } from '@/components/conges/ValiderCongeDialog'
-import { refuserConge } from '@/app/(protected)/conges/actions'
+import { RefuserCongeDialog } from '@/components/conges/RefuserCongeDialog'
 import type { Conge, Veterinaire } from '@/types'
 
 const TYPE_LABELS: Record<string, string> = {
@@ -45,18 +44,11 @@ interface DemandesClientProps {
 
 export function DemandesClient({ demandes, vets, currentVetoId }: DemandesClientProps) {
   const [validerConge, setValiderConge] = useState<Conge | null>(null)
+  const [refuserCongeItem, setRefuserCongeItem] = useState<Conge | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const conges = demandes.filter((d) => d.type !== 'indisponibilite')
   const indispos = demandes.filter((d) => d.type === 'indisponibilite')
-
-  const handleRefuser = (id: string) => {
-    startTransition(async () => {
-      const result = await refuserConge(id)
-      if (result.error) { toast.error(result.error); return }
-      toast.success('Demande refusée')
-    })
-  }
 
   const DemandeRow = ({ d }: { d: Conge }) => {
     const vet = vets.find((v) => v.id === d.veterinaire_id)
@@ -105,7 +97,7 @@ export function DemandesClient({ demandes, vets, currentVetoId }: DemandesClient
           <Button
             variant="ghost" size="icon"
             className="h-8 w-8 text-destructive hover:text-destructive"
-            onClick={() => handleRefuser(d.id)}
+            onClick={() => setRefuserCongeItem(d)}
             disabled={isPending}
             title="Refuser"
           >
@@ -180,6 +172,14 @@ export function DemandesClient({ demandes, vets, currentVetoId }: DemandesClient
           conge={validerConge}
           vet={vets.find((v) => v.id === validerConge.veterinaire_id)}
           currentVetoId={currentVetoId}
+        />
+      )}
+      {refuserCongeItem && (
+        <RefuserCongeDialog
+          open={Boolean(refuserCongeItem)}
+          onClose={() => setRefuserCongeItem(null)}
+          conge={refuserCongeItem}
+          vet={vets.find((v) => v.id === refuserCongeItem.veterinaire_id)}
         />
       )}
     </>

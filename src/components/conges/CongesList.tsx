@@ -98,6 +98,8 @@ export function CongesList({ conges, vets, currentUserId, isAdmin }: CongesListP
     : []
 
   const canEdit = (c: Conge) => isAdmin || c.statut === 'souhait'
+  // Vet peut supprimer ses propres congés (annulation) — admin peut tout supprimer
+  const canDelete = (c: Conge) => isAdmin || c.veterinaire_id === currentUserId
 
   const CongeRow = ({ c, showVet = true, showActions = true }: { c: Conge; showVet?: boolean; showActions?: boolean }) => {
     const vet = vets.find((v) => v.id === c.veterinaire_id)
@@ -133,6 +135,9 @@ export function CongesList({ conges, vets, currentUserId, isAdmin }: CongesListP
             )}
             {c.commentaire && <><span className="mx-1.5 opacity-30">·</span><span className="italic">{c.commentaire}</span></>}
           </p>
+          {!isAdmin && c.statut === 'refuse' && c.raison_refus && (
+            <p className="text-xs text-destructive mt-1 italic">Motif : {c.raison_refus}</p>
+          )}
         </div>
 
         <div className="hidden sm:flex items-center gap-2 shrink-0">
@@ -176,8 +181,8 @@ export function CongesList({ conges, vets, currentUserId, isAdmin }: CongesListP
                   variant="ghost" size="icon"
                   className="h-8 w-8 text-destructive hover:text-destructive"
                   onClick={() => handleDelete(c.id)}
-                  disabled={isPending || !editable}
-                  title={editable ? 'Supprimer' : 'Non supprimable'}
+                  disabled={isPending || !canDelete(c)}
+                  title={canDelete(c) ? 'Supprimer / Annuler' : 'Non supprimable'}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </Button>
