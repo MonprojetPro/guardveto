@@ -17,8 +17,17 @@ export interface CongeFormData {
 export async function createConge(data: CongeFormData, saisi_par: string, isAdmin: boolean) {
   const supabase = await createClient()
 
+  // Pour un veto non-admin, on force le veterinaire_id à celui de l'utilisateur connecté
+  // (évite le cas où le client enverrait un id différent)
+  let veterinaire_id = data.veterinaire_id
+  if (!isAdmin) {
+    const { data: vetId, error: rpcErr } = await supabase.rpc('get_veterinaire_id')
+    if (rpcErr || !vetId) return { error: 'Vétérinaire introuvable ou non authentifié' }
+    veterinaire_id = vetId
+  }
+
   const { error } = await supabase.from('conges').insert({
-    veterinaire_id: data.veterinaire_id,
+    veterinaire_id,
     date_debut: data.date_debut,
     date_fin: data.date_fin,
     type: data.type,

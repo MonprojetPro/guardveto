@@ -122,7 +122,7 @@ export function CongeForm({
     if (!validate()) return
     startTransition(async () => {
       const data = {
-        veterinaire_id: vetId,
+        veterinaire_id: isAdmin ? vetId : currentUserId,
         date_debut: dateDebut,
         date_fin: isIndispo ? dateDebut : dateFin,
         type,
