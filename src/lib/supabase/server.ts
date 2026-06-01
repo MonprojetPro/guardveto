@@ -17,12 +17,12 @@ export async function createClient() {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
     // Mock getUser pour que tout le code applicatif fonctionne sans session
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     client.auth.getUser = async () => ({
       data: { user: { id: DEV_USER_ID } as never },
       error: null,
     })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     return client as any
   }
 

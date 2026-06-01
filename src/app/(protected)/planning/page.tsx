@@ -42,7 +42,6 @@ export default async function PlanningPage({
     .single()
 
   const isAdmin = currentVeto?.role_app === 'admin'
-  const isSecretaire = currentVeto?.role_app === 'secretaire'
 
   // Mois à afficher (searchParam ou mois courant)
   const { mois: moisParam } = await searchParams
@@ -53,18 +52,19 @@ export default async function PlanningPage({
   const { debut, fin } = debutFinMois(anneeMois)
 
   // Chargement parallèle : gardes du mois + toutes les périodes + périodes avec gardes (admin)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const [gardesResult, periodesResult, periodesGardesResult] = await Promise.all([
     supabase.from('planning_semaine').select('*').gte('date', debut).lte('date', fin).order('date'),
     supabase.from('periodes').select('*').order('date_debut', { ascending: false }).limit(20),
     isAdmin ? supabase.from('gardes').select('periode_id').limit(500) : Promise.resolve({ data: null }),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   ]) as any[]
 
   const gardesDb = gardesResult?.data
   const periodesDb = periodesResult?.data
 
-  // Période active du mois affiché (pour le bouton export secrétaire)
+  // Période du mois affiché (pour le bouton export PDF des vétos).
+  // Côté véto, la RLS ne renvoie que les périodes publiées.
   const periodesMois = ((periodesDb as Periode[]) ?? []).filter((p) => {
     return p.date_debut <= fin && p.date_fin >= debut
   })
@@ -120,8 +120,8 @@ export default async function PlanningPage({
         />
       )}
 
-      {/* Bouton export PDF — secrétaire */}
-      {isSecretaire && periodesMois.length > 0 && (
+      {/* Bouton export PDF — vétos (planning publié du mois) */}
+      {!isAdmin && periodesMois.length > 0 && (
         <ExportPdfButton periodeId={periodesMois[0].id} />
       )}
 

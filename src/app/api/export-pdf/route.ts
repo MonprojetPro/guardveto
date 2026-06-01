@@ -3,7 +3,7 @@
 // ============================================================
 // Génère et streame un PDF du planning de la période demandée.
 //
-// Accès : admin + secrétaire
+// Accès : admin (toutes périodes) + véto (périodes publiées uniquement)
 // Params : ?periodeId=<uuid>
 // Réponse : application/pdf (téléchargement direct)
 // ============================================================
@@ -28,8 +28,8 @@ export async function GET(req: NextRequest) {
     .eq('user_id', user.id)
     .single()
 
-  if (!vet || (vet.role_app !== 'admin' && vet.role_app !== 'secretaire')) {
-    return NextResponse.json({ error: 'Accès réservé aux admins et secrétaires.' }, { status: 403 })
+  if (!vet || (vet.role_app !== 'admin' && vet.role_app !== 'veto')) {
+    return NextResponse.json({ error: 'Accès non autorisé.' }, { status: 403 })
   }
 
   // ── Paramètres ──────────────────────────────────────────────
@@ -72,6 +72,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Période introuvable.' }, { status: 404 })
   }
 
+  // Un véto ne peut exporter qu'un planning déjà publié (jamais un brouillon).
+  if (vet.role_app !== 'admin' && !['publie', 'verrouille'].includes(periode.statut)) {
+    return NextResponse.json({ error: "Ce planning n'est pas encore publié." }, { status: 403 })
+  }
+
   if (!gardesDb || gardesDb.length === 0) {
     return NextResponse.json(
       { error: 'Aucune garde générée pour cette période.' },
@@ -100,7 +105,7 @@ export async function GET(req: NextRequest) {
     second_couleur: g.second?.couleur ?? null,
   }))
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const vets: VetoPdf[] = (vetsDb ?? []).map((v: any) => ({
     id:     v.id,
     prenom: v.prenom,

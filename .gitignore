@@ -52,3 +52,10 @@ next-env.d.ts
 # Document de transmission client — JAMAIS sur GitHub
 ACCES-CLIENT.md
 code google cloud.json
+
+# Ruflo runtime (MPP v4.0) — ne jamais committer
+.claude-flow/
+data/
+logs/
+sessions/
+_backups/

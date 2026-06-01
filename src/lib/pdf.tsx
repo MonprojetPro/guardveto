@@ -299,9 +299,9 @@ function CellContent({
   date: string | null
   garde: GardePdf | null
   ferieNom?: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   style: any
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   numStyle: any
 }) {
   if (!date) return <View style={S.cellEmpty} />

@@ -9,7 +9,6 @@ import { LogOut } from 'lucide-react'
 const ROLE_LABELS: Record<string, string> = {
   admin: 'Admin',
   veto: 'Vétérinaire',
-  secretaire: 'Secrétaire',
 }
 
 interface HeaderProps {

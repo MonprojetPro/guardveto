@@ -36,6 +36,15 @@ function getNbSemaines(debut: string, fin: string) {
   return Math.ceil(diff / 7)
 }
 
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-10 gap-2 text-muted-foreground">
+      <Inbox className="w-8 h-8 opacity-30" />
+      <p className="text-sm">{message}</p>
+    </div>
+  )
+}
+
 interface DemandesClientProps {
   demandes: Conge[]
   vets: Veterinaire[]
@@ -107,13 +116,6 @@ export function DemandesClient({ demandes, vets, currentVetoId }: DemandesClient
       </div>
     )
   }
-
-  const EmptyState = ({ message }: { message: string }) => (
-    <div className="flex flex-col items-center justify-center py-10 gap-2 text-muted-foreground">
-      <Inbox className="w-8 h-8 opacity-30" />
-      <p className="text-sm">{message}</p>
-    </div>
-  )
 
   return (
     <>

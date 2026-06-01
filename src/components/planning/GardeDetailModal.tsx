@@ -236,10 +236,14 @@ export function GardeDetailModal({ garde, date, isAdmin, onClose, onSaved }: Gar
 
   useEffect(() => {
     if (!garde || !isOpen) return
+    // Réinitialisation volontaire de l'état à chaque ouverture de la modale,
+    // juste avant de recharger les disponibilités de la garde sélectionnée.
+    /* eslint-disable react-hooks/set-state-in-effect */
     setLoading(true)
     setData(null)
     setCorrectionMode(false)
     setShowCorriger(false)
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     fetch(`/api/gardes/${garde.id}/disponibilites`)
       .then((r) => r.json())
@@ -250,6 +254,9 @@ export function GardeDetailModal({ garde, date, isAdmin, onClose, onSaved }: Gar
       })
       .catch(() => toast.error('Impossible de charger les disponibilités.'))
       .finally(() => setLoading(false))
+    // On ne dépend que de l'id de la garde (pas de l'objet entier) pour éviter
+    // un rechargement à chaque changement de référence.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [garde?.id, isOpen])
 
   function handleClose() {

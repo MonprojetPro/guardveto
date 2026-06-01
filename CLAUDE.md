@@ -59,7 +59,7 @@
 Voir `docs/regles-metier-gardes.md` et `docs/01-prd.md`
 
 - 7 vétérinaires (dont Anne-Cat = dernier recours)
-- 3 rôles : admin / veto / secretaire
+- 2 rôles : admin / veto
 - Moteur de planning : backtracking TypeScript (pas de solver externe)
 - Périodes : 12 semaines (hiver) ou 17 semaines (été)
 

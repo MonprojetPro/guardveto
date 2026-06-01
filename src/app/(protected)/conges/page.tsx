@@ -15,7 +15,7 @@ export default async function CongesPage() {
     .eq('user_id', user.id)
     .single()
 
-  if (!currentVeto || currentVeto.role_app === 'secretaire') redirect('/planning')
+  if (!currentVeto) redirect('/planning')
 
   const [{ data: vets }, { data: conges }] = await Promise.all([
     supabase.from('veterinaires').select('*').order('nom'),

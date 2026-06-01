@@ -6,7 +6,7 @@ product
 
 ## Users
 
-Équipe de 7 vétérinaires d'un cabinet privé + 1 secrétaire.
+Équipe de 7 vétérinaires d'un cabinet privé.
 Profil type : professionnels de santé animale, non-techniciens, peu à l'aise avec les interfaces complexes.
 Anne-So est l'administratrice (la seule à générer et publier les plannings).
 Les autres utilisateurs consultent leur planning et soumettent leurs souhaits de congés.

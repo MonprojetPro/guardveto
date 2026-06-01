@@ -179,7 +179,7 @@ Un **grand week-end** = vendredi + samedi + dimanche, ou samedi + dimanche + lun
 - Vue **mensuelle** (prioritaire).
 
 ### Export
-- Export **PDF imprimable** pour les secrétaires (format propre, lisible papier).
+- Export **PDF imprimable** par l'admin (format propre, lisible papier).
 - À la demande, à chaque nouveau planning publié.
 
 ### Notifications
