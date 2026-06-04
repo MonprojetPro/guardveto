@@ -66,13 +66,10 @@ export default function SetPasswordPage() {
       const { error: updateError } = await supabase.auth.updateUser({ password })
       if (updateError) { setError(updateError.message); return }
 
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        await supabase
-          .from('veterinaires')
-          .update({ invite_pending: false })
-          .eq('user_id', user.id)
-      }
+      // invite_pending est mis à jour côté serveur via RPC SECURITY DEFINER :
+      // la RLS de `veterinaires` réserve l'UPDATE aux admins, donc un véto ne
+      // peut pas modifier sa fiche directement (la fonction borne sur auth.uid()).
+      await supabase.rpc('marquer_invite_complete')
 
       window.location.href = '/planning'
     })

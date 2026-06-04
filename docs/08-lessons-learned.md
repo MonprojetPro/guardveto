@@ -1,0 +1,77 @@
+# Leçons apprises — GuardVeto
+
+> Registre des pièges rencontrés et des solutions qui ont réellement fonctionné.
+> Tenu par ATLAS. Objectif : ne jamais retomber dans le même piège.
+
+---
+
+## 2026-06-04 — Moteur : binôme de semaine = même véto en 1er ET 2nd (contrainte dure manquante)
+
+**Contexte :** recette, génération d'un planning hiver. 38 des 48 gardes de semaine avaient `premier_id = second_id` (le même véto en 1er et 2nd). Les week-ends étaient corrects.
+
+**Cause racine (prouvée par lecture du code) :** dans `src/engine/rules/hard-constraints.ts`, `isValid` n'avait **aucune règle interdisant que le 1er et le 2nd d'un créneau soient la même personne**. Pour le week-end, c'était garanti *indirectement* par R8 (inversion 1er/2nd) + R9 (même duo que vendredi). Pour la semaine, rien → le solver, en cherchant le 2nd, retrouvait le 1er comme candidat valide (meilleur score d'équité) et le réassignait.
+
+**Fix :** ajout de la règle dure **R21** (`checkR21RolesDistincts`) : un véto déjà dans un rôle d'un créneau ne peut pas occuper l'autre rôle. Branchée dans `isValid`. Conséquence voulue : si un soir n'a pas 2 vétos distincts disponibles, le moteur tombe en **impasse signalée** (route `/api/generate` renvoie `success:false` + `joursNonCouverts`, l'UI affiche l'alerte) — il **n'invente plus** de faux binôme.
+
+**Pourquoi le bug n'avait pas été détecté :** le test `tousLesCreneauxRemplis` vérifiait que `premier_id` ET `second_id` sont **non-null**, mais **jamais qu'ils sont différents**. Un test « les cases sont remplies » ≠ « les cases sont valides ».
+
+**À retenir / réutiliser :**
+1. Quand deux rôles doivent être tenus par des personnes différentes, c'est une **contrainte dure explicite** — ne jamais compter sur le fait que « ça arrivera naturellement ».
+2. Un test de complétude (« pas de null ») doit être doublé d'un test de **validité** (« valeurs distinctes / cohérentes »). Ajout du test de régression `R21 — 1er ≠ 2nd` (solver.test.ts), y compris sur le benchmark 12 semaines.
+3. Principe métier confirmé par MiKL : **si une règle ne peut pas être respectée, SIGNALER l'impasse, ne jamais inventer.**
+
+---
+
+## 2026-06-04 — Emails métier non envoyés : clé SMTP ≠ clé API Brevo
+
+**Contexte :** recette. Les emails de **connexion** (invitation, reset) arrivaient, mais **aucun email métier** (congé validé/refusé, planning publié) n'était reçu. `email_log` vide (mais ce flux ne journalise pas — fausse piste écartée).
+
+**Cause racine (prouvée) :** le compte Brevo **n'avait aucune clé API**. La valeur placée dans `BREVO_API_KEY` (Vercel) était en réalité la **clé/identifiant SMTP** (celle qui sert à Supabase Auth). Or il existe **deux circuits Brevo distincts** :
+- **SMTP** (login + clé SMTP) → utilisé par Supabase pour les emails d'auth. ✅
+- **API transactionnelle v3** (`api.brevo.com/v3/smtp/email`, clé `xkeysib-…`) → utilisée par le code app (`src/lib/brevo.ts`, `src/lib/notifications.ts`) pour les emails métier. ❌ refus « non autorisé » → échec **silencieux** (`sendBrevoEmail` log juste un warn).
+
+**Preuve décisive :** page Brevo « Vos clés API » → « Vous n'avez aucune clé API ». Donc la valeur dans Vercel ne pouvait pas être une clé API valide.
+
+**Fix :** générer une **clé API v3** dans Brevo → remplacer `BREVO_API_KEY` dans Vercel (Production) → **redeploy** → email reçu. Aucun code modifié.
+
+**À retenir / réutiliser :**
+1. SMTP et API Brevo sont **deux mondes** : une config SMTP fonctionnelle ne garantit PAS que l'API marche. Vérifier qu'une **clé API `xkeysib-…`** existe.
+2. L'expéditeur (`BREVO_FROM_EMAIL`) doit être un **sender vérifié** pour l'API. Un `@gmail.com` en expéditeur = délivrabilité fragile → privilégier un **domaine dédié** (lié à la question domaine perso du cabinet).
+3. `sendBrevoEmail` échoue en **silence** (warn) — envisager de journaliser aussi les emails congé dans `email_log` (amélioration traçabilité).
+4. Lié à l'incident SMTP du 2026-06-03 (port 587) : la config email de ce projet a deux étages indépendants, tester **les deux**.
+
+---
+
+## 2026-06-04 — Liens des emails Auth cassés en flux PKCE (reset + invitation)
+
+**Contexte :** recette interne. Le scénario « mot de passe oublié » échoue : l'email arrive bien, mais cliquer le lien renvoie l'utilisateur sur la page de connexion sans jamais ouvrir la session ni proposer de changer le mot de passe.
+
+**Cause racine (prouvée par observation directe) :** l'app Supabase est en **flux PKCE**. Les templates email utilisaient `{{ .ConfirmationURL }}`, qui génère un lien vers le endpoint **hébergé** Supabase `…/auth/v1/verify?token=pkce_…&redirect_to=…/set-password`. Après vérification, Supabase redirige vers `redirect_to` avec un `?code=…` qui **doit être échangé contre une session** (`exchangeCodeForSession`). Or la page d'atterrissage `/set-password` ne gérait que l'ancien flux *implicit* (`#access_token` dans le hash) ou une session déjà en cookie — elle ne faisait **pas** l'échange du `code`. Résultat : pas de session → redirection vers `/login`.
+
+**Preuve décisive :** le token du lien commençait par `pkce_` (ex. `token=pkce_0912d2c1…`), et la barre d'adresse finissait sur `/login` sans session. C'est cette URL réelle — pas une hypothèse — qui a confirmé le flux.
+
+**Fix retenu :** réadresser tous les liens d'action des templates email vers la **route serveur** déjà existante `/auth/confirm` (`src/app/auth/confirm/route.ts`), qui fait `verifyOtp({ type, token_hash })`, ouvre la session en cookie, puis redirige vers `next` :
+```
+{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=<recovery|invite|signup|email_change>&next=<page>
+```
+Aucune modification de code applicatif : la route `/auth/confirm` faisait déjà le bon travail ; seuls les **templates email** (config dashboard) étaient mal adressés.
+
+**Pourquoi c'était non-évident (et dangereux) :**
+- L'**envoi** de l'email fonctionne parfaitement (`recovery_sent_at` bien renseigné en base) → on croit que « les mails marchent ».
+- Le **1er admin invité via le dashboard Supabase** ne passe PAS par ce chemin → le bug reste invisible tant qu'on n'a pas testé un clic sur un lien généré par l'app.
+- Le défaut touche **toute la chaîne d'emails à lien** : reset **ET invitation**. Donc l'onboarding des 6 vétos était cassé sans qu'on le voie — symptôme classique du **kit incomplet** (la fonction « envoyer un email » paraissait finie alors que l'atterrissage était mort).
+
+**À retenir / réutiliser :**
+1. Sur tout projet Supabase **SSR + PKCE**, ne pas utiliser `{{ .ConfirmationURL }}` brut : router les liens vers une route serveur (`/auth/confirm`) avec `token_hash` + `type`.
+2. Tester un **clic réel** sur le lien d'au moins **un** email généré par l'app, pas seulement la réception. La réception ne prouve rien sur l'atterrissage.
+3. Un même flux d'atterrissage doit servir **tous** les emails (reset, invitation, confirmation, changement d'email) — sinon un seul template oublié recasse l'onboarding.
+4. TILT respecté : la cause a été **prouvée par l'URL réelle** (token `pkce_`) avant tout correctif. Aucun fix à l'aveugle.
+
+---
+
+## Leçons antérieures (résumées — détail dans `patch-log.md`)
+
+- **2026-06-01 — Vues `SECURITY DEFINER` contournaient la RLS** : un véto pouvait voir un planning en brouillon. Fix : vues en `security_invoker` + `search_path` figé (migrations 010, 011). → Toujours vérifier que les vues respectent la RLS sur un projet auth-critique.
+- **2026-06-01 — Suppression d'un rôle = traquer TOUS les résidus** : retirer le rôle « secretaire » a nécessité base + policies RLS + code + doc (migration 012). Un résidu = faille ou bug.
+- **2026-06-01 — `node_modules` corrompu en dossier OneDrive** : réinstallation complète nécessaire ; ESLint 9 = flat config native via `eslint-config-next`.
+- **2026-06-01 — Résidu d'outil dev en prod** : un script live-reload `localhost:8400` (outil `impeccable`) traînait dans `layout.tsx` et serait parti en prod. Vérifier les résidus d'outillage avant livraison.

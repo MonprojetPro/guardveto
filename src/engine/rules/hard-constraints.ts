@@ -351,6 +351,33 @@ function checkR19Weekend(slot: SlotGarde, roleVisé: 'premier' | 'second', plann
   return ok()
 }
 
+/**
+ * R21 — 1er et 2nd d'un même créneau = deux vétérinaires DIFFÉRENTS.
+ *
+ * Pour le week-end, c'est déjà garanti indirectement par R8 (inversion 1er/2nd)
+ * et R9 (même duo que vendredi soir). Mais pour les gardes de semaine en hiver,
+ * aucune règle ne l'imposait → le solver pouvait réassigner le 1er comme 2nd
+ * (premier_id === second_id). Cette règle interdit qu'un véto déjà présent dans
+ * un rôle du créneau occupe l'autre rôle.
+ */
+function checkR21RolesDistincts(
+  vet: VetEngine,
+  slot: SlotGarde,
+  roleVisé: 'premier' | 'second',
+  planning: PlanningPartiel
+): ValidationResult {
+  const attr = getAttribution(planning, slot.date, slot.type)
+  if (!attr) return ok()
+
+  if (roleVisé === 'second' && attr.premier_id === vet.id) {
+    return invalid(`R21 : ${vet.prenom} est déjà 1er de garde ce créneau — le 1er et le 2nd doivent être deux vétérinaires différents`)
+  }
+  if (roleVisé === 'premier' && attr.second_id === vet.id) {
+    return invalid(`R21 : ${vet.prenom} est déjà 2nd de garde ce créneau — le 1er et le 2nd doivent être deux vétérinaires différents`)
+  }
+  return ok()
+}
+
 // ── Point d'entrée principal ─────────────────────────────
 
 /**
@@ -380,6 +407,7 @@ export function isValid(
     checkR3ReposConditionnel(vet, slot, planning),
     checkR6DuoInterdit(vet, slot, planning, allVets),
     checkR9VendrediLieWE(vet, slot, planning),
+    checkR21RolesDistincts(vet, slot, roleVisé, planning),
   ]
 
   // R8 uniquement pour les WE
@@ -410,4 +438,5 @@ export {
   checkR17Ete,
   checkR18Hiver,
   checkR19Weekend,
+  checkR21RolesDistincts,
 }

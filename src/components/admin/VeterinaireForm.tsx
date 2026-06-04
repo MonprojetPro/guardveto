@@ -187,6 +187,7 @@ export function VeterinaireForm({ open, onClose, veterinaire }: VeterinaireFormP
               <Select
                 value={form.statut}
                 onValueChange={(v) => setForm({ ...form, statut: v as StatutVeto })}
+                items={{ salarie: 'Salarié', associe: 'Associé' }}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -202,6 +203,7 @@ export function VeterinaireForm({ open, onClose, veterinaire }: VeterinaireFormP
               <Select
                 value={form.role_app}
                 onValueChange={(v) => setForm({ ...form, role_app: v as UserRole })}
+                items={{ veto: 'Véto', admin: 'Admin' }}
               >
                 <SelectTrigger>
                   <SelectValue />

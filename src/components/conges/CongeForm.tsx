@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { toast } from 'sonner'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -76,6 +76,20 @@ export function CongeForm({
   const [creneau, setCreneau] = useState<CreneauConge>(conge?.creneau ?? 'journee')
   const [commentaire, setCommentaire] = useState(conge?.commentaire ?? '')
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Réinitialise le formulaire à chaque ouverture (sinon il garde le contexte de la demande précédente)
+  useEffect(() => {
+    if (!open) return
+    const lundi = lundiDeSemaine(new Date())
+    setVetId(conge?.veterinaire_id ?? defaultVetId ?? vets[0]?.id ?? '')
+    setDateDebut(conge?.date_debut ?? toIso(lundi))
+    setDateFin(conge?.date_fin ?? toIso(dimancheDeSemaine(lundi)))
+    setType(conge?.type ?? 'vacances')
+    setCreneau(conge?.creneau ?? 'journee')
+    setCommentaire(conge?.commentaire ?? '')
+    setErrors({})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, conge, defaultVetId])
 
   const isIndispo = type === 'indisponibilite'
 
@@ -156,7 +170,7 @@ export function CongeForm({
           {/* Type — en premier pour adapter le reste du formulaire */}
           <div className="space-y-1.5">
             <Label>Type de demande</Label>
-            <Select value={type} onValueChange={(v) => v && handleTypeChange(v as TypeConge)}>
+            <Select value={type} onValueChange={(v) => v && handleTypeChange(v as TypeConge)} items={TYPES_CONGE}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {TYPES_CONGE.map((t) => (
@@ -236,7 +250,7 @@ export function CongeForm({
           {isIndispo && (
             <div className="space-y-1.5">
               <Label>Créneau</Label>
-              <Select value={creneau} onValueChange={(v) => v && setCreneau(v as CreneauConge)}>
+              <Select value={creneau} onValueChange={(v) => v && setCreneau(v as CreneauConge)} items={CRENEAUX}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {CRENEAUX.map((c) => (

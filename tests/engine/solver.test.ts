@@ -33,6 +33,13 @@ function compterType(planning: { attributions: Array<{type: string}> }, type: st
   return planning.attributions.filter((a) => a.type === type).length
 }
 
+/** R21 — vérifie qu'aucun créneau n'a le même véto en 1er ET en 2nd */
+function aucunDoublonPremierSecond(planning: { attributions: Array<{premier_id: string|null; second_id: string|null}> }): boolean {
+  return planning.attributions.every(
+    (a) => !(a.premier_id && a.second_id && a.premier_id === a.second_id)
+  )
+}
+
 // ── Scénario 1 : Hiver standard ─────────────────────────
 
 describe('Scénario hiver-standard — 4 semaines, 7 vétos, pas de congés', () => {
@@ -52,6 +59,11 @@ describe('Scénario hiver-standard — 4 semaines, 7 vétos, pas de congés', ()
   it('tous les créneaux ont premier_id et second_id remplis (hiver)', () => {
     if (!result.success) return
     expect(tousLesCreneauxRemplis(result.planning, 'hiver')).toBe(true)
+  })
+
+  it('R21 — le 1er et le 2nd sont toujours deux vétérinaires différents', () => {
+    if (!result.success) return
+    expect(aucunDoublonPremierSecond(result.planning)).toBe(true)
   })
 
   it('contient 4 weekends et 4 vendredis soir', () => {
@@ -197,6 +209,8 @@ describe('Benchmark performance — 12 semaines hiver, 7 vétos sans contraintes
       expect(result.planning.attributions.length).toBe(72)
       expect(compterType(result.planning, 'weekend')).toBe(12)
       expect(compterType(result.planning, 'vendredi_soir')).toBe(12)
+      // R21 — régression du bug "même véto en 1er et 2nd" (cas réel prod)
+      expect(aucunDoublonPremierSecond(result.planning)).toBe(true)
     }
   })
 })

@@ -39,12 +39,17 @@ function formatDate(iso: string) {
   })
 }
 
-function getNbSemaines(debut: string, fin: string) {
-  const diff = Math.round(
+function getNbJours(debut: string, fin: string) {
+  return Math.round(
     (new Date(fin + 'T00:00:00').getTime() - new Date(debut + 'T00:00:00').getTime()) /
     (1000 * 60 * 60 * 24)
   ) + 1
-  return Math.ceil(diff / 7)
+}
+
+/** Affiche la durée en jours si < 1 semaine, sinon en semaines (arrondi). */
+function formatDuree(jours: number) {
+  if (jours < 7) return `${jours} j`
+  return `${Math.round(jours / 7)} sem.`
 }
 
 interface CongesListProps {
@@ -92,8 +97,8 @@ export function CongesList({ conges, vets, currentUserId, isAdmin }: CongesListP
   const resumeParVet = isAdmin
     ? vets.filter((v) => v.actif).map((v) => {
         const cv = conges.filter((c) => c.veterinaire_id === v.id)
-        const semaines = cv.reduce((a, c) => a + getNbSemaines(c.date_debut, c.date_fin), 0)
-        return { vet: v, nb: cv.length, semaines }
+        const jours = cv.reduce((a, c) => a + getNbJours(c.date_debut, c.date_fin), 0)
+        return { vet: v, nb: cv.length, jours }
       }).filter((r) => r.nb > 0)
     : []
 
@@ -103,7 +108,7 @@ export function CongesList({ conges, vets, currentUserId, isAdmin }: CongesListP
 
   const CongeRow = ({ c, showVet = true, showActions = true }: { c: Conge; showVet?: boolean; showActions?: boolean }) => {
     const vet = vets.find((v) => v.id === c.veterinaire_id)
-    const sem = getNbSemaines(c.date_debut, c.date_fin)
+    const duree = formatDuree(getNbJours(c.date_debut, c.date_fin))
     const editable = canEdit(c)
     const statutCfg = STATUT_CONFIG[c.statut]
 
@@ -129,7 +134,7 @@ export function CongesList({ conges, vets, currentUserId, isAdmin }: CongesListP
           <p className={`text-xs text-muted-foreground ${!isAdmin ? 'text-sm font-medium text-foreground' : ''}`}>
             {c.type === 'indisponibilite'
               ? formatDate(c.date_debut)
-              : <>{formatDate(c.date_debut)} → {formatDate(c.date_fin)}<span className="mx-1.5 opacity-30">·</span>{sem} sem.</>}
+              : <>{formatDate(c.date_debut)} → {formatDate(c.date_fin)}<span className="mx-1.5 opacity-30">·</span>{duree}</>}
             {c.creneau && c.type === 'indisponibilite' && (
               <><span className="mx-1.5 opacity-30">·</span>{CRENEAU_LABELS[c.creneau] ?? c.creneau}</>
             )}
@@ -228,7 +233,7 @@ export function CongesList({ conges, vets, currentUserId, isAdmin }: CongesListP
       {/* Résumé par véto (admin) */}
       {resumeParVet.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-          {resumeParVet.map(({ vet, nb, semaines }) => (
+          {resumeParVet.map(({ vet, nb, jours }) => (
             <button
               key={vet.id}
               onClick={() => { setAddDefaultVet(vet.id); setAddOpen(true) }}
@@ -239,7 +244,7 @@ export function CongesList({ conges, vets, currentUserId, isAdmin }: CongesListP
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-medium text-foreground truncate">{vet.prenom} {vet.nom}</p>
-                <p className="text-xs text-muted-foreground">{nb} congé{nb > 1 ? 's' : ''} · {semaines} sem.</p>
+                <p className="text-xs text-muted-foreground">{nb} congé{nb > 1 ? 's' : ''} · {formatDuree(jours)}</p>
               </div>
             </button>
           ))}

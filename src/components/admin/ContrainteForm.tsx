@@ -142,6 +142,7 @@ export function ContrainteForm({
               value={type}
               onValueChange={(v) => setType(v as TypeContrainte)}
               disabled={isEdit}
+              items={TYPES}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -159,7 +160,7 @@ export function ContrainteForm({
             <div className="space-y-3">
               <div className="space-y-1.5">
                 <Label>Jour de repos</Label>
-                <Select value={rfJour} onValueChange={(v) => v && setRfJour(v)}>
+                <Select value={rfJour} onValueChange={(v) => v && setRfJour(v)} items={JOURS}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {JOURS.map((j) => (
@@ -188,7 +189,7 @@ export function ContrainteForm({
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Si garde WE</Label>
-                  <Select value={rcSiWe} onValueChange={(v) => v && setRcSiWe(v)}>
+                  <Select value={rcSiWe} onValueChange={(v) => v && setRcSiWe(v)} items={JOURS}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {JOURS.map((j) => (
@@ -199,7 +200,7 @@ export function ContrainteForm({
                 </div>
                 <div className="space-y-1.5">
                   <Label>Sinon</Label>
-                  <Select value={rcSinon} onValueChange={(v) => v && setRcSinon(v)}>
+                  <Select value={rcSinon} onValueChange={(v) => v && setRcSinon(v)} items={JOURS}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {JOURS.map((j) => (
@@ -216,7 +217,7 @@ export function ContrainteForm({
             <div className="space-y-3">
               <div className="space-y-1.5">
                 <Label>Semaines concernées</Label>
-                <Select value={icSemaines} onValueChange={(v) => setIcSemaines(v as typeof icSemaines)}>
+                <Select value={icSemaines} onValueChange={(v) => setIcSemaines(v as typeof icSemaines)} items={{ paires: 'Semaines paires', impaires: 'Semaines impaires', toutes: 'Toutes les semaines' }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="paires">Semaines paires</SelectItem>
