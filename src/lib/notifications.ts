@@ -111,7 +111,7 @@ function buildPlanningPublieHtml(
 ): string {
   const periodeLabel = periode.saison === 'ete'
     ? 'Été'
-    : `Hiver — Période ${periode.numero}`
+    : periode.numero ? `Hiver — Période ${periode.numero}` : 'Hiver'
 
   const gardeRows = gardes.length > 0
     ? gardes.map((g) => {
@@ -228,7 +228,7 @@ function buildRappelPublicationHtml(
 ): string {
   const periodeLabel = periode.saison === 'ete'
     ? 'Été'
-    : `Hiver — Période ${periode.numero}`
+    : periode.numero ? `Hiver — Période ${periode.numero}` : 'Hiver'
 
   const urgence = joursRestants <= 7
 
@@ -295,7 +295,7 @@ export async function sendRappelPublication(
 
   const periodeLabel = periode.saison === 'ete'
     ? 'Été'
-    : `Hiver — Période ${periode.numero}`
+    : periode.numero ? `Hiver — Période ${periode.numero}` : 'Hiver'
 
   // Uniquement les admins actifs
   const { data: admins } = await supabase
@@ -397,7 +397,7 @@ export async function sendPlanningPublie(
 
   const periodeLabel = periode.saison === 'ete'
     ? 'Été'
-    : `Hiver — Période ${periode.numero}`
+    : periode.numero ? `Hiver — Période ${periode.numero}` : 'Hiver'
 
   // Récupérer tous les vétos actifs avec email
   const { data: vets } = await supabase
