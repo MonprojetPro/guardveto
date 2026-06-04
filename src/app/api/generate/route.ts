@@ -143,6 +143,13 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // Régénérer = repartir sur un brouillon : le nouveau planning doit être
+  // revérifié puis republié (ce qui re-notifie les vétérinaires du changement).
+  await supabase
+    .from('periodes')
+    .update({ statut: 'brouillon', publie_at: null })
+    .eq('id', periodeId)
+
   return NextResponse.json({
     success: true,
     nbGardes: gardesAInserer.length,
