@@ -151,14 +151,18 @@ function buildPlanningPublieHtml(
         <tbody>${gardeRows}</tbody>
       </table>
 
-      <div style="margin-top:32px;text-align:center;">
-        <a href="${appUrl()}/planning" style="background:#1d4ed8;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-size:14px;display:inline-block;">
-          Voir le planning complet
-        </a>
+      <div style="margin-top:32px;background:#f3f4f6;border-radius:8px;padding:20px 24px;">
+        <p style="margin:0 0 10px;color:#374151;font-size:14px;line-height:1.5;">
+          Pour consulter le planning complet et gérer vos disponibilités, vous pouvez à tout moment vous connecter à votre espace personnel :
+        </p>
+        <p style="margin:0 0 10px;font-size:16px;font-weight:bold;color:#1d4ed8;word-break:break-all;">${appUrl()}</p>
+        <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.5;">
+          Copiez cette adresse dans votre navigateur, puis connectez-vous avec votre adresse email professionnelle.
+        </p>
       </div>
 
       <p style="color:#9ca3af;font-size:12px;margin-top:32px;">
-        Cet email est envoyé automatiquement par GuardVeto. Pour toute question, contactez Anne-So.
+        Cet email est envoyé automatiquement par GuardVeto. Pour toute question, contactez votre administrateur.
       </p>
     </div>
   </div>
@@ -205,14 +209,18 @@ function buildGardeModifieeHtml(
         </table>
       </div>
 
-      <div style="margin-top:24px;text-align:center;">
-        <a href="${appUrl()}/planning" style="background:#d97706;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-size:14px;display:inline-block;">
-          Voir le planning
-        </a>
+      <div style="margin-top:24px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:20px 24px;">
+        <p style="margin:0 0 10px;color:#374151;font-size:14px;line-height:1.5;">
+          Pour voir le détail de votre planning à jour, vous pouvez vous connecter à votre espace personnel :
+        </p>
+        <p style="margin:0 0 10px;font-size:16px;font-weight:bold;color:#d97706;word-break:break-all;">${appUrl()}</p>
+        <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.5;">
+          Copiez cette adresse dans votre navigateur, puis connectez-vous avec votre adresse email professionnelle.
+        </p>
       </div>
 
       <p style="color:#9ca3af;font-size:12px;margin-top:32px;">
-        Cet email est envoyé automatiquement par GuardVeto. Pour toute question, contactez Anne-So.
+        Cet email est envoyé automatiquement par GuardVeto. Pour toute question, contactez votre administrateur.
       </p>
     </div>
   </div>
@@ -261,10 +269,14 @@ function buildRappelPublicationHtml(
         Pensez à générer et publier le planning dès que possible afin que les vétérinaires puissent en prendre connaissance.
       </p>
 
-      <div style="margin-top:32px;text-align:center;">
-        <a href="${appUrl()}/planning" style="background:${urgence ? '#dc2626' : '#d97706'};color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-size:14px;display:inline-block;">
-          Aller au planning
-        </a>
+      <div style="margin-top:32px;background:${urgence ? '#fef2f2' : '#fffbeb'};border:1px solid ${urgence ? '#fca5a5' : '#fcd34d'};border-radius:8px;padding:20px 24px;">
+        <p style="margin:0 0 10px;color:#374151;font-size:14px;line-height:1.5;">
+          Pour générer et publier le planning, connectez-vous à votre espace administrateur :
+        </p>
+        <p style="margin:0 0 10px;font-size:16px;font-weight:bold;color:${urgence ? '#dc2626' : '#d97706'};word-break:break-all;">${appUrl()}</p>
+        <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.5;">
+          Copiez cette adresse dans votre navigateur, puis connectez-vous avec votre adresse email professionnelle.
+        </p>
       </div>
 
       <p style="color:#9ca3af;font-size:12px;margin-top:32px;">
