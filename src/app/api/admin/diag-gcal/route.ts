@@ -44,12 +44,12 @@ export async function GET() {
   let live: { ok: boolean; calendar?: string | null; error?: string; code?: string | number }
   try {
     const auth = new google.auth.JWT({
-      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim(),
       key: rawKey.replace(/\\n/g, '\n'),
       scopes: ['https://www.googleapis.com/auth/calendar'],
     })
     const cal = google.calendar({ version: 'v3', auth })
-    const meta = await cal.calendars.get({ calendarId: process.env.GOOGLE_CALENDAR_ID ?? '' })
+    const meta = await cal.calendars.get({ calendarId: (process.env.GOOGLE_CALENDAR_ID ?? '').trim() })
     live = { ok: true, calendar: meta.data.summary }
   } catch (e) {
     const err = e as { message?: string; code?: string | number }
@@ -59,7 +59,7 @@ export async function GET() {
   const keySha256 = crypto.createHash('sha256').update(rawKey).digest('hex').slice(0, 16)
 
   return NextResponse.json({
-    marker: 'diag-v4',
+    marker: 'diag-v5',
     calendarId: process.env.GOOGLE_CALENDAR_ID ?? null,
     keyLen: rawKey.length,
     keySha256,

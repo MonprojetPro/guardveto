@@ -25,9 +25,11 @@ export interface GardeEventData {
 // ── Initialisation du client Google ─────────────────────────
 
 function getCalendarClient() {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
+  // .trim() : protège contre les retours à la ligne / espaces parasites
+  // ajoutés en collant les valeurs dans Vercel (sinon : "account not found").
+  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim()
   const key = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, '\n')
-  const calendarId = process.env.GOOGLE_CALENDAR_ID
+  const calendarId = process.env.GOOGLE_CALENDAR_ID?.trim()
 
   if (!email || !key || !calendarId) {
     return null
