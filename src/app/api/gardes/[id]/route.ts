@@ -14,6 +14,9 @@ import { calculerBilans } from '@/engine/bilan'
 import { syncGardeIndividuelle } from '@/lib/sync-calendrier'
 import { sendGardeModifiee } from '@/lib/notifications'
 
+// La route attend la synchro agenda + l'envoi email avant de répondre
+export const maxDuration = 60
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -137,19 +140,24 @@ export async function PATCH(
     }
   }
 
-  // ── Synchronisation Google Agenda (best-effort) ─────────
-  // Ne bloque pas la réponse en cas d'erreur Google
-  syncGardeIndividuelle(supabase, gardeId).catch(() => {
-    // Échec silencieux — la modification garde est enregistrée
-  })
-
-  // ── Notifications email (best-effort) ─────────────────────
-  // Envoyées aux vétos concernés (anciens + nouveaux assignés)
+  // ── Synchro Agenda + notifications ──────────────────────
+  // IMPORTANT : on AWAIT (best-effort). Sur Vercel, le travail lancé sans await
+  // après la réponse n'est PAS garanti de s'exécuter (la fonction serverless est
+  // gelée dès le retour) → c'est ce qui empêchait l'email de modif de partir.
   const oldPremier = (garde as Record<string, unknown>).oldPremier as { id: string; nom: string; prenom: string; email: string } | null
   const oldSecond  = (garde as Record<string, unknown>).oldSecond  as { id: string; nom: string; prenom: string; email: string } | null
-  sendGardeModifiee(supabase, gardeId, oldPremier, oldSecond).catch((err) => {
+
+  try {
+    await syncGardeIndividuelle(supabase, gardeId)
+  } catch (err) {
+    console.error('[gardes] Erreur sync agenda:', err instanceof Error ? err.message : String(err))
+  }
+
+  try {
+    await sendGardeModifiee(supabase, gardeId, oldPremier, oldSecond)
+  } catch (err) {
     console.error('[gardes] Erreur notifications email:', err instanceof Error ? err.message : String(err))
-  })
+  }
 
   return NextResponse.json({ success: true })
 }
