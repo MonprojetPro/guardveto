@@ -13,6 +13,9 @@ import { createClient } from '@/lib/supabase/server'
 import { syncCalendrier } from '@/lib/sync-calendrier'
 import { sendPlanningPublie } from '@/lib/notifications'
 
+// Laisse le temps à la synchro agenda (par lots) + envoi des emails
+export const maxDuration = 60
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
 

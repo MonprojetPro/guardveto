@@ -15,7 +15,11 @@ import { createClient } from '@/lib/supabase/server'
 import { chargerInputDepuisSupabase } from '@/engine/loader'
 import { genererPlanningPur } from '@/engine/solver'
 import { estJourFerie } from '@/engine/utils'
+import { supprimerEvenementsCalendrier } from '@/lib/sync-calendrier'
 import type { TypeGardeEngine } from '@/engine/types'
+
+// Laisse le temps au solver + nettoyage agenda (évite le timeout serverless)
+export const maxDuration = 60
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -106,6 +110,10 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Insertion en base ───────────────────────────────────
+  // 0. Supprimer les événements Google Agenda existants de cette période
+  //    (sinon ils resteraient orphelins/en doublon après régénération)
+  await supprimerEvenementsCalendrier(supabase, periodeId)
+
   // 1. Supprimer les gardes brouillon existantes pour cette période
   const { error: deleteErr } = await supabase
     .from('gardes')

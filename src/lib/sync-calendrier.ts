@@ -21,8 +21,8 @@ interface GardeAvecVetos {
   date: string
   type: 'semaine' | 'weekend' | 'ferie'
   google_event_id: string | null
-  premier: { prenom: string }[] | null
-  second:  { prenom: string }[] | null
+  premier: { prenom: string } | null
+  second:  { prenom: string } | null
 }
 
 export interface SyncResult {
@@ -67,32 +67,44 @@ export async function syncCalendrier(
   const errors: string[] = []
   let synced = 0
 
-  for (const garde of gardes as GardeAvecVetos[]) {
-    const data: GardeEventData = {
-      date:          garde.date,
-      type:          garde.type,
-      prenomPremier: garde.premier?.[0]?.prenom ?? 'Inconnu',
-      prenomSecond:  garde.second?.[0]?.prenom  ?? null,
-    }
+  // Traitement par lots EN PARALLÈLE : ~60 gardes en séquentiel dépassent
+  // le timeout d'une fonction serverless Vercel. Par lots de 8, on reste
+  // bien en dessous (et sous les quotas Google Calendar).
+  const BATCH = 8
+  const toutes = gardes as unknown as GardeAvecVetos[]
 
-    try {
-      if (garde.google_event_id) {
-        // Mise à jour d'un événement existant
-        await updateGardeEvent(garde.google_event_id, data)
-      } else {
-        // Création d'un nouvel événement
-        const eventId = await createGardeEvent(data)
-        if (eventId) {
-          await supabase
-            .from('gardes')
-            .update({ google_event_id: eventId })
-            .eq('id', garde.id)
+  for (let i = 0; i < toutes.length; i += BATCH) {
+    const lot = toutes.slice(i, i + BATCH)
+    const resultats = await Promise.all(
+      lot.map(async (garde) => {
+        const data: GardeEventData = {
+          date:          garde.date,
+          type:          garde.type,
+          prenomPremier: garde.premier?.prenom ?? 'Inconnu',
+          prenomSecond:  garde.second?.prenom  ?? null,
         }
-      }
-      synced++
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      errors.push(`Garde ${garde.date} : ${msg}`)
+        try {
+          if (garde.google_event_id) {
+            await updateGardeEvent(garde.google_event_id, data)
+          } else {
+            const eventId = await createGardeEvent(data)
+            if (eventId) {
+              await supabase
+                .from('gardes')
+                .update({ google_event_id: eventId })
+                .eq('id', garde.id)
+            }
+          }
+          return null
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err)
+          return `Garde ${garde.date} : ${msg}`
+        }
+      })
+    )
+    for (const r of resultats) {
+      if (r === null) synced++
+      else errors.push(r)
     }
   }
 
@@ -127,12 +139,12 @@ export async function syncGardeIndividuelle(
 
   if (!garde) return
 
-  const g = garde as GardeAvecVetos
+  const g = garde as unknown as GardeAvecVetos
   const data: GardeEventData = {
     date:          g.date,
     type:          g.type,
-    prenomPremier: g.premier?.[0]?.prenom ?? 'Inconnu',
-    prenomSecond:  g.second?.[0]?.prenom  ?? null,
+    prenomPremier: g.premier?.prenom ?? 'Inconnu',
+    prenomSecond:  g.second?.prenom  ?? null,
   }
 
   if (g.google_event_id) {
@@ -168,13 +180,14 @@ export async function supprimerEvenementsCalendrier(
 
   if (!gardes) return
 
-  for (const garde of gardes) {
-    if (garde.google_event_id) {
-      try {
-        await deleteGardeEvent(garde.google_event_id)
-      } catch {
-        // On continue même si un événement n'existe plus côté Google
-      }
-    }
-  }
+  // Suppression EN PARALLÈLE (évite le timeout sur ~60 suppressions)
+  await Promise.all(
+    gardes
+      .filter((garde) => garde.google_event_id)
+      .map((garde) =>
+        deleteGardeEvent(garde.google_event_id as string).catch(() => {
+          // On continue même si un événement n'existe plus côté Google
+        })
+      )
+  )
 }
