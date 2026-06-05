@@ -38,6 +38,24 @@ export interface SyncResult {
  * Crée les événements manquants, met à jour les existants.
  * Retourne un bilan (nombre synchronisés + erreurs éventuelles).
  */
+// ── Helpers anti rate-limit Google ───────────────────────────
+// Google Calendar bride les créations/suppressions en rafale. On traite
+// par petits lots espacés, avec reprise automatique en cas d'échec.
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+async function avecReprise<T>(fn: () => Promise<T>, essais = 4): Promise<T> {
+  let derniere: unknown
+  for (let i = 0; i < essais; i++) {
+    try {
+      return await fn()
+    } catch (e) {
+      derniere = e
+      if (i < essais - 1) await sleep(500 * (i + 1))
+    }
+  }
+  throw derniere
+}
+
 export async function syncCalendrier(
   supabase: SupabaseClient,
   periodeId: string
@@ -67,10 +85,11 @@ export async function syncCalendrier(
   const errors: string[] = []
   let synced = 0
 
-  // Traitement par lots EN PARALLÈLE : ~60 gardes en séquentiel dépassent
-  // le timeout d'une fonction serverless Vercel. Par lots de 8, on reste
-  // bien en dessous (et sous les quotas Google Calendar).
-  const BATCH = 8
+  // Petits lots espacés + reprise auto : évite le rate-limit Google
+  // (qui jette une partie des créations quand on en lance trop d'un coup),
+  // tout en restant largement sous le maxDuration de la fonction.
+  const BATCH = 3
+  const PAUSE_MS = 250
   const toutes = gardes as unknown as GardeAvecVetos[]
 
   for (let i = 0; i < toutes.length; i += BATCH) {
@@ -84,17 +103,19 @@ export async function syncCalendrier(
           prenomSecond:  garde.second?.prenom  ?? null,
         }
         try {
-          if (garde.google_event_id) {
-            await updateGardeEvent(garde.google_event_id, data)
-          } else {
-            const eventId = await createGardeEvent(data)
-            if (eventId) {
-              await supabase
-                .from('gardes')
-                .update({ google_event_id: eventId })
-                .eq('id', garde.id)
+          await avecReprise(async () => {
+            if (garde.google_event_id) {
+              await updateGardeEvent(garde.google_event_id as string, data)
+            } else {
+              const eventId = await createGardeEvent(data)
+              if (eventId) {
+                await supabase
+                  .from('gardes')
+                  .update({ google_event_id: eventId })
+                  .eq('id', garde.id)
+              }
             }
-          }
+          })
           return null
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err)
@@ -106,6 +127,7 @@ export async function syncCalendrier(
       if (r === null) synced++
       else errors.push(r)
     }
+    if (i + BATCH < toutes.length) await sleep(PAUSE_MS)
   }
 
   return { synced, errors, skipped: false }
@@ -180,14 +202,20 @@ export async function supprimerEvenementsCalendrier(
 
   if (!gardes) return
 
-  // Suppression EN PARALLÈLE (évite le timeout sur ~60 suppressions)
-  await Promise.all(
-    gardes
-      .filter((garde) => garde.google_event_id)
-      .map((garde) =>
-        deleteGardeEvent(garde.google_event_id as string).catch(() => {
+  // Suppression par petits lots espacés + reprise (anti rate-limit Google)
+  const aSupprimer = gardes.filter((garde) => garde.google_event_id)
+  const BATCH = 3
+  const PAUSE_MS = 250
+
+  for (let i = 0; i < aSupprimer.length; i += BATCH) {
+    const lot = aSupprimer.slice(i, i + BATCH)
+    await Promise.all(
+      lot.map((garde) =>
+        avecReprise(() => deleteGardeEvent(garde.google_event_id as string)).catch(() => {
           // On continue même si un événement n'existe plus côté Google
         })
       )
-  )
+    )
+    if (i + BATCH < aSupprimer.length) await sleep(PAUSE_MS)
+  }
 }
