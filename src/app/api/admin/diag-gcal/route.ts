@@ -55,5 +55,14 @@ export async function GET() {
     live = { ok: false, error: err?.message ?? String(e), code: err?.code }
   }
 
-  return NextResponse.json({ present, keyShape, live })
+  return NextResponse.json({
+    marker: 'diag-v3',
+    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ?? null,
+    calendarId: process.env.GOOGLE_CALENDAR_ID ?? null,
+    keyHead: rawKey.slice(0, 32),
+    keyTail: rawKey.slice(-32),
+    present,
+    keyShape,
+    live,
+  })
 }
