@@ -52,6 +52,14 @@ export async function PATCH(
     return NextResponse.json({ error: 'Corps de requête invalide.' }, { status: 400 })
   }
 
+  // ── Règle : le même véto ne peut pas être 1er ET 2nd de garde ──
+  if (premier_id && second_id && premier_id === second_id) {
+    return NextResponse.json(
+      { error: 'Le même vétérinaire ne peut pas être à la fois 1er et 2nd de garde. Choisissez deux personnes différentes.' },
+      { status: 422 }
+    )
+  }
+
   // ── Vérification de la garde ────────────────────────────
   const { data: garde } = await supabase
     .from('gardes')
