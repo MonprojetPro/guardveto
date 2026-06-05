@@ -336,6 +336,11 @@ export function GardeDetailModal({ garde, date, isAdmin, onClose, onSaved }: Gar
   }
 
   async function handleSave() {
+    // Garde-fou immédiat : le même véto ne peut pas être 1er ET 2nd
+    if (premierSel && secondSel && premierSel === secondSel) {
+      toast.error('Le même vétérinaire ne peut pas être à la fois 1er et 2nd de garde.')
+      return
+    }
     const v = detecterViolation()
     if (v) {
       setViolation(v)
