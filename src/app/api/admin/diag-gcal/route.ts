@@ -3,6 +3,7 @@
 // GET /api/admin/diag-gcal : teste la connexion Google Agenda côté serveur
 // et renvoie l'erreur exacte. Réservé à un admin authentifié.
 // ============================================================
+import crypto from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { createClient } from '@/lib/supabase/server'
@@ -55,12 +56,13 @@ export async function GET() {
     live = { ok: false, error: err?.message ?? String(e), code: err?.code }
   }
 
+  const keySha256 = crypto.createHash('sha256').update(rawKey).digest('hex').slice(0, 16)
+
   return NextResponse.json({
-    marker: 'diag-v3',
-    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ?? null,
+    marker: 'diag-v4',
     calendarId: process.env.GOOGLE_CALENDAR_ID ?? null,
-    keyHead: rawKey.slice(0, 32),
-    keyTail: rawKey.slice(-32),
+    keyLen: rawKey.length,
+    keySha256,
     present,
     keyShape,
     live,
