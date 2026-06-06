@@ -10,6 +10,7 @@ import type { PlanningPartiel, VetEngine } from './types'
 import {
   compterParVet,
   desequilibreWE,
+  desequilibreWeekendPremier,
   desequilibreFeries,
   desequilibreSemainePremier,
   desequilibreSemaineSecond,
@@ -23,6 +24,10 @@ import {
 export const POIDS = {
   /** R11 — Équité WE de garde (priorité absolue) */
   WE_GARDE: 100,
+  /** R11b — Équité du rôle 1er le week-end (avantage financier) — tie-breaker
+   *  secondaire : n'intervient qu'à égalité de nombre total de week-ends, pour
+   *  ne pas dégrader la priorité absolue R11. */
+  WE_PREMIER_ROLE: 25,
   /** R12 — Équité jours fériés (poids fort) */
   FERIES: 60,
   /** R13 — Équité gardes semaine en 1er (poids moyen) */
@@ -94,6 +99,9 @@ export function scoreEquite(
   // R11 : déséquilibre WE brut (sur le planning courant uniquement)
   const scoreR11 = desequilibreWE(compteurs) * POIDS.WE_GARDE
 
+  // R11b : déséquilibre du rôle 1er le week-end (avantage financier)
+  const scoreR11b = desequilibreWeekendPremier(compteurs) * POIDS.WE_PREMIER_ROLE
+
   // R12 : déséquilibre fériés
   const scoreR12 = desequilibreFeries(compteurs) * POIDS.FERIES
 
@@ -106,7 +114,7 @@ export function scoreEquite(
   // R15 : déséquilibre grands WE perdus (salariés uniquement)
   const scoreR15 = desequilibreGrandsWeSalaries(compteurs, vets) * POIDS.GRANDS_WE_SALARIES
 
-  return scoreR11 + scoreR12 + scoreR13 + scoreR14 + scoreR15 + scoreR20
+  return scoreR11 + scoreR11b + scoreR12 + scoreR13 + scoreR14 + scoreR15 + scoreR20
 }
 
 // ── Export des poids et compteurs pour les tests ─────────

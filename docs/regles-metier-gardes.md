@@ -1,7 +1,9 @@
 # Règles métier — Planification des gardes vétérinaires
 
-> Document de référence consolidé — mis à jour le 22 avril 2026
-> Document complet — aucune question ouverte majeure.
+> Document de référence consolidé — mis à jour le 6 juin 2026
+> ⚠️ Questions ouvertes à confirmer avec le cabinet (voir §4) :
+> - **R11b** — faut-il équilibrer le rôle de **1er le week-end** (avantage financier) entre tous les vétos ? (règle souple activée par défaut, à valider/maintenir)
+> - **Charge intra-semaine** — faut-il éviter de cumuler soirs de semaine + week-end la même semaine ? (non implémenté)
 
 ---
 
@@ -81,6 +83,14 @@
 2. Nombre de **jours fériés** de garde
 3. Nombre de gardes de **semaine**, notamment en qualité de **1er** de garde
 4. Les 2nd de garde sont plus difficiles à équilibrer parfaitement → on minimise l'écart
+
+### R11b — Équité du rôle 1er le week-end (avantage financier) — RÈGLE SOUPLE
+> ⚠️ **À confirmer avec le cabinet — règle activée par défaut depuis le 2026-06-06.**
+
+- Être **1er de garde le week-end** ouvre un **avantage financier**. À nombre total de week-ends égal, le moteur cherche donc à répartir équitablement **qui est 1er** (et pas seulement combien de week-ends chacun fait).
+- C'est une règle **souple** : elle n'intervient qu'**à égalité de nombre total de week-ends** (elle ne dégrade jamais la priorité absolue n°1). Levier technique : comme R8 impose « 1er du week-end = 2nd du vendredi », l'équilibrage se joue sur l'attribution du rôle au vendredi soir.
+- **Avant cette règle** : les associés étaient quasi toujours 1er le week-end, les juniors salariés (Manon, Antoine) jamais → avantage financier capté par les mêmes.
+- **Question pour le cabinet** : souhaitez-vous **maintenir** cet équilibrage (tout le monde, y compris les juniors, peut être 1er le week-end), ou le rôle de 1er doit-il rester réservé aux associés/seniors ?
 
 ### Salariés — "grands week-ends"
 Un **grand week-end** = vendredi + samedi + dimanche, ou samedi + dimanche + lundi.

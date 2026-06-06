@@ -78,6 +78,24 @@ describe('compterParVet — compteurs de base', () => {
     expect(cManon.weGardes).toBe(1)
   })
 
+  it('R11b — compte les week-ends en 1er (rôle à avantage financier)', () => {
+    const planning: PlanningPartiel = {
+      attributions: [
+        { date: '2026-05-02', type: 'weekend', premier_id: JEAN.id, second_id: VICTOR.id },
+        { date: '2026-05-09', type: 'weekend', premier_id: JEAN.id, second_id: FANNY.id },
+        { date: '2026-05-16', type: 'weekend', premier_id: MANON.id, second_id: VICTOR.id },
+      ],
+    }
+    const compteurs = compterParVet(planning, ALL_VETS)
+    const cJean = compteurs.find((c) => c.vetId === JEAN.id)!
+    const cVictor = compteurs.find((c) => c.vetId === VICTOR.id)!
+    const cManon = compteurs.find((c) => c.vetId === MANON.id)!
+
+    expect(cJean.weekendPremier).toBe(2)   // 1er les 2 et 9 mai
+    expect(cManon.weekendPremier).toBe(1)   // 1er le 16 mai
+    expect(cVictor.weekendPremier).toBe(0)  // toujours 2nd → aucun avantage
+  })
+
   it('R12 — compte les gardes sur jours fériés', () => {
     // 2026-05-01 = 1er mai (férié fixe)
     const planning: PlanningPartiel = {

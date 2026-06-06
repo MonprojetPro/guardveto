@@ -133,6 +133,7 @@ function scorerCandidat(
   const c = compteurs.find((x) => x.vetId === vet.id) ?? {
     vetId: vet.id,
     weGardes: 0,
+    weekendPremier: 0,
     feriesGardes: 0,
     semainePremier: 0,
     semaineSecond: 0,
@@ -150,7 +151,23 @@ function scorerCandidat(
     // R11 + R20 : équité WE — bonus/malus réduit le compteur effectif
     // Si bm > 0 (véto doit plus de gardes), son score est réduit → essayé avant
     const weEffectif = c.weGardes - bm
-    return weEffectif * POIDS.WE_GARDE + pen
+
+    // R11b : équité du rôle 1er le week-end (avantage financier).
+    // R8 impose : 1er du week-end = 2nd du vendredi soir, et 2nd du week-end =
+    // 1er du vendredi soir. On agit donc sur les DEUX rôles du vendredi pour
+    // répartir l'avantage financier :
+    //  - vendredi 2nd (→ deviendra 1er le WE) : on privilégie ceux qui ont été
+    //    le moins souvent 1er (malus croissant avec weekendPremier).
+    //  - vendredi 1er (→ deviendra 2nd le WE) : on y oriente au contraire ceux
+    //    qui ont DÉJÀ beaucoup été 1er (bonus = malus négatif).
+    let malusRole = 0
+    if (step.type === 'vendredi_soir' && step.role === 'second') {
+      malusRole = c.weekendPremier * POIDS.WE_PREMIER_ROLE
+    } else if (step.type === 'vendredi_soir' && step.role === 'premier') {
+      malusRole = -c.weekendPremier * POIDS.WE_PREMIER_ROLE
+    }
+
+    return weEffectif * POIDS.WE_GARDE + malusRole + pen
   }
 
   // Garde de semaine : priorité selon le type de jour et le rôle

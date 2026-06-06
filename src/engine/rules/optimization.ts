@@ -15,6 +15,8 @@ export interface CompteurVet {
   vetId: string
   /** R11 — Nombre de week-ends de garde (type 'weekend') */
   weGardes: number
+  /** R11b — Nombre de week-ends en qualité de 1er (avantage financier — à équilibrer) */
+  weekendPremier: number
   /** R12 — Nombre de gardes sur jours fériés */
   feriesGardes: number
   /** R13 — Nombre de gardes de semaine en qualité de 1er */
@@ -66,6 +68,7 @@ export function compterParVet(
     const compteur: CompteurVet = {
       vetId: vet.id,
       weGardes: 0,
+      weekendPremier: 0,
       feriesGardes: 0,
       semainePremier: 0,
       semaineSecond: 0,
@@ -77,6 +80,10 @@ export function compterParVet(
         compteur.weGardes++
         // R15 : pour les salariés, un WE de garde = grand WE "perdu"
         if (vet.statut === 'salarie') compteur.grandsWePerdus++
+      }
+      // R11b : être 1er le week-end (rôle à avantage financier)
+      if (attr.type === 'weekend' && attr.premier_id === vet.id) {
+        compteur.weekendPremier++
       }
       if (estFerieGarde(attr, vet.id)) compteur.feriesGardes++
       if (estSemainePremier(attr, vet.id)) compteur.semainePremier++
@@ -113,6 +120,15 @@ export function ecartMaxMin(valeurs: number[]): number {
  */
 export function desequilibreWE(compteurs: CompteurVet[]): number {
   return variance(compteurs.map((c) => c.weGardes))
+}
+
+/**
+ * R11b — Déséquilibre du rôle 1er le week-end (avantage financier).
+ * On cherche à ce que chacun ait, autant que possible, le même nombre de
+ * week-ends en tant que 1er (et pas seulement le même nombre total de WE).
+ */
+export function desequilibreWeekendPremier(compteurs: CompteurVet[]): number {
+  return variance(compteurs.map((c) => c.weekendPremier))
 }
 
 /**

@@ -213,4 +213,39 @@ describe('Benchmark performance — 12 semaines hiver, 7 vétos sans contraintes
       expect(aucunDoublonPremierSecond(result.planning)).toBe(true)
     }
   })
+
+  it('R11b — répartit équitablement le rôle 1er le week-end (avantage financier)', () => {
+    const vets: VetEngine[] = Array.from({ length: 7 }, (_, i) => ({
+      id: `perf-v${i + 1}`,
+      nom: `Nom${i + 1}`,
+      prenom: `Prenom${i + 1}`,
+      statut: i < 4 ? 'associe' : 'salarie',
+      dernier_recours: i === 6,
+      contraintes: [],
+      conges: [],
+    }))
+    const input: SolverInput = {
+      dateDebut: '2026-09-07',
+      dateFin: '2026-11-29', // 12 semaines
+      saison: 'hiver',
+      vets,
+      bonusMalus: {},
+    }
+    const result = genererPlanningPur(input)
+    expect(result.success).toBe(true)
+    if (!result.success) return
+
+    // Compte le nombre de week-ends en tant que 1er par véto (hors dernier recours)
+    const wePremier: Record<string, number> = {}
+    for (const v of vets) if (!v.dernier_recours) wePremier[v.id] = 0
+    for (const a of result.planning.attributions) {
+      if (a.type === 'weekend' && a.premier_id && a.premier_id in wePremier) {
+        wePremier[a.premier_id]++
+      }
+    }
+    const valeurs = Object.values(wePremier)
+    const ecart = Math.max(...valeurs) - Math.min(...valeurs)
+    // 12 week-ends répartis sur 6 vétos → ~2 chacun. On tolère un écart max de 2.
+    expect(ecart).toBeLessThanOrEqual(2)
+  })
 })
