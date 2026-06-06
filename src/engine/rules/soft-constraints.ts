@@ -15,6 +15,8 @@ import { samediDeSemaine, addDays, estJourFerie, estFeteFinAnnee } from '../util
 export const PENALITE = {
   /** R10 — 2 WE de garde consécutifs (pénalité forte) */
   WE_CONSECUTIF: 50,
+  /** R10c — Garde le week-end qui précède immédiatement des vacances du véto */
+  WE_AVANT_VACANCES: 45,
   /** R10b — Garde un soir de réveillon (24 déc ou 31 déc) — à éviter si possible */
   FETE_FIN_ANNEE: 30,
   /** R8b — Même rôle (1er/2nd) la veille d'un jour férié — inversion "si possible" (§7) */
@@ -65,6 +67,36 @@ function penaliteR10WEConsecutif(
   const samPrec = samediPrecedent(samCourant)
   if (aGardeWE(vet.id, samPrec, planning)) {
     return PENALITE.WE_CONSECUTIF
+  }
+  return 0
+}
+
+/**
+ * R10c — Pas de garde le week-end qui précède des vacances (« au maximum du possible »).
+ * Si le véto part en vacances la semaine qui suit immédiatement ce week-end
+ * (congé de type 'vacances' débutant du lundi au vendredi suivant), on pénalise
+ * fortement le fait de le mettre de garde ce week-end-là — pour qu'il parte reposé.
+ * Le congé lui-même reste géré en dur par R16 (aucune garde pendant le congé).
+ */
+function penaliteWEAvantVacances(
+  slot: SlotGarde,
+  vet: VetEngine,
+  planning: PlanningPartiel
+): number {
+  void planning
+  if (slot.type !== 'weekend' && slot.type !== 'vendredi_soir') return 0
+
+  // Samedi de référence du week-end concerné
+  const sam = slot.type === 'weekend' ? slot.date : addDays(slot.date, 1)
+  // Fenêtre « semaine suivante » : du lundi (sam+2) au vendredi (sam+6)
+  const lundiSuivant = addDays(sam, 2)
+  const vendrediSuivant = addDays(sam, 6)
+
+  for (const conge of vet.conges) {
+    if (conge.type !== 'vacances') continue
+    if (conge.date_debut >= lundiSuivant && conge.date_debut <= vendrediSuivant) {
+      return PENALITE.WE_AVANT_VACANCES
+    }
   }
   return 0
 }
@@ -135,6 +167,7 @@ export function penalite(
 ): number {
   return (
     penaliteR10WEConsecutif(slot, vet, planning) +
+    penaliteWEAvantVacances(slot, vet, planning) +
     penaliteFeteFinAnnee(slot) +
     penaliteInversionFerie(slot, vet, role, planning)
   )
@@ -143,6 +176,7 @@ export function penalite(
 // Export individuel pour les tests
 export {
   penaliteR10WEConsecutif,
+  penaliteWEAvantVacances,
   penaliteFeteFinAnnee,
   penaliteInversionFerie,
 }

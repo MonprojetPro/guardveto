@@ -28,6 +28,8 @@ export interface ContrainteEngine {
 export interface CongeEngine {
   date_debut: string  // ISO yyyy-MM-dd
   date_fin: string
+  /** Type du congé — utile pour R10c (pas de garde le WE avant des vacances). */
+  type?: 'vacances' | 'formation' | 'sante' | 'autre' | 'indisponibilite'
 }
 
 // Un créneau de garde à planifier

@@ -23,6 +23,7 @@ interface CongeDb {
   veterinaire_id: string
   date_debut: string
   date_fin: string
+  type: 'vacances' | 'formation' | 'sante' | 'autre' | 'indisponibilite'
 }
 
 interface BonusMalusDb {
@@ -69,7 +70,7 @@ export async function chargerInputDepuisSupabase(periodeId: string): Promise<Sol
   // 3. Congés validés qui chevauchent la période
   const { data: congesDb } = await supabase
     .from('conges')
-    .select('veterinaire_id, date_debut, date_fin')
+    .select('veterinaire_id, date_debut, date_fin, type')
     .eq('statut', 'valide')
     .lte('date_debut', periode.date_fin)
     .gte('date_fin', periode.date_debut)
@@ -124,6 +125,7 @@ export async function chargerInputDepuisSupabase(periodeId: string): Promise<Sol
       .map((c): CongeEngine => ({
         date_debut: c.date_debut,
         date_fin: c.date_fin,
+        type: c.type,
       })),
   }))
 

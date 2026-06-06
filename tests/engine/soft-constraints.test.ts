@@ -2,11 +2,12 @@ import { describe, it, expect } from 'vitest'
 import {
   penalite,
   penaliteR10WEConsecutif,
+  penaliteWEAvantVacances,
   penaliteFeteFinAnnee,
   penaliteInversionFerie,
   PENALITE,
 } from '@/engine/rules/soft-constraints'
-import type { SlotGarde, PlanningPartiel } from '@/engine/types'
+import type { SlotGarde, PlanningPartiel, VetEngine } from '@/engine/types'
 import { JEAN, FANNY, VICTOR, MANON } from './scenarios/vets'
 
 const planningVide: PlanningPartiel = { attributions: [] }
@@ -101,6 +102,69 @@ describe('R10 — Pas 2 WE de garde de suite', () => {
       planning
     )
     expect(score).toBe(PENALITE.WE_CONSECUTIF)
+  })
+})
+
+// ── R10c : Pas de garde le WE avant des vacances ─────────
+
+describe('R10c — Pas de garde le week-end qui précède des vacances', () => {
+  // WE du samedi 9 mai 2026 → semaine suivante = lundi 11 → vendredi 15 mai.
+  function vetAvecConge(debut: string, type: VetEngine['conges'][number]['type']): VetEngine {
+    return { ...JEAN, conges: [{ date_debut: debut, date_fin: '2026-05-22', type }] }
+  }
+
+  it('pénalise si des vacances démarrent le lundi suivant le WE', () => {
+    const score = penaliteWEAvantVacances(
+      slot('2026-05-09', 'weekend'),
+      vetAvecConge('2026-05-11', 'vacances'),
+      planningVide
+    )
+    expect(score).toBe(PENALITE.WE_AVANT_VACANCES)
+  })
+
+  it('pénalise aussi le vendredi soir du même bloc week-end', () => {
+    const score = penaliteWEAvantVacances(
+      slot('2026-05-08', 'vendredi_soir'),
+      vetAvecConge('2026-05-11', 'vacances'),
+      planningVide
+    )
+    expect(score).toBe(PENALITE.WE_AVANT_VACANCES)
+  })
+
+  it('ne pénalise pas si les vacances sont bien plus tard (semaine non adjacente)', () => {
+    const score = penaliteWEAvantVacances(
+      slot('2026-05-09', 'weekend'),
+      vetAvecConge('2026-05-25', 'vacances'),
+      planningVide
+    )
+    expect(score).toBe(0)
+  })
+
+  it('ne pénalise pas si le congé adjacent n\'est pas de type vacances (formation)', () => {
+    const score = penaliteWEAvantVacances(
+      slot('2026-05-09', 'weekend'),
+      vetAvecConge('2026-05-11', 'formation'),
+      planningVide
+    )
+    expect(score).toBe(0)
+  })
+
+  it('ne s\'applique pas à un créneau de semaine', () => {
+    const score = penaliteWEAvantVacances(
+      slot('2026-05-05', 'semaine_soir'),
+      vetAvecConge('2026-05-11', 'vacances'),
+      planningVide
+    )
+    expect(score).toBe(0)
+  })
+
+  it('ne pénalise pas un véto sans congé', () => {
+    const score = penaliteWEAvantVacances(
+      slot('2026-05-09', 'weekend'),
+      JEAN,
+      planningVide
+    )
+    expect(score).toBe(0)
   })
 })
 
