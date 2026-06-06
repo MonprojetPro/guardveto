@@ -230,24 +230,33 @@ export function CongesList({ conges, vets, currentUserId, isAdmin }: CongesListP
         </div>
       )}
 
-      {/* Résumé par véto (admin) */}
+      {/* Résumé par véto (admin) — cliquer filtre la liste sur ce véto */}
       {resumeParVet.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-          {resumeParVet.map(({ vet, nb, jours }) => (
-            <button
-              key={vet.id}
-              onClick={() => { setAddDefaultVet(vet.id); setAddOpen(true) }}
-              className="flex items-center gap-2.5 p-3 rounded-lg border border-border bg-card hover:bg-muted/40 transition-colors text-left"
-            >
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: vet.couleur }}>
-                {vet.prenom.charAt(0)}
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-foreground truncate">{vet.prenom} {vet.nom}</p>
-                <p className="text-xs text-muted-foreground">{nb} congé{nb > 1 ? 's' : ''} · {formatDuree(jours)}</p>
-              </div>
-            </button>
-          ))}
+          {resumeParVet.map(({ vet, nb, jours }) => {
+            const actif = filtreVet === vet.id
+            return (
+              <button
+                key={vet.id}
+                onClick={() => setFiltreVet(actif ? 'tous' : vet.id)}
+                aria-pressed={actif}
+                title={actif ? 'Afficher tous les vétérinaires' : `Voir les congés de ${vet.prenom}`}
+                className={`flex items-center gap-2.5 p-3 rounded-lg border transition-colors text-left ${
+                  actif
+                    ? 'border-primary ring-1 ring-primary/30 bg-primary/5'
+                    : 'border-border bg-card hover:bg-muted/40'
+                }`}
+              >
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: vet.couleur }}>
+                  {vet.prenom.charAt(0)}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-foreground truncate">{vet.prenom} {vet.nom}</p>
+                  <p className="text-xs text-muted-foreground">{nb} congé{nb > 1 ? 's' : ''} · {formatDuree(jours)}</p>
+                </div>
+              </button>
+            )
+          })}
         </div>
       )}
 
