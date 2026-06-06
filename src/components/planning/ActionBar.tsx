@@ -13,6 +13,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import type { Periode } from '@/types'
 
 // ── Types ────────────────────────────────────────────────
@@ -64,6 +72,7 @@ export function ActionBar({ periodes, periodesAvecGardes }: ActionBarProps) {
   const [periodeId, setPeriodeId] = useState<string>(periodes[0]?.id ?? '')
   const [generating, setGenerating] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const [impasse, setImpasse] = useState<JourNonCouvert[] | null>(null)
 
   const periodeSelectionnee = periodes.find((p) => p.id === periodeId) ?? null
@@ -114,6 +123,7 @@ export function ActionBar({ periodes, periodesAvecGardes }: ActionBarProps) {
         return
       }
       toast.success('Planning publié — les vétérinaires peuvent y accéder.')
+      setConfirmOpen(false)
       router.refresh()
     } catch {
       toast.error('Impossible de joindre le serveur.')
@@ -170,7 +180,7 @@ export function ActionBar({ periodes, periodesAvecGardes }: ActionBarProps) {
           </Button>
 
           <Button
-            onClick={handlePublier}
+            onClick={() => setConfirmOpen(true)}
             disabled={publishing || !peutPublier}
             className="bg-accent hover:bg-accent/90 text-accent-foreground disabled:opacity-50"
           >
@@ -250,6 +260,41 @@ export function ActionBar({ periodes, periodesAvecGardes }: ActionBarProps) {
           )}
         </div>
       )}
+
+      {/* Modale de confirmation de publication */}
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Publier le planning ?</DialogTitle>
+            <DialogDescription>
+              Cette action a des conséquences immédiates pour le cabinet :
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="text-sm text-muted-foreground space-y-1.5 list-disc pl-5">
+            <li>Tous les <strong>vétérinaires verront le planning</strong> (il ne sera plus en brouillon).</li>
+            <li>Des <strong>e-mails de notification</strong> sont envoyés aux vétérinaires concernés.</li>
+            <li>Le planning est <strong>synchronisé sur Google Agenda</strong>.</li>
+            <li>Tu pourras toujours <strong>modifier une garde manuellement</strong> ensuite (les compteurs se mettront à jour).</li>
+          </ul>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={publishing}>
+              Annuler
+            </Button>
+            <Button
+              onClick={handlePublier}
+              disabled={publishing}
+              className="bg-accent hover:bg-accent/90 text-accent-foreground"
+            >
+              {publishing ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4 mr-2" />
+              )}
+              Confirmer la publication
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

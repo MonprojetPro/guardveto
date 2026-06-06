@@ -52,6 +52,80 @@ export async function queryCompteurs(
   return (data as CompteursRow[] | null) ?? []
 }
 
+// ── Compteurs sur une plage de dates libre ───────────────
+// Agrège les gardes entre `debut` et `fin` (incluses), en traversant
+// autant de périodes que nécessaire. `valideOnly` ne compte que les
+// gardes appartenant à des périodes publiées ou verrouillées.
+
+function ligneVide(v: { id: string; prenom: string; nom: string; statut: 'associe' | 'salarie'; couleur: string }): CompteursRow {
+  return {
+    veterinaire_id: v.id, prenom: v.prenom, nom: v.nom, statut: v.statut, couleur: v.couleur,
+    we_premier: 0, we_second: 0, we_total: 0,
+    sem_premier: 0, sem_second: 0, sem_total: 0,
+    feries_premier: 0, feries_second: 0, feries_total: 0,
+    total_gardes: 0,
+  }
+}
+
+export async function queryCompteursPlage(
+  supabase: SupabaseClient,
+  debut: string,
+  fin: string,
+  valideOnly: boolean
+): Promise<{ compteurs: CompteursRow[]; totalWE: number }> {
+  // 1. Vétérinaires actifs (noms + couleurs + statut)
+  const { data: vetsData } = await supabase
+    .from('veterinaires')
+    .select('id, prenom, nom, statut, couleur')
+    .eq('actif', true)
+    .order('nom')
+  const vets = (vetsData as Array<{ id: string; prenom: string; nom: string; statut: 'associe' | 'salarie'; couleur: string }> | null) ?? []
+
+  // 2. Gardes de la plage + statut de leur période
+  const { data: gardesData } = await supabase
+    .from('gardes')
+    .select('type, premier_id, second_id, periodes!inner(statut)')
+    .gte('date', debut)
+    .lte('date', fin)
+
+  type GardeRow = { type: 'semaine' | 'weekend' | 'ferie'; premier_id: string | null; second_id: string | null; periodes: { statut: string } | { statut: string }[] }
+  let gardes = (gardesData as GardeRow[] | null) ?? []
+
+  const statutDe = (g: GardeRow): string =>
+    Array.isArray(g.periodes) ? g.periodes[0]?.statut : g.periodes?.statut
+  if (valideOnly) {
+    gardes = gardes.filter((g) => {
+      const s = statutDe(g)
+      return s === 'publie' || s === 'verrouille'
+    })
+  }
+
+  // 3. Agrégation par vétérinaire
+  const map = new Map<string, CompteursRow>()
+  for (const v of vets) map.set(v.id, ligneVide(v))
+
+  let totalWE = 0
+  for (const g of gardes) {
+    if (g.type === 'weekend') totalWE++
+    const p = g.premier_id ? map.get(g.premier_id) : null
+    const s = g.second_id ? map.get(g.second_id) : null
+    if (g.type === 'weekend') {
+      if (p) { p.we_premier++; p.we_total++; p.total_gardes++ }
+      if (s) { s.we_second++; s.we_total++; s.total_gardes++ }
+    } else if (g.type === 'ferie') {
+      if (p) { p.feries_premier++; p.feries_total++; p.total_gardes++ }
+      if (s) { s.feries_second++; s.feries_total++; s.total_gardes++ }
+    } else {
+      if (p) { p.sem_premier++; p.sem_total++; p.total_gardes++ }
+      if (s) { s.sem_second++; s.sem_total++; s.total_gardes++ }
+    }
+  }
+
+  // On ne garde que les vétos ayant au moins une garde (cohérent avec la vue)
+  const compteurs = [...map.values()].filter((r) => r.total_gardes > 0)
+  return { compteurs, totalWE }
+}
+
 /** Compte le nombre total de week-ends dans une période */
 export async function queryTotalWE(
   supabase: SupabaseClient,

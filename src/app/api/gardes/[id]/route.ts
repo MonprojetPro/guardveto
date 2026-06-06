@@ -66,6 +66,7 @@ export async function PATCH(
     .select(`
       id, verrouille, periode_id, modifie_manuellement,
       premier_id, second_id,
+      periode:periode_id(statut),
       oldPremier:premier_id(id, nom, prenom, email),
       oldSecond:second_id(id, nom, prenom, email)
     `)
@@ -125,8 +126,16 @@ export async function PATCH(
       },
       user_id: vet.id,
     })
+  }
 
-    // ── Recalcul des bonus/malus de la période ───────────
+  // ── Recalcul auto du bilan bonus/malus ───────────────────
+  // Dès qu'une garde d'une période PUBLIÉE ou VERROUILLÉE est modifiée
+  // manuellement, on recalcule le bilan pour que les compteurs « validés »
+  // restent à jour SANS avoir à republier. (Sur un brouillon, le bilan
+  // est calculé à la publication — inutile de le faire ici.)
+  const periodeRel = (garde as Record<string, unknown>).periode as { statut?: string } | { statut?: string }[] | null
+  const periodeStatut = Array.isArray(periodeRel) ? periodeRel[0]?.statut : periodeRel?.statut
+  if (periodeStatut === 'publie' || periodeStatut === 'verrouille') {
     const [compteurs, totalWE] = await Promise.all([
       queryCompteurs(supabase, garde.periode_id),
       queryTotalWE(supabase, garde.periode_id),

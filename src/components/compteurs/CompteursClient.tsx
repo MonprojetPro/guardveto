@@ -24,6 +24,11 @@ interface CompteursClientProps {
   isAdmin: boolean
   currentVetId: string | null
   bonusMalusHeritage: BonusMalusRow[]
+  mode: 'periode' | 'plage'
+  perimetre: 'tout' | 'valide'
+  debut: string
+  fin: string
+  statutPeriode: Periode['statut']
 }
 
 // ── Helpers ──────────────────────────────────────────────
@@ -117,8 +122,33 @@ export function CompteursClient({
   isAdmin,
   currentVetId,
   bonusMalusHeritage,
+  mode,
+  perimetre,
+  debut,
+  fin,
+  statutPeriode,
 }: CompteursClientProps) {
   const router = useRouter()
+
+  // ── Navigation par filtre (via URL) ───────────────────────
+  function allerPeriode(id: string) {
+    router.push(`/compteurs?mode=periode&periodeId=${id}`)
+  }
+  function allerPlage(d: string, f: string, peri: 'tout' | 'valide') {
+    router.push(`/compteurs?mode=plage&debut=${d}&fin=${f}&perimetre=${peri}`)
+  }
+  function labelStatut(s: Periode['statut']): string {
+    return s === 'publie' ? 'Publié' : s === 'verrouille' ? 'Verrouillé' : 'Brouillon'
+  }
+
+  // Raccourcis de plage (année de référence = année du début courant)
+  const anneeRef = parseInt(debut.slice(0, 4)) || new Date().getFullYear()
+  const raccourcis: Array<{ label: string; debut: string; fin: string }> = [
+    { label: 'Année civile', debut: `${anneeRef}-01-01`, fin: `${anneeRef}-12-31` },
+    { label: 'Sept → Déc', debut: `${anneeRef}-09-01`, fin: `${anneeRef}-12-31` },
+    { label: 'Saison été (mai→août)', debut: `${anneeRef}-05-01`, fin: `${anneeRef}-08-31` },
+    { label: 'Saison hiver (sept→avr)', debut: `${anneeRef}-09-01`, fin: `${anneeRef + 1}-04-30` },
+  ]
 
   // Moyenne WE (uniquement vets avec données)
   const moyenneWE = compteurs.length > 0
@@ -140,32 +170,160 @@ export function CompteursClient({
   return (
     <div className="space-y-6">
 
-      {/* ── Sélecteur de période ───────────────────────── */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <label htmlFor="periode-sel" className="text-sm font-medium text-foreground whitespace-nowrap">
-          Période :
-        </label>
-        <select
-          id="periode-sel"
-          value={periodeId}
-          onChange={(e) => router.push(`/compteurs?periodeId=${e.target.value}`)}
-          className="rounded-md border border-input bg-card px-3 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring flex-1 max-w-sm"
-        >
-          {periodes.map((p) => (
-            <option key={p.id} value={p.id}>
-              {labelPeriode(p)}
-            </option>
-          ))}
-        </select>
+      {/* ── Barre de filtres ─────────────────────────────── */}
+      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+        {/* Choix du mode */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-medium text-foreground">Filtrer :</span>
+          <div className="inline-flex rounded-md border border-input overflow-hidden">
+            <button
+              type="button"
+              onClick={() => allerPeriode(periodeId)}
+              className={`px-3 py-1.5 text-sm transition-colors ${mode === 'periode' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-muted'}`}
+            >
+              Par période
+            </button>
+            <button
+              type="button"
+              onClick={() => allerPlage(debut, fin, perimetre)}
+              className={`px-3 py-1.5 text-sm transition-colors border-l border-input ${mode === 'plage' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-muted'}`}
+            >
+              Par plage de dates
+            </button>
+          </div>
+        </div>
+
+        {/* Mode période : dropdown + badge statut */}
+        {mode === 'periode' && (
+          <div className="flex items-center gap-3 flex-wrap">
+            <select
+              id="periode-sel"
+              value={periodeId}
+              onChange={(e) => allerPeriode(e.target.value)}
+              className="rounded-md border border-input bg-card px-3 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring flex-1 max-w-sm"
+            >
+              {periodes.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {labelPeriode(p)}
+                </option>
+              ))}
+            </select>
+            <span className="text-[11px] font-medium px-2 py-0.5 rounded border border-border bg-muted/40 text-muted-foreground">
+              {labelStatut(statutPeriode)}
+            </span>
+          </div>
+        )}
+
+        {/* Mode plage : dates + raccourcis + périmètre */}
+        {mode === 'plage' && (
+          <div className="space-y-3">
+            <div className="flex items-end gap-3 flex-wrap">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="date-debut" className="text-xs text-muted-foreground">Du</label>
+                <input
+                  id="date-debut"
+                  type="date"
+                  defaultValue={debut}
+                  onChange={(e) => { if (e.target.value) allerPlage(e.target.value, fin, perimetre) }}
+                  className="rounded-md border border-input bg-card px-3 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="date-fin" className="text-xs text-muted-foreground">Au</label>
+                <input
+                  id="date-fin"
+                  type="date"
+                  defaultValue={fin}
+                  onChange={(e) => { if (e.target.value) allerPlage(debut, e.target.value, perimetre) }}
+                  className="rounded-md border border-input bg-card px-3 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+            </div>
+
+            {/* Raccourcis */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-muted-foreground">Raccourcis :</span>
+              {raccourcis.map((r) => (
+                <button
+                  key={r.label}
+                  type="button"
+                  onClick={() => allerPlage(r.debut, r.fin, perimetre)}
+                  className="px-2.5 py-1 text-xs rounded border border-input bg-card hover:bg-muted transition-colors"
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Périmètre */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-muted-foreground">Périmètre :</span>
+              <div className="inline-flex rounded-md border border-input overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => allerPlage(debut, fin, 'tout')}
+                  className={`px-3 py-1 text-xs transition-colors ${perimetre === 'tout' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-muted'}`}
+                >
+                  Tout (brouillon inclus)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => allerPlage(debut, fin, 'valide')}
+                  className={`px-3 py-1 text-xs transition-colors border-l border-input ${perimetre === 'valide' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-muted'}`}
+                >
+                  Validé uniquement
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {compteurs.length === 0 && (
           <span className="text-xs text-muted-foreground">
-            Aucune garde dans cette période.
+            Aucune garde sur ce {mode === 'plage' ? 'intervalle' : 'cette période'}.
           </span>
         )}
       </div>
 
       {compteurs.length > 0 && (
         <>
+          {/* ── Table : Total général (vue d'ensemble) ── */}
+          <TableCard titre="Total général des gardes">
+            <thead>
+              <tr className="border-b border-border">
+                <Th align="left">Vétérinaire</Th>
+                <Th>Week-ends</Th>
+                <Th>Semaine</Th>
+                <Th>Fériés</Th>
+                <Th>Total</Th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {[...compteurs]
+                .sort((a, b) => b.total_gardes - a.total_gardes)
+                .map((row) => (
+                  <tr key={row.veterinaire_id} className={rowClass(row.veterinaire_id)}>
+                    <Td align="left">
+                      <VetNom row={row} isCurrentVet={row.veterinaire_id === currentVetId} />
+                    </Td>
+                    <Td>{row.we_total}</Td>
+                    <Td>{row.sem_total}</Td>
+                    <Td>{row.feries_total}</Td>
+                    <Td highlight>{row.total_gardes}</Td>
+                  </tr>
+                ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-border bg-muted/20">
+                <td className="px-3 py-2 text-xs text-muted-foreground" colSpan={5}>
+                  {mode === 'plage'
+                    ? `Plage du ${debut} au ${fin}${perimetre === 'valide' ? ' · validé uniquement' : ' · brouillon inclus'}`
+                    : 'Période sélectionnée'}
+                </td>
+              </tr>
+            </tfoot>
+          </TableCard>
+
           {/* ── Table : Week-ends ─────────────────────── */}
           <TableCard titre="Gardes week-end">
             <thead>

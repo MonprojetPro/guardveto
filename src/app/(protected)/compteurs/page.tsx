@@ -13,19 +13,29 @@ import { CompteursClient } from '@/components/compteurs/CompteursClient'
 import { BonusMalusCard } from '@/components/compteurs/BonusMalusCard'
 import {
   queryCompteurs,
+  queryCompteursPlage,
   queryTotalWE,
   queryBonusMalusHeritage,
   queryBonusMalusCourant,
   queryVetsInfo,
+  type CompteursRow,
 } from '@/hooks/useCompteurs'
 import type { Periode } from '@/types'
+
+const RE_DATE = /^\d{4}-\d{2}-\d{2}$/
 
 // ── Page ─────────────────────────────────────────────────
 
 export default async function CompteursPage({
   searchParams,
 }: {
-  searchParams: Promise<{ periodeId?: string }>
+  searchParams: Promise<{
+    periodeId?: string
+    mode?: string
+    debut?: string
+    fin?: string
+    perimetre?: string
+  }>
 }) {
   const supabase = await createClient()
 
@@ -63,8 +73,11 @@ export default async function CompteursPage({
     )
   }
 
-  // ── Sélection de la période ──────────────────────────────
-  const { periodeId: periodeIdParam } = await searchParams
+  // ── Lecture des filtres ──────────────────────────────────
+  const params = await searchParams
+  const mode = params.mode === 'plage' ? 'plage' : 'periode'
+  const perimetre = params.perimetre === 'valide' ? 'valide' : 'tout'
+
   const today = new Date().toISOString().split('T')[0]
   // periodes est en DESC — on inverse pour trouver la plus proche chronologiquement
   const periodesAsc = [...periodes].reverse()
@@ -73,23 +86,46 @@ export default async function CompteursPage({
     periodesAsc.find(p => p.date_debut >= today) ??                       // prochaine à venir (la plus proche)
     periodes[0]                                                            // fallback : la plus récente
   const periodeSelectionnee =
-    periodes.find((p) => p.id === periodeIdParam) ?? periodeCourante
+    periodes.find((p) => p.id === params.periodeId) ?? periodeCourante
 
-  // ── Chargement parallèle ─────────────────────────────────
-  const [compteurs, totalWE, bonusMalusHeritage, bonusMalusCourant, vetsInfo] =
-    await Promise.all([
+  // Plage de dates valide ? (mode plage)
+  const plageValide =
+    mode === 'plage' &&
+    !!params.debut && RE_DATE.test(params.debut) &&
+    !!params.fin && RE_DATE.test(params.fin) &&
+    params.debut <= params.fin
+
+  // Dates affichées dans les champs (défaut = période sélectionnée)
+  const debut = plageValide ? params.debut! : (params.debut && RE_DATE.test(params.debut) ? params.debut : periodeSelectionnee.date_debut)
+  const fin = plageValide ? params.fin! : (params.fin && RE_DATE.test(params.fin) ? params.fin : periodeSelectionnee.date_fin)
+
+  // ── Chargement des compteurs selon le mode ───────────────
+  let compteurs: CompteursRow[]
+  let totalWE: number
+  if (plageValide) {
+    const res = await queryCompteursPlage(supabase, debut, fin, perimetre === 'valide')
+    compteurs = res.compteurs
+    totalWE = res.totalWE
+  } else {
+    ;[compteurs, totalWE] = await Promise.all([
       queryCompteurs(supabase, periodeSelectionnee.id),
       queryTotalWE(supabase, periodeSelectionnee.id),
-      isAdmin
-        ? queryBonusMalusHeritage(supabase, periodeSelectionnee, periodes)
-        : Promise.resolve([]),
-      isAdmin
-        ? queryBonusMalusCourant(supabase, periodeSelectionnee.id)
-        : Promise.resolve([]),
-      isAdmin
-        ? queryVetsInfo(supabase)
-        : Promise.resolve([]),
     ])
+  }
+
+  // Bilan bonus/malus : pertinent uniquement en mode période (mécanisme par période)
+  const afficherBilan = isAdmin && mode === 'periode' && periodeSelectionnee.statut !== 'brouillon'
+  const [bonusMalusHeritage, bonusMalusCourant, vetsInfo] = await Promise.all([
+    isAdmin && mode === 'periode'
+      ? queryBonusMalusHeritage(supabase, periodeSelectionnee, periodes)
+      : Promise.resolve([]),
+    afficherBilan
+      ? queryBonusMalusCourant(supabase, periodeSelectionnee.id)
+      : Promise.resolve([]),
+    afficherBilan
+      ? queryVetsInfo(supabase)
+      : Promise.resolve([]),
+  ])
 
   return (
     <div className="space-y-6">
@@ -119,10 +155,15 @@ export default async function CompteursPage({
         isAdmin={isAdmin}
         currentVetId={currentVetId}
         bonusMalusHeritage={bonusMalusHeritage}
+        mode={mode}
+        perimetre={perimetre}
+        debut={debut}
+        fin={fin}
+        statutPeriode={periodeSelectionnee.statut}
       />
 
-      {/* Bilan bonus/malus — admin, périodes publiées ou verrouillées */}
-      {isAdmin && periodeSelectionnee.statut !== 'brouillon' && (
+      {/* Bilan bonus/malus — admin, mode période, périodes publiées ou verrouillées */}
+      {afficherBilan && (
         <BonusMalusCard
           periodeId={periodeSelectionnee.id}
           periodeStatut={periodeSelectionnee.statut}
