@@ -11,6 +11,7 @@
 // ============================================================
 
 import { useRouter } from 'next/navigation'
+import { CalendarX } from 'lucide-react'
 import type { Periode } from '@/types'
 import type { CompteursRow, BonusMalusRow } from '@/hooks/useCompteurs'
 
@@ -150,6 +151,14 @@ export function CompteursClient({
     { label: 'Saison hiver (sept→avr)', debut: `${anneeRef}-09-01`, fin: `${anneeRef + 1}-04-30` },
   ]
 
+  // Message d'état vide, contextuel et grammaticalement correct
+  const messageVide =
+    mode === 'plage'
+      ? perimetre === 'valide'
+        ? 'Aucune garde validée (planning publié ou verrouillé) sur cet intervalle. Essaie « Tout (brouillon inclus) » ou une autre plage de dates.'
+        : 'Aucune garde sur cet intervalle.'
+      : 'Aucune garde sur cette période.'
+
   // Moyenne WE (uniquement vets avec données)
   const moyenneWE = compteurs.length > 0
     ? compteurs.reduce((s, r) => s + r.we_total, 0) / compteurs.length
@@ -278,12 +287,16 @@ export function CompteursClient({
           </div>
         )}
 
-        {compteurs.length === 0 && (
-          <span className="text-xs text-muted-foreground">
-            Aucune garde sur ce {mode === 'plage' ? 'intervalle' : 'cette période'}.
-          </span>
-        )}
       </div>
+
+      {/* ── État vide (encart visible) ───────────────────── */}
+      {compteurs.length === 0 && (
+        <div className="rounded-lg border border-dashed border-border bg-muted/20 px-6 py-10 text-center">
+          <CalendarX className="w-8 h-8 mx-auto text-muted-foreground/50 mb-3" />
+          <p className="text-base font-semibold text-foreground">Aucune garde à afficher</p>
+          <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">{messageVide}</p>
+        </div>
+      )}
 
       {compteurs.length > 0 && (
         <>
