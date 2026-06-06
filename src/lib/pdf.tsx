@@ -467,10 +467,24 @@ function PageCalendrier({
                   const estDerniere = wi === 2
                   const garde = date ? (gardesParDate.get(date) ?? null) : null
                   const ferieNom = date ? feriesMap.get(date) : undefined
-                  // Si c'est la garde WE (stockée sur Sam), on l'affiche dans la case Sam
-                  // Sur Ven/Dim : afficher uniquement le numéro + "↕ WE" si la garde WE couvre
+                  // Affichage des vétos selon le jour du bloc week-end :
+                  //  • Vendredi (wi 0) : R8 → paire INVERSÉE (1er du WE devient 2nd, et inversement)
+                  //  • Samedi   (wi 1) : paire du week-end telle quelle (garde stockée sur Sam)
+                  //  • Dimanche (wi 2) : indicateur "↕ week-end" (même équipe que samedi)
+                  const gardeVendrediInversee =
+                    gardeWEestWeekend && gardeWE
+                      ? {
+                          ...gardeWE,
+                          premier_prenom: gardeWE.second_prenom,
+                          premier_nom: gardeWE.second_nom,
+                          premier_couleur: gardeWE.second_couleur,
+                          second_prenom: gardeWE.premier_prenom,
+                          second_nom: gardeWE.premier_nom,
+                          second_couleur: gardeWE.premier_couleur,
+                        }
+                      : null
                   const gardeAffichee = gardeWEestWeekend
-                    ? (wi === 0 || wi === 2 ? null : garde) // Sur Ven/Dim, pas de détail
+                    ? (wi === 0 ? gardeVendrediInversee : wi === 2 ? null : garde)
                     : garde
                   const baseStyle = ferieNom
                     ? (estDerniere ? S.weCellFerieLast : S.weCellFerie)
@@ -486,8 +500,8 @@ function PageCalendrier({
                         </Text>
                       )}
                       {ferieNom && <Text style={S.ferieName}>{ferieNom}</Text>}
-                      {/* Sur Ven/Dim avec garde WE : juste un indicateur */}
-                      {gardeWEestWeekend && (wi === 0 || wi === 2) && jourNum && !ferieNom && (
+                      {/* Sur Dim avec garde WE : juste un indicateur (même équipe que samedi) */}
+                      {gardeWEestWeekend && wi === 2 && jourNum && !ferieNom && (
                         <Text style={{ fontSize: 6, color: '#93c5fd', marginTop: 2 }}>↕ week-end</Text>
                       )}
                       {/* Sur Sam (ou si pas de WE) : détail complet */}

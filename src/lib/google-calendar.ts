@@ -53,8 +53,10 @@ function getEventTimes(date: string, type: 'semaine' | 'weekend' | 'ferie') {
   const baseDate = new Date(date + 'T00:00:00')
 
   if (type === 'weekend') {
-    // Samedi 08:00 → Lundi 08:00
-    const start = new Date(date + 'T08:00:00')
+    // Vendredi 18:00 → Lundi 08:00 (la garde de week-end couvre le vendredi soir).
+    // `date` est le samedi → le vendredi est la veille.
+    const start = addDays(baseDate, -1)
+    start.setHours(18, 0, 0, 0)
     const end = addDays(baseDate, 2)
     end.setHours(8, 0, 0, 0)
     return { start: start.toISOString(), end: end.toISOString() }
@@ -82,6 +84,17 @@ function buildEventDescription(data: GardeEventData): string {
     : data.type === 'weekend'
     ? 'Garde de week-end'
     : 'Garde de jour férié'
+
+  // Week-end : R8 — le vendredi soir a les deux mêmes vétos avec les rôles
+  // inversés par rapport au samedi/dimanche. On le détaille dans la description.
+  if (data.type === 'weekend' && data.prenomSecond) {
+    return [
+      typeLabel,
+      '',
+      `Vendredi soir : ${data.prenomSecond} (1er) + ${data.prenomPremier} (2nd)`,
+      `Samedi & dimanche : ${data.prenomPremier} (1er) + ${data.prenomSecond} (2nd)`,
+    ].join('\n')
+  }
 
   const lines = [
     typeLabel,
