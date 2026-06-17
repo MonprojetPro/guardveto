@@ -109,9 +109,10 @@ test.describe('Isolation multi-tenant (RLS)', () => {
       page.getByRole('heading', { name: 'Gestion des vétérinaires' })
     ).toBeVisible()
 
-    // Les vétos du cabinet B sont listés…
-    await expect(page.getByText(USERS.adminB.nom, { exact: false })).toBeVisible()
-    await expect(page.getByText(USERS.vetoB.nom, { exact: false })).toBeVisible()
+    // Les vétos du cabinet B sont listés… (scopé au contenu principal :
+    // le nom de l'admin connecté apparaît aussi dans la barre latérale).
+    await expect(page.getByRole('main').getByText(USERS.adminB.nom, { exact: false }).first()).toBeVisible()
+    await expect(page.getByRole('main').getByText(USERS.vetoB.nom, { exact: false }).first()).toBeVisible()
 
     // …et AUCUN véto du cabinet C n'apparaît.
     await expect(page.getByText(USERS.adminC.nom, { exact: false })).toHaveCount(0)
