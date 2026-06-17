@@ -20,6 +20,11 @@ mcp.json
 # Playwright MCP (outil local, pas de code source)
 .playwright-mcp/
 
+# Playwright E2E (rapports + artefacts générés)
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
 # next.js
 /.next/
 /out/
