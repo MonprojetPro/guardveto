@@ -1,30 +1,39 @@
 // ============================================================
 // GUARDVETO — API Route POST /api/generate
 // ============================================================
-// Charge les données depuis Supabase, lance le solver backtracking,
-// puis insère les gardes générées en base (statut brouillon).
+// Charge le contexte depuis Supabase, lance le solver LNS,
+// puis persiste les attributions en base (statut brouillon).
+//
+// Pipeline V2 (F6-002) :
+//   resoudreContexte → genererPlanningPur → persisterResultat
+//
+// Transition V1 → V2 :
+//   - Écrit dans `attributions` (V2) via persisterResultat
+//   - Écrit aussi dans `gardes` (V1) pour la période de transition
+//     jusqu'à la fin de la migration F1-002
 //
 // Accès : admin uniquement
 // Corps : { periodeId: string }
-// Réponse succès  : { success: true, nbGardes, dureeMs }
+// Réponse succès  : { success: true, nbGardes, snapshotId, dureeMs }
 // Réponse impasse : { success: false, joursNonCouverts[], dureeMs }
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { chargerInputDepuisSupabase } from '@/engine/loader'
 import { genererPlanningPur } from '@/engine/solver'
 import { estJourFerie } from '@/engine/utils'
 import { supprimerEvenementsCalendrier } from '@/lib/sync-calendrier'
+import { resoudreContexte } from '@/data/resoudreContexte'
+import { persisterResultat } from '@/data/persisterResultat'
 import type { TypeGardeEngine } from '@/engine/types'
 
-// Laisse le temps au solver + nettoyage agenda (évite le timeout serverless)
+// Laisse le temps au solver LNS + nettoyage agenda (évite le timeout serverless)
 export const maxDuration = 60
 
 // ── Helpers ──────────────────────────────────────────────
 
 /**
- * Convertit le type interne du moteur vers le type de la table gardes.
+ * Convertit le type interne du moteur vers le type de la table gardes (V1).
  * Les attributions `vendredi_soir` sont ignorées (stockées dans weekend).
  */
 function mapTypeGardeEnDb(type: TypeGardeEngine, date: string): 'semaine' | 'weekend' | 'ferie' {
@@ -48,6 +57,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // ── Vérification rôle admin ──────────────────────────────
   const { data: vet } = await supabase
     .from('veterinaires')
     .select('role_app')
@@ -57,6 +67,17 @@ export async function POST(req: NextRequest) {
   if (vet?.role_app !== 'admin') {
     return NextResponse.json(
       { error: 'Accès réservé aux administrateurs.' },
+      { status: 403 }
+    )
+  }
+
+  // ── Extraction du cabinet_id (règle C1 : app_metadata uniquement) ──
+  // app_metadata n'est modifiable que par le service_role — jamais par l'utilisateur.
+  // Utiliser user_metadata serait une escalade de privilèges triviale.
+  const cabinetId = user.app_metadata?.cabinet_id as string | undefined
+  if (!cabinetId) {
+    return NextResponse.json(
+      { error: 'Cabinet non configuré pour cet utilisateur (app_metadata.cabinet_id manquant).' },
       { status: 403 }
     )
   }
@@ -79,10 +100,10 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // ── Chargement des données ──────────────────────────────
-  let input
+  // ── Chargement du contexte (V2 : inclut le calendrier) ─────
+  let contexte
   try {
-    input = await chargerInputDepuisSupabase(periodeId)
+    contexte = await resoudreContexte(periodeId, cabinetId)
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : String(err) },
@@ -90,15 +111,15 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  if (input.vets.length === 0) {
+  if (contexte.vets.length === 0) {
     return NextResponse.json(
       { error: 'Aucun vétérinaire actif trouvé. Impossible de générer le planning.' },
       { status: 422 }
     )
   }
 
-  // ── Génération du planning ──────────────────────────────
-  const result = genererPlanningPur(input)
+  // ── Génération du planning (solver LNS) ─────────────────────
+  const result = genererPlanningPur(contexte)
 
   if (!result.success) {
     // Impasse : retourne le rapport sans modifier la base
@@ -109,7 +130,21 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  // ── Insertion en base ───────────────────────────────────
+  // ── Persistence V2 (attributions) ───────────────────────────
+  let persistenceResult
+  try {
+    persistenceResult = await persisterResultat(result.planning, periodeId, cabinetId)
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
+    )
+  }
+
+  // ── Persistence V1 (gardes) — transition F1-002 ─────────────
+  // La table `gardes` reste la source de vérité pour les composants
+  // UI existants jusqu'à la fin de la migration V1 → V2 (F1-002).
+
   // 0. Supprimer les événements Google Agenda existants de cette période
   //    (sinon ils resteraient orphelins/en doublon après régénération)
   await supprimerEvenementsCalendrier(supabase, periodeId)
@@ -133,6 +168,7 @@ export async function POST(req: NextRequest) {
     .filter((a) => a.type !== 'vendredi_soir')
     .map((a) => ({
       periode_id: periodeId,
+      cabinet_id: cabinetId,
       date: a.date,
       type: mapTypeGardeEnDb(a.type, a.date),
       premier_id: a.premier_id,
@@ -161,6 +197,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     success: true,
     nbGardes: gardesAInserer.length,
+    snapshotId: persistenceResult.snapshotId,
     dureeMs: result.dureeMs,
   })
 }

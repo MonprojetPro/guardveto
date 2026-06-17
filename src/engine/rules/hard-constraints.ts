@@ -3,10 +3,10 @@
 // ============================================================
 
 import type {
-  VetEngine, SlotGarde, PlanningPartiel, ValidationResult, AttributionGarde,
+  VetEngine, SlotGarde, PlanningPartiel, ValidationResult, AttributionGarde, CalendrierResolu,
 } from '../types'
 import {
-  jourDeLaSemaine, estSemaineImpaire, estEnVacancesScolaires,
+  jourDeLaSemaine, estSemaineImpaire, estSemaineImpaireAncrée, estEnVacancesScolaires,
   estJourFerie, estEnEte, lundiDeSemaine, vendrediDeSemaine, samediDeSemaine, addDays,
 } from '../utils'
 
@@ -73,7 +73,7 @@ function aGardeVendrediSoir(
  * R1 — Jours de repos fixes
  * Vérifie les contraintes `jour_repos_fixe` actives du vétérinaire.
  */
-function checkR1JourReposFixe(vet: VetEngine, slot: SlotGarde): ValidationResult {
+function checkR1JourReposFixe(vet: VetEngine, slot: SlotGarde, calendrier?: CalendrierResolu): ValidationResult {
   const jour = jourDeLaSemaine(slot.date)
   const contraintes = vet.contraintes.filter(
     (c) => c.actif && c.type === 'jour_repos_fixe'
@@ -87,7 +87,7 @@ function checkR1JourReposFixe(vet: VetEngine, slot: SlotGarde): ValidationResult
       if (cfg.jour !== jour) continue
 
       // Si flexible en vacances scolaires → autorisé pendant les vacances
-      if (cfg.flexible_vacances && estEnVacancesScolaires(slot.date)) continue
+      if (cfg.flexible_vacances && estEnVacancesScolaires(slot.date, calendrier)) continue
 
       return invalid(
         `R1 : ${vet.prenom} a un jour de repos fixe le ${jour}`
@@ -96,11 +96,24 @@ function checkR1JourReposFixe(vet: VetEngine, slot: SlotGarde): ValidationResult
 
     // Format avec tableau de règles (Anne-Sophie)
     if (Array.isArray(cfg.regles)) {
-      type Regle = { jour: string; periode?: string; semaine?: string }
+      type Regle = { jour: string; periode?: string; semaine?: string; ancre?: string }
       for (const regle of cfg.regles as Regle[]) {
         if (regle.jour !== jour) continue
-        if (regle.semaine === 'impaire' && !estSemaineImpaire(slot.date)) continue
-        if (regle.semaine === 'paire' && estSemaineImpaire(slot.date)) continue
+
+        if (regle.semaine === 'impaire' || regle.semaine === 'paire') {
+          // Utiliser l'ancre mobile si disponible (F7-001 fix parité ISO 53)
+          let estImpaire: boolean
+          if (regle.ancre && calendrier) {
+            estImpaire = estSemaineImpaireAncrée(slot.date, regle.ancre, calendrier.vacancesScolaires)
+          } else if (regle.ancre) {
+            estImpaire = estSemaineImpaireAncrée(slot.date, regle.ancre, [])
+          } else {
+            estImpaire = estSemaineImpaire(slot.date)
+          }
+          if (regle.semaine === 'impaire' && !estImpaire) continue
+          if (regle.semaine === 'paire' && estImpaire) continue
+        }
+
         return invalid(`R1 : ${vet.prenom} a un repos fixe le ${jour} cette semaine`)
       }
     }
@@ -112,8 +125,12 @@ function checkR1JourReposFixe(vet: VetEngine, slot: SlotGarde): ValidationResult
 /**
  * R2 — Anne-So indisponible semaines impaires (soirs + WE)
  * S'applique via contrainte `indisponibilite_cyclique`.
+ *
+ * Utilise `estSemaineImpaireAncrée()` si le calendrier est fourni et que la contrainte
+ * a une `ancre` (date de début de période) — évite le bug semaine ISO 53.
+ * Fallback sur `estSemaineImpaire()` (ancienne logique) si le calendrier est absent.
  */
-function checkR2IndispoCyclique(vet: VetEngine, slot: SlotGarde): ValidationResult {
+function checkR2IndispoCyclique(vet: VetEngine, slot: SlotGarde, calendrier?: CalendrierResolu): ValidationResult {
   const contraintes = vet.contraintes.filter(
     (c) => c.actif && c.type === 'indisponibilite_cyclique'
   )
@@ -122,11 +139,25 @@ function checkR2IndispoCyclique(vet: VetEngine, slot: SlotGarde): ValidationResu
     const cfg = c.config as Record<string, unknown>
     const semaines = cfg.semaines as string | undefined
     const periodes = (cfg.periodes ?? []) as string[]
+    const ancre = cfg.ancre as string | undefined
+
+    // Utiliser l'ancre mobile si disponible (F7-001 fix parité ISO 53)
+    // Sinon fallback sur la parité ISO globale (comportement V1)
+    let estImpaire: boolean
+    if (ancre && calendrier) {
+      estImpaire = estSemaineImpaireAncrée(slot.date, ancre, calendrier.vacancesScolaires)
+    } else if (ancre) {
+      // Ancre disponible mais pas de calendrier : ancre fixe sans recalage
+      estImpaire = estSemaineImpaireAncrée(slot.date, ancre, [])
+    } else {
+      // Pas d'ancre : fallback V1 (parité ISO globale)
+      estImpaire = estSemaineImpaire(slot.date)
+    }
 
     const concerneCetteSemaine =
       semaines === 'toutes' ||
-      (semaines === 'impaires' && estSemaineImpaire(slot.date)) ||
-      (semaines === 'paires' && !estSemaineImpaire(slot.date))
+      (semaines === 'impaires' && estImpaire) ||
+      (semaines === 'paires' && !estImpaire)
 
     if (!concerneCetteSemaine) continue
 
@@ -395,15 +426,16 @@ export function isValid(
   vet: VetEngine,
   roleVisé: 'premier' | 'second',
   allVets: VetEngine[],
-  planning: PlanningPartiel
+  planning: PlanningPartiel,
+  calendrier?: CalendrierResolu
 ): ValidationResult {
   const checks: ValidationResult[] = [
     checkR16Conge(vet, slot),
     checkR17Ete(slot, roleVisé),
     checkR18Hiver(slot, roleVisé, planning),
     checkR19Weekend(slot, roleVisé, planning),
-    checkR1JourReposFixe(vet, slot),
-    checkR2IndispoCyclique(vet, slot),
+    checkR1JourReposFixe(vet, slot, calendrier),
+    checkR2IndispoCyclique(vet, slot, calendrier),
     checkR3ReposConditionnel(vet, slot, planning),
     checkR6DuoInterdit(vet, slot, planning, allVets),
     checkR9VendrediLieWE(vet, slot, planning),

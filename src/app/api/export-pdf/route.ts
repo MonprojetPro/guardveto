@@ -63,9 +63,13 @@ export async function GET(req: NextRequest) {
         .eq('actif', true)
         .order('nom'),
 
+      // Schéma V2 : la colonne `nom` a été renommée `libelle` et la table est
+      // désormais multi-région (référentiel partagé). On ne récupère que les
+      // fériés métropole (comportement attendu pour le cabinet pilote).
       supabase
         .from('jours_feries')
-        .select('date, nom'),
+        .select('date, libelle')
+        .eq('region', 'metropole'),
     ])
 
   if (!periode) {
@@ -113,8 +117,10 @@ export async function GET(req: NextRequest) {
     couleur: v.couleur ?? '#6b7280',
   }))
 
+  // La table V2 expose `libelle` ; l'interface du PDF (lib/pdf) attend `nom`.
+  // On lit `libelle` en entrée et on remappe vers `nom` en sortie.
   const jours_feries: Array<{ date: string; nom: string }> = (feriesDb ?? []).map(
-    (f: { date: string; nom: string }) => ({ date: f.date, nom: f.nom })
+    (f: { date: string; libelle: string }) => ({ date: f.date, nom: f.libelle })
   )
 
   // ── Génération PDF ──────────────────────────────────────────

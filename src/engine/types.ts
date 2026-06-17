@@ -47,9 +47,30 @@ export interface AttributionGarde {
   second_id: string | null
 }
 
+export interface CalendrierResolu {
+  /** Dates ISO yyyy-mm-dd des jours fériés */
+  feries: Set<string>
+  /** Plages de vacances scolaires */
+  vacancesScolaires: Array<{ debut: string; fin: string }>
+}
+
 // Planning partiellement construit (passé au vérificateur)
 export interface PlanningPartiel {
   attributions: AttributionGarde[]
+}
+
+// Contexte complet d'une simulation — alias structurel de SolverInput,
+// utilisé par la couche data (resoudreContexte / persisterResultat)
+// pour nommer explicitement le contrat entre le loader et le solver.
+export interface ContexteSimulation {
+  dateDebut: string
+  dateFin: string
+  saison: Saison
+  vets: VetEngine[]
+  /** Bonus/malus inter-périodes (R20). Passer {} si aucun. */
+  bonusMalus: import('./score-lexicographique').BonusMalusMap
+  /** Calendrier résolu (fériés + vacances scolaires). Fallback sur listes en dur si absent. */
+  calendrier?: CalendrierResolu
 }
 
 // Résultat d'une vérification

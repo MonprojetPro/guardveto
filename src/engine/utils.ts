@@ -2,7 +2,7 @@
 // GUARDVETO — Utilitaires de dates pour le moteur
 // ============================================================
 
-import type { JourSemaine, Saison } from './types'
+import type { JourSemaine, Saison, CalendrierResolu } from './types'
 
 // ── Helpers de base ──────────────────────────────────────
 
@@ -15,9 +15,52 @@ export function numeroSemaine(date: string): number {
   return Math.ceil(((thursday.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
 }
 
-/** Semaine impaire (numéro ISO % 2 !== 0) */
+/**
+ * Semaine impaire (numéro ISO % 2 !== 0)
+ * @deprecated Utiliser estSemaineImpaireAncrée() qui résiste à la semaine ISO 53.
+ *   Cette fonction retourne un résultat incorrect pour décembre 2026 (semaine 53 ISO)
+ *   car elle se base sur le numéro ISO global au lieu d'un comptage relatif à une ancre.
+ */
 export function estSemaineImpaire(date: string): boolean {
   return numeroSemaine(date) % 2 !== 0
+}
+
+/**
+ * Calcule si une semaine est "impaire" relativement à une ancre.
+ * L'ancre se recale à chaque début de vacances scolaires (évite le bug semaine ISO 53).
+ *
+ * @param date - Date ISO yyyy-mm-dd à tester
+ * @param ancre - Date ISO du début de la période (lundi de référence)
+ * @param vacancesScolaires - Plages de vacances pour les recalages
+ *
+ * @example
+ * // Sans vacances : comptage simple depuis l'ancre
+ * estSemaineImpaireAncrée('2026-12-28', '2026-09-01', []) // 118 jours → semaine 16 → paire (false)
+ *
+ * // Avec vacances : l'ancre se recale au début des vacances
+ * estSemaineImpaireAncrée('2026-11-02', '2026-09-01', [{ debut: '2026-10-17', fin: '2026-10-31' }])
+ * // ancre effective = '2026-10-17', diff = ~2 semaines → paire
+ */
+export function estSemaineImpaireAncrée(
+  date: string,
+  ancre: string,
+  vacancesScolaires: Array<{ debut: string; fin: string }>
+): boolean {
+  // Trouver l'ancre effective = dernier début de vacances AVANT ou ÉGAL à la date
+  // et STRICTEMENT après l'ancre initiale (pour avancer l'ancre uniquement)
+  let ancreEffective = ancre
+  for (const v of vacancesScolaires) {
+    if (v.debut <= date && v.debut > ancreEffective) {
+      ancreEffective = v.debut
+    }
+  }
+
+  // Calculer le nombre de semaines depuis l'ancre effective (en jours / 7)
+  const msParSemaine = 7 * 24 * 60 * 60 * 1000
+  const diffMs = new Date(date + 'T12:00:00Z').getTime() - new Date(ancreEffective + 'T12:00:00Z').getTime()
+  const diffSemaines = Math.floor(diffMs / msParSemaine)
+
+  return diffSemaines % 2 !== 0
 }
 
 /** Jour de la semaine (0=dimanche … 6=samedi) */
@@ -119,7 +162,9 @@ function calculerPaques(annee: number): Date {
   return new Date(Date.UTC(annee, mois - 1, jour))
 }
 
-export function estJourFerie(date: string): boolean {
+export function estJourFerie(date: string, calendrier?: CalendrierResolu): boolean {
+  if (calendrier) return calendrier.feries.has(date)
+
   const annee = parseInt(date.substring(0, 4))
   const mmjj = date.substring(5) // MM-DD
 
@@ -154,7 +199,8 @@ const VACANCES_SCOLAIRES: Array<{ debut: string; fin: string; label: string }> =
   { debut: '2027-07-03', fin: '2027-08-31', label: 'Été 2027' },
 ]
 
-export function estEnVacancesScolaires(date: string): boolean {
+export function estEnVacancesScolaires(date: string, calendrier?: CalendrierResolu): boolean {
+  if (calendrier) return calendrier.vacancesScolaires.some(({ debut, fin }) => dateEntre(date, debut, fin))
   return VACANCES_SCOLAIRES.some(({ debut, fin }) => dateEntre(date, debut, fin))
 }
 

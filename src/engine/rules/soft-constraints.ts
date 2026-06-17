@@ -7,7 +7,7 @@
 // la meilleure solution parmi plusieurs valides.
 // ============================================================
 
-import type { SlotGarde, VetEngine, PlanningPartiel, RoleGarde } from '../types'
+import type { SlotGarde, VetEngine, PlanningPartiel, RoleGarde, CalendrierResolu } from '../types'
 import { samediDeSemaine, addDays, estJourFerie, estFeteFinAnnee } from '../utils'
 
 // ── Scores de pénalité ───────────────────────────────────
@@ -126,10 +126,11 @@ function penaliteInversionFerie(
   slot: SlotGarde,
   vet: VetEngine,
   role: RoleGarde,
-  planning: PlanningPartiel
+  planning: PlanningPartiel,
+  calendrier?: CalendrierResolu
 ): number {
   if (slot.type !== 'semaine_soir') return 0
-  if (!estJourFerie(slot.date)) return 0
+  if (!estJourFerie(slot.date, calendrier)) return 0
 
   // Garde du soir précédent (la nuit avant le jour férié)
   const veille = addDays(slot.date, -1)
@@ -163,13 +164,14 @@ export function penalite(
   slot: SlotGarde,
   vet: VetEngine,
   role: RoleGarde,
-  planning: PlanningPartiel
+  planning: PlanningPartiel,
+  calendrier?: CalendrierResolu
 ): number {
   return (
     penaliteR10WEConsecutif(slot, vet, planning) +
     penaliteWEAvantVacances(slot, vet, planning) +
     penaliteFeteFinAnnee(slot) +
-    penaliteInversionFerie(slot, vet, role, planning)
+    penaliteInversionFerie(slot, vet, role, planning, calendrier)
   )
 }
 
