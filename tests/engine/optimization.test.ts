@@ -9,7 +9,14 @@ import {
   variance,
   ecartMaxMin,
 } from '@/engine/rules/optimization'
-import { scoreEquite, POIDS } from '@/engine/scorer'
+// V2 : le scoring d'équité vit désormais dans score-lexicographique
+// (scorerPlanning → étage EQUITE). scorer.ts est un stub @deprecated.
+import {
+  scorerPlanning,
+  comparerScores,
+  Etage,
+  POIDS_INTRA,
+} from '@/engine/score-lexicographique'
 import type { PlanningPartiel } from '@/engine/types'
 import { ANNE_SOPHIE, FANNY, JEAN, ANNE_CAT, MANON, ANTOINE, VICTOR, ALL_VETS } from './scenarios/vets'
 
@@ -225,15 +232,23 @@ describe('R15 — desequilibreGrandsWeSalaries', () => {
   })
 })
 
-// ── scoreEquite ──────────────────────────────────────────
+// ── Équité — étage EQUITE du score lexicographique V2 ─────
+// NOTE migration V2 (2026-06-17) : le scoring d'équité additif V1
+// (scoreEquite/POIDS dans scorer.ts) a été remplacé par le score
+// lexicographique hybride (scorerPlanning → VecteurScore, étage EQUITE).
+// L'équité reste pleinement testée : ces tests vérifient que
+// (a) l'équité parfaite = 0, (b) un planning équilibré est strictement
+// meilleur qu'un planning déséquilibré, (c) la pondération intra-étage
+// EQUITE conserve la priorité WE > fériés > semaine.
 
-describe('scoreEquite — score global', () => {
+describe('Équité (V2) — étage EQUITE de scorerPlanning', () => {
   it('retourne 0 sur planning vide (équité parfaite, rien à comparer)', () => {
-    expect(scoreEquite(planningVide, {}, ALL_VETS)).toBe(0)
+    const v = scorerPlanning(planningVide, ALL_VETS, 'ete')
+    expect(v.etages[Etage.EQUITE]).toBe(0)
   })
 
-  it('retourne un score plus bas pour un planning équilibré que déséquilibré', () => {
-    // Planning équilibré : 1 WE chacun pour Jean, Fanny, Victor, Manon
+  it('planning équilibré : étage EQUITE plus bas que déséquilibré', () => {
+    // Planning équilibré : 1 WE chacun pour Jean, Fanny, Victor, Manon…
     const planningEquilibre: PlanningPartiel = {
       attributions: [
         { date: '2026-05-02', type: 'weekend', premier_id: JEAN.id, second_id: VICTOR.id },
@@ -252,32 +267,39 @@ describe('scoreEquite — score global', () => {
       ],
     }
 
-    const scoreEq = scoreEquite(planningEquilibre, {}, ALL_VETS)
-    const scoreDeseq = scoreEquite(planningDesequilibre, {}, ALL_VETS)
-    expect(scoreEq).toBeLessThan(scoreDeseq)
+    const eqEquilibre = scorerPlanning(planningEquilibre, ALL_VETS, 'ete').etages[Etage.EQUITE]
+    const eqDesequilibre = scorerPlanning(planningDesequilibre, ALL_VETS, 'ete').etages[Etage.EQUITE]
+    expect(eqEquilibre).toBeLessThan(eqDesequilibre)
   })
 
-  it('R20 — le bonus/malus influence le score global', () => {
-    // Victor doit faire plus de gardes (bonus/malus positif)
-    const planning: PlanningPartiel = {
+  it('comparerScores préfère le planning le plus équitable (étages amont égaux)', () => {
+    // Deux plannings sans pénalité souple (étages 0-5 à 0) → seul l'étage
+    // EQUITE départage. Le plus équilibré doit gagner lexicographiquement.
+    const planningEquilibre: PlanningPartiel = {
       attributions: [
-        { date: '2026-05-02', type: 'weekend', premier_id: JEAN.id, second_id: FANNY.id },
-        { date: '2026-05-09', type: 'weekend', premier_id: MANON.id, second_id: ANTOINE.id },
+        { date: '2026-05-02', type: 'weekend', premier_id: JEAN.id, second_id: VICTOR.id },
+        { date: '2026-05-09', type: 'weekend', premier_id: FANNY.id, second_id: MANON.id },
+        { date: '2026-05-16', type: 'weekend', premier_id: ANTOINE.id, second_id: ANNE_SOPHIE.id },
       ],
     }
-
-    const scoreSansBM = scoreEquite(planning, {}, ALL_VETS)
-    // Victor a un malus : il devrait faire plus (il doit 2 WE)
-    const scoreAvecBM = scoreEquite(planning, { [VICTOR.id]: 2 }, ALL_VETS)
-
-    // Avec le bonus/malus de Victor, le déséquilibre apparaît différemment
-    expect(typeof scoreAvecBM).toBe('number')
-    expect(scoreAvecBM).not.toBe(scoreSansBM)
+    const planningDesequilibre: PlanningPartiel = {
+      attributions: [
+        { date: '2026-05-02', type: 'weekend', premier_id: JEAN.id, second_id: VICTOR.id },
+        { date: '2026-05-09', type: 'weekend', premier_id: JEAN.id, second_id: VICTOR.id },
+        { date: '2026-05-16', type: 'weekend', premier_id: JEAN.id, second_id: VICTOR.id },
+      ],
+    }
+    const vEq = scorerPlanning(planningEquilibre, ALL_VETS, 'ete')
+    const vDeseq = scorerPlanning(planningDesequilibre, ALL_VETS, 'ete')
+    // comparerScores < 0 → premier argument meilleur
+    expect(comparerScores(vEq, vDeseq)).toBeLessThan(0)
   })
 
-  it('les poids POIDS.WE_GARDE contribuent davantage que POIDS.SEMAINE_SECOND', () => {
-    expect(POIDS.WE_GARDE).toBeGreaterThan(POIDS.SEMAINE_SECOND)
-    expect(POIDS.WE_GARDE).toBeGreaterThan(POIDS.SEMAINE_PREMIER)
-    expect(POIDS.WE_GARDE).toBeGreaterThan(POIDS.FERIES)
+  it('les poids EQ_WE pèsent davantage que EQ_SEMAINE_SECOND / EQ_SEMAINE_PREMIER / EQ_FERIES', () => {
+    // La priorité d'équité V1 (WE > fériés > semaine) est conservée dans
+    // les poids intra-étage EQUITE de la V2.
+    expect(POIDS_INTRA.EQ_WE).toBeGreaterThan(POIDS_INTRA.EQ_SEMAINE_SECOND)
+    expect(POIDS_INTRA.EQ_WE).toBeGreaterThan(POIDS_INTRA.EQ_SEMAINE_PREMIER)
+    expect(POIDS_INTRA.EQ_WE).toBeGreaterThan(POIDS_INTRA.EQ_FERIES)
   })
 })
