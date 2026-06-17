@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { revalidatePath } from 'next/cache'
 
 // Détection automatique de la saison depuis la date de début
@@ -41,7 +42,17 @@ export async function creerPeriode(formData: FormData) {
 
   const saison = detecterSaison(dateDebut)
 
+  // cabinet_id dérivé côté serveur (jamais du client) — sinon la période
+  // est insérée avec cabinet_id NULL et reste invisible sous RLS stricte.
+  let cabinetId: string
+  try {
+    cabinetId = await resoudreCabinetId(supabase)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
+  }
+
   const { error } = await supabase.from('periodes').insert({
+    cabinet_id: cabinetId,
     saison,
     numero:     null,
     libelle,

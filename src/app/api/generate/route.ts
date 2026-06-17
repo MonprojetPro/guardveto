@@ -149,11 +149,16 @@ export async function POST(req: NextRequest) {
   //    (sinon ils resteraient orphelins/en doublon après régénération)
   await supprimerEvenementsCalendrier(supabase, periodeId)
 
-  // 1. Supprimer les gardes brouillon existantes pour cette période
+  // 1. Supprimer les gardes brouillon existantes pour cette période.
+  //    Scopé cabinet_id (défense en profondeur : en DEV_BYPASS le client
+  //    service_role contourne la RLS, donc on filtre explicitement).
+  //    On NE supprime PAS les gardes verrouillées (verrouille=true) :
+  //    elles représentent des décisions figées à préserver.
   const { error: deleteErr } = await supabase
     .from('gardes')
     .delete()
     .eq('periode_id', periodeId)
+    .eq('cabinet_id', cabinetId)
     .eq('verrouille', false)
 
   if (deleteErr) {
@@ -163,7 +168,31 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // 2. Préparer les gardes à insérer (vendredi_soir exclu — fusionné dans weekend)
+  // 1b. Recenser les gardes verrouillées résiduelles de la période.
+  //     Le solver régénère TOUTE la période sans connaître les verrous ;
+  //     on doit donc exclure les (date, type) déjà verrouillés de l'insert,
+  //     sinon collision sur l'index UNIQUE(cabinet_id, date, type).
+  const { data: gardesVerrouillees, error: lockedErr } = await supabase
+    .from('gardes')
+    .select('date, type')
+    .eq('periode_id', periodeId)
+    .eq('cabinet_id', cabinetId)
+    .eq('verrouille', true)
+
+  if (lockedErr) {
+    return NextResponse.json(
+      { error: `Erreur lecture des gardes verrouillées : ${lockedErr.message}` },
+      { status: 500 }
+    )
+  }
+
+  const clesVerrouillees = new Set(
+    ((gardesVerrouillees ?? []) as { date: string; type: string }[])
+      .map((g) => `${g.date}|${g.type}`)
+  )
+
+  // 2. Préparer les gardes à insérer (vendredi_soir exclu — fusionné dans weekend ;
+  //    dates/type déjà verrouillés exclus — on conserve le verrou existant).
   const gardesAInserer = result.planning.attributions
     .filter((a) => a.type !== 'vendredi_soir')
     .map((a) => ({
@@ -176,9 +205,17 @@ export async function POST(req: NextRequest) {
       verrouille: false,
       modifie_manuellement: false,
     }))
+    .filter((g: { date: string; type: string }) => !clesVerrouillees.has(`${g.date}|${g.type}`))
 
-  // 3. Insérer en bloc
-  const { error: insertErr } = await supabase.from('gardes').insert(gardesAInserer)
+  // 3. Insérer en bloc — upsert idempotent scopé cabinet.
+  //    ON CONFLICT (cabinet_id, date, type) DO NOTHING : si une ligne
+  //    subsistait (course/retry), on ne casse pas la régénération.
+  const { error: insertErr } = await supabase
+    .from('gardes')
+    .upsert(gardesAInserer, {
+      onConflict: 'cabinet_id,date,type',
+      ignoreDuplicates: true,
+    })
 
   if (insertErr) {
     return NextResponse.json(

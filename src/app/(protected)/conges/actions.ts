@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { revalidatePath } from 'next/cache'
 import { sendBrevoEmail, emailCongeValide, emailCongeRefuse } from '@/lib/brevo'
 import type { CreneauConge, TypeConge } from '@/types'
@@ -26,7 +27,17 @@ export async function createConge(data: CongeFormData, saisi_par: string, isAdmi
     veterinaire_id = vetId
   }
 
+  // cabinet_id dérivé côté serveur (jamais du client) — sinon le congé
+  // est inséré avec cabinet_id NULL et reste invisible sous RLS stricte.
+  let cabinetId: string
+  try {
+    cabinetId = await resoudreCabinetId(supabase)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
+  }
+
   const { error } = await supabase.from('conges').insert({
+    cabinet_id: cabinetId,
     veterinaire_id,
     date_debut: data.date_debut,
     date_fin: data.date_fin,

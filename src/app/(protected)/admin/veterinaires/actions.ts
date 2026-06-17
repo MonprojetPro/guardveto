@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 import type { StatutVeto, UserRole } from '@/types'
@@ -19,18 +20,29 @@ export interface VeterinaireFormData {
 export async function createVeterinaire(data: VeterinaireFormData) {
   const supabase = await createClient()
 
-  // Vérifie unicité email
+  // cabinet_id dérivé côté serveur (jamais du client) — sinon le véto
+  // est inséré avec cabinet_id NULL et reste invisible sous RLS stricte.
+  let cabinetId: string
+  try {
+    cabinetId = await resoudreCabinetId(supabase)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
+  }
+
+  // Vérifie unicité email (au sein du cabinet)
   const { data: existing } = await supabase
     .from('veterinaires')
     .select('id')
-    .eq('email', data.email)
-    .single()
+    .eq('email', data.email.trim().toLowerCase())
+    .eq('cabinet_id', cabinetId)
+    .maybeSingle()
 
   if (existing) {
     return { error: 'Un vétérinaire avec cet email existe déjà.' }
   }
 
   const { error } = await supabase.from('veterinaires').insert({
+    cabinet_id: cabinetId,
     nom: data.nom.trim(),
     prenom: data.prenom.trim(),
     email: data.email.trim().toLowerCase(),

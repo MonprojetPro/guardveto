@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { queryCompteurs, queryTotalWE } from '@/hooks/useCompteurs'
 import { calculerBilans } from '@/engine/bilan'
 
@@ -29,6 +30,17 @@ export async function POST(req: NextRequest) {
 
   if (vet?.role_app !== 'admin') {
     return NextResponse.json({ error: 'Accès réservé aux administrateurs.' }, { status: 403 })
+  }
+
+  // ── cabinet_id dérivé côté serveur (jamais du client) ────
+  let cabinetId: string
+  try {
+    cabinetId = await resoudreCabinetId(supabase)
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : 'Cabinet introuvable.' },
+      { status: 403 }
+    )
   }
 
   // ── Validation du corps ──────────────────────────────────
@@ -79,6 +91,7 @@ export async function POST(req: NextRequest) {
 
   // ── Upsert en base ───────────────────────────────────────
   const rows = bilans.map((b) => ({
+    cabinet_id: cabinetId,
     veterinaire_id: b.veterinaire_id,
     periode_id: periodeId,
     ecart_we: b.ecart_we,
@@ -89,7 +102,7 @@ export async function POST(req: NextRequest) {
 
   const { error: upsertErr } = await supabase
     .from('bonus_malus')
-    .upsert(rows, { onConflict: 'veterinaire_id,periode_id' })
+    .upsert(rows, { onConflict: 'cabinet_id,veterinaire_id,periode_id' })
 
   if (upsertErr) {
     return NextResponse.json(

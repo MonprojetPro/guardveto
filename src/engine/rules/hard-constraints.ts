@@ -67,6 +67,41 @@ function aGardeVendrediSoir(
   return a?.premier_id === vetId || a?.second_id === vetId
 }
 
+/**
+ * Extrait la liste des UUID de vétérinaires "interdits en duo" d'une config
+ * de contrainte `duo_interdit`, quelle que soit sa forme :
+ *   • V1 legacy : { avec_veterinaire_id: 'uuid' }
+ *   • V2 brique  : { params: { avec_veterinaire_id: 'uuid' } }
+ *   • V2 n-aire   : { axes: { qui: 'uuid' | ['uuid', …] } }
+ * Renvoie toujours un tableau (vide si rien d'exploitable).
+ */
+function lireDuoInterditIds(config: Record<string, unknown>): string[] {
+  const ids: string[] = []
+
+  const pousser = (v: unknown) => {
+    if (typeof v === 'string' && v.trim() !== '') ids.push(v)
+    else if (Array.isArray(v)) for (const x of v) if (typeof x === 'string' && x.trim() !== '') ids.push(x)
+  }
+
+  // 1. Top-level (legacy)
+  pousser(config.avec_veterinaire_id)
+
+  // 2. params (brique V2 — la migration y range la config legacy intégrale)
+  const params = config.params
+  if (params && typeof params === 'object') {
+    pousser((params as Record<string, unknown>).avec_veterinaire_id)
+  }
+
+  // 3. axes.qui (forme V2 n-aire éventuelle)
+  const axes = config.axes
+  if (axes && typeof axes === 'object') {
+    pousser((axes as Record<string, unknown>).qui)
+  }
+
+  // Dédoublonnage déterministe
+  return [...new Set(ids)]
+}
+
 // ── Contraintes individuelles ────────────────────────────
 
 /**
@@ -226,23 +261,30 @@ function checkR6DuoInterdit(
   )
 
   for (const c of contraintes) {
-    const cfg = c.config as Record<string, unknown>
-    const autreId = cfg.avec_veterinaire_id as string | undefined
-    if (!autreId) continue
+    // Lecture du/des partenaire(s) interdit(s) — tolère 3 formes de config :
+    //   • V1 legacy  : { avec_veterinaire_id: 'uuid' }
+    //   • V2 brique   : { brique:'duo_interdit', force:2, params:{ avec_veterinaire_id:'uuid' } }
+    //   • V2 n-aire    : axes.qui = 'uuid' | ['uuid', …]   (forme future)
+    // BUG HISTORIQUE (2026-06) : la migration V2 (20260616170001) a déplacé
+    // `avec_veterinaire_id` dans `params`, mais le lecteur ne regardait que le
+    // top-level → R6 ne se déclenchait plus → Antoine+Manon en binôme WE.
+    const autresIds = lireDuoInterditIds(c.config as Record<string, unknown>)
+    if (autresIds.length === 0) continue
 
-    // Vérifie si l'autre est déjà assigné à ce slot
+    // Vérifie si l'un des partenaires interdits est déjà assigné à ce slot
     const attr = getAttribution(planning, slot.date, slot.type)
     if (!attr) continue
 
-    const autreDejaAssigne = attr.premier_id === autreId || attr.second_id === autreId
-    if (!autreDejaAssigne) continue
+    for (const autreId of autresIds) {
+      const autreDejaAssigne = attr.premier_id === autreId || attr.second_id === autreId
+      if (!autreDejaAssigne) continue
 
-    // Vérifie s'il y a un 3e vétérinaire disponible (senior) dans ce slot
-    // Pour un slot à 2 places, si l'autre est déjà là → c'est leur duo → interdit
-    const autreVet = allVets.find((v) => v.id === autreId)
-    return invalid(
-      `R6 : ${vet.prenom} et ${autreVet?.prenom ?? '?'} ne peuvent pas être en duo seuls`
-    )
+      // Pour un slot à 2 places, si l'autre est déjà là → c'est leur duo → interdit
+      const autreVet = allVets.find((v) => v.id === autreId)
+      return invalid(
+        `R6 : ${vet.prenom} et ${autreVet?.prenom ?? '?'} ne peuvent pas être en duo seuls`
+      )
+    }
   }
 
   return ok()

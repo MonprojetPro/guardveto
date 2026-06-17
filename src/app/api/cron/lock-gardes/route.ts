@@ -94,9 +94,24 @@ export async function GET(req: NextRequest) {
 
     if (compteurs.length === 0) continue
 
+    // Cron service_role (multi-cabinet, sans JWT) : le cabinet_id est
+    // dérivé de la période traitée, jamais d'un input client.
+    const { data: periodeRow } = await supabase
+      .from('periodes')
+      .select('cabinet_id')
+      .eq('id', periodeId)
+      .single()
+
+    const cabinetId = periodeRow?.cabinet_id as string | null
+    if (!cabinetId) {
+      console.error(`[lock-gardes] periode ${periodeId} sans cabinet_id — bilan ignoré`)
+      continue
+    }
+
     const bilans = calculerBilans(compteurs, totalWE)
 
     const rows = bilans.map((b) => ({
+      cabinet_id: cabinetId,
       veterinaire_id: b.veterinaire_id,
       periode_id: periodeId,
       ecart_we: b.ecart_we,
@@ -107,7 +122,7 @@ export async function GET(req: NextRequest) {
 
     await supabase
       .from('bonus_malus')
-      .upsert(rows, { onConflict: 'veterinaire_id,periode_id' })
+      .upsert(rows, { onConflict: 'cabinet_id,veterinaire_id,periode_id' })
 
     bilanResults.push({ periodeId, nbVets: bilans.length })
   }

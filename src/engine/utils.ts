@@ -46,19 +46,37 @@ export function estSemaineImpaireAncrée(
   ancre: string,
   vacancesScolaires: Array<{ debut: string; fin: string }>
 ): boolean {
+  // ⚠️ CORRECTIF parité intra-semaine (2026-06) :
+  // La parité est une propriété de la SEMAINE entière (une semaine est paire OU
+  // impaire — pas certains de ses jours). On RAMÈNE donc date, ancre et chaque
+  // recalage de vacances au LUNDI de leur semaine avant de compter les semaines.
+  // Sans cette normalisation, une ancre tombant un mardi (ex. 2026-09-01)
+  // coupait les semaines en deux : le lundi et le samedi d'une même semaine
+  // recevaient des parités OPPOSÉES → Anne-Sophie pouvait être déclarée dispo
+  // un jour et indispo un autre de la même semaine (gardes incohérentes
+  // observées en semaines ISO 28/29/31/32).
+  const ancreLundi = lundiDeSemaine(ancre)
+  const dateLundi = lundiDeSemaine(date)
+
   // Trouver l'ancre effective = dernier début de vacances AVANT ou ÉGAL à la date
-  // et STRICTEMENT après l'ancre initiale (pour avancer l'ancre uniquement)
-  let ancreEffective = ancre
+  // et STRICTEMENT après l'ancre initiale (pour avancer l'ancre uniquement).
+  // On compare la date de début de vacances brute (chevauchement), mais on
+  // ancre sur le LUNDI de cette semaine de vacances.
+  let ancreEffectiveLundi = ancreLundi
   for (const v of vacancesScolaires) {
-    if (v.debut <= date && v.debut > ancreEffective) {
-      ancreEffective = v.debut
+    const vLundi = lundiDeSemaine(v.debut)
+    if (v.debut <= date && vLundi > ancreEffectiveLundi) {
+      ancreEffectiveLundi = vLundi
     }
   }
 
-  // Calculer le nombre de semaines depuis l'ancre effective (en jours / 7)
+  // Nombre de semaines pleines entre deux lundis (différence multiple de 7 jours).
+  // On arrondit (Math.round) pour neutraliser tout résidu de fuseau/DST.
   const msParSemaine = 7 * 24 * 60 * 60 * 1000
-  const diffMs = new Date(date + 'T12:00:00Z').getTime() - new Date(ancreEffective + 'T12:00:00Z').getTime()
-  const diffSemaines = Math.floor(diffMs / msParSemaine)
+  const diffMs =
+    new Date(dateLundi + 'T12:00:00Z').getTime() -
+    new Date(ancreEffectiveLundi + 'T12:00:00Z').getTime()
+  const diffSemaines = Math.round(diffMs / msParSemaine)
 
   return diffSemaines % 2 !== 0
 }

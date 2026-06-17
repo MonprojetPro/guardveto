@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { queryCompteurs, queryTotalWE } from '@/hooks/useCompteurs'
 import { calculerBilans } from '@/engine/bilan'
 import { syncGardeIndividuelle } from '@/lib/sync-calendrier'
@@ -142,18 +143,29 @@ export async function PATCH(
     ])
 
     if (compteurs.length > 0) {
-      const bilans = calculerBilans(compteurs, totalWE)
-      const rows = bilans.map((b) => ({
-        veterinaire_id: b.veterinaire_id,
-        periode_id: garde.periode_id,
-        ecart_we: b.ecart_we,
-        ecart_semaine: b.ecart_semaine,
-        ecart_feries: b.ecart_feries,
-        ecart_grands_we: b.ecart_grands_we,
-      }))
-      await supabase
-        .from('bonus_malus')
-        .upsert(rows, { onConflict: 'veterinaire_id,periode_id' })
+      // cabinet_id dérivé côté serveur (jamais du client) pour le recalcul.
+      let cabinetId: string | null = null
+      try {
+        cabinetId = await resoudreCabinetId(supabase)
+      } catch (err) {
+        console.error('[gardes] cabinet_id introuvable pour recalcul bilan:', err instanceof Error ? err.message : String(err))
+      }
+
+      if (cabinetId) {
+        const bilans = calculerBilans(compteurs, totalWE)
+        const rows = bilans.map((b) => ({
+          cabinet_id: cabinetId as string,
+          veterinaire_id: b.veterinaire_id,
+          periode_id: garde.periode_id,
+          ecart_we: b.ecart_we,
+          ecart_semaine: b.ecart_semaine,
+          ecart_feries: b.ecart_feries,
+          ecart_grands_we: b.ecart_grands_we,
+        }))
+        await supabase
+          .from('bonus_malus')
+          .upsert(rows, { onConflict: 'cabinet_id,veterinaire_id,periode_id' })
+      }
     }
   }
 

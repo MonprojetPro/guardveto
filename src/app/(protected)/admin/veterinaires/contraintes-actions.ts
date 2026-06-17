@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { revalidatePath } from 'next/cache'
 import type { ContrainteVeto } from '@/types'
 
@@ -37,7 +38,18 @@ export async function createContrainte(
   config: ConfigContrainte
 ) {
   const supabase = await createClient()
+
+  // cabinet_id dérivé côté serveur (jamais du client) — sinon la contrainte
+  // est insérée avec cabinet_id NULL et reste invisible sous RLS stricte.
+  let cabinetId: string
+  try {
+    cabinetId = await resoudreCabinetId(supabase)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
+  }
+
   const { error } = await supabase.from('contraintes_veto').insert({
+    cabinet_id: cabinetId,
     veterinaire_id,
     type,
     config,
