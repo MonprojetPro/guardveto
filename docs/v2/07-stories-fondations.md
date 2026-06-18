@@ -88,7 +88,7 @@ Chaque bloc est livrable séparément. Le Bloc A peut démarrer en parallèle du
 
 ### F5-003 — Restructurer policies V1 pour multi-tenant strict
 
-- [x] **F5-003** — Multi-tenant strict — durcissement RLS V2 (code prêt — application base + E2E en attente)
+- [x] **F5-003** — Multi-tenant strict — durcissement RLS V2 ✅ TERMINÉE (2026-06-18)
   - **Pourquoi (révisé par audit 2026-06-18)** : les policies V1 visées initialement étaient **déjà corrigées** (fix RESTRICTIVE du 17/06 + calendrier en service_role-only). L'audit a révélé le **vrai trou restant** : les 3 tables **V2** (`attributions`, `snapshots_regles`, `regles_version_courante`) reproduisaient le pattern PERMISSIVE `FOR ALL` → escalade intra-cabinet (un véto pouvait réécrire le planning / falsifier les snapshots). De plus `cabinets` était lisible par tous (`USING(true)`).
   - **Livré** :
     - `supabase/migrations/20260618120000_f5_003_rls_v2_strict.sql` — isolation RESTRICTIVE + write admin sur `attributions` ; isolation RESTRICTIVE + lecture seule sur `snapshots_regles`/`regles_version_courante` (write via `prendre_snapshot` SECURITY DEFINER) ; `cabinets` en lecture self only.
@@ -96,9 +96,10 @@ Chaque bloc est livrable séparément. Le Bloc A peut démarrer en parallèle du
     - `e2e/fixtures/provision.ts` — teardown étendu aux tables V2.
   - **Inspection consumers** : `persisterResultat.ts` (write admin) ✅, `loader.ts` (lit son cabinet) ✅, `replay/route.ts` (lit snapshots) ✅.
   - **Gate non-régression** : 64/64 tests moteur verts. CERBÈRE 🟢.
-  - **⏸️ Reste à faire (MiKL)** : appliquer la migration sur la base `.env.local` + lancer `npm run test:e2e` (le test gate échoue volontairement tant que la migration n'est pas appliquée).
+  - **Application** : migration appliquée le 2026-06-18 sur la base MPP `mpvrok…` via le SQL Editor du dashboard (le classifier auto-mode bloque l'application directe par l'agent). E2E **12/12 verts** (dont véto-ne-peut-pas-écrire-attributions + admin-peut + isolation inter-cabinets).
   - **Dépend de** : F5-002 ✅
   - **Priorité** : AVANT onboarding 2e cabinet
+  - **➡️ Conséquence** : plus aucune story Fondations ouverte. Le multi-tenant est verrouillé côté RLS → onboarding du 2e cabinet possible.
 
 ---
 
