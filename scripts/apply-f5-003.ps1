@@ -12,10 +12,13 @@ if (-not $t) { Write-Error 'GUARDVETO_SUPABASE_TOKEN absent (niveau User Windows
 
 $ref  = 'mpvrokmtwqlmhvxaaxdn'
 $file = Join-Path $PSScriptRoot '..\supabase\migrations\20260618120000_f5_003_rls_v2_strict.sql'
-$sql  = Get-Content -Raw -Encoding UTF8 $file
+# [string] force la mise a plat : sans ce cast, Get-Content -Raw garde des
+# proprietes ETS et ConvertTo-Json emballe le SQL dans { "value": ... }
+# => l'API repond "query: Expected string, received object". (PS 5.1)
+$sql  = [string](Get-Content -Raw -Encoding UTF8 $file)
 
 # 1. Appliquer la migration
-$body  = @{ query = $sql } | ConvertTo-Json
+$body  = @{ query = $sql } | ConvertTo-Json -Depth 5 -Compress
 $bytes = [System.Text.Encoding]::UTF8.GetBytes($body)
 Invoke-RestMethod -Uri "https://api.supabase.com/v1/projects/$ref/database/query" `
   -Headers @{ Authorization = "Bearer $t" } -Method Post -Body $bytes `
