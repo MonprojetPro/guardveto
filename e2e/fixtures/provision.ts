@@ -244,7 +244,19 @@ export async function teardownTestCabinets(admin: SupabaseClient): Promise<void>
   // Toutes les suppressions sont filtrées par cabinet_id IN (B, C).
   // bonus_malus → FK vers veterinaires/periodes (cascade DELETE), mais on
   // supprime explicitement par cabinet_id pour rester déterministe.
-  const childTables = ['bonus_malus', 'gardes', 'conges', 'contraintes_veto', 'periodes'] as const
+  // Tables V2 (attributions, snapshots) supprimées AVANT periodes/cabinets :
+  // elles portent un cabinet_id FK vers cabinets → une ligne résiduelle
+  // bloquerait la suppression du cabinet en fin de teardown.
+  const childTables = [
+    'attributions',
+    'snapshots_regles',
+    'regles_version_courante',
+    'bonus_malus',
+    'gardes',
+    'conges',
+    'contraintes_veto',
+    'periodes',
+  ] as const
   for (const table of childTables) {
     const { error } = await admin.from(table).delete().in('cabinet_id', ids)
     if (error) throw new Error(`[E2E] Teardown ${table}: ${error.message}`)

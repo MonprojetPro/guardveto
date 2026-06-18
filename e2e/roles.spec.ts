@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { login } from './fixtures/auth-helpers'
 import { loadEnvLocal } from './fixtures/load-env'
 import { signInTenantClient } from './fixtures/tenant-client'
-import { TEST_EMAIL_DOMAIN, USERS } from './fixtures/test-data'
+import { PERIODE_B_ID, TEST_EMAIL_DOMAIN, USERS } from './fixtures/test-data'
 
 // ════════════════════════════════════════════════════════════════
 // GUARDVETO — E2E Rôles (admin vs veto)
@@ -94,5 +94,59 @@ test.describe('Contrôle des rôles', () => {
     expect(error, 'un véto ne doit pas pouvoir créer un vétérinaire').not.toBeNull()
 
     await clientVeto.auth.signOut()
+  })
+
+  test('un véto ne peut pas écrire le planning (attributions) — escalade V2 refusée', async () => {
+    // ⚠️ Ce test GATE le correctif RLS V2 :
+    //    supabase/migrations/20260618120000_f5_003_rls_v2_strict.sql
+    //    Avant ce correctif, la policy d'isolation PERMISSIVE FOR ALL sur
+    //    `attributions` accorde l'écriture à TOUT authentifié du cabinet :
+    //    un simple véto peut réécrire le planning. Le test échoue
+    //    volontairement tant que la migration n'est pas appliquée.
+    const clientVeto = await signInTenantClient(USERS.vetoB.email, USERS.vetoB.password)
+
+    // Données VALIDES (cabinet/période/véto réels) : seul l'absence de
+    // policy d'écriture pour le rôle `veto` doit provoquer le refus.
+    const { error } = await clientVeto.from('attributions').insert({
+      cabinet_id: USERS.vetoB.cabinetId,
+      planning_id: PERIODE_B_ID,
+      veterinaire_id: USERS.vetoB.veterinaireId,
+      role: 'premier',
+      type_presence: 'sur_place',
+      date_debut_reel: '2026-01-05T18:30:00+01:00',
+      date_fin_reel: '2026-01-06T08:30:00+01:00',
+    })
+
+    expect(error, 'un véto ne doit pas pouvoir écrire une attribution').not.toBeNull()
+
+    await clientVeto.auth.signOut()
+  })
+
+  test('un admin peut écrire le planning (attributions) de son cabinet', async () => {
+    const clientAdmin = await signInTenantClient(USERS.adminB.email, USERS.adminB.password)
+
+    const { data, error } = await clientAdmin
+      .from('attributions')
+      .insert({
+        cabinet_id: USERS.adminB.cabinetId,
+        planning_id: PERIODE_B_ID,
+        veterinaire_id: USERS.adminB.veterinaireId,
+        role: 'premier',
+        type_presence: 'sur_place',
+        date_debut_reel: '2026-01-12T18:30:00+01:00',
+        date_fin_reel: '2026-01-13T08:30:00+01:00',
+      })
+      .select('id')
+      .single()
+
+    expect(error, 'un admin doit pouvoir écrire une attribution de son cabinet').toBeNull()
+    expect(data?.id).toBeTruthy()
+
+    // Cleanup explicite (la ligne n'est pas couverte par le seed).
+    if (data?.id) {
+      await clientAdmin.from('attributions').delete().eq('id', data.id)
+    }
+
+    await clientAdmin.auth.signOut()
   })
 })
