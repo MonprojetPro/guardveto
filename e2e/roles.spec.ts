@@ -193,3 +193,56 @@ test.describe('Catalogue briques_regles (P1A-001)', () => {
     await clientVeto.auth.signOut()
   })
 })
+
+// ════════════════════════════════════════════════════════════════
+// P1A-002 — regles_cabinet : écriture admin-only, isolation stricte
+// ════════════════════════════════════════════════════════════════
+// La table `regles_cabinet` porte les règles configurées par cabinet.
+// Gouvernance PRD §5 : le véto PROPOSE, l'admin ANCRE → seul l'admin écrit.
+// Isolation RESTRICTIVE par cabinet (modèle F5-003).
+// ⚠️ Ces tests GATENT la migration 20260619130000_p1a_regles_cabinet.sql.
+// ════════════════════════════════════════════════════════════════
+test.describe('Règles configurables regles_cabinet (P1A-002)', () => {
+  test('un véto ne peut PAS écrire une règle (write admin-only)', async () => {
+    const clientVeto = await signInTenantClient(USERS.vetoB.email, USERS.vetoB.password)
+
+    const { error } = await clientVeto.from('regles_cabinet').insert({
+      cabinet_id: USERS.vetoB.cabinetId,
+      brique_id: 'interdire_creneau',
+      params_json: { qui: { type: 'individu', refs: [USERS.vetoB.veterinaireId] } },
+      force: 'jamais',
+    })
+
+    expect(
+      error,
+      'un véto ne doit pas pouvoir créer une règle (il propose, l’admin ancre)'
+    ).not.toBeNull()
+
+    await clientVeto.auth.signOut()
+  })
+
+  test('un admin peut écrire une règle de son cabinet', async () => {
+    const clientAdmin = await signInTenantClient(USERS.adminB.email, USERS.adminB.password)
+
+    const { data, error } = await clientAdmin
+      .from('regles_cabinet')
+      .insert({
+        cabinet_id: USERS.adminB.cabinetId,
+        brique_id: 'interdire_creneau',
+        params_json: { qui: { type: 'individu', refs: [USERS.adminB.veterinaireId] } },
+        force: 'jamais',
+      })
+      .select('id')
+      .single()
+
+    expect(error, 'un admin doit pouvoir créer une règle de son cabinet').toBeNull()
+    expect(data?.id).toBeTruthy()
+
+    // Cleanup explicite (ligne hors seed).
+    if (data?.id) {
+      await clientAdmin.from('regles_cabinet').delete().eq('id', data.id)
+    }
+
+    await clientAdmin.auth.signOut()
+  })
+})

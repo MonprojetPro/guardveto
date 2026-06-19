@@ -61,7 +61,9 @@ P1A-001 (briques_regles + seed)
 
 ---
 
-## P1A-002 — Table `regles_cabinet` (la donnée) + RLS strict
+## P1A-002 — Table `regles_cabinet` (la donnée) + RLS strict ✅ TERMINÉE (2026-06-19)
+
+**Livré :** `supabase/migrations/20260619130000_p1a_regles_cabinet.sql` (appliquée sur base MPP `mpvrokmtwqlmhvxaaxdn` via dashboard) — isolation RESTRICTIVE + écriture admin-only + lecture authentifiée (modèle F5-003, **pas** l'exemple PERMISSIVE de l'archi). Gate E2E `e2e/roles.spec.ts` : véto refusé / admin OK — **2/2 verts**. CERBÈRE 🟢.
 
 **Contexte.** Archi §7 : la table qui porte les règles configurées par cabinet. ⚠️ **L'exemple de policy de l'archi (§7 ligne ~840) est PERMISSIVE `FOR ALL`** — c'est exactement le pattern qui a causé l'escalade véto corrigée par F5-003. **On NE le reprend PAS tel quel.**
 
