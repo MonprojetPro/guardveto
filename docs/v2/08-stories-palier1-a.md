@@ -165,7 +165,18 @@ du cœur moteur** reporté à une **story dédiée** (risque isolé, banc d'essa
 
 ---
 
-## P1A-005 — Catalogue de briques en code consolidé
+## P1A-005 — Catalogue de briques en code consolidé ✅ TERMINÉE (2026-06-19)
+
+**Livré (net-new : le catalogue n'existait pas — seuls type+validateur de F4-001) :**
+- `src/engine/briques/catalogue.ts` — `CATALOGUE_BRIQUES` (10 briques) : chacune
+  expose `famille`, `axes`, `schemaParams` (le **code devient la source de vérité** ;
+  le `schema_json` du seed était un miroir provisoire), `widget` (réf composant, placeholder
+  P1A-006/007) et `rendreLangageNaturel(params, ctx)` → phrase française lisible. Plus
+  `rendreRegle()` (point d'entrée robuste : fallback si brique inconnue, jamais d'exception).
+- `src/engine/briques/__tests__/catalogue.test.ts` — **cohérence réelle** : le test PARSE
+  la migration SQL P1A-001 et exige que ids + famille + axes n'aient pas divergé (couplage
+  code ↔ base, pas une copie figée) ; + rendu langage naturel des 4 briques pilote + non-vacuité
+  des 10. **11/11 verts (30/30 sur le dossier briques), tsc clean, zéro impact moteur.**
 
 **Contexte.** Archi §4.2 : le catalogue (`src/engine/briques/catalogue.ts`) est la **source unique** lue par le moteur, l'IA et l'interface. Chaque brique expose `rendreLangageNaturel()` (aperçu + trace) et `widget` (réf composant React).
 
