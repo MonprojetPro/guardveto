@@ -109,6 +109,20 @@ P1A-001 (briques_regles + seed)
 
 ---
 
+## P1A-003b — Filet de sécurité : golden test pilote ✅ TERMINÉE (2026-06-19)
+
+**Pourquoi (inséré à la demande de MiKL)** : le « golden test 11/11 » cité dans le découpage **n'existait plus** (supprimé avec les bancs d'essai en F2/F6). Brancher le moteur sur `regles_cabinet` (P1A-004) sans filet = avancer à l'aveugle sur le cœur du produit. On recrée donc le filet **avant** la bascule.
+
+**Livré :**
+- `src/engine/__tests__/fixtures-pilote.ts` — snapshot fidèle des 7 vétos + 10 règles réelles du pilote (lues depuis la base MPP), réutilisable par le test d'équivalence de P1A-004.
+- `src/engine/__tests__/golden-pilote.test.ts` — 3 tests : planning complet, **0 violation dure** (validateur indépendant), **déterminisme** du seed greedy. **45/45 tests moteur verts.**
+
+**⚠️ 2 dettes découvertes en construisant le filet (hors périmètre P1-A, à traiter plus tard) :**
+1. **`genererPlanningPur` mute son input** (entorse à la pureté archi P1) → contourné en clonant l'input dans chaque test.
+2. **Le LNS tourne sous budget de TEMPS → non déterministe entre deux runs** (entorse à archi P2 « même entrée = même sortie »). Le filet est donc figé sur le seed greedy (`lnsTimeoutMs: 0`), déterministe. À corriger : critère de convergence par nombre de passes plutôt que par temps.
+
+---
+
 ## P1A-004 — `resoudreContexte` lit `regles_cabinet`
 
 **Contexte.** Archi §4.3 : le pont règle-en-base → évaluateur-en-code. `resoudreContexte()` lit `regles_cabinet` (scopé cabinet + période), filtre par validité, **valide** chaque `params_json` contre `brique.schemaParams` (rejette les règles corrompues au lieu de crasher), et produit `RegleResolue[]`.
