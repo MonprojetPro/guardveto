@@ -150,3 +150,46 @@ test.describe('Contrôle des rôles', () => {
     await clientAdmin.auth.signOut()
   })
 })
+
+// ════════════════════════════════════════════════════════════════
+// P1A-001 — briques_regles : catalogue partagé, écriture verrouillée (C3)
+// ════════════════════════════════════════════════════════════════
+// La table de référence `briques_regles` est lisible par tout authentifié
+// (l'interface + l'IA en ont besoin) mais N'EST JAMAIS écrite côté app :
+// aucune policy INSERT/UPDATE/DELETE. L'écriture passe par migrations /
+// service_role (une nouvelle brique = une PR Git).
+// ⚠️ Ces tests GATENT la migration 20260619120000_p1a_briques_regles.sql.
+// ════════════════════════════════════════════════════════════════
+test.describe('Catalogue briques_regles (P1A-001)', () => {
+  test('un authentifié peut lire le catalogue de briques', async () => {
+    const clientVeto = await signInTenantClient(USERS.vetoB.email, USERS.vetoB.password)
+
+    const { data, error } = await clientVeto
+      .from('briques_regles')
+      .select('id')
+
+    expect(error, 'la lecture du catalogue doit être ouverte à tout authentifié').toBeNull()
+    // Le seed pose les 10 briques du golden test pilote.
+    expect(data?.length ?? 0).toBeGreaterThanOrEqual(10)
+
+    await clientVeto.auth.signOut()
+  })
+
+  test('un authentifié ne peut PAS écrire dans le catalogue de briques (C3)', async () => {
+    const clientVeto = await signInTenantClient(USERS.vetoB.email, USERS.vetoB.password)
+
+    const { error } = await clientVeto.from('briques_regles').insert({
+      id: 'brique_intrus',
+      famille: 'interdire',
+      operateur: 'JAMAIS',
+      schema_json: {},
+    })
+
+    expect(
+      error,
+      'aucun authentifié ne doit pouvoir écrire dans briques_regles (écriture = migrations/service_role)'
+    ).not.toBeNull()
+
+    await clientVeto.auth.signOut()
+  })
+})
