@@ -86,7 +86,9 @@ P1A-001 (briques_regles + seed)
 
 ---
 
-## P1A-003 — Migration `contraintes_veto` → `regles_cabinet`
+## P1A-003 — Migration `contraintes_veto` → `regles_cabinet` ✅ TERMINÉE (2026-06-19)
+
+**Livré :** `supabase/migrations/20260619140000_p1a_migrate_contraintes_to_regles.sql` (appliquée base MPP via dashboard). Stratégie transition douce (consumers inchangés). Vérification : **10 contraintes v2 → 10 `regles_cabinet`**, 0 non reprise (duo_interdit×2 `jamais`, interdire_creneau×3 `evitee`, repos_conditionnel×4 `sauf_crise`, alternance_ancre×1 `sauf_crise`). Idempotente (réutilise l'`id` source). Tableau consumers présenté avant exécution.
 
 **Contexte.** F4 a normalisé `contraintes_veto.brique_type`. On déplace maintenant ces contraintes vers `regles_cabinet` (Option B).
 
