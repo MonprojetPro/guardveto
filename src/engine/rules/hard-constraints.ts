@@ -121,8 +121,10 @@ function checkR1JourReposFixe(vet: VetEngine, slot: SlotGarde, calendrier?: Cale
     if (typeof cfg.jour === 'string') {
       if (cfg.jour !== jour) continue
 
-      // Si flexible en vacances scolaires → autorisé pendant les vacances
-      if (cfg.flexible_vacances && estEnVacancesScolaires(slot.date, calendrier)) continue
+      // Exception vacances scolaires — deux noms tolérés (V1 flexible_vacances
+      // / V2 exception_vacances_scolaires).
+      const flexibleVac = Boolean(cfg.flexible_vacances ?? cfg.exception_vacances_scolaires)
+      if (flexibleVac && estEnVacancesScolaires(slot.date, calendrier)) continue
 
       return invalid(
         `R1 : ${vet.prenom} a un jour de repos fixe le ${jour}`

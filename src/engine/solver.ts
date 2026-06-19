@@ -32,6 +32,7 @@ import type {
   CalendrierResolu,
 } from './types'
 import { jourIndex, addDays, estJourFerie, lundiDeSemaine } from './utils'
+import { normaliserContraintesVets } from './normaliserContraintes'
 import { isValid } from './rules/hard-constraints'
 import { penalite } from './rules/soft-constraints'
 import { compterParVet } from './rules/optimization'
@@ -604,8 +605,14 @@ function lnsHillClimbing(
 export function genererPlanningPur(input: SolverInput): SolveResult {
   const t0 = performance.now()
 
+  // ── 0. Normalisation des contraintes ─────────────────
+  // Hisse config.params.* à la racine pour que TOUS les contrôles lisent la
+  // règle, qu'elle soit V1 (plate) ou V2 (sous params). Sans ça, seul le duo
+  // était appliqué (bug F4-002). Cf. normaliserContraintes.ts.
+  const inputN: SolverInput = { ...input, vets: normaliserContraintesVets(input.vets) }
+
   // ── 1. Seed greedy ───────────────────────────────────
-  const seed = genererSeedGreedy(input)
+  const seed = genererSeedGreedy(inputN)
 
   if (!seed.success) {
     // Impasse backtracking → retourner directement le rapport d'impasse
@@ -616,7 +623,7 @@ export function genererPlanningPur(input: SolverInput): SolveResult {
   }
 
   // ── 2. LNS hill-climbing ─────────────────────────────
-  const lnsResult = lnsHillClimbing(seed.planning, input, t0)
+  const lnsResult = lnsHillClimbing(seed.planning, inputN, t0)
 
   return {
     success: true,

@@ -34,6 +34,7 @@ import type {
   CalendrierResolu,
   JourSemaine,
 } from '../types'
+import { normaliserContraintesVets } from '../normaliserContraintes'
 
 // ── Entrée minimale attendue (sous-ensemble de SolverInput) ──
 export interface ValidationInput {
@@ -246,7 +247,11 @@ export function validerPlanning(
   input: ValidationInput
 ): Violation[] {
   const violations: Violation[] = []
-  const vetsById = new Map(input.vets.map((v) => [v.id, v]))
+  // Normalise les contraintes (hisse config.params.* à la racine) — MÊME
+  // normalisation que le solver (genererPlanningPur), pour que validateur et
+  // moteur lisent les règles à l'identique (fin de la cécité commune).
+  const vetsNorm = normaliserContraintesVets(input.vets)
+  const vetsById = new Map(vetsNorm.map((v) => [v.id, v]))
   const cal = input.calendrier
 
   // ── A. COUVERTURE : chaque créneau attendu existe et est complet ──
@@ -366,7 +371,8 @@ export function validerPlanning(
           if (typeof cfg.jour === 'string') {
             if (cfg.jour === jour) {
               const flexible =
-                Boolean(cfg.flexible_vacances) && estEnVacances(a.date, cal)
+                Boolean(cfg.flexible_vacances ?? cfg.exception_vacances_scolaires) &&
+                estEnVacances(a.date, cal)
               if (!flexible) {
                 violations.push({
                   regle: 'R1',
@@ -381,7 +387,7 @@ export function validerPlanning(
           }
           // Forme avec tableau de règles (ex. Anne-Sophie)
           if (Array.isArray(cfg.regles)) {
-            type Regle = { jour: string; semaine?: string; ancre?: string }
+            type Regle = { jour: string; periode?: string; semaine?: string; ancre?: string }
             for (const regle of cfg.regles as Regle[]) {
               if (regle.jour !== jour) continue
               if (regle.semaine === 'impaire' || regle.semaine === 'paire') {
