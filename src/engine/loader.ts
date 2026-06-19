@@ -9,17 +9,11 @@ import { createClient } from '@/lib/supabase/server'
 import type { VetEngine, ContrainteEngine, CongeEngine, CalendrierResolu } from './types'
 import type { BonusMalusMap } from './score-lexicographique'
 import type { SolverInput } from './solver'
+import { mapperReglesCabinet, type RegleCabinetRow } from '@/data/mapReglesCabinet'
+
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 
 // ── Mapping DB → engine ──────────────────────────────────
-
-interface ContrainteDb {
-  id: string
-  type: ContrainteEngine['type']
-  config: Record<string, unknown>
-  /** Format du config : 'legacy' = V1 hétérogène, 'v2' = grammaire 6-axes normalisée */
-  brique_type: 'legacy' | 'v2'
-  actif: boolean
-}
 
 interface CongeDb {
   veterinaire_id: string
@@ -126,6 +120,61 @@ async function chargerCalendrierZone(
   }
 }
 
+// ── Chargement des règles du cabinet (P1A-004) ───────────
+
+/**
+ * chargerReglesCabinet — lit `regles_cabinet` (la nouvelle source des règles,
+ * remplace le join `contraintes_veto`) scopée sur le cabinet + la validité
+ * de la période, valide chaque règle contre le catalogue `briques_regles`,
+ * et retourne les contraintes moteur regroupées PAR VÉTÉRINAIRE.
+ *
+ * Une règle au `params_json` corrompu (brique inconnue, propriétaire absent,
+ * params non-objet…) est ÉCARTÉE et tracée (console.warn) — jamais de crash
+ * du solver (critère d'acceptation P1A-004).
+ *
+ * @param supabase   client serveur (RLS-aware : la restrictive borne au cabinet)
+ * @param cabinetId  cabinet courant (isolation tenant garantie par la RLS)
+ * @param periodeId  période générée — inclut les règles permanentes + celles de la période
+ */
+async function chargerReglesCabinet(
+  supabase: SupabaseServerClient,
+  cabinetId: string,
+  periodeId: string,
+): Promise<Map<string, ContrainteEngine[]>> {
+  // Catalogue des briques connues (ids) — socle de la validation déterministe.
+  const { data: briquesDb } = await supabase.from('briques_regles').select('id')
+  const briquesConnues = new Set<string>(
+    ((briquesDb as { id: string }[] | null) ?? []).map((b) => b.id),
+  )
+
+  // Règles actives du cabinet : permanentes (periode_id NULL) OU propres à
+  // CETTE période. La RLS restrictive (F5-003) garantit déjà le scope cabinet.
+  const { data: reglesDb, error } = await supabase
+    .from('regles_cabinet')
+    .select('id, cabinet_id, periode_id, brique_id, params_json, force, validite_json, version, actif')
+    .eq('cabinet_id', cabinetId)
+    .or(`periode_id.is.null,periode_id.eq.${periodeId}`)
+    .order('id')
+
+  if (error) {
+    console.warn(
+      `[P1A-004] Lecture regles_cabinet échouée (${error.message}) — aucune règle appliquée.`,
+    )
+    return new Map()
+  }
+
+  const { contraintesParVet, rejets } = mapperReglesCabinet(
+    (reglesDb as RegleCabinetRow[] | null) ?? [],
+    briquesConnues,
+  )
+
+  for (const r of rejets) {
+    console.warn(`[P1A-004] Règle ${r.regleId} écartée : ${r.raison}`)
+  }
+
+  return contraintesParVet
+}
+
 // ── Chargement principal ─────────────────────────────────
 
 /**
@@ -166,14 +215,22 @@ export async function chargerInputDepuisSupabase(
     throw new Error('Cette période est verrouillée — impossible de régénérer.')
   }
 
-  // 2. Vétérinaires actifs + leurs contraintes (via join)
+  // 2. Vétérinaires actifs (les contraintes ne viennent plus du join
+  //    contraintes_veto, mais de regles_cabinet — cf. étape 2b, P1A-004).
   const { data: vetsDb, error: vetsErr } = await supabase
     .from('veterinaires')
-    .select('id, nom, prenom, statut, dernier_recours, contraintes_veto(*)')
+    .select('id, nom, prenom, statut, dernier_recours')
     .eq('actif', true)
     .order('nom')
 
   if (vetsErr) throw new Error(`Erreur chargement vétérinaires : ${vetsErr.message}`)
+
+  // 2b. Règles du cabinet (nouvelle source — remplace contraintes_veto).
+  //     Scopé cabinet + validité de période ; sans cabinetId (contextes
+  //     hors-DB / legacy) aucune règle n'est appliquée.
+  const contraintesParVet = cabinetId
+    ? await chargerReglesCabinet(supabase, cabinetId, periodeId)
+    : new Map<string, ContrainteEngine[]>()
 
   // 3. Congés validés qui chevauchent la période
   const { data: congesDb } = await supabase
@@ -206,14 +263,13 @@ export async function chargerInputDepuisSupabase(
     }
   }
 
-  // 5. Mapper vers VetEngine
+  // 5. Mapper vers VetEngine (contraintes injectées depuis regles_cabinet)
   type VetDb = {
     id: string
     nom: string
     prenom: string
     statut: 'associe' | 'salarie'
     dernier_recours: boolean
-    contraintes_veto: ContrainteDb[]
   }
 
   const vets: VetEngine[] = ((vetsDb as VetDb[]) ?? []).map((vet) => ({
@@ -222,14 +278,7 @@ export async function chargerInputDepuisSupabase(
     prenom: vet.prenom,
     statut: vet.statut,
     dernier_recours: vet.dernier_recours,
-    contraintes: (vet.contraintes_veto ?? []).map((c): ContrainteEngine => ({
-      id: c.id,
-      type: c.type,
-      config: c.config,
-      // brique_type disponible pour les consommateurs V2 du solver
-      // (non inclus dans ContrainteEngine V1 — sera utilisé dans F6-002)
-      actif: c.actif,
-    })),
+    contraintes: contraintesParVet.get(vet.id) ?? [],
     conges: ((congesDb as CongeDb[] | null) ?? [])
       .filter((c) => c.veterinaire_id === vet.id)
       .map((c): CongeEngine => ({

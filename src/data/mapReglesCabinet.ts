@@ -1,0 +1,193 @@
+// ============================================================
+// GUARDVETO — Mapping regles_cabinet → ContrainteEngine (P1A-004)
+// ============================================================
+// Pont « règle-en-base → contrainte-en-code » (archi §4.3), dans la
+// stratégie de transition douce (approche A : on conserve la FORME que
+// le moteur consomme déjà — les contraintes attachées PAR VÉTO — et on
+// change UNIQUEMENT la source : regles_cabinet au lieu de contraintes_veto).
+//
+// Ce module est PUR (aucune I/O Supabase) → entièrement testable.
+// Il reconstruit, à partir d'une ligne `regles_cabinet`, le même objet
+// `ContrainteEngine { id, type, config:{axes,force,brique,params}, actif }`
+// que le loader fournissait jusqu'ici depuis `contraintes_veto.config`.
+//
+// VALIDATION DÉTERMINISTE (défensive). Le `schema_json` du catalogue
+// (briques_regles) est à ce stade un MIROIR DESCRIPTIF provisoire (texte
+// « integer », « string[] »… — cf. migration P1A-001, re-synchro en
+// P1A-005), PAS un JSON Schema strict. La validation se limite donc à
+// l'ENVELOPPE : brique connue du catalogue, force résoluble, qui/refs
+// présents, type V1 reconstructible, params objet. Une règle qui échoue
+// est ÉCARTÉE + tracée (jamais de crash du solver — critère P1A-004).
+// ============================================================
+
+import type { ContrainteEngine } from '@/engine/types'
+
+/** Ligne brute de `regles_cabinet` telle que lue par le loader. */
+export interface RegleCabinetRow {
+  id: string
+  cabinet_id: string
+  periode_id: string | null
+  brique_id: string
+  params_json: unknown
+  /** Enum texte côté base ; converti en étage entier pour le moteur. */
+  force: string
+  validite_json?: unknown
+  version?: number
+  actif: boolean
+}
+
+/** Forme attendue de `params_json` (produite par la migration P1A-003). */
+interface ParamsJson {
+  qui?: { type?: string; refs?: unknown }
+  quand?: unknown
+  params?: unknown
+  _source?: { contrainte_id?: string; type_v1?: string }
+}
+
+/** force (texte base) → étage entier (score lexicographique 0..5). */
+const FORCE_TEXTE_VERS_ETAGE: Record<string, number> = {
+  invariant: 0,
+  reglementaire: 1,
+  jamais: 2,
+  sauf_crise: 3,
+  evitee: 4,
+  si_possible: 5,
+}
+
+/** Les 4 types de contrainte que le moteur V1 sait évaluer. */
+type TypeContrainte = ContrainteEngine['type']
+const TYPES_V1: ReadonlySet<TypeContrainte> = new Set<TypeContrainte>([
+  'jour_repos_fixe',
+  'jour_repos_conditionnel',
+  'indisponibilite_cyclique',
+  'duo_interdit',
+])
+
+/**
+ * Repli déterministe brique → type V1, utilisé uniquement quand une règle
+ * n'a pas de `_source.type_v1` (ex. règle créée nativement en base, pas
+ * issue de la migration). Couvre les briques du golden test pilote.
+ */
+const BRIQUE_VERS_TYPE: Record<string, TypeContrainte> = {
+  interdire_creneau: 'jour_repos_fixe',
+  repos_conditionnel: 'jour_repos_conditionnel',
+  alternance_ancre: 'indisponibilite_cyclique',
+  duo_interdit: 'duo_interdit',
+}
+
+export interface RegleRejetee {
+  regleId: string
+  raison: string
+}
+
+export interface ResultatMapping {
+  /** vetId → contraintes (triées par étage, brique, id — tri stable E3). */
+  contraintesParVet: Map<string, ContrainteEngine[]>
+  /** Règles écartées (params corrompus / brique inconnue) — à logger. */
+  rejets: RegleRejetee[]
+}
+
+function estObjet(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v)
+}
+
+/**
+ * mapperReglesCabinet — convertit des lignes `regles_cabinet` en contraintes
+ * moteur, regroupées par vétérinaire propriétaire (1re réf de `qui.refs`).
+ *
+ * @param regles          lignes brutes (déjà scopées cabinet + validité par le loader)
+ * @param briquesConnues  ids présents dans le catalogue briques_regles
+ * @returns               contraintes par véto (triées) + liste des rejets
+ */
+export function mapperReglesCabinet(
+  regles: RegleCabinetRow[],
+  briquesConnues: ReadonlySet<string>,
+): ResultatMapping {
+  const contraintesParVet = new Map<string, ContrainteEngine[]>()
+  const rejets: RegleRejetee[] = []
+
+  for (const row of regles) {
+    const rejet = (raison: string) => rejets.push({ regleId: row.id, raison })
+
+    // 1. Brique connue du catalogue
+    if (!briquesConnues.has(row.brique_id)) {
+      rejet(`brique inconnue du catalogue : « ${row.brique_id} »`)
+      continue
+    }
+
+    // 2. Force résoluble en étage
+    const etage = FORCE_TEXTE_VERS_ETAGE[row.force]
+    if (etage === undefined) {
+      rejet(`force invalide : « ${row.force} »`)
+      continue
+    }
+
+    // 3. params_json bien formé
+    if (!estObjet(row.params_json)) {
+      rejet('params_json absent ou non-objet')
+      continue
+    }
+    const pj = row.params_json as ParamsJson
+
+    // 4. qui.refs présent, propriétaire identifiable
+    const refs = pj.qui?.refs
+    if (!Array.isArray(refs) || refs.length === 0 || typeof refs[0] !== 'string') {
+      rejet('qui.refs absent ou vide (propriétaire indéterminable)')
+      continue
+    }
+    const proprietaireId = refs[0] as string
+
+    // 5. type V1 reconstructible (depuis _source, sinon repli brique→type)
+    const typeBrut = pj._source?.type_v1 ?? BRIQUE_VERS_TYPE[row.brique_id]
+    if (typeof typeBrut !== 'string' || !TYPES_V1.has(typeBrut as TypeContrainte)) {
+      rejet(`type V1 indéterminable (brique « ${row.brique_id} »)`)
+      continue
+    }
+    const type = typeBrut as TypeContrainte
+
+    // 6. params métier (objet) — préservés tels quels (V1 intégral)
+    if (!estObjet(pj.params)) {
+      rejet('params_json.params absent ou non-objet')
+      continue
+    }
+
+    // Reconstruction de la FORME config attendue par le moteur :
+    //   { axes, force(int), brique, params } — identique à ce que le loader
+    //   produisait depuis contraintes_veto.config. L'axe `quand` n'est posé
+    //   que s'il est non-null (un `{quand:null}` d'origine ↔ `{}` : inerte
+    //   pour le solver, qui accède à axes.quand → undefined dans les 2 cas).
+    const quand = pj.quand
+    const axes = quand !== null && quand !== undefined ? { quand } : {}
+
+    const contrainte: ContrainteEngine = {
+      id: row.id,
+      type,
+      config: {
+        axes,
+        force: etage,
+        brique: row.brique_id,
+        params: pj.params,
+      },
+      actif: row.actif,
+    }
+
+    const liste = contraintesParVet.get(proprietaireId)
+    if (liste) liste.push(contrainte)
+    else contraintesParVet.set(proprietaireId, [contrainte])
+  }
+
+  // Tri stable (E3) : (étage, brique_id, id) au sein de chaque véto.
+  for (const liste of contraintesParVet.values()) {
+    liste.sort((a, b) => {
+      const fa = a.config.force as number
+      const fb = b.config.force as number
+      if (fa !== fb) return fa - fb
+      const ba = a.config.brique as string
+      const bb = b.config.brique as string
+      if (ba !== bb) return ba < bb ? -1 : 1
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+    })
+  }
+
+  return { contraintesParVet, rejets }
+}

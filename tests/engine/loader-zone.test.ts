@@ -66,6 +66,7 @@ function makeBuilder(table: string) {
   builder.lte = (col: string, val: unknown) => { calls.filters[`${table}.lte.${col}`] = val; return builder }
   builder.gte = (col: string, val: unknown) => { calls.filters[`${table}.gte.${col}`] = val; return builder }
   builder.lt = chain
+  builder.or = chain
   builder.order = chain
   builder.limit = chain
   builder.single = () => Promise.resolve({ data: dataFor(table), error: null })

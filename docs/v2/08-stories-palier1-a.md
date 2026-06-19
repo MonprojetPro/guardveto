@@ -123,7 +123,28 @@ P1A-001 (briques_regles + seed)
 
 ---
 
-## P1A-004 — `resoudreContexte` lit `regles_cabinet`
+## P1A-004 — `resoudreContexte` lit `regles_cabinet` ✅ TERMINÉE (2026-06-19)
+
+**Décision d'archi (validée MiKL) — Approche A « bascule de source, forme conservée ».**
+Le code réel diffère de l'énoncé : la lecture des contraintes était dans `loader.ts`
+(join `contraintes_veto`), **attachée par-véto**, et consommée telle quelle par le
+solver (`hard-constraints.ts` ×4, `validerPlanning.ts`). On a donc changé **uniquement
+la source** (lecture `regles_cabinet`) en **reconstruisant la forme `ContrainteEngine`
+identique** que le moteur consommait déjà → planning inchangé (golden vert). La forme
+cible archi §4.3 (liste plate `RegleResolue[]` consommée par le moteur) est un **rewire
+du cœur moteur** reporté à une **story dédiée** (risque isolé, banc d'essai propre).
+
+**Livré :**
+- `src/data/mapReglesCabinet.ts` — mapper PUR `regles_cabinet` → `ContrainteEngine`
+  par-véto : validation défensive (brique au catalogue, force résoluble, qui/refs,
+  type V1, params objet → sinon écartée + tracée), tri stable E3 `(étage, brique, id)`.
+- `src/engine/loader.ts` — lit `regles_cabinet` (scopé cabinet + `periode_id` NULL/période),
+  valide via catalogue `briques_regles`, logue les rejets ; join `contraintes_veto` retiré.
+- `src/data/__tests__/mapReglesCabinet.test.ts` — équivalence round-trip vs snapshot
+  pilote (8 tests) : reproduit les 10 contraintes des 7 vétos, duo rangé chez son
+  propriétaire, tri E3, et 4 cas de corruption écartés sans crash.
+- **Golden 3/3 + mapper 8/8 + loader-zone 3/3 verts.** Isolation tenant garantie par la
+  RLS restrictive F5-003 (double verrou : `.eq(cabinet_id)` + `auth_cabinet_actif()`).
 
 **Contexte.** Archi §4.3 : le pont règle-en-base → évaluateur-en-code. `resoudreContexte()` lit `regles_cabinet` (scopé cabinet + période), filtre par validité, **valide** chaque `params_json` contre `brique.schemaParams` (rejette les règles corrompues au lieu de crasher), et produit `RegleResolue[]`.
 
