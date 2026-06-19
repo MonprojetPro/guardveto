@@ -195,7 +195,23 @@ du cœur moteur** reporté à une **story dédiée** (risque isolé, banc d'essa
 
 ---
 
-## P1A-006 — Écran "Règles du cabinet" (liste + aperçu)
+## P1A-006 — Écran "Règles du cabinet" (liste + aperçu) ✅ TERMINÉE (2026-06-19)
+
+**Livré (maquette validée par MiKL avant code) :**
+- `src/app/(protected)/regles/page.tsx` — server component : auth, lecture `regles_cabinet`
+  (RLS restrictive scope cabinet auto) + vétos, passe à un client component.
+- `src/components/regles/ReglesClient.tsx` — liste en **langage naturel** (catalogue P1A-005,
+  sujet `qui.refs[0]` + prédicat `rendreRegle`), **groupée par force** : 🔴 fermes /
+  🟠 sauf crise / 🟡 confort, + section **Désactivées** (réversible) + **Réglementaires OFF**
+  (emplacement réservé G1). Admin : activer/désactiver, supprimer (Dialog de confirmation),
+  créer/éditer → toast « P1A-007 ». Véto : **lecture seule** (aucun bouton).
+- `src/app/(protected)/regles/actions.ts` — server actions `setRegleActif`/`deleteRegle` :
+  double garde (rôle admin serveur + RLS admin-write) + `revalidatePath`.
+- Navigation : entrée « Règles » (icône ScrollText) dans Sidebar + MobileNav (`NAV_ITEMS`).
+- **« Temps réel »** = pattern réel GuardVeto (`revalidatePath` + `router.refresh()`) ; aucune
+  table n'est dans la publication `supabase_realtime` → pas de `postgres_changes` (serait
+  orphelin). Seul l'admin écrit → rafraîchissement instantané couvre le besoin.
+- tsc clean sur tous les fichiers, ESLint clean. **À tester visuellement/E2E** (non couvert ici).
 
 **Contexte.** PRD §7.3 : l'admin gère ses règles depuis un écran dédié. Liste groupée par statut (Actives / Réglementaires OFF), chaque règle affichée en **langage naturel** avec son symbole de force (🔴/🟠/🟡/⚪).
 

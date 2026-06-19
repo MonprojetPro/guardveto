@@ -1,0 +1,292 @@
+'use client'
+
+// ============================================================
+// GUARDVETO — Écran « Règles du cabinet » (P1A-006)
+// ============================================================
+// Rend les regles_cabinet en français (catalogue P1A-005), groupées par
+// force. Admin : activer/désactiver, supprimer (confirmation), créer/éditer
+// (→ P1A-007). Véto : lecture seule (aucun bouton d'écriture).
+//
+// « Temps réel » à la mode GuardVeto : après chaque action serveur
+// (revalidatePath) on appelle router.refresh() → la liste se met à jour
+// sans rechargement. L'admin est le seul à écrire, le besoin est couvert.
+// ============================================================
+
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { ScrollText, Power, Pencil, Trash2, Plus, Lock, Inbox } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from '@/components/ui/dialog'
+import { rendreRegle } from '@/engine/briques/catalogue'
+import { setRegleActif, deleteRegle } from '@/app/(protected)/regles/actions'
+
+// ── Données ──────────────────────────────────────────────────
+
+export interface RegleRow {
+  id: string
+  brique_id: string
+  params_json: unknown
+  force: string
+  actif: boolean
+}
+
+export interface VetoMini {
+  id: string
+  prenom: string
+  nom: string
+  couleur: string | null
+}
+
+type GroupeKey = 'fermes' | 'sauf_crise' | 'confort' | 'reglementaires'
+
+const FORCE_META: Record<string, { etage: number; groupe: GroupeKey; symbole: string }> = {
+  invariant:     { etage: 0, groupe: 'fermes',         symbole: '🔴' },
+  reglementaire: { etage: 1, groupe: 'reglementaires', symbole: '⚪' },
+  jamais:        { etage: 2, groupe: 'fermes',         symbole: '🔴' },
+  sauf_crise:    { etage: 3, groupe: 'sauf_crise',     symbole: '🟠' },
+  evitee:        { etage: 4, groupe: 'confort',        symbole: '🟡' },
+  si_possible:   { etage: 5, groupe: 'confort',        symbole: '🟡' },
+}
+
+const GROUPES: { key: GroupeKey; titre: string; symbole: string }[] = [
+  { key: 'fermes',     titre: 'Interdictions fermes',    symbole: '🔴' },
+  { key: 'sauf_crise', titre: 'À éviter sauf crise',     symbole: '🟠' },
+  { key: 'confort',    titre: 'Préférences de confort',  symbole: '🟡' },
+]
+
+function etageDe(force: string): number {
+  return FORCE_META[force]?.etage ?? 99
+}
+function symboleDe(force: string): string {
+  return FORCE_META[force]?.symbole ?? '⚪'
+}
+function groupeDe(force: string): GroupeKey {
+  return FORCE_META[force]?.groupe ?? 'confort'
+}
+
+// ── Rendu d'une règle en français (sujet + prédicat) ─────────
+
+interface ParamsJson {
+  qui?: { refs?: unknown }
+  params?: unknown
+}
+
+function phraseRegle(regle: RegleRow, nomVeto: (id: string) => string): string {
+  const pj = (regle.params_json ?? {}) as ParamsJson
+  const refs = pj.qui?.refs
+  const sujetId = Array.isArray(refs) && refs.length > 0 && typeof refs[0] === 'string' ? refs[0] : null
+  const sujet = sujetId ? nomVeto(sujetId) : ''
+  const params = (pj.params ?? {}) as Record<string, unknown>
+  const predicat = rendreRegle(regle.brique_id, params, { nomVeto })
+  return sujet ? `${sujet} ${predicat}` : predicat
+}
+
+// ── Composant ────────────────────────────────────────────────
+
+interface ReglesClientProps {
+  regles: RegleRow[]
+  vets: VetoMini[]
+  isAdmin: boolean
+}
+
+export function ReglesClient({ regles, vets, isAdmin }: ReglesClientProps) {
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  const [aSupprimer, setASupprimer] = useState<RegleRow | null>(null)
+
+  const nomVeto = (id: string) => {
+    const v = vets.find((x) => x.id === id)
+    return v ? v.prenom : id
+  }
+
+  const actives = regles.filter((r) => r.actif)
+  const inactives = regles.filter((r) => !r.actif)
+
+  const bientot = () =>
+    toast.info('Le formulaire de création/édition arrive à la prochaine étape (P1A-007).')
+
+  const onToggle = (regle: RegleRow) => {
+    startTransition(async () => {
+      const res = await setRegleActif(regle.id, !regle.actif)
+      if (res?.error) toast.error(res.error)
+      else {
+        toast.success(regle.actif ? 'Règle désactivée.' : 'Règle réactivée.')
+        router.refresh()
+      }
+    })
+  }
+
+  const onDelete = () => {
+    if (!aSupprimer) return
+    const cible = aSupprimer
+    startTransition(async () => {
+      const res = await deleteRegle(cible.id)
+      if (res?.error) toast.error(res.error)
+      else {
+        toast.success('Règle supprimée.')
+        setASupprimer(null)
+        router.refresh()
+      }
+    })
+  }
+
+  // ── Ligne de règle ─────────────────────────────────────────
+  const RegleRowView = ({ regle, grisee }: { regle: RegleRow; grisee?: boolean }) => (
+    <div
+      className={`flex items-start gap-3 p-3.5 rounded-lg border border-border bg-card ${grisee ? 'opacity-55' : ''}`}
+    >
+      <span className="text-base leading-6 shrink-0" aria-hidden>
+        {symboleDe(regle.force)}
+      </span>
+
+      <p className="flex-1 min-w-0 text-sm text-foreground leading-6">
+        {phraseRegle(regle, nomVeto)}
+      </p>
+
+      {isAdmin && (
+        <div className="flex gap-1 shrink-0">
+          <Button
+            variant="ghost" size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            onClick={() => onToggle(regle)}
+            disabled={isPending}
+            title={regle.actif ? 'Désactiver' : 'Réactiver'}
+          >
+            <Power className="w-3.5 h-3.5" />
+          </Button>
+          {regle.actif && (
+            <Button
+              variant="ghost" size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={bientot}
+              title="Éditer (bientôt)"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </Button>
+          )}
+          <Button
+            variant="ghost" size="icon"
+            className="h-8 w-8 text-destructive hover:text-destructive"
+            onClick={() => setASupprimer(regle)}
+            disabled={isPending}
+            title="Supprimer"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+
+  const Groupe = ({ groupeKey, titre, symbole }: { groupeKey: GroupeKey; titre: string; symbole: string }) => {
+    const lignes = actives
+      .filter((r) => groupeDe(r.force) === groupeKey)
+      .sort((a, b) => etageDe(a.force) - etageDe(b.force) || a.brique_id.localeCompare(b.brique_id))
+    if (lignes.length === 0) return null
+    return (
+      <section className="space-y-2">
+        <h2 className="font-semibold text-sm text-foreground flex items-center gap-2">
+          <span aria-hidden>{symbole}</span> {titre}
+          <span className="text-muted-foreground font-normal">· {lignes.length}</span>
+        </h2>
+        <div className="space-y-2">
+          {lignes.map((r) => <RegleRowView key={r.id} regle={r} />)}
+        </div>
+      </section>
+    )
+  }
+
+  return (
+    <>
+      <div className="space-y-8 max-w-3xl">
+        {/* En-tête */}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="font-heading text-2xl font-bold text-foreground flex items-center gap-2">
+              <ScrollText className="w-6 h-6 text-primary" />
+              Règles du cabinet
+            </h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              {actives.length === 0
+                ? 'Aucune règle active'
+                : `${actives.length} règle${actives.length > 1 ? 's' : ''} active${actives.length > 1 ? 's' : ''}`}
+              {' · '}mises à jour en direct
+            </p>
+          </div>
+          {isAdmin && (
+            <Button onClick={bientot} className="shrink-0">
+              <Plus className="w-4 h-4 mr-1" /> Nouvelle règle
+            </Button>
+          )}
+        </div>
+
+        {actives.length === 0 && inactives.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground">
+            <Inbox className="w-8 h-8 opacity-30" />
+            <p className="text-sm">Aucune règle configurée pour ce cabinet.</p>
+          </div>
+        )}
+
+        {/* Groupes actifs */}
+        {GROUPES.map((g) => (
+          <Groupe key={g.key} groupeKey={g.key} titre={g.titre} symbole={g.symbole} />
+        ))}
+
+        {/* Désactivées (réversible) */}
+        {inactives.length > 0 && (
+          <section className="space-y-2">
+            <h2 className="font-semibold text-sm text-muted-foreground flex items-center gap-2">
+              Désactivées <span className="font-normal">· {inactives.length}</span>
+            </h2>
+            <div className="space-y-2">
+              {inactives
+                .sort((a, b) => etageDe(a.force) - etageDe(b.force))
+                .map((r) => <RegleRowView key={r.id} regle={r} grisee />)}
+            </div>
+          </section>
+        )}
+
+        {/* Réglementaires — emplacement réservé (archi G1, étage 1 vide) */}
+        <section className="space-y-2">
+          <h2 className="font-semibold text-sm text-muted-foreground flex items-center gap-2">
+            <span aria-hidden>⚪</span> Réglementaires (pré-assemblées)
+            <span className="ml-1 inline-flex items-center gap-1 text-xs font-normal px-2 py-0.5 rounded-md bg-muted">
+              <Lock className="w-3 h-3" /> bientôt
+            </span>
+          </h2>
+          <div className="p-4 rounded-lg border border-dashed border-border text-sm text-muted-foreground">
+            Repos de sécurité, plafonds légaux… seront fournis pré-assemblés. (À venir)
+          </div>
+        </section>
+      </div>
+
+      {/* Confirmation de suppression */}
+      <Dialog open={Boolean(aSupprimer)} onOpenChange={(o) => !o && setASupprimer(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Supprimer cette règle ?</DialogTitle>
+            <DialogDescription>
+              Cette action est définitive. La règle ne sera plus prise en compte lors des prochaines générations.
+            </DialogDescription>
+          </DialogHeader>
+          {aSupprimer && (
+            <p className="text-sm bg-muted rounded-lg p-3 leading-6">
+              {symboleDe(aSupprimer.force)} {phraseRegle(aSupprimer, nomVeto)}
+            </p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setASupprimer(null)} disabled={isPending}>
+              Annuler
+            </Button>
+            <Button variant="destructive" onClick={onDelete} disabled={isPending}>
+              Supprimer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}

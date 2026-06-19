@@ -9,6 +9,7 @@ import {
   BarChart3,
   Settings,
   FileText,
+  ScrollText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -18,6 +19,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   BarChart3,
   Settings,
   FileText,
+  ScrollText,
 }
 
 interface MobileNavProps {

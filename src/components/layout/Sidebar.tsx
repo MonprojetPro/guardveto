@@ -10,6 +10,7 @@ import {
   BarChart3,
   Users,
   Inbox,
+  ScrollText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -20,6 +21,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   BarChart3,
   Users,
   Inbox,
+  ScrollText,
 }
 
 interface SidebarProps {

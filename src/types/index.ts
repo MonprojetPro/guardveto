@@ -128,6 +128,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Planning',      href: '/planning',            icon: 'Calendar',     roles: ['admin', 'veto'] },
   { label: 'Congés',        href: '/conges',              icon: 'CalendarOff',  roles: ['admin', 'veto'] },
   { label: 'Compteurs',     href: '/compteurs',           icon: 'BarChart3',    roles: ['admin', 'veto'] },
+  { label: 'Règles',        href: '/regles',              icon: 'ScrollText',   roles: ['admin', 'veto'] },
   { label: 'Demandes',      href: '/admin/demandes',      icon: 'Inbox',        roles: ['admin'] },
   { label: 'Périodes',      href: '/admin/periodes',      icon: 'CalendarRange', roles: ['admin'] },
   { label: 'Vétérinaires',  href: '/admin/veterinaires',  icon: 'Users',        roles: ['admin'] },
