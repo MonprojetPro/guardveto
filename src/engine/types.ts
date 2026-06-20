@@ -78,6 +78,17 @@ export interface ContexteSimulation {
   bonusMalus: import('./score-lexicographique').BonusMalusMap
   /** Calendrier résolu (fériés + vacances scolaires). Fallback sur listes en dur si absent. */
   calendrier?: CalendrierResolu
+  /**
+   * Effectif configurable la nuit en semaine (1 ou 2). Absent → repli saison.
+   * ⚠️ DOIT être propagé jusqu'au solver : un oubli ici le détruit silencieusement
+   * (le loader le charge mais resoudreContexte reconstruit l'objet à la main).
+   */
+  nbVetosSemaineSoir?: number
+  /**
+   * Poids d'équité configurables (curseurs cabinet). Absent → DEFAULT_EQUITY_WEIGHTS.
+   * Même remarque que ci-dessus : à propager explicitement dans resoudreContexte.
+   */
+  equityWeights?: import('./equity-weights').EquityWeights
 }
 
 // Résultat d'une vérification

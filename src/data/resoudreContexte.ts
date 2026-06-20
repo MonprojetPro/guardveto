@@ -108,6 +108,10 @@ export async function resoudreContexte(
     (await chargerCalendrier(cabinetId, input.dateDebut, input.dateFin))
 
   // 3. Assembler le ContexteSimulation
+  //    ⚠️ Propager EXPLICITEMENT nbVetosSemaineSoir ET equityWeights : cet objet
+  //    est reconstruit champ par champ, donc tout champ oublié ici est détruit
+  //    avant d'atteindre le solver (l'effectif configurable l'était jusqu'ici —
+  //    il était chargé par le loader mais jamais transmis). Cf. ContexteSimulation.
   const contexte: ContexteSimulation = {
     dateDebut: input.dateDebut,
     dateFin: input.dateFin,
@@ -115,6 +119,8 @@ export async function resoudreContexte(
     vets: input.vets,
     bonusMalus: input.bonusMalus,
     calendrier,
+    nbVetosSemaineSoir: input.nbVetosSemaineSoir,
+    equityWeights: input.equityWeights,
   }
 
   return contexte

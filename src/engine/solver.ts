@@ -37,7 +37,7 @@ import { isValid } from './rules/hard-constraints'
 import { penalite } from './rules/soft-constraints'
 import { compterParVet } from './rules/optimization'
 import { comparerScores, scorerPlanning, type VecteurScore, type BonusMalusMap } from './score-lexicographique'
-import { DEFAULT_EQUITY_WEIGHTS } from './equity-weights'
+import { DEFAULT_EQUITY_WEIGHTS, type EquityWeights } from './equity-weights'
 
 // ── Types publics ────────────────────────────────────────
 
@@ -60,6 +60,13 @@ export interface SolverInput {
    * Les vendredi_soir et week-ends restent toujours à 2.
    */
   nbVetosSemaineSoir?: number
+  /**
+   * Poids d'équité configurables (curseurs par cabinet). Pilotent l'importance
+   * relative de chaque dimension d'équité (week-ends, fériés, semaine…) à la
+   * fois dans le scoring greedy/LNS (construction) et le scoreur global (départage).
+   * Absent → DEFAULT_EQUITY_WEIGHTS (comportement historique, planning inchangé).
+   */
+  equityWeights?: EquityWeights
 }
 
 /** Effectif semaine effectif : config si fournie, sinon repli saison (hiver 2 / été 1). */
@@ -165,6 +172,7 @@ function scorerCandidat(
   planning: PlanningPartiel,
   bonusMalus: BonusMalusMap,
   allVets: VetEngine[],
+  weights: EquityWeights,
   calendrier?: CalendrierResolu
 ): number {
   // Dernier recours → toujours en dernier
@@ -197,27 +205,27 @@ function scorerCandidat(
     // R11b : équité du rôle 1er le week-end (avantage financier).
     let malusRole = 0
     if (step.type === 'vendredi_soir' && step.role === 'second') {
-      malusRole = c.weekendPremier * POIDS_LNS.WE_PREMIER_ROLE
+      malusRole = c.weekendPremier * weights.WE_PREMIER_ROLE
     } else if (step.type === 'vendredi_soir' && step.role === 'premier') {
-      malusRole = -c.weekendPremier * POIDS_LNS.WE_PREMIER_ROLE
+      malusRole = -c.weekendPremier * weights.WE_PREMIER_ROLE
     }
 
-    return weEffectif * POIDS_LNS.WE_GARDE + malusRole + pen
+    return weEffectif * weights.WE_GARDE + malusRole + pen
   }
 
   // Garde de semaine : priorité selon le type de jour et le rôle
   if (estJourFerie(step.date, calendrier)) {
     // R12 : équité fériés
-    return c.feriesGardes * POIDS_LNS.FERIES + pen
+    return c.feriesGardes * weights.FERIES + pen
   }
 
   if (step.role === 'premier') {
     // R13 : équité gardes semaine en 1er
-    return c.semainePremier * POIDS_LNS.SEMAINE_PREMIER + pen
+    return c.semainePremier * weights.SEMAINE_PREMIER + pen
   }
 
   // R14 : équité 2nd de garde
-  return c.semaineSecond * POIDS_LNS.SEMAINE_SECOND + pen
+  return c.semaineSecond * weights.SEMAINE_SECOND + pen
 }
 
 // ── Gestion du planning ──────────────────────────────────
@@ -272,6 +280,7 @@ function backtrack(
   planning: PlanningPartiel,
   vets: VetEngine[],
   bonusMalus: BonusMalusMap,
+  weights: EquityWeights,
   deepest: { value: number },
   calendrier?: CalendrierResolu
 ): PlanningPartiel | null {
@@ -289,14 +298,14 @@ function backtrack(
     .filter((vet) => isValid(slot, vet, step.role, vets, planning, calendrier).valid)
     .sort(
       (a, b) =>
-        scorerCandidat(step, a, planning, bonusMalus, vets, calendrier) -
-        scorerCandidat(step, b, planning, bonusMalus, vets, calendrier)
+        scorerCandidat(step, a, planning, bonusMalus, vets, weights, calendrier) -
+        scorerCandidat(step, b, planning, bonusMalus, vets, weights, calendrier)
     )
 
   // Essaie chaque candidat dans l'ordre de priorité
   for (const vet of candidates) {
     const newPlanning = assignerStep(planning, step, vet.id)
-    const result = backtrack(steps, index + 1, newPlanning, vets, bonusMalus, deepest, calendrier)
+    const result = backtrack(steps, index + 1, newPlanning, vets, bonusMalus, weights, deepest, calendrier)
     if (result !== null) return result
   }
 
@@ -312,6 +321,7 @@ function backtrack(
  */
 function genererSeedGreedy(input: SolverInput): SolveResult {
   const { dateDebut, dateFin, saison, vets, bonusMalus, calendrier } = input
+  const weights = input.equityWeights ?? DEFAULT_EQUITY_WEIGHTS
   const t0 = Date.now()
 
   const steps = genererSteps(dateDebut, dateFin, saison, input.nbVetosSemaineSoir)
@@ -323,6 +333,7 @@ function genererSeedGreedy(input: SolverInput): SolveResult {
     { attributions: [] },
     vets,
     bonusMalus,
+    weights,
     deepest,
     calendrier
   )
@@ -408,21 +419,15 @@ function genererStepsSemaine(lundi: string, saison: Saison, nbVetosSemaineSoir?:
 
 /**
  * Scoring LNS — indépendant du bonusMalus (optim intra-période).
- * Poids mutualisés avec le scoreur global via equity-weights.ts (source unique).
+ * Poids d'équité passés en paramètre (curseurs cabinet) — mêmes poids que le
+ * scoreur global via equity-weights.ts (source unique, repli DEFAULT).
  */
-const POIDS_LNS = {
-  WE_GARDE: DEFAULT_EQUITY_WEIGHTS.WE_GARDE,
-  WE_PREMIER_ROLE: DEFAULT_EQUITY_WEIGHTS.WE_PREMIER_ROLE,
-  FERIES: DEFAULT_EQUITY_WEIGHTS.FERIES,
-  SEMAINE_PREMIER: DEFAULT_EQUITY_WEIGHTS.SEMAINE_PREMIER,
-  SEMAINE_SECOND: DEFAULT_EQUITY_WEIGHTS.SEMAINE_SECOND,
-} as const
-
 function scorerCandidatLNS(
   step: SolverStep,
   vet: VetEngine,
   planning: PlanningPartiel,
   allVets: VetEngine[],
+  weights: EquityWeights,
   calendrier?: CalendrierResolu
 ): number {
   if (vet.dernier_recours) return 1_000_000
@@ -449,15 +454,15 @@ function scorerCandidatLNS(
   if (step.type === 'weekend' || step.type === 'vendredi_soir') {
     let malusRole = 0
     if (step.type === 'vendredi_soir' && step.role === 'second') {
-      malusRole = c.weekendPremier * POIDS_LNS.WE_PREMIER_ROLE
+      malusRole = c.weekendPremier * weights.WE_PREMIER_ROLE
     } else if (step.type === 'vendredi_soir' && step.role === 'premier') {
-      malusRole = -c.weekendPremier * POIDS_LNS.WE_PREMIER_ROLE
+      malusRole = -c.weekendPremier * weights.WE_PREMIER_ROLE
     }
-    return c.weGardes * POIDS_LNS.WE_GARDE + malusRole + pen
+    return c.weGardes * weights.WE_GARDE + malusRole + pen
   }
-  if (estJourFerie(step.date, calendrier)) return c.feriesGardes * POIDS_LNS.FERIES + pen
-  if (step.role === 'premier') return c.semainePremier * POIDS_LNS.SEMAINE_PREMIER + pen
-  return c.semaineSecond * POIDS_LNS.SEMAINE_SECOND + pen
+  if (estJourFerie(step.date, calendrier)) return c.feriesGardes * weights.FERIES + pen
+  if (step.role === 'premier') return c.semainePremier * weights.SEMAINE_PREMIER + pen
+  return c.semaineSecond * weights.SEMAINE_SECOND + pen
 }
 
 /** Réparation greedy d'une semaine détruite. Retourne null si impasse. */
@@ -465,6 +470,7 @@ function repairerSemaine(
   partialPlanning: PlanningPartiel,
   steps: SolverStep[],
   vets: VetEngine[],
+  weights: EquityWeights,
   calendrier?: CalendrierResolu
 ): PlanningPartiel | null {
   let planning = partialPlanning
@@ -477,8 +483,8 @@ function repairerSemaine(
 
     const sorted = [...valids].sort(
       (a, b) =>
-        scorerCandidatLNS(step, a, planning, vets, calendrier) -
-        scorerCandidatLNS(step, b, planning, vets, calendrier)
+        scorerCandidatLNS(step, a, planning, vets, weights, calendrier) -
+        scorerCandidatLNS(step, b, planning, vets, weights, calendrier)
     )
 
     const attributions = [...planning.attributions]
@@ -520,7 +526,8 @@ export function scorerSemaine(
   planning: PlanningPartiel,
   lundi: string,
   vets: VetEngine[],
-  saison: Saison
+  saison: Saison,
+  weights: EquityWeights = DEFAULT_EQUITY_WEIGHTS
 ): VecteurScore {
   const dimanche = addDays(lundi, 6)
   const planSemaine: PlanningPartiel = {
@@ -528,7 +535,7 @@ export function scorerSemaine(
       (a) => a.date >= lundi && a.date <= dimanche
     ),
   }
-  return scorerPlanning(planSemaine, vets, saison)
+  return scorerPlanning(planSemaine, vets, saison, weights)
 }
 
 // ── LNS hill-climbing ────────────────────────────────────
@@ -551,11 +558,12 @@ function lnsHillClimbing(
   t0: number
 ): LNSHillResult {
   const { dateDebut, dateFin, saison, vets, calendrier } = input
+  const weights = input.equityWeights ?? DEFAULT_EQUITY_WEIGHTS
   const timeoutMs = input.lnsTimeoutMs ?? 30_000
   const maxPassesSansAmelioration = 3
 
   let meilleur = seedPlanning
-  let scoreMeilleur = scorerPlanning(meilleur, vets, saison)
+  let scoreMeilleur = scorerPlanning(meilleur, vets, saison, weights)
 
   const lundis = extraireLundis(dateDebut, dateFin)
 
@@ -586,11 +594,11 @@ function lnsHillClimbing(
       if (steps.length === 0) continue
 
       // Réparer : greedy LNS sur la semaine
-      const repaired = repairerSemaine(partial, steps, vets, calendrier)
+      const repaired = repairerSemaine(partial, steps, vets, weights, calendrier)
       if (repaired === null) continue
 
       // Comparer : garder si strictement amélioré
-      const scoreNew = scorerPlanning(repaired, vets, saison)
+      const scoreNew = scorerPlanning(repaired, vets, saison, weights)
       if (comparerScores(scoreNew, scoreMeilleur) < 0) {
         meilleur = repaired
         scoreMeilleur = scoreNew

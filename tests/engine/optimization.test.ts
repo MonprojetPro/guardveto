@@ -15,8 +15,8 @@ import {
   scorerPlanning,
   comparerScores,
   Etage,
-  POIDS_INTRA,
 } from '@/engine/score-lexicographique'
+import { DEFAULT_EQUITY_WEIGHTS } from '@/engine/equity-weights'
 import type { PlanningPartiel } from '@/engine/types'
 import { ANNE_SOPHIE, FANNY, JEAN, ANNE_CAT, MANON, ANTOINE, VICTOR, ALL_VETS } from './scenarios/vets'
 
@@ -295,11 +295,11 @@ describe('Équité (V2) — étage EQUITE de scorerPlanning', () => {
     expect(comparerScores(vEq, vDeseq)).toBeLessThan(0)
   })
 
-  it('les poids EQ_WE pèsent davantage que EQ_SEMAINE_SECOND / EQ_SEMAINE_PREMIER / EQ_FERIES', () => {
+  it('les poids d\'équité par défaut : WE_GARDE pèse davantage que SEMAINE_SECOND / SEMAINE_PREMIER / FERIES', () => {
     // La priorité d'équité V1 (WE > fériés > semaine) est conservée dans
-    // les poids intra-étage EQUITE de la V2.
-    expect(POIDS_INTRA.EQ_WE).toBeGreaterThan(POIDS_INTRA.EQ_SEMAINE_SECOND)
-    expect(POIDS_INTRA.EQ_WE).toBeGreaterThan(POIDS_INTRA.EQ_SEMAINE_PREMIER)
-    expect(POIDS_INTRA.EQ_WE).toBeGreaterThan(POIDS_INTRA.EQ_FERIES)
+    // les poids par défaut (curseurs configurables, repli DEFAULT_EQUITY_WEIGHTS).
+    expect(DEFAULT_EQUITY_WEIGHTS.WE_GARDE).toBeGreaterThan(DEFAULT_EQUITY_WEIGHTS.SEMAINE_SECOND)
+    expect(DEFAULT_EQUITY_WEIGHTS.WE_GARDE).toBeGreaterThan(DEFAULT_EQUITY_WEIGHTS.SEMAINE_PREMIER)
+    expect(DEFAULT_EQUITY_WEIGHTS.WE_GARDE).toBeGreaterThan(DEFAULT_EQUITY_WEIGHTS.FERIES)
   })
 })

@@ -24,7 +24,7 @@ export interface BonusMalusMap {
   [vetId: string]: number
 }
 import { isValid } from './rules/hard-constraints'
-import { DEFAULT_EQUITY_WEIGHTS } from './equity-weights'
+import { DEFAULT_EQUITY_WEIGHTS, type EquityWeights } from './equity-weights'
 import {
   penaliteR10WEConsecutif,
   penaliteWEAvantVacances,
@@ -110,15 +110,10 @@ export const POIDS_INTRA = {
   R8B_INVERSION_FERIE: 20,
   /** Marqueur dernier recours — terme DOMINANT dans son étage (§3.2). */
   DERNIER_RECOURS: 100_000,
-  // Étage EQUITE (variance) — poids relatifs des dimensions.
-  // Source unique : equity-weights.ts (mutualisé avec POIDS_LNS du solver).
-  EQ_WE: DEFAULT_EQUITY_WEIGHTS.WE_GARDE,
-  EQ_WE_PREMIER: DEFAULT_EQUITY_WEIGHTS.WE_PREMIER_ROLE,
-  EQ_FERIES: DEFAULT_EQUITY_WEIGHTS.FERIES,
-  EQ_SEMAINE_PREMIER: DEFAULT_EQUITY_WEIGHTS.SEMAINE_PREMIER,
-  EQ_SEMAINE_SECOND: DEFAULT_EQUITY_WEIGHTS.SEMAINE_SECOND,
-  EQ_GRANDS_WE: DEFAULT_EQUITY_WEIGHTS.GRANDS_WE,
 } as const
+// NB : les poids d'équité (étage EQUITE) ne sont PLUS des constantes ici.
+// Ils sont passés en paramètre à scorerPlanning (curseurs configurables par
+// cabinet), avec DEFAULT_EQUITY_WEIGHTS en repli. Source unique : equity-weights.ts.
 
 // ── Reconstruction des slots+rôles d'une attribution ──────
 
@@ -152,11 +147,13 @@ function listerSlotRoles(planning: PlanningPartiel, saison: 'ete' | 'hiver'): Sl
  * @param planning  Planning complet à évaluer
  * @param vets      Tous les vétos
  * @param saison    Saison de la période
+ * @param weights   Poids d'équité configurables (curseurs cabinet). Repli = défaut historique.
  */
 export function scorerPlanning(
   planning: PlanningPartiel,
   vets: VetEngine[],
-  saison: 'ete' | 'hiver'
+  saison: 'ete' | 'hiver',
+  weights: EquityWeights = DEFAULT_EQUITY_WEIGHTS
 ): VecteurScore {
   const v = vecteurVide()
   const slotRoles = listerSlotRoles(planning, saison)
@@ -247,12 +244,12 @@ export function scorerPlanning(
   // ── Étage 6 : ÉQUITÉ (variance des charges) ──
   const compteurs = compterParVet(planning, vets)
   const eq =
-    desequilibreWE(compteurs) * POIDS_INTRA.EQ_WE +
-    desequilibreWeekendPremier(compteurs) * POIDS_INTRA.EQ_WE_PREMIER +
-    desequilibreFeries(compteurs) * POIDS_INTRA.EQ_FERIES +
-    desequilibreSemainePremier(compteurs) * POIDS_INTRA.EQ_SEMAINE_PREMIER +
-    desequilibreSemaineSecond(compteurs) * POIDS_INTRA.EQ_SEMAINE_SECOND +
-    desequilibreGrandsWeSalaries(compteurs, vets) * POIDS_INTRA.EQ_GRANDS_WE
+    desequilibreWE(compteurs) * weights.WE_GARDE +
+    desequilibreWeekendPremier(compteurs) * weights.WE_PREMIER_ROLE +
+    desequilibreFeries(compteurs) * weights.FERIES +
+    desequilibreSemainePremier(compteurs) * weights.SEMAINE_PREMIER +
+    desequilibreSemaineSecond(compteurs) * weights.SEMAINE_SECOND +
+    desequilibreGrandsWeSalaries(compteurs, vets) * weights.GRANDS_WE
   // L'équité est continue : on arrondit pour garder un entier déterministe
   // (variance × poids → on multiplie par 1000 et on arrondit, pour ne pas
   // perdre la finesse sous l'entier).

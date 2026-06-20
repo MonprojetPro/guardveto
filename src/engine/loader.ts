@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/server'
 import type { VetEngine, ContrainteEngine, CongeEngine, CalendrierResolu } from './types'
 import type { BonusMalusMap } from './score-lexicographique'
 import type { SolverInput } from './solver'
+import type { EquityWeights } from './equity-weights'
 import { mapperReglesCabinet, type RegleCabinetRow } from '@/data/mapReglesCabinet'
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
@@ -175,6 +176,67 @@ async function chargerReglesCabinet(
   return contraintesParVet
 }
 
+// ── Chargement des poids d'équité du cabinet (curseurs) ──
+
+/** Ligne brute de la table `equite_cabinet` (une par cabinet). */
+interface EquiteCabinetDb {
+  we_garde: number
+  we_premier_role: number
+  feries: number
+  semaine_premier: number
+  semaine_second: number
+  grands_we: number
+}
+
+/**
+ * chargerEquiteCabinet — lit les 6 poids d'équité configurés par le cabinet
+ * (table `equite_cabinet`, une ligne par cabinet, écriture admin-only).
+ *
+ * BEST-EFFORT : si la table n'existe pas encore (déploiement avant migration),
+ * ou si le cabinet n'a pas de ligne (n'a jamais touché aux curseurs), retourne
+ * `undefined` → le solver retombe sur DEFAULT_EQUITY_WEIGHTS (planning inchangé).
+ * Aucune contrainte d'ordre de déploiement. La RLS restrictive (modèle F5-003)
+ * borne déjà la lecture au cabinet de l'utilisateur ; on filtre quand même par
+ * cabinet_id (défense en profondeur, cohérent avec le reste du loader).
+ *
+ * @param supabase   client serveur (RLS-aware)
+ * @param cabinetId  cabinet courant
+ */
+async function chargerEquiteCabinet(
+  supabase: SupabaseServerClient,
+  cabinetId: string,
+): Promise<EquityWeights | undefined> {
+  const { data, error } = await supabase
+    .from('equite_cabinet')
+    .select('we_garde, we_premier_role, feries, semaine_premier, semaine_second, grands_we')
+    .eq('cabinet_id', cabinetId)
+    .maybeSingle()
+
+  if (error || !data) return undefined
+
+  const row = data as EquiteCabinetDb
+  // Garde-fou : tous les poids doivent être des nombres finis ≥ 0. Une valeur
+  // corrompue invalide TOUTE la config (on retombe sur le défaut) plutôt que de
+  // produire un planning à partir d'un poids aberrant.
+  const vals = [
+    row.we_garde, row.we_premier_role, row.feries,
+    row.semaine_premier, row.semaine_second, row.grands_we,
+  ]
+  if (!vals.every((v) => typeof v === 'number' && Number.isFinite(v) && v >= 0)) {
+    console.warn(`[équité] Poids invalides pour le cabinet ${cabinetId} — repli sur le défaut.`)
+    return undefined
+  }
+
+  return {
+    WE_GARDE: row.we_garde,
+    WE_PREMIER_ROLE: row.we_premier_role,
+    FERIES: row.feries,
+    SEMAINE_PREMIER: row.semaine_premier,
+    SEMAINE_SECOND: row.semaine_second,
+    GRANDS_WE: row.grands_we,
+  }
+}
+
 // ── Chargement principal ─────────────────────────────────
 
 /**
@@ -311,6 +373,14 @@ export async function chargerInputDepuisSupabase(
     if (typeof v === 'number') nbVetosSemaineSoir = v
   }
 
+  // Poids d'équité configurables (curseurs cabinet — table equite_cabinet).
+  // BEST-EFFORT comme l'effectif : si la table n'existe pas encore (déploiement
+  // avant migration) ou si aucune config n'est posée → undefined → le solver
+  // retombe sur DEFAULT_EQUITY_WEIGHTS (comportement historique). Scopé cabinet.
+  const equityWeights = cabinetId
+    ? await chargerEquiteCabinet(supabase, cabinetId)
+    : undefined
+
   return {
     dateDebut: periode.date_debut,
     dateFin: periode.date_fin,
@@ -319,5 +389,6 @@ export async function chargerInputDepuisSupabase(
     bonusMalus,
     calendrier,
     nbVetosSemaineSoir,
+    equityWeights,
   }
 }
