@@ -9,6 +9,7 @@
 
 import type { SlotGarde, VetEngine, PlanningPartiel, RoleGarde, CalendrierResolu } from '../types'
 import { samediDeSemaine, addDays, estJourFerie, estFeteFinAnnee } from '../utils'
+import { penaliteContraintesConfig } from './hard-constraints'
 
 // ── Scores de pénalité ───────────────────────────────────
 
@@ -171,7 +172,9 @@ export function penalite(
     penaliteR10WEConsecutif(slot, vet, planning) +
     penaliteWEAvantVacances(slot, vet, planning) +
     penaliteFeteFinAnnee(slot) +
-    penaliteInversionFerie(slot, vet, role, planning, calendrier)
+    penaliteInversionFerie(slot, vet, role, planning, calendrier) +
+    // P1-B : règles configurées MOLLES (étage ≥ 3) — préférence, pas blocage.
+    penaliteContraintesConfig(slot, vet, role, planning, calendrier)
   )
 }
 

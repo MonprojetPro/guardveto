@@ -27,6 +27,10 @@ export const VET = {
 } as const
 
 // ── Les 10 contraintes réelles (format brique v2) ────────
+// P1-B (2026-06-20) : toutes en `force: 2` (DUR). La migration P1A avait
+// hérité d'étages 3/4 (« préférence ») pour les repos, mais le métier
+// (docs/regles-metier-gardes.md) dit que ce sont de VRAIS jours off → durs.
+// Correction appliquée aussi en base (migration p1b_corriger_forces).
 const C = {
   // Antoine ↔ Manon : duo interdit (R6, force 2 = jamais)
   antoineDuoManon: {
@@ -48,7 +52,7 @@ const C = {
     id: '95c6f138-2835-4bc6-8d76-bb91c6b11894',
     type: 'indisponibilite_cyclique' as const,
     actif: true,
-    config: { axes: { quand: 'soir_semaine' }, force: 3, brique: 'alternance_ancre',
+    config: { axes: { quand: 'soir_semaine' }, force: 2, brique: 'alternance_ancre',
       params: { ancre: '2026-09-01', periodes: ['soir_semaine', 'weekend'], semaines: 'impaires',
         description: 'Pas de garde soir semaine + weekend les semaines impaires' } },
   },
@@ -57,28 +61,28 @@ const C = {
     id: '804cd035-7f51-44e2-9f56-0d6829e74f8f',
     type: 'jour_repos_conditionnel' as const,
     actif: true,
-    config: { axes: {}, force: 3, brique: 'repos_conditionnel',
+    config: { axes: {}, force: 2, brique: 'repos_conditionnel',
       params: { sinon: 'vendredi', description: 'Jeudi si garde WE, Vendredi sinon', si_garde_we: 'jeudi' } },
   },
   jeanReposCond: {
     id: 'ad1dba16-060b-45d5-937c-040d1c645474',
     type: 'jour_repos_conditionnel' as const,
     actif: true,
-    config: { axes: {}, force: 3, brique: 'repos_conditionnel',
+    config: { axes: {}, force: 2, brique: 'repos_conditionnel',
       params: { sinon: 'vendredi', description: 'Vendredi repos sauf si garde WE alors mardi', si_garde_we: 'mardi' } },
   },
   antoineReposCond: {
     id: 'f1983ea7-569d-4d03-acb2-159b6a0f64a0',
     type: 'jour_repos_conditionnel' as const,
     actif: true,
-    config: { axes: {}, force: 3, brique: 'repos_conditionnel',
+    config: { axes: {}, force: 2, brique: 'repos_conditionnel',
       params: { sinon: 'vendredi', description: 'Jeudi si garde WE, Vendredi sinon', si_garde_we: 'jeudi' } },
   },
   victorReposCond: {
     id: '76352224-bc81-4996-b435-8fee694468e9',
     type: 'jour_repos_conditionnel' as const,
     actif: true,
-    config: { axes: {}, force: 3, brique: 'repos_conditionnel',
+    config: { axes: {}, force: 2, brique: 'repos_conditionnel',
       params: { sinon: 'vendredi', description: 'Jeudi si garde WE, Vendredi sinon', si_garde_we: 'jeudi' } },
   },
   // Repos fixes mercredi (R1, force 4 = evitee)
@@ -86,21 +90,21 @@ const C = {
     id: 'af88fac6-0404-431f-9ea1-65c3ceceac0a',
     type: 'jour_repos_fixe' as const,
     actif: true,
-    config: { axes: { quand: 'mercredi' }, force: 4, brique: 'interdire_creneau',
+    config: { axes: { quand: 'mercredi' }, force: 2, brique: 'interdire_creneau',
       params: { jour: 'mercredi', description: 'Mercredi repos fixe sauf vacances scolaires', exception_vacances_scolaires: true } },
   },
   anneCatReposFixe: {
     id: '5ada4d5f-17fd-4211-9f98-e64891aee7cb',
     type: 'jour_repos_fixe' as const,
     actif: true,
-    config: { axes: { quand: 'mercredi' }, force: 4, brique: 'interdire_creneau',
+    config: { axes: { quand: 'mercredi' }, force: 2, brique: 'interdire_creneau',
       params: { jour: 'mercredi', periode: 'apres_midi', description: 'Mercredi apres-midi fixe + un autre demi-journee variable', repos_supplementaire_variable: true } },
   },
   anneSoReposFixe: {
     id: 'f961c313-1c9d-490e-891e-f7d6195a095f',
     type: 'jour_repos_fixe' as const,
     actif: true,
-    config: { axes: { quand: null }, force: 4, brique: 'interdire_creneau',
+    config: { axes: { quand: null }, force: 2, brique: 'interdire_creneau',
       params: { regles: [
         { jour: 'jeudi', periode: 'apres_midi', semaine: 'impaire' },
         { jour: 'lundi', periode: 'apres_midi', semaine: 'paire' },

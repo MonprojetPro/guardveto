@@ -4,6 +4,7 @@
 
 import type {
   VetEngine, SlotGarde, PlanningPartiel, ValidationResult, AttributionGarde, CalendrierResolu,
+  ContrainteEngine, RoleGarde,
 } from '../types'
 import {
   jourDeLaSemaine, estSemaineImpaire, estSemaineImpaireAncrée, estEnVacancesScolaires,
@@ -18,6 +19,36 @@ function invalid(raison: string): ValidationResult {
 
 function ok(warning?: string): ValidationResult {
   return { valid: true, warning }
+}
+
+// ── Routage DUR / MOU des règles configurées (P1-B) ──────
+//
+// Chaque règle de cabinet porte un « étage » (config.force, 0..5) :
+//   0 invariant · 1 reglementaire · 2 jamais   → DUR (blocage)
+//   3 sauf_crise · 4 evitee · 5 si_possible     → MOU (pénalité, ne bloque pas)
+// Les règles STRUCTURELLES (R8/R9/R16-R21, effectifs) restent dures en toutes
+// circonstances — seules les règles CONFIGURÉES par véto (R1/R2/R3/R6) sont
+// routées. Défaut DUR quand l'étage est absent (contraintes legacy sans force)
+// → comportement historique préservé.
+
+/** Étage au-delà duquel une règle configurée devient MOLLE (pénalité). */
+const ETAGE_DUR_MAX = 2
+
+/** Lit l'étage (0..5) d'une contrainte ; 2 (dur) par défaut si absent. */
+function etageDe(c: { config: Record<string, unknown> }): number {
+  const f = c.config?.force
+  return typeof f === 'number' ? f : ETAGE_DUR_MAX
+}
+
+/** Une contrainte d'étage ≤ 2 est appliquée en DUR (bloque). */
+function estDure(c: { config: Record<string, unknown> }): boolean {
+  return etageDe(c) <= ETAGE_DUR_MAX
+}
+
+/** Pénalité souple selon l'étage (plus l'étage est haut, plus c'est faible). */
+const PENALITE_ETAGE: Record<number, number> = { 3: 100, 4: 50, 5: 20 }
+function penaliteEtage(etage: number): number {
+  return PENALITE_ETAGE[etage] ?? 0
 }
 
 /** Recherche l'attribution d'une date+type dans le planning partiel */
@@ -108,54 +139,54 @@ function lireDuoInterditIds(config: Record<string, unknown>): string[] {
  * R1 — Jours de repos fixes
  * Vérifie les contraintes `jour_repos_fixe` actives du vétérinaire.
  */
-function checkR1JourReposFixe(vet: VetEngine, slot: SlotGarde, calendrier?: CalendrierResolu): ValidationResult {
+function violeReposFixe(
+  c: ContrainteEngine, slot: SlotGarde, calendrier?: CalendrierResolu,
+): boolean {
   const jour = jourDeLaSemaine(slot.date)
-  const contraintes = vet.contraintes.filter(
-    (c) => c.actif && c.type === 'jour_repos_fixe'
-  )
+  const cfg = c.config as Record<string, unknown>
 
-  for (const c of contraintes) {
-    const cfg = c.config as Record<string, unknown>
-
-    // Format simple : { jour, flexible_vacances }
-    if (typeof cfg.jour === 'string') {
-      if (cfg.jour !== jour) continue
-
-      // Exception vacances scolaires — deux noms tolérés (V1 flexible_vacances
-      // / V2 exception_vacances_scolaires).
-      const flexibleVac = Boolean(cfg.flexible_vacances ?? cfg.exception_vacances_scolaires)
-      if (flexibleVac && estEnVacancesScolaires(slot.date, calendrier)) continue
-
-      return invalid(
-        `R1 : ${vet.prenom} a un jour de repos fixe le ${jour}`
-      )
-    }
-
-    // Format avec tableau de règles (Anne-Sophie)
-    if (Array.isArray(cfg.regles)) {
-      type Regle = { jour: string; periode?: string; semaine?: string; ancre?: string }
-      for (const regle of cfg.regles as Regle[]) {
-        if (regle.jour !== jour) continue
-
-        if (regle.semaine === 'impaire' || regle.semaine === 'paire') {
-          // Utiliser l'ancre mobile si disponible (F7-001 fix parité ISO 53)
-          let estImpaire: boolean
-          if (regle.ancre && calendrier) {
-            estImpaire = estSemaineImpaireAncrée(slot.date, regle.ancre, calendrier.vacancesScolaires)
-          } else if (regle.ancre) {
-            estImpaire = estSemaineImpaireAncrée(slot.date, regle.ancre, [])
-          } else {
-            estImpaire = estSemaineImpaire(slot.date)
-          }
-          if (regle.semaine === 'impaire' && !estImpaire) continue
-          if (regle.semaine === 'paire' && estImpaire) continue
-        }
-
-        return invalid(`R1 : ${vet.prenom} a un repos fixe le ${jour} cette semaine`)
-      }
-    }
+  // Format simple : { jour, flexible_vacances }
+  if (typeof cfg.jour === 'string') {
+    if (cfg.jour !== jour) return false
+    // Exception vacances scolaires — deux noms tolérés (V1 flexible_vacances
+    // / V2 exception_vacances_scolaires).
+    const flexibleVac = Boolean(cfg.flexible_vacances ?? cfg.exception_vacances_scolaires)
+    if (flexibleVac && estEnVacancesScolaires(slot.date, calendrier)) return false
+    return true
   }
 
+  // Format avec tableau de règles (Anne-Sophie)
+  if (Array.isArray(cfg.regles)) {
+    type Regle = { jour: string; periode?: string; semaine?: string; ancre?: string }
+    for (const regle of cfg.regles as Regle[]) {
+      if (regle.jour !== jour) continue
+      if (regle.semaine === 'impaire' || regle.semaine === 'paire') {
+        // Utiliser l'ancre mobile si disponible (F7-001 fix parité ISO 53)
+        let estImpaire: boolean
+        if (regle.ancre && calendrier) {
+          estImpaire = estSemaineImpaireAncrée(slot.date, regle.ancre, calendrier.vacancesScolaires)
+        } else if (regle.ancre) {
+          estImpaire = estSemaineImpaireAncrée(slot.date, regle.ancre, [])
+        } else {
+          estImpaire = estSemaineImpaire(slot.date)
+        }
+        if (regle.semaine === 'impaire' && !estImpaire) continue
+        if (regle.semaine === 'paire' && estImpaire) continue
+      }
+      return true
+    }
+  }
+  return false
+}
+
+function checkR1JourReposFixe(vet: VetEngine, slot: SlotGarde, calendrier?: CalendrierResolu): ValidationResult {
+  const jour = jourDeLaSemaine(slot.date)
+  for (const c of vet.contraintes) {
+    if (!c.actif || c.type !== 'jour_repos_fixe') continue
+    if (estDure(c) && violeReposFixe(c, slot, calendrier)) {
+      return invalid(`R1 : ${vet.prenom} a un jour de repos fixe le ${jour}`)
+    }
+  }
   return ok()
 }
 
@@ -167,48 +198,46 @@ function checkR1JourReposFixe(vet: VetEngine, slot: SlotGarde, calendrier?: Cale
  * a une `ancre` (date de début de période) — évite le bug semaine ISO 53.
  * Fallback sur `estSemaineImpaire()` (ancienne logique) si le calendrier est absent.
  */
-function checkR2IndispoCyclique(vet: VetEngine, slot: SlotGarde, calendrier?: CalendrierResolu): ValidationResult {
-  const contraintes = vet.contraintes.filter(
-    (c) => c.actif && c.type === 'indisponibilite_cyclique'
-  )
+function violeIndispoCyclique(
+  c: ContrainteEngine, slot: SlotGarde, calendrier?: CalendrierResolu,
+): boolean {
+  const cfg = c.config as Record<string, unknown>
+  const semaines = cfg.semaines as string | undefined
+  const periodes = (cfg.periodes ?? []) as string[]
+  const ancre = cfg.ancre as string | undefined
 
-  for (const c of contraintes) {
-    const cfg = c.config as Record<string, unknown>
-    const semaines = cfg.semaines as string | undefined
-    const periodes = (cfg.periodes ?? []) as string[]
-    const ancre = cfg.ancre as string | undefined
-
-    // Utiliser l'ancre mobile si disponible (F7-001 fix parité ISO 53)
-    // Sinon fallback sur la parité ISO globale (comportement V1)
-    let estImpaire: boolean
-    if (ancre && calendrier) {
-      estImpaire = estSemaineImpaireAncrée(slot.date, ancre, calendrier.vacancesScolaires)
-    } else if (ancre) {
-      // Ancre disponible mais pas de calendrier : ancre fixe sans recalage
-      estImpaire = estSemaineImpaireAncrée(slot.date, ancre, [])
-    } else {
-      // Pas d'ancre : fallback V1 (parité ISO globale)
-      estImpaire = estSemaineImpaire(slot.date)
-    }
-
-    const concerneCetteSemaine =
-      semaines === 'toutes' ||
-      (semaines === 'impaires' && estImpaire) ||
-      (semaines === 'paires' && !estImpaire)
-
-    if (!concerneCetteSemaine) continue
-
-    const estSoir = slot.type === 'semaine_soir' || slot.type === 'vendredi_soir'
-    const estWe = slot.type === 'weekend'
-
-    if (periodes.includes('soir_semaine') && estSoir) {
-      return invalid(`R2 : ${vet.prenom} est indisponible les soirs de semaine ${semaines}s`)
-    }
-    if (periodes.includes('weekend') && estWe) {
-      return invalid(`R2 : ${vet.prenom} est indisponible les weekends ${semaines}s`)
-    }
+  // Utiliser l'ancre mobile si disponible (F7-001 fix parité ISO 53)
+  // Sinon fallback sur la parité ISO globale (comportement V1)
+  let estImpaire: boolean
+  if (ancre && calendrier) {
+    estImpaire = estSemaineImpaireAncrée(slot.date, ancre, calendrier.vacancesScolaires)
+  } else if (ancre) {
+    estImpaire = estSemaineImpaireAncrée(slot.date, ancre, [])
+  } else {
+    estImpaire = estSemaineImpaire(slot.date)
   }
 
+  const concerneCetteSemaine =
+    semaines === 'toutes' ||
+    (semaines === 'impaires' && estImpaire) ||
+    (semaines === 'paires' && !estImpaire)
+  if (!concerneCetteSemaine) return false
+
+  const estSoir = slot.type === 'semaine_soir' || slot.type === 'vendredi_soir'
+  const estWe = slot.type === 'weekend'
+  if (periodes.includes('soir_semaine') && estSoir) return true
+  if (periodes.includes('weekend') && estWe) return true
+  return false
+}
+
+function checkR2IndispoCyclique(vet: VetEngine, slot: SlotGarde, calendrier?: CalendrierResolu): ValidationResult {
+  for (const c of vet.contraintes) {
+    if (!c.actif || c.type !== 'indisponibilite_cyclique') continue
+    if (estDure(c) && violeIndispoCyclique(c, slot, calendrier)) {
+      const semaines = (c.config as Record<string, unknown>).semaines as string | undefined
+      return invalid(`R2 : ${vet.prenom} est indisponible ${semaines}s`)
+    }
+  }
   return ok()
 }
 
@@ -216,79 +245,81 @@ function checkR2IndispoCyclique(vet: VetEngine, slot: SlotGarde, calendrier?: Ca
  * R3 — Repos conditionnel (si garde WE → jour A, sinon jour B)
  * Ex : Jean repos vendredi, SAUF si garde WE → mardi
  */
+function violeReposConditionnel(
+  c: ContrainteEngine, vet: VetEngine, slot: SlotGarde, planning: PlanningPartiel,
+): boolean {
+  const jour = jourDeLaSemaine(slot.date)
+  const cfg = c.config as Record<string, unknown>
+  const siGardeWe = cfg.si_garde_we as string | undefined
+  const sinon = cfg.sinon as string | undefined
+
+  // vendredi_soir EST une garde WE par définition (R9 lie ven soir + sam).
+  // Si on évalue vendredi_soir, le samedi n'est pas encore planifié →
+  // on considère gardeWe = true pour éviter de bloquer à tort.
+  const gardeWe = slot.type === 'vendredi_soir'
+    ? true
+    : aGardeWeekendCetteSemaine(vet.id, slot.date, planning)
+
+  if (gardeWe && siGardeWe === jour) return true
+  if (!gardeWe && sinon === jour) return true
+  return false
+}
+
 function checkR3ReposConditionnel(
   vet: VetEngine,
   slot: SlotGarde,
   planning: PlanningPartiel
 ): ValidationResult {
   const jour = jourDeLaSemaine(slot.date)
-  const contraintes = vet.contraintes.filter(
-    (c) => c.actif && c.type === 'jour_repos_conditionnel'
-  )
-
-  for (const c of contraintes) {
-    const cfg = c.config as Record<string, unknown>
-    const siGardeWe = cfg.si_garde_we as string | undefined
-    const sinon = cfg.sinon as string | undefined
-
-    // vendredi_soir EST une garde WE par définition (R9 lie ven soir + sam).
-    // Si on évalue vendredi_soir, le samedi n'est pas encore planifié →
-    // on considère gardeWe = true pour éviter de bloquer à tort.
-    const gardeWe = slot.type === 'vendredi_soir'
-      ? true
-      : aGardeWeekendCetteSemaine(vet.id, slot.date, planning)
-
-    if (gardeWe && siGardeWe === jour) {
-      return invalid(`R3/R5 : ${vet.prenom} est en repos le ${jour} (garde WE cette semaine)`)
-    }
-    if (!gardeWe && sinon === jour) {
-      return invalid(`R3/R5 : ${vet.prenom} est en repos le ${jour} (pas de garde WE cette semaine)`)
+  for (const c of vet.contraintes) {
+    if (!c.actif || c.type !== 'jour_repos_conditionnel') continue
+    if (estDure(c) && violeReposConditionnel(c, vet, slot, planning)) {
+      return invalid(`R3/R5 : ${vet.prenom} est en repos le ${jour}`)
     }
   }
-
   return ok()
 }
 
 /**
  * R6 — Jamais Manon + Antoine seuls (duo_interdit)
  */
+/** Renvoie l'id du partenaire interdit déjà présent sur ce slot, sinon null. */
+function violeDuoInterdit(
+  c: ContrainteEngine, slot: SlotGarde, planning: PlanningPartiel,
+): string | null {
+  // Lecture du/des partenaire(s) interdit(s) — tolère 3 formes de config :
+  //   • V1 legacy  : { avec_veterinaire_id: 'uuid' }
+  //   • V2 brique   : { brique:'duo_interdit', force:2, params:{ avec_veterinaire_id:'uuid' } }
+  //   • V2 n-aire    : axes.qui = 'uuid' | ['uuid', …]   (forme future)
+  const autresIds = lireDuoInterditIds(c.config as Record<string, unknown>)
+  if (autresIds.length === 0) return null
+
+  const attr = getAttribution(planning, slot.date, slot.type)
+  if (!attr) return null
+
+  for (const autreId of autresIds) {
+    if (attr.premier_id === autreId || attr.second_id === autreId) return autreId
+  }
+  return null
+}
+
 function checkR6DuoInterdit(
   vet: VetEngine,
   slot: SlotGarde,
   planning: PlanningPartiel,
   allVets: VetEngine[]
 ): ValidationResult {
-  const contraintes = vet.contraintes.filter(
-    (c) => c.actif && c.type === 'duo_interdit'
-  )
-
-  for (const c of contraintes) {
-    // Lecture du/des partenaire(s) interdit(s) — tolère 3 formes de config :
-    //   • V1 legacy  : { avec_veterinaire_id: 'uuid' }
-    //   • V2 brique   : { brique:'duo_interdit', force:2, params:{ avec_veterinaire_id:'uuid' } }
-    //   • V2 n-aire    : axes.qui = 'uuid' | ['uuid', …]   (forme future)
-    // BUG HISTORIQUE (2026-06) : la migration V2 (20260616170001) a déplacé
-    // `avec_veterinaire_id` dans `params`, mais le lecteur ne regardait que le
-    // top-level → R6 ne se déclenchait plus → Antoine+Manon en binôme WE.
-    const autresIds = lireDuoInterditIds(c.config as Record<string, unknown>)
-    if (autresIds.length === 0) continue
-
-    // Vérifie si l'un des partenaires interdits est déjà assigné à ce slot
-    const attr = getAttribution(planning, slot.date, slot.type)
-    if (!attr) continue
-
-    for (const autreId of autresIds) {
-      const autreDejaAssigne = attr.premier_id === autreId || attr.second_id === autreId
-      if (!autreDejaAssigne) continue
-
-      // Pour un slot à 2 places, si l'autre est déjà là → c'est leur duo → interdit
+  for (const c of vet.contraintes) {
+    if (!c.actif || c.type !== 'duo_interdit') continue
+    if (!estDure(c)) continue
+    const autreId = violeDuoInterdit(c, slot, planning)
+    if (autreId) {
       const autreVet = allVets.find((v) => v.id === autreId)
       return invalid(
         `R6 : ${vet.prenom} et ${autreVet?.prenom ?? '?'} ne peuvent pas être en duo seuls`
       )
     }
   }
-
   return ok()
 }
 
@@ -451,6 +482,42 @@ function checkR21RolesDistincts(
     return invalid(`R21 : ${vet.prenom} est déjà 2nd de garde ce créneau — le 1er et le 2nd doivent être deux vétérinaires différents`)
   }
   return ok()
+}
+
+// ── Volet MOU des règles configurées (P1-B) ──────────────
+
+/**
+ * penaliteContraintesConfig — pénalité souple des règles CONFIGURÉES d'étage ≥ 3
+ * (sauf_crise / evitee / si_possible) que ce candidat violerait. Les règles
+ * d'étage ≤ 2 ne sont PAS comptées ici (elles bloquent en dur via isValid).
+ * Le moteur préfère donc les éviter, sans jamais les rendre obligatoires.
+ *
+ * @returns somme des pénalités (0 = aucune règle molle violée)
+ */
+export function penaliteContraintesConfig(
+  slot: SlotGarde,
+  vet: VetEngine,
+  _role: RoleGarde,
+  planning: PlanningPartiel,
+  calendrier?: CalendrierResolu,
+): number {
+  let pen = 0
+  for (const c of vet.contraintes) {
+    if (!c.actif || estDure(c)) continue // dur → géré par isValid
+    let viole = false
+    switch (c.type) {
+      case 'jour_repos_fixe':
+        viole = violeReposFixe(c, slot, calendrier); break
+      case 'indisponibilite_cyclique':
+        viole = violeIndispoCyclique(c, slot, calendrier); break
+      case 'jour_repos_conditionnel':
+        viole = violeReposConditionnel(c, vet, slot, planning); break
+      case 'duo_interdit':
+        viole = violeDuoInterdit(c, slot, planning) !== null; break
+    }
+    if (viole) pen += penaliteEtage(etageDe(c))
+  }
+  return pen
 }
 
 // ── Point d'entrée principal ─────────────────────────────

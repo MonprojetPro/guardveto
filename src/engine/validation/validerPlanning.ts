@@ -365,6 +365,13 @@ export function validerPlanning(
         if (!c.actif) continue
         const cfg = c.config as Record<string, unknown>
 
+        // P1-B — DUR / MOU : seules les règles configurées d'étage ≤ 2 sont des
+        // violations DURES. Une règle molle (≥ 3 : sauf_crise/evitee/si_possible)
+        // est une PRÉFÉRENCE — le moteur a le droit de ne pas l'honorer faute de
+        // choix → on ne la compte pas comme violation (cohérent avec isValid).
+        const etage = typeof cfg.force === 'number' ? (cfg.force as number) : 2
+        if (etage > 2) continue
+
         // ── R1 — jour de repos fixe ──
         if (c.type === 'jour_repos_fixe') {
           // Forme simple { jour, flexible_vacances }

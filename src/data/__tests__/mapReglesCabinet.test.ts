@@ -114,9 +114,11 @@ describe('mapperReglesCabinet — équivalence avec le snapshot pilote', () => {
 
   it('trie chaque véto par (étage, brique, id) — tri stable E3', () => {
     const { contraintesParVet } = mapperReglesCabinet(reglesRows, BRIQUES_CONNUES)
-    // Anne-Sophie a 2 contraintes : alternance(force3) doit précéder interdire_creneau(force4).
+    // Anne-Sophie a 2 contraintes au même étage (2, dur depuis P1-B) → départage
+    // par brique_id : 'alternance_ancre' avant 'interdire_creneau'.
     const cs = contraintesParVet.get(VET.anneSophie) ?? []
-    expect(cs.map((c) => c.config.force)).toEqual([3, 4])
+    expect(cs.map((c) => c.config.brique)).toEqual(['alternance_ancre', 'interdire_creneau'])
+    expect(cs.map((c) => c.config.force)).toEqual([2, 2])
   })
 })
 
