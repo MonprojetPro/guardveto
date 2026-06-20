@@ -296,6 +296,21 @@ export async function chargerInputDepuisSupabase(
     ? await chargerCalendrierZone(cabinetId, periode.date_debut, periode.date_fin)
     : undefined
 
+  // Effectif configurable (colonne ajoutée par la migration P1-B effectif).
+  // Lecture en BEST-EFFORT séparée : si la colonne n'existe pas encore (déploiement
+  // avant migration), l'erreur est ignorée → undefined → le solver retombe sur la
+  // saison (hiver = 2, été = 1). Aucune contrainte d'ordre de déploiement.
+  let nbVetosSemaineSoir: number | undefined
+  {
+    const { data: eff } = await supabase
+      .from('periodes')
+      .select('nb_vetos_semaine_soir')
+      .eq('id', periodeId)
+      .single()
+    const v = (eff as { nb_vetos_semaine_soir?: number } | null)?.nb_vetos_semaine_soir
+    if (typeof v === 'number') nbVetosSemaineSoir = v
+  }
+
   return {
     dateDebut: periode.date_debut,
     dateFin: periode.date_fin,
@@ -303,5 +318,6 @@ export async function chargerInputDepuisSupabase(
     vets,
     bonusMalus,
     calendrier,
+    nbVetosSemaineSoir,
   }
 }

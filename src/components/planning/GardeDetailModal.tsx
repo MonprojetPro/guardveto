@@ -349,7 +349,11 @@ export function GardeDetailModal({ garde, date, isAdmin, onClose, onSaved }: Gar
     await performSave()
   }
 
-  const masquerSecond = data?.garde.saison === 'ete' && data?.garde.type === 'semaine'
+  // Effectif configurable : on masque le 2nd seulement si la nuit de semaine est
+  // à 1 véto (repli saison été) ET qu'aucun 2nd n'a été généré. Si un 2nd existe
+  // (période avec effectif semaine forcé à 2), on l'affiche même en été.
+  const masquerSecond =
+    data?.garde.saison === 'ete' && data?.garde.type === 'semaine' && !data?.garde.second_id
   const estVerrouille = data?.garde.verrouille ?? false
   const modeEdition = isAdmin && (!estVerrouille || correctionMode)
 

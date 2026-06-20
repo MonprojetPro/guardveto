@@ -53,6 +53,17 @@ export interface SolverInput {
   lnsTimeoutMs?: number
   /** Données calendaires résolues depuis Supabase. Fallback sur les listes en dur si absent. */
   calendrier?: CalendrierResolu
+  /**
+   * Effectif configurable : nombre de vétos la nuit en semaine (1 ou 2).
+   * Absent → repli sur la saison (hiver = 2, été = 1) — comportement historique.
+   * Les vendredi_soir et week-ends restent toujours à 2.
+   */
+  nbVetosSemaineSoir?: number
+}
+
+/** Effectif semaine effectif : config si fournie, sinon repli saison (hiver 2 / été 1). */
+function effectifSemaine(saison: Saison, nbVetosSemaineSoir?: number): number {
+  return nbVetosSemaineSoir ?? (saison === 'hiver' ? 2 : 1)
 }
 
 export interface JourNonCouvert {
@@ -85,6 +96,8 @@ interface SolverStep {
   type: TypeGardeEngine
   saison: Saison
   role: RoleGarde
+  /** Ce créneau a-t-il besoin d'un 2nd ? (propagé au SlotGarde pour R17/R18). */
+  besoinSecond: boolean
 }
 
 // ── Génération des créneaux ──────────────────────────────
@@ -99,9 +112,12 @@ interface SolverStep {
  * vendredi et WE, R3/R5 conditionne les repos de semaine sur le WE).
  * Les traiter en premier maximise l'élagage précoce du backtracking.
  */
-function genererSteps(dateDebut: string, dateFin: string, saison: Saison): SolverStep[] {
+function genererSteps(
+  dateDebut: string, dateFin: string, saison: Saison, nbVetosSemaineSoir?: number,
+): SolverStep[] {
   const weSteps: SolverStep[] = []
   const semaineSteps: SolverStep[] = []
+  const besoinSecondSemaine = effectifSemaine(saison, nbVetosSemaineSoir) >= 2
 
   let current = dateDebut
   while (current <= dateFin) {
@@ -109,18 +125,17 @@ function genererSteps(dateDebut: string, dateFin: string, saison: Saison): Solve
 
     if (idx === 5) {
       // Vendredi → vendredi_soir (toujours 2 de garde)
-      weSteps.push({ date: current, type: 'vendredi_soir', saison, role: 'premier' })
-      weSteps.push({ date: current, type: 'vendredi_soir', saison, role: 'second' })
+      weSteps.push({ date: current, type: 'vendredi_soir', saison, role: 'premier', besoinSecond: true })
+      weSteps.push({ date: current, type: 'vendredi_soir', saison, role: 'second', besoinSecond: true })
     } else if (idx === 6) {
       // Samedi → weekend (toujours 2 de garde)
-      weSteps.push({ date: current, type: 'weekend', saison, role: 'premier' })
-      weSteps.push({ date: current, type: 'weekend', saison, role: 'second' })
+      weSteps.push({ date: current, type: 'weekend', saison, role: 'premier', besoinSecond: true })
+      weSteps.push({ date: current, type: 'weekend', saison, role: 'second', besoinSecond: true })
     } else if (idx >= 1 && idx <= 4) {
-      // Lundi à Jeudi → semaine_soir
-      semaineSteps.push({ date: current, type: 'semaine_soir', saison, role: 'premier' })
-      // En hiver : 2 de garde (1er + 2nd). En été : 1 seul (R17).
-      if (saison === 'hiver') {
-        semaineSteps.push({ date: current, type: 'semaine_soir', saison, role: 'second' })
+      // Lundi à Jeudi → semaine_soir. Effectif configurable : 2 (1er+2nd) ou 1 (1er seul).
+      semaineSteps.push({ date: current, type: 'semaine_soir', saison, role: 'premier', besoinSecond: besoinSecondSemaine })
+      if (besoinSecondSemaine) {
+        semaineSteps.push({ date: current, type: 'semaine_soir', saison, role: 'second', besoinSecond: true })
       }
     }
     // Dimanche : couvert par le weekend du samedi → aucun slot propre
@@ -266,7 +281,7 @@ function backtrack(
   if (index > deepest.value) deepest.value = index
 
   const step = steps[index]
-  const slot: SlotGarde = { date: step.date, type: step.type, saison: step.saison }
+  const slot: SlotGarde = { date: step.date, type: step.type, saison: step.saison, besoinSecond: step.besoinSecond }
 
   // Candidats valides (contraintes dures) triés par score (équité + pénalités)
   const candidates = vets
@@ -298,7 +313,7 @@ function genererSeedGreedy(input: SolverInput): SolveResult {
   const { dateDebut, dateFin, saison, vets, bonusMalus, calendrier } = input
   const t0 = Date.now()
 
-  const steps = genererSteps(dateDebut, dateFin, saison)
+  const steps = genererSteps(dateDebut, dateFin, saison, input.nbVetosSemaineSoir)
   const deepest = { value: -1 }
 
   const planning = backtrack(
@@ -322,7 +337,7 @@ function genererSeedGreedy(input: SolverInput): SolveResult {
   const joursNonCouverts: JourNonCouvert[] = steps.slice(indexImpasse).map((s) => {
     let contrainteBloquante: string | undefined
     if (s === steps[indexImpasse]) {
-      const slot: SlotGarde = { date: s.date, type: s.type, saison: s.saison }
+      const slot: SlotGarde = { date: s.date, type: s.type, saison: s.saison, besoinSecond: s.besoinSecond }
       const premierKo = vets
         .map((v) => isValid(slot, v, s.role, vets, { attributions: [] }))
         .find((r) => !r.valid)
@@ -364,23 +379,24 @@ function supprimerSemaine(planning: PlanningPartiel, lundi: string): PlanningPar
 }
 
 /** Génère les étapes (steps) d'une semaine donnée (lundi → dimanche inclus). */
-function genererStepsSemaine(lundi: string, saison: Saison): SolverStep[] {
+function genererStepsSemaine(lundi: string, saison: Saison, nbVetosSemaineSoir?: number): SolverStep[] {
   const weSteps: SolverStep[] = []
   const semaineSteps: SolverStep[] = []
+  const besoinSecondSemaine = effectifSemaine(saison, nbVetosSemaineSoir) >= 2
 
   for (let i = 0; i <= 6; i++) {
     const date = addDays(lundi, i)
     const idx = jourIndex(date)
     if (idx === 5) {
-      weSteps.push({ date, type: 'vendredi_soir', saison, role: 'premier' })
-      weSteps.push({ date, type: 'vendredi_soir', saison, role: 'second' })
+      weSteps.push({ date, type: 'vendredi_soir', saison, role: 'premier', besoinSecond: true })
+      weSteps.push({ date, type: 'vendredi_soir', saison, role: 'second', besoinSecond: true })
     } else if (idx === 6) {
-      weSteps.push({ date, type: 'weekend', saison, role: 'premier' })
-      weSteps.push({ date, type: 'weekend', saison, role: 'second' })
+      weSteps.push({ date, type: 'weekend', saison, role: 'premier', besoinSecond: true })
+      weSteps.push({ date, type: 'weekend', saison, role: 'second', besoinSecond: true })
     } else if (idx >= 1 && idx <= 4) {
-      semaineSteps.push({ date, type: 'semaine_soir', saison, role: 'premier' })
-      if (saison === 'hiver') {
-        semaineSteps.push({ date, type: 'semaine_soir', saison, role: 'second' })
+      semaineSteps.push({ date, type: 'semaine_soir', saison, role: 'premier', besoinSecond: besoinSecondSemaine })
+      if (besoinSecondSemaine) {
+        semaineSteps.push({ date, type: 'semaine_soir', saison, role: 'second', besoinSecond: true })
       }
     }
     // Dimanche : couvert par le WE du samedi
@@ -450,7 +466,7 @@ function repairerSemaine(
   let planning = partialPlanning
 
   for (const step of steps) {
-    const slot: SlotGarde = { date: step.date, type: step.type, saison: step.saison }
+    const slot: SlotGarde = { date: step.date, type: step.type, saison: step.saison, besoinSecond: step.besoinSecond }
     const valids = vets.filter((v) => isValid(slot, v, step.role, vets, planning, calendrier).valid)
 
     if (valids.length === 0) return null
@@ -560,7 +576,7 @@ function lnsHillClimbing(
 
       // Détruire : supprimer la semaine
       const partial = supprimerSemaine(meilleur, lundi)
-      const steps = genererStepsSemaine(lundi, saison).filter(
+      const steps = genererStepsSemaine(lundi, saison, input.nbVetosSemaineSoir).filter(
         (s) => s.date >= dateDebut && s.date <= dateFin
       )
       if (steps.length === 0) continue

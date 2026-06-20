@@ -418,22 +418,31 @@ function checkR16Conge(vet: VetEngine, slot: SlotGarde): ValidationResult {
 }
 
 /**
- * R17 — Été : 1 seul de garde la nuit en semaine
- * En été, seul le "premier" existe pour les gardes de semaine.
+ * Effectif d'un créneau semaine_soir : besoin d'un 2nd ?
+ * Configurable (slot.besoinSecond) ; repli historique sur la saison (hiver = 2,
+ * été = 1) quand l'effectif n'est pas porté par le slot (contraintes legacy).
+ */
+function semaineBesoinSecond(slot: SlotGarde): boolean {
+  return slot.besoinSecond ?? (slot.saison === 'hiver')
+}
+
+/**
+ * R17 — Effectif semaine : pas de 2nd quand le créneau n'en a pas besoin.
+ * (Historiquement « été = 1 seul » ; désormais piloté par l'effectif configurable.)
  */
 function checkR17Ete(slot: SlotGarde, roleVisé: 'premier' | 'second'): ValidationResult {
-  if (slot.type === 'semaine_soir' && slot.saison === 'ete' && roleVisé === 'second') {
-    return invalid('R17 : En été, une seule garde de nuit en semaine (pas de 2nd)')
+  if (slot.type === 'semaine_soir' && roleVisé === 'second' && !semaineBesoinSecond(slot)) {
+    return invalid('R17 : une seule garde de nuit en semaine sur ce créneau (pas de 2nd)')
   }
   return ok()
 }
 
 /**
- * R18 — Hiver : 2 de garde la nuit en semaine (1er + 2nd)
- * En hiver, les deux rôles doivent être pourvus.
+ * R18 — Effectif semaine à 2 : le 1er doit être désigné avant le 2nd.
+ * (Historiquement « hiver = 2 » ; désormais piloté par l'effectif configurable.)
  */
 function checkR18Hiver(slot: SlotGarde, roleVisé: 'premier' | 'second', planning: PlanningPartiel): ValidationResult {
-  if (slot.type !== 'semaine_soir' || slot.saison !== 'hiver') return ok()
+  if (slot.type !== 'semaine_soir' || !semaineBesoinSecond(slot)) return ok()
 
   const attr = getAttribution(planning, slot.date, slot.type)
   // Si on assigne le 2nd mais qu'il n'y a pas de 1er → invalide

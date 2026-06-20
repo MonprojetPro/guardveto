@@ -43,6 +43,8 @@ export interface ValidationInput {
   saison: 'ete' | 'hiver'
   vets: VetEngine[]
   calendrier?: CalendrierResolu
+  /** Effectif configurable (1 ou 2 vétos la nuit en semaine). Absent → repli saison. */
+  nbVetosSemaineSoir?: number
 }
 
 // ── Une violation détectée ───────────────────────────────
@@ -224,10 +226,12 @@ function slotsAttendus(input: ValidationInput): SlotAttendu[] {
     } else if (idx === 6) {
       slots.push({ date: cur, type: 'weekend', besoinSecond: true })
     } else if (idx >= 1 && idx <= 4) {
+      // Effectif configurable : besoin d'un 2nd si nb >= 2 ; repli saison sinon.
+      const nb = input.nbVetosSemaineSoir ?? (input.saison === 'hiver' ? 2 : 1)
       slots.push({
         date: cur,
         type: 'semaine_soir',
-        besoinSecond: input.saison === 'hiver',
+        besoinSecond: nb >= 2,
       })
     }
     cur = plusJours(cur, 1)

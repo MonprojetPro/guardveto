@@ -7,7 +7,13 @@ import { redirect } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { CreerPeriodeDialog } from '@/components/admin/CreerPeriodeDialog'
 import { SupprimerPeriodeButton } from '@/components/admin/SupprimerPeriodeButton'
+import { EffectifPeriodeSelect } from '@/components/admin/EffectifPeriodeSelect'
 import type { Periode } from '@/types'
+
+/** Effectif effectif d'une période : explicite si réglé, sinon repli saison. */
+function effectifDe(p: Periode): number {
+  return p.nb_vetos_semaine_soir ?? (p.saison === 'hiver' ? 2 : 1)
+}
 
 function formatDate(d: string) {
   return new Date(d + 'T12:00:00Z').toLocaleDateString('fr-FR', {
@@ -83,6 +89,7 @@ export default async function PeriodesPage() {
               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Début</th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Fin</th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Durée</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Effectif semaine</th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Statut</th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Publié le</th>
               <th className="px-4 py-3" />
@@ -99,6 +106,13 @@ export default async function PeriodesPage() {
                   <td className="px-4 py-3">{formatDate(p.date_debut)}</td>
                   <td className="px-4 py-3">{formatDate(p.date_fin)}</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{Math.round(nbJours / 7)} sem.</td>
+                  <td className="px-4 py-3">
+                    <EffectifPeriodeSelect
+                      periodeId={p.id}
+                      valeur={effectifDe(p)}
+                      disabled={p.statut === 'verrouille'}
+                    />
+                  </td>
                   <td className="px-4 py-3"><StatutBadge statut={p.statut} /></td>
                   <td className="px-4 py-3 text-muted-foreground">
                     {p.publie_at ? formatDate(p.publie_at) : '—'}
@@ -113,7 +127,7 @@ export default async function PeriodesPage() {
             })}
             {liste.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
                   Aucune période créée.
                 </td>
               </tr>

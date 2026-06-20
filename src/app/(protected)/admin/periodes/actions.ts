@@ -67,6 +67,25 @@ export async function creerPeriode(formData: FormData) {
   return { success: true }
 }
 
+/**
+ * Règle l'effectif de garde la nuit en semaine (1 ou 2 vétos) pour une période.
+ * RLS periodes (write admin-only) sécurise l'écriture. S'applique à la PROCHAINE
+ * génération du planning de la période.
+ */
+export async function setEffectifPeriode(periodeId: string, nb: number) {
+  if (nb !== 1 && nb !== 2) return { error: 'Effectif invalide (1 ou 2).' }
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('periodes')
+    .update({ nb_vetos_semaine_soir: nb })
+    .eq('id', periodeId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/periodes')
+  return { success: true }
+}
+
 export async function supprimerPeriode(periodeId: string) {
   const supabase = await createClient()
 

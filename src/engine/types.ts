@@ -37,6 +37,13 @@ export interface SlotGarde {
   date: string        // ISO yyyy-MM-dd (lundi pour semaine, samedi pour WE)
   type: TypeGardeEngine
   saison: Saison
+  /**
+   * Effectif configurable (P1-B/structurelles) : ce créneau a-t-il besoin d'un 2nd ?
+   * Décide l'effectif INDÉPENDAMMENT de la saison (effectif réglable par cabinet).
+   * Absent (legacy) → repli sur la saison (hiver = 2, été = 1) pour les semaine_soir ;
+   * les vendredi_soir / weekend ont toujours besoin d'un 2nd.
+   */
+  besoinSecond?: boolean
 }
 
 // Une attribution dans le planning en cours de construction

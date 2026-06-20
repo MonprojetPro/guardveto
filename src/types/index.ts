@@ -36,6 +36,8 @@ export interface Periode {
   statut: StatutPeriode
   publie_at: string | null
   created_at: string
+  /** Effectif configurable la nuit en semaine (1 ou 2). NULL/absent → repli saison. */
+  nb_vetos_semaine_soir?: number | null
 }
 
 export interface Garde {
