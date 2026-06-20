@@ -90,8 +90,9 @@ export const DIMENSION_EQUITE_LABELS: Record<string, string> = {
   grands_weekend: 'les grands week-ends (salariés)',
 }
 
-/** Adjectif d'importance (les 4 crans nommés). Exporté pour l'écran. */
+/** Adjectif d'importance (les crans nommés). Exporté pour l'écran. */
 export const IMPORTANCE_LABELS: Record<string, string> = {
+  ignoree: 'ignorée',
   peu_important: 'faible',
   normal: 'normale',
   important: 'importante',

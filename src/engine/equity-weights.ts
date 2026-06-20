@@ -52,8 +52,10 @@ export const DEFAULT_EQUITY_WEIGHTS: EquityWeights = {
 // Ce bloc est la SOURCE UNIQUE partagée par : le loader (extraction des poids),
 // l'écran /regles (libellés + défauts) et les tests. Pas de React ici.
 
-/** Les 4 crans d'importance, du plus faible au plus fort (ordre signifiant). */
+/** Les crans d'importance, du plus faible au plus fort (ordre signifiant).
+ *  `ignoree` (poids 0) = la dimension n'est PAS équilibrée du tout (= désactiver). */
 export const IMPORTANCE_LEVELS = [
+  'ignoree',
   'peu_important',
   'normal',
   'important',
@@ -63,6 +65,7 @@ export type ImportanceLevel = (typeof IMPORTANCE_LEVELS)[number]
 
 /** Cran nommé → poids moteur. Choisi pour retomber sur les défauts historiques. */
 export const IMPORTANCE_TO_WEIGHT: Record<ImportanceLevel, number> = {
+  ignoree: 0,
   peu_important: 10,
   normal: 30,
   important: 60,

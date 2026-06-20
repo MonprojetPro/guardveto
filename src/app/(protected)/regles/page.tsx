@@ -17,11 +17,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { ReglesClient, type RegleRow, type VetoMini } from '@/components/regles/ReglesClient'
-import { EquilibrageClient } from '@/components/regles/EquilibrageClient'
 import {
-  StructureWeekendClient,
+  ReglagesPlanningClient,
   type StructureRegleUI,
-} from '@/components/regles/StructureWeekendClient'
+} from '@/components/regles/ReglagesPlanningClient'
 import {
   EQUITY_DIMENSIONS,
   DEFAULT_IMPORTANCE,
@@ -78,8 +77,8 @@ export default async function ReglesPage() {
 
   // Config courante R8/R9 (règle posée, sinon défaut Ferme + active).
   const structureConfig = {
-    r9: resoudreStructure(toutesRegles, BRIQUE_LIAISON),
-    r8: resoudreStructure(toutesRegles, BRIQUE_INVERSION),
+    liaison_creneaux: resoudreStructure(toutesRegles, BRIQUE_LIAISON),
+    inversion_role: resoudreStructure(toutesRegles, BRIQUE_INVERSION),
   }
 
   // Importance courante par dimension : règle posée si elle existe, sinon défaut.
@@ -101,8 +100,11 @@ export default async function ReglesPage() {
         vets={(vets as VetoMini[]) ?? []}
         isAdmin={isAdmin}
       />
-      <EquilibrageClient importances={importances} isAdmin={isAdmin} />
-      <StructureWeekendClient config={structureConfig} isAdmin={isAdmin} />
+      <ReglagesPlanningClient
+        equite={importances}
+        structure={structureConfig}
+        isAdmin={isAdmin}
+      />
     </div>
   )
 }
