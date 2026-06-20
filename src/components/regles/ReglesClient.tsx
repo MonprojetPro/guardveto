@@ -22,6 +22,12 @@ import {
 } from '@/components/ui/dialog'
 import { rendreRegle } from '@/engine/briques/catalogue'
 import { setRegleActif, deleteRegle } from '@/app/(protected)/regles/actions'
+import { RegleFormDialog } from './RegleFormDialog'
+
+/** Briques que le formulaire P1A-007 sait éditer (= évaluables par le moteur). */
+const BRIQUES_EDITABLES = new Set([
+  'interdire_creneau', 'repos_conditionnel', 'alternance_ancre', 'duo_interdit',
+])
 
 // ── Données ──────────────────────────────────────────────────
 
@@ -96,6 +102,8 @@ export function ReglesClient({ regles, vets, isAdmin }: ReglesClientProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [aSupprimer, setASupprimer] = useState<RegleRow | null>(null)
+  const [formOuvert, setFormOuvert] = useState(false)
+  const [aEditer, setAEditer] = useState<RegleRow | null>(null)
 
   const nomVeto = (id: string) => {
     const v = vets.find((x) => x.id === id)
@@ -105,8 +113,19 @@ export function ReglesClient({ regles, vets, isAdmin }: ReglesClientProps) {
   const actives = regles.filter((r) => r.actif)
   const inactives = regles.filter((r) => !r.actif)
 
-  const bientot = () =>
-    toast.info('Le formulaire de création/édition arrive à la prochaine étape (P1A-007).')
+  const ouvrirCreation = () => {
+    setAEditer(null)
+    setFormOuvert(true)
+  }
+
+  const ouvrirEdition = (regle: RegleRow) => {
+    if (!BRIQUES_EDITABLES.has(regle.brique_id)) {
+      toast.info("Ce type de règle n'est pas encore éditable depuis le formulaire.")
+      return
+    }
+    setAEditer(regle)
+    setFormOuvert(true)
+  }
 
   const onToggle = (regle: RegleRow) => {
     startTransition(async () => {
@@ -161,8 +180,8 @@ export function ReglesClient({ regles, vets, isAdmin }: ReglesClientProps) {
             <Button
               variant="ghost" size="icon"
               className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              onClick={bientot}
-              title="Éditer (bientôt)"
+              onClick={() => ouvrirEdition(regle)}
+              title="Éditer"
             >
               <Pencil className="w-3.5 h-3.5" />
             </Button>
@@ -217,7 +236,7 @@ export function ReglesClient({ regles, vets, isAdmin }: ReglesClientProps) {
             </p>
           </div>
           {isAdmin && (
-            <Button onClick={bientot} className="shrink-0">
+            <Button onClick={ouvrirCreation} className="shrink-0">
               <Plus className="w-4 h-4 mr-1" /> Nouvelle règle
             </Button>
           )}
@@ -287,6 +306,16 @@ export function ReglesClient({ regles, vets, isAdmin }: ReglesClientProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Formulaire guidé création / édition (P1A-007) */}
+      {isAdmin && formOuvert && (
+        <RegleFormDialog
+          open={formOuvert}
+          onClose={() => setFormOuvert(false)}
+          vets={vets}
+          regle={aEditer}
+        />
+      )}
     </>
   )
 }
