@@ -37,6 +37,7 @@ import { isValid } from './rules/hard-constraints'
 import { penalite } from './rules/soft-constraints'
 import { compterParVet } from './rules/optimization'
 import { comparerScores, scorerPlanning, type VecteurScore, type BonusMalusMap } from './score-lexicographique'
+import { DEFAULT_EQUITY_WEIGHTS } from './equity-weights'
 
 // ── Types publics ────────────────────────────────────────
 
@@ -405,13 +406,16 @@ function genererStepsSemaine(lundi: string, saison: Saison, nbVetosSemaineSoir?:
   return [...weSteps, ...semaineSteps]
 }
 
-/** Scoring LNS — indépendant du bonusMalus (optim intra-période). */
+/**
+ * Scoring LNS — indépendant du bonusMalus (optim intra-période).
+ * Poids mutualisés avec le scoreur global via equity-weights.ts (source unique).
+ */
 const POIDS_LNS = {
-  WE_GARDE: 100,
-  WE_PREMIER_ROLE: 25,
-  FERIES: 60,
-  SEMAINE_PREMIER: 30,
-  SEMAINE_SECOND: 10,
+  WE_GARDE: DEFAULT_EQUITY_WEIGHTS.WE_GARDE,
+  WE_PREMIER_ROLE: DEFAULT_EQUITY_WEIGHTS.WE_PREMIER_ROLE,
+  FERIES: DEFAULT_EQUITY_WEIGHTS.FERIES,
+  SEMAINE_PREMIER: DEFAULT_EQUITY_WEIGHTS.SEMAINE_PREMIER,
+  SEMAINE_SECOND: DEFAULT_EQUITY_WEIGHTS.SEMAINE_SECOND,
 } as const
 
 function scorerCandidatLNS(

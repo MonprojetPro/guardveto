@@ -24,6 +24,7 @@ export interface BonusMalusMap {
   [vetId: string]: number
 }
 import { isValid } from './rules/hard-constraints'
+import { DEFAULT_EQUITY_WEIGHTS } from './equity-weights'
 import {
   penaliteR10WEConsecutif,
   penaliteWEAvantVacances,
@@ -109,13 +110,14 @@ export const POIDS_INTRA = {
   R8B_INVERSION_FERIE: 20,
   /** Marqueur dernier recours — terme DOMINANT dans son étage (§3.2). */
   DERNIER_RECOURS: 100_000,
-  // Étage EQUITE (variance) — poids relatifs des dimensions
-  EQ_WE: 100,
-  EQ_WE_PREMIER: 25,
-  EQ_FERIES: 60,
-  EQ_SEMAINE_PREMIER: 30,
-  EQ_SEMAINE_SECOND: 10,
-  EQ_GRANDS_WE: 60,
+  // Étage EQUITE (variance) — poids relatifs des dimensions.
+  // Source unique : equity-weights.ts (mutualisé avec POIDS_LNS du solver).
+  EQ_WE: DEFAULT_EQUITY_WEIGHTS.WE_GARDE,
+  EQ_WE_PREMIER: DEFAULT_EQUITY_WEIGHTS.WE_PREMIER_ROLE,
+  EQ_FERIES: DEFAULT_EQUITY_WEIGHTS.FERIES,
+  EQ_SEMAINE_PREMIER: DEFAULT_EQUITY_WEIGHTS.SEMAINE_PREMIER,
+  EQ_SEMAINE_SECOND: DEFAULT_EQUITY_WEIGHTS.SEMAINE_SECOND,
+  EQ_GRANDS_WE: DEFAULT_EQUITY_WEIGHTS.GRANDS_WE,
 } as const
 
 // ── Reconstruction des slots+rôles d'une attribution ──────
