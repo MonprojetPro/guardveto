@@ -19,6 +19,10 @@ import { redirect } from 'next/navigation'
 import { ReglesClient, type RegleRow, type VetoMini } from '@/components/regles/ReglesClient'
 import { EquilibrageClient } from '@/components/regles/EquilibrageClient'
 import {
+  StructureWeekendClient,
+  type StructureRegleUI,
+} from '@/components/regles/StructureWeekendClient'
+import {
   EQUITY_DIMENSIONS,
   DEFAULT_IMPORTANCE,
   IMPORTANCE_LEVELS,
@@ -27,7 +31,18 @@ import {
 } from '@/engine/equity-weights'
 
 const BRIQUE_EQUILIBRER = 'equilibrer'
+const BRIQUE_LIAISON = 'liaison_creneaux' // R9
+const BRIQUE_INVERSION = 'inversion_role' // R8
 const IMPORTANCES = new Set<string>(IMPORTANCE_LEVELS)
+const FORCES_STRUCTURE = new Set(['jamais', 'sauf_crise', 'evitee', 'si_possible'])
+
+/** Résout {actif, force} d'une règle structurelle depuis les lignes (défaut Ferme/active). */
+function resoudreStructure(rows: RegleRow[], briqueId: string): StructureRegleUI {
+  const row = rows.find((r) => r.brique_id === briqueId)
+  if (!row) return { actif: true, force: 'jamais' } // défaut historique = ferme + active
+  const force = FORCES_STRUCTURE.has(row.force) ? row.force : 'jamais'
+  return { actif: row.actif, force }
+}
 
 export default async function ReglesPage() {
   const supabase = await createClient()
@@ -55,10 +70,17 @@ export default async function ReglesPage() {
   const isAdmin = currentVeto.role_app === 'admin'
   const toutesRegles = (regles as RegleRow[]) ?? []
 
-  // Les règles d'équité (equilibrer) sont gérées à part (section Équilibrage) :
-  // on les retire de la liste principale pour éviter le doublon.
-  const reglesClassiques = toutesRegles.filter((r) => r.brique_id !== BRIQUE_EQUILIBRER)
+  // Règles GLOBALES gérées dans leurs propres sections (pas dans la liste par-véto) :
+  // équité (equilibrer) + structurelles week-end (R8/R9). On les retire du listing.
+  const GLOBALES = new Set([BRIQUE_EQUILIBRER, BRIQUE_LIAISON, BRIQUE_INVERSION])
+  const reglesClassiques = toutesRegles.filter((r) => !GLOBALES.has(r.brique_id))
   const reglesEquilibrer = toutesRegles.filter((r) => r.brique_id === BRIQUE_EQUILIBRER)
+
+  // Config courante R8/R9 (règle posée, sinon défaut Ferme + active).
+  const structureConfig = {
+    r9: resoudreStructure(toutesRegles, BRIQUE_LIAISON),
+    r8: resoudreStructure(toutesRegles, BRIQUE_INVERSION),
+  }
 
   // Importance courante par dimension : règle posée si elle existe, sinon défaut.
   const importances = Object.fromEntries(
@@ -80,6 +102,7 @@ export default async function ReglesPage() {
         isAdmin={isAdmin}
       />
       <EquilibrageClient importances={importances} isAdmin={isAdmin} />
+      <StructureWeekendClient config={structureConfig} isAdmin={isAdmin} />
     </div>
   )
 }

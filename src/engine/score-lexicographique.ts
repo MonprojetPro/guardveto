@@ -26,6 +26,11 @@ export interface BonusMalusMap {
 import { isValid } from './rules/hard-constraints'
 import { DEFAULT_EQUITY_WEIGHTS, type EquityWeights } from './equity-weights'
 import {
+  DEFAULT_STRUCTURE_CONFIG, estStructureSouple, penaliteStructureEtage,
+  type StructureConfig,
+} from './structure-config'
+import { vendrediDeSemaine } from './utils'
+import {
   penaliteR10WEConsecutif,
   penaliteWEAvantVacances,
   penaliteFeteFinAnnee,
@@ -153,7 +158,8 @@ export function scorerPlanning(
   planning: PlanningPartiel,
   vets: VetEngine[],
   saison: 'ete' | 'hiver',
-  weights: EquityWeights = DEFAULT_EQUITY_WEIGHTS
+  weights: EquityWeights = DEFAULT_EQUITY_WEIGHTS,
+  structure: StructureConfig = DEFAULT_STRUCTURE_CONFIG
 ): VecteurScore {
   const v = vecteurVide()
   const slotRoles = listerSlotRoles(planning, saison)
@@ -178,7 +184,7 @@ export function scorerPlanning(
         const vet = vetById.get(vetId)
         if (!vet) continue
         const slot: SlotGarde = { date: a.date, type: a.type, saison }
-        const res = isValid(slot, vet, role, vets, cumul)
+        const res = isValid(slot, vet, role, vets, cumul, undefined, structure)
         if (!res.valid) nbInvariantsViols++
         // pose dans le cumul
         const idx = cumul.attributions.findIndex(
@@ -239,6 +245,39 @@ export function scorerPlanning(
     for (const sr of slotRoles) if (drIds.has(sr.vetId)) nbDR++
     if (nbDR > 0)
       ajouter(v, Etage.SI_POSSIBLE, 'dernier_recours', nbDR * POIDS_INTRA.DERNIER_RECOURS)
+  }
+
+  // ── R8/R9 SOUPLES (si réglées en préférence, pas en dur) ──
+  // En DUR, R8/R9 bloquent dans isValid → comptées en étage 0 ci-dessus, jamais
+  // ici. En SOUPLE, isValid ne bloque pas : on pénalise à l'étage configuré pour
+  // que le moteur les PRÉFÈRE sans les imposer. Désactivées → rien.
+  if (estStructureSouple(structure.r9_liaison) || estStructureSouple(structure.r8_inversion)) {
+    for (const a of planning.attributions) {
+      if (a.type !== 'weekend') continue
+      const attrVen = planning.attributions.find(
+        (x) => x.type === 'vendredi_soir' && x.date === vendrediDeSemaine(a.date)
+      )
+      if (!attrVen) continue
+
+      // R9 souple : le binôme du WE diffère de celui du vendredi soir.
+      if (estStructureSouple(structure.r9_liaison)) {
+        const duoWe = [a.premier_id, a.second_id].filter(Boolean).sort().join('|')
+        const duoVen = [attrVen.premier_id, attrVen.second_id].filter(Boolean).sort().join('|')
+        if (duoWe !== duoVen) {
+          ajouter(v, structure.r9_liaison.etage, 'R9-souple', penaliteStructureEtage(structure.r9_liaison.etage))
+        }
+      }
+
+      // R8 souple : rôle 1er/2nd NON inversé entre vendredi soir et WE.
+      if (estStructureSouple(structure.r8_inversion)) {
+        const nonInverse =
+          (attrVen.premier_id && a.premier_id === attrVen.premier_id) ||
+          (attrVen.second_id && a.second_id === attrVen.second_id)
+        if (nonInverse) {
+          ajouter(v, structure.r8_inversion.etage, 'R8-souple', penaliteStructureEtage(structure.r8_inversion.etage))
+        }
+      }
+    }
   }
 
   // ── Étage 6 : ÉQUITÉ (variance des charges) ──

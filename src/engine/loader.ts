@@ -10,9 +10,11 @@ import type { VetEngine, ContrainteEngine, CongeEngine, CalendrierResolu } from 
 import type { BonusMalusMap } from './score-lexicographique'
 import type { SolverInput } from './solver'
 import { buildEquityWeights, type EquityWeights } from './equity-weights'
+import { type StructureConfig } from './structure-config'
 import {
   mapperReglesCabinet,
   extraireEquityRules,
+  extraireStructureConfig,
   type RegleCabinetRow,
 } from '@/data/mapReglesCabinet'
 
@@ -149,7 +151,11 @@ async function chargerReglesCabinet(
   supabase: SupabaseServerClient,
   cabinetId: string,
   periodeId: string,
-): Promise<{ contraintesParVet: Map<string, ContrainteEngine[]>; equityWeights: EquityWeights }> {
+): Promise<{
+  contraintesParVet: Map<string, ContrainteEngine[]>
+  equityWeights: EquityWeights
+  structureConfig: StructureConfig
+}> {
   // Catalogue des briques connues (ids) — socle de la validation déterministe.
   const { data: briquesDb } = await supabase.from('briques_regles').select('id')
   const briquesConnues = new Set<string>(
@@ -169,7 +175,11 @@ async function chargerReglesCabinet(
     console.warn(
       `[P1A-004] Lecture regles_cabinet échouée (${error.message}) — aucune règle appliquée.`,
     )
-    return { contraintesParVet: new Map(), equityWeights: buildEquityWeights([]) }
+    return {
+      contraintesParVet: new Map(),
+      equityWeights: buildEquityWeights([]),
+      structureConfig: extraireStructureConfig([]),
+    }
   }
 
   const rows = (reglesDb as RegleCabinetRow[] | null) ?? []
@@ -181,8 +191,10 @@ async function chargerReglesCabinet(
 
   // Équité : extraite des règles `equilibrer` (défaut historique si absentes).
   const equityWeights = buildEquityWeights(extraireEquityRules(rows))
+  // Structurelles R8/R9 : extraites des règles liaison_creneaux/inversion_role.
+  const structureConfig = extraireStructureConfig(rows)
 
-  return { contraintesParVet, equityWeights }
+  return { contraintesParVet, equityWeights, structureConfig }
 }
 
 // ── Chargement principal ─────────────────────────────────
@@ -239,9 +251,13 @@ export async function chargerInputDepuisSupabase(
   //     Scopé cabinet + validité de période ; sans cabinetId (contextes
   //     hors-DB / legacy) aucune règle n'est appliquée. Inclut les poids
   //     d'équité (extraits des règles `equilibrer`, défaut si absentes).
-  const { contraintesParVet, equityWeights } = cabinetId
+  const { contraintesParVet, equityWeights, structureConfig } = cabinetId
     ? await chargerReglesCabinet(supabase, cabinetId, periodeId)
-    : { contraintesParVet: new Map<string, ContrainteEngine[]>(), equityWeights: buildEquityWeights([]) }
+    : {
+        contraintesParVet: new Map<string, ContrainteEngine[]>(),
+        equityWeights: buildEquityWeights([]),
+        structureConfig: extraireStructureConfig([]),
+      }
 
   // 3. Congés validés qui chevauchent la période
   const { data: congesDb } = await supabase
@@ -334,5 +350,6 @@ export async function chargerInputDepuisSupabase(
     calendrier,
     nbVetosSemaineSoir,
     equityWeights,
+    structureConfig,
   }
 }

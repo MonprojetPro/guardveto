@@ -121,6 +121,7 @@ export async function resoudreContexte(
     calendrier,
     nbVetosSemaineSoir: input.nbVetosSemaineSoir,
     equityWeights: input.equityWeights,
+    structureConfig: input.structureConfig,
   }
 
   return contexte

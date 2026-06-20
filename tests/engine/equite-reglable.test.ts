@@ -165,12 +165,20 @@ function dataFor(table: string): unknown {
     case 'briques_regles':
       return [{ id: 'equilibrer' }]
     case 'regles_cabinet':
-      // Une règle d'équité : week-ends → peu important (poids 10).
-      return [{
-        id: 'r1', cabinet_id: 'cab-1', periode_id: null, brique_id: 'equilibrer',
-        actif: true, force: 'si_possible',
-        params_json: { qui: null, quand: null, params: { dimension: 'weekend', importance: 'peu_important' } },
-      }]
+      // Une règle d'équité (week-ends → peu important = 10) + une structurelle
+      // (R9 liaison désactivée) pour vérifier que les DEUX configs traversent.
+      return [
+        {
+          id: 'r1', cabinet_id: 'cab-1', periode_id: null, brique_id: 'equilibrer',
+          actif: true, force: 'si_possible',
+          params_json: { qui: null, quand: null, params: { dimension: 'weekend', importance: 'peu_important' } },
+        },
+        {
+          id: 'r2', cabinet_id: 'cab-1', periode_id: null, brique_id: 'liaison_creneaux',
+          actif: false, force: 'jamais',
+          params_json: { qui: null, quand: null, params: {} },
+        },
+      ]
     case 'veterinaires':
     case 'conges':
     case 'vacances_scolaires':
@@ -211,16 +219,20 @@ import { resoudreContexte } from '@/data/resoudreContexte'
 describe('Équité réglable — E. le tuyau porte equityWeights + effectif', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('le loader extrait les poids des règles equilibrer (week-ends → 10)', async () => {
+  it('le loader extrait poids d’équité + config R8/R9 + effectif', async () => {
     const input = await chargerInputDepuisSupabase('p1', 'cab-1')
     expect(input.equityWeights?.WE_GARDE).toBe(IMPORTANCE_TO_WEIGHT.peu_important) // 10
     expect(input.equityWeights?.FERIES).toBe(IMPORTANCE_TO_WEIGHT.important) // 60 (défaut)
     expect(input.nbVetosSemaineSoir).toBe(1)
+    // R9 désactivée (règle posée) ; R8 garde son défaut (ferme/active).
+    expect(input.structureConfig?.r9_liaison.actif).toBe(false)
+    expect(input.structureConfig?.r8_inversion).toEqual({ actif: true, etage: 2 })
   })
 
-  it('resoudreContexte PROPAGE les poids ET l’effectif (anti-régression bombe)', async () => {
+  it('resoudreContexte PROPAGE poids + R8/R9 + effectif (anti-régression bombe)', async () => {
     const contexte = await resoudreContexte('p1', 'cab-1')
     expect(contexte.equityWeights?.WE_GARDE).toBe(IMPORTANCE_TO_WEIGHT.peu_important) // 10
     expect(contexte.nbVetosSemaineSoir).toBe(1)
+    expect(contexte.structureConfig?.r9_liaison.actif).toBe(false)
   })
 })

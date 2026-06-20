@@ -28,6 +28,10 @@ import {
   type EquityDimension,
   type ImportanceLevel,
 } from '@/engine/equity-weights'
+import {
+  DEFAULT_STRUCTURE_CONFIG,
+  type StructureConfig,
+} from '@/engine/structure-config'
 
 /** Ligne brute de `regles_cabinet` telle que lue par le loader. */
 export interface RegleCabinetRow {
@@ -139,6 +143,36 @@ export function extraireEquityRules(regles: RegleCabinetRow[]): EquityRule[] {
   return out
 }
 
+// ── Extraction de la config structurelle R8/R9 ──────────────
+// R9 = brique `liaison_creneaux` (vendredi soir = week-end, même duo).
+// R8 = brique `inversion_role`   (1er/2nd inversés vendredi↔WE).
+// Règles GLOBALES (pas de « qui ») : on lit { actif, force→étage } de chaque.
+// Absente → défaut FERME + ACTIVE (comportement historique).
+
+export const BRIQUE_LIAISON = 'liaison_creneaux' // R9
+export const BRIQUE_INVERSION = 'inversion_role' // R8
+
+/**
+ * extraireStructureConfig — résout la config R8/R9 depuis les lignes
+ * `regles_cabinet`. Chaque règle absente garde son défaut (ferme + active).
+ * Une force inconnue retombe sur l'étage dur (2) — jamais d'exception.
+ */
+export function extraireStructureConfig(regles: RegleCabinetRow[]): StructureConfig {
+  const lire = (briqueId: string) => {
+    const row = regles.find((r) => r.brique_id === briqueId)
+    if (!row) return undefined
+    const etage = FORCE_TEXTE_VERS_ETAGE[row.force]
+    return {
+      actif: row.actif,
+      etage: typeof etage === 'number' ? etage : 2,
+    }
+  }
+  return {
+    r9_liaison: lire(BRIQUE_LIAISON) ?? { ...DEFAULT_STRUCTURE_CONFIG.r9_liaison },
+    r8_inversion: lire(BRIQUE_INVERSION) ?? { ...DEFAULT_STRUCTURE_CONFIG.r8_inversion },
+  }
+}
+
 /**
  * mapperReglesCabinet — convertit des lignes `regles_cabinet` en contraintes
  * moteur, regroupées par vétérinaire propriétaire (1re réf de `qui.refs`).
@@ -157,10 +191,17 @@ export function mapperReglesCabinet(
   for (const row of regles) {
     const rejet = (raison: string) => rejets.push({ regleId: row.id, raison })
 
-    // 0. Règles d'équité (famille `equilibrer`) : traitées À PART (par compteur,
-    //    pas par véto) via extraireEquityRules → buildEquityWeights. On les saute
-    //    ici SANS les compter comme rejets (ce n'est pas une contrainte de véto).
-    if (row.brique_id === BRIQUE_EQUILIBRER) continue
+    // 0. Règles GLOBALES (pas par véto) : équité (`equilibrer`) et structurelles
+    //    R8/R9 (`liaison_creneaux`, `inversion_role`). Traitées À PART (équité →
+    //    buildEquityWeights ; structure → extraireStructureConfig). On les saute
+    //    ici SANS les compter comme rejets (ce ne sont pas des contraintes de véto).
+    if (
+      row.brique_id === BRIQUE_EQUILIBRER ||
+      row.brique_id === BRIQUE_LIAISON ||
+      row.brique_id === BRIQUE_INVERSION
+    ) {
+      continue
+    }
 
     // 1. Brique connue du catalogue
     if (!briquesConnues.has(row.brique_id)) {

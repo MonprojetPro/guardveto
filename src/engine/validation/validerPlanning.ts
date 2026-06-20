@@ -35,6 +35,10 @@ import type {
   JourSemaine,
 } from '../types'
 import { normaliserContraintesVets } from '../normaliserContraintes'
+import {
+  DEFAULT_STRUCTURE_CONFIG, estStructureDure,
+  type StructureConfig,
+} from '../structure-config'
 
 // ── Entrée minimale attendue (sous-ensemble de SolverInput) ──
 export interface ValidationInput {
@@ -45,6 +49,13 @@ export interface ValidationInput {
   calendrier?: CalendrierResolu
   /** Effectif configurable (1 ou 2 vétos la nuit en semaine). Absent → repli saison. */
   nbVetosSemaineSoir?: number
+  /**
+   * Config R8/R9 (réglables). On ne signale une violation R8/R9 que si la règle
+   * est appliquée en DUR (active + étage ≤ 2). Souple/désactivée → pas de
+   * violation (sinon le validateur crierait des violations FANTÔMES pour un
+   * cabinet qui a assoupli/coupé la règle). MÊME config que le moteur.
+   */
+  structureConfig?: StructureConfig
 }
 
 // ── Une violation détectée ───────────────────────────────
@@ -502,7 +513,14 @@ export function validerPlanning(
 
   // ── R9 — vendredi soir = même duo que le week-end ──
   // ── R8 — inversion 1er/2nd entre vendredi soir et WE ──
+  // On ne signale ces violations que si la règle est appliquée en DUR (active +
+  // ferme). Souple/désactivée → le moteur a le droit de ne pas la respecter →
+  // pas de violation fantôme. MÊME config que le moteur (les deux gardiens).
+  const structure = input.structureConfig ?? DEFAULT_STRUCTURE_CONFIG
+  const r9Dur = estStructureDure(structure.r9_liaison)
+  const r8Dur = estStructureDure(structure.r8_inversion)
   for (const a of planning.attributions) {
+    if (!r9Dur && !r8Dur) break // les deux assouplies/coupées → rien à contrôler
     if (a.type !== 'weekend') continue
     const ven = vendrediDe(a.date)
     const attrVen = trouver(planning, ven, 'vendredi_soir')
@@ -511,10 +529,10 @@ export function validerPlanning(
     const duoWe = new Set(membres(a))
     const duoVen = new Set(membres(attrVen))
 
-    // R9 : ensembles identiques
+    // R9 : ensembles identiques (seulement si R9 est dure)
     const memesMembres =
       duoWe.size === duoVen.size && [...duoWe].every((m) => duoVen.has(m))
-    if (!memesMembres) {
+    if (r9Dur && !memesMembres) {
       violations.push({
         regle: 'R9',
         date: a.date,
@@ -523,8 +541,8 @@ export function validerPlanning(
       })
     }
 
-    // R8 : inversion des rôles (1er ven → 2nd WE, et inversement)
-    if (attrVen.premier_id && a.premier_id === attrVen.premier_id) {
+    // R8 : inversion des rôles (seulement si R8 est dure)
+    if (r8Dur && attrVen.premier_id && a.premier_id === attrVen.premier_id) {
       violations.push({
         regle: 'R8',
         date: a.date,
@@ -533,7 +551,7 @@ export function validerPlanning(
         detail: `R8 : ${vetsById.get(a.premier_id)?.prenom ?? a.premier_id} est 1er vendredi soir ET 1er le WE — l'inversion impose 2nd le WE (${a.date})`,
       })
     }
-    if (attrVen.second_id && a.second_id === attrVen.second_id) {
+    if (r8Dur && attrVen.second_id && a.second_id === attrVen.second_id) {
       violations.push({
         regle: 'R8',
         date: a.date,

@@ -178,6 +178,74 @@ export async function setEquiteImportance(dimension: string, importance: string)
   return { success: true }
 }
 
+// ── Règles structurelles R8/R9 (réglables : toggle + niveau) ─
+
+/** Les deux briques structurelles réglables. */
+const BRIQUES_STRUCTURELLES = new Set(['liaison_creneaux', 'inversion_role'])
+
+/**
+ * Règle une contrainte structurelle R8 (inversion_role) ou R9 (liaison_creneaux) :
+ * son activation (on/off) ET son niveau de force (ferme → préférence). Comme
+ * l'équité, ce sont des règles GLOBALES (pas de « qui »). UPSERT manuel par
+ * (cabinet, brique). Double garde : assertAdmin + RLS. S'applique à la prochaine
+ * génération. ⚠️ Le moteur ET le validateur lisent cette même config.
+ */
+export async function setStructureRegle(briqueId: string, actif: boolean, force: string) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+  const vetoId = garde.veto.id
+
+  if (!BRIQUES_STRUCTURELLES.has(briqueId)) {
+    return { error: `Règle structurelle inconnue : « ${briqueId} ».` }
+  }
+  if (!FORCES_VALIDES.includes(force as ForceFormulaire)) {
+    return { error: `Niveau de force invalide : « ${force} ».` }
+  }
+  if (typeof actif !== 'boolean') {
+    return { error: 'État (activé/désactivé) invalide.' }
+  }
+
+  let cabinetId: string
+  try {
+    cabinetId = await resoudreCabinetId(supabase)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
+  }
+
+  // Règle globale : pas de « qui », pas de params métier.
+  const params_json = { qui: null, quand: null, params: {} }
+
+  const { data: existante } = await supabase
+    .from('regles_cabinet')
+    .select('id')
+    .eq('cabinet_id', cabinetId)
+    .eq('brique_id', briqueId)
+    .maybeSingle()
+
+  if (existante) {
+    const { error } = await supabase
+      .from('regles_cabinet')
+      .update({ actif, force })
+      .eq('id', (existante as { id: string }).id)
+    if (error) return { error: error.message }
+  } else {
+    const { error } = await supabase.from('regles_cabinet').insert({
+      cabinet_id: cabinetId,
+      brique_id: briqueId,
+      params_json,
+      force,
+      actif,
+      created_by: vetoId,
+    })
+    if (error) return { error: error.message }
+  }
+
+  revalidatePath('/regles')
+  return { success: true }
+}
+
 // ── Création / édition guidée (P1A-007) ──────────────────────
 
 /** Les 4 briques que le moteur sait réellement évaluer (mapReglesCabinet). */

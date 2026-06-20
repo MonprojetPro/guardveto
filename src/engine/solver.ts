@@ -38,6 +38,7 @@ import { penalite } from './rules/soft-constraints'
 import { compterParVet } from './rules/optimization'
 import { comparerScores, scorerPlanning, type VecteurScore, type BonusMalusMap } from './score-lexicographique'
 import { DEFAULT_EQUITY_WEIGHTS, type EquityWeights } from './equity-weights'
+import { DEFAULT_STRUCTURE_CONFIG, type StructureConfig } from './structure-config'
 
 // ── Types publics ────────────────────────────────────────
 
@@ -67,6 +68,12 @@ export interface SolverInput {
    * Absent → DEFAULT_EQUITY_WEIGHTS (comportement historique, planning inchangé).
    */
   equityWeights?: EquityWeights
+  /**
+   * Config des règles structurelles R8/R9 (réglables). Désactivées → ignorées ;
+   * fermes → bloquantes (comportement historique) ; souples → pénalité au scoring.
+   * Absent → DEFAULT_STRUCTURE_CONFIG (les deux fermes/actives = planning inchangé).
+   */
+  structureConfig?: StructureConfig
 }
 
 /** Effectif semaine effectif : config si fournie, sinon repli saison (hiver 2 / été 1). */
@@ -281,6 +288,7 @@ function backtrack(
   vets: VetEngine[],
   bonusMalus: BonusMalusMap,
   weights: EquityWeights,
+  structure: StructureConfig,
   deepest: { value: number },
   calendrier?: CalendrierResolu
 ): PlanningPartiel | null {
@@ -293,9 +301,9 @@ function backtrack(
   const step = steps[index]
   const slot: SlotGarde = { date: step.date, type: step.type, saison: step.saison, besoinSecond: step.besoinSecond }
 
-  // Candidats valides (contraintes dures) triés par score (équité + pénalités)
+  // Candidats valides (contraintes dures, R8/R9 selon config) triés par score
   const candidates = vets
-    .filter((vet) => isValid(slot, vet, step.role, vets, planning, calendrier).valid)
+    .filter((vet) => isValid(slot, vet, step.role, vets, planning, calendrier, structure).valid)
     .sort(
       (a, b) =>
         scorerCandidat(step, a, planning, bonusMalus, vets, weights, calendrier) -
@@ -305,7 +313,7 @@ function backtrack(
   // Essaie chaque candidat dans l'ordre de priorité
   for (const vet of candidates) {
     const newPlanning = assignerStep(planning, step, vet.id)
-    const result = backtrack(steps, index + 1, newPlanning, vets, bonusMalus, weights, deepest, calendrier)
+    const result = backtrack(steps, index + 1, newPlanning, vets, bonusMalus, weights, structure, deepest, calendrier)
     if (result !== null) return result
   }
 
@@ -322,6 +330,7 @@ function backtrack(
 function genererSeedGreedy(input: SolverInput): SolveResult {
   const { dateDebut, dateFin, saison, vets, bonusMalus, calendrier } = input
   const weights = input.equityWeights ?? DEFAULT_EQUITY_WEIGHTS
+  const structure = input.structureConfig ?? DEFAULT_STRUCTURE_CONFIG
   const t0 = Date.now()
 
   const steps = genererSteps(dateDebut, dateFin, saison, input.nbVetosSemaineSoir)
@@ -334,6 +343,7 @@ function genererSeedGreedy(input: SolverInput): SolveResult {
     vets,
     bonusMalus,
     weights,
+    structure,
     deepest,
     calendrier
   )
@@ -471,13 +481,14 @@ function repairerSemaine(
   steps: SolverStep[],
   vets: VetEngine[],
   weights: EquityWeights,
+  structure: StructureConfig,
   calendrier?: CalendrierResolu
 ): PlanningPartiel | null {
   let planning = partialPlanning
 
   for (const step of steps) {
     const slot: SlotGarde = { date: step.date, type: step.type, saison: step.saison, besoinSecond: step.besoinSecond }
-    const valids = vets.filter((v) => isValid(slot, v, step.role, vets, planning, calendrier).valid)
+    const valids = vets.filter((v) => isValid(slot, v, step.role, vets, planning, calendrier, structure).valid)
 
     if (valids.length === 0) return null
 
@@ -527,7 +538,8 @@ export function scorerSemaine(
   lundi: string,
   vets: VetEngine[],
   saison: Saison,
-  weights: EquityWeights = DEFAULT_EQUITY_WEIGHTS
+  weights: EquityWeights = DEFAULT_EQUITY_WEIGHTS,
+  structure: StructureConfig = DEFAULT_STRUCTURE_CONFIG
 ): VecteurScore {
   const dimanche = addDays(lundi, 6)
   const planSemaine: PlanningPartiel = {
@@ -535,7 +547,7 @@ export function scorerSemaine(
       (a) => a.date >= lundi && a.date <= dimanche
     ),
   }
-  return scorerPlanning(planSemaine, vets, saison, weights)
+  return scorerPlanning(planSemaine, vets, saison, weights, structure)
 }
 
 // ── LNS hill-climbing ────────────────────────────────────
@@ -559,11 +571,12 @@ function lnsHillClimbing(
 ): LNSHillResult {
   const { dateDebut, dateFin, saison, vets, calendrier } = input
   const weights = input.equityWeights ?? DEFAULT_EQUITY_WEIGHTS
+  const structure = input.structureConfig ?? DEFAULT_STRUCTURE_CONFIG
   const timeoutMs = input.lnsTimeoutMs ?? 30_000
   const maxPassesSansAmelioration = 3
 
   let meilleur = seedPlanning
-  let scoreMeilleur = scorerPlanning(meilleur, vets, saison, weights)
+  let scoreMeilleur = scorerPlanning(meilleur, vets, saison, weights, structure)
 
   const lundis = extraireLundis(dateDebut, dateFin)
 
@@ -594,11 +607,11 @@ function lnsHillClimbing(
       if (steps.length === 0) continue
 
       // Réparer : greedy LNS sur la semaine
-      const repaired = repairerSemaine(partial, steps, vets, weights, calendrier)
+      const repaired = repairerSemaine(partial, steps, vets, weights, structure, calendrier)
       if (repaired === null) continue
 
       // Comparer : garder si strictement amélioré
-      const scoreNew = scorerPlanning(repaired, vets, saison, weights)
+      const scoreNew = scorerPlanning(repaired, vets, saison, weights, structure)
       if (comparerScores(scoreNew, scoreMeilleur) < 0) {
         meilleur = repaired
         scoreMeilleur = scoreNew

@@ -89,6 +89,11 @@ export interface ContexteSimulation {
    * Même remarque que ci-dessus : à propager explicitement dans resoudreContexte.
    */
   equityWeights?: import('./equity-weights').EquityWeights
+  /**
+   * Config des règles structurelles R8/R9 (réglables). Absent → défaut (fermes).
+   * Même piège : à propager explicitement dans resoudreContexte ET au validateur.
+   */
+  structureConfig?: import('./structure-config').StructureConfig
 }
 
 // Résultat d'une vérification

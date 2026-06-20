@@ -10,6 +10,10 @@ import {
   jourDeLaSemaine, estSemaineImpaire, estSemaineImpaireAncrée, estEnVacancesScolaires,
   estJourFerie, estEnEte, lundiDeSemaine, vendrediDeSemaine, samediDeSemaine, addDays,
 } from '../utils'
+import {
+  DEFAULT_STRUCTURE_CONFIG, estStructureDure,
+  type StructureConfig, type StructureRegleConfig,
+} from '../structure-config'
 
 // ── Helpers internes ────────────────────────────────────
 
@@ -342,8 +346,11 @@ function checkR8Inversion(
   vet: VetEngine,
   slot: SlotGarde,
   roleVisé: 'premier' | 'second',
-  planning: PlanningPartiel
+  planning: PlanningPartiel,
+  cfg: StructureRegleConfig = DEFAULT_STRUCTURE_CONFIG.r8_inversion
 ): ValidationResult {
+  // Désactivée ou souple → ne bloque pas (souple = pénalité gérée au scoring).
+  if (!estStructureDure(cfg)) return ok()
   if (slot.type !== 'weekend') return ok()
 
   const ven = vendrediDeSemaine(slot.date)
@@ -371,8 +378,11 @@ function checkR8Inversion(
 function checkR9VendrediLieWE(
   vet: VetEngine,
   slot: SlotGarde,
-  planning: PlanningPartiel
+  planning: PlanningPartiel,
+  cfg: StructureRegleConfig = DEFAULT_STRUCTURE_CONFIG.r9_liaison
 ): ValidationResult {
+  // Désactivée ou souple → ne bloque pas (souple = pénalité gérée au scoring).
+  if (!estStructureDure(cfg)) return ok()
   if (slot.type === 'weekend') {
     // Vérifie que le vendredi soir a déjà des assignations cohérentes
     const ven = vendrediDeSemaine(slot.date)
@@ -547,7 +557,8 @@ export function isValid(
   roleVisé: 'premier' | 'second',
   allVets: VetEngine[],
   planning: PlanningPartiel,
-  calendrier?: CalendrierResolu
+  calendrier?: CalendrierResolu,
+  structure: StructureConfig = DEFAULT_STRUCTURE_CONFIG
 ): ValidationResult {
   const checks: ValidationResult[] = [
     checkR16Conge(vet, slot),
@@ -558,13 +569,13 @@ export function isValid(
     checkR2IndispoCyclique(vet, slot, calendrier),
     checkR3ReposConditionnel(vet, slot, planning),
     checkR6DuoInterdit(vet, slot, planning, allVets),
-    checkR9VendrediLieWE(vet, slot, planning),
+    checkR9VendrediLieWE(vet, slot, planning, structure.r9_liaison),
     checkR21RolesDistincts(vet, slot, roleVisé, planning),
   ]
 
   // R8 uniquement pour les WE
   if (slot.type === 'weekend') {
-    checks.push(checkR8Inversion(vet, slot, roleVisé, planning))
+    checks.push(checkR8Inversion(vet, slot, roleVisé, planning, structure.r8_inversion))
   }
 
   // Renvoie la première contrainte violée
