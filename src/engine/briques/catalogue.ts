@@ -80,6 +80,24 @@ function fenetreLisible(f: unknown): string {
   return 'fenêtre non précisée'
 }
 
+/** Libellés FR des 6 dimensions d'équité (famille `equilibrer`). Exporté pour l'écran. */
+export const DIMENSION_EQUITE_LABELS: Record<string, string> = {
+  weekend: 'les week-ends',
+  weekend_premier: 'le rôle de 1er le week-end',
+  ferie: 'les jours fériés',
+  semaine_premier: 'les soirs de semaine (1er)',
+  semaine_second: 'les soirs de semaine (2nd)',
+  grands_weekend: 'les grands week-ends (salariés)',
+}
+
+/** Adjectif d'importance (les 4 crans nommés). Exporté pour l'écran. */
+export const IMPORTANCE_LABELS: Record<string, string> = {
+  peu_important: 'faible',
+  normal: 'normale',
+  important: 'importante',
+  essentiel: 'essentielle',
+}
+
 /** Ids des partenaires d'un duo interdit (tolère avec_veterinaire_id | membres). */
 function lirePartenaires(params: Record<string, unknown>): string[] {
   if (typeof params.avec_veterinaire_id === 'string') return [params.avec_veterinaire_id]
@@ -216,14 +234,17 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
     operateur: 'EQUILIBRER',
     axes: ['qui', 'quoi'],
     schemaParams: {
-      dimension: 'string (ex. weekend, ferie, total)',
-      mesure: 'string (variance|min_max — variance par défaut)',
-      quote_part: 'object? (par véto)',
+      dimension: 'string (weekend|weekend_premier|ferie|semaine_premier|semaine_second|grands_weekend)',
+      importance: 'string (peu_important|normal|important|essentiel)',
     },
     widget: 'WidgetEquilibrer',
     rendreLangageNaturel: (params) => {
-      const dim = typeof params.dimension === 'string' ? params.dimension : 'gardes'
-      return `répartit équitablement les ${dim} entre les vétos`
+      const dim = typeof params.dimension === 'string' ? params.dimension : ''
+      const imp = typeof params.importance === 'string' ? params.importance : ''
+      const cible = DIMENSION_EQUITE_LABELS[dim] ?? 'les gardes'
+      const prio = IMPORTANCE_LABELS[imp]
+      const suffixe = prio ? ` — priorité ${prio}` : ''
+      return `répartit équitablement ${cible}${suffixe}`
     },
   },
 

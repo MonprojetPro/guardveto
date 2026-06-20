@@ -1,21 +1,18 @@
 // ============================================================
-// GUARDVETO — Équité réglable (curseurs) — tests bout-en-bout
+// GUARDVETO — Équité réglable (règles `equilibrer`) — tests bout-en-bout
 // ============================================================
-// Couvre les 4 maillons de la feature « poids d'équité configurables » :
+// L'équité est une FAMILLE DE RÈGLE (`equilibrer`) gérée comme les autres,
+// mais de forme différente (elle cible un COMPTEUR, pas un véto). Couvre :
 //
-//   A. Préservation : poids omis ≡ poids = DEFAULT_EQUITY_WEIGHTS
-//      (aucun changement de planning tant qu'on ne touche pas aux curseurs).
+//   A. Préservation : poids omis ≡ poids = DEFAULT_EQUITY_WEIGHTS.
 //   B. Le scoreur global thread les poids (scorerPlanning).
-//   C. Le solveur (seed greedy) thread les poids : un poids extrême change
-//      réellement les décisions → la feature n'est PAS une coquille vide.
-//   D. Le TUYAU (loader → resoudreContexte) porte equityWeights ET
-//      nbVetosSemaineSoir jusqu'au solveur — garde anti-régression de la
-//      « bombe » : resoudreContexte reconstruit l'objet à la main et
-//      détruisait l'effectif (jamais transmis). Cf. ContexteSimulation.
+//   C. Le solveur (seed greedy) thread les poids → pas une coquille vide.
+//   D. buildEquityWeights / extraireEquityRules (pur) : cran → poids, défauts.
+//   E. Le TUYAU : loader extrait l'équité des règles `equilibrer`, et
+//      resoudreContexte propage equityWeights + nbVetosSemaineSoir (anti-bombe).
 //
-// ⚠️ Déterminisme : le LNS est non déterministe (borné par le temps). Les
-// tests A et C utilisent donc lnsTimeoutMs: 0 → le solveur retourne le SEED
-// greedy pur (sans LNS), qui est 100 % déterministe.
+// ⚠️ Déterminisme : le LNS est non déterministe (borné par le temps). A et C
+// utilisent lnsTimeoutMs: 0 → seed greedy pur, 100 % déterministe.
 // ============================================================
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -25,7 +22,13 @@ import {
   empreinteTieBreak,
   Etage,
 } from '@/engine/score-lexicographique'
-import { DEFAULT_EQUITY_WEIGHTS, type EquityWeights } from '@/engine/equity-weights'
+import {
+  DEFAULT_EQUITY_WEIGHTS,
+  buildEquityWeights,
+  IMPORTANCE_TO_WEIGHT,
+  type EquityWeights,
+} from '@/engine/equity-weights'
+import { extraireEquityRules, type RegleCabinetRow } from '@/data/mapReglesCabinet'
 import type { VetEngine, PlanningPartiel } from '@/engine/types'
 
 // ── Fixtures : 7 vétos SANS contrainte (l'équité est le seul levier) ──
@@ -41,14 +44,13 @@ function vetsSimples(): VetEngine[] {
   }))
 }
 
-// Période courte (4 semaines, hiver) — lundi 2026-01-05 → dimanche 2026-02-01.
 const BASE: SolverInput = {
   dateDebut: '2026-01-05',
   dateFin: '2026-02-01',
   saison: 'hiver',
   vets: vetsSimples(),
   bonusMalus: {},
-  lnsTimeoutMs: 0, // → seed greedy pur, déterministe (pas de LNS)
+  lnsTimeoutMs: 0, // → seed greedy pur, déterministe
 }
 
 // ── A. Préservation du comportement ──────────────────────────
@@ -56,20 +58,16 @@ describe('Équité réglable — A. préservation', () => {
   it('poids omis ≡ poids = DEFAULT_EQUITY_WEIGHTS (planning identique)', () => {
     const sansPoids = genererPlanningPur(BASE)
     const avecDefaut = genererPlanningPur({ ...BASE, equityWeights: DEFAULT_EQUITY_WEIGHTS })
-
     expect(sansPoids.success).toBe(true)
     expect(avecDefaut.success).toBe(true)
     if (sansPoids.success && avecDefaut.success) {
-      expect(empreinteTieBreak(avecDefaut.planning)).toBe(
-        empreinteTieBreak(sansPoids.planning),
-      )
+      expect(empreinteTieBreak(avecDefaut.planning)).toBe(empreinteTieBreak(sansPoids.planning))
     }
   })
 })
 
 // ── B. Le scoreur global thread les poids ────────────────────
 describe('Équité réglable — B. scorerPlanning thread les poids', () => {
-  // Planning volontairement DÉSÉQUILIBRÉ en week-ends : v1 cumule les WE.
   const planningDeseq: PlanningPartiel = {
     attributions: [
       { date: '2026-01-10', type: 'weekend', premier_id: 'v1', second_id: 'v2' },
@@ -82,82 +80,98 @@ describe('Équité réglable — B. scorerPlanning thread les poids', () => {
   it('un poids WE_GARDE plus élevé alourdit l’étage ÉQUITÉ du même planning', () => {
     const faible: EquityWeights = { ...DEFAULT_EQUITY_WEIGHTS, WE_GARDE: 1 }
     const fort: EquityWeights = { ...DEFAULT_EQUITY_WEIGHTS, WE_GARDE: 1000 }
-
     const eqFaible = scorerPlanning(planningDeseq, vets, 'hiver', faible).etages[Etage.EQUITE]
     const eqFort = scorerPlanning(planningDeseq, vets, 'hiver', fort).etages[Etage.EQUITE]
-
-    // Même planning, même déséquilibre WE : un poids plus fort = coût plus élevé.
     expect(eqFort).toBeGreaterThan(eqFaible)
   })
 
-  it('mettre un poids à 0 retire sa dimension du coût d’équité', () => {
-    // Déséquilibre UNIQUEMENT sur les WE → si WE_GARDE=0 et que c'est la seule
-    // dimension déséquilibrée, le coût d'équité doit tomber à 0.
-    const sansWE: EquityWeights = {
+  it('mettre tous les poids à 0 annule le coût d’équité', () => {
+    const zero: EquityWeights = {
       WE_GARDE: 0, WE_PREMIER_ROLE: 0, FERIES: 0,
       SEMAINE_PREMIER: 0, SEMAINE_SECOND: 0, GRANDS_WE: 0,
     }
-    const eq = scorerPlanning(planningDeseq, vets, 'hiver', sansWE).etages[Etage.EQUITE]
-    expect(eq).toBe(0)
+    expect(scorerPlanning(planningDeseq, vets, 'hiver', zero).etages[Etage.EQUITE]).toBe(0)
   })
 })
 
 // ── C. Le solveur (seed greedy) thread les poids ─────────────
 describe('Équité réglable — C. le solveur utilise les poids', () => {
+  const extreme: EquityWeights = {
+    WE_GARDE: 0, WE_PREMIER_ROLE: 0, FERIES: 0,
+    SEMAINE_PREMIER: 0, SEMAINE_SECOND: 1000, GRANDS_WE: 0,
+  }
+
   it('un profil de poids extrême change le planning produit (pas une coquille vide)', () => {
     const parDefaut = genererPlanningPur(BASE)
-    // Profil inversé : on annule l'équité WE et on sur-pondère la semaine 2nd.
-    const extreme: EquityWeights = {
-      WE_GARDE: 0, WE_PREMIER_ROLE: 0, FERIES: 0,
-      SEMAINE_PREMIER: 0, SEMAINE_SECOND: 1000, GRANDS_WE: 0,
-    }
     const skew = genererPlanningPur({ ...BASE, equityWeights: extreme })
-
-    expect(parDefaut.success).toBe(true)
-    expect(skew.success).toBe(true)
+    expect(parDefaut.success && skew.success).toBe(true)
     if (parDefaut.success && skew.success) {
-      // Le moteur a pris des décisions différentes → les poids pilotent bien
-      // le greedy de bout en bout (sinon les empreintes seraient identiques).
-      expect(empreinteTieBreak(skew.planning)).not.toBe(
-        empreinteTieBreak(parDefaut.planning),
-      )
+      expect(empreinteTieBreak(skew.planning)).not.toBe(empreinteTieBreak(parDefaut.planning))
     }
   })
 
-  it('un profil de poids personnalisé produit quand même un planning complet', () => {
-    const extreme: EquityWeights = {
-      WE_GARDE: 0, WE_PREMIER_ROLE: 0, FERIES: 0,
-      SEMAINE_PREMIER: 0, SEMAINE_SECOND: 1000, GRANDS_WE: 0,
-    }
-    const res = genererPlanningPur({ ...BASE, equityWeights: extreme })
-    expect(res.success).toBe(true)
+  it('un profil personnalisé produit quand même un planning complet', () => {
+    expect(genererPlanningPur({ ...BASE, equityWeights: extreme }).success).toBe(true)
   })
 })
 
-// ── D. Le tuyau porte les 2 champs (anti-régression « bombe ») ──
-// Mock Supabase : le loader lit equite_cabinet + nb_vetos_semaine_soir, et
-// resoudreContexte DOIT propager les deux jusqu'au ContexteSimulation.
+// ── D. buildEquityWeights / extraireEquityRules (pur) ────────
+describe('Équité réglable — D. assemblage des poids depuis les règles', () => {
+  it('buildEquityWeights([]) = tous les défauts (WE_1er → normal = 30)', () => {
+    const w = buildEquityWeights([])
+    expect(w.WE_GARDE).toBe(IMPORTANCE_TO_WEIGHT.essentiel) // 100
+    expect(w.FERIES).toBe(IMPORTANCE_TO_WEIGHT.important) // 60
+    expect(w.GRANDS_WE).toBe(IMPORTANCE_TO_WEIGHT.important) // 60
+    expect(w.SEMAINE_PREMIER).toBe(IMPORTANCE_TO_WEIGHT.normal) // 30
+    expect(w.WE_PREMIER_ROLE).toBe(IMPORTANCE_TO_WEIGHT.normal) // 30 (25→30 assumé)
+    expect(w.SEMAINE_SECOND).toBe(IMPORTANCE_TO_WEIGHT.peu_important) // 10
+  })
 
-const POIDS_CABINET = {
-  we_garde: 7, we_premier_role: 7, feries: 7,
-  semaine_premier: 7, semaine_second: 7, grands_we: 7,
-}
+  it('une règle écrase le défaut de SA dimension uniquement', () => {
+    const w = buildEquityWeights([{ dimension: 'weekend', importance: 'peu_important' }])
+    expect(w.WE_GARDE).toBe(IMPORTANCE_TO_WEIGHT.peu_important) // 10 (réglé)
+    expect(w.FERIES).toBe(IMPORTANCE_TO_WEIGHT.important) // 60 (défaut intact)
+  })
+
+  it('extraireEquityRules ne garde que les règles equilibrer actives et valides', () => {
+    const rows: RegleCabinetRow[] = [
+      { id: '1', cabinet_id: 'c', periode_id: null, brique_id: 'equilibrer', actif: true,
+        force: 'si_possible', params_json: { params: { dimension: 'weekend', importance: 'essentiel' } } },
+      { id: '2', cabinet_id: 'c', periode_id: null, brique_id: 'equilibrer', actif: false, // inactive
+        force: 'si_possible', params_json: { params: { dimension: 'ferie', importance: 'important' } } },
+      { id: '3', cabinet_id: 'c', periode_id: null, brique_id: 'duo_interdit', actif: true, // autre famille
+        force: 'jamais', params_json: { params: { avec_veterinaire_id: 'x' } } },
+      { id: '4', cabinet_id: 'c', periode_id: null, brique_id: 'equilibrer', actif: true, // dimension inconnue
+        force: 'si_possible', params_json: { params: { dimension: 'bidon', importance: 'normal' } } },
+    ]
+    const rules = extraireEquityRules(rows)
+    expect(rules).toEqual([{ dimension: 'weekend', importance: 'essentiel' }])
+  })
+})
+
+// ── E. Le tuyau : loader (règles equilibrer) → resoudreContexte ──
+// Mock Supabase : regles_cabinet renvoie une règle equilibrer ; le loader doit
+// en extraire les poids, et resoudreContexte propager equityWeights + effectif.
 
 function dataFor(table: string): unknown {
   switch (table) {
     case 'periodes':
       return {
         id: 'p1', saison: 'hiver', date_debut: '2026-01-05',
-        date_fin: '2026-02-01', statut: 'brouillon',
-        nb_vetos_semaine_soir: 1, // effectif configuré ≠ défaut hiver (2)
+        date_fin: '2026-02-01', statut: 'brouillon', nb_vetos_semaine_soir: 1,
       }
     case 'cabinets':
       return { zone_scolaire: 'A', region_feries: 'metropole' }
-    case 'equite_cabinet':
-      return POIDS_CABINET
-    case 'veterinaires':
     case 'briques_regles':
+      return [{ id: 'equilibrer' }]
     case 'regles_cabinet':
+      // Une règle d'équité : week-ends → peu important (poids 10).
+      return [{
+        id: 'r1', cabinet_id: 'cab-1', periode_id: null, brique_id: 'equilibrer',
+        actif: true, force: 'si_possible',
+        params_json: { qui: null, quand: null, params: { dimension: 'weekend', importance: 'peu_important' } },
+      }]
+    case 'veterinaires':
     case 'conges':
     case 'vacances_scolaires':
     case 'jours_feries':
@@ -178,12 +192,7 @@ function makeBuilder(table: string) {
   builder.order = chain
   builder.limit = chain
   builder.single = () => Promise.resolve({ data: dataFor(table), error: null })
-  // maybeSingle : equite_cabinet → la config ; periodes (période précédente) → null.
-  builder.maybeSingle = () =>
-    Promise.resolve({
-      data: table === 'equite_cabinet' ? dataFor(table) : null,
-      error: null,
-    })
+  builder.maybeSingle = () => Promise.resolve({ data: null, error: null }) // pas de période précédente
   builder.then = (resolve: (v: { data: unknown; error: null }) => unknown) =>
     resolve({ data: dataFor(table), error: null })
   return builder
@@ -199,24 +208,19 @@ vi.mock('@/lib/supabase/server', () => ({
 import { chargerInputDepuisSupabase } from '@/engine/loader'
 import { resoudreContexte } from '@/data/resoudreContexte'
 
-const POIDS_ATTENDUS: EquityWeights = {
-  WE_GARDE: 7, WE_PREMIER_ROLE: 7, FERIES: 7,
-  SEMAINE_PREMIER: 7, SEMAINE_SECOND: 7, GRANDS_WE: 7,
-}
-
-describe('Équité réglable — D. le tuyau porte equityWeights + effectif', () => {
+describe('Équité réglable — E. le tuyau porte equityWeights + effectif', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('le loader expose les poids du cabinet et l’effectif', async () => {
+  it('le loader extrait les poids des règles equilibrer (week-ends → 10)', async () => {
     const input = await chargerInputDepuisSupabase('p1', 'cab-1')
-    expect(input.equityWeights).toEqual(POIDS_ATTENDUS)
+    expect(input.equityWeights?.WE_GARDE).toBe(IMPORTANCE_TO_WEIGHT.peu_important) // 10
+    expect(input.equityWeights?.FERIES).toBe(IMPORTANCE_TO_WEIGHT.important) // 60 (défaut)
     expect(input.nbVetosSemaineSoir).toBe(1)
   })
 
   it('resoudreContexte PROPAGE les poids ET l’effectif (anti-régression bombe)', async () => {
     const contexte = await resoudreContexte('p1', 'cab-1')
-    // Les deux champs DOIVENT survivre à la reconstruction de l'objet.
-    expect(contexte.equityWeights).toEqual(POIDS_ATTENDUS)
+    expect(contexte.equityWeights?.WE_GARDE).toBe(IMPORTANCE_TO_WEIGHT.peu_important) // 10
     expect(contexte.nbVetosSemaineSoir).toBe(1)
   })
 })

@@ -23,6 +23,7 @@ import { createClient } from '@/lib/supabase/server'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { EQUITY_DIMENSIONS, IMPORTANCE_LEVELS } from '@/engine/equity-weights'
 
 // ── Garde admin ──────────────────────────────────────────────
 
@@ -105,49 +106,32 @@ export async function deleteRegle(id: string) {
   return { success: true }
 }
 
-// ── Poids d'équité configurables (curseurs cabinet) ──────────
+// ── Équité = règle de compteur (famille `equilibrer`) ────────
 
 /**
- * Les 6 poids d'équité réglables. Bornes volontairement larges (0–500) :
- * 0 = on ignore cette dimension, valeurs hautes = on la priorise fortement.
- * Le défaut métier (DEFAULT_EQUITY_WEIGHTS côté moteur) est : WE 100, WE_1er 25,
- * fériés 60, semaine_1er 30, semaine_2nd 10, grands_WE 60.
+ * Règle l'importance d'UNE dimension d'équité (week-ends, fériés…). L'équité est
+ * gérée comme les autres règles, mais de forme différente : elle cible un
+ * COMPTEUR (pas un véto). Chaque dimension = une règle `equilibrer` portant son
+ * importance (4 crans nommés). Le moteur traduit le cran en poids (equity-weights.ts).
+ *
+ * UPSERT manuel par (cabinet, dimension) : pas de contrainte d'unicité en base,
+ * donc on cherche la règle existante de cette dimension puis update, sinon insert.
+ * Double garde : assertAdmin + RLS regles_cabinet (write admin-only, isolation
+ * RESTRICTIVE). S'applique à la PROCHAINE génération de planning.
  */
-export interface EquiteCabinetPayload {
-  we_garde: number
-  we_premier_role: number
-  feries: number
-  semaine_premier: number
-  semaine_second: number
-  grands_we: number
-}
-
-const EQUITE_MIN = 0
-const EQUITE_MAX = 500
-
-/**
- * Enregistre les 6 poids d'équité du cabinet (curseurs). UPSERT sur la clé
- * cabinet_id (une ligne par cabinet). Double garde : assertAdmin (message clair)
- * + RLS equite_cabinet (write admin-only, isolation RESTRICTIVE). S'applique à
- * la PROCHAINE génération de planning. Aucune valeur n'est lue depuis le client
- * sans validation (chaque poids doit être un nombre fini dans [0, 500]).
- */
-export async function setEquiteCabinet(payload: EquiteCabinetPayload) {
+export async function setEquiteImportance(dimension: string, importance: string) {
   const supabase = await createClient()
 
   const garde = await assertAdmin(supabase)
   if ('error' in garde) return garde
   const vetoId = garde.veto.id
 
-  // Validation stricte côté serveur (frontière de confiance).
-  const champs: Array<keyof EquiteCabinetPayload> = [
-    'we_garde', 'we_premier_role', 'feries', 'semaine_premier', 'semaine_second', 'grands_we',
-  ]
-  for (const k of champs) {
-    const v = payload[k]
-    if (typeof v !== 'number' || !Number.isFinite(v) || v < EQUITE_MIN || v > EQUITE_MAX) {
-      return { error: `Valeur d'équité invalide pour « ${k} » (attendu entre ${EQUITE_MIN} et ${EQUITE_MAX}).` }
-    }
+  // Validation stricte (frontière de confiance) contre les référentiels moteur.
+  if (!(EQUITY_DIMENSIONS as readonly string[]).includes(dimension)) {
+    return { error: `Dimension d'équité inconnue : « ${dimension} ».` }
+  }
+  if (!(IMPORTANCE_LEVELS as readonly string[]).includes(importance)) {
+    return { error: `Niveau d'importance inconnu : « ${importance} ».` }
   }
 
   let cabinetId: string
@@ -157,24 +141,39 @@ export async function setEquiteCabinet(payload: EquiteCabinetPayload) {
     return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
   }
 
-  const { error } = await supabase
-    .from('equite_cabinet')
-    .upsert(
-      {
-        cabinet_id: cabinetId,
-        we_garde: payload.we_garde,
-        we_premier_role: payload.we_premier_role,
-        feries: payload.feries,
-        semaine_premier: payload.semaine_premier,
-        semaine_second: payload.semaine_second,
-        grands_we: payload.grands_we,
-        updated_by: vetoId,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'cabinet_id' },
-    )
+  // params_json minimal : l'équité n'a pas de « qui » (elle est globale au cabinet).
+  // Seuls dimension + importance sont lus (extraireEquityRules / rendu catalogue).
+  const params_json = { qui: null, quand: null, params: { dimension, importance } }
 
-  if (error) return { error: error.message }
+  // Cherche une règle equilibrer existante pour CETTE dimension (UPSERT manuel).
+  const { data: existantes } = await supabase
+    .from('regles_cabinet')
+    .select('id, params_json')
+    .eq('cabinet_id', cabinetId)
+    .eq('brique_id', 'equilibrer')
+
+  const match = ((existantes ?? []) as Array<{ id: string; params_json: unknown }>).find(
+    (r) => (r.params_json as { params?: { dimension?: string } })?.params?.dimension === dimension,
+  )
+
+  if (match) {
+    const { error } = await supabase
+      .from('regles_cabinet')
+      .update({ params_json })
+      .eq('id', match.id)
+    if (error) return { error: error.message }
+  } else {
+    const { error } = await supabase.from('regles_cabinet').insert({
+      cabinet_id: cabinetId,
+      brique_id: 'equilibrer',
+      params_json,
+      force: 'si_possible', // l'équité vit dans l'étage le plus bas (le cran porte l'importance)
+      actif: true,
+      created_by: vetoId,
+    })
+    if (error) return { error: error.message }
+  }
+
   revalidatePath('/regles')
   return { success: true }
 }

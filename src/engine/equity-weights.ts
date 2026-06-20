@@ -40,3 +40,94 @@ export const DEFAULT_EQUITY_WEIGHTS: EquityWeights = {
   SEMAINE_SECOND: 10,
   GRANDS_WE: 60,
 }
+
+// ════════════════════════════════════════════════════════════
+// ÉQUITÉ EN TANT QUE RÈGLES (famille `equilibrer`) — source unique
+// ════════════════════════════════════════════════════════════
+// L'équité n'est plus une table de curseurs séparée : c'est une FAMILLE DE
+// RÈGLES (brique `equilibrer`) gérée comme les autres, mais de forme différente
+// (elle concerne un COMPTEUR, pas un véto). Chaque dimension = une règle avec
+// une IMPORTANCE en 4 crans nommés, que le moteur traduit en poids numérique.
+//
+// Ce bloc est la SOURCE UNIQUE partagée par : le loader (extraction des poids),
+// l'écran /regles (libellés + défauts) et les tests. Pas de React ici.
+
+/** Les 4 crans d'importance, du plus faible au plus fort (ordre signifiant). */
+export const IMPORTANCE_LEVELS = [
+  'peu_important',
+  'normal',
+  'important',
+  'essentiel',
+] as const
+export type ImportanceLevel = (typeof IMPORTANCE_LEVELS)[number]
+
+/** Cran nommé → poids moteur. Choisi pour retomber sur les défauts historiques. */
+export const IMPORTANCE_TO_WEIGHT: Record<ImportanceLevel, number> = {
+  peu_important: 10,
+  normal: 30,
+  important: 60,
+  essentiel: 100,
+}
+
+/** Les 6 dimensions d'équité = les 6 compteurs équilibrés (R11–R15). */
+export const EQUITY_DIMENSIONS = [
+  'weekend',
+  'weekend_premier',
+  'ferie',
+  'semaine_premier',
+  'semaine_second',
+  'grands_weekend',
+] as const
+export type EquityDimension = (typeof EQUITY_DIMENSIONS)[number]
+
+/** dimension (clé règle) → champ EquityWeights consommé par le moteur. */
+export const DIMENSION_TO_FIELD: Record<EquityDimension, keyof EquityWeights> = {
+  weekend: 'WE_GARDE',
+  weekend_premier: 'WE_PREMIER_ROLE',
+  ferie: 'FERIES',
+  semaine_premier: 'SEMAINE_PREMIER',
+  semaine_second: 'SEMAINE_SECOND',
+  grands_weekend: 'GRANDS_WE',
+}
+
+/**
+ * Importance PAR DÉFAUT de chaque dimension (quand le cabinet n'a posé aucune
+ * règle). Reproduit le comportement historique : WE essentiel, fériés/grands-WE
+ * importants, semaine 1er + 1er-du-WE normaux, semaine 2nd peu important.
+ * (Seul 1er-du-WE glisse de 25→30 — écart négligeable, assumé.)
+ */
+export const DEFAULT_IMPORTANCE: Record<EquityDimension, ImportanceLevel> = {
+  weekend: 'essentiel',
+  ferie: 'important',
+  grands_weekend: 'important',
+  semaine_premier: 'normal',
+  weekend_premier: 'normal',
+  semaine_second: 'peu_important',
+}
+
+/** Une dimension réglée (telle qu'extraite d'une règle `equilibrer`). */
+export interface EquityRule {
+  dimension: EquityDimension
+  importance: ImportanceLevel
+}
+
+/**
+ * buildEquityWeights — assemble un EquityWeights à partir des règles d'équité
+ * du cabinet. Chaque dimension absente retombe sur son importance par défaut
+ * (→ comportement historique). Une dimension/importance inconnue est ignorée
+ * (la dimension garde alors son défaut). Jamais d'exception : robustesse moteur.
+ */
+export function buildEquityWeights(rules: EquityRule[]): EquityWeights {
+  // 1. Part des défauts (importance par défaut → poids).
+  const out = { ...DEFAULT_EQUITY_WEIGHTS }
+  for (const dim of EQUITY_DIMENSIONS) {
+    out[DIMENSION_TO_FIELD[dim]] = IMPORTANCE_TO_WEIGHT[DEFAULT_IMPORTANCE[dim]]
+  }
+  // 2. Écrase avec les règles réellement posées (dernière gagne si doublon).
+  for (const r of rules) {
+    const field = DIMENSION_TO_FIELD[r.dimension]
+    const poids = IMPORTANCE_TO_WEIGHT[r.importance]
+    if (field && typeof poids === 'number') out[field] = poids
+  }
+  return out
+}

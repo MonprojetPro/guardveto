@@ -21,6 +21,13 @@
 // ============================================================
 
 import type { ContrainteEngine } from '@/engine/types'
+import {
+  EQUITY_DIMENSIONS,
+  IMPORTANCE_LEVELS,
+  type EquityRule,
+  type EquityDimension,
+  type ImportanceLevel,
+} from '@/engine/equity-weights'
 
 /** Ligne brute de `regles_cabinet` telle que lue par le loader. */
 export interface RegleCabinetRow {
@@ -91,6 +98,47 @@ function estObjet(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
 }
 
+// ── Extraction des règles d'équité (famille `equilibrer`) ────
+// L'équité est une famille de règle À PART : elle ne cible pas un véto mais un
+// COMPTEUR. Elle ne passe donc PAS par mapperReglesCabinet (qui produit des
+// contraintes par véto) — on l'extrait séparément. brique_id = 'equilibrer',
+// params = { dimension, importance }.
+
+/** L'id de brique des règles d'équité (catalogue `equilibrer`). */
+export const BRIQUE_EQUILIBRER = 'equilibrer'
+
+const DIMENSIONS_VALIDES = new Set<string>(EQUITY_DIMENSIONS)
+const IMPORTANCES_VALIDES = new Set<string>(IMPORTANCE_LEVELS)
+
+/**
+ * extraireEquityRules — convertit les lignes `regles_cabinet` de famille
+ * `equilibrer` (actives) en EquityRule[] consommables par buildEquityWeights.
+ *
+ * Robustesse : une ligne au dimension/importance inconnu est IGNORÉE (jamais de
+ * crash). Les règles inactives sont écartées. Le reste (dimension → défaut) est
+ * géré par buildEquityWeights en aval.
+ *
+ * @param regles  lignes brutes regles_cabinet (toutes briques confondues)
+ */
+export function extraireEquityRules(regles: RegleCabinetRow[]): EquityRule[] {
+  const out: EquityRule[] = []
+  for (const row of regles) {
+    if (row.brique_id !== BRIQUE_EQUILIBRER || !row.actif) continue
+    if (!estObjet(row.params_json)) continue
+    const params = (row.params_json as ParamsJson).params
+    if (!estObjet(params)) continue
+    const dimension = params.dimension
+    const importance = params.importance
+    if (typeof dimension !== 'string' || !DIMENSIONS_VALIDES.has(dimension)) continue
+    if (typeof importance !== 'string' || !IMPORTANCES_VALIDES.has(importance)) continue
+    out.push({
+      dimension: dimension as EquityDimension,
+      importance: importance as ImportanceLevel,
+    })
+  }
+  return out
+}
+
 /**
  * mapperReglesCabinet — convertit des lignes `regles_cabinet` en contraintes
  * moteur, regroupées par vétérinaire propriétaire (1re réf de `qui.refs`).
@@ -108,6 +156,11 @@ export function mapperReglesCabinet(
 
   for (const row of regles) {
     const rejet = (raison: string) => rejets.push({ regleId: row.id, raison })
+
+    // 0. Règles d'équité (famille `equilibrer`) : traitées À PART (par compteur,
+    //    pas par véto) via extraireEquityRules → buildEquityWeights. On les saute
+    //    ici SANS les compter comme rejets (ce n'est pas une contrainte de véto).
+    if (row.brique_id === BRIQUE_EQUILIBRER) continue
 
     // 1. Brique connue du catalogue
     if (!briquesConnues.has(row.brique_id)) {
