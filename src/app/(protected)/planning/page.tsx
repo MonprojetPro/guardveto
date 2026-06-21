@@ -3,6 +3,9 @@ import { redirect } from 'next/navigation'
 import { ActionBar } from '@/components/planning/ActionBar'
 import type { VetCrise } from '@/components/planning/CriseModal'
 import { AlerteBandeau } from '@/components/planning/AlerteBandeau'
+import { RevalidationRealtime } from '@/components/planning/RevalidationRealtime'
+import { RealtimeRefresh } from '@/components/planning/RealtimeRefresh'
+import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
 import { MonthView } from '@/components/calendar/MonthView'
 import { ExportPdfButton } from '@/components/planning/ExportPdfButton'
 import type { GardeDenormalisee, Periode } from '@/types'
@@ -100,14 +103,47 @@ export default async function PlanningPage({
       })()
     : null
 
+  // ── Re-validation continue du planning publié (Chantier B) ────
+  // Périodes PUBLIÉES (ou verrouillées) qui chevauchent le mois affiché et qui
+  // ont des gardes : ce sont celles à re-vérifier en continu.
+  const periodeIdsARevalider: string[] = isAdmin
+    ? toutesLesPeriodes
+        .filter(
+          (p) =>
+            (p.statut === 'publie' || p.statut === 'verrouille') &&
+            p.date_debut <= fin &&
+            p.date_fin >= debut &&
+            periodesAvecGardes.includes(p.id)
+        )
+        .map((p) => p.id)
+    : []
+
+  // Violations calculées en SSR (admin) → évite un flash vide ; le composant
+  // client prend ensuite le relais en temps réel.
+  const violationsInitiales =
+    periodeIdsARevalider.length > 0
+      ? await revaliderPlanningPublie(periodeIdsARevalider)
+      : []
+
   return (
     <div className="space-y-6">
+      {/* Rafraîchissement temps réel de la vue (tous les utilisateurs) */}
+      <RealtimeRefresh />
+
       <div>
         <h1 className="font-heading text-2xl font-bold text-foreground">Planning</h1>
         <p className="text-muted-foreground text-sm mt-1">
           Vue mensuelle des gardes
         </p>
       </div>
+
+      {/* Re-validation continue du planning publié — admin, temps réel */}
+      {isAdmin && periodeIdsARevalider.length > 0 && (
+        <RevalidationRealtime
+          periodeIds={periodeIdsARevalider}
+          initialViolations={violationsInitiales}
+        />
+      )}
 
       {/* Rappel de publication — période brouillon < 15 jours */}
       {rappelPublication && (
