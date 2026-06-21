@@ -122,9 +122,12 @@ export async function POST(req: NextRequest) {
   const result = genererPlanningPur(contexte)
 
   if (!result.success) {
-    // Impasse : retourne le rapport sans modifier la base
+    // Impasse : retourne le rapport complet sans modifier la base.
+    // Le diagnostic (créneau bloquant + règles en cause + suggestions) est
+    // ÉPHÉMÈRE — on ne persiste rien, on le renvoie tel quel à l'UI.
     return NextResponse.json({
       success: false,
+      diagnostic: result.diagnostic ?? null,
       joursNonCouverts: result.joursNonCouverts,
       dureeMs: result.dureeMs,
     })

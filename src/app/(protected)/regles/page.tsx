@@ -17,6 +17,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { ReglesClient, type RegleRow, type VetoMini } from '@/components/regles/ReglesClient'
+import { ReglesFocus } from '@/components/regles/ReglesFocus'
 import {
   ReglagesPlanningClient,
   type StructureRegleUI,
@@ -43,7 +44,12 @@ function resoudreStructure(rows: RegleRow[], briqueId: string): StructureRegleUI
   return { actif: row.actif, force }
 }
 
-export default async function ReglesPage() {
+export default async function ReglesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ focus?: string }>
+}) {
+  const { focus } = await searchParams
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -95,6 +101,7 @@ export default async function ReglesPage() {
 
   return (
     <div className="space-y-10">
+      <ReglesFocus focus={focus} />
       <ReglesClient
         regles={reglesClassiques}
         vets={(vets as VetoMini[]) ?? []}

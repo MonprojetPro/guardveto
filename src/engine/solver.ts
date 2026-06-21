@@ -39,6 +39,8 @@ import { compterParVet } from './rules/optimization'
 import { comparerScores, scorerPlanning, type VecteurScore, type BonusMalusMap } from './score-lexicographique'
 import { DEFAULT_EQUITY_WEIGHTS, type EquityWeights } from './equity-weights'
 import { DEFAULT_STRUCTURE_CONFIG, type StructureConfig } from './structure-config'
+import type { DiagnosticImpasse } from './diagnostic'
+import { construireDiagnostic, type CreneauStep, type ReSimuler } from './diagnostic'
 
 // ── Types publics ────────────────────────────────────────
 
@@ -102,6 +104,13 @@ export type SolveResult =
       /** Planning partiel jusqu'au point d'impasse */
       planningPartiel: PlanningPartiel
       dureeMs: number
+      /**
+       * Diagnostic d'impasse fiable (Lot 1) : le VRAI créneau bloquant capté
+       * pendant le backtracking (premier step sans aucun candidat valide).
+       * Optionnel pour rétro-compat ; `joursNonCouverts` reste toujours fourni.
+       * `reglesEnCause`/`suggestions` sont vides au Lot 1 (remplis aux lots 2/3).
+       */
+      diagnostic?: DiagnosticImpasse
     }
 
 // ── Types internes ───────────────────────────────────────
@@ -113,6 +122,22 @@ interface SolverStep {
   role: RoleGarde
   /** Ce créneau a-t-il besoin d'un 2nd ? (propagé au SlotGarde pour R17/R18). */
   besoinSecond: boolean
+}
+
+/**
+ * Capture du PREMIER créneau réellement sans candidat valide rencontré par le
+ * backtracking, AVEC l'état du planning partiel à ce moment-là.
+ *
+ * C'est le vrai point d'impasse (un step où `candidates.length === 0`), bien
+ * plus fiable que `deepest` (step le plus profond atteint, qui peut être au-delà
+ * du vrai blocage via des branches explorées puis abandonnées). Le `planning`
+ * est une copie du contexte partiel au moment du blocage — les lots 2/3 s'en
+ * serviront pour rejouer `isValid` dans le VRAI contexte (et non sur un planning
+ * vide comme l'ancien diagnostic bogué).
+ */
+interface Blocage {
+  step: SolverStep
+  planning: PlanningPartiel
 }
 
 // ── Génération des créneaux ──────────────────────────────
@@ -279,6 +304,8 @@ function assignerStep(
  * @param vets      Tous les vétérinaires
  * @param bonusMalus  Bonus/malus inter-périodes
  * @param deepest   Référence mutable : index le plus profond atteint (pour diagnostics)
+ * @param blocage   Référence mutable : premier créneau réellement sans candidat
+ *                  (avec son contexte partiel) — vrai point d'impasse (Lot 1)
  * @returns         Planning complet si succès, null sinon
  */
 function backtrack(
@@ -290,6 +317,7 @@ function backtrack(
   weights: EquityWeights,
   structure: StructureConfig,
   deepest: { value: number },
+  blocage: { value: Blocage | null },
   calendrier?: CalendrierResolu
 ): PlanningPartiel | null {
   // Cas de base : toutes les étapes sont planifiées
@@ -310,10 +338,20 @@ function backtrack(
         scorerCandidat(step, b, planning, bonusMalus, vets, weights, calendrier)
     )
 
+  // Aucun candidat valide DANS CE CONTEXTE PARTIEL RÉEL → vrai créneau bloquant.
+  // On capte le PREMIER rencontré, avec une copie de l'état courant. C'est plus
+  // fiable que `deepest` (qui peut pointer un step exploré au-delà du blocage).
+  if (candidates.length === 0 && blocage.value === null) {
+    blocage.value = {
+      step,
+      planning: { attributions: planning.attributions.map((a) => ({ ...a })) },
+    }
+  }
+
   // Essaie chaque candidat dans l'ordre de priorité
   for (const vet of candidates) {
     const newPlanning = assignerStep(planning, step, vet.id)
-    const result = backtrack(steps, index + 1, newPlanning, vets, bonusMalus, weights, structure, deepest, calendrier)
+    const result = backtrack(steps, index + 1, newPlanning, vets, bonusMalus, weights, structure, deepest, blocage, calendrier)
     if (result !== null) return result
   }
 
@@ -326,8 +364,13 @@ function backtrack(
 /**
  * genererSeedGreedy — Génère la solution initiale via backtracking greedy.
  * Renommé depuis l'ancien genererPlanningPur ; sert de seed pour le LNS.
+ *
+ * @param avecDiagnostic  Quand true (défaut), construit le diagnostic Lot 2/3 sur
+ *   la branche échec (raisons fiables + suggestions par re-simulation). Mis à
+ *   false lors des re-simulations internes (Lot 3) pour éviter toute récursion
+ *   coûteuse (un seul niveau de re-sim, seed greedy uniquement).
  */
-function genererSeedGreedy(input: SolverInput): SolveResult {
+function genererSeedGreedy(input: SolverInput, avecDiagnostic = true): SolveResult {
   const { dateDebut, dateFin, saison, vets, bonusMalus, calendrier } = input
   const weights = input.equityWeights ?? DEFAULT_EQUITY_WEIGHTS
   const structure = input.structureConfig ?? DEFAULT_STRUCTURE_CONFIG
@@ -335,6 +378,7 @@ function genererSeedGreedy(input: SolverInput): SolveResult {
 
   const steps = genererSteps(dateDebut, dateFin, saison, input.nbVetosSemaineSoir)
   const deepest = { value: -1 }
+  const blocage: { value: Blocage | null } = { value: null }
 
   const planning = backtrack(
     steps,
@@ -345,6 +389,7 @@ function genererSeedGreedy(input: SolverInput): SolveResult {
     weights,
     structure,
     deepest,
+    blocage,
     calendrier
   )
 
@@ -354,7 +399,9 @@ function genererSeedGreedy(input: SolverInput): SolveResult {
     return { success: true, planning, dureeMs }
   }
 
-  // Impasse : construit le rapport des jours non couverts
+  // ── Impasse ──────────────────────────────────────────
+  // Rapport legacy des jours non couverts (rétro-compat UI), basé sur le step
+  // le plus profond atteint. Conservé tel quel pour ne rien casser en aval.
   const indexImpasse = Math.max(0, deepest.value)
   const joursNonCouverts: JourNonCouvert[] = steps.slice(indexImpasse).map((s) => {
     let contrainteBloquante: string | undefined
@@ -368,11 +415,48 @@ function genererSeedGreedy(input: SolverInput): SolveResult {
     return { date: s.date, type: s.type, role: s.role, contrainteBloquante }
   })
 
+  // Le VRAI créneau bloquant = celui capté par le backtracking (premier step
+  // sans candidat valide), AVEC son planning partiel réel. Repli défensif sur le
+  // step `deepest` (planning vide) si — cas théorique — aucun blocage n'a été
+  // capté (ex : aucun step du tout).
+  const stepBloquant: SolverStep | undefined = blocage.value?.step ?? steps[indexImpasse]
+  const planningBloquant: PlanningPartiel = blocage.value?.planning ?? { attributions: [] }
+
+  let diagnostic: DiagnosticImpasse | undefined
+  if (avecDiagnostic && stepBloquant) {
+    // CreneauStep + steps complets (sous-ensemble structurel des SolverStep).
+    const stepDiag: CreneauStep = {
+      date: stepBloquant.date, type: stepBloquant.type,
+      saison: stepBloquant.saison, role: stepBloquant.role, besoinSecond: stepBloquant.besoinSecond,
+    }
+    const stepsDiag: CreneauStep[] = steps.map((s) => ({
+      date: s.date, type: s.type, saison: s.saison, role: s.role, besoinSecond: s.besoinSecond,
+    }))
+
+    // Re-simulation Lot 3 : relance UNIQUEMENT le seed greedy (jamais le LNS,
+    // jamais de diagnostic récursif) avec les vétos / la structure modifiés.
+    const resimuler: ReSimuler = (vetsModifies, structureModifiee) =>
+      genererSeedGreedy(
+        { ...input, vets: vetsModifies, structureConfig: structureModifiee },
+        false,
+      ).success
+
+    diagnostic = construireDiagnostic({
+      blocage: { step: stepDiag, planning: planningBloquant },
+      input: { vets, calendrier, structureConfig: structure },
+      steps: stepsDiag,
+      joursNonCouverts,
+      structure,
+      resimuler,
+    })
+  }
+
   return {
     success: false,
     joursNonCouverts,
     planningPartiel: { attributions: [] },
     dureeMs,
+    diagnostic,
   }
 }
 

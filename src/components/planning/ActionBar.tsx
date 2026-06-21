@@ -3,9 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Loader2, Wand2, Send, FileText, LayoutGrid, AlertTriangle } from 'lucide-react'
+import { Loader2, Wand2, Send, FileText, LayoutGrid } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { DiagnosticImpasse } from '@/components/planning/DiagnosticImpasse'
+import type { JourNonCouvert } from '@/components/planning/types-impasse'
+import type { DiagnosticImpasse as DiagnosticImpasseData } from '@/engine/diagnostic'
 import {
   Select,
   SelectContent,
@@ -30,11 +33,10 @@ interface ActionBarProps {
   periodesAvecGardes: string[]
 }
 
-interface JourNonCouvert {
-  date: string
-  type: string
-  role: string
-  contrainteBloquante?: string
+/** Réponse d'impasse renvoyée par /api/generate (success:false). */
+interface ImpasseState {
+  diagnostic: DiagnosticImpasseData | null
+  joursNonCouverts: JourNonCouvert[]
 }
 
 // ── Helpers ──────────────────────────────────────────────
@@ -73,7 +75,7 @@ export function ActionBar({ periodes, periodesAvecGardes }: ActionBarProps) {
   const [generating, setGenerating] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
-  const [impasse, setImpasse] = useState<JourNonCouvert[] | null>(null)
+  const [impasse, setImpasse] = useState<ImpasseState | null>(null)
 
   const periodeSelectionnee = periodes.find((p) => p.id === periodeId) ?? null
   const aDesGardes = periodesAvecGardes.includes(periodeId)
@@ -98,8 +100,12 @@ export function ActionBar({ periodes, periodesAvecGardes }: ActionBarProps) {
         toast.success(`${data.nbGardes} gardes générées en ${data.dureeMs}ms`)
         router.refresh()
       } else {
-        setImpasse(data.joursNonCouverts ?? [])
-        toast.error(`Impasse — ${data.joursNonCouverts?.length ?? 0} créneaux non couverts`)
+        const jours: JourNonCouvert[] = data.joursNonCouverts ?? []
+        setImpasse({
+          diagnostic: (data.diagnostic ?? null) as DiagnosticImpasseData | null,
+          joursNonCouverts: jours,
+        })
+        toast.error('Aucun planning possible avec les règles actuelles.')
       }
     } catch {
       toast.error('Impossible de joindre le serveur.')
@@ -211,54 +217,12 @@ export function ActionBar({ periodes, periodesAvecGardes }: ActionBarProps) {
         </div>
       </div>
 
-      {/* Rapport d'impasse */}
+      {/* Diagnostic d'impasse actionnable (Lot 5) */}
       {impasse && !generating && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-2">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-destructive mt-0.5 shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-destructive">
-                Impasse — planning incomplet
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Le moteur n'a pas trouvé de solution valide pour{' '}
-                {impasse.length} créneau{impasse.length > 1 ? 'x' : ''}.
-                Vérifiez les contraintes ou les congés des vétérinaires.
-              </p>
-            </div>
-          </div>
-          {impasse.length > 0 && (
-            <div className="space-y-1 max-h-40 overflow-y-auto">
-              {impasse.slice(0, 20).map((j, i) => (
-                <div
-                  key={i}
-                  className="flex items-baseline gap-2 text-xs rounded bg-destructive/10 px-2 py-1"
-                >
-                  <span className="font-medium text-destructive shrink-0">
-                    {new Date(j.date + 'T12:00:00Z').toLocaleDateString('fr-FR', {
-                      weekday: 'short',
-                      day: 'numeric',
-                      month: 'short',
-                    })}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {j.role === 'premier' ? '1er' : '2nd'} de garde
-                  </span>
-                  {j.contrainteBloquante && (
-                    <span className="text-muted-foreground/70 truncate">
-                      — {j.contrainteBloquante}
-                    </span>
-                  )}
-                </div>
-              ))}
-              {impasse.length > 20 && (
-                <p className="text-xs text-muted-foreground px-2">
-                  … et {impasse.length - 20} autres créneaux non couverts.
-                </p>
-              )}
-            </div>
-          )}
-        </div>
+        <DiagnosticImpasse
+          diagnostic={impasse.diagnostic}
+          joursNonCouverts={impasse.joursNonCouverts}
+        />
       )}
 
       {/* Modale de confirmation de publication */}

@@ -172,8 +172,10 @@ export async function POST(req: NextRequest) {
   const dureeMs = Date.now() - t0
 
   if (!result.success) {
+    // Même forme d'impasse que /api/generate : diagnostic éphémère complet.
     return NextResponse.json({
       success: false,
+      diagnostic: result.diagnostic ?? null,
       joursNonCouverts: result.joursNonCouverts,
       dureeMs,
     })

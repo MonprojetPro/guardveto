@@ -155,7 +155,8 @@ export function ReglesClient({ regles, vets, isAdmin }: ReglesClientProps) {
   // ── Ligne de règle ─────────────────────────────────────────
   const RegleRowView = ({ regle, grisee }: { regle: RegleRow; grisee?: boolean }) => (
     <div
-      className={`flex items-start gap-3 p-3.5 rounded-lg border border-border bg-card ${grisee ? 'opacity-55' : ''}`}
+      data-regle-cible={regle.id}
+      className={`flex items-start gap-3 p-3.5 rounded-lg border border-border bg-card transition-shadow data-[focus=on]:ring-2 data-[focus=on]:ring-accent data-[focus=on]:ring-offset-1 ${grisee ? 'opacity-55' : ''}`}
     >
       <span className="text-base leading-6 shrink-0" aria-hidden>
         {symboleDe(regle.force)}

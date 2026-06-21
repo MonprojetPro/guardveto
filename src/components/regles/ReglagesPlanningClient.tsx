@@ -68,7 +68,7 @@ export interface StructureRegleUI {
 
 // ── Ligne générique (présentation identique partout) ────────
 function Ligne({
-  titre, aide, value, valueLabel, options, isAdmin, isPending, onChange,
+  titre, aide, value, valueLabel, options, isAdmin, isPending, onChange, cible, cibleAlt,
 }: {
   titre: string
   aide: string
@@ -78,9 +78,17 @@ function Ligne({
   isAdmin: boolean
   isPending: boolean
   onChange: (v: string) => void
+  /** Identifiant ciblable depuis le diagnostic d'impasse (?focus=…). */
+  cible?: string
+  /** Alias ciblable (ex : clé structurelle r8_inversion/r9_liaison). */
+  cibleAlt?: string
 }) {
   return (
-    <div className="flex items-center gap-3 p-3.5 rounded-lg border border-border bg-card">
+    <div
+      data-regle-cible={cible}
+      data-regle-cible-alt={cibleAlt}
+      className="flex items-center gap-3 p-3.5 rounded-lg border border-border bg-card transition-shadow data-[focus=on]:ring-2 data-[focus=on]:ring-accent data-[focus=on]:ring-offset-1"
+    >
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground">{titre}</p>
         <p className="text-xs text-muted-foreground leading-5">{aide}</p>
@@ -196,6 +204,8 @@ export function ReglagesPlanningClient({ equite, structure, isAdmin }: ReglagesP
               isAdmin={isAdmin}
               isPending={isPending}
               onChange={(v2) => changerStructure(briqueId, v2)}
+              cible={briqueId}
+              cibleAlt={briqueId === 'inversion_role' ? 'r8_inversion' : 'r9_liaison'}
             />
           )
         })}
