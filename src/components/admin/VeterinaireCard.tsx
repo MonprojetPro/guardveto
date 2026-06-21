@@ -4,10 +4,33 @@ import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Pencil, PowerOff, Power, ChevronDown, ChevronUp, ShieldCheck, Star, UserX, CircleOff, Briefcase, Users, MailPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { VeterinaireForm } from './VeterinaireForm'
 import { ContraintesSection } from './ContraintesSection'
-import { inviterVeterinaire, toggleVeterinaireActif } from '@/app/(protected)/admin/veterinaires/actions'
+import { inviterVeterinaire, toggleVeterinaireActif, type GardeAVenir } from '@/app/(protected)/admin/veterinaires/actions'
 import type { ContrainteVeto, Veterinaire } from '@/types'
+
+const LIBELLE_TYPE: Record<string, string> = {
+  semaine: 'Semaine',
+  weekend: 'Week-end',
+  ferie: 'Férié',
+}
+
+function formatGardeFr(g: GardeAVenir): string {
+  const d = new Date(g.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+  return `${d} · ${LIBELLE_TYPE[g.type] ?? g.type}`
+}
 
 interface VeterinaireCardProps {
   veterinaire: Veterinaire
@@ -18,25 +41,40 @@ interface VeterinaireCardProps {
 export function VeterinaireCard({ veterinaire, contraintes, vets }: VeterinaireCardProps) {
   const [editOpen, setEditOpen] = useState(false)
   const [contraintesOpen, setContraintesOpen] = useState(false)
+  const [confirmDeactivate, setConfirmDeactivate] = useState<GardeAVenir[] | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const handleInviter = () => {
     startTransition(async () => {
       const result = await inviterVeterinaire(veterinaire.id)
-      if (result.error) { toast.error(result.error); return }
-      toast.success(`Invitation envoyée à ${result.email}`)
+      if ('error' in result && result.error) { toast.error(result.error); return }
+      if ('email' in result) toast.success(`Invitation envoyée à ${result.email}`)
     })
   }
 
   const handleToggleActif = () => {
     startTransition(async () => {
       const result = await toggleVeterinaireActif(veterinaire.id, !veterinaire.actif)
-      if (result.error) { toast.error(result.error); return }
+      if ('error' in result && result.error) { toast.error(result.error); return }
+      // Garde-fou : véto encore de garde sur un planning publié → confirmation.
+      if ('requiresConfirmation' in result) {
+        setConfirmDeactivate(result.gardesAVenir)
+        return
+      }
       toast.success(
         veterinaire.actif
           ? `${veterinaire.prenom} ${veterinaire.nom} désactivé`
           : `${veterinaire.prenom} ${veterinaire.nom} réactivé`
       )
+    })
+  }
+
+  const confirmerDesactivation = () => {
+    startTransition(async () => {
+      const result = await toggleVeterinaireActif(veterinaire.id, false, true)
+      if ('error' in result && result.error) { toast.error(result.error); return }
+      setConfirmDeactivate(null)
+      toast.success(`${veterinaire.prenom} ${veterinaire.nom} désactivé`)
     })
   }
 
@@ -162,6 +200,45 @@ export function VeterinaireCard({ veterinaire, contraintes, vets }: VeterinaireC
           </div>
         )}
       </div>
+
+      {/* Confirmation de désactivation — véto encore de garde sur un planning publié */}
+      <Dialog open={confirmDeactivate !== null} onOpenChange={(o) => { if (!o && !isPending) setConfirmDeactivate(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Désactiver {veterinaire.prenom} {veterinaire.nom} ?</DialogTitle>
+            <DialogDescription>
+              {veterinaire.prenom} est encore <strong>de garde sur un planning publié</strong> à venir.
+              La désactivation ne supprime pas ces gardes — il faudra les
+              <strong> réattribuer</strong> (édition manuelle ou gestion de crise),
+              sinon elles resteront sans remplaçant et les compteurs d’équité seront faussés.
+            </DialogDescription>
+          </DialogHeader>
+          {confirmDeactivate && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-2.5 dark:border-amber-800 dark:bg-amber-950/20">
+              <p className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">
+                {confirmDeactivate.length} garde{confirmDeactivate.length > 1 ? 's' : ''} à venir :
+              </p>
+              <ul className="text-xs text-amber-700 dark:text-amber-400 space-y-0.5 max-h-40 overflow-auto">
+                {confirmDeactivate.map((g, i) => (
+                  <li key={`${g.date}-${g.type}-${i}`}>{formatGardeFr(g)}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDeactivate(null)} disabled={isPending}>
+              Annuler
+            </Button>
+            <Button
+              onClick={confirmerDesactivation}
+              disabled={isPending}
+              className="bg-destructive hover:bg-destructive/90 text-white"
+            >
+              Désactiver quand même
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <VeterinaireForm
         open={editOpen}

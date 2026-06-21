@@ -84,9 +84,11 @@ export async function POST(req: NextRequest) {
 
   // ── Validation du corps ─────────────────────────────────
   let periodeId: string
+  let confirmRepublication: boolean
   try {
     const body = await req.json()
     periodeId = body?.periodeId
+    confirmRepublication = body?.confirmRepublication === true
     if (!periodeId || typeof periodeId !== 'string') {
       return NextResponse.json(
         { error: 'Corps invalide. Attendu : { periodeId: string }' },
@@ -98,6 +100,33 @@ export async function POST(req: NextRequest) {
       { error: 'Corps de requête non parsable (JSON attendu).' },
       { status: 400 }
     )
+  }
+
+  // ── Garde-fou régénération d'une période PUBLIÉE (Chantier B) ──
+  // Régénérer écrase le planning publié, le repasse en brouillon, supprime les
+  // événements Google Agenda et impose une republication (re-notifie les vétos).
+  // On REFUSE de le faire en silence : sans confirmation explicite, on renvoie
+  // un signal `requiresConfirmation` que l'UI transforme en dialogue.
+  {
+    const { data: periode } = await supabase
+      .from('periodes')
+      .select('statut')
+      .eq('id', periodeId)
+      .single()
+
+    if (periode?.statut === 'publie' && !confirmRepublication) {
+      const { count } = await supabase
+        .from('gardes')
+        .select('id', { count: 'exact', head: true })
+        .eq('periode_id', periodeId)
+        .eq('cabinet_id', cabinetId)
+
+      return NextResponse.json({
+        requiresConfirmation: true,
+        statut: 'publie',
+        nbGardes: count ?? 0,
+      })
+    }
   }
 
   // ── Chargement du contexte (V2 : inclut le calendrier) ─────

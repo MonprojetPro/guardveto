@@ -78,6 +78,7 @@ export function ActionBar({ periodes, periodesAvecGardes, vets }: ActionBarProps
   const [generating, setGenerating] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [republishOpen, setRepublishOpen] = useState(false)
   const [impasse, setImpasse] = useState<ImpasseState | null>(null)
   const [criseOpen, setCriseOpen] = useState(false)
 
@@ -85,7 +86,18 @@ export function ActionBar({ periodes, periodesAvecGardes, vets }: ActionBarProps
   const aDesGardes = periodesAvecGardes.includes(periodeId)
   const peutPublier = aDesGardes && periodeSelectionnee?.statut === 'brouillon'
 
-  async function handleGenerer() {
+  // Clic « Générer » : si la période est publiée, on demande confirmation AVANT
+  // d'écraser le planning publié (garde-fou Chantier B). Sinon on génère direct.
+  function handleGenerer() {
+    if (!periodeId) return
+    if (periodeSelectionnee?.statut === 'publie') {
+      setRepublishOpen(true)
+      return
+    }
+    void lancerGeneration(false)
+  }
+
+  async function lancerGeneration(confirmRepublication: boolean) {
     if (!periodeId) return
     setGenerating(true)
     setImpasse(null)
@@ -93,14 +105,20 @@ export function ActionBar({ periodes, periodesAvecGardes, vets }: ActionBarProps
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ periodeId }),
+        body: JSON.stringify({ periodeId, confirmRepublication }),
       })
       const data = await res.json()
       if (!res.ok) {
         toast.error(data.error ?? 'Erreur lors de la génération.')
         return
       }
+      // Filet de sécurité serveur : période publiée sans confirmation → dialogue.
+      if (data.requiresConfirmation) {
+        setRepublishOpen(true)
+        return
+      }
       if (data.success) {
+        setRepublishOpen(false)
         toast.success(`${data.nbGardes} gardes générées en ${data.dureeMs}ms`)
         router.refresh()
       } else {
@@ -268,6 +286,41 @@ export function ActionBar({ periodes, periodesAvecGardes, vets }: ActionBarProps
                 <Send className="w-4 h-4 mr-2" />
               )}
               Confirmer la publication
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modale de confirmation de RÉGÉNÉRATION d'une période publiée (Chantier B) */}
+      <Dialog open={republishOpen} onOpenChange={(o) => { if (!generating) setRepublishOpen(o) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Régénérer un planning publié ?</DialogTitle>
+            <DialogDescription>
+              Cette période est <strong>publiée</strong>. La régénérer va l’écraser :
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="text-sm text-muted-foreground space-y-1.5 list-disc pl-5">
+            <li>Le planning actuel est <strong>remplacé</strong> (sauf les gardes verrouillées).</li>
+            <li>La période <strong>repasse en brouillon</strong> : les vétérinaires ne la verront plus tant qu’elle n’est pas republiée.</li>
+            <li>Les <strong>événements Google Agenda</strong> de la période sont supprimés puis recréés à la republication.</li>
+            <li>Republier <strong>renvoie des e-mails</strong> de notification aux vétérinaires.</li>
+          </ul>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRepublishOpen(false)} disabled={generating}>
+              Annuler
+            </Button>
+            <Button
+              onClick={() => lancerGeneration(true)}
+              disabled={generating}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
+            >
+              {generating ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Wand2 className="w-4 h-4 mr-2" />
+              )}
+              Régénérer quand même
             </Button>
           </DialogFooter>
         </DialogContent>

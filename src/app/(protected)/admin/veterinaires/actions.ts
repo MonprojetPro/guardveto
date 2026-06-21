@@ -146,8 +146,55 @@ export async function inviterVeterinaire(id: string) {
   return { success: true, email: vet.email }
 }
 
-export async function toggleVeterinaireActif(id: string, actif: boolean) {
+export interface GardeAVenir {
+  date: string
+  type: string
+}
+
+type ToggleActifResult =
+  | { error: string }
+  | { success: true }
+  | { requiresConfirmation: true; gardesAVenir: GardeAVenir[] }
+
+/**
+ * Active / désactive un vétérinaire.
+ *
+ * Garde-fou Chantier B : désactiver un véto qui est ENCORE de garde sur un
+ * planning PUBLIÉ à venir le fait sortir des compteurs (équité faussée) et
+ * laisse une garde « orpheline » que personne ne couvre vraiment. On refuse
+ * donc de désactiver en silence : sans `confirm`, on renvoie la liste des
+ * gardes publiées à venir pour que l'UI demande une confirmation explicite.
+ * (La désactivation n'efface PAS ces gardes — il faudra les réattribuer via
+ * une édition manuelle ou la gestion de crise.)
+ */
+export async function toggleVeterinaireActif(
+  id: string,
+  actif: boolean,
+  confirm: boolean = false
+): Promise<ToggleActifResult> {
   const supabase = await createClient()
+
+  // Contrôle uniquement à la DÉSACTIVATION (réactiver est toujours sûr).
+  if (!actif && !confirm) {
+    const today = new Date().toISOString().slice(0, 10)
+    const { data: gardes } = await supabase
+      .from('gardes')
+      .select('date, type, periodes!inner(statut)')
+      .or(`premier_id.eq.${id},second_id.eq.${id}`)
+      .gte('date', today)
+      .eq('periodes.statut', 'publie')
+      .order('date')
+
+    if (gardes && gardes.length > 0) {
+      return {
+        requiresConfirmation: true as const,
+        gardesAVenir: (gardes as { date: string; type: string }[]).map((g) => ({
+          date: g.date,
+          type: g.type,
+        })),
+      }
+    }
+  }
 
   const { error } = await supabase
     .from('veterinaires')
