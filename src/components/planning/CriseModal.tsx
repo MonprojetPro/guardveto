@@ -108,6 +108,14 @@ interface CriseModalProps {
   vets: VetCrise[]
   /** Date pré-remplie (jour cliqué dans le calendrier), facultatif. */
   dateDefaut?: string
+  /**
+   * Début de la PLAGE pré-remplie (ex : ouverture depuis un conflit de congé),
+   * facultatif. Prioritaire sur `dateDefaut`. Permet de pré-remplir un congé
+   * validé qui couvre plusieurs jours (et pas un jour unique).
+   */
+  dateDebutDefaut?: string
+  /** Fin de la PLAGE pré-remplie, facultatif. Prioritaire sur `dateDefaut`. */
+  dateFinDefaut?: string
   /** Véto pré-sélectionné comme absent (ex : « déclarer ce véto absent »), facultatif. */
   vetDefautId?: string
 }
@@ -383,14 +391,21 @@ export function CriseModal({
   onOpenChange,
   vets,
   dateDefaut,
+  dateDebutDefaut,
+  dateFinDefaut,
   vetDefautId,
 }: CriseModalProps) {
   const router = useRouter()
 
+  // Plage pré-remplie résolue : une plage explicite (dateDebutDefaut/dateFinDefaut)
+  // prime sur le jour unique (dateDefaut), qui prime sur vide.
+  const debutInitial = dateDebutDefaut ?? dateDefaut ?? ''
+  const finInitiale = dateFinDefaut ?? dateDefaut ?? ''
+
   // Étape 1 — déclaration
   const [absentId, setAbsentId] = useState<string>(vetDefautId ?? '')
-  const [dateDebut, setDateDebut] = useState<string>(dateDefaut ?? '')
-  const [dateFin, setDateFin] = useState<string>(dateDefaut ?? '')
+  const [dateDebut, setDateDebut] = useState<string>(debutInitial)
+  const [dateFin, setDateFin] = useState<string>(finInitiale)
   const [motif, setMotif] = useState<MotifAbsence>('maladie')
   const [commentaire, setCommentaire] = useState<string>('')
   const [declaring, setDeclaring] = useState(false)
@@ -407,8 +422,8 @@ export function CriseModal({
   // ── Reset complet à la fermeture ──────────────────────
   function resetAll() {
     setAbsentId(vetDefautId ?? '')
-    setDateDebut(dateDefaut ?? '')
-    setDateFin(dateDefaut ?? '')
+    setDateDebut(debutInitial)
+    setDateFin(finInitiale)
     setMotif('maladie')
     setCommentaire('')
     setResultat(null)

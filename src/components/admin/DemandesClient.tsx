@@ -5,6 +5,8 @@ import { Check, X, Inbox, CalendarOff, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ValiderCongeDialog } from '@/components/conges/ValiderCongeDialog'
 import { RefuserCongeDialog } from '@/components/conges/RefuserCongeDialog'
+import { ConflitPublieBadge } from '@/components/conges/ConflitPublieBadge'
+import type { CreneauImpacte } from '@/lib/crise/contexte'
 import type { Conge, Veterinaire } from '@/types'
 
 const TYPE_LABELS: Record<string, string> = {
@@ -49,9 +51,15 @@ interface DemandesClientProps {
   demandes: Conge[]
   vets: Veterinaire[]
   currentVetoId: string
+  /**
+   * Conflits planning publié pré-calculés côté serveur (LOT A5-lite) :
+   * { congeId → créneaux publiés chevauchés }. Une demande absente de la map
+   * (ou avec un tableau vide) = aucun conflit → pas de badge.
+   */
+  conflitsParConge?: Record<string, CreneauImpacte[]>
 }
 
-export function DemandesClient({ demandes, vets, currentVetoId }: DemandesClientProps) {
+export function DemandesClient({ demandes, vets, currentVetoId, conflitsParConge }: DemandesClientProps) {
   const [validerConge, setValiderConge] = useState<Conge | null>(null)
   const [refuserCongeItem, setRefuserCongeItem] = useState<Conge | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -63,6 +71,7 @@ export function DemandesClient({ demandes, vets, currentVetoId }: DemandesClient
     const vet = vets.find((v) => v.id === d.veterinaire_id)
     const isIndispo = d.type === 'indisponibilite'
     const sem = isIndispo ? null : getNbSemaines(d.date_debut, d.date_fin)
+    const conflitCreneaux = conflitsParConge?.[d.id] ?? []
 
     return (
       <div className="flex items-center gap-3 p-3.5 rounded-lg border border-border bg-card">
@@ -88,6 +97,11 @@ export function DemandesClient({ demandes, vets, currentVetoId }: DemandesClient
             )}
             {d.commentaire && <> · <span className="italic">{d.commentaire}</span></>}
           </p>
+          {conflitCreneaux.length > 0 && (
+            <div className="mt-1.5">
+              <ConflitPublieBadge creneaux={conflitCreneaux} />
+            </div>
+          )}
         </div>
 
         <span className={`hidden sm:inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium shrink-0 ${TYPE_COLORS[d.type] ?? ''}`}>

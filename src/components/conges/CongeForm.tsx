@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { createConge, updateConge } from '@/app/(protected)/conges/actions'
+import { createConge, updateConge, type ConflitPlanning } from '@/app/(protected)/conges/actions'
 import type { Conge, CreneauConge, TypeConge, Veterinaire } from '@/types'
 
 const TYPES_CONGE: { value: TypeConge; label: string }[] = [
@@ -55,10 +55,15 @@ interface CongeFormProps {
   isAdmin: boolean
   conge?: Conge | null
   defaultVetId?: string
+  /**
+   * Appelé quand la CRÉATION (admin → congé validé) a détecté un conflit avec
+   * un planning publié (cas « Antoine »). Le parent ouvre alors l'alerte.
+   */
+  onConflit?: (conflit: ConflitPlanning) => void
 }
 
 export function CongeForm({
-  open, onClose, vets, currentUserId, isAdmin, conge, defaultVetId,
+  open, onClose, vets, currentUserId, isAdmin, conge, defaultVetId, onConflit,
 }: CongeFormProps) {
   const isEdit = Boolean(conge)
   const [isPending, startTransition] = useTransition()
@@ -143,13 +148,20 @@ export function CongeForm({
         creneau: isIndispo ? creneau : null,
         commentaire,
       }
-      const result = isEdit && conge
-        ? await updateConge(conge.id, data)
-        : await createConge(data, currentUserId, isAdmin)
+      if (isEdit && conge) {
+        const result = await updateConge(conge.id, data)
+        if (result.error) { toast.error(result.error); return }
+        toast.success('Demande modifiée')
+        handleClose()
+        return
+      }
 
+      const result = await createConge(data, currentUserId, isAdmin)
       if (result.error) { toast.error(result.error); return }
-      toast.success(isEdit ? 'Demande modifiée' : isIndispo ? 'Indisponibilité soumise' : 'Congé ajouté')
+      toast.success(isIndispo ? 'Indisponibilité soumise' : 'Congé ajouté')
       handleClose()
+      // createConge (branche admin/validé) peut renvoyer un conflit planning publié.
+      if (result.conflit) onConflit?.(result.conflit)
     })
   }
 

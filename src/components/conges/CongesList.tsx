@@ -10,7 +10,11 @@ import {
 } from '@/components/ui/select'
 import { CongeForm } from './CongeForm'
 import { ValiderCongeDialog } from './ValiderCongeDialog'
-import { deleteConge, refuserConge } from '@/app/(protected)/conges/actions'
+import { ConflitPlanningDialog } from './ConflitPlanningDialog'
+import { ConflitPublieBadge } from './ConflitPublieBadge'
+import { CriseModal, type VetCrise } from '@/components/planning/CriseModal'
+import { deleteConge, refuserConge, type ConflitPlanning } from '@/app/(protected)/conges/actions'
+import type { CreneauImpacte } from '@/lib/crise/contexte'
 import type { Conge, StatutConge, TypeConge, Veterinaire } from '@/types'
 
 const TYPE_LABELS: Record<TypeConge, string> = {
@@ -57,9 +61,15 @@ interface CongesListProps {
   vets: Veterinaire[]
   currentUserId: string
   isAdmin: boolean
+  /**
+   * Conflits planning publié pré-calculés côté serveur (LOT A5-lite) :
+   * { congeId → créneaux publiés chevauchés }. Renseigné uniquement pour les
+   * souhaits en attente côté admin ; les autres congés n'y figurent pas.
+   */
+  conflitsParConge?: Record<string, CreneauImpacte[]>
 }
 
-export function CongesList({ conges, vets, currentUserId, isAdmin }: CongesListProps) {
+export function CongesList({ conges, vets, currentUserId, isAdmin, conflitsParConge }: CongesListProps) {
   const [addOpen, setAddOpen] = useState(false)
   const [addDefaultVet, setAddDefaultVet] = useState<string | undefined>()
   const [editConge, setEditConge] = useState<Conge | null>(null)
@@ -67,6 +77,20 @@ export function CongesList({ conges, vets, currentUserId, isAdmin }: CongesListP
   const [isPending, startTransition] = useTransition()
   const [filtreVet, setFiltreVet] = useState('tous')
   const [filtreType, setFiltreType] = useState('tous')
+
+  // ── Conflit congé ↔ planning publié (cas « Antoine », LOT A4) ──────────
+  // `conflit` : alerte affichée après une validation/création qui percute une
+  // garde publiée. `criseOuverte` : passage à la CriseModal pré-remplie quand
+  // l'admin choisit « Gérer maintenant ».
+  const [conflit, setConflit] = useState<ConflitPlanning | null>(null)
+  const [criseOuverte, setCriseOuverte] = useState(false)
+
+  // Vétos au format attendu par la CriseModal (réutilisation du flux existant).
+  const vetsCrise: VetCrise[] = vets.map((v) => ({
+    id: v.id, prenom: v.prenom, nom: v.nom, couleur: v.couleur,
+  }))
+  const vetConflit = conflit ? vets.find((v) => v.id === conflit.veterinaire_id) : null
+  const vetConflitNom = vetConflit ? `${vetConflit.prenom} ${vetConflit.nom}` : 'ce vétérinaire'
 
   const congesVisibles = isAdmin ? conges : conges.filter((c) => c.veterinaire_id === currentUserId)
   const souhaitsEnAttente = isAdmin ? conges.filter((c) => c.statut === 'souhait') : []
@@ -111,6 +135,7 @@ export function CongesList({ conges, vets, currentUserId, isAdmin }: CongesListP
     const duree = formatDuree(getNbJours(c.date_debut, c.date_fin))
     const editable = canEdit(c)
     const statutCfg = STATUT_CONFIG[c.statut]
+    const conflitCreneaux = conflitsParConge?.[c.id] ?? []
 
     return (
       <div className="flex items-center gap-3 p-3.5 rounded-lg border border-border bg-card">
@@ -142,6 +167,11 @@ export function CongesList({ conges, vets, currentUserId, isAdmin }: CongesListP
           </p>
           {!isAdmin && c.statut === 'refuse' && c.raison_refus && (
             <p className="text-xs text-destructive mt-1 italic">Motif : {c.raison_refus}</p>
+          )}
+          {conflitCreneaux.length > 0 && (
+            <div className="mt-1.5">
+              <ConflitPublieBadge creneaux={conflitCreneaux} />
+            </div>
           )}
         </div>
 
@@ -312,6 +342,7 @@ export function CongesList({ conges, vets, currentUserId, isAdmin }: CongesListP
         onClose={() => { setAddOpen(false); setAddDefaultVet(undefined) }}
         vets={vets} currentUserId={currentUserId} isAdmin={isAdmin}
         defaultVetId={addDefaultVet}
+        onConflit={setConflit}
       />
       {editConge && (
         <CongeForm
@@ -328,6 +359,35 @@ export function CongesList({ conges, vets, currentUserId, isAdmin }: CongesListP
           conge={validerConge}
           vet={vets.find((v) => v.id === validerConge.veterinaire_id)}
           currentVetoId={currentUserId}
+          onConflit={setConflit}
+        />
+      )}
+
+      {/* Alerte conflit congé ↔ planning publié (cas « Antoine ») */}
+      {conflit && (
+        <ConflitPlanningDialog
+          open={!criseOuverte}
+          onOpenChange={(o) => { if (!o) setConflit(null) }}
+          vetNom={vetConflitNom}
+          creneauxImpactes={conflit.creneauxImpactes}
+          onGerer={() => setCriseOuverte(true)}
+        />
+      )}
+
+      {/* Réparation du planning via le flux de crise EXISTANT, pré-rempli. */}
+      {conflit && criseOuverte && (
+        <CriseModal
+          key={`crise-${conflit.veterinaire_id}-${conflit.date_debut}`}
+          open={criseOuverte}
+          onOpenChange={(o) => {
+            setCriseOuverte(o)
+            // Fermer la CriseModal clôt tout le parcours de conflit.
+            if (!o) setConflit(null)
+          }}
+          vets={vetsCrise}
+          vetDefautId={conflit.veterinaire_id}
+          dateDebutDefaut={conflit.date_debut}
+          dateFinDefaut={conflit.date_fin}
         />
       )}
     </>

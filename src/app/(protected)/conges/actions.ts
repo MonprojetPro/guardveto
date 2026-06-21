@@ -4,7 +4,22 @@ import { createClient } from '@/lib/supabase/server'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { revalidatePath } from 'next/cache'
 import { sendBrevoEmail, emailCongeValide, emailCongeRefuse } from '@/lib/brevo'
+import { detecterConflitPlanningPublie } from '@/lib/conges/detection-conflit'
+import type { CreneauImpacte } from '@/lib/crise/contexte'
 import type { CreneauConge, TypeConge } from '@/types'
+
+/**
+ * Signal de conflit renvoyé au front quand un congé devenu EFFECTIF (validé)
+ * chevauche une ou plusieurs gardes d'un planning DÉJÀ PUBLIÉ pour ce véto.
+ * Présent UNIQUEMENT en cas de conflit — le contrat de succès reste rétro-compatible
+ * (`{ success: true }` inchangé quand il n'y a aucun conflit).
+ */
+export interface ConflitPlanning {
+  veterinaire_id: string
+  date_debut: string
+  date_fin: string
+  creneauxImpactes: CreneauImpacte[]
+}
 
 export interface CongeFormData {
   veterinaire_id: string
@@ -15,7 +30,21 @@ export interface CongeFormData {
   commentaire: string
 }
 
-export async function createConge(data: CongeFormData, saisi_par: string, isAdmin: boolean) {
+/**
+ * Résultat d'une action qui peut détecter un conflit planning publié.
+ * - `error` : échec (le congé n'a pas été enregistré).
+ * - `success: true` (+ `conflit?`) : congé enregistré ; `conflit` présent
+ *   UNIQUEMENT si l'enregistrement chevauche une garde déjà publiée.
+ */
+export type CongeActionResult =
+  | { error: string; success?: undefined; conflit?: undefined }
+  | { success: true; error?: undefined; conflit?: ConflitPlanning }
+
+export async function createConge(
+  data: CongeFormData,
+  saisi_par: string,
+  isAdmin: boolean,
+): Promise<CongeActionResult> {
   const supabase = await createClient()
 
   // Pour un veto non-admin, on force le veterinaire_id à celui de l'utilisateur connecté
@@ -52,7 +81,52 @@ export async function createConge(data: CongeFormData, saisi_par: string, isAdmi
   if (error) return { error: error.message }
   revalidatePath('/conges')
   revalidatePath('/admin/demandes')
+
+  // ── Détection de conflit congé ↔ planning publié (cas « Antoine ») ──────
+  // UNIQUEMENT quand le congé est CRÉÉ déjà validé par un admin (statut 'valide').
+  // Un simple souhait de véto ne déclenche RIEN ici. La détection NE BLOQUE PAS
+  // (le congé est déjà enregistré — choix admin assumé) : on remonte juste un
+  // signal `conflit` au front pour proposer la réparation du planning.
+  if (isAdmin) {
+    const conflit = await detecterConflit(
+      supabase,
+      cabinetId,
+      veterinaire_id,
+      data.date_debut,
+      data.date_fin,
+    )
+    if (conflit) return { success: true, conflit }
+  }
+
   return { success: true }
+}
+
+/**
+ * detecterConflit — wrapper interne : interroge le détecteur LOT A3 et, en cas
+ * de conflit, façonne le signal `ConflitPlanning` prêt à remonter au front.
+ * Fail-open hérité du détecteur : ne plante jamais la création/validation.
+ */
+async function detecterConflit(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  cabinetId: string,
+  veterinaireId: string,
+  dateDebut: string,
+  dateFin: string,
+): Promise<ConflitPlanning | null> {
+  const { aConflit, creneauxImpactes } = await detecterConflitPlanningPublie({
+    supabase,
+    cabinetId,
+    veterinaireId,
+    dateDebut,
+    dateFin,
+  })
+  if (!aConflit) return null
+  return {
+    veterinaire_id: veterinaireId,
+    date_debut: dateDebut,
+    date_fin: dateFin,
+    creneauxImpactes,
+  }
 }
 
 export async function updateConge(id: string, data: CongeFormData) {
@@ -90,7 +164,7 @@ export async function validerConge(
   valide_par: string,
   date_debut?: string,
   date_fin?: string
-) {
+): Promise<CongeActionResult> {
   const supabase = await createClient()
 
   // Récupère les données du congé + vet AVANT la mise à jour (pour l'email)
@@ -106,6 +180,10 @@ export async function validerConge(
 
   const { error } = await supabase.from('conges').update(update).eq('id', id)
   if (error) return { error: error.message }
+
+  // Dates effectives après validation (l'admin a pu ajuster début/fin).
+  const debutEffectif = date_debut ?? conge?.date_debut ?? null
+  const finEffective = date_fin ?? conge?.date_fin ?? null
 
   // Notification email (fire-and-forget — n'échoue pas le process principal)
   if (conge) {
@@ -133,6 +211,31 @@ export async function validerConge(
 
   revalidatePath('/conges')
   revalidatePath('/admin/demandes')
+
+  // ── Détection de conflit congé ↔ planning publié (cas « Antoine ») ──────
+  // Le congé vient de devenir EFFECTIF (statut 'valide') : on vérifie s'il
+  // chevauche une garde d'un planning déjà publié pour ce véto. La validation
+  // n'est JAMAIS bloquée (le congé reste validé) — on remonte un signal au front.
+  if (conge && debutEffectif && finEffective) {
+    let cabinetId: string | null = null
+    try {
+      cabinetId = await resoudreCabinetId(supabase)
+    } catch {
+      // Pas de cabinet résolu → on n'alerte pas, mais la validation reste OK.
+      cabinetId = null
+    }
+    if (cabinetId) {
+      const conflit = await detecterConflit(
+        supabase,
+        cabinetId,
+        conge.veterinaire_id,
+        debutEffectif,
+        finEffective,
+      )
+      if (conflit) return { success: true, conflit }
+    }
+  }
+
   return { success: true }
 }
 

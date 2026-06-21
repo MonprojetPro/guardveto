@@ -8,7 +8,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { validerConge } from '@/app/(protected)/conges/actions'
+import { validerConge, type ConflitPlanning } from '@/app/(protected)/conges/actions'
 import type { Conge, Veterinaire } from '@/types'
 
 interface ValiderCongeDialogProps {
@@ -17,10 +17,15 @@ interface ValiderCongeDialogProps {
   conge: Conge
   vet: Veterinaire | undefined
   currentVetoId: string
+  /**
+   * Appelé quand la validation a détecté un conflit avec un planning publié
+   * (cas « Antoine »). Le parent ouvre alors l'alerte ConflitPlanningDialog.
+   */
+  onConflit?: (conflit: ConflitPlanning) => void
 }
 
 export function ValiderCongeDialog({
-  open, onClose, conge, vet, currentVetoId,
+  open, onClose, conge, vet, currentVetoId, onConflit,
 }: ValiderCongeDialogProps) {
   const [isPending, startTransition] = useTransition()
   const [dateDebut, setDateDebut] = useState(conge.date_debut)
@@ -32,6 +37,7 @@ export function ValiderCongeDialog({
       if (result.error) { toast.error(result.error); return }
       toast.success('Congé validé')
       onClose()
+      if (result.conflit) onConflit?.(result.conflit)
     })
   }
 
