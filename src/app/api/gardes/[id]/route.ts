@@ -5,15 +5,15 @@
 // Marque la garde comme modifie_manuellement=true.
 // Si force=true : déverrouille la garde, logue dans audit_log
 //                et recalcule les bonus/malus de la période.
+//
+// Le cycle d'application (update + audit + bilan + agenda + email) est
+// factorisé dans `appliquerChangementGarde` (réutilisé aussi par la
+// gestion de crise — POST /api/absences/[id]/reparer).
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { resoudreCabinetId } from '@/lib/supabase/cabinet'
-import { queryCompteurs, queryTotalWE } from '@/hooks/useCompteurs'
-import { calculerBilans } from '@/engine/bilan'
-import { syncGardeIndividuelle } from '@/lib/sync-calendrier'
-import { sendGardeModifiee } from '@/lib/notifications'
+import { appliquerChangementGarde } from '@/lib/gardes/appliquer-changement'
 
 // La route attend la synchro agenda + l'envoi email avant de répondre
 export const maxDuration = 60
@@ -53,139 +53,18 @@ export async function PATCH(
     return NextResponse.json({ error: 'Corps de requête invalide.' }, { status: 400 })
   }
 
-  // ── Règle : le même véto ne peut pas être 1er ET 2nd de garde ──
-  if (premier_id && second_id && premier_id === second_id) {
-    return NextResponse.json(
-      { error: 'Le même vétérinaire ne peut pas être à la fois 1er et 2nd de garde. Choisissez deux personnes différentes.' },
-      { status: 422 }
-    )
-  }
-
-  // ── Vérification de la garde ────────────────────────────
-  const { data: garde } = await supabase
-    .from('gardes')
-    .select(`
-      id, verrouille, periode_id, modifie_manuellement,
-      premier_id, second_id,
-      periode:periode_id(statut),
-      oldPremier:premier_id(id, nom, prenom, email),
-      oldSecond:second_id(id, nom, prenom, email)
-    `)
-    .eq('id', gardeId)
-    .single()
-
-  if (!garde) return NextResponse.json({ error: 'Garde introuvable.' }, { status: 404 })
-
-  if (garde.verrouille && !force) {
-    return NextResponse.json(
-      { error: 'Cette garde est verrouillée. Utilisez "Corriger" pour la modifier.' },
-      { status: 422 }
-    )
-  }
-
-  // ── Mise à jour ──────────────────────────────────────────
-  const updatePayload: Record<string, unknown> = {
+  // ── Application (helper partagé) ─────────────────────────
+  const res = await appliquerChangementGarde({
+    supabase,
+    gardeId,
     premier_id,
     second_id,
-    modifie_manuellement: true,
-    updated_at: new Date().toISOString(),
-  }
+    force,
+    auteurVetId: vet.id,
+  })
 
-  if (force) {
-    updatePayload.verrouille = false
-  }
-
-  const { error } = await supabase
-    .from('gardes')
-    .update(updatePayload)
-    .eq('id', gardeId)
-
-  if (error) {
-    return NextResponse.json(
-      { error: `Erreur lors de la mise à jour : ${error.message}` },
-      { status: 500 }
-    )
-  }
-
-  // ── Audit log (correction d'une garde verrouillée) ──────
-  if (force) {
-    await supabase.from('audit_log').insert({
-      table_name: 'gardes',
-      record_id: gardeId,
-      action: 'update',
-      old_data: {
-        premier_id: garde.premier_id,
-        second_id: garde.second_id,
-        verrouille: true,
-        modifie_manuellement: garde.modifie_manuellement,
-      },
-      new_data: {
-        premier_id,
-        second_id,
-        verrouille: false,
-        modifie_manuellement: true,
-      },
-      user_id: vet.id,
-    })
-  }
-
-  // ── Recalcul auto du bilan bonus/malus ───────────────────
-  // Dès qu'une garde d'une période PUBLIÉE ou VERROUILLÉE est modifiée
-  // manuellement, on recalcule le bilan pour que les compteurs « validés »
-  // restent à jour SANS avoir à republier. (Sur un brouillon, le bilan
-  // est calculé à la publication — inutile de le faire ici.)
-  const periodeRel = (garde as Record<string, unknown>).periode as { statut?: string } | { statut?: string }[] | null
-  const periodeStatut = Array.isArray(periodeRel) ? periodeRel[0]?.statut : periodeRel?.statut
-  if (periodeStatut === 'publie' || periodeStatut === 'verrouille') {
-    const [compteurs, totalWE] = await Promise.all([
-      queryCompteurs(supabase, garde.periode_id),
-      queryTotalWE(supabase, garde.periode_id),
-    ])
-
-    if (compteurs.length > 0) {
-      // cabinet_id dérivé côté serveur (jamais du client) pour le recalcul.
-      let cabinetId: string | null = null
-      try {
-        cabinetId = await resoudreCabinetId(supabase)
-      } catch (err) {
-        console.error('[gardes] cabinet_id introuvable pour recalcul bilan:', err instanceof Error ? err.message : String(err))
-      }
-
-      if (cabinetId) {
-        const bilans = calculerBilans(compteurs, totalWE)
-        const rows = bilans.map((b) => ({
-          cabinet_id: cabinetId as string,
-          veterinaire_id: b.veterinaire_id,
-          periode_id: garde.periode_id,
-          ecart_we: b.ecart_we,
-          ecart_semaine: b.ecart_semaine,
-          ecart_feries: b.ecart_feries,
-          ecart_grands_we: b.ecart_grands_we,
-        }))
-        await supabase
-          .from('bonus_malus')
-          .upsert(rows, { onConflict: 'cabinet_id,veterinaire_id,periode_id' })
-      }
-    }
-  }
-
-  // ── Synchro Agenda + notifications ──────────────────────
-  // IMPORTANT : on AWAIT (best-effort). Sur Vercel, le travail lancé sans await
-  // après la réponse n'est PAS garanti de s'exécuter (la fonction serverless est
-  // gelée dès le retour) → c'est ce qui empêchait l'email de modif de partir.
-  const oldPremier = (garde as Record<string, unknown>).oldPremier as { id: string; nom: string; prenom: string; email: string } | null
-  const oldSecond  = (garde as Record<string, unknown>).oldSecond  as { id: string; nom: string; prenom: string; email: string } | null
-
-  try {
-    await syncGardeIndividuelle(supabase, gardeId)
-  } catch (err) {
-    console.error('[gardes] Erreur sync agenda:', err instanceof Error ? err.message : String(err))
-  }
-
-  try {
-    await sendGardeModifiee(supabase, gardeId, oldPremier, oldSecond)
-  } catch (err) {
-    console.error('[gardes] Erreur notifications email:', err instanceof Error ? err.message : String(err))
+  if (!res.ok) {
+    return NextResponse.json({ error: res.error }, { status: res.status })
   }
 
   return NextResponse.json({ success: true })

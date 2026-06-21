@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Loader2, AlertTriangle, Lock, Wrench } from 'lucide-react'
+import { Loader2, AlertTriangle, Lock, Wrench, UserMinus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -25,6 +25,11 @@ interface GardeDetailModalProps {
   isAdmin: boolean
   onClose: () => void
   onSaved: () => void
+  /**
+   * Admin : déclarer le véto assigné comme absent (gestion de crise). Reçoit la
+   * date de la garde et l'id du véto. Absent → bouton masqué.
+   */
+  onDeclarerAbsent?: (date: string, vetId: string) => void
 }
 
 // ── Helpers ──────────────────────────────────────────────
@@ -65,19 +70,32 @@ function VetAvatar({ prenom, couleur, size = 'md' }: { prenom: string; couleur: 
 
 // ── Résumé des gardes actuelles ──────────────────────────
 
-function GardeActuelle({ label, prenom, nom, couleur }: {
+function GardeActuelle({ label, prenom, nom, couleur, onDeclarerAbsent }: {
   label: string
   prenom: string | null
   nom: string | null
   couleur: string | null
+  /** Présent (admin) → affiche un bouton « déclarer absent » pour ce véto. */
+  onDeclarerAbsent?: () => void
 }) {
   return (
     <div className="flex items-center gap-3">
       <span className="text-xs font-medium text-muted-foreground w-20 shrink-0">{label}</span>
       {prenom ? (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           <VetAvatar prenom={prenom} couleur={couleur ?? '#888'} />
-          <span className="text-sm font-medium text-foreground">{prenom} {nom}</span>
+          <span className="text-sm font-medium text-foreground truncate">{prenom} {nom}</span>
+          {onDeclarerAbsent && (
+            <button
+              type="button"
+              onClick={onDeclarerAbsent}
+              className="ml-auto shrink-0 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/30 transition-colors"
+              title={`Déclarer ${prenom} absent·e`}
+            >
+              <UserMinus className="w-3.5 h-3.5" />
+              Déclarer absent·e
+            </button>
+          )}
         </div>
       ) : (
         <span className="text-sm text-muted-foreground italic">Non attribué</span>
@@ -215,7 +233,7 @@ function SectionSelecteur({
 
 // ── Modal principale ─────────────────────────────────────
 
-export function GardeDetailModal({ garde, date, isAdmin, onClose, onSaved }: GardeDetailModalProps) {
+export function GardeDetailModal({ garde, date, isAdmin, onClose, onSaved, onDeclarerAbsent }: GardeDetailModalProps) {
   const router = useRouter()
 
   const [loading, setLoading] = useState(false)
@@ -400,6 +418,11 @@ export function GardeDetailModal({ garde, date, isAdmin, onClose, onSaved }: Gar
                   prenom={garde.premier_prenom}
                   nom={garde.premier_nom}
                   couleur={garde.premier_couleur}
+                  onDeclarerAbsent={
+                    onDeclarerAbsent && garde.premier_id && garde.periode_statut === 'publie'
+                      ? () => onDeclarerAbsent(garde.date, garde.premier_id!)
+                      : undefined
+                  }
                 />
                 {!masquerSecond && (
                   <GardeActuelle
@@ -407,6 +430,11 @@ export function GardeDetailModal({ garde, date, isAdmin, onClose, onSaved }: Gar
                     prenom={garde.second_prenom}
                     nom={garde.second_nom}
                     couleur={garde.second_couleur}
+                    onDeclarerAbsent={
+                      onDeclarerAbsent && garde.second_id && garde.periode_statut === 'publie'
+                        ? () => onDeclarerAbsent(garde.date, garde.second_id!)
+                        : undefined
+                    }
                   />
                 )}
               </div>

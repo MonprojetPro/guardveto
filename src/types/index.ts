@@ -118,6 +118,39 @@ export interface BonusMalus {
   created_at: string
 }
 
+// ── Gestion de crise (LOT 1) ────────────────────────────────
+export type MotifAbsence = 'maladie' | 'urgence' | 'autre'
+export type StatutAbsence = 'active' | 'resolue' | 'annulee'
+export type RoleCompensation = 'premier' | 'second'
+export type StatutCompensation = 'a_compenser' | 'compensee' | 'annulee'
+
+/** Indisponibilité imprévue déclarée APRÈS publication d'un planning (≠ Conge). */
+export interface Absence {
+  id: string
+  cabinet_id: string
+  veterinaire_id: string
+  date_debut: string
+  date_fin: string
+  motif: MotifAbsence
+  commentaire: string | null
+  statut: StatutAbsence
+  declaree_par: string | null
+  created_at: string
+}
+
+/** Trace légère du dépannage : qui a remplacé qui sur une garde, suite à une absence. */
+export interface Compensation {
+  id: string
+  cabinet_id: string
+  absence_id: string
+  garde_id: string
+  remplacant_id: string
+  remplace_id: string
+  role: RoleCompensation | null
+  statut: StatutCompensation
+  created_at: string
+}
+
 // Navigation
 export interface NavItem {
   label: string
@@ -132,6 +165,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Compteurs',     href: '/compteurs',           icon: 'BarChart3',    roles: ['admin', 'veto'] },
   { label: 'Règles',        href: '/regles',              icon: 'ScrollText',   roles: ['admin', 'veto'] },
   { label: 'Demandes',      href: '/admin/demandes',      icon: 'Inbox',        roles: ['admin'] },
+  { label: 'Dépannages',    href: '/admin/depannages',    icon: 'LifeBuoy',     roles: ['admin'] },
   { label: 'Périodes',      href: '/admin/periodes',      icon: 'CalendarRange', roles: ['admin'] },
   { label: 'Vétérinaires',  href: '/admin/veterinaires',  icon: 'Users',        roles: ['admin'] },
 ]

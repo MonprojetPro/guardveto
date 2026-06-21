@@ -214,11 +214,17 @@ async function chargerReglesCabinet(
  *
  * @param periodeId  UUID de la période à générer
  * @param cabinetId  UUID du cabinet courant (optionnel) — active le calendrier zone-aware
+ * @param options    `autoriserVerrouille` (défaut false) : autorise le chargement
+ *                   d'une période VERROUILLÉE. La génération l'interdit (on ne
+ *                   régénère jamais un planning verrouillé) ; la gestion de crise,
+ *                   elle, doit pouvoir RÉPARER un planning verrouillé sans le
+ *                   régénérer (réparation ciblée d'un seul créneau).
  * @throws           Si la période est introuvable ou inaccessible
  */
 export async function chargerInputDepuisSupabase(
   periodeId: string,
-  cabinetId?: string
+  cabinetId?: string,
+  options?: { autoriserVerrouille?: boolean }
 ): Promise<SolverInput> {
   const supabase = await createClient()
 
@@ -233,7 +239,7 @@ export async function chargerInputDepuisSupabase(
     throw new Error(`Période introuvable : ${periodeId}`)
   }
 
-  if (periode.statut === 'verrouille') {
+  if (periode.statut === 'verrouille' && !options?.autoriserVerrouille) {
     throw new Error('Cette période est verrouillée — impossible de régénérer.')
   }
 

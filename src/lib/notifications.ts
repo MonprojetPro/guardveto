@@ -368,7 +368,7 @@ export async function sendRappelPublication(
 async function logEmail(
   supabase: SupabaseClient,
   params: {
-    type: 'planning_publie' | 'garde_modifiee' | 'rappel_publication'
+    type: 'planning_publie' | 'garde_modifiee' | 'rappel_publication' | 'appel_volontaires' | 'depannage_confirme'
     destinataire: string
     veterinaire_id: string | null
     periode_id?: string | null
@@ -572,4 +572,305 @@ export async function sendGardeModifiee(
 
   console.log(`[notifications] Garde modifiée: ${sent} emails envoyés, ${errors} erreurs`)
   return { sent, errors }
+}
+
+// ============================================================
+// LOT 4 — Appel aux volontaires (Mode 2 de la gestion de crise)
+// ============================================================
+// L'admin, plutôt que d'IMPOSER un remplaçant, DEMANDE : il envoie un email à
+// tous les vétos LÉGAUX (candidats issus de proposerReparation) pour UN créneau
+// libéré par une absence. Chaque email contient un lien ABSOLU « Je prends ce
+// créneau » qui pointe vers l'endpoint d'acceptation (volontaire). Le premier
+// qui clique et passe les contrôles serveur emporte le créneau (anti-collision
+// géré côté endpoint, pas ici).
+// ============================================================
+
+/** Rôle libéré (pour l'affichage email). */
+function roleLabel(role: 'premier' | 'second'): string {
+  return role === 'premier' ? '1er de garde' : '2nd de garde'
+}
+
+/**
+ * Construit le lien ABSOLU « Je prends ce créneau ».
+ *
+ * ⚠️ LEÇON PROJET (emails-brevo-liens-texte) : Brevo casse les liens cliquables
+ * sans domaine absolu. On exige donc une URL absolue (NEXT_PUBLIC_APP_URL). Si
+ * elle n'est pas disponible, on renvoie null et l'email affiche le lien EN TEXTE
+ * (jamais de lien cassé / relatif).
+ *
+ * Le lien pointe vers une page de confirmation côté app qui POST l'endpoint
+ * /api/absences/[id]/volontaire. Les identifiants nécessaires (absence, garde,
+ * rôle) sont passés en query — l'endpoint REVALIDE tout côté serveur (un lien
+ * partagé/forwardé ne contourne aucun contrôle : auth + cabinet + éligibilité).
+ */
+function buildLienVolontaire(params: {
+  absenceId: string
+  gardeId: string
+  role: 'premier' | 'second'
+}): string | null {
+  // appUrl() renvoie toujours une valeur (défaut https://guardveto.vercel.app),
+  // donc on a toujours un domaine absolu en pratique. On garde malgré tout la
+  // garde explicite : si jamais la variable était vidée, on bascule en texte.
+  const base = process.env.NEXT_PUBLIC_APP_URL
+  if (!base) return null
+  const url = new URL('/crise/volontaire', base)
+  url.searchParams.set('absence', params.absenceId)
+  url.searchParams.set('garde', params.gardeId)
+  url.searchParams.set('role', params.role)
+  return url.toString()
+}
+
+// ── Email : Appel aux volontaires ─────────────────────────────
+function buildAppelVolontairesHtml(
+  vet: Veterinaire,
+  creneau: { date: string; type: string; role: 'premier' | 'second' },
+  absent: { prenom: string; nom: string } | null,
+  lien: string | null,
+): string {
+  const absentTxt = absent ? `${absent.prenom} ${absent.nom}` : 'un confrère'
+
+  // Bouton si lien absolu disponible, sinon lien EN TEXTE CLAIR (jamais cassé).
+  const ctaBlock = lien
+    ? `<div style="text-align:center;margin:28px 0;">
+         <a href="${lien}" style="display:inline-block;background:#059669;color:#fff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 28px;border-radius:8px;">
+           Je prends ce créneau
+         </a>
+       </div>
+       <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.5;text-align:center;">
+         Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :<br>
+         <span style="color:#6b7280;word-break:break-all;">${lien}</span>
+       </p>`
+    : `<div style="background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;padding:20px 24px;margin:24px 0;">
+         <p style="margin:0 0 10px;color:#065f46;font-size:14px;font-weight:bold;">Pour prendre ce créneau :</p>
+         <p style="margin:0;color:#374151;font-size:14px;line-height:1.6;">
+           Connectez-vous à votre espace GuardVeto, ouvrez la section « Gestion de crise »
+           et déclarez-vous volontaire sur la garde du ${formatDate(creneau.date)}.
+         </p>
+       </div>`
+
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:sans-serif;">
+  <div style="max-width:600px;margin:32px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+    <div style="background:#059669;padding:24px 32px;">
+      <h1 style="margin:0;color:#fff;font-size:20px;">GuardVeto</h1>
+      <p style="margin:8px 0 0;color:#a7f3d0;font-size:14px;">Appel aux volontaires</p>
+    </div>
+    <div style="padding:32px;">
+      <p style="color:#374151;">Bonjour ${vet.prenom},</p>
+      <p style="color:#374151;">
+        Suite à l'absence imprévue de <strong>${absentTxt}</strong>, une garde
+        cherche un remplaçant. Vous êtes éligible pour la couvrir.
+      </p>
+
+      <div style="background:#ecfdf5;border:1px solid #6ee7b7;border-radius:6px;padding:16px;margin:24px 0;">
+        <p style="margin:0 0 6px;color:#065f46;font-weight:bold;font-size:15px;">
+          ${formatDate(creneau.date)} — ${typeLabel(creneau.type)}
+        </p>
+        <p style="margin:0;color:#047857;font-size:14px;">Rôle à pourvoir : <strong>${roleLabel(creneau.role)}</strong></p>
+      </div>
+
+      <p style="color:#374151;font-size:14px;">
+        Si vous êtes disponible, vous pouvez vous porter volontaire d'un clic.
+        <strong>Le premier qui se déclare emporte le créneau</strong> — pensez à vérifier
+        avant de cliquer.
+      </p>
+
+      ${ctaBlock}
+
+      <p style="color:#9ca3af;font-size:12px;margin-top:32px;">
+        Cet email est envoyé automatiquement par GuardVeto. Si vous n'êtes plus disponible
+        ou si quelqu'un a déjà pris la garde, le lien vous l'indiquera. Pour toute question,
+        contactez votre administrateur.
+      </p>
+    </div>
+  </div>
+</body>
+</html>`
+}
+
+/**
+ * sendAppelVolontaires — envoie l'appel aux volontaires pour UN créneau libéré.
+ *
+ * Reçoit la liste des vétos LÉGAUX (candidats de proposerReparation, identifiés
+ * par leur id) ; résout leurs emails depuis `veterinaires` (VetEngine n'a pas
+ * l'email) et envoie à chacun un email avec lien ABSOLU « Je prends ce créneau ».
+ *
+ * Best-effort, comme les autres notifications : les erreurs d'envoi sont loguées
+ * (email_log) mais ne bloquent jamais l'appelant.
+ *
+ * @param supabase     client serveur (RLS-aware ou service — l'appelant décide)
+ * @param candidatIds  ids des vétos légaux à solliciter (déjà filtrés/validés)
+ * @param creneau      le créneau libéré (gardeId, date, type DB, rôle)
+ * @param absence      l'absence à l'origine (id + véto absent, pour le contexte)
+ */
+export async function sendAppelVolontaires(
+  supabase: SupabaseClient,
+  candidatIds: string[],
+  creneau: { gardeId: string; date: string; type: string; role: 'premier' | 'second' },
+  absence: { id: string; veterinaire_id: string },
+): Promise<{ sent: number; errors: number }> {
+  if (candidatIds.length === 0) return { sent: 0, errors: 0 }
+
+  // Emails des candidats (actifs uniquement) — VetEngine ne porte pas l'email.
+  const { data: candidats } = await supabase
+    .from('veterinaires')
+    .select('id, nom, prenom, email')
+    .in('id', candidatIds)
+    .eq('actif', true)
+
+  if (!candidats || candidats.length === 0) return { sent: 0, errors: 0 }
+
+  // Véto absent (pour personnaliser le message) — best-effort.
+  const { data: absent } = await supabase
+    .from('veterinaires')
+    .select('prenom, nom')
+    .eq('id', absence.veterinaire_id)
+    .single()
+
+  const lien = buildLienVolontaire({
+    absenceId: absence.id,
+    gardeId: creneau.gardeId,
+    role: creneau.role,
+  })
+
+  const subject = `[GuardVeto] Garde à pourvoir — ${formatDate(creneau.date)}`
+
+  let sent = 0
+  let errors = 0
+
+  for (const vet of candidats as Veterinaire[]) {
+    const html = buildAppelVolontairesHtml(
+      vet,
+      { date: creneau.date, type: creneau.type, role: creneau.role },
+      (absent as { prenom: string; nom: string } | null) ?? null,
+      lien,
+    )
+
+    try {
+      const messageId = await sendViaBrevo({
+        to:      [{ email: vet.email, name: `${vet.prenom} ${vet.nom}` }],
+        subject,
+        html,
+      })
+
+      await logEmail(supabase, {
+        type: 'appel_volontaires',
+        destinataire: vet.email,
+        veterinaire_id: vet.id,
+        garde_id: creneau.gardeId,
+        resend_id: messageId,
+        statut: 'envoye',
+      })
+      sent++
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error(`[notifications] Erreur appel_volontaires → ${vet.email}:`, msg)
+      await logEmail(supabase, {
+        type: 'appel_volontaires',
+        destinataire: vet.email,
+        veterinaire_id: vet.id,
+        garde_id: creneau.gardeId,
+        statut: 'erreur',
+        erreur: msg,
+      })
+      errors++
+    }
+  }
+
+  console.log(`[notifications] Appel volontaires (garde ${creneau.gardeId}): ${sent} envoyés, ${errors} erreurs`)
+  return { sent, errors }
+}
+
+// ── Email : Confirmation au volontaire qui a pris le créneau ──
+function buildDepannageConfirmeHtml(
+  vet: Veterinaire,
+  creneau: { date: string; type: string; role: 'premier' | 'second' },
+): string {
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:sans-serif;">
+  <div style="max-width:600px;margin:32px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+    <div style="background:#059669;padding:24px 32px;">
+      <h1 style="margin:0;color:#fff;font-size:20px;">GuardVeto</h1>
+      <p style="margin:8px 0 0;color:#a7f3d0;font-size:14px;">Merci — créneau confirmé</p>
+    </div>
+    <div style="padding:32px;">
+      <p style="color:#374151;">Bonjour ${vet.prenom},</p>
+      <p style="color:#374151;">
+        Merci ! Vous êtes désormais affecté·e à cette garde. Elle apparaît dans votre planning
+        et a été synchronisée avec votre agenda.
+      </p>
+
+      <div style="background:#ecfdf5;border:1px solid #6ee7b7;border-radius:6px;padding:16px;margin:24px 0;">
+        <p style="margin:0 0 6px;color:#065f46;font-weight:bold;font-size:15px;">
+          ${formatDate(creneau.date)} — ${typeLabel(creneau.type)}
+        </p>
+        <p style="margin:0;color:#047857;font-size:14px;">Votre rôle : <strong>${roleLabel(creneau.role)}</strong></p>
+      </div>
+
+      <p style="color:#374151;font-size:14px;">
+        Ce dépannage est tracé : votre administrateur en tiendra compte dans l'équilibrage des gardes.
+      </p>
+
+      <p style="color:#9ca3af;font-size:12px;margin-top:32px;">
+        Cet email est envoyé automatiquement par GuardVeto. Pour toute question, contactez votre administrateur.
+      </p>
+    </div>
+  </div>
+</body>
+</html>`
+}
+
+/**
+ * sendDepannageConfirme — confirme au volontaire qu'il a bien pris le créneau.
+ * Best-effort (erreur loguée, jamais bloquante pour l'endpoint).
+ */
+export async function sendDepannageConfirme(
+  supabase: SupabaseClient,
+  veterinaireId: string,
+  creneau: { gardeId: string; date: string; type: string; role: 'premier' | 'second' },
+): Promise<{ sent: number; errors: number }> {
+  const { data: vet } = await supabase
+    .from('veterinaires')
+    .select('id, nom, prenom, email')
+    .eq('id', veterinaireId)
+    .single()
+
+  if (!vet) return { sent: 0, errors: 0 }
+
+  const v = vet as Veterinaire
+  const html = buildDepannageConfirmeHtml(v, creneau)
+  const subject = `[GuardVeto] Garde confirmée — ${formatDate(creneau.date)}`
+
+  try {
+    const messageId = await sendViaBrevo({
+      to:      [{ email: v.email, name: `${v.prenom} ${v.nom}` }],
+      subject,
+      html,
+    })
+    await logEmail(supabase, {
+      type: 'depannage_confirme',
+      destinataire: v.email,
+      veterinaire_id: v.id,
+      garde_id: creneau.gardeId,
+      resend_id: messageId,
+      statut: 'envoye',
+    })
+    return { sent: 1, errors: 0 }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`[notifications] Erreur depannage_confirme → ${v.email}:`, msg)
+    await logEmail(supabase, {
+      type: 'depannage_confirme',
+      destinataire: v.email,
+      veterinaire_id: v.id,
+      garde_id: creneau.gardeId,
+      statut: 'erreur',
+      erreur: msg,
+    })
+    return { sent: 0, errors: 1 }
+  }
 }

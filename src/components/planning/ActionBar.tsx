@@ -3,10 +3,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Loader2, Wand2, Send, FileText, LayoutGrid } from 'lucide-react'
+import { Loader2, Wand2, Send, FileText, LayoutGrid, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DiagnosticImpasse } from '@/components/planning/DiagnosticImpasse'
+import { CriseModal, type VetCrise } from '@/components/planning/CriseModal'
 import type { JourNonCouvert } from '@/components/planning/types-impasse'
 import type { DiagnosticImpasse as DiagnosticImpasseData } from '@/engine/diagnostic'
 import {
@@ -31,6 +32,8 @@ import type { Periode } from '@/types'
 interface ActionBarProps {
   periodes: Periode[]
   periodesAvecGardes: string[]
+  /** Vétos actifs du cabinet — pour le signalement d'absence (gestion de crise). */
+  vets: VetCrise[]
 }
 
 /** Réponse d'impasse renvoyée par /api/generate (success:false). */
@@ -69,13 +72,14 @@ function StatutBadge({ statut }: { statut: Periode['statut'] }) {
 
 // ── Composant ────────────────────────────────────────────
 
-export function ActionBar({ periodes, periodesAvecGardes }: ActionBarProps) {
+export function ActionBar({ periodes, periodesAvecGardes, vets }: ActionBarProps) {
   const router = useRouter()
   const [periodeId, setPeriodeId] = useState<string>(periodes[0]?.id ?? '')
   const [generating, setGenerating] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [impasse, setImpasse] = useState<ImpasseState | null>(null)
+  const [criseOpen, setCriseOpen] = useState(false)
 
   const periodeSelectionnee = periodes.find((p) => p.id === periodeId) ?? null
   const aDesGardes = periodesAvecGardes.includes(periodeId)
@@ -207,6 +211,15 @@ export function ActionBar({ periodes, periodesAvecGardes }: ActionBarProps) {
             Exporter PDF
           </Button>
 
+          <Button
+            variant="outline"
+            className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-950/30"
+            onClick={() => setCriseOpen(true)}
+          >
+            <AlertTriangle className="w-4 h-4 mr-2" />
+            Signaler une absence
+          </Button>
+
           <a
             href="/admin/periodes"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted"
@@ -259,6 +272,9 @@ export function ActionBar({ periodes, periodesAvecGardes }: ActionBarProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modale de gestion de crise — signaler une absence + réparer (Lot 5) */}
+      <CriseModal open={criseOpen} onOpenChange={setCriseOpen} vets={vets} />
     </div>
   )
 }

@@ -68,7 +68,7 @@ function getAttribution(
  *  Lun/Mar/Mer → le WE pertinent est celui de la semaine précédente (le WE vient de se terminer).
  *  Jeu/Ven/Sam/Dim → le WE pertinent est celui de la semaine courante (le WE arrive).
  *  Vérifie aussi vendredi_soir car R9 garantit que ven soir = même duo que le WE. */
-function aGardeWeekendCetteSemaine(
+export function aGardeWeekendCetteSemaine(
   vetId: string,
   date: string,
   planning: PlanningPartiel

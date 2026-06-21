@@ -88,17 +88,21 @@ async function chargerCalendrier(
  *
  * @param periodeId  UUID de la période à simuler
  * @param cabinetId  UUID du cabinet (lu depuis app_metadata du JWT — règle C1)
- * @throws           Si la période est introuvable, verrouillée, ou inaccessible
+ * @param options    `autoriserVerrouille` (défaut false) : autorise une période
+ *                   VERROUILLÉE. Réservé à la gestion de crise (réparation ciblée
+ *                   d'un planning verrouillé) — la génération laisse le défaut.
+ * @throws           Si la période est introuvable, verrouillée (hors crise), ou inaccessible
  */
 export async function resoudreContexte(
   periodeId: string,
-  cabinetId: string
+  cabinetId: string,
+  options?: { autoriserVerrouille?: boolean }
 ): Promise<ContexteSimulation> {
   // 1. Charger les données métier ET le calendrier zone-aware en une passe.
   //    Le loader charge désormais lui-même les vacances scolaires de la ZONE
   //    du cabinet (cabinets.zone_scolaire) + les fériés de sa région — c'est
   //    le chemin nominal, source unique de vérité.
-  const input = await chargerInputDepuisSupabase(periodeId, cabinetId)
+  const input = await chargerInputDepuisSupabase(periodeId, cabinetId, options)
 
   // 2. Filet de sécurité : si le loader n'a pas pu construire le calendrier
   //    (cabinet/référentiel introuvable), on retente via la RPC get_calendrier

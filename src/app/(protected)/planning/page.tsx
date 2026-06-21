@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { ActionBar } from '@/components/planning/ActionBar'
+import type { VetCrise } from '@/components/planning/CriseModal'
 import { AlerteBandeau } from '@/components/planning/AlerteBandeau'
 import { MonthView } from '@/components/calendar/MonthView'
 import { ExportPdfButton } from '@/components/planning/ExportPdfButton'
@@ -53,11 +54,14 @@ export default async function PlanningPage({
 
   // Chargement parallèle : gardes du mois + toutes les périodes + périodes avec gardes (admin)
    
-  const [gardesResult, periodesResult, periodesGardesResult] = await Promise.all([
+  const [gardesResult, periodesResult, periodesGardesResult, vetsResult] = await Promise.all([
     supabase.from('planning_semaine').select('*').gte('date', debut).lte('date', fin).order('date'),
     supabase.from('periodes').select('*').order('date_debut', { ascending: false }).limit(20),
     isAdmin ? supabase.from('gardes').select('periode_id').limit(500) : Promise.resolve({ data: null }),
-   
+    isAdmin
+      ? supabase.from('veterinaires').select('id, prenom, nom, couleur').eq('actif', true).order('nom')
+      : Promise.resolve({ data: null }),
+
   ]) as any[]
 
   const gardesDb = gardesResult?.data
@@ -71,6 +75,11 @@ export default async function PlanningPage({
 
   // Périodes disponibles pour ActionBar (toutes, admin uniquement)
   const toutesLesPeriodes: Periode[] = isAdmin ? ((periodesDb as Periode[]) ?? []) : []
+
+  // Vétos actifs (admin) — pour le signalement d'absence (gestion de crise).
+  const vetsCrise: VetCrise[] = isAdmin
+    ? ((vetsResult?.data as VetCrise[] | null) ?? [])
+    : []
 
   // Liste dédupliquée des periode_ids qui ont au moins une garde
   const periodesAvecGardes: string[] = isAdmin
@@ -117,6 +126,7 @@ export default async function PlanningPage({
         <ActionBar
           periodes={toutesLesPeriodes}
           periodesAvecGardes={periodesAvecGardes}
+          vets={vetsCrise}
         />
       )}
 
@@ -131,6 +141,7 @@ export default async function PlanningPage({
         periodes={(periodesDb as Periode[]) ?? []}
         anneeMois={anneeMois}
         isAdmin={isAdmin}
+        vets={vetsCrise}
       />
     </div>
   )

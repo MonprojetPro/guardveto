@@ -115,7 +115,11 @@ export type SolveResult =
 
 // ── Types internes ───────────────────────────────────────
 
-interface SolverStep {
+// Exporté pour le module de gestion de crise (crise/reparer.ts) qui réutilise
+// `scorerCandidatLNS` afin de garantir une cohérence EXACTE entre le score de
+// construction (greedy/LNS) et le score d'un remplaçant proposé. Type structurel
+// minimal d'un créneau à pourvoir — ne PAS confondre avec CreneauStep (diagnostic).
+export interface SolverStep {
   date: string
   type: TypeGardeEngine
   saison: Saison
@@ -516,7 +520,7 @@ function genererStepsSemaine(lundi: string, saison: Saison, nbVetosSemaineSoir?:
  * Poids d'équité passés en paramètre (curseurs cabinet) — mêmes poids que le
  * scoreur global via equity-weights.ts (source unique, repli DEFAULT).
  */
-function scorerCandidatLNS(
+export function scorerCandidatLNS(
   step: SolverStep,
   vet: VetEngine,
   planning: PlanningPartiel,

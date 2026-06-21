@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { DayCell } from './DayCell'
 import { GardeBadge } from './GardeBadge'
 import { GardeDetailModal } from '@/components/planning/GardeDetailModal'
+import { CriseModal, type VetCrise } from '@/components/planning/CriseModal'
 import { usePeriodeActuelle } from '@/hooks/usePeriode'
 import { estJourFerie } from '@/engine/utils'
 import type { GardeDenormalisee, Periode } from '@/types'
@@ -20,6 +21,8 @@ interface MonthViewProps {
   /** Format "YYYY-MM" (ex : "2026-09") */
   anneeMois: string
   isAdmin?: boolean
+  /** Vétos actifs du cabinet (admin) — pour « déclarer ce véto absent ». */
+  vets?: VetCrise[]
 }
 
 // ── Helpers calendrier ───────────────────────────────────
@@ -76,11 +79,15 @@ function estAujourdhui(dateISO: string): boolean {
 
 // ── Composant principal ──────────────────────────────────
 
-export function MonthView({ gardes, periodes, anneeMois, isAdmin = false }: MonthViewProps) {
+export function MonthView({ gardes, periodes, anneeMois, isAdmin = false, vets = [] }: MonthViewProps) {
   const router = useRouter()
   const [vueListeMobile, setVueListeMobile] = useState(false)
   const [gardeModal, setGardeModal] = useState<GardeDenormalisee | null>(null)
   const [dateModal, setDateModal] = useState<string | null>(null)
+  // Gestion de crise déclenchée depuis le détail d'une garde (« déclarer absent »).
+  const [criseOpen, setCriseOpen] = useState(false)
+  const [criseDate, setCriseDate] = useState<string | undefined>(undefined)
+  const [criseVetId, setCriseVetId] = useState<string | undefined>(undefined)
 
   const [annee, mois] = anneeMois.split('-').map(Number)
   const grille = genererGrille(annee, mois)
@@ -114,6 +121,15 @@ export function MonthView({ gardes, periodes, anneeMois, isAdmin = false }: Mont
     const g = gardesParDate.get(date) ?? null
     setDateModal(date)
     setGardeModal(g)
+  }
+
+  /** Depuis le détail d'une garde : « déclarer ce véto absent » → ouvre la crise. */
+  function declarerAbsent(date: string, vetId: string) {
+    setDateModal(null)
+    setGardeModal(null)
+    setCriseDate(date)
+    setCriseVetId(vetId)
+    setCriseOpen(true)
   }
 
   // ── Rendu ─────────────────────────────────────────────
@@ -301,7 +317,19 @@ export function MonthView({ gardes, periodes, anneeMois, isAdmin = false }: Mont
         isAdmin={isAdmin}
         onClose={() => { setDateModal(null); setGardeModal(null) }}
         onSaved={() => router.refresh()}
+        onDeclarerAbsent={isAdmin && vets.length > 0 ? declarerAbsent : undefined}
       />
+
+      {/* ── Gestion de crise (pré-remplie depuis une garde) ── */}
+      {isAdmin && vets.length > 0 && (
+        <CriseModal
+          open={criseOpen}
+          onOpenChange={setCriseOpen}
+          vets={vets}
+          dateDefaut={criseDate}
+          vetDefautId={criseVetId}
+        />
+      )}
     </div>
   )
 }

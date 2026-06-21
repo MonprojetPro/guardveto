@@ -1,0 +1,201 @@
+// ============================================================
+// GUARDVETO — Helper PARTAGÉ : appliquer un changement de garde
+// ============================================================
+// Cœur du cycle d'application d'un changement d'attribution sur UNE garde :
+//   1. mise à jour premier_id/second_id (+ modifie_manuellement, updated_at)
+//   2. déverrouillage + audit_log si force
+//   3. recalcul du bilan bonus/malus si la période est publiée/verrouillée
+//   4. synchro Google Agenda (best-effort)
+//   5. envoi email aux vétos concernés (best-effort)
+//
+// Extrait de PATCH /api/gardes/[id] pour être réutilisé SANS duplication par
+// la gestion de crise (POST /api/absences/[id]/reparer). La route PATCH et la
+// route de réparation appellent donc EXACTEMENT le même cycle.
+//
+// ⚠️ Ce helper ne fait AUCUN contrôle d'auth ni de cabinet : l'appelant (la
+//    route) DOIT avoir validé admin + cabinet AVANT. Il ne fait pas non plus la
+//    validation métier « ce véto est-il légal sur ce créneau » — c'est la
+//    responsabilité de l'appelant (la route de crise le fait via proposerReparation).
+// ============================================================
+
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { resoudreCabinetId } from '@/lib/supabase/cabinet'
+import { queryCompteurs, queryTotalWE } from '@/hooks/useCompteurs'
+import { calculerBilans } from '@/engine/bilan'
+import { syncGardeIndividuelle } from '@/lib/sync-calendrier'
+import { sendGardeModifiee } from '@/lib/notifications'
+
+/** Vétérinaire « avant modif » (pour l'email de notification). */
+export interface VetoNotif {
+  id: string
+  nom: string
+  prenom: string
+  email: string
+}
+
+export interface AppliquerChangementParams {
+  /** Client serveur (déjà authentifié — admin + cabinet validés par l'appelant). */
+  supabase: SupabaseClient
+  /** Garde à modifier. */
+  gardeId: string
+  /** Nouvel·le 1er de garde (ou null pour libérer le rôle). */
+  premier_id: string | null
+  /** Nouveau·elle 2nd de garde (ou null pour libérer le rôle). */
+  second_id: string | null
+  /** Déverrouille la garde + trace dans audit_log (correction d'une garde verrouillée). */
+  force: boolean
+  /** Id véto de l'auteur de la modif (pour audit_log.user_id). */
+  auteurVetId: string
+}
+
+export interface AppliquerChangementResultat {
+  ok: boolean
+  /** Code HTTP suggéré à la route (200 si ok, 404/422/500 sinon). */
+  status: number
+  /** Message d'erreur si !ok. */
+  error?: string
+}
+
+/**
+ * appliquerChangementGarde — applique un changement d'attribution sur UNE garde
+ * et déroule TOUT le cycle (update, audit, bilan, agenda, email). Best-effort sur
+ * agenda + email (les erreurs sont loguées, jamais bloquantes).
+ *
+ * Renvoie un résultat structuré (ok + status + error) plutôt qu'une NextResponse :
+ * la route appelante construit sa réponse (utile en lot pour la crise).
+ */
+export async function appliquerChangementGarde(
+  params: AppliquerChangementParams,
+): Promise<AppliquerChangementResultat> {
+  const { supabase, gardeId, premier_id, second_id, force, auteurVetId } = params
+
+  // ── Règle : le même véto ne peut pas être 1er ET 2nd ──
+  if (premier_id && second_id && premier_id === second_id) {
+    return {
+      ok: false,
+      status: 422,
+      error:
+        'Le même vétérinaire ne peut pas être à la fois 1er et 2nd de garde. Choisissez deux personnes différentes.',
+    }
+  }
+
+  // ── Chargement de la garde + période + anciens assignés ──
+  const { data: garde } = await supabase
+    .from('gardes')
+    .select(`
+      id, verrouille, periode_id, modifie_manuellement,
+      premier_id, second_id,
+      periode:periode_id(statut),
+      oldPremier:premier_id(id, nom, prenom, email),
+      oldSecond:second_id(id, nom, prenom, email)
+    `)
+    .eq('id', gardeId)
+    .single()
+
+  if (!garde) return { ok: false, status: 404, error: 'Garde introuvable.' }
+
+  if (garde.verrouille && !force) {
+    return {
+      ok: false,
+      status: 422,
+      error: 'Cette garde est verrouillée. Utilisez « Corriger » pour la modifier.',
+    }
+  }
+
+  // ── Mise à jour ──────────────────────────────────────────
+  const updatePayload: Record<string, unknown> = {
+    premier_id,
+    second_id,
+    modifie_manuellement: true,
+    updated_at: new Date().toISOString(),
+  }
+  if (force) updatePayload.verrouille = false
+
+  const { error } = await supabase.from('gardes').update(updatePayload).eq('id', gardeId)
+  if (error) {
+    return { ok: false, status: 500, error: `Erreur lors de la mise à jour : ${error.message}` }
+  }
+
+  // ── Audit log (correction d'une garde verrouillée) ──────
+  if (force) {
+    await supabase.from('audit_log').insert({
+      table_name: 'gardes',
+      record_id: gardeId,
+      action: 'update',
+      old_data: {
+        premier_id: garde.premier_id,
+        second_id: garde.second_id,
+        verrouille: true,
+        modifie_manuellement: garde.modifie_manuellement,
+      },
+      new_data: { premier_id, second_id, verrouille: false, modifie_manuellement: true },
+      user_id: auteurVetId,
+    })
+  }
+
+  // ── Recalcul auto du bilan bonus/malus (période publiée/verrouillée) ──
+  const periodeRel = (garde as Record<string, unknown>).periode as
+    | { statut?: string }
+    | { statut?: string }[]
+    | null
+  const periodeStatut = Array.isArray(periodeRel) ? periodeRel[0]?.statut : periodeRel?.statut
+
+  if (periodeStatut === 'publie' || periodeStatut === 'verrouille') {
+    const [compteurs, totalWE] = await Promise.all([
+      queryCompteurs(supabase, garde.periode_id),
+      queryTotalWE(supabase, garde.periode_id),
+    ])
+
+    if (compteurs.length > 0) {
+      let cabinetId: string | null = null
+      try {
+        cabinetId = await resoudreCabinetId(supabase)
+      } catch (err) {
+        console.error(
+          '[appliquerChangementGarde] cabinet_id introuvable pour recalcul bilan:',
+          err instanceof Error ? err.message : String(err),
+        )
+      }
+
+      if (cabinetId) {
+        const bilans = calculerBilans(compteurs, totalWE)
+        const rows = bilans.map((b) => ({
+          cabinet_id: cabinetId as string,
+          veterinaire_id: b.veterinaire_id,
+          periode_id: garde.periode_id,
+          ecart_we: b.ecart_we,
+          ecart_semaine: b.ecart_semaine,
+          ecart_feries: b.ecart_feries,
+          ecart_grands_we: b.ecart_grands_we,
+        }))
+        await supabase
+          .from('bonus_malus')
+          .upsert(rows, { onConflict: 'cabinet_id,veterinaire_id,periode_id' })
+      }
+    }
+  }
+
+  // ── Synchro Agenda + notifications (best-effort, AWAIT obligatoire sur Vercel) ──
+  const oldPremier = (garde as Record<string, unknown>).oldPremier as VetoNotif | null
+  const oldSecond = (garde as Record<string, unknown>).oldSecond as VetoNotif | null
+
+  try {
+    await syncGardeIndividuelle(supabase, gardeId)
+  } catch (err) {
+    console.error(
+      '[appliquerChangementGarde] Erreur sync agenda:',
+      err instanceof Error ? err.message : String(err),
+    )
+  }
+
+  try {
+    await sendGardeModifiee(supabase, gardeId, oldPremier, oldSecond)
+  } catch (err) {
+    console.error(
+      '[appliquerChangementGarde] Erreur notifications email:',
+      err instanceof Error ? err.message : String(err),
+    )
+  }
+
+  return { ok: true, status: 200 }
+}
