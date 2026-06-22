@@ -513,6 +513,78 @@ function checkR21RolesDistincts(
  *
  * @returns somme des pénalités (0 = aucune règle molle violée)
  */
+// ── Limite de charge réglable (brique `au_plus_n`) ───────────
+// « au plus N gardes par fenêtre » (semaine civile par défaut, ou glissante de
+// K jours). Réglable par cabinet (dur si étage ≤ 2, sinon pénalité). Compte les
+// gardes DÉJÀ posées dans la fenêtre (planning partiel) : poser ce créneau ferait
+// dejaCount + 1 → viole si ça dépasse N. Filtre optionnel par type de créneau.
+
+/** Fenêtre [debut, fin] (ISO) selon la config : semaine civile ou glissante_K_jours. */
+function fenetreAuPlusN(slotDate: string, cfg: Record<string, unknown>): { debut: string; fin: string } {
+  const f = cfg.fenetre
+  if (typeof f === 'string') {
+    const m = f.match(/^glissante_(\d+)_jours$/)
+    if (m) {
+      const k = parseInt(m[1], 10)
+      return { debut: addDays(slotDate, -(k - 1)), fin: slotDate }
+    }
+  }
+  // Défaut : semaine civile (lundi → dimanche).
+  const lundi = lundiDeSemaine(slotDate)
+  return { debut: lundi, fin: addDays(lundi, 6) }
+}
+
+/** Compte les gardes d'un véto dans [debut, fin], filtrées par type si `creneaux` fourni. */
+function compterGardesFenetre(
+  vetId: string, planning: PlanningPartiel, debut: string, fin: string, creneaux?: string[],
+): number {
+  let n = 0
+  for (const a of planning.attributions) {
+    if (a.date < debut || a.date > fin) continue
+    if (creneaux && !creneaux.includes(a.type)) continue
+    if (a.premier_id === vetId || a.second_id === vetId) n++
+  }
+  return n
+}
+
+/** Lit les types de créneaux filtrés (axe `quoi`), ou undefined si pas de filtre. */
+function lireCreneauxFiltre(cfg: Record<string, unknown>): string[] | undefined {
+  const c = cfg.creneaux
+  if (Array.isArray(c)) {
+    const arr = c.filter((x): x is string => typeof x === 'string')
+    return arr.length > 0 ? arr : undefined
+  }
+  return undefined
+}
+
+/** Poser `vet` sur `slot` dépasserait-il la limite N de cette contrainte ? */
+function violeAuPlusN(
+  c: ContrainteEngine, vetId: string, slot: SlotGarde, planning: PlanningPartiel,
+): boolean {
+  const cfg = c.config as Record<string, unknown>
+  const nRaw = cfg.n
+  const n = typeof nRaw === 'number' ? nRaw : typeof nRaw === 'string' ? parseInt(nRaw, 10) : NaN
+  if (!Number.isFinite(n) || n < 0) return false // mal configurée → inerte (jamais de crash)
+  const creneaux = lireCreneauxFiltre(cfg)
+  // Si un filtre de créneaux existe et que le créneau courant n'en fait pas partie,
+  // la règle ne s'applique pas à ce slot.
+  if (creneaux && !creneaux.includes(slot.type)) return false
+  const { debut, fin } = fenetreAuPlusN(slot.date, cfg)
+  const deja = compterGardesFenetre(vetId, planning, debut, fin, creneaux)
+  return deja + 1 > n
+}
+
+function checkAuPlusN(vet: VetEngine, slot: SlotGarde, planning: PlanningPartiel): ValidationResult {
+  for (const c of vet.contraintes) {
+    if (!c.actif || c.type !== 'au_plus_n') continue
+    if (estDure(c) && violeAuPlusN(c, vet.id, slot, planning)) {
+      const n = (c.config as Record<string, unknown>).n
+      return invalid(`AU_PLUS_N : ${vet.prenom} dépasserait ${n} garde(s) sur la fenêtre`)
+    }
+  }
+  return ok()
+}
+
 export function penaliteContraintesConfig(
   slot: SlotGarde,
   vet: VetEngine,
@@ -533,6 +605,8 @@ export function penaliteContraintesConfig(
         viole = violeReposConditionnel(c, vet, slot, planning); break
       case 'duo_interdit':
         viole = violeDuoInterdit(c, slot, planning) !== null; break
+      case 'au_plus_n':
+        viole = violeAuPlusN(c, vet.id, slot, planning); break
     }
     if (viole) pen += penaliteEtage(etageDe(c))
   }
@@ -571,6 +645,7 @@ export function isValid(
     checkR6DuoInterdit(vet, slot, planning, allVets),
     checkR9VendrediLieWE(vet, slot, planning, structure.r9_liaison),
     checkR21RolesDistincts(vet, slot, roleVisé, planning),
+    checkAuPlusN(vet, slot, planning),
   ]
 
   // R8 uniquement pour les WE
@@ -602,4 +677,5 @@ export {
   checkR18Hiver,
   checkR19Weekend,
   checkR21RolesDistincts,
+  checkAuPlusN,
 }

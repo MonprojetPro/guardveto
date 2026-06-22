@@ -37,7 +37,14 @@ export type VetEngineNormalise = VetEngine & { readonly [__vetNormaliseBrand]: t
 
 export interface ContrainteEngine {
   id: string
-  type: 'jour_repos_fixe' | 'jour_repos_conditionnel' | 'indisponibilite_cyclique' | 'duo_interdit'
+  type:
+    | 'jour_repos_fixe'
+    | 'jour_repos_conditionnel'
+    | 'indisponibilite_cyclique'
+    | 'duo_interdit'
+    // Limite de charge réglable (brique catalogue `au_plus_n`) : au plus N gardes
+    // par fenêtre (semaine civile ou glissante). Dur si étage ≤ 2, sinon pénalité.
+    | 'au_plus_n'
   config: Record<string, unknown>
   actif: boolean
 }

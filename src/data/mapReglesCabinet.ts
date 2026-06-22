@@ -65,13 +65,14 @@ const FORCE_TEXTE_VERS_ETAGE: Record<string, number> = {
   si_possible: 5,
 }
 
-/** Les 4 types de contrainte que le moteur V1 sait évaluer. */
+/** Types de contrainte que le moteur sait évaluer (par véto). */
 type TypeContrainte = ContrainteEngine['type']
 const TYPES_V1: ReadonlySet<TypeContrainte> = new Set<TypeContrainte>([
   'jour_repos_fixe',
   'jour_repos_conditionnel',
   'indisponibilite_cyclique',
   'duo_interdit',
+  'au_plus_n', // limite de charge réglable (brique catalogue `au_plus_n`)
 ])
 
 /**
@@ -84,6 +85,7 @@ const BRIQUE_VERS_TYPE: Record<string, TypeContrainte> = {
   repos_conditionnel: 'jour_repos_conditionnel',
   alternance_ancre: 'indisponibilite_cyclique',
   duo_interdit: 'duo_interdit',
+  au_plus_n: 'au_plus_n',
 }
 
 export interface RegleRejetee {

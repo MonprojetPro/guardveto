@@ -511,6 +511,60 @@ export function validerPlanning(
     }
   }
 
+  // ── AU_PLUS_N — limite de charge par fenêtre (brique réglable) ──
+  // Re-comptage INDÉPENDANT : pour chaque véto porteur d'une règle `au_plus_n`
+  // DURE (étage ≤ 2), on compte ses gardes par fenêtre (semaine civile ou
+  // glissante de K jours) et on signale tout dépassement. Une règle molle
+  // (étage ≥ 3) est une préférence → pas une violation dure.
+  for (const vet of vetsNorm) {
+    for (const c of vet.contraintes) {
+      if (!c.actif || c.type !== 'au_plus_n') continue
+      const cfg = c.config as Record<string, unknown>
+      const etage = typeof cfg.force === 'number' ? (cfg.force as number) : 2
+      if (etage > 2) continue
+      const nRaw = cfg.n
+      const n = typeof nRaw === 'number' ? nRaw : typeof nRaw === 'string' ? parseInt(nRaw, 10) : NaN
+      if (!Number.isFinite(n) || n < 0) continue
+
+      const creneaux = Array.isArray(cfg.creneaux)
+        ? (cfg.creneaux as unknown[]).filter((x): x is string => typeof x === 'string')
+        : undefined
+      const gardesVet = planning.attributions.filter(
+        (a) =>
+          (a.premier_id === vet.id || a.second_id === vet.id) &&
+          (!creneaux || creneaux.includes(a.type)),
+      )
+
+      const fenetreStr = typeof cfg.fenetre === 'string' ? (cfg.fenetre as string) : ''
+      const mGliss = fenetreStr.match(/^glissante_(\d+)_jours$/)
+      const dejaSignale = new Set<string>()
+      for (const ancre of gardesVet) {
+        let debut: string
+        let fin: string
+        if (mGliss) {
+          const k = parseInt(mGliss[1], 10)
+          debut = plusJours(ancre.date, -(k - 1))
+          fin = ancre.date
+        } else {
+          debut = lundiDe(ancre.date)
+          fin = plusJours(debut, 6)
+        }
+        if (dejaSignale.has(debut)) continue
+        const count = gardesVet.filter((a) => a.date >= debut && a.date <= fin).length
+        if (count > n) {
+          dejaSignale.add(debut)
+          violations.push({
+            regle: 'AU_PLUS_N',
+            date: debut,
+            type: 'fenetre',
+            vetId: vet.id,
+            detail: `AU_PLUS_N : ${vet.prenom} a ${count} gardes (max ${n}) sur la fenêtre du ${debut}${mGliss ? ` (${mGliss[1]}j glissants)` : ' (semaine civile)'}`,
+          })
+        }
+      }
+    }
+  }
+
   // ── R9 — vendredi soir = même duo que le week-end ──
   // ── R8 — inversion 1er/2nd entre vendredi soir et WE ──
   // On ne signale ces violations que si la règle est appliquée en DUR (active +
