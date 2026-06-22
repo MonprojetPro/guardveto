@@ -24,6 +24,7 @@ import type {
 } from './types'
 import type { JourNonCouvert } from './solver'
 import { isValid } from './rules/hard-constraints'
+import { normaliserContraintesVets } from './normaliserContraintes'
 import { rendreRegle } from './briques/catalogue'
 import type { StructureConfig, StructureRegleConfig } from './structure-config'
 
@@ -240,8 +241,11 @@ function raisonsSurCreneau(
     date: step.date, type: step.type, saison: step.saison, besoinSecond: step.besoinSecond,
   }
   const out: RaisonVet[] = []
-  for (const vet of input.vets) {
-    const res = isValid(slot, vet, step.role, input.vets, planning, input.calendrier, structure)
+  // Auto-normalisation (idempotente) : isValid exige des vétos normalisés —
+  // parade contre la cécité params (le diagnostic est un lecteur de règles).
+  const vetsN = normaliserContraintesVets(input.vets)
+  for (const vet of vetsN) {
+    const res = isValid(slot, vet, step.role, vetsN, planning, input.calendrier, structure)
     if (res.valid) continue
     const raison = res.raison ?? 'créneau non couvert'
     const code = extraireCode(raison)

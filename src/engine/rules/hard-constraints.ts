@@ -3,7 +3,7 @@
 // ============================================================
 
 import type {
-  VetEngine, SlotGarde, PlanningPartiel, ValidationResult, AttributionGarde, CalendrierResolu,
+  VetEngine, VetEngineNormalise, SlotGarde, PlanningPartiel, ValidationResult, AttributionGarde, CalendrierResolu,
   ContrainteEngine, RoleGarde,
 } from '../types'
 import {
@@ -553,9 +553,9 @@ export function penaliteContraintesConfig(
  */
 export function isValid(
   slot: SlotGarde,
-  vet: VetEngine,
+  vet: VetEngineNormalise,
   roleVisé: 'premier' | 'second',
-  allVets: VetEngine[],
+  allVets: VetEngineNormalise[],
   planning: PlanningPartiel,
   calendrier?: CalendrierResolu,
   structure: StructureConfig = DEFAULT_STRUCTURE_CONFIG

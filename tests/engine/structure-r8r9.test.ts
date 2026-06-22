@@ -21,13 +21,14 @@ import {
   type StructureConfig,
 } from '@/engine/structure-config'
 import { vendrediDeSemaine } from '@/engine/utils'
-import type { VetEngine, SlotGarde, PlanningPartiel } from '@/engine/types'
+import { normaliserContraintesVets } from '@/engine/normaliserContraintes'
+import type { VetEngine, VetEngineNormalise, SlotGarde, PlanningPartiel } from '@/engine/types'
 
 // ── Fixtures ─────────────────────────────────────────────
-const vet = (id: string): VetEngine => ({
+const vet = (id: string): VetEngineNormalise => normaliserContraintesVets([{
   id, prenom: id, nom: 'X', statut: 'associe', dernier_recours: false,
   contraintes: [], conges: [],
-})
+} as VetEngine])[0]
 const A = vet('A'), B = vet('B'), C = vet('C'), D = vet('D')
 const ALL = [A, B, C, D]
 

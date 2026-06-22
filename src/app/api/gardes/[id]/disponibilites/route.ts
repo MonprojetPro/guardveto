@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { isValid } from '@/engine/rules/hard-constraints'
+import { normaliserContraintesVets } from '@/engine/normaliserContraintes'
 import type { VetEngine, ContrainteEngine, SlotGarde, PlanningPartiel, AttributionGarde } from '@/engine/types'
 
 // ── Types retournés ──────────────────────────────────────
@@ -153,9 +154,14 @@ export async function GET(
       .map((c) => ({ date_debut: c.date_debut, date_fin: c.date_fin })),
   }))
 
-  const vets: VetDispo[] = allVets.map((vet) => {
-    const rPremier = isValid(slot, vet, 'premier', allVets, planningPartiel)
-    const rSecond = isValid(slot, vet, 'second', allVets, planningPartiel)
+  // Normalisation OBLIGATOIRE avant isValid (parade cécité params) : sans
+  // dépliage, une dispo « libre » serait calculée en ignorant les repos rangés
+  // sous `params` → faux « disponible » incohérent avec le planning généré.
+  const allVetsN = normaliserContraintesVets(allVets)
+
+  const vets: VetDispo[] = allVetsN.map((vet) => {
+    const rPremier = isValid(slot, vet, 'premier', allVetsN, planningPartiel)
+    const rSecond = isValid(slot, vet, 'second', allVetsN, planningPartiel)
 
     return {
       id: vet.id,

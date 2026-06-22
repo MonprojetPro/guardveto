@@ -31,6 +31,7 @@ import type {
   CalendrierResolu,
 } from '../types'
 import { isValid, aGardeWeekendCetteSemaine } from '../rules/hard-constraints'
+import { normaliserContraintesVets } from '../normaliserContraintes'
 import { scorerCandidatLNS, type SolverStep } from '../solver'
 import { DEFAULT_EQUITY_WEIGHTS, type EquityWeights } from '../equity-weights'
 import { DEFAULT_STRUCTURE_CONFIG, type StructureConfig } from '../structure-config'
@@ -198,10 +199,16 @@ function calculerWarnings(
 export function proposerReparation(
   params: ProposerReparationParams,
 ): ResultatReparation {
-  const { creneau, absentId, vets, planningComplet } = params
+  const { creneau, absentId, planningComplet } = params
   const calendrier = params.calendrier
   const structure = params.structure ?? DEFAULT_STRUCTURE_CONFIG
   const weights = params.equityWeights ?? DEFAULT_EQUITY_WEIGHTS
+
+  // ⚠️ NORMALISATION OBLIGATOIRE (parade cécité params — incident Fanny 2026-06-21) :
+  // isValid lit la config des règles ; sans dépliage, les repos rangés sous
+  // `params` étaient INVISIBLES ici → la crise proposait un véto que le validateur
+  // rejetait ensuite. Le type VetEngineNormalise force désormais ce dépliage.
+  const vets = normaliserContraintesVets(params.vets)
 
   const planningPartiel = construirePlanningPartiel(planningComplet, creneau)
   const slot = slotDe(creneau)

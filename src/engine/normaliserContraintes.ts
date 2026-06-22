@@ -21,7 +21,7 @@
 // rien.
 // ============================================================
 
-import type { VetEngine, ContrainteEngine } from './types'
+import type { VetEngine, VetEngineNormalise, ContrainteEngine } from './types'
 
 /**
  * Hisse `config.params.*` à la racine de `config`, sans écraser les clés déjà
@@ -42,12 +42,12 @@ export function normaliserConfig(
  * Renvoie une COPIE des vétos dont chaque contrainte a une config normalisée.
  * Immutable : n'altère pas les objets d'entrée (respect du contrat de pureté).
  */
-export function normaliserContraintesVets(vets: VetEngine[]): VetEngine[] {
+export function normaliserContraintesVets(vets: VetEngine[]): VetEngineNormalise[] {
   return vets.map((v) => ({
     ...v,
     contraintes: v.contraintes.map((c): ContrainteEngine => ({
       ...c,
       config: normaliserConfig(c.config as Record<string, unknown>),
     })),
-  }))
+  })) as VetEngineNormalise[]
 }

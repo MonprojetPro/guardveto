@@ -12,7 +12,7 @@
 // soft-constraints, optimization) — aucune ré-écriture des règles.
 // ============================================================
 
-import type { PlanningPartiel, VetEngine, SlotGarde, RoleGarde } from './types'
+import type { PlanningPartiel, VetEngine, VetEngineNormalise, SlotGarde, RoleGarde } from './types'
 
 // ── Type partagé solver ↔ loader ─────────────────────────
 /**
@@ -156,7 +156,7 @@ function listerSlotRoles(planning: PlanningPartiel, saison: 'ete' | 'hiver'): Sl
  */
 export function scorerPlanning(
   planning: PlanningPartiel,
-  vets: VetEngine[],
+  vets: VetEngineNormalise[],
   saison: 'ete' | 'hiver',
   weights: EquityWeights = DEFAULT_EQUITY_WEIGHTS,
   structure: StructureConfig = DEFAULT_STRUCTURE_CONFIG

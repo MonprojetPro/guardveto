@@ -23,6 +23,7 @@
 
 import type {
   VetEngine,
+  VetEngineNormalise,
   SlotGarde,
   PlanningPartiel,
   TypeGardeEngine,
@@ -316,7 +317,7 @@ function backtrack(
   steps: SolverStep[],
   index: number,
   planning: PlanningPartiel,
-  vets: VetEngine[],
+  vets: VetEngineNormalise[],
   bonusMalus: BonusMalusMap,
   weights: EquityWeights,
   structure: StructureConfig,
@@ -375,7 +376,10 @@ function backtrack(
  *   coûteuse (un seul niveau de re-sim, seed greedy uniquement).
  */
 function genererSeedGreedy(input: SolverInput, avecDiagnostic = true): SolveResult {
-  const { dateDebut, dateFin, saison, vets, bonusMalus, calendrier } = input
+  const { dateDebut, dateFin, saison, bonusMalus, calendrier } = input
+  // Normalisation à l'entrée (idempotente) : les vétos passés à isValid DOIVENT
+  // être normalisés (type VetEngineNormalise) — parade contre la cécité params.
+  const vets = normaliserContraintesVets(input.vets)
   const weights = input.equityWeights ?? DEFAULT_EQUITY_WEIGHTS
   const structure = input.structureConfig ?? DEFAULT_STRUCTURE_CONFIG
   const t0 = Date.now()
@@ -567,7 +571,7 @@ export function scorerCandidatLNS(
 function repairerSemaine(
   partialPlanning: PlanningPartiel,
   steps: SolverStep[],
-  vets: VetEngine[],
+  vets: VetEngineNormalise[],
   weights: EquityWeights,
   structure: StructureConfig,
   calendrier?: CalendrierResolu
@@ -624,7 +628,7 @@ function repairerSemaine(
 export function scorerSemaine(
   planning: PlanningPartiel,
   lundi: string,
-  vets: VetEngine[],
+  vets: VetEngineNormalise[],
   saison: Saison,
   weights: EquityWeights = DEFAULT_EQUITY_WEIGHTS,
   structure: StructureConfig = DEFAULT_STRUCTURE_CONFIG
@@ -657,7 +661,9 @@ function lnsHillClimbing(
   input: SolverInput,
   t0: number
 ): LNSHillResult {
-  const { dateDebut, dateFin, saison, vets, calendrier } = input
+  const { dateDebut, dateFin, saison, calendrier } = input
+  // Normalisation à l'entrée (idempotente) — vétos exigés normalisés par isValid.
+  const vets = normaliserContraintesVets(input.vets)
   const weights = input.equityWeights ?? DEFAULT_EQUITY_WEIGHTS
   const structure = input.structureConfig ?? DEFAULT_STRUCTURE_CONFIG
   const timeoutMs = input.lnsTimeoutMs ?? 30_000
@@ -734,14 +740,16 @@ function lnsHillClimbing(
 export function genererPlanningPur(input: SolverInput): SolveResult {
   const t0 = performance.now()
 
-  // ── 0. Normalisation des contraintes ─────────────────
+  // ── Normalisation des contraintes ────────────────────
   // Hisse config.params.* à la racine pour que TOUS les contrôles lisent la
   // règle, qu'elle soit V1 (plate) ou V2 (sous params). Sans ça, seul le duo
   // était appliqué (bug F4-002). Cf. normaliserContraintes.ts.
-  const inputN: SolverInput = { ...input, vets: normaliserContraintesVets(input.vets) }
+  // La normalisation est faite À L'ENTRÉE de genererSeedGreedy ET de
+  // lnsHillClimbing (idempotente) : les vétos passés à isValid sont garantis
+  // normalisés par le type VetEngineNormalise (impossible de l'oublier).
 
   // ── 1. Seed greedy ───────────────────────────────────
-  const seed = genererSeedGreedy(inputN)
+  const seed = genererSeedGreedy(input)
 
   if (!seed.success) {
     // Impasse backtracking → retourner directement le rapport d'impasse
@@ -752,7 +760,7 @@ export function genererPlanningPur(input: SolverInput): SolveResult {
   }
 
   // ── 2. LNS hill-climbing ─────────────────────────────
-  const lnsResult = lnsHillClimbing(seed.planning, inputN, t0)
+  const lnsResult = lnsHillClimbing(seed.planning, input, t0)
 
   return {
     success: true,

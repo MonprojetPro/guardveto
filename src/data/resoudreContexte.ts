@@ -16,6 +16,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { chargerInputDepuisSupabase } from '@/engine/loader'
+import { normaliserContraintesVets } from '@/engine/normaliserContraintes'
 import type { ContexteSimulation, CalendrierResolu } from '@/engine/types'
 
 // ── Types internes (réponse brute de get_calendrier) ─────────
@@ -120,7 +121,10 @@ export async function resoudreContexte(
     dateDebut: input.dateDebut,
     dateFin: input.dateFin,
     saison: input.saison,
-    vets: input.vets,
+    // PARADE 1 — normalisation à la SOURCE : tous les consommateurs (générateur,
+    // validateur, crise, disponibilités…) reçoivent des règles déjà dépliées.
+    // Plus aucun consommateur, même futur, ne peut être aveugle à la config params.
+    vets: normaliserContraintesVets(input.vets),
     bonusMalus: input.bonusMalus,
     calendrier,
     nbVetosSemaineSoir: input.nbVetosSemaineSoir,

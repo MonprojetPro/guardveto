@@ -9,20 +9,21 @@
 
 import { describe, it, expect } from 'vitest'
 import { isValid, penaliteContraintesConfig } from '@/engine/rules/hard-constraints'
-import type { SlotGarde, PlanningPartiel, VetEngine, ContrainteEngine } from '@/engine/types'
+import { normaliserContraintesVets } from '@/engine/normaliserContraintes'
+import type { SlotGarde, PlanningPartiel, VetEngineNormalise, ContrainteEngine } from '@/engine/types'
 
 const planningVide: PlanningPartiel = { attributions: [] }
 // 2026-03-11 = mercredi, hors vacances scolaires.
 const slotMercredi: SlotGarde = { date: '2026-03-11', type: 'semaine_soir', saison: 'hiver' }
 
-function vetAvecReposMercredi(force: number | undefined): VetEngine {
+function vetAvecReposMercredi(force: number | undefined): VetEngineNormalise {
   const config: Record<string, unknown> = { brique: 'interdire_creneau', jour: 'mercredi' }
   if (force !== undefined) config.force = force
-  return {
+  return normaliserContraintesVets([{
     id: 'v1', nom: 'Test', prenom: 'Testeur', statut: 'associe', dernier_recours: false,
     conges: [],
     contraintes: [{ id: 'c1', type: 'jour_repos_fixe', actif: true, config } as ContrainteEngine],
-  }
+  }])[0]
 }
 
 describe('P1-B — routage dur/mou des règles configurées', () => {

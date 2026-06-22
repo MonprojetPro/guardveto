@@ -20,7 +20,7 @@ function slot(date: string, type: SlotGarde['type'], saison: SlotGarde['saison']
 
 describe('R16 — Véto en congé', () => {
   it('refuse une garde si le véto est en congé ce jour', () => {
-    const fannyEnConge: VetEngine = {
+    const fannyEnConge = {
       ...FANNY,
       conges: [{ date_debut: '2026-05-04', date_fin: '2026-05-10' }],
     }
@@ -30,7 +30,7 @@ describe('R16 — Véto en congé', () => {
   })
 
   it('autorise une garde hors période de congé', () => {
-    const fannyEnConge: VetEngine = {
+    const fannyEnConge = {
       ...FANNY,
       conges: [{ date_debut: '2026-05-04', date_fin: '2026-05-10' }],
     }

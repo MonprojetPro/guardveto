@@ -29,19 +29,22 @@ import {
   type EquityWeights,
 } from '@/engine/equity-weights'
 import { extraireEquityRules, type RegleCabinetRow } from '@/data/mapReglesCabinet'
-import type { VetEngine, PlanningPartiel } from '@/engine/types'
+import { normaliserContraintesVets } from '@/engine/normaliserContraintes'
+import type { VetEngine, VetEngineNormalise, PlanningPartiel } from '@/engine/types'
 
 // ── Fixtures : 7 vétos SANS contrainte (l'équité est le seul levier) ──
-function vetsSimples(): VetEngine[] {
-  return Array.from({ length: 7 }, (_, i) => ({
-    id: `v${i + 1}`,
-    prenom: `V${i + 1}`,
-    nom: 'Test',
-    statut: i < 4 ? 'associe' : 'salarie',
-    dernier_recours: false,
-    contraintes: [],
-    conges: [],
-  }))
+function vetsSimples(): VetEngineNormalise[] {
+  return normaliserContraintesVets(
+    Array.from({ length: 7 }, (_, i): VetEngine => ({
+      id: `v${i + 1}`,
+      prenom: `V${i + 1}`,
+      nom: 'Test',
+      statut: i < 4 ? 'associe' : 'salarie',
+      dernier_recours: false,
+      contraintes: [],
+      conges: [],
+    })),
+  )
 }
 
 const BASE: SolverInput = {

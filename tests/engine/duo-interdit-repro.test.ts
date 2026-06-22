@@ -10,15 +10,21 @@
 import { describe, it, expect } from 'vitest'
 import { genererPlanningPur, type SolverInput } from '@/engine/solver'
 import { isValid } from '@/engine/rules/hard-constraints'
-import type { PlanningPartiel, SlotGarde, VetEngine } from '@/engine/types'
+import { normaliserContraintesVets } from '@/engine/normaliserContraintes'
+import type { PlanningPartiel, SlotGarde, VetEngine, VetEngineNormalise } from '@/engine/types'
 import { ALL_VETS, MANON, ANTOINE } from './scenarios/vets'
+
+/** Normalise un véto de test (hisse params) → type exigé par isValid. */
+function n(v: VetEngine): VetEngineNormalise {
+  return normaliserContraintesVets([v])[0]
+}
 
 /**
  * MANON avec un duo_interdit AU FORMAT BRIQUE V2 (post-migration prod).
  * Le champ `avec_veterinaire_id` est imbriqué dans `params`, pas au top-level.
  * C'est la forme RÉELLE en base après 20260616170001_migrate_contraintes.sql.
  */
-const MANON_V2: VetEngine = {
+const MANON_V2: VetEngineNormalise = n({
   ...MANON,
   contraintes: [
     {
@@ -35,9 +41,9 @@ const MANON_V2: VetEngine = {
       },
     },
   ],
-}
+})
 
-const ANTOINE_V2: VetEngine = {
+const ANTOINE_V2: VetEngineNormalise = n({
   ...ANTOINE,
   contraintes: [
     {
@@ -54,7 +60,7 @@ const ANTOINE_V2: VetEngine = {
       },
     },
   ],
-}
+})
 
 function slotWE(date: string): SlotGarde {
   return { date, type: 'weekend', saison: 'ete' }
@@ -65,7 +71,7 @@ function slotWE(date: string): SlotGarde {
  * une ancre tombant un MARDI — exactement le cas qui cassait la parité
  * intra-semaine). Indispo soir_semaine + weekend les semaines IMPAIRES.
  */
-const ANNE_SOPHIE_ANCREE: VetEngine = {
+const ANNE_SOPHIE_ANCREE: VetEngineNormalise = n({
   ...ALL_VETS[0], // ANNE_SOPHIE
   contraintes: [
     {
@@ -77,7 +83,7 @@ const ANNE_SOPHIE_ANCREE: VetEngine = {
       },
     },
   ],
-}
+})
 
 /** Vrai si l'attribution est le duo exact {Manon, Antoine} (peu importe le rôle). */
 function estDuoManonAntoine(premierId: string | null, secondId: string | null): boolean {

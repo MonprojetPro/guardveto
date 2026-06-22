@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest'
 import { genererPlanningPur } from '../solver'
 import { scorerPlanning, comparerScores } from '../score-lexicographique'
+import { normaliserContraintesVets } from '../normaliserContraintes'
 import type { SolverInput } from '../solver'
 import type { VetEngine } from '../types'
 
@@ -139,8 +140,9 @@ describe('genererPlanningPur — gate CI', () => {
     expect(lnsResult.success).toBe(true)
     if (!seedResult.success || !lnsResult.success) return
 
-    const scoreSeed = scorerPlanning(seedResult.planning, vets, 'hiver')
-    const scoreLns = scorerPlanning(lnsResult.planning, vets, 'hiver')
+    const vetsN = normaliserContraintesVets(vets)
+    const scoreSeed = scorerPlanning(seedResult.planning, vetsN, 'hiver')
+    const scoreLns = scorerPlanning(lnsResult.planning, vetsN, 'hiver')
 
     // LNS doit être meilleur ou égal au seed (jamais pire)
     // comparerScores < 0 → lns meilleur ; === 0 → égal ; > 0 → seed meilleur (impossible)

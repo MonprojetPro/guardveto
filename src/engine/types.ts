@@ -18,6 +18,23 @@ export interface VetEngine {
   conges: CongeEngine[]
 }
 
+/**
+ * VetEngine dont les contraintes ont été NORMALISÉES (les paramètres rangés sous
+ * `config.params` ont été hissés à la racine — cf. normaliserContraintes.ts).
+ *
+ * Type « marqué » (branded) produit UNIQUEMENT par `normaliserContraintesVets`.
+ * Les fonctions de JUGEMENT qui lisent la config d'une règle (`isValid`,
+ * `scorerPlanning`…) EXIGENT ce type : leur passer des vétos non normalisés
+ * devient une ERREUR DE COMPILATION.
+ *
+ * C'est la parade structurelle contre la cécité « params » : le bug récurrent où
+ * un lecteur lit la règle au mauvais niveau et la rate en silence (le générateur
+ * proposait alors un véto que le validateur rejetait). Désormais, impossible
+ * d'oublier de normaliser avant de juger.
+ */
+declare const __vetNormaliseBrand: unique symbol
+export type VetEngineNormalise = VetEngine & { readonly [__vetNormaliseBrand]: true }
+
 export interface ContrainteEngine {
   id: string
   type: 'jour_repos_fixe' | 'jour_repos_conditionnel' | 'indisponibilite_cyclique' | 'duo_interdit'
@@ -73,7 +90,12 @@ export interface ContexteSimulation {
   dateDebut: string
   dateFin: string
   saison: Saison
-  vets: VetEngine[]
+  /**
+   * Vétos déjà NORMALISÉS à la source (resoudreContexte normalise une fois pour
+   * toutes — parade contre la cécité « params »). Tout consommateur reçoit donc
+   * des règles dépliées, prêtes à être jugées par isValid sans risque d'oubli.
+   */
+  vets: VetEngineNormalise[]
   /** Bonus/malus inter-périodes (R20). Passer {} si aucun. */
   bonusMalus: import('./score-lexicographique').BonusMalusMap
   /** Calendrier résolu (fériés + vacances scolaires). Fallback sur listes en dur si absent. */

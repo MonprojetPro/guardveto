@@ -9,15 +9,18 @@
 import { describe, it, expect } from 'vitest'
 import { isValid } from '@/engine/rules/hard-constraints'
 import { genererPlanningPur } from '@/engine/solver'
-import type { SlotGarde, PlanningPartiel, VetEngine } from '@/engine/types'
+import { normaliserContraintesVets } from '@/engine/normaliserContraintes'
+import type { SlotGarde, PlanningPartiel, VetEngine, VetEngineNormalise } from '@/engine/types'
 
 const planningVide: PlanningPartiel = { attributions: [] }
 const slotSemaine = (besoinSecond?: boolean, saison: 'ete' | 'hiver' = 'ete'): SlotGarde => ({
   date: '2026-07-07', type: 'semaine_soir', saison, besoinSecond, // 2026-07-07 = mardi
 })
 
-function vet(id: string): VetEngine {
-  return { id, nom: id, prenom: id, statut: 'salarie', dernier_recours: false, contraintes: [], conges: [] }
+function vet(id: string): VetEngineNormalise {
+  return normaliserContraintesVets([
+    { id, nom: id, prenom: id, statut: 'salarie', dernier_recours: false, contraintes: [], conges: [] },
+  ])[0]
 }
 
 describe('Effectif configurable — R17/R18 pilotés par besoinSecond', () => {

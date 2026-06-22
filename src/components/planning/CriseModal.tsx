@@ -610,7 +610,19 @@ export function CriseModal({
                 <Label>Vétérinaire absent·e</Label>
                 <Select value={absentId} onValueChange={(v) => setAbsentId(v ?? '')}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Choisir un vétérinaire…" />
+                    {/* base-ui SelectValue rend la VALEUR brute (un UUID ici) → on
+                        affiche le nom à la main, comme l'ActionBar. */}
+                    {absentVet ? (
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full inline-block"
+                          style={{ backgroundColor: absentVet.couleur }}
+                        />
+                        {absentVet.prenom} {absentVet.nom}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">Choisir un vétérinaire…</span>
+                    )}
                   </SelectTrigger>
                   <SelectContent>
                     {vets.map((v) => (

@@ -1,7 +1,16 @@
 // Fixtures — vétérinaires de test (basés sur les données réelles)
-import type { VetEngine } from '@/engine/types'
+import type { VetEngine, VetEngineNormalise } from '@/engine/types'
+import { normaliserContraintesVets } from '@/engine/normaliserContraintes'
 
-export const ANNE_SOPHIE: VetEngine = {
+// Les fixtures sont au format plat (déjà normalisé) ; on les fait passer par
+// normaliserContraintesVets (idempotent) pour obtenir le type VetEngineNormalise
+// exigé par les juges (isValid…). Reflète l'usage réel : on ne juge JAMAIS un
+// véto non normalisé.
+function n(v: VetEngine): VetEngineNormalise {
+  return normaliserContraintesVets([v])[0]
+}
+
+export const ANNE_SOPHIE: VetEngineNormalise = n({
   id: '00000000-0000-0000-0000-000000000001',
   prenom: 'Anne-Sophie', nom: 'Cornu',
   statut: 'associe', dernier_recours: false,
@@ -20,9 +29,9 @@ export const ANNE_SOPHIE: VetEngine = {
     },
   ],
   conges: [],
-}
+})
 
-export const FANNY: VetEngine = {
+export const FANNY: VetEngineNormalise = n({
   id: '00000000-0000-0000-0000-000000000002',
   prenom: 'Fanny', nom: 'Martin',
   statut: 'associe', dernier_recours: false,
@@ -33,9 +42,9 @@ export const FANNY: VetEngine = {
     },
   ],
   conges: [],
-}
+})
 
-export const JEAN: VetEngine = {
+export const JEAN: VetEngineNormalise = n({
   id: '00000000-0000-0000-0000-000000000003',
   prenom: 'Jean', nom: 'Dubois',
   statut: 'associe', dernier_recours: false,
@@ -46,17 +55,17 @@ export const JEAN: VetEngine = {
     },
   ],
   conges: [],
-}
+})
 
-export const ANNE_CAT: VetEngine = {
+export const ANNE_CAT: VetEngineNormalise = n({
   id: '00000000-0000-0000-0000-000000000004',
   prenom: 'Anne-Cat', nom: 'Laurent',
   statut: 'associe', dernier_recours: true,
   contraintes: [],
   conges: [],
-}
+})
 
-export const MANON: VetEngine = {
+export const MANON: VetEngineNormalise = n({
   id: '00000000-0000-0000-0000-000000000005',
   prenom: 'Manon', nom: 'Petit',
   statut: 'salarie', dernier_recours: false,
@@ -71,9 +80,9 @@ export const MANON: VetEngine = {
     },
   ],
   conges: [],
-}
+})
 
-export const ANTOINE: VetEngine = {
+export const ANTOINE: VetEngineNormalise = n({
   id: '00000000-0000-0000-0000-000000000006',
   prenom: 'Antoine', nom: 'Bernard',
   statut: 'salarie', dernier_recours: false,
@@ -88,9 +97,9 @@ export const ANTOINE: VetEngine = {
     },
   ],
   conges: [],
-}
+})
 
-export const VICTOR: VetEngine = {
+export const VICTOR: VetEngineNormalise = n({
   id: '00000000-0000-0000-0000-000000000007',
   prenom: 'Victor', nom: 'Moreau',
   statut: 'salarie', dernier_recours: false,
@@ -101,6 +110,6 @@ export const VICTOR: VetEngine = {
     },
   ],
   conges: [],
-}
+})
 
 export const ALL_VETS = [ANNE_SOPHIE, FANNY, JEAN, ANNE_CAT, MANON, ANTOINE, VICTOR]
