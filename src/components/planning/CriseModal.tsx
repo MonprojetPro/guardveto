@@ -309,7 +309,18 @@ function LigneReparation({
             onValueChange={(v) => onChange(v === '__aucun__' ? null : v)}
           >
             <SelectTrigger className="w-full h-auto">
-              <SelectValue />
+              {/* base-ui SelectValue rend la VALEUR brute (UUID) → on affiche le nom. */}
+              {remplacant ? (
+                <span className="flex items-center gap-2">
+                  <span
+                    className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
+                    style={{ backgroundColor: remplacant.couleur }}
+                  />
+                  {remplacant.prenom} {remplacant.nom}
+                </span>
+              ) : (
+                <span className="text-muted-foreground">Ne pas réparer maintenant</span>
+              )}
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__aucun__">
@@ -430,7 +441,13 @@ export function CriseModal({
     setDecisions({})
   }
 
-  function handleOpenChange(next: boolean) {
+  function handleOpenChange(next: boolean, eventDetails?: { reason?: string }) {
+    // Anti-perte : un clic à côté (outside-press) ou Échap NE ferme PAS la fenêtre
+    // de crise — on ne perd plus une réparation en cours par accident. La fermeture
+    // volontaire passe par Annuler / Fermer / la croix.
+    if (!next && (eventDetails?.reason === 'outside-press' || eventDetails?.reason === 'escape-key')) {
+      return
+    }
     if (!next) resetAll()
     onOpenChange(next)
   }
