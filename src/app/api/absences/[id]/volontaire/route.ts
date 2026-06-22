@@ -266,6 +266,9 @@ export async function POST(
     second_id,
     force: true,
     auteurVetId: volontaireId,
+    // Client SERVICE_ROLE (sans session) → on FOURNIT le cabinetId pour que
+    // le recalcul bonus/malus ait lieu (resoudreCabinetId échouerait ici).
+    cabinetId,
   })
 
   if (!appRes.ok) {

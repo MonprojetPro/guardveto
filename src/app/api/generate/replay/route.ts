@@ -28,19 +28,42 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { genererPlanningPur } from '@/engine/solver'
 import { resoudreContexte } from '@/data/resoudreContexte'
-import type { ContexteSimulation } from '@/engine/types'
+import { normaliserContraintesVets } from '@/engine/normaliserContraintes'
+import { buildEquityWeights } from '@/engine/equity-weights'
+import {
+  mapperReglesCabinet,
+  extraireEquityRules,
+  extraireStructureConfig,
+  type RegleCabinetRow,
+} from '@/data/mapReglesCabinet'
+import type { ContexteSimulation, ContrainteEngine } from '@/engine/types'
 
 // Laisse le temps au solver LNS
 export const maxDuration = 60
 
 // ── Types internes ────────────────────────────────────────
 
-interface SnapshotRegle {
+/**
+ * Forme LEGACY (schéma v1) du snapshot : un tableau de contraintes_veto.
+ * Conservée pour rejouer les snapshots pris AVANT le Chantier C1.
+ */
+interface SnapshotRegleLegacy {
   id: string
   type: string
   brique_type: string
   config: Record<string, unknown>
   actif: boolean
+}
+
+/**
+ * Forme v2 (Chantier C1) du snapshot : photo fidèle des `regles_cabinet`
+ * (briques par-véto + équité `equilibrer` + structure R8/R9) + l'effectif
+ * configurable de la période. C'est ce que le moteur consomme réellement.
+ */
+interface SnapshotV2 {
+  schema: 2
+  regles_cabinet: RegleCabinetRow[]
+  effectif?: { nb_vetos_semaine_soir?: number | null }
 }
 
 // ── Handler principal ────────────────────────────────────
@@ -114,7 +137,7 @@ export async function POST(req: NextRequest) {
   }
 
   const snapshotId = snapshotRow.id as string
-  const snapshotRegles = (snapshotRow.regles_json ?? []) as SnapshotRegle[]
+  const rawRegles = snapshotRow.regles_json ?? []
 
   // ── 2. Charger le contexte courant ──────────────────────
   let contexte: ContexteSimulation
@@ -134,36 +157,74 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // ── 3. Remplacer les contraintes par celles du snapshot ─
-  // On reconstruit un contexte de replay en substituant les contraintes
-  // courantes par celles archivées dans le snapshot. Les vétérinaires,
-  // congés et calendrier restent ceux du contexte courant (seules les
-  // règles de planification sont rejouées à l'identique).
+  // ── 3. Reconstruire le contexte de replay à partir du snapshot ─
+  // Principe : on rejoue les RÈGLES telles qu'archivées à la génération,
+  // sur le MONDE courant (vétos, congés, calendrier d'aujourd'hui). Seules
+  // les règles de planification sont rejouées à l'identique.
   //
-  // Chaque véto du contexte garde ses contraintes originales du snapshot
-  // (filtrage par veterinaire_id non nécessaire ici : les contraintes
-  // du snapshot sont au niveau cabinet, pas par véto).
-  const snapshotContraintesParId = new Map<string, SnapshotRegle>(
-    snapshotRegles.map((r) => [r.id, r])
-  )
+  // Deux formes de snapshot possibles :
+  //   • v2 (Chantier C1) : objet { schema:2, regles_cabinet:[...], effectif }
+  //     → reconstruction FIDÈLE via les mêmes mappers que le loader :
+  //       briques par-véto + équité (`equilibrer`) + structure R8/R9 +
+  //       effectif configurable. C'est le chemin nominal.
+  //   • legacy v1 : tableau de contraintes_veto → on patche le `config`
+  //     des contraintes par id (ancien comportement, équité/structure NON
+  //     rejouées car absentes du snapshot — fidélité partielle, best-effort).
+  let contexteReplay: ContexteSimulation
 
-  // Remplacer les contraintes de chaque véto par leurs versions snapshotées
-  const vetsAvecSnapshotContraintes = contexte.vets.map((v) => {
-    const contraintesSnapshot = v.contraintes
-      .map((c) => {
+  if (!Array.isArray(rawRegles) && (rawRegles as SnapshotV2)?.schema === 2) {
+    // ── Chemin v2 : reconstruction fidèle depuis regles_cabinet ──
+    const snap = rawRegles as SnapshotV2
+    const rows = Array.isArray(snap.regles_cabinet) ? snap.regles_cabinet : []
+
+    // Catalogue des briques connues (même socle de validation que le loader).
+    const { data: briquesDb } = await supabase.from('briques_regles').select('id')
+    const briquesConnues = new Set<string>(
+      ((briquesDb as { id: string }[] | null) ?? []).map((b) => b.id),
+    )
+
+    const { contraintesParVet } = mapperReglesCabinet(rows, briquesConnues)
+    const equityWeights = buildEquityWeights(extraireEquityRules(rows))
+    const structureConfig = extraireStructureConfig(rows)
+    const effectif = snap.effectif?.nb_vetos_semaine_soir
+
+    // Réinjecter les contraintes snapshotées PAR VÉTO, puis re-normaliser à la
+    // source (parade anti-cécité params : tous les consommateurs reçoivent des
+    // règles dépliées — cf. resoudreContexte).
+    const vetsRejoues = contexte.vets.map((v) => ({
+      ...v,
+      contraintes: contraintesParVet.get(v.id) ?? [],
+    }))
+
+    contexteReplay = {
+      ...contexte,
+      vets: normaliserContraintesVets(vetsRejoues),
+      equityWeights,
+      structureConfig,
+      // Effectif d'alors si capturé, sinon on garde celui du contexte courant.
+      nbVetosSemaineSoir:
+        typeof effectif === 'number' ? effectif : contexte.nbVetosSemaineSoir,
+    }
+  } else {
+    // ── Chemin legacy v1 : patch des configs par id (fidélité partielle) ──
+    const legacy = (Array.isArray(rawRegles) ? rawRegles : []) as SnapshotRegleLegacy[]
+    const snapshotContraintesParId = new Map<string, SnapshotRegleLegacy>(
+      legacy.map((r) => [r.id, r]),
+    )
+
+    const vetsAvecSnapshotContraintes = contexte.vets.map((v) => {
+      const contraintesSnapshot = v.contraintes.map((c): ContrainteEngine => {
         const snap = snapshotContraintesParId.get(c.id)
-        if (!snap) return c // contrainte ajoutée après la génération → conserver telle quelle
-        return {
-          ...c,
-          config: snap.config as typeof c.config,
-        }
+        if (!snap) return c // contrainte ajoutée après la génération → conserver
+        return { ...c, config: snap.config as typeof c.config }
       })
-    return { ...v, contraintes: contraintesSnapshot }
-  })
+      return { ...v, contraintes: contraintesSnapshot }
+    })
 
-  const contexteReplay: ContexteSimulation = {
-    ...contexte,
-    vets: vetsAvecSnapshotContraintes,
+    contexteReplay = {
+      ...contexte,
+      vets: vetsAvecSnapshotContraintes,
+    }
   }
 
   // ── 4. Rejouer le solver ─────────────────────────────────

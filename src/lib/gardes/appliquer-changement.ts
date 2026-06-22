@@ -46,6 +46,14 @@ export interface AppliquerChangementParams {
   force: boolean
   /** Id véto de l'auteur de la modif (pour audit_log.user_id). */
   auteurVetId: string
+  /**
+   * Cabinet courant, pour le recalcul du bilan bonus/malus. À FOURNIR
+   * impérativement quand `supabase` est un client SERVICE_ROLE (sans session) :
+   * `resoudreCabinetId` lit la session et échouerait silencieusement, sautant
+   * le recalcul (cas du dépannage volontaire). Si absent, on retombe sur
+   * `resoudreCabinetId` (chemin authentifié classique).
+   */
+  cabinetId?: string
 }
 
 export interface AppliquerChangementResultat {
@@ -68,6 +76,7 @@ export async function appliquerChangementGarde(
   params: AppliquerChangementParams,
 ): Promise<AppliquerChangementResultat> {
   const { supabase, gardeId, premier_id, second_id, force, auteurVetId } = params
+  const cabinetIdFourni = params.cabinetId
 
   // ── Règle : le même véto ne peut pas être 1er ET 2nd ──
   if (premier_id && second_id && premier_id === second_id) {
@@ -147,14 +156,18 @@ export async function appliquerChangementGarde(
     ])
 
     if (compteurs.length > 0) {
-      let cabinetId: string | null = null
-      try {
-        cabinetId = await resoudreCabinetId(supabase)
-      } catch (err) {
-        console.error(
-          '[appliquerChangementGarde] cabinet_id introuvable pour recalcul bilan:',
-          err instanceof Error ? err.message : String(err),
-        )
+      // Priorité au cabinetId fourni par l'appelant (indispensable en
+      // service_role sans session). Sinon, résolution via la session.
+      let cabinetId: string | null = cabinetIdFourni ?? null
+      if (!cabinetId) {
+        try {
+          cabinetId = await resoudreCabinetId(supabase)
+        } catch (err) {
+          console.error(
+            '[appliquerChangementGarde] cabinet_id introuvable pour recalcul bilan:',
+            err instanceof Error ? err.message : String(err),
+          )
+        }
       }
 
       if (cabinetId) {

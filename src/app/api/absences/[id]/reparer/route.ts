@@ -217,6 +217,8 @@ export async function POST(
       second_id,
       force: true,
       auteurVetId: vet.id,
+      // Cabinet connu : on l'injecte (déterministe, indépendant de la session).
+      cabinetId,
     })
 
     if (!appRes.ok) {
