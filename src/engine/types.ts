@@ -45,6 +45,9 @@ export interface ContrainteEngine {
     // Limite de charge réglable (brique catalogue `au_plus_n`) : au plus N gardes
     // par fenêtre (semaine civile ou glissante). Dur si étage ≤ 2, sinon pénalité.
     | 'au_plus_n'
+    // Espacement minimal réglable (brique catalogue `espacement_min`) : au moins
+    // X jours entre deux gardes d'un même véto (anti nuits enchaînées).
+    | 'espacement_min'
   config: Record<string, unknown>
   actif: boolean
 }

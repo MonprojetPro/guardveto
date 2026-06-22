@@ -585,6 +585,44 @@ function checkAuPlusN(vet: VetEngine, slot: SlotGarde, planning: PlanningPartiel
   return ok()
 }
 
+// ── Espacement minimal réglable (brique `espacement_min`) ────
+// « au moins X jours entre deux gardes » d'un même véto. Réglable (dur ≤ 2,
+// sinon pénalité). On compare la date du créneau visé aux gardes DÉJÀ posées.
+
+/** Nombre de jours (absolu) entre deux dates ISO yyyy-MM-dd. */
+function joursEntreDates(a: string, b: string): number {
+  const da = new Date(a + 'T12:00:00Z').getTime()
+  const db = new Date(b + 'T12:00:00Z').getTime()
+  return Math.round(Math.abs(db - da) / 86_400_000)
+}
+
+/** Poser `vet` sur `slot` violerait-il l'espacement minimal de cette contrainte ? */
+function violeEspacementMin(
+  c: ContrainteEngine, vetId: string, slot: SlotGarde, planning: PlanningPartiel,
+): boolean {
+  const cfg = c.config as Record<string, unknown>
+  const eRaw = cfg.ecart_min_jours
+  const ecart = typeof eRaw === 'number' ? eRaw : typeof eRaw === 'string' ? parseInt(eRaw, 10) : NaN
+  if (!Number.isFinite(ecart) || ecart <= 0) return false // inerte si mal configurée
+  for (const a of planning.attributions) {
+    if (a.premier_id !== vetId && a.second_id !== vetId) continue
+    if (a.date === slot.date) continue // même jour : géré ailleurs (R21/effectif)
+    if (joursEntreDates(a.date, slot.date) < ecart) return true
+  }
+  return false
+}
+
+function checkEspacementMin(vet: VetEngine, slot: SlotGarde, planning: PlanningPartiel): ValidationResult {
+  for (const c of vet.contraintes) {
+    if (!c.actif || c.type !== 'espacement_min') continue
+    if (estDure(c) && violeEspacementMin(c, vet.id, slot, planning)) {
+      const e = (c.config as Record<string, unknown>).ecart_min_jours
+      return invalid(`ESPACEMENT : ${vet.prenom} doit espacer ses gardes d'au moins ${e} jour(s)`)
+    }
+  }
+  return ok()
+}
+
 export function penaliteContraintesConfig(
   slot: SlotGarde,
   vet: VetEngine,
@@ -607,6 +645,8 @@ export function penaliteContraintesConfig(
         viole = violeDuoInterdit(c, slot, planning) !== null; break
       case 'au_plus_n':
         viole = violeAuPlusN(c, vet.id, slot, planning); break
+      case 'espacement_min':
+        viole = violeEspacementMin(c, vet.id, slot, planning); break
     }
     if (viole) pen += penaliteEtage(etageDe(c))
   }
@@ -646,6 +686,7 @@ export function isValid(
     checkR9VendrediLieWE(vet, slot, planning, structure.r9_liaison),
     checkR21RolesDistincts(vet, slot, roleVisé, planning),
     checkAuPlusN(vet, slot, planning),
+    checkEspacementMin(vet, slot, planning),
   ]
 
   // R8 uniquement pour les WE
@@ -678,4 +719,5 @@ export {
   checkR19Weekend,
   checkR21RolesDistincts,
   checkAuPlusN,
+  checkEspacementMin,
 }

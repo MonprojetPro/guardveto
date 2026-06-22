@@ -565,6 +565,49 @@ export function validerPlanning(
     }
   }
 
+  // ── ESPACEMENT_MIN — au moins X jours entre deux gardes (brique réglable) ──
+  // Re-vérification INDÉPENDANTE : on trie les dates de garde du véto et on
+  // contrôle l'écart entre dates consécutives (si tous ≥ X, toutes les paires le
+  // sont). Seules les règles DURES (étage ≤ 2) sont des violations.
+  const joursEntre = (a: string, b: string): number => {
+    const da = new Date(a + 'T12:00:00Z').getTime()
+    const db = new Date(b + 'T12:00:00Z').getTime()
+    return Math.round(Math.abs(db - da) / 86_400_000)
+  }
+  for (const vet of vetsNorm) {
+    for (const c of vet.contraintes) {
+      if (!c.actif || c.type !== 'espacement_min') continue
+      const cfg = c.config as Record<string, unknown>
+      const etage = typeof cfg.force === 'number' ? (cfg.force as number) : 2
+      if (etage > 2) continue
+      const eRaw = cfg.ecart_min_jours
+      const ecart = typeof eRaw === 'number' ? eRaw : typeof eRaw === 'string' ? parseInt(eRaw, 10) : NaN
+      if (!Number.isFinite(ecart) || ecart <= 0) continue
+
+      const dates = planning.attributions
+        .filter((a) => a.premier_id === vet.id || a.second_id === vet.id)
+        .map((a) => a.date)
+        .sort()
+      const vues = new Set<string>()
+      for (let i = 1; i < dates.length; i++) {
+        if (dates[i - 1] === dates[i]) continue
+        const j = joursEntre(dates[i - 1], dates[i])
+        if (j < ecart) {
+          const cle = `${dates[i - 1]}|${dates[i]}`
+          if (vues.has(cle)) continue
+          vues.add(cle)
+          violations.push({
+            regle: 'ESPACEMENT',
+            date: dates[i],
+            type: 'espacement',
+            vetId: vet.id,
+            detail: `ESPACEMENT : ${vet.prenom} — seulement ${j} jour(s) entre le ${dates[i - 1]} et le ${dates[i]} (min ${ecart})`,
+          })
+        }
+      }
+    }
+  }
+
   // ── R9 — vendredi soir = même duo que le week-end ──
   // ── R8 — inversion 1er/2nd entre vendredi soir et WE ──
   // On ne signale ces violations que si la règle est appliquée en DUR (active +

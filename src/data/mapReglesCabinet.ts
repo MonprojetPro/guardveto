@@ -72,7 +72,8 @@ const TYPES_V1: ReadonlySet<TypeContrainte> = new Set<TypeContrainte>([
   'jour_repos_conditionnel',
   'indisponibilite_cyclique',
   'duo_interdit',
-  'au_plus_n', // limite de charge réglable (brique catalogue `au_plus_n`)
+  'au_plus_n',      // limite de charge réglable (brique catalogue `au_plus_n`)
+  'espacement_min', // espacement minimal réglable (brique catalogue `espacement_min`)
 ])
 
 /**
@@ -86,6 +87,7 @@ const BRIQUE_VERS_TYPE: Record<string, TypeContrainte> = {
   alternance_ancre: 'indisponibilite_cyclique',
   duo_interdit: 'duo_interdit',
   au_plus_n: 'au_plus_n',
+  espacement_min: 'espacement_min',
 }
 
 export interface RegleRejetee {
