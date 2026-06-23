@@ -19,6 +19,14 @@
 // ============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import {
+  creerNotification,
+  contenuPlanningPublie,
+  contenuGardeModifiee,
+  contenuRappelPublication,
+  contenuAppelVolontaires,
+  contenuDepannageConfirme,
+} from './notifications-inapp'
 
 const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
 
@@ -28,6 +36,7 @@ interface Veterinaire {
   nom: string
   prenom: string
   email: string
+  cabinet_id?: string | null
 }
 
 interface Garde {
@@ -312,7 +321,7 @@ export async function sendRappelPublication(
   // Uniquement les admins actifs
   const { data: admins } = await supabase
     .from('veterinaires')
-    .select('id, nom, prenom, email')
+    .select('id, nom, prenom, email, cabinet_id')
     .eq('role_app', 'admin')
     .eq('actif', true)
 
@@ -358,6 +367,17 @@ export async function sendRappelPublication(
       })
       errors++
     }
+
+    // Notif in-app (indépendante de l'email — créée même si Brevo échoue).
+    const notif = contenuRappelPublication(periodeLabel, joursRestants)
+    await creerNotification(supabase, {
+      veterinaireId: admin.id,
+      type: 'rappel_publication',
+      titre: notif.titre,
+      message: notif.message,
+      lien: notif.lien,
+      cabinetId: admin.cabinet_id,
+    })
   }
 
   console.log(`[notifications] Rappel publication (J-${joursRestants}) — ${periodeLabel}: ${sent} envoyés, ${errors} erreurs`)
@@ -414,7 +434,7 @@ export async function sendPlanningPublie(
   // Récupérer tous les vétos actifs avec email
   const { data: vets } = await supabase
     .from('veterinaires')
-    .select('id, nom, prenom, email')
+    .select('id, nom, prenom, email, cabinet_id')
     .eq('actif', true)
 
   if (!vets || vets.length === 0) return { sent: 0, errors: 0 }
@@ -478,6 +498,17 @@ export async function sendPlanningPublie(
       })
       errors++
     }
+
+    // Notif in-app (indépendante de l'email).
+    const notif = contenuPlanningPublie(periodeLabel, mesGardes.length)
+    await creerNotification(supabase, {
+      veterinaireId: vet.id,
+      type: 'planning_publie',
+      titre: notif.titre,
+      message: notif.message,
+      lien: notif.lien,
+      cabinetId: vet.cabinet_id,
+    })
   }
 
   console.log(`[notifications] Planning publié: ${sent} emails envoyés, ${errors} erreurs`)
@@ -568,6 +599,16 @@ export async function sendGardeModifiee(
       })
       errors++
     }
+
+    // Notif in-app (cabinet_id résolu depuis la table — destinataires hérités).
+    const notif = contenuGardeModifiee(garde.date, garde.type)
+    await creerNotification(supabase, {
+      veterinaireId: vet.id,
+      type: 'garde_modifiee',
+      titre: notif.titre,
+      message: notif.message,
+      lien: notif.lien,
+    })
   }
 
   console.log(`[notifications] Garde modifiée: ${sent} emails envoyés, ${errors} erreurs`)
@@ -716,7 +757,7 @@ export async function sendAppelVolontaires(
   // Emails des candidats (actifs uniquement) — VetEngine ne porte pas l'email.
   const { data: candidats } = await supabase
     .from('veterinaires')
-    .select('id, nom, prenom, email')
+    .select('id, nom, prenom, email, cabinet_id')
     .in('id', candidatIds)
     .eq('actif', true)
 
@@ -777,6 +818,23 @@ export async function sendAppelVolontaires(
       })
       errors++
     }
+
+    // Notif in-app (indépendante de l'email).
+    const absentObj = absent as { prenom: string; nom: string } | null
+    const notif = contenuAppelVolontaires(
+      creneau.date,
+      creneau.type,
+      creneau.role,
+      absentObj?.prenom ?? null,
+    )
+    await creerNotification(supabase, {
+      veterinaireId: vet.id,
+      type: 'appel_volontaires',
+      titre: notif.titre,
+      message: notif.message,
+      lien: notif.lien,
+      cabinetId: vet.cabinet_id,
+    })
   }
 
   console.log(`[notifications] Appel volontaires (garde ${creneau.gardeId}): ${sent} envoyés, ${errors} erreurs`)
@@ -835,13 +893,25 @@ export async function sendDepannageConfirme(
 ): Promise<{ sent: number; errors: number }> {
   const { data: vet } = await supabase
     .from('veterinaires')
-    .select('id, nom, prenom, email')
+    .select('id, nom, prenom, email, cabinet_id')
     .eq('id', veterinaireId)
     .single()
 
   if (!vet) return { sent: 0, errors: 0 }
 
   const v = vet as Veterinaire
+
+  // Notif in-app (indépendante de l'email).
+  const notif = contenuDepannageConfirme(creneau.date, creneau.type, creneau.role)
+  await creerNotification(supabase, {
+    veterinaireId: v.id,
+    type: 'depannage_confirme',
+    titre: notif.titre,
+    message: notif.message,
+    lien: notif.lien,
+    cabinetId: v.cabinet_id,
+  })
+
   const html = buildDepannageConfirmeHtml(v, creneau)
   const subject = `[GuardVeto] Garde confirmée — ${formatDate(creneau.date)}`
 

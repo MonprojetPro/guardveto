@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { Header } from '@/components/layout/Header'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { MobileNav } from '@/components/layout/MobileNav'
+import { getNotifications } from '@/data/notifications'
 import type { Veterinaire } from '@/types'
 
 export default async function ProtectedLayout({
@@ -40,6 +41,9 @@ export default async function ProtectedLayout({
     nbSouhaits = count ?? 0
   }
 
+  // Notifications in-app (cloche) — état initial pour un 1er rendu sans flash.
+  const initialNotifications = await getNotifications()
+
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       {/* Sidebar desktop */}
@@ -47,7 +51,7 @@ export default async function ProtectedLayout({
 
       {/* Zone principale */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Header veterinaire={veterinaire as Veterinaire} />
+        <Header veterinaire={veterinaire as Veterinaire} initialNotifications={initialNotifications} />
 
         <main className="flex-1 overflow-y-auto p-4 pb-20 md:pb-4">
           {children}

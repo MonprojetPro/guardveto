@@ -3,6 +3,8 @@
 import { logout } from '@/app/login/actions'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { NotificationBell } from '@/components/notifications/NotificationBell'
+import type { NotificationsState } from '@/data/notifications'
 import type { Veterinaire } from '@/types'
 import { LogOut } from 'lucide-react'
 
@@ -13,9 +15,10 @@ const ROLE_LABELS: Record<string, string> = {
 
 interface HeaderProps {
   veterinaire: Veterinaire
+  initialNotifications: NotificationsState
 }
 
-export function Header({ veterinaire }: HeaderProps) {
+export function Header({ veterinaire, initialNotifications }: HeaderProps) {
   return (
     <header className="h-14 border-b border-border bg-card flex items-center justify-between px-4 shrink-0">
       {/* Titre page — remplacé dynamiquement par chaque page si besoin */}
@@ -28,6 +31,9 @@ export function Header({ veterinaire }: HeaderProps) {
 
       {/* Utilisateur + déconnexion */}
       <div className="flex items-center gap-3">
+        {/* Cloche de notifications */}
+        <NotificationBell initial={initialNotifications} />
+
         {/* Avatar couleur veto */}
         <div
           className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold shrink-0"
