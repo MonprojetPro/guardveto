@@ -11,15 +11,15 @@
 // Ce test est le GATE de P1A-004 : quand le moteur basculera de
 // contraintes_veto vers regles_cabinet, ce planning doit rester valide.
 //
-// ⚠️ DEUX dettes observées en construisant ce filet (hors périmètre P1-A,
-//    à traiter plus tard) :
-//   (a) genererPlanningPur MUTE son input → on clone l'input dans CHAQUE
-//       test (makeInput) pour éviter la contamination inter-tests.
-//   (b) le LNS tourne sous budget de TEMPS → non déterministe entre runs.
-//       On fige donc le filet sur le seed greedy (lnsTimeoutMs: 0), qui est
-//       déterministe ET valide (vérifié : 72 attributions, 0 violation, diff=0
-//       entre deux runs). L'optimisation d'équité (LNS) n'est pas l'objet de
-//       la bascule P1A-004.
+// HISTORIQUE DES DEUX DETTES (Lot 1 — RÉSOLUES le 2026-06-24) :
+//   (a) « genererPlanningPur MUTE son input » → FAUX après normaliserContraintes
+//       devenue pure. Prouvé par mutation-sonde.test.ts (deep equal avant/après,
+//       seed ET LNS). Le structuredClone défensif de makeInput a donc été RETIRÉ.
+//   (b) « le LNS tourne sous budget de TEMPS → non déterministe » → CORRIGÉ :
+//       le critère d'arrêt par défaut est désormais déterministe (convergence +
+//       plafond de passes lnsMaxPasses), plus aucune coupe au chrono par défaut.
+//       On garde quand même lnsTimeoutMs: 0 ici (= seed greedy seul) : ce filet
+//       cible la BASCULE des règles (P1A-004), pas l'optimisation d'équité (LNS).
 //   NB : le seed greedy prend ~3 s sur 12 semaines → timeout par test allongé
 //        (TEST_TIMEOUT) pour les tests qui génèrent deux fois.
 // ============================================================
@@ -30,19 +30,23 @@ import { validerPlanning } from '../validation/validerPlanning'
 import type { PlanningPartiel, VetEngine } from '../types'
 import { VETS_PILOTE, PERIODE_PILOTE, CALENDRIER_PILOTE } from './fixtures-pilote'
 
-/** Input FRAIS à chaque appel (clone profond) — neutralise la mutation (dette a). */
+/**
+ * Input pilote. Plus de structuredClone défensif : genererPlanningPur ne mute
+ * pas son input (dette a close, prouvé par mutation-sonde.test.ts). On crée
+ * tout de même des objets frais (Set/tableaux neufs) pour l'isolation des tests.
+ */
 function makeInput() {
   return {
     dateDebut: PERIODE_PILOTE.dateDebut,
     dateFin: PERIODE_PILOTE.dateFin,
     saison: PERIODE_PILOTE.saison,
-    vets: structuredClone(VETS_PILOTE) as VetEngine[],
+    vets: VETS_PILOTE as VetEngine[],
     bonusMalus: {},
     calendrier: {
       feries: new Set(CALENDRIER_PILOTE.feries),
       vacancesScolaires: CALENDRIER_PILOTE.vacancesScolaires.map((v) => ({ ...v })),
     },
-    lnsTimeoutMs: 0, // seed greedy déterministe (dette b)
+    lnsTimeoutMs: 0, // seed greedy seul (le LNS n'est pas l'objet de ce filet)
   }
 }
 

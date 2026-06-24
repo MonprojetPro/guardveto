@@ -54,8 +54,27 @@ export interface SolverInput {
   vets: VetEngine[]
   /** Bonus/malus inter-périodes (R20). Passer {} si aucun. */
   bonusMalus: BonusMalusMap
-  /** Budget temps pour la phase LNS en ms (défaut 30 000). */
+  /**
+   * BACKSTOP temps optionnel pour la phase LNS, en ms.
+   *
+   * Comportement (Lot 1 — déterminisme) :
+   *   • `undefined` (défaut) → AUCUNE coupe au chrono. L'arrêt est 100 %
+   *     déterministe : convergence (3 passes sèches) OU plafond `lnsMaxPasses`.
+   *     C'est le mode recommandé (résultat reproductible → replay fiable).
+   *   • `0` (sentinel) → SEED GREEDY SEUL. Le LNS n'est pas exécuté du tout.
+   *   • `> 0` → garde-fou de sécurité EN PLUS du plafond de passes. ⚠️ Fournir
+   *     une valeur > 0 RÉINTRODUIT du non-déterminisme (le nombre de passes
+   *     dépend alors du CPU) : opt-in conscient, à réserver aux contextes où
+   *     borner le temps prime sur la reproductibilité.
+   */
   lnsTimeoutMs?: number
+  /**
+   * Plafond DÉTERMINISTE du nombre de passes LNS (garde-fou anti-boucle).
+   * Une « passe » = un balayage complet de toutes les semaines. Le LNS
+   * s'arrête au plus tard à `lnsMaxPasses` passes, indépendamment du CPU.
+   * Défaut 40 (largement au-dessus de la convergence observée sur 12-17 sem).
+   */
+  lnsMaxPasses?: number
   /** Données calendaires résolues depuis Supabase. Fallback sur les listes en dur si absent. */
   calendrier?: CalendrierResolu
   /**
@@ -648,13 +667,29 @@ interface LNSHillResult {
   planning: PlanningPartiel
   ameliorations: number
   passesSeches: number
+  /** Le plafond déterministe de passes (lnsMaxPasses) a-t-il été atteint ? */
+  plafondAtteint: boolean
+  /** Le backstop temps OPTIONNEL (lnsTimeoutMs > 0) a-t-il coupé ? */
   timeoutAtteint: boolean
 }
+
+/** Plafond déterministe par défaut de passes LNS (garde-fou anti-boucle). */
+const DEFAULT_LNS_MAX_PASSES = 40
 
 /**
  * lnsHillClimbing — améliore `seedPlanning` par passes successives LNS.
  * Neighborhood = 1 semaine (destroy-repair greedy).
  * Critère d'acceptation : comparerScores(nouveau, actuel) < 0 (strict).
+ *
+ * ARRÊT (Lot 1 — déterminisme) :
+ *   1. Convergence : `maxPassesSansAmelioration` passes sèches consécutives (3).
+ *   2. Plafond déterministe : `lnsMaxPasses` passes totales (défaut 40).
+ *   3. Backstop temps OPTIONNEL : seulement si `lnsTimeoutMs > 0` est fourni.
+ *      Non fourni (undefined) → aucune coupe au chrono → résultat reproductible.
+ *
+ * IMPORTANT : ce wrapper n'est appelé que lorsque le LNS doit tourner. Le
+ * sentinel `lnsTimeoutMs === 0` (= seed greedy seul) est intercepté EN AMONT
+ * dans genererPlanningPur, qui ne nous appelle pas dans ce cas.
  */
 function lnsHillClimbing(
   seedPlanning: PlanningPartiel,
@@ -666,7 +701,16 @@ function lnsHillClimbing(
   const vets = normaliserContraintesVets(input.vets)
   const weights = input.equityWeights ?? DEFAULT_EQUITY_WEIGHTS
   const structure = input.structureConfig ?? DEFAULT_STRUCTURE_CONFIG
-  const timeoutMs = input.lnsTimeoutMs ?? 30_000
+  // Backstop temps : actif UNIQUEMENT si fourni > 0. Sinon, aucune coupe chrono
+  // (déterministe). Le sentinel 0 ne nous parvient jamais (intercepté en amont).
+  const timeoutMs =
+    typeof input.lnsTimeoutMs === 'number' && input.lnsTimeoutMs > 0
+      ? input.lnsTimeoutMs
+      : Infinity
+  const maxPasses =
+    typeof input.lnsMaxPasses === 'number' && input.lnsMaxPasses > 0
+      ? input.lnsMaxPasses
+      : DEFAULT_LNS_MAX_PASSES
   const maxPassesSansAmelioration = 3
 
   let meilleur = seedPlanning
@@ -675,11 +719,19 @@ function lnsHillClimbing(
   const lundis = extraireLundis(dateDebut, dateFin)
 
   let passesSansAmelioration = 0
+  let passesTotales = 0
   let ameliorations = 0
   let passesSeches = 0
+  let plafondAtteint = false
   let timeoutAtteint = false
 
   while (passesSansAmelioration < maxPassesSansAmelioration) {
+    // ── Plafond déterministe de passes (garde-fou anti-boucle) ──
+    if (passesTotales >= maxPasses) {
+      plafondAtteint = true
+      break
+    }
+    // ── Backstop temps OPTIONNEL (non-déterministe, opt-in via lnsTimeoutMs>0) ──
     if (performance.now() - t0 >= timeoutMs) {
       timeoutAtteint = true
       break
@@ -714,6 +766,8 @@ function lnsHillClimbing(
       }
     }
 
+    passesTotales++
+
     if (ameliorationCettePasse) {
       passesSansAmelioration = 0
     } else {
@@ -722,7 +776,7 @@ function lnsHillClimbing(
     }
   }
 
-  return { planning: meilleur, ameliorations, passesSeches, timeoutAtteint }
+  return { planning: meilleur, ameliorations, passesSeches, plafondAtteint, timeoutAtteint }
 }
 
 // ── API publique ─────────────────────────────────────────
@@ -759,7 +813,20 @@ export function genererPlanningPur(input: SolverInput): SolveResult {
     }
   }
 
-  // ── 2. LNS hill-climbing ─────────────────────────────
+  // ── Sentinel : lnsTimeoutMs === 0 → SEED GREEDY SEUL ──
+  // On NE rentre PAS dans le LNS (saut total). Plusieurs filets en dépendent
+  // (golden, golden-enforcement, diagnostic-impasse, équité, effectif) :
+  // ils exigent le seed greedy pur, 100 % déterministe. Préservé explicitement
+  // car le critère d'arrêt n'est plus piloté par le temps.
+  if (input.lnsTimeoutMs === 0) {
+    return {
+      success: true,
+      planning: seed.planning,
+      dureeMs: performance.now() - t0,
+    }
+  }
+
+  // ── 2. LNS hill-climbing (arrêt déterministe par défaut) ──
   const lnsResult = lnsHillClimbing(seed.planning, input, t0)
 
   return {
