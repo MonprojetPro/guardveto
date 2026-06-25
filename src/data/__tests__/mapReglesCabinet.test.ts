@@ -161,4 +161,21 @@ describe('mapperReglesCabinet — validation déterministe (règles corrompues �
     const { rejets } = mapperReglesCabinet([corrompue], BRIQUES_CONNUES)
     expect(rejets[0]?.regleId).toBe('bad-force')
   })
+
+  it('écarte une brique INTERNE même avec un type_v1 valide (anti-coquille-vide)', () => {
+    const interne: RegleCabinetRow = {
+      ...base,
+      id: 'interne-1',
+      brique_id: 'motif_grand_weekend',
+      // tentative de contournement : un type_v1 valide qui la ferait passer.
+      params_json: {
+        qui: { type: 'individu', refs: [VET.manon] },
+        params: { jour: 'jeudi' },
+        _source: { type_v1: 'jour_repos_fixe' },
+      },
+    }
+    const { contraintesParVet, rejets } = mapperReglesCabinet([interne], BRIQUES_CONNUES)
+    expect(rejets[0]?.regleId).toBe('interne-1')
+    expect([...contraintesParVet.values()].flat()).toHaveLength(0)
+  })
 })

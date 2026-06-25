@@ -49,6 +49,13 @@ export interface DefinitionBrique {
   widget: string
   /** Rend le PRÉDICAT de la règle en français (le sujet est préfixé par l'appelant). */
   rendreLangageNaturel: (params: Record<string, unknown>, ctx?: ContexteRendu) => string
+  /**
+   * Brique INTERNE/STRUCTURELLE : concept calculé par le moteur, PAS une règle
+   * que l'admin crée à la main. Aucun évaluateur « utilisateur » dédié, JAMAIS
+   * proposée par le formulaire (anti-coquille-vide : sinon doublon trompeur).
+   * Le mapper la rejette donc proprement si elle apparaît en base.
+   */
+  interne?: boolean
 }
 
 // ── Helpers de formulation (français lisible) ────────────────
@@ -280,6 +287,11 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
     },
   },
 
+  // ⚠️ INTERNE — « motif composite pré-calculé » (archi V2 §catalogue blindé).
+  // Le métier « grand week-end » (repos vendredi si pas de garde WE, jeudi sinon)
+  // est DÉJÀ livré par la brique `repos_conditionnel`. Le moteur calcule ce motif
+  // en interne (`aGardeWeekendCetteSemaine`) — il n'y a PAS de règle utilisateur à
+  // créer ici (ce serait un doublon de repos_conditionnel = coquille vide).
   motif_grand_weekend: {
     id: 'motif_grand_weekend',
     famille: 'interdire',
@@ -289,9 +301,16 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
       motif: 'string (garde_we_cette_semaine)',
     },
     widget: 'WidgetMotifGrandWeekend',
-    rendreLangageNaturel: () => "concerne le fait d'être de garde le week-end cette semaine",
+    rendreLangageNaturel: () =>
+      "motif interne « grand week-end » (déjà couvert par le repos conditionnel)",
+    interne: true,
   },
 }
+
+/** Ids des briques INTERNES/structurelles (jamais proposées à l'utilisateur). */
+export const BRIQUES_INTERNES: readonly string[] = Object.values(CATALOGUE_BRIQUES)
+  .filter((b) => b.interne)
+  .map((b) => b.id)
 
 /**
  * rendreRegle — point d'entrée pratique : rend une règle en français à partir

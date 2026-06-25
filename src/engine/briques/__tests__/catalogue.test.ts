@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { CATALOGUE_BRIQUES, BRIQUES_IDS, rendreRegle } from '../catalogue'
+import { CATALOGUE_BRIQUES, BRIQUES_IDS, BRIQUES_INTERNES, rendreRegle } from '../catalogue'
 
 // ── Parse du seed SQL (source de vérité côté base) ───────────
 
@@ -70,6 +70,18 @@ describe('catalogue ↔ seed briques_regles — cohérence (ne divergent pas)', 
       expect(brique.widget, `widget de ${id}`).toMatch(/^Widget/)
       expect(Object.keys(brique.schemaParams).length, `schemaParams de ${id}`).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('briques internes (anti-coquille-vide)', () => {
+  it('motif_grand_weekend est marquée interne (déjà couverte par repos_conditionnel)', () => {
+    expect(CATALOGUE_BRIQUES.motif_grand_weekend.interne).toBe(true)
+    expect(BRIQUES_INTERNES).toContain('motif_grand_weekend')
+  })
+
+  it('BRIQUES_INTERNES dérive bien du flag `interne` du catalogue', () => {
+    const attendues = BRIQUES_IDS.filter((id) => CATALOGUE_BRIQUES[id].interne)
+    expect([...BRIQUES_INTERNES].sort()).toEqual([...attendues].sort())
   })
 })
 

@@ -11,6 +11,12 @@
 // `ContrainteEngine { id, type, config:{axes,force,brique,params}, actif }`
 // que le loader fournissait jusqu'ici depuis `contraintes_veto.config`.
 //
+// 📌 DETTE DOCUMENTÉE (approche A = shim stable). La forme cible archi §4.3
+//    (`RegleResolue[]` plat dans un `ContexteSimulation`) est REPORTÉE au
+//    Palier 3 (IA « et si… ») — c'est là qu'elle a une vraie valeur. Le cœur
+//    du moteur (prouvé fiable) n'est PAS réécrit avant. Cette couche reste le
+//    pont V1↔V2 testé en attendant.
+//
 // VALIDATION DÉTERMINISTE (défensive). Le `schema_json` du catalogue
 // (briques_regles) est à ce stade un MIROIR DESCRIPTIF provisoire (texte
 // « integer », « string[] »… — cf. migration P1A-001, re-synchro en
@@ -32,6 +38,10 @@ import {
   DEFAULT_STRUCTURE_CONFIG,
   type StructureConfig,
 } from '@/engine/structure-config'
+import { BRIQUES_INTERNES } from '@/engine/briques/catalogue'
+
+/** Set des briques internes (rejetées comme règles utilisateur). */
+const BRIQUES_INTERNES_SET = new Set<string>(BRIQUES_INTERNES)
 
 /** Ligne brute de `regles_cabinet` telle que lue par le loader. */
 export interface RegleCabinetRow {
@@ -210,6 +220,15 @@ export function mapperReglesCabinet(
     // 1. Brique connue du catalogue
     if (!briquesConnues.has(row.brique_id)) {
       rejet(`brique inconnue du catalogue : « ${row.brique_id} »`)
+      continue
+    }
+
+    // 1bis. Brique INTERNE/structurelle (ex. motif_grand_weekend) : jamais une
+    //       règle utilisateur — rejet déterministe, même si un _source.type_v1
+    //       valide tentait de la faire passer (anti-coquille-vide, défense en
+    //       profondeur ; le formulaire ne la propose déjà pas).
+    if (BRIQUES_INTERNES_SET.has(row.brique_id)) {
+      rejet(`brique interne non applicable comme règle : « ${row.brique_id} »`)
       continue
     }
 
