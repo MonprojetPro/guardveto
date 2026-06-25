@@ -125,10 +125,10 @@ export type SolveResult =
       planningPartiel: PlanningPartiel
       dureeMs: number
       /**
-       * Diagnostic d'impasse fiable (Lot 1) : le VRAI créneau bloquant capté
-       * pendant le backtracking (premier step sans aucun candidat valide).
+       * Diagnostic d'impasse COMPLET (Palier 2, lots 1+2+3) : le VRAI créneau
+       * bloquant capté pendant le backtracking (premier step sans aucun candidat
+       * valide), + `reglesEnCause` + `suggestions` vérifiées par re-simulation.
        * Optionnel pour rétro-compat ; `joursNonCouverts` reste toujours fourni.
-       * `reglesEnCause`/`suggestions` sont vides au Lot 1 (remplis aux lots 2/3).
        */
       diagnostic?: DiagnosticImpasse
     }

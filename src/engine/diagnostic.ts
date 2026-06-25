@@ -5,14 +5,15 @@
 // trouvé aucun candidat valide dans son contexte partiel réel (le step où
 // `candidates.length === 0` dans le backtracking). Ce fichier pose le contrat
 // de données partagé entre :
-//   • le moteur (solver.ts) — qui REMPLIT le créneau bloquant (Lot 1),
-//   • les analyseurs de raisons (Lot 2) — qui rempliront `reglesEnCause`,
-//   • le générateur de suggestions (Lot 3) — qui rempliront `suggestions`,
-//   • l'UI — qui affichera ce diagnostic à l'utilisateur.
+//   • le moteur (solver.ts) — REMPLIT le créneau bloquant + les règles en cause
+//     + les suggestions vérifiées par re-simulation,
+//   • l'UI (DiagnosticImpasse.tsx) — affiche le diagnostic + le bouton guidé
+//     « Assouplir cette règle » (génération ET gestion de crise).
 //
-// Lot 1 : seul `creneauBloquant` (date/type/role) et `joursNonCouverts` sont
-// renseignés de façon fiable. `reglesEnCause` et `suggestions` restent VIDES
-// (types complets, remplissage différé aux lots 2/3).
+// ✅ Palier 2 COMPLET (lots 1+2+3) : `creneauBloquant`, `joursNonCouverts`,
+// `reglesEnCause` ET `suggestions` (chacune VÉRIFIÉE par re-simulation avant
+// d'être proposée comme actionnable) sont tous renseignés. Le diagnostic est
+// éphémère (jamais persisté) : construit à l'échec, renvoyé tel quel à l'UI.
 //
 // ⚠️ Réutilise les types existants du moteur (TypeGardeEngine, RoleGarde,
 // JourNonCouvert) — ne JAMAIS réinventer ces unions ici.
