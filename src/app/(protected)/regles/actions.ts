@@ -24,6 +24,7 @@ import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { EQUITY_DIMENSIONS, IMPORTANCE_LEVELS } from '@/engine/equity-weights'
+import { construireValiditeJson } from '@/lib/periodes'
 
 // ── Garde admin ──────────────────────────────────────────────
 
@@ -280,6 +281,8 @@ export interface UpsertReglePayload {
   brique_id: BriqueEvaluable
   owner_id: string
   force: ForceFormulaire
+  /** null/absent = règle permanente ; un id = règle limitée à cette période. */
+  periode_id?: string | null
   // interdire_creneau
   jour?: string
   exception_vacances_scolaires?: boolean
@@ -368,6 +371,26 @@ function envelopper(
   }
 }
 
+/**
+ * Valide une période de scoping : `null`/'' ⇒ permanente (ok). Un id ⇒ il DOIT
+ * exister une période de CE cabinet (RLS-scope auto). Retourne l'id normalisé
+ * (null si permanente) ou une erreur. Frontière de confiance.
+ */
+async function resoudrePeriodeScoping(
+  supabase: SupabaseClient<any, any, any>,
+  periodeId: string | null | undefined,
+): Promise<{ periode_id: string | null } | { error: string }> {
+  if (!periodeId) return { periode_id: null }
+  const { data, error } = await supabase
+    .from('periodes')
+    .select('id')
+    .eq('id', periodeId)
+    .maybeSingle()
+  if (error) return { error: error.message }
+  if (!data) return { error: 'Période sélectionnée introuvable pour ce cabinet.' }
+  return { periode_id: periodeId }
+}
+
 /** Cherche l'id d'un duo owner→partner pour ce cabinet (RLS scope auto). */
 async function trouverDuo(
   supabase: SupabaseClient<any, any, any>,
@@ -414,6 +437,13 @@ export async function upsertRegle(payload: UpsertReglePayload) {
     return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
   }
 
+  // Validité : permanente (null) ou limitée à une période existante du cabinet.
+  // C'est `periode_id` que le loader moteur filtre ; validite_json en est le miroir.
+  const scope = await resoudrePeriodeScoping(supabase, payload.periode_id)
+  if ('error' in scope) return scope
+  const periode_id = scope.periode_id
+  const validite_json = construireValiditeJson(periode_id)
+
   // ── Cas duo interdit (symétrique) ──────────────────────────
   if (payload.brique_id === 'duo_interdit') {
     const a = payload.owner_id
@@ -444,6 +474,8 @@ export async function upsertRegle(payload: UpsertReglePayload) {
 
     const ligne = (owner: string, partner: string) => ({
       cabinet_id: cabinetId,
+      periode_id,
+      validite_json,
       brique_id: 'duo_interdit',
       params_json: envelopper(owner, 'duo_interdit', null, { avec_veterinaire_id: partner }),
       force: payload.force,
@@ -468,12 +500,14 @@ export async function upsertRegle(payload: UpsertReglePayload) {
   if (payload.id) {
     const { error } = await supabase
       .from('regles_cabinet')
-      .update({ brique_id: payload.brique_id, params_json, force: payload.force })
+      .update({ brique_id: payload.brique_id, params_json, force: payload.force, periode_id, validite_json })
       .eq('id', payload.id)
     if (error) return { error: error.message }
   } else {
     const { error } = await supabase.from('regles_cabinet').insert({
       cabinet_id: cabinetId,
+      periode_id,
+      validite_json,
       brique_id: payload.brique_id,
       params_json,
       force: payload.force,

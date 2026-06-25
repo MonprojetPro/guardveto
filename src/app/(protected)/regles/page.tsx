@@ -29,6 +29,7 @@ import {
   type EquityDimension,
   type ImportanceLevel,
 } from '@/engine/equity-weights'
+import { periodeLabelCourt, type PeriodeMini } from '@/lib/periodes'
 
 const BRIQUE_EQUILIBRER = 'equilibrer'
 const BRIQUE_LIAISON = 'liaison_creneaux' // R9
@@ -63,14 +64,25 @@ export default async function ReglesPage({
 
   if (!currentVeto) redirect('/login')
 
-  const [{ data: regles }, { data: vets }] = await Promise.all([
+  const [{ data: regles }, { data: vets }, { data: periodesDb }] = await Promise.all([
     supabase
       .from('regles_cabinet')
-      .select('id, brique_id, params_json, force, actif')
+      .select('id, brique_id, params_json, force, actif, periode_id')
       .order('brique_id')
       .order('id'),
     supabase.from('veterinaires').select('id, prenom, nom, couleur').order('nom'),
+    supabase
+      .from('periodes')
+      .select('id, saison, numero, libelle, date_debut, date_fin')
+      .neq('statut', 'verrouille') // une période verrouillée ne sera plus régénérée → inutile pour scoper une règle
+      .order('date_debut', { ascending: false }),
   ])
+
+  // Périodes proposables au formulaire (libellé non ambigu construit côté client).
+  const periodes = ((periodesDb as PeriodeMini[]) ?? []).map((p) => ({
+    id: p.id,
+    label: periodeLabelCourt(p),
+  }))
 
   const isAdmin = currentVeto.role_app === 'admin'
   const toutesRegles = (regles as RegleRow[]) ?? []
@@ -105,6 +117,7 @@ export default async function ReglesPage({
       <ReglesClient
         regles={reglesClassiques}
         vets={(vets as VetoMini[]) ?? []}
+        periodes={periodes}
         isAdmin={isAdmin}
       />
       <ReglagesPlanningClient

@@ -15,7 +15,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ScrollText, Power, Pencil, Trash2, Plus, Lock, Inbox } from 'lucide-react'
+import { ScrollText, Power, Pencil, Trash2, Plus, Lock, Inbox, CalendarClock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
@@ -39,6 +39,14 @@ export interface RegleRow {
   params_json: unknown
   force: string
   actif: boolean
+  /** null = règle permanente ; un id = règle limitée à cette période. */
+  periode_id?: string | null
+}
+
+/** Période proposable au formulaire + résolution de son libellé (liste). */
+export interface PeriodeOption {
+  id: string
+  label: string
 }
 
 export interface VetoMini {
@@ -97,10 +105,13 @@ function phraseRegle(regle: RegleRow, nomVeto: (id: string) => string): string {
 interface ReglesClientProps {
   regles: RegleRow[]
   vets: VetoMini[]
+  periodes: PeriodeOption[]
   isAdmin: boolean
 }
 
-export function ReglesClient({ regles, vets, isAdmin }: ReglesClientProps) {
+export function ReglesClient({ regles, vets, periodes, isAdmin }: ReglesClientProps) {
+  const labelPeriode = (id?: string | null) =>
+    id ? (periodes.find((p) => p.id === id)?.label ?? 'période supprimée') : null
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [aSupprimer, setASupprimer] = useState<RegleRow | null>(null)
@@ -164,9 +175,16 @@ export function ReglesClient({ regles, vets, isAdmin }: ReglesClientProps) {
         {symboleDe(regle.force)}
       </span>
 
-      <p className="flex-1 min-w-0 text-sm text-foreground leading-6">
-        {phraseRegle(regle, nomVeto)}
-      </p>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-foreground leading-6">
+          {phraseRegle(regle, nomVeto)}
+        </p>
+        {regle.periode_id && (
+          <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md bg-accent/15 text-accent-foreground border border-accent/30">
+            <CalendarClock className="w-3 h-3" /> {labelPeriode(regle.periode_id)}
+          </span>
+        )}
+      </div>
 
       {isAdmin && (
         <div className="flex gap-1 shrink-0">
@@ -316,6 +334,7 @@ export function ReglesClient({ regles, vets, isAdmin }: ReglesClientProps) {
           open={formOuvert}
           onClose={() => setFormOuvert(false)}
           vets={vets}
+          periodes={periodes}
           regle={aEditer}
         />
       )}

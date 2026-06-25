@@ -30,7 +30,10 @@ import {
 } from '@/components/ui/select'
 import { rendreRegle } from '@/engine/briques/catalogue'
 import { upsertRegle, type BriqueEvaluable, type ForceFormulaire } from '@/app/(protected)/regles/actions'
-import type { RegleRow, VetoMini } from './ReglesClient'
+import type { RegleRow, VetoMini, PeriodeOption } from './ReglesClient'
+
+/** Valeur sentinelle du sélecteur de validité = règle permanente (periode_id null). */
+const PERMANENTE = '__permanente__'
 
 // ── Référentiels d'affichage ─────────────────────────────────
 
@@ -87,10 +90,11 @@ interface RegleFormDialogProps {
   open: boolean
   onClose: () => void
   vets: VetoMini[]
+  periodes: PeriodeOption[]
   regle?: RegleRow | null
 }
 
-export function RegleFormDialog({ open, onClose, vets, regle }: RegleFormDialogProps) {
+export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, regle }: RegleFormDialogProps) {
   const router = useRouter()
   const isEdit = Boolean(regle)
   const [isPending, startTransition] = useTransition()
@@ -144,6 +148,12 @@ export function RegleFormDialog({ open, onClose, vets, regle }: RegleFormDialogP
     typeof p.ecart_min_jours === 'number' ? String(p.ecart_min_jours)
       : typeof p.ecart_min_jours === 'string' ? p.ecart_min_jours : '3',
   )
+
+  // Validité : PERMANENTE (par défaut) ou limitée à une période existante.
+  const periodeInit = regle?.periode_id && periodesDispo.some((per) => per.id === regle.periode_id)
+    ? regle.periode_id
+    : PERMANENTE
+  const [validite, setValidite] = useState<string>(periodeInit)
 
   const nomVeto = (id: string) => vets.find((v) => v.id === id)?.prenom ?? id
 
@@ -218,6 +228,7 @@ export function RegleFormDialog({ open, onClose, vets, regle }: RegleFormDialogP
         n: Number(n),
         fenetre,
         ecart_min_jours: Number(ecartMin),
+        periode_id: validite === PERMANENTE ? null : validite,
       })
       if (res?.error) { toast.error(res.error); return }
       toast.success(isEdit ? 'Règle modifiée.' : 'Règle créée.')
@@ -421,6 +432,29 @@ export function RegleFormDialog({ open, onClose, vets, regle }: RegleFormDialogP
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* VALIDITÉ (permanente ou limitée à une période) */}
+          <div className="space-y-1.5">
+            <Label>Validité</Label>
+            <Select value={validite} onValueChange={(v) => v && setValidite(v)}>
+              <SelectTrigger>
+                {validite === PERMANENTE
+                  ? 'Permanente (toutes les générations)'
+                  : (periodesDispo.find((per) => per.id === validite)?.label ?? 'Période')}
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={PERMANENTE}>Permanente (toutes les générations)</SelectItem>
+                {periodesDispo.map((per) => (
+                  <SelectItem key={per.id} value={per.id}>Limitée à : {per.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {periodesDispo.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                Aucune période créée — la règle s&apos;appliquera à toutes les générations.
+              </p>
+            )}
           </div>
 
           {/* APERÇU */}
