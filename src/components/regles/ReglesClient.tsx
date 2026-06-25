@@ -24,9 +24,11 @@ import { rendreRegle } from '@/engine/briques/catalogue'
 import { setRegleActif, deleteRegle } from '@/app/(protected)/regles/actions'
 import { RegleFormDialog } from './RegleFormDialog'
 
-/** Briques que le formulaire P1A-007 sait éditer (= évaluables par le moteur). */
+/** Briques que le formulaire P1A-007 sait éditer (= évaluables par le moteur).
+ *  Doit rester aligné avec BRIQUES_EVALUABLES (actions.ts) + BRIQUES (RegleFormDialog). */
 const BRIQUES_EDITABLES = new Set([
   'interdire_creneau', 'repos_conditionnel', 'alternance_ancre', 'duo_interdit',
+  'au_plus_n', 'espacement_min',
 ])
 
 // ── Données ──────────────────────────────────────────────────

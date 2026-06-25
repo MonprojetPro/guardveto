@@ -248,12 +248,14 @@ export async function setStructureRegle(briqueId: string, actif: boolean, force:
 
 // ── Création / édition guidée (P1A-007) ──────────────────────
 
-/** Les 4 briques que le moteur sait réellement évaluer (mapReglesCabinet). */
+/** Les briques que le moteur sait réellement évaluer (mapReglesCabinet). */
 const BRIQUES_EVALUABLES = {
   interdire_creneau: 'jour_repos_fixe',
   repos_conditionnel: 'jour_repos_conditionnel',
   alternance_ancre: 'indisponibilite_cyclique',
   duo_interdit: 'duo_interdit',
+  au_plus_n: 'au_plus_n',           // limite de charge réglable
+  espacement_min: 'espacement_min', // écart minimal entre deux gardes
 } as const
 export type BriqueEvaluable = keyof typeof BRIQUES_EVALUABLES
 
@@ -264,6 +266,13 @@ export type ForceFormulaire = (typeof FORCES_VALIDES)[number]
 const JOURS_VALIDES = new Set(['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi'])
 const SEMAINES_VALIDES = new Set(['paires', 'impaires', 'toutes'])
 const PERIODES_VALIDES = new Set(['soir_semaine', 'weekend']) // seules évaluées par R2
+// Fenêtres de comptage acceptées par checkAuPlusN (hard-constraints.ts) :
+// « semaine_civile » (lundi→dimanche) ou « glissante_K_jours » (regex moteur).
+const FENETRES_VALIDES = new Set([
+  'semaine_civile', 'glissante_7_jours', 'glissante_14_jours', 'glissante_30_jours',
+])
+const N_MAX_GARDES = 14    // borne haute raisonnable (au plus N gardes / fenêtre)
+const ECART_MAX_JOURS = 30 // borne haute raisonnable (espacement minimal)
 
 /** Payload envoyé par le formulaire (champs simples — le JSON est bâti ici). */
 export interface UpsertReglePayload {
@@ -282,6 +291,18 @@ export interface UpsertReglePayload {
   periodes?: string[]
   // duo_interdit
   avec_veterinaire_id?: string
+  // au_plus_n
+  n?: number
+  fenetre?: string
+  // espacement_min
+  ecart_min_jours?: number
+}
+
+/** Parse un entier dans [1, max]. Retourne null si invalide (frontière de confiance). */
+function entierBorne(v: unknown, max: number): number | null {
+  const n = typeof v === 'number' ? v : typeof v === 'string' ? parseInt(v, 10) : NaN
+  if (!Number.isInteger(n) || n < 1 || n > max) return null
+  return n
 }
 
 function lireOwner(pj: unknown): string | null {
@@ -315,6 +336,17 @@ function construireParams(
       const periodes = (p.periodes ?? []).filter((x) => PERIODES_VALIDES.has(x))
       if (periodes.length === 0) return { error: 'Sélectionnez au moins une période (soirs / week-ends).' }
       return { quand: periodes[0], params: { semaines: p.semaines, periodes } }
+    }
+    case 'au_plus_n': {
+      const n = entierBorne(p.n, N_MAX_GARDES)
+      if (n === null) return { error: `Nombre de gardes invalide (1 à ${N_MAX_GARDES}).` }
+      if (!p.fenetre || !FENETRES_VALIDES.has(p.fenetre)) return { error: 'Fenêtre de comptage invalide.' }
+      return { quand: null, params: { n, fenetre: p.fenetre } }
+    }
+    case 'espacement_min': {
+      const ecart = entierBorne(p.ecart_min_jours, ECART_MAX_JOURS)
+      if (ecart === null) return { error: `Écart minimal invalide (1 à ${ECART_MAX_JOURS} jours).` }
+      return { quand: null, params: { ecart_min_jours: ecart } }
     }
     default:
       return { error: 'Brique non gérée par ce constructeur.' }

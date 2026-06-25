@@ -8,9 +8,10 @@
 // FORCE → APERÇU live. Écrit via upsertRegle (params_json bâti côté
 // serveur, frontière de confiance).
 //
-// ⚠️ NE PROPOSE QUE LES 4 BRIQUES ÉVALUABLES par le moteur (interdire_creneau,
-//    repos_conditionnel, alternance_ancre, duo_interdit). Proposer une brique
-//    sans évaluateur créerait une règle silencieusement ignorée (coquille vide).
+// ⚠️ NE PROPOSE QUE LES BRIQUES ÉVALUABLES par le moteur (interdire_creneau,
+//    repos_conditionnel, alternance_ancre, duo_interdit, au_plus_n, espacement_min).
+//    Proposer une brique sans évaluateur créerait une règle silencieusement
+//    ignorée (coquille vide). Doit rester aligné avec BRIQUES_EVALUABLES (actions.ts).
 //
 // L'aperçu réutilise EXACTEMENT le rendu de la liste (catalogue P1A-005) :
 // ce que l'admin lit en construisant = ce qui s'affichera ensuite.
@@ -46,6 +47,16 @@ const BRIQUES: { value: BriqueEvaluable; label: string; aide: string }[] = [
   { value: 'repos_conditionnel', label: 'Repos selon la garde du week-end', aide: 'Jour de repos différent selon que le véto est de garde le week-end ou non.' },
   { value: 'alternance_ancre', label: 'Indisponible une semaine sur deux', aide: 'Indisponible certains créneaux les semaines paires ou impaires.' },
   { value: 'duo_interdit', label: 'Jamais en duo avec…', aide: 'Deux vétos ne peuvent pas être de garde seuls ensemble (réglé dans les deux sens).' },
+  { value: 'au_plus_n', label: 'Limite de gardes', aide: 'Au plus N gardes sur une fenêtre (semaine civile ou jours glissants).' },
+  { value: 'espacement_min', label: 'Espacement minimal', aide: 'Au moins X jours de repos entre deux gardes du même véto.' },
+]
+
+/** Fenêtres de comptage pour « au plus N gardes » (alignées sur FENETRES_VALIDES). */
+const FENETRES = [
+  { value: 'semaine_civile', label: 'par semaine civile (lun→dim)' },
+  { value: 'glissante_7_jours', label: 'sur 7 jours glissants' },
+  { value: 'glissante_14_jours', label: 'sur 14 jours glissants' },
+  { value: 'glissante_30_jours', label: 'sur 30 jours glissants' },
 ]
 
 const FORCES: { value: ForceFormulaire; label: string; symbole: string }[] = [
@@ -66,6 +77,8 @@ const FORCE_DEFAUT: Record<BriqueEvaluable, ForceFormulaire> = {
   alternance_ancre: 'sauf_crise',
   repos_conditionnel: 'sauf_crise',
   interdire_creneau: 'evitee',
+  au_plus_n: 'sauf_crise',      // limite protectrice : ferme mais pliable en crise
+  espacement_min: 'sauf_crise', // idem (trop dur → risque d'impasse)
 }
 
 // ── Composant ────────────────────────────────────────────────
@@ -118,6 +131,20 @@ export function RegleFormDialog({ open, onClose, vets, regle }: RegleFormDialogP
     typeof p.avec_veterinaire_id === 'string' ? p.avec_veterinaire_id : (autresVets[0]?.id ?? ''),
   )
 
+  // au_plus_n
+  const [n, setN] = useState<string>(
+    typeof p.n === 'number' ? String(p.n) : typeof p.n === 'string' ? p.n : '2',
+  )
+  const [fenetre, setFenetre] = useState<string>(
+    typeof p.fenetre === 'string' && FENETRES.some((f) => f.value === p.fenetre) ? p.fenetre : 'semaine_civile',
+  )
+
+  // espacement_min
+  const [ecartMin, setEcartMin] = useState<string>(
+    typeof p.ecart_min_jours === 'number' ? String(p.ecart_min_jours)
+      : typeof p.ecart_min_jours === 'string' ? p.ecart_min_jours : '3',
+  )
+
   const nomVeto = (id: string) => vets.find((v) => v.id === id)?.prenom ?? id
 
   const choisirBrique = (b: BriqueEvaluable) => {
@@ -145,11 +172,17 @@ export function RegleFormDialog({ open, onClose, vets, regle }: RegleFormDialogP
       case 'duo_interdit':
         params = { avec_veterinaire_id: avecId }
         break
+      case 'au_plus_n':
+        params = { n: Number(n) || 0, fenetre }
+        break
+      case 'espacement_min':
+        params = { ecart_min_jours: Number(ecartMin) || 0 }
+        break
     }
     const predicat = rendreRegle(briqueId, params, { nomVeto })
     return sujet ? `${sujet} ${predicat}` : predicat
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [briqueId, ownerId, jour, exVac, siWe, sinon, semaines, periodes, avecId, vets])
+  }, [briqueId, ownerId, jour, exVac, siWe, sinon, semaines, periodes, avecId, n, fenetre, ecartMin, vets])
 
   const handleSubmit = () => {
     if (!ownerId) { toast.error('Sélectionnez le vétérinaire concerné.'); return }
@@ -159,6 +192,14 @@ export function RegleFormDialog({ open, onClose, vets, regle }: RegleFormDialogP
     if (briqueId === 'duo_interdit') {
       if (!avecId) { toast.error('Sélectionnez le second vétérinaire.'); return }
       if (avecId === ownerId) { toast.error('Choisissez deux vétérinaires différents.'); return }
+    }
+    if (briqueId === 'au_plus_n') {
+      const v = Number(n)
+      if (!Number.isInteger(v) || v < 1) { toast.error('Indiquez un nombre de gardes valide (≥ 1).'); return }
+    }
+    if (briqueId === 'espacement_min') {
+      const v = Number(ecartMin)
+      if (!Number.isInteger(v) || v < 1) { toast.error('Indiquez un écart valide (≥ 1 jour).'); return }
     }
 
     startTransition(async () => {
@@ -174,6 +215,9 @@ export function RegleFormDialog({ open, onClose, vets, regle }: RegleFormDialogP
         semaines,
         periodes,
         avec_veterinaire_id: avecId,
+        n: Number(n),
+        fenetre,
+        ecart_min_jours: Number(ecartMin),
       })
       if (res?.error) { toast.error(res.error); return }
       toast.success(isEdit ? 'Règle modifiée.' : 'Règle créée.')
@@ -320,6 +364,47 @@ export function RegleFormDialog({ open, onClose, vets, regle }: RegleFormDialogP
               {autresVets.length === 0 && (
                 <p className="text-xs text-muted-foreground">Aucun autre vétérinaire disponible.</p>
               )}
+            </div>
+          )}
+
+          {briqueId === 'au_plus_n' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="au-plus-n">Nombre de gardes max</Label>
+                <input
+                  id="au-plus-n"
+                  type="number"
+                  min={1}
+                  max={14}
+                  value={n}
+                  onChange={(e) => setN(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Fenêtre de comptage</Label>
+                <Select value={fenetre} onValueChange={(v) => v && setFenetre(v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {FENETRES.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          {briqueId === 'espacement_min' && (
+            <div className="space-y-1.5">
+              <Label htmlFor="ecart-min">Jours de repos minimum entre deux gardes</Label>
+              <input
+                id="ecart-min"
+                type="number"
+                min={1}
+                max={30}
+                value={ecartMin}
+                onChange={(e) => setEcartMin(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
             </div>
           )}
 

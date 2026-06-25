@@ -82,4 +82,28 @@ describe('P1A-007 — contrat formulaire → moteur', () => {
     const duPartner = contraintesParVet.get(PARTNER) ?? []
     expect(duPartner.some((c) => c.type === 'duo_interdit')).toBe(true)
   })
+
+  it('les briques de charge (au_plus_n, espacement_min) sont mappées sans rejet', () => {
+    const rows: RegleCabinetRow[] = [
+      enveloppe('r5', 'au_plus_n', 'sauf_crise', OWNER, null,
+        { n: 2, fenetre: 'semaine_civile' }, 'au_plus_n'),
+      enveloppe('r6', 'espacement_min', 'sauf_crise', OWNER, null,
+        { ecart_min_jours: 3 }, 'espacement_min'),
+    ]
+
+    const { contraintesParVet, rejets } = mapperReglesCabinet(rows, BRIQUES_CONNUES)
+
+    expect(rejets).toEqual([])
+
+    const duOwner = contraintesParVet.get(OWNER) ?? []
+    expect(duOwner.map((c) => c.type).sort()).toEqual(['au_plus_n', 'espacement_min'])
+
+    // Les params de charge sont préservés (le moteur les lit après normalisation).
+    const charge = duOwner.find((c) => c.type === 'au_plus_n')
+    expect((charge?.config.params as Record<string, unknown>).n).toBe(2)
+    expect((charge?.config.params as Record<string, unknown>).fenetre).toBe('semaine_civile')
+
+    const espacement = duOwner.find((c) => c.type === 'espacement_min')
+    expect((espacement?.config.params as Record<string, unknown>).ecart_min_jours).toBe(3)
+  })
 })
