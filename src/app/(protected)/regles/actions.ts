@@ -25,6 +25,13 @@ import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { EQUITY_DIMENSIONS, IMPORTANCE_LEVELS } from '@/engine/equity-weights'
 import { construireValiditeJson } from '@/lib/periodes'
+import { proposerRegleIA, assistantIaDisponible } from '@/lib/ia/proposerRegle'
+import {
+  propositionVersPayload,
+  apercuProposition,
+  type PropositionRegle,
+  type VetoResolu,
+} from '@/lib/ia/regleSchema'
 
 // ── Garde admin ──────────────────────────────────────────────
 
@@ -519,4 +526,59 @@ export async function upsertRegle(payload: UpsertReglePayload) {
 
   revalidatePath('/regles')
   return { success: true }
+}
+
+// ── Assistant IA (Palier 3, slice 1) ─────────────────────────
+
+/** Résultat d'une proposition IA renvoyé à l'UI. */
+export type PropositionIaResultat =
+  | { error: string }
+  | {
+      proposition: PropositionRegle
+      /** Phrase d'aperçu (ce qui serait créé) — présente si faisable. */
+      apercu: string
+      /** Payload prêt pour upsertRegle — présent SEULEMENT si la proposition
+       *  est exploitable (brique + vétos résolus). Absent si non faisable. */
+      payload?: UpsertReglePayload
+    }
+
+/**
+ * proposerRegleDepuisTexte — passe une phrase admin à l'IA et renvoie une
+ * PROPOSITION (jamais d'écriture en base). L'admin créera ensuite via
+ * upsertRegle (frontière de confiance + RLS inchangées). Admin-only.
+ */
+export async function proposerRegleDepuisTexte(phrase: string): Promise<PropositionIaResultat> {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  if (!assistantIaDisponible()) {
+    return { error: 'Assistant IA non configuré (clé API manquante côté serveur).' }
+  }
+  if (!phrase || phrase.trim().length < 3) {
+    return { error: 'Décris ta règle en quelques mots.' }
+  }
+
+  const { data: vetsDb } = await supabase
+    .from('veterinaires')
+    .select('id, prenom')
+    .eq('actif', true)
+    .order('prenom')
+  const vets = ((vetsDb as VetoResolu[] | null) ?? [])
+
+  let proposition: PropositionRegle
+  try {
+    proposition = await proposerRegleIA(phrase.trim(), vets)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Erreur de l'assistant IA." }
+  }
+
+  const conv = propositionVersPayload(proposition, vets)
+  if (!conv.ok) {
+    // Non faisable / ambigu : on renvoie la proposition (message explicatif),
+    // sans payload → l'UI affiche le message, pas de bouton « Créer ».
+    return { proposition, apercu: '' }
+  }
+  return { proposition, apercu: apercuProposition(proposition), payload: conv.payload }
 }

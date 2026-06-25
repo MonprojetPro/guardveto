@@ -23,6 +23,7 @@ import {
 import { rendreRegle } from '@/engine/briques/catalogue'
 import { setRegleActif, deleteRegle } from '@/app/(protected)/regles/actions'
 import { RegleFormDialog } from './RegleFormDialog'
+import { AssistantIA } from './AssistantIA'
 
 /** Briques que le formulaire P1A-007 sait éditer (= évaluables par le moteur).
  *  Doit rester aligné avec BRIQUES_EVALUABLES (actions.ts) + BRIQUES (RegleFormDialog). */
@@ -262,6 +263,9 @@ export function ReglesClient({ regles, vets, periodes, isAdmin }: ReglesClientPr
             </Button>
           )}
         </div>
+
+        {/* Assistant IA (bêta) — création de règle en langage naturel */}
+        {isAdmin && <AssistantIA />}
 
         {actives.length === 0 && inactives.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground">
