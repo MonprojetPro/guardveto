@@ -17,7 +17,7 @@
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Sparkles, Loader2, Check, RotateCcw } from 'lucide-react'
+import { Sparkles, Loader2, Check, RotateCcw, Eraser } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import {
@@ -82,11 +82,19 @@ export function AssistantIA() {
     })
   }
 
-  /** Repart de zéro côté proposition, mais garde la phrase pour l'éditer. */
+  /** Repart de zéro côté proposition, mais GARDE la phrase pour l'éditer. */
   const reformuler = () => {
     setResultat(null)
     setForce(null)
     // Redonne le focus au texte pour enchaîner la reformulation.
+    requestAnimationFrame(() => textareaRef.current?.focus())
+  }
+
+  /** Remise à zéro complète : efface AUSSI la phrase (page blanche). */
+  const toutEffacer = () => {
+    setPhrase('')
+    setResultat(null)
+    setForce(null)
     requestAnimationFrame(() => textareaRef.current?.focus())
   }
 
@@ -201,6 +209,15 @@ export function AssistantIA() {
                 >
                   <RotateCcw className="w-4 h-4 mr-1" /> Reformuler
                 </Button>
+                <Button
+                  onClick={toutEffacer}
+                  disabled={isCreating}
+                  size="sm"
+                  variant="ghost"
+                  title="Effacer la phrase et la proposition (repartir de zéro)"
+                >
+                  <Eraser className="w-4 h-4 mr-1" /> Tout effacer
+                </Button>
               </div>
               <p className="text-[11px] text-muted-foreground/70 text-center">
                 Vérifie la proposition avant de créer — l&apos;IA peut se tromper.
@@ -211,9 +228,19 @@ export function AssistantIA() {
               <p className="text-xs text-amber-700 dark:text-amber-300">
                 {proposition.message || "L'assistant n'a pas pu transformer ta demande en règle. Reformule ou utilise « Nouvelle règle »."}
               </p>
-              <Button onClick={reformuler} size="sm" variant="outline">
-                <RotateCcw className="w-4 h-4 mr-1" /> Reformuler ma demande
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={reformuler} size="sm" variant="outline">
+                  <RotateCcw className="w-4 h-4 mr-1" /> Reformuler ma demande
+                </Button>
+                <Button
+                  onClick={toutEffacer}
+                  size="sm"
+                  variant="ghost"
+                  title="Effacer la phrase et la proposition (repartir de zéro)"
+                >
+                  <Eraser className="w-4 h-4 mr-1" /> Tout effacer
+                </Button>
+              </div>
             </>
           )}
         </div>
