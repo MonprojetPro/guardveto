@@ -161,19 +161,20 @@ export function propositionVersPayload(
       break
     }
     case 'au_plus_n': {
-      // Garde anti-coquille-vide : un plafond hors bornes ou ≥ taille de
-      // fenêtre n'aurait aucun effet → on refuse (pas de bouton « Créer »).
+      // Garde anti-coquille-vide : un plafond trop haut n'aurait aucun effet.
+      // ⚠️ AUCUN chiffre affiché : le « réaliste » dépend du nb de gardes/jour
+      //    que CHAQUE cabinet définit (ici borné à 1/jour → taille de fenêtre,
+      //    et à la borne technique de stockage). Tant que la config cabinet
+      //    n'expose pas ce nombre, on reste honnête : on dit « trop élevé »
+      //    sans inventer un seuil métier. (cf. backlog plafonds config-cabinet)
       const n = p.n
       if (typeof n !== 'number' || !Number.isInteger(n) || n < 1) {
         return { ok: false, raison: 'Indique un nombre de gardes valide (au moins 1).' }
       }
-      if (n > N_MAX) {
-        return { ok: false, raison: `Un plafond de ${n} gardes est trop élevé (maximum ${N_MAX}). Indique une valeur plus réaliste.` }
-      }
       const fenetre = p.fenetre ?? 'semaine_civile'
       const taille = TAILLE_FENETRE[fenetre] ?? 7
-      if (n >= taille) {
-        return { ok: false, raison: `Sur ${taille} jours, un vétérinaire ne peut pas faire ${n} gardes : ce plafond n'aurait aucun effet. Choisis un nombre plus petit (par ex. 2 ou 3).` }
+      if (n >= taille || n > N_MAX) {
+        return { ok: false, raison: 'Ce plafond est trop élevé pour avoir un effet — indique un nombre plus petit.' }
       }
       payload.n = n
       payload.fenetre = fenetre
