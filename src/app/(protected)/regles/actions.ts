@@ -61,17 +61,37 @@ async function assertAdmin(
 
 // ── Toggle actif (P1A-006) ───────────────────────────────────
 
-/** Active ou désactive une règle (toggle `actif`). */
+/**
+ * Active ou désactive une règle (toggle `actif`). Pour un duo interdit, applique
+ * AUSSI le même état au sens miroir (B→A) : l'écran n'affiche qu'une ligne par
+ * duo, donc le toggle doit basculer les deux rows sinon on laisserait un
+ * demi-duo dans un état incohérent (kit complet).
+ */
 export async function setRegleActif(id: string, actif: boolean) {
   const supabase = await createClient()
 
   const garde = await assertAdmin(supabase)
   if ('error' in garde) return garde
 
+  const ids: string[] = [id]
+  const { data: row } = await supabase
+    .from('regles_cabinet')
+    .select('id, brique_id, params_json')
+    .eq('id', id)
+    .single()
+  if (row && row.brique_id === 'duo_interdit') {
+    const owner = lireOwner(row.params_json)
+    const partner = lirePartenaire(row.params_json)
+    if (owner && partner) {
+      const miroir = await trouverDuo(supabase, partner, owner)
+      if (miroir && miroir !== id) ids.push(miroir)
+    }
+  }
+
   const { error } = await supabase
     .from('regles_cabinet')
     .update({ actif })
-    .eq('id', id)
+    .in('id', ids)
 
   if (error) return { error: error.message }
   revalidatePath('/regles')
@@ -398,6 +418,33 @@ async function resoudrePeriodeScoping(
   return { periode_id: periodeId }
 }
 
+/**
+ * Une règle équivalente existe-t-elle déjà (même brique + même véto + mêmes
+ * paramètres métier) ? Évite les doublons silencieux à la création. Compare la
+ * signature `params` (construite par le même code des deux côtés → ordre des
+ * clés déterministe). Les duos sont traités à part (paire non ordonnée).
+ */
+async function trouverEquivalent(
+  supabase: SupabaseClient<any, any, any>,
+  cabinetId: string,
+  briqueId: BriqueEvaluable,
+  ownerId: string,
+  params: Record<string, unknown>,
+): Promise<boolean> {
+  const { data } = await supabase
+    .from('regles_cabinet')
+    .select('id, params_json')
+    .eq('cabinet_id', cabinetId)
+    .eq('brique_id', briqueId)
+  const cible = JSON.stringify(params)
+  for (const r of data ?? []) {
+    if (lireOwner(r.params_json) !== ownerId) continue
+    const p = (r.params_json as { params?: unknown })?.params ?? {}
+    if (JSON.stringify(p) === cible) return true
+  }
+  return false
+}
+
 /** Cherche l'id d'un duo owner→partner pour ce cabinet (RLS scope auto). */
 async function trouverDuo(
   supabase: SupabaseClient<any, any, any>,
@@ -458,6 +505,12 @@ export async function upsertRegle(payload: UpsertReglePayload) {
     if (!b) return { error: 'Sélectionnez le second vétérinaire du duo.' }
     if (a === b) return { error: "Un vétérinaire ne peut pas être en duo interdit avec lui-même." }
 
+    // Anti-doublon (création seulement) : la paire existe-t-elle déjà ?
+    if (!payload.id) {
+      const dejaLa = (await trouverDuo(supabase, a, b)) ?? (await trouverDuo(supabase, b, a))
+      if (dejaLa) return { error: 'Ce duo interdit existe déjà dans les règles du cabinet.' }
+    }
+
     let actif = true
     // Édition : on retire l'ancienne paire avant de réécrire la nouvelle.
     if (payload.id) {
@@ -501,6 +554,14 @@ export async function upsertRegle(payload: UpsertReglePayload) {
   // ── Cas briques non-duo ────────────────────────────────────
   const construit = construireParams(payload)
   if ('error' in construit) return construit
+
+  // Anti-doublon (création seulement) : règle identique déjà présente ?
+  if (!payload.id) {
+    const dejaLa = await trouverEquivalent(
+      supabase, cabinetId, payload.brique_id, payload.owner_id, construit.params,
+    )
+    if (dejaLa) return { error: 'Une règle identique existe déjà pour ce vétérinaire.' }
+  }
 
   const params_json = envelopper(payload.owner_id, payload.brique_id, construit.quand, construit.params)
 

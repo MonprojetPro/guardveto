@@ -91,6 +91,32 @@ interface ParamsJson {
   params?: unknown
 }
 
+/**
+ * Clé de paire non ordonnée d'un duo interdit (sinon null). Sert à n'afficher
+ * QU'UNE ligne par duo, alors que la base en stocke deux (A→B + B→A, requis par
+ * le moteur). Le toggle/suppression côté serveur gèrent déjà les deux sens.
+ */
+function clePaireDuo(r: RegleRow): string | null {
+  if (r.brique_id !== 'duo_interdit') return null
+  const pj = r.params_json as { qui?: { refs?: unknown[] }; params?: { avec_veterinaire_id?: unknown } }
+  const owner = pj?.qui?.refs?.[0]
+  const partner = pj?.params?.avec_veterinaire_id
+  if (typeof owner !== 'string' || typeof partner !== 'string') return null
+  return [owner, partner].sort().join('|')
+}
+
+/** Retire le sens miroir des duos : on ne garde que la 1re ligne de chaque paire. */
+function fusionnerDuos(rows: RegleRow[]): RegleRow[] {
+  const vues = new Set<string>()
+  return rows.filter((r) => {
+    const cle = clePaireDuo(r)
+    if (!cle) return true
+    if (vues.has(cle)) return false
+    vues.add(cle)
+    return true
+  })
+}
+
 function phraseRegle(regle: RegleRow, nomVeto: (id: string) => string): string {
   const pj = (regle.params_json ?? {}) as ParamsJson
   const refs = pj.qui?.refs
@@ -124,8 +150,9 @@ export function ReglesClient({ regles, vets, periodes, isAdmin }: ReglesClientPr
     return v ? v.prenom : id
   }
 
-  const actives = regles.filter((r) => r.actif)
-  const inactives = regles.filter((r) => !r.actif)
+  // Une seule ligne par duo (la base en stocke deux sens — cf. fusionnerDuos).
+  const actives = fusionnerDuos(regles.filter((r) => r.actif))
+  const inactives = fusionnerDuos(regles.filter((r) => !r.actif))
 
   const ouvrirCreation = () => {
     setAEditer(null)

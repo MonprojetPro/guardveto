@@ -105,6 +105,51 @@ describe('propositionVersPayload', () => {
     )
     expect(r.ok).toBe(false)
   })
+
+  it('prénom en double dans le cabinet → ambigu, rejeté sans choisir au hasard', () => {
+    const vetsDup: VetoResolu[] = [
+      { id: 'id-manon-1', prenom: 'Manon' },
+      { id: 'id-manon-2', prenom: 'Manon' },
+    ]
+    const r = propositionVersPayload(
+      prop({ brique_id: 'interdire_creneau', veterinaire: 'Manon', jour: 'lundi' }),
+      vetsDup,
+    )
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.raison).toContain('Plusieurs')
+  })
+
+  it('duo d’un véto avec lui-même → rejeté', () => {
+    const r = propositionVersPayload(
+      prop({ brique_id: 'duo_interdit', veterinaire: 'Manon', partenaire: 'Manon' }),
+      VETS,
+    )
+    expect(r.ok).toBe(false)
+  })
+
+  it('au_plus_n hors borne haute (> 14) → rejeté', () => {
+    const r = propositionVersPayload(
+      prop({ brique_id: 'au_plus_n', veterinaire: 'Victor', n: 50, fenetre: 'semaine_civile' }),
+      VETS,
+    )
+    expect(r.ok).toBe(false)
+  })
+
+  it('au_plus_n sans effet (n ≥ taille de fenêtre) → rejeté', () => {
+    const r = propositionVersPayload(
+      prop({ brique_id: 'au_plus_n', veterinaire: 'Victor', n: 7, fenetre: 'semaine_civile' }),
+      VETS,
+    )
+    expect(r.ok).toBe(false)
+  })
+
+  it('espacement_min hors borne → rejeté', () => {
+    const r = propositionVersPayload(
+      prop({ brique_id: 'espacement_min', veterinaire: 'Victor', ecart_min_jours: 99 }),
+      VETS,
+    )
+    expect(r.ok).toBe(false)
+  })
 })
 
 describe('apercuProposition', () => {

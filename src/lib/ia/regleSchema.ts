@@ -67,12 +67,46 @@ export interface VetoResolu {
   prenom: string
 }
 
-/** Résout un prénom (insensible casse/espaces) vers un id de véto. */
-function resoudrePrenom(prenom: string | null, vets: VetoResolu[]): string | null {
-  if (!prenom) return null
+/** Résultat de résolution d'un prénom : un id, ou la cause de l'échec. */
+type ResolutionPrenom =
+  | { ok: true; id: string }
+  | { ok: false; cause: 'aucun' | 'ambigu' }
+
+/**
+ * Résout un prénom (insensible casse/espaces) vers un id de véto.
+ * Distingue 0 match (`aucun`) de PLUSIEURS matchs (`ambigu`) : si deux vétos
+ * portent le même prénom, on REFUSE de choisir au hasard (le mauvais véto
+ * recevrait la règle silencieusement) — l'humain tranchera via le formulaire.
+ */
+function resoudrePrenom(prenom: string | null, vets: VetoResolu[]): ResolutionPrenom {
+  if (!prenom) return { ok: false, cause: 'aucun' }
   const norm = prenom.trim().toLowerCase()
-  return vets.find((v) => v.prenom.trim().toLowerCase() === norm)?.id ?? null
+  const matchs = vets.filter((v) => v.prenom.trim().toLowerCase() === norm)
+  if (matchs.length === 0) return { ok: false, cause: 'aucun' }
+  if (matchs.length > 1) return { ok: false, cause: 'ambigu' }
+  return { ok: true, id: matchs[0].id }
 }
+
+/** Message d'échec de résolution selon la cause (prénom utilisé dans le texte). */
+function raisonPrenom(prenom: string | null, cause: 'aucun' | 'ambigu', second = false): string {
+  const qui = second ? 'Second vétérinaire' : 'Vétérinaire'
+  if (cause === 'ambigu') {
+    return `Plusieurs vétérinaires s'appellent « ${prenom} » : l'assistant ne peut pas deviner lequel. Crée la règle via « Nouvelle règle » en sélectionnant le bon dans la liste.`
+  }
+  return `${qui} « ${prenom ?? '?'} » introuvable dans le cabinet.`
+}
+
+/** Tailles de fenêtre (jours) — un véto fait au plus 1 garde/jour, donc
+ *  un plafond ≥ taille de fenêtre n'aura JAMAIS d'effet (= coquille vide). */
+const TAILLE_FENETRE: Record<string, number> = {
+  semaine_civile: 7,
+  glissante_7_jours: 7,
+  glissante_14_jours: 14,
+  glissante_30_jours: 30,
+}
+/** Borne haute alignée sur le serveur (N_MAX_GARDES / ECART_MAX_JOURS). */
+const N_MAX = 14
+const ECART_MAX = 30
 
 export type ConversionResultat =
   | { ok: true; payload: UpsertReglePayload }
@@ -91,14 +125,14 @@ export function propositionVersPayload(
   if (!p.faisable) return { ok: false, raison: p.message || 'Demande non traduisible en règle.' }
   if (!p.brique_id) return { ok: false, raison: 'Type de règle non déterminé par l’assistant.' }
 
-  const ownerId = resoudrePrenom(p.veterinaire, vets)
-  if (!ownerId) {
-    return { ok: false, raison: `Vétérinaire « ${p.veterinaire ?? '?'} » introuvable dans le cabinet.` }
+  const owner = resoudrePrenom(p.veterinaire, vets)
+  if (!owner.ok) {
+    return { ok: false, raison: raisonPrenom(p.veterinaire, owner.cause) }
   }
 
   const payload: UpsertReglePayload = {
     brique_id: p.brique_id as BriqueEvaluable,
-    owner_id: ownerId,
+    owner_id: owner.id,
     force: (p.force ?? 'sauf_crise') as ForceFormulaire,
   }
 
@@ -116,20 +150,43 @@ export function propositionVersPayload(
       payload.periodes = p.periodes ?? undefined
       break
     case 'duo_interdit': {
-      const partenaireId = resoudrePrenom(p.partenaire, vets)
-      if (!partenaireId) {
-        return { ok: false, raison: `Second vétérinaire « ${p.partenaire ?? '?'} » introuvable.` }
+      const part = resoudrePrenom(p.partenaire, vets)
+      if (!part.ok) {
+        return { ok: false, raison: raisonPrenom(p.partenaire, part.cause, true) }
       }
-      payload.avec_veterinaire_id = partenaireId
+      if (part.id === owner.id) {
+        return { ok: false, raison: 'Un duo interdit doit concerner deux vétérinaires différents.' }
+      }
+      payload.avec_veterinaire_id = part.id
       break
     }
-    case 'au_plus_n':
-      payload.n = p.n ?? undefined
-      payload.fenetre = p.fenetre ?? undefined
+    case 'au_plus_n': {
+      // Garde anti-coquille-vide : un plafond hors bornes ou ≥ taille de
+      // fenêtre n'aurait aucun effet → on refuse (pas de bouton « Créer »).
+      const n = p.n
+      if (typeof n !== 'number' || !Number.isInteger(n) || n < 1) {
+        return { ok: false, raison: 'Indique un nombre de gardes valide (au moins 1).' }
+      }
+      if (n > N_MAX) {
+        return { ok: false, raison: `Un plafond de ${n} gardes est trop élevé (maximum ${N_MAX}). Indique une valeur plus réaliste.` }
+      }
+      const fenetre = p.fenetre ?? 'semaine_civile'
+      const taille = TAILLE_FENETRE[fenetre] ?? 7
+      if (n >= taille) {
+        return { ok: false, raison: `Sur ${taille} jours, un vétérinaire ne peut pas faire ${n} gardes : ce plafond n'aurait aucun effet. Choisis un nombre plus petit (par ex. 2 ou 3).` }
+      }
+      payload.n = n
+      payload.fenetre = fenetre
       break
-    case 'espacement_min':
-      payload.ecart_min_jours = p.ecart_min_jours ?? undefined
+    }
+    case 'espacement_min': {
+      const e = p.ecart_min_jours
+      if (typeof e !== 'number' || !Number.isInteger(e) || e < 1 || e > ECART_MAX) {
+        return { ok: false, raison: `Indique un écart minimal valide (entre 1 et ${ECART_MAX} jours).` }
+      }
+      payload.ecart_min_jours = e
       break
+    }
   }
 
   return { ok: true, payload }
