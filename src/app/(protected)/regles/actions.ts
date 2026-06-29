@@ -637,9 +637,15 @@ export async function proposerRegleDepuisTexte(phrase: string): Promise<Proposit
 
   const conv = propositionVersPayload(proposition, vets)
   if (!conv.ok) {
-    // Non faisable / ambigu : on renvoie la proposition (message explicatif),
-    // sans payload → l'UI affiche le message, pas de bouton « Créer ».
-    return { proposition, apercu: '' }
+    // Non faisable / ambigu / sans effet : on FORCE le message sur la raison de
+    // notre couche (ex. « plafond sans effet, prends un nombre plus petit »).
+    // Sinon l'UI afficherait le message OPTIMISTE de l'IA (« je propose de
+    // limiter à 20… ») alors qu'on refuse — incohérent. Pas de payload → pas de
+    // bouton « Créer ».
+    return {
+      proposition: { ...proposition, faisable: false, message: conv.raison },
+      apercu: '',
+    }
   }
   return { proposition, apercu: apercuProposition(proposition), payload: conv.payload }
 }

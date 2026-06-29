@@ -65,6 +65,8 @@ export function AssistantIA() {
   const [force, setForce] = useState<ForceFormulaire | null>(null)
   // Message inline si la saisie est trop courte (plus visible qu'un toast en bas).
   const [erreurSaisie, setErreurSaisie] = useState<string | null>(null)
+  // Erreur de création (doublon, etc.) affichée DANS le panneau, pas en toast.
+  const [erreurCreation, setErreurCreation] = useState<string | null>(null)
   const [aideOuverte, setAideOuverte] = useState(false)
   const [isAsking, startAsk] = useTransition()
   const [isCreating, startCreate] = useTransition()
@@ -76,6 +78,7 @@ export function AssistantIA() {
       return
     }
     setErreurSaisie(null)
+    setErreurCreation(null)
     startAsk(async () => {
       const res = await proposerRegleDepuisTexte(phrase)
       setResultat(res)
@@ -87,11 +90,13 @@ export function AssistantIA() {
 
   const creer = () => {
     if (!resultat || 'error' in resultat || !resultat.payload) return
+    setErreurCreation(null)
     // L'admin peut avoir ajusté la puissance : on prend SON choix, sinon celui de l'IA.
     const payloadFinal = { ...resultat.payload, force: force ?? resultat.payload.force }
     startCreate(async () => {
       const res = await upsertRegle(payloadFinal)
-      if (res?.error) { toast.error(res.error); return }
+      // Erreur (ex. doublon) affichée DANS le panneau, pas en toast au loin.
+      if (res?.error) { setErreurCreation(res.error); return }
       toast.success('Règle créée.')
       setPhrase('')
       setResultat(null)
@@ -104,6 +109,7 @@ export function AssistantIA() {
   const reformuler = () => {
     setResultat(null)
     setForce(null)
+    setErreurCreation(null)
     // Redonne le focus au texte pour enchaîner la reformulation.
     requestAnimationFrame(() => textareaRef.current?.focus())
   }
@@ -113,6 +119,7 @@ export function AssistantIA() {
     setPhrase('')
     setResultat(null)
     setForce(null)
+    setErreurCreation(null)
     requestAnimationFrame(() => textareaRef.current?.focus())
   }
 
@@ -252,6 +259,11 @@ export function AssistantIA() {
                   <Eraser className="w-4 h-4 mr-1" /> Tout effacer
                 </Button>
               </div>
+              {erreurCreation && (
+                <p className="text-xs text-destructive font-medium rounded-md bg-destructive/10 px-2.5 py-2" role="alert">
+                  {erreurCreation}
+                </p>
+              )}
               <p className="text-[11px] text-muted-foreground/70 text-center">
                 Vérifie la proposition avant de créer — l&apos;IA peut se tromper.
               </p>
