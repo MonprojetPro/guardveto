@@ -69,6 +69,49 @@ Aucune modification de code applicatif : la route `/auth/confirm` faisait déjà
 
 ---
 
+## 2026-06-29 — Assistant IA : anti-coquille-vide, ambiguïté, et le piège du chiffre en dur
+
+**Contexte :** recette de l'assistant IA (créer une règle en langage naturel). Plusieurs retours MiKL ont révélé des angles morts récurrents — tous des variantes du même thème : **ne jamais livrer quelque chose qui FAIT semblant**.
+
+**Pièges trouvés & corrigés :**
+1. **Doublons** : aucune vérification d'existant à la création → on pouvait empiler la même règle (et un duo apparaissait en double car écrit dans les 2 sens A→B + B→A). Fix : `trouverEquivalent` (même véto + mêmes params) + détection de paire duo non ordonnée, en création seulement.
+2. **Prénom ambigu** : la résolution prénom→id prenait **le 1er match en silence** → si deux vétos s'appellent pareil, la règle visait peut-être le mauvais. Fix : distinguer `aucun` / `ambigu` et **REFUSER de choisir** (l'humain tranche via le formulaire). Principe : mieux vaut refuser que se tromper en silence.
+3. **Règle sans effet** (plafond « au plus 50 gardes/semaine ») : l'IA proposait, le bouton Créer restait. Fix : la couche de conversion refuse (pas de payload → pas de bouton). C'est l'anti-coquille-vide appliqué à l'IA.
+4. **Message incohérent** : quand notre couche refuse une proposition que l'IA croyait faisable, l'UI affichait le message **optimiste de l'IA** (« je propose de limiter à 20… ») → illusion « rien n'a changé ». Fix : forcer le message sur NOTRE raison de refus.
+5. **Affichage du duo** : 2 lignes en base = 2 lignes à l'écran. Fusionné en 1 ligne — MAIS il a fallu rendre le **toggle activer/désactiver** symétrique (sinon on laissait un demi-duo actif). Fusionner un affichage ⇒ vérifier que TOUTES les actions sur la ligne agissent sur les deux rows.
+
+**LA leçon transverse (la plus importante) — pas de chiffre métier en dur :**
+Le message disait « plafond trop élevé (maximum 14) ». MiKL : *le 14 est arbitraire, et même 7 (= 1 garde/jour) est une hypothèse — certains cabinets auront plusieurs gardes/jour.* → tout seuil « réaliste » dépend de **ce que le cabinet définit au départ**. On a retiré **tout chiffre affiché** (borne gardée en garde-fou interne, invisible) ; la version dérivée de la config cabinet est reportée en V2. **À réutiliser : un seuil affiché à l'utilisateur ne doit jamais être une constante câblée — il doit venir de la config du tenant, sinon on ment.**
+
+**À retenir / réutiliser :**
+1. Une couche IA suit les MÊMES règles que le reste : anti-coquille-vide (ne pas proposer ce qui n'aura aucun effet), refuser plutôt que deviner, message honnête.
+2. Quand deux couches portent un avis (l'IA propose `faisable`, notre validateur refuse), c'est **toujours le validateur qui parle à l'écran**, jamais l'optimisme de l'amont.
+3. Fusionner un affichage (duo 2→1 ligne) = auditer tous les consumers d'action de la ligne (toggle, edit, delete).
+4. Tout seuil/borne montré à l'utilisateur = config tenant, pas constante.
+
+---
+
+## 2026-06-29 — Week-end « bloc atomique daté samedi » : angle mort des indispos/absences le dimanche
+
+**Contexte :** MiKL demande « si un véto ne peut pas CE dimanche-là, comment fait-on ? ». Audit de la chaîne congés → moteur → dépannage.
+
+**Cause racine (prouvée par lecture du code) :** le week-end de garde est **un seul créneau, daté au samedi**, qui couvre implicitement vendredi-soir + samedi + dimanche (solver `genererSteps` : dimanche = aucun slot propre). Or :
+- R16 (congé bloque une garde) compare `slot.date` à la plage du congé → une indispo le **dimanche** ne matche pas le samedi → le véto reste assignable au week-end.
+- La détection de crise (`recenserCreneauxImpactes`) filtre les gardes par `date` dans la fenêtre d'absence → une absence **dimanche seul** ne voit pas la garde week-end (datée samedi).
+
+**Décisions MiKL (produit) :**
+1. **Week-end reste atomique** (Option A). Le découpage par jour casserait l'**unité de compteur** (« 1 bloc = 1 week-end » pour toute l'équité, le grand WE, l'avantage rôle 1er) → ce serait un gros chantier V2.
+2. Le cas « quelqu'un prend juste le dimanche » = **dépannage ponctuel** (système vérifié OPÉRATIONNEL : déclaration absence → remplaçant proposé/manuel/volontaire → re-check légalité serveur → application avec recalcul compteurs+agenda+email → trace compensation).
+3. **Ne PAS câbler « ven+sam+dim »** : la couverture jour-par-jour d'un créneau doit venir de la **config cabinet** (un samedi peut être juste un samedi ailleurs) → correctif rangé dans le chantier **structure des gardes configurable (V2)**.
+
+**Contournement immédiat (cabinet pilote, WE = ven→dim) :** déclarer une indispo/absence en **incluant le samedi** (le jour qui porte la garde week-end) → bien prise en compte.
+
+**À retenir / réutiliser :**
+1. Un objet « bloc » qui couvre plusieurs jours mais n'est **daté que d'un seul** crée un angle mort sur les autres jours — vérifier toute logique « par date » (congés, absences, indispos) contre ce type de bloc.
+2. Avant de « simplifier » en câblant une structure métier (durée d'un week-end), se demander si elle varie d'un cabinet à l'autre → si oui, c'est de la **config tenant**, pas une constante.
+
+---
+
 ## Leçons antérieures (résumées — détail dans `patch-log.md`)
 
 - **2026-06-01 — Vues `SECURITY DEFINER` contournaient la RLS** : un véto pouvait voir un planning en brouillon. Fix : vues en `security_invoker` + `search_path` figé (migrations 010, 011). → Toujours vérifier que les vues respectent la RLS sur un projet auth-critique.
