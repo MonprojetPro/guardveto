@@ -22,7 +22,7 @@
 // intérieur changera, les ~7 consommateurs resteront branchés ici.
 // ============================================================
 
-import type { TypeGardeEngine } from './types'
+import type { TypeGardeEngine, Saison } from './types'
 
 /** Horaires résolus d'un créneau (heure locale Europe/Paris). */
 export interface HorairesCreneau {
@@ -104,4 +104,32 @@ export function horairesCreneau(type: TypeGardeEngine): HorairesCreneau {
 /** Libellé humain d'un type de créneau. */
 export function libelleCreneau(type: TypeGardeEngine): string {
   return CRENEAUX[type].libelle
+}
+
+// ============================================================
+// Mapping JOUR → type de créneau (primitive de structure)
+// Convention jourIndex / getDay : 0 = dimanche … 6 = samedi.
+// ============================================================
+
+/**
+ * Type de créneau « propre » porté par un jour de la semaine.
+ *  - vendredi (5) → vendredi_soir
+ *  - samedi   (6) → weekend (couvre samedi + dimanche)
+ *  - lun-jeu (1-4)→ semaine_soir
+ *  - dimanche (0) → null (aucun créneau propre : couvert par le weekend du samedi)
+ *
+ * ⚠️ Le validateur INDÉPENDANT (validerPlanning) NE consomme PAS cette fonction,
+ * À DESSEIN : il ré-implémente sa propre dérivation pour rester un contrôle croisé
+ * indépendant du moteur (cf. l'en-tête de validerPlanning.ts). Ne pas l'y brancher.
+ */
+export function typeGardePourJour(jourIdx: number): TypeGardeEngine | null {
+  if (jourIdx === 5) return 'vendredi_soir'
+  if (jourIdx === 6) return 'weekend'
+  if (jourIdx >= 1 && jourIdx <= 4) return 'semaine_soir'
+  return null
+}
+
+/** Effectif semaine par défaut quand non configuré par le cabinet (hiver = 2, été = 1). */
+export function effectifSemaineParDefaut(saison: Saison): number {
+  return saison === 'hiver' ? 2 : 1
 }

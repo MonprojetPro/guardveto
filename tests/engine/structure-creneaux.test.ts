@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { CRENEAUX, horairesCreneau, libelleCreneau } from '@/engine/structure-creneaux'
+import {
+  CRENEAUX,
+  horairesCreneau,
+  libelleCreneau,
+  typeGardePourJour,
+  effectifSemaineParDefaut,
+} from '@/engine/structure-creneaux'
 import type { TypeGardeEngine } from '@/engine/types'
 
 // ============================================================
@@ -64,4 +70,24 @@ describe('structure-creneaux — libelleCreneau', () => {
     expect(libelleCreneau('weekend')).toBe('Week-end (sam+dim)')
     expect(libelleCreneau('ferie')).toBe('Jour férié')
   })
+})
+
+describe('structure-creneaux — typeGardePourJour (mapping jour→type)', () => {
+  // Convention jourIndex / getDay : 0=dim, 1=lun … 5=ven, 6=sam.
+  it('vendredi (5) → vendredi_soir', () => expect(typeGardePourJour(5)).toBe('vendredi_soir'))
+  it('samedi (6) → weekend', () => expect(typeGardePourJour(6)).toBe('weekend'))
+  it('lundi à jeudi (1-4) → semaine_soir', () => {
+    expect(typeGardePourJour(1)).toBe('semaine_soir')
+    expect(typeGardePourJour(2)).toBe('semaine_soir')
+    expect(typeGardePourJour(3)).toBe('semaine_soir')
+    expect(typeGardePourJour(4)).toBe('semaine_soir')
+  })
+  it('dimanche (0) → null (couvert par le weekend du samedi)', () => {
+    expect(typeGardePourJour(0)).toBeNull()
+  })
+})
+
+describe('structure-creneaux — effectifSemaineParDefaut (repli)', () => {
+  it('hiver = 2', () => expect(effectifSemaineParDefaut('hiver')).toBe(2))
+  it('été = 1', () => expect(effectifSemaineParDefaut('ete')).toBe(1))
 })

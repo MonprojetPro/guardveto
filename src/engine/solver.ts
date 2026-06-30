@@ -33,6 +33,7 @@ import type {
   CalendrierResolu,
 } from './types'
 import { jourIndex, addDays, estJourFerie, lundiDeSemaine } from './utils'
+import { typeGardePourJour, effectifSemaineParDefaut } from './structure-creneaux'
 import { normaliserContraintesVets } from './normaliserContraintes'
 import { isValid } from './rules/hard-constraints'
 import { penalite } from './rules/soft-constraints'
@@ -100,7 +101,7 @@ export interface SolverInput {
 
 /** Effectif semaine effectif : config si fournie, sinon repli saison (hiver 2 / été 1). */
 function effectifSemaine(saison: Saison, nbVetosSemaineSoir?: number): number {
-  return nbVetosSemaineSoir ?? (saison === 'hiver' ? 2 : 1)
+  return nbVetosSemaineSoir ?? effectifSemaineParDefaut(saison)
 }
 
 export interface JourNonCouvert {
@@ -176,6 +177,34 @@ interface Blocage {
  * vendredi et WE, R3/R5 conditionne les repos de semaine sur le WE).
  * Les traiter en premier maximise l'élagage précoce du backtracking.
  */
+/**
+ * Étapes (slots à pourvoir) portées par UN jour donné. Source unique du mapping
+ * jour→type pour le MOTEUR : genererSteps ET genererStepsSemaine y passent toutes
+ * deux (c'étaient deux copies identiques). Le validateur indépendant garde, lui,
+ * sa propre dérivation — cf. typeGardePourJour (structure-creneaux).
+ */
+function stepsForDay(date: string, saison: Saison, besoinSecondSemaine: boolean): SolverStep[] {
+  const t = typeGardePourJour(jourIndex(date)) // 0=dim … 6=sam
+  if (t === 'vendredi_soir' || t === 'weekend') {
+    // Vendredi soir / week-end → toujours 2 de garde.
+    return [
+      { date, type: t, saison, role: 'premier', besoinSecond: true },
+      { date, type: t, saison, role: 'second', besoinSecond: true },
+    ]
+  }
+  if (t === 'semaine_soir') {
+    // Lundi à jeudi. Effectif configurable : 2 (1er+2nd) ou 1 (1er seul).
+    const steps: SolverStep[] = [
+      { date, type: t, saison, role: 'premier', besoinSecond: besoinSecondSemaine },
+    ]
+    if (besoinSecondSemaine) {
+      steps.push({ date, type: t, saison, role: 'second', besoinSecond: true })
+    }
+    return steps
+  }
+  return [] // dimanche : couvert par le weekend du samedi → aucun slot propre
+}
+
 function genererSteps(
   dateDebut: string, dateFin: string, saison: Saison, nbVetosSemaineSoir?: number,
 ): SolverStep[] {
@@ -185,25 +214,9 @@ function genererSteps(
 
   let current = dateDebut
   while (current <= dateFin) {
-    const idx = jourIndex(current) // 0=dim, 1=lun, ..., 6=sam
-
-    if (idx === 5) {
-      // Vendredi → vendredi_soir (toujours 2 de garde)
-      weSteps.push({ date: current, type: 'vendredi_soir', saison, role: 'premier', besoinSecond: true })
-      weSteps.push({ date: current, type: 'vendredi_soir', saison, role: 'second', besoinSecond: true })
-    } else if (idx === 6) {
-      // Samedi → weekend (toujours 2 de garde)
-      weSteps.push({ date: current, type: 'weekend', saison, role: 'premier', besoinSecond: true })
-      weSteps.push({ date: current, type: 'weekend', saison, role: 'second', besoinSecond: true })
-    } else if (idx >= 1 && idx <= 4) {
-      // Lundi à Jeudi → semaine_soir. Effectif configurable : 2 (1er+2nd) ou 1 (1er seul).
-      semaineSteps.push({ date: current, type: 'semaine_soir', saison, role: 'premier', besoinSecond: besoinSecondSemaine })
-      if (besoinSecondSemaine) {
-        semaineSteps.push({ date: current, type: 'semaine_soir', saison, role: 'second', besoinSecond: true })
-      }
+    for (const s of stepsForDay(current, saison, besoinSecondSemaine)) {
+      (s.type === 'semaine_soir' ? semaineSteps : weSteps).push(s)
     }
-    // Dimanche : couvert par le weekend du samedi → aucun slot propre
-
     current = addDays(current, 1)
   }
 
@@ -519,20 +532,9 @@ function genererStepsSemaine(lundi: string, saison: Saison, nbVetosSemaineSoir?:
 
   for (let i = 0; i <= 6; i++) {
     const date = addDays(lundi, i)
-    const idx = jourIndex(date)
-    if (idx === 5) {
-      weSteps.push({ date, type: 'vendredi_soir', saison, role: 'premier', besoinSecond: true })
-      weSteps.push({ date, type: 'vendredi_soir', saison, role: 'second', besoinSecond: true })
-    } else if (idx === 6) {
-      weSteps.push({ date, type: 'weekend', saison, role: 'premier', besoinSecond: true })
-      weSteps.push({ date, type: 'weekend', saison, role: 'second', besoinSecond: true })
-    } else if (idx >= 1 && idx <= 4) {
-      semaineSteps.push({ date, type: 'semaine_soir', saison, role: 'premier', besoinSecond: besoinSecondSemaine })
-      if (besoinSecondSemaine) {
-        semaineSteps.push({ date, type: 'semaine_soir', saison, role: 'second', besoinSecond: true })
-      }
+    for (const s of stepsForDay(date, saison, besoinSecondSemaine)) {
+      (s.type === 'semaine_soir' ? semaineSteps : weSteps).push(s)
     }
-    // Dimanche : couvert par le WE du samedi
   }
 
   return [...weSteps, ...semaineSteps]
