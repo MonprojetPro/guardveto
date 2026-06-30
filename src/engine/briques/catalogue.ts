@@ -287,6 +287,21 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
     },
   },
 
+  espacement_weekend: {
+    id: 'espacement_weekend',
+    famille: 'limiter',
+    operateur: 'ESPACEMENT_WE',
+    axes: ['qui', 'combien'],
+    schemaParams: {
+      n_semaines: 'integer',
+    },
+    widget: 'WidgetEspacementWeekend',
+    rendreLangageNaturel: (params) => {
+      const n = params.n_semaines ?? '?'
+      return `de garde au plus un week-end sur ${n}`
+    },
+  },
+
   // ⚠️ INTERNE — « motif composite pré-calculé » (archi V2 §catalogue blindé).
   // Le métier « grand week-end » (repos vendredi si pas de garde WE, jeudi sinon)
   // est DÉJÀ livré par la brique `repos_conditionnel`. Le moteur calcule ce motif

@@ -22,6 +22,7 @@ export const BRIQUES_IA = [
   'duo_interdit',
   'au_plus_n',
   'espacement_min',
+  'espacement_weekend',
 ] as const
 
 export const FORCES_IA = ['jamais', 'sauf_crise', 'evitee', 'si_possible'] as const
@@ -57,6 +58,8 @@ export const PropositionRegleSchema = z.object({
   n: z.number().int().nullable(),
   fenetre: z.enum(['semaine_civile', 'glissante_7_jours', 'glissante_14_jours', 'glissante_30_jours']).nullable(),
   ecart_min_jours: z.number().int().nullable(),
+  /** espacement_weekend : « au plus 1 week-end sur N » (N ≥ 2). */
+  n_semaines: z.number().int().nullable(),
 })
 
 export type PropositionRegle = z.infer<typeof PropositionRegleSchema>
@@ -107,6 +110,8 @@ const TAILLE_FENETRE: Record<string, number> = {
 /** Borne haute alignée sur le serveur (N_MAX_GARDES / ECART_MAX_JOURS). */
 const N_MAX = 14
 const ECART_MAX = 30
+/** Fréquence WE « 1 sur N » : borne haute alignée sur le serveur (N_SEM_WE_MAX). */
+const N_SEM_WE_MAX = 26
 
 export type ConversionResultat =
   | { ok: true; payload: UpsertReglePayload }
@@ -130,10 +135,16 @@ export function propositionVersPayload(
     return { ok: false, raison: raisonPrenom(p.veterinaire, owner.cause) }
   }
 
+  // Force par défaut si l'IA n'en propose pas : la fréquence WE est une
+  // PRÉFÉRENCE par défaut (décision MiKL — ne jamais bloquer une génération) ;
+  // les autres briques restent en sauf_crise.
+  const forceParDefaut: ForceFormulaire =
+    p.brique_id === 'espacement_weekend' ? 'si_possible' : 'sauf_crise'
+
   const payload: UpsertReglePayload = {
     brique_id: p.brique_id as BriqueEvaluable,
     owner_id: owner.id,
-    force: (p.force ?? 'sauf_crise') as ForceFormulaire,
+    force: (p.force ?? forceParDefaut) as ForceFormulaire,
   }
 
   switch (p.brique_id) {
@@ -188,6 +199,15 @@ export function propositionVersPayload(
       payload.ecart_min_jours = e
       break
     }
+    case 'espacement_weekend': {
+      // « 1 week-end sur N » : N ≥ 2 (N=1 = tous les week-ends = aucune contrainte).
+      const n = p.n_semaines
+      if (typeof n !== 'number' || !Number.isInteger(n) || n < 2 || n > N_SEM_WE_MAX) {
+        return { ok: false, raison: `Précise une fréquence valide : un week-end sur 2 à ${N_SEM_WE_MAX}.` }
+      }
+      payload.n_semaines = n
+      break
+    }
   }
 
   return { ok: true, payload }
@@ -220,6 +240,9 @@ export function apercuProposition(p: PropositionRegle): string {
       break
     case 'espacement_min':
       params = { ecart_min_jours: p.ecart_min_jours }
+      break
+    case 'espacement_weekend':
+      params = { n_semaines: p.n_semaines }
       break
   }
   const predicat = rendreRegle(p.brique_id, params, { nomVeto: (x) => x })

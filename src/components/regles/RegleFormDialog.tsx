@@ -52,6 +52,7 @@ const BRIQUES: { value: BriqueEvaluable; label: string; aide: string }[] = [
   { value: 'duo_interdit', label: 'Jamais en duo avec…', aide: 'Deux vétos ne peuvent pas être de garde seuls ensemble (réglé dans les deux sens).' },
   { value: 'au_plus_n', label: 'Limite de gardes', aide: 'Au plus N gardes sur une fenêtre (semaine civile ou jours glissants).' },
   { value: 'espacement_min', label: 'Espacement minimal', aide: 'Au moins X jours de repos entre deux gardes du même véto.' },
+  { value: 'espacement_weekend', label: 'Fréquence des week-ends', aide: 'Au plus un week-end de garde toutes les N semaines (« un week-end sur N »).' },
 ]
 
 /** Fenêtres de comptage pour « au plus N gardes » (alignées sur FENETRES_VALIDES). */
@@ -82,6 +83,7 @@ const FORCE_DEFAUT: Record<BriqueEvaluable, ForceFormulaire> = {
   interdire_creneau: 'evitee',
   au_plus_n: 'sauf_crise',      // limite protectrice : ferme mais pliable en crise
   espacement_min: 'sauf_crise', // idem (trop dur → risque d'impasse)
+  espacement_weekend: 'si_possible', // fréquence WE = préférence (ne jamais bloquer)
 }
 
 // ── Composant ────────────────────────────────────────────────
@@ -149,6 +151,12 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
       : typeof p.ecart_min_jours === 'string' ? p.ecart_min_jours : '3',
   )
 
+  // espacement_weekend (« un week-end sur N »)
+  const [nSemaines, setNSemaines] = useState<string>(
+    typeof p.n_semaines === 'number' ? String(p.n_semaines)
+      : typeof p.n_semaines === 'string' ? p.n_semaines : '2',
+  )
+
   // Validité : PERMANENTE (par défaut) ou limitée à une période existante.
   const periodeInit = regle?.periode_id && periodesDispo.some((per) => per.id === regle.periode_id)
     ? regle.periode_id
@@ -188,11 +196,14 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
       case 'espacement_min':
         params = { ecart_min_jours: Number(ecartMin) || 0 }
         break
+      case 'espacement_weekend':
+        params = { n_semaines: Number(nSemaines) || 0 }
+        break
     }
     const predicat = rendreRegle(briqueId, params, { nomVeto })
     return sujet ? `${sujet} ${predicat}` : predicat
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [briqueId, ownerId, jour, exVac, siWe, sinon, semaines, periodes, avecId, n, fenetre, ecartMin, vets])
+  }, [briqueId, ownerId, jour, exVac, siWe, sinon, semaines, periodes, avecId, n, fenetre, ecartMin, nSemaines, vets])
 
   const handleSubmit = () => {
     if (!ownerId) { toast.error('Sélectionnez le vétérinaire concerné.'); return }
@@ -211,6 +222,10 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
       const v = Number(ecartMin)
       if (!Number.isInteger(v) || v < 1) { toast.error('Indiquez un écart valide (≥ 1 jour).'); return }
     }
+    if (briqueId === 'espacement_weekend') {
+      const v = Number(nSemaines)
+      if (!Number.isInteger(v) || v < 2) { toast.error('Indiquez une fréquence valide (un week-end sur 2 minimum).'); return }
+    }
 
     startTransition(async () => {
       const res = await upsertRegle({
@@ -228,6 +243,7 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
         n: Number(n),
         fenetre,
         ecart_min_jours: Number(ecartMin),
+        n_semaines: Number(nSemaines),
         periode_id: validite === PERMANENTE ? null : validite,
       })
       if (res?.error) { toast.error(res.error); return }
@@ -416,6 +432,24 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
                 onChange={(e) => setEcartMin(e.target.value)}
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               />
+            </div>
+          )}
+
+          {briqueId === 'espacement_weekend' && (
+            <div className="space-y-1.5">
+              <Label htmlFor="n-semaines">De garde au plus un week-end sur…</Label>
+              <input
+                id="n-semaines"
+                type="number"
+                min={2}
+                max={26}
+                value={nSemaines}
+                onChange={(e) => setNSemaines(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
+              <p className="text-xs text-muted-foreground">
+                Ex. « 3 » = un week-end sur trois (les deux week-ends suivants sont libres).
+              </p>
             </div>
           )}
 

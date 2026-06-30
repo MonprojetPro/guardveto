@@ -623,6 +623,42 @@ function checkEspacementMin(vet: VetEngine, slot: SlotGarde, planning: PlanningP
   return ok()
 }
 
+// ── Fréquence des week-ends réglable (brique `espacement_weekend`) ──
+// « au plus 1 garde de week-end toutes les N semaines » (= 1 WE sur N). Ne
+// concerne QUE les créneaux `weekend` (le vendredi soir, lié au WE par R9, n'est
+// pas compté ici). Deux gardes WE doivent être espacées d'au moins N semaines :
+// on viole si une autre garde WE du véto est à moins de N×7 jours du slot visé.
+// Réglable (dur si étage ≤ 2, sinon pénalité). N ≤ 1 ⇒ aucune contrainte (inerte).
+
+function violeEspacementWeekend(
+  c: ContrainteEngine, vetId: string, slot: SlotGarde, planning: PlanningPartiel,
+): boolean {
+  if (slot.type !== 'weekend') return false // ne s'applique qu'aux week-ends
+  const cfg = c.config as Record<string, unknown>
+  const nRaw = cfg.n_semaines
+  const n = typeof nRaw === 'number' ? nRaw : typeof nRaw === 'string' ? parseInt(nRaw, 10) : NaN
+  if (!Number.isFinite(n) || n <= 1) return false // n ≤ 1 ou mal configurée → inerte
+  const seuil = n * 7
+  for (const a of planning.attributions) {
+    if (a.type !== 'weekend') continue
+    if (a.premier_id !== vetId && a.second_id !== vetId) continue
+    if (a.date === slot.date) continue
+    if (joursEntreDates(a.date, slot.date) < seuil) return true
+  }
+  return false
+}
+
+function checkEspacementWeekend(vet: VetEngine, slot: SlotGarde, planning: PlanningPartiel): ValidationResult {
+  for (const c of vet.contraintes) {
+    if (!c.actif || c.type !== 'espacement_weekend') continue
+    if (estDure(c) && violeEspacementWeekend(c, vet.id, slot, planning)) {
+      const n = (c.config as Record<string, unknown>).n_semaines
+      return invalid(`FREQ_WE : ${vet.prenom} ne doit pas faire plus d'un week-end toutes les ${n} semaines`)
+    }
+  }
+  return ok()
+}
+
 export function penaliteContraintesConfig(
   slot: SlotGarde,
   vet: VetEngine,
@@ -647,6 +683,8 @@ export function penaliteContraintesConfig(
         viole = violeAuPlusN(c, vet.id, slot, planning); break
       case 'espacement_min':
         viole = violeEspacementMin(c, vet.id, slot, planning); break
+      case 'espacement_weekend':
+        viole = violeEspacementWeekend(c, vet.id, slot, planning); break
     }
     if (viole) pen += penaliteEtage(etageDe(c))
   }
@@ -687,6 +725,7 @@ export function isValid(
     checkR21RolesDistincts(vet, slot, roleVisé, planning),
     checkAuPlusN(vet, slot, planning),
     checkEspacementMin(vet, slot, planning),
+    checkEspacementWeekend(vet, slot, planning),
   ]
 
   // R8 uniquement pour les WE
@@ -720,4 +759,5 @@ export {
   checkR21RolesDistincts,
   checkAuPlusN,
   checkEspacementMin,
+  checkEspacementWeekend,
 }

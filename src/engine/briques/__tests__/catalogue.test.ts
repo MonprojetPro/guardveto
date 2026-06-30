@@ -15,18 +15,22 @@ import { CATALOGUE_BRIQUES, BRIQUES_IDS, BRIQUES_INTERNES, rendreRegle } from '.
 
 // ── Parse du seed SQL (source de vérité côté base) ───────────
 
-const MIGRATION = fileURLToPath(
-  new URL('../../../../supabase/migrations/20260619120000_p1a_briques_regles.sql', import.meta.url),
-)
+// Le catalogue est seedé par PLUSIEURS migrations : le seed initial (10 briques)
+// + chaque ajout ultérieur (1 brique par migration). On les parse TOUTES pour
+// garder le couplage réel code ↔ base.
+const MIGRATIONS = [
+  '20260619120000_p1a_briques_regles.sql',
+  '20260629181000_p3_brique_espacement_weekend.sql',
+].map((f) => fileURLToPath(new URL(`../../../../supabase/migrations/${f}`, import.meta.url)))
 
 interface SeedBrique {
   famille: string
   axes: string[]
 }
 
-/** Extrait { id → {famille, axes} } depuis le seed INSERT de la migration. */
-function parserSeed(): Record<string, SeedBrique> {
-  const sql = readFileSync(MIGRATION, 'utf8')
+/** Extrait { id → {famille, axes} } depuis le bloc INSERT d'une migration. */
+function parserMigration(chemin: string): Record<string, SeedBrique> {
+  const sql = readFileSync(chemin, 'utf8')
   // NB : « ON CONFLICT » apparaît AUSSI dans le commentaire d'en-tête → on
   // borne le bloc INSERT au VALUES puis au premier ON CONFLICT QUI SUIT.
   const debut = sql.indexOf('VALUES')
@@ -45,11 +49,19 @@ function parserSeed(): Record<string, SeedBrique> {
   return seed
 }
 
+/** Fusionne le seed de toutes les migrations du catalogue. */
+function parserSeed(): Record<string, SeedBrique> {
+  return MIGRATIONS.reduce<Record<string, SeedBrique>>(
+    (acc, chemin) => ({ ...acc, ...parserMigration(chemin) }),
+    {},
+  )
+}
+
 describe('catalogue ↔ seed briques_regles — cohérence (ne divergent pas)', () => {
   const seed = parserSeed()
 
-  it('le seed parsé contient bien les 10 briques (sanity du parser)', () => {
-    expect(Object.keys(seed)).toHaveLength(10)
+  it('le seed parsé contient bien les 11 briques (sanity du parser)', () => {
+    expect(Object.keys(seed)).toHaveLength(11)
   })
 
   it('catalogue et seed déclarent EXACTEMENT les mêmes briques', () => {

@@ -21,7 +21,7 @@ export function assistantIaDisponible(): boolean {
 }
 
 /** Décrit les 6 briques disponibles pour guider l'IA (jours = lundi→vendredi). */
-const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 6 types de règle :
+const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 7 types de règle :
 
 1. interdire_creneau — un vétérinaire ne fait pas de garde un jour fixe de la semaine.
    params: jour (lundi|mardi|mercredi|jeudi|vendredi), exception_vacances_scolaires (true/false).
@@ -35,6 +35,9 @@ const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 6 types de rè
    params: n (entier ≥ 1), fenetre (semaine_civile|glissante_7_jours|glissante_14_jours|glissante_30_jours).
 6. espacement_min — au moins X jours entre deux gardes du même vétérinaire.
    params: ecart_min_jours (entier ≥ 1).
+7. espacement_weekend — au plus 1 garde de WEEK-END toutes les N semaines (« un week-end sur N », limite la fréquence des week-ends d'un véto).
+   params: n_semaines (entier ≥ 2 ; « un week-end sur 3 » → n_semaines = 3).
+   ⚠️ N'utilise ce type QUE si la demande parle bien de WEEK-ENDS (pas des gardes en général → c'est au_plus_n). Force par défaut conseillée : si_possible (préférence).
 
 Niveau d'importance (force) :
 - jamais = interdiction ferme

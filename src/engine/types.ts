@@ -48,6 +48,10 @@ export interface ContrainteEngine {
     // Espacement minimal réglable (brique catalogue `espacement_min`) : au moins
     // X jours entre deux gardes d'un même véto (anti nuits enchaînées).
     | 'espacement_min'
+    // Fréquence des week-ends réglable (brique catalogue `espacement_weekend`) :
+    // au plus 1 garde de week-end toutes les N semaines (« 1 WE sur N »). Dur si
+    // étage ≤ 2, sinon pénalité. Ne s'applique qu'aux créneaux `weekend`.
+    | 'espacement_weekend'
   config: Record<string, unknown>
   actif: boolean
 }

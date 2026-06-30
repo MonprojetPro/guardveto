@@ -284,6 +284,7 @@ const BRIQUES_EVALUABLES = {
   duo_interdit: 'duo_interdit',
   au_plus_n: 'au_plus_n',           // limite de charge réglable
   espacement_min: 'espacement_min', // écart minimal entre deux gardes
+  espacement_weekend: 'espacement_weekend', // fréquence WE : au plus 1 WE sur N
 } as const
 export type BriqueEvaluable = keyof typeof BRIQUES_EVALUABLES
 
@@ -301,6 +302,9 @@ const FENETRES_VALIDES = new Set([
 ])
 const N_MAX_GARDES = 14    // borne haute raisonnable (au plus N gardes / fenêtre)
 const ECART_MAX_JOURS = 30 // borne haute raisonnable (espacement minimal)
+// Fréquence WE : « 1 week-end sur N ». N=1 = aucune contrainte (inerte) → min 2.
+const N_SEM_WE_MIN = 2
+const N_SEM_WE_MAX = 26    // une période fait 12-17 semaines : 26 couvre large
 
 /** Payload envoyé par le formulaire (champs simples — le JSON est bâti ici). */
 export interface UpsertReglePayload {
@@ -326,6 +330,8 @@ export interface UpsertReglePayload {
   fenetre?: string
   // espacement_min
   ecart_min_jours?: number
+  // espacement_weekend
+  n_semaines?: number
 }
 
 /** Parse un entier dans [1, max]. Retourne null si invalide (frontière de confiance). */
@@ -377,6 +383,13 @@ function construireParams(
       const ecart = entierBorne(p.ecart_min_jours, ECART_MAX_JOURS)
       if (ecart === null) return { error: `Écart minimal invalide (1 à ${ECART_MAX_JOURS} jours).` }
       return { quand: null, params: { ecart_min_jours: ecart } }
+    }
+    case 'espacement_weekend': {
+      const n = entierBorne(p.n_semaines, N_SEM_WE_MAX)
+      if (n === null || n < N_SEM_WE_MIN) {
+        return { error: `Fréquence de week-end invalide (un week-end sur ${N_SEM_WE_MIN} à ${N_SEM_WE_MAX}).` }
+      }
+      return { quand: null, params: { n_semaines: n } }
     }
     default:
       return { error: 'Brique non gérée par ce constructeur.' }

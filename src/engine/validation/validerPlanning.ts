@@ -608,6 +608,46 @@ export function validerPlanning(
     }
   }
 
+  // ── ESPACEMENT_WEEKEND — « au plus 1 WE toutes les N semaines » (réglable) ──
+  // Re-vérification INDÉPENDANTE : on trie les dates de garde DE WEEK-END du véto
+  // et on contrôle l'écart entre week-ends consécutifs. Si tous ≥ N×7 jours,
+  // toutes les paires le sont. Seules les règles DURES (étage ≤ 2) sont des
+  // violations (souple = préférence). MÊME logique que le moteur (les 2 gardiens).
+  for (const vet of vetsNorm) {
+    for (const c of vet.contraintes) {
+      if (!c.actif || c.type !== 'espacement_weekend') continue
+      const cfg = c.config as Record<string, unknown>
+      const etage = typeof cfg.force === 'number' ? (cfg.force as number) : 2
+      if (etage > 2) continue
+      const nRaw = cfg.n_semaines
+      const n = typeof nRaw === 'number' ? nRaw : typeof nRaw === 'string' ? parseInt(nRaw, 10) : NaN
+      if (!Number.isFinite(n) || n <= 1) continue
+      const seuil = n * 7
+
+      const datesWe = planning.attributions
+        .filter((a) => a.type === 'weekend' && (a.premier_id === vet.id || a.second_id === vet.id))
+        .map((a) => a.date)
+        .sort()
+      const vues = new Set<string>()
+      for (let i = 1; i < datesWe.length; i++) {
+        if (datesWe[i - 1] === datesWe[i]) continue
+        const j = joursEntre(datesWe[i - 1], datesWe[i])
+        if (j < seuil) {
+          const cle = `${datesWe[i - 1]}|${datesWe[i]}`
+          if (vues.has(cle)) continue
+          vues.add(cle)
+          violations.push({
+            regle: 'FREQ_WE',
+            date: datesWe[i],
+            type: 'espacement_weekend',
+            vetId: vet.id,
+            detail: `FREQ_WE : ${vet.prenom} — deux week-ends à ${j} jour(s) d'écart (${datesWe[i - 1]} → ${datesWe[i]}), min 1 toutes les ${n} semaines`,
+          })
+        }
+      }
+    }
+  }
+
   // ── R9 — vendredi soir = même duo que le week-end ──
   // ── R8 — inversion 1er/2nd entre vendredi soir et WE ──
   // On ne signale ces violations que si la règle est appliquée en DUR (active +

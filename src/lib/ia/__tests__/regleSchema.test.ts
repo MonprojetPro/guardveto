@@ -150,6 +150,26 @@ describe('propositionVersPayload', () => {
     )
     expect(r.ok).toBe(false)
   })
+
+  it('espacement_weekend → n_semaines + force « préférence » par défaut', () => {
+    const r = propositionVersPayload(
+      prop({ brique_id: 'espacement_weekend', veterinaire: 'Manon', n_semaines: 3 }),
+      VETS,
+    )
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.payload.n_semaines).toBe(3)
+      expect(r.payload.force).toBe('si_possible') // préférence par défaut (décision MiKL)
+    }
+  })
+
+  it('espacement_weekend « 1 sur 1 » → rejeté (aucune contrainte)', () => {
+    const r = propositionVersPayload(
+      prop({ brique_id: 'espacement_weekend', veterinaire: 'Manon', n_semaines: 1 }),
+      VETS,
+    )
+    expect(r.ok).toBe(false)
+  })
 })
 
 describe('apercuProposition', () => {

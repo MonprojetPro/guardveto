@@ -29,7 +29,7 @@ import { AssistantIA } from './AssistantIA'
  *  Doit rester aligné avec BRIQUES_EVALUABLES (actions.ts) + BRIQUES (RegleFormDialog). */
 const BRIQUES_EDITABLES = new Set([
   'interdire_creneau', 'repos_conditionnel', 'alternance_ancre', 'duo_interdit',
-  'au_plus_n', 'espacement_min',
+  'au_plus_n', 'espacement_min', 'espacement_weekend',
 ])
 
 // ── Données ──────────────────────────────────────────────────
