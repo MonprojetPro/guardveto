@@ -12,6 +12,7 @@
 
 import { google } from 'googleapis'
 import { addDays } from 'date-fns'
+import { horairesCreneau } from '@/engine/structure-creneaux'
 
 // ── Types internes ───────────────────────────────────────────
 
@@ -48,24 +49,37 @@ function getCalendarClient() {
 }
 
 // ── Calcul des horaires selon le type de garde ───────────────
+// Horaires lus à la SOURCE UNIQUE (structure-creneaux). Avant A0, ce fichier
+// codait 18h00/08h00 en dur — décalés de 30 min par rapport à la base
+// (18h30/08h30) : c'était le bug de désynchronisation de l'agenda. Une seule
+// vérité désormais.
+
+/** Pose l'heure 'HH:MM' sur une copie de la date (heure locale Europe/Paris). */
+function withTime(d: Date, hhmm: string): Date {
+  const [h, m] = hhmm.split(':').map(Number)
+  const r = new Date(d)
+  r.setHours(h, m, 0, 0)
+  return r
+}
 
 function getEventTimes(date: string, type: 'semaine' | 'weekend' | 'ferie') {
   const baseDate = new Date(date + 'T00:00:00')
 
   if (type === 'weekend') {
-    // Vendredi 18:00 → Lundi 08:00 (la garde de week-end couvre le vendredi soir).
-    // `date` est le samedi → le vendredi est la veille.
-    const start = addDays(baseDate, -1)
-    start.setHours(18, 0, 0, 0)
-    const end = addDays(baseDate, 2)
-    end.setHours(8, 0, 0, 0)
+    // L'événement agenda regroupe le vendredi soir + le week-end en UN seul
+    // bloc (lisibilité côté cabinet). Début = prise du vendredi soir (veille
+    // du samedi), fin = fin du week-end. `date` est le samedi.
+    const ven = horairesCreneau('vendredi_soir')
+    const we = horairesCreneau('weekend')
+    const start = withTime(addDays(baseDate, -1), ven.heureDebut)
+    const end = withTime(addDays(baseDate, we.offsetJoursFin), we.heureFin)
     return { start: start.toISOString(), end: end.toISOString() }
   }
 
-  // semaine / ferie : 18:00 → lendemain 08:00
-  const start = new Date(date + 'T18:00:00')
-  const end = addDays(baseDate, 1)
-  end.setHours(8, 0, 0, 0)
+  // semaine → semaine_soir ; ferie → ferie (journée entière, comme en base).
+  const h = horairesCreneau(type === 'ferie' ? 'ferie' : 'semaine_soir')
+  const start = withTime(baseDate, h.heureDebut)
+  const end = withTime(addDays(baseDate, h.offsetJoursFin), h.heureFin)
   return { start: start.toISOString(), end: end.toISOString() }
 }
 

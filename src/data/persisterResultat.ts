@@ -19,6 +19,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import type { PlanningPartiel, TypeGardeEngine } from '@/engine/types'
+import { horairesCreneau } from '@/engine/structure-creneaux'
 
 // ── Types internes ───────────────────────────────────────────
 
@@ -93,23 +94,12 @@ function calculerHoraires(
     return d.toISOString().slice(0, 10)
   }
 
-  switch (type) {
-    case 'semaine_soir':
-    case 'vendredi_soir':
-      return {
-        dateDebut: toUTCString(date, '18:30'),
-        dateFin:   toUTCString(addDaysISO(date, 1), '08:30'),
-      }
-    case 'weekend':
-      return {
-        dateDebut: toUTCString(date, '08:30'),
-        dateFin:   toUTCString(addDaysISO(date, 2), '08:30'),
-      }
-    case 'ferie':
-      return {
-        dateDebut: toUTCString(date, '08:30'),
-        dateFin:   toUTCString(addDaysISO(date, 1), '08:30'),
-      }
+  // Horaires lus à la SOURCE UNIQUE (structure-creneaux) — plus aucune
+  // valeur en dur ici. A0 : un seul endroit décrit la structure des gardes.
+  const { heureDebut, heureFin, offsetJoursFin } = horairesCreneau(type)
+  return {
+    dateDebut: toUTCString(date, heureDebut),
+    dateFin:   toUTCString(addDaysISO(date, offsetJoursFin), heureFin),
   }
 }
 
