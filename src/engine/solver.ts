@@ -320,7 +320,7 @@ function scorerCandidat(
   // Dernier recours → toujours en dernier
   if (vet.dernier_recours) return 1_000_000
 
-  const compteurs = compterParVet(planning, allVets)
+  const compteurs = compterParVet(planning, allVets, roleAvantageFinancier)
   const c = compteurs.find((x) => x.vetId === vet.id) ?? {
     vetId: vet.id,
     weGardes: 0,
@@ -629,7 +629,7 @@ export function scorerCandidatLNS(
 ): number {
   if (vet.dernier_recours) return 1_000_000
 
-  const compteurs = compterParVet(planning, allVets)
+  const compteurs = compterParVet(planning, allVets, roleAvantageFinancier)
   const c = compteurs.find((x) => x.vetId === vet.id) ?? {
     vetId: vet.id,
     weGardes: 0,
@@ -715,7 +715,8 @@ export function scorerSemaine(
   vets: VetEngineNormalise[],
   saison: Saison,
   weights: EquityWeights = DEFAULT_EQUITY_WEIGHTS,
-  structure: StructureConfig = DEFAULT_STRUCTURE_CONFIG
+  structure: StructureConfig = DEFAULT_STRUCTURE_CONFIG,
+  roleAvantageFinancier: string | null = DEFAULT_ROLE_AVANTAGE_FINANCIER,
 ): VecteurScore {
   const dimanche = addDays(lundi, 6)
   const planSemaine: PlanningPartiel = {
@@ -723,7 +724,7 @@ export function scorerSemaine(
       (a) => a.date >= lundi && a.date <= dimanche
     ),
   }
-  return scorerPlanning(planSemaine, vets, saison, weights, structure)
+  return scorerPlanning(planSemaine, vets, saison, weights, structure, roleAvantageFinancier)
 }
 
 // ── LNS hill-climbing ────────────────────────────────────
@@ -782,7 +783,7 @@ function lnsHillClimbing(
   const maxPassesSansAmelioration = 3
 
   let meilleur = seedPlanning
-  let scoreMeilleur = scorerPlanning(meilleur, vets, saison, weights, structure)
+  let scoreMeilleur = scorerPlanning(meilleur, vets, saison, weights, structure, roleAvantage)
 
   const lundis = extraireLundis(dateDebut, dateFin)
 
@@ -825,7 +826,7 @@ function lnsHillClimbing(
       if (repaired === null) continue
 
       // Comparer : garder si strictement amélioré
-      const scoreNew = scorerPlanning(repaired, vets, saison, weights, structure)
+      const scoreNew = scorerPlanning(repaired, vets, saison, weights, structure, roleAvantage)
       if (comparerScores(scoreNew, scoreMeilleur) < 0) {
         meilleur = repaired
         scoreMeilleur = scoreNew

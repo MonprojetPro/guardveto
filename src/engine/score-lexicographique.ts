@@ -24,7 +24,7 @@ export interface BonusMalusMap {
   [vetId: string]: number
 }
 import { isValid } from './rules/hard-constraints'
-import { DEFAULT_EQUITY_WEIGHTS, type EquityWeights } from './equity-weights'
+import { DEFAULT_EQUITY_WEIGHTS, DEFAULT_ROLE_AVANTAGE_FINANCIER, type EquityWeights } from './equity-weights'
 import {
   DEFAULT_STRUCTURE_CONFIG, estStructureSouple, penaliteStructureEtage,
   type StructureConfig,
@@ -161,7 +161,8 @@ export function scorerPlanning(
   vets: VetEngineNormalise[],
   saison: 'ete' | 'hiver',
   weights: EquityWeights = DEFAULT_EQUITY_WEIGHTS,
-  structure: StructureConfig = DEFAULT_STRUCTURE_CONFIG
+  structure: StructureConfig = DEFAULT_STRUCTURE_CONFIG,
+  roleAvantageFinancier: string | null = DEFAULT_ROLE_AVANTAGE_FINANCIER,
 ): VecteurScore {
   const v = vecteurVide()
   const slotRoles = listerSlotRoles(planning, saison)
@@ -277,7 +278,7 @@ export function scorerPlanning(
   }
 
   // ── Étage 6 : ÉQUITÉ (variance des charges) ──
-  const compteurs = compterParVet(planning, vets)
+  const compteurs = compterParVet(planning, vets, roleAvantageFinancier)
   const eq =
     desequilibreWE(compteurs) * weights.WE_GARDE +
     desequilibreWeekendPremier(compteurs) * weights.WE_PREMIER_ROLE +

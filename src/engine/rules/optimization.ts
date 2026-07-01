@@ -8,6 +8,7 @@
 import type { PlanningPartiel, VetEngine, AttributionGarde } from '../types'
 import { estJourFerie } from '../utils'
 import { estAttribue, vetPourRole } from '../attribution'
+import { DEFAULT_ROLE_AVANTAGE_FINANCIER } from '../equity-weights'
 
 // ── Types ────────────────────────────────────────────────
 
@@ -16,7 +17,12 @@ export interface CompteurVet {
   vetId: string
   /** R11 — Nombre de week-ends de garde (type 'weekend') */
   weGardes: number
-  /** R11b — Nombre de week-ends en qualité de 1er (avantage financier — à équilibrer) */
+  /**
+   * R11b — Nombre de week-ends passés dans le RÔLE À AVANTAGE FINANCIER
+   * (réglable — P4 ; défaut = 'premier'). C'est ce compteur qu'on équilibre.
+   * (Nom historique `weekendPremier` conservé ; le rôle compté est désormais
+   * `roleAvantageFinancier` passé à compterParVet, plus 'premier' en dur.)
+   */
   weekendPremier: number
   /** R12 — Nombre de gardes sur jours fériés */
   feriesGardes: number
@@ -60,10 +66,14 @@ function estSemaineSecond(attr: AttributionGarde, vetId: string): boolean {
  *
  * @param planning  Planning (partiel ou complet)
  * @param vets      Liste de tous les vétérinaires
+ * @param roleAvantageFinancier  Rôle dont on compte les week-ends pour R11b
+ *   (réglable — P4). Défaut 'premier' → compteur historique. `null` → on ne
+ *   compte rien (aucun rôle avantagé, donc rien à équilibrer).
  */
 export function compterParVet(
   planning: PlanningPartiel,
-  vets: VetEngine[]
+  vets: VetEngine[],
+  roleAvantageFinancier: string | null = DEFAULT_ROLE_AVANTAGE_FINANCIER,
 ): CompteurVet[] {
   return vets.map((vet) => {
     const compteur: CompteurVet = {
@@ -82,8 +92,13 @@ export function compterParVet(
         // R15 : pour les salariés, un WE de garde = grand WE "perdu"
         if (vet.statut === 'salarie') compteur.grandsWePerdus++
       }
-      // R11b : être 1er le week-end (rôle à avantage financier)
-      if (attr.type === 'weekend' && vetPourRole(attr, 'premier') === vet.id) {
+      // R11b : occuper le RÔLE À AVANTAGE FINANCIER le week-end (réglable — P4).
+      // Défaut 'premier' → compteur historique. null → aucun rôle avantagé.
+      if (
+        attr.type === 'weekend' &&
+        roleAvantageFinancier !== null &&
+        vetPourRole(attr, roleAvantageFinancier) === vet.id
+      ) {
         compteur.weekendPremier++
       }
       if (estFerieGarde(attr, vet.id)) compteur.feriesGardes++

@@ -1,15 +1,12 @@
 // ============================================================
-// GUARDVETO — P4 slice 1 : l'AVANTAGE FINANCIER devient réglable
+// GUARDVETO — P4 slice 1 (+1.5) : l'AVANTAGE FINANCIER devient réglable
 // ============================================================
-// R11b (« équilibrer qui est 1er le week-end ») n'est plus câblé en dur sur le
-// rôle 'premier' : le moteur équilibre le rôle `roleAvantageFinancier`, réglable.
-//   • absent → défaut 'premier' (byte-identique à l'historique — prouvé par le
-//     reste du banc, 363 passed inchangés).
-//   • null → AUCUN équilibrage du rôle (l'IA a appris qu'être 1er ne change rien).
-//   • autre label → l'avantage porte sur ce rôle-là.
-//
-// Ce test attaque DIRECTEMENT le scorer exporté (arithmétique déterministe) +
-// prouve que la config traverse tout le moteur (end-to-end) sans casser.
+// R11b (« équilibrer qui a le rôle à avantage financier le week-end ») n'est
+// plus câblé en dur sur 'premier' :
+//   • le SCORER (slice 1) applique le malus sur le rôle `roleAvantageFinancier`.
+//   • le COMPTEUR (slice 1.5, compterParVet) compte ce MÊME rôle configuré.
+// Défaut 'premier' → byte-identique à l'historique (363 passed inchangés).
+// null → aucun rôle avantagé (l'IA a appris qu'être 1er ne change rien).
 // ============================================================
 
 import { describe, it, expect } from 'vitest'
@@ -19,11 +16,12 @@ import {
   type SolverInput,
   type SolverStep,
 } from '@/engine/solver'
+import { compterParVet } from '@/engine/rules/optimization'
 import { validerPlanning } from '@/engine/validation/validerPlanning'
 import { DEFAULT_EQUITY_WEIGHTS } from '@/engine/equity-weights'
 import type { VetEngine, PlanningPartiel } from '@/engine/types'
 
-// ── Fixture : X a déjà été 1er d'UN week-end (weekendPremier = 1) ──
+// ── Vétos simples ──
 const vets: VetEngine[] = ['x', 'y', 'z'].map((id) => ({
   id,
   nom: id.toUpperCase(),
@@ -34,7 +32,9 @@ const vets: VetEngine[] = ['x', 'y', 'z'].map((id) => ({
   conges: [],
 }))
 
-// Un week-end déjà pourvu : X en 1er, Y en 2nd.
+// ── Fixture : X a été 1er d'un WE (2026-01-10) ET 2nd d'un autre (2026-01-17) ──
+// → compteur('premier').X = 1 ET compteur('second').X = 1 : permet de prouver
+//   que le malus suit BIEN le rôle configuré (le compteur aussi — slice 1.5).
 const planning: PlanningPartiel = {
   attributions: [
     {
@@ -45,52 +45,85 @@ const planning: PlanningPartiel = {
         { role: 'second', vetId: 'y' },
       ],
     },
+    {
+      date: '2026-01-17', // samedi
+      type: 'weekend',
+      placements: [
+        { role: 'premier', vetId: 'z' },
+        { role: 'second', vetId: 'x' },
+      ],
+    },
   ],
 }
 
-// On score X pour un créneau vendredi_soir en 1er (là où R11b agit).
+// ── Slice 1.5 : le COMPTEUR suit le rôle configuré ──
+describe('P4 slice 1.5 — compterParVet suit le rôle à avantage configuré', () => {
+  const cptPremier = compterParVet(planning, vets, 'premier')
+  const cptSecond = compterParVet(planning, vets, 'second')
+  const cptNull = compterParVet(planning, vets, null)
+  const get = (cpt: ReturnType<typeof compterParVet>, id: string) =>
+    cpt.find((c) => c.vetId === id)!.weekendPremier
+
+  it('rôle="premier" : compte X=1 (1er en W1), Z=1 (1er en W2), Y=0', () => {
+    expect(get(cptPremier, 'x')).toBe(1)
+    expect(get(cptPremier, 'z')).toBe(1)
+    expect(get(cptPremier, 'y')).toBe(0)
+  })
+
+  it('rôle="second" : compte Y=1 (2nd en W1), X=1 (2nd en W2), Z=0', () => {
+    expect(get(cptSecond, 'y')).toBe(1)
+    expect(get(cptSecond, 'x')).toBe(1)
+    expect(get(cptSecond, 'z')).toBe(0)
+  })
+
+  it('null : aucun rôle avantagé → compteur nul pour tous', () => {
+    expect(cptNull.every((c) => c.weekendPremier === 0)).toBe(true)
+  })
+
+  it('défaut (param omis) == "premier"', () => {
+    const omis = compterParVet(planning, vets)
+    expect(omis.map((c) => c.weekendPremier)).toEqual(cptPremier.map((c) => c.weekendPremier))
+  })
+})
+
+// ── Slice 1 : le SCORER applique le malus sur le rôle configuré ──
 const stepVenPremier: SolverStep = {
-  date: '2026-01-16', // vendredi
+  date: '2026-01-23', // vendredi
   type: 'vendredi_soir',
   saison: 'hiver',
   role: 'premier',
   besoinSecond: true,
 }
-
 const W = DEFAULT_EQUITY_WEIGHTS.WE_PREMIER_ROLE // 25
 
-describe('P4 slice 1 — le rôle à avantage financier est réglable (scorer)', () => {
-  // Référence SANS équilibrage du rôle (null) : le malus R11b vaut 0.
+describe('P4 slice 1 — le scorer applique le malus sur le rôle configuré', () => {
+  // X a compteur('premier')=1 ET compteur('second')=1 → les deux crans agissent.
   const scoreNeutre = scorerCandidatLNS(
     stepVenPremier, vets[0], planning, vets, DEFAULT_EQUITY_WEIGHTS, undefined, null,
   )
 
-  it('défaut = "premier" : X (déjà 1er) est DÉPRIORITISÉ pour rester 1er (−W)', () => {
-    const scorePremier = scorerCandidatLNS(
+  it('avantage="premier" : X (déjà 1er) déprioritisé pour rester 1er (−W)', () => {
+    const score = scorerCandidatLNS(
       stepVenPremier, vets[0], planning, vets, DEFAULT_EQUITY_WEIGHTS, undefined, 'premier',
     )
-    // -weekendPremier(1) * W par rapport au neutre.
-    expect(scorePremier).toBe(scoreNeutre - W)
+    expect(score).toBe(scoreNeutre - W)
   })
 
-  it('avantage sur "second" : le signe s\'inverse pour un step 1er (+W)', () => {
-    const scoreSecond = scorerCandidatLNS(
+  it('avantage="second" : X (déjà 2nd) déprioritisé pour un step 1er (+W)', () => {
+    const score = scorerCandidatLNS(
       stepVenPremier, vets[0], planning, vets, DEFAULT_EQUITY_WEIGHTS, undefined, 'second',
     )
-    expect(scoreSecond).toBe(scoreNeutre + W)
+    expect(score).toBe(scoreNeutre + W)
   })
 
-  it('null : aucun équilibrage du rôle (malus R11b = 0)', () => {
-    // Le neutre ne contient QUE l'équité week-end + pénalités, pas le malus rôle.
-    // On le vérifie en le comparant à premier/second qui, eux, portent ±W.
+  it('null : aucun équilibrage du rôle (malus = 0)', () => {
     const scorePremier = scorerCandidatLNS(
       stepVenPremier, vets[0], planning, vets, DEFAULT_EQUITY_WEIGHTS, undefined, 'premier',
     )
-    expect(scoreNeutre).not.toBe(scorePremier) // le malus existe bien quand un rôle est avantagé
-    expect(scoreNeutre - scorePremier).toBe(W) // et il vaut exactement W
+    expect(scoreNeutre - scorePremier).toBe(W)
   })
 
-  it('le défaut (param omis) == "premier" explicite', () => {
+  it('défaut (param omis) == "premier" explicite', () => {
     const omis = scorerCandidatLNS(
       stepVenPremier, vets[0], planning, vets, DEFAULT_EQUITY_WEIGHTS, undefined,
     )
@@ -102,7 +135,7 @@ describe('P4 slice 1 — le rôle à avantage financier est réglable (scorer)',
 })
 
 // ── End-to-end : la config traverse tout le moteur sans casser ──
-describe('P4 slice 1 — roleAvantageFinancier=null traverse le moteur (end-to-end)', () => {
+describe('P4 — roleAvantageFinancier=null traverse le moteur (end-to-end)', () => {
   const base: SolverInput = {
     dateDebut: '2026-01-05', // lundi
     dateFin: '2026-01-18', // 2 semaines
