@@ -12,6 +12,7 @@ import {
   Inbox,
   ScrollText,
   LifeBuoy,
+  Clock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -24,6 +25,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   Inbox,
   ScrollText,
   LifeBuoy,
+  Clock,
 }
 
 interface SidebarProps {

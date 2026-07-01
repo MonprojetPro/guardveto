@@ -167,5 +167,6 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Demandes',      href: '/admin/demandes',      icon: 'Inbox',        roles: ['admin'] },
   { label: 'Dépannages',    href: '/admin/depannages',    icon: 'LifeBuoy',     roles: ['admin'] },
   { label: 'Périodes',      href: '/admin/periodes',      icon: 'CalendarRange', roles: ['admin'] },
+  { label: 'Structure',     href: '/admin/structure',     icon: 'Clock',        roles: ['admin'] },
   { label: 'Vétérinaires',  href: '/admin/veterinaires',  icon: 'Users',        roles: ['admin'] },
 ]
