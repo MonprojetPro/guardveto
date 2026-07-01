@@ -77,7 +77,7 @@ function empreinte(planning: PlanningPartiel): string {
       .sort((a, b) =>
         a.date === b.date ? a.type.localeCompare(b.type) : a.date.localeCompare(b.date),
       )
-      .map((a) => `${a.date}|${a.type}|${a.premier_id ?? '-'}|${a.second_id ?? '-'}`),
+      .map((a) => `${a.date}|${a.type}|${a.placements.map((p) => p.vetId ?? '-').join('|')}`),
   )
 }
 
@@ -111,7 +111,7 @@ describe('Banc congés + fériés — faisabilité + 0 violation dure', () => {
     // Faits directs : Manon n'apparaît sur AUCUN créneau de son congé.
     const fautes = res.planning.attributions.filter(
       (a) =>
-        (a.premier_id === VET.manon || a.second_id === VET.manon) &&
+        a.placements.some((p) => p.vetId === VET.manon) &&
         a.date >= CONGE_MANON.date_debut &&
         a.date <= CONGE_MANON.date_fin,
     )
@@ -146,7 +146,7 @@ describe('Banc congés + fériés — faisabilité + 0 violation dure', () => {
     for (const [vetId, conge] of Object.entries(congesParVet)) {
       const fautes = res.planning.attributions.filter(
         (a) =>
-          (a.premier_id === vetId || a.second_id === vetId) &&
+          a.placements.some((p) => p.vetId === vetId) &&
           a.date >= conge.date_debut &&
           a.date <= conge.date_fin,
       )

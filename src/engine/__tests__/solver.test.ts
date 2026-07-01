@@ -7,6 +7,7 @@ import { scorerPlanning, comparerScores } from '../score-lexicographique'
 import { normaliserContraintesVets } from '../normaliserContraintes'
 import type { SolverInput } from '../solver'
 import type { VetEngine } from '../types'
+import { premierId, secondId } from '../attribution'
 
 // ── Fixtures minimalistes ────────────────────────────────
 
@@ -78,9 +79,9 @@ describe('genererPlanningPur — gate CI', () => {
 
     // Chaque attribution doit avoir au moins un véto
     for (const a of result.planning.attributions) {
-      expect(a.premier_id).not.toBeNull()
-      // second_id peut être null en été mais pas en hiver
-      expect(a.second_id).not.toBeNull()
+      expect(premierId(a)).not.toBeNull()
+      // le 2nd peut être null en été mais pas en hiver
+      expect(secondId(a)).not.toBeNull()
     }
 
     expect(result.dureeMs).toBeGreaterThan(0)
@@ -122,8 +123,8 @@ describe('genererPlanningPur — gate CI', () => {
 
     // vet-1 ne doit apparaître dans aucune attribution
     for (const a of result.planning.attributions) {
-      expect(a.premier_id).not.toBe('vet-1')
-      expect(a.second_id).not.toBe('vet-1')
+      expect(premierId(a)).not.toBe('vet-1')
+      expect(secondId(a)).not.toBe('vet-1')
     }
   })
 

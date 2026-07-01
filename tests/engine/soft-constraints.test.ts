@@ -32,7 +32,7 @@ describe('R10 — Pas 2 WE de garde de suite', () => {
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-05-02', type: 'weekend',
-        premier_id: JEAN.id, second_id: VICTOR.id,
+        placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }],
       }],
     }
     const score = penaliteR10WEConsecutif(
@@ -48,7 +48,7 @@ describe('R10 — Pas 2 WE de garde de suite', () => {
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-05-02', type: 'weekend',
-        premier_id: FANNY.id, second_id: VICTOR.id,
+        placements: [{ role: 'premier', vetId: FANNY.id }, { role: 'second', vetId: VICTOR.id }],
       }],
     }
     const score = penaliteR10WEConsecutif(
@@ -63,7 +63,7 @@ describe('R10 — Pas 2 WE de garde de suite', () => {
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-05-02', type: 'weekend',
-        premier_id: JEAN.id, second_id: VICTOR.id,
+        placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }],
       }],
     }
     const score = penaliteR10WEConsecutif(
@@ -78,7 +78,7 @@ describe('R10 — Pas 2 WE de garde de suite', () => {
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-05-02', type: 'weekend',
-        premier_id: JEAN.id, second_id: VICTOR.id,
+        placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }],
       }],
     }
     const score = penaliteR10WEConsecutif(
@@ -93,7 +93,7 @@ describe('R10 — Pas 2 WE de garde de suite', () => {
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-05-02', type: 'weekend',
-        premier_id: FANNY.id, second_id: JEAN.id,
+        placements: [{ role: 'premier', vetId: FANNY.id }, { role: 'second', vetId: JEAN.id }],
       }],
     }
     const score = penaliteR10WEConsecutif(
@@ -206,7 +206,7 @@ describe('R8b — Inversion rôle sur jours fériés (§7, si possible)', () => 
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-05-13', type: 'semaine_soir',
-        premier_id: JEAN.id, second_id: VICTOR.id,
+        placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }],
       }],
     }
     const score = penaliteInversionFerie(
@@ -220,7 +220,7 @@ describe('R8b — Inversion rôle sur jours fériés (§7, si possible)', () => 
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-05-13', type: 'semaine_soir',
-        premier_id: JEAN.id, second_id: VICTOR.id,
+        placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }],
       }],
     }
     const score = penaliteInversionFerie(
@@ -234,7 +234,7 @@ describe('R8b — Inversion rôle sur jours fériés (§7, si possible)', () => 
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-05-13', type: 'semaine_soir',
-        premier_id: JEAN.id, second_id: FANNY.id,
+        placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: FANNY.id }],
       }],
     }
     const score = penaliteInversionFerie(
@@ -256,7 +256,7 @@ describe('R8b — Inversion rôle sur jours fériés (§7, si possible)', () => 
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-05-11', type: 'semaine_soir',
-        premier_id: JEAN.id, second_id: VICTOR.id,
+        placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }],
       }],
     }
     // 12 mai 2026 = mardi ordinaire
@@ -271,7 +271,7 @@ describe('R8b — Inversion rôle sur jours fériés (§7, si possible)', () => 
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-05-13', type: 'semaine_soir',
-        premier_id: JEAN.id, second_id: VICTOR.id,
+        placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }],
       }],
     }
     const score = penaliteInversionFerie(
@@ -303,7 +303,7 @@ describe('penalite() — agrégation', () => {
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-05-02', type: 'weekend',
-        premier_id: MANON.id, second_id: VICTOR.id,
+        placements: [{ role: 'premier', vetId: MANON.id }, { role: 'second', vetId: VICTOR.id }],
       }],
     }
     expect(penalite(slot('2026-05-09', 'weekend'), MANON, 'premier', planning))
@@ -322,7 +322,7 @@ describe('penalite() — agrégation', () => {
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-12-23', type: 'semaine_soir',
-        premier_id: JEAN.id, second_id: VICTOR.id,
+        placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }],
       }],
     }
     const score = penalite(slot('2026-12-24', 'semaine_soir'), JEAN, 'premier', planning)

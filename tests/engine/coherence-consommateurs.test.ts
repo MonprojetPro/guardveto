@@ -18,6 +18,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { genererPlanningPur, type SolverInput } from '@/engine/solver'
+import { premierId, secondId } from '@/engine/attribution'
 import { validerPlanning } from '@/engine/validation/validerPlanning'
 import { proposerReparation } from '@/engine/crise/reparer'
 import type { VetEngine, PlanningPartiel } from '@/engine/types'
@@ -55,7 +56,7 @@ describe('Cohérence inter-consommateurs — règle rangée sous params (Fanny r
       absentId: 'v1', // c'est v1 qui s'absente → on cherche un remplaçant
       vets: TOUS,
       planningComplet: [
-        { date: MERCREDI, type: 'semaine_soir', premier_id: 'v1', second_id: null },
+        { date: MERCREDI, type: 'semaine_soir', placements: [{ role: 'premier', vetId: 'v1' }, { role: 'second', vetId: null }] },
       ],
     })
     // Fanny est en repos DUR le mercredi → exclue des candidats…
@@ -69,7 +70,7 @@ describe('Cohérence inter-consommateurs — règle rangée sous params (Fanny r
   it('validerPlanning signale Fanny si elle est de garde le mercredi (R1)', () => {
     const planning: PlanningPartiel = {
       attributions: [
-        { date: MERCREDI, type: 'semaine_soir', premier_id: 'fanny', second_id: null },
+        { date: MERCREDI, type: 'semaine_soir', placements: [{ role: 'premier', vetId: 'fanny' }, { role: 'second', vetId: null }] },
       ],
     }
     const violations = validerPlanning(planning, {
@@ -94,8 +95,8 @@ describe('Cohérence inter-consommateurs — règle rangée sous params (Fanny r
       (a) => a.date === MERCREDI && a.type === 'semaine_soir',
     )
     if (mercrediAttr) {
-      expect(mercrediAttr.premier_id).not.toBe('fanny')
-      expect(mercrediAttr.second_id).not.toBe('fanny')
+      expect(premierId(mercrediAttr)).not.toBe('fanny')
+      expect(secondId(mercrediAttr)).not.toBe('fanny')
     }
 
     // …et le validateur INDÉPENDANT ne trouve aucune violation R1 sur ce planning

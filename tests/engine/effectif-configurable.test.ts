@@ -9,6 +9,7 @@
 import { describe, it, expect } from 'vitest'
 import { isValid } from '@/engine/rules/hard-constraints'
 import { genererPlanningPur } from '@/engine/solver'
+import { premierId, secondId } from '@/engine/attribution'
 import { normaliserContraintesVets } from '@/engine/normaliserContraintes'
 import type { SlotGarde, PlanningPartiel, VetEngine, VetEngineNormalise } from '@/engine/types'
 
@@ -53,7 +54,7 @@ describe('Effectif configurable — génération de bout en bout', () => {
     if (!res.success) return
     const nuits = res.planning.attributions.filter((a) => a.type === 'semaine_soir')
     expect(nuits.length).toBeGreaterThan(0)
-    expect(nuits.every((a) => a.second_id === null)).toBe(true)
+    expect(nuits.every((a) => secondId(a) === null)).toBe(true)
   })
 
   it('été nbVetosSemaineSoir=2 → chaque nuit de semaine a un 2nd', () => {
@@ -62,6 +63,6 @@ describe('Effectif configurable — génération de bout en bout', () => {
     if (!res.success) return
     const nuits = res.planning.attributions.filter((a) => a.type === 'semaine_soir')
     expect(nuits.length).toBeGreaterThan(0)
-    expect(nuits.every((a) => a.premier_id !== null && a.second_id !== null)).toBe(true)
+    expect(nuits.every((a) => premierId(a) !== null && secondId(a) !== null)).toBe(true)
   })
 })

@@ -46,7 +46,7 @@ describe('proposerReparation — réparation ciblée d’UN créneau', () => {
       vet('C', 'Carla'),
     ]
     const planningComplet: AttributionGarde[] = [
-      { date: MARDI, type: 'semaine_soir', premier_id: 'A', second_id: null },
+      { date: MARDI, type: 'semaine_soir', placements: [{ role: 'premier', vetId: 'A' }, { role: 'second', vetId: null }] },
     ]
 
     const res = proposerReparation({
@@ -66,7 +66,7 @@ describe('proposerReparation — réparation ciblée d’UN créneau', () => {
   it('(b) exclut toujours l’absent des candidats', () => {
     const vets = [vet('A', 'Alice'), vet('C', 'Carla')]
     const planningComplet: AttributionGarde[] = [
-      { date: MARDI, type: 'semaine_soir', premier_id: 'A', second_id: null },
+      { date: MARDI, type: 'semaine_soir', placements: [{ role: 'premier', vetId: 'A' }, { role: 'second', vetId: null }] },
     ]
 
     const res = proposerReparation({
@@ -93,7 +93,7 @@ describe('proposerReparation — réparation ciblée d’UN créneau', () => {
       }),
     ]
     const planningComplet: AttributionGarde[] = [
-      { date: MARDI, type: 'semaine_soir', premier_id: 'A', second_id: null },
+      { date: MARDI, type: 'semaine_soir', placements: [{ role: 'premier', vetId: 'A' }, { role: 'second', vetId: null }] },
     ]
 
     const res = proposerReparation({
@@ -123,8 +123,8 @@ describe('proposerReparation — réparation ciblée d’UN créneau', () => {
     // simple substitution tant que R8/R9 sont fermes → meilleur=null + diagnostic.
     const vets = [vet('A', 'Alice'), vet('B', 'Bob'), vet('C', 'Carla')]
     const planningComplet: AttributionGarde[] = [
-      { date: VENDREDI, type: 'vendredi_soir', premier_id: 'A', second_id: 'B' },
-      { date: SAMEDI, type: 'weekend', premier_id: 'A', second_id: 'B' },
+      { date: VENDREDI, type: 'vendredi_soir', placements: [{ role: 'premier', vetId: 'A' }, { role: 'second', vetId: 'B' }] },
+      { date: SAMEDI, type: 'weekend', placements: [{ role: 'premier', vetId: 'A' }, { role: 'second', vetId: 'B' }] },
     ]
 
     const res = proposerReparation({
@@ -146,8 +146,8 @@ describe('proposerReparation — réparation ciblée d’UN créneau', () => {
   it('(d-bis) avec R8/R9 désactivées, le candidat hors-duo redevient légal', () => {
     const vets = [vet('A', 'Alice'), vet('B', 'Bob'), vet('C', 'Carla')]
     const planningComplet: AttributionGarde[] = [
-      { date: VENDREDI, type: 'vendredi_soir', premier_id: 'A', second_id: 'B' },
-      { date: SAMEDI, type: 'weekend', premier_id: 'A', second_id: 'B' },
+      { date: VENDREDI, type: 'vendredi_soir', placements: [{ role: 'premier', vetId: 'A' }, { role: 'second', vetId: 'B' }] },
+      { date: SAMEDI, type: 'weekend', placements: [{ role: 'premier', vetId: 'A' }, { role: 'second', vetId: 'B' }] },
     ]
 
     const res = proposerReparation({

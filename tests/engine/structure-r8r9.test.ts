@@ -38,7 +38,7 @@ const VEN = vendrediDeSemaine(SAM)
 
 // Vendredi soir = duo {A,B} (A=1er, B=2nd).
 const planningVenAB: PlanningPartiel = {
-  attributions: [{ date: VEN, type: 'vendredi_soir', premier_id: 'A', second_id: 'B' }],
+  attributions: [{ date: VEN, type: 'vendredi_soir', placements: [{ role: 'premier', vetId: 'A' }, { role: 'second', vetId: 'B' }] }],
 }
 const weekendSlot: SlotGarde = { date: SAM, type: 'weekend', saison: 'hiver', besoinSecond: true }
 
@@ -99,8 +99,8 @@ describe('validerPlanning — R8/R9 selon la config (anti-fantôme)', () => {
   // Planning DÉCOUPLÉ : vendredi {A,B}, week-end {C,D}.
   const planningDecouple: PlanningPartiel = {
     attributions: [
-      { date: VEN, type: 'vendredi_soir', premier_id: 'A', second_id: 'B' },
-      { date: SAM, type: 'weekend', premier_id: 'C', second_id: 'D' },
+      { date: VEN, type: 'vendredi_soir', placements: [{ role: 'premier', vetId: 'A' }, { role: 'second', vetId: 'B' }] },
+      { date: SAM, type: 'weekend', placements: [{ role: 'premier', vetId: 'C' }, { role: 'second', vetId: 'D' }] },
     ],
   }
   const input = {
@@ -125,8 +125,8 @@ describe('validerPlanning — R8/R9 selon la config (anti-fantôme)', () => {
 describe('scorerPlanning — R9 souple pénalise sans casser la validité', () => {
   const planningDecouple: PlanningPartiel = {
     attributions: [
-      { date: VEN, type: 'vendredi_soir', premier_id: 'A', second_id: 'B' },
-      { date: SAM, type: 'weekend', premier_id: 'C', second_id: 'D' },
+      { date: VEN, type: 'vendredi_soir', placements: [{ role: 'premier', vetId: 'A' }, { role: 'second', vetId: 'B' }] },
+      { date: SAM, type: 'weekend', placements: [{ role: 'premier', vetId: 'C' }, { role: 'second', vetId: 'D' }] },
     ],
   }
 

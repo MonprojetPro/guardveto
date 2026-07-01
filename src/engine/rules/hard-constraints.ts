@@ -14,6 +14,7 @@ import {
   DEFAULT_STRUCTURE_CONFIG, estStructureDure,
   type StructureConfig, type StructureRegleConfig,
 } from '../structure-config'
+import { estAttribue, vetPourRole } from '../attribution'
 
 // ── Helpers internes ────────────────────────────────────
 
@@ -84,11 +85,11 @@ export function aGardeWeekendCetteSemaine(
   }
   // Vérifie la garde weekend (samedi)
   const aWE = getAttribution(planning, sam, 'weekend')
-  if (aWE?.premier_id === vetId || aWE?.second_id === vetId) return true
+  if (aWE && estAttribue(aWE, vetId)) return true
   // Vérifie aussi vendredi_soir (lié au même WE par R9)
   const ven = addDays(sam, -1)
   const aVen = getAttribution(planning, ven, 'vendredi_soir')
-  return aVen?.premier_id === vetId || aVen?.second_id === vetId
+  return !!aVen && estAttribue(aVen, vetId)
 }
 
 /** Vérifie si le véto est déjà de garde vendredi soir cette semaine */
@@ -99,7 +100,7 @@ function aGardeVendrediSoir(
 ): boolean {
   const ven = vendrediDeSemaine(date)
   const a = getAttribution(planning, ven, 'vendredi_soir')
-  return a?.premier_id === vetId || a?.second_id === vetId
+  return !!a && estAttribue(a, vetId)
 }
 
 /**
@@ -302,7 +303,7 @@ function violeDuoInterdit(
   if (!attr) return null
 
   for (const autreId of autresIds) {
-    if (attr.premier_id === autreId || attr.second_id === autreId) return autreId
+    if (estAttribue(attr, autreId)) return autreId
   }
   return null
 }
@@ -357,8 +358,8 @@ function checkR8Inversion(
   const attrVen = getAttribution(planning, ven, 'vendredi_soir')
   if (!attrVen) return ok()
 
-  const etait1erVen = attrVen.premier_id === vet.id
-  const etait2ndVen = attrVen.second_id === vet.id
+  const etait1erVen = vetPourRole(attrVen, 'premier') === vet.id
+  const etait2ndVen = vetPourRole(attrVen, 'second') === vet.id
 
   // Inversion : 1er vendredi → 2nd WE / 2nd vendredi → 1er WE
   if (etait1erVen && roleVisé === 'premier') {
@@ -390,7 +391,7 @@ function checkR9VendrediLieWE(
     if (!attrVen) return ok() // vendredi pas encore planifié → ok
 
     // Le véto doit être dans le duo du vendredi soir
-    const dansVendredi = attrVen.premier_id === vet.id || attrVen.second_id === vet.id
+    const dansVendredi = estAttribue(attrVen, vet.id)
     if (!dansVendredi) {
       return invalid(
         `R9 : ${vet.prenom} n'est pas dans le duo du vendredi soir — le WE doit avoir les mêmes vétérinaires`
@@ -404,7 +405,7 @@ function checkR9VendrediLieWE(
     const attrWe = getAttribution(planning, sam, 'weekend')
     if (!attrWe) return ok()
 
-    const dansWe = attrWe.premier_id === vet.id || attrWe.second_id === vet.id
+    const dansWe = estAttribue(attrWe, vet.id)
     if (!dansWe) {
       return invalid(
         `R9 : ${vet.prenom} n'est pas dans le duo WE — le vendredi soir doit avoir les mêmes vétérinaires`
@@ -456,7 +457,7 @@ function checkR18Hiver(slot: SlotGarde, roleVisé: 'premier' | 'second', plannin
 
   const attr = getAttribution(planning, slot.date, slot.type)
   // Si on assigne le 2nd mais qu'il n'y a pas de 1er → invalide
-  if (roleVisé === 'second' && attr && !attr.premier_id) {
+  if (roleVisé === 'second' && attr && !vetPourRole(attr, 'premier')) {
     return invalid('R18 : En hiver, le 1er de garde doit être désigné avant le 2nd')
   }
   return ok()
@@ -470,7 +471,7 @@ function checkR19Weekend(slot: SlotGarde, roleVisé: 'premier' | 'second', plann
   if (slot.type !== 'weekend') return ok()
 
   const attr = getAttribution(planning, slot.date, slot.type)
-  if (roleVisé === 'second' && attr && !attr.premier_id) {
+  if (roleVisé === 'second' && attr && !vetPourRole(attr, 'premier')) {
     return invalid('R19 : Le 1er de garde WE doit être désigné avant le 2nd')
   }
   return ok()
@@ -494,10 +495,10 @@ function checkR21RolesDistincts(
   const attr = getAttribution(planning, slot.date, slot.type)
   if (!attr) return ok()
 
-  if (roleVisé === 'second' && attr.premier_id === vet.id) {
+  if (roleVisé === 'second' && vetPourRole(attr, 'premier') === vet.id) {
     return invalid(`R21 : ${vet.prenom} est déjà 1er de garde ce créneau — le 1er et le 2nd doivent être deux vétérinaires différents`)
   }
-  if (roleVisé === 'premier' && attr.second_id === vet.id) {
+  if (roleVisé === 'premier' && vetPourRole(attr, 'second') === vet.id) {
     return invalid(`R21 : ${vet.prenom} est déjà 2nd de garde ce créneau — le 1er et le 2nd doivent être deux vétérinaires différents`)
   }
   return ok()
@@ -542,7 +543,7 @@ function compterGardesFenetre(
   for (const a of planning.attributions) {
     if (a.date < debut || a.date > fin) continue
     if (creneaux && !creneaux.includes(a.type)) continue
-    if (a.premier_id === vetId || a.second_id === vetId) n++
+    if (estAttribue(a, vetId)) n++
   }
   return n
 }
@@ -605,7 +606,7 @@ function violeEspacementMin(
   const ecart = typeof eRaw === 'number' ? eRaw : typeof eRaw === 'string' ? parseInt(eRaw, 10) : NaN
   if (!Number.isFinite(ecart) || ecart <= 0) return false // inerte si mal configurée
   for (const a of planning.attributions) {
-    if (a.premier_id !== vetId && a.second_id !== vetId) continue
+    if (!estAttribue(a, vetId)) continue
     if (a.date === slot.date) continue // même jour : géré ailleurs (R21/effectif)
     if (joursEntreDates(a.date, slot.date) < ecart) return true
   }
@@ -641,7 +642,7 @@ function violeEspacementWeekend(
   const seuil = n * 7
   for (const a of planning.attributions) {
     if (a.type !== 'weekend') continue
-    if (a.premier_id !== vetId && a.second_id !== vetId) continue
+    if (!estAttribue(a, vetId)) continue
     if (a.date === slot.date) continue
     if (joursEntreDates(a.date, slot.date) < seuil) return true
   }

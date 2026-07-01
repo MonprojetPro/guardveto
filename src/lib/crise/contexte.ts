@@ -112,8 +112,10 @@ function gardesToPlanningComplet(gardes: GardeRow[]): AttributionGarde[] {
   return gardes.map((g): AttributionGarde => ({
     date: g.date,
     type: mapDbTypeToEngine(g.type),
-    premier_id: g.premier_id,
-    second_id: g.second_id,
+    placements: [
+      { role: 'premier', vetId: g.premier_id },
+      { role: 'second', vetId: g.second_id },
+    ],
   }))
 }
 

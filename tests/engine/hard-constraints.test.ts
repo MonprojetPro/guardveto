@@ -133,7 +133,7 @@ describe('R3/R5 — Repos conditionnel', () => {
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-05-02', type: 'weekend',
-        premier_id: JEAN.id, second_id: VICTOR.id,
+        placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }],
       }],
     }
     const result = isValid(slot('2026-05-01', 'semaine_soir'), JEAN, 'premier', ALL_VETS, planning)
@@ -144,7 +144,7 @@ describe('R3/R5 — Repos conditionnel', () => {
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-04-25', type: 'weekend',
-        premier_id: JEAN.id, second_id: VICTOR.id,
+        placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }],
       }],
     }
     const result = isValid(slot('2026-04-28', 'semaine_soir'), JEAN, 'premier', ALL_VETS, planning)
@@ -156,7 +156,7 @@ describe('R3/R5 — Repos conditionnel', () => {
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-04-25', type: 'weekend',
-        premier_id: MANON.id, second_id: VICTOR.id,
+        placements: [{ role: 'premier', vetId: MANON.id }, { role: 'second', vetId: VICTOR.id }],
       }],
     }
     const result = isValid(slot('2026-04-23', 'semaine_soir'), MANON, 'premier', ALL_VETS, planning)
@@ -194,7 +194,7 @@ describe('R3/R5 — Repos conditionnel', () => {
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-05-08', type: 'vendredi_soir',
-        premier_id: VICTOR.id, second_id: FANNY.id,
+        placements: [{ role: 'premier', vetId: VICTOR.id }, { role: 'second', vetId: FANNY.id }],
       }],
     }
     const result = isValid(slot('2026-05-07', 'semaine_soir'), VICTOR, 'premier', ALL_VETS, planning)
@@ -210,7 +210,7 @@ describe('R6 — Duo interdit', () => {
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-04-25', type: 'weekend',
-        premier_id: MANON.id, second_id: null,
+        placements: [{ role: 'premier', vetId: MANON.id }, { role: 'second', vetId: null }],
       }],
     }
     const result = isValid(slot('2026-04-25', 'weekend'), ANTOINE, 'second', ALL_VETS, planning)
@@ -222,7 +222,7 @@ describe('R6 — Duo interdit', () => {
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-04-25', type: 'weekend',
-        premier_id: VICTOR.id, second_id: null,
+        placements: [{ role: 'premier', vetId: VICTOR.id }, { role: 'second', vetId: null }],
       }],
     }
     const result = isValid(slot('2026-04-25', 'weekend'), ANTOINE, 'second', ALL_VETS, planning)
@@ -233,7 +233,7 @@ describe('R6 — Duo interdit', () => {
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-04-25', type: 'weekend',
-        premier_id: VICTOR.id, second_id: null,
+        placements: [{ role: 'premier', vetId: VICTOR.id }, { role: 'second', vetId: null }],
       }],
     }
     const result = isValid(slot('2026-04-25', 'weekend'), MANON, 'second', ALL_VETS, planning)
@@ -263,7 +263,7 @@ describe('R8 — Inversion vendredi soir / WE', () => {
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-05-01', type: 'vendredi_soir',
-        premier_id: JEAN.id, second_id: VICTOR.id,
+        placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }],
       }],
     }
     const result = isValid(slot('2026-05-02', 'weekend'), JEAN, 'premier', ALL_VETS, planning)
@@ -275,7 +275,7 @@ describe('R8 — Inversion vendredi soir / WE', () => {
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-05-01', type: 'vendredi_soir',
-        premier_id: JEAN.id, second_id: VICTOR.id,
+        placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }],
       }],
     }
     const result = isValid(slot('2026-05-02', 'weekend'), JEAN, 'second', ALL_VETS, planning)
@@ -290,7 +290,7 @@ describe('R9 — Vendredi soir lié au WE', () => {
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-05-01', type: 'vendredi_soir',
-        premier_id: JEAN.id, second_id: FANNY.id,
+        placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: FANNY.id }],
       }],
     }
     const result = isValid(slot('2026-05-02', 'weekend'), VICTOR, 'premier', ALL_VETS, planning)
@@ -302,7 +302,7 @@ describe('R9 — Vendredi soir lié au WE', () => {
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-05-01', type: 'vendredi_soir',
-        premier_id: JEAN.id, second_id: FANNY.id,
+        placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: FANNY.id }],
       }],
     }
     const result = isValid(slot('2026-05-02', 'weekend'), JEAN, 'second', ALL_VETS, planning)
@@ -317,7 +317,7 @@ describe('R19 — WE toujours 2 de garde', () => {
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-04-25', type: 'weekend',
-        premier_id: null, second_id: null,
+        placements: [{ role: 'premier', vetId: null }, { role: 'second', vetId: null }],
       }],
     }
     const result = isValid(slot('2026-04-25', 'weekend'), VICTOR, 'second', ALL_VETS, planning)

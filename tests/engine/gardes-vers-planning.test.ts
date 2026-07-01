@@ -36,9 +36,15 @@ describe('gardesVersPlanningPartiel — reconstruction fidèle (Chantier B)', ()
     const we = attributions.find((a) => a.type === 'weekend')
     const ven = attributions.find((a) => a.type === 'vendredi_soir')
 
-    expect(we).toEqual({ date: SAM, type: 'weekend', premier_id: 'A', second_id: 'B' })
+    expect(we).toEqual({
+      date: SAM, type: 'weekend',
+      placements: [{ role: 'premier', vetId: 'A' }, { role: 'second', vetId: 'B' }],
+    })
     // R8 : le 1er du WE (A) devient 2nd le vendredi ; le 2nd (B) devient 1er.
-    expect(ven).toEqual({ date: VEN, type: 'vendredi_soir', premier_id: 'B', second_id: 'A' })
+    expect(ven).toEqual({
+      date: VEN, type: 'vendredi_soir',
+      placements: [{ role: 'premier', vetId: 'B' }, { role: 'second', vetId: 'A' }],
+    })
   })
 
   it('une garde semaine → semaine_soir (rôles natifs), pas de vendredi synthétisé', () => {
@@ -47,7 +53,10 @@ describe('gardesVersPlanningPartiel — reconstruction fidèle (Chantier B)', ()
     ]
     const { attributions } = gardesVersPlanningPartiel(gardes)
     expect(attributions).toEqual([
-      { date: '2026-01-06', type: 'semaine_soir', premier_id: 'A', second_id: 'B' },
+      {
+        date: '2026-01-06', type: 'semaine_soir',
+        placements: [{ role: 'premier', vetId: 'A' }, { role: 'second', vetId: 'B' }],
+      },
     ])
   })
 

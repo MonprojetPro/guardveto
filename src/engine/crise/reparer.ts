@@ -31,6 +31,7 @@ import type {
   CalendrierResolu,
 } from '../types'
 import { isValid, aGardeWeekendCetteSemaine } from '../rules/hard-constraints'
+import { avecVet, clonerAttribution } from '../attribution'
 import { normaliserContraintesVets } from '../normaliserContraintes'
 import { scorerCandidatLNS, type SolverStep } from '../solver'
 import { DEFAULT_EQUITY_WEIGHTS, type EquityWeights } from '../equity-weights'
@@ -118,14 +119,14 @@ function construirePlanningPartiel(
   planningComplet: AttributionGarde[],
   creneau: CreneauCrise,
 ): PlanningPartiel {
-  const champ = creneau.role === 'premier' ? 'premier_id' : 'second_id'
   return {
     attributions: planningComplet.map((a): AttributionGarde => {
       if (a.date === creneau.date && a.type === creneau.type) {
-        return { ...a, [champ]: null }
+        // Vide UNIQUEMENT la place du rôle libéré (le binôme reste en place).
+        return avecVet(a, creneau.role, null)
       }
       // Copie défensive (immutabilité) — l'appelant garde son objet intact.
-      return { ...a }
+      return clonerAttribution(a)
     }),
   }
 }

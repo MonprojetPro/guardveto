@@ -47,23 +47,29 @@ export function gardesVersPlanningPartiel(gardes: GardeRow[]): PlanningPartiel {
       attributions.push({
         date: g.date,
         type: 'weekend',
-        premier_id: g.premier_id,
-        second_id: g.second_id,
+        placements: [
+          { role: 'premier', vetId: g.premier_id },
+          { role: 'second', vetId: g.second_id },
+        ],
       })
       // Vendredi soir = veille, rôles inversés (cf. vue 014).
       attributions.push({
         date: moinsJours(g.date, 1),
         type: 'vendredi_soir',
-        premier_id: g.second_id, // 2nd du WE → 1er le vendredi
-        second_id: g.premier_id, // 1er du WE → 2nd le vendredi
+        placements: [
+          { role: 'premier', vetId: g.second_id }, // 2nd du WE → 1er le vendredi
+          { role: 'second', vetId: g.premier_id }, // 1er du WE → 2nd le vendredi
+        ],
       })
     } else {
       // 'semaine' et 'ferie' (férié en semaine) → garde de nuit en semaine.
       attributions.push({
         date: g.date,
         type: 'semaine_soir',
-        premier_id: g.premier_id,
-        second_id: g.second_id,
+        placements: [
+          { role: 'premier', vetId: g.premier_id },
+          { role: 'second', vetId: g.second_id },
+        ],
       })
     }
   }

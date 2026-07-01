@@ -33,6 +33,7 @@ import type {
   CalendrierResolu,
 } from './types'
 import { jourIndex, addDays, estJourFerie, lundiDeSemaine } from './utils'
+import { attributionVide, avecVet, clonerAttribution } from './attribution'
 import { typeGardePourJour, effectifSemaineParDefaut } from './structure-creneaux'
 import { typeGardePourJourCatalogue, type CreneauModele } from './creneau-modele'
 import { normaliserContraintesVets } from './normaliserContraintes'
@@ -330,17 +331,10 @@ function assignerStep(
   )
 
   if (idx >= 0) {
-    attributions[idx] = {
-      ...attributions[idx],
-      [step.role === 'premier' ? 'premier_id' : 'second_id']: vetId,
-    }
+    attributions[idx] = avecVet(attributions[idx], step.role, vetId)
   } else {
-    attributions.push({
-      date: step.date,
-      type: step.type,
-      premier_id: step.role === 'premier' ? vetId : null,
-      second_id: step.role === 'second' ? vetId : null,
-    })
+    // Défaut 2 places [premier, second] → miroir exact de l'ancien objet à 2 champs.
+    attributions.push(avecVet(attributionVide(step.date, step.type), step.role, vetId))
   }
 
   return { attributions }
@@ -397,7 +391,7 @@ function backtrack(
   if (candidates.length === 0 && blocage.value === null) {
     blocage.value = {
       step,
-      planning: { attributions: planning.attributions.map((a) => ({ ...a })) },
+      planning: { attributions: planning.attributions.map(clonerAttribution) },
     }
   }
 
@@ -634,18 +628,9 @@ function repairerSemaine(
       (a) => a.date === step.date && a.type === step.type
     )
     if (idx >= 0) {
-      attributions[idx] = {
-        ...attributions[idx],
-        [step.role === 'premier' ? 'premier_id' : 'second_id']: sorted[0].id,
-      }
+      attributions[idx] = avecVet(attributions[idx], step.role, sorted[0].id)
     } else {
-      const nouv: AttributionGarde = {
-        date: step.date,
-        type: step.type,
-        premier_id: step.role === 'premier' ? sorted[0].id : null,
-        second_id: step.role === 'second' ? sorted[0].id : null,
-      }
-      attributions.push(nouv)
+      attributions.push(avecVet(attributionVide(step.date, step.type), step.role, sorted[0].id))
     }
     planning = { attributions }
   }

@@ -7,6 +7,7 @@
 
 import type { PlanningPartiel, VetEngine, AttributionGarde } from '../types'
 import { estJourFerie } from '../utils'
+import { estAttribue, vetPourRole } from '../attribution'
 
 // ── Types ────────────────────────────────────────────────
 
@@ -34,21 +35,21 @@ export interface CompteurVet {
 // ── Helpers internes ─────────────────────────────────────
 
 function estWEGarde(attr: AttributionGarde, vetId: string): boolean {
-  return attr.type === 'weekend' && (attr.premier_id === vetId || attr.second_id === vetId)
+  return attr.type === 'weekend' && estAttribue(attr, vetId)
 }
 
 function estFerieGarde(attr: AttributionGarde, vetId: string): boolean {
-  return estJourFerie(attr.date) && (attr.premier_id === vetId || attr.second_id === vetId)
+  return estJourFerie(attr.date) && estAttribue(attr, vetId)
 }
 
 function estSemainePremier(attr: AttributionGarde, vetId: string): boolean {
   return (attr.type === 'semaine_soir' || attr.type === 'vendredi_soir') &&
-    attr.premier_id === vetId
+    vetPourRole(attr, 'premier') === vetId
 }
 
 function estSemaineSecond(attr: AttributionGarde, vetId: string): boolean {
   return (attr.type === 'semaine_soir' || attr.type === 'vendredi_soir') &&
-    attr.second_id === vetId
+    vetPourRole(attr, 'second') === vetId
 }
 
 // ── Compteurs ────────────────────────────────────────────
@@ -82,7 +83,7 @@ export function compterParVet(
         if (vet.statut === 'salarie') compteur.grandsWePerdus++
       }
       // R11b : être 1er le week-end (rôle à avantage financier)
-      if (attr.type === 'weekend' && attr.premier_id === vet.id) {
+      if (attr.type === 'weekend' && vetPourRole(attr, 'premier') === vet.id) {
         compteur.weekendPremier++
       }
       if (estFerieGarde(attr, vet.id)) compteur.feriesGardes++

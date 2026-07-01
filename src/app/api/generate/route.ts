@@ -21,6 +21,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { genererPlanningPur } from '@/engine/solver'
+import { premierId, secondId } from '@/engine/attribution'
 import { estJourFerie } from '@/engine/utils'
 import { supprimerEvenementsCalendrier } from '@/lib/sync-calendrier'
 import { resoudreContexte } from '@/data/resoudreContexte'
@@ -232,8 +233,8 @@ export async function POST(req: NextRequest) {
       cabinet_id: cabinetId,
       date: a.date,
       type: mapTypeGardeEnDb(a.type, a.date),
-      premier_id: a.premier_id,
-      second_id: a.second_id,
+      premier_id: premierId(a),
+      second_id: secondId(a),
       verrouille: false,
       modifie_manuellement: false,
     }))

@@ -68,9 +68,9 @@ describe('compterParVet — compteurs de base', () => {
   it('R11 — compte les WE de garde correctement', () => {
     const planning: PlanningPartiel = {
       attributions: [
-        { date: '2026-05-02', type: 'weekend', premier_id: JEAN.id, second_id: VICTOR.id },
-        { date: '2026-05-09', type: 'weekend', premier_id: JEAN.id, second_id: FANNY.id },
-        { date: '2026-05-16', type: 'weekend', premier_id: MANON.id, second_id: VICTOR.id },
+        { date: '2026-05-02', type: 'weekend', placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }] },
+        { date: '2026-05-09', type: 'weekend', placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: FANNY.id }] },
+        { date: '2026-05-16', type: 'weekend', placements: [{ role: 'premier', vetId: MANON.id }, { role: 'second', vetId: VICTOR.id }] },
       ],
     }
     const compteurs = compterParVet(planning, ALL_VETS)
@@ -88,9 +88,9 @@ describe('compterParVet — compteurs de base', () => {
   it('R11b — compte les week-ends en 1er (rôle à avantage financier)', () => {
     const planning: PlanningPartiel = {
       attributions: [
-        { date: '2026-05-02', type: 'weekend', premier_id: JEAN.id, second_id: VICTOR.id },
-        { date: '2026-05-09', type: 'weekend', premier_id: JEAN.id, second_id: FANNY.id },
-        { date: '2026-05-16', type: 'weekend', premier_id: MANON.id, second_id: VICTOR.id },
+        { date: '2026-05-02', type: 'weekend', placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }] },
+        { date: '2026-05-09', type: 'weekend', placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: FANNY.id }] },
+        { date: '2026-05-16', type: 'weekend', placements: [{ role: 'premier', vetId: MANON.id }, { role: 'second', vetId: VICTOR.id }] },
       ],
     }
     const compteurs = compterParVet(planning, ALL_VETS)
@@ -107,8 +107,8 @@ describe('compterParVet — compteurs de base', () => {
     // 2026-05-01 = 1er mai (férié fixe)
     const planning: PlanningPartiel = {
       attributions: [
-        { date: '2026-05-01', type: 'semaine_soir', premier_id: JEAN.id, second_id: VICTOR.id },
-        { date: '2026-05-08', type: 'semaine_soir', premier_id: FANNY.id, second_id: MANON.id },
+        { date: '2026-05-01', type: 'semaine_soir', placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }] },
+        { date: '2026-05-08', type: 'semaine_soir', placements: [{ role: 'premier', vetId: FANNY.id }, { role: 'second', vetId: MANON.id }] },
       ],
     }
     const compteurs = compterParVet(planning, ALL_VETS)
@@ -124,9 +124,9 @@ describe('compterParVet — compteurs de base', () => {
   it('R13 — compte les gardes de semaine en 1er', () => {
     const planning: PlanningPartiel = {
       attributions: [
-        { date: '2026-04-20', type: 'semaine_soir', premier_id: JEAN.id, second_id: VICTOR.id },
-        { date: '2026-04-21', type: 'semaine_soir', premier_id: JEAN.id, second_id: FANNY.id },
-        { date: '2026-04-22', type: 'semaine_soir', premier_id: VICTOR.id, second_id: MANON.id },
+        { date: '2026-04-20', type: 'semaine_soir', placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }] },
+        { date: '2026-04-21', type: 'semaine_soir', placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: FANNY.id }] },
+        { date: '2026-04-22', type: 'semaine_soir', placements: [{ role: 'premier', vetId: VICTOR.id }, { role: 'second', vetId: MANON.id }] },
       ],
     }
     const compteurs = compterParVet(planning, ALL_VETS)
@@ -140,8 +140,8 @@ describe('compterParVet — compteurs de base', () => {
   it('R14 — compte les gardes de semaine en 2nd', () => {
     const planning: PlanningPartiel = {
       attributions: [
-        { date: '2026-04-20', type: 'semaine_soir', premier_id: JEAN.id, second_id: VICTOR.id },
-        { date: '2026-04-21', type: 'semaine_soir', premier_id: FANNY.id, second_id: VICTOR.id },
+        { date: '2026-04-20', type: 'semaine_soir', placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }] },
+        { date: '2026-04-21', type: 'semaine_soir', placements: [{ role: 'premier', vetId: FANNY.id }, { role: 'second', vetId: VICTOR.id }] },
       ],
     }
     const compteurs = compterParVet(planning, ALL_VETS)
@@ -155,9 +155,9 @@ describe('compterParVet — compteurs de base', () => {
   it('R15 — compte les grands WE perdus pour les salariés uniquement', () => {
     const planning: PlanningPartiel = {
       attributions: [
-        { date: '2026-05-02', type: 'weekend', premier_id: MANON.id, second_id: VICTOR.id },
-        { date: '2026-05-09', type: 'weekend', premier_id: ANTOINE.id, second_id: FANNY.id },
-        { date: '2026-05-16', type: 'weekend', premier_id: VICTOR.id, second_id: MANON.id },
+        { date: '2026-05-02', type: 'weekend', placements: [{ role: 'premier', vetId: MANON.id }, { role: 'second', vetId: VICTOR.id }] },
+        { date: '2026-05-09', type: 'weekend', placements: [{ role: 'premier', vetId: ANTOINE.id }, { role: 'second', vetId: FANNY.id }] },
+        { date: '2026-05-16', type: 'weekend', placements: [{ role: 'premier', vetId: VICTOR.id }, { role: 'second', vetId: MANON.id }] },
       ],
     }
     const compteurs = compterParVet(planning, ALL_VETS)
@@ -179,10 +179,10 @@ describe('R11 — desequilibreWE', () => {
   it('= 0 si tous les vétos ont le même nombre de WE', () => {
     const compteurs = compterParVet({
       attributions: [
-        { date: '2026-05-02', type: 'weekend', premier_id: JEAN.id, second_id: FANNY.id },
-        { date: '2026-05-09', type: 'weekend', premier_id: VICTOR.id, second_id: MANON.id },
-        { date: '2026-05-16', type: 'weekend', premier_id: ANTOINE.id, second_id: ANNE_SOPHIE.id },
-        { date: '2026-05-23', type: 'weekend', premier_id: ANNE_CAT.id, second_id: JEAN.id },
+        { date: '2026-05-02', type: 'weekend', placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: FANNY.id }] },
+        { date: '2026-05-09', type: 'weekend', placements: [{ role: 'premier', vetId: VICTOR.id }, { role: 'second', vetId: MANON.id }] },
+        { date: '2026-05-16', type: 'weekend', placements: [{ role: 'premier', vetId: ANTOINE.id }, { role: 'second', vetId: ANNE_SOPHIE.id }] },
+        { date: '2026-05-23', type: 'weekend', placements: [{ role: 'premier', vetId: ANNE_CAT.id }, { role: 'second', vetId: JEAN.id }] },
       ],
     }, ALL_VETS)
     // JEAN = 2, FANNY = 1, VICTOR = 1, MANON = 1, ANTOINE = 1, ANNE_SOPHIE = 1, ANNE_CAT = 1
@@ -193,9 +193,9 @@ describe('R11 — desequilibreWE', () => {
   it('> 0 si les WE sont inégalement répartis', () => {
     const compteurs = compterParVet({
       attributions: [
-        { date: '2026-05-02', type: 'weekend', premier_id: JEAN.id, second_id: JEAN.id },
-        { date: '2026-05-09', type: 'weekend', premier_id: JEAN.id, second_id: JEAN.id },
-        { date: '2026-05-16', type: 'weekend', premier_id: JEAN.id, second_id: JEAN.id },
+        { date: '2026-05-02', type: 'weekend', placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: JEAN.id }] },
+        { date: '2026-05-09', type: 'weekend', placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: JEAN.id }] },
+        { date: '2026-05-16', type: 'weekend', placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: JEAN.id }] },
       ],
     }, ALL_VETS)
     // Jean a 3 WE, les autres 0
@@ -207,10 +207,10 @@ describe('R15 — desequilibreGrandsWeSalaries', () => {
   it('= 0 si les 3 salariés ont le même nombre de WE perdus', () => {
     const planning: PlanningPartiel = {
       attributions: [
-        { date: '2026-05-02', type: 'weekend', premier_id: MANON.id, second_id: ANTOINE.id },
-        { date: '2026-05-09', type: 'weekend', premier_id: VICTOR.id, second_id: JEAN.id },
-        { date: '2026-05-16', type: 'weekend', premier_id: MANON.id, second_id: ANTOINE.id },
-        { date: '2026-05-23', type: 'weekend', premier_id: VICTOR.id, second_id: FANNY.id },
+        { date: '2026-05-02', type: 'weekend', placements: [{ role: 'premier', vetId: MANON.id }, { role: 'second', vetId: ANTOINE.id }] },
+        { date: '2026-05-09', type: 'weekend', placements: [{ role: 'premier', vetId: VICTOR.id }, { role: 'second', vetId: JEAN.id }] },
+        { date: '2026-05-16', type: 'weekend', placements: [{ role: 'premier', vetId: MANON.id }, { role: 'second', vetId: ANTOINE.id }] },
+        { date: '2026-05-23', type: 'weekend', placements: [{ role: 'premier', vetId: VICTOR.id }, { role: 'second', vetId: FANNY.id }] },
       ],
     }
     // Manon=2, Antoine=2, Victor=2 → variance=0
@@ -221,9 +221,9 @@ describe('R15 — desequilibreGrandsWeSalaries', () => {
   it('> 0 si un salarié a plus de WE perdus que les autres', () => {
     const planning: PlanningPartiel = {
       attributions: [
-        { date: '2026-05-02', type: 'weekend', premier_id: MANON.id, second_id: VICTOR.id },
-        { date: '2026-05-09', type: 'weekend', premier_id: MANON.id, second_id: VICTOR.id },
-        { date: '2026-05-16', type: 'weekend', premier_id: MANON.id, second_id: VICTOR.id },
+        { date: '2026-05-02', type: 'weekend', placements: [{ role: 'premier', vetId: MANON.id }, { role: 'second', vetId: VICTOR.id }] },
+        { date: '2026-05-09', type: 'weekend', placements: [{ role: 'premier', vetId: MANON.id }, { role: 'second', vetId: VICTOR.id }] },
+        { date: '2026-05-16', type: 'weekend', placements: [{ role: 'premier', vetId: MANON.id }, { role: 'second', vetId: VICTOR.id }] },
         // ANTOINE n'a aucun WE
       ],
     }
@@ -251,19 +251,19 @@ describe('Équité (V2) — étage EQUITE de scorerPlanning', () => {
     // Planning équilibré : 1 WE chacun pour Jean, Fanny, Victor, Manon…
     const planningEquilibre: PlanningPartiel = {
       attributions: [
-        { date: '2026-05-02', type: 'weekend', premier_id: JEAN.id, second_id: VICTOR.id },
-        { date: '2026-05-09', type: 'weekend', premier_id: FANNY.id, second_id: MANON.id },
-        { date: '2026-05-16', type: 'weekend', premier_id: ANTOINE.id, second_id: ANNE_SOPHIE.id },
-        { date: '2026-05-23', type: 'weekend', premier_id: ANNE_CAT.id, second_id: JEAN.id },
+        { date: '2026-05-02', type: 'weekend', placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }] },
+        { date: '2026-05-09', type: 'weekend', placements: [{ role: 'premier', vetId: FANNY.id }, { role: 'second', vetId: MANON.id }] },
+        { date: '2026-05-16', type: 'weekend', placements: [{ role: 'premier', vetId: ANTOINE.id }, { role: 'second', vetId: ANNE_SOPHIE.id }] },
+        { date: '2026-05-23', type: 'weekend', placements: [{ role: 'premier', vetId: ANNE_CAT.id }, { role: 'second', vetId: JEAN.id }] },
       ],
     }
 
     // Planning déséquilibré : Jean fait 3 WE, les autres 0
     const planningDesequilibre: PlanningPartiel = {
       attributions: [
-        { date: '2026-05-02', type: 'weekend', premier_id: JEAN.id, second_id: FANNY.id },
-        { date: '2026-05-09', type: 'weekend', premier_id: JEAN.id, second_id: FANNY.id },
-        { date: '2026-05-16', type: 'weekend', premier_id: JEAN.id, second_id: FANNY.id },
+        { date: '2026-05-02', type: 'weekend', placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: FANNY.id }] },
+        { date: '2026-05-09', type: 'weekend', placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: FANNY.id }] },
+        { date: '2026-05-16', type: 'weekend', placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: FANNY.id }] },
       ],
     }
 
@@ -277,16 +277,16 @@ describe('Équité (V2) — étage EQUITE de scorerPlanning', () => {
     // EQUITE départage. Le plus équilibré doit gagner lexicographiquement.
     const planningEquilibre: PlanningPartiel = {
       attributions: [
-        { date: '2026-05-02', type: 'weekend', premier_id: JEAN.id, second_id: VICTOR.id },
-        { date: '2026-05-09', type: 'weekend', premier_id: FANNY.id, second_id: MANON.id },
-        { date: '2026-05-16', type: 'weekend', premier_id: ANTOINE.id, second_id: ANNE_SOPHIE.id },
+        { date: '2026-05-02', type: 'weekend', placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }] },
+        { date: '2026-05-09', type: 'weekend', placements: [{ role: 'premier', vetId: FANNY.id }, { role: 'second', vetId: MANON.id }] },
+        { date: '2026-05-16', type: 'weekend', placements: [{ role: 'premier', vetId: ANTOINE.id }, { role: 'second', vetId: ANNE_SOPHIE.id }] },
       ],
     }
     const planningDesequilibre: PlanningPartiel = {
       attributions: [
-        { date: '2026-05-02', type: 'weekend', premier_id: JEAN.id, second_id: VICTOR.id },
-        { date: '2026-05-09', type: 'weekend', premier_id: JEAN.id, second_id: VICTOR.id },
-        { date: '2026-05-16', type: 'weekend', premier_id: JEAN.id, second_id: VICTOR.id },
+        { date: '2026-05-02', type: 'weekend', placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }] },
+        { date: '2026-05-09', type: 'weekend', placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }] },
+        { date: '2026-05-16', type: 'weekend', placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }] },
       ],
     }
     const vEq = scorerPlanning(planningEquilibre, ALL_VETS, 'ete')

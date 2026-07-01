@@ -77,12 +77,34 @@ export interface SlotGarde {
   besoinSecond?: boolean
 }
 
-// Une attribution dans le planning en cours de construction
+/**
+ * Une PLACE à pourvoir sur un créneau : un rôle (label) + le véto assigné.
+ *
+ * P3a : le rôle reste 'premier' | 'second' (défaut à 2 places). Il se généralisera
+ * en label libre (`string`) quand le catalogue pilotera N places par créneau (P3a-2).
+ */
+export interface Placement {
+  role: RoleGarde
+  /** Véto assigné à cette place, ou null si non encore pourvue. */
+  vetId: string | null
+}
+
+/**
+ * Une attribution dans le planning en cours de construction.
+ *
+ * Modèle « liste de placements » (P3a) : une garde n'est plus un couple figé
+ * (premier_id, second_id) mais une LISTE de places à label. Cela lève le verrou
+ * « exactement 2 rôles » et débloque N vétos / plusieurs gardes par jour.
+ *
+ * ÉQUIVALENCE : pour le défaut, `placements = [{premier,…},{second,…}]` — une
+ * place non pourvue a `vetId: null` (miroir exact de premier_id/second_id à null).
+ * Les accès historiques passent par les helpers de `attribution.ts` (côté solver)
+ * et par des accesseurs ré-implémentés indépendamment côté validateur.
+ */
 export interface AttributionGarde {
   date: string
   type: TypeGardeEngine
-  premier_id: string | null
-  second_id: string | null
+  placements: Placement[]
 }
 
 export interface CalendrierResolu {

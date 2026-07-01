@@ -19,6 +19,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import type { PlanningPartiel, TypeGardeEngine } from '@/engine/types'
+import { premierId, secondId } from '@/engine/attribution'
 import { horairesResolus, type StructureCreneauxResolue } from '@/engine/structure-creneaux'
 import { chargerStructureCabinet } from '@/data/chargerStructureCabinet'
 
@@ -193,12 +194,13 @@ export async function persisterResultat(
     const creneauId = creneauMap.get(codeCreneau) ?? null
     const { dateDebut, dateFin } = calculerHoraires(a.date, a.type, structure)
 
-    if (a.premier_id) {
+    const premier = premierId(a)
+    if (premier) {
       rows.push({
         cabinet_id:       cabinetId,
         planning_id:      periodeId,
         creneau_id:       creneauId,
-        veterinaire_id:   a.premier_id,
+        veterinaire_id:   premier,
         role:             'premier',
         type_presence:    'sur_place',
         date_debut_reel:  dateDebut,
@@ -207,12 +209,13 @@ export async function persisterResultat(
       })
     }
 
-    if (a.second_id) {
+    const second = secondId(a)
+    if (second) {
       rows.push({
         cabinet_id:       cabinetId,
         planning_id:      periodeId,
         creneau_id:       creneauId,
-        veterinaire_id:   a.second_id,
+        veterinaire_id:   second,
         role:             'second',
         type_presence:    'sur_place',
         date_debut_reel:  dateDebut,

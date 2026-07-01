@@ -35,8 +35,8 @@ const slot = (date: string): SlotGarde => ({ date, type: 'semaine_soir', saison:
 // Planning : Victor déjà de garde lundi + mardi (2 gardes dans la semaine).
 const planning2: PlanningPartiel = {
   attributions: [
-    { date: LUN, type: 'semaine_soir', premier_id: 'v', second_id: null },
-    { date: MAR, type: 'semaine_soir', premier_id: 'v', second_id: null },
+    { date: LUN, type: 'semaine_soir', placements: [{ role: 'premier', vetId: 'v' }, { role: 'second', vetId: null }] },
+    { date: MAR, type: 'semaine_soir', placements: [{ role: 'premier', vetId: 'v' }, { role: 'second', vetId: null }] },
   ],
 }
 
@@ -66,9 +66,9 @@ describe('au_plus_n — MOU (étage 4) : ne bloque pas, mais pénalise', () => {
 describe('au_plus_n — validateur indépendant', () => {
   const planning3: PlanningPartiel = {
     attributions: [
-      { date: LUN, type: 'semaine_soir', premier_id: 'v', second_id: null },
-      { date: MAR, type: 'semaine_soir', premier_id: 'v', second_id: null },
-      { date: MER, type: 'semaine_soir', premier_id: 'v', second_id: null },
+      { date: LUN, type: 'semaine_soir', placements: [{ role: 'premier', vetId: 'v' }, { role: 'second', vetId: null }] },
+      { date: MAR, type: 'semaine_soir', placements: [{ role: 'premier', vetId: 'v' }, { role: 'second', vetId: null }] },
+      { date: MER, type: 'semaine_soir', placements: [{ role: 'premier', vetId: 'v' }, { role: 'second', vetId: null }] },
     ],
   }
   const input = { dateDebut: LUN, dateFin: '2026-01-11', saison: 'hiver' as const, nbVetosSemaineSoir: 1 }

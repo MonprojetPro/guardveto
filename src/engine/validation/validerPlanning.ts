@@ -219,13 +219,25 @@ function trouver(
   return planning.attributions.find((a) => a.date === date && a.type === type)
 }
 
-/** Tous les vétos assignés (premier OU second) sur une attribution */
+// ── Accès aux PLACES (modèle P3a) — ré-implémentés INDÉPENDAMMENT ──
+// Le validateur ne partage aucune logique avec le solver (cf. en-tête). Ces
+// accesseurs sur la forme `placements` sont triviaux et ré-écrits ici, comme
+// jIndex/plusJours, pour ne dépendre d'aucun helper du moteur.
+
+/** Véto d'une place (par label de rôle), ou null si place absente/non pourvue. */
+function vetRole(a: AttributionGarde | undefined, role: 'premier' | 'second'): string | null {
+  return a?.placements.find((p) => p.role === role)?.vetId ?? null
+}
+
+/** Le véto occupe-t-il l'une des places de ce créneau ? */
+function surCreneau(a: AttributionGarde | undefined, vetId: string): boolean {
+  return !!a && a.placements.some((p) => p.vetId === vetId)
+}
+
+/** Tous les vétos assignés (n'importe quelle place) sur une attribution */
 function membres(a: AttributionGarde | undefined): string[] {
   if (!a) return []
-  const out: string[] = []
-  if (a.premier_id) out.push(a.premier_id)
-  if (a.second_id) out.push(a.second_id)
-  return out
+  return a.placements.map((p) => p.vetId).filter((x): x is string => x !== null)
 }
 
 // ── Construction des créneaux ATTENDUS (couverture) ──────
@@ -332,7 +344,7 @@ export function validerPlanning(
       })
       continue
     }
-    if (!attr.premier_id) {
+    if (!vetRole(attr, 'premier')) {
       violations.push({
         regle: 'COUVERTURE',
         date: s.date,
@@ -341,7 +353,7 @@ export function validerPlanning(
         detail: `Aucun 1er de garde assigné (${s.type} du ${s.date})`,
       })
     }
-    if (s.besoinSecond && !attr.second_id) {
+    if (s.besoinSecond && !vetRole(attr, 'second')) {
       violations.push({
         regle: s.type === 'weekend' ? 'R19' : 'R18',
         date: s.date,
@@ -360,13 +372,14 @@ export function validerPlanning(
   // ── R17 — Été : pas de 2nd en semaine_soir ──
   if (input.saison === 'ete') {
     for (const a of planning.attributions) {
-      if (a.type === 'semaine_soir' && a.second_id) {
+      const second = vetRole(a, 'second')
+      if (a.type === 'semaine_soir' && second) {
         violations.push({
           regle: 'R17',
           date: a.date,
           type: a.type,
           role: 'second',
-          vetId: a.second_id,
+          vetId: second,
           detail: `R17 : en été, une seule garde de nuit en semaine — un 2nd a été assigné (${a.date})`,
         })
       }
@@ -375,12 +388,14 @@ export function validerPlanning(
 
   // ── R21 — premier ≠ second sur un même créneau ──
   for (const a of planning.attributions) {
-    if (a.premier_id && a.second_id && a.premier_id === a.second_id) {
+    const p = vetRole(a, 'premier')
+    const s = vetRole(a, 'second')
+    if (p && s && p === s) {
       violations.push({
         regle: 'R21',
         date: a.date,
         type: a.type,
-        vetId: a.premier_id,
+        vetId: p,
         detail: `R21 : le même vétérinaire est 1er ET 2nd du créneau (${a.type} du ${a.date})`,
       })
     }
@@ -388,11 +403,7 @@ export function validerPlanning(
 
   // ── Parcours par attribution pour les règles « par véto » ──
   for (const a of planning.attributions) {
-    const roles: Array<{ role: 'premier' | 'second'; vetId: string | null }> = [
-      { role: 'premier', vetId: a.premier_id },
-      { role: 'second', vetId: a.second_id },
-    ]
-    for (const { role, vetId } of roles) {
+    for (const { role, vetId } of a.placements) {
       if (!vetId) continue
       const vet = vetsById.get(vetId)
       if (!vet) {
@@ -581,7 +592,7 @@ export function validerPlanning(
         : undefined
       const gardesVet = planning.attributions.filter(
         (a) =>
-          (a.premier_id === vet.id || a.second_id === vet.id) &&
+          surCreneau(a, vet.id) &&
           (!creneaux || creneaux.includes(a.type)),
       )
 
@@ -635,7 +646,7 @@ export function validerPlanning(
       if (!Number.isFinite(ecart) || ecart <= 0) continue
 
       const dates = planning.attributions
-        .filter((a) => a.premier_id === vet.id || a.second_id === vet.id)
+        .filter((a) => surCreneau(a, vet.id))
         .map((a) => a.date)
         .sort()
       const vues = new Set<string>()
@@ -675,7 +686,7 @@ export function validerPlanning(
       const seuil = n * 7
 
       const datesWe = planning.attributions
-        .filter((a) => a.type === 'weekend' && (a.premier_id === vet.id || a.second_id === vet.id))
+        .filter((a) => a.type === 'weekend' && surCreneau(a, vet.id))
         .map((a) => a.date)
         .sort()
       const vues = new Set<string>()
@@ -729,22 +740,26 @@ export function validerPlanning(
     }
 
     // R8 : inversion des rôles (seulement si R8 est dure)
-    if (r8Dur && attrVen.premier_id && a.premier_id === attrVen.premier_id) {
+    const venPremier = vetRole(attrVen, 'premier')
+    const wePremier = vetRole(a, 'premier')
+    if (r8Dur && venPremier && wePremier === venPremier) {
       violations.push({
         regle: 'R8',
         date: a.date,
         type: 'weekend',
-        vetId: a.premier_id,
-        detail: `R8 : ${vetsById.get(a.premier_id)?.prenom ?? a.premier_id} est 1er vendredi soir ET 1er le WE — l'inversion impose 2nd le WE (${a.date})`,
+        vetId: wePremier,
+        detail: `R8 : ${vetsById.get(wePremier)?.prenom ?? wePremier} est 1er vendredi soir ET 1er le WE — l'inversion impose 2nd le WE (${a.date})`,
       })
     }
-    if (r8Dur && attrVen.second_id && a.second_id === attrVen.second_id) {
+    const venSecond = vetRole(attrVen, 'second')
+    const weSecond = vetRole(a, 'second')
+    if (r8Dur && venSecond && weSecond === venSecond) {
       violations.push({
         regle: 'R8',
         date: a.date,
         type: 'weekend',
-        vetId: a.second_id,
-        detail: `R8 : ${vetsById.get(a.second_id)?.prenom ?? a.second_id} est 2nd vendredi soir ET 2nd le WE — l'inversion impose 1er le WE (${a.date})`,
+        vetId: weSecond,
+        detail: `R8 : ${vetsById.get(weSecond)?.prenom ?? weSecond} est 2nd vendredi soir ET 2nd le WE — l'inversion impose 1er le WE (${a.date})`,
       })
     }
   }
@@ -771,8 +786,8 @@ function aGardeWeekendCetteSemaine(
     sam = samediDe(date)
   }
   const we = trouver(planning, sam, 'weekend')
-  if (we && (we.premier_id === vetId || we.second_id === vetId)) return true
+  if (surCreneau(we, vetId)) return true
   const ven = plusJours(sam, -1)
   const av = trouver(planning, ven, 'vendredi_soir')
-  return !!av && (av.premier_id === vetId || av.second_id === vetId)
+  return surCreneau(av, vetId)
 }

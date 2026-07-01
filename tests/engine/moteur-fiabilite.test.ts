@@ -526,7 +526,7 @@ describe('Contrôle négatif — le validateur DÉTECTE bien les violations plan
 
   it('détecte R1 (garde le jour de repos fixe)', () => {
     const v = validerPlanning(
-      { attributions: [{ date: '2026-09-07', type: 'semaine_soir', premier_id: 'a1', second_id: 'b1' }] },
+      { attributions: [{ date: '2026-09-07', type: 'semaine_soir', placements: [{ role: 'premier', vetId: 'a1' }, { role: 'second', vetId: 'b1' }] }] },
       input
     )
     expect(v.some((x) => x.regle === 'R1')).toBe(true)
@@ -534,7 +534,7 @@ describe('Contrôle négatif — le validateur DÉTECTE bien les violations plan
 
   it('détecte R16 (garde pendant un congé)', () => {
     const v = validerPlanning(
-      { attributions: [{ date: '2026-09-08', type: 'semaine_soir', premier_id: 'a1', second_id: 'b1' }] },
+      { attributions: [{ date: '2026-09-08', type: 'semaine_soir', placements: [{ role: 'premier', vetId: 'a1' }, { role: 'second', vetId: 'b1' }] }] },
       input
     )
     expect(v.some((x) => x.regle === 'R16')).toBe(true)
@@ -542,7 +542,7 @@ describe('Contrôle négatif — le validateur DÉTECTE bien les violations plan
 
   it('détecte R6 (duo interdit Bruno+Claire)', () => {
     const v = validerPlanning(
-      { attributions: [{ date: '2026-09-09', type: 'semaine_soir', premier_id: 'b1', second_id: 'c1' }] },
+      { attributions: [{ date: '2026-09-09', type: 'semaine_soir', placements: [{ role: 'premier', vetId: 'b1' }, { role: 'second', vetId: 'c1' }] }] },
       input
     )
     expect(v.some((x) => x.regle === 'R6')).toBe(true)
@@ -550,7 +550,7 @@ describe('Contrôle négatif — le validateur DÉTECTE bien les violations plan
 
   it('détecte R21 (même véto 1er ET 2nd)', () => {
     const v = validerPlanning(
-      { attributions: [{ date: '2026-09-09', type: 'semaine_soir', premier_id: 'b1', second_id: 'b1' }] },
+      { attributions: [{ date: '2026-09-09', type: 'semaine_soir', placements: [{ role: 'premier', vetId: 'b1' }, { role: 'second', vetId: 'b1' }] }] },
       input
     )
     expect(v.some((x) => x.regle === 'R21')).toBe(true)
@@ -565,8 +565,8 @@ describe('Contrôle négatif — le validateur DÉTECTE bien les violations plan
     const v = validerPlanning(
       {
         attributions: [
-          { date: '2026-09-11', type: 'vendredi_soir', premier_id: 'a1', second_id: 'b1' },
-          { date: '2026-09-12', type: 'weekend', premier_id: 'b1', second_id: 'c1' },
+          { date: '2026-09-11', type: 'vendredi_soir', placements: [{ role: 'premier', vetId: 'a1' }, { role: 'second', vetId: 'b1' }] },
+          { date: '2026-09-12', type: 'weekend', placements: [{ role: 'premier', vetId: 'b1' }, { role: 'second', vetId: 'c1' }] },
         ],
       },
       input
@@ -578,8 +578,8 @@ describe('Contrôle négatif — le validateur DÉTECTE bien les violations plan
     const v = validerPlanning(
       {
         attributions: [
-          { date: '2026-09-11', type: 'vendredi_soir', premier_id: 'a1', second_id: 'b1' },
-          { date: '2026-09-12', type: 'weekend', premier_id: 'a1', second_id: 'b1' }, // même rôles → viole R8
+          { date: '2026-09-11', type: 'vendredi_soir', placements: [{ role: 'premier', vetId: 'a1' }, { role: 'second', vetId: 'b1' }] },
+          { date: '2026-09-12', type: 'weekend', placements: [{ role: 'premier', vetId: 'a1' }, { role: 'second', vetId: 'b1' }] }, // même rôles → viole R8
         ],
       },
       input
@@ -608,12 +608,12 @@ describe('Contrôle négatif — le validateur DÉTECTE bien les violations plan
     // Aucun véto sur son repos/congé ; aucun duo interdit ; rôles inversés ven↔WE.
     const sain = {
       attributions: [
-        { date: '2026-09-07', type: 'semaine_soir', premier_id: 'b1', second_id: 'd1' }, // lun (Alice exclue)
-        { date: '2026-09-08', type: 'semaine_soir', premier_id: 'b1', second_id: 'd1' }, // mar (Alice en congé)
-        { date: '2026-09-09', type: 'semaine_soir', premier_id: 'd1', second_id: 'e1' }, // mer
-        { date: '2026-09-10', type: 'semaine_soir', premier_id: 'b1', second_id: 'e1' }, // jeu
-        { date: '2026-09-11', type: 'vendredi_soir', premier_id: 'a1', second_id: 'b1' },
-        { date: '2026-09-12', type: 'weekend', premier_id: 'b1', second_id: 'a1' }, // inversé → R8 ok
+        { date: '2026-09-07', type: 'semaine_soir', placements: [{ role: 'premier', vetId: 'b1' }, { role: 'second', vetId: 'd1' }] }, // lun (Alice exclue)
+        { date: '2026-09-08', type: 'semaine_soir', placements: [{ role: 'premier', vetId: 'b1' }, { role: 'second', vetId: 'd1' }] }, // mar (Alice en congé)
+        { date: '2026-09-09', type: 'semaine_soir', placements: [{ role: 'premier', vetId: 'd1' }, { role: 'second', vetId: 'e1' }] }, // mer
+        { date: '2026-09-10', type: 'semaine_soir', placements: [{ role: 'premier', vetId: 'b1' }, { role: 'second', vetId: 'e1' }] }, // jeu
+        { date: '2026-09-11', type: 'vendredi_soir', placements: [{ role: 'premier', vetId: 'a1' }, { role: 'second', vetId: 'b1' }] },
+        { date: '2026-09-12', type: 'weekend', placements: [{ role: 'premier', vetId: 'b1' }, { role: 'second', vetId: 'a1' }] }, // inversé → R8 ok
       ],
     }
     const v = validerPlanning(sain, inputSain)

@@ -14,7 +14,8 @@
 import { describe, it, expect } from 'vitest'
 import { genererPlanningPur } from '../solver'
 import { jourDeLaSemaine, estSemaineImpaireAncrée } from '../utils'
-import type { VetEngine } from '../types'
+import type { VetEngine, AttributionGarde } from '../types'
+import { estAttribue, vetsAttribues } from '../attribution'
 import { VETS_PILOTE, PERIODE_PILOTE, CALENDRIER_PILOTE, VET } from './fixtures-pilote'
 
 function makeInput() {
@@ -38,8 +39,7 @@ function enVacances(date: string): boolean {
 
 const res = genererPlanningPur(makeInput())
 const attributions = res.success ? res.planning.attributions : []
-const aGarde = (vetId: string, a: { premier_id: string | null; second_id: string | null }) =>
-  a.premier_id === vetId || a.second_id === vetId
+const aGarde = (vetId: string, a: AttributionGarde) => estAttribue(a, vetId)
 
 describe("Application des règles — faits directs (le filet n'est plus aveugle)", () => {
   it('le planning est complet', () => {
@@ -61,8 +61,8 @@ describe("Application des règles — faits directs (le filet n'est plus aveugle
   it('R6 : Antoine et Manon ne sont jamais de garde ensemble', () => {
     const fautes = attributions.filter(
       (a) =>
-        [a.premier_id, a.second_id].includes(VET.antoine) &&
-        [a.premier_id, a.second_id].includes(VET.manon),
+        vetsAttribues(a).includes(VET.antoine) &&
+        vetsAttribues(a).includes(VET.manon),
     )
     expect(fautes, `duo interdit ensemble : ${fautes.map((a) => `${a.date}/${a.type}`).join(', ')}`).toEqual([])
   })

@@ -73,9 +73,9 @@ describe('Équité réglable — A. préservation', () => {
 describe('Équité réglable — B. scorerPlanning thread les poids', () => {
   const planningDeseq: PlanningPartiel = {
     attributions: [
-      { date: '2026-01-10', type: 'weekend', premier_id: 'v1', second_id: 'v2' },
-      { date: '2026-01-17', type: 'weekend', premier_id: 'v1', second_id: 'v3' },
-      { date: '2026-01-24', type: 'weekend', premier_id: 'v1', second_id: 'v4' },
+      { date: '2026-01-10', type: 'weekend', placements: [{ role: 'premier', vetId: 'v1' }, { role: 'second', vetId: 'v2' }] },
+      { date: '2026-01-17', type: 'weekend', placements: [{ role: 'premier', vetId: 'v1' }, { role: 'second', vetId: 'v3' }] },
+      { date: '2026-01-24', type: 'weekend', placements: [{ role: 'premier', vetId: 'v1' }, { role: 'second', vetId: 'v4' }] },
     ],
   }
   const vets = vetsSimples()

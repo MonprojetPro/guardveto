@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { genererPlanningPur, type SolverInput } from '@/engine/solver'
-import type { VetEngine } from '@/engine/types'
+import type { VetEngine, PlanningPartiel } from '@/engine/types'
+import { premierId, secondId, estAttribue } from '@/engine/attribution'
 
 import hiverStandard from './scenarios/hiver-standard.json'
 import eteCongesLourds from './scenarios/ete-conges-lourds.json'
@@ -19,12 +20,12 @@ function buildInput(scenario: typeof hiverStandard): SolverInput {
 }
 
 /** Vérifie que chaque créneau du planning a ses 2 vétérinaires renseignés */
-function tousLesCreneauxRemplis(planning: { attributions: Array<{premier_id: string|null; second_id: string|null; type: string}> }, saison: string): boolean {
+function tousLesCreneauxRemplis(planning: PlanningPartiel, saison: string): boolean {
   return planning.attributions.every((a) => {
-    if (!a.premier_id) return false
+    if (!premierId(a)) return false
     // En été, semaine_soir n'a qu'un seul véto
     if (saison === 'ete' && a.type === 'semaine_soir') return true
-    return a.second_id !== null
+    return secondId(a) !== null
   })
 }
 
@@ -34,10 +35,12 @@ function compterType(planning: { attributions: Array<{type: string}> }, type: st
 }
 
 /** R21 — vérifie qu'aucun créneau n'a le même véto en 1er ET en 2nd */
-function aucunDoublonPremierSecond(planning: { attributions: Array<{premier_id: string|null; second_id: string|null}> }): boolean {
-  return planning.attributions.every(
-    (a) => !(a.premier_id && a.second_id && a.premier_id === a.second_id)
-  )
+function aucunDoublonPremierSecond(planning: PlanningPartiel): boolean {
+  return planning.attributions.every((a) => {
+    const p = premierId(a)
+    const s = secondId(a)
+    return !(p && s && p === s)
+  })
 }
 
 // ── Scénario 1 : Hiver standard ─────────────────────────
@@ -79,7 +82,7 @@ describe('Scénario hiver-standard — 4 semaines, 7 vétos, pas de congés', ()
   it('dernier recours (h-v7) a peu ou pas de gardes si possible', () => {
     if (!result.success) return
     const attribH7 = result.planning.attributions.filter(
-      (a) => a.premier_id === 'h-v7' || a.second_id === 'h-v7'
+      (a) => estAttribue(a, 'h-v7')
     )
     // Avec 6 autres vétos disponibles, h-v7 ne devrait pas être sollicité
     expect(attribH7.length).toBe(0)
@@ -107,8 +110,8 @@ describe('Scénario ete-conges-lourds — 4 semaines, congés semaines 3-4', () 
       for (const [vetId, conges] of Object.entries(congesParVet)) {
         for (const conge of conges) {
           if (attr.date >= conge.date_debut && attr.date <= conge.date_fin) {
-            expect(attr.premier_id).not.toBe(vetId)
-            expect(attr.second_id).not.toBe(vetId)
+            expect(premierId(attr)).not.toBe(vetId)
+            expect(secondId(attr)).not.toBe(vetId)
           }
         }
       }
@@ -119,7 +122,7 @@ describe('Scénario ete-conges-lourds — 4 semaines, congés semaines 3-4', () 
     if (!result.success) return
     const semaineSlots = result.planning.attributions.filter((a) => a.type === 'semaine_soir')
     for (const s of semaineSlots) {
-      expect(s.second_id).toBeNull()
+      expect(secondId(s)).toBeNull()
     }
   })
 
@@ -132,10 +135,10 @@ describe('Scénario ete-conges-lourds — 4 semaines, congés semaines 3-4', () 
     if (!result.success) return
     // e-v1 a bonusMalus=1 (doit plus de gardes) → devrait avoir plus de gardes que e-v2
     const gardesV1 = result.planning.attributions.filter(
-      (a) => a.premier_id === 'e-v1' || a.second_id === 'e-v1'
+      (a) => estAttribue(a, 'e-v1')
     ).length
     const gardesV2 = result.planning.attributions.filter(
-      (a) => a.premier_id === 'e-v2' || a.second_id === 'e-v2'
+      (a) => estAttribue(a, 'e-v2')
     ).length
     // e-v2 a bonusMalus=-1 (a déjà fait plus) → devrait en faire moins
     // e-v2 est aussi en congé les 2 dernières semaines
@@ -239,8 +242,9 @@ describe('Benchmark performance — 12 semaines hiver, 7 vétos sans contraintes
     const wePremier: Record<string, number> = {}
     for (const v of vets) if (!v.dernier_recours) wePremier[v.id] = 0
     for (const a of result.planning.attributions) {
-      if (a.type === 'weekend' && a.premier_id && a.premier_id in wePremier) {
-        wePremier[a.premier_id]++
+      const p = premierId(a)
+      if (a.type === 'weekend' && p && p in wePremier) {
+        wePremier[p]++
       }
     }
     const valeurs = Object.values(wePremier)

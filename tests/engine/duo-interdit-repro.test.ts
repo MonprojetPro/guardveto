@@ -11,6 +11,7 @@ import { describe, it, expect } from 'vitest'
 import { genererPlanningPur, type SolverInput } from '@/engine/solver'
 import { isValid } from '@/engine/rules/hard-constraints'
 import { normaliserContraintesVets } from '@/engine/normaliserContraintes'
+import { premierId, secondId } from '@/engine/attribution'
 import type { PlanningPartiel, SlotGarde, VetEngine, VetEngineNormalise } from '@/engine/types'
 import { ALL_VETS, MANON, ANTOINE } from './scenarios/vets'
 
@@ -97,7 +98,7 @@ describe('REPRO — duo_interdit config V2 (avec_veterinaire_id dans params)', (
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-07-25', type: 'weekend',
-        premier_id: MANON_V2.id, second_id: null,
+        placements: [{ role: 'premier', vetId: MANON_V2.id }, { role: 'second', vetId: null }],
       }],
     }
     const vets = [...ALL_VETS.filter((v) => v.id !== MANON.id && v.id !== ANTOINE.id), MANON_V2, ANTOINE_V2]
@@ -110,7 +111,7 @@ describe('REPRO — duo_interdit config V2 (avec_veterinaire_id dans params)', (
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-08-15', type: 'weekend',
-        premier_id: ANTOINE_V2.id, second_id: null,
+        placements: [{ role: 'premier', vetId: ANTOINE_V2.id }, { role: 'second', vetId: null }],
       }],
     }
     const vets = [...ALL_VETS.filter((v) => v.id !== MANON.id && v.id !== ANTOINE.id), MANON_V2, ANTOINE_V2]
@@ -189,7 +190,7 @@ describe('REPRO — duo_interdit Antoine + Manon (binôme WE)', () => {
     const duosInterdits = result.planning.attributions.filter(
       (a) =>
         (a.type === 'weekend' || a.type === 'vendredi_soir') &&
-        estDuoManonAntoine(a.premier_id, a.second_id)
+        estDuoManonAntoine(premierId(a), secondId(a))
     )
 
     expect(duosInterdits).toEqual([])
@@ -211,7 +212,7 @@ describe('REPRO — duo_interdit Antoine + Manon (binôme WE)', () => {
     if (!result.success) return
 
     const duosInterdits = result.planning.attributions.filter((a) =>
-      estDuoManonAntoine(a.premier_id, a.second_id)
+      estDuoManonAntoine(premierId(a), secondId(a))
     )
 
     expect(duosInterdits).toEqual([])

@@ -10,6 +10,7 @@
 import type { SlotGarde, VetEngine, PlanningPartiel, RoleGarde, CalendrierResolu } from '../types'
 import { samediDeSemaine, addDays, estJourFerie, estFeteFinAnnee } from '../utils'
 import { penaliteContraintesConfig } from './hard-constraints'
+import { estAttribue, vetPourRole } from '../attribution'
 
 // ── Scores de pénalité ───────────────────────────────────
 
@@ -36,14 +37,14 @@ function aGardeWE(vetId: string, samedi: string, planning: PlanningPartiel): boo
   for (const attr of planning.attributions) {
     if (attr.date !== samedi) continue
     if (attr.type !== 'weekend' && attr.type !== 'vendredi_soir') continue
-    if (attr.premier_id === vetId || attr.second_id === vetId) return true
+    if (estAttribue(attr, vetId)) return true
   }
   // Vendredi soir est planifié sur la date du vendredi, mais on cherche par samedi
   const vendredi = addDays(samedi, -1)
   for (const attr of planning.attributions) {
     if (attr.date !== vendredi) continue
     if (attr.type !== 'vendredi_soir') continue
-    if (attr.premier_id === vetId || attr.second_id === vetId) return true
+    if (estAttribue(attr, vetId)) return true
   }
   return false
 }
@@ -140,8 +141,8 @@ function penaliteInversionFerie(
   )
   if (!attrVeille) return 0
 
-  const etait1er = attrVeille.premier_id === vet.id
-  const etait2nd = attrVeille.second_id === vet.id
+  const etait1er = vetPourRole(attrVeille, 'premier') === vet.id
+  const etait2nd = vetPourRole(attrVeille, 'second') === vet.id
 
   // Pénalité si même rôle que la veille (devrait s'inverser)
   if (etait1er && role === 'premier') return PENALITE.INVERSION_FERIE

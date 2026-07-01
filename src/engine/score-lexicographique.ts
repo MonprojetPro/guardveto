@@ -30,6 +30,7 @@ import {
   type StructureConfig,
 } from './structure-config'
 import { vendrediDeSemaine } from './utils'
+import { vetPourRole, avecVet, attributionVide } from './attribution'
 import {
   penaliteR10WEConsecutif,
   penaliteWEAvantVacances,
@@ -132,8 +133,9 @@ function listerSlotRoles(planning: PlanningPartiel, saison: 'ete' | 'hiver'): Sl
   const out: SlotRole[] = []
   for (const a of planning.attributions) {
     const slot: SlotGarde = { date: a.date, type: a.type, saison }
-    if (a.premier_id) out.push({ slot, role: 'premier', vetId: a.premier_id })
-    if (a.second_id) out.push({ slot, role: 'second', vetId: a.second_id })
+    for (const p of a.placements) {
+      if (p.vetId) out.push({ slot, role: p.role, vetId: p.vetId })
+    }
   }
   return out
 }
@@ -177,9 +179,9 @@ export function scorerPlanning(
       a.date < b.date ? -1 : a.date > b.date ? 1 : a.type < b.type ? -1 : 1
     )
     for (const a of ordered) {
-      // premier d'abord
+      // premier d'abord (ordre préservé : R18/R19 exigent le 1er posé avant le 2nd)
       for (const role of ['premier', 'second'] as RoleGarde[]) {
-        const vetId = role === 'premier' ? a.premier_id : a.second_id
+        const vetId = vetPourRole(a, role)
         if (!vetId) continue
         const vet = vetById.get(vetId)
         if (!vet) continue
@@ -191,17 +193,9 @@ export function scorerPlanning(
           (x) => x.date === a.date && x.type === a.type
         )
         if (idx >= 0) {
-          cumul.attributions[idx] = {
-            ...cumul.attributions[idx],
-            [role === 'premier' ? 'premier_id' : 'second_id']: vetId,
-          }
+          cumul.attributions[idx] = avecVet(cumul.attributions[idx], role, vetId)
         } else {
-          cumul.attributions.push({
-            date: a.date,
-            type: a.type,
-            premier_id: role === 'premier' ? vetId : null,
-            second_id: role === 'second' ? vetId : null,
-          })
+          cumul.attributions.push(avecVet(attributionVide(a.date, a.type), role, vetId))
         }
       }
     }
@@ -261,8 +255,8 @@ export function scorerPlanning(
 
       // R9 souple : le binôme du WE diffère de celui du vendredi soir.
       if (estStructureSouple(structure.r9_liaison)) {
-        const duoWe = [a.premier_id, a.second_id].filter(Boolean).sort().join('|')
-        const duoVen = [attrVen.premier_id, attrVen.second_id].filter(Boolean).sort().join('|')
+        const duoWe = [vetPourRole(a, 'premier'), vetPourRole(a, 'second')].filter(Boolean).sort().join('|')
+        const duoVen = [vetPourRole(attrVen, 'premier'), vetPourRole(attrVen, 'second')].filter(Boolean).sort().join('|')
         if (duoWe !== duoVen) {
           ajouter(v, structure.r9_liaison.etage, 'R9-souple', penaliteStructureEtage(structure.r9_liaison.etage))
         }
@@ -270,9 +264,11 @@ export function scorerPlanning(
 
       // R8 souple : rôle 1er/2nd NON inversé entre vendredi soir et WE.
       if (estStructureSouple(structure.r8_inversion)) {
+        const venPremier = vetPourRole(attrVen, 'premier')
+        const venSecond = vetPourRole(attrVen, 'second')
         const nonInverse =
-          (attrVen.premier_id && a.premier_id === attrVen.premier_id) ||
-          (attrVen.second_id && a.second_id === attrVen.second_id)
+          (venPremier && vetPourRole(a, 'premier') === venPremier) ||
+          (venSecond && vetPourRole(a, 'second') === venSecond)
         if (nonInverse) {
           ajouter(v, structure.r8_inversion.etage, 'R8-souple', penaliteStructureEtage(structure.r8_inversion.etage))
         }
@@ -308,6 +304,6 @@ export function scorerPlanning(
 export function empreinteTieBreak(planning: PlanningPartiel): string {
   return [...planning.attributions]
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.type < b.type ? -1 : 1))
-    .map((a) => `${a.date}|${a.type}|${a.premier_id ?? ''}|${a.second_id ?? ''}`)
+    .map((a) => `${a.date}|${a.type}|${vetPourRole(a, 'premier') ?? ''}|${vetPourRole(a, 'second') ?? ''}`)
     .join('//')
 }

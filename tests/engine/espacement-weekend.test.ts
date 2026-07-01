@@ -33,7 +33,7 @@ const slotSoir = (date: string): SlotGarde => ({ date, type: 'semaine_soir', sai
 
 // Manon déjà de garde le WE du SAT1.
 const planningWe1: PlanningPartiel = {
-  attributions: [{ date: SAT1, type: 'weekend', premier_id: 'v', second_id: null }],
+  attributions: [{ date: SAT1, type: 'weekend', placements: [{ role: 'premier', vetId: 'v' }, { role: 'second', vetId: null }] }],
 }
 
 describe('espacement_weekend — DUR (étage 2) : « 1 WE sur 3 »', () => {
@@ -71,8 +71,8 @@ describe('espacement_weekend — MOU (étage 4) : ne bloque pas, mais pénalise'
 describe('espacement_weekend — validateur indépendant', () => {
   const planningWe2: PlanningPartiel = {
     attributions: [
-      { date: SAT1, type: 'weekend', premier_id: 'v', second_id: null },
-      { date: SAT2, type: 'weekend', premier_id: 'v', second_id: null },
+      { date: SAT1, type: 'weekend', placements: [{ role: 'premier', vetId: 'v' }, { role: 'second', vetId: null }] },
+      { date: SAT2, type: 'weekend', placements: [{ role: 'premier', vetId: 'v' }, { role: 'second', vetId: null }] },
     ],
   }
   const input = { dateDebut: SAT1, dateFin: '2026-02-01', saison: 'hiver' as const, nbVetosSemaineSoir: 1 }

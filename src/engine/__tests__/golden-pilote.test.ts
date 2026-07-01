@@ -57,7 +57,7 @@ function empreinte(planning: PlanningPartiel): string {
       .sort((a, b) =>
         a.date === b.date ? a.type.localeCompare(b.type) : a.date.localeCompare(b.date)
       )
-      .map((a) => `${a.date}|${a.type}|${a.premier_id ?? '-'}|${a.second_id ?? '-'}`)
+      .map((a) => `${a.date}|${a.type}|${a.placements.map((p) => p.vetId ?? '-').join('|')}`)
   )
 }
 
