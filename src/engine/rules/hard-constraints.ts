@@ -14,7 +14,7 @@ import {
   DEFAULT_STRUCTURE_CONFIG, estStructureDure,
   type StructureConfig, type StructureRegleConfig,
 } from '../structure-config'
-import { estAttribue, vetPourRole } from '../attribution'
+import { estAttribue, vetPourRole, roleDuVet } from '../attribution'
 
 // ── Helpers internes ────────────────────────────────────
 
@@ -340,8 +340,26 @@ function checkR7DernierRecours(vet: VetEngine): ValidationResult {
 }
 
 /**
- * R8 — Inversion 1er/2nd entre vendredi soir et WE
- * Si le véto était 1er vendredi soir → doit être 2nd le WE (et inversement).
+ * Message R8 (inversion). Préserve le libellé historique pour premier/second ;
+ * générique au-delà (N-places — P4 slice 2). Le sens : « ton rôle du week-end
+ * doit être DIFFÉRENT de celui du vendredi soir » (pour 2 rôles = inversion 1er/2nd).
+ */
+function messageR8(prenom: string, roleVen: string): string {
+  if (roleVen === 'premier') return `R8 : ${prenom} était 1er vendredi soir → doit être 2nd ce week-end`
+  if (roleVen === 'second') return `R8 : ${prenom} était 2nd vendredi soir → doit être 1er ce week-end`
+  return `R8 : ${prenom} avait le rôle « ${roleVen} » vendredi soir → doit changer de rôle ce week-end`
+}
+
+/**
+ * R8 — Inversion des rôles entre vendredi soir et WE (réglable).
+ *
+ * Sémantique généralisée (P4 slice 2) : le rôle qu'un véto occupe le week-end
+ * doit être DIFFÉRENT de celui qu'il occupait le vendredi soir. Pour le défaut à
+ * 2 rôles [premier, second], « différent » ⇔ « inversé » (1er↔2nd) → BYTE-IDENTIQUE
+ * à l'ancien code, mais sans présumer les noms de rôle : ça vaut pour N places.
+ *
+ * (Le COUPLE vendredi_soir↔weekend reste, lui, en dur : sa généralisation via le
+ * modèle `RelationCreneau` viendra quand des structures custom existeront — P5.)
  */
 function checkR8Inversion(
   vet: VetEngine,
@@ -358,15 +376,10 @@ function checkR8Inversion(
   const attrVen = getAttribution(planning, ven, 'vendredi_soir')
   if (!attrVen) return ok()
 
-  const etait1erVen = vetPourRole(attrVen, 'premier') === vet.id
-  const etait2ndVen = vetPourRole(attrVen, 'second') === vet.id
-
-  // Inversion : 1er vendredi → 2nd WE / 2nd vendredi → 1er WE
-  if (etait1erVen && roleVisé === 'premier') {
-    return invalid(`R8 : ${vet.prenom} était 1er vendredi soir → doit être 2nd ce week-end`)
-  }
-  if (etait2ndVen && roleVisé === 'second') {
-    return invalid(`R8 : ${vet.prenom} était 2nd vendredi soir → doit être 1er ce week-end`)
+  // Le rôle du week-end doit différer de celui tenu le vendredi soir.
+  const roleVen = roleDuVet(attrVen, vet.id)
+  if (roleVen !== null && roleVisé === roleVen) {
+    return invalid(messageR8(vet.prenom, roleVen))
   }
 
   return ok()

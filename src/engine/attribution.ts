@@ -34,6 +34,11 @@ export function estAttribue(attr: AttributionGarde, vetId: string): boolean {
   return attr.placements.some((p) => p.vetId === vetId)
 }
 
+/** Label du rôle occupé par `vetId` sur cette attribution, ou null s'il n'y figure pas. */
+export function roleDuVet(attr: AttributionGarde, vetId: string): string | null {
+  return attr.placements.find((p) => p.vetId === vetId)?.role ?? null
+}
+
 /** Ids des vétos effectivement placés (places non pourvues ignorées). */
 export function vetsAttribues(attr: AttributionGarde): string[] {
   return attr.placements.map((p) => p.vetId).filter((v): v is string => v !== null)

@@ -263,13 +263,12 @@ export function scorerPlanning(
         }
       }
 
-      // R8 souple : rôle 1er/2nd NON inversé entre vendredi soir et WE.
+      // R8 souple : un rôle NON changé entre vendredi soir et WE (généralisé
+      // N-places — P4 slice 2 ; pour 2 rôles = rôle 1er/2nd non inversé).
       if (estStructureSouple(structure.r8_inversion)) {
-        const venPremier = vetPourRole(attrVen, 'premier')
-        const venSecond = vetPourRole(attrVen, 'second')
-        const nonInverse =
-          (venPremier && vetPourRole(a, 'premier') === venPremier) ||
-          (venSecond && vetPourRole(a, 'second') === venSecond)
+        const nonInverse = attrVen.placements.some(
+          (p) => p.vetId !== null && vetPourRole(a, p.role) === p.vetId,
+        )
         if (nonInverse) {
           ajouter(v, structure.r8_inversion.etage, 'R8-souple', penaliteStructureEtage(structure.r8_inversion.etage))
         }

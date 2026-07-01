@@ -782,28 +782,24 @@ export function validerPlanning(
       })
     }
 
-    // R8 : inversion des rôles (seulement si R8 est dure)
-    const venPremier = vetRole(attrVen, 'premier')
-    const wePremier = vetRole(a, 'premier')
-    if (r8Dur && venPremier && wePremier === venPremier) {
-      violations.push({
-        regle: 'R8',
-        date: a.date,
-        type: 'weekend',
-        vetId: wePremier,
-        detail: `R8 : ${vetsById.get(wePremier)?.prenom ?? wePremier} est 1er vendredi soir ET 1er le WE — l'inversion impose 2nd le WE (${a.date})`,
-      })
-    }
-    const venSecond = vetRole(attrVen, 'second')
-    const weSecond = vetRole(a, 'second')
-    if (r8Dur && venSecond && weSecond === venSecond) {
-      violations.push({
-        regle: 'R8',
-        date: a.date,
-        type: 'weekend',
-        vetId: weSecond,
-        detail: `R8 : ${vetsById.get(weSecond)?.prenom ?? weSecond} est 2nd vendredi soir ET 2nd le WE — l'inversion impose 1er le WE (${a.date})`,
-      })
+    // R8 : inversion des rôles (seulement si R8 est dure). Généralisé N-places
+    // (P4 slice 2) : pour CHAQUE place, si le véto qui la tenait vendredi soir la
+    // tient ENCORE le week-end → rôle non changé → violation. Pour 2 rôles, ce
+    // sont exactement les deux contrôles 1er/2nd historiques (messages conservés).
+    if (r8Dur) {
+      for (const p of attrVen.placements) {
+        const venR = p.vetId
+        if (!venR) continue
+        if (vetRole(a, p.role) !== venR) continue
+        const prenom = vetsById.get(venR)?.prenom ?? venR
+        const detail =
+          p.role === 'premier'
+            ? `R8 : ${prenom} est 1er vendredi soir ET 1er le WE — l'inversion impose 2nd le WE (${a.date})`
+            : p.role === 'second'
+              ? `R8 : ${prenom} est 2nd vendredi soir ET 2nd le WE — l'inversion impose 1er le WE (${a.date})`
+              : `R8 : ${prenom} garde le rôle « ${p.role} » du vendredi au WE — l'inversion impose d'en changer (${a.date})`
+        violations.push({ regle: 'R8', date: a.date, type: 'weekend', vetId: venR, detail })
+      }
     }
   }
 
