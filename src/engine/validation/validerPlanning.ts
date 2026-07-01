@@ -76,8 +76,8 @@ export interface Violation {
   date: string
   /** Type de créneau */
   type: string
-  /** Rôle concerné, si pertinent */
-  role?: 'premier' | 'second'
+  /** Rôle concerné, si pertinent — label libre (P3a-2), défauts premier/second. */
+  role?: string
   /** Vétérinaire fautif, si identifiable */
   vetId?: string
   /** Détail concret lisible */
@@ -225,7 +225,7 @@ function trouver(
 // jIndex/plusJours, pour ne dépendre d'aucun helper du moteur.
 
 /** Véto d'une place (par label de rôle), ou null si place absente/non pourvue. */
-function vetRole(a: AttributionGarde | undefined, role: 'premier' | 'second'): string | null {
+function vetRole(a: AttributionGarde | undefined, role: string): string | null {
   return a?.placements.find((p) => p.role === role)?.vetId ?? null
 }
 
@@ -248,7 +248,40 @@ function membres(a: AttributionGarde | undefined): string[] {
 interface SlotAttendu {
   date: string
   type: 'semaine_soir' | 'vendredi_soir' | 'weekend'
-  besoinSecond: boolean
+  /**
+   * Places attendues (labels, dans l'ordre) — P3a-2. Vient du catalogue si le
+   * cabinet en fournit un (`nbPlaces`/`roles`), sinon du défaut 2-rôles en dur.
+   * L'effectif configurable plafonne UNIQUEMENT `semaine_soir` (été 1 / hiver 2).
+   */
+  roles: string[]
+}
+
+/**
+ * Places attendues sur un créneau couvrant `idx` (0=dim…6=sam), DÉRIVÉES du
+ * catalogue si présent (donnée), sinon du défaut 2-rôles historique. Ré-implémenté
+ * ICI (indépendance du solveur). Pour le catalogue par défaut, redonne exactement
+ * ['premier'] / ['premier','second'] selon l'effectif — équivalence prouvée.
+ */
+function rolesAttendus(
+  input: ValidationInput,
+  idx: number,
+  type: 'semaine_soir' | 'vendredi_soir' | 'weekend',
+): string[] {
+  const effectifSemaine = input.nbVetosSemaineSoir ?? (input.saison === 'hiver' ? 2 : 1)
+  const creneaux = input.creneaux
+  if (creneaux && creneaux.length > 0) {
+    const c = creneaux.find(
+      (cr) => cr.actif && !cr.surFeries && cr.joursSemaine.includes(idx),
+    )
+    if (!c) return []
+    const nbAEmettre = type === 'semaine_soir'
+      ? Math.min(c.nbPlaces, effectifSemaine)
+      : c.nbPlaces
+    return c.roles.slice(0, nbAEmettre)
+  }
+  // Défaut en dur (legacy / hors-cabinet).
+  if (type === 'semaine_soir') return effectifSemaine >= 2 ? ['premier', 'second'] : ['premier']
+  return ['premier', 'second'] // vendredi_soir & weekend
 }
 
 /**
@@ -293,19 +326,11 @@ function slotsAttendus(input: ValidationInput): SlotAttendu[] {
   const slots: SlotAttendu[] = []
   let cur = input.dateDebut
   while (cur <= input.dateFin) {
-    const t = typeCreneauPourJour(input, jIndex(cur))
-    if (t === 'vendredi_soir') {
-      slots.push({ date: cur, type: 'vendredi_soir', besoinSecond: true })
-    } else if (t === 'weekend') {
-      slots.push({ date: cur, type: 'weekend', besoinSecond: true })
-    } else if (t === 'semaine_soir') {
-      // Effectif configurable : besoin d'un 2nd si nb >= 2 ; repli saison sinon.
-      const nb = input.nbVetosSemaineSoir ?? (input.saison === 'hiver' ? 2 : 1)
-      slots.push({
-        date: cur,
-        type: 'semaine_soir',
-        besoinSecond: nb >= 2,
-      })
+    const idx = jIndex(cur)
+    const t = typeCreneauPourJour(input, idx)
+    if (t) {
+      const roles = rolesAttendus(input, idx, t)
+      if (roles.length > 0) slots.push({ date: cur, type: t, roles })
     }
     cur = plusJours(cur, 1)
   }
@@ -344,28 +369,40 @@ export function validerPlanning(
       })
       continue
     }
-    if (!vetRole(attr, 'premier')) {
-      violations.push({
-        regle: 'COUVERTURE',
-        date: s.date,
-        type: s.type,
-        role: 'premier',
-        detail: `Aucun 1er de garde assigné (${s.type} du ${s.date})`,
-      })
-    }
-    if (s.besoinSecond && !vetRole(attr, 'second')) {
-      violations.push({
-        regle: s.type === 'weekend' ? 'R19' : 'R18',
-        date: s.date,
-        type: s.type,
-        role: 'second',
-        detail:
-          s.type === 'weekend'
-            ? `R19 : week-end sans 2nd de garde (${s.date})`
-            : s.type === 'vendredi_soir'
-              ? `vendredi soir sans 2nd de garde (${s.date})`
-              : `R18 : hiver, garde semaine sans 2nd (${s.date})`,
-      })
+    // Chaque place attendue (P3a-2) doit être pourvue. Messages premier/second
+    // conservés à l'identique (compat) ; générique pour les places au-delà.
+    for (const role of s.roles) {
+      if (vetRole(attr, role)) continue
+      if (role === 'premier') {
+        violations.push({
+          regle: 'COUVERTURE',
+          date: s.date,
+          type: s.type,
+          role: 'premier',
+          detail: `Aucun 1er de garde assigné (${s.type} du ${s.date})`,
+        })
+      } else if (role === 'second') {
+        violations.push({
+          regle: s.type === 'weekend' ? 'R19' : 'R18',
+          date: s.date,
+          type: s.type,
+          role: 'second',
+          detail:
+            s.type === 'weekend'
+              ? `R19 : week-end sans 2nd de garde (${s.date})`
+              : s.type === 'vendredi_soir'
+                ? `vendredi soir sans 2nd de garde (${s.date})`
+                : `R18 : hiver, garde semaine sans 2nd (${s.date})`,
+        })
+      } else {
+        violations.push({
+          regle: 'COUVERTURE',
+          date: s.date,
+          type: s.type,
+          role,
+          detail: `Place « ${role} » non pourvue (${s.type} du ${s.date})`,
+        })
+      }
     }
   }
 
@@ -386,18 +423,24 @@ export function validerPlanning(
     }
   }
 
-  // ── R21 — premier ≠ second sur un même créneau ──
+  // ── R21 — toutes les places d'un même créneau = vétos DISTINCTS ──
+  // Généralisé N-places (P3a-2) : un même véto ne peut occuper deux places du
+  // créneau. Pour le défaut à 2 rôles, c'est exactement « 1er ≠ 2nd ».
   for (const a of planning.attributions) {
-    const p = vetRole(a, 'premier')
-    const s = vetRole(a, 'second')
-    if (p && s && p === s) {
-      violations.push({
-        regle: 'R21',
-        date: a.date,
-        type: a.type,
-        vetId: p,
-        detail: `R21 : le même vétérinaire est 1er ET 2nd du créneau (${a.type} du ${a.date})`,
-      })
+    const vus = new Set<string>()
+    for (const { vetId } of a.placements) {
+      if (!vetId) continue
+      if (vus.has(vetId)) {
+        violations.push({
+          regle: 'R21',
+          date: a.date,
+          type: a.type,
+          vetId,
+          detail: `R21 : le même vétérinaire occupe deux places du créneau (${a.type} du ${a.date})`,
+        })
+      } else {
+        vus.add(vetId)
+      }
     }
   }
 

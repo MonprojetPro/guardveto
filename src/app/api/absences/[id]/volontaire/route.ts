@@ -49,7 +49,6 @@ import {
   besoinSecondCreneau,
 } from '@/lib/crise/contexte'
 import { sendDepannageConfirme } from '@/lib/notifications'
-import type { RoleGarde } from '@/engine/types'
 
 export const maxDuration = 60
 
@@ -63,7 +62,7 @@ function getServiceClient() {
 
 interface Corps {
   gardeId: string
-  role: RoleGarde
+  role: 'premier' | 'second'
 }
 
 function estCorps(v: unknown): v is Corps {

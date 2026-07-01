@@ -346,7 +346,7 @@ function checkR7DernierRecours(vet: VetEngine): ValidationResult {
 function checkR8Inversion(
   vet: VetEngine,
   slot: SlotGarde,
-  roleVisé: 'premier' | 'second',
+  roleVisé: RoleGarde,
   planning: PlanningPartiel,
   cfg: StructureRegleConfig = DEFAULT_STRUCTURE_CONFIG.r8_inversion
 ): ValidationResult {
@@ -441,7 +441,7 @@ function semaineBesoinSecond(slot: SlotGarde): boolean {
  * R17 — Effectif semaine : pas de 2nd quand le créneau n'en a pas besoin.
  * (Historiquement « été = 1 seul » ; désormais piloté par l'effectif configurable.)
  */
-function checkR17Ete(slot: SlotGarde, roleVisé: 'premier' | 'second'): ValidationResult {
+function checkR17Ete(slot: SlotGarde, roleVisé: RoleGarde): ValidationResult {
   if (slot.type === 'semaine_soir' && roleVisé === 'second' && !semaineBesoinSecond(slot)) {
     return invalid('R17 : une seule garde de nuit en semaine sur ce créneau (pas de 2nd)')
   }
@@ -452,7 +452,7 @@ function checkR17Ete(slot: SlotGarde, roleVisé: 'premier' | 'second'): Validati
  * R18 — Effectif semaine à 2 : le 1er doit être désigné avant le 2nd.
  * (Historiquement « hiver = 2 » ; désormais piloté par l'effectif configurable.)
  */
-function checkR18Hiver(slot: SlotGarde, roleVisé: 'premier' | 'second', planning: PlanningPartiel): ValidationResult {
+function checkR18Hiver(slot: SlotGarde, roleVisé: RoleGarde, planning: PlanningPartiel): ValidationResult {
   if (slot.type !== 'semaine_soir' || !semaineBesoinSecond(slot)) return ok()
 
   const attr = getAttribution(planning, slot.date, slot.type)
@@ -467,7 +467,7 @@ function checkR18Hiver(slot: SlotGarde, roleVisé: 'premier' | 'second', plannin
  * R19 — WE : toujours 2 de garde
  * Un weekend nécessite toujours un 1er et un 2nd.
  */
-function checkR19Weekend(slot: SlotGarde, roleVisé: 'premier' | 'second', planning: PlanningPartiel): ValidationResult {
+function checkR19Weekend(slot: SlotGarde, roleVisé: RoleGarde, planning: PlanningPartiel): ValidationResult {
   if (slot.type !== 'weekend') return ok()
 
   const attr = getAttribution(planning, slot.date, slot.type)
@@ -489,17 +489,19 @@ function checkR19Weekend(slot: SlotGarde, roleVisé: 'premier' | 'second', plann
 function checkR21RolesDistincts(
   vet: VetEngine,
   slot: SlotGarde,
-  roleVisé: 'premier' | 'second',
+  roleVisé: RoleGarde,
   planning: PlanningPartiel
 ): ValidationResult {
   const attr = getAttribution(planning, slot.date, slot.type)
   if (!attr) return ok()
 
-  if (roleVisé === 'second' && vetPourRole(attr, 'premier') === vet.id) {
-    return invalid(`R21 : ${vet.prenom} est déjà 1er de garde ce créneau — le 1er et le 2nd doivent être deux vétérinaires différents`)
-  }
-  if (roleVisé === 'premier' && vetPourRole(attr, 'second') === vet.id) {
-    return invalid(`R21 : ${vet.prenom} est déjà 2nd de garde ce créneau — le 1er et le 2nd doivent être deux vétérinaires différents`)
+  // Généralisé N-places (P3a-2) : chaque PLACE d'un créneau doit être un véto
+  // différent. Le véto est-il déjà posé sur une AUTRE place de ce créneau ?
+  // (isValid est évalué AVANT l'assignation de `roleVisé`, donc `estAttribue`
+  // ne remonte que les places DÉJÀ pourvues.) Pour le défaut à 2 rôles, c'est
+  // exactement l'ancien contrôle 1er↔2nd — équivalence préservée.
+  if (estAttribue(attr, vet.id)) {
+    return invalid(`R21 : ${vet.prenom} occupe déjà une place de ce créneau — chaque place doit être un vétérinaire différent`)
   }
   return ok()
 }
@@ -707,7 +709,7 @@ export function penaliteContraintesConfig(
 export function isValid(
   slot: SlotGarde,
   vet: VetEngineNormalise,
-  roleVisé: 'premier' | 'second',
+  roleVisé: RoleGarde,
   allVets: VetEngineNormalise[],
   planning: PlanningPartiel,
   calendrier?: CalendrierResolu,

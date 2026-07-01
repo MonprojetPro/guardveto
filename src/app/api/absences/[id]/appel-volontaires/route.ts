@@ -39,13 +39,12 @@ import {
   besoinSecondCreneau,
 } from '@/lib/crise/contexte'
 import { sendAppelVolontaires } from '@/lib/notifications'
-import type { RoleGarde } from '@/engine/types'
 
 export const maxDuration = 60
 
 interface Corps {
   gardeId: string
-  role: RoleGarde
+  role: 'premier' | 'second'
 }
 
 function estCorps(v: unknown): v is Corps {

@@ -5,7 +5,15 @@
 export type JourSemaine = 'lundi' | 'mardi' | 'mercredi' | 'jeudi' | 'vendredi' | 'samedi' | 'dimanche'
 export type TypeGardeEngine = 'semaine_soir' | 'vendredi_soir' | 'weekend' | 'ferie'
 export type Saison = 'ete' | 'hiver'
-export type RoleGarde = 'premier' | 'second'
+/**
+ * Label d'une place sur un créneau. **Libre** (P3a-2) : le catalogue décide
+ * combien de places et comment elles s'appellent (1er, 2nd, 3e…). Les valeurs
+ * 'premier' / 'second' restent les DÉFAUTS conventionnels (catalogue seed), et
+ * la sémantique historique (R11b avantage financier du 1er, R8 inversion) reste
+ * portée par ces NOMS — pas par le type. La généralisation de cette sémantique
+ * en règles/relations configurables est P4 ; P3a-2 ne pose que le rail générique.
+ */
+export type RoleGarde = string
 
 // Vétérinaire tel que le moteur le voit
 export interface VetEngine {

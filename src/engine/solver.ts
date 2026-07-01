@@ -35,7 +35,7 @@ import type {
 import { jourIndex, addDays, estJourFerie, lundiDeSemaine } from './utils'
 import { attributionVide, avecVet, clonerAttribution } from './attribution'
 import { typeGardePourJour, effectifSemaineParDefaut } from './structure-creneaux'
-import { typeGardePourJourCatalogue, type CreneauModele } from './creneau-modele'
+import type { CreneauModele } from './creneau-modele'
 import { normaliserContraintesVets } from './normaliserContraintes'
 import { isValid } from './rules/hard-constraints'
 import { penalite } from './rules/soft-constraints'
@@ -195,12 +195,34 @@ function stepsForDay(
   date: string, saison: Saison, besoinSecondSemaine: boolean, creneaux?: CreneauModele[],
 ): SolverStep[] {
   const idx = jourIndex(date) // 0=dim … 6=sam
-  // Type dérivé du CATALOGUE si présent (P2b), sinon mapping en dur (legacy /
-  // hors-cabinet). Pour le catalogue par défaut, résultat identique — équivalence
-  // prouvée par creneau-modele.test.ts → planning inchangé.
-  const t = creneaux && creneaux.length > 0
-    ? (typeGardePourJourCatalogue(creneaux, idx) as TypeGardeEngine | null)
-    : typeGardePourJour(idx)
+
+  // ── Chemin CATALOGUE (P3a-2) : les PLACES sont pilotées par la donnée ──
+  // Le nombre de places et leurs labels viennent du catalogue (`roles`/`nbPlaces`),
+  // plus de « 2 rôles » en dur. RÉCONCILIATION effectif : seul `semaine_soir` est
+  // plafonné par l'effectif configurable (été 1 / hiver 2 / override) — les autres
+  // créneaux émettent toutes leurs places. Pour le catalogue par DÉFAUT (seed :
+  // semaine_soir/vendredi_soir/weekend à 2 places [premier,second]), le résultat
+  // est byte-identique à l'ancien comportement (prouvé par les bancs d'équivalence).
+  if (creneaux && creneaux.length > 0) {
+    const c = creneaux.find(
+      (cr) => cr.actif && !cr.surFeries && cr.joursSemaine.includes(idx),
+    )
+    if (!c) return [] // aucun créneau ce jour (ex : dimanche)
+    const t = c.code as TypeGardeEngine | null
+    // On ne planifie que les codes portés par la logique actuelle ; un code
+    // sur-mesure encore inconnu → aucun slot (P3 le généralisera en aval).
+    if (t !== 'semaine_soir' && t !== 'vendredi_soir' && t !== 'weekend') return []
+    const effectifSemaine = besoinSecondSemaine ? 2 : 1
+    const nbAEmettre = t === 'semaine_soir'
+      ? Math.min(c.nbPlaces, effectifSemaine)
+      : c.nbPlaces
+    const roles = c.roles.slice(0, nbAEmettre)
+    const besoinSecond = nbAEmettre >= 2 // « le créneau a-t-il ≥ 2 places ? » (R17/R18)
+    return roles.map((role) => ({ date, type: t, saison, role, besoinSecond }))
+  }
+
+  // ── Chemin LEGACY (hors-catalogue) : mapping + 2 rôles en dur, INCHANGÉ ──
+  const t = typeGardePourJour(idx)
   if (t === 'vendredi_soir' || t === 'weekend') {
     // Vendredi soir / week-end → toujours 2 de garde.
     return [
