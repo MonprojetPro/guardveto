@@ -130,6 +130,7 @@ export async function resoudreContexte(
     nbVetosSemaineSoir: input.nbVetosSemaineSoir,
     equityWeights: input.equityWeights,
     structureConfig: input.structureConfig,
+    creneaux: input.creneaux,
   }
 
   return contexte

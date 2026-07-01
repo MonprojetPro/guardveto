@@ -130,6 +130,12 @@ export interface ContexteSimulation {
    * Même piège : à propager explicitement dans resoudreContexte ET au validateur.
    */
   structureConfig?: import('./structure-config').StructureConfig
+  /**
+   * Catalogue de créneaux du cabinet (fondamentaux universels — P1/P2). Même
+   * piège que ci-dessus : à propager explicitement dans resoudreContexte.
+   * Absent → le moteur retombe sur le mapping en dur (comportement historique).
+   */
+  creneaux?: import('./creneau-modele').CreneauModele[]
 }
 
 // Résultat d'une vérification

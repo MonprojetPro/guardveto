@@ -17,6 +17,7 @@ import {
   extraireStructureConfig,
   type RegleCabinetRow,
 } from '@/data/mapReglesCabinet'
+import { chargerCreneauModele } from '@/data/chargerCreneauModele'
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 
@@ -347,6 +348,13 @@ export async function chargerInputDepuisSupabase(
   // Poids d'équité : déjà calculés ci-dessus par chargerReglesCabinet (extraits
   // des règles `equilibrer`). Repli DEFAULT_EQUITY_WEIGHTS si aucune règle.
 
+  // Catalogue de créneaux du cabinet (fondamentaux universels — P1/P2).
+  // Best-effort : absent si pas de cabinet → le moteur retombe sur le mapping
+  // en dur (comportement historique). Consommé par le moteur à partir de P2b.
+  const creneaux = cabinetId
+    ? await chargerCreneauModele(supabase, cabinetId)
+    : undefined
+
   return {
     dateDebut: periode.date_debut,
     dateFin: periode.date_fin,
@@ -357,5 +365,6 @@ export async function chargerInputDepuisSupabase(
     nbVetosSemaineSoir,
     equityWeights,
     structureConfig,
+    creneaux,
   }
 }

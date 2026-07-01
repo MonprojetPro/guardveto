@@ -52,3 +52,20 @@ export function creneauCouvreJour(c: CreneauModele, jourIdx: number, estFerie: b
   if (estFerie && c.surFeries) return true
   return c.joursSemaine.includes(jourIdx)
 }
+
+/**
+ * Type de créneau (code) couvrant un jour de semaine donné (0=dim…6=sam),
+ * DÉRIVÉ du catalogue au lieu du mapping en dur. Ignore les créneaux « fériés »
+ * (qui ne génèrent pas de slot propre dans le modèle actuel — le férié est une
+ * reclassification au scoring, pas un slot). Renvoie le code du premier créneau
+ * (par ordre) couvrant ce jour, ou null.
+ *
+ * P2 : pour le catalogue PAR DÉFAUT (4 types seed), le résultat est IDENTIQUE à
+ * typeGardePourJour (prouvé par test) → bascule sans changement de comportement.
+ */
+export function typeGardePourJourCatalogue(creneaux: CreneauModele[], jourIdx: number): string | null {
+  const c = creneaux.find(
+    (cr) => cr.actif && !cr.surFeries && cr.joursSemaine.includes(jourIdx),
+  )
+  return c ? c.code : null
+}

@@ -34,6 +34,7 @@ import type {
 } from './types'
 import { jourIndex, addDays, estJourFerie, lundiDeSemaine } from './utils'
 import { typeGardePourJour, effectifSemaineParDefaut } from './structure-creneaux'
+import type { CreneauModele } from './creneau-modele'
 import { normaliserContraintesVets } from './normaliserContraintes'
 import { isValid } from './rules/hard-constraints'
 import { penalite } from './rules/soft-constraints'
@@ -97,6 +98,12 @@ export interface SolverInput {
    * Absent → DEFAULT_STRUCTURE_CONFIG (les deux fermes/actives = planning inchangé).
    */
   structureConfig?: StructureConfig
+  /**
+   * Catalogue de créneaux du cabinet (fondamentaux universels — P1/P2). Absent
+   * (contextes legacy / hors-cabinet) → le moteur retombe sur le mapping en dur
+   * `typeGardePourJour`. Pour le catalogue par défaut, la dérivation est identique.
+   */
+  creneaux?: CreneauModele[]
 }
 
 /** Effectif semaine effectif : config si fournie, sinon repli saison (hiver 2 / été 1). */
