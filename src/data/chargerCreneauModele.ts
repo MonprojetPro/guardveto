@@ -43,17 +43,41 @@ function hhmm(t: string): string {
   return t.slice(0, 5)
 }
 
-/** Catalogue de créneaux d'un cabinet (ordre d'affichage). Vide si aucun. */
+/**
+ * Catalogue de créneaux d'un cabinet, SCOPÉ À UN PROFIL (P5). Vide si aucun.
+ *
+ * Un cabinet compose plusieurs profils de planning nommés ; le catalogue lu est
+ * celui du profil `profilId` s'il est fourni, sinon celui du profil DÉFAUT du
+ * cabinet (`est_defaut = true`). Sans profil résolu (cabinet sans profil défaut,
+ * cas théorique) → `[]`, et le moteur retombe sur le mapping en dur — comme les
+ * contextes legacy. Tant qu'un cabinet n'a que son profil défaut (seed), le
+ * résultat est IDENTIQUE à avant l'introduction des profils.
+ */
 export async function chargerCreneauModele(
   supabase: SupabaseClient,
   cabinetId?: string,
+  profilId?: string,
 ): Promise<CreneauModele[]> {
   if (!cabinetId) return []
+
+  // Résoudre le profil : demandé, sinon le profil défaut du cabinet.
+  let profil = profilId
+  if (!profil) {
+    const { data: def } = await supabase
+      .from('profils_planning')
+      .select('id')
+      .eq('cabinet_id', cabinetId)
+      .eq('est_defaut', true)
+      .maybeSingle()
+    profil = (def as { id: string } | null)?.id ?? undefined
+  }
+  if (!profil) return []
 
   const { data, error } = await supabase
     .from('creneau_modele')
     .select('id, code, nom, jours_semaine, sur_feries, heure_debut, heure_fin, offset_jours_fin, nb_places, roles, actif, ordre')
     .eq('cabinet_id', cabinetId)
+    .eq('profil_id', profil)
     .order('ordre')
 
   if (error || !data) return []
