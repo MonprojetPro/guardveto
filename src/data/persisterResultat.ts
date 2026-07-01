@@ -19,7 +19,8 @@
 
 import { createClient } from '@/lib/supabase/server'
 import type { PlanningPartiel, TypeGardeEngine } from '@/engine/types'
-import { horairesCreneau } from '@/engine/structure-creneaux'
+import { horairesResolus, type StructureCreneauxResolue } from '@/engine/structure-creneaux'
+import { chargerStructureCabinet } from '@/data/chargerStructureCabinet'
 
 // ── Types internes ───────────────────────────────────────────
 
@@ -86,7 +87,8 @@ function toUTCString(dateISO: string, heureLocale: string): string {
  */
 function calculerHoraires(
   date: string,
-  type: TypeGardeEngine
+  type: TypeGardeEngine,
+  structure: StructureCreneauxResolue,
 ): { dateDebut: string; dateFin: string } {
   function addDaysISO(iso: string, days: number): string {
     const d = new Date(`${iso}T00:00:00Z`)
@@ -94,9 +96,9 @@ function calculerHoraires(
     return d.toISOString().slice(0, 10)
   }
 
-  // Horaires lus à la SOURCE UNIQUE (structure-creneaux) — plus aucune
-  // valeur en dur ici. A0 : un seul endroit décrit la structure des gardes.
-  const { heureDebut, heureFin, offsetJoursFin } = horairesCreneau(type)
+  // Horaires résolus pour CE cabinet (A1 : structure par défaut + surcharge
+  // cabinet). Repli automatique sur le défaut si le cabinet n'a rien personnalisé.
+  const { heureDebut, heureFin, offsetJoursFin } = horairesResolus(structure, type)
   return {
     dateDebut: toUTCString(date, heureDebut),
     dateFin:   toUTCString(addDaysISO(date, offsetJoursFin), heureFin),
@@ -152,6 +154,10 @@ export async function persisterResultat(
   // 1. Charger le catalogue de créneaux (pour résoudre creneau_id)
   const creneauMap = await chargerCreneauxCatalogue()
 
+  // 1b. Structure des créneaux résolue pour ce cabinet (horaires par défaut +
+  //     surcharge cabinet A1). Vide → défauts : comportement inchangé.
+  const structure = await chargerStructureCabinet(supabase, cabinetId)
+
   // 2. Prendre un snapshot des règles actives AVANT l'insertion
   //    (F8-002 : le snapshot_id doit être connu au moment de construire les lignes)
   const { data: snapshotId, error: snapshotErr } = await supabase.rpc('prendre_snapshot', {
@@ -185,7 +191,7 @@ export async function persisterResultat(
   for (const a of planning.attributions) {
     const codeCreneau = typeEngineVersCodeCreneau(a.type)
     const creneauId = creneauMap.get(codeCreneau) ?? null
-    const { dateDebut, dateFin } = calculerHoraires(a.date, a.type)
+    const { dateDebut, dateFin } = calculerHoraires(a.date, a.type, structure)
 
     if (a.premier_id) {
       rows.push({

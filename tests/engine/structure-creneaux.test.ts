@@ -5,6 +5,9 @@ import {
   libelleCreneau,
   typeGardePourJour,
   effectifSemaineParDefaut,
+  structureParDefaut,
+  resoudreStructure,
+  horairesResolus,
 } from '@/engine/structure-creneaux'
 import type { TypeGardeEngine } from '@/engine/types'
 
@@ -90,4 +93,33 @@ describe('structure-creneaux — typeGardePourJour (mapping jour→type)', () =>
 describe('structure-creneaux — effectifSemaineParDefaut (repli)', () => {
   it('hiver = 2', () => expect(effectifSemaineParDefaut('hiver')).toBe(2))
   it('été = 1', () => expect(effectifSemaineParDefaut('ete')).toBe(1))
+})
+
+describe('structure-creneaux — structure résolue (A1 : défaut + surcharge cabinet)', () => {
+  it('structureParDefaut = horaires du référentiel pour les 4 types', () => {
+    const s = structureParDefaut()
+    expect(s.semaine_soir).toEqual(horairesCreneau('semaine_soir'))
+    expect(s.weekend).toEqual(horairesCreneau('weekend'))
+  })
+
+  it('resoudreStructure(undefined) = défaut inchangé', () => {
+    expect(resoudreStructure()).toEqual(structureParDefaut())
+  })
+
+  it('horairesResolus(undefined, type) retombe sur le défaut', () => {
+    expect(horairesResolus(undefined, 'semaine_soir')).toEqual(horairesCreneau('semaine_soir'))
+  })
+
+  it('une surcharge cabinet ne change QUE le type visé', () => {
+    const resolue = resoudreStructure({
+      semaine_soir: { heureDebut: '19:00', heureFin: '08:00' },
+    })
+    // Le type surchargé prend les nouvelles heures…
+    expect(horairesResolus(resolue, 'semaine_soir').heureDebut).toBe('19:00')
+    expect(horairesResolus(resolue, 'semaine_soir').heureFin).toBe('08:00')
+    // …en gardant l'offset par défaut (non surchargé)…
+    expect(horairesResolus(resolue, 'semaine_soir').offsetJoursFin).toBe(1)
+    // …et les autres types restent au défaut.
+    expect(horairesResolus(resolue, 'weekend')).toEqual(horairesCreneau('weekend'))
+  })
 })

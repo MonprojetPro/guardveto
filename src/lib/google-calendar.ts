@@ -12,7 +12,7 @@
 
 import { google } from 'googleapis'
 import { addDays } from 'date-fns'
-import { horairesCreneau } from '@/engine/structure-creneaux'
+import { horairesResolus, type StructureCreneauxResolue } from '@/engine/structure-creneaux'
 
 // ── Types internes ───────────────────────────────────────────
 
@@ -62,22 +62,26 @@ function withTime(d: Date, hhmm: string): Date {
   return r
 }
 
-function getEventTimes(date: string, type: 'semaine' | 'weekend' | 'ferie') {
+function getEventTimes(
+  date: string,
+  type: 'semaine' | 'weekend' | 'ferie',
+  structure?: StructureCreneauxResolue,
+) {
   const baseDate = new Date(date + 'T00:00:00')
 
   if (type === 'weekend') {
     // L'événement agenda regroupe le vendredi soir + le week-end en UN seul
     // bloc (lisibilité côté cabinet). Début = prise du vendredi soir (veille
     // du samedi), fin = fin du week-end. `date` est le samedi.
-    const ven = horairesCreneau('vendredi_soir')
-    const we = horairesCreneau('weekend')
+    const ven = horairesResolus(structure, 'vendredi_soir')
+    const we = horairesResolus(structure, 'weekend')
     const start = withTime(addDays(baseDate, -1), ven.heureDebut)
     const end = withTime(addDays(baseDate, we.offsetJoursFin), we.heureFin)
     return { start: start.toISOString(), end: end.toISOString() }
   }
 
   // semaine → semaine_soir ; ferie → ferie (journée entière, comme en base).
-  const h = horairesCreneau(type === 'ferie' ? 'ferie' : 'semaine_soir')
+  const h = horairesResolus(structure, type === 'ferie' ? 'ferie' : 'semaine_soir')
   const start = withTime(baseDate, h.heureDebut)
   const end = withTime(addDays(baseDate, h.offsetJoursFin), h.heureFin)
   return { start: start.toISOString(), end: end.toISOString() }
@@ -126,11 +130,14 @@ function buildEventDescription(data: GardeEventData): string {
  * Crée un événement Google Agenda pour une garde.
  * Retourne l'ID de l'événement créé, ou null si Google n'est pas configuré.
  */
-export async function createGardeEvent(data: GardeEventData): Promise<string | null> {
+export async function createGardeEvent(
+  data: GardeEventData,
+  structure?: StructureCreneauxResolue,
+): Promise<string | null> {
   const ctx = getCalendarClient()
   if (!ctx) return null
 
-  const { start, end } = getEventTimes(data.date, data.type)
+  const { start, end } = getEventTimes(data.date, data.type, structure)
 
   const res = await ctx.client.events.insert({
     calendarId: ctx.calendarId,
@@ -149,11 +156,15 @@ export async function createGardeEvent(data: GardeEventData): Promise<string | n
  * Met à jour un événement Google Agenda existant.
  * No-op si Google n'est pas configuré.
  */
-export async function updateGardeEvent(eventId: string, data: GardeEventData): Promise<void> {
+export async function updateGardeEvent(
+  eventId: string,
+  data: GardeEventData,
+  structure?: StructureCreneauxResolue,
+): Promise<void> {
   const ctx = getCalendarClient()
   if (!ctx) return
 
-  const { start, end } = getEventTimes(data.date, data.type)
+  const { start, end } = getEventTimes(data.date, data.type, structure)
 
   await ctx.client.events.update({
     calendarId: ctx.calendarId,

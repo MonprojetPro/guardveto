@@ -133,3 +133,50 @@ export function typeGardePourJour(jourIdx: number): TypeGardeEngine | null {
 export function effectifSemaineParDefaut(saison: Saison): number {
   return saison === 'hiver' ? 2 : 1
 }
+
+// ============================================================
+// STRUCTURE RÉSOLUE — horaires effectifs (défaut + surcharge cabinet)
+// ============================================================
+// A1 : un cabinet peut personnaliser ses horaires (table creneaux_cabinet).
+// On matérialise la structure « résolue » = horaires par type après fusion
+// { défaut ⟵ surcharge cabinet }. Le loader (src/data/chargerStructureCabinet)
+// la construit ; les consommateurs d'horaires (persistance, agenda…) la
+// reçoivent en paramètre et retombent sur le défaut quand elle est absente.
+
+/** Horaires effectifs par type de créneau, après application de la config cabinet. */
+export type StructureCreneauxResolue = Record<TypeGardeEngine, HorairesCreneau>
+
+/** Structure résolue par défaut = les horaires du référentiel partagé. */
+export function structureParDefaut(): StructureCreneauxResolue {
+  return {
+    semaine_soir: horairesCreneau('semaine_soir'),
+    vendredi_soir: horairesCreneau('vendredi_soir'),
+    weekend: horairesCreneau('weekend'),
+    ferie: horairesCreneau('ferie'),
+  }
+}
+
+/** Applique des surcharges PARTIELLES (cabinet) sur la structure par défaut. */
+export function resoudreStructure(
+  overrides?: Partial<Record<TypeGardeEngine, Partial<HorairesCreneau>>>,
+): StructureCreneauxResolue {
+  const base = structureParDefaut()
+  if (!overrides) return base
+  for (const code of Object.keys(base) as TypeGardeEngine[]) {
+    const o = overrides[code]
+    if (o) base[code] = { ...base[code], ...o }
+  }
+  return base
+}
+
+/**
+ * Horaires d'un type dans une structure résolue, avec repli sur le défaut si
+ * la structure est absente (contextes legacy / hors-cabinet). Point d'accès
+ * unique pour les consommateurs d'horaires.
+ */
+export function horairesResolus(
+  structure: StructureCreneauxResolue | undefined,
+  type: TypeGardeEngine,
+): HorairesCreneau {
+  return structure?.[type] ?? horairesCreneau(type)
+}

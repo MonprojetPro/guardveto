@@ -13,6 +13,8 @@ import {
   isGoogleCalendarConfigured,
   GardeEventData,
 } from './google-calendar'
+import { chargerStructureCabinet } from '@/data/chargerStructureCabinet'
+import type { StructureCreneauxResolue } from '@/engine/structure-creneaux'
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -21,8 +23,27 @@ interface GardeAvecVetos {
   date: string
   type: 'semaine' | 'weekend' | 'ferie'
   google_event_id: string | null
+  periode_id?: string
   premier: { prenom: string } | null
   second:  { prenom: string } | null
+}
+
+/**
+ * Structure des créneaux (horaires) du cabinet propriétaire d'une période.
+ * Best-effort : période / cabinet introuvable → horaires par défaut. Sert à
+ * ce que l'agenda affiche les MÊMES horaires que ceux écrits en base (A1).
+ */
+async function structurePourPeriode(
+  supabase: SupabaseClient,
+  periodeId: string,
+): Promise<StructureCreneauxResolue | undefined> {
+  const { data } = await supabase
+    .from('periodes')
+    .select('cabinet_id')
+    .eq('id', periodeId)
+    .single()
+  const cabinetId = (data as { cabinet_id?: string } | null)?.cabinet_id
+  return chargerStructureCabinet(supabase, cabinetId)
 }
 
 export interface SyncResult {
@@ -85,6 +106,10 @@ export async function syncCalendrier(
   const errors: string[] = []
   let synced = 0
 
+  // Structure horaire du cabinet (A1) — passée à l'agenda pour rester aligné
+  // avec les horaires écrits en base. Défaut si le cabinet n'a rien personnalisé.
+  const structure = await structurePourPeriode(supabase, periodeId)
+
   // Petits lots espacés + reprise auto : évite le rate-limit Google
   // (qui jette une partie des créations quand on en lance trop d'un coup),
   // tout en restant largement sous le maxDuration de la fonction.
@@ -105,9 +130,9 @@ export async function syncCalendrier(
         try {
           await avecReprise(async () => {
             if (garde.google_event_id) {
-              await updateGardeEvent(garde.google_event_id as string, data)
+              await updateGardeEvent(garde.google_event_id as string, data, structure)
             } else {
-              const eventId = await createGardeEvent(data)
+              const eventId = await createGardeEvent(data, structure)
               if (eventId) {
                 await supabase
                   .from('gardes')
@@ -153,6 +178,7 @@ export async function syncGardeIndividuelle(
       date,
       type,
       google_event_id,
+      periode_id,
       premier:veterinaires!gardes_premier_id_fkey ( prenom ),
       second:veterinaires!gardes_second_id_fkey  ( prenom )
     `)
@@ -169,10 +195,15 @@ export async function syncGardeIndividuelle(
     prenomSecond:  g.second?.prenom  ?? null,
   }
 
+  // Structure horaire du cabinet (A1) — aligne l'agenda sur la base.
+  const structure = g.periode_id
+    ? await structurePourPeriode(supabase, g.periode_id)
+    : undefined
+
   if (g.google_event_id) {
-    await updateGardeEvent(g.google_event_id, data)
+    await updateGardeEvent(g.google_event_id, data, structure)
   } else {
-    const eventId = await createGardeEvent(data)
+    const eventId = await createGardeEvent(data, structure)
     if (eventId) {
       await supabase
         .from('gardes')
