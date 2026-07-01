@@ -39,6 +39,7 @@ import {
   DEFAULT_STRUCTURE_CONFIG, estStructureDure,
   type StructureConfig,
 } from '../structure-config'
+import type { CreneauModele } from '../creneau-modele'
 
 // ── Entrée minimale attendue (sous-ensemble de SolverInput) ──
 export interface ValidationInput {
@@ -56,6 +57,15 @@ export interface ValidationInput {
    * cabinet qui a assoupli/coupé la règle). MÊME config que le moteur.
    */
   structureConfig?: StructureConfig
+  /**
+   * Catalogue de créneaux du cabinet (fondamentaux universels, P1) — MÊME source
+   * que le moteur (SolverInput.creneaux). Présent → la dérivation jour→type est
+   * LUE du catalogue (donnée), comme le moteur en P2b ; absent/vide → repli sur
+   * le mapping en dur historique. Ré-implémenté ici (cf. typeCreneauPourJour) sans
+   * importer la dérivation du solver, pour préserver l'INDÉPENDANCE : une
+   * divergence de structure se traduit en violation DÉTECTÉE, pas cachée.
+   */
+  creneaux?: CreneauModele[]
 }
 
 // ── Une violation détectée ───────────────────────────────
@@ -221,22 +231,62 @@ function membres(a: AttributionGarde | undefined): string[] {
 // ── Construction des créneaux ATTENDUS (couverture) ──────
 // Indépendant du solver : on dérive la structure directement de la règle
 // métier R17/R18/R19 (été = 1 véto semaine, hiver = 2 ; WE & ven soir = 2).
+// Le type de créneau d'un jour vient du CATALOGUE si le cabinet en fournit un
+// (donnée, comme le moteur en P2b), sinon du mapping en dur historique.
 interface SlotAttendu {
   date: string
   type: 'semaine_soir' | 'vendredi_soir' | 'weekend'
   besoinSecond: boolean
 }
 
+/**
+ * Type de créneau couvrant un jour (0=dim…6=sam), DÉRIVÉ du catalogue si présent,
+ * sinon mapping en dur historique (miroir de `typeGardePourJour`). Ré-implémenté
+ * ICI, sans importer la dérivation du moteur (`typeGardePourJourCatalogue`) : le
+ * validateur reste DÉLIBÉRÉMENT indépendant, exactement comme il ré-implémente
+ * déjà `jIndex`/`plusJours`. Une divergence entre cette dérivation et celle du
+ * solver se traduit alors en violation DÉTECTÉE par le banc d'essai, pas cachée.
+ *
+ * Pour le catalogue PAR DÉFAUT (4 types seed), le résultat est identique au
+ * mapping en dur — prouvé par `creneau-modele.test.ts` (côté moteur) et par
+ * `p0-validateur-catalogue-equivalence.test.ts` (côté validateur).
+ *
+ * On ne retient que les 3 types portés par la logique de couverture actuelle ;
+ * un code sur-mesure encore inconnu → null (aucun slot attendu tant que P3 ne
+ * l'aura pas généralisé). Les créneaux « fériés » (surFeries) sont ignorés :
+ * comme pour le moteur, le férié est une reclassification au scoring, pas un slot.
+ */
+function typeCreneauPourJour(
+  input: ValidationInput,
+  idx: number,
+): 'semaine_soir' | 'vendredi_soir' | 'weekend' | null {
+  const creneaux = input.creneaux
+  if (creneaux && creneaux.length > 0) {
+    const c = creneaux.find(
+      (cr) => cr.actif && !cr.surFeries && cr.joursSemaine.includes(idx),
+    )
+    const code = c ? c.code : null
+    return code === 'semaine_soir' || code === 'vendredi_soir' || code === 'weekend'
+      ? code
+      : null
+  }
+  // Repli en dur historique (legacy / hors-cabinet) — miroir de typeGardePourJour.
+  if (idx === 5) return 'vendredi_soir'
+  if (idx === 6) return 'weekend'
+  if (idx >= 1 && idx <= 4) return 'semaine_soir'
+  return null
+}
+
 function slotsAttendus(input: ValidationInput): SlotAttendu[] {
   const slots: SlotAttendu[] = []
   let cur = input.dateDebut
   while (cur <= input.dateFin) {
-    const idx = jIndex(cur)
-    if (idx === 5) {
+    const t = typeCreneauPourJour(input, jIndex(cur))
+    if (t === 'vendredi_soir') {
       slots.push({ date: cur, type: 'vendredi_soir', besoinSecond: true })
-    } else if (idx === 6) {
+    } else if (t === 'weekend') {
       slots.push({ date: cur, type: 'weekend', besoinSecond: true })
-    } else if (idx >= 1 && idx <= 4) {
+    } else if (t === 'semaine_soir') {
       // Effectif configurable : besoin d'un 2nd si nb >= 2 ; repli saison sinon.
       const nb = input.nbVetosSemaineSoir ?? (input.saison === 'hiver' ? 2 : 1)
       slots.push({

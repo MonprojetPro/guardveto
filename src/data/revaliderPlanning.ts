@@ -97,6 +97,10 @@ export async function revaliderPlanningPublie(
       calendrier: ctx.calendrier,
       nbVetosSemaineSoir: ctx.nbVetosSemaineSoir,
       structureConfig: ctx.structureConfig,
+      // Catalogue-aware (P0) : MÊME source que le moteur → validateur et solver
+      // voient la même structure de gardes. Défaut (seed 4 types) = comportement
+      // historique, prouvé équivalent par p0-validateur-catalogue-equivalence.
+      creneaux: ctx.creneaux,
     }
 
     for (const v of validerPlanning(planning, input)) {
