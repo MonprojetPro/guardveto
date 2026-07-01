@@ -41,7 +41,7 @@ import { isValid } from './rules/hard-constraints'
 import { penalite } from './rules/soft-constraints'
 import { compterParVet } from './rules/optimization'
 import { comparerScores, scorerPlanning, type VecteurScore, type BonusMalusMap } from './score-lexicographique'
-import { DEFAULT_EQUITY_WEIGHTS, type EquityWeights } from './equity-weights'
+import { DEFAULT_EQUITY_WEIGHTS, DEFAULT_ROLE_AVANTAGE_FINANCIER, type EquityWeights } from './equity-weights'
 import { DEFAULT_STRUCTURE_CONFIG, type StructureConfig } from './structure-config'
 import type { DiagnosticImpasse } from './diagnostic'
 import { construireDiagnostic, type CreneauStep, type ReSimuler } from './diagnostic'
@@ -105,6 +105,15 @@ export interface SolverInput {
    * `typeGardePourJour`. Pour le catalogue par défaut, la dérivation est identique.
    */
   creneaux?: CreneauModele[]
+  /**
+   * Rôle portant l'AVANTAGE FINANCIER à équilibrer (R11b) — P4 slice 1.
+   *   • absent (undefined) → défaut historique 'premier' (planning inchangé).
+   *   • null → AUCUN rôle avantagé : le moteur n'équilibre pas le rôle (l'IA a
+   *     appris qu'être 1er ne change rien pour ce cabinet).
+   *   • autre label → l'avantage porte sur ce rôle.
+   * Le WEIGHT reste la dimension d'équité `weekend_premier` (WE_PREMIER_ROLE).
+   */
+  roleAvantageFinancier?: string | null
 }
 
 /** Effectif semaine effectif : config si fournie, sinon repli saison (hiver 2 / été 1). */
@@ -265,6 +274,30 @@ function genererSteps(
 // ── Scoring des candidats ────────────────────────────────
 
 /**
+ * Malus d'équité du rôle portant l'AVANTAGE FINANCIER (R11b) — P4 slice 1.
+ *
+ * Le rôle avantagé est équilibré : un véto qui l'a déjà eu souvent
+ * (`compteurRoleAvantage`) est déprioritisé pour l'obtenir encore (+poids) et
+ * priorisé pour les autres rôles (−poids). N'agit que sur `vendredi_soir` (le
+ * duo du week-end via R9), comme historiquement. `roleAvantage === null` →
+ * aucun équilibrage (le rôle ne confère aucun avantage pour ce cabinet).
+ *
+ * ÉQUIVALENCE : avec le défaut `roleAvantage = 'premier'`, redonne EXACTEMENT
+ * l'ancien code (premier → −w, second → +w) — prouvé par le banc.
+ */
+function malusAvantageFinancier(
+  step: SolverStep,
+  roleAvantage: string | null,
+  compteurRoleAvantage: number,
+  poids: number,
+): number {
+  if (step.type !== 'vendredi_soir' || roleAvantage === null) return 0
+  return step.role === roleAvantage
+    ? -compteurRoleAvantage * poids
+    : compteurRoleAvantage * poids
+}
+
+/**
  * Score d'un vétérinaire pour un créneau donné.
  * Score plus bas = vétérinaire prioritaire (moins de gardes, équité à rétablir).
  *
@@ -281,7 +314,8 @@ function scorerCandidat(
   bonusMalus: BonusMalusMap,
   allVets: VetEngine[],
   weights: EquityWeights,
-  calendrier?: CalendrierResolu
+  calendrier?: CalendrierResolu,
+  roleAvantageFinancier: string | null = DEFAULT_ROLE_AVANTAGE_FINANCIER,
 ): number {
   // Dernier recours → toujours en dernier
   if (vet.dernier_recours) return 1_000_000
@@ -310,13 +344,12 @@ function scorerCandidat(
     // Si bm > 0 (véto doit plus de gardes), son score est réduit → essayé avant
     const weEffectif = c.weGardes - bm
 
-    // R11b : équité du rôle 1er le week-end (avantage financier).
-    let malusRole = 0
-    if (step.type === 'vendredi_soir' && step.role === 'second') {
-      malusRole = c.weekendPremier * weights.WE_PREMIER_ROLE
-    } else if (step.type === 'vendredi_soir' && step.role === 'premier') {
-      malusRole = -c.weekendPremier * weights.WE_PREMIER_ROLE
-    }
+    // R11b : équité du rôle portant l'avantage financier (réglable — P4).
+    // Défaut roleAvantageFinancier='premier' → byte-identique à l'historique
+    // (premier → -w, second → +w). null → aucun équilibrage du rôle.
+    const malusRole = malusAvantageFinancier(
+      step, roleAvantageFinancier, c.weekendPremier, weights.WE_PREMIER_ROLE,
+    )
 
     return weEffectif * weights.WE_GARDE + malusRole + pen
   }
@@ -387,7 +420,8 @@ function backtrack(
   structure: StructureConfig,
   deepest: { value: number },
   blocage: { value: Blocage | null },
-  calendrier?: CalendrierResolu
+  calendrier: CalendrierResolu | undefined,
+  roleAvantageFinancier: string | null,
 ): PlanningPartiel | null {
   // Cas de base : toutes les étapes sont planifiées
   if (index === steps.length) return planning
@@ -403,8 +437,8 @@ function backtrack(
     .filter((vet) => isValid(slot, vet, step.role, vets, planning, calendrier, structure).valid)
     .sort(
       (a, b) =>
-        scorerCandidat(step, a, planning, bonusMalus, vets, weights, calendrier) -
-        scorerCandidat(step, b, planning, bonusMalus, vets, weights, calendrier)
+        scorerCandidat(step, a, planning, bonusMalus, vets, weights, calendrier, roleAvantageFinancier) -
+        scorerCandidat(step, b, planning, bonusMalus, vets, weights, calendrier, roleAvantageFinancier)
     )
 
   // Aucun candidat valide DANS CE CONTEXTE PARTIEL RÉEL → vrai créneau bloquant.
@@ -420,7 +454,7 @@ function backtrack(
   // Essaie chaque candidat dans l'ordre de priorité
   for (const vet of candidates) {
     const newPlanning = assignerStep(planning, step, vet.id)
-    const result = backtrack(steps, index + 1, newPlanning, vets, bonusMalus, weights, structure, deepest, blocage, calendrier)
+    const result = backtrack(steps, index + 1, newPlanning, vets, bonusMalus, weights, structure, deepest, blocage, calendrier, roleAvantageFinancier)
     if (result !== null) return result
   }
 
@@ -446,6 +480,10 @@ function genererSeedGreedy(input: SolverInput, avecDiagnostic = true): SolveResu
   const vets = normaliserContraintesVets(input.vets)
   const weights = input.equityWeights ?? DEFAULT_EQUITY_WEIGHTS
   const structure = input.structureConfig ?? DEFAULT_STRUCTURE_CONFIG
+  // R11b (P4) : absent → défaut historique 'premier' ; null explicite → aucun avantage.
+  const roleAvantage = input.roleAvantageFinancier === undefined
+    ? DEFAULT_ROLE_AVANTAGE_FINANCIER
+    : input.roleAvantageFinancier
   const t0 = Date.now()
 
   const steps = genererSteps(dateDebut, dateFin, saison, input.nbVetosSemaineSoir, input.creneaux)
@@ -462,7 +500,8 @@ function genererSeedGreedy(input: SolverInput, avecDiagnostic = true): SolveResu
     structure,
     deepest,
     blocage,
-    calendrier
+    calendrier,
+    roleAvantage
   )
 
   const dureeMs = Date.now() - t0
@@ -585,7 +624,8 @@ export function scorerCandidatLNS(
   planning: PlanningPartiel,
   allVets: VetEngine[],
   weights: EquityWeights,
-  calendrier?: CalendrierResolu
+  calendrier?: CalendrierResolu,
+  roleAvantageFinancier: string | null = DEFAULT_ROLE_AVANTAGE_FINANCIER,
 ): number {
   if (vet.dernier_recours) return 1_000_000
 
@@ -609,12 +649,9 @@ export function scorerCandidatLNS(
   )
 
   if (step.type === 'weekend' || step.type === 'vendredi_soir') {
-    let malusRole = 0
-    if (step.type === 'vendredi_soir' && step.role === 'second') {
-      malusRole = c.weekendPremier * weights.WE_PREMIER_ROLE
-    } else if (step.type === 'vendredi_soir' && step.role === 'premier') {
-      malusRole = -c.weekendPremier * weights.WE_PREMIER_ROLE
-    }
+    const malusRole = malusAvantageFinancier(
+      step, roleAvantageFinancier, c.weekendPremier, weights.WE_PREMIER_ROLE,
+    )
     return c.weGardes * weights.WE_GARDE + malusRole + pen
   }
   if (estJourFerie(step.date, calendrier)) return c.feriesGardes * weights.FERIES + pen
@@ -629,7 +666,8 @@ function repairerSemaine(
   vets: VetEngineNormalise[],
   weights: EquityWeights,
   structure: StructureConfig,
-  calendrier?: CalendrierResolu
+  calendrier: CalendrierResolu | undefined,
+  roleAvantageFinancier: string | null,
 ): PlanningPartiel | null {
   let planning = partialPlanning
 
@@ -641,8 +679,8 @@ function repairerSemaine(
 
     const sorted = [...valids].sort(
       (a, b) =>
-        scorerCandidatLNS(step, a, planning, vets, weights, calendrier) -
-        scorerCandidatLNS(step, b, planning, vets, weights, calendrier)
+        scorerCandidatLNS(step, a, planning, vets, weights, calendrier, roleAvantageFinancier) -
+        scorerCandidatLNS(step, b, planning, vets, weights, calendrier, roleAvantageFinancier)
     )
 
     const attributions = [...planning.attributions]
@@ -728,6 +766,9 @@ function lnsHillClimbing(
   const vets = normaliserContraintesVets(input.vets)
   const weights = input.equityWeights ?? DEFAULT_EQUITY_WEIGHTS
   const structure = input.structureConfig ?? DEFAULT_STRUCTURE_CONFIG
+  const roleAvantage = input.roleAvantageFinancier === undefined
+    ? DEFAULT_ROLE_AVANTAGE_FINANCIER
+    : input.roleAvantageFinancier
   // Backstop temps : actif UNIQUEMENT si fourni > 0. Sinon, aucune coupe chrono
   // (déterministe). Le sentinel 0 ne nous parvient jamais (intercepté en amont).
   const timeoutMs =
@@ -780,7 +821,7 @@ function lnsHillClimbing(
       if (steps.length === 0) continue
 
       // Réparer : greedy LNS sur la semaine
-      const repaired = repairerSemaine(partial, steps, vets, weights, structure, calendrier)
+      const repaired = repairerSemaine(partial, steps, vets, weights, structure, calendrier, roleAvantage)
       if (repaired === null) continue
 
       // Comparer : garder si strictement amélioré

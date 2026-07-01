@@ -31,6 +31,19 @@ export interface EquityWeights {
   GRANDS_WE: number
 }
 
+/**
+ * Rôle portant l'AVANTAGE FINANCIER par défaut (R11b) = 'premier'.
+ *
+ * P4 : ce rôle n'est plus présumé par le code. Le moteur équilibre le rôle
+ * `roleAvantageFinancier` du créneau (qui l'obtient combien de fois) ; le WEIGHT
+ * associé reste la dimension d'équité `weekend_premier` (WE_PREMIER_ROLE).
+ *   • undefined (absent de l'input) → ce défaut historique 'premier'.
+ *   • null → AUCUN rôle avantagé (l'IA a appris qu'être 1er ne change rien pour
+ *     ce cabinet → on n'équilibre pas le rôle).
+ *   • autre label → l'avantage porte sur ce rôle-là.
+ */
+export const DEFAULT_ROLE_AVANTAGE_FINANCIER = 'premier'
+
 /** Valeurs par défaut = comportement historique (aucun changement de planning). */
 export const DEFAULT_EQUITY_WEIGHTS: EquityWeights = {
   WE_GARDE: 100,
