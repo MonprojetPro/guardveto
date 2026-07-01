@@ -34,7 +34,7 @@ import type {
 } from './types'
 import { jourIndex, addDays, estJourFerie, lundiDeSemaine } from './utils'
 import { typeGardePourJour, effectifSemaineParDefaut } from './structure-creneaux'
-import type { CreneauModele } from './creneau-modele'
+import { typeGardePourJourCatalogue, type CreneauModele } from './creneau-modele'
 import { normaliserContraintesVets } from './normaliserContraintes'
 import { isValid } from './rules/hard-constraints'
 import { penalite } from './rules/soft-constraints'
@@ -190,8 +190,16 @@ interface Blocage {
  * deux (c'étaient deux copies identiques). Le validateur indépendant garde, lui,
  * sa propre dérivation — cf. typeGardePourJour (structure-creneaux).
  */
-function stepsForDay(date: string, saison: Saison, besoinSecondSemaine: boolean): SolverStep[] {
-  const t = typeGardePourJour(jourIndex(date)) // 0=dim … 6=sam
+function stepsForDay(
+  date: string, saison: Saison, besoinSecondSemaine: boolean, creneaux?: CreneauModele[],
+): SolverStep[] {
+  const idx = jourIndex(date) // 0=dim … 6=sam
+  // Type dérivé du CATALOGUE si présent (P2b), sinon mapping en dur (legacy /
+  // hors-cabinet). Pour le catalogue par défaut, résultat identique — équivalence
+  // prouvée par creneau-modele.test.ts → planning inchangé.
+  const t = creneaux && creneaux.length > 0
+    ? (typeGardePourJourCatalogue(creneaux, idx) as TypeGardeEngine | null)
+    : typeGardePourJour(idx)
   if (t === 'vendredi_soir' || t === 'weekend') {
     // Vendredi soir / week-end → toujours 2 de garde.
     return [
@@ -214,6 +222,7 @@ function stepsForDay(date: string, saison: Saison, besoinSecondSemaine: boolean)
 
 function genererSteps(
   dateDebut: string, dateFin: string, saison: Saison, nbVetosSemaineSoir?: number,
+  creneaux?: CreneauModele[],
 ): SolverStep[] {
   const weSteps: SolverStep[] = []
   const semaineSteps: SolverStep[] = []
@@ -221,7 +230,7 @@ function genererSteps(
 
   let current = dateDebut
   while (current <= dateFin) {
-    for (const s of stepsForDay(current, saison, besoinSecondSemaine)) {
+    for (const s of stepsForDay(current, saison, besoinSecondSemaine, creneaux)) {
       (s.type === 'semaine_soir' ? semaineSteps : weSteps).push(s)
     }
     current = addDays(current, 1)
@@ -423,7 +432,7 @@ function genererSeedGreedy(input: SolverInput, avecDiagnostic = true): SolveResu
   const structure = input.structureConfig ?? DEFAULT_STRUCTURE_CONFIG
   const t0 = Date.now()
 
-  const steps = genererSteps(dateDebut, dateFin, saison, input.nbVetosSemaineSoir)
+  const steps = genererSteps(dateDebut, dateFin, saison, input.nbVetosSemaineSoir, input.creneaux)
   const deepest = { value: -1 }
   const blocage: { value: Blocage | null } = { value: null }
 
@@ -532,14 +541,16 @@ function supprimerSemaine(planning: PlanningPartiel, lundi: string): PlanningPar
 }
 
 /** Génère les étapes (steps) d'une semaine donnée (lundi → dimanche inclus). */
-function genererStepsSemaine(lundi: string, saison: Saison, nbVetosSemaineSoir?: number): SolverStep[] {
+function genererStepsSemaine(
+  lundi: string, saison: Saison, nbVetosSemaineSoir?: number, creneaux?: CreneauModele[],
+): SolverStep[] {
   const weSteps: SolverStep[] = []
   const semaineSteps: SolverStep[] = []
   const besoinSecondSemaine = effectifSemaine(saison, nbVetosSemaineSoir) >= 2
 
   for (let i = 0; i <= 6; i++) {
     const date = addDays(lundi, i)
-    for (const s of stepsForDay(date, saison, besoinSecondSemaine)) {
+    for (const s of stepsForDay(date, saison, besoinSecondSemaine, creneaux)) {
       (s.type === 'semaine_soir' ? semaineSteps : weSteps).push(s)
     }
   }
@@ -756,7 +767,7 @@ function lnsHillClimbing(
 
       // Détruire : supprimer la semaine
       const partial = supprimerSemaine(meilleur, lundi)
-      const steps = genererStepsSemaine(lundi, saison, input.nbVetosSemaineSoir).filter(
+      const steps = genererStepsSemaine(lundi, saison, input.nbVetosSemaineSoir, input.creneaux).filter(
         (s) => s.date >= dateDebut && s.date <= dateFin
       )
       if (steps.length === 0) continue
