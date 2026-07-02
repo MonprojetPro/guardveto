@@ -44,6 +44,48 @@ function hhmm(t: string): string {
 }
 
 /**
+ * resoudreProfilId — id du profil EFFECTIF d'un cabinet : celui demandé
+ * (`profilId`), sinon le profil DÉFAUT du cabinet (`est_defaut = true`).
+ *
+ * SOURCE UNIQUE de résolution du profil (P5 slice 3) : utilisée par le loader
+ * du catalogue ET par la lecture de l'effectif porté par le profil, pour que
+ * les deux photographient le MÊME profil. `undefined` si le cabinet n'a aucun
+ * profil défaut (cas théorique) → le moteur retombe sur le mapping en dur.
+ */
+export async function resoudreProfilId(
+  supabase: SupabaseClient,
+  cabinetId: string,
+  profilId?: string,
+): Promise<string | undefined> {
+  if (profilId) return profilId
+  const { data: def } = await supabase
+    .from('profils_planning')
+    .select('id')
+    .eq('cabinet_id', cabinetId)
+    .eq('est_defaut', true)
+    .maybeSingle()
+  return (def as { id: string } | null)?.id ?? undefined
+}
+
+/**
+ * chargerEffectifProfil — effectif de garde la nuit en semaine (1 ou 2) porté
+ * par un profil (P5 slice 3), ou `undefined` si non réglé / colonne absente /
+ * erreur. Best-effort : jamais de throw (repli saison en aval).
+ */
+export async function chargerEffectifProfil(
+  supabase: SupabaseClient,
+  profilId: string,
+): Promise<number | undefined> {
+  const { data } = await supabase
+    .from('profils_planning')
+    .select('nb_vetos_semaine_soir')
+    .eq('id', profilId)
+    .maybeSingle()
+  const v = (data as { nb_vetos_semaine_soir?: number | null } | null)?.nb_vetos_semaine_soir
+  return typeof v === 'number' ? v : undefined
+}
+
+/**
  * Catalogue de créneaux d'un cabinet, SCOPÉ À UN PROFIL (P5). Vide si aucun.
  *
  * Un cabinet compose plusieurs profils de planning nommés ; le catalogue lu est
@@ -61,16 +103,7 @@ export async function chargerCreneauModele(
   if (!cabinetId) return []
 
   // Résoudre le profil : demandé, sinon le profil défaut du cabinet.
-  let profil = profilId
-  if (!profil) {
-    const { data: def } = await supabase
-      .from('profils_planning')
-      .select('id')
-      .eq('cabinet_id', cabinetId)
-      .eq('est_defaut', true)
-      .maybeSingle()
-    profil = (def as { id: string } | null)?.id ?? undefined
-  }
+  const profil = await resoudreProfilId(supabase, cabinetId, profilId)
   if (!profil) return []
 
   const { data, error } = await supabase

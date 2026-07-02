@@ -17,7 +17,7 @@ import {
   extraireStructureConfig,
   type RegleCabinetRow,
 } from '@/data/mapReglesCabinet'
-import { chargerCreneauModele } from '@/data/chargerCreneauModele'
+import { chargerCreneauModele, resoudreProfilId, chargerEffectifProfil } from '@/data/chargerCreneauModele'
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 
@@ -232,7 +232,7 @@ export async function chargerInputDepuisSupabase(
   // 1. Période à générer
   const { data: periode, error: periodeErr } = await supabase
     .from('periodes')
-    .select('id, saison, date_debut, date_fin, statut')
+    .select('id, saison, date_debut, date_fin, statut, profil_id')
     .eq('id', periodeId)
     .single()
 
@@ -330,10 +330,20 @@ export async function chargerInputDepuisSupabase(
     ? await chargerCalendrierZone(cabinetId, periode.date_debut, periode.date_fin)
     : undefined
 
-  // Effectif configurable (colonne ajoutée par la migration P1-B effectif).
-  // Lecture en BEST-EFFORT séparée : si la colonne n'existe pas encore (déploiement
-  // avant migration), l'erreur est ignorée → undefined → le solver retombe sur la
-  // saison (hiver = 2, été = 1). Aucune contrainte d'ordre de déploiement.
+  // Profil de planning de la période (P5 slice 3) : celui explicitement choisi
+  // (`periode.profil_id`), sinon le profil DÉFAUT du cabinet. SOURCE UNIQUE
+  // réutilisée pour le catalogue ET l'effectif → les deux photographient le même
+  // profil. Sans cabinet (contextes legacy) → undefined (repli mapping en dur).
+  const profilId = cabinetId
+    ? await resoudreProfilId(supabase, cabinetId, (periode as { profil_id?: string | null }).profil_id ?? undefined)
+    : undefined
+
+  // Effectif configurable — PRÉCÉDENCE : période (surcharge) > profil > saison.
+  // Lecture BEST-EFFORT (jamais de throw) : une colonne absente (déploiement
+  // avant migration) → undefined → repli saison (hiver = 2, été = 1) en aval.
+  // Byte-identique : toutes les périodes existantes portent déjà une valeur
+  // explicite (backfill P1-B) → la branche période gagne toujours pour elles ;
+  // le profil ne s'applique qu'aux périodes sans surcharge (ex. profil « Été »).
   let nbVetosSemaineSoir: number | undefined
   {
     const { data: eff } = await supabase
@@ -341,18 +351,24 @@ export async function chargerInputDepuisSupabase(
       .select('nb_vetos_semaine_soir')
       .eq('id', periodeId)
       .single()
-    const v = (eff as { nb_vetos_semaine_soir?: number } | null)?.nb_vetos_semaine_soir
-    if (typeof v === 'number') nbVetosSemaineSoir = v
+    const vPeriode = (eff as { nb_vetos_semaine_soir?: number | null } | null)?.nb_vetos_semaine_soir
+    if (typeof vPeriode === 'number') {
+      nbVetosSemaineSoir = vPeriode
+    } else if (profilId) {
+      // Pas de surcharge période → l'effectif porté par le profil de la période.
+      nbVetosSemaineSoir = await chargerEffectifProfil(supabase, profilId)
+    }
+    // Sinon undefined → le solver retombe sur la saison.
   }
 
   // Poids d'équité : déjà calculés ci-dessus par chargerReglesCabinet (extraits
   // des règles `equilibrer`). Repli DEFAULT_EQUITY_WEIGHTS si aucune règle.
 
-  // Catalogue de créneaux du cabinet (fondamentaux universels — P1/P2).
-  // Best-effort : absent si pas de cabinet → le moteur retombe sur le mapping
-  // en dur (comportement historique). Consommé par le moteur à partir de P2b.
+  // Catalogue de créneaux du cabinet (fondamentaux universels — P1/P2), SCOPÉ au
+  // profil de la période (P5 slice 3). Best-effort : absent si pas de cabinet →
+  // le moteur retombe sur le mapping en dur (comportement historique).
   const creneaux = cabinetId
-    ? await chargerCreneauModele(supabase, cabinetId)
+    ? await chargerCreneauModele(supabase, cabinetId, profilId)
     : undefined
 
   return {
