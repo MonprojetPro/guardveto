@@ -27,6 +27,7 @@ import {
 import {
   ProfilsManager, type ProfilLigne,
 } from '@/components/admin/ProfilsManager'
+import { AssistantProfilIA } from '@/components/admin/AssistantProfilIA'
 
 /** Types de garde connus, dans l'ordre d'affichage (les seuls horodatés par l'aval). */
 const CODES_CONNUS: TypeGardeEngine[] = ['semaine_soir', 'vendredi_soir', 'weekend', 'ferie']
@@ -197,6 +198,8 @@ export default async function StructurePage() {
             {!isAdmin && ' (Lecture seule — seul l’administrateur peut modifier.)'}
           </p>
         </div>
+        {/* P5 slice 5 — créer un profil en langage naturel (admin seul). */}
+        {isAdmin && <AssistantProfilIA />}
         <ProfilsManager profils={profils} isAdmin={isAdmin} />
       </section>
 

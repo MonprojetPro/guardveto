@@ -24,6 +24,15 @@ import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { TypeGardeEngine } from '@/engine/types'
+import { assistantIaDisponible } from '@/lib/ia/proposerRegle'
+import { proposerProfilIA } from '@/lib/ia/proposerProfil'
+import {
+  propositionVersProfilPayload,
+  apercuProfil,
+  type PropositionProfil,
+  type ProfilResolu,
+  type CreerProfilCompletPayload,
+} from '@/lib/ia/profilSchema'
 
 // ── Référentiels de validation ───────────────────────────────
 const CODES_VALIDES = new Set<TypeGardeEngine>([
@@ -63,6 +72,28 @@ async function assertAdmin(
 function enMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(':').map((x) => parseInt(x, 10))
   return h * 60 + m
+}
+
+/**
+ * Valide un triplet horaire (début/fin en 'HH:MM' + jour de fin). Renvoie un
+ * message d'erreur clair, ou null si tout est cohérent. Frontière de confiance
+ * partagée par les écritures d'horaires (réglage manuel ET création IA).
+ */
+function validerHoraire(p: {
+  heure_debut: string
+  heure_fin: string
+  offset_jours_fin: number
+}): string | null {
+  if (!HEURE_RE.test(p.heure_debut)) return 'Heure de début invalide (format attendu HH:MM).'
+  if (!HEURE_RE.test(p.heure_fin)) return 'Heure de fin invalide (format attendu HH:MM).'
+  const offset = p.offset_jours_fin
+  if (!Number.isInteger(offset) || offset < OFFSET_MIN || offset > OFFSET_MAX) {
+    return `Jour de fin invalide (doit être entre ${OFFSET_MIN} et ${OFFSET_MAX}).`
+  }
+  if (offset === 0 && enMinutes(p.heure_fin) <= enMinutes(p.heure_debut)) {
+    return "L'heure de fin doit être après l'heure de début, ou la garde doit se terminer un jour suivant."
+  }
+  return null
 }
 
 // ── Payload du formulaire (champs simples) ───────────────────
@@ -331,23 +362,8 @@ export async function setHorairesProfilCreneau(
   const garde = await assertAdmin(supabase)
   if ('error' in garde) return garde
 
-  if (!HEURE_RE.test(payload.heure_debut)) {
-    return { error: 'Heure de début invalide (format attendu HH:MM).' }
-  }
-  if (!HEURE_RE.test(payload.heure_fin)) {
-    return { error: 'Heure de fin invalide (format attendu HH:MM).' }
-  }
-  const offset = payload.offset_jours_fin
-  if (!Number.isInteger(offset) || offset < OFFSET_MIN || offset > OFFSET_MAX) {
-    return { error: `Jour de fin invalide (doit être entre ${OFFSET_MIN} et ${OFFSET_MAX}).` }
-  }
-  if (offset === 0 && enMinutes(payload.heure_fin) <= enMinutes(payload.heure_debut)) {
-    return {
-      error:
-        "L'heure de fin doit être après l'heure de début, ou la garde doit se "
-        + 'terminer un jour suivant.',
-    }
-  }
+  const invalide = validerHoraire(payload)
+  if (invalide) return { error: invalide }
 
   const { error, count } = await supabase
     .from('creneau_modele')
@@ -355,7 +371,7 @@ export async function setHorairesProfilCreneau(
       {
         heure_debut: payload.heure_debut,
         heure_fin: payload.heure_fin,
-        offset_jours_fin: offset,
+        offset_jours_fin: payload.offset_jours_fin,
       },
       { count: 'exact' },
     )
@@ -399,4 +415,201 @@ export async function supprimerProfil(profilId: string) {
   revalidatePath('/admin/structure')
   revalidatePath('/admin/periodes')
   return { success: true }
+}
+
+// ════════════════════════════════════════════════════════════
+// P5 slice 5 — Assistant IA : créer un PROFIL en langage naturel
+// ════════════════════════════════════════════════════════════
+// « Crée un profil été avec 2 vétos le soir et des gardes qui démarrent à 19h »
+// → l'IA PROPOSE un profil structuré → l'admin valide → creerProfilComplet
+// crée (duplication d'une source) puis applique les horaires ajustés. L'IA ne
+// touche JAMAIS la base : la frontière de confiance reste ces server actions
+// (assertAdmin + RLS admin-only + validation stricte). Périmètre : types
+// EXISTANTS uniquement (miroir de creerProfil / setHorairesProfilCreneau).
+
+/**
+ * creerProfilComplet — crée un profil par duplication d'une source, puis ajuste
+ * les horaires demandés (P5 slice 5). Tout est validé AVANT création (nom,
+ * saison, effectif, horaires + existence des types dans la source), pour ne
+ * jamais laisser un profil à moitié réglé sur une donnée invalide.
+ */
+export async function creerProfilComplet(payload: CreerProfilCompletPayload) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  const nom = payload.nom?.trim()
+  if (!nom) return { error: 'Le nom du profil est obligatoire.' }
+  if (nom.length > 60) return { error: 'Le nom du profil est trop long (60 caractères max).' }
+
+  const saison = payload.saison_suggeree ?? null
+  if (saison !== null && !SAISONS_VALIDES.has(saison)) {
+    return { error: 'Saison suggérée invalide.' }
+  }
+  const effectif = payload.nb_vetos_semaine_soir ?? null
+  if (effectif !== null && !EFFECTIFS_VALIDES.has(effectif)) {
+    return { error: 'Effectif invalide (1 ou 2).' }
+  }
+
+  // Horaires à ajuster : type connu + triplet cohérent (frontière de confiance).
+  const overrides = payload.horaires ?? []
+  for (const h of overrides) {
+    if (!CODES_VALIDES.has(h.code as TypeGardeEngine)) {
+      return { error: `Type de créneau inconnu : « ${h.code} ».` }
+    }
+    const invalide = validerHoraire(h)
+    if (invalide) return { error: `Horaire « ${h.code} » : ${invalide}` }
+  }
+
+  let cabinetId: string
+  try {
+    cabinetId = await resoudreCabinetId(supabase)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
+  }
+
+  // Source : celle demandée (bornée au cabinet), sinon le profil défaut. On la
+  // résout ici pour VÉRIFIER que les types à horodater y existent bien avant de
+  // créer quoi que ce soit (anti-coquille-vide).
+  let sourceId = payload.source_profil_id ?? null
+  if (!sourceId) {
+    const { data: def } = await supabase
+      .from('profils_planning')
+      .select('id')
+      .eq('cabinet_id', cabinetId)
+      .eq('est_defaut', true)
+      .maybeSingle()
+    sourceId = (def as { id: string } | null)?.id ?? null
+  }
+  if (!sourceId) {
+    return { error: 'Aucun profil source disponible pour créer ce profil.' }
+  }
+
+  if (overrides.length > 0) {
+    const { data: srcRows } = await supabase
+      .from('creneau_modele')
+      .select('code')
+      .eq('cabinet_id', cabinetId)
+      .eq('profil_id', sourceId)
+    const codesSource = new Set(
+      ((srcRows as { code: string | null }[] | null) ?? [])
+        .map((r) => r.code)
+        .filter((c): c is string => Boolean(c)),
+    )
+    for (const h of overrides) {
+      if (!codesSource.has(h.code)) {
+        return { error: `Le profil source n'a pas de « ${h.code} » : impossible d'en régler l'horaire.` }
+      }
+    }
+  }
+
+  // 1. Créer par duplication (atomique) — récupère le nouvel id.
+  const { data: newId, error: rpcErr } = await supabase.rpc('dupliquer_profil', {
+    p_nom: nom,
+    p_source_profil_id: sourceId,
+    p_saison: saison,
+    p_effectif: effectif,
+  })
+  if (rpcErr) {
+    if (rpcErr.code === '23505') return { error: `Un profil « ${nom} » existe déjà.` }
+    return { error: rpcErr.message }
+  }
+  const profilId = (newId as string | null) ?? null
+  if (!profilId) return { error: 'Création du profil : identifiant non renvoyé.' }
+
+  // 2. Appliquer les horaires ajustés sur les créneaux du NOUVEAU profil (par code).
+  if (overrides.length > 0) {
+    const { data: newRows } = await supabase
+      .from('creneau_modele')
+      .select('id, code')
+      .eq('cabinet_id', cabinetId)
+      .eq('profil_id', profilId)
+    const parCode = new Map<string, string>()
+    for (const r of ((newRows as { id: string; code: string | null }[] | null) ?? [])) {
+      if (r.code) parCode.set(r.code, r.id)
+    }
+    for (const h of overrides) {
+      const creneauId = parCode.get(h.code)
+      if (!creneauId) continue // vérifié sur la source : ne devrait pas arriver
+      const { error: upErr } = await supabase
+        .from('creneau_modele')
+        .update({
+          heure_debut: h.heure_debut,
+          heure_fin: h.heure_fin,
+          offset_jours_fin: h.offset_jours_fin,
+        })
+        .eq('id', creneauId)
+      if (upErr) {
+        return { error: `Profil créé, mais l'horaire « ${h.code} » n'a pas pu être réglé : ${upErr.message}` }
+      }
+    }
+  }
+
+  revalidatePath('/admin/structure')
+  revalidatePath('/admin/periodes')
+  return { success: true }
+}
+
+/** Résultat d'une proposition de profil renvoyé à l'UI. */
+export type PropositionProfilResultat =
+  | { error: string }
+  | {
+      proposition: PropositionProfil
+      /** Phrase d'aperçu (ce qui serait créé) — présente si faisable. */
+      apercu: string
+      /** Payload prêt pour creerProfilComplet — présent SEULEMENT si exploitable. */
+      payload?: CreerProfilCompletPayload
+    }
+
+/**
+ * proposerProfilDepuisTexte — passe une phrase admin à l'IA et renvoie une
+ * PROPOSITION de profil (jamais d'écriture en base). L'admin créera ensuite via
+ * creerProfilComplet (frontière de confiance + RLS inchangées). Admin-only.
+ */
+export async function proposerProfilDepuisTexte(phrase: string): Promise<PropositionProfilResultat> {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  if (!assistantIaDisponible()) {
+    return { error: 'Assistant IA non configuré (clé API manquante côté serveur).' }
+  }
+  if (!phrase || phrase.trim().length < 3) {
+    return { error: 'Décris le profil en quelques mots.' }
+  }
+
+  let cabinetId: string
+  try {
+    cabinetId = await resoudreCabinetId(supabase)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
+  }
+
+  const { data: profilsDb } = await supabase
+    .from('profils_planning')
+    .select('id, nom, est_defaut')
+    .eq('cabinet_id', cabinetId)
+    .eq('actif', true)
+    .order('ordre')
+  const profils = ((profilsDb as ProfilResolu[] | null) ?? [])
+
+  let proposition: PropositionProfil
+  try {
+    proposition = await proposerProfilIA(phrase.trim(), profils)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Erreur de l'assistant IA." }
+  }
+
+  const conv = propositionVersProfilPayload(proposition, profils)
+  if (!conv.ok) {
+    // Non faisable / ambigu / hors périmètre : on FORCE le message de NOTRE
+    // couche (cohérent avec l'UI — pas de payload → pas de bouton « Créer »).
+    return {
+      proposition: { ...proposition, faisable: false, message: conv.raison },
+      apercu: '',
+    }
+  }
+  return { proposition, apercu: apercuProfil(proposition), payload: conv.payload }
 }
