@@ -61,7 +61,7 @@ export function ProfilPeriodeSelect({ periodeId, valeur, profils, disabled }: Pr
 
   return (
     <Select value={val} onValueChange={(v) => v && onChange(v)} disabled={isPending}>
-      <SelectTrigger className="h-8 w-[170px] text-xs">
+      <SelectTrigger className="h-8 min-w-[170px] max-w-full text-xs">
         {labelDe(val)}
       </SelectTrigger>
       <SelectContent>

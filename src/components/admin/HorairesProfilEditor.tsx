@@ -187,7 +187,8 @@ export function HorairesProfilEditor({
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Profil :</span>
           <Select value={profilId} onValueChange={(v) => v && setProfilId(v)}>
-            <SelectTrigger className="h-9 w-[220px] text-sm">
+            {/* min-w plutôt que largeur fixe : le nom de profil ne doit pas être tronqué. */}
+            <SelectTrigger className="h-9 min-w-[220px] max-w-full text-sm">
               {profil.nom}{profil.est_defaut ? ' (par défaut)' : ''}
             </SelectTrigger>
             <SelectContent>
