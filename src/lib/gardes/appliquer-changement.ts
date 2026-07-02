@@ -24,6 +24,7 @@ import { queryCompteurs, queryTotalWE } from '@/hooks/useCompteurs'
 import { calculerBilans } from '@/engine/bilan'
 import { syncGardeIndividuelle } from '@/lib/sync-calendrier'
 import { sendGardeModifiee } from '@/lib/notifications'
+import { placementsPourPaire } from '@/data/gardePlacements'
 
 /** Vétérinaire « avant modif » (pour l'email de notification). */
 export interface VetoNotif {
@@ -92,7 +93,7 @@ export async function appliquerChangementGarde(
   const { data: garde } = await supabase
     .from('gardes')
     .select(`
-      id, verrouille, periode_id, modifie_manuellement,
+      id, verrouille, periode_id, modifie_manuellement, cabinet_id,
       premier_id, second_id,
       periode:periode_id(statut),
       oldPremier:premier_id(id, nom, prenom, email),
@@ -123,6 +124,27 @@ export async function appliquerChangementGarde(
   const { error } = await supabase.from('gardes').update(updatePayload).eq('id', gardeId)
   if (error) {
     return { ok: false, status: 500, error: `Erreur lors de la mise à jour : ${error.message}` }
+  }
+
+  // ── Double écriture P3b-2 — miroir de la paire dans garde_placements ──
+  //    Résout la désync : l'édition manuelle ET la crise (qui transite ici)
+  //    répercutent enfin le changement sur la liste de places. ADDITIF (aucun
+  //    lecteur encore) + best-effort : n'interrompt JAMAIS le cycle d'édition V1.
+  //    On remplace les places de CETTE garde (delete → re-insert la paire).
+  try {
+    const cabinetIdGarde = (garde as Record<string, unknown>).cabinet_id as string | null
+    if (cabinetIdGarde) {
+      await supabase.from('garde_placements').delete().eq('garde_id', gardeId)
+      const placements = placementsPourPaire(cabinetIdGarde, gardeId, premier_id, second_id)
+      if (placements.length > 0) {
+        const { error: placementsErr } = await supabase.from('garde_placements').insert(placements)
+        if (placementsErr) {
+          console.error('[P3b-2] miroir garde_placements échoué:', placementsErr.message)
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[P3b-2] miroir garde_placements exception:', e)
   }
 
   // ── Audit log (correction d'une garde verrouillée) ──────

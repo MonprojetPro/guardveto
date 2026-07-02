@@ -56,3 +56,26 @@ export function construireGardePlacements(
   }
   return rows
 }
+
+/**
+ * placementsPourPaire — miroir d'UNE garde éditée (premier_id/second_id) vers
+ * garde_placements (P3b-2, édition manuelle + crise). Place 0 = premier, place 1
+ * = second ; un rôle libéré (null) n'émet aucune ligne (comme la colonne NULL).
+ * PUR & testable. L'édition manuelle reste à 2 rôles (l'UI est premier/second) ;
+ * la généralisation N places viendra avec l'écran d'édition P6.
+ */
+export function placementsPourPaire(
+  cabinetId: string,
+  gardeId: string,
+  premierId: string | null,
+  secondId: string | null,
+): GardePlacementRow[] {
+  const rows: GardePlacementRow[] = []
+  if (premierId) {
+    rows.push({ cabinet_id: cabinetId, garde_id: gardeId, place_index: 0, role: 'premier', veterinaire_id: premierId })
+  }
+  if (secondId) {
+    rows.push({ cabinet_id: cabinetId, garde_id: gardeId, place_index: 1, role: 'second', veterinaire_id: secondId })
+  }
+  return rows
+}

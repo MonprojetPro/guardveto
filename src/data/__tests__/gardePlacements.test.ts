@@ -10,6 +10,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   construireGardePlacements,
+  placementsPourPaire,
   type AttributionPersistee,
 } from '../gardePlacements'
 
@@ -88,5 +89,32 @@ describe('construireGardePlacements', () => {
     expect(rows).toHaveLength(2)
     expect(rows.find((r) => r.garde_id === 'g-sem')?.veterinaire_id).toBe('v-a')
     expect(rows.find((r) => r.garde_id === 'g-fer')?.veterinaire_id).toBe('v-b')
+  })
+})
+
+describe('placementsPourPaire (édition manuelle + crise, P3b-2)', () => {
+  it('paire complète → place 0 premier + place 1 second', () => {
+    const rows = placementsPourPaire(CAB, 'g-1', 'v-a', 'v-b')
+    expect(rows).toEqual([
+      { cabinet_id: CAB, garde_id: 'g-1', place_index: 0, role: 'premier', veterinaire_id: 'v-a' },
+      { cabinet_id: CAB, garde_id: 'g-1', place_index: 1, role: 'second', veterinaire_id: 'v-b' },
+    ])
+  })
+
+  it('second null (été) → seule la place 0 premier', () => {
+    const rows = placementsPourPaire(CAB, 'g-1', 'v-a', null)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ place_index: 0, role: 'premier', veterinaire_id: 'v-a' })
+  })
+
+  it('premier null mais second présent → seule la place 1 (miroir fidèle des colonnes)', () => {
+    const rows = placementsPourPaire(CAB, 'g-1', null, 'v-b')
+    expect(rows).toEqual([
+      { cabinet_id: CAB, garde_id: 'g-1', place_index: 1, role: 'second', veterinaire_id: 'v-b' },
+    ])
+  })
+
+  it('paire vide (deux rôles libérés) → aucune ligne', () => {
+    expect(placementsPourPaire(CAB, 'g-1', null, null)).toEqual([])
   })
 })
