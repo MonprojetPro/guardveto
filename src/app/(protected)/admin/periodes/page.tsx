@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge'
 import { CreerPeriodeDialog } from '@/components/admin/CreerPeriodeDialog'
 import { SupprimerPeriodeButton } from '@/components/admin/SupprimerPeriodeButton'
 import { EffectifPeriodeSelect } from '@/components/admin/EffectifPeriodeSelect'
-import type { Periode } from '@/types'
+import { ProfilPeriodeSelect } from '@/components/admin/ProfilPeriodeSelect'
+import type { Periode, ProfilPlanning } from '@/types'
 
 /** Effectif effectif d'une période : explicite si réglé, sinon repli saison. */
 function effectifDe(p: Periode): number {
@@ -47,6 +48,18 @@ export default async function PeriodesPage() {
   const { data: periodes } = await supabase
     .from('periodes').select('*').order('date_debut', { ascending: false })
 
+  // Profils de planning du cabinet (RLS restrictive → déjà scopés au cabinet).
+  const { data: profilsDb } = await supabase
+    .from('profils_planning')
+    .select('id, nom, est_defaut, saison_suggeree')
+    .eq('actif', true)
+    .order('ordre')
+  const profils = (profilsDb as ProfilPlanning[]) ?? []
+  // Le profil défaut est représenté par « Par défaut » (valeur nulle) : on
+  // normalise un profil_id pointant dessus vers null pour un affichage propre.
+  const defautId = profils.find((p) => p.est_defaut)?.id ?? null
+  const profilsNommes = profils.filter((p) => !p.est_defaut)
+
   const liste = (periodes as Periode[]) ?? []
   const stats = {
     total:      liste.length,
@@ -62,7 +75,7 @@ export default async function PeriodesPage() {
           <h1 className="font-heading text-2xl font-bold text-foreground">Périodes</h1>
           <p className="text-muted-foreground text-sm mt-1">Toutes les périodes de planification</p>
         </div>
-        <CreerPeriodeDialog />
+        <CreerPeriodeDialog profils={profilsNommes} />
       </div>
 
       {/* Stats */}
@@ -90,6 +103,7 @@ export default async function PeriodesPage() {
               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Fin</th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Durée</th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Effectif semaine</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Profil</th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Statut</th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Publié le</th>
               <th className="px-4 py-3" />
@@ -113,6 +127,14 @@ export default async function PeriodesPage() {
                       disabled={p.statut === 'verrouille'}
                     />
                   </td>
+                  <td className="px-4 py-3">
+                    <ProfilPeriodeSelect
+                      periodeId={p.id}
+                      valeur={p.profil_id && p.profil_id !== defautId ? p.profil_id : null}
+                      profils={profilsNommes}
+                      disabled={p.statut === 'verrouille'}
+                    />
+                  </td>
                   <td className="px-4 py-3"><StatutBadge statut={p.statut} /></td>
                   <td className="px-4 py-3 text-muted-foreground">
                     {p.publie_at ? formatDate(p.publie_at) : '—'}
@@ -127,7 +149,7 @@ export default async function PeriodesPage() {
             })}
             {liste.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
                   Aucune période créée.
                 </td>
               </tr>

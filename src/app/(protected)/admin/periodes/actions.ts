@@ -51,6 +51,35 @@ export async function creerPeriode(formData: FormData) {
     return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
   }
 
+  // Profil de planning choisi (P5 slice 3c). Si l'admin en choisit un, on VÉRIFIE
+  // qu'il appartient à son cabinet (garde tenant : la RLS restrictive borne déjà
+  // la lecture, ce check rejette proprement un id étranger/inexistant). Sinon on
+  // PROPOSE le profil dont saison_suggeree = saison détectée ; à défaut NULL
+  // (= profil défaut du cabinet → byte-identique avec l'existant).
+  const profilChoisi = (formData.get('profil_id') as string | null)?.trim() || null
+  let profilId: string | null = null
+  if (profilChoisi) {
+    const { data: owned } = await supabase
+      .from('profils_planning')
+      .select('id')
+      .eq('id', profilChoisi)
+      .eq('cabinet_id', cabinetId)
+      .maybeSingle()
+    if (!owned) return { error: 'Profil invalide pour ce cabinet.' }
+    profilId = profilChoisi
+  } else {
+    const { data: parSaison } = await supabase
+      .from('profils_planning')
+      .select('id')
+      .eq('cabinet_id', cabinetId)
+      .eq('saison_suggeree', saison)
+      .eq('actif', true)
+      .order('ordre')
+      .limit(1)
+      .maybeSingle()
+    profilId = (parSaison as { id: string } | null)?.id ?? null
+  }
+
   const { error } = await supabase.from('periodes').insert({
     cabinet_id: cabinetId,
     saison,
@@ -59,10 +88,39 @@ export async function creerPeriode(formData: FormData) {
     date_debut: dateDebut,
     date_fin:   dateFin,
     statut:     'brouillon',
+    profil_id:  profilId,
   })
 
   if (error) return { error: error.message }
 
+  revalidatePath('/admin/periodes')
+  return { success: true }
+}
+
+/**
+ * Rattache une période à un profil de planning (ou NULL = profil défaut du
+ * cabinet). S'applique à la PROCHAINE génération. RLS periodes (write admin-only,
+ * cabinet-borné) sécurise l'écriture ; on vérifie en plus que le profil est bien
+ * visible pour ce cabinet (garde tenant, cohérente avec creerPeriode).
+ */
+export async function setProfilPeriode(periodeId: string, profilId: string | null) {
+  const supabase = await createClient()
+
+  if (profilId) {
+    const { data: owned } = await supabase
+      .from('profils_planning')
+      .select('id')
+      .eq('id', profilId)
+      .maybeSingle()
+    if (!owned) return { error: 'Profil introuvable.' }
+  }
+
+  const { error } = await supabase
+    .from('periodes')
+    .update({ profil_id: profilId })
+    .eq('id', periodeId)
+
+  if (error) return { error: error.message }
   revalidatePath('/admin/periodes')
   return { success: true }
 }

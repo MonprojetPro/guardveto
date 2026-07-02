@@ -2,8 +2,14 @@
 
 import { useState, useRef } from 'react'
 import { creerPeriode } from '@/app/(protected)/admin/periodes/actions'
+import type { ProfilPlanning } from '@/types'
 
-export function CreerPeriodeDialog() {
+interface CreerPeriodeDialogProps {
+  /** Profils nommés du cabinet (hors défaut) proposés à la création. */
+  profils?: ProfilPlanning[]
+}
+
+export function CreerPeriodeDialog({ profils = [] }: CreerPeriodeDialogProps) {
   const [open, setOpen]       = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState<string | null>(null)
@@ -77,6 +83,26 @@ export function CreerPeriodeDialog() {
                     required
                   />
                 </div>
+
+                {/* Profil de planning (P5) — seulement s'il existe des profils nommés.
+                    Vide = automatique selon la saison, sinon profil défaut du cabinet. */}
+                {profils.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">
+                      Profil de planning <span className="text-muted-foreground font-normal">(structure des gardes)</span>
+                    </label>
+                    <select
+                      name="profil_id"
+                      defaultValue=""
+                      className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="">Automatique (selon la saison)</option>
+                      {profils.map((p) => (
+                        <option key={p.id} value={p.id}>{p.nom}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 {error && (
                   <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>

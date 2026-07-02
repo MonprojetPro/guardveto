@@ -38,6 +38,17 @@ export interface Periode {
   created_at: string
   /** Effectif configurable la nuit en semaine (1 ou 2). NULL/absent → repli saison. */
   nb_vetos_semaine_soir?: number | null
+  /** Profil de planning choisi (P5). NULL/absent → profil défaut du cabinet. */
+  profil_id?: string | null
+}
+
+/** Profil de planning nommé d'un cabinet (structure + effectif réutilisables, P5). */
+export interface ProfilPlanning {
+  id: string
+  nom: string
+  est_defaut: boolean
+  /** Saison proposée par défaut à la génération (suggestion UI). */
+  saison_suggeree: Saison | null
 }
 
 export interface Garde {
