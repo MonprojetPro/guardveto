@@ -24,6 +24,9 @@ import {
 import {
   CatalogueCreneauxView, type CatalogueTypeUI,
 } from '@/components/admin/CatalogueCreneauxView'
+import {
+  ProfilsManager, type ProfilLigne,
+} from '@/components/admin/ProfilsManager'
 
 /** Ordre d'affichage des types de créneau. */
 const ORDRE: TypeGardeEngine[] = ['semaine_soir', 'vendredi_soir', 'weekend', 'ferie']
@@ -127,6 +130,25 @@ export default async function StructurePage() {
   const catalogue = cabinetId ? await chargerCreneauModele(supabase, cabinetId) : []
   const catalogueUI = versCatalogueUI(catalogue)
 
+  // Profils de planning du cabinet + nombre de types par profil (P5 slice 4a).
+  const { data: profilsDb } = cabinetId
+    ? await supabase
+        .from('profils_planning')
+        .select('id, nom, est_defaut, saison_suggeree, nb_vetos_semaine_soir')
+        .eq('actif', true)
+        .order('ordre')
+    : { data: null }
+  const { data: cmRows } = cabinetId
+    ? await supabase.from('creneau_modele').select('profil_id').eq('cabinet_id', cabinetId)
+    : { data: null }
+  const comptes = new Map<string, number>()
+  for (const r of ((cmRows as { profil_id: string | null }[] | null) ?? [])) {
+    if (r.profil_id) comptes.set(r.profil_id, (comptes.get(r.profil_id) ?? 0) + 1)
+  }
+  const profils: ProfilLigne[] = (
+    (profilsDb as Omit<ProfilLigne, 'nb_types'>[] | null) ?? []
+  ).map((p) => ({ ...p, nb_types: comptes.get(p.id) ?? 0 }))
+
   const rows = (rowsRaw as CreneauCabinetRow[] | null) ?? []
   const defaut = structureParDefaut()
 
@@ -164,6 +186,23 @@ export default async function StructurePage() {
           {!isAdmin && ' (Lecture seule — seul l’administrateur peut modifier.)'}
         </p>
       </div>
+
+      {/* P5 slice 4a — gestionnaire de profils de planning. */}
+      <section className="space-y-3">
+        <div>
+          <h2 className="font-heading text-lg font-semibold text-foreground">
+            Profils de planning
+          </h2>
+          <p className="text-muted-foreground text-sm mt-1 leading-5 max-w-2xl">
+            Un profil est une organisation de gardes réutilisable (ex. « Hiver », « Été »).
+            À la création d&apos;une période, vous choisissez le profil à appliquer ; il peut
+            être proposé automatiquement selon la saison. Créez un profil en le dupliquant,
+            puis réglez sa saison suggérée et son effectif.
+            {!isAdmin && ' (Lecture seule — seul l’administrateur peut modifier.)'}
+          </p>
+        </div>
+        <ProfilsManager profils={profils} isAdmin={isAdmin} />
+      </section>
 
       {/* P5 slice 1 — vue LECTURE du vrai catalogue (jours / places / rôles). */}
       <section className="space-y-3">

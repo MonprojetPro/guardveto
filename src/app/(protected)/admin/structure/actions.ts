@@ -166,3 +166,175 @@ export async function resetCreneauCabinet(code: string) {
   revalidatePath('/admin/structure')
   return { success: true }
 }
+
+// ════════════════════════════════════════════════════════════
+// P5 slice 4a — Gestionnaire de PROFILS de planning
+// ════════════════════════════════════════════════════════════
+// Un cabinet compose des profils nommés (« Hiver », « Été »…) réutilisables,
+// sélectionnés à la génération d'une période (slice 3). Ces actions permettent
+// de les CRÉER (par duplication d'un profil source, atomique via RPC), les
+// RENOMMER, régler leur saison suggérée + effectif, et les SUPPRIMER.
+//
+// Garde : assertAdmin (message clair) + RLS profils_planning (admin_write +
+// isolation restrictive par cabinet). On borne toujours au cabinet via la RLS
+// et, côté RPC, via auth_cabinet_actif() — jamais un cabinet_id du client.
+//
+// PÉRIMÈTRE (honnêteté end-to-end) : on compose des profils à partir des types
+// de garde EXISTANTS. Inventer des types inédits ou monter à >2 places n'est PAS
+// exposé ici (l'aval — gardes V1, agenda, PDF — ne sait pas encore les persister ;
+// ce serait une coquille vide). Cela s'ouvrira avec P3b/P6.
+
+/** Saisons acceptées par la suggestion (miroir du CHECK profils_planning). */
+const SAISONS_VALIDES = new Set(['ete', 'hiver'])
+/** Effectifs acceptés (miroir du CHECK nb_vetos_semaine_soir IN (1,2)). */
+const EFFECTIFS_VALIDES = new Set([1, 2])
+
+export interface CreerProfilPayload {
+  nom: string
+  /** Profil dont on copie le catalogue (défaut du cabinet si omis). */
+  source_profil_id?: string | null
+  saison_suggeree?: 'ete' | 'hiver' | null
+  nb_vetos_semaine_soir?: number | null
+}
+
+/**
+ * Crée un profil en DUPLIQUANT le catalogue d'un profil source (atomique via la
+ * RPC dupliquer_profil). Le nouveau profil est immédiatement générable (il porte
+ * les mêmes types que sa source). Nom en doublon → message clair.
+ */
+export async function creerProfil(payload: CreerProfilPayload) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  const nom = payload.nom?.trim()
+  if (!nom) return { error: 'Le nom du profil est obligatoire.' }
+  if (nom.length > 60) return { error: 'Le nom du profil est trop long (60 caractères max).' }
+
+  const saison = payload.saison_suggeree ?? null
+  if (saison !== null && !SAISONS_VALIDES.has(saison)) {
+    return { error: 'Saison suggérée invalide.' }
+  }
+  const effectif = payload.nb_vetos_semaine_soir ?? null
+  if (effectif !== null && !EFFECTIFS_VALIDES.has(effectif)) {
+    return { error: 'Effectif invalide (1 ou 2).' }
+  }
+
+  const { error } = await supabase.rpc('dupliquer_profil', {
+    p_nom: nom,
+    p_source_profil_id: payload.source_profil_id ?? null,
+    p_saison: saison,
+    p_effectif: effectif,
+  })
+
+  if (error) {
+    // 23505 = unique_violation (nom déjà pris pour ce cabinet).
+    if (error.code === '23505') {
+      return { error: `Un profil « ${nom} » existe déjà.` }
+    }
+    return { error: error.message }
+  }
+
+  revalidatePath('/admin/structure')
+  revalidatePath('/admin/periodes')
+  return { success: true }
+}
+
+/** Renomme un profil (RLS bornée au cabinet). Nom en doublon → message clair. */
+export async function renommerProfil(profilId: string, nom: string) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  const nouveau = nom?.trim()
+  if (!nouveau) return { error: 'Le nom du profil est obligatoire.' }
+  if (nouveau.length > 60) return { error: 'Le nom du profil est trop long (60 caractères max).' }
+
+  const { error } = await supabase
+    .from('profils_planning')
+    .update({ nom: nouveau })
+    .eq('id', profilId)
+
+  if (error) {
+    if (error.code === '23505') return { error: `Un profil « ${nouveau} » existe déjà.` }
+    return { error: error.message }
+  }
+
+  revalidatePath('/admin/structure')
+  revalidatePath('/admin/periodes')
+  return { success: true }
+}
+
+/**
+ * Règle la saison suggérée et/ou l'effectif d'un profil. `undefined` = champ
+ * laissé tel quel ; `null` = valeur explicitement effacée (aucune surcharge).
+ */
+export async function setProfilMeta(
+  profilId: string,
+  meta: { saison_suggeree?: 'ete' | 'hiver' | null; nb_vetos_semaine_soir?: number | null },
+) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  const patch: Record<string, unknown> = {}
+  if (meta.saison_suggeree !== undefined) {
+    if (meta.saison_suggeree !== null && !SAISONS_VALIDES.has(meta.saison_suggeree)) {
+      return { error: 'Saison suggérée invalide.' }
+    }
+    patch.saison_suggeree = meta.saison_suggeree
+  }
+  if (meta.nb_vetos_semaine_soir !== undefined) {
+    if (meta.nb_vetos_semaine_soir !== null && !EFFECTIFS_VALIDES.has(meta.nb_vetos_semaine_soir)) {
+      return { error: 'Effectif invalide (1 ou 2).' }
+    }
+    patch.nb_vetos_semaine_soir = meta.nb_vetos_semaine_soir
+  }
+  if (Object.keys(patch).length === 0) return { success: true }
+
+  const { error } = await supabase
+    .from('profils_planning')
+    .update(patch)
+    .eq('id', profilId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/structure')
+  revalidatePath('/admin/periodes')
+  return { success: true }
+}
+
+/**
+ * Supprime un profil. Le profil DÉFAUT est intangible (le cabinet doit toujours
+ * en avoir un). Les périodes qui le référençaient retombent sur le défaut
+ * (periodes.profil_id ON DELETE SET NULL) ; son catalogue part en cascade.
+ */
+export async function supprimerProfil(profilId: string) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  const { data: profil } = await supabase
+    .from('profils_planning')
+    .select('est_defaut')
+    .eq('id', profilId)
+    .maybeSingle()
+
+  if (!profil) return { error: 'Profil introuvable.' }
+  if ((profil as { est_defaut: boolean }).est_defaut) {
+    return { error: 'Le profil par défaut ne peut pas être supprimé.' }
+  }
+
+  const { error } = await supabase
+    .from('profils_planning')
+    .delete()
+    .eq('id', profilId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/structure')
+  revalidatePath('/admin/periodes')
+  return { success: true }
+}
