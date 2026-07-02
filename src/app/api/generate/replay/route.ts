@@ -37,6 +37,7 @@ import {
   type RegleCabinetRow,
 } from '@/data/mapReglesCabinet'
 import type { ContexteSimulation, ContrainteEngine } from '@/engine/types'
+import type { CreneauModele } from '@/engine/creneau-modele'
 
 // Laisse le temps au solver LNS
 export const maxDuration = 60
@@ -55,15 +56,60 @@ interface SnapshotRegleLegacy {
   actif: boolean
 }
 
+/** Ligne `creneau_modele` telle que figée dans le snapshot (schéma v3). */
+interface CreneauModeleSnapshotRow {
+  id: string
+  code: string | null
+  nom: string
+  jours_semaine: number[] | null
+  sur_feries: boolean
+  heure_debut: string
+  heure_fin: string
+  offset_jours_fin: number
+  nb_places: number
+  roles: string[] | null
+  actif: boolean
+  ordre: number
+}
+
 /**
- * Forme v2 (Chantier C1) du snapshot : photo fidèle des `regles_cabinet`
- * (briques par-véto + équité `equilibrer` + structure R8/R9) + l'effectif
- * configurable de la période. C'est ce que le moteur consomme réellement.
+ * Forme versionnée du snapshot (schéma >= 2) : photo fidèle des `regles_cabinet`
+ * (briques par-véto + équité `equilibrer` + structure R8/R9) + l'effectif figé.
+ * À partir du schéma v3 (P5 slice 3d), la STRUCTURE (catalogue de créneaux du
+ * profil) est aussi figée → le replay reconstruit les créneaux depuis le snapshot
+ * au lieu du catalogue vivant. C'est ce que le moteur consomme réellement.
  */
-interface SnapshotV2 {
-  schema: 2
+interface SnapshotVersionne {
+  schema: number
   regles_cabinet: RegleCabinetRow[]
   effectif?: { nb_vetos_semaine_soir?: number | null }
+  structure?: {
+    profil_id?: string | null
+    creneau_modele?: CreneauModeleSnapshotRow[]
+  }
+}
+
+/** Postgres TIME 'HH:MM:SS' → 'HH:MM' (identique à chargerCreneauModele). */
+function hhmm(t: string): string {
+  return (t ?? '').slice(0, 5)
+}
+
+/** Reconstruit le catalogue moteur depuis les lignes figées du snapshot (v3). */
+function creneauxDepuisSnapshot(rows: CreneauModeleSnapshotRow[]): CreneauModele[] {
+  return rows.map((r) => ({
+    id: r.id,
+    code: r.code,
+    nom: r.nom,
+    joursSemaine: r.jours_semaine ?? [],
+    surFeries: r.sur_feries,
+    heureDebut: hhmm(r.heure_debut),
+    heureFin: hhmm(r.heure_fin),
+    offsetJoursFin: r.offset_jours_fin,
+    nbPlaces: r.nb_places,
+    roles: r.roles ?? [],
+    actif: r.actif,
+    ordre: r.ordre,
+  }))
 }
 
 // ── Handler principal ────────────────────────────────────
@@ -123,11 +169,16 @@ export async function POST(req: NextRequest) {
 
   // ── 1. Charger le snapshot associé au planning ──────────
   // RLS garantit l'isolation cabinet : seul le snapshot du cabinet actif est visible.
+  // Chaque génération EMPILE un snapshot (prendre_snapshot insère sans supprimer),
+  // donc un planning régénéré en a plusieurs : on rejoue LE PLUS RÉCENT (celui de
+  // la dernière génération). `.single()` planterait ici sur multi-lignes.
   const { data: snapshotRow, error: snapshotErr } = await supabase
     .from('snapshots_regles')
     .select('id, regles_json')
     .eq('planning_id', planningId)
-    .single()
+    .order('cree_le', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
   if (snapshotErr || !snapshotRow) {
     return NextResponse.json(
@@ -172,9 +223,9 @@ export async function POST(req: NextRequest) {
   //     rejouées car absentes du snapshot — fidélité partielle, best-effort).
   let contexteReplay: ContexteSimulation
 
-  if (!Array.isArray(rawRegles) && (rawRegles as SnapshotV2)?.schema === 2) {
-    // ── Chemin v2 : reconstruction fidèle depuis regles_cabinet ──
-    const snap = rawRegles as SnapshotV2
+  if (!Array.isArray(rawRegles) && ((rawRegles as SnapshotVersionne)?.schema ?? 0) >= 2) {
+    // ── Chemin versionné (v2/v3) : reconstruction fidèle depuis regles_cabinet ──
+    const snap = rawRegles as SnapshotVersionne
     const rows = Array.isArray(snap.regles_cabinet) ? snap.regles_cabinet : []
 
     // Catalogue des briques connues (même socle de validation que le loader).
@@ -196,6 +247,14 @@ export async function POST(req: NextRequest) {
       contraintes: contraintesParVet.get(v.id) ?? [],
     }))
 
+    // STRUCTURE figée (v3) : si le snapshot contient le catalogue du profil, on
+    // rejoue CE catalogue au lieu du catalogue vivant (rejouabilité fidèle même
+    // après évolution du profil). Absent (v2) → on garde les créneaux courants.
+    const creneauxSnapshot =
+      snap.structure?.creneau_modele && snap.structure.creneau_modele.length > 0
+        ? creneauxDepuisSnapshot(snap.structure.creneau_modele)
+        : undefined
+
     contexteReplay = {
       ...contexte,
       vets: normaliserContraintesVets(vetsRejoues),
@@ -204,6 +263,8 @@ export async function POST(req: NextRequest) {
       // Effectif d'alors si capturé, sinon on garde celui du contexte courant.
       nbVetosSemaineSoir:
         typeof effectif === 'number' ? effectif : contexte.nbVetosSemaineSoir,
+      // Catalogue d'alors si figé (v3), sinon le catalogue courant.
+      creneaux: creneauxSnapshot ?? contexte.creneaux,
     }
   } else {
     // ── Chemin legacy v1 : patch des configs par id (fidélité partielle) ──
