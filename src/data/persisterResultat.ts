@@ -21,7 +21,7 @@ import { createClient } from '@/lib/supabase/server'
 import type { PlanningPartiel, TypeGardeEngine } from '@/engine/types'
 import { premierId, secondId } from '@/engine/attribution'
 import { horairesResolus, type StructureCreneauxResolue } from '@/engine/structure-creneaux'
-import { chargerStructureCabinet } from '@/data/chargerStructureCabinet'
+import { chargerStructureProfilPeriode } from '@/data/chargerStructureCabinet'
 
 // ── Types internes ───────────────────────────────────────────
 
@@ -155,9 +155,10 @@ export async function persisterResultat(
   // 1. Charger le catalogue de créneaux (pour résoudre creneau_id)
   const creneauMap = await chargerCreneauxCatalogue()
 
-  // 1b. Structure des créneaux résolue pour ce cabinet (horaires par défaut +
-  //     surcharge cabinet A1). Vide → défauts : comportement inchangé.
-  const structure = await chargerStructureCabinet(supabase, cabinetId)
+  // 1b. Structure des créneaux résolue pour le PROFIL de la période (P5 slice 4b) :
+  //     les horaires viennent du catalogue du profil (creneau_modele), plus de la
+  //     surcharge cabinet. Profil défaut = horaires par défaut → byte-identique.
+  const structure = await chargerStructureProfilPeriode(supabase, periodeId)
 
   // 2. Prendre un snapshot des règles actives AVANT l'insertion
   //    (F8-002 : le snapshot_id doit être connu au moment de construire les lignes)

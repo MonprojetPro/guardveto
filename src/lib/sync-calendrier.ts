@@ -13,7 +13,7 @@ import {
   isGoogleCalendarConfigured,
   GardeEventData,
 } from './google-calendar'
-import { chargerStructureCabinet } from '@/data/chargerStructureCabinet'
+import { chargerStructureProfilPeriode } from '@/data/chargerStructureCabinet'
 import type { StructureCreneauxResolue } from '@/engine/structure-creneaux'
 
 // ── Types ────────────────────────────────────────────────────
@@ -29,21 +29,16 @@ interface GardeAvecVetos {
 }
 
 /**
- * Structure des créneaux (horaires) du cabinet propriétaire d'une période.
- * Best-effort : période / cabinet introuvable → horaires par défaut. Sert à
- * ce que l'agenda affiche les MÊMES horaires que ceux écrits en base (A1).
+ * Structure des créneaux (horaires) du PROFIL de la période (P5 slice 4b).
+ * Best-effort : période / cabinet introuvable → horaires par défaut. Sert à ce
+ * que l'agenda affiche les MÊMES horaires que ceux écrits en base — désormais
+ * portés par le profil (creneau_modele), non plus par le cabinet.
  */
 async function structurePourPeriode(
   supabase: SupabaseClient,
   periodeId: string,
 ): Promise<StructureCreneauxResolue | undefined> {
-  const { data } = await supabase
-    .from('periodes')
-    .select('cabinet_id')
-    .eq('id', periodeId)
-    .single()
-  const cabinetId = (data as { cabinet_id?: string } | null)?.cabinet_id
-  return chargerStructureCabinet(supabase, cabinetId)
+  return chargerStructureProfilPeriode(supabase, periodeId)
 }
 
 export interface SyncResult {

@@ -306,6 +306,68 @@ export async function setProfilMeta(
   return { success: true }
 }
 
+export interface SetHorairesProfilPayload {
+  heure_debut: string // 'HH:MM'
+  heure_fin: string // 'HH:MM'
+  offset_jours_fin: number // 0..3
+}
+
+/**
+ * Règle les horaires d'un type de garde POUR UN PROFIL (P5 slice 4b) : écrit
+ * directement la ligne `creneau_modele` (heure_debut/fin/offset). Remplace
+ * l'ancien réglage cabinet-large (creneaux_cabinet). C'est ce qui rend les
+ * horaires réellement propres à un profil (« Été 19h » vs « Hiver 18h30 »).
+ *
+ * Garde : assertAdmin + RLS creneau_modele (admin_write + isolation cabinet) →
+ * l'update ne touche qu'une ligne du cabinet courant. Validation stricte des
+ * heures/offset (frontière de confiance) avant écriture.
+ */
+export async function setHorairesProfilCreneau(
+  creneauId: string,
+  payload: SetHorairesProfilPayload,
+) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  if (!HEURE_RE.test(payload.heure_debut)) {
+    return { error: 'Heure de début invalide (format attendu HH:MM).' }
+  }
+  if (!HEURE_RE.test(payload.heure_fin)) {
+    return { error: 'Heure de fin invalide (format attendu HH:MM).' }
+  }
+  const offset = payload.offset_jours_fin
+  if (!Number.isInteger(offset) || offset < OFFSET_MIN || offset > OFFSET_MAX) {
+    return { error: `Jour de fin invalide (doit être entre ${OFFSET_MIN} et ${OFFSET_MAX}).` }
+  }
+  if (offset === 0 && enMinutes(payload.heure_fin) <= enMinutes(payload.heure_debut)) {
+    return {
+      error:
+        "L'heure de fin doit être après l'heure de début, ou la garde doit se "
+        + 'terminer un jour suivant.',
+    }
+  }
+
+  const { error, count } = await supabase
+    .from('creneau_modele')
+    .update(
+      {
+        heure_debut: payload.heure_debut,
+        heure_fin: payload.heure_fin,
+        offset_jours_fin: offset,
+      },
+      { count: 'exact' },
+    )
+    .eq('id', creneauId)
+
+  if (error) return { error: error.message }
+  if (count === 0) return { error: 'Créneau introuvable pour ce cabinet.' }
+
+  revalidatePath('/admin/structure')
+  return { success: true }
+}
+
 /**
  * Supprime un profil. Le profil DÉFAUT est intangible (le cabinet doit toujours
  * en avoir un). Les périodes qui le référençaient retombent sur le défaut

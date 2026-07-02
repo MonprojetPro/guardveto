@@ -23,6 +23,7 @@ import {
   structureParDefaut,
   resoudreStructure,
 } from '@/engine/structure-creneaux'
+import { chargerCreneauModele } from '@/data/chargerCreneauModele'
 
 interface CreneauCabinetRow {
   code: string
@@ -66,4 +67,59 @@ export async function chargerStructureCabinet(
     }
   }
   return resoudreStructure(overrides)
+}
+
+// ── Structure horaire PAR PROFIL (P5 slice 4b) ───────────────
+
+/**
+ * chargerStructureProfil — structure horaire résolue depuis le CATALOGUE DU
+ * PROFIL (`creneau_modele`), source PAR PROFIL. Remplace la lecture cabinet-large
+ * (`creneaux_cabinet`) pour la persistance et l'agenda : un profil « Été » peut
+ * ainsi porter des horaires distincts d'« Hiver ».
+ *
+ * On ne retient que les horaires des 4 types connus (les seuls que l'aval sait
+ * horodater) ; un créneau sur-mesure (code null) est ignoré ici. Repli défaut
+ * si pas de cabinet / catalogue vide.
+ *
+ * BYTE-IDENTIQUE aujourd'hui : le profil défaut porte les horaires par défaut
+ * (seed) — identiques à ce que `creneaux_cabinet` (vide) résolvait.
+ */
+export async function chargerStructureProfil(
+  supabase: SupabaseClient,
+  cabinetId?: string,
+  profilId?: string,
+): Promise<StructureCreneauxResolue> {
+  if (!cabinetId) return structureParDefaut()
+
+  const creneaux = await chargerCreneauModele(supabase, cabinetId, profilId)
+  if (creneaux.length === 0) return structureParDefaut()
+
+  const overrides: Partial<Record<TypeGardeEngine, Partial<HorairesCreneau>>> = {}
+  for (const c of creneaux) {
+    if (!c.code || !CODES_VALIDES.includes(c.code as TypeGardeEngine)) continue
+    overrides[c.code as TypeGardeEngine] = {
+      heureDebut: c.heureDebut,   // déjà 'HH:MM' (chargerCreneauModele)
+      heureFin: c.heureFin,
+      offsetJoursFin: c.offsetJoursFin,
+    }
+  }
+  return resoudreStructure(overrides)
+}
+
+/**
+ * Variante « par période » : résout le cabinet + le profil de la période, puis
+ * délègue à chargerStructureProfil. Point d'accès des consommateurs qui ne
+ * connaissent que la période (persistance, agenda).
+ */
+export async function chargerStructureProfilPeriode(
+  supabase: SupabaseClient,
+  periodeId: string,
+): Promise<StructureCreneauxResolue> {
+  const { data } = await supabase
+    .from('periodes')
+    .select('cabinet_id, profil_id')
+    .eq('id', periodeId)
+    .single()
+  const per = data as { cabinet_id?: string; profil_id?: string | null } | null
+  return chargerStructureProfil(supabase, per?.cabinet_id, per?.profil_id ?? undefined)
 }

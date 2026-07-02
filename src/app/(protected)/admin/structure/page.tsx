@@ -1,26 +1,26 @@
 // ============================================================
-// GUARDVETO — Page /admin/structure (A3)
+// GUARDVETO — Page /admin/structure
 // ============================================================
-// Écran admin où un cabinet règle SES horaires de garde par type.
-// Pour chacun des 4 types de créneau, on préremplit avec la surcharge du
-// cabinet (creneaux_cabinet) si elle existe, sinon avec les horaires PAR
-// DÉFAUT (structure-creneaux), en signalant visuellement « valeur par défaut ».
+// Écran admin de configuration de la structure des gardes d'un cabinet :
+//   1. les PROFILS de planning (créer / dupliquer / régler) — P5 slice 4a ;
+//   2. le catalogue des types de garde du profil défaut (lecture) — P5 slice 1 ;
+//   3. les HORAIRES par type, réglés PAR PROFIL (creneau_modele) — P5 slice 4b.
 //
-// La RLS restrictive (migration A1) scope la lecture au cabinet ; le cabinet_id
-// n'est utilisé ici que pour filtrer explicitement les surcharges. L'admin
-// édite ; le véto consulte en lecture seule (comme /regles).
+// La RLS restrictive scope tout au cabinet courant. L'admin édite ; le véto
+// consulte en lecture seule (comme /regles). Les horaires réglés ici sont ceux
+// que la génération ET l'agenda utilisent réellement (via chargerStructureProfil).
 // ============================================================
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
-import { CRENEAUX, structureParDefaut } from '@/engine/structure-creneaux'
+import { CRENEAUX } from '@/engine/structure-creneaux'
 import type { TypeGardeEngine } from '@/engine/types'
 import type { CreneauModele } from '@/engine/creneau-modele'
 import { chargerCreneauModele } from '@/data/chargerCreneauModele'
 import {
-  StructureCreneauxClient, type CreneauUI,
-} from '@/components/admin/StructureCreneauxClient'
+  HorairesProfilEditor, type ProfilHorairesUI, type HoraireCreneauUI,
+} from '@/components/admin/HorairesProfilEditor'
 import {
   CatalogueCreneauxView, type CatalogueTypeUI,
 } from '@/components/admin/CatalogueCreneauxView'
@@ -28,8 +28,8 @@ import {
   ProfilsManager, type ProfilLigne,
 } from '@/components/admin/ProfilsManager'
 
-/** Ordre d'affichage des types de créneau. */
-const ORDRE: TypeGardeEngine[] = ['semaine_soir', 'vendredi_soir', 'weekend', 'ferie']
+/** Types de garde connus, dans l'ordre d'affichage (les seuls horodatés par l'aval). */
+const CODES_CONNUS: TypeGardeEngine[] = ['semaine_soir', 'vendredi_soir', 'weekend', 'ferie']
 
 /** Jours en clair (0 = dimanche … 6 = samedi). */
 const JOURS_COURTS = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
@@ -83,11 +83,15 @@ function versCatalogueUI(catalogue: CreneauModele[]): CatalogueTypeUI[] {
     }))
 }
 
-interface CreneauCabinetRow {
-  code: string
+/** Ligne brute d'horaires d'un créneau (par profil). */
+interface CreneauHoraireRow {
+  id: string
+  code: string | null
   heure_debut: string // Postgres TIME → 'HH:MM:SS'
   heure_fin: string
   offset_jours_fin: number
+  profil_id: string | null
+  ordre: number
 }
 
 /** Postgres TIME 'HH:MM:SS' → 'HH:MM' pour l'input time. */
@@ -118,19 +122,12 @@ export default async function StructurePage() {
     cabinetId = null
   }
 
-  const { data: rowsRaw } = cabinetId
-    ? await supabase
-        .from('creneaux_cabinet')
-        .select('code, heure_debut, heure_fin, offset_jours_fin')
-        .eq('cabinet_id', cabinetId)
-    : { data: null }
-
   // Le VRAI catalogue du cabinet (creneau_modele) — la source que le moteur
   // consomme (jours / places / rôles). Vide si pas de cabinetId (best-effort).
   const catalogue = cabinetId ? await chargerCreneauModele(supabase, cabinetId) : []
   const catalogueUI = versCatalogueUI(catalogue)
 
-  // Profils de planning du cabinet + nombre de types par profil (P5 slice 4a).
+  // Profils de planning du cabinet (P5 slice 4a) + horaires par profil (slice 4b).
   const { data: profilsDb } = cabinetId
     ? await supabase
         .from('profils_planning')
@@ -139,41 +136,40 @@ export default async function StructurePage() {
         .order('ordre')
     : { data: null }
   const { data: cmRows } = cabinetId
-    ? await supabase.from('creneau_modele').select('profil_id').eq('cabinet_id', cabinetId)
+    ? await supabase
+        .from('creneau_modele')
+        .select('id, code, heure_debut, heure_fin, offset_jours_fin, profil_id, ordre')
+        .eq('cabinet_id', cabinetId)
+        .order('ordre')
     : { data: null }
+  const horairesRows = (cmRows as CreneauHoraireRow[] | null) ?? []
+
+  // Nombre de types par profil (badge du gestionnaire).
   const comptes = new Map<string, number>()
-  for (const r of ((cmRows as { profil_id: string | null }[] | null) ?? [])) {
+  for (const r of horairesRows) {
     if (r.profil_id) comptes.set(r.profil_id, (comptes.get(r.profil_id) ?? 0) + 1)
   }
-  const profils: ProfilLigne[] = (
-    (profilsDb as Omit<ProfilLigne, 'nb_types'>[] | null) ?? []
-  ).map((p) => ({ ...p, nb_types: comptes.get(p.id) ?? 0 }))
+  const profilsBase = (profilsDb as Omit<ProfilLigne, 'nb_types'>[] | null) ?? []
+  const profils: ProfilLigne[] = profilsBase.map((p) => ({ ...p, nb_types: comptes.get(p.id) ?? 0 }))
 
-  const rows = (rowsRaw as CreneauCabinetRow[] | null) ?? []
-  const defaut = structureParDefaut()
-
-  const creneaux: CreneauUI[] = ORDRE.map((code) => {
-    const row = rows.find((r) => r.code === code)
-    if (row) {
-      return {
-        code,
-        libelle: CRENEAUX[code].libelle,
-        heureDebut: hhmm(row.heure_debut),
-        heureFin: hhmm(row.heure_fin),
-        offsetJoursFin: row.offset_jours_fin,
-        estDefaut: false,
-      }
-    }
-    const d = defaut[code]
-    return {
-      code,
-      libelle: CRENEAUX[code].libelle,
-      heureDebut: d.heureDebut,
-      heureFin: d.heureFin,
-      offsetJoursFin: d.offsetJoursFin,
-      estDefaut: true,
-    }
-  })
+  // Horaires éditables par profil (slice 4b) : un bloc de cartes par profil,
+  // restreint aux 4 types connus (les seuls que l'aval sait horodater).
+  const profilsHoraires: ProfilHorairesUI[] = profilsBase.map((p) => ({
+    id: p.id,
+    nom: p.nom,
+    est_defaut: p.est_defaut,
+    creneaux: horairesRows
+      .filter((r) => r.profil_id === p.id && r.code && CODES_CONNUS.includes(r.code as TypeGardeEngine))
+      .sort((a, b) => a.ordre - b.ordre)
+      .map((r): HoraireCreneauUI => ({
+        id: r.id,
+        code: r.code as string,
+        libelle: CRENEAUX[r.code as TypeGardeEngine].libelle,
+        heureDebut: hhmm(r.heure_debut),
+        heureFin: hhmm(r.heure_fin),
+        offsetJoursFin: r.offset_jours_fin,
+      })),
+  }))
 
   return (
     <div className="space-y-6">
@@ -212,18 +208,18 @@ export default async function StructurePage() {
         <CatalogueCreneauxView types={catalogueUI} />
       </section>
 
-      {/* Éditeur d'horaires existant (A3) — inchangé. */}
+      {/* P5 slice 4b — éditeur d'horaires PAR PROFIL. */}
       <section className="space-y-3">
         <div>
-          <h2 className="font-heading text-lg font-semibold text-foreground">Horaires</h2>
+          <h2 className="font-heading text-lg font-semibold text-foreground">Horaires par profil</h2>
           <p className="text-muted-foreground text-sm mt-1 leading-5 max-w-2xl">
-            Réglez les horaires de chaque type de garde. Tant qu&apos;un type porte le badge
-            <span className="font-medium"> « valeur par défaut »</span>, il utilise les horaires
-            standard de l&apos;application. Vos réglages s&apos;appliquent à la prochaine génération
-            de planning et à la synchronisation de l&apos;agenda.
+            Réglez les horaires de chaque type de garde, <span className="font-medium">pour le profil
+            choisi</span>. Un profil « Été » peut ainsi démarrer les gardes plus tard qu&apos;« Hiver ».
+            Vos réglages s&apos;appliquent à la prochaine génération de planning et à la
+            synchronisation de l&apos;agenda.
           </p>
         </div>
-        <StructureCreneauxClient creneaux={creneaux} isAdmin={isAdmin} />
+        <HorairesProfilEditor profils={profilsHoraires} isAdmin={isAdmin} />
       </section>
 
       <a href="/planning" className="inline-block text-sm text-muted-foreground hover:text-foreground transition-colors">
