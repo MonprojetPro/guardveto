@@ -26,6 +26,7 @@ import { estJourFerie } from '@/engine/utils'
 import { supprimerEvenementsCalendrier } from '@/lib/sync-calendrier'
 import { resoudreContexte } from '@/data/resoudreContexte'
 import { persisterResultat } from '@/data/persisterResultat'
+import { construireGardePlacements } from '@/data/gardePlacements'
 import type { TypeGardeEngine } from '@/engine/types'
 
 // Laisse le temps au solver LNS + nettoyage agenda (évite le timeout serverless)
@@ -226,19 +227,23 @@ export async function POST(req: NextRequest) {
 
   // 2. Préparer les gardes à insérer (vendredi_soir exclu — fusionné dans weekend ;
   //    dates/type déjà verrouillés exclus — on conserve le verrou existant).
-  const gardesAInserer = result.planning.attributions
+  //    On garde EN PARALLÈLE l'attribution source + sa clé de type DB, pour la
+  //    double écriture P3b-1 (garde_placements) avec exactement le même filtre.
+  const attributionsInserees = result.planning.attributions
     .filter((a) => a.type !== 'vendredi_soir')
-    .map((a) => ({
-      periode_id: periodeId,
-      cabinet_id: cabinetId,
-      date: a.date,
-      type: mapTypeGardeEnDb(a.type, a.date),
-      premier_id: premierId(a),
-      second_id: secondId(a),
-      verrouille: false,
-      modifie_manuellement: false,
-    }))
-    .filter((g: { date: string; type: string }) => !clesVerrouillees.has(`${g.date}|${g.type}`))
+    .map((a) => ({ a, dbType: mapTypeGardeEnDb(a.type, a.date) }))
+    .filter(({ a, dbType }) => !clesVerrouillees.has(`${a.date}|${dbType}`))
+
+  const gardesAInserer = attributionsInserees.map(({ a, dbType }) => ({
+    periode_id: periodeId,
+    cabinet_id: cabinetId,
+    date: a.date,
+    type: dbType,
+    premier_id: premierId(a),
+    second_id: secondId(a),
+    verrouille: false,
+    modifie_manuellement: false,
+  }))
 
   // 3. Insérer en bloc — upsert idempotent scopé cabinet.
   //    ON CONFLICT (cabinet_id, date, type) DO NOTHING : si une ligne
@@ -255,6 +260,46 @@ export async function POST(req: NextRequest) {
       { error: `Erreur insertion des gardes : ${insertErr.message}` },
       { status: 500 }
     )
+  }
+
+  // 3b. Double écriture P3b-1 — miroir des placements dans garde_placements
+  //     (enfant de gardes.id, généralise premier_id/second_id vers N places).
+  //     ADDITIF : aucun lecteur ne la consomme encore → best-effort. Un échec
+  //     ici NE casse JAMAIS la persistance V1 : `gardes` reste la source de vérité.
+  //     Les placements des gardes brouillon supprimées (étape 1) sont partis en
+  //     cascade ; on ne (ré)écrit que ceux des gardes qu'on vient d'insérer.
+  try {
+    const { data: gardesEcrites } = await supabase
+      .from('gardes')
+      .select('id, date, type')
+      .eq('periode_id', periodeId)
+      .eq('cabinet_id', cabinetId)
+
+    const idParCle = new Map<string, string>()
+    for (const g of (gardesEcrites ?? []) as { id: string; date: string; type: string }[]) {
+      idParCle.set(`${g.date}|${g.type}`, g.id)
+    }
+
+    const placementsRows = construireGardePlacements(
+      attributionsInserees.map(({ a, dbType }) => ({
+        date: a.date,
+        dbType,
+        placements: a.placements,
+      })),
+      idParCle,
+      cabinetId,
+    )
+
+    if (placementsRows.length > 0) {
+      const { error: placementsErr } = await supabase
+        .from('garde_placements')
+        .upsert(placementsRows, { onConflict: 'garde_id,place_index', ignoreDuplicates: false })
+      if (placementsErr) {
+        console.error('[P3b-1] double écriture garde_placements échouée:', placementsErr.message)
+      }
+    }
+  } catch (e) {
+    console.error('[P3b-1] double écriture garde_placements exception:', e)
   }
 
   // Régénérer = repartir sur un brouillon : le nouveau planning doit être
