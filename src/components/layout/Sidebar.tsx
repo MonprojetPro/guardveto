@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { NAV_ITEMS, type Veterinaire } from '@/types'
 import {
+  ArrowLeftRight,
   Calendar,
   CalendarOff,
   CalendarRange,
@@ -17,6 +18,7 @@ import {
 import { cn } from '@/lib/utils'
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  ArrowLeftRight,
   Calendar,
   CalendarOff,
   CalendarRange,
