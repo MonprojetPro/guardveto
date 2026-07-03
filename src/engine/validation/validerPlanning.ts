@@ -406,8 +406,13 @@ export function validerPlanning(
     }
   }
 
-  // ── R17 — Été : pas de 2nd en semaine_soir ──
-  if (input.saison === 'ete') {
+  // ── R17 — effectif nuit semaine = 1 : pas de 2nd en semaine_soir ──
+  // Conditionné à l'effectif RÉSOLU (période > profil > saison), comme le
+  // moteur (`slot.besoinSecond`) et la section COUVERTURE ci-dessus — et non
+  // plus au seul `saison === 'ete'` : un cabinet peut régler 2 vétos/nuit en
+  // été (fix audit 2026-07-03 : violations fantômes sur été + effectif 2).
+  const effectifSemaineR17 = input.nbVetosSemaineSoir ?? (input.saison === 'hiver' ? 2 : 1)
+  if (effectifSemaineR17 < 2) {
     for (const a of planning.attributions) {
       const second = vetRole(a, 'second')
       if (a.type === 'semaine_soir' && second) {
@@ -417,7 +422,7 @@ export function validerPlanning(
           type: a.type,
           role: 'second',
           vetId: second,
-          detail: `R17 : en été, une seule garde de nuit en semaine — un 2nd a été assigné (${a.date})`,
+          detail: `R17 : une seule garde de nuit en semaine (effectif réglé à 1) — un 2nd a été assigné (${a.date})`,
         })
       }
     }

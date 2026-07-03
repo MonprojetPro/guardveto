@@ -5,8 +5,8 @@
 // des fonctions de mesure d'équité pour chaque dimension.
 // ============================================================
 
-import type { PlanningPartiel, VetEngine, AttributionGarde } from '../types'
-import { estJourFerie } from '../utils'
+import type { PlanningPartiel, VetEngine, AttributionGarde, CalendrierResolu } from '../types'
+import { estJourFerie, addDays } from '../utils'
 import { estAttribue, vetPourRole } from '../attribution'
 import { DEFAULT_ROLE_AVANTAGE_FINANCIER } from '../equity-weights'
 
@@ -44,8 +44,25 @@ function estWEGarde(attr: AttributionGarde, vetId: string): boolean {
   return attr.type === 'weekend' && estAttribue(attr, vetId)
 }
 
-function estFerieGarde(attr: AttributionGarde, vetId: string): boolean {
-  return estJourFerie(attr.date) && estAttribue(attr, vetId)
+/**
+ * Une garde compte comme « férié » pour l'équité R12 si son jour est férié —
+ * OU, pour un week-end (daté au SAMEDI), si le DIMANCHE couvert est férié
+ * (fix audit 2026-07-03, bug n°3 du catalogue blindé : un férié tombant un
+ * dimanche n'était JAMAIS compté). Zone-aware : le calendrier du cabinet est
+ * utilisé s'il est fourni, sinon repli fériés France en dur (historique).
+ */
+function estFerieGarde(
+  attr: AttributionGarde,
+  vetId: string,
+  calendrier?: CalendrierResolu,
+): boolean {
+  if (!estAttribue(attr, vetId)) return false
+  if (estJourFerie(attr.date, calendrier)) return true
+  if (attr.type === 'weekend') {
+    // Week-end daté au samedi → couvre aussi le dimanche (date + 1 jour).
+    return estJourFerie(addDays(attr.date, 1), calendrier)
+  }
+  return false
 }
 
 function estSemainePremier(attr: AttributionGarde, vetId: string): boolean {
@@ -69,11 +86,14 @@ function estSemaineSecond(attr: AttributionGarde, vetId: string): boolean {
  * @param roleAvantageFinancier  Rôle dont on compte les week-ends pour R11b
  *   (réglable — P4). Défaut 'premier' → compteur historique. `null` → on ne
  *   compte rien (aucun rôle avantagé, donc rien à équilibrer).
+ * @param calendrier  Calendrier résolu du cabinet (fériés zone-aware). Absent →
+ *   repli fériés France en dur (comportement historique).
  */
 export function compterParVet(
   planning: PlanningPartiel,
   vets: VetEngine[],
   roleAvantageFinancier: string | null = DEFAULT_ROLE_AVANTAGE_FINANCIER,
+  calendrier?: CalendrierResolu,
 ): CompteurVet[] {
   return vets.map((vet) => {
     const compteur: CompteurVet = {
@@ -101,7 +121,7 @@ export function compterParVet(
       ) {
         compteur.weekendPremier++
       }
-      if (estFerieGarde(attr, vet.id)) compteur.feriesGardes++
+      if (estFerieGarde(attr, vet.id, calendrier)) compteur.feriesGardes++
       if (estSemainePremier(attr, vet.id)) compteur.semainePremier++
       if (estSemaineSecond(attr, vet.id)) compteur.semaineSecond++
     }

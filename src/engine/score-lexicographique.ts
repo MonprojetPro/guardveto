@@ -12,7 +12,7 @@
 // soft-constraints, optimization) — aucune ré-écriture des règles.
 // ============================================================
 
-import type { PlanningPartiel, VetEngine, VetEngineNormalise, SlotGarde, RoleGarde } from './types'
+import type { PlanningPartiel, VetEngine, VetEngineNormalise, SlotGarde, RoleGarde, CalendrierResolu } from './types'
 
 // ── Type partagé solver ↔ loader ─────────────────────────
 /**
@@ -155,6 +155,10 @@ function listerSlotRoles(planning: PlanningPartiel, saison: 'ete' | 'hiver'): Sl
  * @param vets      Tous les vétos
  * @param saison    Saison de la période
  * @param weights   Poids d'équité configurables (curseurs cabinet). Repli = défaut historique.
+ * @param calendrier  Calendrier résolu du cabinet (fériés/vacances zone-aware).
+ *   Absent → repli fériés France en dur (comportement historique). Fix audit
+ *   2026-07-03 : le scoreur global jugeait l'étage 0, R8b et l'équité fériés
+ *   sur le MAUVAIS référentiel pour tout cabinet hors défaut.
  */
 export function scorerPlanning(
   planning: PlanningPartiel,
@@ -163,6 +167,7 @@ export function scorerPlanning(
   weights: EquityWeights = DEFAULT_EQUITY_WEIGHTS,
   structure: StructureConfig = DEFAULT_STRUCTURE_CONFIG,
   roleAvantageFinancier: string | null = DEFAULT_ROLE_AVANTAGE_FINANCIER,
+  calendrier?: CalendrierResolu,
 ): VecteurScore {
   const v = vecteurVide()
   const slotRoles = listerSlotRoles(planning, saison)
@@ -175,6 +180,9 @@ export function scorerPlanning(
   let nbInvariantsViols = 0
   {
     const cumul: PlanningPartiel = { attributions: [] }
+    // Index (date|type) → position dans cumul.attributions — remplace le
+    // findIndex O(n) par pose (perf audit 2026-07-03, comportement identique).
+    const indexCumul = new Map<string, number>()
     // Ordre déterministe : chronologique puis premier avant second
     const ordered = [...planning.attributions].sort((a, b) =>
       a.date < b.date ? -1 : a.date > b.date ? 1 : a.type < b.type ? -1 : 1
@@ -187,15 +195,15 @@ export function scorerPlanning(
         const vet = vetById.get(vetId)
         if (!vet) continue
         const slot: SlotGarde = { date: a.date, type: a.type, saison }
-        const res = isValid(slot, vet, role, vets, cumul, undefined, structure)
+        const res = isValid(slot, vet, role, vets, cumul, calendrier, structure)
         if (!res.valid) nbInvariantsViols++
         // pose dans le cumul
-        const idx = cumul.attributions.findIndex(
-          (x) => x.date === a.date && x.type === a.type
-        )
-        if (idx >= 0) {
+        const cle = `${a.date}|${a.type}`
+        const idx = indexCumul.get(cle)
+        if (idx !== undefined) {
           cumul.attributions[idx] = avecVet(cumul.attributions[idx], role, vetId)
         } else {
+          indexCumul.set(cle, cumul.attributions.length)
           cumul.attributions.push(avecVet(attributionVide(a.date, a.type), role, vetId))
         }
       }
@@ -227,7 +235,7 @@ export function scorerPlanning(
       ajouter(v, Etage.EVITEE_AU_MAX, 'R10b', POIDS_INTRA.R10B_FETE_FIN_ANNEE)
 
     // R8b (⚪ SI_POSSIBLE)
-    const r8b = penaliteInversionFerie(sr.slot, vet, sr.role, planning)
+    const r8b = penaliteInversionFerie(sr.slot, vet, sr.role, planning, calendrier)
     if (r8b > 0)
       ajouter(v, Etage.SI_POSSIBLE, 'R8b', POIDS_INTRA.R8B_INVERSION_FERIE)
   }
@@ -277,7 +285,7 @@ export function scorerPlanning(
   }
 
   // ── Étage 6 : ÉQUITÉ (variance des charges) ──
-  const compteurs = compterParVet(planning, vets, roleAvantageFinancier)
+  const compteurs = compterParVet(planning, vets, roleAvantageFinancier, calendrier)
   const eq =
     desequilibreWE(compteurs) * weights.WE_GARDE +
     desequilibreWeekendPremier(compteurs) * weights.WE_PREMIER_ROLE +

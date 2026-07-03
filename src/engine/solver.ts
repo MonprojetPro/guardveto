@@ -39,7 +39,7 @@ import type { CreneauModele } from './creneau-modele'
 import { normaliserContraintesVets } from './normaliserContraintes'
 import { isValid } from './rules/hard-constraints'
 import { penalite } from './rules/soft-constraints'
-import { compterParVet } from './rules/optimization'
+import { compterParVet, type CompteurVet } from './rules/optimization'
 import { comparerScores, scorerPlanning, type VecteurScore, type BonusMalusMap } from './score-lexicographique'
 import { DEFAULT_EQUITY_WEIGHTS, DEFAULT_ROLE_AVANTAGE_FINANCIER, type EquityWeights } from './equity-weights'
 import { DEFAULT_STRUCTURE_CONFIG, type StructureConfig } from './structure-config'
@@ -316,11 +316,16 @@ function scorerCandidat(
   weights: EquityWeights,
   calendrier?: CalendrierResolu,
   roleAvantageFinancier: string | null = DEFAULT_ROLE_AVANTAGE_FINANCIER,
+  // Perf (audit 2026-07-03) : les compteurs ne dépendent QUE du planning —
+  // identiques pour tous les candidats d'un même step. Le caller peut les
+  // pré-calculer UNE fois par step au lieu d'une fois par comparaison de tri.
+  compteursPrecalcules?: CompteurVet[],
 ): number {
   // Dernier recours → toujours en dernier
   if (vet.dernier_recours) return 1_000_000
 
-  const compteurs = compterParVet(planning, allVets, roleAvantageFinancier)
+  const compteurs =
+    compteursPrecalcules ?? compterParVet(planning, allVets, roleAvantageFinancier, calendrier)
   const c = compteurs.find((x) => x.vetId === vet.id) ?? {
     vetId: vet.id,
     weGardes: 0,
@@ -432,14 +437,22 @@ function backtrack(
   const step = steps[index]
   const slot: SlotGarde = { date: step.date, type: step.type, saison: step.saison, besoinSecond: step.besoinSecond }
 
-  // Candidats valides (contraintes dures, R8/R9 selon config) triés par score
-  const candidates = vets
-    .filter((vet) => isValid(slot, vet, step.role, vets, planning, calendrier, structure).valid)
-    .sort(
-      (a, b) =>
-        scorerCandidat(step, a, planning, bonusMalus, vets, weights, calendrier, roleAvantageFinancier) -
-        scorerCandidat(step, b, planning, bonusMalus, vets, weights, calendrier, roleAvantageFinancier)
-    )
+  // Candidats valides (contraintes dures, R8/R9 selon config) triés par score.
+  // Perf : compteurs calculés UNE fois par step + score UNE fois par candidat
+  // (l'ancien comparateur recalculait tout à chaque comparaison de tri).
+  // Ordre STRICTEMENT identique : mêmes valeurs, tri stable → byte-identique.
+  const valides = vets.filter(
+    (vet) => isValid(slot, vet, step.role, vets, planning, calendrier, structure).valid
+  )
+  const compteursStep =
+    valides.length > 1 ? compterParVet(planning, vets, roleAvantageFinancier, calendrier) : undefined
+  const candidates = valides
+    .map((vet) => ({
+      vet,
+      score: scorerCandidat(step, vet, planning, bonusMalus, vets, weights, calendrier, roleAvantageFinancier, compteursStep),
+    }))
+    .sort((a, b) => a.score - b.score)
+    .map(({ vet }) => vet)
 
   // Aucun candidat valide DANS CE CONTEXTE PARTIEL RÉEL → vrai créneau bloquant.
   // On capte le PREMIER rencontré, avec une copie de l'état courant. C'est plus
@@ -626,10 +639,13 @@ export function scorerCandidatLNS(
   weights: EquityWeights,
   calendrier?: CalendrierResolu,
   roleAvantageFinancier: string | null = DEFAULT_ROLE_AVANTAGE_FINANCIER,
+  // Perf (audit 2026-07-03) : pré-calculables une fois par step (cf. scorerCandidat).
+  compteursPrecalcules?: CompteurVet[],
 ): number {
   if (vet.dernier_recours) return 1_000_000
 
-  const compteurs = compterParVet(planning, allVets, roleAvantageFinancier)
+  const compteurs =
+    compteursPrecalcules ?? compterParVet(planning, allVets, roleAvantageFinancier, calendrier)
   const c = compteurs.find((x) => x.vetId === vet.id) ?? {
     vetId: vet.id,
     weGardes: 0,
@@ -677,11 +693,17 @@ function repairerSemaine(
 
     if (valids.length === 0) return null
 
-    const sorted = [...valids].sort(
-      (a, b) =>
-        scorerCandidatLNS(step, a, planning, vets, weights, calendrier, roleAvantageFinancier) -
-        scorerCandidatLNS(step, b, planning, vets, weights, calendrier, roleAvantageFinancier)
-    )
+    // Perf : compteurs UNE fois par step + score UNE fois par candidat
+    // (byte-identique — cf. backtrack).
+    const compteursStep =
+      valids.length > 1 ? compterParVet(planning, vets, roleAvantageFinancier, calendrier) : undefined
+    const sorted = valids
+      .map((v) => ({
+        v,
+        score: scorerCandidatLNS(step, v, planning, vets, weights, calendrier, roleAvantageFinancier, compteursStep),
+      }))
+      .sort((a, b) => a.score - b.score)
+      .map(({ v }) => v)
 
     const attributions = [...planning.attributions]
     const idx = attributions.findIndex(
@@ -717,6 +739,7 @@ export function scorerSemaine(
   weights: EquityWeights = DEFAULT_EQUITY_WEIGHTS,
   structure: StructureConfig = DEFAULT_STRUCTURE_CONFIG,
   roleAvantageFinancier: string | null = DEFAULT_ROLE_AVANTAGE_FINANCIER,
+  calendrier?: CalendrierResolu,
 ): VecteurScore {
   const dimanche = addDays(lundi, 6)
   const planSemaine: PlanningPartiel = {
@@ -724,7 +747,7 @@ export function scorerSemaine(
       (a) => a.date >= lundi && a.date <= dimanche
     ),
   }
-  return scorerPlanning(planSemaine, vets, saison, weights, structure, roleAvantageFinancier)
+  return scorerPlanning(planSemaine, vets, saison, weights, structure, roleAvantageFinancier, calendrier)
 }
 
 // ── LNS hill-climbing ────────────────────────────────────
@@ -783,7 +806,7 @@ function lnsHillClimbing(
   const maxPassesSansAmelioration = 3
 
   let meilleur = seedPlanning
-  let scoreMeilleur = scorerPlanning(meilleur, vets, saison, weights, structure, roleAvantage)
+  let scoreMeilleur = scorerPlanning(meilleur, vets, saison, weights, structure, roleAvantage, calendrier)
 
   const lundis = extraireLundis(dateDebut, dateFin)
 
@@ -826,7 +849,7 @@ function lnsHillClimbing(
       if (repaired === null) continue
 
       // Comparer : garder si strictement amélioré
-      const scoreNew = scorerPlanning(repaired, vets, saison, weights, structure, roleAvantage)
+      const scoreNew = scorerPlanning(repaired, vets, saison, weights, structure, roleAvantage, calendrier)
       if (comparerScores(scoreNew, scoreMeilleur) < 0) {
         meilleur = repaired
         scoreMeilleur = scoreNew
