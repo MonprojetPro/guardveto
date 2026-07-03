@@ -49,6 +49,8 @@ export interface ProfilPlanning {
   est_defaut: boolean
   /** Saison proposée par défaut à la génération (suggestion UI). */
   saison_suggeree: Saison | null
+  /** Effectif nuit semaine porté par le profil (null = selon la saison). */
+  nb_vetos_semaine_soir?: number | null
 }
 
 export interface Garde {

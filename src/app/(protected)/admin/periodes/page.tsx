@@ -11,9 +11,30 @@ import { EffectifPeriodeSelect } from '@/components/admin/EffectifPeriodeSelect'
 import { ProfilPeriodeSelect } from '@/components/admin/ProfilPeriodeSelect'
 import type { Periode, ProfilPlanning } from '@/types'
 
-/** Effectif effectif d'une période : explicite si réglé, sinon repli saison. */
-function effectifDe(p: Periode): number {
-  return p.nb_vetos_semaine_soir ?? (p.saison === 'hiver' ? 2 : 1)
+/**
+ * Effectif RÉELLEMENT appliqué par le moteur — MÊME précédence que le loader
+ * (engine/loader.ts) : période (surcharge) > profil > saison. L'ancienne
+ * version ignorait le profil : la colonne affichait une valeur fausse pour
+ * toute période sans surcharge rattachée à un profil portant un effectif.
+ */
+function effectifResolu(
+  p: Periode,
+  profilParId: Map<string, ProfilPlanning>,
+): { valeur: number; provenance: string | null } {
+  if (typeof p.nb_vetos_semaine_soir === 'number') {
+    return { valeur: p.nb_vetos_semaine_soir, provenance: null } // réglé sur la période
+  }
+  const profil = p.profil_id ? profilParId.get(p.profil_id) : undefined
+  if (profil && typeof profil.nb_vetos_semaine_soir === 'number') {
+    return {
+      valeur: profil.nb_vetos_semaine_soir,
+      provenance: `hérité du profil « ${profil.nom} »`,
+    }
+  }
+  return {
+    valeur: p.saison === 'hiver' ? 2 : 1,
+    provenance: `selon la saison (${p.saison === 'hiver' ? 'hiver' : 'été'})`,
+  }
 }
 
 function formatDate(d: string) {
@@ -49,12 +70,15 @@ export default async function PeriodesPage() {
     .from('periodes').select('*').order('date_debut', { ascending: false })
 
   // Profils de planning du cabinet (RLS restrictive → déjà scopés au cabinet).
+  // nb_vetos_semaine_soir : nécessaire pour afficher l'effectif RÉSOLU
+  // (précédence période > profil > saison, comme le moteur).
   const { data: profilsDb } = await supabase
     .from('profils_planning')
-    .select('id, nom, est_defaut, saison_suggeree')
+    .select('id, nom, est_defaut, saison_suggeree, nb_vetos_semaine_soir')
     .eq('actif', true)
     .order('ordre')
   const profils = (profilsDb as ProfilPlanning[]) ?? []
+  const profilParId = new Map(profils.map((p) => [p.id, p]))
   // Le profil défaut est représenté par « Par défaut » (valeur nulle) : on
   // normalise un profil_id pointant dessus vers null pour un affichage propre.
   const defautId = profils.find((p) => p.est_defaut)?.id ?? null
@@ -93,8 +117,8 @@ export default async function PeriodesPage() {
         ))}
       </div>
 
-      {/* Tableau */}
-      <div className="rounded-xl border overflow-hidden bg-card">
+      {/* Tableau — overflow-x-auto : 9 colonnes, illisible sinon sur mobile */}
+      <div className="rounded-xl border overflow-x-auto bg-card">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 border-b">
             <tr>
@@ -121,11 +145,21 @@ export default async function PeriodesPage() {
                   <td className="px-4 py-3">{formatDate(p.date_fin)}</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{Math.round(nbJours / 7)} sem.</td>
                   <td className="px-4 py-3">
-                    <EffectifPeriodeSelect
-                      periodeId={p.id}
-                      valeur={effectifDe(p)}
-                      disabled={p.statut === 'verrouille'}
-                    />
+                    {(() => {
+                      const eff = effectifResolu(p, profilParId)
+                      return (
+                        <div className="space-y-0.5">
+                          <EffectifPeriodeSelect
+                            periodeId={p.id}
+                            valeur={eff.valeur}
+                            disabled={p.statut === 'verrouille'}
+                          />
+                          {eff.provenance && (
+                            <p className="text-[11px] text-muted-foreground">{eff.provenance}</p>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </td>
                   <td className="px-4 py-3">
                     <ProfilPeriodeSelect

@@ -8,12 +8,16 @@ import { Badge } from '@/components/ui/badge'
 import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from '@/components/ui/select'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog'
 import { CongeForm } from './CongeForm'
 import { ValiderCongeDialog } from './ValiderCongeDialog'
+import { RefuserCongeDialog } from './RefuserCongeDialog'
 import { ConflitPlanningDialog } from './ConflitPlanningDialog'
 import { ConflitPublieBadge } from './ConflitPublieBadge'
 import { CriseModal, type VetCrise } from '@/components/planning/CriseModal'
-import { deleteConge, refuserConge, type ConflitPlanning } from '@/app/(protected)/conges/actions'
+import { deleteConge, type ConflitPlanning } from '@/app/(protected)/conges/actions'
 import type { CreneauImpacte } from '@/lib/crise/contexte'
 import type { Conge, StatutConge, TypeConge, Veterinaire } from '@/types'
 
@@ -74,6 +78,8 @@ export function CongesList({ conges, vets, currentUserId, isAdmin, conflitsParCo
   const [addDefaultVet, setAddDefaultVet] = useState<string | undefined>()
   const [editConge, setEditConge] = useState<Conge | null>(null)
   const [validerConge, setValiderConge] = useState<Conge | null>(null)
+  const [congeARefuser, setCongeARefuser] = useState<Conge | null>(null)
+  const [congeASupprimer, setCongeASupprimer] = useState<Conge | null>(null)
   const [isPending, startTransition] = useTransition()
   const [filtreVet, setFiltreVet] = useState('tous')
   const [filtreType, setFiltreType] = useState('tous')
@@ -102,19 +108,17 @@ export function CongesList({ conges, vets, currentUserId, isAdmin, conflitsParCo
     .filter((c) => filtreVet === 'tous' || c.veterinaire_id === filtreVet)
     .filter((c) => filtreType === 'tous' || c.type === filtreType)
 
-  const handleDelete = (id: string) => {
+  // Suppression TOUJOURS confirmée (audit 2026-07-03) : c'était la seule
+  // suppression de l'app sans garde-fou — un tap de travers sur mobile
+  // effaçait un congé validé, sans retour arrière possible.
+  const handleDeleteConfirme = () => {
+    const conge = congeASupprimer
+    if (!conge) return
     startTransition(async () => {
-      const result = await deleteConge(id)
+      const result = await deleteConge(conge.id)
       if (result.error) { toast.error(result.error); return }
       toast.success('Congé supprimé')
-    })
-  }
-
-  const handleRefuser = (id: string) => {
-    startTransition(async () => {
-      const result = await refuserConge(id)
-      if (result.error) { toast.error(result.error); return }
-      toast.success('Congé refusé')
+      setCongeASupprimer(null)
     })
   }
 
@@ -175,8 +179,10 @@ export function CongesList({ conges, vets, currentUserId, isAdmin, conflitsParCo
           )}
         </div>
 
-        <div className="hidden sm:flex items-center gap-2 shrink-0">
-          <Badge variant="outline" className={`text-xs ${TYPE_COLORS[c.type]}`}>{TYPE_LABELS[c.type]}</Badge>
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Le type reste masqué sur mobile (place limitée), mais le STATUT
+              est toujours visible : la couleur seule ne suffisait pas. */}
+          <Badge variant="outline" className={`hidden sm:inline-flex text-xs ${TYPE_COLORS[c.type]}`}>{TYPE_LABELS[c.type]}</Badge>
           <Badge variant="outline" className={`text-xs ${statutCfg.className}`}>{statutCfg.label}</Badge>
         </div>
 
@@ -195,7 +201,7 @@ export function CongesList({ conges, vets, currentUserId, isAdmin, conflitsParCo
                 <Button
                   variant="ghost" size="icon"
                   className="h-8 w-8 text-destructive hover:text-destructive"
-                  onClick={() => handleRefuser(c.id)}
+                  onClick={() => setCongeARefuser(c)}
                   disabled={isPending}
                   title="Refuser"
                 >
@@ -215,7 +221,7 @@ export function CongesList({ conges, vets, currentUserId, isAdmin, conflitsParCo
                 <Button
                   variant="ghost" size="icon"
                   className="h-8 w-8 text-destructive hover:text-destructive"
-                  onClick={() => handleDelete(c.id)}
+                  onClick={() => setCongeASupprimer(c)}
                   disabled={isPending || !canDelete(c)}
                   title={canDelete(c) ? 'Supprimer / Annuler' : 'Non supprimable'}
                 >
@@ -362,6 +368,50 @@ export function CongesList({ conges, vets, currentUserId, isAdmin, conflitsParCo
           onConflit={setConflit}
         />
       )}
+
+      {/* Refus AVEC motif — même dialogue que /admin/demandes (flux unifié) */}
+      {congeARefuser && (
+        <RefuserCongeDialog
+          open={Boolean(congeARefuser)}
+          onClose={() => setCongeARefuser(null)}
+          conge={congeARefuser}
+          vet={vets.find((v) => v.id === congeARefuser.veterinaire_id)}
+        />
+      )}
+
+      {/* Confirmation de suppression / annulation d'un congé */}
+      <Dialog open={congeASupprimer !== null} onOpenChange={(o) => { if (!o && !isPending) setCongeASupprimer(null) }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-heading">
+              {isAdmin ? 'Supprimer ce congé ?' : 'Annuler cette demande ?'}
+            </DialogTitle>
+            <DialogDescription>
+              {congeASupprimer && (
+                <>
+                  {TYPE_LABELS[congeASupprimer.type]} du {formatDate(congeASupprimer.date_debut)}
+                  {congeASupprimer.type !== 'indisponibilite' && <> au {formatDate(congeASupprimer.date_fin)}</>}
+                  {congeASupprimer.statut === 'valide' && (
+                    <> — ce congé est <strong>déjà validé</strong>.</>
+                  )}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Cette action est définitive : le congé disparaît et le moteur pourra à
+            nouveau attribuer des gardes sur ces dates.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCongeASupprimer(null)} disabled={isPending}>
+              Garder le congé
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteConfirme} disabled={isPending}>
+              {isPending ? 'Suppression…' : 'Supprimer définitivement'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Alerte conflit congé ↔ planning publié (cas « Antoine ») */}
       {conflit && (
