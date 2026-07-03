@@ -2,9 +2,27 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { createClient as createAdminClient, type SupabaseClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 import type { StatutVeto, UserRole } from '@/types'
+
+// ── Garde admin (même pattern que /regles et /admin/structure) ──
+async function assertAdmin(
+  supabase: SupabaseClient<any, any, any>,
+): Promise<{ error: string } | { veto: { id: string; role_app: string } }> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Non authentifié.' }
+  const { data: vet } = await supabase
+    .from('veterinaires')
+    .select('id, role_app')
+    .eq('user_id', user.id)
+    .single()
+  if (!vet) return { error: 'Non authentifié.' }
+  if (vet.role_app !== 'admin') {
+    return { error: "Action réservée à l'administrateur du cabinet." }
+  }
+  return { veto: vet }
+}
 
 export interface VeterinaireFormData {
   nom: string
@@ -19,6 +37,9 @@ export interface VeterinaireFormData {
 
 export async function createVeterinaire(data: VeterinaireFormData) {
   const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return { error: garde.error }
 
   // cabinet_id dérivé côté serveur (jamais du client) — sinon le véto
   // est inséré avec cabinet_id NULL et reste invisible sous RLS stricte.
@@ -63,6 +84,9 @@ export async function createVeterinaire(data: VeterinaireFormData) {
 export async function updateVeterinaire(id: string, data: VeterinaireFormData) {
   const supabase = await createClient()
 
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return { error: garde.error }
+
   // Vérifie unicité email (hors soi-même)
   const { data: existing } = await supabase
     .from('veterinaires')
@@ -96,8 +120,15 @@ export async function updateVeterinaire(id: string, data: VeterinaireFormData) {
 }
 
 export async function inviterVeterinaire(id: string) {
-  // Récupère l'email du véto
   const supabase = await createClient()
+
+  // Garde admin OBLIGATOIRE : cette action bascule ensuite en service_role
+  // (bypass RLS) — la RLS ne peut donc pas nous rattraper plus bas.
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return { error: garde.error }
+
+  // Récupère l'email du véto via le client AUTHENTIFIÉ : la RLS garantit que
+  // la cible appartient au cabinet du caller (scope tenant vérifié ici).
   const { data: vet } = await supabase
     .from('veterinaires')
     .select('email, prenom, nom, user_id')
@@ -113,7 +144,10 @@ export async function inviterVeterinaire(id: string) {
   )
 
   // Vérifie si un compte auth existe déjà pour cet email
-  const { data: existingUsers } = await adminClient.auth.admin.listUsers()
+  const { data: existingUsers } = await adminClient.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000,
+  })
   const existingUser = existingUsers?.users?.find((u) => u.email === vet.email)
 
   let authUserId: string
@@ -123,7 +157,19 @@ export async function inviterVeterinaire(id: string) {
       // Compte déjà confirmé et actif → rien à faire
       return { error: 'Ce compte est déjà actif.' }
     }
-    // Compte invité mais non confirmé → supprime et ré-invite pour générer un nouveau lien
+    // Compte invité mais non confirmé → supprime et ré-invite pour générer un
+    // nouveau lien. Uniquement si ce compte est bien celui de CE véto (lié par
+    // user_id ou par la métadonnée d'invitation) — jamais le compte en attente
+    // d'un homonyme, potentiellement d'un autre cabinet.
+    const lieACeVeto =
+      vet.user_id === existingUser.id ||
+      existingUser.user_metadata?.veterinaire_id === id
+    if (!lieACeVeto) {
+      return {
+        error:
+          "Un compte en attente existe déjà pour cet email mais n'est pas lié à ce vétérinaire.",
+      }
+    }
     await adminClient.auth.admin.deleteUser(existingUser.id)
   }
 
@@ -173,6 +219,9 @@ export async function toggleVeterinaireActif(
   confirm: boolean = false
 ): Promise<ToggleActifResult> {
   const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return { error: garde.error }
 
   // Contrôle uniquement à la DÉSACTIVATION (réactiver est toujours sûr).
   if (!actif && !confirm) {

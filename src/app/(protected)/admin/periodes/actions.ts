@@ -3,6 +3,27 @@
 import { createClient } from '@/lib/supabase/server'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { revalidatePath } from 'next/cache'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+// ── Garde admin (même pattern que /regles et /admin/structure) ──
+// La RLS periodes (write admin-only) protège déjà l'écriture ; cette garde
+// ajoute un refus explicite en français au lieu d'une erreur Postgres brute.
+async function assertAdmin(
+  supabase: SupabaseClient<any, any, any>,
+): Promise<{ error: string } | { veto: { id: string; role_app: string } }> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Non authentifié.' }
+  const { data: vet } = await supabase
+    .from('veterinaires')
+    .select('id, role_app')
+    .eq('user_id', user.id)
+    .single()
+  if (!vet) return { error: 'Non authentifié.' }
+  if (vet.role_app !== 'admin') {
+    return { error: "Action réservée à l'administrateur du cabinet." }
+  }
+  return { veto: vet }
+}
 
 // Détection automatique de la saison depuis la date de début
 // Mai (5) → Août (8) = été, le reste = hiver
@@ -13,6 +34,9 @@ function detecterSaison(dateDebut: string): 'ete' | 'hiver' {
 
 export async function creerPeriode(formData: FormData) {
   const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return { error: garde.error }
 
   const libelle   = (formData.get('libelle') as string | null)?.trim() || null
   const dateDebut = formData.get('date_debut') as string
@@ -106,6 +130,9 @@ export async function creerPeriode(formData: FormData) {
 export async function setProfilPeriode(periodeId: string, profilId: string | null) {
   const supabase = await createClient()
 
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return { error: garde.error }
+
   if (profilId) {
     const { data: owned } = await supabase
       .from('profils_planning')
@@ -134,6 +161,9 @@ export async function setEffectifPeriode(periodeId: string, nb: number) {
   if (nb !== 1 && nb !== 2) return { error: 'Effectif invalide (1 ou 2).' }
   const supabase = await createClient()
 
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return { error: garde.error }
+
   const { error } = await supabase
     .from('periodes')
     .update({ nb_vetos_semaine_soir: nb })
@@ -146,6 +176,9 @@ export async function setEffectifPeriode(periodeId: string, nb: number) {
 
 export async function supprimerPeriode(periodeId: string) {
   const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return { error: garde.error }
 
   // Sécurité : seulement les brouillons sans gardes peuvent être supprimés
   const { count } = await supabase
