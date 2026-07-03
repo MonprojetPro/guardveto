@@ -305,7 +305,7 @@ export async function sendRappelPublication(
 ): Promise<{ sent: number; errors: number }> {
   const { data: periode } = await supabase
     .from('periodes')
-    .select('id, saison, numero, date_debut')
+    .select('id, saison, numero, date_debut, cabinet_id')
     .eq('id', periodeId)
     .single()
 
@@ -318,10 +318,17 @@ export async function sendRappelPublication(
     ? 'Été'
     : periode.numero ? `Hiver — Période ${periode.numero}` : 'Hiver'
 
-  // Uniquement les admins actifs
+  // Uniquement les admins actifs DU CABINET de la période (fix audit
+  // 2026-07-03 : appelé par le cron en service_role — la RLS est contournée,
+  // sans ce filtre chaque admin recevait les rappels des AUTRES cabinets).
+  if (!periode.cabinet_id) {
+    console.error('[notifications] Période sans cabinet_id — rappel ignoré:', periodeId)
+    return { sent: 0, errors: 0 }
+  }
   const { data: admins } = await supabase
     .from('veterinaires')
     .select('id, nom, prenom, email, cabinet_id')
+    .eq('cabinet_id', periode.cabinet_id)
     .eq('role_app', 'admin')
     .eq('actif', true)
 

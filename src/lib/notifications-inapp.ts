@@ -30,6 +30,7 @@ export type NotifType =
   | 'appel_volontaires'
   | 'depannage_confirme'
   | 'incident_technique'
+  | 'rappel_creation_periode'
   | 'echange_propose'
   | 'echange_accepte'
   | 'echange_refuse'
@@ -132,6 +133,20 @@ export function contenuDepannageConfirme(
     message: `Vous assurez désormais la garde du ${formatDateFr(date)} (${typeGardeLabel(typeGarde)}, ${roleLabel(role)}). Elle apparaît dans votre planning.`,
     lien: '/planning',
   }
+}
+
+export function contenuRappelCreationPeriode(dateFinDerniere: string, dejaFinie: boolean) {
+  return dejaFinie
+    ? {
+        titre: '🚨 Plus aucune période de planning',
+        message: `La dernière période s'est terminée le ${formatDateFr(dateFinDerniere)} et aucune ne la suit : les gardes ne sont plus planifiées. Crée la période suivante dès que possible.`,
+        lien: '/admin/periodes',
+      }
+    : {
+        titre: 'Pense à créer la période suivante',
+        message: `La dernière période de planning se termine le ${formatDateFr(dateFinDerniere)} et aucune ne la suit. Crée la prochaine période pour laisser le temps de générer et publier le planning.`,
+        lien: '/admin/periodes',
+      }
 }
 
 // ── Contenus : échange de gardes ──────────────────────────────

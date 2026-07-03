@@ -14,6 +14,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { sendRappelPublication } from '@/lib/notifications'
+import { creerNotification, contenuRappelCreationPeriode } from '@/lib/notifications-inapp'
+
+// Alerte « période suivante manquante » quand la couverture restante passe
+// sous ce seuil (laisse le temps de créer + générer + publier).
+const SEUIL_COUVERTURE_JOURS = 21
+// Anti-spam : au plus une alerte par admin par semaine.
+const ANTI_SPAM_JOURS = 7
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -58,13 +65,9 @@ export async function GET(req: NextRequest) {
     )
   }
 
-  if (!periodes || periodes.length === 0) {
-    return NextResponse.json({
-      success: true,
-      message: 'Aucune période à venir non publiée.',
-      rappelsEnvoyes: [],
-    })
-  }
+  // ⚠️ PAS de retour anticipé si aucune période à venir : c'est justement le
+  // cas le plus grave pour la phase 2 (« plus aucune période » → alerte).
+  const periodesAVenir = periodes ?? []
 
   const rappelsEnvoyes: Array<{
     periodeId: string
@@ -74,7 +77,7 @@ export async function GET(req: NextRequest) {
     errors: number
   }> = []
 
-  for (const periode of periodes) {
+  for (const periode of periodesAVenir) {
     const dateDebut = new Date(periode.date_debut + 'T12:00:00Z')
     const diffMs = dateDebut.getTime() - today.getTime()
     const joursRestants = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
@@ -107,10 +110,77 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ── Phase 2 : la période SUIVANTE n'existe pas (audit 2026-07-03, n°11) ──
+  // Le rappel de publication ne voit que les périodes EXISTANTES : si l'admin
+  // oublie de CRÉER la période suivante, plus rien n'alerte jusqu'au trou de
+  // gardes. Ici : pour chaque cabinet, si la dernière période se termine dans
+  // ≤ SEUIL_COUVERTURE_JOURS (ou est déjà finie) et qu'aucune ne la suit →
+  // notif in-app aux admins du cabinet (anti-spam hebdomadaire).
+  const alertesPeriodeManquante: Array<{ cabinetId: string; dateFin: string }> = []
+  {
+    const todayStr = today.toISOString().split('T')[0]
+    const seuil = new Date(today)
+    seuil.setUTCDate(seuil.getUTCDate() + SEUIL_COUVERTURE_JOURS)
+    const seuilStr = seuil.toISOString().split('T')[0]
+    const depuis = new Date(today.getTime() - ANTI_SPAM_JOURS * 24 * 60 * 60 * 1000).toISOString()
+
+    const { data: cabinets } = await supabase.from('cabinets').select('id')
+    for (const cabinet of (cabinets ?? []) as { id: string }[]) {
+      const { data: derniere } = await supabase
+        .from('periodes')
+        .select('id, date_fin')
+        .eq('cabinet_id', cabinet.id)
+        .order('date_fin', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      // Cabinet sans aucune période (onboarding en cours) : on ne spamme pas.
+      if (!derniere) continue
+      const dateFin = (derniere as { date_fin: string }).date_fin
+      if (dateFin > seuilStr) continue // encore assez de couverture
+
+      const dejaFinie = dateFin < todayStr
+      const contenu = contenuRappelCreationPeriode(dateFin, dejaFinie)
+
+      const { data: admins } = await supabase
+        .from('veterinaires')
+        .select('id')
+        .eq('cabinet_id', cabinet.id)
+        .eq('role_app', 'admin')
+        .eq('actif', true)
+
+      let notifie = false
+      for (const admin of (admins ?? []) as { id: string }[]) {
+        // Anti-spam : au plus une alerte par admin par semaine.
+        const { data: doublon } = await supabase
+          .from('notifications')
+          .select('id')
+          .eq('veterinaire_id', admin.id)
+          .eq('type', 'rappel_creation_periode')
+          .gte('created_at', depuis)
+          .limit(1)
+          .maybeSingle()
+        if (doublon) continue
+
+        await creerNotification(supabase, {
+          veterinaireId: admin.id,
+          type: 'rappel_creation_periode',
+          titre: contenu.titre,
+          message: contenu.message,
+          lien: contenu.lien,
+          cabinetId: cabinet.id,
+        })
+        notifie = true
+      }
+      if (notifie) alertesPeriodeManquante.push({ cabinetId: cabinet.id, dateFin })
+    }
+  }
+
   return NextResponse.json({
     success: true,
     date: today.toISOString().split('T')[0],
-    periodesVerifiees: periodes.length,
+    periodesVerifiees: periodesAVenir.length,
     rappelsEnvoyes,
+    alertesPeriodeManquante,
   })
 }
