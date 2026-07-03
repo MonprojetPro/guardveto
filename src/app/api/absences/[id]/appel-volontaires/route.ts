@@ -165,6 +165,7 @@ export async function POST(
     calendrier: ctx.calendrier,
     structure: ctx.structure,
     equityWeights: ctx.equityWeights,
+    roleAvantageFinancier: ctx.roleAvantageFinancier,
   })
 
   const candidatIds = resultat.candidats.map((c) => c.vetId)

@@ -75,6 +75,12 @@ export interface ContexteCrisePeriode {
    * (le repli saison dirait « pas de 2nd l'été »). Cohérence avec la génération.
    */
   nbVetosSemaineSoir?: number
+  /**
+   * R11b — rôle à avantage financier (réglage cabinet). Threadé au classement
+   * des candidats (scorerCandidatLNS) pour que la crise trie avec le MÊME
+   * critère d'équité que la génération. undefined → défaut moteur ('premier').
+   */
+  roleAvantageFinancier?: string | null
 }
 
 /**
@@ -235,5 +241,6 @@ export async function chargerContextePourPeriode(
     equityWeights: contexte.equityWeights,
     saison: contexte.saison,
     nbVetosSemaineSoir: contexte.nbVetosSemaineSoir,
+    roleAvantageFinancier: contexte.roleAvantageFinancier,
   }
 }

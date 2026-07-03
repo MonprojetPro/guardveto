@@ -98,6 +98,9 @@ export interface ProposerReparationParams {
   structure?: StructureConfig
   /** Poids d'équité — mêmes curseurs qu'à la génération. Défaut historique. */
   equityWeights?: EquityWeights
+  /** R11b — rôle à avantage financier (même réglage qu'à la génération).
+   *  undefined → défaut moteur ('premier'). null → aucun équilibrage. */
+  roleAvantageFinancier?: string | null
 }
 
 // ── Helpers internes ─────────────────────────────────────
@@ -204,6 +207,8 @@ export function proposerReparation(
   const calendrier = params.calendrier
   const structure = params.structure ?? DEFAULT_STRUCTURE_CONFIG
   const weights = params.equityWeights ?? DEFAULT_EQUITY_WEIGHTS
+  // R11b : undefined → défaut moteur ; null explicite → aucun équilibrage.
+  const roleAvantage = params.roleAvantageFinancier
 
   // ⚠️ NORMALISATION OBLIGATOIRE (parade cécité params — incident Fanny 2026-06-21) :
   // isValid lit la config des règles ; sans dépliage, les repos rangés sous
@@ -222,7 +227,9 @@ export function proposerReparation(
     const res = isValid(slot, vet, creneau.role, vets, planningPartiel, calendrier, structure)
     if (!res.valid) continue
 
-    const score = scorerCandidatLNS(step, vet, planningPartiel, vets, weights, calendrier)
+    const score = roleAvantage === undefined
+      ? scorerCandidatLNS(step, vet, planningPartiel, vets, weights, calendrier)
+      : scorerCandidatLNS(step, vet, planningPartiel, vets, weights, calendrier, roleAvantage)
     const warnings = calculerWarnings(vet, creneau, planningPartiel, res)
     candidatsLegaux.push({ vetId: vet.id, score, warnings })
   }

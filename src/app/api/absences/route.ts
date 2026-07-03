@@ -168,6 +168,7 @@ export async function POST(req: NextRequest) {
       calendrier: ctx.calendrier,
       structure: ctx.structure,
       equityWeights: ctx.equityWeights,
+      roleAvantageFinancier: ctx.roleAvantageFinancier,
     })
 
     creneauxImpactes.push({

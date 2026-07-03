@@ -44,6 +44,20 @@ export interface EquityWeights {
  */
 export const DEFAULT_ROLE_AVANTAGE_FINANCIER = 'premier'
 
+/**
+ * Mappe la valeur BASE (`cabinets.role_avantage_financier`) vers le paramètre
+ * moteur `roleAvantageFinancier` :
+ *   'premier' | 'second' → tel quel ;
+ *   'aucun'              → null (pas d'équilibrage du rôle) ;
+ *   absent / inconnu     → undefined (repli défaut moteur = 'premier').
+ * Lecture BEST-EFFORT : une colonne pas encore migrée ne casse rien.
+ */
+export function mapperRoleAvantageFinancierDb(v: unknown): string | null | undefined {
+  if (v === 'aucun') return null
+  if (v === 'premier' || v === 'second') return v
+  return undefined
+}
+
 /** Valeurs par défaut = comportement historique (aucun changement de planning). */
 export const DEFAULT_EQUITY_WEIGHTS: EquityWeights = {
   WE_GARDE: 100,

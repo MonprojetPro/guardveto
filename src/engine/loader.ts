@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/server'
 import type { VetEngine, ContrainteEngine, CongeEngine, CalendrierResolu } from './types'
 import type { BonusMalusMap } from './score-lexicographique'
 import type { SolverInput } from './solver'
-import { buildEquityWeights, type EquityWeights } from './equity-weights'
+import { buildEquityWeights, mapperRoleAvantageFinancierDb, type EquityWeights } from './equity-weights'
 import { type StructureConfig } from './structure-config'
 import {
   mapperReglesCabinet,
@@ -364,6 +364,21 @@ export async function chargerInputDepuisSupabase(
   // Poids d'équité : déjà calculés ci-dessus par chargerReglesCabinet (extraits
   // des règles `equilibrer`). Repli DEFAULT_EQUITY_WEIGHTS si aucune règle.
 
+  // R11b — rôle à avantage financier (réglage cabinet, fin du « réglage
+  // fantôme » P4). Best-effort : colonne absente / cabinet inconnu →
+  // undefined → défaut moteur ('premier', byte-identique à l'historique).
+  let roleAvantageFinancier: string | null | undefined
+  if (cabinetId) {
+    const { data: cab } = await supabase
+      .from('cabinets')
+      .select('role_avantage_financier')
+      .eq('id', cabinetId)
+      .maybeSingle()
+    roleAvantageFinancier = mapperRoleAvantageFinancierDb(
+      (cab as { role_avantage_financier?: unknown } | null)?.role_avantage_financier,
+    )
+  }
+
   // Catalogue de créneaux du cabinet (fondamentaux universels — P1/P2), SCOPÉ au
   // profil de la période (P5 slice 3). Best-effort : absent si pas de cabinet →
   // le moteur retombe sur le mapping en dur (comportement historique).
@@ -382,5 +397,6 @@ export async function chargerInputDepuisSupabase(
     equityWeights,
     structureConfig,
     creneaux,
+    roleAvantageFinancier,
   }
 }

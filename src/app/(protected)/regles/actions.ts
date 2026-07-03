@@ -274,6 +274,33 @@ export async function setStructureRegle(briqueId: string, actif: boolean, force:
   return { success: true }
 }
 
+// ── R11b : rôle à avantage financier (réglage cabinet) ───────
+
+const ROLES_AVANTAGE_VALIDES = new Set(['premier', 'second', 'aucun'])
+
+/**
+ * Règle QUEL rôle de week-end porte l'avantage financier (équilibré R11b).
+ * Écriture via la RPC auto-gardée `set_role_avantage_financier` (la table
+ * cabinets n'a pas de policy UPDATE large). Double garde : assertAdmin ici +
+ * re-vérification admin DANS la RPC. Effet à la prochaine génération.
+ */
+export async function setRoleAvantageFinancier(role: string) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  if (!ROLES_AVANTAGE_VALIDES.has(role)) {
+    return { error: 'Valeur invalide (1er, 2nd ou aucun).' }
+  }
+
+  const { error } = await supabase.rpc('set_role_avantage_financier', { p_role: role })
+  if (error) return { error: error.message }
+
+  revalidatePath('/regles')
+  return { success: true }
+}
+
 // ── Création / édition guidée (P1A-007) ──────────────────────
 
 /** Les briques que le moteur sait réellement évaluer (mapReglesCabinet). */

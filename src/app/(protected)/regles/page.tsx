@@ -64,7 +64,7 @@ export default async function ReglesPage({
 
   if (!currentVeto) redirect('/login')
 
-  const [{ data: regles }, { data: vets }, { data: periodesDb }] = await Promise.all([
+  const [{ data: regles }, { data: vets }, { data: periodesDb }, { data: cabinetRow }] = await Promise.all([
     supabase
       .from('regles_cabinet')
       .select('id, brique_id, params_json, force, actif, periode_id')
@@ -76,7 +76,12 @@ export default async function ReglesPage({
       .select('id, saison, numero, libelle, date_debut, date_fin')
       .neq('statut', 'verrouille') // une période verrouillée ne sera plus régénérée → inutile pour scoper une règle
       .order('date_debut', { ascending: false }),
+    // R11b : rôle à avantage financier (RLS cabinets = lecture de SON cabinet).
+    supabase.from('cabinets').select('role_avantage_financier').maybeSingle(),
   ])
+
+  const roleAvantage =
+    (cabinetRow as { role_avantage_financier?: string } | null)?.role_avantage_financier ?? 'premier'
 
   // Périodes proposables au formulaire (libellé non ambigu construit côté client).
   const periodes = ((periodesDb as PeriodeMini[]) ?? []).map((p) => ({
@@ -123,6 +128,7 @@ export default async function ReglesPage({
       <ReglagesPlanningClient
         equite={importances}
         structure={structureConfig}
+        roleAvantage={roleAvantage}
         isAdmin={isAdmin}
       />
     </div>

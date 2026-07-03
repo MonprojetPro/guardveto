@@ -175,6 +175,7 @@ export async function POST(
       calendrier: ctx.calendrier,
       structure: ctx.structure,
       equityWeights: ctx.equityWeights,
+      roleAvantageFinancier: ctx.roleAvantageFinancier,
     })
 
     const legal = resultat.candidats.some((c) => c.vetId === dec.remplacant_id)

@@ -131,6 +131,7 @@ export async function resoudreContexte(
     equityWeights: input.equityWeights,
     structureConfig: input.structureConfig,
     creneaux: input.creneaux,
+    roleAvantageFinancier: input.roleAvantageFinancier,
   }
 
   return contexte

@@ -166,6 +166,12 @@ export interface ContexteSimulation {
    * Absent → le moteur retombe sur le mapping en dur (comportement historique).
    */
   creneaux?: import('./creneau-modele').CreneauModele[]
+  /**
+   * R11b — rôle à avantage financier (réglage cabinet). undefined → défaut
+   * moteur ('premier') ; null → aucun équilibrage. Même piège de propagation
+   * que ci-dessus : à transmettre explicitement dans resoudreContexte.
+   */
+  roleAvantageFinancier?: string | null
 }
 
 // Résultat d'une vérification

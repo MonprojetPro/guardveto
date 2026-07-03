@@ -26,7 +26,7 @@ import {
   type EquityDimension, type ImportanceLevel,
 } from '@/engine/equity-weights'
 import { IMPORTANCE_LABELS } from '@/engine/briques/catalogue'
-import { setEquiteImportance, setStructureRegle } from '@/app/(protected)/regles/actions'
+import { setEquiteImportance, setStructureRegle, setRoleAvantageFinancier } from '@/app/(protected)/regles/actions'
 
 // ── Référentiels d'affichage ─────────────────────────────────
 
@@ -60,6 +60,14 @@ const STRUCTURE_META: Record<'liaison_creneaux' | 'inversion_role', { titre: str
 }
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
+// R11b — rôle à avantage financier (réglage cabinet).
+const ROLE_AVANTAGE_LABELS: Record<string, string> = {
+  premier: 'Le 1er de garde',
+  second: 'Le 2nd de garde',
+  aucun: 'Aucun (pas d\'équilibrage)',
+}
+const ROLE_AVANTAGE_OPTIONS = ['premier', 'second', 'aucun']
 
 export interface StructureRegleUI {
   actif: boolean
@@ -112,14 +120,17 @@ function Ligne({
 interface ReglagesPlanningClientProps {
   equite: Record<EquityDimension, ImportanceLevel>
   structure: { liaison_creneaux: StructureRegleUI; inversion_role: StructureRegleUI }
+  /** R11b : rôle portant l'avantage financier ('premier' | 'second' | 'aucun'). */
+  roleAvantage: string
   isAdmin: boolean
 }
 
-export function ReglagesPlanningClient({ equite, structure, isAdmin }: ReglagesPlanningClientProps) {
+export function ReglagesPlanningClient({ equite, structure, roleAvantage, isAdmin }: ReglagesPlanningClientProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [eq, setEq] = useState(equite)
   const [st, setSt] = useState(structure)
+  const [roleAv, setRoleAv] = useState(roleAvantage)
 
   const optionsImportance = IMPORTANCE_LEVELS.map((n) => ({ value: n, label: cap(IMPORTANCE_LABELS[n]) }))
   const optionsForce = FORCE_OPTIONS.map((f) => ({ value: f, label: FORCE_LABELS[f] }))
@@ -130,6 +141,16 @@ export function ReglagesPlanningClient({ equite, structure, isAdmin }: ReglagesP
     startTransition(async () => {
       const res = await setEquiteImportance(dim, niveau)
       if (res?.error) { toast.error(res.error); setEq((p) => ({ ...p, [dim]: avant })) }
+      else { toast.success('Réglage enregistré — appliqué à la prochaine génération.'); router.refresh() }
+    })
+  }
+
+  const changerRoleAvantage = (role: string) => {
+    const avant = roleAv
+    setRoleAv(role)
+    startTransition(async () => {
+      const res = await setRoleAvantageFinancier(role)
+      if (res?.error) { toast.error(res.error); setRoleAv(avant) }
       else { toast.success('Réglage enregistré — appliqué à la prochaine génération.'); router.refresh() }
     })
   }
@@ -209,6 +230,17 @@ export function ReglagesPlanningClient({ equite, structure, isAdmin }: ReglagesP
             />
           )
         })}
+        <Ligne
+          titre="Rôle payé du week-end (avantage financier)"
+          aide="Le rôle qui rapporte plus le week-end. Le moteur équilibre qui l'obtient (dimension « Rôle de 1er le week-end » ci-dessus)."
+          value={roleAv}
+          valueLabel={ROLE_AVANTAGE_LABELS[roleAv] ?? roleAv}
+          options={ROLE_AVANTAGE_OPTIONS.map((r) => ({ value: r, label: ROLE_AVANTAGE_LABELS[r] }))}
+          isAdmin={isAdmin}
+          isPending={isPending}
+          onChange={changerRoleAvantage}
+          cible="role_avantage_financier"
+        />
       </div>
     </section>
   )
