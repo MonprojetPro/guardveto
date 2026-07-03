@@ -41,11 +41,12 @@ export default async function PlanningPage({
 
   const { data: currentVeto } = await supabase
     .from('veterinaires')
-    .select('role_app')
+    .select('id, role_app')
     .eq('user_id', user.id)
     .single()
 
   const isAdmin = currentVeto?.role_app === 'admin'
+  const moiVetId = currentVeto?.id as string | undefined
 
   // Mois à afficher (searchParam ou mois courant)
   const { mois: moisParam } = await searchParams
@@ -178,6 +179,7 @@ export default async function PlanningPage({
         anneeMois={anneeMois}
         isAdmin={isAdmin}
         vets={vetsCrise}
+        moiVetId={moiVetId}
       />
     </div>
   )

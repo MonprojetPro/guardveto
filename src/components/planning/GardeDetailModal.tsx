@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Loader2, AlertTriangle, Lock, Wrench, UserMinus } from 'lucide-react'
+import { Loader2, AlertTriangle, ArrowLeftRight, Lock, Wrench, UserMinus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -23,6 +23,8 @@ interface GardeDetailModalProps {
   garde: GardeDenormalisee | null
   date: string | null
   isAdmin: boolean
+  /** Id du véto connecté — pour « proposer un échange » sur SES gardes. */
+  moiVetId?: string
   onClose: () => void
   onSaved: () => void
   /**
@@ -233,7 +235,7 @@ function SectionSelecteur({
 
 // ── Modal principale ─────────────────────────────────────
 
-export function GardeDetailModal({ garde, date, isAdmin, onClose, onSaved, onDeclarerAbsent }: GardeDetailModalProps) {
+export function GardeDetailModal({ garde, date, isAdmin, moiVetId, onClose, onSaved, onDeclarerAbsent }: GardeDetailModalProps) {
   const router = useRouter()
 
   const [loading, setLoading] = useState(false)
@@ -375,6 +377,17 @@ export function GardeDetailModal({ garde, date, isAdmin, onClose, onSaved, onDec
   const estVerrouille = data?.garde.verrouille ?? false
   const modeEdition = isAdmin && (!estVerrouille || correctionMode)
 
+  // Véto : « proposer un échange » sur SA garde (publiée, future, non verrouillée).
+  const aujourdHui = new Date().toISOString().slice(0, 10)
+  const peutProposerEchange =
+    !isAdmin &&
+    Boolean(moiVetId) &&
+    Boolean(garde) &&
+    garde!.periode_statut === 'publie' &&
+    garde!.date > aujourdHui &&
+    !estVerrouille &&
+    (garde!.premier_id === moiVetId || garde!.second_id === moiVetId)
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose() }}>
@@ -491,6 +504,16 @@ export function GardeDetailModal({ garde, date, isAdmin, onClose, onSaved, onDec
           )}
 
           <DialogFooter>
+            {peutProposerEchange && garde && (
+              <Button
+                variant="outline"
+                className="sm:mr-auto"
+                onClick={() => router.push(`/echanges?proposer=${garde.id}`)}
+              >
+                <ArrowLeftRight className="w-4 h-4 mr-2" />
+                Proposer un échange
+              </Button>
+            )}
             <Button variant="outline" onClick={handleClose} disabled={saving}>
               {modeEdition && garde ? 'Annuler' : 'Fermer'}
             </Button>

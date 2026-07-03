@@ -56,7 +56,8 @@ export interface EchangeRow {
   role_demandeur: 'premier' | 'second'
   role_contrepartie: 'premier' | 'second' | null
   demandeur_id: string
-  cible_id: string
+  /** null = proposition OUVERTE à tous (premier arrivé, premier servi). */
+  cible_id: string | null
   created_at: string
   garde: { id: string; date: string; type: string } | null
   gardeContrepartie: { id: string; date: string; type: string } | null
@@ -68,6 +69,8 @@ interface EchangesClientProps {
   echanges: EchangeRow[]
   gardesFutures: GardeLite[]
   vets: VetLite[]
+  /** Garde pré-sélectionnée (entrée depuis le planning : /echanges?proposer=ID). */
+  gardePreselectionnee?: string | null
 }
 
 // ── Helpers d'affichage ───────────────────────────────────
@@ -101,10 +104,11 @@ const STATUT_CONFIG: Record<EchangeRow['statut'], { label: string; className: st
 
 // ── Composant principal ───────────────────────────────────
 
-export function EchangesClient({ moiId, isAdmin, echanges, gardesFutures, vets }: EchangesClientProps) {
+export function EchangesClient({ moiId, isAdmin, echanges, gardesFutures, vets, gardePreselectionnee }: EchangesClientProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [proposerOpen, setProposerOpen] = useState(false)
+  // Entrée depuis le planning : le dialogue s'ouvre pré-rempli sur la garde.
+  const [proposerOpen, setProposerOpen] = useState(Boolean(gardePreselectionnee))
   const [refusEnCours, setRefusEnCours] = useState<{ id: string; admin: boolean } | null>(null)
   const [motifRefus, setMotifRefus] = useState('')
   const [annulationEnCours, setAnnulationEnCours] = useState<string | null>(null)
@@ -117,12 +121,16 @@ export function EchangesClient({ moiId, isAdmin, echanges, gardesFutures, vets }
 
   const aValider = isAdmin ? echanges.filter((e) => e.statut === 'acceptee') : []
   const recues = echanges.filter((e) => e.cible_id === moiId && e.statut === 'proposee')
+  // Propositions OUVERTES des confrères : premier arrivé, premier servi.
+  const ouvertes = echanges.filter(
+    (e) => e.cible_id === null && e.statut === 'proposee' && e.demandeur_id !== moiId,
+  )
   const mesDemandes = echanges.filter(
     (e) => e.demandeur_id === moiId && (e.statut === 'proposee' || e.statut === 'acceptee'),
   )
   const historique = echanges.filter(
     (e) =>
-      !aValider.includes(e) && !recues.includes(e) && !mesDemandes.includes(e),
+      !aValider.includes(e) && !recues.includes(e) && !ouvertes.includes(e) && !mesDemandes.includes(e),
   )
 
   const lancer = (fn: () => Promise<{ error?: string; success?: boolean }>, okMsg: string) => {
@@ -147,7 +155,7 @@ export function EchangesClient({ moiId, isAdmin, echanges, gardesFutures, vets }
             <p className="font-medium text-foreground">
               {nomDe(e.demandeur_id)} cède sa garde
               {e.garde && <> du <strong>{formatDate(e.garde.date)}</strong> ({typeLabel(e.garde.type)}, {roleLabel(e.role_demandeur)})</>}
-              {' '}à {nomDe(e.cible_id)}
+              {' '}{e.cible_id ? <>à {nomDe(e.cible_id)}</> : <>au premier confrère intéressé</>}
             </p>
             {e.gardeContrepartie && e.role_contrepartie && (
               <p className="text-muted-foreground flex items-center gap-1.5">
@@ -263,6 +271,33 @@ export function EchangesClient({ moiId, isAdmin, echanges, gardesFutures, vets }
         </section>
       )}
 
+      {/* Propositions ouvertes (premier arrivé, premier servi) */}
+      {ouvertes.length > 0 && (
+        <section className="rounded-xl border-2 border-violet-200 bg-violet-50/50 p-4 space-y-3">
+          <p className="text-sm font-semibold text-violet-800">
+            {ouvertes.length} garde{ouvertes.length > 1 ? 's' : ''} à reprendre — premier arrivé, premier servi
+          </p>
+          <div className="space-y-2">
+            {ouvertes.map((e) => (
+              <EchangeCard
+                key={e.id}
+                e={e}
+                actions={
+                  <Button
+                    size="sm"
+                    className="bg-violet-600 hover:bg-violet-700 text-white"
+                    disabled={isPending}
+                    onClick={() => lancer(() => accepterEchange(e.id), 'C\'est noté — en attente de validation admin.')}
+                  >
+                    <Check className="w-3.5 h-3.5 mr-1.5" /> Je la prends
+                  </Button>
+                }
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Mes demandes en cours */}
       {mesDemandes.length > 0 && (
         <section className="space-y-3">
@@ -289,7 +324,7 @@ export function EchangesClient({ moiId, isAdmin, echanges, gardesFutures, vets }
       )}
 
       {/* État vide global */}
-      {aValider.length === 0 && recues.length === 0 && mesDemandes.length === 0 && historique.length === 0 && (
+      {aValider.length === 0 && recues.length === 0 && ouvertes.length === 0 && mesDemandes.length === 0 && historique.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
           <ArrowLeftRight className="w-10 h-10 opacity-30" />
           <p className="text-sm">Aucun échange pour le moment.</p>
@@ -314,6 +349,7 @@ export function EchangesClient({ moiId, isAdmin, echanges, gardesFutures, vets }
         moiId={moiId}
         gardesFutures={gardesFutures}
         vets={vets}
+        gardePreselectionnee={gardePreselectionnee}
         onDone={() => { setProposerOpen(false); router.refresh() }}
       />
 
@@ -391,21 +427,26 @@ interface ProposerEchangeDialogProps {
   moiId: string
   gardesFutures: GardeLite[]
   vets: VetLite[]
+  gardePreselectionnee?: string | null
   onDone: () => void
 }
 
-function ProposerEchangeDialog({ open, onClose, moiId, gardesFutures, vets, onDone }: ProposerEchangeDialogProps) {
+function ProposerEchangeDialog({ open, onClose, moiId, gardesFutures, vets, gardePreselectionnee, onDone }: ProposerEchangeDialogProps) {
   const [isPending, startTransition] = useTransition()
-  const [gardeId, setGardeId] = useState('')
-  const [cibleId, setCibleId] = useState('')
-  const [avecContrepartie, setAvecContrepartie] = useState(false)
-  const [contrepartieId, setContrepartieId] = useState('')
-  const [message, setMessage] = useState('')
-
   const mesGardes = useMemo(
     () => gardesFutures.filter((g) => g.premier_id === moiId || g.second_id === moiId),
     [gardesFutures, moiId],
   )
+  // Pré-sélection depuis le planning (seulement si la garde est bien à moi).
+  const preselValide = gardePreselectionnee && mesGardes.some((g) => g.id === gardePreselectionnee)
+    ? gardePreselectionnee
+    : ''
+  const [gardeId, setGardeId] = useState(preselValide)
+  const [aTous, setATous] = useState(false)
+  const [cibleId, setCibleId] = useState('')
+  const [avecContrepartie, setAvecContrepartie] = useState(false)
+  const [contrepartieId, setContrepartieId] = useState('')
+  const [message, setMessage] = useState('')
   const gardesCible = useMemo(
     () => (cibleId
       ? gardesFutures.filter((g) => g.premier_id === cibleId || g.second_id === cibleId)
@@ -421,26 +462,28 @@ function ProposerEchangeDialog({ open, onClose, moiId, gardesFutures, vets, onDo
     `${formatDate(g.date)} — ${typeLabel(g.type)} (${roleLabel(roleSur(g, vetId))})`
 
   const reset = () => {
-    setGardeId(''); setCibleId(''); setAvecContrepartie(false); setContrepartieId(''); setMessage('')
+    setGardeId(''); setATous(false); setCibleId(''); setAvecContrepartie(false); setContrepartieId(''); setMessage('')
   }
 
-  const peutEnvoyer = gardeId && cibleId && (!avecContrepartie || contrepartieId)
+  const peutEnvoyer = gardeId && (aTous || cibleId) && (aTous || !avecContrepartie || contrepartieId)
 
   const envoyer = () => {
     const maGarde = mesGardes.find((g) => g.id === gardeId)
     if (!maGarde) return
-    const contrepartie = avecContrepartie ? gardesCible.find((g) => g.id === contrepartieId) : null
+    const contrepartie = !aTous && avecContrepartie ? gardesCible.find((g) => g.id === contrepartieId) : null
     startTransition(async () => {
       const result = await proposerEchange({
         gardeId: maGarde.id,
         roleDemandeur: roleSur(maGarde, moiId),
-        cibleId,
+        cibleId: aTous ? null : cibleId,
         gardeContrepartieId: contrepartie?.id ?? null,
         roleContrepartie: contrepartie ? roleSur(contrepartie, cibleId) : null,
         message: message || null,
       })
       if (result.error) { toast.error(result.error); return }
-      toast.success('Proposition envoyée — ton confrère est prévenu.')
+      toast.success(aTous
+        ? 'Proposition envoyée à tous les confrères — le premier qui accepte la prend.'
+        : 'Proposition envoyée — ton confrère est prévenu.')
       reset()
       onDone()
     })
@@ -484,22 +527,47 @@ function ProposerEchangeDialog({ open, onClose, moiId, gardesFutures, vets, onDo
 
           <div className="space-y-1.5">
             <Label>À proposer à</Label>
-            <Select value={cibleId} onValueChange={(v) => { if (v) { setCibleId(v); setContrepartieId('') } }}>
-              <SelectTrigger className="w-full">
-                <span className="flex-1 text-left truncate text-sm">
-                  {cibleId
-                    ? (() => { const v = confreres.find((x) => x.id === cibleId); return v ? `${v.prenom} ${v.nom}` : '' })()
-                    : <span className="text-muted-foreground">Choisir un confrère…</span>}
-                </span>
-              </SelectTrigger>
-              <SelectContent>
-                {confreres.map((v) => (
-                  <SelectItem key={v.id} value={v.id}>{v.prenom} {v.nom}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setATous(false)}
+                aria-pressed={!aTous}
+                className={`rounded-md border px-3 py-2 text-sm transition-colors ${!aTous ? 'border-primary bg-primary/5 font-medium' : 'border-border text-muted-foreground hover:bg-muted/40'}`}
+              >
+                Un confrère précis
+              </button>
+              <button
+                type="button"
+                onClick={() => { setATous(true); setCibleId(''); setAvecContrepartie(false); setContrepartieId('') }}
+                aria-pressed={aTous}
+                className={`rounded-md border px-3 py-2 text-sm transition-colors ${aTous ? 'border-primary bg-primary/5 font-medium' : 'border-border text-muted-foreground hover:bg-muted/40'}`}
+              >
+                Tous les confrères
+              </button>
+            </div>
+            {aTous ? (
+              <p className="text-xs text-muted-foreground">
+                Premier arrivé, premier servi — et forcément une cession simple (pas de garde en retour).
+              </p>
+            ) : (
+              <Select value={cibleId} onValueChange={(v) => { if (v) { setCibleId(v); setContrepartieId('') } }}>
+                <SelectTrigger className="w-full">
+                  <span className="flex-1 text-left truncate text-sm">
+                    {cibleId
+                      ? (() => { const v = confreres.find((x) => x.id === cibleId); return v ? `${v.prenom} ${v.nom}` : '' })()
+                      : <span className="text-muted-foreground">Choisir un confrère…</span>}
+                  </span>
+                </SelectTrigger>
+                <SelectContent>
+                  {confreres.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>{v.prenom} {v.nom}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
+          {!aTous && (
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
               <input
@@ -535,6 +603,7 @@ function ProposerEchangeDialog({ open, onClose, moiId, gardesFutures, vets, onDo
               )
             )}
           </div>
+          )}
 
           <div className="space-y-1.5">
             <Label htmlFor="message-echange">Message <span className="text-muted-foreground font-normal">(facultatif)</span></Label>

@@ -136,12 +136,23 @@ export function contenuDepannageConfirme(
 
 // ── Contenus : échange de gardes ──────────────────────────────
 
-export function contenuEchangePropose(prenomDemandeur: string, date: string, typeGarde: string) {
-  return {
-    titre: 'Proposition d\'échange de garde',
-    message: `${prenomDemandeur} vous propose de reprendre sa garde du ${formatDateFr(date)} (${typeGardeLabel(typeGarde)}). Répondez depuis la page Échanges.`,
-    lien: '/echanges',
-  }
+export function contenuEchangePropose(
+  prenomDemandeur: string,
+  date: string,
+  typeGarde: string,
+  ouverte = false,
+) {
+  return ouverte
+    ? {
+        titre: 'Garde à reprendre — premier arrivé',
+        message: `${prenomDemandeur} propose sa garde du ${formatDateFr(date)} (${typeGardeLabel(typeGarde)}) à qui peut la reprendre. Premier arrivé, premier servi — répondez depuis la page Échanges.`,
+        lien: '/echanges',
+      }
+    : {
+        titre: 'Proposition d\'échange de garde',
+        message: `${prenomDemandeur} vous propose de reprendre sa garde du ${formatDateFr(date)} (${typeGardeLabel(typeGarde)}). Répondez depuis la page Échanges.`,
+        lien: '/echanges',
+      }
 }
 
 export function contenuEchangeAccepte(prenomCible: string, date: string, pourAdmin: boolean) {

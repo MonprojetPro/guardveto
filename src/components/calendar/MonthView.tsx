@@ -23,6 +23,8 @@ interface MonthViewProps {
   isAdmin?: boolean
   /** Vétos actifs du cabinet (admin) — pour « déclarer ce véto absent ». */
   vets?: VetCrise[]
+  /** Id du véto connecté — pour « proposer un échange » sur SES gardes. */
+  moiVetId?: string
 }
 
 // ── Helpers calendrier ───────────────────────────────────
@@ -79,7 +81,7 @@ function estAujourdhui(dateISO: string): boolean {
 
 // ── Composant principal ──────────────────────────────────
 
-export function MonthView({ gardes, periodes, anneeMois, isAdmin = false, vets = [] }: MonthViewProps) {
+export function MonthView({ gardes, periodes, anneeMois, isAdmin = false, vets = [], moiVetId }: MonthViewProps) {
   const router = useRouter()
   const [vueListeMobile, setVueListeMobile] = useState(false)
   const [gardeModal, setGardeModal] = useState<GardeDenormalisee | null>(null)
@@ -315,6 +317,7 @@ export function MonthView({ gardes, periodes, anneeMois, isAdmin = false, vets =
         garde={gardeModal}
         date={dateModal}
         isAdmin={isAdmin}
+        moiVetId={moiVetId}
         onClose={() => { setDateModal(null); setGardeModal(null) }}
         onSaved={() => router.refresh()}
         onDeclarerAbsent={isAdmin && vets.length > 0 ? declarerAbsent : undefined}

@@ -33,9 +33,11 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
 interface SidebarProps {
   veterinaire: Veterinaire
   nbSouhaits?: number
+  /** Échanges attendant une action de l'utilisateur (badge nav). */
+  nbEchanges?: number
 }
 
-export function Sidebar({ veterinaire, nbSouhaits = 0 }: SidebarProps) {
+export function Sidebar({ veterinaire, nbSouhaits = 0, nbEchanges = 0 }: SidebarProps) {
   const pathname = usePathname()
 
   const visibleItems = NAV_ITEMS.filter(item =>
@@ -54,7 +56,11 @@ export function Sidebar({ veterinaire, nbSouhaits = 0 }: SidebarProps) {
         {visibleItems.map(item => {
           const Icon = ICONS[item.icon]
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-          const showBadge = (item.href === '/admin/demandes' || item.href === '/conges') && nbSouhaits > 0
+          const badgeCount =
+            (item.href === '/admin/demandes' || item.href === '/conges') ? nbSouhaits
+            : item.href === '/echanges' ? nbEchanges
+            : 0
+          const showBadge = badgeCount > 0
           return (
             <Link
               key={item.href}
@@ -75,7 +81,7 @@ export function Sidebar({ veterinaire, nbSouhaits = 0 }: SidebarProps) {
                   className="ml-auto min-w-[1.25rem] h-5 px-1 rounded-full text-white text-[10px] font-bold flex items-center justify-center"
                   style={{ backgroundColor: 'var(--warning)' }}
                 >
-                  {nbSouhaits > 9 ? '9+' : nbSouhaits}
+                  {badgeCount > 9 ? '9+' : badgeCount}
                 </span>
               )}
             </Link>

@@ -38,9 +38,11 @@ const MAX_ITEMS_BARRE = 4
 
 interface MobileNavProps {
   veterinaire: Veterinaire
+  /** Échanges attendant une action de l'utilisateur (badge nav). */
+  nbEchanges?: number
 }
 
-export function MobileNav({ veterinaire }: MobileNavProps) {
+export function MobileNav({ veterinaire, nbEchanges = 0 }: MobileNavProps) {
   const pathname = usePathname()
   const [plusOuvert, setPlusOuvert] = useState(false)
 
@@ -82,18 +84,27 @@ export function MobileNav({ veterinaire }: MobileNavProps) {
       <div className="flex items-center justify-around h-16 px-2 safe-area-pb">
         {itemsBarre.map(item => {
           const Icon = ICONS[item.icon]
+          const badgeCount = item.href === '/echanges' ? nbEchanges : 0
           return (
             <Link
               key={item.href}
               href={item.href}
               onClick={() => setPlusOuvert(false)}
               className={cn(
-                'flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-colors min-w-[44px] min-h-[44px] justify-center',
+                'relative flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-colors min-w-[44px] min-h-[44px] justify-center',
                 estActif(item.href) ? 'text-primary' : 'text-muted-foreground'
               )}
             >
               {Icon && <Icon className="w-5 h-5" />}
               <span className="text-[10px] font-medium leading-none">{item.label}</span>
+              {badgeCount > 0 && (
+                <span
+                  className="absolute top-0.5 right-1 min-w-[1rem] h-4 px-1 rounded-full text-white text-[9px] font-bold flex items-center justify-center"
+                  style={{ backgroundColor: 'var(--warning)' }}
+                >
+                  {badgeCount > 9 ? '9+' : badgeCount}
+                </span>
+              )}
             </Link>
           )
         })}

@@ -153,8 +153,10 @@ async function estEnConge(
 export interface ProposerEchangePayload {
   gardeId: string
   roleDemandeur: Role
-  cibleId: string
-  /** Garde de la cible reprise en retour (null = cession simple). */
+  /** null = proposition OUVERTE à tous les confrères (premier arrivé). */
+  cibleId: string | null
+  /** Garde de la cible reprise en retour (null = cession simple).
+   *  Interdit en proposition ouverte. */
   gardeContrepartieId?: string | null
   roleContrepartie?: Role | null
   message?: string | null
@@ -166,18 +168,12 @@ export async function proposerEchange(payload: ProposerEchangePayload) {
   if (!moi) return { error: 'Non authentifié.' }
   if (!moi.cabinet_id) return { error: 'Cabinet introuvable.' }
 
+  const ouverte = payload.cibleId === null
+  if (ouverte && payload.gardeContrepartieId) {
+    return { error: 'Une proposition ouverte à tous est une cession simple : pas de garde reprise en échange.' }
+  }
   if (payload.cibleId === moi.id) {
     return { error: 'On ne s\'échange pas une garde avec soi-même 🙂' }
-  }
-
-  // La cible existe, est active, dans MON cabinet (RLS borne déjà la lecture).
-  const { data: cible } = await supabase
-    .from('veterinaires')
-    .select('id, prenom, nom, actif')
-    .eq('id', payload.cibleId)
-    .single()
-  if (!cible || !(cible as { actif: boolean }).actif) {
-    return { error: 'Confrère introuvable ou inactif.' }
   }
 
   // Ma garde : future, publiée, non verrouillée, à moi sur ce rôle.
@@ -187,32 +183,44 @@ export async function proposerEchange(payload: ProposerEchangePayload) {
   if ('error' in resGarde) return { error: resGarde.error }
   const maGarde = resGarde.garde
 
-  // La cible ne doit pas déjà être sur cette garde (R21 : places distinctes).
-  if (maGarde.premier_id === payload.cibleId || maGarde.second_id === payload.cibleId) {
-    return { error: `${(cible as { prenom: string }).prenom} est déjà de garde ce jour-là sur ce créneau.` }
-  }
-
-  // La cible ne doit pas être en congé validé ce jour-là.
-  if (await estEnConge(supabase, payload.cibleId, maGarde.date)) {
-    return { error: `${(cible as { prenom: string }).prenom} est en congé validé ce jour-là.` }
-  }
-
-  // Contrepartie (échange) : la garde de la cible, mêmes vérifications
-  // symétriques — et JE ne dois pas être en congé le jour de la contrepartie.
   let contrepartie: GardeRow | null = null
-  if (payload.gardeContrepartieId) {
-    if (!payload.roleContrepartie) return { error: 'Rôle de la garde reprise manquant.' }
-    const resContre = await chargerGardeEchangeable(
-      supabase, payload.gardeContrepartieId, payload.cibleId, payload.roleContrepartie, 'reprise en échange',
-    )
-    if ('error' in resContre) return { error: resContre.error }
-    contrepartie = resContre.garde
-
-    if (contrepartie.premier_id === moi.id || contrepartie.second_id === moi.id) {
-      return { error: 'Tu es déjà de garde sur le créneau que tu veux reprendre.' }
+  if (!ouverte) {
+    // La cible existe, est active, dans MON cabinet (RLS borne déjà la lecture).
+    const { data: cible } = await supabase
+      .from('veterinaires')
+      .select('id, prenom, nom, actif')
+      .eq('id', payload.cibleId as string)
+      .single()
+    if (!cible || !(cible as { actif: boolean }).actif) {
+      return { error: 'Confrère introuvable ou inactif.' }
     }
-    if (await estEnConge(supabase, moi.id, contrepartie.date)) {
-      return { error: 'Tu es en congé validé le jour de la garde que tu veux reprendre.' }
+
+    // La cible ne doit pas déjà être sur cette garde (R21 : places distinctes).
+    if (maGarde.premier_id === payload.cibleId || maGarde.second_id === payload.cibleId) {
+      return { error: `${(cible as { prenom: string }).prenom} est déjà de garde ce jour-là sur ce créneau.` }
+    }
+
+    // La cible ne doit pas être en congé validé ce jour-là.
+    if (await estEnConge(supabase, payload.cibleId as string, maGarde.date)) {
+      return { error: `${(cible as { prenom: string }).prenom} est en congé validé ce jour-là.` }
+    }
+
+    // Contrepartie (échange) : la garde de la cible, mêmes vérifications
+    // symétriques — et JE ne dois pas être en congé le jour de la contrepartie.
+    if (payload.gardeContrepartieId) {
+      if (!payload.roleContrepartie) return { error: 'Rôle de la garde reprise manquant.' }
+      const resContre = await chargerGardeEchangeable(
+        supabase, payload.gardeContrepartieId, payload.cibleId as string, payload.roleContrepartie, 'reprise en échange',
+      )
+      if ('error' in resContre) return { error: resContre.error }
+      contrepartie = resContre.garde
+
+      if (contrepartie.premier_id === moi.id || contrepartie.second_id === moi.id) {
+        return { error: 'Tu es déjà de garde sur le créneau que tu veux reprendre.' }
+      }
+      if (await estEnConge(supabase, moi.id, contrepartie.date)) {
+        return { error: 'Tu es en congé validé le jour de la garde que tu veux reprendre.' }
+      }
     }
   }
 
@@ -235,23 +243,39 @@ export async function proposerEchange(payload: ProposerEchangePayload) {
     role_demandeur: payload.roleDemandeur,
     demandeur_id: moi.id,
     cible_id: payload.cibleId,
-    garde_contrepartie_id: payload.gardeContrepartieId ?? null,
-    role_contrepartie: payload.gardeContrepartieId ? payload.roleContrepartie : null,
+    garde_contrepartie_id: ouverte ? null : (payload.gardeContrepartieId ?? null),
+    role_contrepartie: !ouverte && payload.gardeContrepartieId ? payload.roleContrepartie : null,
     message: payload.message?.trim() || null,
     statut: 'proposee',
   })
   if (error) return { error: 'Impossible d\'enregistrer la proposition. Réessaie.' }
 
-  // Notif in-app à la cible (service_role — cf. en-tête ; best-effort).
-  const c = contenuEchangePropose(moi.prenom, maGarde.date, maGarde.type)
-  await creerNotification(clientNotifs(), {
-    veterinaireId: payload.cibleId,
-    type: 'echange_propose',
-    titre: c.titre,
-    message: c.message,
-    lien: c.lien,
-    cabinetId: moi.cabinet_id,
-  })
+  // Notifs in-app (service_role — cf. en-tête ; best-effort) :
+  // ciblée → au confrère ; ouverte → à tous les confrères actifs du cabinet.
+  const notifs = clientNotifs()
+  const c = contenuEchangePropose(moi.prenom, maGarde.date, maGarde.type, ouverte)
+  const destinataires: string[] = []
+  if (ouverte) {
+    const { data: confreres } = await notifs
+      .from('veterinaires')
+      .select('id')
+      .eq('cabinet_id', moi.cabinet_id)
+      .eq('actif', true)
+      .neq('id', moi.id)
+    destinataires.push(...((confreres ?? []) as { id: string }[]).map((v) => v.id))
+  } else {
+    destinataires.push(payload.cibleId as string)
+  }
+  for (const vetId of destinataires) {
+    await creerNotification(notifs, {
+      veterinaireId: vetId,
+      type: 'echange_propose',
+      titre: c.titre,
+      message: c.message,
+      lien: c.lien,
+      cabinetId: moi.cabinet_id,
+    })
+  }
 
   revalidatePath('/echanges')
   return { success: true }
@@ -284,7 +308,7 @@ async function chargerEchangePour(
     garde_id: string
     role_demandeur: Role
     demandeur_id: string
-    cible_id: string
+    cible_id: string | null
     garde_contrepartie_id: string | null
     role_contrepartie: Role | null
     garde: { id: string; date: string; type: string } | { id: string; date: string; type: string }[] | null
@@ -304,7 +328,13 @@ export async function accepterEchange(echangeId: string) {
 
   const echange = await chargerEchangePour(supabase, echangeId)
   if (!echange) return { error: 'Échange introuvable.' }
-  if (echange.cible_id !== moi.id) return { error: 'Cette proposition ne t\'est pas adressée.' }
+  const ouverte = echange.cible_id === null
+  if (!ouverte && echange.cible_id !== moi.id) {
+    return { error: 'Cette proposition ne t\'est pas adressée.' }
+  }
+  if (ouverte && echange.demandeur_id === moi.id) {
+    return { error: 'Tu ne peux pas reprendre ta propre garde 🙂' }
+  }
   if (echange.statut !== 'proposee') return { error: 'Cette proposition n\'est plus en attente.' }
 
   const garde = un(echange.garde)
@@ -312,12 +342,39 @@ export async function accepterEchange(echangeId: string) {
     return { error: 'Trop tard : la garde est passée ou imminente.' }
   }
 
-  const { error } = await supabase
+  // Garde-fous AU MOMENT d'accepter (indispensables en proposition ouverte,
+  // sains aussi en ciblée : la situation a pu changer depuis la proposition).
+  if (await estEnConge(supabase, moi.id, garde.date)) {
+    return { error: 'Tu es en congé validé ce jour-là — tu ne peux pas reprendre cette garde.' }
+  }
+  {
+    const { data: gardeRow } = await supabase
+      .from('gardes')
+      .select('premier_id, second_id')
+      .eq('id', echange.garde_id)
+      .single()
+    const g = gardeRow as { premier_id: string | null; second_id: string | null } | null
+    if (g && (g.premier_id === moi.id || g.second_id === moi.id)) {
+      return { error: 'Tu es déjà de garde sur ce créneau.' }
+    }
+  }
+
+  // Compare-and-swap : jamais 2 transitions concurrentes. En proposition
+  // OUVERTE, on « réclame » aussi la place (cible_id NULL → moi) : le premier
+  // arrivé gagne, la base tranche la course.
+  let query = supabase
     .from('echanges_gardes')
-    .update({ statut: 'acceptee' })
+    .update(ouverte ? { statut: 'acceptee', cible_id: moi.id } : { statut: 'acceptee' })
     .eq('id', echangeId)
-    .eq('statut', 'proposee') // compare-and-swap : jamais 2 transitions concurrentes
+    .eq('statut', 'proposee')
+  query = ouverte ? query.is('cible_id', null) : query.eq('cible_id', moi.id)
+  const { data: gagne, error } = await query.select('id')
   if (error) return { error: 'Impossible d\'accepter. Réessaie.' }
+  if (!gagne || gagne.length === 0) {
+    return { error: ouverte
+      ? 'Trop tard — un confrère a déjà repris cette garde.'
+      : 'Cette proposition n\'est plus en attente.' }
+  }
 
   // Notifs : le demandeur + les admins (validation attendue).
   const notifs = clientNotifs()
@@ -359,6 +416,9 @@ export async function refuserEchange(echangeId: string, motif?: string) {
 
   const echange = await chargerEchangePour(supabase, echangeId)
   if (!echange) return { error: 'Échange introuvable.' }
+  if (echange.cible_id === null) {
+    return { error: 'Une proposition ouverte à tous ne se refuse pas — ignore-la simplement.' }
+  }
   if (echange.cible_id !== moi.id) return { error: 'Cette proposition ne t\'est pas adressée.' }
   if (echange.statut !== 'proposee') return { error: 'Cette proposition n\'est plus en attente.' }
 
@@ -428,6 +488,9 @@ export async function validerEchangeAdmin(echangeId: string) {
   if (!echange) return { error: 'Échange introuvable.' }
   if (echange.statut !== 'acceptee') {
     return { error: 'Seul un échange accepté par le confrère peut être validé.' }
+  }
+  if (!echange.cible_id) {
+    return { error: 'Échange incohérent (accepté sans repreneur). Recharge la page.' }
   }
 
   // ── Re-vérification COMPLÈTE au moment T (le planning a pu bouger) ──
@@ -555,7 +618,11 @@ export async function refuserEchangeAdmin(echangeId: string, motif?: string) {
   if (garde) {
     const notifs = clientNotifs()
     const c = contenuEchangeRefuseAdmin(garde.date, motif?.trim() || null)
-    for (const vetId of [echange.demandeur_id, echange.cible_id]) {
+    // cible_id peut être null (refus d'une proposition ouverte pas encore reprise).
+    const destinataires = [echange.demandeur_id, echange.cible_id].filter(
+      (id): id is string => Boolean(id),
+    )
+    for (const vetId of destinataires) {
       await creerNotification(notifs, {
         veterinaireId: vetId,
         type: 'echange_refuse_admin',

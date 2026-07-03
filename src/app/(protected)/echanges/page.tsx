@@ -12,8 +12,13 @@ import { EchangesClient, type EchangeRow, type GardeLite, type VetLite } from '@
 
 export const dynamic = 'force-dynamic'
 
-export default async function EchangesPage() {
+export default async function EchangesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ proposer?: string }>
+}) {
   const supabase = await createClient()
+  const { proposer } = await searchParams
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -61,6 +66,7 @@ export default async function EchangesPage() {
       echanges={(echanges ?? []) as unknown as EchangeRow[]}
       gardesFutures={(gardesFutures ?? []) as unknown as GardeLite[]}
       vets={(vets ?? []) as VetLite[]}
+      gardePreselectionnee={proposer ?? null}
     />
   )
 }
