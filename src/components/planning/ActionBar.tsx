@@ -10,6 +10,7 @@ import { DiagnosticImpasse } from '@/components/planning/DiagnosticImpasse'
 import { CriseModal, type VetCrise } from '@/components/planning/CriseModal'
 import type { JourNonCouvert } from '@/components/planning/types-impasse'
 import type { DiagnosticImpasse as DiagnosticImpasseData } from '@/engine/diagnostic'
+import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
 import {
   Select,
   SelectContent,
@@ -40,6 +41,12 @@ interface ActionBarProps {
 interface ImpasseState {
   diagnostic: DiagnosticImpasseData | null
   joursNonCouverts: JourNonCouvert[]
+}
+
+/** Réserves renvoyées par le gate de /api/publish (requiresConfirmation). */
+interface ReservesPublication {
+  violations: ViolationRevalidation[]
+  souhaitsEnAttente: number
 }
 
 // ── Helpers ──────────────────────────────────────────────
@@ -79,6 +86,7 @@ export function ActionBar({ periodes, periodesAvecGardes, vets }: ActionBarProps
   const [publishing, setPublishing] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [republishOpen, setRepublishOpen] = useState(false)
+  const [reserves, setReserves] = useState<ReservesPublication | null>(null)
   const [impasse, setImpasse] = useState<ImpasseState | null>(null)
   const [criseOpen, setCriseOpen] = useState(false)
 
@@ -136,22 +144,33 @@ export function ActionBar({ periodes, periodesAvecGardes, vets }: ActionBarProps
     }
   }
 
-  async function handlePublier() {
+  async function handlePublier(confirmAvecReserves = false) {
     if (!periodeId) return
     setPublishing(true)
     try {
       const res = await fetch('/api/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ periodeId }),
+        body: JSON.stringify({ periodeId, confirmAvecReserves }),
       })
       const data = await res.json()
       if (!res.ok) {
         toast.error(data.error ?? 'Erreur lors de la publication.')
         return
       }
+      // Gate serveur : violations dures ou souhaits de congé en attente →
+      // on montre les réserves et on demande une confirmation explicite.
+      if (data.requiresConfirmation) {
+        setConfirmOpen(false)
+        setReserves({
+          violations: data.violations ?? [],
+          souhaitsEnAttente: data.souhaitsEnAttente ?? 0,
+        })
+        return
+      }
       toast.success('Planning publié — les vétérinaires peuvent y accéder.')
       setConfirmOpen(false)
+      setReserves(null)
       router.refresh()
     } catch {
       toast.error('Impossible de joindre le serveur.')
@@ -276,7 +295,7 @@ export function ActionBar({ periodes, periodesAvecGardes, vets }: ActionBarProps
               Annuler
             </Button>
             <Button
-              onClick={handlePublier}
+              onClick={() => handlePublier(false)}
               disabled={publishing}
               className="bg-accent hover:bg-accent/90 text-accent-foreground"
             >
@@ -286,6 +305,65 @@ export function ActionBar({ periodes, periodesAvecGardes, vets }: ActionBarProps
                 <Send className="w-4 h-4 mr-2" />
               )}
               Confirmer la publication
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modale des RÉSERVES de publication (gate serveur) */}
+      <Dialog open={reserves !== null} onOpenChange={(o) => { if (!publishing && !o) setReserves(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Des points méritent ton attention avant de publier</DialogTitle>
+            <DialogDescription>
+              La vérification automatique du planning a relevé :
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            {reserves && reserves.violations.length > 0 && (
+              <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30 p-3">
+                <p className="font-medium text-red-800 dark:text-red-300 mb-1.5">
+                  {reserves.violations.length} règle{reserves.violations.length > 1 ? 's' : ''} non respectée{reserves.violations.length > 1 ? 's' : ''} :
+                </p>
+                <ul className="space-y-1 text-red-700 dark:text-red-400 list-disc pl-5">
+                  {reserves.violations.slice(0, 6).map((v, i) => (
+                    <li key={i}>
+                      <span className="font-medium">{v.date}</span> — {v.detail}
+                    </li>
+                  ))}
+                  {reserves.violations.length > 6 && (
+                    <li className="list-none text-red-600/80 dark:text-red-500/80">
+                      … et {reserves.violations.length - 6} autre{reserves.violations.length - 6 > 1 ? 's' : ''}.
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
+            {reserves && reserves.souhaitsEnAttente > 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 p-3 text-amber-800 dark:text-amber-300">
+                <span className="font-medium">{reserves.souhaitsEnAttente} demande{reserves.souhaitsEnAttente > 1 ? 's' : ''} de congé en attente</span>{' '}
+                chevauche{reserves.souhaitsEnAttente > 1 ? 'nt' : ''} cette période — valide-la/les ou refuse-la/les d'abord si tu veux qu'elle{reserves.souhaitsEnAttente > 1 ? 's' : ''} soi{reserves.souhaitsEnAttente > 1 ? 'ent' : 't'} prise{reserves.souhaitsEnAttente > 1 ? 's' : ''} en compte.
+              </div>
+            )}
+            <p className="text-muted-foreground">
+              Tu peux corriger d'abord, ou publier quand même en connaissance de cause.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReserves(null)} disabled={publishing}>
+              Corriger d'abord
+            </Button>
+            <Button
+              onClick={() => handlePublier(true)}
+              disabled={publishing}
+              className="bg-accent hover:bg-accent/90 text-accent-foreground"
+            >
+              {publishing ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4 mr-2" />
+              )}
+              Publier quand même
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -3,15 +3,23 @@
 // ============================================================
 // Change le statut d'une période de 'brouillon' → 'publie'.
 //
+// GATE DE PUBLICATION (audit 2026-07-03) : avant de publier, on re-valide le
+// planning avec le validateur indépendant (violations dures + jours non
+// couverts) et on compte les souhaits de congé encore en attente sur la
+// période. S'il y a des réserves, on NE publie PAS : on les renvoie à l'UI
+// qui demande une confirmation explicite (`confirmAvecReserves: true`).
+//
 // Accès : admin uniquement
-// Corps : { periodeId: string }
-// Réponse : { success: true } | { error: string }
+// Corps : { periodeId: string, confirmAvecReserves?: boolean }
+// Réponse : { success: true } | { requiresConfirmation: true, violations, souhaitsEnAttente } | { error: string }
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { syncCalendrier } from '@/lib/sync-calendrier'
 import { sendPlanningPublie } from '@/lib/notifications'
+import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
+import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
 
 // Laisse le temps à la synchro agenda (par lots) + envoi des emails
 export const maxDuration = 60
@@ -43,9 +51,11 @@ export async function POST(req: NextRequest) {
 
   // ── Validation du corps ─────────────────────────────────
   let periodeId: string
+  let confirmAvecReserves = false
   try {
     const body = await req.json()
     periodeId = body?.periodeId
+    confirmAvecReserves = body?.confirmAvecReserves === true
     if (!periodeId || typeof periodeId !== 'string') {
       return NextResponse.json(
         { error: 'Corps invalide. Attendu : { periodeId: string }' },
@@ -62,7 +72,7 @@ export async function POST(req: NextRequest) {
   // ── Vérification de la période ──────────────────────────
   const { data: periode } = await supabase
     .from('periodes')
-    .select('id, statut')
+    .select('id, statut, date_debut, date_fin')
     .eq('id', periodeId)
     .single()
 
@@ -91,6 +101,35 @@ export async function POST(req: NextRequest) {
       { error: 'Aucune garde trouvée pour cette période. Générez d\'abord le planning avant de publier.' },
       { status: 422 }
     )
+  }
+
+  // ── Gate de publication : re-validation + souhaits en attente ──
+  // Le code de re-validation existait déjà (revaliderPlanningPublie) mais
+  // n'était appelé qu'après coup, depuis /planning. Ici on l'appelle AVANT
+  // de publier : violations dures / jours non couverts → confirmation exigée.
+  if (!confirmAvecReserves) {
+    let violations: ViolationRevalidation[] = []
+    try {
+      violations = await revaliderPlanningPublie([periodeId])
+    } catch (e) {
+      console.error('[publish] Re-validation impossible (gate best-effort):', e)
+    }
+
+    const { count: nbSouhaits } = await supabase
+      .from('conges')
+      .select('id', { count: 'exact', head: true })
+      .eq('statut', 'souhait')
+      .lte('date_debut', periode.date_fin)
+      .gte('date_fin', periode.date_debut)
+    const souhaitsEnAttente = nbSouhaits ?? 0
+
+    if (violations.length > 0 || souhaitsEnAttente > 0) {
+      return NextResponse.json({
+        requiresConfirmation: true,
+        violations,
+        souhaitsEnAttente,
+      })
+    }
   }
 
   // ── Publication ─────────────────────────────────────────

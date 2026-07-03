@@ -228,20 +228,39 @@ export async function supprimerEvenementsCalendrier(
 
   if (!gardes) return
 
+  await supprimerEvenementsParIds(
+    gardes
+      .map((garde) => garde.google_event_id as string | null)
+      .filter((id): id is string => Boolean(id))
+  )
+}
+
+/**
+ * Supprime une liste d'événements Google Agenda par leurs ids.
+ *
+ * Variante « ids pré-capturés » (audit 2026-07-03) : les `google_event_id`
+ * vivent sur les lignes `gardes` — lors d'une régénération, il faut donc les
+ * LIRE avant le DELETE des gardes, mais ne purger l'agenda qu'APRÈS le succès
+ * de la réécriture en base (sinon un échec à mi-course laissait la base vide
+ * ET l'agenda déjà purgé).
+ */
+export async function supprimerEvenementsParIds(eventIds: string[]): Promise<void> {
+  if (!isGoogleCalendarConfigured()) return
+  if (eventIds.length === 0) return
+
   // Suppression par petits lots espacés + reprise (anti rate-limit Google)
-  const aSupprimer = gardes.filter((garde) => garde.google_event_id)
   const BATCH = 3
   const PAUSE_MS = 250
 
-  for (let i = 0; i < aSupprimer.length; i += BATCH) {
-    const lot = aSupprimer.slice(i, i + BATCH)
+  for (let i = 0; i < eventIds.length; i += BATCH) {
+    const lot = eventIds.slice(i, i + BATCH)
     await Promise.all(
-      lot.map((garde) =>
-        avecReprise(() => deleteGardeEvent(garde.google_event_id as string)).catch(() => {
+      lot.map((eventId) =>
+        avecReprise(() => deleteGardeEvent(eventId)).catch(() => {
           // On continue même si un événement n'existe plus côté Google
         })
       )
     )
-    if (i + BATCH < aSupprimer.length) await sleep(PAUSE_MS)
+    if (i + BATCH < eventIds.length) await sleep(PAUSE_MS)
   }
 }
