@@ -7,6 +7,8 @@ import { Loader2, Wand2, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { CreneauxIgnoresAlert } from '@/components/planning/CreneauxIgnoresAlert'
+import type { CreneauIgnore } from '@/engine/creneau-modele'
 import type { Periode } from '@/types'
 
 // ── Types ────────────────────────────────────────────────
@@ -60,6 +62,8 @@ export function GenerateurPlanning({ periodes }: GenerateurPlanningProps) {
   const [enCours, setEnCours] = useState(false)
   const [impasse, setImpasse] = useState<JourNonCouvert[] | null>(null)
   const [dernierSucces, setDernierSucces] = useState<{ nbGardes: number; dureeMs: number } | null>(null)
+  // Créneaux du catalogue ignorés par le moteur (backlog n°4, tranche 1).
+  const [creneauxIgnores, setCreneauxIgnores] = useState<CreneauIgnore[]>([])
 
   const periodesFiltrees = periodes.filter((p) => p.statut !== 'verrouille')
 
@@ -72,6 +76,7 @@ export function GenerateurPlanning({ periodes }: GenerateurPlanningProps) {
     setEnCours(true)
     setImpasse(null)
     setDernierSucces(null)
+    setCreneauxIgnores([])
 
     try {
       const res = await fetch('/api/generate', {
@@ -87,6 +92,7 @@ export function GenerateurPlanning({ periodes }: GenerateurPlanningProps) {
         return
       }
 
+      setCreneauxIgnores((data.creneauxIgnores ?? []) as CreneauIgnore[])
       if (data.success) {
         setDernierSucces({ nbGardes: data.nbGardes, dureeMs: data.dureeMs })
         toast.success(
@@ -190,6 +196,9 @@ export function GenerateurPlanning({ periodes }: GenerateurPlanningProps) {
             </div>
           </div>
         )}
+
+        {/* Créneaux du catalogue ignorés (backlog n°4, tranche 1) */}
+        {!enCours && <CreneauxIgnoresAlert creneaux={creneauxIgnores} />}
 
         {/* Résultat : impasse */}
         {impasse && !enCours && (

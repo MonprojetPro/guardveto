@@ -14,8 +14,8 @@
 //
 // Accès : admin uniquement
 // Corps : { periodeId: string }
-// Réponse succès  : { success: true, nbGardes, snapshotId, dureeMs }
-// Réponse impasse : { success: false, joursNonCouverts[], dureeMs }
+// Réponse succès  : { success: true, nbGardes, snapshotId, creneauxIgnores[], dureeMs }
+// Réponse impasse : { success: false, joursNonCouverts[], creneauxIgnores[], dureeMs }
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -25,6 +25,7 @@ import { premierId, secondId } from '@/engine/attribution'
 import { estJourFerie } from '@/engine/utils'
 import { supprimerEvenementsParIds } from '@/lib/sync-calendrier'
 import { resoudreContexte } from '@/data/resoudreContexte'
+import { detecterCreneauxIgnores } from '@/engine/creneau-modele'
 import { persisterResultat } from '@/data/persisterResultat'
 import { construireGardePlacements } from '@/data/gardePlacements'
 import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
@@ -191,6 +192,13 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // ── Créneaux du catalogue ignorés par le moteur (backlog n°4, tranche 1) ──
+    // Un créneau sur-mesure (code inconnu) ou masqué par un autre le même jour
+    // ne génère AUCUN slot — jusqu'ici en silence. On le dit à l'admin.
+    const creneauxIgnores = contexte.creneaux
+      ? detecterCreneauxIgnores(contexte.creneaux)
+      : []
+
     // ── Génération du planning (solver LNS) ─────────────────────
     const result = genererPlanningPur(contexte)
 
@@ -202,6 +210,7 @@ export async function POST(req: NextRequest) {
         success: false,
         diagnostic: result.diagnostic ?? null,
         joursNonCouverts: result.joursNonCouverts,
+        creneauxIgnores,
         dureeMs: result.dureeMs,
       })
     }
@@ -400,6 +409,7 @@ export async function POST(req: NextRequest) {
       success: true,
       nbGardes: gardesAInserer.length,
       snapshotId: persistenceResult.snapshotId,
+      creneauxIgnores,
       dureeMs: result.dureeMs,
     })
   } finally {

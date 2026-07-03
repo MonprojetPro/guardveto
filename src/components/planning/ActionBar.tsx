@@ -7,7 +7,9 @@ import { Loader2, Wand2, Send, FileText, LayoutGrid, AlertTriangle } from 'lucid
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DiagnosticImpasse } from '@/components/planning/DiagnosticImpasse'
+import { CreneauxIgnoresAlert } from '@/components/planning/CreneauxIgnoresAlert'
 import { CriseModal, type VetCrise } from '@/components/planning/CriseModal'
+import type { CreneauIgnore } from '@/engine/creneau-modele'
 import type { JourNonCouvert } from '@/components/planning/types-impasse'
 import type { DiagnosticImpasse as DiagnosticImpasseData } from '@/engine/diagnostic'
 import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
@@ -88,6 +90,9 @@ export function ActionBar({ periodes, periodesAvecGardes, vets }: ActionBarProps
   const [republishOpen, setRepublishOpen] = useState(false)
   const [reserves, setReserves] = useState<ReservesPublication | null>(null)
   const [impasse, setImpasse] = useState<ImpasseState | null>(null)
+  // Créneaux du catalogue ignorés par le moteur (backlog n°4, tranche 1) —
+  // affichés APRÈS la génération, succès comme impasse (fin du silence).
+  const [creneauxIgnores, setCreneauxIgnores] = useState<CreneauIgnore[]>([])
   const [criseOpen, setCriseOpen] = useState(false)
 
   const periodeSelectionnee = periodes.find((p) => p.id === periodeId) ?? null
@@ -109,6 +114,7 @@ export function ActionBar({ periodes, periodesAvecGardes, vets }: ActionBarProps
     if (!periodeId) return
     setGenerating(true)
     setImpasse(null)
+    setCreneauxIgnores([])
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
@@ -125,6 +131,7 @@ export function ActionBar({ periodes, periodesAvecGardes, vets }: ActionBarProps
         setRepublishOpen(true)
         return
       }
+      setCreneauxIgnores((data.creneauxIgnores ?? []) as CreneauIgnore[])
       if (data.success) {
         setRepublishOpen(false)
         toast.success(`${data.nbGardes} gardes générées en ${data.dureeMs}ms`)
@@ -186,7 +193,7 @@ export function ActionBar({ periodes, periodesAvecGardes, vets }: ActionBarProps
       {/* Barre principale */}
       <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4 shadow-sm">
         {/* Sélecteur de période */}
-        <Select value={periodeId} onValueChange={(v) => { if (v) { setPeriodeId(v); setImpasse(null) } }}>
+        <Select value={periodeId} onValueChange={(v) => { if (v) { setPeriodeId(v); setImpasse(null); setCreneauxIgnores([]) } }}>
           <SelectTrigger className="w-[300px]">
             <span className="flex-1 text-left truncate text-sm">
               {periodeId && periodes.find((p) => p.id === periodeId)
@@ -266,6 +273,9 @@ export function ActionBar({ periodes, periodesAvecGardes, vets }: ActionBarProps
           </a>
         </div>
       </div>
+
+      {/* Créneaux du catalogue ignorés par le moteur (backlog n°4, tranche 1) */}
+      {!generating && <CreneauxIgnoresAlert creneaux={creneauxIgnores} />}
 
       {/* Diagnostic d'impasse actionnable (Lot 5) */}
       {impasse && !generating && (
