@@ -29,6 +29,12 @@ export type NotifType =
   | 'rappel_publication'
   | 'appel_volontaires'
   | 'depannage_confirme'
+  | 'incident_technique'
+  | 'echange_propose'
+  | 'echange_accepte'
+  | 'echange_refuse'
+  | 'echange_valide'
+  | 'echange_refuse_admin'
 
 interface CreerNotifParams {
   /** Véto destinataire (propriétaire de la notif). */
@@ -128,6 +134,54 @@ export function contenuDepannageConfirme(
   }
 }
 
+// ── Contenus : échange de gardes ──────────────────────────────
+
+export function contenuEchangePropose(prenomDemandeur: string, date: string, typeGarde: string) {
+  return {
+    titre: 'Proposition d\'échange de garde',
+    message: `${prenomDemandeur} vous propose de reprendre sa garde du ${formatDateFr(date)} (${typeGardeLabel(typeGarde)}). Répondez depuis la page Échanges.`,
+    lien: '/echanges',
+  }
+}
+
+export function contenuEchangeAccepte(prenomCible: string, date: string, pourAdmin: boolean) {
+  return pourAdmin
+    ? {
+        titre: 'Échange de garde à valider',
+        message: `Un échange concernant la garde du ${formatDateFr(date)} a été accepté entre confrères. Il attend votre validation.`,
+        lien: '/echanges',
+      }
+    : {
+        titre: 'Échange accepté par votre confrère',
+        message: `${prenomCible} a accepté votre proposition d'échange pour la garde du ${formatDateFr(date)}. Reste la validation de l'administrateur.`,
+        lien: '/echanges',
+      }
+}
+
+export function contenuEchangeRefuse(prenomCible: string, date: string) {
+  return {
+    titre: 'Échange décliné',
+    message: `${prenomCible} a décliné votre proposition d'échange pour la garde du ${formatDateFr(date)}.`,
+    lien: '/echanges',
+  }
+}
+
+export function contenuEchangeValide(date: string) {
+  return {
+    titre: 'Échange de garde appliqué',
+    message: `L'échange concernant la garde du ${formatDateFr(date)} a été validé : le planning est à jour.`,
+    lien: '/planning',
+  }
+}
+
+export function contenuEchangeRefuseAdmin(date: string, motif: string | null) {
+  return {
+    titre: 'Échange refusé par l\'administrateur',
+    message: `L'échange concernant la garde du ${formatDateFr(date)} n'a pas été validé${motif ? ` : ${motif}` : '.'}`,
+    lien: '/echanges',
+  }
+}
+
 // ============================================================
 // Insertion
 // ============================================================
@@ -170,5 +224,71 @@ export async function creerNotification(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error(`[notif-inapp] Exception (${params.type} → ${params.veterinaireId}):`, msg)
+  }
+}
+
+// ============================================================
+// Monitoring interne — incidents techniques (audit 2026-07-03)
+// ============================================================
+
+/**
+ * Signale un incident technique aux ADMINS du cabinet via la cloche.
+ *
+ * Avant : un échec agenda/Brevo/placements = `console.error` dans les logs
+ * Vercel que personne ne lit. Désormais l'admin est prévenu dans l'app.
+ *
+ * - `cabinetId` OBLIGATOIRE et filtré explicitement : les contextes
+ *   service_role contournent la RLS (leçon multi-tenant — jamais de
+ *   sélection d'admins sans borne cabinet).
+ * - Anti-spam : si une notif `incident_technique` NON LUE avec le même titre
+ *   existe déjà pour un admin (moins de 24 h), on ne double pas.
+ * - Best-effort : ne lève JAMAIS (le monitoring ne doit pas casser le métier).
+ */
+export async function signalerIncidentTechnique(
+  supabase: SupabaseClient,
+  cabinetId: string,
+  titre: string,
+  detail: string,
+): Promise<void> {
+  try {
+    if (!cabinetId) return
+
+    const { data: admins } = await supabase
+      .from('veterinaires')
+      .select('id')
+      .eq('cabinet_id', cabinetId)
+      .eq('role_app', 'admin')
+      .eq('actif', true)
+
+    if (!admins || admins.length === 0) return
+
+    const depuis = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+    for (const admin of admins as { id: string }[]) {
+      // Anti-spam : même incident non lu < 24 h → on ne ré-alerte pas.
+      const { data: doublon } = await supabase
+        .from('notifications')
+        .select('id')
+        .eq('veterinaire_id', admin.id)
+        .eq('type', 'incident_technique')
+        .eq('titre', titre)
+        .eq('lu', false)
+        .gte('created_at', depuis)
+        .limit(1)
+        .maybeSingle()
+      if (doublon) continue
+
+      await creerNotification(supabase, {
+        veterinaireId: admin.id,
+        type: 'incident_technique',
+        titre,
+        message: detail,
+        lien: null,
+        cabinetId,
+      })
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`[notif-inapp] signalerIncidentTechnique en échec (${titre}):`, msg)
   }
 }

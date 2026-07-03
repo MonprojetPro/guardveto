@@ -27,6 +27,7 @@ import { supprimerEvenementsParIds } from '@/lib/sync-calendrier'
 import { resoudreContexte } from '@/data/resoudreContexte'
 import { persisterResultat } from '@/data/persisterResultat'
 import { construireGardePlacements } from '@/data/gardePlacements'
+import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
 import type { TypeGardeEngine, CalendrierResolu } from '@/engine/types'
 
 // Verrou de génération : au-delà de ce délai, un verrou est considéré périmé
@@ -365,10 +366,20 @@ export async function POST(req: NextRequest) {
           .upsert(placementsRows, { onConflict: 'garde_id,place_index', ignoreDuplicates: false })
         if (placementsErr) {
           console.error('[P3b-1] double écriture garde_placements échouée:', placementsErr.message)
+          await signalerIncidentTechnique(
+            supabase, cabinetId,
+            'Écriture des placements incomplète',
+            'La copie technique des attributions (garde_placements) a échoué pendant la génération. Le planning affiché est correct ; signale-le si ça se répète.',
+          )
         }
       }
     } catch (e) {
       console.error('[P3b-1] double écriture garde_placements exception:', e)
+      await signalerIncidentTechnique(
+        supabase, cabinetId,
+        'Écriture des placements incomplète',
+        'La copie technique des attributions (garde_placements) a échoué pendant la génération. Le planning affiché est correct ; signale-le si ça se répète.',
+      )
     }
 
     // 4. Purge des anciens événements Google Agenda — APRÈS le succès de la
@@ -378,6 +389,11 @@ export async function POST(req: NextRequest) {
       await supprimerEvenementsParIds(eventIdsAPurger)
     } catch (e) {
       console.error('[generate] purge agenda échouée (best-effort):', e)
+      await signalerIncidentTechnique(
+        supabase, cabinetId,
+        'Nettoyage Google Agenda incomplet',
+        "D'anciens événements de la période n'ont pas pu être retirés de Google Agenda pendant la régénération. Des doublons peuvent apparaître à la republication.",
+      )
     }
 
     return NextResponse.json({

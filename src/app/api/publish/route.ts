@@ -19,6 +19,7 @@ import { createClient } from '@/lib/supabase/server'
 import { syncCalendrier } from '@/lib/sync-calendrier'
 import { sendPlanningPublie } from '@/lib/notifications'
 import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
+import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
 import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
 
 // Laisse le temps à la synchro agenda (par lots) + envoi des emails
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   const { data: vet } = await supabase
     .from('veterinaires')
-    .select('role_app')
+    .select('role_app, cabinet_id')
     .eq('user_id', user.id)
     .single()
 
@@ -48,6 +49,7 @@ export async function POST(req: NextRequest) {
       { status: 403 }
     )
   }
+  const cabinetId = (vet.cabinet_id as string | null) ?? null
 
   // ── Validation du corps ─────────────────────────────────
   let periodeId: string
@@ -168,6 +170,22 @@ export async function POST(req: NextRequest) {
     const msg = notifErr instanceof Error ? notifErr.message : String(notifErr)
     console.error('[publish] Erreur notifications email:', msg)
     emailNotif = { sent: 0, errors: 1 }
+  }
+
+  // ── Monitoring interne (audit 2026-07-03) : plus d'échec silencieux ──
+  if (cabinetId && calendarSync && !calendarSync.skipped && calendarSync.errors.length > 0) {
+    await signalerIncidentTechnique(
+      supabase, cabinetId,
+      'Synchro Google Agenda incomplète',
+      `À la publication : ${calendarSync.synced} événement(s) synchronisé(s), ${calendarSync.errors.length} erreur(s). Republier depuis le planning relancera la synchro.`,
+    )
+  }
+  if (cabinetId && emailNotif && emailNotif.errors > 0) {
+    await signalerIncidentTechnique(
+      supabase, cabinetId,
+      'Emails de publication en échec',
+      `${emailNotif.errors} email(s) de notification n'ont pas pu être envoyés (${emailNotif.sent} envoyé(s)). Les vétérinaires concernés n'ont peut-être pas été prévenus.`,
+    )
   }
 
   return NextResponse.json({ success: true, calendarSync, emailNotif })

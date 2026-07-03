@@ -24,6 +24,7 @@ import { queryCompteurs, queryTotalWE } from '@/hooks/useCompteurs'
 import { calculerBilans } from '@/engine/bilan'
 import { syncGardeIndividuelle } from '@/lib/sync-calendrier'
 import { sendGardeModifiee } from '@/lib/notifications'
+import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
 import { placementsPourPaire } from '@/data/gardePlacements'
 
 /** Vétérinaire « avant modif » (pour l'email de notification). */
@@ -214,6 +215,10 @@ export async function appliquerChangementGarde(
   const oldPremier = (garde as Record<string, unknown>).oldPremier as VetoNotif | null
   const oldSecond = (garde as Record<string, unknown>).oldSecond as VetoNotif | null
 
+  // cabinet_id pour le monitoring : fourni par l'appelant, sinon celui de la garde.
+  const cabinetIdIncident =
+    cabinetIdFourni ?? ((garde as Record<string, unknown>).cabinet_id as string | null)
+
   try {
     await syncGardeIndividuelle(supabase, gardeId)
   } catch (err) {
@@ -221,6 +226,13 @@ export async function appliquerChangementGarde(
       '[appliquerChangementGarde] Erreur sync agenda:',
       err instanceof Error ? err.message : String(err),
     )
+    if (cabinetIdIncident) {
+      await signalerIncidentTechnique(
+        supabase, cabinetIdIncident,
+        'Synchro Google Agenda en échec sur une garde',
+        'La modification de garde est bien enregistrée dans le planning, mais Google Agenda n\'a pas pu être mis à jour. Republier la période resynchronisera tout.',
+      )
+    }
   }
 
   try {
@@ -230,6 +242,13 @@ export async function appliquerChangementGarde(
       '[appliquerChangementGarde] Erreur notifications email:',
       err instanceof Error ? err.message : String(err),
     )
+    if (cabinetIdIncident) {
+      await signalerIncidentTechnique(
+        supabase, cabinetIdIncident,
+        'Email de modification de garde en échec',
+        'La garde a bien été modifiée mais l\'email de prévenance aux vétérinaires concernés n\'est pas parti. Pense à les prévenir si besoin.',
+      )
+    }
   }
 
   return { ok: true, status: 200 }
