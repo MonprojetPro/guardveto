@@ -14,9 +14,17 @@
 // On reproduit ICI exactement cette synthèse, pour que le validateur voie la
 // composition RÉELLE du vendredi. Sans ça, il lèverait une fausse violation R8
 // (ou un vendredi « non couvert ») à chaque week-end.
+//
+// P6 (verrou n°3) — GÉNÉRIQUE : la synthèse du vendredi ne code plus l'inversion
+// R8 EN DUR. Elle est déléguée à `reconstruireWeekend` (aval générique), qui
+// APPLIQUE les relations (`meme_binome`/`inversion_role`). Défaut (couple
+// historique) → sortie byte-identique. Passer `relations` pour piloter (un
+// cabinet qui coupe l'inversion voit alors le vendredi non inversé).
 // ============================================================
 
 import type { PlanningPartiel, AttributionGarde } from '../types'
+import type { RelationStructure } from '../structure-config'
+import { reconstruireWeekend } from '../aval/resoudrePlanningAffichage'
 
 export interface GardeRow {
   /** Id de la garde — sert à retrouver ses placements miroir (P3b). Optionnel. */
@@ -42,6 +50,12 @@ export interface OptionsSurMesure {
   rolesParCode?: Record<string, string[]>
   /** Placements miroir par garde_id — restaure les places au-delà des 2 colonnes V1. */
   placementsParGarde?: Record<string, PlacementRow[]>
+  /**
+   * Relations résolues (codes) du profil, pour PILOTER la synthèse du vendredi
+   * (P6 verrou n°3). `undefined` → couple historique (repli byte-identique) ;
+   * `[]` → aucun couple → le vendredi n'est pas matérialisé (découplage réel).
+   */
+  relations?: readonly RelationStructure[]
 }
 
 /** Recule une date ISO yyyy-mm-dd de `n` jours (UTC, pur). */
@@ -66,23 +80,12 @@ export function gardesVersPlanningPartiel(
 
   for (const g of gardes) {
     if (g.type === 'weekend') {
-      attributions.push({
-        date: g.date,
-        type: 'weekend',
-        placements: [
-          { role: 'premier', vetId: g.premier_id },
-          { role: 'second', vetId: g.second_id },
-        ],
-      })
-      // Vendredi soir = veille, rôles inversés (cf. vue 014).
-      attributions.push({
-        date: moinsJours(g.date, 1),
-        type: 'vendredi_soir',
-        placements: [
-          { role: 'premier', vetId: g.second_id }, // 2nd du WE → 1er le vendredi
-          { role: 'second', vetId: g.premier_id }, // 1er du WE → 2nd le vendredi
-        ],
-      })
+      // Week-end (samedi natif) + vendredi lié — dérivation GÉNÉRIQUE (P6) :
+      // l'inversion R8 n'est plus câblée, elle vient des relations. Défaut →
+      // vendredi inversé, byte-identique à l'ancienne synthèse de la vue 014.
+      attributions.push(
+        ...reconstruireWeekend(g, { relations: options?.relations }),
+      )
     } else if (g.type === 'semaine' || g.type === 'ferie') {
       // 'semaine' et 'ferie' (férié en semaine) → garde de nuit en semaine.
       attributions.push({

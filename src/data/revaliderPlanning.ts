@@ -112,6 +112,11 @@ export async function revaliderPlanningPublie(
     const planning = gardesVersPlanningPartiel(gardes as GardeRow[], {
       rolesParCode,
       placementsParGarde,
+      // P6 (verrou n°3) : la synthèse du vendredi APPLIQUE les MÊMES relations
+      // que le validateur ci-dessous (ctx.structureConfig.relations) — sinon la
+      // reconstruction et le contrôle divergeraient pour un cabinet qui pilote
+      // ses relations. undefined → couple historique (byte-identique).
+      relations: ctx.structureConfig?.relations,
     })
 
     // 3. Re-validation indépendante.

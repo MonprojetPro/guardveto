@@ -19,6 +19,8 @@ import { google } from 'googleapis'
 import { addDays } from 'date-fns'
 import { horairesResolus, type StructureCreneauxResolue } from '@/engine/structure-creneaux'
 import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
+import { ordonnerSourceLiee, COUPLE_HISTORIQUE } from '@/engine/aval/resoudrePlanningAffichage'
+import { RELATIONS_STRUCTURE_DEFAUT, type RelationStructure } from '@/engine/structure-config'
 
 // ── Types internes ───────────────────────────────────────────
 
@@ -116,7 +118,10 @@ function buildEventTitle(data: GardeEventData): string {
   return `Garde — ${data.prenomPremier} (1er)`
 }
 
-function buildEventDescription(data: GardeEventData): string {
+function buildEventDescription(
+  data: GardeEventData,
+  relations: readonly RelationStructure[] = RELATIONS_STRUCTURE_DEFAUT,
+): string {
   const typeLabel = data.type === 'semaine'
     ? 'Garde de semaine (soir)'
     : data.type === 'weekend'
@@ -126,15 +131,23 @@ function buildEventDescription(data: GardeEventData): string {
     // Type SUR-MESURE (P3b) : son propre libellé — fini le « jour férié » mensonger.
     : `Garde — ${libelleTypeGardeDb(data.type)}`
 
-  // Week-end : R8 — le vendredi soir a les deux mêmes vétos avec les rôles
-  // inversés par rapport au samedi/dimanche. On le détaille dans la description.
+  // Week-end : le vendredi soir est DÉRIVÉ du week-end via les relations (P6
+  // verrou n°3 — plus d'inversion R8 câblée). Défaut (couple historique) →
+  // rôles inversés, byte-identique. Un cabinet qui coupe l'inversion voit le
+  // vendredi non inversé ; qui découple (pas de meme_binome) → pas de ligne.
   if (data.type === 'weekend' && data.prenomSecond) {
-    return [
-      typeLabel,
-      '',
-      `Vendredi soir : ${data.prenomSecond} (1er) + ${data.prenomPremier} (2nd)`,
-      `Samedi & dimanche : ${data.prenomPremier} (1er) + ${data.prenomSecond} (2nd)`,
-    ].join('\n')
+    const ordonnes = ordonnerSourceLiee(
+      [data.prenomPremier, data.prenomSecond],
+      relations,
+      COUPLE_HISTORIQUE.source,
+      COUPLE_HISTORIQUE.cible,
+    )
+    const lignes = [typeLabel, '']
+    if (ordonnes) {
+      lignes.push(`Vendredi soir : ${ordonnes[0]} (1er) + ${ordonnes[1]} (2nd)`)
+    }
+    lignes.push(`Samedi & dimanche : ${data.prenomPremier} (1er) + ${data.prenomSecond} (2nd)`)
+    return lignes.join('\n')
   }
 
   const lines = [
@@ -157,6 +170,7 @@ export async function createGardeEvent(
   data: GardeEventData,
   structure?: StructureCreneauxResolue,
   calendarIdCabinet?: string | null,
+  relations?: readonly RelationStructure[],
 ): Promise<string | null> {
   const ctx = getCalendarClient(calendarIdCabinet)
   if (!ctx) return null
@@ -167,7 +181,7 @@ export async function createGardeEvent(
     calendarId: ctx.calendarId,
     requestBody: {
       summary: buildEventTitle(data),
-      description: buildEventDescription(data),
+      description: buildEventDescription(data, relations),
       start: { dateTime: start, timeZone: 'Europe/Paris' },
       end:   { dateTime: end,   timeZone: 'Europe/Paris' },
     },
@@ -185,6 +199,7 @@ export async function updateGardeEvent(
   data: GardeEventData,
   structure?: StructureCreneauxResolue,
   calendarIdCabinet?: string | null,
+  relations?: readonly RelationStructure[],
 ): Promise<void> {
   const ctx = getCalendarClient(calendarIdCabinet)
   if (!ctx) return
@@ -196,7 +211,7 @@ export async function updateGardeEvent(
     eventId,
     requestBody: {
       summary: buildEventTitle(data),
-      description: buildEventDescription(data),
+      description: buildEventDescription(data, relations),
       start: { dateTime: start, timeZone: 'Europe/Paris' },
       end:   { dateTime: end,   timeZone: 'Europe/Paris' },
     },

@@ -13,6 +13,8 @@ import {
   renderToBuffer,
 } from '@react-pdf/renderer'
 import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
+import { ordonnerSourceLiee, COUPLE_HISTORIQUE } from '@/engine/aval/resoudrePlanningAffichage'
+import { RELATIONS_STRUCTURE_DEFAUT, type RelationStructure } from '@/engine/structure-config'
 
 // ── Types ─────────────────────────────────────────────────────
 export interface GardePdf {
@@ -47,6 +49,11 @@ export interface PlanningPdfData {
   gardes: GardePdf[]
   vets: VetoPdf[]
   jours_feries: Array<{ date: string; nom: string }>
+  /**
+   * Relations résolues (codes) du profil — pilotent la dérivation du vendredi
+   * (P6 verrou n°3). Absent → couple historique (repli byte-identique).
+   */
+  relations?: readonly RelationStructure[]
 }
 
 // ── Constantes ────────────────────────────────────────────────
@@ -367,6 +374,7 @@ interface PageCalendrierProps {
   gardes: GardePdf[]
   vets: VetoPdf[]
   jours_feries: Array<{ date: string; nom: string }>
+  relations: readonly RelationStructure[]
   pageIndex: number
   totalPages: number
 }
@@ -378,6 +386,7 @@ function PageCalendrier({
   gardes,
   vets,
   jours_feries,
+  relations,
   pageIndex,
   totalPages,
 }: PageCalendrierProps) {
@@ -508,16 +517,32 @@ function PageCalendrier({
                   //  • Vendredi (wi 0) : R8 → paire INVERSÉE (1er du WE devient 2nd, et inversement)
                   //  • Samedi   (wi 1) : paire du week-end telle quelle (garde stockée sur Sam)
                   //  • Dimanche (wi 2) : indicateur "↕ week-end" (même équipe que samedi)
-                  const gardeVendrediInversee =
+                  // Vendredi DÉRIVÉ du week-end via les relations (P6 verrou
+                  // n°3 — plus d'inversion R8 câblée). Défaut → rôles inversés,
+                  // byte-identique. Inversion coupée → vendredi non inversé ;
+                  // découplage (pas de meme_binome) → pas de vendredi (null).
+                  const ordonnesVen =
                     gardeWEestWeekend && gardeWE
+                      ? ordonnerSourceLiee(
+                          [
+                            { prenom: gardeWE.premier_prenom, nom: gardeWE.premier_nom, couleur: gardeWE.premier_couleur },
+                            { prenom: gardeWE.second_prenom, nom: gardeWE.second_nom, couleur: gardeWE.second_couleur },
+                          ],
+                          relations,
+                          COUPLE_HISTORIQUE.source,
+                          COUPLE_HISTORIQUE.cible,
+                        )
+                      : null
+                  const gardeVendrediInversee =
+                    gardeWEestWeekend && gardeWE && ordonnesVen
                       ? {
                           ...gardeWE,
-                          premier_prenom: gardeWE.second_prenom,
-                          premier_nom: gardeWE.second_nom,
-                          premier_couleur: gardeWE.second_couleur,
-                          second_prenom: gardeWE.premier_prenom,
-                          second_nom: gardeWE.premier_nom,
-                          second_couleur: gardeWE.premier_couleur,
+                          premier_prenom: ordonnesVen[0]?.prenom ?? null,
+                          premier_nom: ordonnesVen[0]?.nom ?? null,
+                          premier_couleur: ordonnesVen[0]?.couleur ?? null,
+                          second_prenom: ordonnesVen[1]?.prenom ?? null,
+                          second_nom: ordonnesVen[1]?.nom ?? null,
+                          second_couleur: ordonnesVen[1]?.couleur ?? null,
                         }
                       : null
                   const gardeAffichee = gardeWEestWeekend
@@ -607,6 +632,7 @@ function PageCalendrier({
 // ── Document PDF ──────────────────────────────────────────────
 function PlanningDocument({ data }: { data: PlanningPdfData }) {
   const moisList = moisDePeriode(data.periode.date_debut, data.periode.date_fin)
+  const relations = data.relations ?? RELATIONS_STRUCTURE_DEFAUT
 
   return (
     <Document
@@ -623,6 +649,7 @@ function PlanningDocument({ data }: { data: PlanningPdfData }) {
           gardes={data.gardes}
           vets={data.vets}
           jours_feries={data.jours_feries}
+          relations={relations}
           pageIndex={i}
           totalPages={moisList.length}
         />

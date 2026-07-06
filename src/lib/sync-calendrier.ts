@@ -15,6 +15,7 @@ import {
 } from './google-calendar'
 import { chargerStructureProfilPeriode } from '@/data/chargerStructureCabinet'
 import type { StructureCreneauxResolue } from '@/engine/structure-creneaux'
+import { chargerRelationsAffichagePeriode } from '@/data/chargerRelationsAffichage'
 
 // ── Résolution du calendarId PAR CABINET (#10b) ──────────────
 // Le calendarId Google est désormais porté par le cabinet
@@ -145,6 +146,10 @@ export async function syncCalendrier(
   // avec les horaires écrits en base. Défaut si le cabinet n'a rien personnalisé.
   const structure = await structurePourPeriode(supabase, periodeId)
 
+  // Relations du profil (P6 verrou n°3) — pilotent le vendredi dans la
+  // description. undefined (pas de catalogue) → couple historique, byte-identique.
+  const relations = await chargerRelationsAffichagePeriode(supabase, periodeId)
+
   // Petits lots espacés + reprise auto : évite le rate-limit Google
   // (qui jette une partie des créations quand on en lance trop d'un coup),
   // tout en restant largement sous le maxDuration de la fonction.
@@ -165,9 +170,9 @@ export async function syncCalendrier(
         try {
           await avecReprise(async () => {
             if (garde.google_event_id) {
-              await updateGardeEvent(garde.google_event_id as string, data, structure, calendarId)
+              await updateGardeEvent(garde.google_event_id as string, data, structure, calendarId, relations)
             } else {
-              const eventId = await createGardeEvent(data, structure, calendarId)
+              const eventId = await createGardeEvent(data, structure, calendarId, relations)
               if (eventId) {
                 await supabase
                   .from('gardes')
@@ -239,10 +244,15 @@ export async function syncGardeIndividuelle(
     ? await structurePourPeriode(supabase, g.periode_id)
     : undefined
 
+  // Relations du profil (P6 verrou n°3) — pilotent le vendredi dans la description.
+  const relations = g.periode_id
+    ? await chargerRelationsAffichagePeriode(supabase, g.periode_id)
+    : undefined
+
   if (g.google_event_id) {
-    await updateGardeEvent(g.google_event_id, data, structure, calendarId)
+    await updateGardeEvent(g.google_event_id, data, structure, calendarId, relations)
   } else {
-    const eventId = await createGardeEvent(data, structure, calendarId)
+    const eventId = await createGardeEvent(data, structure, calendarId, relations)
     if (eventId) {
       await supabase
         .from('gardes')

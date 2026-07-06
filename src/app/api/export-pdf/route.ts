@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { genererPdfPlanning } from '@/lib/pdf'
 import type { GardePdf, VetoPdf } from '@/lib/pdf'
+import { chargerRelationsAffichagePeriode } from '@/data/chargerRelationsAffichage'
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -123,6 +124,10 @@ export async function GET(req: NextRequest) {
     (f: { date: string; libelle: string }) => ({ date: f.date, nom: f.libelle })
   )
 
+  // Relations du profil (P6 verrou n°3) — pilotent la dérivation du vendredi.
+  // undefined (pas de catalogue) → couple historique, byte-identique.
+  const relations = await chargerRelationsAffichagePeriode(supabase, periodeId)
+
   // ── Génération PDF ──────────────────────────────────────────
   let pdfBuffer: Buffer
   try {
@@ -137,6 +142,7 @@ export async function GET(req: NextRequest) {
       gardes,
       vets,
       jours_feries,
+      relations,
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
