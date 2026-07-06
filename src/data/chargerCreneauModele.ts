@@ -131,17 +131,30 @@ export async function chargerCreneauModele(
   }))
 }
 
-/** Relations entre créneaux d'un cabinet. Vide si aucune. */
+/**
+ * Relations entre créneaux d'un cabinet, SCOPÉES À UN PROFIL (RG1) —
+ * même résolution de profil que le catalogue (`resoudreProfilId`, source
+ * unique) pour que catalogue et relations photographient le MÊME profil.
+ * Vide si aucune. Best-effort : jamais de throw.
+ *
+ * ⚠️ RG1 (tranche 1) : chargées mais PAS encore consommées par le moteur —
+ * le branchement (hard-constraints, scoring, solver, validateur) = tranche 2.
+ */
 export async function chargerRelationsCreneau(
   supabase: SupabaseClient,
   cabinetId?: string,
+  profilId?: string,
 ): Promise<RelationCreneau[]> {
   if (!cabinetId) return []
+
+  const profil = await resoudreProfilId(supabase, cabinetId, profilId)
+  if (!profil) return []
 
   const { data, error } = await supabase
     .from('relation_creneau')
     .select('id, source_id, cible_id, genre, actif')
     .eq('cabinet_id', cabinetId)
+    .eq('profil_id', profil)
 
   if (error || !data) return []
 
