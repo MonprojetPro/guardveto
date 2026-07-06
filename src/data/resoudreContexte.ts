@@ -17,6 +17,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { chargerInputDepuisSupabase } from '@/engine/loader'
 import { normaliserContraintesVets } from '@/engine/normaliserContraintes'
+import { fallbackVacancesObsolete, VACANCES_FALLBACK_FIN } from '@/engine/utils'
 import type { ContexteSimulation, CalendrierResolu } from '@/engine/types'
 
 // ── Types internes (réponse brute de get_calendrier) ─────────
@@ -111,6 +112,22 @@ export async function resoudreContexte(
   const calendrier =
     input.calendrier ??
     (await chargerCalendrier(cabinetId, input.dateDebut, input.dateFin))
+
+  // Alerte NON silencieuse (dette technique) : si AUCUN calendrier zone-aware
+  // n'a pu être résolu (ni loader ni RPC), le moteur retombe sur la liste de
+  // vacances scolaires EN DUR (utils.ts), qui expire au 31/08/2027. Pour une
+  // période qui déborde cette couverture, on le DIT au lieu de fausser en
+  // silence les règles « repos sauf vacances ». Pur logging → aucun effet sur
+  // le planning généré (byte-identique).
+  if (!calendrier && fallbackVacancesObsolete(input.dateFin)) {
+    console.warn(
+      `[vacances-fallback] Aucun calendrier scolaire zone-aware pour la période ` +
+      `${periodeId} (fin ${input.dateFin}, cabinet ${cabinetId}) : repli sur la liste ` +
+      `EN DUR, obsolète après ${VACANCES_FALLBACK_FIN}. Étendre la table ` +
+      `vacances_scolaires ou vérifier la zone scolaire du cabinet — les règles ` +
+      `« repos sauf vacances » risquent d'être faussées sur cette période.`,
+    )
+  }
 
   // 3. Assembler le ContexteSimulation
   //    ⚠️ Propager EXPLICITEMENT nbVetosSemaineSoir ET equityWeights : cet objet

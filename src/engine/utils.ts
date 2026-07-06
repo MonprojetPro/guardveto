@@ -222,6 +222,28 @@ export function estEnVacancesScolaires(date: string, calendrier?: CalendrierReso
   return VACANCES_SCOLAIRES.some(({ debut, fin }) => dateEntre(date, debut, fin))
 }
 
+/**
+ * Dernière date couverte par la liste de vacances scolaires EN DUR (fallback
+ * hors-DB). Au-delà, la liste est OBSOLÈTE : `estEnVacancesScolaires` sans
+ * calendrier zone-aware renverra `false` pour des dates réellement en vacances,
+ * ce qui fausse silencieusement les règles « repos sauf vacances ».
+ */
+export const VACANCES_FALLBACK_FIN = '2027-08-31'
+
+/**
+ * Le fallback en dur est-il obsolète pour couvrir une période finissant à
+ * `dateFin` ? (true = la liste en dur ne couvre pas toute la période → il faut
+ * alerter et/ou étendre la table `vacances_scolaires`.)
+ *
+ * N'est utile que sur le CHEMIN FALLBACK (aucun calendrier zone-aware résolu) :
+ * appelé par les assembleurs d'input (loader / resoudreContexte) pour lever
+ * l'alerte AU BON ENDROIT (période connue), jamais dans la fonction chaude
+ * `estEnVacancesScolaires` (appelée par date → spam de logs).
+ */
+export function fallbackVacancesObsolete(dateFin: string): boolean {
+  return dateFin > VACANCES_FALLBACK_FIN
+}
+
 // ── Fêtes de fin d'année ─────────────────────────────────
 
 /**

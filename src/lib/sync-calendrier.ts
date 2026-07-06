@@ -16,6 +16,40 @@ import {
 import { chargerStructureProfilPeriode } from '@/data/chargerStructureCabinet'
 import type { StructureCreneauxResolue } from '@/engine/structure-creneaux'
 
+// ── Résolution du calendarId PAR CABINET (#10b) ──────────────
+// Le calendarId Google est désormais porté par le cabinet
+// (cabinets.google_calendar_id). On le résout ici depuis un cabinet_id ; la
+// couche google-calendar retombe sur l'env GOOGLE_CALENDAR_ID si le résultat
+// est vide (cabinet pilote = colonne nulle → comportement inchangé).
+
+/** calendarId du cabinet, ou null si non renseigné (→ fallback env en aval). */
+async function calendarIdDuCabinet(
+  supabase: SupabaseClient,
+  cabinetId: string | null | undefined,
+): Promise<string | null> {
+  if (!cabinetId) return null
+  const { data } = await supabase
+    .from('cabinets')
+    .select('google_calendar_id')
+    .eq('id', cabinetId)
+    .single()
+  const val = (data as { google_calendar_id?: string | null } | null)?.google_calendar_id
+  return (val ?? '').trim() || null
+}
+
+/** cabinet_id d'une période (pour scoper l'agenda). */
+async function cabinetIdDePeriode(
+  supabase: SupabaseClient,
+  periodeId: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from('periodes')
+    .select('cabinet_id')
+    .eq('id', periodeId)
+    .single()
+  return (data as { cabinet_id?: string | null } | null)?.cabinet_id ?? null
+}
+
 // ── Types ────────────────────────────────────────────────────
 
 interface GardeAvecVetos {
@@ -25,6 +59,7 @@ interface GardeAvecVetos {
   type: string
   google_event_id: string | null
   periode_id?: string
+  cabinet_id?: string | null
   premier: { prenom: string } | null
   second:  { prenom: string } | null
 }
@@ -77,7 +112,11 @@ export async function syncCalendrier(
   supabase: SupabaseClient,
   periodeId: string
 ): Promise<SyncResult> {
-  if (!isGoogleCalendarConfigured()) {
+  // calendarId scopé au cabinet de la période (fallback env en aval).
+  const cabinetId = await cabinetIdDePeriode(supabase, periodeId)
+  const calendarId = await calendarIdDuCabinet(supabase, cabinetId)
+
+  if (!isGoogleCalendarConfigured(calendarId)) {
     return { synced: 0, errors: [], skipped: true }
   }
 
@@ -126,9 +165,9 @@ export async function syncCalendrier(
         try {
           await avecReprise(async () => {
             if (garde.google_event_id) {
-              await updateGardeEvent(garde.google_event_id as string, data, structure)
+              await updateGardeEvent(garde.google_event_id as string, data, structure, calendarId)
             } else {
-              const eventId = await createGardeEvent(data, structure)
+              const eventId = await createGardeEvent(data, structure, calendarId)
               if (eventId) {
                 await supabase
                   .from('gardes')
@@ -165,8 +204,6 @@ export async function syncGardeIndividuelle(
   supabase: SupabaseClient,
   gardeId: string
 ): Promise<void> {
-  if (!isGoogleCalendarConfigured()) return
-
   const { data: garde } = await supabase
     .from('gardes')
     .select(`
@@ -175,6 +212,7 @@ export async function syncGardeIndividuelle(
       type,
       google_event_id,
       periode_id,
+      cabinet_id,
       premier:veterinaires!gardes_premier_id_fkey ( prenom ),
       second:veterinaires!gardes_second_id_fkey  ( prenom )
     `)
@@ -184,6 +222,11 @@ export async function syncGardeIndividuelle(
   if (!garde) return
 
   const g = garde as unknown as GardeAvecVetos
+
+  // calendarId scopé au cabinet de la garde (fallback env en aval).
+  const calendarId = await calendarIdDuCabinet(supabase, g.cabinet_id)
+  if (!isGoogleCalendarConfigured(calendarId)) return
+
   const data: GardeEventData = {
     date:          g.date,
     type:          g.type,
@@ -197,9 +240,9 @@ export async function syncGardeIndividuelle(
     : undefined
 
   if (g.google_event_id) {
-    await updateGardeEvent(g.google_event_id, data, structure)
+    await updateGardeEvent(g.google_event_id, data, structure, calendarId)
   } else {
-    const eventId = await createGardeEvent(data, structure)
+    const eventId = await createGardeEvent(data, structure, calendarId)
     if (eventId) {
       await supabase
         .from('gardes')
@@ -219,7 +262,9 @@ export async function supprimerEvenementsCalendrier(
   supabase: SupabaseClient,
   periodeId: string
 ): Promise<void> {
-  if (!isGoogleCalendarConfigured()) return
+  const cabinetId = await cabinetIdDePeriode(supabase, periodeId)
+  const calendarId = await calendarIdDuCabinet(supabase, cabinetId)
+  if (!isGoogleCalendarConfigured(calendarId)) return
 
   const { data: gardes } = await supabase
     .from('gardes')
@@ -232,7 +277,8 @@ export async function supprimerEvenementsCalendrier(
   await supprimerEvenementsParIds(
     gardes
       .map((garde) => garde.google_event_id as string | null)
-      .filter((id): id is string => Boolean(id))
+      .filter((id): id is string => Boolean(id)),
+    calendarId,
   )
 }
 
@@ -245,8 +291,11 @@ export async function supprimerEvenementsCalendrier(
  * de la réécriture en base (sinon un échec à mi-course laissait la base vide
  * ET l'agenda déjà purgé).
  */
-export async function supprimerEvenementsParIds(eventIds: string[]): Promise<void> {
-  if (!isGoogleCalendarConfigured()) return
+export async function supprimerEvenementsParIds(
+  eventIds: string[],
+  calendarId?: string | null,
+): Promise<void> {
+  if (!isGoogleCalendarConfigured(calendarId)) return
   if (eventIds.length === 0) return
 
   // Suppression par petits lots espacés + reprise (anti rate-limit Google)
@@ -257,7 +306,7 @@ export async function supprimerEvenementsParIds(eventIds: string[]): Promise<voi
     const lot = eventIds.slice(i, i + BATCH)
     await Promise.all(
       lot.map((eventId) =>
-        avecReprise(() => deleteGardeEvent(eventId)).catch(() => {
+        avecReprise(() => deleteGardeEvent(eventId, calendarId)).catch(() => {
           // On continue même si un événement n'existe plus côté Google
         })
       )

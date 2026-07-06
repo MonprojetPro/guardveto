@@ -1,22 +1,38 @@
 // Envoi d'emails transactionnels via l'API Brevo
 // Variables requises : BREVO_API_KEY, BREVO_FROM_EMAIL, BREVO_FROM_NAME
+//
+// #10c (multi-cabinet) — l'expéditeur (from email + from name) peut désormais
+// être porté PAR CABINET (colonnes cabinets.brevo_from_email / brevo_from_name)
+// et passé en argument. À défaut, on retombe sur les variables d'env
+// BREVO_FROM_EMAIL / BREVO_FROM_NAME, puis sur le défaut historique — le
+// comportement du cabinet pilote (colonnes nulles) est donc inchangé.
 
 export async function sendBrevoEmail({
   to,
   toName,
   subject,
   htmlContent,
+  fromEmail,
+  fromName,
 }: {
   to: string
   toName: string
   subject: string
   htmlContent: string
+  /** Expéditeur propre au cabinet (fallback env puis défaut si absent). */
+  fromEmail?: string | null
+  fromName?: string | null
 }) {
   const apiKey = process.env.BREVO_API_KEY
   if (!apiKey) {
     console.warn('[Brevo] BREVO_API_KEY manquante — email non envoyé')
     return { error: 'Config email manquante' }
   }
+
+  const senderEmail =
+    (fromEmail?.trim() || process.env.BREVO_FROM_EMAIL?.trim() || 'vetovaldallier@gmail.com')
+  const senderName =
+    (fromName?.trim() || process.env.BREVO_FROM_NAME?.trim() || 'GuardVeto')
 
   try {
     const response = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -27,8 +43,8 @@ export async function sendBrevoEmail({
       },
       body: JSON.stringify({
         sender: {
-          name: process.env.BREVO_FROM_NAME ?? 'GuardVeto',
-          email: process.env.BREVO_FROM_EMAIL ?? 'vetovaldallier@gmail.com',
+          name: senderName,
+          email: senderEmail,
         },
         to: [{ email: to, name: toName }],
         subject,

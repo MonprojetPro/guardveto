@@ -1,13 +1,16 @@
 // ============================================================
-// GUARDVETO — Chargeur de la structure des créneaux PAR CABINET (A1)
+// GUARDVETO — Chargeur de la structure horaire des créneaux PAR PROFIL
 // ============================================================
-// Lit la surcouche `creneaux_cabinet` (horaires propres au cabinet) et la
-// fusionne avec les horaires par défaut (structure-creneaux) pour produire
-// une StructureCreneauxResolue.
+// Résout les horaires des créneaux (début/fin/jour de fin) depuis le CATALOGUE
+// DU PROFIL (`creneau_modele`) et les fusionne avec les horaires par défaut
+// (structure-creneaux) pour produire une StructureCreneauxResolue.
+//
+// (Historique : ce module lisait aussi la surcouche cabinet-large
+// `creneaux_cabinet` — supprimée le 2026-07-06, cf. NOTE ci-dessous.)
 //
 // BEST-EFFORT (même philosophie que nb_vetos_semaine_soir dans loader.ts) :
 //   - pas de cabinetId → défaut
-//   - table absente / erreur / cabinet sans ligne → défaut
+//   - catalogue vide / erreur → défaut
 // Aucune contrainte d'ordre de déploiement : tant qu'un cabinet ne
 // personnalise rien, le comportement est strictement inchangé.
 //
@@ -16,7 +19,6 @@
 // ============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { TypeGardeEngine } from '@/engine/types'
 import {
   type StructureCreneauxResolue,
   type HorairesCreneau,
@@ -25,49 +27,11 @@ import {
 } from '@/engine/structure-creneaux'
 import { chargerCreneauModele } from '@/data/chargerCreneauModele'
 
-interface CreneauCabinetRow {
-  code: string
-  heure_debut: string        // Postgres TIME → 'HH:MM:SS'
-  heure_fin: string
-  offset_jours_fin: number
-  actif: boolean
-}
-
-const CODES_VALIDES: TypeGardeEngine[] = ['semaine_soir', 'vendredi_soir', 'weekend', 'ferie']
-
-/** Postgres TIME renvoie 'HH:MM:SS' ; la structure travaille en 'HH:MM'. */
-function hhmm(t: string): string {
-  return t.slice(0, 5)
-}
-
-/**
- * Structure des créneaux résolue pour un cabinet (horaires par défaut +
- * surcharges du cabinet). Retombe sur le défaut en l'absence de config.
- */
-export async function chargerStructureCabinet(
-  supabase: SupabaseClient,
-  cabinetId?: string,
-): Promise<StructureCreneauxResolue> {
-  if (!cabinetId) return structureParDefaut()
-
-  const { data, error } = await supabase
-    .from('creneaux_cabinet')
-    .select('code, heure_debut, heure_fin, offset_jours_fin, actif')
-    .eq('cabinet_id', cabinetId)
-
-  if (error || !data || data.length === 0) return structureParDefaut()
-
-  const overrides: Partial<Record<TypeGardeEngine, Partial<HorairesCreneau>>> = {}
-  for (const row of data as CreneauCabinetRow[]) {
-    if (!CODES_VALIDES.includes(row.code as TypeGardeEngine)) continue
-    overrides[row.code as TypeGardeEngine] = {
-      heureDebut: hhmm(row.heure_debut),
-      heureFin: hhmm(row.heure_fin),
-      offsetJoursFin: row.offset_jours_fin,
-    }
-  }
-  return resoudreStructure(overrides)
-}
+// NOTE (nettoyage dette technique 2026-07-06) : `chargerStructureCabinet` (lecture
+// de la surcouche cabinet-large `creneaux_cabinet`) a été SUPPRIMÉE — plus aucun
+// appelant (les horaires sont lus PAR PROFIL, cf. `chargerStructureProfil`
+// ci-dessous). La table `creneaux_cabinet` est droppée par la migration
+// 20260706200000. Ce module ne porte plus que la résolution PAR PROFIL.
 
 // ── Structure horaire PAR PROFIL (P5 slice 4b) ───────────────
 

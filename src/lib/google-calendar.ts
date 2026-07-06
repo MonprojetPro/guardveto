@@ -7,7 +7,12 @@
 // Variables d'environnement requises :
 //   GOOGLE_SERVICE_ACCOUNT_EMAIL  — email du Service Account
 //   GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY — clé privée (avec \n)
-//   GOOGLE_CALENDAR_ID            — ID du calendrier cible
+//   GOOGLE_CALENDAR_ID            — ID du calendrier cible (FALLBACK global)
+//
+// #10b (multi-cabinet) — le calendarId peut désormais être porté PAR CABINET
+// (colonne cabinets.google_calendar_id) et passé en argument. L'env
+// GOOGLE_CALENDAR_ID reste le FALLBACK (compat cabinet pilote : sa colonne est
+// nulle → on retombe sur l'env, comportement inchangé).
 // ============================================================
 
 import { google } from 'googleapis'
@@ -27,12 +32,22 @@ export interface GardeEventData {
 
 // ── Initialisation du client Google ─────────────────────────
 
-function getCalendarClient() {
+/**
+ * Résout le calendarId effectif : celui du cabinet (argument) en priorité,
+ * sinon l'env globale GOOGLE_CALENDAR_ID (fallback compat cabinet pilote).
+ */
+function resoudreCalendarId(calendarIdCabinet?: string | null): string | null {
+  const perCabinet = calendarIdCabinet?.trim()
+  if (perCabinet) return perCabinet
+  return process.env.GOOGLE_CALENDAR_ID?.trim() || null
+}
+
+function getCalendarClient(calendarIdCabinet?: string | null) {
   // .trim() : protège contre les retours à la ligne / espaces parasites
   // ajoutés en collant les valeurs dans Vercel (sinon : "account not found").
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim()
   const key = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, '\n')
-  const calendarId = process.env.GOOGLE_CALENDAR_ID?.trim()
+  const calendarId = resoudreCalendarId(calendarIdCabinet)
 
   if (!email || !key || !calendarId) {
     return null
@@ -141,8 +156,9 @@ function buildEventDescription(data: GardeEventData): string {
 export async function createGardeEvent(
   data: GardeEventData,
   structure?: StructureCreneauxResolue,
+  calendarIdCabinet?: string | null,
 ): Promise<string | null> {
-  const ctx = getCalendarClient()
+  const ctx = getCalendarClient(calendarIdCabinet)
   if (!ctx) return null
 
   const { start, end } = getEventTimes(data.date, data.type, structure)
@@ -168,8 +184,9 @@ export async function updateGardeEvent(
   eventId: string,
   data: GardeEventData,
   structure?: StructureCreneauxResolue,
+  calendarIdCabinet?: string | null,
 ): Promise<void> {
-  const ctx = getCalendarClient()
+  const ctx = getCalendarClient(calendarIdCabinet)
   if (!ctx) return
 
   const { start, end } = getEventTimes(data.date, data.type, structure)
@@ -190,8 +207,11 @@ export async function updateGardeEvent(
  * Supprime un événement Google Agenda.
  * No-op si Google n'est pas configuré.
  */
-export async function deleteGardeEvent(eventId: string): Promise<void> {
-  const ctx = getCalendarClient()
+export async function deleteGardeEvent(
+  eventId: string,
+  calendarIdCabinet?: string | null,
+): Promise<void> {
+  const ctx = getCalendarClient(calendarIdCabinet)
   if (!ctx) return
 
   await ctx.client.events.delete({
@@ -201,12 +221,16 @@ export async function deleteGardeEvent(eventId: string): Promise<void> {
 }
 
 /**
- * Vérifie si Google Calendar est configuré (variables d'env présentes).
+ * Vérifie si Google Calendar est configuré (credentials présents ET un
+ * calendarId résoluble — celui du cabinet, sinon l'env globale).
+ *
+ * @param calendarIdCabinet calendarId propre au cabinet (colonne
+ *   cabinets.google_calendar_id) ; si absent, on retombe sur GOOGLE_CALENDAR_ID.
  */
-export function isGoogleCalendarConfigured(): boolean {
+export function isGoogleCalendarConfigured(calendarIdCabinet?: string | null): boolean {
   return !!(
     process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
     process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY &&
-    process.env.GOOGLE_CALENDAR_ID
+    resoudreCalendarId(calendarIdCabinet)
   )
 }

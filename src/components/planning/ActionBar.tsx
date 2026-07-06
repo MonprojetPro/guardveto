@@ -136,6 +136,11 @@ export function ActionBar({ periodes, periodesAvecGardes, vets }: ActionBarProps
         setRepublishOpen(false)
         toast.success(`${data.nbGardes} gardes générées en ${data.dureeMs}ms`)
         router.refresh()
+      } else if (data.interrompu) {
+        // Coupe propre du backtracking (calcul trop long) — PAS une impasse
+        // prouvée : message dédié, on n'affiche pas de diagnostic (il n'y en a pas).
+        setImpasse(null)
+        toast.error(data.error ?? 'Génération interrompue : le planning est trop contraint (calcul trop long).')
       } else {
         const jours: JourNonCouvert[] = data.joursNonCouverts ?? []
         setImpasse({

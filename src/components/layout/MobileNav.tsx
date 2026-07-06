@@ -13,6 +13,7 @@ import {
   Clock,
   Inbox,
   LifeBuoy,
+  MailWarning,
   MoreHorizontal,
   ScrollText,
   Users,
@@ -28,6 +29,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   Clock,
   Inbox,
   LifeBuoy,
+  MailWarning,
   ScrollText,
   Users,
 }

@@ -7,6 +7,31 @@ import { sendBrevoEmail, emailCongeValide, emailCongeRefuse } from '@/lib/brevo'
 import { detecterConflitPlanningPublie } from '@/lib/conges/detection-conflit'
 import type { CreneauImpacte } from '@/lib/crise/contexte'
 import type { CreneauConge, TypeConge } from '@/types'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+/**
+ * #10c — Expéditeur Brevo du cabinet courant (from email + from name), lus sur
+ * `cabinets`. Best-effort : toute erreur (cabinet non résolu, colonnes nulles)
+ * renvoie `{}` → sendBrevoEmail retombe alors sur l'env puis le défaut.
+ */
+async function chargerExpediteurCabinet(
+  supabase: SupabaseClient<any, any, any>,
+): Promise<{ fromEmail?: string | null; fromName?: string | null }> {
+  try {
+    const cabinetId = await resoudreCabinetId(supabase)
+    const { data } = await supabase
+      .from('cabinets')
+      .select('brevo_from_email, brevo_from_name')
+      .eq('id', cabinetId)
+      .single()
+    return {
+      fromEmail: (data as { brevo_from_email?: string | null } | null)?.brevo_from_email ?? null,
+      fromName: (data as { brevo_from_name?: string | null } | null)?.brevo_from_name ?? null,
+    }
+  } catch {
+    return {}
+  }
+}
 
 /**
  * Signal de conflit renvoyé au front quand un congé devenu EFFECTIF (validé)
@@ -194,6 +219,7 @@ export async function validerConge(
       .single()
 
     if (vet) {
+      const expediteur = await chargerExpediteurCabinet(supabase)
       sendBrevoEmail({
         to: vet.email,
         toName: `${vet.prenom} ${vet.nom}`,
@@ -205,6 +231,7 @@ export async function validerConge(
           date_debut: date_debut ?? conge.date_debut,
           date_fin: date_fin ?? conge.date_fin,
         }),
+        ...expediteur,
       }).catch(console.error)
     }
   }
@@ -265,6 +292,7 @@ export async function refuserConge(id: string, raison?: string) {
       .single()
 
     if (vet) {
+      const expediteur = await chargerExpediteurCabinet(supabase)
       sendBrevoEmail({
         to: vet.email,
         toName: `${vet.prenom} ${vet.nom}`,
@@ -277,6 +305,7 @@ export async function refuserConge(id: string, raison?: string) {
           date_fin: conge.date_fin,
           raison: raison ?? null,
         }),
+        ...expediteur,
       }).catch(console.error)
     }
   }

@@ -256,6 +256,9 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
     message: string
     vetPrenom: string
   } | null>(null)
+  // Avertissements métier renvoyés par le SERVEUR (véto inactif / en congé
+  // validé) — garde-fou au moment de l'écriture (backlog n°12). À confirmer.
+  const [avertServeur, setAvertServeur] = useState<string[] | null>(null)
 
   const isOpen = date !== null
 
@@ -338,16 +341,29 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
     return null
   }
 
-  async function performSave() {
+  async function performSave(confirmerAvertissements = false) {
     if (!garde) return
     setSaving(true)
     try {
       const res = await fetch(`/api/gardes/${garde.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ premier_id: premierSel, second_id: secondSel, force: correctionMode }),
+        body: JSON.stringify({
+          premier_id: premierSel,
+          second_id: secondSel,
+          force: correctionMode,
+          confirmerAvertissements,
+        }),
       })
       const json = await res.json()
+      // Garde-fou serveur (backlog n°12) : véto inactif / en congé validé →
+      // 409 avec la liste des avertissements. On les affiche pour confirmation.
+      if (res.status === 409 && json?.needsConfirmation) {
+        setAvertServeur(Array.isArray(json.warnings) && json.warnings.length > 0
+          ? json.warnings
+          : [json.error ?? 'Affectation à confirmer.'])
+        return
+      }
       if (!res.ok) { toast.error(json.error ?? 'Erreur lors de la sauvegarde.'); return }
       toast.success('Garde mise à jour.')
       onSaved()
@@ -548,6 +564,38 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
           onAnnuler={() => setViolation(null)}
         />
       )}
+
+      {/* ── Avertissement métier serveur (véto inactif / en congé) ── */}
+      <Dialog open={!!avertServeur} onOpenChange={(open) => { if (!open) setAvertServeur(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              Affectation à confirmer
+            </DialogTitle>
+          </DialogHeader>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-1 dark:border-amber-800 dark:bg-amber-950/20">
+            {(avertServeur ?? []).map((w, i) => (
+              <p key={i} className="text-xs leading-relaxed text-amber-800 dark:text-amber-300">{w}</p>
+            ))}
+          </div>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Voulez-vous enregistrer cette affectation malgré tout ?
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAvertServeur(null)} disabled={saving}>
+              Annuler
+            </Button>
+            <Button
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              disabled={saving}
+              onClick={async () => { setAvertServeur(null); await performSave(true) }}
+            >
+              Enregistrer quand même
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Confirmation "Corriger" ──────────────────────── */}
       <Dialog open={showCorriger} onOpenChange={(open) => { if (!open) setShowCorriger(false) }}>

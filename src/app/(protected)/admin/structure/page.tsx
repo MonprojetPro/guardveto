@@ -35,6 +35,9 @@ import {
   RelationsCreneauxAdmin, type RelationLigneUI, type CreneauOptionUI,
 } from '@/components/admin/RelationsCreneauxAdmin'
 import { AssistantRelationIA } from '@/components/admin/AssistantRelationIA'
+import {
+  ParametresCabinet, type ParametresCabinetUI,
+} from '@/components/admin/ParametresCabinet'
 
 /** Types de garde connus, dans l'ordre d'affichage (les seuls horodatés par l'aval). */
 const CODES_CONNUS: TypeGardeEngine[] = ['semaine_soir', 'vendredi_soir', 'weekend', 'ferie']
@@ -197,6 +200,27 @@ export default async function StructurePage() {
   const profilsBase = (profilsDb as Omit<ProfilLigne, 'nb_types'>[] | null) ?? []
   const profils: ProfilLigne[] = profilsBase.map((p) => ({ ...p, nb_types: comptes.get(p.id) ?? 0 }))
 
+  // Paramètres du cabinet (#10 b/c/d) : agenda Google + expéditeur Brevo +
+  // adresse (→ zone). RLS cabinets = lecture de SON cabinet uniquement.
+  const { data: cabinetRow } = cabinetId
+    ? await supabase
+        .from('cabinets')
+        .select('google_calendar_id, brevo_from_email, brevo_from_name, adresse, code_postal, ville, zone_scolaire, region_feries')
+        .eq('id', cabinetId)
+        .maybeSingle()
+    : { data: null }
+  const cab = (cabinetRow as Record<string, string | null> | null) ?? {}
+  const parametresCabinet: ParametresCabinetUI = {
+    googleCalendarId: cab.google_calendar_id ?? '',
+    brevoFromEmail: cab.brevo_from_email ?? '',
+    brevoFromName: cab.brevo_from_name ?? '',
+    adresse: cab.adresse ?? '',
+    codePostal: cab.code_postal ?? '',
+    ville: cab.ville ?? '',
+    zoneScolaire: cab.zone_scolaire ?? '',
+    regionFeries: cab.region_feries ?? 'metropole',
+  }
+
   // Horaires éditables par profil (slice 4b, généralisé P3b) : un bloc de
   // cartes par profil, pour TOUS les créneaux codifiés — les 4 types connus
   // (libellé du référentiel) comme les sur-mesure (libellé = nom du catalogue).
@@ -312,6 +336,22 @@ export default async function StructurePage() {
           </p>
         </div>
         <HorairesProfilEditor profils={profilsHoraires} isAdmin={isAdmin} />
+      </section>
+
+      {/* #10 b/c/d — Paramètres du cabinet (agenda Google, emails, adresse→zone). */}
+      <section className="space-y-3">
+        <div>
+          <h2 className="font-heading text-lg font-semibold text-foreground">
+            Paramètres du cabinet
+          </h2>
+          <p className="text-muted-foreground text-sm mt-1 leading-5 max-w-2xl">
+            Réglez l’agenda Google et l’expéditeur des emails propres à votre cabinet,
+            et renseignez votre adresse pour déduire automatiquement votre zone de
+            vacances scolaires.
+            {!isAdmin && ' (Lecture seule — seul l’administrateur peut modifier.)'}
+          </p>
+        </div>
+        <ParametresCabinet valeurs={parametresCabinet} isAdmin={isAdmin} />
       </section>
 
       <a href="/planning" className="inline-block text-sm text-muted-foreground hover:text-foreground transition-colors">

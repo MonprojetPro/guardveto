@@ -114,6 +114,22 @@ export interface SolverInput {
    * Le WEIGHT reste la dimension d'équité `weekend_premier` (WE_PREMIER_ROLE).
    */
   roleAvantageFinancier?: string | null
+  /**
+   * Plafond de TEMPS (ms, horloge murale) du backtracking du seed — garde-fou
+   * serverless (dette technique : pire cas infaisable vicieux non borné). Au-delà,
+   * la recherche est COUPÉE proprement (échec `interrompu`), AVANT le timeout
+   * serverless brutal. NON DÉTERMINISTE (dépend de la machine) : à ne fournir que
+   * sur le chemin serveur (route /generate). Absent (undefined) → aucune coupe au
+   * chrono (tests/bancs = 100 % reproductibles). Le plafond de NŒUDS, lui, est
+   * toujours actif mais fixé très haut (jamais atteint par un cas réalisable).
+   */
+  seedDeadlineMs?: number
+  /**
+   * Plafond de NŒUDS du backtracking du seed (déterministe). Défaut interne très
+   * élevé (`MAX_NOEUDS_SEED`) : jamais atteint par un cas réalisable → byte-identique.
+   * Exposé surtout pour les tests (prouver la coupe sur un cas pathologique).
+   */
+  seedMaxNoeuds?: number
 }
 
 /** Effectif semaine effectif : config si fournie, sinon repli saison (hiver 2 / été 1). */
@@ -149,6 +165,16 @@ export type SolveResult =
        * Optionnel pour rétro-compat ; `joursNonCouverts` reste toujours fourni.
        */
       diagnostic?: DiagnosticImpasse
+      /**
+       * `true` = la recherche a été COUPÉE par le plafond de nœuds/temps du
+       * backtracking (dette technique : pire cas non borné sous le maxDuration
+       * serverless), et NON par une vraie impasse structurelle. On coupe alors
+       * proprement, AVANT le timeout serverless brutal, en le disant à l'admin.
+       * Le diagnostic d'impasse n'est PAS calculé dans ce cas (il re-simule).
+       */
+      interrompu?: boolean
+      /** Message clair d'interruption (présent uniquement si `interrompu`). */
+      raisonInterruption?: string
     }
 
 // ── Types internes ───────────────────────────────────────
@@ -442,6 +468,28 @@ function assignerStep(
 // ── Backtracking ─────────────────────────────────────────
 
 /**
+ * Plafond de NŒUDS par défaut du backtracking du seed (déterministe).
+ * Fixé TRÈS haut : un planning réalisable est trouvé de façon greedy en quelques
+ * centaines à quelques milliers de nœuds (banc d'essai : 12 sem < 5 s). Ce plafond
+ * n'est atteint QUE par un cas pathologique (infaisable vicieux à explosion
+ * combinatoire) → zéro impact sur un cas réel (byte-identique).
+ */
+const MAX_NOEUDS_SEED = 2_000_000
+
+/**
+ * Budget de recherche du backtracking (garde-fou anti-explosion, dette technique).
+ * Mutable, partagé par toute la récursion d'UN seed. `depasse` une fois vrai fait
+ * remonter la pile SANS explorer davantage (échec `interrompu`, pas une impasse).
+ */
+interface SeedBudget {
+  noeuds: number
+  maxNoeuds: number
+  /** Horloge murale absolue (performance.now) au-delà de laquelle on coupe, ou Infinity. */
+  deadline: number
+  depasse: boolean
+}
+
+/**
  * Backtracking récursif.
  *
  * @param steps     Liste ordonnée de toutes les étapes à planifier
@@ -452,6 +500,7 @@ function assignerStep(
  * @param deepest   Référence mutable : index le plus profond atteint (pour diagnostics)
  * @param blocage   Référence mutable : premier créneau réellement sans candidat
  *                  (avec son contexte partiel) — vrai point d'impasse (Lot 1)
+ * @param budget    Référence mutable : plafond de nœuds/temps (coupe propre)
  * @returns         Planning complet si succès, null sinon
  */
 function backtrack(
@@ -466,7 +515,20 @@ function backtrack(
   blocage: { value: Blocage | null },
   calendrier: CalendrierResolu | undefined,
   roleAvantageFinancier: string | null,
+  budget: SeedBudget,
 ): PlanningPartiel | null {
+  // Garde-fou de budget (plafond de nœuds/temps). Une fois dépassé, on remonte
+  // la pile immédiatement sans explorer : coupe PROPRE avant le timeout serverless.
+  if (budget.depasse) return null
+  budget.noeuds++
+  if (
+    budget.noeuds > budget.maxNoeuds ||
+    (budget.deadline !== Infinity && performance.now() > budget.deadline)
+  ) {
+    budget.depasse = true
+    return null
+  }
+
   // Cas de base : toutes les étapes sont planifiées
   if (index === steps.length) return planning
 
@@ -506,8 +568,10 @@ function backtrack(
   // Essaie chaque candidat dans l'ordre de priorité
   for (const vet of candidates) {
     const newPlanning = assignerStep(planning, step, vet.id)
-    const result = backtrack(steps, index + 1, newPlanning, vets, bonusMalus, weights, structure, deepest, blocage, calendrier, roleAvantageFinancier)
+    const result = backtrack(steps, index + 1, newPlanning, vets, bonusMalus, weights, structure, deepest, blocage, calendrier, roleAvantageFinancier, budget)
     if (result !== null) return result
+    // Budget épuisé pendant la descente → on arrête d'essayer d'autres candidats.
+    if (budget.depasse) return null
   }
 
   // Aucun candidat n'a mené à une solution → backtrack
@@ -542,6 +606,19 @@ function genererSeedGreedy(input: SolverInput, avecDiagnostic = true): SolveResu
   const deepest = { value: -1 }
   const blocage: { value: Blocage | null } = { value: null }
 
+  // Budget de recherche (garde-fou anti-explosion). Plafond de nœuds toujours
+  // actif (déterministe, très haut → jamais atteint par un cas réalisable) ;
+  // plafond de TEMPS optionnel (opt-in via input.seedDeadlineMs, chemin serveur).
+  const budget: SeedBudget = {
+    noeuds: 0,
+    maxNoeuds: input.seedMaxNoeuds ?? MAX_NOEUDS_SEED,
+    deadline:
+      typeof input.seedDeadlineMs === 'number' && input.seedDeadlineMs > 0
+        ? performance.now() + input.seedDeadlineMs
+        : Infinity,
+    depasse: false,
+  }
+
   const planning = backtrack(
     steps,
     0,
@@ -553,13 +630,33 @@ function genererSeedGreedy(input: SolverInput, avecDiagnostic = true): SolveResu
     deepest,
     blocage,
     calendrier,
-    roleAvantage
+    roleAvantage,
+    budget,
   )
 
   const dureeMs = Date.now() - t0
 
   if (planning !== null) {
     return { success: true, planning, dureeMs }
+  }
+
+  // ── Interruption par le budget (nœuds/temps) ─────────
+  // La recherche a été coupée AVANT de conclure : ce n'est PAS une impasse
+  // structurelle prouvée. On renvoie un échec EXPLICITE et clair, sans calculer
+  // le diagnostic d'impasse (qui re-simule le seed → re-explosion). L'admin est
+  // invité à assouplir des règles ou réduire la période.
+  if (budget.depasse) {
+    return {
+      success: false,
+      joursNonCouverts: [],
+      planningPartiel: { attributions: [] },
+      dureeMs,
+      interrompu: true,
+      raisonInterruption:
+        'La génération a été interrompue : le planning est trop contraint pour être ' +
+        'résolu dans le temps imparti (recherche trop longue). Assouplissez certaines ' +
+        'règles obligatoires, libérez des disponibilités ou réduisez la période, puis relancez.',
+    }
   }
 
   // ── Impasse ──────────────────────────────────────────

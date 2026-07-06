@@ -183,4 +183,5 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Périodes',      href: '/admin/periodes',      icon: 'CalendarRange', roles: ['admin'] },
   { label: 'Structure',     href: '/admin/structure',     icon: 'Clock',        roles: ['admin'] },
   { label: 'Vétérinaires',  href: '/admin/veterinaires',  icon: 'Users',        roles: ['admin'] },
+  { label: 'Journal e-mails', href: '/admin/journal-emails', icon: 'MailWarning', roles: ['admin'] },
 ]

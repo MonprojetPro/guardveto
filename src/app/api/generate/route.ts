@@ -37,6 +37,11 @@ const VERROU_PERIME_MS = 3 * 60 * 1000
 // Laisse le temps au solver LNS + nettoyage agenda (évite le timeout serverless)
 export const maxDuration = 60
 
+// Plafond de TEMPS du backtracking du seed (dette technique : pire cas infaisable
+// vicieux non borné). Coupe PROPRE bien avant maxDuration (60 s), en gardant ~20 s
+// de marge pour la persistance + le nettoyage agenda.
+const SEED_DEADLINE_MS = 40_000
+
 // ── Helpers ──────────────────────────────────────────────
 
 /**
@@ -206,9 +211,25 @@ export async function POST(req: NextRequest) {
       : []
 
     // ── Génération du planning (solver LNS) ─────────────────────
-    const result = genererPlanningPur(contexte)
+    // seedDeadlineMs : coupe PROPRE du backtracking du seed avant le timeout
+    // serverless brutal (dette technique). Non déterministe → chemin serveur only.
+    const result = genererPlanningPur({ ...contexte, seedDeadlineMs: SEED_DEADLINE_MS })
 
     if (!result.success) {
+      // Interruption par le plafond de nœuds/temps (PAS une impasse prouvée) :
+      // on le dit clairement — sans diagnostic (il re-simule → ré-explosion).
+      if (result.interrompu) {
+        return NextResponse.json({
+          success: false,
+          interrompu: true,
+          error: result.raisonInterruption ?? 'Génération interrompue (calcul trop long).',
+          diagnostic: null,
+          joursNonCouverts: [],
+          creneauxIgnores,
+          dureeMs: result.dureeMs,
+        })
+      }
+
       // Impasse : retourne le rapport complet sans modifier la base.
       // Le diagnostic (créneau bloquant + règles en cause + suggestions) est
       // ÉPHÉMÈRE — on ne persiste rien, on le renvoie tel quel à l'UI.
@@ -407,7 +428,16 @@ export async function POST(req: NextRequest) {
     //    réécriture, avec les ids capturés à l'étape 0. Best-effort : un échec
     //    ne casse pas la génération (la resynchro se fait à la publication).
     try {
-      await supprimerEvenementsParIds(eventIdsAPurger)
+      // #10b — calendarId scopé au cabinet (colonne cabinets.google_calendar_id) ;
+      // fallback env GOOGLE_CALENDAR_ID en aval si la colonne est nulle (pilote).
+      const { data: cab } = await supabase
+        .from('cabinets')
+        .select('google_calendar_id')
+        .eq('id', cabinetId)
+        .single()
+      const calendarId = ((cab as { google_calendar_id?: string | null } | null)
+        ?.google_calendar_id ?? '').trim() || null
+      await supprimerEvenementsParIds(eventIdsAPurger, calendarId)
     } catch (e) {
       console.error('[generate] purge agenda échouée (best-effort):', e)
       await signalerIncidentTechnique(

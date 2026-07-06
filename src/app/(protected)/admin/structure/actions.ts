@@ -1,29 +1,32 @@
 'use server'
 
 // ============================================================
-// GUARDVETO — Server actions « Structure des créneaux » (A3)
+// GUARDVETO — Server actions « Structure des créneaux » (admin)
 // ============================================================
-// Écritures sur creneaux_cabinet (surcouche des horaires PAR CABINET) :
-//   • upsertCreneauCabinet — crée/met à jour l'horaire d'un type (UPSERT
-//     onConflict cabinet_id,code) → le cabinet surcharge le défaut ;
-//   • resetCreneauCabinet  — supprime la ligne → retour au défaut.
+// Point d'entrée UI des écritures de structure d'un cabinet :
+//   • PROFILS de planning (créer par duplication, renommer, saison/effectif,
+//     supprimer) + assistant IA « profil en langage naturel » ;
+//   • HORAIRES par profil (creneau_modele) ;
+//   • CRÉNEAUX sur-mesure (P3b) + activation/désactivation ;
+//   • RELATIONS entre créneaux (ex R8/R9 généralisées, RG4) + assistant IA ;
+//   • PARAMÈTRES du cabinet (#10 : agenda Google, expéditeur Brevo, adresse
+//     → zone scolaire dérivée).
 //
-// Double garde : (1) vérification rôle admin côté serveur (message clair),
-// (2) RLS creneaux_cabinet (migration A1) — write admin-only + isolation
-// RESTRICTIVE par cabinet. Un véto ne peut donc rien écrire, même en appel
-// direct. Le cabinet_id est TOUJOURS dérivé côté serveur (jamais du client),
-// sinon la ligne serait invisible sous RLS.
+// Frontière de confiance commune : assertAdmin côté serveur (message clair) +
+// RLS admin-only / isolation restrictive par cabinet + validation stricte des
+// champs (formats/bornes) avant toute écriture. Le cabinet_id est TOUJOURS
+// dérivé côté serveur (jamais du client). Les écritures sur `cabinets`
+// (sans policy UPDATE large) passent par des RPC SECURITY DEFINER auto-gardées.
 //
-// Frontière de confiance : code/heures/offset validés ici avant toute écriture
-// (formats stricts + bornes), pour ne jamais insérer une valeur que le moteur
-// ou l'agenda ne saurait interpréter.
+// NB : la surcouche cabinet-large `creneaux_cabinet` a été retirée
+// (les horaires sont réglés PAR PROFIL depuis P5 slice 4b).
 // ============================================================
 
 import { createClient } from '@/lib/supabase/server'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
+import { zoneEtRegionDepuisCodePostal } from '@/lib/geo-zone'
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { TypeGardeEngine } from '@/engine/types'
 import { assistantIaDisponible } from '@/lib/ia/proposerRegle'
 import { proposerProfilIA } from '@/lib/ia/proposerProfil'
 import {
@@ -43,9 +46,6 @@ import {
 } from '@/lib/ia/relationSchema'
 
 // ── Référentiels de validation ───────────────────────────────
-const CODES_VALIDES = new Set<TypeGardeEngine>([
-  'semaine_soir', 'vendredi_soir', 'weekend', 'ferie',
-])
 /** 'HH:MM' 24h strict (00:00 → 23:59). */
 const HEURE_RE = /^([01]\d|2[0-3]):[0-5]\d$/
 /** Format d'un code machine de créneau (mêmes bornes que le CHECK SQL). */
@@ -123,107 +123,12 @@ function validerHoraire(p: {
   return null
 }
 
-// ── Payload du formulaire (champs simples) ───────────────────
-export interface UpsertCreneauPayload {
-  code: string
-  heure_debut: string // 'HH:MM'
-  heure_fin: string // 'HH:MM'
-  offset_jours_fin: number // 0..3
-}
-
-/**
- * Crée ou met à jour l'horaire d'un type de créneau pour le cabinet courant.
- * UPSERT sur (cabinet_id, code). L'absence de ligne = horaires par défaut :
- * écrire ici surcharge, réinitialiser (resetCreneauCabinet) revient au défaut.
- */
-export async function upsertCreneauCabinet(payload: UpsertCreneauPayload) {
-  const supabase = await createClient()
-
-  const garde = await assertAdmin(supabase)
-  if ('error' in garde) return garde
-
-  // Validation stricte (frontière de confiance).
-  if (!CODES_VALIDES.has(payload.code as TypeGardeEngine)) {
-    return { error: `Type de créneau inconnu : « ${payload.code} ».` }
-  }
-  if (!HEURE_RE.test(payload.heure_debut)) {
-    return { error: "Heure de début invalide (format attendu HH:MM)." }
-  }
-  if (!HEURE_RE.test(payload.heure_fin)) {
-    return { error: 'Heure de fin invalide (format attendu HH:MM).' }
-  }
-  const offset = payload.offset_jours_fin
-  if (!Number.isInteger(offset) || offset < OFFSET_MIN || offset > OFFSET_MAX) {
-    return { error: `Jour de fin invalide (doit être entre ${OFFSET_MIN} et ${OFFSET_MAX}).` }
-  }
-  // Cohérence : si la garde finit le jour même (offset 0), la fin doit être
-  // strictement après le début. Si elle finit un autre jour (offset ≥ 1),
-  // n'importe quelle heure de fin est cohérente (ex. 18:30 → 08:30 le lendemain).
-  if (offset === 0 && enMinutes(payload.heure_fin) <= enMinutes(payload.heure_debut)) {
-    return {
-      error:
-        "L'heure de fin doit être après l'heure de début, ou la garde doit se "
-        + 'terminer un jour suivant.',
-    }
-  }
-
-  let cabinetId: string
-  try {
-    cabinetId = await resoudreCabinetId(supabase)
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
-  }
-
-  const { error } = await supabase
-    .from('creneaux_cabinet')
-    .upsert(
-      {
-        cabinet_id: cabinetId,
-        code: payload.code,
-        heure_debut: payload.heure_debut,
-        heure_fin: payload.heure_fin,
-        offset_jours_fin: offset,
-        actif: true,
-      },
-      { onConflict: 'cabinet_id,code' },
-    )
-
-  if (error) return { error: error.message }
-  revalidatePath('/admin/structure')
-  return { success: true }
-}
-
-/**
- * Réinitialise un type de créneau : supprime la surcharge du cabinet → le code
- * retombe sur les horaires par défaut (structure-creneaux). Admin-only + RLS.
- */
-export async function resetCreneauCabinet(code: string) {
-  const supabase = await createClient()
-
-  const garde = await assertAdmin(supabase)
-  if ('error' in garde) return garde
-
-  if (!CODES_VALIDES.has(code as TypeGardeEngine)) {
-    return { error: `Type de créneau inconnu : « ${code} ».` }
-  }
-
-  let cabinetId: string
-  try {
-    cabinetId = await resoudreCabinetId(supabase)
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
-  }
-
-  const { error } = await supabase
-    .from('creneaux_cabinet')
-    .delete()
-    .eq('cabinet_id', cabinetId)
-    .eq('code', code)
-
-  if (error) return { error: error.message }
-  revalidatePath('/admin/structure')
-  return { success: true }
-}
+// NOTE (nettoyage dette technique 2026-07-06) : les server actions
+// `upsertCreneauCabinet` / `resetCreneauCabinet` (surcouche horaires cabinet-large
+// `creneaux_cabinet`) ont été SUPPRIMÉES. Leur seul appelant était le composant
+// orphelin `StructureCreneauxClient` (supprimé), et les horaires sont désormais
+// réglés PAR PROFIL via `setHorairesProfilCreneau` (creneau_modele). La table
+// `creneaux_cabinet` est droppée par la migration 20260706200000.
 
 // ════════════════════════════════════════════════════════════
 // P5 slice 4a — Gestionnaire de PROFILS de planning
@@ -1061,4 +966,70 @@ export async function supprimerCreneauSurMesure(creneauId: string) {
   if (error) return { error: error.message }
   revalidatePath('/admin/structure')
   return { success: true }
+}
+
+// ── Paramètres du cabinet (#10 b/c/d) ────────────────────────
+// Dé-câblage des partages « en dur » : agenda Google, expéditeur Brevo et
+// adresse (→ zone scolaire dérivée) réglables PAR CABINET. Écriture via RPC
+// SECURITY DEFINER auto-gardée (la table cabinets n'a pas de policy UPDATE
+// large). Double garde : assertAdmin ici + re-vérification admin DANS la RPC.
+
+/**
+ * #10b + #10c — Règle l'agenda Google (calendarId) et l'expéditeur Brevo
+ * (email + nom) du cabinet. Champs vides → NULL en base → fallback env.
+ */
+export async function configurerPartagesCabinet(input: {
+  googleCalendarId: string
+  brevoFromEmail: string
+  brevoFromName: string
+}) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  const { error } = await supabase.rpc('configurer_partages_cabinet', {
+    p_google_calendar_id: input.googleCalendarId ?? '',
+    p_brevo_from_email: input.brevoFromEmail ?? '',
+    p_brevo_from_name: input.brevoFromName ?? '',
+  })
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/structure')
+  return { success: true }
+}
+
+/**
+ * #10d — Enregistre l'adresse du cabinet ET en DÉRIVE la zone scolaire (A/B/C)
+ * + la région des fériés depuis le code postal (src/lib/geo-zone.ts, table
+ * département→zone). Si la dérivation est incertaine (Corse, DOM, CP invalide),
+ * la zone/région déjà configurée est CONSERVÉE (aucune régression du calendrier).
+ * Retourne la zone/région dérivées pour le retour visuel admin.
+ */
+export async function configurerAdresseCabinet(input: {
+  adresse: string
+  codePostal: string
+  ville: string
+}) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  const { zone, region, departement } = zoneEtRegionDepuisCodePostal(input.codePostal ?? '')
+
+  const { error } = await supabase.rpc('configurer_adresse_cabinet', {
+    p_adresse: input.adresse ?? '',
+    p_code_postal: input.codePostal ?? '',
+    p_ville: input.ville ?? '',
+    p_zone: zone, // null → RPC conserve la valeur existante (COALESCE)
+    p_region: region,
+  })
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/structure')
+  return {
+    success: true as const,
+    derive: { zone, region, departement },
+  }
 }
