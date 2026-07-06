@@ -27,10 +27,10 @@ import { isValid } from './rules/hard-constraints'
 import { DEFAULT_EQUITY_WEIGHTS, DEFAULT_ROLE_AVANTAGE_FINANCIER, type EquityWeights } from './equity-weights'
 import {
   DEFAULT_STRUCTURE_CONFIG, estStructureSouple, penaliteStructureEtage,
-  type StructureConfig,
+  relationsEffectives, type StructureConfig,
 } from './structure-config'
-import { vendrediDeSemaine } from './utils'
-import { vetPourRole, avecVet, attributionVide } from './attribution'
+import { apparierSourcePourCible } from './relations-structure'
+import { vetPourRole, vetsAttribues, avecVet, attributionVide } from './attribution'
 import {
   penaliteR10WEConsecutif,
   penaliteWEAvantVacances,
@@ -257,31 +257,34 @@ export function scorerPlanning(
   // En DUR, R8/R9 bloquent dans isValid → comptées en étage 0 ci-dessus, jamais
   // ici. En SOUPLE, isValid ne bloque pas : on pénalise à l'étage configuré pour
   // que le moteur les PRÉFÈRE sans les imposer. Désactivées → rien.
+  // GÉNÉRIQUE (RG tranche 2) : le couple vendredi↔WE n'est plus câblé — on
+  // parcourt les relations effectives (donnée, repli couple historique) avec le
+  // MÊME appariement d'occurrences que le gardien dur (relations-structure).
   if (estStructureSouple(structure.r9_liaison) || estStructureSouple(structure.r8_inversion)) {
-    for (const a of planning.attributions) {
-      if (a.type !== 'weekend') continue
-      const attrVen = planning.attributions.find(
-        (x) => x.type === 'vendredi_soir' && x.date === vendrediDeSemaine(a.date)
-      )
-      if (!attrVen) continue
+    for (const rel of relationsEffectives(structure)) {
+      for (const a of planning.attributions) {
+        if (a.type !== rel.cibleCode) continue
+        const attrSource = apparierSourcePourCible(planning, rel, a.date)
+        if (!attrSource) continue
 
-      // R9 souple : le binôme du WE diffère de celui du vendredi soir.
-      if (estStructureSouple(structure.r9_liaison)) {
-        const duoWe = [vetPourRole(a, 'premier'), vetPourRole(a, 'second')].filter(Boolean).sort().join('|')
-        const duoVen = [vetPourRole(attrVen, 'premier'), vetPourRole(attrVen, 'second')].filter(Boolean).sort().join('|')
-        if (duoWe !== duoVen) {
-          ajouter(v, structure.r9_liaison.etage, 'R9-souple', penaliteStructureEtage(structure.r9_liaison.etage))
+        // R9 souple : l'équipe de la cible diffère de celle de la source liée.
+        if (rel.genre === 'meme_binome' && estStructureSouple(structure.r9_liaison)) {
+          const equipeCible = vetsAttribues(a).slice().sort().join('|')
+          const equipeSource = vetsAttribues(attrSource).slice().sort().join('|')
+          if (equipeCible !== equipeSource) {
+            ajouter(v, structure.r9_liaison.etage, 'R9-souple', penaliteStructureEtage(structure.r9_liaison.etage))
+          }
         }
-      }
 
-      // R8 souple : un rôle NON changé entre vendredi soir et WE (généralisé
-      // N-places — P4 slice 2 ; pour 2 rôles = rôle 1er/2nd non inversé).
-      if (estStructureSouple(structure.r8_inversion)) {
-        const nonInverse = attrVen.placements.some(
-          (p) => p.vetId !== null && vetPourRole(a, p.role) === p.vetId,
-        )
-        if (nonInverse) {
-          ajouter(v, structure.r8_inversion.etage, 'R8-souple', penaliteStructureEtage(structure.r8_inversion.etage))
+        // R8 souple : un rôle NON changé entre la source et la cible (généralisé
+        // N-places — P4 slice 2 ; pour 2 rôles = rôle 1er/2nd non inversé).
+        if (rel.genre === 'inversion_role' && estStructureSouple(structure.r8_inversion)) {
+          const nonInverse = attrSource.placements.some(
+            (p) => p.vetId !== null && vetPourRole(a, p.role) === p.vetId,
+          )
+          if (nonInverse) {
+            ajouter(v, structure.r8_inversion.etage, 'R8-souple', penaliteStructureEtage(structure.r8_inversion.etage))
+          }
         }
       }
     }

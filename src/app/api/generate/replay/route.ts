@@ -37,7 +37,8 @@ import {
   type RegleCabinetRow,
 } from '@/data/mapReglesCabinet'
 import type { ContexteSimulation, ContrainteEngine } from '@/engine/types'
-import type { CreneauModele } from '@/engine/creneau-modele'
+import type { CreneauModele, GenreRelationCreneau } from '@/engine/creneau-modele'
+import { resoudreRelationsStructure } from '@/engine/relations-structure'
 
 // Laisse le temps au solver LNS
 export const maxDuration = 60
@@ -72,12 +73,23 @@ interface CreneauModeleSnapshotRow {
   ordre: number
 }
 
+/** Ligne `relation_creneau` telle que figée dans le snapshot (schéma v4). */
+interface RelationCreneauSnapshotRow {
+  id: string
+  source_id: string
+  cible_id: string
+  genre: string
+  actif: boolean
+}
+
 /**
  * Forme versionnée du snapshot (schéma >= 2) : photo fidèle des `regles_cabinet`
  * (briques par-véto + équité `equilibrer` + structure R8/R9) + l'effectif figé.
  * À partir du schéma v3 (P5 slice 3d), la STRUCTURE (catalogue de créneaux du
  * profil) est aussi figée → le replay reconstruit les créneaux depuis le snapshot
  * au lieu du catalogue vivant. C'est ce que le moteur consomme réellement.
+ * À partir du schéma v4 (RG tranche 1), les RELATIONS entre créneaux le sont
+ * aussi → le replay rejoue les couples d'alors (ex R8/R9 en donnée).
  */
 interface SnapshotVersionne {
   schema: number
@@ -86,6 +98,7 @@ interface SnapshotVersionne {
   structure?: {
     profil_id?: string | null
     creneau_modele?: CreneauModeleSnapshotRow[]
+    relation_creneau?: RelationCreneauSnapshotRow[]
   }
 }
 
@@ -254,6 +267,23 @@ export async function POST(req: NextRequest) {
       snap.structure?.creneau_modele && snap.structure.creneau_modele.length > 0
         ? creneauxDepuisSnapshot(snap.structure.creneau_modele)
         : undefined
+
+    // RELATIONS figées (v4) : rejouées telles qu'archivées (résolues en codes
+    // via le catalogue du MÊME snapshot). Snapshot ≤ v3 → undefined → repli
+    // couple historique vendredi↔WE — FIDÈLE : ces plannings ont été générés
+    // quand le couple était câblé en dur dans le moteur.
+    if (creneauxSnapshot && snap.structure?.relation_creneau) {
+      structureConfig.relations = resoudreRelationsStructure(
+        snap.structure.relation_creneau.map((r) => ({
+          id: r.id,
+          sourceId: r.source_id,
+          cibleId: r.cible_id,
+          genre: r.genre as GenreRelationCreneau,
+          actif: r.actif,
+        })),
+        creneauxSnapshot,
+      )
+    }
 
     contexteReplay = {
       ...contexte,

@@ -17,7 +17,10 @@ import {
   extraireStructureConfig,
   type RegleCabinetRow,
 } from '@/data/mapReglesCabinet'
-import { chargerCreneauModele, resoudreProfilId, chargerEffectifProfil } from '@/data/chargerCreneauModele'
+import {
+  chargerCreneauModele, chargerRelationsCreneau, resoudreProfilId, chargerEffectifProfil,
+} from '@/data/chargerCreneauModele'
+import { resoudreRelationsStructure } from './relations-structure'
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 
@@ -385,6 +388,16 @@ export async function chargerInputDepuisSupabase(
   const creneaux = cabinetId
     ? await chargerCreneauModele(supabase, cabinetId, profilId)
     : undefined
+
+  // Relations entre créneaux (RG tranche 2) : résolues ids → codes et portées
+  // par structureConfig (propagé en bloc partout). SEULEMENT si un catalogue
+  // est chargé : sans catalogue (legacy), `relations` reste undefined → repli
+  // couple historique. Avec catalogue, la DONNÉE fait foi — y compris vide
+  // (un cabinet qui supprime ses relations découple réellement ses créneaux).
+  if (cabinetId && creneaux && creneaux.length > 0) {
+    const relationsRows = await chargerRelationsCreneau(supabase, cabinetId, profilId)
+    structureConfig.relations = resoudreRelationsStructure(relationsRows, creneaux)
+  }
 
   return {
     dateDebut: periode.date_debut,

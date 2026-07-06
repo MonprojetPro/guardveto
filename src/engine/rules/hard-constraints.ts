@@ -11,9 +11,11 @@ import {
   estJourFerie, estEnEte, lundiDeSemaine, vendrediDeSemaine, samediDeSemaine, addDays,
 } from '../utils'
 import {
-  DEFAULT_STRUCTURE_CONFIG, estStructureDure,
-  type StructureConfig, type StructureRegleConfig,
+  DEFAULT_STRUCTURE_CONFIG, estStructureDure, relationsEffectives,
+  RELATIONS_STRUCTURE_DEFAUT,
+  type StructureConfig, type StructureRegleConfig, type RelationStructure,
 } from '../structure-config'
+import { apparierSourcePourCible, apparierCiblePourSource } from '../relations-structure'
 import { estAttribue, vetPourRole, roleDuVet } from '../attribution'
 
 // ── Helpers internes ────────────────────────────────────
@@ -344,90 +346,108 @@ function checkR7DernierRecours(vet: VetEngine): ValidationResult {
   return ok()
 }
 
-/**
- * Message R8 (inversion). Préserve le libellé historique pour premier/second ;
- * générique au-delà (N-places — P4 slice 2). Le sens : « ton rôle du week-end
- * doit être DIFFÉRENT de celui du vendredi soir » (pour 2 rôles = inversion 1er/2nd).
- */
-function messageR8(prenom: string, roleVen: string): string {
-  if (roleVen === 'premier') return `R8 : ${prenom} était 1er vendredi soir → doit être 2nd ce week-end`
-  if (roleVen === 'second') return `R8 : ${prenom} était 2nd vendredi soir → doit être 1er ce week-end`
-  return `R8 : ${prenom} avait le rôle « ${roleVen} » vendredi soir → doit changer de rôle ce week-end`
+/** Le couple historique (messages legacy conservés mot pour mot pour lui). */
+function estCoupleHistorique(rel: RelationStructure): boolean {
+  return rel.sourceCode === 'vendredi_soir' && rel.cibleCode === 'weekend'
 }
 
 /**
- * R8 — Inversion des rôles entre vendredi soir et WE (réglable).
+ * Message R8 (inversion). Préserve le libellé historique pour le couple
+ * vendredi↔WE (et premier/second — P4 slice 2) ; générique au-delà.
+ * Le sens : « ton rôle sur le créneau cible doit être DIFFÉRENT de celui
+ * tenu sur le créneau source lié » (pour 2 rôles = inversion 1er/2nd).
+ */
+function messageR8(prenom: string, roleSource: string, rel: RelationStructure): string {
+  if (estCoupleHistorique(rel)) {
+    if (roleSource === 'premier') return `R8 : ${prenom} était 1er vendredi soir → doit être 2nd ce week-end`
+    if (roleSource === 'second') return `R8 : ${prenom} était 2nd vendredi soir → doit être 1er ce week-end`
+    return `R8 : ${prenom} avait le rôle « ${roleSource} » vendredi soir → doit changer de rôle ce week-end`
+  }
+  return `R8 : ${prenom} avait le rôle « ${roleSource} » sur « ${rel.sourceCode} » → doit changer de rôle sur « ${rel.cibleCode} »`
+}
+
+/**
+ * R8 — Inversion des rôles entre créneaux liés (réglable).
  *
- * Sémantique généralisée (P4 slice 2) : le rôle qu'un véto occupe le week-end
- * doit être DIFFÉRENT de celui qu'il occupait le vendredi soir. Pour le défaut à
- * 2 rôles [premier, second], « différent » ⇔ « inversé » (1er↔2nd) → BYTE-IDENTIQUE
- * à l'ancien code, mais sans présumer les noms de rôle : ça vaut pour N places.
- *
- * (Le COUPLE vendredi_soir↔weekend reste, lui, en dur : sa généralisation via le
- * modèle `RelationCreneau` viendra quand des structures custom existeront — P5.)
+ * GÉNÉRIQUE (RG tranche 2) : le couple n'est plus câblé vendredi↔WE — chaque
+ * relation `inversion_role` (donnée, repli couple historique) impose que le
+ * rôle tenu sur l'occurrence CIBLE diffère de celui tenu sur l'occurrence
+ * SOURCE appariée (adjacence, cf. relations-structure). Sémantique N-places
+ * (P4 slice 2) conservée : « différent », sans présumer les noms de rôle.
  */
 function checkR8Inversion(
   vet: VetEngine,
   slot: SlotGarde,
   roleVisé: RoleGarde,
   planning: PlanningPartiel,
-  cfg: StructureRegleConfig = DEFAULT_STRUCTURE_CONFIG.r8_inversion
+  cfg: StructureRegleConfig = DEFAULT_STRUCTURE_CONFIG.r8_inversion,
+  relations: readonly RelationStructure[] = RELATIONS_STRUCTURE_DEFAUT
 ): ValidationResult {
   // Désactivée ou souple → ne bloque pas (souple = pénalité gérée au scoring).
   if (!estStructureDure(cfg)) return ok()
-  if (slot.type !== 'weekend') return ok()
 
-  const ven = vendrediDeSemaine(slot.date)
-  const attrVen = getAttribution(planning, ven, 'vendredi_soir')
-  if (!attrVen) return ok()
+  for (const rel of relations) {
+    if (rel.genre !== 'inversion_role' || slot.type !== rel.cibleCode) continue
+    const attrSource = apparierSourcePourCible(planning, rel, slot.date)
+    if (!attrSource) continue // source non planifiée / hors fenêtre → pas de contrainte
 
-  // Le rôle du week-end doit différer de celui tenu le vendredi soir.
-  const roleVen = roleDuVet(attrVen, vet.id)
-  if (roleVen !== null && roleVisé === roleVen) {
-    return invalid(messageR8(vet.prenom, roleVen))
+    // Le rôle sur la cible doit différer de celui tenu sur la source liée.
+    const roleSource = roleDuVet(attrSource, vet.id)
+    if (roleSource !== null && roleVisé === roleSource) {
+      return invalid(messageR8(vet.prenom, roleSource, rel))
+    }
   }
 
   return ok()
 }
 
+/** Messages R9 : libellés historiques pour le couple vendredi↔WE, génériques sinon. */
+function messageR9Cible(prenom: string, rel: RelationStructure): string {
+  return estCoupleHistorique(rel)
+    ? `R9 : ${prenom} n'est pas dans le duo du vendredi soir — le WE doit avoir les mêmes vétérinaires`
+    : `R9 : ${prenom} n'est pas dans l'équipe de « ${rel.sourceCode} » — « ${rel.cibleCode} » doit avoir les mêmes vétérinaires`
+}
+function messageR9Source(prenom: string, rel: RelationStructure): string {
+  return estCoupleHistorique(rel)
+    ? `R9 : ${prenom} n'est pas dans le duo WE — le vendredi soir doit avoir les mêmes vétérinaires`
+    : `R9 : ${prenom} n'est pas dans l'équipe de « ${rel.cibleCode} » — « ${rel.sourceCode} » doit avoir les mêmes vétérinaires`
+}
+
 /**
- * R9 — Vendredi soir lié au WE (même duo)
- * Les vétos du WE doivent être les mêmes que vendredi soir.
+ * R9 — Créneaux liés = même équipe (réglable).
+ *
+ * GÉNÉRIQUE (RG tranche 2) : chaque relation `meme_binome` (donnée, repli
+ * couple historique vendredi↔WE) impose que l'occurrence CIBLE et l'occurrence
+ * SOURCE appariée portent les MÊMES vétérinaires. Contrôlé dans les deux sens
+ * (on planifie la cible en regardant la source déjà posée, et inversement).
  */
 function checkR9VendrediLieWE(
   vet: VetEngine,
   slot: SlotGarde,
   planning: PlanningPartiel,
-  cfg: StructureRegleConfig = DEFAULT_STRUCTURE_CONFIG.r9_liaison
+  cfg: StructureRegleConfig = DEFAULT_STRUCTURE_CONFIG.r9_liaison,
+  relations: readonly RelationStructure[] = RELATIONS_STRUCTURE_DEFAUT
 ): ValidationResult {
   // Désactivée ou souple → ne bloque pas (souple = pénalité gérée au scoring).
   if (!estStructureDure(cfg)) return ok()
-  if (slot.type === 'weekend') {
-    // Vérifie que le vendredi soir a déjà des assignations cohérentes
-    const ven = vendrediDeSemaine(slot.date)
-    const attrVen = getAttribution(planning, ven, 'vendredi_soir')
-    if (!attrVen) return ok() // vendredi pas encore planifié → ok
 
-    // Le véto doit être dans le duo du vendredi soir
-    const dansVendredi = estAttribue(attrVen, vet.id)
-    if (!dansVendredi) {
-      return invalid(
-        `R9 : ${vet.prenom} n'est pas dans le duo du vendredi soir — le WE doit avoir les mêmes vétérinaires`
-      )
+  for (const rel of relations) {
+    if (rel.genre !== 'meme_binome') continue
+
+    if (slot.type === rel.cibleCode) {
+      // On planifie la CIBLE : le véto doit être dans l'équipe de la source liée.
+      const attrSource = apparierSourcePourCible(planning, rel, slot.date)
+      if (attrSource && !estAttribue(attrSource, vet.id)) {
+        return invalid(messageR9Cible(vet.prenom, rel))
+      }
     }
-  }
 
-  if (slot.type === 'vendredi_soir') {
-    // Vérifie la cohérence avec le WE si déjà planifié
-    const sam = samediDeSemaine(slot.date)
-    const attrWe = getAttribution(planning, sam, 'weekend')
-    if (!attrWe) return ok()
-
-    const dansWe = estAttribue(attrWe, vet.id)
-    if (!dansWe) {
-      return invalid(
-        `R9 : ${vet.prenom} n'est pas dans le duo WE — le vendredi soir doit avoir les mêmes vétérinaires`
-      )
+    if (slot.type === rel.sourceCode) {
+      // On planifie la SOURCE : cohérence avec la cible liée si déjà posée.
+      const attrCible = apparierCiblePourSource(planning, rel, slot.date)
+      if (attrCible && !estAttribue(attrCible, vet.id)) {
+        return invalid(messageR9Source(vet.prenom, rel))
+      }
     }
   }
 
@@ -761,6 +781,10 @@ export function isValid(
   calendrier?: CalendrierResolu,
   structure: StructureConfig = DEFAULT_STRUCTURE_CONFIG
 ): ValidationResult {
+  // Relations entre créneaux liés (RG tranche 2) : la donnée si chargée,
+  // sinon le couple historique vendredi↔WE — mêmes couples pour R8 et R9.
+  const relations = relationsEffectives(structure)
+
   const checks: ValidationResult[] = [
     checkR16Conge(vet, slot),
     checkR17Ete(slot, roleVisé),
@@ -770,18 +794,16 @@ export function isValid(
     checkR2IndispoCyclique(vet, slot, calendrier),
     checkR3ReposConditionnel(vet, slot, planning),
     checkR6DuoInterdit(vet, slot, planning, allVets),
-    checkR9VendrediLieWE(vet, slot, planning, structure.r9_liaison),
+    checkR9VendrediLieWE(vet, slot, planning, structure.r9_liaison, relations),
     checkR21RolesDistincts(vet, slot, roleVisé, planning),
     checkR22UneGardeParJour(vet, slot, planning),
     checkAuPlusN(vet, slot, planning),
     checkEspacementMin(vet, slot, planning),
     checkEspacementWeekend(vet, slot, planning),
+    // R8 : ne s'applique que si slot.type est la CIBLE d'une relation
+    // inversion_role (le check filtre lui-même — générique, plus de « WE only »).
+    checkR8Inversion(vet, slot, roleVisé, planning, structure.r8_inversion, relations),
   ]
-
-  // R8 uniquement pour les WE
-  if (slot.type === 'weekend') {
-    checks.push(checkR8Inversion(vet, slot, roleVisé, planning, structure.r8_inversion))
-  }
 
   // Renvoie la première contrainte violée
   for (const result of checks) {
