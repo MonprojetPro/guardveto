@@ -118,3 +118,28 @@ Le message disait « plafond trop élevé (maximum 14) ». MiKL : *le 14 est arb
 - **2026-06-01 — Suppression d'un rôle = traquer TOUS les résidus** : retirer le rôle « secretaire » a nécessité base + policies RLS + code + doc (migration 012). Un résidu = faille ou bug.
 - **2026-06-01 — `node_modules` corrompu en dossier OneDrive** : réinstallation complète nécessaire ; ESLint 9 = flat config native via `eslint-config-next`.
 - **2026-06-01 — Résidu d'outil dev en prod** : un script live-reload `localhost:8400` (outil `impeccable`) traînait dans `layout.tsx` et serait parti en prod. Vérifier les résidus d'outillage avant livraison.
+
+## 2026-07-06 — P3b : généraliser un type fermé, la checklist des points de silence
+
+**Contexte** : rendre les créneaux sur-mesure planifiables a exigé d'ouvrir l'union
+`TypeGardeEngine` fermée. La recon a recensé 27 fichiers touchant le trio de codes.
+
+**Leçons** :
+1. **Un « byte-identique » non testé n'existe pas.** Les goldens du moteur
+   n'exerçaient que le chemin legacy (aucun ne passait `input.creneaux`) — la
+   preuve d'équivalence catalogue-défaut ↔ legacy était un commentaire, pas un
+   test. Réflexe : AVANT de généraliser un chemin, écrire le test d'équivalence
+   qui fige l'existant (`tests/engine/p3b-sur-mesure.test.ts`).
+2. **Chercher la règle absente, pas seulement les règles cassées.** « Pas deux
+   gardes le même jour pour un même véto » n'existait nulle part : R21 couvre le
+   même créneau, `espacement_min` saute explicitement le même jour. Invisible
+   tant qu'un seul créneau/jour existait — béant dès le multi-créneaux (R22 créée).
+3. **Les mappings réducteurs sont des complices en chaîne.** `mapTypeGardeEnDb`
+   (4→3), `mapDbTypeToEngine` (3→2), `typeEngineVersCodeCreneau` (switch fermé),
+   le CHECK SQL et le dictionnaire `CRENEAUX[type]` devaient être levés ENSEMBLE :
+   en oublier UN = crash (horaires), perte silencieuse (UNIQUE collision +
+   ignoreDuplicates) ou violations fantômes (gate de publication qui aplatit).
+   Réflexe : griller le chemin complet type-par-type du moteur jusqu'au PDF.
+4. **Les colonnes V1 perdent de l'info (labels + places >2)** : toute
+   reconstruction depuis `gardes` doit repasser par le catalogue (rôles) et le
+   miroir `garde_placements`, sinon la couverture du validateur ment.
