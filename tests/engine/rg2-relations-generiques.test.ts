@@ -19,6 +19,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { genererPlanningPur, type SolverInput } from '@/engine/solver'
+import { validerPlanning, type ValidationInput } from '@/engine/validation/validerPlanning'
 import {
   isValid, checkR8Inversion, checkR9VendrediLieWE,
 } from '@/engine/rules/hard-constraints'
@@ -285,5 +286,106 @@ describe('bout-en-bout — meme_binome sur deux créneaux sur-mesure (mar → me
       expect(venLie).toBeDefined()
       expect(vetsAttribues(we).sort()).toEqual(vetsAttribues(venLie!).sort())
     }
+  })
+
+  // ── Tranche 3 : le VALIDATEUR INDÉPENDANT voit les mêmes relations ──
+  it('validateur : le planning généré ne porte AUCUNE violation (les deux gardiens d’accord)', () => {
+    if (!result.success) return
+    const vInput: ValidationInput = {
+      dateDebut: '2026-01-05', dateFin: '2026-02-01', saison: 'hiver',
+      vets, creneaux: catalogue, structureConfig: input.structureConfig,
+    }
+    expect(validerPlanning(result.planning, vInput)).toEqual([])
+  })
+
+  it('validateur : casser l’équipe d’un sm_soir → violation R9 DÉTECTÉE sur le type custom', () => {
+    if (!result.success) return
+    const soir = result.planning.attributions.find((a) => a.type === 'sm_soir')!
+    const intrus = vets.find((v) => !vetsAttribues(soir).includes(v.id))!
+    const casse = {
+      attributions: result.planning.attributions.map((a) =>
+        a === soir
+          ? { ...a, placements: [{ role: 'premier', vetId: intrus.id }, a.placements[1]] }
+          : a,
+      ),
+    }
+    const vInput: ValidationInput = {
+      dateDebut: '2026-01-05', dateFin: '2026-02-01', saison: 'hiver',
+      vets, creneaux: catalogue, structureConfig: input.structureConfig,
+    }
+    const violations = validerPlanning(casse, vInput)
+    expect(violations.some((v) => v.regle === 'R9' && v.type === 'sm_soir')).toBe(true)
+  })
+})
+
+// ── G. Validateur indépendant — la donnée fait foi (anti-fantôme) ──
+
+describe('validerPlanning — relations génériques (tranche 3)', () => {
+  const ferme2 = { actif: true, etage: 2 }
+  // Vendredi {A,B} / week-end {C,D} : couple historique violé SI appliqué.
+  const planningDecouple: PlanningPartiel = {
+    attributions: [
+      attr('2026-01-09', 'vendredi_soir', 'A', 'B'),
+      attr('2026-01-10', 'weekend', 'C', 'D'),
+    ],
+  }
+  const base: ValidationInput = {
+    dateDebut: '2026-01-09', dateFin: '2026-01-11', saison: 'hiver',
+    vets: ALL,
+  }
+
+  it('relations ABSENTES (undefined) → repli couple historique : R9 signalée', () => {
+    expect(validerPlanning(planningDecouple, base).some((v) => v.regle === 'R9')).toBe(true)
+  })
+
+  it('relations = [] → découplage réel : AUCUNE violation R8/R9 (pas de fantôme)', () => {
+    const v = validerPlanning(planningDecouple, {
+      ...base,
+      structureConfig: { r9_liaison: ferme2, r8_inversion: ferme2, relations: [] },
+    })
+    expect(v.some((x) => x.regle === 'R9' || x.regle === 'R8')).toBe(false)
+  })
+
+  it('relation custom violée → R9 signalée sur les types custom, pas sur le couple historique', () => {
+    // Matin {A,B} / soir {C,D} le même jour, liés meme_binome.
+    const p: PlanningPartiel = {
+      attributions: [attr('2026-01-06', 'sm_matin', 'A', 'B'), attr('2026-01-06', 'sm_soir', 'C', 'D')],
+    }
+    const v = validerPlanning(p, {
+      ...base,
+      dateDebut: '2026-01-06', dateFin: '2026-01-06',
+      structureConfig: { r9_liaison: ferme2, r8_inversion: ferme2, relations: [REL_MEME] },
+    })
+    const r9 = v.filter((x) => x.regle === 'R9')
+    expect(r9).toHaveLength(1)
+    expect(r9[0].type).toBe('sm_soir')
+    expect(r9[0].detail).toContain('sm_matin')
+  })
+
+  it('relation custom inversion_role : rôle conservé → R8 signalée avec le véto fautif', () => {
+    const p: PlanningPartiel = {
+      attributions: [attr('2026-01-06', 'sm_matin', 'A', 'B'), attr('2026-01-06', 'sm_soir', 'A', 'C')],
+    }
+    const v = validerPlanning(p, {
+      ...base,
+      dateDebut: '2026-01-06', dateFin: '2026-01-06',
+      structureConfig: { r9_liaison: { actif: false, etage: 2 }, r8_inversion: ferme2, relations: [REL_INV] },
+    })
+    const r8 = v.filter((x) => x.regle === 'R8')
+    expect(r8).toHaveLength(1)
+    expect(r8[0].vetId).toBe('A') // A garde le rôle premier du matin au soir
+    expect(r8[0].type).toBe('sm_soir')
+  })
+
+  it('réglage souple → le validateur se tait aussi sur les relations custom', () => {
+    const p: PlanningPartiel = {
+      attributions: [attr('2026-01-06', 'sm_matin', 'A', 'B'), attr('2026-01-06', 'sm_soir', 'C', 'D')],
+    }
+    const v = validerPlanning(p, {
+      ...base,
+      dateDebut: '2026-01-06', dateFin: '2026-01-06',
+      structureConfig: { r9_liaison: { actif: true, etage: 4 }, r8_inversion: ferme2, relations: [REL_MEME] },
+    })
+    expect(v.some((x) => x.regle === 'R9')).toBe(false)
   })
 })

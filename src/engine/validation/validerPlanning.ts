@@ -36,8 +36,8 @@ import type {
 } from '../types'
 import { normaliserContraintesVets } from '../normaliserContraintes'
 import {
-  DEFAULT_STRUCTURE_CONFIG, estStructureDure,
-  type StructureConfig,
+  DEFAULT_STRUCTURE_CONFIG, estStructureDure, RELATIONS_STRUCTURE_DEFAUT,
+  type StructureConfig, type RelationStructure,
 } from '../structure-config'
 import type { CreneauModele } from '../creneau-modele'
 
@@ -112,10 +112,6 @@ function lundiDe(date: string): string {
   const diff = j === 0 ? -6 : 1 - j
   d.setUTCDate(d.getUTCDate() + diff)
   return d.toISOString().split('T')[0]
-}
-
-function vendrediDe(date: string): string {
-  return plusJours(lundiDe(date), 4)
 }
 
 function samediDe(date: string): string {
@@ -766,53 +762,83 @@ export function validerPlanning(
     }
   }
 
-  // ── R9 — vendredi soir = même duo que le week-end ──
-  // ── R8 — inversion 1er/2nd entre vendredi soir et WE ──
-  // On ne signale ces violations que si la règle est appliquée en DUR (active +
-  // ferme). Souple/désactivée → le moteur a le droit de ne pas la respecter →
-  // pas de violation fantôme. MÊME config que le moteur (les deux gardiens).
+  // ── R9 — créneaux liés = même équipe · R8 — rôles changés entre eux ──
+  // GÉNÉRIQUE (RG tranche 3) : le couple vendredi↔WE n'est plus câblé — les
+  // couples viennent de la DONNÉE (structureConfig.relations ; undefined →
+  // repli couple historique, [] → aucun couple), MÊME précédence que le moteur.
+  // On ne signale une violation que si la règle du GENRE est appliquée en DUR
+  // (active + ferme). Souple/désactivée → pas de violation fantôme.
+  //
+  // APPARIEMENT ré-implémenté INDÉPENDAMMENT (jamais le module du moteur) :
+  // l'occurrence SOURCE appariée à une occurrence cible est l'occurrence
+  // ADJACENTE — on remonte jour par jour (même jour inclus, fenêtre 7 jours) ;
+  // la première occurrence rencontrée décide : le créneau source → appariée ;
+  // une autre occurrence du créneau cible → rien (elle capture la source).
+  // Pour le couple historique, c'est EXACTEMENT le vendredi J-1 du samedi.
   const structure = input.structureConfig ?? DEFAULT_STRUCTURE_CONFIG
   const r9Dur = estStructureDure(structure.r9_liaison)
   const r8Dur = estStructureDure(structure.r8_inversion)
+  const relations = structure.relations ?? RELATIONS_STRUCTURE_DEFAUT
+
+  const FENETRE_LIAISON_JOURS = 7
+  const sourceLiee = (rel: RelationStructure, dateCible: string): AttributionGarde | undefined => {
+    for (let k = 0; k <= FENETRE_LIAISON_JOURS; k++) {
+      const d = plusJours(dateCible, -k)
+      const src = trouver(planning, d, rel.sourceCode)
+      if (src) return src
+      if (k > 0 && trouver(planning, d, rel.cibleCode)) return undefined
+    }
+    return undefined
+  }
+  const coupleHistorique = (rel: RelationStructure): boolean =>
+    rel.sourceCode === 'vendredi_soir' && rel.cibleCode === 'weekend'
+
   for (const a of planning.attributions) {
     if (!r9Dur && !r8Dur) break // les deux assouplies/coupées → rien à contrôler
-    if (a.type !== 'weekend') continue
-    const ven = vendrediDe(a.date)
-    const attrVen = trouver(planning, ven, 'vendredi_soir')
-    if (!attrVen) continue // pas de vendredi → rien à coupler
+    for (const rel of relations) {
+      if (a.type !== rel.cibleCode) continue
+      const dur = rel.genre === 'meme_binome' ? r9Dur : r8Dur
+      if (!dur) continue
+      const attrSource = sourceLiee(rel, a.date)
+      if (!attrSource) continue // pas d'occurrence source appariée → rien à coupler
 
-    const duoWe = new Set(membres(a))
-    const duoVen = new Set(membres(attrVen))
+      // R9 (meme_binome) : ensembles de vétos identiques.
+      if (rel.genre === 'meme_binome') {
+        const equipeCible = new Set(membres(a))
+        const equipeSource = new Set(membres(attrSource))
+        const memesMembres =
+          equipeCible.size === equipeSource.size && [...equipeCible].every((m) => equipeSource.has(m))
+        if (!memesMembres) {
+          violations.push({
+            regle: 'R9',
+            date: a.date,
+            type: a.type,
+            detail: coupleHistorique(rel)
+              ? `R9 : le duo WE [${[...equipeCible].join(',')}] diffère du duo vendredi soir [${[...equipeSource].join(',')}] (semaine du ${attrSource.date})`
+              : `R9 : l'équipe de « ${rel.cibleCode} » [${[...equipeCible].join(',')}] diffère de celle de « ${rel.sourceCode} » [${[...equipeSource].join(',')}] (${attrSource.date})`,
+          })
+        }
+      }
 
-    // R9 : ensembles identiques (seulement si R9 est dure)
-    const memesMembres =
-      duoWe.size === duoVen.size && [...duoWe].every((m) => duoVen.has(m))
-    if (r9Dur && !memesMembres) {
-      violations.push({
-        regle: 'R9',
-        date: a.date,
-        type: 'weekend',
-        detail: `R9 : le duo WE [${[...duoWe].join(',')}] diffère du duo vendredi soir [${[...duoVen].join(',')}] (semaine du ${ven})`,
-      })
-    }
-
-    // R8 : inversion des rôles (seulement si R8 est dure). Généralisé N-places
-    // (P4 slice 2) : pour CHAQUE place, si le véto qui la tenait vendredi soir la
-    // tient ENCORE le week-end → rôle non changé → violation. Pour 2 rôles, ce
-    // sont exactement les deux contrôles 1er/2nd historiques (messages conservés).
-    if (r8Dur) {
-      for (const p of attrVen.placements) {
-        const venR = p.vetId
-        if (!venR) continue
-        if (vetRole(a, p.role) !== venR) continue
-        const prenom = vetsById.get(venR)?.prenom ?? venR
-        const detail =
-          p.role === 'premier'
-            ? `R8 : ${prenom} est 1er vendredi soir ET 1er le WE — l'inversion impose 2nd le WE (${a.date})`
-            : p.role === 'second'
-              ? `R8 : ${prenom} est 2nd vendredi soir ET 2nd le WE — l'inversion impose 1er le WE (${a.date})`
-              : `R8 : ${prenom} garde le rôle « ${p.role} » du vendredi au WE — l'inversion impose d'en changer (${a.date})`
-        violations.push({ regle: 'R8', date: a.date, type: 'weekend', vetId: venR, detail })
+      // R8 (inversion_role) : généralisé N-places (P4 slice 2) — pour CHAQUE
+      // place, si le véto qui la tenait sur la source la tient ENCORE sur la
+      // cible → rôle non changé → violation. Pour 2 rôles, ce sont exactement
+      // les deux contrôles 1er/2nd historiques (messages conservés).
+      if (rel.genre === 'inversion_role') {
+        for (const p of attrSource.placements) {
+          const vetSrc = p.vetId
+          if (!vetSrc) continue
+          if (vetRole(a, p.role) !== vetSrc) continue
+          const prenom = vetsById.get(vetSrc)?.prenom ?? vetSrc
+          const detail = coupleHistorique(rel)
+            ? p.role === 'premier'
+              ? `R8 : ${prenom} est 1er vendredi soir ET 1er le WE — l'inversion impose 2nd le WE (${a.date})`
+              : p.role === 'second'
+                ? `R8 : ${prenom} est 2nd vendredi soir ET 2nd le WE — l'inversion impose 1er le WE (${a.date})`
+                : `R8 : ${prenom} garde le rôle « ${p.role} » du vendredi au WE — l'inversion impose d'en changer (${a.date})`
+            : `R8 : ${prenom} garde le rôle « ${p.role} » de « ${rel.sourceCode} » à « ${rel.cibleCode} » — les rôles doivent changer (${a.date})`
+          violations.push({ regle: 'R8', date: a.date, type: a.type, vetId: vetSrc, detail })
+        }
       }
     }
   }
