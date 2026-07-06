@@ -143,3 +143,17 @@ Le message disait « plafond trop élevé (maximum 14) ». MiKL : *le 14 est arb
 4. **Les colonnes V1 perdent de l'info (labels + places >2)** : toute
    reconstruction depuis `gardes` doit repasser par le catalogue (rôles) et le
    miroir `garde_placements`, sinon la couverture du validateur ment.
+
+---
+
+## 2026-07-06 — RG2 : généraliser une règle structurelle sans champ de mines (relations en donnée)
+
+**Contexte :** verrou n°4 du doc 09 — R8/R9 étaient câblées sur le couple `vendredi_soir↔weekend` dans 3 couches moteur (contrainte dure, pénalité souple, et le repli du validateur). Objectif : les étendre aux types sur-mesure via des relations en donnée, en byte-identique pour l''existant.
+
+**Ce qui a réellement fonctionné :**
+1. **Faire voyager la nouvelle config DANS un objet déjà threadé partout.** `relations` vit DANS `StructureConfig`, déjà propagé en bloc par `resoudreContexte`, la crise, le replay et le diagnostic → zéro nouveau threading, zéro risque de « champ détruit en silence » par une reconstruction champ-par-champ (le piège R11b/resoudreContexte n''existe même pas ici).
+2. **Distinguer `undefined` de `[]`.** `undefined` = pas de donnée chargée (contexte legacy, snapshot ≤ v3) → repli couple historique, FIDÈLE parce que ces plannings ont été générés quand le couple était câblé. `[]` = la donnée dit « zéro relation » → découplage réel voulu. Sans cette distinction, soit le repli écrase la volonté du cabinet, soit les contextes legacy perdent R8/R9.
+3. **L''appariement des occurrences est LA vraie nouveauté conceptuelle** (le reste est mécanique). Règle retenue : adjacence (aucune autre occurrence de l''un ou l''autre créneau entre les deux), même jour inclus (matin+soir), fenêtre 7 jours. Byte-identique à `vendrediDeSemaine` par construction (depuis un samedi, la 1re occurrence en arrière est TOUJOURS le vendredi J-1).
+4. **Écrire les tests custom AVANT de généraliser révèle les angles morts** : c''est en écrivant le cas « matin+soir le même jour » que le balayage k=0 (même jour) s''est avéré manquant — la vision produit (doc 09 : plusieurs gardes/jour) doit piloter les cas de test, pas le code existant.
+
+**Piège restant (assumé, tranche 3) :** le validateur indépendant applique encore le couple historique en dur — sans UI d''édition des relations, aucune divergence possible en pratique, mais toute donnée custom AVANT la tranche 3 produirait des violations fantômes.
