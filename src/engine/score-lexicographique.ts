@@ -188,8 +188,11 @@ export function scorerPlanning(
       a.date < b.date ? -1 : a.date > b.date ? 1 : a.type < b.type ? -1 : 1
     )
     for (const a of ordered) {
-      // premier d'abord (ordre préservé : R18/R19 exigent le 1er posé avant le 2nd)
-      for (const role of ['premier', 'second'] as RoleGarde[]) {
+      // Re-vérifie les places RÉELLES de l'attribution, dans leur ordre déclaré
+      // (généralisé P3b : les rôles custom d'un créneau sur-mesure sont couverts).
+      // Pour le défaut, placements = [premier, second] → itération et ordre
+      // strictement identiques à l'ancien ['premier','second'] en dur.
+      for (const role of a.placements.map((p) => p.role)) {
         const vetId = vetPourRole(a, role)
         if (!vetId) continue
         const vet = vetById.get(vetId)

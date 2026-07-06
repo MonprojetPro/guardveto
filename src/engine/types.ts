@@ -4,6 +4,16 @@
 
 export type JourSemaine = 'lundi' | 'mardi' | 'mercredi' | 'jeudi' | 'vendredi' | 'samedi' | 'dimanche'
 export type TypeGardeEngine = 'semaine_soir' | 'vendredi_soir' | 'weekend' | 'ferie'
+/**
+ * Type d'un créneau tel qu'il circule dans le moteur : le CODE du créneau du
+ * catalogue (`creneau_modele.code`). Les 4 codes historiques (TypeGardeEngine)
+ * gardent leur sémantique câblée (R8/R9/effectif/équité nommée) ; tout autre
+ * code est un créneau SUR-MESURE : planifié génériquement (places du catalogue,
+ * règles keyées sur la DATE, équité d'étalement par code), sans la sémantique
+ * spécifique des types historiques. Un code null n'atteint jamais le moteur
+ * (aucun slot généré — signalé par detecterCreneauxIgnores).
+ */
+export type CodeCreneau = string
 export type Saison = 'ete' | 'hiver'
 /**
  * Label d'une place sur un créneau. **Libre** (P3a-2) : le catalogue décide
@@ -74,7 +84,7 @@ export interface CongeEngine {
 // Un créneau de garde à planifier
 export interface SlotGarde {
   date: string        // ISO yyyy-MM-dd (lundi pour semaine, samedi pour WE)
-  type: TypeGardeEngine
+  type: CodeCreneau
   saison: Saison
   /**
    * Effectif configurable (P1-B/structurelles) : ce créneau a-t-il besoin d'un 2nd ?
@@ -111,7 +121,7 @@ export interface Placement {
  */
 export interface AttributionGarde {
   date: string
-  type: TypeGardeEngine
+  type: CodeCreneau
   placements: Placement[]
 }
 

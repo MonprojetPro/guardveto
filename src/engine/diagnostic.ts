@@ -20,7 +20,7 @@
 // ============================================================
 
 import type {
-  TypeGardeEngine, RoleGarde, VetEngine, SlotGarde, PlanningPartiel, Saison,
+  CodeCreneau, RoleGarde, VetEngine, SlotGarde, PlanningPartiel, Saison,
   CalendrierResolu, ContrainteEngine,
 } from './types'
 import type { JourNonCouvert } from './solver'
@@ -57,7 +57,7 @@ export interface RegleEnCause {
  */
 export interface CreneauBloquant {
   date: string
-  type: TypeGardeEngine
+  type: CodeCreneau
   role: RoleGarde
   /** Règles ayant écarté tous les candidats sur ce créneau (vide au Lot 1). */
   reglesEnCause: RegleEnCause[]
@@ -111,7 +111,7 @@ export interface DiagnosticImpasse {
 /** Étape minimale décrivant un créneau à valider (sous-ensemble du SolverStep). */
 export interface CreneauStep {
   date: string
-  type: TypeGardeEngine
+  type: CodeCreneau
   saison: Saison
   role: RoleGarde
   besoinSecond: boolean

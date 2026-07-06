@@ -40,8 +40,27 @@ const CODES_VALIDES = new Set<TypeGardeEngine>([
 ])
 /** 'HH:MM' 24h strict (00:00 → 23:59). */
 const HEURE_RE = /^([01]\d|2[0-3]):[0-5]\d$/
+/** Format d'un code machine de créneau (mêmes bornes que le CHECK SQL). */
+const CODE_RE = /^[a-z0-9_]{1,60}$/
 const OFFSET_MIN = 0
 const OFFSET_MAX = 3
+/** Bornes d'un créneau sur-mesure (P3b) : de 1 à 4 places. */
+const N_PLACES_MAX = 4
+
+/**
+ * Slug machine d'un créneau sur-mesure : « Garde de jour » → « sm_garde_de_jour ».
+ * Préfixe `sm_` = zéro collision possible avec les 4 codes réservés du seed.
+ * (Même translittération que le backfill SQL 20260706120000.)
+ */
+function slugSurMesure(nom: string): string {
+  const plat = nom
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+  return `sm_${plat || 'creneau'}`.slice(0, 56)
+}
 
 // ── Garde admin (même pattern que /regles) ───────────────────
 async function getAuthVeto(
@@ -452,10 +471,12 @@ export async function creerProfilComplet(payload: CreerProfilCompletPayload) {
     return { error: 'Effectif invalide (1 ou 2).' }
   }
 
-  // Horaires à ajuster : type connu + triplet cohérent (frontière de confiance).
+  // Horaires à ajuster : code au format machine + triplet cohérent (frontière
+  // de confiance). L'EXISTENCE du code dans le profil source est vérifiée plus
+  // bas (codesSource) — les créneaux sur-mesure (P3b) sont donc réglables aussi.
   const overrides = payload.horaires ?? []
   for (const h of overrides) {
-    if (!CODES_VALIDES.has(h.code as TypeGardeEngine)) {
+    if (!CODE_RE.test(h.code)) {
       return { error: `Type de créneau inconnu : « ${h.code} ».` }
     }
     const invalide = validerHoraire(h)
@@ -612,4 +633,173 @@ export async function proposerProfilDepuisTexte(phrase: string): Promise<Proposi
     }
   }
   return { proposition, apercu: apercuProfil(proposition), payload: conv.payload }
+}
+
+// ════════════════════════════════════════════════════════════
+// P3b — Créneaux SUR-MESURE : création / activation / suppression
+// ════════════════════════════════════════════════════════════
+// Le moteur planifie désormais TOUT code non-null du catalogue. Ces actions
+// sont LA porte d'entrée des structures non standard (garde de jour, samedi
+// seul, week-end fractionné…). Frontière de confiance : assertAdmin + RLS +
+// validation stricte de chaque champ, comme le reste du fichier.
+
+/** Les 4 codes du seed — intouchables à la suppression (le défaut = filet). */
+const CODES_SEED = new Set(['semaine_soir', 'vendredi_soir', 'weekend', 'ferie'])
+
+export interface CreerCreneauSurMesurePayload {
+  profil_id: string
+  nom: string
+  /** Jours d'application (0=dim … 6=sam), au moins un. */
+  jours_semaine: number[]
+  heure_debut: string // 'HH:MM'
+  heure_fin: string // 'HH:MM'
+  offset_jours_fin: number // 0..3
+  nb_places: number // 1..N_PLACES_MAX
+  /** Labels des places — longueur = nb_places, distincts. */
+  roles: string[]
+}
+
+/**
+ * Crée un créneau SUR-MESURE dans le catalogue d'un profil. Le code machine
+ * (slug `sm_…`) est dérivé du nom — il devient l'identifiant du créneau dans
+ * tout le pipeline (moteur, gardes, horaires, agenda).
+ */
+export async function creerCreneauSurMesure(payload: CreerCreneauSurMesurePayload) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  const nom = payload.nom?.trim()
+  if (!nom) return { error: 'Le nom du créneau est obligatoire.' }
+  if (nom.length > 60) return { error: 'Le nom du créneau est trop long (60 caractères max).' }
+
+  const jours = [...new Set(payload.jours_semaine ?? [])].sort()
+  if (jours.length === 0) return { error: 'Choisis au moins un jour de la semaine.' }
+  if (jours.some((j) => !Number.isInteger(j) || j < 0 || j > 6)) {
+    return { error: 'Jour de semaine invalide.' }
+  }
+
+  const invalide = validerHoraire(payload)
+  if (invalide) return { error: invalide }
+
+  const nbPlaces = payload.nb_places
+  if (!Number.isInteger(nbPlaces) || nbPlaces < 1 || nbPlaces > N_PLACES_MAX) {
+    return { error: `Nombre de vétérinaires invalide (entre 1 et ${N_PLACES_MAX}).` }
+  }
+  const roles = (payload.roles ?? []).map((r) => r.trim())
+  if (roles.length !== nbPlaces || roles.some((r) => !r || r.length > 30)) {
+    return { error: 'Chaque place doit avoir un nom (30 caractères max).' }
+  }
+  if (new Set(roles).size !== roles.length) {
+    return { error: 'Les noms des places doivent être différents.' }
+  }
+
+  let cabinetId: string
+  try {
+    cabinetId = await resoudreCabinetId(supabase)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
+  }
+
+  // Le profil cible doit appartenir au cabinet (défense en profondeur avec la RLS).
+  const { data: profil } = await supabase
+    .from('profils_planning')
+    .select('id')
+    .eq('id', payload.profil_id)
+    .eq('cabinet_id', cabinetId)
+    .maybeSingle()
+  if (!profil) return { error: 'Profil introuvable pour ce cabinet.' }
+
+  // Ordre : après le dernier créneau du profil.
+  const { data: dernier } = await supabase
+    .from('creneau_modele')
+    .select('ordre')
+    .eq('cabinet_id', cabinetId)
+    .eq('profil_id', payload.profil_id)
+    .order('ordre', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const ordre = ((dernier as { ordre: number } | null)?.ordre ?? 0) + 1
+
+  const { error } = await supabase.from('creneau_modele').insert({
+    cabinet_id: cabinetId,
+    profil_id: payload.profil_id,
+    code: slugSurMesure(nom),
+    nom,
+    jours_semaine: jours,
+    sur_feries: false,
+    heure_debut: payload.heure_debut,
+    heure_fin: payload.heure_fin,
+    offset_jours_fin: payload.offset_jours_fin,
+    nb_places: nbPlaces,
+    roles,
+    actif: true,
+    ordre,
+  })
+
+  if (error) {
+    if (error.code === '23505') {
+      return { error: `Un créneau au nom trop proche existe déjà dans ce profil — choisis un autre nom.` }
+    }
+    return { error: error.message }
+  }
+
+  revalidatePath('/admin/structure')
+  return { success: true }
+}
+
+/**
+ * Active / désactive un créneau du catalogue (seed compris — c'est ainsi qu'un
+ * cabinet remplace le week-end atomique par un samedi + un dimanche sur-mesure).
+ * Un créneau inactif n'émet plus aucun slot à la génération.
+ */
+export async function setCreneauActif(creneauId: string, actif: boolean) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  const { error, count } = await supabase
+    .from('creneau_modele')
+    .update({ actif: actif === true }, { count: 'exact' })
+    .eq('id', creneauId)
+
+  if (error) return { error: error.message }
+  if (count === 0) return { error: 'Créneau introuvable pour ce cabinet.' }
+
+  revalidatePath('/admin/structure')
+  return { success: true }
+}
+
+/**
+ * Supprime un créneau SUR-MESURE. Les 4 créneaux du seed sont intangibles
+ * (les désactiver suffit — le défaut reste le filet de sécurité du cabinet).
+ */
+export async function supprimerCreneauSurMesure(creneauId: string) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  const { data: creneau } = await supabase
+    .from('creneau_modele')
+    .select('code')
+    .eq('id', creneauId)
+    .maybeSingle()
+
+  if (!creneau) return { error: 'Créneau introuvable pour ce cabinet.' }
+  const code = (creneau as { code: string | null }).code
+  if (code !== null && CODES_SEED.has(code)) {
+    return { error: 'Les 4 créneaux de base ne peuvent pas être supprimés — désactive-les si besoin.' }
+  }
+
+  const { error } = await supabase
+    .from('creneau_modele')
+    .delete()
+    .eq('id', creneauId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/structure')
+  return { success: true }
 }

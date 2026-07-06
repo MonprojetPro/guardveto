@@ -81,12 +81,38 @@ export async function revaliderPlanningPublie(
     // 2. Gardes publiées de la période (source de vérité V1).
     const { data: gardes, error } = await supabase
       .from('gardes')
-      .select('date, type, premier_id, second_id')
+      .select('id, date, type, premier_id, second_id')
       .eq('periode_id', periodeId)
       .eq('cabinet_id', cabinetId)
     if (error || !gardes || gardes.length === 0) continue
 
-    const planning = gardesVersPlanningPartiel(gardes as GardeRow[])
+    // 2b. Reconstruction SUR-MESURE (P3b) : rôles du catalogue + miroir
+    //     garde_placements (les colonnes V1 ne portent que 2 places, et des
+    //     labels premier/second — la couverture attend les rôles réels).
+    const rolesParCode: Record<string, string[]> = {}
+    for (const c of ctx.creneaux ?? []) {
+      if (c.code) rolesParCode[c.code] = c.roles
+    }
+    const typesV1 = new Set(['semaine', 'weekend', 'ferie'])
+    const idsSurMesure = (gardes as GardeRow[])
+      .filter((g) => !typesV1.has(g.type))
+      .map((g) => g.id)
+      .filter((id): id is string => Boolean(id))
+    const placementsParGarde: Record<string, { garde_id: string; place_index: number; role: string; veterinaire_id: string | null }[]> = {}
+    if (idsSurMesure.length > 0) {
+      const { data: placs } = await supabase
+        .from('garde_placements')
+        .select('garde_id, place_index, role, veterinaire_id')
+        .in('garde_id', idsSurMesure)
+      for (const p of ((placs ?? []) as { garde_id: string; place_index: number; role: string; veterinaire_id: string | null }[])) {
+        (placementsParGarde[p.garde_id] ??= []).push(p)
+      }
+    }
+
+    const planning = gardesVersPlanningPartiel(gardes as GardeRow[], {
+      rolesParCode,
+      placementsParGarde,
+    })
 
     // 3. Re-validation indépendante.
     const input: ValidationInput = {

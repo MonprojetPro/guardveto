@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/card'
 import { VolontaireConfirm } from '@/components/crise/VolontaireConfirm'
 import type { RoleGarde } from '@/engine/types'
+import { humaniserCodeGarde } from '@/lib/libelles-gardes'
 
 // ── Helpers d'affichage FR ───────────────────────────────
 function formatDateFr(dateIso: string): string {
@@ -43,7 +44,9 @@ function formatDateFr(dateIso: string): string {
 function labelTypeDb(type: string): string {
   if (type === 'weekend') return 'Week-end'
   if (type === 'ferie') return 'Jour férié'
-  return 'Soir de semaine'
+  if (type === 'semaine') return 'Soir de semaine'
+  // Type SUR-MESURE (P3b) : son nom humanisé.
+  return humaniserCodeGarde(type)
 }
 
 function labelRole(role: RoleGarde): string {

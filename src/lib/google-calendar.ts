@@ -13,12 +13,14 @@
 import { google } from 'googleapis'
 import { addDays } from 'date-fns'
 import { horairesResolus, type StructureCreneauxResolue } from '@/engine/structure-creneaux'
+import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
 
 // ── Types internes ───────────────────────────────────────────
 
 export interface GardeEventData {
   date: string              // ISO yyyy-MM-dd
-  type: 'semaine' | 'weekend' | 'ferie'
+  /** Type de la table gardes : 'semaine'/'weekend'/'ferie' ou code sur-mesure (P3b). */
+  type: string
   prenomPremier: string
   prenomSecond: string | null
 }
@@ -64,7 +66,7 @@ function withTime(d: Date, hhmm: string): Date {
 
 function getEventTimes(
   date: string,
-  type: 'semaine' | 'weekend' | 'ferie',
+  type: string,
   structure?: StructureCreneauxResolue,
 ) {
   const baseDate = new Date(date + 'T00:00:00')
@@ -80,8 +82,11 @@ function getEventTimes(
     return { start: start.toISOString(), end: end.toISOString() }
   }
 
-  // semaine → semaine_soir ; ferie → ferie (journée entière, comme en base).
-  const h = horairesResolus(structure, type === 'ferie' ? 'ferie' : 'semaine_soir')
+  // semaine → semaine_soir ; ferie → ferie ; type SUR-MESURE (P3b) → ses
+  // propres horaires, lus du catalogue par code (chargerStructureProfil les
+  // inclut désormais). Fini l'horodatage « soir de semaine » par défaut.
+  const code = type === 'ferie' ? 'ferie' : type === 'semaine' ? 'semaine_soir' : type
+  const h = horairesResolus(structure, code)
   const start = withTime(baseDate, h.heureDebut)
   const end = withTime(addDays(baseDate, h.offsetJoursFin), h.heureFin)
   return { start: start.toISOString(), end: end.toISOString() }
@@ -101,7 +106,10 @@ function buildEventDescription(data: GardeEventData): string {
     ? 'Garde de semaine (soir)'
     : data.type === 'weekend'
     ? 'Garde de week-end'
-    : 'Garde de jour férié'
+    : data.type === 'ferie'
+    ? 'Garde de jour férié'
+    // Type SUR-MESURE (P3b) : son propre libellé — fini le « jour férié » mensonger.
+    : `Garde — ${libelleTypeGardeDb(data.type)}`
 
   // Week-end : R8 — le vendredi soir a les deux mêmes vétos avec les rôles
   // inversés par rapport au samedi/dimanche. On le détaille dans la description.

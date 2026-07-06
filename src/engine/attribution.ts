@@ -12,7 +12,7 @@
 // objets — jamais de mutation en place.
 // ============================================================
 
-import type { AttributionGarde, RoleGarde, TypeGardeEngine } from './types'
+import type { AttributionGarde, CodeCreneau, RoleGarde } from './types'
 
 /** Véto d'une place (par label de rôle), ou null si la place est absente/non pourvue. */
 export function vetPourRole(attr: AttributionGarde, role: RoleGarde): string | null {
@@ -50,7 +50,7 @@ export function vetsAttribues(attr: AttributionGarde): string[] {
  */
 export function attributionVide(
   date: string,
-  type: TypeGardeEngine,
+  type: CodeCreneau,
   roles: RoleGarde[] = ['premier', 'second'],
 ): AttributionGarde {
   return { date, type, placements: roles.map((role) => ({ role, vetId: null })) }

@@ -77,12 +77,12 @@ export async function chargerStructureCabinet(
  * (`creneaux_cabinet`) pour la persistance et l'agenda : un profil « Été » peut
  * ainsi porter des horaires distincts d'« Hiver ».
  *
- * On ne retient que les horaires des 4 types connus (les seuls que l'aval sait
- * horodater) ; un créneau sur-mesure (code null) est ignoré ici. Repli défaut
- * si pas de cabinet / catalogue vide.
+ * Généralisé P3b : TOUT code non-null du catalogue porte ses horaires — les 4
+ * types connus (surcharge du défaut) comme les créneaux SUR-MESURE (entrée
+ * ajoutée, l'aval sait maintenant les horodater). Un créneau à code null reste
+ * ignoré (jamais planifié). Repli défaut si pas de cabinet / catalogue vide.
  *
- * BYTE-IDENTIQUE aujourd'hui : le profil défaut porte les horaires par défaut
- * (seed) — identiques à ce que `creneaux_cabinet` (vide) résolvait.
+ * BYTE-IDENTIQUE pour le catalogue par défaut : mêmes 4 codes, mêmes horaires.
  */
 export async function chargerStructureProfil(
   supabase: SupabaseClient,
@@ -94,10 +94,10 @@ export async function chargerStructureProfil(
   const creneaux = await chargerCreneauModele(supabase, cabinetId, profilId)
   if (creneaux.length === 0) return structureParDefaut()
 
-  const overrides: Partial<Record<TypeGardeEngine, Partial<HorairesCreneau>>> = {}
+  const overrides: Record<string, Partial<HorairesCreneau>> = {}
   for (const c of creneaux) {
-    if (!c.code || !CODES_VALIDES.includes(c.code as TypeGardeEngine)) continue
-    overrides[c.code as TypeGardeEngine] = {
+    if (!c.code) continue
+    overrides[c.code] = {
       heureDebut: c.heureDebut,   // déjà 'HH:MM' (chargerCreneauModele)
       heureFin: c.heureFin,
       offsetJoursFin: c.offsetJoursFin,

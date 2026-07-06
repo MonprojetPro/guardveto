@@ -22,7 +22,7 @@ import { resoudreContexte } from '@/data/resoudreContexte'
 import type {
   VetEngine,
   AttributionGarde,
-  TypeGardeEngine,
+  CodeCreneau,
   RoleGarde,
   CalendrierResolu,
   Saison,
@@ -32,12 +32,19 @@ import { DEFAULT_STRUCTURE_CONFIG, type StructureConfig } from '@/engine/structu
 
 // ── Type DB → moteur ─────────────────────────────────────
 
-/** Type DB des gardes (V1). */
-export type TypeGardeDb = 'semaine' | 'weekend' | 'ferie'
+/** Type DB des gardes : 'semaine'/'weekend'/'ferie' (V1) ou code sur-mesure (P3b). */
+export type TypeGardeDb = string
 
-/** Mappe le type DB d'une garde vers le type moteur (cf. route disponibilites). */
-export function mapDbTypeToEngine(type: string): Extract<TypeGardeEngine, 'semaine_soir' | 'weekend'> {
-  return type === 'weekend' ? 'weekend' : 'semaine_soir'
+/**
+ * Mappe le type DB d'une garde vers le type moteur (cf. route disponibilites).
+ * Généralisé P3b : un code SUR-MESURE passe TEL QUEL (le code EST le type
+ * moteur) — fini l'aplatissement silencieux en 'semaine_soir' qui faisait
+ * évaluer les règles d'un soir de semaine sur une garde de jour.
+ */
+export function mapDbTypeToEngine(type: string): CodeCreneau {
+  if (type === 'weekend') return 'weekend'
+  if (type === 'semaine' || type === 'ferie') return 'semaine_soir'
+  return type
 }
 
 // ── Un créneau impacté par l'absence ─────────────────────
@@ -49,7 +56,7 @@ export interface CreneauImpacte {
   /** Type DB tel que stocké dans `gardes` (pour l'affichage / le re-check). */
   type: TypeGardeDb
   /** Type moteur dérivé (pour proposerReparation). */
-  typeEngine: Extract<TypeGardeEngine, 'semaine_soir' | 'weekend'>
+  typeEngine: CodeCreneau
   /** Rôle libéré par l'absence sur ce créneau. */
   role: RoleGarde
   /** Saison de la période (pour l'effectif / équité). */
@@ -90,13 +97,19 @@ export interface ContexteCrisePeriode {
  * la logique du solver (`effectifSemaine`) pour que la réparation soit cohérente.
  */
 export function besoinSecondCreneau(
-  typeEngine: Extract<TypeGardeEngine, 'semaine_soir' | 'weekend'>,
+  typeEngine: CodeCreneau,
   saison: Saison,
   nbVetosSemaineSoir?: number,
 ): boolean {
   if (typeEngine === 'weekend') return true
-  const effectif = nbVetosSemaineSoir ?? (saison === 'hiver' ? 2 : 1)
-  return effectif >= 2
+  if (typeEngine === 'semaine_soir') {
+    const effectif = nbVetosSemaineSoir ?? (saison === 'hiver' ? 2 : 1)
+    return effectif >= 2
+  }
+  // Type SUR-MESURE : le besoin d'un 2nd = la garde en avait un (colonne V1).
+  // On ne peut pas le déduire du type seul ; le caller passe l'info réelle via
+  // le créneau (second_id présent). Repli conservateur : pas de 2nd exigé.
+  return false
 }
 
 // ── Helpers internes ─────────────────────────────────────

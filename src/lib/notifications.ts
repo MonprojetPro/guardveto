@@ -27,6 +27,7 @@ import {
   contenuAppelVolontaires,
   contenuDepannageConfirme,
 } from './notifications-inapp'
+import { humaniserCodeGarde } from '@/lib/libelles-gardes'
 
 const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
 
@@ -62,7 +63,9 @@ function typeLabel(type: string): string {
   switch (type) {
     case 'weekend': return 'Week-end'
     case 'ferie':   return 'Jour férié'
-    default:        return 'Semaine'
+    case 'semaine': return 'Semaine'
+    // Type SUR-MESURE (P3b) : son nom humanisé, plus jamais « Semaine ».
+    default:        return humaniserCodeGarde(type)
   }
 }
 

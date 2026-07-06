@@ -115,9 +115,14 @@ export async function queryCompteursPlage(
     } else if (g.type === 'ferie') {
       if (p) { p.feries_premier++; p.feries_total++; p.total_gardes++ }
       if (s) { s.feries_second++; s.feries_total++; s.total_gardes++ }
-    } else {
+    } else if (g.type === 'semaine') {
       if (p) { p.sem_premier++; p.sem_total++; p.total_gardes++ }
       if (s) { s.sem_second++; s.sem_total++; s.total_gardes++ }
+    } else {
+      // Type SUR-MESURE (P3b) : compte dans le TOTAL uniquement — même règle
+      // que la vue SQL compteurs_gardes (sinon les deux chemins divergeaient).
+      if (p) p.total_gardes++
+      if (s) s.total_gardes++
     }
   }
 

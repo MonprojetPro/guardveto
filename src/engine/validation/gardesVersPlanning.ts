@@ -19,10 +19,29 @@
 import type { PlanningPartiel, AttributionGarde } from '../types'
 
 export interface GardeRow {
+  /** Id de la garde — sert à retrouver ses placements miroir (P3b). Optionnel. */
+  id?: string
   date: string
-  type: 'semaine' | 'weekend' | 'ferie'
+  /** Type V1 ('semaine'/'weekend'/'ferie') ou code sur-mesure (P3b). */
+  type: string
   premier_id: string | null
   second_id: string | null
+}
+
+/** Une place du miroir `garde_placements` (P3b-1). */
+export interface PlacementRow {
+  garde_id: string
+  place_index: number
+  role: string
+  veterinaire_id: string | null
+}
+
+/** Options de reconstruction pour les types SUR-MESURE (P3b). */
+export interface OptionsSurMesure {
+  /** Rôles du catalogue par code (creneau_modele) — labels attendus par la couverture. */
+  rolesParCode?: Record<string, string[]>
+  /** Placements miroir par garde_id — restaure les places au-delà des 2 colonnes V1. */
+  placementsParGarde?: Record<string, PlacementRow[]>
 }
 
 /** Recule une date ISO yyyy-mm-dd de `n` jours (UTC, pur). */
@@ -39,7 +58,10 @@ export function moinsJours(date: string, n: number): string {
  *   - 'weekend' (samedi)  → attribution `weekend` (rôles natifs)
  *                         + attribution `vendredi_soir` la veille, rôles INVERSÉS
  */
-export function gardesVersPlanningPartiel(gardes: GardeRow[]): PlanningPartiel {
+export function gardesVersPlanningPartiel(
+  gardes: GardeRow[],
+  options?: OptionsSurMesure,
+): PlanningPartiel {
   const attributions: AttributionGarde[] = []
 
   for (const g of gardes) {
@@ -61,7 +83,7 @@ export function gardesVersPlanningPartiel(gardes: GardeRow[]): PlanningPartiel {
           { role: 'second', vetId: g.premier_id }, // 1er du WE → 2nd le vendredi
         ],
       })
-    } else {
+    } else if (g.type === 'semaine' || g.type === 'ferie') {
       // 'semaine' et 'ferie' (férié en semaine) → garde de nuit en semaine.
       attributions.push({
         date: g.date,
@@ -71,6 +93,27 @@ export function gardesVersPlanningPartiel(gardes: GardeRow[]): PlanningPartiel {
           { role: 'second', vetId: g.second_id },
         ],
       })
+    } else {
+      // Type SUR-MESURE (P3b) : le code EST le type moteur — passthrough.
+      // (L'aplatir en 'semaine_soir' créait des collisions de (date, type) et
+      // des violations fantômes au gate de publication.)
+      // Placements : d'abord le MIROIR garde_placements (labels réels + places
+      // au-delà des 2 colonnes V1) ; sinon reconstruction POSITIONNELLE avec
+      // les rôles du catalogue (place 0 → premier_id, place 1 → second_id).
+      const miroir = g.id ? options?.placementsParGarde?.[g.id] : undefined
+      let placements: AttributionGarde['placements']
+      if (miroir && miroir.length > 0) {
+        placements = [...miroir]
+          .sort((a, b) => a.place_index - b.place_index)
+          .map((p) => ({ role: p.role, vetId: p.veterinaire_id }))
+      } else {
+        const roles = options?.rolesParCode?.[g.type] ?? ['premier', 'second']
+        placements = roles.map((role, i) => ({
+          role,
+          vetId: i === 0 ? g.premier_id : i === 1 ? g.second_id : null,
+        }))
+      }
+      attributions.push({ date: g.date, type: g.type, placements })
     }
   }
 

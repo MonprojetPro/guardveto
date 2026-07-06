@@ -58,18 +58,26 @@ export default async function PlanningPage({
 
   // Chargement parallèle : gardes du mois + toutes les périodes + périodes avec gardes (admin)
    
-  const [gardesResult, periodesResult, periodesGardesResult, vetsResult] = await Promise.all([
+  const [gardesResult, periodesResult, periodesGardesResult, vetsResult, nomsTypesResult] = await Promise.all([
     supabase.from('planning_semaine').select('*').gte('date', debut).lte('date', fin).order('date'),
     supabase.from('periodes').select('*').order('date_debut', { ascending: false }).limit(20),
     isAdmin ? supabase.from('gardes').select('periode_id').limit(500) : Promise.resolve({ data: null }),
     isAdmin
       ? supabase.from('veterinaires').select('id, prenom, nom, couleur').eq('actif', true).order('nom')
       : Promise.resolve({ data: null }),
-
+    // Libellés des types SUR-MESURE (P3b) : code → nom du catalogue. RLS scope
+    // au cabinet. Les 3 types V1 gardent leurs libellés historiques.
+    supabase.from('creneau_modele').select('code, nom').not('code', 'is', null),
   ]) as any[]
 
   const gardesDb = gardesResult?.data
   const periodesDb = periodesResult?.data
+
+  // Map code → nom pour l'affichage des types sur-mesure.
+  const nomsTypes: Record<string, string> = {}
+  for (const r of ((nomsTypesResult?.data ?? []) as { code: string; nom: string }[])) {
+    nomsTypes[r.code] = r.nom
+  }
 
   // Période du mois affiché (pour le bouton export PDF des vétos).
   // Côté véto, la RLS ne renvoie que les périodes publiées.
@@ -180,6 +188,7 @@ export default async function PlanningPage({
         isAdmin={isAdmin}
         vets={vetsCrise}
         moiVetId={moiVetId}
+        nomsTypes={nomsTypes}
       />
     </div>
   )

@@ -53,75 +53,47 @@ export function creneauCouvreJour(c: CreneauModele, jourIdx: number, estFerie: b
   return c.joursSemaine.includes(jourIdx)
 }
 
-// ── Détection des créneaux ignorés par le moteur (backlog n°4, tranche 1) ──
-
-/**
- * Codes que le solver sait effectivement planifier aujourd'hui (cf.
- * `stepsForDay` dans solver.ts). `ferie` est À PART : il ne génère pas de slot
- * propre (le férié est une reclassification au scoring), c'est voulu — il ne
- * doit donc jamais déclencher d'avertissement.
- */
-const CODES_PLANIFIABLES = new Set(['semaine_soir', 'vendredi_soir', 'weekend'])
+// ── Détection des créneaux ignorés par le moteur (backlog n°4) ──
 
 /**
  * Un créneau du catalogue que la génération va ignorer EN SILENCE, et pourquoi.
- * - `type_inconnu`   : code sur-mesure (ou null) que le moteur ne sait pas encore
- *                      planifier → aucun slot généré pour ce créneau.
- * - `jour_masque`    : un autre créneau actif couvre le(s) même(s) jour(s) et
- *                      passe avant lui (stepsForDay ne retient que le PREMIER
- *                      créneau actif d'un jour) → ignoré ces jours-là.
+ *
+ * Depuis P3b (créneaux sur-mesure réellement planifiables), tout code non-null
+ * génère de vrais slots — y compris plusieurs créneaux le même jour. Restent
+ * ignorés :
+ * - `sans_code`   : créneau jamais codifié (code null) → aucun slot généré.
+ * - `aucun_jour`  : créneau actif qui ne couvre aucun jour (hors férié) → rien
+ *                   à planifier (configuration probablement incomplète).
+ * `ferie` reste À PART, par design : le férié est une reclassification au
+ * scoring, pas un slot propre — jamais d'avertissement.
  */
 export interface CreneauIgnore {
   id: string
   nom: string
-  raison: 'type_inconnu' | 'jour_masque'
+  raison: 'sans_code' | 'aucun_jour'
   /** Jours concernés (0=dim … 6=sam). Vide si le créneau ne couvre aucun jour. */
   jours: number[]
 }
 
 /**
  * Recense les créneaux ACTIFS du catalogue que le moteur ignorera à la
- * génération. MIROIR EXACT de la sélection de `stepsForDay` (solver.ts) :
- * pour chaque jour, seul le premier créneau actif non-férié est retenu, et
- * seulement si son code fait partie des codes planifiables.
+ * génération. MIROIR EXACT du filtre de `stepsForDay` (solver.ts) et de
+ * `slotsAttendus` (validateur) : actif, non-férié, code non-null → planifié.
  *
- * Catalogue par DÉFAUT (seed 4 types, aucun chevauchement) → tableau vide,
- * garanti par test — aucun bruit pour les cabinets existants.
+ * Catalogue par DÉFAUT (seed 4 types) → tableau vide, garanti par test —
+ * aucun bruit pour les cabinets existants.
  */
 export function detecterCreneauxIgnores(creneaux: CreneauModele[]): CreneauIgnore[] {
-  const ignores = new Map<string, CreneauIgnore>()
-  const signaler = (c: CreneauModele, raison: CreneauIgnore['raison'], jour?: number) => {
-    const existant = ignores.get(c.id)
-    if (existant) {
-      if (jour !== undefined && !existant.jours.includes(jour)) existant.jours.push(jour)
-      return
-    }
-    ignores.set(c.id, {
-      id: c.id, nom: c.nom, raison, jours: jour === undefined ? [] : [jour],
-    })
-  }
-
-  // Créneaux au type non planifiable : ignorés partout, quel que soit le jour.
+  const ignores: CreneauIgnore[] = []
   for (const c of creneaux) {
-    if (!c.actif) continue
-    if (c.code !== null && (c.code === 'ferie' || CODES_PLANIFIABLES.has(c.code))) continue
-    for (const j of c.joursSemaine) signaler(c, 'type_inconnu', j)
-    if (c.joursSemaine.length === 0) signaler(c, 'type_inconnu')
-  }
-
-  // Créneaux masqués : couvrent un jour dont le créneau RETENU est un autre.
-  for (let jour = 0; jour <= 6; jour++) {
-    const couvrants = creneaux.filter(
-      (cr) => cr.actif && !cr.surFeries && cr.joursSemaine.includes(jour),
-    )
-    for (const masque of couvrants.slice(1)) {
-      // Un type inconnu est déjà signalé plus haut (raison plus parlante).
-      if (masque.code === null || !CODES_PLANIFIABLES.has(masque.code)) continue
-      signaler(masque, 'jour_masque', jour)
+    if (!c.actif || c.surFeries || c.code === 'ferie') continue
+    if (c.code === null) {
+      ignores.push({ id: c.id, nom: c.nom, raison: 'sans_code', jours: [...c.joursSemaine] })
+    } else if (c.joursSemaine.length === 0) {
+      ignores.push({ id: c.id, nom: c.nom, raison: 'aucun_jour', jours: [] })
     }
   }
-
-  return [...ignores.values()]
+  return ignores
 }
 
 /**

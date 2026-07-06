@@ -60,6 +60,7 @@ import type {
   DiagnosticImpasse as DiagnosticImpasseData,
   RegleEnCause,
 } from '@/engine/diagnostic'
+import { humaniserCodeGarde } from '@/lib/libelles-gardes'
 
 // ── Types des contrats API (LOT 3) ───────────────────────
 
@@ -130,10 +131,12 @@ function formatDateFr(dateIso: string): string {
   })
 }
 
-function labelType(type: 'semaine' | 'weekend' | 'ferie'): string {
+function labelType(type: string): string {
   if (type === 'weekend') return 'Week-end'
   if (type === 'ferie') return 'Jour férié'
-  return 'Soir de semaine'
+  if (type === 'semaine') return 'Soir de semaine'
+  // Type SUR-MESURE (P3b) : son nom humanisé.
+  return humaniserCodeGarde(type)
 }
 
 function labelRole(role: 'premier' | 'second'): string {

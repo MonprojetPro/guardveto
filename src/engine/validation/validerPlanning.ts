@@ -247,7 +247,8 @@ function membres(a: AttributionGarde | undefined): string[] {
 // (donnée, comme le moteur en P2b), sinon du mapping en dur historique.
 interface SlotAttendu {
   date: string
-  type: 'semaine_soir' | 'vendredi_soir' | 'weekend'
+  /** Code du créneau : historique OU sur-mesure (P3b). */
+  type: string
   /**
    * Places attendues (labels, dans l'ordre) — P3a-2. Vient du catalogue si le
    * cabinet en fournit un (`nbPlaces`/`roles`), sinon du défaut 2-rôles en dur.
@@ -257,80 +258,50 @@ interface SlotAttendu {
 }
 
 /**
- * Places attendues sur un créneau couvrant `idx` (0=dim…6=sam), DÉRIVÉES du
- * catalogue si présent (donnée), sinon du défaut 2-rôles historique. Ré-implémenté
- * ICI (indépendance du solveur). Pour le catalogue par défaut, redonne exactement
- * ['premier'] / ['premier','second'] selon l'effectif — équivalence prouvée.
- */
-function rolesAttendus(
-  input: ValidationInput,
-  idx: number,
-  type: 'semaine_soir' | 'vendredi_soir' | 'weekend',
-): string[] {
-  const effectifSemaine = input.nbVetosSemaineSoir ?? (input.saison === 'hiver' ? 2 : 1)
-  const creneaux = input.creneaux
-  if (creneaux && creneaux.length > 0) {
-    const c = creneaux.find(
-      (cr) => cr.actif && !cr.surFeries && cr.joursSemaine.includes(idx),
-    )
-    if (!c) return []
-    const nbAEmettre = type === 'semaine_soir'
-      ? Math.min(c.nbPlaces, effectifSemaine)
-      : c.nbPlaces
-    return c.roles.slice(0, nbAEmettre)
-  }
-  // Défaut en dur (legacy / hors-cabinet).
-  if (type === 'semaine_soir') return effectifSemaine >= 2 ? ['premier', 'second'] : ['premier']
-  return ['premier', 'second'] // vendredi_soir & weekend
-}
-
-/**
- * Type de créneau couvrant un jour (0=dim…6=sam), DÉRIVÉ du catalogue si présent,
- * sinon mapping en dur historique (miroir de `typeGardePourJour`). Ré-implémenté
- * ICI, sans importer la dérivation du moteur (`typeGardePourJourCatalogue`) : le
- * validateur reste DÉLIBÉRÉMENT indépendant, exactement comme il ré-implémente
- * déjà `jIndex`/`plusJours`. Une divergence entre cette dérivation et celle du
- * solver se traduit alors en violation DÉTECTÉE par le banc d'essai, pas cachée.
+ * Slots attendus sur la période, DÉRIVÉS du catalogue si présent (donnée),
+ * sinon du mapping en dur historique. Ré-implémenté ICI, sans importer la
+ * dérivation du moteur (`stepsForDay`) : le validateur reste DÉLIBÉRÉMENT
+ * indépendant, exactement comme il ré-implémente déjà `jIndex`/`plusJours`.
+ * Une divergence entre cette dérivation et celle du solver se traduit alors
+ * en violation DÉTECTÉE par le banc d'essai, pas cachée.
  *
- * Pour le catalogue PAR DÉFAUT (4 types seed), le résultat est identique au
- * mapping en dur — prouvé par `creneau-modele.test.ts` (côté moteur) et par
- * `p0-validateur-catalogue-equivalence.test.ts` (côté validateur).
- *
- * On ne retient que les 3 types portés par la logique de couverture actuelle ;
- * un code sur-mesure encore inconnu → null (aucun slot attendu tant que P3 ne
- * l'aura pas généralisé). Les créneaux « fériés » (surFeries) sont ignorés :
- * comme pour le moteur, le férié est une reclassification au scoring, pas un slot.
+ * Généralisé P3b : TOUS les créneaux actifs non-fériés couvrant un jour sont
+ * attendus (plus de « premier créneau seulement »), y compris les codes
+ * SUR-MESURE. Seuls un code null (jamais codifié) et 'ferie' (reclassification
+ * au scoring, pas un slot) sont sans slot attendu — même contrat que le moteur.
+ * Seul `semaine_soir` est plafonné par l'effectif configurable. Pour le
+ * catalogue PAR DÉFAUT, le résultat est identique au mapping en dur (banc
+ * d'équivalence).
  */
-function typeCreneauPourJour(
-  input: ValidationInput,
-  idx: number,
-): 'semaine_soir' | 'vendredi_soir' | 'weekend' | null {
-  const creneaux = input.creneaux
-  if (creneaux && creneaux.length > 0) {
-    const c = creneaux.find(
-      (cr) => cr.actif && !cr.surFeries && cr.joursSemaine.includes(idx),
-    )
-    const code = c ? c.code : null
-    return code === 'semaine_soir' || code === 'vendredi_soir' || code === 'weekend'
-      ? code
-      : null
-  }
-  // Repli en dur historique (legacy / hors-cabinet) — miroir de typeGardePourJour.
-  if (idx === 5) return 'vendredi_soir'
-  if (idx === 6) return 'weekend'
-  if (idx >= 1 && idx <= 4) return 'semaine_soir'
-  return null
-}
-
 function slotsAttendus(input: ValidationInput): SlotAttendu[] {
+  const effectifSemaine = input.nbVetosSemaineSoir ?? (input.saison === 'hiver' ? 2 : 1)
   const slots: SlotAttendu[] = []
   let cur = input.dateDebut
   while (cur <= input.dateFin) {
     const idx = jIndex(cur)
-    const t = typeCreneauPourJour(input, idx)
-    if (t) {
-      const roles = rolesAttendus(input, idx, t)
-      if (roles.length > 0) slots.push({ date: cur, type: t, roles })
+    const creneaux = input.creneaux
+    if (creneaux && creneaux.length > 0) {
+      for (const c of creneaux) {
+        if (!c.actif || c.surFeries || !c.joursSemaine.includes(idx)) continue
+        if (c.code === null || c.code === 'ferie') continue
+        const nbAttendu = c.code === 'semaine_soir'
+          ? Math.min(c.nbPlaces, effectifSemaine)
+          : c.nbPlaces
+        const roles = c.roles.slice(0, nbAttendu)
+        if (roles.length > 0) slots.push({ date: cur, type: c.code, roles })
+      }
+    } else {
+      // Repli en dur historique (legacy / hors-cabinet) — miroir de typeGardePourJour.
+      const t = idx === 5 ? 'vendredi_soir'
+        : idx === 6 ? 'weekend'
+        : idx >= 1 && idx <= 4 ? 'semaine_soir'
+        : null
+      if (t) {
+        const roles = t === 'semaine_soir'
+          ? (effectifSemaine >= 2 ? ['premier', 'second'] : ['premier'])
+          : ['premier', 'second']
+        slots.push({ date: cur, type: t, roles })
+      }
     }
     cur = plusJours(cur, 1)
   }
@@ -445,6 +416,31 @@ export function validerPlanning(
         })
       } else {
         vus.add(vetId)
+      }
+    }
+  }
+
+  // ── R22 — une seule garde par JOUR et par véto (inter-créneaux, P3b) ──
+  // Nécessaire depuis que plusieurs créneaux peuvent coexister le même jour.
+  // Sur le catalogue par défaut (un créneau/jour), jamais déclenchée.
+  {
+    const parJourVet = new Map<string, string>() // "date|vetId" → type déjà vu
+    for (const a of planning.attributions) {
+      for (const { vetId } of a.placements) {
+        if (!vetId) continue
+        const cle = `${a.date}|${vetId}`
+        const deja = parJourVet.get(cle)
+        if (deja !== undefined && deja !== a.type) {
+          violations.push({
+            regle: 'R22',
+            date: a.date,
+            type: a.type,
+            vetId,
+            detail: `R22 : le même vétérinaire tient deux gardes le ${a.date} (${deja} + ${a.type})`,
+          })
+        } else {
+          parJourVet.set(cle, a.type)
+        }
       }
     }
   }
@@ -567,6 +563,19 @@ export function validerPlanning(
                 role,
                 vetId,
                 detail: `R2 : ${vet.prenom} indisponible week-ends ${semaines} mais de garde le ${a.date}`,
+              })
+            }
+            // Créneau SUR-MESURE : miroir du choix conservateur du moteur —
+            // une indispo cyclique bloque tout créneau non historique dès
+            // qu'une période est configurée (véto « pas là cette semaine-là »).
+            if (!estSoir && !estWe && a.type !== 'ferie' && periodes.length > 0) {
+              violations.push({
+                regle: 'R2',
+                date: a.date,
+                type: a.type,
+                role,
+                vetId,
+                detail: `R2 : ${vet.prenom} indisponible semaines ${semaines} mais de garde (${a.type}) le ${a.date}`,
               })
             }
           }

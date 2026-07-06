@@ -23,10 +23,10 @@ function labelJours(jours: number[]) {
 }
 
 function labelRaison(c: CreneauIgnore) {
-  if (c.raison === 'jour_masque') {
-    return `un autre créneau couvre déjà ${labelJours(c.jours) || 'ces jours'} — un seul créneau par jour est planifié pour l'instant`
+  if (c.raison === 'aucun_jour') {
+    return 'aucun jour de la semaine n\'est coché — il n\'y a rien à planifier'
   }
-  return 'type de garde sur-mesure — le moteur ne sait pas encore le planifier'
+  return 'créneau sans code machine — recrée-le depuis la structure ou l\'assistant pour le rendre planifiable'
 }
 
 export function CreneauxIgnoresAlert({ creneaux }: { creneaux: CreneauIgnore[] }) {
@@ -52,9 +52,7 @@ export function CreneauxIgnoresAlert({ creneaux }: { creneaux: CreneauIgnore[] }
         {creneaux.map((c) => (
           <li key={c.id} className="text-xs text-amber-800 dark:text-amber-300">
             <span className="font-medium">{c.nom}</span>
-            {c.raison === 'type_inconnu' && c.jours.length > 0 && (
-              <span> ({labelJours(c.jours)})</span>
-            )}
+            {c.jours.length > 0 && <span> ({labelJours(c.jours)})</span>}
             <span className="text-amber-700 dark:text-amber-400"> — {labelRaison(c)}</span>
           </li>
         ))}

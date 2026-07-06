@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import type { GardeDenormalisee } from '@/types'
 import type { VetDispo, DisponibilitesData } from '@/app/api/gardes/[id]/disponibilites/route'
+import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
 import { ViolationDialog } from './ViolationDialog'
 
 // ── Types ────────────────────────────────────────────────
@@ -25,6 +26,8 @@ interface GardeDetailModalProps {
   isAdmin: boolean
   /** Id du véto connecté — pour « proposer un échange » sur SES gardes. */
   moiVetId?: string
+  /** Libellés du catalogue (code → nom) pour les types sur-mesure (P3b). */
+  nomsTypes?: Record<string, string>
   onClose: () => void
   onSaved: () => void
   /**
@@ -42,10 +45,12 @@ function formatDateLongue(dateISO: string): string {
   })
 }
 
-function labelTypeGarde(type: string): string {
+function labelTypeGarde(type: string, nomsTypes?: Record<string, string>): string {
   if (type === 'weekend') return 'Week-end (sam → lun)'
   if (type === 'ferie') return 'Jour férié'
-  return 'Garde de semaine (soir)'
+  if (type === 'semaine') return 'Garde de semaine (soir)'
+  // Type SUR-MESURE (P3b) : nom du catalogue, sinon code humanisé.
+  return libelleTypeGardeDb(type, nomsTypes)
 }
 
 function StatutBadge({ statut }: { statut: string }) {
@@ -235,7 +240,7 @@ function SectionSelecteur({
 
 // ── Modal principale ─────────────────────────────────────
 
-export function GardeDetailModal({ garde, date, isAdmin, moiVetId, onClose, onSaved, onDeclarerAbsent }: GardeDetailModalProps) {
+export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, onClose, onSaved, onDeclarerAbsent }: GardeDetailModalProps) {
   const router = useRouter()
 
   const [loading, setLoading] = useState(false)
@@ -372,8 +377,11 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, onClose, onSa
   // Effectif configurable : on masque le 2nd seulement si la nuit de semaine est
   // à 1 véto (repli saison été) ET qu'aucun 2nd n'a été généré. Si un 2nd existe
   // (période avec effectif semaine forcé à 2), on l'affiche même en été.
+  // Type SUR-MESURE (P3b) : un créneau à 1 place n'a pas de 2nd → masqué aussi.
+  const estTypeV1 = ['semaine', 'weekend', 'ferie'].includes(data?.garde.type ?? '')
   const masquerSecond =
-    data?.garde.saison === 'ete' && data?.garde.type === 'semaine' && !data?.garde.second_id
+    (data?.garde.saison === 'ete' && data?.garde.type === 'semaine' && !data?.garde.second_id)
+    || (!estTypeV1 && !data?.garde.second_id)
   const estVerrouille = data?.garde.verrouille ?? false
   const modeEdition = isAdmin && (!estVerrouille || correctionMode)
 
@@ -398,7 +406,7 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, onClose, onSa
             </DialogTitle>
             {garde && (
               <div className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
-                <span>{labelTypeGarde(garde.type)}</span>
+                <span>{labelTypeGarde(garde.type, nomsTypes)}</span>
                 <span>·</span>
                 <StatutBadge statut={garde.periode_statut} />
                 {garde.modifie_manuellement && (

@@ -25,7 +25,7 @@ import type {
   SlotGarde,
   PlanningPartiel,
   AttributionGarde,
-  TypeGardeEngine,
+  CodeCreneau,
   RoleGarde,
   Saison,
   CalendrierResolu,
@@ -48,8 +48,8 @@ import {
 export interface CreneauCrise {
   /** Date ISO yyyy-MM-dd (lundi→jeudi pour semaine, vendredi, ou samedi pour WE). */
   date: string
-  /** Type du créneau de garde. */
-  type: TypeGardeEngine
+  /** Type du créneau de garde (code du catalogue — historique ou sur-mesure). */
+  type: CodeCreneau
   /** Rôle libéré à repourvoir (premier ou second). */
   role: RoleGarde
   /** Saison de la période (équité fériés / effectif). Défaut 'hiver'. */

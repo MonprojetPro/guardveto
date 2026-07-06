@@ -232,6 +232,11 @@ function violeIndispoCyclique(
   const estWe = slot.type === 'weekend'
   if (periodes.includes('soir_semaine') && estSoir) return true
   if (periodes.includes('weekend') && estWe) return true
+  // Créneau SUR-MESURE (code hors types historiques) : choix CONSERVATEUR —
+  // une indispo cyclique signifie « pas là ces semaines-là » ; on bloque dès
+  // qu'une période est configurée, plutôt que de planifier un véto absent.
+  // (La granularité par créneau du cabinet viendra avec les règles par type.)
+  if (!estSoir && !estWe && slot.type !== 'ferie' && periodes.length > 0) return true
   return false
 }
 
@@ -519,6 +524,34 @@ function checkR21RolesDistincts(
   return ok()
 }
 
+/**
+ * R22 — Un vétérinaire ne tient qu'UNE garde par jour (inter-créneaux).
+ *
+ * Nécessaire depuis que plusieurs créneaux peuvent coexister le même jour
+ * (P3b — ex : garde de jour + garde de nuit). R21 ne couvre que les places
+ * d'un MÊME créneau ; espacement_min saute explicitement le même jour.
+ * Sur le catalogue par défaut (un seul créneau par jour), cette règle ne se
+ * déclenche jamais → byte-identique.
+ *
+ * Limite connue (héritage weekend atomique) : le créneau `weekend` est daté du
+ * samedi mais couvre ven→dim ; un créneau sur-mesure daté du dimanche n'est
+ * donc PAS vu comme le même jour. Disparaîtra avec la fin du weekend magique.
+ */
+function checkR22UneGardeParJour(
+  vet: VetEngine,
+  slot: SlotGarde,
+  planning: PlanningPartiel
+): ValidationResult {
+  for (const a of planning.attributions) {
+    if (a.date === slot.date && a.type !== slot.type && estAttribue(a, vet.id)) {
+      return invalid(
+        `R22 : ${vet.prenom} a déjà une garde ce jour-là (${a.type}) — une seule garde par jour`
+      )
+    }
+  }
+  return ok()
+}
+
 // ── Volet MOU des règles configurées (P1-B) ──────────────
 
 /**
@@ -739,6 +772,7 @@ export function isValid(
     checkR6DuoInterdit(vet, slot, planning, allVets),
     checkR9VendrediLieWE(vet, slot, planning, structure.r9_liaison),
     checkR21RolesDistincts(vet, slot, roleVisé, planning),
+    checkR22UneGardeParJour(vet, slot, planning),
     checkAuPlusN(vet, slot, planning),
     checkEspacementMin(vet, slot, planning),
     checkEspacementWeekend(vet, slot, planning),
@@ -773,6 +807,7 @@ export {
   checkR18Hiver,
   checkR19Weekend,
   checkR21RolesDistincts,
+  checkR22UneGardeParJour,
   checkAuPlusN,
   checkEspacementMin,
   checkEspacementWeekend,

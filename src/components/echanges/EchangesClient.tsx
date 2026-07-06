@@ -30,6 +30,7 @@ import {
   validerEchangeAdmin,
   refuserEchangeAdmin,
 } from '@/app/(protected)/echanges/actions'
+import { humaniserCodeGarde } from '@/lib/libelles-gardes'
 
 // ── Types partagés avec la page (serveur) ─────────────────
 
@@ -85,7 +86,9 @@ function typeLabel(type: string) {
   switch (type) {
     case 'weekend': return 'week-end'
     case 'ferie':   return 'jour férié'
-    default:        return 'semaine'
+    case 'semaine': return 'semaine'
+    // Type SUR-MESURE (P3b) : son nom humanisé.
+    default:        return humaniserCodeGarde(type).toLowerCase()
   }
 }
 

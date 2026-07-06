@@ -1,9 +1,10 @@
 // ============================================================
-// GUARDVETO — Tests : détection des créneaux ignorés (backlog n°4, tranche 1)
+// GUARDVETO — Tests : détection des créneaux ignorés (backlog n°4)
 // ============================================================
-// `detecterCreneauxIgnores` est le MIROIR de la sélection de `stepsForDay`
-// (solver.ts) : elle doit signaler exactement ce que le moteur ignore en
-// silence, et RIEN sur le catalogue par défaut (zéro bruit cabinets actuels).
+// Depuis P3b, tout créneau actif non-férié à code non-null est PLANIFIÉ
+// (y compris sur-mesure, y compris plusieurs le même jour). Ne restent
+// ignorés que : code null (jamais codifié) et créneau sans aucun jour.
+// `detecterCreneauxIgnores` reste le MIROIR du filtre de `stepsForDay`.
 // ============================================================
 
 import { describe, it, expect } from 'vitest'
@@ -43,7 +44,7 @@ function catalogueDefaut(): CreneauModele[] {
 
 // ── Tests ─────────────────────────────────────────────────
 
-describe('detecterCreneauxIgnores', () => {
+describe('detecterCreneauxIgnores (contrat P3b)', () => {
   it('catalogue par défaut → AUCUN avertissement (zéro bruit cabinets actuels)', () => {
     expect(detecterCreneauxIgnores(catalogueDefaut())).toEqual([])
   })
@@ -52,64 +53,46 @@ describe('detecterCreneauxIgnores', () => {
     expect(detecterCreneauxIgnores([])).toEqual([])
   })
 
-  it('créneau sur-mesure (code null) → type_inconnu avec ses jours', () => {
+  it('créneau sur-mesure AVEC code → planifié, donc AUCUN avertissement', () => {
     const cat = [
       ...catalogueDefaut(),
-      creneau({ id: 'gj', code: null, nom: 'Garde de jour', joursSemaine: [1, 2], ordre: 5 }),
+      creneau({ id: 'gj', code: 'garde_jour', nom: 'Garde de jour', joursSemaine: [1, 2], ordre: 5 }),
+    ]
+    expect(detecterCreneauxIgnores(cat)).toEqual([])
+  })
+
+  it('deux créneaux le même jour → plus aucun masquage (tous planifiés)', () => {
+    const cat = [
+      ...catalogueDefaut(),
+      creneau({ id: 'gj', code: 'garde_jour', nom: 'Garde de jour', joursSemaine: [1, 2, 3, 4], ordre: 0 }),
+    ]
+    expect(detecterCreneauxIgnores(cat)).toEqual([])
+  })
+
+  it('créneau sans code machine (code null) → sans_code avec ses jours', () => {
+    const cat = [
+      ...catalogueDefaut(),
+      creneau({ id: 'x', code: null, nom: 'Vieux créneau', joursSemaine: [1, 2] }),
     ]
     const ignores = detecterCreneauxIgnores(cat)
     expect(ignores).toHaveLength(1)
-    expect(ignores[0]).toMatchObject({ id: 'gj', nom: 'Garde de jour', raison: 'type_inconnu' })
+    expect(ignores[0]).toMatchObject({ id: 'x', nom: 'Vieux créneau', raison: 'sans_code' })
     expect(ignores[0].jours.sort()).toEqual([1, 2])
   })
 
-  it('créneau au code inconnu du moteur → type_inconnu', () => {
-    const cat = [
-      creneau({ id: 'sam', code: 'samedi_seul', nom: 'Samedi seul', joursSemaine: [6] }),
-    ]
+  it('créneau codifié mais sans aucun jour coché → aucun_jour', () => {
+    const cat = [creneau({ id: 'v', code: 'garde_vide', nom: 'Garde vide', joursSemaine: [] })]
     const ignores = detecterCreneauxIgnores(cat)
     expect(ignores).toHaveLength(1)
-    expect(ignores[0]).toMatchObject({ id: 'sam', raison: 'type_inconnu', jours: [6] })
-  })
-
-  it('deux créneaux planifiables le même jour → le second est jour_masque', () => {
-    // Le cabinet ajoute une 2e garde le lundi : stepsForDay ne retient que la 1re.
-    const cat = [
-      ...catalogueDefaut(),
-      creneau({ id: 'ss2', code: 'semaine_soir', nom: 'Soir de semaine bis', joursSemaine: [1], ordre: 5 }),
-    ]
-    const ignores = detecterCreneauxIgnores(cat)
-    expect(ignores).toHaveLength(1)
-    expect(ignores[0]).toMatchObject({ id: 'ss2', raison: 'jour_masque', jours: [1] })
-  })
-
-  it('créneau sur-mesure passé DEVANT un créneau connu → les deux sont signalés', () => {
-    // Cas catastrophe silencieuse : « Garde de jour » en tête de catalogue sur
-    // lun-jeu → elle n'est pas planifiable ET elle masque semaine_soir. Sans
-    // avertissement, le planning sort SANS AUCUN soir de semaine.
-    const gardeJour = creneau({ id: 'gj', code: null, nom: 'Garde de jour', joursSemaine: [1, 2, 3, 4], ordre: 0 })
-    const cat = [gardeJour, ...catalogueDefaut()]
-    const ignores = detecterCreneauxIgnores(cat)
-    expect(ignores.map((i) => i.id).sort()).toEqual(['gj', 'ss'])
-    expect(ignores.find((i) => i.id === 'gj')?.raison).toBe('type_inconnu')
-    const ss = ignores.find((i) => i.id === 'ss')
-    expect(ss?.raison).toBe('jour_masque')
-    expect(ss?.jours.sort()).toEqual([1, 2, 3, 4])
+    expect(ignores[0]).toMatchObject({ id: 'v', raison: 'aucun_jour', jours: [] })
   })
 
   it('créneau inactif → jamais signalé (il est désactivé, pas ignoré)', () => {
     const cat = [
       ...catalogueDefaut(),
-      creneau({ id: 'gj', code: null, nom: 'Garde de jour', joursSemaine: [1], actif: false }),
+      creneau({ id: 'x', code: null, nom: 'Vieux créneau', joursSemaine: [1], actif: false }),
     ]
     expect(detecterCreneauxIgnores(cat)).toEqual([])
-  })
-
-  it('créneau sur-mesure sans aucun jour → signalé quand même (jours vide)', () => {
-    const cat = [creneau({ id: 'x', code: null, nom: 'Astreinte', joursSemaine: [] })]
-    const ignores = detecterCreneauxIgnores(cat)
-    expect(ignores).toHaveLength(1)
-    expect(ignores[0]).toMatchObject({ id: 'x', raison: 'type_inconnu', jours: [] })
   })
 
   it('le créneau ferie du seed ne déclenche jamais rien (géré à part, par design)', () => {

@@ -18,8 +18,7 @@
 // ============================================================
 
 import { createClient } from '@/lib/supabase/server'
-import type { PlanningPartiel, TypeGardeEngine } from '@/engine/types'
-import { premierId, secondId } from '@/engine/attribution'
+import type { PlanningPartiel } from '@/engine/types'
 import { horairesResolus, type StructureCreneauxResolue } from '@/engine/structure-creneaux'
 import { chargerStructureProfilPeriode } from '@/data/chargerStructureCabinet'
 
@@ -30,22 +29,12 @@ interface AttributionRow {
   planning_id: string
   creneau_id: string | null
   veterinaire_id: string
-  role: 'premier' | 'second'
+  /** Label libre depuis P3b (rôles du catalogue) — CHECK SQL levé en migration. */
+  role: string
   type_presence: 'sur_place'
   date_debut_reel: string
   date_fin_reel: string
   snapshot_id: string | null
-}
-
-// ── Mapping TypeGardeEngine → code creneaux_catalogue ────────
-
-function typeEngineVersCodeCreneau(type: TypeGardeEngine): string {
-  switch (type) {
-    case 'vendredi_soir': return 'vendredi_soir'
-    case 'weekend':       return 'weekend'
-    case 'ferie':         return 'ferie'
-    case 'semaine_soir':  return 'semaine_soir'
-  }
 }
 
 // ── Calcul des horodatages (Europe/Paris) ────────────────────
@@ -88,7 +77,7 @@ function toUTCString(dateISO: string, heureLocale: string): string {
  */
 function calculerHoraires(
   date: string,
-  type: TypeGardeEngine,
+  type: string,
   structure: StructureCreneauxResolue,
 ): { dateDebut: string; dateFin: string } {
   function addDaysISO(iso: string, days: number): string {
@@ -191,33 +180,22 @@ export async function persisterResultat(
   const rows: AttributionRow[] = []
 
   for (const a of planning.attributions) {
-    const codeCreneau = typeEngineVersCodeCreneau(a.type)
-    const creneauId = creneauMap.get(codeCreneau) ?? null
+    // Le type moteur EST le code du catalogue (identité). Un code sur-mesure
+    // n'existe pas dans `creneaux_catalogue` (table V2 des 4 types fixes) →
+    // creneau_id null, prévu par le schéma (« créneau manuel non catalogué »).
+    const creneauId = creneauMap.get(a.type) ?? null
     const { dateDebut, dateFin } = calculerHoraires(a.date, a.type, structure)
 
-    const premier = premierId(a)
-    if (premier) {
+    // Généralisé P3b : une ligne par PLACE pourvue, avec son label réel.
+    // Défaut [premier, second] → exactement les deux lignes historiques.
+    for (const p of a.placements) {
+      if (!p.vetId) continue
       rows.push({
         cabinet_id:       cabinetId,
         planning_id:      periodeId,
         creneau_id:       creneauId,
-        veterinaire_id:   premier,
-        role:             'premier',
-        type_presence:    'sur_place',
-        date_debut_reel:  dateDebut,
-        date_fin_reel:    dateFin,
-        snapshot_id:      snapshotIdStr,
-      })
-    }
-
-    const second = secondId(a)
-    if (second) {
-      rows.push({
-        cabinet_id:       cabinetId,
-        planning_id:      periodeId,
-        creneau_id:       creneauId,
-        veterinaire_id:   second,
-        role:             'second',
+        veterinaire_id:   p.vetId,
+        role:             p.role,
         type_presence:    'sur_place',
         date_debut_reel:  dateDebut,
         date_fin_reel:    dateFin,

@@ -29,7 +29,8 @@ export interface DisponibilitesData {
   garde: {
     id: string
     date: string
-    type: 'semaine' | 'weekend' | 'ferie'
+    /** Type V1 ('semaine'/'weekend'/'ferie') ou code sur-mesure (P3b). */
+    type: string
     saison: 'ete' | 'hiver'
     periode_statut: 'brouillon' | 'publie' | 'verrouille'
     premier_id: string | null
@@ -43,8 +44,14 @@ export interface DisponibilitesData {
 
 // ── Helpers ──────────────────────────────────────────────
 
-function mapDbTypeToEngine(type: string): 'semaine_soir' | 'weekend' {
-  return type === 'weekend' ? 'weekend' : 'semaine_soir'
+/**
+ * Type DB → moteur. Généralisé P3b : un code SUR-MESURE passe tel quel (le
+ * code EST le type moteur) — les règles s'évaluent sur le bon type.
+ */
+function mapDbTypeToEngine(type: string): string {
+  if (type === 'weekend') return 'weekend'
+  if (type === 'semaine' || type === 'ferie') return 'semaine_soir'
+  return type
 }
 
 function finDeMois(annee: string, mois: string): string {
@@ -123,9 +130,12 @@ export async function GET(
   }
 
   // ── Construction du PlanningPartiel (hors garde courante) ─
+  // Exclusion par type DB BRUT (P3b) : avec le mapping, deux gardes sur-mesure
+  // du même jour se mappaient toutes en 'semaine_soir' et étaient TOUTES
+  // exclues → faux « disponibles ». Le type brut identifie la seule courante.
   const planningPartiel: PlanningPartiel = {
     attributions: ((gardesDeLaPeriode as GardeCtx[] | null) ?? [])
-      .filter((g) => !(g.date === gardeDb.date && mapDbTypeToEngine(g.type) === mapDbTypeToEngine(gardeDb.type)))
+      .filter((g) => !(g.date === gardeDb.date && g.type === gardeDb.type))
       .map((g): AttributionGarde => ({
         date: g.date,
         type: mapDbTypeToEngine(g.type) as AttributionGarde['type'],

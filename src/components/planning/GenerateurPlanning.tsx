@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { CreneauxIgnoresAlert } from '@/components/planning/CreneauxIgnoresAlert'
 import type { CreneauIgnore } from '@/engine/creneau-modele'
 import type { Periode } from '@/types'
+import { humaniserCodeGarde } from '@/lib/libelles-gardes'
 
 // ── Types ────────────────────────────────────────────────
 
@@ -50,7 +51,8 @@ function labelTypeGarde(type: string) {
   if (type === 'vendredi_soir') return 'Vendredi soir'
   if (type === 'weekend') return 'Week-end'
   if (type === 'semaine_soir') return 'Soir de semaine'
-  return type
+  // Type SUR-MESURE (P3b) : son nom humanisé.
+  return humaniserCodeGarde(type)
 }
 
 // ── Composant ────────────────────────────────────────────

@@ -11,6 +11,7 @@ import { GardeDetailModal } from '@/components/planning/GardeDetailModal'
 import { CriseModal, type VetCrise } from '@/components/planning/CriseModal'
 import { usePeriodeActuelle } from '@/hooks/usePeriode'
 import { estJourFerie } from '@/engine/utils'
+import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
 import type { GardeDenormalisee, Periode } from '@/types'
 
 // ── Types ────────────────────────────────────────────────
@@ -25,6 +26,8 @@ interface MonthViewProps {
   vets?: VetCrise[]
   /** Id du véto connecté — pour « proposer un échange » sur SES gardes. */
   moiVetId?: string
+  /** Libellés du catalogue (code → nom) pour les types sur-mesure (P3b). */
+  nomsTypes?: Record<string, string>
 }
 
 // ── Helpers calendrier ───────────────────────────────────
@@ -81,7 +84,7 @@ function estAujourdhui(dateISO: string): boolean {
 
 // ── Composant principal ──────────────────────────────────
 
-export function MonthView({ gardes, periodes, anneeMois, isAdmin = false, vets = [], moiVetId }: MonthViewProps) {
+export function MonthView({ gardes, periodes, anneeMois, isAdmin = false, vets = [], moiVetId, nomsTypes }: MonthViewProps) {
   const router = useRouter()
   const [vueListeMobile, setVueListeMobile] = useState(false)
   const [gardeModal, setGardeModal] = useState<GardeDenormalisee | null>(null)
@@ -95,10 +98,13 @@ export function MonthView({ gardes, periodes, anneeMois, isAdmin = false, vets =
   const grille = genererGrille(annee, mois)
   const periode = usePeriodeActuelle(gardes, periodes)
 
-  // Index gardes par date pour accès O(1)
-  const gardesParDate = new Map<string, GardeDenormalisee>()
+  // Index gardes par date pour accès O(1). LISTE par jour (P3b) : plusieurs
+  // créneaux peuvent coexister le même jour — plus d'écrasement silencieux.
+  const gardesParDate = new Map<string, GardeDenormalisee[]>()
   for (const g of gardes) {
-    gardesParDate.set(g.date, g)
+    const liste = gardesParDate.get(g.date)
+    if (liste) liste.push(g)
+    else gardesParDate.set(g.date, [g])
   }
 
   // Vétérinaires uniques (pour la légende)
@@ -119,10 +125,10 @@ export function MonthView({ gardes, periodes, anneeMois, isAdmin = false, vets =
     router.push(`/planning?mois=${newMois}`)
   }
 
-  function ouvrirModal(date: string) {
-    const g = gardesParDate.get(date) ?? null
-    setDateModal(date)
-    setGardeModal(g)
+  /** Ouvre le détail d'UNE garde précise (P3b : une case peut en porter plusieurs). */
+  function ouvrirModalGarde(garde: GardeDenormalisee) {
+    setDateModal(garde.date)
+    setGardeModal(garde)
   }
 
   /** Depuis le détail d'une garde : « déclarer ce véto absent » → ouvre la crise. */
@@ -218,13 +224,14 @@ export function MonthView({ gardes, periodes, anneeMois, isAdmin = false, vets =
               <DayCell
                 key={i}
                 date={date}
-                garde={date ? (gardesParDate.get(date) ?? null) : null}
+                gardes={date ? (gardesParDate.get(date) ?? []) : []}
                 estAujourdhui={date ? estAujourdhui(date) : false}
                 estPasse={date ? estPasse(date) : false}
                 estWeekend={date ? estWeekend(date) : false}
                 estFerie={date ? estJourFerie(date) : false}
                 compact={true}
-                onClick={() => date && ouvrirModal(date)}
+                nomsTypes={nomsTypes}
+                onClickGarde={ouvrirModalGarde}
               />
             ))}
           </div>
@@ -245,7 +252,7 @@ export function MonthView({ gardes, periodes, anneeMois, isAdmin = false, vets =
                 <button
                   key={garde.id}
                   className="w-full flex items-start gap-3 rounded-lg border border-border bg-card p-3 text-left hover:bg-muted/30 transition-colors"
-                  onClick={() => ouvrirModal(garde.date)}
+                  onClick={() => ouvrirModalGarde(garde)}
                 >
                   {/* Date */}
                   <div className="shrink-0 text-center min-w-[48px]">
@@ -261,7 +268,7 @@ export function MonthView({ gardes, periodes, anneeMois, isAdmin = false, vets =
                   <div className="flex-1 min-w-0 space-y-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-xs text-muted-foreground">
-                        {garde.type === 'weekend' ? 'Week-end' : garde.type === 'ferie' ? 'Jour férié' : 'Soir semaine'}
+                        {libelleTypeGardeDb(garde.type, nomsTypes)}
                       </span>
                       {estJourFerie(garde.date) && (
                         <Star className="w-3 h-3 text-amber-500 fill-amber-400" />
@@ -318,6 +325,7 @@ export function MonthView({ gardes, periodes, anneeMois, isAdmin = false, vets =
         date={dateModal}
         isAdmin={isAdmin}
         moiVetId={moiVetId}
+        nomsTypes={nomsTypes}
         onClose={() => { setDateModal(null); setGardeModal(null) }}
         onSaved={() => router.refresh()}
         onDeclarerAbsent={isAdmin && vets.length > 0 ? declarerAbsent : undefined}

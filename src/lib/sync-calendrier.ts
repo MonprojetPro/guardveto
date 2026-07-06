@@ -21,7 +21,8 @@ import type { StructureCreneauxResolue } from '@/engine/structure-creneaux'
 interface GardeAvecVetos {
   id: string
   date: string
-  type: 'semaine' | 'weekend' | 'ferie'
+  /** Type V1 ('semaine'/'weekend'/'ferie') ou code sur-mesure (P3b). */
+  type: string
   google_event_id: string | null
   periode_id?: string
   premier: { prenom: string } | null

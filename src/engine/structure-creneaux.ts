@@ -95,15 +95,39 @@ export const CRENEAUX: Record<TypeGardeEngine, CreneauDef> = {
   },
 }
 
+/**
+ * Horaires par défaut d'un créneau SUR-MESURE dont le catalogue n'a pas fourni
+ * les horaires (ne devrait pas arriver : chargerStructureProfil les lit du
+ * catalogue). Repli sûr — journée 08:30→18:30, même jour — plutôt qu'un crash.
+ */
+const HORAIRES_SUR_MESURE_DEFAUT: HorairesCreneau = {
+  heureDebut: '08:30',
+  heureFin: '18:30',
+  offsetJoursFin: 0,
+}
+
 /** Horaires d'un type de créneau (la fonction à appeler partout). */
-export function horairesCreneau(type: TypeGardeEngine): HorairesCreneau {
-  const c = CRENEAUX[type]
+export function horairesCreneau(type: string): HorairesCreneau {
+  const c = CRENEAUX[type as TypeGardeEngine]
+  if (!c) return { ...HORAIRES_SUR_MESURE_DEFAUT }
   return { heureDebut: c.heureDebut, heureFin: c.heureFin, offsetJoursFin: c.offsetJoursFin }
 }
 
-/** Libellé humain d'un type de créneau. */
-export function libelleCreneau(type: TypeGardeEngine): string {
-  return CRENEAUX[type].libelle
+/** Libellé humain d'un type de créneau — code humanisé si sur-mesure. */
+export function libelleCreneau(type: string): string {
+  const c = CRENEAUX[type as TypeGardeEngine]
+  if (c) return c.libelle
+  return humaniserCode(type)
+}
+
+/**
+ * Libellé de repli d'un code sur-mesure : « garde_jour » → « Garde jour ».
+ * Les vrais libellés viennent du catalogue (`creneau_modele.nom`) quand le
+ * consommateur y a accès ; ceci évite seulement d'afficher un code brut.
+ */
+export function humaniserCode(code: string): string {
+  const mots = code.replace(/[_-]+/g, ' ').trim()
+  return mots.length === 0 ? code : mots.charAt(0).toUpperCase() + mots.slice(1)
 }
 
 // ============================================================
@@ -143,8 +167,12 @@ export function effectifSemaineParDefaut(saison: Saison): number {
 // la construit ; les consommateurs d'horaires (persistance, agenda…) la
 // reçoivent en paramètre et retombent sur le défaut quand elle est absente.
 
-/** Horaires effectifs par type de créneau, après application de la config cabinet. */
-export type StructureCreneauxResolue = Record<TypeGardeEngine, HorairesCreneau>
+/**
+ * Horaires effectifs par CODE de créneau, après application de la config
+ * cabinet. Généralisé P3b : les 4 codes historiques sont toujours présents,
+ * et tout code SUR-MESURE du catalogue y ajoute sa propre entrée.
+ */
+export type StructureCreneauxResolue = Record<string, HorairesCreneau>
 
 /** Structure résolue par défaut = les horaires du référentiel partagé. */
 export function structureParDefaut(): StructureCreneauxResolue {
@@ -156,15 +184,20 @@ export function structureParDefaut(): StructureCreneauxResolue {
   }
 }
 
-/** Applique des surcharges PARTIELLES (cabinet) sur la structure par défaut. */
+/**
+ * Applique des surcharges PARTIELLES (cabinet) sur la structure par défaut.
+ * Un code SUR-MESURE (absent du défaut) est AJOUTÉ tel quel : ses horaires
+ * doivent alors être complets (le loader les lit toujours du catalogue).
+ */
 export function resoudreStructure(
-  overrides?: Partial<Record<TypeGardeEngine, Partial<HorairesCreneau>>>,
+  overrides?: Record<string, Partial<HorairesCreneau>>,
 ): StructureCreneauxResolue {
   const base = structureParDefaut()
   if (!overrides) return base
-  for (const code of Object.keys(base) as TypeGardeEngine[]) {
+  for (const code of Object.keys(overrides)) {
     const o = overrides[code]
-    if (o) base[code] = { ...base[code], ...o }
+    if (!o) continue
+    base[code] = { ...(base[code] ?? HORAIRES_SUR_MESURE_DEFAUT), ...o }
   }
   return base
 }
@@ -172,11 +205,12 @@ export function resoudreStructure(
 /**
  * Horaires d'un type dans une structure résolue, avec repli sur le défaut si
  * la structure est absente (contextes legacy / hors-cabinet). Point d'accès
- * unique pour les consommateurs d'horaires.
+ * unique pour les consommateurs d'horaires. Jamais de crash : un code inconnu
+ * de la structure retombe sur le défaut (connu ou repli sur-mesure).
  */
 export function horairesResolus(
   structure: StructureCreneauxResolue | undefined,
-  type: TypeGardeEngine,
+  type: string,
 ): HorairesCreneau {
   return structure?.[type] ?? horairesCreneau(type)
 }

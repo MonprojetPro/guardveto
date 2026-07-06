@@ -26,14 +26,14 @@ import type {
   VetEngineNormalise,
   SlotGarde,
   PlanningPartiel,
-  TypeGardeEngine,
+  CodeCreneau,
   RoleGarde,
   Saison,
   AttributionGarde,
   CalendrierResolu,
 } from './types'
 import { jourIndex, addDays, estJourFerie, lundiDeSemaine } from './utils'
-import { attributionVide, avecVet, clonerAttribution } from './attribution'
+import { attributionVide, avecVet, clonerAttribution, estAttribue } from './attribution'
 import { typeGardePourJour, effectifSemaineParDefaut } from './structure-creneaux'
 import type { CreneauModele } from './creneau-modele'
 import { normaliserContraintesVets } from './normaliserContraintes'
@@ -123,7 +123,7 @@ function effectifSemaine(saison: Saison, nbVetosSemaineSoir?: number): number {
 
 export interface JourNonCouvert {
   date: string
-  type: TypeGardeEngine
+  type: CodeCreneau
   role: RoleGarde
   /** Raison de blocage si identifiable */
   contrainteBloquante?: string
@@ -159,11 +159,17 @@ export type SolveResult =
 // minimal d'un créneau à pourvoir — ne PAS confondre avec CreneauStep (diagnostic).
 export interface SolverStep {
   date: string
-  type: TypeGardeEngine
+  type: CodeCreneau
   saison: Saison
   role: RoleGarde
   /** Ce créneau a-t-il besoin d'un 2nd ? (propagé au SlotGarde pour R17/R18). */
   besoinSecond: boolean
+  /**
+   * Liste COMPLÈTE des rôles du créneau (catalogue) — sert à créer l'attribution
+   * avec les bonnes places déclarées (plus de places fantômes premier/second sur
+   * un créneau à rôles custom). Absent (legacy) → défaut ['premier','second'].
+   */
+  rolesCreneau?: string[]
 }
 
 /**
@@ -205,29 +211,33 @@ function stepsForDay(
 ): SolverStep[] {
   const idx = jourIndex(date) // 0=dim … 6=sam
 
-  // ── Chemin CATALOGUE (P3a-2) : les PLACES sont pilotées par la donnée ──
-  // Le nombre de places et leurs labels viennent du catalogue (`roles`/`nbPlaces`),
-  // plus de « 2 rôles » en dur. RÉCONCILIATION effectif : seul `semaine_soir` est
-  // plafonné par l'effectif configurable (été 1 / hiver 2 / override) — les autres
-  // créneaux émettent toutes leurs places. Pour le catalogue par DÉFAUT (seed :
-  // semaine_soir/vendredi_soir/weekend à 2 places [premier,second]), le résultat
-  // est byte-identique à l'ancien comportement (prouvé par les bancs d'équivalence).
+  // ── Chemin CATALOGUE (P3a-2, généralisé P3b) : slots pilotés par la donnée ──
+  // TOUS les créneaux actifs non-fériés couvrant le jour émettent leurs places
+  // (plus de « premier créneau seulement ») — l'unicité (cabinet, profil, code)
+  // en base garantit qu'aucune paire (date, type) ne collisionne. Un code
+  // SUR-MESURE est planifié génériquement ; seul un code null (jamais codifié)
+  // ou 'ferie' (reclassification au scoring, pas un slot) est sans slot propre.
+  // RÉCONCILIATION effectif : seul `semaine_soir` est plafonné par l'effectif
+  // configurable — les autres créneaux émettent toutes leurs places. Pour le
+  // catalogue par DÉFAUT (un seul créneau par jour, codes historiques), le
+  // résultat est byte-identique à l'ancien comportement (banc d'équivalence).
   if (creneaux && creneaux.length > 0) {
-    const c = creneaux.find(
-      (cr) => cr.actif && !cr.surFeries && cr.joursSemaine.includes(idx),
-    )
-    if (!c) return [] // aucun créneau ce jour (ex : dimanche)
-    const t = c.code as TypeGardeEngine | null
-    // On ne planifie que les codes portés par la logique actuelle ; un code
-    // sur-mesure encore inconnu → aucun slot (P3 le généralisera en aval).
-    if (t !== 'semaine_soir' && t !== 'vendredi_soir' && t !== 'weekend') return []
-    const effectifSemaine = besoinSecondSemaine ? 2 : 1
-    const nbAEmettre = t === 'semaine_soir'
-      ? Math.min(c.nbPlaces, effectifSemaine)
-      : c.nbPlaces
-    const roles = c.roles.slice(0, nbAEmettre)
-    const besoinSecond = nbAEmettre >= 2 // « le créneau a-t-il ≥ 2 places ? » (R17/R18)
-    return roles.map((role) => ({ date, type: t, saison, role, besoinSecond }))
+    const steps: SolverStep[] = []
+    for (const c of creneaux) {
+      if (!c.actif || c.surFeries || !c.joursSemaine.includes(idx)) continue
+      const t = c.code
+      if (t === null || t === 'ferie') continue
+      const effectifSemaine = besoinSecondSemaine ? 2 : 1
+      const nbAEmettre = t === 'semaine_soir'
+        ? Math.min(c.nbPlaces, effectifSemaine)
+        : c.nbPlaces
+      const roles = c.roles.slice(0, nbAEmettre)
+      const besoinSecond = nbAEmettre >= 2 // « le créneau a-t-il ≥ 2 places ? » (R17/R18)
+      for (const role of roles) {
+        steps.push({ date, type: t, saison, role, besoinSecond, rolesCreneau: c.roles })
+      }
+    }
+    return steps
   }
 
   // ── Chemin LEGACY (hors-catalogue) : mapping + 2 rôles en dur, INCHANGÉ ──
@@ -285,6 +295,26 @@ function genererSteps(
  * ÉQUIVALENCE : avec le défaut `roleAvantage = 'premier'`, redonne EXACTEMENT
  * l'ancien code (premier → −w, second → +w) — prouvé par le banc.
  */
+/**
+ * Équité v1 des créneaux SUR-MESURE (P3b) : étalement simple par code.
+ * Les 6 dimensions d'équité nommées ne connaissent pas ces créneaux ; à défaut,
+ * on compte les gardes du MÊME code déjà tenues par le véto — le moins servi
+ * est prioritaire. Poids SEMAINE_PREMIER (proxy raisonnable d'une garde
+ * « ordinaire »). Ne s'applique JAMAIS aux codes historiques → byte-identique.
+ */
+function compterGardesDuCode(planning: PlanningPartiel, type: string, vetId: string): number {
+  let n = 0
+  for (const a of planning.attributions) {
+    if (a.type === type && estAttribue(a, vetId)) n++
+  }
+  return n
+}
+
+/** Le code fait-il partie des types HISTORIQUES à sémantique câblée ? */
+function estCodeHistorique(type: string): boolean {
+  return type === 'semaine_soir' || type === 'vendredi_soir' || type === 'weekend' || type === 'ferie'
+}
+
 function malusAvantageFinancier(
   step: SolverStep,
   roleAvantage: string | null,
@@ -344,6 +374,12 @@ function scorerCandidat(
     calendrier
   )
 
+  // Créneau SUR-MESURE : équité d'étalement par code (jamais pour les codes
+  // historiques — leurs branches nommées ci-dessous restent byte-identiques).
+  if (!estCodeHistorique(step.type)) {
+    return compterGardesDuCode(planning, step.type, vet.id) * weights.SEMAINE_PREMIER + pen
+  }
+
   if (step.type === 'weekend' || step.type === 'vendredi_soir') {
     // R11 + R20 : équité WE — bonus/malus réduit le compteur effectif
     // Si bm > 0 (véto doit plus de gardes), son score est réduit → essayé avant
@@ -393,8 +429,11 @@ function assignerStep(
   if (idx >= 0) {
     attributions[idx] = avecVet(attributions[idx], step.role, vetId)
   } else {
-    // Défaut 2 places [premier, second] → miroir exact de l'ancien objet à 2 champs.
-    attributions.push(avecVet(attributionVide(step.date, step.type), step.role, vetId))
+    // Places déclarées = rôles du créneau (catalogue). Legacy sans catalogue →
+    // défaut ['premier','second'], miroir exact de l'ancien objet à 2 champs.
+    attributions.push(
+      avecVet(attributionVide(step.date, step.type, step.rolesCreneau), step.role, vetId)
+    )
   }
 
   return { attributions }
@@ -664,6 +703,11 @@ export function scorerCandidatLNS(
     calendrier
   )
 
+  // Créneau SUR-MESURE : même équité d'étalement par code que scorerCandidat.
+  if (!estCodeHistorique(step.type)) {
+    return compterGardesDuCode(planning, step.type, vet.id) * weights.SEMAINE_PREMIER + pen
+  }
+
   if (step.type === 'weekend' || step.type === 'vendredi_soir') {
     const malusRole = malusAvantageFinancier(
       step, roleAvantageFinancier, c.weekendPremier, weights.WE_PREMIER_ROLE,
@@ -712,7 +756,9 @@ function repairerSemaine(
     if (idx >= 0) {
       attributions[idx] = avecVet(attributions[idx], step.role, sorted[0].id)
     } else {
-      attributions.push(avecVet(attributionVide(step.date, step.type), step.role, sorted[0].id))
+      attributions.push(
+        avecVet(attributionVide(step.date, step.type, step.rolesCreneau), step.role, sorted[0].id)
+      )
     }
     planning = { attributions }
   }

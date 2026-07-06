@@ -21,7 +21,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { genererPlanningPur } from '@/engine/solver'
-import { premierId, secondId } from '@/engine/attribution'
 import { estJourFerie } from '@/engine/utils'
 import { supprimerEvenementsParIds } from '@/lib/sync-calendrier'
 import { resoudreContexte } from '@/data/resoudreContexte'
@@ -29,7 +28,7 @@ import { detecterCreneauxIgnores } from '@/engine/creneau-modele'
 import { persisterResultat } from '@/data/persisterResultat'
 import { construireGardePlacements } from '@/data/gardePlacements'
 import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
-import type { TypeGardeEngine, CalendrierResolu } from '@/engine/types'
+import type { CalendrierResolu } from '@/engine/types'
 
 // Verrou de génération : au-delà de ce délai, un verrou est considéré périmé
 // (crash serverless sans libération) — largement > maxDuration (60 s).
@@ -46,16 +45,23 @@ export const maxDuration = 60
  * Zone-aware (fix audit 2026-07-03) : le calendrier du cabinet est utilisé —
  * MÊME source que le solver — sinon `gardes.type` divergeait du moteur pour
  * tout cabinet dont les fériés diffèrent du fallback national en dur.
+ *
+ * Généralisé P3b : un code SUR-MESURE est persisté TEL QUEL (le CHECK 3 valeurs
+ * de `gardes.type` est levé en migration). Il garde son code même un jour férié
+ * (la reclassification 'ferie' est un héritage propre à semaine_soir) — sinon
+ * deux gardes du même jour entreraient en collision sur UNIQUE(date, type).
  */
 function mapTypeGardeEnDb(
-  type: TypeGardeEngine,
+  type: string,
   date: string,
   calendrier?: CalendrierResolu,
-): 'semaine' | 'weekend' | 'ferie' {
+): string {
   if (type === 'weekend') return 'weekend'
-  // semaine_soir sur un jour férié → type 'ferie' en DB
-  if (estJourFerie(date, calendrier)) return 'ferie'
-  return 'semaine'
+  if (type === 'semaine_soir') {
+    // semaine_soir sur un jour férié → type 'ferie' en DB (héritage V1)
+    return estJourFerie(date, calendrier) ? 'ferie' : 'semaine'
+  }
+  return type
 }
 
 // ── Handler principal ────────────────────────────────────
@@ -313,13 +319,19 @@ export async function POST(req: NextRequest) {
       .map((a) => ({ a, dbType: mapTypeGardeEnDb(a.type, a.date, contexte.calendrier) }))
       .filter(({ a, dbType }) => !clesVerrouillees.has(`${a.date}|${dbType}`))
 
+    // Places POSITIONNELLES (P3b) : place 0 → premier_id, place 1 → second_id
+    // (même convention que garde_placements). Pour le défaut, placements =
+    // [premier, second] → identique aux anciens premierId()/secondId(). Les
+    // rôles custom d'un créneau sur-mesure remplissent ainsi les colonnes V1
+    // au lieu de les laisser à null ; les places au-delà de 2 vivent dans
+    // garde_placements (miroir P3b-1).
     const gardesAInserer = attributionsInserees.map(({ a, dbType }) => ({
       periode_id: periodeId,
       cabinet_id: cabinetId,
       date: a.date,
       type: dbType,
-      premier_id: premierId(a),
-      second_id: secondId(a),
+      premier_id: a.placements[0]?.vetId ?? null,
+      second_id: a.placements[1]?.vetId ?? null,
       verrouille: false,
       modifie_manuellement: false,
     }))

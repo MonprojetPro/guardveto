@@ -28,6 +28,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import type { CreneauImpacte } from '@/lib/crise/contexte'
+import { humaniserCodeGarde } from '@/lib/libelles-gardes'
 
 // ── Helpers de formatage FR ──────────────────────────────
 
@@ -42,7 +43,9 @@ function formatDateFr(dateIso: string): string {
 function labelType(type: CreneauImpacte['type']): string {
   if (type === 'weekend') return 'Week-end'
   if (type === 'ferie') return 'Jour férié'
-  return 'Soir de semaine'
+  if (type === 'semaine') return 'Soir de semaine'
+  // Type SUR-MESURE (P3b) : son nom humanisé.
+  return humaniserCodeGarde(type)
 }
 
 function labelRole(role: CreneauImpacte['role']): string {

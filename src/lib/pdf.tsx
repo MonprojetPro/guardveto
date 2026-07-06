@@ -12,6 +12,7 @@ import {
   View,
   renderToBuffer,
 } from '@react-pdf/renderer'
+import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
 
 // ── Types ─────────────────────────────────────────────────────
 export interface GardePdf {
@@ -288,31 +289,11 @@ const S = StyleSheet.create({
   footerText: { fontSize: 6, color: '#9ca3af' },
 })
 
-// ── Sous-composant : contenu d'une cellule (semaine) ─────────
-function CellContent({
-  date,
-  garde,
-  ferieNom,
-  style,
-  numStyle,
-}: {
-  date: string | null
-  garde: GardePdf | null
-  ferieNom?: string
-   
-  style: any
-   
-  numStyle: any
-}) {
-  if (!date) return <View style={S.cellEmpty} />
-
-  const jourNum = parseInt(date.split('-')[2])
-
+// ── Sous-composant : les vétos d'UNE garde (1er en gras, 2nd normal) ──
+function GardeVets({ garde }: { garde: GardePdf }) {
   return (
-    <View style={style}>
-      <Text style={numStyle}>{jourNum}</Text>
-      {ferieNom && <Text style={S.ferieName}>{ferieNom}</Text>}
-      {garde?.premier_prenom && (
+    <>
+      {garde.premier_prenom && (
         <View style={S.vetRow}>
           <View style={[S.vetDot, { backgroundColor: garde.premier_couleur ?? '#6b7280' }]} />
           <Text style={S.vetNomGras}>
@@ -320,7 +301,7 @@ function CellContent({
           </Text>
         </View>
       )}
-      {garde?.second_prenom && (
+      {garde.second_prenom && (
         <View style={S.vetRow}>
           <View style={[S.vetDot, { backgroundColor: garde.second_couleur ?? '#6b7280' }]} />
           <Text style={S.vetNom}>
@@ -328,6 +309,52 @@ function CellContent({
           </Text>
         </View>
       )}
+    </>
+  )
+}
+
+/** Étiquette compacte du type — affichée quand une case porte plusieurs gardes. */
+function TypeTag({ type }: { type: string }) {
+  return (
+    <Text style={{ fontSize: 5.5, color: '#6b7280', marginTop: 2 }}>
+      {libelleTypeGardeDb(type)}
+    </Text>
+  )
+}
+
+// ── Sous-composant : contenu d'une cellule (semaine) ─────────
+// P3b : une case peut porter PLUSIEURS gardes (ex. garde de jour + soir) —
+// chaque garde est rendue, étiquetée par son type quand il y en a plusieurs.
+function CellContent({
+  date,
+  gardes,
+  ferieNom,
+  style,
+  numStyle,
+}: {
+  date: string | null
+  gardes: GardePdf[]
+  ferieNom?: string
+
+  style: any
+
+  numStyle: any
+}) {
+  if (!date) return <View style={S.cellEmpty} />
+
+  const jourNum = parseInt(date.split('-')[2])
+  const plusieurs = gardes.length > 1
+
+  return (
+    <View style={style}>
+      <Text style={numStyle}>{jourNum}</Text>
+      {ferieNom && <Text style={S.ferieName}>{ferieNom}</Text>}
+      {gardes.map((garde, gi) => (
+        <View key={gi}>
+          {plusieurs && <TypeTag type={garde.type} />}
+          <GardeVets garde={garde} />
+        </View>
+      ))}
     </View>
   )
 }
@@ -359,8 +386,13 @@ function PageCalendrier({
     ? 'Été'
     : `Hiver — Période ${periode.numero ?? ''}`
 
-  const gardesParDate = new Map<string, GardePdf>()
-  for (const g of gardes) gardesParDate.set(g.date, g)
+  // LISTE par jour (P3b) : plusieurs créneaux peuvent coexister le même jour.
+  const gardesParDate = new Map<string, GardePdf[]>()
+  for (const g of gardes) {
+    const liste = gardesParDate.get(g.date)
+    if (liste) liste.push(g)
+    else gardesParDate.set(g.date, [g])
+  }
 
   const feriesMap = new Map<string, string>()
   for (const f of jours_feries) feriesMap.set(f.date, f.nom)
@@ -413,12 +445,12 @@ function PageCalendrier({
         // Cellules Ven/Sam/Dim (index 4-6)
         const [ven, sam, dim] = semaine.slice(4, 7)
 
-        // Garde du week-end : chercher sur Sam d'abord, sinon Ven, sinon Dim
-        const gardeWE =
-          (sam ? gardesParDate.get(sam) : null) ??
-          (ven ? gardesParDate.get(ven) : null) ??
-          (dim ? gardesParDate.get(dim) : null) ??
-          null
+        // Garde du week-end ATOMIQUE : chercher le type 'weekend' sur Sam
+        // d'abord, sinon Ven, sinon Dim. Les autres gardes de ces jours
+        // (sur-mesure — P3b) sont rendues dans leur cellule ci-dessous.
+        const chercherWE = (d: string | null) =>
+          d ? (gardesParDate.get(d) ?? []).find((g) => g.type === 'weekend') ?? null : null
+        const gardeWE = chercherWE(sam) ?? chercherWE(ven) ?? chercherWE(dim)
         const gardeWEestWeekend = gardeWE?.type === 'weekend'
 
         // Nom vétos pour le header WE
@@ -436,13 +468,13 @@ function PageCalendrier({
           <View key={si} style={S.row}>
             {/* Lun → Jeu */}
             {joursSemaine.map((date, di) => {
-              const garde = date ? (gardesParDate.get(date) ?? null) : null
+              const gardesJour = date ? (gardesParDate.get(date) ?? []) : []
               const ferieNom = date ? feriesMap.get(date) : undefined
               return (
                 <View key={di} style={{ flex: 1 }}>
                   <CellContent
                     date={date}
-                    garde={garde}
+                    gardes={gardesJour}
                     ferieNom={ferieNom}
                     style={ferieNom ? S.cellFerie : S.cell}
                     numStyle={ferieNom ? S.cellNumeroFerie : S.cellNumero}
@@ -465,7 +497,12 @@ function PageCalendrier({
               <View style={S.weRow}>
                 {[ven, sam, dim].map((date, wi) => {
                   const estDerniere = wi === 2
-                  const garde = date ? (gardesParDate.get(date) ?? null) : null
+                  const gardesJour = date ? (gardesParDate.get(date) ?? []) : []
+                  // La garde « atomique » du jour (weekend le samedi, ou l'unique
+                  // garde legacy) + les AUTRES gardes du jour (sur-mesure, P3b).
+                  const garde = gardesJour.find((g) => g.type === 'weekend')
+                    ?? (gardesJour.length > 0 && !gardeWEestWeekend ? gardesJour[0] : null)
+                  const gardesAutres = gardesJour.filter((g) => g !== garde && g.type !== 'weekend')
                   const ferieNom = date ? feriesMap.get(date) : undefined
                   // Affichage des vétos selon le jour du bloc week-end :
                   //  • Vendredi (wi 0) : R8 → paire INVERSÉE (1er du WE devient 2nd, et inversement)
@@ -521,6 +558,13 @@ function PageCalendrier({
                           </Text>
                         </View>
                       )}
+                      {/* Autres gardes du jour (sur-mesure, P3b) — étiquetées par type */}
+                      {gardesAutres.map((autre, ai) => (
+                        <View key={ai}>
+                          <TypeTag type={autre.type} />
+                          <GardeVets garde={autre} />
+                        </View>
+                      ))}
                     </View>
                   )
                 })}

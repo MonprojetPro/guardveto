@@ -19,6 +19,7 @@
 // ============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { humaniserCodeGarde } from '@/lib/libelles-gardes'
 
 // Types d'événements notifiables (alignés sur email_log.type).
 // Liste volontairement ouverte : de nouveaux types viendront avec l'app
@@ -69,7 +70,9 @@ function typeGardeLabel(type: string): string {
   switch (type) {
     case 'weekend': return 'week-end'
     case 'ferie':   return 'jour férié'
-    default:        return 'semaine'
+    case 'semaine': return 'semaine'
+    // Type SUR-MESURE (P3b) : son nom humanisé, plus jamais « semaine ».
+    default:        return humaniserCodeGarde(type).toLowerCase()
   }
 }
 

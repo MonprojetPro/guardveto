@@ -2,6 +2,7 @@
 
 import { Lock, Star } from 'lucide-react'
 import { GardeBadge } from './GardeBadge'
+import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
 import type { GardeDenormalisee } from '@/types'
 
 // ── Types ────────────────────────────────────────────────
@@ -9,8 +10,11 @@ import type { GardeDenormalisee } from '@/types'
 interface DayCellProps {
   /** Date ISO yyyy-MM-dd, ou null pour les cases de remplissage */
   date: string | null
-  /** Garde planifiée ce jour (null si aucune ou si case de remplissage) */
-  garde: GardeDenormalisee | null
+  /**
+   * Gardes planifiées ce jour (P3b : plusieurs créneaux peuvent coexister —
+   * ex. garde de jour + garde de nuit). Vide si aucune ou case de remplissage.
+   */
+  gardes: GardeDenormalisee[]
   estAujourdhui: boolean
   estPasse: boolean
   /** Samedi ou dimanche */
@@ -18,20 +22,24 @@ interface DayCellProps {
   estFerie: boolean
   /** Mode compact (mobile) */
   compact?: boolean
-  onClick?: () => void
+  /** Libellés catalogue (code → nom) pour les types sur-mesure. */
+  nomsTypes?: Record<string, string>
+  /** Clic sur UNE garde précise du jour (chaque garde est cliquable). */
+  onClickGarde?: (garde: GardeDenormalisee) => void
 }
 
 // ── Composant ────────────────────────────────────────────
 
 export function DayCell({
   date,
-  garde,
+  gardes,
   estAujourdhui,
   estPasse,
   estWeekend,
   estFerie,
   compact,
-  onClick,
+  nomsTypes,
+  onClickGarde,
 }: DayCellProps) {
   // Case de remplissage (début/fin de mois)
   if (!date) {
@@ -41,6 +49,8 @@ export function DayCell({
   }
 
   const jour = parseInt(date.split('-')[2])
+  const aDesGardes = gardes.length > 0
+  const plusieurs = gardes.length > 1
 
   // Classes de fond selon l'état
   const classFond = [
@@ -50,11 +60,19 @@ export function DayCell({
     !estWeekend && estPasse ? 'bg-muted/20 border-border/30' : '',
     !estWeekend && !estPasse ? 'bg-card border-border/50' : '',
     estAujourdhui ? 'ring-2 ring-primary ring-offset-0' : '',
-    onClick && garde ? 'cursor-pointer hover:bg-primary/8' : '',
+    onClickGarde && aDesGardes && !plusieurs ? 'cursor-pointer hover:bg-primary/8' : '',
   ].filter(Boolean).join(' ')
 
+  const verrouille = gardes.some((g) => g.verrouille)
+
   return (
-    <div className={classFond} onClick={garde ? onClick : undefined} role={garde ? 'button' : undefined}>
+    <div
+      className={classFond}
+      // Une seule garde : toute la case est cliquable (comportement historique).
+      // Plusieurs : chaque garde a sa propre zone cliquable ci-dessous.
+      onClick={!plusieurs && aDesGardes && onClickGarde ? () => onClickGarde(gardes[0]) : undefined}
+      role={!plusieurs && aDesGardes ? 'button' : undefined}
+    >
       {/* En-tête : numéro + icônes */}
       <div className="flex items-center justify-between">
         <span
@@ -67,7 +85,7 @@ export function DayCell({
           {jour}
         </span>
         <div className="flex items-center gap-0.5">
-          {garde?.verrouille && (
+          {verrouille && (
             <Lock
               className="w-3 h-3 text-muted-foreground/50 shrink-0"
               aria-label="Garde verrouillée"
@@ -82,9 +100,26 @@ export function DayCell({
         </div>
       </div>
 
-      {/* Badges gardes */}
-      {garde && (
-        <div className="flex flex-col gap-0.5 min-w-0">
+      {/* Badges gardes — un groupe par garde du jour */}
+      {gardes.map((garde) => (
+        <div
+          key={garde.id}
+          className={[
+            'flex flex-col gap-0.5 min-w-0',
+            plusieurs ? 'rounded-md -mx-0.5 px-0.5 py-0.5' : '',
+            plusieurs && onClickGarde ? 'cursor-pointer hover:bg-primary/8' : '',
+          ].filter(Boolean).join(' ')}
+          onClick={plusieurs && onClickGarde
+            ? (e) => { e.stopPropagation(); onClickGarde(garde) }
+            : undefined}
+          role={plusieurs ? 'button' : undefined}
+        >
+          {/* Étiquette du type quand la case porte plusieurs gardes */}
+          {plusieurs && (
+            <span className="text-[10px] leading-none text-muted-foreground truncate">
+              {libelleTypeGardeDb(garde.type, nomsTypes)}
+            </span>
+          )}
           {garde.premier_prenom && (
             <GardeBadge
               prenom={garde.premier_prenom}
@@ -104,7 +139,7 @@ export function DayCell({
             />
           )}
         </div>
-      )}
+      ))}
     </div>
   )
 }

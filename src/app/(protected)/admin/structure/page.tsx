@@ -25,6 +25,9 @@ import {
   CatalogueCreneauxView, type CatalogueTypeUI,
 } from '@/components/admin/CatalogueCreneauxView'
 import {
+  CatalogueCreneauxAdmin, type CatalogueTypeAdminUI,
+} from '@/components/admin/CatalogueCreneauxAdmin'
+import {
   ProfilsManager, type ProfilLigne,
 } from '@/components/admin/ProfilsManager'
 import { AssistantProfilIA } from '@/components/admin/AssistantProfilIA'
@@ -71,7 +74,7 @@ function horairesClair(c: CreneauModele): string {
 }
 
 /** Mappe le catalogue moteur → vue d'affichage (déjà mis en clair). */
-function versCatalogueUI(catalogue: CreneauModele[]): CatalogueTypeUI[] {
+function versCatalogueUI(catalogue: CreneauModele[]): CatalogueTypeAdminUI[] {
   return [...catalogue]
     .sort((a, b) => a.ordre - b.ordre)
     .map((c) => ({
@@ -81,6 +84,7 @@ function versCatalogueUI(catalogue: CreneauModele[]): CatalogueTypeUI[] {
       places: placesClair(c),
       horaires: horairesClair(c),
       actif: c.actif,
+      estSeed: c.code !== null && CODES_CONNUS.includes(c.code as TypeGardeEngine),
     }))
 }
 
@@ -88,6 +92,7 @@ function versCatalogueUI(catalogue: CreneauModele[]): CatalogueTypeUI[] {
 interface CreneauHoraireRow {
   id: string
   code: string | null
+  nom: string
   heure_debut: string // Postgres TIME → 'HH:MM:SS'
   heure_fin: string
   offset_jours_fin: number
@@ -139,7 +144,7 @@ export default async function StructurePage() {
   const { data: cmRows } = cabinetId
     ? await supabase
         .from('creneau_modele')
-        .select('id, code, heure_debut, heure_fin, offset_jours_fin, profil_id, ordre')
+        .select('id, code, nom, heure_debut, heure_fin, offset_jours_fin, profil_id, ordre')
         .eq('cabinet_id', cabinetId)
         .order('ordre')
     : { data: null }
@@ -153,19 +158,22 @@ export default async function StructurePage() {
   const profilsBase = (profilsDb as Omit<ProfilLigne, 'nb_types'>[] | null) ?? []
   const profils: ProfilLigne[] = profilsBase.map((p) => ({ ...p, nb_types: comptes.get(p.id) ?? 0 }))
 
-  // Horaires éditables par profil (slice 4b) : un bloc de cartes par profil,
-  // restreint aux 4 types connus (les seuls que l'aval sait horodater).
+  // Horaires éditables par profil (slice 4b, généralisé P3b) : un bloc de
+  // cartes par profil, pour TOUS les créneaux codifiés — les 4 types connus
+  // (libellé du référentiel) comme les sur-mesure (libellé = nom du catalogue).
   const profilsHoraires: ProfilHorairesUI[] = profilsBase.map((p) => ({
     id: p.id,
     nom: p.nom,
     est_defaut: p.est_defaut,
     creneaux: horairesRows
-      .filter((r) => r.profil_id === p.id && r.code && CODES_CONNUS.includes(r.code as TypeGardeEngine))
+      .filter((r) => r.profil_id === p.id && r.code)
       .sort((a, b) => a.ordre - b.ordre)
       .map((r): HoraireCreneauUI => ({
         id: r.id,
         code: r.code as string,
-        libelle: CRENEAUX[r.code as TypeGardeEngine].libelle,
+        libelle: CODES_CONNUS.includes(r.code as TypeGardeEngine)
+          ? CRENEAUX[r.code as TypeGardeEngine].libelle
+          : r.nom,
         heureDebut: hhmm(r.heure_debut),
         heureFin: hhmm(r.heure_fin),
         offsetJoursFin: r.offset_jours_fin,
@@ -203,12 +211,30 @@ export default async function StructurePage() {
         <ProfilsManager profils={profils} isAdmin={isAdmin} />
       </section>
 
-      {/* P5 slice 1 — vue LECTURE du vrai catalogue (jours / places / rôles). */}
+      {/* P5 slice 1 + P3b — le vrai catalogue (jours / places / rôles).
+          Admin : création sur-mesure, activation, suppression. Véto : lecture. */}
       <section className="space-y-3">
-        <h2 className="font-heading text-lg font-semibold text-foreground">
-          Vos types de garde
-        </h2>
-        <CatalogueCreneauxView types={catalogueUI} />
+        <div>
+          <h2 className="font-heading text-lg font-semibold text-foreground">
+            Vos types de garde
+          </h2>
+          {isAdmin && (
+            <p className="text-muted-foreground text-sm mt-1 leading-5 max-w-2xl">
+              Ajoutez vos propres types de garde (garde de jour, samedi seul…) : le moteur
+              les planifie comme les autres. Désactivez un type pour qu&apos;il ne soit plus
+              planifié — par exemple le week-end complet, si vous le remplacez par un samedi
+              et un dimanche séparés.
+            </p>
+          )}
+        </div>
+        {isAdmin ? (
+          <CatalogueCreneauxAdmin
+            types={catalogueUI}
+            profils={profils.map((p) => ({ id: p.id, nom: p.nom, est_defaut: p.est_defaut }))}
+          />
+        ) : (
+          <CatalogueCreneauxView types={catalogueUI} />
+        )}
       </section>
 
       {/* P5 slice 4b — éditeur d'horaires PAR PROFIL. */}
