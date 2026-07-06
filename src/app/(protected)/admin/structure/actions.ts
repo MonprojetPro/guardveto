@@ -33,6 +33,14 @@ import {
   type ProfilResolu,
   type CreerProfilCompletPayload,
 } from '@/lib/ia/profilSchema'
+import { proposerRelationIA } from '@/lib/ia/proposerRelation'
+import {
+  propositionVersRelationPayload,
+  apercuRelation,
+  type PropositionRelation,
+  type CreneauResoluIA,
+  type CreerRelationIaPayload,
+} from '@/lib/ia/relationSchema'
 
 // ── Référentiels de validation ───────────────────────────────
 const CODES_VALIDES = new Set<TypeGardeEngine>([
@@ -770,6 +778,257 @@ export async function setCreneauActif(creneauId: string, actif: boolean) {
 
   revalidatePath('/admin/structure')
   return { success: true }
+}
+
+// ════════════════════════════════════════════════════════════
+// RG tranche 4 — RELATIONS entre créneaux (ex R8/R9, généralisées)
+// ════════════════════════════════════════════════════════════
+// Le moteur ET le validateur consomment `relation_creneau` (RG2/RG3). Ces
+// actions sont la porte d'entrée UI : lier deux créneaux d'un profil par
+// « même équipe » (ex R9) ou « rôles différents » (ex R8), désactiver ou
+// supprimer une liaison. Frontière de confiance : assertAdmin + RLS
+// (admin_write + isolation restrictive) + trigger SQL d'intégrité (même
+// cabinet + même profil, pas d'auto-lien) + validations claires ici.
+//
+// Le NIVEAU (ferme / souple / coupée) reste réglé PAR GENRE via les briques
+// R8/R9 de /regles (config par relation individuelle = backlog).
+
+/** Genres exposés à l'UI (repos_apres existe en base mais n'est pas consommé). */
+const GENRES_RELATION_VALIDES = new Set(['meme_binome', 'inversion_role'])
+
+export interface CreerRelationPayload {
+  profil_id: string
+  source_id: string
+  cible_id: string
+  genre: 'meme_binome' | 'inversion_role'
+}
+
+/**
+ * Lie deux créneaux d'un profil. Garde métier : « même équipe » entre deux
+ * créneaux couvrant UN MÊME JOUR est refusée — la règle R22 (jamais deux
+ * gardes le même jour pour un même véto) rendrait tout planning impossible.
+ */
+export async function creerRelationCreneau(payload: CreerRelationPayload) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  if (!GENRES_RELATION_VALIDES.has(payload.genre)) {
+    return { error: 'Type de liaison inconnu.' }
+  }
+  if (payload.source_id === payload.cible_id) {
+    return { error: 'Choisis deux créneaux différents pour les lier.' }
+  }
+
+  let cabinetId: string
+  try {
+    cabinetId = await resoudreCabinetId(supabase)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
+  }
+
+  // Les deux créneaux doivent exister dans CE profil de CE cabinet (défense en
+  // profondeur — le trigger SQL revérifie). On lit aussi leurs jours pour la
+  // garde R22 ci-dessous.
+  const { data: rows } = await supabase
+    .from('creneau_modele')
+    .select('id, nom, jours_semaine')
+    .eq('cabinet_id', cabinetId)
+    .eq('profil_id', payload.profil_id)
+    .in('id', [payload.source_id, payload.cible_id])
+  const creneaux = (rows as { id: string; nom: string; jours_semaine: number[] | null }[] | null) ?? []
+  const source = creneaux.find((c) => c.id === payload.source_id)
+  const cible = creneaux.find((c) => c.id === payload.cible_id)
+  if (!source || !cible) {
+    return { error: 'Créneau introuvable dans ce profil.' }
+  }
+
+  // Garde métier : même équipe + jours communs = incompatible avec R22
+  // (un véto ne peut pas tenir deux gardes le même jour). On refuse AVANT
+  // que le cabinet ne se fabrique un planning ingénérable.
+  if (payload.genre === 'meme_binome') {
+    const joursSource = new Set(source.jours_semaine ?? [])
+    const commun = (cible.jours_semaine ?? []).some((j) => joursSource.has(j))
+    if (commun) {
+      return {
+        error:
+          `« ${source.nom} » et « ${cible.nom} » couvrent un même jour : exiger la même équipe `
+          + 'est impossible (un vétérinaire ne peut pas tenir deux gardes le même jour). '
+          + 'Utilise plutôt « rôles différents », ou lie des créneaux de jours différents.',
+      }
+    }
+  }
+
+  const { error } = await supabase.from('relation_creneau').insert({
+    cabinet_id: cabinetId,
+    profil_id: payload.profil_id,
+    source_id: payload.source_id,
+    cible_id: payload.cible_id,
+    genre: payload.genre,
+    actif: true,
+  })
+
+  if (error) {
+    if (error.code === '23505') {
+      return { error: 'Cette liaison existe déjà entre ces deux créneaux.' }
+    }
+    return { error: error.message }
+  }
+
+  revalidatePath('/admin/structure')
+  return { success: true }
+}
+
+/** Active / désactive une liaison (inactif = le moteur l'ignore, réversible). */
+export async function setRelationActive(relationId: string, actif: boolean) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  const { error, count } = await supabase
+    .from('relation_creneau')
+    .update({ actif: actif === true }, { count: 'exact' })
+    .eq('id', relationId)
+
+  if (error) return { error: error.message }
+  if (count === 0) return { error: 'Liaison introuvable pour ce cabinet.' }
+
+  revalidatePath('/admin/structure')
+  return { success: true }
+}
+
+/**
+ * Supprime une liaison — y compris celles du seed (vendredi↔week-end) : un
+ * cabinet peut réellement découpler son vendredi de son week-end. Les
+ * plannings déjà générés ne sont pas modifiés (snapshot).
+ */
+export async function supprimerRelation(relationId: string) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  const { error, count } = await supabase
+    .from('relation_creneau')
+    .delete({ count: 'exact' })
+    .eq('id', relationId)
+
+  if (error) return { error: error.message }
+  if (count === 0) return { error: 'Liaison introuvable pour ce cabinet.' }
+
+  revalidatePath('/admin/structure')
+  return { success: true }
+}
+
+/** Résultat d'une proposition de liaison renvoyé à l'UI. */
+export type PropositionRelationResultat =
+  | { error: string }
+  | {
+      proposition: PropositionRelation
+      /** Phrase d'aperçu (ce qui serait créé) — présente si faisable. */
+      apercu: string
+      /** Payload prêt pour creerRelationCreneau — présent SEULEMENT si exploitable. */
+      payload?: CreerRelationIaPayload
+    }
+
+/**
+ * proposerRelationDepuisTexte — passe une phrase admin à l'IA et renvoie une
+ * PROPOSITION de liaison (jamais d'écriture en base). L'admin créera ensuite
+ * via creerRelationCreneau (frontière de confiance + RLS + trigger inchangés).
+ * Admin-only. La résolution noms → ids et la garde « même équipe + même
+ * jour » (R22) sont appliquées ICI, sur la vraie donnée du cabinet.
+ */
+export async function proposerRelationDepuisTexte(phrase: string): Promise<PropositionRelationResultat> {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  if (!assistantIaDisponible()) {
+    return { error: 'Assistant IA non configuré (clé API manquante côté serveur).' }
+  }
+  if (!phrase || phrase.trim().length < 3) {
+    return { error: 'Décris la liaison en quelques mots.' }
+  }
+
+  let cabinetId: string
+  try {
+    cabinetId = await resoudreCabinetId(supabase)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
+  }
+
+  // Profils + catalogue (noms exacts par profil) — le contexte donné à l'IA.
+  const { data: profilsDb } = await supabase
+    .from('profils_planning')
+    .select('id, nom, est_defaut')
+    .eq('cabinet_id', cabinetId)
+    .eq('actif', true)
+    .order('ordre')
+  const profils = ((profilsDb as ProfilResolu[] | null) ?? [])
+  const { data: cmDb } = await supabase
+    .from('creneau_modele')
+    .select('id, nom, jours_semaine, profil_id')
+    .eq('cabinet_id', cabinetId)
+    .order('ordre')
+  const creneauxRows =
+    ((cmDb as { id: string; nom: string; jours_semaine: number[] | null; profil_id: string | null }[] | null) ?? [])
+
+  const catalogueTexte = profils
+    .map((p) => {
+      const noms = creneauxRows
+        .filter((c) => c.profil_id === p.id)
+        .map((c) => `« ${c.nom} »`)
+        .join(', ') || '(aucun type)'
+      return `- Profil « ${p.nom} »${p.est_defaut ? ' (par défaut)' : ''} : ${noms}`
+    })
+    .join('\n') || '(aucun profil)'
+
+  let proposition: PropositionRelation
+  try {
+    proposition = await proposerRelationIA(phrase.trim(), catalogueTexte)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Erreur de l'assistant IA." }
+  }
+
+  // Résolution du profil (nom → id, insensible à la casse ; null → défaut).
+  const nomProfil = proposition.profil?.trim().toLowerCase()
+  const profil = nomProfil
+    ? profils.find((p) => p.nom.trim().toLowerCase() === nomProfil)
+    : profils.find((p) => p.est_defaut) ?? profils[0]
+  if (!profil) {
+    return {
+      proposition: {
+        ...proposition,
+        faisable: false,
+        message: proposition.profil?.trim()
+          ? `Le profil « ${proposition.profil.trim()} » n'existe pas.`
+          : 'Aucun profil de planning disponible.',
+      },
+      apercu: '',
+    }
+  }
+
+  const creneauxProfil: CreneauResoluIA[] = creneauxRows
+    .filter((c) => c.profil_id === profil.id)
+    .map((c) => ({ id: c.id, nom: c.nom, joursSemaine: c.jours_semaine ?? [] }))
+
+  const conv = propositionVersRelationPayload(proposition, creneauxProfil, profil.id)
+  if (!conv.ok) {
+    // Non faisable / ambigu / hors périmètre : on FORCE le message de NOTRE
+    // couche (cohérent avec l'UI — pas de payload → pas de bouton « Créer »).
+    return {
+      proposition: { ...proposition, faisable: false, message: conv.raison },
+      apercu: '',
+    }
+  }
+  return {
+    proposition,
+    apercu: apercuRelation(proposition, profil.est_defaut ? undefined : profil.nom),
+    payload: conv.payload,
+  }
 }
 
 /**

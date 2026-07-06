@@ -31,6 +31,10 @@ import {
   ProfilsManager, type ProfilLigne,
 } from '@/components/admin/ProfilsManager'
 import { AssistantProfilIA } from '@/components/admin/AssistantProfilIA'
+import {
+  RelationsCreneauxAdmin, type RelationLigneUI, type CreneauOptionUI,
+} from '@/components/admin/RelationsCreneauxAdmin'
+import { AssistantRelationIA } from '@/components/admin/AssistantRelationIA'
 
 /** Types de garde connus, dans l'ordre d'affichage (les seuls horodatés par l'aval). */
 const CODES_CONNUS: TypeGardeEngine[] = ['semaine_soir', 'vendredi_soir', 'weekend', 'ferie']
@@ -98,6 +102,17 @@ interface CreneauHoraireRow {
   offset_jours_fin: number
   profil_id: string | null
   ordre: number
+  actif: boolean
+}
+
+/** Ligne brute d'une liaison entre créneaux (RG4). */
+interface RelationRow {
+  id: string
+  profil_id: string | null
+  source_id: string
+  cible_id: string
+  genre: string
+  actif: boolean
 }
 
 /** Postgres TIME 'HH:MM:SS' → 'HH:MM' pour l'input time. */
@@ -144,11 +159,35 @@ export default async function StructurePage() {
   const { data: cmRows } = cabinetId
     ? await supabase
         .from('creneau_modele')
-        .select('id, code, nom, heure_debut, heure_fin, offset_jours_fin, profil_id, ordre')
+        .select('id, code, nom, heure_debut, heure_fin, offset_jours_fin, profil_id, ordre, actif')
         .eq('cabinet_id', cabinetId)
         .order('ordre')
     : { data: null }
   const horairesRows = (cmRows as CreneauHoraireRow[] | null) ?? []
+
+  // Liaisons entre créneaux (RG4) — tous profils, mappées avec les noms.
+  const { data: relRows } = cabinetId
+    ? await supabase
+        .from('relation_creneau')
+        .select('id, profil_id, source_id, cible_id, genre, actif')
+        .eq('cabinet_id', cabinetId)
+        .order('cree_le')
+    : { data: null }
+  const nomParCreneau = new Map(horairesRows.map((r) => [r.id, r.nom]))
+  const relationsUI: RelationLigneUI[] = (((relRows as RelationRow[] | null) ?? []))
+    .filter((r): r is RelationRow & { profil_id: string } => Boolean(r.profil_id))
+    .filter((r) => r.genre === 'meme_binome' || r.genre === 'inversion_role')
+    .map((r) => ({
+      id: r.id,
+      profilId: r.profil_id,
+      sourceNom: nomParCreneau.get(r.source_id) ?? '?',
+      cibleNom: nomParCreneau.get(r.cible_id) ?? '?',
+      genre: r.genre as RelationLigneUI['genre'],
+      actif: r.actif,
+    }))
+  const creneauxOptions: CreneauOptionUI[] = horairesRows
+    .filter((r): r is CreneauHoraireRow & { profil_id: string } => Boolean(r.profil_id))
+    .map((r) => ({ id: r.id, nom: r.nom, profilId: r.profil_id, actif: r.actif }))
 
   // Nombre de types par profil (badge du gestionnaire).
   const comptes = new Map<string, number>()
@@ -235,6 +274,30 @@ export default async function StructurePage() {
         ) : (
           <CatalogueCreneauxView types={catalogueUI} />
         )}
+      </section>
+
+      {/* RG4 — liaisons entre créneaux (ex R8/R9, généralisées). */}
+      <section className="space-y-3">
+        <div>
+          <h2 className="font-heading text-lg font-semibold text-foreground">
+            Créneaux liés
+          </h2>
+          <p className="text-muted-foreground text-sm mt-1 leading-5 max-w-2xl">
+            Une liaison relie deux types de garde : « même équipe » (les mêmes vétérinaires
+            enchaînent les deux gardes — comme votre vendredi soir et votre week-end) ou
+            « rôles différents » (un vétérinaire présent sur les deux y change de rôle).
+            {isAdmin && ' Vous pouvez lier n’importe quels types, y compris sur-mesure.'}
+            {!isAdmin && ' (Lecture seule — seul l’administrateur peut modifier.)'}
+          </p>
+        </div>
+        {/* RG4 — lier deux créneaux en langage naturel (admin seul). */}
+        {isAdmin && <AssistantRelationIA />}
+        <RelationsCreneauxAdmin
+          profils={profils.map((p) => ({ id: p.id, nom: p.nom, est_defaut: p.est_defaut }))}
+          relations={relationsUI}
+          creneaux={creneauxOptions}
+          isAdmin={isAdmin}
+        />
       </section>
 
       {/* P5 slice 4b — éditeur d'horaires PAR PROFIL. */}
