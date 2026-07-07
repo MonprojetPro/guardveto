@@ -39,6 +39,8 @@ import {
   type StructureConfig,
   type PenaliteSoupleId,
   type PenalitesSouplesConfig,
+  type CompositionEquipeRegle,
+  type ModeComposition,
 } from '@/engine/structure-config'
 import { BRIQUES_INTERNES } from '@/engine/briques/catalogue'
 
@@ -203,6 +205,50 @@ export function extrairePenalitesSouples(regles: RegleCabinetRow[]): PenalitesSo
   return out
 }
 
+// ── Composition d'équipe par tag (backlog n°6) ──────────────
+// Règles GLOBALES avec PARAMS (contrairement à R8/R9 qui n'ont que
+// { actif, force }) : chaque ligne `composition_equipe` porte
+// params = { mode, tag, creneaux? }. PLUSIEURS lignes possibles par cabinet
+// (une par règle : « au moins un senior le WE » + « un junior jamais seul »).
+
+/** L'id de brique des règles de composition d'équipe. */
+export const BRIQUE_COMPOSITION = 'composition_equipe'
+
+const MODES_COMPOSITION = new Set<string>(['au_moins_un', 'pas_seuls'])
+
+/**
+ * extraireCompositions — convertit les lignes `composition_equipe` en règles
+ * moteur résolues (tag normalisé, étage entier). Une ligne mal formée (mode
+ * inconnu, tag vide) est IGNORÉE (jamais de crash). Les règles inactives sont
+ * CONSERVÉES avec actif=false (l'UI liste tout ; le moteur filtre par actif).
+ */
+export function extraireCompositions(regles: RegleCabinetRow[]): CompositionEquipeRegle[] {
+  const out: CompositionEquipeRegle[] = []
+  for (const row of regles) {
+    if (row.brique_id !== BRIQUE_COMPOSITION) continue
+    if (!estObjet(row.params_json)) continue
+    const params = (row.params_json as ParamsJson).params
+    if (!estObjet(params)) continue
+    const mode = params.mode
+    const tagBrut = params.tag
+    if (typeof mode !== 'string' || !MODES_COMPOSITION.has(mode)) continue
+    if (typeof tagBrut !== 'string' || tagBrut.trim() === '') continue
+    const creneaux = Array.isArray(params.creneaux)
+      ? (params.creneaux as unknown[]).filter((x): x is string => typeof x === 'string' && x.trim() !== '')
+      : undefined
+    const etage = FORCE_TEXTE_VERS_ETAGE[row.force]
+    out.push({
+      regleId: row.id,
+      mode: mode as ModeComposition,
+      tag: tagBrut.trim().toLowerCase(),
+      ...(creneaux && creneaux.length > 0 ? { creneaux } : {}),
+      actif: row.actif,
+      etage: typeof etage === 'number' ? etage : 2,
+    })
+  }
+  return out
+}
+
 /**
  * extraireStructureConfig — résout la config R8/R9 depuis les lignes
  * `regles_cabinet`. Chaque règle absente garde son défaut (ferme + active).
@@ -226,10 +272,14 @@ export function extraireStructureConfig(regles: RegleCabinetRow[]): StructureCon
   // historique (DEFAULT_STRUCTURE_CONFIG) — byte-identique, et les consommateurs
   // aval résolvent chaque pénalité absente à son défaut (resoudrePenaliteSouple).
   const penalitesSouples = extrairePenalitesSouples(regles)
+  // Composition d'équipe (n°6) : même principe — la clé n'existe que si des
+  // règles sont posées en base (zéro ligne → byte-identique).
+  const compositions = extraireCompositions(regles)
   return {
     r9_liaison: lire(BRIQUE_LIAISON) ?? { ...DEFAULT_STRUCTURE_CONFIG.r9_liaison },
     r8_inversion: lire(BRIQUE_INVERSION) ?? { ...DEFAULT_STRUCTURE_CONFIG.r8_inversion },
     ...(Object.keys(penalitesSouples).length > 0 ? { penalitesSouples } : {}),
+    ...(compositions.length > 0 ? { compositions } : {}),
   }
 }
 
@@ -252,14 +302,16 @@ export function mapperReglesCabinet(
     const rejet = (raison: string) => rejets.push({ regleId: row.id, raison })
 
     // 0. Règles GLOBALES (pas par véto) : équité (`equilibrer`), structurelles
-    //    R8/R9 (`liaison_creneaux`, `inversion_role`) et pénalités souples
-    //    réglables (backlog n°16). Traitées À PART (équité → buildEquityWeights ;
-    //    structure + pénalités → extraireStructureConfig). On les saute ici SANS
-    //    les compter comme rejets (ce ne sont pas des contraintes de véto).
+    //    R8/R9 (`liaison_creneaux`, `inversion_role`), pénalités souples
+    //    réglables (backlog n°16) et composition d'équipe (n°6). Traitées À PART
+    //    (équité → buildEquityWeights ; structure + pénalités + compositions →
+    //    extraireStructureConfig). On les saute ici SANS les compter comme
+    //    rejets (ce ne sont pas des contraintes de véto).
     if (
       row.brique_id === BRIQUE_EQUILIBRER ||
       row.brique_id === BRIQUE_LIAISON ||
       row.brique_id === BRIQUE_INVERSION ||
+      row.brique_id === BRIQUE_COMPOSITION ||
       row.brique_id in BRIQUES_PENALITES_SOUPLES
     ) {
       continue

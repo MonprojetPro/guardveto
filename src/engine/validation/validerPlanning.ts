@@ -416,6 +416,48 @@ export function validerPlanning(
     }
   }
 
+  // ── COMPOSITION — équipe par tag (backlog n°6), règles DURES seulement ──
+  // Ré-implémenté INDÉPENDAMMENT (jamais d'import de rules/composition-equipe) :
+  // on juge l'ÉQUIPE EFFECTIVEMENT PUBLIÉE de chaque créneau ciblé.
+  //   • au_moins_un : aucun véto de l'équipe ne porte le tag → violation.
+  //   • pas_seuls   : l'équipe n'est composée QUE de porteurs du tag → violation.
+  // Souple (étage ≥ 3) → jamais une violation (préférence, pas interdiction).
+  {
+    const compositions = (input.structureConfig?.compositions ?? []).filter(
+      (r) => r.actif && r.etage <= 2,
+    )
+    for (const regle of compositions) {
+      const tagNorm = regle.tag.trim().toLowerCase()
+      const porteTag = (vetId: string): boolean => {
+        const vt = vetsById.get(vetId)
+        return !!vt && (vt.tags ?? []).some((t) => t.trim().toLowerCase() === tagNorm)
+      }
+      for (const a of planning.attributions) {
+        if (regle.creneaux && regle.creneaux.length > 0 && !regle.creneaux.includes(a.type)) continue
+        const equipe = membres(a)
+        if (equipe.length === 0) continue // couverture jugée à part
+        const nbPorteurs = equipe.filter(porteTag).length
+        if (regle.mode === 'au_moins_un' && nbPorteurs === 0) {
+          violations.push({
+            regle: 'COMPOSITION',
+            date: a.date,
+            type: a.type,
+            detail: `COMPOSITION : aucun vétérinaire « ${regle.tag} » sur ce créneau (${a.type} du ${a.date})`,
+          })
+        }
+        if (regle.mode === 'pas_seuls' && nbPorteurs > 0 && nbPorteurs === equipe.length) {
+          violations.push({
+            regle: 'COMPOSITION',
+            date: a.date,
+            type: a.type,
+            vetId: equipe[0],
+            detail: `COMPOSITION : uniquement des vétérinaires « ${regle.tag} » sur ce créneau (${a.type} du ${a.date}) — il en faut au moins un sans ce tag`,
+          })
+        }
+      }
+    }
+  }
+
   // ── R22 — une seule garde par JOUR et par véto (inter-créneaux, P3b) ──
   // Nécessaire depuis que plusieurs créneaux peuvent coexister le même jour.
   // Sur le catalogue par défaut (un créneau/jour), jamais déclenchée.

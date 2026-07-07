@@ -26,6 +26,7 @@ import {
 import {
   proposerRegleDepuisTexte,
   upsertRegle,
+  upsertCompositionRegle,
   type ForceFormulaire,
   type PropositionIaResultat,
 } from '@/app/(protected)/regles/actions'
@@ -38,6 +39,7 @@ const CAPACITES = [
   'Empêcher deux vétérinaires d’être de garde seuls ensemble.',
   'Limiter le nombre de gardes d’un vétérinaire sur une période (ex. au plus 2 par semaine).',
   'Imposer un nombre minimum de jours entre deux gardes d’un même vétérinaire.',
+  'Créer des règles d’équipe avec les étiquettes (ex. « un junior jamais seul », « toujours un senior le week-end »).',
 ]
 
 const FORCE_LABEL: Record<ForceFormulaire, string> = {
@@ -83,18 +85,28 @@ export function AssistantIA() {
       const res = await proposerRegleDepuisTexte(phrase)
       setResultat(res)
       // Pré-remplit le curseur de puissance avec le choix de l'IA (réglable ensuite).
-      setForce(!('error' in res) && res.payload ? res.payload.force : null)
+      const forceIa = !('error' in res)
+        ? (res.payload?.force ?? res.payloadComposition?.force ?? null)
+        : null
+      setForce(forceIa)
       if ('error' in res) toast.error(res.error)
     })
   }
 
   const creer = () => {
-    if (!resultat || 'error' in resultat || !resultat.payload) return
+    if (!resultat || 'error' in resultat) return
+    if (!resultat.payload && !resultat.payloadComposition) return
     setErreurCreation(null)
-    // L'admin peut avoir ajusté la puissance : on prend SON choix, sinon celui de l'IA.
-    const payloadFinal = { ...resultat.payload, force: force ?? resultat.payload.force }
     startCreate(async () => {
-      const res = await upsertRegle(payloadFinal)
+      // L'admin peut avoir ajusté la puissance : on prend SON choix, sinon celui de l'IA.
+      // Deux familles : règle par-véto (upsertRegle) ou règle GLOBALE d'équipe
+      // (upsertCompositionRegle — composition_equipe, n°6).
+      const res = resultat.payloadComposition
+        ? await upsertCompositionRegle({
+            ...resultat.payloadComposition,
+            force: force ?? resultat.payloadComposition.force,
+          })
+        : await upsertRegle({ ...resultat.payload!, force: force ?? resultat.payload!.force })
       // Erreur (ex. doublon) affichée DANS le panneau, pas en toast au loin.
       if (res?.error) { setErreurCreation(res.error); return }
       toast.success('Règle créée.')
@@ -126,8 +138,9 @@ export function AssistantIA() {
   const proposition = resultat && !('error' in resultat) ? resultat.proposition : null
   const apercu = resultat && !('error' in resultat) ? resultat.apercu : ''
   const payload = resultat && !('error' in resultat) ? resultat.payload : undefined
+  const payloadComposition = resultat && !('error' in resultat) ? resultat.payloadComposition : undefined
   /** Puissance proposée par l'IA (pour signaler à l'admin s'il l'a modifiée). */
-  const forceIa = payload?.force ?? null
+  const forceIa = payload?.force ?? payloadComposition?.force ?? null
 
   return (
     <section className="rounded-lg border border-accent/30 bg-accent/5 p-4 space-y-3 max-w-3xl">
@@ -192,7 +205,7 @@ export function AssistantIA() {
             </p>
           )}
 
-          {payload && apercu ? (
+          {(payload || payloadComposition) && apercu ? (
             <>
               <div className="rounded-md bg-muted/50 p-2.5">
                 <p className="text-sm text-foreground leading-6">{apercu}</p>
@@ -205,7 +218,7 @@ export function AssistantIA() {
                 </Label>
                 <div className="flex flex-wrap gap-1.5" role="group" aria-label="Puissance de la règle">
                   {FORCES_ORDRE.map((f) => {
-                    const actif = (force ?? payload.force) === f
+                    const actif = (force ?? forceIa) === f
                     return (
                       <button
                         key={f}
@@ -224,7 +237,7 @@ export function AssistantIA() {
                     )
                   })}
                 </div>
-                {forceIa && (force ?? payload.force) !== forceIa && (
+                {forceIa && (force ?? forceIa) !== forceIa && (
                   <p className="text-[11px] text-muted-foreground/70">
                     Modifié — l&apos;IA proposait : {FORCE_LABEL[forceIa]}
                   </p>

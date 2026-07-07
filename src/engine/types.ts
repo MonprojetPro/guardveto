@@ -32,6 +32,12 @@ export interface VetEngine {
   prenom: string
   statut: 'associe' | 'salarie'
   dernier_recours: boolean
+  /**
+   * Étiquettes libres du véto (ex. 'junior', 'senior') — backlog n°6/n°22.
+   * Consommées par les règles composition_equipe / role_interdit_tag via
+   * StructureConfig. Absent/vide → aucune règle de tag ne s'applique à lui.
+   */
+  tags?: string[]
   contraintes: ContrainteEngine[]
   conges: CongeEngine[]
 }
@@ -93,6 +99,14 @@ export interface SlotGarde {
    * les vendredi_soir / weekend ont toujours besoin d'un 2nd.
    */
   besoinSecond?: boolean
+  /**
+   * Nombre TOTAL de places du créneau visé (backlog n°6 — composition d'équipe).
+   * Sert au check de composition à détecter la « pose complétante » quand
+   * l'attribution n'existe pas encore dans le planning partiel (1re pose d'un
+   * créneau à 1 place). Absent → le check lit les places déclarées de
+   * l'attribution, et reste muet si elle n'existe pas (jamais de faux blocage).
+   */
+  nbPlaces?: number
 }
 
 /**

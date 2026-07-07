@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Pencil, PowerOff, Power, ChevronDown, ChevronUp, ShieldCheck, Star, UserX, CircleOff, Briefcase, Users, MailPlus } from 'lucide-react'
+import { Pencil, PowerOff, Power, ChevronDown, ChevronUp, ShieldCheck, Star, UserX, CircleOff, Briefcase, Users, MailPlus, Tag } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -127,6 +127,16 @@ export function VeterinaireCard({ veterinaire, contraintes, vets }: VeterinaireC
                       Dernier recours
                     </span>
                   )}
+                  {/* Étiquettes d'équipe (junior/senior… — règles de composition n°6) */}
+                  {(veterinaire.tags ?? []).map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-sky-100 text-sky-700 text-[11px] font-medium leading-none"
+                    >
+                      <Tag className="w-3 h-3" />
+                      {tag}
+                    </span>
+                  ))}
                   {/* Inactif */}
                   {!veterinaire.actif && (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-destructive/10 text-destructive text-[11px] font-medium leading-none">

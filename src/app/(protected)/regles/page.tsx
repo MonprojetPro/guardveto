@@ -25,6 +25,10 @@ import {
   type StructureRegleUI,
 } from '@/components/regles/ReglagesPlanningClient'
 import {
+  CompositionEquipeClient,
+  type CompositionRegleUI,
+} from '@/components/regles/CompositionEquipeClient'
+import {
   EQUITY_DIMENSIONS,
   DEFAULT_IMPORTANCE,
   IMPORTANCE_LEVELS,
@@ -36,6 +40,7 @@ import { periodeLabelCourt, type PeriodeMini } from '@/lib/periodes'
 const BRIQUE_EQUILIBRER = 'equilibrer'
 const BRIQUE_LIAISON = 'liaison_creneaux' // R9
 const BRIQUE_INVERSION = 'inversion_role' // R8
+const BRIQUE_COMPOSITION = 'composition_equipe' // n°6
 const IMPORTANCES = new Set<string>(IMPORTANCE_LEVELS)
 const FORCES_STRUCTURE = new Set(['jamais', 'sauf_crise', 'evitee', 'si_possible'])
 const FORCES_SOUPLES = new Set(['sauf_crise', 'evitee', 'si_possible'])
@@ -92,7 +97,7 @@ export default async function ReglesPage({
       .select('id, brique_id, params_json, force, actif, periode_id')
       .order('brique_id')
       .order('id'),
-    supabase.from('veterinaires').select('id, prenom, nom, couleur').order('nom'),
+    supabase.from('veterinaires').select('id, prenom, nom, couleur, tags').order('nom'),
     supabase
       .from('periodes')
       .select('id, saison, numero, libelle, date_debut, date_fin')
@@ -138,11 +143,36 @@ export default async function ReglesPage({
   // équité (equilibrer) + structurelles week-end (R8/R9) + pénalités souples
   // réglables (backlog n°16). On les retire du listing.
   const GLOBALES = new Set([
-    BRIQUE_EQUILIBRER, BRIQUE_LIAISON, BRIQUE_INVERSION,
+    BRIQUE_EQUILIBRER, BRIQUE_LIAISON, BRIQUE_INVERSION, BRIQUE_COMPOSITION,
     ...Object.keys(PENALITES_SOUPLES_DEFAUT_FORCE),
   ])
   const reglesClassiques = toutesRegles.filter((r) => !GLOBALES.has(r.brique_id))
   const reglesEquilibrer = toutesRegles.filter((r) => r.brique_id === BRIQUE_EQUILIBRER)
+
+  // Composition d'équipe (n°6) : résolution des lignes → forme UI.
+  const reglesComposition: CompositionRegleUI[] = toutesRegles
+    .filter((r) => r.brique_id === BRIQUE_COMPOSITION)
+    .flatMap((r) => {
+      const p = (r.params_json as { params?: { mode?: string; tag?: string; creneaux?: unknown } })?.params
+      const mode = p?.mode
+      const tag = p?.tag
+      if ((mode !== 'au_moins_un' && mode !== 'pas_seuls') || typeof tag !== 'string') return []
+      const creneaux = Array.isArray(p?.creneaux)
+        ? (p.creneaux as unknown[]).filter((x): x is string => typeof x === 'string')
+        : []
+      const force = FORCES_STRUCTURE.has(r.force) ? r.force : 'jamais'
+      return [{ id: r.id, mode, tag, creneaux, force, actif: r.actif }]
+    })
+
+  // Étiquettes portées par l'équipe (suggestions du formulaire composition).
+  const tagsEquipe = [
+    ...new Set(
+      ((vets as Array<{ tags?: string[] | null }> | null) ?? [])
+        .flatMap((v) => v.tags ?? [])
+        .map((t) => t.trim().toLowerCase())
+        .filter((t) => t !== ''),
+    ),
+  ].sort()
 
   // Config courante R8/R9 (règle posée, sinon défaut Ferme + active).
   const structureConfig = {
@@ -177,6 +207,12 @@ export default async function ReglesPage({
         vets={(vets as VetoMini[]) ?? []}
         periodes={periodes}
         typesCreneaux={typesCreneaux}
+        isAdmin={isAdmin}
+      />
+      <CompositionEquipeClient
+        regles={reglesComposition}
+        typesCreneaux={typesCreneaux}
+        tagsEquipe={tagsEquipe}
         isAdmin={isAdmin}
       />
       <ReglagesPlanningClient

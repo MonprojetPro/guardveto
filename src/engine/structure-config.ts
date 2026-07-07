@@ -93,6 +93,53 @@ export interface StructureConfig {
    * byte-identique. Voyage DANS StructureConfig (même principe que `relations`).
    */
   historiqueFetes?: HistoriqueFetesResolu
+  /**
+   * Règles de COMPOSITION D'ÉQUIPE par tag (backlog n°6 — « un junior jamais
+   * seul », « au moins un senior par week-end »). Extraites des lignes
+   * `regles_cabinet` de brique `composition_equipe` (une ligne par règle).
+   * Dures (étage ≤ 2) → isValid bloque + validateur signale ; souples →
+   * pénalité dans les DEUX scoreurs. `undefined`/vide → aucune règle →
+   * byte-identique. Voyage DANS StructureConfig (même principe que `relations`).
+   */
+  compositions?: CompositionEquipeRegle[]
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Composition d'équipe par TAG (backlog n°6)
+// ═══════════════════════════════════════════════════════════════
+// Le « qui » de ces règles n'est pas un véto nominal mais une ÉTIQUETTE
+// (veterinaires.tags — ex. 'junior', 'senior'). Deux modes :
+//   • au_moins_un : chaque créneau ciblé compte ≥ 1 véto portant le tag.
+//   • pas_seuls   : les porteurs du tag n'ont jamais un créneau à eux seuls
+//     (il faut toujours ≥ 1 véto SANS le tag à leurs côtés ; sur un créneau
+//     à une place, un porteur du tag est donc exclu).
+// La composition se juge sur l'ÉQUIPE COMPLÈTE d'un créneau, jamais sur une
+// place isolée — cf. rules/composition-equipe.ts (pose complétante).
+
+export type ModeComposition = 'au_moins_un' | 'pas_seuls'
+
+/** Une règle de composition d'équipe, résolue et consommable moteur. */
+export interface CompositionEquipeRegle {
+  /** id de la ligne regles_cabinet (trace / ciblage UI). */
+  regleId: string
+  mode: ModeComposition
+  /** Tag ciblé, NORMALISÉ (minuscules, sans espaces parasites). */
+  tag: string
+  /** Codes de créneaux ciblés — absent/vide = tous les créneaux. */
+  creneaux?: string[]
+  actif: boolean
+  /** Étage lexicographique (≤ 2 = dur, ≥ 3 = pénalité souple). */
+  etage: number
+}
+
+/** Les règles de composition DURES effectives (actives + étage ≤ 2). */
+export function compositionsDures(structure: StructureConfig): CompositionEquipeRegle[] {
+  return (structure.compositions ?? []).filter((r) => r.actif && r.etage <= ETAGE_STRUCTURE_DUR_MAX)
+}
+
+/** Les règles de composition SOUPLES effectives (actives + étage ≥ 3). */
+export function compositionsSouples(structure: StructureConfig): CompositionEquipeRegle[] {
+  return (structure.compositions ?? []).filter((r) => r.actif && r.etage > ETAGE_STRUCTURE_DUR_MAX)
 }
 
 /** Relations effectivement appliquées (donnée si chargée, sinon couple historique). */

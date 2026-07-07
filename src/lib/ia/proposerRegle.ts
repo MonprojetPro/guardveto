@@ -29,7 +29,7 @@ export interface TypeCreneauIA {
 }
 
 /** Décrit les briques disponibles pour guider l'IA (jours = lundi→vendredi). */
-const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 7 types de règle :
+const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 8 types de règle :
 
 1. interdire_creneau — un vétérinaire ne fait pas de garde un jour fixe de la semaine.
    params: jour (lundi|mardi|mercredi|jeudi|vendredi), exception_vacances_scolaires (true/false).
@@ -48,6 +48,12 @@ const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 7 types de rè
 7. espacement_weekend — au plus 1 garde de WEEK-END toutes les N semaines (« un week-end sur N », limite la fréquence des week-ends d'un véto).
    params: n_semaines (entier ≥ 2 ; « un week-end sur 3 » → n_semaines = 3).
    ⚠️ N'utilise ce type QUE si la demande est une FRÉQUENCE de week-ends (« un WE sur N »). Un PLAFOND de week-ends (« au plus 2 WE par mois ») → au_plus_n avec creneaux=["weekend"]. Force par défaut conseillée : si_possible (préférence).
+8. composition_equipe — règle GLOBALE d'équipe basée sur une ÉTIQUETTE (pas un vétérinaire nominal → laisse veterinaire=null).
+   params: mode_composition ('au_moins_un' = chaque créneau ciblé doit compter au moins un véto portant l'étiquette ; 'pas_seuls' = les porteurs de l'étiquette ne sont jamais seuls sur un créneau), tag (une étiquette de la liste fournie), creneaux (optionnel : codes de créneaux ciblés ; null = tous).
+   Ex. « un junior n'est jamais seul de garde » → mode_composition=pas_seuls, tag="junior".
+   Ex. « toujours un senior le week-end » → mode_composition=au_moins_un, tag="senior", creneaux=["weekend"].
+   Force par défaut conseillée : jamais (exigence de sécurité).
+   ⚠️ Si la demande vise une étiquette QUE PERSONNE ne porte (hors liste fournie), faisable=false : demande d'abord de poser l'étiquette sur les fiches (page Équipe).
 
 Niveau d'importance (force) :
 - jamais = interdiction ferme
@@ -63,6 +69,8 @@ export async function proposerRegleIA(
   phrase: string,
   vets: VetoResolu[],
   typesCreneaux: TypeCreneauIA[] = [],
+  // Étiquettes réellement portées par l'équipe (composition_equipe, n°6).
+  tagsEquipe: string[] = [],
 ): Promise<PropositionRegle> {
   if (!assistantIaDisponible()) {
     throw new Error('Assistant IA non configuré (clé API manquante).')
@@ -78,11 +86,15 @@ export async function proposerRegleIA(
   const blocCreneaux = typesCreneaux.length > 0
     ? `\nTypes de créneaux de garde DE CE CABINET (codes EXACTS à utiliser dans "creneaux") :\n${lignesCreneaux}\n`
     : ''
+  // Référentiel DYNAMIQUE des étiquettes d'équipe (composition_equipe).
+  const blocTags = tagsEquipe.length > 0
+    ? `\nÉtiquettes d'équipe DE CE CABINET (les seules utilisables dans "tag") : ${tagsEquipe.join(', ')}.\n`
+    : `\nAucune étiquette d'équipe n'est posée dans ce cabinet pour l'instant : toute règle composition_equipe est donc infaisable (faisable=false, invite à poser les étiquettes sur la page Équipe d'abord).\n`
 
   const system = `Tu es l'assistant de configuration de GuardVeto, un logiciel de planning de gardes vétérinaires. Ton rôle : traduire une demande en langage naturel en UNE règle structurée que le moteur sait appliquer. Tu PROPOSES seulement — un humain validera avant création.
 
 Vétérinaires du cabinet (utilise EXACTEMENT ces prénoms) : ${prenoms}.
-${blocCreneaux}
+${blocCreneaux}${blocTags}
 ${CATALOGUE_PROMPT}
 
 Règles de comportement :

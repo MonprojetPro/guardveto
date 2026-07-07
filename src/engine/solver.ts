@@ -42,7 +42,11 @@ import { penalite } from './rules/soft-constraints'
 import { compterParVet, type CompteurVet } from './rules/optimization'
 import { comparerScores, scorerPlanning, type VecteurScore, type BonusMalusMap } from './score-lexicographique'
 import { DEFAULT_EQUITY_WEIGHTS, DEFAULT_ROLE_AVANTAGE_FINANCIER, type EquityWeights } from './equity-weights'
-import { DEFAULT_STRUCTURE_CONFIG, type StructureConfig, type PenalitesSouplesConfig } from './structure-config'
+import {
+  DEFAULT_STRUCTURE_CONFIG, compositionsSouples,
+  type StructureConfig, type PenalitesSouplesConfig, type CompositionEquipeRegle,
+} from './structure-config'
+import { penaliteCompositionCandidat } from './rules/composition-equipe'
 import type { HistoriqueFetesResolu } from './historique-fete'
 import type { DiagnosticImpasse } from './diagnostic'
 import { construireDiagnostic, type CreneauStep, type ReSimuler } from './diagnostic'
@@ -197,6 +201,14 @@ export interface SolverStep {
    * un créneau à rôles custom). Absent (legacy) → défaut ['premier','second'].
    */
   rolesCreneau?: string[]
+  /**
+   * Nombre de places que le solver VA pourvoir sur ce créneau (backlog n°6 —
+   * composition d'équipe). ≠ rolesCreneau.length quand l'effectif plafonne
+   * (semaine_soir à 1 malgré 2 places déclarées) : c'est CE nombre qui décide
+   * la « pose complétante » du check de composition. Absent (appels legacy,
+   * crise) → le check lit les places de l'attribution réelle.
+   */
+  nbPlaces?: number
 }
 
 /**
@@ -261,7 +273,7 @@ function stepsForDay(
       const roles = c.roles.slice(0, nbAEmettre)
       const besoinSecond = nbAEmettre >= 2 // « le créneau a-t-il ≥ 2 places ? » (R17/R18)
       for (const role of roles) {
-        steps.push({ date, type: t, saison, role, besoinSecond, rolesCreneau: c.roles })
+        steps.push({ date, type: t, saison, role, besoinSecond, rolesCreneau: c.roles, nbPlaces: nbAEmettre })
       }
     }
     return steps
@@ -272,17 +284,18 @@ function stepsForDay(
   if (t === 'vendredi_soir' || t === 'weekend') {
     // Vendredi soir / week-end → toujours 2 de garde.
     return [
-      { date, type: t, saison, role: 'premier', besoinSecond: true },
-      { date, type: t, saison, role: 'second', besoinSecond: true },
+      { date, type: t, saison, role: 'premier', besoinSecond: true, nbPlaces: 2 },
+      { date, type: t, saison, role: 'second', besoinSecond: true, nbPlaces: 2 },
     ]
   }
   if (t === 'semaine_soir') {
     // Lundi à jeudi. Effectif configurable : 2 (1er+2nd) ou 1 (1er seul).
+    const nbPlaces = besoinSecondSemaine ? 2 : 1
     const steps: SolverStep[] = [
-      { date, type: t, saison, role: 'premier', besoinSecond: besoinSecondSemaine },
+      { date, type: t, saison, role: 'premier', besoinSecond: besoinSecondSemaine, nbPlaces },
     ]
     if (besoinSecondSemaine) {
-      steps.push({ date, type: t, saison, role: 'second', besoinSecond: true })
+      steps.push({ date, type: t, saison, role: 'second', besoinSecond: true, nbPlaces })
     }
     return steps
   }
@@ -382,6 +395,8 @@ function scorerCandidat(
   penalitesSouples?: PenalitesSouplesConfig,
   // Historique des fêtes (backlog n°14). Absent/vide → 0 (byte-identique).
   historiqueFetes?: HistoriqueFetesResolu,
+  // Composition d'équipe SOUPLE (backlog n°6). Absent/vide → 0 (byte-identique).
+  compositions?: CompositionEquipeRegle[],
 ): number {
   // Dernier recours → toujours en dernier
   if (vet.dernier_recours) return 1_000_000
@@ -406,6 +421,11 @@ function scorerCandidat(
     calendrier,
     penalitesSouples,
     historiqueFetes
+  ) + penaliteCompositionCandidat(
+    // Composition d'équipe souple (n°6) — même « pose complétante » que le
+    // gardien dur, à l'étage configuré (le scoreur global reste cohérent).
+    { date: step.date, type: step.type, saison: step.saison, nbPlaces: step.nbPlaces },
+    step.role, vet, planning, allVets, compositions,
   )
 
   // Créneau SUR-MESURE : équité d'étalement par code (jamais pour les codes
@@ -544,7 +564,7 @@ function backtrack(
   if (index > deepest.value) deepest.value = index
 
   const step = steps[index]
-  const slot: SlotGarde = { date: step.date, type: step.type, saison: step.saison, besoinSecond: step.besoinSecond }
+  const slot: SlotGarde = { date: step.date, type: step.type, saison: step.saison, besoinSecond: step.besoinSecond, nbPlaces: step.nbPlaces }
 
   // Candidats valides (contraintes dures, R8/R9 selon config) triés par score.
   // Perf : compteurs calculés UNE fois par step + score UNE fois par candidat
@@ -555,10 +575,11 @@ function backtrack(
   )
   const compteursStep =
     valides.length > 1 ? compterParVet(planning, vets, roleAvantageFinancier, calendrier) : undefined
+  const compositionsSouplesStep = compositionsSouples(structure)
   const candidates = valides
     .map((vet) => ({
       vet,
-      score: scorerCandidat(step, vet, planning, bonusMalus, vets, weights, calendrier, roleAvantageFinancier, compteursStep, structure.penalitesSouples, structure.historiqueFetes),
+      score: scorerCandidat(step, vet, planning, bonusMalus, vets, weights, calendrier, roleAvantageFinancier, compteursStep, structure.penalitesSouples, structure.historiqueFetes, compositionsSouplesStep),
     }))
     .sort((a, b) => a.score - b.score)
     .map(({ vet }) => vet)
@@ -674,7 +695,7 @@ function genererSeedGreedy(input: SolverInput, avecDiagnostic = true): SolveResu
   const joursNonCouverts: JourNonCouvert[] = steps.slice(indexImpasse).map((s) => {
     let contrainteBloquante: string | undefined
     if (s === steps[indexImpasse]) {
-      const slot: SlotGarde = { date: s.date, type: s.type, saison: s.saison, besoinSecond: s.besoinSecond }
+      const slot: SlotGarde = { date: s.date, type: s.type, saison: s.saison, besoinSecond: s.besoinSecond, nbPlaces: s.nbPlaces }
       const premierKo = vets
         .map((v) => isValid(slot, v, s.role, vets, { attributions: [] }))
         .find((r) => !r.valid)
@@ -791,6 +812,8 @@ export function scorerCandidatLNS(
   // Historique des fêtes (backlog n°14). Absent/vide → 0 (byte-identique —
   // la crise ne le passe pas : réparation ciblée sans équité inter-annuelle).
   historiqueFetes?: HistoriqueFetesResolu,
+  // Composition d'équipe SOUPLE (backlog n°6). Absent/vide → 0 (byte-identique).
+  compositions?: CompositionEquipeRegle[],
 ): number {
   if (vet.dernier_recours) return 1_000_000
 
@@ -814,6 +837,10 @@ export function scorerCandidatLNS(
     calendrier,
     penalitesSouples,
     historiqueFetes
+  ) + penaliteCompositionCandidat(
+    // Composition d'équipe souple (n°6) — cohérente avec scorerCandidat.
+    { date: step.date, type: step.type, saison: step.saison, nbPlaces: step.nbPlaces },
+    step.role, vet, planning, allVets, compositions,
   )
 
   // Créneau SUR-MESURE : même équité d'étalement par code que scorerCandidat.
@@ -845,7 +872,7 @@ function repairerSemaine(
   let planning = partialPlanning
 
   for (const step of steps) {
-    const slot: SlotGarde = { date: step.date, type: step.type, saison: step.saison, besoinSecond: step.besoinSecond }
+    const slot: SlotGarde = { date: step.date, type: step.type, saison: step.saison, besoinSecond: step.besoinSecond, nbPlaces: step.nbPlaces }
     const valids = vets.filter((v) => isValid(slot, v, step.role, vets, planning, calendrier, structure).valid)
 
     if (valids.length === 0) return null
@@ -857,7 +884,7 @@ function repairerSemaine(
     const sorted = valids
       .map((v) => ({
         v,
-        score: scorerCandidatLNS(step, v, planning, vets, weights, calendrier, roleAvantageFinancier, compteursStep, structure.penalitesSouples, structure.historiqueFetes),
+        score: scorerCandidatLNS(step, v, planning, vets, weights, calendrier, roleAvantageFinancier, compteursStep, structure.penalitesSouples, structure.historiqueFetes, compositionsSouples(structure)),
       }))
       .sort((a, b) => a.score - b.score)
       .map(({ v }) => v)

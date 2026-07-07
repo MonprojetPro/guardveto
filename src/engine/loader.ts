@@ -253,7 +253,7 @@ export async function chargerInputDepuisSupabase(
   //    contraintes_veto, mais de regles_cabinet — cf. étape 2b, P1A-004).
   const { data: vetsDb, error: vetsErr } = await supabase
     .from('veterinaires')
-    .select('id, nom, prenom, statut, dernier_recours')
+    .select('id, nom, prenom, statut, dernier_recours, tags')
     .eq('actif', true)
     .order('nom')
 
@@ -309,6 +309,7 @@ export async function chargerInputDepuisSupabase(
     prenom: string
     statut: 'associe' | 'salarie'
     dernier_recours: boolean
+    tags?: string[] | null
   }
 
   const vets: VetEngine[] = ((vetsDb as VetDb[]) ?? []).map((vet) => ({
@@ -317,6 +318,9 @@ export async function chargerInputDepuisSupabase(
     prenom: vet.prenom,
     statut: vet.statut,
     dernier_recours: vet.dernier_recours,
+    // Tags d'équipe (n°6/n°22) — normalisés À LA SOURCE (parade anti-cécité :
+    // tous les consommateurs comparent des tags déjà minuscules/épurés).
+    tags: (vet.tags ?? []).map((t) => t.trim().toLowerCase()).filter((t) => t !== ''),
     contraintes: contraintesParVet.get(vet.id) ?? [],
     conges: ((congesDb as CongeDb[] | null) ?? [])
       .filter((c) => c.veterinaire_id === vet.id)

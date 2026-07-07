@@ -28,8 +28,10 @@ import { DEFAULT_EQUITY_WEIGHTS, DEFAULT_ROLE_AVANTAGE_FINANCIER, type EquityWei
 import {
   DEFAULT_STRUCTURE_CONFIG, estStructureSouple, penaliteStructureEtage,
   relationsEffectives, resoudrePenaliteSouple, PENALITE_SOUPLE_DEFAUT,
+  compositionsSouples,
   type StructureConfig,
 } from './structure-config'
+import { compositionCibleType, violeCompositionEquipe } from './rules/composition-equipe'
 import { apparierSourcePourCible } from './relations-structure'
 import { vetPourRole, vetsAttribues, avecVet, attributionVide } from './attribution'
 import { penaliteFeteHistorique, PENALITE_FETE_HISTORIQUE } from './historique-fete'
@@ -194,12 +196,17 @@ export function scorerPlanning(
       // (généralisé P3b : les rôles custom d'un créneau sur-mesure sont couverts).
       // Pour le défaut, placements = [premier, second] → itération et ordre
       // strictement identiques à l'ancien ['premier','second'] en dur.
+      // nbPlaces = places POURVUES de l'attribution finale : c'est le nombre de
+      // poses que la reconstruction va rejouer — la référence de la « pose
+      // complétante » du check de composition (n°6). Une place restée vide
+      // (trou de couverture) n'a jamais complété l'équipe côté solver.
+      const nbPoses = a.placements.filter((p) => p.vetId !== null).length
       for (const role of a.placements.map((p) => p.role)) {
         const vetId = vetPourRole(a, role)
         if (!vetId) continue
         const vet = vetById.get(vetId)
         if (!vet) continue
-        const slot: SlotGarde = { date: a.date, type: a.type, saison }
+        const slot: SlotGarde = { date: a.date, type: a.type, saison, nbPlaces: nbPoses }
         const res = isValid(slot, vet, role, vets, cumul, calendrier, structure)
         if (!res.valid) nbInvariantsViols++
         // pose dans le cumul
@@ -209,7 +216,11 @@ export function scorerPlanning(
           cumul.attributions[idx] = avecVet(cumul.attributions[idx], role, vetId)
         } else {
           indexCumul.set(cle, cumul.attributions.length)
-          cumul.attributions.push(avecVet(attributionVide(a.date, a.type), role, vetId))
+          // Places déclarées = les VRAIES places de l'attribution (un créneau à
+          // rôles custom ne doit pas hériter des défauts premier/second).
+          cumul.attributions.push(
+            avecVet(attributionVide(a.date, a.type, a.placements.map((p) => p.role)), role, vetId)
+          )
         }
       }
     }
@@ -304,6 +315,26 @@ export function scorerPlanning(
           if (nonInverse) {
             ajouter(v, structure.r8_inversion.etage, 'R8-souple', penaliteStructureEtage(structure.r8_inversion.etage))
           }
+        }
+      }
+    }
+  }
+
+  // ── COMPOSITION D'ÉQUIPE SOUPLE (backlog n°6, étage configuré) ──
+  // En DUR, la composition bloque dans isValid → comptée à l'étage 0 ci-dessus.
+  // En SOUPLE, on pénalise chaque attribution dont l'ÉQUIPE COMPLÈTE viole la
+  // règle — MÊME prédicat que la pénalité candidate (les deux gardiens de score
+  // restent cohérents : le LNS n'accepte pas ce que le scoreur global punirait).
+  {
+    const compsSouples = compositionsSouples(structure)
+    for (const regle of compsSouples) {
+      for (const a of planning.attributions) {
+        if (!compositionCibleType(regle, a.type)) continue
+        const equipe = vetsAttribues(a)
+          .map((id) => vetById.get(id))
+          .filter((x): x is VetEngineNormalise => x !== undefined)
+        if (violeCompositionEquipe(regle, equipe)) {
+          ajouter(v, regle.etage, 'composition-souple', penaliteStructureEtage(regle.etage))
         }
       }
     }

@@ -23,6 +23,8 @@ export interface Veterinaire {
   actif: boolean
   dernier_recours: boolean
   couleur: string
+  /** Étiquettes d'équipe (ex. junior, senior) — règles de composition (n°6/n°22). */
+  tags?: string[]
   created_at: string
 }
 

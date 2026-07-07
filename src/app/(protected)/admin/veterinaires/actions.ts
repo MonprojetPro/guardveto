@@ -33,6 +33,20 @@ export interface VeterinaireFormData {
   couleur: string
   actif: boolean
   dernier_recours: boolean
+  /** Étiquettes d'équipe (junior/senior…) — règles de composition (n°6). */
+  tags?: string[]
+}
+
+/** Normalise les étiquettes (frontière de confiance) : minuscules, uniques, bornées. */
+function normaliserTags(tags: string[] | undefined): string[] {
+  return [
+    ...new Set(
+      (tags ?? [])
+        .filter((t): t is string => typeof t === 'string')
+        .map((t) => t.trim().toLowerCase())
+        .filter((t) => t !== '' && t.length <= 30),
+    ),
+  ].slice(0, 10)
 }
 
 export async function createVeterinaire(data: VeterinaireFormData) {
@@ -72,6 +86,7 @@ export async function createVeterinaire(data: VeterinaireFormData) {
     couleur: data.couleur,
     actif: data.actif,
     dernier_recours: data.dernier_recours,
+    tags: normaliserTags(data.tags),
     user_id: null,
   })
 
@@ -110,6 +125,7 @@ export async function updateVeterinaire(id: string, data: VeterinaireFormData) {
       couleur: data.couleur,
       actif: data.actif,
       dernier_recours: data.dernier_recours,
+      tags: normaliserTags(data.tags),
     })
     .eq('id', id)
 

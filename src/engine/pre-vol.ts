@@ -48,6 +48,7 @@ export type CodeAvertissementPreVol =
   | 'creneau_impossible'        // un créneau qu'aucune combinaison de vétos ne peut pourvoir
   | 'charge_globale_insuffisante' // Σ des plafonds de charge < places à pourvoir
   | 'weekends_insuffisants'     // Σ des plafonds week-end < places de week-end
+  | 'composition_sans_porteur'  // règle de composition dont AUCUN véto actif ne porte le tag
 
 /**
  * Un avertissement du pré-vol — TOUJOURS non bloquant.
@@ -590,5 +591,45 @@ export function preVolRegles(input: PreVolInput): AvertissementPreVol[] {
     ...detecterCreneauxImpossibles(slots, dispos, vetsN, input),
     ...detecterChargeInsuffisante(slots, vetsN, input, nomVeto),
     ...detecterWeekendsInsuffisants(slots, vetsN, nomVeto),
+    // (c) composition d'équipe sans porteur du tag (n°6)
+    ...detecterCompositionsSansPorteur(vetsN, input),
   ]
+}
+
+// ── (c) Composition d'équipe — tag sans porteur (backlog n°6) ──
+// Une règle « au moins un vétérinaire "senior" » alors qu'AUCUN véto actif ne
+// porte le tag = impasse CERTAINE sur tous les créneaux ciblés si la règle est
+// dure (et pénalité systématique si souple). Une règle « pas seuls » sans
+// porteur est, elle, simplement INERTE (personne à protéger) — on le signale
+// aussi : c'est probablement un tag oublié sur les fiches de l'équipe.
+function detecterCompositionsSansPorteur(
+  vets: VetEngine[],
+  input: PreVolInput,
+): AvertissementPreVol[] {
+  const out: AvertissementPreVol[] = []
+  const compositions = (input.structureConfig?.compositions ?? []).filter((r) => r.actif)
+  for (const regle of compositions) {
+    const tagNorm = regle.tag.trim().toLowerCase()
+    const porteurs = vets.filter((v) =>
+      (v.tags ?? []).some((t) => t.trim().toLowerCase() === tagNorm),
+    )
+    if (porteurs.length > 0) continue
+    const dure = regle.etage <= ETAGE_DUR_MAX
+    if (regle.mode === 'au_moins_un') {
+      out.push({
+        code: 'composition_sans_porteur',
+        regles: [`au moins un vétérinaire « ${regle.tag} » par créneau`],
+        message: dure
+          ? `La règle « au moins un vétérinaire ${regle.tag} » est active mais AUCUN vétérinaire actif ne porte l'étiquette « ${regle.tag} » : les créneaux concernés seront impossibles à pourvoir. Ajoutez l'étiquette sur les fiches de l'équipe (Équipe) ou désactivez la règle.`
+          : `La préférence « au moins un vétérinaire ${regle.tag} » est active mais aucun vétérinaire actif ne porte l'étiquette « ${regle.tag} » : elle ne pourra jamais être satisfaite. Ajoutez l'étiquette sur les fiches de l'équipe ou désactivez la règle.`,
+      })
+    } else {
+      out.push({
+        code: 'composition_sans_porteur',
+        regles: [`les vétérinaires « ${regle.tag} » ne sont jamais seuls`],
+        message: `La règle « les vétérinaires ${regle.tag} ne sont jamais seuls » est active mais aucun vétérinaire actif ne porte l'étiquette « ${regle.tag} » : elle est sans effet. Ajoutez l'étiquette sur les fiches concernées (Équipe) ou supprimez la règle.`,
+      })
+    }
+  }
+  return out
 }

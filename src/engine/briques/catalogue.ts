@@ -368,6 +368,39 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
       'le rôle 1er/2nd s’inverse si possible entre la veille d’un jour férié et le férié lui-même (R8b)',
   },
 
+  // ── Composition d'équipe par tag (backlog n°6 — règle GLOBALE à params) ──
+  // Le « qui » n'est pas un véto nominal mais une ÉTIQUETTE (veterinaires.tags).
+  // Plusieurs règles possibles par cabinet (une ligne regles_cabinet chacune).
+
+  composition_equipe: {
+    id: 'composition_equipe',
+    famille: 'couverture',
+    operateur: 'COMPOSITION',
+    axes: ['qui', 'quoi'],
+    schemaParams: {
+      mode: 'string (au_moins_un|pas_seuls)',
+      tag: 'string (étiquette portée par les vétos, ex. senior)',
+      creneaux: 'string[]? (codes de créneaux ciblés — absent = tous)',
+    },
+    widget: 'WidgetCompositionEquipe',
+    rendreLangageNaturel: (params) => {
+      const tag = typeof params.tag === 'string' && params.tag.trim() !== '' ? params.tag : '?'
+      const creneaux = Array.isArray(params.creneaux)
+        ? (params.creneaux as unknown[]).filter((x): x is string => typeof x === 'string')
+        : []
+      const cible = creneaux.length > 0
+        ? `sur : ${creneaux.map(creneauLisible).join(', ')}`
+        : 'sur chaque créneau'
+      if (params.mode === 'au_moins_un') {
+        return `au moins un vétérinaire « ${tag} » ${cible}`
+      }
+      if (params.mode === 'pas_seuls') {
+        return `les vétérinaires « ${tag} » ne sont jamais seuls ${cible}`
+      }
+      return `composition d'équipe « ${tag} » (mode non précisé)`
+    },
+  },
+
   // ⚠️ INTERNE — « motif composite pré-calculé » (archi V2 §catalogue blindé).
   // Le métier « grand week-end » (repos vendredi si pas de garde WE, jeudi sinon)
   // est DÉJÀ livré par la brique `repos_conditionnel`. Le moteur calcule ce motif

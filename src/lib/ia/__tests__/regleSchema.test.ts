@@ -10,6 +10,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   propositionVersPayload,
+  propositionVersComposition,
   apercuProposition,
   type PropositionRegle,
   type VetoResolu,
@@ -30,6 +31,7 @@ function prop(over: Partial<PropositionRegle>): PropositionRegle {
     si_garde_we: null, sinon: null, semaines: null, periodes: null,
     partenaire: null, n: null, fenetre: null, creneaux: null,
     ecart_min_jours: null, n_semaines: null,
+    mode_composition: null, tag: null,
     ...over,
   }
 }
@@ -223,5 +225,66 @@ describe('apercuProposition', () => {
     )
     expect(phrase).toContain('Manon')
     expect(phrase).toContain('Antoine')
+  })
+})
+
+describe('propositionVersComposition (règle GLOBALE d’équipe — n°6)', () => {
+  const TAGS = ['junior', 'senior']
+
+  it('convertit une proposition complète (tag normalisé, créneaux dédupliqués)', () => {
+    const r = propositionVersComposition(
+      prop({ brique_id: 'composition_equipe', mode_composition: 'au_moins_un', tag: ' Senior ', creneaux: ['weekend', 'weekend'], force: 'jamais' }),
+      TAGS,
+    )
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.payload.mode).toBe('au_moins_un')
+      expect(r.payload.tag).toBe('senior')
+      expect(r.payload.creneaux).toEqual(['weekend'])
+      expect(r.payload.force).toBe('jamais')
+    }
+  })
+
+  it('force par défaut = jamais (exigence de sécurité) quand l’IA n’en propose pas', () => {
+    const r = propositionVersComposition(
+      prop({ brique_id: 'composition_equipe', mode_composition: 'pas_seuls', tag: 'junior' }),
+      TAGS,
+    )
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.payload.force).toBe('jamais')
+  })
+
+  it('refuse un tag que PERSONNE ne porte (anti-coquille-vide)', () => {
+    const r = propositionVersComposition(
+      prop({ brique_id: 'composition_equipe', mode_composition: 'au_moins_un', tag: 'chirurgien' }),
+      TAGS,
+    )
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.raison).toContain('chirurgien')
+  })
+
+  it('refuse mode ou tag manquant', () => {
+    expect(propositionVersComposition(
+      prop({ brique_id: 'composition_equipe', tag: 'junior' }), TAGS,
+    ).ok).toBe(false)
+    expect(propositionVersComposition(
+      prop({ brique_id: 'composition_equipe', mode_composition: 'pas_seuls' }), TAGS,
+    ).ok).toBe(false)
+  })
+
+  it('propositionVersPayload REFUSE la composition (routage dédié, jamais de payload véto)', () => {
+    const r = propositionVersPayload(
+      prop({ brique_id: 'composition_equipe', mode_composition: 'pas_seuls', tag: 'junior', veterinaire: 'Manon' }),
+      VETS,
+    )
+    expect(r.ok).toBe(false)
+  })
+
+  it('aperçu : phrase française SANS sujet vétérinaire', () => {
+    const phrase = apercuProposition(
+      prop({ brique_id: 'composition_equipe', mode_composition: 'pas_seuls', tag: 'junior' }),
+    )
+    expect(phrase).toContain('junior')
+    expect(phrase).toContain('jamais seuls')
   })
 })

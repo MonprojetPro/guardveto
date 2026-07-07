@@ -29,6 +29,7 @@ import { chargerCreneauModele } from '@/data/chargerCreneauModele'
 import { proposerRegleIA, assistantIaDisponible, type TypeCreneauIA } from '@/lib/ia/proposerRegle'
 import {
   propositionVersPayload,
+  propositionVersComposition,
   apercuProposition,
   type PropositionRegle,
   type VetoResolu,
@@ -286,6 +287,128 @@ export async function setStructureRegle(briqueId: string, actif: boolean, force:
       params_json,
       force,
       actif,
+      created_by: vetoId,
+    })
+    if (error) return { error: error.message }
+  }
+
+  revalidatePath('/regles')
+  return { success: true }
+}
+
+// ── Composition d'équipe par tag (backlog n°6) ───────────────
+
+const MODES_COMPOSITION = new Set(['au_moins_un', 'pas_seuls'])
+const TAG_MAX_LONGUEUR = 30
+
+/** Payload du formulaire composition (règle GLOBALE avec params). */
+export interface CompositionReglePayload {
+  id?: string // présent = édition
+  mode: 'au_moins_un' | 'pas_seuls'
+  tag: string
+  /** Codes de créneaux ciblés — vide/absent = tous les créneaux. */
+  creneaux?: string[]
+  force: ForceFormulaire
+}
+
+/**
+ * Crée ou édite une règle de composition d'équipe (« au moins un senior par
+ * week-end », « un junior jamais seul »). Règle GLOBALE : pas de « qui »
+ * nominal — le qui est un TAG (veterinaires.tags). PLUSIEURS règles possibles
+ * par cabinet (une ligne chacune). Contrairement à setStructureRegle, elle
+ * porte des PARAMS métier ({ mode, tag, creneaux? }), reconstruits ici
+ * (frontière de confiance). Toggle/suppression : setRegleActif / deleteRegle.
+ */
+export async function upsertCompositionRegle(payload: CompositionReglePayload) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+  const vetoId = garde.veto.id
+
+  if (!MODES_COMPOSITION.has(payload.mode)) {
+    return { error: 'Mode de composition invalide.' }
+  }
+  if (!FORCES_VALIDES.includes(payload.force)) {
+    return { error: 'Niveau de force invalide.' }
+  }
+  const tag = (payload.tag ?? '').trim().toLowerCase()
+  if (tag === '' || tag.length > TAG_MAX_LONGUEUR) {
+    return { error: `Étiquette invalide (1 à ${TAG_MAX_LONGUEUR} caractères).` }
+  }
+
+  let cabinetId: string
+  try {
+    cabinetId = await resoudreCabinetId(supabase)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
+  }
+
+  // Créneaux ciblés : chaque code DOIT exister dans le référentiel du cabinet
+  // (un code fantôme rendrait la règle silencieusement inerte sur ce créneau).
+  const creneaux = [
+    ...new Set((payload.creneaux ?? []).filter((x) => typeof x === 'string' && x.trim() !== '')),
+  ]
+  if (creneaux.length > 0) {
+    const codesValides = await chargerCodesCreneauxValides(supabase, cabinetId)
+    const inconnus = creneaux.filter((c) => !codesValides.has(c))
+    if (inconnus.length > 0) {
+      return { error: `Type(s) de créneau inconnu(s) pour ce cabinet : ${inconnus.join(', ')}.` }
+    }
+  }
+
+  // Garde anti-coquille-vide : le tag doit être porté par AU MOINS un véto
+  // actif — sinon la règle est soit impossible (au_moins_un), soit inerte
+  // (pas_seuls). Le pré-vol le re-signale, mais on prévient dès l'écriture.
+  const { data: vetsTags } = await supabase
+    .from('veterinaires')
+    .select('tags')
+    .eq('actif', true)
+  const tagPorte = ((vetsTags as { tags?: string[] | null }[] | null) ?? []).some((v) =>
+    (v.tags ?? []).some((t) => t.trim().toLowerCase() === tag),
+  )
+  if (!tagPorte) {
+    return {
+      error: `Aucun vétérinaire actif ne porte l'étiquette « ${tag} ». Ajoute-la d'abord sur les fiches concernées (page Équipe).`,
+    }
+  }
+
+  const params: Record<string, unknown> = {
+    mode: payload.mode,
+    tag,
+    ...(creneaux.length > 0 ? { creneaux } : {}),
+  }
+  const params_json = { qui: null, quand: null, params }
+
+  // Anti-doublon (création seulement) : même mode + tag + créneaux.
+  if (!payload.id) {
+    const { data: existantes } = await supabase
+      .from('regles_cabinet')
+      .select('id, params_json')
+      .eq('cabinet_id', cabinetId)
+      .eq('brique_id', 'composition_equipe')
+    const cible = JSON.stringify(params)
+    for (const r of existantes ?? []) {
+      const p = (r.params_json as { params?: unknown })?.params ?? {}
+      if (JSON.stringify(p) === cible) {
+        return { error: 'Une règle de composition identique existe déjà.' }
+      }
+    }
+  }
+
+  if (payload.id) {
+    const { error } = await supabase
+      .from('regles_cabinet')
+      .update({ params_json, force: payload.force })
+      .eq('id', payload.id)
+    if (error) return { error: error.message }
+  } else {
+    const { error } = await supabase.from('regles_cabinet').insert({
+      cabinet_id: cabinetId,
+      brique_id: 'composition_equipe',
+      params_json,
+      force: payload.force,
+      actif: true,
       created_by: vetoId,
     })
     if (error) return { error: error.message }
@@ -708,6 +831,10 @@ export type PropositionIaResultat =
       /** Payload prêt pour upsertRegle — présent SEULEMENT si la proposition
        *  est exploitable (brique + vétos résolus). Absent si non faisable. */
       payload?: UpsertReglePayload
+      /** Payload prêt pour upsertCompositionRegle (règle GLOBALE d'équipe,
+       *  n°6) — présent à la place de `payload` quand l'IA propose une
+       *  composition_equipe exploitable. */
+      payloadComposition?: CompositionReglePayload
     }
 
 /**
@@ -730,10 +857,20 @@ export async function proposerRegleDepuisTexte(phrase: string): Promise<Proposit
 
   const { data: vetsDb } = await supabase
     .from('veterinaires')
-    .select('id, prenom')
+    .select('id, prenom, tags')
     .eq('actif', true)
     .order('prenom')
-  const vets = ((vetsDb as VetoResolu[] | null) ?? [])
+  const vetsRows = ((vetsDb as Array<VetoResolu & { tags?: string[] | null }> | null) ?? [])
+  const vets: VetoResolu[] = vetsRows.map(({ id, prenom }) => ({ id, prenom }))
+  // Étiquettes d'équipe réellement portées (composition_equipe, n°6).
+  const tagsEquipe = [
+    ...new Set(
+      vetsRows
+        .flatMap((v) => v.tags ?? [])
+        .map((t) => t.trim().toLowerCase())
+        .filter((t) => t !== ''),
+    ),
+  ].sort()
 
   // Types de créneaux DU cabinet (dynamiques — verrou 8) : l'IA peut proposer
   // un filtre `creneaux` pour au_plus_n (« max 2 week-ends par mois », n°19).
@@ -758,9 +895,25 @@ export async function proposerRegleDepuisTexte(phrase: string): Promise<Proposit
 
   let proposition: PropositionRegle
   try {
-    proposition = await proposerRegleIA(phrase.trim(), vets, typesCreneaux)
+    proposition = await proposerRegleIA(phrase.trim(), vets, typesCreneaux, tagsEquipe)
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Erreur de l'assistant IA." }
+  }
+
+  // ── Règle GLOBALE d'équipe (composition_equipe, n°6) : conversion dédiée ──
+  if (proposition.brique_id === 'composition_equipe') {
+    const convCompo = propositionVersComposition(proposition, tagsEquipe)
+    if (!convCompo.ok) {
+      return {
+        proposition: { ...proposition, faisable: false, message: convCompo.raison },
+        apercu: '',
+      }
+    }
+    return {
+      proposition,
+      apercu: apercuProposition(proposition),
+      payloadComposition: convCompo.payload,
+    }
   }
 
   const conv = propositionVersPayload(proposition, vets)

@@ -12,10 +12,11 @@ import {
 } from '../utils'
 import {
   DEFAULT_STRUCTURE_CONFIG, estStructureDure, relationsEffectives,
-  RELATIONS_STRUCTURE_DEFAUT,
+  RELATIONS_STRUCTURE_DEFAUT, compositionsDures,
   type StructureConfig, type StructureRegleConfig, type RelationStructure,
 } from '../structure-config'
 import { apparierSourcePourCible, apparierCiblePourSource } from '../relations-structure'
+import { violeCompositionPose, messageComposition } from './composition-equipe'
 import { estAttribue, vetPourRole, roleDuVet } from '../attribution'
 
 // ── Helpers internes ────────────────────────────────────
@@ -545,6 +546,34 @@ function checkR21RolesDistincts(
 }
 
 /**
+ * COMPOSITION — Composition d'équipe par tag (backlog n°6, règles DURES).
+ *
+ * « Au moins un senior par créneau ciblé » / « un junior jamais seul ».
+ * Ne juge que la POSE COMPLÉTANTE (l'équipe du créneau se fige) — cf.
+ * rules/composition-equipe.ts. Les règles souples (étage ≥ 3) ne bloquent
+ * pas : elles pèsent au scoring (les deux scoreurs).
+ */
+function checkComposition(
+  vet: VetEngine,
+  slot: SlotGarde,
+  roleVisé: RoleGarde,
+  planning: PlanningPartiel,
+  structure: StructureConfig,
+  allVets: VetEngine[],
+): ValidationResult {
+  const regles = compositionsDures(structure)
+  if (regles.length === 0) return ok()
+
+  const vetsById = new Map(allVets.map((v) => [v.id, v]))
+  for (const regle of regles) {
+    if (violeCompositionPose(regle, slot, roleVisé, vet, planning, vetsById)) {
+      return invalid(messageComposition(regle, vet.prenom))
+    }
+  }
+  return ok()
+}
+
+/**
  * R22 — Un vétérinaire ne tient qu'UNE garde par jour (inter-créneaux).
  *
  * Nécessaire depuis que plusieurs créneaux peuvent coexister le même jour
@@ -803,6 +832,8 @@ export function isValid(
     // R8 : ne s'applique que si slot.type est la CIBLE d'une relation
     // inversion_role (le check filtre lui-même — générique, plus de « WE only »).
     checkR8Inversion(vet, slot, roleVisé, planning, structure.r8_inversion, relations),
+    // COMPOSITION (n°6) : équipe par tag — dur seulement (pose complétante).
+    checkComposition(vet, slot, roleVisé, planning, structure, allVets),
   ]
 
   // Renvoie la première contrainte violée
@@ -833,4 +864,5 @@ export {
   checkAuPlusN,
   checkEspacementMin,
   checkEspacementWeekend,
+  checkComposition,
 }

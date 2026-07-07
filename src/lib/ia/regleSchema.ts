@@ -11,10 +11,12 @@
 // ============================================================
 
 import { z } from 'zod'
-import type { BriqueEvaluable, ForceFormulaire, UpsertReglePayload } from '@/app/(protected)/regles/actions'
+import type {
+  BriqueEvaluable, ForceFormulaire, UpsertReglePayload, CompositionReglePayload,
+} from '@/app/(protected)/regles/actions'
 import { rendreRegle } from '@/engine/briques/catalogue'
 
-/** Les 6 briques que l'IA peut proposer (= évaluables par le moteur). */
+/** Les briques que l'IA peut proposer (= évaluables par le moteur). */
 export const BRIQUES_IA = [
   'interdire_creneau',
   'repos_conditionnel',
@@ -23,6 +25,8 @@ export const BRIQUES_IA = [
   'au_plus_n',
   'espacement_min',
   'espacement_weekend',
+  // Règle GLOBALE (pas de vétérinaire) — composition d'équipe par tag (n°6).
+  'composition_equipe',
 ] as const
 
 export const FORCES_IA = ['jamais', 'sauf_crise', 'evitee', 'si_possible'] as const
@@ -64,6 +68,10 @@ export const PropositionRegleSchema = z.object({
   ecart_min_jours: z.number().int().nullable(),
   /** espacement_weekend : « au plus 1 week-end sur N » (N ≥ 2). */
   n_semaines: z.number().int().nullable(),
+  /** composition_equipe : mode de la règle d'équipe (règle GLOBALE, n°6). */
+  mode_composition: z.enum(['au_moins_un', 'pas_seuls']).nullable(),
+  /** composition_equipe : étiquette ciblée (parmi celles du cabinet, ex. senior). */
+  tag: z.string().nullable(),
 })
 
 export type PropositionRegle = z.infer<typeof PropositionRegleSchema>
@@ -133,6 +141,11 @@ export function propositionVersPayload(
 ): ConversionResultat {
   if (!p.faisable) return { ok: false, raison: p.message || 'Demande non traduisible en règle.' }
   if (!p.brique_id) return { ok: false, raison: 'Type de règle non déterminé par l’assistant.' }
+  // La composition d'équipe (règle GLOBALE, sans vétérinaire) a sa propre
+  // conversion — cf. propositionVersComposition (routée par l'appelant).
+  if (p.brique_id === 'composition_equipe') {
+    return { ok: false, raison: 'Règle d’équipe : conversion dédiée (propositionVersComposition).' }
+  }
 
   const owner = resoudrePrenom(p.veterinaire, vets)
   if (!owner.ok) {
@@ -224,6 +237,55 @@ export function propositionVersPayload(
   return { ok: true, payload }
 }
 
+export type ConversionCompositionResultat =
+  | { ok: true; payload: CompositionReglePayload }
+  | { ok: false; raison: string }
+
+/**
+ * propositionVersComposition — convertit une proposition `composition_equipe`
+ * (règle GLOBALE : pas de vétérinaire nominal) en CompositionReglePayload.
+ * `tagsEquipe` : étiquettes réellement portées par l'équipe (normalisées) —
+ * anti-coquille-vide : un tag que personne ne porte est refusé ici (le serveur
+ * re-vérifie à l'écriture, frontière de confiance inchangée).
+ */
+export function propositionVersComposition(
+  p: PropositionRegle,
+  tagsEquipe: string[],
+): ConversionCompositionResultat {
+  if (!p.faisable) return { ok: false, raison: p.message || 'Demande non traduisible en règle.' }
+  if (p.brique_id !== 'composition_equipe') {
+    return { ok: false, raison: 'Type de règle non déterminé par l’assistant.' }
+  }
+  const mode = p.mode_composition
+  if (mode !== 'au_moins_un' && mode !== 'pas_seuls') {
+    return { ok: false, raison: 'Précise le sens de la règle : « toujours au moins un … » ou « … jamais seuls ».' }
+  }
+  const tag = (p.tag ?? '').trim().toLowerCase()
+  if (tag === '') {
+    return { ok: false, raison: 'Précise l’étiquette concernée (ex. junior, senior).' }
+  }
+  if (!tagsEquipe.includes(tag)) {
+    return {
+      ok: false,
+      raison: `Aucun vétérinaire ne porte l'étiquette « ${tag} ». Ajoute-la d'abord sur les fiches concernées (page Équipe), puis reviens créer la règle.`,
+    }
+  }
+  const creneaux = [...new Set(
+    (p.creneaux ?? []).filter((x): x is string => typeof x === 'string' && x.trim() !== ''),
+  )]
+  return {
+    ok: true,
+    payload: {
+      mode,
+      tag,
+      ...(creneaux.length > 0 ? { creneaux } : {}),
+      // Défaut FERME : « un junior jamais seul » est presque toujours une
+      // exigence de sécurité, pas une préférence. L'admin ajuste avant création.
+      force: (p.force ?? 'jamais') as ForceFormulaire,
+    },
+  }
+}
+
 /**
  * apercuProposition — rend la proposition en une phrase française (le même
  * rendu que la liste /regles), à partir des termes humains de la proposition.
@@ -255,7 +317,12 @@ export function apercuProposition(p: PropositionRegle): string {
     case 'espacement_weekend':
       params = { n_semaines: p.n_semaines }
       break
+    case 'composition_equipe':
+      params = { mode: p.mode_composition, tag: p.tag, creneaux: p.creneaux ?? undefined }
+      break
   }
   const predicat = rendreRegle(p.brique_id, params, { nomVeto: (x) => x })
+  // Règle GLOBALE (composition) : pas de sujet vétérinaire à préfixer.
+  if (p.brique_id === 'composition_equipe') return predicat
   return p.veterinaire ? `${p.veterinaire} ${predicat}` : predicat
 }

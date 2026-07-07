@@ -43,6 +43,8 @@ interface FormState {
   couleur: string
   actif: boolean
   dernier_recours: boolean
+  /** Étiquettes d'équipe (junior/senior…) — règles de composition (n°6). */
+  tags: string[]
 }
 
 const defaultForm: FormState = {
@@ -54,7 +56,11 @@ const defaultForm: FormState = {
   couleur: '#3B82F6',
   actif: true,
   dernier_recours: false,
+  tags: [],
 }
+
+/** Étiquettes proposées par défaut (saisie libre possible en plus). */
+const TAGS_PRESETS = ['junior', 'senior']
 
 export function VeterinaireForm({ open, onClose, veterinaire }: VeterinaireFormProps) {
   const isEdit = Boolean(veterinaire)
@@ -71,11 +77,13 @@ export function VeterinaireForm({ open, onClose, veterinaire }: VeterinaireFormP
           couleur: veterinaire.couleur,
           actif: veterinaire.actif,
           dernier_recours: veterinaire.dernier_recours,
+          tags: veterinaire.tags ?? [],
         }
       : defaultForm
   )
 
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
+  const [tagLibre, setTagLibre] = useState('')
 
   // Reset form when dialog opens/closes
   const handleClose = () => {
@@ -89,11 +97,27 @@ export function VeterinaireForm({ open, onClose, veterinaire }: VeterinaireFormP
           couleur: veterinaire.couleur,
           actif: veterinaire.actif,
           dernier_recours: veterinaire.dernier_recours,
+          tags: veterinaire.tags ?? [],
         }
       : defaultForm
     )
     setErrors({})
+    setTagLibre('')
     onClose()
+  }
+
+  const basculerTag = (tag: string) => {
+    setForm((f) => ({
+      ...f,
+      tags: f.tags.includes(tag) ? f.tags.filter((t) => t !== tag) : [...f.tags, tag],
+    }))
+  }
+
+  const ajouterTagLibre = () => {
+    const t = tagLibre.trim().toLowerCase()
+    if (t === '' || form.tags.includes(t)) { setTagLibre(''); return }
+    setForm((f) => ({ ...f, tags: [...f.tags, t] }))
+    setTagLibre('')
   }
 
   const validate = (): boolean => {
@@ -235,6 +259,39 @@ export function VeterinaireForm({ open, onClose, veterinaire }: VeterinaireFormP
                 />
               ))}
             </div>
+          </div>
+
+          {/* Étiquettes d'équipe (junior/senior… — règles de composition n°6) */}
+          <div className="space-y-1.5">
+            <Label>Étiquettes d&apos;équipe</Label>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {[...new Set([...TAGS_PRESETS, ...form.tags])].map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => basculerTag(tag)}
+                  className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                    form.tags.includes(tag)
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-muted text-muted-foreground border-border hover:border-primary'
+                  }`}
+                >
+                  {tag}
+                </button>
+              ))}
+              <Input
+                value={tagLibre}
+                onChange={(e) => setTagLibre(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); ajouterTagLibre() } }}
+                onBlur={ajouterTagLibre}
+                placeholder="Autre…"
+                className="h-7 w-24 text-xs"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Utilisées par les règles d&apos;équipe (« un junior jamais seul »,
+              « au moins un senior par week-end ») — page Règles.
+            </p>
           </div>
 
           {/* Options booléennes */}
