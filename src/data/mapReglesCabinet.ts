@@ -90,6 +90,10 @@ const TYPES_V1: ReadonlySet<TypeContrainte> = new Set<TypeContrainte>([
   'au_plus_n',      // limite de charge réglable (brique catalogue `au_plus_n`)
   'espacement_min', // espacement minimal réglable (brique catalogue `espacement_min`)
   'espacement_weekend', // fréquence WE réglable (brique catalogue `espacement_weekend`)
+  // Desiderata (n°7) — préférences positives, toujours souples (rules/desiderata.ts).
+  'preferer_creneau',
+  'preferer_avec',
+  'volume_gardes',
 ])
 
 /**
@@ -105,6 +109,9 @@ const BRIQUE_VERS_TYPE: Record<string, TypeContrainte> = {
   au_plus_n: 'au_plus_n',
   espacement_min: 'espacement_min',
   espacement_weekend: 'espacement_weekend',
+  preferer_creneau: 'preferer_creneau',
+  preferer_avec: 'preferer_avec',
+  volume_gardes: 'volume_gardes',
 }
 
 export interface RegleRejetee {

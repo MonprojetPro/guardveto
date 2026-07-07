@@ -33,6 +33,7 @@ function prop(over: Partial<PropositionRegle>): PropositionRegle {
     partenaire: null, n: null, fenetre: null, creneaux: null,
     ecart_min_jours: null, n_semaines: null,
     mode_composition: null, tag: null, role_interdit: null,
+    jours: null, sens: null,
     ...over,
   }
 }
@@ -322,5 +323,62 @@ describe('propositionVersRoleInterdit (règle GLOBALE — n°22)', () => {
     )
     expect(phrase).toContain('junior')
     expect(phrase).toContain('1er')
+  })
+})
+
+describe('desiderata (n°7) — conversion par-véto, toujours souple', () => {
+  it('preferer_creneau : jours + force souple par défaut', () => {
+    const r = propositionVersPayload(
+      prop({ brique_id: 'preferer_creneau', veterinaire: 'Manon', jours: ['mardi'] }),
+      VETS,
+    )
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.payload.jours).toEqual(['mardi'])
+      expect(r.payload.force).toBe('si_possible')
+    }
+  })
+
+  it('preferer_creneau sans jour NI créneau → rejeté', () => {
+    expect(propositionVersPayload(
+      prop({ brique_id: 'preferer_creneau', veterinaire: 'Manon' }), VETS,
+    ).ok).toBe(false)
+  })
+
+  it('preferer_avec : partenaire résolu, soi-même rejeté', () => {
+    const r = propositionVersPayload(
+      prop({ brique_id: 'preferer_avec', veterinaire: 'Manon', partenaire: 'Antoine' }),
+      VETS,
+    )
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.payload.avec_veterinaire_id).toBe('id-antoine')
+
+    expect(propositionVersPayload(
+      prop({ brique_id: 'preferer_avec', veterinaire: 'Manon', partenaire: 'Manon' }), VETS,
+    ).ok).toBe(false)
+  })
+
+  it('volume_gardes : sens obligatoire ; force « jamais » rétrogradée en souple', () => {
+    const r = propositionVersPayload(
+      prop({ brique_id: 'volume_gardes', veterinaire: 'Victor', sens: 'plus', force: 'jamais' }),
+      VETS,
+    )
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.payload.sens).toBe('plus')
+      expect(r.payload.force).toBe('sauf_crise') // jamais → rétrogradé
+    }
+    expect(propositionVersPayload(
+      prop({ brique_id: 'volume_gardes', veterinaire: 'Victor' }), VETS,
+    ).ok).toBe(false)
+  })
+
+  it('aperçu : phrases françaises avec sujet', () => {
+    expect(apercuProposition(
+      prop({ brique_id: 'preferer_creneau', veterinaire: 'Manon', jours: ['mardi'] }),
+    )).toContain('mardi')
+    expect(apercuProposition(
+      prop({ brique_id: 'volume_gardes', veterinaire: 'Victor', sens: 'plus' }),
+    )).toContain('PLUS')
   })
 })

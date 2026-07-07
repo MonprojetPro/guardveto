@@ -53,6 +53,22 @@ const BRIQUES: { value: BriqueEvaluable; label: string; aide: string }[] = [
   { value: 'au_plus_n', label: 'Limite de gardes', aide: 'Au plus N gardes sur une fenêtre (semaine civile ou jours glissants).' },
   { value: 'espacement_min', label: 'Espacement minimal', aide: 'Au moins X jours de repos entre deux gardes du même véto.' },
   { value: 'espacement_weekend', label: 'Fréquence des week-ends', aide: 'Au plus un week-end de garde toutes les N semaines (« un week-end sur N »).' },
+  // Desiderata (n°7) — préférences POSITIVES, toujours souples.
+  { value: 'preferer_creneau', label: 'Préférence de jours / créneaux', aide: 'Le moteur essaie de placer ses gardes sur les jours ou créneaux qu’il préfère. Jamais bloquant.' },
+  { value: 'preferer_avec', label: 'Préfère être de garde avec…', aide: 'Le moteur essaie de le mettre en binôme avec ce co-équipier. Jamais bloquant.' },
+  { value: 'volume_gardes', label: 'Souhaite plus / moins de gardes', aide: 'Biais assumé sur la répartition : le moteur lui donne plus (ou moins) de gardes que la moyenne. Jamais bloquant.' },
+]
+
+/** Desiderata : préférences pures — le niveau « Interdiction ferme » est exclu. */
+const BRIQUES_SOUPLES_SEULEMENT = new Set<BriqueEvaluable>([
+  'preferer_creneau', 'preferer_avec', 'volume_gardes',
+])
+
+/** Jours proposés pour une PRÉFÉRENCE (7 jours — un week-end est daté samedi). */
+const JOURS_TOUS = [
+  ...JOURS,
+  { value: 'samedi', label: 'Samedi' },
+  { value: 'dimanche', label: 'Dimanche' },
 ]
 
 /** Fenêtres de comptage pour « au plus N gardes » (alignées sur FENETRES_VALIDES). */
@@ -84,6 +100,9 @@ const FORCE_DEFAUT: Record<BriqueEvaluable, ForceFormulaire> = {
   au_plus_n: 'sauf_crise',      // limite protectrice : ferme mais pliable en crise
   espacement_min: 'sauf_crise', // idem (trop dur → risque d'impasse)
   espacement_weekend: 'si_possible', // fréquence WE = préférence (ne jamais bloquer)
+  preferer_creneau: 'si_possible',   // desiderata = préférences pures (n°7)
+  preferer_avec: 'si_possible',
+  volume_gardes: 'si_possible',
 }
 
 // ── Composant ────────────────────────────────────────────────
@@ -168,6 +187,17 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
       : typeof p.n_semaines === 'string' ? p.n_semaines : '2',
   )
 
+  // preferer_creneau (n°7) : jours préférés + créneaux préférés (creneaux partagé
+  // avec le filtre au_plus_n — même état creneauxFiltre, validé par brique).
+  const [joursPref, setJoursPref] = useState<string[]>(
+    Array.isArray(p.jours)
+      ? (p.jours as unknown[]).filter((x): x is string => typeof x === 'string')
+      : [],
+  )
+
+  // volume_gardes (n°7)
+  const [sens, setSens] = useState<string>(p.sens === 'moins' ? 'moins' : 'plus')
+
   // Validité : PERMANENTE (par défaut) ou limitée à une période existante.
   const periodeInit = regle?.periode_id && periodesDispo.some((per) => per.id === regle.periode_id)
     ? regle.periode_id
@@ -183,6 +213,9 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
 
   const togglePeriode = (p: string) =>
     setPeriodes((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]))
+
+  const toggleJourPref = (j: string) =>
+    setJoursPref((prev) => (prev.includes(j) ? prev.filter((x) => x !== j) : [...prev, j]))
 
   const toggleCreneauFiltre = (code: string) =>
     setCreneauxFiltre((prev) => (prev.includes(code) ? prev.filter((x) => x !== code) : [...prev, code]))
@@ -213,11 +246,23 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
       case 'espacement_weekend':
         params = { n_semaines: Number(nSemaines) || 0 }
         break
+      case 'preferer_creneau':
+        params = {
+          jours: joursPref.length > 0 ? joursPref : undefined,
+          creneaux: creneauxFiltre.length > 0 ? creneauxFiltre : undefined,
+        }
+        break
+      case 'preferer_avec':
+        params = { avec_veterinaire_id: avecId }
+        break
+      case 'volume_gardes':
+        params = { sens }
+        break
     }
     const predicat = rendreRegle(briqueId, params, { nomVeto })
     return sujet ? `${sujet} ${predicat}` : predicat
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [briqueId, ownerId, jour, exVac, siWe, sinon, semaines, periodes, avecId, n, fenetre, creneauxFiltre, ecartMin, nSemaines, vets])
+  }, [briqueId, ownerId, jour, exVac, siWe, sinon, semaines, periodes, avecId, n, fenetre, creneauxFiltre, ecartMin, nSemaines, joursPref, sens, vets])
 
   const handleSubmit = () => {
     if (!ownerId) { toast.error('Sélectionnez le vétérinaire concerné.'); return }
@@ -240,6 +285,13 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
       const v = Number(nSemaines)
       if (!Number.isInteger(v) || v < 2) { toast.error('Indiquez une fréquence valide (un week-end sur 2 minimum).'); return }
     }
+    if (briqueId === 'preferer_creneau' && joursPref.length === 0 && creneauxFiltre.length === 0) {
+      toast.error('Sélectionnez au moins un jour ou un type de créneau préféré.'); return
+    }
+    if (briqueId === 'preferer_avec') {
+      if (!avecId) { toast.error('Sélectionnez le co-équipier préféré.'); return }
+      if (avecId === ownerId) { toast.error('Choisissez deux vétérinaires différents.'); return }
+    }
 
     startTransition(async () => {
       const res = await upsertRegle({
@@ -256,9 +308,11 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
         avec_veterinaire_id: avecId,
         n: Number(n),
         fenetre,
-        creneaux: briqueId === 'au_plus_n' && creneauxFiltre.length > 0 ? creneauxFiltre : undefined,
+        creneaux: (briqueId === 'au_plus_n' || briqueId === 'preferer_creneau') && creneauxFiltre.length > 0 ? creneauxFiltre : undefined,
         ecart_min_jours: Number(ecartMin),
         n_semaines: Number(nSemaines),
+        jours: briqueId === 'preferer_creneau' && joursPref.length > 0 ? joursPref : undefined,
+        sens,
         periode_id: validite === PERMANENTE ? null : validite,
       })
       if (res?.error) { toast.error(res.error); return }
@@ -473,6 +527,93 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
             </div>
           )}
 
+          {briqueId === 'preferer_creneau' && (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>Jours préférés</Label>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {JOURS_TOUS.map((j) => (
+                    <button
+                      key={j.value}
+                      type="button"
+                      onClick={() => toggleJourPref(j.value)}
+                      className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                        joursPref.includes(j.value)
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-muted text-muted-foreground border-border hover:border-primary'
+                      }`}
+                    >
+                      {j.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Créneaux préférés</Label>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {typesCreneaux.map((t) => (
+                    <button
+                      key={t.code}
+                      type="button"
+                      onClick={() => toggleCreneauFiltre(t.code)}
+                      className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                        creneauxFiltre.includes(t.code)
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-muted text-muted-foreground border-border hover:border-primary'
+                      }`}
+                    >
+                      {t.nom}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Au moins un jour OU un créneau. Le moteur essaie de concentrer ses
+                  gardes dessus — sans jamais bloquer la génération.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {briqueId === 'preferer_avec' && (
+            <div className="space-y-1.5">
+              <Label>Préfère être de garde avec</Label>
+              <Select value={avecId} onValueChange={(v) => v && setAvecId(v)}>
+                <SelectTrigger>
+                  {avecId
+                    ? (() => { const v = autresVets.find((x) => x.id === avecId); return v ? `${v.prenom} ${v.nom}` : '' })()
+                    : <span className="text-muted-foreground">Sélectionner…</span>}
+                </SelectTrigger>
+                <SelectContent>
+                  {autresVets.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>{v.prenom} {v.nom}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Préférence dans UN sens (créez la règle symétrique si le souhait est partagé).
+              </p>
+            </div>
+          )}
+
+          {briqueId === 'volume_gardes' && (
+            <div className="space-y-1.5">
+              <Label>Souhait</Label>
+              <Select value={sens} onValueChange={(v) => v && setSens(v)}>
+                <SelectTrigger>
+                  {sens === 'plus' ? 'Faire PLUS de gardes que la moyenne' : 'Faire MOINS de gardes que la moyenne'}
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="plus">Faire PLUS de gardes que la moyenne</SelectItem>
+                  <SelectItem value="moins">Faire MOINS de gardes que la moyenne</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Biais assumé sur la répartition — les règles dures et l&apos;équilibre
+                global restent prioritaires.
+              </p>
+            </div>
+          )}
+
           {briqueId === 'espacement_weekend' && (
             <div className="space-y-1.5">
               <Label htmlFor="n-semaines">De garde au plus un week-end sur…</Label>
@@ -491,7 +632,7 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
             </div>
           )}
 
-          {/* FORCE */}
+          {/* FORCE — les desiderata (préférences pures) excluent « Interdiction ferme » */}
           <div className="space-y-1.5">
             <Label>Niveau d&apos;importance</Label>
             <Select value={force} onValueChange={(v) => v && setForce(v as ForceFormulaire)}>
@@ -499,7 +640,9 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
                 {(() => { const f = FORCES.find((x) => x.value === force); return f ? `${f.symbole} ${f.label}` : '' })()}
               </SelectTrigger>
               <SelectContent>
-                {FORCES.map((f) => (
+                {FORCES.filter(
+                  (f) => !(BRIQUES_SOUPLES_SEULEMENT.has(briqueId) && f.value === 'jamais'),
+                ).map((f) => (
                   <SelectItem key={f.value} value={f.value}>{f.symbole} {f.label}</SelectItem>
                 ))}
               </SelectContent>

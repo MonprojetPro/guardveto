@@ -30,6 +30,8 @@ import { AssistantIA } from './AssistantIA'
 const BRIQUES_EDITABLES = new Set([
   'interdire_creneau', 'repos_conditionnel', 'alternance_ancre', 'duo_interdit',
   'au_plus_n', 'espacement_min', 'espacement_weekend',
+  // Desiderata (n°7) — préférences positives par véto.
+  'preferer_creneau', 'preferer_avec', 'volume_gardes',
 ])
 
 // ── Données ──────────────────────────────────────────────────

@@ -427,6 +427,68 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
     },
   },
 
+  // ── Desiderata (backlog n°7) — préférences POSITIVES par véto ──
+  // TOUJOURS souples (étage ≥ 3) : l'écriture refuse « jamais », l'évaluation
+  // clampe (rules/desiderata.ts). Une préférence ne bloque jamais un planning.
+
+  preferer_creneau: {
+    id: 'preferer_creneau',
+    famille: 'forcer',
+    operateur: 'PREFERER',
+    axes: ['qui', 'quoi', 'quand'],
+    schemaParams: {
+      jours: 'string[]? (lundi..dimanche — jours préférés)',
+      creneaux: 'string[]? (codes de créneaux préférés)',
+    },
+    widget: 'WidgetPrefererCreneau',
+    rendreLangageNaturel: (params) => {
+      const jours = Array.isArray(params.jours)
+        ? (params.jours as unknown[]).filter((x): x is string => typeof x === 'string')
+        : []
+      const creneaux = Array.isArray(params.creneaux)
+        ? (params.creneaux as unknown[]).filter((x): x is string => typeof x === 'string')
+        : []
+      const morceaux = [
+        ...jours.map((j) => `le ${j}`),
+        ...creneaux.map(creneauLisible),
+      ]
+      if (morceaux.length === 0) return 'préfère certains créneaux (non précisés)'
+      return `préfère être de garde ${morceaux.join(', ')}`
+    },
+  },
+
+  preferer_avec: {
+    id: 'preferer_avec',
+    famille: 'forcer',
+    operateur: 'PREFERER_AVEC',
+    axes: ['qui'],
+    schemaParams: {
+      avec_veterinaire_id: 'string (id du co-équipier préféré)',
+    },
+    widget: 'WidgetPrefererAvec',
+    rendreLangageNaturel: (params, ctx) => {
+      const id = typeof params.avec_veterinaire_id === 'string' ? params.avec_veterinaire_id : null
+      if (!id) return 'préfère être de garde avec un autre vétérinaire (non précisé)'
+      return `préfère être de garde avec ${ctx?.nomVeto?.(id) ?? id}`
+    },
+  },
+
+  volume_gardes: {
+    id: 'volume_gardes',
+    famille: 'equilibrer',
+    operateur: 'VOLUME',
+    axes: ['qui', 'combien'],
+    schemaParams: {
+      sens: "string (plus|moins — souhaite plus ou moins de gardes que la moyenne)",
+    },
+    widget: 'WidgetVolumeGardes',
+    rendreLangageNaturel: (params) => {
+      if (params.sens === 'plus') return 'souhaite faire PLUS de gardes que la moyenne'
+      if (params.sens === 'moins') return 'souhaite faire MOINS de gardes que la moyenne'
+      return 'souhaite ajuster son volume de gardes (non précisé)'
+    },
+  },
+
   // ⚠️ INTERNE — « motif composite pré-calculé » (archi V2 §catalogue blindé).
   // Le métier « grand week-end » (repos vendredi si pas de garde WE, jeudi sinon)
   // est DÉJÀ livré par la brique `repos_conditionnel`. Le moteur calcule ce motif

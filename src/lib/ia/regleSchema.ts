@@ -29,6 +29,10 @@ export const BRIQUES_IA = [
   // Règles GLOBALES (pas de vétérinaire) — équipe par tag (n°6 + n°22).
   'composition_equipe',
   'role_interdit_tag',
+  // Desiderata (n°7) — préférences positives par véto, toujours souples.
+  'preferer_creneau',
+  'preferer_avec',
+  'volume_gardes',
 ] as const
 
 export const FORCES_IA = ['jamais', 'sauf_crise', 'evitee', 'si_possible'] as const
@@ -76,6 +80,10 @@ export const PropositionRegleSchema = z.object({
   tag: z.string().nullable(),
   /** role_interdit_tag : label du rôle interdit (parmi les rôles du cabinet, ex. premier). */
   role_interdit: z.string().nullable(),
+  /** preferer_creneau : jours préférés (lundi..dimanche). */
+  jours: z.array(z.enum(['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'])).nullable(),
+  /** volume_gardes : souhaite plus ou moins de gardes que la moyenne. */
+  sens: z.enum(['plus', 'moins']).nullable(),
 })
 
 export type PropositionRegle = z.infer<typeof PropositionRegleSchema>
@@ -156,16 +164,24 @@ export function propositionVersPayload(
     return { ok: false, raison: raisonPrenom(p.veterinaire, owner.cause) }
   }
 
-  // Force par défaut si l'IA n'en propose pas : la fréquence WE est une
-  // PRÉFÉRENCE par défaut (décision MiKL — ne jamais bloquer une génération) ;
-  // les autres briques restent en sauf_crise.
+  // Force par défaut si l'IA n'en propose pas : la fréquence WE et les
+  // desiderata (n°7) sont des PRÉFÉRENCES par défaut (ne jamais bloquer une
+  // génération) ; les autres briques restent en sauf_crise.
+  const DESIDERATA = new Set(['preferer_creneau', 'preferer_avec', 'volume_gardes'])
   const forceParDefaut: ForceFormulaire =
-    p.brique_id === 'espacement_weekend' ? 'si_possible' : 'sauf_crise'
+    p.brique_id === 'espacement_weekend' || DESIDERATA.has(p.brique_id)
+      ? 'si_possible'
+      : 'sauf_crise'
+
+  let force = (p.force ?? forceParDefaut) as ForceFormulaire
+  // Desiderata : préférences PURES — « jamais » serait refusé par le serveur ;
+  // on rétrograde au niveau souple le plus proche.
+  if (DESIDERATA.has(p.brique_id) && force === 'jamais') force = 'sauf_crise'
 
   const payload: UpsertReglePayload = {
     brique_id: p.brique_id as BriqueEvaluable,
     owner_id: owner.id,
-    force: (p.force ?? forceParDefaut) as ForceFormulaire,
+    force,
   }
 
   switch (p.brique_id) {
@@ -234,6 +250,37 @@ export function propositionVersPayload(
         return { ok: false, raison: `Précise une fréquence valide : un week-end sur 2 à ${N_SEM_WE_MAX}.` }
       }
       payload.n_semaines = n
+      break
+    }
+    // ── Desiderata (n°7) — préférences positives ──
+    case 'preferer_creneau': {
+      const jours = [...new Set(p.jours ?? [])]
+      const creneaux = [...new Set(
+        (p.creneaux ?? []).filter((x): x is string => typeof x === 'string' && x.trim() !== ''),
+      )]
+      if (jours.length === 0 && creneaux.length === 0) {
+        return { ok: false, raison: 'Précise au moins un jour ou un type de créneau préféré.' }
+      }
+      if (jours.length > 0) payload.jours = jours
+      if (creneaux.length > 0) payload.creneaux = creneaux
+      break
+    }
+    case 'preferer_avec': {
+      const part = resoudrePrenom(p.partenaire, vets)
+      if (!part.ok) {
+        return { ok: false, raison: raisonPrenom(p.partenaire, part.cause, true) }
+      }
+      if (part.id === owner.id) {
+        return { ok: false, raison: 'Le co-équipier préféré doit être un autre vétérinaire.' }
+      }
+      payload.avec_veterinaire_id = part.id
+      break
+    }
+    case 'volume_gardes': {
+      if (p.sens !== 'plus' && p.sens !== 'moins') {
+        return { ok: false, raison: 'Précise le souhait : plus ou moins de gardes.' }
+      }
+      payload.sens = p.sens
       break
     }
   }
@@ -373,6 +420,16 @@ export function apercuProposition(p: PropositionRegle): string {
       break
     case 'role_interdit_tag':
       params = { tag: p.tag, role: p.role_interdit, creneaux: p.creneaux ?? undefined }
+      break
+    case 'preferer_creneau':
+      params = { jours: p.jours ?? undefined, creneaux: p.creneaux ?? undefined }
+      break
+    case 'preferer_avec':
+      // Le partenaire est un prénom : nomVeto le renvoie tel quel.
+      params = { avec_veterinaire_id: p.partenaire }
+      break
+    case 'volume_gardes':
+      params = { sens: p.sens }
       break
   }
   const predicat = rendreRegle(p.brique_id, params, { nomVeto: (x) => x })

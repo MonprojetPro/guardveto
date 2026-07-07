@@ -41,6 +41,7 @@ const CAPACITES = [
   'Limiter le nombre de gardes d’un vétérinaire sur une période (ex. au plus 2 par semaine).',
   'Imposer un nombre minimum de jours entre deux gardes d’un même vétérinaire.',
   'Créer des règles d’équipe avec les étiquettes (ex. « un junior jamais seul », « toujours un senior le week-end », « un junior jamais 1er »).',
+  'Enregistrer des préférences (ex. « Manon préfère le mardi », « Victor préfère être avec Antoine », « Antoine veut plus de gardes »).',
 ]
 
 const FORCE_LABEL: Record<ForceFormulaire, string> = {

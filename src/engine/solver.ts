@@ -48,6 +48,7 @@ import {
   type CompositionEquipeRegle, type RoleInterditTagRegle,
 } from './structure-config'
 import { penaliteCompositionCandidat, penaliteRoleInterditCandidat } from './rules/composition-equipe'
+import { penaliteDesiderataCandidat, biaisVolumeCandidat } from './rules/desiderata'
 import type { HistoriqueFetesResolu } from './historique-fete'
 import type { DiagnosticImpasse } from './diagnostic'
 import { construireDiagnostic, type CreneauStep, type ReSimuler } from './diagnostic'
@@ -432,7 +433,11 @@ function scorerCandidat(
   ) + penaliteRoleInterditCandidat(
     // Rôle interdit par tag souple (n°22).
     step.type, step.role, vet, rolesInterdits,
-  )
+  ) + penaliteDesiderataCandidat(
+    // Desiderata (n°7) : préférences positives du véto (jours/créneaux, avec X).
+    { date: step.date, type: step.type, saison: step.saison, nbPlaces: step.nbPlaces },
+    step.role, vet, planning,
+  ) + biaisVolumeCandidat(vet) // « veut plus/moins de gardes » (terme signé du tri)
 
   // Créneau SUR-MESURE : équité d'étalement par code (jamais pour les codes
   // historiques — leurs branches nommées ci-dessous restent byte-identiques).
@@ -853,7 +858,11 @@ export function scorerCandidatLNS(
   ) + penaliteRoleInterditCandidat(
     // Rôle interdit par tag souple (n°22) — cohérente avec scorerCandidat.
     step.type, step.role, vet, rolesInterdits,
-  )
+  ) + penaliteDesiderataCandidat(
+    // Desiderata (n°7) — cohérente avec scorerCandidat.
+    { date: step.date, type: step.type, saison: step.saison, nbPlaces: step.nbPlaces },
+    step.role, vet, planning,
+  ) + biaisVolumeCandidat(vet)
 
   // Créneau SUR-MESURE : même équité d'étalement par code que scorerCandidat.
   if (!estCodeHistorique(step.type)) {

@@ -76,6 +76,15 @@ export interface ContrainteEngine {
     // au plus 1 garde de week-end toutes les N semaines (« 1 WE sur N »). Dur si
     // étage ≤ 2, sinon pénalité. Ne s'applique qu'aux créneaux `weekend`.
     | 'espacement_weekend'
+    // ── Desiderata (backlog n°7) — préférences POSITIVES, TOUJOURS souples ──
+    // Aucun gardien dur n'existe pour elles : l'écriture refuse « jamais » et
+    // l'évaluation clampe tout étage < 3 (cf. rules/desiderata.ts).
+    // « Préfère le mardi » / « préfère les week-ends » (jours et/ou créneaux).
+    | 'preferer_creneau'
+    // « Préfère être de garde avec X » (non symétrique, contrairement au duo).
+    | 'preferer_avec'
+    // « Veut PLUS (ou MOINS) de gardes » — biais assumé sur l'équité.
+    | 'volume_gardes'
   config: Record<string, unknown>
   actif: boolean
 }

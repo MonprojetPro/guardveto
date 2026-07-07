@@ -592,14 +592,29 @@ const BRIQUES_EVALUABLES = {
   au_plus_n: 'au_plus_n',           // limite de charge réglable
   espacement_min: 'espacement_min', // écart minimal entre deux gardes
   espacement_weekend: 'espacement_weekend', // fréquence WE : au plus 1 WE sur N
+  // Desiderata (n°7) — préférences positives, TOUJOURS souples (force
+  // « jamais » refusée plus bas : aucun gardien dur n'existe pour elles).
+  preferer_creneau: 'preferer_creneau',
+  preferer_avec: 'preferer_avec',
+  volume_gardes: 'volume_gardes',
 } as const
 export type BriqueEvaluable = keyof typeof BRIQUES_EVALUABLES
+
+/** Briques desiderata : préférences pures — jamais d'interdiction ferme. */
+const BRIQUES_DESIDERATA = new Set<BriqueEvaluable>([
+  'preferer_creneau', 'preferer_avec', 'volume_gardes',
+])
 
 /** Forces sélectionnables par l'admin (les niveaux système sont exclus). */
 const FORCES_VALIDES = ['jamais', 'sauf_crise', 'evitee', 'si_possible'] as const
 export type ForceFormulaire = (typeof FORCES_VALIDES)[number]
 
 const JOURS_VALIDES = new Set(['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi'])
+// Préférences de jours (preferer_creneau) : les 7 jours (un créneau weekend
+// est daté du samedi ; le vendredi soir du vendredi).
+const JOURS_VALIDES_TOUS = new Set([
+  'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche',
+])
 const SEMAINES_VALIDES = new Set(['paires', 'impaires', 'toutes'])
 const PERIODES_VALIDES = new Set(['soir_semaine', 'weekend']) // seules évaluées par R2
 // Fenêtres de comptage acceptées par checkAuPlusN (hard-constraints.ts) :
@@ -642,6 +657,10 @@ export interface UpsertReglePayload {
   ecart_min_jours?: number
   // espacement_weekend
   n_semaines?: number
+  // preferer_creneau (n°7) : jours et/ou créneaux préférés (creneaux réutilisé)
+  jours?: string[]
+  // volume_gardes (n°7)
+  sens?: string
 }
 
 /** Parse un entier dans [1, max]. Retourne null si invalide (frontière de confiance). */
@@ -736,6 +755,43 @@ function construireParams(
         return { error: `Fréquence de week-end invalide (un week-end sur ${N_SEM_WE_MIN} à ${N_SEM_WE_MAX}).` }
       }
       return { quand: null, params: { n_semaines: n } }
+    }
+    // ── Desiderata (n°7) — préférences positives, toujours souples ──
+    case 'preferer_creneau': {
+      const jours = [...new Set((p.jours ?? []).filter((x) => JOURS_VALIDES_TOUS.has(x)))]
+      const creneaux = [
+        ...new Set((p.creneaux ?? []).filter((x) => typeof x === 'string' && x.trim() !== '')),
+      ]
+      if (jours.length === 0 && creneaux.length === 0) {
+        return { error: 'Sélectionnez au moins un jour ou un type de créneau préféré.' }
+      }
+      if (creneaux.length > 0) {
+        if (!codesCreneaux) return { error: 'Types de créneaux du cabinet indisponibles.' }
+        const inconnus = creneaux.filter((c) => !codesCreneaux.has(c))
+        if (inconnus.length > 0) {
+          return { error: `Type(s) de créneau inconnu(s) pour ce cabinet : ${inconnus.join(', ')}.` }
+        }
+      }
+      return {
+        quand: null,
+        params: {
+          ...(jours.length > 0 ? { jours } : {}),
+          ...(creneaux.length > 0 ? { creneaux } : {}),
+        },
+      }
+    }
+    case 'preferer_avec': {
+      if (!p.avec_veterinaire_id) return { error: 'Sélectionnez le co-équipier préféré.' }
+      if (p.avec_veterinaire_id === p.owner_id) {
+        return { error: 'Le co-équipier préféré doit être un autre vétérinaire.' }
+      }
+      return { quand: null, params: { avec_veterinaire_id: p.avec_veterinaire_id } }
+    }
+    case 'volume_gardes': {
+      if (p.sens !== 'plus' && p.sens !== 'moins') {
+        return { error: 'Précisez le souhait : plus ou moins de gardes.' }
+      }
+      return { quand: null, params: { sens: p.sens } }
     }
     default:
       return { error: 'Brique non gérée par ce constructeur.' }
@@ -839,6 +895,12 @@ export async function upsertRegle(payload: UpsertReglePayload) {
   if (!FORCES_VALIDES.includes(payload.force)) {
     return { error: 'Niveau de force invalide.' }
   }
+  // Desiderata (n°7) : préférences PURES — aucun gardien dur n'existe pour
+  // elles, une force « jamais » serait une coquille vide (le moteur clampe
+  // de toute façon à souple — défense en profondeur).
+  if (BRIQUES_DESIDERATA.has(payload.brique_id) && !FORCES_SOUPLES.has(payload.force)) {
+    return { error: 'Cette règle est une préférence : elle ne peut pas être une interdiction ferme.' }
+  }
   if (!payload.owner_id) {
     return { error: 'Sélectionnez le vétérinaire concerné.' }
   }
@@ -912,9 +974,10 @@ export async function upsertRegle(payload: UpsertReglePayload) {
 
   // ── Cas briques non-duo ────────────────────────────────────
   // Référentiel de créneaux du cabinet : chargé SEULEMENT si un filtre est
-  // demandé (au_plus_n, n°19) — zéro requête supplémentaire sinon.
+  // demandé (au_plus_n n°19, preferer_creneau n°7) — zéro requête sinon.
   const besoinCodes =
-    payload.brique_id === 'au_plus_n' && (payload.creneaux ?? []).length > 0
+    (payload.brique_id === 'au_plus_n' || payload.brique_id === 'preferer_creneau') &&
+    (payload.creneaux ?? []).length > 0
   const codesCreneaux = besoinCodes
     ? await chargerCodesCreneauxValides(supabase, cabinetId)
     : undefined

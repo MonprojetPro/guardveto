@@ -34,6 +34,7 @@ import {
 import {
   compositionCibleType, violeCompositionEquipe, violeRoleInterdit,
 } from './rules/composition-equipe'
+import { scorerDesiderata } from './rules/desiderata'
 import { apparierSourcePourCible } from './relations-structure'
 import { vetPourRole, vetsAttribues, avecVet, attributionVide } from './attribution'
 import { penaliteFeteHistorique, PENALITE_FETE_HISTORIQUE } from './historique-fete'
@@ -358,6 +359,15 @@ export function scorerPlanning(
         }
       }
     }
+  }
+
+  // ── DESIDERATA (backlog n°7, étages configurés — toujours souples) ──
+  // Préférences positives par-véto (« préfère le mardi », « préfère avec X »,
+  // « veut plus de gardes ») : pénalités de NON-satisfaction, mêmes prédicats
+  // que le gardien candidat (le LNS ne défait pas ce que le greedy construit).
+  // Aucun desiderata → tableau vide → byte-identique.
+  for (const contrib of scorerDesiderata(planning, vets)) {
+    ajouter(v, contrib.etage, contrib.regle, contrib.cout)
   }
 
   // ── Étage 6 : ÉQUITÉ (variance des charges) ──

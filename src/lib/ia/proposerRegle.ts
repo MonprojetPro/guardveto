@@ -29,7 +29,7 @@ export interface TypeCreneauIA {
 }
 
 /** Décrit les briques disponibles pour guider l'IA (jours = lundi→vendredi). */
-const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 9 types de règle :
+const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 12 types de règle :
 
 1. interdire_creneau — un vétérinaire ne fait pas de garde un jour fixe de la semaine.
    params: jour (lundi|mardi|mercredi|jeudi|vendredi), exception_vacances_scolaires (true/false).
@@ -58,6 +58,17 @@ const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 9 types de rè
    params: tag (une étiquette de la liste fournie), role_interdit (un rôle de la liste des rôles fournie, ex. 'premier' pour « 1er de garde »), creneaux (optionnel : codes ciblés ; null = tous).
    Ex. « un junior n'est jamais 1er de garde » → role_interdit_tag, tag="junior", role_interdit="premier".
    Force par défaut conseillée : jamais. Même règle que le type 8 pour les étiquettes inconnues.
+
+Les types 10 à 12 sont des DESIDERATA : des préférences POSITIVES d'un vétérinaire (« préfère », « aimerait », « veut plus »). Elles ne bloquent JAMAIS la génération → force TOUJOURS souple (si_possible ou evitee, JAMAIS "jamais").
+10. preferer_creneau — un vétérinaire PRÉFÈRE certains jours et/ou certains créneaux (le moteur y concentre ses gardes).
+   params: jours (liste parmi lundi..dimanche, optionnel), creneaux (codes du cabinet, optionnel) — au moins l'un des deux.
+   Ex. « Manon préfère être de garde le mardi » → preferer_creneau, jours=["mardi"].
+   Ex. « Victor préfère les week-ends » → preferer_creneau, creneaux=["weekend"].
+11. preferer_avec — un vétérinaire PRÉFÈRE être de garde avec un co-équipier donné (dans UN sens).
+   params: veterinaire = qui préfère, partenaire = le co-équipier préféré (deux prénoms différents).
+12. volume_gardes — un vétérinaire souhaite faire PLUS ou MOINS de gardes que la moyenne.
+   params: sens ('plus' | 'moins').
+   Ex. « Antoine veut faire plus de gardes » → volume_gardes, sens="plus".
 
 Niveau d'importance (force) :
 - jamais = interdiction ferme
