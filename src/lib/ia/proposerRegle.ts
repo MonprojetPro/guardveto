@@ -29,7 +29,7 @@ export interface TypeCreneauIA {
 }
 
 /** Décrit les briques disponibles pour guider l'IA (jours = lundi→vendredi). */
-const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 8 types de règle :
+const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 9 types de règle :
 
 1. interdire_creneau — un vétérinaire ne fait pas de garde un jour fixe de la semaine.
    params: jour (lundi|mardi|mercredi|jeudi|vendredi), exception_vacances_scolaires (true/false).
@@ -54,6 +54,10 @@ const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 8 types de rè
    Ex. « toujours un senior le week-end » → mode_composition=au_moins_un, tag="senior", creneaux=["weekend"].
    Force par défaut conseillée : jamais (exigence de sécurité).
    ⚠️ Si la demande vise une étiquette QUE PERSONNE ne porte (hors liste fournie), faisable=false : demande d'abord de poser l'étiquette sur les fiches (page Équipe).
+9. role_interdit_tag — règle GLOBALE : les vétérinaires portant une ÉTIQUETTE ne tiennent jamais un RÔLE donné (laisse veterinaire=null).
+   params: tag (une étiquette de la liste fournie), role_interdit (un rôle de la liste des rôles fournie, ex. 'premier' pour « 1er de garde »), creneaux (optionnel : codes ciblés ; null = tous).
+   Ex. « un junior n'est jamais 1er de garde » → role_interdit_tag, tag="junior", role_interdit="premier".
+   Force par défaut conseillée : jamais. Même règle que le type 8 pour les étiquettes inconnues.
 
 Niveau d'importance (force) :
 - jamais = interdiction ferme
@@ -71,6 +75,8 @@ export async function proposerRegleIA(
   typesCreneaux: TypeCreneauIA[] = [],
   // Étiquettes réellement portées par l'équipe (composition_equipe, n°6).
   tagsEquipe: string[] = [],
+  // Labels de rôles du catalogue du cabinet (role_interdit_tag, n°22).
+  rolesCabinet: string[] = [],
 ): Promise<PropositionRegle> {
   if (!assistantIaDisponible()) {
     throw new Error('Assistant IA non configuré (clé API manquante).')
@@ -89,12 +95,16 @@ export async function proposerRegleIA(
   // Référentiel DYNAMIQUE des étiquettes d'équipe (composition_equipe).
   const blocTags = tagsEquipe.length > 0
     ? `\nÉtiquettes d'équipe DE CE CABINET (les seules utilisables dans "tag") : ${tagsEquipe.join(', ')}.\n`
-    : `\nAucune étiquette d'équipe n'est posée dans ce cabinet pour l'instant : toute règle composition_equipe est donc infaisable (faisable=false, invite à poser les étiquettes sur la page Équipe d'abord).\n`
+    : `\nAucune étiquette d'équipe n'est posée dans ce cabinet pour l'instant : toute règle composition_equipe ou role_interdit_tag est donc infaisable (faisable=false, invite à poser les étiquettes sur la page Équipe d'abord).\n`
+  // Référentiel DYNAMIQUE des rôles de place (role_interdit_tag).
+  const blocRoles = rolesCabinet.length > 0
+    ? `Rôles de garde DE CE CABINET (les seuls utilisables dans "role_interdit") : ${rolesCabinet.map((r) => `${r}${r === 'premier' ? ' (1er)' : r === 'second' ? ' (2nd)' : ''}`).join(', ')}.\n`
+    : ''
 
   const system = `Tu es l'assistant de configuration de GuardVeto, un logiciel de planning de gardes vétérinaires. Ton rôle : traduire une demande en langage naturel en UNE règle structurée que le moteur sait appliquer. Tu PROPOSES seulement — un humain validera avant création.
 
 Vétérinaires du cabinet (utilise EXACTEMENT ces prénoms) : ${prenoms}.
-${blocCreneaux}${blocTags}
+${blocCreneaux}${blocTags}${blocRoles}
 ${CATALOGUE_PROMPT}
 
 Règles de comportement :

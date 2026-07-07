@@ -401,6 +401,32 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
     },
   },
 
+  // ── Rôle interdit par tag (backlog n°22 — « un junior jamais 1er ») ──
+  role_interdit_tag: {
+    id: 'role_interdit_tag',
+    famille: 'interdire',
+    operateur: 'ROLE_INTERDIT',
+    axes: ['qui', 'quoi'],
+    schemaParams: {
+      tag: 'string (étiquette portée par les vétos, ex. junior)',
+      role: 'string (label de la place interdite, ex. premier)',
+      creneaux: 'string[]? (codes de créneaux ciblés — absent = tous)',
+    },
+    widget: 'WidgetRoleInterditTag',
+    rendreLangageNaturel: (params) => {
+      const tag = typeof params.tag === 'string' && params.tag.trim() !== '' ? params.tag : '?'
+      const role = typeof params.role === 'string' && params.role.trim() !== '' ? params.role : '?'
+      const roleLisible = role === 'premier' ? '1er' : role === 'second' ? '2nd' : role
+      const creneaux = Array.isArray(params.creneaux)
+        ? (params.creneaux as unknown[]).filter((x): x is string => typeof x === 'string')
+        : []
+      const cible = creneaux.length > 0
+        ? ` sur : ${creneaux.map(creneauLisible).join(', ')}`
+        : ''
+      return `les vétérinaires « ${tag} » ne sont jamais ${roleLisible} de garde${cible}`
+    },
+  },
+
   // ⚠️ INTERNE — « motif composite pré-calculé » (archi V2 §catalogue blindé).
   // Le métier « grand week-end » (repos vendredi si pas de garde WE, jeudi sinon)
   // est DÉJÀ livré par la brique `repos_conditionnel`. Le moteur calcule ce motif

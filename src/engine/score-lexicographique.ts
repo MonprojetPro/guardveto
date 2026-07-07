@@ -28,10 +28,12 @@ import { DEFAULT_EQUITY_WEIGHTS, DEFAULT_ROLE_AVANTAGE_FINANCIER, type EquityWei
 import {
   DEFAULT_STRUCTURE_CONFIG, estStructureSouple, penaliteStructureEtage,
   relationsEffectives, resoudrePenaliteSouple, PENALITE_SOUPLE_DEFAUT,
-  compositionsSouples,
+  compositionsSouples, rolesInterditsSouples,
   type StructureConfig,
 } from './structure-config'
-import { compositionCibleType, violeCompositionEquipe } from './rules/composition-equipe'
+import {
+  compositionCibleType, violeCompositionEquipe, violeRoleInterdit,
+} from './rules/composition-equipe'
 import { apparierSourcePourCible } from './relations-structure'
 import { vetPourRole, vetsAttribues, avecVet, attributionVide } from './attribution'
 import { penaliteFeteHistorique, PENALITE_FETE_HISTORIQUE } from './historique-fete'
@@ -335,6 +337,24 @@ export function scorerPlanning(
           .filter((x): x is VetEngineNormalise => x !== undefined)
         if (violeCompositionEquipe(regle, equipe)) {
           ajouter(v, regle.etage, 'composition-souple', penaliteStructureEtage(regle.etage))
+        }
+      }
+    }
+  }
+
+  // ── RÔLE INTERDIT PAR TAG SOUPLE (backlog n°22, étage configuré) ──
+  // En DUR, bloqué dans isValid (étage 0 ci-dessus). En SOUPLE : pénalité par
+  // (slot, rôle) tenu en violation — MÊME prédicat que la pénalité candidate.
+  {
+    const rolesSouples = rolesInterditsSouples(structure)
+    if (rolesSouples.length > 0) {
+      for (const sr of slotRoles) {
+        const vet = vetById.get(sr.vetId)
+        if (!vet) continue
+        for (const regle of rolesSouples) {
+          if (violeRoleInterdit(regle, sr.slot.type, sr.role, vet)) {
+            ajouter(v, regle.etage, 'role-interdit-souple', penaliteStructureEtage(regle.etage))
+          }
         }
       }
     }

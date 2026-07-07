@@ -1,15 +1,15 @@
 'use client'
 
 // ============================================================
-// GUARDVETO — Composition d'équipe par tag (backlog n°6) — section /regles
+// GUARDVETO — Règles d'équipe par étiquette (backlog n°6 + n°22) — /regles
 // ============================================================
-// Règles GLOBALES « qui peut faire quoi » basées sur les étiquettes de
-// l'équipe (junior/senior…) : « au moins un senior par week-end »,
-// « un junior jamais seul ». Plusieurs règles possibles ; chacune a son
-// niveau de force (ferme = bloque la génération, sinon préférence).
-//
-// Présentation homogène avec ReglagesPlanningClient (ligne + menu à droite),
-// + un bouton d'ajout ouvrant un petit formulaire guidé. Véto = lecture seule.
+// Le lot « qui peut faire quoi », basé sur les étiquettes de l'équipe
+// (junior/senior…). Deux briques, une seule section homogène :
+//   • composition_equipe (n°6) : « au moins un senior par week-end »
+//     (au_moins_un) / « un junior jamais seul » (pas_seuls)
+//   • role_interdit_tag (n°22) : « un junior jamais 1er »
+// Plusieurs règles possibles ; chacune a son niveau de force (ferme =
+// bloque la génération, sinon préférence). Véto = lecture seule.
 // ============================================================
 
 import { useState, useTransition } from 'react'
@@ -27,16 +27,21 @@ import {
 } from '@/components/ui/select'
 import { rendreRegle } from '@/engine/briques/catalogue'
 import {
-  upsertCompositionRegle, setRegleActif, deleteRegle,
-  type CompositionReglePayload,
+  upsertCompositionRegle, upsertRoleInterditRegle, setRegleActif, deleteRegle,
+  type CompositionReglePayload, type RoleInterditReglePayload, type ForceFormulaire,
 } from '@/app/(protected)/regles/actions'
 
 // ── Types des props (résolus côté page serveur) ──────────────
 
-export interface CompositionRegleUI {
+/** Une règle d'équipe, toutes briques confondues (forme UI unifiée). */
+export interface RegleEquipeUI {
   id: string
-  mode: 'au_moins_un' | 'pas_seuls'
+  brique: 'composition_equipe' | 'role_interdit_tag'
+  /** composition_equipe uniquement. */
+  mode?: 'au_moins_un' | 'pas_seuls'
   tag: string
+  /** role_interdit_tag uniquement. */
+  role?: string
   creneaux: string[]
   force: string
   actif: boolean
@@ -48,10 +53,12 @@ export interface TypeCreneauCompo {
 }
 
 interface CompositionEquipeClientProps {
-  regles: CompositionRegleUI[]
+  regles: RegleEquipeUI[]
   typesCreneaux: TypeCreneauCompo[]
   /** Étiquettes déjà portées par l'équipe (suggestions du formulaire). */
   tagsEquipe: string[]
+  /** Labels de rôles du catalogue du cabinet (ex. premier, second). */
+  rolesCabinet: string[]
   isAdmin: boolean
 }
 
@@ -64,34 +71,60 @@ const FORCE_LABELS: Record<string, string> = {
 }
 const FORCE_OPTIONS = ['desactivee', 'jamais', 'sauf_crise', 'evitee', 'si_possible']
 
-const MODE_LABELS: Record<CompositionRegleUI['mode'], string> = {
+/** Les 3 formes de règle proposées au formulaire (2 briques). */
+type TypeRegleForm = 'au_moins_un' | 'pas_seuls' | 'role_interdit'
+
+const TYPE_REGLE_LABELS: Record<TypeRegleForm, string> = {
   au_moins_un: 'Toujours au moins un vétérinaire avec cette étiquette',
   pas_seuls: 'Les vétérinaires avec cette étiquette ne sont jamais seuls',
+  role_interdit: 'Les vétérinaires avec cette étiquette ne tiennent jamais un rôle',
 }
 
+const ROLE_LABELS: Record<string, string> = { premier: '1er', second: '2nd' }
+const roleLisible = (r: string) => ROLE_LABELS[r] ?? r
+
 export function CompositionEquipeClient({
-  regles, typesCreneaux, tagsEquipe, isAdmin,
+  regles, typesCreneaux, tagsEquipe, rolesCabinet, isAdmin,
 }: CompositionEquipeClientProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [dialogOuvert, setDialogOuvert] = useState(false)
 
   // ── Formulaire d'ajout ──
-  const [mode, setMode] = useState<CompositionRegleUI['mode']>('au_moins_un')
+  const [typeRegle, setTypeRegle] = useState<TypeRegleForm>('au_moins_un')
   const [tag, setTag] = useState('')
+  const [role, setRole] = useState(rolesCabinet[0] ?? 'premier')
   const [creneauxSel, setCreneauxSel] = useState<string[]>([])
   const [force, setForce] = useState('jamais')
 
   const resetForm = () => {
-    setMode('au_moins_un'); setTag(''); setCreneauxSel([]); setForce('jamais')
+    setTypeRegle('au_moins_un'); setTag(''); setRole(rolesCabinet[0] ?? 'premier')
+    setCreneauxSel([]); setForce('jamais')
   }
 
-  const phrase = (r: CompositionRegleUI) =>
-    rendreRegle('composition_equipe', {
-      mode: r.mode, tag: r.tag, creneaux: r.creneaux.length > 0 ? r.creneaux : undefined,
+  const phrase = (r: RegleEquipeUI) =>
+    rendreRegle(r.brique, {
+      mode: r.mode, tag: r.tag, role: r.role,
+      creneaux: r.creneaux.length > 0 ? r.creneaux : undefined,
     })
 
-  const changerForce = (r: CompositionRegleUI, choix: string) => {
+  /** Réécrit une règle existante avec une nouvelle force (via la bonne action). */
+  const reecrire = async (r: RegleEquipeUI, nouvelleForce: ForceFormulaire) => {
+    if (r.brique === 'role_interdit_tag') {
+      const payload: RoleInterditReglePayload = {
+        id: r.id, tag: r.tag, role: r.role ?? 'premier',
+        creneaux: r.creneaux, force: nouvelleForce,
+      }
+      return upsertRoleInterditRegle(payload)
+    }
+    const payload: CompositionReglePayload = {
+      id: r.id, mode: r.mode ?? 'au_moins_un', tag: r.tag,
+      creneaux: r.creneaux, force: nouvelleForce,
+    }
+    return upsertCompositionRegle(payload)
+  }
+
+  const changerForce = (r: RegleEquipeUI, choix: string) => {
     startTransition(async () => {
       // « Désactivée » → toggle actif=false (la force est conservée en base) ;
       // sinon réactive si besoin + applique la force choisie.
@@ -101,11 +134,7 @@ export function CompositionEquipeClient({
         else { toast.success('Règle désactivée.'); router.refresh() }
         return
       }
-      const payload: CompositionReglePayload = {
-        id: r.id, mode: r.mode, tag: r.tag,
-        creneaux: r.creneaux, force: choix as CompositionReglePayload['force'],
-      }
-      const res = await upsertCompositionRegle(payload)
+      const res = await reecrire(r, choix as ForceFormulaire)
       if (res?.error) { toast.error(res.error); return }
       if (!r.actif) await setRegleActif(r.id, true)
       toast.success('Réglage enregistré — appliqué à la prochaine génération.')
@@ -113,7 +142,7 @@ export function CompositionEquipeClient({
     })
   }
 
-  const supprimer = (r: CompositionRegleUI) => {
+  const supprimer = (r: RegleEquipeUI) => {
     startTransition(async () => {
       const res = await deleteRegle(r.id)
       if (res?.error) toast.error(res.error)
@@ -123,11 +152,13 @@ export function CompositionEquipeClient({
 
   const creer = () => {
     startTransition(async () => {
-      const res = await upsertCompositionRegle({
-        mode, tag,
-        creneaux: creneauxSel,
-        force: force as CompositionReglePayload['force'],
-      })
+      const res = typeRegle === 'role_interdit'
+        ? await upsertRoleInterditRegle({
+            tag, role, creneaux: creneauxSel, force: force as ForceFormulaire,
+          })
+        : await upsertCompositionRegle({
+            mode: typeRegle, tag, creneaux: creneauxSel, force: force as ForceFormulaire,
+          })
       if (res?.error) { toast.error(res.error); return }
       toast.success('Règle d’équipe créée — appliquée à la prochaine génération.')
       setDialogOuvert(false)
@@ -152,7 +183,8 @@ export function CompositionEquipeClient({
           <p className="text-muted-foreground text-sm mt-1 leading-5">
             Des règles basées sur les <strong>étiquettes</strong> de l&apos;équipe
             (junior, senior…) : « au moins un senior par week-end », « un junior
-            jamais seul ». Les étiquettes se posent sur les fiches de la page Équipe.
+            jamais seul », « un junior jamais 1er ». Les étiquettes se posent sur
+            les fiches de la page Équipe.
           </p>
         </div>
         {isAdmin && (
@@ -180,6 +212,7 @@ export function CompositionEquipeClient({
                   <p className="text-sm font-medium text-foreground">{phrase(r)}</p>
                   <p className="text-xs text-muted-foreground leading-5">
                     Étiquette « {r.tag} »
+                    {r.role ? ` — rôle : ${roleLisible(r.role)}` : ''}
                     {r.creneaux.length > 0
                       ? ` — créneaux : ${r.creneaux
                           .map((c) => typesCreneaux.find((t) => t.code === c)?.nom ?? c)
@@ -225,11 +258,12 @@ export function CompositionEquipeClient({
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label>Type de règle</Label>
-              <Select value={mode} onValueChange={(v) => v && setMode(v as CompositionRegleUI['mode'])}>
-                <SelectTrigger className="w-full">{MODE_LABELS[mode]}</SelectTrigger>
+              <Select value={typeRegle} onValueChange={(v) => v && setTypeRegle(v as TypeRegleForm)}>
+                <SelectTrigger className="w-full">{TYPE_REGLE_LABELS[typeRegle]}</SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="au_moins_un">{MODE_LABELS.au_moins_un}</SelectItem>
-                  <SelectItem value="pas_seuls">{MODE_LABELS.pas_seuls}</SelectItem>
+                  {(Object.keys(TYPE_REGLE_LABELS) as TypeRegleForm[]).map((t) => (
+                    <SelectItem key={t} value={t}>{TYPE_REGLE_LABELS[t]}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -240,7 +274,7 @@ export function CompositionEquipeClient({
                 id="compo-tag"
                 value={tag}
                 onChange={(e) => setTag(e.target.value)}
-                placeholder="senior"
+                placeholder={typeRegle === 'au_moins_un' ? 'senior' : 'junior'}
               />
               {tagsEquipe.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 pt-1">
@@ -264,6 +298,20 @@ export function CompositionEquipeClient({
                 L&apos;étiquette doit être posée sur au moins un vétérinaire (page Équipe).
               </p>
             </div>
+
+            {typeRegle === 'role_interdit' && (
+              <div className="space-y-1.5">
+                <Label>Rôle interdit</Label>
+                <Select value={role} onValueChange={(v) => v && setRole(v)}>
+                  <SelectTrigger className="w-full">{roleLisible(role)}</SelectTrigger>
+                  <SelectContent>
+                    {rolesCabinet.map((r) => (
+                      <SelectItem key={r} value={r}>{roleLisible(r)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-1.5">
               <Label>Créneaux concernés</Label>

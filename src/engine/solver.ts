@@ -43,10 +43,11 @@ import { compterParVet, type CompteurVet } from './rules/optimization'
 import { comparerScores, scorerPlanning, type VecteurScore, type BonusMalusMap } from './score-lexicographique'
 import { DEFAULT_EQUITY_WEIGHTS, DEFAULT_ROLE_AVANTAGE_FINANCIER, type EquityWeights } from './equity-weights'
 import {
-  DEFAULT_STRUCTURE_CONFIG, compositionsSouples,
-  type StructureConfig, type PenalitesSouplesConfig, type CompositionEquipeRegle,
+  DEFAULT_STRUCTURE_CONFIG, compositionsSouples, rolesInterditsSouples,
+  type StructureConfig, type PenalitesSouplesConfig,
+  type CompositionEquipeRegle, type RoleInterditTagRegle,
 } from './structure-config'
-import { penaliteCompositionCandidat } from './rules/composition-equipe'
+import { penaliteCompositionCandidat, penaliteRoleInterditCandidat } from './rules/composition-equipe'
 import type { HistoriqueFetesResolu } from './historique-fete'
 import type { DiagnosticImpasse } from './diagnostic'
 import { construireDiagnostic, type CreneauStep, type ReSimuler } from './diagnostic'
@@ -397,6 +398,8 @@ function scorerCandidat(
   historiqueFetes?: HistoriqueFetesResolu,
   // Composition d'équipe SOUPLE (backlog n°6). Absent/vide → 0 (byte-identique).
   compositions?: CompositionEquipeRegle[],
+  // Rôle interdit par tag SOUPLE (backlog n°22). Absent/vide → 0 (byte-identique).
+  rolesInterdits?: RoleInterditTagRegle[],
 ): number {
   // Dernier recours → toujours en dernier
   if (vet.dernier_recours) return 1_000_000
@@ -426,6 +429,9 @@ function scorerCandidat(
     // gardien dur, à l'étage configuré (le scoreur global reste cohérent).
     { date: step.date, type: step.type, saison: step.saison, nbPlaces: step.nbPlaces },
     step.role, vet, planning, allVets, compositions,
+  ) + penaliteRoleInterditCandidat(
+    // Rôle interdit par tag souple (n°22).
+    step.type, step.role, vet, rolesInterdits,
   )
 
   // Créneau SUR-MESURE : équité d'étalement par code (jamais pour les codes
@@ -576,10 +582,11 @@ function backtrack(
   const compteursStep =
     valides.length > 1 ? compterParVet(planning, vets, roleAvantageFinancier, calendrier) : undefined
   const compositionsSouplesStep = compositionsSouples(structure)
+  const rolesInterditsSouplesStep = rolesInterditsSouples(structure)
   const candidates = valides
     .map((vet) => ({
       vet,
-      score: scorerCandidat(step, vet, planning, bonusMalus, vets, weights, calendrier, roleAvantageFinancier, compteursStep, structure.penalitesSouples, structure.historiqueFetes, compositionsSouplesStep),
+      score: scorerCandidat(step, vet, planning, bonusMalus, vets, weights, calendrier, roleAvantageFinancier, compteursStep, structure.penalitesSouples, structure.historiqueFetes, compositionsSouplesStep, rolesInterditsSouplesStep),
     }))
     .sort((a, b) => a.score - b.score)
     .map(({ vet }) => vet)
@@ -814,6 +821,8 @@ export function scorerCandidatLNS(
   historiqueFetes?: HistoriqueFetesResolu,
   // Composition d'équipe SOUPLE (backlog n°6). Absent/vide → 0 (byte-identique).
   compositions?: CompositionEquipeRegle[],
+  // Rôle interdit par tag SOUPLE (backlog n°22). Absent/vide → 0 (byte-identique).
+  rolesInterdits?: RoleInterditTagRegle[],
 ): number {
   if (vet.dernier_recours) return 1_000_000
 
@@ -841,6 +850,9 @@ export function scorerCandidatLNS(
     // Composition d'équipe souple (n°6) — cohérente avec scorerCandidat.
     { date: step.date, type: step.type, saison: step.saison, nbPlaces: step.nbPlaces },
     step.role, vet, planning, allVets, compositions,
+  ) + penaliteRoleInterditCandidat(
+    // Rôle interdit par tag souple (n°22) — cohérente avec scorerCandidat.
+    step.type, step.role, vet, rolesInterdits,
   )
 
   // Créneau SUR-MESURE : même équité d'étalement par code que scorerCandidat.
@@ -884,7 +896,7 @@ function repairerSemaine(
     const sorted = valids
       .map((v) => ({
         v,
-        score: scorerCandidatLNS(step, v, planning, vets, weights, calendrier, roleAvantageFinancier, compteursStep, structure.penalitesSouples, structure.historiqueFetes, compositionsSouples(structure)),
+        score: scorerCandidatLNS(step, v, planning, vets, weights, calendrier, roleAvantageFinancier, compteursStep, structure.penalitesSouples, structure.historiqueFetes, compositionsSouples(structure), rolesInterditsSouples(structure)),
       }))
       .sort((a, b) => a.score - b.score)
       .map(({ v }) => v)

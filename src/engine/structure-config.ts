@@ -102,6 +102,46 @@ export interface StructureConfig {
    * byte-identique. Voyage DANS StructureConfig (même principe que `relations`).
    */
   compositions?: CompositionEquipeRegle[]
+  /**
+   * Règles de RÔLE INTERDIT PAR TAG (backlog n°22 — « un junior jamais 1er »).
+   * Extraites des lignes `regles_cabinet` de brique `role_interdit_tag`.
+   * Même mécanique dur/mou que `compositions`. `undefined`/vide → aucune
+   * règle → byte-identique.
+   */
+  rolesInterdits?: RoleInterditTagRegle[]
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Rôle interdit par TAG (backlog n°22 — « un junior jamais 1er »)
+// ═══════════════════════════════════════════════════════════════
+// Un véto portant le TAG ne peut pas tenir le RÔLE (label de place, ex.
+// 'premier') sur les créneaux ciblés. Contrairement à la composition (qui se
+// juge sur l'équipe complète), ce prédicat se juge PLACE PAR PLACE — gabarit
+// R17 : le check reçoit le rôle visé et bloque la pose.
+
+/** Une règle « rôle interdit selon attribut », résolue et consommable moteur. */
+export interface RoleInterditTagRegle {
+  /** id de la ligne regles_cabinet (trace / ciblage UI). */
+  regleId: string
+  /** Tag ciblé, NORMALISÉ (minuscules, sans espaces parasites). */
+  tag: string
+  /** Label du rôle interdit (place du catalogue, ex. 'premier'). */
+  role: string
+  /** Codes de créneaux ciblés — absent/vide = tous les créneaux. */
+  creneaux?: string[]
+  actif: boolean
+  /** Étage lexicographique (≤ 2 = dur, ≥ 3 = pénalité souple). */
+  etage: number
+}
+
+/** Les règles de rôle interdit DURES effectives (actives + étage ≤ 2). */
+export function rolesInterditsDurs(structure: StructureConfig): RoleInterditTagRegle[] {
+  return (structure.rolesInterdits ?? []).filter((r) => r.actif && r.etage <= ETAGE_STRUCTURE_DUR_MAX)
+}
+
+/** Les règles de rôle interdit SOUPLES effectives (actives + étage ≥ 3). */
+export function rolesInterditsSouples(structure: StructureConfig): RoleInterditTagRegle[] {
+  return (structure.rolesInterdits ?? []).filter((r) => r.actif && r.etage > ETAGE_STRUCTURE_DUR_MAX)
 }
 
 // ═══════════════════════════════════════════════════════════════

@@ -458,6 +458,36 @@ export function validerPlanning(
     }
   }
 
+  // ── ROLE_TAG — rôle interdit selon attribut (backlog n°22), DUR seulement ──
+  // Ré-implémenté INDÉPENDAMMENT : chaque place tenue est confrontée à la
+  // règle « un porteur du tag ne tient jamais ce rôle ». Souple → silencieux.
+  {
+    const rolesInterdits = (input.structureConfig?.rolesInterdits ?? []).filter(
+      (r) => r.actif && r.etage <= 2,
+    )
+    for (const regle of rolesInterdits) {
+      const tagNorm = regle.tag.trim().toLowerCase()
+      for (const a of planning.attributions) {
+        if (regle.creneaux && regle.creneaux.length > 0 && !regle.creneaux.includes(a.type)) continue
+        const vetId = vetRole(a, regle.role)
+        if (!vetId) continue
+        const vt = vetsById.get(vetId)
+        if (!vt) continue
+        const porte = (vt.tags ?? []).some((t) => t.trim().toLowerCase() === tagNorm)
+        if (porte) {
+          violations.push({
+            regle: 'ROLE_TAG',
+            date: a.date,
+            type: a.type,
+            role: regle.role,
+            vetId,
+            detail: `ROLE_TAG : ${vt.prenom} porte le tag « ${regle.tag} » — le rôle « ${regle.role} » lui est interdit (${a.type} du ${a.date})`,
+          })
+        }
+      }
+    }
+  }
+
   // ── R22 — une seule garde par JOUR et par véto (inter-créneaux, P3b) ──
   // Nécessaire depuis que plusieurs créneaux peuvent coexister le même jour.
   // Sur le catalogue par défaut (un créneau/jour), jamais déclenchée.

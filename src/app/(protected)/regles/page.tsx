@@ -26,7 +26,7 @@ import {
 } from '@/components/regles/ReglagesPlanningClient'
 import {
   CompositionEquipeClient,
-  type CompositionRegleUI,
+  type RegleEquipeUI,
 } from '@/components/regles/CompositionEquipeClient'
 import {
   EQUITY_DIMENSIONS,
@@ -41,6 +41,7 @@ const BRIQUE_EQUILIBRER = 'equilibrer'
 const BRIQUE_LIAISON = 'liaison_creneaux' // R9
 const BRIQUE_INVERSION = 'inversion_role' // R8
 const BRIQUE_COMPOSITION = 'composition_equipe' // n°6
+const BRIQUE_ROLE_INTERDIT = 'role_interdit_tag' // n°22
 const IMPORTANCES = new Set<string>(IMPORTANCE_LEVELS)
 const FORCES_STRUCTURE = new Set(['jamais', 'sauf_crise', 'evitee', 'si_possible'])
 const FORCES_SOUPLES = new Set(['sauf_crise', 'evitee', 'si_possible'])
@@ -121,13 +122,18 @@ export default async function ReglesPage({
 
   // Types de créneaux DU cabinet (n°19 — filtre au_plus_n). Dynamique (verrou 8) :
   // catalogue actif du profil défaut ; sans catalogue → 3 types historiques.
+  // On en dérive AUSSI les labels de rôles (n°22 — « un junior jamais 1er »).
   let typesCreneaux: TypeCreneauOption[] = []
+  let rolesCabinet: string[] = []
   try {
     const cabinetId = await resoudreCabinetId(supabase)
     const modeles = await chargerCreneauModele(supabase, cabinetId)
     typesCreneaux = modeles
       .filter((m) => m.actif && m.code !== null && m.code !== 'ferie')
       .map((m) => ({ code: m.code as string, nom: m.nom }))
+    rolesCabinet = [
+      ...new Set(modeles.filter((m) => m.actif).flatMap((m) => m.roles ?? [])),
+    ].filter((r) => typeof r === 'string' && r.trim() !== '')
   } catch {
     // best-effort : repli ci-dessous
   }
@@ -138,30 +144,40 @@ export default async function ReglesPage({
       { code: 'weekend', nom: 'Week-end' },
     ]
   }
+  if (rolesCabinet.length === 0) rolesCabinet = ['premier', 'second']
 
   // Règles GLOBALES gérées dans leurs propres sections (pas dans la liste par-véto) :
   // équité (equilibrer) + structurelles week-end (R8/R9) + pénalités souples
   // réglables (backlog n°16). On les retire du listing.
   const GLOBALES = new Set([
-    BRIQUE_EQUILIBRER, BRIQUE_LIAISON, BRIQUE_INVERSION, BRIQUE_COMPOSITION,
+    BRIQUE_EQUILIBRER, BRIQUE_LIAISON, BRIQUE_INVERSION,
+    BRIQUE_COMPOSITION, BRIQUE_ROLE_INTERDIT,
     ...Object.keys(PENALITES_SOUPLES_DEFAUT_FORCE),
   ])
   const reglesClassiques = toutesRegles.filter((r) => !GLOBALES.has(r.brique_id))
   const reglesEquilibrer = toutesRegles.filter((r) => r.brique_id === BRIQUE_EQUILIBRER)
 
-  // Composition d'équipe (n°6) : résolution des lignes → forme UI.
-  const reglesComposition: CompositionRegleUI[] = toutesRegles
-    .filter((r) => r.brique_id === BRIQUE_COMPOSITION)
-    .flatMap((r) => {
-      const p = (r.params_json as { params?: { mode?: string; tag?: string; creneaux?: unknown } })?.params
-      const mode = p?.mode
+  // Règles d'équipe par étiquette (n°6 + n°22) : résolution → forme UI unifiée.
+  const reglesEquipe: RegleEquipeUI[] = toutesRegles
+    .filter((r) => r.brique_id === BRIQUE_COMPOSITION || r.brique_id === BRIQUE_ROLE_INTERDIT)
+    .flatMap((r): RegleEquipeUI[] => {
+      const p = (r.params_json as {
+        params?: { mode?: string; tag?: string; role?: string; creneaux?: unknown }
+      })?.params
       const tag = p?.tag
-      if ((mode !== 'au_moins_un' && mode !== 'pas_seuls') || typeof tag !== 'string') return []
+      if (typeof tag !== 'string') return []
       const creneaux = Array.isArray(p?.creneaux)
         ? (p.creneaux as unknown[]).filter((x): x is string => typeof x === 'string')
         : []
       const force = FORCES_STRUCTURE.has(r.force) ? r.force : 'jamais'
-      return [{ id: r.id, mode, tag, creneaux, force, actif: r.actif }]
+      if (r.brique_id === BRIQUE_COMPOSITION) {
+        const mode = p?.mode
+        if (mode !== 'au_moins_un' && mode !== 'pas_seuls') return []
+        return [{ id: r.id, brique: 'composition_equipe' as const, mode, tag, creneaux, force, actif: r.actif }]
+      }
+      const role = p?.role
+      if (typeof role !== 'string' || role.trim() === '') return []
+      return [{ id: r.id, brique: 'role_interdit_tag' as const, tag, role, creneaux, force, actif: r.actif }]
     })
 
   // Étiquettes portées par l'équipe (suggestions du formulaire composition).
@@ -210,9 +226,10 @@ export default async function ReglesPage({
         isAdmin={isAdmin}
       />
       <CompositionEquipeClient
-        regles={reglesComposition}
+        regles={reglesEquipe}
         typesCreneaux={typesCreneaux}
         tagsEquipe={tagsEquipe}
+        rolesCabinet={rolesCabinet}
         isAdmin={isAdmin}
       />
       <ReglagesPlanningClient

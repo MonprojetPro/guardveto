@@ -49,6 +49,7 @@ export type CodeAvertissementPreVol =
   | 'charge_globale_insuffisante' // Σ des plafonds de charge < places à pourvoir
   | 'weekends_insuffisants'     // Σ des plafonds week-end < places de week-end
   | 'composition_sans_porteur'  // règle de composition dont AUCUN véto actif ne porte le tag
+  | 'role_interdit_intenable'   // rôle interdit à un tag que TOUS les vétos actifs portent
 
 /**
  * Un avertissement du pré-vol — TOUJOURS non bloquant.
@@ -593,7 +594,43 @@ export function preVolRegles(input: PreVolInput): AvertissementPreVol[] {
     ...detecterWeekendsInsuffisants(slots, vetsN, nomVeto),
     // (c) composition d'équipe sans porteur du tag (n°6)
     ...detecterCompositionsSansPorteur(vetsN, input),
+    // (d) rôle interdit intenable — tous les vétos portent le tag (n°22)
+    ...detecterRolesInterditsIntenables(vetsN, input),
   ]
+}
+
+// ── (d) Rôle interdit par tag — intenable (backlog n°22) ──
+// « Un junior jamais 1er » alors que TOUS les vétos actifs sont juniors :
+// personne ne peut tenir le rôle sur les créneaux ciblés → impasse certaine
+// si la règle est dure. Un tag que personne ne porte rend, lui, la règle
+// simplement INERTE — signalé aussi (tag probablement oublié sur les fiches).
+function detecterRolesInterditsIntenables(
+  vets: VetEngine[],
+  input: PreVolInput,
+): AvertissementPreVol[] {
+  const out: AvertissementPreVol[] = []
+  const regles = (input.structureConfig?.rolesInterdits ?? []).filter((r) => r.actif)
+  for (const regle of regles) {
+    const tagNorm = regle.tag.trim().toLowerCase()
+    const porteurs = vets.filter((v) =>
+      (v.tags ?? []).some((t) => t.trim().toLowerCase() === tagNorm),
+    )
+    const libelle = `les vétérinaires « ${regle.tag} » ne tiennent jamais le rôle « ${regle.role} »`
+    if (porteurs.length === 0) {
+      out.push({
+        code: 'role_interdit_intenable',
+        regles: [libelle],
+        message: `La règle « ${libelle} » est active mais aucun vétérinaire actif ne porte l'étiquette « ${regle.tag} » : elle est sans effet. Ajoutez l'étiquette sur les fiches concernées (Équipe) ou supprimez la règle.`,
+      })
+    } else if (porteurs.length === vets.length && regle.etage <= ETAGE_DUR_MAX) {
+      out.push({
+        code: 'role_interdit_intenable',
+        regles: [libelle],
+        message: `TOUS les vétérinaires actifs portent l'étiquette « ${regle.tag} » : personne ne peut tenir le rôle « ${regle.role} » sur les créneaux concernés — la génération échouera. Retirez l'étiquette d'au moins un vétérinaire ou assouplissez la règle.`,
+      })
+    }
+  }
+  return out
 }
 
 // ── (c) Composition d'équipe — tag sans porteur (backlog n°6) ──

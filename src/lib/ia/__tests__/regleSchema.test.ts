@@ -11,6 +11,7 @@ import { describe, it, expect } from 'vitest'
 import {
   propositionVersPayload,
   propositionVersComposition,
+  propositionVersRoleInterdit,
   apercuProposition,
   type PropositionRegle,
   type VetoResolu,
@@ -31,7 +32,7 @@ function prop(over: Partial<PropositionRegle>): PropositionRegle {
     si_garde_we: null, sinon: null, semaines: null, periodes: null,
     partenaire: null, n: null, fenetre: null, creneaux: null,
     ecart_min_jours: null, n_semaines: null,
-    mode_composition: null, tag: null,
+    mode_composition: null, tag: null, role_interdit: null,
     ...over,
   }
 }
@@ -286,5 +287,40 @@ describe('propositionVersComposition (règle GLOBALE d’équipe — n°6)', () 
     )
     expect(phrase).toContain('junior')
     expect(phrase).toContain('jamais seuls')
+  })
+})
+
+describe('propositionVersRoleInterdit (règle GLOBALE — n°22)', () => {
+  const TAGS = ['junior', 'senior']
+  const ROLES = ['premier', 'second']
+
+  it('convertit « un junior jamais 1er » (tag normalisé)', () => {
+    const r = propositionVersRoleInterdit(
+      prop({ brique_id: 'role_interdit_tag', tag: ' Junior ', role_interdit: 'premier', force: 'jamais' }),
+      TAGS, ROLES,
+    )
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.payload.tag).toBe('junior')
+      expect(r.payload.role).toBe('premier')
+      expect(r.payload.force).toBe('jamais')
+    }
+  })
+
+  it('refuse un tag non porté ou un rôle hors catalogue', () => {
+    expect(propositionVersRoleInterdit(
+      prop({ brique_id: 'role_interdit_tag', tag: 'chirurgien', role_interdit: 'premier' }), TAGS, ROLES,
+    ).ok).toBe(false)
+    expect(propositionVersRoleInterdit(
+      prop({ brique_id: 'role_interdit_tag', tag: 'junior', role_interdit: 'chef' }), TAGS, ROLES,
+    ).ok).toBe(false)
+  })
+
+  it('aperçu : phrase française sans sujet vétérinaire, rôle lisible', () => {
+    const phrase = apercuProposition(
+      prop({ brique_id: 'role_interdit_tag', tag: 'junior', role_interdit: 'premier' }),
+    )
+    expect(phrase).toContain('junior')
+    expect(phrase).toContain('1er')
   })
 })

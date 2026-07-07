@@ -41,6 +41,7 @@ import {
   type PenalitesSouplesConfig,
   type CompositionEquipeRegle,
   type ModeComposition,
+  type RoleInterditTagRegle,
 } from '@/engine/structure-config'
 import { BRIQUES_INTERNES } from '@/engine/briques/catalogue'
 
@@ -249,6 +250,45 @@ export function extraireCompositions(regles: RegleCabinetRow[]): CompositionEqui
   return out
 }
 
+// ── Rôle interdit par tag (backlog n°22) ────────────────────
+// « Un junior jamais 1er » : règle GLOBALE avec params { tag, role, creneaux? },
+// même famille que composition_equipe (le « qui » est un TAG).
+
+/** L'id de brique des règles de rôle interdit par tag. */
+export const BRIQUE_ROLE_INTERDIT = 'role_interdit_tag'
+
+/**
+ * extraireRolesInterdits — convertit les lignes `role_interdit_tag` en règles
+ * moteur résolues (tag normalisé, étage entier). Ligne mal formée (tag/role
+ * vides) → IGNORÉE (jamais de crash). Inactives conservées (l'UI liste tout).
+ */
+export function extraireRolesInterdits(regles: RegleCabinetRow[]): RoleInterditTagRegle[] {
+  const out: RoleInterditTagRegle[] = []
+  for (const row of regles) {
+    if (row.brique_id !== BRIQUE_ROLE_INTERDIT) continue
+    if (!estObjet(row.params_json)) continue
+    const params = (row.params_json as ParamsJson).params
+    if (!estObjet(params)) continue
+    const tagBrut = params.tag
+    const role = params.role
+    if (typeof tagBrut !== 'string' || tagBrut.trim() === '') continue
+    if (typeof role !== 'string' || role.trim() === '') continue
+    const creneaux = Array.isArray(params.creneaux)
+      ? (params.creneaux as unknown[]).filter((x): x is string => typeof x === 'string' && x.trim() !== '')
+      : undefined
+    const etage = FORCE_TEXTE_VERS_ETAGE[row.force]
+    out.push({
+      regleId: row.id,
+      tag: tagBrut.trim().toLowerCase(),
+      role: role.trim(),
+      ...(creneaux && creneaux.length > 0 ? { creneaux } : {}),
+      actif: row.actif,
+      etage: typeof etage === 'number' ? etage : 2,
+    })
+  }
+  return out
+}
+
 /**
  * extraireStructureConfig — résout la config R8/R9 depuis les lignes
  * `regles_cabinet`. Chaque règle absente garde son défaut (ferme + active).
@@ -272,14 +312,17 @@ export function extraireStructureConfig(regles: RegleCabinetRow[]): StructureCon
   // historique (DEFAULT_STRUCTURE_CONFIG) — byte-identique, et les consommateurs
   // aval résolvent chaque pénalité absente à son défaut (resoudrePenaliteSouple).
   const penalitesSouples = extrairePenalitesSouples(regles)
-  // Composition d'équipe (n°6) : même principe — la clé n'existe que si des
-  // règles sont posées en base (zéro ligne → byte-identique).
+  // Composition d'équipe (n°6) + rôle interdit par tag (n°22) : même principe
+  // — la clé n'existe que si des règles sont posées en base (zéro ligne →
+  // byte-identique).
   const compositions = extraireCompositions(regles)
+  const rolesInterdits = extraireRolesInterdits(regles)
   return {
     r9_liaison: lire(BRIQUE_LIAISON) ?? { ...DEFAULT_STRUCTURE_CONFIG.r9_liaison },
     r8_inversion: lire(BRIQUE_INVERSION) ?? { ...DEFAULT_STRUCTURE_CONFIG.r8_inversion },
     ...(Object.keys(penalitesSouples).length > 0 ? { penalitesSouples } : {}),
     ...(compositions.length > 0 ? { compositions } : {}),
+    ...(rolesInterdits.length > 0 ? { rolesInterdits } : {}),
   }
 }
 
@@ -312,6 +355,7 @@ export function mapperReglesCabinet(
       row.brique_id === BRIQUE_LIAISON ||
       row.brique_id === BRIQUE_INVERSION ||
       row.brique_id === BRIQUE_COMPOSITION ||
+      row.brique_id === BRIQUE_ROLE_INTERDIT ||
       row.brique_id in BRIQUES_PENALITES_SOUPLES
     ) {
       continue

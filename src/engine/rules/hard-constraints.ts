@@ -12,11 +12,14 @@ import {
 } from '../utils'
 import {
   DEFAULT_STRUCTURE_CONFIG, estStructureDure, relationsEffectives,
-  RELATIONS_STRUCTURE_DEFAUT, compositionsDures,
+  RELATIONS_STRUCTURE_DEFAUT, compositionsDures, rolesInterditsDurs,
   type StructureConfig, type StructureRegleConfig, type RelationStructure,
 } from '../structure-config'
 import { apparierSourcePourCible, apparierCiblePourSource } from '../relations-structure'
-import { violeCompositionPose, messageComposition } from './composition-equipe'
+import {
+  violeCompositionPose, messageComposition,
+  violeRoleInterdit, messageRoleInterdit,
+} from './composition-equipe'
 import { estAttribue, vetPourRole, roleDuVet } from '../attribution'
 
 // ── Helpers internes ────────────────────────────────────
@@ -574,6 +577,27 @@ function checkComposition(
 }
 
 /**
+ * ROLE_TAG — Rôle interdit selon attribut (backlog n°22, règles DURES).
+ *
+ * « Un junior jamais 1er » : un véto portant le tag ne peut pas tenir le
+ * rôle interdit sur les créneaux ciblés. Gabarit R17 (place par place).
+ * Les règles souples (étage ≥ 3) pèsent au scoring (les deux scoreurs).
+ */
+function checkRoleInterditTag(
+  vet: VetEngine,
+  slot: SlotGarde,
+  roleVisé: RoleGarde,
+  structure: StructureConfig,
+): ValidationResult {
+  for (const regle of rolesInterditsDurs(structure)) {
+    if (violeRoleInterdit(regle, slot.type, roleVisé, vet)) {
+      return invalid(messageRoleInterdit(regle, vet.prenom))
+    }
+  }
+  return ok()
+}
+
+/**
  * R22 — Un vétérinaire ne tient qu'UNE garde par jour (inter-créneaux).
  *
  * Nécessaire depuis que plusieurs créneaux peuvent coexister le même jour
@@ -834,6 +858,8 @@ export function isValid(
     checkR8Inversion(vet, slot, roleVisé, planning, structure.r8_inversion, relations),
     // COMPOSITION (n°6) : équipe par tag — dur seulement (pose complétante).
     checkComposition(vet, slot, roleVisé, planning, structure, allVets),
+    // ROLE_TAG (n°22) : rôle interdit selon attribut — dur seulement.
+    checkRoleInterditTag(vet, slot, roleVisé, structure),
   ]
 
   // Renvoie la première contrainte violée
@@ -865,4 +891,5 @@ export {
   checkEspacementMin,
   checkEspacementWeekend,
   checkComposition,
+  checkRoleInterditTag,
 }

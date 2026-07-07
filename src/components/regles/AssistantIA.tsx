@@ -27,6 +27,7 @@ import {
   proposerRegleDepuisTexte,
   upsertRegle,
   upsertCompositionRegle,
+  upsertRoleInterditRegle,
   type ForceFormulaire,
   type PropositionIaResultat,
 } from '@/app/(protected)/regles/actions'
@@ -39,7 +40,7 @@ const CAPACITES = [
   'Empêcher deux vétérinaires d’être de garde seuls ensemble.',
   'Limiter le nombre de gardes d’un vétérinaire sur une période (ex. au plus 2 par semaine).',
   'Imposer un nombre minimum de jours entre deux gardes d’un même vétérinaire.',
-  'Créer des règles d’équipe avec les étiquettes (ex. « un junior jamais seul », « toujours un senior le week-end »).',
+  'Créer des règles d’équipe avec les étiquettes (ex. « un junior jamais seul », « toujours un senior le week-end », « un junior jamais 1er »).',
 ]
 
 const FORCE_LABEL: Record<ForceFormulaire, string> = {
@@ -86,7 +87,7 @@ export function AssistantIA() {
       setResultat(res)
       // Pré-remplit le curseur de puissance avec le choix de l'IA (réglable ensuite).
       const forceIa = !('error' in res)
-        ? (res.payload?.force ?? res.payloadComposition?.force ?? null)
+        ? (res.payload?.force ?? res.payloadComposition?.force ?? res.payloadRoleInterdit?.force ?? null)
         : null
       setForce(forceIa)
       if ('error' in res) toast.error(res.error)
@@ -95,18 +96,23 @@ export function AssistantIA() {
 
   const creer = () => {
     if (!resultat || 'error' in resultat) return
-    if (!resultat.payload && !resultat.payloadComposition) return
+    if (!resultat.payload && !resultat.payloadComposition && !resultat.payloadRoleInterdit) return
     setErreurCreation(null)
     startCreate(async () => {
       // L'admin peut avoir ajusté la puissance : on prend SON choix, sinon celui de l'IA.
-      // Deux familles : règle par-véto (upsertRegle) ou règle GLOBALE d'équipe
-      // (upsertCompositionRegle — composition_equipe, n°6).
+      // Trois familles : règle par-véto (upsertRegle) ou règles GLOBALES d'équipe
+      // (upsertCompositionRegle n°6 / upsertRoleInterditRegle n°22).
       const res = resultat.payloadComposition
         ? await upsertCompositionRegle({
             ...resultat.payloadComposition,
             force: force ?? resultat.payloadComposition.force,
           })
-        : await upsertRegle({ ...resultat.payload!, force: force ?? resultat.payload!.force })
+        : resultat.payloadRoleInterdit
+          ? await upsertRoleInterditRegle({
+              ...resultat.payloadRoleInterdit,
+              force: force ?? resultat.payloadRoleInterdit.force,
+            })
+          : await upsertRegle({ ...resultat.payload!, force: force ?? resultat.payload!.force })
       // Erreur (ex. doublon) affichée DANS le panneau, pas en toast au loin.
       if (res?.error) { setErreurCreation(res.error); return }
       toast.success('Règle créée.')
@@ -139,8 +145,9 @@ export function AssistantIA() {
   const apercu = resultat && !('error' in resultat) ? resultat.apercu : ''
   const payload = resultat && !('error' in resultat) ? resultat.payload : undefined
   const payloadComposition = resultat && !('error' in resultat) ? resultat.payloadComposition : undefined
+  const payloadRoleInterdit = resultat && !('error' in resultat) ? resultat.payloadRoleInterdit : undefined
   /** Puissance proposée par l'IA (pour signaler à l'admin s'il l'a modifiée). */
-  const forceIa = payload?.force ?? payloadComposition?.force ?? null
+  const forceIa = payload?.force ?? payloadComposition?.force ?? payloadRoleInterdit?.force ?? null
 
   return (
     <section className="rounded-lg border border-accent/30 bg-accent/5 p-4 space-y-3 max-w-3xl">
@@ -205,7 +212,7 @@ export function AssistantIA() {
             </p>
           )}
 
-          {(payload || payloadComposition) && apercu ? (
+          {(payload || payloadComposition || payloadRoleInterdit) && apercu ? (
             <>
               <div className="rounded-md bg-muted/50 p-2.5">
                 <p className="text-sm text-foreground leading-6">{apercu}</p>

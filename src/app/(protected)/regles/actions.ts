@@ -30,6 +30,7 @@ import { proposerRegleIA, assistantIaDisponible, type TypeCreneauIA } from '@/li
 import {
   propositionVersPayload,
   propositionVersComposition,
+  propositionVersRoleInterdit,
   apercuProposition,
   type PropositionRegle,
   type VetoResolu,
@@ -406,6 +407,141 @@ export async function upsertCompositionRegle(payload: CompositionReglePayload) {
     const { error } = await supabase.from('regles_cabinet').insert({
       cabinet_id: cabinetId,
       brique_id: 'composition_equipe',
+      params_json,
+      force: payload.force,
+      actif: true,
+      created_by: vetoId,
+    })
+    if (error) return { error: error.message }
+  }
+
+  revalidatePath('/regles')
+  return { success: true }
+}
+
+// ── Rôle interdit par tag (backlog n°22 — « un junior jamais 1er ») ──
+
+/** Payload du formulaire rôle interdit (règle GLOBALE avec params). */
+export interface RoleInterditReglePayload {
+  id?: string // présent = édition
+  tag: string
+  /** Label de la place interdite (rôle du catalogue, ex. 'premier'). */
+  role: string
+  /** Codes de créneaux ciblés — vide/absent = tous les créneaux. */
+  creneaux?: string[]
+  force: ForceFormulaire
+}
+
+/** Labels de rôles VALIDES du cabinet (catalogue actif ; repli premier/second). */
+async function chargerRolesValides(
+  supabase: SupabaseClient<any, any, any>,
+  cabinetId: string,
+): Promise<Set<string>> {
+  const modeles = await chargerCreneauModele(supabase, cabinetId)
+  const roles = modeles
+    .filter((m) => m.actif)
+    .flatMap((m) => m.roles ?? [])
+    .filter((r) => typeof r === 'string' && r.trim() !== '')
+  return new Set(roles.length > 0 ? roles : ['premier', 'second'])
+}
+
+/**
+ * Crée ou édite une règle « rôle interdit selon attribut » (« un junior
+ * jamais 1er »). Règle GLOBALE par TAG, comme composition_equipe : params
+ * { tag, role, creneaux? } reconstruits ici (frontière de confiance).
+ * Toggle/suppression : setRegleActif / deleteRegle (génériques).
+ */
+export async function upsertRoleInterditRegle(payload: RoleInterditReglePayload) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+  const vetoId = garde.veto.id
+
+  if (!FORCES_VALIDES.includes(payload.force)) {
+    return { error: 'Niveau de force invalide.' }
+  }
+  const tag = (payload.tag ?? '').trim().toLowerCase()
+  if (tag === '' || tag.length > TAG_MAX_LONGUEUR) {
+    return { error: `Étiquette invalide (1 à ${TAG_MAX_LONGUEUR} caractères).` }
+  }
+  const role = (payload.role ?? '').trim()
+  if (role === '') return { error: 'Sélectionnez le rôle interdit.' }
+
+  let cabinetId: string
+  try {
+    cabinetId = await resoudreCabinetId(supabase)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
+  }
+
+  // Le rôle DOIT exister dans le catalogue du cabinet (un rôle fantôme
+  // rendrait la règle silencieusement inerte).
+  const rolesValides = await chargerRolesValides(supabase, cabinetId)
+  if (!rolesValides.has(role)) {
+    return { error: `Rôle inconnu pour ce cabinet : « ${role} ».` }
+  }
+
+  // Créneaux ciblés : mêmes règles que la composition (codes du cabinet).
+  const creneaux = [
+    ...new Set((payload.creneaux ?? []).filter((x) => typeof x === 'string' && x.trim() !== '')),
+  ]
+  if (creneaux.length > 0) {
+    const codesValides = await chargerCodesCreneauxValides(supabase, cabinetId)
+    const inconnus = creneaux.filter((c) => !codesValides.has(c))
+    if (inconnus.length > 0) {
+      return { error: `Type(s) de créneau inconnu(s) pour ce cabinet : ${inconnus.join(', ')}.` }
+    }
+  }
+
+  // Anti-coquille-vide : le tag doit être porté par au moins un véto actif.
+  const { data: vetsTags } = await supabase
+    .from('veterinaires')
+    .select('tags')
+    .eq('actif', true)
+  const rowsTags = ((vetsTags as { tags?: string[] | null }[] | null) ?? [])
+  const porteurs = rowsTags.filter((v) =>
+    (v.tags ?? []).some((t) => t.trim().toLowerCase() === tag),
+  ).length
+  if (porteurs === 0) {
+    return {
+      error: `Aucun vétérinaire actif ne porte l'étiquette « ${tag} ». Ajoute-la d'abord sur les fiches concernées (page Équipe).`,
+    }
+  }
+
+  const params: Record<string, unknown> = {
+    tag,
+    role,
+    ...(creneaux.length > 0 ? { creneaux } : {}),
+  }
+  const params_json = { qui: null, quand: null, params }
+
+  // Anti-doublon (création seulement) : même tag + rôle + créneaux.
+  if (!payload.id) {
+    const { data: existantes } = await supabase
+      .from('regles_cabinet')
+      .select('id, params_json')
+      .eq('cabinet_id', cabinetId)
+      .eq('brique_id', 'role_interdit_tag')
+    const cible = JSON.stringify(params)
+    for (const r of existantes ?? []) {
+      const p = (r.params_json as { params?: unknown })?.params ?? {}
+      if (JSON.stringify(p) === cible) {
+        return { error: 'Une règle identique existe déjà.' }
+      }
+    }
+  }
+
+  if (payload.id) {
+    const { error } = await supabase
+      .from('regles_cabinet')
+      .update({ params_json, force: payload.force })
+      .eq('id', payload.id)
+    if (error) return { error: error.message }
+  } else {
+    const { error } = await supabase.from('regles_cabinet').insert({
+      cabinet_id: cabinetId,
+      brique_id: 'role_interdit_tag',
       params_json,
       force: payload.force,
       actif: true,
@@ -835,6 +971,8 @@ export type PropositionIaResultat =
        *  n°6) — présent à la place de `payload` quand l'IA propose une
        *  composition_equipe exploitable. */
       payloadComposition?: CompositionReglePayload
+      /** Payload prêt pour upsertRoleInterditRegle (règle GLOBALE, n°22). */
+      payloadRoleInterdit?: RoleInterditReglePayload
     }
 
 /**
@@ -876,12 +1014,16 @@ export async function proposerRegleDepuisTexte(phrase: string): Promise<Proposit
   // un filtre `creneaux` pour au_plus_n (« max 2 week-ends par mois », n°19).
   // Best-effort : sans cabinet/catalogue → types historiques.
   let typesCreneaux: TypeCreneauIA[] = []
+  let rolesCabinet: string[] = []
   try {
     const cabinetId = await resoudreCabinetId(supabase)
     const modeles = await chargerCreneauModele(supabase, cabinetId)
     typesCreneaux = modeles
       .filter((m) => m.actif && m.code !== null && m.code !== 'ferie')
       .map((m) => ({ code: m.code as string, nom: m.nom }))
+    rolesCabinet = [
+      ...new Set(modeles.filter((m) => m.actif).flatMap((m) => m.roles ?? [])),
+    ].filter((r) => typeof r === 'string' && r.trim() !== '')
   } catch {
     // silencieux : repli ci-dessous
   }
@@ -892,10 +1034,11 @@ export async function proposerRegleDepuisTexte(phrase: string): Promise<Proposit
       { code: 'weekend', nom: 'Week-end' },
     ]
   }
+  if (rolesCabinet.length === 0) rolesCabinet = ['premier', 'second']
 
   let proposition: PropositionRegle
   try {
-    proposition = await proposerRegleIA(phrase.trim(), vets, typesCreneaux, tagsEquipe)
+    proposition = await proposerRegleIA(phrase.trim(), vets, typesCreneaux, tagsEquipe, rolesCabinet)
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Erreur de l'assistant IA." }
   }
@@ -913,6 +1056,22 @@ export async function proposerRegleDepuisTexte(phrase: string): Promise<Proposit
       proposition,
       apercu: apercuProposition(proposition),
       payloadComposition: convCompo.payload,
+    }
+  }
+
+  // ── Règle GLOBALE « rôle interdit par tag » (n°22) : conversion dédiée ──
+  if (proposition.brique_id === 'role_interdit_tag') {
+    const convRole = propositionVersRoleInterdit(proposition, tagsEquipe, rolesCabinet)
+    if (!convRole.ok) {
+      return {
+        proposition: { ...proposition, faisable: false, message: convRole.raison },
+        apercu: '',
+      }
+    }
+    return {
+      proposition,
+      apercu: apercuProposition(proposition),
+      payloadRoleInterdit: convRole.payload,
     }
   }
 

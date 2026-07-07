@@ -24,7 +24,10 @@
 // ============================================================
 
 import type { VetEngine, SlotGarde, PlanningPartiel, RoleGarde } from '../types'
-import { penaliteStructureEtage, type CompositionEquipeRegle } from '../structure-config'
+import {
+  penaliteStructureEtage,
+  type CompositionEquipeRegle, type RoleInterditTagRegle,
+} from '../structure-config'
 
 /** Normalise un tag pour comparaison (mêmes règles que le mapper/l'écriture). */
 export function normaliserTag(tag: string): string {
@@ -129,4 +132,54 @@ export function messageComposition(
     return `COMPOSITION : ce créneau doit compter au moins un vétérinaire « ${regle.tag} »`
   }
   return `COMPOSITION : ${prenom} porte le tag « ${regle.tag} » — il faut au moins un vétérinaire sans ce tag à ses côtés`
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Rôle interdit par TAG (backlog n°22 — « un junior jamais 1er »)
+// ═══════════════════════════════════════════════════════════════
+// Prédicat PLACE PAR PLACE (gabarit R17) : contrairement à la composition,
+// pas de « pose complétante » — la pose viole dès que le rôle visé est le
+// rôle interdit et que le candidat porte le tag.
+
+/** La règle cible-t-elle ce type de créneau ? (absent/vide = tous) */
+export function roleInterditCibleType(regle: RoleInterditTagRegle, type: string): boolean {
+  return !regle.creneaux || regle.creneaux.length === 0 || regle.creneaux.includes(type)
+}
+
+/** Poser `vet` sur (slot.type, roleVisé) violerait-il `regle` ? */
+export function violeRoleInterdit(
+  regle: RoleInterditTagRegle,
+  slotType: string,
+  roleVisé: RoleGarde,
+  vet: Pick<VetEngine, 'tags'>,
+): boolean {
+  if (roleVisé !== regle.role) return false
+  if (!roleInterditCibleType(regle, slotType)) return false
+  return vetPorteTag(vet, regle.tag)
+}
+
+/**
+ * Pénalité SOUPLE d'un candidat pour les règles de rôle interdit d'étage ≥ 3.
+ * Consommée par les DEUX scoreurs de candidats (greedy + LNS) — le scoreur
+ * global juge, lui, chaque (slot, rôle) du planning complet (scorerPlanning).
+ */
+export function penaliteRoleInterditCandidat(
+  slotType: string,
+  roleVisé: RoleGarde,
+  vet: Pick<VetEngine, 'tags'>,
+  regles?: RoleInterditTagRegle[],
+): number {
+  if (!regles || regles.length === 0) return 0
+  let pen = 0
+  for (const regle of regles) {
+    if (violeRoleInterdit(regle, slotType, roleVisé, vet)) {
+      pen += penaliteStructureEtage(regle.etage)
+    }
+  }
+  return pen
+}
+
+/** Message d'invalidité lisible (préfixe ROLE_TAG). */
+export function messageRoleInterdit(regle: RoleInterditTagRegle, prenom: string): string {
+  return `ROLE_TAG : ${prenom} porte le tag « ${regle.tag} » — le rôle « ${regle.role} » lui est interdit`
 }
