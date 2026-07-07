@@ -38,12 +38,14 @@
    question au cabinet (mémoire `equite-1er-weekend-financier`) ne peut pas
    être traduite en réglage. Finir (colonne cabinet/profil + UI + loader) ou
    retirer la promesse.
-6. **Composition d'équipe (tags junior/senior)** — « un junior jamais seul »,
-   « au moins un senior par week-end ». Indispensable dès 8+ vétos ou présence
-   de juniors ; le duo_interdit du pilote est un contournement binaire.
-7. **Préférences positives (desiderata)** — tout le catalogue est en
-   interdiction/limite. Aucune brique « préfère le mardi », « préfère être avec
-   X », « veut PLUS de gardes ». Standard chez les concurrents.
+6. ✅ **FAIT (2026-07-07, Vague 4)** — Composition d'équipe (tags junior/senior) :
+   `veterinaires.tags` + brique globale `composition_equipe` (au_moins_un /
+   pas_seuls, ciblage créneaux, dur/mou) de bout en bout (moteur + validateur +
+   pré-vol + UI /regles + fiche véto + IA).
+7. ✅ **FAIT (2026-07-07, Vague 4)** — Préférences positives (desiderata) :
+   briques par-véto toujours souples `preferer_creneau` (« préfère le mardi »,
+   « préfère les week-ends »), `preferer_avec`, `volume_gardes` (« veut PLUS /
+   MOINS de gardes ») — scorées dans les deux gardiens, formulaire + IA.
 8. **Remplaçants externes (locum)** — pas de carnet de remplaçants ni de règle
    d'intégration au planning.
 
@@ -93,7 +95,9 @@
 21. **Groupes/cohortes d'équité paramétrables** — l'équité `grands_weekend`
     est le seul groupe, codé « salariés » ; généraliser (filières canine ‖
     rurale ‖ équine, associés vs salariés…).
-22. **Rôle selon attribut** — « un junior jamais 1er ». Dépend du n°6.
+22. ✅ **FAIT (2026-07-07, Vague 4)** — Rôle selon attribut : brique globale
+    `role_interdit_tag` (« un junior jamais 1er »), dur/mou, ciblage créneaux,
+    rôle choisi parmi ceux du catalogue du cabinet.
 23. **Pré-vol de cohérence des règles** — détecter AVANT génération les paires
     de règles dures arithmétiquement contradictoires et les règles pointant un
     véto sorti ; le diagnostic d'impasse est bon mais réactif.

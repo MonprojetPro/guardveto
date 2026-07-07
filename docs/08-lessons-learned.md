@@ -157,3 +157,18 @@ Le message disait « plafond trop élevé (maximum 14) ». MiKL : *le 14 est arb
 4. **Écrire les tests custom AVANT de généraliser révèle les angles morts** : c''est en écrivant le cas « matin+soir le même jour » que le balayage k=0 (même jour) s''est avéré manquant — la vision produit (doc 09 : plusieurs gardes/jour) doit piloter les cas de test, pas le code existant.
 
 **Piège restant (assumé, tranche 3) :** le validateur indépendant applique encore le couple historique en dur — sans UI d''édition des relations, aucune divergence possible en pratique, mais toute donnée custom AVANT la tranche 3 produirait des violations fantômes.
+
+---
+
+## 2026-07-07 — Vague 4 : règles « qui peut faire quoi » (tags + composition + desiderata)
+
+**Contexte :** backlog #6 (« un junior jamais seul », « au moins un senior par week-end »), #22 (« un junior jamais 1er ») et #7 (desiderata : « préfère le mardi », « préfère avec X », « veut plus de gardes ») — 3 tranches livrées le même jour (`f59de66`, `5ee9eac`, `7239da5`).
+
+**Ce qui a réellement fonctionné :**
+1. **La « pose complétante » est LE bon moment pour juger une équipe.** Une règle qui porte sur la COMPOSITION d'un créneau (au moins un senior, pas que des juniors, avec X) ne peut pas bloquer une pose intermédiaire : l'avenir peut encore réparer (le senior arrive sur la place suivante). Le check ne se déclenche que quand la dernière place se pourvoit — le backtracking gère le reste. Bloquer plus tôt élimine des solutions valides.
+2. **Le total de places qui fait foi = ce que le solver VA pourvoir, pas ce que le catalogue déclare.** Un `semaine_soir` plafonné par l'effectif déclare 2 places mais n'en pourvoit qu'une : l'équipe se fige à la 1re pose. D'où `SolverStep.nbPlaces` (nbAEmettre) threadé jusqu'aux slots — y compris dans la reconstruction étage 0 de `scorerPlanning` (places POURVUES de l'attribution finale).
+3. **Jamais de bonus négatif dans le vecteur lexicographique.** Un coût négatif rendrait un planning « meilleur que zéro violation » et casserait la hiérarchie des étages. Préférence positive = PÉNALITÉ DE NON-SATISFACTION (0 si honorée) ; les termes négatifs restent réservés au tri des candidats (précédent : malusAvantageFinancier), utilisé pour le biais « veut plus de gardes ».
+4. **Règle sans gardien dur = famille R10/R8b** : refuser « jamais » à l'écriture + clamper l'étage à l'évaluation (défense en profondeur). Les desiderata sont des préférences PURES — les proposer « fermes » serait une coquille vide.
+5. **Le « qui » d'une règle peut être une ÉTIQUETTE, pas un véto** : `veterinaires.tags` (text[] libre) prépare aussi les cohortes d'équité (#21) sans re-migration. Anti-coquille-vide : l'écriture refuse un tag que personne ne porte, le pré-vol re-signale (tag sans porteur, rôle intenable si TOUS portent le tag).
+
+**Piège évité :** le scoreur global ne comptait PAS les règles par-véto souples (dette double-scoring préexistante) — les nouvelles briques (composition, rôle, desiderata) sont scorées EXPLICITEMENT dans `scorerPlanning` avec les mêmes prédicats que le tri candidat, sinon le LNS défait ce que le greedy construit.
