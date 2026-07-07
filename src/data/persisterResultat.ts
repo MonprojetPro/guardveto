@@ -19,81 +19,15 @@
 
 import { createClient } from '@/lib/supabase/server'
 import type { PlanningPartiel } from '@/engine/types'
-import { horairesResolus, type StructureCreneauxResolue } from '@/engine/structure-creneaux'
 import { chargerStructureProfilPeriode } from '@/data/chargerStructureCabinet'
+import { construireLignesAttributions } from '@/data/attributionRows'
 
-// ── Types internes ───────────────────────────────────────────
-
-interface AttributionRow {
-  cabinet_id: string
-  planning_id: string
-  creneau_id: string | null
-  veterinaire_id: string
-  /** Label libre depuis P3b (rôles du catalogue) — CHECK SQL levé en migration. */
-  role: string
-  type_presence: 'sur_place'
-  date_debut_reel: string
-  date_fin_reel: string
-  snapshot_id: string | null
-}
-
-// ── Calcul des horodatages (Europe/Paris) ────────────────────
-
-/**
- * Retourne une date ISO 8601 UTC correspondant à l'heure locale
- * Europe/Paris pour la date et le décalage horaire donnés.
- *
- * On utilise l'API Intl pour déduire l'offset Paris au moment
- * de la date (gestion automatique heure d'été / heure d'hiver).
- */
-function toUTCString(dateISO: string, heureLocale: string): string {
-  // heureLocale = 'HH:MM' (ex: '18:30', '08:30')
-  const [hh, mm] = heureLocale.split(':').map(Number)
-  // Construire la date en heure locale Paris
-  // On passe par un Date UTC puis on ajuste l'offset
-  const naive = new Date(`${dateISO}T${heureLocale}:00.000`)
-
-  // Offset Europe/Paris en minutes (positif = en avance sur UTC)
-  const formatter = new Intl.DateTimeFormat('fr-FR', {
-    timeZone: 'Europe/Paris',
-    timeZoneName: 'shortOffset',
-  })
-  const parts = formatter.formatToParts(naive)
-  const offsetPart = parts.find((p) => p.type === 'timeZoneName')?.value ?? 'UTC+1'
-  // offsetPart : 'UTC+1', 'UTC+2', etc.
-  const offsetMatch = offsetPart.match(/UTC([+-]\d+)/)
-  const offsetHours = offsetMatch ? parseInt(offsetMatch[1], 10) : 1
-
-  // Date UTC = date locale - offset
-  const utcMs = naive.getTime() - offsetHours * 60 * 60 * 1000
-  return new Date(utcMs).toISOString()
-}
-
-/**
- * Calcule date_debut_reel et date_fin_reel pour une attribution,
- * selon le type de créneau.
- *
- * Mapping identique à la migration F1-002 (020260616170002_migrate_gardes.sql).
- */
-function calculerHoraires(
-  date: string,
-  type: string,
-  structure: StructureCreneauxResolue,
-): { dateDebut: string; dateFin: string } {
-  function addDaysISO(iso: string, days: number): string {
-    const d = new Date(`${iso}T00:00:00Z`)
-    d.setUTCDate(d.getUTCDate() + days)
-    return d.toISOString().slice(0, 10)
-  }
-
-  // Horaires résolus pour CE cabinet (A1 : structure par défaut + surcharge
-  // cabinet). Repli automatique sur le défaut si le cabinet n'a rien personnalisé.
-  const { heureDebut, heureFin, offsetJoursFin } = horairesResolus(structure, type)
-  return {
-    dateDebut: toUTCString(date, heureDebut),
-    dateFin:   toUTCString(addDaysISO(date, offsetJoursFin), heureFin),
-  }
-}
+// ── Calcul des horodatages / conversion en lignes ────────────
+// DÉPLACÉS dans src/data/attributionRows.ts (P6 verrou n°7, étape 3) :
+// la conversion PlanningPartiel → lignes `attributions` est désormais
+// PARTAGÉE avec la synchro post-mutation (syncAttributions), à
+// l'identique — le test syncAttributions.test.ts fige l'équivalence
+// avec l'implémentation historique de ce fichier.
 
 // ── Chargement du catalogue de créneaux ─────────────────────
 
@@ -176,33 +110,15 @@ export async function persisterResultat(
   }
 
   // 4. Construire les lignes à insérer
-  //    Une ligne par (attribution × rôle occupé), avec snapshot_id (F8-002)
-  const rows: AttributionRow[] = []
-
-  for (const a of planning.attributions) {
-    // Le type moteur EST le code du catalogue (identité). Un code sur-mesure
-    // n'existe pas dans `creneaux_catalogue` (table V2 des 4 types fixes) →
-    // creneau_id null, prévu par le schéma (« créneau manuel non catalogué »).
-    const creneauId = creneauMap.get(a.type) ?? null
-    const { dateDebut, dateFin } = calculerHoraires(a.date, a.type, structure)
-
-    // Généralisé P3b : une ligne par PLACE pourvue, avec son label réel.
-    // Défaut [premier, second] → exactement les deux lignes historiques.
-    for (const p of a.placements) {
-      if (!p.vetId) continue
-      rows.push({
-        cabinet_id:       cabinetId,
-        planning_id:      periodeId,
-        creneau_id:       creneauId,
-        veterinaire_id:   p.vetId,
-        role:             p.role,
-        type_presence:    'sur_place',
-        date_debut_reel:  dateDebut,
-        date_fin_reel:    dateFin,
-        snapshot_id:      snapshotIdStr,
-      })
-    }
-  }
+  //    Une ligne par (attribution × rôle occupé), avec snapshot_id (F8-002).
+  //    Constructeur PUR PARTAGÉ avec la synchro post-mutation (attributionRows).
+  const rows = construireLignesAttributions(planning, {
+    cabinetId,
+    planningId: periodeId,
+    snapshotId: snapshotIdStr,
+    structure,
+    creneauIdParCode: creneauMap,
+  })
 
   // 5. Insérer en bloc (idempotent via index unique idx_attributions_garde_role)
   if (rows.length > 0) {

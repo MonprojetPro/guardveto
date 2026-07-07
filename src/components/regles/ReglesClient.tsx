@@ -50,6 +50,12 @@ export interface PeriodeOption {
   label: string
 }
 
+/** Type de créneau du cabinet proposable au filtre au_plus_n (n°19). */
+export interface TypeCreneauOption {
+  code: string
+  nom: string
+}
+
 export interface VetoMini {
   id: string
   prenom: string
@@ -120,8 +126,11 @@ function fusionnerDuos(rows: RegleRow[]): RegleRow[] {
 function phraseRegle(regle: RegleRow, nomVeto: (id: string) => string): string {
   const pj = (regle.params_json ?? {}) as ParamsJson
   const refs = pj.qui?.refs
-  const sujetId = Array.isArray(refs) && refs.length > 0 && typeof refs[0] === 'string' ? refs[0] : null
-  const sujet = sujetId ? nomVeto(sujetId) : ''
+  // Multi-propriétaires (n°18) : le sujet affiche TOUTES les réfs — sauf pour
+  // un duo interdit où refs[1] est le PARTENAIRE (déjà rendu par le prédicat).
+  const refsStr = Array.isArray(refs) ? refs.filter((x): x is string => typeof x === 'string') : []
+  const sujets = regle.brique_id === 'duo_interdit' ? refsStr.slice(0, 1) : refsStr
+  const sujet = sujets.map(nomVeto).join(', ')
   const params = (pj.params ?? {}) as Record<string, unknown>
   const predicat = rendreRegle(regle.brique_id, params, { nomVeto })
   return sujet ? `${sujet} ${predicat}` : predicat
@@ -133,10 +142,12 @@ interface ReglesClientProps {
   regles: RegleRow[]
   vets: VetoMini[]
   periodes: PeriodeOption[]
+  /** Types de créneaux du cabinet (filtre au_plus_n — n°19). */
+  typesCreneaux: TypeCreneauOption[]
   isAdmin: boolean
 }
 
-export function ReglesClient({ regles, vets, periodes, isAdmin }: ReglesClientProps) {
+export function ReglesClient({ regles, vets, periodes, typesCreneaux, isAdmin }: ReglesClientProps) {
   const labelPeriode = (id?: string | null) =>
     id ? (periodes.find((p) => p.id === id)?.label ?? 'période supprimée') : null
   const router = useRouter()
@@ -366,6 +377,7 @@ export function ReglesClient({ regles, vets, periodes, isAdmin }: ReglesClientPr
           onClose={() => setFormOuvert(false)}
           vets={vets}
           periodes={periodes}
+          typesCreneaux={typesCreneaux}
           regle={aEditer}
         />
       )}

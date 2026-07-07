@@ -25,7 +25,8 @@ import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { EQUITY_DIMENSIONS, IMPORTANCE_LEVELS } from '@/engine/equity-weights'
 import { construireValiditeJson } from '@/lib/periodes'
-import { proposerRegleIA, assistantIaDisponible } from '@/lib/ia/proposerRegle'
+import { chargerCreneauModele } from '@/data/chargerCreneauModele'
+import { proposerRegleIA, assistantIaDisponible, type TypeCreneauIA } from '@/lib/ia/proposerRegle'
 import {
   propositionVersPayload,
   apercuProposition,
@@ -212,8 +213,24 @@ export async function setEquiteImportance(dimension: string, importance: string)
 const BRIQUES_STRUCTURELLES = new Set(['liaison_creneaux', 'inversion_role'])
 
 /**
- * Règle une contrainte structurelle R8 (inversion_role) ou R9 (liaison_creneaux) :
- * son activation (on/off) ET son niveau de force (ferme → préférence). Comme
+ * Pénalités souples réglables (backlog n°16 — R10/R10c/R10b/R8b). Règles
+ * GLOBALES comme R8/R9, MAIS structurellement souples : il n'existe AUCUN
+ * gardien dur (isValid / validateur) pour elles → la force « jamais » est
+ * REFUSÉE à l'écriture (sinon coquille vide : une « interdiction ferme » qui
+ * ne bloque rien). Le moteur clampe aussi tout étage < 3 (défense en profondeur).
+ */
+const BRIQUES_PENALITES_SOUPLES = new Set([
+  'eviter_we_consecutifs',    // R10
+  'eviter_we_avant_vacances', // R10c
+  'eviter_fete_fin_annee',    // R10b
+  'inversion_role_ferie',     // R8b
+])
+const FORCES_SOUPLES = new Set<ForceFormulaire>(['sauf_crise', 'evitee', 'si_possible'])
+
+/**
+ * Règle une contrainte structurelle R8 (inversion_role) ou R9 (liaison_creneaux),
+ * ou une pénalité souple réglable (R10/R10c/R10b/R8b — backlog n°16) :
+ * son activation (on/off) ET son niveau de force. Comme
  * l'équité, ce sont des règles GLOBALES (pas de « qui »). UPSERT manuel par
  * (cabinet, brique). Double garde : assertAdmin + RLS. S'applique à la prochaine
  * génération. ⚠️ Le moteur ET le validateur lisent cette même config.
@@ -225,11 +242,15 @@ export async function setStructureRegle(briqueId: string, actif: boolean, force:
   if ('error' in garde) return garde
   const vetoId = garde.veto.id
 
-  if (!BRIQUES_STRUCTURELLES.has(briqueId)) {
+  const estPenaliteSouple = BRIQUES_PENALITES_SOUPLES.has(briqueId)
+  if (!BRIQUES_STRUCTURELLES.has(briqueId) && !estPenaliteSouple) {
     return { error: `Règle structurelle inconnue : « ${briqueId} ».` }
   }
   if (!FORCES_VALIDES.includes(force as ForceFormulaire)) {
     return { error: `Niveau de force invalide : « ${force} ».` }
+  }
+  if (estPenaliteSouple && !FORCES_SOUPLES.has(force as ForceFormulaire)) {
+    return { error: 'Cette règle est une préférence : elle ne peut pas être une interdiction ferme.' }
   }
   if (typeof actif !== 'boolean') {
     return { error: 'État (activé/désactivé) invalide.' }
@@ -355,6 +376,9 @@ export interface UpsertReglePayload {
   // au_plus_n
   n?: number
   fenetre?: string
+  /** Filtre optionnel par types de créneaux du cabinet (axe `quoi`, n°19).
+   *  Vide/absent = toutes les gardes comptent (comportement historique). */
+  creneaux?: string[]
   // espacement_min
   ecart_min_jours?: number
   // espacement_weekend
@@ -377,9 +401,31 @@ function lirePartenaire(pj: unknown): string | null {
   return typeof a === 'string' ? a : null
 }
 
-/** Construit { quand, params } pour les briques NON-duo. Null = erreur (raison). */
+/** Types de créneaux historiques — repli quand le cabinet n'a pas de catalogue. */
+const CODES_CRENEAUX_HISTORIQUES = ['semaine_soir', 'vendredi_soir', 'weekend'] as const
+
+/**
+ * Codes de créneaux VALIDES du cabinet (référentiel dynamique — verrou 8 :
+ * on référence les types DU cabinet, jamais un enum figé). Catalogue actif du
+ * profil défaut ; sans catalogue → repli sur les 3 types historiques.
+ */
+async function chargerCodesCreneauxValides(
+  supabase: SupabaseClient<any, any, any>,
+  cabinetId: string,
+): Promise<Set<string>> {
+  const modeles = await chargerCreneauModele(supabase, cabinetId)
+  const codes = modeles
+    .filter((m) => m.actif && m.code !== null && m.code !== 'ferie')
+    .map((m) => m.code as string)
+  return new Set(codes.length > 0 ? codes : CODES_CRENEAUX_HISTORIQUES)
+}
+
+/** Construit { quand, params } pour les briques NON-duo. Null = erreur (raison).
+ *  `codesCreneaux` : référentiel du cabinet, requis SEULEMENT si un filtre de
+ *  créneaux est demandé (au_plus_n, n°19). */
 function construireParams(
   p: UpsertReglePayload,
+  codesCreneaux?: Set<string>,
 ): { quand: unknown; params: Record<string, unknown> } | { error: string } {
   switch (p.brique_id) {
     case 'interdire_creneau': {
@@ -404,6 +450,20 @@ function construireParams(
       const n = entierBorne(p.n, N_MAX_GARDES)
       if (n === null) return { error: `Nombre de gardes invalide (1 à ${N_MAX_GARDES}).` }
       if (!p.fenetre || !FENETRES_VALIDES.has(p.fenetre)) return { error: 'Fenêtre de comptage invalide.' }
+      // Axe `quoi` (n°19) : filtre optionnel par types de créneaux du cabinet.
+      // Frontière de confiance : chaque code DOIT exister dans le référentiel
+      // du cabinet (un code fantôme rendrait la règle silencieusement inerte).
+      const creneaux = [
+        ...new Set((p.creneaux ?? []).filter((x) => typeof x === 'string' && x.trim() !== '')),
+      ]
+      if (creneaux.length > 0) {
+        if (!codesCreneaux) return { error: 'Types de créneaux du cabinet indisponibles.' }
+        const inconnus = creneaux.filter((c) => !codesCreneaux.has(c))
+        if (inconnus.length > 0) {
+          return { error: `Type(s) de créneau inconnu(s) pour ce cabinet : ${inconnus.join(', ')}.` }
+        }
+        return { quand: null, params: { n, fenetre: p.fenetre, creneaux } }
+      }
       return { quand: null, params: { n, fenetre: p.fenetre } }
     }
     case 'espacement_min': {
@@ -592,7 +652,14 @@ export async function upsertRegle(payload: UpsertReglePayload) {
   }
 
   // ── Cas briques non-duo ────────────────────────────────────
-  const construit = construireParams(payload)
+  // Référentiel de créneaux du cabinet : chargé SEULEMENT si un filtre est
+  // demandé (au_plus_n, n°19) — zéro requête supplémentaire sinon.
+  const besoinCodes =
+    payload.brique_id === 'au_plus_n' && (payload.creneaux ?? []).length > 0
+  const codesCreneaux = besoinCodes
+    ? await chargerCodesCreneauxValides(supabase, cabinetId)
+    : undefined
+  const construit = construireParams(payload, codesCreneaux)
   if ('error' in construit) return construit
 
   // Anti-doublon (création seulement) : règle identique déjà présente ?
@@ -668,9 +735,30 @@ export async function proposerRegleDepuisTexte(phrase: string): Promise<Proposit
     .order('prenom')
   const vets = ((vetsDb as VetoResolu[] | null) ?? [])
 
+  // Types de créneaux DU cabinet (dynamiques — verrou 8) : l'IA peut proposer
+  // un filtre `creneaux` pour au_plus_n (« max 2 week-ends par mois », n°19).
+  // Best-effort : sans cabinet/catalogue → types historiques.
+  let typesCreneaux: TypeCreneauIA[] = []
+  try {
+    const cabinetId = await resoudreCabinetId(supabase)
+    const modeles = await chargerCreneauModele(supabase, cabinetId)
+    typesCreneaux = modeles
+      .filter((m) => m.actif && m.code !== null && m.code !== 'ferie')
+      .map((m) => ({ code: m.code as string, nom: m.nom }))
+  } catch {
+    // silencieux : repli ci-dessous
+  }
+  if (typesCreneaux.length === 0) {
+    typesCreneaux = [
+      { code: 'semaine_soir', nom: 'Soirs de semaine' },
+      { code: 'vendredi_soir', nom: 'Vendredi soir' },
+      { code: 'weekend', nom: 'Week-end' },
+    ]
+  }
+
   let proposition: PropositionRegle
   try {
-    proposition = await proposerRegleIA(phrase.trim(), vets)
+    proposition = await proposerRegleIA(phrase.trim(), vets, typesCreneaux)
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Erreur de l'assistant IA." }
   }

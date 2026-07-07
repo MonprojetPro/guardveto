@@ -15,7 +15,9 @@
 
 import { describe, it, expect } from 'vitest'
 import { mapperReglesCabinet, type RegleCabinetRow } from '../mapReglesCabinet'
-import type { ContrainteEngine } from '@/engine/types'
+import { normaliserContraintesVets } from '@/engine/normaliserContraintes'
+import { isValid } from '@/engine/rules/hard-constraints'
+import type { ContrainteEngine, VetEngine, SlotGarde, PlanningPartiel } from '@/engine/types'
 import { VETS_PILOTE, VET } from '@/engine/__tests__/fixtures-pilote'
 
 const CABINET_PILOTE = '00000000-0000-0000-0000-0000000000c1'
@@ -122,6 +124,82 @@ describe('mapperReglesCabinet — équivalence avec le snapshot pilote', () => {
   })
 })
 
+// ── Multi-propriétaires (backlog n°18) ──────────────────────
+// Une règle « pour Manon ET Antoine » (qui.refs = [manon, antoine]) était
+// TRONQUÉE en silence : seul refs[0] la recevait. Correction : DÉPLIAGE en une
+// instance par réf — la règle s'applique à CHAQUE propriétaire (moteur ET
+// validateur consomment le même mapping). Exception : duo_interdit, où refs[1]
+// est le PARTENAIRE (pas un co-propriétaire) — refs[0] seul, comme avant.
+describe('mapperReglesCabinet — multi-propriétaires (n°18, plus de troncature)', () => {
+  const multiRow = (refs: string[], over: Partial<RegleCabinetRow> = {}): RegleCabinetRow => ({
+    id: 'multi-1', cabinet_id: CABINET_PILOTE, periode_id: null,
+    brique_id: 'interdire_creneau', force: 'jamais', actif: true,
+    params_json: {
+      qui: { type: 'individu', refs },
+      quand: null, params: { jour: 'lundi' },
+      _source: { contrainte_id: 'multi-1', type_v1: 'jour_repos_fixe' },
+    },
+    ...over,
+  })
+
+  it('refs = [Manon, Antoine] → la contrainte existe chez LES DEUX (empreintes identiques)', () => {
+    const { contraintesParVet, rejets } = mapperReglesCabinet(
+      [multiRow([VET.manon, VET.antoine])], BRIQUES_CONNUES,
+    )
+    expect(rejets).toEqual([])
+    const chezManon = contraintesParVet.get(VET.manon) ?? []
+    const chezAntoine = contraintesParVet.get(VET.antoine) ?? []
+    expect(chezManon).toHaveLength(1)
+    expect(chezAntoine).toHaveLength(1)
+    expect(empreinte(chezManon[0])).toEqual(empreinte(chezAntoine[0]))
+    // Instances distinctes (pas de partage de référence entre vétos).
+    expect(chezManon[0]).not.toBe(chezAntoine[0])
+  })
+
+  it('réfs en double → dédupliquées (une seule instance par véto)', () => {
+    const { contraintesParVet } = mapperReglesCabinet(
+      [multiRow([VET.manon, VET.manon, VET.antoine])], BRIQUES_CONNUES,
+    )
+    expect(contraintesParVet.get(VET.manon)).toHaveLength(1)
+    expect(contraintesParVet.get(VET.antoine)).toHaveLength(1)
+  })
+
+  it('duo_interdit : refs[1] reste le PARTENAIRE (pas de dépliage — comme avant)', () => {
+    const duo = multiRow([VET.antoine, VET.manon], {
+      id: 'duo-x', brique_id: 'duo_interdit',
+      params_json: {
+        qui: { type: 'duo', refs: [VET.antoine, VET.manon] },
+        quand: null, params: { avec_veterinaire_id: VET.manon },
+        _source: { contrainte_id: 'duo-x', type_v1: 'duo_interdit' },
+      },
+    })
+    const { contraintesParVet } = mapperReglesCabinet([duo], BRIQUES_CONNUES)
+    expect(contraintesParVet.get(VET.antoine)).toHaveLength(1)
+    // Manon ne reçoit PAS l'instance (la symétrie vient de la ligne miroir).
+    expect(contraintesParVet.get(VET.manon) ?? []).toHaveLength(0)
+  })
+
+  it('FAIT DIRECT moteur : la règle dépliée BLOQUE chacun des deux vétos', () => {
+    const { contraintesParVet } = mapperReglesCabinet(
+      [multiRow([VET.manon, VET.antoine])], BRIQUES_CONNUES,
+    )
+    const brut = (id: string, prenom: string): VetEngine => ({
+      id, prenom, nom: 'X', statut: 'associe', dernier_recours: false,
+      conges: [], contraintes: contraintesParVet.get(id) ?? [],
+    } as VetEngine)
+    const vets = normaliserContraintesVets([
+      brut(VET.manon, 'Manon'), brut(VET.antoine, 'Antoine'),
+    ])
+    // 2026-01-05 est un LUNDI — la règle « jamais de garde le lundi » (dure).
+    const slotLundi: SlotGarde = { date: '2026-01-05', type: 'semaine_soir', saison: 'hiver', besoinSecond: false }
+    const vide: PlanningPartiel = { attributions: [] }
+    for (const v of vets) {
+      const r = isValid(slotLundi, v, 'premier', vets, vide)
+      expect(r.valid, `le lundi doit être bloqué pour ${v.prenom}`).toBe(false)
+    }
+  })
+})
+
 describe('mapperReglesCabinet — validation déterministe (règles corrompues écartées)', () => {
   const base: RegleCabinetRow = {
     id: 'ok-1', cabinet_id: CABINET_PILOTE, periode_id: null,
@@ -160,6 +238,15 @@ describe('mapperReglesCabinet — validation déterministe (règles corrompues �
     const corrompue: RegleCabinetRow = { ...base, id: 'bad-force', force: 'tres_fort' }
     const { rejets } = mapperReglesCabinet([corrompue], BRIQUES_CONNUES)
     expect(rejets[0]?.regleId).toBe('bad-force')
+  })
+
+  it('écarte une règle multi-refs dont AUCUNE réf n’est une chaîne', () => {
+    const corrompue: RegleCabinetRow = {
+      ...base, id: 'bad-refs-types',
+      params_json: { qui: { type: 'individu', refs: [42, null] }, params: {}, _source: { type_v1: 'jour_repos_fixe' } },
+    }
+    const { rejets } = mapperReglesCabinet([corrompue], BRIQUES_CONNUES)
+    expect(rejets[0]?.regleId).toBe('bad-refs-types')
   })
 
   it('écarte une brique INTERNE même avec un type_v1 valide (anti-coquille-vide)', () => {

@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/select'
 import { rendreRegle } from '@/engine/briques/catalogue'
 import { upsertRegle, type BriqueEvaluable, type ForceFormulaire } from '@/app/(protected)/regles/actions'
-import type { RegleRow, VetoMini, PeriodeOption } from './ReglesClient'
+import type { RegleRow, VetoMini, PeriodeOption, TypeCreneauOption } from './ReglesClient'
 
 /** Valeur sentinelle du sélecteur de validité = règle permanente (periode_id null). */
 const PERMANENTE = '__permanente__'
@@ -93,10 +93,12 @@ interface RegleFormDialogProps {
   onClose: () => void
   vets: VetoMini[]
   periodes: PeriodeOption[]
+  /** Types de créneaux du cabinet — filtre optionnel de au_plus_n (n°19). */
+  typesCreneaux: TypeCreneauOption[]
   regle?: RegleRow | null
 }
 
-export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, regle }: RegleFormDialogProps) {
+export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, typesCreneaux, regle }: RegleFormDialogProps) {
   const router = useRouter()
   const isEdit = Boolean(regle)
   const [isPending, startTransition] = useTransition()
@@ -144,6 +146,15 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
   const [fenetre, setFenetre] = useState<string>(
     typeof p.fenetre === 'string' && FENETRES.some((f) => f.value === p.fenetre) ? p.fenetre : 'semaine_civile',
   )
+  // au_plus_n — filtre optionnel par types de créneaux du cabinet (n°19).
+  // Vide = toutes les gardes comptent (comportement historique).
+  const [creneauxFiltre, setCreneauxFiltre] = useState<string[]>(
+    Array.isArray(p.creneaux)
+      ? (p.creneaux as unknown[]).filter(
+          (x): x is string => typeof x === 'string' && typesCreneaux.some((t) => t.code === x),
+        )
+      : [],
+  )
 
   // espacement_min
   const [ecartMin, setEcartMin] = useState<string>(
@@ -173,6 +184,9 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
   const togglePeriode = (p: string) =>
     setPeriodes((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]))
 
+  const toggleCreneauFiltre = (code: string) =>
+    setCreneauxFiltre((prev) => (prev.includes(code) ? prev.filter((x) => x !== code) : [...prev, code]))
+
   // ── Aperçu live (mêmes params que ceux écrits côté serveur) ──
   const apercu = useMemo(() => {
     const sujet = ownerId ? nomVeto(ownerId) : ''
@@ -191,7 +205,7 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
         params = { avec_veterinaire_id: avecId }
         break
       case 'au_plus_n':
-        params = { n: Number(n) || 0, fenetre }
+        params = { n: Number(n) || 0, fenetre, creneaux: creneauxFiltre.length > 0 ? creneauxFiltre : undefined }
         break
       case 'espacement_min':
         params = { ecart_min_jours: Number(ecartMin) || 0 }
@@ -203,7 +217,7 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
     const predicat = rendreRegle(briqueId, params, { nomVeto })
     return sujet ? `${sujet} ${predicat}` : predicat
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [briqueId, ownerId, jour, exVac, siWe, sinon, semaines, periodes, avecId, n, fenetre, ecartMin, nSemaines, vets])
+  }, [briqueId, ownerId, jour, exVac, siWe, sinon, semaines, periodes, avecId, n, fenetre, creneauxFiltre, ecartMin, nSemaines, vets])
 
   const handleSubmit = () => {
     if (!ownerId) { toast.error('Sélectionnez le vétérinaire concerné.'); return }
@@ -242,6 +256,7 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
         avec_veterinaire_id: avecId,
         n: Number(n),
         fenetre,
+        creneaux: briqueId === 'au_plus_n' && creneauxFiltre.length > 0 ? creneauxFiltre : undefined,
         ecart_min_jours: Number(ecartMin),
         n_semaines: Number(nSemaines),
         periode_id: validite === PERMANENTE ? null : validite,
@@ -395,27 +410,50 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
           )}
 
           {briqueId === 'au_plus_n' && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="au-plus-n">Nombre de gardes max</Label>
-                <input
-                  id="au-plus-n"
-                  type="number"
-                  min={1}
-                  max={14}
-                  value={n}
-                  onChange={(e) => setN(e.target.value)}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                />
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="au-plus-n">Nombre de gardes max</Label>
+                  <input
+                    id="au-plus-n"
+                    type="number"
+                    min={1}
+                    max={14}
+                    value={n}
+                    onChange={(e) => setN(e.target.value)}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Fenêtre de comptage</Label>
+                  <Select value={fenetre} onValueChange={(v) => v && setFenetre(v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {FENETRES.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+              {/* Filtre de créneaux (n°19) : « max 2 week-ends par mois ». */}
               <div className="space-y-1.5">
-                <Label>Fenêtre de comptage</Label>
-                <Select value={fenetre} onValueChange={(v) => v && setFenetre(v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {FENETRES.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Label>Ne compter que certains créneaux (optionnel)</Label>
+                <div className="space-y-2 mt-1">
+                  {typesCreneaux.map((t) => (
+                    <label key={t.code} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={creneauxFiltre.includes(t.code)}
+                        onChange={() => toggleCreneauFiltre(t.code)}
+                        className="rounded"
+                      />
+                      <span className="text-sm">{t.nom}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Rien de coché = toutes les gardes comptent. Ex. cocher «&nbsp;Week-end&nbsp;»
+                  avec «&nbsp;2 sur 30 jours glissants&nbsp;» = au plus 2 week-ends par mois.
+                </p>
               </div>
             </div>
           )}

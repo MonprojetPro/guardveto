@@ -42,7 +42,7 @@ import { penalite } from './rules/soft-constraints'
 import { compterParVet, type CompteurVet } from './rules/optimization'
 import { comparerScores, scorerPlanning, type VecteurScore, type BonusMalusMap } from './score-lexicographique'
 import { DEFAULT_EQUITY_WEIGHTS, DEFAULT_ROLE_AVANTAGE_FINANCIER, type EquityWeights } from './equity-weights'
-import { DEFAULT_STRUCTURE_CONFIG, type StructureConfig } from './structure-config'
+import { DEFAULT_STRUCTURE_CONFIG, type StructureConfig, type PenalitesSouplesConfig } from './structure-config'
 import type { DiagnosticImpasse } from './diagnostic'
 import { construireDiagnostic, type CreneauStep, type ReSimuler } from './diagnostic'
 
@@ -376,6 +376,9 @@ function scorerCandidat(
   // identiques pour tous les candidats d'un même step. Le caller peut les
   // pré-calculer UNE fois par step au lieu d'une fois par comparaison de tri.
   compteursPrecalcules?: CompteurVet[],
+  // Réglage des pénalités souples R10/R10c/R10b/R8b (backlog n°16).
+  // Absent → poids historiques (byte-identique).
+  penalitesSouples?: PenalitesSouplesConfig,
 ): number {
   // Dernier recours → toujours en dernier
   if (vet.dernier_recours) return 1_000_000
@@ -397,7 +400,8 @@ function scorerCandidat(
     vet,
     step.role,
     planning,
-    calendrier
+    calendrier,
+    penalitesSouples
   )
 
   // Créneau SUR-MESURE : équité d'étalement par code (jamais pour les codes
@@ -550,7 +554,7 @@ function backtrack(
   const candidates = valides
     .map((vet) => ({
       vet,
-      score: scorerCandidat(step, vet, planning, bonusMalus, vets, weights, calendrier, roleAvantageFinancier, compteursStep),
+      score: scorerCandidat(step, vet, planning, bonusMalus, vets, weights, calendrier, roleAvantageFinancier, compteursStep, structure.penalitesSouples),
     }))
     .sort((a, b) => a.score - b.score)
     .map(({ vet }) => vet)
@@ -777,6 +781,9 @@ export function scorerCandidatLNS(
   roleAvantageFinancier: string | null = DEFAULT_ROLE_AVANTAGE_FINANCIER,
   // Perf (audit 2026-07-03) : pré-calculables une fois par step (cf. scorerCandidat).
   compteursPrecalcules?: CompteurVet[],
+  // Réglage des pénalités souples R10/R10c/R10b/R8b (backlog n°16).
+  // Absent → poids historiques (byte-identique — les appels crise inchangés).
+  penalitesSouples?: PenalitesSouplesConfig,
 ): number {
   if (vet.dernier_recours) return 1_000_000
 
@@ -797,7 +804,8 @@ export function scorerCandidatLNS(
     vet,
     step.role,
     planning,
-    calendrier
+    calendrier,
+    penalitesSouples
   )
 
   // Créneau SUR-MESURE : même équité d'étalement par code que scorerCandidat.
@@ -841,7 +849,7 @@ function repairerSemaine(
     const sorted = valids
       .map((v) => ({
         v,
-        score: scorerCandidatLNS(step, v, planning, vets, weights, calendrier, roleAvantageFinancier, compteursStep),
+        score: scorerCandidatLNS(step, v, planning, vets, weights, calendrier, roleAvantageFinancier, compteursStep, structure.penalitesSouples),
       }))
       .sort((a, b) => a.score - b.score)
       .map(({ v }) => v)

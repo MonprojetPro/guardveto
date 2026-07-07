@@ -190,6 +190,25 @@ export async function supprimerPeriode(periodeId: string) {
     return { error: 'Cette période a des gardes générées. Impossible de la supprimer.' }
   }
 
+  // Purge V2 (P6 verrou n°7, étape 3) : `attributions.planning_id` n'a pas de
+  // FK vers periodes — une génération dont l'écriture V1 a échoué à mi-course
+  // peut avoir laissé des lignes V2 sans gardes. On les retire AVANT de
+  // supprimer la période, sinon elles resteraient orphelines à jamais.
+  // Borné aux BROUILLONS (même garde-fou que le delete de la période juste
+  // en dessous) : on ne touche pas la V2 d'une période publiée par erreur.
+  const { data: perStatut } = await supabase
+    .from('periodes')
+    .select('statut')
+    .eq('id', periodeId)
+    .single()
+  if ((perStatut as { statut?: string } | null)?.statut === 'brouillon') {
+    const { error: attribErr } = await supabase
+      .from('attributions')
+      .delete()
+      .eq('planning_id', periodeId)
+    if (attribErr) return { error: attribErr.message }
+  }
+
   const { error } = await supabase
     .from('periodes')
     .delete()

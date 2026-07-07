@@ -5,24 +5,32 @@
 // Contrairement aux contraintes dures, une pénalité non nulle
 // ne bloque pas l'attribution — elle aide le solver à choisir
 // la meilleure solution parmi plusieurs valides.
+//
+// RÉGLABLES (backlog n°16) : les 4 poids historiques ne sont plus câblés —
+// chaque fonction accepte la config `penalitesSouples` (StructureConfig) et
+// résout son poids effectif (0 si la règle est désactivée par le cabinet).
+// Sans config → poids historiques (PENALITE_SOUPLE_DEFAUT) → byte-identique.
 // ============================================================
 
 import type { SlotGarde, VetEngine, PlanningPartiel, RoleGarde, CalendrierResolu } from '../types'
 import { samediDeSemaine, addDays, estJourFerie, estFeteFinAnnee } from '../utils'
 import { penaliteContraintesConfig } from './hard-constraints'
 import { estAttribue, vetPourRole } from '../attribution'
+import {
+  PENALITE_SOUPLE_DEFAUT, poidsPenaliteSouple, type PenalitesSouplesConfig,
+} from '../structure-config'
 
-// ── Scores de pénalité ───────────────────────────────────
+// ── Scores de pénalité (défauts historiques — source unique structure-config) ──
 
 export const PENALITE = {
   /** R10 — 2 WE de garde consécutifs (pénalité forte) */
-  WE_CONSECUTIF: 50,
+  WE_CONSECUTIF: PENALITE_SOUPLE_DEFAUT.we_consecutif.poids,
   /** R10c — Garde le week-end qui précède immédiatement des vacances du véto */
-  WE_AVANT_VACANCES: 45,
+  WE_AVANT_VACANCES: PENALITE_SOUPLE_DEFAUT.we_avant_vacances.poids,
   /** R10b — Garde un soir de réveillon (24 déc ou 31 déc) — à éviter si possible */
-  FETE_FIN_ANNEE: 30,
+  FETE_FIN_ANNEE: PENALITE_SOUPLE_DEFAUT.fete_fin_annee.poids,
   /** R8b — Même rôle (1er/2nd) la veille d'un jour férié — inversion "si possible" (§7) */
-  INVERSION_FERIE: 20,
+  INVERSION_FERIE: PENALITE_SOUPLE_DEFAUT.inversion_ferie.poids,
 } as const
 
 // ── Helpers ──────────────────────────────────────────────
@@ -58,7 +66,8 @@ function aGardeWE(vetId: string, samedi: string, planning: PlanningPartiel): boo
 function penaliteR10WEConsecutif(
   slot: SlotGarde,
   vet: VetEngine,
-  planning: PlanningPartiel
+  planning: PlanningPartiel,
+  penalitesSouples?: PenalitesSouplesConfig
 ): number {
   if (slot.type !== 'weekend' && slot.type !== 'vendredi_soir') return 0
 
@@ -68,7 +77,7 @@ function penaliteR10WEConsecutif(
 
   const samPrec = samediPrecedent(samCourant)
   if (aGardeWE(vet.id, samPrec, planning)) {
-    return PENALITE.WE_CONSECUTIF
+    return poidsPenaliteSouple('we_consecutif', penalitesSouples)
   }
   return 0
 }
@@ -83,7 +92,8 @@ function penaliteR10WEConsecutif(
 function penaliteWEAvantVacances(
   slot: SlotGarde,
   vet: VetEngine,
-  planning: PlanningPartiel
+  planning: PlanningPartiel,
+  penalitesSouples?: PenalitesSouplesConfig
 ): number {
   void planning
   if (slot.type !== 'weekend' && slot.type !== 'vendredi_soir') return 0
@@ -97,7 +107,7 @@ function penaliteWEAvantVacances(
   for (const conge of vet.conges) {
     if (conge.type !== 'vacances') continue
     if (conge.date_debut >= lundiSuivant && conge.date_debut <= vendrediSuivant) {
-      return PENALITE.WE_AVANT_VACANCES
+      return poidsPenaliteSouple('we_avant_vacances', penalitesSouples)
     }
   }
   return 0
@@ -109,11 +119,11 @@ function penaliteWEAvantVacances(
  * Seules les veilles (soirs "normaux") sont pénalisées — Dec 25 et Jan 1
  * sont déjà des fériés gérés par le système d'équité.
  */
-function penaliteFeteFinAnnee(slot: SlotGarde): number {
+function penaliteFeteFinAnnee(slot: SlotGarde, penalitesSouples?: PenalitesSouplesConfig): number {
   if (slot.type !== 'semaine_soir') return 0
   const mmjj = slot.date.substring(5)
   if (mmjj === '12-24' || mmjj === '12-31') {
-    return PENALITE.FETE_FIN_ANNEE
+    return poidsPenaliteSouple('fete_fin_annee', penalitesSouples)
   }
   return 0
 }
@@ -129,7 +139,8 @@ function penaliteInversionFerie(
   vet: VetEngine,
   role: RoleGarde,
   planning: PlanningPartiel,
-  calendrier?: CalendrierResolu
+  calendrier?: CalendrierResolu,
+  penalitesSouples?: PenalitesSouplesConfig
 ): number {
   if (slot.type !== 'semaine_soir') return 0
   if (!estJourFerie(slot.date, calendrier)) return 0
@@ -145,8 +156,8 @@ function penaliteInversionFerie(
   const etait2nd = vetPourRole(attrVeille, 'second') === vet.id
 
   // Pénalité si même rôle que la veille (devrait s'inverser)
-  if (etait1er && role === 'premier') return PENALITE.INVERSION_FERIE
-  if (etait2nd && role === 'second') return PENALITE.INVERSION_FERIE
+  if (etait1er && role === 'premier') return poidsPenaliteSouple('inversion_ferie', penalitesSouples)
+  if (etait2nd && role === 'second') return poidsPenaliteSouple('inversion_ferie', penalitesSouples)
 
   return 0
 }
@@ -167,13 +178,14 @@ export function penalite(
   vet: VetEngine,
   role: RoleGarde,
   planning: PlanningPartiel,
-  calendrier?: CalendrierResolu
+  calendrier?: CalendrierResolu,
+  penalitesSouples?: PenalitesSouplesConfig
 ): number {
   return (
-    penaliteR10WEConsecutif(slot, vet, planning) +
-    penaliteWEAvantVacances(slot, vet, planning) +
-    penaliteFeteFinAnnee(slot) +
-    penaliteInversionFerie(slot, vet, role, planning, calendrier) +
+    penaliteR10WEConsecutif(slot, vet, planning, penalitesSouples) +
+    penaliteWEAvantVacances(slot, vet, planning, penalitesSouples) +
+    penaliteFeteFinAnnee(slot, penalitesSouples) +
+    penaliteInversionFerie(slot, vet, role, planning, calendrier, penalitesSouples) +
     // P1-B : règles configurées MOLLES (étage ≥ 3) — préférence, pas blocage.
     penaliteContraintesConfig(slot, vet, role, planning, calendrier)
   )

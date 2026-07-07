@@ -27,6 +27,7 @@ import { resoudreContexte } from '@/data/resoudreContexte'
 import { detecterCreneauxIgnores } from '@/engine/creneau-modele'
 import { persisterResultat } from '@/data/persisterResultat'
 import { construireGardePlacements } from '@/data/gardePlacements'
+import { syncAttributionsPourJours, joursImpactesGarde } from '@/data/syncAttributions'
 import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
 import type { CalendrierResolu } from '@/engine/types'
 
@@ -422,6 +423,34 @@ export async function POST(req: NextRequest) {
         'Écriture des placements incomplète',
         'La copie technique des attributions (garde_placements) a échoué pendant la génération. Le planning affiché est correct ; signale-le si ça se répète.',
       )
+    }
+
+    // 3c. Réalignement V2 sur les gardes VERROUILLÉES (P6 verrou n°7, étape 3).
+    //     persisterResultat a écrit dans `attributions` le planning du SOLVER
+    //     pour TOUTE la période — mais l'étape 2 a exclu de la V1 les (date,
+    //     type) verrouillés (le verrou existant prime sur la proposition du
+    //     solver). Sans réalignement, V2 porterait l'équipe du solver là où V1
+    //     garde l'équipe verrouillée → dérive garantie dès la régénération.
+    //     Resynchro PAR JOUR depuis la V1 (le vendredi lié d'un week-end
+    //     verrouillé suit). Aucune garde verrouillée → no-op (byte-identique).
+    if (clesVerrouillees.size > 0) {
+      const joursVerrouilles = [
+        ...new Set(
+          ((gardesVerrouillees ?? []) as { date: string; type: string }[])
+            .flatMap((g) => joursImpactesGarde(g.date, g.type))
+        ),
+      ]
+      const syncVerrous = await syncAttributionsPourJours(
+        supabase, periodeId, cabinetId, joursVerrouilles,
+      )
+      if (!syncVerrous.ok) {
+        console.error('[sync-V2] réalignement des gardes verrouillées échoué:', syncVerrous.erreur)
+        await signalerIncidentTechnique(
+          supabase, cabinetId,
+          'Copie technique du planning (V2) désynchronisée',
+          'Le planning a bien été généré, mais sa copie technique (attributions) n\'a pas pu être réalignée sur les gardes verrouillées. Le contrôle de cohérence la signalera tant qu\'elle diverge.',
+        )
+      }
     }
 
     // 4. Purge des anciens événements Google Agenda — APRÈS le succès de la

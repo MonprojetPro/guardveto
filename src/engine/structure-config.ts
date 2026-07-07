@@ -74,6 +74,13 @@ export interface StructureConfig {
    * (resoudreContexte, crise, replay, diagnostic) sans nouveau threading.
    */
   relations?: RelationStructure[]
+  /**
+   * Réglage des 4 pénalités SOUPLES historiques (R10/R10c/R10b/R8b — backlog
+   * n°16). `undefined` / entrée absente → défaut historique (actif, étage et
+   * poids d'origine) → byte-identique. Voyage DANS StructureConfig (même
+   * principe que `relations` : propagé partout sans nouveau threading).
+   */
+  penalitesSouples?: PenalitesSouplesConfig
 }
 
 /** Relations effectivement appliquées (donnée si chargée, sinon couple historique). */
@@ -101,4 +108,81 @@ export function estStructureSouple(r: StructureRegleConfig): boolean {
 const PENALITE_ETAGE_STRUCTURE: Record<number, number> = { 3: 100, 4: 50, 5: 20 }
 export function penaliteStructureEtage(etage: number): number {
   return PENALITE_ETAGE_STRUCTURE[etage] ?? 0
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Pénalités SOUPLES réglables (backlog n°16 — R10/R10c/R10b/R8b)
+// ═══════════════════════════════════════════════════════════════
+// Les 4 règles souples historiques (poids 50/45/30/20 en dur) deviennent
+// réglables comme R8/R9 : un cabinet peut les DÉSACTIVER ou changer leur
+// NIVEAU (l'étage lexicographique où elles pèsent). Contrairement à R8/R9,
+// elles restent STRUCTURELLEMENT SOUPLES (étage ≥ 3) : il n'existe AUCUN
+// contrôle dur (isValid / validateur indépendant) pour elles — les rendre
+// « fermes » serait une coquille vide. L'écriture (setStructureRegle) refuse
+// donc `jamais`, et la résolution ci-dessous CLAMP tout étage < 3 à 3
+// (défense en profondeur : une ligne posée en dur en base reste souple).
+//
+// Le POIDS intra-étage de chaque règle reste sa constante historique : le
+// réglage porte le NIVEAU (étage, ce qui compte lexicographiquement) et
+// l'ACTIVATION — pas de chiffres abstraits exposés (leçon UX équité).
+// Défaut (aucune ligne en base) = étage + poids historiques → byte-identique.
+
+/** Identifiants internes des 4 pénalités souples réglables. */
+export const PENALITES_SOUPLES_IDS = [
+  'we_consecutif',     // R10  — 2 week-ends de garde consécutifs
+  'we_avant_vacances', // R10c — garde le WE qui précède des vacances du véto
+  'fete_fin_annee',    // R10b — garde un soir de réveillon (24/31 déc)
+  'inversion_ferie',   // R8b  — même rôle la veille d'un jour férié
+] as const
+export type PenaliteSoupleId = (typeof PENALITES_SOUPLES_IDS)[number]
+
+/** Réglage d'une pénalité souple (absence = défaut historique). */
+export type PenalitesSouplesConfig = Partial<Record<PenaliteSoupleId, StructureRegleConfig>>
+
+/** Défauts HISTORIQUES : étage lexicographique + poids intra-étage d'origine. */
+export const PENALITE_SOUPLE_DEFAUT: Record<PenaliteSoupleId, { etage: number; poids: number }> = {
+  we_consecutif:     { etage: 3, poids: 50 }, // 🟠 SAUF_CRISE
+  we_avant_vacances: { etage: 4, poids: 45 }, // 🟡 EVITEE
+  fete_fin_annee:    { etage: 4, poids: 30 }, // 🟡 EVITEE
+  inversion_ferie:   { etage: 5, poids: 20 }, // ⚪ SI_POSSIBLE
+}
+
+/** Une pénalité souple entièrement résolue (consommable moteur + scoreur). */
+export interface PenaliteSoupleResolue {
+  actif: boolean
+  /** Étage lexicographique où la règle pèse (clampé 3..5 : toujours souple). */
+  etage: number
+  /** Poids intra-étage (constante historique de la règle ; 0 si inactive). */
+  poids: number
+}
+
+/**
+ * resoudrePenaliteSouple — résout le réglage effectif d'une des 4 pénalités.
+ * `cfg` absent → défaut historique (actif + étage/poids d'origine).
+ * Étage configuré < 3 → clampé à 3 (ces règles n'ont pas de gardien dur).
+ */
+export function resoudrePenaliteSouple(
+  id: PenaliteSoupleId,
+  config?: PenalitesSouplesConfig,
+): PenaliteSoupleResolue {
+  const defaut = PENALITE_SOUPLE_DEFAUT[id]
+  const cfg = config?.[id]
+  if (!cfg) return { actif: true, etage: defaut.etage, poids: defaut.poids }
+  const etage = Math.min(5, Math.max(3, cfg.etage))
+  return {
+    actif: cfg.actif,
+    etage,
+    poids: cfg.actif ? defaut.poids : 0,
+  }
+}
+
+/**
+ * poidsPenaliteSouple — poids effectif à sommer par le solver greedy
+ * (0 si la règle est désactivée ; poids historique sinon).
+ */
+export function poidsPenaliteSouple(
+  id: PenaliteSoupleId,
+  config?: PenalitesSouplesConfig,
+): number {
+  return resoudrePenaliteSouple(id, config).poids
 }

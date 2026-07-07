@@ -37,6 +37,8 @@ import {
 import {
   DEFAULT_STRUCTURE_CONFIG,
   type StructureConfig,
+  type PenaliteSoupleId,
+  type PenalitesSouplesConfig,
 } from '@/engine/structure-config'
 import { BRIQUES_INTERNES } from '@/engine/briques/catalogue'
 
@@ -168,10 +170,46 @@ export function extraireEquityRules(regles: RegleCabinetRow[]): EquityRule[] {
 export const BRIQUE_LIAISON = 'liaison_creneaux' // R9
 export const BRIQUE_INVERSION = 'inversion_role' // R8
 
+// ── Pénalités souples réglables (backlog n°16 — R10/R10c/R10b/R8b) ──
+// Règles GLOBALES comme R8/R9 (pas de « qui ») : { actif, force→étage } par
+// brique. Absente → défaut historique (résolu par resoudrePenaliteSouple).
+// ⚠️ Ces règles n'ont AUCUN gardien dur : une force « jamais » posée en base
+//    est clampée en souple à la résolution (structure-config).
+
+/** brique_id (base/catalogue) → identifiant interne de la pénalité souple. */
+export const BRIQUES_PENALITES_SOUPLES: Record<string, PenaliteSoupleId> = {
+  eviter_we_consecutifs: 'we_consecutif',     // R10
+  eviter_we_avant_vacances: 'we_avant_vacances', // R10c
+  eviter_fete_fin_annee: 'fete_fin_annee',    // R10b
+  inversion_role_ferie: 'inversion_ferie',    // R8b
+}
+
+/**
+ * extrairePenalitesSouples — résout le réglage des 4 pénalités souples depuis
+ * les lignes `regles_cabinet`. Une brique absente n'apparaît pas dans le
+ * résultat (→ défaut historique en aval). Force inconnue → étage défaut 3.
+ */
+export function extrairePenalitesSouples(regles: RegleCabinetRow[]): PenalitesSouplesConfig {
+  const out: PenalitesSouplesConfig = {}
+  for (const [briqueId, cle] of Object.entries(BRIQUES_PENALITES_SOUPLES)) {
+    const row = regles.find((r) => r.brique_id === briqueId)
+    if (!row) continue
+    const etage = FORCE_TEXTE_VERS_ETAGE[row.force]
+    out[cle] = {
+      actif: row.actif,
+      etage: typeof etage === 'number' ? etage : 3,
+    }
+  }
+  return out
+}
+
 /**
  * extraireStructureConfig — résout la config R8/R9 depuis les lignes
  * `regles_cabinet`. Chaque règle absente garde son défaut (ferme + active).
  * Une force inconnue retombe sur l'étage dur (2) — jamais d'exception.
+ * Porte AUSSI le réglage des pénalités souples (backlog n°16) : il voyage
+ * dans StructureConfig, donc partout où elle est déjà threadée (solver,
+ * scoreur, crise, replay) sans nouveau branchement.
  */
 export function extraireStructureConfig(regles: RegleCabinetRow[]): StructureConfig {
   const lire = (briqueId: string) => {
@@ -183,9 +221,15 @@ export function extraireStructureConfig(regles: RegleCabinetRow[]): StructureCon
       etage: typeof etage === 'number' ? etage : 2,
     }
   }
+  // Pénalités souples : la clé n'est portée QUE si au moins une règle est
+  // configurée en base. Zéro ligne → config strictement égale au défaut
+  // historique (DEFAULT_STRUCTURE_CONFIG) — byte-identique, et les consommateurs
+  // aval résolvent chaque pénalité absente à son défaut (resoudrePenaliteSouple).
+  const penalitesSouples = extrairePenalitesSouples(regles)
   return {
     r9_liaison: lire(BRIQUE_LIAISON) ?? { ...DEFAULT_STRUCTURE_CONFIG.r9_liaison },
     r8_inversion: lire(BRIQUE_INVERSION) ?? { ...DEFAULT_STRUCTURE_CONFIG.r8_inversion },
+    ...(Object.keys(penalitesSouples).length > 0 ? { penalitesSouples } : {}),
   }
 }
 
@@ -207,14 +251,16 @@ export function mapperReglesCabinet(
   for (const row of regles) {
     const rejet = (raison: string) => rejets.push({ regleId: row.id, raison })
 
-    // 0. Règles GLOBALES (pas par véto) : équité (`equilibrer`) et structurelles
-    //    R8/R9 (`liaison_creneaux`, `inversion_role`). Traitées À PART (équité →
-    //    buildEquityWeights ; structure → extraireStructureConfig). On les saute
-    //    ici SANS les compter comme rejets (ce ne sont pas des contraintes de véto).
+    // 0. Règles GLOBALES (pas par véto) : équité (`equilibrer`), structurelles
+    //    R8/R9 (`liaison_creneaux`, `inversion_role`) et pénalités souples
+    //    réglables (backlog n°16). Traitées À PART (équité → buildEquityWeights ;
+    //    structure + pénalités → extraireStructureConfig). On les saute ici SANS
+    //    les compter comme rejets (ce ne sont pas des contraintes de véto).
     if (
       row.brique_id === BRIQUE_EQUILIBRER ||
       row.brique_id === BRIQUE_LIAISON ||
-      row.brique_id === BRIQUE_INVERSION
+      row.brique_id === BRIQUE_INVERSION ||
+      row.brique_id in BRIQUES_PENALITES_SOUPLES
     ) {
       continue
     }
@@ -254,7 +300,13 @@ export function mapperReglesCabinet(
       rejet('qui.refs absent ou vide (propriétaire indéterminable)')
       continue
     }
-    const proprietaireId = refs[0] as string
+    // MULTI-PROPRIÉTAIRES (backlog n°18) : une règle « pour Manon ET Antoine »
+    // s'applique à CHAQUE réf — plus de troncature silencieuse de refs[1..n].
+    // ⚠️ EXCEPTION duo_interdit : historiquement refs = [propriétaire, partenaire]
+    //    (migration P1A-003 + écriture symétrique A→B/B→A d'upsertRegle). refs[1]
+    //    y est le PARTENAIRE, pas un co-propriétaire → refs[0] seul, comme avant.
+    //    (La symétrie du duo est déjà garantie par la ligne miroir.)
+    const refsUniques = [...new Set(refs.filter((x): x is string => typeof x === 'string'))]
 
     // 5. type V1 reconstructible (depuis _source, sinon repli brique→type)
     const typeBrut = pj._source?.type_v1 ?? BRIQUE_VERS_TYPE[row.brique_id]
@@ -278,21 +330,26 @@ export function mapperReglesCabinet(
     const quand = pj.quand
     const axes = quand !== null && quand !== undefined ? { quand } : {}
 
-    const contrainte: ContrainteEngine = {
-      id: row.id,
-      type,
-      config: {
-        axes,
-        force: etage,
-        brique: row.brique_id,
-        params: pj.params,
-      },
-      actif: row.actif,
+    // Dépliage n°18 : une instance de contrainte PAR propriétaire (duo → refs[0]
+    // seul, cf. exception ci-dessus). Objets DISTINCTS par véto (pas de partage
+    // de référence : normaliserContraintes copie, mais on reste défensif).
+    const proprietaires = type === 'duo_interdit' ? [refsUniques[0]] : refsUniques
+    for (const proprietaireId of proprietaires) {
+      const contrainte: ContrainteEngine = {
+        id: row.id,
+        type,
+        config: {
+          axes,
+          force: etage,
+          brique: row.brique_id,
+          params: pj.params,
+        },
+        actif: row.actif,
+      }
+      const liste = contraintesParVet.get(proprietaireId)
+      if (liste) liste.push(contrainte)
+      else contraintesParVet.set(proprietaireId, [contrainte])
     }
-
-    const liste = contraintesParVet.get(proprietaireId)
-    if (liste) liste.push(contrainte)
-    else contraintesParVet.set(proprietaireId, [contrainte])
   }
 
   // Tri stable (E3) : (étage, brique_id, id) au sein de chaque véto.

@@ -16,7 +16,9 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { ReglesClient, type RegleRow, type VetoMini } from '@/components/regles/ReglesClient'
+import { resoudreCabinetId } from '@/lib/supabase/cabinet'
+import { chargerCreneauModele } from '@/data/chargerCreneauModele'
+import { ReglesClient, type RegleRow, type VetoMini, type TypeCreneauOption } from '@/components/regles/ReglesClient'
 import { ReglesFocus } from '@/components/regles/ReglesFocus'
 import {
   ReglagesPlanningClient,
@@ -36,12 +38,32 @@ const BRIQUE_LIAISON = 'liaison_creneaux' // R9
 const BRIQUE_INVERSION = 'inversion_role' // R8
 const IMPORTANCES = new Set<string>(IMPORTANCE_LEVELS)
 const FORCES_STRUCTURE = new Set(['jamais', 'sauf_crise', 'evitee', 'si_possible'])
+const FORCES_SOUPLES = new Set(['sauf_crise', 'evitee', 'si_possible'])
+
+// Pénalités souples réglables (backlog n°16) : brique → force par DÉFAUT
+// (= l'étage historique de chaque règle — cf. PENALITE_SOUPLE_DEFAUT).
+const PENALITES_SOUPLES_DEFAUT_FORCE: Record<string, string> = {
+  eviter_we_consecutifs: 'sauf_crise',    // R10  (étage 3)
+  eviter_we_avant_vacances: 'evitee',     // R10c (étage 4)
+  eviter_fete_fin_annee: 'evitee',        // R10b (étage 4)
+  inversion_role_ferie: 'si_possible',    // R8b  (étage 5)
+}
 
 /** Résout {actif, force} d'une règle structurelle depuis les lignes (défaut Ferme/active). */
 function resoudreStructure(rows: RegleRow[], briqueId: string): StructureRegleUI {
   const row = rows.find((r) => r.brique_id === briqueId)
   if (!row) return { actif: true, force: 'jamais' } // défaut historique = ferme + active
   const force = FORCES_STRUCTURE.has(row.force) ? row.force : 'jamais'
+  return { actif: row.actif, force }
+}
+
+/** Résout {actif, force} d'une pénalité souple (défaut = actif + force historique). */
+function resoudrePenaliteSoupleUI(rows: RegleRow[], briqueId: string): StructureRegleUI {
+  const defaut = PENALITES_SOUPLES_DEFAUT_FORCE[briqueId] ?? 'sauf_crise'
+  const row = rows.find((r) => r.brique_id === briqueId)
+  if (!row) return { actif: true, force: defaut }
+  // Toujours souple : une force dure (posée hors formulaire) s'affiche au défaut.
+  const force = FORCES_SOUPLES.has(row.force) ? row.force : defaut
   return { actif: row.actif, force }
 }
 
@@ -92,9 +114,33 @@ export default async function ReglesPage({
   const isAdmin = currentVeto.role_app === 'admin'
   const toutesRegles = (regles as RegleRow[]) ?? []
 
+  // Types de créneaux DU cabinet (n°19 — filtre au_plus_n). Dynamique (verrou 8) :
+  // catalogue actif du profil défaut ; sans catalogue → 3 types historiques.
+  let typesCreneaux: TypeCreneauOption[] = []
+  try {
+    const cabinetId = await resoudreCabinetId(supabase)
+    const modeles = await chargerCreneauModele(supabase, cabinetId)
+    typesCreneaux = modeles
+      .filter((m) => m.actif && m.code !== null && m.code !== 'ferie')
+      .map((m) => ({ code: m.code as string, nom: m.nom }))
+  } catch {
+    // best-effort : repli ci-dessous
+  }
+  if (typesCreneaux.length === 0) {
+    typesCreneaux = [
+      { code: 'semaine_soir', nom: 'Soirs de semaine' },
+      { code: 'vendredi_soir', nom: 'Vendredi soir' },
+      { code: 'weekend', nom: 'Week-end' },
+    ]
+  }
+
   // Règles GLOBALES gérées dans leurs propres sections (pas dans la liste par-véto) :
-  // équité (equilibrer) + structurelles week-end (R8/R9). On les retire du listing.
-  const GLOBALES = new Set([BRIQUE_EQUILIBRER, BRIQUE_LIAISON, BRIQUE_INVERSION])
+  // équité (equilibrer) + structurelles week-end (R8/R9) + pénalités souples
+  // réglables (backlog n°16). On les retire du listing.
+  const GLOBALES = new Set([
+    BRIQUE_EQUILIBRER, BRIQUE_LIAISON, BRIQUE_INVERSION,
+    ...Object.keys(PENALITES_SOUPLES_DEFAUT_FORCE),
+  ])
   const reglesClassiques = toutesRegles.filter((r) => !GLOBALES.has(r.brique_id))
   const reglesEquilibrer = toutesRegles.filter((r) => r.brique_id === BRIQUE_EQUILIBRER)
 
@@ -103,6 +149,13 @@ export default async function ReglesPage({
     liaison_creneaux: resoudreStructure(toutesRegles, BRIQUE_LIAISON),
     inversion_role: resoudreStructure(toutesRegles, BRIQUE_INVERSION),
   }
+
+  // Config courante des 4 pénalités souples (défaut = actif + niveau historique).
+  const penalitesSouples = Object.fromEntries(
+    Object.keys(PENALITES_SOUPLES_DEFAUT_FORCE).map((b) => [
+      b, resoudrePenaliteSoupleUI(toutesRegles, b),
+    ]),
+  ) as Record<string, StructureRegleUI>
 
   // Importance courante par dimension : règle posée si elle existe, sinon défaut.
   const importances = Object.fromEntries(
@@ -123,11 +176,13 @@ export default async function ReglesPage({
         regles={reglesClassiques}
         vets={(vets as VetoMini[]) ?? []}
         periodes={periodes}
+        typesCreneaux={typesCreneaux}
         isAdmin={isAdmin}
       />
       <ReglagesPlanningClient
         equite={importances}
         structure={structureConfig}
+        penalitesSouples={penalitesSouples}
         roleAvantage={roleAvantage}
         isAdmin={isAdmin}
       />

@@ -27,7 +27,8 @@ import { isValid } from './rules/hard-constraints'
 import { DEFAULT_EQUITY_WEIGHTS, DEFAULT_ROLE_AVANTAGE_FINANCIER, type EquityWeights } from './equity-weights'
 import {
   DEFAULT_STRUCTURE_CONFIG, estStructureSouple, penaliteStructureEtage,
-  relationsEffectives, type StructureConfig,
+  relationsEffectives, resoudrePenaliteSouple, PENALITE_SOUPLE_DEFAUT,
+  type StructureConfig,
 } from './structure-config'
 import { apparierSourcePourCible } from './relations-structure'
 import { vetPourRole, vetsAttribues, avecVet, attributionVide } from './attribution'
@@ -107,13 +108,13 @@ function ajouter(v: VecteurScore, etage: Etage, regle: string, cout: number): vo
 // départager DEUX règles DU MÊME étage. Les étages sont hermétiques.
 
 export const POIDS_INTRA = {
-  // Étage SAUF_CRISE (🟠)
-  R10_WE_CONSECUTIF: 50,
+  // Étage SAUF_CRISE (🟠) — défaut réglable (backlog n°16, source unique structure-config)
+  R10_WE_CONSECUTIF: PENALITE_SOUPLE_DEFAUT.we_consecutif.poids,
   // Étage EVITEE_AU_MAX (🟡)
-  R10C_WE_AVANT_VACANCES: 45,
-  R10B_FETE_FIN_ANNEE: 30,
+  R10C_WE_AVANT_VACANCES: PENALITE_SOUPLE_DEFAUT.we_avant_vacances.poids,
+  R10B_FETE_FIN_ANNEE: PENALITE_SOUPLE_DEFAUT.fete_fin_annee.poids,
   // Étage SI_POSSIBLE (⚪)
-  R8B_INVERSION_FERIE: 20,
+  R8B_INVERSION_FERIE: PENALITE_SOUPLE_DEFAUT.inversion_ferie.poids,
   /** Marqueur dernier recours — terme DOMINANT dans son étage (§3.2). */
   DERNIER_RECOURS: 100_000,
 } as const
@@ -219,28 +220,37 @@ export function scorerPlanning(
   // ── Étages 3-5 : pénalités souples réelles, par étage ──
   // On évalue chaque (slot, rôle) contre le planning ENTIER (les pénalités
   // souples V1 regardent le contexte ; ici le planning est complet).
+  // RÉGLABLES (backlog n°16) : étage + poids résolus depuis la config du
+  // cabinet (structure.penalitesSouples) — MÊME source que le solver (les
+  // deux gardiens de score). Défaut absent = étages/poids historiques
+  // (SAUF_CRISE/EVITEE/EVITEE/SI_POSSIBLE, 50/45/30/20) → byte-identique.
+  const pcfg = structure.penalitesSouples
+  const cfgR10 = resoudrePenaliteSouple('we_consecutif', pcfg)
+  const cfgR10c = resoudrePenaliteSouple('we_avant_vacances', pcfg)
+  const cfgR10b = resoudrePenaliteSouple('fete_fin_annee', pcfg)
+  const cfgR8b = resoudrePenaliteSouple('inversion_ferie', pcfg)
   for (const sr of slotRoles) {
     const vet = vetById.get(sr.vetId)
     if (!vet) continue
 
-    // R10 (🟠 SAUF_CRISE)
-    const r10 = penaliteR10WEConsecutif(sr.slot, vet, planning)
-    if (r10 > 0) ajouter(v, Etage.SAUF_CRISE, 'R10', POIDS_INTRA.R10_WE_CONSECUTIF)
+    // R10 (défaut 🟠 SAUF_CRISE)
+    const r10 = penaliteR10WEConsecutif(sr.slot, vet, planning, pcfg)
+    if (r10 > 0) ajouter(v, cfgR10.etage, 'R10', cfgR10.poids)
 
-    // R10c (🟡 EVITEE)
-    const r10c = penaliteWEAvantVacances(sr.slot, vet, planning)
+    // R10c (défaut 🟡 EVITEE)
+    const r10c = penaliteWEAvantVacances(sr.slot, vet, planning, pcfg)
     if (r10c > 0)
-      ajouter(v, Etage.EVITEE_AU_MAX, 'R10c', POIDS_INTRA.R10C_WE_AVANT_VACANCES)
+      ajouter(v, cfgR10c.etage, 'R10c', cfgR10c.poids)
 
-    // R10b (🟡 EVITEE) — pénalité de fête de fin d'année (slot seul)
-    const r10b = penaliteFeteFinAnnee(sr.slot)
+    // R10b (défaut 🟡 EVITEE) — pénalité de fête de fin d'année (slot seul)
+    const r10b = penaliteFeteFinAnnee(sr.slot, pcfg)
     if (r10b > 0)
-      ajouter(v, Etage.EVITEE_AU_MAX, 'R10b', POIDS_INTRA.R10B_FETE_FIN_ANNEE)
+      ajouter(v, cfgR10b.etage, 'R10b', cfgR10b.poids)
 
-    // R8b (⚪ SI_POSSIBLE)
-    const r8b = penaliteInversionFerie(sr.slot, vet, sr.role, planning, calendrier)
+    // R8b (défaut ⚪ SI_POSSIBLE)
+    const r8b = penaliteInversionFerie(sr.slot, vet, sr.role, planning, calendrier, pcfg)
     if (r8b > 0)
-      ajouter(v, Etage.SI_POSSIBLE, 'R8b', POIDS_INTRA.R8B_INVERSION_FERIE)
+      ajouter(v, cfgR8b.etage, 'R8b', cfgR8b.poids)
   }
 
   // Dernier recours (⚪ SI_POSSIBLE) — terme dominant dans son étage.

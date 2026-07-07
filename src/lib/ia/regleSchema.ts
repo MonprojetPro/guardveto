@@ -57,6 +57,10 @@ export const PropositionRegleSchema = z.object({
   partenaire: z.string().nullable(),
   n: z.number().int().nullable(),
   fenetre: z.enum(['semaine_civile', 'glissante_7_jours', 'glissante_14_jours', 'glissante_30_jours']).nullable(),
+  /** au_plus_n : filtre optionnel par types de créneaux du cabinet (n°19).
+   *  Codes EXACTS fournis dans le prompt (référentiel dynamique du cabinet).
+   *  null / vide = toutes les gardes comptent. */
+  creneaux: z.array(z.string()).nullable(),
   ecart_min_jours: z.number().int().nullable(),
   /** espacement_weekend : « au plus 1 week-end sur N » (N ≥ 2). */
   n_semaines: z.number().int().nullable(),
@@ -189,6 +193,13 @@ export function propositionVersPayload(
       }
       payload.n = n
       payload.fenetre = fenetre
+      // Filtre de créneaux (n°19) : codes proposés par l'IA depuis le
+      // référentiel DU cabinet (prompt). La validation stricte des codes reste
+      // côté serveur (upsertRegle) — frontière de confiance inchangée.
+      const creneaux = (p.creneaux ?? []).filter(
+        (x): x is string => typeof x === 'string' && x.trim() !== '',
+      )
+      if (creneaux.length > 0) payload.creneaux = [...new Set(creneaux)]
       break
     }
     case 'espacement_min': {
@@ -236,7 +247,7 @@ export function apercuProposition(p: PropositionRegle): string {
       params = { avec_veterinaire_id: p.partenaire }
       break
     case 'au_plus_n':
-      params = { n: p.n, fenetre: p.fenetre }
+      params = { n: p.n, fenetre: p.fenetre, creneaux: p.creneaux ?? undefined }
       break
     case 'espacement_min':
       params = { ecart_min_jours: p.ecart_min_jours }

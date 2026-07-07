@@ -59,6 +59,47 @@ const STRUCTURE_META: Record<'liaison_creneaux' | 'inversion_role', { titre: str
   },
 }
 
+// ── Pénalités souples réglables (backlog n°16 — R10/R10c/R10b/R8b) ──
+// Préférences du moteur, jamais des interdictions fermes : le menu ne propose
+// PAS « Ferme » (aucun gardien dur n'existe pour elles — coquille vide sinon).
+
+export const PENALITES_SOUPLES_UI = [
+  'eviter_we_consecutifs',
+  'eviter_we_avant_vacances',
+  'eviter_fete_fin_annee',
+  'inversion_role_ferie',
+] as const
+type PenaliteSoupleUIId = (typeof PENALITES_SOUPLES_UI)[number]
+
+const PENALITES_META: Record<PenaliteSoupleUIId, { titre: string; aide: string }> = {
+  eviter_we_consecutifs: {
+    titre: 'Éviter deux week-ends de garde de suite',
+    aide: 'Le moteur évite de donner deux week-ends consécutifs au même vétérinaire (R10).',
+  },
+  eviter_we_avant_vacances: {
+    titre: 'Éviter la garde le week-end avant ses vacances',
+    aide: 'Un vétérinaire qui part en vacances la semaine suivante part reposé (R10c).',
+  },
+  eviter_fete_fin_annee: {
+    titre: 'Éviter les gardes des soirs de réveillon',
+    aide: 'Les soirs des 24 et 31 décembre sont évités autant que possible (R10b).',
+  },
+  inversion_role_ferie: {
+    titre: 'Changer de rôle la veille d’un jour férié',
+    aide: 'Le 1er de la veille devient si possible 2nd le jour férié, et inversement (R8b).',
+  },
+}
+
+const FORCE_OPTIONS_SOUPLES = ['desactivee', 'sauf_crise', 'evitee', 'si_possible']
+
+/** Force de repli quand on réactive une pénalité souple désactivée. */
+const PENALITE_FORCE_REPLI: Record<PenaliteSoupleUIId, string> = {
+  eviter_we_consecutifs: 'sauf_crise',
+  eviter_we_avant_vacances: 'evitee',
+  eviter_fete_fin_annee: 'evitee',
+  inversion_role_ferie: 'si_possible',
+}
+
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 // R11b — rôle à avantage financier (réglage cabinet).
@@ -120,20 +161,24 @@ function Ligne({
 interface ReglagesPlanningClientProps {
   equite: Record<EquityDimension, ImportanceLevel>
   structure: { liaison_creneaux: StructureRegleUI; inversion_role: StructureRegleUI }
+  /** Réglage des 4 pénalités souples (backlog n°16) — clés PENALITES_SOUPLES_UI. */
+  penalitesSouples: Record<string, StructureRegleUI>
   /** R11b : rôle portant l'avantage financier ('premier' | 'second' | 'aucun'). */
   roleAvantage: string
   isAdmin: boolean
 }
 
-export function ReglagesPlanningClient({ equite, structure, roleAvantage, isAdmin }: ReglagesPlanningClientProps) {
+export function ReglagesPlanningClient({ equite, structure, penalitesSouples, roleAvantage, isAdmin }: ReglagesPlanningClientProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [eq, setEq] = useState(equite)
   const [st, setSt] = useState(structure)
+  const [ps, setPs] = useState(penalitesSouples)
   const [roleAv, setRoleAv] = useState(roleAvantage)
 
   const optionsImportance = IMPORTANCE_LEVELS.map((n) => ({ value: n, label: cap(IMPORTANCE_LABELS[n]) }))
   const optionsForce = FORCE_OPTIONS.map((f) => ({ value: f, label: FORCE_LABELS[f] }))
+  const optionsForceSouple = FORCE_OPTIONS_SOUPLES.map((f) => ({ value: f, label: FORCE_LABELS[f] }))
 
   const changerEquite = (dim: EquityDimension, niveau: ImportanceLevel) => {
     const avant = eq[dim]
@@ -151,6 +196,22 @@ export function ReglagesPlanningClient({ equite, structure, roleAvantage, isAdmi
     startTransition(async () => {
       const res = await setRoleAvantageFinancier(role)
       if (res?.error) { toast.error(res.error); setRoleAv(avant) }
+      else { toast.success('Réglage enregistré — appliqué à la prochaine génération.'); router.refresh() }
+    })
+  }
+
+  const changerPenaliteSouple = (briqueId: PenaliteSoupleUIId, choix: string) => {
+    const avant = ps[briqueId]
+    // « desactivee » → actif=false (on conserve la dernière force souple) ;
+    // sinon actif=true + force choisie. Jamais « jamais » (préférence pure).
+    const next: StructureRegleUI =
+      choix === 'desactivee'
+        ? { actif: false, force: FORCE_OPTIONS_SOUPLES.includes(avant.force) && avant.force !== 'desactivee' ? avant.force : PENALITE_FORCE_REPLI[briqueId] }
+        : { actif: true, force: choix }
+    setPs((p) => ({ ...p, [briqueId]: next }))
+    startTransition(async () => {
+      const res = await setStructureRegle(briqueId, next.actif, next.force)
+      if (res?.error) { toast.error(res.error); setPs((p) => ({ ...p, [briqueId]: avant })) }
       else { toast.success('Réglage enregistré — appliqué à la prochaine génération.'); router.refresh() }
     })
   }
@@ -241,6 +302,35 @@ export function ReglagesPlanningClient({ equite, structure, roleAvantage, isAdmi
           onChange={changerRoleAvantage}
           cible="role_avantage_financier"
         />
+      </div>
+
+      {/* Préférences du planning (pénalités souples réglables — backlog n°16) */}
+      <div className="space-y-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Préférences du planning
+        </h3>
+        <p className="text-xs text-muted-foreground leading-5">
+          Des préférences que le moteur essaie d&apos;honorer, jamais des
+          interdictions : elles ne bloquent pas la génération.
+        </p>
+        {PENALITES_SOUPLES_UI.map((briqueId) => {
+          const v = ps[briqueId] ?? { actif: true, force: PENALITE_FORCE_REPLI[briqueId] }
+          const courant = v.actif ? v.force : 'desactivee'
+          return (
+            <Ligne
+              key={briqueId}
+              titre={PENALITES_META[briqueId].titre}
+              aide={PENALITES_META[briqueId].aide}
+              value={courant}
+              valueLabel={FORCE_LABELS[courant] ?? courant}
+              options={optionsForceSouple}
+              isAdmin={isAdmin}
+              isPending={isPending}
+              onChange={(v2) => changerPenaliteSouple(briqueId, v2)}
+              cible={briqueId}
+            />
+          )
+        })}
       </div>
     </section>
   )

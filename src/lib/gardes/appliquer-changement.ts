@@ -26,6 +26,7 @@ import { syncGardeIndividuelle } from '@/lib/sync-calendrier'
 import { sendGardeModifiee } from '@/lib/notifications'
 import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
 import { placementsPourPaire } from '@/data/gardePlacements'
+import { syncAttributionsPourGarde } from '@/data/syncAttributions'
 
 /** Vétérinaire « avant modif » (pour l'email de notification). */
 export interface VetoNotif {
@@ -146,6 +147,29 @@ export async function appliquerChangementGarde(
     }
   } catch (e) {
     console.error('[P3b-2] miroir garde_placements exception:', e)
+  }
+
+  // ── Synchro V2 (P6 verrou n°7, étape 3) — miroir `attributions` ──
+  //    TOUS les chemins de mutation (édition PATCH, crise, dépannage
+  //    volontaire, échanges) transitent ici : c'est LE point unique où V2
+  //    suit V1. Un week-end resynchronise AUSSI son vendredi_soir V2 lié
+  //    (relations du profil appliquées). Best-effort : n'interrompt JAMAIS
+  //    le cycle V1 ; un échec alerte les admins (cloche) et sera de toute
+  //    façon détecté par le contrôle de dérive V1↔V2 de la re-validation.
+  {
+    const cabinetIdSync =
+      cabinetIdFourni ?? ((garde as Record<string, unknown>).cabinet_id as string | null)
+    const sync = await syncAttributionsPourGarde(supabase, gardeId)
+    if (!sync.ok) {
+      console.error('[sync-V2] synchro attributions échouée:', sync.erreur)
+      if (cabinetIdSync) {
+        await signalerIncidentTechnique(
+          supabase, cabinetIdSync,
+          'Copie technique du planning (V2) désynchronisée',
+          'La modification de garde est bien enregistrée dans le planning affiché, mais sa copie technique (attributions) n\'a pas pu être mise à jour. Le contrôle de cohérence la signalera tant qu\'elle diverge ; signale-le si ça se répète.',
+        )
+      }
+    }
   }
 
   // ── Audit log (correction d'une garde verrouillée) ──────

@@ -28,7 +28,8 @@ function prop(over: Partial<PropositionRegle>): PropositionRegle {
     veterinaire: null, brique_id: null, force: null,
     jour: null, exception_vacances_scolaires: null,
     si_garde_we: null, sinon: null, semaines: null, periodes: null,
-    partenaire: null, n: null, fenetre: null, ecart_min_jours: null,
+    partenaire: null, n: null, fenetre: null, creneaux: null,
+    ecart_min_jours: null, n_semaines: null,
     ...over,
   }
 }
@@ -68,6 +69,33 @@ describe('propositionVersPayload', () => {
     if (r.ok) {
       expect(r.payload.n).toBe(2)
       expect(r.payload.fenetre).toBe('semaine_civile')
+    }
+  })
+
+  it('au_plus_n + creneaux (n°19) → filtre transmis, dédupliqué (« max 2 WE par mois »)', () => {
+    const r = propositionVersPayload(
+      prop({
+        brique_id: 'au_plus_n', veterinaire: 'Victor', n: 2,
+        fenetre: 'glissante_30_jours', creneaux: ['weekend', 'weekend'],
+      }),
+      VETS,
+    )
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.payload.n).toBe(2)
+      expect(r.payload.fenetre).toBe('glissante_30_jours')
+      expect(r.payload.creneaux).toEqual(['weekend']) // dédupliqué
+    }
+  })
+
+  it('au_plus_n sans creneaux (null ou vide) → pas de filtre dans le payload (historique)', () => {
+    for (const creneaux of [null, [] as string[], ['  ']]) {
+      const r = propositionVersPayload(
+        prop({ brique_id: 'au_plus_n', veterinaire: 'Victor', n: 2, fenetre: 'semaine_civile', creneaux }),
+        VETS,
+      )
+      expect(r.ok).toBe(true)
+      if (r.ok) expect(r.payload.creneaux).toBeUndefined()
     }
   })
 
@@ -179,6 +207,14 @@ describe('apercuProposition', () => {
     )
     expect(phrase).toContain('Manon')
     expect(phrase).toContain('mercredi')
+  })
+
+  it('au_plus_n + creneaux : l’aperçu rend le filtre en français (n°19)', () => {
+    const phrase = apercuProposition(
+      prop({ brique_id: 'au_plus_n', veterinaire: 'Victor', n: 2, fenetre: 'glissante_30_jours', creneaux: ['weekend'] }),
+    )
+    expect(phrase).toContain('week-end')
+    expect(phrase).toContain('2')
   })
 
   it('duo : affiche le prénom du partenaire (pas un id)', () => {

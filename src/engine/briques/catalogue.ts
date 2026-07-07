@@ -264,11 +264,19 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
     schemaParams: {
       n: 'integer',
       fenetre: 'string (semaine_civile|glissante_N_jours) — OBLIGATOIRE',
+      creneaux: 'string[]? (codes de créneaux du cabinet — absent = toutes les gardes)',
     },
     widget: 'WidgetAuPlusN',
     rendreLangageNaturel: (params) => {
       const n = params.n ?? '?'
-      return `au plus ${n} garde(s) par ${fenetreLisible(params.fenetre)}`
+      // Filtre de créneaux (axe `quoi`, backlog n°19) : « max 2 week-ends par mois ».
+      const creneaux = Array.isArray(params.creneaux)
+        ? (params.creneaux as unknown[]).filter((x): x is string => typeof x === 'string')
+        : []
+      const quoi = creneaux.length > 0
+        ? `garde(s) sur : ${creneaux.map(creneauLisible).join(', ')}`
+        : 'garde(s)'
+      return `au plus ${n} ${quoi} par ${fenetreLisible(params.fenetre)}`
     },
   },
 
@@ -300,6 +308,64 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
       const n = params.n_semaines ?? '?'
       return `de garde au plus un week-end sur ${n}`
     },
+  },
+
+  // ── Pénalités souples réglables (backlog n°16 — règles GLOBALES) ──
+  // Comme liaison_creneaux/inversion_role : pas de « qui », un réglage
+  // { actif, force } par cabinet. Absentes de la base → défaut historique
+  // (étage + poids d'origine). Toujours SOUPLES (l'écriture refuse « jamais »,
+  // la résolution clampe) : aucun gardien dur n'existe pour elles.
+
+  eviter_we_consecutifs: {
+    id: 'eviter_we_consecutifs',
+    famille: 'sequence',
+    operateur: 'EVITER_SUITE',
+    axes: ['quoi'],
+    schemaParams: {
+      _reglage: 'aucun paramètre — le réglage porte { actif, force } (R10 : pas 2 week-ends de suite)',
+    },
+    widget: 'WidgetPenaliteSouple',
+    rendreLangageNaturel: () =>
+      'le moteur évite de donner deux week-ends de garde consécutifs au même vétérinaire (R10)',
+  },
+
+  eviter_we_avant_vacances: {
+    id: 'eviter_we_avant_vacances',
+    famille: 'interdire',
+    operateur: 'EVITER_AVANT',
+    axes: ['quoi'],
+    schemaParams: {
+      _reglage: 'aucun paramètre — le réglage porte { actif, force } (R10c : pas de garde le WE avant ses vacances)',
+    },
+    widget: 'WidgetPenaliteSouple',
+    rendreLangageNaturel: () =>
+      'le moteur évite de mettre un vétérinaire de garde le week-end qui précède ses vacances (R10c)',
+  },
+
+  eviter_fete_fin_annee: {
+    id: 'eviter_fete_fin_annee',
+    famille: 'interdire',
+    operateur: 'EVITER_FETE',
+    axes: ['quand'],
+    schemaParams: {
+      _reglage: 'aucun paramètre — le réglage porte { actif, force } (R10b : soirs des 24 et 31 décembre)',
+    },
+    widget: 'WidgetPenaliteSouple',
+    rendreLangageNaturel: () =>
+      'le moteur évite les gardes des soirs de réveillon (24 et 31 décembre) autant que possible (R10b)',
+  },
+
+  inversion_role_ferie: {
+    id: 'inversion_role_ferie',
+    famille: 'forcer',
+    operateur: 'INVERSER_FERIE',
+    axes: ['quand'],
+    schemaParams: {
+      _reglage: 'aucun paramètre — le réglage porte { actif, force } (R8b : rôle inversé la veille d’un férié)',
+    },
+    widget: 'WidgetPenaliteSouple',
+    rendreLangageNaturel: () =>
+      'le rôle 1er/2nd s’inverse si possible entre la veille d’un jour férié et le férié lui-même (R8b)',
   },
 
   // ⚠️ INTERNE — « motif composite pré-calculé » (archi V2 §catalogue blindé).

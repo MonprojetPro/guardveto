@@ -29,6 +29,13 @@ import {
   gardesVersPlanningPartiel,
   type GardeRow,
 } from '@/engine/validation/gardesVersPlanning'
+import {
+  comparerAttributionsV1V2,
+  type AttributionLue,
+} from '@/data/attributionRows'
+import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { PlanningPartiel } from '@/engine/types'
 import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
 
 // ── Server Action : re-valider les périodes publiées affichées ──
@@ -119,6 +126,14 @@ export async function revaliderPlanningPublie(
       relations: ctx.structureConfig?.relations,
     })
 
+    // 2c. DÉTECTEUR DE DÉRIVE V1 ↔ V2 (P6 verrou n°7, étape 3) — premier
+    //     LECTEUR réel d'`attributions` : contrôle de cohérence EN COMPLÉMENT
+    //     (jamais en remplacement) de la re-validation. Si la synchro V2 fuit
+    //     quelque part en prod (chemin d'écriture oublié, échec silencieux),
+    //     c'est ICI qu'on le voit : console + cloche admin (anti-spam 24 h).
+    //     Best-effort : ne perturbe JAMAIS la re-validation elle-même.
+    await detecterDeriveV1V2(supabase, periodeId, cabinetId, planning)
+
     // 3. Re-validation indépendante.
     const input: ValidationInput = {
       dateDebut: ctx.dateDebut,
@@ -152,4 +167,53 @@ export async function revaliderPlanningPublie(
   // Tri chronologique pour un affichage lisible.
   out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
   return out
+}
+
+// ── Détecteur de dérive V1 ↔ V2 (helper privé, best-effort) ──
+
+/**
+ * Confronte le planning reconstruit depuis la V1 (source de vérité des écrans)
+ * aux lignes réelles de la table `attributions` (V2). Comparaison en MULTISET
+ * (jour Paris × véto × rôle) — insensible aux horodatages exacts, mais le
+ * vendredi V2 explicite est bien comparé au vendredi DÉRIVÉ de la V1 (les deux
+ * tombent sur le même jour). Toute divergence = la synchro V2 a fui quelque
+ * part → console.error + incident in-app (anti-spam 24 h par titre).
+ */
+async function detecterDeriveV1V2(
+  supabase: SupabaseClient,
+  periodeId: string,
+  cabinetId: string,
+  planningV1: PlanningPartiel,
+): Promise<void> {
+  try {
+    const { data, error } = await supabase
+      .from('attributions')
+      .select('veterinaire_id, role, date_debut_reel')
+      .eq('planning_id', periodeId)
+      .eq('cabinet_id', cabinetId)
+
+    if (error) return // lecture V2 impossible → on ne bloque pas la re-validation
+
+    const divergences = comparerAttributionsV1V2(
+      planningV1,
+      (data ?? []) as AttributionLue[],
+    )
+    if (divergences.length === 0) return
+
+    const extrait = divergences
+      .slice(0, 10)
+      .map((d) => `${d.date} ${d.role} ${d.nature === 'manquant' ? 'absent de V2' : 'orphelin en V2'} (vet ${d.veterinaireId})`)
+      .join(' ; ')
+    console.error(
+      `[derive-V1V2] période ${periodeId} : ${divergences.length} divergence(s) gardes↔attributions — ${extrait}`,
+    )
+
+    await signalerIncidentTechnique(
+      supabase, cabinetId,
+      'Divergence détectée entre le planning et sa copie technique (V2)',
+      `Le contrôle de cohérence a détecté ${divergences.length} différence(s) entre le planning affiché et sa copie technique (table attributions) sur la période. Le planning affiché reste la référence ; signale-le pour qu'on resynchronise.`,
+    )
+  } catch (e) {
+    console.error('[derive-V1V2] contrôle de cohérence en échec:', e)
+  }
 }

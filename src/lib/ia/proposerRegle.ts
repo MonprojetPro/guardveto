@@ -20,7 +20,15 @@ export function assistantIaDisponible(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY)
 }
 
-/** Décrit les 6 briques disponibles pour guider l'IA (jours = lundi→vendredi). */
+/** Un type de créneau du cabinet, injecté dynamiquement dans le prompt (n°19). */
+export interface TypeCreneauIA {
+  /** Code EXACT (celui que le moteur compare aux gardes du planning). */
+  code: string
+  /** Nom lisible pour aider l'IA à comprendre la demande. */
+  nom: string
+}
+
+/** Décrit les briques disponibles pour guider l'IA (jours = lundi→vendredi). */
 const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 7 types de règle :
 
 1. interdire_creneau — un vétérinaire ne fait pas de garde un jour fixe de la semaine.
@@ -32,12 +40,14 @@ const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 7 types de rè
 4. duo_interdit — deux vétérinaires ne sont jamais de garde seuls ensemble.
    params: veterinaire = le premier, partenaire = le second (deux prénoms différents).
 5. au_plus_n — au plus N gardes sur une fenêtre.
-   params: n (entier ≥ 1), fenetre (semaine_civile|glissante_7_jours|glissante_14_jours|glissante_30_jours).
+   params: n (entier ≥ 1), fenetre (semaine_civile|glissante_7_jours|glissante_14_jours|glissante_30_jours),
+   creneaux (optionnel : liste de CODES de créneaux du cabinet — voir la liste fournie — pour ne compter QUE ces types de garde ; null = toutes les gardes).
+   Ex. « Manon fait au plus 2 week-ends par mois » → au_plus_n, n=2, fenetre=glissante_30_jours, creneaux=["weekend"].
 6. espacement_min — au moins X jours entre deux gardes du même vétérinaire.
    params: ecart_min_jours (entier ≥ 1).
 7. espacement_weekend — au plus 1 garde de WEEK-END toutes les N semaines (« un week-end sur N », limite la fréquence des week-ends d'un véto).
    params: n_semaines (entier ≥ 2 ; « un week-end sur 3 » → n_semaines = 3).
-   ⚠️ N'utilise ce type QUE si la demande parle bien de WEEK-ENDS (pas des gardes en général → c'est au_plus_n). Force par défaut conseillée : si_possible (préférence).
+   ⚠️ N'utilise ce type QUE si la demande est une FRÉQUENCE de week-ends (« un WE sur N »). Un PLAFOND de week-ends (« au plus 2 WE par mois ») → au_plus_n avec creneaux=["weekend"]. Force par défaut conseillée : si_possible (préférence).
 
 Niveau d'importance (force) :
 - jamais = interdiction ferme
@@ -52,6 +62,7 @@ Niveau d'importance (force) :
 export async function proposerRegleIA(
   phrase: string,
   vets: VetoResolu[],
+  typesCreneaux: TypeCreneauIA[] = [],
 ): Promise<PropositionRegle> {
   if (!assistantIaDisponible()) {
     throw new Error('Assistant IA non configuré (clé API manquante).')
@@ -59,11 +70,19 @@ export async function proposerRegleIA(
 
   const client = new Anthropic()
   const prenoms = vets.map((v) => v.prenom).join(', ')
+  // Référentiel DYNAMIQUE des créneaux du cabinet (verrou 8 : jamais d'enum
+  // figé) — l'IA doit utiliser ces CODES exacts dans `creneaux` (au_plus_n).
+  const lignesCreneaux = typesCreneaux
+    .map((t) => `- ${t.code} (${t.nom})`)
+    .join('\n')
+  const blocCreneaux = typesCreneaux.length > 0
+    ? `\nTypes de créneaux de garde DE CE CABINET (codes EXACTS à utiliser dans "creneaux") :\n${lignesCreneaux}\n`
+    : ''
 
   const system = `Tu es l'assistant de configuration de GuardVeto, un logiciel de planning de gardes vétérinaires. Ton rôle : traduire une demande en langage naturel en UNE règle structurée que le moteur sait appliquer. Tu PROPOSES seulement — un humain validera avant création.
 
 Vétérinaires du cabinet (utilise EXACTEMENT ces prénoms) : ${prenoms}.
-
+${blocCreneaux}
 ${CATALOGUE_PROMPT}
 
 Règles de comportement :
@@ -72,7 +91,8 @@ Règles de comportement :
 - Si la demande est ambiguë (jour manquant, véto non précisé, etc.) OU n'est pas réalisable : faisable=false, brique_id=null, et explique dans "message".
 - IMPORTANT — ton du "message" quand faisable=false : parle comme à un vétérinaire, AVEC SES MOTS. Ne mentionne JAMAIS « les 6 types de règles », « brique », ni aucun terme technique ou interne. Si c'est ambigu, demande simplement la précision manquante. Si la demande sort du périmètre (ce n'est pas une règle de planning de gardes), dis-le simplement et invite à reformuler autrement — sans lister de catalogue.
 - Choisis une force par défaut raisonnable si l'utilisateur ne la précise pas (souvent sauf_crise, ou jamais pour une interdiction nette).
-- N'invente jamais un prénom hors de la liste.`
+- N'invente jamais un prénom hors de la liste.
+- N'invente jamais un code de créneau : "creneaux" n'accepte QUE les codes listés ci-dessus (sinon laisse creneaux=null).`
 
   const response = await client.messages.parse({
     model: 'claude-opus-4-8',
