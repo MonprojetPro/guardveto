@@ -43,6 +43,7 @@ import { compterParVet, type CompteurVet } from './rules/optimization'
 import { comparerScores, scorerPlanning, type VecteurScore, type BonusMalusMap } from './score-lexicographique'
 import { DEFAULT_EQUITY_WEIGHTS, DEFAULT_ROLE_AVANTAGE_FINANCIER, type EquityWeights } from './equity-weights'
 import { DEFAULT_STRUCTURE_CONFIG, type StructureConfig, type PenalitesSouplesConfig } from './structure-config'
+import type { HistoriqueFetesResolu } from './historique-fete'
 import type { DiagnosticImpasse } from './diagnostic'
 import { construireDiagnostic, type CreneauStep, type ReSimuler } from './diagnostic'
 
@@ -379,6 +380,8 @@ function scorerCandidat(
   // Réglage des pénalités souples R10/R10c/R10b/R8b (backlog n°16).
   // Absent → poids historiques (byte-identique).
   penalitesSouples?: PenalitesSouplesConfig,
+  // Historique des fêtes (backlog n°14). Absent/vide → 0 (byte-identique).
+  historiqueFetes?: HistoriqueFetesResolu,
 ): number {
   // Dernier recours → toujours en dernier
   if (vet.dernier_recours) return 1_000_000
@@ -401,7 +404,8 @@ function scorerCandidat(
     step.role,
     planning,
     calendrier,
-    penalitesSouples
+    penalitesSouples,
+    historiqueFetes
   )
 
   // Créneau SUR-MESURE : équité d'étalement par code (jamais pour les codes
@@ -554,7 +558,7 @@ function backtrack(
   const candidates = valides
     .map((vet) => ({
       vet,
-      score: scorerCandidat(step, vet, planning, bonusMalus, vets, weights, calendrier, roleAvantageFinancier, compteursStep, structure.penalitesSouples),
+      score: scorerCandidat(step, vet, planning, bonusMalus, vets, weights, calendrier, roleAvantageFinancier, compteursStep, structure.penalitesSouples, structure.historiqueFetes),
     }))
     .sort((a, b) => a.score - b.score)
     .map(({ vet }) => vet)
@@ -784,6 +788,9 @@ export function scorerCandidatLNS(
   // Réglage des pénalités souples R10/R10c/R10b/R8b (backlog n°16).
   // Absent → poids historiques (byte-identique — les appels crise inchangés).
   penalitesSouples?: PenalitesSouplesConfig,
+  // Historique des fêtes (backlog n°14). Absent/vide → 0 (byte-identique —
+  // la crise ne le passe pas : réparation ciblée sans équité inter-annuelle).
+  historiqueFetes?: HistoriqueFetesResolu,
 ): number {
   if (vet.dernier_recours) return 1_000_000
 
@@ -805,7 +812,8 @@ export function scorerCandidatLNS(
     step.role,
     planning,
     calendrier,
-    penalitesSouples
+    penalitesSouples,
+    historiqueFetes
   )
 
   // Créneau SUR-MESURE : même équité d'étalement par code que scorerCandidat.
@@ -849,7 +857,7 @@ function repairerSemaine(
     const sorted = valids
       .map((v) => ({
         v,
-        score: scorerCandidatLNS(step, v, planning, vets, weights, calendrier, roleAvantageFinancier, compteursStep, structure.penalitesSouples),
+        score: scorerCandidatLNS(step, v, planning, vets, weights, calendrier, roleAvantageFinancier, compteursStep, structure.penalitesSouples, structure.historiqueFetes),
       }))
       .sort((a, b) => a.score - b.score)
       .map(({ v }) => v)

@@ -21,6 +21,8 @@ import {
   chargerCreneauModele, chargerRelationsCreneau, resoudreProfilId, chargerEffectifProfil,
 } from '@/data/chargerCreneauModele'
 import { resoudreRelationsStructure } from './relations-structure'
+import { chargerHistoriqueFetes } from '@/data/historiqueFetes'
+import { anneesFetesCouvertes } from './historique-fete'
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 
@@ -397,6 +399,26 @@ export async function chargerInputDepuisSupabase(
   if (cabinetId && creneaux && creneaux.length > 0) {
     const relationsRows = await chargerRelationsCreneau(supabase, cabinetId, profilId)
     structureConfig.relations = resoudreRelationsStructure(relationsRows, creneaux)
+  }
+
+  // Historique des fêtes (backlog n°14 — équité inter-annuelle). Chargé
+  // UNIQUEMENT si la période couvre une fête (24-25/12, 31/12-01/01) : on
+  // requête alors les années N-1 des instances couvertes, NORMALISÉES À LA
+  // SOURCE (Set canonique — parade anti-cécité params). Porté par
+  // structureConfig (même principe que `relations` : propagé partout —
+  // resoudreContexte, generate, crise, diagnostic — sans nouveau threading).
+  // Best-effort : table absente / erreur → undefined → aucune pénalité →
+  // byte-identique (idem table VIDE, par construction de la pénalité).
+  if (cabinetId) {
+    const anneesCouvertes = anneesFetesCouvertes(periode.date_debut, periode.date_fin)
+    if (anneesCouvertes.length > 0) {
+      const historique = await chargerHistoriqueFetes(
+        supabase,
+        cabinetId,
+        anneesCouvertes.map((a) => a - 1),
+      )
+      if (historique) structureConfig.historiqueFetes = historique
+    }
   }
 
   return {

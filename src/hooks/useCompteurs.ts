@@ -171,6 +171,54 @@ export async function queryVetsInfo(
   return (data as Array<{ id: string; prenom: string; nom: string; couleur: string }> | null) ?? []
 }
 
+// ── Historique des fêtes (backlog n°14 — équité inter-annuelle) ──
+
+export interface HistoriqueFeteAffichage {
+  veterinaire_id: string
+  fete: 'noel' | 'nouvel_an'
+  annee: number
+  role: string | null
+  prenom: string
+  nom: string
+}
+
+/**
+ * Charge l'historique des fêtes du cabinet (RLS restrictive = scope tenant),
+ * avec les noms des vétérinaires. BEST-EFFORT : table pas encore migrée ou
+ * erreur → [] (la section n'est simplement pas affichée — pas de coquille
+ * vide : on ne montre la carte QUE si des données réelles existent).
+ */
+export async function queryHistoriqueFetes(
+  supabase: SupabaseClient
+): Promise<HistoriqueFeteAffichage[]> {
+  const { data, error } = await supabase
+    .from('historique_fete')
+    .select('veterinaire_id, fete, annee, role, veterinaires(prenom, nom)')
+    .order('annee', { ascending: false })
+    .order('fete')
+
+  if (error || !data) return []
+
+  type Row = {
+    veterinaire_id: string
+    fete: 'noel' | 'nouvel_an'
+    annee: number
+    role: string | null
+    veterinaires: { prenom: string; nom: string } | { prenom: string; nom: string }[] | null
+  }
+  return (data as Row[]).map((r) => {
+    const v = Array.isArray(r.veterinaires) ? r.veterinaires[0] : r.veterinaires
+    return {
+      veterinaire_id: r.veterinaire_id,
+      fete: r.fete,
+      annee: r.annee,
+      role: r.role,
+      prenom: v?.prenom ?? '',
+      nom: v?.nom ?? '',
+    }
+  })
+}
+
 /**
  * Charge le bonus/malus hérité depuis la période précédente.
  * Retourne null si aucun enregistrement trouvé.

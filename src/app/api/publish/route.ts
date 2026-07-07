@@ -20,6 +20,8 @@ import { syncCalendrier } from '@/lib/sync-calendrier'
 import { sendPlanningPublie } from '@/lib/notifications'
 import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
 import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
+import { enregistrerHistoriqueFetes } from '@/data/historiqueFetes'
+import { compterSouhaitsCongesEnAttente } from '@/data/souhaitsCongesEnAttente'
 import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
 
 // Laisse le temps à la synchro agenda (par lots) + envoi des emails
@@ -117,13 +119,11 @@ export async function POST(req: NextRequest) {
       console.error('[publish] Re-validation impossible (gate best-effort):', e)
     }
 
-    const { count: nbSouhaits } = await supabase
-      .from('conges')
-      .select('id', { count: 'exact', head: true })
-      .eq('statut', 'souhait')
-      .lte('date_debut', periode.date_fin)
-      .gte('date_fin', periode.date_debut)
-    const souhaitsEnAttente = nbSouhaits ?? 0
+    // Source unique (backlog n°24) : la MÊME détection alimente le pré-vol de
+    // génération (/api/generate/pre-vol) — signal précoce — et ce gate — tardif.
+    const souhaitsEnAttente = await compterSouhaitsCongesEnAttente(
+      supabase, periode.date_debut, periode.date_fin,
+    )
 
     if (violations.length > 0 || souhaitsEnAttente > 0) {
       return NextResponse.json({
@@ -148,6 +148,19 @@ export async function POST(req: NextRequest) {
       { error: `Erreur lors de la publication : ${error.message}` },
       { status: 500 }
     )
+  }
+
+  // ── Historique des fêtes (backlog n°14 — équité inter-annuelle) ──
+  // Si la période couvre une fête (24-25/12, 31/12-01/01), on enregistre QUI
+  // l'a tenue — consommé par le moteur l'année suivante (pénalité souple
+  // « pas deux Noëls de suite »). IDEMPOTENT (delete ciblé + insert : une
+  // re-publication réécrit le même état) et BEST-EFFORT : un échec (table pas
+  // encore migrée, erreur) ne bloque JAMAIS la publication.
+  if (cabinetId) {
+    const histo = await enregistrerHistoriqueFetes(supabase, { periodeId, cabinetId })
+    if (!histo.ok) {
+      console.warn(`[publish] Historique des fêtes non enregistré : ${histo.erreur}`)
+    }
   }
 
   // ── Synchronisation Google Agenda ───────────────────────

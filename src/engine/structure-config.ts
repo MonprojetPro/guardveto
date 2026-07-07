@@ -22,6 +22,8 @@
 //   actif = false → la règle est ignorée partout.
 // ============================================================
 
+import type { HistoriqueFetesResolu } from './historique-fete'
+
 /** Étage au-delà duquel une règle structurelle devient MOLLE (pénalité). */
 export const ETAGE_STRUCTURE_DUR_MAX = 2
 
@@ -81,6 +83,16 @@ export interface StructureConfig {
    * principe que `relations` : propagé partout sans nouveau threading).
    */
   penalitesSouples?: PenalitesSouplesConfig
+  /**
+   * Historique des fêtes de fin d'année (backlog n°14 — équité inter-annuelle
+   * « qui a fait Noël l'an dernier ne le refait pas cette année »). Résolu à
+   * la SOURCE par le loader (table `historique_fete` → Set canonique, cf.
+   * historique-fete.ts) et consommé en PÉNALITÉ SOUPLE par les deux scoreurs
+   * (greedy/LNS via penalite(), scoreur global via scorerPlanning) — jamais
+   * par le validateur indépendant. `undefined` ou vide → aucune pénalité →
+   * byte-identique. Voyage DANS StructureConfig (même principe que `relations`).
+   */
+  historiqueFetes?: HistoriqueFetesResolu
 }
 
 /** Relations effectivement appliquées (donnée si chargée, sinon couple historique). */

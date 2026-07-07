@@ -32,6 +32,7 @@ import {
 } from './structure-config'
 import { apparierSourcePourCible } from './relations-structure'
 import { vetPourRole, vetsAttribues, avecVet, attributionVide } from './attribution'
+import { penaliteFeteHistorique, PENALITE_FETE_HISTORIQUE } from './historique-fete'
 import {
   penaliteR10WEConsecutif,
   penaliteWEAvantVacances,
@@ -251,6 +252,14 @@ export function scorerPlanning(
     const r8b = penaliteInversionFerie(sr.slot, vet, sr.role, planning, calendrier, pcfg)
     if (r8b > 0)
       ajouter(v, cfgR8b.etage, 'R8b', cfgR8b.poids)
+
+    // Backlog n°14 (🟡 EVITEE) — fête déjà tenue L'AN DERNIER (historique
+    // inter-annuel). MÊME source (structure.historiqueFetes) et MÊME fonction
+    // que le solver greedy/LNS via penalite() — les deux gardiens de score
+    // restent cohérents. Historique absent/vide → 0 → byte-identique.
+    const fh = penaliteFeteHistorique(sr.slot, sr.vetId, structure.historiqueFetes)
+    if (fh > 0)
+      ajouter(v, PENALITE_FETE_HISTORIQUE.etage, 'fete_historique', fh)
   }
 
   // Dernier recours (⚪ SI_POSSIBLE) — terme dominant dans son étage.

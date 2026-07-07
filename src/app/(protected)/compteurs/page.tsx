@@ -11,6 +11,7 @@ import { redirect } from 'next/navigation'
 import { BarChart3 } from 'lucide-react'
 import { CompteursClient } from '@/components/compteurs/CompteursClient'
 import { BonusMalusCard } from '@/components/compteurs/BonusMalusCard'
+import { HistoriqueFetesCard } from '@/components/compteurs/HistoriqueFetesCard'
 import {
   queryCompteurs,
   queryCompteursPlage,
@@ -18,6 +19,7 @@ import {
   queryBonusMalusHeritage,
   queryBonusMalusCourant,
   queryVetsInfo,
+  queryHistoriqueFetes,
   type CompteursRow,
 } from '@/hooks/useCompteurs'
 import type { Periode } from '@/types'
@@ -115,7 +117,7 @@ export default async function CompteursPage({
 
   // Bilan bonus/malus : pertinent uniquement en mode période (mécanisme par période)
   const afficherBilan = isAdmin && mode === 'periode' && periodeSelectionnee.statut !== 'brouillon'
-  const [bonusMalusHeritage, bonusMalusCourant, vetsInfo] = await Promise.all([
+  const [bonusMalusHeritage, bonusMalusCourant, vetsInfo, historiqueFetes] = await Promise.all([
     isAdmin && mode === 'periode'
       ? queryBonusMalusHeritage(supabase, periodeSelectionnee, periodes)
       : Promise.resolve([]),
@@ -125,6 +127,9 @@ export default async function CompteursPage({
     afficherBilan
       ? queryVetsInfo(supabase)
       : Promise.resolve([]),
+    // Historique des fêtes (backlog n°14) — admin uniquement. Best-effort :
+    // table pas migrée / vide → [] → la carte n'est pas rendue.
+    isAdmin ? queryHistoriqueFetes(supabase) : Promise.resolve([]),
   ])
 
   return (
@@ -172,6 +177,9 @@ export default async function CompteursPage({
           vetsInfo={vetsInfo}
         />
       )}
+
+      {/* Historique des fêtes de fin d'année — admin, données réelles uniquement */}
+      {isAdmin && <HistoriqueFetesCard rows={historiqueFetes} />}
     </div>
   )
 }

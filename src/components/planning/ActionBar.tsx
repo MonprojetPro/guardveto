@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Loader2, Wand2, Send, FileText, LayoutGrid, AlertTriangle } from 'lucide-react'
@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DiagnosticImpasse } from '@/components/planning/DiagnosticImpasse'
 import { CreneauxIgnoresAlert } from '@/components/planning/CreneauxIgnoresAlert'
+import { PreVolAlert } from '@/components/planning/PreVolAlert'
+import type { AvertissementPreVol } from '@/engine/pre-vol'
 import { CriseModal, type VetCrise } from '@/components/planning/CriseModal'
 import type { CreneauIgnore } from '@/engine/creneau-modele'
 import type { JourNonCouvert } from '@/components/planning/types-impasse'
@@ -48,6 +50,12 @@ interface ImpasseState {
 /** Réserves renvoyées par le gate de /api/publish (requiresConfirmation). */
 interface ReservesPublication {
   violations: ViolationRevalidation[]
+  souhaitsEnAttente: number
+}
+
+/** Résultat du pré-vol (backlog n°23 + n°24) — GET /api/generate/pre-vol. */
+interface PreVolState {
+  avertissements: AvertissementPreVol[]
   souhaitsEnAttente: number
 }
 
@@ -94,6 +102,36 @@ export function ActionBar({ periodes, periodesAvecGardes, vets }: ActionBarProps
   // affichés APRÈS la génération, succès comme impasse (fin du silence).
   const [creneauxIgnores, setCreneauxIgnores] = useState<CreneauIgnore[]>([])
   const [criseOpen, setCriseOpen] = useState(false)
+  // Pré-vol (backlog n°23 + n°24) : avertissements de cohérence des règles +
+  // souhaits de congé en attente — affichés AVANT le clic « Générer ».
+  // Le résultat est CLÉ sur sa période : changer de période invalide l'affichage
+  // sans setState synchrone dans l'effet (règle react-hooks/set-state-in-effect).
+  const [preVol, setPreVol] = useState<(PreVolState & { periodeId: string }) | null>(null)
+  // Bumpé après chaque génération : les règles/congés ont pu changer entre-temps
+  // (assouplissement via le diagnostic, congé traité dans un autre onglet…).
+  const [preVolVersion, setPreVolVersion] = useState(0)
+
+  // Charge le pré-vol dès qu'une période est sélectionnée (best-effort : un
+  // échec réseau laisse simplement l'écran sans avertissement — jamais bloquant).
+  useEffect(() => {
+    if (!periodeId) return
+    let annule = false
+    fetch(`/api/generate/pre-vol?periodeId=${encodeURIComponent(periodeId)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (annule || !data) return
+        setPreVol({
+          periodeId,
+          avertissements: (data.avertissements ?? []) as AvertissementPreVol[],
+          souhaitsEnAttente: typeof data.souhaitsEnAttente === 'number' ? data.souhaitsEnAttente : 0,
+        })
+      })
+      .catch(() => { /* silencieux — le pré-vol ne bloque jamais */ })
+    return () => { annule = true }
+  }, [periodeId, preVolVersion])
+
+  // Seul le pré-vol de la période AFFICHÉE est montré (l'ancien devient inerte).
+  const preVolActuel = preVol && preVol.periodeId === periodeId ? preVol : null
 
   const periodeSelectionnee = periodes.find((p) => p.id === periodeId) ?? null
   const aDesGardes = periodesAvecGardes.includes(periodeId)
@@ -153,6 +191,8 @@ export function ActionBar({ periodes, periodesAvecGardes, vets }: ActionBarProps
       toast.error('Impossible de joindre le serveur.')
     } finally {
       setGenerating(false)
+      // Re-vérifie le pré-vol : les règles/congés ont pu changer depuis la sélection.
+      setPreVolVersion((v) => v + 1)
     }
   }
 
@@ -278,6 +318,15 @@ export function ActionBar({ periodes, periodesAvecGardes, vets }: ActionBarProps
           </a>
         </div>
       </div>
+
+      {/* Pré-vol (backlog n°23 + n°24) : congés en attente + cohérence des
+          règles — AVANT le clic « Générer ». Rien détecté → rien d'affiché. */}
+      {preVolActuel && !generating && (
+        <PreVolAlert
+          avertissements={preVolActuel.avertissements}
+          souhaitsEnAttente={preVolActuel.souhaitsEnAttente}
+        />
+      )}
 
       {/* Créneaux du catalogue ignorés par le moteur (backlog n°4, tranche 1) */}
       {!generating && <CreneauxIgnoresAlert creneaux={creneauxIgnores} />}

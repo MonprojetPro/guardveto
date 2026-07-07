@@ -19,6 +19,7 @@ import { estAttribue, vetPourRole } from '../attribution'
 import {
   PENALITE_SOUPLE_DEFAUT, poidsPenaliteSouple, type PenalitesSouplesConfig,
 } from '../structure-config'
+import { penaliteFeteHistorique, type HistoriqueFetesResolu } from '../historique-fete'
 
 // ── Scores de pénalité (défauts historiques — source unique structure-config) ──
 
@@ -179,13 +180,17 @@ export function penalite(
   role: RoleGarde,
   planning: PlanningPartiel,
   calendrier?: CalendrierResolu,
-  penalitesSouples?: PenalitesSouplesConfig
+  penalitesSouples?: PenalitesSouplesConfig,
+  // Backlog n°14 — équité inter-annuelle des fêtes. Absent/vide → 0 (byte-identique).
+  historiqueFetes?: HistoriqueFetesResolu
 ): number {
   return (
     penaliteR10WEConsecutif(slot, vet, planning, penalitesSouples) +
     penaliteWEAvantVacances(slot, vet, planning, penalitesSouples) +
     penaliteFeteFinAnnee(slot, penalitesSouples) +
     penaliteInversionFerie(slot, vet, role, planning, calendrier, penalitesSouples) +
+    // Backlog n°14 : le véto a tenu cette fête L'AN DERNIER → pénalité souple.
+    penaliteFeteHistorique(slot, vet.id, historiqueFetes) +
     // P1-B : règles configurées MOLLES (étage ≥ 3) — préférence, pas blocage.
     penaliteContraintesConfig(slot, vet, role, planning, calendrier)
   )

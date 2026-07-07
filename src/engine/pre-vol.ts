@@ -1,0 +1,594 @@
+// ============================================================
+// GUARDVETO — Pré-vol de cohérence des règles (backlog n°23)
+// ============================================================
+// Le diagnostic d'impasse (diagnostic.ts) est BON mais RÉACTIF : il explique
+// l'échec APRÈS une génération ratée. Ce module détecte AVANT de générer :
+//   (a) les configurations de règles DURES arithmétiquement intenables
+//       (véto que ses règles écartent de tout, limites de charge qui ne
+//       couvrent pas la période, espacements week-end impossibles, créneaux
+//       qu'aucune combinaison de vétos ne peut pourvoir) ;
+//   (b) les règles FANTÔMES : une règle active qui pointe un vétérinaire
+//       sorti de l'effectif (inactif/supprimé) — silencieusement sans effet.
+//
+// PRINCIPE DIRECTEUR — réutiliser le diagnostic, pas le réinventer :
+//   • le « pourquoi un véto est écarté » = `raisonsSurCreneau` (diagnostic.ts),
+//     rejouée ici sur un planning VIDE (avant génération, il n'y a pas de
+//     contexte partiel — un véto écarté à vide le sera dans TOUT contexte,
+//     les contraintes dures ne faisant que se resserrer quand le planning
+//     se remplit) ;
+//   • les libellés en clair = `rendreRegle` (catalogue/briques) — la MÊME
+//     source de formulations françaises que le diagnostic ;
+//   • la normalisation = `normaliserContraintesVets` (idempotente).
+//
+// GARANTIES :
+//   • Fonction PURE (aucune I/O) — entièrement testable.
+//   • Avertissements NON bloquants : la génération reste toujours possible.
+//   • Un pré-vol qui ne détecte rien renvoie [] → l'UI n'affiche RIEN.
+//   • Jamais d'exception : une règle mal formée est ignorée (comme le moteur).
+// ============================================================
+
+import type {
+  VetEngine, VetEngineNormalise, SlotGarde, PlanningPartiel, Saison,
+  CalendrierResolu, ContrainteEngine,
+} from './types'
+import { raisonsSurCreneau, type CreneauStep } from './diagnostic'
+import { isValid } from './rules/hard-constraints'
+import { normaliserContraintesVets } from './normaliserContraintes'
+import { rendreRegle } from './briques/catalogue'
+import { lundiDeSemaine } from './utils'
+import { DEFAULT_STRUCTURE_CONFIG, type StructureConfig } from './structure-config'
+import type { CreneauModele } from './creneau-modele'
+
+// ── Types publics ────────────────────────────────────────────
+
+export type CodeAvertissementPreVol =
+  | 'regle_veto_sorti'          // règle active dont le propriétaire n'est plus dans l'effectif
+  | 'duo_veto_sorti'            // duo interdit dont le partenaire n'est plus dans l'effectif
+  | 'veto_jamais_disponible'    // un véto que ses règles/congés écartent de TOUT créneau
+  | 'creneau_impossible'        // un créneau qu'aucune combinaison de vétos ne peut pourvoir
+  | 'charge_globale_insuffisante' // Σ des plafonds de charge < places à pourvoir
+  | 'weekends_insuffisants'     // Σ des plafonds week-end < places de week-end
+
+/**
+ * Un avertissement du pré-vol — TOUJOURS non bloquant.
+ * `regles` : libellés en clair (formulations du catalogue) des règles en cause.
+ * `message` : phrase compréhensible par une vétérinaire, sans jargon.
+ */
+export interface AvertissementPreVol {
+  code: CodeAvertissementPreVol
+  regles: string[]
+  message: string
+}
+
+/** Fiche minimale d'un véto de l'annuaire (actifs ET sortis) — pour nommer. */
+export interface VetAnnuaire {
+  id: string
+  prenom: string
+  nom: string
+  actif: boolean
+}
+
+export interface PreVolInput {
+  /** Vétos ACTIFS avec leurs contraintes + congés (le contexte de génération). */
+  vets: VetEngine[]
+  dateDebut: string
+  dateFin: string
+  saison: Saison
+  calendrier?: CalendrierResolu
+  structureConfig?: StructureConfig
+  /** Catalogue de créneaux du cabinet — absent = mapping historique en dur. */
+  creneaux?: CreneauModele[]
+  /** Effectif configurable nuit de semaine. Absent → repli saison. */
+  nbVetosSemaineSoir?: number
+  /** Annuaire COMPLET (actifs + inactifs) — pour nommer les vétos sortis. */
+  annuaire?: VetAnnuaire[]
+  /**
+   * Contraintes par véto telles que mappées depuis `regles_cabinet`
+   * (mapperReglesCabinet), AVANT le filtrage « vétos actifs » du loader.
+   * C'est la seule façon de voir les règles fantômes : le loader les jette
+   * en silence (aucun véto actif ne les ramasse). Absent → détection (b) sautée.
+   */
+  contraintesParVet?: Map<string, ContrainteEngine[]>
+}
+
+// ── Helpers internes ─────────────────────────────────────────
+
+const ETAGE_DUR_MAX = 2 // miroir de hard-constraints.ts (dur si étage ≤ 2)
+
+function estDure(c: ContrainteEngine): boolean {
+  const f = (c.config as Record<string, unknown>).force
+  return (typeof f === 'number' ? f : ETAGE_DUR_MAX) <= ETAGE_DUR_MAX
+}
+
+/** Le `brique` d'une contrainte (repli sur le type) — même lecture que diagnostic.ts. */
+function briqueDe(c: ContrainteEngine): string {
+  const b = (c.config as Record<string, unknown>).brique
+  return typeof b === 'string' ? b : c.type
+}
+
+/** Les params d'une contrainte (post-normalisation : params sinon racine). */
+function paramsDe(c: ContrainteEngine): Record<string, unknown> {
+  const cfg = c.config as Record<string, unknown>
+  const p = cfg.params
+  return p && typeof p === 'object' && !Array.isArray(p)
+    ? (p as Record<string, unknown>)
+    : cfg
+}
+
+/** Libellé « Prénom + prédicat » via le catalogue — même recette que le diagnostic. */
+function libelleRegle(
+  prenom: string,
+  c: ContrainteEngine,
+  nomVeto: (id: string) => string,
+): string {
+  return `${prenom} ${rendreRegle(briqueDe(c), paramsDe(c), { nomVeto })}`
+}
+
+/** Nombre de jours inclus entre deux dates ISO. */
+function nbJoursEntre(debut: string, fin: string): number {
+  const a = new Date(debut + 'T12:00:00Z').getTime()
+  const b = new Date(fin + 'T12:00:00Z').getTime()
+  return Math.round((b - a) / 86_400_000) + 1
+}
+
+function plusJours(date: string, n: number): string {
+  const d = new Date(date + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
+function jIndex(date: string): number {
+  return new Date(date + 'T12:00:00Z').getUTCDay() // 0=dim … 6=sam
+}
+
+/** Date lisible en français (« 8 novembre »). */
+function dateLisible(date: string): string {
+  return new Date(date + 'T12:00:00Z').toLocaleDateString('fr-FR', {
+    day: 'numeric', month: 'long',
+  })
+}
+
+/** Retire le préfixe technique (« R3/R5 : », « AU_PLUS_N : ») d'une raison isValid. */
+function sansPrefixeTechnique(raison: string): string {
+  return raison.replace(/^[A-Z0-9/_-]+\s*:\s*/, '')
+}
+
+/** Nom lisible d'un créneau (nom du catalogue si dispo, sinon libellé historique). */
+function nomCreneau(type: string, creneaux?: CreneauModele[]): string {
+  const c = creneaux?.find((x) => x.code === type)
+  if (c) return c.nom
+  const NOMS: Record<string, string> = {
+    semaine_soir: 'soir de semaine',
+    vendredi_soir: 'vendredi soir',
+    weekend: 'week-end',
+  }
+  return NOMS[type] ?? type
+}
+
+// ── Énumération des créneaux de la période ───────────────────
+// Miroir de `slotsAttendus` (validation/validerPlanning.ts) : catalogue si
+// présent (actif, non-férié, code non-null, jours cochés ; semaine_soir
+// plafonné par l'effectif), sinon mapping historique en dur. Utilisé UNIQUEMENT
+// pour des AVERTISSEMENTS (jamais bloquant) : une divergence éventuelle avec le
+// solver produit au pire un avertissement de trop/de moins, jamais un planning faux.
+
+interface SlotPreVol {
+  date: string
+  type: string
+  roles: string[]
+}
+
+function enumererSlots(input: PreVolInput): SlotPreVol[] {
+  const effectifSemaine = input.nbVetosSemaineSoir ?? (input.saison === 'hiver' ? 2 : 1)
+  const slots: SlotPreVol[] = []
+  let cur = input.dateDebut
+  while (cur <= input.dateFin) {
+    const idx = jIndex(cur)
+    const creneaux = input.creneaux
+    if (creneaux && creneaux.length > 0) {
+      for (const c of creneaux) {
+        if (!c.actif || c.surFeries || !c.joursSemaine.includes(idx)) continue
+        if (c.code === null || c.code === 'ferie') continue
+        const nbAttendu = c.code === 'semaine_soir'
+          ? Math.min(c.nbPlaces, effectifSemaine)
+          : c.nbPlaces
+        const roles = c.roles.slice(0, nbAttendu)
+        if (roles.length > 0) slots.push({ date: cur, type: c.code, roles })
+      }
+    } else {
+      const t = idx === 5 ? 'vendredi_soir'
+        : idx === 6 ? 'weekend'
+        : idx >= 1 && idx <= 4 ? 'semaine_soir'
+        : null
+      if (t) {
+        const roles = t === 'semaine_soir'
+          ? (effectifSemaine >= 2 ? ['premier', 'second'] : ['premier'])
+          : ['premier', 'second']
+        slots.push({ date: cur, type: t, roles })
+      }
+    }
+    cur = plusJours(cur, 1)
+  }
+  return slots
+}
+
+/** CreneauStep (contrat du diagnostic) depuis un slot du pré-vol + un rôle. */
+function versStep(s: SlotPreVol, role: string, saison: Saison): CreneauStep {
+  return { date: s.date, type: s.type, saison, role, besoinSecond: s.roles.length >= 2 }
+}
+
+// ── (b) Règles fantômes — véto sorti de l'effectif ───────────
+
+function detecterReglesFantomes(
+  input: PreVolInput,
+  actifsIds: Set<string>,
+  nomVeto: (id: string) => string,
+): AvertissementPreVol[] {
+  const out: AvertissementPreVol[] = []
+  if (!input.contraintesParVet) return out
+
+  for (const [vetId, contraintes] of input.contraintesParVet) {
+    if (actifsIds.has(vetId)) continue
+    const fiche = input.annuaire?.find((a) => a.id === vetId)
+    const prenom = fiche ? fiche.prenom : 'un vétérinaire retiré de l’équipe'
+    for (const c of contraintes) {
+      if (!c.actif) continue
+      out.push({
+        code: 'regle_veto_sorti',
+        regles: [libelleRegle(prenom, c, nomVeto)],
+        message: fiche
+          ? `Une règle concerne ${fiche.prenom} ${fiche.nom}, qui ne fait plus partie de l’équipe de garde : elle n’a plus aucun effet. Tu peux la supprimer depuis l’écran Règles.`
+          : `Une règle concerne un vétérinaire qui a été retiré de l’équipe : elle n’a plus aucun effet. Tu peux la supprimer depuis l’écran Règles.`,
+      })
+    }
+  }
+  return out
+}
+
+/** Ids des partenaires d'un duo interdit (config normalisée : racine ou params). */
+function lirePartenairesDuo(c: ContrainteEngine): string[] {
+  const out = new Set<string>()
+  const pousser = (v: unknown) => {
+    if (typeof v === 'string' && v.trim() !== '') out.add(v)
+  }
+  const cfg = c.config as Record<string, unknown>
+  const p = paramsDe(c)
+  pousser(p.avec_veterinaire_id)
+  pousser(cfg.avec_veterinaire_id)
+  for (const src of [p.membres, cfg.membres]) {
+    if (Array.isArray(src)) for (const m of src) pousser(m)
+  }
+  return [...out]
+}
+
+function detecterDuosFantomes(
+  vets: VetEngineNormalise[],
+  input: PreVolInput,
+  actifsIds: Set<string>,
+  nomVeto: (id: string) => string,
+): AvertissementPreVol[] {
+  const out: AvertissementPreVol[] = []
+  for (const vet of vets) {
+    for (const c of vet.contraintes) {
+      if (!c.actif || c.type !== 'duo_interdit') continue
+      const sortis = lirePartenairesDuo(c).filter(
+        (id) => id !== vet.id && !actifsIds.has(id),
+      )
+      for (const id of sortis) {
+        const fiche = input.annuaire?.find((a) => a.id === id)
+        const nomPartenaire = fiche
+          ? `${fiche.prenom} ${fiche.nom}`
+          : 'un vétérinaire qui a été retiré de l’équipe'
+        out.push({
+          code: 'duo_veto_sorti',
+          regles: [libelleRegle(vet.prenom, c, nomVeto)],
+          message: `La règle « jamais ensemble » de ${vet.prenom} mentionne ${nomPartenaire}, qui ne fait plus partie de l’équipe de garde : cette règle n’a plus aucun effet.`,
+        })
+      }
+    }
+  }
+  return out
+}
+
+// ── (a1) Vétos que leurs règles écartent de TOUT créneau ─────
+// Rejeu de `raisonsSurCreneau` (diagnostic) sur planning VIDE : un véto écarté
+// partout à vide le sera a fortiori dans tout contexte réel (les contraintes
+// dures ne font que se resserrer quand le planning se remplit).
+
+interface DisponibilitesParSlot {
+  /** slot index → ids des vétos valides sur AU MOINS un rôle du slot. */
+  candidatsParSlot: string[][]
+  /** slot index → rôle → ids valides sur CE rôle. */
+  candidatsParRole: Map<string, string[]>[]
+}
+
+function calculerDisponibilites(
+  slots: SlotPreVol[],
+  vetsN: VetEngineNormalise[],
+  input: PreVolInput,
+): DisponibilitesParSlot {
+  // MÊME rejeu que raisonsSurCreneau (diagnostic.ts) : isValid sur le planning
+  // vide. On appelle isValid directement (et pas raisonsSurCreneau) parce que
+  // cette dernière ne remonte que les raisons préfixées « Rxx » — un véto
+  // écarté par AU_PLUS_N/ESPACEMENT/FREQ_WE serait compté à tort disponible.
+  const planningVide: PlanningPartiel = { attributions: [] }
+  const structure = input.structureConfig ?? DEFAULT_STRUCTURE_CONFIG
+  const candidatsParSlot: string[][] = []
+  const candidatsParRole: Map<string, string[]>[] = []
+
+  for (const s of slots) {
+    const parRole = new Map<string, string[]>()
+    const union = new Set<string>()
+    for (const role of s.roles) {
+      const slot: SlotGarde = {
+        date: s.date, type: s.type, saison: input.saison, besoinSecond: s.roles.length >= 2,
+      }
+      const valides = vetsN
+        .filter((v) => isValid(slot, v, role, vetsN, planningVide, input.calendrier, structure).valid)
+        .map((v) => v.id)
+      parRole.set(role, valides)
+      for (const id of valides) union.add(id)
+    }
+    candidatsParSlot.push([...union])
+    candidatsParRole.push(parRole)
+  }
+  return { candidatsParSlot, candidatsParRole }
+}
+
+function detecterVetosJamaisDisponibles(
+  slots: SlotPreVol[],
+  dispos: DisponibilitesParSlot,
+  vetsN: VetEngineNormalise[],
+  nomVeto: (id: string) => string,
+): AvertissementPreVol[] {
+  const out: AvertissementPreVol[] = []
+  if (slots.length === 0) return out
+
+  for (const vet of vetsN) {
+    const disponibleQuelquePart = dispos.candidatsParSlot.some((ids) => ids.includes(vet.id))
+    if (disponibleQuelquePart) continue
+
+    const reglesDures = vet.contraintes.filter((c) => c.actif && estDure(c))
+    if (reglesDures.length === 0) {
+      // Aucune règle dure → l'exclusion vient des congés (R16).
+      out.push({
+        code: 'veto_jamais_disponible',
+        regles: [],
+        message: `${vet.prenom} est en congé sur toute la période : aucune garde ne pourra lui être attribuée.`,
+      })
+    } else {
+      out.push({
+        code: 'veto_jamais_disponible',
+        regles: reglesDures.map((c) => libelleRegle(vet.prenom, c, nomVeto)),
+        message: `Avec ses règles actuelles (et ses congés), ${vet.prenom} ne peut prendre aucune garde sur cette période : le planning se fera entièrement sans ${vet.prenom}. Vérifie que c’est bien voulu.`,
+      })
+    }
+  }
+  return out
+}
+
+// ── (a2) Créneaux qu'aucune combinaison ne peut pourvoir ─────
+// Un créneau demande N vétos DISTINCTS. Si, à planning vide (le cas le PLUS
+// favorable), un rôle n'a aucun candidat ou l'union des candidats < N, la
+// génération échouera À COUP SÛR sur ce créneau.
+
+const MAX_DATES_AFFICHEES = 4
+const MAX_RAISONS_AFFICHEES = 3
+
+function detecterCreneauxImpossibles(
+  slots: SlotPreVol[],
+  dispos: DisponibilitesParSlot,
+  vetsN: VetEngineNormalise[],
+  input: PreVolInput,
+): AvertissementPreVol[] {
+  // Regroupés par type de créneau (une seule alerte par type, dates agrégées).
+  const parType = new Map<string, { dates: string[]; places: number; raisons: Set<string> }>()
+  const planningVide: PlanningPartiel = { attributions: [] }
+  const diagInput = {
+    vets: vetsN,
+    calendrier: input.calendrier,
+    structureConfig: input.structureConfig,
+  }
+
+  slots.forEach((s, i) => {
+    const parRole = dispos.candidatsParRole[i]
+    const union = dispos.candidatsParSlot[i]
+    const roleVide = s.roles.some((r) => (parRole.get(r) ?? []).length === 0)
+    const pasAssezDistincts = union.length < s.roles.length
+    if (!roleVide && !pasAssezDistincts) return
+
+    let groupe = parType.get(s.type)
+    if (!groupe) {
+      groupe = { dates: [], places: s.roles.length, raisons: new Set() }
+      parType.set(s.type, groupe)
+    }
+    groupe.dates.push(s.date)
+    groupe.places = Math.max(groupe.places, s.roles.length)
+    // Raisons dominantes : pourquoi les vétos écartés le sont (source unique diagnostic).
+    if (groupe.raisons.size < MAX_RAISONS_AFFICHEES) {
+      const step = versStep(s, s.roles[0], input.saison)
+      const structure = input.structureConfig ?? DEFAULT_STRUCTURE_CONFIG
+      for (const r of raisonsSurCreneau(step, planningVide, diagInput, structure)) {
+        if (groupe.raisons.size >= MAX_RAISONS_AFFICHEES) break
+        groupe.raisons.add(sansPrefixeTechnique(r.raison))
+      }
+    }
+  })
+
+  const out: AvertissementPreVol[] = []
+  for (const [type, g] of parType) {
+    const nom = nomCreneau(type, input.creneaux)
+    const affichees = g.dates.slice(0, MAX_DATES_AFFICHEES).map(dateLisible).join(', ')
+    const reste = g.dates.length - MAX_DATES_AFFICHEES
+    const quand = reste > 0 ? `${affichees} (et ${reste} autre${reste > 1 ? 's' : ''} date${reste > 1 ? 's' : ''})` : affichees
+    out.push({
+      code: 'creneau_impossible',
+      regles: [...g.raisons],
+      message: g.places > 1
+        ? `Le créneau « ${nom} » demande ${g.places} vétérinaires différents, mais il n’y en a pas assez de disponibles le ${quand} : la génération échouera sur ce créneau.`
+        : `Personne ne peut prendre le créneau « ${nom} » le ${quand} : la génération échouera sur ce créneau.`,
+    })
+  }
+  return out
+}
+
+// ── (a3) Arithmétique de charge — plafonds vs places à pourvoir ──
+// « Espacements/limites impossibles vu le nombre de créneaux et de vétos » :
+// on calcule pour chaque véto un PLAFOND certain de gardes sur la période
+// (au_plus_n, espacement_min) ; si la somme des plafonds est inférieure au
+// nombre de places à pourvoir, AUCUN planning n'existe — c'est prouvable
+// avant de générer. Les bornes sont des MAJORANTS (jamais de faux positif).
+
+interface CapaciteVet {
+  cap: number
+  reglesLimitantes: string[]
+}
+
+function capaciteVet(
+  vet: VetEngineNormalise,
+  nbSemainesCiviles: number,
+  nbJours: number,
+  nbSlots: number,
+  nomVeto: (id: string) => string,
+): CapaciteVet {
+  let cap = nbSlots // sans limite : au plus une garde par créneau
+  const limitantes: string[] = []
+
+  for (const c of vet.contraintes) {
+    if (!c.actif || !estDure(c)) continue
+    const p = paramsDe(c)
+
+    if (c.type === 'au_plus_n') {
+      // Un filtre de créneaux rend la borne partielle → on l'ignore (prudent).
+      const creneauxFiltre = p.creneaux ?? (c.config as Record<string, unknown>).creneaux
+      if (Array.isArray(creneauxFiltre) && creneauxFiltre.length > 0) continue
+      const nRaw = p.n
+      const n = typeof nRaw === 'number' ? nRaw : typeof nRaw === 'string' ? parseInt(nRaw, 10) : NaN
+      if (!Number.isFinite(n) || n < 0) continue // mal configurée → inerte (comme le moteur)
+      const f = typeof p.fenetre === 'string' ? p.fenetre : 'semaine_civile'
+      const m = f.match(/^glissante_(\d+)_jours$/)
+      const borne = m
+        ? n * Math.ceil(nbJours / Math.max(1, parseInt(m[1], 10)))
+        : n * nbSemainesCiviles // défaut : semaine civile (même défaut que le moteur)
+      if (borne < cap) {
+        cap = borne
+        limitantes.push(libelleRegle(vet.prenom, c, nomVeto))
+      }
+    }
+
+    if (c.type === 'espacement_min') {
+      const eRaw = p.ecart_min_jours
+      const ecart = typeof eRaw === 'number' ? eRaw : typeof eRaw === 'string' ? parseInt(eRaw, 10) : NaN
+      if (!Number.isFinite(ecart) || ecart <= 0) continue
+      const borne = Math.floor((nbJours - 1) / ecart) + 1
+      if (borne < cap) {
+        cap = borne
+        limitantes.push(libelleRegle(vet.prenom, c, nomVeto))
+      }
+    }
+  }
+  return { cap: Math.max(0, cap), reglesLimitantes: limitantes }
+}
+
+function detecterChargeInsuffisante(
+  slots: SlotPreVol[],
+  vetsN: VetEngineNormalise[],
+  input: PreVolInput,
+  nomVeto: (id: string) => string,
+): AvertissementPreVol[] {
+  if (slots.length === 0 || vetsN.length === 0) return []
+  const totalPlaces = slots.reduce((n, s) => n + s.roles.length, 0)
+  const nbJours = nbJoursEntre(input.dateDebut, input.dateFin)
+  const semaines = new Set<string>()
+  for (const s of slots) semaines.add(lundiDeSemaine(s.date))
+  const nbSemaines = Math.max(1, semaines.size)
+
+  let somme = 0
+  const regles: string[] = []
+  for (const vet of vetsN) {
+    const { cap, reglesLimitantes } = capaciteVet(vet, nbSemaines, nbJours, slots.length, nomVeto)
+    somme += cap
+    if (cap < slots.length) regles.push(...reglesLimitantes)
+  }
+
+  if (somme >= totalPlaces) return []
+  return [{
+    code: 'charge_globale_insuffisante',
+    regles: [...new Set(regles)],
+    message: `Les limites de charge configurées ne permettent pas de couvrir la période : ${totalPlaces} gardes sont à pourvoir, mais les règles n’en autorisent que ${somme} au total. Assouplis une de ces règles ou ajoute un vétérinaire, sinon la génération échouera.`,
+  }]
+}
+
+// ── (a4) Espacement des week-ends vs nombre de week-ends ────
+
+function detecterWeekendsInsuffisants(
+  slots: SlotPreVol[],
+  vetsN: VetEngineNormalise[],
+  nomVeto: (id: string) => string,
+): AvertissementPreVol[] {
+  const weSlots = slots.filter((s) => s.type === 'weekend')
+  if (weSlots.length === 0 || vetsN.length === 0) return []
+  const wePlaces = weSlots.reduce((n, s) => n + s.roles.length, 0)
+  const nbWe = weSlots.length
+
+  let somme = 0
+  const regles: string[] = []
+  for (const vet of vetsN) {
+    let cap = nbWe
+    for (const c of vet.contraintes) {
+      if (!c.actif || !estDure(c) || c.type !== 'espacement_weekend') continue
+      const p = paramsDe(c)
+      const nRaw = p.n_semaines
+      const n = typeof nRaw === 'number' ? nRaw : typeof nRaw === 'string' ? parseInt(nRaw, 10) : NaN
+      if (!Number.isFinite(n) || n <= 1) continue // inerte (comme le moteur)
+      const borne = Math.ceil(nbWe / n)
+      if (borne < cap) {
+        cap = borne
+        regles.push(libelleRegle(vet.prenom, c, nomVeto))
+      }
+    }
+    somme += cap
+  }
+
+  if (somme >= wePlaces) return []
+  return [{
+    code: 'weekends_insuffisants',
+    regles: [...new Set(regles)],
+    message: `Les règles d’espacement des week-ends ne permettent pas de couvrir tous les week-ends de la période : ${wePlaces} places de week-end sont à pourvoir, mais les règles n’en autorisent que ${somme} au total. Assouplis une de ces règles ou ajoute un vétérinaire.`,
+  }]
+}
+
+// ============================================================
+// preVolRegles — POINT D'ENTRÉE (fonction pure)
+// ============================================================
+
+/**
+ * Analyse la configuration AVANT génération et renvoie la liste des
+ * avertissements NON bloquants. Tableau vide = rien à signaler (silence).
+ */
+export function preVolRegles(input: PreVolInput): AvertissementPreVol[] {
+  // Auto-normalisation (idempotente) — même parade anti-cécité params que le
+  // diagnostic : le pré-vol est un LECTEUR de règles.
+  const vetsN = normaliserContraintesVets(input.vets)
+  const actifsIds = new Set(vetsN.map((v) => v.id))
+  const nomVeto = (id: string) => {
+    const actif = vetsN.find((v) => v.id === id)
+    if (actif) return actif.prenom
+    const fiche = input.annuaire?.find((a) => a.id === id)
+    return fiche ? fiche.prenom : id
+  }
+
+  const slots = enumererSlots(input)
+  const dispos = calculerDisponibilites(slots, vetsN, input)
+
+  return [
+    // (b) règles fantômes — véto sorti
+    ...detecterReglesFantomes(input, actifsIds, nomVeto),
+    ...detecterDuosFantomes(vetsN, input, actifsIds, nomVeto),
+    // (a) contradictions arithmétiques certaines
+    ...detecterVetosJamaisDisponibles(slots, dispos, vetsN, nomVeto),
+    ...detecterCreneauxImpossibles(slots, dispos, vetsN, input),
+    ...detecterChargeInsuffisante(slots, vetsN, input, nomVeto),
+    ...detecterWeekendsInsuffisants(slots, vetsN, nomVeto),
+  ]
+}

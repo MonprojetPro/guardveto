@@ -250,6 +250,10 @@ export async function POST(req: NextRequest) {
     const { contraintesParVet } = mapperReglesCabinet(rows, briquesConnues)
     const equityWeights = buildEquityWeights(extraireEquityRules(rows))
     const structureConfig = extraireStructureConfig(rows)
+    // Historique des fêtes (backlog n°14) : donnée du MONDE courant (comme les
+    // congés/calendrier), pas une règle snapshotée — on propage celui chargé
+    // par resoudreContexte pour que le replay pénalise comme la génération.
+    structureConfig.historiqueFetes = contexte.structureConfig?.historiqueFetes
     const effectif = snap.effectif?.nb_vetos_semaine_soir
 
     // Réinjecter les contraintes snapshotées PAR VÉTO, puis re-normaliser à la

@@ -220,7 +220,7 @@ function libelleStructurel(code: string): string {
 // ── Agrégation des raisons sur un créneau ──────────────────────────────────
 
 /** Une raison d'échec brute pour un véto sur un créneau donné. */
-interface RaisonVet {
+export interface RaisonVet {
   code: string
   vetId: string
   raison: string
@@ -231,8 +231,12 @@ interface RaisonVet {
  * Renvoie la liste des raisons d'échec (une par véto écarté). Les vétos valides
  * (peu probable au créneau bloquant, mais possible aux autres créneaux) sont
  * ignorés.
+ *
+ * Exportée (backlog n°23) : le PRÉ-VOL de cohérence (`pre-vol.ts`) rejoue la
+ * MÊME logique sur un planning VIDE, avant génération — source unique du
+ * « pourquoi ce véto est écarté », jamais ré-implémentée ailleurs.
  */
-function raisonsSurCreneau(
+export function raisonsSurCreneau(
   step: CreneauStep,
   planning: PlanningPartiel,
   input: DiagnosticInput,
