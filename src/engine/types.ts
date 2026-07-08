@@ -111,6 +111,16 @@ export interface ContrainteEngine {
     // lookback #17). Mal configurée (forme absente, paire identique, date non-ISO)
     // → INERTE. Consomme les gardes DÉJÀ posées du véto (comme au_plus_n).
     | 'exclusion_dates'
+    // ── Garde conditionnelle ORIENTÉE « seulement avec B » (Vague 6 tranche C — #15b) ──
+    // Règle PAR-VÉTO, famille `interdire` (elle INTERDIT à A d'être posé sans B),
+    // réglable dur/mou. ORIENTÉE : A dépend de B, jamais l'inverse — UNE SEULE
+    // ligne en base (refs[0] = A, params.avec_veterinaire_id = B), PAS de miroir
+    // (contrairement au duo_interdit symétrique). Sémantique « même créneau » :
+    // B doit être dans l'équipe du MÊME slot (même date + même type). Jugée à la
+    // POSE COMPLÉTANTE (gabarit composition_equipe). Params : { avec_veterinaire_id,
+    // creneaux? }. Slot 1 place → A refusé (B ne peut y être). Intra-période.
+    // Mal configurée (partenaire absent) → INERTE des deux côtés.
+    | 'seulement_avec'
   config: Record<string, unknown>
   actif: boolean
 }

@@ -737,6 +737,8 @@ const BRIQUES_EVALUABLES = {
   cadencement_weekend: 'cadencement_weekend',
   // Exclusion de dates / XOR « pas les deux » (Vague 6 tranche B — #15a).
   exclusion_dates: 'exclusion_dates',
+  // Garde conditionnelle ORIENTÉE « seulement avec B » (Vague 6 tranche C — #15b).
+  seulement_avec: 'seulement_avec',
 } as const
 export type BriqueEvaluable = keyof typeof BRIQUES_EVALUABLES
 
@@ -1044,6 +1046,29 @@ function construireParams(
       if (dates[0] === dates[1]) return { error: 'Les deux dates doivent être différentes.' }
       return { quand: null, params: { dates: [dates[0], dates[1]] } }
     }
+    // ── Garde conditionnelle ORIENTÉE « seulement avec B » (#15b) ──
+    // A ne peut être de garde QUE si B l'est sur le même créneau. B ≠ A. Ciblage
+    // `creneaux` optionnel (mêmes règles de validation que au_plus_n). L'existence
+    // et l'activité de B + la garde anti-impasse sont vérifiées dans upsertRegle
+    // (elles nécessitent la base : effectif actif + catalogue nbPlaces).
+    case 'seulement_avec': {
+      if (!p.avec_veterinaire_id) return { error: 'Sélectionnez le binôme requis.' }
+      if (p.avec_veterinaire_id === p.owner_id) {
+        return { error: 'Le binôme requis doit être un autre vétérinaire.' }
+      }
+      const creneaux = [
+        ...new Set((p.creneaux ?? []).filter((x) => typeof x === 'string' && x.trim() !== '')),
+      ]
+      if (creneaux.length > 0) {
+        if (!codesCreneaux) return { error: 'Types de créneaux du cabinet indisponibles.' }
+        const inconnus = creneaux.filter((c) => !codesCreneaux.has(c))
+        if (inconnus.length > 0) {
+          return { error: `Type(s) de créneau inconnu(s) pour ce cabinet : ${inconnus.join(', ')}.` }
+        }
+        return { quand: null, params: { avec_veterinaire_id: p.avec_veterinaire_id, creneaux } }
+      }
+      return { quand: null, params: { avec_veterinaire_id: p.avec_veterinaire_id } }
+    }
     default:
       return { error: 'Brique non gérée par ce constructeur.' }
   }
@@ -1124,6 +1149,55 @@ async function trouverDuo(
   for (const r of data ?? []) {
     if (lireOwner(r.params_json) === owner && lirePartenaire(r.params_json) === partner) {
       return r.id as string
+    }
+  }
+  return null
+}
+
+/**
+ * verifierSeulementAvec — gardes anti-impasse de la brique « seulement avec B »
+ * (#15b), sur la vraie donnée du cabinet (frontière de confiance). Renvoie
+ * `{ error }` si la config est intenable, sinon `null`.
+ *   ② B doit être un vétérinaire ACTIF du cabinet.
+ *   ③ (règle DURE seulement) si TOUS les créneaux visés sont à 1 place → A ne
+ *      pourrait plus JAMAIS être de garde dessus → impasse certaine.
+ * `force = 'jamais'` ⇒ dure ; les autres niveaux (souples) ne bloquent pas et
+ * ne créent donc pas d'impasse (garde ③ sautée).
+ */
+async function verifierSeulementAvec(
+  supabase: SupabaseClient<any, any, any>,
+  cabinetId: string,
+  ownerId: string,
+  partenaireId: string,
+  creneauxCibles: string[],
+  force: ForceFormulaire,
+): Promise<{ error: string } | null> {
+  // ② B actif dans le cabinet ? (les vétos sont scopés par RLS au cabinet courant)
+  const { data: vetB } = await supabase
+    .from('veterinaires')
+    .select('id, prenom, actif')
+    .eq('id', partenaireId)
+    .maybeSingle()
+  const bActif = vetB as { id: string; prenom: string; actif: boolean } | null
+  if (!bActif || !bActif.actif) {
+    return { error: 'Le binôme requis doit être un vétérinaire actif du cabinet.' }
+  }
+
+  // ③ Impasse « tous les créneaux visés à 1 place » — seulement si DURE.
+  if (force !== 'jamais') return null
+
+  const modeles = await chargerCreneauModele(supabase, cabinetId)
+  const actifsPlanifiables = modeles.filter(
+    (m) => m.actif && m.code !== null && m.code !== 'ferie',
+  )
+  // Créneaux réellement concernés : le ciblage, sinon tout le catalogue.
+  const concernes = creneauxCibles.length > 0
+    ? actifsPlanifiables.filter((m) => creneauxCibles.includes(m.code as string))
+    : actifsPlanifiables
+  if (concernes.length > 0 && concernes.every((m) => m.nbPlaces <= 1)) {
+    return {
+      error:
+        'Cette règle « seulement avec » ne peut pas être ferme ici : tous les créneaux visés n\'ont qu\'une place, donc le binôme requis ne pourra jamais y être en même temps — le vétérinaire ne serait plus jamais de garde dessus. Cible des créneaux à plusieurs places, ou utilise une préférence souple « préfère être avec ».',
     }
   }
   return null
@@ -1231,13 +1305,33 @@ export async function upsertRegle(payload: UpsertReglePayload) {
     payload.brique_id === 'succession_interdite' ||
     ((payload.brique_id === 'au_plus_n' ||
       payload.brique_id === 'preferer_creneau' ||
-      payload.brique_id === 'serie_max') &&
+      payload.brique_id === 'serie_max' ||
+      payload.brique_id === 'seulement_avec') &&
       (payload.creneaux ?? []).length > 0)
   const codesCreneaux = besoinCodes
     ? await chargerCodesCreneauxValides(supabase, cabinetId)
     : undefined
   const construit = construireParams(payload, codesCreneaux)
   if ('error' in construit) return construit
+
+  // ── Garde anti-impasse « seulement avec B » (#15b — frontière de confiance) ──
+  // Une contrainte « A seulement avec B » DURE peut créer des impasses. Gardes
+  // (miroir de la conversion IA + de la garde meme_binome/R22 de RG4) :
+  //   ① B ≠ A → déjà refusé par construireParams.
+  //   ② B inexistant ou inactif → refus (message clair).
+  //   ③ Si TOUS les créneaux visés (ciblage, ou tout le catalogue) sont à
+  //      1 seule place → impasse certaine (A ne pourrait plus JAMAIS être de
+  //      garde sur ces créneaux) → refus + alternative proposée. (Souple → OK :
+  //      une préférence ne bloque pas, donc pas d'impasse.)
+  if (payload.brique_id === 'seulement_avec') {
+    const garde = await verifierSeulementAvec(
+      supabase, cabinetId, payload.owner_id,
+      (construit.params.avec_veterinaire_id as string) ?? '',
+      (construit.params.creneaux as string[]) ?? [],
+      payload.force,
+    )
+    if (garde) return garde
+  }
 
   // Anti-doublon (création seulement) : règle identique déjà présente ?
   if (!payload.id) {

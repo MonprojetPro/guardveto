@@ -65,6 +65,7 @@ const BRIQUES: { value: BriqueEvaluable; label: string; aide: string }[] = [
   { value: 'cadencement_weekend', label: 'Week-ends calés sur un cycle fixe', aide: 'Cas type : pompier volontaire de garde 1 week-end sur 3 à dates fixes. Ces week-ends lui sont interdits (ou au contraire ses gardes doivent tomber dessus).' },
   // Exclusion de dates / XOR « pas les deux » (#15a).
   { value: 'exclusion_dates', label: 'Pas les deux dates (ex. 24 XOR 31 déc)', aide: 'Le vétérinaire ne fait jamais de garde aux DEUX dates à la fois (mais peut en faire une). Cas type : Noël ou Nouvel An, pas les deux.' },
+  { value: 'seulement_avec', label: 'De garde seulement avec…', aide: 'Le vétérinaire n’est de garde QUE si un binôme précis est de garde sur le même créneau (dans un seul sens). Cas type : un jeune véto accompagné d’un senior. L’inverse n’est PAS imposé.' },
 ]
 
 /** Desiderata : préférences pures — le niveau « Interdiction ferme » est exclu. */
@@ -122,6 +123,9 @@ const FORCE_DEFAUT: Record<BriqueEvaluable, ForceFormulaire> = {
   // Exclusion « pas les deux » (#15a) : le cas métier (24 XOR 31 déc) est une
   // exigence forte mais pliable en dernier recours (ne pas casser une génération).
   exclusion_dates: 'sauf_crise',
+  // Seulement avec B (#15b) : « accompagné d'un senior » est une exigence de
+  // sécurité forte mais pliable en crise (comme au_plus_n) — évite les impasses.
+  seulement_avec: 'sauf_crise',
 }
 
 // ── Composant ────────────────────────────────────────────────
@@ -327,6 +331,12 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
       case 'preferer_avec':
         params = { avec_veterinaire_id: avecId }
         break
+      case 'seulement_avec':
+        params = {
+          avec_veterinaire_id: avecId,
+          creneaux: creneauxFiltre.length > 0 ? creneauxFiltre : undefined,
+        }
+        break
       case 'volume_gardes':
         params = { sens }
         break
@@ -384,6 +394,10 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
       if (!avecId) { toast.error('Sélectionnez le co-équipier préféré.'); return }
       if (avecId === ownerId) { toast.error('Choisissez deux vétérinaires différents.'); return }
     }
+    if (briqueId === 'seulement_avec') {
+      if (!avecId) { toast.error('Sélectionnez le binôme requis.'); return }
+      if (avecId === ownerId) { toast.error('Choisissez deux vétérinaires différents.'); return }
+    }
     if (briqueId === 'succession_interdite') {
       if (!typeAvant || !typeApres) { toast.error('Choisissez les deux créneaux.'); return }
     }
@@ -423,7 +437,7 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
         avec_veterinaire_id: avecId,
         n: Number(n),
         fenetre,
-        creneaux: (briqueId === 'au_plus_n' || briqueId === 'preferer_creneau' || briqueId === 'serie_max') && creneauxFiltre.length > 0 ? creneauxFiltre : undefined,
+        creneaux: (briqueId === 'au_plus_n' || briqueId === 'preferer_creneau' || briqueId === 'serie_max' || briqueId === 'seulement_avec') && creneauxFiltre.length > 0 ? creneauxFiltre : undefined,
         ecart_min_jours: Number(ecartMin),
         // n_semaines sert à espacement_weekend ET à cadencement_weekend (#20).
         n_semaines: briqueId === 'cadencement_weekend' ? Number(nSemainesCadence) : Number(nSemaines),
@@ -722,6 +736,50 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
               <p className="text-xs text-muted-foreground">
                 Préférence dans UN sens (créez la règle symétrique si le souhait est partagé).
               </p>
+            </div>
+          )}
+
+          {briqueId === 'seulement_avec' && (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>De garde seulement si ce binôme est de garde</Label>
+                <Select value={avecId} onValueChange={(v) => v && setAvecId(v)}>
+                  <SelectTrigger>
+                    {avecId
+                      ? (() => { const v = autresVets.find((x) => x.id === avecId); return v ? `${v.prenom} ${v.nom}` : '' })()
+                      : <span className="text-muted-foreground">Sélectionner…</span>}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {autresVets.map((v) => (
+                      <SelectItem key={v.id} value={v.id}>{v.prenom} {v.nom}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Dans UN sens : le binôme, lui, peut être de garde sans ce vétérinaire.
+                </p>
+              </div>
+              {/* Ciblage créneaux optionnel (comme au_plus_n). */}
+              <div className="space-y-1.5">
+                <Label>Uniquement sur certains créneaux (optionnel)</Label>
+                <div className="space-y-2 mt-1">
+                  {typesCreneaux.map((t) => (
+                    <label key={t.code} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={creneauxFiltre.includes(t.code)}
+                        onChange={() => toggleCreneauFiltre(t.code)}
+                        className="rounded"
+                      />
+                      <span className="text-sm">{t.nom}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Rien de coché = tous les créneaux. En interdiction ferme, cible
+                  des créneaux à plusieurs places (le binôme doit pouvoir y tenir une place).
+                </p>
+              </div>
             </div>
           )}
 

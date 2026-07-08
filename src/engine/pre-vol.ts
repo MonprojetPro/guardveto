@@ -53,6 +53,7 @@ export type CodeAvertissementPreVol =
   | 'role_interdit_intenable'   // rôle interdit à un tag que TOUS les vétos actifs portent
   | 'sequence_inerte'           // règle de rythme (série/succession/repos) mal paramétrée → sans effet
   | 'cohorte_equite_sans_porteur' // cohorte d'équité (#21) dont AUCUN véto actif ne porte le tag → inerte
+  | 'seulement_avec_partenaire_sorti' // « A seulement avec B » (#15b) dont B n'est plus dans l'effectif → A écarté
 
 /**
  * Un avertissement du pré-vol — TOUJOURS non bloquant.
@@ -296,6 +297,47 @@ function detecterDuosFantomes(
           message: `La règle « jamais ensemble » de ${vet.prenom} mentionne ${nomPartenaire}, qui ne fait plus partie de l’équipe de garde : cette règle n’a plus aucun effet.`,
         })
       }
+    }
+  }
+  return out
+}
+
+// ── (b') « seulement avec B » dont le partenaire est sorti de l'effectif (#15b) ──
+// Une règle DURE « A seulement si B est de garde sur le même créneau » devient
+// INTENABLE si B n'est plus dans l'effectif : B ne pourra JAMAIS être présent,
+// donc A ne pourra plus JAMAIS être de garde (là où la règle s'applique). C'est
+// plus grave qu'un duo fantôme (qui, lui, devient inerte) : ici A est ÉCARTÉ.
+// Souple → simple préférence, jamais bloquante → non signalé.
+
+/** Étage (0..5) d'une contrainte — 2 (dur) par défaut. */
+function etageContrainte(c: ContrainteEngine): number {
+  const f = (c.config as Record<string, unknown>).force
+  return typeof f === 'number' ? f : 2
+}
+
+function detecterPartenaireRequisSorti(
+  vets: VetEngineNormalise[],
+  input: PreVolInput,
+  actifsIds: Set<string>,
+  nomVeto: (id: string) => string,
+): AvertissementPreVol[] {
+  const out: AvertissementPreVol[] = []
+  for (const vet of vets) {
+    for (const c of vet.contraintes) {
+      if (!c.actif || c.type !== 'seulement_avec') continue
+      if (etageContrainte(c) > 2) continue // souple → jamais bloquante
+      const b = (paramsDe(c).avec_veterinaire_id ?? (c.config as Record<string, unknown>).avec_veterinaire_id)
+      if (typeof b !== 'string' || b.trim() === '') continue // inerte
+      if (b === vet.id || actifsIds.has(b)) continue // B ok
+      const fiche = input.annuaire?.find((a) => a.id === b)
+      const nomPartenaire = fiche
+        ? `${fiche.prenom} ${fiche.nom}`
+        : 'un vétérinaire qui a été retiré de l’équipe'
+      out.push({
+        code: 'seulement_avec_partenaire_sorti',
+        regles: [libelleRegle(vet.prenom, c, nomVeto)],
+        message: `La règle « ${vet.prenom} seulement de garde avec ${nomPartenaire} » est INTENABLE : ${fiche ? fiche.prenom : 'ce vétérinaire'} ne fait plus partie de l’équipe de garde, donc ${vet.prenom} ne pourrait plus jamais être de garde là où cette règle s’applique. Supprime la règle ou choisis un autre binôme depuis l’écran Règles.`,
+      })
     }
   }
   return out
@@ -626,6 +668,8 @@ export function preVolRegles(input: PreVolInput): AvertissementPreVol[] {
     // (b) règles fantômes — véto sorti
     ...detecterReglesFantomes(input, actifsIds, nomVeto),
     ...detecterDuosFantomes(vetsN, input, actifsIds, nomVeto),
+    // (b') « seulement avec B » dont le partenaire est sorti (#15b) → A écarté
+    ...detecterPartenaireRequisSorti(vetsN, input, actifsIds, nomVeto),
     // (a) contradictions arithmétiques certaines
     ...detecterVetosJamaisDisponibles(slots, dispos, vetsN, nomVeto),
     ...detecterCreneauxImpossibles(slots, dispos, vetsN, input),

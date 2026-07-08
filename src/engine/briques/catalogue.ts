@@ -509,6 +509,35 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
     },
   },
 
+  // ── Garde conditionnelle ORIENTÉE « seulement avec B » (Vague 6 tranche C — #15b) ──
+  // Par-véto, famille `interdire` (elle INTERDIT à A d'être posé sans B),
+  // réglable dur/mou. Version CONDITIONNELLE dur/mou de preferer_avec (qui, lui,
+  // est toujours SOUPLE). ORIENTÉE : A dépend de B, jamais l'inverse — UNE ligne,
+  // pas de miroir (contrairement au duo). « Même créneau » = même date + même
+  // type. Ciblage `creneaux` optionnel. Jugée à la POSE COMPLÉTANTE.
+  seulement_avec: {
+    id: 'seulement_avec',
+    famille: 'interdire',
+    operateur: 'SEULEMENT_AVEC',
+    axes: ['qui', 'quoi'],
+    schemaParams: {
+      avec_veterinaire_id: 'string (id du binôme REQUIS — A n\'est de garde que si B l\'est)',
+      creneaux: 'string[]? (ne cibler que ces types de créneau — absent = tous)',
+    },
+    widget: 'WidgetSeulementAvec',
+    rendreLangageNaturel: (params, ctx) => {
+      const id = typeof params.avec_veterinaire_id === 'string' ? params.avec_veterinaire_id : null
+      const creneaux = Array.isArray(params.creneaux)
+        ? (params.creneaux as unknown[]).filter((x): x is string => typeof x === 'string')
+        : []
+      const suffixe = creneaux.length > 0
+        ? ` (sur : ${creneaux.map(creneauLisible).join(', ')})`
+        : ''
+      if (!id) return 'ne veut être de garde que si un autre vétérinaire est de garde (non précisé)'
+      return `ne veut être de garde que si ${ctx?.nomVeto?.(id) ?? id} est de garde sur le même créneau${suffixe}`
+    },
+  },
+
   volume_gardes: {
     id: 'volume_gardes',
     famille: 'equilibrer',

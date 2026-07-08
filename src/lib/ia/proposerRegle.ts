@@ -29,7 +29,7 @@ export interface TypeCreneauIA {
 }
 
 /** Décrit les briques disponibles pour guider l'IA (jours = lundi→vendredi). */
-const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 18 types de règle :
+const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 19 types de règle :
 
 1. interdire_creneau — un vétérinaire ne fait pas de garde un jour fixe de la semaine.
    params: jour (lundi|mardi|mercredi|jeudi|vendredi), exception_vacances_scolaires (true/false).
@@ -65,8 +65,9 @@ Les types 10 à 12 sont des DESIDERATA : des préférences POSITIVES d'un vété
    params: jours (liste parmi lundi..dimanche, optionnel), creneaux (codes du cabinet, optionnel) — au moins l'un des deux.
    Ex. « Manon préfère être de garde le mardi » → preferer_creneau, jours=["mardi"].
    Ex. « Victor préfère les week-ends » → preferer_creneau, creneaux=["weekend"].
-11. preferer_avec — un vétérinaire PRÉFÈRE être de garde avec un co-équipier donné (dans UN sens).
+11. preferer_avec — un vétérinaire PRÉFÈRE (souhait SOUPLE) être de garde avec un co-équipier donné (dans UN sens).
    params: veterinaire = qui préfère, partenaire = le co-équipier préféré (deux prénoms différents).
+   ⚠️ NE PAS confondre avec le type 19 (seulement_avec) : ici c'est une simple PRÉFÉRENCE (« je préfère être avec Victor »). Si la demande est CONDITIONNELLE et ferme (« je ne veux être de garde QUE si Victor est de garde », « seulement si », « jamais sans ») → type 19.
 12. volume_gardes — un vétérinaire souhaite faire PLUS ou MOINS de gardes que la moyenne.
    params: sens ('plus' | 'moins').
    Ex. « Antoine veut faire plus de gardes » → volume_gardes, sens="plus".
@@ -103,6 +104,13 @@ Les types 13 à 15 sont des règles de RYTHME (successions et repos entre gardes
    params: dimension_equite (weekend = nombre de week-ends | weekend_premier = rôle de 1er le week-end | ferie = jours fériés | semaine_premier = soirs de semaine en 1er | semaine_second = soirs de semaine en 2nd | grands_weekend = grands week-ends des salariés), tag (une étiquette de la liste fournie), importance_equite (peu_important | normal | important | essentiel).
    Ex. « répartis équitablement les week-ends entre les juniors » → equilibrer, dimension_equite="weekend", tag="junior", importance_equite="important".
    Même règle que les types 8/9 pour une étiquette inconnue (faisable=false, invite à poser l'étiquette d'abord). Ce type n'a PAS de "force" (le cran d'importance suffit).
+
+19. seulement_avec — garde conditionnelle ORIENTÉE : un vétérinaire (A) n'est de garde QUE si un binôme précis (B) est de garde SUR LE MÊME CRÉNEAU (même date + même type). Règle par véto, dans UN SEUL sens : A dépend de B, JAMAIS l'inverse (B peut être de garde sans A).
+   params: veterinaire = A (celui qui a la condition), partenaire = B (le binôme REQUIS), creneaux (optionnel : liste de CODES de créneaux du cabinet à cibler ; null = tous).
+   ⚠️ DÉSAMBIGUÏSATION avec le type 11 (preferer_avec) : « je PRÉFÈRE être avec Victor » = souhait souple = type 11. « je ne veux être de garde QUE si Victor est de garde » / « seulement si » / « jamais sans lui » / « uniquement accompagné de Victor » = condition ferme = type 19.
+   Ex. « le jeune Antoine ne prend une garde que si Victor est de garde avec lui » → seulement_avec, veterinaire="Antoine", partenaire="Victor".
+   Ex. « Manon n'est de garde le week-end que si Victor est de garde » → seulement_avec, veterinaire="Manon", partenaire="Victor", creneaux=["weekend"].
+   ⚠️ Un créneau à UNE seule place ne peut pas accueillir A ET B → cible plutôt les créneaux à plusieurs places (week-end, soirs en hiver). Force par défaut conseillée : jamais (exigence de sécurité — accompagnement obligatoire).
 
 Niveau d'importance (force) :
 - jamais = interdiction ferme

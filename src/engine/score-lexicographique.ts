@@ -36,6 +36,7 @@ import {
   compositionCibleType, violeCompositionEquipe, violeRoleInterdit,
 } from './rules/composition-equipe'
 import { scorerDesiderata } from './rules/desiderata'
+import { scorerSeulementAvec } from './rules/seulement-avec'
 import { apparierSourcePourCible } from './relations-structure'
 import { vetPourRole, vetsAttribues, avecVet, attributionVide } from './attribution'
 import { penaliteFeteHistorique, PENALITE_FETE_HISTORIQUE } from './historique-fete'
@@ -380,6 +381,15 @@ export function scorerPlanning(
   // Aucun desiderata → tableau vide → byte-identique.
   for (const contrib of scorerDesiderata(planning, vets)) {
     ajouter(v, contrib.etage, contrib.regle, contrib.cout)
+  }
+
+  // ── seulement_avec SOUPLE (Vague 6 tranche C — #15b) ──
+  // « A seulement avec B » à l'étage configuré : une pénalité par créneau où A
+  // est présent sans B. MÊME jugement que le gardien de candidat (le LNS ne
+  // défait pas ce que le greedy construit). Dur → bloqué dans isValid (étage 0).
+  // Aucune règle souple → boucle vide → byte-identique.
+  for (const contrib of scorerSeulementAvec(planning, vets)) {
+    ajouter(v, contrib.etage, 'seulement-avec-souple', contrib.cout)
   }
 
   // ── Étage 6 : ÉQUITÉ (variance des charges) ──

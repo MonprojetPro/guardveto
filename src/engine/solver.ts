@@ -49,6 +49,7 @@ import {
 } from './structure-config'
 import { penaliteCompositionCandidat, penaliteRoleInterditCandidat } from './rules/composition-equipe'
 import { penaliteDesiderataCandidat, biaisVolumeCandidat } from './rules/desiderata'
+import { penaliteSeulementAvecCandidat } from './rules/seulement-avec'
 import type { HistoriqueFetesResolu } from './historique-fete'
 import type { DiagnosticImpasse } from './diagnostic'
 import { construireDiagnostic, type CreneauStep, type ReSimuler } from './diagnostic'
@@ -448,6 +449,11 @@ function scorerCandidat(
     step.type, step.role, vet, rolesInterdits,
   ) + penaliteDesiderataCandidat(
     // Desiderata (n°7) : préférences positives du véto (jours/créneaux, avec X).
+    { date: step.date, type: step.type, saison: step.saison, nbPlaces: step.nbPlaces },
+    step.role, vet, planning,
+  ) + penaliteSeulementAvecCandidat(
+    // seulement_avec SOUPLE (#15b) : « A seulement avec B » à la pose complétante,
+    // à l'étage configuré (le scoreur global reste cohérent). Dur → géré par isValid.
     { date: step.date, type: step.type, saison: step.saison, nbPlaces: step.nbPlaces },
     step.role, vet, planning,
   ) + biaisVolumeCandidat(vet) // « veut plus/moins de gardes » (terme signé du tri)
@@ -882,6 +888,10 @@ export function scorerCandidatLNS(
     step.type, step.role, vet, rolesInterdits,
   ) + penaliteDesiderataCandidat(
     // Desiderata (n°7) — cohérente avec scorerCandidat.
+    { date: step.date, type: step.type, saison: step.saison, nbPlaces: step.nbPlaces },
+    step.role, vet, planning,
+  ) + penaliteSeulementAvecCandidat(
+    // seulement_avec SOUPLE (#15b) — cohérente avec scorerCandidat.
     { date: step.date, type: step.type, saison: step.saison, nbPlaces: step.nbPlaces },
     step.role, vet, planning,
   ) + biaisVolumeCandidat(vet)

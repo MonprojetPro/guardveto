@@ -41,6 +41,8 @@ export const BRIQUES_IA = [
   'cadencement_weekend',
   // Exclusion « pas les deux » (Vague 6 tranche B — #15a) — par véto (XOR fêtes/dates).
   'exclusion_dates',
+  // Garde conditionnelle ORIENTÉE « seulement avec B » (Vague 6 tranche C — #15b) — par véto.
+  'seulement_avec',
   // Équité par COHORTE de tag (Vague 6 tranche A — #21) — règle GLOBALE.
   'equilibrer',
 ] as const
@@ -219,7 +221,9 @@ export function propositionVersPayload(
   const forceParDefaut: ForceFormulaire =
     p.brique_id === 'espacement_weekend' || DESIDERATA.has(p.brique_id)
       ? 'si_possible'
-      : p.brique_id === 'cadencement_weekend' && p.sens_cadence === 'interdit'
+      : (p.brique_id === 'cadencement_weekend' && p.sens_cadence === 'interdit') ||
+        // « seulement si un senior est de garde » = exigence de sécurité ferme.
+        p.brique_id === 'seulement_avec'
         ? 'jamais'
         : 'sauf_crise'
 
@@ -413,6 +417,23 @@ export function propositionVersPayload(
         return { ok: false, raison: 'Les deux dates doivent être différentes.' }
       }
       payload.dates = [dates[0], dates[1]]
+      break
+    }
+    // ── Garde conditionnelle ORIENTÉE « seulement avec B » (#15b) ──
+    case 'seulement_avec': {
+      const part = resoudrePrenom(p.partenaire, vets)
+      if (!part.ok) {
+        return { ok: false, raison: raisonPrenom(p.partenaire, part.cause, true) }
+      }
+      if (part.id === owner.id) {
+        return { ok: false, raison: 'Le binôme requis doit être un autre vétérinaire.' }
+      }
+      payload.avec_veterinaire_id = part.id
+      // Ciblage créneaux optionnel (codes du cabinet ; validés côté serveur).
+      const creneaux = (p.creneaux ?? []).filter(
+        (x): x is string => typeof x === 'string' && x.trim() !== '',
+      )
+      if (creneaux.length > 0) payload.creneaux = [...new Set(creneaux)]
       break
     }
   }
@@ -631,6 +652,10 @@ export function apercuProposition(p: PropositionRegle): string {
       params = (p.fetes ?? []).length > 0
         ? { fetes: p.fetes }
         : { dates: p.dates ?? undefined }
+      break
+    case 'seulement_avec':
+      // Le partenaire est un prénom : nomVeto le renvoie tel quel.
+      params = { avec_veterinaire_id: p.partenaire, creneaux: p.creneaux ?? undefined }
       break
     case 'equilibrer':
       params = { dimension: p.dimension_equite, importance: p.importance_equite, tag: p.tag }

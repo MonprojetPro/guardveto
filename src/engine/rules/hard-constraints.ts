@@ -21,6 +21,7 @@ import {
   violeCompositionPose, messageComposition,
   violeRoleInterdit, messageRoleInterdit,
 } from './composition-equipe'
+import { raisonSeulementAvecDur } from './seulement-avec'
 import { estAttribue, vetPourRole, roleDuVet } from '../attribution'
 import { fetesCouvertesParSlot, cleInstanceFete } from '../historique-fete'
 
@@ -1183,6 +1184,26 @@ function checkExclusionDates(vet: VetEngine, slot: SlotGarde, planning: Planning
   return ok()
 }
 
+// ── seulement_avec — garde conditionnelle ORIENTÉE (Vague 6 tranche C — #15b) ──
+// « A seulement si B est de garde sur le MÊME créneau ». Jugée à la POSE
+// COMPLÉTANTE (gabarit composition_equipe) : à la pose qui complète l'équipe
+// d'un slot ciblé, si A est présent sans B → refus. Slot 1 place → A refusé
+// (B ne peut pas y être). ORIENTÉE : le prédicat ne se déclenche que quand on
+// pose A (le porteur) ; B reste libre d'être de garde sans A. Souple → pénalité.
+
+function checkSeulementAvec(
+  vet: VetEngine,
+  slot: SlotGarde,
+  roleVisé: RoleGarde,
+  planning: PlanningPartiel,
+  allVets: VetEngine[],
+): ValidationResult {
+  // Pas de Map pré-construite : isValid est le chemin le plus chaud du moteur
+  // (LNS) — le prénom de B n'est résolu (find O(n)) qu'en cas de refus.
+  const raison = raisonSeulementAvecDur(vet, slot, roleVisé, planning, allVets)
+  return raison ? invalid(raison) : ok()
+}
+
 export function penaliteContraintesConfig(
   slot: SlotGarde,
   vet: VetEngine,
@@ -1299,6 +1320,9 @@ export function isValid(
     // XOR « pas les deux » (#15a) : INTRA-PÉRIODE → planning courant (JAMAIS le
     // lookback : le XOR ne se juge que sur la période en cours, par principe).
     checkExclusionDates(vet, slot, planning),
+    // seulement_avec (#15b) : garde conditionnelle ORIENTÉE, jugée à la POSE
+    // COMPLÉTANTE (nbPlaces threadé par le step) — dur seulement. Intra-période.
+    checkSeulementAvec(vet, slot, roleVisé, planning, allVets),
     // R8 : ne s'applique que si slot.type est la CIBLE d'une relation
     // inversion_role (le check filtre lui-même — générique, plus de « WE only »).
     checkR8Inversion(vet, slot, roleVisé, planning, structure.r8_inversion, relations),
@@ -1341,6 +1365,7 @@ export {
   checkSerieMax,
   checkReposApresSerie,
   checkExclusionDates,
+  checkSeulementAvec,
   checkComposition,
   checkRoleInterditTag,
 }

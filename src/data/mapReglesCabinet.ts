@@ -102,6 +102,8 @@ const TYPES_V1: ReadonlySet<TypeContrainte> = new Set<TypeContrainte>([
   'cadencement_weekend',
   // Exclusion de dates / XOR « pas les deux » (Vague 6 tranche B — #15a).
   'exclusion_dates',
+  // Garde conditionnelle ORIENTÉE « seulement avec B » (Vague 6 tranche C — #15b).
+  'seulement_avec',
 ])
 
 /**
@@ -125,6 +127,7 @@ const BRIQUE_VERS_TYPE: Record<string, TypeContrainte> = {
   repos_apres_serie: 'repos_apres_serie',
   cadencement_weekend: 'cadencement_weekend',
   exclusion_dates: 'exclusion_dates',
+  seulement_avec: 'seulement_avec',
 }
 
 export interface RegleRejetee {

@@ -1156,6 +1156,45 @@ export function validerPlanning(
     }
   }
 
+  // ── seulement_avec — garde conditionnelle ORIENTÉE (Vague 6 tranche C — #15b) ──
+  // Re-vérification INDÉPENDANTE (jamais d'import de rules/) : un véto A porteur
+  // d'une règle `seulement_avec` DURE (étage ≤ 2) ne doit JAMAIS figurer sur un
+  // créneau (dans le ciblage) sans son partenaire requis B dans la MÊME équipe.
+  // ORIENTÉE : on ne juge QUE les créneaux où A est présent — B reste libre
+  // d'être de garde sans A. Souple (étage ≥ 3) → jamais une violation.
+  // Config inerte (partenaire absent) → aucune violation (jamais de fantôme).
+  {
+    for (const vet of vetsNorm) {
+      for (const c of vet.contraintes) {
+        if (!c.actif || c.type !== 'seulement_avec') continue
+        const cfg = c.config as Record<string, unknown>
+        const etage = typeof cfg.force === 'number' ? (cfg.force as number) : 2
+        if (etage > 2) continue // souple → pas une violation dure
+        const b = cfg.avec_veterinaire_id
+        if (typeof b !== 'string' || b.trim() === '') continue // inerte
+        // Ciblage créneaux (absent/vide = tous).
+        const ciblage = Array.isArray(cfg.creneaux)
+          ? (cfg.creneaux as unknown[]).filter((x): x is string => typeof x === 'string' && x.trim() !== '')
+          : []
+        for (const a of planning.attributions) {
+          if (ciblage.length > 0 && !ciblage.includes(a.type)) continue
+          const equipe = membres(a)
+          if (!equipe.includes(vet.id)) continue // A pas sur ce créneau
+          if (!equipe.includes(b)) {
+            const nomB = vetsById.get(b)?.prenom ?? '?'
+            violations.push({
+              regle: 'SEULEMENT_AVEC',
+              date: a.date,
+              type: a.type,
+              vetId: vet.id,
+              detail: `SEULEMENT_AVEC : ${vet.prenom} est de garde le ${a.date} (${a.type}) sans ${nomB}, alors qu'il ne peut être de garde QUE si ${nomB} l'est sur le même créneau`,
+            })
+          }
+        }
+      }
+    }
+  }
+
   // ── R9 — créneaux liés = même équipe · R8 — rôles changés entre eux ──
   // GÉNÉRIQUE (RG tranche 3) : le couple vendredi↔WE n'est plus câblé — les
   // couples viennent de la DONNÉE (structureConfig.relations ; undefined →

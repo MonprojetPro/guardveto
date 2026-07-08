@@ -129,4 +129,27 @@ describe('P1A-007 — contrat formulaire → moteur', () => {
     const formeDates = exclusions.find((c) => (c.config.params as Record<string, unknown>).dates)
     expect((formeDates?.config.params as Record<string, unknown>).dates).toEqual(['2026-07-14', '2026-08-15'])
   })
+
+  it('seulement_avec (garde conditionnelle orientée) est mappée sans rejet — UNE ligne, pas de miroir', () => {
+    const rows: RegleCabinetRow[] = [
+      // A (OWNER) « seulement avec » B (PARTNER) — une SEULE ligne (refs=[A], B en params).
+      enveloppe('r9', 'seulement_avec', 'jamais', OWNER, null,
+        { avec_veterinaire_id: PARTNER, creneaux: ['weekend'] }, 'seulement_avec'),
+    ]
+
+    const { contraintesParVet, rejets } = mapperReglesCabinet(rows, BRIQUES_CONNUES)
+
+    expect(rejets).toEqual([])
+
+    // La règle appartient à A (le porteur), PAS à B (pas de miroir contrairement au duo).
+    const duA = contraintesParVet.get(OWNER) ?? []
+    const sa = duA.filter((c) => c.type === 'seulement_avec')
+    expect(sa).toHaveLength(1)
+    expect((sa[0].config.params as Record<string, unknown>).avec_veterinaire_id).toBe(PARTNER)
+    expect((sa[0].config.params as Record<string, unknown>).creneaux).toEqual(['weekend'])
+
+    // B n'a AUCUNE règle (orientation : pas de ligne miroir).
+    const duB = contraintesParVet.get(PARTNER) ?? []
+    expect(duB.some((c) => c.type === 'seulement_avec')).toBe(false)
+  })
 })
