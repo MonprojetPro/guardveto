@@ -71,9 +71,12 @@
 
 ## 🟠 MOYENNE probabilité
 
-13. **Successions/repos avancés** — les 4 patterns standard du nurse rostering :
-    successions interdites entre types (nuit→matin), repos minimum consécutif,
-    série bornée (« stretch » max N jours d'affilée), repos imposé après N nuits.
+13. ✅ **FAIT (2026-07-08, Vague 5)** — Successions/repos avancés : 3 briques
+    famille `sequence` de bout en bout — `succession_interdite` (pas de garde B
+    le lendemain d'une garde A), `serie_max` (stretch borné, WE = 2 jours),
+    `repos_apres_serie` (M jours de repos après N jours d'affilée). « Repos
+    minimum consécutif » non dupliqué : équivalent `espacement_min` (écart N+1),
+    documenté côté IA.
 14. **Équité inter-annuelle des fêtes** — `historique_fete` (qui a fait Noël
     l'an dernier ?) promis par le doc métier §7, rien ne le porte.
 15. **XOR et relations orientées** — « 24 déc XOR 31 déc », « moi seulement si
@@ -81,17 +84,23 @@
 16. **Pénalités R10/R10b/R10c/R8b réglables** — 4 règles souples encore en dur
     (poids 50/30/45/20) : application directe du principe fondateur « aucune
     règle en dur » ; le mécanisme (étage + pénalité) existe déjà.
-17. **Lookback inter-périodes (~10 jours)** — R10/espacements aveugles à la
-    jonction de deux périodes (dernier WE de la période N + premier de N+1).
-    Champ `contexteAnterieur` spécifié dans l'archi, jamais posé.
+17. ✅ **FAIT (2026-07-08, Vague 5)** — Lookback inter-périodes :
+    `contexteAnterieur` (~10 j de gardes figées) posé sur SolverInput +
+    ValidationInput, chargé best-effort par le loader, consommé par les seules
+    règles de rythme (R10, R3, espacement_min, espacement_weekend, au_plus_n)
+    dans les deux gardiens ; équité/couverture insensibles, byte-identique
+    sans donnée.
 18. **Multi-propriétaires d'une règle** — `qui.refs[1..n]` tronqués en silence
     (`mapReglesCabinet.ts:253`) : une règle « pour Manon ET Antoine » ne
     s'applique qu'à Manon. Au minimum valider `refs.length === 1` à l'écriture.
 19. **`au_plus_n` avec filtre créneaux exposé** — le moteur sait faire « max
     2 week-ends par mois » mais ni le formulaire ni l'IA ne permettent de le
     poser (axe `creneaux` non exposé).
-20. **Cadencement fixe « 1 sur N » ancré** — (pompier volontaire 1 WE/3) :
-    `espacement_weekend` est un espacement, pas un cadencement.
+20. ✅ **FAIT (2026-07-08, Vague 5)** — Cadencement fixe « 1 sur N » ancré :
+    brique `cadencement_weekend` (n_semaines + ancre samedi + sens
+    interdit/impose), cycle calendaire strict sans recalage vacances, phase
+    stable inter-périodes par construction ; pré-vol intègre la capacité WE
+    réduite du sens `interdit`.
 21. **Groupes/cohortes d'équité paramétrables** — l'équité `grands_weekend`
     est le seul groupe, codé « salariés » ; généraliser (filières canine ‖
     rurale ‖ équine, associés vs salariés…).

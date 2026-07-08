@@ -172,3 +172,16 @@ Le message disait « plafond trop élevé (maximum 14) ». MiKL : *le 14 est arb
 5. **Le « qui » d'une règle peut être une ÉTIQUETTE, pas un véto** : `veterinaires.tags` (text[] libre) prépare aussi les cohortes d'équité (#21) sans re-migration. Anti-coquille-vide : l'écriture refuse un tag que personne ne porte, le pré-vol re-signale (tag sans porteur, rôle intenable si TOUS portent le tag).
 
 **Piège évité :** le scoreur global ne comptait PAS les règles par-véto souples (dette double-scoring préexistante) — les nouvelles briques (composition, rôle, desiderata) sont scorées EXPLICITEMENT dans `scorerPlanning` avec les mêmes prédicats que le tri candidat, sinon le LNS défait ce que le greedy construit.
+
+---
+
+## 2026-07-08 — Vague 5 : les rythmes (lookback inter-périodes + séquences + cadencement ancré)
+
+**Contexte :** backlog #17 (règles de rythme aveugles à la jonction de deux périodes), #13 (successions/repos du nurse rostering) et #20 (cadencement « 1 WE sur N ancré », cas pompier volontaire) — 3 tranches livrées le même jour (`9543cf9`, `8f13908`, `4ea3460`).
+
+**Ce qui a réellement fonctionné :**
+1. **Une donnée de contexte hors-période s''injecte en VUE ÉTENDUE explicite, jamais fusionnée dans `planning.attributions`.** Le lookback (~10 j de gardes figées de la période précédente) est concaténé par un helper pur (`attributionsAvecContexte`) consommé par les SEULS prédicats de rythme (R10, R3, espacement_min, espacement_weekend, au_plus_n). Fusionner dans le planning aurait contaminé la couverture (`slotsAttendus`), l''équité (`compterParVet`) et la persistance — trois familles de bugs silencieux évitées d''un coup. Le validateur indépendant construit SA propre vue (`planningRythme`), sans importer le helper moteur (deux gardiens).
+2. **Avant de créer une brique, chercher l''ÉQUIVALENCE sémantique dans le catalogue.** « Repos minimum consécutif de N jours » ≡ `espacement_min` d''écart N+1 : le pattern manquant du nurse rostering se règle dans le PROMPT IA (« si un véto dit ‹ au moins 2 jours de repos ›, propose espacement_min »), pas par une 4e brique doublon qui aurait divergé de la première à la prochaine évolution.
+3. **Une règle « après exactement N » est INVULNÉRABLE.** Premier jet de `repos_apres_serie` : « une série d''exactement N jours impose M jours de repos » — or toute pose adjacente ALLONGE la série au-delà de N, donc plus aucune série n''est « exactement N » et la règle ne se déclenche jamais. Les seuils de séquence se formulent en « ≥ N ». Test d''invulnérabilité à ajouter d''office sur toute règle à fenêtre déclenchante.
+4. **Un cadencement ancré sur date absolue est inter-périodes PAR CONSTRUCTION.** `cadencement_weekend` juge le slot contre son ancre (modulo signé N×7 depuis le samedi de l''ancre), pas contre les autres gardes : pas besoin du lookback, phase stable à travers les jonctions, et STRICTEMENT calendaire (aucun recalage vacances — un engagement pompier ne se décale pas, contrairement à l''indispo cyclique scolaire).
+5. **L''ordre de pose non chronologique du solver (WE d''abord, soirs ensuite) impose des prédicats SYMÉTRIQUES** : chaque règle de séquence juge le candidat contre les gardes déjà posées AVANT et APRÈS lui dans le temps (gabarit espacement_min). Un prédicat « seulement vers le passé » raterait la moitié des violations.
