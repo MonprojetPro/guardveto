@@ -33,6 +33,10 @@ export const BRIQUES_IA = [
   'preferer_creneau',
   'preferer_avec',
   'volume_gardes',
+  // Successions / séries / repos avancés (#13) — règles de rythme par véto.
+  'succession_interdite',
+  'serie_max',
+  'repos_apres_serie',
 ] as const
 
 export const FORCES_IA = ['jamais', 'sauf_crise', 'evitee', 'si_possible'] as const
@@ -84,6 +88,13 @@ export const PropositionRegleSchema = z.object({
   jours: z.array(z.enum(['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'])).nullable(),
   /** volume_gardes : souhaite plus ou moins de gardes que la moyenne. */
   sens: z.enum(['plus', 'moins']).nullable(),
+  /** succession_interdite (#13) : codes de créneaux « veille » et « lendemain interdit ». */
+  type_avant: z.string().nullable(),
+  type_apres: z.string().nullable(),
+  /** serie_max / repos_apres_serie (#13) : longueur de série en jours. */
+  n_jours: z.number().int().nullable(),
+  /** repos_apres_serie (#13) : jours de repos imposés après la série. */
+  repos_jours: z.number().int().nullable(),
 })
 
 export type PropositionRegle = z.infer<typeof PropositionRegleSchema>
@@ -136,6 +147,9 @@ const N_MAX = 14
 const ECART_MAX = 30
 /** Fréquence WE « 1 sur N » : borne haute alignée sur le serveur (N_SEM_WE_MAX). */
 const N_SEM_WE_MAX = 26
+/** Séries / repos avancés (#13) : bornes hautes alignées sur le serveur. */
+const SERIE_MAX_JOURS = 31
+const REPOS_APRES_MAX = 30
 
 export type ConversionResultat =
   | { ok: true; payload: UpsertReglePayload }
@@ -281,6 +295,44 @@ export function propositionVersPayload(
         return { ok: false, raison: 'Précise le souhait : plus ou moins de gardes.' }
       }
       payload.sens = p.sens
+      break
+    }
+    // ── Successions / séries / repos avancés (#13) ──
+    case 'succession_interdite': {
+      const avant = (p.type_avant ?? '').trim()
+      const apres = (p.type_apres ?? '').trim()
+      if (avant === '' || apres === '') {
+        return { ok: false, raison: 'Précise le créneau de la veille et le créneau interdit le lendemain.' }
+      }
+      // La validité des CODES est re-vérifiée côté serveur (construireParams) —
+      // frontière de confiance inchangée.
+      payload.type_avant = avant
+      payload.type_apres = apres
+      break
+    }
+    case 'serie_max': {
+      const n = p.n_jours
+      if (typeof n !== 'number' || !Number.isInteger(n) || n < 1 || n > SERIE_MAX_JOURS) {
+        return { ok: false, raison: `Indique un nombre de jours d'affilée valide (entre 1 et ${SERIE_MAX_JOURS}).` }
+      }
+      payload.n_jours = n
+      const creneaux = (p.creneaux ?? []).filter(
+        (x): x is string => typeof x === 'string' && x.trim() !== '',
+      )
+      if (creneaux.length > 0) payload.creneaux = [...new Set(creneaux)]
+      break
+    }
+    case 'repos_apres_serie': {
+      const n = p.n_jours
+      const repos = p.repos_jours
+      if (typeof n !== 'number' || !Number.isInteger(n) || n < 1 || n > SERIE_MAX_JOURS) {
+        return { ok: false, raison: `Indique une longueur de série valide (entre 1 et ${SERIE_MAX_JOURS} jours).` }
+      }
+      if (typeof repos !== 'number' || !Number.isInteger(repos) || repos < 1 || repos > REPOS_APRES_MAX) {
+        return { ok: false, raison: `Indique un nombre de jours de repos valide (entre 1 et ${REPOS_APRES_MAX}).` }
+      }
+      payload.n_jours = n
+      payload.repos_jours = repos
       break
     }
   }
@@ -430,6 +482,15 @@ export function apercuProposition(p: PropositionRegle): string {
       break
     case 'volume_gardes':
       params = { sens: p.sens }
+      break
+    case 'succession_interdite':
+      params = { type_avant: p.type_avant, type_apres: p.type_apres }
+      break
+    case 'serie_max':
+      params = { n_jours: p.n_jours, creneaux: p.creneaux ?? undefined }
+      break
+    case 'repos_apres_serie':
+      params = { n_jours: p.n_jours, repos_jours: p.repos_jours }
       break
   }
   const predicat = rendreRegle(p.brique_id, params, { nomVeto: (x) => x })

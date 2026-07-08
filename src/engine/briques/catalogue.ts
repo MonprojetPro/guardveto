@@ -489,6 +489,69 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
     },
   },
 
+  // ── Successions / séries / repos avancés (Vague 5 tranche B — #13) ──
+  // Trois briques par-véto, famille `sequence` (patterns standard du nurse
+  // rostering). Réglables dur/mou ; jamais bloquantes si mal configurées (inertes).
+
+  succession_interdite: {
+    id: 'succession_interdite',
+    famille: 'sequence',
+    operateur: 'SUCCESSION_INTERDITE',
+    axes: ['qui', 'quoi'],
+    schemaParams: {
+      type_avant: 'string (code du créneau « veille » — ex. weekend)',
+      type_apres: 'string (code du créneau interdit le lendemain — ex. semaine_soir)',
+    },
+    widget: 'WidgetSuccessionInterdite',
+    rendreLangageNaturel: (params) => {
+      const avant = creneauLisible(params.type_avant)
+      const apres = creneauLisible(params.type_apres)
+      if (typeof params.type_avant === 'string' && typeof params.type_apres === 'string') {
+        return `ne fait jamais ${apres} le lendemain d'une garde ${avant}`
+      }
+      return 'succession de créneaux interdite (paramètres non précisés)'
+    },
+  },
+
+  serie_max: {
+    id: 'serie_max',
+    famille: 'sequence',
+    operateur: 'SERIE_MAX',
+    axes: ['qui', 'combien'],
+    schemaParams: {
+      n_jours: 'integer (nombre max de jours de garde d\'affilée)',
+      creneaux: 'string[]? (ne compter que ces types — absent = tous)',
+    },
+    widget: 'WidgetSerieMax',
+    rendreLangageNaturel: (params) => {
+      const n = params.n_jours ?? '?'
+      const creneaux = Array.isArray(params.creneaux)
+        ? (params.creneaux as unknown[]).filter((x): x is string => typeof x === 'string')
+        : []
+      const suffixe = creneaux.length > 0
+        ? ` (en ne comptant que : ${creneaux.map(creneauLisible).join(', ')})`
+        : ''
+      return `jamais plus de ${n} jour(s) de garde d'affilée${suffixe}`
+    },
+  },
+
+  repos_apres_serie: {
+    id: 'repos_apres_serie',
+    famille: 'sequence',
+    operateur: 'REPOS_APRES_SERIE',
+    axes: ['qui', 'combien'],
+    schemaParams: {
+      n_jours: 'integer (longueur de série déclenchant le repos)',
+      repos_jours: 'integer (jours sans garde imposés après la série)',
+    },
+    widget: 'WidgetReposApresSerie',
+    rendreLangageNaturel: (params) => {
+      const n = params.n_jours ?? '?'
+      const repos = params.repos_jours ?? '?'
+      return `après ${n} jour(s) de garde d'affilée, au moins ${repos} jour(s) de repos`
+    },
+  },
+
   // ⚠️ INTERNE — « motif composite pré-calculé » (archi V2 §catalogue blindé).
   // Le métier « grand week-end » (repos vendredi si pas de garde WE, jeudi sinon)
   // est DÉJÀ livré par la brique `repos_conditionnel`. Le moteur calcule ce motif

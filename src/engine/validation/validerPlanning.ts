@@ -866,6 +866,126 @@ export function validerPlanning(
     }
   }
 
+  // ── SUCCESSION / SÉRIE / REPOS avancés (Vague 5 tranche B — #13) ──
+  // Re-vérification INDÉPENDANTE (jamais d'import de rules/) des trois briques de
+  // rythme `sequence`. On raisonne en JOURS CIVILS COUVERTS : le week-end (daté du
+  // samedi) couvre samedi + dimanche → son « lendemain » est le lundi. Helpers
+  // ré-implémentés ici (miroir triviaux, comme jIndex/plusJours). #17 : on inclut
+  // les gardes du LOOKBACK (planningRythme) → une série/succession à cheval sur la
+  // jonction de périodes est détectée. Seules les règles DURES (étage ≤ 2) sont
+  // des violations (souple = préférence, silencieux).
+  const joursCouverts = (date: string, type: string): string[] =>
+    type === 'weekend' ? [date, plusJours(date, 1)] : [date]
+
+  // Jours de garde (dépliés) d'un véto sur le planning ÉTENDU (rythme), filtrés
+  // par types si `creneaux` fourni.
+  const joursGardeVet = (vetId: string, creneaux?: string[]): Set<string> => {
+    const jours = new Set<string>()
+    for (const a of planningRythme.attributions) {
+      if (!surCreneau(a, vetId)) continue
+      if (creneaux && !creneaux.includes(a.type)) continue
+      for (const j of joursCouverts(a.date, a.type)) jours.add(j)
+    }
+    return jours
+  }
+
+  for (const vet of vetsNorm) {
+    for (const c of vet.contraintes) {
+      if (!c.actif) continue
+      const cfg = c.config as Record<string, unknown>
+      const etage = typeof cfg.force === 'number' ? (cfg.force as number) : 2
+      if (etage > 2) continue // souple → pas une violation dure
+
+      // ── succession_interdite — B jamais le lendemain de A ──
+      if (c.type === 'succession_interdite') {
+        const typeAvant = cfg.type_avant
+        const typeApres = cfg.type_apres
+        if (typeof typeAvant !== 'string' || typeof typeApres !== 'string') continue
+        if (typeAvant === '' || typeApres === '') continue
+        // Toutes les gardes « avant » (type A) du véto : le lendemain de leur FIN
+        // ne doit pas porter une garde « après » (type B).
+        for (const a of planningRythme.attributions) {
+          if (a.type !== typeAvant || !surCreneau(a, vet.id)) continue
+          const joursA = joursCouverts(a.date, a.type)
+          const lendemain = plusJours(joursA[joursA.length - 1], 1)
+          for (const b of planningRythme.attributions) {
+            if (b.type !== typeApres || !surCreneau(b, vet.id)) continue
+            if (joursCouverts(b.date, b.type)[0] === lendemain) {
+              violations.push({
+                regle: 'SUCCESSION',
+                date: b.date,
+                type: b.type,
+                vetId: vet.id,
+                detail: `SUCCESSION : ${vet.prenom} fait « ${typeApres} » le ${b.date}, lendemain de « ${typeAvant} » (${a.date}) — interdit`,
+              })
+            }
+          }
+        }
+      }
+
+      // ── serie_max — jamais plus de N jours d'affilée ──
+      if (c.type === 'serie_max') {
+        const nRaw = cfg.n_jours
+        const n = typeof nRaw === 'number' ? nRaw : typeof nRaw === 'string' ? parseInt(nRaw, 10) : NaN
+        if (!Number.isFinite(n) || n <= 0) continue
+        const creneaux = Array.isArray(cfg.creneaux)
+          ? (cfg.creneaux as unknown[]).filter((x): x is string => typeof x === 'string')
+          : undefined
+        const jours = joursGardeVet(vet.id, creneaux && creneaux.length > 0 ? creneaux : undefined)
+        // Longueur de chaque série maximale (une série = jours consécutifs) : on
+        // ne signale qu'aux DÉBUTS de série (jour dont la veille n'est pas de garde).
+        const vues = new Set<string>()
+        for (const j of jours) {
+          if (jours.has(plusJours(j, -1))) continue // pas un début de série
+          let len = 1
+          let d = plusJours(j, 1)
+          while (jours.has(d)) { len++; d = plusJours(d, 1) }
+          if (len > n && !vues.has(j)) {
+            vues.add(j)
+            violations.push({
+              regle: 'SERIE_MAX',
+              date: j,
+              type: 'serie',
+              vetId: vet.id,
+              detail: `SERIE_MAX : ${vet.prenom} enchaîne ${len} jours de garde d'affilée à partir du ${j} (max ${n})`,
+            })
+          }
+        }
+      }
+
+      // ── repos_apres_serie — après N jours d'affilée, ≥ M jours sans garde ──
+      if (c.type === 'repos_apres_serie') {
+        const nRaw = cfg.n_jours
+        const mRaw = cfg.repos_jours
+        const n = typeof nRaw === 'number' ? nRaw : typeof nRaw === 'string' ? parseInt(nRaw, 10) : NaN
+        const m = typeof mRaw === 'number' ? mRaw : typeof mRaw === 'string' ? parseInt(mRaw, 10) : NaN
+        if (!Number.isFinite(n) || n <= 0 || !Number.isFinite(m) || m <= 0) continue
+        const jours = joursGardeVet(vet.id)
+        const vues = new Set<string>()
+        for (const fin of jours) {
+          if (jours.has(plusJours(fin, 1))) continue // pas une fin de stretch maximal
+          let len = 1
+          let d = plusJours(fin, -1)
+          while (jours.has(d)) { len++; d = plusJours(d, -1) }
+          if (len < n) continue // série trop courte → aucun repos imposé
+          for (let k = 1; k <= m; k++) {
+            const jour = plusJours(fin, k)
+            if (jours.has(jour) && !vues.has(`${fin}|${jour}`)) {
+              vues.add(`${fin}|${jour}`)
+              violations.push({
+                regle: 'REPOS_SERIE',
+                date: jour,
+                type: 'repos_serie',
+                vetId: vet.id,
+                detail: `REPOS_SERIE : ${vet.prenom} est de garde le ${jour} alors qu'une série d'au moins ${n} jours (fin le ${fin}) impose ${m} jour(s) de repos`,
+              })
+            }
+          }
+        }
+      }
+    }
+  }
+
   // ── R9 — créneaux liés = même équipe · R8 — rôles changés entre eux ──
   // GÉNÉRIQUE (RG tranche 3) : le couple vendredi↔WE n'est plus câblé — les
   // couples viennent de la DONNÉE (structureConfig.relations ; undefined →

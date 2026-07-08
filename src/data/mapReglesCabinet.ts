@@ -94,6 +94,10 @@ const TYPES_V1: ReadonlySet<TypeContrainte> = new Set<TypeContrainte>([
   'preferer_creneau',
   'preferer_avec',
   'volume_gardes',
+  // Successions / séries / repos avancés (Vague 5 tranche B — #13).
+  'succession_interdite',
+  'serie_max',
+  'repos_apres_serie',
 ])
 
 /**
@@ -112,6 +116,9 @@ const BRIQUE_VERS_TYPE: Record<string, TypeContrainte> = {
   preferer_creneau: 'preferer_creneau',
   preferer_avec: 'preferer_avec',
   volume_gardes: 'volume_gardes',
+  succession_interdite: 'succession_interdite',
+  serie_max: 'serie_max',
+  repos_apres_serie: 'repos_apres_serie',
 }
 
 export interface RegleRejetee {

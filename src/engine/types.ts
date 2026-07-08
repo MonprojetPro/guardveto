@@ -85,6 +85,15 @@ export interface ContrainteEngine {
     | 'preferer_avec'
     // « Veut PLUS (ou MOINS) de gardes » — biais assumé sur l'équité.
     | 'volume_gardes'
+    // ── Successions / séries / repos avancés (Vague 5 tranche B — #13) ──
+    // Règles de RYTHME par-véto, famille `sequence`, réglables (dur si étage ≤ 2,
+    // sinon pénalité). Consomment la vue étendue du lookback inter-périodes (#17).
+    // « Pas de garde B le lendemain d'une garde A » (jour civil ; WE → lundi).
+    | 'succession_interdite'
+    // « Jamais plus de N jours de garde d'affilée » (stretch borné).
+    | 'serie_max'
+    // « Après N jours de garde d'affilée, au moins M jours sans garde ».
+    | 'repos_apres_serie'
   config: Record<string, unknown>
   actif: boolean
 }

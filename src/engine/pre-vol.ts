@@ -50,6 +50,7 @@ export type CodeAvertissementPreVol =
   | 'weekends_insuffisants'     // Σ des plafonds week-end < places de week-end
   | 'composition_sans_porteur'  // règle de composition dont AUCUN véto actif ne porte le tag
   | 'role_interdit_intenable'   // rôle interdit à un tag que TOUS les vétos actifs portent
+  | 'sequence_inerte'           // règle de rythme (série/succession/repos) mal paramétrée → sans effet
 
 /**
  * Un avertissement du pré-vol — TOUJOURS non bloquant.
@@ -596,7 +597,57 @@ export function preVolRegles(input: PreVolInput): AvertissementPreVol[] {
     ...detecterCompositionsSansPorteur(vetsN, input),
     // (d) rôle interdit intenable — tous les vétos portent le tag (n°22)
     ...detecterRolesInterditsIntenables(vetsN, input),
+    // (e) règles de rythme (#13) arithmétiquement inertes (ex. serie_max = 0)
+    ...detecterSequencesInertes(vetsN, nomVeto),
   ]
+}
+
+// ── (e) Successions / séries / repos avancés — configs inertes (#13) ──
+// Ces briques ne rendent JAMAIS un véto « jamais disponible » (elles ne se
+// déclenchent pas sur un planning vide), donc les détecteurs (a) ne les voient
+// pas. En revanche une config arithmétiquement absurde les rend silencieusement
+// SANS EFFET (coquille vide) — on le signale ici :
+//   • serie_max avec n_jours ≤ 0 → aucune borne (le moteur la traite comme inerte)
+//   • repos_apres_serie avec n_jours ≤ 0 OU repos_jours ≤ 0 → aucun repos imposé
+//   • succession_interdite avec type_avant/type_apres vide → aucune succession jugée
+// (Le moteur ignore déjà ces cas — pas de crash ; l'alerte évite juste le piège.)
+function detecterSequencesInertes(
+  vets: VetEngineNormalise[],
+  nomVeto: (id: string) => string,
+): AvertissementPreVol[] {
+  const out: AvertissementPreVol[] = []
+  const entier = (v: unknown): number =>
+    typeof v === 'number' ? v : typeof v === 'string' ? parseInt(v, 10) : NaN
+
+  for (const vet of vets) {
+    for (const c of vet.contraintes) {
+      if (!c.actif) continue
+      const p = paramsDe(c)
+      let inerte = false
+      if (c.type === 'serie_max') {
+        const n = entier(p.n_jours)
+        inerte = !Number.isFinite(n) || n <= 0
+      } else if (c.type === 'repos_apres_serie') {
+        const n = entier(p.n_jours)
+        const m = entier(p.repos_jours)
+        inerte = !Number.isFinite(n) || n <= 0 || !Number.isFinite(m) || m <= 0
+      } else if (c.type === 'succession_interdite') {
+        const av = typeof p.type_avant === 'string' ? p.type_avant.trim() : ''
+        const ap = typeof p.type_apres === 'string' ? p.type_apres.trim() : ''
+        inerte = av === '' || ap === ''
+      } else {
+        continue
+      }
+      if (inerte) {
+        out.push({
+          code: 'sequence_inerte',
+          regles: [libelleRegle(vet.prenom, c, nomVeto)],
+          message: `Une règle de rythme de ${vet.prenom} est mal paramétrée (valeur nulle ou incomplète) : elle n'aura aucun effet. Modifie-la ou supprime-la depuis l'écran Règles.`,
+        })
+      }
+    }
+  }
+  return out
 }
 
 // ── (d) Rôle interdit par tag — intenable (backlog n°22) ──

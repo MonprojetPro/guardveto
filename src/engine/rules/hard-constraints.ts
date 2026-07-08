@@ -782,6 +782,216 @@ function checkEspacementWeekend(vet: VetEngine, slot: SlotGarde, planning: Plann
   return ok()
 }
 
+// ── Successions / séries / repos avancés (Vague 5 tranche B — #13) ──
+// Trois briques de RYTHME de la famille `sequence`, toutes par-véto et réglables
+// (dur si étage ≤ 2, sinon pénalité). Elles raisonnent en JOURS CIVILS COUVERTS :
+// le créneau `weekend` est daté du SAMEDI mais couvre sam+dim → le « lendemain »
+// d'un week-end est le lundi. On ré-utilise donc partout `joursCouvertsGarde`
+// (miroir de syncAttributions.joursImpactesGarde, étendu au dimanche du WE).
+//
+// SYMÉTRIE (leçon solver : WE posés AVANT les soirs de semaine) : chaque prédicat
+// juge le candidat contre les gardes déjà posées AVANT ET APRÈS lui dans le
+// temps. En phase candidat on répond « si j'ajoute cette garde, la contrainte
+// tient-elle ? » — on inclut donc virtuellement les jours du slot visé.
+//
+// Vue étendue (#17) : ces prédicats reçoivent le `planning` DÉJÀ enrichi du
+// lookback inter-périodes (cf. isValid / penaliteContraintesConfig) → une série
+// entamée en fin de période précédente compte.
+
+/**
+ * Jours civils COUVERTS par une garde `type` datée `date`.
+ * `weekend` (daté du samedi) couvre samedi + dimanche ; tout autre type = 1 jour.
+ * Miroir de `syncAttributions.joursImpactesGarde` (qui, lui, ne renvoie que
+ * [vendredi, samedi] pour l'agenda) — ici c'est la couverture RÉELLE de présence
+ * de garde (sam+dim), ce qui importe pour succession/série/repos.
+ */
+function joursCouvertsGarde(date: string, type: string): string[] {
+  return type === 'weekend' ? [date, addDays(date, 1)] : [date]
+}
+
+/**
+ * Tous les jours civils où `vetId` est de garde dans `planning` (dépliés :
+ * un week-end compte samedi ET dimanche). Set trié pour un balayage déterministe.
+ */
+function joursDeGardeVet(vetId: string, planning: PlanningPartiel): Set<string> {
+  const jours = new Set<string>()
+  for (const a of planning.attributions) {
+    if (!estAttribue(a, vetId)) continue
+    for (const j of joursCouvertsGarde(a.date, a.type)) jours.add(j)
+  }
+  return jours
+}
+
+// ── succession_interdite ─────────────────────────────────────
+// « pas de garde de type B le lendemain d'une garde de type A » (par véto).
+// Sémantique JOUR CIVIL : A le jour J, B le jour J+1 → violation. Le « lendemain »
+// d'un weekend (daté samedi, fin = dimanche) est donc le LUNDI (J+2 depuis samedi).
+// Symétrique : on vérifie si le candidat (B) suit un A déjà posé, ET si le candidat
+// (A) précède un B déjà posé.
+
+/** Poser `vet` sur `slot` créerait-il une succession interdite (dans un sens ou l'autre) ? */
+function violeSuccessionInterdite(
+  c: ContrainteEngine, vetId: string, slot: SlotGarde, planning: PlanningPartiel,
+): boolean {
+  const cfg = c.config as Record<string, unknown>
+  const typeAvant = cfg.type_avant
+  const typeApres = cfg.type_apres
+  if (typeof typeAvant !== 'string' || typeof typeApres !== 'string') return false // inerte
+  if (typeAvant === '' || typeApres === '') return false
+
+  const joursSlot = joursCouvertsGarde(slot.date, slot.type)
+  const premierJourSlot = joursSlot[0]
+  const dernierJourSlot = joursSlot[joursSlot.length - 1]
+
+  for (const a of planning.attributions) {
+    if (a.date === slot.date && a.type === slot.type) continue // le slot lui-même
+    if (!estAttribue(a, vetId)) continue
+    const joursA = joursCouvertsGarde(a.date, a.type)
+    const premierJourA = joursA[0]
+    const dernierJourA = joursA[joursA.length - 1]
+
+    // Cas 1 : le CANDIDAT est le « après » (type B), l'autre garde est un « avant » (type A).
+    //   lendemain de la FIN de A == début du candidat ?
+    if (slot.type === typeApres && a.type === typeAvant) {
+      if (addDays(dernierJourA, 1) === premierJourSlot) return true
+    }
+    // Cas 2 : le CANDIDAT est l'« avant » (type A), l'autre garde est un « après » (type B).
+    //   lendemain de la FIN du candidat == début de B ?
+    if (slot.type === typeAvant && a.type === typeApres) {
+      if (addDays(dernierJourSlot, 1) === premierJourA) return true
+    }
+  }
+  return false
+}
+
+function checkSuccessionInterdite(vet: VetEngine, slot: SlotGarde, planning: PlanningPartiel): ValidationResult {
+  for (const c of vet.contraintes) {
+    if (!c.actif || c.type !== 'succession_interdite') continue
+    if (estDure(c) && violeSuccessionInterdite(c, vet.id, slot, planning)) {
+      const cfg = c.config as Record<string, unknown>
+      return invalid(
+        `SUCCESSION : ${vet.prenom} ne peut pas enchaîner « ${cfg.type_apres} » juste après « ${cfg.type_avant} »`,
+      )
+    }
+  }
+  return ok()
+}
+
+// ── serie_max ────────────────────────────────────────────────
+// « jamais plus de N jours de garde d'affilée » (stretch borné). Jours consécutifs
+// = dates civiles adjacentes (weekend = 2 jours). Filtre optionnel `creneaux` :
+// on ne compte que les jours issus des types listés (absent = tous). Poser le
+// candidat créerait-il une série (maximale, autour du candidat) de plus de N jours ?
+
+/** Longueur de la plus longue série de jours consécutifs contenant `pivot` dans `jours`. */
+function longueurSerieAutour(pivot: string, jours: Set<string>): number {
+  if (!jours.has(pivot)) return 0
+  let n = 1
+  let d = addDays(pivot, -1)
+  while (jours.has(d)) { n++; d = addDays(d, -1) }
+  d = addDays(pivot, 1)
+  while (jours.has(d)) { n++; d = addDays(d, 1) }
+  return n
+}
+
+/** Poser `vet` sur `slot` créerait-il une série de plus de N jours d'affilée ? */
+function violeSerieMax(
+  c: ContrainteEngine, vetId: string, slot: SlotGarde, planning: PlanningPartiel,
+): boolean {
+  const cfg = c.config as Record<string, unknown>
+  const nRaw = cfg.n_jours
+  const n = typeof nRaw === 'number' ? nRaw : typeof nRaw === 'string' ? parseInt(nRaw, 10) : NaN
+  if (!Number.isFinite(n) || n <= 0) return false // n ≤ 0 ou mal configurée → inerte
+  const creneaux = lireCreneauxFiltre(cfg)
+  // Filtre : le slot visé doit lui-même être compté, sinon poser ce slot ne peut
+  // pas allonger une série de types comptés.
+  if (creneaux && !creneaux.includes(slot.type)) return false
+
+  // Jours de garde du véto (filtrés par type si demandé) + les jours du candidat.
+  const jours = new Set<string>()
+  for (const a of planning.attributions) {
+    if (a.date === slot.date && a.type === slot.type) continue
+    if (!estAttribue(a, vetId)) continue
+    if (creneaux && !creneaux.includes(a.type)) continue
+    for (const j of joursCouvertsGarde(a.date, a.type)) jours.add(j)
+  }
+  const joursSlot = joursCouvertsGarde(slot.date, slot.type)
+  for (const j of joursSlot) jours.add(j)
+
+  // Série maximale contenant le premier jour du candidat (les jours du candidat
+  // sont contigus par construction — WE = sam+dim adjacents).
+  return longueurSerieAutour(joursSlot[0], jours) > n
+}
+
+function checkSerieMax(vet: VetEngine, slot: SlotGarde, planning: PlanningPartiel): ValidationResult {
+  for (const c of vet.contraintes) {
+    if (!c.actif || c.type !== 'serie_max') continue
+    if (estDure(c) && violeSerieMax(c, vet.id, slot, planning)) {
+      const n = (c.config as Record<string, unknown>).n_jours
+      return invalid(`SERIE_MAX : ${vet.prenom} ne peut pas faire plus de ${n} jour(s) de garde d'affilée`)
+    }
+  }
+  return ok()
+}
+
+// ── repos_apres_serie ────────────────────────────────────────
+// « après N gardes consécutives (jours d'affilée), imposer M jours sans garde ».
+// Une série d'AU MOINS N jours (une série de MOINS de N n'impose rien) doit être
+// suivie d'au moins M jours sans garde : les M jours qui suivent la FIN d'un
+// stretch maximal de ≥ N jours doivent être libres. On juge autour du candidat :
+// il peut être la garde de trop dans la fenêtre de repos due à un stretch antérieur,
+// OU il peut clore/allonger un stretch qui impose un repos violé par une garde
+// postérieure déjà posée. Balayer TOUS les stretches (planning partiel borné)
+// couvre les deux sens sans threading d'ordre de pose.
+
+/** Poser `vet` sur `slot` violerait-il un repos dû après une série de ≥ N jours ? */
+function violeReposApresSerie(
+  c: ContrainteEngine, vetId: string, slot: SlotGarde, planning: PlanningPartiel,
+): boolean {
+  const cfg = c.config as Record<string, unknown>
+  const nRaw = cfg.n_jours
+  const mRaw = cfg.repos_jours
+  const n = typeof nRaw === 'number' ? nRaw : typeof nRaw === 'string' ? parseInt(nRaw, 10) : NaN
+  const m = typeof mRaw === 'number' ? mRaw : typeof mRaw === 'string' ? parseInt(mRaw, 10) : NaN
+  if (!Number.isFinite(n) || n <= 0) return false // inerte
+  if (!Number.isFinite(m) || m <= 0) return false // pas de repos exigé → inerte
+
+  // Ensemble des jours de garde AVEC le candidat inclus.
+  const jours = joursDeGardeVet(vetId, planning)
+  const joursSlot = joursCouvertsGarde(slot.date, slot.type)
+  for (const j of joursSlot) jours.add(j)
+
+  // Toute FIN de stretch maximal (jour de garde dont le lendemain est libre) de
+  // longueur ≥ N impose que les M jours suivants soient libres. Le jour F+1 l'est
+  // par définition (fin maximale) ; une garde à F+2..F+M (avec un TROU en F+1)
+  // viole le repos. On repère donc une garde dans (F, F+M] APRÈS le trou.
+  for (const fin of jours) {
+    if (jours.has(addDays(fin, 1))) continue // pas une fin de stretch maximal
+    let len = 1
+    let d = addDays(fin, -1)
+    while (jours.has(d)) { len++; d = addDays(d, -1) }
+    if (len < n) continue // série trop courte → aucun repos imposé
+    // Fenêtre de repos : F+1 … F+M. Une garde y tombe → violation.
+    for (let k = 1; k <= m; k++) {
+      if (jours.has(addDays(fin, k))) return true
+    }
+  }
+  return false
+}
+
+function checkReposApresSerie(vet: VetEngine, slot: SlotGarde, planning: PlanningPartiel): ValidationResult {
+  for (const c of vet.contraintes) {
+    if (!c.actif || c.type !== 'repos_apres_serie') continue
+    if (estDure(c) && violeReposApresSerie(c, vet.id, slot, planning)) {
+      const cfg = c.config as Record<string, unknown>
+      return invalid(
+        `REPOS_SERIE : ${vet.prenom} doit avoir au moins ${cfg.repos_jours} jour(s) de repos après ${cfg.n_jours} jour(s) de garde d'affilée`,
+      )
+    }
+  }
+  return ok()
+}
+
 export function penaliteContraintesConfig(
   slot: SlotGarde,
   vet: VetEngine,
@@ -815,6 +1025,13 @@ export function penaliteContraintesConfig(
         viole = violeEspacementMin(c, vet.id, slot, planningRythme); break
       case 'espacement_weekend':
         viole = violeEspacementWeekend(c, vet.id, slot, planningRythme); break
+      // Successions / séries / repos avancés (#13) — règles de RYTHME → vue étendue.
+      case 'succession_interdite':
+        viole = violeSuccessionInterdite(c, vet.id, slot, planningRythme); break
+      case 'serie_max':
+        viole = violeSerieMax(c, vet.id, slot, planningRythme); break
+      case 'repos_apres_serie':
+        viole = violeReposApresSerie(c, vet.id, slot, planningRythme); break
     }
     if (viole) pen += penaliteEtage(etageDe(c))
   }
@@ -874,6 +1091,10 @@ export function isValid(
     checkAuPlusN(vet, slot, planningRythme),
     checkEspacementMin(vet, slot, planningRythme),
     checkEspacementWeekend(vet, slot, planningRythme),
+    // Successions / séries / repos avancés (#13) — règles de RYTHME → vue étendue.
+    checkSuccessionInterdite(vet, slot, planningRythme),
+    checkSerieMax(vet, slot, planningRythme),
+    checkReposApresSerie(vet, slot, planningRythme),
     // R8 : ne s'applique que si slot.type est la CIBLE d'une relation
     // inversion_role (le check filtre lui-même — générique, plus de « WE only »).
     checkR8Inversion(vet, slot, roleVisé, planning, structure.r8_inversion, relations),
@@ -911,6 +1132,9 @@ export {
   checkAuPlusN,
   checkEspacementMin,
   checkEspacementWeekend,
+  checkSuccessionInterdite,
+  checkSerieMax,
+  checkReposApresSerie,
   checkComposition,
   checkRoleInterditTag,
 }

@@ -57,6 +57,10 @@ const BRIQUES: { value: BriqueEvaluable; label: string; aide: string }[] = [
   { value: 'preferer_creneau', label: 'Préférence de jours / créneaux', aide: 'Le moteur essaie de placer ses gardes sur les jours ou créneaux qu’il préfère. Jamais bloquant.' },
   { value: 'preferer_avec', label: 'Préfère être de garde avec…', aide: 'Le moteur essaie de le mettre en binôme avec ce co-équipier. Jamais bloquant.' },
   { value: 'volume_gardes', label: 'Souhaite plus / moins de gardes', aide: 'Biais assumé sur la répartition : le moteur lui donne plus (ou moins) de gardes que la moyenne. Jamais bloquant.' },
+  // Successions / séries / repos avancés (#13).
+  { value: 'succession_interdite', label: 'Enchaînement interdit', aide: 'Ne fait jamais un type de garde le lendemain d’un autre (ex. pas de soir de semaine le lendemain d’un week-end).' },
+  { value: 'serie_max', label: 'Jours de garde d’affilée (max)', aide: 'Jamais plus de N jours de garde consécutifs.' },
+  { value: 'repos_apres_serie', label: 'Repos après une série', aide: 'Après N jours de garde d’affilée, imposer M jours sans garde.' },
 ]
 
 /** Desiderata : préférences pures — le niveau « Interdiction ferme » est exclu. */
@@ -103,6 +107,11 @@ const FORCE_DEFAUT: Record<BriqueEvaluable, ForceFormulaire> = {
   preferer_creneau: 'si_possible',   // desiderata = préférences pures (n°7)
   preferer_avec: 'si_possible',
   volume_gardes: 'si_possible',
+  // Successions / séries / repos avancés (#13) : sécurité de rythme, ferme
+  // mais pliable en crise (comme espacement_min) — évite les impasses.
+  succession_interdite: 'sauf_crise',
+  serie_max: 'sauf_crise',
+  repos_apres_serie: 'sauf_crise',
 }
 
 // ── Composant ────────────────────────────────────────────────
@@ -198,6 +207,32 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
   // volume_gardes (n°7)
   const [sens, setSens] = useState<string>(p.sens === 'moins' ? 'moins' : 'plus')
 
+  // succession_interdite (#13) — codes de créneaux du cabinet (défaut : 1ers dispos).
+  const [typeAvant, setTypeAvant] = useState<string>(
+    typeof p.type_avant === 'string' && typesCreneaux.some((t) => t.code === p.type_avant)
+      ? p.type_avant : (typesCreneaux[0]?.code ?? ''),
+  )
+  const [typeApres, setTypeApres] = useState<string>(
+    typeof p.type_apres === 'string' && typesCreneaux.some((t) => t.code === p.type_apres)
+      ? p.type_apres : (typesCreneaux[0]?.code ?? ''),
+  )
+
+  // serie_max (#13) — n_jours (le filtre creneaux réutilise creneauxFiltre).
+  const [nJoursSerie, setNJoursSerie] = useState<string>(
+    typeof p.n_jours === 'number' ? String(p.n_jours)
+      : typeof p.n_jours === 'string' ? p.n_jours : '3',
+  )
+
+  // repos_apres_serie (#13) — n_jours + repos_jours.
+  const [nJoursRepos, setNJoursRepos] = useState<string>(
+    typeof p.n_jours === 'number' ? String(p.n_jours)
+      : typeof p.n_jours === 'string' ? p.n_jours : '2',
+  )
+  const [reposJours, setReposJours] = useState<string>(
+    typeof p.repos_jours === 'number' ? String(p.repos_jours)
+      : typeof p.repos_jours === 'string' ? p.repos_jours : '2',
+  )
+
   // Validité : PERMANENTE (par défaut) ou limitée à une période existante.
   const periodeInit = regle?.periode_id && periodesDispo.some((per) => per.id === regle.periode_id)
     ? regle.periode_id
@@ -258,11 +293,23 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
       case 'volume_gardes':
         params = { sens }
         break
+      case 'succession_interdite':
+        params = { type_avant: typeAvant, type_apres: typeApres }
+        break
+      case 'serie_max':
+        params = {
+          n_jours: Number(nJoursSerie) || 0,
+          creneaux: creneauxFiltre.length > 0 ? creneauxFiltre : undefined,
+        }
+        break
+      case 'repos_apres_serie':
+        params = { n_jours: Number(nJoursRepos) || 0, repos_jours: Number(reposJours) || 0 }
+        break
     }
     const predicat = rendreRegle(briqueId, params, { nomVeto })
     return sujet ? `${sujet} ${predicat}` : predicat
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [briqueId, ownerId, jour, exVac, siWe, sinon, semaines, periodes, avecId, n, fenetre, creneauxFiltre, ecartMin, nSemaines, joursPref, sens, vets])
+  }, [briqueId, ownerId, jour, exVac, siWe, sinon, semaines, periodes, avecId, n, fenetre, creneauxFiltre, ecartMin, nSemaines, joursPref, sens, typeAvant, typeApres, nJoursSerie, nJoursRepos, reposJours, vets])
 
   const handleSubmit = () => {
     if (!ownerId) { toast.error('Sélectionnez le vétérinaire concerné.'); return }
@@ -292,6 +339,18 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
       if (!avecId) { toast.error('Sélectionnez le co-équipier préféré.'); return }
       if (avecId === ownerId) { toast.error('Choisissez deux vétérinaires différents.'); return }
     }
+    if (briqueId === 'succession_interdite') {
+      if (!typeAvant || !typeApres) { toast.error('Choisissez les deux créneaux.'); return }
+    }
+    if (briqueId === 'serie_max') {
+      const v = Number(nJoursSerie)
+      if (!Number.isInteger(v) || v < 1) { toast.error('Indiquez un nombre de jours valide (≥ 1).'); return }
+    }
+    if (briqueId === 'repos_apres_serie') {
+      const a = Number(nJoursRepos), b = Number(reposJours)
+      if (!Number.isInteger(a) || a < 1) { toast.error('Indiquez une longueur de série valide (≥ 1).'); return }
+      if (!Number.isInteger(b) || b < 1) { toast.error('Indiquez un nombre de jours de repos valide (≥ 1).'); return }
+    }
 
     startTransition(async () => {
       const res = await upsertRegle({
@@ -308,11 +367,17 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
         avec_veterinaire_id: avecId,
         n: Number(n),
         fenetre,
-        creneaux: (briqueId === 'au_plus_n' || briqueId === 'preferer_creneau') && creneauxFiltre.length > 0 ? creneauxFiltre : undefined,
+        creneaux: (briqueId === 'au_plus_n' || briqueId === 'preferer_creneau' || briqueId === 'serie_max') && creneauxFiltre.length > 0 ? creneauxFiltre : undefined,
         ecart_min_jours: Number(ecartMin),
         n_semaines: Number(nSemaines),
         jours: briqueId === 'preferer_creneau' && joursPref.length > 0 ? joursPref : undefined,
         sens,
+        // Successions / séries / repos avancés (#13).
+        type_avant: typeAvant,
+        type_apres: typeApres,
+        n_jours: briqueId === 'serie_max' ? Number(nJoursSerie)
+          : briqueId === 'repos_apres_serie' ? Number(nJoursRepos) : undefined,
+        repos_jours: briqueId === 'repos_apres_serie' ? Number(reposJours) : undefined,
         periode_id: validite === PERMANENTE ? null : validite,
       })
       if (res?.error) { toast.error(res.error); return }
@@ -629,6 +694,101 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
               <p className="text-xs text-muted-foreground">
                 Ex. « 3 » = un week-end sur trois (les deux week-ends suivants sont libres).
               </p>
+            </div>
+          )}
+
+          {briqueId === 'succession_interdite' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Créneau la veille</Label>
+                <Select value={typeAvant} onValueChange={(v) => v && setTypeAvant(v)}>
+                  <SelectTrigger>
+                    {typesCreneaux.find((t) => t.code === typeAvant)?.nom ?? <span className="text-muted-foreground">Sélectionner…</span>}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {typesCreneaux.map((t) => <SelectItem key={t.code} value={t.code}>{t.nom}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Interdit le lendemain</Label>
+                <Select value={typeApres} onValueChange={(v) => v && setTypeApres(v)}>
+                  <SelectTrigger>
+                    {typesCreneaux.find((t) => t.code === typeApres)?.nom ?? <span className="text-muted-foreground">Sélectionner…</span>}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {typesCreneaux.map((t) => <SelectItem key={t.code} value={t.code}>{t.nom}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <p className="col-span-2 text-xs text-muted-foreground">
+                  Le «&nbsp;lendemain&nbsp;» d&apos;un week-end est le lundi (il couvre samedi et dimanche).
+                </p>
+              </div>
+            </div>
+          )}
+
+          {briqueId === 'serie_max' && (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="serie-n">Jours de garde d&apos;affilée maximum</Label>
+                <input
+                  id="serie-n"
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={nJoursSerie}
+                  onChange={(e) => setNJoursSerie(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Ne compter que certains créneaux (optionnel)</Label>
+                <div className="space-y-2 mt-1">
+                  {typesCreneaux.map((t) => (
+                    <label key={t.code} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={creneauxFiltre.includes(t.code)}
+                        onChange={() => toggleCreneauFiltre(t.code)}
+                        className="rounded"
+                      />
+                      <span className="text-sm">{t.nom}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Rien de coché = tous les types de garde comptent dans la série.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {briqueId === 'repos_apres_serie' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="repos-n">Après … jours de garde d&apos;affilée</Label>
+                <input
+                  id="repos-n"
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={nJoursRepos}
+                  onChange={(e) => setNJoursRepos(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="repos-m">… jours de repos minimum</Label>
+                <input
+                  id="repos-m"
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={reposJours}
+                  onChange={(e) => setReposJours(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
             </div>
           )}
 

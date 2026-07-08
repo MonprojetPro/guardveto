@@ -32,6 +32,8 @@ const BRIQUES_EDITABLES = new Set([
   'au_plus_n', 'espacement_min', 'espacement_weekend',
   // Desiderata (n°7) — préférences positives par véto.
   'preferer_creneau', 'preferer_avec', 'volume_gardes',
+  // Successions / séries / repos avancés (#13).
+  'succession_interdite', 'serie_max', 'repos_apres_serie',
 ])
 
 // ── Données ──────────────────────────────────────────────────

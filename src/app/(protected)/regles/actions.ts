@@ -597,6 +597,10 @@ const BRIQUES_EVALUABLES = {
   preferer_creneau: 'preferer_creneau',
   preferer_avec: 'preferer_avec',
   volume_gardes: 'volume_gardes',
+  // Successions / séries / repos avancés (Vague 5 tranche B — #13).
+  succession_interdite: 'succession_interdite',
+  serie_max: 'serie_max',
+  repos_apres_serie: 'repos_apres_serie',
 } as const
 export type BriqueEvaluable = keyof typeof BRIQUES_EVALUABLES
 
@@ -627,6 +631,9 @@ const ECART_MAX_JOURS = 30 // borne haute raisonnable (espacement minimal)
 // Fréquence WE : « 1 week-end sur N ». N=1 = aucune contrainte (inerte) → min 2.
 const N_SEM_WE_MIN = 2
 const N_SEM_WE_MAX = 26    // une période fait 12-17 semaines : 26 couvre large
+// Séries / repos avancés (#13) : bornes hautes raisonnables (jours).
+const SERIE_MAX_JOURS = 31 // « pas plus de N jours d'affilée » — 31 couvre large
+const REPOS_APRES_MAX = 30 // jours de repos imposés après une série
 
 /** Payload envoyé par le formulaire (champs simples — le JSON est bâti ici). */
 export interface UpsertReglePayload {
@@ -661,6 +668,13 @@ export interface UpsertReglePayload {
   jours?: string[]
   // volume_gardes (n°7)
   sens?: string
+  // succession_interdite (#13) : « pas de B le lendemain de A »
+  type_avant?: string
+  type_apres?: string
+  // serie_max (#13) : « jamais plus de N jours d'affilée » (creneaux réutilisé)
+  n_jours?: number
+  // repos_apres_serie (#13) : « après N jours, M jours de repos »
+  repos_jours?: number
 }
 
 /** Parse un entier dans [1, max]. Retourne null si invalide (frontière de confiance). */
@@ -792,6 +806,46 @@ function construireParams(
         return { error: 'Précisez le souhait : plus ou moins de gardes.' }
       }
       return { quand: null, params: { sens: p.sens } }
+    }
+    // ── Successions / séries / repos avancés (#13) ──
+    case 'succession_interdite': {
+      const avant = typeof p.type_avant === 'string' ? p.type_avant.trim() : ''
+      const apres = typeof p.type_apres === 'string' ? p.type_apres.trim() : ''
+      if (avant === '' || apres === '') {
+        return { error: 'Choisissez le créneau « veille » et le créneau interdit le lendemain.' }
+      }
+      // Frontière de confiance : les deux codes DOIVENT exister dans le
+      // référentiel du cabinet (un code fantôme rendrait la règle inerte).
+      if (!codesCreneaux) return { error: 'Types de créneaux du cabinet indisponibles.' }
+      const inconnus = [avant, apres].filter((c) => !codesCreneaux.has(c))
+      if (inconnus.length > 0) {
+        return { error: `Type(s) de créneau inconnu(s) pour ce cabinet : ${inconnus.join(', ')}.` }
+      }
+      return { quand: null, params: { type_avant: avant, type_apres: apres } }
+    }
+    case 'serie_max': {
+      const n = entierBorne(p.n_jours, SERIE_MAX_JOURS)
+      if (n === null) return { error: `Nombre de jours invalide (1 à ${SERIE_MAX_JOURS}).` }
+      // Filtre optionnel de créneaux (mêmes règles que au_plus_n).
+      const creneaux = [
+        ...new Set((p.creneaux ?? []).filter((x) => typeof x === 'string' && x.trim() !== '')),
+      ]
+      if (creneaux.length > 0) {
+        if (!codesCreneaux) return { error: 'Types de créneaux du cabinet indisponibles.' }
+        const inconnus = creneaux.filter((c) => !codesCreneaux.has(c))
+        if (inconnus.length > 0) {
+          return { error: `Type(s) de créneau inconnu(s) pour ce cabinet : ${inconnus.join(', ')}.` }
+        }
+        return { quand: null, params: { n_jours: n, creneaux } }
+      }
+      return { quand: null, params: { n_jours: n } }
+    }
+    case 'repos_apres_serie': {
+      const n = entierBorne(p.n_jours, SERIE_MAX_JOURS)
+      if (n === null) return { error: `Longueur de série invalide (1 à ${SERIE_MAX_JOURS}).` }
+      const repos = entierBorne(p.repos_jours, REPOS_APRES_MAX)
+      if (repos === null) return { error: `Jours de repos invalides (1 à ${REPOS_APRES_MAX}).` }
+      return { quand: null, params: { n_jours: n, repos_jours: repos } }
     }
     default:
       return { error: 'Brique non gérée par ce constructeur.' }
@@ -976,8 +1030,12 @@ export async function upsertRegle(payload: UpsertReglePayload) {
   // Référentiel de créneaux du cabinet : chargé SEULEMENT si un filtre est
   // demandé (au_plus_n n°19, preferer_creneau n°7) — zéro requête sinon.
   const besoinCodes =
-    (payload.brique_id === 'au_plus_n' || payload.brique_id === 'preferer_creneau') &&
-    (payload.creneaux ?? []).length > 0
+    // succession_interdite valide TOUJOURS ses deux codes créneaux (#13).
+    payload.brique_id === 'succession_interdite' ||
+    ((payload.brique_id === 'au_plus_n' ||
+      payload.brique_id === 'preferer_creneau' ||
+      payload.brique_id === 'serie_max') &&
+      (payload.creneaux ?? []).length > 0)
   const codesCreneaux = besoinCodes
     ? await chargerCodesCreneauxValides(supabase, cabinetId)
     : undefined

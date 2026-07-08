@@ -29,7 +29,7 @@ export interface TypeCreneauIA {
 }
 
 /** Décrit les briques disponibles pour guider l'IA (jours = lundi→vendredi). */
-const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 12 types de règle :
+const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 15 types de règle :
 
 1. interdire_creneau — un vétérinaire ne fait pas de garde un jour fixe de la semaine.
    params: jour (lundi|mardi|mercredi|jeudi|vendredi), exception_vacances_scolaires (true/false).
@@ -45,6 +45,7 @@ const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 12 types de r�
    Ex. « Manon fait au plus 2 week-ends par mois » → au_plus_n, n=2, fenetre=glissante_30_jours, creneaux=["weekend"].
 6. espacement_min — au moins X jours entre deux gardes du même vétérinaire.
    params: ecart_min_jours (entier ≥ 1).
+   ⚠️ C'est AUSSI le type à utiliser pour un REPOS entre gardes : « au moins N jours de repos entre mes gardes » = espacement_min avec ecart_min_jours = N+1 (2 jours de repos = 3 jours d'écart minimum).
 7. espacement_weekend — au plus 1 garde de WEEK-END toutes les N semaines (« un week-end sur N », limite la fréquence des week-ends d'un véto).
    params: n_semaines (entier ≥ 2 ; « un week-end sur 3 » → n_semaines = 3).
    ⚠️ N'utilise ce type QUE si la demande est une FRÉQUENCE de week-ends (« un WE sur N »). Un PLAFOND de week-ends (« au plus 2 WE par mois ») → au_plus_n avec creneaux=["weekend"]. Force par défaut conseillée : si_possible (préférence).
@@ -69,6 +70,18 @@ Les types 10 à 12 sont des DESIDERATA : des préférences POSITIVES d'un vété
 12. volume_gardes — un vétérinaire souhaite faire PLUS ou MOINS de gardes que la moyenne.
    params: sens ('plus' | 'moins').
    Ex. « Antoine veut faire plus de gardes » → volume_gardes, sens="plus".
+
+Les types 13 à 15 sont des règles de RYTHME (successions et repos entre gardes) d'un vétérinaire.
+13. succession_interdite — un vétérinaire ne fait jamais un type de garde le LENDEMAIN d'un autre type.
+   params: type_avant (code du créneau la veille), type_apres (code du créneau interdit le lendemain) — deux CODES de créneaux du cabinet (voir la liste fournie).
+   ⚠️ « lendemain » au sens JOUR CIVIL : le week-end couvre samedi+dimanche, donc son lendemain est le lundi.
+   Ex. « pas de garde de semaine juste après un week-end » → succession_interdite, type_avant="weekend", type_apres="semaine_soir".
+14. serie_max — jamais plus de N JOURS de garde d'affilée (jours consécutifs).
+   params: n_jours (entier ≥ 1), creneaux (optionnel : ne compter que ces CODES de créneaux ; null = tous).
+   Ex. « jamais plus de 3 jours de garde d'affilée » → serie_max, n_jours=3.
+15. repos_apres_serie — après N jours de garde d'affilée, imposer M jours SANS garde.
+   params: n_jours (longueur de série, entier ≥ 1), repos_jours (jours de repos imposés, entier ≥ 1).
+   Ex. « après 2 jours de garde d'affilée, au moins 2 jours de repos » → repos_apres_serie, n_jours=2, repos_jours=2.
 
 Niveau d'importance (force) :
 - jamais = interdiction ferme
