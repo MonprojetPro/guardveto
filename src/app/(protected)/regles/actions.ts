@@ -601,6 +601,8 @@ const BRIQUES_EVALUABLES = {
   succession_interdite: 'succession_interdite',
   serie_max: 'serie_max',
   repos_apres_serie: 'repos_apres_serie',
+  // Cadencement « 1 WE sur N ancré » (Vague 5 tranche C — #20).
+  cadencement_weekend: 'cadencement_weekend',
 } as const
 export type BriqueEvaluable = keyof typeof BRIQUES_EVALUABLES
 
@@ -634,6 +636,11 @@ const N_SEM_WE_MAX = 26    // une période fait 12-17 semaines : 26 couvre large
 // Séries / repos avancés (#13) : bornes hautes raisonnables (jours).
 const SERIE_MAX_JOURS = 31 // « pas plus de N jours d'affilée » — 31 couvre large
 const REPOS_APRES_MAX = 30 // jours de repos imposés après une série
+// Cadencement WE « 1 sur N ancré » (#20) : N=1 = tous les WE (inerte) → min 2.
+// Max 12 : au-delà, un cycle plus long qu'une période hiver n'a guère de sens.
+const N_SEM_CADENCE_MIN = 2
+const N_SEM_CADENCE_MAX = 12
+const SENS_CADENCE_VALIDES = new Set(['interdit', 'impose'])
 
 /** Payload envoyé par le formulaire (champs simples — le JSON est bâti ici). */
 export interface UpsertReglePayload {
@@ -675,6 +682,9 @@ export interface UpsertReglePayload {
   n_jours?: number
   // repos_apres_serie (#13) : « après N jours, M jours de repos »
   repos_jours?: number
+  // cadencement_weekend (#20) : « 1 WE sur N ancré » — n_semaines réutilisé.
+  // `sens` est partagé avec volume_gardes (plus/moins) mais porte ici interdit/impose.
+  ancre?: string // date ISO yyyy-MM-dd (un samedi de référence)
 }
 
 /** Parse un entier dans [1, max]. Retourne null si invalide (frontière de confiance). */
@@ -846,6 +856,24 @@ function construireParams(
       const repos = entierBorne(p.repos_jours, REPOS_APRES_MAX)
       if (repos === null) return { error: `Jours de repos invalides (1 à ${REPOS_APRES_MAX}).` }
       return { quand: null, params: { n_jours: n, repos_jours: repos } }
+    }
+    // ── Cadencement « 1 WE sur N ancré » (#20) ──
+    case 'cadencement_weekend': {
+      const n = entierBorne(p.n_semaines, N_SEM_CADENCE_MAX)
+      if (n === null || n < N_SEM_CADENCE_MIN) {
+        return { error: `Cycle invalide (un week-end sur ${N_SEM_CADENCE_MIN} à ${N_SEM_CADENCE_MAX}).` }
+      }
+      const ancre = typeof p.ancre === 'string' ? p.ancre.trim() : ''
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(ancre) || Number.isNaN(new Date(ancre + 'T12:00:00Z').getTime())) {
+        return { error: 'Date d’ancrage invalide (format attendu : une date de week-end).' }
+      }
+      const sens = typeof p.sens === 'string' ? p.sens : ''
+      if (!SENS_CADENCE_VALIDES.has(sens)) {
+        return { error: 'Précisez le sens : week-ends interdits ou gardes forcées sur le cycle.' }
+      }
+      // On stocke l'ancre TELLE QUE saisie : le moteur la ramène au samedi de sa
+      // semaine (aucune dépendance à ce que l'admin ait pile choisi un samedi).
+      return { quand: null, params: { n_semaines: n, ancre, sens } }
     }
     default:
       return { error: 'Brique non gérée par ce constructeur.' }

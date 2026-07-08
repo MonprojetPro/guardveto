@@ -35,7 +35,7 @@ import { raisonsSurCreneau, type CreneauStep } from './diagnostic'
 import { isValid } from './rules/hard-constraints'
 import { normaliserContraintesVets } from './normaliserContraintes'
 import { rendreRegle } from './briques/catalogue'
-import { lundiDeSemaine } from './utils'
+import { lundiDeSemaine, samediDeSemaine } from './utils'
 import { DEFAULT_STRUCTURE_CONFIG, type StructureConfig } from './structure-config'
 import type { CreneauModele } from './creneau-modele'
 
@@ -534,20 +534,50 @@ function detecterWeekendsInsuffisants(
   const wePlaces = weSlots.reduce((n, s) => n + s.roles.length, 0)
   const nbWe = weSlots.length
 
+  // Dates des week-ends (samedis) de la période — pour évaluer la capacité
+  // RÉDUITE d'un véto en cadencement `interdit` (#20 : il ne peut couvrir que
+  // les WE HORS de son cycle). Le WE est daté du samedi.
+  const datesWe = weSlots.map((s) => s.date)
+  const samediAncre = (date: string): string => samediDeSemaine(date)
+  const surCycle = (sam: string, ancreSam: string, n: number): boolean => {
+    const ms =
+      new Date(sam + 'T12:00:00Z').getTime() -
+      new Date(ancreSam + 'T12:00:00Z').getTime()
+    const semaines = Math.round(ms / (7 * 24 * 60 * 60 * 1000))
+    return ((semaines % n) + n) % n === 0
+  }
+
   let somme = 0
   const regles: string[] = []
   for (const vet of vetsN) {
     let cap = nbWe
     for (const c of vet.contraintes) {
-      if (!c.actif || !estDure(c) || c.type !== 'espacement_weekend') continue
+      if (!c.actif || !estDure(c)) continue
       const p = paramsDe(c)
-      const nRaw = p.n_semaines
-      const n = typeof nRaw === 'number' ? nRaw : typeof nRaw === 'string' ? parseInt(nRaw, 10) : NaN
-      if (!Number.isFinite(n) || n <= 1) continue // inerte (comme le moteur)
-      const borne = Math.ceil(nbWe / n)
-      if (borne < cap) {
-        cap = borne
-        regles.push(libelleRegle(vet.prenom, c, nomVeto))
+      if (c.type === 'espacement_weekend') {
+        const nRaw = p.n_semaines
+        const n = typeof nRaw === 'number' ? nRaw : typeof nRaw === 'string' ? parseInt(nRaw, 10) : NaN
+        if (!Number.isFinite(n) || n <= 1) continue // inerte (comme le moteur)
+        const borne = Math.ceil(nbWe / n)
+        if (borne < cap) {
+          cap = borne
+          regles.push(libelleRegle(vet.prenom, c, nomVeto))
+        }
+      } else if (c.type === 'cadencement_weekend' && p.sens === 'interdit') {
+        // Cadencement pompier « interdit » : le véto ne peut couvrir QUE les WE
+        // qui ne tombent PAS sur son cycle. On borne sa capacité au nombre de WE
+        // hors cycle (indépendant de espacement_weekend → on prend le min).
+        const nRaw = p.n_semaines
+        const n = typeof nRaw === 'number' ? nRaw : typeof nRaw === 'string' ? parseInt(nRaw, 10) : NaN
+        if (!Number.isFinite(n) || n < 2) continue // inerte
+        const ancre = typeof p.ancre === 'string' ? p.ancre : ''
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(ancre) || Number.isNaN(new Date(ancre + 'T12:00:00Z').getTime())) continue
+        const ancreSam = samediAncre(ancre)
+        const horsCycle = datesWe.filter((d) => !surCycle(d, ancreSam, n)).length
+        if (horsCycle < cap) {
+          cap = horsCycle
+          regles.push(libelleRegle(vet.prenom, c, nomVeto))
+        }
       }
     }
     somme += cap
@@ -635,6 +665,15 @@ function detecterSequencesInertes(
         const av = typeof p.type_avant === 'string' ? p.type_avant.trim() : ''
         const ap = typeof p.type_apres === 'string' ? p.type_apres.trim() : ''
         inerte = av === '' || ap === ''
+      } else if (c.type === 'cadencement_weekend') {
+        // Cadencement « 1 WE sur N ancré » (#20) : inerte si n < 2, ancre non-date,
+        // ou sens inconnu (le moteur l'ignore alors silencieusement).
+        const n = entier(p.n_semaines)
+        const ancre = typeof p.ancre === 'string' ? p.ancre : ''
+        const ancreValide = /^\d{4}-\d{2}-\d{2}$/.test(ancre) &&
+          !Number.isNaN(new Date(ancre + 'T12:00:00Z').getTime())
+        const sensValide = p.sens === 'interdit' || p.sens === 'impose'
+        inerte = !Number.isFinite(n) || n < 2 || !ancreValide || !sensValide
       } else {
         continue
       }

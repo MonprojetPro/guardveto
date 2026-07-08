@@ -35,6 +35,7 @@ function prop(over: Partial<PropositionRegle>): PropositionRegle {
     mode_composition: null, tag: null, role_interdit: null,
     jours: null, sens: null,
     type_avant: null, type_apres: null, n_jours: null, repos_jours: null,
+    ancre: null, sens_cadence: null,
     ...over,
   }
 }
@@ -199,6 +200,40 @@ describe('propositionVersPayload', () => {
   it('espacement_weekend « 1 sur 1 » → rejeté (aucune contrainte)', () => {
     const r = propositionVersPayload(
       prop({ brique_id: 'espacement_weekend', veterinaire: 'Manon', n_semaines: 1 }),
+      VETS,
+    )
+    expect(r.ok).toBe(false)
+  })
+
+  it('cadencement_weekend « pompier 1 sur 3 interdit » → payload complet, force jamais par défaut (#20)', () => {
+    const r = propositionVersPayload(
+      prop({
+        brique_id: 'cadencement_weekend', veterinaire: 'Victor',
+        n_semaines: 3, ancre: '2026-09-05', sens_cadence: 'interdit',
+      }),
+      VETS,
+    )
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.payload.owner_id).toBe('id-victor')
+      expect(r.payload.n_semaines).toBe(3)
+      expect(r.payload.ancre).toBe('2026-09-05')
+      expect(r.payload.sens).toBe('interdit')
+      expect(r.payload.force).toBe('jamais') // interdit = ferme par défaut
+    }
+  })
+
+  it('cadencement_weekend sans ancre valide → rejeté', () => {
+    const r = propositionVersPayload(
+      prop({ brique_id: 'cadencement_weekend', veterinaire: 'Victor', n_semaines: 3, ancre: 'bidon', sens_cadence: 'interdit' }),
+      VETS,
+    )
+    expect(r.ok).toBe(false)
+  })
+
+  it('cadencement_weekend sans sens précisé → rejeté', () => {
+    const r = propositionVersPayload(
+      prop({ brique_id: 'cadencement_weekend', veterinaire: 'Victor', n_semaines: 3, ancre: '2026-09-05' }),
       VETS,
     )
     expect(r.ok).toBe(false)

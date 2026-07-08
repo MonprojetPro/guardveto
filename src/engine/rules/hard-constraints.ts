@@ -782,6 +782,75 @@ function checkEspacementWeekend(vet: VetEngine, slot: SlotGarde, planning: Plann
   return ok()
 }
 
+// ── Cadencement « 1 WE sur N ancré » (brique `cadencement_weekend`, #20) ──
+// À NE PAS confondre avec espacement_weekend (un ESPACEMENT). Ici c'est un
+// CADENCEMENT ANCRÉ : les week-ends « du véto » sont ceux dont le samedi tombe
+// à un multiple de N×7 jours d'une date d'ancrage (un samedi de référence),
+// passé OU futur (arithmétique modulo SIGNÉE). Cas type : pompier volontaire de
+// garde 1 WE sur 3 à dates fixes. Cycle CALENDAIRE STRICT — AUCUN recalage
+// vacances (contrairement à l'indispo cyclique). Deux sens :
+//   • interdit (cas pompier) : les WE DU CYCLE sont INTERDITS de garde véto ;
+//     les autres WE restent libres → viole si le WE candidat est SUR le cycle.
+//   • impose : les gardes WE du véto doivent tomber SUR le cycle (hors cycle =
+//     violation) → viole si le WE candidat est HORS cycle. (Filtre de POSITION,
+//     n'oblige pas à poser à chaque WE du cycle.)
+// La brique juge le SLOT candidat par rapport à l'ancre SEULE : elle ne lit pas
+// le planning (indépendante du lookback #17 par construction — l'ancrage absolu
+// rend le cadencement stable à travers les périodes). Étage ≤ 2 = dur, sinon
+// pénalité. Params invalides (n<2, ancre non-date, sens inconnu) → INERTE.
+
+/** Ramène une date au SAMEDI de sa semaine (imite le recalage d'estSemaineImpaireAncrée
+ *  sans recalage vacances). Réutilise le helper `samediDeSemaine` du moteur. */
+function samediAncre(date: string): string {
+  return samediDeSemaine(date)
+}
+
+/** Le samedi `sam` appartient-il au cycle « 1 sur N » ancré sur `ancreSam` ?
+ *  (différence en semaines multiple de N — modulo signé, passé ou futur). */
+function estWeekendDuCycle(sam: string, ancreSam: string, n: number): boolean {
+  const ms =
+    new Date(sam + 'T12:00:00Z').getTime() -
+    new Date(ancreSam + 'T12:00:00Z').getTime()
+  const semaines = Math.round(ms / (7 * 24 * 60 * 60 * 1000))
+  // Modulo positif (JS `%` garde le signe du dividende) → phase correcte des 2 côtés.
+  return ((semaines % n) + n) % n === 0
+}
+
+/** Poser `vet` sur `slot` violerait-il un cadencement de week-end ? */
+function violeCadencementWeekend(c: ContrainteEngine, slot: SlotGarde): boolean {
+  if (slot.type !== 'weekend') return false // ne s'applique qu'aux week-ends
+  const cfg = c.config as Record<string, unknown>
+  const nRaw = cfg.n_semaines
+  const n = typeof nRaw === 'number' ? nRaw : typeof nRaw === 'string' ? parseInt(nRaw, 10) : NaN
+  if (!Number.isFinite(n) || n < 2) return false // inerte (n < 2 = pas un cycle)
+  const ancre = cfg.ancre
+  // Ancre = une vraie date ISO. Non-date → inerte (jamais de crash).
+  if (typeof ancre !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(ancre)) return false
+  if (Number.isNaN(new Date(ancre + 'T12:00:00Z').getTime())) return false
+  const sens = cfg.sens
+  if (sens !== 'interdit' && sens !== 'impose') return false // sens inconnu → inerte
+
+  // Le WE est daté du SAMEDI ; l'ancre est ramenée au samedi de sa semaine.
+  const surCycle = estWeekendDuCycle(slot.date, samediAncre(ancre), n)
+  // interdit : violer si SUR le cycle (le véto est déjà pris ailleurs).
+  // impose   : violer si HORS du cycle (ses gardes WE doivent y tomber).
+  return sens === 'interdit' ? surCycle : !surCycle
+}
+
+function checkCadencementWeekend(vet: VetEngine, slot: SlotGarde): ValidationResult {
+  for (const c of vet.contraintes) {
+    if (!c.actif || c.type !== 'cadencement_weekend') continue
+    if (estDure(c) && violeCadencementWeekend(c, slot)) {
+      const cfg = c.config as Record<string, unknown>
+      const n = cfg.n_semaines
+      return cfg.sens === 'impose'
+        ? invalid(`CADENCE_WE : le week-end de garde de ${vet.prenom} doit tomber sur son cycle (1 sur ${n})`)
+        : invalid(`CADENCE_WE : ${vet.prenom} est indisponible ce week-end (cycle 1 sur ${n})`)
+    }
+  }
+  return ok()
+}
+
 // ── Successions / séries / repos avancés (Vague 5 tranche B — #13) ──
 // Trois briques de RYTHME de la famille `sequence`, toutes par-véto et réglables
 // (dur si étage ≤ 2, sinon pénalité). Elles raisonnent en JOURS CIVILS COUVERTS :
@@ -1025,6 +1094,9 @@ export function penaliteContraintesConfig(
         viole = violeEspacementMin(c, vet.id, slot, planningRythme); break
       case 'espacement_weekend':
         viole = violeEspacementWeekend(c, vet.id, slot, planningRythme); break
+      // Cadencement « 1 WE sur N ancré » (#20) : jugé sur l'ancre, sans planning.
+      case 'cadencement_weekend':
+        viole = violeCadencementWeekend(c, slot); break
       // Successions / séries / repos avancés (#13) — règles de RYTHME → vue étendue.
       case 'succession_interdite':
         viole = violeSuccessionInterdite(c, vet.id, slot, planningRythme); break
@@ -1091,6 +1163,9 @@ export function isValid(
     checkAuPlusN(vet, slot, planningRythme),
     checkEspacementMin(vet, slot, planningRythme),
     checkEspacementWeekend(vet, slot, planningRythme),
+    // Cadencement « 1 WE sur N ancré » (#20) : jugé par rapport à l'ancre SEULE
+    // (pas le planning ni le lookback — l'ancrage absolu suffit).
+    checkCadencementWeekend(vet, slot),
     // Successions / séries / repos avancés (#13) — règles de RYTHME → vue étendue.
     checkSuccessionInterdite(vet, slot, planningRythme),
     checkSerieMax(vet, slot, planningRythme),
@@ -1132,6 +1207,7 @@ export {
   checkAuPlusN,
   checkEspacementMin,
   checkEspacementWeekend,
+  checkCadencementWeekend,
   checkSuccessionInterdite,
   checkSerieMax,
   checkReposApresSerie,

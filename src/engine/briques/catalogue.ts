@@ -310,6 +310,38 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
     },
   },
 
+  // ── Cadencement fixe « 1 WE sur N ancré » (Vague 5 tranche C — #20) ──
+  // À NE PAS confondre avec espacement_weekend (un ESPACEMENT « au moins N
+  // semaines entre deux WE »). Ici c'est un CADENCEMENT ANCRÉ : les week-ends
+  // « du véto » sont ceux dont le samedi tombe à un multiple de N×7 jours d'une
+  // date d'ancrage (un samedi de référence) — cas type du pompier volontaire de
+  // garde 1 WE sur 3 à dates FIXES. Cycle calendaire STRICT (aucun recalage
+  // vacances, contrairement à l'indispo cyclique). Deux sens :
+  //   • interdit : les WE du cycle sont INTERDITS de garde véto (il est déjà pris).
+  //   • impose   : les gardes WE du véto DOIVENT tomber sur le cycle (filtre de
+  //     position ; PAS une obligation d'être présent à chaque WE du cycle).
+  cadencement_weekend: {
+    id: 'cadencement_weekend',
+    famille: 'sequence',
+    operateur: 'CADENCEMENT_WE',
+    axes: ['qui', 'quand'],
+    schemaParams: {
+      n_semaines: 'integer (≥ 2 — cycle : 1 week-end sur N)',
+      ancre: 'string (date ISO yyyy-MM-dd — un samedi de référence qui donne la phase du cycle)',
+      sens: "string (interdit|impose — WE du cycle interdits, ou gardes WE forcées sur le cycle)",
+    },
+    widget: 'WidgetCadencementWeekend',
+    rendreLangageNaturel: (params) => {
+      const n = params.n_semaines ?? '?'
+      const ancre = typeof params.ancre === 'string' && params.ancre.trim() !== '' ? params.ancre : '?'
+      if (params.sens === 'impose') {
+        return `ses week-ends de garde suivent un cycle d'1 semaine sur ${n} (ancré au ${ancre})`
+      }
+      // Défaut / 'interdit' : le cas pompier.
+      return `est indisponible le week-end 1 semaine sur ${n} (cycle ancré au ${ancre})`
+    },
+  },
+
   // ── Pénalités souples réglables (backlog n°16 — règles GLOBALES) ──
   // Comme liaison_creneaux/inversion_role : pas de « qui », un réglage
   // { actif, force } par cabinet. Absentes de la base → défaut historique

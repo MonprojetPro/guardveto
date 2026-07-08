@@ -29,7 +29,7 @@ export interface TypeCreneauIA {
 }
 
 /** Décrit les briques disponibles pour guider l'IA (jours = lundi→vendredi). */
-const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 15 types de règle :
+const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 16 types de règle :
 
 1. interdire_creneau — un vétérinaire ne fait pas de garde un jour fixe de la semaine.
    params: jour (lundi|mardi|mercredi|jeudi|vendredi), exception_vacances_scolaires (true/false).
@@ -82,6 +82,12 @@ Les types 13 à 15 sont des règles de RYTHME (successions et repos entre gardes
 15. repos_apres_serie — après N jours de garde d'affilée, imposer M jours SANS garde.
    params: n_jours (longueur de série, entier ≥ 1), repos_jours (jours de repos imposés, entier ≥ 1).
    Ex. « après 2 jours de garde d'affilée, au moins 2 jours de repos » → repos_apres_serie, n_jours=2, repos_jours=2.
+16. cadencement_weekend — CADENCEMENT FIXE des week-ends d'un vétérinaire, calé sur un cycle « 1 week-end sur N » ancré à une date de référence. Cas type : un pompier volontaire de garde 1 week-end sur 3 à dates FIXES, qui ne peut donc JAMAIS prendre de garde véto ces week-ends-là ; ou au contraire un véto qui VEUT ses gardes week-end calées sur un cycle régulier.
+   params: n_semaines (entier ≥ 2 ; « un week-end sur 3 » → 3), ancre (date ISO yyyy-MM-dd d'un week-end de RÉFÉRENCE qui fixe la phase du cycle — souvent un samedi), sens_cadence :
+     - 'interdit' : les week-ends du cycle sont INTERDITS de garde (le véto est déjà pris ailleurs) ; les autres week-ends restent libres.
+     - 'impose' : les gardes week-end du véto DOIVENT tomber sur ce cycle (hors cycle = interdit). ⚠️ Cela n'OBLIGE PAS le moteur à le mettre de garde à CHAQUE week-end du cycle : c'est seulement un filtre de POSITION.
+   ⚠️ NE PAS confondre avec espacement_weekend (type 7) qui limite juste la FRÉQUENCE (« au plus 1 WE sur N ») sans dates fixes. Ici les week-ends sont ANCRÉS à des DATES PRÉCISES. Cycle calendaire strict (indépendant des vacances).
+   Ex. « Victor est pompier volontaire, il est pris un week-end sur 3 à partir du samedi 5 septembre 2026 » → cadencement_weekend, veterinaire="Victor", n_semaines=3, ancre="2026-09-05", sens_cadence="interdit", force="jamais".
 
 Niveau d'importance (force) :
 - jamais = interdiction ferme

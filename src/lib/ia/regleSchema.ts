@@ -37,6 +37,8 @@ export const BRIQUES_IA = [
   'succession_interdite',
   'serie_max',
   'repos_apres_serie',
+  // Cadencement « 1 WE sur N ancré » (#20) — par véto (cas pompier volontaire).
+  'cadencement_weekend',
 ] as const
 
 export const FORCES_IA = ['jamais', 'sauf_crise', 'evitee', 'si_possible'] as const
@@ -95,6 +97,12 @@ export const PropositionRegleSchema = z.object({
   n_jours: z.number().int().nullable(),
   /** repos_apres_serie (#13) : jours de repos imposés après la série. */
   repos_jours: z.number().int().nullable(),
+  /** cadencement_weekend (#20) : date d'ancrage du cycle (un samedi, ISO yyyy-MM-dd). */
+  ancre: z.string().nullable(),
+  /** cadencement_weekend (#20) : sens du cadencement.
+   *  interdit = WE du cycle interdits de garde (cas pompier) ;
+   *  impose = gardes WE forcées sur le cycle. (n_semaines réutilisé pour le cycle N.) */
+  sens_cadence: z.enum(['interdit', 'impose']).nullable(),
 })
 
 export type PropositionRegle = z.infer<typeof PropositionRegleSchema>
@@ -150,6 +158,9 @@ const N_SEM_WE_MAX = 26
 /** Séries / repos avancés (#13) : bornes hautes alignées sur le serveur. */
 const SERIE_MAX_JOURS = 31
 const REPOS_APRES_MAX = 30
+/** Cadencement WE « 1 sur N » (#20) : bornes alignées sur le serveur. */
+const N_SEM_CADENCE_MIN = 2
+const N_SEM_CADENCE_MAX = 12
 
 export type ConversionResultat =
   | { ok: true; payload: UpsertReglePayload }
@@ -180,12 +191,15 @@ export function propositionVersPayload(
 
   // Force par défaut si l'IA n'en propose pas : la fréquence WE et les
   // desiderata (n°7) sont des PRÉFÉRENCES par défaut (ne jamais bloquer une
-  // génération) ; les autres briques restent en sauf_crise.
+  // génération) ; un cadencement « interdit » (#20 : pompier réellement pris
+  // ailleurs) est en revanche FERME par défaut ; les autres restent en sauf_crise.
   const DESIDERATA = new Set(['preferer_creneau', 'preferer_avec', 'volume_gardes'])
   const forceParDefaut: ForceFormulaire =
     p.brique_id === 'espacement_weekend' || DESIDERATA.has(p.brique_id)
       ? 'si_possible'
-      : 'sauf_crise'
+      : p.brique_id === 'cadencement_weekend' && p.sens_cadence === 'interdit'
+        ? 'jamais'
+        : 'sauf_crise'
 
   let force = (p.force ?? forceParDefaut) as ForceFormulaire
   // Desiderata : préférences PURES — « jamais » serait refusé par le serveur ;
@@ -333,6 +347,24 @@ export function propositionVersPayload(
       }
       payload.n_jours = n
       payload.repos_jours = repos
+      break
+    }
+    // ── Cadencement « 1 WE sur N ancré » (#20) ──
+    case 'cadencement_weekend': {
+      const n = p.n_semaines
+      if (typeof n !== 'number' || !Number.isInteger(n) || n < N_SEM_CADENCE_MIN || n > N_SEM_CADENCE_MAX) {
+        return { ok: false, raison: `Précise un cycle valide : un week-end sur ${N_SEM_CADENCE_MIN} à ${N_SEM_CADENCE_MAX}.` }
+      }
+      const ancre = (p.ancre ?? '').trim()
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(ancre) || Number.isNaN(new Date(ancre + 'T12:00:00Z').getTime())) {
+        return { ok: false, raison: 'Précise la date de départ du cycle (un week-end de référence, ex. le samedi 5 septembre 2026).' }
+      }
+      if (p.sens_cadence !== 'interdit' && p.sens_cadence !== 'impose') {
+        return { ok: false, raison: 'Précise si ces week-ends lui sont INTERDITS (engagement extérieur) ou si ses gardes DOIVENT tomber sur ce cycle.' }
+      }
+      payload.n_semaines = n
+      payload.ancre = ancre
+      payload.sens = p.sens_cadence
       break
     }
   }
@@ -491,6 +523,9 @@ export function apercuProposition(p: PropositionRegle): string {
       break
     case 'repos_apres_serie':
       params = { n_jours: p.n_jours, repos_jours: p.repos_jours }
+      break
+    case 'cadencement_weekend':
+      params = { n_semaines: p.n_semaines, ancre: p.ancre, sens: p.sens_cadence }
       break
   }
   const predicat = rendreRegle(p.brique_id, params, { nomVeto: (x) => x })

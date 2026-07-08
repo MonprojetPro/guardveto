@@ -34,6 +34,8 @@ const BRIQUES_EDITABLES = new Set([
   'preferer_creneau', 'preferer_avec', 'volume_gardes',
   // Successions / séries / repos avancés (#13).
   'succession_interdite', 'serie_max', 'repos_apres_serie',
+  // Cadencement « 1 WE sur N ancré » (#20).
+  'cadencement_weekend',
 ])
 
 // ── Données ──────────────────────────────────────────────────

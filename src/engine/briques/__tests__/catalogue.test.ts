@@ -26,6 +26,7 @@ const MIGRATIONS = [
   '20260707170000_role_interdit_tag.sql',
   '20260707190000_desiderata.sql',
   '20260708120000_successions_repos_avances.sql',
+  '20260708140000_cadencement_weekend.sql',
 ].map((f) => fileURLToPath(new URL(`../../../../supabase/migrations/${f}`, import.meta.url)))
 
 interface SeedBrique {
@@ -65,8 +66,8 @@ function parserSeed(): Record<string, SeedBrique> {
 describe('catalogue ↔ seed briques_regles — cohérence (ne divergent pas)', () => {
   const seed = parserSeed()
 
-  it('le seed parsé contient bien les 23 briques (sanity du parser)', () => {
-    expect(Object.keys(seed)).toHaveLength(23)
+  it('le seed parsé contient bien les 24 briques (sanity du parser)', () => {
+    expect(Object.keys(seed)).toHaveLength(24)
   })
 
   it('catalogue et seed déclarent EXACTEMENT les mêmes briques', () => {
@@ -145,6 +146,20 @@ describe('catalogue — rendu en langage naturel', () => {
     })
     expect(phrase).toContain('impaire')
     expect(phrase.toLowerCase()).toContain('soir')
+  })
+
+  it('cadencement_weekend — interdit vs impose (cycle ancré, #20)', () => {
+    const interdit = rendreRegle('cadencement_weekend', {
+      n_semaines: 3, ancre: '2026-09-05', sens: 'interdit',
+    })
+    expect(interdit).toContain('indisponible')
+    expect(interdit).toContain('sur 3')
+    expect(interdit).toContain('2026-09-05')
+    const impose = rendreRegle('cadencement_weekend', {
+      n_semaines: 3, ancre: '2026-09-05', sens: 'impose',
+    })
+    expect(impose).toContain('suivent')
+    expect(impose).toContain('sur 3')
   })
 
   it('chaque brique rend une phrase NON VIDE même sans params (robustesse interface)', () => {

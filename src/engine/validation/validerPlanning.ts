@@ -866,6 +866,62 @@ export function validerPlanning(
     }
   }
 
+  // ── CADENCEMENT « 1 WE sur N ancré » (Vague 5 tranche C — #20) ──
+  // Re-vérification INDÉPENDANTE (jamais d'import de rules/) : chaque garde de
+  // WEEK-END tenue par un véto porteur d'une règle `cadencement_weekend` DURE
+  // (étage ≤ 2) est confrontée à son cycle ancré. Le WE est daté du SAMEDI ;
+  // l'ancre est ramenée au samedi de SA semaine (cycle calendaire STRICT, AUCUN
+  // recalage vacances). Helpers ré-implémentés ici (miroirs triviaux).
+  //   • sens='interdit' : une garde WE tombant SUR le cycle → violation.
+  //   • sens='impose'   : une garde WE tombant HORS du cycle → violation.
+  // Ne consomme NI le planning NI le lookback (jugé sur l'ancre seule). Souple
+  // (étage ≥ 3) → jamais une violation (préférence).
+  {
+    const samediDeLocal = (date: string): string => samediDe(date)
+    const surCycle = (sam: string, ancreSam: string, n: number): boolean => {
+      const ms =
+        new Date(sam + 'T12:00:00Z').getTime() -
+        new Date(ancreSam + 'T12:00:00Z').getTime()
+      const semaines = Math.round(ms / (7 * 24 * 60 * 60 * 1000))
+      return ((semaines % n) + n) % n === 0
+    }
+    for (const vet of vetsNorm) {
+      for (const c of vet.contraintes) {
+        if (!c.actif || c.type !== 'cadencement_weekend') continue
+        const cfg = c.config as Record<string, unknown>
+        const etage = typeof cfg.force === 'number' ? (cfg.force as number) : 2
+        if (etage > 2) continue
+        const nRaw = cfg.n_semaines
+        const n = typeof nRaw === 'number' ? nRaw : typeof nRaw === 'string' ? parseInt(nRaw, 10) : NaN
+        if (!Number.isFinite(n) || n < 2) continue // inerte
+        const ancre = cfg.ancre
+        if (typeof ancre !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(ancre)) continue
+        if (Number.isNaN(new Date(ancre + 'T12:00:00Z').getTime())) continue
+        const sens = cfg.sens
+        if (sens !== 'interdit' && sens !== 'impose') continue
+        const ancreSam = samediDeLocal(ancre)
+
+        for (const a of planning.attributions) {
+          if (a.type !== 'weekend' || !surCreneau(a, vet.id)) continue
+          const dansLeCycle = surCycle(a.date, ancreSam, n)
+          const viole = sens === 'interdit' ? dansLeCycle : !dansLeCycle
+          if (viole) {
+            violations.push({
+              regle: 'CADENCE_WE',
+              date: a.date,
+              type: a.type,
+              vetId: vet.id,
+              detail:
+                sens === 'interdit'
+                  ? `CADENCE_WE : ${vet.prenom} est de garde le week-end du ${a.date} alors que ce week-end tombe sur son cycle d'indisponibilité (1 sur ${n}, ancre ${ancre})`
+                  : `CADENCE_WE : ${vet.prenom} est de garde le week-end du ${a.date} hors de son cycle imposé (1 sur ${n}, ancre ${ancre})`,
+            })
+          }
+        }
+      }
+    }
+  }
+
   // ── SUCCESSION / SÉRIE / REPOS avancés (Vague 5 tranche B — #13) ──
   // Re-vérification INDÉPENDANTE (jamais d'import de rules/) des trois briques de
   // rythme `sequence`. On raisonne en JOURS CIVILS COUVERTS : le week-end (daté du

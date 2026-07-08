@@ -94,6 +94,14 @@ export interface ContrainteEngine {
     | 'serie_max'
     // « Après N jours de garde d'affilée, au moins M jours sans garde ».
     | 'repos_apres_serie'
+    // ── Cadencement « 1 WE sur N ancré » (Vague 5 tranche C — #20) ──
+    // Cadencement CALENDAIRE des week-ends de garde, ancré sur une date de
+    // référence (un samedi). Cas type : pompier volontaire de garde 1 WE sur 3
+    // à dates fixes. Deux sens : `interdit` (WE du cycle interdits de garde) ou
+    // `impose` (gardes WE forcées sur le cycle). Dur si étage ≤ 2, sinon pénalité.
+    // Ne s'applique qu'aux créneaux `weekend`. AUCUN recalage vacances (cycle
+    // strict). Jugé par rapport à l'ancre seule — n'a pas besoin du planning.
+    | 'cadencement_weekend'
   config: Record<string, unknown>
   actif: boolean
 }

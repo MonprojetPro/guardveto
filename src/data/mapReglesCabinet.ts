@@ -98,6 +98,8 @@ const TYPES_V1: ReadonlySet<TypeContrainte> = new Set<TypeContrainte>([
   'succession_interdite',
   'serie_max',
   'repos_apres_serie',
+  // Cadencement « 1 WE sur N ancré » (Vague 5 tranche C — #20).
+  'cadencement_weekend',
 ])
 
 /**
@@ -119,6 +121,7 @@ const BRIQUE_VERS_TYPE: Record<string, TypeContrainte> = {
   succession_interdite: 'succession_interdite',
   serie_max: 'serie_max',
   repos_apres_serie: 'repos_apres_serie',
+  cadencement_weekend: 'cadencement_weekend',
 }
 
 export interface RegleRejetee {

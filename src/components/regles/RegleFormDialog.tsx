@@ -61,6 +61,8 @@ const BRIQUES: { value: BriqueEvaluable; label: string; aide: string }[] = [
   { value: 'succession_interdite', label: 'Enchaînement interdit', aide: 'Ne fait jamais un type de garde le lendemain d’un autre (ex. pas de soir de semaine le lendemain d’un week-end).' },
   { value: 'serie_max', label: 'Jours de garde d’affilée (max)', aide: 'Jamais plus de N jours de garde consécutifs.' },
   { value: 'repos_apres_serie', label: 'Repos après une série', aide: 'Après N jours de garde d’affilée, imposer M jours sans garde.' },
+  // Cadencement « 1 WE sur N ancré » (#20).
+  { value: 'cadencement_weekend', label: 'Week-ends calés sur un cycle fixe', aide: 'Cas type : pompier volontaire de garde 1 week-end sur 3 à dates fixes. Ces week-ends lui sont interdits (ou au contraire ses gardes doivent tomber dessus).' },
 ]
 
 /** Desiderata : préférences pures — le niveau « Interdiction ferme » est exclu. */
@@ -112,6 +114,9 @@ const FORCE_DEFAUT: Record<BriqueEvaluable, ForceFormulaire> = {
   succession_interdite: 'sauf_crise',
   serie_max: 'sauf_crise',
   repos_apres_serie: 'sauf_crise',
+  // Cadencement WE (#20) : le cas « interdit » (pompier réellement pris) est
+  // ferme par défaut — un engagement extérieur ne se plie pas à la crise.
+  cadencement_weekend: 'jamais',
 }
 
 // ── Composant ────────────────────────────────────────────────
@@ -233,6 +238,16 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
       : typeof p.repos_jours === 'string' ? p.repos_jours : '2',
   )
 
+  // cadencement_weekend (#20) — cycle (n_semaines dédié), date d'ancrage, sens.
+  const [nSemainesCadence, setNSemainesCadence] = useState<string>(
+    typeof p.n_semaines === 'number' && briqueId === 'cadencement_weekend' ? String(p.n_semaines)
+      : typeof p.n_semaines === 'string' && briqueId === 'cadencement_weekend' ? p.n_semaines : '3',
+  )
+  const [ancre, setAncre] = useState<string>(typeof p.ancre === 'string' ? p.ancre : '')
+  const [sensCadence, setSensCadence] = useState<string>(
+    p.sens === 'impose' ? 'impose' : 'interdit',
+  )
+
   // Validité : PERMANENTE (par défaut) ou limitée à une période existante.
   const periodeInit = regle?.periode_id && periodesDispo.some((per) => per.id === regle.periode_id)
     ? regle.periode_id
@@ -305,11 +320,14 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
       case 'repos_apres_serie':
         params = { n_jours: Number(nJoursRepos) || 0, repos_jours: Number(reposJours) || 0 }
         break
+      case 'cadencement_weekend':
+        params = { n_semaines: Number(nSemainesCadence) || 0, ancre, sens: sensCadence }
+        break
     }
     const predicat = rendreRegle(briqueId, params, { nomVeto })
     return sujet ? `${sujet} ${predicat}` : predicat
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [briqueId, ownerId, jour, exVac, siWe, sinon, semaines, periodes, avecId, n, fenetre, creneauxFiltre, ecartMin, nSemaines, joursPref, sens, typeAvant, typeApres, nJoursSerie, nJoursRepos, reposJours, vets])
+  }, [briqueId, ownerId, jour, exVac, siWe, sinon, semaines, periodes, avecId, n, fenetre, creneauxFiltre, ecartMin, nSemaines, joursPref, sens, typeAvant, typeApres, nJoursSerie, nJoursRepos, reposJours, nSemainesCadence, ancre, sensCadence, vets])
 
   const handleSubmit = () => {
     if (!ownerId) { toast.error('Sélectionnez le vétérinaire concerné.'); return }
@@ -351,6 +369,11 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
       if (!Number.isInteger(a) || a < 1) { toast.error('Indiquez une longueur de série valide (≥ 1).'); return }
       if (!Number.isInteger(b) || b < 1) { toast.error('Indiquez un nombre de jours de repos valide (≥ 1).'); return }
     }
+    if (briqueId === 'cadencement_weekend') {
+      const v = Number(nSemainesCadence)
+      if (!Number.isInteger(v) || v < 2) { toast.error('Indiquez un cycle valide (un week-end sur 2 minimum).'); return }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(ancre)) { toast.error('Choisissez la date de départ du cycle.'); return }
+    }
 
     startTransition(async () => {
       const res = await upsertRegle({
@@ -369,15 +392,19 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
         fenetre,
         creneaux: (briqueId === 'au_plus_n' || briqueId === 'preferer_creneau' || briqueId === 'serie_max') && creneauxFiltre.length > 0 ? creneauxFiltre : undefined,
         ecart_min_jours: Number(ecartMin),
-        n_semaines: Number(nSemaines),
+        // n_semaines sert à espacement_weekend ET à cadencement_weekend (#20).
+        n_semaines: briqueId === 'cadencement_weekend' ? Number(nSemainesCadence) : Number(nSemaines),
         jours: briqueId === 'preferer_creneau' && joursPref.length > 0 ? joursPref : undefined,
-        sens,
+        // `sens` porte plus/moins (volume_gardes) OU interdit/impose (cadencement).
+        sens: briqueId === 'cadencement_weekend' ? sensCadence : sens,
         // Successions / séries / repos avancés (#13).
         type_avant: typeAvant,
         type_apres: typeApres,
         n_jours: briqueId === 'serie_max' ? Number(nJoursSerie)
           : briqueId === 'repos_apres_serie' ? Number(nJoursRepos) : undefined,
         repos_jours: briqueId === 'repos_apres_serie' ? Number(reposJours) : undefined,
+        // Cadencement WE (#20) : date d'ancrage du cycle.
+        ancre: briqueId === 'cadencement_weekend' ? ancre : undefined,
         periode_id: validite === PERMANENTE ? null : validite,
       })
       if (res?.error) { toast.error(res.error); return }
@@ -789,6 +816,56 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
               </div>
+            </div>
+          )}
+
+          {briqueId === 'cadencement_weekend' && (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>Ce que dit ce cycle</Label>
+                <Select value={sensCadence} onValueChange={(v) => v && setSensCadence(v)}>
+                  <SelectTrigger>
+                    {sensCadence === 'impose'
+                      ? 'Ses gardes week-end doivent tomber sur ce cycle'
+                      : 'Ces week-ends lui sont interdits (engagement extérieur)'}
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="interdit">Ces week-ends lui sont interdits (engagement extérieur)</SelectItem>
+                    <SelectItem value="impose">Ses gardes week-end doivent tomber sur ce cycle</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="cadence-n">Un week-end sur…</Label>
+                  <input
+                    id="cadence-n"
+                    type="number"
+                    min={2}
+                    max={12}
+                    value={nSemainesCadence}
+                    onChange={(e) => setNSemainesCadence(e.target.value)}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="cadence-ancre">Date de départ du cycle</Label>
+                  <input
+                    id="cadence-ancre"
+                    type="date"
+                    value={ancre}
+                    onChange={(e) => setAncre(e.target.value)}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Choisissez un samedi où le cycle tombe (un week-end « de référence »).
+                {' '}Le cycle est calendaire strict : il ne se décale pas avec les vacances.
+                {sensCadence === 'impose' && (
+                  <> Attention : «&nbsp;imposé&nbsp;» ne force pas une garde à CHAQUE week-end du cycle — il empêche seulement les gardes week-end hors du cycle.</>
+                )}
+              </p>
             </div>
           )}
 
