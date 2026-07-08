@@ -79,8 +79,12 @@
     documenté côté IA.
 14. **Équité inter-annuelle des fêtes** — `historique_fete` (qui a fait Noël
     l'an dernier ?) promis par le doc métier §7, rien ne le porte.
-15. **XOR et relations orientées** — « 24 déc XOR 31 déc », « moi seulement si
-    Victor est de garde » : non exprimables.
+15. ✅ **FAIT (2026-07-08, Vague 6)** — XOR et relations orientées : brique
+    `exclusion_dates` « pas les deux » (forme fêtes noel/nouvel_an par année,
+    reconduite seule + forme dates ISO libres, jours couverts WE inclus,
+    intra-période) ; brique `seulement_avec` conditionnelle ORIENTÉE (« A
+    seulement si B sur le même créneau », une ligne sans miroir, pose
+    complétante, gardes anti-impasse à la création).
 16. **Pénalités R10/R10b/R10c/R8b réglables** — 4 règles souples encore en dur
     (poids 50/30/45/20) : application directe du principe fondateur « aucune
     règle en dur » ; le mécanisme (étage + pénalité) existe déjà.
@@ -101,9 +105,14 @@
     interdit/impose), cycle calendaire strict sans recalage vacances, phase
     stable inter-périodes par construction ; pré-vol intègre la capacité WE
     réduite du sens `interdit`.
-21. **Groupes/cohortes d'équité paramétrables** — l'équité `grands_weekend`
-    est le seul groupe, codé « salariés » ; généraliser (filières canine ‖
-    rurale ‖ équine, associés vs salariés…).
+21. ✅ **FAIT (2026-07-08, Vague 6)** — Groupes/cohortes d'équité
+    paramétrables : brique `equilibrer` + tag optionnel — chaque règle taguée
+    = entrée de score indépendante (dimension × cohorte × importance),
+    variance sur les seuls porteurs ; partition explicite (2 cohortes +
+    dimension globale sur Ignorée) ; UI + IA + pré-vol sans-porteur.
+    `grands_weekend` global garde son défaut salariés (byte-identique).
+    Limites assumées : tags lus live au replay ; cohorte sur grands_weekend
+    ne voit que les salariés porteurs (compteur inchangé).
 22. ✅ **FAIT (2026-07-07, Vague 4)** — Rôle selon attribut : brique globale
     `role_interdit_tag` (« un junior jamais 1er »), dur/mou, ciblage créneaux,
     rôle choisi parmi ceux du catalogue du cabinet.
