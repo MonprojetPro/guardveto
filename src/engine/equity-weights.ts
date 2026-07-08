@@ -29,6 +29,15 @@ export interface EquityWeights {
   SEMAINE_SECOND: number
   /** R15 — équité des « grands week-ends perdus » par les salariés. */
   GRANDS_WE: number
+  /**
+   * Vague 6 tranche A (#21) — COHORTES d'équité par tag (dimension × tag ×
+   * poids). Chaque cohorte S'AJOUTE aux 6 dimensions globales ci-dessus, sa
+   * variance étant calculée uniquement sur les porteurs du tag. Absent/vide →
+   * BYTE-IDENTIQUE (aucune entrée de score cohorte). Voyage DANS EquityWeights
+   * précisément pour être threadée partout où equityWeights l'est déjà, sans
+   * ajouter de champ à SolverInput/ContexteSimulation (piège resoudreContexte).
+   */
+  cohortes?: EquityCohorte[]
 }
 
 /**
@@ -110,8 +119,13 @@ export const EQUITY_DIMENSIONS = [
 ] as const
 export type EquityDimension = (typeof EQUITY_DIMENSIONS)[number]
 
+/** Les champs NUMÉRIQUES de poids d'EquityWeights (hors `cohortes`). */
+export type EquityWeightField =
+  | 'WE_GARDE' | 'WE_PREMIER_ROLE' | 'FERIES'
+  | 'SEMAINE_PREMIER' | 'SEMAINE_SECOND' | 'GRANDS_WE'
+
 /** dimension (clé règle) → champ EquityWeights consommé par le moteur. */
-export const DIMENSION_TO_FIELD: Record<EquityDimension, keyof EquityWeights> = {
+export const DIMENSION_TO_FIELD: Record<EquityDimension, EquityWeightField> = {
   weekend: 'WE_GARDE',
   weekend_premier: 'WE_PREMIER_ROLE',
   ferie: 'FERIES',
@@ -139,6 +153,33 @@ export const DEFAULT_IMPORTANCE: Record<EquityDimension, ImportanceLevel> = {
 export interface EquityRule {
   dimension: EquityDimension
   importance: ImportanceLevel
+  /**
+   * Vague 6 tranche A (#21) — COHORTE : si présent, la règle ne concerne QUE les
+   * vétos portant ce tag (normalisé trim().toLowerCase()). Absent (undefined) →
+   * dimension GLOBALE historique (byte-identique). Une dimension globale et une
+   * cohorte taguée sur la même dimension = DEUX entrées de score indépendantes
+   * (la variance de la cohorte S'AJOUTE à la variance globale, elle ne la remplace
+   * PAS — l'admin met la globale sur « Ignorée » s'il veut une partition pure).
+   */
+  tag?: string
+}
+
+/**
+ * Vague 6 tranche A (#21) — une COHORTE d'équité : (dimension × tag × poids).
+ * Chaque cohorte = une entrée de score indépendante, dont la variance est
+ * calculée UNIQUEMENT sur les vétos porteurs du tag, puis pondérée par `poids`
+ * (résolu depuis le cran d'importance, comme les dimensions globales). Voyage
+ * DANS EquityWeights (cf. `EquityWeights.cohortes`) → threadée partout où
+ * equityWeights l'est déjà (loader → solver → scoreur → crise → replay), sans
+ * nouveau champ de SolverInput/ContexteSimulation à propager (anti-bombe
+ * resoudreContexte).
+ */
+export interface EquityCohorte {
+  dimension: EquityDimension
+  /** Tag NORMALISÉ (trim().toLowerCase()) désignant les porteurs de la cohorte. */
+  tag: string
+  /** Poids moteur (résolu du cran d'importance via IMPORTANCE_TO_WEIGHT). */
+  poids: number
 }
 
 /**
@@ -153,11 +194,44 @@ export function buildEquityWeights(rules: EquityRule[]): EquityWeights {
   for (const dim of EQUITY_DIMENSIONS) {
     out[DIMENSION_TO_FIELD[dim]] = IMPORTANCE_TO_WEIGHT[DEFAULT_IMPORTANCE[dim]]
   }
-  // 2. Écrase avec les règles réellement posées (dernière gagne si doublon).
+  // 2. Sépare les règles GLOBALES (sans tag) des règles COHORTE (avec tag).
+  //    • Globales → écrasent le poids de LEUR dimension (dernière gagne si doublon).
+  //    • Cohortes → une entrée de score indépendante par (dimension, tag) — une
+  //      importance « ignoree » (poids 0) est INERTE : on ne la matérialise pas
+  //      (byte-identique : pas d'entrée cohorte à poids nul dans le scoreur).
+  const cohortes: EquityCohorte[] = []
   for (const r of rules) {
-    const field = DIMENSION_TO_FIELD[r.dimension]
     const poids = IMPORTANCE_TO_WEIGHT[r.importance]
-    if (field && typeof poids === 'number') out[field] = poids
+    if (typeof poids !== 'number') continue
+    const tag = typeof r.tag === 'string' ? r.tag.trim().toLowerCase() : ''
+    if (tag !== '') {
+      if (poids > 0) cohortes.push({ dimension: r.dimension, tag, poids })
+      continue
+    }
+    // Règle globale (sans tag) : comportement historique inchangé.
+    const field = DIMENSION_TO_FIELD[r.dimension]
+    if (field) out[field] = poids
   }
+  // Absent/vide → BYTE-IDENTIQUE (pas de clé `cohortes` du tout).
+  if (cohortes.length > 0) out.cohortes = cohortes
   return out
+}
+
+/** dimension d'équité → champ du CompteurVet (rules/optimization.ts) équilibré.
+ *  Utilisé par le scoreur pour dériver la variance d'une COHORTE (#21).
+ *  ⚠️ `grands_weekend` → `grandsWePerdus`, qui n'est incrémenté que pour les
+ *  SALARIÉS (compterParVet l.113) : une cohorte sur cette dimension ne « voit »
+ *  donc que les salariés porteurs du tag. Limitation ASSUMÉE et documentée
+ *  (voie sûre : aucune modification de compterParVet → byte-identique au score
+ *  global des 6 dimensions). Les 5 autres dimensions comptent tous les vétos. */
+export const DIMENSION_TO_COMPTEUR: Record<
+  EquityDimension,
+  'weGardes' | 'weekendPremier' | 'feriesGardes' | 'semainePremier' | 'semaineSecond' | 'grandsWePerdus'
+> = {
+  weekend: 'weGardes',
+  weekend_premier: 'weekendPremier',
+  ferie: 'feriesGardes',
+  semaine_premier: 'semainePremier',
+  semaine_second: 'semaineSecond',
+  grands_weekend: 'grandsWePerdus',
 }

@@ -31,9 +31,11 @@ import {
   propositionVersPayload,
   propositionVersComposition,
   propositionVersRoleInterdit,
+  propositionVersEquite,
   apercuProposition,
   type PropositionRegle,
   type VetoResolu,
+  type CohorteEquitePayload,
 } from '@/lib/ia/regleSchema'
 
 // ── Garde admin ──────────────────────────────────────────────
@@ -176,16 +178,21 @@ export async function setEquiteImportance(dimension: string, importance: string)
   // Seuls dimension + importance sont lus (extraireEquityRules / rendu catalogue).
   const params_json = { qui: null, quand: null, params: { dimension, importance } }
 
-  // Cherche une règle equilibrer existante pour CETTE dimension (UPSERT manuel).
+  // Cherche une règle equilibrer GLOBALE (SANS tag) pour CETTE dimension
+  // (UPSERT manuel). ⚠️ On ne matche QUE les lignes sans tag : les cohortes
+  // (Vague 6 #21) sont des lignes distinctes par (dimension, tag) — la globale
+  // ne doit jamais écraser une cohorte, ni l'inverse.
   const { data: existantes } = await supabase
     .from('regles_cabinet')
     .select('id, params_json')
     .eq('cabinet_id', cabinetId)
     .eq('brique_id', 'equilibrer')
 
-  const match = ((existantes ?? []) as Array<{ id: string; params_json: unknown }>).find(
-    (r) => (r.params_json as { params?: { dimension?: string } })?.params?.dimension === dimension,
-  )
+  const match = ((existantes ?? []) as Array<{ id: string; params_json: unknown }>).find((r) => {
+    const p = (r.params_json as { params?: { dimension?: string; tag?: unknown } })?.params
+    const t = typeof p?.tag === 'string' ? p.tag.trim() : ''
+    return p?.dimension === dimension && t === '' // globale = sans tag
+  })
 
   if (match) {
     const { error } = await supabase
@@ -205,6 +212,131 @@ export async function setEquiteImportance(dimension: string, importance: string)
     if (error) return { error: error.message }
   }
 
+  revalidatePath('/regles')
+  return { success: true }
+}
+
+// ── Cohortes d'équité par tag (Vague 6 tranche A — #21) ──────
+//
+// Une COHORTE = une règle `equilibrer` avec un TAG en plus de dimension +
+// importance : l'équité de cette dimension n'est équilibrée QUE sur les vétos
+// porteurs du tag. UPSERT manuel par (cabinet, dimension, tag) — une ligne
+// distincte de la dimension globale (sans tag) et des autres cohortes.
+// Double garde : assertAdmin + RLS regles_cabinet (write admin-only, isolation
+// RESTRICTIVE). S'applique à la PROCHAINE génération.
+
+/** Une cohorte telle que renvoyée à l'UI (liste des cohortes posées). */
+export interface CohorteEquiteUI {
+  id: string
+  dimension: string
+  tag: string
+  importance: string
+}
+
+/**
+ * Crée ou met à jour l'importance d'une cohorte d'équité (dimension × tag).
+ * `importance = 'ignoree'` supprime la cohorte (0 = inerte : pas de ligne à
+ * poids nul en base). Le tag DOIT être porté par au moins un véto actif
+ * (anti-coquille-vide ; le pré-vol le re-signale). Frontière de confiance :
+ * dimension/importance/tag reconstruits + validés ici.
+ */
+export async function setCohorteEquite(dimension: string, tag: string, importance: string) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+  const vetoId = garde.veto.id
+
+  if (!(EQUITY_DIMENSIONS as readonly string[]).includes(dimension)) {
+    return { error: `Dimension d'équité inconnue : « ${dimension} ».` }
+  }
+  if (!(IMPORTANCE_LEVELS as readonly string[]).includes(importance)) {
+    return { error: `Niveau d'importance inconnu : « ${importance} ».` }
+  }
+  const tagNorm = (tag ?? '').trim().toLowerCase()
+  if (tagNorm === '' || tagNorm.length > TAG_MAX_LONGUEUR) {
+    return { error: `Étiquette invalide (1 à ${TAG_MAX_LONGUEUR} caractères).` }
+  }
+
+  let cabinetId: string
+  try {
+    cabinetId = await resoudreCabinetId(supabase)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
+  }
+
+  // Anti-coquille-vide : le tag doit être porté par au moins un véto actif.
+  const { data: vetsTags } = await supabase
+    .from('veterinaires')
+    .select('tags')
+    .eq('actif', true)
+  const tagPorte = ((vetsTags as { tags?: string[] | null }[] | null) ?? []).some((v) =>
+    (v.tags ?? []).some((t) => t.trim().toLowerCase() === tagNorm),
+  )
+  if (!tagPorte) {
+    return {
+      error: `Aucun vétérinaire actif ne porte l'étiquette « ${tagNorm} ». Ajoute-la d'abord sur les fiches concernées (page Équipe).`,
+    }
+  }
+
+  // Cherche la cohorte existante (même dimension + même tag).
+  const { data: existantes } = await supabase
+    .from('regles_cabinet')
+    .select('id, params_json')
+    .eq('cabinet_id', cabinetId)
+    .eq('brique_id', 'equilibrer')
+  const match = ((existantes ?? []) as Array<{ id: string; params_json: unknown }>).find((r) => {
+    const p = (r.params_json as { params?: { dimension?: string; tag?: unknown } })?.params
+    const t = typeof p?.tag === 'string' ? p.tag.trim().toLowerCase() : ''
+    return p?.dimension === dimension && t === tagNorm
+  })
+
+  // « Ignorée » = 0 (inerte) → on SUPPRIME la cohorte plutôt que de stocker une
+  // ligne à poids nul (byte-identique : aucune entrée cohorte côté moteur).
+  if (importance === 'ignoree') {
+    if (match) {
+      const { error } = await supabase.from('regles_cabinet').delete().eq('id', match.id)
+      if (error) return { error: error.message }
+    }
+    revalidatePath('/regles')
+    return { success: true }
+  }
+
+  const params_json = {
+    qui: null,
+    quand: null,
+    params: { dimension, importance, tag: tagNorm },
+  }
+
+  if (match) {
+    const { error } = await supabase
+      .from('regles_cabinet')
+      .update({ params_json })
+      .eq('id', match.id)
+    if (error) return { error: error.message }
+  } else {
+    const { error } = await supabase.from('regles_cabinet').insert({
+      cabinet_id: cabinetId,
+      brique_id: 'equilibrer',
+      params_json,
+      force: 'si_possible',
+      actif: true,
+      created_by: vetoId,
+    })
+    if (error) return { error: error.message }
+  }
+
+  revalidatePath('/regles')
+  return { success: true }
+}
+
+/** Supprime une cohorte d'équité par son id de règle. Admin-only + RLS. */
+export async function deleteCohorteEquite(id: string) {
+  const supabase = await createClient()
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+  const { error } = await supabase.from('regles_cabinet').delete().eq('id', id)
+  if (error) return { error: error.message }
   revalidatePath('/regles')
   return { success: true }
 }
@@ -1122,6 +1254,8 @@ export type PropositionIaResultat =
       payloadComposition?: CompositionReglePayload
       /** Payload prêt pour upsertRoleInterditRegle (règle GLOBALE, n°22). */
       payloadRoleInterdit?: RoleInterditReglePayload
+      /** Payload prêt pour setCohorteEquite (cohorte d'équité GLOBALE, #21). */
+      payloadEquite?: CohorteEquitePayload
     }
 
 /**
@@ -1205,6 +1339,22 @@ export async function proposerRegleDepuisTexte(phrase: string): Promise<Proposit
       proposition,
       apercu: apercuProposition(proposition),
       payloadComposition: convCompo.payload,
+    }
+  }
+
+  // ── Cohorte d'équité GLOBALE (equilibrer, #21) : conversion dédiée ──
+  if (proposition.brique_id === 'equilibrer') {
+    const convEq = propositionVersEquite(proposition, tagsEquipe)
+    if (!convEq.ok) {
+      return {
+        proposition: { ...proposition, faisable: false, message: convEq.raison },
+        apercu: '',
+      }
+    }
+    return {
+      proposition,
+      apercu: apercuProposition(proposition),
+      payloadEquite: convEq.payload,
     }
   }
 

@@ -36,6 +36,7 @@ function prop(over: Partial<PropositionRegle>): PropositionRegle {
     jours: null, sens: null,
     type_avant: null, type_apres: null, n_jours: null, repos_jours: null,
     ancre: null, sens_cadence: null,
+    dimension_equite: null, importance_equite: null,
     ...over,
   }
 }

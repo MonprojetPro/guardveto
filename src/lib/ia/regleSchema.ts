@@ -39,6 +39,14 @@ export const BRIQUES_IA = [
   'repos_apres_serie',
   // Cadencement « 1 WE sur N ancré » (#20) — par véto (cas pompier volontaire).
   'cadencement_weekend',
+  // Équité par COHORTE de tag (Vague 6 tranche A — #21) — règle GLOBALE.
+  'equilibrer',
+] as const
+
+/** Dimensions d'équité proposables par l'IA (miroir de EQUITY_DIMENSIONS). */
+export const DIMENSIONS_EQUITE_IA = [
+  'weekend', 'weekend_premier', 'ferie',
+  'semaine_premier', 'semaine_second', 'grands_weekend',
 ] as const
 
 export const FORCES_IA = ['jamais', 'sauf_crise', 'evitee', 'si_possible'] as const
@@ -103,6 +111,10 @@ export const PropositionRegleSchema = z.object({
    *  interdit = WE du cycle interdits de garde (cas pompier) ;
    *  impose = gardes WE forcées sur le cycle. (n_semaines réutilisé pour le cycle N.) */
   sens_cadence: z.enum(['interdit', 'impose']).nullable(),
+  /** equilibrer (#21) : dimension d'équité à équilibrer sur la cohorte du tag. */
+  dimension_equite: z.enum(DIMENSIONS_EQUITE_IA).nullable(),
+  /** equilibrer (#21) : niveau d'importance de l'équilibrage (cohorte). */
+  importance_equite: z.enum(['peu_important', 'normal', 'important', 'essentiel']).nullable(),
 })
 
 export type PropositionRegle = z.infer<typeof PropositionRegleSchema>
@@ -178,10 +190,14 @@ export function propositionVersPayload(
 ): ConversionResultat {
   if (!p.faisable) return { ok: false, raison: p.message || 'Demande non traduisible en règle.' }
   if (!p.brique_id) return { ok: false, raison: 'Type de règle non déterminé par l’assistant.' }
-  // Les règles GLOBALES d'équipe (sans vétérinaire) ont leur propre
-  // conversion — cf. propositionVersComposition / propositionVersRoleInterdit.
-  if (p.brique_id === 'composition_equipe' || p.brique_id === 'role_interdit_tag') {
-    return { ok: false, raison: 'Règle d’équipe : conversion dédiée (routage appelant).' }
+  // Les règles GLOBALES (sans vétérinaire) ont leur propre conversion — cf.
+  // propositionVersComposition / propositionVersRoleInterdit / propositionVersEquite.
+  if (
+    p.brique_id === 'composition_equipe' ||
+    p.brique_id === 'role_interdit_tag' ||
+    p.brique_id === 'equilibrer'
+  ) {
+    return { ok: false, raison: 'Règle globale : conversion dédiée (routage appelant).' }
   }
 
   const owner = resoudrePrenom(p.veterinaire, vets)
@@ -468,6 +484,58 @@ export function propositionVersRoleInterdit(
   }
 }
 
+/** Payload d'une cohorte d'équité (#21) — cible setCohorteEquite. */
+export interface CohorteEquitePayload {
+  dimension: string
+  tag: string
+  importance: string
+}
+
+export type ConversionEquiteResultat =
+  | { ok: true; payload: CohorteEquitePayload }
+  | { ok: false; raison: string }
+
+/**
+ * propositionVersEquite — convertit une proposition `equilibrer` (règle GLOBALE
+ * d'équité par COHORTE de tag, #21) en CohorteEquitePayload. L'IA ne pilote
+ * l'équité QUE par cohorte (dimension × tag) : l'équilibrage GLOBAL des 6
+ * dimensions se règle aux menus (pas de valeur ajoutée IA). `tagsEquipe` : les
+ * étiquettes réellement portées (anti-coquille-vide ; le serveur re-vérifie).
+ */
+export function propositionVersEquite(
+  p: PropositionRegle,
+  tagsEquipe: string[],
+): ConversionEquiteResultat {
+  if (!p.faisable) return { ok: false, raison: p.message || 'Demande non traduisible en règle.' }
+  if (p.brique_id !== 'equilibrer') {
+    return { ok: false, raison: 'Type de règle non déterminé par l’assistant.' }
+  }
+  const dimension = p.dimension_equite
+  if (!dimension) {
+    return { ok: false, raison: 'Précise ce qu’il faut équilibrer (week-ends, fériés, soirs de semaine…).' }
+  }
+  const tag = (p.tag ?? '').trim().toLowerCase()
+  if (tag === '') {
+    return { ok: false, raison: 'Précise l’étiquette de la cohorte concernée (ex. junior, senior).' }
+  }
+  if (!tagsEquipe.includes(tag)) {
+    return {
+      ok: false,
+      raison: `Aucun vétérinaire ne porte l'étiquette « ${tag} ». Ajoute-la d'abord sur les fiches concernées (page Équipe), puis reviens créer la règle.`,
+    }
+  }
+  return {
+    ok: true,
+    payload: {
+      dimension,
+      tag,
+      // Défaut « important » si l'IA n'a pas jugé le niveau (jamais « ignoree » :
+      // une cohorte inerte n'a pas de sens à créer).
+      importance: p.importance_equite ?? 'important',
+    },
+  }
+}
+
 /**
  * apercuProposition — rend la proposition en une phrase française (le même
  * rendu que la liste /regles), à partir des termes humains de la proposition.
@@ -527,9 +595,16 @@ export function apercuProposition(p: PropositionRegle): string {
     case 'cadencement_weekend':
       params = { n_semaines: p.n_semaines, ancre: p.ancre, sens: p.sens_cadence }
       break
+    case 'equilibrer':
+      params = { dimension: p.dimension_equite, importance: p.importance_equite, tag: p.tag }
+      break
   }
   const predicat = rendreRegle(p.brique_id, params, { nomVeto: (x) => x })
-  // Règles GLOBALES d'équipe : pas de sujet vétérinaire à préfixer.
-  if (p.brique_id === 'composition_equipe' || p.brique_id === 'role_interdit_tag') return predicat
+  // Règles GLOBALES (équipe + équité) : pas de sujet vétérinaire à préfixer.
+  if (
+    p.brique_id === 'composition_equipe' ||
+    p.brique_id === 'role_interdit_tag' ||
+    p.brique_id === 'equilibrer'
+  ) return predicat
   return p.veterinaire ? `${p.veterinaire} ${predicat}` : predicat
 }

@@ -38,6 +38,7 @@ import { rendreRegle } from './briques/catalogue'
 import { lundiDeSemaine, samediDeSemaine } from './utils'
 import { DEFAULT_STRUCTURE_CONFIG, type StructureConfig } from './structure-config'
 import type { CreneauModele } from './creneau-modele'
+import type { EquityCohorte } from './equity-weights'
 
 // ── Types publics ────────────────────────────────────────────
 
@@ -51,6 +52,7 @@ export type CodeAvertissementPreVol =
   | 'composition_sans_porteur'  // règle de composition dont AUCUN véto actif ne porte le tag
   | 'role_interdit_intenable'   // rôle interdit à un tag que TOUS les vétos actifs portent
   | 'sequence_inerte'           // règle de rythme (série/succession/repos) mal paramétrée → sans effet
+  | 'cohorte_equite_sans_porteur' // cohorte d'équité (#21) dont AUCUN véto actif ne porte le tag → inerte
 
 /**
  * Un avertissement du pré-vol — TOUJOURS non bloquant.
@@ -92,6 +94,12 @@ export interface PreVolInput {
    * en silence (aucun véto actif ne les ramasse). Absent → détection (b) sautée.
    */
   contraintesParVet?: Map<string, ContrainteEngine[]>
+  /**
+   * Cohortes d'équité par tag (Vague 6 tranche A — #21), telles qu'assemblées
+   * dans equityWeights.cohortes par le loader. Absent/vide → détection sautée.
+   * Sert au SEUL avertissement « cohorte sans porteur » (léger, non bloquant).
+   */
+  cohortesEquite?: EquityCohorte[]
 }
 
 // ── Helpers internes ─────────────────────────────────────────
@@ -629,7 +637,41 @@ export function preVolRegles(input: PreVolInput): AvertissementPreVol[] {
     ...detecterRolesInterditsIntenables(vetsN, input),
     // (e) règles de rythme (#13) arithmétiquement inertes (ex. serie_max = 0)
     ...detecterSequencesInertes(vetsN, nomVeto),
+    // (f) cohortes d'équité (#21) dont aucun véto actif ne porte le tag → inerte
+    ...detecterCohortesEquiteSansPorteur(vetsN, input),
   ]
+}
+
+// ── (f) Cohortes d'équité — tag sans porteur (Vague 6 #21) ──
+// Une cohorte d'équité taguée sur une étiquette QUE PERSONNE ne porte est
+// simplement INERTE (variance calculée sur 0 véto = 0). Avertissement LÉGER,
+// non bloquant : c'est probablement un tag oublié sur les fiches de l'équipe.
+// (Une cohorte à 1 seul porteur est aussi de variance 0 mais reste un choix
+// admin volontaire potentiel — on ne signale QUE le zéro porteur.)
+function detecterCohortesEquiteSansPorteur(
+  vets: VetEngine[],
+  input: PreVolInput,
+): AvertissementPreVol[] {
+  const out: AvertissementPreVol[] = []
+  const cohortes = input.cohortesEquite ?? []
+  // Dédoublonne par tag (plusieurs dimensions peuvent viser le même tag absent).
+  const tagsSansPorteur = new Set<string>()
+  for (const co of cohortes) {
+    const tagNorm = co.tag.trim().toLowerCase()
+    if (tagNorm === '' || tagsSansPorteur.has(tagNorm)) continue
+    const porteurs = vets.some((v) =>
+      (v.tags ?? []).some((t) => t.trim().toLowerCase() === tagNorm),
+    )
+    if (!porteurs) tagsSansPorteur.add(tagNorm)
+  }
+  for (const tag of tagsSansPorteur) {
+    out.push({
+      code: 'cohorte_equite_sans_porteur',
+      regles: [`équilibrage réservé aux vétérinaires « ${tag} »`],
+      message: `Un réglage d'équité vise l'étiquette « ${tag} », mais aucun vétérinaire actif ne la porte : ce réglage n'a aucun effet. Ajoutez l'étiquette sur les fiches concernées (page Équipe) ou retirez la cohorte depuis l'écran Règles.`,
+    })
+  }
+  return out
 }
 
 // ── (e) Successions / séries / repos avancés — configs inertes (#13) ──

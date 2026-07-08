@@ -17,7 +17,9 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { SlidersHorizontal } from 'lucide-react'
+import { SlidersHorizontal, Plus, Trash2, Tags } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from '@/components/ui/select'
@@ -26,7 +28,11 @@ import {
   type EquityDimension, type ImportanceLevel,
 } from '@/engine/equity-weights'
 import { IMPORTANCE_LABELS } from '@/engine/briques/catalogue'
-import { setEquiteImportance, setStructureRegle, setRoleAvantageFinancier } from '@/app/(protected)/regles/actions'
+import {
+  setEquiteImportance, setStructureRegle, setRoleAvantageFinancier,
+  setCohorteEquite, deleteCohorteEquite,
+  type CohorteEquiteUI,
+} from '@/app/(protected)/regles/actions'
 
 // ── Référentiels d'affichage ─────────────────────────────────
 
@@ -158,8 +164,26 @@ function Ligne({
   )
 }
 
+// ── Cohortes d'équité par tag (Vague 6 tranche A — #21) ──────
+// Libellé court de chaque dimension pour la liste des cohortes.
+const DIMENSION_LABELS: Record<EquityDimension, string> = {
+  weekend: 'Week-ends',
+  weekend_premier: 'Rôle de 1er le week-end',
+  ferie: 'Jours fériés',
+  semaine_premier: 'Soirs de semaine — 1er',
+  semaine_second: 'Soirs de semaine — 2nd',
+  grands_weekend: 'Grands week-ends (salariés)',
+}
+// Crans proposés à la CRÉATION d'une cohorte (on exclut « Ignorée » : pour
+// retirer une cohorte on utilise la corbeille — plus explicite qu'un cran nul).
+const IMPORTANCE_ACTIVES = IMPORTANCE_LEVELS.filter((n) => n !== 'ignoree')
+
 interface ReglagesPlanningClientProps {
   equite: Record<EquityDimension, ImportanceLevel>
+  /** Cohortes d'équité posées (dimension × tag × importance) — #21. */
+  cohortes: CohorteEquiteUI[]
+  /** Étiquettes réellement portées par l'équipe (choix du formulaire cohorte). */
+  tagsEquipe: string[]
   structure: { liaison_creneaux: StructureRegleUI; inversion_role: StructureRegleUI }
   /** Réglage des 4 pénalités souples (backlog n°16) — clés PENALITES_SOUPLES_UI. */
   penalitesSouples: Record<string, StructureRegleUI>
@@ -168,13 +192,18 @@ interface ReglagesPlanningClientProps {
   isAdmin: boolean
 }
 
-export function ReglagesPlanningClient({ equite, structure, penalitesSouples, roleAvantage, isAdmin }: ReglagesPlanningClientProps) {
+export function ReglagesPlanningClient({ equite, cohortes, tagsEquipe, structure, penalitesSouples, roleAvantage, isAdmin }: ReglagesPlanningClientProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [eq, setEq] = useState(equite)
   const [st, setSt] = useState(structure)
   const [ps, setPs] = useState(penalitesSouples)
   const [roleAv, setRoleAv] = useState(roleAvantage)
+  // Formulaire d'ajout de cohorte.
+  const [ajoutOuvert, setAjoutOuvert] = useState(false)
+  const [coDim, setCoDim] = useState<EquityDimension>('weekend')
+  const [coTag, setCoTag] = useState(tagsEquipe[0] ?? '')
+  const [coImp, setCoImp] = useState<ImportanceLevel>('important')
 
   const optionsImportance = IMPORTANCE_LEVELS.map((n) => ({ value: n, label: cap(IMPORTANCE_LABELS[n]) }))
   const optionsForce = FORCE_OPTIONS.map((f) => ({ value: f, label: FORCE_LABELS[f] }))
@@ -234,6 +263,37 @@ export function ReglagesPlanningClient({ equite, structure, penalitesSouples, ro
     })
   }
 
+  // ── Cohortes d'équité (#21) ──
+  const changerImportanceCohorte = (c: CohorteEquiteUI, imp: string) => {
+    startTransition(async () => {
+      const res = await setCohorteEquite(c.dimension, c.tag, imp)
+      if (res?.error) toast.error(res.error)
+      else { toast.success('Réglage enregistré — appliqué à la prochaine génération.'); router.refresh() }
+    })
+  }
+
+  const supprimerCohorte = (c: CohorteEquiteUI) => {
+    startTransition(async () => {
+      const res = await deleteCohorteEquite(c.id)
+      if (res?.error) toast.error(res.error)
+      else { toast.success('Cohorte retirée.'); router.refresh() }
+    })
+  }
+
+  const ajouterCohorte = () => {
+    const tag = coTag.trim().toLowerCase()
+    if (tag === '') { toast.error('Choisis une étiquette.'); return }
+    startTransition(async () => {
+      const res = await setCohorteEquite(coDim, tag, coImp)
+      if (res?.error) { toast.error(res.error); return }
+      toast.success('Cohorte ajoutée — appliquée à la prochaine génération.')
+      setAjoutOuvert(false)
+      router.refresh()
+    })
+  }
+
+  const optionsImportanceActives = IMPORTANCE_ACTIVES.map((n) => ({ value: n, label: cap(IMPORTANCE_LABELS[n]) }))
+
   return (
     <section className="space-y-4 max-w-3xl">
       <div>
@@ -265,6 +325,139 @@ export function ReglagesPlanningClient({ equite, structure, penalitesSouples, ro
             onChange={(v) => changerEquite(dim, v as ImportanceLevel)}
           />
         ))}
+      </div>
+
+      {/* Cohortes d'équité par étiquette (Vague 6 tranche A — #21) */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+            <Tags className="w-3.5 h-3.5" /> Cohortes d&apos;équité
+          </h3>
+          {isAdmin && (
+            <Button
+              size="sm" variant="outline"
+              onClick={() => { setCoTag(tagsEquipe[0] ?? ''); setAjoutOuvert((o) => !o) }}
+              disabled={isPending}
+            >
+              <Plus className="w-4 h-4 mr-1" /> Ajouter
+            </Button>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground leading-5">
+          Équilibrer une dimension <strong>uniquement</strong> entre les
+          vétérinaires portant une étiquette (junior, senior…). S&apos;ajoute à
+          l&apos;équilibrage global ci-dessus. Pour une répartition strictement
+          séparée, mettez la dimension globale sur « Ignorée ».
+        </p>
+
+        {cohortes.length === 0 ? (
+          <p className="text-sm text-muted-foreground p-3.5 rounded-lg border border-dashed border-border">
+            Aucune cohorte d&apos;équité pour l&apos;instant.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {cohortes.map((c) => (
+              <div
+                key={c.id}
+                className="flex items-center gap-3 p-3.5 rounded-lg border border-border bg-card"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground">
+                    {DIMENSION_LABELS[c.dimension as EquityDimension] ?? c.dimension}
+                  </p>
+                  <p className="text-xs text-muted-foreground leading-5">
+                    Entre les vétérinaires « {c.tag} »
+                  </p>
+                </div>
+                {isAdmin ? (
+                  <>
+                    <Select
+                      value={c.importance}
+                      onValueChange={(v) => v && changerImportanceCohorte(c, v)}
+                      disabled={isPending}
+                    >
+                      <SelectTrigger className="w-52 shrink-0">{cap(IMPORTANCE_LABELS[c.importance as ImportanceLevel] ?? c.importance)}</SelectTrigger>
+                      <SelectContent>
+                        {optionsImportanceActives.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="ghost" size="icon"
+                      className="shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => supprimerCohorte(c)} disabled={isPending}
+                      aria-label="Retirer la cohorte"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <span className="text-sm text-muted-foreground shrink-0 w-52 text-right">
+                    {cap(IMPORTANCE_LABELS[c.importance as ImportanceLevel] ?? c.importance)}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {isAdmin && ajoutOuvert && (
+          <div className="p-3.5 rounded-lg border border-border bg-muted/40 space-y-3">
+            {tagsEquipe.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aucune étiquette n&apos;est posée sur l&apos;équipe. Ajoutez-en
+                d&apos;abord sur les fiches de la page Équipe.
+              </p>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Dimension</Label>
+                    <Select value={coDim} onValueChange={(v) => v && setCoDim(v as EquityDimension)}>
+                      <SelectTrigger className="w-full">{DIMENSION_LABELS[coDim]}</SelectTrigger>
+                      <SelectContent>
+                        {EQUITY_DIMENSIONS.map((d) => (
+                          <SelectItem key={d} value={d}>{DIMENSION_LABELS[d]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Étiquette</Label>
+                    <Select value={coTag} onValueChange={(v) => v && setCoTag(v)}>
+                      <SelectTrigger className="w-full">{coTag || 'Choisir…'}</SelectTrigger>
+                      <SelectContent>
+                        {tagsEquipe.map((t) => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Importance</Label>
+                    <Select value={coImp} onValueChange={(v) => v && setCoImp(v as ImportanceLevel)}>
+                      <SelectTrigger className="w-full">{cap(IMPORTANCE_LABELS[coImp])}</SelectTrigger>
+                      <SelectContent>
+                        {optionsImportanceActives.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setAjoutOuvert(false)} disabled={isPending}>
+                    Annuler
+                  </Button>
+                  <Button size="sm" onClick={ajouterCohorte} disabled={isPending || coTag.trim() === ''}>
+                    {isPending ? 'Ajout…' : 'Ajouter la cohorte'}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Structure du week-end */}

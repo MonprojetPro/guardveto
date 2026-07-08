@@ -134,6 +134,9 @@ export async function GET(req: NextRequest) {
       nbVetosSemaineSoir: contexte.nbVetosSemaineSoir,
       annuaire,
       contraintesParVet,
+      // #21 — cohortes d'équité (voyagent dans equityWeights) : signale un tag
+      // sans porteur (léger, non bloquant).
+      cohortesEquite: contexte.equityWeights?.cohortes,
     })
   } catch (e) {
     console.warn('[pre-vol] analyse de cohérence échouée (best-effort):', e)

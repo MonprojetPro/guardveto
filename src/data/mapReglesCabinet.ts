@@ -173,9 +173,19 @@ export function extraireEquityRules(regles: RegleCabinetRow[]): EquityRule[] {
     const importance = params.importance
     if (typeof dimension !== 'string' || !DIMENSIONS_VALIDES.has(dimension)) continue
     if (typeof importance !== 'string' || !IMPORTANCES_VALIDES.has(importance)) continue
+    // Cohorte par tag (Vague 6 tranche A — #21) : optionnel, normalisé à la
+    // frontière (trim().toLowerCase()) comme extraireCompositions. Un tag vide
+    // ou absent → règle GLOBALE historique (byte-identique). Un tag présent →
+    // la règle ne concerne que les porteurs (cohorte indépendante).
+    const tagBrut = params.tag
+    const tag =
+      typeof tagBrut === 'string' && tagBrut.trim() !== ''
+        ? tagBrut.trim().toLowerCase()
+        : undefined
     out.push({
       dimension: dimension as EquityDimension,
       importance: importance as ImportanceLevel,
+      ...(tag ? { tag } : {}),
     })
   }
   return out

@@ -28,6 +28,7 @@ import {
   upsertRegle,
   upsertCompositionRegle,
   upsertRoleInterditRegle,
+  setCohorteEquite,
   type ForceFormulaire,
   type PropositionIaResultat,
 } from '@/app/(protected)/regles/actions'
@@ -97,13 +98,21 @@ export function AssistantIA() {
 
   const creer = () => {
     if (!resultat || 'error' in resultat) return
-    if (!resultat.payload && !resultat.payloadComposition && !resultat.payloadRoleInterdit) return
+    if (!resultat.payload && !resultat.payloadComposition && !resultat.payloadRoleInterdit && !resultat.payloadEquite) return
     setErreurCreation(null)
     startCreate(async () => {
       // L'admin peut avoir ajusté la puissance : on prend SON choix, sinon celui de l'IA.
-      // Trois familles : règle par-véto (upsertRegle) ou règles GLOBALES d'équipe
-      // (upsertCompositionRegle n°6 / upsertRoleInterditRegle n°22).
-      const res = resultat.payloadComposition
+      // Quatre familles : règle par-véto (upsertRegle) ; règles GLOBALES d'équipe
+      // (upsertCompositionRegle n°6 / upsertRoleInterditRegle n°22) ; cohorte
+      // d'équité (setCohorteEquite #21 — pas de « force », le cran d'importance
+      // porte le réglage).
+      const res = resultat.payloadEquite
+        ? await setCohorteEquite(
+            resultat.payloadEquite.dimension,
+            resultat.payloadEquite.tag,
+            resultat.payloadEquite.importance,
+          )
+        : resultat.payloadComposition
         ? await upsertCompositionRegle({
             ...resultat.payloadComposition,
             force: force ?? resultat.payloadComposition.force,
@@ -147,6 +156,7 @@ export function AssistantIA() {
   const payload = resultat && !('error' in resultat) ? resultat.payload : undefined
   const payloadComposition = resultat && !('error' in resultat) ? resultat.payloadComposition : undefined
   const payloadRoleInterdit = resultat && !('error' in resultat) ? resultat.payloadRoleInterdit : undefined
+  const payloadEquite = resultat && !('error' in resultat) ? resultat.payloadEquite : undefined
   /** Puissance proposée par l'IA (pour signaler à l'admin s'il l'a modifiée). */
   const forceIa = payload?.force ?? payloadComposition?.force ?? payloadRoleInterdit?.force ?? null
 
@@ -213,13 +223,16 @@ export function AssistantIA() {
             </p>
           )}
 
-          {(payload || payloadComposition || payloadRoleInterdit) && apercu ? (
+          {(payload || payloadComposition || payloadRoleInterdit || payloadEquite) && apercu ? (
             <>
               <div className="rounded-md bg-muted/50 p-2.5">
                 <p className="text-sm text-foreground leading-6">{apercu}</p>
               </div>
 
-              {/* Puissance réglable — pré-remplie avec le choix de l'IA */}
+              {/* Puissance réglable — pré-remplie avec le choix de l'IA.
+                  Masquée pour une cohorte d'équité (#21) : elle se règle par
+                  cran d'importance, pas par « puissance » de force. */}
+              {!payloadEquite && (
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-foreground">
                   Puissance de la règle
@@ -251,6 +264,7 @@ export function AssistantIA() {
                   </p>
                 )}
               </div>
+              )}
 
               {proposition.message && (
                 <p className="text-xs text-muted-foreground">{proposition.message}</p>

@@ -244,15 +244,19 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
     schemaParams: {
       dimension: 'string (weekend|weekend_premier|ferie|semaine_premier|semaine_second|grands_weekend)',
       importance: 'string (peu_important|normal|important|essentiel)',
+      tag: 'string? (cohorte #21 — absent = équilibrage GLOBAL ; présent = équilibré UNIQUEMENT sur les vétos portant cette étiquette)',
     },
     widget: 'WidgetEquilibrer',
     rendreLangageNaturel: (params) => {
       const dim = typeof params.dimension === 'string' ? params.dimension : ''
       const imp = typeof params.importance === 'string' ? params.importance : ''
+      const tag = typeof params.tag === 'string' ? params.tag.trim() : ''
       const cible = DIMENSION_EQUITE_LABELS[dim] ?? 'les gardes'
       const prio = IMPORTANCE_LABELS[imp]
       const suffixe = prio ? ` — priorité ${prio}` : ''
-      return `répartit équitablement ${cible}${suffixe}`
+      // Cohorte (#21) : on précise sur QUELS vétos porte l'équilibrage.
+      const portee = tag !== '' ? ` entre les vétérinaires « ${tag} »` : ''
+      return `répartit équitablement ${cible}${portee}${suffixe}`
     },
   },
 

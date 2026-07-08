@@ -29,7 +29,7 @@ export interface TypeCreneauIA {
 }
 
 /** Décrit les briques disponibles pour guider l'IA (jours = lundi→vendredi). */
-const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 16 types de règle :
+const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 17 types de règle :
 
 1. interdire_creneau — un vétérinaire ne fait pas de garde un jour fixe de la semaine.
    params: jour (lundi|mardi|mercredi|jeudi|vendredi), exception_vacances_scolaires (true/false).
@@ -88,6 +88,12 @@ Les types 13 à 15 sont des règles de RYTHME (successions et repos entre gardes
      - 'impose' : les gardes week-end du véto DOIVENT tomber sur ce cycle (hors cycle = interdit). ⚠️ Cela n'OBLIGE PAS le moteur à le mettre de garde à CHAQUE week-end du cycle : c'est seulement un filtre de POSITION.
    ⚠️ NE PAS confondre avec espacement_weekend (type 7) qui limite juste la FRÉQUENCE (« au plus 1 WE sur N ») sans dates fixes. Ici les week-ends sont ANCRÉS à des DATES PRÉCISES. Cycle calendaire strict (indépendant des vacances).
    Ex. « Victor est pompier volontaire, il est pris un week-end sur 3 à partir du samedi 5 septembre 2026 » → cadencement_weekend, veterinaire="Victor", n_semaines=3, ancre="2026-09-05", sens_cadence="interdit", force="jamais".
+
+17. equilibrer — règle GLOBALE d'ÉQUITÉ ciblée sur une COHORTE d'étiquette (pas un vétérinaire nominal → laisse veterinaire=null). Elle demande au moteur de répartir équitablement une DIMENSION de charge UNIQUEMENT entre les vétérinaires portant une étiquette (junior, senior…).
+   ⚠️ N'utilise ce type QUE si la demande vise une étiquette (« équilibrer les week-ends ENTRE LES JUNIORS », « que les seniors aient autant de fériés »). L'équilibrage GLOBAL (tous les vétos confondus) se règle dans les menus de l'application — PAS via toi (faisable=false, invite à utiliser les réglages d'équité).
+   params: dimension_equite (weekend = nombre de week-ends | weekend_premier = rôle de 1er le week-end | ferie = jours fériés | semaine_premier = soirs de semaine en 1er | semaine_second = soirs de semaine en 2nd | grands_weekend = grands week-ends des salariés), tag (une étiquette de la liste fournie), importance_equite (peu_important | normal | important | essentiel).
+   Ex. « répartis équitablement les week-ends entre les juniors » → equilibrer, dimension_equite="weekend", tag="junior", importance_equite="important".
+   Même règle que les types 8/9 pour une étiquette inconnue (faisable=false, invite à poser l'étiquette d'abord). Ce type n'a PAS de "force" (le cran d'importance suffit).
 
 Niveau d'importance (force) :
 - jamais = interdiction ferme

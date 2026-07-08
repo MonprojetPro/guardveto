@@ -24,6 +24,7 @@ import {
   ReglagesPlanningClient,
   type StructureRegleUI,
 } from '@/components/regles/ReglagesPlanningClient'
+import type { CohorteEquiteUI } from '@/app/(protected)/regles/actions'
 import {
   CompositionEquipeClient,
   type RegleEquipeUI,
@@ -203,17 +204,36 @@ export default async function ReglesPage({
     ]),
   ) as Record<string, StructureRegleUI>
 
-  // Importance courante par dimension : règle posée si elle existe, sinon défaut.
+  // Importance courante par dimension GLOBALE (sans tag) : règle posée si elle
+  // existe, sinon défaut. ⚠️ On ignore les lignes COHORTE (avec tag) ici — elles
+  // ont leur propre sous-section.
   const importances = Object.fromEntries(
     EQUITY_DIMENSIONS.map((dim) => {
-      const regle = reglesEquilibrer.find(
-        (r) => (r.params_json as { params?: { dimension?: string } })?.params?.dimension === dim,
-      )
+      const regle = reglesEquilibrer.find((r) => {
+        const p = (r.params_json as { params?: { dimension?: string; tag?: unknown } })?.params
+        const t = typeof p?.tag === 'string' ? p.tag.trim() : ''
+        return p?.dimension === dim && t === '' // globale = sans tag
+      })
       const imp = (regle?.params_json as { params?: { importance?: string } })?.params?.importance
       const valide = typeof imp === 'string' && IMPORTANCES.has(imp)
       return [dim, valide ? (imp as ImportanceLevel) : DEFAULT_IMPORTANCE[dim]]
     }),
   ) as Record<EquityDimension, ImportanceLevel>
+
+  // Cohortes d'équité posées (Vague 6 #21) : lignes equilibrer AVEC un tag.
+  const cohortesEquite: CohorteEquiteUI[] = reglesEquilibrer
+    .flatMap((r): CohorteEquiteUI[] => {
+      const p = (r.params_json as {
+        params?: { dimension?: string; importance?: string; tag?: unknown }
+      })?.params
+      const tag = typeof p?.tag === 'string' ? p.tag.trim().toLowerCase() : ''
+      const dimension = p?.dimension
+      const importance = p?.importance
+      if (tag === '' || typeof dimension !== 'string' || typeof importance !== 'string') return []
+      if (!(EQUITY_DIMENSIONS as readonly string[]).includes(dimension)) return []
+      if (!IMPORTANCES.has(importance)) return []
+      return [{ id: r.id, dimension, tag, importance }]
+    })
 
   return (
     <div className="space-y-10">
@@ -234,6 +254,8 @@ export default async function ReglesPage({
       />
       <ReglagesPlanningClient
         equite={importances}
+        cohortes={cohortesEquite}
+        tagsEquipe={tagsEquipe}
         structure={structureConfig}
         penalitesSouples={penalitesSouples}
         roleAvantage={roleAvantage}

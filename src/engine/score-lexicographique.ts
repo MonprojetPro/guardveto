@@ -25,7 +25,7 @@ export interface BonusMalusMap {
   [vetId: string]: number
 }
 import { isValid } from './rules/hard-constraints'
-import { DEFAULT_EQUITY_WEIGHTS, DEFAULT_ROLE_AVANTAGE_FINANCIER, type EquityWeights } from './equity-weights'
+import { DEFAULT_EQUITY_WEIGHTS, DEFAULT_ROLE_AVANTAGE_FINANCIER, DIMENSION_TO_COMPTEUR, type EquityWeights } from './equity-weights'
 import {
   DEFAULT_STRUCTURE_CONFIG, estStructureSouple, penaliteStructureEtage,
   relationsEffectives, resoudrePenaliteSouple, PENALITE_SOUPLE_DEFAUT,
@@ -53,6 +53,8 @@ import {
   desequilibreSemainePremier,
   desequilibreSemaineSecond,
   desequilibreGrandsWeSalaries,
+  variance,
+  type CompteurVet,
 } from './rules/optimization'
 
 // ── Étages (cf. §3.2 enum Etage) ─────────────────────────
@@ -382,19 +384,71 @@ export function scorerPlanning(
 
   // ── Étage 6 : ÉQUITÉ (variance des charges) ──
   const compteurs = compterParVet(planning, vets, roleAvantageFinancier, calendrier)
-  const eq =
+  let eq =
     desequilibreWE(compteurs) * weights.WE_GARDE +
     desequilibreWeekendPremier(compteurs) * weights.WE_PREMIER_ROLE +
     desequilibreFeries(compteurs) * weights.FERIES +
     desequilibreSemainePremier(compteurs) * weights.SEMAINE_PREMIER +
     desequilibreSemaineSecond(compteurs) * weights.SEMAINE_SECOND +
     desequilibreGrandsWeSalaries(compteurs, vets) * weights.GRANDS_WE
+
+  // ── COHORTES D'ÉQUITÉ PAR TAG (Vague 6 tranche A — #21) ──
+  // Chaque cohorte S'AJOUTE aux 6 dimensions globales (elle ne les remplace
+  // PAS). Sa variance est calculée UNIQUEMENT sur les vétos porteurs du tag,
+  // avec le MÊME compteur par-véto que la dimension globale (source unique).
+  // Absent/vide → boucle jamais entrée → BYTE-IDENTIQUE au comportement
+  // historique. Une cohorte dont 0 ou 1 véto porte le tag = variance 0 (inerte,
+  // jamais de crash : variance([]) et variance([x]) valent 0).
+  if (weights.cohortes && weights.cohortes.length > 0) {
+    eq += variancesCohortes(weights.cohortes, compteurs, vets)
+  }
+
   // L'équité est continue : on arrondit pour garder un entier déterministe
   // (variance × poids → on multiplie par 1000 et on arrondit, pour ne pas
   // perdre la finesse sous l'entier).
   ajouter(v, Etage.EQUITE, 'equite-variance', Math.round(eq * 1000))
 
   return v
+}
+
+/**
+ * variancesCohortes — somme pondérée des variances par COHORTE (#21).
+ * Pour chaque cohorte (dimension × tag × poids) : on restreint les compteurs
+ * aux vétos porteurs du tag (normalisé), on prend le champ du CompteurVet
+ * correspondant à la dimension (DIMENSION_TO_COMPTEUR), et on pondère la
+ * variance par le poids de la cohorte. Fonction PURE, jamais d'exception.
+ */
+function variancesCohortes(
+  cohortes: import('./equity-weights').EquityCohorte[],
+  compteurs: CompteurVet[],
+  vets: VetEngineNormalise[],
+): number {
+  // ⚠️ LIMITATION CONNUE (replay) : l'appartenance à une cohorte est lue sur les
+  //    `vet.tags` LIVE, pas snapshotés. La règle `equilibrer` (dimension, tag,
+  //    importance) EST snapshotée (c'est une ligne regles_cabinet), mais les
+  //    TAGS des vétos ne le sont pas. Rejouer un planning après avoir changé les
+  //    étiquettes d'un véto peut donc recomposer la cohorte différemment. C'est
+  //    le MÊME comportement que composition_equipe / role_interdit_tag (lecture
+  //    live des tags) — assumé et cohérent. Non bloquant : jamais de crash.
+  // Tags normalisés par véto (une fois) — source unique de l'appartenance cohorte.
+  const tagsParVet = new Map<string, Set<string>>()
+  for (const vet of vets) {
+    tagsParVet.set(
+      vet.id,
+      new Set((vet.tags ?? []).map((t) => t.trim().toLowerCase()).filter((t) => t !== '')),
+    )
+  }
+  let total = 0
+  for (const co of cohortes) {
+    const champ = DIMENSION_TO_COMPTEUR[co.dimension]
+    if (!champ) continue // dimension inconnue → cohorte ignorée (robustesse)
+    const valeurs = compteurs
+      .filter((c) => tagsParVet.get(c.vetId)?.has(co.tag))
+      .map((c) => c[champ])
+    // 0 ou 1 porteur → variance 0 (inerte). Jamais de crash (variance gère []).
+    total += variance(valeurs) * co.poids
+  }
+  return total
 }
 
 // ── Tie-break déterministe (§3.2 D-R2) ───────────────────
