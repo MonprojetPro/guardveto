@@ -3,8 +3,15 @@
 > Synthèse de la réflexion d'ensemble (2026-07-08), nourrie par l'audit interne
 > (doc 12) et le benchmark marché (doc 11). Cadrage MiKL : penser depuis le
 > cabinet qui vient de s'abonner ; simplicité SANS perdre liberté/visibilité ;
-> moderne, IA-first ; assistant = RENARD (décision ferme). Statut : **vision
-> proposée, en attente d'arbitrage MiKL avant tout découpage.**
+> moderne, IA-first ; assistant = RENARD (décision ferme).
+>
+> **Statut (2026-07-08 soir) : VISION VALIDÉE par MiKL.** Arbitrages :
+> ① l'assistant s'appelle **FILOU** (vérif INPI à faire avant gravure
+> marketing) ; ② des **MAQUETTES HTML navigables** sont fabriquées et validées
+> AVANT tout développement (spécialistes design — critères : moderne, fluide,
+> bien pensé, l'utilisateur ne peut pas se perdre) ; ③ Filou a un 5e verbe :
+> **il renseigne** (répond aux questions sur le fonctionnement de l'appli).
+> Maquettage NON lancé (suspendu par MiKL, à reprendre).
 
 ---
 
@@ -37,11 +44,12 @@ qui fuit dans l'interface.
 
 ## 3. La vision : 4 mouvements
 
-### Mouvement 1 — Le renard devient LE fil conducteur 🦊
+### Mouvement 1 — FILOU devient LE fil conducteur 🦊
 
-UN SEUL assistant (fusion des 3 existants), nommé, incarné (avatars fox-1..5
-déjà dans le repo), accessible partout (panneau global, pas un encadré « bêta »
-au milieu d'un écran). Quatre verbes :
+UN SEUL assistant (fusion des 3 existants), nommé **Filou** (décision MiKL),
+incarné (avatars fox-1..5 déjà dans le repo + dossier « image avatar renard/ »),
+accessible partout (panneau global, pas un encadré « bêta » au milieu d'un
+écran). Cinq verbes :
 
 - **Il accueille** : au jour 1, c'est lui qui mène l'entretien d'arrivée
   (« Vous êtes combien ? Qui fait les gardes ? Comment tournez-vous le
@@ -53,6 +61,11 @@ au milieu d'un écran). Quatre verbes :
   week-end ? », « qu'est-ce qui est défini pour Victor ? », « pourquoi la
   génération a échoué ? » — il pilote la sortie d'impasse au lieu de renvoyer
   l'admin cliquer des liens.
+- **Il renseigne** (arbitrage MiKL) : Filou répond aux questions relatives au
+  FONCTIONNEMENT de l'application (« comment je pose un congé ? », « à quoi
+  sert la publication ? ») — l'aide/FAQ devient conversationnelle, adossée à
+  la doc DOC/Élio existante, avec repli honnête (« je ne sais pas → contacter
+  MonProjetPro ») plutôt qu'une réponse inventée.
 - **Il célèbre sobrement** : « Planning publié, 12 semaines équitables. »
   Jamais de nagging (anti-pattern Duo/Clippy).
 
@@ -123,8 +136,18 @@ nouveau parcours : dicter au renard « équilibre les week-ends entre les
 juniors » est le test des cohortes ; « Manon ne veut pas faire le 24 ET le
 31 » celui du XOR. Le Bloc 3 EST la recette rendue possible.
 
-Découpage pressenti (à affiner après arbitrage) : T1 fondations du renard
-(fusion + identité + panneau global) → T2 jour 1 (accueil, checklist, défauts,
-exemple) → T3 réunification règles/structure/vocabulaire → T4 vue « tout ce qui
-est défini » + explications du renard. La refonte design visuelle reste la
-phase finale (décision MiKL inchangée).
+**Étape suivante (décidée par MiKL, NON lancée)** : fabriquer des MAQUETTES
+avant tout dev — une maquette HTML navigable autonome (format déjà validé chez
+MiKL : ouvrable dans le navigateur) couvrant ~5 écrans clés : ① accueil jour-1
+(checklist 4 étapes + Filou en entretien d'arrivée) ② panneau Filou
+(conversation, reformulation→validation, mode réduit, journal, réponses aux
+questions d'aide) ③ écran Règles réunifié + vue « tout ce qui est défini »
+(par véto) ④ planning avec navigation regroupée (~5 groupes) ⑤ récap avant
+génération. Spécialistes design (PIXEL/MPP + skills design Claude). Critères
+MiKL : moderne, fluide, bien pensé, l'utilisateur ne peut pas se perdre.
+
+Après validation des maquettes seulement, découpage dev pressenti : T1
+fondations de Filou (fusion + identité + panneau global) → T2 jour 1 (accueil,
+checklist, défauts, exemple) → T3 réunification règles/structure/vocabulaire →
+T4 vue « tout ce qui est défini » + explications de Filou. La refonte design
+visuelle complète reste la phase finale (décision MiKL inchangée).
