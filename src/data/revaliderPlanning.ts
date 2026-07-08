@@ -147,6 +147,9 @@ export async function revaliderPlanningPublie(
       // voient la même structure de gardes. Défaut (seed 4 types) = comportement
       // historique, prouvé équivalent par p0-validateur-catalogue-equivalence.
       creneaux: ctx.creneaux,
+      // #17 — MÊME lookback inter-périodes que le solver a vu à la génération :
+      // les deux gardiens jugent la jonction de périodes sur la même donnée.
+      contexteAnterieur: ctx.contexteAnterieur,
     }
 
     for (const v of validerPlanning(planning, input)) {

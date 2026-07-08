@@ -2,7 +2,7 @@
 // GUARDVETO — Utilitaires de dates pour le moteur
 // ============================================================
 
-import type { JourSemaine, Saison, CalendrierResolu } from './types'
+import type { JourSemaine, Saison, CalendrierResolu, PlanningPartiel, AttributionGarde } from './types'
 
 // ── Helpers de base ──────────────────────────────────────
 
@@ -263,6 +263,40 @@ export function estFeteFinAnnee(date: string): boolean {
 export function estWeekend(date: string): boolean {
   const j = jourIndex(date)
   return j === 0 || j === 6
+}
+
+// ── Lookback inter-périodes (#17 — vue étendue des règles de rythme) ──
+
+/**
+ * attributionsAvecContexte — vue ÉTENDUE d'un planning pour les seules règles
+ * de RYTHME (R10, espacement_min, espacement_weekend, R3, au_plus_n fenêtre).
+ *
+ * À la jonction de deux périodes, ces règles doivent « voir » les gardes de la
+ * FIN de la période précédente (le `contexteAnterieur`, ~10 jours de lookback)
+ * pour ne pas laisser un véto enchaîner deux week-ends à cheval sur deux
+ * périodes. On concatène donc les attributions figées antérieures DEVANT les
+ * attributions courantes, et on ne fait consommer cette vue QUE par les
+ * prédicats de rythme (jamais par la couverture, l'équité, R21/R22, etc.).
+ *
+ * Le lookback ne crée AUCUN slot, ne compte dans AUCUNE équité : il ne sert
+ * qu'à juger les écarts / consécutivités.
+ *
+ * Distinction VOLONTAIRE `undefined` vs `[]` (leçon RG2) :
+ *   • `undefined` / absent → repli HISTORIQUE : on renvoie le planning tel quel
+ *     (référence identique → byte-identique, pas d'allocation superflue).
+ *   • `[]` (donnée vide voulue) → on renvoie aussi le planning tel quel (aucune
+ *     garde antérieure à ajouter) — même effet, mais l'intention est explicite.
+ */
+export function attributionsAvecContexte(
+  planning: PlanningPartiel,
+  contexteAnterieur?: AttributionGarde[],
+): PlanningPartiel {
+  // Absent OU vide → aucune extension (référence inchangée = byte-identique).
+  if (!contexteAnterieur || contexteAnterieur.length === 0) return planning
+  // Lookback DEVANT les attributions courantes. Les dates du lookback sont
+  // strictement antérieures au début de la période (filtre par date côté
+  // loader) → aucune collision (date, type) avec le planning courant.
+  return { attributions: [...contexteAnterieur, ...planning.attributions] }
 }
 
 /** Vérifie si un véto est en congé validé à cette date */

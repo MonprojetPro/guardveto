@@ -101,6 +101,12 @@ export interface ProposerReparationParams {
   /** R11b — rôle à avantage financier (même réglage qu'à la génération).
    *  undefined → défaut moteur ('premier'). null → aucun équilibrage. */
   roleAvantageFinancier?: string | null
+  /**
+   * #17 — lookback inter-périodes (mêmes attributions figées de la période
+   * précédente qu'à la génération). Sert aux règles de rythme quand le créneau à
+   * réparer tombe en tout début de période (jonction). Absent/vide → byte-identique.
+   */
+  contexteAnterieur?: AttributionGarde[]
 }
 
 // ── Helpers internes ─────────────────────────────────────
@@ -209,6 +215,8 @@ export function proposerReparation(
   const weights = params.equityWeights ?? DEFAULT_EQUITY_WEIGHTS
   // R11b : undefined → défaut moteur ; null explicite → aucun équilibrage.
   const roleAvantage = params.roleAvantageFinancier
+  // #17 — lookback inter-périodes (jonction). Absent/vide → byte-identique.
+  const contexteAnterieur = params.contexteAnterieur
 
   // ⚠️ NORMALISATION OBLIGATOIRE (parade cécité params — incident Fanny 2026-06-21) :
   // isValid lit la config des règles ; sans dépliage, les repos rangés sous
@@ -224,12 +232,14 @@ export function proposerReparation(
   const candidatsLegaux: CandidatReparation[] = []
   for (const vet of vets) {
     if (vet.id === absentId) continue // X exclu
-    const res = isValid(slot, vet, creneau.role, vets, planningPartiel, calendrier, structure)
+    const res = isValid(slot, vet, creneau.role, vets, planningPartiel, calendrier, structure, contexteAnterieur)
     if (!res.valid) continue
 
+    // #17 : le scoreur voit le même lookback (R10 à la jonction). On garde la
+    // distinction undefined/défini de roleAvantage (byte-identique historique).
     const score = roleAvantage === undefined
-      ? scorerCandidatLNS(step, vet, planningPartiel, vets, weights, calendrier)
-      : scorerCandidatLNS(step, vet, planningPartiel, vets, weights, calendrier, roleAvantage)
+      ? scorerCandidatLNS(step, vet, planningPartiel, vets, weights, calendrier, undefined, undefined, undefined, undefined, undefined, undefined, contexteAnterieur)
+      : scorerCandidatLNS(step, vet, planningPartiel, vets, weights, calendrier, roleAvantage, undefined, undefined, undefined, undefined, undefined, contexteAnterieur)
     const warnings = calculerWarnings(vet, creneau, planningPartiel, res)
     candidatsLegaux.push({ vetId: vet.id, score, warnings })
   }

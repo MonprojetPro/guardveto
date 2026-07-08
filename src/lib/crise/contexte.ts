@@ -88,6 +88,13 @@ export interface ContexteCrisePeriode {
    * critère d'équité que la génération. undefined → défaut moteur ('premier').
    */
   roleAvantageFinancier?: string | null
+  /**
+   * #17 — lookback inter-périodes (attributions figées de la période précédente).
+   * Threadé à proposerReparation pour que la réparation d'un créneau en début de
+   * période juge le rythme (R10/espacement) sur la MÊME jonction que la génération.
+   * undefined → byte-identique.
+   */
+  contexteAnterieur?: AttributionGarde[]
 }
 
 /**
@@ -255,5 +262,7 @@ export async function chargerContextePourPeriode(
     saison: contexte.saison,
     nbVetosSemaineSoir: contexte.nbVetosSemaineSoir,
     roleAvantageFinancier: contexte.roleAvantageFinancier,
+    // #17 — lookback inter-périodes (résolu par resoudreContexte, best-effort).
+    contexteAnterieur: contexte.contexteAnterieur,
   }
 }

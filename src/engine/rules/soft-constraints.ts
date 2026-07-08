@@ -12,8 +12,8 @@
 // Sans config → poids historiques (PENALITE_SOUPLE_DEFAUT) → byte-identique.
 // ============================================================
 
-import type { SlotGarde, VetEngine, PlanningPartiel, RoleGarde, CalendrierResolu } from '../types'
-import { samediDeSemaine, addDays, estJourFerie, estFeteFinAnnee } from '../utils'
+import type { SlotGarde, VetEngine, PlanningPartiel, RoleGarde, CalendrierResolu, AttributionGarde } from '../types'
+import { samediDeSemaine, addDays, estJourFerie, estFeteFinAnnee, attributionsAvecContexte } from '../utils'
 import { penaliteContraintesConfig } from './hard-constraints'
 import { estAttribue, vetPourRole } from '../attribution'
 import {
@@ -182,17 +182,25 @@ export function penalite(
   calendrier?: CalendrierResolu,
   penalitesSouples?: PenalitesSouplesConfig,
   // Backlog n°14 — équité inter-annuelle des fêtes. Absent/vide → 0 (byte-identique).
-  historiqueFetes?: HistoriqueFetesResolu
+  historiqueFetes?: HistoriqueFetesResolu,
+  // #17 (Vague 5) — lookback inter-périodes. Absent/vide → byte-identique.
+  // Consommé UNIQUEMENT par les pénalités de RYTHME (R10, et les règles molles
+  // au_plus_n/espacement via penaliteContraintesConfig) — jamais R10c/R10b/R8b.
+  contexteAnterieur?: AttributionGarde[],
 ): number {
+  // Vue étendue = lookback + planning courant, pour les seules règles de rythme.
+  const planningRythme = attributionsAvecContexte(planning, contexteAnterieur)
   return (
-    penaliteR10WEConsecutif(slot, vet, planning, penalitesSouples) +
+    // R10 (2 WE consécutifs) : voit le WE du lookback à la jonction → étendu.
+    penaliteR10WEConsecutif(slot, vet, planningRythme, penalitesSouples) +
     penaliteWEAvantVacances(slot, vet, planning, penalitesSouples) +
     penaliteFeteFinAnnee(slot, penalitesSouples) +
     penaliteInversionFerie(slot, vet, role, planning, calendrier, penalitesSouples) +
     // Backlog n°14 : le véto a tenu cette fête L'AN DERNIER → pénalité souple.
     penaliteFeteHistorique(slot, vet.id, historiqueFetes) +
     // P1-B : règles configurées MOLLES (étage ≥ 3) — préférence, pas blocage.
-    penaliteContraintesConfig(slot, vet, role, planning, calendrier)
+    // Le lookback est transmis pour les variantes molles des règles de rythme.
+    penaliteContraintesConfig(slot, vet, role, planning, calendrier, contexteAnterieur)
   )
 }
 

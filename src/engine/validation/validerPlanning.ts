@@ -66,6 +66,15 @@ export interface ValidationInput {
    * divergence de structure se traduit en violation DÉTECTÉE, pas cachée.
    */
   creneaux?: CreneauModele[]
+  /**
+   * #17 (Vague 5) — LOOKBACK INTER-PÉRIODES. Attributions FIGÉES de la fin de la
+   * période PRÉCÉDENTE (~10 j), MÊME donnée que `SolverInput.contexteAnterieur`.
+   * Le validateur ÉTEND lui-même ses listes de dates avec ce lookback dans ses
+   * seuls blocs de RYTHME (espacement_min, espacement_weekend, R3) — sans importer
+   * le helper du moteur (principe des deux gardiens indépendants). Absent/vide →
+   * comportement historique byte-identique. Ne touche NI la couverture NI R21/R22.
+   */
+  contexteAnterieur?: AttributionGarde[]
 }
 
 // ── Une violation détectée ───────────────────────────────
@@ -322,6 +331,19 @@ export function validerPlanning(
   const vetsNorm = normaliserContraintesVets(input.vets)
   const vetsById = new Map(vetsNorm.map((v) => [v.id, v]))
   const cal = input.calendrier
+
+  // #17 — lookback inter-périodes. Ré-implémenté INDÉPENDAMMENT (pas d'import du
+  // helper moteur) : on concatène les attributions figées antérieures DEVANT les
+  // attributions courantes, et ce planning ÉTENDU n'est utilisé QUE par les blocs
+  // de RYTHME ci-dessous (espacement_min, espacement_weekend, R3). Les blocs de
+  // couverture / R21 / R22 / composition gardent `planning` (le lookback ne crée
+  // aucun slot et ne compte dans aucune équité). Absent/vide → `planning` tel quel
+  // (byte-identique).
+  const lookback = input.contexteAnterieur ?? []
+  const planningRythme: PlanningPartiel =
+    lookback.length === 0
+      ? planning
+      : { attributions: [...lookback, ...planning.attributions] }
 
   // ── A. COUVERTURE : chaque créneau attendu existe et est complet ──
   const attendus = slotsAttendus(input)
@@ -653,7 +675,9 @@ export function validerPlanning(
         if (c.type === 'jour_repos_conditionnel') {
           const siGardeWe = cfg.si_garde_we as string | undefined
           const sinon = cfg.sinon as string | undefined
-          const gardeWe = aGardeWeekendCetteSemaine(vetId, a.date, planning)
+          // #17 : planning ÉTENDU → « garde WE cette semaine ? » voit le WE du
+          // lookback quand la 1re semaine chevauche la jonction de périodes.
+          const gardeWe = aGardeWeekendCetteSemaine(vetId, a.date, planningRythme)
           if (gardeWe && siGardeWe === jour) {
             violations.push({
               regle: 'R3',
@@ -715,7 +739,10 @@ export function validerPlanning(
       const creneaux = Array.isArray(cfg.creneaux)
         ? (cfg.creneaux as unknown[]).filter((x): x is string => typeof x === 'string')
         : undefined
-      const gardesVet = planning.attributions.filter(
+      // #17 : gardes du LOOKBACK incluses → une fenêtre (glissante ou semaine
+      // civile) qui chevauche la jonction compte aussi les gardes de la période
+      // précédente (anti-dépassement à cheval).
+      const gardesVet = planningRythme.attributions.filter(
         (a) =>
           surCreneau(a, vet.id) &&
           (!creneaux || creneaux.includes(a.type)),
@@ -770,7 +797,10 @@ export function validerPlanning(
       const ecart = typeof eRaw === 'number' ? eRaw : typeof eRaw === 'string' ? parseInt(eRaw, 10) : NaN
       if (!Number.isFinite(ecart) || ecart <= 0) continue
 
-      const dates = planning.attributions
+      // #17 : on inclut les gardes du LOOKBACK → une garde en fin de période
+      // précédente trop proche d'une garde du début de la période courante est
+      // détectée (jonction). Le tri place la date antérieure en `dates[i-1]`.
+      const dates = planningRythme.attributions
         .filter((a) => surCreneau(a, vet.id))
         .map((a) => a.date)
         .sort()
@@ -810,7 +840,9 @@ export function validerPlanning(
       if (!Number.isFinite(n) || n <= 1) continue
       const seuil = n * 7
 
-      const datesWe = planning.attributions
+      // #17 : week-ends du LOOKBACK inclus → deux WE consécutifs à cheval sur la
+      // jonction de périodes sont détectés. Tri = date antérieure en premier.
+      const datesWe = planningRythme.attributions
         .filter((a) => a.type === 'weekend' && surCreneau(a, vet.id))
         .map((a) => a.date)
         .sort()

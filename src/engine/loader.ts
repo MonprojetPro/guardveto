@@ -6,9 +6,12 @@
 // ============================================================
 
 import { createClient } from '@/lib/supabase/server'
-import type { VetEngine, ContrainteEngine, CongeEngine, CalendrierResolu } from './types'
+import type { VetEngine, ContrainteEngine, CongeEngine, CalendrierResolu, AttributionGarde } from './types'
 import type { BonusMalusMap } from './score-lexicographique'
 import type { SolverInput } from './solver'
+import {
+  gardesVersPlanningPartiel, moinsJours, type GardeRow,
+} from './validation/gardesVersPlanning'
 import { buildEquityWeights, mapperRoleAvantageFinancierDb, type EquityWeights } from './equity-weights'
 import { type StructureConfig } from './structure-config'
 import {
@@ -25,6 +28,15 @@ import { chargerHistoriqueFetes } from '@/data/historiqueFetes'
 import { anneesFetesCouvertes } from './historique-fete'
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
+
+/**
+ * #17 (Vague 5) — fenêtre de LOOKBACK inter-périodes, en jours. On charge les
+ * gardes des `LOOKBACK_JOURS` jours qui précèdent le début de la période, pour
+ * que les règles de rythme voient la jonction. 10 j couvrent : le week-end
+ * précédent (R10 « pas 2 WE de suite »), l'espacement min (typiquement 2-3 j) et
+ * la fenêtre « 1 WE sur N » usuelle. (docs/v2/06-architecture-v2.md l.124/384.)
+ */
+const LOOKBACK_JOURS = 10
 
 // ── Mapping DB → engine ──────────────────────────────────
 
@@ -302,6 +314,45 @@ export async function chargerInputDepuisSupabase(
     }
   }
 
+  // 4b. #17 (Vague 5) — LOOKBACK INTER-PÉRIODES : les gardes des ~10 jours qui
+  //     PRÉCÈDENT le début de la période. Sert aux SEULES règles de rythme
+  //     (R10, R3, espacement_min, espacement_weekend, au_plus_n fenêtre) pour ne
+  //     pas être aveugle à la jonction de deux périodes (ex. deux week-ends
+  //     consécutifs à cheval). Filtré PAR DATE (toutes périodes confondues), scopé
+  //     cabinet. BEST-EFFORT ABSOLU (comme chargerHistoriqueFetes) : erreur /
+  //     absence → undefined → comportement historique byte-identique, jamais de
+  //     throw. La conversion réutilise gardesVersPlanningPartiel (synthèse du
+  //     vendredi_soir depuis le week-end — indispensable pour R10/R3 qui lisent
+  //     ces types).
+  let contexteAnterieur: AttributionGarde[] | undefined
+  if (cabinetId) {
+    try {
+      const debutLookback = moinsJours(periode.date_debut, LOOKBACK_JOURS)
+      const { data: gardesAvant, error: lookbackErr } = await supabase
+        .from('gardes')
+        .select('id, date, type, premier_id, second_id')
+        .eq('cabinet_id', cabinetId)
+        .gte('date', debutLookback)
+        .lt('date', periode.date_debut)
+        .order('date')
+      if (!lookbackErr && gardesAvant && gardesAvant.length > 0) {
+        const { attributions } = gardesVersPlanningPartiel(
+          gardesAvant as GardeRow[],
+          // Relations résolues plus bas (structureConfig.relations) ; à ce stade
+          // on n'en a pas besoin : la synthèse du vendredi utilise le repli
+          // couple historique (byte-identique pour le pilote). Les règles de
+          // rythme qui consomment le lookback (R10/R3/espacements) ne dépendent
+          // pas de l'inversion des rôles du vendredi, seulement de sa présence.
+          undefined,
+        )
+        contexteAnterieur = attributions
+      }
+    } catch (e) {
+      // Best-effort : un lookback indisponible ne doit JAMAIS casser la génération.
+      console.warn('[lookback-#17] chargement du contexte antérieur ignoré (best-effort):', e)
+    }
+  }
+
   // 5. Mapper vers VetEngine (contraintes injectées depuis regles_cabinet)
   type VetDb = {
     id: string
@@ -437,5 +488,7 @@ export async function chargerInputDepuisSupabase(
     structureConfig,
     creneaux,
     roleAvantageFinancier,
+    // #17 — lookback inter-périodes (best-effort ; undefined → byte-identique).
+    contexteAnterieur,
   }
 }

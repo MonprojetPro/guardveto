@@ -149,6 +149,10 @@ export async function resoudreContexte(
     structureConfig: input.structureConfig,
     creneaux: input.creneaux,
     roleAvantageFinancier: input.roleAvantageFinancier,
+    // #17 — lookback inter-périodes : propagation EXPLICITE (objet reconstruit
+    // champ par champ ; sans cette ligne, le lookback chargé par le loader serait
+    // détruit avant d'atteindre le solver — cf. avertissement ContexteSimulation).
+    contexteAnterieur: input.contexteAnterieur,
   }
 
   return contexte

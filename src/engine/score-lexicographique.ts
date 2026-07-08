@@ -12,7 +12,8 @@
 // soft-constraints, optimization) — aucune ré-écriture des règles.
 // ============================================================
 
-import type { PlanningPartiel, VetEngine, VetEngineNormalise, SlotGarde, RoleGarde, CalendrierResolu } from './types'
+import type { PlanningPartiel, VetEngine, VetEngineNormalise, SlotGarde, RoleGarde, CalendrierResolu, AttributionGarde } from './types'
+import { attributionsAvecContexte } from './utils'
 
 // ── Type partagé solver ↔ loader ─────────────────────────
 /**
@@ -175,10 +176,17 @@ export function scorerPlanning(
   structure: StructureConfig = DEFAULT_STRUCTURE_CONFIG,
   roleAvantageFinancier: string | null = DEFAULT_ROLE_AVANTAGE_FINANCIER,
   calendrier?: CalendrierResolu,
+  // #17 (Vague 5) — lookback inter-périodes. Absent/vide → byte-identique.
+  // Étend la vue des SEULES règles de rythme (R10, + étage 0 via isValid) —
+  // JAMAIS l'équité (étage 6) ni la couverture, qui ne comptent pas le lookback.
+  contexteAnterieur?: AttributionGarde[],
 ): VecteurScore {
   const v = vecteurVide()
   const slotRoles = listerSlotRoles(planning, saison)
   const vetById = new Map(vets.map((x) => [x.id, x]))
+  // Vue étendue pour les règles de rythme (R10 + le re-check isValid étage 0).
+  // Absent/vide → identiquement `planning` (référence inchangée, byte-identique).
+  const planningRythme = attributionsAvecContexte(planning, contexteAnterieur)
 
   // ── Étage 0 : INVARIANTS (hard constraints) ──
   // On reconstruit le planning attribution par attribution et on vérifie
@@ -210,7 +218,9 @@ export function scorerPlanning(
         const vet = vetById.get(vetId)
         if (!vet) continue
         const slot: SlotGarde = { date: a.date, type: a.type, saison, nbPlaces: nbPoses }
-        const res = isValid(slot, vet, role, vets, cumul, calendrier, structure)
+        // #17 : les règles de rythme (R3/espacement/au_plus_n) voient le lookback
+        // via `contexteAnterieur` — cohérent avec le solver (mêmes invariants).
+        const res = isValid(slot, vet, role, vets, cumul, calendrier, structure, contexteAnterieur)
         if (!res.valid) nbInvariantsViols++
         // pose dans le cumul
         const cle = `${a.date}|${a.type}`
@@ -248,8 +258,8 @@ export function scorerPlanning(
     const vet = vetById.get(sr.vetId)
     if (!vet) continue
 
-    // R10 (défaut 🟠 SAUF_CRISE)
-    const r10 = penaliteR10WEConsecutif(sr.slot, vet, planning, pcfg)
+    // R10 (défaut 🟠 SAUF_CRISE) — voit le WE du lookback à la jonction (#17).
+    const r10 = penaliteR10WEConsecutif(sr.slot, vet, planningRythme, pcfg)
     if (r10 > 0) ajouter(v, cfgR10.etage, 'R10', cfgR10.poids)
 
     // R10c (défaut 🟡 EVITEE)

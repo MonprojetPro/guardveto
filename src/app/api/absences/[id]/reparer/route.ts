@@ -176,6 +176,8 @@ export async function POST(
       structure: ctx.structure,
       equityWeights: ctx.equityWeights,
       roleAvantageFinancier: ctx.roleAvantageFinancier,
+      // #17 — lookback inter-périodes (même jonction qu'à la génération).
+      contexteAnterieur: ctx.contexteAnterieur,
     })
 
     const legal = resultat.candidats.some((c) => c.vetId === dec.remplacant_id)

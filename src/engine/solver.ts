@@ -137,6 +137,16 @@ export interface SolverInput {
    * Exposé surtout pour les tests (prouver la coupe sur un cas pathologique).
    */
   seedMaxNoeuds?: number
+  /**
+   * #17 (Vague 5) — LOOKBACK INTER-PÉRIODES. Attributions FIGÉES de la fin de la
+   * période PRÉCÉDENTE (~10 jours avant `dateDebut`), chargées best-effort par le
+   * loader. Sert UNIQUEMENT aux règles de RYTHME (R10, R3, au_plus_n fenêtre,
+   * espacement_min, espacement_weekend) pour ne pas être aveugle à la jonction de
+   * deux périodes (ex. deux week-ends consécutifs à cheval). Il ne crée AUCUN slot
+   * et ne compte dans AUCUNE équité/couverture. Absent/vide → comportement
+   * historique BYTE-IDENTIQUE (les golden tests passent sans modification).
+   */
+  contexteAnterieur?: AttributionGarde[]
 }
 
 /** Effectif semaine effectif : config si fournie, sinon repli saison (hiver 2 / été 1). */
@@ -401,6 +411,8 @@ function scorerCandidat(
   compositions?: CompositionEquipeRegle[],
   // Rôle interdit par tag SOUPLE (backlog n°22). Absent/vide → 0 (byte-identique).
   rolesInterdits?: RoleInterditTagRegle[],
+  // #17 — lookback inter-périodes. Absent/vide → 0 (byte-identique).
+  contexteAnterieur?: AttributionGarde[],
 ): number {
   // Dernier recours → toujours en dernier
   if (vet.dernier_recours) return 1_000_000
@@ -424,7 +436,8 @@ function scorerCandidat(
     planning,
     calendrier,
     penalitesSouples,
-    historiqueFetes
+    historiqueFetes,
+    contexteAnterieur,
   ) + penaliteCompositionCandidat(
     // Composition d'équipe souple (n°6) — même « pose complétante » que le
     // gardien dur, à l'étage configuré (le scoreur global reste cohérent).
@@ -555,6 +568,8 @@ function backtrack(
   calendrier: CalendrierResolu | undefined,
   roleAvantageFinancier: string | null,
   budget: SeedBudget,
+  // #17 — lookback inter-périodes (attributions figées de la période précédente).
+  contexteAnterieur: AttributionGarde[] | undefined,
 ): PlanningPartiel | null {
   // Garde-fou de budget (plafond de nœuds/temps). Une fois dépassé, on remonte
   // la pile immédiatement sans explorer : coupe PROPRE avant le timeout serverless.
@@ -582,7 +597,7 @@ function backtrack(
   // (l'ancien comparateur recalculait tout à chaque comparaison de tri).
   // Ordre STRICTEMENT identique : mêmes valeurs, tri stable → byte-identique.
   const valides = vets.filter(
-    (vet) => isValid(slot, vet, step.role, vets, planning, calendrier, structure).valid
+    (vet) => isValid(slot, vet, step.role, vets, planning, calendrier, structure, contexteAnterieur).valid
   )
   const compteursStep =
     valides.length > 1 ? compterParVet(planning, vets, roleAvantageFinancier, calendrier) : undefined
@@ -591,7 +606,7 @@ function backtrack(
   const candidates = valides
     .map((vet) => ({
       vet,
-      score: scorerCandidat(step, vet, planning, bonusMalus, vets, weights, calendrier, roleAvantageFinancier, compteursStep, structure.penalitesSouples, structure.historiqueFetes, compositionsSouplesStep, rolesInterditsSouplesStep),
+      score: scorerCandidat(step, vet, planning, bonusMalus, vets, weights, calendrier, roleAvantageFinancier, compteursStep, structure.penalitesSouples, structure.historiqueFetes, compositionsSouplesStep, rolesInterditsSouplesStep, contexteAnterieur),
     }))
     .sort((a, b) => a.score - b.score)
     .map(({ vet }) => vet)
@@ -609,7 +624,7 @@ function backtrack(
   // Essaie chaque candidat dans l'ordre de priorité
   for (const vet of candidates) {
     const newPlanning = assignerStep(planning, step, vet.id)
-    const result = backtrack(steps, index + 1, newPlanning, vets, bonusMalus, weights, structure, deepest, blocage, calendrier, roleAvantageFinancier, budget)
+    const result = backtrack(steps, index + 1, newPlanning, vets, bonusMalus, weights, structure, deepest, blocage, calendrier, roleAvantageFinancier, budget, contexteAnterieur)
     if (result !== null) return result
     // Budget épuisé pendant la descente → on arrête d'essayer d'autres candidats.
     if (budget.depasse) return null
@@ -673,6 +688,7 @@ function genererSeedGreedy(input: SolverInput, avecDiagnostic = true): SolveResu
     calendrier,
     roleAvantage,
     budget,
+    input.contexteAnterieur,
   )
 
   const dureeMs = Date.now() - t0
@@ -709,7 +725,10 @@ function genererSeedGreedy(input: SolverInput, avecDiagnostic = true): SolveResu
     if (s === steps[indexImpasse]) {
       const slot: SlotGarde = { date: s.date, type: s.type, saison: s.saison, besoinSecond: s.besoinSecond, nbPlaces: s.nbPlaces }
       const premierKo = vets
-        .map((v) => isValid(slot, v, s.role, vets, { attributions: [] }))
+        // Défauts historiques (calendrier undefined, structure défaut) conservés
+        // pour ne pas altérer ce message d'impasse legacy ; on ajoute seulement le
+        // lookback #17 pour que la raison reflète la jonction de périodes.
+        .map((v) => isValid(slot, v, s.role, vets, { attributions: [] }, undefined, DEFAULT_STRUCTURE_CONFIG, input.contexteAnterieur))
         .find((r) => !r.valid)
       contrainteBloquante = premierKo?.raison
     }
@@ -828,6 +847,8 @@ export function scorerCandidatLNS(
   compositions?: CompositionEquipeRegle[],
   // Rôle interdit par tag SOUPLE (backlog n°22). Absent/vide → 0 (byte-identique).
   rolesInterdits?: RoleInterditTagRegle[],
+  // #17 — lookback inter-périodes. Absent/vide → 0 (byte-identique — crise inchangée).
+  contexteAnterieur?: AttributionGarde[],
 ): number {
   if (vet.dernier_recours) return 1_000_000
 
@@ -850,7 +871,8 @@ export function scorerCandidatLNS(
     planning,
     calendrier,
     penalitesSouples,
-    historiqueFetes
+    historiqueFetes,
+    contexteAnterieur,
   ) + penaliteCompositionCandidat(
     // Composition d'équipe souple (n°6) — cohérente avec scorerCandidat.
     { date: step.date, type: step.type, saison: step.saison, nbPlaces: step.nbPlaces },
@@ -889,12 +911,14 @@ function repairerSemaine(
   structure: StructureConfig,
   calendrier: CalendrierResolu | undefined,
   roleAvantageFinancier: string | null,
+  // #17 — lookback inter-périodes (mêmes règles de rythme qu'à la construction).
+  contexteAnterieur?: AttributionGarde[],
 ): PlanningPartiel | null {
   let planning = partialPlanning
 
   for (const step of steps) {
     const slot: SlotGarde = { date: step.date, type: step.type, saison: step.saison, besoinSecond: step.besoinSecond, nbPlaces: step.nbPlaces }
-    const valids = vets.filter((v) => isValid(slot, v, step.role, vets, planning, calendrier, structure).valid)
+    const valids = vets.filter((v) => isValid(slot, v, step.role, vets, planning, calendrier, structure, contexteAnterieur).valid)
 
     if (valids.length === 0) return null
 
@@ -905,7 +929,7 @@ function repairerSemaine(
     const sorted = valids
       .map((v) => ({
         v,
-        score: scorerCandidatLNS(step, v, planning, vets, weights, calendrier, roleAvantageFinancier, compteursStep, structure.penalitesSouples, structure.historiqueFetes, compositionsSouples(structure), rolesInterditsSouples(structure)),
+        score: scorerCandidatLNS(step, v, planning, vets, weights, calendrier, roleAvantageFinancier, compteursStep, structure.penalitesSouples, structure.historiqueFetes, compositionsSouples(structure), rolesInterditsSouples(structure), contexteAnterieur),
       }))
       .sort((a, b) => a.score - b.score)
       .map(({ v }) => v)
@@ -947,6 +971,8 @@ export function scorerSemaine(
   structure: StructureConfig = DEFAULT_STRUCTURE_CONFIG,
   roleAvantageFinancier: string | null = DEFAULT_ROLE_AVANTAGE_FINANCIER,
   calendrier?: CalendrierResolu,
+  // #17 — lookback inter-périodes (transmis au scoreur pour R10 à la jonction).
+  contexteAnterieur?: AttributionGarde[],
 ): VecteurScore {
   const dimanche = addDays(lundi, 6)
   const planSemaine: PlanningPartiel = {
@@ -954,7 +980,7 @@ export function scorerSemaine(
       (a) => a.date >= lundi && a.date <= dimanche
     ),
   }
-  return scorerPlanning(planSemaine, vets, saison, weights, structure, roleAvantageFinancier, calendrier)
+  return scorerPlanning(planSemaine, vets, saison, weights, structure, roleAvantageFinancier, calendrier, contexteAnterieur)
 }
 
 // ── LNS hill-climbing ────────────────────────────────────
@@ -1000,6 +1026,7 @@ function lnsHillClimbing(
   const roleAvantage = input.roleAvantageFinancier === undefined
     ? DEFAULT_ROLE_AVANTAGE_FINANCIER
     : input.roleAvantageFinancier
+  const contexteAnterieur = input.contexteAnterieur
   // Backstop temps : actif UNIQUEMENT si fourni > 0. Sinon, aucune coupe chrono
   // (déterministe). Le sentinel 0 ne nous parvient jamais (intercepté en amont).
   const timeoutMs =
@@ -1013,7 +1040,7 @@ function lnsHillClimbing(
   const maxPassesSansAmelioration = 3
 
   let meilleur = seedPlanning
-  let scoreMeilleur = scorerPlanning(meilleur, vets, saison, weights, structure, roleAvantage, calendrier)
+  let scoreMeilleur = scorerPlanning(meilleur, vets, saison, weights, structure, roleAvantage, calendrier, contexteAnterieur)
 
   const lundis = extraireLundis(dateDebut, dateFin)
 
@@ -1052,11 +1079,11 @@ function lnsHillClimbing(
       if (steps.length === 0) continue
 
       // Réparer : greedy LNS sur la semaine
-      const repaired = repairerSemaine(partial, steps, vets, weights, structure, calendrier, roleAvantage)
+      const repaired = repairerSemaine(partial, steps, vets, weights, structure, calendrier, roleAvantage, contexteAnterieur)
       if (repaired === null) continue
 
       // Comparer : garder si strictement amélioré
-      const scoreNew = scorerPlanning(repaired, vets, saison, weights, structure, roleAvantage, calendrier)
+      const scoreNew = scorerPlanning(repaired, vets, saison, weights, structure, roleAvantage, calendrier, contexteAnterieur)
       if (comparerScores(scoreNew, scoreMeilleur) < 0) {
         meilleur = repaired
         scoreMeilleur = scoreNew

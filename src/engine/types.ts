@@ -205,6 +205,14 @@ export interface ContexteSimulation {
    * que ci-dessus : à transmettre explicitement dans resoudreContexte.
    */
   roleAvantageFinancier?: string | null
+  /**
+   * #17 (Vague 5) — LOOKBACK INTER-PÉRIODES : attributions FIGÉES de la fin de la
+   * période précédente (~10 j), pour les règles de rythme (jonction de périodes).
+   * ⚠️ MÊME piège de propagation : `resoudreContexte` reconstruit cet objet champ
+   * par champ → un oubli ici DÉTRUIT le lookback en silence (le loader le charge
+   * mais il n'atteindrait jamais le solver). Absent → byte-identique.
+   */
+  contexteAnterieur?: AttributionGarde[]
 }
 
 // Résultat d'une vérification

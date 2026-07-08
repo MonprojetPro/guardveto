@@ -9,6 +9,7 @@ import type {
 import {
   jourDeLaSemaine, estSemaineImpaire, estSemaineImpaireAncrée, estEnVacancesScolaires,
   estJourFerie, estEnEte, lundiDeSemaine, vendrediDeSemaine, samediDeSemaine, addDays,
+  attributionsAvecContexte,
 } from '../utils'
 import {
   DEFAULT_STRUCTURE_CONFIG, estStructureDure, relationsEffectives,
@@ -787,7 +788,14 @@ export function penaliteContraintesConfig(
   _role: RoleGarde,
   planning: PlanningPartiel,
   calendrier?: CalendrierResolu,
+  // #17 — même lookback que isValid : les variantes MOLLES des règles de rythme
+  // doivent aussi voir la jonction de périodes (les deux gardiens de score restent
+  // cohérents). Absent/vide → byte-identique.
+  contexteAnterieur?: AttributionGarde[],
 ): number {
+  // Vue étendue pour les seules règles de rythme (cf. isValid). Les règles
+  // non-rythme (repos fixe, indispo cyclique, duo) gardent le planning courant.
+  const planningRythme = attributionsAvecContexte(planning, contexteAnterieur)
   let pen = 0
   for (const c of vet.contraintes) {
     if (!c.actif || estDure(c)) continue // dur → géré par isValid
@@ -798,15 +806,15 @@ export function penaliteContraintesConfig(
       case 'indisponibilite_cyclique':
         viole = violeIndispoCyclique(c, slot, calendrier); break
       case 'jour_repos_conditionnel':
-        viole = violeReposConditionnel(c, vet, slot, planning); break
+        viole = violeReposConditionnel(c, vet, slot, planningRythme); break
       case 'duo_interdit':
         viole = violeDuoInterdit(c, slot, planning) !== null; break
       case 'au_plus_n':
-        viole = violeAuPlusN(c, vet.id, slot, planning); break
+        viole = violeAuPlusN(c, vet.id, slot, planningRythme); break
       case 'espacement_min':
-        viole = violeEspacementMin(c, vet.id, slot, planning); break
+        viole = violeEspacementMin(c, vet.id, slot, planningRythme); break
       case 'espacement_weekend':
-        viole = violeEspacementWeekend(c, vet.id, slot, planning); break
+        viole = violeEspacementWeekend(c, vet.id, slot, planningRythme); break
     }
     if (viole) pen += penaliteEtage(etageDe(c))
   }
@@ -832,11 +840,21 @@ export function isValid(
   allVets: VetEngineNormalise[],
   planning: PlanningPartiel,
   calendrier?: CalendrierResolu,
-  structure: StructureConfig = DEFAULT_STRUCTURE_CONFIG
+  structure: StructureConfig = DEFAULT_STRUCTURE_CONFIG,
+  // #17 (Vague 5) — lookback inter-périodes : attributions FIGÉES de la fin de
+  // la période précédente (~10 j). Absent/vide → comportement historique
+  // (byte-identique). Consommé UNIQUEMENT par les règles de RYTHME ci-dessous
+  // (R3, au_plus_n, espacement_min, espacement_weekend) via une vue étendue —
+  // jamais par la couverture, l'équité, R21/R22, la composition, etc.
+  contexteAnterieur?: AttributionGarde[],
 ): ValidationResult {
   // Relations entre créneaux liés (RG tranche 2) : la donnée si chargée,
   // sinon le couple historique vendredi↔WE — mêmes couples pour R8 et R9.
   const relations = relationsEffectives(structure)
+
+  // Vue étendue = lookback + planning courant, POUR LES SEULES règles de rythme.
+  // Absent/vide → identiquement `planning` (référence inchangée, byte-identique).
+  const planningRythme = attributionsAvecContexte(planning, contexteAnterieur)
 
   const checks: ValidationResult[] = [
     checkR16Conge(vet, slot),
@@ -845,14 +863,17 @@ export function isValid(
     checkR19Weekend(slot, roleVisé, planning),
     checkR1JourReposFixe(vet, slot, calendrier),
     checkR2IndispoCyclique(vet, slot, calendrier),
-    checkR3ReposConditionnel(vet, slot, planning),
+    // R3 (repos conditionnel) : « garde WE cette semaine ? » doit voir le WE du
+    // lookback quand la semaine chevauche la jonction → planning ÉTENDU.
+    checkR3ReposConditionnel(vet, slot, planningRythme),
     checkR6DuoInterdit(vet, slot, planning, allVets),
     checkR9VendrediLieWE(vet, slot, planning, structure.r9_liaison, relations),
     checkR21RolesDistincts(vet, slot, roleVisé, planning),
     checkR22UneGardeParJour(vet, slot, planning),
-    checkAuPlusN(vet, slot, planning),
-    checkEspacementMin(vet, slot, planning),
-    checkEspacementWeekend(vet, slot, planning),
+    // Rythme (fenêtres glissantes / espacements) : voient le lookback → étendu.
+    checkAuPlusN(vet, slot, planningRythme),
+    checkEspacementMin(vet, slot, planningRythme),
+    checkEspacementWeekend(vet, slot, planningRythme),
     // R8 : ne s'applique que si slot.type est la CIBLE d'une relation
     // inversion_role (le check filtre lui-même — générique, plus de « WE only »).
     checkR8Inversion(vet, slot, roleVisé, planning, structure.r8_inversion, relations),

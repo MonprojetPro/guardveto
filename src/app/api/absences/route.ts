@@ -169,6 +169,8 @@ export async function POST(req: NextRequest) {
       structure: ctx.structure,
       equityWeights: ctx.equityWeights,
       roleAvantageFinancier: ctx.roleAvantageFinancier,
+      // #17 — lookback inter-périodes (même jonction qu'à la génération).
+      contexteAnterieur: ctx.contexteAnterieur,
     })
 
     creneauxImpactes.push({
