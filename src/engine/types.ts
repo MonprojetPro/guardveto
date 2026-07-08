@@ -102,6 +102,15 @@ export interface ContrainteEngine {
     // Ne s'applique qu'aux créneaux `weekend`. AUCUN recalage vacances (cycle
     // strict). Jugé par rapport à l'ancre seule — n'a pas besoin du planning.
     | 'cadencement_weekend'
+    // ── Exclusion de dates / XOR « pas les deux » (Vague 6 tranche B — #15a) ──
+    // Règle PAR-VÉTO, famille `interdire`, réglable dur/mou. Sémantique FIGÉE :
+    // « pas les DEUX » (le véto ne peut couvrir À LA FOIS les deux cibles).
+    // Deux formes de params (une seule par règle) : `fetes` (paire de codes fête
+    // du référentiel historique-fete.ts, une instance par année couverte) ou
+    // `dates` (paire de dates ISO explicites). Intra-période uniquement (pas de
+    // lookback #17). Mal configurée (forme absente, paire identique, date non-ISO)
+    // → INERTE. Consomme les gardes DÉJÀ posées du véto (comme au_plus_n).
+    | 'exclusion_dates'
   config: Record<string, unknown>
   actif: boolean
 }

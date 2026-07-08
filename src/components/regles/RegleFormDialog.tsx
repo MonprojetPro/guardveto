@@ -63,6 +63,8 @@ const BRIQUES: { value: BriqueEvaluable; label: string; aide: string }[] = [
   { value: 'repos_apres_serie', label: 'Repos après une série', aide: 'Après N jours de garde d’affilée, imposer M jours sans garde.' },
   // Cadencement « 1 WE sur N ancré » (#20).
   { value: 'cadencement_weekend', label: 'Week-ends calés sur un cycle fixe', aide: 'Cas type : pompier volontaire de garde 1 week-end sur 3 à dates fixes. Ces week-ends lui sont interdits (ou au contraire ses gardes doivent tomber dessus).' },
+  // Exclusion de dates / XOR « pas les deux » (#15a).
+  { value: 'exclusion_dates', label: 'Pas les deux dates (ex. 24 XOR 31 déc)', aide: 'Le vétérinaire ne fait jamais de garde aux DEUX dates à la fois (mais peut en faire une). Cas type : Noël ou Nouvel An, pas les deux.' },
 ]
 
 /** Desiderata : préférences pures — le niveau « Interdiction ferme » est exclu. */
@@ -117,6 +119,9 @@ const FORCE_DEFAUT: Record<BriqueEvaluable, ForceFormulaire> = {
   // Cadencement WE (#20) : le cas « interdit » (pompier réellement pris) est
   // ferme par défaut — un engagement extérieur ne se plie pas à la crise.
   cadencement_weekend: 'jamais',
+  // Exclusion « pas les deux » (#15a) : le cas métier (24 XOR 31 déc) est une
+  // exigence forte mais pliable en dernier recours (ne pas casser une génération).
+  exclusion_dates: 'sauf_crise',
 }
 
 // ── Composant ────────────────────────────────────────────────
@@ -248,6 +253,23 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
     p.sens === 'impose' ? 'impose' : 'interdit',
   )
 
+  // exclusion_dates (#15a) — deux formes : « fêtes » (défaut) ou « dates libres ».
+  const pFetes = Array.isArray(p.fetes)
+    ? (p.fetes as unknown[]).filter((x): x is string => typeof x === 'string')
+    : []
+  const pDates = Array.isArray(p.dates)
+    ? (p.dates as unknown[]).filter((x): x is string => typeof x === 'string')
+    : []
+  // Une règle en édition qui porte des dates → mode « dates » ; sinon « fetes ».
+  const [formeExclusion, setFormeExclusion] = useState<'fetes' | 'dates'>(
+    pDates.length === 2 ? 'dates' : 'fetes',
+  )
+  const [dateExcl1, setDateExcl1] = useState<string>(pDates[0] ?? '')
+  const [dateExcl2, setDateExcl2] = useState<string>(pDates[1] ?? '')
+  // La forme « fêtes » du cas métier dominant = paire fixe (Noël / Nouvel An).
+  const FETES_FIN_ANNEE = ['noel', 'nouvel_an'] as const
+  void pFetes // (paire fixe : pas de sélecteur à ce stade — cas métier unique)
+
   // Validité : PERMANENTE (par défaut) ou limitée à une période existante.
   const periodeInit = regle?.periode_id && periodesDispo.some((per) => per.id === regle.periode_id)
     ? regle.periode_id
@@ -323,11 +345,16 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
       case 'cadencement_weekend':
         params = { n_semaines: Number(nSemainesCadence) || 0, ancre, sens: sensCadence }
         break
+      case 'exclusion_dates':
+        params = formeExclusion === 'dates'
+          ? { dates: [dateExcl1, dateExcl2] }
+          : { fetes: [...FETES_FIN_ANNEE] }
+        break
     }
     const predicat = rendreRegle(briqueId, params, { nomVeto })
     return sujet ? `${sujet} ${predicat}` : predicat
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [briqueId, ownerId, jour, exVac, siWe, sinon, semaines, periodes, avecId, n, fenetre, creneauxFiltre, ecartMin, nSemaines, joursPref, sens, typeAvant, typeApres, nJoursSerie, nJoursRepos, reposJours, nSemainesCadence, ancre, sensCadence, vets])
+  }, [briqueId, ownerId, jour, exVac, siWe, sinon, semaines, periodes, avecId, n, fenetre, creneauxFiltre, ecartMin, nSemaines, joursPref, sens, typeAvant, typeApres, nJoursSerie, nJoursRepos, reposJours, nSemainesCadence, ancre, sensCadence, formeExclusion, dateExcl1, dateExcl2, vets])
 
   const handleSubmit = () => {
     if (!ownerId) { toast.error('Sélectionnez le vétérinaire concerné.'); return }
@@ -374,6 +401,12 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
       if (!Number.isInteger(v) || v < 2) { toast.error('Indiquez un cycle valide (un week-end sur 2 minimum).'); return }
       if (!/^\d{4}-\d{2}-\d{2}$/.test(ancre)) { toast.error('Choisissez la date de départ du cycle.'); return }
     }
+    if (briqueId === 'exclusion_dates' && formeExclusion === 'dates') {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateExcl1) || !/^\d{4}-\d{2}-\d{2}$/.test(dateExcl2)) {
+        toast.error('Choisissez les deux dates.'); return
+      }
+      if (dateExcl1 === dateExcl2) { toast.error('Choisissez deux dates différentes.'); return }
+    }
 
     startTransition(async () => {
       const res = await upsertRegle({
@@ -405,6 +438,11 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
         repos_jours: briqueId === 'repos_apres_serie' ? Number(reposJours) : undefined,
         // Cadencement WE (#20) : date d'ancrage du cycle.
         ancre: briqueId === 'cadencement_weekend' ? ancre : undefined,
+        // Exclusion « pas les deux » (#15a) : une SEULE forme envoyée selon le choix.
+        fetes: briqueId === 'exclusion_dates' && formeExclusion === 'fetes'
+          ? [...FETES_FIN_ANNEE] : undefined,
+        dates: briqueId === 'exclusion_dates' && formeExclusion === 'dates'
+          ? [dateExcl1, dateExcl2] : undefined,
         periode_id: validite === PERMANENTE ? null : validite,
       })
       if (res?.error) { toast.error(res.error); return }
@@ -866,6 +904,61 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
                   <> Attention : «&nbsp;imposé&nbsp;» ne force pas une garde à CHAQUE week-end du cycle — il empêche seulement les gardes week-end hors du cycle.</>
                 )}
               </p>
+            </div>
+          )}
+
+          {briqueId === 'exclusion_dates' && (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>Type d&apos;exclusion</Label>
+                <Select value={formeExclusion} onValueChange={(v) => v && setFormeExclusion(v as 'fetes' | 'dates')}>
+                  <SelectTrigger>
+                    {formeExclusion === 'fetes'
+                      ? 'Fêtes de fin d’année (Noël / Nouvel An)'
+                      : 'Deux dates précises'}
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="fetes">Fêtes de fin d’année (Noël / Nouvel An)</SelectItem>
+                    <SelectItem value="dates">Deux dates précises</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {formeExclusion === 'fetes' ? (
+                <p className="text-xs text-muted-foreground">
+                  Le vétérinaire ne sera jamais de garde à la fois pour Noël (24/25 déc)
+                  {' '}ET le Nouvel An (31 déc / 1er janv) la même année. Il peut en faire
+                  {' '}une, jamais les deux. Cette règle se reconduit chaque année.
+                </p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="excl-date-1">Première date</Label>
+                      <input
+                        id="excl-date-1"
+                        type="date"
+                        value={dateExcl1}
+                        onChange={(e) => setDateExcl1(e.target.value)}
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="excl-date-2">Seconde date</Label>
+                      <input
+                        id="excl-date-2"
+                        type="date"
+                        value={dateExcl2}
+                        onChange={(e) => setDateExcl2(e.target.value)}
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Le vétérinaire ne sera jamais de garde à la fois sur ces deux dates
+                    {' '}(il peut en faire une). Un week-end couvre le samedi et le dimanche.
+                  </p>
+                </>
+              )}
             </div>
           )}
 

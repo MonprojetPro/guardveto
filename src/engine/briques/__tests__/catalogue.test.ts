@@ -27,6 +27,7 @@ const MIGRATIONS = [
   '20260707190000_desiderata.sql',
   '20260708120000_successions_repos_avances.sql',
   '20260708140000_cadencement_weekend.sql',
+  '20260708170000_exclusion_dates.sql',
 ].map((f) => fileURLToPath(new URL(`../../../../supabase/migrations/${f}`, import.meta.url)))
 
 interface SeedBrique {
@@ -66,8 +67,8 @@ function parserSeed(): Record<string, SeedBrique> {
 describe('catalogue ↔ seed briques_regles — cohérence (ne divergent pas)', () => {
   const seed = parserSeed()
 
-  it('le seed parsé contient bien les 24 briques (sanity du parser)', () => {
-    expect(Object.keys(seed)).toHaveLength(24)
+  it('le seed parsé contient bien les 25 briques (sanity du parser)', () => {
+    expect(Object.keys(seed)).toHaveLength(25)
   })
 
   it('catalogue et seed déclarent EXACTEMENT les mêmes briques', () => {

@@ -128,6 +128,16 @@ export function cleHistoriqueFete(vetId: string, fete: CodeFete, annee: number):
   return `${vetId}|${fete}|${annee}`
 }
 
+/**
+ * Clé canonique d'une INSTANCE de fête (fête, année), SANS véto — sert au XOR
+ * « pas les deux fêtes » (brique exclusion_dates, #15a) à identifier « la même
+ * année » : une garde couvrant Noël(2026) et une couvrant le Nouvel An(2026)
+ * sont exclusives ; Noël(2026) et Nouvel An(2027) ne le sont PAS.
+ */
+export function cleInstanceFete(inst: InstanceFete): string {
+  return `${inst.fete}|${inst.annee}`
+}
+
 /** Normalise les lignes DB en historique résolu (lignes inconnues écartées). */
 export function resoudreHistoriqueFetes(rows: HistoriqueFeteRow[]): HistoriqueFetesResolu {
   const set = new Set<string>()

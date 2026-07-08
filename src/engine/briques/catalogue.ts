@@ -588,6 +588,54 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
     },
   },
 
+  // ── Exclusion de dates / XOR « pas les deux » (Vague 6 tranche B — #15a) ──
+  // Brique PAR-VÉTO (famille `interdire`), réglable dur/mou. Sémantique retenue
+  // et FIGÉE : « pas les DEUX » — le véto ne peut pas être de garde À LA FOIS sur
+  // les deux cibles (JAMAIS « exactement une » : on n'oblige personne à en faire
+  // une). Deux formes de params, une SEULE par règle :
+  //   • fetes : ['noel','nouvel_an'] — paire de codes fête (référentiel
+  //     historique-fete.ts). Cas métier dominant (24 déc XOR 31 déc), se
+  //     reconduit seule chaque année : pour CHAQUE année couverte, le véto ne
+  //     peut couvrir à la fois une instance de la 1re fête ET de la 2e (même
+  //     année, convention « année du décembre » portée par feteDeDate()).
+  //   • dates : ['YYYY-MM-DD','YYYY-MM-DD'] — paire de dates ISO explicites,
+  //     pour tout autre cas. Le véto ne peut être de garde aux deux dates (au
+  //     sens « jours couverts par ses gardes » — un WE couvre samedi + dimanche).
+  // Mal configurée (forme absente, paire identique, date non-ISO) → INERTE
+  // (jamais de crash, jamais de blocage) — des DEUX côtés moteur + validateur.
+  // Intra-période uniquement (pas de lookback #17 : le XOR est réservé au
+  // planning de la période en cours ; les fêtes tombant dans deux périodes
+  // distinctes ne se voient qu'à moitié — limite documentée).
+  exclusion_dates: {
+    id: 'exclusion_dates',
+    famille: 'interdire',
+    operateur: 'PAS_LES_DEUX',
+    axes: ['qui', 'quand'],
+    schemaParams: {
+      fetes: "string[2]? (paire de codes fête : noel|nouvel_an — forme « fêtes de fin d'année »)",
+      dates: 'string[2]? (paire de dates ISO yyyy-MM-dd — forme « dates libres »)',
+    },
+    widget: 'WidgetExclusionDates',
+    rendreLangageNaturel: (params) => {
+      const fetes = Array.isArray(params.fetes)
+        ? (params.fetes as unknown[]).filter((x): x is string => typeof x === 'string')
+        : []
+      if (fetes.length === 2) {
+        const LIB: Record<string, string> = { noel: 'Noël', nouvel_an: 'le Nouvel An' }
+        const a = LIB[fetes[0]] ?? fetes[0]
+        const b = LIB[fetes[1]] ?? fetes[1]
+        return `ne fait jamais de garde à la fois pour ${a} et ${b} la même année`
+      }
+      const dates = Array.isArray(params.dates)
+        ? (params.dates as unknown[]).filter((x): x is string => typeof x === 'string')
+        : []
+      if (dates.length === 2) {
+        return `ne fait jamais de garde à la fois le ${dates[0]} et le ${dates[1]}`
+      }
+      return 'ne fait jamais deux dates ensemble (paramètres non précisés)'
+    },
+  },
+
   // ⚠️ INTERNE — « motif composite pré-calculé » (archi V2 §catalogue blindé).
   // Le métier « grand week-end » (repos vendredi si pas de garde WE, jeudi sinon)
   // est DÉJÀ livré par la brique `repos_conditionnel`. Le moteur calcule ce motif

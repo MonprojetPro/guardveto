@@ -36,6 +36,8 @@ const BRIQUES_EDITABLES = new Set([
   'succession_interdite', 'serie_max', 'repos_apres_serie',
   // Cadencement « 1 WE sur N ancré » (#20).
   'cadencement_weekend',
+  // Exclusion de dates / XOR « pas les deux » (#15a).
+  'exclusion_dates',
 ])
 
 // ── Données ──────────────────────────────────────────────────

@@ -22,6 +22,7 @@ import {
   violeRoleInterdit, messageRoleInterdit,
 } from './composition-equipe'
 import { estAttribue, vetPourRole, roleDuVet } from '../attribution'
+import { fetesCouvertesParSlot, cleInstanceFete } from '../historique-fete'
 
 // ── Helpers internes ────────────────────────────────────
 
@@ -1061,6 +1062,127 @@ function checkReposApresSerie(vet: VetEngine, slot: SlotGarde, planning: Plannin
   return ok()
 }
 
+// ── exclusion_dates — XOR « pas les deux » (Vague 6 tranche B — #15a) ────────
+// Règle PAR-VÉTO : le véto ne peut être de garde À LA FOIS sur les deux cibles.
+// Sémantique FIGÉE « pas les DEUX » (jamais « exactement une »). Deux formes,
+// une seule par règle :
+//   • fetes : ['noel','nouvel_an'] — paire de codes fête. Pour CHAQUE année
+//     couverte, exclusion entre une instance de la 1re fête et de la 2e fête DE
+//     LA MÊME ANNÉE (convention d'année portée par feteDeDate via
+//     fetesCouvertesParSlot — un slot weekend daté du samedi couvre sam+dim).
+//   • dates : ['YYYY-MM-DD','YYYY-MM-DD'] — paire de dates ISO. Exclusion « au
+//     sens jours couverts » : on réutilise joursCouvertsGarde (WE = sam+dim).
+// Le prédicat regarde le slot candidat + les gardes DÉJÀ posées du véto (comme
+// au_plus_n) : « si j'ajoute cette garde, le véto couvre-t-il les DEUX cibles ? »
+// INTRA-PÉRIODE (pas de lookback #17). Mal configurée → INERTE.
+
+/** Lit la paire de codes fête (exactement 2, distinctes) ou null. */
+function lirePaireFetes(cfg: Record<string, unknown>): [string, string] | null {
+  const f = cfg.fetes
+  if (!Array.isArray(f) || f.length !== 2) return null
+  const [a, b] = f
+  if (typeof a !== 'string' || typeof b !== 'string') return null
+  if (a !== 'noel' && a !== 'nouvel_an') return null
+  if (b !== 'noel' && b !== 'nouvel_an') return null
+  if (a === b) return null // paire identique → inerte
+  return [a, b]
+}
+
+/** Lit la paire de dates ISO (exactement 2, distinctes, bien formées) ou null. */
+function lirePaireDates(cfg: Record<string, unknown>): [string, string] | null {
+  const d = cfg.dates
+  if (!Array.isArray(d) || d.length !== 2) return null
+  const [a, b] = d
+  if (typeof a !== 'string' || typeof b !== 'string') return null
+  const isISO = (x: string) =>
+    /^\d{4}-\d{2}-\d{2}$/.test(x) && !Number.isNaN(new Date(x + 'T12:00:00Z').getTime())
+  if (!isISO(a) || !isISO(b)) return null
+  if (a === b) return null // paire identique → inerte
+  return [a, b]
+}
+
+/** Poser `vet` sur `slot` ferait-il couvrir au véto LES DEUX cibles d'une règle XOR ? */
+function violeExclusionDates(
+  c: ContrainteEngine, vetId: string, slot: SlotGarde, planning: PlanningPartiel,
+): boolean {
+  const cfg = c.config as Record<string, unknown>
+
+  // ── Forme FÊTES : « pas Noël ET Nouvel An la même année » ──
+  const fetes = lirePaireFetes(cfg)
+  if (fetes) {
+    // Instances de fête couvertes par le slot candidat (fête → set d'années).
+    const parFeteCandidat = new Map<string, Set<number>>()
+    for (const inst of fetesCouvertesParSlot(slot.date, slot.type)) {
+      if (inst.fete !== fetes[0] && inst.fete !== fetes[1]) continue
+      const s = parFeteCandidat.get(inst.fete) ?? new Set<number>()
+      s.add(inst.annee)
+      parFeteCandidat.set(inst.fete, s)
+    }
+    if (parFeteCandidat.size === 0) return false // le candidat ne touche aucune des 2 fêtes
+    // Le candidat couvre-t-il À LUI SEUL les deux fêtes de la même année ?
+    // (Impossible avec les fêtes actuelles — ≥ 6 jours d'écart — mais le
+    // validateur juge « jours couverts par le planning » : miroir obligatoire
+    // pour que les deux gardiens restent d'accord si le référentiel s'étend.)
+    const annees0 = parFeteCandidat.get(fetes[0])
+    const annees1 = parFeteCandidat.get(fetes[1])
+    if (annees0 && annees1) {
+      for (const an of annees0) if (annees1.has(an)) return true
+    }
+    // L'AUTRE fête est-elle déjà couverte par une garde du véto, la MÊME année ?
+    for (const a of planning.attributions) {
+      if (a.date === slot.date && a.type === slot.type) continue // le slot lui-même
+      if (!estAttribue(a, vetId)) continue
+      for (const inst of fetesCouvertesParSlot(a.date, a.type)) {
+        if (inst.fete !== fetes[0] && inst.fete !== fetes[1]) continue
+        // Cherche l'AUTRE fête de la paire, sur la même année, côté candidat.
+        const autre = inst.fete === fetes[0] ? fetes[1] : fetes[0]
+        if (parFeteCandidat.get(autre)?.has(inst.annee)) return true
+      }
+    }
+    return false
+  }
+
+  // ── Forme DATES libres : « pas le 24 ET le 31 » (jours couverts) ──
+  const dates = lirePaireDates(cfg)
+  if (dates) {
+    const joursCandidat = new Set(joursCouvertsGarde(slot.date, slot.type))
+    const candidatCouvre = (d: string) => joursCandidat.has(d)
+    // Quelles cibles le candidat couvre-t-il ?
+    const cible0 = candidatCouvre(dates[0])
+    const cible1 = candidatCouvre(dates[1])
+    if (!cible0 && !cible1) return false // le candidat ne touche aucune des 2 dates
+    // Le candidat couvre-t-il À LUI SEUL les deux dates ? (ex. paire samedi +
+    // dimanche du même week-end : un seul slot `weekend` couvre les deux.)
+    // Sans ce refus, le moteur poserait la garde et le validateur — qui juge
+    // les jours couverts du planning FINAL — crierait une violation fantôme
+    // au gate de publication (désaccord des deux gardiens).
+    if (cible0 && cible1) return true
+    // L'autre cible est-elle déjà couverte par une garde existante du véto ?
+    for (const a of planning.attributions) {
+      if (a.date === slot.date && a.type === slot.type) continue // le slot lui-même
+      if (!estAttribue(a, vetId)) continue
+      const jours = new Set(joursCouvertsGarde(a.date, a.type))
+      if (cible0 && jours.has(dates[1])) return true
+      if (cible1 && jours.has(dates[0])) return true
+    }
+    return false
+  }
+
+  return false // aucune forme valide → inerte
+}
+
+function checkExclusionDates(vet: VetEngine, slot: SlotGarde, planning: PlanningPartiel): ValidationResult {
+  for (const c of vet.contraintes) {
+    if (!c.actif || c.type !== 'exclusion_dates') continue
+    if (estDure(c) && violeExclusionDates(c, vet.id, slot, planning)) {
+      return invalid(
+        `XOR_DATES : ${vet.prenom} ne peut pas être de garde à la fois sur les deux dates/fêtes exclusives`,
+      )
+    }
+  }
+  return ok()
+}
+
 export function penaliteContraintesConfig(
   slot: SlotGarde,
   vet: VetEngine,
@@ -1104,6 +1226,10 @@ export function penaliteContraintesConfig(
         viole = violeSerieMax(c, vet.id, slot, planningRythme); break
       case 'repos_apres_serie':
         viole = violeReposApresSerie(c, vet.id, slot, planningRythme); break
+      // XOR « pas les deux » (#15a) : INTRA-PÉRIODE → planning courant (jamais le
+      // lookback : le XOR ne se juge que sur la période en cours, par principe).
+      case 'exclusion_dates':
+        viole = violeExclusionDates(c, vet.id, slot, planning); break
     }
     if (viole) pen += penaliteEtage(etageDe(c))
   }
@@ -1170,6 +1296,9 @@ export function isValid(
     checkSuccessionInterdite(vet, slot, planningRythme),
     checkSerieMax(vet, slot, planningRythme),
     checkReposApresSerie(vet, slot, planningRythme),
+    // XOR « pas les deux » (#15a) : INTRA-PÉRIODE → planning courant (JAMAIS le
+    // lookback : le XOR ne se juge que sur la période en cours, par principe).
+    checkExclusionDates(vet, slot, planning),
     // R8 : ne s'applique que si slot.type est la CIBLE d'une relation
     // inversion_role (le check filtre lui-même — générique, plus de « WE only »).
     checkR8Inversion(vet, slot, roleVisé, planning, structure.r8_inversion, relations),
@@ -1211,6 +1340,7 @@ export {
   checkSuccessionInterdite,
   checkSerieMax,
   checkReposApresSerie,
+  checkExclusionDates,
   checkComposition,
   checkRoleInterditTag,
 }

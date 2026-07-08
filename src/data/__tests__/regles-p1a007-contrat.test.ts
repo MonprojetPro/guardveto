@@ -106,4 +106,27 @@ describe('P1A-007 — contrat formulaire → moteur', () => {
     const espacement = duOwner.find((c) => c.type === 'espacement_min')
     expect((espacement?.config.params as Record<string, unknown>).ecart_min_jours).toBe(3)
   })
+
+  it('exclusion_dates (XOR « pas les deux ») est mappée sans rejet, les deux formes', () => {
+    const rows: RegleCabinetRow[] = [
+      enveloppe('r7', 'exclusion_dates', 'sauf_crise', OWNER, null,
+        { fetes: ['noel', 'nouvel_an'] }, 'exclusion_dates'),
+      enveloppe('r8', 'exclusion_dates', 'jamais', OWNER, null,
+        { dates: ['2026-07-14', '2026-08-15'] }, 'exclusion_dates'),
+    ]
+
+    const { contraintesParVet, rejets } = mapperReglesCabinet(rows, BRIQUES_CONNUES)
+
+    expect(rejets).toEqual([])
+
+    const duOwner = contraintesParVet.get(OWNER) ?? []
+    const exclusions = duOwner.filter((c) => c.type === 'exclusion_dates')
+    expect(exclusions).toHaveLength(2)
+
+    // Les params (fêtes / dates) sont préservés intacts.
+    const formeFetes = exclusions.find((c) => (c.config.params as Record<string, unknown>).fetes)
+    expect((formeFetes?.config.params as Record<string, unknown>).fetes).toEqual(['noel', 'nouvel_an'])
+    const formeDates = exclusions.find((c) => (c.config.params as Record<string, unknown>).dates)
+    expect((formeDates?.config.params as Record<string, unknown>).dates).toEqual(['2026-07-14', '2026-08-15'])
+  })
 })

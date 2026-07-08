@@ -39,6 +39,8 @@ export const BRIQUES_IA = [
   'repos_apres_serie',
   // Cadencement « 1 WE sur N ancré » (#20) — par véto (cas pompier volontaire).
   'cadencement_weekend',
+  // Exclusion « pas les deux » (Vague 6 tranche B — #15a) — par véto (XOR fêtes/dates).
+  'exclusion_dates',
   // Équité par COHORTE de tag (Vague 6 tranche A — #21) — règle GLOBALE.
   'equilibrer',
 ] as const
@@ -111,6 +113,10 @@ export const PropositionRegleSchema = z.object({
    *  interdit = WE du cycle interdits de garde (cas pompier) ;
    *  impose = gardes WE forcées sur le cycle. (n_semaines réutilisé pour le cycle N.) */
   sens_cadence: z.enum(['interdit', 'impose']).nullable(),
+  /** exclusion_dates (#15a) : XOR « pas les deux ». UNE seule forme :
+   *  fetes = paire de codes fête (noel/nouvel_an) ; dates = paire de dates ISO. */
+  fetes: z.array(z.enum(['noel', 'nouvel_an'])).nullable(),
+  dates: z.array(z.string()).nullable(),
   /** equilibrer (#21) : dimension d'équité à équilibrer sur la cohorte du tag. */
   dimension_equite: z.enum(DIMENSIONS_EQUITE_IA).nullable(),
   /** equilibrer (#21) : niveau d'importance de l'équilibrage (cohorte). */
@@ -383,6 +389,32 @@ export function propositionVersPayload(
       payload.sens = p.sens_cadence
       break
     }
+    // ── Exclusion « pas les deux » (#15a) ──
+    case 'exclusion_dates': {
+      // Forme FÊTES prioritaire (cas métier dominant : 24 XOR 31 déc).
+      const fetes = [...new Set((p.fetes ?? []).filter(
+        (x): x is 'noel' | 'nouvel_an' => x === 'noel' || x === 'nouvel_an',
+      ))]
+      if (fetes.length > 0) {
+        if (fetes.length !== 2) {
+          return { ok: false, raison: 'Précise les deux fêtes concernées (Noël et Nouvel An).' }
+        }
+        payload.fetes = fetes
+        break
+      }
+      // Forme DATES libres.
+      const isISO = (x: string) =>
+        /^\d{4}-\d{2}-\d{2}$/.test(x) && !Number.isNaN(new Date(x + 'T12:00:00Z').getTime())
+      const dates = (p.dates ?? []).filter((x): x is string => typeof x === 'string')
+      if (dates.length !== 2 || !isISO(dates[0]) || !isISO(dates[1])) {
+        return { ok: false, raison: 'Précise les deux dates à ne pas cumuler (ou dis « Noël et Nouvel An »).' }
+      }
+      if (dates[0] === dates[1]) {
+        return { ok: false, raison: 'Les deux dates doivent être différentes.' }
+      }
+      payload.dates = [dates[0], dates[1]]
+      break
+    }
   }
 
   return { ok: true, payload }
@@ -594,6 +626,11 @@ export function apercuProposition(p: PropositionRegle): string {
       break
     case 'cadencement_weekend':
       params = { n_semaines: p.n_semaines, ancre: p.ancre, sens: p.sens_cadence }
+      break
+    case 'exclusion_dates':
+      params = (p.fetes ?? []).length > 0
+        ? { fetes: p.fetes }
+        : { dates: p.dates ?? undefined }
       break
     case 'equilibrer':
       params = { dimension: p.dimension_equite, importance: p.importance_equite, tag: p.tag }

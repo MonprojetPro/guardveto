@@ -1042,6 +1042,120 @@ export function validerPlanning(
     }
   }
 
+  // ── EXCLUSION DE DATES / XOR « pas les deux » (Vague 6 tranche B — #15a) ──
+  // Re-vérification INDÉPENDANTE (jamais d'import de rules/) : un véto porteur
+  // d'une règle `exclusion_dates` DURE (étage ≤ 2) ne doit pas être de garde À
+  // LA FOIS sur les deux cibles. Deux formes (une seule par règle) :
+  //   • fetes ['noel','nouvel_an'] : pour CHAQUE année couverte, exclusion entre
+  //     une instance de la 1re fête et une de la 2e DE LA MÊME ANNÉE. La
+  //     convention d'année (nouvel_an(N) = 31 déc N + 1er janv N+1) est
+  //     ré-implémentée ici (feteInstance) — miroir trivial, pas d'import.
+  //   • dates ['YYYY-MM-DD','YYYY-MM-DD'] : exclusion « au sens jours couverts »
+  //     (un week-end daté du samedi couvre samedi + dimanche → joursCouverts).
+  // INTRA-PÉRIODE : on n'utilise PAS planningRythme (pas de lookback #17 : le XOR
+  // se juge sur la période courante par principe). Config inerte (forme absente,
+  // paire identique, date non-ISO) → aucune violation (jamais de fantôme).
+  {
+    // Fête (et année de saison) portée par une DATE — ré-implémenté indépendamment.
+    // Convention : 24/25 déc → noel(année) ; 31 déc → nouvel_an(année) ;
+    // 1er janv → nouvel_an(année-1) (même réveillon que le 31 déc précédent).
+    const feteInstance = (date: string): { fete: string; annee: number } | null => {
+      const mmjj = date.substring(5)
+      const annee = Number(date.substring(0, 4))
+      if (mmjj === '12-24' || mmjj === '12-25') return { fete: 'noel', annee }
+      if (mmjj === '12-31') return { fete: 'nouvel_an', annee }
+      if (mmjj === '01-01') return { fete: 'nouvel_an', annee: annee - 1 }
+      return null
+    }
+    // Instances de fête (dédoublonnées) couvertes par un slot (weekend = sam+dim).
+    const fetesDuSlot = (date: string, type: string): { fete: string; annee: number }[] => {
+      const jours = type === 'weekend' ? [date, plusJours(date, 1)] : [date]
+      const vues = new Set<string>()
+      const out: { fete: string; annee: number }[] = []
+      for (const j of jours) {
+        const inst = feteInstance(j)
+        if (!inst) continue
+        const cle = `${inst.fete}|${inst.annee}`
+        if (vues.has(cle)) continue
+        vues.add(cle)
+        out.push(inst)
+      }
+      return out
+    }
+    const joursCouvertsXor = (date: string, type: string): string[] =>
+      type === 'weekend' ? [date, plusJours(date, 1)] : [date]
+
+    const isISO = (x: string) =>
+      /^\d{4}-\d{2}-\d{2}$/.test(x) && !Number.isNaN(new Date(x + 'T12:00:00Z').getTime())
+
+    for (const vet of vetsNorm) {
+      for (const c of vet.contraintes) {
+        if (!c.actif || c.type !== 'exclusion_dates') continue
+        const cfg = c.config as Record<string, unknown>
+        const etage = typeof cfg.force === 'number' ? (cfg.force as number) : 2
+        if (etage > 2) continue // souple → pas une violation dure
+
+        // Forme FÊTES.
+        const fetesRaw = cfg.fetes
+        const fetes = Array.isArray(fetesRaw) && fetesRaw.length === 2
+          ? fetesRaw.filter((x): x is string => x === 'noel' || x === 'nouvel_an')
+          : []
+        if (fetes.length === 2 && fetes[0] !== fetes[1]) {
+          // Année → set des fêtes (de la paire) couvertes par le véto cette année.
+          const parAnnee = new Map<number, Set<string>>()
+          const preuve = new Map<string, string>() // `annee|fete` → date de garde
+          for (const a of planning.attributions) {
+            if (!surCreneau(a, vet.id)) continue
+            for (const inst of fetesDuSlot(a.date, a.type)) {
+              if (inst.fete !== fetes[0] && inst.fete !== fetes[1]) continue
+              const s = parAnnee.get(inst.annee) ?? new Set<string>()
+              s.add(inst.fete)
+              parAnnee.set(inst.annee, s)
+              preuve.set(`${inst.annee}|${inst.fete}`, a.date)
+            }
+          }
+          for (const [annee, couvertes] of parAnnee) {
+            if (couvertes.has(fetes[0]) && couvertes.has(fetes[1])) {
+              violations.push({
+                regle: 'XOR_DATES',
+                date: preuve.get(`${annee}|${fetes[1]}`) ?? '',
+                type: 'exclusion_dates',
+                vetId: vet.id,
+                detail: `XOR_DATES : ${vet.prenom} est de garde à la fois pour ${fetes[0]} et ${fetes[1]} en ${annee} (interdit : pas les deux)`,
+              })
+            }
+          }
+          continue // une seule forme par règle
+        }
+
+        // Forme DATES libres.
+        const datesRaw = cfg.dates
+        const dates = Array.isArray(datesRaw) && datesRaw.length === 2
+          ? datesRaw.filter((x): x is string => typeof x === 'string' && isISO(x))
+          : []
+        if (dates.length === 2 && dates[0] !== dates[1]) {
+          let couvre0: string | null = null
+          let couvre1: string | null = null
+          for (const a of planning.attributions) {
+            if (!surCreneau(a, vet.id)) continue
+            const jours = joursCouvertsXor(a.date, a.type)
+            if (jours.includes(dates[0])) couvre0 = a.date
+            if (jours.includes(dates[1])) couvre1 = a.date
+          }
+          if (couvre0 && couvre1) {
+            violations.push({
+              regle: 'XOR_DATES',
+              date: dates[1],
+              type: 'exclusion_dates',
+              vetId: vet.id,
+              detail: `XOR_DATES : ${vet.prenom} est de garde à la fois le ${dates[0]} (${couvre0}) et le ${dates[1]} (${couvre1}) — interdit : pas les deux`,
+            })
+          }
+        }
+      }
+    }
+  }
+
   // ── R9 — créneaux liés = même équipe · R8 — rôles changés entre eux ──
   // GÉNÉRIQUE (RG tranche 3) : le couple vendredi↔WE n'est plus câblé — les
   // couples viennent de la DONNÉE (structureConfig.relations ; undefined →

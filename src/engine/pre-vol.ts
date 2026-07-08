@@ -716,14 +716,30 @@ function detecterSequencesInertes(
           !Number.isNaN(new Date(ancre + 'T12:00:00Z').getTime())
         const sensValide = p.sens === 'interdit' || p.sens === 'impose'
         inerte = !Number.isFinite(n) || n < 2 || !ancreValide || !sensValide
+      } else if (c.type === 'exclusion_dates') {
+        // XOR « pas les deux » (#15a) : inerte si AUCUNE forme valide (ni paire de
+        // fêtes distinctes, ni paire de dates ISO distinctes) → le moteur l'ignore.
+        const estCodeFete = (x: unknown) => x === 'noel' || x === 'nouvel_an'
+        const fetes = Array.isArray(p.fetes) ? p.fetes : []
+        const paireFetesOk =
+          fetes.length === 2 && estCodeFete(fetes[0]) && estCodeFete(fetes[1]) && fetes[0] !== fetes[1]
+        const isISO = (x: unknown): x is string =>
+          typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x) &&
+          !Number.isNaN(new Date(x + 'T12:00:00Z').getTime())
+        const dates = Array.isArray(p.dates) ? p.dates : []
+        const paireDatesOk = dates.length === 2 && isISO(dates[0]) && isISO(dates[1]) && dates[0] !== dates[1]
+        inerte = !paireFetesOk && !paireDatesOk
       } else {
         continue
       }
       if (inerte) {
+        const estRythme = c.type !== 'exclusion_dates'
         out.push({
           code: 'sequence_inerte',
           regles: [libelleRegle(vet.prenom, c, nomVeto)],
-          message: `Une règle de rythme de ${vet.prenom} est mal paramétrée (valeur nulle ou incomplète) : elle n'aura aucun effet. Modifie-la ou supprime-la depuis l'écran Règles.`,
+          message: estRythme
+            ? `Une règle de rythme de ${vet.prenom} est mal paramétrée (valeur nulle ou incomplète) : elle n'aura aucun effet. Modifie-la ou supprime-la depuis l'écran Règles.`
+            : `Une règle « pas les deux dates » de ${vet.prenom} est mal paramétrée (dates identiques ou incomplètes) : elle n'aura aucun effet. Modifie-la ou supprime-la depuis l'écran Règles.`,
         })
       }
     }

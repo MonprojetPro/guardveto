@@ -735,6 +735,8 @@ const BRIQUES_EVALUABLES = {
   repos_apres_serie: 'repos_apres_serie',
   // Cadencement « 1 WE sur N ancré » (Vague 5 tranche C — #20).
   cadencement_weekend: 'cadencement_weekend',
+  // Exclusion de dates / XOR « pas les deux » (Vague 6 tranche B — #15a).
+  exclusion_dates: 'exclusion_dates',
 } as const
 export type BriqueEvaluable = keyof typeof BRIQUES_EVALUABLES
 
@@ -773,6 +775,8 @@ const REPOS_APRES_MAX = 30 // jours de repos imposés après une série
 const N_SEM_CADENCE_MIN = 2
 const N_SEM_CADENCE_MAX = 12
 const SENS_CADENCE_VALIDES = new Set(['interdit', 'impose'])
+// Exclusion « pas les deux » (#15a) : codes fête reconnus (référentiel historique).
+const CODES_FETE_VALIDES = new Set(['noel', 'nouvel_an'])
 
 /** Payload envoyé par le formulaire (champs simples — le JSON est bâti ici). */
 export interface UpsertReglePayload {
@@ -817,6 +821,10 @@ export interface UpsertReglePayload {
   // cadencement_weekend (#20) : « 1 WE sur N ancré » — n_semaines réutilisé.
   // `sens` est partagé avec volume_gardes (plus/moins) mais porte ici interdit/impose.
   ancre?: string // date ISO yyyy-MM-dd (un samedi de référence)
+  // exclusion_dates (#15a) : XOR « pas les deux ». UNE seule forme :
+  //   fetes = paire de codes fête (noel/nouvel_an) ; dates = paire de dates ISO.
+  fetes?: string[]
+  dates?: string[]
 }
 
 /** Parse un entier dans [1, max]. Retourne null si invalide (frontière de confiance). */
@@ -1006,6 +1014,35 @@ function construireParams(
       // On stocke l'ancre TELLE QUE saisie : le moteur la ramène au samedi de sa
       // semaine (aucune dépendance à ce que l'admin ait pile choisi un samedi).
       return { quand: null, params: { n_semaines: n, ancre, sens } }
+    }
+    // ── Exclusion « pas les deux » (#15a) ──
+    // Une SEULE forme par règle : `fetes` (paire de codes fête) prioritaire si
+    // fournie, sinon `dates` (paire de dates ISO distinctes). Frontière de
+    // confiance : validation stricte ici (le moteur est inerte si mal formé,
+    // mais on refuse à l'écriture pour ne pas créer de coquille vide).
+    case 'exclusion_dates': {
+      const fetes = Array.isArray(p.fetes)
+        ? [...new Set((p.fetes as unknown[]).filter((x): x is string => typeof x === 'string'))]
+        : []
+      if (fetes.length > 0) {
+        if (fetes.length !== 2) return { error: 'Sélectionnez exactement deux fêtes.' }
+        if (fetes.some((f) => !CODES_FETE_VALIDES.has(f))) {
+          return { error: 'Fête inconnue (Noël ou Nouvel An).' }
+        }
+        // fetes.length===2 après dédoublonnage ⇒ déjà distinctes.
+        return { quand: null, params: { fetes } }
+      }
+      const dates = Array.isArray(p.dates)
+        ? (p.dates as unknown[]).filter((x): x is string => typeof x === 'string')
+        : []
+      if (dates.length !== 2) {
+        return { error: 'Indiquez deux dates (ou choisissez la forme « fêtes »).' }
+      }
+      const isISO = (x: string) =>
+        /^\d{4}-\d{2}-\d{2}$/.test(x) && !Number.isNaN(new Date(x + 'T12:00:00Z').getTime())
+      if (!isISO(dates[0]) || !isISO(dates[1])) return { error: 'Date invalide.' }
+      if (dates[0] === dates[1]) return { error: 'Les deux dates doivent être différentes.' }
+      return { quand: null, params: { dates: [dates[0], dates[1]] } }
     }
     default:
       return { error: 'Brique non gérée par ce constructeur.' }
