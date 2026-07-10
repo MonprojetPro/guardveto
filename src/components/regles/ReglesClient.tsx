@@ -38,6 +38,8 @@ const BRIQUES_EDITABLES = new Set([
   'cadencement_weekend',
   // Exclusion de dates / XOR « pas les deux » (#15a).
   'exclusion_dates',
+  // Garde conditionnelle orientée « seulement avec » (#15b — Vague 6C).
+  'seulement_avec',
 ])
 
 // ── Données ──────────────────────────────────────────────────
