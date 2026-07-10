@@ -200,3 +200,9 @@ Le message disait « plafond trop élevé (maximum 14) ». MiKL : *le 14 est arb
 5. **La sémantique « même créneau » d'une conditionnelle rend les créneaux 1 place structurellement interdits au porteur** — conséquence à ASSUMER et à attraper à la CRÉATION (pattern RG4) : refus si tous les créneaux visés sont à 1 place, avec alternative proposée (ciblage multi-places ou préférence souple `preferer_avec`). L'impasse cryptique des semaines plus tard coûte plus cher que le message au moment du geste.
 
 **Piège documenté (non corrigé, assumé) :** les cohortes d'équité lisent les `vet.tags` LIVE au replay (les tags ne sont pas snapshotés) — même comportement que `composition_equipe`/`role_interdit_tag`, cohérent. Et une cohorte taguée sur `grands_weekend` ne « voit » que les salariés porteurs (le compteur `grandsWePerdus` n'est incrémenté que pour eux — voie sûre du byte-identique).
+
+## 2026-07-10 — Fixes audit Bloc 3 (D1-D8) : deux leçons transverses
+
+1. **Tout texte nominatif dans un template = bombe multi-cabinet.** « Anne-Sophie » signait en dur les e-mails de congés (brevo.ts) : parfait pour le pilote, faux pour tout autre abonné. Règle : les templates reçoivent l'identité (signature, expéditeur) en PARAMÈTRE avec un repli générique — et le repli ne doit JAMAIS être une adresse/nom réels (D4 : refuser d'envoyer vaut mieux qu'usurper l'adresse du pilote).
+
+2. **Avant de gater une route « admin-only », grep ses consumers.** `/api/gardes/[id]/disponibilites` semblait réservée à la réattribution admin, mais la modale de garde est PARTAGÉE admin/véto : le véto en lit les métadonnées (verrouillage, type, échange). Un 403 sec aurait cassé le parcours véto en silence. Pattern retenu : dégrader la réponse par rôle (`vets: []`) plutôt que bloquer — la donnée sensible n'est ni calculée ni servie, l'UI existante ne change pas.
