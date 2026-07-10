@@ -41,6 +41,8 @@ const TYPE_LABEL: Record<string, string> = {
   rappel_publication: 'Rappel de publication',
   appel_volontaires:  'Appel aux volontaires',
   depannage_confirme: 'Dépannage confirmé',
+  conge_valide:       'Congé validé',
+  conge_refuse:       'Congé refusé',
 }
 
 function typeLabel(type: string): string {

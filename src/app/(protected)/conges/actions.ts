@@ -34,6 +34,36 @@ async function chargerExpediteurCabinet(
 }
 
 /**
+ * D5 — journalise dans `email_log` l'envoi (ou l'échec) d'un e-mail de congé.
+ * Aligne le chemin sendBrevoEmail sur celui de sendViaBrevo (notifications.ts) :
+ * mêmes colonnes/statuts que le journal admin (/admin/journal-emails). Types
+ * autorisés par la contrainte email_log_type_check (migration élargie).
+ * Best-effort : toute erreur d'insertion est loguée mais jamais bloquante.
+ */
+async function journaliserEmailConge(
+  supabase: SupabaseClient<any, any, any>,
+  params: {
+    type: 'conge_valide' | 'conge_refuse'
+    destinataire: string
+    veterinaire_id: string
+    resultat: { error?: string; success?: boolean }
+  },
+): Promise<void> {
+  const erreur = params.resultat.error ?? null
+  try {
+    await supabase.from('email_log').insert({
+      type: params.type,
+      destinataire: params.destinataire,
+      veterinaire_id: params.veterinaire_id,
+      statut: erreur ? 'erreur' : 'envoye',
+      erreur,
+    })
+  } catch (e) {
+    console.error('[conges] Journalisation email_log échouée:', e)
+  }
+}
+
+/**
  * Signal de conflit renvoyé au front quand un congé devenu EFFECTIF (validé)
  * chevauche une ou plusieurs gardes d'un planning DÉJÀ PUBLIÉ pour ce véto.
  * Présent UNIQUEMENT en cas de conflit — le contrat de succès reste rétro-compatible
@@ -230,9 +260,19 @@ export async function validerConge(
           creneau: conge.creneau,
           date_debut: date_debut ?? conge.date_debut,
           date_fin: date_fin ?? conge.date_fin,
+          signature: expediteur.fromName,
         }),
         ...expediteur,
-      }).catch(console.error)
+      })
+        .then((res) =>
+          journaliserEmailConge(supabase, {
+            type: 'conge_valide',
+            destinataire: vet.email,
+            veterinaire_id: conge.veterinaire_id,
+            resultat: res,
+          }),
+        )
+        .catch(console.error)
     }
   }
 
@@ -304,9 +344,19 @@ export async function refuserConge(id: string, raison?: string) {
           date_debut: conge.date_debut,
           date_fin: conge.date_fin,
           raison: raison ?? null,
+          signature: expediteur.fromName,
         }),
         ...expediteur,
-      }).catch(console.error)
+      })
+        .then((res) =>
+          journaliserEmailConge(supabase, {
+            type: 'conge_refuse',
+            destinataire: vet.email,
+            veterinaire_id: conge.veterinaire_id,
+            resultat: res,
+          }),
+        )
+        .catch(console.error)
     }
   }
 
