@@ -90,14 +90,23 @@ const CRENEAU_LABELS: Record<string, string> = {
   journee: 'Journée entière', matin: 'Matin', 'apres-midi': 'Après-midi', soiree: 'Soirée',
 }
 
+/** Signature neutre côté cabinet (D3 — plus de « Anne-Sophie » en dur).
+ *  Reçoit le nom d'expéditeur du cabinet ; repli générique si absent. */
+function signatureCabinet(signature?: string | null): string {
+  return signature?.trim() || 'l’équipe du cabinet'
+}
+
 export function emailCongeValide(params: {
   prenom: string
   type: string
   creneau: string | null
   date_debut: string
   date_fin: string
+  /** Nom d'expéditeur du cabinet (cabinets.brevo_from_name) — D3. */
+  signature?: string | null
 }) {
   const { prenom, type, creneau, date_debut, date_fin } = params
+  const signature = signatureCabinet(params.signature)
   const isIndispo = type === 'indisponibilite'
   const typeLabel = TYPE_LABELS[type] ?? type
   const periode = isIndispo
@@ -111,7 +120,7 @@ export function emailCongeValide(params: {
   </div>
   <div style="background:#f9fafb;padding:28px;border:1px solid #e5e7eb;border-top:0;border-radius:0 0 8px 8px">
     <p style="margin:0 0 16px">Bonjour ${prenom},</p>
-    <p style="margin:0 0 20px">Votre demande a été <strong style="color:#059669">validée</strong> par Anne-Sophie.</p>
+    <p style="margin:0 0 20px">Votre demande a été <strong style="color:#059669">validée</strong> par ${signature}.</p>
     <div style="background:#fff;border:1px solid #d1fae5;border-left:4px solid #059669;border-radius:6px;padding:16px;margin:0 0 20px">
       <p style="margin:0 0 6px;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Type</p>
       <p style="margin:0 0 14px;font-weight:600">${typeLabel}</p>
@@ -130,8 +139,11 @@ export function emailCongeRefuse(params: {
   date_debut: string
   date_fin: string
   raison: string | null
+  /** Nom d'expéditeur du cabinet (cabinets.brevo_from_name) — D3. */
+  signature?: string | null
 }) {
   const { prenom, type, creneau, date_debut, date_fin, raison } = params
+  const signature = signatureCabinet(params.signature)
   const isIndispo = type === 'indisponibilite'
   const typeLabel = TYPE_LABELS[type] ?? type
   const periode = isIndispo
@@ -145,7 +157,7 @@ export function emailCongeRefuse(params: {
   </div>
   <div style="background:#f9fafb;padding:28px;border:1px solid #e5e7eb;border-top:0;border-radius:0 0 8px 8px">
     <p style="margin:0 0 16px">Bonjour ${prenom},</p>
-    <p style="margin:0 0 20px">Votre demande a été <strong style="color:#dc2626">refusée</strong> par Anne-Sophie.</p>
+    <p style="margin:0 0 20px">Votre demande a été <strong style="color:#dc2626">refusée</strong> par ${signature}.</p>
     <div style="background:#fff;border:1px solid #fee2e2;border-left:4px solid #dc2626;border-radius:6px;padding:16px;margin:0 0 20px">
       <p style="margin:0 0 6px;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Type</p>
       <p style="margin:0 0 14px;font-weight:600">${typeLabel}</p>
@@ -156,7 +168,7 @@ export function emailCongeRefuse(params: {
       <p style="margin:0;font-style:italic;color:#374151">${raison}</p>
       ` : ''}
     </div>
-    <p style="margin:0;color:#6b7280;font-size:13px">Si vous avez des questions, contactez Anne-Sophie directement.</p>
+    <p style="margin:0;color:#6b7280;font-size:13px">Si vous avez des questions, contactez ${signature} directement.</p>
   </div>
 </div>`
 }
