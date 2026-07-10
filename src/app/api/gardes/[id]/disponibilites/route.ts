@@ -68,9 +68,23 @@ export async function GET(
   const { id: gardeId } = await params
   const supabase = await createClient()
 
-  // ── Auth ────────────────────────────────────────────────
+  // ── Auth + rôle ─────────────────────────────────────────
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
+
+  // D8 — la liste des disponibilités porte les RAISONS d'indispo de TOUS les
+  // vétos (congé, règle métier…) : donnée réservée à l'admin (réattribution).
+  // On ne 403 PAS le véto : la modale de garde (partagée admin/véto) a besoin
+  // des MÉTADONNÉES de la garde pour s'afficher et proposer un échange. On lui
+  // renvoie donc la garde mais `vets: []` — la liste sensible n'est calculée
+  // et servie qu'à l'admin. Le client conditionne d'ailleurs déjà l'usage de
+  // `vets` au mode admin (aucun 403 en console pour le véto).
+  const { data: vetCourant } = await supabase
+    .from('veterinaires')
+    .select('role_app')
+    .eq('user_id', user.id)
+    .single()
+  const estAdmin = vetCourant?.role_app === 'admin'
 
   // ── Chargement de la garde + période ────────────────────
   const { data: gardeDb } = await supabase
@@ -85,7 +99,29 @@ export async function GET(
   const periode = gardeDb.periodes as unknown as PeriodeDb
   if (!periode) return NextResponse.json({ error: 'Période introuvable.' }, { status: 404 })
 
-  // ── Chargement des vétérinaires + contraintes ────────────
+  // ── Non-admin : on renvoie la garde SANS la liste sensible (D8) ──────────
+  // Le véto n'a pas l'usage des disponibilités/raisons de tous ; on lui évite
+  // ce calcul (et cette fuite). La modale s'affiche depuis `garde` + `vets:[]`.
+  if (!estAdmin) {
+    const responseVeto: DisponibilitesData = {
+      garde: {
+        id: gardeDb.id,
+        date: gardeDb.date,
+        type: gardeDb.type as 'semaine' | 'weekend' | 'ferie',
+        saison: periode.saison as 'ete' | 'hiver',
+        periode_statut: periode.statut as 'brouillon' | 'publie' | 'verrouille',
+        premier_id: gardeDb.premier_id,
+        second_id: gardeDb.second_id,
+        verrouille: gardeDb.verrouille,
+        modifie_manuellement: gardeDb.modifie_manuellement,
+        periode_id: periode.id,
+      },
+      vets: [],
+    }
+    return NextResponse.json(responseVeto)
+  }
+
+  // ── Chargement des vétérinaires + contraintes (admin only) ───────────────
   type VetDbRow = {
     id: string; nom: string; prenom: string; statut: 'associe' | 'salarie'
     dernier_recours: boolean; couleur: string
