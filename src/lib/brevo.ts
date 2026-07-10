@@ -29,10 +29,18 @@ export async function sendBrevoEmail({
     return { error: 'Config email manquante' }
   }
 
+  // D4 — plus d'expéditeur client en dur. On privilégie l'expéditeur du cabinet
+  // (colonnes cabinets.brevo_*), sinon la variable d'env générique BREVO_FROM_EMAIL,
+  // sinon on refuse l'envoi (mieux qu'expédier depuis l'adresse d'un autre cabinet).
   const senderEmail =
-    (fromEmail?.trim() || process.env.BREVO_FROM_EMAIL?.trim() || 'vetovaldallier@gmail.com')
+    (fromEmail?.trim() || process.env.BREVO_FROM_EMAIL?.trim() || '')
   const senderName =
     (fromName?.trim() || process.env.BREVO_FROM_NAME?.trim() || 'GuardVeto')
+
+  if (!senderEmail) {
+    console.warn('[Brevo] Aucun expéditeur configuré (cabinet.brevo_from_email / BREVO_FROM_EMAIL) — email non envoyé')
+    return { error: 'Expéditeur email manquant' }
+  }
 
   try {
     const response = await fetch('https://api.brevo.com/v3/smtp/email', {
