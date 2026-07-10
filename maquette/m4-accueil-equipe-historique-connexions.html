@@ -831,6 +831,24 @@ input, select { font-family: var(--font-body); color: var(--text); }
 .ecart.warn { background: var(--warn-soft); color: var(--warn); }
 .ecart.bad  { background: var(--bad-soft);  color: var(--bad); }
 .ecart.none { background: var(--surface-2); color: var(--soft); border: 1px solid var(--border); font-weight: 500; }
+.dette {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-size: 0.62rem; font-weight: 700;
+  background: var(--warn-soft); color: var(--warn);
+  border: 1px dashed rgba(196, 138, 20, 0.5);
+  padding: 2px 8px; border-radius: 999px;
+  margin-left: 7px;
+  white-space: nowrap;
+  vertical-align: 1px;
+}
+.count-note {
+  padding: 10px 18px 13px;
+  border-top: 1px dashed var(--border);
+  font-size: 0.74rem; color: var(--soft); line-height: 1.55;
+}
+.count-note a { color: var(--accent-ink); text-decoration: underline dotted; text-underline-offset: 3px; }
+.count-note a:hover { color: var(--accent); }
 
 /* Bilan bonus/malus */
 .bm-card { margin-bottom: 26px; }
@@ -1548,6 +1566,14 @@ body.filou-out .burrow-panel {
           <thead><tr><th scope="col">Vétérinaire</th><th scope="col">Gardes</th><th scope="col">Écart</th></tr></thead>
           <tbody id="tb-gwe"></tbody>
         </table>
+      </section>
+      <section class="card count-card" aria-label="Compteur des dépannages">
+        <div class="card-head"><h3>🤝 Dépannages</h3><span class="sub spacer">qui a repris la garde de qui</span></div>
+        <table class="count-table">
+          <thead><tr><th scope="col">Vétérinaire</th><th scope="col">Rendus</th><th scope="col">Reçus</th><th scope="col">Solde</th></tr></thead>
+          <tbody id="tb-dep"></tbody>
+        </table>
+        <p class="count-note">La garde reprise compte déjà dans les tableaux ci-dessus : ici, on suit seulement l'entraide. Le badge « à rendre / à récupérer » montre les dettes encore ouvertes aujourd'hui, quel que soit le filtre. Le détail vit dans <a href="m3-absences-echanges.html">Absences &amp; échanges → Dépannages</a>.</p>
       </section>
     </div>
 
@@ -2406,40 +2432,45 @@ body.filou-out .burrow-panel {
      SECTION 3 · HISTORIQUE & COMPTEURS
      ============================================================ */
   /* Données par période et par véto (ordre : AS, Manon, Victor, Camille, Julie, Thomas, Anne-Cat).
-     Chaque véto : [WE 1er, WE 2nd, Sem 1er, Sem 2nd, Fériés, Grands WE] */
+     Chaque véto : [WE 1er, WE 2nd, Sem 1er, Sem 2nd, Fériés, Grands WE, Dépannages rendus, Dépannages reçus] */
   var PERIODS = {
     printemps: {
       label: "Printemps 2025", detail: "12 semaines · 23 mars → 14 juin 2025", statut: "validé",
       du: "2025-03-23", au: "2025-06-14",
-      data: { anneso: [2,2,8,8,2,0], manon: [2,2,8,8,1,1], victor: [2,2,8,8,1,1], camille: [2,2,8,8,2,0], julie: [2,2,8,8,1,1], thomas: [2,2,8,8,1,1], annecat: [0,0,0,0,0,0] }
+      data: { anneso: [2,2,8,8,2,0,1,0], manon: [2,2,8,8,1,1,0,1], victor: [2,2,8,8,1,1,0,0], camille: [2,2,8,8,2,0,0,0], julie: [2,2,8,8,1,1,0,0], thomas: [2,2,8,8,1,1,0,0], annecat: [0,0,0,0,0,0,0,0] }
     },
     ete: {
       label: "Été 2025", detail: "17 semaines · 16 juin → 12 oct. 2025", statut: "validé",
       du: "2025-06-16", au: "2025-10-12",
-      data: { anneso: [3,3,11,11,1,1], manon: [3,3,12,11,0,1], victor: [3,2,11,12,1,0], camille: [2,3,11,11,0,1], julie: [3,3,12,11,1,0], thomas: [3,3,11,12,1,1], annecat: [0,0,0,0,0,0] }
+      data: { anneso: [3,3,11,11,1,1,0,0], manon: [3,3,12,11,0,1,1,0], victor: [3,2,11,12,1,0,1,0], camille: [2,3,11,11,0,1,0,0], julie: [3,3,12,11,1,0,0,1], thomas: [3,3,11,12,1,1,0,1], annecat: [0,0,0,0,0,0,0,0] }
     },
     automne: {
       label: "Automne 2025", detail: "12 semaines · 13 oct. 2025 → 4 janv. 2026", statut: "validé",
       du: "2025-10-13", au: "2026-01-04",
-      data: { anneso: [2,2,8,8,2,0], manon: [2,2,9,8,2,1], victor: [3,2,7,8,1,0], camille: [1,2,8,8,1,0], julie: [2,2,8,8,1,1], thomas: [2,2,8,8,1,0], annecat: [0,0,0,0,0,0] }
+      data: { anneso: [2,2,8,8,2,0,0,0], manon: [2,2,9,8,2,1,1,0], victor: [3,2,7,8,1,0,1,1], camille: [1,2,8,8,1,0,0,1], julie: [2,2,8,8,1,1,0,0], thomas: [2,2,8,8,1,0,0,0], annecat: [0,0,0,0,0,0,0,0] }
     },
     hiver: {
       label: "Hiver 2026 (brouillon)", detail: "12 semaines · 5 janv. → 29 mars 2026", statut: "brouillon",
       du: "2026-01-05", au: "2026-03-29",
-      data: { anneso: [2,2,8,8,1,0], manon: [2,2,8,8,0,1], victor: [2,2,8,8,1,0], camille: [2,2,8,8,1,1], julie: [2,2,8,8,0,0], thomas: [2,2,8,8,1,0], annecat: [0,0,0,0,0,0] }
+      data: { anneso: [2,2,8,8,1,0,0,0], manon: [2,2,8,8,0,1,0,0], victor: [2,2,8,8,1,0,0,0], camille: [2,2,8,8,1,1,0,0], julie: [2,2,8,8,0,0,0,0], thomas: [2,2,8,8,1,0,0,0], annecat: [0,0,0,0,0,0,0,0] }
     }
+  };
+  /* Dettes de dépannage encore ouvertes AUJOURD'HUI (état courant, hors filtres) */
+  var OPEN_DEBTS = {
+    julie:  { txt: "1 à rendre",     title: "Julie doit encore 1 garde de dépannage à Manon" },
+    victor: { txt: "1 à récupérer",  title: "Thomas doit encore 1 garde de dépannage à Victor" }
   };
   var histPeriod = "automne"; /* automne | ete | printemps | toutes | plage */
   var histScope = "valide";   /* valide | tout */
 
   function zeroData() {
     var d = {};
-    VETS.forEach(function (v) { d[v.id] = [0, 0, 0, 0, 0, 0]; });
+    VETS.forEach(function (v) { d[v.id] = [0, 0, 0, 0, 0, 0, 0, 0]; });
     return d;
   }
   function addData(target, src) {
     VETS.forEach(function (v) {
-      for (var i = 0; i < 6; i++) target[v.id][i] += src[v.id][i];
+      for (var i = 0; i < 8; i++) target[v.id][i] += src[v.id][i];
     });
   }
   function periodsInRange(du, au) {
@@ -2517,18 +2548,37 @@ body.filou-out .burrow-panel {
     }
     function num(n) { return '<td class="' + (n === 0 ? "zero" : "") + '">' + n + "</td>"; }
 
-    var we = "", sem = "", fer = "", gwe = "";
+    /* Solde des dépannages : rendus − reçus (auto-équilibré, pas d'écart à la moyenne) */
+    function soldeChip(rendus, recus, isRecours) {
+      if (isRecours) return '<span class="ecart none" title="Dernier recours : hors répartition">—</span>';
+      var s = rendus - recus;
+      var txt = s === 0 ? "=" : (s > 0 ? "+" + s : "−" + Math.abs(s));
+      var cls = s >= 0 ? "ok" : "warn";
+      var title = s > 0 ? "A dépanné plus souvent qu'il n'a été dépanné"
+        : (s < 0 ? "A été dépanné plus souvent : Filou en tient compte à la génération" : "Entraide équilibrée");
+      return '<span class="ecart ' + cls + '" title="' + title + '">' + txt + "</span>";
+    }
+    function detteBadge(v) {
+      var od = OPEN_DEBTS[v.id];
+      if (!od) return "";
+      return '<span class="dette" title="' + od.title + '">🤝 ' + od.txt + "</span>";
+    }
+
+    var we = "", sem = "", fer = "", gwe = "", dep = "";
     VETS.forEach(function (v) {
       var x = d[v.id];
       we  += "<tr>" + vetCell(v) + num(x[0]) + num(x[1]) + num(x[0] + x[1]) + "<td>" + ecartChip(x[0] + x[1] - mWE, v.recours) + "</td></tr>";
       sem += "<tr>" + vetCell(v) + num(x[2]) + num(x[3]) + num(x[2] + x[3]) + "<td>" + ecartChip(x[2] + x[3] - mSem, v.recours) + "</td></tr>";
       fer += "<tr>" + vetCell(v) + num(x[4]) + "<td>" + ecartChip(x[4] - mFer, v.recours) + "</td></tr>";
       gwe += "<tr>" + vetCell(v) + num(x[5]) + "<td>" + ecartChip(x[5] - mGwe, v.recours) + "</td></tr>";
+      dep += "<tr><td><span class=\"ct-vet\"><i style=\"background:" + v.c + "\"></i>" + v.court + "</span>" + detteBadge(v) + "</td>" +
+        num(x[6]) + num(x[7]) + "<td>" + soldeChip(x[6], x[7], v.recours) + "</td></tr>";
     });
     $("#tb-we").innerHTML = we;
     $("#tb-sem").innerHTML = sem;
     $("#tb-fer").innerHTML = fer;
     $("#tb-gwe").innerHTML = gwe;
+    $("#tb-dep").innerHTML = dep;
   }
 
   /* Filtres */

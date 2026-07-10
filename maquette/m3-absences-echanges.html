@@ -865,6 +865,31 @@ body.filou-out .burrow-panel { opacity: 1; pointer-events: auto; transform: none
 }
 
 /* ============================================================
+   GARDE-FOU DE FILOU (vérification avant enregistrement)
+   ============================================================ */
+.dlg-gf { border-color: rgba(196, 138, 20, 0.5); }
+.gf-avatar {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--warn-soft);
+  border: 1.5px solid rgba(196, 138, 20, 0.5);
+  overflow: hidden; flex: none;
+  display: flex; justify-content: center; align-items: flex-start;
+}
+.gf-avatar img { width: 130%; height: auto; margin-top: 2px; }
+.dlg-gf .dlg-kicker { color: var(--warn); }
+.gf-cause-label {
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--warn);
+  margin: 0 0 4px;
+}
+#gardefou-causes { margin: 0 0 12px; }
+.btn-warn { background: var(--warn); color: #fff; }
+.btn-warn:hover { filter: brightness(1.08); }
+/* Filou est sorti du terrier pendant qu'il prévient */
+body.gardefou .fox-peek { transform: translateX(-50%) translateY(36px); }
+body.gardefou .terrier .t-hint { opacity: 0; }
+
+/* ============================================================
    TOAST
    ============================================================ */
 .toast {
@@ -950,7 +975,7 @@ body.filou-out .burrow-panel { opacity: 1; pointer-events: auto; transform: none
     <div>
       <p class="page-kicker">Absences &amp; échanges · vue admin · Filou au terrier</p>
       <h1>Congés, échanges et coups durs : une seule porte.</h1>
-      <p class="lede">Les anciens écrans « Congés » et « Demandes » fusionnent ici. Chaque souhait arrive avec son verdict de conflit déjà calculé, chaque échange suit son cycle sous tes yeux, et quand un imprévu tombe, Filou sort du terrier et mène la réparation.</p>
+      <p class="lede">Les anciens écrans « Congés » et « Demandes » fusionnent ici. Chaque souhait arrive avec son verdict de conflit déjà calculé, et <b>Filou vérifie chaque congé avant enregistrement</b> : si une semaine devenait intenable avec les autres absences et les règles, il prévient (sans jamais bloquer). Quand un imprévu tombe, il sort du terrier et mène la réparation.</p>
     </div>
     <div class="page-actions">
       <button type="button" class="btn btn-outline" id="btn-creer-conge">+ Créer un congé</button>
@@ -989,7 +1014,7 @@ body.filou-out .burrow-panel { opacity: 1; pointer-events: auto; transform: none
             <span class="vet-dot" style="--c: var(--vet-julie)">J</span>
             <div class="row-main">
               <p class="row-line"><b>Julie</b><span class="type-chip t-vacances">Vacances</span></p>
-              <p class="row-dates">Du lundi 9 au dimanche 15 mars 2026 · 7 jours</p>
+              <p class="row-dates">Du lundi 16 au dimanche 22 mars 2026 · 7 jours</p>
               <p class="row-motif">« Semaine au ski avec les enfants. »</p>
             </div>
             <div class="row-side">
@@ -1074,6 +1099,21 @@ body.filou-out .burrow-panel { opacity: 1; pointer-events: auto; transform: none
             <span class="vet-dot" style="--c: var(--vet-manon)">M</span>
             <div class="row-main">
               <p class="row-line"><b>Manon</b><span class="type-chip t-vacances">Vacances</span></p>
+              <p class="row-dates">Du lundi 16 au dimanche 22 mars 2026 · posé par Manon, validé le 25 janvier</p>
+            </div>
+            <div class="row-side">
+              <span class="status-pill st-valide">Validé</span>
+              <div class="row-actions">
+                <button type="button" class="icon-btn" data-del="valide" data-name="Manon" data-dates="du 16 au 22 mars" aria-label="Supprimer le congé de Manon du 16 au 22 mars">🗑</button>
+              </div>
+            </div>
+          </div>
+        </li>
+        <li data-vet="manon" data-type="vacances">
+          <div class="row">
+            <span class="vet-dot" style="--c: var(--vet-manon)">M</span>
+            <div class="row-main">
+              <p class="row-line"><b>Manon</b><span class="type-chip t-vacances">Vacances</span></p>
               <p class="row-dates">Du lundi 6 au dimanche 12 avril 2026 · posé par Manon, validé le 28 janvier</p>
             </div>
             <div class="row-side">
@@ -1089,12 +1129,12 @@ body.filou-out .burrow-panel { opacity: 1; pointer-events: auto; transform: none
             <span class="vet-dot" style="--c: var(--vet-victor)">V</span>
             <div class="row-main">
               <p class="row-line"><b>Victor</b><span class="type-chip t-formation">Formation</span></p>
-              <p class="row-dates">Jeudi 5 et vendredi 6 mars 2026 · posé par Victor, validé le 20 janvier</p>
+              <p class="row-dates">Jeudi 19 et vendredi 20 mars 2026 · posé par Victor, validé le 20 janvier</p>
             </div>
             <div class="row-side">
               <span class="status-pill st-valide">Validé</span>
               <div class="row-actions">
-                <button type="button" class="icon-btn" data-del="valide" data-name="Victor" data-dates="des 5 et 6 mars" aria-label="Supprimer le congé de Victor des 5 et 6 mars">🗑</button>
+                <button type="button" class="icon-btn" data-del="valide" data-name="Victor" data-dates="des 19 et 20 mars" aria-label="Supprimer le congé de Victor des 19 et 20 mars">🗑</button>
               </div>
             </div>
           </div>
@@ -1512,7 +1552,7 @@ body.filou-out .burrow-panel { opacity: 1; pointer-events: auto; transform: none
       </div>
       <button type="button" class="dlg-close" data-close aria-label="Fermer">✕</button>
     </div>
-    <p class="dlg-note">Créé par toi, il est validé d'office : pas de circuit de demande. La vétérinaire est simplement prévenue.</p>
+    <p class="dlg-note">Créé par toi, il est validé d'office : pas de circuit de demande. La vétérinaire est simplement prévenue. 🦊 Avant d'enregistrer, Filou vérifie la cohérence avec les autres congés et les règles du cabinet.</p>
     <div class="field">
       <label for="creer-vet">Vétérinaire</label>
       <select id="creer-vet">
@@ -1684,6 +1724,29 @@ body.filou-out .burrow-panel { opacity: 1; pointer-events: auto; transform: none
   </div>
 </div>
 
+<!-- Garde-fou de Filou : cohérence prospective avant enregistrement -->
+<div class="veil" id="dlg-gardefou" role="dialog" aria-modal="true" aria-labelledby="gardefou-title" hidden>
+  <div class="dlg dlg-gf">
+    <div class="dlg-head">
+      <span class="gf-avatar"><img src="../fox-4.png" alt=""></span>
+      <div>
+        <p class="dlg-kicker">🦊 Filou · garde-fou · avant enregistrement</p>
+        <h2 id="gardefou-title">Une seconde : ce congé fragilise une semaine.</h2>
+      </div>
+      <button type="button" class="dlg-close" data-close aria-label="Fermer sans enregistrer">✕</button>
+    </div>
+    <div class="dlg-warnbox" id="gardefou-msg"></div>
+    <p class="gf-cause-label">Ce qui coince, précisément</p>
+    <ul class="dlg-gardes" id="gardefou-causes"></ul>
+    <p class="dlg-note">Je préviens, je ne bloque pas : c'est toi qui décides. Si tu enregistres quand même, je le note au journal comme un risque accepté, et je te le rappellerai à la prochaine génération.</p>
+    <div class="dlg-foot">
+      <button type="button" class="btn btn-ghost" id="gardefou-annuler">Annuler</button>
+      <button type="button" class="btn btn-outline" id="gardefou-ajuster">Ajuster les dates</button>
+      <button type="button" class="btn btn-warn" id="gardefou-quandmeme">Enregistrer quand même</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============================================================
      LA CRISE MENÉE PAR FILOU
      ============================================================ -->
@@ -1732,7 +1795,7 @@ body.filou-out .burrow-panel { opacity: 1; pointer-events: auto; transform: none
       </div>
       <div class="journal-entry">
         <span class="je-dot"></span>
-        <div><time>Hier · 09:15</time>Souhait de congé reçu de Julie (9 → 15 mars). Aucun conflit détecté avec le planning publié.</div>
+        <div><time>Hier · 09:15</time>Souhait de congé reçu de Julie (16 → 22 mars). Aucun conflit détecté avec le planning publié.</div>
       </div>
     </div>
   </div>
@@ -1764,7 +1827,7 @@ body.filou-out .burrow-panel { opacity: 1; pointer-events: auto; transform: none
 
 <footer class="footer-maquette">
   <span><b>Maquette M3 · Absences &amp; échanges</b> · ambiance Terrier chaleureux, données fictives · MonProjetPro</span>
-  <span>Démo de la crise : bouton « 🚨 Déclarer une absence », ou valider le congé de Thomas puis « Gérer maintenant ».</span>
+  <span>Démo de la crise : « 🚨 Déclarer une absence », ou valider le congé de Thomas puis « Gérer maintenant ». Démo du garde-fou : valider le souhait de Julie (16 → 22 mars), ou créer un congé sur ces dates.</span>
 </footer>
 
 <script>
@@ -1906,8 +1969,8 @@ body.filou-out .burrow-panel { opacity: 1; pointer-events: auto; transform: none
      ============================================================ */
   var PENDING = {
     julie: {
-      vet: "julie", type: "vacances", du: "2026-03-09", au: "2026-03-15",
-      label: "du 9 au 15 mars", recap: "<b>Julie</b> · Vacances · du lundi 9 au dimanche 15 mars 2026 · « Semaine au ski avec les enfants. »",
+      vet: "julie", type: "vacances", du: "2026-03-16", au: "2026-03-22",
+      label: "du 16 au 22 mars", recap: "<b>Julie</b> · Vacances · du lundi 16 au dimanche 22 mars 2026 · « Semaine au ski avec les enfants. »",
       conflit: false
     },
     thomas: {
@@ -1980,6 +2043,73 @@ body.filou-out .burrow-panel { opacity: 1; pointer-events: auto; transform: none
 
   var conflitContext = "validation"; /* validation = vient de valider ; consultation = simple aperçu */
 
+  /* ============================================================
+     GARDE-FOU DE FILOU · cohérence prospective avant enregistrement
+     (ce congé + les congés déjà validés + les règles → semaine tenable ?)
+     Semaine scénarisée : 16 → 22 mars, Manon et Victor déjà en congé.
+     ============================================================ */
+  var GF_WINDOW = { du: "2026-03-16", au: "2026-03-22", label: "du 16 mars" };
+  var GF_ABSENTS = ["manon", "victor"];
+  var gfContext = null; /* { origin: 'creer'|'valider', vetKey, proceed } */
+
+  function verifierProspectif(vetKey, du, au) {
+    if (!du || !au) return null;
+    if (GF_ABSENTS.indexOf(vetKey) >= 0) return null; /* déjà compté parmi les absents */
+    if (du <= GF_WINDOW.au && au >= GF_WINDOW.du) return { semaine: GF_WINDOW.label };
+    return null;
+  }
+
+  function ouvrirGardefou(ctx) {
+    gfContext = ctx;
+    var v = VETS[ctx.vetKey];
+    $("#gardefou-msg").innerHTML =
+      "<b>⚠ Avec ce congé de " + v.n + ", la semaine " + GF_WINDOW.label +
+      " il ne restera que 3 vétérinaires réellement disponibles pour 4 nuits et un week-end en binôme.</b> " +
+      "La prochaine génération risque d’être impossible cette semaine-là.";
+    var causes = $("#gardefou-causes");
+    causes.innerHTML =
+      '<li><span class="g-ico">📅</span><span><b>Manon</b> · vacances du 16 au 22 mars (congé validé) : toute la semaine.</span></li>' +
+      '<li><span class="g-ico">📅</span><span><b>Victor</b> · formation les jeudi 19 et vendredi 20 mars (congé validé).</span></li>' +
+      '<li><span class="g-ico">📖</span><span>Règle du cabinet : « <b>Thomas ne travaille jamais le jeudi soir</b> » : le jeudi 19, il ne resterait qu’une seule vétérinaire possible.</span></li>' +
+      '<li><span class="g-ico">🤝</span><span><b>Anne-Catherine</b> n’est appelée qu’en dernier recours : je ne la compte pas.</span></li>';
+    document.body.classList.add("gardefou");
+    openDlg("#dlg-gardefou");
+  }
+  function fermerGardefou() {
+    document.body.classList.remove("gardefou");
+    closeDlg("#dlg-gardefou");
+  }
+  $("#dlg-gardefou").addEventListener("click", function (e) {
+    if (e.target === this || e.target.closest("[data-close]")) {
+      document.body.classList.remove("gardefou");
+      gfContext = null;
+    }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !$("#dlg-gardefou").hidden) {
+      document.body.classList.remove("gardefou");
+      gfContext = null;
+    }
+  });
+  $("#gardefou-annuler").addEventListener("click", function () {
+    gfContext = null;
+    fermerGardefou();
+    toast("Rien n’a été enregistré.");
+  });
+  $("#gardefou-ajuster").addEventListener("click", function () {
+    var ctx = gfContext; gfContext = null;
+    fermerGardefou();
+    setTimeout(function () {
+      openDlg(ctx.origin === "creer" ? "#dlg-creer" : "#dlg-valider");
+    }, REDUCED ? 0 : 300);
+  });
+  $("#gardefou-quandmeme").addEventListener("click", function () {
+    var ctx = gfContext; gfContext = null;
+    fermerGardefou();
+    journal("Risque accepté par Anne-Sophie : congé de " + VETS[ctx.vetKey].n + " enregistré malgré l’alerte de Filou (semaine du 16 mars réduite à 3 vétérinaires). À surveiller à la prochaine génération.", "warn");
+    ctx.proceed();
+  });
+
   $("#valider-confirm").addEventListener("click", function () {
     var req = PENDING[currentReq];
     var du = $("#valider-du").value, au = $("#valider-au").value;
@@ -1987,17 +2117,29 @@ body.filou-out .burrow-panel { opacity: 1; pointer-events: auto; transform: none
     var v = VETS[req.vet];
     var dates = du === au ? "Le " + frDate(du) + " 2026" : "Du " + frDate(du) + " au " + frDate(au) + " 2026";
     var extra = req.type === "indispo" ? " · après-midi" : "";
+    var faire = function (risque) {
+      var reqRow = document.querySelector('#pending-list .row[data-req="' + currentReq + '"]');
+      removeRow(reqRow, function () {
+        addCongeRow(req.vet, req.type, dates + " · posé par " + v.n + ", validé à l’instant" + (adjusted ? " (dates ajustées)" : ""), "valide", null, extra);
+        toast(risque
+          ? "Congé de " + v.n + " validé · risque accepté, noté au journal."
+          : "Congé de " + v.n + " validé" + (adjusted ? " avec dates ajustées" : "") + " ✓" + (req.conflit ? " Elle est prévenue." : " 🦊 Filou a vérifié : rien à signaler."));
+        journal("Congé " + TYPE_META[req.type].label.toLowerCase() + " de " + v.n + " validé (" + req.label + ")" + (adjusted ? ", dates ajustées par Anne-Sophie" : "") + ".", risque ? "warn" : "ok");
+        if (req.conflit) {
+          conflitContext = "validation";
+          setTimeout(function () { openDlg("#dlg-conflit"); }, REDUCED ? 0 : 380);
+        }
+      });
+    };
+    var verdict = verifierProspectif(req.vet, du, au);
     closeDlg("#dlg-valider");
-    var reqRow = document.querySelector('#pending-list .row[data-req="' + currentReq + '"]');
-    removeRow(reqRow, function () {
-      addCongeRow(req.vet, req.type, dates + " · posé par " + v.n + ", validé à l’instant" + (adjusted ? " (dates ajustées)" : ""), "valide", null, extra);
-      toast("Congé de " + v.n + " validé" + (adjusted ? " avec dates ajustées" : "") + " ✓ Elle est prévenue.");
-      journal("Congé " + TYPE_META[req.type].label.toLowerCase() + " de " + v.n + " validé (" + req.label + ")" + (adjusted ? ", dates ajustées par Anne-Sophie" : "") + ".", "ok");
-      if (req.conflit) {
-        conflitContext = "validation";
-        setTimeout(function () { openDlg("#dlg-conflit"); }, REDUCED ? 0 : 380);
-      }
-    });
+    if (verdict) {
+      setTimeout(function () {
+        ouvrirGardefou({ origin: "valider", vetKey: req.vet, proceed: function () { faire(true); } });
+      }, REDUCED ? 0 : 300);
+    } else {
+      faire(false);
+    }
   });
 
   $("#refuser-confirm").addEventListener("click", function () {
@@ -2059,11 +2201,23 @@ body.filou-out .burrow-panel { opacity: 1; pointer-events: auto; transform: none
     var creneauLabels = { matin: "matin", "apres-midi": "après-midi", soiree: "soirée", journee: "journée entière" };
     var extra = type === "indispo" ? " · " + creneauLabels[creerCreneau] : "";
     var dates = du === au ? "Le " + frDate(du) + " 2026" : "Du " + frDate(du) + " au " + frDate(au) + " 2026";
+    var faire = function (risque) {
+      addCongeRow(vet, type, dates + " · créé par Anne-Sophie (admin)" + (note ? " : « " + note + " »" : ""), "valide", null, extra);
+      toast(risque
+        ? "Congé créé pour " + v.n + " · risque accepté, noté au journal."
+        : "Congé créé pour " + v.n + " ✓ 🦊 Filou a vérifié : rien à signaler.");
+      journal("Congé " + TYPE_META[type].label.toLowerCase() + " créé pour " + v.n + " par Anne-Sophie (" + dates.toLowerCase() + ").", risque ? "warn" : "ok");
+      recount();
+    };
+    var verdict = verifierProspectif(vet, du, au);
     closeDlg("#dlg-creer");
-    addCongeRow(vet, type, dates + " · créé par Anne-Sophie (admin)" + (note ? " : « " + note + " »" : ""), "valide", null, extra);
-    toast("Congé créé pour " + v.n + " ✓ " + (vet === "anneso" ? "" : "Elle est prévenue."));
-    journal("Congé " + TYPE_META[type].label.toLowerCase() + " créé pour " + v.n + " par Anne-Sophie (" + dates.toLowerCase() + ").", "ok");
-    recount();
+    if (verdict) {
+      setTimeout(function () {
+        ouvrirGardefou({ origin: "creer", vetKey: vet, proceed: function () { faire(true); } });
+      }, REDUCED ? 0 : 300);
+    } else {
+      faire(false);
+    }
   });
 
   /* ---------- Suppression avec confirmation ---------- */
