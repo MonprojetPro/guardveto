@@ -1,0 +1,2901 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GuardVeto · M3 · Absences &amp; échanges</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700;800&family=Noto+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   MAQUETTE M3 · ABSENCES & ÉCHANGES · vue admin (Anne-Sophie)
+   Ambiance « Terrier chaleureux » reprise du labo design v2.
+   Filou : niveau 3 (terrier discret), sauf la crise où il mène.
+   ============================================================ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --font-display: "Figtree", "Segoe UI Variable Display", "Trebuchet MS", sans-serif;
+  --font-body: "Noto Sans", "Segoe UI", Verdana, sans-serif;
+  --vet-anneso:  #3B6FD1;
+  --vet-annecat: #8153C7;
+  --vet-manon:   #B93A72;
+  --vet-victor:  #0B7D6C;
+  --vet-camille: #55700F;
+  --vet-julie:   #A0522D;
+  --vet-thomas:  #4B5D73;
+  --topbar-h: 64px;
+
+  --bg:            #F6EEDF;
+  --bg-deep:       #EFE2CB;
+  --surface:       #FFFCF4;
+  --surface-2:     #F6EBD6;
+  --text:          #3A2A1C;
+  --muted:         #7C6A55;
+  --soft:          #A08D75;
+  --border:        #E6D7BB;
+  --border-strong: #D8C4A1;
+  --accent:        #C7530F;
+  --accent-ink:    #AC4508;
+  --accent-soft:   rgba(224, 122, 47, 0.13);
+  --accent-glow:   rgba(230, 126, 34, 0.28);
+  --ok:            #3E7A2E;
+  --ok-soft:       rgba(90, 150, 60, 0.14);
+  --warn:          #9A6200;
+  --warn-soft:     rgba(196, 138, 20, 0.16);
+  --danger:        #A2331F;
+  --danger-soft:   rgba(178, 58, 34, 0.12);
+  --bubble-filou:  #FBF3E2;
+  --bubble-user:   #EFE0C4;
+  --panel-bg:      #FFFCF4;
+  --r-lg: 26px; --r-md: 18px; --r-sm: 12px;
+  --shadow-card:  0 10px 30px rgba(140, 84, 24, 0.10), 0 2px 6px rgba(140, 84, 24, 0.06);
+  --shadow-panel: 0 24px 60px rgba(120, 70, 18, 0.20), 0 4px 12px rgba(120, 70, 18, 0.10);
+  --topbar-bg: rgba(246, 238, 223, 0.90);
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  padding-top: var(--topbar-h);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, h4, .display { font-family: var(--font-display); }
+button { font-family: var(--font-body); cursor: pointer; }
+button:focus-visible, input:focus-visible, a:focus-visible,
+select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+img { display: block; }
+.shell { max-width: 1180px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 40px); }
+
+/* ============================================================
+   BARRE DE NAVIGATION COMMUNE (maquette maîtresse)
+   ============================================================ */
+.appbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: var(--topbar-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px 20px; flex-wrap: wrap;
+  padding: 8px clamp(14px, 3vw, 32px);
+  min-height: var(--topbar-h);
+}
+.appbar .brand {
+  display: flex; align-items: center; gap: 9px;
+  font-family: var(--font-display); font-weight: 800; font-size: 0.98rem;
+}
+.appbar .brand img { width: 30px; height: 30px; object-fit: contain; }
+.appbar .brand small {
+  display: block; font-family: var(--font-body); font-weight: 500;
+  font-size: 0.62rem; color: var(--muted);
+  letter-spacing: 0.1em; text-transform: uppercase;
+}
+.appnav {
+  margin-left: auto;
+  display: flex; flex-wrap: wrap; gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px; padding: 4px;
+  box-shadow: var(--shadow-card);
+}
+.appnav a {
+  text-decoration: none; color: var(--muted);
+  font-size: 0.8rem; font-weight: 600;
+  padding: 7px 13px; border-radius: 999px;
+  white-space: nowrap; min-height: 32px;
+  display: inline-flex; align-items: center;
+}
+.appnav a:hover { color: var(--text); background: var(--surface-2); }
+.appnav a[aria-current="page"] {
+  background: var(--accent); color: #fff;
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+
+/* ============================================================
+   TÊTE DE PAGE
+   ============================================================ */
+.page-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px 24px; align-items: end;
+  margin: 40px 0 20px;
+}
+.page-kicker {
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 8px;
+}
+.page-head h1 { font-size: clamp(1.4rem, 2.6vw, 1.85rem); font-weight: 800; line-height: 1.2; }
+.page-head .lede { margin-top: 8px; color: var(--muted); font-size: 0.93rem; line-height: 1.6; max-width: 62ch; }
+.page-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.btn {
+  border: none; border-radius: 999px;
+  font-size: 0.85rem; font-weight: 700;
+  padding: 10px 18px; min-height: 42px;
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.btn-accent { background: var(--accent); color: #fff; box-shadow: 0 3px 10px var(--accent-glow); }
+.btn-accent:hover { filter: brightness(1.07); }
+.btn-outline {
+  background: var(--surface); color: var(--accent-ink);
+  border: 1px solid var(--border-strong);
+}
+.btn-outline:hover { background: var(--accent-soft); border-color: var(--accent-ink); }
+.btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border-strong); }
+.btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+.btn-ok { background: var(--ok); color: #fff; }
+.btn-ok:hover { filter: brightness(1.08); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { filter: brightness(1.08); }
+.btn-sm { font-size: 0.78rem; padding: 7px 14px; min-height: 34px; }
+
+/* ============================================================
+   ONGLETS DE LA PAGE
+   ============================================================ */
+.tabs {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px; padding: 5px;
+  box-shadow: var(--shadow-card);
+  width: fit-content; max-width: 100%;
+  margin-bottom: 26px;
+}
+.tabs button {
+  border: none; background: transparent; color: var(--muted);
+  font-size: 0.88rem; font-weight: 600;
+  padding: 10px 18px; border-radius: 999px; min-height: 42px;
+  display: inline-flex; align-items: center; gap: 8px;
+  white-space: nowrap;
+}
+.tabs button:hover { color: var(--text); }
+.tabs button[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; }
+.tabs .count {
+  font-family: var(--font-display); font-size: 0.68rem; font-weight: 800;
+  background: var(--accent); color: #fff;
+  border-radius: 999px; padding: 2px 8px; min-width: 22px;
+  text-align: center;
+}
+.tabs .count.zero { background: var(--surface-2); color: var(--soft); }
+.tab-panel[hidden] { display: none; }
+.tab-panel { animation: panelIn .4s ease both; }
+@keyframes panelIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ============================================================
+   CARTES ET LISTES
+   ============================================================ */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+  margin-bottom: 24px;
+}
+.card-head {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+  padding: 16px 22px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.card-head h2 { font-size: 1.02rem; font-weight: 700; }
+.card-head .sub { width: 100%; font-size: 0.78rem; color: var(--muted); line-height: 1.5; }
+.card-head .spacer { margin-left: auto; }
+.section-count {
+  font-family: var(--font-display); font-size: 0.72rem; font-weight: 800;
+  background: var(--accent-soft); color: var(--accent-ink);
+  border-radius: 999px; padding: 3px 10px;
+}
+.section-count.zero { background: var(--surface-2); color: var(--soft); }
+
+.rows { list-style: none; }
+.row {
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 14px;
+  padding: 15px 22px;
+  border-bottom: 1px dashed var(--border);
+}
+.rows li:last-child .row, .row:last-child { border-bottom: none; }
+.row.fresh { animation: freshRow 2.4s ease both; }
+@keyframes freshRow { 0% { background: var(--accent-soft); } 100% { background: transparent; } }
+.row.leaving { transition: opacity .35s ease, transform .35s ease; opacity: 0; transform: translateX(14px); }
+
+.vet-dot {
+  flex: none; width: 34px; height: 34px; border-radius: 50%;
+  background: var(--c, var(--soft)); color: #fff;
+  font-family: var(--font-display); font-weight: 800; font-size: 0.74rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-top: 2px;
+}
+.row-main { flex: 1 1 260px; min-width: 0; }
+.row-line { font-size: 0.93rem; line-height: 1.45; }
+.row-line b { font-weight: 700; }
+.row-dates { font-size: 0.82rem; color: var(--muted); margin-top: 2px; }
+.row-motif { font-size: 0.82rem; color: var(--muted); font-style: italic; margin-top: 3px; }
+.row-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; margin-left: auto; }
+.row-actions { display: flex; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
+
+.type-chip {
+  display: inline-block;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em;
+  padding: 2px 10px; border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2); color: var(--muted);
+  vertical-align: 2px; margin-left: 6px;
+}
+.t-vacances { background: rgba(59, 111, 209, 0.10); color: #33569C; border-color: rgba(59, 111, 209, 0.28); }
+.t-formation { background: rgba(129, 83, 199, 0.10); color: #6A45A5; border-color: rgba(129, 83, 199, 0.28); }
+.t-sante { background: var(--danger-soft); color: var(--danger); border-color: rgba(178, 58, 34, 0.3); }
+.t-indispo { background: var(--warn-soft); color: var(--warn); border-color: rgba(196, 138, 20, 0.35); }
+.t-autre { background: var(--surface-2); color: var(--muted); }
+
+.conflict {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.74rem; font-weight: 700;
+  padding: 5px 12px; border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.conflict.ok { background: var(--ok-soft); color: var(--ok); }
+.conflict.warn {
+  background: var(--warn-soft); color: var(--warn);
+  border-color: rgba(196, 138, 20, 0.4);
+  cursor: pointer;
+}
+.conflict.warn:hover { background: rgba(196, 138, 20, 0.24); }
+
+.status-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 11px; border-radius: 999px;
+  white-space: nowrap;
+}
+.st-attente-confrere { background: var(--warn-soft); color: var(--warn); }
+.st-attente-validation { background: var(--accent-soft); color: var(--accent-ink); }
+.st-decline { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+.st-annule { background: var(--surface-2); color: var(--soft); border: 1px solid var(--border); }
+.st-applique { background: var(--ok-soft); color: var(--ok); }
+.st-refuse-admin { background: var(--danger-soft); color: var(--danger); }
+.st-valide { background: var(--ok-soft); color: var(--ok); }
+.st-refuse { background: var(--danger-soft); color: var(--danger); }
+.st-ouverte { background: var(--warn-soft); color: var(--warn); }
+.st-compensee { background: var(--ok-soft); color: var(--ok); }
+.st-dette-annulee { background: var(--surface-2); color: var(--soft); border: 1px solid var(--border); }
+
+.icon-btn {
+  border: 1px solid var(--border);
+  background: transparent; color: var(--soft);
+  border-radius: var(--r-sm);
+  width: 34px; height: 34px;
+  font-size: 0.95rem;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.icon-btn:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
+
+.empty-row {
+  padding: 18px 22px;
+  font-size: 0.85rem; color: var(--soft); font-style: italic;
+}
+
+/* ---------- Filtres + résumé par véto ---------- */
+.filters {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: 0;
+}
+.filters .f-label {
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--soft);
+}
+.vet-filter {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface); color: var(--text);
+  font-size: 0.78rem; font-weight: 600;
+  padding: 6px 12px; border-radius: 999px; min-height: 34px;
+}
+.vet-filter i { width: 10px; height: 10px; border-radius: 50%; background: var(--c, var(--soft)); }
+.vet-filter:hover { border-color: var(--accent-ink); color: var(--accent-ink); }
+.vet-filter[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.vet-filter[aria-pressed="true"] i { background: #fff; }
+.filters select {
+  font-family: var(--font-body); font-size: 0.82rem; font-weight: 600;
+  color: var(--text); background: var(--surface);
+  border: 1px solid var(--border-strong); border-radius: 999px;
+  padding: 7px 12px; min-height: 36px;
+}
+.resume-vets {
+  display: flex; flex-wrap: wrap; gap: 7px;
+  padding: 12px 22px;
+  border-bottom: 1px solid var(--border);
+}
+.resume-vets .r-label {
+  width: 100%; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--soft);
+}
+.resume-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: 0.76rem; font-weight: 600; color: var(--muted);
+  padding: 5px 11px; border-radius: 999px; min-height: 32px;
+}
+.resume-chip i { width: 9px; height: 9px; border-radius: 50%; background: var(--c, var(--soft)); }
+.resume-chip b { font-family: var(--font-display); color: var(--text); }
+.resume-chip:hover { border-color: var(--accent-ink); color: var(--accent-ink); }
+.resume-chip:hover b { color: var(--accent-ink); }
+
+/* ---------- Légende des statuts (échanges) ---------- */
+.status-legend {
+  display: flex; flex-wrap: wrap; gap: 7px;
+  margin: -8px 0 22px;
+  align-items: center;
+}
+.status-legend .sl-label { font-size: 0.72rem; color: var(--soft); font-weight: 600; margin-right: 4px; }
+
+/* ---------- Tableau dépannages ---------- */
+.dep-table { width: 100%; border-collapse: collapse; }
+.dep-table th {
+  font-family: var(--font-display);
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--soft);
+  text-align: left; padding: 12px 14px 8px;
+  border-bottom: 1px solid var(--border-strong);
+}
+.dep-table td {
+  padding: 12px 14px;
+  border-bottom: 1px dashed var(--border);
+  font-size: 0.86rem; vertical-align: middle;
+}
+.dep-table tr:last-child td { border-bottom: none; }
+.dep-table .dep-vet { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; white-space: nowrap; }
+.dep-table .dep-vet i { width: 10px; height: 10px; border-radius: 50%; background: var(--c, var(--soft)); flex: none; }
+.dep-table small { display: block; color: var(--soft); font-size: 0.72rem; margin-top: 2px; }
+.dep-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.dep-actions button {
+  border: 1px solid var(--border-strong);
+  background: transparent; color: var(--muted);
+  font-size: 0.72rem; font-weight: 600;
+  padding: 5px 11px; border-radius: 999px; min-height: 30px;
+}
+.dep-actions button:hover { color: var(--accent-ink); border-color: var(--accent-ink); background: var(--accent-soft); }
+.table-scroll { overflow-x: auto; }
+
+/* ============================================================
+   DIALOGUES
+   ============================================================ */
+.veil {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(58, 42, 28, 0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 18px;
+  opacity: 0;
+  transition: opacity .25s ease;
+}
+.veil[hidden] { display: none; }
+.veil.open { opacity: 1; }
+.dlg {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-panel);
+  width: min(540px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 22px 24px 20px;
+  transform: translateY(14px) scale(0.97);
+  transition: transform .3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.veil.open .dlg { transform: none; }
+.dlg-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+.dlg-head h2 { font-size: 1.1rem; font-weight: 700; line-height: 1.3; margin-top: 2px; }
+.dlg-head .dlg-kicker {
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 5px;
+}
+.dlg-close {
+  margin-left: auto; flex: none;
+  border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--muted);
+  border-radius: var(--r-sm);
+  width: 36px; height: 36px; font-size: 1rem;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.dlg-close:hover { color: var(--text); border-color: var(--border-strong); }
+.dlg p.dlg-note { font-size: 0.85rem; color: var(--muted); line-height: 1.6; margin-bottom: 14px; }
+.dlg-recap {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 11px 14px;
+  font-size: 0.87rem; line-height: 1.55;
+  margin-bottom: 14px;
+}
+.dlg-recap b { font-weight: 700; }
+.dlg-warnbox {
+  background: var(--warn-soft);
+  border: 1px solid rgba(196, 138, 20, 0.4);
+  border-radius: var(--r-sm);
+  padding: 11px 14px;
+  font-size: 0.84rem; line-height: 1.55;
+  margin-bottom: 14px;
+}
+.dlg-warnbox b { color: var(--warn); }
+.dlg-dangerbox {
+  background: var(--danger-soft);
+  border: 1px solid rgba(178, 58, 34, 0.35);
+  border-radius: var(--r-sm);
+  padding: 11px 14px;
+  font-size: 0.84rem; line-height: 1.55;
+  margin-bottom: 14px;
+}
+.dlg-dangerbox b { color: var(--danger); }
+.dlg-gardes { list-style: none; margin: 8px 0 2px; }
+.dlg-gardes li {
+  display: flex; gap: 9px; align-items: baseline;
+  padding: 6px 0;
+  font-size: 0.85rem;
+  border-bottom: 1px dashed rgba(196, 138, 20, 0.35);
+}
+.dlg-gardes li:last-child { border-bottom: none; }
+.dlg-gardes .g-ico { flex: none; }
+.field { margin-bottom: 13px; }
+.field label {
+  display: block;
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--soft);
+  margin-bottom: 5px;
+}
+.field input[type="date"], .field input[type="text"], .field select, .field textarea {
+  width: 100%;
+  font-family: var(--font-body); font-size: 0.9rem; color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 10px 13px;
+  min-height: 44px;
+}
+.field textarea { min-height: 84px; resize: vertical; }
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); outline: none; }
+.field .f-hint { font-size: 0.74rem; color: var(--soft); margin-top: 4px; }
+.field-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.seg-creneau { display: flex; flex-wrap: wrap; gap: 5px; }
+.seg-creneau button {
+  border: 1px solid var(--border-strong);
+  background: var(--surface); color: var(--muted);
+  font-size: 0.8rem; font-weight: 600;
+  padding: 8px 14px; border-radius: 999px; min-height: 38px;
+}
+.seg-creneau button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.radio-line { display: flex; align-items: flex-start; gap: 9px; padding: 8px 0; font-size: 0.88rem; line-height: 1.5; cursor: pointer; }
+.radio-line input { margin-top: 3px; accent-color: var(--accent); }
+.radio-line small { display: block; color: var(--muted); font-size: 0.78rem; }
+.dlg-foot { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+
+/* ============================================================
+   LA CRISE MENÉE PAR FILOU
+   ============================================================ */
+.crise-veil {
+  position: fixed; inset: 0; z-index: 320;
+  background: rgba(58, 42, 28, 0.5);
+  display: flex; align-items: flex-end; justify-content: center;
+  padding: clamp(10px, 3vh, 30px) 16px;
+  opacity: 0;
+  transition: opacity .3s ease;
+}
+.crise-veil[hidden] { display: none; }
+.crise-veil.open { opacity: 1; }
+.crise-panel {
+  position: relative;
+  background: var(--panel-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-panel);
+  width: min(660px, 100%);
+  height: min(720px, calc(100vh - clamp(20px, 6vh, 60px)));
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  transform: translateY(26px) scale(0.97);
+  transition: transform .4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.crise-veil.open .crise-panel { transform: none; }
+.crise-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, var(--accent-soft), transparent 70%);
+  flex: none;
+}
+.crise-head .avatar {
+  width: 46px; height: 46px; border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1.5px solid var(--border-strong);
+  overflow: hidden; flex: none;
+  display: flex; justify-content: center; align-items: flex-start;
+}
+.crise-head .avatar img { width: 130%; height: auto; margin-top: 2px; }
+.crise-head h2 { font-size: 1.02rem; font-weight: 800; }
+.crise-head .sub { font-size: 0.74rem; color: var(--muted); margin-top: 1px; }
+.crise-convo {
+  flex: 1; overflow-y: auto;
+  padding: 18px 18px 14px;
+  display: flex; flex-direction: column; gap: 12px;
+  scroll-behavior: smooth;
+}
+.bubble {
+  max-width: 90%;
+  padding: 11px 15px;
+  border-radius: var(--r-md);
+  font-size: 0.9rem; line-height: 1.55;
+  animation: bubbleIn .35s ease both;
+}
+@keyframes bubbleIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+.bubble.filou {
+  align-self: flex-start;
+  background: var(--bubble-filou);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+.bubble.user {
+  align-self: flex-end;
+  background: var(--bubble-user);
+  border-bottom-right-radius: 4px;
+}
+.bubble .who {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 5px;
+}
+.bubble.user .who { color: var(--muted); justify-content: flex-end; }
+.bubble.reformulation {
+  align-self: flex-start;
+  background: var(--accent-soft);
+  border: 1px solid var(--border-strong);
+  max-width: 94%;
+}
+.bubble.note {
+  align-self: center;
+  background: var(--ok-soft);
+  border: 1px dashed var(--border-strong);
+  color: var(--ok);
+  font-size: 0.79rem; font-weight: 600;
+  padding: 7px 14px;
+}
+.type-caret {
+  display: inline-block; width: 2px; height: 1em;
+  background: var(--accent-ink);
+  vertical-align: text-bottom; margin-left: 1px;
+  animation: caretBlink .8s steps(1) infinite;
+}
+@keyframes caretBlink { 50% { opacity: 0; } }
+.thinking { display: inline-flex; gap: 4px; padding: 4px 2px; }
+.thinking i {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--soft);
+  animation: think 1.1s ease-in-out infinite;
+}
+.thinking i:nth-child(2) { animation-delay: .18s; }
+.thinking i:nth-child(3) { animation-delay: .36s; }
+@keyframes think { 0%, 100% { opacity: .3; transform: translateY(0); } 45% { opacity: 1; transform: translateY(-3px); } }
+
+.crise-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.crise-actions .btn { min-height: 38px; padding: 8px 16px; font-size: 0.82rem; }
+.btn.pressed { background: var(--ok); color: #fff; transform: scale(0.98); }
+
+.impact-list { list-style: none; margin-top: 9px; }
+.impact-list li {
+  display: flex; gap: 10px; align-items: baseline;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+  margin-bottom: 6px;
+  font-size: 0.85rem; line-height: 1.5;
+}
+.impact-list .num {
+  flex: none;
+  font-family: var(--font-display); font-weight: 800; font-size: 0.72rem;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.impact-list small { display: block; color: var(--muted); font-size: 0.76rem; }
+
+.reco-card {
+  background: var(--surface);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 11px 13px;
+  margin-top: 10px;
+}
+.reco-card .reco-tag {
+  display: inline-block;
+  font-size: 0.62rem; font-weight: 800; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--ok);
+  background: var(--ok-soft);
+  border-radius: 999px; padding: 3px 10px;
+  margin-bottom: 7px;
+}
+.reco-card .reco-line { display: flex; align-items: center; gap: 9px; font-size: 0.9rem; }
+.reco-card .reco-line .vet-dot { width: 28px; height: 28px; font-size: 0.64rem; margin: 0; }
+.reco-card .reco-why { font-size: 0.8rem; color: var(--muted); line-height: 1.55; margin-top: 6px; }
+.reco-card .btn { margin-top: 10px; }
+.alts { margin-top: 9px; }
+.alts summary {
+  cursor: pointer;
+  font-size: 0.79rem; font-weight: 700; color: var(--accent-ink);
+  padding: 4px 2px;
+  list-style-position: inside;
+}
+.alts summary:hover { text-decoration: underline dotted; text-underline-offset: 3px; }
+.alt-item {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 8px 11px;
+  margin-top: 6px;
+  font-size: 0.82rem;
+}
+.alt-item .vet-dot { width: 24px; height: 24px; font-size: 0.58rem; margin: 0; }
+.alt-item .alt-warn { flex: 1 1 160px; color: var(--warn); font-size: 0.77rem; line-height: 1.45; }
+.alt-item .btn { margin-left: auto; }
+.other-options {
+  display: flex; gap: 7px; flex-wrap: wrap;
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+.other-options .opt-hint { width: 100%; font-size: 0.74rem; color: var(--soft); line-height: 1.5; }
+
+.recap-final { margin-top: 9px; }
+.recap-final li {
+  display: flex; gap: 9px; align-items: baseline;
+  list-style: none;
+  padding: 7px 0;
+  border-bottom: 1px dashed var(--border-strong);
+  font-size: 0.86rem; line-height: 1.5;
+}
+.recap-final li:last-child { border-bottom: none; }
+.recap-final .r-ico { flex: none; }
+.crise-input {
+  display: flex; gap: 8px;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  flex: none;
+}
+.crise-input input {
+  flex: 1; min-width: 0;
+  font-family: var(--font-body); font-size: 0.88rem; color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 10px 16px; min-height: 44px;
+}
+.crise-input input:focus { border-color: var(--accent); outline: none; }
+.crise-input button {
+  border: none; background: var(--accent); color: #fff;
+  border-radius: 999px;
+  min-width: 44px; min-height: 44px; font-size: 1.05rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none;
+}
+.chips-inline { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.chip {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  border-radius: 999px;
+  font-size: 0.8rem; font-weight: 600;
+  padding: 8px 14px; min-height: 38px;
+}
+.chip:hover { background: var(--accent-soft); border-color: var(--accent-ink); color: var(--accent-ink); }
+
+/* ============================================================
+   TERRIER DE FILOU (niveau 3, discret) + panneau
+   ============================================================ */
+.terrier-zone {
+  position: fixed; right: 18px; bottom: 10px;
+  z-index: 200;
+  display: flex; flex-direction: column; align-items: flex-end;
+}
+.terrier {
+  position: relative;
+  width: 132px; height: 94px;
+  border: none; background: transparent; padding: 0;
+}
+.terrier svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.fox-peek {
+  position: absolute; left: 50%; bottom: 31px;
+  transform: translateX(-50%);
+  width: 52px; height: 31px;
+  overflow: hidden; z-index: 2;
+  transition: transform .3s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.fox-peek img { width: 100%; height: auto; }
+.terrier:hover .fox-peek { transform: translateX(-50%) translateY(-5px); }
+.terrier .t-hint {
+  position: absolute; left: 50%; bottom: -4px; transform: translateX(-50%);
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.06em;
+  color: var(--muted); white-space: nowrap;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 999px; padding: 2px 9px;
+  z-index: 4;
+}
+.terrier:hover .t-hint { color: var(--accent-ink); border-color: var(--border-strong); }
+body.filou-out .fox-peek { transform: translateX(-50%) translateY(36px); }
+body.filou-out .terrier .t-hint { opacity: 0; }
+
+.burrow-panel {
+  position: fixed; right: 14px; bottom: 112px;
+  width: min(360px, calc(100vw - 28px));
+  max-height: min(440px, calc(100vh - 140px));
+  background: var(--panel-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-panel);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  z-index: 210;
+  opacity: 0; pointer-events: none;
+  transform: translateY(18px) scale(0.94);
+  transform-origin: bottom right;
+  transition: transform .4s cubic-bezier(0.22, 1, 0.36, 1), opacity .3s ease;
+}
+body.filou-out .burrow-panel { opacity: 1; pointer-events: auto; transform: none; }
+.panel-head {
+  display: flex; align-items: center; gap: 11px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex: none;
+}
+.panel-head .avatar {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1px solid var(--border-strong);
+  overflow: hidden; flex: none;
+  display: flex; justify-content: center; align-items: flex-start;
+}
+.panel-head .avatar img { width: 130%; height: auto; margin-top: 2px; }
+.panel-head h2 { font-size: 0.92rem; font-weight: 700; }
+.panel-head .sub { font-size: 0.68rem; color: var(--muted); }
+.panel-reduce {
+  margin-left: auto;
+  border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--muted);
+  border-radius: var(--r-sm);
+  width: 34px; height: 34px; font-size: 1rem; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.panel-reduce:hover { color: var(--text); border-color: var(--border-strong); }
+.panel-scroll {
+  flex: 1; overflow-y: auto;
+  padding: 13px 13px 9px;
+  display: flex; flex-direction: column; gap: 10px;
+  min-height: 90px;
+}
+.burrow-panel .bubble { font-size: 0.83rem; max-width: 95%; }
+.journal {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  padding: 10px 14px 8px;
+  max-height: 170px; overflow-y: auto;
+  flex: none;
+}
+.journal h3 {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--soft);
+  margin-bottom: 8px;
+}
+.journal h3 .count {
+  background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 999px; padding: 1px 8px; font-size: 0.64rem;
+}
+.journal-entry {
+  display: flex; gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--border);
+  font-size: 0.74rem; line-height: 1.5;
+}
+.journal-entry:last-child { border-bottom: none; }
+.journal-entry .je-dot {
+  flex: none; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent); margin-top: 6px;
+}
+.journal-entry .je-dot.ok { background: var(--ok); }
+.journal-entry .je-dot.warn { background: var(--warn); }
+.journal-entry time { display: block; font-size: 0.64rem; color: var(--soft); margin-bottom: 1px; }
+.panel-input {
+  display: flex; gap: 8px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  flex: none;
+}
+.panel-input input {
+  flex: 1; min-width: 0;
+  font-family: var(--font-body); font-size: 0.84rem; color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 10px 15px; min-height: 44px;
+}
+.panel-input input:focus { border-color: var(--accent); outline: none; }
+.panel-send {
+  border: none; background: var(--accent); color: #fff;
+  border-radius: 999px;
+  min-width: 44px; min-height: 44px; font-size: 1rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none;
+}
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+.toast {
+  position: fixed; left: 50%; bottom: 26px;
+  transform: translateX(-50%) translateY(16px);
+  z-index: 400;
+  background: var(--text); color: var(--bg);
+  font-size: 0.85rem; font-weight: 600;
+  padding: 11px 20px; border-radius: 999px;
+  box-shadow: var(--shadow-panel);
+  opacity: 0; pointer-events: none;
+  transition: opacity .3s ease, transform .3s cubic-bezier(0.22, 1, 0.36, 1);
+  max-width: min(520px, calc(100vw - 32px));
+  text-align: center;
+}
+.toast.show { opacity: 1; transform: translateX(-50%); }
+
+/* ============================================================
+   PIED DE PAGE
+   ============================================================ */
+.footer-maquette {
+  margin-top: 64px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  padding: 18px clamp(16px, 4vw, 40px) 120px;
+  font-size: 0.76rem; color: var(--muted);
+  display: flex; flex-wrap: wrap; gap: 6px 24px; justify-content: space-between;
+}
+.footer-maquette b { color: var(--text); }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 980px) {
+  :root { --topbar-h: 104px; }
+  .appnav { margin-left: 0; }
+  .page-head { grid-template-columns: 1fr; align-items: start; }
+  .page-actions { justify-content: flex-start; }
+  .row-side { align-items: flex-start; margin-left: 48px; width: 100%; }
+  .row-actions { justify-content: flex-start; }
+  .field-duo { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .tabs button { padding: 9px 12px; font-size: 0.8rem; }
+  .crise-veil { padding: 0; align-items: stretch; }
+  .crise-panel { width: 100%; height: 100%; border-radius: 0; }
+}
+
+/* ============================================================
+   ACCESSIBILITÉ · prefers-reduced-motion
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .tab-panel, .bubble, .row.fresh, .thinking i { animation: none !important; }
+  .fox-peek, .burrow-panel, .veil, .dlg, .crise-veil, .crise-panel, .toast,
+  .row.leaving { transition: none !important; }
+  .type-caret { animation: none; }
+  * { scroll-behavior: auto !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===================== BARRE DE NAVIGATION COMMUNE ===================== -->
+<header class="appbar">
+  <a class="brand" href="index.html" style="text-decoration:none; color:inherit;">
+    <img src="../fox-1.png" alt="Filou, l'assistant renard de GuardVeto">
+    <span>GuardVeto<small>Maquette Bloc 3</small></span>
+  </a>
+  <nav class="appnav" aria-label="Navigation de la maquette">
+    <a href="index.html">🏠 Hub</a>
+    <a href="m1-planning.html">M1 Planning</a>
+    <a href="m2-regles.html">M2 Règles</a>
+    <a href="m3-absences-echanges.html" aria-current="page">M3 Absences &amp; échanges</a>
+    <a href="m4-accueil-equipe-historique-connexions.html">M4 Accueil &amp; réglages</a>
+    <a href="m5-veto-mobile.html">M5 Véto mobile</a>
+  </nav>
+</header>
+
+<main class="shell">
+
+  <!-- ===================== TÊTE DE PAGE ===================== -->
+  <div class="page-head">
+    <div>
+      <p class="page-kicker">Absences &amp; échanges · vue admin · Filou au terrier</p>
+      <h1>Congés, échanges et coups durs : une seule porte.</h1>
+      <p class="lede">Les anciens écrans « Congés » et « Demandes » fusionnent ici. Chaque souhait arrive avec son verdict de conflit déjà calculé, chaque échange suit son cycle sous tes yeux, et quand un imprévu tombe, Filou sort du terrier et mène la réparation.</p>
+    </div>
+    <div class="page-actions">
+      <button type="button" class="btn btn-outline" id="btn-creer-conge">+ Créer un congé</button>
+      <button type="button" class="btn btn-accent" id="btn-declarer-absence">🚨 Déclarer une absence</button>
+    </div>
+  </div>
+
+  <!-- ===================== ONGLETS ===================== -->
+  <nav class="tabs" role="tablist" aria-label="Sections d'Absences et échanges">
+    <button type="button" role="tab" id="tabbtn-conges" aria-selected="true" aria-controls="tab-conges">
+      Congés <span class="count" id="count-conges">3</span>
+    </button>
+    <button type="button" role="tab" id="tabbtn-echanges" aria-selected="false" aria-controls="tab-echanges">
+      Échanges de gardes <span class="count" id="count-echanges">2</span>
+    </button>
+    <button type="button" role="tab" id="tabbtn-depannages" aria-selected="false" aria-controls="tab-depannages">
+      Dépannages <span class="count" id="count-depannages">2</span>
+    </button>
+  </nav>
+
+  <!-- ============================================================
+       ONGLET 1 · CONGÉS (réunifiés)
+       ============================================================ -->
+  <section class="tab-panel" id="tab-conges" role="tabpanel" aria-labelledby="tabbtn-conges">
+
+    <!-- Souhaits en attente -->
+    <section class="card" aria-label="Souhaits de congé en attente">
+      <div class="card-head">
+        <h2>Souhaits en attente</h2>
+        <span class="section-count" id="pending-count">3</span>
+        <p class="sub">Chaque demande arrive avec son verdict : conflit ou non avec le planning publié, calculé d'avance. Tu peux ajuster les dates avant de valider.</p>
+      </div>
+      <ul class="rows" id="pending-list">
+        <li>
+          <div class="row" data-req="julie">
+            <span class="vet-dot" style="--c: var(--vet-julie)">J</span>
+            <div class="row-main">
+              <p class="row-line"><b>Julie</b><span class="type-chip t-vacances">Vacances</span></p>
+              <p class="row-dates">Du lundi 9 au dimanche 15 mars 2026 · 7 jours</p>
+              <p class="row-motif">« Semaine au ski avec les enfants. »</p>
+            </div>
+            <div class="row-side">
+              <span class="conflict ok">✓ Aucun conflit avec le planning publié</span>
+              <div class="row-actions">
+                <button type="button" class="btn btn-ghost btn-sm" data-act="refuser">Refuser…</button>
+                <button type="button" class="btn btn-ok btn-sm" data-act="valider">Valider…</button>
+              </div>
+            </div>
+          </div>
+        </li>
+        <li>
+          <div class="row" data-req="thomas">
+            <span class="vet-dot" style="--c: var(--vet-thomas)">T</span>
+            <div class="row-main">
+              <p class="row-line"><b>Thomas</b><span class="type-chip t-formation">Formation</span></p>
+              <p class="row-dates">Du vendredi 20 au dimanche 22 février 2026 · 3 jours</p>
+              <p class="row-motif">« Congrès d'imagerie vétérinaire, Lyon. »</p>
+            </div>
+            <div class="row-side">
+              <button type="button" class="conflict warn" data-act="voir-conflit" title="Voir les gardes touchées">⚠ 1 garde publiée touchée</button>
+              <div class="row-actions">
+                <button type="button" class="btn btn-ghost btn-sm" data-act="refuser">Refuser…</button>
+                <button type="button" class="btn btn-ok btn-sm" data-act="valider">Valider…</button>
+              </div>
+            </div>
+          </div>
+        </li>
+        <li>
+          <div class="row" data-req="camille">
+            <span class="vet-dot" style="--c: var(--vet-camille)">C</span>
+            <div class="row-main">
+              <p class="row-line"><b>Camille</b><span class="type-chip t-indispo">Indisponibilité · après-midi</span></p>
+              <p class="row-dates">Mercredi 18 février 2026 · 1 jour, créneau après-midi</p>
+              <p class="row-motif">« Rendez-vous médical. »</p>
+            </div>
+            <div class="row-side">
+              <span class="conflict ok">✓ Aucun conflit avec le planning publié</span>
+              <div class="row-actions">
+                <button type="button" class="btn btn-ghost btn-sm" data-act="refuser">Refuser…</button>
+                <button type="button" class="btn btn-ok btn-sm" data-act="valider">Valider…</button>
+              </div>
+            </div>
+          </div>
+        </li>
+      </ul>
+      <p class="empty-row" id="pending-empty" hidden>Aucun souhait en attente. Les prochaines demandes des vétos arriveront ici.</p>
+    </section>
+
+    <!-- Congés du cabinet -->
+    <section class="card" aria-label="Congés du cabinet">
+      <div class="card-head">
+        <h2>Congés du cabinet</h2>
+        <span class="section-count" id="list-count">5</span>
+        <p class="sub">Validés et refusés, toutes vétérinaires confondues. Filtre par personne ou par type, ou clique sur un prénom du résumé.</p>
+      </div>
+      <div class="resume-vets" id="resume-vets" aria-label="Résumé des congés par vétérinaire (cliquable)">
+        <span class="r-label">Résumé par véto · clique pour filtrer</span>
+      </div>
+      <div class="filters">
+        <span class="f-label">Filtrer</span>
+        <button type="button" class="vet-filter" data-vet="tous" aria-pressed="true"><i style="--c: var(--accent)"></i>Toute l'équipe</button>
+        <button type="button" class="vet-filter" data-vet="anneso" aria-pressed="false"><i style="--c: var(--vet-anneso)"></i>Anne-Sophie</button>
+        <button type="button" class="vet-filter" data-vet="annecat" aria-pressed="false"><i style="--c: var(--vet-annecat)"></i>Anne-Catherine</button>
+        <button type="button" class="vet-filter" data-vet="manon" aria-pressed="false"><i style="--c: var(--vet-manon)"></i>Manon</button>
+        <button type="button" class="vet-filter" data-vet="victor" aria-pressed="false"><i style="--c: var(--vet-victor)"></i>Victor</button>
+        <button type="button" class="vet-filter" data-vet="camille" aria-pressed="false"><i style="--c: var(--vet-camille)"></i>Camille</button>
+        <button type="button" class="vet-filter" data-vet="julie" aria-pressed="false"><i style="--c: var(--vet-julie)"></i>Julie</button>
+        <button type="button" class="vet-filter" data-vet="thomas" aria-pressed="false"><i style="--c: var(--vet-thomas)"></i>Thomas</button>
+        <select id="filter-type" aria-label="Filtrer par type de congé">
+          <option value="tous">Tous les types</option>
+          <option value="vacances">Vacances</option>
+          <option value="formation">Formation</option>
+          <option value="sante">Santé</option>
+          <option value="indispo">Indisponibilité 1 jour</option>
+          <option value="autre">Autre</option>
+        </select>
+      </div>
+      <ul class="rows" id="conges-list">
+        <li data-vet="manon" data-type="vacances">
+          <div class="row">
+            <span class="vet-dot" style="--c: var(--vet-manon)">M</span>
+            <div class="row-main">
+              <p class="row-line"><b>Manon</b><span class="type-chip t-vacances">Vacances</span></p>
+              <p class="row-dates">Du lundi 6 au dimanche 12 avril 2026 · posé par Manon, validé le 28 janvier</p>
+            </div>
+            <div class="row-side">
+              <span class="status-pill st-valide">Validé</span>
+              <div class="row-actions">
+                <button type="button" class="icon-btn" data-del="valide" data-name="Manon" data-dates="du 6 au 12 avril" aria-label="Supprimer le congé de Manon du 6 au 12 avril">🗑</button>
+              </div>
+            </div>
+          </div>
+        </li>
+        <li data-vet="victor" data-type="formation">
+          <div class="row">
+            <span class="vet-dot" style="--c: var(--vet-victor)">V</span>
+            <div class="row-main">
+              <p class="row-line"><b>Victor</b><span class="type-chip t-formation">Formation</span></p>
+              <p class="row-dates">Jeudi 5 et vendredi 6 mars 2026 · posé par Victor, validé le 20 janvier</p>
+            </div>
+            <div class="row-side">
+              <span class="status-pill st-valide">Validé</span>
+              <div class="row-actions">
+                <button type="button" class="icon-btn" data-del="valide" data-name="Victor" data-dates="des 5 et 6 mars" aria-label="Supprimer le congé de Victor des 5 et 6 mars">🗑</button>
+              </div>
+            </div>
+          </div>
+        </li>
+        <li data-vet="anneso" data-type="indispo">
+          <div class="row">
+            <span class="vet-dot" style="--c: var(--vet-anneso)">AS</span>
+            <div class="row-main">
+              <p class="row-line"><b>Anne-Sophie</b><span class="type-chip t-indispo">Indisponibilité · soirée</span></p>
+              <p class="row-dates">Mardi 24 février 2026, créneau soirée · créé par Anne-Sophie (admin)</p>
+            </div>
+            <div class="row-side">
+              <span class="status-pill st-valide">Validé</span>
+              <div class="row-actions">
+                <button type="button" class="icon-btn" data-del="valide" data-name="Anne-Sophie" data-dates="du 24 février au soir" aria-label="Supprimer l'indisponibilité d'Anne-Sophie du 24 février">🗑</button>
+              </div>
+            </div>
+          </div>
+        </li>
+        <li data-vet="annecat" data-type="autre">
+          <div class="row">
+            <span class="vet-dot" style="--c: var(--vet-annecat)">AC</span>
+            <div class="row-main">
+              <p class="row-line"><b>Anne-Catherine</b><span class="type-chip t-autre">Autre</span></p>
+              <p class="row-dates">Du lundi 2 au dimanche 8 mars 2026 · créé par Anne-Sophie (admin) : « garde de ses petits-enfants »</p>
+            </div>
+            <div class="row-side">
+              <span class="status-pill st-valide">Validé</span>
+              <div class="row-actions">
+                <button type="button" class="icon-btn" data-del="valide" data-name="Anne-Catherine" data-dates="du 2 au 8 mars" aria-label="Supprimer le congé d'Anne-Catherine du 2 au 8 mars">🗑</button>
+              </div>
+            </div>
+          </div>
+        </li>
+        <li data-vet="victor" data-type="vacances">
+          <div class="row">
+            <span class="vet-dot" style="--c: var(--vet-victor)">V</span>
+            <div class="row-main">
+              <p class="row-line"><b>Victor</b><span class="type-chip t-vacances">Vacances</span></p>
+              <p class="row-dates">Du lundi 2 au dimanche 8 mars 2026 · refusé le 15 janvier</p>
+              <p class="row-motif">Motif du refus : « Anne-Catherine est déjà absente cette semaine, il faut garder l'effectif. »</p>
+            </div>
+            <div class="row-side">
+              <span class="status-pill st-refuse">Refusé</span>
+              <div class="row-actions">
+                <button type="button" class="icon-btn" data-del="souhait" data-name="Victor" data-dates="du 2 au 8 mars (refusé)" aria-label="Supprimer la demande refusée de Victor">🗑</button>
+              </div>
+            </div>
+          </div>
+        </li>
+      </ul>
+      <p class="empty-row" id="conges-empty" hidden>Aucun congé ne correspond à ce filtre.</p>
+    </section>
+  </section>
+
+  <!-- ============================================================
+       ONGLET 2 · ÉCHANGES DE GARDES
+       ============================================================ -->
+  <section class="tab-panel" id="tab-echanges" role="tabpanel" aria-labelledby="tabbtn-echanges" hidden>
+
+    <div class="status-legend" aria-label="Les six statuts d'un échange">
+      <span class="sl-label">Le cycle d'un échange :</span>
+      <span class="status-pill st-attente-confrere">En attente du confrère</span>
+      <span class="status-pill st-attente-validation">En attente de validation</span>
+      <span class="status-pill st-decline">Décliné</span>
+      <span class="status-pill st-annule">Annulé</span>
+      <span class="status-pill st-applique">Appliqué ✓</span>
+      <span class="status-pill st-refuse-admin">Refusé admin</span>
+    </div>
+
+    <!-- À valider (admin) -->
+    <section class="card" aria-label="Échanges à valider par l'admin">
+      <div class="card-head">
+        <h2>À valider (admin)</h2>
+        <span class="section-count" id="avalider-count">1</span>
+        <p class="sub">Le confrère a accepté : dernier mot pour toi. Valider applique l'échange au planning publié, refuser exige un motif.</p>
+      </div>
+      <ul class="rows" id="ex-avalider">
+        <li>
+          <div class="row" data-ex="julie-victor">
+            <span class="vet-dot" style="--c: var(--vet-julie)">J</span>
+            <div class="row-main">
+              <p class="row-line"><b>Julie</b> cède sa nuit du <b>mardi 3 mars</b> à <b>Victor</b></p>
+              <p class="row-dates">Contrepartie acceptée : Victor cède sa nuit du jeudi 12 mars à Julie</p>
+              <p class="row-motif">« Spectacle de ma fille le 3 au soir. » · Victor a accepté le 30 janvier</p>
+            </div>
+            <div class="row-side">
+              <span class="status-pill st-attente-validation">En attente de validation</span>
+              <div class="row-actions">
+                <button type="button" class="btn btn-ghost btn-sm" data-act="refuser-admin">Refuser…</button>
+                <button type="button" class="btn btn-ok btn-sm" data-act="valider-admin">Valider l'échange</button>
+              </div>
+            </div>
+          </div>
+        </li>
+      </ul>
+      <p class="empty-row" id="avalider-empty" hidden>Rien à valider pour l'instant.</p>
+    </section>
+
+    <!-- Propositions reçues -->
+    <section class="card" aria-label="Propositions d'échange reçues">
+      <div class="card-head">
+        <h2>Propositions reçues</h2>
+        <span class="section-count" id="recues-count">1</span>
+        <p class="sub">Un confrère te propose une de ses gardes, à toi d'accepter ou de décliner (avec un mot d'explication).</p>
+      </div>
+      <ul class="rows" id="ex-recues">
+        <li>
+          <div class="row" data-ex="thomas-anneso">
+            <span class="vet-dot" style="--c: var(--vet-thomas)">T</span>
+            <div class="row-main">
+              <p class="row-line"><b>Thomas</b> te propose sa nuit du <b>lundi 9 mars</b></p>
+              <p class="row-dates">Sans contrepartie · proposé le 1er février</p>
+              <p class="row-motif">« Je récupère ma voiture au garage ce soir-là, je préfère assurer. »</p>
+            </div>
+            <div class="row-side">
+              <span class="status-pill st-attente-confrere">En attente du confrère (toi)</span>
+              <div class="row-actions">
+                <button type="button" class="btn btn-ghost btn-sm" data-act="decliner">Décliner…</button>
+                <button type="button" class="btn btn-ok btn-sm" data-act="accepter">Accepter</button>
+              </div>
+            </div>
+          </div>
+        </li>
+      </ul>
+      <p class="empty-row" id="recues-empty" hidden>Aucune proposition en attente de ta réponse.</p>
+    </section>
+
+    <!-- Gardes à reprendre -->
+    <section class="card" aria-label="Gardes ouvertes à reprendre">
+      <div class="card-head">
+        <h2>Gardes à reprendre</h2>
+        <span class="section-count" id="ouvertes-count">2</span>
+        <p class="sub">Proposées à toute l'équipe : première arrivée, première servie. Reprendre une garde envoie l'échange en validation admin.</p>
+      </div>
+      <ul class="rows" id="ex-ouvertes">
+        <li>
+          <div class="row" data-ex="camille-we">
+            <span class="vet-dot" style="--c: var(--vet-camille)">C</span>
+            <div class="row-main">
+              <p class="row-line"><b>Camille</b> cède son week-end du <b>21 et 22 mars</b> (2nde de garde)</p>
+              <p class="row-dates">Ouverte à toute l'équipe depuis le 29 janvier</p>
+              <p class="row-motif">« Mariage d'une amie d'enfance. »</p>
+            </div>
+            <div class="row-side">
+              <span class="status-pill st-attente-confrere">En attente du confrère</span>
+              <div class="row-actions">
+                <button type="button" class="btn btn-outline btn-sm" data-act="prendre">Je la prends</button>
+              </div>
+            </div>
+          </div>
+        </li>
+        <li>
+          <div class="row" data-ex="manon-nuit">
+            <span class="vet-dot" style="--c: var(--vet-manon)">M</span>
+            <div class="row-main">
+              <p class="row-line"><b>Manon</b> cède sa nuit du <b>mercredi 25 mars</b></p>
+              <p class="row-dates">Ouverte à toute l'équipe depuis ce matin</p>
+              <p class="row-motif">« Réunion parents-profs, je ne peux pas la déplacer. »</p>
+            </div>
+            <div class="row-side">
+              <span class="status-pill st-attente-confrere">En attente du confrère</span>
+              <div class="row-actions">
+                <button type="button" class="btn btn-outline btn-sm" data-act="prendre">Je la prends</button>
+              </div>
+            </div>
+          </div>
+        </li>
+      </ul>
+      <p class="empty-row" id="ouvertes-empty" hidden>Aucune garde ouverte à la reprise.</p>
+    </section>
+
+    <!-- Mes demandes -->
+    <section class="card" aria-label="Mes demandes d'échange">
+      <div class="card-head">
+        <h2>Mes demandes</h2>
+        <span class="section-count" id="mesdem-count">1</span>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-accent btn-sm" id="btn-proposer">+ Proposer un échange</button>
+        <p class="sub">Les gardes que tu as proposées, tant que le cycle n'est pas terminé. Tu peux annuler tant que l'échange n'est pas appliqué.</p>
+      </div>
+      <ul class="rows" id="ex-mesdemandes">
+        <li>
+          <div class="row" data-ex="anneso-camille">
+            <span class="vet-dot" style="--c: var(--vet-anneso)">AS</span>
+            <div class="row-main">
+              <p class="row-line">Tu proposes ta nuit du <b>jeudi 19 mars</b> à <b>Camille</b></p>
+              <p class="row-dates">Contrepartie proposée : sa nuit du mardi 31 mars · envoyée hier</p>
+            </div>
+            <div class="row-side">
+              <span class="status-pill st-attente-confrere">En attente du confrère</span>
+              <div class="row-actions">
+                <button type="button" class="btn btn-ghost btn-sm" data-act="annuler">Annuler</button>
+              </div>
+            </div>
+          </div>
+        </li>
+      </ul>
+      <p class="empty-row" id="mesdem-empty" hidden>Aucune demande en cours.</p>
+    </section>
+
+    <!-- Historique -->
+    <section class="card" aria-label="Historique des échanges">
+      <div class="card-head">
+        <h2>Historique</h2>
+        <p class="sub">Tous les échanges terminés, avec leur motif quand il y en a un. Rien ne s'efface : c'est la mémoire du cabinet.</p>
+      </div>
+      <ul class="rows" id="ex-histo">
+        <li>
+          <div class="row">
+            <span class="vet-dot" style="--c: var(--vet-manon)">M</span>
+            <div class="row-main">
+              <p class="row-line"><b>Manon</b> → <b>Victor</b> · nuit du jeudi 12 février</p>
+              <p class="row-dates">Accepté par Victor, validé par Anne-Sophie le 26 janvier · planning et agendas mis à jour</p>
+            </div>
+            <div class="row-side"><span class="status-pill st-applique">Appliqué ✓</span></div>
+          </div>
+        </li>
+        <li>
+          <div class="row">
+            <span class="vet-dot" style="--c: var(--vet-julie)">J</span>
+            <div class="row-main">
+              <p class="row-line"><b>Julie</b> → <b>Thomas</b> · week-end du 7 et 8 février</p>
+              <p class="row-motif">Décliné par Thomas : « Déjà de garde le vendredi soir, j'enchaînerais trois jours. »</p>
+            </div>
+            <div class="row-side"><span class="status-pill st-decline">Décliné</span></div>
+          </div>
+        </li>
+        <li>
+          <div class="row">
+            <span class="vet-dot" style="--c: var(--vet-camille)">C</span>
+            <div class="row-main">
+              <p class="row-line"><b>Camille</b> → <b>Julie</b> · nuit du mardi 20 janvier</p>
+              <p class="row-motif">Refusé par Anne-Sophie : « Ça ferait trois semaines d'affilée avec une garde pour Julie. »</p>
+            </div>
+            <div class="row-side"><span class="status-pill st-refuse-admin">Refusé admin</span></div>
+          </div>
+        </li>
+        <li>
+          <div class="row">
+            <span class="vet-dot" style="--c: var(--vet-victor)">V</span>
+            <div class="row-main">
+              <p class="row-line"><b>Victor</b> → toute l'équipe · nuit du lundi 12 janvier</p>
+              <p class="row-dates">Annulé par Victor avant toute réponse</p>
+            </div>
+            <div class="row-side"><span class="status-pill st-annule">Annulé</span></div>
+          </div>
+        </li>
+      </ul>
+    </section>
+  </section>
+
+  <!-- ============================================================
+       ONGLET 3 · DÉPANNAGES / COMPENSATIONS
+       ============================================================ -->
+  <section class="tab-panel" id="tab-depannages" role="tabpanel" aria-labelledby="tabbtn-depannages" hidden>
+    <section class="card" aria-label="Dépannages et compensations">
+      <div class="card-head">
+        <h2>Qui a dépanné qui</h2>
+        <span class="section-count" id="dep-count">2</span>
+        <p class="sub">Chaque garde reprise en urgence ouvre une dette de dépannage. Elle se solde quand l'absent rend la pareille, ou s'annule d'un geste. Les crises gérées avec Filou alimentent ce tableau automatiquement.</p>
+      </div>
+      <div class="table-scroll">
+        <table class="dep-table">
+          <thead>
+            <tr>
+              <th scope="col">Créneau repris</th>
+              <th scope="col">Absent·e</th>
+              <th scope="col">Dépanneur·se</th>
+              <th scope="col">Motif</th>
+              <th scope="col">Dette</th>
+              <th scope="col"><span style="position:absolute; width:1px; height:1px; overflow:hidden;">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody id="dep-body">
+            <tr>
+              <td>Nuit du jeudi 8 janvier<small>garde de semaine</small></td>
+              <td><span class="dep-vet"><i style="--c: var(--vet-julie)"></i>Julie</span></td>
+              <td><span class="dep-vet"><i style="--c: var(--vet-thomas)"></i>Thomas</span></td>
+              <td>Enfant malade</td>
+              <td><span class="status-pill st-ouverte dep-status">Dette ouverte</span></td>
+              <td><div class="dep-actions">
+                <button type="button" data-dep="compenser">Marquer compensée</button>
+                <button type="button" data-dep="annuler">Annuler la dette</button>
+              </div></td>
+            </tr>
+            <tr>
+              <td>Soir du vendredi 16 janvier<small>lié au week-end</small></td>
+              <td><span class="dep-vet"><i style="--c: var(--vet-victor)"></i>Victor</span></td>
+              <td><span class="dep-vet"><i style="--c: var(--vet-anneso)"></i>Anne-Sophie</span></td>
+              <td>Urgence familiale</td>
+              <td><span class="status-pill st-ouverte dep-status">Dette ouverte</span></td>
+              <td><div class="dep-actions">
+                <button type="button" data-dep="compenser">Marquer compensée</button>
+                <button type="button" data-dep="annuler">Annuler la dette</button>
+              </div></td>
+            </tr>
+            <tr>
+              <td>Week-end du 10 et 11 janvier<small>2nde de garde</small></td>
+              <td><span class="dep-vet"><i style="--c: var(--vet-manon)"></i>Manon</span></td>
+              <td><span class="dep-vet"><i style="--c: var(--vet-camille)"></i>Camille</span></td>
+              <td>Grippe</td>
+              <td><span class="status-pill st-compensee dep-status">Compensée le 24 janv.</span></td>
+              <td><div class="dep-actions">
+                <button type="button" data-dep="rouvrir">Rouvrir</button>
+              </div></td>
+            </tr>
+            <tr>
+              <td>Nuit du lundi 5 janvier<small>garde de semaine</small></td>
+              <td><span class="dep-vet"><i style="--c: var(--vet-thomas)"></i>Thomas</span></td>
+              <td><span class="dep-vet"><i style="--c: var(--vet-julie)"></i>Julie</span></td>
+              <td>Voiture en panne</td>
+              <td><span class="status-pill st-dette-annulee dep-status">Annulée (geste offert)</span></td>
+              <td><div class="dep-actions">
+                <button type="button" data-dep="rouvrir">Rouvrir</button>
+              </div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </section>
+</main>
+
+<!-- ============================================================
+     DIALOGUES
+     ============================================================ -->
+
+<!-- Valider un souhait (dates ajustables) -->
+<div class="veil" id="dlg-valider" role="dialog" aria-modal="true" aria-labelledby="valider-title" hidden>
+  <div class="dlg">
+    <div class="dlg-head">
+      <div>
+        <p class="dlg-kicker">Valider un souhait de congé</p>
+        <h2 id="valider-title">Valider le congé</h2>
+      </div>
+      <button type="button" class="dlg-close" data-close aria-label="Fermer">✕</button>
+    </div>
+    <div class="dlg-recap" id="valider-recap"></div>
+    <div class="field-duo">
+      <div class="field">
+        <label for="valider-du">Du</label>
+        <input type="date" id="valider-du">
+      </div>
+      <div class="field">
+        <label for="valider-au">Au</label>
+        <input type="date" id="valider-au">
+      </div>
+    </div>
+    <p class="dlg-note" style="margin-top:-4px;">Tu peux ajuster les dates avant de valider : la vétérinaire sera prévenue du congé réellement accordé.</p>
+    <div class="dlg-warnbox" id="valider-warn" hidden>
+      <b>⚠ Ce congé chevauche le planning publié.</b> En validant, il faudra réattribuer les gardes touchées (Filou te le proposera juste après).
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="btn btn-ghost" data-close>Annuler</button>
+      <button type="button" class="btn btn-ok" id="valider-confirm">Valider le congé</button>
+    </div>
+  </div>
+</div>
+
+<!-- Refuser un souhait (motif obligatoire) -->
+<div class="veil" id="dlg-refuser" role="dialog" aria-modal="true" aria-labelledby="refuser-title" hidden>
+  <div class="dlg">
+    <div class="dlg-head">
+      <div>
+        <p class="dlg-kicker">Refuser un souhait de congé</p>
+        <h2 id="refuser-title">Refuser la demande</h2>
+      </div>
+      <button type="button" class="dlg-close" data-close aria-label="Fermer">✕</button>
+    </div>
+    <div class="dlg-recap" id="refuser-recap"></div>
+    <div class="field">
+      <label for="refuser-motif">Motif du refus (obligatoire, envoyé à la vétérinaire)</label>
+      <textarea id="refuser-motif" placeholder="Ex. : trop d'absences déjà validées cette semaine-là, propose plutôt la semaine suivante."></textarea>
+      <p class="f-hint">Un refus expliqué passe toujours mieux qu'un refus sec. La vétérinaire recevra ce motif tel quel.</p>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="btn btn-ghost" data-close>Annuler</button>
+      <button type="button" class="btn btn-danger" id="refuser-confirm">Refuser et prévenir</button>
+    </div>
+  </div>
+</div>
+
+<!-- Conflit avec un planning publié -->
+<div class="veil" id="dlg-conflit" role="dialog" aria-modal="true" aria-labelledby="conflit-title" hidden>
+  <div class="dlg">
+    <div class="dlg-head">
+      <div>
+        <p class="dlg-kicker">Conflit avec le planning publié</p>
+        <h2 id="conflit-title">Le congé de Thomas touche une garde publiée</h2>
+      </div>
+      <button type="button" class="dlg-close" data-close aria-label="Fermer">✕</button>
+    </div>
+    <p class="dlg-note">Le congé du 20 au 22 février est validé. Mais sur ces dates, le planning déjà publié compte sur Thomas :</p>
+    <div class="dlg-warnbox">
+      <ul class="dlg-gardes">
+        <li><span class="g-ico">📅</span><span><b>Week-end du 21 et 22 février</b> · Thomas est 1er de garde, en binôme avec Julie (2nde). Publié et synchronisé aux agendas.</span></li>
+      </ul>
+    </div>
+    <p class="dlg-note">Tant que cette garde n'est pas réattribuée, le planning publié est faux. Filou peut mener la réparation maintenant, créneau par créneau.</p>
+    <div class="dlg-foot">
+      <button type="button" class="btn btn-ghost" id="conflit-plustard">Réparer plus tard</button>
+      <button type="button" class="btn btn-accent" id="conflit-gerer">🦊 Gérer maintenant avec Filou</button>
+    </div>
+  </div>
+</div>
+
+<!-- Créer un congé direct -->
+<div class="veil" id="dlg-creer" role="dialog" aria-modal="true" aria-labelledby="creer-title" hidden>
+  <div class="dlg">
+    <div class="dlg-head">
+      <div>
+        <p class="dlg-kicker">Créer un congé · action admin</p>
+        <h2 id="creer-title">Poser un congé pour une vétérinaire</h2>
+      </div>
+      <button type="button" class="dlg-close" data-close aria-label="Fermer">✕</button>
+    </div>
+    <p class="dlg-note">Créé par toi, il est validé d'office : pas de circuit de demande. La vétérinaire est simplement prévenue.</p>
+    <div class="field">
+      <label for="creer-vet">Vétérinaire</label>
+      <select id="creer-vet">
+        <option value="anneso">Anne-Sophie (toi)</option>
+        <option value="annecat">Anne-Catherine</option>
+        <option value="manon">Manon</option>
+        <option value="victor">Victor</option>
+        <option value="camille">Camille</option>
+        <option value="julie">Julie</option>
+        <option value="thomas">Thomas</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="creer-type">Type</label>
+      <select id="creer-type">
+        <option value="vacances">Vacances</option>
+        <option value="formation">Formation</option>
+        <option value="sante">Santé</option>
+        <option value="indispo">Indisponibilité 1 jour</option>
+        <option value="autre">Autre</option>
+      </select>
+    </div>
+    <div class="field-duo" id="creer-dates-duo">
+      <div class="field">
+        <label for="creer-du">Du</label>
+        <input type="date" id="creer-du" value="2026-03-16">
+      </div>
+      <div class="field" id="creer-au-field">
+        <label for="creer-au">Au</label>
+        <input type="date" id="creer-au" value="2026-03-22">
+      </div>
+    </div>
+    <div class="field" id="creer-creneau-field" hidden>
+      <label id="creer-creneau-label">Créneau de l'indisponibilité</label>
+      <div class="seg-creneau" role="group" aria-labelledby="creer-creneau-label">
+        <button type="button" data-creneau="matin" aria-pressed="false">Matin</button>
+        <button type="button" data-creneau="apres-midi" aria-pressed="false">Après-midi</button>
+        <button type="button" data-creneau="soiree" aria-pressed="false">Soirée</button>
+        <button type="button" data-creneau="journee" aria-pressed="true">Journée entière</button>
+      </div>
+      <p class="f-hint">Une indisponibilité tient sur un seul jour : la date de fin s'aligne automatiquement.</p>
+    </div>
+    <div class="field">
+      <label for="creer-note">Note (facultative)</label>
+      <input type="text" id="creer-note" placeholder="Ex. : garde de ses petits-enfants">
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="btn btn-ghost" data-close>Annuler</button>
+      <button type="button" class="btn btn-accent" id="creer-confirm">Créer le congé</button>
+    </div>
+  </div>
+</div>
+
+<!-- Supprimer un congé (confirmation, renforcée si validé) -->
+<div class="veil" id="dlg-suppr" role="dialog" aria-modal="true" aria-labelledby="suppr-title" hidden>
+  <div class="dlg">
+    <div class="dlg-head">
+      <div>
+        <p class="dlg-kicker">Supprimer un congé</p>
+        <h2 id="suppr-title">Confirmer la suppression</h2>
+      </div>
+      <button type="button" class="dlg-close" data-close aria-label="Fermer">✕</button>
+    </div>
+    <div class="dlg-recap" id="suppr-recap"></div>
+    <div class="dlg-dangerbox" id="suppr-danger" hidden>
+      <b>⚠ Ce congé est déjà validé.</b> Le supprimer rend la vétérinaire à nouveau disponible sur ces dates, mais le planning déjà généré ou publié n'est pas recalculé tout seul. La vétérinaire sera prévenue de l'annulation.
+    </div>
+    <p class="dlg-note" id="suppr-note-souhait" hidden>Cette demande sera retirée sans autre conséquence : aucun planning n'en dépend.</p>
+    <div class="dlg-foot">
+      <button type="button" class="btn btn-ghost" data-close>Garder le congé</button>
+      <button type="button" class="btn btn-danger" id="suppr-confirm">Supprimer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Motif générique (décliner / refuser admin un échange) -->
+<div class="veil" id="dlg-motif" role="dialog" aria-modal="true" aria-labelledby="motif-title" hidden>
+  <div class="dlg">
+    <div class="dlg-head">
+      <div>
+        <p class="dlg-kicker" id="motif-kicker">Échange de gardes</p>
+        <h2 id="motif-title">Décliner la proposition</h2>
+      </div>
+      <button type="button" class="dlg-close" data-close aria-label="Fermer">✕</button>
+    </div>
+    <div class="dlg-recap" id="motif-recap"></div>
+    <div class="field">
+      <label for="motif-text" id="motif-label">Motif (obligatoire, envoyé au confrère)</label>
+      <textarea id="motif-text" placeholder="Ex. : je suis déjà de garde la veille."></textarea>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="btn btn-ghost" data-close>Annuler</button>
+      <button type="button" class="btn btn-danger" id="motif-confirm">Envoyer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirmation générique (annuler ma demande, annuler une dette) -->
+<div class="veil" id="dlg-confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-title" hidden>
+  <div class="dlg">
+    <div class="dlg-head">
+      <div>
+        <p class="dlg-kicker" id="confirm-kicker">Confirmation</p>
+        <h2 id="confirm-title">Confirmer</h2>
+      </div>
+      <button type="button" class="dlg-close" data-close aria-label="Fermer">✕</button>
+    </div>
+    <p class="dlg-note" id="confirm-note"></p>
+    <div class="dlg-foot">
+      <button type="button" class="btn btn-ghost" data-close>Retour</button>
+      <button type="button" class="btn btn-danger" id="confirm-yes">Confirmer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Proposer un échange -->
+<div class="veil" id="dlg-proposer" role="dialog" aria-modal="true" aria-labelledby="proposer-title" hidden>
+  <div class="dlg">
+    <div class="dlg-head">
+      <div>
+        <p class="dlg-kicker">Échange de gardes</p>
+        <h2 id="proposer-title">Proposer une de tes gardes</h2>
+      </div>
+      <button type="button" class="dlg-close" data-close aria-label="Fermer">✕</button>
+    </div>
+    <div class="field">
+      <label for="proposer-garde">Ta garde à céder</label>
+      <select id="proposer-garde">
+        <option value="Nuit du jeudi 19 mars">Nuit du jeudi 19 mars</option>
+        <option value="Nuit du lundi 30 mars">Nuit du lundi 30 mars</option>
+        <option value="Week-end du 4 et 5 avril (1re de garde)">Week-end du 4 et 5 avril (1re de garde)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label id="proposer-dest-label">À qui la proposer</label>
+      <label class="radio-line"><input type="radio" name="proposer-dest" value="cible" checked>
+        <span>À un confrère précis<small>Il reçoit la proposition, accepte ou décline. Tu peux demander une contrepartie.</small></span>
+      </label>
+      <label class="radio-line"><input type="radio" name="proposer-dest" value="tous">
+        <span>À tous les confrères<small>La garde apparaît dans « Gardes à reprendre » : première arrivée, première servie.</small></span>
+      </label>
+    </div>
+    <div id="proposer-cible-zone">
+      <div class="field">
+        <label for="proposer-vet">Confrère</label>
+        <select id="proposer-vet">
+          <option value="manon">Manon</option>
+          <option value="victor">Victor</option>
+          <option value="camille">Camille</option>
+          <option value="julie">Julie</option>
+          <option value="thomas">Thomas</option>
+          <option value="annecat">Anne-Catherine</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="proposer-contrepartie">Contrepartie demandée (facultative)</label>
+        <select id="proposer-contrepartie">
+          <option value="">Aucune : je cède ma garde, c'est tout</option>
+          <option value="sa nuit du mardi 31 mars">Sa nuit du mardi 31 mars</option>
+          <option value="sa nuit du mercredi 8 avril">Sa nuit du mercredi 8 avril</option>
+        </select>
+      </div>
+    </div>
+    <div class="dlg-recap" id="proposer-recap" aria-live="polite"></div>
+    <div class="dlg-foot">
+      <button type="button" class="btn btn-ghost" data-close>Annuler</button>
+      <button type="button" class="btn btn-accent" id="proposer-confirm">Envoyer la proposition</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     LA CRISE MENÉE PAR FILOU
+     ============================================================ -->
+<div class="crise-veil" id="crise-veil" role="dialog" aria-modal="true" aria-labelledby="crise-title" hidden>
+  <div class="crise-panel">
+    <div class="crise-head">
+      <span class="avatar"><img src="../fox-2.png" alt="" id="crise-avatar"></span>
+      <div>
+        <h2 id="crise-title">Filou · gestion d'absence</h2>
+        <p class="sub">Il mène, tu décides. Rien ne s'applique sans ta validation.</p>
+      </div>
+      <button type="button" class="panel-reduce" id="crise-close" style="margin-left:auto;" aria-label="Fermer la gestion d'absence">✕</button>
+    </div>
+    <div class="crise-convo" id="crise-convo" aria-live="polite"></div>
+    <form class="crise-input" id="crise-form">
+      <input type="text" id="crise-text" placeholder="Réponds à Filou ici…" aria-label="Répondre à Filou" autocomplete="off">
+      <button type="submit" aria-label="Envoyer">➤</button>
+    </form>
+  </div>
+</div>
+
+<!-- ============================================================
+     TERRIER DE FILOU + PANNEAU DISCRET
+     ============================================================ -->
+<aside class="burrow-panel" id="burrow-panel" aria-label="Panneau de conversation avec Filou">
+  <div class="panel-head">
+    <span class="avatar"><img src="../fox-1.png" alt=""></span>
+    <div>
+      <h2>Filou</h2>
+      <p class="sub">Sorti du terrier · il renseigne et veille</p>
+    </div>
+    <button type="button" class="panel-reduce" id="panel-reduce" aria-label="Renvoyer Filou dans son terrier" title="Refermer">—</button>
+  </div>
+  <div class="panel-scroll" id="panel-scroll">
+    <div class="bubble filou">
+      <span class="who">🦊 Filou</span>
+      Je veille sur les absences depuis mon terrier. Pose-moi une question sur le fonctionnement, ou déclare une absence si un imprévu tombe.
+    </div>
+  </div>
+  <div class="journal" aria-label="Journal de Filou">
+    <h3>Journal de Filou <span class="count" id="journal-count">2</span></h3>
+    <div id="journal-list">
+      <div class="journal-entry">
+        <span class="je-dot ok"></span>
+        <div><time>Hier · 17:41</time>Échange Manon → Victor appliqué : nuit du 12 février, planning et agendas synchronisés.</div>
+      </div>
+      <div class="journal-entry">
+        <span class="je-dot"></span>
+        <div><time>Hier · 09:15</time>Souhait de congé reçu de Julie (9 → 15 mars). Aucun conflit détecté avec le planning publié.</div>
+      </div>
+    </div>
+  </div>
+  <form class="panel-input" id="panel-form">
+    <input type="text" id="panel-text" placeholder="Ex. : comment je pose un congé ?" aria-label="Écrire un message à Filou" autocomplete="off">
+    <button type="submit" class="panel-send" aria-label="Envoyer le message">➤</button>
+  </form>
+</aside>
+
+<div class="terrier-zone">
+  <button type="button" class="terrier" id="terrier" aria-label="Appeler Filou (il sort de son terrier)">
+    <svg viewBox="0 0 148 104" aria-hidden="true">
+      <path d="M10 96 C 16 52, 44 34, 74 32 C 104 34, 132 52, 138 96 Z" fill="#E4CFA6"/>
+      <path d="M18 96 C 24 58, 48 42, 74 40 C 100 42, 124 58, 130 96 Z" fill="#D9BE8C"/>
+      <ellipse cx="74" cy="66" rx="30" ry="21" fill="#4A3520"/>
+      <ellipse cx="74" cy="68" rx="24" ry="16" fill="#31210F"/>
+    </svg>
+    <span class="fox-peek" aria-hidden="true"><img src="../fox-1.png" alt=""></span>
+    <svg viewBox="0 0 148 104" aria-hidden="true" style="z-index:3; pointer-events:none;">
+      <path d="M40 78 Q 74 92 108 78 L 112 96 Q 74 104 36 96 Z" fill="#C9AA72"/>
+      <path d="M30 62 q -2 -10 2 -14 q 1 8 4 11 q 0 -9 5 -12 q -1 9 1 13 Z" fill="#7A8A3A"/>
+      <path d="M112 58 q 3 -9 0 -14 q -3 7 -6 9 q 1 -8 -3 -12 q 0 9 -2 13 Z" fill="#7A8A3A"/>
+    </svg>
+    <span class="t-hint">Filou 🦊</span>
+  </button>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<footer class="footer-maquette">
+  <span><b>Maquette M3 · Absences &amp; échanges</b> · ambiance Terrier chaleureux, données fictives · MonProjetPro</span>
+  <span>Démo de la crise : bouton « 🚨 Déclarer une absence », ou valider le congé de Thomas puis « Gérer maintenant ».</span>
+</footer>
+
+<script>
+/* ============================================================
+   MAQUETTE M3 · JS vanilla
+   ============================================================ */
+(function () {
+  "use strict";
+
+  var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var $ = function (sel) { return document.querySelector(sel); };
+  var $$ = function (sel) { return Array.prototype.slice.call(document.querySelectorAll(sel)); };
+  var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, REDUCED ? Math.min(ms, 40) : ms); }); };
+
+  var VETS = {
+    anneso:  { n: "Anne-Sophie",   ini: "AS", c: "var(--vet-anneso)" },
+    annecat: { n: "Anne-Catherine",ini: "AC", c: "var(--vet-annecat)" },
+    manon:   { n: "Manon",         ini: "M",  c: "var(--vet-manon)" },
+    victor:  { n: "Victor",        ini: "V",  c: "var(--vet-victor)" },
+    camille: { n: "Camille",       ini: "C",  c: "var(--vet-camille)" },
+    julie:   { n: "Julie",         ini: "J",  c: "var(--vet-julie)" },
+    thomas:  { n: "Thomas",        ini: "T",  c: "var(--vet-thomas)" }
+  };
+  var TYPE_META = {
+    vacances: { label: "Vacances", cls: "t-vacances" },
+    formation:{ label: "Formation", cls: "t-formation" },
+    sante:    { label: "Santé", cls: "t-sante" },
+    indispo:  { label: "Indisponibilité", cls: "t-indispo" },
+    autre:    { label: "Autre", cls: "t-autre" }
+  };
+
+  /* ---------- Toast + journal ---------- */
+  var toastTimer = null;
+  function toast(msg) {
+    var t = $("#toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 3400);
+  }
+  function journal(text, kind) {
+    var list = $("#journal-list");
+    var e = document.createElement("div");
+    e.className = "journal-entry";
+    var dotClass = kind === "ok" ? "je-dot ok" : (kind === "warn" ? "je-dot warn" : "je-dot");
+    e.innerHTML = '<span class="' + dotClass + '"></span><div><time>Aujourd’hui · ' +
+      new Date().toTimeString().slice(0, 5) + "</time></div>";
+    e.lastChild.appendChild(document.createTextNode(text));
+    list.insertBefore(e, list.firstChild);
+    $("#journal-count").textContent = list.children.length;
+  }
+
+  /* ---------- Onglets ---------- */
+  var TABS = ["conges", "echanges", "depannages"];
+  function showTab(name) {
+    TABS.forEach(function (k) {
+      $("#tab-" + k).hidden = (k !== name);
+      $("#tabbtn-" + k).setAttribute("aria-selected", String(k === name));
+    });
+  }
+  TABS.forEach(function (k) {
+    $("#tabbtn-" + k).addEventListener("click", function () {
+      showTab(k);
+      if (history.replaceState) history.replaceState(null, "", "#" + k);
+    });
+  });
+  if (location.hash && TABS.indexOf(location.hash.slice(1)) >= 0) showTab(location.hash.slice(1));
+
+  /* ---------- Compteurs d'onglets et de sections ---------- */
+  function setCount(el, n) {
+    el.textContent = n;
+    el.classList.toggle("zero", n === 0);
+  }
+  function recount() {
+    var pending = $("#pending-list").querySelectorAll(".row").length;
+    setCount($("#pending-count"), pending);
+    setCount($("#count-conges"), pending);
+    $("#pending-empty").hidden = pending > 0;
+
+    var av = $("#ex-avalider").querySelectorAll(".row").length;
+    var re = $("#ex-recues").querySelectorAll(".row").length;
+    var ou = $("#ex-ouvertes").querySelectorAll(".row").length;
+    var md = $("#ex-mesdemandes").querySelectorAll(".row").length;
+    setCount($("#avalider-count"), av); $("#avalider-empty").hidden = av > 0;
+    setCount($("#recues-count"), re); $("#recues-empty").hidden = re > 0;
+    setCount($("#ouvertes-count"), ou); $("#ouvertes-empty").hidden = ou > 0;
+    setCount($("#mesdem-count"), md); $("#mesdem-empty").hidden = md > 0;
+    setCount($("#count-echanges"), av + re);
+
+    var open = 0;
+    $$("#dep-body .dep-status").forEach(function (s) { if (s.classList.contains("st-ouverte")) open++; });
+    setCount($("#dep-count"), open);
+    setCount($("#count-depannages"), open);
+
+    var visible = 0;
+    $$("#conges-list > li").forEach(function (li) { if (!li.hidden) visible++; });
+    setCount($("#list-count"), visible);
+    $("#conges-empty").hidden = visible > 0;
+    buildResume();
+  }
+
+  /* ---------- Dialogues génériques ---------- */
+  var lastFocus = null;
+  function openDlg(id) {
+    var v = $(id);
+    lastFocus = document.activeElement;
+    v.hidden = false;
+    requestAnimationFrame(function () { v.classList.add("open"); });
+    var btn = v.querySelector(".dlg-close");
+    if (btn) btn.focus();
+  }
+  function closeDlg(v) {
+    if (typeof v === "string") v = $(v);
+    v.classList.remove("open");
+    var done = function () { v.hidden = true; };
+    if (REDUCED) done(); else setTimeout(done, 250);
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  $$(".veil").forEach(function (v) {
+    v.addEventListener("click", function (e) { if (e.target === v) closeDlg(v); });
+    v.querySelectorAll("[data-close]").forEach(function (b) {
+      b.addEventListener("click", function () { closeDlg(v); });
+    });
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    $$(".veil").forEach(function (v) { if (!v.hidden) closeDlg(v); });
+    if (!$("#crise-veil").hidden) closeCrise();
+  });
+
+  function removeRow(rowEl, cb) {
+    var li = rowEl.closest("li") || rowEl;
+    rowEl.classList.add("leaving");
+    setTimeout(function () { li.remove(); recount(); if (cb) cb(); }, REDUCED ? 0 : 360);
+  }
+
+  /* ============================================================
+     CONGÉS · souhaits en attente
+     ============================================================ */
+  var PENDING = {
+    julie: {
+      vet: "julie", type: "vacances", du: "2026-03-09", au: "2026-03-15",
+      label: "du 9 au 15 mars", recap: "<b>Julie</b> · Vacances · du lundi 9 au dimanche 15 mars 2026 · « Semaine au ski avec les enfants. »",
+      conflit: false
+    },
+    thomas: {
+      vet: "thomas", type: "formation", du: "2026-02-20", au: "2026-02-22",
+      label: "du 20 au 22 février", recap: "<b>Thomas</b> · Formation · du vendredi 20 au dimanche 22 février 2026 · « Congrès d’imagerie vétérinaire, Lyon. »",
+      conflit: true
+    },
+    camille: {
+      vet: "camille", type: "indispo", du: "2026-02-18", au: "2026-02-18",
+      label: "du 18 février (après-midi)", recap: "<b>Camille</b> · Indisponibilité, créneau après-midi · mercredi 18 février 2026 · « Rendez-vous médical. »",
+      conflit: false
+    }
+  };
+  var currentReq = null;
+
+  $("#pending-list").addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    var row = btn.closest(".row");
+    currentReq = row.dataset.req;
+    var req = PENDING[currentReq];
+    if (btn.dataset.act === "valider") {
+      $("#valider-recap").innerHTML = req.recap;
+      $("#valider-du").value = req.du;
+      $("#valider-au").value = req.au;
+      $("#valider-warn").hidden = !req.conflit;
+      openDlg("#dlg-valider");
+    } else if (btn.dataset.act === "refuser") {
+      $("#refuser-recap").innerHTML = req.recap;
+      $("#refuser-motif").value = "";
+      openDlg("#dlg-refuser");
+    } else if (btn.dataset.act === "voir-conflit") {
+      conflitContext = "consultation";
+      openDlg("#dlg-conflit");
+    }
+  });
+
+  function frDate(iso) {
+    var mois = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
+    var p = iso.split("-");
+    return parseInt(p[2], 10) + " " + mois[parseInt(p[1], 10) - 1];
+  }
+
+  function addCongeRow(vetKey, typeKey, datesText, statut, motifText, extra) {
+    var v = VETS[vetKey], t = TYPE_META[typeKey];
+    var li = document.createElement("li");
+    li.dataset.vet = vetKey;
+    li.dataset.type = typeKey;
+    var pill = statut === "refuse"
+      ? '<span class="status-pill st-refuse">Refusé</span>'
+      : '<span class="status-pill st-valide">Validé</span>';
+    var delKind = statut === "refuse" ? "souhait" : "valide";
+    li.innerHTML =
+      '<div class="row fresh">' +
+        '<span class="vet-dot" style="--c: ' + v.c + '">' + v.ini + "</span>" +
+        '<div class="row-main">' +
+          '<p class="row-line"><b>' + v.n + '</b><span class="type-chip ' + t.cls + '">' + t.label + (extra || "") + "</span></p>" +
+          '<p class="row-dates">' + datesText + "</p>" +
+          (motifText ? '<p class="row-motif">' + motifText + "</p>" : "") +
+        "</div>" +
+        '<div class="row-side">' + pill +
+          '<div class="row-actions"><button type="button" class="icon-btn" data-del="' + delKind +
+          '" data-name="' + v.n + '" data-dates="' + datesText.split("·")[0].trim() +
+          '" aria-label="Supprimer ce congé de ' + v.n + '">🗑</button></div>' +
+        "</div>" +
+      "</div>";
+    $("#conges-list").insertBefore(li, $("#conges-list").firstChild);
+    applyFilters();
+  }
+
+  var conflitContext = "validation"; /* validation = vient de valider ; consultation = simple aperçu */
+
+  $("#valider-confirm").addEventListener("click", function () {
+    var req = PENDING[currentReq];
+    var du = $("#valider-du").value, au = $("#valider-au").value;
+    var adjusted = (du !== req.du || au !== req.au);
+    var v = VETS[req.vet];
+    var dates = du === au ? "Le " + frDate(du) + " 2026" : "Du " + frDate(du) + " au " + frDate(au) + " 2026";
+    var extra = req.type === "indispo" ? " · après-midi" : "";
+    closeDlg("#dlg-valider");
+    var reqRow = document.querySelector('#pending-list .row[data-req="' + currentReq + '"]');
+    removeRow(reqRow, function () {
+      addCongeRow(req.vet, req.type, dates + " · posé par " + v.n + ", validé à l’instant" + (adjusted ? " (dates ajustées)" : ""), "valide", null, extra);
+      toast("Congé de " + v.n + " validé" + (adjusted ? " avec dates ajustées" : "") + " ✓ Elle est prévenue.");
+      journal("Congé " + TYPE_META[req.type].label.toLowerCase() + " de " + v.n + " validé (" + req.label + ")" + (adjusted ? ", dates ajustées par Anne-Sophie" : "") + ".", "ok");
+      if (req.conflit) {
+        conflitContext = "validation";
+        setTimeout(function () { openDlg("#dlg-conflit"); }, REDUCED ? 0 : 380);
+      }
+    });
+  });
+
+  $("#refuser-confirm").addEventListener("click", function () {
+    var motif = $("#refuser-motif").value.trim();
+    if (!motif) { $("#refuser-motif").focus(); $("#refuser-motif").placeholder = "Le motif est obligatoire pour refuser."; return; }
+    var req = PENDING[currentReq];
+    var v = VETS[req.vet];
+    closeDlg("#dlg-refuser");
+    var reqRow = document.querySelector('#pending-list .row[data-req="' + currentReq + '"]');
+    removeRow(reqRow, function () {
+      addCongeRow(req.vet, req.type, "Demande " + req.label + " · refusée à l’instant", "refuse", "Motif du refus : « " + motif + " »");
+      toast("Demande de " + v.n + " refusée. Le motif lui est envoyé.");
+      journal("Souhait de congé de " + v.n + " refusé (" + req.label + "), motif transmis.", "warn");
+    });
+  });
+
+  $("#conflit-plustard").addEventListener("click", function () {
+    closeDlg("#dlg-conflit");
+    if (conflitContext === "validation") {
+      toast("À réparer : le week-end du 21 et 22 février reste attribué à Thomas.");
+      journal("Conflit non réparé : week-end du 21-22 février toujours attribué à Thomas malgré son congé. À reprendre.", "warn");
+    }
+  });
+  $("#conflit-gerer").addEventListener("click", function () {
+    closeDlg("#dlg-conflit");
+    setTimeout(function () { startCrise("thomas"); }, REDUCED ? 0 : 260);
+  });
+
+  /* ---------- Créer un congé direct ---------- */
+  $("#btn-creer-conge").addEventListener("click", function () {
+    showTab("conges");
+    openDlg("#dlg-creer");
+  });
+  var creerCreneau = "journee";
+  $("#creer-type").addEventListener("change", function () {
+    var isIndispo = this.value === "indispo";
+    $("#creer-creneau-field").hidden = !isIndispo;
+    $("#creer-au-field").style.opacity = isIndispo ? "0.45" : "";
+    $("#creer-au").disabled = isIndispo;
+    if (isIndispo) $("#creer-au").value = $("#creer-du").value;
+  });
+  $("#creer-du").addEventListener("change", function () {
+    if ($("#creer-type").value === "indispo") $("#creer-au").value = this.value;
+  });
+  $$("#creer-creneau-field .seg-creneau button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      $$("#creer-creneau-field .seg-creneau button").forEach(function (x) { x.setAttribute("aria-pressed", "false"); });
+      b.setAttribute("aria-pressed", "true");
+      creerCreneau = b.dataset.creneau;
+    });
+  });
+  $("#creer-confirm").addEventListener("click", function () {
+    var vet = $("#creer-vet").value, type = $("#creer-type").value;
+    var du = $("#creer-du").value, au = $("#creer-au").value;
+    if (!du || (!au && type !== "indispo")) { toast("Choisis les dates du congé."); return; }
+    if (type === "indispo") au = du;
+    var v = VETS[vet];
+    var note = $("#creer-note").value.trim();
+    var creneauLabels = { matin: "matin", "apres-midi": "après-midi", soiree: "soirée", journee: "journée entière" };
+    var extra = type === "indispo" ? " · " + creneauLabels[creerCreneau] : "";
+    var dates = du === au ? "Le " + frDate(du) + " 2026" : "Du " + frDate(du) + " au " + frDate(au) + " 2026";
+    closeDlg("#dlg-creer");
+    addCongeRow(vet, type, dates + " · créé par Anne-Sophie (admin)" + (note ? " : « " + note + " »" : ""), "valide", null, extra);
+    toast("Congé créé pour " + v.n + " ✓ " + (vet === "anneso" ? "" : "Elle est prévenue."));
+    journal("Congé " + TYPE_META[type].label.toLowerCase() + " créé pour " + v.n + " par Anne-Sophie (" + dates.toLowerCase() + ").", "ok");
+    recount();
+  });
+
+  /* ---------- Suppression avec confirmation ---------- */
+  var supprTarget = null;
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-del]");
+    if (!btn) return;
+    supprTarget = btn;
+    var renforce = btn.dataset.del === "valide";
+    $("#suppr-recap").innerHTML = "<b>" + btn.dataset.name + "</b> · congé " + btn.dataset.dates;
+    $("#suppr-danger").hidden = !renforce;
+    $("#suppr-note-souhait").hidden = renforce;
+    $("#suppr-confirm").textContent = renforce ? "Supprimer quand même" : "Supprimer";
+    openDlg("#dlg-suppr");
+  });
+  $("#suppr-confirm").addEventListener("click", function () {
+    if (!supprTarget) return;
+    var renforce = supprTarget.dataset.del === "valide";
+    var name = supprTarget.dataset.name;
+    var row = supprTarget.closest(".row");
+    closeDlg("#dlg-suppr");
+    removeRow(row, function () {
+      toast("Congé de " + name + " supprimé." + (renforce ? " Pense à vérifier le planning sur ces dates." : ""));
+      journal("Congé de " + name + " supprimé par Anne-Sophie" + (renforce ? " (il était validé : dates redevenues disponibles)" : "") + ".", renforce ? "warn" : "");
+    });
+    supprTarget = null;
+  });
+
+  /* ---------- Filtres + résumé par véto ---------- */
+  var filterVet = "tous", filterType = "tous";
+  function applyFilters() {
+    $$("#conges-list > li").forEach(function (li) {
+      var okVet = filterVet === "tous" || li.dataset.vet === filterVet;
+      var okType = filterType === "tous" || li.dataset.type === filterType;
+      li.hidden = !(okVet && okType);
+    });
+    recount();
+  }
+  $$(".vet-filter").forEach(function (b) {
+    b.addEventListener("click", function () {
+      filterVet = b.dataset.vet;
+      $$(".vet-filter").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+      applyFilters();
+    });
+  });
+  $("#filter-type").addEventListener("change", function () {
+    filterType = this.value;
+    applyFilters();
+  });
+  function buildResume() {
+    var counts = {};
+    $$("#conges-list > li").forEach(function (li) {
+      counts[li.dataset.vet] = (counts[li.dataset.vet] || 0) + 1;
+    });
+    var host = $("#resume-vets");
+    host.querySelectorAll(".resume-chip").forEach(function (c) { c.remove(); });
+    Object.keys(VETS).forEach(function (k) {
+      var n = counts[k] || 0;
+      if (n === 0) return;
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "resume-chip";
+      b.style.setProperty("--c", VETS[k].c);
+      b.innerHTML = "<i></i>" + VETS[k].n + " <b>" + n + "</b>";
+      b.title = "Filtrer sur " + VETS[k].n;
+      b.addEventListener("click", function () {
+        filterVet = k;
+        $$(".vet-filter").forEach(function (x) { x.setAttribute("aria-pressed", String(x.dataset.vet === k)); });
+        applyFilters();
+      });
+      host.appendChild(b);
+    });
+  }
+
+  /* ============================================================
+     ÉCHANGES DE GARDES
+     ============================================================ */
+  function addHistoRow(vetKey, lineHtml, subText, statusCls, statusLabel, dotHtml) {
+    var v = VETS[vetKey];
+    var li = document.createElement("li");
+    li.innerHTML =
+      '<div class="row fresh">' +
+        (dotHtml || '<span class="vet-dot" style="--c: ' + v.c + '">' + v.ini + "</span>") +
+        '<div class="row-main"><p class="row-line">' + lineHtml + "</p>" +
+        (subText ? '<p class="row-motif">' + subText + "</p>" : "") + "</div>" +
+        '<div class="row-side"><span class="status-pill ' + statusCls + '">' + statusLabel + "</span></div>" +
+      "</div>";
+    $("#ex-histo").insertBefore(li, $("#ex-histo").firstChild);
+  }
+  function addAValiderRow(vetKey, lineHtml, subText, actions) {
+    var v = VETS[vetKey];
+    var li = document.createElement("li");
+    li.innerHTML =
+      '<div class="row fresh">' +
+        '<span class="vet-dot" style="--c: ' + v.c + '">' + v.ini + "</span>" +
+        '<div class="row-main"><p class="row-line">' + lineHtml + "</p>" +
+        '<p class="row-dates">' + subText + "</p></div>" +
+        '<div class="row-side"><span class="status-pill st-attente-validation">En attente de validation</span>' +
+          '<div class="row-actions">' +
+            '<button type="button" class="btn btn-ghost btn-sm" data-act="refuser-admin">Refuser…</button>' +
+            '<button type="button" class="btn btn-ok btn-sm" data-act="valider-admin">Valider l’échange</button>' +
+          "</div></div>" +
+      "</div>";
+    li.querySelector(".row").dataset.ex = "dyn-" + Date.now();
+    $("#ex-avalider").appendChild(li);
+  }
+
+  var motifMode = null; /* { kind: 'decliner'|'refuser-admin', row, ... } */
+
+  $("#tab-echanges").addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    var row = btn.closest(".row");
+    var act = btn.dataset.act;
+
+    if (act === "valider-admin") {
+      var line = row.querySelector(".row-line").innerHTML;
+      var dot = row.querySelector(".vet-dot").outerHTML;
+      removeRow(row, function () {
+        addHistoRow("julie", line, "Validé par Anne-Sophie à l’instant · planning et agendas mis à jour", "st-applique", "Appliqué ✓", dot);
+        toast("Échange appliqué ✓ Le planning publié et les agendas sont à jour.");
+        journal("Échange validé et appliqué : " + row.querySelector(".row-line").textContent.trim() + ".", "ok");
+      });
+    } else if (act === "refuser-admin" || act === "decliner") {
+      motifMode = { kind: act, row: row };
+      $("#motif-kicker").textContent = act === "decliner" ? "Décliner une proposition" : "Refus admin";
+      $("#motif-title").textContent = act === "decliner" ? "Décliner la proposition" : "Refuser cet échange";
+      $("#motif-label").textContent = act === "decliner"
+        ? "Motif (obligatoire, envoyé au confrère)"
+        : "Motif du refus (obligatoire, envoyé aux deux vétérinaires)";
+      $("#motif-recap").innerHTML = row.querySelector(".row-line").innerHTML;
+      $("#motif-text").value = "";
+      openDlg("#dlg-motif");
+    } else if (act === "accepter") {
+      var lineA = row.querySelector(".row-line").innerHTML.replace("te propose", "cède");
+      removeRow(row, function () {
+        addAValiderRow("thomas", lineA + " à <b>Anne-Sophie</b>", "Acceptée par toi à l’instant · reste ta validation admin", null);
+        toast("Proposition acceptée. Elle attend maintenant la validation admin (toi, avec ta 2e casquette).");
+        journal("Anne-Sophie a accepté la proposition de Thomas (nuit du 9 mars). En attente de validation admin.");
+      });
+    } else if (act === "prendre") {
+      var who = row.dataset.ex === "camille-we" ? "camille" : "manon";
+      var lineP = row.querySelector(".row-line").innerHTML;
+      removeRow(row, function () {
+        addAValiderRow(who, lineP + " → reprise par <b>Anne-Sophie</b>", "Première arrivée, première servie : la garde t’est réservée, reste la validation admin", null);
+        toast("Garde réservée pour toi ✓ Plus personne d’autre ne peut la prendre.");
+        journal("Anne-Sophie reprend la garde ouverte de " + VETS[who].n + ". Verrou posé, en attente de validation admin.");
+      });
+    } else if (act === "annuler") {
+      $("#confirm-kicker").textContent = "Annuler ma demande";
+      $("#confirm-title").textContent = "Annuler cette proposition d’échange ?";
+      $("#confirm-note").textContent = "Camille ne pourra plus l’accepter. Tu pourras toujours reproposer cette garde plus tard.";
+      $("#confirm-yes").textContent = "Annuler la proposition";
+      confirmAction = function () {
+        removeRow(row, function () {
+          addHistoRow("anneso", "Tu proposais ta nuit du <b>jeudi 19 mars</b> à <b>Camille</b>", "Annulée par toi avant sa réponse", "st-annule", "Annulé");
+          toast("Proposition annulée.");
+          journal("Anne-Sophie a annulé sa proposition d’échange (nuit du 19 mars).");
+        });
+      };
+      openDlg("#dlg-confirm");
+    }
+  });
+
+  $("#motif-confirm").addEventListener("click", function () {
+    var motif = $("#motif-text").value.trim();
+    if (!motif) { $("#motif-text").focus(); $("#motif-text").placeholder = "Le motif est obligatoire."; return; }
+    var m = motifMode; motifMode = null;
+    closeDlg("#dlg-motif");
+    if (m.kind === "decliner") {
+      removeRow(m.row, function () {
+        addHistoRow("thomas", "<b>Thomas</b> → <b>Anne-Sophie</b> · nuit du lundi 9 mars", "Décliné par toi : « " + motif + " »", "st-decline", "Décliné");
+        toast("Proposition déclinée. Thomas reçoit ton motif.");
+        journal("Proposition de Thomas déclinée par Anne-Sophie, motif transmis.");
+      });
+    } else {
+      var line = m.row.querySelector(".row-line").innerHTML;
+      var dot = m.row.querySelector(".vet-dot").outerHTML;
+      removeRow(m.row, function () {
+        addHistoRow("julie", line, "Refusé par Anne-Sophie : « " + motif + " »", "st-refuse-admin", "Refusé admin", dot);
+        toast("Échange refusé. Les deux vétérinaires reçoivent le motif.");
+        journal("Échange refusé par l’admin, motif transmis aux deux vétérinaires.", "warn");
+      });
+    }
+  });
+
+  var confirmAction = null;
+  $("#confirm-yes").addEventListener("click", function () {
+    closeDlg("#dlg-confirm");
+    if (confirmAction) { confirmAction(); confirmAction = null; }
+  });
+
+  /* ---------- Proposer un échange ---------- */
+  $("#btn-proposer").addEventListener("click", function () {
+    updateProposerRecap();
+    openDlg("#dlg-proposer");
+  });
+  function updateProposerRecap() {
+    var garde = $("#proposer-garde").value;
+    var dest = document.querySelector('input[name="proposer-dest"]:checked').value;
+    var html;
+    if (dest === "tous") {
+      html = "Tu cèdes <b>" + garde.toLowerCase() + "</b> à <b>toute l’équipe</b> : première arrivée, première servie, puis validation admin.";
+      $("#proposer-cible-zone").hidden = true;
+    } else {
+      var v = VETS[$("#proposer-vet").value].n;
+      var cp = $("#proposer-contrepartie").value;
+      html = "Tu proposes <b>" + garde.toLowerCase() + "</b> à <b>" + v + "</b>" +
+        (cp ? ", en échange de <b>" + cp + "</b>" : ", sans contrepartie") + ".";
+      $("#proposer-cible-zone").hidden = false;
+    }
+    $("#proposer-recap").innerHTML = html;
+  }
+  $$('input[name="proposer-dest"]').forEach(function (r) { r.addEventListener("change", updateProposerRecap); });
+  ["#proposer-garde", "#proposer-vet", "#proposer-contrepartie"].forEach(function (s) {
+    $(s).addEventListener("change", updateProposerRecap);
+  });
+  $("#proposer-confirm").addEventListener("click", function () {
+    var garde = $("#proposer-garde").value;
+    var dest = document.querySelector('input[name="proposer-dest"]:checked').value;
+    closeDlg("#dlg-proposer");
+    var li = document.createElement("li");
+    if (dest === "tous") {
+      li.innerHTML =
+        '<div class="row fresh">' +
+          '<span class="vet-dot" style="--c: var(--vet-anneso)">AS</span>' +
+          '<div class="row-main"><p class="row-line"><b>Anne-Sophie</b> cède sa garde : <b>' + garde.toLowerCase() + "</b></p>" +
+          '<p class="row-dates">Ouverte à toute l’équipe à l’instant · première arrivée, première servie</p></div>' +
+          '<div class="row-side"><span class="status-pill st-attente-confrere">En attente du confrère</span></div>' +
+        "</div>";
+      $("#ex-ouvertes").appendChild(li);
+      toast("Garde ouverte à l’équipe ✓ Chacun reçoit une notification.");
+      journal("Anne-Sophie ouvre sa garde (" + garde.toLowerCase() + ") à toute l’équipe.");
+    } else {
+      var vKey = $("#proposer-vet").value;
+      var cp = $("#proposer-contrepartie").value;
+      li.innerHTML =
+        '<div class="row fresh" data-ex="dyn">' +
+          '<span class="vet-dot" style="--c: var(--vet-anneso)">AS</span>' +
+          '<div class="row-main"><p class="row-line">Tu proposes ta <b>' + garde.toLowerCase() + "</b> à <b>" + VETS[vKey].n + "</b></p>" +
+          '<p class="row-dates">' + (cp ? "Contrepartie demandée : " + cp : "Sans contrepartie") + " · envoyée à l’instant</p></div>" +
+          '<div class="row-side"><span class="status-pill st-attente-confrere">En attente du confrère</span>' +
+            '<div class="row-actions"><button type="button" class="btn btn-ghost btn-sm" data-act="annuler">Annuler</button></div></div>' +
+        "</div>";
+      $("#ex-mesdemandes").appendChild(li);
+      toast("Proposition envoyée à " + VETS[vKey].n + " ✓");
+      journal("Anne-Sophie propose sa garde (" + garde.toLowerCase() + ") à " + VETS[vKey].n + ".");
+    }
+    recount();
+  });
+
+  /* ============================================================
+     DÉPANNAGES / COMPENSATIONS
+     ============================================================ */
+  function depButtons(status) {
+    if (status === "ouverte") {
+      return '<button type="button" data-dep="compenser">Marquer compensée</button>' +
+             '<button type="button" data-dep="annuler">Annuler la dette</button>';
+    }
+    return '<button type="button" data-dep="rouvrir">Rouvrir</button>';
+  }
+  $("#dep-body").addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-dep]");
+    if (!btn) return;
+    var tr = btn.closest("tr");
+    var pill = tr.querySelector(".dep-status");
+    var actions = tr.querySelector(".dep-actions");
+    var who = tr.children[2].textContent.trim();
+    var act = btn.dataset.dep;
+    function setStatus(cls, label, status) {
+      pill.className = "status-pill dep-status " + cls;
+      pill.textContent = label;
+      actions.innerHTML = depButtons(status);
+      recount();
+    }
+    if (act === "compenser") {
+      setStatus("st-compensee", "Compensée aujourd’hui", "done");
+      toast("Dette marquée compensée ✓");
+      journal("Dette de dépannage envers " + who + " marquée compensée.", "ok");
+    } else if (act === "annuler") {
+      $("#confirm-kicker").textContent = "Dépannages";
+      $("#confirm-title").textContent = "Annuler cette dette ?";
+      $("#confirm-note").textContent = "La dette envers " + who + " sera passée en « geste offert » : plus rien à rendre. Réversible avec « Rouvrir ».";
+      $("#confirm-yes").textContent = "Annuler la dette";
+      confirmAction = function () {
+        setStatus("st-dette-annulee", "Annulée (geste offert)", "done");
+        toast("Dette annulée : geste offert.");
+        journal("Dette de dépannage envers " + who + " annulée (geste offert).");
+      };
+      openDlg("#dlg-confirm");
+    } else if (act === "rouvrir") {
+      setStatus("st-ouverte", "Dette ouverte", "ouverte");
+      toast("Dette rouverte.");
+      journal("Dette de dépannage envers " + who + " rouverte.", "warn");
+    }
+  });
+
+  function addDepRow(creneau, sousTitre, absentKey, depanneurKey, motif) {
+    var a = VETS[absentKey], d = VETS[depanneurKey];
+    var tr = document.createElement("tr");
+    tr.innerHTML =
+      "<td>" + creneau + "<small>" + sousTitre + "</small></td>" +
+      '<td><span class="dep-vet"><i style="--c: ' + a.c + '"></i>' + a.n + "</span></td>" +
+      '<td><span class="dep-vet"><i style="--c: ' + d.c + '"></i>' + d.n + "</span></td>" +
+      "<td>" + motif + "</td>" +
+      '<td><span class="status-pill st-ouverte dep-status">Dette ouverte</span></td>' +
+      '<td><div class="dep-actions">' + depButtons("ouverte") + "</div></td>";
+    $("#dep-body").insertBefore(tr, $("#dep-body").firstChild);
+  }
+
+  /* ============================================================
+     LA CRISE MENÉE PAR FILOU (conversation scriptée)
+     ============================================================ */
+  var criseConvo = $("#crise-convo");
+  var criseRun = 0;
+  var criseInputCb = null;
+
+  function criseScroll() { criseConvo.scrollTop = criseConvo.scrollHeight; }
+  function clearCrise() { criseConvo.innerHTML = ""; }
+
+  function makeBubble(kind, who) {
+    var b = document.createElement("div");
+    b.className = "bubble " + kind;
+    if (who) {
+      var w = document.createElement("span");
+      w.className = "who";
+      w.textContent = who;
+      b.appendChild(w);
+    }
+    var body = document.createElement("span");
+    b.appendChild(body);
+    criseConvo.appendChild(b);
+    criseScroll();
+    return { bubble: b, body: body };
+  }
+  async function typeInto(el, text, id) {
+    if (REDUCED) { el.textContent = text; criseScroll(); return; }
+    var caret = document.createElement("span");
+    caret.className = "type-caret";
+    el.after(caret);
+    for (var i = 0; i < text.length; i++) {
+      if (id !== criseRun) { caret.remove(); return; }
+      el.textContent += text[i];
+      if (i % 4 === 0) criseScroll();
+      await sleep(13);
+    }
+    caret.remove();
+    criseScroll();
+  }
+  async function filouSays(text, id) {
+    var r = makeBubble("filou", "🦊 Filou");
+    await typeInto(r.body, text, id);
+    return r;
+  }
+  function userSays(text) {
+    var r = makeBubble("user", "Anne-Sophie");
+    r.body.textContent = text;
+    criseScroll();
+  }
+  function noteSays(text) {
+    var r = makeBubble("note");
+    r.body.textContent = text;
+    criseScroll();
+  }
+  async function filouThinks(ms, id) {
+    var r = makeBubble("filou", "🦊 Filou");
+    r.body.innerHTML = '<span class="thinking"><i></i><i></i><i></i></span>';
+    criseScroll();
+    await sleep(REDUCED ? 60 : ms);
+    if (id !== criseRun) return null;
+    r.bubble.remove();
+    return true;
+  }
+  /* Attend un clic parmi des boutons ajoutés à un conteneur. */
+  function waitChoice(host, buttons) {
+    return new Promise(function (resolve) {
+      var zone = document.createElement("div");
+      zone.className = "crise-actions";
+      buttons.forEach(function (def) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "btn " + (def.cls || "btn-valider btn-accent");
+        b.textContent = def.label;
+        b.addEventListener("click", function () {
+          zone.querySelectorAll("button").forEach(function (x) { x.disabled = true; });
+          b.classList.add("pressed");
+          resolve(def.value);
+        });
+        zone.appendChild(b);
+      });
+      host.appendChild(zone);
+      criseScroll();
+    });
+  }
+
+  function vetDotHtml(key, size) {
+    var v = VETS[key];
+    return '<span class="vet-dot" style="--c: ' + v.c + '">' + v.ini + "</span>";
+  }
+
+  /* Carte de choix pour UN créneau : recommandé + alternatives + autres options. */
+  function choiceCard(garde) {
+    return new Promise(function (resolve) {
+      var host = makeBubble("filou", "🦊 Filou").bubble;
+      host.querySelector("span:last-child").remove();
+      var reco = document.createElement("div");
+      reco.className = "reco-card";
+      var recoHtml;
+      if (garde.recoVol) {
+        recoHtml =
+          '<span class="reco-tag">Ma recommandation</span>' +
+          '<div class="reco-line"><b>📨 Demander aux volontaires</b></div>' +
+          '<p class="reco-why">' + garde.recoWhy + "</p>" +
+          '<button type="button" class="btn btn-accent btn-sm" data-choice="vol">Envoyer l’appel aux volontaires</button>';
+      } else {
+        recoHtml =
+          '<span class="reco-tag">Le plus équitable</span>' +
+          '<div class="reco-line">' + vetDotHtml(garde.reco) + "<b>" + VETS[garde.reco].n + "</b></div>" +
+          '<p class="reco-why">' + garde.recoWhy + "</p>" +
+          '<button type="button" class="btn btn-accent btn-sm" data-choice="vet" data-vet="' + garde.reco + '">Confier à ' + VETS[garde.reco].n + " ✓</button>";
+      }
+      reco.innerHTML = recoHtml;
+      host.appendChild(reco);
+
+      if (garde.alts && garde.alts.length) {
+        var det = document.createElement("details");
+        det.className = "alts";
+        var sum = document.createElement("summary");
+        sum.textContent = "Voir les autres possibilités (" + garde.alts.length + ")";
+        det.appendChild(sum);
+        garde.alts.forEach(function (a) {
+          var item = document.createElement("div");
+          item.className = "alt-item";
+          item.innerHTML = vetDotHtml(a.v) + "<b>" + VETS[a.v].n + "</b>" +
+            '<span class="alt-warn">⚠ ' + a.warn + "</span>" +
+            '<button type="button" class="btn btn-ghost btn-sm" data-choice="vet" data-vet="' + a.v + '">Choisir</button>';
+          det.appendChild(item);
+        });
+        det.addEventListener("toggle", criseScroll);
+        host.appendChild(det);
+      }
+
+      var opts = document.createElement("div");
+      opts.className = "other-options";
+      var optsHtml = "";
+      if (!garde.recoVol) {
+        optsHtml += '<button type="button" class="btn btn-outline btn-sm" data-choice="vol">📨 Demander aux volontaires</button>';
+      }
+      optsHtml += '<button type="button" class="btn btn-ghost btn-sm" data-choice="skip">Ne pas réparer maintenant</button>';
+      optsHtml += '<p class="opt-hint">« Volontaires » : Filou envoie un e-mail à l’équipe disponible avec un lien « je prends ce créneau ». Première arrivée, première servie, et tu es prévenue aussitôt.</p>';
+      opts.innerHTML = optsHtml;
+      host.appendChild(opts);
+      criseScroll();
+
+      host.addEventListener("click", function onPick(e) {
+        var b = e.target.closest("button[data-choice]");
+        if (!b) return;
+        host.querySelectorAll("button[data-choice]").forEach(function (x) { x.disabled = true; });
+        b.classList.add("pressed");
+        host.removeEventListener("click", onPick);
+        if (b.dataset.choice === "vet") resolve({ kind: "vet", v: b.dataset.vet });
+        else if (b.dataset.choice === "vol") resolve({ kind: "vol" });
+        else resolve({ kind: "skip" });
+      });
+    });
+  }
+
+  var SCENARIOS = {
+    manon: {
+      absentKey: "manon",
+      congeLabel: "congé « santé » du 12 au 15 février",
+      reformulation: "Je récapitule avant de toucher à quoi que ce soit : Manon, absente du jeudi 12 au dimanche 15 février inclus. Je crée un congé « santé » sur ces dates, et on répare le planning ensemble, créneau par créneau. C’est bien ça ?",
+      analyse: "Je regarde le planning publié… 3 gardes de Manon tombent sur ces dates. On les prend une par une, tu gardes la main à chaque fois.",
+      gardes: [
+        {
+          titre: "Nuit du jeudi 12 février", sous: "garde de semaine",
+          intro: "Créneau 1 sur 3 : la nuit du jeudi 12 février.",
+          reco: "victor",
+          recoWhy: "Victor est disponible, il a une nuit de retard sur la moyenne de la période, et il ne consulte pas le vendredi matin : c’est le choix le plus équitable.",
+          alts: [
+            { v: "julie", warn: "disponible, mais ce serait son 3e créneau de la semaine" },
+            { v: "thomas", warn: "1er de garde le week-end qui suit : il enchaînerait 3 jours" },
+            { v: "annecat", warn: "dernier recours, à réserver aux impasses" }
+          ],
+          depSous: "garde de semaine"
+        },
+        {
+          titre: "Vendredi 13 février au soir", sous: "soir lié au week-end",
+          intro: "Créneau 2 sur 3 : le vendredi 13 au soir, lié au week-end.",
+          recoVol: true,
+          recoWhy: "Là, personne ne sort du lot : Julie et Thomas sont déjà chargés cette semaine, et Camille reprend le week-end juste après (créneau suivant). Le plus juste est de demander qui veut dépanner.",
+          alts: [
+            { v: "julie", warn: "possible, mais 3e créneau de la semaine" },
+            { v: "annecat", warn: "dernier recours, à réserver aux impasses" }
+          ],
+          depSous: "soir lié au week-end"
+        },
+        {
+          titre: "Week-end du 14 et 15 février", sous: "2nde de garde, binôme avec Thomas",
+          intro: "Créneau 3 sur 3 : le week-end du 14 et 15, où Manon était 2nde de garde avec Thomas.",
+          reco: "camille",
+          recoWhy: "Camille est disponible, elle a un week-end de retard sur la période, et aucune garde la semaine suivante.",
+          alts: [
+            { v: "julie", warn: "ce serait son 2e week-end du mois" },
+            { v: "victor", warn: "si tu lui as déjà confié la nuit du 12, ça ferait beaucoup" }
+          ],
+          depSous: "2nde de garde"
+        }
+      ],
+      onApply: function (choices) {
+        journal("Absence de Manon (12 → 15 février) traitée avec Filou : congé « santé » créé.", "ok");
+        addCongeRow("manon", "sante", "Du 12 au 15 février 2026 · créé pendant la gestion d’absence avec Filou", "valide", null);
+        applyCrisisChoices(this.gardes, choices, "manon");
+      }
+    },
+    thomas: {
+      absentKey: "thomas",
+      congeLabel: "congé formation du 20 au 22 février (déjà validé)",
+      skipAsk: true,
+      opening: "On vient du congé de Thomas : formation du 20 au 22 février, que tu viens de valider. Une garde publiée est touchée. On la répare ensemble ?",
+      reformulation: "Je récapitule : Thomas est en formation du vendredi 20 au dimanche 22 février, son congé est validé, et il reste 1 garde publiée à réattribuer sur ces dates. C’est bien ça ?",
+      analyse: "Voilà ce que le planning publié attendait de Thomas sur ces dates :",
+      gardes: [
+        {
+          titre: "Week-end du 21 et 22 février", sous: "1er de garde, binôme avec Julie (2nde)",
+          intro: "Créneau 1 sur 1 : le week-end du 21 et 22 février, où Thomas est 1er de garde avec Julie.",
+          reco: "manon",
+          recoWhy: "Manon est disponible, et elle a un 1er de garde de retard sur la période : l’avantage financier tourne, c’est le choix le plus équitable.",
+          alts: [
+            { v: "camille", warn: "disponible, mais elle enchaînerait deux week-ends" },
+            { v: "victor", warn: "déjà 2 nuits cette semaine-là" },
+            { v: "annecat", warn: "dernier recours, à réserver aux impasses" }
+          ],
+          depSous: "1er de garde du week-end"
+        }
+      ],
+      onApply: function (choices) {
+        journal("Conflit du congé de Thomas (20 → 22 février) réparé avec Filou.", "ok");
+        applyCrisisChoices(this.gardes, choices, "thomas");
+      }
+    }
+  };
+
+  function applyCrisisChoices(gardes, choices, absentKey) {
+    choices.forEach(function (c, i) {
+      var g = gardes[i];
+      if (c.kind === "vet") {
+        addDepRow(g.titre, g.depSous, absentKey, c.v, "Absence gérée avec Filou");
+        journal(g.titre + " réattribuée à " + VETS[c.v].n + " (dette de dépannage ouverte).", "ok");
+      } else if (c.kind === "vol") {
+        journal(g.titre + " : appel aux volontaires envoyé à l’équipe (première arrivée, première servie).");
+      } else {
+        journal(g.titre + " : laissée non réparée, à reprendre.", "warn");
+      }
+    });
+    recount();
+  }
+
+  function openCrise() {
+    var v = $("#crise-veil");
+    lastFocus = document.activeElement;
+    v.hidden = false;
+    requestAnimationFrame(function () { v.classList.add("open"); });
+    $("#crise-close").focus();
+  }
+  function closeCrise() {
+    criseRun++;
+    var v = $("#crise-veil");
+    v.classList.remove("open");
+    var done = function () { v.hidden = true; };
+    if (REDUCED) done(); else setTimeout(done, 280);
+    criseInputCb = null;
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  $("#crise-close").addEventListener("click", closeCrise);
+  $("#crise-veil").addEventListener("click", function (e) { if (e.target === this) closeCrise(); });
+  $("#crise-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var txt = $("#crise-text").value.trim();
+    if (!txt) return;
+    $("#crise-text").value = "";
+    if (criseInputCb) { var cb = criseInputCb; criseInputCb = null; cb(txt); }
+  });
+
+  async function startCrise(key) {
+    var sc = SCENARIOS[key];
+    var id = ++criseRun;
+    clearCrise();
+    openCrise();
+    document.body.classList.remove("filou-out");
+    await sleep(350);
+    if (id !== criseRun) return;
+
+    if (!sc.skipAsk) {
+      await filouSays("Aïe, un imprévu… Dis-moi qui est absent, et sur quelles dates : je m’occupe du reste.", id);
+      var asked = await askWho(id);
+      if (id !== criseRun) return;
+      if (!asked) return;
+    } else {
+      await filouSays(sc.opening, id);
+      await sleep(300);
+    }
+
+    /* Reformulation → validation */
+    var okReform = false;
+    while (!okReform) {
+      var rb = makeBubble("reformulation", "🦊 Filou · je reformule");
+      await typeInto(rb.body, sc.reformulation, id);
+      if (id !== criseRun) return;
+      var rep = await waitChoice(rb.bubble, [
+        { label: "C’est bien ça", value: "ok", cls: "btn-accent" },
+        { label: "Corriger", value: "corriger", cls: "btn-ghost" }
+      ]);
+      if (id !== criseRun) return;
+      if (rep === "ok") { okReform = true; }
+      else {
+        await filouSays("Pas de souci, redis-moi ça avec tes mots, je reprends de zéro.", id);
+        if (sc.skipAsk) { await sleep(400); continue; }
+        var again = await askWho(id);
+        if (id !== criseRun || !again) return;
+      }
+    }
+
+    /* Analyse d'impact */
+    await filouThinks(1100, id);
+    if (id !== criseRun) return;
+    var ana = await filouSays(sc.analyse, id);
+    if (id !== criseRun) return;
+    var ul = document.createElement("ul");
+    ul.className = "impact-list";
+    sc.gardes.forEach(function (g, i) {
+      var li = document.createElement("li");
+      li.innerHTML = '<span class="num">' + (i + 1) + "</span><span><b>" + g.titre + "</b><small>" + g.sous + "</small></span>";
+      ul.appendChild(li);
+    });
+    ana.bubble.appendChild(ul);
+    criseScroll();
+    await sleep(600);
+
+    /* Créneau par créneau */
+    var choices = [];
+    for (var i = 0; i < sc.gardes.length; i++) {
+      if (id !== criseRun) return;
+      var g = sc.gardes[i];
+      await filouSays(g.intro, id);
+      var choice = await choiceCard(g);
+      if (id !== criseRun) return;
+      choices.push(choice);
+      if (choice.kind === "vet") {
+        userSays("Confie-la à " + VETS[choice.v].n + ".");
+        await filouSays("C’est noté : " + VETS[choice.v].n + " prend ce créneau. J’ouvre une dette de dépannage en sa faveur, visible dans l’onglet Dépannages.", id);
+      } else if (choice.kind === "vol") {
+        userSays("Demande aux volontaires.");
+        await filouSays("Je prépare l’e-mail aux vétérinaires disponibles, avec un lien « je prends ce créneau ». Première arrivée, première servie : tu seras prévenue dès qu’on a une volontaire. Il partira quand tu valideras le récap final.", id);
+      } else {
+        userSays("Ne répare pas celle-ci pour l’instant.");
+        await filouSays("Entendu, je n’y touche pas. Je te la rappellerai tant qu’elle n’est pas couverte.", id);
+      }
+      await sleep(350);
+    }
+
+    /* Récap final honnête → validation → application */
+    if (id !== criseRun) return;
+    var nVet = choices.filter(function (c) { return c.kind === "vet"; }).length;
+    var nVol = choices.filter(function (c) { return c.kind === "vol"; }).length;
+    var nSkip = choices.filter(function (c) { return c.kind === "skip"; }).length;
+    var phraseBits = [];
+    if (nVet) phraseBits.push(nVet + (nVet > 1 ? " réparées" : " réparée"));
+    if (nVol) phraseBits.push(nVol + " en attente de volontaire");
+    if (nSkip) phraseBits.push(nSkip + (nSkip > 1 ? " non réparées" : " non réparée"));
+    var recap = makeBubble("reformulation", "🦊 Filou · récap final");
+    await typeInto(recap.body, "Voilà où on en est, honnêtement : " + phraseBits.join(", ") + ". Rien n’est appliqué tant que tu ne valides pas.", id);
+    if (id !== criseRun) return;
+    var ulR = document.createElement("ul");
+    ulR.className = "recap-final";
+    sc.gardes.forEach(function (g, i) {
+      var c = choices[i];
+      var li = document.createElement("li");
+      if (c.kind === "vet") {
+        li.innerHTML = '<span class="r-ico">✓</span><span><b>' + g.titre + "</b> → " + VETS[c.v].n + " (dette de dépannage ouverte)</span>";
+      } else if (c.kind === "vol") {
+        li.innerHTML = '<span class="r-ico">⏳</span><span><b>' + g.titre + "</b> → e-mail aux volontaires, première arrivée première servie</span>";
+      } else {
+        li.innerHTML = '<span class="r-ico">○</span><span><b>' + g.titre + "</b> → laissée en l’état, à reprendre</span>";
+      }
+      ulR.appendChild(li);
+    });
+    var liC = document.createElement("li");
+    liC.innerHTML = '<span class="r-ico">📄</span><span>' +
+      (key === "manon" ? "Congé « santé » créé pour Manon, du 12 au 15 février." : "Congé formation de Thomas déjà validé (20 → 22 février).") +
+      "</span>";
+    ulR.appendChild(liC);
+    recap.bubble.appendChild(ulR);
+    criseScroll();
+    var final = await waitChoice(recap.bubble, [
+      { label: "Appliquer tout ça", value: "ok", cls: "btn-accent" },
+      { label: "Corriger", value: "corriger", cls: "btn-ghost" }
+    ]);
+    if (id !== criseRun) return;
+    if (final === "corriger") {
+      await filouSays("On reprend les créneaux un par un, rien n’a été appliqué.", id);
+      return startCriseFrom(sc, key, id);
+    }
+    noteSays("✓ Appliqué · tracé au journal de Filou");
+    sc.onApply(choices);
+    var avatarHost = $("#crise-avatar");
+    avatarHost.src = "../fox-5.png";
+    await filouSays("C’est fait. Le planning est à jour" + (nVol ? ", l’e-mail aux volontaires est parti" : "") + ", les agendas suivent, et tout est consigné au journal. " + (key === "manon" ? "Bon rétablissement à Manon." : "Bonne formation à Thomas."), id);
+    var closer = makeBubble("filou", "");
+    closer.bubble.classList.remove("filou");
+    closer.bubble.style.alignSelf = "center";
+    closer.bubble.style.background = "transparent";
+    closer.bubble.style.padding = "0";
+    var end = await waitChoice(closer.bubble, [{ label: "Fermer", value: "close", cls: "btn-ghost" }]);
+    if (end === "close") { closeCrise(); avatarHost.src = "../fox-2.png"; toast("Absence gérée ✓ Retrouve le détail dans le journal de Filou et l’onglet Dépannages."); }
+  }
+
+  /* Relance la boucle créneau par créneau après un « Corriger » du récap. */
+  async function startCriseFrom(sc, key, id) {
+    var choices = [];
+    for (var i = 0; i < sc.gardes.length; i++) {
+      if (id !== criseRun) return;
+      var g = sc.gardes[i];
+      await filouSays(g.intro, id);
+      var choice = await choiceCard(g);
+      if (id !== criseRun) return;
+      choices.push(choice);
+      await sleep(250);
+    }
+    /* Récap version courte après correction */
+    var nVet = choices.filter(function (c) { return c.kind === "vet"; }).length;
+    var nVol = choices.filter(function (c) { return c.kind === "vol"; }).length;
+    var recap = makeBubble("reformulation", "🦊 Filou · récap corrigé");
+    await typeInto(recap.body, "Nouveau récap : " + nVet + " réparée(s), " + nVol + " en attente de volontaire. J’applique ?", id);
+    var final = await waitChoice(recap.bubble, [
+      { label: "Appliquer tout ça", value: "ok", cls: "btn-accent" },
+      { label: "Fermer sans appliquer", value: "annuler", cls: "btn-ghost" }
+    ]);
+    if (final === "ok") {
+      noteSays("✓ Appliqué · tracé au journal de Filou");
+      sc.onApply(choices);
+      await filouSays("C’est fait, tout est consigné au journal.", id);
+    }
+    closeCrise();
+  }
+
+  /* Étape « qui est absent ? » : puce guidée + saisie libre honnête. */
+  function askWho(id) {
+    return new Promise(function (resolve) {
+      var host = makeBubble("filou", "");
+      host.bubble.classList.remove("filou");
+      host.bubble.style.alignSelf = "stretch";
+      host.bubble.style.maxWidth = "100%";
+      host.bubble.style.background = "transparent";
+      host.bubble.style.border = "none";
+      host.bubble.style.padding = "0";
+      var chips = document.createElement("div");
+      chips.className = "chips-inline";
+      var chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "chip";
+      chip.textContent = "« Manon est malade, du 12 au 15 février »";
+      chips.appendChild(chip);
+      host.bubble.appendChild(chips);
+      criseScroll();
+      var done = false;
+      chip.addEventListener("click", function () {
+        if (done) return; done = true;
+        chip.disabled = true;
+        criseInputCb = null;
+        userSays("Manon est malade, du 12 au 15 février.");
+        resolve(true);
+      });
+      var freeInput = function (txt) {
+        if (done || id !== criseRun) return;
+        userSays(txt);
+        filouSays("Dans cette maquette, je sais rejouer l’exemple de Manon : clique sur la puce ci-dessus. Dans la vraie application, tu peux me dire n’importe qui, n’importe quelles dates.", id).then(function () {
+          if (!done && id === criseRun) criseInputCb = freeInput; /* on remet l'écoute */
+        });
+      };
+      criseInputCb = freeInput;
+    });
+  }
+
+  $("#btn-declarer-absence").addEventListener("click", function () { startCrise("manon"); });
+
+  /* ============================================================
+     TERRIER + PANNEAU DISCRET (Filou renseigne)
+     ============================================================ */
+  $("#terrier").addEventListener("click", function () {
+    document.body.classList.add("filou-out");
+    $("#panel-text").focus();
+  });
+  $("#panel-reduce").addEventListener("click", function () {
+    document.body.classList.remove("filou-out");
+  });
+  var AIDE = [
+    { k: ["conge", "congé", "poser"], r: "Pour poser un congé : chaque vétérinaire le fait depuis son espace (5 types : vacances, formation, santé, indisponibilité d’un jour, autre). Toi, en admin, tu peux aussi créer un congé direct avec le bouton « + Créer un congé » en haut : il est validé d’office." },
+    { k: ["echange", "échange", "garde"], r: "Un échange suit toujours le même cycle : proposition (à un confrère précis ou à toute l’équipe) → acceptation → ta validation admin → application au planning et aux agendas. À chaque étape, on peut décliner ou annuler, toujours avec un motif." },
+    { k: ["absence", "malade", "crise"], r: "Pour un imprévu (maladie, urgence), clique sur « 🚨 Déclarer une absence » : je m’occupe de tout, créneau par créneau, et rien ne s’applique sans ta validation." },
+    { k: ["dette", "depannage", "dépannage", "compens"], r: "L’onglet Dépannages liste qui a dépanné qui. Chaque dette reste « ouverte » jusqu’à ce que tu la marques compensée, ou que tu l’annules (geste offert)." }
+  ];
+  $("#panel-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var txt = $("#panel-text").value.trim();
+    if (!txt) return;
+    $("#panel-text").value = "";
+    var scroll = $("#panel-scroll");
+    var u = document.createElement("div");
+    u.className = "bubble user";
+    u.innerHTML = '<span class="who">Anne-Sophie</span>';
+    u.appendChild(document.createTextNode(txt));
+    scroll.appendChild(u);
+    var low = txt.toLowerCase();
+    var found = null;
+    AIDE.forEach(function (a) {
+      if (found) return;
+      a.k.forEach(function (kw) { if (low.indexOf(kw) >= 0) found = a.r; });
+    });
+    var f = document.createElement("div");
+    f.className = "bubble filou";
+    f.innerHTML = '<span class="who">🦊 Filou</span>';
+    f.appendChild(document.createTextNode(found ||
+      "Bonne question ! Dans cette maquette je réponds surtout sur les congés, les échanges, les absences et les dépannages. Et si je ne sais vraiment pas, je le dis franchement et je te mets en relation avec MonProjetPro."));
+    scroll.appendChild(f);
+    scroll.scrollTop = scroll.scrollHeight;
+  });
+
+  /* ---------- init ---------- */
+  updateProposerRecap();
+  recount();
+})();
+</script>
+</body>
+</html>

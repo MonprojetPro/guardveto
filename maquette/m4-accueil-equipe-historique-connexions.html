@@ -1,0 +1,2865 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GuardVeto · M4 — Accueil, Équipe, Historique &amp; Connexions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700;800&family=Noto+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   MAQUETTE M4 · GUARDVETO — Terrier chaleureux
+   4 sections : Accueil jour-1 retouché (roue seule + pop-up),
+   Équipe, Historique & compteurs enrichi, Connexions.
+   100 % autonome (file://), vanilla JS, données fictives.
+   ============================================================ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --font-display: "Figtree", "Segoe UI Variable Display", "Trebuchet MS", sans-serif;
+  --font-body: "Noto Sans", "Segoe UI", Verdana, sans-serif;
+  /* Couleurs des vétérinaires : le langage visuel de l'équipe. */
+  --vet-anneso:  #3B6FD1;
+  --vet-annecat: #8153C7;
+  --vet-manon:   #B93A72;
+  --vet-victor:  #0B7D6C;
+  --vet-camille: #55700F;
+  --vet-julie:   #A0522D;
+  --vet-thomas:  #4B5D73;
+  --topbar-h: 118px;
+
+  /* ---- Terrier chaleureux ---- */
+  --bg:            #F6EEDF;
+  --bg-deep:       #EFE2CB;
+  --surface:       #FFFCF4;
+  --surface-2:     #F6EBD6;
+  --text:          #3A2A1C;
+  --muted:         #7C6A55;
+  --soft:          #A08D75;
+  --border:        #E6D7BB;
+  --border-strong: #D8C4A1;
+  --accent:        #C7530F;
+  --accent-ink:    #AC4508;
+  --accent-soft:   rgba(224, 122, 47, 0.13);
+  --accent-glow:   rgba(230, 126, 34, 0.28);
+  --ok:            #3E7A2E;
+  --ok-soft:       rgba(90, 150, 60, 0.14);
+  --warn:          #9A6200;
+  --warn-soft:     rgba(196, 138, 20, 0.16);
+  --bad:           #B23A2A;
+  --bad-soft:      rgba(178, 58, 42, 0.13);
+  --bubble-filou:  #FBF3E2;
+  --bubble-user:   #EFE0C4;
+  --grid-we:       rgba(199, 83, 15, 0.07);
+  --r-lg: 26px; --r-md: 18px; --r-sm: 12px;
+  --shadow-card:  0 10px 30px rgba(140, 84, 24, 0.10), 0 2px 6px rgba(140, 84, 24, 0.06);
+  --shadow-panel: 0 24px 60px rgba(120, 70, 18, 0.20), 0 4px 12px rgba(120, 70, 18, 0.10);
+  --topbar-bg: rgba(246, 238, 223, 0.90);
+  --blob1: rgba(242, 158, 74, 0.55); --blob2: rgba(252, 208, 138, 0.50);
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  padding-top: var(--topbar-h);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, h4, .display { font-family: var(--font-display); }
+button { font-family: var(--font-body); cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+img { display: block; }
+input, select { font-family: var(--font-body); color: var(--text); }
+
+/* ============================================================
+   BARRE COMMUNE DE LA GRANDE MAQUETTE + sous-onglets M4
+   ============================================================ */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0;
+  z-index: 100;
+  background: var(--topbar-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-row {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 8px 18px;
+  padding: 10px clamp(16px, 4vw, 40px) 8px;
+}
+.brand {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--font-display);
+  font-weight: 700; font-size: 1rem;
+}
+.brand img { width: 34px; height: 34px; object-fit: contain; }
+.brand small {
+  display: block;
+  font-family: var(--font-body);
+  font-weight: 500; font-size: 0.66rem;
+  color: var(--muted); letter-spacing: 0.10em;
+  text-transform: uppercase;
+}
+.mnav {
+  margin-left: auto;
+  display: flex; flex-wrap: wrap; gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px;
+}
+.mnav a {
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 0.8rem; font-weight: 600;
+  padding: 8px 13px; border-radius: 999px;
+  min-height: 36px; display: inline-flex; align-items: center;
+  white-space: nowrap;
+}
+.mnav a:hover { color: var(--text); background: var(--surface-2); }
+.mnav a[aria-current="page"] {
+  background: var(--accent); color: #fff;
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+.subtabs {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 0 clamp(16px, 4vw, 40px) 10px;
+}
+.subtabs button {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.82rem; font-weight: 600;
+  padding: 8px 16px; border-radius: 999px;
+  min-height: 38px;
+}
+.subtabs button:hover { color: var(--text); border-color: var(--border-strong); }
+.subtabs button[aria-selected="true"] {
+  background: var(--accent-soft); color: var(--accent-ink);
+  border-color: var(--border-strong); font-weight: 700;
+}
+
+/* ============================================================
+   STRUCTURE COMMUNE
+   ============================================================ */
+.section { display: none; }
+.section.active { display: block; animation: screenIn .5s ease both; }
+@keyframes screenIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+.shell { max-width: 1180px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 40px) 80px; }
+.section-head { margin: 42px 0 20px; max-width: 64ch; }
+.section-kicker {
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 8px;
+}
+.section-head h2 { font-size: clamp(1.3rem, 2.4vw, 1.65rem); font-weight: 700; line-height: 1.25; }
+.section-head p { margin-top: 8px; color: var(--muted); font-size: 0.94rem; line-height: 1.6; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+}
+.card-head {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.card-head h3 { font-size: 1.02rem; font-weight: 700; }
+.card-head .sub { font-size: 0.76rem; color: var(--muted); margin-top: 1px; }
+.card-head .spacer { margin-left: auto; }
+
+.btn {
+  border: none; border-radius: 999px;
+  font-size: 0.82rem; font-weight: 600;
+  padding: 8px 16px; min-height: 38px;
+}
+.btn-valider { background: var(--accent); color: #fff; }
+.btn-valider:hover { filter: brightness(1.06); }
+.btn-corriger {
+  background: transparent; color: var(--muted);
+  border: 1px solid var(--border-strong);
+}
+.btn-corriger:hover { color: var(--text); border-color: var(--muted); }
+.btn-destructif { background: transparent; color: var(--bad); border: 1px solid rgba(178, 58, 42, 0.45); }
+.btn-destructif:hover { background: var(--bad-soft); }
+.btn.pressed { background: var(--ok); color: #fff; transform: scale(0.98); border: none; }
+.head-btn {
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2); color: var(--muted);
+  border-radius: 999px; font-size: 0.78rem; font-weight: 700;
+  padding: 8px 14px; min-height: 38px;
+}
+.head-btn:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
+.head-btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-ink); }
+.head-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.head-btn.primary:hover { filter: brightness(1.07); color: #fff; }
+
+/* ============================================================
+   SECTION 1 · ACCUEIL JOUR-1 (roue seule + pop-up)
+   ============================================================ */
+.welcome-stage {
+  position: relative;
+  margin-top: 34px;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  padding: 40px clamp(16px, 4vw, 48px) 30px;
+  text-align: center;
+}
+.welcome-stage .blob {
+  position: absolute; border-radius: 50%;
+  filter: blur(64px); pointer-events: none;
+}
+.welcome-stage .blob.wb1 { width: 44vw; height: 44vw; min-width: 340px; min-height: 340px; top: -32%; left: -10%;
+  background: radial-gradient(circle at 40% 40%, var(--blob1), transparent 66%);
+  animation: drift1 26s ease-in-out infinite alternate; }
+.welcome-stage .blob.wb2 { width: 36vw; height: 36vw; min-width: 300px; min-height: 300px; bottom: -38%; right: -8%;
+  background: radial-gradient(circle at 55% 45%, var(--blob2), transparent 66%);
+  animation: drift2 32s ease-in-out infinite alternate; }
+@keyframes drift1 { to { transform: translate(8vw, 5vh) scale(1.12); } }
+@keyframes drift2 { to { transform: translate(-6vw, -6vh) scale(0.94); } }
+.welcome-word { position: relative; z-index: 2; max-width: 56ch; margin: 0 auto 10px; }
+.welcome-word .hero-kicker {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--accent-ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 6px 14px; border-radius: 999px;
+  margin-bottom: 14px;
+}
+.welcome-word h1 {
+  font-size: clamp(1.6rem, 3.6vw, 2.5rem);
+  font-weight: 800; line-height: 1.12; letter-spacing: -0.015em;
+}
+.welcome-word p {
+  margin: 12px auto 0; color: var(--muted);
+  font-size: clamp(0.92rem, 1.3vw, 1.02rem); line-height: 1.65; max-width: 52ch;
+}
+
+/* --- La roue orbitale, seule en scène --- */
+.orbital-collapse {
+  position: relative; z-index: 2;
+  overflow: hidden;
+  max-height: 900px;
+  transition: max-height .8s cubic-bezier(0.22, 1, 0.36, 1), opacity .6s ease, transform .6s ease;
+}
+.orbital-collapse.gone { max-height: 0; opacity: 0; transform: translateY(-14px); }
+.orbital {
+  position: relative;
+  width: min(460px, 88vw);
+  aspect-ratio: 1;
+  margin: 26px auto 8px;
+  --orb-r: min(186px, 36vw);
+}
+.orbit-ring {
+  position: absolute; inset: 0;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: 50%;
+  opacity: 0.8;
+}
+.orbit-ring.inner { inset: 17%; border-style: solid; border-width: 1px; opacity: 0.45; }
+.orbit-center {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 122px; height: 122px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--border-strong);
+  box-shadow: 0 0 0 10px var(--accent-soft), var(--shadow-card);
+  display: flex; align-items: flex-start; justify-content: center;
+  overflow: hidden;
+  z-index: 5;
+}
+.orbit-center img { width: 120%; height: auto; margin-top: 6px; }
+.orbit-center.celebrating img { width: 100%; margin-top: 0; }
+.orbit-center::after {
+  content: "Filou";
+  position: absolute; bottom: 7px; left: 50%; transform: translateX(-50%);
+  font-family: var(--font-display); font-weight: 700; font-size: 0.72rem;
+  background: var(--accent); color: #fff;
+  padding: 2px 10px; border-radius: 999px;
+}
+.rotor { position: absolute; inset: 0; animation: orbitSpin 110s linear infinite; }
+@keyframes orbitSpin { to { transform: rotate(360deg); } }
+.node {
+  position: absolute; top: 50%; left: 50%;
+  width: 0; height: 0; border: none; background: none;
+  transform: rotate(var(--a)) translate(var(--orb-r)) rotate(calc(-1 * var(--a)));
+}
+.node-inner {
+  position: absolute; top: 0; left: 0;
+  transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  animation: orbitSpinRev 110s linear infinite;
+  cursor: pointer;
+  width: 132px;
+}
+@keyframes orbitSpinRev { to { transform: translate(-50%, -50%) rotate(-360deg); } }
+.node-dot {
+  width: 54px; height: 54px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-weight: 800; font-size: 1.05rem;
+  background: var(--surface);
+  border: 2px solid var(--border-strong);
+  color: var(--muted);
+  box-shadow: var(--shadow-card);
+  transition: background-color .35s ease, border-color .35s ease, color .35s ease;
+}
+.node-label {
+  font-size: 0.72rem; font-weight: 600; line-height: 1.3;
+  text-align: center; color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 4px 10px; border-radius: 999px;
+  box-shadow: var(--shadow-card);
+  max-width: 132px;
+}
+.node .node-state {
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--soft);
+}
+.node.done .node-dot { background: var(--ok); border-color: var(--ok); color: #fff; }
+.node.done .node-label { color: var(--ok); }
+.node.done .node-state { color: var(--ok); }
+.node.active .node-dot {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+  animation: nodePulse 2.2s ease-in-out infinite;
+}
+.node.active .node-label { color: var(--accent-ink); border-color: var(--border-strong); font-weight: 700; }
+.node.active .node-state { color: var(--accent-ink); }
+@keyframes nodePulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  50% { box-shadow: 0 0 0 12px transparent; }
+}
+.node-inner:hover .node-dot { border-color: var(--accent-ink); }
+.orbital-hint {
+  position: relative; z-index: 2;
+  font-size: 0.8rem; color: var(--muted);
+  margin-top: 6px;
+}
+.sparkle {
+  position: absolute; top: 50%; left: 50%;
+  font-size: 1.1rem; color: var(--accent-ink);
+  pointer-events: none; opacity: 0;
+  z-index: 6;
+}
+.orbital.celebrate .sparkle { animation: sparklePop 1.4s ease-out both; }
+@keyframes sparklePop {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+  25%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--sx)), calc(-50% + var(--sy))) scale(1.15); }
+}
+.demo-finish-zone { position: relative; z-index: 2; text-align: center; margin-top: 14px; }
+.demo-finish {
+  background: transparent;
+  border: 1.5px dashed var(--border-strong);
+  color: var(--muted);
+  border-radius: 999px;
+  font-size: 0.78rem; font-weight: 600;
+  padding: 8px 16px; min-height: 38px;
+}
+.demo-finish:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
+
+/* --- Célébration sobre de fin d'onboarding --- */
+.finish-card { display: none; position: relative; z-index: 2; margin: 8px auto 0; max-width: 640px; text-align: left; }
+.finish-card.show { display: block; animation: screenIn .6s ease both; }
+.finish-inner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+  padding: 24px clamp(16px, 3vw, 30px);
+}
+.finish-top { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-bottom: 14px; }
+.finish-top .avatar {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1px solid var(--border-strong);
+  overflow: hidden; flex: none;
+  display: flex; justify-content: center; align-items: flex-start;
+}
+.finish-top .avatar img { width: 120%; height: auto; }
+.finish-top h3 { font-size: 1.15rem; font-weight: 700; }
+.finish-top p { font-size: 0.86rem; color: var(--muted); margin-top: 2px; }
+.finish-inner .note { font-size: 0.85rem; color: var(--muted); line-height: 1.6; }
+.finish-inner .note b { color: var(--text); }
+.finish-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+
+/* ============================================================
+   POP-UP D'ÉTAPE : Filou à gauche, validations à droite
+   ============================================================ */
+.modal-veil {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(58, 42, 28, 0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 18px;
+  opacity: 0;
+  transition: opacity .25s ease;
+}
+.modal-veil[hidden] { display: none; }
+.modal-veil.open { opacity: 1; }
+.step-modal {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-panel);
+  width: min(940px, 100%);
+  max-height: calc(100vh - 36px);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  transform: translateY(14px) scale(0.97);
+  transition: transform .3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.modal-veil.open .step-modal { transform: none; }
+.step-modal-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex: none;
+}
+.step-modal-head .avatar {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1px solid var(--border-strong);
+  overflow: hidden; flex: none;
+  display: flex; align-items: flex-start; justify-content: center;
+}
+.step-modal-head .avatar img { width: 130%; height: auto; margin-top: 2px; }
+.step-modal-head .step-tag {
+  font-size: 0.64rem; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--accent-ink);
+}
+.step-modal-head h3 { font-size: 1.1rem; font-weight: 700; }
+.modal-close {
+  margin-left: auto;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  border-radius: var(--r-sm);
+  width: 38px; height: 38px;
+  font-size: 1rem; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none;
+}
+.modal-close:hover { color: var(--text); border-color: var(--border-strong); }
+.step-modal-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+}
+.step-convo {
+  padding: 18px 20px;
+  display: flex; flex-direction: column; gap: 12px;
+  overflow-y: auto;
+  min-height: 320px; max-height: 52vh;
+  scroll-behavior: smooth;
+  border-right: 1px solid var(--border);
+}
+.bubble {
+  max-width: 90%;
+  padding: 11px 15px;
+  border-radius: var(--r-md);
+  font-size: 0.9rem; line-height: 1.55;
+  animation: bubbleIn .35s ease both;
+}
+@keyframes bubbleIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+.bubble.filou {
+  align-self: flex-start;
+  background: var(--bubble-filou);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+.bubble.user {
+  align-self: flex-end;
+  background: var(--bubble-user);
+  border: 1px solid transparent;
+  border-bottom-right-radius: 4px;
+}
+.bubble .who {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 5px;
+}
+.bubble.user .who { color: var(--muted); justify-content: flex-end; }
+.bubble.reformulation {
+  align-self: flex-start;
+  background: var(--accent-soft);
+  border: 1px solid var(--border-strong);
+  max-width: 94%;
+}
+.reform-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.bubble.note {
+  align-self: center;
+  background: var(--ok-soft);
+  border: 1px dashed var(--border-strong);
+  color: var(--ok);
+  font-size: 0.78rem; font-weight: 600;
+  padding: 7px 14px;
+}
+.type-caret {
+  display: inline-block; width: 2px; height: 1em;
+  background: var(--accent-ink);
+  vertical-align: text-bottom; margin-left: 1px;
+  animation: caretBlink .8s steps(1) infinite;
+}
+@keyframes caretBlink { 50% { opacity: 0; } }
+
+/* Le tableau des validations, à droite */
+.step-valids {
+  display: flex; flex-direction: column;
+  background: var(--surface-2);
+  min-height: 0;
+}
+.step-valids-head { padding: 16px 20px 10px; flex: none; }
+.step-valids-head h4 {
+  font-size: 0.8rem; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--soft);
+}
+.step-valids-head p { font-size: 0.76rem; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+.valid-rows { flex: 1; overflow-y: auto; padding: 4px 16px 16px; }
+.valid-empty {
+  color: var(--soft); font-size: 0.82rem; font-style: italic;
+  padding: 8px 4px;
+}
+.valid-empty.hide { display: none; }
+.valid-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 10px 13px;
+  font-size: 0.84rem; line-height: 1.5;
+  margin-bottom: 8px;
+  opacity: 0; transform: translateY(8px);
+}
+.valid-row.in {
+  opacity: 1; transform: none;
+  transition: opacity .4s ease, transform .45s ease;
+}
+.valid-row .ico { flex: none; font-size: 0.95rem; line-height: 1.4; }
+.valid-row b { font-weight: 700; }
+.valid-row small { display: block; color: var(--muted); font-size: 0.74rem; margin-top: 2px; }
+.valid-row .vchk { margin-left: auto; color: var(--ok); font-weight: 700; flex: none; }
+.step-modal-foot {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  flex: none;
+}
+.step-progress { font-size: 0.76rem; color: var(--muted); }
+.step-modal-foot .btn { margin-left: auto; }
+
+/* ============================================================
+   SECTION 2 · ÉQUIPE
+   ============================================================ */
+.team-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  margin-bottom: 16px;
+}
+.team-count { font-size: 0.84rem; color: var(--muted); }
+.team-toolbar .spacer { margin-left: auto; }
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+.vet-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
+  padding: 16px 18px 14px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.vet-card.inactive { opacity: 0.62; }
+.vet-card-top { display: flex; align-items: center; gap: 12px; }
+.vet-avatar {
+  width: 46px; height: 46px; border-radius: 50%;
+  color: #fff; font-family: var(--font-display);
+  font-weight: 800; font-size: 1rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none;
+  box-shadow: inset 0 0 0 3px rgba(255,255,255,0.35);
+}
+.vet-card-top h3 { font-size: 1.02rem; font-weight: 700; line-height: 1.2; }
+.vet-card-top .vet-sub { font-size: 0.76rem; color: var(--muted); margin-top: 1px; }
+.vet-flags { display: flex; flex-wrap: wrap; gap: 6px; }
+.flag {
+  font-size: 0.64rem; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 10px; border-radius: 999px;
+}
+.flag-admin { background: var(--accent-soft); color: var(--accent-ink); }
+.flag-recours { background: var(--warn-soft); color: var(--warn); }
+.flag-role { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+.vet-tags { display: flex; flex-wrap: wrap; gap: 6px; min-height: 24px; }
+.tag {
+  font-size: 0.7rem; font-weight: 600;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 3px 10px; border-radius: 999px;
+}
+.vet-account {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.78rem; font-weight: 600;
+  padding-top: 10px; border-top: 1px dashed var(--border);
+}
+.acct-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.acct-actif    .acct-dot { background: var(--ok); }
+.acct-invite   .acct-dot { background: var(--warn); }
+.acct-sans     .acct-dot { background: var(--soft); }
+.acct-inactif  .acct-dot { background: var(--bad); }
+.acct-actif    { color: var(--ok); }
+.acct-invite   { color: var(--warn); }
+.acct-sans     { color: var(--muted); }
+.acct-inactif  { color: var(--bad); }
+.vet-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.vet-actions button {
+  border: 1px solid var(--border-strong);
+  background: transparent; color: var(--muted);
+  border-radius: 999px;
+  font-size: 0.74rem; font-weight: 600;
+  padding: 6px 12px; min-height: 34px;
+}
+.vet-actions button:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
+.vet-actions button.va-danger:hover { color: var(--bad); border-color: var(--bad); background: var(--bad-soft); }
+.vet-actions button.va-invite { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--border-strong); font-weight: 700; }
+.vet-actions button.va-invite:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* Formulaire « créer une fiche » (panneau qui se déplie, pas de modale) */
+.create-panel {
+  overflow: hidden; max-height: 0;
+  transition: max-height .5s cubic-bezier(0.22, 1, 0.36, 1);
+  margin-bottom: 0;
+}
+.create-panel.open { max-height: 480px; margin-bottom: 18px; }
+.create-inner {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
+  padding: 18px 20px;
+}
+.create-inner h3 { font-size: 0.98rem; font-weight: 700; margin-bottom: 12px; }
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px 16px;
+}
+.field label {
+  display: block;
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--soft);
+  margin-bottom: 5px;
+}
+.field input[type="text"], .field input[type="email"], .field input[type="date"], .field select {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+  font-size: 0.86rem;
+  min-height: 42px;
+}
+.field input:focus, .field select:focus { border-color: var(--accent); outline: none; }
+.swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+.swatch {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+}
+.swatch[aria-pressed="true"] { border-color: var(--text); box-shadow: 0 0 0 2px var(--surface); }
+.check-line { display: flex; align-items: center; gap: 8px; font-size: 0.84rem; padding-top: 22px; }
+.create-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+
+/* Dialogue garde-fou de désactivation */
+.guard-modal {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-panel);
+  width: min(540px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 22px 24px 20px;
+  transform: translateY(14px) scale(0.97);
+  transition: transform .3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.modal-veil.open .guard-modal { transform: none; }
+.guard-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+.guard-head .gfox {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--warn-soft);
+  border: 1px solid rgba(196, 138, 20, 0.4);
+  overflow: hidden; flex: none;
+  display: flex; justify-content: center; align-items: flex-start;
+}
+.guard-head .gfox img { width: 130%; height: auto; margin-top: 2px; }
+.guard-head h3 { font-size: 1.08rem; font-weight: 700; line-height: 1.3; }
+.guard-head p { font-size: 0.82rem; color: var(--muted); margin-top: 3px; }
+.guard-list { list-style: none; margin: 12px 0 14px; }
+.guard-list li {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--warn-soft);
+  border: 1px solid rgba(196, 138, 20, 0.35);
+  border-radius: var(--r-sm);
+  padding: 9px 13px;
+  font-size: 0.85rem;
+  margin-bottom: 7px;
+}
+.guard-list li .gl-date { font-family: var(--font-display); font-weight: 700; }
+.guard-list li .gl-role { margin-left: auto; font-size: 0.72rem; color: var(--warn); font-weight: 700; }
+.guard-note { font-size: 0.8rem; color: var(--muted); line-height: 1.55; margin-bottom: 14px; }
+.guard-foot { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+
+/* ============================================================
+   SECTION 3 · HISTORIQUE & COMPTEURS
+   ============================================================ */
+.hist-filters {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
+  padding: 14px 18px;
+  margin-bottom: 18px;
+}
+.hf-label {
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--soft);
+}
+.seg {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  background: var(--surface-2); padding: 4px;
+  border-radius: 999px; border: 1px solid var(--border);
+}
+.seg button {
+  border: none; background: transparent; color: var(--muted);
+  font-size: 0.78rem; font-weight: 600;
+  padding: 7px 13px; border-radius: 999px;
+  min-height: 34px;
+  white-space: nowrap;
+}
+.seg button:hover { color: var(--text); }
+.seg button[aria-pressed="true"] {
+  background: var(--accent); color: #fff;
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+.range-fields {
+  display: none;
+  align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.range-fields.show { display: flex; animation: bubbleIn .3s ease both; }
+.range-fields input[type="date"] {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-size: 0.8rem;
+  min-height: 38px;
+}
+.range-fields input[type="date"]:focus { border-color: var(--accent); outline: none; }
+.range-fields .arrow { color: var(--soft); font-weight: 700; }
+.hist-caption {
+  width: 100%;
+  font-size: 0.78rem; color: var(--muted);
+  padding-top: 4px;
+  border-top: 1px dashed var(--border);
+  margin-top: 4px;
+}
+.hist-caption b { color: var(--text); }
+
+.count-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(430px, 100%), 1fr));
+  gap: 16px;
+  margin-bottom: 26px;
+}
+.count-card { border-radius: var(--r-md); }
+.count-card .card-head { padding: 13px 18px; }
+.count-card h3 { font-size: 0.94rem; }
+.count-table { width: 100%; border-collapse: collapse; }
+.count-table th {
+  font-family: var(--font-display);
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--soft);
+  padding: 9px 8px 7px; text-align: center;
+  border-bottom: 1px solid var(--border-strong);
+}
+.count-table th:first-child { text-align: left; padding-left: 18px; }
+.count-table td {
+  padding: 8px; text-align: center;
+  border-bottom: 1px dashed var(--border);
+  font-family: var(--font-display); font-weight: 700; font-size: 0.9rem;
+}
+.count-table tr:last-child td { border-bottom: none; }
+.count-table td.zero { color: var(--soft); font-weight: 500; }
+.count-table td:first-child { text-align: left; padding-left: 18px; }
+.ct-vet { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-body); font-size: 0.82rem; font-weight: 600; }
+.ct-vet i { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+.ecart {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-size: 0.7rem; font-weight: 700;
+  padding: 2px 10px; border-radius: 999px;
+  min-width: 38px;
+}
+.ecart.ok   { background: var(--ok-soft);   color: var(--ok); }
+.ecart.warn { background: var(--warn-soft); color: var(--warn); }
+.ecart.bad  { background: var(--bad-soft);  color: var(--bad); }
+.ecart.none { background: var(--surface-2); color: var(--soft); border: 1px solid var(--border); font-weight: 500; }
+
+/* Bilan bonus/malus */
+.bm-card { margin-bottom: 26px; }
+.bm-intro { padding: 14px 20px 0; font-size: 0.85rem; color: var(--muted); line-height: 1.6; max-width: 70ch; }
+.bm-body { padding: 14px 20px 18px; }
+.bm-empty {
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 18px;
+  text-align: center;
+  color: var(--muted); font-size: 0.86rem;
+}
+.bm-table { width: 100%; border-collapse: collapse; display: none; }
+.bm-table.show { display: table; animation: screenIn .4s ease both; }
+.bm-table th {
+  font-family: var(--font-display);
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--soft);
+  padding: 8px; text-align: center;
+  border-bottom: 1px solid var(--border-strong);
+}
+.bm-table th:first-child { text-align: left; }
+.bm-table td {
+  padding: 9px 8px; text-align: center;
+  border-bottom: 1px dashed var(--border);
+  font-size: 0.86rem;
+}
+.bm-table tr:last-child td { border-bottom: none; }
+.bm-table td:first-child { text-align: left; }
+.bm-val { font-family: var(--font-display); font-weight: 700; }
+.bm-val.pos { color: var(--ok); }
+.bm-val.neg { color: var(--warn); }
+.bm-val.nul { color: var(--soft); font-weight: 500; }
+.bm-foot {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 0 20px 18px;
+}
+.bm-status { font-size: 0.78rem; color: var(--muted); }
+.bm-status b { color: var(--ok); }
+
+/* Historique des fêtes */
+.fetes-card { margin-bottom: 26px; }
+.fetes-table { width: 100%; border-collapse: collapse; }
+.fetes-table th {
+  font-family: var(--font-display);
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--soft);
+  padding: 10px 18px 8px; text-align: left;
+  border-bottom: 1px solid var(--border-strong);
+}
+.fetes-table td {
+  padding: 11px 18px;
+  border-bottom: 1px dashed var(--border);
+  font-size: 0.86rem;
+  vertical-align: middle;
+}
+.fetes-table tr:last-child td { border-bottom: none; }
+.fetes-table .annee { font-family: var(--font-display); font-weight: 800; font-size: 0.95rem; }
+.fete-duo { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  color: #fff; font-size: 0.7rem; font-weight: 700;
+  padding: 3px 9px; border-radius: 6px;
+  line-height: 1.3;
+}
+.pill .rank { font-weight: 400; opacity: 0.75; }
+.pill.second { opacity: 0.82; }
+.fetes-note {
+  margin: 12px 18px 16px;
+  font-size: 0.78rem; color: var(--soft); font-style: italic;
+}
+
+/* Périodes passées + cumul (repris du labo) */
+.periods-card, .cumul-card { margin-bottom: 26px; }
+.periods-list { list-style: none; }
+.periods-list li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+  padding: 13px 20px;
+  border-bottom: 1px dashed var(--border);
+}
+.periods-list li:last-child { border-bottom: none; }
+.period-name { flex: 1; min-width: 220px; }
+.period-name b { font-family: var(--font-display); font-size: 0.98rem; display: block; }
+.period-name small { font-size: 0.76rem; color: var(--muted); }
+.status {
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 4px 11px; border-radius: 999px;
+}
+.st-brouillon { background: var(--warn-soft); color: var(--warn); }
+.st-publiee { background: var(--ok-soft); color: var(--ok); }
+.st-archivee { background: var(--surface-2); color: var(--soft); border: 1px solid var(--border); }
+.period-view {
+  border: 1px solid var(--border-strong);
+  background: transparent; color: var(--muted);
+  border-radius: 999px;
+  font-size: 0.76rem; font-weight: 600;
+  padding: 7px 14px; min-height: 36px;
+}
+.period-view:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
+.cumul-body { padding: 16px 20px 6px; }
+.cm-row {
+  display: grid;
+  grid-template-columns: 108px repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--border);
+}
+.cm-row:last-child { border-bottom: none; }
+.cm-row.cm-header { border-bottom: 1px solid var(--border-strong); padding-bottom: 5px; }
+.cm-row.cm-header span {
+  font-family: var(--font-display); font-size: 0.62rem; font-weight: 700;
+  letter-spacing: 0.07em; text-transform: uppercase; color: var(--soft);
+}
+.cm-vet { display: inline-flex; align-items: center; gap: 7px; font-size: 0.82rem; font-weight: 600; }
+.cm-vet i { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+.cm-cell { display: flex; align-items: center; gap: 8px; }
+.cm-cell b { font-family: var(--font-display); font-size: 0.88rem; min-width: 22px; text-align: right; }
+.cm-cell .bar { flex: 1; height: 6px; border-radius: 999px; background: var(--bg-deep); overflow: hidden; }
+.cm-cell .bar i { display: block; height: 100%; border-radius: 999px; opacity: 0.8; }
+.lookback-note {
+  margin: 14px 20px 18px;
+  background: var(--ok-soft);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 10px 14px;
+  font-size: 0.82rem; line-height: 1.55;
+}
+
+/* ============================================================
+   SECTION 4 · CONNEXIONS
+   ============================================================ */
+.conn-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
+  gap: 16px;
+  margin-bottom: 26px;
+}
+.conn-card { border-radius: var(--r-md); display: flex; flex-direction: column; }
+.conn-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 15px 18px 13px;
+  border-bottom: 1px solid var(--border);
+}
+.conn-ico {
+  width: 40px; height: 40px; border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 1.15rem; flex: none;
+}
+.conn-head h3 { font-size: 0.96rem; font-weight: 700; }
+.conn-head .sub { font-size: 0.74rem; color: var(--muted); margin-top: 1px; }
+.conn-state {
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.7rem; font-weight: 700;
+  padding: 4px 11px; border-radius: 999px;
+}
+.conn-state.on  { background: var(--ok-soft); color: var(--ok); }
+.conn-state.off { background: var(--surface-2); color: var(--soft); border: 1px solid var(--border); }
+.conn-state .cs-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.conn-body { padding: 14px 18px 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+.conn-line { font-size: 0.84rem; line-height: 1.55; color: var(--muted); }
+.conn-line b { color: var(--text); }
+.conn-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; }
+.mono {
+  font-family: "Consolas", "Menlo", monospace;
+  font-size: 0.78rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px 8px;
+  word-break: break-all;
+}
+.derived {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.derived .dv {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: var(--ok-soft);
+  border: 1px dashed var(--border-strong);
+  color: var(--ok);
+  font-size: 0.76rem; font-weight: 700;
+  padding: 6px 12px; border-radius: 999px;
+}
+.derived-note { font-size: 0.74rem; color: var(--soft); font-style: italic; }
+.sync-spin {
+  display: inline-block; width: 14px; height: 14px;
+  border: 2px solid var(--accent-soft);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+  vertical-align: -2px; margin-right: 6px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Journal des e-mails */
+.mail-card { margin-bottom: 26px; }
+.mail-table { width: 100%; border-collapse: collapse; }
+.mail-table th {
+  font-family: var(--font-display);
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--soft);
+  padding: 10px 14px 8px; text-align: left;
+  border-bottom: 1px solid var(--border-strong);
+}
+.mail-table td {
+  padding: 10px 14px;
+  border-bottom: 1px dashed var(--border);
+  font-size: 0.83rem;
+  vertical-align: middle;
+}
+.mail-table tr:last-child td { border-bottom: none; }
+.mail-table .m-date { color: var(--muted); font-size: 0.76rem; white-space: nowrap; }
+.mail-type {
+  display: inline-block;
+  font-size: 0.7rem; font-weight: 700;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 3px 10px; border-radius: 999px;
+  white-space: nowrap;
+}
+.m-statut { display: inline-flex; align-items: center; gap: 6px; font-size: 0.76rem; font-weight: 700; }
+.m-statut .msd { width: 8px; height: 8px; border-radius: 50%; }
+.m-statut.envoye { color: var(--ok); } .m-statut.envoye .msd { background: var(--ok); }
+.m-statut.echec  { color: var(--bad); } .m-statut.echec .msd { background: var(--bad); }
+.m-retry {
+  border: 1px solid rgba(178, 58, 42, 0.45);
+  background: transparent; color: var(--bad);
+  border-radius: 999px;
+  font-size: 0.7rem; font-weight: 700;
+  padding: 4px 11px; min-height: 30px;
+  margin-left: 8px;
+}
+.m-retry:hover { background: var(--bad-soft); }
+.mail-filter { margin-left: auto; }
+.mail-filter select {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-size: 0.78rem; font-weight: 600;
+  min-height: 38px;
+}
+
+/* ============================================================
+   TERRIER GLOBAL DE FILOU (sections 2, 3, 4)
+   ============================================================ */
+.terrier-zone {
+  position: fixed; right: 18px; bottom: 8px;
+  z-index: 120;
+  display: flex; flex-direction: column; align-items: flex-end;
+}
+body.on-accueil .terrier-zone, body.on-accueil .burrow-panel, body.on-accueil .fox-out { display: none; }
+.terrier {
+  position: relative;
+  width: 148px; height: 104px;
+  border: none; background: transparent;
+  padding: 0;
+}
+.terrier svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.fox-peek {
+  position: absolute; left: 50%; bottom: 34px;
+  transform: translateX(-50%);
+  width: 58px; height: 34px;
+  overflow: hidden;
+  z-index: 2;
+  transition: transform .3s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.fox-peek img { width: 100%; height: auto; }
+.terrier:hover .fox-peek { transform: translateX(-50%) translateY(-5px); }
+.terrier .t-hint {
+  position: absolute; left: 50%; bottom: -4px; transform: translateX(-50%);
+  font-size: 0.64rem; font-weight: 700; letter-spacing: 0.06em;
+  color: var(--muted); white-space: nowrap;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 999px; padding: 2px 9px;
+  z-index: 4;
+}
+.terrier:hover .t-hint { color: var(--accent-ink); border-color: var(--border-strong); }
+body.filou-out .fox-peek { transform: translateX(-50%) translateY(40px); }
+body.filou-out .terrier .t-hint { opacity: 0; }
+.fox-out {
+  position: fixed; right: 44px; bottom: 96px;
+  width: 92px; z-index: 121;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(70px) scale(0.4);
+}
+body.filou-out .fox-out { animation: foxOut .6s cubic-bezier(0.34, 1.35, 0.64, 1) both; }
+body.filou-in .fox-out { animation: foxIn .4s ease-in both; }
+@keyframes foxOut {
+  0%   { opacity: 0; transform: translateY(70px) scale(0.4); }
+  55%  { opacity: 1; transform: translateY(-10px) scale(1.06); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes foxIn {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateY(70px) scale(0.4); }
+}
+.fox-out img { width: 100%; height: auto; filter: drop-shadow(0 10px 18px rgba(120,70,18,0.3)); }
+.burrow-panel {
+  position: fixed; right: 14px; bottom: 200px;
+  width: min(372px, calc(100vw - 28px));
+  max-height: min(440px, calc(100vh - 240px));
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-panel);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  z-index: 122;
+  opacity: 0; pointer-events: none;
+  transform: translateY(18px) scale(0.94);
+  transform-origin: bottom right;
+  transition: transform .4s cubic-bezier(0.22, 1, 0.36, 1), opacity .3s ease;
+}
+body.filou-out .burrow-panel {
+  opacity: 1; pointer-events: auto; transform: none;
+  transition-delay: .28s;
+}
+.panel-head {
+  display: flex; align-items: center; gap: 11px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex: none;
+}
+.panel-head .avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1px solid var(--border-strong);
+  overflow: hidden; flex: none;
+  display: flex; justify-content: center; align-items: flex-start;
+}
+.panel-head .avatar img { width: 130%; height: auto; margin-top: 2px; }
+.panel-head h3 { font-size: 0.95rem; font-weight: 700; }
+.panel-head .sub { font-size: 0.7rem; color: var(--muted); }
+.panel-reduce {
+  margin-left: auto;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  border-radius: var(--r-sm);
+  width: 36px; height: 36px;
+  font-size: 1rem; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.panel-reduce:hover { color: var(--text); border-color: var(--border-strong); }
+.panel-scroll {
+  flex: 1; overflow-y: auto;
+  padding: 14px 14px 10px;
+  display: flex; flex-direction: column; gap: 10px;
+  min-height: 110px;
+}
+.burrow-panel .bubble { font-size: 0.85rem; max-width: 95%; }
+.panel-chips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 2px 14px 10px;
+  flex: none;
+}
+.chip {
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  border-radius: 999px;
+  font-size: 0.76rem; font-weight: 600;
+  padding: 7px 13px; min-height: 36px;
+}
+.chip:hover { background: var(--accent-soft); border-color: var(--accent-ink); color: var(--accent-ink); }
+.panel-input {
+  display: flex; gap: 8px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  flex: none;
+}
+.panel-input input {
+  flex: 1;
+  font-family: var(--font-body); font-size: 0.86rem;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 10px 16px;
+  min-height: 44px;
+  min-width: 0;
+}
+.panel-input input::placeholder { color: var(--soft); }
+.panel-input input:focus { border-color: var(--accent); outline: none; }
+.panel-send {
+  border: none; background: var(--accent); color: #fff;
+  border-radius: 999px;
+  min-width: 44px; min-height: 44px;
+  font-size: 1.05rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none;
+}
+.panel-send:hover { filter: brightness(1.07); }
+.reform-actions .btn-mini { padding: 6px 13px; min-height: 32px; font-size: 0.76rem; }
+
+/* ============================================================
+   TOASTS
+   ============================================================ */
+.toast-zone {
+  position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+  z-index: 400;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  background: var(--text); color: var(--surface);
+  font-size: 0.84rem; font-weight: 600;
+  padding: 11px 20px; border-radius: 999px;
+  box-shadow: var(--shadow-panel);
+  animation: toastIn .35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.toast.bye { animation: toastOut .3s ease both; }
+@keyframes toastIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateY(10px); } }
+
+/* Pied de page */
+.footer-lab {
+  margin-top: 26px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  padding: 18px clamp(16px, 4vw, 40px);
+  display: flex; flex-wrap: wrap; gap: 6px 24px;
+  align-items: center; justify-content: space-between;
+  font-size: 0.76rem; color: var(--muted);
+}
+.footer-lab b { color: var(--text); font-weight: 600; }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 1020px) {
+  :root { --topbar-h: 158px; }
+  .step-modal-body { grid-template-columns: 1fr; }
+  .step-convo { border-right: none; border-bottom: 1px solid var(--border); max-height: 40vh; }
+  .cm-row { grid-template-columns: 92px repeat(3, minmax(0, 1fr)); gap: 8px; }
+}
+@media (max-width: 640px) {
+  :root { --topbar-h: 196px; }
+  .orbital { --orb-r: 34vw; }
+  .node-inner { width: 96px; }
+  .node-label { max-width: 96px; font-size: 0.64rem; }
+  .count-table th, .count-table td { padding: 7px 4px; font-size: 0.8rem; }
+  .count-table th:first-child, .count-table td:first-child { padding-left: 10px; }
+  .mail-table { display: block; overflow-x: auto; }
+}
+
+/* ============================================================
+   ACCESSIBILITÉ · prefers-reduced-motion
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .rotor, .node-inner, .node.active .node-dot, .welcome-stage .blob,
+  .sparkle, .sync-spin { animation: none !important; }
+  .section.active, .valid-row, .bubble, .toast, .bm-table.show, .range-fields.show { animation: none; }
+  .fox-peek, .burrow-panel, .modal-veil, .step-modal, .guard-modal,
+  .orbital-collapse, .create-panel { transition: none; }
+  body.filou-out .fox-out { animation: none; opacity: 1; transform: none; }
+  body.filou-in .fox-out { animation: none; opacity: 0; }
+  * { scroll-behavior: auto !important; }
+}
+</style>
+</head>
+<body class="on-accueil">
+
+<!-- ===================== BARRE COMMUNE + SOUS-ONGLETS ===================== -->
+<header class="topbar">
+  <div class="topbar-row">
+    <div class="brand">
+      <img src="../fox-1.png" alt="Filou, le renard assistant de GuardVeto">
+      <span>
+        GuardVeto
+        <small>Maquette M4 · Accueil &amp; réglages</small>
+      </span>
+    </div>
+    <nav class="mnav" aria-label="Navigation de la grande maquette">
+      <a href="index.html">🏠 Hub</a>
+      <a href="m1-planning.html">M1 Planning</a>
+      <a href="m2-regles.html">M2 Règles</a>
+      <a href="m3-absences-echanges.html">M3 Absences &amp; échanges</a>
+      <a href="m4-accueil-equipe-historique-connexions.html" aria-current="page">M4 Accueil &amp; réglages</a>
+      <a href="m5-veto-mobile.html">M5 Véto mobile</a>
+    </nav>
+  </div>
+  <div class="subtabs" role="tablist" aria-label="Sections de la page M4">
+    <button type="button" role="tab" data-sec="accueil" aria-selected="true">🦊 Accueil jour-1</button>
+    <button type="button" role="tab" data-sec="equipe" aria-selected="false">Équipe</button>
+    <button type="button" role="tab" data-sec="historique" aria-selected="false">Historique &amp; compteurs</button>
+    <button type="button" role="tab" data-sec="connexions" aria-selected="false">Connexions</button>
+  </div>
+</header>
+
+<!-- ===================== SECTION 1 · ACCUEIL JOUR-1 ===================== -->
+<main id="sec-accueil" class="section active" aria-label="Accueil jour 1 : la roue d'installation, seule en scène">
+  <div class="shell">
+
+    <div class="welcome-stage">
+      <div class="blob wb1" aria-hidden="true"></div>
+      <div class="blob wb2" aria-hidden="true"></div>
+
+      <div class="welcome-word">
+        <span class="hero-kicker">Jour 1 · Ton cabinet vient d'arriver</span>
+        <h1>Bienvenue, Cabinet des Quatre Pattes.</h1>
+        <p>Quatre étapes autour de Filou, une dizaine de minutes. Clique sur une étape : il ouvre l'entretien, tu parles, il note, tu valides.</p>
+      </div>
+
+      <div class="orbital-collapse" id="orbital-collapse">
+        <div class="orbital" id="orbital" role="group" aria-label="Parcours d'installation en quatre étapes">
+          <div class="orbit-ring"></div>
+          <div class="orbit-ring inner"></div>
+          <div class="orbit-center" id="orbit-center"><img src="../fox-1.png" alt="Filou au centre du parcours" id="orbit-center-img"></div>
+          <span class="sparkle" style="--sx:-92px; --sy:-64px; animation-delay:.05s">✦</span>
+          <span class="sparkle" style="--sx:88px; --sy:-72px; animation-delay:.2s">✦</span>
+          <span class="sparkle" style="--sx:-70px; --sy:66px; animation-delay:.35s">✧</span>
+          <span class="sparkle" style="--sx:96px; --sy:52px; animation-delay:.5s">✦</span>
+          <span class="sparkle" style="--sx:0px; --sy:-104px; animation-delay:.65s">✧</span>
+          <div class="rotor">
+            <button type="button" class="node done" style="--a: -90deg" data-step="0" aria-label="Étape 1, Ton équipe, complétée. Ouvrir le récapitulatif.">
+              <span class="node-inner">
+                <span class="node-dot" aria-hidden="true">✓</span>
+                <span class="node-label">Ton équipe</span>
+                <span class="node-state">Complétée</span>
+              </span>
+            </button>
+            <button type="button" class="node active" style="--a: 0deg" data-step="1" aria-label="Étape 2, Vos habitudes de garde, en cours. Ouvrir l'entretien.">
+              <span class="node-inner">
+                <span class="node-dot" aria-hidden="true">2</span>
+                <span class="node-label">Vos habitudes de garde</span>
+                <span class="node-state">En cours</span>
+              </span>
+            </button>
+            <button type="button" class="node" style="--a: 90deg" data-step="2" aria-label="Étape 3, Générer ton premier planning, à venir.">
+              <span class="node-inner">
+                <span class="node-dot" aria-hidden="true">3</span>
+                <span class="node-label">Générer ton premier planning</span>
+                <span class="node-state">À venir</span>
+              </span>
+            </button>
+            <button type="button" class="node" style="--a: 180deg" data-step="3" aria-label="Étape 4, Inviter les vétos, à venir.">
+              <span class="node-inner">
+                <span class="node-dot" aria-hidden="true">4</span>
+                <span class="node-label">Inviter les vétos</span>
+                <span class="node-state">À venir</span>
+              </span>
+            </button>
+          </div>
+        </div>
+        <p class="orbital-hint">Clique sur une étape pour ouvrir l'entretien avec Filou.</p>
+        <div class="demo-finish-zone">
+          <button type="button" class="demo-finish" id="demo-finish">▶ Démo : simuler la fin de l'onboarding</button>
+        </div>
+      </div>
+
+      <!-- Fin d'onboarding : la roue disparaît, célébration sobre -->
+      <div class="finish-card" id="finish-card" aria-live="polite">
+        <div class="finish-inner">
+          <div class="finish-top">
+            <span class="avatar"><img src="../fox-5.png" alt="Filou émerveillé, un papillon lumineux au-dessus de la main"></span>
+            <div>
+              <h3>Installation terminée. Bravo !</h3>
+              <p>Planning généré, équipe invitée : la roue a disparu, elle ne sert plus à rien.</p>
+            </div>
+          </div>
+          <p class="note">À partir de maintenant, cet écran laisse place au quotidien : le <b>Planning</b> t'attend dans l'onglet M1, et Filou vit dans son <b>terrier</b>, en bas à droite de chaque écran. Il ne reprend la scène que pour te protéger d'une erreur.</p>
+          <div class="finish-actions">
+            <a class="btn btn-valider" href="m1-planning.html" style="text-decoration:none; display:inline-flex; align-items:center;">Voir le planning →</a>
+            <button type="button" class="btn btn-corriger" id="demo-replay">↺ Rejouer l'installation</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- ===================== SECTION 2 · ÉQUIPE ===================== -->
+<main id="sec-equipe" class="section" aria-label="Équipe : les fiches des vétérinaires">
+  <div class="shell">
+
+    <div class="section-head">
+      <p class="section-kicker">Équipe · Filou dans son terrier</p>
+      <h2>Sept fiches, sept couleurs. L'app reconnaît les gens.</h2>
+      <p>Statut, rôle dans l'app, étiquettes et état de compte : tout se lit d'un coup d'œil. Pour inviter tout le monde d'un coup, demande à Filou, en bas à droite.</p>
+    </div>
+
+    <div class="team-toolbar">
+      <span class="team-count" id="team-count">7 vétérinaires · 3 comptes actifs</span>
+      <span class="spacer"></span>
+      <button type="button" class="head-btn primary" id="create-toggle" aria-expanded="false" aria-controls="create-panel">+ Créer une fiche</button>
+    </div>
+
+    <div class="create-panel" id="create-panel">
+      <form class="create-inner" id="create-form">
+        <h3>Nouvelle fiche vétérinaire</h3>
+        <div class="form-grid">
+          <div class="field">
+            <label for="cf-nom">Prénom</label>
+            <input type="text" id="cf-nom" placeholder="Ex. : Léa" required>
+          </div>
+          <div class="field">
+            <label for="cf-statut">Statut</label>
+            <select id="cf-statut">
+              <option>Salariée / Salarié</option>
+              <option>Associée / Associé</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="cf-role">Rôle dans l'app</label>
+            <select id="cf-role">
+              <option>Vétérinaire</option>
+              <option>Administratrice / Administrateur</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="cf-tags">Étiquettes (séparées par des virgules)</label>
+            <input type="text" id="cf-tags" placeholder="Ex. : junior, canine">
+          </div>
+          <div class="field">
+            <label id="cf-couleur-label">Couleur</label>
+            <div class="swatches" role="group" aria-labelledby="cf-couleur-label" id="cf-swatches">
+              <button type="button" class="swatch" style="background:#C7530F" aria-pressed="true" aria-label="Orange terrier"></button>
+              <button type="button" class="swatch" style="background:#2E7A8C" aria-pressed="false" aria-label="Bleu canard"></button>
+              <button type="button" class="swatch" style="background:#7A5FBE" aria-pressed="false" aria-label="Violet doux"></button>
+              <button type="button" class="swatch" style="background:#8A7A1E" aria-pressed="false" aria-label="Olive doré"></button>
+            </div>
+          </div>
+          <div class="check-line">
+            <input type="checkbox" id="cf-recours" style="width:18px;height:18px;accent-color:var(--accent);">
+            <label for="cf-recours" style="all:unset;font-size:0.84rem;cursor:pointer;">Dernier recours uniquement</label>
+          </div>
+        </div>
+        <div class="create-actions">
+          <button type="submit" class="btn btn-valider">Créer la fiche</button>
+          <button type="button" class="btn btn-corriger" id="create-cancel">Annuler</button>
+          <span style="font-size:0.76rem;color:var(--soft);align-self:center;">La fiche est créée « sans compte » : tu l'invites quand tu veux.</span>
+        </div>
+      </form>
+    </div>
+
+    <div class="team-grid" id="team-grid"><!-- rempli par le JS --></div>
+
+  </div>
+</main>
+
+<!-- ===================== SECTION 3 · HISTORIQUE & COMPTEURS ===================== -->
+<main id="sec-historique" class="section" aria-label="Historique et compteurs : les périodes passées et l'équité">
+  <div class="shell">
+
+    <div class="section-head">
+      <p class="section-kicker">Historique &amp; compteurs · Filou dans son terrier</p>
+      <h2>Qui a fait quoi, sur la période que tu veux.</h2>
+      <p>Par période, ou sur une plage de dates libre qui peut chevaucher plusieurs périodes. Les écarts se lisent en couleur : vert c'est juste, ambre à surveiller, rouge à rattraper.</p>
+    </div>
+
+    <!-- Filtres : période, plage libre, périmètre -->
+    <div class="hist-filters" role="group" aria-label="Filtres des compteurs">
+      <span class="hf-label">Période</span>
+      <div class="seg" id="period-seg">
+        <button type="button" data-period="automne" aria-pressed="true">Automne 2025</button>
+        <button type="button" data-period="ete" aria-pressed="false">Été 2025</button>
+        <button type="button" data-period="printemps" aria-pressed="false">Printemps 2025</button>
+        <button type="button" data-period="toutes" aria-pressed="false">Toutes</button>
+        <button type="button" data-period="plage" aria-pressed="false">Plage libre…</button>
+      </div>
+      <div class="range-fields" id="range-fields">
+        <label class="hf-label" for="range-du">Du</label>
+        <input type="date" id="range-du" value="2025-09-01">
+        <span class="arrow" aria-hidden="true">→</span>
+        <label class="hf-label" for="range-au">au</label>
+        <input type="date" id="range-au" value="2026-02-15">
+        <button type="button" class="head-btn" id="range-apply">Appliquer</button>
+      </div>
+      <span class="spacer" style="margin-left:auto;"></span>
+      <span class="hf-label">Périmètre</span>
+      <div class="seg" id="scope-seg">
+        <button type="button" data-scope="valide" aria-pressed="true">Validé seulement</button>
+        <button type="button" data-scope="tout" aria-pressed="false">Tout (brouillons inclus)</button>
+      </div>
+      <p class="hist-caption" id="hist-caption"><!-- rempli par le JS --></p>
+    </div>
+
+    <!-- 4 tableaux de compteurs -->
+    <div class="count-grid">
+      <section class="card count-card" aria-label="Compteur des week-ends">
+        <div class="card-head"><h3>🧡 Week-ends</h3><span class="sub spacer">1er = avantage financier</span></div>
+        <table class="count-table">
+          <thead><tr><th scope="col">Vétérinaire</th><th scope="col">1er</th><th scope="col">2nd</th><th scope="col">Total</th><th scope="col">Écart</th></tr></thead>
+          <tbody id="tb-we"></tbody>
+        </table>
+      </section>
+      <section class="card count-card" aria-label="Compteur des nuits de semaine">
+        <div class="card-head"><h3>🌙 Semaine · 1er / 2nd</h3><span class="sub spacer">nuits du lundi au jeudi</span></div>
+        <table class="count-table">
+          <thead><tr><th scope="col">Vétérinaire</th><th scope="col">1er</th><th scope="col">2nd</th><th scope="col">Total</th><th scope="col">Écart</th></tr></thead>
+          <tbody id="tb-sem"></tbody>
+        </table>
+      </section>
+      <section class="card count-card" aria-label="Compteur des jours fériés">
+        <div class="card-head"><h3>🎈 Fériés</h3><span class="sub spacer">zone du cabinet, fêtes comprises</span></div>
+        <table class="count-table">
+          <thead><tr><th scope="col">Vétérinaire</th><th scope="col">Gardes</th><th scope="col">Écart</th></tr></thead>
+          <tbody id="tb-fer"></tbody>
+        </table>
+      </section>
+      <section class="card count-card" aria-label="Compteur des grands week-ends">
+        <div class="card-head"><h3>🌉 Grands week-ends</h3><span class="sub spacer">3 jours et plus (ponts)</span></div>
+        <table class="count-table">
+          <thead><tr><th scope="col">Vétérinaire</th><th scope="col">Gardes</th><th scope="col">Écart</th></tr></thead>
+          <tbody id="tb-gwe"></tbody>
+        </table>
+      </section>
+    </div>
+
+    <!-- Bilan bonus / malus de fin de période -->
+    <section class="card bm-card" aria-label="Bilan de fin de période">
+      <div class="card-head">
+        <div>
+          <h3>⚖️ Bilan de fin de période · Automne 2025</h3>
+          <p class="sub">Réservé à l'administratrice · nourrit l'équité de la période suivante</p>
+        </div>
+        <span class="spacer"></span>
+        <button type="button" class="head-btn primary" id="bm-calc">Calculer le bilan</button>
+      </div>
+      <p class="bm-intro">À la fin d'une période, Filou compare ce que chacun a réellement pris à sa juste part. Un « +1 » signifie un coup de main donné en plus : il sera rendu à la génération suivante. Le report hérité de la période précédente est rappelé pour comparaison.</p>
+      <div class="bm-body">
+        <div class="bm-empty" id="bm-empty">Le bilan de l'Automne 2025 n'a pas encore été calculé. Clique sur « Calculer le bilan » ci-dessus.</div>
+        <table class="bm-table" id="bm-table">
+          <thead>
+            <tr>
+              <th scope="col">Vétérinaire</th>
+              <th scope="col">Report hérité<br>(fin Été 2025)</th>
+              <th scope="col">Bilan de la période</th>
+              <th scope="col">Nouveau report</th>
+            </tr>
+          </thead>
+          <tbody id="bm-body"></tbody>
+        </table>
+      </div>
+      <div class="bm-foot">
+        <span class="bm-status" id="bm-status"></span>
+      </div>
+    </section>
+
+    <!-- Historique des fêtes -->
+    <section class="card fetes-card" aria-label="Historique des fêtes de fin d'année">
+      <div class="card-head">
+        <div>
+          <h3>🎄 Historique des fêtes</h3>
+          <p class="sub">Qui a tenu Noël et le Nouvel An, année après année</p>
+        </div>
+      </div>
+      <table class="fetes-table">
+        <thead>
+          <tr><th scope="col">Année</th><th scope="col">Noël (24–25 déc.)</th><th scope="col">Nouvel An (31 déc.–1er janv.)</th></tr>
+        </thead>
+        <tbody id="fetes-body"></tbody>
+      </table>
+      <p class="fetes-note">Alimenté automatiquement à chaque publication. À la génération, Filou évite de redonner la même fête à la même personne deux années de suite.</p>
+    </section>
+
+    <!-- Périodes passées -->
+    <section class="card periods-card" aria-label="Périodes planifiées">
+      <div class="card-head">
+        <div>
+          <h3>Périodes planifiées</h3>
+          <p class="sub">De la plus récente à la plus ancienne</p>
+        </div>
+      </div>
+      <ul class="periods-list">
+        <li>
+          <div class="period-name"><b>Hiver 2026</b><small>12 semaines · 5 janv. → 29 mars 2026</small></div>
+          <span class="status st-brouillon">Brouillon</span>
+          <button type="button" class="period-view" data-toast="Ouvre le planning Hiver 2026 (voir maquette M1).">Consulter</button>
+        </li>
+        <li>
+          <div class="period-name"><b>Automne 2025</b><small>12 semaines · 13 oct. 2025 → 4 janv. 2026</small></div>
+          <span class="status st-publiee">Publiée</span>
+          <button type="button" class="period-view" data-toast="Ouvre le planning Automne 2025 en lecture seule.">Consulter</button>
+        </li>
+        <li>
+          <div class="period-name"><b>Été 2025</b><small>17 semaines · 16 juin → 12 oct. 2025</small></div>
+          <span class="status st-archivee">Archivée</span>
+          <button type="button" class="period-view" data-toast="Ouvre le planning Été 2025 en lecture seule.">Consulter</button>
+        </li>
+        <li>
+          <div class="period-name"><b>Printemps 2025</b><small>12 semaines · 23 mars → 14 juin 2025</small></div>
+          <span class="status st-archivee">Archivée</span>
+          <button type="button" class="period-view" data-toast="Ouvre le planning Printemps 2025 en lecture seule.">Consulter</button>
+        </li>
+      </ul>
+    </section>
+
+    <!-- Compteurs cumulés -->
+    <section class="card cumul-card" aria-label="Compteurs cumulés sur toutes les périodes validées">
+      <div class="card-head">
+        <div>
+          <h3>Compteurs cumulés</h3>
+          <p class="sub">3 périodes validées · 41 semaines · brouillon en cours non compté</p>
+        </div>
+      </div>
+      <div class="cumul-body" id="cumul-body"><!-- rempli par le JS --></div>
+      <p class="lookback-note">⚖️ L'équité entre les périodes est déjà dans le moteur : à chaque génération, Filou relit ces compteurs et rattrape les petits écarts de la période précédente. Personne ne « perd » un week-end en changeant de saison.</p>
+    </section>
+
+  </div>
+</main>
+
+<!-- ===================== SECTION 4 · CONNEXIONS ===================== -->
+<main id="sec-connexions" class="section" aria-label="Connexions : agenda, e-mails et adresse du cabinet">
+  <div class="shell">
+
+    <div class="section-head">
+      <p class="section-kicker">Connexions · la tuyauterie, sortie du métier</p>
+      <h2>Trois branchements, réglés une fois, puis oubliés.</h2>
+      <p>Rien ici ne parle de gardes : uniquement ce qui relie GuardVeto au monde extérieur. Si un branchement tousse, Filou te le raconte en français.</p>
+    </div>
+
+    <div class="conn-grid">
+
+      <!-- Google Agenda -->
+      <section class="card conn-card" aria-label="Connexion Google Agenda">
+        <div class="conn-head">
+          <span class="conn-ico" aria-hidden="true">📅</span>
+          <div>
+            <h3>Google Agenda</h3>
+            <p class="sub">Le planning publié se retrouve dans l'agenda du cabinet</p>
+          </div>
+          <span class="conn-state on"><span class="cs-dot" aria-hidden="true"></span>Connecté</span>
+        </div>
+        <div class="conn-body">
+          <div class="field">
+            <label for="gcal-id">Identifiant du calendrier</label>
+            <input type="text" id="gcal-id" class="mono" value="cabinet4pattes@group.calendar.google.com" style="width:100%; min-height:42px; border-radius:12px;">
+          </div>
+          <p class="conn-line" id="sync-state">Dernière synchronisation : <b>cette nuit à 02:14</b> · 61 événements sur 61 <span style="color:var(--ok); font-weight:700;">✓</span></p>
+          <div class="conn-actions">
+            <button type="button" class="btn btn-valider" id="btn-resync">Re-synchroniser</button>
+            <button type="button" class="btn btn-corriger" data-ask="resync">Pourquoi re-synchroniser ?</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Expéditeur e-mail -->
+      <section class="card conn-card" aria-label="Expéditeur des e-mails">
+        <div class="conn-head">
+          <span class="conn-ico" aria-hidden="true">✉️</span>
+          <div>
+            <h3>Expéditeur des e-mails</h3>
+            <p class="sub">Invitations, plannings publiés, congés : signés par le cabinet</p>
+          </div>
+          <span class="conn-state on"><span class="cs-dot" aria-hidden="true"></span>Actif</span>
+        </div>
+        <div class="conn-body">
+          <div class="field">
+            <label for="brevo-email">Adresse d'envoi</label>
+            <input type="email" id="brevo-email" value="contact@cabinet4pattes.fr">
+          </div>
+          <div class="field">
+            <label for="brevo-nom">Nom affiché</label>
+            <input type="text" id="brevo-nom" value="Cabinet des Quatre Pattes">
+          </div>
+          <div class="conn-actions">
+            <button type="button" class="btn btn-valider" id="btn-brevo-save">Enregistrer</button>
+            <span style="font-size:0.74rem;color:var(--soft);align-self:center;">Le journal des envois est en bas de page.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Adresse du cabinet -->
+      <section class="card conn-card" aria-label="Adresse du cabinet et zones déduites">
+        <div class="conn-head">
+          <span class="conn-ico" aria-hidden="true">📍</span>
+          <div>
+            <h3>Adresse du cabinet</h3>
+            <p class="sub">Elle déduit la zone scolaire et les jours fériés</p>
+          </div>
+        </div>
+        <div class="conn-body">
+          <div class="field">
+            <label for="cab-adresse">Adresse</label>
+            <input type="text" id="cab-adresse" value="12 rue des Tilleuls, 03200 Vichy">
+          </div>
+          <div class="derived" id="derived-zone">
+            <span class="dv">🏫 Zone A · académie de Clermont-Ferrand</span>
+            <span class="dv">🎈 Fériés : France métropolitaine</span>
+          </div>
+          <p class="derived-note">Déduits automatiquement de l'adresse : rien à choisir, rien à se tromper.</p>
+          <div class="conn-actions">
+            <button type="button" class="btn btn-corriger" id="btn-adresse">Vérifier l'adresse</button>
+            <button type="button" class="btn btn-corriger" data-ask="zones">À quoi servent ces zones ?</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Journal des e-mails -->
+    <section class="card mail-card" aria-label="Journal des e-mails envoyés">
+      <div class="card-head">
+        <div>
+          <h3>Journal des e-mails</h3>
+          <p class="sub">Tout ce que GuardVeto a envoyé, et si c'est bien arrivé</p>
+        </div>
+        <span class="spacer"></span>
+        <div class="mail-filter">
+          <label class="hf-label" for="mail-type" style="margin-right:8px;">Type</label>
+          <select id="mail-type">
+            <option value="tous">Tous les types</option>
+            <option value="Invitation">Invitation</option>
+            <option value="Planning publié">Planning publié</option>
+            <option value="Congé validé">Congé validé</option>
+            <option value="Congé refusé">Congé refusé</option>
+            <option value="Rappel de publication">Rappel de publication</option>
+          </select>
+        </div>
+      </div>
+      <table class="mail-table">
+        <thead>
+          <tr><th scope="col">Date</th><th scope="col">Type</th><th scope="col">Destinataire</th><th scope="col">Objet</th><th scope="col">Statut</th></tr>
+        </thead>
+        <tbody id="mail-body"></tbody>
+      </table>
+    </section>
+
+  </div>
+</main>
+
+<!-- ===================== POP-UP D'ÉTAPE (roue) ===================== -->
+<div class="modal-veil" id="step-veil" role="dialog" aria-modal="true" aria-labelledby="sm-title" hidden>
+  <div class="step-modal">
+    <div class="step-modal-head">
+      <span class="avatar"><img src="../fox-1.png" alt="" id="sm-fox"></span>
+      <div>
+        <p class="step-tag" id="sm-tag">Étape 2 sur 4</p>
+        <h3 id="sm-title">Vos habitudes de garde</h3>
+      </div>
+      <button type="button" class="modal-close" id="sm-close" aria-label="Fermer l'entretien et revenir à la roue">✕</button>
+    </div>
+    <div class="step-modal-body">
+      <div class="step-convo" id="sm-convo" aria-live="polite"></div>
+      <aside class="step-valids" aria-label="Ce que tu as validé pendant l'entretien">
+        <div class="step-valids-head">
+          <h4>Ce que tu as validé</h4>
+          <p>S'écrit ligne à ligne, à chaque « C'est ça ». Rien ne s'enregistre sans ton accord.</p>
+        </div>
+        <div class="valid-rows" id="sm-rows">
+          <p class="valid-empty" id="sm-empty">Rien pour l'instant : réponds à Filou, à gauche.</p>
+        </div>
+      </aside>
+    </div>
+    <div class="step-modal-foot">
+      <span class="step-progress" id="sm-progress">L'étape avance sur la roue quand tu fermes.</span>
+      <button type="button" class="btn btn-corriger" id="sm-done">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== DIALOGUE GARDE-FOU DE DÉSACTIVATION ===================== -->
+<div class="modal-veil" id="guard-veil" role="dialog" aria-modal="true" aria-labelledby="guard-title" hidden>
+  <div class="guard-modal">
+    <div class="guard-head">
+      <span class="gfox"><img src="../fox-4.png" alt="Filou, l'air préoccupé"></span>
+      <div>
+        <h3 id="guard-title">Attends : Victor a des gardes publiées à venir.</h3>
+        <p>Filou · garde-fou avant désactivation</p>
+      </div>
+    </div>
+    <ul class="guard-list" id="guard-list"><!-- rempli par le JS --></ul>
+    <p class="guard-note" id="guard-note">Si tu le désactives maintenant, ces gardes restent sans titulaire : il faudra les réattribuer une par une, ou me demander de proposer une réparation équitable.</p>
+    <div class="guard-foot">
+      <button type="button" class="btn btn-valider" id="guard-keep">Garder la fiche active</button>
+      <button type="button" class="btn btn-destructif" id="guard-confirm">Désactiver quand même</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== TERRIER GLOBAL DE FILOU ===================== -->
+<div class="fox-out" id="fox-out" aria-hidden="true"><img src="../fox-1.png" alt=""></div>
+
+<aside class="burrow-panel" id="burrow-panel" aria-label="Panneau de conversation avec Filou">
+  <div class="panel-head">
+    <span class="avatar"><img src="../fox-1.png" alt="Avatar de Filou"></span>
+    <div>
+      <h3>Filou</h3>
+      <p class="sub">Sorti du terrier · il crée, explique, renseigne</p>
+    </div>
+    <button type="button" class="panel-reduce" id="panel-reduce" aria-label="Renvoyer Filou dans son terrier" title="Refermer">—</button>
+  </div>
+  <div class="panel-scroll" id="panel-scroll"></div>
+  <div class="panel-chips" id="panel-chips"><!-- chips selon la section --></div>
+  <form class="panel-input" id="panel-form">
+    <input type="text" id="panel-text" placeholder="Pose ta question à Filou…" aria-label="Écrire un message à Filou" autocomplete="off">
+    <button type="submit" class="panel-send" aria-label="Envoyer le message">➤</button>
+  </form>
+</aside>
+
+<div class="terrier-zone">
+  <button type="button" class="terrier" id="terrier" aria-label="Appeler Filou (il sort de son terrier)">
+    <svg viewBox="0 0 148 104" aria-hidden="true">
+      <path d="M10 96 C 16 52, 44 34, 74 32 C 104 34, 132 52, 138 96 Z" fill="#E4CFA6"/>
+      <path d="M18 96 C 24 58, 48 42, 74 40 C 100 42, 124 58, 130 96 Z" fill="#D9BE8C"/>
+      <ellipse cx="74" cy="66" rx="30" ry="21" fill="#4A3520"/>
+      <ellipse cx="74" cy="68" rx="24" ry="16" fill="#31210F"/>
+    </svg>
+    <span class="fox-peek" aria-hidden="true"><img src="../fox-1.png" alt=""></span>
+    <svg viewBox="0 0 148 104" aria-hidden="true" style="z-index:3; pointer-events:none;">
+      <path d="M40 78 Q 74 92 108 78 L 112 96 Q 74 104 36 96 Z" fill="#C9AA72"/>
+      <path d="M30 62 q -2 -10 2 -14 q 1 8 4 11 q 0 -9 5 -12 q -1 9 1 13 Z" fill="#7A8A3A"/>
+      <path d="M112 58 q 3 -9 0 -14 q -3 7 -6 9 q 1 -8 -3 -12 q 0 9 -2 13 Z" fill="#7A8A3A"/>
+      <path d="M120 82 q 4 -7 2 -12 q -4 5 -7 6 q 2 -6 -1 -10 q -2 7 -4 11 Z" fill="#8B9B47"/>
+    </svg>
+    <span class="t-hint">Filou 🦊</span>
+  </button>
+</div>
+
+<div class="toast-zone" id="toast-zone" aria-live="polite"></div>
+
+<footer class="footer-lab">
+  <span><b>Maquette M4 · GuardVeto</b> · Accueil jour-1, Équipe, Historique &amp; compteurs, Connexions · données fictives · MonProjetPro</span>
+  <span>Ambiance Terrier chaleureux · Filou en pleine lumière à l'accueil, en terrier partout ailleurs.</span>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var $ = function (sel) { return document.querySelector(sel); };
+  var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, REDUCED ? Math.min(ms, 60) : ms); }); };
+
+  /* ============================================================
+     DONNÉES COMMUNES
+     ============================================================ */
+  var VETS = [
+    { id: "anneso",  nom: "Anne-Sophie",   court: "Anne-So",  ini: "AS", c: "var(--vet-anneso)"  },
+    { id: "manon",   nom: "Manon",          court: "Manon",    ini: "M",  c: "var(--vet-manon)"   },
+    { id: "victor",  nom: "Victor",         court: "Victor",   ini: "V",  c: "var(--vet-victor)"  },
+    { id: "camille", nom: "Camille",        court: "Camille",  ini: "C",  c: "var(--vet-camille)" },
+    { id: "julie",   nom: "Julie",          court: "Julie",    ini: "J",  c: "var(--vet-julie)"   },
+    { id: "thomas",  nom: "Thomas",         court: "Thomas",   ini: "T",  c: "var(--vet-thomas)"  },
+    { id: "annecat", nom: "Anne-Catherine", court: "Anne-Cat", ini: "AC", c: "var(--vet-annecat)", recours: true }
+  ];
+
+  /* ---------- Toasts ---------- */
+  function toast(msg) {
+    var zone = $("#toast-zone");
+    var t = document.createElement("div");
+    t.className = "toast";
+    t.textContent = msg;
+    zone.appendChild(t);
+    setTimeout(function () { t.classList.add("bye"); }, 3200);
+    setTimeout(function () { t.remove(); }, 3600);
+  }
+
+  /* ============================================================
+     NAVIGATION PAR SOUS-ONGLETS
+     ============================================================ */
+  var SECTIONS = ["accueil", "equipe", "historique", "connexions"];
+  function showSection(name) {
+    SECTIONS.forEach(function (s) {
+      $("#sec-" + s).classList.toggle("active", s === name);
+    });
+    document.querySelectorAll(".subtabs [data-sec]").forEach(function (b) {
+      b.setAttribute("aria-selected", String(b.dataset.sec === name));
+    });
+    document.body.classList.toggle("on-accueil", name === "accueil");
+    if (name !== "accueil") setPanelContext(name);
+    foxRentre();
+    window.scrollTo({ top: 0, behavior: REDUCED ? "auto" : "smooth" });
+  }
+  document.querySelectorAll(".subtabs [data-sec]").forEach(function (btn) {
+    btn.addEventListener("click", function () { showSection(btn.dataset.sec); });
+  });
+
+  /* ============================================================
+     SECTION 1 · ROUE ORBITALE + POP-UP D'ÉTAPE
+     ============================================================ */
+  var stepStatus = ["done", "active", "todo", "todo"]; /* état des 4 étapes */
+  var stepCompletedNow = false; /* l'étape ouverte vient-elle d'être terminée ? */
+  var currentStep = 1;
+  var runId = 0;
+
+  var STEP_META = [
+    { title: "Ton équipe", fox: "../fox-1.png" },
+    { title: "Vos habitudes de garde", fox: "../fox-1.png" },
+    { title: "Générer ton premier planning", fox: "../fox-2.png" },
+    { title: "Inviter les vétos", fox: "../fox-3.png" }
+  ];
+
+  /* Chaque étape : une suite d'échanges { filou, user, reform, rows[] }.
+     rows = ce qui s'ajoute au tableau de droite quand on clique « C'est ça ». */
+  var STEP_FLOWS = [
+    { /* Étape 1 · déjà complétée : récap en lecture */
+      recap: true,
+      opening: "Cette étape est déjà complétée : voici ce que tu as validé. Dis-moi si quelqu'un arrive ou s'en va, je mettrai la fiche à jour.",
+      rows: [
+        { ico: "👥", label: "7 vétérinaires enregistrés", detail: "Anne-Sophie, Anne-Catherine, Manon, Victor, Camille, Julie, Thomas" },
+        { ico: "🔑", label: "Anne-Sophie : administratrice", detail: "Seule à générer et publier les plannings" },
+        { ico: "🛟", label: "Anne-Catherine : dernier recours", detail: "Appelée uniquement si personne d'autre ne peut" }
+      ],
+      closing: "Tout est bon de ce côté. Tu peux fermer et passer à l'étape 2 : vos habitudes de garde."
+    },
+    { /* Étape 2 · habitudes de garde */
+      opening: "Étape 2 : vos habitudes de garde. Raconte-moi votre roulement, avec tes mots : qui prend les nuits de semaine, comment se passe le week-end ?",
+      exchanges: [
+        {
+          user: "Une garde chaque nuit du lundi au jeudi, et le week-end en binôme du vendredi soir au dimanche.",
+          reform: "Si je comprends bien : 1 vétérinaire de garde par nuit de semaine, et un binôme (1er et 2nd) du vendredi soir au dimanche. C'est bien ça ?",
+          rows: [
+            { ico: "🌙", label: "Nuits de semaine : 1 vétérinaire", detail: "Du lundi au jeudi soir" },
+            { ico: "🧡", label: "Week-end en binôme", detail: "Du vendredi soir au dimanche · 1er et 2nd de garde" }
+          ]
+        },
+        {
+          filou: "Noté ! Et Anne-Catherine, elle tourne comme les autres ?",
+          user: "Non, Anne-Cat ne prend des gardes qu'en dernier recours.",
+          reform: "Donc : Anne-Catherine n'est appelée qu'en dernier recours, jamais dans la rotation normale. J'enregistre ?",
+          rows: [
+            { ico: "🛟", label: "Anne-Catherine : dernier recours", detail: "Hors rotation, appelée seulement en secours" }
+          ]
+        }
+      ],
+      closing: "Parfait, vos habitudes sont enregistrées dans « Règles du cabinet ». Ferme la fenêtre : la roue avance à l'étape 3."
+    },
+    { /* Étape 3 · génération */
+      opening: "Étape 3 : ton premier planning. Je récapitule ce que j'ai en main : 7 vétérinaires, 9 règles actives, période d'hiver de 12 semaines, effectif de 1 par nuit.",
+      exchanges: [
+        {
+          user: "Vas-y, lance !",
+          reform: "Je génère le brouillon Hiver 2026 (12 semaines, du 5 janvier au 29 mars) avec vos 9 règles. Je lance ?",
+          rows: [
+            { ico: "🗓️", label: "Période : Hiver 2026", detail: "12 semaines · 5 janvier → 29 mars" },
+            { ico: "✅", label: "Brouillon généré", detail: "9 règles respectées · équitable à 1 garde près" }
+          ],
+          after: "C'est fait ! Le brouillon t'attend dans l'onglet Planning : relis-le tranquillement, tout reste modifiable à la main."
+        }
+      ],
+      closing: "Dernière étape ensuite : inviter les vétos, pour que chacun voie ses gardes sur son téléphone."
+    },
+    { /* Étape 4 · invitations */
+      opening: "Dernière étape : inviter les vétos. J'envoie un e-mail à chacun des 6 autres ; ils verront leurs gardes sur leur téléphone, sans rien installer.",
+      exchanges: [
+        {
+          user: "Oui, envoie à tout le monde.",
+          reform: "J'envoie 6 invitations : Anne-Catherine, Manon, Victor, Camille, Julie et Thomas. Tu suivras qui a rejoint dans l'onglet Équipe. J'envoie ?",
+          rows: [
+            { ico: "✉️", label: "6 invitations envoyées", detail: "Chacun crée son mot de passe depuis l'e-mail" },
+            { ico: "👀", label: "Suivi dans l'onglet Équipe", detail: "Sans compte → Invitation envoyée → Actif" }
+          ]
+        }
+      ],
+      closing: "Et voilà : l'installation est finie ! Ferme la fenêtre, je te fais une petite surprise."
+    }
+  ];
+
+  /* ---------- Construction des bulles ---------- */
+  var smConvo = $("#sm-convo");
+  function scrollConvo() { smConvo.scrollTop = smConvo.scrollHeight; }
+  function makeBubble(kind, whoLabel) {
+    var b = document.createElement("div");
+    b.className = "bubble " + kind;
+    if (whoLabel) {
+      var w = document.createElement("span");
+      w.className = "who";
+      w.textContent = whoLabel;
+      b.appendChild(w);
+    }
+    var body = document.createElement("span");
+    b.appendChild(body);
+    smConvo.appendChild(b);
+    scrollConvo();
+    return { bubble: b, body: body };
+  }
+  async function typeInto(el, text, id) {
+    if (REDUCED) { el.textContent = text; return; }
+    var caret = document.createElement("span");
+    caret.className = "type-caret";
+    el.after(caret);
+    for (var i = 0; i < text.length; i++) {
+      if (id !== runId) { caret.remove(); return; }
+      el.textContent += text[i];
+      if (i % 3 === 0) scrollConvo();
+      await new Promise(function (r) { setTimeout(r, 15); });
+    }
+    caret.remove();
+    scrollConvo();
+  }
+  async function filouSays(text, id) {
+    var r = makeBubble("filou", "🦊 Filou");
+    await typeInto(r.body, text, id);
+  }
+  function userSays(text) {
+    var r = makeBubble("user", "Anne-Sophie");
+    r.body.textContent = text;
+    scrollConvo();
+  }
+  function systemNote(text) {
+    var b = document.createElement("div");
+    b.className = "bubble note";
+    b.textContent = text;
+    smConvo.appendChild(b);
+    scrollConvo();
+  }
+  /* Reformulation : rend une promesse résolue quand on clique « C'est ça ✓ » */
+  async function filouReformulates(text, id) {
+    var r = makeBubble("reformulation", "🦊 Filou reformule");
+    await typeInto(r.body, text, id);
+    return new Promise(function (resolve) {
+      if (id !== runId) { resolve(false); return; }
+      var actions = document.createElement("div");
+      actions.className = "reform-actions";
+      var ok = document.createElement("button");
+      ok.type = "button"; ok.className = "btn btn-valider"; ok.textContent = "C'est ça ✓";
+      var ko = document.createElement("button");
+      ko.type = "button"; ko.className = "btn btn-corriger"; ko.textContent = "Corriger";
+      actions.append(ok, ko);
+      r.bubble.appendChild(actions);
+      scrollConvo();
+      ok.addEventListener("click", function () {
+        ok.classList.add("pressed");
+        ok.textContent = "Validé ✓";
+        ko.disabled = true; ko.style.opacity = "0.4";
+        resolve(true);
+      });
+      ko.addEventListener("click", function () {
+        var note = document.createElement("p");
+        note.style.cssText = "margin-top:8px;font-size:0.78rem;color:var(--muted);font-style:italic;";
+        note.textContent = "Dans la vraie application, tu corriges en une phrase et Filou reformule à nouveau.";
+        if (!r.bubble.querySelector("p")) r.bubble.appendChild(note);
+        scrollConvo();
+      });
+    });
+  }
+
+  /* ---------- Le tableau des validations (colonne droite) ---------- */
+  function addValidRow(row) {
+    $("#sm-empty").classList.add("hide");
+    var d = document.createElement("div");
+    d.className = "valid-row";
+    d.innerHTML = '<span class="ico">' + row.ico + '</span><span><b>' + row.label + "</b><small>" + row.detail + '</small></span><span class="vchk" aria-hidden="true">✓</span>';
+    $("#sm-rows").appendChild(d);
+    requestAnimationFrame(function () { requestAnimationFrame(function () { d.classList.add("in"); }); });
+    $("#sm-rows").scrollTop = $("#sm-rows").scrollHeight;
+  }
+
+  /* ---------- Ouverture / fermeture de la pop-up d'étape ---------- */
+  var stepVeil = $("#step-veil");
+  var lastFocus = null;
+  function openStepModal(step) {
+    currentStep = step;
+    stepCompletedNow = false;
+    lastFocus = document.activeElement;
+    var meta = STEP_META[step];
+    $("#sm-tag").textContent = "Étape " + (step + 1) + " sur 4" + (stepStatus[step] === "done" ? " · complétée" : "");
+    $("#sm-title").textContent = meta.title;
+    $("#sm-fox").src = meta.fox;
+    smConvo.innerHTML = "";
+    $("#sm-rows").querySelectorAll(".valid-row").forEach(function (n) { n.remove(); });
+    $("#sm-empty").classList.remove("hide");
+    $("#sm-done").className = "btn btn-corriger";
+    $("#sm-done").textContent = "Fermer";
+    $("#sm-progress").textContent = "L'étape avance sur la roue quand tu fermes.";
+    stepVeil.hidden = false;
+    requestAnimationFrame(function () { stepVeil.classList.add("open"); });
+    $("#sm-close").focus();
+    runStepFlow(step);
+  }
+  function closeStepModal() {
+    runId++;
+    stepVeil.classList.remove("open");
+    setTimeout(function () { stepVeil.hidden = true; }, REDUCED ? 0 : 250);
+    if (lastFocus) lastFocus.focus();
+    if (stepCompletedNow && stepStatus[currentStep] !== "done") advanceWheel(currentStep);
+  }
+  $("#sm-close").addEventListener("click", closeStepModal);
+  $("#sm-done").addEventListener("click", closeStepModal);
+  stepVeil.addEventListener("click", function (e) { if (e.target === stepVeil) closeStepModal(); });
+
+  async function runStepFlow(step) {
+    var id = ++runId;
+    var flow = STEP_FLOWS[step];
+    await sleep(400); if (id !== runId) return;
+
+    if (flow.recap || stepStatus[step] === "done") {
+      /* Étape déjà complétée : récap en lecture */
+      await filouSays(flow.opening || "Cette étape est déjà complétée : voici ce que tu avais validé.", id);
+      if (id !== runId) return;
+      var rows = flow.rows || [];
+      for (var i = 0; i < rows.length; i++) {
+        if (id !== runId) return;
+        addValidRow(rows[i]);
+        await sleep(320);
+      }
+      systemNote("✓ Étape déjà complétée · rien à refaire");
+      if (flow.closing) { await sleep(500); if (id !== runId) return; await filouSays(flow.closing, id); }
+      return;
+    }
+
+    await filouSays(flow.opening, id);
+    if (id !== runId) return;
+
+    for (var e = 0; e < flow.exchanges.length; e++) {
+      var ex = flow.exchanges[e];
+      if (ex.filou) {
+        await sleep(700); if (id !== runId) return;
+        await filouSays(ex.filou, id);
+        if (id !== runId) return;
+      }
+      await sleep(900); if (id !== runId) return;
+      userSays(ex.user);
+      await sleep(800); if (id !== runId) return;
+      var okClicked = await filouReformulates(ex.reform, id);
+      if (id !== runId || !okClicked) return;
+      for (var r = 0; r < ex.rows.length; r++) {
+        addValidRow(ex.rows[r]);
+        await sleep(300); if (id !== runId) return;
+      }
+      systemNote("✓ Enregistré · ajouté au tableau de droite");
+      if (ex.after) {
+        await sleep(600); if (id !== runId) return;
+        await filouSays(ex.after, id);
+        if (id !== runId) return;
+      }
+    }
+
+    stepCompletedNow = true;
+    await sleep(500); if (id !== runId) return;
+    await filouSays(flow.closing, id);
+    if (id !== runId) return;
+    $("#sm-done").className = "btn btn-valider";
+    $("#sm-done").textContent = "Fermer : étape validée ✓";
+    $("#sm-progress").textContent = "Étape " + (step + 1) + " terminée : la roue avance à la fermeture.";
+  }
+
+  /* ---------- La roue : états et avancement ---------- */
+  function paintWheel() {
+    document.querySelectorAll(".node").forEach(function (node, i) {
+      node.classList.remove("done", "active");
+      var st = stepStatus[i];
+      if (st === "done") node.classList.add("done");
+      if (st === "active") node.classList.add("active");
+      var dot = node.querySelector(".node-dot");
+      var state = node.querySelector(".node-state");
+      if (dot) dot.textContent = st === "done" ? "✓" : String(i + 1);
+      if (state) state.textContent = st === "done" ? "Complétée" : (st === "active" ? "En cours" : "À venir");
+    });
+  }
+  function advanceWheel(step) {
+    stepStatus[step] = "done";
+    var next = stepStatus.indexOf("todo");
+    if (next !== -1) stepStatus[next] = "active";
+    paintWheel();
+    if (stepStatus.every(function (s) { return s === "done"; })) celebrate();
+    else toast("Étape « " + STEP_META[step].title + " » validée ✓");
+  }
+  async function celebrate() {
+    var orbital = $("#orbital");
+    $("#orbit-center-img").src = "../fox-5.png";
+    $("#orbit-center-img").alt = "Filou émerveillé : l'installation est terminée";
+    $("#orbit-center").classList.add("celebrating");
+    orbital.classList.add("celebrate");
+    await sleep(1700);
+    $("#orbital-collapse").classList.add("gone");
+    $("#finish-card").classList.add("show");
+  }
+  document.querySelectorAll(".node").forEach(function (node) {
+    node.addEventListener("click", function () {
+      openStepModal(Number(node.dataset.step));
+    });
+  });
+
+  /* Démo : simuler la fin de l'onboarding */
+  $("#demo-finish").addEventListener("click", async function () {
+    runId++;
+    for (var i = 0; i < 4; i++) {
+      if (stepStatus[i] !== "done") { stepStatus[i] = "done"; paintWheel(); await sleep(340); }
+    }
+    celebrate();
+  });
+  $("#demo-replay").addEventListener("click", function () {
+    stepStatus = ["done", "active", "todo", "todo"];
+    $("#finish-card").classList.remove("show");
+    var oc = $("#orbital-collapse");
+    oc.classList.remove("gone");
+    $("#orbital").classList.remove("celebrate");
+    $("#orbit-center").classList.remove("celebrating");
+    $("#orbit-center-img").src = "../fox-1.png";
+    $("#orbit-center-img").alt = "Filou au centre du parcours";
+    paintWheel();
+  });
+
+  /* ============================================================
+     SECTION 2 · ÉQUIPE
+     ============================================================ */
+  /* état de compte : actif | invite | sans | inactif */
+  var TEAM = [
+    { id: "anneso",  nom: "Anne-Sophie",   ini: "AS", c: "var(--vet-anneso)",  statut: "Associée", admin: true,  recours: false, tags: ["chirurgie"],          compte: "actif",  gardes: [] },
+    { id: "annecat", nom: "Anne-Catherine", ini: "AC", c: "var(--vet-annecat)", statut: "Associée", admin: false, recours: true,  tags: ["référente NAC"],      compte: "actif",  gardes: [] },
+    { id: "manon",   nom: "Manon",          ini: "M",  c: "var(--vet-manon)",   statut: "Salariée", admin: false, recours: false, tags: ["canine", "nuits ok"], compte: "actif",  gardes: [
+        { date: "WE du 14–15 févr.", role: "1re de garde" },
+        { date: "Nuit du mar. 24 févr.", role: "seule de garde" }
+      ] },
+    { id: "victor",  nom: "Victor",         ini: "V",  c: "var(--vet-victor)",  statut: "Salarié",  admin: false, recours: false, tags: ["rurale"],             compte: "invite", gardes: [
+        { date: "WE du 21–22 févr.", role: "2nd de garde" },
+        { date: "Nuit du jeu. 5 mars", role: "seul de garde" },
+        { date: "WE du 14–15 mars", role: "1er de garde" }
+      ] },
+    { id: "camille", nom: "Camille",        ini: "C",  c: "var(--vet-camille)", statut: "Salariée", admin: false, recours: false, tags: ["féline"],             compte: "invite", gardes: [
+        { date: "Nuit du lun. 2 mars", role: "seule de garde" }
+      ] },
+    { id: "julie",   nom: "Julie",          ini: "J",  c: "var(--vet-julie)",   statut: "Salariée", admin: false, recours: false, tags: ["junior"],             compte: "sans",   gardes: [
+        { date: "WE du 28 févr.–1er mars", role: "2nde de garde" }
+      ] },
+    { id: "thomas",  nom: "Thomas",         ini: "T",  c: "var(--vet-thomas)",  statut: "Salarié",  admin: false, recours: false, tags: ["junior"],             compte: "sans",   gardes: [
+        { date: "Nuit du mer. 25 févr.", role: "seul de garde" },
+        { date: "WE du 7–8 mars", role: "1er de garde" }
+      ] }
+  ];
+  var ACCT_LABEL = { actif: "Compte actif", invite: "Invitation envoyée", sans: "Sans compte", inactif: "Fiche désactivée" };
+
+  function renderTeam() {
+    var grid = $("#team-grid");
+    grid.innerHTML = "";
+    TEAM.forEach(function (v) {
+      var card = document.createElement("article");
+      card.className = "vet-card" + (v.compte === "inactif" ? " inactive" : "");
+      var flags = "";
+      if (v.admin) flags += '<span class="flag flag-admin">Admin</span>';
+      else flags += '<span class="flag flag-role">Véto</span>';
+      flags += '<span class="flag flag-role">' + v.statut + "</span>";
+      if (v.recours) flags += '<span class="flag flag-recours">🛟 Dernier recours</span>';
+      var tags = v.tags.map(function (t) { return '<span class="tag">' + t + "</span>"; }).join("");
+      if (!tags) tags = '<span class="tag" style="opacity:0.55;font-style:italic;">aucune étiquette</span>';
+
+      var actions = '<button type="button" data-act="edit">Modifier</button>';
+      if (v.compte === "sans") actions += '<button type="button" class="va-invite" data-act="invite">Inviter</button>';
+      if (v.compte === "invite") actions += '<button type="button" class="va-invite" data-act="reinvite">Renvoyer l’invitation</button>';
+      if (v.compte === "inactif") actions += '<button type="button" class="va-invite" data-act="reactivate">Réactiver</button>';
+      else if (!v.admin) actions += '<button type="button" class="va-danger" data-act="deactivate">Désactiver</button>';
+
+      card.innerHTML =
+        '<div class="vet-card-top">' +
+          '<span class="vet-avatar" style="background:' + v.c + '">' + v.ini + "</span>" +
+          "<div><h3>" + v.nom + '</h3><p class="vet-sub">' + (v.admin ? "Administratrice du cabinet" : "Consulte son planning et pose ses congés") + "</p></div>" +
+        "</div>" +
+        '<div class="vet-flags">' + flags + "</div>" +
+        '<div class="vet-tags">' + tags + "</div>" +
+        '<div class="vet-account acct-' + v.compte + '"><span class="acct-dot" aria-hidden="true"></span>' + ACCT_LABEL[v.compte] + "</div>" +
+        '<div class="vet-actions">' + actions + "</div>";
+      grid.appendChild(card);
+
+      card.querySelectorAll("[data-act]").forEach(function (b) {
+        b.addEventListener("click", function () { teamAction(v, b.dataset.act); });
+      });
+    });
+    var actifs = TEAM.filter(function (v) { return v.compte === "actif"; }).length;
+    $("#team-count").textContent = TEAM.length + " vétérinaires · " + actifs + (actifs > 1 ? " comptes actifs" : " compte actif");
+  }
+
+  var guardTarget = null;
+  function teamAction(v, act) {
+    if (act === "invite") {
+      v.compte = "invite"; renderTeam();
+      toast("Invitation envoyée à " + v.nom + " ✉️");
+      filouJournal("Invitation envoyée à " + v.nom + ".");
+    } else if (act === "reinvite") {
+      toast("Invitation renvoyée à " + v.nom + " ✉️");
+    } else if (act === "edit") {
+      toast("Ouvre la fiche de " + v.nom + " (maquette : édition non simulée ici).");
+    } else if (act === "reactivate") {
+      v.compte = "sans"; renderTeam();
+      toast(v.nom + " est de retour dans l'équipe. Pense à l'inviter.");
+    } else if (act === "deactivate") {
+      openGuard(v);
+    }
+  }
+
+  /* ---------- Garde-fou de désactivation ---------- */
+  var guardVeil = $("#guard-veil");
+  function openGuard(v) {
+    guardTarget = v;
+    var fem = /e$/.test(v.statut.toLowerCase());
+    if (v.gardes.length) {
+      $("#guard-title").textContent = "Attends : " + v.nom + " a " + v.gardes.length +
+        (v.gardes.length > 1 ? " gardes publiées" : " garde publiée") + " à venir.";
+      $("#guard-note").textContent = "Si tu " + (fem ? "la" : "le") + " désactives maintenant, ces gardes restent sans titulaire : il faudra les réattribuer une par une, ou me demander de proposer une réparation équitable.";
+    } else {
+      $("#guard-title").textContent = v.nom + " n'a aucune garde publiée à venir.";
+      $("#guard-note").textContent = "Tu peux désactiver sa fiche sans rien casser : " + (fem ? "elle" : "il") + " n'apparaîtra plus dans les prochaines générations.";
+    }
+    var list = $("#guard-list");
+    list.innerHTML = "";
+    v.gardes.forEach(function (g) {
+      var li = document.createElement("li");
+      li.innerHTML = '<span aria-hidden="true">📅</span><span class="gl-date">' + g.date + '</span><span class="gl-role">' + g.role + "</span>";
+      list.appendChild(li);
+    });
+    guardVeil.hidden = false;
+    requestAnimationFrame(function () { guardVeil.classList.add("open"); });
+    $("#guard-keep").focus();
+  }
+  function closeGuard() {
+    guardVeil.classList.remove("open");
+    setTimeout(function () { guardVeil.hidden = true; }, REDUCED ? 0 : 250);
+  }
+  $("#guard-keep").addEventListener("click", function () {
+    closeGuard();
+    toast(guardTarget ? guardTarget.nom + " reste dans l'équipe 🦊" : "");
+  });
+  $("#guard-confirm").addEventListener("click", function () {
+    if (guardTarget) {
+      guardTarget.compte = "inactif";
+      renderTeam();
+      var n = guardTarget.gardes.length;
+      toast(guardTarget.nom + " désactivé·e" + (n ? " · " + n + (n > 1 ? " gardes à réattribuer" : " garde à réattribuer") : ""));
+      filouJournal("Fiche de " + guardTarget.nom + " désactivée" + (n ? " (" + n + " garde" + (n > 1 ? "s" : "") + " à réattribuer)" : "") + ".");
+    }
+    closeGuard();
+  });
+  guardVeil.addEventListener("click", function (e) { if (e.target === guardVeil) closeGuard(); });
+
+  /* ---------- Créer une fiche ---------- */
+  var createOpen = false;
+  $("#create-toggle").addEventListener("click", function () {
+    createOpen = !createOpen;
+    $("#create-panel").classList.toggle("open", createOpen);
+    this.setAttribute("aria-expanded", String(createOpen));
+    if (createOpen) $("#cf-nom").focus();
+  });
+  $("#create-cancel").addEventListener("click", function () {
+    createOpen = false;
+    $("#create-panel").classList.remove("open");
+    $("#create-toggle").setAttribute("aria-expanded", "false");
+  });
+  var newColor = "#C7530F";
+  document.querySelectorAll("#cf-swatches .swatch").forEach(function (s) {
+    s.addEventListener("click", function () {
+      document.querySelectorAll("#cf-swatches .swatch").forEach(function (x) { x.setAttribute("aria-pressed", "false"); });
+      s.setAttribute("aria-pressed", "true");
+      newColor = s.style.background;
+    });
+  });
+  $("#create-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var nom = $("#cf-nom").value.trim();
+    if (!nom) { $("#cf-nom").focus(); return; }
+    var tags = $("#cf-tags").value.split(",").map(function (t) { return t.trim(); }).filter(Boolean);
+    TEAM.push({
+      id: "new" + Date.now(), nom: nom, ini: nom.slice(0, 1).toUpperCase(),
+      c: newColor,
+      statut: $("#cf-statut").value.indexOf("Associé") === 0 ? "Associé·e" : "Salarié·e",
+      admin: $("#cf-role").value.indexOf("Admin") === 0,
+      recours: $("#cf-recours").checked,
+      tags: tags, compte: "sans", gardes: []
+    });
+    renderTeam();
+    this.reset();
+    createOpen = false;
+    $("#create-panel").classList.remove("open");
+    $("#create-toggle").setAttribute("aria-expanded", "false");
+    toast("Fiche de " + nom + " créée · sans compte pour l'instant");
+    filouJournal("Fiche créée : " + nom + ".");
+  });
+
+  /* ============================================================
+     SECTION 3 · HISTORIQUE & COMPTEURS
+     ============================================================ */
+  /* Données par période et par véto (ordre : AS, Manon, Victor, Camille, Julie, Thomas, Anne-Cat).
+     Chaque véto : [WE 1er, WE 2nd, Sem 1er, Sem 2nd, Fériés, Grands WE] */
+  var PERIODS = {
+    printemps: {
+      label: "Printemps 2025", detail: "12 semaines · 23 mars → 14 juin 2025", statut: "validé",
+      du: "2025-03-23", au: "2025-06-14",
+      data: { anneso: [2,2,8,8,2,0], manon: [2,2,8,8,1,1], victor: [2,2,8,8,1,1], camille: [2,2,8,8,2,0], julie: [2,2,8,8,1,1], thomas: [2,2,8,8,1,1], annecat: [0,0,0,0,0,0] }
+    },
+    ete: {
+      label: "Été 2025", detail: "17 semaines · 16 juin → 12 oct. 2025", statut: "validé",
+      du: "2025-06-16", au: "2025-10-12",
+      data: { anneso: [3,3,11,11,1,1], manon: [3,3,12,11,0,1], victor: [3,2,11,12,1,0], camille: [2,3,11,11,0,1], julie: [3,3,12,11,1,0], thomas: [3,3,11,12,1,1], annecat: [0,0,0,0,0,0] }
+    },
+    automne: {
+      label: "Automne 2025", detail: "12 semaines · 13 oct. 2025 → 4 janv. 2026", statut: "validé",
+      du: "2025-10-13", au: "2026-01-04",
+      data: { anneso: [2,2,8,8,2,0], manon: [2,2,9,8,2,1], victor: [3,2,7,8,1,0], camille: [1,2,8,8,1,0], julie: [2,2,8,8,1,1], thomas: [2,2,8,8,1,0], annecat: [0,0,0,0,0,0] }
+    },
+    hiver: {
+      label: "Hiver 2026 (brouillon)", detail: "12 semaines · 5 janv. → 29 mars 2026", statut: "brouillon",
+      du: "2026-01-05", au: "2026-03-29",
+      data: { anneso: [2,2,8,8,1,0], manon: [2,2,8,8,0,1], victor: [2,2,8,8,1,0], camille: [2,2,8,8,1,1], julie: [2,2,8,8,0,0], thomas: [2,2,8,8,1,0], annecat: [0,0,0,0,0,0] }
+    }
+  };
+  var histPeriod = "automne"; /* automne | ete | printemps | toutes | plage */
+  var histScope = "valide";   /* valide | tout */
+
+  function zeroData() {
+    var d = {};
+    VETS.forEach(function (v) { d[v.id] = [0, 0, 0, 0, 0, 0]; });
+    return d;
+  }
+  function addData(target, src) {
+    VETS.forEach(function (v) {
+      for (var i = 0; i < 6; i++) target[v.id][i] += src[v.id][i];
+    });
+  }
+  function periodsInRange(du, au) {
+    var out = [];
+    Object.keys(PERIODS).forEach(function (k) {
+      var p = PERIODS[k];
+      if (p.du <= au && p.au >= du) out.push(k);
+    });
+    return out;
+  }
+  function currentSelection() {
+    /* renvoie { data, caption } selon période + périmètre */
+    var keys = [];
+    var capParts = [];
+    if (histPeriod === "toutes") {
+      keys = ["printemps", "ete", "automne"];
+      capParts.push("<b>Toutes les périodes</b> · 41 semaines validées");
+    } else if (histPeriod === "plage") {
+      var du = $("#range-du").value, au = $("#range-au").value;
+      if (du && au && du <= au) {
+        keys = periodsInRange(du, au);
+        var names = keys.map(function (k) { return PERIODS[k].label; });
+        capParts.push("<b>Plage libre</b> · du " + frDate(du) + " au " + frDate(au) + " · chevauche : " + (names.join(", ") || "aucune période"));
+      } else {
+        capParts.push("<b>Plage libre</b> · choisis deux dates valides puis « Appliquer »");
+      }
+    } else {
+      keys = [histPeriod];
+      capParts.push("<b>" + PERIODS[histPeriod].label + "</b> · " + PERIODS[histPeriod].detail);
+    }
+    var excluded = [];
+    if (histScope === "valide") {
+      keys = keys.filter(function (k) {
+        if (PERIODS[k].statut === "brouillon") { excluded.push(PERIODS[k].label); return false; }
+        return true;
+      });
+      capParts.push("gardes validées seulement" + (excluded.length ? " · " + excluded.join(", ") + " exclu" : ""));
+    } else {
+      capParts.push("tout compris, brouillons inclus");
+    }
+    var data = zeroData();
+    keys.forEach(function (k) { addData(data, PERIODS[k].data); });
+    return { data: data, caption: capParts.join(" · ") };
+  }
+  function frDate(iso) {
+    var p = iso.split("-");
+    return p[2] + "/" + p[1] + "/" + p[0];
+  }
+
+  function ecartChip(delta, isRecours) {
+    if (isRecours) return '<span class="ecart none" title="Dernier recours : hors répartition">—</span>';
+    var r = Math.round(delta);
+    var txt = r === 0 ? "=" : (r > 0 ? "+" + r : "−" + Math.abs(r));
+    var cls = Math.abs(delta) < 0.75 ? "ok" : (Math.abs(delta) < 1.75 ? "warn" : "bad");
+    var title = cls === "ok" ? "Dans la juste part" : (cls === "warn" ? "Léger écart, surveillé par Filou" : "Écart à rattraper à la prochaine génération");
+    return '<span class="ecart ' + cls + '" title="' + title + '">' + txt + "</span>";
+  }
+  function renderCounters() {
+    var sel = currentSelection();
+    $("#hist-caption").innerHTML = sel.caption;
+    var d = sel.data;
+    var actifs = VETS.filter(function (v) { return !v.recours; });
+    function mean(fn) {
+      var s = 0;
+      actifs.forEach(function (v) { s += fn(d[v.id]); });
+      return s / actifs.length;
+    }
+    var mWE  = mean(function (x) { return x[0] + x[1]; });
+    var mSem = mean(function (x) { return x[2] + x[3]; });
+    var mFer = mean(function (x) { return x[4]; });
+    var mGwe = mean(function (x) { return x[5]; });
+
+    function vetCell(v) {
+      return '<td><span class="ct-vet"><i style="background:' + v.c + '"></i>' + v.court + "</span></td>";
+    }
+    function num(n) { return '<td class="' + (n === 0 ? "zero" : "") + '">' + n + "</td>"; }
+
+    var we = "", sem = "", fer = "", gwe = "";
+    VETS.forEach(function (v) {
+      var x = d[v.id];
+      we  += "<tr>" + vetCell(v) + num(x[0]) + num(x[1]) + num(x[0] + x[1]) + "<td>" + ecartChip(x[0] + x[1] - mWE, v.recours) + "</td></tr>";
+      sem += "<tr>" + vetCell(v) + num(x[2]) + num(x[3]) + num(x[2] + x[3]) + "<td>" + ecartChip(x[2] + x[3] - mSem, v.recours) + "</td></tr>";
+      fer += "<tr>" + vetCell(v) + num(x[4]) + "<td>" + ecartChip(x[4] - mFer, v.recours) + "</td></tr>";
+      gwe += "<tr>" + vetCell(v) + num(x[5]) + "<td>" + ecartChip(x[5] - mGwe, v.recours) + "</td></tr>";
+    });
+    $("#tb-we").innerHTML = we;
+    $("#tb-sem").innerHTML = sem;
+    $("#tb-fer").innerHTML = fer;
+    $("#tb-gwe").innerHTML = gwe;
+  }
+
+  /* Filtres */
+  document.querySelectorAll("#period-seg button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll("#period-seg button").forEach(function (x) { x.setAttribute("aria-pressed", "false"); });
+      b.setAttribute("aria-pressed", "true");
+      histPeriod = b.dataset.period;
+      $("#range-fields").classList.toggle("show", histPeriod === "plage");
+      renderCounters();
+    });
+  });
+  document.querySelectorAll("#scope-seg button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll("#scope-seg button").forEach(function (x) { x.setAttribute("aria-pressed", "false"); });
+      b.setAttribute("aria-pressed", "true");
+      histScope = b.dataset.scope;
+      renderCounters();
+    });
+  });
+  $("#range-apply").addEventListener("click", renderCounters);
+
+  /* ---------- Bilan bonus / malus ---------- */
+  var BM = [
+    { id: "anneso",  herite: 1,  periode: -1 },
+    { id: "manon",   herite: -1, periode: 1 },
+    { id: "victor",  herite: 0,  periode: 1 },
+    { id: "camille", herite: 0,  periode: -1 },
+    { id: "julie",   herite: 1,  periode: -1 },
+    { id: "thomas",  herite: -1, periode: 1 }
+  ];
+  function bmVal(n) {
+    var cls = n > 0 ? "pos" : (n < 0 ? "neg" : "nul");
+    var txt = n > 0 ? "+" + n : (n < 0 ? "−" + Math.abs(n) : "0");
+    return '<span class="bm-val ' + cls + '">' + txt + "</span>";
+  }
+  var bmDone = false;
+  $("#bm-calc").addEventListener("click", async function () {
+    var body = $("#bm-body");
+    body.innerHTML = "";
+    $("#bm-empty").style.display = "none";
+    $("#bm-table").classList.add("show");
+    for (var i = 0; i < BM.length; i++) {
+      var v = VETS.find(function (x) { return x.id === BM[i].id; });
+      var tr = document.createElement("tr");
+      tr.innerHTML = '<td><span class="ct-vet"><i style="background:' + v.c + '"></i>' + v.court + "</span></td>" +
+        "<td>" + bmVal(BM[i].herite) + "</td>" +
+        "<td>" + bmVal(BM[i].periode) + "</td>" +
+        "<td>" + bmVal(BM[i].herite + BM[i].periode) + "</td>";
+      body.appendChild(tr);
+      await sleep(160);
+    }
+    var tr2 = document.createElement("tr");
+    tr2.innerHTML = '<td><span class="ct-vet"><i style="background:var(--vet-annecat)"></i>Anne-Cat</span></td><td><span class="bm-val nul">—</span></td><td><span class="bm-val nul">—</span></td><td><span class="bm-val nul">—</span></td>';
+    body.appendChild(tr2);
+    $("#bm-status").innerHTML = bmDone
+      ? "Bilan <b>recalculé</b> à l'instant · le nouveau report nourrira la génération de l'Hiver 2026."
+      : "Bilan <b>calculé</b> à l'instant · le nouveau report nourrira la génération de l'Hiver 2026.";
+    this.textContent = "Recalculer";
+    if (!bmDone) { toast("Bilan de fin de période calculé ⚖️"); filouJournal("Bilan de l'Automne 2025 calculé : les reports sont à jour."); }
+    else toast("Bilan recalculé : mêmes reports, rien n'a bougé.");
+    bmDone = true;
+  });
+
+  /* ---------- Historique des fêtes ---------- */
+  var FETES = [
+    { annee: 2025, noel: [["Manon", "1re"], ["Anne-So", "2nde"]], na: [["Camille", "1re"], ["Victor", "2nd"]] },
+    { annee: 2024, noel: [["Victor", "1er"], ["Camille", "2nde"]], na: [["Thomas", "1er"], ["Julie", "2nde"]] },
+    { annee: 2023, noel: [["Julie", "1re"], ["Thomas", "2nd"]], na: [["Anne-So", "1re"], ["Manon", "2nde"]] }
+  ];
+  function vetByCourt(court) { return VETS.find(function (v) { return v.court === court; }); }
+  function duo(list) {
+    return '<span class="fete-duo">' + list.map(function (pair, i) {
+      var v = vetByCourt(pair[0]);
+      return '<span class="pill' + (i === 1 ? " second" : "") + '" style="background:' + (v ? v.c : "var(--soft)") + '">' + pair[0] + ' <span class="rank">' + pair[1] + "</span></span>";
+    }).join("") + "</span>";
+  }
+  (function renderFetes() {
+    var body = $("#fetes-body");
+    FETES.forEach(function (f) {
+      var tr = document.createElement("tr");
+      tr.innerHTML = '<td class="annee">' + f.annee + "</td><td>" + duo(f.noel) + "</td><td>" + duo(f.na) + "</td>";
+      body.appendChild(tr);
+    });
+  })();
+
+  /* ---------- Compteurs cumulés (barres) ---------- */
+  (function renderCumul() {
+    var data = zeroData();
+    ["printemps", "ete", "automne"].forEach(function (k) { addData(data, PERIODS[k].data); });
+    var body = $("#cumul-body");
+    var head = document.createElement("div");
+    head.className = "cm-row cm-header";
+    head.innerHTML = "<span>Vétérinaire</span><span>Week-ends</span><span>Nuits de semaine</span><span>Fériés</span>";
+    body.appendChild(head);
+    var maxWE = 0, maxSem = 0, maxFer = 0;
+    VETS.forEach(function (v) {
+      var x = data[v.id];
+      maxWE = Math.max(maxWE, x[0] + x[1]);
+      maxSem = Math.max(maxSem, x[2] + x[3]);
+      maxFer = Math.max(maxFer, x[4]);
+    });
+    VETS.forEach(function (v) {
+      var x = data[v.id];
+      var row = document.createElement("div");
+      row.className = "cm-row";
+      function cell(val, max) {
+        var w = max ? Math.round((val / max) * 100) : 0;
+        return '<span class="cm-cell"><b>' + val + '</b><span class="bar"><i style="width:' + w + "%;background:" + v.c + '"></i></span></span>';
+      }
+      row.innerHTML = '<span class="cm-vet"><i style="background:' + v.c + '"></i>' + v.court + "</span>" +
+        cell(x[0] + x[1], maxWE) + cell(x[2] + x[3], maxSem) + cell(x[4], maxFer);
+      body.appendChild(row);
+    });
+  })();
+
+  /* Boutons « Consulter » des périodes */
+  document.querySelectorAll(".period-view").forEach(function (b) {
+    b.addEventListener("click", function () { toast(b.dataset.toast || "Consultation (maquette)"); });
+  });
+
+  /* ============================================================
+     SECTION 4 · CONNEXIONS
+     ============================================================ */
+  $("#btn-resync").addEventListener("click", async function () {
+    var btn = this;
+    if (btn.disabled) return;
+    btn.disabled = true;
+    var old = btn.textContent;
+    btn.innerHTML = '<span class="sync-spin" aria-hidden="true"></span>Synchronisation…';
+    $("#sync-state").innerHTML = "Synchronisation en cours : envoi des gardes publiées vers Google Agenda…";
+    await sleep(1900);
+    btn.disabled = false;
+    btn.textContent = old;
+    $("#sync-state").innerHTML = 'Dernière synchronisation : <b>à l’instant</b> · 61 événements sur 61 <span style="color:var(--ok); font-weight:700;">✓</span>';
+    toast("Agenda re-synchronisé : 61 événements sur 61 ✓");
+    filouJournal("Re-synchronisation Google Agenda demandée par Anne-Sophie : 61/61 ✓.");
+  });
+  $("#btn-brevo-save").addEventListener("click", function () {
+    toast("Expéditeur enregistré : " + $("#brevo-nom").value + " <" + $("#brevo-email").value + ">");
+  });
+  $("#btn-adresse").addEventListener("click", async function () {
+    var btn = this;
+    btn.disabled = true;
+    var old = btn.textContent;
+    btn.innerHTML = '<span class="sync-spin" aria-hidden="true"></span>Vérification…';
+    await sleep(1200);
+    btn.disabled = false;
+    btn.textContent = old;
+    $("#derived-zone").innerHTML = '<span class="dv">🏫 Zone A · académie de Clermont-Ferrand</span><span class="dv">🎈 Fériés : France métropolitaine</span>';
+    toast("Adresse confirmée : zone A, fériés métropole ✓");
+  });
+
+  /* ---------- Journal des e-mails ---------- */
+  var MAILS = [
+    { date: "Auj. 08:12",     type: "Rappel de publication", dest: "anne-sophie@cabinet4pattes.fr", objet: "Hiver 2026 : publication attendue sous 12 jours", statut: "envoye" },
+    { date: "Hier 18:40",     type: "Congé validé",          dest: "manon@exemple.fr",              objet: "Ton congé du 16 au 18 février est validé",        statut: "envoye" },
+    { date: "Hier 18:39",     type: "Congé refusé",          dest: "thomas@exemple.fr",             objet: "Ton souhait du 14 février n'a pas pu être retenu", statut: "envoye" },
+    { date: "Lun. 09:03",     type: "Invitation",            dest: "victor@exemple.fr",             objet: "Rejoins GuardVeto : ton planning de gardes t'attend", statut: "envoye" },
+    { date: "Lun. 09:03",     type: "Invitation",            dest: "camille@exemple.fr",            objet: "Rejoins GuardVeto : ton planning de gardes t'attend", statut: "echec" },
+    { date: "Ven. 17:22",     type: "Planning publié",       dest: "toute l'équipe (6)",            objet: "Le planning Automne 2025 est publié",             statut: "envoye" },
+    { date: "Ven. 17:22",     type: "Planning publié",       dest: "julie@exemple.fr",              objet: "Le planning Automne 2025 est publié",             statut: "envoye" },
+    { date: "Jeu. 11:15",     type: "Congé validé",          dest: "camille@exemple.fr",            objet: "Ton congé du 2 mars est validé",                  statut: "envoye" }
+  ];
+  function renderMails() {
+    var filtre = $("#mail-type").value;
+    var body = $("#mail-body");
+    body.innerHTML = "";
+    MAILS.forEach(function (m, idx) {
+      if (filtre !== "tous" && m.type !== filtre) return;
+      var tr = document.createElement("tr");
+      var statut = m.statut === "envoye"
+        ? '<span class="m-statut envoye"><span class="msd" aria-hidden="true"></span>Envoyé</span>'
+        : '<span class="m-statut echec"><span class="msd" aria-hidden="true"></span>Échec</span><button type="button" class="m-retry" data-idx="' + idx + '">Renvoyer</button>';
+      tr.innerHTML = '<td class="m-date">' + m.date + '</td><td><span class="mail-type">' + m.type + "</span></td><td>" + m.dest + "</td><td>" + m.objet + "</td><td>" + statut + "</td>";
+      body.appendChild(tr);
+    });
+    body.querySelectorAll(".m-retry").forEach(function (b) {
+      b.addEventListener("click", function () {
+        MAILS[Number(b.dataset.idx)].statut = "envoye";
+        renderMails();
+        toast("E-mail renvoyé ✓");
+        filouJournal("Invitation renvoyée après échec : camille@exemple.fr ✓.");
+      });
+    });
+  }
+  $("#mail-type").addEventListener("change", renderMails);
+
+  /* ============================================================
+     TERRIER GLOBAL DE FILOU (sections 2, 3, 4)
+     ============================================================ */
+  var panelScroll = $("#panel-scroll");
+  function panelBubble(kind, who, html) {
+    var b = document.createElement("div");
+    b.className = "bubble " + kind;
+    if (who) {
+      var w = document.createElement("span");
+      w.className = "who";
+      w.textContent = who;
+      b.appendChild(w);
+    }
+    var body = document.createElement("span");
+    body.innerHTML = html;
+    b.appendChild(body);
+    panelScroll.appendChild(b);
+    panelScroll.scrollTop = panelScroll.scrollHeight;
+    return b;
+  }
+  var journalEntries = [];
+  function filouJournal(text) { journalEntries.push(text); }
+
+  function foxSort() {
+    document.body.classList.remove("filou-in");
+    document.body.classList.add("filou-out");
+  }
+  function foxRentre() {
+    if (!document.body.classList.contains("filou-out")) return;
+    document.body.classList.remove("filou-out");
+    document.body.classList.add("filou-in");
+  }
+  $("#terrier").addEventListener("click", function () {
+    if (document.body.classList.contains("filou-out")) foxRentre();
+    else { foxSort(); setTimeout(function () { $("#panel-text").focus(); }, REDUCED ? 0 : 500); }
+  });
+  $("#panel-reduce").addEventListener("click", foxRentre);
+
+  /* Chips et réponses selon la section active */
+  var PANEL_CTX = {
+    equipe: {
+      hello: "Tu es sur l'Équipe. Je peux t'aider : par exemple, inviter tous les vétos qui n'ont pas encore de compte, d'un seul coup.",
+      chips: [
+        { label: "Invite les vétos d'un coup ?", act: "invite-all" },
+        { label: "À quoi servent les étiquettes ?", answer: "Les étiquettes décrivent qui peut faire quoi : « junior », « canine », « rurale »… Elles servent ensuite dans les règles, par exemple « toujours un senior avec un junior le week-end »." },
+        { label: "C'est quoi « dernier recours » ?", answer: "Anne-Catherine n'entre jamais dans la rotation normale : je ne l'appelle que si aucune autre solution n'existe. Son badge 🛟 le rappelle sur sa fiche." }
+      ]
+    },
+    historique: {
+      hello: "Tu consultes l'Historique. Les écarts en couleur, le bilan de fin de période, la plage libre : demande-moi, j'explique tout.",
+      chips: [
+        { label: "C'est quoi le bilan de fin de période ?", answer: "À la fin d'une période, je compare ce que chacun a réellement pris à sa juste part. Un « +1 » = un coup de main donné en plus : je le rends à la génération suivante. Le report hérité vient de la période d'avant, pour comparer." },
+        { label: "À quoi sert la plage libre ?", answer: "Elle compte les gardes entre deux dates de ton choix, même à cheval sur plusieurs périodes. Pratique pour vérifier une année civile complète, ou juste les fêtes." },
+        { label: "Pourquoi des écarts en couleur ?", answer: "Vert : la personne est dans sa juste part. Ambre : un petit écart, que je surveille. Rouge : un écart à rattraper, je le corrige en priorité à la prochaine génération." }
+      ]
+    },
+    connexions: {
+      hello: "Tu es sur les Connexions : l'agenda, les e-mails et l'adresse du cabinet. Si un branchement tousse, c'est ici que ça se voit, et je te le raconte.",
+      chips: [
+        { label: "Pourquoi re-synchroniser ?", act: "explain-resync" },
+        { label: "D'où viennent la zone et les fériés ?", answer: "De l'adresse du cabinet : Vichy est dans l'Allier, donc zone A (académie de Clermont-Ferrand) et fériés de métropole. Si vous déménagez, corrige l'adresse : tout se recalcule." },
+        { label: "Un e-mail a échoué, je fais quoi ?", answer: "Regarde le journal en bas : la ligne en rouge a un bouton « Renvoyer ». Si ça échoue encore, l'adresse du destinataire est probablement erronée : vérifie-la sur sa fiche, dans l'Équipe." }
+      ]
+    }
+  };
+  var currentCtx = "equipe";
+  function setPanelContext(name) {
+    if (!PANEL_CTX[name]) return;
+    currentCtx = name;
+    panelScroll.innerHTML = "";
+    panelBubble("filou", "🦊 Filou", PANEL_CTX[name].hello);
+    var chips = $("#panel-chips");
+    chips.innerHTML = "";
+    PANEL_CTX[name].chips.forEach(function (c) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "chip"; b.textContent = c.label;
+      b.addEventListener("click", function () { handleChip(c); });
+      chips.appendChild(b);
+    });
+  }
+  function handleChip(c) {
+    panelBubble("user", "Anne-Sophie", c.label);
+    if (c.answer) {
+      setTimeout(function () { panelBubble("filou", "🦊 Filou", c.answer); }, REDUCED ? 0 : 450);
+    } else if (c.act === "invite-all") {
+      setTimeout(function () {
+        var attente = TEAM.filter(function (v) { return v.compte === "sans" || v.compte === "invite"; });
+        var noms = attente.map(function (v) { return v.nom; }).join(", ");
+        var b = panelBubble("reformulation", "🦊 Filou reformule",
+          attente.length
+            ? "J'envoie (ou renvoie) une invitation à : <b>" + noms + "</b>. Chacun recevra un e-mail pour créer son compte. J'envoie ?"
+            : "Tout le monde a déjà un compte actif : il n'y a personne à inviter 🦊");
+        if (!attente.length) return;
+        var actions = document.createElement("div");
+        actions.className = "reform-actions";
+        var ok = document.createElement("button");
+        ok.type = "button"; ok.className = "btn btn-valider btn-mini"; ok.textContent = "Envoie ✓";
+        var ko = document.createElement("button");
+        ko.type = "button"; ko.className = "btn btn-corriger btn-mini"; ko.textContent = "Pas maintenant";
+        actions.append(ok, ko);
+        b.appendChild(actions);
+        panelScroll.scrollTop = panelScroll.scrollHeight;
+        ok.addEventListener("click", function () {
+          ok.classList.add("pressed"); ok.textContent = "Envoyé ✓"; ko.disabled = true; ko.style.opacity = "0.4";
+          attente.forEach(function (v) { if (v.compte === "sans") v.compte = "invite"; });
+          renderTeam();
+          toast(attente.length + " invitations envoyées d'un coup ✉️");
+          filouJournal(attente.length + " invitations envoyées d'un coup, à la demande d'Anne-Sophie.");
+          setTimeout(function () {
+            panelBubble("filou", "🦊 Filou", "C'est fait : " + attente.length + " invitations parties. Tu suivras qui a rejoint sur les fiches, et chaque envoi est tracé dans le journal des e-mails (Connexions).");
+          }, REDUCED ? 0 : 400);
+        });
+        ko.addEventListener("click", function () {
+          ko.disabled = true; ok.disabled = true; ok.style.opacity = "0.4";
+          panelBubble("filou", "🦊 Filou", "Entendu, rien n'est parti. Les boutons « Inviter » restent sur chaque fiche quand tu voudras.");
+        });
+      }, REDUCED ? 0 : 450);
+    } else if (c.act === "explain-resync") {
+      setTimeout(function () {
+        panelBubble("filou", "🦊 Filou", "Normalement, chaque publication met l'agenda à jour toute seule. Mais si quelqu'un a supprimé un événement dans Google Agenda par erreur, ou si une synchro nocturne a échoué (je te préviens quand ça arrive), « Re-synchroniser » renvoie tout le planning publié, proprement. Aucun doublon : je remplace, je n'empile pas.");
+      }, REDUCED ? 0 : 450);
+    }
+  }
+  $("#panel-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var txt = $("#panel-text").value.trim();
+    if (!txt) return;
+    panelBubble("user", "Anne-Sophie", txt);
+    $("#panel-text").value = "";
+    setTimeout(function () {
+      panelBubble("filou", "🦊 Filou", "Bonne question ! Dans la vraie application, je réponds ou j'agis, et tout est tracé dans mon journal. Ici, dans la maquette, essaie plutôt les questions proposées au-dessus du champ.");
+    }, REDUCED ? 0 : 500);
+  });
+
+  /* ============================================================
+     INITIALISATION
+     ============================================================ */
+  paintWheel();
+  renderTeam();
+  renderCounters();
+  renderMails();
+  setPanelContext("equipe");
+})();
+</script>
+</body>
+</html>

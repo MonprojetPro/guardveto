@@ -1,0 +1,2343 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GuardVeto · Maquette M1 · Planning complet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700;800&family=Noto+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   GRANDE MAQUETTE GUARDVETO · TRANCHE M1 · PLANNING COMPLET
+   Ambiance : Terrier chaleureux (design system du labo v3).
+   Vue ADMIN. Données fictives. Aujourd'hui simulé : jeu. 15 janv. 2026.
+   ============================================================ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --font-display: "Figtree", "Segoe UI Variable Display", "Trebuchet MS", sans-serif;
+  --font-body: "Noto Sans", "Segoe UI", Verdana, sans-serif;
+  /* Couleurs des vétérinaires : le langage visuel de l'équipe. */
+  --vet-anneso:  #3B6FD1;
+  --vet-annecat: #8153C7;
+  --vet-manon:   #B93A72;
+  --vet-victor:  #0B7D6C;
+  --vet-camille: #55700F;
+  --vet-julie:   #A0522D;
+  --vet-thomas:  #4B5D73;
+  --nav-h: 62px;
+
+  /* ---- Terrier chaleureux ---- */
+  --bg:            #F6EEDF;
+  --bg-deep:       #EFE2CB;
+  --surface:       #FFFCF4;
+  --surface-2:     #F6EBD6;
+  --text:          #3A2A1C;
+  --muted:         #7C6A55;
+  --soft:          #A08D75;
+  --border:        #E6D7BB;
+  --border-strong: #D8C4A1;
+  --accent:        #C7530F;
+  --accent-ink:    #AC4508;
+  --accent-soft:   rgba(224, 122, 47, 0.13);
+  --accent-glow:   rgba(230, 126, 34, 0.28);
+  --ok:            #3E7A2E;
+  --ok-soft:       rgba(90, 150, 60, 0.14);
+  --warn:          #9A6200;
+  --warn-soft:     rgba(196, 138, 20, 0.16);
+  --danger:        #A8341F;
+  --danger-soft:   rgba(168, 52, 31, 0.12);
+  --bubble-filou:  #FBF3E2;
+  --bubble-user:   #EFE0C4;
+  --panel-bg:      #FFFCF4;
+  --grid-we:       rgba(199, 83, 15, 0.07);
+  --r-lg: 26px; --r-md: 18px; --r-sm: 12px;
+  --shadow-card:  0 10px 30px rgba(140, 84, 24, 0.10), 0 2px 6px rgba(140, 84, 24, 0.06);
+  --shadow-panel: 0 24px 60px rgba(120, 70, 18, 0.20), 0 4px 12px rgba(120, 70, 18, 0.10);
+  --nav-bg: rgba(246, 238, 223, 0.9);
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  padding-top: var(--nav-h);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, h4, .display { font-family: var(--font-display); }
+button { font-family: var(--font-body); cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+img { display: block; }
+.shell { max-width: 1240px; margin: 0 auto; padding: 0 clamp(14px, 3vw, 36px); }
+
+/* ============================================================
+   BARRE DE NAVIGATION COMMUNE (identique sur toutes les tranches)
+   ============================================================ */
+.mq-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  height: var(--nav-h);
+  background: var(--nav-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 18px;
+  padding: 0 clamp(14px, 3vw, 36px);
+  overflow-x: auto;
+}
+.mq-brand {
+  display: flex; align-items: center; gap: 10px; flex: none;
+  font-family: var(--font-display); font-weight: 700; font-size: 0.98rem;
+}
+.mq-brand img { width: 32px; height: 32px; object-fit: contain; }
+.mq-brand small {
+  display: block; font-family: var(--font-body);
+  font-weight: 500; font-size: 0.64rem; color: var(--muted);
+  letter-spacing: 0.1em; text-transform: uppercase;
+}
+.mq-links { display: flex; gap: 4px; margin-left: auto; flex: none; }
+.mq-links a {
+  display: inline-flex; align-items: center;
+  color: var(--muted); text-decoration: none;
+  font-size: 0.84rem; font-weight: 600;
+  padding: 8px 14px; border-radius: 999px;
+  min-height: 38px; white-space: nowrap;
+  border: 1px solid transparent;
+}
+.mq-links a:hover { color: var(--text); background: var(--surface-2); }
+.mq-links a[aria-current="page"] {
+  background: var(--accent); color: #fff;
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+
+/* ============================================================
+   BANDEAU · CARACTÉRISTIQUES DE LA PÉRIODE (retour MiKL n°1)
+   ============================================================ */
+.period-banner {
+  margin: 26px 0 18px;
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 14px 26px;
+}
+.pb-main { flex: 1 1 380px; min-width: 0; }
+.pb-title { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.pb-title h1 {
+  font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 800;
+  letter-spacing: -0.01em; line-height: 1.15;
+}
+.status-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.72rem; font-weight: 700;
+  padding: 5px 13px; border-radius: 999px;
+  border: 1px solid transparent;
+  transition: background-color .3s ease, color .3s ease;
+}
+.status-badge.st-brouillon { background: var(--warn-soft); color: var(--warn); border-color: rgba(196, 138, 20, 0.35); }
+.status-badge.st-publiee { background: var(--ok-soft); color: var(--ok); border-color: rgba(90, 150, 60, 0.35); }
+.status-badge.st-verrouillee { background: var(--surface-2); color: var(--muted); border-color: var(--border-strong); }
+.status-badge.pulse { animation: badgePulse 1.2s ease both; }
+@keyframes badgePulse {
+  0% { box-shadow: 0 0 0 0 var(--ok-soft); }
+  45% { box-shadow: 0 0 0 12px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.pb-sub { margin-top: 6px; color: var(--muted); font-size: 0.92rem; line-height: 1.55; }
+.pb-sub b { color: var(--text); font-family: var(--font-display); }
+.pb-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.pb-chip {
+  display: inline-flex; flex-direction: column; justify-content: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 7px 13px;
+  font-size: 0.8rem; font-weight: 600; line-height: 1.35;
+  box-shadow: 0 1px 3px rgba(140, 84, 24, 0.05);
+}
+.pb-chip small { font-size: 0.68rem; font-weight: 500; color: var(--muted); }
+.pb-chip.effectif { border-color: var(--border-strong); background: var(--accent-soft); }
+.pb-chip.effectif small { color: var(--accent-ink); font-weight: 600; }
+.pb-side { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+.pb-select-label {
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--soft);
+}
+.pb-select {
+  font-family: var(--font-body); font-size: 0.86rem; font-weight: 600;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 9px 14px;
+  min-height: 42px;
+  cursor: pointer;
+}
+.pb-today {
+  font-size: 0.72rem; color: var(--soft);
+  background: var(--surface); border: 1px dashed var(--border-strong);
+  border-radius: 999px; padding: 4px 12px;
+}
+
+/* ============================================================
+   ESPACE DE TRAVAIL (repris du labo : workspace + terrier)
+   ============================================================ */
+.workspace {
+  position: relative;
+  margin-bottom: 34px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  min-height: 680px;
+}
+.work-head {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.month-nav { display: flex; align-items: center; gap: 6px; }
+.month-nav h2 {
+  font-size: 1.02rem; font-weight: 700; min-width: 132px; text-align: center;
+}
+.mn-btn {
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2); color: var(--muted);
+  border-radius: 999px;
+  width: 36px; height: 36px;
+  font-size: 0.95rem; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.mn-btn:hover:not(:disabled) { color: var(--accent-ink); border-color: var(--accent-ink); }
+.mn-btn:disabled { opacity: 0.35; cursor: default; }
+.work-head .meta { font-size: 0.76rem; color: var(--muted); }
+.head-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+.head-btn {
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2); color: var(--muted);
+  border-radius: 999px; font-size: 0.78rem; font-weight: 700;
+  padding: 8px 14px; min-height: 38px;
+}
+.head-btn:hover:not(:disabled) { color: var(--accent-ink); border-color: var(--accent-ink); }
+.head-btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-ink); }
+.head-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.head-btn.primary:hover:not(:disabled) { filter: brightness(1.07); color: #fff; }
+.head-btn.primary:disabled { background: var(--ok); border-color: var(--ok); color: #fff; opacity: 0.85; cursor: default; }
+.head-btn.ghost { border-color: var(--border); background: transparent; }
+
+.work-body { padding: 18px 20px 130px; }
+.work-grid { display: grid; grid-template-columns: minmax(0, 1fr) 262px; gap: 20px; align-items: start; }
+.workspace.counters-closed .work-grid { grid-template-columns: 1fr; }
+.workspace.counters-closed .counters-panel { display: none; }
+
+/* ============================================================
+   GRILLE MENSUELLE
+   ============================================================ */
+.cal { min-width: 760px; }
+.cal-head {
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px;
+  margin-bottom: 5px;
+}
+.cal-head span {
+  font-family: var(--font-display);
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--soft);
+  text-align: center; padding: 2px 0;
+}
+.cal-body { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.cal-scroll { overflow-x: auto; padding-bottom: 4px; }
+.day {
+  position: relative;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 6px 6px 7px;
+  min-height: 96px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.day.we { background: var(--grid-we); }
+.day.fri { background: linear-gradient(180deg, var(--surface-2) 38%, var(--grid-we) 82%); }
+.day.other { border-style: dashed; }
+.day.other .d-num { color: var(--soft); }
+.day.past { background: #F1E9D8; }
+.day.past .pill, .day.past .conge-chip { opacity: 0.55; filter: saturate(0.55); }
+.day.past .d-num { color: var(--soft); }
+.day.hors { background: transparent; border-style: dashed; }
+.day.hors .d-num { color: var(--soft); }
+.d-hors-note { font-size: 0.6rem; color: var(--soft); font-style: italic; margin-top: 2px; }
+.day.today { border: 2px solid var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.d-head { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; }
+.d-num { font-family: var(--font-display); font-weight: 700; font-size: 0.82rem; }
+.d-today-tag {
+  font-size: 0.56rem; font-weight: 800; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--accent-ink);
+  background: var(--accent-soft); border-radius: 999px; padding: 1px 7px;
+}
+.d-ferie {
+  font-size: 0.6rem; font-weight: 700; color: var(--accent-ink);
+  white-space: nowrap;
+}
+.d-lock { margin-left: auto; font-size: 0.62rem; color: var(--soft); }
+.slot-label {
+  font-family: var(--font-display);
+  font-size: 0.55rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--soft);
+  margin-top: 1px;
+}
+.pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  color: #fff; font-size: 0.66rem; font-weight: 700;
+  padding: 3px 8px; border-radius: 6px;
+  line-height: 1.3;
+  border: none;
+  max-width: 100%;
+  text-align: left;
+}
+.pill .rank { font-weight: 400; opacity: 0.75; }
+.pill.second { opacity: 0.82; }
+button.pill { cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
+button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120, 70, 18, 0.28); }
+.pill.warned { box-shadow: 0 0 0 2px var(--warn); }
+.pill.empty {
+  background: transparent; color: var(--muted);
+  border: 1.5px dashed var(--border-strong);
+  font-weight: 600;
+}
+.pill.empty:hover { color: var(--accent-ink); border-color: var(--accent-ink); box-shadow: none; }
+.pill-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.conge-chip {
+  display: inline-block;
+  border: 1.5px dashed var(--border-strong);
+  color: var(--muted);
+  font-size: 0.6rem; font-weight: 600;
+  padding: 2px 7px; border-radius: 6px;
+  background: var(--surface);
+  max-width: 100%;
+}
+.conge-chip.souhait { border-style: dotted; color: var(--soft); font-style: italic; }
+
+/* ✓ discret qui s'évapore après un changement cohérent */
+.ok-flash {
+  position: absolute; top: 3px; right: 5px;
+  color: var(--ok); font-size: 0.95rem; font-weight: 700;
+  pointer-events: none;
+  animation: okEvaporate 1.8s ease-out both;
+  z-index: 2;
+}
+@keyframes okEvaporate {
+  0%   { opacity: 0; transform: translateY(4px) scale(0.7); }
+  25%  { opacity: 1; transform: none; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-10px) scale(0.9); }
+}
+/* Mise en évidence d'une cellule (réserve, impasse) */
+.day.spot { animation: spotCell 2.6s ease both; }
+@keyframes spotCell {
+  0%   { box-shadow: 0 0 0 0 var(--accent-glow); border-color: var(--accent); }
+  30%  { box-shadow: 0 0 0 10px transparent; border-color: var(--accent); }
+  100% { box-shadow: none; }
+}
+
+.legend {
+  display: flex; flex-wrap: wrap; gap: 7px 16px;
+  margin-top: 14px;
+  font-size: 0.73rem; color: var(--muted);
+  align-items: center;
+}
+.legend .l-item { display: inline-flex; align-items: center; gap: 6px; }
+.legend .l-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
+.legend .l-vets { display: inline-flex; gap: 10px; flex-wrap: wrap; }
+
+.demo-strip {
+  margin-top: 18px;
+  display: flex; flex-wrap: wrap; gap: 10px;
+}
+.demo-finish {
+  background: transparent;
+  border: 1.5px dashed var(--border-strong);
+  color: var(--muted);
+  border-radius: 999px;
+  font-size: 0.78rem; font-weight: 600;
+  padding: 9px 16px; min-height: 40px;
+}
+.demo-finish:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
+
+/* Voile de consultation (périodes passées du sélecteur) */
+.archive-veil {
+  position: absolute; inset: 0; z-index: 40;
+  background: rgba(246, 238, 223, 0.82);
+  backdrop-filter: blur(2px);
+  display: none;
+  align-items: center; justify-content: center;
+  text-align: center; padding: 30px;
+}
+.archive-veil.show { display: flex; animation: veilIn .3s ease both; }
+@keyframes veilIn { from { opacity: 0; } to { opacity: 1; } }
+.archive-card {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-panel);
+  padding: 26px 30px;
+  max-width: 400px;
+}
+.archive-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
+.archive-card p { font-size: 0.86rem; color: var(--muted); line-height: 1.6; margin-bottom: 16px; }
+
+/* ============================================================
+   VOLET COMPTEURS EXTENSIBLE (retour MiKL n°2)
+   ============================================================ */
+.counters-panel {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 14px 14px 12px;
+  animation: panelIn .35s ease both;
+}
+@keyframes panelIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.cnt-head h4 { font-family: var(--font-display); font-size: 0.84rem; font-weight: 700; }
+.cnt-head p { font-size: 0.71rem; color: var(--muted); margin: 3px 0 10px; line-height: 1.45; }
+.cnt-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) repeat(4, 33px);
+  align-items: center; gap: 3px;
+  padding: 6px 2px;
+  border-bottom: 1px dashed var(--border);
+}
+.cnt-row:last-child { border-bottom: none; }
+.cnt-row.cnt-header { border-bottom: 1px solid var(--border-strong); padding-bottom: 4px; }
+.cnt-row.cnt-header span {
+  font-family: var(--font-display); font-size: 0.56rem; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--soft);
+  text-align: center; line-height: 1.25;
+}
+.cnt-row.cnt-header span.custom { color: var(--accent-ink); }
+.cnt-vet { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 600; min-width: 0; }
+.cnt-vet i { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+.cnt-vet small { font-size: 0.6rem; color: var(--soft); font-weight: 500; }
+.cnt-num {
+  position: relative;
+  text-align: center;
+  font-family: var(--font-display); font-weight: 700; font-size: 0.9rem;
+}
+.cnt-num.zero { color: var(--soft); font-weight: 500; }
+.cnt-num.bump-up { animation: bumpUp .8s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+.cnt-num.bump-down { animation: bumpDown .8s ease both; }
+@keyframes bumpUp { 30% { transform: scale(1.5); color: var(--ok); } }
+@keyframes bumpDown { 30% { transform: scale(0.7); color: var(--warn); } }
+.cnt-delta {
+  position: absolute; left: 50%; top: -13px;
+  transform: translateX(-50%);
+  font-style: normal; font-size: 0.62rem; font-weight: 800;
+  pointer-events: none;
+  animation: deltaUp 1.4s ease-out both;
+}
+.cnt-delta.plus { color: var(--ok); }
+.cnt-delta.minus { color: var(--warn); }
+@keyframes deltaUp {
+  0%   { opacity: 0; }
+  25%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-9px); }
+}
+.cnt-foot { margin-top: 10px; font-size: 0.67rem; color: var(--soft); line-height: 1.5; }
+.cnt-foot b { color: var(--accent-ink); }
+
+/* ============================================================
+   TERRIER DE FILOU + PANNEAU (repris du labo)
+   ============================================================ */
+.terrier-zone {
+  position: absolute; right: 18px; bottom: 10px;
+  z-index: 20;
+  display: flex; flex-direction: column; align-items: flex-end;
+}
+.terrier { position: relative; width: 148px; height: 104px; border: none; background: transparent; padding: 0; }
+.terrier svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.fox-peek {
+  position: absolute; left: 50%; bottom: 34px;
+  transform: translateX(-50%);
+  width: 58px; height: 34px;
+  overflow: hidden; z-index: 2;
+  transition: transform .3s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.fox-peek img { width: 100%; height: auto; }
+.terrier:hover .fox-peek { transform: translateX(-50%) translateY(-5px); }
+.terrier .t-hint {
+  position: absolute; left: 50%; bottom: -4px; transform: translateX(-50%);
+  font-size: 0.64rem; font-weight: 700; letter-spacing: 0.06em;
+  color: var(--muted); white-space: nowrap;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 999px; padding: 2px 9px;
+  z-index: 4;
+}
+.terrier:hover .t-hint { color: var(--accent-ink); border-color: var(--border-strong); }
+.workspace.filou-out .fox-peek { transform: translateX(-50%) translateY(40px); }
+.workspace.filou-out .terrier .t-hint { opacity: 0; }
+
+.fox-out {
+  position: absolute; right: 44px; bottom: 96px;
+  width: 92px; z-index: 21;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(70px) scale(0.4);
+}
+.workspace.filou-out .fox-out { animation: foxOut .6s cubic-bezier(0.34, 1.35, 0.64, 1) both; }
+.workspace.filou-in .fox-out { animation: foxIn .4s ease-in both; }
+@keyframes foxOut {
+  0%   { opacity: 0; transform: translateY(70px) scale(0.4); }
+  55%  { opacity: 1; transform: translateY(-10px) scale(1.06); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes foxIn {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateY(70px) scale(0.4); }
+}
+.fox-out img { width: 100%; height: auto; filter: drop-shadow(0 10px 18px rgba(120,70,18,0.3)); }
+
+.burrow-panel {
+  position: absolute; right: 14px; bottom: 200px;
+  width: min(400px, calc(100% - 28px));
+  max-height: min(470px, calc(100% - 230px));
+  background: var(--panel-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-panel);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  z-index: 22;
+  opacity: 0; pointer-events: none;
+  transform: translateY(18px) scale(0.94);
+  transform-origin: bottom right;
+  transition: transform .4s cubic-bezier(0.22, 1, 0.36, 1), opacity .3s ease;
+}
+.workspace.filou-out .burrow-panel {
+  opacity: 1; pointer-events: auto; transform: none;
+  transition-delay: .28s;
+}
+.panel-head {
+  display: flex; align-items: center; gap: 11px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex: none;
+}
+.panel-head .avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1px solid var(--border-strong);
+  overflow: hidden; flex: none;
+  display: flex; justify-content: center; align-items: flex-start;
+}
+.panel-head .avatar img { width: 130%; height: auto; margin-top: 2px; }
+.panel-head h3 { font-size: 0.95rem; font-weight: 700; }
+.panel-head .sub { font-size: 0.7rem; color: var(--muted); }
+.panel-reduce {
+  margin-left: auto;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  border-radius: var(--r-sm);
+  width: 36px; height: 36px;
+  font-size: 1rem; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none;
+}
+.panel-reduce:hover { color: var(--text); border-color: var(--border-strong); }
+.panel-scroll {
+  flex: 1; overflow-y: auto;
+  padding: 14px 14px 10px;
+  display: flex; flex-direction: column; gap: 10px;
+  min-height: 130px;
+}
+.bubble {
+  max-width: 95%;
+  padding: 11px 15px;
+  border-radius: var(--r-md);
+  font-size: 0.85rem; line-height: 1.55;
+  animation: bubbleIn .35s ease both;
+}
+@keyframes bubbleIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+.bubble.filou {
+  align-self: flex-start;
+  background: var(--bubble-filou);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+.bubble.user {
+  align-self: flex-end;
+  background: var(--bubble-user);
+  border: 1px solid transparent;
+  border-bottom-right-radius: 4px;
+}
+.bubble .who {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 5px;
+}
+.bubble.user .who { color: var(--muted); justify-content: flex-end; }
+.bubble.note {
+  align-self: center;
+  background: var(--ok-soft);
+  border: 1px dashed var(--border-strong);
+  color: var(--ok);
+  font-size: 0.8rem; font-weight: 600;
+  padding: 7px 14px;
+}
+.bubble.gardefou {
+  align-self: stretch; max-width: 100%;
+  background: var(--warn-soft);
+  border: 1px solid rgba(196, 138, 20, 0.4);
+}
+.bubble.gardefou .who { color: var(--warn); }
+.bubble.impasse {
+  align-self: stretch; max-width: 100%;
+  background: var(--danger-soft);
+  border: 1px solid rgba(168, 52, 31, 0.32);
+}
+.bubble.impasse .who { color: var(--danger); }
+.gardefou-fox {
+  float: right; width: 52px; margin: 0 0 6px 8px;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  border: 1px solid rgba(196, 138, 20, 0.4);
+}
+.gardefou-fox img { width: 100%; height: auto; }
+.gf-rule {
+  display: block; margin: 8px 0;
+  background: var(--surface);
+  border: 1px dashed rgba(196, 138, 20, 0.5);
+  border-radius: var(--r-sm);
+  padding: 8px 11px;
+  font-size: 0.8rem; line-height: 1.5;
+}
+.gf-rule .gf-act {
+  display: inline-block; margin-top: 4px;
+  border: none; background: transparent;
+  color: var(--accent-ink); font-size: 0.72rem; font-weight: 700;
+  text-decoration: underline dotted; text-underline-offset: 3px;
+  padding: 2px 0; cursor: pointer;
+}
+.gf-verified {
+  display: block; margin: 8px 0;
+  background: var(--ok-soft);
+  border: 1px dashed rgba(90, 150, 60, 0.5);
+  border-radius: var(--r-sm);
+  padding: 8px 11px;
+  font-size: 0.8rem; line-height: 1.5;
+  color: var(--text);
+}
+.gf-verified b { color: var(--ok); }
+.reform-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.btn {
+  border: none; border-radius: 999px;
+  font-size: 0.82rem; font-weight: 600;
+  padding: 8px 16px; min-height: 36px;
+  display: inline-flex; align-items: center; justify-content: center;
+  text-decoration: none;
+}
+.btn-valider { background: var(--accent); color: #fff; }
+.btn-valider:hover { filter: brightness(1.06); }
+.btn-corriger {
+  background: transparent; color: var(--muted);
+  border: 1px solid var(--border-strong);
+}
+.btn-corriger:hover { color: var(--text); border-color: var(--muted); }
+.btn.pressed { background: var(--ok); color: #fff; transform: scale(0.98); }
+.btn-warn-ok { background: var(--accent); color: #fff; }
+.btn-warn-keep {
+  background: transparent; color: var(--warn);
+  border: 1px solid rgba(196, 138, 20, 0.5);
+}
+.btn-warn-keep:hover { background: var(--warn-soft); }
+.btn-danger-keep {
+  background: transparent; color: var(--danger);
+  border: 1px solid rgba(168, 52, 31, 0.45);
+}
+.btn-danger-keep:hover { background: var(--danger-soft); }
+
+.journal {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  padding: 10px 14px 8px;
+  max-height: 150px; overflow-y: auto;
+  flex: none;
+}
+.journal h4 {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-display);
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--soft);
+  margin-bottom: 8px;
+}
+.journal h4 .count {
+  background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 999px; padding: 1px 8px; font-size: 0.66rem;
+}
+.journal-entry {
+  display: flex; gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--border);
+  font-size: 0.76rem; line-height: 1.5;
+}
+.journal-entry:last-child { border-bottom: none; }
+.journal-entry .je-dot {
+  flex: none; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent); margin-top: 6px;
+}
+.journal-entry .je-dot.ok { background: var(--ok); }
+.journal-entry .je-dot.warn { background: var(--warn); }
+.journal-entry time { display: block; font-size: 0.66rem; color: var(--soft); margin-bottom: 1px; }
+.panel-input {
+  display: flex; gap: 8px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  flex: none;
+}
+.panel-input input {
+  flex: 1;
+  font-family: var(--font-body); font-size: 0.86rem;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 10px 16px;
+  min-height: 44px;
+  min-width: 0;
+}
+.panel-input input::placeholder { color: var(--soft); }
+.panel-input input:focus { border-color: var(--accent); outline: none; }
+.panel-send {
+  border: none; background: var(--accent); color: #fff;
+  border-radius: 999px;
+  min-width: 44px; min-height: 44px;
+  font-size: 1.05rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none;
+}
+.panel-send:hover { filter: brightness(1.07); }
+.aide-steps { margin: 8px 0 2px; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.aide-steps li { display: flex; gap: 8px; align-items: baseline; font-size: 0.82rem; }
+.aide-steps .n { flex: none; font-family: var(--font-display); font-weight: 800; font-size: 0.7rem; color: var(--accent-ink); }
+
+/* ============================================================
+   MODALES (voile commun repris du labo)
+   ============================================================ */
+.modal-veil {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(58, 42, 28, 0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 18px;
+  opacity: 0;
+  transition: opacity .25s ease;
+}
+.modal-veil[hidden] { display: none; }
+.modal-veil.open { opacity: 1; }
+.gv-modal {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-panel);
+  width: min(600px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 22px 24px 20px;
+  transform: translateY(14px) scale(0.97);
+  transition: transform .3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.modal-veil.open .gv-modal { transform: none; }
+.gm-kicker {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 6px;
+}
+.gm-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 6px; }
+.gm-head h3 { font-size: 1.15rem; font-weight: 700; line-height: 1.3; margin-top: 2px; flex: 1; }
+.gm-badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 14px; }
+.gm-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 0.68rem; font-weight: 700;
+  padding: 4px 11px; border-radius: 999px;
+}
+.gm-badge.ferie { background: var(--accent-soft); color: var(--accent-ink); }
+.gm-badge.lock { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border-strong); }
+.gm-badge.warn { background: var(--warn-soft); color: var(--warn); }
+
+.lock-encart {
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-size: 0.84rem; line-height: 1.55;
+}
+.lock-encart b { font-family: var(--font-display); }
+.lock-encart .reform-actions { margin-top: 8px; }
+.lock-confirm {
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px dashed var(--border-strong);
+  animation: bubbleIn .3s ease both;
+}
+
+.gm-section {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: var(--surface);
+}
+.gm-section.disabled { opacity: 0.55; }
+.gm-slot-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.gm-slot-label {
+  font-family: var(--font-display);
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--soft);
+  flex: 1 1 150px;
+}
+.gm-slot-label small { display: block; font-family: var(--font-body); font-weight: 500; text-transform: none; letter-spacing: 0; font-size: 0.68rem; color: var(--soft); margin-top: 1px; }
+.gm-current {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 0.88rem; font-weight: 700;
+}
+.gm-current .dot { width: 14px; height: 14px; border-radius: 50%; flex: none; }
+.gm-current.none { color: var(--muted); font-weight: 600; font-style: italic; }
+.gm-reassign {
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2); color: var(--muted);
+  border-radius: 999px; font-size: 0.74rem; font-weight: 700;
+  padding: 7px 13px; min-height: 34px;
+}
+.gm-reassign:hover:not(:disabled) { color: var(--accent-ink); border-color: var(--accent-ink); }
+.gm-reassign[aria-expanded="true"] { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent-ink); }
+.gm-reassign:disabled { opacity: 0.5; cursor: default; }
+.gm-done { font-size: 0.76rem; color: var(--ok); font-weight: 700; animation: bubbleIn .3s ease both; }
+
+.av-list { list-style: none; margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 6px; animation: bubbleIn .25s ease both; }
+.av-row {
+  display: grid;
+  grid-template-columns: 16px minmax(72px, auto) 14px minmax(0, 1fr);
+  align-items: center; gap: 9px;
+  width: 100%; text-align: left;
+  border: none; background: transparent;
+  color: var(--text);
+  font-size: 0.84rem; font-weight: 600;
+  padding: 8px 8px; border-radius: var(--r-sm);
+  min-height: 40px;
+}
+.av-row:hover { background: var(--accent-soft); }
+.av-row .dot { width: 13px; height: 13px; border-radius: 50%; }
+.av-row .dot.none {
+  background: transparent; border: 1.5px dashed var(--border-strong);
+}
+.av-state { font-size: 0.8rem; line-height: 1; text-align: center; }
+.av-state.vert { color: var(--ok); }
+.av-state.ambre { color: var(--warn); }
+.av-state.rouge { color: var(--danger); }
+.av-reason { font-size: 0.73rem; font-weight: 500; color: var(--muted); line-height: 1.35; }
+.av-row.rouge .av-reason { color: var(--danger); }
+.av-row.ambre .av-reason { color: var(--warn); }
+
+/* Dialogue de confirmation de violation (garde-fou Filou dans la modale) */
+.gf-card {
+  margin-top: 10px;
+  border-radius: var(--r-sm);
+  padding: 12px 13px;
+  font-size: 0.83rem; line-height: 1.55;
+  animation: bubbleIn .3s ease both;
+}
+.gf-card.souple { background: var(--warn-soft); border: 1px solid rgba(196, 138, 20, 0.4); }
+.gf-card.dure { background: var(--danger-soft); border: 1px solid rgba(168, 52, 31, 0.35); }
+.gf-card .gf-title {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em;
+  text-transform: uppercase; margin-bottom: 6px;
+}
+.gf-card.souple .gf-title { color: var(--warn); }
+.gf-card.dure .gf-title { color: var(--danger); }
+
+.gm-foot {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px; padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.gm-absent {
+  border: 1px solid var(--border-strong);
+  background: transparent; color: var(--muted);
+  border-radius: 999px; font-size: 0.78rem; font-weight: 700;
+  padding: 8px 15px; min-height: 38px;
+}
+.gm-absent:hover { color: var(--danger); border-color: var(--danger); }
+.gm-absent-note {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 10px 13px;
+  font-size: 0.8rem; line-height: 1.55;
+  animation: bubbleIn .3s ease both;
+}
+.gm-absent-note .reform-actions { margin-top: 8px; }
+
+/* Récap avant génération (repris du labo, + gate de régénération) */
+.recap-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+.recap-head h3 { font-size: 1.15rem; font-weight: 700; line-height: 1.3; margin-top: 2px; flex: 1; }
+.regen-warning {
+  background: var(--danger-soft);
+  border: 1px solid rgba(168, 52, 31, 0.35);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-size: 0.84rem; line-height: 1.6;
+}
+.regen-warning[hidden] { display: none; }
+.regen-warning b { color: var(--danger); }
+.regen-warning ul { margin: 6px 0 0 18px; }
+.recap-list { list-style: none; margin-bottom: 14px; }
+.recap-list li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px;
+  padding: 10px 2px;
+  border-bottom: 1px dashed var(--border);
+  font-size: 0.9rem; line-height: 1.5;
+}
+.recap-list li:last-child { border-bottom: none; }
+.recap-list b { font-family: var(--font-display); }
+.recap-edit {
+  margin-left: auto;
+  border: none; background: transparent;
+  color: var(--soft);
+  font-size: 0.74rem; font-weight: 600;
+  text-decoration: underline dotted; text-underline-offset: 3px;
+  padding: 4px 6px; min-height: 30px;
+}
+.recap-edit:hover { color: var(--accent-ink); }
+.recap-seg {
+  margin-left: auto;
+  display: inline-flex; gap: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px; padding: 3px;
+}
+.recap-seg button {
+  border: none; background: transparent; color: var(--muted);
+  font-size: 0.78rem; font-weight: 700;
+  padding: 4px 13px; border-radius: 999px; min-height: 28px;
+}
+.recap-seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.recap-prev {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+.recap-prev h4 {
+  font-family: var(--font-display);
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 6px;
+}
+.recap-prev p { font-size: 0.84rem; line-height: 1.6; }
+.recap-prev ul { list-style: none; margin-top: 4px; }
+.recap-prev li { font-size: 0.84rem; line-height: 1.6; padding: 2px 0; }
+.recap-hint-msg {
+  font-size: 0.78rem; color: var(--muted); font-style: italic;
+  margin-bottom: 12px;
+  animation: bubbleIn .3s ease both;
+}
+.recap-foot { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+.toast {
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
+  z-index: 400;
+  background: var(--text); color: var(--bg);
+  font-size: 0.82rem; font-weight: 600;
+  padding: 11px 20px; border-radius: 999px;
+  box-shadow: var(--shadow-panel);
+  opacity: 0; pointer-events: none;
+  transition: opacity .3s ease, transform .3s cubic-bezier(0.22, 1, 0.36, 1);
+  max-width: min(560px, calc(100vw - 40px));
+  text-align: center;
+}
+.toast.show { opacity: 1; transform: translateX(-50%); }
+
+/* ============================================================
+   PIED DE PAGE
+   ============================================================ */
+.footer-lab {
+  margin-top: 30px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  padding: 18px clamp(16px, 4vw, 40px);
+  display: flex; flex-wrap: wrap; gap: 6px 24px;
+  align-items: center; justify-content: space-between;
+  font-size: 0.76rem; color: var(--muted);
+}
+.footer-lab b { color: var(--text); font-weight: 600; }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 1020px) {
+  .work-grid { grid-template-columns: 1fr; }
+  .counters-panel { max-width: 420px; }
+  .pb-side { align-items: flex-start; }
+  .burrow-panel { bottom: 190px; }
+}
+@media (max-width: 640px) {
+  :root { --nav-h: 58px; }
+  .mq-brand small { display: none; }
+  .work-body { padding: 14px 12px 130px; }
+}
+
+/* ============================================================
+   ACCESSIBILITÉ · prefers-reduced-motion
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .ok-flash, .day.spot, .cnt-num.bump-up, .cnt-num.bump-down, .cnt-delta,
+  .counters-panel, .bubble, .gf-card, .av-list, .lock-confirm, .gm-absent-note,
+  .status-badge.pulse, .archive-veil.show, .recap-hint-msg, .gm-done { animation: none !important; }
+  .fox-peek, .burrow-panel, .modal-veil, .gv-modal, .status-badge { transition: none; }
+  .workspace.filou-out .fox-out { animation: none; opacity: 1; transform: none; }
+  .workspace.filou-in .fox-out { animation: none; opacity: 0; }
+  .toast { transition: opacity .1s ease; }
+  * { scroll-behavior: auto !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===================== NAVIGATION COMMUNE ===================== -->
+<nav class="mq-nav" aria-label="Tranches de la grande maquette">
+  <span class="mq-brand">
+    <img src="../fox-1.png" alt="">
+    <span>GuardVeto<small>Grande maquette · M1</small></span>
+  </span>
+  <div class="mq-links">
+    <a href="index.html">🏠 Hub</a>
+    <a href="m1-planning.html" aria-current="page">M1 Planning</a>
+    <a href="m2-regles.html">M2 Règles</a>
+    <a href="m3-absences-echanges.html">M3 Absences &amp; échanges</a>
+    <a href="m4-accueil-equipe-historique-connexions.html">M4 Accueil &amp; réglages</a>
+    <a href="m5-veto-mobile.html">M5 Véto mobile</a>
+  </div>
+</nav>
+
+<div class="shell">
+
+  <!-- ===================== BANDEAU · CARACTÉRISTIQUES DE LA PÉRIODE ===================== -->
+  <header class="period-banner" aria-label="Caractéristiques de la période de travail">
+    <div class="pb-main">
+      <div class="pb-title">
+        <h1>Planning des gardes</h1>
+        <span class="status-badge st-brouillon" id="status-badge">● Brouillon · non publié</span>
+      </div>
+      <p class="pb-sub" id="pb-sub">Période <b>Hiver 2026</b> · 12 semaines · du lun. 29 déc. 2025 au dim. 22 mars 2026</p>
+      <div class="pb-chips" id="pb-chips">
+        <span class="pb-chip">❄️ Saison hiver</span>
+        <span class="pb-chip">Profil de planning « Hiver »</span>
+        <span class="pb-chip effectif"><b>2 vétos par nuit de semaine</b><small>réglé sur cette période · le profil Hiver dit 1</small></span>
+      </div>
+    </div>
+    <div class="pb-side">
+      <label class="pb-select-label" for="period-select">Période de travail</label>
+      <select class="pb-select" id="period-select" aria-label="Choisir la période de travail">
+        <option value="hiver2026" selected>Hiver 2026 · Brouillon</option>
+        <option value="automne2025">Automne 2025 · Publiée</option>
+        <option value="ete2025">Été 2025 · Verrouillée</option>
+      </select>
+      <span class="pb-today">📌 Aujourd'hui simulé : jeu. 15 janv. 2026</span>
+    </div>
+  </header>
+
+  <!-- ===================== ESPACE DE TRAVAIL ===================== -->
+  <div class="workspace" id="workspace">
+    <div class="work-head">
+      <div class="month-nav">
+        <button type="button" class="mn-btn" id="prev-month" aria-label="Mois précédent">←</button>
+        <h2 id="month-label">Janvier 2026</h2>
+        <button type="button" class="mn-btn" id="next-month" aria-label="Mois suivant">→</button>
+      </div>
+      <span class="meta">Clique sur une garde pour la réattribuer</span>
+      <div class="head-actions">
+        <button type="button" class="head-btn" id="counters-toggle" aria-pressed="true" aria-controls="counters-panel">Compteurs</button>
+        <button type="button" class="head-btn ghost" id="btn-pdf" title="Exporter le planning en PDF">🖨 PDF</button>
+        <button type="button" class="head-btn" id="btn-generate">Générer</button>
+        <button type="button" class="head-btn primary" id="btn-publish">Publier</button>
+      </div>
+    </div>
+
+    <div class="work-body">
+      <div class="work-grid">
+        <div class="work-main">
+          <div class="cal-scroll">
+            <div class="cal">
+              <div class="cal-head" aria-hidden="true">
+                <span>Lun</span><span>Mar</span><span>Mer</span><span>Jeu</span><span>Ven</span><span>Sam</span><span>Dim</span>
+              </div>
+              <div class="cal-body" id="cal-body"><!-- rempli par le JS --></div>
+            </div>
+          </div>
+
+          <div class="legend" aria-label="Légende">
+            <span class="l-vets" id="legend-vets"><!-- rempli par le JS --></span>
+            <span class="l-item"><span class="l-dot" style="background: var(--grid-we); border: 1px solid var(--border-strong);"></span> Week-end (ven. soir → dim., binôme 1er et 2nd)</span>
+            <span class="l-item">★ férié</span>
+            <span class="l-item">🔒 garde verrouillée (passée ou notifiée)</span>
+            <span class="l-item"><span class="l-dot" style="border: 2px solid var(--warn); background: transparent;"></span> règle outrepassée, consignée au journal</span>
+            <span class="l-item"><span class="l-dot" style="border: 1.5px dashed var(--border-strong); background: var(--surface);"></span> congé validé</span>
+            <span class="l-item"><span class="l-dot" style="border: 1.5px dotted var(--border-strong); background: var(--surface);"></span> souhait de congé en attente</span>
+          </div>
+
+          <div class="demo-strip">
+            <button type="button" class="demo-finish" id="demo-impasse">▶ Simuler une génération impossible</button>
+            <button type="button" class="demo-finish" id="demo-reset">↺ Réinitialiser la maquette</button>
+          </div>
+        </div>
+
+        <!-- Volet compteurs EXTENSIBLE : colonnes dérivées du catalogue du cabinet -->
+        <aside class="counters-panel" id="counters-panel" aria-label="Compteurs de la période">
+          <div class="cnt-head">
+            <h4>Compteurs · période</h4>
+            <p>Ils bougent en direct, à chaque changement manuel.</p>
+          </div>
+          <div id="cnt-grid"><!-- rempli par le JS --></div>
+          <p class="cnt-foot">Les colonnes suivent le <b>catalogue du cabinet</b> : le créneau sur-mesure « Samedi matin » (1 place) a la sienne. « 1er WE » = 1er de garde du week-end (avantage financier), suivi à part.</p>
+        </aside>
+      </div>
+    </div>
+
+    <!-- Voile de consultation des périodes passées -->
+    <div class="archive-veil" id="archive-veil" role="region" aria-label="Période en consultation seule">
+      <div class="archive-card">
+        <h3 id="archive-title">Automne 2025</h3>
+        <p id="archive-desc">Cette période est publiée et close : consultation seule. Dans la maquette, seule Hiver 2026 est manipulable.</p>
+        <button type="button" class="btn btn-valider" id="archive-back">Revenir à Hiver 2026</button>
+      </div>
+    </div>
+
+    <!-- Filou qui émerge du terrier -->
+    <div class="fox-out" id="fox-out" aria-hidden="true"><img src="../fox-1.png" alt=""></div>
+
+    <!-- Panneau compact de conversation -->
+    <aside class="burrow-panel" id="burrow-panel" aria-label="Panneau de conversation avec Filou">
+      <div class="panel-head">
+        <span class="avatar"><img src="../fox-1.png" alt="Avatar de Filou"></span>
+        <div>
+          <h3>Filou</h3>
+          <p class="sub">Sorti du terrier · il crée, explique, renseigne</p>
+        </div>
+        <button type="button" class="panel-reduce" id="panel-reduce" aria-label="Renvoyer Filou dans son terrier" title="Refermer">—</button>
+      </div>
+      <div class="panel-scroll" id="panel-scroll">
+        <div class="bubble filou">
+          <span class="who">🦊 Filou</span>
+          Tu m'as appelé ? Je surveille ton brouillon depuis mon terrier : pose-moi une question, ou continue tes changements, je veille.
+        </div>
+      </div>
+      <div class="journal" aria-label="Journal des actions de Filou">
+        <h4>Journal de Filou <span class="count" id="journal-count">3</span></h4>
+        <div id="journal-list">
+          <div class="journal-entry">
+            <span class="je-dot warn"></span>
+            <div><time>Hier · 17:41</time>Changement manuel consigné : Victor prend la nuit du mar. 27 janv. et enchaîne deux nuits d'affilée (règle souple, outrepassée par Anne-Sophie).</div>
+          </div>
+          <div class="journal-entry">
+            <span class="je-dot"></span>
+            <div><time>Hier · 09:12</time>Brouillon généré : 12 semaines, 11 règles fermes respectées, équitable à une garde près. Anne-Cat dépanne une nuit la semaine du 16 févr. (congé de Manon).</div>
+          </div>
+          <div class="journal-entry">
+            <span class="je-dot ok"></span>
+            <div><time>Lun. · 18:04</time>Congé validé : Manon, du 16 au 22 févr. Validé par Anne-Sophie.</div>
+          </div>
+        </div>
+      </div>
+      <form class="panel-input" id="panel-form">
+        <input type="text" id="panel-text" placeholder="Ex. : comment je pose un congé ?" aria-label="Écrire un message à Filou" autocomplete="off">
+        <button type="submit" class="panel-send" aria-label="Envoyer le message">➤</button>
+      </form>
+    </aside>
+
+    <!-- Le terrier, toujours au même coin -->
+    <div class="terrier-zone">
+      <button type="button" class="terrier" id="terrier" aria-label="Appeler Filou (il sort de son terrier)">
+        <svg viewBox="0 0 148 104" aria-hidden="true">
+          <path d="M10 96 C 16 52, 44 34, 74 32 C 104 34, 132 52, 138 96 Z" fill="#E4CFA6"/>
+          <path d="M18 96 C 24 58, 48 42, 74 40 C 100 42, 124 58, 130 96 Z" fill="#D9BE8C"/>
+          <ellipse cx="74" cy="66" rx="30" ry="21" fill="#4A3520"/>
+          <ellipse cx="74" cy="68" rx="24" ry="16" fill="#31210F"/>
+        </svg>
+        <span class="fox-peek" aria-hidden="true"><img src="../fox-1.png" alt=""></span>
+        <svg viewBox="0 0 148 104" aria-hidden="true" style="z-index:3; pointer-events:none;">
+          <path d="M40 78 Q 74 92 108 78 L 112 96 Q 74 104 36 96 Z" fill="#C9AA72"/>
+          <path d="M30 62 q -2 -10 2 -14 q 1 8 4 11 q 0 -9 5 -12 q -1 9 1 13 Z" fill="#7A8A3A"/>
+          <path d="M112 58 q 3 -9 0 -14 q -3 7 -6 9 q 1 -8 -3 -12 q 0 9 -2 13 Z" fill="#7A8A3A"/>
+          <path d="M120 82 q 4 -7 2 -12 q -4 5 -7 6 q 2 -6 -1 -10 q -2 7 -4 11 Z" fill="#8B9B47"/>
+        </svg>
+        <span class="t-hint">Filou 🦊</span>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===================== MODALE DE GARDE ===================== -->
+<div class="modal-veil" id="garde-veil" role="dialog" aria-modal="true" aria-labelledby="gm-title" hidden>
+  <div class="gv-modal" id="garde-modal">
+    <p class="gm-kicker" id="gm-kicker">Garde · réattribution</p>
+    <div class="gm-head">
+      <h3 id="gm-title">…</h3>
+      <button type="button" class="panel-reduce" id="gm-close" aria-label="Fermer">✕</button>
+    </div>
+    <div id="gm-body"><!-- rempli par le JS --></div>
+  </div>
+</div>
+
+<!-- ===================== RÉCAP AVANT GÉNÉRATION ===================== -->
+<div class="modal-veil" id="recap-veil" role="dialog" aria-modal="true" aria-labelledby="recap-title" hidden>
+  <div class="gv-modal">
+    <div class="recap-head">
+      <div style="flex:1">
+        <p class="gm-kicker">Hiver 2026 · récap avant génération</p>
+        <h3 id="recap-title">12 semaines · 29 déc. 2025 → 22 mars 2026</h3>
+      </div>
+      <button type="button" class="panel-reduce" id="recap-close" aria-label="Fermer le récapitulatif">✕</button>
+    </div>
+
+    <div class="regen-warning" id="regen-warning" hidden>
+      <b>⚠ Cette période est déjà publiée.</b> Régénérer maintenant :
+      <ul>
+        <li>remplace toutes les gardes <b>non verrouillées</b> (les gardes passées restent) ;</li>
+        <li>efface tes <b>changements manuels</b> sur ces gardes ;</li>
+        <li>re-notifie les 6 vétérinaires et resynchronise Google Agenda.</li>
+      </ul>
+    </div>
+
+    <ul class="recap-list">
+      <li><b>11</b>&nbsp;règles fermes, respectées à la lettre <button type="button" class="recap-edit">modifier</button></li>
+      <li><b>8</b>&nbsp;préférences guident l'équilibre <button type="button" class="recap-edit">modifier</button></li>
+      <li>Effectif par nuit de semaine
+        <span class="recap-seg" role="group" aria-label="Vétérinaires par nuit de semaine">
+          <button type="button" data-eff="1" aria-pressed="false">1</button>
+          <button type="button" data-eff="2" aria-pressed="true">2</button>
+        </span>
+      </li>
+      <li>Profil <b>Hiver</b> · rotations resserrées, vacances scolaires zone A intégrées <button type="button" class="recap-edit">modifier</button></li>
+    </ul>
+
+    <div class="recap-prev">
+      <h4>À savoir avant de générer</h4>
+      <ul>
+        <li>⏳ <b>2 souhaits de congé</b> encore en attente sur la période (Camille, Julie) : je planifie sans eux tant qu'ils ne sont pas tranchés.</li>
+        <li>🧡 La semaine du <b>16 févr.</b> est serrée (congé validé de Manon) : Anne-Cat pourrait dépanner une nuit, en dernier recours.</li>
+      </ul>
+    </div>
+    <div class="recap-prev">
+      <h4>Compteurs prévisionnels</h4>
+      <p>Sur 12 semaines : <b>≈ 16 nuits</b>, <b>4 week-ends</b> et <b>2 samedis matin</b> par vétérinaire, à 1 près. Lookback : <b>Camille</b> sera prioritaire pour un 1er de week-end (elle en a un de retard sur l'automne, voir l'Historique).</p>
+    </div>
+    <p class="recap-hint-msg" id="recap-hint" hidden>Chaque « modifier » ouvre le réglage fin dans la vraie application. Jamais obligatoire : les valeurs proposées suffisent.</p>
+    <div class="recap-foot">
+      <button type="button" class="btn btn-corriger" id="recap-cancel">Plus tard</button>
+      <button type="button" class="btn btn-valider" id="recap-generate">Générer le planning</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<footer class="footer-lab">
+  <span><b>Maquette M1 · Planning complet</b> · ambiance Terrier chaleureux, données fictives · MonProjetPro</span>
+  <span>Démos : clique une garde (modale) · Générer · Publier · « ▶ Simuler une génération impossible » · le terrier 🦊</span>
+</footer>
+
+<script>
+/* ============================================================
+   MAQUETTE M1 · JS vanilla · aucune dépendance
+   ============================================================ */
+(function () {
+  "use strict";
+
+  var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var $ = function (sel) { return document.querySelector(sel); };
+  var DAY = 86400000;
+
+  /* ---------- Équipe ---------- */
+  var VETS = [
+    { n: "Anne-So",  c: "var(--vet-anneso)",  role: "admin" },
+    { n: "Anne-Cat", c: "var(--vet-annecat)", role: "dernier recours" },
+    { n: "Manon",    c: "var(--vet-manon)",   role: "" },
+    { n: "Victor",   c: "var(--vet-victor)",  role: "" },
+    { n: "Camille",  c: "var(--vet-camille)", role: "" },
+    { n: "Julie",    c: "var(--vet-julie)",   role: "" },
+    { n: "Thomas",   c: "var(--vet-thomas)",  role: "" }
+  ];
+  var ACT = ["Anne-So", "Manon", "Victor", "Camille", "Julie", "Thomas"];
+  function vetColor(name) {
+    for (var i = 0; i < VETS.length; i++) if (VETS[i].n === name) return VETS[i].c;
+    return "var(--soft)";
+  }
+
+  /* ---------- Calendrier ---------- */
+  var W0 = new Date(2025, 11, 29);           /* lundi 29 déc. 2025 */
+  var NB_WEEKS = 12;                          /* fin : dim. 22 mars 2026 */
+  var TODAY = new Date(2026, 0, 15);          /* jeudi (simulé) */
+  var FERIES = { "2026-01-01": "Jour de l'an" };
+  var MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+  var MOIS_C = ["Janvier", "Février", "Mars"];
+  var JOURS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+
+  function addDays(d, n) { var x = new Date(d.getTime()); x.setDate(x.getDate() + n); return x; }
+  function iso(d) {
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+  function fmtShort(d) { return d.getDate() + " " + MOIS[d.getMonth()].slice(0, 4) + "."; }
+  function fmtLong(d) { return JOURS[d.getDay()] + " " + d.getDate() + (d.getDate() === 1 ? "er" : "") + " " + MOIS[d.getMonth()]; }
+
+  /* ---------- Congés ---------- */
+  var CONGES = [
+    { who: "Manon",   from: "2026-02-16", to: "2026-02-22", statut: "valide" },
+    { who: "Julie",   from: "2026-01-08", to: "2026-01-09", statut: "valide" },
+    { who: "Camille", from: "2026-03-02", to: "2026-03-06", statut: "souhait" },
+    { who: "Julie",   from: "2026-02-14", to: "2026-02-15", statut: "souhait" }
+  ];
+  function congesOn(dateIso) {
+    return CONGES.filter(function (c) { return dateIso >= c.from && dateIso <= c.to; });
+  }
+  function congeValide(name, dateIso) {
+    return CONGES.find(function (c) {
+      return c.statut === "valide" && c.who === name && dateIso >= c.from && dateIso <= c.to;
+    }) || null;
+  }
+
+  /* ---------- Génération déterministe du brouillon ---------- */
+  var WEEKS = [];
+  function buildWeeks() {
+    WEEKS = [];
+    for (var w = 0; w < NB_WEEKS; w++) {
+      var monday = addDays(W0, w * 7);
+      var nights = [];
+      for (var d = 0; d < 4; d++) nights.push([ACT[(w * 2 + d) % 6], ACT[(w * 2 + d + 3) % 6]]);
+      /* Règle « Manon jamais le mardi » : échange mardi ↔ lundi */
+      for (var p = 0; p < 2; p++) {
+        if (nights[1][p] === "Manon") { var t = nights[0][p]; nights[0][p] = "Manon"; nights[1][p] = t; }
+      }
+      var we = { v1: ACT[w % 6], v2: ACT[(w + 2) % 6] };
+      /* Le jeudi soir ne doit pas enchaîner avec le week-end : échange jeudi ↔ mercredi */
+      for (p = 0; p < 2; p++) {
+        if (nights[3][p] === we.v1 || nights[3][p] === we.v2) {
+          var t2 = nights[2][p]; nights[2][p] = nights[3][p]; nights[3][p] = t2;
+        }
+      }
+      var sam = ACT[(w + 4) % 6];
+      WEEKS.push({ monday: monday, nights: nights, we: we, sam: sam });
+    }
+    /* Semaine du 16 févr. (w=7) : congé validé de Manon, semaine serrée.
+       Anne-Cat dépanne une nuit (dernier recours). */
+    WEEKS[7].nights = [["Victor", "Thomas"], ["Camille", "Anne-So"], ["Julie", "Anne-Cat"], ["Thomas", "Victor"]];
+    WEEKS[7].we = { v1: "Julie", v2: "Camille" };
+    WEEKS[7].sam = "Anne-So";
+    /* Changement manuel d'hier (consigné) : Victor sur la nuit du mardi 27 janv. */
+    WEEKS[4].nights[1][1] = "Victor";
+  }
+  buildWeeks();
+
+  /* Violations souples consignées : clef de place → raison */
+  var warnedMap = {};
+  function seedWarned() {
+    warnedMap = {};
+    warnedMap["4|night|1|1"] = "Victor enchaîne deux nuits d'affilée (lun. 26 + mar. 27) · règle souple outrepassée hier, consignée au journal.";
+  }
+  seedWarned();
+
+  /* ---------- Références de créneau ----------
+     ref = { w, kind: "night"|"we"|"sam", d (0-3 pour night), place (0/1 night · 1/2 we) } */
+  function slotDates(ref) {
+    var m = WEEKS[ref.w].monday;
+    if (ref.kind === "night") return [addDays(m, ref.d)];
+    if (ref.kind === "sam") return [addDays(m, 5)];
+    return [addDays(m, 4), addDays(m, 5), addDays(m, 6)];
+  }
+  function slotKey(ref, place) {
+    return ref.w + "|" + ref.kind + "|" + (ref.kind === "night" ? ref.d : 0) + "|" + place;
+  }
+  function slotLocked(ref) {
+    var dates = slotDates(ref);
+    return dates[dates.length - 1].getTime() < TODAY.getTime();
+  }
+  function getAssign(ref, place) {
+    var w = WEEKS[ref.w];
+    if (ref.kind === "night") return w.nights[ref.d][place];
+    if (ref.kind === "sam") return w.sam;
+    return place === 1 ? w.we.v1 : w.we.v2;
+  }
+  function setAssign(ref, place, name) {
+    var w = WEEKS[ref.w];
+    if (ref.kind === "night") w.nights[ref.d][place] = name;
+    else if (ref.kind === "sam") w.sam = name;
+    else if (place === 1) w.we.v1 = name;
+    else w.we.v2 = name;
+  }
+  function slotTitle(ref) {
+    var m = WEEKS[ref.w].monday;
+    if (ref.kind === "night") return "Nuit du " + fmtLong(addDays(m, ref.d));
+    if (ref.kind === "sam") return "Samedi matin · " + fmtShort(addDays(m, 5));
+    return "Week-end du " + fmtShort(addDays(m, 4)) + " au " + fmtShort(addDays(m, 6));
+  }
+
+  /* ---------- Occupations d'un vétérinaire ---------- */
+  function assignmentsOf(name, w) {
+    var res = [];
+    var wk = WEEKS[w];
+    wk.nights.forEach(function (pair, d) {
+      pair.forEach(function (v, p) { if (v === name) res.push({ kind: "night", d: d, place: p }); });
+    });
+    if (wk.we.v1 === name) res.push({ kind: "we", place: 1 });
+    if (wk.we.v2 === name) res.push({ kind: "we", place: 2 });
+    if (wk.sam === name) res.push({ kind: "sam" });
+    return res;
+  }
+  function busySameDates(name, ref) {
+    /* déjà de garde sur au moins une date du créneau visé ? */
+    var target = slotDates(ref).map(function (d) { return iso(d); });
+    var wk = WEEKS[ref.w];
+    var m = wk.monday;
+    var hits = [];
+    wk.nights.forEach(function (pair, d) {
+      pair.forEach(function (v, p) {
+        if (v !== name) return;
+        if (ref.kind === "night" && ref.d === d) return; /* la place visée elle-même */
+        if (target.indexOf(iso(addDays(m, d))) >= 0) hits.push("la nuit du " + fmtShort(addDays(m, d)));
+      });
+    });
+    if (ref.kind !== "we" && (wk.we.v1 === name || wk.we.v2 === name)) {
+      var weDates = [iso(addDays(m, 4)), iso(addDays(m, 5)), iso(addDays(m, 6))];
+      if (weDates.some(function (x) { return target.indexOf(x) >= 0; })) hits.push("le week-end");
+    }
+    if (ref.kind !== "sam" && wk.sam === name) {
+      if (target.indexOf(iso(addDays(m, 5))) >= 0) hits.push("le samedi matin");
+    }
+    return hits;
+  }
+  function consecutiveWeekends(name, weekIdx) {
+    var has = WEEKS.map(function (w, i) {
+      if (i === weekIdx) return true;
+      return w.we.v1 === name || w.we.v2 === name;
+    });
+    var run = 0, best = 0;
+    for (var i = 0; i < has.length; i++) { run = has[i] ? run + 1 : 0; if (run > best) best = run; }
+    return best;
+  }
+  function hasNightAdjacent(name, w, d) {
+    var wk = WEEKS[w];
+    var res = [];
+    [d - 1, d + 1].forEach(function (dd) {
+      if (dd < 0 || dd > 3) return;
+      if (wk.nights[dd][0] === name || wk.nights[dd][1] === name) res.push(dd);
+    });
+    return res;
+  }
+  function hasNightInWeek(name, w) {
+    return WEEKS[w].nights.some(function (pair) { return pair[0] === name || pair[1] === name; });
+  }
+
+  /* ---------- Disponibilité calculée (pastilles + raisons) ---------- */
+  function availability(name, ref, place) {
+    var dates = slotDates(ref);
+    /* 1. congé validé */
+    for (var i = 0; i < dates.length; i++) {
+      var c = congeValide(name, iso(dates[i]));
+      if (c) {
+        return { tone: "rouge", severity: "dure",
+          reason: "En congé validé du " + fmtShort(new Date(c.from + "T12:00:00")) + " au " + fmtShort(new Date(c.to + "T12:00:00")),
+          rule: "Un congé validé bloque toute garde sur ses dates (obligatoire)." };
+      }
+    }
+    /* 2. règle individuelle dure */
+    if (name === "Manon" && ref.kind === "night" && ref.d === 1) {
+      return { tone: "rouge", severity: "dure",
+        reason: "Règle : jamais le mardi (obligatoire)",
+        rule: "« Manon n'est jamais de garde le mardi soir » (obligatoire)." };
+    }
+    /* 3. déjà de garde sur ces dates */
+    var busy = busySameDates(name, ref);
+    if (busy.length) {
+      return { tone: "rouge", severity: "dure",
+        reason: "Déjà de garde : " + busy.join(", "),
+        rule: "Deux gardes le même jour pour la même personne, c'est impossible (obligatoire)." };
+    }
+    /* 4. trois week-ends d'affilée */
+    if (ref.kind === "we" && consecutiveWeekends(name, ref.w) > 2) {
+      return { tone: "rouge", severity: "dure",
+        reason: "Enchaînerait 3 week-ends d'affilée",
+        rule: "« Jamais plus de 2 week-ends consécutifs » (obligatoire)." };
+    }
+    /* 5. dernier recours */
+    if (name === "Anne-Cat") {
+      return { tone: "ambre", severity: "souple",
+        reason: "Dernier recours : à n'appeler qu'en dernier",
+        rule: "« Anne-Cat n'est appelée qu'en dernier recours » (souple)." };
+    }
+    /* 6. nuits d'affilée */
+    if (ref.kind === "night") {
+      var adj = hasNightAdjacent(name, ref.w, ref.d);
+      if (adj.length) {
+        return { tone: "ambre", severity: "souple",
+          reason: "De garde la veille ou le lendemain soir",
+          rule: "« Pas deux nuits d'affilée pour la même personne » (souple)." };
+      }
+      if (WEEKS[ref.w].we.v1 === name || WEEKS[ref.w].we.v2 === name) {
+        return { tone: "ambre", severity: "souple",
+          reason: "A déjà le week-end cette semaine-là",
+          rule: "« Éviter de cumuler nuit et week-end la même semaine » (souple)." };
+      }
+    }
+    /* 7. cumul nuit + week-end */
+    if (ref.kind === "we" && hasNightInWeek(name, ref.w)) {
+      return { tone: "ambre", severity: "souple",
+        reason: "Cumulerait nuit + week-end la même semaine",
+        rule: "« Éviter de cumuler nuit et week-end la même semaine » (souple)." };
+    }
+    /* 8. disponible */
+    if (ref.kind === "we" && name === "Camille") {
+      return { tone: "vert", severity: null, reason: "Disponible · en retard d'un 1er WE (équité)" };
+    }
+    return { tone: "vert", severity: null, reason: "Disponible" };
+  }
+  function bestSubstitute(ref, place, excluded) {
+    for (var i = 0; i < VETS.length; i++) {
+      var n = VETS[i].n;
+      if (excluded.indexOf(n) >= 0) continue;
+      if (availability(n, ref, place).tone === "vert") return n;
+    }
+    return null;
+  }
+
+  /* ============================================================
+     GRILLE MENSUELLE
+     ============================================================ */
+  var currentMonth = 0; /* 0 = janvier 2026, 1 = février, 2 = mars */
+  var calBody = $("#cal-body");
+  var PERIOD_START = W0;
+  var PERIOD_END = addDays(W0, NB_WEEKS * 7 - 1);
+
+  function dateInfo(d) {
+    var diff = Math.round((d.getTime() - W0.getTime()) / DAY);
+    if (diff < 0 || diff >= NB_WEEKS * 7) return null;
+    return { w: Math.floor(diff / 7), dow: diff % 7 };
+  }
+
+  function pillHtml(name, ref, place, rankLabel) {
+    var locked = slotLocked(ref);
+    var key = slotKey(ref, place);
+    var warned = warnedMap[key];
+    var refAttr = ' data-w="' + ref.w + '" data-kind="' + ref.kind + '" data-d="' + (ref.d || 0) + '"';
+    if (!name) {
+      return '<button type="button" class="pill empty"' + refAttr +
+        ' aria-label="Place à pourvoir · ' + slotTitle(ref) + '">À pourvoir</button>';
+    }
+    var cls = "pill" + (rankLabel === "2" ? " second" : "") + (warned ? " warned" : "");
+    var rk = rankLabel ? ' <span class="rank">' + rankLabel + "</span>" : "";
+    return '<button type="button" class="' + cls + '" style="background:' + vetColor(name) + '"' + refAttr +
+      (warned ? ' title="' + warned.replace(/"/g, "&quot;") + '"' : "") +
+      ' aria-label="' + slotTitle(ref) + " · " + name + (locked ? " · verrouillée" : "") + '">' +
+      name + rk + "</button>";
+  }
+
+  function dayCellHtml(d, monthIdx) {
+    var dIso = iso(d);
+    var info = dateInfo(d);
+    var classes = ["day"];
+    var dow = (d.getDay() + 6) % 7; /* 0 = lundi */
+    if (dow === 4) classes.push("fri");
+    if (dow >= 5) classes.push("we");
+    if (d.getMonth() !== monthIdx + 0) classes.push("other");
+    if (d.getTime() < TODAY.getTime()) classes.push("past");
+    if (dIso === iso(TODAY)) classes.push("today");
+    if (!info) classes.push("hors");
+
+    var html = '<div class="' + classes.join(" ") + '" data-date="' + dIso + '">';
+    html += '<div class="d-head"><span class="d-num">' + d.getDate() + "</span>";
+    if (FERIES[dIso]) html += '<span class="d-ferie">★ ' + FERIES[dIso] + "</span>";
+    if (dIso === iso(TODAY)) html += '<span class="d-today-tag">Aujourd’hui</span>';
+
+    if (!info) {
+      html += "</div>";
+      html += '<span class="d-hors-note">hors période</span>';
+      html += "</div>";
+      return html;
+    }
+
+    var w = info.w, wk = WEEKS[w];
+    var lockAny = false;
+
+    /* corps du jour */
+    var body = "";
+    congesOn(dIso).forEach(function (c) {
+      body += '<span class="conge-chip' + (c.statut === "souhait" ? " souhait" : "") + '">' +
+        (c.statut === "souhait" ? "Souhait" : "Congé") + " · " + c.who + "</span>";
+    });
+
+    if (info.dow <= 3) {
+      var refN = { w: w, kind: "night", d: info.dow };
+      if (slotLocked(refN)) lockAny = true;
+      body += '<span class="slot-label">Nuit</span><span class="pill-stack">' +
+        pillHtml(wk.nights[info.dow][0], refN, 0, "") +
+        pillHtml(wk.nights[info.dow][1], refN, 1, "") + "</span>";
+    } else {
+      var refWe = { w: w, kind: "we" };
+      if (info.dow === 5) {
+        var refS = { w: w, kind: "sam", d: 0 };
+        if (slotLocked(refS)) lockAny = true;
+        body += '<span class="slot-label">Sam. matin · sur-mesure</span>' +
+          '<span class="pill-stack">' + pillHtml(wk.sam, refS, 0, "") + "</span>";
+      }
+      if (slotLocked(refWe)) lockAny = true;
+      body += '<span class="slot-label">' + (info.dow === 4 ? "Week-end · dès le soir" : "Week-end") + "</span>" +
+        '<span class="pill-stack">' +
+        pillHtml(wk.we.v1, refWe, 1, "1") +
+        pillHtml(wk.we.v2, refWe, 2, "2") + "</span>";
+    }
+
+    if (lockAny) html += '<span class="d-lock" title="Garde verrouillée (passée ou notifiée)">🔒</span>';
+    html += "</div>";
+    html += body;
+    html += "</div>";
+    return html;
+  }
+
+  function renderMonth() {
+    var monthIdx = currentMonth; /* 0..2 → janv..mars 2026 */
+    var first = new Date(2026, monthIdx, 1);
+    var start = addDays(first, -((first.getDay() + 6) % 7));
+    var last = new Date(2026, monthIdx + 1, 0);
+    var html = "";
+    var d = start;
+    while (d.getTime() <= last.getTime() || (d.getDay() + 6) % 7 !== 0) {
+      html += dayCellHtml(d, monthIdx);
+      d = addDays(d, 1);
+      if (html.length > 400000) break;
+    }
+    calBody.innerHTML = html;
+    $("#month-label").textContent = MOIS_C[monthIdx] + " 2026";
+    $("#prev-month").disabled = monthIdx === 0;
+    $("#next-month").disabled = monthIdx === 2;
+  }
+  $("#prev-month").addEventListener("click", function () { if (currentMonth > 0) { currentMonth--; renderMonth(); } });
+  $("#next-month").addEventListener("click", function () { if (currentMonth < 2) { currentMonth++; renderMonth(); } });
+
+  /* légende vétos */
+  (function buildLegendVets() {
+    var html = "";
+    VETS.forEach(function (v) {
+      html += '<span class="l-item"><span class="l-dot" style="background:' + v.c + '; border-radius:50%;"></span>' +
+        v.n + (v.role ? " (" + v.role + ")" : "") + "</span>";
+    });
+    $("#legend-vets").innerHTML = html;
+  })();
+
+  function flashCellsBySlot(ref) {
+    slotDates(ref).forEach(function (d) {
+      var cell = calBody.querySelector('.day[data-date="' + iso(d) + '"]');
+      if (!cell) return;
+      var ok = document.createElement("span");
+      ok.className = "ok-flash";
+      ok.textContent = "✓";
+      cell.appendChild(ok);
+      setTimeout(function () { ok.remove(); }, 1900);
+    });
+  }
+  function spotDate(dIso) {
+    var cell = calBody.querySelector('.day[data-date="' + dIso + '"]');
+    if (!cell) return;
+    cell.classList.remove("spot");
+    void cell.offsetWidth;
+    cell.classList.add("spot");
+    cell.scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "center" });
+  }
+
+  /* ============================================================
+     VOLET COMPTEURS · colonnes DÉRIVÉES du catalogue du cabinet
+     ============================================================ */
+  /* Le catalogue du cabinet pilote les colonnes : ici, un créneau
+     sur-mesure « Samedi matin » s'ajoute aux colonnes standard. */
+  var CATALOGUE_COLS = [
+    { k: "n",   label: "Nuits",      custom: false },
+    { k: "we",  label: "WE",         custom: false },
+    { k: "p",   label: "1er WE",     custom: false },
+    { k: "sam", label: "Sam. matin", custom: true }
+  ];
+  var prevCounts = null;
+
+  function computeCounts() {
+    var c = {};
+    VETS.forEach(function (v) { c[v.n] = { n: 0, we: 0, p: 0, sam: 0 }; });
+    WEEKS.forEach(function (w) {
+      w.nights.forEach(function (pair) {
+        pair.forEach(function (name) { if (name && c[name]) c[name].n++; });
+      });
+      if (c[w.we.v1]) { c[w.we.v1].we++; c[w.we.v1].p++; }
+      if (c[w.we.v2]) { c[w.we.v2].we++; }
+      if (c[w.sam]) { c[w.sam].sam++; }
+    });
+    return c;
+  }
+  function buildCounters() {
+    var grid = $("#cnt-grid");
+    var counts = computeCounts();
+    var html = '<div class="cnt-row cnt-header"><span></span>';
+    CATALOGUE_COLS.forEach(function (col) {
+      html += '<span class="' + (col.custom ? "custom" : "") + '">' + col.label + "</span>";
+    });
+    html += "</div>";
+    VETS.forEach(function (v) {
+      var k = counts[v.n];
+      html += '<div class="cnt-row"><span class="cnt-vet"><i style="background:' + v.c + '"></i>' +
+        v.n + (v.n === "Anne-Cat" ? ' <small>dern. recours</small>' : "") + "</span>";
+      CATALOGUE_COLS.forEach(function (col) {
+        html += '<span class="cnt-num' + (k[col.k] === 0 ? " zero" : "") + '" data-vet="' + v.n + '" data-m="' + col.k + '">' + k[col.k] + "</span>";
+      });
+      html += "</div>";
+    });
+    grid.innerHTML = html;
+    prevCounts = counts;
+  }
+  function updateCounters() {
+    if (!prevCounts) { buildCounters(); return; }
+    var counts = computeCounts();
+    VETS.forEach(function (v) {
+      CATALOGUE_COLS.forEach(function (col) {
+        var m = col.k;
+        var oldV = prevCounts[v.n][m];
+        var newV = counts[v.n][m];
+        if (oldV === newV) return;
+        var el = document.querySelector('.cnt-num[data-vet="' + v.n + '"][data-m="' + m + '"]');
+        if (!el) return;
+        el.textContent = newV;
+        el.classList.toggle("zero", newV === 0);
+        el.classList.remove("bump-up", "bump-down");
+        void el.offsetWidth;
+        el.classList.add(newV > oldV ? "bump-up" : "bump-down");
+        var dd = document.createElement("i");
+        dd.className = "cnt-delta " + (newV > oldV ? "plus" : "minus");
+        dd.textContent = (newV > oldV ? "+" : "−") + Math.abs(newV - oldV);
+        el.appendChild(dd);
+        setTimeout(function () { dd.remove(); }, 1500);
+      });
+    });
+    prevCounts = counts;
+  }
+  var workspace = $("#workspace");
+  $("#counters-toggle").addEventListener("click", function () {
+    var closed = workspace.classList.toggle("counters-closed");
+    this.setAttribute("aria-pressed", String(!closed));
+  });
+
+  /* ============================================================
+     TERRIER · PANNEAU · JOURNAL (repris du labo)
+     ============================================================ */
+  var filouOut = false;
+  function foxSort() {
+    if (filouOut) return;
+    filouOut = true;
+    workspace.classList.remove("filou-in");
+    workspace.classList.add("filou-out");
+  }
+  function foxRentre() {
+    if (!filouOut) return;
+    filouOut = false;
+    workspace.classList.remove("filou-out");
+    workspace.classList.add("filou-in");
+  }
+  $("#terrier").addEventListener("click", function () { if (filouOut) foxRentre(); else foxSort(); });
+  $("#panel-reduce").addEventListener("click", foxRentre);
+
+  var panelScroll = $("#panel-scroll");
+  function appendPanelBubble(kind, who, html) {
+    var b = document.createElement("div");
+    b.className = "bubble " + kind;
+    b.innerHTML = (who ? '<span class="who">' + who + "</span>" : "") + html;
+    panelScroll.appendChild(b);
+    panelScroll.scrollTop = panelScroll.scrollHeight;
+    return b;
+  }
+  function addJournalEntry(text, tone) {
+    var list = $("#journal-list");
+    var e = document.createElement("div");
+    e.className = "journal-entry";
+    e.innerHTML = '<span class="je-dot' + (tone ? " " + tone : "") + '"></span>' +
+      "<div><time>Aujourd'hui · 10:0" + (Number($("#journal-count").textContent) % 10) + "</time>" + text + "</div>";
+    list.prepend(e);
+    var count = $("#journal-count");
+    count.textContent = String(Number(count.textContent) + 1);
+  }
+  function disableActions(scope) {
+    scope.querySelectorAll("button").forEach(function (btn) {
+      btn.disabled = true;
+      btn.style.opacity = "0.45";
+      btn.style.cursor = "default";
+    });
+  }
+
+  /* « Renseigner » : réponse d'aide dans le panneau */
+  $("#panel-form").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var input = $("#panel-text");
+    var val = input.value.trim();
+    if (!val) return;
+    appendPanelBubble("user", "Anne-Sophie", val);
+    input.value = "";
+    setTimeout(function () {
+      if (/cong[ée]/i.test(val)) {
+        appendPanelBubble("filou", "🦊 Filou renseigne",
+          "C'est simple, trois petites étapes :" +
+          '<ul class="aide-steps">' +
+          '<li><span class="n">1</span><span>Ouvre <b>Absences &amp; échanges</b>, puis « Poser un congé ».</span></li>' +
+          '<li><span class="n">2</span><span>Choisis tes dates : je te préviens tout de suite si ça touche une garde déjà posée.</span></li>' +
+          '<li><span class="n">3</span><span>Envoie : l’admin reçoit la demande et la valide.</span></li>' +
+          "</ul>");
+      } else if (/pourquoi|explique/i.test(val)) {
+        appendPanelBubble("filou", "🦊 Filou explique",
+          "Bonne question ! Dans la vraie application, je rejoue le calcul et je te réponds en français : qui était disponible, quelle règle a tranché, et ce que ça change pour l'équité. Ici, essaie plutôt les boutons de démonstration.");
+      } else {
+        appendPanelBubble("filou", "🦊 Filou",
+          "Bien noté ! Dans cette maquette, je ne réponds qu'aux scénarios prévus (essaie « Comment je pose un congé ? »). Dans la vraie application, je répondrais à toute question sur le fonctionnement, et je reformulerais tes demandes avant d'agir.");
+      }
+    }, REDUCED ? 100 : 650);
+  });
+
+  /* ============================================================
+     MODALE DE GARDE COMPLÈTE
+     ============================================================ */
+  var gardeVeil = $("#garde-veil");
+  var gmBody = $("#gm-body");
+  var modalRef = null;
+  var modalUnlocked = false;
+
+  function openVeil(veil) {
+    veil.hidden = false;
+    requestAnimationFrame(function () { veil.classList.add("open"); });
+  }
+  function closeVeil(veil) {
+    veil.classList.remove("open");
+    setTimeout(function () { veil.hidden = true; }, REDUCED ? 0 : 260);
+  }
+  $("#gm-close").addEventListener("click", function () { closeVeil(gardeVeil); });
+  gardeVeil.addEventListener("click", function (ev) { if (ev.target === gardeVeil) closeVeil(gardeVeil); });
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape") {
+      if (!gardeVeil.hidden) closeVeil(gardeVeil);
+      if (!recapVeil.hidden) closeVeil(recapVeil);
+    }
+  });
+
+  function sectionsFor(ref) {
+    if (ref.kind === "we") {
+      return [
+        { place: 1, label: "1er de garde", sub: "avantage financier · suivi à part dans les compteurs" },
+        { place: 2, label: "2nd de garde", sub: "renfort du binôme, du vendredi soir au dimanche" }
+      ];
+    }
+    if (ref.kind === "night") {
+      return [
+        { place: 0, label: "Place 1", sub: "effectif de 2 réglé sur cette période" },
+        { place: 1, label: "Place 2", sub: "effectif de 2 réglé sur cette période" }
+      ];
+    }
+    return [{ place: 0, label: "Vétérinaire du samedi matin", sub: "créneau sur-mesure du cabinet · 1 place" }];
+  }
+
+  function renderGardeModal() {
+    var ref = modalRef;
+    var locked = slotLocked(ref);
+    var dates = slotDates(ref);
+    var ferie = dates.map(function (d) { return FERIES[iso(d)]; }).filter(Boolean)[0];
+
+    $("#gm-kicker").textContent =
+      (ref.kind === "we" ? "Week-end en binôme" : ref.kind === "sam" ? "Créneau sur-mesure" : "Garde de nuit") +
+      " · semaine " + (ref.w + 1) + " sur 12";
+    $("#gm-title").textContent = slotTitle(ref);
+
+    var html = "";
+
+    /* badges */
+    var badges = "";
+    if (ferie) badges += '<span class="gm-badge ferie">★ Férié · ' + ferie + "</span>";
+    if (locked) badges += '<span class="gm-badge lock">🔒 Garde verrouillée</span>';
+    sectionsFor(ref).forEach(function (s) {
+      if (warnedMap[slotKey(ref, s.place)]) badges += '<span class="gm-badge warn">⚠ Règle outrepassée, consignée</span>';
+    });
+    if (badges) html += '<div class="gm-badges">' + badges + "</div>";
+
+    /* encart verrouillage */
+    if (locked && !modalUnlocked) {
+      html += '<div class="lock-encart" id="lock-encart">' +
+        "<b>🔒 Cette garde est verrouillée</b> : elle est passée, ou les vétérinaires en ont déjà été notifiés. On ne la modifie pas par accident." +
+        '<div class="reform-actions"><button type="button" class="btn btn-corriger" id="lock-correct">Corriger cette garde</button></div>' +
+        '<div class="lock-confirm" id="lock-confirm" hidden>' +
+        "Les vétérinaires concernés seront prévenus de la correction, et Google Agenda resynchronisé. On continue ?" +
+        '<div class="reform-actions">' +
+        '<button type="button" class="btn btn-valider" id="lock-yes">Oui, corriger</button>' +
+        '<button type="button" class="btn btn-corriger" id="lock-no">Annuler</button>' +
+        "</div></div></div>";
+    }
+    if (locked && modalUnlocked) {
+      html += '<div class="lock-encart"><b>🔓 Correction ouverte</b> · les vétérinaires seront prévenus à l’enregistrement.</div>';
+    }
+
+    /* sections par place */
+    var disabled = locked && !modalUnlocked;
+    sectionsFor(ref).forEach(function (s) {
+      var current = getAssign(ref, s.place);
+      var warned = warnedMap[slotKey(ref, s.place)];
+      html += '<div class="gm-section' + (disabled ? " disabled" : "") + '" data-place="' + s.place + '">' +
+        '<div class="gm-slot-row">' +
+        '<span class="gm-slot-label">' + s.label + "<small>" + s.sub + "</small></span>" +
+        (current
+          ? '<span class="gm-current"><span class="dot" style="background:' + vetColor(current) + '"></span>' + current + "</span>"
+          : '<span class="gm-current none">Aucun · à pourvoir</span>') +
+        '<button type="button" class="gm-reassign" data-place="' + s.place + '" aria-expanded="false"' + (disabled ? " disabled" : "") + ">Réattribuer</button>" +
+        "</div>" +
+        (warned ? '<p class="av-reason" style="margin-top:6px; color: var(--warn);">⚠ ' + warned + "</p>" : "") +
+        '<div class="gm-list-zone" data-place="' + s.place + '"></div>' +
+        "</div>";
+    });
+
+    /* pied : déclarer une absence */
+    html += '<div class="gm-foot">' +
+      '<button type="button" class="gm-absent" id="gm-absent">Déclarer un·e vétérinaire absent·e</button>' +
+      '<button type="button" class="btn btn-corriger" id="gm-close2">Fermer</button>' +
+      '<div class="gm-absent-note" id="gm-absent-note" hidden>' +
+      "Une absence imprévue se répare créneau par créneau : c'est le parcours <b>crise</b>, mené par Filou dans « Absences &amp; échanges ». Il propose des remplaçants équitables, ou lance un appel aux volontaires." +
+      '<div class="reform-actions">' +
+      '<a class="btn btn-valider" href="m3-absences-echanges.html">Ouvrir M3 · Absences &amp; échanges</a>' +
+      '<button type="button" class="btn btn-corriger" id="gm-absent-cancel">Pas maintenant</button>' +
+      "</div></div></div>";
+
+    gmBody.innerHTML = html;
+
+    /* branchements */
+    if (locked && !modalUnlocked) {
+      $("#lock-correct").addEventListener("click", function () {
+        $("#lock-confirm").hidden = false;
+        this.disabled = true; this.style.opacity = "0.5";
+      });
+      var yes = $("#lock-yes");
+      if (yes) yes.addEventListener("click", function () {
+        modalUnlocked = true;
+        addJournalEntry("Correction d'une garde verrouillée ouverte par Anne-Sophie : " + slotTitle(modalRef) + ". Les vétérinaires seront prévenus.", "warn");
+        renderGardeModal();
+      });
+      var no = $("#lock-no");
+      if (no) no.addEventListener("click", function () { $("#lock-confirm").hidden = true; var c = $("#lock-correct"); c.disabled = false; c.style.opacity = "1"; });
+    }
+    gmBody.querySelectorAll(".gm-reassign").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var place = Number(btn.dataset.place);
+        var zone = gmBody.querySelector('.gm-list-zone[data-place="' + place + '"]');
+        var already = zone.innerHTML !== "";
+        gmBody.querySelectorAll(".gm-list-zone").forEach(function (z) { z.innerHTML = ""; });
+        gmBody.querySelectorAll(".gm-reassign").forEach(function (b) { b.setAttribute("aria-expanded", "false"); });
+        if (already) return;
+        btn.setAttribute("aria-expanded", "true");
+        renderAvailList(zone, place);
+      });
+    });
+    $("#gm-close2").addEventListener("click", function () { closeVeil(gardeVeil); });
+    $("#gm-absent").addEventListener("click", function () { $("#gm-absent-note").hidden = false; });
+    var ac = $("#gm-absent-cancel");
+    if (ac) { /* branché après ouverture de la note */ }
+    gmBody.addEventListener("click", function (ev) {
+      if (ev.target && ev.target.id === "gm-absent-cancel") $("#gm-absent-note").hidden = true;
+    });
+  }
+
+  function renderAvailList(zone, place) {
+    var ref = modalRef;
+    var current = getAssign(ref, place);
+    var partnerPlaces = sectionsFor(ref).map(function (s) { return s.place; }).filter(function (p) { return p !== place; });
+    var partners = partnerPlaces.map(function (p) { return getAssign(ref, p); });
+
+    var html = '<ul class="av-list">';
+    VETS.forEach(function (v) {
+      if (v.n === current || partners.indexOf(v.n) >= 0) return;
+      var av = availability(v.n, ref, place);
+      html += '<li><button type="button" class="av-row ' + av.tone + '" data-name="' + v.n + '">' +
+        '<span class="dot" style="background:' + v.c + '"></span>' +
+        "<span>" + v.n + "</span>" +
+        '<span class="av-state ' + av.tone + '">●</span>' +
+        '<span class="av-reason">' + av.reason + "</span>" +
+        "</button></li>";
+    });
+    html += '<li><button type="button" class="av-row" data-name="">' +
+      '<span class="dot none"></span><span>Aucun</span><span class="av-state">·</span>' +
+      '<span class="av-reason">Laisser la place à pourvoir</span></button></li>';
+    html += "</ul>";
+    zone.innerHTML = html;
+
+    zone.querySelectorAll(".av-row").forEach(function (row) {
+      row.addEventListener("click", function () {
+        var name = row.dataset.name || null;
+        if (!name) { applyChange(place, null, null); return; }
+        var av = availability(name, ref, place);
+        if (av.tone === "vert") { applyChange(place, name, null); return; }
+        showViolationDialog(zone, place, name, av);
+      });
+    });
+  }
+
+  /* Dialogue de confirmation · violation dure vs souple (garde-fou Filou) */
+  function showViolationDialog(zone, place, name, av) {
+    var ref = modalRef;
+    var current = getAssign(ref, place);
+    var partnerPlaces = sectionsFor(ref).map(function (s) { return s.place; }).filter(function (p) { return p !== place; });
+    var partners = partnerPlaces.map(function (p) { return getAssign(ref, p); });
+    var sub = bestSubstitute(ref, place, [name, current].concat(partners).filter(Boolean));
+    var dure = av.severity === "dure";
+
+    var html = '<div class="gf-card ' + (dure ? "dure" : "souple") + '">' +
+      '<span class="gardefou-fox"><img src="../fox-4.png" alt="Filou lève un panneau d’alerte"></span>' +
+      '<p class="gf-title">🦊 Filou · ' + (dure ? "règle obligatoire" : "règle souple") + "</p>" +
+      "Hop, une seconde ! Si je mets <b>" + name + "</b> ici : " + av.reason.toLowerCase() + "." +
+      '<span class="gf-rule">' + av.rule + "</span>" +
+      (sub ? '<span class="gf-verified"><b>✓ Vérifié</b> : <b>' + sub + "</b> est disponible sur ce créneau et ne casse aucune règle.</span>" : "") +
+      '<div class="reform-actions">' +
+      (sub ? '<button type="button" class="btn btn-warn-ok" data-act="sub">Mettre ' + sub + " à la place</button>" : "") +
+      '<button type="button" class="btn ' + (dure ? "btn-danger-keep" : "btn-warn-keep") + '" data-act="force">' +
+      (dure ? "Enfreindre la règle : mettre " + name : "Garder " + name + " quand même") + "</button>" +
+      '<button type="button" class="btn btn-corriger" data-act="cancel">Annuler</button>' +
+      "</div></div>";
+    zone.innerHTML = html;
+
+    var card = zone.querySelector(".gf-card");
+    card.querySelectorAll("button").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var act = btn.dataset.act;
+        if (act === "cancel") { renderAvailList(zone, place); return; }
+        if (act === "sub") { applyChange(place, sub, null); return; }
+        /* forcer : consigner la violation */
+        applyChange(place, name, {
+          reason: name + " · " + av.reason + " · " + (dure ? "règle obligatoire enfreinte" : "règle souple outrepassée") + " par Anne-Sophie, consignée.",
+          tone: dure ? "warn" : "warn",
+          journal: (dure ? "Règle obligatoire enfreinte" : "Règle souple outrepassée") + " par Anne-Sophie : " + name + " sur " + slotTitle(ref).toLowerCase() + " (" + av.reason.toLowerCase() + "). Signalé et consigné."
+        });
+      });
+    });
+  }
+
+  function applyChange(place, name, violation) {
+    var ref = modalRef;
+    var key = slotKey(ref, place);
+    setAssign(ref, place, name);
+    delete warnedMap[key];
+    if (violation) {
+      warnedMap[key] = violation.reason;
+      addJournalEntry(violation.journal, "warn");
+    }
+    renderMonth();
+    updateCounters();
+    if (!violation) flashCellsBySlot(ref); /* ✓ discret : changement cohérent */
+    renderGardeModal();
+    var section = gmBody.querySelector('.gm-section[data-place="' + place + '"] .gm-slot-row');
+    if (section) {
+      var done = document.createElement("span");
+      done.className = "gm-done";
+      done.textContent = violation ? "⚠ Modifié, consigné" : "✓ Modifié";
+      section.appendChild(done);
+      setTimeout(function () { done.remove(); }, 2600);
+    }
+  }
+
+  /* clic sur une pastille de la grille */
+  calBody.addEventListener("click", function (ev) {
+    var btn = ev.target.closest("button.pill");
+    if (!btn) return;
+    modalRef = {
+      w: Number(btn.dataset.w),
+      kind: btn.dataset.kind,
+      d: Number(btn.dataset.d)
+    };
+    modalUnlocked = false;
+    renderGardeModal();
+    openVeil(gardeVeil);
+  });
+
+  /* ============================================================
+     GÉNÉRER · récap + gate de RE-génération d'une période publiée
+     ============================================================ */
+  var recapVeil = $("#recap-veil");
+  var periodStatus = "brouillon"; /* brouillon | publiee */
+
+  function openRecap() {
+    var published = periodStatus === "publiee";
+    $("#regen-warning").hidden = !published;
+    var gen = $("#recap-generate");
+    gen.disabled = false;
+    gen.textContent = published ? "Régénérer malgré la publication" : "Générer le planning";
+    $("#recap-hint").hidden = true;
+    openVeil(recapVeil);
+  }
+  $("#btn-generate").addEventListener("click", openRecap);
+  $("#recap-close").addEventListener("click", function () { closeVeil(recapVeil); });
+  $("#recap-cancel").addEventListener("click", function () {
+    closeVeil(recapVeil);
+    foxSort();
+    appendPanelBubble("filou", "🦊 Filou",
+      "Pas de souci, je garde tout sous le coude. Reclique sur « Générer » quand tu veux, le récap t'attendra.");
+  });
+  recapVeil.addEventListener("click", function (ev) { if (ev.target === recapVeil) closeVeil(recapVeil); });
+  document.querySelectorAll(".recap-edit").forEach(function (b) {
+    b.addEventListener("click", function () { $("#recap-hint").hidden = false; });
+  });
+  document.querySelectorAll(".recap-seg button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll(".recap-seg button").forEach(function (x) {
+        x.setAttribute("aria-pressed", String(x === b));
+      });
+    });
+  });
+  $("#recap-generate").addEventListener("click", function () {
+    var gen = this;
+    var wasPublished = periodStatus === "publiee";
+    gen.disabled = true;
+    gen.textContent = "✓ Génération lancée…";
+    setTimeout(function () {
+      closeVeil(recapVeil);
+      foxSort();
+      if (wasPublished) {
+        setStatus("brouillon");
+        addJournalEntry("Régénération d'une période publiée : gardes non verrouillées recalculées, 6 vétérinaires re-notifiés, agenda resynchronisé. La période repasse en brouillon.", "warn");
+        appendPanelBubble("filou", "🦊 Filou",
+          "C'est refait : les gardes <b>non verrouillées</b> ont été recalculées, les vétos re-notifiés, et la période repasse en <b>brouillon</b> le temps que tu relises. (Dans cette maquette, la grille reste identique.)");
+      } else {
+        addJournalEntry("Brouillon regénéré : 12 semaines, 11 règles fermes respectées, équitable à une garde près.", "ok");
+        appendPanelBubble("filou", "🦊 Filou",
+          "Et voilà : brouillon regénéré, <b>11 règles fermes respectées</b>, équitable à une garde près. Relis-le tranquillement, les compteurs racontent la même histoire à droite. (Dans cette maquette, la grille reste identique.)");
+      }
+      setTimeout(foxRentre, REDUCED ? 500 : 3600);
+    }, REDUCED ? 150 : 900);
+  });
+
+  /* ============================================================
+     PUBLIER · gate des réserves RACONTÉ par Filou
+     ============================================================ */
+  function souhaitsEnAttente() {
+    return CONGES.filter(function (c) { return c.statut === "souhait"; });
+  }
+  function violationsConsignees() { return Object.keys(warnedMap).length; }
+
+  function setStatus(st) {
+    periodStatus = st;
+    var badge = $("#status-badge");
+    badge.classList.remove("st-brouillon", "st-publiee", "st-verrouillee", "pulse");
+    if (st === "publiee") {
+      badge.classList.add("st-publiee");
+      badge.textContent = "● Publiée · vétos notifiés";
+      void badge.offsetWidth;
+      badge.classList.add("pulse");
+      $("#btn-publish").disabled = true;
+      $("#btn-publish").textContent = "Publiée ✓";
+      $("#btn-generate").textContent = "Régénérer";
+    } else {
+      badge.classList.add("st-brouillon");
+      badge.textContent = "● Brouillon · non publié";
+      $("#btn-publish").disabled = false;
+      $("#btn-publish").textContent = "Publier";
+      $("#btn-generate").textContent = "Générer";
+    }
+  }
+
+  $("#btn-publish").addEventListener("click", function () {
+    foxSort();
+    var nbS = souhaitsEnAttente().length;
+    var nbV = violationsConsignees();
+    var b = appendPanelBubble("gardefou", "🦊 Filou sort du terrier · avant de publier",
+      '<span class="gardefou-fox"><img src="../fox-4.png" alt="Filou lève un panneau d’alerte qui devient une coche verte"></span>' +
+      "Avant de publier, deux réserves : <b>" + nbS + " souhaits de congé</b> sont encore en attente sur cette période, et " +
+      (nbV > 0 ? "le <b>changement manuel de mardi 27</b> crée une violation souple (Victor enchaîne deux nuits)." : "aucun changement manuel ne pose problème.") +
+      " Je te montre ?" +
+      '<span class="reform-actions">' +
+      '<button type="button" class="btn btn-corriger" data-pub="show">Montre-moi</button>' +
+      '<button type="button" class="btn btn-warn-keep" data-pub="fix">Corriger d’abord</button>' +
+      '<button type="button" class="btn btn-warn-ok" data-pub="go">Publier quand même</button>' +
+      "</span>");
+
+    b.querySelector('[data-pub="show"]').addEventListener("click", function () {
+      this.disabled = true; this.style.opacity = "0.45";
+      appendPanelBubble("filou", "🦊 Filou détaille",
+        '<span class="gf-rule">⏳ <b>Souhait de congé</b> · Camille, 2 → 6 mars : chevauche sa nuit du mer. 4 mars.' +
+        ' <button type="button" class="gf-act" data-see="2026-03-04">Voir sur la grille</button></span>' +
+        '<span class="gf-rule">⏳ <b>Souhait de congé</b> · Julie, 14 → 15 févr. : elle n’y est pas de garde, mais c’est à trancher avant publication.' +
+        ' <button type="button" class="gf-act" data-see="2026-02-14">Voir sur la grille</button></span>' +
+        '<span class="gf-rule">⚠ <b>Violation souple consignée</b> · Victor enchaîne deux nuits (lun. 26 + mar. 27 janv.), suite au changement manuel d’hier.' +
+        ' <button type="button" class="gf-act" data-see="2026-01-27">Voir sur la grille</button></span>' +
+        "Les souhaits se tranchent dans <b>Absences &amp; échanges</b> (tranche M3).");
+      panelScroll.querySelectorAll("[data-see]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var dIso = btn.dataset.see;
+          currentMonth = Number(dIso.slice(5, 7)) - 1;
+          renderMonth();
+          spotDate(dIso);
+        });
+      });
+    });
+
+    b.querySelector('[data-pub="fix"]').addEventListener("click", function () {
+      disableActions(b);
+      appendPanelBubble("filou", "🦊 Filou",
+        "Bonne idée. Je te laisse la main : la violation de mardi 27 est en surbrillance. Rappelle-moi avec « Publier » quand tu es prête.");
+      currentMonth = 0;
+      renderMonth();
+      spotDate("2026-01-27");
+      setTimeout(foxRentre, REDUCED ? 400 : 2600);
+    });
+
+    b.querySelector('[data-pub="go"]').addEventListener("click", function () {
+      disableActions(b);
+      var c = appendPanelBubble("gardefou", "🦊 Filou · dernier point avant l'envoi",
+        "Je publie <b>Hiver 2026</b> :" +
+        '<ul class="aide-steps">' +
+        '<li><span class="n">✉</span><span>les <b>6 vétérinaires</b> reçoivent leur planning par e-mail ;</span></li>' +
+        '<li><span class="n">📅</span><span>la synchro <b>Google Agenda</b> démarre (61 événements) ;</span></li>' +
+        '<li><span class="n">🔒</span><span>chaque garde se <b>verrouille</b> automatiquement à l’approche de sa date.</span></li>' +
+        "</ul>On y va ?" +
+        '<span class="reform-actions">' +
+        '<button type="button" class="btn btn-valider" data-pub2="yes">Publier ✓</button>' +
+        '<button type="button" class="btn btn-corriger" data-pub2="no">Annuler</button>' +
+        "</span>");
+      c.querySelector('[data-pub2="yes"]').addEventListener("click", function () {
+        disableActions(c);
+        setStatus("publiee");
+        addJournalEntry("Planning publié : 12 semaines, 6 vétérinaires notifiés, 61 événements synchronisés dans Google Agenda. 2 souhaits de congé restent à trancher.", "ok");
+        appendPanelBubble("note", null, "✓ Planning publié · 12 semaines, équitable à une garde près.");
+        appendPanelBubble("filou", "🦊 Filou",
+          "C'est en ligne 🦊 Je continue de veiller depuis mon terrier : si un congé validé ou un échange touche le planning publié, je te préviens aussitôt.");
+        setTimeout(foxRentre, REDUCED ? 500 : 4200);
+      });
+      c.querySelector('[data-pub2="no"]').addEventListener("click", function () {
+        disableActions(c);
+        appendPanelBubble("filou", "🦊 Filou", "Entendu, rien n'est parti. Le brouillon t'attend.");
+      });
+    });
+  });
+
+  /* ============================================================
+     SCÈNE · DIAGNOSTIC D'IMPASSE (génération impossible)
+     ============================================================ */
+  $("#demo-impasse").addEventListener("click", function () {
+    foxSort();
+    var b = appendPanelBubble("impasse", "🦊 Filou explique · génération impossible",
+      '<span class="gardefou-fox" style="border-color: rgba(168,52,31,0.3)"><img src="../fox-2.png" alt="Filou présente le moteur de planning"></span>' +
+      "Je n'ai pas réussi à générer, et je peux te dire pourquoi. Le blocage : le <b>week-end du 20 au 22 février</b>, aucun binôme complet possible." +
+      '<span class="gf-rule" style="border-color: rgba(168,52,31,0.35)">En cause, trois choses qui se marchent dessus :' +
+      '<ul class="aide-steps" style="margin-top:6px">' +
+      '<li><span class="n">1</span><span>le <b>congé validé de Manon</b> (16 → 22 févr.) ;</span></li>' +
+      '<li><span class="n">2</span><span>« jamais plus de 2 week-ends consécutifs » (obligatoire), qui écarte Thomas et Camille ;</span></li>' +
+      '<li><span class="n">3</span><span>« un week-end sur trois maximum » (obligatoire), qui écarte tous les autres.</span></li>' +
+      "</ul></span>" +
+      '<span class="gf-verified"><b>✓ Vérifié par simulation</b> : en passant « un week-end sur trois maximum » de <b>obligatoire</b> à <b>important</b>, la génération aboutit, équitable à une garde près. Personne ne dépasse 1 week-end sur 2.</span>' +
+      '<span class="reform-actions">' +
+      '<a class="btn btn-valider" href="m2-regles.html?focus=cadence-weekend">Assouplir cette règle · M2</a>' +
+      '<button type="button" class="btn btn-corriger" data-imp="see">Voir le week-end bloqué</button>' +
+      '<button type="button" class="btn btn-danger-keep" data-imp="keep">Garder mes règles</button>' +
+      "</span>");
+    addJournalEntry("Génération impossible (simulation) : week-end du 20-22 févr. sans binôme. Suggestion vérifiée proposée : assouplir « un week-end sur trois maximum ».", "warn");
+    b.querySelector('[data-imp="see"]').addEventListener("click", function () {
+      currentMonth = 1;
+      renderMonth();
+      spotDate("2026-02-20");
+      spotDate("2026-02-21");
+      spotDate("2026-02-22");
+    });
+    b.querySelector('[data-imp="keep"]').addEventListener("click", function () {
+      disableActions(b);
+      appendPanelBubble("filou", "🦊 Filou",
+        "Entendu, tes règles restent telles quelles. D'autres portes de sortie : trancher le congé autrement, ou demander un dépannage à Anne-Cat sur ce week-end. Dis-moi, je vérifie avant de proposer.");
+    });
+  });
+
+  $("#demo-reset").addEventListener("click", function () { window.location.reload(); });
+
+  /* ============================================================
+     EXPORT PDF (discret) · SÉLECTEUR DE PÉRIODE
+     ============================================================ */
+  var toastTimer = null;
+  function showToast(msg) {
+    var t = $("#toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 3200);
+  }
+  $("#btn-pdf").addEventListener("click", function () {
+    showToast("Export PDF préparé (simulé) · le vrai PDF reprend fériés et zone du cabinet.");
+    addJournalEntry("Export PDF du planning Hiver 2026 demandé par Anne-Sophie.", "ok");
+  });
+
+  var PERIODS_META = {
+    hiver2026: null, /* période de travail */
+    automne2025: {
+      title: "Automne 2025",
+      badge: ["st-publiee", "● Publiée · close"],
+      sub: "Période <b>Automne 2025</b> · 12 semaines · du lun. 6 oct. au dim. 28 déc. 2025",
+      chips: '<span class="pb-chip">🍂 Saison automne</span>' +
+        '<span class="pb-chip">Profil de planning « Hiver »</span>' +
+        '<span class="pb-chip effectif"><b>1 véto par nuit de semaine</b><small>hérité du profil Hiver</small></span>',
+      desc: "Cette période est publiée et close : consultation seule. Dans la maquette, seule Hiver 2026 est manipulable."
+    },
+    ete2025: {
+      title: "Été 2025",
+      badge: ["st-verrouillee", "🔒 Verrouillée · archivée"],
+      sub: "Période <b>Été 2025</b> · 17 semaines · du lun. 9 juin au dim. 5 oct. 2025",
+      chips: '<span class="pb-chip">☀️ Saison été</span>' +
+        '<span class="pb-chip">Profil de planning « Été »</span>' +
+        '<span class="pb-chip effectif"><b>2 vétos par nuit de semaine</b><small>hérité de la saison été</small></span>',
+      desc: "Cette période est verrouillée par le passage de fin de période : plus aucune modification possible, ses compteurs nourrissent l'équité des périodes suivantes."
+    }
+  };
+  var CURRENT_BANNER = {
+    sub: $("#pb-sub").innerHTML,
+    chips: $("#pb-chips").innerHTML
+  };
+  $("#period-select").addEventListener("change", function () {
+    var v = this.value;
+    var meta = PERIODS_META[v];
+    var veil = $("#archive-veil");
+    if (!meta) {
+      veil.classList.remove("show");
+      $("#pb-sub").innerHTML = CURRENT_BANNER.sub;
+      $("#pb-chips").innerHTML = CURRENT_BANNER.chips;
+      setStatus(periodStatus);
+      return;
+    }
+    $("#pb-sub").innerHTML = meta.sub;
+    $("#pb-chips").innerHTML = meta.chips;
+    var badge = $("#status-badge");
+    badge.classList.remove("st-brouillon", "st-publiee", "st-verrouillee", "pulse");
+    badge.classList.add(meta.badge[0]);
+    badge.textContent = meta.badge[1];
+    $("#archive-title").textContent = meta.title;
+    $("#archive-desc").textContent = meta.desc;
+    veil.classList.add("show");
+  });
+  $("#archive-back").addEventListener("click", function () {
+    $("#period-select").value = "hiver2026";
+    $("#period-select").dispatchEvent(new Event("change"));
+  });
+
+  /* ---------- démarrage ---------- */
+  renderMonth();
+  buildCounters();
+})();
+</script>
+</body>
+</html>

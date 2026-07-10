@@ -1,0 +1,1987 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>M5 · Parcours vétérinaire mobile · GuardVeto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700;800&family=Noto+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   M5 — PARCOURS VÉTÉRINAIRE MOBILE-FIRST
+   Ambiance : Terrier chaleureux (reprise du labo design v3).
+   L'app vue par Manon (vétérinaire, pas admin) dans un cadre
+   téléphone. 6 moments pilotés par les boutons de scénario.
+   ============================================================ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --font-display: "Figtree", "Segoe UI Variable Display", "Trebuchet MS", sans-serif;
+  --font-body: "Noto Sans", "Segoe UI", Verdana, sans-serif;
+  /* Couleurs des vétérinaires */
+  --vet-anneso:  #3B6FD1;
+  --vet-annecat: #8153C7;
+  --vet-manon:   #B93A72;
+  --vet-victor:  #0B7D6C;
+  --vet-camille: #55700F;
+  --vet-julie:   #A0522D;
+  --vet-thomas:  #4B5D73;
+
+  /* ---- Terrier chaleureux ---- */
+  --bg:            #F6EEDF;
+  --bg-deep:       #EFE2CB;
+  --surface:       #FFFCF4;
+  --surface-2:     #F6EBD6;
+  --text:          #3A2A1C;
+  --muted:         #7C6A55;
+  --soft:          #A08D75;
+  --border:        #E6D7BB;
+  --border-strong: #D8C4A1;
+  --accent:        #C7530F;
+  --accent-ink:    #AC4508;
+  --accent-soft:   rgba(224, 122, 47, 0.13);
+  --accent-glow:   rgba(230, 126, 34, 0.28);
+  --ok:            #3E7A2E;
+  --ok-soft:       rgba(90, 150, 60, 0.14);
+  --warn:          #9A6200;
+  --warn-soft:     rgba(196, 138, 20, 0.16);
+  --bad:           #A93226;
+  --bad-soft:      rgba(169, 50, 38, 0.12);
+  --bubble-filou:  #FBF3E2;
+  --bubble-user:   #EFE0C4;
+  --grid-we:       rgba(199, 83, 15, 0.07);
+  --manon-soft:    rgba(185, 58, 114, 0.10);
+  --r-lg: 26px; --r-md: 18px; --r-sm: 12px;
+  --shadow-card:  0 10px 30px rgba(140, 84, 24, 0.10), 0 2px 6px rgba(140, 84, 24, 0.06);
+  --shadow-panel: 0 24px 60px rgba(120, 70, 18, 0.20), 0 4px 12px rgba(120, 70, 18, 0.10);
+  --topbar-h: 62px;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  padding-top: var(--topbar-h);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, h4, .display { font-family: var(--font-display); }
+button { font-family: var(--font-body); cursor: pointer; }
+button:focus-visible, input:focus-visible, a:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+img { display: block; }
+
+/* ============================================================
+   BARRE COMMUNE DE LA GRANDE MAQUETTE (hors téléphone)
+   ============================================================ */
+.mnav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(246, 238, 223, 0.90);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 4px;
+  padding: 10px clamp(12px, 3vw, 32px);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.mnav a {
+  font-size: 0.82rem; font-weight: 600; text-decoration: none;
+  color: var(--muted);
+  padding: 8px 14px; border-radius: 999px;
+  border: 1px solid transparent;
+  flex: none;
+}
+.mnav a:hover { color: var(--text); background: var(--surface-2); }
+.mnav a[aria-current="page"] {
+  color: #fff; background: var(--accent);
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+.mnav .sep { color: var(--border-strong); flex: none; }
+
+/* ============================================================
+   EN-TÊTE DE PAGE
+   ============================================================ */
+.page-head {
+  max-width: 1240px; margin: 0 auto;
+  padding: 34px clamp(16px, 4vw, 40px) 6px;
+}
+.page-kicker {
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 8px;
+}
+.page-head h1 { font-size: clamp(1.5rem, 3vw, 2.1rem); font-weight: 800; letter-spacing: -0.01em; }
+.page-head p { margin-top: 8px; color: var(--muted); font-size: 0.95rem; line-height: 1.6; max-width: 62ch; }
+.page-head b { color: var(--text); }
+
+/* ============================================================
+   SCÈNE : rail de scénarios + téléphone + notes
+   ============================================================ */
+.stage {
+  max-width: 1240px; margin: 0 auto;
+  padding: 22px clamp(16px, 4vw, 40px) 70px;
+  display: grid;
+  grid-template-columns: minmax(230px, 0.9fr) auto minmax(230px, 0.9fr);
+  gap: 28px;
+  align-items: start;
+}
+.rail { position: sticky; top: calc(var(--topbar-h) + 18px); }
+.rail-title {
+  font-family: var(--font-display);
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--soft);
+  margin-bottom: 10px;
+}
+.scenarios { display: flex; flex-direction: column; gap: 8px; }
+.sc-btn {
+  display: flex; gap: 12px; align-items: flex-start;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  box-shadow: var(--shadow-card);
+  transition: transform .18s ease, border-color .18s ease;
+}
+.sc-btn:hover { transform: translateX(3px); border-color: var(--border-strong); }
+.sc-btn .n {
+  flex: none;
+  width: 30px; height: 30px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-weight: 800; font-size: 0.9rem;
+  background: var(--surface-2); color: var(--muted);
+  border: 1.5px solid var(--border-strong);
+}
+.sc-btn b { display: block; font-size: 0.88rem; font-weight: 700; }
+.sc-btn small { display: block; margin-top: 2px; font-size: 0.74rem; color: var(--muted); line-height: 1.45; }
+.sc-btn[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-card); }
+.sc-btn[aria-pressed="true"] .n { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.note-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
+  padding: 16px 18px;
+  margin-bottom: 14px;
+}
+.note-card h3 { font-size: 0.9rem; font-weight: 700; margin-bottom: 8px; }
+.note-card ul { list-style: none; }
+.note-card li {
+  font-size: 0.8rem; color: var(--muted); line-height: 1.5;
+  padding: 5px 0 5px 20px; position: relative;
+  border-bottom: 1px dashed var(--border);
+}
+.note-card li:last-child { border-bottom: none; }
+.note-card li::before { content: "✕"; position: absolute; left: 2px; color: var(--bad); font-weight: 700; font-size: 0.72rem; }
+.note-card.tips li::before { content: "→"; color: var(--accent-ink); }
+.note-card p { font-size: 0.8rem; color: var(--muted); line-height: 1.55; }
+
+/* ============================================================
+   LE TÉLÉPHONE
+   ============================================================ */
+.phone-zone { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.phone {
+  width: 390px; height: 812px;
+  flex: none;
+  background: #2E2114;
+  border-radius: 52px;
+  padding: 11px;
+  box-shadow: 0 34px 80px rgba(80, 46, 10, 0.38), 0 6px 18px rgba(80, 46, 10, 0.22);
+  position: relative;
+}
+.phone::before {
+  content: ""; position: absolute; top: 22px; left: 50%; transform: translateX(-50%);
+  width: 110px; height: 24px; border-radius: 999px;
+  background: #2E2114; z-index: 40;
+}
+.phone-screen {
+  width: 100%; height: 100%;
+  background: var(--bg);
+  border-radius: 42px;
+  overflow: hidden;
+  position: relative;
+  display: flex; flex-direction: column;
+}
+.phone-caption { font-size: 0.78rem; color: var(--muted); text-align: center; max-width: 44ch; line-height: 1.55; }
+.phone-caption b { color: var(--text); }
+
+.statusbar {
+  flex: none;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 26px 4px;
+  font-size: 0.7rem; font-weight: 700; color: var(--muted);
+  font-family: var(--font-display);
+}
+
+/* ============================================================
+   MOMENT 1 · PREMIÈRE CONNEXION (60 secondes)
+   ============================================================ */
+.onboard { flex: 1; display: none; flex-direction: column; overflow-y: auto; padding: 18px 20px 24px; }
+.onboard.active { display: flex; }
+.ob-step { display: none; flex-direction: column; flex: 1; }
+.ob-step.active { display: flex; animation: stepIn .45s ease both; }
+@keyframes stepIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+.ob-progress { display: flex; gap: 6px; margin: 6px 0 20px; }
+.ob-progress i { flex: 1; height: 5px; border-radius: 999px; background: var(--surface-2); }
+.ob-progress i.on { background: var(--accent); }
+
+.mail-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
+  padding: 18px;
+}
+.mail-meta { font-size: 0.72rem; color: var(--soft); border-bottom: 1px dashed var(--border); padding-bottom: 10px; margin-bottom: 12px; line-height: 1.7; }
+.mail-meta b { color: var(--text); font-size: 0.8rem; }
+.mail-card h2 { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
+.mail-card p { font-size: 0.86rem; color: var(--muted); line-height: 1.6; }
+.mail-card p b { color: var(--text); }
+
+.ob-title { font-size: 1.3rem; font-weight: 800; line-height: 1.2; margin-bottom: 6px; }
+.ob-sub { font-size: 0.86rem; color: var(--muted); line-height: 1.55; margin-bottom: 18px; }
+
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 0.76rem; font-weight: 700; color: var(--muted); margin-bottom: 6px; }
+.field input, .field select, .field textarea {
+  width: 100%;
+  font-family: var(--font-body); font-size: 0.9rem; color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  min-height: 46px;
+}
+.field input:focus, .field textarea:focus { border-color: var(--accent); outline: none; }
+.field .hint { font-size: 0.72rem; color: var(--soft); margin-top: 5px; }
+.field .hint.good { color: var(--ok); font-weight: 600; }
+
+.btn {
+  border: none; border-radius: 999px;
+  font-size: 0.9rem; font-weight: 700;
+  padding: 13px 22px; min-height: 48px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn-main { background: var(--accent); color: #fff; width: 100%; box-shadow: 0 4px 14px var(--accent-glow); }
+.btn-main:hover { filter: brightness(1.06); }
+.btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border-strong); }
+.btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+.btn-sm { font-size: 0.8rem; padding: 8px 15px; min-height: 38px; }
+
+.ob-fox { display: flex; justify-content: center; margin: 8px 0 4px; }
+.ob-fox img { width: 120px; height: auto; filter: drop-shadow(0 12px 22px rgba(120,70,18,0.25)); animation: foxFloat 5.5s ease-in-out infinite; }
+@keyframes foxFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+.ob-chat { display: flex; flex-direction: column; gap: 10px; margin: 12px 0 18px; }
+.bubble {
+  max-width: 92%;
+  padding: 11px 15px;
+  border-radius: var(--r-md);
+  font-size: 0.87rem; line-height: 1.55;
+}
+.bubble.filou {
+  align-self: flex-start;
+  background: var(--bubble-filou);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+  opacity: 0;
+}
+.bubble.filou.show { animation: bubbleIn .4s ease both; }
+@keyframes bubbleIn { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+.bubble.user {
+  align-self: flex-end;
+  background: var(--bubble-user);
+  border: 1px solid transparent;
+  border-bottom-right-radius: 4px;
+}
+.bubble .who {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.64rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 4px;
+}
+.bubble b { font-weight: 700; }
+.ob-cta-zone { margin-top: auto; padding-top: 10px; }
+.chrono {
+  align-self: center;
+  font-size: 0.7rem; font-weight: 700; color: var(--ok);
+  background: var(--ok-soft);
+  border: 1px dashed var(--border-strong);
+  border-radius: 999px; padding: 4px 12px;
+  margin-top: 2px;
+}
+
+/* ============================================================
+   L'APP (après connexion)
+   ============================================================ */
+.app { flex: 1; display: none; flex-direction: column; overflow: hidden; position: relative; }
+.app.active { display: flex; }
+
+.app-top {
+  flex: none;
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 18px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.app-top .logo { font-family: var(--font-display); font-weight: 800; font-size: 0.98rem; letter-spacing: -0.01em; }
+.app-top .logo span { color: var(--accent-ink); }
+.chip-periode {
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--ok-soft); color: var(--ok);
+  border: 1px solid rgba(90,150,60,0.3);
+  font-size: 0.66rem; font-weight: 700;
+  padding: 4px 10px; border-radius: 999px;
+  white-space: nowrap;
+}
+.me-dot {
+  width: 30px; height: 30px; border-radius: 50%; flex: none;
+  background: var(--vet-manon); color: #fff;
+  font-family: var(--font-display); font-weight: 800; font-size: 0.78rem;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
+.tab { flex: 1; display: none; flex-direction: column; overflow-y: auto; padding: 14px 16px 120px; }
+.tab.active { display: flex; animation: tabIn .3s ease both; }
+@keyframes tabIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.tab-title { font-size: 1.15rem; font-weight: 800; }
+.tab-sub { font-size: 0.78rem; color: var(--muted); margin-top: 2px; line-height: 1.5; }
+
+/* ---- Moment 2 · Mon planning ---- */
+.pl-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.pl-head h2 { font-size: 1.15rem; font-weight: 800; flex: 1; }
+.pl-nav { display: flex; gap: 4px; }
+.pl-nav button {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 1px solid var(--border-strong); background: var(--surface);
+  color: var(--muted); font-size: 0.95rem; line-height: 1;
+}
+.pl-nav button:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
+.pl-tools { display: flex; align-items: center; gap: 8px; margin: 10px 0 12px; flex-wrap: wrap; }
+.seg { display: flex; gap: 3px; background: var(--surface-2); padding: 3px; border-radius: 999px; border: 1px solid var(--border); }
+.seg button {
+  border: none; background: transparent; color: var(--muted);
+  font-size: 0.76rem; font-weight: 600;
+  padding: 6px 13px; border-radius: 999px; min-height: 32px;
+}
+.seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.mine-toggle {
+  margin-left: auto;
+  font-size: 0.72rem; font-weight: 700; color: var(--vet-manon);
+  background: var(--manon-soft);
+  border: 1px solid rgba(185,58,114,0.3);
+  border-radius: 999px; padding: 6px 12px; min-height: 32px;
+}
+
+.garde-list { display: flex; flex-direction: column; gap: 7px; }
+.g-sep {
+  font-family: var(--font-display);
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--soft);
+  margin: 8px 2px 1px;
+  display: flex; align-items: center; gap: 8px;
+}
+.g-sep::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.garde {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.garde:hover { transform: translateY(-1px); box-shadow: var(--shadow-card); }
+.garde .g-date {
+  flex: none; width: 44px; text-align: center;
+  font-family: var(--font-display); line-height: 1.1;
+}
+.garde .g-date small { display: block; font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); }
+.garde .g-date b { font-size: 1.15rem; font-weight: 800; color: var(--text); }
+.garde .g-body { flex: 1; min-width: 0; }
+.garde .g-type { font-size: 0.82rem; font-weight: 700; }
+.garde .g-heure { font-size: 0.7rem; color: var(--muted); }
+.garde .g-vets { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  color: #fff; font-size: 0.64rem; font-weight: 700;
+  padding: 2px 8px; border-radius: 6px; line-height: 1.4;
+}
+.pill .rank { font-weight: 400; opacity: 0.8; }
+.garde.other { background: transparent; border-style: dashed; }
+.garde.other .g-type { font-weight: 600; color: var(--muted); font-size: 0.78rem; }
+.garde.other .g-date b { color: var(--soft); font-size: 1rem; }
+.garde.other .pill { opacity: 0.55; }
+.garde.mine {
+  background: var(--surface);
+  border: 1.5px solid var(--vet-manon);
+  box-shadow: 0 6px 18px rgba(185, 58, 114, 0.14);
+}
+.garde.mine .g-date b { color: var(--vet-manon); }
+.g-mine-tag {
+  flex: none;
+  font-size: 0.62rem; font-weight: 800; letter-spacing: 0.05em;
+  color: var(--vet-manon);
+  background: var(--manon-soft);
+  border-radius: 999px; padding: 3px 9px;
+}
+.g-ferie {
+  flex: none; font-size: 0.62rem; font-weight: 700;
+  color: var(--warn); background: var(--warn-soft);
+  border-radius: 999px; padding: 3px 9px;
+}
+.garde.we-row { background: var(--grid-we); }
+.garde.we-row.mine { background: var(--surface); }
+
+/* Vue grille (mini mois) */
+.month-grid { display: none; }
+.month-grid.show { display: block; animation: tabIn .3s ease both; }
+.mg-head, .mg-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.mg-head span {
+  font-family: var(--font-display); font-size: 0.6rem; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--soft);
+  text-align: center; padding: 4px 0;
+}
+.mg-week { margin-bottom: 4px; }
+.mg-cell {
+  aspect-ratio: 1 / 1.06;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  font-size: 0.72rem; font-weight: 600; color: var(--muted);
+}
+.mg-cell.empty { background: transparent; border-color: transparent; }
+.mg-cell.we { background: var(--grid-we); }
+.mg-cell .d { font-family: var(--font-display); }
+.mg-cell .vdot { width: 9px; height: 9px; border-radius: 50%; }
+.mg-cell.mine {
+  border: 1.5px solid var(--vet-manon);
+  background: var(--manon-soft);
+  color: var(--vet-manon);
+}
+.mg-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 12px; font-size: 0.68rem; color: var(--muted); }
+.mg-legend .l { display: inline-flex; align-items: center; gap: 5px; }
+.mg-legend .vdot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+/* Bottom sheet détail de garde */
+.sheet-veil {
+  position: absolute; inset: 0; z-index: 28;
+  background: rgba(58, 42, 28, 0.35);
+  opacity: 0; pointer-events: none;
+  transition: opacity .25s ease;
+}
+.sheet-veil.open { opacity: 1; pointer-events: auto; }
+.sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 29;
+  background: var(--surface);
+  border-top: 1px solid var(--border-strong);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  box-shadow: var(--shadow-panel);
+  padding: 12px 20px 26px;
+  transform: translateY(105%);
+  transition: transform .35s cubic-bezier(0.22, 1, 0.36, 1);
+  max-height: 78%;
+  overflow-y: auto;
+}
+.sheet.open { transform: none; }
+.sheet-grip { width: 42px; height: 5px; border-radius: 999px; background: var(--border-strong); margin: 0 auto 14px; }
+.sheet h3 { font-size: 1.05rem; font-weight: 800; }
+.sheet .sh-sub { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+.sh-rows { margin: 14px 0; display: flex; flex-direction: column; gap: 8px; }
+.sh-row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 10px 13px;
+  font-size: 0.84rem;
+}
+.sh-row .ic { flex: none; width: 20px; text-align: center; }
+.sh-row b { font-weight: 700; }
+.sh-row small { color: var(--muted); display: block; font-size: 0.72rem; }
+.sh-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+
+/* ---- Moment 3 · Congés ---- */
+.conge-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 13px 15px;
+  margin-bottom: 8px;
+}
+.conge-card .c-top { display: flex; align-items: center; gap: 8px; }
+.conge-card .c-type { font-size: 0.88rem; font-weight: 700; flex: 1; }
+.statut {
+  font-size: 0.64rem; font-weight: 800; letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 10px; border-radius: 999px;
+  flex: none;
+}
+.statut.souhait { background: var(--warn-soft); color: var(--warn); }
+.statut.valide  { background: var(--ok-soft); color: var(--ok); }
+.statut.refuse  { background: var(--bad-soft); color: var(--bad); }
+.conge-card .c-dates { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+.motif-refus {
+  margin-top: 9px;
+  background: var(--bad-soft);
+  border: 1px dashed rgba(169, 50, 38, 0.4);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+  font-size: 0.78rem; line-height: 1.55; color: var(--text);
+}
+.motif-refus b { color: var(--bad); font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; display: block; margin-bottom: 3px; }
+.c-actions { display: flex; gap: 6px; margin-top: 10px; }
+.c-actions button {
+  border: 1px solid var(--border-strong); background: transparent;
+  color: var(--muted); font-size: 0.74rem; font-weight: 700;
+  padding: 6px 13px; border-radius: 999px; min-height: 32px;
+}
+.c-actions button:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
+.c-actions button.danger:hover { color: var(--bad); border-color: var(--bad); }
+.confirm-line {
+  display: none;
+  margin-top: 10px;
+  background: var(--warn-soft);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+  font-size: 0.8rem;
+  align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.confirm-line.open { display: flex; }
+.confirm-line b { flex: 1; min-width: 120px; }
+.confirm-line button { border-radius: 999px; border: none; font-size: 0.74rem; font-weight: 700; padding: 6px 14px; min-height: 32px; }
+.confirm-line .yes { background: var(--bad); color: #fff; }
+.confirm-line .no { background: transparent; border: 1px solid var(--border-strong); color: var(--muted); }
+.c-note { font-size: 0.72rem; color: var(--soft); margin-top: 4px; }
+
+.conge-form {
+  display: none;
+  background: var(--surface);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--r-md);
+  padding: 16px;
+  margin: 4px 0 14px;
+}
+.conge-form.open { display: block; animation: tabIn .3s ease both; }
+.conge-form h3 { font-size: 0.98rem; font-weight: 800; margin-bottom: 12px; }
+.type-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.tchip {
+  border: 1px solid var(--border-strong); background: var(--surface-2);
+  color: var(--text); font-size: 0.78rem; font-weight: 600;
+  padding: 8px 13px; border-radius: 999px; min-height: 36px;
+}
+.tchip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.date-duo { display: flex; gap: 8px; }
+.date-duo .field { flex: 1; }
+.creneau-zone { display: none; }
+.creneau-zone.show { display: block; }
+.form-foot { display: flex; gap: 8px; margin-top: 6px; }
+.form-foot .btn-main { flex: 1; width: auto; }
+
+/* ---- Moment 4 · Échanges ---- */
+.ech-section { margin-bottom: 18px; }
+.ech-section > h3 {
+  font-family: var(--font-display);
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin: 14px 0 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+.ech-section > h3::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.ech-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 13px 15px;
+  margin-bottom: 8px;
+}
+.ech-card.hot { border: 1.5px solid var(--accent); box-shadow: 0 6px 18px var(--accent-glow); }
+.ech-head { display: flex; align-items: center; gap: 9px; }
+.vdot-lg {
+  flex: none; width: 32px; height: 32px; border-radius: 50%;
+  color: #fff; font-family: var(--font-display); font-weight: 800; font-size: 0.72rem;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.ech-head .t { flex: 1; min-width: 0; }
+.ech-head b { font-size: 0.86rem; font-weight: 700; display: block; }
+.ech-head small { font-size: 0.72rem; color: var(--muted); }
+.ech-body { font-size: 0.8rem; color: var(--muted); line-height: 1.55; margin-top: 8px; }
+.ech-body b { color: var(--text); }
+.contrepartie {
+  margin-top: 8px;
+  background: var(--surface-2);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 8px 11px;
+  font-size: 0.76rem; line-height: 1.5;
+}
+.ech-actions { display: flex; gap: 7px; margin-top: 11px; flex-wrap: wrap; }
+.ech-actions .btn { min-height: 40px; font-size: 0.8rem; padding: 9px 16px; }
+.btn-ok { background: var(--ok); color: #fff; border: none; }
+.btn-ok:hover { filter: brightness(1.08); }
+.btn-decline { background: transparent; color: var(--bad); border: 1px solid rgba(169,50,38,0.4); }
+.btn-decline:hover { background: var(--bad-soft); }
+.decline-zone { display: none; margin-top: 10px; }
+.decline-zone.open { display: block; }
+.statut-e {
+  font-size: 0.64rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
+  padding: 3px 10px; border-radius: 999px; flex: none;
+}
+.st-proposee  { background: var(--accent-soft); color: var(--accent-ink); }
+.st-acceptee  { background: var(--ok-soft); color: var(--ok); }
+.st-refusee   { background: var(--bad-soft); color: var(--bad); }
+.st-validee   { background: var(--ok-soft); color: var(--ok); border: 1px solid rgba(90,150,60,0.35); }
+.st-annulee   { background: var(--surface-2); color: var(--soft); border: 1px solid var(--border); }
+.st-appliquee { background: var(--vet-victor); color: #fff; }
+.statuts-legend { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.timeline { list-style: none; margin-top: 10px; }
+.timeline li {
+  position: relative; padding: 0 0 10px 20px;
+  font-size: 0.76rem; color: var(--muted); line-height: 1.5;
+}
+.timeline li::before {
+  content: ""; position: absolute; left: 4px; top: 5px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--border-strong);
+}
+.timeline li.done::before { background: var(--ok); }
+.timeline li.now::before { background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.timeline li b { color: var(--text); }
+
+.ech-form { display: none; background: var(--surface); border: 1.5px solid var(--border-strong); border-radius: var(--r-md); padding: 16px; margin: 4px 0 14px; }
+.ech-form.open { display: block; animation: tabIn .3s ease both; }
+.ech-form h3 { font-size: 0.98rem; font-weight: 800; margin-bottom: 4px; }
+.ech-form .ef-garde { font-size: 0.8rem; color: var(--muted); margin-bottom: 12px; }
+.ef-label { font-size: 0.76rem; font-weight: 700; color: var(--muted); margin: 12px 0 6px; }
+.dest-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ---- Moment 5 · Compteurs ---- */
+.eq-banner {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--ok-soft);
+  border: 1px solid rgba(90, 150, 60, 0.3);
+  border-radius: var(--r-md);
+  padding: 12px 15px;
+  margin: 10px 0 16px;
+}
+.eq-banner .ic { font-size: 1.3rem; flex: none; }
+.eq-banner b { display: block; font-size: 0.88rem; color: var(--ok); }
+.eq-banner small { font-size: 0.75rem; color: var(--muted); line-height: 1.45; display: block; margin-top: 2px; }
+.cnt-block { margin-bottom: 18px; }
+.cnt-block h3 {
+  font-family: var(--font-display);
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 7px;
+  display: flex; align-items: center; gap: 8px;
+}
+.cnt-block h3::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.cnt-block h3 small { font-size: 0.64rem; color: var(--soft); text-transform: none; letter-spacing: 0; font-weight: 500; }
+table.cnt { width: 100%; border-collapse: separate; border-spacing: 0 3px; }
+table.cnt th {
+  font-family: var(--font-display);
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--soft); text-align: left; padding: 2px 10px;
+}
+table.cnt th:not(:first-child), table.cnt td:not(:first-child) { text-align: center; }
+table.cnt td {
+  background: var(--surface);
+  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  padding: 8px 10px;
+  font-size: 0.8rem;
+}
+table.cnt td:first-child { border-left: 1px solid var(--border); border-radius: var(--r-sm) 0 0 var(--r-sm); font-weight: 600; }
+table.cnt td:last-child { border-right: 1px solid var(--border); border-radius: 0 var(--r-sm) var(--r-sm) 0; }
+table.cnt tr.me td {
+  background: var(--manon-soft);
+  border-color: rgba(185, 58, 114, 0.35);
+  font-weight: 700;
+}
+table.cnt .v { display: inline-flex; align-items: center; gap: 7px; }
+table.cnt .vdot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+.eq {
+  display: inline-block;
+  font-size: 0.68rem; font-weight: 800;
+  padding: 2px 9px; border-radius: 999px;
+}
+.eq.zero  { background: var(--ok-soft); color: var(--ok); }
+.eq.plus  { background: var(--warn-soft); color: var(--warn); }
+.eq.moins { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+.cnt-foot { font-size: 0.7rem; color: var(--soft); margin-top: 4px; line-height: 1.5; }
+
+/* ---- Règles (lecture) ---- */
+.regle-item { padding: 11px 4px 10px; border-bottom: 1px dashed var(--border); }
+.regle-item:last-child { border-bottom: none; }
+.regle-item p { font-size: 0.86rem; line-height: 1.55; }
+.lvl {
+  display: inline-block; margin-top: 6px;
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  padding: 3px 10px; border-radius: 999px;
+}
+.lvl-obligatoire { background: var(--accent-soft); color: var(--accent-ink); }
+.lvl-important   { background: var(--warn-soft); color: var(--warn); }
+.lvl-sipossible  { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+.lecture-note {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: var(--surface-2);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  font-size: 0.78rem; color: var(--muted); line-height: 1.55;
+  margin: 12px 0;
+}
+
+/* ============================================================
+   TERRIER DE FILOU (mobile, discret)
+   ============================================================ */
+.terrier-m {
+  position: absolute; right: 12px; bottom: 86px; z-index: 26;
+  width: 78px; height: 58px;
+  border: none; background: transparent; padding: 0;
+}
+.terrier-m svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.terrier-m .fox-peek {
+  position: absolute; left: 50%; bottom: 17px; transform: translateX(-50%);
+  width: 36px; height: 22px; overflow: hidden; z-index: 2;
+  transition: transform .3s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.terrier-m .fox-peek img { width: 100%; height: auto; }
+.terrier-m:hover .fox-peek { transform: translateX(-50%) translateY(-4px); }
+.terrier-m .t-hint {
+  position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%);
+  font-size: 0.56rem; font-weight: 700; letter-spacing: 0.05em;
+  color: var(--muted); white-space: nowrap;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 999px; padding: 2px 8px; z-index: 4;
+}
+.app.filou-open .terrier-m { display: none; }
+
+/* Panneau Filou plein écran mobile */
+.filou-panel {
+  position: absolute; left: 0; right: 0; bottom: 0; top: 12%;
+  z-index: 30;
+  background: var(--surface);
+  border-top: 1px solid var(--border-strong);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  box-shadow: var(--shadow-panel);
+  display: flex; flex-direction: column;
+  transform: translateY(105%);
+  transition: transform .4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.app.filou-open .filou-panel { transform: none; }
+.fp-head {
+  flex: none;
+  display: flex; align-items: center; gap: 11px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.fp-head .avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1px solid var(--border-strong);
+  overflow: hidden; flex: none;
+  display: flex; justify-content: center; align-items: flex-start;
+}
+.fp-head .avatar img { width: 130%; height: auto; margin-top: 2px; }
+.fp-head h3 { font-size: 0.95rem; font-weight: 800; }
+.fp-head .sub { font-size: 0.68rem; color: var(--muted); }
+.fp-close {
+  margin-left: auto;
+  border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--muted); border-radius: var(--r-sm);
+  width: 36px; height: 36px; font-size: 1rem; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.fp-scroll {
+  flex: 1; overflow-y: auto;
+  padding: 14px 14px 8px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.fp-scroll .bubble.filou { opacity: 1; }
+.fp-scroll .bubble { font-size: 0.84rem; max-width: 95%; }
+.aide-steps { margin: 8px 0 2px; list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.aide-steps li { display: flex; gap: 8px; align-items: baseline; font-size: 0.8rem; }
+.aide-steps .n { flex: none; font-family: var(--font-display); font-weight: 800; font-size: 0.68rem; color: var(--accent-ink); }
+.fp-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 14px 8px; flex: none; }
+.fp-chips .chip {
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  border-radius: 999px;
+  font-size: 0.74rem; font-weight: 600;
+  padding: 8px 13px; min-height: 36px;
+}
+.fp-chips .chip:hover { background: var(--accent-soft); border-color: var(--accent-ink); color: var(--accent-ink); }
+.fp-input {
+  display: flex; gap: 8px;
+  padding: 10px 12px 14px;
+  border-top: 1px solid var(--border);
+  flex: none;
+}
+.fp-input input {
+  flex: 1; min-width: 0;
+  font-family: var(--font-body); font-size: 0.86rem; color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 10px 16px; min-height: 44px;
+}
+.fp-input input:focus { border-color: var(--accent); outline: none; }
+.fp-send {
+  border: none; background: var(--accent); color: #fff;
+  border-radius: 999px; min-width: 44px; min-height: 44px;
+  font-size: 1rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none;
+}
+.typing { display: inline-flex; gap: 4px; padding: 4px 2px; }
+.typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--soft); animation: typeDot 1.1s ease-in-out infinite; }
+.typing i:nth-child(2) { animation-delay: .15s; }
+.typing i:nth-child(3) { animation-delay: .3s; }
+@keyframes typeDot { 0%, 100% { transform: none; opacity: .5; } 50% { transform: translateY(-4px); opacity: 1; } }
+.bubble .b-act { margin-top: 9px; }
+
+/* ============================================================
+   BOTTOM NAV (5 entrées)
+   ============================================================ */
+.bnav {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 25;
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 6px 6px calc(10px + env(safe-area-inset-bottom, 6px));
+}
+.bnav button {
+  position: relative;
+  border: none; background: transparent;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  color: var(--muted);
+  font-size: 0.58rem; font-weight: 700;
+  padding: 7px 2px 4px;
+  border-radius: var(--r-sm);
+  min-height: 52px;
+}
+.bnav button .ic { font-size: 1.15rem; line-height: 1; filter: grayscale(0.45) opacity(0.75); }
+.bnav button[aria-current="true"] { color: var(--accent-ink); background: var(--accent-soft); }
+.bnav button[aria-current="true"] .ic { filter: none; }
+.bnav .badge {
+  position: absolute; top: 3px; right: calc(50% - 21px);
+  min-width: 17px; height: 17px;
+  background: var(--accent); color: #fff;
+  font-size: 0.6rem; font-weight: 800;
+  border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0 4px;
+  border: 2px solid var(--surface);
+}
+.bnav .badge:empty, .bnav .badge[data-zero] { display: none; }
+
+/* Toast interne au téléphone */
+.toast {
+  position: absolute; left: 50%; bottom: 96px; z-index: 35;
+  transform: translateX(-50%) translateY(16px);
+  background: var(--text); color: var(--bg);
+  font-size: 0.78rem; font-weight: 600;
+  padding: 10px 18px; border-radius: 999px;
+  box-shadow: var(--shadow-panel);
+  opacity: 0; pointer-events: none;
+  transition: opacity .25s ease, transform .3s cubic-bezier(0.22, 1, 0.36, 1);
+  max-width: 88%; text-align: center;
+}
+.toast.show { opacity: 1; transform: translateX(-50%); }
+
+/* ============================================================
+   RESPONSIVE PAGE (le labo autour du téléphone)
+   ============================================================ */
+@media (max-width: 1080px) {
+  .stage { grid-template-columns: 1fr; justify-items: center; }
+  .rail { position: static; width: 100%; max-width: 560px; }
+  .scenarios { flex-direction: row; flex-wrap: wrap; }
+  .sc-btn { flex: 1 1 45%; }
+}
+@media (max-width: 460px) {
+  .phone { width: 100%; max-width: 390px; height: 780px; border-radius: 44px; }
+  .sc-btn { flex: 1 1 100%; }
+}
+
+/* ============================================================
+   ACCESSIBILITÉ · prefers-reduced-motion
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ===================== BARRE COMMUNE ===================== -->
+<nav class="mnav" aria-label="Navigation de la grande maquette">
+  <a href="index.html">🏠 Hub</a>
+  <span class="sep">·</span>
+  <a href="m1-planning.html">M1 Planning</a>
+  <a href="m2-regles.html">M2 Règles</a>
+  <a href="m3-absences-echanges.html">M3 Absences &amp; échanges</a>
+  <a href="m4-accueil-equipe-historique-connexions.html">M4 Accueil &amp; réglages</a>
+  <a href="m5-veto-mobile.html" aria-current="page">M5 Véto mobile</a>
+</nav>
+
+<header class="page-head">
+  <div class="page-kicker">Tranche M5 · Acte 3 de la vision</div>
+  <h1>L'appli dans la poche de Manon</h1>
+  <p>Manon est <b>vétérinaire</b>, pas admin. Elle reçoit son invitation, et en <b>60 secondes</b> elle doit
+  comprendre l'appli sans formation : ses gardes, ses congés, ses échanges, son équité. Choisis un moment
+  à gauche, tout se joue dans le téléphone.</p>
+</header>
+
+<main class="stage">
+
+  <!-- ===================== RAIL DES SCÉNARIOS ===================== -->
+  <aside class="rail rail-left">
+    <div class="rail-title">Les 6 moments</div>
+    <div class="scenarios" role="group" aria-label="Scénarios du parcours vétérinaire">
+      <button class="sc-btn" data-sc="1" aria-pressed="true">
+        <span class="n">1</span>
+        <span><b>Première connexion</b><small>E-mail d'invitation, mot de passe, Filou accueille en 3 messages.</small></span>
+      </button>
+      <button class="sc-btn" data-sc="2" aria-pressed="false">
+        <span class="n">2</span>
+        <span><b>Mon planning</b><small>Mes gardes en avant, les autres en retrait. Détail au tap.</small></span>
+      </button>
+      <button class="sc-btn" data-sc="3" aria-pressed="false">
+        <span class="n">3</span>
+        <span><b>Poser un congé</b><small>5 types, indispo à la journée ou au créneau, statuts et motif de refus.</small></span>
+      </button>
+      <button class="sc-btn" data-sc="4" aria-pressed="false">
+        <span class="n">4</span>
+        <span><b>Échanges</b><small>Proposer, répondre, prendre une garde ouverte, suivre les statuts.</small></span>
+      </button>
+      <button class="sc-btn" data-sc="5" aria-pressed="false">
+        <span class="n">5</span>
+        <span><b>Mes compteurs</b><small>Les 4 tableaux, ma ligne surlignée : « tu es dans la moyenne ».</small></span>
+      </button>
+      <button class="sc-btn" data-sc="6" aria-pressed="false">
+        <span class="n">6</span>
+        <span><b>Filou renseigne</b><small>Le 5e verbe : il explique l'appli et les décisions du planning.</small></span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ===================== LE TÉLÉPHONE ===================== -->
+  <div class="phone-zone">
+    <div class="phone" role="region" aria-label="Téléphone de Manon">
+      <div class="phone-screen">
+        <div class="statusbar"><span>9:41</span><span>GuardVeto</span><span>📶 🔋</span></div>
+
+        <!-- ============ MOMENT 1 · ONBOARDING ============ -->
+        <div class="onboard active" id="onboard">
+          <div class="ob-progress" aria-hidden="true"><i class="on" id="obp1"></i><i id="obp2"></i><i id="obp3"></i></div>
+
+          <!-- Étape A : l'e-mail d'invitation -->
+          <section class="ob-step active" id="ob-a">
+            <div class="mail-card">
+              <div class="mail-meta">
+                De : <b>Cabinet Val d'Allier · GuardVeto</b><br>
+                À : manon@…&nbsp;&nbsp;·&nbsp;&nbsp;aujourd'hui, 8h12
+              </div>
+              <h2>Manon, ton planning de gardes t'attend 🦊</h2>
+              <p>Anne-Sophie t'a invitée sur <b>GuardVeto</b>, l'appli du cabinet pour les gardes.
+              Tu y verras tes gardes, tu y poseras tes congés et tes échanges. Une minute suffit pour entrer.</p>
+            </div>
+            <div class="ob-cta-zone">
+              <button class="btn btn-main" id="ob-go-b">Créer mon mot de passe</button>
+            </div>
+          </section>
+
+          <!-- Étape B : mot de passe -->
+          <section class="ob-step" id="ob-b">
+            <h2 class="ob-title">Bienvenue, Manon</h2>
+            <p class="ob-sub">Ton compte est prêt, il ne manque que ton mot de passe. C'est la seule étape.</p>
+            <div class="field">
+              <label for="pw1">Mot de passe</label>
+              <input type="password" id="pw1" value="••••••••••" autocomplete="new-password">
+              <div class="hint good" id="pw-hint">✓ Assez long, assez costaud.</div>
+            </div>
+            <div class="field">
+              <label for="pw2">Confirme-le</label>
+              <input type="password" id="pw2" value="••••••••••" autocomplete="new-password">
+            </div>
+            <div class="ob-cta-zone">
+              <button class="btn btn-main" id="ob-go-c">C'est parti</button>
+            </div>
+          </section>
+
+          <!-- Étape C : Filou accueille en 3 messages -->
+          <section class="ob-step" id="ob-c">
+            <div class="ob-fox"><img src="../fox-1.png" alt="Filou, le renard assistant, souhaite la bienvenue"></div>
+            <div class="ob-chat" id="ob-chat">
+              <div class="bubble filou" id="fb1">
+                <span class="who">🦊 Filou</span>
+                Salut Manon, moi c'est <b>Filou</b>. Je vis dans l'appli, en bas de l'écran. Une question, un doute : tu me demandes.
+              </div>
+              <div class="bubble filou" id="fb2">
+                <span class="who">🦊 Filou</span>
+                <b>Tes gardes</b> sont dans l'onglet Planning : elles ressortent en couleur, le reste de l'équipe est en retrait.
+              </div>
+              <div class="bubble filou" id="fb3">
+                <span class="who">🦊 Filou</span>
+                Un congé à poser ? Onglet <b>Congés</b>, deux minutes montre en main. C'est tout, je te laisse regarder.
+              </div>
+              <span class="chrono" id="chrono" hidden>⏱ 54 secondes. Promesse tenue.</span>
+            </div>
+            <div class="ob-cta-zone">
+              <button class="btn btn-main" id="ob-finish" hidden>Voir mon planning</button>
+            </div>
+          </section>
+        </div>
+
+        <!-- ============ L'APP CONNECTÉE ============ -->
+        <div class="app" id="app">
+          <header class="app-top">
+            <span class="logo">Guard<span>Veto</span></span>
+            <span class="chip-periode">✓ Été 2026 · publiée</span>
+            <span class="me-dot" title="Manon">M</span>
+          </header>
+
+          <!-- ===== ONGLET PLANNING ===== -->
+          <section class="tab active" id="tab-planning" aria-label="Mon planning">
+            <div class="pl-head">
+              <h2>Juillet 2026</h2>
+              <div class="pl-nav">
+                <button aria-label="Mois précédent">‹</button>
+                <button aria-label="Mois suivant">›</button>
+              </div>
+            </div>
+            <p class="tab-sub">Période Été 2026 · 17 semaines · publiée le 12 mai. Ce planning est le bon.</p>
+            <div class="pl-tools">
+              <div class="seg" role="group" aria-label="Affichage">
+                <button id="vw-liste" aria-pressed="true">Liste</button>
+                <button id="vw-grille" aria-pressed="false">Grille</button>
+              </div>
+              <button class="mine-toggle" id="mine-only" aria-pressed="false">Mes gardes · 4</button>
+            </div>
+
+            <div class="garde-list" id="garde-list"><!-- rempli par JS --></div>
+
+            <div class="month-grid" id="month-grid">
+              <div class="mg-head"><span>lu</span><span>ma</span><span>me</span><span>je</span><span>ve</span><span>sa</span><span>di</span></div>
+              <div id="mg-cells"><!-- rempli par JS --></div>
+              <div class="mg-legend" id="mg-legend"><!-- rempli par JS --></div>
+            </div>
+          </section>
+
+          <!-- ===== ONGLET CONGÉS ===== -->
+          <section class="tab" id="tab-conges" aria-label="Mes congés">
+            <h2 class="tab-title">Mes congés</h2>
+            <p class="tab-sub">Un souhait se modifie ou se supprime tant qu'Anne-Sophie ne l'a pas traité.</p>
+            <div style="margin:12px 0 14px;">
+              <button class="btn btn-main" id="open-conge-form">＋ Poser un congé</button>
+            </div>
+
+            <!-- Formulaire simple -->
+            <form class="conge-form" id="conge-form">
+              <h3>Nouveau congé</h3>
+              <div class="type-chips" id="type-chips" role="group" aria-label="Type de congé">
+                <button type="button" class="tchip" data-type="Congés payés" aria-pressed="true">Congés payés</button>
+                <button type="button" class="tchip" data-type="RTT" aria-pressed="false">RTT</button>
+                <button type="button" class="tchip" data-type="Formation" aria-pressed="false">Formation</button>
+                <button type="button" class="tchip" data-type="Maladie" aria-pressed="false">Maladie</button>
+                <button type="button" class="tchip" data-type="Indisponibilité" aria-pressed="false">Indispo 1 jour</button>
+              </div>
+              <div class="date-duo" id="dates-plage">
+                <div class="field"><label for="c-debut">Du</label><input type="text" id="c-debut" value="lun 14 sept 2026"></div>
+                <div class="field"><label for="c-fin">Au</label><input type="text" id="c-fin" value="dim 20 sept 2026"></div>
+              </div>
+              <div class="creneau-zone" id="creneau-zone">
+                <div class="field"><label for="c-jour">Le</label><input type="text" id="c-jour" value="mar 15 sept 2026"></div>
+                <div class="ef-label">Sur quel créneau ?</div>
+                <div class="type-chips" id="creneau-chips" role="group" aria-label="Créneau d'indisponibilité">
+                  <button type="button" class="tchip" data-cr="Matin" aria-pressed="false">Matin</button>
+                  <button type="button" class="tchip" data-cr="Après-midi" aria-pressed="false">Après-midi</button>
+                  <button type="button" class="tchip" data-cr="Soirée" aria-pressed="true">Soirée</button>
+                  <button type="button" class="tchip" data-cr="Journée" aria-pressed="false">Journée</button>
+                </div>
+              </div>
+              <div class="form-foot">
+                <button type="submit" class="btn btn-main">Envoyer le souhait</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="cancel-conge">Annuler</button>
+              </div>
+            </form>
+
+            <div id="conge-list">
+              <!-- Souhait modifiable -->
+              <article class="conge-card" id="conge-souhait">
+                <div class="c-top">
+                  <span class="c-type">Formation</span>
+                  <span class="statut souhait">Souhait</span>
+                </div>
+                <div class="c-dates">mar 15 sept 2026 · journée</div>
+                <div class="c-actions">
+                  <button id="edit-souhait">Modifier</button>
+                  <button class="danger" id="del-souhait">Supprimer</button>
+                </div>
+                <div class="confirm-line" id="del-confirm">
+                  <b>Supprimer ce souhait ?</b>
+                  <button class="yes" id="del-yes">Oui, supprimer</button>
+                  <button class="no" id="del-no">Non</button>
+                </div>
+              </article>
+
+              <!-- Validé -->
+              <article class="conge-card">
+                <div class="c-top">
+                  <span class="c-type">Congés payés</span>
+                  <span class="statut valide">Validé</span>
+                </div>
+                <div class="c-dates">lun 3 → dim 9 août 2026 · 7 jours</div>
+                <p class="c-note">Validé par Anne-Sophie le 2 juil. Bonnes vacances 🌞</p>
+              </article>
+
+              <!-- Refusé + motif -->
+              <article class="conge-card">
+                <div class="c-top">
+                  <span class="c-type">Indisponibilité</span>
+                  <span class="statut refuse">Refusé</span>
+                </div>
+                <div class="c-dates">ven 10 juil 2026 · soirée</div>
+                <div class="motif-refus">
+                  <b>Motif du refus</b>
+                  La garde du 10 est déjà publiée et deux confrères sont absents ce soir-là.
+                  Passe plutôt par un échange : Victor est dispo.
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <!-- ===== ONGLET ÉCHANGES ===== -->
+          <section class="tab" id="tab-echanges" aria-label="Mes échanges">
+            <h2 class="tab-title">Échanges</h2>
+            <p class="tab-sub">Chaque échange accepté passe par la validation d'Anne-Sophie avant d'être appliqué.</p>
+
+            <!-- Formulaire de proposition (ouvert depuis une de MES gardes) -->
+            <form class="ech-form" id="ech-form">
+              <h3>Proposer un échange</h3>
+              <p class="ef-garde" id="ef-garde">Ta garde : <b>ven 24 juil · Vendredi soir · 1re</b></p>
+              <div class="ef-label">À qui la proposer ?</div>
+              <div class="dest-chips" id="dest-chips" role="group" aria-label="Destinataire">
+                <button type="button" class="tchip" data-dest="Victor" aria-pressed="false">Victor</button>
+                <button type="button" class="tchip" data-dest="Camille" aria-pressed="false">Camille</button>
+                <button type="button" class="tchip" data-dest="Julie" aria-pressed="false">Julie</button>
+                <button type="button" class="tchip" data-dest="Thomas" aria-pressed="false">Thomas</button>
+                <button type="button" class="tchip" data-dest="Anne-Catherine" aria-pressed="false">Anne-Cat</button>
+                <button type="button" class="tchip" data-dest="tous" aria-pressed="true">📢 Tous les confrères</button>
+              </div>
+              <div class="ef-label">Contrepartie (facultative)</div>
+              <div class="field">
+                <select id="ef-contrepartie">
+                  <option value="">Sans contrepartie</option>
+                  <option>Ma garde du jeu 9 juil (nuit, 1re)</option>
+                  <option>Ma garde du mar 21 juil (nuit, 2nde)</option>
+                </select>
+                <div class="hint">La contrepartie ne sert que pour une proposition à un confrère précis.</div>
+              </div>
+              <div class="form-foot">
+                <button type="submit" class="btn btn-main">Envoyer la proposition</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="cancel-ech">Annuler</button>
+              </div>
+            </form>
+
+            <div class="ech-section">
+              <h3>À traiter</h3>
+
+              <!-- Proposition reçue -->
+              <article class="ech-card hot" id="ech-recue">
+                <div class="ech-head">
+                  <span class="vdot-lg" style="background: var(--vet-victor);">VI</span>
+                  <span class="t"><b>Victor te propose sa garde</b><small>jeu 16 juil · Nuit de semaine · 1er</small></span>
+                  <span class="statut-e st-proposee">Proposée</span>
+                </div>
+                <div class="contrepartie">↔ En échange, il prend <b>ta garde du mar 21 juil</b> (nuit, 2nde).</div>
+                <div class="ech-actions" id="recue-actions">
+                  <button class="btn btn-ok btn-sm" id="btn-accepter">Accepter</button>
+                  <button class="btn btn-decline btn-sm" id="btn-decliner">Décliner</button>
+                </div>
+                <div class="decline-zone" id="decline-zone">
+                  <div class="field">
+                    <label for="decline-motif">Un mot pour Victor (motif)</label>
+                    <textarea id="decline-motif" rows="2" placeholder="Ex. : je garde ma nièce ce soir-là, désolée !"></textarea>
+                  </div>
+                  <div class="form-foot">
+                    <button type="button" class="btn btn-decline btn-sm" id="decline-send">Décliner avec ce motif</button>
+                    <button type="button" class="btn btn-ghost btn-sm" id="decline-cancel">Retour</button>
+                  </div>
+                </div>
+              </article>
+
+              <!-- Garde ouverte à tous -->
+              <article class="ech-card" id="ech-ouverte">
+                <div class="ech-head">
+                  <span class="vdot-lg" style="background: var(--vet-julie);">JU</span>
+                  <span class="t"><b>Julie ouvre sa garde à tous</b><small>me 22 juil · Nuit de semaine · 1re</small></span>
+                  <span class="statut-e st-proposee">Ouverte</span>
+                </div>
+                <div class="ech-body">« Mariage de ma sœur, je prends ce que vous voulez en retour ! »</div>
+                <div class="ech-actions">
+                  <button class="btn btn-ok btn-sm" id="btn-prendre">Je la prends</button>
+                </div>
+              </article>
+            </div>
+
+            <div class="ech-section">
+              <h3>Mes propositions</h3>
+
+              <article class="ech-card" id="ech-suivi">
+                <div class="ech-head">
+                  <span class="vdot-lg" style="background: var(--vet-manon);">MA</span>
+                  <span class="t"><b>Ma garde du sam 8 août (WE, 1re)</b><small>proposée à Camille, contre son WE du 22 août</small></span>
+                  <span class="statut-e st-acceptee">Acceptée</span>
+                </div>
+                <ul class="timeline">
+                  <li class="done"><b>Proposée</b> · 6 juil, 21h04</li>
+                  <li class="done"><b>Acceptée</b> par Camille · 7 juil, 7h32</li>
+                  <li class="now"><b>Validation d'Anne-Sophie</b> en cours</li>
+                  <li>Appliquée au planning</li>
+                </ul>
+              </article>
+
+              <article class="ech-card">
+                <div class="ech-head">
+                  <span class="vdot-lg" style="background: var(--vet-manon);">MA</span>
+                  <span class="t"><b>Ma garde du ven 19 juin</b><small>échangée avec Thomas</small></span>
+                  <span class="statut-e st-appliquee">Appliquée</span>
+                </div>
+              </article>
+
+              <div class="statuts-legend" aria-label="Les 6 statuts possibles">
+                <span class="statut-e st-proposee">Proposée</span>
+                <span class="statut-e st-acceptee">Acceptée</span>
+                <span class="statut-e st-refusee">Refusée</span>
+                <span class="statut-e st-validee">Validée</span>
+                <span class="statut-e st-annulee">Annulée</span>
+                <span class="statut-e st-appliquee">Appliquée</span>
+              </div>
+              <p class="cnt-foot">Le cycle complet : proposée → acceptée (ou refusée / annulée) → validée par l'admin → appliquée au planning.</p>
+            </div>
+          </section>
+
+          <!-- ===== ONGLET COMPTEURS ===== -->
+          <section class="tab" id="tab-compteurs" aria-label="Mes compteurs">
+            <h2 class="tab-title">Mes compteurs</h2>
+            <p class="tab-sub">Période Été 2026, gardes validées. La ligne rose, c'est toi.</p>
+
+            <div class="eq-banner">
+              <span class="ic">⚖️</span>
+              <span><b>Tu es dans la moyenne de l'équipe.</b>
+              <small>Aucun compteur ne s'écarte de plus d'une garde. Le moteur veille à l'équilibre sur toute la période.</small></span>
+            </div>
+
+            <div class="cnt-block">
+              <h3>Week-ends <small>moyenne 3,9</small></h3>
+              <table class="cnt" id="t-we"></table>
+            </div>
+            <div class="cnt-block">
+              <h3>Nuits de semaine <small>1er / 2nd · moyennes 5,1 / 4,9</small></h3>
+              <table class="cnt" id="t-nuits"></table>
+            </div>
+            <div class="cnt-block">
+              <h3>Jours fériés <small>moyenne 0,9</small></h3>
+              <table class="cnt" id="t-feries"></table>
+            </div>
+            <div class="cnt-block">
+              <h3>Grands week-ends <small>3 jours · moyenne 0,4</small></h3>
+              <table class="cnt" id="t-gwe"></table>
+              <p class="cnt-foot">Tu n'as pas encore eu de grand week-end cette période : tu seras prioritaire pour ne pas en avoir deux d'affilée la prochaine fois.</p>
+            </div>
+          </section>
+
+          <!-- ===== ONGLET RÈGLES (lecture) ===== -->
+          <section class="tab" id="tab-regles" aria-label="Règles du cabinet, en lecture">
+            <h2 class="tab-title">Les règles du cabinet</h2>
+            <p class="tab-sub">Ce que le planning respecte pour toi et pour l'équipe. En lecture seule.</p>
+            <div class="lecture-note">
+              <span>👀</span>
+              <span>Ces règles se règlent au cabinet, avec Anne-Sophie. Ici tu peux tout consulter, et demander à Filou pourquoi une garde t'a été attribuée.</span>
+            </div>
+            <div class="regle-item">
+              <p>Après une garde de nuit, <b>Manon ne travaille pas le lendemain matin</b>.</p>
+              <span class="lvl lvl-obligatoire">Obligatoire</span>
+            </div>
+            <div class="regle-item">
+              <p>Le vendredi soir est <b>lié au week-end qui suit</b> : le rôle change entre les deux.</p>
+              <span class="lvl lvl-obligatoire">Obligatoire</span>
+            </div>
+            <div class="regle-item">
+              <p>Pas plus d'<b>un week-end de garde toutes les 3 semaines</b> par vétérinaire.</p>
+              <span class="lvl lvl-important">Important</span>
+            </div>
+            <div class="regle-item">
+              <p>Manon préfère <b>ne pas être de garde le mercredi</b> (soir de piscine des enfants).</p>
+              <span class="lvl lvl-sipossible">Si possible</span>
+            </div>
+            <div class="regle-item">
+              <p>Les week-ends, nuits, fériés et grands week-ends sont <b>répartis équitablement</b> sur la période.</p>
+              <span class="lvl lvl-important">Important</span>
+            </div>
+            <div style="margin-top:14px;">
+              <button class="btn btn-ghost" id="regles-ask-filou" style="width:100%;">🦊 Une question sur une règle ? Demande à Filou</button>
+            </div>
+          </section>
+
+          <!-- ===== TERRIER DE FILOU (discret) ===== -->
+          <button class="terrier-m" id="terrier" aria-label="Ouvrir Filou, l'assistant du cabinet">
+            <svg viewBox="0 0 78 58" aria-hidden="true">
+              <ellipse cx="39" cy="46" rx="34" ry="11" fill="var(--bg-deep)"/>
+              <ellipse cx="39" cy="42" rx="26" ry="9" fill="#3A2A1C" opacity="0.85"/>
+              <ellipse cx="39" cy="40" rx="20" ry="7" fill="#241A10"/>
+            </svg>
+            <span class="fox-peek"><img src="../fox-1.png" alt=""></span>
+            <span class="t-hint">Filou</span>
+          </button>
+
+          <!-- ===== PANNEAU FILOU ===== -->
+          <div class="filou-panel" id="filou-panel" role="dialog" aria-label="Conversation avec Filou">
+            <div class="fp-head">
+              <span class="avatar"><img src="../fox-1.png" alt="Avatar de Filou"></span>
+              <span><h3>Filou</h3><span class="sub">L'assistant du cabinet · il répond, il n'invente pas</span></span>
+              <button class="fp-close" id="fp-close" aria-label="Réduire Filou">▾</button>
+            </div>
+            <div class="fp-scroll" id="fp-scroll">
+              <div class="bubble filou show">
+                <span class="who">🦊 Filou</span>
+                Salut Manon ! Pose-moi une question sur l'appli, ou sur ton planning. Si je ne sais pas, je te le dirai franchement.
+              </div>
+            </div>
+            <div class="fp-chips" id="fp-chips">
+              <button class="chip" data-q="conge">Comment je pose un congé ?</button>
+              <button class="chip" data-q="garde24">Pourquoi je suis de garde le 24 ?</button>
+            </div>
+            <div class="fp-input">
+              <input type="text" id="fp-text" placeholder="Écris ta question…" aria-label="Ta question à Filou">
+              <button class="fp-send" id="fp-send" aria-label="Envoyer">➤</button>
+            </div>
+          </div>
+
+          <div class="sheet-veil" id="sheet-veil"></div>
+          <!-- ===== BOTTOM SHEET · DÉTAIL DE GARDE ===== -->
+          <div class="sheet" id="garde-sheet" role="dialog" aria-label="Détail de la garde">
+            <div class="sheet-grip" aria-hidden="true"></div>
+            <h3 id="gs-title">Vendredi 24 juillet</h3>
+            <p class="sh-sub" id="gs-sub">Vendredi soir · période Été 2026, publiée</p>
+            <div class="sh-rows" id="gs-rows"></div>
+            <div class="sh-actions" id="gs-actions"></div>
+          </div>
+
+          <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+          <!-- ===== BOTTOM NAV ===== -->
+          <nav class="bnav" aria-label="Navigation de l'application">
+            <button data-tab="planning" aria-current="true"><span class="ic">📅</span>Planning</button>
+            <button data-tab="conges" aria-current="false"><span class="ic">🌴</span>Congés</button>
+            <button data-tab="echanges" aria-current="false"><span class="ic">🔁</span>Échanges<span class="badge" id="ech-badge">2</span></button>
+            <button data-tab="compteurs" aria-current="false"><span class="ic">⚖️</span>Compteurs</button>
+            <button data-tab="regles" aria-current="false"><span class="ic">📖</span>Règles</button>
+          </nav>
+        </div><!-- /app -->
+
+      </div>
+    </div>
+    <p class="phone-caption" id="phone-caption">
+      <b>Moment 1.</b> Manon vient de recevoir l'invitation d'Anne-Sophie. Clique sur les boutons du téléphone pour dérouler ses 60 premières secondes.
+    </p>
+  </div>
+
+  <!-- ===================== NOTES ===================== -->
+  <aside class="rail rail-right">
+    <div class="note-card">
+      <h3>Ce que Manon ne voit pas</h3>
+      <ul>
+        <li>Générer ou publier le planning</li>
+        <li>Les brouillons en préparation</li>
+        <li>Les réglages du cabinet (règles, structure, connexions)</li>
+        <li>Les congés des autres tant qu'ils ne touchent pas ses gardes</li>
+      </ul>
+      <p style="margin-top:10px;">Le planning qu'elle consulte est toujours la version <b style="color:var(--text);">publiée</b>. Zéro bruit d'admin.</p>
+    </div>
+    <div class="note-card tips">
+      <h3>À essayer dans le téléphone</h3>
+      <ul>
+        <li>Tape une garde rose pour voir binôme et horaires</li>
+        <li>Bascule Liste / Grille, filtre « Mes gardes »</li>
+        <li>Supprime le souhait de formation (confirmation)</li>
+        <li>Accepte ou décline la proposition de Victor</li>
+        <li>Ouvre le terrier de Filou en bas à droite</li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function $(s, c) { return (c || document).querySelector(s); }
+  function $$(s, c) { return Array.prototype.slice.call((c || document).querySelectorAll(s)); }
+
+  /* ---------- Données ---------- */
+  var VETS = {
+    "Anne-Sophie":   { c: "var(--vet-anneso)",  ini: "AS" },
+    "Anne-Catherine":{ c: "var(--vet-annecat)", ini: "AC" },
+    "Manon":         { c: "var(--vet-manon)",   ini: "MA" },
+    "Victor":        { c: "var(--vet-victor)",  ini: "VI" },
+    "Camille":       { c: "var(--vet-camille)", ini: "CA" },
+    "Julie":         { c: "var(--vet-julie)",   ini: "JU" },
+    "Thomas":        { c: "var(--vet-thomas)",  ini: "TH" }
+  };
+
+  /* Juillet 2026 : le 1er tombe un mercredi. */
+  var PLANNING = [
+    { sem: "Semaine du 29 juin", rows: [
+      { d: "1",  jd: "mer", type: "Nuit de semaine", h: "19h00 → 8h00", p1: "Anne-Sophie", p2: "Thomas" },
+      { d: "2",  jd: "jeu", type: "Nuit de semaine", h: "19h00 → 8h00", p1: "Camille", p2: "Julie" },
+      { d: "3",  jd: "ven", type: "Vendredi soir", h: "19h00 → 8h00", p1: "Victor", p2: "Anne-Sophie" },
+      { d: "4·5", jd: "we", type: "Week-end", h: "sam 8h00 → lun 8h00", p1: "Anne-Sophie", p2: "Victor", we: true }
+    ]},
+    { sem: "Semaine du 6 juillet", rows: [
+      { d: "6",  jd: "lun", type: "Nuit de semaine", h: "19h00 → 8h00", p1: "Julie", p2: "Camille" },
+      { d: "7",  jd: "mar", type: "Nuit de semaine", h: "19h00 → 8h00", p1: "Thomas", p2: "Victor" },
+      { d: "8",  jd: "mer", type: "Nuit de semaine", h: "19h00 → 8h00", p1: "Camille", p2: "Anne-Catherine" },
+      { d: "9",  jd: "jeu", type: "Nuit de semaine", h: "19h00 → 8h00", p1: "Manon", p2: "Thomas", mine: true, role: "1re" },
+      { d: "10", jd: "ven", type: "Vendredi soir", h: "19h00 → 8h00", p1: "Julie", p2: "Thomas" },
+      { d: "11·12", jd: "we", type: "Week-end", h: "sam 8h00 → lun 8h00", p1: "Thomas", p2: "Julie", we: true }
+    ]},
+    { sem: "Semaine du 13 juillet", rows: [
+      { d: "13", jd: "lun", type: "Nuit de semaine", h: "19h00 → 8h00", p1: "Victor", p2: "Anne-Sophie" },
+      { d: "14", jd: "mar", type: "Nuit de semaine", h: "19h00 → 8h00", p1: "Anne-Catherine", p2: "Camille", ferie: true },
+      { d: "15", jd: "mer", type: "Nuit de semaine", h: "19h00 → 8h00", p1: "Anne-Sophie", p2: "Julie" },
+      { d: "16", jd: "jeu", type: "Nuit de semaine", h: "19h00 → 8h00", p1: "Victor", p2: "Camille" },
+      { d: "17", jd: "ven", type: "Vendredi soir", h: "19h00 → 8h00", p1: "Camille", p2: "Anne-Catherine" },
+      { d: "18·19", jd: "we", type: "Week-end", h: "sam 8h00 → lun 8h00", p1: "Julie", p2: "Camille", we: true }
+    ]},
+    { sem: "Semaine du 20 juillet", rows: [
+      { d: "20", jd: "lun", type: "Nuit de semaine", h: "19h00 → 8h00", p1: "Thomas", p2: "Anne-Sophie" },
+      { d: "21", jd: "mar", type: "Nuit de semaine", h: "19h00 → 8h00", p1: "Julie", p2: "Manon", mine: true, role: "2nde" },
+      { d: "22", jd: "mer", type: "Nuit de semaine", h: "19h00 → 8h00", p1: "Julie", p2: "Victor" },
+      { d: "23", jd: "jeu", type: "Nuit de semaine", h: "19h00 → 8h00", p1: "Anne-Sophie", p2: "Thomas" },
+      { d: "24", jd: "ven", type: "Vendredi soir", h: "19h00 → 8h00", p1: "Manon", p2: "Victor", mine: true, role: "1re" },
+      { d: "25·26", jd: "we", type: "Week-end", h: "sam 8h00 → lun 8h00", p1: "Victor", p2: "Manon", we: true, mine: true, role: "2nde" }
+    ]},
+    { sem: "Semaine du 27 juillet", rows: [
+      { d: "27", jd: "lun", type: "Nuit de semaine", h: "19h00 → 8h00", p1: "Camille", p2: "Julie" },
+      { d: "28", jd: "mar", type: "Nuit de semaine", h: "19h00 → 8h00", p1: "Thomas", p2: "Anne-Catherine" },
+      { d: "29", jd: "mer", type: "Nuit de semaine", h: "19h00 → 8h00", p1: "Victor", p2: "Julie" },
+      { d: "30", jd: "jeu", type: "Nuit de semaine", h: "19h00 → 8h00", p1: "Anne-Sophie", p2: "Camille" },
+      { d: "31", jd: "ven", type: "Vendredi soir", h: "19h00 → 8h00", p1: "Thomas", p2: "Julie" }
+    ]}
+  ];
+
+  /* ---------- Rendu de la liste planning ---------- */
+  var MASCULIN = { "Victor": true, "Thomas": true };
+  function pill(name, first) {
+    var v = VETS[name];
+    var prenom = name === "Anne-Sophie" ? "Anne-So" : (name === "Anne-Catherine" ? "Anne-Cat" : name);
+    var rank = first ? (MASCULIN[name] ? "1er" : "1re") : (MASCULIN[name] ? "2nd" : "2nde");
+    return '<span class="pill" style="background:' + v.c + '">' + prenom +
+           ' <span class="rank">' + rank + '</span></span>';
+  }
+  function renderList(mineOnly) {
+    var html = "";
+    PLANNING.forEach(function (sem) {
+      var rows = sem.rows.filter(function (r) { return !mineOnly || r.mine; });
+      if (!rows.length) return;
+      html += '<div class="g-sep">' + sem.sem + '</div>';
+      rows.forEach(function (r) {
+        var cls = "garde " + (r.mine ? "mine" : "other") + (r.we ? " we-row" : "");
+        html += '<button class="' + cls + '" data-garde=\'' + JSON.stringify(r).replace(/'/g, "&#39;") + '\'>' +
+          '<span class="g-date"><small>' + r.jd + '</small><b>' + r.d + '</b></span>' +
+          '<span class="g-body">' +
+            '<span class="g-type">' + r.type + '</span> <span class="g-heure">· ' + r.h + '</span>' +
+            '<span class="g-vets">' + pill(r.p1, true) + pill(r.p2, false) + '</span>' +
+          '</span>' +
+          (r.ferie ? '<span class="g-ferie">Férié</span>' : "") +
+          (r.mine ? '<span class="g-mine-tag">Ma garde · ' + r.role + '</span>' : "") +
+        '</button>';
+      });
+    });
+    $("#garde-list").innerHTML = html;
+    $$("#garde-list .garde").forEach(function (b) {
+      b.addEventListener("click", function () {
+        openSheet(JSON.parse(b.getAttribute("data-garde")));
+      });
+    });
+  }
+
+  /* ---------- Vue grille ---------- */
+  function renderGrid() {
+    /* Juillet 2026 : 31 jours, le 1er = mercredi (offset 2 depuis lundi). */
+    var firstVet = {};
+    PLANNING.forEach(function (s) { s.rows.forEach(function (r) {
+      var days = r.d.split("·");
+      days.forEach(function (dd) { firstVet[parseInt(dd, 10)] = { p1: r.p1, mine: !!r.mine, we: !!r.we }; });
+    }); });
+    var html = '<div class="mg-week">';
+    var col = 0;
+    for (var i = 0; i < 2; i++) { html += '<div class="mg-cell empty"></div>'; col++; }
+    for (var day = 1; day <= 31; day++) {
+      var info = firstVet[day];
+      var isWE = col === 5 || col === 6;
+      var cls = "mg-cell" + (isWE ? " we" : "") + (info && info.mine ? " mine" : "");
+      html += '<div class="' + cls + '"><span class="d">' + day + '</span>' +
+        (info ? '<span class="vdot" style="background:' + VETS[info.p1].c + '"></span>' : "") +
+        '</div>';
+      col++;
+      if (col === 7) { html += '</div><div class="mg-week">'; col = 0; }
+    }
+    while (col > 0 && col < 7) { html += '<div class="mg-cell empty"></div>'; col++; }
+    html += "</div>";
+    $("#mg-cells").innerHTML = html;
+    var leg = "";
+    Object.keys(VETS).forEach(function (n) {
+      var prenom = n === "Anne-Sophie" ? "Anne-So" : (n === "Anne-Catherine" ? "Anne-Cat" : n);
+      leg += '<span class="l"><span class="vdot" style="background:' + VETS[n].c + '"></span>' + prenom + '</span>';
+    });
+    $("#mg-legend").innerHTML = leg + '<span class="l" style="color:var(--vet-manon);font-weight:700;">Cadre rose = ta garde</span>';
+  }
+
+  /* ---------- Compteurs ---------- */
+  function eqChip(v) {
+    if (v === 0) return '<span class="eq zero">±0</span>';
+    if (v > 0) return '<span class="eq plus">+' + v + '</span>';
+    return '<span class="eq moins">−' + Math.abs(v) + '</span>';
+  }
+  function renderCnt(id, cols, rows) {
+    var html = "<thead><tr><th>Vétérinaire</th>";
+    cols.forEach(function (c) { html += "<th>" + c + "</th>"; });
+    html += "<th>Écart</th></tr></thead><tbody>";
+    rows.forEach(function (r) {
+      var v = VETS[r.n];
+      var prenom = r.n === "Anne-Sophie" ? "Anne-So" : (r.n === "Anne-Catherine" ? "Anne-Cat" : r.n);
+      html += '<tr' + (r.n === "Manon" ? ' class="me"' : "") + '><td><span class="v"><span class="vdot" style="background:' + v.c + '"></span>' + prenom + (r.n === "Manon" ? " (toi)" : "") + '</span></td>';
+      r.vals.forEach(function (x) { html += "<td>" + x + "</td>"; });
+      html += "<td>" + eqChip(r.e) + "</td></tr>";
+    });
+    $(id).innerHTML = html + "</tbody>";
+  }
+  renderCnt("#t-we", ["Week-ends"], [
+    { n: "Anne-Sophie", vals: [4], e: 0 },
+    { n: "Anne-Catherine", vals: [3], e: -1 },
+    { n: "Manon", vals: [4], e: 0 },
+    { n: "Victor", vals: [4], e: 0 },
+    { n: "Camille", vals: [4], e: 0 },
+    { n: "Julie", vals: [4], e: 0 },
+    { n: "Thomas", vals: [4], e: 0 }
+  ]);
+  renderCnt("#t-nuits", ["1er", "2nd"], [
+    { n: "Anne-Sophie", vals: [5, 5], e: 0 },
+    { n: "Anne-Catherine", vals: [4, 4], e: -1 },
+    { n: "Manon", vals: [5, 5], e: 0 },
+    { n: "Victor", vals: [6, 5], e: 1 },
+    { n: "Camille", vals: [5, 5], e: 0 },
+    { n: "Julie", vals: [6, 5], e: 1 },
+    { n: "Thomas", vals: [5, 5], e: 0 }
+  ]);
+  renderCnt("#t-feries", ["Fériés"], [
+    { n: "Anne-Sophie", vals: [1], e: 0 },
+    { n: "Anne-Catherine", vals: [1], e: 0 },
+    { n: "Manon", vals: [1], e: 0 },
+    { n: "Victor", vals: [1], e: 0 },
+    { n: "Camille", vals: [1], e: 0 },
+    { n: "Julie", vals: [0], e: -1 },
+    { n: "Thomas", vals: [1], e: 0 }
+  ]);
+  renderCnt("#t-gwe", ["Grands WE"], [
+    { n: "Anne-Sophie", vals: [1], e: 1 },
+    { n: "Anne-Catherine", vals: [0], e: 0 },
+    { n: "Manon", vals: [0], e: 0 },
+    { n: "Victor", vals: [1], e: 1 },
+    { n: "Camille", vals: [0], e: 0 },
+    { n: "Julie", vals: [1], e: 1 },
+    { n: "Thomas", vals: [0], e: 0 }
+  ]);
+
+  /* ---------- Toast ---------- */
+  var toastTimer = null;
+  function toast(msg) {
+    var t = $("#toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2800);
+  }
+
+  /* ---------- Onglets ---------- */
+  function setTab(name) {
+    $$(".tab").forEach(function (t) { t.classList.toggle("active", t.id === "tab-" + name); });
+    $$(".bnav button").forEach(function (b) {
+      b.setAttribute("aria-current", b.getAttribute("data-tab") === name ? "true" : "false");
+    });
+  }
+  $$(".bnav button").forEach(function (b) {
+    b.addEventListener("click", function () { setTab(b.getAttribute("data-tab")); });
+  });
+
+  /* ---------- Écran : onboarding ↔ app ---------- */
+  function showApp() {
+    $("#onboard").classList.remove("active");
+    $("#app").classList.add("active");
+  }
+  function showOnboard(step) {
+    $("#app").classList.remove("active");
+    $("#app").classList.remove("filou-open");
+    $("#onboard").classList.add("active");
+    $$(".ob-step").forEach(function (s) { s.classList.toggle("active", s.id === step); });
+    $("#obp1").classList.toggle("on", true);
+    $("#obp2").classList.toggle("on", step !== "ob-a");
+    $("#obp3").classList.toggle("on", step === "ob-c");
+  }
+
+  /* Onboarding : progression */
+  $("#ob-go-b").addEventListener("click", function () { showOnboard("ob-b"); });
+  $("#ob-go-c").addEventListener("click", function () {
+    showOnboard("ob-c");
+    playWelcome();
+  });
+  function playWelcome() {
+    var ids = ["#fb1", "#fb2", "#fb3"];
+    ids.forEach(function (id) { $(id).classList.remove("show"); });
+    $("#chrono").hidden = true;
+    $("#ob-finish").hidden = true;
+    var delay = REDUCED ? 0 : 900;
+    ids.forEach(function (id, i) {
+      setTimeout(function () { $(id).classList.add("show"); }, delay * i + (REDUCED ? 0 : 250));
+    });
+    setTimeout(function () {
+      $("#chrono").hidden = false;
+      $("#ob-finish").hidden = false;
+    }, delay * ids.length + (REDUCED ? 0 : 200));
+  }
+  $("#ob-finish").addEventListener("click", function () {
+    showApp();
+    setTab("planning");
+    setCaption(2);
+    setScenarioPressed(2);
+    toast("Bienvenue dans ton planning, Manon 🦊");
+  });
+
+  /* ---------- Scénarios (autour du téléphone) ---------- */
+  var CAPTIONS = {
+    1: "<b>Moment 1.</b> Manon vient de recevoir l'invitation d'Anne-Sophie. Clique sur les boutons du téléphone pour dérouler ses 60 premières secondes.",
+    2: "<b>Moment 2.</b> Ses 4 gardes de juillet ressortent en rose, le reste de l'équipe est en retrait. Tape une garde pour le détail, bascule Liste / Grille.",
+    3: "<b>Moment 3.</b> Poser un congé : 5 types, une plage de dates ou une indispo d'un jour au créneau. Les statuts et le motif de refus sont sous ses yeux.",
+    4: "<b>Moment 4.</b> Victor lui propose un échange, Julie ouvre une garde à tous. Chaque proposition suit son cycle jusqu'à la validation d'Anne-Sophie.",
+    5: "<b>Moment 5.</b> Les 4 compteurs d'équité, sa ligne surlignée. Le message est simple : tu es dans la moyenne, le moteur veille.",
+    6: "<b>Moment 6.</b> Le 5e verbe de Filou : il renseigne. Il explique l'appli pas à pas, et il explique le planning honnêtement, sans inventer."
+  };
+  function setCaption(n) { $("#phone-caption").innerHTML = CAPTIONS[n]; }
+  function setScenarioPressed(n) {
+    $$(".sc-btn").forEach(function (b) {
+      b.setAttribute("aria-pressed", b.getAttribute("data-sc") === String(n) ? "true" : "false");
+    });
+  }
+  $$(".sc-btn").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var n = parseInt(b.getAttribute("data-sc"), 10);
+      setScenarioPressed(n);
+      setCaption(n);
+      closeSheet();
+      $("#app").classList.remove("filou-open");
+      if (n === 1) { showOnboard("ob-a"); return; }
+      showApp();
+      if (n === 2) setTab("planning");
+      if (n === 3) setTab("conges");
+      if (n === 4) setTab("echanges");
+      if (n === 5) setTab("compteurs");
+      if (n === 6) { setTab("planning"); openFilou(); }
+    });
+  });
+
+  /* ---------- Planning : liste / grille / filtre ---------- */
+  var mineOnly = false;
+  renderList(false);
+  renderGrid();
+  $("#vw-liste").addEventListener("click", function () {
+    this.setAttribute("aria-pressed", "true");
+    $("#vw-grille").setAttribute("aria-pressed", "false");
+    $("#garde-list").style.display = "";
+    $("#month-grid").classList.remove("show");
+  });
+  $("#vw-grille").addEventListener("click", function () {
+    this.setAttribute("aria-pressed", "true");
+    $("#vw-liste").setAttribute("aria-pressed", "false");
+    $("#garde-list").style.display = "none";
+    $("#month-grid").classList.add("show");
+  });
+  $("#mine-only").addEventListener("click", function () {
+    mineOnly = !mineOnly;
+    this.setAttribute("aria-pressed", String(mineOnly));
+    this.textContent = mineOnly ? "Toutes les gardes" : "Mes gardes · 4";
+    renderList(mineOnly);
+  });
+
+  /* ---------- Bottom sheet : détail de garde ---------- */
+  var MOIS = "juillet";
+  function openSheet(r) {
+    var jours = { lun: "Lundi", mar: "Mardi", mer: "Mercredi", jeu: "Jeudi", ven: "Vendredi", we: "Week-end du" };
+    $("#gs-title").textContent = (jours[r.jd] || "") + " " + r.d.replace("·", " et ") + " " + MOIS;
+    $("#gs-sub").textContent = r.type + " · période Été 2026, publiée" + (r.ferie ? " · jour férié" : "");
+    var rows =
+      '<div class="sh-row"><span class="ic">🕗</span><span><b>' + r.h + '</b><small>' + (r.we ? "48 h, du samedi matin au lundi matin" : "de la fermeture à l'ouverture") + '</small></span></div>' +
+      '<div class="sh-row"><span class="ic">🥇</span><span><b>' + r.p1 + '</b><small>1er de garde' + (r.we ? " (avantage financier)" : "") + '</small></span></div>' +
+      '<div class="sh-row"><span class="ic">🤝</span><span><b>' + r.p2 + '</b><small>2nd de garde · ton binôme' + (r.mine ? "" : "") + '</small></span></div>';
+    $("#gs-rows").innerHTML = rows;
+    var actions = "";
+    if (r.mine) {
+      actions = '<button class="btn btn-main" id="gs-echanger">🔁 Proposer un échange</button>' +
+                '<button class="btn btn-ghost btn-sm" id="gs-close">Fermer</button>';
+    } else {
+      actions = '<button class="btn btn-ghost btn-sm" id="gs-close">Fermer</button>';
+    }
+    $("#gs-actions").innerHTML = actions;
+    $("#garde-sheet").classList.add("open");
+    $("#sheet-veil").classList.add("open");
+    var close = $("#gs-close");
+    if (close) close.addEventListener("click", closeSheet);
+    var ech = $("#gs-echanger");
+    if (ech) ech.addEventListener("click", function () {
+      closeSheet();
+      $("#ef-garde").innerHTML = "Ta garde : <b>" + (r.jd === "we" ? "WE " : "") + r.d.replace("·", "-") + " juil · " + r.type + " · " + (r.role || "") + "</b>";
+      setTab("echanges");
+      $("#ech-form").classList.add("open");
+      setScenarioPressed(4); setCaption(4);
+    });
+  }
+  function closeSheet() {
+    $("#garde-sheet").classList.remove("open");
+    $("#sheet-veil").classList.remove("open");
+  }
+  $("#sheet-veil").addEventListener("click", closeSheet);
+
+  /* ---------- Congés ---------- */
+  $("#open-conge-form").addEventListener("click", function () {
+    $("#conge-form").classList.add("open");
+    this.style.display = "none";
+  });
+  $("#cancel-conge").addEventListener("click", function () {
+    $("#conge-form").classList.remove("open");
+    $("#open-conge-form").style.display = "";
+  });
+  $$("#type-chips .tchip").forEach(function (ch) {
+    ch.addEventListener("click", function () {
+      $$("#type-chips .tchip").forEach(function (c) { c.setAttribute("aria-pressed", "false"); });
+      ch.setAttribute("aria-pressed", "true");
+      var indispo = ch.getAttribute("data-type") === "Indisponibilité";
+      $("#creneau-zone").classList.toggle("show", indispo);
+      $("#dates-plage").style.display = indispo ? "none" : "";
+    });
+  });
+  $$("#creneau-chips .tchip").forEach(function (ch) {
+    ch.addEventListener("click", function () {
+      $$("#creneau-chips .tchip").forEach(function (c) { c.setAttribute("aria-pressed", "false"); });
+      ch.setAttribute("aria-pressed", "true");
+    });
+  });
+  $("#conge-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var type = $('#type-chips .tchip[aria-pressed="true"]').getAttribute("data-type");
+    var dates;
+    if (type === "Indisponibilité") {
+      dates = $("#c-jour").value + " · " + $('#creneau-chips .tchip[aria-pressed="true"]').getAttribute("data-cr").toLowerCase();
+    } else {
+      dates = $("#c-debut").value + " → " + $("#c-fin").value;
+    }
+    var card = document.createElement("article");
+    card.className = "conge-card";
+    card.innerHTML = '<div class="c-top"><span class="c-type">' + type + '</span><span class="statut souhait">Souhait</span></div>' +
+      '<div class="c-dates">' + dates + '</div>' +
+      '<p class="c-note">Envoyé à l’instant. Anne-Sophie recevra ta demande : tu peux encore la modifier.</p>';
+    $("#conge-list").prepend(card);
+    $("#conge-form").classList.remove("open");
+    $("#open-conge-form").style.display = "";
+    toast("Souhait envoyé. Tu seras prévenue de la réponse d'Anne-Sophie.");
+  });
+  $("#del-souhait").addEventListener("click", function () { $("#del-confirm").classList.add("open"); });
+  $("#del-no").addEventListener("click", function () { $("#del-confirm").classList.remove("open"); });
+  $("#del-yes").addEventListener("click", function () {
+    $("#conge-souhait").remove();
+    toast("Souhait supprimé.");
+  });
+  $("#edit-souhait").addEventListener("click", function () {
+    $("#conge-form").classList.add("open");
+    $("#open-conge-form").style.display = "none";
+    $$("#type-chips .tchip").forEach(function (c) {
+      c.setAttribute("aria-pressed", c.getAttribute("data-type") === "Formation" ? "true" : "false");
+    });
+    $("#creneau-zone").classList.remove("show");
+    $("#dates-plage").style.display = "";
+    $("#c-debut").value = "mar 15 sept 2026";
+    $("#c-fin").value = "mar 15 sept 2026";
+    toast("Modifie les dates puis renvoie : le souhait sera mis à jour.");
+    $("#conge-form").scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "start" });
+  });
+
+  /* ---------- Échanges ---------- */
+  function decBadge() {
+    var b = $("#ech-badge");
+    var n = Math.max(0, parseInt(b.textContent || "0", 10) - 1);
+    b.textContent = n === 0 ? "" : String(n);
+  }
+  $("#btn-accepter").addEventListener("click", function () {
+    var card = $("#ech-recue");
+    card.classList.remove("hot");
+    $("#recue-actions").innerHTML = "";
+    $(".statut-e", card).className = "statut-e st-acceptee";
+    $(".statut-e", card).textContent = "Acceptée";
+    var tl = document.createElement("ul");
+    tl.className = "timeline";
+    tl.innerHTML = '<li class="done"><b>Acceptée</b> par toi, à l’instant</li>' +
+      '<li class="now"><b>Validation d’Anne-Sophie</b> en cours</li><li>Appliquée au planning</li>';
+    card.appendChild(tl);
+    decBadge();
+    toast("Accepté ! Anne-Sophie valide, puis le planning se met à jour tout seul.");
+  });
+  $("#btn-decliner").addEventListener("click", function () {
+    $("#decline-zone").classList.add("open");
+  });
+  $("#decline-cancel").addEventListener("click", function () {
+    $("#decline-zone").classList.remove("open");
+  });
+  $("#decline-send").addEventListener("click", function () {
+    var card = $("#ech-recue");
+    card.classList.remove("hot");
+    $("#recue-actions").innerHTML = "";
+    $("#decline-zone").classList.remove("open");
+    $(".statut-e", card).className = "statut-e st-refusee";
+    $(".statut-e", card).textContent = "Refusée";
+    var p = document.createElement("p");
+    p.className = "c-note";
+    p.textContent = "Victor recevra ton motif. Aucun changement au planning.";
+    card.appendChild(p);
+    decBadge();
+    toast("Proposition déclinée, avec ton mot pour Victor.");
+  });
+  $("#btn-prendre").addEventListener("click", function () {
+    var card = $("#ech-ouverte");
+    $(".ech-actions", card).innerHTML = "";
+    $(".statut-e", card).className = "statut-e st-acceptee";
+    $(".statut-e", card).textContent = "Acceptée";
+    var p = document.createElement("p");
+    p.className = "c-note";
+    p.textContent = "Tu prends la garde du me 22 juil. Reste la validation d'Anne-Sophie.";
+    card.appendChild(p);
+    decBadge();
+    toast("C'est noté ! Julie et Anne-Sophie sont prévenues.");
+  });
+  $$("#dest-chips .tchip").forEach(function (ch) {
+    ch.addEventListener("click", function () {
+      $$("#dest-chips .tchip").forEach(function (c) { c.setAttribute("aria-pressed", "false"); });
+      ch.setAttribute("aria-pressed", "true");
+    });
+  });
+  $("#cancel-ech").addEventListener("click", function () { $("#ech-form").classList.remove("open"); });
+  $("#ech-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var dest = $('#dest-chips .tchip[aria-pressed="true"]').getAttribute("data-dest");
+    var destLabel = dest === "tous" ? "tous les confrères" : dest;
+    var card = document.createElement("article");
+    card.className = "ech-card";
+    card.innerHTML = '<div class="ech-head">' +
+      '<span class="vdot-lg" style="background: var(--vet-manon);">MA</span>' +
+      '<span class="t"><b>Ma garde du ven 24 juil (Vendredi soir, 1re)</b><small>proposée à ' + destLabel + '</small></span>' +
+      '<span class="statut-e st-proposee">Proposée</span></div>';
+    var section = $$(".ech-section")[1];
+    section.insertBefore(card, section.children[1]);
+    $("#ech-form").classList.remove("open");
+    toast("Proposition envoyée à " + destLabel + ".");
+  });
+
+  /* ---------- Filou : le terrier et le panneau ---------- */
+  function openFilou() { $("#app").classList.add("filou-open"); }
+  function closeFilou() { $("#app").classList.remove("filou-open"); }
+  $("#terrier").addEventListener("click", openFilou);
+  $("#fp-close").addEventListener("click", closeFilou);
+  $("#regles-ask-filou").addEventListener("click", openFilou);
+
+  var ANSWERS = {
+    conge:
+      '<span class="who">🦊 Filou</span>Rien de plus simple :' +
+      '<ul class="aide-steps">' +
+      '<li><span class="n">1</span>Ouvre l’onglet <b>Congés</b>, en bas de l’écran.</li>' +
+      '<li><span class="n">2</span>Tape <b>« ＋ Poser un congé »</b>.</li>' +
+      '<li><span class="n">3</span>Choisis le type (congés payés, RTT, formation, maladie) et tes dates. Pour une simple indispo d’un jour, choisis le créneau : matin, après-midi, soirée ou journée.</li>' +
+      '<li><span class="n">4</span>Envoie : c’est un <b>souhait</b>. Tu peux le modifier ou le supprimer tant qu’Anne-Sophie ne l’a pas traité.</li>' +
+      '</ul>' +
+      '<div class="b-act"><button class="btn btn-main btn-sm" id="fp-go-conges">Ouvrir l’onglet Congés</button></div>',
+    garde24:
+      '<span class="who">🦊 Filou</span>Bonne question. Deux raisons, vérifiées dans le planning :' +
+      '<ul class="aide-steps">' +
+      '<li><span class="n">⚖️</span><b>L’équité</b> : avant cette semaine, tu étais à 3 vendredis contre 4 en moyenne pour l’équipe. Le moteur t’a donc proposée en priorité.</li>' +
+      '<li><span class="n">📏</span><b>Une règle du cabinet</b> : « le vendredi soir est lié au week-end qui suit ». Tu es 2nde sur le week-end du 25-26 avec Victor, donc 1re le vendredi 24.</li>' +
+      '</ul>' +
+      'Si ce vendredi te pose problème, tu peux le proposer en échange depuis ta garde. Je ne peux pas le changer moi-même : le planning publié, c’est Anne-Sophie qui en décide.',
+    fallback:
+      '<span class="who">🦊 Filou</span>Honnêtement, <b>je ne sais pas</b> répondre à ça, et je préfère te le dire plutôt que d’inventer. Le plus sûr : demande à <b>Anne-Sophie</b> au cabinet, elle a la main sur tout ça.'
+  };
+
+  function filouSay(html, after) {
+    var scroll = $("#fp-scroll");
+    var typing = document.createElement("div");
+    typing.className = "bubble filou show";
+    typing.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>';
+    scroll.appendChild(typing);
+    scroll.scrollTop = scroll.scrollHeight;
+    setTimeout(function () {
+      typing.innerHTML = html;
+      scroll.scrollTop = scroll.scrollHeight;
+      var go = $("#fp-go-conges");
+      if (go) go.addEventListener("click", function () {
+        closeFilou();
+        setTab("conges");
+        setScenarioPressed(3); setCaption(3);
+      });
+      if (after) after();
+    }, REDUCED ? 30 : 950);
+  }
+  function userSay(text) {
+    var scroll = $("#fp-scroll");
+    var b = document.createElement("div");
+    b.className = "bubble user";
+    b.innerHTML = '<span class="who">Manon</span>' + text;
+    scroll.appendChild(b);
+    scroll.scrollTop = scroll.scrollHeight;
+  }
+  $$("#fp-chips .chip").forEach(function (ch) {
+    ch.addEventListener("click", function () {
+      userSay(ch.textContent);
+      filouSay(ANSWERS[ch.getAttribute("data-q")]);
+    });
+  });
+  function sendFree() {
+    var input = $("#fp-text");
+    var v = input.value.trim();
+    if (!v) return;
+    userSay(v.replace(/</g, "&lt;"));
+    input.value = "";
+    var low = v.toLowerCase();
+    if (low.indexOf("cong") !== -1 || low.indexOf("vacance") !== -1) filouSay(ANSWERS.conge);
+    else if (low.indexOf("24") !== -1 || low.indexOf("pourquoi") !== -1) filouSay(ANSWERS.garde24);
+    else filouSay(ANSWERS.fallback);
+  }
+  $("#fp-send").addEventListener("click", sendFree);
+  $("#fp-text").addEventListener("keydown", function (e) { if (e.key === "Enter") sendFree(); });
+
+})();
+</script>
+</body>
+</html>

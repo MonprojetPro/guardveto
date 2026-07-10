@@ -1,0 +1,2137 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GuardVeto · M2 — Les règles du cabinet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700;800&family=Noto+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   MAQUETTE M2 · LES RÈGLES DU CABINET (vue admin)
+   Ambiance : Terrier chaleureux (design system du labo v3).
+   Filou : niveau 2 de présence, au premier plan d'office.
+   ============================================================ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --font-display: "Figtree", "Segoe UI Variable Display", "Trebuchet MS", sans-serif;
+  --font-body: "Noto Sans", "Segoe UI", Verdana, sans-serif;
+  /* Couleurs des vétérinaires : le langage visuel de l'équipe. */
+  --vet-anneso:  #3B6FD1;
+  --vet-annecat: #8153C7;
+  --vet-manon:   #B93A72;
+  --vet-victor:  #0B7D6C;
+  --vet-camille: #55700F;
+  --vet-julie:   #A0522D;
+  --vet-thomas:  #4B5D73;
+  --topbar-h: 66px;
+
+  /* ---- Terrier chaleureux ---- */
+  --bg:            #F6EEDF;
+  --bg-deep:       #EFE2CB;
+  --surface:       #FFFCF4;
+  --surface-2:     #F6EBD6;
+  --text:          #3A2A1C;
+  --muted:         #7C6A55;
+  --soft:          #A08D75;
+  --border:        #E6D7BB;
+  --border-strong: #D8C4A1;
+  --accent:        #C7530F;
+  --accent-ink:    #AC4508;
+  --accent-soft:   rgba(224, 122, 47, 0.13);
+  --accent-glow:   rgba(230, 126, 34, 0.28);
+  --ok:            #3E7A2E;
+  --ok-soft:       rgba(90, 150, 60, 0.14);
+  --warn:          #9A6200;
+  --warn-soft:     rgba(196, 138, 20, 0.16);
+  --bubble-filou:  #FBF3E2;
+  --bubble-user:   #EFE0C4;
+  --panel-bg:      #FFFCF4;
+  --r-lg: 26px; --r-md: 18px; --r-sm: 12px;
+  --shadow-card:  0 10px 30px rgba(140, 84, 24, 0.10), 0 2px 6px rgba(140, 84, 24, 0.06);
+  --shadow-panel: 0 24px 60px rgba(120, 70, 18, 0.20), 0 4px 12px rgba(120, 70, 18, 0.10);
+  --topbar-bg: rgba(246, 238, 223, 0.90);
+  --blob1: rgba(242, 158, 74, 0.50); --blob2: rgba(252, 208, 138, 0.48);
+}
+
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  padding-top: var(--topbar-h);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, h4, .display { font-family: var(--font-display); }
+button { font-family: var(--font-body); cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+img { display: block; }
+
+/* ============================================================
+   BARRE DE NAVIGATION COMMUNE (maquette M1→M5)
+   ============================================================ */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0;
+  z-index: 200;
+  background: var(--topbar-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+  padding: 10px clamp(14px, 3vw, 36px);
+  display: flex; align-items: center; gap: 14px 22px;
+  min-height: var(--topbar-h);
+}
+.lab-brand {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--font-display);
+  font-weight: 700; font-size: 0.98rem;
+  letter-spacing: 0.01em;
+  flex: none;
+}
+.lab-brand img { width: 32px; height: 32px; object-fit: contain; }
+.lab-brand small {
+  display: block;
+  font-family: var(--font-body);
+  font-weight: 500; font-size: 0.64rem;
+  color: var(--muted); letter-spacing: 0.10em;
+  text-transform: uppercase;
+}
+.mq-nav {
+  margin-left: auto;
+  display: flex; align-items: center; gap: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px;
+  overflow-x: auto;
+  max-width: 100%;
+  scrollbar-width: thin;
+}
+.mq-nav a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.8rem; font-weight: 600;
+  padding: 7px 13px; border-radius: 999px;
+  white-space: nowrap;
+  min-height: 34px;
+  display: inline-flex; align-items: center;
+}
+.mq-nav a:hover { color: var(--text); }
+.mq-nav a[aria-current="page"] {
+  background: var(--accent); color: #fff;
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+
+/* ============================================================
+   EN-TÊTE DE PAGE
+   ============================================================ */
+.page-hero {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-deep);
+  border-bottom: 1px solid var(--border);
+}
+.page-hero .blob {
+  position: absolute; border-radius: 50%;
+  filter: blur(58px); pointer-events: none;
+}
+.page-hero .blob.b1 { width: 34vw; height: 34vw; min-width: 300px; min-height: 300px; top: -58%; left: -6%;
+  background: radial-gradient(circle at 40% 40%, var(--blob1), transparent 66%);
+  animation: drift1 28s ease-in-out infinite alternate; }
+.page-hero .blob.b2 { width: 28vw; height: 28vw; min-width: 240px; min-height: 240px; top: -30%; right: 4%;
+  background: radial-gradient(circle at 55% 45%, var(--blob2), transparent 66%);
+  animation: drift2 34s ease-in-out infinite alternate; }
+@keyframes drift1 { to { transform: translate(6vw, 4vh) scale(1.12); } }
+@keyframes drift2 { to { transform: translate(-5vw, 5vh) scale(0.94); } }
+.page-hero-inner {
+  position: relative; z-index: 2;
+  max-width: 1280px; margin: 0 auto;
+  padding: 30px clamp(14px, 3vw, 36px) 24px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 14px 26px;
+}
+.page-hero-kicker {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 6px;
+}
+.page-hero h1 { font-size: clamp(1.5rem, 3vw, 2.05rem); font-weight: 800; line-height: 1.12; letter-spacing: -0.01em; }
+.page-hero .lede { margin-top: 7px; color: var(--muted); font-size: 0.92rem; line-height: 1.6; max-width: 56ch; }
+.hero-stats {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin-top: 12px; flex-wrap: wrap;
+}
+.hero-stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.76rem; font-weight: 600; color: var(--muted);
+  padding: 6px 13px;
+}
+.hero-stat b { color: var(--text); font-family: var(--font-display); }
+.hero-actions {
+  margin-left: auto;
+  display: flex; flex-direction: column; gap: 9px; align-items: flex-end;
+}
+.btn-defini {
+  border: none;
+  background: var(--accent); color: #fff;
+  border-radius: 999px;
+  font-size: 0.88rem; font-weight: 700;
+  padding: 12px 22px; min-height: 46px;
+  box-shadow: 0 4px 14px var(--accent-glow);
+  display: inline-flex; align-items: center; gap: 9px;
+}
+.btn-defini:hover { filter: brightness(1.07); }
+.demo-link {
+  border: 1.5px dashed var(--border-strong);
+  background: transparent; color: var(--muted);
+  border-radius: 999px;
+  font-size: 0.74rem; font-weight: 600;
+  padding: 7px 14px; min-height: 34px;
+}
+.demo-link:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
+
+/* ============================================================
+   SCÈNE PRINCIPALE : FILOU (gauche, d'office) + RÈGLES (droite)
+   ============================================================ */
+.shell { max-width: 1280px; margin: 0 auto; padding: 0 clamp(14px, 3vw, 36px); }
+.rules-stage {
+  display: grid;
+  grid-template-columns: minmax(320px, 396px) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+  margin: 26px 0 48px;
+}
+
+/* ----- Le poste de Filou : premier plan, pas de terrier ici ----- */
+.filou-dock {
+  position: sticky; top: calc(var(--topbar-h) + 14px);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  max-height: calc(100vh - var(--topbar-h) - 28px);
+}
+.filou-dock.speaking { box-shadow: 0 0 0 3px var(--accent-glow), var(--shadow-panel); }
+.chat-fox {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 18px;
+  background: linear-gradient(135deg, var(--accent-soft), transparent 72%);
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+.chat-fox .fox-frame {
+  width: 66px; height: 84px; flex: none;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 2px solid var(--border-strong);
+  box-shadow: var(--shadow-card);
+  background: var(--surface-2);
+}
+.chat-fox .fox-frame img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.chat-fox h2 { font-size: 1.02rem; font-weight: 700; line-height: 1.25; }
+.chat-fox p { font-size: 0.78rem; color: var(--muted); line-height: 1.5; margin-top: 3px; }
+
+/* Pastille de contexte : la règle sur laquelle Filou est branché */
+.ctx-strip {
+  display: none;
+  align-items: flex-start; gap: 9px;
+  margin: 12px 14px 0;
+  background: var(--accent-soft);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+  font-size: 0.78rem; line-height: 1.45;
+  flex: none;
+}
+.ctx-strip.on { display: flex; animation: bubbleIn .3s ease both; }
+.ctx-strip .ctx-ico { flex: none; font-size: 0.95rem; }
+.ctx-strip b { display: block; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent-ink); margin-bottom: 2px; }
+.ctx-strip .ctx-off {
+  margin-left: auto; flex: none;
+  border: none; background: transparent; color: var(--soft);
+  font-size: 0.9rem; line-height: 1; padding: 2px 4px;
+}
+.ctx-strip .ctx-off:hover { color: var(--accent-ink); }
+
+.convo {
+  padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 10px;
+  min-height: 190px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  flex: 1;
+}
+.bubble {
+  max-width: 92%;
+  padding: 10px 13px;
+  border-radius: var(--r-md);
+  font-size: 0.85rem; line-height: 1.55;
+  animation: bubbleIn .35s ease both;
+}
+@keyframes bubbleIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+.bubble.filou {
+  align-self: flex-start;
+  background: var(--bubble-filou);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+.bubble.user {
+  align-self: flex-end;
+  background: var(--bubble-user);
+  border: 1px solid transparent;
+  border-bottom-right-radius: 4px;
+}
+.bubble .who {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 4px;
+}
+.bubble.user .who { color: var(--muted); justify-content: flex-end; }
+.bubble.reformulation {
+  align-self: flex-start;
+  background: var(--accent-soft);
+  border: 1px solid var(--border-strong);
+  max-width: 96%;
+}
+.bubble .impact-list { list-style: none; margin-top: 7px; display: flex; flex-direction: column; gap: 5px; }
+.bubble .impact-list li { display: flex; gap: 8px; align-items: baseline; font-size: 0.82rem; line-height: 1.5; }
+.bubble .impact-list .n { flex: none; font-family: var(--font-display); font-weight: 800; font-size: 0.72rem; color: var(--accent-ink); }
+.type-caret {
+  display: inline-block; width: 2px; height: 1em;
+  background: var(--accent-ink);
+  vertical-align: text-bottom; margin-left: 1px;
+  animation: caretBlink .8s steps(1) infinite;
+}
+@keyframes caretBlink { 50% { opacity: 0; } }
+.reform-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.btn {
+  border: none; border-radius: 999px;
+  font-size: 0.8rem; font-weight: 600;
+  padding: 8px 15px; min-height: 36px;
+}
+.btn-valider { background: var(--accent); color: #fff; }
+.btn-valider:hover { filter: brightness(1.06); }
+.btn-corriger {
+  background: transparent; color: var(--muted);
+  border: 1px solid var(--border-strong);
+}
+.btn-corriger:hover { color: var(--text); border-color: var(--muted); }
+.btn.pressed { background: var(--ok); color: #fff; transform: scale(0.98); }
+.bubble.note {
+  align-self: center;
+  background: var(--ok-soft);
+  border: 1px dashed var(--border-strong);
+  color: var(--ok);
+  font-size: 0.78rem; font-weight: 600;
+  padding: 7px 13px;
+  text-align: center;
+}
+
+.chips {
+  display: flex; flex-wrap: wrap; gap: 7px;
+  padding: 4px 16px 12px;
+  flex: none;
+}
+.chips .chips-label {
+  width: 100%; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--soft);
+}
+.chip {
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  border-radius: 999px;
+  font-size: 0.76rem; font-weight: 600;
+  padding: 8px 13px; min-height: 36px;
+  text-align: left;
+}
+.chip:hover { background: var(--accent-soft); border-color: var(--accent-ink); color: var(--accent-ink); }
+.chip:disabled { opacity: 0.45; cursor: default; }
+
+.panel-input {
+  display: flex; gap: 8px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  flex: none;
+}
+.panel-input input {
+  flex: 1;
+  font-family: var(--font-body); font-size: 0.85rem;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 10px 16px;
+  min-height: 44px;
+  min-width: 0;
+}
+.panel-input input::placeholder { color: var(--soft); }
+.panel-input input:focus { border-color: var(--accent); outline: none; }
+.panel-send {
+  border: none; background: var(--accent); color: #fff;
+  border-radius: 999px;
+  min-width: 44px; min-height: 44px;
+  font-size: 1.05rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none;
+}
+.panel-send:hover { filter: brightness(1.07); }
+
+.journal {
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  padding: 9px 14px 8px;
+  max-height: 118px; overflow-y: auto;
+  flex: none;
+}
+.journal h3 {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--soft);
+  margin-bottom: 6px;
+}
+.journal h3 .count {
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 999px; padding: 1px 8px; font-size: 0.64rem;
+}
+.journal-entry {
+  display: flex; gap: 9px;
+  padding: 5px 0;
+  border-bottom: 1px dashed var(--border);
+  font-size: 0.73rem; line-height: 1.45;
+}
+.journal-entry:last-child { border-bottom: none; }
+.journal-entry .je-dot {
+  flex: none; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent); margin-top: 5px;
+}
+.journal-entry .je-dot.ok { background: var(--ok); }
+.journal-entry .je-dot.warn { background: var(--warn); }
+.journal-entry time { display: block; font-size: 0.62rem; color: var(--soft); }
+
+/* ============================================================
+   COLONNE RÈGLES · ONGLETS PAR CATÉGORIE
+   ============================================================ */
+.rules-main { min-width: 0; }
+.tabs {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 18px;
+}
+.tabs button {
+  border: none; background: transparent;
+  color: var(--muted);
+  font-size: 0.82rem; font-weight: 600;
+  padding: 9px 14px; border-radius: 999px;
+  min-height: 40px;
+  display: inline-flex; align-items: center; gap: 7px;
+  white-space: nowrap;
+  transition: background-color .2s ease, color .2s ease;
+}
+.tabs button:hover { color: var(--text); background: var(--surface-2); }
+.tabs button[aria-selected="true"] {
+  background: var(--accent); color: #fff;
+  box-shadow: 0 2px 8px var(--accent-glow);
+  font-weight: 700;
+}
+.tabs button .tcount {
+  font-family: var(--font-display); font-size: 0.66rem; font-weight: 800;
+  background: var(--surface-2); color: var(--muted);
+  border-radius: 999px; padding: 2px 7px;
+}
+.tabs button[aria-selected="true"] .tcount { background: rgba(255,255,255,0.22); color: #fff; }
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; animation: panelIn .35s ease both; }
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.tab-intro {
+  font-size: 0.85rem; color: var(--muted); line-height: 1.6;
+  margin: 2px 4px 16px;
+  max-width: 68ch;
+}
+.tab-intro b { color: var(--text); }
+
+/* ----- Encart de règle ----- */
+.rule-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
+  padding: 15px 18px 13px;
+  margin-bottom: 12px;
+  transition: box-shadow .3s ease, opacity .3s ease;
+}
+.rule-card.fresh { animation: freshRule 2.4s ease both; }
+@keyframes freshRule {
+  0%   { background: var(--accent-soft); box-shadow: 0 0 0 3px var(--accent-glow), var(--shadow-card); }
+  100% { background: var(--surface); box-shadow: var(--shadow-card); }
+}
+.rule-card.focused {
+  animation: focusHalo 2.6s ease both;
+  scroll-margin-top: calc(var(--topbar-h) + 90px);
+}
+@keyframes focusHalo {
+  0%   { box-shadow: 0 0 0 0 var(--accent-glow), var(--shadow-panel); }
+  20%  { box-shadow: 0 0 0 10px var(--accent-glow), var(--shadow-panel); }
+  60%  { box-shadow: 0 0 0 10px transparent, var(--shadow-panel); }
+  100% { box-shadow: var(--shadow-card); }
+}
+.rule-card.suspended { opacity: 0.72; }
+.rule-card.suspended .rule-phrase { opacity: 0.5; text-decoration: line-through; text-decoration-thickness: 1px; }
+.rule-card.removing { opacity: 0; transform: translateX(14px); transition: opacity .3s ease, transform .3s ease; }
+
+.rule-top { display: flex; align-items: flex-start; gap: 12px; }
+.rule-phrase { font-size: 0.95rem; line-height: 1.55; font-weight: 600; flex: 1; min-width: 0; }
+.rule-icons { display: flex; gap: 2px; flex: none; }
+.icon-btn {
+  border: none; background: transparent;
+  color: var(--soft);
+  font-size: 0.92rem;
+  width: 34px; height: 34px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.icon-btn:hover { color: var(--accent-ink); background: var(--accent-soft); }
+.icon-btn.danger:hover { color: #A4300E; background: rgba(164, 48, 14, 0.12); }
+
+.rule-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 9px; }
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em;
+  padding: 4px 11px; border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--muted);
+}
+.badge .vdot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.badge.b-periode { background: var(--warn-soft); color: var(--warn); border-color: rgba(196, 138, 20, 0.35); }
+.badge.b-susp { background: var(--warn-soft); color: var(--warn); border-color: rgba(196, 138, 20, 0.35); text-transform: uppercase; }
+
+/* ----- Réglette : la grammaire unique à 3 positions ----- */
+.rule-foot {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px dashed var(--border);
+}
+.reglette { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.reglette-seg {
+  display: inline-flex; gap: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px;
+  width: max-content;
+}
+.reglette-seg button {
+  border: none; background: transparent;
+  color: var(--muted);
+  font-size: 0.75rem; font-weight: 700;
+  padding: 6px 13px; border-radius: 999px;
+  min-height: 32px;
+  transition: background-color .2s ease, color .2s ease;
+}
+.reglette-seg button:hover { color: var(--text); }
+.reglette-seg button[aria-checked="true"] { color: #fff; }
+.reglette-seg button[aria-checked="true"][data-pos="obligatoire"] { background: var(--accent); }
+.reglette-seg button[aria-checked="true"][data-pos="important"]   { background: var(--warn); }
+.reglette-seg button[aria-checked="true"][data-pos="sipossible"]  { background: var(--soft); }
+.reglette-map {
+  font-size: 0.7rem; color: var(--soft); line-height: 1.5;
+  min-height: 1.1em;
+  max-width: 46ch;
+}
+.reglette-map b { color: var(--muted); font-weight: 700; }
+.fine-link {
+  margin-left: auto;
+  border: none; background: transparent;
+  color: var(--soft);
+  font-size: 0.72rem; font-weight: 600;
+  text-decoration: underline dotted; text-underline-offset: 3px;
+  padding: 4px 2px; min-height: 30px;
+  align-self: flex-end;
+}
+.fine-link:hover { color: var(--accent-ink); }
+.btn-filou {
+  border: 1px solid var(--border-strong);
+  background: var(--accent-soft); color: var(--accent-ink);
+  border-radius: 999px;
+  font-size: 0.78rem; font-weight: 700;
+  padding: 8px 15px; min-height: 38px;
+  display: inline-flex; align-items: center; gap: 7px;
+  flex: none;
+}
+.btn-filou:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* ----- Réglage fin (échelle réelle du moteur, dépliée) ----- */
+.fine-panel {
+  display: none;
+  margin-top: 11px;
+  background: var(--surface-2);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 11px 14px 12px;
+}
+.fine-panel.open { display: block; animation: panelIn .3s ease both; }
+.fine-panel h4 {
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 8px;
+}
+.fine-opts { display: flex; flex-direction: column; gap: 3px; }
+.fine-opt {
+  display: flex; align-items: baseline; gap: 9px;
+  border: none; background: transparent;
+  text-align: left;
+  font-size: 0.79rem; line-height: 1.5;
+  padding: 5px 8px; border-radius: 8px;
+  color: var(--text);
+}
+.fine-opt:hover { background: var(--surface); }
+.fine-opt .fo-dot {
+  flex: none; width: 11px; height: 11px; border-radius: 50%;
+  border: 2px solid var(--border-strong); background: transparent;
+  align-self: center;
+}
+.fine-opt[aria-checked="true"] .fo-dot { background: var(--accent); border-color: var(--accent); }
+.fine-opt[aria-checked="true"] { font-weight: 700; }
+.fine-opt small { color: var(--soft); font-weight: 400; font-size: 0.72rem; }
+.fine-note { margin-top: 8px; font-size: 0.7rem; color: var(--soft); line-height: 1.5; }
+
+/* ----- Confirmation inline (suppression) & historique ----- */
+.confirm-row {
+  display: none;
+  align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 11px;
+  background: rgba(164, 48, 14, 0.07);
+  border: 1px solid rgba(164, 48, 14, 0.25);
+  border-radius: var(--r-sm);
+  padding: 9px 13px;
+  font-size: 0.8rem;
+}
+.confirm-row.open { display: flex; animation: panelIn .25s ease both; }
+.btn-danger { background: #A4300E; color: #fff; }
+.btn-danger:hover { filter: brightness(1.1); }
+.history-panel {
+  display: none;
+  margin-top: 11px;
+  border-top: 1px dashed var(--border);
+  padding-top: 9px;
+}
+.history-panel.open { display: block; animation: panelIn .25s ease both; }
+.history-panel h4 {
+  font-size: 0.64rem; font-weight: 700; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--soft);
+  margin-bottom: 6px;
+}
+.history-panel ul { list-style: none; }
+.history-panel li {
+  display: flex; gap: 9px;
+  font-size: 0.75rem; line-height: 1.5; color: var(--muted);
+  padding: 3px 0;
+}
+.history-panel li .h-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--border-strong); margin-top: 6px; }
+.history-panel li time { color: var(--soft); font-size: 0.68rem; display: block; }
+
+/* ----- Bannière deep-link (arrivée depuis le diagnostic M1) ----- */
+.focus-banner {
+  display: none;
+  align-items: flex-start; gap: 12px;
+  background: var(--warn-soft);
+  border: 1px solid rgba(196, 138, 20, 0.4);
+  border-radius: var(--r-md);
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  font-size: 0.85rem; line-height: 1.55;
+}
+.focus-banner.on { display: flex; animation: panelIn .35s ease both; }
+.focus-banner .fb-fox {
+  flex: none; width: 44px; height: 54px;
+  border-radius: var(--r-sm); overflow: hidden;
+  border: 1px solid rgba(196, 138, 20, 0.4);
+}
+.focus-banner .fb-fox img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.focus-banner b { display: block; color: var(--warn); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 3px; }
+.focus-banner .fb-close {
+  margin-left: auto; flex: none;
+  border: none; background: transparent; color: var(--warn);
+  font-size: 1rem; padding: 2px 6px;
+}
+
+/* ----- Structure du week-end : une seule porte ----- */
+.structure-card {
+  background: var(--surface);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+  padding: 18px 20px 16px;
+  margin-bottom: 18px;
+}
+.structure-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 4px; }
+.structure-head .s-ico {
+  flex: none; width: 42px; height: 42px; border-radius: 12px;
+  background: var(--accent-soft);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 1.2rem;
+}
+.structure-head h3 { font-size: 1.02rem; font-weight: 700; }
+.structure-head p { font-size: 0.8rem; color: var(--muted); line-height: 1.55; margin-top: 3px; max-width: 58ch; }
+.structure-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+  padding: 12px 2px;
+  border-bottom: 1px dashed var(--border);
+}
+.structure-row:last-of-type { border-bottom: none; }
+.structure-row .s-phrase { flex: 1; min-width: 240px; font-size: 0.88rem; line-height: 1.5; font-weight: 600; }
+.structure-row .s-phrase small { display: block; font-weight: 400; color: var(--soft); font-size: 0.73rem; margin-top: 2px; }
+.switch {
+  position: relative;
+  width: 46px; height: 26px; flex: none;
+  border: none; border-radius: 999px;
+  background: var(--border-strong);
+  transition: background-color .25s ease;
+}
+.switch::after {
+  content: "";
+  position: absolute; top: 3px; left: 3px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(58,42,28,0.3);
+  transition: transform .25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.switch[aria-checked="true"] { background: var(--ok); }
+.switch[aria-checked="true"]::after { transform: translateX(20px); }
+.souples-title {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin: 14px 0 2px;
+  display: flex; align-items: center; gap: 8px;
+}
+.souples-title::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+/* ----- Onglet Équité ----- */
+.equity-dim {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
+  padding: 13px 18px 12px;
+  margin-bottom: 10px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px;
+}
+.equity-dim .ed-name { flex: 1; min-width: 220px; }
+.equity-dim .ed-name b { font-family: var(--font-display); font-size: 0.92rem; display: block; }
+.equity-dim .ed-name small { font-size: 0.74rem; color: var(--muted); line-height: 1.45; display: block; margin-top: 2px; }
+.equity-extra {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
+  padding: 16px 18px;
+  margin-top: 18px;
+}
+.equity-extra h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 4px; }
+.equity-extra > p { font-size: 0.8rem; color: var(--muted); line-height: 1.55; max-width: 62ch; }
+.tag-groups { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.tag-group {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 0.8rem; font-weight: 600;
+}
+.tag-group .tg-dots { display: inline-flex; }
+.tag-group .tg-dots i { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--surface); margin-left: -4px; }
+.tag-group .tg-dots i:first-child { margin-left: 0; }
+.tag-group small { color: var(--muted); font-weight: 500; font-size: 0.7rem; }
+.tag-add {
+  border: 1.5px dashed var(--border-strong);
+  background: transparent; color: var(--muted);
+  border-radius: 999px;
+  font-size: 0.78rem; font-weight: 600;
+  padding: 7px 14px; min-height: 36px;
+}
+.tag-add:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
+.role-fin { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 12px; }
+.role-fin .rf-label { font-size: 0.84rem; font-weight: 600; }
+.role-seg {
+  display: inline-flex; gap: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px; padding: 3px;
+}
+.role-seg button {
+  border: none; background: transparent; color: var(--muted);
+  font-size: 0.78rem; font-weight: 700;
+  padding: 6px 14px; border-radius: 999px; min-height: 32px;
+}
+.role-seg button[aria-checked="true"] { background: var(--accent); color: #fff; }
+.role-hint { width: 100%; font-size: 0.72rem; color: var(--soft); line-height: 1.5; }
+
+.advanced-link {
+  display: inline-block;
+  margin: 10px 4px 0;
+  font-size: 0.78rem; color: var(--soft);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.advanced-link:hover { color: var(--accent-ink); }
+
+/* ============================================================
+   VUE « TOUT CE QUI EST DÉFINI » (volet latéral)
+   ============================================================ */
+.defini-veil {
+  position: fixed; inset: 0; z-index: 400;
+  background: rgba(58, 42, 28, 0.42);
+  opacity: 0;
+  transition: opacity .28s ease;
+}
+.defini-veil[hidden] { display: none; }
+.defini-veil.open { opacity: 1; }
+.defini-panel {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 401;
+  width: min(660px, 100%);
+  background: var(--panel-bg);
+  border-left: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-panel);
+  display: flex; flex-direction: column;
+  transform: translateX(102%);
+  transition: transform .38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.defini-panel.open { transform: none; }
+.defini-head {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex: none;
+}
+.defini-head h2 { font-size: 1.15rem; font-weight: 800; }
+.defini-head p { font-size: 0.8rem; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+.defini-close {
+  margin-left: auto; flex: none;
+  border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--muted);
+  border-radius: var(--r-sm);
+  width: 38px; height: 38px;
+  font-size: 1rem;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.defini-close:hover { color: var(--text); border-color: var(--border-strong); }
+.defini-filters {
+  padding: 12px 22px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex: none;
+}
+.df-label {
+  font-size: 0.64rem; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--soft);
+  margin-bottom: 7px;
+}
+.vet-filter { display: flex; flex-wrap: wrap; gap: 6px; }
+.vf-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 999px;
+  font-size: 0.76rem; font-weight: 600;
+  padding: 6px 12px; min-height: 34px;
+}
+.vf-chip .vdot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.vf-chip:hover { border-color: var(--border-strong); }
+.vf-chip[aria-pressed="true"] {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+.vf-chip[aria-pressed="true"] .vdot { box-shadow: 0 0 0 2px rgba(255,255,255,0.55); }
+.theme-row { display: flex; align-items: center; gap: 10px; margin-top: 11px; }
+.theme-row select {
+  font-family: var(--font-body); font-size: 0.82rem; font-weight: 600;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 14px;
+  min-height: 38px;
+}
+.defini-body { flex: 1; overflow-y: auto; padding: 16px 22px 26px; }
+.defini-group h3 {
+  font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--accent-ink);
+  margin: 18px 0 6px;
+  display: flex; align-items: center; gap: 8px;
+}
+.defini-group h3:first-child { margin-top: 2px; }
+.defini-group h3::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.defini-item {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 9px 2px;
+  border-bottom: 1px dashed var(--border);
+  font-size: 0.86rem; line-height: 1.55;
+}
+.defini-item:last-child { border-bottom: none; }
+.defini-item .di-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--border-strong); align-self: center; }
+.defini-item .di-text { flex: 1; min-width: 0; }
+.defini-item .di-text small { color: var(--soft); font-size: 0.7rem; display: block; margin-top: 1px; }
+.defini-item .lvl-mini {
+  flex: none;
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 9px; border-radius: 999px;
+  align-self: center;
+}
+.lvl-mini.m-obligatoire { background: var(--accent-soft); color: var(--accent-ink); }
+.lvl-mini.m-important   { background: var(--warn-soft); color: var(--warn); }
+.lvl-mini.m-sipossible  { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+.defini-empty { color: var(--soft); font-style: italic; font-size: 0.85rem; padding: 14px 2px; }
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+.toast {
+  position: fixed; left: 50%; bottom: 22px; z-index: 500;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--text); color: var(--bg);
+  border-radius: 999px;
+  font-size: 0.83rem; font-weight: 600;
+  padding: 11px 20px;
+  box-shadow: var(--shadow-panel);
+  display: flex; align-items: center; gap: 14px;
+  opacity: 0;
+  transition: transform .35s cubic-bezier(0.22, 1, 0.36, 1), opacity .3s ease;
+  max-width: min(92vw, 560px);
+}
+.toast.show { transform: translateX(-50%); opacity: 1; }
+.toast button {
+  border: none; background: transparent;
+  color: #F9C489; font-weight: 700; font-size: 0.83rem;
+  text-decoration: underline; text-underline-offset: 3px;
+  padding: 4px 2px;
+  flex: none;
+}
+
+/* ============================================================
+   PIED DE PAGE
+   ============================================================ */
+.footer-lab {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  padding: 18px clamp(14px, 3vw, 36px);
+  display: flex; flex-wrap: wrap; gap: 6px 24px;
+  align-items: center; justify-content: space-between;
+  font-size: 0.76rem; color: var(--muted);
+}
+.footer-lab b { color: var(--text); font-weight: 600; }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 1060px) {
+  .rules-stage { grid-template-columns: 1fr; }
+  .filou-dock { position: static; max-height: none; }
+  .filou-dock .convo { max-height: 300px; }
+  .hero-actions { margin-left: 0; align-items: flex-start; }
+}
+@media (max-width: 700px) {
+  :root { --topbar-h: 106px; }
+  .topbar { flex-direction: column; align-items: stretch; gap: 8px; }
+  .mq-nav { margin-left: 0; }
+  .rule-foot { align-items: flex-start; }
+  .btn-filou { width: 100%; justify-content: center; }
+  .fine-link { margin-left: 0; }
+}
+
+/* ============================================================
+   ACCESSIBILITÉ · prefers-reduced-motion
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { scroll-behavior: auto !important; }
+  .page-hero .blob { animation: none !important; }
+  .bubble, .tab-panel.active, .fine-panel.open, .confirm-row.open,
+  .history-panel.open, .focus-banner.on, .ctx-strip.on { animation-duration: 0.01ms !important; }
+  .rule-card.fresh, .rule-card.focused { animation: none; box-shadow: 0 0 0 3px var(--accent-glow), var(--shadow-card); }
+  .type-caret { animation: none; }
+  .defini-panel, .defini-veil, .toast, .switch::after, .switch { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===================== NAVIGATION COMMUNE ===================== -->
+<header class="topbar">
+  <div class="lab-brand">
+    <img src="../fox-1.png" alt="Filou, le renard assistant de GuardVeto">
+    <span>
+      GuardVeto
+      <small>Grande maquette · Terrier chaleureux</small>
+    </span>
+  </div>
+  <nav class="mq-nav" aria-label="Tranches de la maquette">
+    <a href="index.html">🏠 Hub</a>
+    <a href="m1-planning.html">M1 Planning</a>
+    <a href="m2-regles.html" aria-current="page">M2 Règles</a>
+    <a href="m3-absences-echanges.html">M3 Absences &amp; échanges</a>
+    <a href="m4-accueil-equipe-historique-connexions.html">M4 Accueil &amp; réglages</a>
+    <a href="m5-veto-mobile.html">M5 Véto mobile</a>
+  </nav>
+</header>
+
+<!-- ===================== EN-TÊTE DE PAGE ===================== -->
+<section class="page-hero">
+  <div class="blob b1" aria-hidden="true"></div>
+  <div class="blob b2" aria-hidden="true"></div>
+  <div class="page-hero-inner">
+    <div>
+      <p class="page-hero-kicker">Règles du cabinet · Filou au premier plan</p>
+      <h1>Les règles, en phrases. Le moteur, en dessous.</h1>
+      <p class="lede">Chaque règle se lit, se règle et se questionne ici. Une seule échelle à comprendre : obligatoire, important, si possible. Filou traduit, explique et n'enregistre rien sans ton accord.</p>
+      <div class="hero-stats" aria-label="Résumé de la configuration">
+        <span class="hero-stat"><b id="stat-rules">16</b> règles</span>
+        <span class="hero-stat"><b>6</b> équilibrages suivis</span>
+        <span class="hero-stat"><b>1</b> suspendue</span>
+        <span class="hero-stat">Période en cours : <b>Hiver 2026</b></span>
+      </div>
+    </div>
+    <div class="hero-actions">
+      <button type="button" class="btn-defini" id="open-defini">👁 Tout ce qui est défini</button>
+      <button type="button" class="demo-link" id="demo-focus">▶ Démo : arriver depuis le diagnostic d'impasse (M1)</button>
+    </div>
+  </div>
+</section>
+
+<div class="shell">
+  <div class="rules-stage">
+
+    <!-- ============ FILOU · D'OFFICE, PAS DE TERRIER ICI ============ -->
+    <aside class="filou-dock" id="filou-dock" aria-label="Conversation avec Filou">
+      <div class="chat-fox">
+        <span class="fox-frame"><img src="../fox-3.png" alt="Filou tient une balance dorée : l'équité des règles"></span>
+        <div>
+          <h2>Dis ta règle, Filou l'écrit.</h2>
+          <p>Il reformule mot à mot, tu valides. Il répond aussi à « ça change quoi si… ? ».</p>
+        </div>
+      </div>
+
+      <div class="ctx-strip" id="ctx-strip" aria-live="polite">
+        <span class="ctx-ico">🎯</span>
+        <span><b>Filou est branché sur</b><span id="ctx-text"></span></span>
+        <button type="button" class="ctx-off" id="ctx-off" aria-label="Détacher Filou de cette règle" title="Détacher">✕</button>
+      </div>
+
+      <div class="convo" id="convo" aria-live="polite">
+        <div class="bubble filou">
+          <span class="who">🦊 Filou</span>
+          Bonjour Anne-Sophie ! Dicte-moi une règle en français, pars d'un exemple, ou clique sur « Demander à Filou » depuis n'importe quelle règle : je m'y branche.
+        </div>
+      </div>
+
+      <div class="chips" id="chips" aria-label="Suggestions de Filou"></div>
+
+      <form class="panel-input" id="chat-form">
+        <input type="text" id="chat-text" placeholder="Écris ta règle ou ta question…" aria-label="Écrire à Filou" autocomplete="off">
+        <button type="submit" class="panel-send" aria-label="Envoyer">➤</button>
+      </form>
+
+      <div class="journal" aria-label="Journal des actions de Filou">
+        <h3>Journal de Filou <span class="count" id="journal-count">2</span></h3>
+        <div id="journal-list">
+          <div class="journal-entry">
+            <span class="je-dot ok"></span>
+            <div><time>Hier · 18:04</time>Règle créée : jamais plus de 2 week-ends consécutifs. Validée par Anne-Sophie.</div>
+          </div>
+          <div class="journal-entry">
+            <span class="je-dot"></span>
+            <div><time>Mardi · 09:31</time>Équilibrage des jours fériés relevé à « Important », à la demande d'Anne-Sophie.</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ============ LES RÈGLES · ONGLETS PAR CATÉGORIE ============ -->
+    <section class="rules-main" aria-label="Règles du cabinet par catégorie">
+
+      <div class="focus-banner" id="focus-banner" role="status">
+        <span class="fb-fox"><img src="../fox-4.png" alt=""></span>
+        <span>
+          <b>Tu arrives du diagnostic d'impasse</b>
+          C'est la règle surlignée ci-dessous qui bloque la génération du 12 janvier. Passe-la en « Important » le temps de cette période, ou demande-moi ce que ça changerait.
+        </span>
+        <button type="button" class="fb-close" id="focus-close" aria-label="Fermer ce message">✕</button>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="Catégories de règles" id="tabs"></div>
+
+      <!-- Panneaux : construits par le script (données plus bas) -->
+      <div id="panels"></div>
+
+      <a class="advanced-link" href="#" onclick="return false;">Réglages avancés (formulaire classique, pour les habituées)</a>
+    </section>
+
+  </div>
+</div>
+
+<!-- ===================== VUE « TOUT CE QUI EST DÉFINI » ===================== -->
+<div class="defini-veil" id="defini-veil" hidden></div>
+<aside class="defini-panel" id="defini-panel" role="dialog" aria-modal="true" aria-labelledby="defini-title" hidden>
+  <div class="defini-head">
+    <div>
+      <h2 id="defini-title">Tout ce qui est défini</h2>
+      <p>L'intégralité de la configuration du cabinet, en phrases. Rien n'est caché.</p>
+    </div>
+    <button type="button" class="defini-close" id="defini-close" aria-label="Fermer la vue">✕</button>
+  </div>
+  <div class="defini-filters">
+    <p class="df-label">Filtrer par vétérinaire</p>
+    <div class="vet-filter" id="vet-filter"></div>
+    <div class="theme-row">
+      <p class="df-label" style="margin:0">Thème</p>
+      <select id="theme-filter" aria-label="Filtrer par thème">
+        <option value="all">Tous les thèmes</option>
+        <option value="repos">Repos &amp; jours</option>
+        <option value="weekends">Week-ends</option>
+        <option value="charge">Charge &amp; rythme</option>
+        <option value="duos">Duos &amp; équipe</option>
+        <option value="prefs">Préférences</option>
+        <option value="equite">Équité</option>
+      </select>
+    </div>
+  </div>
+  <div class="defini-body" id="defini-body"></div>
+</aside>
+
+<!-- ===================== TOAST ===================== -->
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <span id="toast-text"></span>
+  <button type="button" id="toast-undo" hidden>Annuler</button>
+</div>
+
+<!-- ===================== PIED DE PAGE ===================== -->
+<footer class="footer-lab">
+  <span><b>Maquette M2 · Règles du cabinet</b> · vue admin, données fictives · MonProjetPro</span>
+  <span>Grammaire unique : obligatoire / important / si possible. Le « réglage fin » montre l'échelle réelle du moteur.</span>
+</footer>
+
+<script>
+/* ============================================================
+   MAQUETTE M2 · JS vanilla
+   ============================================================ */
+(function () {
+  "use strict";
+
+  var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var $ = function (sel) { return document.querySelector(sel); };
+  var $$ = function (sel) { return Array.prototype.slice.call(document.querySelectorAll(sel)); };
+
+  var VETS = [
+    { n: "Anne-Sophie",   c: "var(--vet-anneso)" },
+    { n: "Anne-Catherine",c: "var(--vet-annecat)" },
+    { n: "Manon",         c: "var(--vet-manon)" },
+    { n: "Victor",        c: "var(--vet-victor)" },
+    { n: "Camille",       c: "var(--vet-camille)" },
+    { n: "Julie",         c: "var(--vet-julie)" },
+    { n: "Thomas",        c: "var(--vet-thomas)" }
+  ];
+  function vetColor(name) {
+    for (var i = 0; i < VETS.length; i++) if (VETS[i].n === name) return VETS[i].c;
+    return "var(--soft)";
+  }
+
+  /* ---------- Grammaire unique → 2 échelles du moteur ----------
+     famille "regle"  : force à 4 niveaux (ferme, pénalité forte, moyenne, légère)
+     famille "equite" : importance à 5 crans (prioritaire, forte, modérée, légère, ignorée)
+  */
+  var FINE = {
+    regle: [
+      { id: "ferme",   label: "Règle ferme",       hint: "jamais enfreinte, la génération échoue plutôt que de la violer", pos: "obligatoire" },
+      { id: "forte",   label: "Pénalité forte",    hint: "enfreinte seulement en dernier recours, toujours signalée",      pos: "important" },
+      { id: "moyenne", label: "Pénalité moyenne",  hint: "le moteur essaie sérieusement, sans alerte s'il cède",           pos: "sipossible" },
+      { id: "legere",  label: "Pénalité légère",   hint: "simple préférence, départage les solutions équivalentes",        pos: "sipossible" }
+    ],
+    equite: [
+      { id: "prioritaire", label: "Prioritaire",  hint: "écart d'une garde au maximum, avant tout le reste",        pos: "obligatoire" },
+      { id: "eq-forte",    label: "Forte",        hint: "équilibrée de près, peut céder devant une règle ferme",    pos: "important" },
+      { id: "moderee",     label: "Modérée",      hint: "équilibrée quand le planning le permet",                   pos: "sipossible" },
+      { id: "eq-legere",   label: "Légère",       hint: "simple coup de pouce en fin de calcul",                    pos: "sipossible" },
+      { id: "ignoree",     label: "Ignorée",      hint: "cette dimension n'est plus suivie du tout",                pos: "sipossible" }
+    ]
+  };
+  var POS_DEFAULT = {
+    regle:  { obligatoire: "ferme",       important: "forte",    sipossible: "moyenne" },
+    equite: { obligatoire: "prioritaire", important: "eq-forte", sipossible: "moderee" }
+  };
+  var POS_TEXT = {
+    regle: {
+      obligatoire: "Jamais enfreinte : si elle rend le planning impossible, la génération s'arrête et l'explique.",
+      important:   "Respectée sauf impasse : le moteur ne l'enfreint qu'en dernier recours, et te le signale.",
+      sipossible:  "Guide le choix quand tout le reste est égal. Aucune alerte si elle est écartée."
+    },
+    equite: {
+      obligatoire: "Écart d'une garde au maximum entre vétérinaires, avant tout le reste.",
+      important:   "Le moteur équilibre de près, mais peut céder devant une règle obligatoire.",
+      sipossible:  "Simple préférence d'équilibre, appliquée en fin de calcul."
+    }
+  };
+  var POS_LABEL = { obligatoire: "Obligatoire", important: "Important", sipossible: "Si possible" };
+
+  function fineOf(famille, id) {
+    var list = FINE[famille];
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+    return list[0];
+  }
+
+  /* ---------- Les règles (données de démonstration réalistes) ---------- */
+  var CATS = [
+    { id: "repos",    label: "Repos & jours",    emoji: "🌙" },
+    { id: "weekends", label: "Week-ends",        emoji: "📆" },
+    { id: "charge",   label: "Charge & rythme",  emoji: "⚡" },
+    { id: "duos",     label: "Duos & équipe",    emoji: "🤝" },
+    { id: "prefs",    label: "Préférences",      emoji: "💡" },
+    { id: "equite",   label: "Équité",           emoji: "⚖️" }
+  ];
+
+  var RULES = [
+    /* --- Repos & jours --- */
+    { id: "manon-mardi", cat: "repos", famille: "regle", fine: "ferme",
+      text: "Manon ne travaille jamais le mardi soir.",
+      portee: "veto", vets: ["Manon"] },
+    { id: "repos-lundi", cat: "repos", famille: "regle", fine: "ferme",
+      text: "Après un week-end de garde, le lundi qui suit est libre.",
+      portee: "cabinet", vets: [] },
+    { id: "thomas-formations", cat: "repos", famille: "regle", fine: "ferme",
+      text: "Thomas ne fait pas de nuit pendant ses semaines de formation.",
+      portee: "veto", vets: ["Thomas"], periode: "Hiver 2026" },
+    { id: "camille-jeudi", cat: "repos", famille: "regle", fine: "ferme",
+      text: "Camille ne prend pas de garde le jeudi.",
+      portee: "veto", vets: ["Camille"] },
+    { id: "julie-xor", cat: "repos", famille: "regle", fine: "ferme",
+      text: "Julie ne tient pas le 24 ET le 31 décembre : l'un des deux au plus.",
+      portee: "veto", vets: ["Julie"], periode: "Hiver 2026" },
+    /* --- Week-ends --- */
+    { id: "serie-we", cat: "weekends", famille: "regle", fine: "forte",
+      text: "Jamais plus de 2 week-ends consécutifs pour la même personne.",
+      portee: "equipe", vets: [] },
+    { id: "espacement-we", cat: "weekends", famille: "regle", fine: "forte",
+      text: "Chacun garde au plus un week-end sur trois.",
+      portee: "equipe", vets: [] },
+    { id: "thomas-pompier", cat: "weekends", famille: "regle", fine: "ferme",
+      text: "Thomas prend un week-end sur quatre, toujours le même du cycle (calé sur ses gardes de pompier volontaire).",
+      portee: "veto", vets: ["Thomas"] },
+    /* --- Charge & rythme --- */
+    { id: "serie-max", cat: "charge", famille: "regle", fine: "ferme",
+      text: "Jamais plus de 3 nuits de garde d'affilée.",
+      portee: "equipe", vets: [] },
+    { id: "deux-par-semaine", cat: "charge", famille: "regle", fine: "forte",
+      text: "Au plus 2 gardes par semaine pour chacun.",
+      portee: "equipe", vets: [] },
+    { id: "victor-these", cat: "charge", famille: "regle", fine: "forte",
+      text: "Victor plafonne à 4 gardes par mois pendant sa thèse.",
+      portee: "veto", vets: ["Victor"], periode: "Hiver 2026" },
+    /* --- Duos & équipe --- */
+    { id: "duo-manon-victor", cat: "duos", famille: "regle", fine: "ferme",
+      text: "Manon et Victor ne sont jamais de garde ensemble.",
+      portee: "duo", vets: ["Manon", "Victor"] },
+    { id: "julie-accompagnee", cat: "duos", famille: "regle", fine: "ferme",
+      text: "Julie ne prend un week-end qu'avec Anne-Sophie ou Camille en face.",
+      portee: "veto", vets: ["Julie", "Anne-Sophie", "Camille"] },
+    { id: "senior-we", cat: "duos", famille: "regle", fine: "forte",
+      text: "Chaque week-end compte au moins une vétérinaire étiquetée « senior ».",
+      portee: "equipe", vets: [] },
+    { id: "annecat-recours", cat: "duos", famille: "regle", fine: "ferme",
+      text: "Anne-Catherine n'est appelée qu'en dernier recours.",
+      portee: "veto", vets: ["Anne-Catherine"] },
+    /* --- Préférences --- */
+    { id: "victor-lundi", cat: "prefs", famille: "regle", fine: "moyenne",
+      text: "Victor préfère les nuits du lundi.",
+      portee: "veto", vets: ["Victor"] },
+    { id: "camille-groupees", cat: "prefs", famille: "regle", fine: "moyenne",
+      text: "Camille aime regrouper ses gardes dans la même semaine.",
+      portee: "veto", vets: ["Camille"], suspended: true },
+    { id: "anneso-vacances", cat: "prefs", famille: "regle", fine: "legere",
+      text: "Anne-Sophie évite les gardes pendant les vacances scolaires.",
+      portee: "veto", vets: ["Anne-Sophie"] }
+  ];
+
+  /* Structure du week-end : une seule porte (onglet Week-ends) */
+  var STRUCTURE = [
+    { id: "st-bloc", kind: "switch", on: true,
+      text: "Le vendredi soir et le week-end forment un bloc : le même binôme enchaîne.",
+      sub: "C'est la charpente du planning. La couper libère le vendredi, mais casse le repos du lundi tel qu'il est pensé." },
+    { id: "st-inversion", kind: "reglette", famille: "regle", fine: "forte",
+      text: "Le 1er et le 2nd de garde échangent leurs rôles entre le vendredi et le week-end." },
+    { id: "st-deux-blocs", kind: "reglette", famille: "regle", fine: "forte", souple: true,
+      text: "Éviter deux blocs week-end de suite pour la même personne." },
+    { id: "st-espacement", kind: "reglette", famille: "regle", fine: "moyenne", souple: true,
+      text: "Espacer les blocs week-end d'au moins deux semaines." },
+    { id: "st-vendredi-isole", kind: "reglette", famille: "regle", fine: "moyenne", souple: true,
+      text: "Éviter un vendredi soir isolé, sans le week-end qui suit." },
+    { id: "st-cumul-semaine", kind: "reglette", famille: "regle", fine: "forte", souple: true,
+      text: "Éviter de cumuler nuits de semaine et bloc week-end la même semaine." }
+  ];
+
+  /* Équité : 6 dimensions en langage métier */
+  var EQUITY = [
+    { id: "eq-we",     name: "Week-ends de garde",              desc: "Le même nombre de blocs week-end pour chacune, sur la période.", fine: "prioritaire" },
+    { id: "eq-nuits",  name: "Nuits de semaine",                desc: "Les gardes du lundi au jeudi soir, réparties sans favoritisme.", fine: "eq-forte" },
+    { id: "eq-role1",  name: "Rôle « 1er de week-end »",        desc: "Le rôle qui porte l'avantage financier : il tourne, il ne s'installe pas.", fine: "eq-forte" },
+    { id: "eq-feries", name: "Jours fériés",                    desc: "Pâques, 14 juillet, Toussaint… comptés à part des nuits ordinaires.", fine: "eq-forte" },
+    { id: "eq-grands", name: "Grands week-ends (3 jours)",      desc: "Les ponts et week-ends prolongés, plus lourds qu'un week-end simple.", fine: "moderee" },
+    { id: "eq-fetes",  name: "Fêtes de fin d'année",            desc: "Noël et Nouvel An : qui les a tenus hier compte pour demain.", fine: "prioritaire" }
+  ];
+
+  /* Historiques fictifs par règle (aperçu) */
+  var HISTORY_DEFAULT = [
+    { t: "12 mai 2026", txt: "Créée par Anne-Sophie, via Filou." },
+    { t: "3 juin 2026", txt: "Niveau relevé de « Si possible » à son niveau actuel." }
+  ];
+  var HISTORY = {
+    "serie-we": [
+      { t: "Hier · 18:04", txt: "Créée par Anne-Sophie, via Filou (« pas plus de 2 week-ends de suite »)." },
+      { t: "Hier · 18:05", txt: "Niveau réglé sur « Important » à la création." }
+    ],
+    "camille-groupees": [
+      { t: "2 avril 2026", txt: "Créée par Anne-Sophie, via le formulaire." },
+      { t: "28 juin 2026", txt: "Suspendue le temps du congé maternité de Camille." }
+    ]
+  };
+
+  var deletedStash = null;
+
+  /* ============================================================
+     RENDU · badges, réglette, encarts
+     ============================================================ */
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function badgePortee(rule) {
+    if (rule.portee === "veto") {
+      var v = rule.vets[0];
+      return '<span class="badge"><span class="vdot" style="background:' + vetColor(v) + '"></span>' + esc(v) + "</span>";
+    }
+    if (rule.portee === "duo") {
+      var dots = rule.vets.map(function (v) {
+        return '<span class="vdot" style="background:' + vetColor(v) + '"></span>';
+      }).join("");
+      return '<span class="badge">' + dots + esc(rule.vets.join(" + ")) + "</span>";
+    }
+    if (rule.portee === "cabinet") return '<span class="badge">🏠 Le cabinet</span>';
+    return '<span class="badge">👥 Toute l’équipe</span>';
+  }
+
+  function regletteHTML(id, famille, fineId) {
+    var pos = fineOf(famille, fineId).pos;
+    var segs = ["obligatoire", "important", "sipossible"].map(function (p) {
+      return '<button type="button" role="radio" data-reglette="' + id + '" data-pos="' + p + '"' +
+        ' aria-checked="' + (p === pos) + '">' + POS_LABEL[p] + "</button>";
+    }).join("");
+    return '<div class="reglette">' +
+      '<div class="reglette-seg" role="radiogroup" aria-label="Niveau de la règle">' + segs + "</div>" +
+      '<p class="reglette-map" id="map-' + id + '">' + mapText(famille, fineId) + "</p>" +
+      "</div>";
+  }
+
+  function mapText(famille, fineId) {
+    var f = fineOf(famille, fineId);
+    var moteur = famille === "equite" ? "Équilibrage" : "Moteur";
+    return "<b>" + moteur + " : " + f.label.toLowerCase() + "</b> · " + f.hint + ".";
+  }
+
+  function finePanelHTML(id, famille, fineId) {
+    var opts = FINE[famille].map(function (f) {
+      return '<button type="button" class="fine-opt" role="radio" data-fine="' + id + '" data-fineval="' + f.id + '"' +
+        ' aria-checked="' + (f.id === fineId) + '">' +
+        '<span class="fo-dot" aria-hidden="true"></span>' +
+        "<span>" + f.label + " <small>· " + f.hint + " · position « " + POS_LABEL[f.pos] + " »</small></span>" +
+        "</button>";
+    }).join("");
+    var title = famille === "equite"
+      ? "L’échelle réelle du moteur · importance sur 5 crans"
+      : "L’échelle réelle du moteur · force sur 4 niveaux";
+    return '<div class="fine-panel" id="fine-' + id + '">' +
+      "<h4>" + title + "</h4>" +
+      '<div class="fine-opts" role="radiogroup">' + opts + "</div>" +
+      '<p class="fine-note">La réglette à 3 positions pilote cette échelle. Choisir ici un niveau précis ajuste la réglette à la position correspondante : rien n’est caché, rien n’est perdu.</p>' +
+      "</div>";
+  }
+
+  function ruleCardHTML(rule) {
+    var hist = HISTORY[rule.id] || HISTORY_DEFAULT;
+    var histItems = hist.map(function (h) {
+      return '<li><span class="h-dot"></span><span><time>' + esc(h.t) + "</time>" + esc(h.txt) + "</span></li>";
+    }).join("");
+    return '<article class="rule-card' + (rule.suspended ? " suspended" : "") + '" id="card-' + rule.id + '" data-rule="' + rule.id + '">' +
+      '<div class="rule-top">' +
+        '<p class="rule-phrase" id="phrase-' + rule.id + '">' + esc(rule.text) + "</p>" +
+        '<span class="rule-icons">' +
+          '<button type="button" class="icon-btn" data-action="suspend" data-rule="' + rule.id + '" aria-label="' + (rule.suspended ? "Réactiver la règle" : "Suspendre la règle") + '" title="' + (rule.suspended ? "Réactiver" : "Suspendre") + '">' + (rule.suspended ? "▶" : "⏸") + "</button>" +
+          '<button type="button" class="icon-btn" data-action="history" data-rule="' + rule.id + '" aria-label="Historique de la règle" title="Historique">🕐</button>' +
+          '<button type="button" class="icon-btn danger" data-action="delete" data-rule="' + rule.id + '" aria-label="Supprimer la règle" title="Supprimer">🗑</button>' +
+        "</span>" +
+      "</div>" +
+      '<div class="rule-badges" id="badges-' + rule.id + '">' +
+        badgePortee(rule) +
+        (rule.periode ? '<span class="badge b-periode">📌 Limitée à ' + esc(rule.periode) + "</span>" : "") +
+        (rule.suspended ? '<span class="badge b-susp">Suspendue</span>' : "") +
+      "</div>" +
+      '<div class="rule-foot">' +
+        regletteHTML(rule.id, rule.famille, rule.fine) +
+        '<button type="button" class="fine-link" data-action="fine" data-rule="' + rule.id + '" aria-expanded="false">réglage fin</button>' +
+        '<button type="button" class="btn-filou" data-action="filou" data-rule="' + rule.id + '">🦊 Demander à Filou</button>' +
+      "</div>" +
+      finePanelHTML(rule.id, rule.famille, rule.fine) +
+      '<div class="confirm-row" id="confirm-' + rule.id + '">' +
+        "<span>Supprimer cette règle ? Elle disparaîtra du prochain planning généré.</span>" +
+        '<button type="button" class="btn btn-danger" data-action="delete-yes" data-rule="' + rule.id + '">Supprimer</button>' +
+        '<button type="button" class="btn btn-corriger" data-action="delete-no" data-rule="' + rule.id + '">Garder</button>' +
+      "</div>" +
+      '<div class="history-panel" id="history-' + rule.id + '">' +
+        "<h4>Historique</h4><ul>" + histItems + "</ul>" +
+      "</div>" +
+    "</article>";
+  }
+
+  function structureRowHTML(s) {
+    if (s.kind === "switch") {
+      return '<div class="structure-row">' +
+        '<p class="s-phrase">' + esc(s.text) + "<small>" + esc(s.sub) + "</small></p>" +
+        '<button type="button" class="switch" role="switch" aria-checked="' + s.on + '" data-switch="' + s.id + '" aria-label="' + esc(s.text) + '"></button>' +
+      "</div>";
+    }
+    return '<div class="structure-row">' +
+      '<p class="s-phrase">' + esc(s.text) + "</p>" +
+      regletteHTML(s.id, s.famille, s.fine) +
+    "</div>";
+  }
+
+  function equityDimHTML(d) {
+    return '<div class="equity-dim" id="card-' + d.id + '">' +
+      '<div class="ed-name"><b>' + esc(d.name) + "</b><small>" + esc(d.desc) + "</small></div>" +
+      regletteHTML(d.id, "equite", d.fine) +
+      '<button type="button" class="fine-link" data-action="fine" data-rule="' + d.id + '" aria-expanded="false">réglage fin</button>' +
+      finePanelHTML(d.id, "equite", d.fine) +
+    "</div>";
+  }
+
+  /* ============================================================
+     ONGLETS + PANNEAUX
+     ============================================================ */
+  var INTROS = {
+    repos: "Les jours et soirs que le planning doit respecter : repos fixes, absences récurrentes, dates exclues. <b>Une règle = une phrase.</b>",
+    weekends: "Tout le week-end tient ici, <b>une seule porte</b> : la structure du bloc vendredi-dimanche, puis les règles qui s’y appliquent.",
+    charge: "Le rythme soutenable : séries, plafonds, respiration entre les gardes.",
+    duos: "Qui peut garder avec qui, et ce que chaque week-end doit réunir comme compétences.",
+    prefs: "Les souhaits de chacune : jamais garantis, jamais punis. Le moteur les suit quand tout le reste est égal.",
+    equite: "Six comptes que le moteur tient pour que personne ne porte plus que sa part. <b>Ici on parle d’équilibrage et d’étiquettes</b>, jamais de mécanique interne."
+  };
+
+  function buildTabs() {
+    var tabs = $("#tabs");
+    var panels = $("#panels");
+    CATS.forEach(function (cat, idx) {
+      var count = cat.id === "equite" ? EQUITY.length : RULES.filter(function (r) { return r.cat === cat.id; }).length;
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.setAttribute("role", "tab");
+      btn.setAttribute("aria-selected", idx === 0 ? "true" : "false");
+      btn.setAttribute("aria-controls", "panel-" + cat.id);
+      btn.dataset.tab = cat.id;
+      btn.innerHTML = cat.emoji + " " + cat.label + ' <span class="tcount" data-tabcount="' + cat.id + '">' + count + "</span>";
+      tabs.appendChild(btn);
+
+      var panel = document.createElement("div");
+      panel.className = "tab-panel" + (idx === 0 ? " active" : "");
+      panel.id = "panel-" + cat.id;
+      panel.setAttribute("role", "tabpanel");
+      var html = '<p class="tab-intro">' + INTROS[cat.id] + "</p>";
+      if (cat.id === "weekends") {
+        html += '<section class="structure-card" aria-label="Structure du week-end">' +
+          '<div class="structure-head">' +
+            '<span class="s-ico" aria-hidden="true">🧩</span>' +
+            "<div><h3>La structure du week-end</h3>" +
+            "<p>Le squelette du bloc vendredi-dimanche, réuni en un seul endroit : le binôme, l’échange des rôles et les quatre coups de pouce d’espacement.</p></div>" +
+          "</div>" +
+          STRUCTURE.slice(0, 2).map(structureRowHTML).join("") +
+          '<p class="souples-title">Les quatre coups de pouce (souples par nature)</p>' +
+          STRUCTURE.slice(2).map(structureRowHTML).join("") +
+        "</section>";
+        html += '<div id="list-weekends">' + RULES.filter(function (r) { return r.cat === "weekends"; }).map(ruleCardHTML).join("") + "</div>";
+      } else if (cat.id === "equite") {
+        html += EQUITY.map(equityDimHTML).join("");
+        html += '<div class="equity-extra">' +
+          "<h3>Équilibrer aussi au sein des étiquettes</h3>" +
+          "<p>En plus de l’équipe entière, le moteur peut équilibrer un groupe entre ses membres. Exemple : les week-ends tournent équitablement <b>entre les juniors</b>, sans les comparer aux associées.</p>" +
+          '<div class="tag-groups">' +
+            '<span class="tag-group"><span class="tg-dots"><i style="background:var(--vet-manon)"></i><i style="background:var(--vet-julie)"></i><i style="background:var(--vet-victor)"></i></span>Étiquette « junior » <small>· week-ends équilibrés entre eux</small></span>' +
+            '<span class="tag-group"><span class="tg-dots"><i style="background:var(--vet-anneso)"></i><i style="background:var(--vet-annecat)"></i></span>Étiquette « associée » <small>· fériés équilibrés entre elles</small></span>' +
+            '<button type="button" class="tag-add" id="tag-add">+ Équilibrer une autre étiquette</button>' +
+          "</div>" +
+          '<div class="role-fin">' +
+            '<span class="rf-label">Rôle qui porte l’avantage financier :</span>' +
+            '<span class="role-seg" role="radiogroup" aria-label="Rôle à avantage financier">' +
+              '<button type="button" role="radio" data-role-fin="1er" aria-checked="true">1er de garde</button>' +
+              '<button type="button" role="radio" data-role-fin="2nd" aria-checked="false">2nd de garde</button>' +
+              '<button type="button" role="radio" data-role-fin="aucun" aria-checked="false">Aucun</button>' +
+            "</span>" +
+            '<p class="role-hint" id="role-hint">Le moteur suit ce rôle à part, pour que l’avantage financier tourne aussi équitablement que les gardes.</p>' +
+          "</div>" +
+        "</div>";
+      } else {
+        html += '<div id="list-' + cat.id + '">' + RULES.filter(function (r) { return r.cat === cat.id; }).map(ruleCardHTML).join("") + "</div>";
+      }
+      panel.innerHTML = html;
+      panels.appendChild(panel);
+    });
+
+    tabs.addEventListener("click", function (e) {
+      var btn = e.target.closest("button[data-tab]");
+      if (btn) selectTab(btn.dataset.tab);
+    });
+  }
+
+  function selectTab(id) {
+    $$("#tabs button").forEach(function (b) { b.setAttribute("aria-selected", String(b.dataset.tab === id)); });
+    $$(".tab-panel").forEach(function (p) { p.classList.toggle("active", p.id === "panel-" + id); });
+  }
+
+  function refreshCounts() {
+    CATS.forEach(function (cat) {
+      if (cat.id === "equite") return;
+      var el = document.querySelector('[data-tabcount="' + cat.id + '"]');
+      if (el) el.textContent = RULES.filter(function (r) { return r.cat === cat.id; }).length;
+    });
+    var stat = $("#stat-rules");
+    if (stat) stat.textContent = RULES.length;
+  }
+
+  /* ============================================================
+     RÉGLETTE · interactions (grammaire unique → échelle moteur)
+     ============================================================ */
+  function findItem(id) {
+    for (var i = 0; i < RULES.length; i++) if (RULES[i].id === id) return RULES[i];
+    for (var j = 0; j < STRUCTURE.length; j++) if (STRUCTURE[j].id === id) return STRUCTURE[j];
+    for (var k = 0; k < EQUITY.length; k++) if (EQUITY[k].id === id) return EQUITY[k];
+    return null;
+  }
+
+  function setLevel(id, fineId, silent) {
+    var item = findItem(id);
+    if (!item) return;
+    item.fine = fineId;
+    var famille = item.famille || "equite";
+    var pos = fineOf(famille, fineId).pos;
+    $$('[data-reglette="' + id + '"]').forEach(function (b) {
+      b.setAttribute("aria-checked", String(b.dataset.pos === pos));
+    });
+    $$('[data-fine="' + id + '"]').forEach(function (b) {
+      b.setAttribute("aria-checked", String(b.dataset.fineval === fineId));
+    });
+    var map = document.getElementById("map-" + id);
+    if (map) map.innerHTML = mapText(famille, fineId);
+    if (!silent) {
+      var label = item.text || item.name;
+      toast("« " + truncate(label, 46) + " » réglée sur " + POS_LABEL[pos] + ".");
+      addJournal("Niveau modifié : « " + truncate(label, 52) + " » → " + POS_LABEL[pos] + ".", "");
+    }
+  }
+
+  function truncate(s, n) { return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+
+  /* Survol d'une position : micro-texte honnête du mapping */
+  function bindHoverMap() {
+    document.body.addEventListener("mouseover", function (e) {
+      var b = e.target.closest("[data-reglette]");
+      if (!b) return;
+      var item = findItem(b.dataset.reglette);
+      if (!item) return;
+      var famille = item.famille || "equite";
+      var map = document.getElementById("map-" + b.dataset.reglette);
+      if (map) map.innerHTML = "<b>" + POS_LABEL[b.dataset.pos] + "</b> · " + POS_TEXT[famille][b.dataset.pos];
+    });
+    document.body.addEventListener("mouseout", function (e) {
+      var b = e.target.closest("[data-reglette]");
+      if (!b) return;
+      var item = findItem(b.dataset.reglette);
+      if (!item) return;
+      var famille = item.famille || "equite";
+      var map = document.getElementById("map-" + b.dataset.reglette);
+      if (map) map.innerHTML = mapText(famille, item.fine);
+    });
+  }
+
+  /* ============================================================
+     ACTIONS DES ENCARTS (délégation globale)
+     ============================================================ */
+  function bindActions() {
+    document.body.addEventListener("click", function (e) {
+
+      var seg = e.target.closest("[data-reglette]");
+      if (seg) {
+        var itemA = findItem(seg.dataset.reglette);
+        var familleA = itemA && (itemA.famille || "equite");
+        setLevel(seg.dataset.reglette, POS_DEFAULT[familleA][seg.dataset.pos]);
+        return;
+      }
+
+      var fineBtn = e.target.closest("[data-fineval]");
+      if (fineBtn) { setLevel(fineBtn.dataset.fine, fineBtn.dataset.fineval); return; }
+
+      var sw = e.target.closest("[data-switch]");
+      if (sw) {
+        var on = sw.getAttribute("aria-checked") !== "true";
+        sw.setAttribute("aria-checked", String(on));
+        toast(on ? "Bloc vendredi-week-end rétabli : le même binôme enchaîne." : "Bloc coupé : le vendredi soir redevient une garde indépendante.");
+        return;
+      }
+
+      var roleBtn = e.target.closest("[data-role-fin]");
+      if (roleBtn) {
+        $$("[data-role-fin]").forEach(function (b) { b.setAttribute("aria-checked", String(b === roleBtn)); });
+        var hint = $("#role-hint");
+        if (roleBtn.dataset.roleFin === "aucun") hint.textContent = "Aucun équilibrage financier : les deux rôles du week-end sont traités à l’identique.";
+        else hint.textContent = "Le moteur suit le rôle « " + roleBtn.dataset.roleFin + " de garde » à part, pour que l’avantage financier tourne aussi équitablement que les gardes.";
+        return;
+      }
+
+      var act = e.target.closest("[data-action]");
+      if (!act) return;
+      var id = act.dataset.rule;
+      var rule = findItem(id);
+
+      switch (act.dataset.action) {
+        case "fine": {
+          var panel = document.getElementById("fine-" + id);
+          var open = panel.classList.toggle("open");
+          act.setAttribute("aria-expanded", String(open));
+          act.textContent = open ? "replier le réglage fin" : "réglage fin";
+          break;
+        }
+        case "history": {
+          document.getElementById("history-" + id).classList.toggle("open");
+          break;
+        }
+        case "suspend": {
+          rule.suspended = !rule.suspended;
+          var card = document.getElementById("card-" + id);
+          card.classList.toggle("suspended", rule.suspended);
+          act.textContent = rule.suspended ? "▶" : "⏸";
+          act.setAttribute("aria-label", rule.suspended ? "Réactiver la règle" : "Suspendre la règle");
+          act.title = rule.suspended ? "Réactiver" : "Suspendre";
+          renderBadges(rule);
+          toast(rule.suspended
+            ? "Règle suspendue : elle sera ignorée à la prochaine génération."
+            : "Règle réactivée : elle compte de nouveau.");
+          addJournal((rule.suspended ? "Règle suspendue : « " : "Règle réactivée : « ") + truncate(rule.text, 52) + " »", rule.suspended ? "warn" : "ok");
+          break;
+        }
+        case "delete": {
+          document.getElementById("confirm-" + id).classList.add("open");
+          break;
+        }
+        case "delete-no": {
+          document.getElementById("confirm-" + id).classList.remove("open");
+          break;
+        }
+        case "delete-yes": {
+          var cardD = document.getElementById("card-" + id);
+          deletedStash = { rule: rule, cat: rule.cat };
+          RULES = RULES.filter(function (r) { return r.id !== id; });
+          cardD.classList.add("removing");
+          setTimeout(function () { cardD.remove(); refreshCounts(); }, REDUCED ? 0 : 300);
+          toast("Règle supprimée.", true);
+          addJournal("Règle supprimée : « " + truncate(rule.text, 52) + " »", "warn");
+          break;
+        }
+        case "filou": {
+          askFilou(rule);
+          break;
+        }
+      }
+    });
+  }
+
+  function renderBadges(rule) {
+    var el = document.getElementById("badges-" + rule.id);
+    if (!el) return;
+    el.innerHTML = badgePortee(rule) +
+      (rule.periode ? '<span class="badge b-periode">📌 Limitée à ' + esc(rule.periode) + "</span>" : "") +
+      (rule.suspended ? '<span class="badge b-susp">Suspendue</span>' : "");
+  }
+
+  /* ============================================================
+     TOAST + JOURNAL
+     ============================================================ */
+  var toastTimer = null;
+  function toast(msg, undoable) {
+    var t = $("#toast");
+    $("#toast-text").textContent = msg;
+    var undo = $("#toast-undo");
+    undo.hidden = !undoable;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 4200);
+  }
+  $("#toast-undo").addEventListener("click", function () {
+    if (!deletedStash) return;
+    RULES.push(deletedStash.rule);
+    var list = document.getElementById("list-" + deletedStash.cat);
+    if (list) {
+      list.insertAdjacentHTML("beforeend", ruleCardHTML(deletedStash.rule));
+      document.getElementById("card-" + deletedStash.rule.id).classList.add("fresh");
+    }
+    refreshCounts();
+    deletedStash = null;
+    $("#toast").classList.remove("show");
+    addJournal("Suppression annulée : la règle est de retour.", "ok");
+  });
+
+  function addJournal(txt, kind) {
+    var list = $("#journal-list");
+    var entry = document.createElement("div");
+    entry.className = "journal-entry";
+    entry.innerHTML = '<span class="je-dot ' + (kind || "") + '"></span><div><time>À l’instant</time>' + esc(txt) + "</div>";
+    list.insertBefore(entry, list.firstChild);
+    var count = $("#journal-count");
+    count.textContent = String(parseInt(count.textContent, 10) + 1);
+  }
+
+  /* ============================================================
+     FILOU · conversation, contexte, scénarios
+     ============================================================ */
+  var convo = $("#convo");
+  var chipsBox = $("#chips");
+  var chatInput = $("#chat-text");
+  var currentCtx = null;
+
+  function bubble(kind, html, who) {
+    var b = document.createElement("div");
+    b.className = "bubble " + kind;
+    b.innerHTML = (who ? '<span class="who">' + who + "</span>" : "") + html;
+    convo.appendChild(b);
+    convo.scrollTop = convo.scrollHeight;
+    return b;
+  }
+
+  function filouSays(html, cb) {
+    if (REDUCED) {
+      bubble("filou", html, "🦊 Filou");
+      if (cb) cb();
+      return;
+    }
+    var b = bubble("filou", '<span class="type-caret"></span>', "🦊 Filou");
+    setTimeout(function () {
+      b.innerHTML = '<span class="who">🦊 Filou</span>' + html;
+      convo.scrollTop = convo.scrollHeight;
+      if (cb) cb();
+    }, 650);
+  }
+
+  function speakGlow() {
+    var dock = $("#filou-dock");
+    dock.classList.add("speaking");
+    setTimeout(function () { dock.classList.remove("speaking"); }, 1600);
+  }
+
+  function setChips(list) {
+    chipsBox.innerHTML = '<span class="chips-label">' + (currentCtx ? "Sur cette règle" : "Essaie un exemple") + "</span>" +
+      list.map(function (c, i) {
+        return '<button type="button" class="chip" data-chip="' + i + '">' + esc(c.label) + "</button>";
+      }).join("");
+    chipsBox._actions = list;
+  }
+  chipsBox.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-chip]");
+    if (!b || !chipsBox._actions) return;
+    var a = chipsBox._actions[parseInt(b.dataset.chip, 10)];
+    if (a && a.run) a.run();
+  });
+
+  var BASE_CHIPS = [
+    { label: "« Victor ne travaille pas le mercredi soir »", run: function () { flowCreate(); } },
+    { label: "« Comment marchent les trois niveaux ? »", run: function () { flowLevels(); } },
+    { label: "« Qu’est-ce qui est défini pour Manon ? »", run: function () { flowManon(); } }
+  ];
+
+  function resetContext() {
+    currentCtx = null;
+    $("#ctx-strip").classList.remove("on");
+    setChips(BASE_CHIPS);
+  }
+  $("#ctx-off").addEventListener("click", function () {
+    resetContext();
+    filouSays("Je me détache de cette règle. Dicte-moi ce que tu veux, je t’écoute.");
+  });
+
+  /* --- Scénario : création d'une règle en français --- */
+  function flowCreate() {
+    bubble("user", "Victor ne travaille pas le mercredi soir", "Anne-Sophie");
+    filouSays("Voici comment je la comprends :" +
+      '<span style="display:block; margin-top:7px; padding:8px 11px; background:var(--surface); border:1px dashed var(--border-strong); border-radius:10px;">' +
+      "<b>Victor n’est jamais de garde le mercredi soir.</b><br>" +
+      '<small style="color:var(--muted)">Portée : Victor · Catégorie : Repos &amp; jours · Niveau proposé : Obligatoire</small></span>' +
+      '<span class="reform-actions"><button type="button" class="btn btn-valider" id="rf-yes">Valider</button>' +
+      '<button type="button" class="btn btn-corriger" id="rf-no">Corriger</button></span>',
+      function () {
+        $("#rf-yes").addEventListener("click", function () {
+          this.classList.add("pressed"); this.textContent = "Validée ✓";
+          var newRule = { id: "victor-mercredi", cat: "repos", famille: "regle", fine: "ferme",
+            text: "Victor n’est jamais de garde le mercredi soir.", portee: "veto", vets: ["Victor"] };
+          if (!findItem(newRule.id)) {
+            RULES.push(newRule);
+            var list = document.getElementById("list-repos");
+            list.insertAdjacentHTML("beforeend", ruleCardHTML(newRule));
+            document.getElementById("card-" + newRule.id).classList.add("fresh");
+          }
+          selectTab("repos");
+          refreshCounts();
+          bubble("note", "Règle enregistrée dans « Repos &amp; jours ». Elle comptera à la prochaine génération.");
+          addJournal("Règle créée : « Victor n’est jamais de garde le mercredi soir. » Validée par Anne-Sophie.", "ok");
+        }, { once: true });
+        $("#rf-no").addEventListener("click", function () {
+          filouSays("Pas de souci, rien n’est enregistré. Reformule ta phrase, je réessaie.");
+        }, { once: true });
+      });
+    speakGlow();
+  }
+
+  /* --- Scénario : Filou renseigne (les niveaux) --- */
+  function flowLevels() {
+    bubble("user", "Comment marchent les trois niveaux ?", "Anne-Sophie");
+    filouSays("Une seule échelle à retenir :" +
+      '<ul class="impact-list">' +
+      '<li><span class="n">1</span><span><b>Obligatoire</b> : jamais enfreinte. Si elle rend le planning impossible, je m’arrête et je t’explique pourquoi.</span></li>' +
+      '<li><span class="n">2</span><span><b>Important</b> : respectée sauf impasse, et toute entorse t’est signalée.</span></li>' +
+      '<li><span class="n">3</span><span><b>Si possible</b> : un simple penchant, suivi quand tout le reste est égal.</span></li>' +
+      "</ul>" +
+      "En dessous, le moteur garde une échelle plus fine (4 niveaux pour les règles, 5 crans pour l’équité) : le lien « réglage fin » de chaque règle te la montre.");
+    speakGlow();
+  }
+
+  /* --- Scénario : tout ce qui concerne Manon --- */
+  function flowManon() {
+    bubble("user", "Qu’est-ce qui est défini pour Manon ?", "Anne-Sophie");
+    filouSays("Trois choses la concernent en propre : son mardi soir libre (obligatoire), l’interdiction de garder avec Victor, et l’équilibrage « junior » qu’elle partage avec Julie et Victor. Le reste des règles d’équipe s’applique à elle comme aux autres. Je t’ouvre la vue complète filtrée sur elle.",
+      function () {
+        setTimeout(function () { openDefini("Manon"); }, REDUCED ? 0 : 500);
+      });
+    speakGlow();
+  }
+
+  /* --- Filou branché sur une règle (bouton par encart) --- */
+  var IMPACTS = {
+    "serie-we": "En « Si possible », <b>Victor pourrait enchaîner 3 week-ends de suite en janvier</b> (semaines 2, 3 et 4 du brouillon actuel), car il est le plus disponible. Deux autres règles interagissent : « un week-end sur trois au plus » resterait le seul garde-fou (Important), et le repos du lundi (Obligatoire) continuerait de s’appliquer. Le reste du planning ne bouge presque pas : 3 attributions changeraient."
+  };
+
+  function askFilou(rule) {
+    currentCtx = rule;
+    $("#ctx-text").textContent = " " + truncate(rule.text || rule.name, 64);
+    $("#ctx-strip").classList.add("on");
+    var dock = $("#filou-dock");
+    if (dock.getBoundingClientRect().top < 0 || window.innerWidth < 1060) {
+      dock.scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "start" });
+    }
+    speakGlow();
+    filouSays("Je suis branché sur : <b>« " + esc(truncate(rule.text || rule.name, 80)) + " »</b>. Tu peux la modifier en français, ou me demander ce qu’un changement provoquerait.");
+    setChips([
+      { label: "Si je la passe en « Si possible », ça change quoi ?", run: function () { flowImpact(rule); } },
+      { label: "Modifier cette règle en français", run: function () { flowModify(rule); } },
+      { label: "Voir tout ce qui touche cette règle", run: function () { flowRelated(rule); } }
+    ]);
+  }
+
+  function flowImpact(rule) {
+    bubble("user", "Si je la passe en « Si possible », ça change quoi ?", "Anne-Sophie");
+    var answer = IMPACTS[rule.id] ||
+      ("En « Si possible », « " + esc(truncate(rule.text || rule.name, 60)) + " » deviendrait une simple préférence : je pourrais l’écarter <b>sans te prévenir</b> dès qu’elle gênerait. Sur le brouillon Hiver 2026, j’ai rejoué le calcul : <b>2 attributions changeraient</b>. Les règles obligatoires qui l’entourent continueraient de s’appliquer.");
+    filouSays(answer + '<br><small style="color:var(--muted)">J’ai vérifié en rejouant la génération, pas en devinant. Rien n’est modifié tant que tu ne bouges pas la réglette.</small>');
+    speakGlow();
+  }
+
+  function flowModify(rule) {
+    if (rule.id === "serie-we") {
+      chatInput.value = "Autorise 3 week-ends de suite, mais seulement sur cette période";
+      chatInput.focus();
+      filouSays("J’ai préparé ta phrase dans le champ ci-dessous : envoie-la telle quelle ou ajuste-la.");
+      return;
+    }
+    chatInput.value = "Passe cette règle en « Important »";
+    chatInput.focus();
+    filouSays("Dis-moi le changement en français. J’ai mis un exemple dans le champ : envoie-le ou écris le tien.");
+  }
+
+  function flowRelated(rule) {
+    bubble("user", "Voir tout ce qui touche cette règle", "Anne-Sophie");
+    var names = rule.vets && rule.vets.length ? rule.vets[0] : null;
+    filouSays(names
+      ? "Je t’ouvre la vue « Tout ce qui est défini », filtrée sur " + esc(names) + " : tu verras cette règle au milieu de tout ce qui la concerne."
+      : "Je t’ouvre la vue « Tout ce qui est défini », filtrée sur le thème de cette règle.",
+      function () {
+        setTimeout(function () {
+          openDefini(names || null, names ? null : rule.cat);
+        }, REDUCED ? 0 : 450);
+      });
+  }
+
+  /* --- Envoi libre : reformulation ou réponse honnête de démo --- */
+  $("#chat-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var txt = chatInput.value.trim();
+    if (!txt) return;
+    chatInput.value = "";
+    bubble("user", esc(txt), "Anne-Sophie");
+
+    /* Cas scénarisé : modification de la règle des week-ends consécutifs */
+    if (currentCtx && currentCtx.id === "serie-we" && /3\s*week/i.test(txt)) {
+      filouSays("Voici comment je comprends ta modification :" +
+        '<span style="display:block; margin-top:7px; padding:8px 11px; background:var(--surface); border:1px dashed var(--border-strong); border-radius:10px;">' +
+        "<b>Jamais plus de 3 week-ends consécutifs pour la même personne.</b><br>" +
+        '<small style="color:var(--muted)">Dérogation limitée à la période Hiver 2026 · Niveau conservé : Important</small></span>' +
+        '<span class="reform-actions"><button type="button" class="btn btn-valider" id="mod-yes">Valider</button>' +
+        '<button type="button" class="btn btn-corriger" id="mod-no">Corriger</button></span>',
+        function () {
+          $("#mod-yes").addEventListener("click", function () {
+            this.classList.add("pressed"); this.textContent = "Validée ✓";
+            var r = findItem("serie-we");
+            r.text = "Jamais plus de 3 week-ends consécutifs pour la même personne.";
+            r.periode = "Hiver 2026";
+            $("#phrase-serie-we").textContent = r.text;
+            renderBadges(r);
+            var card = $("#card-serie-we");
+            card.classList.remove("fresh"); void card.offsetWidth; card.classList.add("fresh");
+            bubble("note", "Règle modifiée. La dérogation tombera d’elle-même à la fin de la période.");
+            addJournal("Règle modifiée : 2 → 3 week-ends consécutifs maxi, sur Hiver 2026 uniquement. Validée par Anne-Sophie.", "ok");
+            toast("Règle mise à jour : badge « Limitée à Hiver 2026 » ajouté.");
+          }, { once: true });
+          $("#mod-no").addEventListener("click", function () {
+            filouSays("Rien n’est enregistré. Reformule, je réessaie.");
+          }, { once: true });
+        });
+      speakGlow();
+      return;
+    }
+
+    /* Cas scénarisé : passage en Important (règle contextualisée) */
+    if (currentCtx && /important/i.test(txt)) {
+      var r2 = currentCtx;
+      filouSays("Je passe « " + esc(truncate(r2.text || r2.name, 56)) + " » en <b>Important</b> : respectée sauf impasse, toute entorse signalée. On y va ?" +
+        '<span class="reform-actions"><button type="button" class="btn btn-valider" id="lvl-yes">Valider</button>' +
+        '<button type="button" class="btn btn-corriger" id="lvl-no">Corriger</button></span>',
+        function () {
+          $("#lvl-yes").addEventListener("click", function () {
+            this.classList.add("pressed"); this.textContent = "Validée ✓";
+            setLevel(r2.id, POS_DEFAULT[r2.famille || "equite"].important);
+          }, { once: true });
+          $("#lvl-no").addEventListener("click", function () {
+            filouSays("D’accord, rien ne bouge.");
+          }, { once: true });
+        });
+      speakGlow();
+      return;
+    }
+
+    /* Question : Filou renseigne */
+    if (/\?\s*$/.test(txt)) {
+      filouSays("(Démo) Dans l’application réelle, je réponds ici en m’appuyant sur le fonctionnement documenté de GuardVeto, et je dis franchement quand je ne sais pas. Essaie « Comment marchent les trois niveaux ? » pour voir un exemple complet.");
+      return;
+    }
+
+    /* Autre texte libre : borne honnête de la maquette */
+    filouSays("(Démo) Dans l’application réelle, je reformule ta phrase en règle précise et tu valides avant tout enregistrement. Pour voir le circuit complet ici, pars d’un exemple ci-dessous ou du bouton « 🦊 Demander à Filou » d’une règle.");
+  });
+
+  /* ============================================================
+     VUE « TOUT CE QUI EST DÉFINI »
+     ============================================================ */
+  var CAT_LABEL = { repos: "Repos & jours", weekends: "Week-ends", charge: "Charge & rythme", duos: "Duos & équipe", prefs: "Préférences", equite: "Équité" };
+  var definiVet = null;   /* null = toute l'équipe */
+  var definiTheme = "all";
+
+  function buildVetFilter() {
+    var box = $("#vet-filter");
+    var html = '<button type="button" class="vf-chip" data-vf="" aria-pressed="true">👥 Toute l’équipe</button>';
+    VETS.forEach(function (v) {
+      html += '<button type="button" class="vf-chip" data-vf="' + esc(v.n) + '" aria-pressed="false">' +
+        '<span class="vdot" style="background:' + v.c + '"></span>' + esc(v.n) + "</button>";
+    });
+    box.innerHTML = html;
+    box.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-vf]");
+      if (!b) return;
+      definiVet = b.dataset.vf || null;
+      $$("#vet-filter .vf-chip").forEach(function (c) { c.setAttribute("aria-pressed", String(c === b)); });
+      renderDefini();
+    });
+  }
+  $("#theme-filter").addEventListener("change", function () {
+    definiTheme = this.value;
+    renderDefini();
+  });
+
+  function definiItems() {
+    var items = [];
+    RULES.forEach(function (r) {
+      items.push({ text: r.text, cat: r.cat, portee: r.portee, vets: r.vets, famille: r.famille,
+        fine: r.fine, periode: r.periode, suspended: r.suspended });
+    });
+    STRUCTURE.forEach(function (s) {
+      items.push({ text: s.text, cat: "weekends", portee: "cabinet", vets: [], famille: s.famille || null,
+        fine: s.fine || null, structure: true, on: s.on });
+    });
+    EQUITY.forEach(function (d) {
+      items.push({ text: d.name + " : équilibrage « " + fineOf("equite", d.fine).label.toLowerCase() + " ».",
+        cat: "equite", portee: "equipe", vets: [], famille: "equite", fine: d.fine });
+    });
+    items.push({ text: "Les week-ends s’équilibrent aussi entre les vétérinaires étiquetés « junior » (Manon, Julie, Victor).",
+      cat: "equite", portee: "equipe", vets: ["Manon", "Julie", "Victor"], famille: "equite", fine: "eq-forte" });
+    items.push({ text: "Les jours fériés s’équilibrent aussi entre les associées (Anne-Sophie, Anne-Catherine).",
+      cat: "equite", portee: "equipe", vets: ["Anne-Sophie", "Anne-Catherine"], famille: "equite", fine: "eq-forte" });
+    items.push({ text: "L’avantage financier suit le rôle « 1er de garde » du week-end.",
+      cat: "equite", portee: "cabinet", vets: [], famille: null, fine: null });
+    return items;
+  }
+
+  function lvlMini(item) {
+    if (!item.famille || !item.fine) return "";
+    var pos = fineOf(item.famille, item.fine).pos;
+    return '<span class="lvl-mini m-' + pos + '">' + POS_LABEL[pos] + "</span>";
+  }
+
+  function renderDefini() {
+    var body = $("#defini-body");
+    var items = definiItems().filter(function (it) {
+      return definiTheme === "all" || it.cat === definiTheme;
+    });
+
+    var html = "";
+    if (definiVet) {
+      var own = items.filter(function (it) { return it.vets.indexOf(definiVet) === 0 && it.portee !== "duo"; });
+      var with_ = items.filter(function (it) { return it.vets.indexOf(definiVet) > -1 && own.indexOf(it) === -1; });
+      var team = items.filter(function (it) { return (it.portee === "equipe" || it.portee === "cabinet") && it.vets.length === 0; });
+      html += definiGroup("Rien que pour " + definiVet, own, "Aucune règle qui ne concerne que " + definiVet + ".");
+      html += definiGroup("Duos, accompagnements et étiquettes", with_, "Aucun duo ni équilibrage d’étiquette ne l’inclut.");
+      html += definiGroup("Et comme tout le monde", team, "");
+    } else {
+      CATS.forEach(function (cat) {
+        if (definiTheme !== "all" && cat.id !== definiTheme) return;
+        var group = items.filter(function (it) { return it.cat === cat.id; });
+        if (group.length) html += definiGroup(cat.emoji + " " + cat.label, group, "");
+      });
+    }
+    body.innerHTML = html || '<p class="defini-empty">Rien ne correspond à ce filtre.</p>';
+  }
+
+  function definiGroup(title, list, emptyMsg) {
+    var html = '<div class="defini-group"><h3>' + title + "</h3>";
+    if (!list.length) {
+      html += emptyMsg ? '<p class="defini-empty">' + esc(emptyMsg) + "</p>" : "";
+      return html + "</div>";
+    }
+    list.forEach(function (it) {
+      var dotColor = it.vets.length === 1 ? vetColor(it.vets[0]) : "var(--border-strong)";
+      html += '<div class="defini-item">' +
+        '<span class="di-dot" style="background:' + dotColor + '"></span>' +
+        '<span class="di-text">' + esc(it.text) +
+        (it.periode ? "<small>📌 Limitée à " + esc(it.periode) + "</small>" : "") +
+        (it.suspended ? "<small>⏸ Suspendue en ce moment</small>" : "") +
+        (it.structure && it.on === false ? "<small>Désactivée</small>" : "") +
+        "</span>" +
+        lvlMini(it) +
+        "</div>";
+    });
+    return html + "</div>";
+  }
+
+  var lastFocusBeforePanel = null;
+  function openDefini(vet, theme) {
+    lastFocusBeforePanel = document.activeElement;
+    definiVet = vet || null;
+    if (theme) { definiTheme = theme; $("#theme-filter").value = theme; }
+    $$("#vet-filter .vf-chip").forEach(function (c) {
+      c.setAttribute("aria-pressed", String((c.dataset.vf || null) === definiVet));
+    });
+    renderDefini();
+    var veil = $("#defini-veil"), panel = $("#defini-panel");
+    veil.hidden = false; panel.hidden = false;
+    requestAnimationFrame(function () { veil.classList.add("open"); panel.classList.add("open"); });
+    $("#defini-close").focus();
+  }
+  function closeDefini() {
+    var veil = $("#defini-veil"), panel = $("#defini-panel");
+    veil.classList.remove("open"); panel.classList.remove("open");
+    setTimeout(function () { veil.hidden = true; panel.hidden = true; }, REDUCED ? 0 : 380);
+    if (lastFocusBeforePanel) lastFocusBeforePanel.focus();
+  }
+  $("#open-defini").addEventListener("click", function () { openDefini(null, null); });
+  $("#defini-close").addEventListener("click", closeDefini);
+  $("#defini-veil").addEventListener("click", closeDefini);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !$("#defini-panel").hidden) closeDefini();
+  });
+
+  /* ============================================================
+     DEEP-LINK #focus : arrivée depuis le diagnostic d'impasse (M1)
+     ============================================================ */
+  function focusRule(id) {
+    var rule = findItem(id) || findItem("serie-we");
+    id = rule.id;
+    selectTab(rule.cat || "weekends");
+    var banner = $("#focus-banner");
+    banner.classList.add("on");
+    var card = document.getElementById("card-" + id);
+    if (!card) return;
+    card.classList.remove("focused"); void card.offsetWidth; card.classList.add("focused");
+    setTimeout(function () {
+      card.scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "center" });
+    }, 60);
+  }
+  $("#focus-close").addEventListener("click", function () {
+    $("#focus-banner").classList.remove("on");
+  });
+  $("#demo-focus").addEventListener("click", function () { focusRule("serie-we"); });
+
+  function handleHash() {
+    var m = location.hash.match(/^#focus(?:=([\w-]+))?$/);
+    if (m) focusRule(m[1] || "serie-we");
+  }
+  window.addEventListener("hashchange", handleHash);
+
+  /* ============================================================
+     INIT
+     ============================================================ */
+  buildTabs();
+  bindActions();
+  bindHoverMap();
+  buildVetFilter();
+  setChips(BASE_CHIPS);
+  refreshCounts();
+  handleHash();
+
+})();
+</script>
+</body>
+</html>

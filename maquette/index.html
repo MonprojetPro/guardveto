@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GuardVeto — Grande maquette (hub)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700;800&family=Noto+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --creme:#faf3e7; --sable:#f3e7d3; --carton:#fffdf8;
+    --renard:#e07a3f; --renard-fonce:#c05f28; --brun:#4a3426;
+    --brun-doux:#7a6353; --vert:#5a8a4f; --ambre:#c98a2d;
+    --ombre:0 10px 30px rgba(74,52,38,.10), 0 2px 8px rgba(74,52,38,.06);
+    --arrondi:22px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Noto Sans',system-ui,sans-serif;background:
+    radial-gradient(1200px 600px at 20% -10%, #ffe9d2 0%, transparent 60%),
+    radial-gradient(1000px 500px at 110% 10%, #f7e3c4 0%, transparent 55%),
+    var(--creme);
+    color:var(--brun);min-height:100vh;padding:48px 24px}
+  h1,h2,h3{font-family:'Figtree',sans-serif}
+  .wrap{max-width:1040px;margin:0 auto}
+  header{display:flex;align-items:center;gap:20px;margin-bottom:14px}
+  header img{width:76px;height:76px;object-fit:contain;filter:drop-shadow(0 4px 10px rgba(74,52,38,.18))}
+  header h1{font-size:2rem;font-weight:800}
+  header p{color:var(--brun-doux)}
+  .note{background:var(--sable);border-radius:14px;padding:12px 18px;font-size:.92rem;color:var(--brun-doux);margin:18px 0 34px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px}
+  a.carte{display:block;background:var(--carton);border-radius:var(--arrondi);padding:26px 26px 22px;
+    box-shadow:var(--ombre);text-decoration:none;color:inherit;border:2px solid transparent;
+    transition:transform .18s ease, border-color .18s ease}
+  a.carte:hover{transform:translateY(-4px);border-color:var(--renard)}
+  .carte .tag{display:inline-block;font-family:'Figtree';font-weight:700;font-size:.78rem;letter-spacing:.06em;
+    color:#fff;background:var(--renard);border-radius:999px;padding:4px 12px;margin-bottom:12px}
+  .carte h2{font-size:1.22rem;margin-bottom:8px}
+  .carte p{font-size:.92rem;color:var(--brun-doux);line-height:1.5}
+  footer{margin-top:44px;text-align:center;font-size:.85rem;color:var(--brun-doux)}
+  @media (prefers-reduced-motion: reduce){a.carte{transition:none}a.carte:hover{transform:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="../fox-1.png" alt="Filou le renard">
+    <div>
+      <h1>GuardVeto — la grande maquette</h1>
+      <p>Ambiance « Terrier chaleureux » · Filou 🦊 · données fictives</p>
+    </div>
+  </header>
+  <div class="note">
+    Chaque tranche est une page navigable autonome. Ouvre-les, clique partout : les scènes clés
+    (garde-fou, crise, création de règle…) sont simulées. La barre en haut de chaque page permet de circuler.
+  </div>
+  <div class="grid">
+    <a class="carte" href="m1-planning.html">
+      <span class="tag">M1</span>
+      <h2>Planning complet</h2>
+      <p>Caractéristiques de période, compteurs extensibles en direct, modale de garde complète, génération &amp; publication portées par Filou, diagnostic d'impasse.</p>
+    </a>
+    <a class="carte" href="m2-regles.html">
+      <span class="tag">M2</span>
+      <h2>Règles du cabinet</h2>
+      <p>Onglets par catégorie, encart par règle (icônes + réglette), bouton « Demander à Filou », vue « tout ce qui est défini », équité et week-ends réunifiés.</p>
+    </a>
+    <a class="carte" href="m3-absences-echanges.html">
+      <span class="tag">M3</span>
+      <h2>Absences &amp; échanges</h2>
+      <p>Congés réunifiés (valider, refuser, conflits), échanges cycle complet, la crise menée par Filou, dépannages et compensations.</p>
+    </a>
+    <a class="carte" href="m4-accueil-equipe-historique-connexions.html">
+      <span class="tag">M4</span>
+      <h2>Accueil &amp; réglages</h2>
+      <p>La roue seule au jour 1 (pop-up par étape), Équipe (fiches, invitations), Historique enrichi (bonus/malus, fêtes, plage libre), Connexions.</p>
+    </a>
+    <a class="carte" href="m5-veto-mobile.html">
+      <span class="tag">M5</span>
+      <h2>Parcours véto (mobile)</h2>
+      <p>L'appli dans la poche de Manon : première connexion en 60 secondes, mes gardes, congés, échanges, compteurs, Filou qui renseigne.</p>
+    </a>
+  </div>
+  <footer>Maquette GuardVeto — MonProjetPro · rien n'est réel, tout est une promesse à tenir 🦊</footer>
+</div>
+</body>
+</html>

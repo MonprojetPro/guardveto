@@ -1,0 +1,2990 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Labo design GuardVeto v2 · Terrier chaleureux · 4 onglets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700;800&family=Noto+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   LABO DESIGN GUARDVETO · v2
+   Ambiance unique : Terrier chaleureux (décision MiKL).
+   3 écrans : Accueil jour 1 / Planning au quotidien / Règles.
+   Les 3 niveaux de présence de Filou :
+     1. pleine lumière (onboarding)  2. d'office (règles)
+     3. dans son terrier (reste de l'app).
+   ============================================================ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --font-display: "Figtree", "Segoe UI Variable Display", "Trebuchet MS", sans-serif;
+  --font-body: "Noto Sans", "Segoe UI", Verdana, sans-serif;
+  /* Couleurs des vétérinaires : le langage visuel de l'équipe. */
+  --vet-anneso:  #3B6FD1;
+  --vet-annecat: #8153C7;
+  --vet-manon:   #B93A72;
+  --vet-victor:  #0B7D6C;
+  --vet-camille: #55700F;
+  --vet-julie:   #A0522D;
+  --vet-thomas:  #4B5D73;
+  --topbar-h: 78px;
+
+  /* ---- Terrier chaleureux ---- */
+  --bg:            #F6EEDF;
+  --bg-deep:       #EFE2CB;
+  --surface:       #FFFCF4;
+  --surface-2:     #F6EBD6;
+  --text:          #3A2A1C;
+  --muted:         #7C6A55;
+  --soft:          #A08D75;
+  --border:        #E6D7BB;
+  --border-strong: #D8C4A1;
+  --accent:        #C7530F;
+  --accent-ink:    #AC4508;
+  --accent-soft:   rgba(224, 122, 47, 0.13);
+  --accent-glow:   rgba(230, 126, 34, 0.28);
+  --ok:            #3E7A2E;
+  --ok-soft:       rgba(90, 150, 60, 0.14);
+  --warn:          #9A6200;
+  --warn-soft:     rgba(196, 138, 20, 0.16);
+  --bubble-filou:  #FBF3E2;
+  --bubble-user:   #EFE0C4;
+  --panel-bg:      #FFFCF4;
+  --grid-we:       rgba(199, 83, 15, 0.07);
+  --r-lg: 26px; --r-md: 18px; --r-sm: 12px;
+  --shadow-card:  0 10px 30px rgba(140, 84, 24, 0.10), 0 2px 6px rgba(140, 84, 24, 0.06);
+  --shadow-panel: 0 24px 60px rgba(120, 70, 18, 0.20), 0 4px 12px rgba(120, 70, 18, 0.10);
+  --topbar-bg: rgba(246, 238, 223, 0.88);
+  --blob1: rgba(242, 158, 74, 0.62); --blob2: rgba(252, 208, 138, 0.58);
+  --blob3: rgba(233, 116, 86, 0.40); --blob4: rgba(255, 238, 205, 0.75);
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  padding-top: var(--topbar-h);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, .display { font-family: var(--font-display); }
+
+button { font-family: var(--font-body); cursor: pointer; }
+button:focus-visible, input:focus-visible, a:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+
+img { display: block; }
+
+/* ============================================================
+   BARRE DU LABO (fixe)
+   ============================================================ */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0;
+  z-index: 100;
+  background: var(--topbar-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px clamp(16px, 4vw, 40px) 10px;
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 10px 22px;
+}
+.lab-brand {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--font-display);
+  font-weight: 700; font-size: 1rem;
+  letter-spacing: 0.01em;
+}
+.lab-brand img { width: 34px; height: 34px; object-fit: contain; }
+.lab-brand small {
+  display: block;
+  font-family: var(--font-body);
+  font-weight: 500; font-size: 0.68rem;
+  color: var(--muted); letter-spacing: 0.10em;
+  text-transform: uppercase;
+}
+.controls { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; margin-left: auto; }
+.control-group { display: flex; align-items: center; gap: 8px; }
+.control-label {
+  font-size: 0.66rem; font-weight: 600; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--soft);
+}
+.seg { display: flex; gap: 4px; background: var(--surface-2); padding: 4px; border-radius: 999px; border: 1px solid var(--border); }
+.seg button {
+  border: none; background: transparent; color: var(--muted);
+  font-size: 0.82rem; font-weight: 600;
+  padding: 7px 14px; border-radius: 999px;
+  min-height: 34px;
+  white-space: nowrap;
+}
+.seg button:hover { color: var(--text); }
+.seg button[aria-pressed="true"] {
+  background: var(--accent); color: #fff;
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+.seg .amb-key {
+  display: inline-block; font-family: var(--font-display); font-weight: 800;
+  margin-right: 6px; opacity: 0.75;
+}
+
+/* ============================================================
+   ÉCRANS
+   ============================================================ */
+.screen { display: none; }
+.screen.active { display: block; animation: screenIn .5s ease both; }
+@keyframes screenIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.shell { max-width: 1180px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 40px); }
+
+.section-head { margin: 56px 0 22px; max-width: 62ch; }
+.section-kicker {
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 8px;
+}
+.section-head h2 { font-size: clamp(1.35rem, 2.4vw, 1.7rem); font-weight: 700; line-height: 1.25; }
+.section-head p { margin-top: 8px; color: var(--muted); font-size: 0.95rem; line-height: 1.6; }
+
+/* ============================================================
+   ÉCRAN 1 · HERO
+   ============================================================ */
+.hero {
+  position: relative;
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
+  overflow: hidden;
+  background: var(--bg-deep);
+  min-height: 360px;
+  display: flex; align-items: center;
+}
+.hero-bg { position: absolute; inset: 0; overflow: hidden; background: var(--bg-deep); }
+.hero-bg .blob {
+  position: absolute; border-radius: 50%;
+  filter: blur(64px);
+  will-change: transform;
+}
+.blob.b1 { width: 46vw; height: 46vw; min-width: 380px; min-height: 380px; top: -34%; left: -8%;
+  background: radial-gradient(circle at 40% 40%, var(--blob1), transparent 66%);
+  animation: drift1 26s ease-in-out infinite alternate; }
+.blob.b2 { width: 38vw; height: 38vw; min-width: 320px; min-height: 320px; top: -12%; right: -6%;
+  background: radial-gradient(circle at 55% 45%, var(--blob2), transparent 66%);
+  animation: drift2 32s ease-in-out infinite alternate; }
+.blob.b3 { width: 34vw; height: 34vw; min-width: 300px; min-height: 300px; bottom: -46%; left: 26%;
+  background: radial-gradient(circle at 50% 50%, var(--blob3), transparent 66%);
+  animation: drift3 38s ease-in-out infinite alternate; }
+.blob.b4 { width: 30vw; height: 30vw; min-width: 260px; min-height: 260px; top: 8%; left: 38%;
+  background: radial-gradient(circle at 50% 50%, var(--blob4), transparent 66%);
+  animation: drift4 22s ease-in-out infinite alternate; }
+@keyframes drift1 { to { transform: translate(9vw, 6vh) scale(1.14); } }
+@keyframes drift2 { to { transform: translate(-7vw, 8vh) scale(0.92); } }
+@keyframes drift3 { to { transform: translate(6vw, -7vh) scale(1.18); } }
+@keyframes drift4 { to { transform: translate(-9vw, 5vh) scale(1.10) rotate(12deg); } }
+.hero-inner {
+  position: relative; z-index: 2;
+  width: 100%;
+  max-width: 1180px; margin: 0 auto;
+  padding: 56px clamp(16px, 4vw, 40px);
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(180px, 0.7fr);
+  gap: 24px; align-items: center;
+}
+.hero-kicker {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--accent-ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 7px 14px; border-radius: 999px;
+  margin-bottom: 18px;
+}
+.hero h1 {
+  font-size: clamp(1.9rem, 4.4vw, 3.1rem);
+  font-weight: 800; line-height: 1.08;
+  letter-spacing: -0.015em;
+  max-width: 15ch;
+}
+.hero p.lede {
+  margin-top: 14px; font-size: clamp(0.95rem, 1.4vw, 1.08rem);
+  color: var(--muted); line-height: 1.65; max-width: 46ch;
+}
+.hero-fox { justify-self: center; position: relative; }
+.hero-fox img {
+  width: clamp(150px, 18vw, 230px); height: auto;
+  filter: drop-shadow(0 18px 30px rgba(0,0,0,0.18));
+  animation: foxFloat 5.5s ease-in-out infinite;
+}
+@keyframes foxFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.hero-fox .fox-tag {
+  position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%);
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.75rem; font-weight: 600;
+  padding: 6px 14px; border-radius: 999px;
+  box-shadow: var(--shadow-card);
+  white-space: nowrap;
+}
+.hero-fox .fox-tag .paw { color: var(--accent-ink); }
+
+/* ============================================================
+   ÉCRAN 1 · SPLIT-VIEW ENTRETIEN
+   ============================================================ */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+  gap: 22px;
+  align-items: stretch;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+}
+/* La fenêtre d'échange « s'allume » quand on l'ouvre depuis l'orbital */
+.card.flash { animation: cardFlash 1.6s ease both; }
+@keyframes cardFlash {
+  0%   { box-shadow: 0 0 0 0 var(--accent-glow), var(--shadow-card); }
+  30%  { box-shadow: 0 0 0 14px transparent, var(--shadow-panel); }
+  100% { box-shadow: var(--shadow-card); }
+}
+.card-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.card-head .avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  overflow: hidden; flex: none;
+  display: flex; align-items: flex-start; justify-content: center;
+}
+.card-head .avatar img { width: 130%; height: auto; margin-top: 2px; }
+.card-head h3 { font-size: 1rem; font-weight: 700; }
+.card-head .sub { font-size: 0.75rem; color: var(--muted); margin-top: 1px; }
+.live-dot {
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 0.72rem; font-weight: 600; color: var(--muted);
+}
+.live-dot::before {
+  content: ""; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--ok);
+  animation: livePulse 2.4s ease-in-out infinite;
+}
+@keyframes livePulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--ok-soft); }
+  50% { box-shadow: 0 0 0 6px var(--ok-soft); }
+}
+
+.convo {
+  padding: 18px 20px;
+  display: flex; flex-direction: column; gap: 12px;
+  min-height: 380px; max-height: 460px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+.bubble {
+  max-width: 88%;
+  padding: 11px 15px;
+  border-radius: var(--r-md);
+  font-size: 0.92rem; line-height: 1.55;
+  animation: bubbleIn .35s ease both;
+}
+@keyframes bubbleIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+.bubble.filou {
+  align-self: flex-start;
+  background: var(--bubble-filou);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+.bubble.user {
+  align-self: flex-end;
+  background: var(--bubble-user);
+  border: 1px solid transparent;
+  border-bottom-right-radius: 4px;
+}
+.bubble .who {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 5px;
+}
+.bubble.user .who { color: var(--muted); justify-content: flex-end; }
+.type-caret {
+  display: inline-block; width: 2px; height: 1em;
+  background: var(--accent-ink);
+  vertical-align: text-bottom; margin-left: 1px;
+  animation: caretBlink .8s steps(1) infinite;
+}
+@keyframes caretBlink { 50% { opacity: 0; } }
+
+.bubble.reformulation {
+  align-self: flex-start;
+  background: var(--accent-soft);
+  border: 1px solid var(--border-strong);
+  max-width: 92%;
+}
+.bubble.reformulation .who { color: var(--accent-ink); }
+.reform-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.btn {
+  border: none; border-radius: 999px;
+  font-size: 0.82rem; font-weight: 600;
+  padding: 8px 16px; min-height: 36px;
+}
+.btn-valider { background: var(--accent); color: #fff; }
+.btn-valider:hover { filter: brightness(1.06); }
+.btn-corriger {
+  background: transparent; color: var(--muted);
+  border: 1px solid var(--border-strong);
+}
+.btn-corriger:hover { color: var(--text); border-color: var(--muted); }
+.btn.pressed {
+  background: var(--ok); color: #fff;
+  transform: scale(0.98);
+}
+.bubble.note {
+  align-self: center;
+  background: var(--ok-soft);
+  border: 1px dashed var(--border-strong);
+  color: var(--ok);
+  font-size: 0.8rem; font-weight: 600;
+  padding: 7px 14px;
+}
+
+/* Fiche du cabinet */
+.fiche { display: flex; flex-direction: column; }
+.fiche-body { padding: 18px 20px 22px; flex: 1; }
+.fiche-progress {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 0.75rem; font-weight: 600; color: var(--muted);
+  margin-bottom: 16px;
+}
+.fiche-progress .bar {
+  flex: 1; height: 6px; border-radius: 999px;
+  background: var(--surface-2); overflow: hidden;
+}
+.fiche-progress .bar i {
+  display: block; height: 100%; width: 0%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width .8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.fiche h4 {
+  font-family: var(--font-display);
+  font-size: 0.82rem; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--soft);
+  margin: 18px 0 10px;
+}
+.fiche h4:first-of-type { margin-top: 0; }
+.vet-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.vet-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 13px 6px 8px;
+  font-size: 0.83rem; font-weight: 600;
+  opacity: 0; transform: translateY(8px) scale(0.92);
+}
+.vet-chip.in {
+  opacity: 1; transform: none;
+  transition: opacity .4s ease, transform .45s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.vet-chip .dot {
+  width: 22px; height: 22px; border-radius: 50%;
+  color: #fff; font-size: 0.62rem; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+  letter-spacing: 0.02em;
+}
+.vet-chip .role { font-size: 0.68rem; font-weight: 500; color: var(--muted); }
+.fiche-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 10px 13px;
+  font-size: 0.86rem; line-height: 1.5;
+  margin-bottom: 8px;
+  opacity: 0; transform: translateY(8px);
+}
+.fiche-row.in {
+  opacity: 1; transform: none;
+  transition: opacity .4s ease, transform .45s ease;
+}
+.fiche-row .ico { flex: none; font-size: 0.95rem; line-height: 1.4; }
+.fiche-row b { font-weight: 700; }
+.fiche-row small { display: block; color: var(--muted); font-size: 0.76rem; margin-top: 2px; }
+.fiche-empty {
+  color: var(--soft); font-size: 0.83rem; font-style: italic;
+  padding: 4px 0;
+}
+.fiche-empty.hide { display: none; }
+
+/* ============================================================
+   ÉCRAN 1 · ORBITE D'INSTALLATION
+   ============================================================ */
+.orbital-collapse {
+  overflow: hidden;
+  max-height: 1400px;
+  transition: max-height .8s cubic-bezier(0.22, 1, 0.36, 1), opacity .6s ease, transform .6s ease;
+}
+.orbital-collapse.gone { max-height: 0; opacity: 0; transform: translateY(-14px); }
+.orbital-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.8fr);
+  gap: 28px; align-items: center;
+}
+.orbital {
+  position: relative;
+  width: min(440px, 88vw);
+  aspect-ratio: 1;
+  margin: 12px auto;
+  --orb-r: min(178px, 36vw);
+}
+.orbit-ring {
+  position: absolute; inset: 0;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: 50%;
+  opacity: 0.8;
+}
+.orbit-ring.inner { inset: 17%; border-style: solid; border-width: 1px; opacity: 0.45; }
+.orbit-center {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 118px; height: 118px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--border-strong);
+  box-shadow: 0 0 0 10px var(--accent-soft), var(--shadow-card);
+  display: flex; align-items: flex-start; justify-content: center;
+  overflow: hidden;
+  z-index: 5;
+}
+.orbit-center img { width: 120%; height: auto; margin-top: 6px; }
+.orbit-center.celebrating img { width: 100%; margin-top: 0; }
+.orbit-center::after {
+  content: "Filou";
+  position: absolute; bottom: 7px; left: 50%; transform: translateX(-50%);
+  font-family: var(--font-display); font-weight: 700; font-size: 0.72rem;
+  background: var(--accent); color: #fff;
+  padding: 2px 10px; border-radius: 999px;
+}
+.rotor {
+  position: absolute; inset: 0;
+  animation: orbitSpin 110s linear infinite;
+}
+@keyframes orbitSpin { to { transform: rotate(360deg); } }
+.node {
+  position: absolute; top: 50%; left: 50%;
+  width: 0; height: 0; border: none; background: none;
+  transform: rotate(var(--a)) translate(var(--orb-r)) rotate(calc(-1 * var(--a)));
+}
+.node-inner {
+  position: absolute; top: 0; left: 0;
+  transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  animation: orbitSpinRev 110s linear infinite;
+  cursor: pointer;
+  width: 128px;
+}
+@keyframes orbitSpinRev { to { transform: translate(-50%, -50%) rotate(-360deg); } }
+.node-dot {
+  width: 52px; height: 52px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-weight: 800; font-size: 1.05rem;
+  background: var(--surface);
+  border: 2px solid var(--border-strong);
+  color: var(--muted);
+  box-shadow: var(--shadow-card);
+  transition: background-color .35s ease, border-color .35s ease, color .35s ease;
+}
+.node-label {
+  font-size: 0.72rem; font-weight: 600; line-height: 1.3;
+  text-align: center; color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 4px 10px; border-radius: 999px;
+  box-shadow: var(--shadow-card);
+  max-width: 128px;
+}
+.node.done .node-dot { background: var(--ok); border-color: var(--ok); color: #fff; }
+.node.done .node-label { color: var(--ok); }
+.node.active .node-dot {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+  animation: nodePulse 2.2s ease-in-out infinite;
+}
+.node.active .node-label { color: var(--accent-ink); border-color: var(--border-strong); font-weight: 700; }
+@keyframes nodePulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  50% { box-shadow: 0 0 0 12px transparent; }
+}
+.node.selected .node-dot { outline: 3px solid var(--accent-ink); outline-offset: 3px; }
+
+/* Étincelles de célébration (sobres, autour du centre) */
+.sparkle {
+  position: absolute; top: 50%; left: 50%;
+  font-size: 1.1rem; color: var(--accent-ink);
+  pointer-events: none; opacity: 0;
+  z-index: 6;
+}
+.orbital.celebrate .sparkle { animation: sparklePop 1.4s ease-out both; }
+@keyframes sparklePop {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+  25%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--sx)), calc(-50% + var(--sy))) scale(1.15); }
+}
+
+.step-detail {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+  padding: 22px 24px;
+}
+.step-detail .step-status {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 5px 12px; border-radius: 999px;
+  margin-bottom: 12px;
+}
+.step-detail .step-status.done   { background: var(--ok-soft); color: var(--ok); }
+.step-detail .step-status.active { background: var(--accent-soft); color: var(--accent-ink); }
+.step-detail .step-status.todo   { background: var(--surface-2); color: var(--soft); }
+.step-detail h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: 8px; }
+.step-detail p { color: var(--muted); font-size: 0.9rem; line-height: 1.65; }
+.step-detail .hint { margin-top: 14px; font-size: 0.78rem; color: var(--soft); }
+.step-detail .open-step {
+  margin-top: 14px;
+  background: var(--accent-soft); color: var(--accent-ink);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  font-size: 0.8rem; font-weight: 700;
+  padding: 8px 16px; min-height: 38px;
+}
+.step-detail .open-step:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* Démo de fin d'onboarding */
+.demo-finish-zone { text-align: center; margin-top: 20px; }
+.demo-finish {
+  background: transparent;
+  border: 1.5px dashed var(--border-strong);
+  color: var(--muted);
+  border-radius: 999px;
+  font-size: 0.8rem; font-weight: 600;
+  padding: 9px 18px; min-height: 40px;
+}
+.demo-finish:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
+
+.dash-preview { display: none; margin-top: 8px; }
+.dash-preview.show { display: block; animation: screenIn .6s ease both; }
+.dash-preview .preview-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+  padding: 26px clamp(16px, 3vw, 32px);
+}
+.preview-top {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
+  margin-bottom: 18px;
+}
+.preview-top .avatar {
+  width: 54px; height: 54px; border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1px solid var(--border-strong);
+  overflow: hidden; flex: none;
+  display: flex; justify-content: center; align-items: flex-start;
+}
+.preview-top .avatar img { width: 120%; height: auto; }
+.preview-top h3 { font-size: 1.2rem; font-weight: 700; }
+.preview-top p { font-size: 0.88rem; color: var(--muted); margin-top: 2px; }
+.preview-strip {
+  display: grid; grid-template-columns: repeat(5, minmax(0,1fr));
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.preview-strip .ps-cell {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 8px 6px;
+  text-align: center;
+}
+.preview-strip .ps-cell.we { background: var(--grid-we); }
+.preview-strip .ps-day {
+  font-family: var(--font-display); font-size: 0.64rem; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft);
+  display: block; margin-bottom: 5px;
+}
+.preview-note { font-size: 0.83rem; color: var(--muted); line-height: 1.6; }
+.preview-note b { color: var(--text); }
+.replay-zone { text-align: center; margin-top: 16px; }
+
+/* ============================================================
+   ÉCRAN 1 · DOCK DE NAVIGATION
+   ============================================================ */
+.dock-stage {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 34px clamp(14px, 3vw, 34px) 26px;
+  text-align: center;
+}
+.dock {
+  position: relative;
+  display: inline-flex; flex-wrap: wrap; justify-content: center;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px;
+  box-shadow: var(--shadow-card);
+}
+.dock-indicator {
+  position: absolute; top: 5px; bottom: 5px;
+  background: var(--accent-soft);
+  border-radius: 999px;
+  transition: left .3s cubic-bezier(0.22, 1, 0.36, 1), width .3s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+.dock button {
+  position: relative; z-index: 1;
+  border: none; background: transparent;
+  color: var(--muted);
+  font-size: 0.86rem; font-weight: 600;
+  padding: 10px 18px; border-radius: 999px;
+  min-height: 42px;
+  white-space: nowrap;
+}
+.dock button:hover { color: var(--text); }
+.dock button[aria-current="true"] { color: var(--accent-ink); font-weight: 700; }
+.dock-caption { margin-top: 16px; font-size: 0.82rem; color: var(--muted); }
+.dock-caption b { color: var(--text); }
+
+/* ============================================================
+   ÉCRAN 2 · PLANNING BROUILLON + TERRIER
+   ============================================================ */
+.workspace {
+  position: relative;
+  margin-top: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  min-height: 640px;
+}
+.work-head {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.work-head h3 { font-size: 1.05rem; font-weight: 700; }
+.work-head .meta { font-size: 0.78rem; color: var(--muted); }
+.badge-brouillon {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--warn-soft); color: var(--warn);
+  border: 1px solid rgba(196, 138, 20, 0.35);
+  font-size: 0.72rem; font-weight: 700;
+  padding: 5px 12px; border-radius: 999px;
+}
+.work-body { padding: 20px 22px 120px; }
+
+.planning-table { width: 100%; border-collapse: separate; border-spacing: 5px; }
+.planning-table th {
+  font-family: var(--font-display);
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--soft);
+  padding: 4px 6px; text-align: center;
+}
+.planning-table th.week-col { text-align: left; width: 96px; }
+.planning-table td {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 7px 6px;
+  text-align: center;
+  vertical-align: middle;
+  min-width: 74px;
+  height: 62px;
+  position: relative;
+}
+.planning-table td.week-cell {
+  background: transparent; border-color: transparent;
+  text-align: left; padding-left: 2px;
+}
+.week-cell b { font-family: var(--font-display); font-size: 0.85rem; display: block; }
+.week-cell small { font-size: 0.68rem; color: var(--muted); }
+.planning-table td.we { background: var(--grid-we); }
+.pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  color: #fff; font-size: 0.68rem; font-weight: 700;
+  padding: 3px 8px; border-radius: 6px;
+  line-height: 1.3;
+  margin: 1.5px 0;
+  border: none;
+}
+.pill .rank { font-weight: 400; opacity: 0.75; }
+.pill.second { opacity: 0.82; }
+button.pill { cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
+button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120, 70, 18, 0.28); }
+.pill-stack { display: flex; flex-direction: column; align-items: center; }
+.pill.warned { box-shadow: 0 0 0 2px var(--warn); }
+.conge-chip {
+  display: inline-block;
+  border: 1.5px dashed var(--border-strong);
+  color: var(--muted);
+  font-size: 0.66rem; font-weight: 600;
+  padding: 3px 8px; border-radius: 6px;
+  background: var(--surface);
+}
+.legend {
+  display: flex; flex-wrap: wrap; gap: 8px 18px;
+  margin-top: 16px;
+  font-size: 0.74rem; color: var(--muted);
+}
+.legend .l-item { display: inline-flex; align-items: center; gap: 6px; }
+.legend .l-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+/* ✓ discret qui s'évapore après un changement cohérent */
+.ok-flash {
+  position: absolute; top: 2px; right: 4px;
+  color: var(--ok); font-size: 0.9rem; font-weight: 700;
+  pointer-events: none;
+  animation: okEvaporate 1.8s ease-out both;
+}
+@keyframes okEvaporate {
+  0%   { opacity: 0; transform: translateY(4px) scale(0.7); }
+  25%  { opacity: 1; transform: none; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-10px) scale(0.9); }
+}
+
+/* Menu contextuel « Changer de vétérinaire » */
+.ctx-menu {
+  position: absolute;
+  z-index: 30;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-panel);
+  padding: 8px;
+  width: 218px;
+  display: none;
+}
+.ctx-menu.open { display: block; animation: ctxIn .22s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes ctxIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+.ctx-menu h5 {
+  font-family: var(--font-display);
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--soft);
+  padding: 5px 10px 7px;
+}
+.ctx-menu ul { list-style: none; max-height: 236px; overflow-y: auto; }
+.ctx-menu li button {
+  display: flex; align-items: center; gap: 9px;
+  width: 100%; text-align: left;
+  border: none; background: transparent;
+  color: var(--text);
+  font-size: 0.85rem; font-weight: 600;
+  padding: 8px 10px; border-radius: var(--r-sm);
+  min-height: 38px;
+}
+.ctx-menu li button:hover { background: var(--accent-soft); }
+.ctx-menu li button .dot {
+  width: 14px; height: 14px; border-radius: 50%; flex: none;
+}
+.ctx-menu li button small { margin-left: auto; font-size: 0.66rem; color: var(--soft); font-weight: 500; }
+
+/* ----- Le terrier de Filou ----- */
+.terrier-zone {
+  position: absolute; right: 18px; bottom: 10px;
+  z-index: 20;
+  display: flex; flex-direction: column; align-items: flex-end;
+}
+.terrier {
+  position: relative;
+  width: 148px; height: 104px;
+  border: none; background: transparent;
+  padding: 0;
+}
+.terrier svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.fox-peek {
+  position: absolute; left: 50%; bottom: 34px;
+  transform: translateX(-50%);
+  width: 58px; height: 34px;
+  overflow: hidden;
+  z-index: 2;
+  transition: transform .3s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.fox-peek img { width: 100%; height: auto; }
+.terrier:hover .fox-peek { transform: translateX(-50%) translateY(-5px); }
+.terrier .t-hint {
+  position: absolute; left: 50%; bottom: -4px; transform: translateX(-50%);
+  font-size: 0.64rem; font-weight: 700; letter-spacing: 0.06em;
+  color: var(--muted); white-space: nowrap;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 999px; padding: 2px 9px;
+  z-index: 4;
+}
+.terrier:hover .t-hint { color: var(--accent-ink); border-color: var(--border-strong); }
+/* Filou sorti : le museau disparaît du trou */
+.workspace.filou-out .fox-peek { transform: translateX(-50%) translateY(40px); }
+.workspace.filou-out .terrier .t-hint { opacity: 0; }
+
+/* Filou qui émerge */
+.fox-out {
+  position: absolute; right: 44px; bottom: 96px;
+  width: 92px; z-index: 21;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(70px) scale(0.4);
+}
+.workspace.filou-out .fox-out {
+  animation: foxOut .6s cubic-bezier(0.34, 1.35, 0.64, 1) both;
+}
+.workspace.filou-in .fox-out {
+  animation: foxIn .4s ease-in both;
+}
+@keyframes foxOut {
+  0%   { opacity: 0; transform: translateY(70px) scale(0.4); }
+  55%  { opacity: 1; transform: translateY(-10px) scale(1.06); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes foxIn {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateY(70px) scale(0.4); }
+}
+.fox-out img { width: 100%; height: auto; filter: drop-shadow(0 10px 18px rgba(120,70,18,0.3)); }
+
+/* Panneau compact de conversation */
+.burrow-panel {
+  position: absolute; right: 14px; bottom: 200px;
+  width: min(372px, calc(100% - 28px));
+  max-height: min(430px, calc(100% - 230px));
+  background: var(--panel-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-panel);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  z-index: 22;
+  opacity: 0; pointer-events: none;
+  transform: translateY(18px) scale(0.94);
+  transform-origin: bottom right;
+  transition: transform .4s cubic-bezier(0.22, 1, 0.36, 1), opacity .3s ease;
+}
+.workspace.filou-out .burrow-panel {
+  opacity: 1; pointer-events: auto; transform: none;
+  transition-delay: .28s;
+}
+.panel-head {
+  display: flex; align-items: center; gap: 11px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex: none;
+}
+.panel-head .avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1px solid var(--border-strong);
+  overflow: hidden; flex: none;
+  display: flex; justify-content: center; align-items: flex-start;
+}
+.panel-head .avatar img { width: 130%; height: auto; margin-top: 2px; }
+.panel-head h3 { font-size: 0.95rem; font-weight: 700; }
+.panel-head .sub { font-size: 0.7rem; color: var(--muted); }
+.panel-reduce {
+  margin-left: auto;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  border-radius: var(--r-sm);
+  width: 36px; height: 36px;
+  font-size: 1rem; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.panel-reduce:hover { color: var(--text); border-color: var(--border-strong); }
+.panel-scroll {
+  flex: 1; overflow-y: auto;
+  padding: 14px 14px 10px;
+  display: flex; flex-direction: column; gap: 10px;
+  min-height: 120px;
+}
+.burrow-panel .bubble { font-size: 0.85rem; max-width: 95%; }
+.aide-steps { margin: 8px 0 2px; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.aide-steps li { display: flex; gap: 8px; align-items: baseline; font-size: 0.82rem; }
+.aide-steps .n {
+  flex: none;
+  font-family: var(--font-display); font-weight: 800; font-size: 0.7rem;
+  color: var(--accent-ink);
+}
+
+/* Bulle garde-fou : Filou sort de lui-même */
+.bubble.gardefou {
+  align-self: stretch; max-width: 100%;
+  background: var(--warn-soft);
+  border: 1px solid rgba(196, 138, 20, 0.4);
+}
+.bubble.gardefou .who { color: var(--warn); }
+.gardefou-fox {
+  float: right; width: 52px; margin: 0 0 6px 8px;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  border: 1px solid rgba(196, 138, 20, 0.4);
+}
+.gardefou-fox img { width: 100%; height: auto; }
+.gf-rule {
+  display: block; margin: 8px 0;
+  background: var(--surface);
+  border: 1px dashed rgba(196, 138, 20, 0.5);
+  border-radius: var(--r-sm);
+  padding: 8px 11px;
+  font-size: 0.8rem; line-height: 1.5;
+}
+.btn-warn-ok { background: var(--accent); color: #fff; }
+.btn-warn-keep {
+  background: transparent; color: var(--warn);
+  border: 1px solid rgba(196, 138, 20, 0.5);
+}
+.btn-warn-keep:hover { background: var(--warn-soft); }
+
+.journal {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  padding: 10px 14px 8px;
+  max-height: 150px; overflow-y: auto;
+  flex: none;
+}
+.journal h4 {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-display);
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--soft);
+  margin-bottom: 8px;
+}
+.journal h4 .count {
+  background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 999px; padding: 1px 8px; font-size: 0.66rem;
+}
+.journal-entry {
+  display: flex; gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--border);
+  font-size: 0.76rem; line-height: 1.5;
+}
+.journal-entry:last-child { border-bottom: none; }
+.journal-entry .je-dot {
+  flex: none; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent); margin-top: 6px;
+}
+.journal-entry .je-dot.ok { background: var(--ok); }
+.journal-entry .je-dot.warn { background: var(--warn); }
+.journal-entry time { display: block; font-size: 0.66rem; color: var(--soft); margin-bottom: 1px; }
+.panel-input {
+  display: flex; gap: 8px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  flex: none;
+}
+.panel-input input {
+  flex: 1;
+  font-family: var(--font-body); font-size: 0.86rem;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 10px 16px;
+  min-height: 44px;
+  min-width: 0;
+}
+.panel-input input::placeholder { color: var(--soft); }
+.panel-input input:focus { border-color: var(--accent); outline: none; }
+.panel-send {
+  border: none; background: var(--accent); color: #fff;
+  border-radius: 999px;
+  min-width: 44px; min-height: 44px;
+  font-size: 1.05rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none;
+}
+.panel-send:hover { filter: brightness(1.07); }
+
+/* ============================================================
+   ÉCRAN 3 · LES RÈGLES DU CABINET
+   ============================================================ */
+.rules-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
+  gap: 22px;
+  align-items: start;
+  margin-bottom: 40px;
+}
+.rules-chat { display: flex; flex-direction: column; overflow: hidden; }
+.chat-fox {
+  display: flex; align-items: center; gap: 16px;
+  padding: 18px 20px;
+  background: linear-gradient(135deg, var(--accent-soft), transparent 70%);
+  border-bottom: 1px solid var(--border);
+}
+.chat-fox .fox-frame {
+  width: 84px; height: 108px; flex: none;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 2px solid var(--border-strong);
+  box-shadow: var(--shadow-card);
+}
+.chat-fox .fox-frame img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.chat-fox h3 { font-size: 1.15rem; font-weight: 700; }
+.chat-fox p { font-size: 0.85rem; color: var(--muted); line-height: 1.55; margin-top: 4px; max-width: 34ch; }
+.rules-chat .convo { min-height: 260px; max-height: 340px; }
+.chips {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding: 4px 20px 12px;
+}
+.chips .chips-label {
+  width: 100%; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--soft);
+}
+.chip {
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  border-radius: 999px;
+  font-size: 0.79rem; font-weight: 600;
+  padding: 8px 14px; min-height: 38px;
+}
+.chip:hover { background: var(--accent-soft); border-color: var(--accent-ink); color: var(--accent-ink); }
+.chip:disabled { opacity: 0.45; cursor: default; }
+
+.rule-proposal {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  margin-top: 9px;
+  font-size: 0.84rem; line-height: 1.55;
+}
+.rule-proposal .rp-label {
+  font-size: 0.64rem; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 5px;
+}
+.rule-proposal .rp-importance {
+  display: inline-block; margin-top: 7px;
+  background: var(--accent-soft); color: var(--accent-ink);
+  font-size: 0.7rem; font-weight: 700;
+  padding: 3px 10px; border-radius: 999px;
+}
+
+/* Liste des règles en phrases */
+.rules-list {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+  padding: 20px 22px 16px;
+}
+.rules-list-head {
+  display: flex; align-items: baseline; gap: 12px;
+  padding-bottom: 14px; margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.rules-list-head h3 { font-size: 1.05rem; font-weight: 700; }
+.rules-list-head .count-rules { font-size: 0.78rem; color: var(--muted); }
+.rule-group h4 {
+  font-family: var(--font-display);
+  font-size: 0.76rem; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--accent-ink);
+  margin: 18px 0 6px;
+  display: flex; align-items: center; gap: 8px;
+}
+.rule-group h4::after {
+  content: ""; flex: 1; height: 1px; background: var(--border);
+}
+.rule-group ul { list-style: none; }
+.rule-item {
+  padding: 10px 4px 9px;
+  border-bottom: 1px dashed var(--border);
+}
+.rule-group ul li:last-child .rule-item,
+.rule-item:last-child { border-bottom: none; }
+.rule-item p { font-size: 0.9rem; line-height: 1.55; }
+.rule-item .rule-meta {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 6px;
+}
+.lvl {
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 10px; border-radius: 999px;
+}
+.lvl-obligatoire { background: var(--accent-soft); color: var(--accent-ink); }
+.lvl-important   { background: var(--warn-soft); color: var(--warn); }
+.lvl-sipossible  { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+.rule-actions { margin-left: auto; display: flex; gap: 4px; }
+.rule-actions button {
+  border: none; background: transparent;
+  color: var(--soft);
+  font-size: 0.72rem; font-weight: 600;
+  padding: 5px 8px; border-radius: 999px;
+  min-height: 30px;
+}
+.rule-actions button:hover { color: var(--accent-ink); background: var(--accent-soft); }
+.rule-item.suspended p { opacity: 0.45; text-decoration: line-through; text-decoration-thickness: 1px; }
+.rule-item.suspended .lvl { opacity: 0.5; }
+.suspended-tag {
+  font-size: 0.66rem; font-weight: 700; color: var(--warn);
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.rule-item.fresh { animation: freshRule 2.2s ease both; border-radius: var(--r-sm); }
+@keyframes freshRule {
+  0%   { background: var(--accent-soft); }
+  100% { background: transparent; }
+}
+.advanced-link {
+  display: inline-block;
+  margin-top: 18px;
+  font-size: 0.78rem; color: var(--soft);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.advanced-link:hover { color: var(--accent-ink); }
+
+/* ============================================================
+   ÉCRAN 2 · VOLET COMPTEURS (mis à jour en direct)
+   ============================================================ */
+.head-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+.head-btn {
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2); color: var(--muted);
+  border-radius: 999px; font-size: 0.78rem; font-weight: 700;
+  padding: 8px 14px; min-height: 38px;
+}
+.head-btn:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
+.head-btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-ink); }
+.head-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.head-btn.primary:hover { filter: brightness(1.07); color: #fff; }
+
+.work-grid { display: grid; grid-template-columns: minmax(0, 1fr) 246px; gap: 20px; align-items: start; }
+.workspace.counters-closed .work-grid { grid-template-columns: 1fr; }
+.workspace.counters-closed .counters-panel { display: none; }
+.counters-panel {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 14px 14px 12px;
+  animation: screenIn .35s ease both;
+}
+.cnt-head h4 { font-family: var(--font-display); font-size: 0.84rem; font-weight: 700; }
+.cnt-head p { font-size: 0.72rem; color: var(--muted); margin: 3px 0 10px; line-height: 1.45; }
+.cnt-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) 38px 34px 40px;
+  align-items: center; gap: 4px;
+  padding: 6px 2px;
+  border-bottom: 1px dashed var(--border);
+}
+.cnt-row:last-child { border-bottom: none; }
+.cnt-row.cnt-header { border-bottom: 1px solid var(--border-strong); padding-bottom: 4px; }
+.cnt-row.cnt-header span {
+  font-family: var(--font-display); font-size: 0.6rem; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--soft);
+  text-align: center;
+}
+.cnt-vet { display: inline-flex; align-items: center; gap: 7px; font-size: 0.8rem; font-weight: 600; min-width: 0; }
+.cnt-vet i { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+.cnt-num {
+  position: relative;
+  text-align: center;
+  font-family: var(--font-display); font-weight: 700; font-size: 0.92rem;
+}
+.cnt-num.zero { color: var(--soft); font-weight: 500; }
+.cnt-num.bump-up { animation: bumpUp .8s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+.cnt-num.bump-down { animation: bumpDown .8s ease both; }
+@keyframes bumpUp { 30% { transform: scale(1.5); color: var(--ok); } }
+@keyframes bumpDown { 30% { transform: scale(0.7); color: var(--warn); } }
+.cnt-delta {
+  position: absolute; left: 50%; top: -13px;
+  transform: translateX(-50%);
+  font-style: normal; font-size: 0.62rem; font-weight: 800;
+  pointer-events: none;
+  animation: deltaUp 1.4s ease-out both;
+}
+.cnt-delta.plus { color: var(--ok); }
+.cnt-delta.minus { color: var(--warn); }
+@keyframes deltaUp {
+  0%   { opacity: 0; }
+  25%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-9px); }
+}
+.cnt-foot { margin-top: 10px; font-size: 0.68rem; color: var(--soft); line-height: 1.5; }
+
+/* ============================================================
+   ÉCRAN 2 · MODAL RÉCAP AVANT GÉNÉRATION
+   ============================================================ */
+.modal-veil {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(58, 42, 28, 0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 18px;
+  opacity: 0;
+  transition: opacity .25s ease;
+}
+.modal-veil[hidden] { display: none; }
+.modal-veil.open { opacity: 1; }
+.recap-modal {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-panel);
+  width: min(580px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 22px 24px 20px;
+  transform: translateY(14px) scale(0.97);
+  transition: transform .3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.modal-veil.open .recap-modal { transform: none; }
+.recap-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+.recap-head h3 { font-size: 1.15rem; font-weight: 700; line-height: 1.3; margin-top: 2px; }
+.recap-head .panel-reduce { margin-left: auto; flex: none; }
+.recap-list { list-style: none; margin-bottom: 14px; }
+.recap-list li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px;
+  padding: 10px 2px;
+  border-bottom: 1px dashed var(--border);
+  font-size: 0.9rem; line-height: 1.5;
+}
+.recap-list li:last-child { border-bottom: none; }
+.recap-list b { font-family: var(--font-display); }
+.recap-edit {
+  margin-left: auto;
+  border: none; background: transparent;
+  color: var(--soft);
+  font-size: 0.74rem; font-weight: 600;
+  text-decoration: underline dotted; text-underline-offset: 3px;
+  padding: 4px 6px; min-height: 30px;
+}
+.recap-edit:hover { color: var(--accent-ink); }
+.recap-seg {
+  margin-left: auto;
+  display: inline-flex; gap: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px; padding: 3px;
+}
+.recap-seg button {
+  border: none; background: transparent; color: var(--muted);
+  font-size: 0.78rem; font-weight: 700;
+  padding: 4px 13px; border-radius: 999px; min-height: 28px;
+}
+.recap-seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.recap-prev {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+.recap-prev h4 {
+  font-family: var(--font-display);
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 6px;
+}
+.recap-prev p { font-size: 0.84rem; line-height: 1.6; }
+.recap-hint-msg {
+  font-size: 0.78rem; color: var(--muted); font-style: italic;
+  margin-bottom: 12px;
+  animation: bubbleIn .3s ease both;
+}
+.recap-foot { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+
+/* ============================================================
+   ÉCRAN 4 · HISTORIQUE (consultation pure)
+   ============================================================ */
+.periods-card, .cumul-card { margin-bottom: 26px; }
+.periods-list { list-style: none; }
+.periods-list li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+  padding: 13px 20px;
+  border-bottom: 1px dashed var(--border);
+}
+.periods-list li:last-child { border-bottom: none; }
+.period-name { flex: 1; min-width: 220px; }
+.period-name b { font-family: var(--font-display); font-size: 0.98rem; display: block; }
+.period-name small { font-size: 0.76rem; color: var(--muted); }
+.status {
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 4px 11px; border-radius: 999px;
+}
+.st-brouillon { background: var(--warn-soft); color: var(--warn); }
+.st-publiee { background: var(--ok-soft); color: var(--ok); }
+.st-archivee { background: var(--surface-2); color: var(--soft); border: 1px solid var(--border); }
+.period-view {
+  border: 1px solid var(--border-strong);
+  background: transparent; color: var(--muted);
+  border-radius: 999px;
+  font-size: 0.76rem; font-weight: 600;
+  padding: 7px 14px; min-height: 36px;
+}
+.period-view:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
+.ro-note { font-size: 0.7rem; color: var(--soft); font-style: italic; animation: bubbleIn .3s ease both; }
+.cumul-body { padding: 16px 20px 6px; }
+.cm-row {
+  display: grid;
+  grid-template-columns: 108px repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--border);
+}
+.cm-row:last-child { border-bottom: none; }
+.cm-row.cm-header { border-bottom: 1px solid var(--border-strong); padding-bottom: 5px; }
+.cm-row.cm-header span {
+  font-family: var(--font-display); font-size: 0.62rem; font-weight: 700;
+  letter-spacing: 0.07em; text-transform: uppercase; color: var(--soft);
+}
+.cm-vet { display: inline-flex; align-items: center; gap: 7px; font-size: 0.82rem; font-weight: 600; }
+.cm-vet i { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+.cm-cell { display: flex; align-items: center; gap: 8px; }
+.cm-cell b { font-family: var(--font-display); font-size: 0.88rem; min-width: 22px; text-align: right; }
+.cm-cell .bar { flex: 1; height: 6px; border-radius: 999px; background: var(--bg-deep); overflow: hidden; }
+.cm-cell .bar i { display: block; height: 100%; border-radius: 999px; opacity: 0.8; }
+.lookback-note {
+  margin: 14px 20px 18px;
+  background: var(--ok-soft);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 10px 14px;
+  font-size: 0.82rem; line-height: 1.55;
+}
+
+/* ============================================================
+   PIED DE PAGE DU LABO
+   ============================================================ */
+.footer-lab {
+  margin-top: 72px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  padding: 20px clamp(16px, 4vw, 40px);
+  display: flex; flex-wrap: wrap; gap: 6px 24px;
+  align-items: center; justify-content: space-between;
+  font-size: 0.78rem; color: var(--muted);
+}
+.footer-lab b { color: var(--text); font-weight: 600; }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 980px) {
+  :root { --topbar-h: 118px; }
+  .hero-inner { grid-template-columns: 1fr; text-align: left; }
+  .hero-fox { display: none; }
+  .split { grid-template-columns: 1fr; }
+  .orbital-wrap { grid-template-columns: 1fr; }
+  .rules-layout { grid-template-columns: 1fr; }
+  .burrow-panel { bottom: 190px; }
+  .work-grid { grid-template-columns: 1fr; }
+  .cm-row { grid-template-columns: 92px repeat(3, minmax(0, 1fr)); gap: 8px; }
+}
+@media (max-width: 640px) {
+  .orbital { --orb-r: 34vw; }
+  .node-inner { width: 96px; }
+  .node-label { max-width: 96px; font-size: 0.64rem; }
+  .planning-table { display: block; overflow-x: auto; }
+  .preview-strip { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+
+/* ============================================================
+   ACCESSIBILITÉ · prefers-reduced-motion
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .rotor, .node-inner, .hero-fox img, .live-dot::before,
+  .node.active .node-dot, .hero-bg .blob, .sparkle { animation: none !important; }
+  .screen.active, .card.flash, .rule-item.fresh, .ok-flash, .ctx-menu.open { animation: none; }
+  .cnt-num.bump-up, .cnt-num.bump-down, .cnt-delta, .counters-panel { animation: none !important; }
+  .bubble { animation-duration: 0.01ms; }
+  .fox-peek, .burrow-panel, .modal-veil, .recap-modal { transition: none; }
+  .workspace.filou-out .fox-out { animation: none; opacity: 1; transform: none; }
+  .workspace.filou-in .fox-out { animation: none; opacity: 0; }
+  * { scroll-behavior: auto !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===================== BARRE DU LABO ===================== -->
+<header class="topbar">
+  <div class="lab-brand">
+    <img src="fox-1.png" alt="Filou, le renard assistant de GuardVeto">
+    <span>
+      GuardVeto
+      <small>Labo design v2 · Terrier chaleureux</small>
+    </span>
+  </div>
+  <div class="controls">
+    <div class="control-group">
+      <span class="control-label">Écran</span>
+      <div class="seg" role="group" aria-label="Choix de l'écran échantillon">
+        <button type="button" data-screen="1" aria-pressed="true"><span class="amb-key">1</span>Accueil jour 1</button>
+        <button type="button" data-screen="2" aria-pressed="false"><span class="amb-key">2</span>Planning au quotidien</button>
+        <button type="button" data-screen="3" aria-pressed="false"><span class="amb-key">3</span>Règles du cabinet</button>
+        <button type="button" data-screen="4" aria-pressed="false"><span class="amb-key">4</span>Historique</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ===================== ÉCRAN 1 · ACCUEIL JOUR 1 ===================== -->
+<main id="screen-1" class="screen active" aria-label="Écran 1 : accueil jour 1, Filou en pleine lumière">
+
+  <section class="hero">
+    <div class="hero-bg" aria-hidden="true">
+      <div class="blob b1"></div>
+      <div class="blob b2"></div>
+      <div class="blob b3"></div>
+      <div class="blob b4"></div>
+    </div>
+    <div class="hero-inner">
+      <div>
+        <span class="hero-kicker">Jour 1 · Ton cabinet vient d'arriver</span>
+        <h1>Bienvenue, Cabinet des Quatre Pattes.</h1>
+        <p class="lede">Filou t'accompagne : quatre étapes, une dizaine de minutes, et ton premier planning de gardes est prêt. Tu parles, il configure, tu valides.</p>
+      </div>
+      <div class="hero-fox">
+        <img src="fox-1.png" alt="Filou, le renard vétérinaire, fait un geste de bienvenue">
+        <span class="fox-tag"><span class="paw">🦊</span> Filou · ton assistant</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="shell">
+
+    <!-- Split-view : entretien d'arrivée -->
+    <div class="section-head">
+      <p class="section-kicker">L'entretien d'arrivée</p>
+      <h2>Tu parles à gauche, ta fiche se construit à droite.</h2>
+      <p>Séquence simulée en boucle : Filou pose ses questions, reformule, et chaque validation remplit la fiche du cabinet sous tes yeux. Rien ne s'applique sans ton accord.</p>
+    </div>
+
+    <div class="split">
+      <!-- Conversation -->
+      <div class="card" id="convo-card">
+        <div class="card-head">
+          <span class="avatar"><img src="fox-1.png" alt=""></span>
+          <div>
+            <h3>Entretien avec Filou</h3>
+            <p class="sub">Il reformule, tu valides. Toujours.</p>
+          </div>
+          <span class="live-dot">Démo en boucle</span>
+        </div>
+        <div class="convo" id="convo" aria-live="polite"></div>
+      </div>
+
+      <!-- Fiche du cabinet -->
+      <div class="card fiche">
+        <div class="card-head">
+          <div>
+            <h3>Fiche du cabinet</h3>
+            <p class="sub">Se remplit pendant que vous parlez</p>
+          </div>
+        </div>
+        <div class="fiche-body">
+          <div class="fiche-progress">
+            <span id="fiche-pct">Fiche complétée : 0 / 4</span>
+            <span class="bar"><i id="fiche-bar"></i></span>
+          </div>
+          <h4>Équipe</h4>
+          <p class="fiche-empty" id="vets-empty">En attente de l'entretien…</p>
+          <div class="vet-grid" id="vet-grid"></div>
+          <h4>Habitudes de garde</h4>
+          <p class="fiche-empty" id="habits-empty">Filou n'a pas encore posé la question.</p>
+          <div id="habits"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Orbite d'installation -->
+    <div class="section-head">
+      <p class="section-kicker">Ton parcours d'installation</p>
+      <h2>Quatre étapes en orbite autour de Filou.</h2>
+      <p>La checklist du jour 1, visible tant qu'elle n'est pas finie. Clique sur une étape : la fenêtre d'échange s'ouvre et Filou démarre l'entretien de cette étape.</p>
+    </div>
+
+    <div class="orbital-collapse" id="orbital-collapse">
+      <div class="orbital-wrap">
+        <div class="orbital" id="orbital" role="group" aria-label="Parcours d'installation en quatre étapes">
+          <div class="orbit-ring"></div>
+          <div class="orbit-ring inner"></div>
+          <div class="orbit-center" id="orbit-center"><img src="fox-1.png" alt="Filou au centre du parcours" id="orbit-center-img"></div>
+          <span class="sparkle" style="--sx:-92px; --sy:-64px; animation-delay:.05s">✦</span>
+          <span class="sparkle" style="--sx:88px; --sy:-72px; animation-delay:.2s">✦</span>
+          <span class="sparkle" style="--sx:-70px; --sy:66px; animation-delay:.35s">✧</span>
+          <span class="sparkle" style="--sx:96px; --sy:52px; animation-delay:.5s">✦</span>
+          <span class="sparkle" style="--sx:0px; --sy:-104px; animation-delay:.65s">✧</span>
+          <div class="rotor">
+            <button type="button" class="node done" style="--a: -90deg" data-step="0">
+              <span class="node-inner">
+                <span class="node-dot" aria-hidden="true">✓</span>
+                <span class="node-label">Ton équipe</span>
+              </span>
+            </button>
+            <button type="button" class="node active selected" style="--a: 0deg" data-step="1">
+              <span class="node-inner">
+                <span class="node-dot" aria-hidden="true">2</span>
+                <span class="node-label">Vos habitudes de garde</span>
+              </span>
+            </button>
+            <button type="button" class="node" style="--a: 90deg" data-step="2">
+              <span class="node-inner">
+                <span class="node-dot" aria-hidden="true">3</span>
+                <span class="node-label">Générer ton premier planning</span>
+              </span>
+            </button>
+            <button type="button" class="node" style="--a: 180deg" data-step="3">
+              <span class="node-inner">
+                <span class="node-dot" aria-hidden="true">4</span>
+                <span class="node-label">Inviter les vétos</span>
+              </span>
+            </button>
+          </div>
+        </div>
+        <aside class="step-detail" id="step-detail" aria-live="polite">
+          <span class="step-status active" id="sd-status">En cours</span>
+          <h3 id="sd-title">Vos habitudes de garde</h3>
+          <p id="sd-desc">Raconte à Filou comment vous tournez : qui prend les nuits de semaine, comment se passe le week-end. Il traduit en règles claires et te les relit avant d'enregistrer.</p>
+          <p class="hint" id="sd-hint">Étape 2 sur 4 · environ 3 minutes</p>
+          <button type="button" class="open-step" id="open-step">Ouvrir cette étape avec Filou 🦊</button>
+        </aside>
+      </div>
+      <div class="demo-finish-zone">
+        <button type="button" class="demo-finish" id="demo-finish">▶ Démo : simuler la fin de l'onboarding</button>
+      </div>
+    </div>
+
+    <!-- Après l'onboarding : l'orbital s'efface, place au tableau de bord -->
+    <div class="dash-preview" id="dash-preview" aria-live="polite">
+      <div class="preview-card">
+        <div class="preview-top">
+          <span class="avatar"><img src="fox-5.png" alt="Filou émerveillé, un papillon lumineux au-dessus de la main"></span>
+          <div>
+            <h3>Installation terminée. Bravo !</h3>
+            <p>L'orbite a disparu : elle ne sert plus à rien. Place au vrai tableau de bord, sobre et quotidien.</p>
+          </div>
+        </div>
+        <div class="preview-strip" aria-label="Aperçu de la semaine en cours">
+          <div class="ps-cell"><span class="ps-day">Lun</span><span class="pill" style="background: var(--vet-manon)">Manon</span></div>
+          <div class="ps-cell"><span class="ps-day">Mar</span><span class="pill" style="background: var(--vet-victor)">Victor</span></div>
+          <div class="ps-cell"><span class="ps-day">Mer</span><span class="pill" style="background: var(--vet-camille)">Camille</span></div>
+          <div class="ps-cell"><span class="ps-day">Jeu</span><span class="pill" style="background: var(--vet-julie)">Julie</span></div>
+          <div class="ps-cell we"><span class="ps-day">Week-end</span><span class="pill" style="background: var(--vet-thomas)">Thomas <span class="rank">1</span></span></div>
+        </div>
+        <p class="preview-note">À partir de maintenant, Filou vit dans son <b>terrier</b>, en bas à droite de chaque écran (voir l'écran 2). Il ne prend plus le devant de la scène, sauf pour te protéger d'une erreur.</p>
+        <div class="replay-zone">
+          <button type="button" class="demo-finish" id="demo-replay">↺ Rejouer l'installation</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dock de navigation -->
+    <div class="section-head">
+      <p class="section-kicker">La navigation, regroupée</p>
+      <h2>Cinq portes. Pas onze.</h2>
+      <p>Le menu reste volontairement ennuyeux et rassurant : on sait toujours où l'on est, on ne se perd jamais.</p>
+    </div>
+
+    <div class="dock-stage">
+      <nav class="dock" id="dock" aria-label="Navigation principale (aperçu)">
+        <span class="dock-indicator" id="dock-indicator"></span>
+        <button type="button" aria-current="true">Planning</button>
+        <button type="button" aria-current="false">Absences &amp; échanges</button>
+        <button type="button" aria-current="false">Équipe</button>
+        <button type="button" aria-current="false">Règles du cabinet</button>
+        <button type="button" aria-current="false">Réglages</button>
+      </nav>
+      <p class="dock-caption">Survole, clique : l'indicateur glisse, rien ne surprend. <b>Le spectaculaire est réservé à Filou, jamais au menu.</b></p>
+    </div>
+
+  </div>
+</main>
+
+<!-- ===================== ÉCRAN 2 · PLANNING AU QUOTIDIEN ===================== -->
+<main id="screen-2" class="screen" aria-label="Écran 2 : le planning au quotidien, Filou dans son terrier">
+  <div class="shell">
+
+    <div class="section-head">
+      <p class="section-kicker">Au quotidien · niveau 3 de Filou</p>
+      <h2>Le planning reste ton territoire. Filou vit dans son terrier.</h2>
+      <p>Brouillon sobre, modifiable à la main comme avant : clique sur une garde pour changer de vétérinaire, sans passer par Filou. Il ne sort de son terrier que si tu l'appelles, ou si un changement enfreint une règle. Essaie : mets <b>Victor</b> sur le week-end du 24 janvier. Et garde un œil sur les <b>compteurs</b>, à droite : ils bougent en direct, à chaque changement.</p>
+    </div>
+
+    <div class="workspace" id="workspace">
+      <div class="work-head">
+        <h3>Planning des gardes</h3>
+        <span class="meta">Hiver 2026 · semaines 2 à 5</span>
+        <span class="badge-brouillon">● Brouillon · non publié</span>
+        <div class="head-actions">
+          <button type="button" class="head-btn" id="counters-toggle" aria-pressed="true" aria-controls="counters-panel">Compteurs</button>
+          <button type="button" class="head-btn primary" id="new-period">+ Nouvelle période</button>
+        </div>
+      </div>
+      <div class="work-body">
+        <div class="work-grid">
+        <div class="work-main">
+        <table class="planning-table" id="planning-table">
+          <thead>
+            <tr>
+              <th class="week-col">Semaine</th>
+              <th>Lun</th><th>Mar</th><th>Mer</th><th>Jeu</th>
+              <th>Week-end · ven soir → dim</th>
+            </tr>
+          </thead>
+          <tbody id="planning-body"><!-- rempli par le JS --></tbody>
+        </table>
+        <div class="legend">
+          <span class="l-item"><span class="l-dot" style="background: var(--grid-we); border: 1px solid var(--border-strong);"></span> Bloc week-end en binôme (1er et 2nd de garde)</span>
+          <span class="l-item"><span class="l-dot" style="border: 1.5px dashed var(--border-strong);"></span> Congé validé</span>
+          <span class="l-item">Anne-Cat : dernier recours, pas de garde cette période</span>
+        </div>
+        </div>
+        <aside class="counters-panel" id="counters-panel" aria-label="Compteurs de la période">
+          <div class="cnt-head">
+            <h4>Compteurs · période</h4>
+            <p>Ils racontent la même histoire que Filou, et bougent avec tes changements.</p>
+          </div>
+          <div id="cnt-grid"><!-- rempli par le JS --></div>
+          <p class="cnt-foot">« 1er WE » = 1er de garde du week-end (avantage financier), suivi à part.</p>
+        </aside>
+        </div>
+      </div>
+
+      <!-- Menu contextuel « Changer de vétérinaire » -->
+      <div class="ctx-menu" id="ctx-menu" role="menu" aria-label="Changer de vétérinaire">
+        <h5 id="ctx-title">Changer de vétérinaire</h5>
+        <ul id="ctx-list"></ul>
+      </div>
+
+      <!-- Filou qui émerge du terrier -->
+      <div class="fox-out" id="fox-out" aria-hidden="true"><img src="fox-1.png" alt=""></div>
+
+      <!-- Panneau compact de conversation -->
+      <aside class="burrow-panel" id="burrow-panel" aria-label="Panneau de conversation avec Filou">
+        <div class="panel-head">
+          <span class="avatar"><img src="fox-1.png" alt="Avatar de Filou"></span>
+          <div>
+            <h3>Filou</h3>
+            <p class="sub">Sorti du terrier · il crée, explique, renseigne</p>
+          </div>
+          <button type="button" class="panel-reduce" id="panel-reduce" aria-label="Renvoyer Filou dans son terrier" title="Refermer">—</button>
+        </div>
+        <div class="panel-scroll" id="panel-scroll">
+          <div class="bubble filou">
+            <span class="who">🦊 Filou</span>
+            Tu m'as appelé ? Je surveille ton brouillon depuis mon terrier : pose-moi une question ou continue tes changements, je veille.
+          </div>
+        </div>
+        <div class="journal" aria-label="Journal des actions de Filou">
+          <h4>Journal de Filou <span class="count" id="journal-count">2</span></h4>
+          <div id="journal-list">
+            <div class="journal-entry">
+              <span class="je-dot"></span>
+              <div><time>Aujourd'hui · 09:12</time>Brouillon généré : 12 semaines, 9 règles respectées, équité à 1 garde près.</div>
+            </div>
+            <div class="journal-entry">
+              <span class="je-dot ok"></span>
+              <div><time>Hier · 18:04</time>Règle créée : pas plus de 2 week-ends consécutifs. Validée par Anne-Sophie.</div>
+            </div>
+          </div>
+        </div>
+        <form class="panel-input" id="panel-form">
+          <input type="text" id="panel-text" placeholder="Ex. : comment je pose un congé ?" aria-label="Écrire un message à Filou" autocomplete="off">
+          <button type="submit" class="panel-send" aria-label="Envoyer le message">➤</button>
+        </form>
+      </aside>
+
+      <!-- Le terrier, toujours au même coin -->
+      <div class="terrier-zone">
+        <button type="button" class="terrier" id="terrier" aria-label="Appeler Filou (il sort de son terrier)">
+          <svg viewBox="0 0 148 104" aria-hidden="true">
+            <!-- monticule arrière -->
+            <path d="M10 96 C 16 52, 44 34, 74 32 C 104 34, 132 52, 138 96 Z" fill="#E4CFA6"/>
+            <path d="M18 96 C 24 58, 48 42, 74 40 C 100 42, 124 58, 130 96 Z" fill="#D9BE8C"/>
+            <!-- entrée du terrier -->
+            <ellipse cx="74" cy="66" rx="30" ry="21" fill="#4A3520"/>
+            <ellipse cx="74" cy="68" rx="24" ry="16" fill="#31210F"/>
+          </svg>
+          <span class="fox-peek" aria-hidden="true"><img src="fox-1.png" alt=""></span>
+          <svg viewBox="0 0 148 104" aria-hidden="true" style="z-index:3; pointer-events:none;">
+            <!-- lèvre avant qui masque le bas du museau -->
+            <path d="M40 78 Q 74 92 108 78 L 112 96 Q 74 104 36 96 Z" fill="#C9AA72"/>
+            <!-- touffes d'herbe -->
+            <path d="M30 62 q -2 -10 2 -14 q 1 8 4 11 q 0 -9 5 -12 q -1 9 1 13 Z" fill="#7A8A3A"/>
+            <path d="M112 58 q 3 -9 0 -14 q -3 7 -6 9 q 1 -8 -3 -12 q 0 9 -2 13 Z" fill="#7A8A3A"/>
+            <path d="M120 82 q 4 -7 2 -12 q -4 5 -7 6 q 2 -6 -1 -10 q -2 7 -4 11 Z" fill="#8B9B47"/>
+          </svg>
+          <span class="t-hint">Filou 🦊</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Récap avant génération (nouvelle période) -->
+    <div class="modal-veil" id="recap-veil" role="dialog" aria-modal="true" aria-labelledby="recap-title" hidden>
+      <div class="recap-modal">
+        <div class="recap-head">
+          <div>
+            <p class="section-kicker">Nouvelle période · récap avant génération</p>
+            <h3 id="recap-title">Été 2026 · 17 semaines · 2 février → 28 juin</h3>
+          </div>
+          <button type="button" class="panel-reduce" id="recap-close" aria-label="Fermer le récapitulatif">✕</button>
+        </div>
+        <ul class="recap-list">
+          <li><b>12</b>&nbsp;règles fermes, respectées à la lettre <button type="button" class="recap-edit">modifier</button></li>
+          <li><b>8</b>&nbsp;préférences guident l'équilibre <button type="button" class="recap-edit">modifier</button></li>
+          <li>Effectif par nuit de semaine
+            <span class="recap-seg" role="group" aria-label="Vétérinaires par nuit de semaine">
+              <button type="button" data-eff="1" aria-pressed="false">1</button>
+              <button type="button" data-eff="2" aria-pressed="true">2</button>
+            </span>
+          </li>
+          <li>Profil <b>Été</b> · horaires étendus, congés scolaires intégrés <button type="button" class="recap-edit">modifier</button></li>
+        </ul>
+        <div class="recap-prev">
+          <h4>Compteurs prévisionnels</h4>
+          <p>Sur 17 semaines : <b>≈ 11 nuits</b> et <b>5 à 6 week-ends</b> par vétérinaire, à 1 près. Lookback : <b>Camille</b> sera prioritaire pour un 1er de week-end de plus (elle en a un de retard, voir l'Historique).</p>
+        </div>
+        <p class="recap-hint-msg" id="recap-hint" hidden>Chaque « modifier » ouvre le réglage fin dans la vraie application. Jamais obligatoire : les valeurs proposées par Filou suffisent.</p>
+        <div class="recap-foot">
+          <button type="button" class="btn btn-corriger" id="recap-cancel">Plus tard</button>
+          <button type="button" class="btn btn-valider" id="recap-generate">Générer le planning</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- ===================== ÉCRAN 3 · LES RÈGLES DU CABINET ===================== -->
+<main id="screen-3" class="screen" aria-label="Écran 3 : les règles du cabinet, Filou au premier plan">
+  <div class="shell">
+
+    <div class="section-head">
+      <p class="section-kicker">Les règles du cabinet · niveau 2 de Filou</p>
+      <h2>Ici, c'est par Filou qu'on écrit les règles. En phrases.</h2>
+      <p>Pas de formulaire à onglets : tu dis ta règle en français, Filou la reformule précisément, tu valides. La liste de droite reste la référence, lisible par tout le monde.</p>
+    </div>
+
+    <div class="rules-layout">
+      <!-- Conversation : Filou d'office, au premier plan -->
+      <section class="card rules-chat" aria-label="Écrire une règle avec Filou">
+        <div class="chat-fox">
+          <span class="fox-frame"><img src="fox-3.png" alt="Filou tient une balance dorée : l'équité des règles"></span>
+          <div>
+            <h3>Dis ta règle, Filou l'écrit.</h3>
+            <p>Il reformule mot à mot ce qu'il a compris et n'enregistre rien sans ton accord.</p>
+          </div>
+        </div>
+        <div class="convo" id="rules-convo" aria-live="polite">
+          <div class="bubble filou">
+            <span class="who">🦊 Filou</span>
+            Bonjour Anne-Sophie ! Dicte-moi une règle en français, ou pars d'un exemple ci-dessous.
+          </div>
+        </div>
+        <div class="chips" id="rule-chips">
+          <span class="chips-label">Essaie un exemple</span>
+          <button type="button" class="chip" data-rule="0">« Manon ne travaille jamais le mardi soir »</button>
+          <button type="button" class="chip" data-rule="1">« Pas plus d'un week-end sur trois pour chacun »</button>
+          <button type="button" class="chip" data-rule="2">« Thomas ne fait pas les nuits pendant ses formations »</button>
+        </div>
+        <form class="panel-input" id="rules-form">
+          <input type="text" id="rules-text" placeholder="Écris ta règle en français…" aria-label="Écrire une règle à Filou" autocomplete="off">
+          <button type="submit" class="panel-send" aria-label="Envoyer la règle">➤</button>
+        </form>
+      </section>
+
+      <!-- La liste des règles en phrases -->
+      <section class="rules-list" aria-label="Règles actives du cabinet">
+        <div class="rules-list-head">
+          <h3>Les règles en vigueur</h3>
+          <span class="count-rules" id="count-rules">9 règles actives</span>
+        </div>
+
+        <div class="rule-group">
+          <h4>Équipe</h4>
+          <ul id="group-equipe">
+            <li><div class="rule-item">
+              <p>Anne-Cat n'est appelée qu'en dernier recours.</p>
+              <div class="rule-meta"><span class="lvl lvl-obligatoire">Obligatoire</span>
+                <span class="rule-actions"><button type="button" class="ra-edit">Modifier</button><button type="button" class="ra-suspend">Suspendre</button></span></div>
+            </div></li>
+            <li><div class="rule-item">
+              <p>Une seule vétérinaire de garde par nuit de semaine.</p>
+              <div class="rule-meta"><span class="lvl lvl-obligatoire">Obligatoire</span>
+                <span class="rule-actions"><button type="button" class="ra-edit">Modifier</button><button type="button" class="ra-suspend">Suspendre</button></span></div>
+            </div></li>
+          </ul>
+        </div>
+
+        <div class="rule-group">
+          <h4>Week-ends</h4>
+          <ul id="group-weekends">
+            <li><div class="rule-item">
+              <p>Le week-end se garde en binôme, du vendredi soir au dimanche.</p>
+              <div class="rule-meta"><span class="lvl lvl-obligatoire">Obligatoire</span>
+                <span class="rule-actions"><button type="button" class="ra-edit">Modifier</button><button type="button" class="ra-suspend">Suspendre</button></span></div>
+            </div></li>
+            <li><div class="rule-item">
+              <p>Jamais plus de 2 week-ends consécutifs pour la même personne.</p>
+              <div class="rule-meta"><span class="lvl lvl-obligatoire">Obligatoire</span>
+                <span class="rule-actions"><button type="button" class="ra-edit">Modifier</button><button type="button" class="ra-suspend">Suspendre</button></span></div>
+            </div></li>
+            <li><div class="rule-item">
+              <p>Le 1er et le 2nd de garde échangent leurs rôles d'un week-end à l'autre.</p>
+              <div class="rule-meta"><span class="lvl lvl-important">Important</span>
+                <span class="rule-actions"><button type="button" class="ra-edit">Modifier</button><button type="button" class="ra-suspend">Suspendre</button></span></div>
+            </div></li>
+          </ul>
+        </div>
+
+        <div class="rule-group">
+          <h4>Équité</h4>
+          <ul id="group-equite">
+            <li><div class="rule-item">
+              <p>Les gardes de week-end sont réparties à une garde près sur la période.</p>
+              <div class="rule-meta"><span class="lvl lvl-important">Important</span>
+                <span class="rule-actions"><button type="button" class="ra-edit">Modifier</button><button type="button" class="ra-suspend">Suspendre</button></span></div>
+            </div></li>
+            <li><div class="rule-item">
+              <p>Le rôle de 1er de week-end (avantage financier) tourne équitablement.</p>
+              <div class="rule-meta"><span class="lvl lvl-important">Important</span>
+                <span class="rule-actions"><button type="button" class="ra-edit">Modifier</button><button type="button" class="ra-suspend">Suspendre</button></span></div>
+            </div></li>
+          </ul>
+        </div>
+
+        <div class="rule-group">
+          <h4>Congés</h4>
+          <ul id="group-conges">
+            <li><div class="rule-item">
+              <p>Un congé validé bloque toute garde sur ses dates.</p>
+              <div class="rule-meta"><span class="lvl lvl-obligatoire">Obligatoire</span>
+                <span class="rule-actions"><button type="button" class="ra-edit">Modifier</button><button type="button" class="ra-suspend">Suspendre</button></span></div>
+            </div></li>
+            <li><div class="rule-item">
+              <p>Les souhaits de congés se posent au moins 3 semaines avant la génération.</p>
+              <div class="rule-meta"><span class="lvl lvl-sipossible">Si possible</span>
+                <span class="rule-actions"><button type="button" class="ra-edit">Modifier</button><button type="button" class="ra-suspend">Suspendre</button></span></div>
+            </div></li>
+          </ul>
+        </div>
+
+        <a class="advanced-link" href="#" onclick="return false;">Réglages avancés (formulaire classique, pour les habitués)</a>
+      </section>
+    </div>
+
+  </div>
+</main>
+
+<!-- ===================== ÉCRAN 4 · HISTORIQUE ===================== -->
+<main id="screen-4" class="screen" aria-label="Écran 4 : historique des périodes, consultation pure">
+  <div class="shell">
+
+    <div class="section-head">
+      <p class="section-kicker">Historique · consultation</p>
+      <h2>Les périodes passées, noir sur blanc.</h2>
+      <p>Rien à régler ici : on consulte, on vérifie, on se souvient. Et l'équité d'hier nourrit le planning de demain.</p>
+    </div>
+
+    <section class="card periods-card" aria-label="Périodes planifiées">
+      <div class="card-head">
+        <div>
+          <h3>Périodes planifiées</h3>
+          <p class="sub">De la plus récente à la plus ancienne</p>
+        </div>
+      </div>
+      <ul class="periods-list">
+        <li>
+          <div class="period-name"><b>Hiver 2026</b><small>12 semaines · 5 janv. → 29 mars 2026</small></div>
+          <span class="status st-brouillon">Brouillon</span>
+          <button type="button" class="period-view" data-goto="2">Consulter</button>
+        </li>
+        <li>
+          <div class="period-name"><b>Automne 2025</b><small>12 semaines · 13 oct. 2025 → 4 janv. 2026</small></div>
+          <span class="status st-publiee">Publiée</span>
+          <button type="button" class="period-view">Consulter</button>
+        </li>
+        <li>
+          <div class="period-name"><b>Été 2025</b><small>17 semaines · 16 juin → 12 oct. 2025</small></div>
+          <span class="status st-archivee">Archivée</span>
+          <button type="button" class="period-view">Consulter</button>
+        </li>
+        <li>
+          <div class="period-name"><b>Printemps 2025</b><small>12 semaines · 23 mars → 14 juin 2025</small></div>
+          <span class="status st-archivee">Archivée</span>
+          <button type="button" class="period-view">Consulter</button>
+        </li>
+      </ul>
+    </section>
+
+    <section class="card cumul-card" aria-label="Compteurs cumulés sur toutes les périodes">
+      <div class="card-head">
+        <div>
+          <h3>Compteurs cumulés</h3>
+          <p class="sub">3 périodes terminées · 41 semaines · brouillon en cours non compté</p>
+        </div>
+      </div>
+      <div class="cumul-body" id="cumul-body"><!-- rempli par le JS --></div>
+      <p class="lookback-note">⚖️ L'équité entre les périodes est déjà dans le moteur : à chaque génération, Filou relit ces compteurs (le « lookback ») et rattrape les petits écarts de la période précédente. Personne ne « perd » un week-end en changeant de saison.</p>
+    </section>
+
+  </div>
+</main>
+
+<!-- ===================== PIED DE PAGE ===================== -->
+<footer class="footer-lab">
+  <span><b>Labo design GuardVeto · v2</b> · ambiance Terrier chaleureux, données fictives · MonProjetPro</span>
+  <span>Écrans 1 à 3 = les 3 niveaux de présence de Filou · Historique = consultation pure.</span>
+</footer>
+
+<script>
+/* ============================================================
+   LABO DESIGN GUARDVETO v2 · JS vanilla
+   ============================================================ */
+(function () {
+  "use strict";
+
+  var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var $ = function (sel) { return document.querySelector(sel); };
+  var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+
+  var VETS = [
+    { n: "Anne-So",  ini: "AS", c: "var(--vet-anneso)",  role: "admin" },
+    { n: "Anne-Cat", ini: "AC", c: "var(--vet-annecat)", role: "dernier recours" },
+    { n: "Manon",    ini: "M",  c: "var(--vet-manon)",   role: "" },
+    { n: "Victor",   ini: "V",  c: "var(--vet-victor)",  role: "" },
+    { n: "Camille",  ini: "C",  c: "var(--vet-camille)", role: "" },
+    { n: "Julie",    ini: "J",  c: "var(--vet-julie)",   role: "" },
+    { n: "Thomas",   ini: "T",  c: "var(--vet-thomas)",  role: "" }
+  ];
+  function vetColor(name) {
+    for (var i = 0; i < VETS.length; i++) if (VETS[i].n === name) return VETS[i].c;
+    return "var(--soft)";
+  }
+
+  /* ---------- 1. Bascule d'écran ---------- */
+  document.querySelectorAll("[data-screen]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var n = btn.dataset.screen;
+      document.querySelectorAll("[data-screen]").forEach(function (b) {
+        b.setAttribute("aria-pressed", String(b === btn));
+      });
+      ["1", "2", "3", "4"].forEach(function (k) {
+        $("#screen-" + k).classList.toggle("active", n === k);
+      });
+      window.scrollTo({ top: 0, behavior: REDUCED ? "auto" : "smooth" });
+      if (n === "1") positionDockIndicator();
+    });
+  });
+
+  /* ============================================================
+     ÉCRAN 1 · Entretien d'arrivée (boucle + étapes à la demande)
+     ============================================================ */
+  var convo = $("#convo");
+  var runId = 0;
+
+  function scrollConvo() { convo.scrollTop = convo.scrollHeight; }
+
+  function makeBubble(kind, whoLabel) {
+    var b = document.createElement("div");
+    b.className = "bubble " + kind;
+    if (whoLabel) {
+      var w = document.createElement("span");
+      w.className = "who";
+      w.textContent = whoLabel;
+      b.appendChild(w);
+    }
+    var body = document.createElement("span");
+    body.className = "b-body";
+    b.appendChild(body);
+    convo.appendChild(b);
+    scrollConvo();
+    return { bubble: b, body: body };
+  }
+
+  async function typeInto(el, text, id) {
+    if (REDUCED) { el.textContent = text; return; }
+    var caret = document.createElement("span");
+    caret.className = "type-caret";
+    el.after(caret);
+    for (var i = 0; i < text.length; i++) {
+      if (id !== runId) { caret.remove(); return; }
+      el.textContent += text[i];
+      if (i % 3 === 0) scrollConvo();
+      await sleep(17);
+    }
+    caret.remove();
+    scrollConvo();
+  }
+
+  async function filouSays(text, id) {
+    var r = makeBubble("filou", "🦊 Filou");
+    await typeInto(r.body, text, id);
+  }
+  function userSays(text) {
+    var r = makeBubble("user", "Anne-Sophie");
+    r.body.textContent = text;
+    scrollConvo();
+  }
+  async function filouReformulates(text, id) {
+    var r = makeBubble("reformulation", "🦊 Filou reformule");
+    await typeInto(r.body, text, id);
+    var actions = document.createElement("div");
+    actions.className = "reform-actions";
+    var ok = document.createElement("button");
+    ok.type = "button"; ok.className = "btn btn-valider"; ok.textContent = "C'est ça ✓";
+    var ko = document.createElement("button");
+    ko.type = "button"; ko.className = "btn btn-corriger"; ko.textContent = "Corriger";
+    actions.append(ok, ko);
+    r.bubble.appendChild(actions);
+    scrollConvo();
+    return ok;
+  }
+  function systemNote(text) {
+    var b = document.createElement("div");
+    b.className = "bubble note";
+    b.textContent = text;
+    convo.appendChild(b);
+    scrollConvo();
+  }
+  function setFicheProgress(n) {
+    $("#fiche-pct").textContent = "Fiche complétée : " + n + " / 4";
+    $("#fiche-bar").style.width = (n / 4) * 100 + "%";
+  }
+  function resetFiche() {
+    $("#vet-grid").innerHTML = "";
+    $("#habits").innerHTML = "";
+    $("#vets-empty").classList.remove("hide");
+    $("#habits-empty").classList.remove("hide");
+    setFicheProgress(0);
+  }
+  async function showVets(id) {
+    $("#vets-empty").classList.add("hide");
+    for (var i = 0; i < VETS.length; i++) {
+      if (id !== runId) return;
+      var v = VETS[i];
+      var chip = document.createElement("span");
+      chip.className = "vet-chip";
+      chip.innerHTML =
+        '<span class="dot" style="background:' + v.c + '">' + v.ini + "</span>" +
+        v.n + (v.role === "admin" ? ' <span class="role">· admin</span>' : "");
+      $("#vet-grid").appendChild(chip);
+      (function (c) {
+        requestAnimationFrame(function () { requestAnimationFrame(function () { c.classList.add("in"); }); });
+      })(chip);
+      await sleep(REDUCED ? 40 : 320);
+    }
+  }
+  async function showHabits(id) {
+    $("#habits-empty").classList.add("hide");
+    var rows = [
+      { ico: "🌙", html: "<b>Nuits de semaine</b> : 1 vétérinaire de garde par nuit.<small>Du lundi au jeudi soir</small>" },
+      { ico: "🧡", html: "<b>Week-end en binôme</b> : du vendredi soir au dimanche.<small>1er et 2nd de garde, le bloc reste ensemble</small>" },
+      { ico: "⚖️", html: "<b>Équité standard</b> : Filou répartit au plus juste.<small>Anne-Cat en dernier recours uniquement</small>" }
+    ];
+    for (var i = 0; i < rows.length; i++) {
+      if (id !== runId) return;
+      var div = document.createElement("div");
+      div.className = "fiche-row";
+      div.innerHTML = '<span class="ico">' + rows[i].ico + "</span><span>" + rows[i].html + "</span>";
+      $("#habits").appendChild(div);
+      (function (d) {
+        requestAnimationFrame(function () { requestAnimationFrame(function () { d.classList.add("in"); }); });
+      })(div);
+      await sleep(REDUCED ? 40 : 430);
+    }
+  }
+  async function autoValidate(btn, id) {
+    await sleep(REDUCED ? 300 : 1600);
+    if (id !== runId || !btn) return;
+    btn.classList.add("pressed");
+    btn.textContent = "Validé ✓";
+    await sleep(600);
+  }
+
+  /* Boucle complète (étapes 1 + 2) */
+  async function runDemo() {
+    var id = ++runId;
+    convo.innerHTML = "";
+    resetFiche();
+    await sleep(700); if (id !== runId) return;
+
+    await filouSays("Bonjour Anne-Sophie ! Je suis Filou 🦊 Je vais préparer GuardVeto avec toi. Première question : qui compose ton équipe ?", id);
+    if (id !== runId) return;
+    await sleep(900); if (id !== runId) return;
+
+    userSays("On est 7 : moi (Anne-So), Anne-Cat, Manon, Victor, Camille, Julie et Thomas.");
+    await sleep(900); if (id !== runId) return;
+
+    var p1 = showVets(id);
+    var ok1 = await filouReformulates("Si je comprends bien : 7 vétérinaires, dont toi comme administratrice. Je les ajoute à ta fiche, regarde à droite. C'est bien ça ?", id);
+    if (id !== runId) return;
+    await p1;
+    await autoValidate(ok1, id); if (id !== runId) return;
+    setFicheProgress(1);
+    systemNote("✓ Équipe enregistrée");
+    await sleep(800); if (id !== runId) return;
+
+    await filouSays("Parfait ! Et le week-end, comment tournez-vous ?", id);
+    if (id !== runId) return;
+    await sleep(800); if (id !== runId) return;
+
+    userSays("Une garde chaque nuit, et le week-end en binôme du vendredi soir au dimanche. Anne-Cat seulement en dernier recours.");
+    await sleep(900); if (id !== runId) return;
+
+    var p2 = showHabits(id);
+    var ok2 = await filouReformulates("Donc : 1 vétérinaire par nuit de semaine, un binôme du vendredi soir au dimanche, et Anne-Cat n'est appelée qu'en dernier recours. J'enregistre ces habitudes ?", id);
+    if (id !== runId) return;
+    await p2;
+    await autoValidate(ok2, id); if (id !== runId) return;
+    setFicheProgress(2);
+    systemNote("✓ Enregistré dans « Règles du cabinet »");
+    await sleep(700); if (id !== runId) return;
+
+    await filouSays("Ta fiche est à mi-chemin. Prochaine étape : je génère ton premier planning, et tu me dis ce que tu en penses 🦊", id);
+    if (id !== runId) return;
+
+    await sleep(5200);
+    if (id === runId) runDemo();
+  }
+  runDemo();
+
+  /* Scripts d'entretien par étape (ouverts au clic sur l'orbital) */
+  var STEP_SCRIPTS = [
+    async function (id) {
+      await filouSays("On reprend l'étape « Ton équipe » ? Elle est déjà complétée : 7 vétérinaires, chacun avec sa couleur. Dis-moi si quelqu'un arrive ou s'en va, je mets la fiche à jour.", id);
+      if (id !== runId) return;
+      await sleep(900); if (id !== runId) return;
+      systemNote("✓ Étape 1 déjà complétée · rien à refaire");
+    },
+    async function (id) {
+      await filouSays("Étape 2, vos habitudes de garde. Raconte-moi votre roulement : qui prend les nuits de semaine, comment se passe le week-end ?", id);
+      if (id !== runId) return;
+      await sleep(1100); if (id !== runId) return;
+      userSays("Une garde chaque nuit, et le week-end en binôme du vendredi soir au dimanche.");
+      await sleep(900); if (id !== runId) return;
+      var ok = await filouReformulates("Donc : 1 vétérinaire par nuit de semaine et un binôme du vendredi soir au dimanche. J'enregistre ?", id);
+      if (id !== runId) return;
+      await autoValidate(ok, id); if (id !== runId) return;
+      systemNote("✓ Enregistré dans « Règles du cabinet »");
+    },
+    async function (id) {
+      await filouSays("Étape 3 : générer ton premier planning. Je récapitule d'abord : 7 vétérinaires, 9 règles actives, période d'hiver de 12 semaines. Je lance ?", id);
+      if (id !== runId) return;
+      await sleep(1000); if (id !== runId) return;
+      userSays("Vas-y !");
+      await sleep(800); if (id !== runId) return;
+      await filouSays("C'est parti… et voilà : un brouillon complet, équitable à une garde près. Tu le retrouves dans l'écran « Planning au quotidien », modifiable à la main.", id);
+      if (id !== runId) return;
+      systemNote("✓ Brouillon généré · à toi de le relire");
+    },
+    async function (id) {
+      await filouSays("Dernière étape : inviter les vétos. J'envoie un e-mail à chacun des 6 autres ; ils verront leurs gardes sur leur téléphone, sans rien installer. J'envoie ?", id);
+      if (id !== runId) return;
+      await sleep(1000); if (id !== runId) return;
+      userSays("Oui, envoie.");
+      await sleep(800); if (id !== runId) return;
+      systemNote("✓ 6 invitations envoyées · l'orbite disparaîtra quand tout le monde aura rejoint");
+    }
+  ];
+
+  function openStepConversation(step) {
+    var id = ++runId;
+    convo.innerHTML = "";
+    var card = $("#convo-card");
+    card.classList.remove("flash");
+    void card.offsetWidth; /* redémarre l'animation */
+    card.classList.add("flash");
+    card.scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "center" });
+    (async function () {
+      await sleep(500); if (id !== runId) return;
+      await STEP_SCRIPTS[step](id);
+      await sleep(6000);
+      if (id === runId) runDemo(); /* la boucle reprend */
+    })();
+  }
+
+  /* ---------- Orbite : sélection + ouverture d'étape ---------- */
+  var STEPS = [
+    {
+      status: "done", statusLabel: "✓ Complété", title: "Ton équipe",
+      desc: "Les 7 vétérinaires du cabinet sont enregistrés, chacun avec sa couleur. Anne-Sophie est administratrice, Anne-Cat est notée en dernier recours.",
+      hint: "Étape 1 sur 4 · faite pendant l'entretien d'arrivée"
+    },
+    {
+      status: "active", statusLabel: "En cours", title: "Vos habitudes de garde",
+      desc: "Raconte à Filou comment vous tournez : qui prend les nuits de semaine, comment se passe le week-end. Il traduit en règles claires et te les relit avant d'enregistrer.",
+      hint: "Étape 2 sur 4 · environ 3 minutes"
+    },
+    {
+      status: "todo", statusLabel: "À venir", title: "Générer ton premier planning",
+      desc: "Filou te montre d'abord un récapitulatif : règles fermes, préférences, effectif. Tu lances, et le planning apparaît avec ses explications en français.",
+      hint: "Étape 3 sur 4 · moins d'une minute"
+    },
+    {
+      status: "todo", statusLabel: "À venir", title: "Inviter les vétos",
+      desc: "Chaque vétérinaire reçoit une invitation par e-mail et retrouve ses gardes sur son téléphone. Fini les captures d'écran du tableau Excel.",
+      hint: "Étape 4 sur 4 · deux clics"
+    }
+  ];
+  var selectedStep = 1;
+  function showStepDetail(step) {
+    var s = STEPS[step];
+    var st = $("#sd-status");
+    st.textContent = s.statusLabel;
+    st.className = "step-status " + s.status;
+    $("#sd-title").textContent = s.title;
+    $("#sd-desc").textContent = s.desc;
+    $("#sd-hint").textContent = s.hint;
+  }
+  document.querySelectorAll(".node").forEach(function (node) {
+    node.addEventListener("click", function () {
+      document.querySelectorAll(".node").forEach(function (n) { n.classList.remove("selected"); });
+      node.classList.add("selected");
+      selectedStep = Number(node.dataset.step);
+      showStepDetail(selectedStep);
+      openStepConversation(selectedStep); /* le clic OUVRE la fenêtre d'échange */
+    });
+  });
+  $("#open-step").addEventListener("click", function () { openStepConversation(selectedStep); });
+
+  /* ---------- Démo : fin de l'onboarding ---------- */
+  var demoDone = false;
+  $("#demo-finish").addEventListener("click", async function () {
+    if (demoDone) return;
+    demoDone = true;
+    runId++; /* stoppe la boucle d'entretien */
+    var orbital = $("#orbital");
+    var nodes = document.querySelectorAll(".node");
+    for (var i = 0; i < nodes.length; i++) {
+      nodes[i].classList.remove("active", "selected");
+      nodes[i].classList.add("done");
+      var dot = nodes[i].querySelector(".node-dot");
+      if (dot) dot.textContent = "✓";
+      await sleep(REDUCED ? 60 : 340);
+    }
+    /* Célébration sobre : Filou émerveillé + étincelles */
+    $("#orbit-center-img").src = "fox-5.png";
+    $("#orbit-center-img").alt = "Filou émerveillé : l'installation est terminée";
+    $("#orbit-center").classList.add("celebrating");
+    orbital.classList.add("celebrate");
+    setFicheProgress(4);
+    await sleep(REDUCED ? 250 : 1700);
+    /* L'orbital s'efface, le tableau de bord prend la place */
+    $("#orbital-collapse").classList.add("gone");
+    $("#dash-preview").classList.add("show");
+    $("#dash-preview").scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "center" });
+  });
+  $("#demo-replay").addEventListener("click", function () {
+    demoDone = false;
+    $("#dash-preview").classList.remove("show");
+    var oc = $("#orbital-collapse");
+    oc.classList.remove("gone");
+    $("#orbital").classList.remove("celebrate");
+    $("#orbit-center").classList.remove("celebrating");
+    $("#orbit-center-img").src = "fox-1.png";
+    $("#orbit-center-img").alt = "Filou au centre du parcours";
+    var labels = ["✓", "2", "3", "4"];
+    document.querySelectorAll(".node").forEach(function (node, i) {
+      node.classList.remove("done", "active", "selected");
+      if (i === 0) node.classList.add("done");
+      if (i === 1) node.classList.add("active", "selected");
+      var dot = node.querySelector(".node-dot");
+      if (dot) dot.textContent = labels[i];
+    });
+    showStepDetail(1);
+    runDemo();
+    oc.scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "center" });
+  });
+
+  /* ---------- Dock de navigation ---------- */
+  var dock = $("#dock");
+  var indicator = $("#dock-indicator");
+  function positionDockIndicator() {
+    var active = dock.querySelector('[aria-current="true"]');
+    if (!active) return;
+    indicator.style.left = active.offsetLeft + "px";
+    indicator.style.width = active.offsetWidth + "px";
+  }
+  dock.querySelectorAll("button").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      dock.querySelectorAll("button").forEach(function (b) { b.setAttribute("aria-current", "false"); });
+      btn.setAttribute("aria-current", "true");
+      positionDockIndicator();
+    });
+  });
+  window.addEventListener("resize", positionDockIndicator);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(positionDockIndicator);
+  setTimeout(positionDockIndicator, 300);
+  positionDockIndicator();
+
+  /* ============================================================
+     ÉCRAN 2 · Planning brouillon + terrier + garde-fou
+     ============================================================ */
+  /* Modèle de données (simulation) */
+  var WEEKS = [
+    { label: "S2", dates: "5 → 11 janv.",       nights: ["Manon", "Victor", "Camille", "Julie"],   we: { v1: "Thomas",  v2: "Victor" },  conge: null },
+    { label: "S3", dates: "12 → 18 janv.",      nights: ["Camille", "Thomas", "Anne-So", "Manon"], we: { v1: "Victor",  v2: "Anne-So" }, conge: { day: 2, who: "Julie" } },
+    { label: "S4", dates: "19 → 25 janv.",      nights: ["Julie", "Anne-So", "Victor", "Thomas"],  we: { v1: "Camille", v2: "Manon" },   conge: null },
+    { label: "S5", dates: "26 janv. → 1 fév.",  nights: ["Victor", "Manon", "Julie", "Camille"],   we: { v1: "Anne-So", v2: "Thomas" },  conge: null }
+  ];
+  var WE_DATES = ["10-11 janv.", "17-18 janv.", "24-25 janv.", "31 janv.-1 fév."];
+
+  var planningBody = $("#planning-body");
+
+  function pillBtn(name, rank, week, kind, night) {
+    var cls = "pill" + (rank === 2 ? " second" : "");
+    var rk = rank ? ' <span class="rank">' + rank + "</span>" : "";
+    return '<button type="button" class="' + cls + '" style="background:' + vetColor(name) + '" ' +
+      'data-week="' + week + '" data-kind="' + kind + '"' +
+      (night !== undefined ? ' data-night="' + night + '"' : "") +
+      (rank ? ' data-role="' + rank + '"' : "") +
+      ' aria-label="Changer de vétérinaire (' + name + ')">' + name + rk + "</button>";
+  }
+
+  function renderPlanning() {
+    var html = "";
+    WEEKS.forEach(function (w, wi) {
+      html += "<tr>";
+      html += '<td class="week-cell"><b>' + w.label + "</b><small>" + w.dates + "</small></td>";
+      w.nights.forEach(function (name, ni) {
+        html += "<td>";
+        if (w.conge && w.conge.day === ni) {
+          html += '<span class="conge-chip">Congé · ' + w.conge.who + "</span><br>";
+        }
+        html += pillBtn(name, 0, wi, "night", ni);
+        html += "</td>";
+      });
+      html += '<td class="we"><span class="pill-stack">' +
+        pillBtn(w.we.v1, 1, wi, "we") +
+        pillBtn(w.we.v2, 2, wi, "we") +
+        "</span></td>";
+      html += "</tr>";
+    });
+    planningBody.innerHTML = html;
+  }
+  renderPlanning();
+  buildCounters();
+
+  /* ---------- Menu contextuel « Changer de vétérinaire » ---------- */
+  var workspace = $("#workspace");
+  var ctxMenu = $("#ctx-menu");
+  var ctxTarget = null; /* { week, kind, night?, role? } */
+
+  function closeCtx() { ctxMenu.classList.remove("open"); ctxTarget = null; }
+
+  function openCtx(btn) {
+    var week = Number(btn.dataset.week);
+    var kind = btn.dataset.kind;
+    ctxTarget = {
+      week: week, kind: kind,
+      night: btn.dataset.night !== undefined ? Number(btn.dataset.night) : undefined,
+      role: btn.dataset.role !== undefined ? Number(btn.dataset.role) : undefined
+    };
+    var current = kind === "night" ? WEEKS[week].nights[ctxTarget.night]
+      : (ctxTarget.role === 1 ? WEEKS[week].we.v1 : WEEKS[week].we.v2);
+    var partner = kind === "we" ? (ctxTarget.role === 1 ? WEEKS[week].we.v2 : WEEKS[week].we.v1) : null;
+    $("#ctx-title").textContent = "Remplacer " + current +
+      (kind === "we" ? " (" + (ctxTarget.role === 1 ? "1er" : "2nd") + " du week-end)" : "");
+    var list = $("#ctx-list");
+    list.innerHTML = "";
+    VETS.forEach(function (v) {
+      if (v.n === current || v.n === partner) return;
+      var li = document.createElement("li");
+      var b = document.createElement("button");
+      b.type = "button";
+      b.innerHTML = '<span class="dot" style="background:' + v.c + '"></span>' + v.n +
+        (v.n === "Anne-Cat" ? "<small>dernier recours</small>" : "");
+      b.addEventListener("click", function () { assignVet(v.n); });
+      li.appendChild(b);
+      list.appendChild(li);
+    });
+    /* position près de la pastille cliquée */
+    var wr = workspace.getBoundingClientRect();
+    var br = btn.getBoundingClientRect();
+    var left = br.left - wr.left + br.width / 2 - 109;
+    left = Math.max(10, Math.min(left, wr.width - 232));
+    var top = br.bottom - wr.top + 8;
+    ctxMenu.style.left = left + "px";
+    ctxMenu.style.top = top + "px";
+    ctxMenu.classList.add("open");
+  }
+
+  planningBody.addEventListener("click", function (ev) {
+    var btn = ev.target.closest("button.pill");
+    if (!btn) return;
+    ev.stopPropagation();
+    openCtx(btn);
+  });
+  document.addEventListener("click", function (ev) {
+    if (!ctxMenu.contains(ev.target)) closeCtx();
+  });
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape") {
+      closeCtx();
+      if (!$("#recap-veil").hidden) closeRecap();
+    }
+  });
+
+  /* ---------- Règle simulée : pas plus de 2 week-ends consécutifs ---------- */
+  function consecutiveWeekends(name, weekIdx) {
+    /* week-ends hypothétiques si `name` est ajouté au WE weekIdx */
+    var has = WEEKS.map(function (w, i) {
+      if (i === weekIdx) return true;
+      return w.we.v1 === name || w.we.v2 === name;
+    });
+    var run = 0, best = 0;
+    for (var i = 0; i < has.length; i++) {
+      run = has[i] ? run + 1 : 0;
+      if (run > best) best = run;
+    }
+    return best;
+  }
+  function findSubstitute(weekIdx, excluded) {
+    /* propose la personne sans week-end sur la période (équité), hors Anne-Cat */
+    for (var i = 0; i < VETS.length; i++) {
+      var n = VETS[i].n;
+      if (n === "Anne-Cat" || excluded.indexOf(n) >= 0) continue;
+      var count = WEEKS.reduce(function (acc, w) {
+        return acc + (w.we.v1 === n || w.we.v2 === n ? 1 : 0);
+      }, 0);
+      if (count === 0) return n;
+    }
+    return "Julie";
+  }
+
+  function applyAssign(target, name) {
+    var w = WEEKS[target.week];
+    if (target.kind === "night") w.nights[target.night] = name;
+    else if (target.role === 1) w.we.v1 = name;
+    else w.we.v2 = name;
+    renderPlanning();
+    updateCounters(); /* les chiffres racontent la même histoire, en direct */
+  }
+  function flashOk(target) {
+    /* ✓ discret qui s'évapore sur la cellule modifiée */
+    var selector = target.kind === "night"
+      ? 'button.pill[data-week="' + target.week + '"][data-kind="night"][data-night="' + target.night + '"]'
+      : 'button.pill[data-week="' + target.week + '"][data-kind="we"][data-role="' + target.role + '"]';
+    var btn = planningBody.querySelector(selector);
+    if (!btn) return;
+    var cell = btn.closest("td");
+    var ok = document.createElement("span");
+    ok.className = "ok-flash";
+    ok.textContent = "✓";
+    cell.appendChild(ok);
+    setTimeout(function () { ok.remove(); }, 1900);
+  }
+  function markWarned(target) {
+    var selector = 'button.pill[data-week="' + target.week + '"][data-kind="we"][data-role="' + target.role + '"]';
+    var btn = planningBody.querySelector(selector);
+    if (btn) btn.classList.add("warned");
+  }
+
+  function assignVet(name) {
+    var target = ctxTarget;
+    closeCtx();
+    if (!target) return;
+    if (target.kind === "we" && consecutiveWeekends(name, target.week) > 2) {
+      /* ⚠ règle enfreinte : Filou sort de son terrier DE LUI-MÊME */
+      gardefouScene(target, name);
+      return;
+    }
+    applyAssign(target, name);
+    flashOk(target); /* changement cohérent : juste un ✓ qui s'évapore */
+  }
+
+  /* ---------- Terrier : sortir / rentrer ---------- */
+  var filouOut = false;
+  function foxSort() {
+    if (filouOut) return;
+    filouOut = true;
+    workspace.classList.remove("filou-in");
+    workspace.classList.add("filou-out");
+  }
+  function foxRentre() {
+    if (!filouOut) return;
+    filouOut = false;
+    workspace.classList.remove("filou-out");
+    workspace.classList.add("filou-in");
+  }
+  $("#terrier").addEventListener("click", function () {
+    if (filouOut) foxRentre(); else foxSort();
+  });
+  $("#panel-reduce").addEventListener("click", foxRentre);
+
+  var panelScroll = $("#panel-scroll");
+  function appendPanelBubble(kind, who, html) {
+    var b = document.createElement("div");
+    b.className = "bubble " + kind;
+    b.innerHTML = (who ? '<span class="who">' + who + "</span>" : "") + html;
+    panelScroll.appendChild(b);
+    panelScroll.scrollTop = panelScroll.scrollHeight;
+    return b;
+  }
+  function addJournalEntry(text, tone) {
+    var list = $("#journal-list");
+    var e = document.createElement("div");
+    e.className = "journal-entry";
+    var now = new Date();
+    var hh = String(now.getHours()).padStart(2, "0");
+    var mm = String(now.getMinutes()).padStart(2, "0");
+    e.innerHTML =
+      '<span class="je-dot' + (tone ? " " + tone : "") + '"></span>' +
+      "<div><time>Aujourd'hui · " + hh + ":" + mm + "</time>" + text + "</div>";
+    list.prepend(e);
+    var count = $("#journal-count");
+    count.textContent = String(Number(count.textContent) + 1);
+  }
+
+  /* ---------- La scène garde-fou ---------- */
+  function gardefouScene(target, name) {
+    foxSort(); /* Filou sort du terrier de lui-même */
+    var partner = target.role === 1 ? WEEKS[target.week].we.v2 : WEEKS[target.week].we.v1;
+    var sub = findSubstitute(target.week, [name, partner]);
+    var b = appendPanelBubble("gardefou", "🦊 Filou sort du terrier · garde-fou",
+      '<span class="gardefou-fox"><img src="fox-4.png" alt="Filou montre un panneau d\'alerte qui devient une coche verte"></span>' +
+      "Hop, une seconde ! Si je mets <b>" + name + "</b> sur le week-end du " + WE_DATES[target.week] + ", il enchaîne <b>3 week-ends d'affilée</b>." +
+      '<span class="gf-rule">La règle « jamais plus de 2 week-ends consécutifs » (obligatoire) serait enfreinte pour ' + name + ".</span>" +
+      "<b>" + sub + "</b> est disponible ce week-end-là et ça préserve l'équité : je " + (sub === "Julie" ? "l'y mets" : "le mets") + " ?" +
+      '<span class="reform-actions">' +
+      '<button type="button" class="btn btn-warn-ok" data-gf="fix">Corriger avec ' + sub + "</button>" +
+      '<button type="button" class="btn btn-warn-keep" data-gf="keep">Garder quand même</button>' +
+      "</span>");
+    b.querySelector('[data-gf="fix"]').addEventListener("click", function () {
+      applyAssign(target, sub);
+      flashOk(target);
+      appendPanelBubble("filou", "🦊 Filou",
+        "C'est corrigé : <b>" + sub + "</b> prend le week-end du " + WE_DATES[target.week] + ". La règle est respectée, je retourne dans mon terrier 🦊");
+      addJournalEntry("Garde-fou : " + name + " aurait enchaîné 3 week-ends (S" + (target.week + 2) + "). Corrigé avec " + sub + ", validé par Anne-Sophie.", "ok");
+      disableGf(b);
+      setTimeout(foxRentre, REDUCED ? 400 : 2400);
+    });
+    b.querySelector('[data-gf="keep"]').addEventListener("click", function () {
+      applyAssign(target, name);
+      markWarned(target);
+      appendPanelBubble("filou", "🦊 Filou",
+        "Entendu, tu restes la cheffe : <b>" + name + "</b> garde le week-end du " + WE_DATES[target.week] + ". Je le note dans le journal, et je garde un œil dessus depuis mon terrier.");
+      addJournalEntry("Règle outrepassée par Anne-Sophie : " + name + " enchaîne 3 week-ends (S" + (target.week + 2) + "). Signalé et consigné.", "warn");
+      disableGf(b);
+      setTimeout(foxRentre, REDUCED ? 400 : 2400);
+    });
+  }
+  function disableGf(bubble) {
+    bubble.querySelectorAll("button").forEach(function (btn) {
+      btn.disabled = true;
+      btn.style.opacity = "0.45";
+      btn.style.cursor = "default";
+    });
+  }
+
+  /* ---------- Saisie du panneau : « renseigner » ---------- */
+  $("#panel-form").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var input = $("#panel-text");
+    var val = input.value.trim();
+    if (!val) return;
+    appendPanelBubble("user", "Anne-Sophie", val);
+    input.value = "";
+    if (/planifie|p[ée]riode|jusqu'?[àa] fin/i.test(val)) {
+      setTimeout(npReformulate, REDUCED ? 100 : 700);
+      return;
+    }
+    setTimeout(function () {
+      if (/cong[ée]/i.test(val)) {
+        appendPanelBubble("filou", "🦊 Filou renseigne",
+          "C'est simple, trois petites étapes :" +
+          '<ul class="aide-steps">' +
+          '<li><span class="n">1</span><span>Ouvre <b>Absences &amp; échanges</b>, puis « Poser un congé ».</span></li>' +
+          '<li><span class="n">2</span><span>Choisis tes dates : je te préviens tout de suite si ça touche une garde déjà posée.</span></li>' +
+          '<li><span class="n">3</span><span>Envoie : l\'admin reçoit la demande et la valide.</span></li>' +
+          "</ul>");
+      } else {
+        appendPanelBubble("filou", "🦊 Filou",
+          "Bien noté ! Dans cette maquette, je ne réponds qu'aux scénarios prévus (essaie « Comment je pose un congé ? »). Dans la vraie application, je répondrais à toute question sur le fonctionnement, et je reformulerais tes demandes avant d'agir.");
+      }
+    }, REDUCED ? 100 : 650);
+  });
+
+  /* ============================================================
+     ÉCRAN 3 · Les règles, par Filou
+     ============================================================ */
+  var rulesConvo = $("#rules-convo");
+  var ruleRunId = 0;
+
+  function rScroll() { rulesConvo.scrollTop = rulesConvo.scrollHeight; }
+  function rBubble(kind, who, html) {
+    var b = document.createElement("div");
+    b.className = "bubble " + kind;
+    b.innerHTML = (who ? '<span class="who">' + who + "</span>" : "") + html;
+    rulesConvo.appendChild(b);
+    rScroll();
+    return b;
+  }
+
+  var RULE_DEMOS = [
+    {
+      said: "Manon ne travaille jamais le mardi soir",
+      label: "Règle · indisponibilité récurrente",
+      reformulation: "<b>Manon</b> n'est jamais de garde le <b>mardi soir</b>, toutes semaines et toute l'année.",
+      level: "Obligatoire", levelClass: "lvl-obligatoire",
+      group: "group-equipe",
+      sentence: "Manon n'est jamais de garde le mardi soir."
+    },
+    {
+      said: "Pas plus d'un week-end sur trois pour chacun",
+      label: "Règle · cadence des week-ends",
+      reformulation: "Chaque vétérinaire est de week-end <b>au maximum 1 fois toutes les 3 semaines</b>.",
+      level: "Important", levelClass: "lvl-important",
+      group: "group-weekends",
+      sentence: "Chaque vétérinaire est de week-end au maximum 1 fois toutes les 3 semaines."
+    },
+    {
+      said: "Thomas ne fait pas les nuits pendant ses formations",
+      label: "Règle · absence liée aux formations",
+      reformulation: "<b>Thomas</b> n'est pas de garde en semaine pendant ses <b>périodes de formation</b> (dates renseignées dans les congés).",
+      level: "Important", levelClass: "lvl-important",
+      group: "group-conges",
+      sentence: "Thomas n'est pas de garde en semaine pendant ses périodes de formation."
+    }
+  ];
+
+  function addRuleToList(demo) {
+    var group = document.getElementById(demo.group);
+    var li = document.createElement("li");
+    li.innerHTML = '<div class="rule-item fresh">' +
+      "<p>" + demo.sentence + "</p>" +
+      '<div class="rule-meta"><span class="lvl ' + demo.levelClass + '">' + demo.level + "</span>" +
+      '<span class="rule-actions"><button type="button" class="ra-edit">Modifier</button><button type="button" class="ra-suspend">Suspendre</button></span></div>' +
+      "</div>";
+    group.appendChild(li);
+    updateRuleCount(1);
+    if (window.matchMedia("(max-width: 980px)").matches) {
+      li.scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "center" });
+    }
+  }
+  function updateRuleCount(delta) {
+    var el = $("#count-rules");
+    var current = Number(el.textContent.match(/\d+/)[0]) + delta;
+    el.textContent = current + " règles actives";
+  }
+
+  function playRuleDemo(idx, chipBtn) {
+    var demo = RULE_DEMOS[idx];
+    var id = ++ruleRunId;
+    if (chipBtn) chipBtn.disabled = true;
+    rBubble("user", "Anne-Sophie", demo.said + ".");
+    setTimeout(function () {
+      if (id !== ruleRunId) return;
+      var b = rBubble("reformulation", "🦊 Filou reformule",
+        "Je te propose cette règle, dis-moi si c'est bien ça :" +
+        '<div class="rule-proposal"><p class="rp-label">' + demo.label + "</p>" +
+        demo.reformulation +
+        '<span class="rp-importance">Importance proposée : ' + demo.level.toLowerCase() + "</span></div>" +
+        '<span class="reform-actions">' +
+        '<button type="button" class="btn btn-valider">C\'est ça ✓</button>' +
+        '<button type="button" class="btn btn-corriger">Corriger</button>' +
+        "</span>");
+      var okBtn = b.querySelector(".btn-valider");
+      var koBtn = b.querySelector(".btn-corriger");
+      okBtn.addEventListener("click", function () {
+        okBtn.classList.add("pressed");
+        okBtn.textContent = "Validé ✓";
+        koBtn.disabled = true; koBtn.style.opacity = "0.4";
+        addRuleToList(demo);
+        rBubble("note", null, "✓ Règle ajoutée à la liste, groupe « " +
+          { "group-equipe": "Équipe", "group-weekends": "Week-ends", "group-equite": "Équité", "group-conges": "Congés" }[demo.group] + " »");
+      }, { once: true });
+      koBtn.addEventListener("click", function () {
+        rBubble("filou", "🦊 Filou",
+          "Pas de souci ! Dis-moi ce que je corrige : la personne, le créneau, ou l'importance de la règle.");
+      });
+    }, REDUCED ? 100 : 700);
+  }
+
+  document.querySelectorAll("#rule-chips .chip").forEach(function (chip) {
+    chip.addEventListener("click", function () {
+      playRuleDemo(Number(chip.dataset.rule), chip);
+    });
+  });
+
+  $("#rules-form").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var input = $("#rules-text");
+    var val = input.value.trim();
+    if (!val) return;
+    input.value = "";
+    /* si le texte ressemble à un exemple connu, joue le scénario complet */
+    var lower = val.toLowerCase();
+    var matched = -1;
+    RULE_DEMOS.forEach(function (d, i) {
+      if (matched < 0 && lower.indexOf(d.said.toLowerCase().slice(0, 12)) >= 0) matched = i;
+    });
+    if (matched >= 0) { playRuleDemo(matched, null); return; }
+    rBubble("user", "Anne-Sophie", val);
+    setTimeout(function () {
+      rBubble("filou", "🦊 Filou",
+        "Dans cette maquette, je ne sais reformuler que les trois exemples proposés. Dans la vraie application, je transformerais ta phrase en règle précise, avec son niveau d'importance, et j'attendrais ton « C'est ça ✓ ».");
+    }, REDUCED ? 100 : 650);
+  });
+
+  /* Actions discrètes sur les règles existantes (délégation) */
+  document.querySelector(".rules-list").addEventListener("click", function (ev) {
+    var btn = ev.target.closest("button");
+    if (!btn) return;
+    var item = btn.closest(".rule-item");
+    if (!item) return;
+    if (btn.classList.contains("ra-suspend")) {
+      var suspended = item.classList.toggle("suspended");
+      btn.textContent = suspended ? "Réactiver" : "Suspendre";
+      var meta = item.querySelector(".rule-meta");
+      var tag = meta.querySelector(".suspended-tag");
+      if (suspended && !tag) {
+        tag = document.createElement("span");
+        tag.className = "suspended-tag";
+        tag.textContent = "Suspendue";
+        meta.insertBefore(tag, meta.querySelector(".rule-actions"));
+      } else if (!suspended && tag) {
+        tag.remove();
+      }
+      updateRuleCount(suspended ? -1 : 1);
+    } else if (btn.classList.contains("ra-edit")) {
+      var sentence = item.querySelector("p").textContent;
+      rBubble("filou", "🦊 Filou",
+        "Tu veux modifier « " + sentence + " » ? Dis-moi ce qui change : la personne, le créneau, ou le niveau d'importance, et je te reformule la nouvelle version.");
+      rulesConvo.scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "center" });
+    }
+  });
+
+  /* ============================================================
+     ÉCRAN 2 · Volet compteurs (mis à jour en direct)
+     ============================================================ */
+  var prevCounts = null;
+
+  /* nuits · week-ends · 1er WE (fonction : disponible avant sa position dans le fichier) */
+  function METRICS() { return ["n", "we", "p"]; }
+
+  function computeCounts() {
+    var c = {};
+    VETS.forEach(function (v) { c[v.n] = { n: 0, we: 0, p: 0 }; });
+    WEEKS.forEach(function (w) {
+      w.nights.forEach(function (name) { if (c[name]) c[name].n++; });
+      if (c[w.we.v1]) { c[w.we.v1].we++; c[w.we.v1].p++; }
+      if (c[w.we.v2]) { c[w.we.v2].we++; }
+    });
+    return c;
+  }
+  function buildCounters() {
+    var grid = $("#cnt-grid");
+    if (!grid) return;
+    var counts = computeCounts();
+    var html = '<div class="cnt-row cnt-header"><span></span><span>Nuits</span><span>WE</span><span>1er WE</span></div>';
+    VETS.forEach(function (v) {
+      var k = counts[v.n];
+      html += '<div class="cnt-row"><span class="cnt-vet"><i style="background:' + v.c + '"></i>' + v.n + "</span>";
+      METRICS().forEach(function (m) {
+        html += '<span class="cnt-num' + (k[m] === 0 ? " zero" : "") + '" data-vet="' + v.n + '" data-m="' + m + '">' + k[m] + "</span>";
+      });
+      html += "</div>";
+    });
+    grid.innerHTML = html;
+    prevCounts = counts;
+  }
+  function updateCounters() {
+    if (!prevCounts) { buildCounters(); return; }
+    var counts = computeCounts();
+    VETS.forEach(function (v) {
+      METRICS().forEach(function (m) {
+        var oldV = prevCounts[v.n][m];
+        var newV = counts[v.n][m];
+        if (oldV === newV) return;
+        var el = document.querySelector('.cnt-num[data-vet="' + v.n + '"][data-m="' + m + '"]');
+        if (!el) return;
+        el.textContent = newV;
+        el.classList.toggle("zero", newV === 0);
+        el.classList.remove("bump-up", "bump-down");
+        void el.offsetWidth; /* redémarre l'animation */
+        el.classList.add(newV > oldV ? "bump-up" : "bump-down");
+        var d = document.createElement("i");
+        d.className = "cnt-delta " + (newV > oldV ? "plus" : "minus");
+        d.textContent = (newV > oldV ? "+" : "−") + Math.abs(newV - oldV);
+        el.appendChild(d);
+        setTimeout(function () { d.remove(); }, 1500);
+      });
+    });
+    prevCounts = counts;
+  }
+  $("#counters-toggle").addEventListener("click", function () {
+    var closed = workspace.classList.toggle("counters-closed");
+    this.setAttribute("aria-pressed", String(!closed));
+  });
+
+  /* ============================================================
+     ÉCRAN 2 · Nouvelle période (par Filou, puis récap ajustable)
+     ============================================================ */
+  var veil = $("#recap-veil");
+
+  function openRecap() {
+    var gen = $("#recap-generate");
+    gen.disabled = false;
+    gen.textContent = "Générer le planning";
+    $("#recap-hint").hidden = true;
+    veil.hidden = false;
+    requestAnimationFrame(function () { veil.classList.add("open"); });
+  }
+  function closeRecap() {
+    veil.classList.remove("open");
+    setTimeout(function () { veil.hidden = true; }, REDUCED ? 0 : 260);
+  }
+  $("#recap-close").addEventListener("click", closeRecap);
+  $("#recap-cancel").addEventListener("click", function () {
+    closeRecap();
+    appendPanelBubble("filou", "🦊 Filou",
+      "Pas de souci, je garde tout sous le coude. Reclique sur « Nouvelle période » quand tu veux, le récap t'attendra.");
+  });
+  veil.addEventListener("click", function (ev) { if (ev.target === veil) closeRecap(); });
+
+  function startNewPeriod() {
+    foxSort(); /* le bouton appelle Filou hors de son terrier */
+    var b = appendPanelBubble("filou", "🦊 Filou",
+      "Une nouvelle période ? Dis-moi simplement jusqu'à quand je planifie, je m'occupe du reste." +
+      '<span class="reform-actions"><button type="button" class="chip np-say">« Planifie-nous jusqu\'à fin juin »</button></span>');
+    b.querySelector(".np-say").addEventListener("click", function () {
+      this.disabled = true;
+      appendPanelBubble("user", "Anne-Sophie", "Planifie-nous jusqu'à fin juin.");
+      setTimeout(npReformulate, REDUCED ? 100 : 700);
+    }, { once: true });
+  }
+  function npReformulate() {
+    var b = appendPanelBubble("reformulation", "🦊 Filou reformule",
+      "Je prépare <b>17 semaines</b>, du lundi <b>2 février</b> au dimanche <b>28 juin 2026</b>, profil <b>Été</b>, <b>2 vétérinaires</b> par nuit de semaine. C'est bien ça ?" +
+      '<span class="reform-actions">' +
+      '<button type="button" class="btn btn-valider">C\'est ça ✓</button>' +
+      '<button type="button" class="btn btn-corriger">Corriger</button>' +
+      "</span>");
+    var ok = b.querySelector(".btn-valider");
+    var ko = b.querySelector(".btn-corriger");
+    ok.addEventListener("click", function () {
+      ok.classList.add("pressed");
+      ok.textContent = "Validé ✓";
+      ko.disabled = true; ko.style.opacity = "0.4";
+      setTimeout(openRecap, REDUCED ? 100 : 450);
+    }, { once: true });
+    ko.addEventListener("click", function () {
+      appendPanelBubble("filou", "🦊 Filou",
+        "Dis-moi ce que je corrige : la date de fin, le profil, ou l'effectif par nuit.");
+    });
+  }
+  $("#new-period").addEventListener("click", startNewPeriod);
+
+  /* Récap : chaque valeur pré-remplie reste ajustable, jamais obligatoire */
+  document.querySelectorAll(".recap-edit").forEach(function (b) {
+    b.addEventListener("click", function () { $("#recap-hint").hidden = false; });
+  });
+  document.querySelectorAll(".recap-seg button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll(".recap-seg button").forEach(function (x) {
+        x.setAttribute("aria-pressed", String(x === b));
+      });
+    });
+  });
+  $("#recap-generate").addEventListener("click", function () {
+    var gen = this;
+    gen.disabled = true;
+    gen.textContent = "✓ Génération lancée…";
+    var effBtn = document.querySelector('.recap-seg [aria-pressed="true"]');
+    var eff = effBtn ? effBtn.dataset.eff : "2";
+    setTimeout(function () {
+      closeRecap();
+      appendPanelBubble("filou", "🦊 Filou",
+        "Je génère le brouillon <b>Été 2026</b> : 17 semaines, profil Été, effectif " + eff + " par nuit. Tu le retrouveras ici même, et dans l'onglet <b>Historique</b>.");
+      addJournalEntry("Période Été 2026 créée : 17 semaines (2 fév. → 28 juin), profil Été, effectif " + eff + ". Génération du brouillon lancée.", "ok");
+      setTimeout(foxRentre, REDUCED ? 400 : 2800);
+    }, REDUCED ? 150 : 900);
+  });
+
+  /* ============================================================
+     ÉCRAN 4 · Historique (consultation pure)
+     ============================================================ */
+  var CUMUL = [
+    { n: "Anne-So",  c: "var(--vet-anneso)",  nuits: 27, we: 14, prem: 7 },
+    { n: "Anne-Cat", c: "var(--vet-annecat)", nuits: 2,  we: 0,  prem: 0 },
+    { n: "Manon",    c: "var(--vet-manon)",   nuits: 28, we: 13, prem: 7 },
+    { n: "Victor",   c: "var(--vet-victor)",  nuits: 27, we: 14, prem: 7 },
+    { n: "Camille",  c: "var(--vet-camille)", nuits: 28, we: 14, prem: 6 },
+    { n: "Julie",    c: "var(--vet-julie)",   nuits: 27, we: 13, prem: 7 },
+    { n: "Thomas",   c: "var(--vet-thomas)",  nuits: 27, we: 14, prem: 7 }
+  ];
+  (function buildCumul() {
+    var body = $("#cumul-body");
+    if (!body) return;
+    var max = { nuits: 0, we: 0, prem: 0 };
+    CUMUL.forEach(function (v) {
+      ["nuits", "we", "prem"].forEach(function (m) { if (v[m] > max[m]) max[m] = v[m]; });
+    });
+    var html = '<div class="cm-row cm-header"><span></span><span>Nuits</span><span>Week-ends</span><span>1er WE</span></div>';
+    CUMUL.forEach(function (v) {
+      html += '<div class="cm-row"><span class="cm-vet"><i style="background:' + v.c + '"></i>' + v.n + "</span>";
+      ["nuits", "we", "prem"].forEach(function (m) {
+        var pct = max[m] ? Math.round((v[m] / max[m]) * 100) : 0;
+        html += '<span class="cm-cell"><b>' + v[m] + '</b><span class="bar"><i style="width:' + pct + "%; background:" + v.c + '"></i></span></span>';
+      });
+      html += "</div>";
+    });
+    body.innerHTML = html;
+  })();
+  document.querySelectorAll(".period-view").forEach(function (b) {
+    b.addEventListener("click", function () {
+      if (b.dataset.goto) {
+        document.querySelector('[data-screen="' + b.dataset.goto + '"]').click();
+        return;
+      }
+      if (!b.parentElement.querySelector(".ro-note")) {
+        var s = document.createElement("span");
+        s.className = "ro-note";
+        s.textContent = "Lecture seule · non simulé dans la maquette";
+        b.after(s);
+        setTimeout(function () { s.remove(); }, 2600);
+      }
+    });
+  });
+
+})();
+</script>
+</body>
+</html>
