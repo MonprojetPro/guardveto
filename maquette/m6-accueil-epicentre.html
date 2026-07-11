@@ -117,76 +117,146 @@ img { display: block; }
 }
 
 /* ============================================================
-   ÉPICENTRE · le matin dans le terrier
-   Fond fait main : SOIE CHAUDE — des nappes dorées qui dérivent
-   sur 60 à 110 secondes, quasi imperceptibles. Aucune interaction
-   souris. Une sensation de bien-être, jamais un spectacle.
+   LA SCÈNE · le matin dans le terrier
+   Le SATIN occupe tout le cadre (nappes dorées + plis de velours
+   qui respirent + reflet qui traverse) ; le GROS ENCART flotte
+   au-dessus, rétro-éclairé, ourlé d'une comète dorée. Aucune
+   interaction souris — le tissu vit tout seul, lentement.
    ============================================================ */
-.epicentre {
+.scene {
   position: relative;
   margin: 22px 0 30px;
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow-card);
   overflow: hidden;
+  background: linear-gradient(180deg, #F4E8D0 0%, var(--bg-deep) 100%);
+  padding: clamp(26px, 4.5vw, 62px) clamp(18px, 3.5vw, 56px);
 }
+/* Le groupe satin : dérive en parallaxe passive au scroll (JS) */
+.satin { position: absolute; inset: -90px 0; pointer-events: none; will-change: transform; }
 .silk {
   position: absolute; inset: -22% -12%;
-  z-index: 0;
   filter: blur(70px);
-  pointer-events: none;
 }
 .silk i { position: absolute; border-radius: 50%; }
 .silk .s1 {
   width: 56%; height: 70%; left: -10%; top: -18%;
-  background: #FFDFAE; opacity: 0.8;
-  animation: silkDrift1 84s ease-in-out infinite alternate;
+  background: #FFDFAE; opacity: 0.95;
+  animation: silkDrift1 74s ease-in-out infinite alternate;
 }
 .silk .s2 {
   width: 48%; height: 62%; right: -8%; top: -12%;
-  background: #F3C687; opacity: 0.55;
-  animation: silkDrift2 96s ease-in-out infinite alternate;
+  background: #F0BC72; opacity: 0.7;
+  animation: silkDrift2 86s ease-in-out infinite alternate;
 }
 .silk .s3 {
   width: 36%; height: 50%; left: 36%; bottom: -16%;
-  background: rgba(199, 83, 15, 0.20); opacity: 0.5;
-  animation: silkDrift3 66s ease-in-out infinite alternate;
+  background: rgba(199, 83, 15, 0.26); opacity: 0.6;
+  animation: silkDrift3 58s ease-in-out infinite alternate;
 }
 .silk .s4 {
   width: 30%; height: 44%; left: 8%; bottom: -10%;
-  background: #E3E8C2; opacity: 0.32;
-  animation: silkDrift2 110s ease-in-out infinite alternate-reverse;
+  background: #E3E8C2; opacity: 0.38;
+  animation: silkDrift2 98s ease-in-out infinite alternate-reverse;
 }
 @keyframes silkDrift1 { to { transform: translate(4%, 8%) scale(1.08); } }
 @keyframes silkDrift2 { to { transform: translate(-5%, 6%) scale(1.05); } }
 @keyframes silkDrift3 { to { transform: translate(6%, -5%) scale(0.95); } }
-/* L'ondulation de la soie : une lueur diagonale qui traverse la
-   surface en ~90 s, aller-retour, à peine perceptible. */
+/* Les PLIS DE VELOURS : deux jeux de bandes diagonales douces qui
+   ondulent en sens contraires — le tissu respire (46 et 58 s) */
+.folds {
+  position: absolute; inset: -14%;
+  mix-blend-mode: soft-light;
+}
+.folds.f1 {
+  background: repeating-linear-gradient(104deg,
+    rgba(255, 240, 208, 0) 0px,
+    rgba(255, 240, 208, 0.75) 70px,
+    rgba(171, 128, 70, 0.5) 150px,
+    rgba(255, 240, 208, 0) 230px);
+  filter: blur(6px);
+  animation: foldBreath1 46s ease-in-out infinite alternate;
+}
+.folds.f2 {
+  background: repeating-linear-gradient(64deg,
+    rgba(255, 236, 200, 0) 0px,
+    rgba(255, 236, 200, 0.6) 110px,
+    rgba(150, 110, 60, 0.42) 220px,
+    rgba(255, 236, 200, 0) 330px);
+  filter: blur(11px);
+  animation: foldBreath2 58s ease-in-out infinite alternate;
+}
+@keyframes foldBreath1 { to { transform: translate3d(-3.2%, 1.6%, 0); } }
+@keyframes foldBreath2 { to { transform: translate3d(2.8%, -2.2%, 0); } }
+/* Le reflet satiné qui traverse la surface (~52 s, perceptible) */
 .sheen {
-  position: absolute; inset: 0; z-index: 1;
-  pointer-events: none;
+  position: absolute; inset: 0;
   background: linear-gradient(118deg,
-    transparent 18%,
-    rgba(255, 240, 210, 0.55) 40%,
+    transparent 16%,
+    rgba(255, 242, 212, 0.75) 40%,
     transparent 58%,
-    rgba(255, 228, 182, 0.35) 78%,
+    rgba(255, 228, 182, 0.5) 78%,
     transparent 94%);
   background-size: 260% 100%;
   background-position: 0% 0;
   mix-blend-mode: soft-light;
-  animation: sheenDrift 90s ease-in-out infinite alternate;
+  animation: sheenDrift 52s ease-in-out infinite alternate;
 }
 @keyframes sheenDrift { to { background-position: 100% 0; } }
-/* Voile de lisibilité : le fond reste tamisé sous les cartes */
-.soft-veil {
-  position: absolute; inset: 0; z-index: 2;
+
+/* ---- Le gros encart : il FLOTTE au-dessus du satin ---- */
+.float-wrap { position: relative; z-index: 2; }
+.float-wrap::before {
+  /* rétro-éclairage : halo d'or derrière la carte, le plus
+     lumineux au ras de ses bords, fondu dans le satin */
+  content: "";
+  position: absolute; inset: -6% -4%;
+  background: radial-gradient(closest-side,
+    rgba(255, 218, 152, 0.9),
+    rgba(255, 218, 152, 0.35) 58%,
+    rgba(255, 218, 152, 0) 80%);
+  filter: blur(16px);
   pointer-events: none;
-  background: linear-gradient(180deg,
-    rgba(255, 252, 244, 0.14) 0%,
-    rgba(255, 252, 244, 0.30) 58%,
-    rgba(246, 238, 223, 0.48) 100%);
 }
+.epicentre {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  overflow: hidden;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 252, 240, 0.95),  /* lisière lumineuse en tranche haute */
+    0 2px 6px rgba(120, 70, 18, 0.12),         /* ombre de contact dense */
+    0 14px 30px -6px rgba(120, 70, 18, 0.20),  /* ombre proche */
+    0 48px 90px -18px rgba(120, 70, 18, 0.30); /* ombre ambiante large */
+}
+/* LA comète : une seule, majestueuse, sur le contour du gros encart */
+@property --sb {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.epicentre::after {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(from var(--sb),
+    transparent 0deg,
+    transparent 240deg,
+    rgba(255, 214, 140, 0.18) 282deg,
+    rgba(244, 164, 76, 0.55) 330deg,
+    rgba(199, 83, 15, 0.9) 352deg,
+    rgba(255, 232, 178, 0.55) 360deg);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 6;
+  animation: starBorder 18s linear infinite;
+}
+@keyframes starBorder { to { --sb: 360deg; } }
 .grain {
   position: absolute; inset: 0; z-index: 2;
   pointer-events: none;
@@ -297,6 +367,7 @@ img { display: block; }
   font-size: clamp(1.7rem, 3.6vw, 2.5rem);
   font-weight: 800; letter-spacing: -0.015em; line-height: 1.08;
 }
+.hello-text h1 .nobr { white-space: nowrap; }
 .hello-text h1 .sun {
   display: inline-block;
   font-size: 0.72em;
@@ -505,46 +576,6 @@ img { display: block; }
   box-shadow: 0 2px 8px rgba(140, 84, 24, 0.06);
   transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
-
-/* ---- STAR BORDER · une comète dorée voyage sur le contour ----
-   Un conic-gradient tourné via une propriété @property, masqué
-   (content-box exclu) pour ne laisser qu'un anneau de ~1,5 px au
-   bord. Tête orange renard, traîne d'or qui fond au transparent.
-   Lent (11-13 s/tour), départs déphasés : un scintillement,
-   pas une guirlande. Le contenu ne bouge pas d'un cheveu. */
-@property --sb {
-  syntax: "<angle>";
-  inherits: false;
-  initial-value: 0deg;
-}
-.widget::after, .fen::after {
-  content: "";
-  position: absolute; inset: -1px;
-  border-radius: inherit;
-  padding: 1.5px;
-  background: conic-gradient(from var(--sb),
-    transparent 0deg,
-    transparent 292deg,
-    rgba(255, 205, 130, 0.28) 320deg,
-    rgba(240, 150, 60, 0.62) 347deg,
-    rgba(199, 83, 15, 0.85) 357deg,
-    rgba(255, 224, 165, 0.5) 360deg);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask-composite: exclude;
-  pointer-events: none;
-  animation: starBorder 12s linear infinite;
-}
-@keyframes starBorder { to { --sb: 360deg; } }
-/* Départs déphasés, cadences légèrement différentes */
-.glance .widget:nth-of-type(1)::after { animation-delay: -1.2s; }
-.glance .widget:nth-of-type(2)::after { animation-delay: -4.3s; animation-duration: 13s; }
-.glance .widget:nth-of-type(3)::after { animation-delay: -7.1s; animation-duration: 11s; }
-.glance .widget:nth-of-type(4)::after { animation-delay: -9.8s; }
-/* La fenêtre contextuelle : sa comète ne tourne que quand elle est ouverte */
-.fen::after { animation-duration: 13s; animation-play-state: paused; }
-.fen.active::after { animation-play-state: running; }
 .widget:hover {
   transform: translateX(4px);
   border-color: var(--border-strong);
@@ -989,13 +1020,14 @@ img { display: block; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.001s !important;
   }
-  .silk i, .sheen, .beam, .rays, .filou-figure::before,
+  .silk i, .folds, .sheen, .beam, .rays, .filou-figure::before,
   .filou-figure img, .filou-figure::after, .typing i { animation: none !important; }
   .stat-fill { transition: none; }
-  /* Star Border : plus de comète, un simple liseré chaud statique */
-  .widget::after, .fen::after {
+  /* Star Border : plus de comète, un simple liseré chaud statique.
+     Le satin est figé ; la profondeur (ombres, halo) reste, immobile. */
+  .epicentre::after {
     animation: none !important;
-    background: rgba(199, 83, 15, 0.16);
+    background: rgba(199, 83, 15, 0.18);
   }
 }
 </style>
@@ -1049,12 +1081,18 @@ img { display: block; }
     </a>
   </header>
 
-  <!-- ===================== ÉPICENTRE ===================== -->
-  <section class="epicentre" aria-label="Accueil du matin : Filou et la fenêtre contextuelle">
-    <div class="silk" aria-hidden="true"><i class="s1"></i><i class="s2"></i><i class="s3"></i><i class="s4"></i></div>
-    <div class="sheen" aria-hidden="true"></div>
-    <div class="soft-veil" aria-hidden="true"></div>
-    <div class="grain" aria-hidden="true"></div>
+  <!-- ============ LA SCÈNE : satin en cadre, gros encart flottant ============ -->
+  <section class="scene" aria-label="Accueil du matin : Filou et la fenêtre contextuelle">
+    <div class="satin" id="satin" aria-hidden="true">
+      <div class="silk"><i class="s1"></i><i class="s2"></i><i class="s3"></i><i class="s4"></i></div>
+      <div class="folds f1"></div>
+      <div class="folds f2"></div>
+      <div class="sheen"></div>
+      <div class="grain"></div>
+    </div>
+
+    <div class="float-wrap">
+    <div class="epicentre">
 
     <div class="epi-inner">
 
@@ -1067,7 +1105,7 @@ img { display: block; }
           </div>
           <div class="hello-text">
             <p class="hello-kicker">Jeudi 15 janvier 2026 · cabinet du Val d'Allier</p>
-            <h1>Bonjour Anne-Sophie <span class="sun">☀️</span></h1>
+            <h1>Bonjour <span class="nobr">Anne-Sophie <span class="sun">☀️</span></span></h1>
             <p class="hello-sub">Le brouillon <b>Hiver 2026</b> est cohérent, l'équipe est au complet.<br>Que puis-je faire pour toi ?</p>
           </div>
         </div>
@@ -1420,6 +1458,9 @@ img { display: block; }
 
       </div><!-- /stage -->
     </div><!-- /epi-inner -->
+
+    </div><!-- /epicentre -->
+    </div><!-- /float-wrap -->
   </section>
 
   <!-- Réglette de démo : cas A (période déjà configurée) / cas B (Filou questionne) -->
@@ -1436,6 +1477,25 @@ img { display: block; }
   "use strict";
   var $ = function (s) { return document.querySelector(s); };
   var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ============================================================
+     PARALLAXE PASSIVE · le satin dérive un peu plus lentement que
+     la carte au scroll : deux plans distincts. Jamais à la souris.
+     ============================================================ */
+  (function () {
+    if (REDUCED) return;
+    var satin = document.getElementById("satin");
+    if (!satin) return;
+    var tick = false;
+    window.addEventListener("scroll", function () {
+      if (tick) return;
+      tick = true;
+      window.requestAnimationFrame(function () {
+        satin.style.transform = "translate3d(0," + (window.scrollY * 0.07).toFixed(1) + "px,0)";
+        tick = false;
+      });
+    }, { passive: true });
+  })();
 
   /* ============================================================
      LE FIL DE FILOU · chat auto-nettoyant
