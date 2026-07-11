@@ -75,7 +75,7 @@ button:focus-visible, input:focus-visible, a:focus-visible {
   outline-offset: 2px;
 }
 img { display: block; }
-.shell { max-width: 1240px; margin: 0 auto; padding: 0 clamp(14px, 3vw, 36px); }
+.shell { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 0 clamp(14px, 3vw, 36px); }
 
 /* ============================================================
    BARRE DE NAVIGATION COMMUNE (identique sur toutes les tranches)
@@ -117,23 +117,20 @@ img { display: block; }
 }
 
 /* ============================================================
-   LA SCÈNE · le matin dans le terrier
-   Le SATIN occupe tout le cadre (nappes dorées + plis de velours
-   qui respirent + reflet qui traverse) ; le GROS ENCART flotte
-   au-dessus, rétro-éclairé, ourlé d'une comète dorée. Aucune
-   interaction souris — le tissu vit tout seul, lentement.
+   DEUX PLANS · le matin dans le terrier
+   Plan 1 : le SATIN, fond d'écran de TOUTE la page, bord à bord,
+   derrière tout (nav maquette et dock compris). Plan 2 : la carte
+   Filou, seule posée dessus, rétro-éclairée, ourlée d'une
+   étincelle. Aucune surface intermédiaire.
    ============================================================ */
-.scene {
-  position: relative;
-  margin: 22px 0 30px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  overflow: hidden;
-  background: linear-gradient(180deg, #F4E8D0 0%, var(--bg-deep) 100%);
-  padding: clamp(26px, 4.5vw, 62px) clamp(18px, 3.5vw, 56px);
+.scene { position: relative; margin: 14px 0 26px; }
+.satin {
+  position: fixed; inset: -110px 0;
+  z-index: 0;
+  pointer-events: none;
+  will-change: transform;
+  background: linear-gradient(180deg, #F6EBD3 0%, var(--bg-deep) 72%, #E9DABC 100%);
 }
-/* Le groupe satin : dérive en parallaxe passive au scroll (JS) */
-.satin { position: absolute; inset: -90px 0; pointer-events: none; will-change: transform; }
 .silk {
   position: absolute; inset: -22% -12%;
   filter: blur(70px);
@@ -204,18 +201,20 @@ img { display: block; }
 }
 @keyframes sheenDrift { to { background-position: 100% 0; } }
 
-/* ---- Le gros encart : il FLOTTE au-dessus du satin ---- */
+/* ---- La carte Filou : LE seul objet posé sur le satin.
+   Profondeur évidente : rétro-éclairage, ombres 3 couches,
+   lisière. Le bord supérieur reste dégagé (Filou s'y perchera). */
 .float-wrap { position: relative; z-index: 2; }
 .float-wrap::before {
   /* rétro-éclairage : halo d'or derrière la carte, le plus
      lumineux au ras de ses bords, fondu dans le satin */
   content: "";
-  position: absolute; inset: -6% -4%;
+  position: absolute; inset: -9% -5%;
   background: radial-gradient(closest-side,
-    rgba(255, 218, 152, 0.9),
-    rgba(255, 218, 152, 0.35) 58%,
+    rgba(255, 220, 150, 1),
+    rgba(255, 218, 152, 0.45) 56%,
     rgba(255, 218, 152, 0) 80%);
-  filter: blur(16px);
+  filter: blur(22px);
   pointer-events: none;
 }
 .epicentre {
@@ -225,12 +224,14 @@ img { display: block; }
   background: var(--surface);
   overflow: hidden;
   box-shadow:
-    inset 0 1px 0 rgba(255, 252, 240, 0.95),  /* lisière lumineuse en tranche haute */
-    0 2px 6px rgba(120, 70, 18, 0.12),         /* ombre de contact dense */
-    0 14px 30px -6px rgba(120, 70, 18, 0.20),  /* ombre proche */
-    0 48px 90px -18px rgba(120, 70, 18, 0.30); /* ombre ambiante large */
+    inset 0 1px 0 rgba(255, 252, 240, 0.98),   /* lisière lumineuse en tranche haute */
+    0 3px 8px rgba(110, 62, 14, 0.18),          /* ombre de contact dense */
+    0 18px 38px -8px rgba(110, 62, 14, 0.26),   /* ombre proche */
+    0 60px 120px -18px rgba(110, 62, 14, 0.38); /* ombre ambiante large */
 }
-/* LA comète : une seule, majestueuse, sur le contour du gros encart */
+/* L'ÉTINCELLE : une tête blanc chaud éclatante qui circule sur le
+   contour, traîne d'or, deux particules scintillantes dans son
+   sillage, et un micro-halo (::before, même angle, flouté). */
 @property --sb {
   syntax: "<angle>";
   inherits: false;
@@ -240,21 +241,48 @@ img { display: block; }
   content: "";
   position: absolute; inset: 0;
   border-radius: inherit;
-  padding: 2px;
+  padding: 3px;
   background: conic-gradient(from var(--sb),
     transparent 0deg,
-    transparent 240deg,
-    rgba(255, 214, 140, 0.18) 282deg,
-    rgba(244, 164, 76, 0.55) 330deg,
-    rgba(199, 83, 15, 0.9) 352deg,
-    rgba(255, 232, 178, 0.55) 360deg);
+    transparent 248deg,
+    rgba(255, 210, 130, 0.25) 290deg,
+    rgba(246, 158, 62, 0.6) 322deg,
+    rgba(255, 244, 214, 0.95) 328deg,   /* particule 1 */
+    rgba(246, 158, 62, 0.55) 331deg,
+    rgba(243, 148, 50, 0.75) 340deg,
+    rgba(255, 250, 230, 1) 344.5deg,    /* particule 2 */
+    rgba(230, 120, 30, 0.85) 348deg,
+    rgba(255, 253, 244, 1) 353deg,      /* la tête, blanc chaud éclatant */
+    rgba(255, 238, 190, 0.85) 357deg,
+    rgba(255, 226, 168, 0.35) 360deg);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask-composite: exclude;
   pointer-events: none;
   z-index: 6;
-  animation: starBorder 18s linear infinite;
+  animation: starBorder 16s linear infinite;
+}
+.epicentre::before {
+  /* le micro-halo de la tête : même conic, même angle, flouté */
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  padding: 7px;
+  background: conic-gradient(from var(--sb),
+    transparent 0deg,
+    transparent 336deg,
+    rgba(255, 216, 140, 0.9) 352deg,
+    rgba(255, 232, 180, 0.5) 357deg,
+    transparent 360deg);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  filter: blur(5px);
+  pointer-events: none;
+  z-index: 6;
+  animation: starBorder 16s linear infinite;
 }
 @keyframes starBorder { to { --sb: 360deg; } }
 .grain {
@@ -901,12 +929,12 @@ img { display: block; }
 .dock-menu {
   display: flex; align-items: center; gap: 2px;
   width: max-content; max-width: 100%;
-  margin: 16px 0 0;
+  margin: 16px auto 0; /* centré, quasi accolé à la carte (la scène ajoute ~14 px) */
   padding: 7px;
   background: rgba(255, 252, 244, 0.9);
   border: 1px solid var(--border);
   border-radius: 999px;
-  box-shadow: 0 4px 16px rgba(140, 84, 24, 0.07);
+  box-shadow: 0 6px 20px rgba(120, 70, 18, 0.12), 0 2px 5px rgba(120, 70, 18, 0.08);
   overflow-x: auto;
 }
 .dock-item {
@@ -1023,16 +1051,29 @@ img { display: block; }
   .silk i, .folds, .sheen, .beam, .rays, .filou-figure::before,
   .filou-figure img, .filou-figure::after, .typing i { animation: none !important; }
   .stat-fill { transition: none; }
-  /* Star Border : plus de comète, un simple liseré chaud statique.
+  /* Étincelle : plus de circulation, un simple liseré chaud statique.
      Le satin est figé ; la profondeur (ombres, halo) reste, immobile. */
   .epicentre::after {
     animation: none !important;
     background: rgba(199, 83, 15, 0.18);
   }
+  .epicentre::before {
+    animation: none !important;
+    background: none;
+  }
 }
 </style>
 </head>
 <body>
+
+<!-- Plan 1 · le satin : fond d'écran de toute la page, derrière tout -->
+<div class="satin" id="satin" aria-hidden="true">
+  <div class="silk"><i class="s1"></i><i class="s2"></i><i class="s3"></i><i class="s4"></i></div>
+  <div class="folds f1"></div>
+  <div class="folds f2"></div>
+  <div class="sheen"></div>
+  <div class="grain"></div>
+</div>
 
 <nav class="mq-nav" aria-label="Tranches de la grande maquette">
   <span class="mq-brand">
@@ -1081,16 +1122,8 @@ img { display: block; }
     </a>
   </header>
 
-  <!-- ============ LA SCÈNE : satin en cadre, gros encart flottant ============ -->
+  <!-- ============ Plan 2 · la carte Filou, seule posée sur le satin ============ -->
   <section class="scene" aria-label="Accueil du matin : Filou et la fenêtre contextuelle">
-    <div class="satin" id="satin" aria-hidden="true">
-      <div class="silk"><i class="s1"></i><i class="s2"></i><i class="s3"></i><i class="s4"></i></div>
-      <div class="folds f1"></div>
-      <div class="folds f2"></div>
-      <div class="sheen"></div>
-      <div class="grain"></div>
-    </div>
-
     <div class="float-wrap">
     <div class="epicentre">
 
