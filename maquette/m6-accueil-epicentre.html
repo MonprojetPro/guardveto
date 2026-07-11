@@ -298,48 +298,41 @@ img { display: block; }
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.95fr);
   gap: clamp(18px, 3vw, 36px);
-  padding: clamp(20px, 3.4vw, 40px);
+  padding: clamp(22px, 3vw, 38px) clamp(20px, 3.4vw, 40px) clamp(20px, 3.4vw, 36px);
   align-items: stretch;
-  min-height: 560px;
+  min-height: 540px;
 }
 
 /* ---------------- Le bureau de Filou (gauche) ---------------- */
 .desk { display: flex; flex-direction: column; min-width: 0; }
-.desk-hello { display: flex; align-items: flex-end; gap: 18px; }
-.filou-figure { position: relative; flex: none; width: clamp(88px, 10vw, 118px); }
-.filou-figure img {
-  width: 100%; height: auto;
-  filter: drop-shadow(0 12px 20px rgba(120, 70, 18, 0.28));
-  animation: filouBob 5.2s ease-in-out infinite;
-  transform-origin: 50% 100%;
-}
-@keyframes filouBob {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-5px) rotate(-0.6deg); }
-}
-.filou-figure::after {
-  content: "";
-  position: absolute; left: 14%; right: 14%; bottom: -7px;
-  height: 12px; border-radius: 50%;
-  background: rgba(120, 70, 18, 0.16);
-  filter: blur(3px);
-  animation: filouShade 5.2s ease-in-out infinite;
-}
-@keyframes filouShade {
-  0%, 100% { transform: scaleX(1); opacity: 1; }
-  50%      { transform: scaleX(0.86); opacity: 0.7; }
-}
+.desk-hello { min-width: 0; }
 
-/* ---- SIDE RAYS : la lumière met Filou en scène ----
-   2-3 faisceaux très diffus qui tombent en biais depuis le haut
-   et convergent sur Filou. Ancrés DANS .filou-figure (origine de
-   rotation = Filou), ils le suivent à tous les points de rupture.
-   Scintillement très lent, jamais un projecteur. */
-.filou-figure::before {
+/* ---- FILOU PERCHÉ · la vidéo transparente assise sur la tranche
+   de la carte (avatar provisoire, intégration définitive).
+   Le bas de la vidéo (jambes pendantes) chevauche le bord
+   supérieur de ~88 px ; il est aligné sur la GOUTTIÈRE entre les
+   deux colonnes : dessous, presque rien — il respire.
+   Repli : image fox-1 si la vidéo ne charge pas. Jamais de trou. */
+.filou-perch {
+  position: absolute;
+  left: 52%;
+  bottom: calc(100% - 88px);
+  transform: translateX(-50%);
+  width: 220px;
+  z-index: 7;
+  pointer-events: none;
+}
+.filou-perch video,
+.filou-perch img.filou-fallback {
+  width: 100%; height: auto; display: block;
+  filter: drop-shadow(0 14px 22px rgba(110, 62, 14, 0.32));
+}
+.filou-perch img.filou-fallback { width: 62%; margin: 0 auto; }
+.filou-perch::before {
   /* le halo qui se pose sur lui */
   content: "";
-  position: absolute; left: -46%; right: -46%; top: -30%; bottom: -16%;
-  background: radial-gradient(closest-side, rgba(255, 224, 168, 0.62), rgba(255, 224, 168, 0) 72%);
+  position: absolute; left: -20%; right: -20%; top: 4%; bottom: 16%;
+  background: radial-gradient(closest-side, rgba(255, 224, 168, 0.55), rgba(255, 224, 168, 0) 72%);
   z-index: -1; pointer-events: none;
   animation: haloBreath 18s ease-in-out infinite;
 }
@@ -347,8 +340,12 @@ img { display: block; }
   0%, 100% { opacity: 0.72; }
   50%      { opacity: 1; }
 }
+
+/* ---- SIDE RAYS : la lumière tombe du haut-GAUCHE et converge
+   sur le Filou perché. Ancrés dans .filou-perch : ils le suivent
+   à tous les points de rupture. Scintillement très lent. */
 .rays {
-  position: absolute; left: 50%; top: 26%;
+  position: absolute; left: 50%; top: 30%;
   width: 0; height: 0;
   z-index: -1; pointer-events: none;
   animation: raysSway 46s ease-in-out infinite alternate;
@@ -369,22 +366,22 @@ img { display: block; }
   clip-path: polygon(10% 0, 90% 0, 60% 100%, 40% 100%);
   filter: blur(9px);
 }
-.beam.b1 { transform: rotate(27deg); animation: beamGlow 19s ease-in-out infinite; }
+.beam.b1 { transform: rotate(-27deg); animation: beamGlow 19s ease-in-out infinite; }
 .beam.b2 {
   width: 96px; margin-left: -48px; height: 560px;
-  transform: rotate(36deg);
+  transform: rotate(-36deg);
   animation: beamGlow 25s ease-in-out infinite; animation-delay: -9s;
 }
 .beam.b3 {
   width: 68px; margin-left: -34px; height: 500px;
-  transform: rotate(17deg);
+  transform: rotate(-17deg);
   animation: beamGlow 31s ease-in-out infinite; animation-delay: -17s;
 }
 @keyframes beamGlow {
   0%, 100% { opacity: 0.5; }
   50%      { opacity: 0.95; }
 }
-.hello-text { min-width: 0; padding-bottom: 4px; }
+.hello-text { min-width: 0; }
 .hello-kicker {
   font-family: var(--font-display);
   font-size: 0.7rem; font-weight: 700; letter-spacing: 0.14em;
@@ -426,9 +423,9 @@ img { display: block; }
 /* ------ Le fil de conversation (échange en cours) ------ */
 .thread {
   flex: 1;
-  margin: 18px 0 12px;
+  margin: 20px 0 14px;
   display: flex; flex-direction: column; justify-content: flex-end; gap: 9px;
-  min-height: 120px;
+  min-height: 148px;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -926,10 +923,18 @@ img { display: block; }
    à la voisine, l'ancienne se replie pendant que la nouvelle
    se déplie (transitions croisées). Né mobile, même geste partout.
    ============================================================ */
+/* La bande au-dessus de la carte : Filou perché y déborde à
+   gauche-centre, le dock vit en bas-DROITE, accolé à la carte.
+   Les deux respirent, chacun son tiers. */
+.over-card {
+  display: flex; justify-content: flex-end; align-items: flex-end;
+  min-height: 168px;
+  margin-top: 4px;
+}
 .dock-menu {
   display: flex; align-items: center; gap: 2px;
   width: max-content; max-width: 100%;
-  margin: 16px auto 0; /* centré, quasi accolé à la carte (la scène ajoute ~14 px) */
+  margin: 0;
   padding: 7px;
   background: rgba(255, 252, 244, 0.9);
   border: 1px solid var(--border);
@@ -1032,11 +1037,17 @@ img { display: block; }
   .fen { position: static; visibility: hidden; display: none; max-height: none; }
   .stage.open .fen.active { display: flex; visibility: visible; }
   .thread { min-height: 76px; max-height: 220px; }
+  /* Filou plus petit, perché à droite (la salutation est à gauche) */
+  .over-card { min-height: 116px; }
+  .filou-perch {
+    width: 150px;
+    left: auto; right: 16px; transform: none;
+    bottom: calc(100% - 60px);
+  }
 }
 @media (max-width: 560px) {
-  .desk-hello { align-items: center; }
-  .filou-figure { width: 72px; }
   .recap-grid { grid-template-columns: 1fr; }
+  .filou-perch { width: 124px; right: 8px; bottom: calc(100% - 50px); }
 }
 
 /* ============================================================
@@ -1048,8 +1059,8 @@ img { display: block; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.001s !important;
   }
-  .silk i, .folds, .sheen, .beam, .rays, .filou-figure::before,
-  .filou-figure img, .filou-figure::after, .typing i { animation: none !important; }
+  .silk i, .folds, .sheen, .beam, .rays, .filou-perch::before,
+  .typing i { animation: none !important; }
   .stat-fill { transition: none; }
   /* Étincelle : plus de circulation, un simple liseré chaud statique.
      Le satin est figé ; la profondeur (ombres, halo) reste, immobile. */
@@ -1093,9 +1104,12 @@ img { display: block; }
 
 <div class="shell">
 
-  <!-- ============ DOCK DES MAISONS (header de la page) ============
-       Icônes seules au repos ; le libellé se déplie au survol/focus. -->
-  <header class="dock-menu rise" aria-label="Les six espaces de GuardVeto">
+  <!-- ============ LA BANDE AU-DESSUS DE LA CARTE ============
+       Filou perché y déborde à gauche-centre ; le dock vit en
+       bas-droite, accolé à la carte. Icônes seules au repos ;
+       le libellé se déplie au survol/focus. -->
+  <div class="over-card rise">
+  <header class="dock-menu" aria-label="Les six espaces de GuardVeto">
     <a class="dock-item" href="m1-planning.html" aria-label="Planning · brouillon Hiver 2026 en cours">
       <span class="di-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="4.5"/><path d="M8 3.2v3.4M16 3.2v3.4M3.5 10.2h17"/><circle cx="12" cy="15.2" r="1.7" fill="currentColor" stroke="none"/></svg><i class="di-pip warn"></i></span>
       <span class="di-flap" aria-hidden="true"><span class="di-text">Planning · Brouillon Hiver 2026</span></span>
@@ -1121,10 +1135,21 @@ img { display: block; }
       <span class="di-flap" aria-hidden="true"><span class="di-text">Réglages · Agenda connecté ✓</span></span>
     </a>
   </header>
+  </div><!-- /over-card -->
 
   <!-- ============ Plan 2 · la carte Filou, seule posée sur le satin ============ -->
   <section class="scene" aria-label="Accueil du matin : Filou et la fenêtre contextuelle">
     <div class="float-wrap">
+
+    <!-- Filou ANIMÉ, perché sur la tranche de la carte (provisoire :
+         la boucle sera remplacée ; l'intégration est définitive) -->
+    <div class="filou-perch" aria-hidden="true">
+      <span class="rays"><span class="beam b1"></span><span class="beam b2"></span><span class="beam b3"></span></span>
+      <video id="filou-video" autoplay loop muted playsinline>
+        <source src="../filou/filou-idle-salut.webm" type="video/webm">
+      </video>
+    </div>
+
     <div class="epicentre">
 
     <div class="epi-inner">
@@ -1132,10 +1157,6 @@ img { display: block; }
       <!-- ------ Le bureau de Filou ------ -->
       <div class="desk">
         <div class="desk-hello rise">
-          <div class="filou-figure" aria-hidden="true">
-            <span class="rays"><span class="beam b1"></span><span class="beam b2"></span><span class="beam b3"></span></span>
-            <img src="../fox-1.png" alt="">
-          </div>
           <div class="hello-text">
             <p class="hello-kicker">Jeudi 15 janvier 2026 · cabinet du Val d'Allier</p>
             <h1>Bonjour <span class="nobr">Anne-Sophie <span class="sun">☀️</span></span></h1>
@@ -1510,6 +1531,33 @@ img { display: block; }
   "use strict";
   var $ = function (s) { return document.querySelector(s); };
   var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ============================================================
+     FILOU PERCHÉ · repli sans trou : si la vidéo WebM alpha ne
+     charge pas (Safari, fichier absent) OU en motion réduite,
+     l'image statique fox-1 prend sa place sur le perchoir.
+     ============================================================ */
+  (function () {
+    var v = document.getElementById("filou-video");
+    if (!v) return;
+    var swapped = false;
+    function fallback() {
+      if (swapped || !v.isConnected) return;
+      swapped = true;
+      var img = document.createElement("img");
+      img.src = "../fox-1.png";
+      img.alt = "";
+      img.className = "filou-fallback";
+      v.replaceWith(img);
+    }
+    if (REDUCED) { fallback(); return; }
+    v.addEventListener("error", fallback, true); /* capte aussi l'échec des <source> */
+    var src = v.querySelector("source");
+    if (src) src.addEventListener("error", fallback);
+    window.setTimeout(function () {
+      if (v.readyState < 2) fallback(); /* rien de décodable après 3 s */
+    }, 3000);
+  })();
 
   /* ============================================================
      PARALLAXE PASSIVE · le satin dérive un peu plus lentement que
