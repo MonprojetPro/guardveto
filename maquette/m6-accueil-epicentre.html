@@ -495,6 +495,7 @@ img { display: block; }
   padding-left: 4px;
 }
 .widget {
+  position: relative;
   display: flex; align-items: center; gap: 14px;
   text-align: left;
   background: rgba(255, 252, 244, 0.82);
@@ -504,6 +505,46 @@ img { display: block; }
   box-shadow: 0 2px 8px rgba(140, 84, 24, 0.06);
   transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
+
+/* ---- STAR BORDER · une comète dorée voyage sur le contour ----
+   Un conic-gradient tourné via une propriété @property, masqué
+   (content-box exclu) pour ne laisser qu'un anneau de ~1,5 px au
+   bord. Tête orange renard, traîne d'or qui fond au transparent.
+   Lent (11-13 s/tour), départs déphasés : un scintillement,
+   pas une guirlande. Le contenu ne bouge pas d'un cheveu. */
+@property --sb {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.widget::after, .fen::after {
+  content: "";
+  position: absolute; inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(from var(--sb),
+    transparent 0deg,
+    transparent 292deg,
+    rgba(255, 205, 130, 0.28) 320deg,
+    rgba(240, 150, 60, 0.62) 347deg,
+    rgba(199, 83, 15, 0.85) 357deg,
+    rgba(255, 224, 165, 0.5) 360deg);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: starBorder 12s linear infinite;
+}
+@keyframes starBorder { to { --sb: 360deg; } }
+/* Départs déphasés, cadences légèrement différentes */
+.glance .widget:nth-of-type(1)::after { animation-delay: -1.2s; }
+.glance .widget:nth-of-type(2)::after { animation-delay: -4.3s; animation-duration: 13s; }
+.glance .widget:nth-of-type(3)::after { animation-delay: -7.1s; animation-duration: 11s; }
+.glance .widget:nth-of-type(4)::after { animation-delay: -9.8s; }
+/* La fenêtre contextuelle : sa comète ne tourne que quand elle est ouverte */
+.fen::after { animation-duration: 13s; animation-play-state: paused; }
+.fen.active::after { animation-play-state: running; }
 .widget:hover {
   transform: translateX(4px);
   border-color: var(--border-strong);
@@ -817,82 +858,90 @@ img { display: block; }
 .check-row .ck.warn { color: var(--warn); }
 
 /* ============================================================
-   DOCK DES MAISONS · dans le header de la page
-   Icônes SVG dessinées maison + libellé ; au survol/focus,
-   l'entrée s'illumine en orange renard, l'icône se soulève et
-   un point d'accent apparaît. Mobile : icônes seules.
+   DOCK DES MAISONS · signature « modern mobile menu »
+   Au repos : icônes SEULES, traits fins, dans une pilule épurée.
+   L'entrée survolée / au focus SE DÉPLIE : son libellé glisse
+   horizontalement à côté de l'icône (la pilule s'élargit pour
+   lui faire de la place), en orange renard, avec un trait
+   souligné. Une seule entrée dépliée à la fois — quand on passe
+   à la voisine, l'ancienne se replie pendant que la nouvelle
+   se déplie (transitions croisées). Né mobile, même geste partout.
    ============================================================ */
 .dock-menu {
-  display: flex; align-items: stretch; gap: 4px;
+  display: flex; align-items: center; gap: 2px;
   width: max-content; max-width: 100%;
   margin: 16px 0 0;
-  padding: 8px;
-  background: rgba(255, 252, 244, 0.78);
+  padding: 7px;
+  background: rgba(255, 252, 244, 0.9);
   border: 1px solid var(--border);
-  border-radius: 24px;
+  border-radius: 999px;
   box-shadow: 0 4px 16px rgba(140, 84, 24, 0.07);
   overflow-x: auto;
 }
 .dock-item {
-  position: relative;
-  display: flex; flex-direction: column; align-items: center; gap: 5px;
-  min-width: 98px; flex: none;
-  padding: 12px 14px 15px;
-  border-radius: 17px;
+  display: flex; align-items: center;
+  height: 46px; flex: none;
+  padding: 0 13px;
+  border-radius: 999px;
   text-decoration: none;
-  color: var(--muted);
-  transition: background-color 0.25s ease, color 0.25s ease;
+  color: var(--soft);
+  transition: color 0.25s ease;
 }
 .dock-item .di-ico {
-  width: 28px; height: 28px;
-  color: var(--soft);
-  transition: transform 0.3s var(--ease-out), color 0.25s ease;
+  position: relative;
+  width: 23px; height: 23px; flex: none;
+  transition: color 0.25s ease;
 }
 .dock-item .di-ico svg { width: 100%; height: 100%; display: block; }
-.dock-item .di-label {
-  font-family: var(--font-display);
-  font-size: 0.72rem; font-weight: 700;
-  white-space: nowrap; line-height: 1.2;
+/* Le point d'état, discret, accroché au coin de l'icône */
+.di-pip {
+  position: absolute; top: -3px; right: -4px;
+  width: 8px; height: 8px; border-radius: 50%;
+  border: 2px solid var(--surface);
+  box-sizing: content-box;
+  font-style: normal;
 }
-.dock-item .di-dot {
-  position: absolute; bottom: 6px; left: 50%;
-  width: 5px; height: 5px; margin-left: -2.5px;
-  border-radius: 50%;
+.di-pip.warn { background: var(--warn); }
+.di-pip.ok { background: var(--ok); }
+.di-pip.count {
+  width: 15px; height: 15px; top: -7px; right: -9px;
   background: var(--accent);
-  transform: scale(0); opacity: 0;
-  transition: transform 0.3s var(--ease-out), opacity 0.2s ease;
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 0.56rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1;
 }
-.dock-item:hover, .dock-item:focus-visible {
-  background: var(--accent-soft);
+/* Le libellé replié : 0fr → 1fr, la pilule s'élargit en douceur */
+.di-flap {
+  display: grid; grid-template-columns: 0fr;
+  opacity: 0;
+  transition: grid-template-columns 0.38s var(--ease-out), opacity 0.22s ease;
+}
+.di-text {
+  min-width: 0; overflow: hidden; white-space: nowrap;
+  position: relative;
+  padding: 0 3px 5px 10px;
+  font-family: var(--font-display);
+  font-size: 0.78rem; font-weight: 700;
   color: var(--accent-ink);
 }
-.dock-item:hover .di-ico, .dock-item:focus-visible .di-ico {
-  transform: translateY(-3px);
-  color: var(--accent);
+.di-text::after {
+  /* le trait souligné de l'entrée dépliée */
+  content: "";
+  position: absolute; left: 10px; right: 4px; bottom: 0;
+  height: 2px; border-radius: 2px;
+  background: var(--accent);
+  transform: scaleX(0); transform-origin: left center;
+  transition: transform 0.3s var(--ease-out) 0.12s;
 }
-.dock-item:hover .di-dot, .dock-item:focus-visible .di-dot {
-  transform: scale(1); opacity: 1;
+.dock-item:hover, .dock-item:focus-visible { color: var(--accent); }
+.dock-item:hover .di-flap, .dock-item:focus-visible .di-flap {
+  grid-template-columns: 1fr;
+  opacity: 1;
 }
-.di-badge {
-  position: absolute; top: 5px; right: 7px;
-  font-size: 0.56rem; font-weight: 700;
-  border-radius: 999px; padding: 2px 7px;
-  background: var(--surface-2); color: var(--muted);
-  border: 1px solid var(--border);
-  white-space: nowrap;
-}
-.di-badge.warn { background: var(--warn-soft); color: var(--warn); border-color: rgba(196, 138, 20, 0.35); }
-.di-badge.accent { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--border-strong); }
-.di-badge.ok { background: var(--ok-soft); color: var(--ok); border-color: rgba(90, 150, 60, 0.35); }
-@media (max-width: 700px) {
-  /* le dock se resserre : icônes seules, badges en pastilles */
-  .dock-item { min-width: 54px; padding: 12px 10px 14px; }
-  .dock-item .di-label { display: none; }
-  .di-badge {
-    font-size: 0; padding: 0;
-    width: 9px; height: 9px;
-    top: 6px; right: 6px;
-  }
+.dock-item:hover .di-text::after, .dock-item:focus-visible .di-text::after {
+  transform: scaleX(1);
 }
 
 /* Réglette de démo (bascule cas A / cas B de la période) */
@@ -943,6 +992,11 @@ img { display: block; }
   .silk i, .sheen, .beam, .rays, .filou-figure::before,
   .filou-figure img, .filou-figure::after, .typing i { animation: none !important; }
   .stat-fill { transition: none; }
+  /* Star Border : plus de comète, un simple liseré chaud statique */
+  .widget::after, .fen::after {
+    animation: none !important;
+    background: rgba(199, 83, 15, 0.16);
+  }
 }
 </style>
 </head>
@@ -966,40 +1020,32 @@ img { display: block; }
 
 <div class="shell">
 
-  <!-- ============ DOCK DES MAISONS (header de la page) ============ -->
+  <!-- ============ DOCK DES MAISONS (header de la page) ============
+       Icônes seules au repos ; le libellé se déplie au survol/focus. -->
   <header class="dock-menu rise" aria-label="Les six espaces de GuardVeto">
-    <a class="dock-item" href="m1-planning.html">
-      <span class="di-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="4.5"/><path d="M8 3.2v3.4M16 3.2v3.4M3.5 10.2h17"/><circle cx="12" cy="15.2" r="1.7" fill="currentColor" stroke="none"/></svg></span>
-      <span class="di-label">Planning</span>
-      <span class="di-badge warn">Brouillon</span>
-      <span class="di-dot" aria-hidden="true"></span>
+    <a class="dock-item" href="m1-planning.html" aria-label="Planning · brouillon Hiver 2026 en cours">
+      <span class="di-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="4.5"/><path d="M8 3.2v3.4M16 3.2v3.4M3.5 10.2h17"/><circle cx="12" cy="15.2" r="1.7" fill="currentColor" stroke="none"/></svg><i class="di-pip warn"></i></span>
+      <span class="di-flap" aria-hidden="true"><span class="di-text">Planning · Brouillon Hiver 2026</span></span>
     </a>
-    <a class="dock-item" href="m3-absences-echanges.html">
-      <span class="di-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7.3 9.2a5.6 5.6 0 0 1 9.6-2.5"/><path d="M17.6 3.6v3.2h-3.2"/><path d="M16.7 14.8a5.6 5.6 0 0 1-9.6 2.5"/><path d="M6.4 20.4v-3.2h3.2"/></svg></span>
-      <span class="di-label">Absences &amp; échanges</span>
-      <span class="di-badge accent" id="menu-souhaits-badge">3 souhaits</span>
-      <span class="di-dot" aria-hidden="true"></span>
+    <a class="dock-item" href="m3-absences-echanges.html" id="dock-absences" aria-label="Absences et échanges · 3 souhaits en attente">
+      <span class="di-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7.3 9.2a5.6 5.6 0 0 1 9.6-2.5"/><path d="M17.6 3.6v3.2h-3.2"/><path d="M16.7 14.8a5.6 5.6 0 0 1-9.6 2.5"/><path d="M6.4 20.4v-3.2h3.2"/></svg><i class="di-pip count" id="pip-souhaits">3</i></span>
+      <span class="di-flap" aria-hidden="true"><span class="di-text" id="label-souhaits">Absences &amp; échanges · 3 souhaits</span></span>
     </a>
-    <a class="dock-item" href="m4-accueil-equipe-historique-connexions.html#sec-equipe">
-      <span class="di-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.6" r="3.2"/><path d="M3.4 19.4c.6-3.3 2.8-5.2 5.6-5.2s5 1.9 5.6 5.2"/><circle cx="17" cy="9.8" r="2.4"/><path d="M15.8 14.3c2.3.4 4.2 2 4.8 4.6"/></svg></span>
-      <span class="di-label">Équipe</span>
-      <span class="di-dot" aria-hidden="true"></span>
+    <a class="dock-item" href="m4-accueil-equipe-historique-connexions.html#sec-equipe" aria-label="Équipe · 7 vétérinaires">
+      <span class="di-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.6" r="3.2"/><path d="M3.4 19.4c.6-3.3 2.8-5.2 5.6-5.2s5 1.9 5.6 5.2"/><circle cx="17" cy="9.8" r="2.4"/><path d="M15.8 14.3c2.3.4 4.2 2 4.8 4.6"/></svg></span>
+      <span class="di-flap" aria-hidden="true"><span class="di-text">Équipe · 7 vétos</span></span>
     </a>
-    <a class="dock-item" href="m2-regles.html">
-      <span class="di-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.4h2.9M11 7.4h9M4 12h8.9M17 12h3M4 16.6h4.9M13 16.6h7"/><circle cx="9" cy="7.4" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="11" cy="16.6" r="2"/></svg></span>
-      <span class="di-label">Règles</span>
-      <span class="di-dot" aria-hidden="true"></span>
+    <a class="dock-item" href="m2-regles.html" aria-label="Règles du cabinet · 12 fermes, 8 souples">
+      <span class="di-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.4h2.9M11 7.4h9M4 12h8.9M17 12h3M4 16.6h4.9M13 16.6h7"/><circle cx="9" cy="7.4" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="11" cy="16.6" r="2"/></svg></span>
+      <span class="di-flap" aria-hidden="true"><span class="di-text">Règles · 12 fermes, 8 souples</span></span>
     </a>
-    <a class="dock-item" href="m4-accueil-equipe-historique-connexions.html#sec-historique">
-      <span class="di-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12.6" r="7.4"/><path d="M12 8.6v4l2.9 1.9"/><path d="M4.6 5.4 6.9 3.7M19.4 5.4 17.1 3.7"/></svg></span>
-      <span class="di-label">Historique &amp; compteurs</span>
-      <span class="di-dot" aria-hidden="true"></span>
+    <a class="dock-item" href="m4-accueil-equipe-historique-connexions.html#sec-historique" aria-label="Historique et compteurs">
+      <span class="di-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12.6" r="7.4"/><path d="M12 8.6v4l2.9 1.9"/><path d="M4.6 5.4 6.9 3.7M19.4 5.4 17.1 3.7"/></svg></span>
+      <span class="di-flap" aria-hidden="true"><span class="di-text">Historique &amp; compteurs</span></span>
     </a>
-    <a class="dock-item" href="m4-accueil-equipe-historique-connexions.html#sec-connexions">
-      <span class="di-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M12 4v2.3M12 17.7V20M4 12h2.3M17.7 12H20M6.3 6.3l1.7 1.7M16 16l1.7 1.7M17.7 6.3 16 8M8 16l-1.7 1.7"/></svg></span>
-      <span class="di-label">Réglages</span>
-      <span class="di-badge ok">✓ agenda</span>
-      <span class="di-dot" aria-hidden="true"></span>
+    <a class="dock-item" href="m4-accueil-equipe-historique-connexions.html#sec-connexions" aria-label="Réglages · agenda connecté">
+      <span class="di-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M12 4v2.3M12 17.7V20M4 12h2.3M17.7 12H20M6.3 6.3l1.7 1.7M16 16l1.7 1.7M17.7 6.3 16 8M8 16l-1.7 1.7"/></svg><i class="di-pip ok"></i></span>
+      <span class="di-flap" aria-hidden="true"><span class="di-text">Réglages · Agenda connecté ✓</span></span>
     </a>
   </header>
 
@@ -1827,7 +1873,9 @@ img { display: block; }
       souhaitsRestants -= 1;
       souhaitAnneCatValide = true;
       /* tous les consommateurs du compteur bougent ensemble */
-      $("#menu-souhaits-badge").textContent = souhaitsRestants + " souhaits";
+      $("#pip-souhaits").textContent = souhaitsRestants;
+      $("#label-souhaits").textContent = "Absences & échanges · " + souhaitsRestants + " souhaits";
+      $("#dock-absences").setAttribute("aria-label", "Absences et échanges · " + souhaitsRestants + " souhaits en attente");
       $("#glance-souhaits-title").textContent = souhaitsRestants + " souhaits de congé en attente";
       $("#glance-souhaits-sub").textContent = "Julie (à arbitrer) et Thomas · Anne-Catherine vient d'être validée";
       $("#fen-souhaits-title").textContent = "Souhaits de congé · " + souhaitsRestants + " en attente";
