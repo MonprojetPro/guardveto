@@ -176,6 +176,33 @@ img { display: block; }
 }
 .epicentre > .epi-inner { position: relative; z-index: 3; }
 
+/* ---- Liquid Ether du Terrier (chantier WAHOU) ----
+   Fluide lumineux WebGL fait main : bruit fractal advecté par un
+   tourbillon qui suit le curseur avec inertie. Rendu à mi-résolution
+   puis adouci au blur pour la matière « lumière liquide ». Palette
+   Terrier uniquement (crème, ors, ambre, orange renard, brin de sauge).
+   Sans WebGL ou en motion réduite → l'aurore CSS reprend la main. */
+#liquid {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  display: none;
+  filter: blur(14px) saturate(1.05);
+  transform: scale(1.07);
+  pointer-events: none;
+}
+.epicentre.liquid-on #liquid { display: block; }
+.epicentre.liquid-on .aurora,
+.epicentre.liquid-on .ray { display: none; }
+.liquid-veil {
+  position: absolute; inset: 0; z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    rgba(255, 252, 244, 0.14) 0%,
+    rgba(255, 252, 244, 0.30) 58%,
+    rgba(246, 238, 223, 0.48) 100%);
+}
+
 .epi-inner {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.95fr);
@@ -305,6 +332,29 @@ img { display: block; }
 .typing i:nth-child(2) { animation-delay: 0.16s; }
 .typing i:nth-child(3) { animation-delay: 0.32s; }
 @keyframes typDot { 0%, 100% { opacity: 0.35; transform: none; } 45% { opacity: 1; transform: translateY(-3px); } }
+
+/* ------ Chat auto-nettoyant : l'échange fini s'évapore ------ */
+.bubble.bye { animation: bubbleOut 0.4s ease both; pointer-events: none; }
+@keyframes bubbleOut {
+  to { opacity: 0; transform: translateY(-9px) scale(0.97); }
+}
+/* Chips de choix / de suite, à même les bulles de Filou */
+.mini-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.mini-chip {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--accent-ink);
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-size: 0.75rem; font-weight: 700;
+  padding: 6px 13px; min-height: 32px;
+  display: inline-flex; align-items: center; gap: 5px;
+  text-decoration: none; cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+.mini-chip:hover { background: var(--accent-soft); transform: translateY(-1px); }
+.mini-chip.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.mini-chip.primary:hover { filter: brightness(1.07); background: var(--accent); }
 
 /* ------ Le champ de consigne, généreux ------ */
 .consigne {
@@ -719,57 +769,53 @@ img { display: block; }
 .check-row .ck.warn { color: var(--warn); }
 
 /* ============================================================
-   LES SIX MAISONS · le chemin des visuels
+   MENU DES MAISONS · dans le header de la page (le chemin des
+   visuels : les 6 espaces sans passer par Filou)
    ============================================================ */
-.maisons { margin-bottom: 36px; }
-.maisons-head {
-  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
-  margin-bottom: 14px; padding: 0 4px;
-}
-.maisons-head h2 { font-size: 1.12rem; font-weight: 800; letter-spacing: -0.01em; }
-.maisons-head p { font-size: 0.78rem; color: var(--muted); }
-.dock {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(172px, 1fr));
-  gap: 12px;
-}
-.maison {
-  position: relative;
-  display: flex; flex-direction: column; gap: 8px;
-  background: var(--surface);
+.app-menu {
+  display: flex; align-items: center; gap: 2px;
+  margin: 16px 0 0;
+  padding: 6px;
+  background: rgba(255, 252, 244, 0.72);
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  padding: 16px 16px 14px;
-  text-decoration: none; color: inherit;
-  box-shadow: 0 2px 8px rgba(140, 84, 24, 0.05);
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  border-radius: 999px;
+  box-shadow: 0 2px 10px rgba(140, 84, 24, 0.06);
+  overflow-x: auto;
 }
-.maison:hover {
-  transform: translateY(-4px);
-  border-color: var(--accent);
-  box-shadow: var(--shadow-card);
+.am-link {
+  display: inline-flex; align-items: center; gap: 7px;
+  white-space: nowrap; flex: none;
+  padding: 8px 13px; border-radius: 999px;
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 0.84rem; font-weight: 600;
+  min-height: 40px;
+  border: 1px solid transparent;
+  transition: color 0.18s ease, background-color 0.18s ease;
 }
-.maison .m-ico {
-  width: 42px; height: 42px; border-radius: 13px;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: 1.25rem;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  transition: transform 0.25s var(--ease-out), background-color 0.2s ease;
-}
-.maison:hover .m-ico { transform: rotate(-6deg) scale(1.08); background: var(--accent-soft); }
-.maison h3 { font-size: 0.92rem; font-weight: 700; line-height: 1.25; }
-.maison .m-state {
-  margin-top: auto;
-  display: inline-flex; align-self: flex-start;
-  font-size: 0.67rem; font-weight: 700;
-  border-radius: 999px; padding: 3px 10px;
+.am-link:hover { color: var(--accent-ink); background: var(--surface-2); }
+.am-link .am-ico { font-size: 0.98rem; }
+.am-badge {
+  font-size: 0.62rem; font-weight: 700;
+  border-radius: 999px; padding: 2px 8px;
   background: var(--surface-2); color: var(--muted);
   border: 1px solid var(--border);
 }
-.m-state.warn { background: var(--warn-soft); color: var(--warn); border-color: rgba(196, 138, 20, 0.35); }
-.m-state.accent { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--border-strong); }
-.m-state.ok { background: var(--ok-soft); color: var(--ok); border-color: rgba(90, 150, 60, 0.35); }
+.am-badge.warn { background: var(--warn-soft); color: var(--warn); border-color: rgba(196, 138, 20, 0.35); }
+.am-badge.accent { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--border-strong); }
+.am-badge.ok { background: var(--ok-soft); color: var(--ok); border-color: rgba(90, 150, 60, 0.35); }
+
+/* Réglette de démo (bascule cas A / cas B de la période) */
+.demo-strip { display: flex; margin: -14px 0 26px; }
+.demo-finish {
+  background: transparent;
+  border: 1.5px dashed var(--border-strong);
+  color: var(--muted);
+  border-radius: 999px;
+  font-size: 0.75rem; font-weight: 600;
+  padding: 8px 15px; min-height: 38px;
+}
+.demo-finish:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
 
 .mq-foot {
   text-align: center;
@@ -793,7 +839,7 @@ img { display: block; }
   .desk-hello { align-items: center; }
   .filou-figure { width: 72px; }
   .recap-grid { grid-template-columns: 1fr; }
-  .dock { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+  .am-link { font-size: 0.78rem; padding: 8px 10px; }
 }
 
 /* ============================================================
@@ -830,10 +876,22 @@ img { display: block; }
 
 <div class="shell">
 
+  <!-- ============ MENU DES MAISONS (header de la page) ============ -->
+  <header class="app-menu rise" aria-label="Les six espaces de GuardVeto">
+    <a class="am-link" href="m1-planning.html"><span class="am-ico" aria-hidden="true">📅</span>Planning<span class="am-badge warn">Brouillon</span></a>
+    <a class="am-link" href="m3-absences-echanges.html"><span class="am-ico" aria-hidden="true">🌴</span>Absences &amp; échanges<span class="am-badge accent" id="menu-souhaits-badge">3 souhaits</span></a>
+    <a class="am-link" href="m4-accueil-equipe-historique-connexions.html#sec-equipe"><span class="am-ico" aria-hidden="true">👥</span>Équipe</a>
+    <a class="am-link" href="m2-regles.html"><span class="am-ico" aria-hidden="true">📏</span>Règles</a>
+    <a class="am-link" href="m4-accueil-equipe-historique-connexions.html#sec-historique"><span class="am-ico" aria-hidden="true">📚</span>Historique &amp; compteurs</a>
+    <a class="am-link" href="m4-accueil-equipe-historique-connexions.html#sec-connexions"><span class="am-ico" aria-hidden="true">⚙️</span>Réglages<span class="am-badge ok">✓ agenda</span></a>
+  </header>
+
   <!-- ===================== ÉPICENTRE ===================== -->
   <section class="epicentre" aria-label="Accueil du matin : Filou et la fenêtre contextuelle">
+    <canvas id="liquid" aria-hidden="true"></canvas>
     <div class="aurora" aria-hidden="true"><i class="a1"></i><i class="a2"></i><i class="a3"></i><i class="a4"></i></div>
     <div class="ray" aria-hidden="true"></div>
+    <div class="liquid-veil" aria-hidden="true"></div>
     <div class="grain" aria-hidden="true"></div>
 
     <div class="epi-inner">
@@ -1109,8 +1167,8 @@ img { display: block; }
           </header>
           <div class="fen-body">
             <div class="recap-grid">
-              <div class="recap-chip hero">☀️ 17 semaines · du lun. 23 mars au dim. 19 juil. 2026<small>calculé automatiquement à la suite d'Hiver 2026</small></div>
-              <div class="recap-chip">Profil « Été »<small>1 véto par nuit de semaine</small></div>
+              <div class="recap-chip hero" id="recap-hero">☀️ 17 semaines · du lun. 23 mars au dim. 19 juil. 2026<small id="recap-hero-sub">période déjà configurée</small></div>
+              <div class="recap-chip">Profil « Été »<small id="recap-effectif">2 vétos par nuit de semaine</small></div>
               <div class="recap-chip">7 vétérinaires<small>Anne-Cat en dernier recours</small></div>
               <div class="recap-chip">12 règles fermes<small>toutes actives</small></div>
               <div class="recap-chip">8 préférences<small>équité standard</small></div>
@@ -1201,45 +1259,10 @@ img { display: block; }
     </div><!-- /epi-inner -->
   </section>
 
-  <!-- ===================== LES SIX MAISONS ===================== -->
-  <section class="maisons" aria-label="Accès direct aux six espaces">
-    <div class="maisons-head rise rise-5">
-      <h2>Sans passer par Filou</h2>
-      <p>Les six maisons de GuardVeto, à un clic. Chacune vit sa vie, Filou n'est qu'un raccourci.</p>
-    </div>
-    <div class="dock">
-      <a class="maison rise rise-2" href="m1-planning.html">
-        <span class="m-ico" aria-hidden="true">📅</span>
-        <h3>Planning</h3>
-        <span class="m-state warn">● Brouillon Hiver 2026</span>
-      </a>
-      <a class="maison rise rise-2" href="m3-absences-echanges.html">
-        <span class="m-ico" aria-hidden="true">🌴</span>
-        <h3>Absences &amp; échanges</h3>
-        <span class="m-state accent" id="maison-souhaits-badge">3 souhaits en attente</span>
-      </a>
-      <a class="maison rise rise-3" href="m4-accueil-equipe-historique-connexions.html#sec-equipe">
-        <span class="m-ico" aria-hidden="true">👥</span>
-        <h3>Équipe</h3>
-        <span class="m-state">7 vétérinaires</span>
-      </a>
-      <a class="maison rise rise-3" href="m2-regles.html">
-        <span class="m-ico" aria-hidden="true">📏</span>
-        <h3>Règles du cabinet</h3>
-        <span class="m-state">12 fermes · 8 souples</span>
-      </a>
-      <a class="maison rise rise-4" href="m4-accueil-equipe-historique-connexions.html#sec-historique">
-        <span class="m-ico" aria-hidden="true">📚</span>
-        <h3>Historique &amp; compteurs</h3>
-        <span class="m-state">Automne 2025 close</span>
-      </a>
-      <a class="maison rise rise-4" href="m4-accueil-equipe-historique-connexions.html#sec-connexions">
-        <span class="m-ico" aria-hidden="true">⚙️</span>
-        <h3>Réglages</h3>
-        <span class="m-state ok">✓ Agenda connecté</span>
-      </a>
-    </div>
-  </section>
+  <!-- Réglette de démo : cas A (période déjà configurée) / cas B (Filou questionne) -->
+  <div class="demo-strip">
+    <button type="button" class="demo-finish" id="demo-toggle">▶ Démo « prépare la période » : cas B — rien n'est prêt, Filou pose ses questions (cliquer pour basculer)</button>
+  </div>
 
   <footer class="mq-foot">Maquette M6 · rien n'est réel, tout est une promesse à tenir 🦊</footer>
 
@@ -1251,6 +1274,133 @@ img { display: block; }
   var $ = function (s) { return document.querySelector(s); };
   var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+  /* ============================================================
+     LIQUID ETHER DU TERRIER · fluide lumineux WebGL fait main
+     Un plein-écran quad ; le fragment shader advecte un bruit
+     fractal (fbm domain-warpé) et un tourbillon suit le curseur
+     avec inertie (lissage + vitesse côté JS). Palette Terrier.
+     Repli : pas de WebGL ou motion réduite → aurore CSS statique.
+     ============================================================ */
+  (function liquidEther() {
+    if (REDUCED) return;
+    var section = document.querySelector(".epicentre");
+    var canvas = document.getElementById("liquid");
+    if (!section || !canvas) return;
+    var gl;
+    try {
+      gl = canvas.getContext("webgl", { alpha: false, antialias: false, depth: false, stencil: false })
+        || canvas.getContext("experimental-webgl");
+    } catch (e) { gl = null; }
+    if (!gl) return;
+
+    var vsrc = "attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}";
+    var fsrc = [
+      "precision mediump float;",
+      "uniform vec2 u_res;uniform float u_t;uniform vec2 u_m;uniform vec2 u_v;",
+      "float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);}",
+      "float noise(vec2 p){vec2 i=floor(p),f=fract(p);vec2 u=f*f*(3.-2.*f);",
+      "  return mix(mix(hash(i),hash(i+vec2(1.,0.)),u.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.,1.)),u.x),u.y);}",
+      "float fbm(vec2 p){float v=0.,a=.5;for(int k=0;k<5;k++){v+=a*noise(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return v;}",
+      "void main(){",
+      "  vec2 uv=gl_FragCoord.xy/u_res;",
+      "  vec2 asp=vec2(u_res.x/u_res.y,1.);",
+      "  vec2 p=uv*asp; vec2 m=u_m*asp;",
+      "  vec2 d=p-m; float dist=length(d);",
+      "  float fall=exp(-dist*dist*6.0);",
+      /* tourbillon autour du curseur + poussée dans le sens du geste */
+      "  vec2 swirl=vec2(-d.y,d.x)/(dist+.15)*fall*.5+u_v*asp*fall*2.4;",
+      "  vec2 q=p*2.1+swirl;",
+      "  float t=u_t*.055;",
+      "  float n1=fbm(q+vec2(t,-t*.7));",
+      "  vec2 w=vec2(fbm(q+n1+vec2(1.3,4.7)-t*.5),fbm(q+n1+vec2(6.1,2.2)+t*.4));",
+      "  float v=fbm(q+1.6*w)+fall*.4;",
+      /* palette Terrier : crème → or → ambre → orange renard, brin de sauge */
+      "  vec3 creme=vec3(.965,.933,.875);vec3 gold=vec3(1.,.851,.651);",
+      "  vec3 amber=vec3(.953,.753,.443);vec3 fox=vec3(.78,.325,.06);",
+      "  vec3 col=mix(creme,gold,smoothstep(.25,.6,v));",
+      "  col=mix(col,amber,smoothstep(.55,.8,v));",
+      "  col=mix(col,fox,smoothstep(.78,1.05,v)*.55);",
+      "  col=mix(col,vec3(.86,.89,.71),smoothstep(.3,.05,v)*.16);",
+      "  gl_FragColor=vec4(col,1.);}"
+    ].join("\n");
+
+    function sh(type, src) {
+      var s = gl.createShader(type);
+      gl.shaderSource(s, src); gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+      return s;
+    }
+    var prog;
+    try {
+      prog = gl.createProgram();
+      gl.attachShader(prog, sh(gl.VERTEX_SHADER, vsrc));
+      gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, fsrc));
+      gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error("link");
+    } catch (e) { return; /* repli : aurore CSS */ }
+    gl.useProgram(prog);
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    var loc = gl.getAttribLocation(prog, "a");
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    var uRes = gl.getUniformLocation(prog, "u_res");
+    var uT = gl.getUniformLocation(prog, "u_t");
+    var uM = gl.getUniformLocation(prog, "u_m");
+    var uV = gl.getUniformLocation(prog, "u_v");
+
+    section.classList.add("liquid-on");
+
+    /* curseur avec inertie : position lissée + vitesse lissée */
+    var mx = 0.5, my = 0.45, tx = 0.5, ty = 0.45, vx = 0, vy = 0;
+    var lastMove = -9999;
+    function resize() {
+      var r = section.getBoundingClientRect();
+      var s = Math.min(window.devicePixelRatio || 1, 1.5) * 0.5; /* mi-résolution : fluide ET 60fps */
+      canvas.width = Math.max(2, Math.round(r.width * s));
+      canvas.height = Math.max(2, Math.round(r.height * s));
+      gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+    resize();
+    window.addEventListener("resize", resize);
+    section.addEventListener("pointermove", function (e) {
+      var r = section.getBoundingClientRect();
+      tx = (e.clientX - r.left) / Math.max(1, r.width);
+      ty = 1 - (e.clientY - r.top) / Math.max(1, r.height);
+      lastMove = performance.now();
+    });
+
+    var t0 = performance.now();
+    function frame(now) {
+      if (!document.hidden) {
+        var t = (now - t0) / 1000;
+        /* la lumière dérive paresseusement quand la souris se repose */
+        if (now - lastMove > 3200) {
+          tx = 0.5 + 0.3 * Math.cos(t * 0.24);
+          ty = 0.5 + 0.24 * Math.sin(t * 0.19);
+        }
+        var nmx = mx + (tx - mx) * 0.055;
+        var nmy = my + (ty - my) * 0.055;
+        vx += ((nmx - mx) * 34 - vx) * 0.08;
+        vy += ((nmy - my) * 34 - vy) * 0.08;
+        mx = nmx; my = nmy;
+        gl.uniform2f(uRes, canvas.width, canvas.height);
+        gl.uniform1f(uT, t);
+        gl.uniform2f(uM, mx, my);
+        gl.uniform2f(uV, vx, vy);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      }
+      window.requestAnimationFrame(frame);
+    }
+    window.requestAnimationFrame(frame);
+  })();
+
+  /* ============================================================
+     LE FIL DE FILOU · chat auto-nettoyant
+     Chaque consigne vit dans un « échange » ; quand la fenêtre se
+     referme, l'échange s'évapore et Filou propose des suites.
+     Le journal (M1) garde la trace, lui — pas le fil.
+     ============================================================ */
   var stage = $("#stage");
   var thread = $("#thread");
   var input = $("#consigne-input");
@@ -1258,15 +1408,20 @@ img { display: block; }
   var activeFen = null;
   var typingEl = null;
   var souhaitsRestants = 3;
+  var souhaitAnneCatValide = false;
+  var exchange = [];          /* bulles de l'échange en cours */
+  var suggestionBubble = null;
+  var lastScenario = null;
+  var demoConfigA = false;    /* cas A : une période attend déjà */
+  var pFlow = null;           /* état du dialogue « période » */
 
-  /* ---------- fil de conversation ---------- */
-  function bubble(kind, who, html) {
+  function bubble(kind, who, html, untracked) {
     var b = document.createElement("div");
     b.className = "bubble " + kind;
     b.innerHTML = (who ? '<span class="who">' + who + "</span>" : "") + html;
     thread.appendChild(b);
-    /* on garde le fil court : 6 bulles max */
-    while (thread.children.length > 6) thread.removeChild(thread.firstChild);
+    if (!untracked) exchange.push(b);
+    while (thread.children.length > 8) thread.removeChild(thread.firstChild);
     thread.scrollTop = thread.scrollHeight;
     return b;
   }
@@ -1274,13 +1429,61 @@ img { display: block; }
     typingEl = bubble("filou", "🦊 Filou", '<span class="typing" aria-label="Filou réfléchit"><i></i><i></i><i></i></span>');
   }
   function replaceTyping(html) {
+    var b;
     if (typingEl) {
       typingEl.innerHTML = '<span class="who">🦊 Filou</span>' + html;
-      typingEl = null;
+      b = typingEl; typingEl = null;
     } else {
-      bubble("filou", "🦊 Filou", html);
+      b = bubble("filou", "🦊 Filou", html);
     }
     thread.scrollTop = thread.scrollHeight;
+    return b;
+  }
+  function fadeOutBubbles(list) {
+    list.forEach(function (b) {
+      if (!b || !b.isConnected) return;
+      if (REDUCED) { b.remove(); return; }
+      b.classList.add("bye");
+      window.setTimeout(function () { b.remove(); }, 430);
+    });
+  }
+
+  /* ---- chips à même les bulles (choix et suites) ---- */
+  function chipBtn(label, consigne, primary) {
+    var c = document.createElement("button");
+    c.type = "button";
+    c.className = "mini-chip" + (primary ? " primary" : "");
+    c.textContent = label;
+    c.addEventListener("click", function () { handleConsigne(consigne); });
+    return c;
+  }
+  function chipLink(label, href) {
+    var a = document.createElement("a");
+    a.className = "mini-chip";
+    a.href = href;
+    a.textContent = label;
+    return a;
+  }
+  function choiceBubble(html, choices) {
+    var b = replaceTyping(html);
+    var wrap = document.createElement("div");
+    wrap.className = "mini-chips";
+    choices.forEach(function (ch) {
+      var c = document.createElement("button");
+      c.type = "button";
+      c.className = "mini-chip" + (ch.primary ? " primary" : "");
+      c.textContent = ch.label;
+      c.addEventListener("click", function () {
+        wrap.remove();                       /* les choix non pris s'effacent */
+        bubble("user", "Anne-Sophie", ch.label);
+        showTyping();
+        window.setTimeout(ch.next, REDUCED ? 0 : 620);
+      });
+      wrap.appendChild(c);
+    });
+    b.appendChild(wrap);
+    thread.scrollTop = thread.scrollHeight;
+    return b;
   }
 
   /* ---------- ouverture / fermeture de la fenêtre ---------- */
@@ -1292,7 +1495,6 @@ img { display: block; }
     fen.classList.add("active");
     stage.classList.add("open");
     if (id === "victor") animateBars(fen);
-    /* focus doux sur le titre de la fenêtre */
     window.setTimeout(function () {
       var h = fen.querySelector("h2");
       if (h) h.focus({ preventScroll: true });
@@ -1305,8 +1507,77 @@ img { display: block; }
     var f = activeFen;
     window.setTimeout(function () { f.classList.remove("active"); }, REDUCED ? 0 : 320);
     activeFen = null;
-    bubble("filou", "🦊 Filou", "Je referme. Une autre consigne ?");
+    finalizeExchange();
     input.focus();
+  }
+  /* Échange fini : le fil s'auto-nettoie, Filou propose la suite */
+  function finalizeExchange() {
+    fadeOutBubbles(exchange);
+    exchange = [];
+    window.setTimeout(function () { suggestAfter(lastScenario); }, REDUCED ? 0 : 320);
+  }
+  function suggestAfter(key) {
+    var intro = "C'est rangé (le journal garde la trace). La suite, peut-être :";
+    var items = [];
+    switch (key) {
+      case "annecat":
+        intro = souhaitAnneCatValide
+          ? "Souhait validé et consigné ✓ La suite, peut-être :"
+          : "Fiche refermée. La suite, peut-être :";
+        items = [
+          chipBtn(souhaitAnneCatValide ? "Voir les " + souhaitsRestants + " souhaits restants" : "Les souhaits en attente", "Montre-moi les souhaits en attente", true),
+          chipBtn("Qui est de garde ce soir ?", "Qui est de garde ce soir ?"),
+          chipBtn("Créer une période", "Prépare la période suivante")
+        ];
+        break;
+      case "victor":
+        items = [
+          chipLink("Comparer toute l'équipe", "m4-accueil-equipe-historique-connexions.html#sec-historique"),
+          chipBtn("Créer une période", "Prépare la période suivante"),
+          chipBtn("Qui est de garde ce soir ?", "Qui est de garde ce soir ?")
+        ];
+        break;
+      case "cesoir":
+        items = [
+          chipLink("Voir le planning", "m1-planning.html"),
+          chipBtn("Les souhaits en attente", "Montre-moi les souhaits en attente"),
+          chipBtn("Créer une période", "Prépare la période suivante")
+        ];
+        break;
+      case "periode":
+        items = [
+          chipLink("Continuer sur le planning", "m1-planning.html"),
+          chipLink("Consulter les congés", "m3-absences-echanges.html"),
+          chipBtn("Qui est de garde ce soir ?", "Qui est de garde ce soir ?")
+        ];
+        break;
+      case "souhaits":
+        items = [
+          chipLink("Ouvrir Absences & échanges", "m3-absences-echanges.html"),
+          chipBtn("La fiche d'Anne-Catherine", "Ouvre-moi la fiche d'Anne-Catherine, ses congés"),
+          chipBtn("Créer une période", "Prépare la période suivante")
+        ];
+        break;
+      case "coherence":
+        items = [
+          chipLink("Ouvrir le planning", "m1-planning.html"),
+          chipBtn("Les souhaits en attente", "Montre-moi les souhaits en attente"),
+          chipBtn("Créer une période", "Prépare la période suivante")
+        ];
+        break;
+      default:
+        items = [
+          chipBtn("Qui est de garde ce soir ?", "Qui est de garde ce soir ?"),
+          chipBtn("Les souhaits en attente", "Montre-moi les souhaits en attente"),
+          chipBtn("Créer une période", "Prépare la période suivante")
+        ];
+    }
+    suggestionBubble = bubble("filou", "🦊 Filou", intro, true);
+    var wrap = document.createElement("div");
+    wrap.className = "mini-chips";
+    items.forEach(function (i) { wrap.appendChild(i); });
+    suggestionBubble.appendChild(wrap);
+    thread.scrollTop = thread.scrollHeight;
   }
   function animateBars(fen) {
     var fills = fen.querySelectorAll(".stat-fill");
@@ -1324,7 +1595,117 @@ img { display: block; }
     if (e.key === "Escape") closeFen();
   });
 
-  /* ---------- les scénarios ---------- */
+  /* ============================================================
+     « PRÉPARE LA PÉRIODE SUIVANTE » · Filou questionne d'abord
+     Cas A (démo) : une période configurée attend → 1 clic.
+     Cas B (défaut) : fin de période ? effectif ? reformulation,
+     validation, ET ALORS le récap s'ouvre dans la fenêtre.
+     ============================================================ */
+  function setRecap(heroHtml, heroSub, effectifTxt) {
+    $("#recap-hero").innerHTML = heroHtml + '<small id="recap-hero-sub">' + heroSub + "</small>";
+    $("#recap-effectif").textContent = effectifTxt;
+  }
+  function startPeriodeFlow() {
+    if (demoConfigA) {
+      choiceBubble(
+        "Bonne nouvelle : l'<b>Été 2026</b> est déjà configurée — 17 semaines (23 mars → 19 juil.), profil Été, 2 vétos par nuit. Je te la prépare ?",
+        [
+          { label: "Prépare-la ✓", primary: true, next: function () {
+              setRecap("☀️ 17 semaines · du lun. 23 mars au dim. 19 juil. 2026", "période déjà configurée", "2 vétos par nuit de semaine");
+              replaceTyping("La voilà. Relis le récap à côté : rien ne sera généré sans ton feu vert.");
+              lastScenario = "periode";
+              openFen("periode");
+              pFlow = null;
+            } },
+          { label: "Je regarde d'abord le planning", next: function () {
+              replaceTyping('Très bien, va voir le brouillon en cours : <a class="mini-chip" href="m1-planning.html">Ouvrir le planning</a>');
+              pFlow = null;
+            } }
+        ]
+      );
+      return;
+    }
+    askFin();
+  }
+  function askFin() {
+    pFlow = { step: "fin", fin: null, effectif: null };
+    choiceBubble(
+      "Rien n'est encore prêt pour la suite, alors préparons-la ensemble. Première question : <b>jusqu'à quand veux-tu planifier ?</b>",
+      [
+        { label: "Fin juin", primary: true, next: function () { pickFin("juin"); } },
+        { label: "Fin d'année", next: function () { pickFinAnnee(); } },
+        { label: "Autre date…", next: function () { awaitDate(); } }
+      ]
+    );
+  }
+  function pickFin(kind) {
+    if (kind === "juin") {
+      pFlow.fin = {
+        txt: "jusqu'à fin juin (14 semaines)",
+        hero: "☀️ 14 semaines · du lun. 23 mars au dim. 28 juin 2026",
+        sub: "choisi avec Filou à l'instant"
+      };
+    }
+    askEffectif();
+  }
+  function pickFinAnnee() {
+    pFlow.step = "fin";
+    choiceBubble(
+      "D'ici fin décembre, ça ferait <b>40 semaines d'un coup</b> : trop long pour rester équitable et lisible. Je te propose de couper à <b>fin juin</b> (14 semaines), et on préparera la suite cet été. Ça te va ?",
+      [
+        { label: "Va pour fin juin", primary: true, next: function () { pickFin("juin"); } },
+        { label: "Autre date…", next: function () { awaitDate(); } }
+      ]
+    );
+  }
+  function awaitDate() {
+    pFlow.step = "awaitText";
+    replaceTyping("Dis-moi jusqu'à quand, avec tes mots (par exemple « fin août ») — écris-le dans le champ en bas.");
+    input.focus();
+  }
+  function receiveDate(text) {
+    pFlow.fin = {
+      txt: "jusqu'à « " + text + " »",
+      hero: "☀️ Du lun. 23 mars 2026 → " + text,
+      sub: "durée exacte calculée à la génération"
+    };
+    showTyping();
+    window.setTimeout(askEffectif, REDUCED ? 0 : 620);
+  }
+  function askEffectif() {
+    pFlow.step = "effectif";
+    choiceBubble(
+      "Ensuite : je garde le <b>profil Été</b> tel quel (2 vétos par nuit de semaine), ou tu veux ajuster l'effectif ?",
+      [
+        { label: "Garde 2 vétos par nuit", primary: true, next: function () { pickEffectif(2); } },
+        { label: "Passe à 1 véto par nuit", next: function () { pickEffectif(1); } }
+      ]
+    );
+  }
+  function pickEffectif(n) {
+    pFlow.effectif = n;
+    confirmFlow();
+  }
+  function confirmFlow() {
+    pFlow.step = "confirm";
+    choiceBubble(
+      "Récapitulons : je prépare <b>Été 2026</b>, du lun. 23 mars " + pFlow.fin.txt +
+      ", profil Été, <b>" + pFlow.effectif + " véto" + (pFlow.effectif > 1 ? "s" : "") + " par nuit de semaine</b>. C'est bien ça ?",
+      [
+        { label: "C'est ça ✓", primary: true, next: function () { finishFlow(); } },
+        { label: "On corrige", next: function () { askFin(); } }
+      ]
+    );
+  }
+  function finishFlow() {
+    setRecap(pFlow.fin.hero, pFlow.fin.sub, pFlow.effectif + " véto" + (pFlow.effectif > 1 ? "s" : "") + " par nuit de semaine");
+    replaceTyping("Parfait ✓ Voilà le récap complet à côté. Rien ne sera généré sans ton feu vert.");
+    lastScenario = "periode";
+    openFen("periode");
+    pFlow = null;
+  }
+
+  /* ---------- les scénarios directs ---------- */
   var SCENARIOS = {
     annecat: {
       reply: "Voilà la fiche d'Anne-Catherine : ses congés, et son souhait du 4-5 avril qui n'attend que toi.",
@@ -1337,10 +1718,6 @@ img { display: block; }
     cesoir: {
       reply: "Ce soir, ce sont <b>Manon</b> et <b>Thomas</b>, de 19 h à 8 h. Les détails à côté.",
       fen: "cesoir"
-    },
-    periode: {
-      reply: "J'ai préparé le récap d'<b>Été 2026</b> : 17 semaines, profil Été, 12 règles fermes. Tout est prêt à générer.",
-      fen: "periode"
     },
     souhaits: {
       reply: "Trois souhaits attendent. Un seul demande une vraie décision : celui de Julie.",
@@ -1371,13 +1748,33 @@ img { display: block; }
 
   function handleConsigne(text) {
     if (!text) return;
+    /* le fil reste frais : la suggestion précédente s'efface,
+       et un échange resté ouvert (fenêtre non refermée) aussi */
+    if (suggestionBubble) { fadeOutBubbles([suggestionBubble]); suggestionBubble = null; }
+    /* réponse libre attendue par le dialogue de période ? */
+    if (pFlow && pFlow.step === "awaitText") {
+      bubble("user", "Anne-Sophie", text);
+      input.value = "";
+      receiveDate(text);
+      return;
+    }
+    if (exchange.length) { fadeOutBubbles(exchange); exchange = []; }
+    pFlow = null;
     bubble("user", "Anne-Sophie", text);
     input.value = "";
     var key = route(text);
     showTyping();
     window.setTimeout(function () {
-      if (key && SCENARIOS[key]) {
-        replaceTyping(SCENARIOS[key].reply);
+      if (key === "periode") {
+        lastScenario = "periode";
+        startPeriodeFlow();
+      } else if (key && SCENARIOS[key]) {
+        lastScenario = key;
+        var r = SCENARIOS[key].reply;
+        if (key === "souhaits" && souhaitAnneCatValide) {
+          r = "Il reste " + souhaitsRestants + " souhaits : celui de Julie (à arbitrer) et celui de Thomas.";
+        }
+        replaceTyping(r);
         openFen(SCENARIOS[key].fen);
       } else if (key === "aide") {
         replaceTyping("Je peux t'ouvrir une <b>fiche</b> (« la fiche d'Anne-Catherine »), un <b>compteur</b> (« combien de week-ends a fait Victor ? »), la <b>garde du soir</b>, les <b>souhaits en attente</b>, ou <b>préparer la période suivante</b>. Et je réponds aussi aux questions sur le fonctionnement de l'appli.");
@@ -1404,12 +1801,23 @@ img { display: block; }
       var phrases = {
         cesoir: "Qui est de garde ce soir ?",
         souhaits: "Montre-moi les souhaits en attente",
-        periode: "Où en est la publication de la prochaine période ?",
+        periode: "Prépare la période suivante",
         coherence: "Le planning est-il toujours cohérent ?"
       };
       handleConsigne(phrases[key] || key);
     });
   });
+
+  /* ---------- réglette de démo : cas A / cas B ---------- */
+  var demoToggle = $("#demo-toggle");
+  if (demoToggle) {
+    demoToggle.addEventListener("click", function () {
+      demoConfigA = !demoConfigA;
+      demoToggle.textContent = demoConfigA
+        ? "▶ Démo « prépare la période » : cas A — l'Été 2026 attend, déjà configurée (cliquer pour basculer)"
+        : "▶ Démo « prépare la période » : cas B — rien n'est prêt, Filou pose ses questions (cliquer pour basculer)";
+    });
+  }
 
   /* ---------- valider le souhait d'Anne-Catherine ---------- */
   var btnValider = $("#btn-valider-souhait");
@@ -1421,8 +1829,9 @@ img { display: block; }
         '<div class="souhait-done"><span aria-hidden="true">✓</span>' +
         "Congé validé : Anne-Catherine, sam. 4 → dim. 5 avril. Consigné au journal, l'équipe est prévenue.</div>";
       souhaitsRestants -= 1;
+      souhaitAnneCatValide = true;
       /* tous les consommateurs du compteur bougent ensemble */
-      $("#maison-souhaits-badge").textContent = souhaitsRestants + " souhaits en attente";
+      $("#menu-souhaits-badge").textContent = souhaitsRestants + " souhaits";
       $("#glance-souhaits-title").textContent = souhaitsRestants + " souhaits de congé en attente";
       $("#glance-souhaits-sub").textContent = "Julie (à arbitrer) et Thomas · Anne-Catherine vient d'être validée";
       $("#fen-souhaits-title").textContent = "Souhaits de congé · " + souhaitsRestants + " en attente";

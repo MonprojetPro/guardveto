@@ -210,36 +210,143 @@ img { display: block; }
   margin: 26px 0 48px;
 }
 
-/* ----- Le poste de Filou : premier plan, pas de terrier ici ----- */
-.filou-dock {
+/* ============================================================
+   FILOU PERCHÉ · composant isolé (.filou-perche)
+   Le renard est agrippé au bord supérieur du panneau : tête et
+   pattes dépassent, le corps est caché derrière. Clic sur lui :
+   il se hisse et la conversation se déploie SOUS lui. Fermé, il
+   se laisse glisser : seuls la tête et les pattes dépassent.
+   Prototype à reprendre sur les autres pages si MiKL valide.
+   ============================================================ */
+.filou-perche {
   position: sticky; top: calc(var(--topbar-h) + 14px);
+  z-index: 20;
+}
+/* Le perchoir entier est cliquable : le renard EST le bouton */
+.fp-toggle {
+  position: relative;
+  display: block; width: 100%;
+  border: none; background: transparent;
+  padding: 54px 0 0;   /* la place de la tête, au-dessus du rebord */
+  text-align: left;
+}
+.fp-fox {
+  position: absolute; top: 0; left: 24px;
+  width: 118px; height: 56px;
+  z-index: 4;   /* au-dessus du rebord : les pattes agrippent la lisière */
+  pointer-events: none;
+  transition: transform .4s cubic-bezier(0.34, 1.45, 0.64, 1);
+}
+.fp-toggle:hover .fp-fox { transform: translateY(-5px) scale(1.03); }
+.fp-sway {
+  position: absolute; inset: 0;
+  animation: fpSway 5.4s ease-in-out infinite alternate;
+}
+@keyframes fpSway {
+  from { transform: translateY(0) rotate(-0.5deg); }
+  to   { transform: translateY(1.6px) rotate(0.6deg); }
+}
+/* Fenêtre de recadrage : le PNG est détouré, seule la tête émerge.
+   Le bas de la fenêtre coïncide avec le rebord : le corps est « derrière ». */
+.fp-head {
+  position: absolute; inset: 0;
+  overflow: hidden;
+}
+.fp-head img {
+  position: absolute;
+  width: 190px; height: auto;
+  left: -26px; top: -4px;
+  transition: transform .55s cubic-bezier(0.34, 1.45, 0.64, 1);
+}
+/* Replié : il se laisse glisser derrière le rebord (front et oreilles) */
+.filou-perche[data-state="folded"] .fp-head img {
+  transform: translateY(22px);
+  transition: transform .5s ease-in;
+}
+/* À l'appel : il se hisse (traction en deux temps, puis il s'installe) */
+.filou-perche.hoisting .fp-head img {
+  animation: fpHoist .75s cubic-bezier(0.34, 1.3, 0.64, 1) both;
+}
+@keyframes fpHoist {
+  0%   { transform: translateY(22px); }
+  38%  { transform: translateY(9px) rotate(-1.8deg); }
+  56%  { transform: translateY(13px) rotate(0.9deg); }
+  100% { transform: translateY(0) rotate(0); }
+}
+/* Paupière du clignement : calque couleur fourrure qui passe sur l'œil ouvert */
+.fp-lid {
+  position: absolute;
+  left: 63px; top: 30px;
+  width: 17px; height: 13px;
+  border-radius: 2px 2px 9px 9px;
+  background: linear-gradient(180deg, #EF9243, #DC7326);
+  transform: scaleY(0);
+  transform-origin: top;
+  transition: transform .09s ease-out;
+}
+.filou-perche[data-state="open"].blink .fp-lid { transform: scaleY(1); }
+/* Pattes agrippées au rebord (SVG maison, par-dessus la lisière) */
+.fp-paw {
+  position: absolute; bottom: -8px;
+  width: 26px; height: 17px;
+  z-index: 4;
+}
+.fp-paw.pl { left: 14px; transform: rotate(-6deg); }
+.fp-paw.pr { left: 76px; transform: rotate(5deg); }
+/* Le rebord : la lisière du panneau, à laquelle il s'accroche */
+.fp-bar {
+  position: relative; z-index: 3;
+  display: flex; align-items: center; gap: 10px;
+  min-height: 48px;
+  padding: 8px 16px 8px 152px;
+  background: linear-gradient(180deg, #EBD8B0, var(--bg-deep) 82%);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  box-shadow: var(--shadow-card);
+  transition: border-radius .3s ease;
+}
+.filou-perche[data-state="folded"] .fp-bar { border-radius: var(--r-lg); }
+.fp-name {
+  font-family: var(--font-display);
+  font-weight: 800; font-size: 0.95rem;
+}
+.fp-state { font-size: 0.7rem; color: var(--muted); font-weight: 600; }
+.fp-chev {
+  margin-left: auto; flex: none;
+  width: 18px; height: 18px;
+  color: var(--muted);
+  transition: transform .3s ease;
+}
+.filou-perche[data-state="folded"] .fp-chev { transform: rotate(180deg); }
+.fp-toggle:hover .fp-bar { border-color: var(--accent); }
+/* Le panneau se déploie SOUS lui */
+.fp-body {
   background: var(--surface);
   border: 1px solid var(--border-strong);
-  border-radius: var(--r-lg);
+  border-top: none;
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
   box-shadow: var(--shadow-card);
   display: flex; flex-direction: column;
   overflow: hidden;
-  max-height: calc(100vh - var(--topbar-h) - 28px);
+  max-height: calc(100vh - var(--topbar-h) - 136px);
+  transition: max-height .45s cubic-bezier(0.22, 1, 0.36, 1), opacity .28s ease .08s;
 }
-.filou-dock.speaking { box-shadow: 0 0 0 3px var(--accent-glow), var(--shadow-panel); }
-.chat-fox {
-  display: flex; align-items: center; gap: 14px;
-  padding: 16px 18px;
+.filou-perche[data-state="folded"] .fp-body {
+  max-height: 0;
+  opacity: 0;
+  border-bottom-width: 0;
+  transition: max-height .4s ease-in, opacity .18s ease;
+}
+.filou-perche.speaking .fp-bar,
+.filou-perche.speaking .fp-body { box-shadow: 0 0 0 3px var(--accent-glow), var(--shadow-panel); }
+.fp-panel-head {
+  padding: 12px 18px 10px;
   background: linear-gradient(135deg, var(--accent-soft), transparent 72%);
   border-bottom: 1px solid var(--border);
   flex: none;
 }
-.chat-fox .fox-frame {
-  width: 66px; height: 84px; flex: none;
-  border-radius: var(--r-md);
-  overflow: hidden;
-  border: 2px solid var(--border-strong);
-  box-shadow: var(--shadow-card);
-  background: var(--surface-2);
-}
-.chat-fox .fox-frame img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
-.chat-fox h2 { font-size: 1.02rem; font-weight: 700; line-height: 1.25; }
-.chat-fox p { font-size: 0.78rem; color: var(--muted); line-height: 1.5; margin-top: 3px; }
+.fp-panel-head h2 { font-size: 0.96rem; font-weight: 700; line-height: 1.25; }
+.fp-panel-head p { font-size: 0.75rem; color: var(--muted); line-height: 1.5; margin-top: 2px; }
 
 /* Pastille de contexte : la règle sur laquelle Filou est branché */
 .ctx-strip {
@@ -503,18 +610,50 @@ img { display: block; }
 .rule-card.suspended .rule-phrase { opacity: 0.5; text-decoration: line-through; text-decoration-thickness: 1px; }
 .rule-card.removing { opacity: 0; transform: translateX(14px); transition: opacity .3s ease, transform .3s ease; }
 
-.rule-top { display: flex; align-items: flex-start; gap: 12px; }
-.rule-phrase { font-size: 0.95rem; line-height: 1.55; font-weight: 600; flex: 1; min-width: 0; }
-.rule-icons { display: flex; gap: 2px; flex: none; }
-.icon-btn {
-  border: none; background: transparent;
-  color: var(--soft);
-  font-size: 0.92rem;
-  width: 34px; height: 34px; border-radius: 999px;
-  display: inline-flex; align-items: center; justify-content: center;
+.rule-top { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 12px; }
+.rule-phrase { font-size: 0.95rem; line-height: 1.55; font-weight: 600; flex: 1; min-width: 220px; }
+
+/* ----- Actions d'encart : un bouton « Actions » visible, qui se
+   déplie en éventail de pilules libellées (icônes SVG maison) ----- */
+.rule-actions {
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: 6px; flex-wrap: wrap;
+  flex: none;
+  margin-left: auto;
 }
-.icon-btn:hover { color: var(--accent-ink); background: var(--accent-soft); }
-.icon-btn.danger:hover { color: #A4300E; background: rgba(164, 48, 14, 0.12); }
+.ra-toggle {
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2); color: var(--muted);
+  border-radius: 999px;
+  font-size: 0.74rem; font-weight: 700;
+  padding: 7px 13px; min-height: 34px;
+}
+.ra-toggle:hover { color: var(--accent-ink); border-color: var(--accent-ink); background: var(--accent-soft); }
+.ra-toggle[aria-expanded="true"] { color: var(--accent-ink); border-color: var(--accent-ink); background: var(--accent-soft); }
+.ra-toggle .ico { width: 15px; height: 15px; transition: transform .3s cubic-bezier(0.34, 1.4, 0.64, 1); }
+.ra-toggle[aria-expanded="true"] .ico { transform: rotate(90deg); }
+.ra-fan { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.ra-pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface); color: var(--text);
+  border-radius: 999px;
+  font-size: 0.75rem; font-weight: 700;
+  padding: 7px 13px; min-height: 34px;
+  opacity: 0; transform: translateX(16px) rotate(4deg) scale(0.82);
+  pointer-events: none;
+  transition: opacity .22s ease, transform .38s cubic-bezier(0.34, 1.4, 0.64, 1),
+              color .2s ease, border-color .2s ease, background-color .2s ease;
+}
+.rule-actions.open .ra-pill { opacity: 1; transform: none; pointer-events: auto; }
+.rule-actions.open .ra-pill:nth-child(1) { transition-delay: .03s; }
+.rule-actions.open .ra-pill:nth-child(2) { transition-delay: .09s; }
+.rule-actions.open .ra-pill:nth-child(3) { transition-delay: .15s; }
+.ra-pill .ico { width: 16px; height: 16px; color: var(--accent-ink); flex: none; }
+.ra-pill:hover { border-color: var(--accent-ink); background: var(--accent-soft); color: var(--accent-ink); }
+.ra-pill.ra-danger:hover { color: #A4300E; border-color: #A4300E; background: rgba(164, 48, 14, 0.09); }
+.ra-pill.ra-danger:hover .ico { color: #A4300E; }
 
 .rule-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 9px; }
 .badge {
@@ -598,49 +737,6 @@ img { display: block; }
   flex: none;
 }
 .btn-filou:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
-
-/* ----- Le 18 : appel de Filou, toujours à portée de patte ----- */
-.filou-call {
-  position: fixed; right: 20px; bottom: 20px; z-index: 350;
-  display: flex; align-items: center; gap: 11px;
-  border: 1.5px solid var(--border-strong);
-  background: var(--surface);
-  border-radius: 999px;
-  padding: 8px 20px 8px 8px;
-  box-shadow: var(--shadow-panel);
-  text-align: left;
-}
-.filou-call::before {
-  content: "";
-  position: absolute; inset: -1.5px;
-  border-radius: 999px;
-  box-shadow: 0 0 0 0 var(--accent-glow);
-  animation: callPulse 3.2s ease-out infinite;
-  pointer-events: none;
-}
-@keyframes callPulse {
-  0%   { box-shadow: 0 0 0 0 var(--accent-glow); }
-  45%  { box-shadow: 0 0 0 12px transparent; }
-  100% { box-shadow: 0 0 0 0 transparent; }
-}
-.filou-call:hover { border-color: var(--accent); transform: translateY(-2px); }
-.filou-call { transition: transform .2s ease, border-color .2s ease; }
-.filou-call .fc-avatar {
-  width: 46px; height: 46px; border-radius: 50%;
-  background: var(--accent-soft);
-  border: 1.5px solid var(--border-strong);
-  overflow: hidden; flex: none;
-  display: flex; justify-content: center; align-items: flex-start;
-}
-.filou-call .fc-avatar img { width: 130%; height: auto; margin-top: 2px; }
-.filou-call .fc-text {
-  font-size: 0.78rem; font-weight: 600; color: var(--muted); line-height: 1.3;
-}
-.filou-call .fc-text b {
-  display: block;
-  font-family: var(--font-display);
-  font-size: 0.86rem; font-weight: 700; color: var(--text);
-}
 
 /* ----- Confirmation inline (suppression) & historique ----- */
 .confirm-row {
@@ -978,8 +1074,9 @@ img { display: block; }
    ============================================================ */
 @media (max-width: 1060px) {
   .rules-stage { grid-template-columns: 1fr; }
-  .filou-dock { position: static; max-height: none; }
-  .filou-dock .convo { max-height: 300px; }
+  .filou-perche { position: static; }
+  .fp-body { max-height: 460px; }
+  .filou-perche .convo { max-height: 260px; }
   .hero-actions { margin-left: 0; align-items: flex-start; }
 }
 @media (max-width: 700px) {
@@ -988,8 +1085,8 @@ img { display: block; }
   .mq-nav { margin-left: 0; }
   .rule-foot { align-items: flex-start; }
   .btn-filou { width: 100%; justify-content: center; margin-left: 0; }
-  .filou-call .fc-text { display: none; }
-  .filou-call { padding: 8px; }
+  .rule-actions { margin-left: 0; justify-content: flex-start; }
+  .ra-fan { justify-content: flex-start; }
 }
 
 /* ============================================================
@@ -1003,8 +1100,13 @@ img { display: block; }
   .history-panel.open, .focus-banner.on, .ctx-strip.on { animation-duration: 0.01ms !important; }
   .rule-card.fresh, .rule-card.focused { animation: none; box-shadow: 0 0 0 3px var(--accent-glow), var(--shadow-card); }
   .type-caret { animation: none; }
-  .filou-call::before { animation: none; box-shadow: none; }
-  .filou-call { transition: none; }
+  /* Filou perché : statique, panneau sans animation */
+  .fp-sway { animation: none; }
+  .filou-perche.hoisting .fp-head img { animation: none; }
+  .fp-fox, .fp-head img, .fp-lid, .fp-chev, .fp-body, .fp-bar { transition: none; }
+  .fp-toggle:hover .fp-fox { transform: none; }
+  .filou-perche[data-state="open"].blink .fp-lid { transform: scaleY(0); }
+  .ra-pill, .ra-toggle .ico { transition: none; }
   .defini-panel, .defini-veil, .toast, .switch::after, .switch { transition: none; }
 }
 </style>
@@ -1057,14 +1159,41 @@ img { display: block; }
 <div class="shell">
   <div class="rules-stage">
 
-    <!-- ============ FILOU · D'OFFICE, PAS DE TERRIER ICI ============ -->
-    <aside class="filou-dock" id="filou-dock" aria-label="Conversation avec Filou">
-      <div class="chat-fox">
-        <span class="fox-frame"><img src="../fox-3.png" alt="Filou tient une balance dorée : l'équité des règles"></span>
-        <div>
-          <h2>Dis ta règle, Filou l'écrit.</h2>
-          <p>Il reformule mot à mot, tu valides. Il répond aussi à « ça change quoi si… ? ».</p>
-        </div>
+    <!-- ============ FILOU PERCHÉ · composant isolé (prototype) ============ -->
+    <aside class="filou-perche" id="filou-perche" data-state="open" aria-label="Filou, perché sur son panneau de conversation">
+
+      <!-- Le perchoir : le renard agrippé au rebord, cliquable en entier -->
+      <button type="button" class="fp-toggle" id="fp-toggle" aria-expanded="true" aria-controls="fp-body">
+        <span class="fp-fox" aria-hidden="true">
+          <span class="fp-sway">
+            <span class="fp-head">
+              <img src="../fox-1.png" alt="">
+              <span class="fp-lid"></span>
+            </span>
+            <svg class="fp-paw pl" viewBox="0 0 26 17" aria-hidden="true">
+              <path d="M2.4 12.6 C2 7.8 4.6 4.6 8.4 4.2 C12.6 3.8 15.2 6.6 15 11.2 C14.9 13.4 13.6 14.8 11.9 14.4 C11.2 14.2 10.9 13.5 11 12.4 C9.9 14.6 8.3 15.2 6.9 14.5 C6 14 5.7 13.1 5.9 12 C4.8 13.6 3.4 13.9 2.4 12.6 Z"
+                fill="#E8813A" stroke="#8A4A1B" stroke-width="1.1" stroke-linejoin="round"/>
+            </svg>
+            <svg class="fp-paw pr" viewBox="0 0 26 17" aria-hidden="true">
+              <path d="M23.6 12.4 C24.1 7.7 21.6 4.5 17.8 4.1 C13.6 3.8 10.9 6.7 11.1 11.3 C11.2 13.5 12.5 14.9 14.2 14.4 C14.9 14.2 15.2 13.4 15.1 12.4 C16.2 14.6 17.8 15.1 19.2 14.4 C20.1 13.9 20.4 13 20.2 11.9 C21.3 13.5 22.7 13.7 23.6 12.4 Z"
+                fill="#E8813A" stroke="#8A4A1B" stroke-width="1.1" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </span>
+        <span class="fp-bar">
+          <span class="fp-name">Filou</span>
+          <span class="fp-state" id="fp-state">perché sur ton panneau · il t'écoute</span>
+          <svg class="fp-chev" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5.4 14.6 C7.6 12.2 9.8 10.2 12 8.6 C14.2 10.2 16.4 12.2 18.6 14.5"/>
+          </svg>
+        </span>
+      </button>
+
+      <!-- Le panneau se déploie SOUS lui -->
+      <div class="fp-body" id="fp-body">
+      <div class="fp-panel-head">
+        <h2>Dis ta règle, Filou l'écrit.</h2>
+        <p>Il reformule mot à mot, tu valides. Il répond aussi à « ça change quoi si… ? ».</p>
       </div>
 
       <div class="ctx-strip" id="ctx-strip" aria-live="polite">
@@ -1100,6 +1229,7 @@ img { display: block; }
           </div>
         </div>
       </div>
+      </div><!-- /fp-body -->
     </aside>
 
     <!-- ============ LES RÈGLES · ONGLETS PAR CATÉGORIE ============ -->
@@ -1153,12 +1283,6 @@ img { display: block; }
   </div>
   <div class="defini-body" id="defini-body"></div>
 </aside>
-
-<!-- ===================== LE 18 · APPEL DE FILOU ===================== -->
-<button type="button" class="filou-call" id="filou-call" aria-label="Appeler Filou, l'assistant du cabinet">
-  <span class="fc-avatar" aria-hidden="true"><img src="../fox-1.png" alt=""></span>
-  <span class="fc-text"><b>Besoin d'aide ?</b>Appelle Filou</span>
-</button>
 
 <!-- ===================== TOAST ===================== -->
 <div class="toast" id="toast" role="status" aria-live="polite">
@@ -1390,6 +1514,23 @@ img { display: block; }
     return "<b>" + lvl.label + "</b> · " + lvl.hint + ".";
   }
 
+  /* Icônes SVG maison (trait organique, cohérentes avec le Terrier) */
+  function icone(n) {
+    var P = {
+      pause: '<path d="M9.3 5.9 C9 9.3 9 13.9 9.5 18.1"/><path d="M14.9 6.2 C15.2 9.6 15.1 14.1 14.6 18.3"/>',
+      play: '<path d="M9.2 6.1 C12 7.8 14.8 9.9 17.1 11.9 C14.9 13.9 12 16 9.3 17.8 C9 14 9 9.9 9.2 6.1 Z" fill="currentColor" stroke="none"/>',
+      histoire: '<path d="M5.2 9.4 A7.6 7.6 0 1 1 4.4 14.6"/><path d="M4.7 5.6 L5 9.6 L8.9 8.8"/><path d="M12 8.2 L12.2 12.4 L15.2 14"/>',
+      corbeille: '<path d="M7 8.7 C7.3 12.3 7.6 15.4 8.1 18.2 C9.5 19 14.6 19 15.9 18.1 C16.4 15.2 16.7 12.1 16.9 8.6"/><path d="M5.3 7.3 C9.8 6.5 14.2 6.5 18.7 7.2"/><path d="M9.9 6.9 C9.9 5.7 10.4 4.9 12 4.9 C13.6 4.9 14.1 5.7 14.1 6.8"/>',
+      pattes: '<circle cx="6" cy="12.3" r="1.8" fill="currentColor" stroke="none"/><circle cx="12" cy="11.6" r="1.9" fill="currentColor" stroke="none"/><circle cx="18.1" cy="12.4" r="1.8" fill="currentColor" stroke="none"/>'
+    };
+    return '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + P[n] + "</svg>";
+  }
+
+  function suspendPillHTML(rule) {
+    return icone(rule.suspended ? "play" : "pause") +
+      "<span>" + (rule.suspended ? "Réactiver" : "Suspendre") + "</span>";
+  }
+
   function ruleCardHTML(rule) {
     var hist = HISTORY[rule.id] || HISTORY_DEFAULT;
     var histItems = hist.map(function (h) {
@@ -1398,11 +1539,14 @@ img { display: block; }
     return '<article class="rule-card' + (rule.suspended ? " suspended" : "") + '" id="card-' + rule.id + '" data-rule="' + rule.id + '">' +
       '<div class="rule-top">' +
         '<p class="rule-phrase" id="phrase-' + rule.id + '">' + esc(rule.text) + "</p>" +
-        '<span class="rule-icons">' +
-          '<button type="button" class="icon-btn" data-action="suspend" data-rule="' + rule.id + '" aria-label="' + (rule.suspended ? "Réactiver la règle" : "Suspendre la règle") + '" title="' + (rule.suspended ? "Réactiver" : "Suspendre") + '">' + (rule.suspended ? "▶" : "⏸") + "</button>" +
-          '<button type="button" class="icon-btn" data-action="history" data-rule="' + rule.id + '" aria-label="Historique de la règle" title="Historique">🕐</button>' +
-          '<button type="button" class="icon-btn danger" data-action="delete" data-rule="' + rule.id + '" aria-label="Supprimer la règle" title="Supprimer">🗑</button>' +
-        "</span>" +
+        '<div class="rule-actions" id="actions-' + rule.id + '">' +
+          '<div class="ra-fan" role="group" aria-label="Actions sur cette règle">' +
+            '<button type="button" class="ra-pill" data-action="suspend" data-rule="' + rule.id + '" id="suspend-' + rule.id + '">' + suspendPillHTML(rule) + "</button>" +
+            '<button type="button" class="ra-pill" data-action="history" data-rule="' + rule.id + '">' + icone("histoire") + "<span>Historique</span></button>" +
+            '<button type="button" class="ra-pill ra-danger" data-action="delete" data-rule="' + rule.id + '">' + icone("corbeille") + "<span>Supprimer</span></button>" +
+          "</div>" +
+          '<button type="button" class="ra-toggle" data-action="fan" data-rule="' + rule.id + '" aria-expanded="false">' + icone("pattes") + "<span>Actions</span></button>" +
+        "</div>" +
       "</div>" +
       '<div class="rule-badges" id="badges-' + rule.id + '">' +
         badgePortee(rule) +
@@ -1644,6 +1788,13 @@ img { display: block; }
       var rule = findItem(id);
 
       switch (act.dataset.action) {
+        case "fan": {
+          var box = act.closest(".rule-actions");
+          var openFan = box.classList.toggle("open");
+          act.setAttribute("aria-expanded", String(openFan));
+          act.querySelector("span").textContent = openFan ? "Fermer" : "Actions";
+          break;
+        }
         case "history": {
           document.getElementById("history-" + id).classList.toggle("open");
           break;
@@ -1652,9 +1803,7 @@ img { display: block; }
           rule.suspended = !rule.suspended;
           var card = document.getElementById("card-" + id);
           card.classList.toggle("suspended", rule.suspended);
-          act.textContent = rule.suspended ? "▶" : "⏸";
-          act.setAttribute("aria-label", rule.suspended ? "Réactiver la règle" : "Suspendre la règle");
-          act.title = rule.suspended ? "Réactiver" : "Suspendre";
+          act.innerHTML = suspendPillHTML(rule);
           renderBadges(rule);
           toast(rule.suspended
             ? "Règle suspendue : elle sera ignorée à la prochaine génération."
@@ -1764,10 +1913,43 @@ img { display: block; }
     }, 650);
   }
 
+  /* ---------- Filou perché : états, traction, clignement ---------- */
+  var perche = $("#filou-perche");
+
+  function percheEstOuvert() { return perche.dataset.state === "open"; }
+
+  function percheOuvre() {
+    if (percheEstOuvert()) return;
+    perche.dataset.state = "open";
+    $("#fp-toggle").setAttribute("aria-expanded", "true");
+    $("#fp-state").textContent = "perché sur ton panneau · il t'écoute";
+    if (!REDUCED) {
+      perche.classList.add("hoisting");
+      setTimeout(function () { perche.classList.remove("hoisting"); }, 780);
+    }
+  }
+  function percheReplie() {
+    if (!percheEstOuvert()) return;
+    perche.dataset.state = "folded";
+    $("#fp-toggle").setAttribute("aria-expanded", "false");
+    $("#fp-state").textContent = "il attend ton appel · clique";
+  }
+
+  /* Clignement : la paupière passe sur l'œil ouvert, toutes les 4 à 7 s */
+  function planifieClignement() {
+    if (REDUCED) return;
+    setTimeout(function () {
+      if (percheEstOuvert() && !document.hidden) {
+        perche.classList.add("blink");
+        setTimeout(function () { perche.classList.remove("blink"); }, 150);
+      }
+      planifieClignement();
+    }, 4000 + Math.random() * 3000);
+  }
+
   function speakGlow() {
-    var dock = $("#filou-dock");
-    dock.classList.add("speaking");
-    setTimeout(function () { dock.classList.remove("speaking"); }, 1600);
+    perche.classList.add("speaking");
+    setTimeout(function () { perche.classList.remove("speaking"); }, 1600);
   }
 
   function setChips(list) {
@@ -1869,11 +2051,11 @@ img { display: block; }
     ];
   }
 
-  /* Le 18 : amener Filou sous les yeux, sans qu'il parle de lui-même */
+  /* Appeler Filou : il se hisse si besoin, sans parler de lui-même */
   function appelFilou() {
-    var dock = $("#filou-dock");
-    if (dock.getBoundingClientRect().top < 0 || window.innerWidth < 1060) {
-      dock.scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "start" });
+    percheOuvre();
+    if (perche.getBoundingClientRect().top < 0 || window.innerWidth < 1060) {
+      perche.scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "start" });
     }
     speakGlow();
     setChips(currentCtx ? ctxChips(currentCtx) : BASE_CHIPS);
@@ -2139,8 +2321,12 @@ img { display: block; }
   });
   $("#demo-focus").addEventListener("click", function () { focusRule("serie-we"); });
 
-  /* Le 18 : bouton d'appel permanent */
-  $("#filou-call").addEventListener("click", function () {
+  /* Le perchoir : clic sur Filou (ou son rebord) = appel ou repli */
+  $("#fp-toggle").addEventListener("click", function () {
+    if (percheEstOuvert()) {
+      percheReplie();
+      return;
+    }
     appelFilou();
     filouSays("Je suis là ! Pose-moi ta question, dicte une règle en français, ou pars d’une suggestion ci-dessous.");
     $("#chat-text").focus();
@@ -2162,6 +2348,7 @@ img { display: block; }
   setChips(BASE_CHIPS);
   refreshCounts();
   handleHash();
+  planifieClignement();
 
 })();
 </script>
