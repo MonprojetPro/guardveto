@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Filou animé — prévisualisation</title>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@600;800&family=Noto+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{--creme:#faf3e7;--carton:#fffdf8;--renard:#e07a3f;--brun:#4a3426;--brun-doux:#7a6353}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Noto Sans',sans-serif;background:
+    radial-gradient(900px 500px at 25% 0%, #ffe9d2 0%, transparent 60%),
+    radial-gradient(800px 450px at 100% 15%, #f7e3c4 0%, transparent 55%),
+    var(--creme);
+    color:var(--brun);min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:28px;padding:40px 20px}
+  h1{font-family:'Figtree';font-size:1.5rem}
+  p{color:var(--brun-doux);max-width:560px;text-align:center}
+  .scene{position:relative;margin-top:120px}
+  .panneau{width:420px;min-height:250px;background:var(--carton);border-radius:20px;
+    box-shadow:0 14px 40px rgba(74,52,38,.14);padding:22px;padding-top:34px}
+  .panneau h2{font-family:'Figtree';font-size:1.05rem;margin-bottom:8px}
+  .panneau .bulle{background:#f6ecdc;border-radius:12px;padding:10px 14px;font-size:.92rem;margin-top:8px}
+  /* Filou assis SUR le bord du panneau : le bas de la vidéo (ses pieds/jambes
+     pendantes) recouvre le haut du panneau, comme la mascotte de référence. */
+  video.filou{position:absolute;left:50%;transform:translateX(-50%);
+    bottom:calc(100% - 96px);width:250px;pointer-events:none;
+    filter:drop-shadow(0 10px 18px rgba(74,52,38,.25))}
+  .note{font-size:.85rem;color:var(--brun-doux)}
+</style>
+</head>
+<body>
+  <h1>🦊 Filou animé — essai n°1 (Gemini + détourage IA)</h1>
+  <p>La vidéo générée sur Gemini, détourée image par image par IA (fond vert supprimé sans toucher
+  à ses yeux ni à son pull), convertie en WebM transparent, posée sur le bord d'un panneau.</p>
+  <div class="scene">
+    <video class="filou" src="filou-idle-salut.webm" autoplay loop muted playsinline></video>
+    <div class="panneau">
+      <h2>Panneau de conversation (factice)</h2>
+      <div class="bulle">« Bonjour Anne-Sophie ☀️ Que puis-je faire pour toi ? »</div>
+      <div class="bulle">Filou est assis sur le bord, il vit sa vie : il attend, il cligne, il salue.</div>
+    </div>
+  </div>
+  <p class="note">Ouvrir dans Chrome/Edge/Firefox (la transparence WebM n'est pas lue par Safari — on fournira une variante HEVC plus tard).</p>
+</body>
+</html>
