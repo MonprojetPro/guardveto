@@ -285,6 +285,8 @@ img { display: block; }
 .st-ouverte { background: var(--warn-soft); color: var(--warn); }
 .st-compensee { background: var(--ok-soft); color: var(--ok); }
 .st-dette-annulee { background: var(--surface-2); color: var(--soft); border: 1px solid var(--border); }
+.st-expiree { background: var(--surface-2); color: var(--soft); border: 1px dashed var(--border-strong); }
+.st-echeance { background: var(--warn-soft); color: var(--warn); }
 
 .icon-btn {
   border: 1px solid var(--border);
@@ -330,34 +332,23 @@ img { display: block; }
   border: 1px solid var(--border-strong); border-radius: 999px;
   padding: 7px 12px; min-height: 36px;
 }
-.resume-vets {
-  display: flex; flex-wrap: wrap; gap: 7px;
-  padding: 12px 22px;
-  border-bottom: 1px solid var(--border);
+.vet-filter b {
+  font-family: var(--font-display); font-weight: 800;
+  color: var(--accent-ink); margin-left: 1px;
 }
-.resume-vets .r-label {
-  width: 100%; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.1em;
-  text-transform: uppercase; color: var(--soft);
-}
-.resume-chip {
-  display: inline-flex; align-items: center; gap: 7px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  font-size: 0.76rem; font-weight: 600; color: var(--muted);
-  padding: 5px 11px; border-radius: 999px; min-height: 32px;
-}
-.resume-chip i { width: 9px; height: 9px; border-radius: 50%; background: var(--c, var(--soft)); }
-.resume-chip b { font-family: var(--font-display); color: var(--text); }
-.resume-chip:hover { border-color: var(--accent-ink); color: var(--accent-ink); }
-.resume-chip:hover b { color: var(--accent-ink); }
+.vet-filter[aria-pressed="true"] b { color: #fff; }
 
 /* ---------- Légende des statuts (échanges) ---------- */
 .status-legend {
   display: flex; flex-wrap: wrap; gap: 7px;
-  margin: -8px 0 22px;
+  margin: -8px 0 10px;
   align-items: center;
 }
 .status-legend .sl-label { font-size: 0.72rem; color: var(--soft); font-weight: 600; margin-right: 4px; }
+.echeance-note {
+  font-size: 0.8rem; color: var(--muted); line-height: 1.55;
+  margin: 0 0 22px;
+}
 
 /* ---------- Tableau dépannages ---------- */
 .dep-table { width: 100%; border-collapse: collapse; }
@@ -960,6 +951,7 @@ body.gardefou .terrier .t-hint { opacity: 0; }
   </a>
   <nav class="appnav" aria-label="Navigation de la maquette">
     <a href="index.html">🏠 Hub</a>
+    <a href="m6-accueil-epicentre.html">M6 Accueil épicentre</a>
     <a href="m1-planning.html">M1 Planning</a>
     <a href="m2-regles.html">M2 Règles</a>
     <a href="m3-absences-echanges.html" aria-current="page">M3 Absences &amp; échanges</a>
@@ -975,7 +967,7 @@ body.gardefou .terrier .t-hint { opacity: 0; }
     <div>
       <p class="page-kicker">Absences &amp; échanges · vue admin · Filou au terrier</p>
       <h1>Congés, échanges et coups durs : une seule porte.</h1>
-      <p class="lede">Les anciens écrans « Congés » et « Demandes » fusionnent ici. Chaque souhait arrive avec son verdict de conflit déjà calculé, et <b>Filou vérifie chaque congé avant enregistrement</b> : si une semaine devenait intenable avec les autres absences et les règles, il prévient (sans jamais bloquer). Quand un imprévu tombe, il sort du terrier et mène la réparation.</p>
+      <p class="lede">Les anciens écrans « Congés » et « Demandes » fusionnent ici. Chaque souhait arrive avec <b>deux verdicts déjà calculés</b> : le conflit avec le <b>planning publié</b>, et la <b>solidité de la semaine</b> (Filou croise les autres congés validés et les règles du cabinet). Rien ne surprend au moment de valider. Et quand un imprévu tombe, Filou sort du terrier et mène la réparation.</p>
     </div>
     <div class="page-actions">
       <button type="button" class="btn btn-outline" id="btn-creer-conge">+ Créer un congé</button>
@@ -1006,7 +998,7 @@ body.gardefou .terrier .t-hint { opacity: 0; }
       <div class="card-head">
         <h2>Souhaits en attente</h2>
         <span class="section-count" id="pending-count">3</span>
-        <p class="sub">Chaque demande arrive avec son verdict : conflit ou non avec le planning publié, calculé d'avance. Tu peux ajuster les dates avant de valider.</p>
+        <p class="sub">Deux verdicts calculés d'avance sur chaque demande : le planning publié, et la solidité de la semaine (étudiée par Filou). Tu peux ajuster les dates avant de valider.</p>
       </div>
       <ul class="rows" id="pending-list">
         <li>
@@ -1019,6 +1011,7 @@ body.gardefou .terrier .t-hint { opacity: 0; }
             </div>
             <div class="row-side">
               <span class="conflict ok">✓ Aucun conflit avec le planning publié</span>
+              <button type="button" class="conflict warn" data-act="voir-prospectif" title="Voir le détail étudié par Filou (aperçu, rien n'est décidé)">⚠ Problématique identifiée · étudiée par Filou</button>
               <div class="row-actions">
                 <button type="button" class="btn btn-ghost btn-sm" data-act="refuser">Refuser…</button>
                 <button type="button" class="btn btn-ok btn-sm" data-act="valider">Valider…</button>
@@ -1036,6 +1029,7 @@ body.gardefou .terrier .t-hint { opacity: 0; }
             </div>
             <div class="row-side">
               <button type="button" class="conflict warn" data-act="voir-conflit" title="Voir les gardes touchées">⚠ 1 garde publiée touchée</button>
+              <span class="conflict ok">✓ Semaine solide : rien à signaler</span>
               <div class="row-actions">
                 <button type="button" class="btn btn-ghost btn-sm" data-act="refuser">Refuser…</button>
                 <button type="button" class="btn btn-ok btn-sm" data-act="valider">Valider…</button>
@@ -1053,6 +1047,7 @@ body.gardefou .terrier .t-hint { opacity: 0; }
             </div>
             <div class="row-side">
               <span class="conflict ok">✓ Aucun conflit avec le planning publié</span>
+              <span class="conflict ok">✓ Semaine solide : rien à signaler</span>
               <div class="row-actions">
                 <button type="button" class="btn btn-ghost btn-sm" data-act="refuser">Refuser…</button>
                 <button type="button" class="btn btn-ok btn-sm" data-act="valider">Valider…</button>
@@ -1069,21 +1064,12 @@ body.gardefou .terrier .t-hint { opacity: 0; }
       <div class="card-head">
         <h2>Congés du cabinet</h2>
         <span class="section-count" id="list-count">5</span>
-        <p class="sub">Validés et refusés, toutes vétérinaires confondues. Filtre par personne ou par type, ou clique sur un prénom du résumé.</p>
+        <p class="sub">Validés et refusés, toutes vétérinaires confondues. Chaque prénom compte et filtre d'un même geste (« Manon · 2 »).</p>
       </div>
-      <div class="resume-vets" id="resume-vets" aria-label="Résumé des congés par vétérinaire (cliquable)">
-        <span class="r-label">Résumé par véto · clique pour filtrer</span>
-      </div>
-      <div class="filters">
+      <div class="filters" id="filters-bar">
         <span class="f-label">Filtrer</span>
-        <button type="button" class="vet-filter" data-vet="tous" aria-pressed="true"><i style="--c: var(--accent)"></i>Toute l'équipe</button>
-        <button type="button" class="vet-filter" data-vet="anneso" aria-pressed="false"><i style="--c: var(--vet-anneso)"></i>Anne-Sophie</button>
-        <button type="button" class="vet-filter" data-vet="annecat" aria-pressed="false"><i style="--c: var(--vet-annecat)"></i>Anne-Catherine</button>
-        <button type="button" class="vet-filter" data-vet="manon" aria-pressed="false"><i style="--c: var(--vet-manon)"></i>Manon</button>
-        <button type="button" class="vet-filter" data-vet="victor" aria-pressed="false"><i style="--c: var(--vet-victor)"></i>Victor</button>
-        <button type="button" class="vet-filter" data-vet="camille" aria-pressed="false"><i style="--c: var(--vet-camille)"></i>Camille</button>
-        <button type="button" class="vet-filter" data-vet="julie" aria-pressed="false"><i style="--c: var(--vet-julie)"></i>Julie</button>
-        <button type="button" class="vet-filter" data-vet="thomas" aria-pressed="false"><i style="--c: var(--vet-thomas)"></i>Thomas</button>
+        <button type="button" class="vet-filter" data-vet="tous" aria-pressed="true" id="filter-tous"><i style="--c: var(--accent)"></i>Toute l'équipe</button>
+        <span id="vet-chips" style="display: contents;"><!-- chips par véto (compteur intégré), générées par le JS --></span>
         <select id="filter-type" aria-label="Filtrer par type de congé">
           <option value="tous">Tous les types</option>
           <option value="vacances">Vacances</option>
@@ -1195,7 +1181,7 @@ body.gardefou .terrier .t-hint { opacity: 0; }
        ============================================================ -->
   <section class="tab-panel" id="tab-echanges" role="tabpanel" aria-labelledby="tabbtn-echanges" hidden>
 
-    <div class="status-legend" aria-label="Les six statuts d'un échange">
+    <div class="status-legend" aria-label="Les statuts d'un échange">
       <span class="sl-label">Le cycle d'un échange :</span>
       <span class="status-pill st-attente-confrere">En attente du confrère</span>
       <span class="status-pill st-attente-validation">En attente de validation</span>
@@ -1203,7 +1189,9 @@ body.gardefou .terrier .t-hint { opacity: 0; }
       <span class="status-pill st-annule">Annulé</span>
       <span class="status-pill st-applique">Appliqué ✓</span>
       <span class="status-pill st-refuse-admin">Refusé admin</span>
+      <span class="status-pill st-expiree">Expirée</span>
     </div>
+    <p class="echeance-note">🛡 Une proposition n'enlève jamais ta garde : tant que l'échange n'est pas validé, c'est toi qui es de garde. Personne n'est jamais « sans garde » à l'échéance.</p>
 
     <!-- À valider (admin) -->
     <section class="card" aria-label="Échanges à valider par l'admin">
@@ -1218,7 +1206,7 @@ body.gardefou .terrier .t-hint { opacity: 0; }
             <span class="vet-dot" style="--c: var(--vet-julie)">J</span>
             <div class="row-main">
               <p class="row-line"><b>Julie</b> cède sa nuit du <b>mardi 3 mars</b> à <b>Victor</b></p>
-              <p class="row-dates">Contrepartie acceptée : Victor cède sa nuit du jeudi 12 mars à Julie</p>
+              <p class="row-dates">En échange : Victor cède sa nuit du jeudi 12 mars à Julie</p>
               <p class="row-motif">« Spectacle de ma fille le 3 au soir. » · Victor a accepté le 30 janvier</p>
             </div>
             <div class="row-side">
@@ -1247,7 +1235,7 @@ body.gardefou .terrier .t-hint { opacity: 0; }
             <span class="vet-dot" style="--c: var(--vet-thomas)">T</span>
             <div class="row-main">
               <p class="row-line"><b>Thomas</b> te propose sa nuit du <b>lundi 9 mars</b></p>
-              <p class="row-dates">Sans contrepartie · proposé le 1er février</p>
+              <p class="row-dates">Tu la reprends, c'est tout · proposé le 1er février</p>
               <p class="row-motif">« Je récupère ma voiture au garage ce soir-là, je préfère assurer. »</p>
             </div>
             <div class="row-side">
@@ -1318,11 +1306,29 @@ body.gardefou .terrier .t-hint { opacity: 0; }
       </div>
       <ul class="rows" id="ex-mesdemandes">
         <li>
+          <div class="row" data-ex="anneso-victor-j3">
+            <span class="vet-dot" style="--c: var(--vet-anneso)">AS</span>
+            <div class="row-main">
+              <p class="row-line">Tu proposes ta nuit du <b>vendredi 6 février</b> à <b>Victor</b></p>
+              <p class="row-dates">Victor la reprend, c'est tout · envoyée le 26 janvier</p>
+              <p class="row-motif">Sans réponse de Victor à la date de la garde, la proposition expirera : tu restes de garde, comme prévu au planning.</p>
+            </div>
+            <div class="row-side">
+              <span class="status-pill st-echeance">⏳ J-3 : la garde a lieu vendredi</span>
+              <span class="status-pill st-attente-confrere">En attente du confrère</span>
+              <div class="row-actions">
+                <button type="button" class="btn btn-outline btn-sm" data-act="relancer">🦊 Victor n'a pas répondu, je le relance ?</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-act="annuler">Annuler</button>
+              </div>
+            </div>
+          </div>
+        </li>
+        <li>
           <div class="row" data-ex="anneso-camille">
             <span class="vet-dot" style="--c: var(--vet-anneso)">AS</span>
             <div class="row-main">
               <p class="row-line">Tu proposes ta nuit du <b>jeudi 19 mars</b> à <b>Camille</b></p>
-              <p class="row-dates">Contrepartie proposée : sa nuit du mardi 31 mars · envoyée hier</p>
+              <p class="row-dates">En échange : tu reprends sa nuit du mardi 31 mars · envoyée hier</p>
             </div>
             <div class="row-side">
               <span class="status-pill st-attente-confrere">En attente du confrère</span>
@@ -1343,6 +1349,16 @@ body.gardefou .terrier .t-hint { opacity: 0; }
         <p class="sub">Tous les échanges terminés, avec leur motif quand il y en a un. Rien ne s'efface : c'est la mémoire du cabinet.</p>
       </div>
       <ul class="rows" id="ex-histo">
+        <li>
+          <div class="row">
+            <span class="vet-dot" style="--c: var(--vet-anneso)">AS</span>
+            <div class="row-main">
+              <p class="row-line">Tu proposais ta nuit du <b>vendredi 9 janvier</b> à <b>Thomas</b></p>
+              <p class="row-motif">La date est passée sans réponse : la proposition a expiré et tu es restée de garde le 9 janvier. Rien n'a jamais été libéré.</p>
+            </div>
+            <div class="row-side"><span class="status-pill st-expiree">Expirée</span></div>
+          </div>
+        </li>
         <li>
           <div class="row">
             <span class="vet-dot" style="--c: var(--vet-manon)">M</span>
@@ -1689,7 +1705,7 @@ body.gardefou .terrier .t-hint { opacity: 0; }
     <div class="field">
       <label id="proposer-dest-label">À qui la proposer</label>
       <label class="radio-line"><input type="radio" name="proposer-dest" value="cible" checked>
-        <span>À un confrère précis<small>Il reçoit la proposition, accepte ou décline. Tu peux demander une contrepartie.</small></span>
+        <span>À un confrère précis<small>Il reçoit la proposition, accepte ou décline. Simple reprise, ou échange de gardes.</small></span>
       </label>
       <label class="radio-line"><input type="radio" name="proposer-dest" value="tous">
         <span>À tous les confrères<small>La garde apparaît dans « Gardes à reprendre » : première arrivée, première servie.</small></span>
@@ -1708,9 +1724,17 @@ body.gardefou .terrier .t-hint { opacity: 0; }
         </select>
       </div>
       <div class="field">
-        <label for="proposer-contrepartie">Contrepartie demandée (facultative)</label>
-        <select id="proposer-contrepartie">
-          <option value="">Aucune : je cède ma garde, c'est tout</option>
+        <label id="proposer-mode-label">Ce que tu proposes</label>
+        <label class="radio-line"><input type="radio" name="proposer-mode" value="don" checked>
+          <span>Il/elle la reprend, c'est tout<small>Ta garde passe chez le confrère, rien en retour.</small></span>
+        </label>
+        <label class="radio-line"><input type="radio" name="proposer-mode" value="troc">
+          <span>On échange : je reprends une de ses gardes<small>Choisis la garde que tu reprends en retour.</small></span>
+        </label>
+      </div>
+      <div class="field" id="proposer-troc-zone" hidden>
+        <label for="proposer-troc-garde">Sa garde que tu reprends</label>
+        <select id="proposer-troc-garde">
           <option value="sa nuit du mardi 31 mars">Sa nuit du mardi 31 mars</option>
           <option value="sa nuit du mercredi 8 avril">Sa nuit du mercredi 8 avril</option>
         </select>
@@ -1738,8 +1762,9 @@ body.gardefou .terrier .t-hint { opacity: 0; }
     <div class="dlg-warnbox" id="gardefou-msg"></div>
     <p class="gf-cause-label">Ce qui coince, précisément</p>
     <ul class="dlg-gardes" id="gardefou-causes"></ul>
-    <p class="dlg-note">Je préviens, je ne bloque pas : c'est toi qui décides. Si tu enregistres quand même, je le note au journal comme un risque accepté, et je te le rappellerai à la prochaine génération.</p>
+    <p class="dlg-note" id="gardefou-note">Je préviens, je ne bloque pas : c'est toi qui décides. Si tu enregistres quand même, je le note au journal comme un risque accepté, et je te le rappellerai à la prochaine génération.</p>
     <div class="dlg-foot">
+      <button type="button" class="btn btn-ghost" id="gardefou-compris" data-close hidden>Compris, je déciderai à la validation</button>
       <button type="button" class="btn btn-ghost" id="gardefou-annuler">Annuler</button>
       <button type="button" class="btn btn-outline" id="gardefou-ajuster">Ajuster les dates</button>
       <button type="button" class="btn btn-warn" id="gardefou-quandmeme">Enregistrer quand même</button>
@@ -1827,7 +1852,7 @@ body.gardefou .terrier .t-hint { opacity: 0; }
 
 <footer class="footer-maquette">
   <span><b>Maquette M3 · Absences &amp; échanges</b> · ambiance Terrier chaleureux, données fictives · MonProjetPro</span>
-  <span>Démo de la crise : « 🚨 Déclarer une absence », ou valider le congé de Thomas puis « Gérer maintenant ». Démo du garde-fou : valider le souhait de Julie (16 → 22 mars), ou créer un congé sur ces dates.</span>
+  <span>Démos : crise = « 🚨 Déclarer une absence » ou congé de Thomas puis « Gérer maintenant » · garde-fou = badge ambre de Julie ou valider son souhait · échéance = onglet Échanges, badge « ⏳ J-3 » et statut « Expirée » de l'historique.</span>
 </footer>
 
 <script>
@@ -2005,6 +2030,8 @@ body.gardefou .terrier .t-hint { opacity: 0; }
     } else if (btn.dataset.act === "voir-conflit") {
       conflitContext = "consultation";
       openDlg("#dlg-conflit");
+    } else if (btn.dataset.act === "voir-prospectif") {
+      ouvrirGardefou({ mode: "apercu", vetKey: req.vet });
     }
   });
 
@@ -2061,7 +2088,11 @@ body.gardefou .terrier .t-hint { opacity: 0; }
 
   function ouvrirGardefou(ctx) {
     gfContext = ctx;
+    var apercu = ctx.mode === "apercu";
     var v = VETS[ctx.vetKey];
+    $("#gardefou-title").textContent = apercu
+      ? "Ce souhait fragilise une semaine."
+      : "Une seconde : ce congé fragilise une semaine.";
     $("#gardefou-msg").innerHTML =
       "<b>⚠ Avec ce congé de " + v.n + ", la semaine " + GF_WINDOW.label +
       " il ne restera que 3 vétérinaires réellement disponibles pour 4 nuits et un week-end en binôme.</b> " +
@@ -2072,6 +2103,13 @@ body.gardefou .terrier .t-hint { opacity: 0; }
       '<li><span class="g-ico">📅</span><span><b>Victor</b> · formation les jeudi 19 et vendredi 20 mars (congé validé).</span></li>' +
       '<li><span class="g-ico">📖</span><span>Règle du cabinet : « <b>Thomas ne travaille jamais le jeudi soir</b> » : le jeudi 19, il ne resterait qu’une seule vétérinaire possible.</span></li>' +
       '<li><span class="g-ico">🤝</span><span><b>Anne-Catherine</b> n’est appelée qu’en dernier recours : je ne la compte pas.</span></li>';
+    $("#gardefou-note").textContent = apercu
+      ? "Aperçu seulement : rien n’est décidé ici. Tu trancheras au moment de valider ou refuser le souhait, je te reposerai la question."
+      : "Je préviens, je ne bloque pas : c’est toi qui décides. Si tu enregistres quand même, je le note au journal comme un risque accepté, et je te le rappellerai à la prochaine génération.";
+    $("#gardefou-annuler").hidden = apercu;
+    $("#gardefou-ajuster").hidden = apercu;
+    $("#gardefou-quandmeme").hidden = apercu;
+    $("#gardefou-compris").hidden = !apercu;
     document.body.classList.add("gardefou");
     openDlg("#dlg-gardefou");
   }
@@ -2246,7 +2284,7 @@ body.gardefou .terrier .t-hint { opacity: 0; }
     supprTarget = null;
   });
 
-  /* ---------- Filtres + résumé par véto ---------- */
+  /* ---------- Filtre fusionné : chips par véto (compteur intégré) + type ---------- */
   var filterVet = "tous", filterType = "tous";
   function applyFilters() {
     $$("#conges-list > li").forEach(function (li) {
@@ -2256,40 +2294,45 @@ body.gardefou .terrier .t-hint { opacity: 0; }
     });
     recount();
   }
-  $$(".vet-filter").forEach(function (b) {
-    b.addEventListener("click", function () {
-      filterVet = b.dataset.vet;
-      $$(".vet-filter").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
-      applyFilters();
-    });
+  $("#filters-bar").addEventListener("click", function (e) {
+    var b = e.target.closest(".vet-filter");
+    if (!b) return;
+    filterVet = b.dataset.vet;
+    applyFilters();
   });
   $("#filter-type").addEventListener("change", function () {
     filterType = this.value;
     applyFilters();
   });
+  /* Reconstruit les chips (le compteur EST le filtre) ; appelé par recount(). */
   function buildResume() {
     var counts = {};
     $$("#conges-list > li").forEach(function (li) {
       counts[li.dataset.vet] = (counts[li.dataset.vet] || 0) + 1;
     });
-    var host = $("#resume-vets");
-    host.querySelectorAll(".resume-chip").forEach(function (c) { c.remove(); });
+    if (filterVet !== "tous" && !counts[filterVet]) {
+      /* plus aucun congé pour ce filtre : retour à toute l'équipe, sans récursion */
+      filterVet = "tous";
+      $$("#conges-list > li").forEach(function (li) {
+        li.hidden = !(filterType === "tous" || li.dataset.type === filterType);
+      });
+    }
+    var host = $("#vet-chips");
+    host.innerHTML = "";
     Object.keys(VETS).forEach(function (k) {
       var n = counts[k] || 0;
       if (n === 0) return;
       var b = document.createElement("button");
       b.type = "button";
-      b.className = "resume-chip";
+      b.className = "vet-filter";
+      b.dataset.vet = k;
+      b.setAttribute("aria-pressed", String(filterVet === k));
       b.style.setProperty("--c", VETS[k].c);
       b.innerHTML = "<i></i>" + VETS[k].n + " <b>" + n + "</b>";
-      b.title = "Filtrer sur " + VETS[k].n;
-      b.addEventListener("click", function () {
-        filterVet = k;
-        $$(".vet-filter").forEach(function (x) { x.setAttribute("aria-pressed", String(x.dataset.vet === k)); });
-        applyFilters();
-      });
+      b.title = "Voir les " + n + " congé(s) de " + VETS[k].n;
       host.appendChild(b);
     });
+    $("#filter-tous").setAttribute("aria-pressed", String(filterVet === "tous"));
   }
 
   /* ============================================================
@@ -2367,18 +2410,25 @@ body.gardefou .terrier .t-hint { opacity: 0; }
         journal("Anne-Sophie reprend la garde ouverte de " + VETS[who].n + ". Verrou posé, en attente de validation admin.");
       });
     } else if (act === "annuler") {
+      var lineAn = row.querySelector(".row-line").innerHTML;
+      var dotAn = row.querySelector(".vet-dot").outerHTML;
       $("#confirm-kicker").textContent = "Annuler ma demande";
       $("#confirm-title").textContent = "Annuler cette proposition d’échange ?";
-      $("#confirm-note").textContent = "Camille ne pourra plus l’accepter. Tu pourras toujours reproposer cette garde plus tard.";
+      $("#confirm-note").textContent = "Le confrère ne pourra plus l’accepter. Tu restes de garde comme prévu, et tu pourras toujours reproposer cette garde plus tard.";
       $("#confirm-yes").textContent = "Annuler la proposition";
       confirmAction = function () {
         removeRow(row, function () {
-          addHistoRow("anneso", "Tu proposais ta nuit du <b>jeudi 19 mars</b> à <b>Camille</b>", "Annulée par toi avant sa réponse", "st-annule", "Annulé");
-          toast("Proposition annulée.");
-          journal("Anne-Sophie a annulé sa proposition d’échange (nuit du 19 mars).");
+          addHistoRow("anneso", lineAn.replace("Tu proposes", "Tu proposais"), "Annulée par toi avant réponse", "st-annule", "Annulé", dotAn);
+          toast("Proposition annulée. Tu restes de garde comme prévu.");
+          journal("Anne-Sophie a annulé une proposition d’échange avant réponse.");
         });
       };
       openDlg("#dlg-confirm");
+    } else if (act === "relancer") {
+      btn.disabled = true;
+      btn.textContent = "🦊 Relance envoyée ✓";
+      toast("Filou a relancé Victor : e-mail + notification. Tu restes de garde tant que rien n’est validé.");
+      journal("Relance envoyée à Victor par Filou : proposition de la nuit du vendredi 6 février toujours sans réponse (échéance J-3).", "warn");
     }
   });
 
@@ -2424,15 +2474,20 @@ body.gardefou .terrier .t-hint { opacity: 0; }
       $("#proposer-cible-zone").hidden = true;
     } else {
       var v = VETS[$("#proposer-vet").value].n;
-      var cp = $("#proposer-contrepartie").value;
+      var mode = document.querySelector('input[name="proposer-mode"]:checked').value;
+      $("#proposer-troc-zone").hidden = (mode !== "troc");
       html = "Tu proposes <b>" + garde.toLowerCase() + "</b> à <b>" + v + "</b>" +
-        (cp ? ", en échange de <b>" + cp + "</b>" : ", sans contrepartie") + ".";
+        (mode === "troc"
+          ? ", et tu reprends <b>" + $("#proposer-troc-garde").value + "</b>."
+          : " : " + v + " la reprend, c’est tout.");
       $("#proposer-cible-zone").hidden = false;
     }
     $("#proposer-recap").innerHTML = html;
   }
-  $$('input[name="proposer-dest"]').forEach(function (r) { r.addEventListener("change", updateProposerRecap); });
-  ["#proposer-garde", "#proposer-vet", "#proposer-contrepartie"].forEach(function (s) {
+  $$('input[name="proposer-dest"], input[name="proposer-mode"]').forEach(function (r) {
+    r.addEventListener("change", updateProposerRecap);
+  });
+  ["#proposer-garde", "#proposer-vet", "#proposer-troc-garde"].forEach(function (s) {
     $(s).addEventListener("change", updateProposerRecap);
   });
   $("#proposer-confirm").addEventListener("click", function () {
@@ -2453,18 +2508,19 @@ body.gardefou .terrier .t-hint { opacity: 0; }
       journal("Anne-Sophie ouvre sa garde (" + garde.toLowerCase() + ") à toute l’équipe.");
     } else {
       var vKey = $("#proposer-vet").value;
-      var cp = $("#proposer-contrepartie").value;
+      var mode = document.querySelector('input[name="proposer-mode"]:checked').value;
+      var troc = $("#proposer-troc-garde").value;
       li.innerHTML =
         '<div class="row fresh" data-ex="dyn">' +
           '<span class="vet-dot" style="--c: var(--vet-anneso)">AS</span>' +
           '<div class="row-main"><p class="row-line">Tu proposes ta <b>' + garde.toLowerCase() + "</b> à <b>" + VETS[vKey].n + "</b></p>" +
-          '<p class="row-dates">' + (cp ? "Contrepartie demandée : " + cp : "Sans contrepartie") + " · envoyée à l’instant</p></div>" +
+          '<p class="row-dates">' + (mode === "troc" ? "En échange : tu reprends " + troc : VETS[vKey].n + " la reprend, c’est tout") + " · envoyée à l’instant</p></div>" +
           '<div class="row-side"><span class="status-pill st-attente-confrere">En attente du confrère</span>' +
             '<div class="row-actions"><button type="button" class="btn btn-ghost btn-sm" data-act="annuler">Annuler</button></div></div>' +
         "</div>";
       $("#ex-mesdemandes").appendChild(li);
       toast("Proposition envoyée à " + VETS[vKey].n + " ✓");
-      journal("Anne-Sophie propose sa garde (" + garde.toLowerCase() + ") à " + VETS[vKey].n + ".");
+      journal("Anne-Sophie propose sa garde (" + garde.toLowerCase() + ") à " + VETS[vKey].n + (mode === "troc" ? ", en échange de " + troc : ", simple reprise") + ".");
     }
     recount();
   });

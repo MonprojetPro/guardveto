@@ -1333,6 +1333,7 @@ body.filou-out .burrow-panel {
     </div>
     <nav class="mnav" aria-label="Navigation de la grande maquette">
       <a href="index.html">🏠 Hub</a>
+      <a href="m6-accueil-epicentre.html">M6 Accueil épicentre</a>
       <a href="m1-planning.html">M1 Planning</a>
       <a href="m2-regles.html">M2 Règles</a>
       <a href="m3-absences-echanges.html">M3 Absences &amp; échanges</a>
@@ -1359,11 +1360,11 @@ body.filou-out .burrow-panel {
       <div class="welcome-word">
         <span class="hero-kicker">Jour 1 · Ton cabinet vient d'arriver</span>
         <h1>Bienvenue, Cabinet des Quatre Pattes.</h1>
-        <p>Quatre étapes autour de Filou, une dizaine de minutes. Clique sur une étape : il ouvre l'entretien, tu parles, il note, tu valides.</p>
+        <p>Cinq étapes autour de Filou, une dizaine de minutes. Clique sur une étape : il t'explique à quoi elle sert, tu parles, il note, tu valides.</p>
       </div>
 
       <div class="orbital-collapse" id="orbital-collapse">
-        <div class="orbital" id="orbital" role="group" aria-label="Parcours d'installation en quatre étapes">
+        <div class="orbital" id="orbital" role="group" aria-label="Parcours d'installation en cinq étapes">
           <div class="orbit-ring"></div>
           <div class="orbit-ring inner"></div>
           <div class="orbit-center" id="orbit-center"><img src="../fox-1.png" alt="Filou au centre du parcours" id="orbit-center-img"></div>
@@ -1373,31 +1374,38 @@ body.filou-out .burrow-panel {
           <span class="sparkle" style="--sx:96px; --sy:52px; animation-delay:.5s">✦</span>
           <span class="sparkle" style="--sx:0px; --sy:-104px; animation-delay:.65s">✧</span>
           <div class="rotor">
-            <button type="button" class="node done" style="--a: -90deg" data-step="0" aria-label="Étape 1, Ton équipe, complétée. Ouvrir le récapitulatif.">
+            <button type="button" class="node active" style="--a: -90deg" data-step="0" aria-label="Étape 1 sur 5, Ton équipe, en cours. Ouvrir l'entretien.">
               <span class="node-inner">
-                <span class="node-dot" aria-hidden="true">✓</span>
+                <span class="node-dot" aria-hidden="true">1</span>
                 <span class="node-label">Ton équipe</span>
-                <span class="node-state">Complétée</span>
-              </span>
-            </button>
-            <button type="button" class="node active" style="--a: 0deg" data-step="1" aria-label="Étape 2, Vos habitudes de garde, en cours. Ouvrir l'entretien.">
-              <span class="node-inner">
-                <span class="node-dot" aria-hidden="true">2</span>
-                <span class="node-label">Vos habitudes de garde</span>
                 <span class="node-state">En cours</span>
               </span>
             </button>
-            <button type="button" class="node" style="--a: 90deg" data-step="2" aria-label="Étape 3, Générer ton premier planning, à venir.">
+            <button type="button" class="node" style="--a: -18deg" data-step="1" aria-label="Étape 2 sur 5, Vos habitudes de garde, à venir.">
               <span class="node-inner">
-                <span class="node-dot" aria-hidden="true">3</span>
-                <span class="node-label">Générer ton premier planning</span>
+                <span class="node-dot" aria-hidden="true">2</span>
+                <span class="node-label">Vos habitudes de garde</span>
                 <span class="node-state">À venir</span>
               </span>
             </button>
-            <button type="button" class="node" style="--a: 180deg" data-step="3" aria-label="Étape 4, Inviter les vétos, à venir.">
+            <button type="button" class="node" style="--a: 54deg" data-step="2" aria-label="Étape 3 sur 5, Inviter les vétos, à venir.">
+              <span class="node-inner">
+                <span class="node-dot" aria-hidden="true">3</span>
+                <span class="node-label">Inviter les vétos</span>
+                <span class="node-state">À venir</span>
+              </span>
+            </button>
+            <button type="button" class="node" style="--a: 126deg" data-step="3" aria-label="Étape 4 sur 5, Ta première période, à venir.">
               <span class="node-inner">
                 <span class="node-dot" aria-hidden="true">4</span>
-                <span class="node-label">Inviter les vétos</span>
+                <span class="node-label">Ta première période</span>
+                <span class="node-state">À venir</span>
+              </span>
+            </button>
+            <button type="button" class="node" style="--a: 198deg" data-step="4" aria-label="Étape 5 sur 5, Générer et publier, à venir.">
+              <span class="node-inner">
+                <span class="node-dot" aria-hidden="true">5</span>
+                <span class="node-label">Générer &amp; publier</span>
                 <span class="node-state">À venir</span>
               </span>
             </button>
@@ -1419,9 +1427,9 @@ body.filou-out .burrow-panel {
               <p>Planning généré, équipe invitée : la roue a disparu, elle ne sert plus à rien.</p>
             </div>
           </div>
-          <p class="note">À partir de maintenant, cet écran laisse place au quotidien : le <b>Planning</b> t'attend dans l'onglet M1, et Filou vit dans son <b>terrier</b>, en bas à droite de chaque écran. Il ne reprend la scène que pour te protéger d'une erreur.</p>
+          <p class="note">À partir de maintenant, cet écran laisse place au quotidien : ton <b>accueil</b> prend le relais, et Filou vit dans son <b>terrier</b>, en bas à droite de chaque écran. Il ne reprend la scène que pour te protéger d'une erreur.</p>
           <div class="finish-actions">
-            <a class="btn btn-valider" href="m1-planning.html" style="text-decoration:none; display:inline-flex; align-items:center;">Voir le planning →</a>
+            <a class="btn btn-valider" href="m6-accueil-epicentre.html" style="text-decoration:none; display:inline-flex; align-items:center;">Découvre ton accueil →</a>
             <button type="button" class="btn btn-corriger" id="demo-replay">↺ Rejouer l'installation</button>
           </div>
         </div>
@@ -1797,8 +1805,8 @@ body.filou-out .burrow-panel {
     <div class="step-modal-head">
       <span class="avatar"><img src="../fox-1.png" alt="" id="sm-fox"></span>
       <div>
-        <p class="step-tag" id="sm-tag">Étape 2 sur 4</p>
-        <h3 id="sm-title">Vos habitudes de garde</h3>
+        <p class="step-tag" id="sm-tag">Étape 1 sur 5</p>
+        <h3 id="sm-title">Ton équipe</h3>
       </div>
       <button type="button" class="modal-close" id="sm-close" aria-label="Fermer l'entretien et revenir à la roue">✕</button>
     </div>
@@ -1941,33 +1949,53 @@ body.filou-out .burrow-panel {
   /* ============================================================
      SECTION 1 · ROUE ORBITALE + POP-UP D'ÉTAPE
      ============================================================ */
-  var stepStatus = ["done", "active", "todo", "todo"]; /* état des 4 étapes */
+  var stepStatus = ["active", "todo", "todo", "todo", "todo"]; /* état des 5 étapes */
   var stepCompletedNow = false; /* l'étape ouverte vient-elle d'être terminée ? */
-  var currentStep = 1;
+  var currentStep = 0;
   var runId = 0;
 
   var STEP_META = [
     { title: "Ton équipe", fox: "../fox-1.png" },
     { title: "Vos habitudes de garde", fox: "../fox-1.png" },
-    { title: "Générer ton premier planning", fox: "../fox-2.png" },
-    { title: "Inviter les vétos", fox: "../fox-3.png" }
+    { title: "Inviter les vétos", fox: "../fox-3.png" },
+    { title: "Ta première période", fox: "../fox-2.png" },
+    { title: "Générer & publier", fox: "../fox-2.png" }
   ];
 
   /* Chaque étape : une suite d'échanges { filou, user, reform, rows[] }.
-     rows = ce qui s'ajoute au tableau de droite quand on clique « C'est ça ». */
+     rows = ce qui s'ajoute au tableau de droite quand on clique « C'est ça ».
+     L'opening explique TOUJOURS : à quoi sert l'étape, ce qui suivra,
+     et où l'on retrouvera ce réglage plus tard. */
   var STEP_FLOWS = [
-    { /* Étape 1 · déjà complétée : récap en lecture */
-      recap: true,
-      opening: "Cette étape est déjà complétée : voici ce que tu as validé. Dis-moi si quelqu'un arrive ou s'en va, je mettrai la fiche à jour.",
-      rows: [
-        { ico: "👥", label: "7 vétérinaires enregistrés", detail: "Anne-Sophie, Anne-Catherine, Manon, Victor, Camille, Julie, Thomas" },
-        { ico: "🔑", label: "Anne-Sophie : administratrice", detail: "Seule à générer et publier les plannings" },
-        { ico: "🛟", label: "Anne-Catherine : dernier recours", detail: "Appelée uniquement si personne d'autre ne peut" }
+    { /* Étape 1 · l'équipe, noms + e-mails */
+      opening: "Bienvenue ! Première étape : ton équipe. Je vais noter le nom et l'adresse e-mail de chaque vétérinaire. Pourquoi les e-mails ? C'est avec ces adresses qu'ils recevront leur invitation à rejoindre GuardVeto, puis leur planning publié et leurs notifications. Tu pourras toujours corriger une fiche plus tard, dans l'onglet Équipe. Alors : qui compose ton équipe ?",
+      exchanges: [
+        {
+          user: "On est 7 : moi (Anne-Sophie), Anne-Catherine, Manon, Victor, Camille, Julie et Thomas. Anne-Catherine seulement en dernier recours.",
+          reform: "Si je comprends bien : 7 vétérinaires, toi comme administratrice, Anne-Catherine en dernier recours, et Manon, Victor, Camille, Julie et Thomas dans la rotation. C'est bien ça ?",
+          rows: [
+            { ico: "👥", label: "7 vétérinaires enregistrés", detail: "Anne-Sophie (admin) · Anne-Catherine (dernier recours) · Manon, Victor, Camille, Julie, Thomas" }
+          ]
+        },
+        {
+          filou: "Il me faut maintenant leurs adresses e-mail : c'est par là que chacun recevra son invitation à l'étape 3, puis le planning publié.",
+          user: "anne-catherine@exemple.fr, manon@exemple.fr, victor@exemple.fr, camille@exemple.fr, julie@exemple.fr et thomas@exemple.fr.",
+          reform: "Je note ces 6 adresses ; la tienne, je l'ai déjà, c'est ton compte. Sans e-mail, pas d'invitation ni de notification : vérifie-les à droite. Je les enregistre ?",
+          rows: [
+            { ico: "🔑", label: "Anne-Sophie", detail: "anne-sophie@cabinet4pattes.fr · compte actif (toi)" },
+            { ico: "✉️", label: "Anne-Catherine", detail: "anne-catherine@exemple.fr · à inviter" },
+            { ico: "✉️", label: "Manon", detail: "manon@exemple.fr · à inviter" },
+            { ico: "✉️", label: "Victor", detail: "victor@exemple.fr · à inviter" },
+            { ico: "✉️", label: "Camille", detail: "camille@exemple.fr · à inviter" },
+            { ico: "✉️", label: "Julie", detail: "julie@exemple.fr · à inviter" },
+            { ico: "✉️", label: "Thomas", detail: "thomas@exemple.fr · à inviter" }
+          ]
+        }
       ],
-      closing: "Tout est bon de ce côté. Tu peux fermer et passer à l'étape 2 : vos habitudes de garde."
+      closing: "Ton équipe est prête, adresses comprises. Tu retrouveras ces fiches dans l'onglet Équipe : couleurs, étiquettes, invitations, tout se gère là-bas. Étape suivante : vos habitudes de garde."
     },
     { /* Étape 2 · habitudes de garde */
-      opening: "Étape 2 : vos habitudes de garde. Raconte-moi votre roulement, avec tes mots : qui prend les nuits de semaine, comment se passe le week-end ?",
+      opening: "Étape 2 : vos habitudes de garde. À quoi ça sert : je traduis votre roulement en règles claires, que le générateur respectera à la lettre. Ensuite, tu pourras tout relire et ajuster dans « Règles du cabinet », en français, jamais en jargon. Raconte-moi, avec tes mots : qui prend les nuits de semaine, comment se passe le week-end ?",
       exchanges: [
         {
           user: "Une garde chaque nuit du lundi au jeudi, et le week-end en binôme du vendredi soir au dimanche.",
@@ -1986,36 +2014,60 @@ body.filou-out .burrow-panel {
           ]
         }
       ],
-      closing: "Parfait, vos habitudes sont enregistrées dans « Règles du cabinet ». Ferme la fenêtre : la roue avance à l'étape 3."
+      closing: "Parfait, vos habitudes sont enregistrées dans « Règles du cabinet ». Ferme la fenêtre : la roue avance à l'étape 3, les invitations."
     },
-    { /* Étape 3 · génération */
-      opening: "Étape 3 : ton premier planning. Je récapitule ce que j'ai en main : 7 vétérinaires, 9 règles actives, période d'hiver de 12 semaines, effectif de 1 par nuit.",
+    { /* Étape 3 · invitations (avec les e-mails de l'étape 1) */
+      opening: "Étape 3 : inviter les vétos, avec les adresses de l'étape 1. Pourquoi maintenant ? Pour qu'au moment où tu publieras ton premier planning (étape 5), tout le monde le reçoive déjà. Concrètement, chacun recevra un e-mail pour créer son compte ; ensuite il pourra consulter ses gardes sur son téléphone, poser ses congés et proposer des échanges. Toi, tu suivras qui a rejoint dans l'onglet Équipe.",
       exchanges: [
         {
-          user: "Vas-y, lance !",
-          reform: "Je génère le brouillon Hiver 2026 (12 semaines, du 5 janvier au 29 mars) avec vos 9 règles. Je lance ?",
+          user: "Vas-y, invite tout le monde.",
+          reform: "J'envoie 6 invitations aux adresses notées à l'étape 1 : Anne-Catherine, Manon, Victor, Camille, Julie et Thomas. J'envoie ?",
           rows: [
-            { ico: "🗓️", label: "Période : Hiver 2026", detail: "12 semaines · 5 janvier → 29 mars" },
-            { ico: "✅", label: "Brouillon généré", detail: "9 règles respectées · équitable à 1 garde près" }
-          ],
-          after: "C'est fait ! Le brouillon t'attend dans l'onglet Planning : relis-le tranquillement, tout reste modifiable à la main."
-        }
-      ],
-      closing: "Dernière étape ensuite : inviter les vétos, pour que chacun voie ses gardes sur son téléphone."
-    },
-    { /* Étape 4 · invitations */
-      opening: "Dernière étape : inviter les vétos. J'envoie un e-mail à chacun des 6 autres ; ils verront leurs gardes sur leur téléphone, sans rien installer.",
-      exchanges: [
-        {
-          user: "Oui, envoie à tout le monde.",
-          reform: "J'envoie 6 invitations : Anne-Catherine, Manon, Victor, Camille, Julie et Thomas. Tu suivras qui a rejoint dans l'onglet Équipe. J'envoie ?",
-          rows: [
-            { ico: "✉️", label: "6 invitations envoyées", detail: "Chacun crée son mot de passe depuis l'e-mail" },
+            { ico: "✉️", label: "6 invitations envoyées", detail: "Un e-mail pour créer son compte, aux adresses de l'étape 1" },
+            { ico: "📱", label: "Ce qu'ils pourront faire", detail: "Consulter leurs gardes, poser des congés, échanger des gardes" },
             { ico: "👀", label: "Suivi dans l'onglet Équipe", detail: "Sans compte → Invitation envoyée → Actif" }
           ]
         }
       ],
-      closing: "Et voilà : l'installation est finie ! Ferme la fenêtre, je te fais une petite surprise."
+      closing: "Invitations parties ! Pas besoin d'attendre les réponses pour continuer : passons à ta première période."
+    },
+    { /* Étape 4 · première période */
+      opening: "Étape 4 : ta première période. Une « période », c'est la tranche de planning que je génère d'un coup : 12 semaines l'hiver, 17 l'été. C'est le cadre dans lequel je poserai les gardes à l'étape suivante, et plus tard tu créeras les périodes suivantes en une phrase. Dis-moi simplement : jusqu'à quand veux-tu planifier ?",
+      exchanges: [
+        {
+          user: "Planifie jusqu'à fin mars.",
+          reform: "Je crée la période Hiver 2026 : du lundi 5 janvier au dimanche 29 mars, soit 12 semaines. Le lundi de départ, la saison et le profil Hiver, je les ai calculés tout seul ; l'effectif reste 1 vétérinaire par nuit, comme vos habitudes. Je crée ?",
+          rows: [
+            { ico: "🗓️", label: "Période Hiver 2026", detail: "5 janvier → 29 mars · 12 semaines" },
+            { ico: "🧭", label: "Calculé automatiquement", detail: "Lundi de départ, saison, profil Hiver" },
+            { ico: "👥", label: "Effectif : 1 par nuit", detail: "Modifiable avant chaque génération" }
+          ]
+        }
+      ],
+      closing: "La période est prête. Dernière étape : générer le planning, puis le publier pour toute l'équipe."
+    },
+    { /* Étape 5 · générer & publier */
+      opening: "Dernière étape, le grand moment. Générer : je remplis la période Hiver 2026 en respectant vos règles, et je t'explique mes choix. Publier : j'envoie le planning à l'équipe, un e-mail à chacun (les adresses de l'étape 1) et les gardes dans l'agenda Google du cabinet. Tant que tu ne publies pas, c'est un brouillon : tu peux tout modifier à la main, dans l'onglet Planning.",
+      exchanges: [
+        {
+          user: "Génère !",
+          reform: "Je génère le brouillon Hiver 2026 avec vos 9 règles. Tu pourras le relire et le corriger à la main avant de publier. Je lance ?",
+          rows: [
+            { ico: "✅", label: "Brouillon généré", detail: "9 règles respectées · équitable à 1 garde près" }
+          ],
+          after: "Voilà ton premier planning ! Il t'attend dans l'onglet Planning : chaque garde se change à la main, et je veille depuis mon terrier."
+        },
+        {
+          filou: "Quand tu es satisfaite du brouillon, on le publie : c'est la version officielle, celle que l'équipe reçoit.",
+          user: "Publie !",
+          reform: "Je publie Hiver 2026 : chaque vétérinaire reçoit son planning par e-mail, et l'agenda Google du cabinet se remplit. Je publie ?",
+          rows: [
+            { ico: "📣", label: "Planning publié", detail: "Un e-mail à chacun des 7 vétérinaires" },
+            { ico: "📅", label: "Agenda Google à jour", detail: "Toutes les gardes synchronisées dans le calendrier du cabinet" }
+          ]
+        }
+      ],
+      closing: "Bravo, ton cabinet est installé de bout en bout ! Ferme la fenêtre : la roue a fini son travail."
     }
   ];
 
@@ -2117,7 +2169,7 @@ body.filou-out .burrow-panel {
     stepCompletedNow = false;
     lastFocus = document.activeElement;
     var meta = STEP_META[step];
-    $("#sm-tag").textContent = "Étape " + (step + 1) + " sur 4" + (stepStatus[step] === "done" ? " · complétée" : "");
+    $("#sm-tag").textContent = "Étape " + (step + 1) + " sur " + STEP_META.length + (stepStatus[step] === "done" ? " · complétée" : "");
     $("#sm-title").textContent = meta.title;
     $("#sm-fox").src = meta.fox;
     smConvo.innerHTML = "";
@@ -2148,10 +2200,13 @@ body.filou-out .burrow-panel {
     await sleep(400); if (id !== runId) return;
 
     if (flow.recap || stepStatus[step] === "done") {
-      /* Étape déjà complétée : récap en lecture */
-      await filouSays(flow.opening || "Cette étape est déjà complétée : voici ce que tu avais validé.", id);
+      /* Étape déjà complétée : récap en lecture de ce qui avait été validé */
+      await filouSays("Cette étape est déjà complétée : voici ce que tu avais validé. Dis-moi si quelque chose a changé, je mettrai la fiche à jour.", id);
       if (id !== runId) return;
       var rows = flow.rows || [];
+      if (!rows.length && flow.exchanges) {
+        flow.exchanges.forEach(function (ex) { rows = rows.concat(ex.rows || []); });
+      }
       for (var i = 0; i < rows.length; i++) {
         if (id !== runId) return;
         addValidRow(rows[i]);
@@ -2238,13 +2293,13 @@ body.filou-out .burrow-panel {
   /* Démo : simuler la fin de l'onboarding */
   $("#demo-finish").addEventListener("click", async function () {
     runId++;
-    for (var i = 0; i < 4; i++) {
+    for (var i = 0; i < stepStatus.length; i++) {
       if (stepStatus[i] !== "done") { stepStatus[i] = "done"; paintWheel(); await sleep(340); }
     }
     celebrate();
   });
   $("#demo-replay").addEventListener("click", function () {
-    stepStatus = ["done", "active", "todo", "todo"];
+    stepStatus = ["active", "todo", "todo", "todo", "todo"];
     $("#finish-card").classList.remove("show");
     var oc = $("#orbital-collapse");
     oc.classList.remove("gone");

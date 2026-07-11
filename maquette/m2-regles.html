@@ -528,7 +528,7 @@ img { display: block; }
 .badge.b-periode { background: var(--warn-soft); color: var(--warn); border-color: rgba(196, 138, 20, 0.35); }
 .badge.b-susp { background: var(--warn-soft); color: var(--warn); border-color: rgba(196, 138, 20, 0.35); text-transform: uppercase; }
 
-/* ----- Réglette : la grammaire unique à 3 positions ----- */
+/* ----- Réglette unique à 4 positions (mapping 1:1 avec le moteur) ----- */
 .rule-foot {
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
   margin-top: 12px;
@@ -555,25 +555,40 @@ img { display: block; }
 .reglette-seg button:hover { color: var(--text); }
 .reglette-seg button[aria-checked="true"] { color: #fff; }
 .reglette-seg button[aria-checked="true"][data-pos="obligatoire"] { background: var(--accent); }
+.reglette-seg button[aria-checked="true"][data-pos="saufurgence"] { background: #B0651C; }
 .reglette-seg button[aria-checked="true"][data-pos="important"]   { background: var(--warn); }
 .reglette-seg button[aria-checked="true"][data-pos="sipossible"]  { background: var(--soft); }
+/* Position verrouillée (pénalités souples : jamais « Obligatoire ») */
+.reglette-seg button[aria-disabled="true"] {
+  opacity: 0.38; cursor: not-allowed;
+  text-decoration: line-through; text-decoration-thickness: 1px;
+}
+.reglette-seg button[aria-disabled="true"]:hover { color: var(--muted); }
+/* Réglette d'équité : autre question (« combien ça pèse »), autre style */
+.reglette-eq .reglette-seg {
+  border-radius: 10px;
+  background: var(--ok-soft);
+  border-color: rgba(90, 150, 60, 0.38);
+}
+.reglette-eq .reglette-seg button {
+  border-radius: 7px;
+  font-size: 0.72rem;
+  padding: 6px 10px;
+}
+.reglette-eq .reglette-seg button[aria-checked="true"] { background: var(--ok); color: #fff; }
+.reglette-eq .eq-caption {
+  display: block;
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--ok);
+}
 .reglette-map {
   font-size: 0.7rem; color: var(--soft); line-height: 1.5;
   min-height: 1.1em;
   max-width: 46ch;
 }
 .reglette-map b { color: var(--muted); font-weight: 700; }
-.fine-link {
-  margin-left: auto;
-  border: none; background: transparent;
-  color: var(--soft);
-  font-size: 0.72rem; font-weight: 600;
-  text-decoration: underline dotted; text-underline-offset: 3px;
-  padding: 4px 2px; min-height: 30px;
-  align-self: flex-end;
-}
-.fine-link:hover { color: var(--accent-ink); }
 .btn-filou {
+  margin-left: auto;
   border: 1px solid var(--border-strong);
   background: var(--accent-soft); color: var(--accent-ink);
   border-radius: 999px;
@@ -584,40 +599,48 @@ img { display: block; }
 }
 .btn-filou:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 
-/* ----- Réglage fin (échelle réelle du moteur, dépliée) ----- */
-.fine-panel {
-  display: none;
-  margin-top: 11px;
-  background: var(--surface-2);
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--r-sm);
-  padding: 11px 14px 12px;
-}
-.fine-panel.open { display: block; animation: panelIn .3s ease both; }
-.fine-panel h4 {
-  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.09em;
-  text-transform: uppercase; color: var(--accent-ink);
-  margin-bottom: 8px;
-}
-.fine-opts { display: flex; flex-direction: column; gap: 3px; }
-.fine-opt {
-  display: flex; align-items: baseline; gap: 9px;
-  border: none; background: transparent;
+/* ----- Le 18 : appel de Filou, toujours à portée de patte ----- */
+.filou-call {
+  position: fixed; right: 20px; bottom: 20px; z-index: 350;
+  display: flex; align-items: center; gap: 11px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 8px 20px 8px 8px;
+  box-shadow: var(--shadow-panel);
   text-align: left;
-  font-size: 0.79rem; line-height: 1.5;
-  padding: 5px 8px; border-radius: 8px;
-  color: var(--text);
 }
-.fine-opt:hover { background: var(--surface); }
-.fine-opt .fo-dot {
-  flex: none; width: 11px; height: 11px; border-radius: 50%;
-  border: 2px solid var(--border-strong); background: transparent;
-  align-self: center;
+.filou-call::before {
+  content: "";
+  position: absolute; inset: -1.5px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 0 var(--accent-glow);
+  animation: callPulse 3.2s ease-out infinite;
+  pointer-events: none;
 }
-.fine-opt[aria-checked="true"] .fo-dot { background: var(--accent); border-color: var(--accent); }
-.fine-opt[aria-checked="true"] { font-weight: 700; }
-.fine-opt small { color: var(--soft); font-weight: 400; font-size: 0.72rem; }
-.fine-note { margin-top: 8px; font-size: 0.7rem; color: var(--soft); line-height: 1.5; }
+@keyframes callPulse {
+  0%   { box-shadow: 0 0 0 0 var(--accent-glow); }
+  45%  { box-shadow: 0 0 0 12px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.filou-call:hover { border-color: var(--accent); transform: translateY(-2px); }
+.filou-call { transition: transform .2s ease, border-color .2s ease; }
+.filou-call .fc-avatar {
+  width: 46px; height: 46px; border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1.5px solid var(--border-strong);
+  overflow: hidden; flex: none;
+  display: flex; justify-content: center; align-items: flex-start;
+}
+.filou-call .fc-avatar img { width: 130%; height: auto; margin-top: 2px; }
+.filou-call .fc-text {
+  font-size: 0.78rem; font-weight: 600; color: var(--muted); line-height: 1.3;
+}
+.filou-call .fc-text b {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.86rem; font-weight: 700; color: var(--text);
+}
 
 /* ----- Confirmation inline (suppression) & historique ----- */
 .confirm-row {
@@ -906,8 +929,10 @@ img { display: block; }
   align-self: center;
 }
 .lvl-mini.m-obligatoire { background: var(--accent-soft); color: var(--accent-ink); }
+.lvl-mini.m-saufurgence { background: rgba(176, 101, 28, 0.15); color: #B0651C; }
 .lvl-mini.m-important   { background: var(--warn-soft); color: var(--warn); }
 .lvl-mini.m-sipossible  { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+.lvl-mini.m-eq          { background: var(--ok-soft); color: var(--ok); }
 .defini-empty { color: var(--soft); font-style: italic; font-size: 0.85rem; padding: 14px 2px; }
 
 /* ============================================================
@@ -962,8 +987,9 @@ img { display: block; }
   .topbar { flex-direction: column; align-items: stretch; gap: 8px; }
   .mq-nav { margin-left: 0; }
   .rule-foot { align-items: flex-start; }
-  .btn-filou { width: 100%; justify-content: center; }
-  .fine-link { margin-left: 0; }
+  .btn-filou { width: 100%; justify-content: center; margin-left: 0; }
+  .filou-call .fc-text { display: none; }
+  .filou-call { padding: 8px; }
 }
 
 /* ============================================================
@@ -973,10 +999,12 @@ img { display: block; }
   html { scroll-behavior: auto; }
   * { scroll-behavior: auto !important; }
   .page-hero .blob { animation: none !important; }
-  .bubble, .tab-panel.active, .fine-panel.open, .confirm-row.open,
+  .bubble, .tab-panel.active, .confirm-row.open,
   .history-panel.open, .focus-banner.on, .ctx-strip.on { animation-duration: 0.01ms !important; }
   .rule-card.fresh, .rule-card.focused { animation: none; box-shadow: 0 0 0 3px var(--accent-glow), var(--shadow-card); }
   .type-caret { animation: none; }
+  .filou-call::before { animation: none; box-shadow: none; }
+  .filou-call { transition: none; }
   .defini-panel, .defini-veil, .toast, .switch::after, .switch { transition: none; }
 }
 </style>
@@ -994,6 +1022,7 @@ img { display: block; }
   </div>
   <nav class="mq-nav" aria-label="Tranches de la maquette">
     <a href="index.html">🏠 Hub</a>
+    <a href="m6-accueil-epicentre.html">M6 Accueil épicentre</a>
     <a href="m1-planning.html">M1 Planning</a>
     <a href="m2-regles.html" aria-current="page">M2 Règles</a>
     <a href="m3-absences-echanges.html">M3 Absences &amp; échanges</a>
@@ -1010,7 +1039,7 @@ img { display: block; }
     <div>
       <p class="page-hero-kicker">Règles du cabinet · Filou au premier plan</p>
       <h1>Les règles, en phrases. Le moteur, en dessous.</h1>
-      <p class="lede">Chaque règle se lit, se règle et se questionne ici. Une seule échelle à comprendre : obligatoire, important, si possible. Filou traduit, explique et n'enregistre rien sans ton accord.</p>
+      <p class="lede">Chaque règle se lit, se règle et se questionne ici. Une seule réglette, quatre positions : obligatoire, sauf urgence, important, si possible. Ce que tu lis est exactement ce que le moteur applique. Filou traduit, explique et n'enregistre rien sans ton accord.</p>
       <div class="hero-stats" aria-label="Résumé de la configuration">
         <span class="hero-stat"><b id="stat-rules">16</b> règles</span>
         <span class="hero-stat"><b>6</b> équilibrages suivis</span>
@@ -1125,6 +1154,12 @@ img { display: block; }
   <div class="defini-body" id="defini-body"></div>
 </aside>
 
+<!-- ===================== LE 18 · APPEL DE FILOU ===================== -->
+<button type="button" class="filou-call" id="filou-call" aria-label="Appeler Filou, l'assistant du cabinet">
+  <span class="fc-avatar" aria-hidden="true"><img src="../fox-1.png" alt=""></span>
+  <span class="fc-text"><b>Besoin d'aide ?</b>Appelle Filou</span>
+</button>
+
 <!-- ===================== TOAST ===================== -->
 <div class="toast" id="toast" role="status" aria-live="polite">
   <span id="toast-text"></span>
@@ -1134,7 +1169,7 @@ img { display: block; }
 <!-- ===================== PIED DE PAGE ===================== -->
 <footer class="footer-lab">
   <span><b>Maquette M2 · Règles du cabinet</b> · vue admin, données fictives · MonProjetPro</span>
-  <span>Grammaire unique : obligatoire / important / si possible. Le « réglage fin » montre l'échelle réelle du moteur.</span>
+  <span>Réglette unique à 4 positions, mapping 1:1 avec le moteur. L'équité a sa propre échelle de poids (5 crans).</span>
 </footer>
 
 <script>
@@ -1162,45 +1197,31 @@ img { display: block; }
     return "var(--soft)";
   }
 
-  /* ---------- Grammaire unique → 2 échelles du moteur ----------
-     famille "regle"  : force à 4 niveaux (ferme, pénalité forte, moyenne, légère)
-     famille "equite" : importance à 5 crans (prioritaire, forte, modérée, légère, ignorée)
-  */
-  var FINE = {
+  /* ---------- Deux échelles, deux questions ----------
+     Règles ("regle") : réglette UNIQUE à 4 positions, mapping 1:1 avec le moteur.
+       La question : « a-t-on le droit d'y déroger ? »
+     Équité ("equite") : réglette de POIDS à 5 crans, visuellement distincte.
+       La question : « combien ce compte pèse dans l'équilibrage ? »
+     Rien de caché, rien à déplier : ce qui est affiché EST le réglage moteur. */
+  var SCALES = {
     regle: [
-      { id: "ferme",   label: "Règle ferme",       hint: "jamais enfreinte, la génération échoue plutôt que de la violer", pos: "obligatoire" },
-      { id: "forte",   label: "Pénalité forte",    hint: "enfreinte seulement en dernier recours, toujours signalée",      pos: "important" },
-      { id: "moyenne", label: "Pénalité moyenne",  hint: "le moteur essaie sérieusement, sans alerte s'il cède",           pos: "sipossible" },
-      { id: "legere",  label: "Pénalité légère",   hint: "simple préférence, départage les solutions équivalentes",        pos: "sipossible" }
+      { id: "obligatoire", label: "Obligatoire", hint: "jamais enfreinte : la génération échoue plutôt que de la violer" },
+      { id: "saufurgence", label: "Sauf urgence", hint: "enfreinte seulement en dernier recours, et toujours signalée" },
+      { id: "important",   label: "Important",   hint: "le moteur essaie sérieusement de l'éviter, sans garantie absolue" },
+      { id: "sipossible",  label: "Si possible", hint: "simple préférence, suivie quand tout le reste est égal" }
     ],
     equite: [
-      { id: "prioritaire", label: "Prioritaire",  hint: "écart d'une garde au maximum, avant tout le reste",        pos: "obligatoire" },
-      { id: "eq-forte",    label: "Forte",        hint: "équilibrée de près, peut céder devant une règle ferme",    pos: "important" },
-      { id: "moderee",     label: "Modérée",      hint: "équilibrée quand le planning le permet",                   pos: "sipossible" },
-      { id: "eq-legere",   label: "Légère",       hint: "simple coup de pouce en fin de calcul",                    pos: "sipossible" },
-      { id: "ignoree",     label: "Ignorée",      hint: "cette dimension n'est plus suivie du tout",                pos: "sipossible" }
+      { id: "essentiel",    label: "Essentiel",     hint: "écart d'une garde au maximum, avant tout le reste" },
+      { id: "eqimportant",  label: "Important",     hint: "équilibré de près, peut céder devant une règle obligatoire" },
+      { id: "normal",       label: "Normal",        hint: "équilibré avec les autres comptes, sans priorité" },
+      { id: "peuimportant", label: "Peu important", hint: "simple coup de pouce en fin de calcul" },
+      { id: "ignoree",      label: "Ignorée",       hint: "ce compte n'est plus suivi du tout" }
     ]
   };
-  var POS_DEFAULT = {
-    regle:  { obligatoire: "ferme",       important: "forte",    sipossible: "moyenne" },
-    equite: { obligatoire: "prioritaire", important: "eq-forte", sipossible: "moderee" }
-  };
-  var POS_TEXT = {
-    regle: {
-      obligatoire: "Jamais enfreinte : si elle rend le planning impossible, la génération s'arrête et l'explique.",
-      important:   "Respectée sauf impasse : le moteur ne l'enfreint qu'en dernier recours, et te le signale.",
-      sipossible:  "Guide le choix quand tout le reste est égal. Aucune alerte si elle est écartée."
-    },
-    equite: {
-      obligatoire: "Écart d'une garde au maximum entre vétérinaires, avant tout le reste.",
-      important:   "Le moteur équilibre de près, mais peut céder devant une règle obligatoire.",
-      sipossible:  "Simple préférence d'équilibre, appliquée en fin de calcul."
-    }
-  };
-  var POS_LABEL = { obligatoire: "Obligatoire", important: "Important", sipossible: "Si possible" };
+  var LOCKED_HINT = "toujours souple, pour ne jamais bloquer la génération";
 
-  function fineOf(famille, id) {
-    var list = FINE[famille];
+  function levelOf(famille, id) {
+    var list = SCALES[famille];
     for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
     return list[0];
   }
@@ -1217,62 +1238,62 @@ img { display: block; }
 
   var RULES = [
     /* --- Repos & jours --- */
-    { id: "manon-mardi", cat: "repos", famille: "regle", fine: "ferme",
+    { id: "manon-mardi", cat: "repos", famille: "regle", fine: "obligatoire",
       text: "Manon ne travaille jamais le mardi soir.",
       portee: "veto", vets: ["Manon"] },
-    { id: "repos-lundi", cat: "repos", famille: "regle", fine: "ferme",
+    { id: "repos-lundi", cat: "repos", famille: "regle", fine: "obligatoire",
       text: "Après un week-end de garde, le lundi qui suit est libre.",
       portee: "cabinet", vets: [] },
-    { id: "thomas-formations", cat: "repos", famille: "regle", fine: "ferme",
+    { id: "thomas-formations", cat: "repos", famille: "regle", fine: "obligatoire",
       text: "Thomas ne fait pas de nuit pendant ses semaines de formation.",
       portee: "veto", vets: ["Thomas"], periode: "Hiver 2026" },
-    { id: "camille-jeudi", cat: "repos", famille: "regle", fine: "ferme",
+    { id: "camille-jeudi", cat: "repos", famille: "regle", fine: "obligatoire",
       text: "Camille ne prend pas de garde le jeudi.",
       portee: "veto", vets: ["Camille"] },
-    { id: "julie-xor", cat: "repos", famille: "regle", fine: "ferme",
+    { id: "julie-xor", cat: "repos", famille: "regle", fine: "obligatoire",
       text: "Julie ne tient pas le 24 ET le 31 décembre : l'un des deux au plus.",
       portee: "veto", vets: ["Julie"], periode: "Hiver 2026" },
     /* --- Week-ends --- */
-    { id: "serie-we", cat: "weekends", famille: "regle", fine: "forte",
+    { id: "serie-we", cat: "weekends", famille: "regle", fine: "saufurgence",
       text: "Jamais plus de 2 week-ends consécutifs pour la même personne.",
       portee: "equipe", vets: [] },
-    { id: "espacement-we", cat: "weekends", famille: "regle", fine: "forte",
+    { id: "espacement-we", cat: "weekends", famille: "regle", fine: "saufurgence",
       text: "Chacun garde au plus un week-end sur trois.",
       portee: "equipe", vets: [] },
-    { id: "thomas-pompier", cat: "weekends", famille: "regle", fine: "ferme",
+    { id: "thomas-pompier", cat: "weekends", famille: "regle", fine: "obligatoire",
       text: "Thomas prend un week-end sur quatre, toujours le même du cycle (calé sur ses gardes de pompier volontaire).",
       portee: "veto", vets: ["Thomas"] },
     /* --- Charge & rythme --- */
-    { id: "serie-max", cat: "charge", famille: "regle", fine: "ferme",
+    { id: "serie-max", cat: "charge", famille: "regle", fine: "obligatoire",
       text: "Jamais plus de 3 nuits de garde d'affilée.",
       portee: "equipe", vets: [] },
-    { id: "deux-par-semaine", cat: "charge", famille: "regle", fine: "forte",
+    { id: "deux-par-semaine", cat: "charge", famille: "regle", fine: "saufurgence",
       text: "Au plus 2 gardes par semaine pour chacun.",
       portee: "equipe", vets: [] },
-    { id: "victor-these", cat: "charge", famille: "regle", fine: "forte",
+    { id: "victor-these", cat: "charge", famille: "regle", fine: "saufurgence",
       text: "Victor plafonne à 4 gardes par mois pendant sa thèse.",
       portee: "veto", vets: ["Victor"], periode: "Hiver 2026" },
     /* --- Duos & équipe --- */
-    { id: "duo-manon-victor", cat: "duos", famille: "regle", fine: "ferme",
+    { id: "duo-manon-victor", cat: "duos", famille: "regle", fine: "obligatoire",
       text: "Manon et Victor ne sont jamais de garde ensemble.",
       portee: "duo", vets: ["Manon", "Victor"] },
-    { id: "julie-accompagnee", cat: "duos", famille: "regle", fine: "ferme",
+    { id: "julie-accompagnee", cat: "duos", famille: "regle", fine: "obligatoire",
       text: "Julie ne prend un week-end qu'avec Anne-Sophie ou Camille en face.",
       portee: "veto", vets: ["Julie", "Anne-Sophie", "Camille"] },
-    { id: "senior-we", cat: "duos", famille: "regle", fine: "forte",
+    { id: "senior-we", cat: "duos", famille: "regle", fine: "saufurgence",
       text: "Chaque week-end compte au moins une vétérinaire étiquetée « senior ».",
       portee: "equipe", vets: [] },
-    { id: "annecat-recours", cat: "duos", famille: "regle", fine: "ferme",
+    { id: "annecat-recours", cat: "duos", famille: "regle", fine: "obligatoire",
       text: "Anne-Catherine n'est appelée qu'en dernier recours.",
       portee: "veto", vets: ["Anne-Catherine"] },
     /* --- Préférences --- */
-    { id: "victor-lundi", cat: "prefs", famille: "regle", fine: "moyenne",
+    { id: "victor-lundi", cat: "prefs", famille: "regle", fine: "important",
       text: "Victor préfère les nuits du lundi.",
       portee: "veto", vets: ["Victor"] },
-    { id: "camille-groupees", cat: "prefs", famille: "regle", fine: "moyenne",
+    { id: "camille-groupees", cat: "prefs", famille: "regle", fine: "important",
       text: "Camille aime regrouper ses gardes dans la même semaine.",
       portee: "veto", vets: ["Camille"], suspended: true },
-    { id: "anneso-vacances", cat: "prefs", famille: "regle", fine: "legere",
+    { id: "anneso-vacances", cat: "prefs", famille: "regle", fine: "sipossible",
       text: "Anne-Sophie évite les gardes pendant les vacances scolaires.",
       portee: "veto", vets: ["Anne-Sophie"] }
   ];
@@ -1282,26 +1303,26 @@ img { display: block; }
     { id: "st-bloc", kind: "switch", on: true,
       text: "Le vendredi soir et le week-end forment un bloc : le même binôme enchaîne.",
       sub: "C'est la charpente du planning. La couper libère le vendredi, mais casse le repos du lundi tel qu'il est pensé." },
-    { id: "st-inversion", kind: "reglette", famille: "regle", fine: "forte",
+    { id: "st-inversion", kind: "reglette", famille: "regle", fine: "saufurgence",
       text: "Le 1er et le 2nd de garde échangent leurs rôles entre le vendredi et le week-end." },
-    { id: "st-deux-blocs", kind: "reglette", famille: "regle", fine: "forte", souple: true,
+    { id: "st-deux-blocs", kind: "reglette", famille: "regle", fine: "saufurgence", souple: true,
       text: "Éviter deux blocs week-end de suite pour la même personne." },
-    { id: "st-espacement", kind: "reglette", famille: "regle", fine: "moyenne", souple: true,
+    { id: "st-espacement", kind: "reglette", famille: "regle", fine: "important", souple: true,
       text: "Espacer les blocs week-end d'au moins deux semaines." },
-    { id: "st-vendredi-isole", kind: "reglette", famille: "regle", fine: "moyenne", souple: true,
+    { id: "st-vendredi-isole", kind: "reglette", famille: "regle", fine: "important", souple: true,
       text: "Éviter un vendredi soir isolé, sans le week-end qui suit." },
-    { id: "st-cumul-semaine", kind: "reglette", famille: "regle", fine: "forte", souple: true,
+    { id: "st-cumul-semaine", kind: "reglette", famille: "regle", fine: "saufurgence", souple: true,
       text: "Éviter de cumuler nuits de semaine et bloc week-end la même semaine." }
   ];
 
   /* Équité : 6 dimensions en langage métier */
   var EQUITY = [
-    { id: "eq-we",     name: "Week-ends de garde",              desc: "Le même nombre de blocs week-end pour chacune, sur la période.", fine: "prioritaire" },
-    { id: "eq-nuits",  name: "Nuits de semaine",                desc: "Les gardes du lundi au jeudi soir, réparties sans favoritisme.", fine: "eq-forte" },
-    { id: "eq-role1",  name: "Rôle « 1er de week-end »",        desc: "Le rôle qui porte l'avantage financier : il tourne, il ne s'installe pas.", fine: "eq-forte" },
-    { id: "eq-feries", name: "Jours fériés",                    desc: "Pâques, 14 juillet, Toussaint… comptés à part des nuits ordinaires.", fine: "eq-forte" },
-    { id: "eq-grands", name: "Grands week-ends (3 jours)",      desc: "Les ponts et week-ends prolongés, plus lourds qu'un week-end simple.", fine: "moderee" },
-    { id: "eq-fetes",  name: "Fêtes de fin d'année",            desc: "Noël et Nouvel An : qui les a tenus hier compte pour demain.", fine: "prioritaire" }
+    { id: "eq-we",     name: "Week-ends de garde",              desc: "Le même nombre de blocs week-end pour chacune, sur la période.", fine: "essentiel" },
+    { id: "eq-nuits",  name: "Nuits de semaine",                desc: "Les gardes du lundi au jeudi soir, réparties sans favoritisme.", fine: "eqimportant" },
+    { id: "eq-role1",  name: "Rôle « 1er de week-end »",        desc: "Le rôle qui porte l'avantage financier : il tourne, il ne s'installe pas.", fine: "eqimportant" },
+    { id: "eq-feries", name: "Jours fériés",                    desc: "Pâques, 14 juillet, Toussaint… comptés à part des nuits ordinaires.", fine: "eqimportant" },
+    { id: "eq-grands", name: "Grands week-ends (3 jours)",      desc: "Les ponts et week-ends prolongés, plus lourds qu'un week-end simple.", fine: "normal" },
+    { id: "eq-fetes",  name: "Fêtes de fin d'année",            desc: "Noël et Nouvel An : qui les a tenus hier compte pour demain.", fine: "essentiel" }
   ];
 
   /* Historiques fictifs par règle (aperçu) */
@@ -1344,40 +1365,29 @@ img { display: block; }
     return '<span class="badge">👥 Toute l’équipe</span>';
   }
 
-  function regletteHTML(id, famille, fineId) {
-    var pos = fineOf(famille, fineId).pos;
-    var segs = ["obligatoire", "important", "sipossible"].map(function (p) {
-      return '<button type="button" role="radio" data-reglette="' + id + '" data-pos="' + p + '"' +
-        ' aria-checked="' + (p === pos) + '">' + POS_LABEL[p] + "</button>";
+  /* La réglette : ce qui est affiché EST le réglage moteur (mapping 1:1).
+     opts.locked = liste de positions interdites (pénalités souples). */
+  function regletteHTML(id, famille, fineId, opts) {
+    opts = opts || {};
+    var locked = opts.locked || [];
+    var segs = SCALES[famille].map(function (lvl) {
+      var isLocked = locked.indexOf(lvl.id) > -1;
+      return '<button type="button" role="radio" data-reglette="' + id + '" data-pos="' + lvl.id + '"' +
+        ' aria-checked="' + (lvl.id === fineId) + '"' +
+        (isLocked ? ' aria-disabled="true" title="' + LOCKED_HINT + '"' : "") +
+        ">" + lvl.label + "</button>";
     }).join("");
-    return '<div class="reglette">' +
-      '<div class="reglette-seg" role="radiogroup" aria-label="Niveau de la règle">' + segs + "</div>" +
+    var isEq = famille === "equite";
+    return '<div class="reglette' + (isEq ? " reglette-eq" : "") + '">' +
+      (isEq ? '<span class="eq-caption">Poids dans l’équilibrage</span>' : "") +
+      '<div class="reglette-seg" role="radiogroup" aria-label="' + (isEq ? "Poids de ce compte dans l’équilibrage" : "Niveau de la règle") + '">' + segs + "</div>" +
       '<p class="reglette-map" id="map-' + id + '">' + mapText(famille, fineId) + "</p>" +
       "</div>";
   }
 
   function mapText(famille, fineId) {
-    var f = fineOf(famille, fineId);
-    var moteur = famille === "equite" ? "Équilibrage" : "Moteur";
-    return "<b>" + moteur + " : " + f.label.toLowerCase() + "</b> · " + f.hint + ".";
-  }
-
-  function finePanelHTML(id, famille, fineId) {
-    var opts = FINE[famille].map(function (f) {
-      return '<button type="button" class="fine-opt" role="radio" data-fine="' + id + '" data-fineval="' + f.id + '"' +
-        ' aria-checked="' + (f.id === fineId) + '">' +
-        '<span class="fo-dot" aria-hidden="true"></span>' +
-        "<span>" + f.label + " <small>· " + f.hint + " · position « " + POS_LABEL[f.pos] + " »</small></span>" +
-        "</button>";
-    }).join("");
-    var title = famille === "equite"
-      ? "L’échelle réelle du moteur · importance sur 5 crans"
-      : "L’échelle réelle du moteur · force sur 4 niveaux";
-    return '<div class="fine-panel" id="fine-' + id + '">' +
-      "<h4>" + title + "</h4>" +
-      '<div class="fine-opts" role="radiogroup">' + opts + "</div>" +
-      '<p class="fine-note">La réglette à 3 positions pilote cette échelle. Choisir ici un niveau précis ajuste la réglette à la position correspondante : rien n’est caché, rien n’est perdu.</p>' +
-      "</div>";
+    var lvl = levelOf(famille, fineId);
+    return "<b>" + lvl.label + "</b> · " + lvl.hint + ".";
   }
 
   function ruleCardHTML(rule) {
@@ -1401,10 +1411,8 @@ img { display: block; }
       "</div>" +
       '<div class="rule-foot">' +
         regletteHTML(rule.id, rule.famille, rule.fine) +
-        '<button type="button" class="fine-link" data-action="fine" data-rule="' + rule.id + '" aria-expanded="false">réglage fin</button>' +
         '<button type="button" class="btn-filou" data-action="filou" data-rule="' + rule.id + '">🦊 Demander à Filou</button>' +
       "</div>" +
-      finePanelHTML(rule.id, rule.famille, rule.fine) +
       '<div class="confirm-row" id="confirm-' + rule.id + '">' +
         "<span>Supprimer cette règle ? Elle disparaîtra du prochain planning généré.</span>" +
         '<button type="button" class="btn btn-danger" data-action="delete-yes" data-rule="' + rule.id + '">Supprimer</button>' +
@@ -1425,7 +1433,7 @@ img { display: block; }
     }
     return '<div class="structure-row">' +
       '<p class="s-phrase">' + esc(s.text) + "</p>" +
-      regletteHTML(s.id, s.famille, s.fine) +
+      regletteHTML(s.id, s.famille, s.fine, s.souple ? { locked: ["obligatoire"] } : null) +
     "</div>";
   }
 
@@ -1433,8 +1441,6 @@ img { display: block; }
     return '<div class="equity-dim" id="card-' + d.id + '">' +
       '<div class="ed-name"><b>' + esc(d.name) + "</b><small>" + esc(d.desc) + "</small></div>" +
       regletteHTML(d.id, "equite", d.fine) +
-      '<button type="button" class="fine-link" data-action="fine" data-rule="' + d.id + '" aria-expanded="false">réglage fin</button>' +
-      finePanelHTML(d.id, "equite", d.fine) +
     "</div>";
   }
 
@@ -1447,7 +1453,7 @@ img { display: block; }
     charge: "Le rythme soutenable : séries, plafonds, respiration entre les gardes.",
     duos: "Qui peut garder avec qui, et ce que chaque week-end doit réunir comme compétences.",
     prefs: "Les souhaits de chacune : jamais garantis, jamais punis. Le moteur les suit quand tout le reste est égal.",
-    equite: "Six comptes que le moteur tient pour que personne ne porte plus que sa part. <b>Ici on parle d’équilibrage et d’étiquettes</b>, jamais de mécanique interne."
+    equite: "Six comptes que le moteur tient pour que personne ne porte plus que sa part. <b>La réglette est différente ici</b> : elle ne dit pas ce qui est permis, elle dit combien chaque compte pèse dans l’équilibrage, sur cinq crans."
   };
 
   function buildTabs() {
@@ -1491,14 +1497,18 @@ img { display: block; }
             '<span class="tag-group"><span class="tg-dots"><i style="background:var(--vet-anneso)"></i><i style="background:var(--vet-annecat)"></i></span>Étiquette « associée » <small>· fériés équilibrés entre elles</small></span>' +
             '<button type="button" class="tag-add" id="tag-add">+ Équilibrer une autre étiquette</button>' +
           "</div>" +
+        "</div>";
+        html += '<div class="equity-extra">' +
+          "<h3>Un rôle est mieux payé chez vous ?</h3>" +
+          "<p>Dans beaucoup de cabinets, le 1er de garde du week-end touche une rémunération en plus. Dis-moi quel rôle est concerné : je veillerai à ce qu’il tourne équitablement entre vous.</p>" +
           '<div class="role-fin">' +
-            '<span class="rf-label">Rôle qui porte l’avantage financier :</span>' +
-            '<span class="role-seg" role="radiogroup" aria-label="Rôle à avantage financier">' +
+            '<span class="role-seg" role="radiogroup" aria-label="Rôle mieux payé">' +
               '<button type="button" role="radio" data-role-fin="1er" aria-checked="true">1er de garde</button>' +
               '<button type="button" role="radio" data-role-fin="2nd" aria-checked="false">2nd de garde</button>' +
               '<button type="button" role="radio" data-role-fin="aucun" aria-checked="false">Aucun</button>' +
             "</span>" +
-            '<p class="role-hint" id="role-hint">Le moteur suit ce rôle à part, pour que l’avantage financier tourne aussi équitablement que les gardes.</p>' +
+            '<button type="button" class="btn-filou" id="role-explain" style="margin-left:0">🦊 Explique-moi ce réglage</button>' +
+            '<p class="role-hint" id="role-hint">Aujourd’hui : les week-ends « 1er de garde » sont comptés à part, pour que ce rôle mieux payé tourne aussi équitablement que les gardes.</p>' +
           "</div>" +
         "</div>";
       } else {
@@ -1539,30 +1549,28 @@ img { display: block; }
     return null;
   }
 
-  function setLevel(id, fineId, silent) {
+  function setLevel(id, levelId, silent) {
     var item = findItem(id);
     if (!item) return;
-    item.fine = fineId;
+    item.fine = levelId;
     var famille = item.famille || "equite";
-    var pos = fineOf(famille, fineId).pos;
+    var lvl = levelOf(famille, levelId);
     $$('[data-reglette="' + id + '"]').forEach(function (b) {
-      b.setAttribute("aria-checked", String(b.dataset.pos === pos));
-    });
-    $$('[data-fine="' + id + '"]').forEach(function (b) {
-      b.setAttribute("aria-checked", String(b.dataset.fineval === fineId));
+      b.setAttribute("aria-checked", String(b.dataset.pos === levelId));
     });
     var map = document.getElementById("map-" + id);
-    if (map) map.innerHTML = mapText(famille, fineId);
+    if (map) map.innerHTML = mapText(famille, levelId);
     if (!silent) {
       var label = item.text || item.name;
-      toast("« " + truncate(label, 46) + " » réglée sur " + POS_LABEL[pos] + ".");
-      addJournal("Niveau modifié : « " + truncate(label, 52) + " » → " + POS_LABEL[pos] + ".", "");
+      var verbe = famille === "equite" ? "Poids réglé sur" : "Réglée sur";
+      toast("« " + truncate(label, 46) + " » : " + verbe.toLowerCase() + " " + lvl.label + ".");
+      addJournal((famille === "equite" ? "Poids modifié : « " : "Niveau modifié : « ") + truncate(label, 52) + " » → " + lvl.label + ".", "");
     }
   }
 
   function truncate(s, n) { return s.length > n ? s.slice(0, n - 1) + "…" : s; }
 
-  /* Survol d'une position : micro-texte honnête du mapping */
+  /* Survol d'une position : micro-texte honnête (mapping 1:1, y compris positions verrouillées) */
   function bindHoverMap() {
     document.body.addEventListener("mouseover", function (e) {
       var b = e.target.closest("[data-reglette]");
@@ -1571,16 +1579,20 @@ img { display: block; }
       if (!item) return;
       var famille = item.famille || "equite";
       var map = document.getElementById("map-" + b.dataset.reglette);
-      if (map) map.innerHTML = "<b>" + POS_LABEL[b.dataset.pos] + "</b> · " + POS_TEXT[famille][b.dataset.pos];
+      if (!map) return;
+      if (b.getAttribute("aria-disabled") === "true") {
+        map.innerHTML = "<b>" + levelOf(famille, b.dataset.pos).label + "</b> · indisponible ici : " + LOCKED_HINT + ".";
+      } else {
+        map.innerHTML = mapText(famille, b.dataset.pos);
+      }
     });
     document.body.addEventListener("mouseout", function (e) {
       var b = e.target.closest("[data-reglette]");
       if (!b) return;
       var item = findItem(b.dataset.reglette);
       if (!item) return;
-      var famille = item.famille || "equite";
       var map = document.getElementById("map-" + b.dataset.reglette);
-      if (map) map.innerHTML = mapText(famille, item.fine);
+      if (map) map.innerHTML = mapText(item.famille || "equite", item.fine);
     });
   }
 
@@ -1592,14 +1604,15 @@ img { display: block; }
 
       var seg = e.target.closest("[data-reglette]");
       if (seg) {
-        var itemA = findItem(seg.dataset.reglette);
-        var familleA = itemA && (itemA.famille || "equite");
-        setLevel(seg.dataset.reglette, POS_DEFAULT[familleA][seg.dataset.pos]);
+        if (seg.getAttribute("aria-disabled") === "true") {
+          var itemL = findItem(seg.dataset.reglette);
+          var mapL = document.getElementById("map-" + seg.dataset.reglette);
+          if (mapL && itemL) mapL.innerHTML = "<b>" + levelOf(itemL.famille || "equite", seg.dataset.pos).label + "</b> · indisponible ici : " + LOCKED_HINT + ".";
+          return;
+        }
+        setLevel(seg.dataset.reglette, seg.dataset.pos);
         return;
       }
-
-      var fineBtn = e.target.closest("[data-fineval]");
-      if (fineBtn) { setLevel(fineBtn.dataset.fine, fineBtn.dataset.fineval); return; }
 
       var sw = e.target.closest("[data-switch]");
       if (sw) {
@@ -1613,8 +1626,15 @@ img { display: block; }
       if (roleBtn) {
         $$("[data-role-fin]").forEach(function (b) { b.setAttribute("aria-checked", String(b === roleBtn)); });
         var hint = $("#role-hint");
-        if (roleBtn.dataset.roleFin === "aucun") hint.textContent = "Aucun équilibrage financier : les deux rôles du week-end sont traités à l’identique.";
-        else hint.textContent = "Le moteur suit le rôle « " + roleBtn.dataset.roleFin + " de garde » à part, pour que l’avantage financier tourne aussi équitablement que les gardes.";
+        if (roleBtn.dataset.roleFin === "aucun") hint.textContent = "Aujourd’hui : personne n’est mieux payé, les deux rôles du week-end sont traités à l’identique.";
+        else hint.textContent = "Aujourd’hui : les week-ends « " + roleBtn.dataset.roleFin + " de garde » sont comptés à part, pour que ce rôle mieux payé tourne aussi équitablement que les gardes.";
+        return;
+      }
+
+      if (e.target.closest("#role-explain")) {
+        appelFilou();
+        bubble("user", "Explique-moi ce réglage", "Anne-Sophie");
+        filouSays("Dans beaucoup de cabinets, le week-end se garde à deux : un <b>1er de garde</b> qui se déplace en premier, un <b>2nd</b> en renfort. Souvent, le 1er touche une rémunération en plus. Si c’est votre cas, je compte ces week-ends « mieux payés » dans une colonne à part : personne ne les enchaîne, personne n’en est privé. Si personne n’est mieux payé chez vous, choisis « Aucun » et je répartis les deux rôles exactement pareil. Ce réglage ne change pas qui est de garde, seulement ce que je surveille pour l’équité.");
         return;
       }
 
@@ -1624,13 +1644,6 @@ img { display: block; }
       var rule = findItem(id);
 
       switch (act.dataset.action) {
-        case "fine": {
-          var panel = document.getElementById("fine-" + id);
-          var open = panel.classList.toggle("open");
-          act.setAttribute("aria-expanded", String(open));
-          act.textContent = open ? "replier le réglage fin" : "réglage fin";
-          break;
-        }
         case "history": {
           document.getElementById("history-" + id).classList.toggle("open");
           break;
@@ -1773,7 +1786,7 @@ img { display: block; }
 
   var BASE_CHIPS = [
     { label: "« Victor ne travaille pas le mercredi soir »", run: function () { flowCreate(); } },
-    { label: "« Comment marchent les trois niveaux ? »", run: function () { flowLevels(); } },
+    { label: "« Comment marchent les quatre niveaux ? »", run: function () { flowLevels(); } },
     { label: "« Qu’est-ce qui est défini pour Manon ? »", run: function () { flowManon(); } }
   ];
 
@@ -1799,7 +1812,7 @@ img { display: block; }
       function () {
         $("#rf-yes").addEventListener("click", function () {
           this.classList.add("pressed"); this.textContent = "Validée ✓";
-          var newRule = { id: "victor-mercredi", cat: "repos", famille: "regle", fine: "ferme",
+          var newRule = { id: "victor-mercredi", cat: "repos", famille: "regle", fine: "obligatoire",
             text: "Victor n’est jamais de garde le mercredi soir.", portee: "veto", vets: ["Victor"] };
           if (!findItem(newRule.id)) {
             RULES.push(newRule);
@@ -1821,14 +1834,15 @@ img { display: block; }
 
   /* --- Scénario : Filou renseigne (les niveaux) --- */
   function flowLevels() {
-    bubble("user", "Comment marchent les trois niveaux ?", "Anne-Sophie");
-    filouSays("Une seule échelle à retenir :" +
+    bubble("user", "Comment marchent les quatre niveaux ?", "Anne-Sophie");
+    filouSays("La réglette dit exactement ce que je ferai, sans rien de caché :" +
       '<ul class="impact-list">' +
       '<li><span class="n">1</span><span><b>Obligatoire</b> : jamais enfreinte. Si elle rend le planning impossible, je m’arrête et je t’explique pourquoi.</span></li>' +
-      '<li><span class="n">2</span><span><b>Important</b> : respectée sauf impasse, et toute entorse t’est signalée.</span></li>' +
-      '<li><span class="n">3</span><span><b>Si possible</b> : un simple penchant, suivi quand tout le reste est égal.</span></li>' +
+      '<li><span class="n">2</span><span><b>Sauf urgence</b> : enfreinte seulement en dernier recours, et je te le signale toujours.</span></li>' +
+      '<li><span class="n">3</span><span><b>Important</b> : j’essaie sérieusement de l’éviter, sans garantie absolue.</span></li>' +
+      '<li><span class="n">4</span><span><b>Si possible</b> : un simple penchant, suivi quand tout le reste est égal.</span></li>' +
       "</ul>" +
-      "En dessous, le moteur garde une échelle plus fine (4 niveaux pour les règles, 5 crans pour l’équité) : le lien « réglage fin » de chaque règle te la montre.");
+      "L’équité a sa propre réglette, la verte : elle ne dit pas ce qui est permis, elle dit <b>combien chaque compte pèse</b> dans l’équilibrage (cinq crans, d’Essentiel à Ignorée).");
     speakGlow();
   }
 
@@ -1844,24 +1858,33 @@ img { display: block; }
 
   /* --- Filou branché sur une règle (bouton par encart) --- */
   var IMPACTS = {
-    "serie-we": "En « Si possible », <b>Victor pourrait enchaîner 3 week-ends de suite en janvier</b> (semaines 2, 3 et 4 du brouillon actuel), car il est le plus disponible. Deux autres règles interagissent : « un week-end sur trois au plus » resterait le seul garde-fou (Important), et le repos du lundi (Obligatoire) continuerait de s’appliquer. Le reste du planning ne bouge presque pas : 3 attributions changeraient."
+    "serie-we": "En « Si possible », <b>Victor pourrait enchaîner 3 week-ends de suite en janvier</b> (semaines 2, 3 et 4 du brouillon actuel), car il est le plus disponible. Deux autres règles interagissent : « un week-end sur trois au plus » resterait le seul garde-fou (Sauf urgence), et le repos du lundi (Obligatoire) continuerait de s’appliquer. Le reste du planning ne bouge presque pas : 3 attributions changeraient."
   };
 
-  function askFilou(rule) {
-    currentCtx = rule;
-    $("#ctx-text").textContent = " " + truncate(rule.text || rule.name, 64);
-    $("#ctx-strip").classList.add("on");
+  function ctxChips(rule) {
+    return [
+      { label: "Si je la passe en « Si possible », ça change quoi ?", run: function () { flowImpact(rule); } },
+      { label: "Modifier cette règle en français", run: function () { flowModify(rule); } },
+      { label: "Voir tout ce qui touche cette règle", run: function () { flowRelated(rule); } }
+    ];
+  }
+
+  /* Le 18 : amener Filou sous les yeux, sans qu'il parle de lui-même */
+  function appelFilou() {
     var dock = $("#filou-dock");
     if (dock.getBoundingClientRect().top < 0 || window.innerWidth < 1060) {
       dock.scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "start" });
     }
     speakGlow();
+    setChips(currentCtx ? ctxChips(currentCtx) : BASE_CHIPS);
+  }
+
+  function askFilou(rule) {
+    currentCtx = rule;
+    $("#ctx-text").textContent = " " + truncate(rule.text || rule.name, 64);
+    $("#ctx-strip").classList.add("on");
+    appelFilou();
     filouSays("Je suis branché sur : <b>« " + esc(truncate(rule.text || rule.name, 80)) + " »</b>. Tu peux la modifier en français, ou me demander ce qu’un changement provoquerait.");
-    setChips([
-      { label: "Si je la passe en « Si possible », ça change quoi ?", run: function () { flowImpact(rule); } },
-      { label: "Modifier cette règle en français", run: function () { flowModify(rule); } },
-      { label: "Voir tout ce qui touche cette règle", run: function () { flowRelated(rule); } }
-    ]);
   }
 
   function flowImpact(rule) {
@@ -1910,7 +1933,7 @@ img { display: block; }
       filouSays("Voici comment je comprends ta modification :" +
         '<span style="display:block; margin-top:7px; padding:8px 11px; background:var(--surface); border:1px dashed var(--border-strong); border-radius:10px;">' +
         "<b>Jamais plus de 3 week-ends consécutifs pour la même personne.</b><br>" +
-        '<small style="color:var(--muted)">Dérogation limitée à la période Hiver 2026 · Niveau conservé : Important</small></span>' +
+        '<small style="color:var(--muted)">Dérogation limitée à la période Hiver 2026 · Niveau conservé : Sauf urgence</small></span>' +
         '<span class="reform-actions"><button type="button" class="btn btn-valider" id="mod-yes">Valider</button>' +
         '<button type="button" class="btn btn-corriger" id="mod-no">Corriger</button></span>',
         function () {
@@ -1938,13 +1961,14 @@ img { display: block; }
     /* Cas scénarisé : passage en Important (règle contextualisée) */
     if (currentCtx && /important/i.test(txt)) {
       var r2 = currentCtx;
-      filouSays("Je passe « " + esc(truncate(r2.text || r2.name, 56)) + " » en <b>Important</b> : respectée sauf impasse, toute entorse signalée. On y va ?" +
+      var lvlId = (r2.famille || "equite") === "equite" ? "eqimportant" : "important";
+      filouSays("Je passe « " + esc(truncate(r2.text || r2.name, 56)) + " » en <b>Important</b> : j’essaie sérieusement de l’éviter, sans garantie absolue. On y va ?" +
         '<span class="reform-actions"><button type="button" class="btn btn-valider" id="lvl-yes">Valider</button>' +
         '<button type="button" class="btn btn-corriger" id="lvl-no">Corriger</button></span>',
         function () {
           $("#lvl-yes").addEventListener("click", function () {
             this.classList.add("pressed"); this.textContent = "Validée ✓";
-            setLevel(r2.id, POS_DEFAULT[r2.famille || "equite"].important);
+            setLevel(r2.id, lvlId);
           }, { once: true });
           $("#lvl-no").addEventListener("click", function () {
             filouSays("D’accord, rien ne bouge.");
@@ -1956,7 +1980,7 @@ img { display: block; }
 
     /* Question : Filou renseigne */
     if (/\?\s*$/.test(txt)) {
-      filouSays("(Démo) Dans l’application réelle, je réponds ici en m’appuyant sur le fonctionnement documenté de GuardVeto, et je dis franchement quand je ne sais pas. Essaie « Comment marchent les trois niveaux ? » pour voir un exemple complet.");
+      filouSays("(Démo) Dans l’application réelle, je réponds ici en m’appuyant sur le fonctionnement documenté de GuardVeto, et je dis franchement quand je ne sais pas. Essaie « Comment marchent les quatre niveaux ? » pour voir un exemple complet.");
       return;
     }
 
@@ -2003,13 +2027,13 @@ img { display: block; }
         fine: s.fine || null, structure: true, on: s.on });
     });
     EQUITY.forEach(function (d) {
-      items.push({ text: d.name + " : équilibrage « " + fineOf("equite", d.fine).label.toLowerCase() + " ».",
+      items.push({ text: d.name + " : poids « " + levelOf("equite", d.fine).label.toLowerCase() + " » dans l’équilibrage.",
         cat: "equite", portee: "equipe", vets: [], famille: "equite", fine: d.fine });
     });
     items.push({ text: "Les week-ends s’équilibrent aussi entre les vétérinaires étiquetés « junior » (Manon, Julie, Victor).",
-      cat: "equite", portee: "equipe", vets: ["Manon", "Julie", "Victor"], famille: "equite", fine: "eq-forte" });
+      cat: "equite", portee: "equipe", vets: ["Manon", "Julie", "Victor"], famille: "equite", fine: "eqimportant" });
     items.push({ text: "Les jours fériés s’équilibrent aussi entre les associées (Anne-Sophie, Anne-Catherine).",
-      cat: "equite", portee: "equipe", vets: ["Anne-Sophie", "Anne-Catherine"], famille: "equite", fine: "eq-forte" });
+      cat: "equite", portee: "equipe", vets: ["Anne-Sophie", "Anne-Catherine"], famille: "equite", fine: "eqimportant" });
     items.push({ text: "L’avantage financier suit le rôle « 1er de garde » du week-end.",
       cat: "equite", portee: "cabinet", vets: [], famille: null, fine: null });
     return items;
@@ -2017,8 +2041,9 @@ img { display: block; }
 
   function lvlMini(item) {
     if (!item.famille || !item.fine) return "";
-    var pos = fineOf(item.famille, item.fine).pos;
-    return '<span class="lvl-mini m-' + pos + '">' + POS_LABEL[pos] + "</span>";
+    var lvl = levelOf(item.famille, item.fine);
+    var cls = item.famille === "equite" ? "m-eq" : "m-" + item.fine;
+    return '<span class="lvl-mini ' + cls + '">' + lvl.label + "</span>";
   }
 
   function renderDefini() {
@@ -2113,6 +2138,13 @@ img { display: block; }
     $("#focus-banner").classList.remove("on");
   });
   $("#demo-focus").addEventListener("click", function () { focusRule("serie-we"); });
+
+  /* Le 18 : bouton d'appel permanent */
+  $("#filou-call").addEventListener("click", function () {
+    appelFilou();
+    filouSays("Je suis là ! Pose-moi ta question, dicte une règle en français, ou pars d’une suggestion ci-dessous.");
+    $("#chat-text").focus();
+  });
 
   function handleHash() {
     var m = location.hash.match(/^#focus(?:=([\w-]+))?$/);
