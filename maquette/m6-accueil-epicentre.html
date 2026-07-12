@@ -127,8 +127,8 @@ img { display: block; }
    DEUX PLANS · le matin dans le terrier
    Plan 1 : le SATIN, fond d'écran de TOUTE la page, bord à bord,
    derrière tout (nav maquette et dock compris). Plan 2 : la carte
-   Filou, seule posée dessus, rétro-éclairée, ourlée d'une
-   étincelle. Aucune surface intermédiaire.
+   Filou, seule posée dessus, ourlée d'une étincelle. Aucune
+   surface intermédiaire.
    ============================================================ */
 .scene { position: relative; margin: 14px 0 26px; }
 .satin {
@@ -210,21 +210,9 @@ img { display: block; }
 @keyframes sheenDrift { to { transform: translate3d(36%, 0, 0); } }
 
 /* ---- La carte Filou : LE seul objet posé sur le satin.
-   Profondeur évidente : rétro-éclairage, ombres 3 couches,
-   lisière. Le bord supérieur reste dégagé (Filou s'y perchera). */
+   Profondeur évidente : ombres 3 couches, lisière. Le bord
+   supérieur reste dégagé (Filou s'y perchera). */
 .float-wrap { position: relative; z-index: 2; }
-.float-wrap::before {
-  /* rétro-éclairage : halo d'or derrière la carte, le plus
-     lumineux au ras de ses bords, fondu dans le satin */
-  content: "";
-  position: absolute; inset: -9% -5%;
-  background: radial-gradient(closest-side,
-    rgba(255, 220, 150, 1),
-    rgba(255, 218, 152, 0.45) 56%,
-    rgba(255, 218, 152, 0) 80%);
-  filter: blur(22px);
-  pointer-events: none;
-}
 .epicentre {
   position: relative;
   border: 1px solid var(--border);
@@ -337,7 +325,7 @@ img { display: block; }
   flex: none;
   width: 270px;
   min-height: 404px;
-  z-index: 4; /* contexte : rays derrière Filou, tête devant l'étincelle */
+  z-index: 4; /* contexte : la tête de Filou passe devant l'étincelle */
 }
 .filou-cube video,
 .filou-cube img.filou-fallback {
@@ -355,7 +343,7 @@ img { display: block; }
    249 px dans l'emplacement, +4 px d'enfoncement) ; centre de la
    face = axe du corps (47 % de 270 = 127 px). Les jambes
    (62→90 %, ~134 px) pendent sur la face avant (150 px).
-   Lumière haut-gauche, cohérente avec les side rays. ---- */
+   Lumière haut-gauche, cohérente avec le reste de la scène. ---- */
 .socle {
   position: absolute;
   left: 33px; top: 244px; /* ancré par le HAUT : la face supérieure
@@ -398,46 +386,6 @@ img { display: block; }
   transform: skewX(-52deg);
   background: radial-gradient(closest-side, rgba(110, 62, 14, 0.22), transparent 76%);
   filter: blur(2.5px);
-}
-
-/* ---- SIDE RAYS : la lumière tombe du haut-GAUCHE et converge
-   sur le cube. Ancrés dedans : ils suivent Filou partout. */
-.rays {
-  position: absolute; left: 50%; top: 12%;
-  width: 0; height: 0;
-  z-index: -1; pointer-events: none;
-  animation: raysSway 46s ease-in-out infinite alternate;
-}
-@keyframes raysSway {
-  from { transform: rotate(-0.7deg); }
-  to   { transform: rotate(0.9deg); }
-}
-.beam {
-  position: absolute; bottom: 0; left: 0;
-  width: 130px; height: 430px;
-  margin-left: -65px;
-  transform-origin: 50% 100%;
-  background: linear-gradient(to bottom,
-    rgba(255, 222, 160, 0.42) 0%,
-    rgba(255, 230, 185, 0.20) 55%,
-    rgba(255, 230, 185, 0) 96%);
-  clip-path: polygon(10% 0, 90% 0, 60% 100%, 40% 100%);
-  filter: blur(9px);
-}
-.beam.b1 { transform: rotate(-27deg); animation: beamGlow 19s ease-in-out infinite; }
-.beam.b2 {
-  width: 84px; margin-left: -42px; height: 390px;
-  transform: rotate(-36deg);
-  animation: beamGlow 25s ease-in-out infinite; animation-delay: -9s;
-}
-.beam.b3 {
-  width: 60px; margin-left: -30px; height: 340px;
-  transform: rotate(-17deg);
-  animation: beamGlow 31s ease-in-out infinite; animation-delay: -17s;
-}
-@keyframes beamGlow {
-  0%, 100% { opacity: 0.5; }
-  50%      { opacity: 0.95; }
 }
 
 /* ---- LA TABLETTE DE FILOU (.convo) · arbitrage MiKL.
@@ -1140,23 +1088,27 @@ img { display: block; }
    se déplie (transitions croisées). Né mobile, même geste partout.
    ============================================================ */
 /* LA BARRE · une seule pilule cohérente, accolée à la carte :
-   [identité fixe : GuardVeto 🦊 · Anne-Sophie] [dock au centre]
-   [cagnotte solidaire 💚 à droite] */
+   [marque : GuardVeto · Anne-Sophie] [dock au centre]
+   [cagnotte solidaire à droite]. Fond PLEIN (blanc-crème net) :
+   le satin ne transparaît pas, rien ne bave dessus. */
 .app-bar {
   display: flex; align-items: center; gap: 10px;
   margin: 14px 0;
-  padding: 8px 9px 8px 18px;
-  background: rgba(255, 252, 244, 0.9);
+  padding: 8px 9px 8px 20px;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 999px;
   box-shadow: var(--edge-light), 3px 8px 22px rgba(120, 70, 18, 0.12), 1px 2px 5px rgba(120, 70, 18, 0.08);
 }
-.ab-ident { display: flex; align-items: center; gap: 9px; flex: none; }
-.ab-logo { font-size: 1.02rem; }
+.ab-ident { display: flex; align-items: center; gap: 10px; flex: none; }
+/* La marque, en lettres seules : Figtree serré, « Veto » en encre
+   renarde — le seul clin d'œil, typographique et sobre. */
 .ab-name {
   font-family: var(--font-display);
-  font-weight: 800; font-size: 0.95rem; letter-spacing: -0.01em;
+  font-weight: 800; font-size: 1rem; letter-spacing: -0.022em;
+  color: var(--text);
 }
+.ab-name em { font-style: normal; color: var(--accent-ink); }
 .ab-user {
   font-size: 0.78rem; font-weight: 600; color: var(--muted);
   padding-left: 10px;
@@ -1170,18 +1122,52 @@ img { display: block; }
   padding: 0;
   overflow-x: auto;
 }
-/* La cagnotte solidaire : discrète, chaleureuse, expliquée au survol */
+/* La cagnotte solidaire : l'objet de FIERTÉ de la barre — une
+   part de chaque abonnement va à l'association du cabinet.
+   Carte-pilule crème : cœur dessiné main (trait organique,
+   ouvert) dans une pastille verte, montant pesé en Figtree,
+   micro-libellé « reversés ». Expliquée au survol / clic. */
 .cagnotte {
   position: relative; flex: none;
-  display: inline-flex; align-items: center; gap: 6px;
-  border: 1px solid rgba(90, 150, 60, 0.35);
-  background: var(--ok-soft); color: var(--ok);
+  display: inline-flex; align-items: center; gap: 9px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, #FFFEF9 0%, #FBF3E1 100%);
+  color: var(--text);
   border-radius: 999px;
-  padding: 8px 15px; min-height: 40px;
-  font-size: 0.76rem; font-weight: 700;
+  padding: 5px 16px 5px 6px; min-height: 40px;
   cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 252, 0.9), 1px 2px 5px rgba(120, 70, 18, 0.07);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
-.cagnotte:hover { background: rgba(90, 150, 60, 0.2); }
+.cagnotte:hover {
+  border-color: var(--border-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 252, 0.9), 2px 4px 10px rgba(120, 70, 18, 0.12);
+}
+.cg-heart {
+  flex: none;
+  width: 28px; height: 28px; padding: 5px;
+  border-radius: 50%;
+  background: var(--ok-soft);
+  color: var(--ok);
+  transform: rotate(-6deg); /* posé un peu de travers, à la main */
+  transition: transform 0.25s var(--ease-out);
+}
+.cg-heart svg { width: 100%; height: 100%; display: block; }
+.cagnotte:hover .cg-heart { transform: rotate(-6deg) scale(1.12); }
+.cg-txt {
+  display: flex; flex-direction: column; align-items: flex-start;
+  gap: 2px; line-height: 1; text-align: left;
+}
+.cg-num {
+  font-family: var(--font-display);
+  font-size: 0.92rem; font-weight: 800; letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.cg-txt small {
+  font-size: 0.56rem; font-weight: 700;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--ok);
+}
 .cagnotte-tip {
   position: absolute; top: calc(100% + 9px); right: 0;
   width: 244px;
@@ -1336,11 +1322,11 @@ img { display: block; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.001s !important;
   }
-  .silk i, .folds, .sheen, .beam, .rays,
+  .silk i, .folds, .sheen,
   .typing i { animation: none !important; }
   .stat-fill { transition: none; }
   /* Étincelle : plus de circulation, un simple liseré chaud statique.
-     Le satin est figé ; la profondeur (ombres, halo) reste, immobile. */
+     Le satin est figé ; la profondeur (ombres) reste, immobile. */
   .epicentre::after {
     animation: none !important;
     background: rgba(199, 83, 15, 0.18);
@@ -1386,8 +1372,7 @@ img { display: block; }
        libellé déplié au survol/focus), cagnotte solidaire à droite. -->
   <header class="app-bar rise" aria-label="Barre GuardVeto">
     <div class="ab-ident">
-      <span class="ab-logo" aria-hidden="true">🦊</span>
-      <span class="ab-name">GuardVeto</span>
+      <span class="ab-name">Guard<em>Veto</em></span>
       <span class="ab-user">Anne-Sophie</span>
     </div>
   <nav class="dock-menu" aria-label="Les six espaces de GuardVeto">
@@ -1417,7 +1402,8 @@ img { display: block; }
     </a>
   </nav>
     <button type="button" class="cagnotte" id="cagnotte" aria-describedby="cagnotte-tip">
-      💚 87 € reversés
+      <span class="cg-heart" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19.3C8.9 16.7 5 13.6 4.6 9.9 4.3 7.3 6.2 5.2 8.4 5.4c1.6.15 2.9 1.3 3.6 2.8.8-1.6 2.3-2.9 4-2.8 2.2.1 3.9 2.2 3.5 4.8-.6 3.7-4.5 6.7-7.2 8.9"/></svg></span>
+      <span class="cg-txt"><b class="cg-num">87 €</b><small>reversés</small></span>
       <span class="cagnotte-tip" role="tooltip" id="cagnotte-tip">Une part de chaque abonnement GuardVeto va à l'association choisie par votre cabinet.</span>
     </button>
   </header>
@@ -1439,7 +1425,6 @@ img { display: block; }
         <div class="desk-top rise rise-2">
           <!-- Filou assis sur son cube 3D ; sa tête dépasse de la carte -->
           <div class="filou-cube" aria-hidden="true">
-            <span class="rays"><span class="beam b1"></span><span class="beam b2"></span><span class="beam b3"></span></span>
             <div class="socle">
               <i class="sc-shadow"></i><i class="sc-side"></i><i class="sc-top"></i><i class="sc-front"></i><i class="sc-contact"></i>
             </div>
