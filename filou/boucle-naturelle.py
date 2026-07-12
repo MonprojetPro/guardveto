@@ -35,24 +35,29 @@ if drop_fin:
 n = len(frames)
 print(f'      {n} images utiles', flush=True)
 
-print('[2/4] recherche du point de bouclage naturel...', flush=True)
+print('[2/4] recherche du point de bouclage naturel (pose + mouvement)...', flush=True)
 minis = []
 for f in frames:
-    im = Image.open(os.path.join(src, f)).convert('RGBA').resize((68, 120))
+    im = Image.open(os.path.join(src, f)).convert('RGBA').resize((108, 192))
     minis.append(np.asarray(im, dtype=np.float32))
 
-DUREE_MIN = int(n * 0.45)  # la boucle doit garder au moins ~45 % de la video
+DUREE_MIN = int(n * 0.40)  # la boucle doit garder au moins ~40 % de la video
 best = (1e18, 0, n)
-for i in range(0, min(90, n // 3)):
-    for j in range(i + DUREE_MIN, n):
-        d = float(np.mean(np.abs(minis[i] - minis[j])))
+for i in range(0, min(100, n // 3)):
+    for j in range(i + DUREE_MIN, n - 2):
+        # pose identique (i vs j) ET mouvement identique (les 2 images suivantes
+        # doivent aussi se ressembler) : c'est l'a-coup de vitesse qui trahit
+        # un raccord, pas seulement la pose.
+        d = (float(np.mean(np.abs(minis[i] - minis[j])))
+             + float(np.mean(np.abs(minis[i + 1] - minis[j + 1])))
+             + float(np.mean(np.abs(minis[i + 2] - minis[j + 2])))) / 3.0
         if d < best[0]:
             best = (d, i, j)
 score, i0, j0 = best
 print(f'      meilleur point : image {i0} -> {j0} (ecart moyen {score:.2f}/255, duree {j0-i0} img = {(j0-i0)/24:.1f} s)', flush=True)
 
-print('[3/4] assemblage avec micro-fondu (3 images)...', flush=True)
-K = 3
+print('[3/4] assemblage avec micro-fondu (5 images)...', flush=True)
+K = 5
 
 
 def charge(k):
