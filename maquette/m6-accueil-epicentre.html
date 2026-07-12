@@ -497,11 +497,30 @@ img { display: block; }
   background: linear-gradient(to left, rgba(110, 62, 14, 0.15), rgba(110, 62, 14, 0));
   pointer-events: none;
 }
-.convo .bubble.filou { background: var(--surface); } /* contraste sur la dalle */
+.tab-marque {
+  /* la gravure constructeur sur le bezel bas : c'est SA tablette 🦊 */
+  position: absolute; left: 50%; bottom: -11px; height: 11px;
+  transform: translateX(-50%);
+  display: flex; align-items: center;
+  font-family: var(--font-display);
+  font-size: 7.5px; font-weight: 700;
+  letter-spacing: 0.32em; text-indent: 0.32em; /* recentre malgré l'espacement */
+  text-transform: uppercase;
+  color: rgba(255, 240, 210, 0.52);
+  pointer-events: none;
+}
+.tab-btn {
+  /* le bouton latéral (marche/veille), en saillie sur la tranche droite */
+  position: absolute; right: -14px; top: 56px;
+  width: 3px; height: 42px; border-radius: 2px;
+  background: linear-gradient(180deg, #5E5243 0%, #3B332B 100%);
+  box-shadow: 1px 1px 2px rgba(110, 62, 14, 0.25);
+  pointer-events: none;
+}
 .convo-head {
   position: relative;
   border-bottom: 1px dashed var(--border-strong);
-  padding-bottom: 12px;
+  padding-bottom: 10px;
   margin-bottom: 4px;
 }
 /* La barre de statut de la tablette : heure + batterie, sur sa
@@ -536,7 +555,7 @@ img { display: block; }
   margin-bottom: 4px;
 }
 .convo-head h1 {
-  font-size: clamp(1.4rem, 2.6vw, 1.85rem);
+  font-size: clamp(1.25rem, 2.1vw, 1.55rem); /* densité écran : plus compact */
   font-weight: 800; letter-spacing: -0.012em; line-height: 1.1;
 }
 .convo-head h1 .sun {
@@ -561,59 +580,70 @@ img { display: block; }
   to   { opacity: 1; transform: none; }
 }
 
-/* ------ Le fil de conversation (échange en cours) ------
-   LE fil est ancré en bas : le mot d'accueil et les échanges
-   restent collés à la consigne, le vide résiduel monte au-dessus
-   (l'air d'une pièce, pas un trou entre deux blocs). L'ancrage
-   se fait par margin-top:auto sur la première bulle — flex-end
-   casserait le défilement en cas de débordement. */
+/* ------ Le fil de conversation · une VRAIE messagerie ------
+   Interface de chat dessinée pour l'écran de la tablette :
+   rangées de messages (.msg) avec mini-avatar 🦊 côté Filou
+   (plus d'étiquette « FILOU » dans chaque bulle), bulles
+   compactes, notes système centrées en pilule. LE fil est ancré
+   en bas (margin-top:auto sur la première rangée — flex-end
+   casserait le défilement) : le vide résiduel monte au-dessus. */
 .thread {
   flex: 1 1 0;
-  margin: 12px 0;
-  display: flex; flex-direction: column; gap: 9px;
+  margin: 10px 0;
+  display: flex; flex-direction: column; gap: 7px;
   min-height: 88px;
   overflow-y: auto;
   padding-right: 4px;
 }
 .thread > :first-child { margin-top: auto; }
-.bubble {
-  max-width: 88%;
-  padding: 11px 15px;
-  border-radius: var(--r-md);
-  font-size: 0.87rem; line-height: 1.55;
-  box-shadow: 1px 2px 5px rgba(110, 62, 14, 0.06); /* léger décollement */
+.msg {
+  display: flex; align-items: flex-end; gap: 7px;
   animation: bubbleIn 0.35s ease both;
+}
+.msg.user { justify-content: flex-end; }
+.msg.note { justify-content: center; }
+.m-ava {
+  flex: none;
+  width: 22px; height: 22px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.72rem;
+  background: var(--accent-soft);
+  border: 1px solid var(--border-strong);
+  margin-bottom: 1px;
+}
+.vh { /* le locuteur, pour les lecteurs d'écran seulement */
+  position: absolute; width: 1px; height: 1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+.bubble {
+  max-width: 86%;
+  padding: 7px 11px;
+  border-radius: 14px;
+  font-size: 0.8rem; line-height: 1.5;
+  box-shadow: 1px 1px 3px rgba(110, 62, 14, 0.05);
 }
 @keyframes bubbleIn {
   from { opacity: 0; transform: translateY(8px) scale(0.98); }
   to   { opacity: 1; transform: none; }
 }
-.bubble.filou {
-  align-self: flex-start;
-  background: var(--bubble-filou);
+.msg.filou .bubble {
+  background: var(--surface);
   border: 1px solid var(--border);
   border-bottom-left-radius: 4px;
 }
-.bubble.user {
-  align-self: flex-end;
+.msg.user .bubble {
   background: var(--bubble-user);
   border: 1px solid transparent;
   border-bottom-right-radius: 4px;
 }
-.bubble .who {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em;
-  text-transform: uppercase; color: var(--accent-ink);
-  margin-bottom: 4px;
-}
-.bubble.user .who { color: var(--muted); justify-content: flex-end; }
-.bubble.note {
-  align-self: flex-start;
+.msg.note .bubble {
   background: var(--ok-soft);
   border: 1px dashed var(--border-strong);
   color: var(--ok);
-  font-size: 0.8rem; font-weight: 600;
-  padding: 7px 14px;
+  font-size: 0.7rem; font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 999px;
+  box-shadow: none;
 }
 .typing { display: inline-flex; gap: 4px; align-items: center; padding: 4px 2px 0; }
 .typing i {
@@ -626,20 +656,20 @@ img { display: block; }
 @keyframes typDot { 0%, 100% { opacity: 0.35; transform: none; } 45% { opacity: 1; transform: translateY(-3px); } }
 
 /* ------ Chat auto-nettoyant : l'échange fini s'évapore ------ */
-.bubble.bye { animation: bubbleOut 0.4s ease both; pointer-events: none; }
+.msg.bye { animation: bubbleOut 0.4s ease both; pointer-events: none; }
 @keyframes bubbleOut {
   to { opacity: 0; transform: translateY(-9px) scale(0.97); }
 }
 /* Chips de choix / de suite, à même les bulles de Filou */
-.mini-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.mini-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
 .mini-chip {
   border: 1px solid var(--border-strong);
-  background: var(--surface);
+  background: var(--bubble-filou);
   color: var(--accent-ink);
   border-radius: 999px;
   font-family: var(--font-body);
-  font-size: 0.75rem; font-weight: 700;
-  padding: 6px 13px; min-height: 32px;
+  font-size: 0.7rem; font-weight: 700;
+  padding: 4px 10px; min-height: 26px;
   display: inline-flex; align-items: center; gap: 5px;
   text-decoration: none; cursor: pointer;
   transition: transform 0.15s ease, background-color 0.15s ease;
@@ -648,93 +678,97 @@ img { display: block; }
 .mini-chip.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .mini-chip.primary:hover { filter: brightness(1.07); background: var(--accent); }
 
-/* ------ Le champ de consigne, généreux ------ */
+/* ------ La barre de saisie · dessinée POUR la tablette ------
+   Fini l'ancien composant hérité (grosse pilule creusée) : une
+   barre fine d'app de messagerie, bouton d'envoi carré-arrondi
+   intégré à droite, juste un soupçon de creux. */
 .consigne {
-  display: flex; gap: 10px; align-items: center;
-  /* CREUSÉ dans la carte : ombre intérieure haute (côté lumière),
-     lueur basse — comme gravé dans le papier */
-  background: #FBF4E4;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 8px 8px 8px 22px;
-  box-shadow:
-    inset 2px 3px 7px rgba(110, 62, 14, 0.13),
-    inset -1px -2px 2px rgba(255, 253, 246, 0.9);
-  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  flex: none;
+  display: flex; gap: 8px; align-items: center;
+  background: #FFFDF6;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  padding: 4px 4px 4px 13px;
+  box-shadow: inset 0 1px 3px rgba(110, 62, 14, 0.07);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .consigne:focus-within {
   border-color: var(--accent);
   box-shadow:
-    inset 2px 3px 7px rgba(110, 62, 14, 0.13),
-    inset -1px -2px 2px rgba(255, 253, 246, 0.9),
+    inset 0 1px 3px rgba(110, 62, 14, 0.07),
     0 0 0 3px var(--accent-soft);
 }
 .consigne input {
   flex: 1; min-width: 0;
   border: none; background: transparent;
   font-family: var(--font-body);
-  font-size: 0.98rem; color: var(--text);
-  min-height: 42px;
+  font-size: 0.85rem; color: var(--text);
+  min-height: 34px;
 }
 .consigne input::placeholder { color: var(--soft); }
 .consigne input:focus { outline: none; }
 .consigne button {
   flex: none;
-  width: 46px; height: 46px; border-radius: 50%;
+  width: 34px; height: 34px; border-radius: 10px;
   border: none;
   background: var(--accent); color: #fff;
-  font-size: 1.05rem;
+  font-size: 0.85rem;
   display: inline-flex; align-items: center; justify-content: center;
-  box-shadow: 0 3px 10px var(--accent-glow);
+  box-shadow: 0 2px 6px var(--accent-glow);
   transition: transform 0.15s ease, filter 0.15s ease;
 }
 .consigne button:hover { filter: brightness(1.07); transform: scale(1.05); }
 .consigne button:active { transform: scale(0.94); }
 
+/* Les suggestions : chips compactes, 2 rangées maximum */
 .chips {
-  display: flex; flex-wrap: wrap; gap: 8px;
-  margin-top: 13px;
-}
-.chips .lead {
-  flex: none; align-self: center;
-  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em;
-  text-transform: uppercase; color: var(--soft);
-  font-family: var(--font-display);
-  margin-right: 2px;
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-top: 9px;
 }
 .chip {
-  border: 1px solid var(--border-strong);
-  background: rgba(255, 252, 244, 0.9);
+  border: 1px solid var(--border);
+  background: transparent;
   color: var(--muted);
   border-radius: 999px;
-  font-size: 0.76rem; font-weight: 600;
-  padding: 7px 12px; min-height: 36px;
-  box-shadow: var(--edge-light), 1px 2px 5px rgba(110, 62, 14, 0.08); /* pilule posée */
-  transition: color 0.18s ease, border-color 0.18s ease, transform 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+  font-size: 0.72rem; font-weight: 600;
+  padding: 5px 11px; min-height: 28px;
+  transition: color 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
 }
 .chip:hover {
   color: var(--accent-ink); border-color: var(--accent-ink);
-  background: var(--surface);
-  transform: translateY(-2px);
-  box-shadow: var(--edge-light), var(--elev-1);
+  background: var(--accent-soft);
 }
 
 /* ============================================================
-   LA FENÊTRE CONTEXTUELLE (droite) · le cœur du concept
-   Au repos : le coup d'œil du matin. Sur consigne : la fenêtre
-   de Filou se matérialise par-dessus, comme un dossier qu'on
-   pose sur le comptoir.
+   LE TABLEAU D'AFFICHAGE DU CABINET (droite) · la scène se lit :
+   l'assistant et sa tablette / ta tablette / LE TABLEAU du
+   cabinet — l'objet qu'on trouve dans toute salle de repos.
+   Surface feutre crème dans un cadre fin bois clair ; les
+   widgets du coup d'œil sont des FICHES ÉPINGLÉES (épingle +
+   inclinaison ±0,5°) ; quand Filou montre quelque chose, sa
+   fenêtre arrive comme une fiche qu'il épingle par-dessus.
    ============================================================ */
 .stage {
   position: relative;
   min-height: 520px;
   min-width: 0;
+  /* le feutre, dans son cadre bois clair */
+  border: 6px solid #E5CFA5;
+  border-radius: 18px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, #F4E7CB 0%, #EEDEBB 100%);
+  background-blend-mode: soft-light, normal;
+  box-shadow:
+    0 0 0 1px var(--border-strong),               /* le liseré du cadre */
+    inset 0 2px 7px rgba(110, 62, 14, 0.13),      /* le feutre en retrait */
+    2px 4px 12px rgba(110, 62, 14, 0.10);         /* le tableau accroché à la carte */
 }
 
-/* ------ Coup d'œil du matin (état de repos) ------ */
+/* ------ Coup d'œil du matin : les fiches épinglées ------ */
 .glance {
-  position: absolute; inset: 0;
-  display: flex; flex-direction: column; gap: 10px;
+  position: absolute; inset: 13px;
+  display: flex; flex-direction: column; gap: 11px;
   transition: opacity 0.28s ease, transform 0.45s var(--ease-out);
 }
 .stage.open .glance {
@@ -744,22 +778,36 @@ img { display: block; }
 .glance-title {
   font-family: var(--font-display);
   font-size: 0.7rem; font-weight: 700; letter-spacing: 0.13em;
-  text-transform: uppercase; color: var(--soft);
+  text-transform: uppercase; color: var(--muted);
   padding-left: 4px;
 }
 .widget {
+  --tilt: 0deg; /* chaque fiche est épinglée un peu de travers */
   position: relative;
   display: flex; align-items: center; gap: 14px;
   text-align: left;
-  background: rgba(255, 252, 244, 0.82);
+  background: rgba(255, 252, 244, 0.94);
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  border-radius: var(--r-sm);
   padding: 13px 17px;
   box-shadow: var(--edge-light), var(--elev-1);
+  transform: rotate(var(--tilt));
   transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
+.glance .widget:nth-of-type(1) { --tilt: -0.4deg; }
+.glance .widget:nth-of-type(2) { --tilt: 0.35deg; }
+.glance .widget:nth-of-type(3) { --tilt: -0.25deg; }
+.glance .widget:nth-of-type(4) { --tilt: 0.45deg; }
+.widget::after {
+  /* l'épingle */
+  content: "";
+  position: absolute; top: -5px; left: 50%; margin-left: -5px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: radial-gradient(circle at 32% 30%, #F09B5C, #A84B0F 72%);
+  box-shadow: 0 2px 3px rgba(110, 62, 14, 0.35), inset 0 -1px 1px rgba(0, 0, 0, 0.15);
+}
 .widget:hover {
-  transform: translateY(-3px); /* la carte se soulève vers la lumière */
+  transform: translateY(-3px) rotate(var(--tilt)); /* la fiche se soulève, épingle comprise */
   border-color: var(--border-strong);
   box-shadow: var(--edge-light), var(--elev-2);
 }
@@ -795,20 +843,19 @@ img { display: block; }
 }
 .glance-foot b { color: var(--muted); }
 
-/* ------ La fenêtre de Filou ------ */
+/* ------ La fenêtre de Filou · la fiche qu'il épingle ------ */
 .fen {
-  position: absolute; inset: 0;
+  position: absolute; inset: 13px;
   display: flex; flex-direction: column;
   background: var(--surface);
   border: 1px solid var(--border-strong);
-  border-radius: var(--r-lg);
+  border-radius: var(--r-md);
   box-shadow: var(--shadow-panel);
-  overflow: hidden;
   opacity: 0;
-  /* permutation douce : la fenêtre prend la place du coup d'œil,
-     au même endroit (fondu + léger soulèvement, pas de glissade) */
-  transform: translateY(14px) scale(0.98);
-  transform-origin: 50% 60%;
+  /* la POSE DE FICHE : elle arrive d'un peu plus haut, à peine
+     de travers, et se plaque sur le tableau (ease-out) */
+  transform: translateY(-20px) rotate(0.9deg) scale(1.01);
+  transform-origin: 50% 0;
   pointer-events: none;
   transition: transform 0.45s var(--ease-out), opacity 0.3s ease;
   visibility: hidden;
@@ -818,12 +865,21 @@ img { display: block; }
   pointer-events: auto;
   visibility: visible;
 }
+.fen::after {
+  /* son épingle, un cran plus grosse : la fiche du dessus */
+  content: "";
+  position: absolute; top: -5px; left: 50%; margin-left: -6px;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: radial-gradient(circle at 32% 30%, #F09B5C, #A84B0F 72%);
+  box-shadow: 0 2px 4px rgba(110, 62, 14, 0.4), inset 0 -1px 1px rgba(0, 0, 0, 0.15);
+}
 .fen-head {
   flex: none;
   display: flex; align-items: center; gap: 11px;
   padding: 14px 16px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-2);
+  border-radius: calc(var(--r-md) - 1px) calc(var(--r-md) - 1px) 0 0;
 }
 .fen-head .f-ico {
   flex: none;
@@ -854,6 +910,7 @@ img { display: block; }
   padding: 12px 16px;
   border-top: 1px solid var(--border);
   background: var(--surface);
+  border-radius: 0 0 calc(var(--r-md) - 1px) calc(var(--r-md) - 1px);
 }
 .fen-foot .hint { font-size: 0.71rem; color: var(--soft); margin-left: auto; }
 
@@ -1088,7 +1145,7 @@ img { display: block; }
 .app-bar {
   display: flex; align-items: center; gap: 10px;
   margin: 14px 0;
-  padding: 7px 8px 7px 18px;
+  padding: 8px 9px 8px 18px;
   background: rgba(255, 252, 244, 0.9);
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -1148,8 +1205,8 @@ img { display: block; }
 }
 .dock-item {
   display: flex; align-items: center;
-  height: 46px; flex: none;
-  padding: 0 13px;
+  height: 56px; flex: none;
+  padding: 0 15px;
   border-radius: 999px;
   text-decoration: none;
   color: var(--soft);
@@ -1157,14 +1214,14 @@ img { display: block; }
 }
 .dock-item .di-ico {
   position: relative;
-  width: 23px; height: 23px; flex: none;
+  width: 28px; height: 28px; flex: none;
   transition: color 0.25s ease;
 }
 .dock-item .di-ico svg { width: 100%; height: 100%; display: block; }
 /* Le point d'état, discret, accroché au coin de l'icône */
 .di-pip {
   position: absolute; top: -3px; right: -4px;
-  width: 8px; height: 8px; border-radius: 50%;
+  width: 9px; height: 9px; border-radius: 50%;
   border: 2px solid var(--surface);
   box-sizing: content-box;
   font-style: normal;
@@ -1172,11 +1229,11 @@ img { display: block; }
 .di-pip.warn { background: var(--warn); }
 .di-pip.ok { background: var(--ok); }
 .di-pip.count {
-  width: 15px; height: 15px; top: -7px; right: -9px;
+  width: 17px; height: 17px; top: -7px; right: -10px;
   background: var(--accent);
   color: #fff;
   font-family: var(--font-display);
-  font-size: 0.56rem; font-weight: 700;
+  font-size: 0.6rem; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
   line-height: 1;
 }
@@ -1191,7 +1248,7 @@ img { display: block; }
   position: relative;
   padding: 0 3px 5px 10px;
   font-family: var(--font-display);
-  font-size: 0.78rem; font-weight: 700;
+  font-size: 0.84rem; font-weight: 700;
   color: var(--accent-ink);
 }
 .di-text::after {
@@ -1235,7 +1292,7 @@ img { display: block; }
    ============================================================ */
 @media (max-width: 940px) {
   .epi-inner { grid-template-columns: 1fr; min-height: 0; }
-  .stage { min-height: 0; }
+  .stage { min-height: 0; padding: 12px; }
   .glance { position: static; }
   .stage.open .glance { display: none; }
   .fen { position: static; visibility: hidden; display: none; max-height: none; }
@@ -1251,6 +1308,8 @@ img { display: block; }
   .convo { margin-left: -32px; border-width: 9px; border-radius: 26px; padding: 12px 16px 12px 18px; }
   .convo::before { left: -16px; }
   .convo::after { top: -7px; width: 5px; height: 5px; }
+  .tab-marque { bottom: -9px; height: 9px; font-size: 7px; }
+  .tab-btn { right: -12px; top: 48px; height: 36px; }
 }
 @media (max-width: 560px) {
   .recap-grid { grid-template-columns: 1fr; }
@@ -1263,6 +1322,8 @@ img { display: block; }
   .convo { margin-left: -18px; border-width: 7px; border-radius: 22px; padding: 11px 13px 11px 14px; }
   .convo::before { left: -14px; }
   .convo::after { top: -6px; width: 4px; height: 4px; }
+  .tab-marque { display: none; } /* illisible à cette taille de bezel */
+  .tab-btn { right: -10px; top: 40px; height: 30px; }
   .ab-user { display: none; }
 }
 
@@ -1387,8 +1448,10 @@ img { display: block; }
             </video>
           </div>
           <div class="convo">
+            <span class="tab-marque" aria-hidden="true">Filou</span>
+            <span class="tab-btn" aria-hidden="true"></span>
             <header class="convo-head">
-              <span class="tab-status" aria-hidden="true">08:12 <span class="ts-batt"><i></i></span></span>
+              <span class="tab-status" aria-hidden="true"><span id="tab-heure">--:--</span> <span class="ts-batt"><i></i></span></span>
               <p class="hello-kicker">Cabinet du Val d'Allier · période Hiver 2026</p>
               <h1>Jeudi 15 janvier <span class="sun">☀️</span></h1>
             </header>
@@ -1401,11 +1464,10 @@ img { display: block; }
             </form>
 
             <div class="chips" role="group" aria-label="Consignes suggérées">
-              <span class="lead">Essaie :</span>
-              <button type="button" class="chip" data-consigne="Ouvre-moi la fiche d'Anne-Catherine, ses congés">Fiche d'Anne-Catherine</button>
+              <button type="button" class="chip" data-consigne="Ouvre-moi la fiche d'Anne-Catherine, ses congés">Fiche d'Anne-Cat</button>
               <button type="button" class="chip" data-consigne="Combien de week-ends a fait Victor ?">Week-ends de Victor</button>
-              <button type="button" class="chip" data-consigne="Qui est de garde ce soir ?">De garde ce soir ?</button>
-              <button type="button" class="chip" data-consigne="Prépare la période suivante">Préparer la période</button>
+              <button type="button" class="chip" data-consigne="Qui est de garde ce soir ?">Garde ce soir ?</button>
+              <button type="button" class="chip" data-consigne="Prépare la période suivante">Nouvelle période</button>
             </div>
           </div>
         </div>
@@ -1457,7 +1519,7 @@ img { display: block; }
             <span class="w-go" aria-hidden="true">→</span>
           </button>
 
-          <p class="glance-foot">Ces cartes s'ouvrent aussi à la voix de Filou : clique, ou demande-lui. <b>La fenêtre s'ouvrira ici, à côté de la conversation.</b></p>
+          <p class="glance-foot">Ces fiches s'ouvrent aussi à la voix de Filou : clique, ou demande-lui. <b>Il épinglera sa fiche ici, sur le tableau.</b></p>
         </div>
 
         <!-- ===== Fenêtre · fiche d'Anne-Catherine ===== -->
@@ -1786,6 +1848,22 @@ img { display: block; }
     }, 3000);
   })();
 
+  /* ---- L'heure RÉELLE sur la barre de statut de la tablette
+     (format 24 h français, recalée à chaque minute pile) ---- */
+  (function () {
+    var el = document.getElementById("tab-heure");
+    if (!el) return;
+    function maj() {
+      var d = new Date();
+      el.textContent = ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+    }
+    maj();
+    window.setTimeout(function () {
+      maj();
+      window.setInterval(maj, 60000);
+    }, (60 - new Date().getSeconds()) * 1000 + 50);
+  })();
+
   /* L'infobulle de la cagnotte s'épingle au clic (tactile) */
   var cagnotte = document.getElementById("cagnotte");
   if (cagnotte) {
@@ -1833,29 +1911,35 @@ img { display: block; }
   var demoConfigA = false;    /* cas A : une période attend déjà */
   var pFlow = null;           /* état du dialogue « période » */
 
+  /* Chaque message est une RANGÉE (.msg) : mini-avatar 🦊 côté
+     Filou, bulle compacte ; le locuteur reste annoncé aux
+     lecteurs d'écran via un span .vh invisible. */
   function bubble(kind, who, html, untracked) {
-    var b = document.createElement("div");
-    b.className = "bubble " + kind;
-    b.innerHTML = (who ? '<span class="who">' + who + "</span>" : "") + html;
-    thread.appendChild(b);
-    if (!untracked) exchange.push(b);
+    var row = document.createElement("div");
+    row.className = "msg " + kind;
+    var sr = who ? '<span class="vh">' + who + " : </span>" : "";
+    var ava = kind === "filou" ? '<span class="m-ava" aria-hidden="true">🦊</span>' : "";
+    row.innerHTML = ava + '<div class="bubble">' + sr + html + "</div>";
+    thread.appendChild(row);
+    if (!untracked) exchange.push(row);
     while (thread.children.length > 8) thread.removeChild(thread.firstChild);
     thread.scrollTop = thread.scrollHeight;
-    return b;
+    return row;
   }
+  function bub(row) { return row.querySelector(".bubble"); }
   function showTyping() {
-    typingEl = bubble("filou", "🦊 Filou", '<span class="typing" aria-label="Filou réfléchit"><i></i><i></i><i></i></span>');
+    typingEl = bubble("filou", "Filou", '<span class="typing" aria-label="Filou réfléchit"><i></i><i></i><i></i></span>');
   }
   function replaceTyping(html) {
-    var b;
+    var row;
     if (typingEl) {
-      typingEl.innerHTML = '<span class="who">🦊 Filou</span>' + html;
-      b = typingEl; typingEl = null;
+      bub(typingEl).innerHTML = '<span class="vh">Filou : </span>' + html;
+      row = typingEl; typingEl = null;
     } else {
-      b = bubble("filou", "🦊 Filou", html);
+      row = bubble("filou", "Filou", html);
     }
     thread.scrollTop = thread.scrollHeight;
-    return b;
+    return row;
   }
   function fadeOutBubbles(list) {
     list.forEach(function (b) {
@@ -1899,7 +1983,7 @@ img { display: block; }
       });
       wrap.appendChild(c);
     });
-    b.appendChild(wrap);
+    bub(b).appendChild(wrap);
     thread.scrollTop = thread.scrollHeight;
     return b;
   }
@@ -1990,11 +2074,11 @@ img { display: block; }
           chipBtn("Créer une période", "Prépare la période suivante")
         ];
     }
-    suggestionBubble = bubble("filou", "🦊 Filou", intro, true);
+    suggestionBubble = bubble("filou", "Filou", intro, true);
     var wrap = document.createElement("div");
     wrap.className = "mini-chips";
     items.forEach(function (i) { wrap.appendChild(i); });
-    suggestionBubble.appendChild(wrap);
+    bub(suggestionBubble).appendChild(wrap);
     thread.scrollTop = thread.scrollHeight;
   }
   function animateBars(fen) {
@@ -2228,7 +2312,7 @@ img { display: block; }
 
   /* ---------- le mot d'accueil : première bulle du fil ----------
      (plus de bulle statique séparée — la conversation est UNE) */
-  bubble("filou", "🦊 Filou",
+  bubble("filou", "Filou",
     "Bonjour Anne-Sophie ! Le brouillon <b>Hiver 2026</b> est cohérent, l'équipe est au complet. Que puis-je faire pour toi ?",
     true);
 
