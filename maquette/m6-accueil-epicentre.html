@@ -90,9 +90,8 @@ img { display: block; }
 .mq-nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 200;
   height: var(--nav-h);
-  background: var(--nav-bg);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  /* perf : plus de backdrop-filter plein écran — fond quasi opaque */
+  background: rgba(250, 243, 229, 0.96);
   border-bottom: 1px solid var(--border);
   display: flex; align-items: center; gap: 18px;
   padding: 0 clamp(14px, 3vw, 36px);
@@ -138,39 +137,40 @@ img { display: block; }
   will-change: transform;
   background: linear-gradient(180deg, #F6EBD3 0%, var(--bg-deep) 72%, #E9DABC 100%);
 }
-.silk {
-  position: absolute; inset: -22% -12%;
-  filter: blur(70px);
-}
-.silk i { position: absolute; border-radius: 50%; }
+/* Perf : plus AUCUN filtre plein écran. Les nappes sont des
+   dégradés radiaux naturellement doux (flou « intégré »), et tout
+   ce qui bouge n'anime QUE transform (composité GPU). */
+.silk { position: absolute; inset: -22% -12%; }
+.silk i { position: absolute; border-radius: 50%; will-change: transform; }
 .silk .s1 {
-  width: 56%; height: 70%; left: -10%; top: -18%;
-  background: #FFDFAE; opacity: 0.95;
+  width: 62%; height: 76%; left: -12%; top: -20%;
+  background: radial-gradient(closest-side, rgba(255, 223, 174, 0.95), rgba(255, 223, 174, 0) 72%);
   animation: silkDrift1 74s ease-in-out infinite alternate;
 }
 .silk .s2 {
-  width: 48%; height: 62%; right: -8%; top: -12%;
-  background: #F0BC72; opacity: 0.7;
+  width: 54%; height: 68%; right: -10%; top: -14%;
+  background: radial-gradient(closest-side, rgba(240, 188, 114, 0.7), rgba(240, 188, 114, 0) 72%);
   animation: silkDrift2 86s ease-in-out infinite alternate;
 }
 .silk .s3 {
-  width: 36%; height: 50%; left: 36%; bottom: -16%;
-  background: rgba(199, 83, 15, 0.26); opacity: 0.6;
+  width: 42%; height: 56%; left: 34%; bottom: -18%;
+  background: radial-gradient(closest-side, rgba(199, 83, 15, 0.17), rgba(199, 83, 15, 0) 74%);
   animation: silkDrift3 58s ease-in-out infinite alternate;
 }
 .silk .s4 {
-  width: 30%; height: 44%; left: 8%; bottom: -10%;
-  background: #E3E8C2; opacity: 0.38;
+  width: 36%; height: 50%; left: 6%; bottom: -12%;
+  background: radial-gradient(closest-side, rgba(227, 232, 194, 0.36), rgba(227, 232, 194, 0) 72%);
   animation: silkDrift2 98s ease-in-out infinite alternate-reverse;
 }
 @keyframes silkDrift1 { to { transform: translate(4%, 8%) scale(1.08); } }
 @keyframes silkDrift2 { to { transform: translate(-5%, 6%) scale(1.05); } }
 @keyframes silkDrift3 { to { transform: translate(6%, -5%) scale(0.95); } }
-/* Les PLIS DE VELOURS : deux jeux de bandes diagonales douces qui
-   ondulent en sens contraires — le tissu respire (46 et 58 s) */
+/* Les PLIS DE VELOURS : flou statique appliqué à l'élément,
+   animation en transform uniquement — le tissu respire (46/58 s) */
 .folds {
   position: absolute; inset: -14%;
   mix-blend-mode: soft-light;
+  will-change: transform;
 }
 .folds.f1 {
   background: repeating-linear-gradient(104deg,
@@ -192,21 +192,21 @@ img { display: block; }
 }
 @keyframes foldBreath1 { to { transform: translate3d(-3.2%, 1.6%, 0); } }
 @keyframes foldBreath2 { to { transform: translate3d(2.8%, -2.2%, 0); } }
-/* Le reflet satiné qui traverse la surface (~52 s, perceptible) */
+/* Le reflet satiné : une nappe surdimensionnée qui TRAVERSE en
+   transform (plus jamais d'animation de background-position) */
 .sheen {
-  position: absolute; inset: 0;
+  position: absolute; top: 0; bottom: 0; left: -130%; width: 340%;
   background: linear-gradient(118deg,
-    transparent 16%,
-    rgba(255, 242, 212, 0.75) 40%,
-    transparent 58%,
-    rgba(255, 228, 182, 0.5) 78%,
-    transparent 94%);
-  background-size: 260% 100%;
-  background-position: 0% 0;
+    transparent 34%,
+    rgba(255, 242, 212, 0.75) 42%,
+    transparent 50%,
+    rgba(255, 228, 182, 0.5) 58%,
+    transparent 66%);
   mix-blend-mode: soft-light;
+  will-change: transform;
   animation: sheenDrift 52s ease-in-out infinite alternate;
 }
-@keyframes sheenDrift { to { background-position: 100% 0; } }
+@keyframes sheenDrift { to { transform: translate3d(36%, 0, 0); } }
 
 /* ---- La carte Filou : LE seul objet posé sur le satin.
    Profondeur évidente : rétro-éclairage, ombres 3 couches,
@@ -325,38 +325,39 @@ img { display: block; }
   margin-top: calc(14px - clamp(22px, 3vw, 38px)); /* le cube frôle le bord haut */
 }
 .filou-cube {
-  /* plus de niche colorée : derrière Filou, le fond de la carte,
-     en continuité totale. Ce bloc n'est que l'emplacement. */
+  /* L'emplacement, transparent. GÉOMÉTRIE RÉELLE de la vidéo
+     540×960 : assise à 62 % de la hauteur, pieds à 90 %, axe du
+     corps à 47 % de la largeur. Vidéo rendue à 270 px de large
+     (H ≈ 480). Ancrée en HAUT (top −44 → tête ~30 px au-dessus
+     de la carte) ; l'assise tombe donc à 253 px du haut de
+     l'emplacement, et le socle est calé dessous. */
   position: relative;
   flex: none;
-  width: 172px;
-  min-height: 194px;
+  width: 270px;
+  min-height: 404px;
   z-index: 4; /* contexte : rays derrière Filou, tête devant l'étincelle */
 }
 .filou-cube video,
 .filou-cube img.filou-fallback {
   position: absolute;
-  left: 50%; bottom: 38px; /* assis sur le socle : les jambes pendent sur la face avant */
-  transform: translateX(-50%);
-  /* dépassement constant : bottom(38) + surplus(6) = 44 px au-dessus
-     de l'emplacement → ~30 px au-dessus du bord de la carte */
-  height: calc(100% + 6px); width: auto;
+  top: -44px; left: 0;
+  width: 270px; height: auto;
   max-width: none;
   z-index: 2;
-  filter: drop-shadow(2px 10px 14px rgba(110, 62, 14, 0.26));
+  /* perf : PAS de drop-shadow sur la vidéo (recalculé à chaque
+     image) — l'ombre de contact du socle fait le travail */
 }
 
-/* ---- LE SOCLE 3D · un pavé blanc-crème en volume, même matière
-   que la carte. Projection oblique douce, profondeur vers le
-   haut-droite (vecteur ≈ 18px, −14px). Lumière haut-gauche :
-   dessus le plus clair, face avant en dégradé, flanc droit plus
-   sombre. Il projette son ombre sur la carte, Filou pose la
-   sienne sur le dessus. ---- */
+/* ---- LE SOCLE 3D · pavé blanc-crème en volume, même matière que
+   la carte. Face supérieure = ligne d'assise (62 % de H, soit
+   249 px dans l'emplacement, +4 px d'enfoncement) ; centre de la
+   face = axe du corps (47 % de 270 = 127 px). Les jambes
+   (62→90 %, ~134 px) pendent sur la face avant (150 px).
+   Lumière haut-gauche, cohérente avec les side rays. ---- */
 .socle {
   position: absolute;
-  left: 50%; bottom: 10px;
-  transform: translateX(-54%);
-  width: 118px; height: 82px; /* la face avant */
+  left: 33px; bottom: 10px;
+  width: 154px; height: 150px; /* la face avant */
   z-index: 1;
   pointer-events: none;
 }
@@ -364,18 +365,18 @@ img { display: block; }
 .sc-front {
   inset: 0;
   background: linear-gradient(180deg, #FCF7EA 0%, #F0E6CF 100%);
-  border-radius: 0 0 4px 3px;
+  border-radius: 0 0 5px 4px;
   box-shadow: inset 1px 1px 0 rgba(255, 255, 250, 0.85);
 }
 .sc-top {
-  left: 0; top: -14px; width: 100%; height: 14px;
+  left: 0; top: -16px; width: 100%; height: 16px;
   transform: skewX(-52deg);
   transform-origin: 0 100%;
   background: linear-gradient(90deg, #FFFEF8 0%, #F6EEDA 100%);
   border-radius: 2px 3px 0 0;
 }
 .sc-side {
-  left: 100%; top: 0; width: 18px; height: 82px;
+  left: 100%; top: 0; width: 20px; height: 150px;
   transform: skewY(-38deg);
   transform-origin: 0 0;
   background: linear-gradient(180deg, #E9DCBF 0%, #DFCFAD 100%);
@@ -383,13 +384,13 @@ img { display: block; }
 }
 .sc-shadow {
   /* l'ombre portée du pavé sur la carte, fuyante vers la droite */
-  left: 6px; right: -28px; bottom: -9px; height: 18px;
+  left: 8px; right: -34px; bottom: -10px; height: 20px;
   background: radial-gradient(52% 100% at 44% 0%, rgba(110, 62, 14, 0.20), transparent 72%);
   filter: blur(5px);
 }
 .sc-contact {
   /* Filou assis : son ombre de contact sur la face du dessus */
-  left: 16%; top: -12px; width: 64%; height: 10px;
+  left: 14%; top: -13px; width: 68%; height: 11px;
   transform: skewX(-52deg);
   background: radial-gradient(closest-side, rgba(110, 62, 14, 0.22), transparent 76%);
   filter: blur(2.5px);
@@ -438,8 +439,11 @@ img { display: block; }
 /* ---- À droite du cube : ① les infos du jour ② le mot de Filou ---- */
 .hello-side {
   flex: 1; min-width: 0;
+  /* ancré en BAS de la rangée du cube : le mot de Filou finit au
+     niveau du socle, le chat vient juste dessous — pas de vide
+     entre les blocs (le souffle reste en haut, sous sa tête) */
   display: flex; flex-direction: column; justify-content: flex-end;
-  padding: 18px 0 2px; /* compense la remontée du cube : le texte reste sous le bord */
+  padding: 46px 0 6px;
 }
 .hello-kicker {
   font-family: var(--font-display);
@@ -506,10 +510,13 @@ img { display: block; }
 
 /* ------ Le fil de conversation (échange en cours) ------ */
 .thread {
-  flex: 1;
-  margin: 20px 0 14px;
+  /* compact : le chat vient DIRECTEMENT sous le mot de Filou ;
+     le vide résiduel de la colonne va en bas, pas entre les blocs */
+  flex: 0 1 auto;
+  margin: 16px 0 12px;
   display: flex; flex-direction: column; justify-content: flex-end; gap: 9px;
-  min-height: 148px;
+  min-height: 52px;
+  max-height: 250px;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -1178,21 +1185,24 @@ img { display: block; }
   .fen { position: static; visibility: hidden; display: none; max-height: none; }
   .stage.open .fen.active { display: flex; visibility: visible; }
   .thread { min-height: 76px; max-height: 220px; }
-  /* Le cube se resserre, la tête dépasse toujours un peu */
-  .filou-cube { width: 138px; min-height: 158px; }
-  .filou-cube video, .filou-cube img.filou-fallback { height: calc(100% + 4px); bottom: 30px; }
-  .socle { width: 94px; height: 64px; bottom: 8px; }
-  .sc-top { top: -11px; height: 11px; }
-  .sc-side { width: 14px; height: 64px; }
+  /* Même géométrie d'assise, à l'échelle 0,74 (vidéo 200 px) */
+  .filou-cube { width: 200px; min-height: 300px; }
+  .filou-cube video, .filou-cube img.filou-fallback { width: 200px; top: -32px; }
+  .socle { left: 37px; bottom: 3px; width: 114px; height: 112px; }
+  .sc-top { top: -12px; height: 12px; }
+  .sc-side { width: 15px; height: 112px; }
+  .hello-side { padding-top: 36px; }
 }
 @media (max-width: 560px) {
   .recap-grid { grid-template-columns: 1fr; }
   .desk-top { gap: 12px; }
-  .filou-cube { width: 112px; min-height: 132px; }
-  .filou-cube video, .filou-cube img.filou-fallback { height: calc(100% + 2px); bottom: 24px; }
-  .socle { width: 78px; height: 52px; bottom: 7px; }
-  .sc-top { top: -9px; height: 9px; }
-  .sc-side { width: 11px; height: 52px; }
+  /* Échelle 0,59 (vidéo 160 px) */
+  .filou-cube { width: 160px; min-height: 240px; }
+  .filou-cube video, .filou-cube img.filou-fallback { width: 160px; top: -26px; }
+  .socle { left: 30px; bottom: 3px; width: 91px; height: 90px; }
+  .sc-top { top: -10px; height: 10px; }
+  .sc-side { width: 12px; height: 90px; }
+  .hello-side { padding-top: 30px; }
   .ab-user { display: none; }
 }
 
