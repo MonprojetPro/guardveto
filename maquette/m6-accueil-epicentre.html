@@ -440,22 +440,95 @@ img { display: block; }
   50%      { opacity: 0.95; }
 }
 
-/* ---- LA STATION DE CONVERSATION (.convo) · structure commune
-   aux deux compositions : ① en-tête cabinet + date ② LE fil de
-   conversation (le mot d'accueil de Filou en est la première
-   bulle — plus de bulle statique séparée) ③ la consigne + chips.
-   LA QUEUE DERRIÈRE UN OBJET VISIBLE : la vidéo est coupée au
-   bord droit de son cadre (x = 270, coupe visible de y ≈ 222 à
-   334 dans l'emplacement). L'objet qui recouvre la coupe est
-   désormais une SURFACE VISIBLE (bord + ombre) : le carnet en
-   composition A, le comptoir en composition B. ---- */
+/* ---- LA TABLETTE DE FILOU (.convo) · arbitrage MiKL.
+   Filou tapote sur sa tablette dans la vidéo — et le panneau de
+   conversation à côté de lui EST l'écran de sa tablette en
+   grand : ce qu'il consulte, on le voit. Dedans : ① barre de
+   statut + date ② LE fil (le mot d'accueil de Filou en est la
+   première bulle — plus de bulle statique séparée) ③ la
+   consigne creusée + chips.
+   L'OBJET : bezel anthracite CHAUD (le border, jamais noir
+   brut), dalle crème claire (plus lumineuse que la carte, pas
+   de mode sombre), reflet oblique très léger en haut,
+   micro-caméra en pastille dans le bezel. Lumière haut-gauche :
+   lèvre écran/bezel, ombres portées vers le bas-droite.
+   LA QUEUE DERRIÈRE LA TABLETTE : la vidéo est coupée au bord
+   droit de son cadre (x = 270, coupe visible de y ≈ 222 à 334
+   dans l'emplacement) ; l'épaule gauche de la tablette chevauche
+   franchement le cadre (bord externe à x ≈ 226, genou de Filou
+   dégagé à ~205) : la queue glisse derrière un objet physique,
+   bezel et ombre à l'appui. ---- */
 .convo {
   flex: 1; min-width: 0;
   position: relative;
   z-index: 5;               /* au-dessus de la vidéo (cube z 4) */
   display: flex; flex-direction: column;
+  margin: 20px 0 2px -44px;
+  border: 11px solid #473E33;  /* le bezel */
+  border-radius: 30px;
+  background:
+    /* le reflet d'écran : une nappe oblique discrète en haut */
+    linear-gradient(115deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 30%),
+    /* la dalle allumée, crème clair */
+    linear-gradient(180deg, #FEFBF2 0%, #F9F2E0 100%);
+  padding: 13px 18px 14px 20px;
+  box-shadow:
+    inset 0 0 0 1px rgba(63, 52, 40, 0.18),        /* la lèvre écran/bezel */
+    2px 3px 6px rgba(110, 62, 14, 0.18),           /* ombre de contact, fuyante à droite */
+    12px 20px 44px -8px rgba(110, 62, 14, 0.30);   /* ombre ambiante de l'objet */
 }
-.convo-head { position: relative; }
+.convo::after {
+  /* la micro-caméra frontale, en pastille dans le bezel haut */
+  content: "";
+  position: absolute; top: -8px; left: 50%;
+  transform: translateX(-50%);
+  width: 6px; height: 6px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #6E6153, #221E19 68%);
+  pointer-events: none;
+}
+.convo::before {
+  /* pénombre de contact : la queue s'assombrit à peine en
+     glissant sous la tablette (occlusion, pas d'ombre projetée).
+     Décalée du bezel : les offsets se mesurent depuis la zone
+     de padding, le bord externe est 11 px plus loin. */
+  content: "";
+  position: absolute; left: -18px; top: -4px; bottom: -4px; width: 7px;
+  border-radius: 7px 0 0 7px;
+  background: linear-gradient(to left, rgba(110, 62, 14, 0.15), rgba(110, 62, 14, 0));
+  pointer-events: none;
+}
+.convo .bubble.filou { background: var(--surface); } /* contraste sur la dalle */
+.convo-head {
+  position: relative;
+  border-bottom: 1px dashed var(--border-strong);
+  padding-bottom: 12px;
+  margin-bottom: 4px;
+}
+/* La barre de statut de la tablette : heure + batterie, sur sa
+   propre ligne (comme un vrai écran), discrète en haut à droite */
+.tab-status {
+  display: flex; align-items: center; justify-content: flex-end; gap: 6px;
+  font-size: 0.64rem; font-weight: 600; color: var(--soft);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 5px;
+}
+.ts-batt {
+  position: relative; display: inline-block;
+  width: 17px; height: 9px;
+  border: 1px solid var(--soft); border-radius: 3px;
+}
+.ts-batt::after {
+  content: "";
+  position: absolute; right: -3px; top: 2px;
+  width: 2px; height: 3px;
+  background: var(--soft);
+  border-radius: 0 1px 1px 0;
+}
+.ts-batt i {
+  position: absolute; left: 1px; top: 1px; bottom: 1px;
+  width: 9px; border-radius: 1px;
+  background: var(--ok); opacity: 0.75;
+}
 .hello-kicker {
   font-family: var(--font-display);
   font-size: 0.68rem; font-weight: 700; letter-spacing: 0.14em;
@@ -475,113 +548,6 @@ img { display: block; }
 @keyframes sunRise {
   from { opacity: 0; transform: translateY(9px) rotate(-30deg) scale(0.6); }
   to   { opacity: 1; transform: none; }
-}
-
-/* ===== COMPOSITION A · « LE CARNET » (recommandée) =====
-   Toute la conversation vit dans UN objet : un carnet posé sur
-   la carte, pleine hauteur, à droite de Filou. Date en en-tête,
-   fil au milieu (ancré en bas), consigne creusée au pied.
-   Son épaule gauche recouvre la coupe vidéo : la queue passe
-   DERRIÈRE le carnet — bord, ombre, et une fine pénombre de
-   contact sur la fourrure pour que « derrière » se lise. */
-.compo-a .convo {
-  margin: 22px 0 2px -44px;   /* chevauche franchement le cadre vidéo :
-     la queue glisse profondément sous le carnet (coupe à x = 270,
-     épaule du carnet à x = 226, genou de Filou dégagé à ~205) */
-  background: linear-gradient(180deg, #FCF6E7 0%, #F8EED7 100%);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  box-shadow: var(--edge-light), var(--elev-1);
-  padding: 18px 20px 16px 22px;
-}
-.compo-a .convo::before {
-  /* pénombre de contact : la queue s'assombrit à peine en
-     glissant sous le carnet (occlusion, pas d'ombre projetée) */
-  content: "";
-  position: absolute; left: -7px; top: 10px; bottom: 10px; width: 7px;
-  border-radius: 7px 0 0 7px;
-  background: linear-gradient(to left, rgba(110, 62, 14, 0.16), rgba(110, 62, 14, 0));
-  pointer-events: none;
-}
-.compo-a .convo-head {
-  border-bottom: 1px dashed var(--border-strong);
-  padding-bottom: 12px;
-  margin-bottom: 4px;
-}
-.compo-a .bubble.filou { background: var(--surface); } /* contraste sur le papier du carnet */
-.compo-a .chip { background: rgba(255, 253, 246, 0.9); }
-
-/* ===== COMPOSITION B · « LE COMPTOIR » (alternative) =====
-   La conversation reste posée à même la carte (date en haut,
-   bulles ancrées en bas), et la consigne + les chips vivent sur
-   un COMPTOIR d'accueil : un meuble 3D (tranche supérieure en
-   biseau, même lumière haut-gauche que le socle) calé à hauteur
-   de l'assise. C'est LUI qui recouvre la coupe : la queue de
-   Filou passe derrière son comptoir, comme à la réception. */
-.compo-b .convo {
-  padding: calc(clamp(22px, 3vw, 38px) - 14px) 0 0 30px;
-}
-.compo-b .convo-head { margin-bottom: 14px; }
-.compo-b .thread { padding-bottom: 14px; }
-.compo-b .comptoir {
-  position: relative;
-  margin-left: -44px;        /* chevauche franchement le cadre vidéo */
-  min-height: 196px;         /* du haut de la coupe (y ≈ 218) au bas du cube */
-  display: flex; flex-direction: column; justify-content: center;
-  background: linear-gradient(180deg, #FCF7EA 0%, #F1E5CB 100%);
-  border: 1px solid var(--border-strong);
-  border-radius: 4px 14px 14px 14px;
-  box-shadow: var(--edge-light), var(--elev-2);
-  padding: 16px 18px 14px;
-}
-.compo-b .comptoir::before {
-  /* la tranche supérieure du comptoir, biseautée comme le socle */
-  content: "";
-  position: absolute; left: 0; top: -12px; width: 100%; height: 12px;
-  transform: skewX(-52deg);
-  transform-origin: 0 100%;
-  background: linear-gradient(90deg, #FFFEF8 0%, #F2E8D0 100%);
-  border-radius: 2px 3px 0 0;
-}
-.compo-b .comptoir::after {
-  /* pénombre de contact sur la fourrure, au ras du bord gauche */
-  content: "";
-  position: absolute; left: -7px; top: 2px; bottom: 10px; width: 7px;
-  border-radius: 7px 0 0 7px;
-  background: linear-gradient(to left, rgba(110, 62, 14, 0.16), rgba(110, 62, 14, 0));
-  pointer-events: none;
-}
-/* LE RETOUR DU COMPTOIR · le petit meuble vertical à l'extrémité
-   gauche (comme à une vraie réception). C'est lui qui monte
-   jusqu'au haut de la coupe vidéo (y ≈ 222 dans l'emplacement) :
-   la queue de Filou glisse DERRIÈRE le retour, bord et ombre
-   à l'appui. Masqué en composition A (le carnet fait le travail). */
-.retour { display: none; }
-.compo-b .retour {
-  display: block;
-  position: absolute; left: 0; top: -98px; width: 42px; height: 98px;
-  background: linear-gradient(180deg, #FBF5E6 0%, #F2E7CF 100%);
-  border: 1px solid var(--border-strong);
-  border-bottom: none;
-  border-radius: 4px 10px 0 0;
-  box-shadow: inset 1px 1px 0 rgba(255, 253, 246, 0.9), 2px 3px 9px rgba(110, 62, 14, 0.10);
-  pointer-events: none;
-}
-.compo-b .retour::before {
-  /* sa pénombre de contact à lui, posée sur la fourrure */
-  content: "";
-  position: absolute; left: -7px; top: 4px; bottom: 0; width: 7px;
-  border-radius: 7px 0 0 7px;
-  background: linear-gradient(to left, rgba(110, 62, 14, 0.15), rgba(110, 62, 14, 0));
-}
-.compo-b .retour::after {
-  /* la tranche du dessus, même biseau que le socle et le comptoir */
-  content: "";
-  position: absolute; left: 0; top: -9px; width: 100%; height: 9px;
-  transform: skewX(-52deg);
-  transform-origin: 0 100%;
-  background: linear-gradient(90deg, #FFFEF8 0%, #F5ECD6 100%);
-  border-radius: 2px 3px 0 0;
 }
 
 /* Entrée orchestrée du matin : chaque étage se révèle en cascade */
@@ -1246,33 +1212,8 @@ img { display: block; }
   transform: scaleX(1);
 }
 
-/* Réglette de démo (compositions + bascule cas A / cas B de la période) */
+/* Réglette de démo (bascule cas A / cas B de la période) */
 .demo-strip { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: -14px 0 26px; }
-.compo-switch {
-  display: inline-flex; align-items: center; gap: 6px;
-  border: 1.5px dashed var(--border-strong);
-  border-radius: 999px;
-  padding: 4px 6px 4px 14px;
-}
-.compo-switch .cs-lead {
-  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em;
-  text-transform: uppercase; color: var(--soft);
-  font-family: var(--font-display);
-}
-.cs-btn {
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--muted);
-  border-radius: 999px;
-  font-size: 0.75rem; font-weight: 600;
-  padding: 6px 13px; min-height: 30px;
-}
-.cs-btn:hover { color: var(--accent-ink); }
-.cs-btn[aria-pressed="true"] {
-  background: var(--accent-soft);
-  border-color: var(--accent-ink);
-  color: var(--accent-ink);
-}
 .demo-finish {
   background: transparent;
   border: 1.5px dashed var(--border-strong);
@@ -1306,11 +1247,10 @@ img { display: block; }
   .socle { left: 37px; top: 185px; width: 114px; height: 112px; }
   .sc-top { top: -12px; height: 12px; }
   .sc-side { width: 15px; height: 112px; }
-  /* les recouvrements de coupe suivent l'échelle */
-  .compo-a .convo { margin-left: -32px; padding-left: 18px; }
-  .compo-b .convo { padding-left: 24px; }
-  .compo-b .comptoir { margin-left: -32px; min-height: 152px; }
-  .compo-b .retour { top: -74px; height: 74px; width: 34px; }
+  /* le recouvrement de coupe suit l'échelle ; la tablette s'affine */
+  .convo { margin-left: -32px; border-width: 9px; border-radius: 26px; padding: 12px 16px 12px 18px; }
+  .convo::before { left: -16px; }
+  .convo::after { top: -7px; width: 5px; height: 5px; }
 }
 @media (max-width: 560px) {
   .recap-grid { grid-template-columns: 1fr; }
@@ -1320,10 +1260,9 @@ img { display: block; }
   .socle { left: 30px; top: 147px; width: 91px; height: 90px; }
   .sc-top { top: -10px; height: 10px; }
   .sc-side { width: 12px; height: 90px; }
-  .compo-a .convo { margin-left: -18px; padding: 14px 14px 12px 16px; }
-  .compo-b .convo { padding-left: 20px; }
-  .compo-b .comptoir { margin-left: -20px; min-height: 124px; padding: 12px 12px 10px; }
-  .compo-b .retour { top: -58px; height: 58px; width: 28px; }
+  .convo { margin-left: -18px; border-width: 7px; border-radius: 22px; padding: 11px 13px 11px 14px; }
+  .convo::before { left: -14px; }
+  .convo::after { top: -6px; width: 4px; height: 4px; }
   .ab-user { display: none; }
 }
 
@@ -1352,7 +1291,7 @@ img { display: block; }
 }
 </style>
 </head>
-<body class="compo-a">
+<body>
 
 <!-- Plan 1 · le satin : fond d'écran de toute la page, derrière tout -->
 <div class="satin" id="satin" aria-hidden="true">
@@ -1431,10 +1370,10 @@ img { display: block; }
     <div class="epi-inner">
 
       <!-- ------ Le bureau de Filou ------
-           Deux objets, pas plus : Filou sur son cube, et la station
-           de conversation (carnet A / conversation + comptoir B).
-           Le mot d'accueil de Filou est la PREMIÈRE bulle du fil,
-           semée par le script au chargement. -->
+           Deux objets, pas plus : Filou sur son cube, et SA TABLETTE
+           en grand (il la tapote dans la vidéo : ce qu'il consulte,
+           on le voit à l'écran). Le mot d'accueil de Filou est la
+           PREMIÈRE bulle du fil, semée par le script au chargement. -->
       <div class="desk">
         <div class="desk-top rise rise-2">
           <!-- Filou assis sur son cube 3D ; sa tête dépasse de la carte -->
@@ -1449,26 +1388,24 @@ img { display: block; }
           </div>
           <div class="convo">
             <header class="convo-head">
+              <span class="tab-status" aria-hidden="true">08:12 <span class="ts-batt"><i></i></span></span>
               <p class="hello-kicker">Cabinet du Val d'Allier · période Hiver 2026</p>
               <h1>Jeudi 15 janvier <span class="sun">☀️</span></h1>
             </header>
 
             <div class="thread" id="thread" aria-live="polite" aria-label="Conversation avec Filou"></div>
 
-            <div class="comptoir">
-              <i class="retour" aria-hidden="true"></i>
-              <form class="consigne" id="consigne-form">
-                <input type="text" id="consigne-input" placeholder="Ex. : ouvre la fiche d'Anne-Catherine" aria-label="Donner une consigne à Filou" autocomplete="off">
-                <button type="submit" aria-label="Envoyer la consigne">➤</button>
-              </form>
+            <form class="consigne" id="consigne-form">
+              <input type="text" id="consigne-input" placeholder="Ex. : ouvre la fiche d'Anne-Catherine" aria-label="Donner une consigne à Filou" autocomplete="off">
+              <button type="submit" aria-label="Envoyer la consigne">➤</button>
+            </form>
 
-              <div class="chips" role="group" aria-label="Consignes suggérées">
-                <span class="lead">Essaie :</span>
-                <button type="button" class="chip" data-consigne="Ouvre-moi la fiche d'Anne-Catherine, ses congés">Fiche d'Anne-Catherine</button>
-                <button type="button" class="chip" data-consigne="Combien de week-ends a fait Victor ?">Week-ends de Victor</button>
-                <button type="button" class="chip" data-consigne="Qui est de garde ce soir ?">De garde ce soir ?</button>
-                <button type="button" class="chip" data-consigne="Prépare la période suivante">Préparer la période</button>
-              </div>
+            <div class="chips" role="group" aria-label="Consignes suggérées">
+              <span class="lead">Essaie :</span>
+              <button type="button" class="chip" data-consigne="Ouvre-moi la fiche d'Anne-Catherine, ses congés">Fiche d'Anne-Catherine</button>
+              <button type="button" class="chip" data-consigne="Combien de week-ends a fait Victor ?">Week-ends de Victor</button>
+              <button type="button" class="chip" data-consigne="Qui est de garde ce soir ?">De garde ce soir ?</button>
+              <button type="button" class="chip" data-consigne="Prépare la période suivante">Préparer la période</button>
             </div>
           </div>
         </div>
@@ -1806,13 +1743,8 @@ img { display: block; }
     </div><!-- /float-wrap -->
   </section>
 
-  <!-- Réglette de démo : compositions A/B + cas A/B de la période -->
+  <!-- Réglette de démo : cas A (période déjà configurée) / cas B (Filou questionne) -->
   <div class="demo-strip">
-    <div class="compo-switch" role="group" aria-label="Démo : choisir la composition de la zone Filou">
-      <span class="cs-lead">Composition</span>
-      <button type="button" class="cs-btn" data-compo="a" aria-pressed="true">A · Le carnet</button>
-      <button type="button" class="cs-btn" data-compo="b" aria-pressed="false">B · Le comptoir</button>
-    </div>
     <button type="button" class="demo-finish" id="demo-toggle">▶ Démo « prépare la période » : cas B — rien n'est prêt, Filou pose ses questions (cliquer pour basculer)</button>
   </div>
 
@@ -2299,18 +2231,6 @@ img { display: block; }
   bubble("filou", "🦊 Filou",
     "Bonjour Anne-Sophie ! Le brouillon <b>Hiver 2026</b> est cohérent, l'équipe est au complet. Que puis-je faire pour toi ?",
     true);
-
-  /* ---------- sélecteur de composition A / B ---------- */
-  document.querySelectorAll(".cs-btn").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      var isA = btn.getAttribute("data-compo") === "a";
-      document.body.classList.toggle("compo-a", isA);
-      document.body.classList.toggle("compo-b", !isA);
-      document.querySelectorAll(".cs-btn").forEach(function (b) {
-        b.setAttribute("aria-pressed", String(b === btn));
-      });
-    });
-  });
 
   /* ---------- réglette de démo : cas A / cas B ---------- */
   var demoToggle = $("#demo-toggle");
