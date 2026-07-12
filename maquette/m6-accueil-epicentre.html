@@ -55,9 +55,16 @@
   --bubble-user:   #EFE0C4;
   --r-lg: 26px; --r-md: 18px; --r-sm: 12px;
   --shadow-card:  0 10px 30px rgba(140, 84, 24, 0.10), 0 2px 6px rgba(140, 84, 24, 0.06);
-  --shadow-panel: 0 24px 60px rgba(120, 70, 18, 0.20), 0 4px 12px rgba(120, 70, 18, 0.10);
+  --shadow-panel: 4px 24px 60px rgba(120, 70, 18, 0.20), 2px 4px 12px rgba(120, 70, 18, 0.10);
   --nav-bg: rgba(246, 238, 223, 0.9);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ---- Grammaire de profondeur : UNE source de lumière (haut-
+     gauche) → ombres portées vers le bas-droite, tranches hautes
+     et gauches éclairées. Matériaux réels : papier, craie. ---- */
+  --elev-1: 1px 2px 3px rgba(110, 62, 14, 0.10), 4px 8px 18px rgba(110, 62, 14, 0.08);
+  --elev-2: 2px 4px 8px rgba(110, 62, 14, 0.13), 10px 18px 34px rgba(110, 62, 14, 0.13);
+  --edge-light: inset 1px 1px 0 rgba(255, 253, 246, 0.95);
 }
 
 body {
@@ -224,10 +231,11 @@ img { display: block; }
   background: var(--surface);
   /* plus d'overflow hidden : la tête de Filou dépasse du bord supérieur */
   box-shadow:
-    inset 0 1px 0 rgba(255, 252, 240, 0.98),   /* lisière lumineuse en tranche haute */
-    0 3px 8px rgba(110, 62, 14, 0.18),          /* ombre de contact dense */
-    0 18px 38px -8px rgba(110, 62, 14, 0.26),   /* ombre proche */
-    0 60px 120px -18px rgba(110, 62, 14, 0.38); /* ombre ambiante large */
+    inset 0 1px 0 rgba(255, 252, 240, 0.98),    /* lisière lumineuse en tranche haute */
+    inset 1px 0 0 rgba(255, 252, 240, 0.55),    /* lueur discrète sur la tranche gauche */
+    2px 3px 8px rgba(110, 62, 14, 0.16),        /* ombre de contact, fuyante à droite */
+    8px 18px 38px -8px rgba(110, 62, 14, 0.24), /* ombre proche */
+    18px 60px 120px -18px rgba(110, 62, 14, 0.36); /* ombre ambiante large */
 }
 /* L'ÉTINCELLE : une tête blanc chaud éclatante qui circule sur le
    contour, traîne d'or, deux particules scintillantes dans son
@@ -317,40 +325,74 @@ img { display: block; }
   margin-top: calc(14px - clamp(22px, 3vw, 38px)); /* le cube frôle le bord haut */
 }
 .filou-cube {
+  /* plus de niche colorée : derrière Filou, le fond de la carte,
+     en continuité totale. Ce bloc n'est que l'emplacement. */
   position: relative;
   flex: none;
   width: 172px;
   min-height: 194px;
   z-index: 4; /* contexte : rays derrière Filou, tête devant l'étincelle */
-  border-radius: var(--r-md);
-  background:
-    radial-gradient(120% 85% at 50% 100%, rgba(199, 83, 15, 0.10), transparent 62%),
-    linear-gradient(180deg, #FBEFD8 0%, var(--surface-2) 100%);
-  border: 1px solid var(--border);
-  box-shadow: inset 0 2px 8px rgba(140, 84, 24, 0.10);
 }
 .filou-cube video,
 .filou-cube img.filou-fallback {
   position: absolute;
-  left: 50%; bottom: 5px;
+  left: 50%; bottom: 38px; /* assis sur le socle : les jambes pendent sur la face avant */
   transform: translateX(-50%);
-  /* toujours 42 px plus haut que la niche : la tête dépasse la
-     carte d'une trentaine de pixels, quelle que soit sa hauteur */
-  height: calc(100% + 42px); width: auto;
+  /* dépassement constant : bottom(38) + surplus(6) = 44 px au-dessus
+     de l'emplacement → ~30 px au-dessus du bord de la carte */
+  height: calc(100% + 6px); width: auto;
   max-width: none;
-  filter: drop-shadow(0 10px 16px rgba(110, 62, 14, 0.28));
+  z-index: 2;
+  filter: drop-shadow(2px 10px 14px rgba(110, 62, 14, 0.26));
 }
-.filou-cube::before {
-  /* le halo qui se pose sur lui, dans la niche */
-  content: "";
-  position: absolute; inset: 6% 2% 26%;
-  background: radial-gradient(closest-side, rgba(255, 224, 168, 0.5), rgba(255, 224, 168, 0) 72%);
+
+/* ---- LE SOCLE 3D · un pavé blanc-crème en volume, même matière
+   que la carte. Projection oblique douce, profondeur vers le
+   haut-droite (vecteur ≈ 18px, −14px). Lumière haut-gauche :
+   dessus le plus clair, face avant en dégradé, flanc droit plus
+   sombre. Il projette son ombre sur la carte, Filou pose la
+   sienne sur le dessus. ---- */
+.socle {
+  position: absolute;
+  left: 50%; bottom: 10px;
+  transform: translateX(-54%);
+  width: 118px; height: 82px; /* la face avant */
+  z-index: 1;
   pointer-events: none;
-  animation: haloBreath 18s ease-in-out infinite;
 }
-@keyframes haloBreath {
-  0%, 100% { opacity: 0.72; }
-  50%      { opacity: 1; }
+.socle i { position: absolute; display: block; }
+.sc-front {
+  inset: 0;
+  background: linear-gradient(180deg, #FCF7EA 0%, #F0E6CF 100%);
+  border-radius: 0 0 4px 3px;
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 250, 0.85);
+}
+.sc-top {
+  left: 0; top: -14px; width: 100%; height: 14px;
+  transform: skewX(-52deg);
+  transform-origin: 0 100%;
+  background: linear-gradient(90deg, #FFFEF8 0%, #F6EEDA 100%);
+  border-radius: 2px 3px 0 0;
+}
+.sc-side {
+  left: 100%; top: 0; width: 18px; height: 82px;
+  transform: skewY(-38deg);
+  transform-origin: 0 0;
+  background: linear-gradient(180deg, #E9DCBF 0%, #DFCFAD 100%);
+  border-radius: 0 3px 3px 0;
+}
+.sc-shadow {
+  /* l'ombre portée du pavé sur la carte, fuyante vers la droite */
+  left: 6px; right: -28px; bottom: -9px; height: 18px;
+  background: radial-gradient(52% 100% at 44% 0%, rgba(110, 62, 14, 0.20), transparent 72%);
+  filter: blur(5px);
+}
+.sc-contact {
+  /* Filou assis : son ombre de contact sur la face du dessus */
+  left: 16%; top: -12px; width: 64%; height: 10px;
+  transform: skewX(-52deg);
+  background: radial-gradient(closest-side, rgba(110, 62, 14, 0.22), transparent 76%);
+  filter: blur(2.5px);
 }
 
 /* ---- SIDE RAYS : la lumière tombe du haut-GAUCHE et converge
@@ -423,11 +465,12 @@ img { display: block; }
   display: inline-flex; align-self: flex-start; align-items: center; gap: 7px;
   margin-top: 9px;
   border: 1.5px dashed var(--border-strong);
-  background: rgba(255, 252, 244, 0.7);
+  background: rgba(255, 252, 244, 0.85);
   color: var(--muted);
   border-radius: 999px;
   padding: 6px 14px; min-height: 34px;
   font-size: 0.8rem; font-weight: 600;
+  box-shadow: 1px 2px 5px rgba(110, 62, 14, 0.07);
   transition: color 0.18s ease, border-color 0.18s ease;
 }
 .garde-line:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
@@ -440,6 +483,7 @@ img { display: block; }
   border-top-left-radius: 4px; /* la pointe regarde vers le cube */
   padding: 10px 14px;
   font-size: 0.86rem; line-height: 1.55;
+  box-shadow: var(--edge-light), var(--elev-1); /* plan flottant */
 }
 .filou-mot .who {
   display: flex; align-items: center; gap: 6px;
@@ -474,6 +518,7 @@ img { display: block; }
   padding: 11px 15px;
   border-radius: var(--r-md);
   font-size: 0.87rem; line-height: 1.55;
+  box-shadow: 1px 2px 5px rgba(110, 62, 14, 0.06); /* léger décollement */
   animation: bubbleIn 0.35s ease both;
 }
 @keyframes bubbleIn {
@@ -543,16 +588,23 @@ img { display: block; }
 /* ------ Le champ de consigne, généreux ------ */
 .consigne {
   display: flex; gap: 10px; align-items: center;
-  background: var(--surface);
-  border: 1.5px solid var(--border-strong);
+  /* CREUSÉ dans la carte : ombre intérieure haute (côté lumière),
+     lueur basse — comme gravé dans le papier */
+  background: #FBF4E4;
+  border: 1px solid var(--border);
   border-radius: 999px;
   padding: 8px 8px 8px 22px;
-  box-shadow: 0 6px 20px rgba(140, 84, 24, 0.10);
+  box-shadow:
+    inset 2px 3px 7px rgba(110, 62, 14, 0.13),
+    inset -1px -2px 2px rgba(255, 253, 246, 0.9);
   transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 .consigne:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 6px 24px var(--accent-glow);
+  box-shadow:
+    inset 2px 3px 7px rgba(110, 62, 14, 0.13),
+    inset -1px -2px 2px rgba(255, 253, 246, 0.9),
+    0 0 0 3px var(--accent-soft);
 }
 .consigne input {
   flex: 1; min-width: 0;
@@ -589,17 +641,19 @@ img { display: block; }
 }
 .chip {
   border: 1px solid var(--border-strong);
-  background: rgba(255, 252, 244, 0.75);
+  background: rgba(255, 252, 244, 0.9);
   color: var(--muted);
   border-radius: 999px;
   font-size: 0.8rem; font-weight: 600;
   padding: 8px 15px; min-height: 38px;
-  transition: color 0.18s ease, border-color 0.18s ease, transform 0.18s ease, background-color 0.18s ease;
+  box-shadow: var(--edge-light), 1px 2px 5px rgba(110, 62, 14, 0.08); /* pilule posée */
+  transition: color 0.18s ease, border-color 0.18s ease, transform 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
 }
 .chip:hover {
   color: var(--accent-ink); border-color: var(--accent-ink);
   background: var(--surface);
   transform: translateY(-2px);
+  box-shadow: var(--edge-light), var(--elev-1);
 }
 
 /* ============================================================
@@ -638,13 +692,13 @@ img { display: block; }
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   padding: 13px 17px;
-  box-shadow: 0 2px 8px rgba(140, 84, 24, 0.06);
+  box-shadow: var(--edge-light), var(--elev-1);
   transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .widget:hover {
-  transform: translateX(4px);
+  transform: translateY(-3px); /* la carte se soulève vers la lumière */
   border-color: var(--border-strong);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--edge-light), var(--elev-2);
 }
 .widget .w-ico {
   flex: none;
@@ -975,7 +1029,7 @@ img { display: block; }
   background: rgba(255, 252, 244, 0.9);
   border: 1px solid var(--border);
   border-radius: 999px;
-  box-shadow: 0 6px 20px rgba(120, 70, 18, 0.12), 0 2px 5px rgba(120, 70, 18, 0.08);
+  box-shadow: var(--edge-light), 3px 8px 22px rgba(120, 70, 18, 0.12), 1px 2px 5px rgba(120, 70, 18, 0.08);
 }
 .ab-ident { display: flex; align-items: center; gap: 9px; flex: none; }
 .ab-logo { font-size: 1.02rem; }
@@ -1126,13 +1180,19 @@ img { display: block; }
   .thread { min-height: 76px; max-height: 220px; }
   /* Le cube se resserre, la tête dépasse toujours un peu */
   .filou-cube { width: 138px; min-height: 158px; }
-  .filou-cube video, .filou-cube img.filou-fallback { height: calc(100% + 32px); }
+  .filou-cube video, .filou-cube img.filou-fallback { height: calc(100% + 4px); bottom: 30px; }
+  .socle { width: 94px; height: 64px; bottom: 8px; }
+  .sc-top { top: -11px; height: 11px; }
+  .sc-side { width: 14px; height: 64px; }
 }
 @media (max-width: 560px) {
   .recap-grid { grid-template-columns: 1fr; }
   .desk-top { gap: 12px; }
   .filou-cube { width: 112px; min-height: 132px; }
-  .filou-cube video, .filou-cube img.filou-fallback { height: calc(100% + 24px); }
+  .filou-cube video, .filou-cube img.filou-fallback { height: calc(100% + 2px); bottom: 24px; }
+  .socle { width: 78px; height: 52px; bottom: 7px; }
+  .sc-top { top: -9px; height: 9px; }
+  .sc-side { width: 11px; height: 52px; }
   .ab-user { display: none; }
 }
 
@@ -1145,7 +1205,7 @@ img { display: block; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.001s !important;
   }
-  .silk i, .folds, .sheen, .beam, .rays, .filou-cube::before,
+  .silk i, .folds, .sheen, .beam, .rays,
   .typing i { animation: none !important; }
   .stat-fill { transition: none; }
   /* Étincelle : plus de circulation, un simple liseré chaud statique.
@@ -1242,9 +1302,12 @@ img { display: block; }
       <!-- ------ Le bureau de Filou ------ -->
       <div class="desk">
         <div class="desk-top rise">
-          <!-- Le cube : la niche de Filou, sa tête dépasse de la carte -->
+          <!-- Filou assis sur son cube 3D ; sa tête dépasse de la carte -->
           <div class="filou-cube" aria-hidden="true">
             <span class="rays"><span class="beam b1"></span><span class="beam b2"></span><span class="beam b3"></span></span>
+            <div class="socle">
+              <i class="sc-shadow"></i><i class="sc-side"></i><i class="sc-top"></i><i class="sc-front"></i><i class="sc-contact"></i>
+            </div>
             <video id="filou-video" autoplay loop muted playsinline>
               <source src="../filou/filou-attente.webm" type="video/webm">
             </video>
