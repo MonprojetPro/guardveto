@@ -304,7 +304,7 @@ img { display: block; }
 
 .epi-inner {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.95fr);
+  grid-template-columns: minmax(0, 1.18fr) minmax(330px, 0.82fr);
   gap: clamp(18px, 3vw, 36px);
   padding: clamp(22px, 3vw, 38px) clamp(20px, 3.4vw, 40px) clamp(20px, 3.4vw, 36px);
   align-items: stretch;
@@ -321,7 +321,7 @@ img { display: block; }
    derrière sa tête (contenu z 3). Repli : « filou avatar de
    base.png » si la vidéo n'est pas là. Jamais de trou. */
 .desk-top {
-  display: flex; gap: 16px; align-items: stretch;
+  display: flex; gap: 0; align-items: stretch; /* le chevauchement queue/bloc fait l'espacement */
   margin-top: calc(14px - clamp(22px, 3vw, 38px)); /* le cube frôle le bord haut */
 }
 .filou-cube {
@@ -356,7 +356,9 @@ img { display: block; }
    Lumière haut-gauche, cohérente avec les side rays. ---- */
 .socle {
   position: absolute;
-  left: 33px; bottom: 10px;
+  left: 33px; top: 244px; /* ancré par le HAUT : la face supérieure
+     reste calée sous l'assise (62 %), quelle que soit la hauteur
+     que prend la rangée */
   width: 154px; height: 150px; /* la face avant */
   z-index: 1;
   pointer-events: none;
@@ -436,26 +438,35 @@ img { display: block; }
   50%      { opacity: 0.95; }
 }
 
-/* ---- À droite du cube : ① les infos du jour ② le mot de Filou ---- */
-.hello-side {
+/* ---- LE BLOC CENTRAL, épuré : ① bloc cabinet + date (EN HAUT)
+   ② la bulle de Filou ③ le chat, directement dessous.
+   L'ASTUCE DE LA QUEUE : le bloc chevauche le bord droit de la
+   vidéo (marge négative) et porte le MÊME fond que la carte, avec
+   un z-index supérieur — la coupe du cadre vidéo disparaît sous
+   lui : la queue semble passer DERRIÈRE le bloc. ---- */
+.desk-col {
   flex: 1; min-width: 0;
-  /* ancré en BAS de la rangée du cube : le mot de Filou finit au
-     niveau du socle, le chat vient juste dessous — pas de vide
-     entre les blocs (le souffle reste en haut, sous sa tête) */
-  display: flex; flex-direction: column; justify-content: flex-end;
-  padding: 46px 0 6px;
+  position: relative;
+  z-index: 5;               /* au-dessus de la vidéo (cube z 4) */
+  margin-left: -28px;        /* chevauche le bord droit du cadre vidéo */
+  /* aligné : le haut du bloc date = le haut du « coup d'œil »
+     (desk-top remonte de padTop−14 → on redescend d'autant) */
+  padding: calc(clamp(22px, 3vw, 38px) - 14px) 0 6px 34px;
+  background: var(--surface); /* même matière que la carte : couture invisible */
+  display: flex; flex-direction: column;
 }
+.date-bloc { margin-bottom: 16px; }
 .hello-kicker {
   font-family: var(--font-display);
   font-size: 0.68rem; font-weight: 700; letter-spacing: 0.14em;
   text-transform: uppercase; color: var(--accent-ink);
   margin-bottom: 4px;
 }
-.hello-side h1 {
+.date-bloc h1 {
   font-size: clamp(1.4rem, 2.6vw, 1.85rem);
   font-weight: 800; letter-spacing: -0.012em; line-height: 1.1;
 }
-.hello-side h1 .sun {
+.date-bloc h1 .sun {
   display: inline-block;
   font-size: 0.72em;
   animation: sunRise 1.4s var(--ease-out) both;
@@ -465,22 +476,7 @@ img { display: block; }
   from { opacity: 0; transform: translateY(9px) rotate(-30deg) scale(0.6); }
   to   { opacity: 1; transform: none; }
 }
-.garde-line {
-  display: inline-flex; align-self: flex-start; align-items: center; gap: 7px;
-  margin-top: 9px;
-  border: 1.5px dashed var(--border-strong);
-  background: rgba(255, 252, 244, 0.85);
-  color: var(--muted);
-  border-radius: 999px;
-  padding: 6px 14px; min-height: 34px;
-  font-size: 0.8rem; font-weight: 600;
-  box-shadow: 1px 2px 5px rgba(110, 62, 14, 0.07);
-  transition: color 0.18s ease, border-color 0.18s ease;
-}
-.garde-line:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
-.garde-line b { color: var(--text); }
 .filou-mot {
-  margin-top: 11px;
   background: var(--bubble-filou);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
@@ -1188,21 +1184,20 @@ img { display: block; }
   /* Même géométrie d'assise, à l'échelle 0,74 (vidéo 200 px) */
   .filou-cube { width: 200px; min-height: 300px; }
   .filou-cube video, .filou-cube img.filou-fallback { width: 200px; top: -32px; }
-  .socle { left: 37px; bottom: 3px; width: 114px; height: 112px; }
+  .socle { left: 37px; top: 185px; width: 114px; height: 112px; }
   .sc-top { top: -12px; height: 12px; }
   .sc-side { width: 15px; height: 112px; }
-  .hello-side { padding-top: 36px; }
+  .desk-col { margin-left: -22px; padding-left: 28px; }
 }
 @media (max-width: 560px) {
   .recap-grid { grid-template-columns: 1fr; }
-  .desk-top { gap: 12px; }
   /* Échelle 0,59 (vidéo 160 px) */
   .filou-cube { width: 160px; min-height: 240px; }
   .filou-cube video, .filou-cube img.filou-fallback { width: 160px; top: -26px; }
-  .socle { left: 30px; bottom: 3px; width: 91px; height: 90px; }
+  .socle { left: 30px; top: 147px; width: 91px; height: 90px; }
   .sc-top { top: -10px; height: 10px; }
   .sc-side { width: 12px; height: 90px; }
-  .hello-side { padding-top: 30px; }
+  .desk-col { margin-left: -18px; padding-left: 24px; }
   .ab-user { display: none; }
 }
 
@@ -1322,17 +1317,20 @@ img { display: block; }
               <source src="../filou/filou-attente.webm" type="video/webm">
             </video>
           </div>
-          <div class="hello-side">
-            <p class="hello-kicker">Cabinet du Val d'Allier · période Hiver 2026</p>
-            <h1>Jeudi 15 janvier <span class="sun">☀️</span></h1>
-            <button type="button" class="garde-line" id="garde-line">🌙 Ce soir : <b>Manon</b> &amp; <b>Thomas</b> · 19 h 00 → 8 h 00</button>
-            <div class="filou-mot">
+          <div class="desk-col">
+            <div class="date-bloc">
+              <p class="hello-kicker">Cabinet du Val d'Allier · période Hiver 2026</p>
+              <h1>Jeudi 15 janvier <span class="sun">☀️</span></h1>
+            </div>
+
+            <div class="filou-mot rise rise-2">
               <span class="who">🦊 Filou</span>
               Bonjour Anne-Sophie ! Le brouillon <b>Hiver 2026</b> est cohérent, l'équipe est au complet. Que puis-je faire pour toi ?
             </div>
           </div>
         </div>
 
+        <!-- Rangée 2 : le chat, PLEINE LARGEUR sous cube + bloc central -->
         <div class="thread rise rise-2" id="thread" aria-live="polite" aria-label="Conversation avec Filou"></div>
 
         <form class="consigne rise rise-3" id="consigne-form">
@@ -1342,10 +1340,10 @@ img { display: block; }
 
         <div class="chips rise rise-4" role="group" aria-label="Consignes suggérées">
           <span class="lead">Essaie :</span>
-          <button type="button" class="chip" data-consigne="Ouvre-moi la fiche d'Anne-Catherine, ses congés">La fiche d'Anne-Catherine 🌴</button>
-          <button type="button" class="chip" data-consigne="Combien de week-ends a fait Victor ?">Les week-ends de Victor</button>
-          <button type="button" class="chip" data-consigne="Qui est de garde ce soir ?">Qui est de garde ce soir ?</button>
-          <button type="button" class="chip" data-consigne="Prépare la période suivante">Prépare la période suivante</button>
+          <button type="button" class="chip" data-consigne="Ouvre-moi la fiche d'Anne-Catherine, ses congés">Fiche d'Anne-Catherine</button>
+          <button type="button" class="chip" data-consigne="Combien de week-ends a fait Victor ?">Week-ends de Victor</button>
+          <button type="button" class="chip" data-consigne="Qui est de garde ce soir ?">De garde ce soir ?</button>
+          <button type="button" class="chip" data-consigne="Prépare la période suivante">Préparer la période</button>
         </div>
       </div>
 
@@ -1724,13 +1722,6 @@ img { display: block; }
     }, 3000);
   })();
 
-  /* La ligne « qui est de garde ce soir » ouvre la fenêtre du soir */
-  var gardeLine = document.getElementById("garde-line");
-  if (gardeLine) {
-    gardeLine.addEventListener("click", function () {
-      handleConsigne("Qui est de garde ce soir ?");
-    });
-  }
   /* L'infobulle de la cagnotte s'épingle au clic (tactile) */
   var cagnotte = document.getElementById("cagnotte");
   if (cagnotte) {
