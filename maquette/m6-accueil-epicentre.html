@@ -222,7 +222,7 @@ img { display: block; }
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   background: var(--surface);
-  overflow: hidden;
+  /* plus d'overflow hidden : la tête de Filou dépasse du bord supérieur */
   box-shadow:
     inset 0 1px 0 rgba(255, 252, 240, 0.98),   /* lisière lumineuse en tranche haute */
     0 3px 8px rgba(110, 62, 14, 0.18),          /* ombre de contact dense */
@@ -260,7 +260,7 @@ img { display: block; }
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask-composite: exclude;
   pointer-events: none;
-  z-index: 6;
+  z-index: 2; /* sous le contenu (z 3) : elle passe derrière la tête de Filou */
   animation: starBorder 16s linear infinite;
 }
 .epicentre::before {
@@ -281,7 +281,7 @@ img { display: block; }
   mask-composite: exclude;
   filter: blur(5px);
   pointer-events: none;
-  z-index: 6;
+  z-index: 2;
   animation: starBorder 16s linear infinite;
 }
 @keyframes starBorder { to { --sb: 360deg; } }
@@ -305,35 +305,47 @@ img { display: block; }
 
 /* ---------------- Le bureau de Filou (gauche) ---------------- */
 .desk { display: flex; flex-direction: column; min-width: 0; }
-.desk-hello { min-width: 0; }
 
-/* ---- FILOU PERCHÉ · la vidéo transparente assise sur la tranche
-   de la carte (avatar provisoire, intégration définitive).
-   Le bas de la vidéo (jambes pendantes) chevauche le bord
-   supérieur de ~88 px ; il est aligné sur la GOUTTIÈRE entre les
-   deux colonnes : dessous, presque rien — il respire.
-   Repli : image fox-1 si la vidéo ne charge pas. Jamais de trou. */
-.filou-perch {
+/* ---- LE CUBE DE FILOU · une niche chaleureuse dans la carte.
+   Filou y est assis (vidéo tablette, avatar provisoire) et SA
+   TÊTE DÉPASSE un peu du bord supérieur de la carte : il est
+   dedans, mais il déborde. L'étincelle du contour (z 2) passe
+   derrière sa tête (contenu z 3). Repli : « filou avatar de
+   base.png » si la vidéo n'est pas là. Jamais de trou. */
+.desk-top {
+  display: flex; gap: 16px; align-items: stretch;
+  margin-top: calc(14px - clamp(22px, 3vw, 38px)); /* le cube frôle le bord haut */
+}
+.filou-cube {
+  position: relative;
+  flex: none;
+  width: 172px;
+  min-height: 194px;
+  z-index: 4; /* contexte : rays derrière Filou, tête devant l'étincelle */
+  border-radius: var(--r-md);
+  background:
+    radial-gradient(120% 85% at 50% 100%, rgba(199, 83, 15, 0.10), transparent 62%),
+    linear-gradient(180deg, #FBEFD8 0%, var(--surface-2) 100%);
+  border: 1px solid var(--border);
+  box-shadow: inset 0 2px 8px rgba(140, 84, 24, 0.10);
+}
+.filou-cube video,
+.filou-cube img.filou-fallback {
   position: absolute;
-  left: 52%;
-  bottom: calc(100% - 88px);
+  left: 50%; bottom: 5px;
   transform: translateX(-50%);
-  width: 220px;
-  z-index: 7;
-  pointer-events: none;
+  /* toujours 42 px plus haut que la niche : la tête dépasse la
+     carte d'une trentaine de pixels, quelle que soit sa hauteur */
+  height: calc(100% + 42px); width: auto;
+  max-width: none;
+  filter: drop-shadow(0 10px 16px rgba(110, 62, 14, 0.28));
 }
-.filou-perch video,
-.filou-perch img.filou-fallback {
-  width: 100%; height: auto; display: block;
-  filter: drop-shadow(0 14px 22px rgba(110, 62, 14, 0.32));
-}
-.filou-perch img.filou-fallback { width: 62%; margin: 0 auto; }
-.filou-perch::before {
-  /* le halo qui se pose sur lui */
+.filou-cube::before {
+  /* le halo qui se pose sur lui, dans la niche */
   content: "";
-  position: absolute; left: -20%; right: -20%; top: 4%; bottom: 16%;
-  background: radial-gradient(closest-side, rgba(255, 224, 168, 0.55), rgba(255, 224, 168, 0) 72%);
-  z-index: -1; pointer-events: none;
+  position: absolute; inset: 6% 2% 26%;
+  background: radial-gradient(closest-side, rgba(255, 224, 168, 0.5), rgba(255, 224, 168, 0) 72%);
+  pointer-events: none;
   animation: haloBreath 18s ease-in-out infinite;
 }
 @keyframes haloBreath {
@@ -342,10 +354,9 @@ img { display: block; }
 }
 
 /* ---- SIDE RAYS : la lumière tombe du haut-GAUCHE et converge
-   sur le Filou perché. Ancrés dans .filou-perch : ils le suivent
-   à tous les points de rupture. Scintillement très lent. */
+   sur le cube. Ancrés dedans : ils suivent Filou partout. */
 .rays {
-  position: absolute; left: 50%; top: 30%;
+  position: absolute; left: 50%; top: 12%;
   width: 0; height: 0;
   z-index: -1; pointer-events: none;
   animation: raysSway 46s ease-in-out infinite alternate;
@@ -356,8 +367,8 @@ img { display: block; }
 }
 .beam {
   position: absolute; bottom: 0; left: 0;
-  width: 150px; height: 620px;
-  margin-left: -75px;
+  width: 130px; height: 430px;
+  margin-left: -65px;
   transform-origin: 50% 100%;
   background: linear-gradient(to bottom,
     rgba(255, 222, 160, 0.42) 0%,
@@ -368,12 +379,12 @@ img { display: block; }
 }
 .beam.b1 { transform: rotate(-27deg); animation: beamGlow 19s ease-in-out infinite; }
 .beam.b2 {
-  width: 96px; margin-left: -48px; height: 560px;
+  width: 84px; margin-left: -42px; height: 390px;
   transform: rotate(-36deg);
   animation: beamGlow 25s ease-in-out infinite; animation-delay: -9s;
 }
 .beam.b3 {
-  width: 68px; margin-left: -34px; height: 500px;
+  width: 60px; margin-left: -30px; height: 340px;
   transform: rotate(-17deg);
   animation: beamGlow 31s ease-in-out infinite; animation-delay: -17s;
 }
@@ -381,19 +392,24 @@ img { display: block; }
   0%, 100% { opacity: 0.5; }
   50%      { opacity: 0.95; }
 }
-.hello-text { min-width: 0; }
+
+/* ---- À droite du cube : ① les infos du jour ② le mot de Filou ---- */
+.hello-side {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  padding: 18px 0 2px; /* compense la remontée du cube : le texte reste sous le bord */
+}
 .hello-kicker {
   font-family: var(--font-display);
-  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.14em;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.14em;
   text-transform: uppercase; color: var(--accent-ink);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
-.hello-text h1 {
-  font-size: clamp(1.7rem, 3.6vw, 2.5rem);
-  font-weight: 800; letter-spacing: -0.015em; line-height: 1.08;
+.hello-side h1 {
+  font-size: clamp(1.4rem, 2.6vw, 1.85rem);
+  font-weight: 800; letter-spacing: -0.012em; line-height: 1.1;
 }
-.hello-text h1 .nobr { white-space: nowrap; }
-.hello-text h1 .sun {
+.hello-side h1 .sun {
   display: inline-block;
   font-size: 0.72em;
   animation: sunRise 1.4s var(--ease-out) both;
@@ -403,11 +419,35 @@ img { display: block; }
   from { opacity: 0; transform: translateY(9px) rotate(-30deg) scale(0.6); }
   to   { opacity: 1; transform: none; }
 }
-.hello-sub {
-  margin-top: 7px;
-  font-size: 0.92rem; color: var(--muted); line-height: 1.55;
+.garde-line {
+  display: inline-flex; align-self: flex-start; align-items: center; gap: 7px;
+  margin-top: 9px;
+  border: 1.5px dashed var(--border-strong);
+  background: rgba(255, 252, 244, 0.7);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 6px 14px; min-height: 34px;
+  font-size: 0.8rem; font-weight: 600;
+  transition: color 0.18s ease, border-color 0.18s ease;
 }
-.hello-sub b { color: var(--text); font-family: var(--font-display); }
+.garde-line:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
+.garde-line b { color: var(--text); }
+.filou-mot {
+  margin-top: 11px;
+  background: var(--bubble-filou);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  border-top-left-radius: 4px; /* la pointe regarde vers le cube */
+  padding: 10px 14px;
+  font-size: 0.86rem; line-height: 1.55;
+}
+.filou-mot .who {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.64rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 3px;
+}
+.filou-mot b { color: var(--text); font-family: var(--font-display); }
 
 /* Entrée orchestrée du matin : chaque étage se révèle en cascade */
 .rise { animation: riseIn 0.7s var(--ease-out) both; }
@@ -648,10 +688,12 @@ img { display: block; }
   box-shadow: var(--shadow-panel);
   overflow: hidden;
   opacity: 0;
-  transform: translateX(30px) scale(0.96);
-  transform-origin: left center;
+  /* permutation douce : la fenêtre prend la place du coup d'œil,
+     au même endroit (fondu + léger soulèvement, pas de glissade) */
+  transform: translateY(14px) scale(0.98);
+  transform-origin: 50% 60%;
   pointer-events: none;
-  transition: transform 0.5s var(--ease-out), opacity 0.3s ease;
+  transition: transform 0.45s var(--ease-out), opacity 0.3s ease;
   visibility: hidden;
 }
 .stage.open .fen.active {
@@ -923,24 +965,69 @@ img { display: block; }
    à la voisine, l'ancienne se replie pendant que la nouvelle
    se déplie (transitions croisées). Né mobile, même geste partout.
    ============================================================ */
-/* La bande au-dessus de la carte : Filou perché y déborde à
-   gauche-centre, le dock vit en bas-DROITE, accolé à la carte.
-   Les deux respirent, chacun son tiers. */
-.over-card {
-  display: flex; justify-content: flex-end; align-items: flex-end;
-  min-height: 168px;
-  margin-top: 4px;
-}
-.dock-menu {
-  display: flex; align-items: center; gap: 2px;
-  width: max-content; max-width: 100%;
-  margin: 0;
-  padding: 7px;
+/* LA BARRE · une seule pilule cohérente, accolée à la carte :
+   [identité fixe : GuardVeto 🦊 · Anne-Sophie] [dock au centre]
+   [cagnotte solidaire 💚 à droite] */
+.app-bar {
+  display: flex; align-items: center; gap: 10px;
+  margin: 14px 0;
+  padding: 7px 8px 7px 18px;
   background: rgba(255, 252, 244, 0.9);
   border: 1px solid var(--border);
   border-radius: 999px;
   box-shadow: 0 6px 20px rgba(120, 70, 18, 0.12), 0 2px 5px rgba(120, 70, 18, 0.08);
+}
+.ab-ident { display: flex; align-items: center; gap: 9px; flex: none; }
+.ab-logo { font-size: 1.02rem; }
+.ab-name {
+  font-family: var(--font-display);
+  font-weight: 800; font-size: 0.95rem; letter-spacing: -0.01em;
+}
+.ab-user {
+  font-size: 0.78rem; font-weight: 600; color: var(--muted);
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+  white-space: nowrap;
+}
+.dock-menu {
+  display: flex; align-items: center; gap: 2px;
+  width: max-content; max-width: 100%;
+  margin: 0 auto;
+  padding: 0;
   overflow-x: auto;
+}
+/* La cagnotte solidaire : discrète, chaleureuse, expliquée au survol */
+.cagnotte {
+  position: relative; flex: none;
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid rgba(90, 150, 60, 0.35);
+  background: var(--ok-soft); color: var(--ok);
+  border-radius: 999px;
+  padding: 8px 15px; min-height: 40px;
+  font-size: 0.76rem; font-weight: 700;
+  cursor: pointer;
+}
+.cagnotte:hover { background: rgba(90, 150, 60, 0.2); }
+.cagnotte-tip {
+  position: absolute; top: calc(100% + 9px); right: 0;
+  width: 244px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-panel);
+  padding: 9px 12px;
+  font-size: 0.72rem; font-weight: 500; line-height: 1.5; text-align: left;
+  opacity: 0; transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.25s var(--ease-out);
+  z-index: 60;
+}
+.cagnotte:hover .cagnotte-tip,
+.cagnotte:focus-visible .cagnotte-tip,
+.cagnotte.tip-open .cagnotte-tip { opacity: 1; transform: none; }
+@media (max-width: 980px) {
+  .app-bar { flex-wrap: wrap; border-radius: 24px; }
+  .app-bar .dock-menu { order: 3; width: 100%; }
 }
 .dock-item {
   display: flex; align-items: center;
@@ -1037,17 +1124,16 @@ img { display: block; }
   .fen { position: static; visibility: hidden; display: none; max-height: none; }
   .stage.open .fen.active { display: flex; visibility: visible; }
   .thread { min-height: 76px; max-height: 220px; }
-  /* Filou plus petit, perché à droite (la salutation est à gauche) */
-  .over-card { min-height: 116px; }
-  .filou-perch {
-    width: 150px;
-    left: auto; right: 16px; transform: none;
-    bottom: calc(100% - 60px);
-  }
+  /* Le cube se resserre, la tête dépasse toujours un peu */
+  .filou-cube { width: 138px; min-height: 158px; }
+  .filou-cube video, .filou-cube img.filou-fallback { height: calc(100% + 32px); }
 }
 @media (max-width: 560px) {
   .recap-grid { grid-template-columns: 1fr; }
-  .filou-perch { width: 124px; right: 8px; bottom: calc(100% - 50px); }
+  .desk-top { gap: 12px; }
+  .filou-cube { width: 112px; min-height: 132px; }
+  .filou-cube video, .filou-cube img.filou-fallback { height: calc(100% + 24px); }
+  .ab-user { display: none; }
 }
 
 /* ============================================================
@@ -1059,7 +1145,7 @@ img { display: block; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.001s !important;
   }
-  .silk i, .folds, .sheen, .beam, .rays, .filou-perch::before,
+  .silk i, .folds, .sheen, .beam, .rays, .filou-cube::before,
   .typing i { animation: none !important; }
   .stat-fill { transition: none; }
   /* Étincelle : plus de circulation, un simple liseré chaud statique.
@@ -1104,12 +1190,16 @@ img { display: block; }
 
 <div class="shell">
 
-  <!-- ============ LA BANDE AU-DESSUS DE LA CARTE ============
-       Filou perché y déborde à gauche-centre ; le dock vit en
-       bas-droite, accolé à la carte. Icônes seules au repos ;
-       le libellé se déplie au survol/focus. -->
-  <div class="over-card rise">
-  <header class="dock-menu" aria-label="Les six espaces de GuardVeto">
+  <!-- ============ LA BARRE ============
+       Identité fixe à gauche, dock au centre (icônes seules,
+       libellé déplié au survol/focus), cagnotte solidaire à droite. -->
+  <header class="app-bar rise" aria-label="Barre GuardVeto">
+    <div class="ab-ident">
+      <span class="ab-logo" aria-hidden="true">🦊</span>
+      <span class="ab-name">GuardVeto</span>
+      <span class="ab-user">Anne-Sophie</span>
+    </div>
+  <nav class="dock-menu" aria-label="Les six espaces de GuardVeto">
     <a class="dock-item" href="m1-planning.html" aria-label="Planning · brouillon Hiver 2026 en cours">
       <span class="di-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="4.5"/><path d="M8 3.2v3.4M16 3.2v3.4M3.5 10.2h17"/><circle cx="12" cy="15.2" r="1.7" fill="currentColor" stroke="none"/></svg><i class="di-pip warn"></i></span>
       <span class="di-flap" aria-hidden="true"><span class="di-text">Planning · Brouillon Hiver 2026</span></span>
@@ -1134,21 +1224,16 @@ img { display: block; }
       <span class="di-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M12 4v2.3M12 17.7V20M4 12h2.3M17.7 12H20M6.3 6.3l1.7 1.7M16 16l1.7 1.7M17.7 6.3 16 8M8 16l-1.7 1.7"/></svg><i class="di-pip ok"></i></span>
       <span class="di-flap" aria-hidden="true"><span class="di-text">Réglages · Agenda connecté ✓</span></span>
     </a>
+  </nav>
+    <button type="button" class="cagnotte" id="cagnotte" aria-describedby="cagnotte-tip">
+      💚 87 € reversés
+      <span class="cagnotte-tip" role="tooltip" id="cagnotte-tip">Une part de chaque abonnement GuardVeto va à l'association choisie par votre cabinet.</span>
+    </button>
   </header>
-  </div><!-- /over-card -->
 
   <!-- ============ Plan 2 · la carte Filou, seule posée sur le satin ============ -->
   <section class="scene" aria-label="Accueil du matin : Filou et la fenêtre contextuelle">
     <div class="float-wrap">
-
-    <!-- Filou ANIMÉ, perché sur la tranche de la carte (provisoire :
-         la boucle sera remplacée ; l'intégration est définitive) -->
-    <div class="filou-perch" aria-hidden="true">
-      <span class="rays"><span class="beam b1"></span><span class="beam b2"></span><span class="beam b3"></span></span>
-      <video id="filou-video" autoplay loop muted playsinline>
-        <source src="../filou/filou-idle-salut.webm" type="video/webm">
-      </video>
-    </div>
 
     <div class="epicentre">
 
@@ -1156,20 +1241,26 @@ img { display: block; }
 
       <!-- ------ Le bureau de Filou ------ -->
       <div class="desk">
-        <div class="desk-hello rise">
-          <div class="hello-text">
-            <p class="hello-kicker">Jeudi 15 janvier 2026 · cabinet du Val d'Allier</p>
-            <h1>Bonjour <span class="nobr">Anne-Sophie <span class="sun">☀️</span></span></h1>
-            <p class="hello-sub">Le brouillon <b>Hiver 2026</b> est cohérent, l'équipe est au complet.<br>Que puis-je faire pour toi ?</p>
+        <div class="desk-top rise">
+          <!-- Le cube : la niche de Filou, sa tête dépasse de la carte -->
+          <div class="filou-cube" aria-hidden="true">
+            <span class="rays"><span class="beam b1"></span><span class="beam b2"></span><span class="beam b3"></span></span>
+            <video id="filou-video" autoplay loop muted playsinline>
+              <source src="../filou/filou-attente.webm" type="video/webm">
+            </video>
+          </div>
+          <div class="hello-side">
+            <p class="hello-kicker">Cabinet du Val d'Allier · période Hiver 2026</p>
+            <h1>Jeudi 15 janvier <span class="sun">☀️</span></h1>
+            <button type="button" class="garde-line" id="garde-line">🌙 Ce soir : <b>Manon</b> &amp; <b>Thomas</b> · 19 h 00 → 8 h 00</button>
+            <div class="filou-mot">
+              <span class="who">🦊 Filou</span>
+              Bonjour Anne-Sophie ! Le brouillon <b>Hiver 2026</b> est cohérent, l'équipe est au complet. Que puis-je faire pour toi ?
+            </div>
           </div>
         </div>
 
-        <div class="thread rise rise-2" id="thread" aria-live="polite" aria-label="Conversation avec Filou">
-          <div class="bubble filou">
-            <span class="who">🦊 Filou</span>
-            Demande-moi une fiche, un compteur, la garde du soir… j'ouvre la fenêtre à côté pour que tu voies tout.
-          </div>
-        </div>
+        <div class="thread rise rise-2" id="thread" aria-live="polite" aria-label="Conversation avec Filou"></div>
 
         <form class="consigne rise rise-3" id="consigne-form">
           <input type="text" id="consigne-input" placeholder="Ex. : ouvre-moi la fiche d'Anne-Catherine, ses congés" aria-label="Donner une consigne à Filou" autocomplete="off">
@@ -1533,9 +1624,10 @@ img { display: block; }
   var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   /* ============================================================
-     FILOU PERCHÉ · repli sans trou : si la vidéo WebM alpha ne
-     charge pas (Safari, fichier absent) OU en motion réduite,
-     l'image statique fox-1 prend sa place sur le perchoir.
+     FILOU DANS SON CUBE · repli sans trou : si la vidéo WebM
+     alpha ne charge pas (pipeline en cours, Safari, fichier
+     absent) OU en motion réduite, le nouvel avatar tablette
+     « filou avatar de base.png » prend sa place dans la niche.
      ============================================================ */
   (function () {
     var v = document.getElementById("filou-video");
@@ -1545,7 +1637,7 @@ img { display: block; }
       if (swapped || !v.isConnected) return;
       swapped = true;
       var img = document.createElement("img");
-      img.src = "../fox-1.png";
+      img.src = "../filou/filou avatar de base.png";
       img.alt = "";
       img.className = "filou-fallback";
       v.replaceWith(img);
@@ -1558,6 +1650,21 @@ img { display: block; }
       if (v.readyState < 2) fallback(); /* rien de décodable après 3 s */
     }, 3000);
   })();
+
+  /* La ligne « qui est de garde ce soir » ouvre la fenêtre du soir */
+  var gardeLine = document.getElementById("garde-line");
+  if (gardeLine) {
+    gardeLine.addEventListener("click", function () {
+      handleConsigne("Qui est de garde ce soir ?");
+    });
+  }
+  /* L'infobulle de la cagnotte s'épingle au clic (tactile) */
+  var cagnotte = document.getElementById("cagnotte");
+  if (cagnotte) {
+    cagnotte.addEventListener("click", function () {
+      cagnotte.classList.toggle("tip-open");
+    });
+  }
 
   /* ============================================================
      PARALLAXE PASSIVE · le satin dérive un peu plus lentement que
