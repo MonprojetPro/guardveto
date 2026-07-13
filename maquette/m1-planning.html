@@ -387,16 +387,39 @@ img { display: block; }
 /* ============================================================
    BANDEAU · CARACTÉRISTIQUES DE LA PÉRIODE (retour MiKL n°1)
    ============================================================ */
-.period-banner {
-  margin: 26px 0 18px;
-  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 14px 26px;
+/* Le titre de page ne s'affiche plus (le dock dit où on est) ;
+   il reste pour les lecteurs d'écran. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
-.pb-main { flex: 1 1 380px; min-width: 0; }
-.pb-title { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.pb-title h1 {
-  font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 800;
-  letter-spacing: -0.01em; line-height: 1.15;
+/* LA PÉRIODE, un seul objet : une pilule « Hiver 2026 · Brouillon ▾ »
+   dans la rangée d'outils. On clique dessus pour voir sa carte
+   d'identité (dates, saison, profil, effectif), changer de période
+   ou en préparer une nouvelle (parcours Filou, sur l'accueil). */
+.period-pill {
+  position: relative;
+  display: inline-flex; align-items: center; gap: 9px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 6px 14px 6px 16px; min-height: 42px;
+  font-family: var(--font-display);
+  font-size: 0.95rem; font-weight: 800; letter-spacing: -0.01em;
+  color: var(--text);
+  box-shadow: var(--edge-light), 1px 2px 5px rgba(120, 70, 18, 0.08);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
+.period-pill:hover {
+  border-color: var(--accent-ink);
+  box-shadow: var(--edge-light), 2px 4px 10px rgba(120, 70, 18, 0.12);
+}
+.pp-caret {
+  font-size: 0.7rem; color: var(--muted);
+  transition: transform 0.25s var(--ease-out);
+}
+.period-pill[aria-expanded="true"] .pp-caret { transform: rotate(180deg); }
 .status-badge {
   display: inline-flex; align-items: center; gap: 6px;
   font-size: 0.72rem; font-weight: 700;
@@ -413,40 +436,70 @@ img { display: block; }
   45% { box-shadow: 0 0 0 12px transparent; }
   100% { box-shadow: 0 0 0 0 transparent; }
 }
-.pb-sub { margin-top: 6px; color: var(--muted); font-size: 0.92rem; line-height: 1.55; }
-.pb-sub b { color: var(--text); font-family: var(--font-display); }
-.pb-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+/* --- La carte d'identité de la période (popover de la pilule) --- */
+.period-pop {
+  position: absolute; top: calc(100% + 10px); left: 0;
+  width: min(360px, 86vw);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-panel);
+  padding: 16px 16px 12px;
+  z-index: 80;
+  text-align: left;
+  font-family: var(--font-body); font-weight: 500; letter-spacing: 0;
+}
+.pp-sub { color: var(--muted); font-size: 0.86rem; line-height: 1.55; }
+.pp-sub b { color: var(--text); font-family: var(--font-display); }
+.pb-chips { display: flex; flex-direction: column; align-items: stretch; gap: 6px; margin-top: 10px; }
 .pb-chip {
   display: inline-flex; flex-direction: column; justify-content: center;
-  background: var(--surface);
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   padding: 7px 13px;
   font-size: 0.8rem; font-weight: 600; line-height: 1.35;
-  box-shadow: 0 1px 3px rgba(140, 84, 24, 0.05);
 }
 .pb-chip small { font-size: 0.68rem; font-weight: 500; color: var(--muted); }
 .pb-chip.effectif { border-color: var(--border-strong); background: var(--accent-soft); }
 .pb-chip.effectif small { color: var(--accent-ink); font-weight: 600; }
-.pb-side { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
-.pb-select-label {
+.pp-label {
+  margin: 14px 0 6px;
   font-size: 0.66rem; font-weight: 700; letter-spacing: 0.12em;
   text-transform: uppercase; color: var(--soft);
+  border-top: 1px solid var(--border); padding-top: 12px;
 }
-.pb-select {
-  font-family: var(--font-body); font-size: 0.86rem; font-weight: 600;
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  padding: 9px 14px;
-  min-height: 42px;
-  cursor: pointer;
+.pp-item {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  padding: 7px 11px;
+  font-size: 0.84rem; font-weight: 700; color: var(--text);
+  text-align: left;
 }
-.pb-today {
-  font-size: 0.72rem; color: var(--soft);
-  background: var(--surface); border: 1px dashed var(--border-strong);
-  border-radius: 999px; padding: 4px 12px;
+.pp-item small { font-size: 0.7rem; font-weight: 500; color: var(--muted); }
+.pp-item:hover { background: var(--surface-2); }
+.pp-item[aria-current="true"] {
+  background: var(--accent-soft);
+  border-color: var(--border-strong);
+  color: var(--accent-ink);
+}
+.pp-new {
+  display: flex; flex-direction: column; gap: 1px;
+  margin-top: 8px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 8px 11px;
+  font-size: 0.82rem; font-weight: 700; color: var(--accent-ink);
+  text-decoration: none;
+}
+.pp-new small { font-size: 0.7rem; font-weight: 500; color: var(--muted); }
+.pp-new:hover { border-color: var(--accent-ink); background: var(--accent-soft); }
+.pp-today {
+  margin-top: 10px;
+  font-size: 0.7rem; color: var(--soft); text-align: center;
 }
 
 /* ============================================================
@@ -1264,7 +1317,6 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
 @media (max-width: 1020px) {
   .work-grid { grid-template-columns: 1fr; }
   .counters-panel { max-width: 420px; }
-  .pb-side { align-items: flex-start; }
   .burrow-panel { bottom: 190px; }
 }
 @media (max-width: 640px) {
@@ -1360,34 +1412,38 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
     </button>
   </header>
 
-  <!-- ===================== BANDEAU · CARACTÉRISTIQUES DE LA PÉRIODE ===================== -->
-  <header class="period-banner" aria-label="Caractéristiques de la période de travail">
-    <div class="pb-main">
-      <div class="pb-title">
-        <h1>Planning des gardes</h1>
-        <span class="status-badge st-brouillon" id="status-badge">● Brouillon · non publié</span>
-      </div>
-      <p class="pb-sub" id="pb-sub">Période <b>Hiver 2026</b> · 12 semaines · du lun. 29 déc. 2025 au dim. 22 mars 2026</p>
-      <div class="pb-chips" id="pb-chips">
-        <span class="pb-chip">❄️ Saison hiver</span>
-        <span class="pb-chip">Profil de planning « Hiver »</span>
-        <span class="pb-chip effectif"><b>2 vétos par nuit de semaine</b><small>réglé sur cette période · le profil Hiver dit 1</small></span>
-      </div>
-    </div>
-    <div class="pb-side">
-      <label class="pb-select-label" for="period-select">Période de travail</label>
-      <select class="pb-select" id="period-select" aria-label="Choisir la période de travail">
-        <option value="hiver2026" selected>Hiver 2026 · Brouillon</option>
-        <option value="automne2025">Automne 2025 · Publiée</option>
-        <option value="ete2025">Été 2025 · Verrouillée</option>
-      </select>
-      <span class="pb-today">📌 Aujourd'hui simulé : jeu. 15 janv. 2026</span>
-    </div>
-  </header>
+  <h1 class="sr-only">Planning des gardes</h1>
 
   <!-- ===================== ESPACE DE TRAVAIL ===================== -->
   <div class="workspace" id="workspace">
     <div class="work-head">
+
+      <!-- LA PÉRIODE, un seul objet : la pilule est le sélecteur.
+           Sa carte d'identité (dates, saison, profil, effectif),
+           le changement de période et « préparer la suivante »
+           (parcours Filou, sur l'accueil) vivent dans le popover. -->
+      <div class="period-wrap" style="position: relative;">
+        <button type="button" class="period-pill" id="period-pill" aria-expanded="false" aria-controls="period-pop" aria-label="Période de travail : Hiver 2026, brouillon. Ouvrir la carte de la période.">
+          <b id="period-label">Hiver 2026</b>
+          <span class="status-badge st-brouillon" id="status-badge">● Brouillon · non publié</span>
+          <span class="pp-caret" aria-hidden="true">▾</span>
+        </button>
+        <div class="period-pop" id="period-pop" hidden>
+          <p class="pp-sub" id="pb-sub">Période <b>Hiver 2026</b> · 12 semaines · du lun. 29 déc. 2025 au dim. 22 mars 2026</p>
+          <div class="pb-chips" id="pb-chips">
+            <span class="pb-chip">❄️ Saison hiver</span>
+            <span class="pb-chip">Profil de planning « Hiver »</span>
+            <span class="pb-chip effectif"><b>2 vétos par nuit de semaine</b><small>réglé sur cette période · le profil Hiver dit 1</small></span>
+          </div>
+          <p class="pp-label">Changer de période</p>
+          <button type="button" class="pp-item" data-period="hiver2026" aria-current="true">Hiver 2026 <small>Brouillon · la période de travail</small></button>
+          <button type="button" class="pp-item" data-period="automne2025">Automne 2025 <small>Publiée · close — consultation seule</small></button>
+          <button type="button" class="pp-item" data-period="ete2025">Été 2025 <small>Verrouillée · archivée</small></button>
+          <a class="pp-new" href="m6-accueil-epicentre.html">🦊 Préparer la période suivante <small>ça se passe avec Filou, sur l'accueil</small></a>
+          <p class="pp-today">📌 Aujourd'hui simulé : jeu. 15 janv. 2026</p>
+        </div>
+      </div>
+
       <div class="month-nav">
         <button type="button" class="mn-btn" id="prev-month" aria-label="Mois précédent">←</button>
         <h2 id="month-label">Janvier 2026</h2>
@@ -2653,17 +2709,46 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
     sub: $("#pb-sub").innerHTML,
     chips: $("#pb-chips").innerHTML
   };
-  $("#period-select").addEventListener("change", function () {
-    var v = this.value;
+
+  /* --- La pilule période : ouverture / fermeture du popover --- */
+  var periodPill = $("#period-pill");
+  var periodPop = $("#period-pop");
+  function openPeriodPop() {
+    periodPop.hidden = false;
+    periodPill.setAttribute("aria-expanded", "true");
+  }
+  function closePeriodPop() {
+    periodPop.hidden = true;
+    periodPill.setAttribute("aria-expanded", "false");
+  }
+  periodPill.addEventListener("click", function () {
+    if (periodPop.hidden) openPeriodPop(); else closePeriodPop();
+  });
+  document.addEventListener("click", function (e) {
+    if (!periodPop.hidden && !e.target.closest(".period-wrap")) closePeriodPop();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !periodPop.hidden) { closePeriodPop(); periodPill.focus(); }
+  });
+
+  /* --- Bascule de période (ex-select) --- */
+  function selectPeriod(v) {
     var meta = PERIODS_META[v];
     var veil = $("#archive-veil");
+    periodPop.querySelectorAll(".pp-item").forEach(function (btn) {
+      if (btn.dataset.period === v) btn.setAttribute("aria-current", "true");
+      else btn.removeAttribute("aria-current");
+    });
+    closePeriodPop();
     if (!meta) {
       veil.classList.remove("show");
+      $("#period-label").textContent = "Hiver 2026";
       $("#pb-sub").innerHTML = CURRENT_BANNER.sub;
       $("#pb-chips").innerHTML = CURRENT_BANNER.chips;
       setStatus(periodStatus);
       return;
     }
+    $("#period-label").textContent = meta.title;
     $("#pb-sub").innerHTML = meta.sub;
     $("#pb-chips").innerHTML = meta.chips;
     var badge = $("#status-badge");
@@ -2673,10 +2758,12 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
     $("#archive-title").textContent = meta.title;
     $("#archive-desc").textContent = meta.desc;
     veil.classList.add("show");
+  }
+  periodPop.querySelectorAll(".pp-item").forEach(function (btn) {
+    btn.addEventListener("click", function () { selectPeriod(btn.dataset.period); });
   });
   $("#archive-back").addEventListener("click", function () {
-    $("#period-select").value = "hiver2026";
-    $("#period-select").dispatchEvent(new Event("change"));
+    selectPeriod("hiver2026");
   });
 
   /* ---------- démarrage ---------- */
