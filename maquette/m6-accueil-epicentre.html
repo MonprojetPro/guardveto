@@ -338,8 +338,10 @@ img { display: block; }
      image) — l'ombre de contact du socle fait le travail */
 }
 /* Fondu croisé attente <-> tape-tablette : les deux boucles sont
-   empilées, seule l'opacité bascule (composité GPU). */
-.filou-cube video { transition: opacity 0.28s ease; }
+   empilées, seule l'opacité bascule (composité GPU). 0,4 s :
+   assez long pour absorber le léger balancement de l'attente
+   au moment où la consigne part. */
+.filou-cube video { transition: opacity 0.4s ease; }
 #filou-video-tape { opacity: 0; z-index: 3; pointer-events: none; }
 .filou-cube.taping #filou-video { opacity: 0; }
 .filou-cube.taping #filou-video-tape { opacity: 1; }
@@ -1846,9 +1848,25 @@ img { display: block; }
   })();
 
   /* ---- Fondu croisé : Filou TAPE sur sa tablette quand on lui
-     envoie une consigne, puis revient à l'attente. Silencieux si
-     la boucle tape n'est pas décodable (repli image, Safari). ---- */
+     envoie une consigne, puis revient à l'attente. La boucle tape
+     est générée première ET dernière image = pose d'attente : au
+     retour on recale l'attente sur sa frame 0 pendant qu'elle est
+     cachée, et la couture est invisible. Silencieux si la boucle
+     n'est pas décodable (repli image, Safari). ---- */
   var tapeTimer = null;
+  function tapeRetour() {
+    var cube = document.querySelector(".filou-cube");
+    var att = document.getElementById("filou-video");
+    var tape = document.getElementById("filou-video-tape");
+    window.clearTimeout(tapeTimer);
+    if (att && att.isConnected) {
+      try { att.currentTime = 0; } catch (e) {}
+      var p = att.play();
+      if (p && p.catch) p.catch(function () {});
+    }
+    cube.classList.remove("taping");
+    window.setTimeout(function () { tape.pause(); }, 320);
+  }
   function filouTape() {
     if (REDUCED) return;
     var cube = document.querySelector(".filou-cube");
@@ -1857,15 +1875,12 @@ img { display: block; }
     if (!cube || !tape || !att || !att.isConnected || tape.readyState < 2) return;
     window.clearTimeout(tapeTimer);
     tape.currentTime = 0;
+    tape.onended = tapeRetour;
     var p = tape.play();
     if (p && p.catch) p.catch(function () {});
     cube.classList.add("taping");
-    /* rebascule avant la fin de la boucle (il se redresse sur les
-       toutes dernières images) */
-    tapeTimer = window.setTimeout(function () {
-      cube.classList.remove("taping");
-      window.setTimeout(function () { tape.pause(); }, 300);
-    }, 6200);
+    /* filet de sécurité si 'ended' ne vient pas */
+    tapeTimer = window.setTimeout(tapeRetour, 8600);
   }
 
   /* ---- L'heure RÉELLE sur la barre de statut de la tablette
@@ -2336,6 +2351,27 @@ img { display: block; }
   bubble("filou", "Filou",
     "Bonjour Anne-Sophie ! Le brouillon <b>Hiver 2026</b> est cohérent, l'équipe est au complet. Que puis-je faire pour toi ?",
     true);
+
+  /* ---------- Filou arrive AVEC le contexte ----------
+     Quand une autre page l'appelle pour une mission précise
+     (ex. M1 : « Préparer la période suivante »), elle le dit dans
+     l'URL (#filou=periode). Filou enchaîne tout seul : pas besoin
+     de répéter la demande. Le hash est consommé (pas de re-déclenche
+     au rechargement). */
+  (function () {
+    var m = /[#&]filou=([\w-]+)/.exec(window.location.hash);
+    if (!m) return;
+    var missions = {
+      periode: "Prépare la période suivante",
+      cesoir: "Qui est de garde ce soir ?",
+      souhaits: "Montre-moi les souhaits en attente",
+      coherence: "Le planning est-il toujours cohérent ?"
+    };
+    var consigne = missions[m[1]];
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+    if (!consigne) return;
+    window.setTimeout(function () { handleConsigne(consigne); }, REDUCED ? 150 : 900);
+  })();
 
   /* ---------- réglette de démo : cas A / cas B ---------- */
   var demoToggle = $("#demo-toggle");
