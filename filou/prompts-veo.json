@@ -1,0 +1,27 @@
+{
+  "_negative": "green background, text, watermark, subtitles, logo, camera movement, zoom, cut, scene change, extra characters, human, realistic fur, blur, dark lighting",
+
+  "attente": {
+    "prompt": "A cute 3D cartoon fox mascot veterinarian named Filou, orange fur with white muzzle, wearing an open white lab coat with a small name badge, a beige plaid shirt and beige trousers, sits calmly on the floor holding a digital tablet on his lap. He glances at the tablet, blinks slowly, breathes gently, occasionally looks up with a friendly smile. Pure plain white background, soft even studio lighting, static camera, front view, full body visible. The animation is a calm idle loop: he starts and ends in exactly the same pose. No sound effects, no camera motion, no cuts."
+  },
+
+  "tape-tablette": {
+    "prompt": "A cute 3D cartoon fox mascot veterinarian named Filou, orange fur with white muzzle, wearing an open white lab coat with a small name badge, a beige plaid shirt and beige trousers, sits on the floor and actively taps and swipes on a digital tablet held on his lap, focused and enthusiastic, ears twitching slightly. Pure plain white background, soft even studio lighting, static camera, front view, full body visible. Calm loop: he starts and ends in exactly the same sitting pose looking at the tablet. No sound effects, no camera motion, no cuts."
+  },
+
+  "accroche-rebord": {
+    "prompt": "A cute 3D cartoon fox mascot veterinarian named Filou, orange fur with white muzzle, wearing an open white lab coat with a small name badge over a beige plaid shirt, hangs playfully behind a plain light ledge like a wall edge: only his head, shoulders and two front paws gripping the top of the ledge are visible, the rest of his body hidden behind it. He peeks over the edge with big curious friendly eyes, blinks, sways very slightly left and right, ears perking up. Pure plain white background and plain white ledge, soft even studio lighting, static camera, front view. Calm idle loop: he starts and ends in exactly the same peeking pose. No sound effects, no camera motion, no cuts."
+  },
+
+  "ecoute": {
+    "prompt": "A cute 3D cartoon fox mascot veterinarian named Filou, orange fur with white muzzle, wearing an open white lab coat with a small name badge, a beige plaid shirt and beige trousers, sits on the floor with a digital tablet on his lap, looking up toward the viewer, attentive and listening: ears perked forward, small nods, soft blinks. Pure plain white background, soft even studio lighting, static camera, front view, full body visible. Calm loop: he starts and ends in exactly the same pose. No sound effects, no camera motion, no cuts."
+  },
+
+  "celebre": {
+    "prompt": "A cute 3D cartoon fox mascot veterinarian named Filou, orange fur with white muzzle, wearing an open white lab coat with a small name badge, a beige plaid shirt and beige trousers, stands and gives one short joyful celebration: a modest fist pump and a happy smile, tail wagging once, then returns to a calm standing pose. Pure plain white background, soft even studio lighting, static camera, front view, full body visible. He starts and ends in exactly the same calm standing pose. No sound effects, no camera motion, no cuts."
+  },
+
+  "somnole": {
+    "prompt": "A cute 3D cartoon fox mascot veterinarian named Filou, orange fur with white muzzle, wearing an open white lab coat with a small name badge, a beige plaid shirt and beige trousers, sits on the floor dozing peacefully: eyes closed, head slowly tilting, chest rising and falling, one ear twitching. A digital tablet rests on his lap. Pure plain white background, soft even studio lighting, static camera, front view, full body visible. Calm sleep loop: he starts and ends in exactly the same pose. No sound effects, no camera motion, no cuts."
+  }
+}
