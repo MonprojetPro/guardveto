@@ -6,7 +6,7 @@ Usage :
   python generate-veo.py --list
 
 La clé API est lue dans (ordre) : $GEMINI_API_KEY, puis le niveau User
-du registre Windows (HKCU\Environment) — pas besoin de redémarrer le
+du registre Windows (HKCU/Environment) - pas besoin de redemarrer le
 terminal après un setx.
 
 Sortie : filou/veo-out/<scene>-<n>.mp4 (à passer ensuite au pipeline
@@ -67,8 +67,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--scene", help="nom de la scène (cf. --list)")
     ap.add_argument("--list", action="store_true", help="lister les scènes")
-    ap.add_argument("--model", default="veo-3.0-fast-generate-001",
-                    help="veo-3.0-fast-generate-001 (éco) | veo-3.0-generate-001 | veo-3.1-generate-preview")
+    ap.add_argument("--model", default="veo-3.1-fast-generate-preview",
+                    help="veo-3.1-fast-generate-preview (éco) | veo-3.1-generate-preview | veo-3.1-lite-generate-preview")
     ap.add_argument("--image", help="image de première frame (PNG) pour ancrer le personnage")
     ap.add_argument("--prompt", help="prompt libre (à la place d'une scène du pack)")
     ap.add_argument("--aspect", default="9:16", help="9:16 (défaut, comme filou-attente) ou 16:9")
@@ -106,17 +106,17 @@ def main():
         "parameters": {"aspectRatio": args.aspect, "negativePrompt": negative},
     }
 
-    print("Lancement Veo · modèle %s · scène %s" % (args.model, scene_name))
+    print("Lancement Veo | modele %s | scene %s" % (args.model, scene_name))
     op = http_json("%s/models/%s:predictLongRunning?key=%s" % (API_BASE, args.model, key), payload)
     op_name = op["name"]
-    print("Opération :", op_name)
+    print("Operation :", op_name)
 
     while True:
         time.sleep(10)
         st = http_json("%s/%s?key=%s" % (API_BASE, op_name, key))
         if st.get("done"):
             break
-        print("  … génération en cours")
+        print("  ... generation en cours")
 
     if "error" in st:
         sys.exit("Erreur Veo : " + json.dumps(st["error"], ensure_ascii=False))
@@ -134,7 +134,7 @@ def main():
             continue
         sep = "&" if "?" in uri else "?"
         out = os.path.join(OUT_DIR, "%s-%d.mp4" % (scene_name, i))
-        print("Téléchargement →", out)
+        print("Telechargement ->", out)
         urllib.request.urlretrieve(uri + sep + "key=" + key, out)
     print("Terminé. Prochaine étape : pipeline-detourage.py sur le MP4 retenu.")
 

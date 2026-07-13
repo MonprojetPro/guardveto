@@ -337,6 +337,12 @@ img { display: block; }
   /* perf : PAS de drop-shadow sur la vidéo (recalculé à chaque
      image) — l'ombre de contact du socle fait le travail */
 }
+/* Fondu croisé attente <-> tape-tablette : les deux boucles sont
+   empilées, seule l'opacité bascule (composité GPU). */
+.filou-cube video { transition: opacity 0.28s ease; }
+#filou-video-tape { opacity: 0; z-index: 3; pointer-events: none; }
+.filou-cube.taping #filou-video { opacity: 0; }
+.filou-cube.taping #filou-video-tape { opacity: 1; }
 
 /* ---- LE SOCLE 3D · pavé blanc-crème en volume, même matière que
    la carte. Face supérieure = ligne d'assise (62 % de H, soit
@@ -1431,6 +1437,12 @@ img { display: block; }
             <video id="filou-video" autoplay loop muted playsinline>
               <source src="../filou/filou-attente.webm" type="video/webm">
             </video>
+            <!-- La boucle « il tape sur sa tablette » : empilée sur
+                 l'attente, révélée en fondu croisé quand on lui
+                 envoie une consigne. -->
+            <video id="filou-video-tape" muted playsinline preload="auto">
+              <source src="../filou/filou-tape-tablette.webm" type="video/webm">
+            </video>
           </div>
           <div class="convo">
             <span class="tab-marque" aria-hidden="true">Filou</span>
@@ -1832,6 +1844,29 @@ img { display: block; }
       if (v.readyState < 2) fallback(); /* rien de décodable après 3 s */
     }, 3000);
   })();
+
+  /* ---- Fondu croisé : Filou TAPE sur sa tablette quand on lui
+     envoie une consigne, puis revient à l'attente. Silencieux si
+     la boucle tape n'est pas décodable (repli image, Safari). ---- */
+  var tapeTimer = null;
+  function filouTape() {
+    if (REDUCED) return;
+    var cube = document.querySelector(".filou-cube");
+    var att = document.getElementById("filou-video");
+    var tape = document.getElementById("filou-video-tape");
+    if (!cube || !tape || !att || !att.isConnected || tape.readyState < 2) return;
+    window.clearTimeout(tapeTimer);
+    tape.currentTime = 0;
+    var p = tape.play();
+    if (p && p.catch) p.catch(function () {});
+    cube.classList.add("taping");
+    /* rebascule avant la fin de la boucle (il se redresse sur les
+       toutes dernières images) */
+    tapeTimer = window.setTimeout(function () {
+      cube.classList.remove("taping");
+      window.setTimeout(function () { tape.pause(); }, 300);
+    }, 6200);
+  }
 
   /* ---- L'heure RÉELLE sur la barre de statut de la tablette
      (format 24 h français, recalée à chaque minute pile) ---- */
@@ -2235,6 +2270,7 @@ img { display: block; }
 
   function handleConsigne(text) {
     if (!text) return;
+    filouTape(); /* il pianote sur sa tablette le temps de traiter */
     /* le fil reste frais : la suggestion précédente s'efface,
        et un échange resté ouvert (fenêtre non refermée) aussi */
     if (suggestionBubble) { fadeOutBubbles([suggestionBubble]); suggestionBubble = null; }

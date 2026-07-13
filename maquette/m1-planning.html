@@ -772,8 +772,8 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
    ============================================================ */
 .plan-scene { position: relative; }
 .filou-edge {
-  position: absolute; top: 200px; left: -88px;
-  width: 88px; height: 168px;
+  position: absolute; top: 200px; left: -110px;
+  width: 110px; height: 168px;
   z-index: 2; /* au-dessus de la carte : ses pattes se posent SUR le rebord */
   border: none; background: transparent; padding: 0;
   cursor: pointer;
@@ -794,6 +794,21 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
   margin-left: -58px;
   filter: drop-shadow(3px 6px 10px rgba(120, 70, 18, 0.28));
 }
+/* La vidéo « il se penche depuis le rebord » : cadrée pour que
+   l'arête qu'il agrippe tombe PILE sur le rebord de la carte
+   (miroir : dans la vidéo il se penche à droite d'un mur). */
+.filou-edge video {
+  width: 250px; height: auto; max-width: none;
+  margin-left: -73px; margin-top: -26px;
+  transform: scaleX(-1);
+  display: none;
+}
+.filou-edge.has-video video { display: block; }
+.filou-edge.has-video #fe-img { display: none; }
+.filou-edge.has-video .fe-paw { display: none; } /* la vraie patte est dans la vidéo */
+/* NB : côté droit, le conteneur est déjà en miroir — le scaleX(-1)
+   de la vidéo s'y annule et elle reprend son sens natif, qui est
+   le bon (il se penche à l'opposé de la carte des deux côtés). */
 /* les pattes posées sur le rebord de la carte */
 .filou-edge .fe-paw {
   position: absolute;
@@ -817,7 +832,7 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
 }
 /* de l'autre côté : même pose, en miroir (les pattes suivent) */
 .plan-scene.filou-right .filou-edge {
-  left: auto; right: -88px;
+  left: auto; right: -110px;
   transform: rotate(9deg) scaleX(-1);
 }
 .plan-scene.filou-right .filou-edge:hover,
@@ -1460,9 +1475,16 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
   <div class="plan-scene" id="plan-scene">
 
     <!-- Filou accroché au rebord : il attend qu'on le sollicite.
+         Vidéo animée (il se penche, guette, se retire — comme sur
+         l'accueil) ; repli image si le WebM ne se décode pas.
          Un clic = petit bond, puis l'accueil s'ouvre (sa tablette y vit). -->
     <button type="button" class="filou-edge" id="filou-edge" aria-label="Demander l'assistance de Filou — ouvre l'accueil">
-      <span class="fe-crop" aria-hidden="true"><img src="../filou/filou avatar de base.png" alt=""></span>
+      <span class="fe-crop" aria-hidden="true">
+        <video id="fe-video" muted playsinline preload="auto">
+          <source src="../filou/filou-accroche-cote.webm" type="video/webm">
+        </video>
+        <img id="fe-img" src="../filou/filou avatar de base.png" alt="">
+      </span>
       <span class="fe-paw p1" aria-hidden="true"></span>
       <span class="fe-paw p2" aria-hidden="true"></span>
       <span class="fe-hint">Un coup de main ? 🦊</span>
@@ -2182,9 +2204,45 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
   var filouEdge = $("#filou-edge");
   var filouBusy = false;
 
-  /* S'il n'est pas sollicité, il plonge et ressort de l'autre côté */
+  /* La vidéo « il se penche, guette, se retire » (comme l'accueil).
+     Chaque lecture est UN cycle complet ; à la fin d'un cycle sur
+     trois, il ressort de l'autre côté. Repli image si indécodable. */
+  var feVideo = $("#fe-video");
+  var feVideoActif = false;
+  var feCycles = 0;
+  var FE_DEBUT = 0.45; /* saute les résidus de détourage des 1res images */
+  function feRelance() {
+    try { feVideo.currentTime = FE_DEBUT; } catch (e) {}
+    var p = feVideo.play();
+    if (p && p.catch) p.catch(function () {});
+  }
+  if (!REDUCED && feVideo) {
+    feVideo.addEventListener("canplay", function once() {
+      feVideo.removeEventListener("canplay", once);
+      feVideoActif = true;
+      filouEdge.classList.add("has-video");
+      feRelance();
+    });
+    feVideo.addEventListener("ended", function () {
+      feCycles++;
+      var occupe = filouBusy || filouOut ||
+        filouEdge.matches(":hover") || filouEdge === document.activeElement;
+      if (!occupe && feCycles % 3 === 0) planScene.classList.toggle("filou-right");
+      feRelance();
+    });
+    feVideo.addEventListener("error", function () {
+      feVideoActif = false;
+      filouEdge.classList.remove("has-video");
+    }, true);
+    window.setTimeout(function () {
+      if (feVideo.readyState < 2) filouEdge.classList.remove("has-video");
+    }, 3000);
+  }
+
+  /* Repli statique : sans vidéo, la migration reste au minuteur */
   if (!REDUCED) {
     setInterval(function () {
+      if (feVideoActif) return;
       if (filouBusy || filouOut) return;
       if (filouEdge.matches(":hover") || filouEdge === document.activeElement) return;
       filouEdge.classList.add("fe-dive");

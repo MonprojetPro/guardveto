@@ -69,3 +69,4 @@ code google cloud.json
 # Dumps de base — JAMAIS sur GitHub (le pattern racine /_backups/ ne couvre
 # pas les sous-dossiers : celui-ci attrape supabase/_backups/ et consorts)
 **/_backups/
+filou/veo-out/
