@@ -55,8 +55,16 @@
   --grid-we:       rgba(199, 83, 15, 0.07);
   --r-lg: 26px; --r-md: 18px; --r-sm: 12px;
   --shadow-card:  0 10px 30px rgba(140, 84, 24, 0.10), 0 2px 6px rgba(140, 84, 24, 0.06);
-  --shadow-panel: 0 24px 60px rgba(120, 70, 18, 0.20), 0 4px 12px rgba(120, 70, 18, 0.10);
+  --shadow-panel: 4px 24px 60px rgba(120, 70, 18, 0.20), 2px 4px 12px rgba(120, 70, 18, 0.10);
   --nav-bg: rgba(246, 238, 223, 0.9);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ---- Grammaire de profondeur (M6) : UNE source de lumière (haut-
+     gauche) → ombres portées vers le bas-droite, tranches hautes
+     et gauches éclairées. Matériaux réels : papier, craie. ---- */
+  --elev-1: 1px 2px 3px rgba(110, 62, 14, 0.10), 4px 8px 18px rgba(110, 62, 14, 0.08);
+  --elev-2: 2px 4px 8px rgba(110, 62, 14, 0.13), 10px 18px 34px rgba(110, 62, 14, 0.13);
+  --edge-light: inset 1px 1px 0 rgba(255, 253, 246, 0.95);
 }
 
 body {
@@ -74,7 +82,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
   outline-offset: 2px;
 }
 img { display: block; }
-.shell { max-width: 1240px; margin: 0 auto; padding: 0 clamp(14px, 3vw, 36px); }
+.shell { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 0 clamp(14px, 3vw, 36px); }
 
 /* ============================================================
    BARRE DE NAVIGATION COMMUNE (identique sur toutes les tranches)
@@ -82,9 +90,8 @@ img { display: block; }
 .mq-nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 200;
   height: var(--nav-h);
-  background: var(--nav-bg);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  /* perf : plus de backdrop-filter plein écran — fond quasi opaque */
+  background: rgba(250, 243, 229, 0.96);
   border-bottom: 1px solid var(--border);
   display: flex; align-items: center; gap: 18px;
   padding: 0 clamp(14px, 3vw, 36px);
@@ -113,6 +120,268 @@ img { display: block; }
 .mq-links a[aria-current="page"] {
   background: var(--accent); color: #fff;
   box-shadow: 0 2px 8px var(--accent-glow);
+}
+
+/* ============================================================
+   LE SATIN (M6) · fond d'écran de TOUTE la page, bord à bord,
+   derrière tout. Perf : aucun filtre plein écran, tout ce qui
+   bouge n'anime QUE transform (composité GPU).
+   ============================================================ */
+.satin {
+  position: fixed; inset: -110px 0;
+  z-index: 0;
+  pointer-events: none;
+  will-change: transform;
+  background: linear-gradient(180deg, #F6EBD3 0%, var(--bg-deep) 72%, #E9DABC 100%);
+}
+.silk { position: absolute; inset: -22% -12%; }
+.silk i { position: absolute; border-radius: 50%; will-change: transform; }
+.silk .s1 {
+  width: 62%; height: 76%; left: -12%; top: -20%;
+  background: radial-gradient(closest-side, rgba(255, 223, 174, 0.95), rgba(255, 223, 174, 0) 72%);
+  animation: silkDrift1 74s ease-in-out infinite alternate;
+}
+.silk .s2 {
+  width: 54%; height: 68%; right: -10%; top: -14%;
+  background: radial-gradient(closest-side, rgba(240, 188, 114, 0.7), rgba(240, 188, 114, 0) 72%);
+  animation: silkDrift2 86s ease-in-out infinite alternate;
+}
+.silk .s3 {
+  width: 42%; height: 56%; left: 34%; bottom: -18%;
+  background: radial-gradient(closest-side, rgba(199, 83, 15, 0.17), rgba(199, 83, 15, 0) 74%);
+  animation: silkDrift3 58s ease-in-out infinite alternate;
+}
+.silk .s4 {
+  width: 36%; height: 50%; left: 6%; bottom: -12%;
+  background: radial-gradient(closest-side, rgba(227, 232, 194, 0.36), rgba(227, 232, 194, 0) 72%);
+  animation: silkDrift2 98s ease-in-out infinite alternate-reverse;
+}
+@keyframes silkDrift1 { to { transform: translate(4%, 8%) scale(1.08); } }
+@keyframes silkDrift2 { to { transform: translate(-5%, 6%) scale(1.05); } }
+@keyframes silkDrift3 { to { transform: translate(6%, -5%) scale(0.95); } }
+.folds {
+  position: absolute; inset: -14%;
+  mix-blend-mode: soft-light;
+  will-change: transform;
+}
+.folds.f1 {
+  background: repeating-linear-gradient(104deg,
+    rgba(255, 240, 208, 0) 0px,
+    rgba(255, 240, 208, 0.75) 70px,
+    rgba(171, 128, 70, 0.5) 150px,
+    rgba(255, 240, 208, 0) 230px);
+  filter: blur(6px);
+  animation: foldBreath1 46s ease-in-out infinite alternate;
+}
+.folds.f2 {
+  background: repeating-linear-gradient(64deg,
+    rgba(255, 236, 200, 0) 0px,
+    rgba(255, 236, 200, 0.6) 110px,
+    rgba(150, 110, 60, 0.42) 220px,
+    rgba(255, 236, 200, 0) 330px);
+  filter: blur(11px);
+  animation: foldBreath2 58s ease-in-out infinite alternate;
+}
+@keyframes foldBreath1 { to { transform: translate3d(-3.2%, 1.6%, 0); } }
+@keyframes foldBreath2 { to { transform: translate3d(2.8%, -2.2%, 0); } }
+.sheen {
+  position: absolute; top: 0; bottom: 0; left: -130%; width: 340%;
+  background: linear-gradient(118deg,
+    transparent 34%,
+    rgba(255, 242, 212, 0.75) 42%,
+    transparent 50%,
+    rgba(255, 228, 182, 0.5) 58%,
+    transparent 66%);
+  mix-blend-mode: soft-light;
+  will-change: transform;
+  animation: sheenDrift 52s ease-in-out infinite alternate;
+}
+@keyframes sheenDrift { to { transform: translate3d(36%, 0, 0); } }
+.grain {
+  position: absolute; inset: 0; z-index: 2;
+  pointer-events: none;
+  opacity: 0.45;
+  mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+}
+
+/* Entrée orchestrée : chaque étage se révèle en cascade (M6) */
+.rise { animation: riseIn 0.7s var(--ease-out) both; }
+.rise-2 { animation-delay: 0.08s; }
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ============================================================
+   LA BARRE (M6) · une seule pilule cohérente :
+   [marque : GuardVeto · Anne-Sophie] [dock des maisons au centre]
+   [cagnotte solidaire à droite]. Fond PLEIN (blanc-crème net).
+   ============================================================ */
+.app-bar {
+  display: flex; align-items: center; gap: 10px;
+  margin: 14px 0;
+  padding: 8px 9px 8px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: var(--edge-light), 3px 8px 22px rgba(120, 70, 18, 0.12), 1px 2px 5px rgba(120, 70, 18, 0.08);
+}
+.ab-ident { display: flex; align-items: center; gap: 10px; flex: none; }
+/* La marque, en lettres seules : Figtree serré, « Veto » en encre
+   renarde — le seul clin d'œil, typographique et sobre. */
+.ab-name {
+  font-family: var(--font-display);
+  font-weight: 800; font-size: 1rem; letter-spacing: -0.022em;
+  color: var(--text);
+  text-decoration: none;
+}
+.ab-name em { font-style: normal; color: var(--accent-ink); }
+.ab-user {
+  font-size: 0.78rem; font-weight: 600; color: var(--muted);
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+  white-space: nowrap;
+}
+.dock-menu {
+  display: flex; align-items: center; gap: 2px;
+  width: max-content; max-width: 100%;
+  margin: 0 auto;
+  padding: 0;
+  overflow-x: auto;
+}
+/* La cagnotte solidaire : cœur dessiné main dans une pastille
+   verte, montant pesé en Figtree, micro-libellé « reversés ». */
+.cagnotte {
+  position: relative; flex: none;
+  display: inline-flex; align-items: center; gap: 9px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, #FFFEF9 0%, #FBF3E1 100%);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 5px 16px 5px 6px; min-height: 40px;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 252, 0.9), 1px 2px 5px rgba(120, 70, 18, 0.07);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.cagnotte:hover {
+  border-color: var(--border-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 252, 0.9), 2px 4px 10px rgba(120, 70, 18, 0.12);
+}
+.cg-heart {
+  flex: none;
+  width: 28px; height: 28px; padding: 5px;
+  border-radius: 50%;
+  background: var(--ok-soft);
+  color: var(--ok);
+  transform: rotate(-6deg); /* posé un peu de travers, à la main */
+  transition: transform 0.25s var(--ease-out);
+}
+.cg-heart svg { width: 100%; height: 100%; display: block; }
+.cagnotte:hover .cg-heart { transform: rotate(-6deg) scale(1.12); }
+.cg-txt {
+  display: flex; flex-direction: column; align-items: flex-start;
+  gap: 2px; line-height: 1; text-align: left;
+}
+.cg-num {
+  font-family: var(--font-display);
+  font-size: 0.92rem; font-weight: 800; letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.cg-txt small {
+  font-size: 0.56rem; font-weight: 700;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--ok);
+}
+.cagnotte-tip {
+  position: absolute; top: calc(100% + 9px); right: 0;
+  width: 244px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-panel);
+  padding: 9px 12px;
+  font-size: 0.72rem; font-weight: 500; line-height: 1.5; text-align: left;
+  opacity: 0; transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.25s var(--ease-out);
+  z-index: 60;
+}
+.cagnotte:hover .cagnotte-tip,
+.cagnotte:focus-visible .cagnotte-tip,
+.cagnotte.tip-open .cagnotte-tip { opacity: 1; transform: none; }
+@media (max-width: 980px) {
+  .app-bar { flex-wrap: wrap; border-radius: 24px; }
+  .app-bar .dock-menu { order: 3; width: 100%; }
+}
+@media (max-width: 560px) {
+  .ab-user { display: none; }
+}
+/* Le dock des maisons : icônes seules, le libellé se déplie au
+   survol / focus (la pilule s'élargit pour lui faire de la place). */
+.dock-item {
+  display: flex; align-items: center;
+  height: 56px; flex: none;
+  padding: 0 15px;
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--soft);
+  transition: color 0.25s ease;
+}
+/* La maison où l'on est : encre renarde, toujours. */
+.dock-item[aria-current="page"] { color: var(--accent-ink); }
+.dock-item .di-ico {
+  position: relative;
+  width: 28px; height: 28px; flex: none;
+  transition: color 0.25s ease;
+}
+.dock-item .di-ico svg { width: 100%; height: 100%; display: block; }
+.di-pip {
+  position: absolute; top: -3px; right: -4px;
+  width: 9px; height: 9px; border-radius: 50%;
+  border: 2px solid var(--surface);
+  box-sizing: content-box;
+  font-style: normal;
+}
+.di-pip.warn { background: var(--warn); }
+.di-pip.ok { background: var(--ok); }
+.di-pip.count {
+  width: 17px; height: 17px; top: -7px; right: -10px;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 0.6rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1;
+}
+.di-flap {
+  display: grid; grid-template-columns: 0fr;
+  opacity: 0;
+  transition: grid-template-columns 0.38s var(--ease-out), opacity 0.22s ease;
+}
+.di-text {
+  min-width: 0; overflow: hidden; white-space: nowrap;
+  position: relative;
+  padding: 0 3px 5px 10px;
+  font-family: var(--font-display);
+  font-size: 0.84rem; font-weight: 700;
+  color: var(--accent-ink);
+}
+.di-text::after {
+  content: "";
+  position: absolute; left: 10px; right: 4px; bottom: 0;
+  height: 2px; border-radius: 2px;
+  background: var(--accent);
+  transform: scaleX(0); transform-origin: left center;
+  transition: transform 0.3s var(--ease-out) 0.12s;
+}
+.dock-item:hover, .dock-item:focus-visible { color: var(--accent); }
+.dock-item:hover .di-flap, .dock-item:focus-visible .di-flap {
+  grid-template-columns: 1fr;
+  opacity: 1;
+}
+.dock-item:hover .di-text::after, .dock-item:focus-visible .di-text::after {
+  transform: scaleX(1);
 }
 
 /* ============================================================
@@ -189,7 +458,12 @@ img { display: block; }
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   background: var(--surface);
-  box-shadow: var(--shadow-card);
+  /* grammaire de profondeur M6 : lumière haut-gauche, ombres bas-droite */
+  box-shadow:
+    var(--edge-light),
+    2px 3px 8px rgba(110, 62, 14, 0.12),
+    8px 18px 38px -8px rgba(110, 62, 14, 0.18),
+    18px 60px 120px -18px rgba(110, 62, 14, 0.22);
   overflow: hidden;
   min-height: 680px;
 }
@@ -1003,6 +1277,7 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
    ACCESSIBILITÉ · prefers-reduced-motion
    ============================================================ */
 @media (prefers-reduced-motion: reduce) {
+  .silk i, .folds, .sheen, .rise { animation: none !important; }
   .ok-flash, .day.spot, .cnt-num.bump-up, .cnt-num.bump-down, .cnt-delta,
   .counters-panel, .bubble, .gf-card, .av-list, .lock-confirm, .gm-absent-note,
   .status-badge.pulse, .archive-veil.show, .recap-hint-msg, .gm-done { animation: none !important; }
@@ -1015,6 +1290,15 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
 </style>
 </head>
 <body>
+
+<!-- Plan 1 · le satin : fond d'écran de toute la page, derrière tout -->
+<div class="satin" id="satin" aria-hidden="true">
+  <div class="silk"><i class="s1"></i><i class="s2"></i><i class="s3"></i><i class="s4"></i></div>
+  <div class="folds f1"></div>
+  <div class="folds f2"></div>
+  <div class="sheen"></div>
+  <div class="grain"></div>
+</div>
 
 <!-- ===================== NAVIGATION COMMUNE ===================== -->
 <nav class="mq-nav" aria-label="Tranches de la grande maquette">
@@ -1034,6 +1318,47 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
 </nav>
 
 <div class="shell">
+
+  <!-- ============ LA BARRE (M6) ============
+       Identité fixe à gauche, dock au centre (icônes seules,
+       libellé déplié au survol/focus), cagnotte solidaire à droite. -->
+  <header class="app-bar rise" aria-label="Barre GuardVeto">
+    <div class="ab-ident">
+      <a class="ab-name" href="m6-accueil-epicentre.html" title="Retour à l'accueil">Guard<em>Veto</em></a>
+      <span class="ab-user">Anne-Sophie</span>
+    </div>
+  <nav class="dock-menu" aria-label="Les six espaces de GuardVeto">
+    <a class="dock-item" href="m1-planning.html" aria-current="page" aria-label="Planning · brouillon Hiver 2026 en cours — vous y êtes">
+      <span class="di-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="4.5"/><path d="M8 3.2v3.4M16 3.2v3.4M3.5 10.2h17"/><circle cx="12" cy="15.2" r="1.7" fill="currentColor" stroke="none"/></svg><i class="di-pip warn"></i></span>
+      <span class="di-flap" aria-hidden="true"><span class="di-text">Planning · Brouillon Hiver 2026</span></span>
+    </a>
+    <a class="dock-item" href="m3-absences-echanges.html" aria-label="Absences et échanges · 3 souhaits en attente">
+      <span class="di-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7.3 9.2a5.6 5.6 0 0 1 9.6-2.5"/><path d="M17.6 3.6v3.2h-3.2"/><path d="M16.7 14.8a5.6 5.6 0 0 1-9.6 2.5"/><path d="M6.4 20.4v-3.2h3.2"/></svg><i class="di-pip count">3</i></span>
+      <span class="di-flap" aria-hidden="true"><span class="di-text">Absences &amp; échanges · 3 souhaits</span></span>
+    </a>
+    <a class="dock-item" href="m4-accueil-equipe-historique-connexions.html#sec-equipe" aria-label="Équipe · 7 vétérinaires">
+      <span class="di-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.6" r="3.2"/><path d="M3.4 19.4c.6-3.3 2.8-5.2 5.6-5.2s5 1.9 5.6 5.2"/><circle cx="17" cy="9.8" r="2.4"/><path d="M15.8 14.3c2.3.4 4.2 2 4.8 4.6"/></svg></span>
+      <span class="di-flap" aria-hidden="true"><span class="di-text">Équipe · 7 vétos</span></span>
+    </a>
+    <a class="dock-item" href="m2-regles.html" aria-label="Règles du cabinet · 12 fermes, 8 souples">
+      <span class="di-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.4h2.9M11 7.4h9M4 12h8.9M17 12h3M4 16.6h4.9M13 16.6h7"/><circle cx="9" cy="7.4" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="11" cy="16.6" r="2"/></svg></span>
+      <span class="di-flap" aria-hidden="true"><span class="di-text">Règles · 12 fermes, 8 souples</span></span>
+    </a>
+    <a class="dock-item" href="m4-accueil-equipe-historique-connexions.html#sec-historique" aria-label="Historique et compteurs">
+      <span class="di-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12.6" r="7.4"/><path d="M12 8.6v4l2.9 1.9"/><path d="M4.6 5.4 6.9 3.7M19.4 5.4 17.1 3.7"/></svg></span>
+      <span class="di-flap" aria-hidden="true"><span class="di-text">Historique &amp; compteurs</span></span>
+    </a>
+    <a class="dock-item" href="m4-accueil-equipe-historique-connexions.html#sec-connexions" aria-label="Réglages · agenda connecté">
+      <span class="di-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M12 4v2.3M12 17.7V20M4 12h2.3M17.7 12H20M6.3 6.3l1.7 1.7M16 16l1.7 1.7M17.7 6.3 16 8M8 16l-1.7 1.7"/></svg><i class="di-pip ok"></i></span>
+      <span class="di-flap" aria-hidden="true"><span class="di-text">Réglages · Agenda connecté ✓</span></span>
+    </a>
+  </nav>
+    <button type="button" class="cagnotte" id="cagnotte" aria-describedby="cagnotte-tip">
+      <span class="cg-heart" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19.3C8.9 16.7 5 13.6 4.6 9.9 4.3 7.3 6.2 5.2 8.4 5.4c1.6.15 2.9 1.3 3.6 2.8.8-1.6 2.3-2.9 4-2.8 2.2.1 3.9 2.2 3.5 4.8-.6 3.7-4.5 6.7-7.2 8.9"/></svg></span>
+      <span class="cg-txt"><b class="cg-num">87 €</b><small>reversés</small></span>
+      <span class="cagnotte-tip" role="tooltip" id="cagnotte-tip">Une part de chaque abonnement GuardVeto va à l'association choisie par votre cabinet.</span>
+    </button>
+  </header>
 
   <!-- ===================== BANDEAU · CARACTÉRISTIQUES DE LA PÉRIODE ===================== -->
   <header class="period-banner" aria-label="Caractéristiques de la période de travail">
@@ -1271,6 +1596,25 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
   var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var $ = function (sel) { return document.querySelector(sel); };
   var DAY = 86400000;
+
+  /* ============================================================
+     PARALLAXE PASSIVE (M6) · le satin dérive un peu plus lentement
+     que la page au scroll : deux plans distincts. Jamais à la souris.
+     ============================================================ */
+  (function () {
+    if (REDUCED) return;
+    var satin = document.getElementById("satin");
+    if (!satin) return;
+    var tick = false;
+    window.addEventListener("scroll", function () {
+      if (tick) return;
+      tick = true;
+      window.requestAnimationFrame(function () {
+        satin.style.transform = "translate3d(0," + (window.scrollY * 0.07).toFixed(1) + "px,0)";
+        tick = false;
+      });
+    }, { passive: true });
+  })();
 
   /* ---------- Équipe ---------- */
   var VETS = [
