@@ -591,9 +591,13 @@ img { display: block; }
 .day.fri { background: linear-gradient(180deg, var(--surface-2) 38%, var(--grid-we) 82%); }
 .day.other { border-style: dashed; }
 .day.other .d-num { color: var(--soft); }
-.day.past { background: #F1E9D8; }
-.day.past .pill, .day.past .conge-chip { opacity: 0.55; filter: saturate(0.55); }
+/* Grammaire de profondeur : le passé s'aplatit et s'éteint — la fiche
+   perd son relief, l'encre pâlit. Plus de cadenas par case : la barre
+   d'outils le dit une fois pour toutes. */
+.day.past { background: #EFE7D6; border-color: #E4D8BF; }
 .day.past .d-num { color: var(--soft); }
+.day.past .slot-card { background: transparent; border-color: var(--border); box-shadow: none; }
+.day.past .vet-row, .day.past .conge-chip { opacity: 0.6; filter: saturate(0.4); }
 .day.hors { background: transparent; border-style: dashed; }
 .day.hors .d-num { color: var(--soft); }
 .d-hors-note { font-size: 0.6rem; color: var(--soft); font-style: italic; margin-top: 2px; }
@@ -609,42 +613,82 @@ img { display: block; }
   font-size: 0.6rem; font-weight: 700; color: var(--accent-ink);
   white-space: nowrap;
 }
-.d-lock { margin-left: auto; font-size: 0.62rem; color: var(--soft); }
-.slot-label {
-  font-family: var(--font-display);
-  font-size: 0.55rem; font-weight: 700; letter-spacing: 0.08em;
-  text-transform: uppercase; color: var(--soft);
-  margin-top: 1px;
-}
-.pill {
-  display: inline-flex; align-items: center; gap: 4px;
-  color: #fff; font-size: 0.66rem; font-weight: 700;
-  padding: 3px 8px; border-radius: 6px;
-  line-height: 1.3;
-  border: none;
-  max-width: 100%;
-  text-align: left;
-}
-.pill .rank { font-weight: 400; opacity: 0.75; }
-.pill.second { opacity: 0.82; }
-button.pill { cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
-button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120, 70, 18, 0.28); }
-.pill.warned { box-shadow: 0 0 0 2px var(--warn); }
-.pill.empty {
-  background: transparent; color: var(--muted);
-  border: 1.5px dashed var(--border-strong);
-  font-weight: 600;
-}
-.pill.empty:hover { color: var(--accent-ink); border-color: var(--accent-ink); box-shadow: none; }
-.pill-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
-.conge-chip {
-  display: inline-block;
-  border: 1.5px dashed var(--border-strong);
-  color: var(--muted);
-  font-size: 0.6rem; font-weight: 600;
-  padding: 2px 7px; border-radius: 6px;
+/* ------ La fiche de garde : point de couleur + nom, encre sur fond
+   neutre — le langage des compteurs et de la modale, étendu à la
+   grille. La couleur pleine est réservée aux états qui la méritent
+   (aujourd'hui, alerte, sélection). ------ */
+.slot-card {
+  position: relative;
+  display: flex; flex-direction: column;
   background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 2px;
+  box-shadow: var(--edge-light), 1px 2px 4px rgba(110, 62, 14, 0.08);
+}
+/* micro-étiquette réservée aux EXCEPTIONS (vendredi inversé, matin) :
+   la nuit, elle, est le cas par défaut — elle n'a plus de libellé */
+.sc-tag {
+  align-self: flex-start;
+  font-family: var(--font-display);
+  font-size: 0.52rem; font-weight: 800; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--soft);
+  padding: 2px 6px 0;
+  white-space: nowrap;
+}
+.vet-row {
+  display: flex; align-items: center; gap: 5px;
+  width: 100%;
+  border: none; background: transparent;
+  color: var(--text);
+  font-size: 0.7rem; font-weight: 600; line-height: 1.35;
+  padding: 3px 6px; border-radius: 7px;
+  text-align: left;
+  transition: background-color .15s ease, color .15s ease;
+}
+button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink); }
+.vet-row .vdot {
+  width: 9px; height: 9px; border-radius: 50%; flex: none;
+  box-shadow: inset 0 0 0 1px rgba(58, 42, 28, 0.1);
+}
+.vet-row .role {
+  flex: none; margin-left: 2px;
+  font-family: var(--font-display);
+  font-size: 0.56rem; font-weight: 700; color: var(--soft);
+}
+.vet-row.warned { box-shadow: inset 0 0 0 1.5px var(--warn); }
+.vet-row.warned .role { color: var(--warn); }
+.vet-row.empty {
+  color: var(--muted);
+  border: 1.5px dashed var(--border-strong); border-radius: 7px;
+}
+.vet-row.empty .vdot { background: transparent; border: 1.5px dashed var(--border-strong); box-shadow: none; }
+.vet-row.empty:hover { color: var(--accent-ink); border-color: var(--accent-ink); background: transparent; }
+
+/* ------ Le bandeau week-end : UN seul objet continu qui traverse
+   les cases qu'il couvre (samedi + dimanche ici — l'affichage suit
+   la configuration du cabinet : binôme inversé le vendredi, donc le
+   vendredi garde sa propre fiche). Largeur : 100 % par case + les
+   6px de padding ×2, la gouttière de 5px et les bordures. ------ */
+.slot-card.we-span-2 { width: calc(200% + 19px); z-index: 1; }
+.slot-card.we-span-3 { width: calc(300% + 38px); z-index: 1; }
+.we-band-card { background: linear-gradient(180deg, var(--surface) 0%, #FCF4E2 100%); }
+
+/* ------ Congés : l'anneau de couleur « vidé » dit l'absence,
+   le tireté dit « pas une garde » ------ */
+.conge-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  align-self: flex-start;
+  border: 1.5px dashed var(--border-strong);
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.62rem; font-weight: 600;
+  padding: 2px 8px 2px 5px; border-radius: 999px;
   max-width: 100%;
+}
+.conge-chip .vdot {
+  width: 7px; height: 7px; border-radius: 50%; flex: none;
+  background: transparent; border: 2px solid var(--soft);
 }
 .conge-chip.souhait { border-style: dotted; color: var(--soft); font-style: italic; }
 
@@ -742,6 +786,26 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
   font-family: var(--font-display); font-weight: 700; font-size: 0.9rem;
 }
 .cnt-num.zero { color: var(--soft); font-weight: 500; }
+/* la jauge sous chaque nombre : l'équité se VOIT, sans comparer de tête */
+.cnt-num .bar {
+  display: block; height: 3px; margin: 2px 3px 0;
+  border-radius: 2px; background: var(--border);
+  overflow: hidden;
+}
+.cnt-num .bar b {
+  display: block; height: 100%;
+  background: var(--accent); opacity: 0.55;
+  border-radius: 2px;
+  transform-origin: left center;
+  transition: transform .5s var(--ease-out);
+}
+.cnt-num.zero .bar b { transform: scaleX(0) !important; }
+.cnt-row.cnt-aside { opacity: 0.62; }
+.cnt-ecart {
+  margin-top: 10px;
+  font-size: 0.7rem; font-weight: 600; color: var(--muted);
+  line-height: 1.5;
+}
 .cnt-num.bump-up { animation: bumpUp .8s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
 .cnt-num.bump-down { animation: bumpDown .8s ease both; }
 @keyframes bumpUp { 30% { transform: scale(1.5); color: var(--ok); } }
@@ -777,7 +841,8 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
   z-index: 2; /* au-dessus de la carte : ses pattes se posent SUR le rebord */
   border: none; background: transparent; padding: 0;
   cursor: pointer;
-  transform: rotate(-9deg);
+  /* plus de rotation : l'arête verticale de la vidéo doit rester
+     parallèle au rebord de la carte pour que les pattes s'y posent */
   transition: transform .45s cubic-bezier(0.34, 1.4, 0.64, 1), opacity .3s ease;
 }
 .filou-edge .fe-crop {
@@ -794,21 +859,18 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
   margin-left: -58px;
   filter: drop-shadow(3px 6px 10px rgba(120, 70, 18, 0.28));
 }
-/* La vidéo « il se penche depuis le rebord » : cadrée pour que
-   l'arête qu'il agrippe tombe PILE sur le rebord de la carte
-   (miroir : dans la vidéo il se penche à droite d'un mur). */
+/* La vidéo « accroché au rebord » (Veo, pattes VISIBLES sur l'arête) :
+   cadrée pour que l'arête verticale qu'il agrippe tombe PILE sur le
+   rebord de la carte. Orientée côté gauche nativement — côté droit,
+   le miroir du conteneur suffit. */
 .filou-edge video {
-  width: 250px; height: auto; max-width: none;
-  margin-left: -73px; margin-top: -26px;
-  transform: scaleX(-1);
+  width: 118px; height: auto; max-width: none;
+  margin-left: 15px; margin-top: -14px;
   display: none;
 }
 .filou-edge.has-video video { display: block; }
 .filou-edge.has-video #fe-img { display: none; }
-.filou-edge.has-video .fe-paw { display: none; } /* la vraie patte est dans la vidéo */
-/* NB : côté droit, le conteneur est déjà en miroir — le scaleX(-1)
-   de la vidéo s'y annule et elle reprend son sens natif, qui est
-   le bon (il se penche à l'opposé de la carte des deux côtés). */
+.filou-edge.has-video .fe-paw { display: none; } /* les vraies pattes sont dans la vidéo */
 /* les pattes posées sur le rebord de la carte */
 .filou-edge .fe-paw {
   position: absolute;
@@ -828,25 +890,25 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
   box-shadow: 1px 2px 5px rgba(120, 70, 18, 0.12);
 }
 .filou-edge:hover, .filou-edge:focus-visible {
-  transform: rotate(-9deg) translateY(-7px);
+  transform: translateY(-7px);
 }
 /* de l'autre côté : même pose, en miroir (les pattes suivent) */
 .plan-scene.filou-right .filou-edge {
   left: auto; right: -110px;
-  transform: rotate(9deg) scaleX(-1);
+  transform: scaleX(-1);
 }
 .plan-scene.filou-right .filou-edge:hover,
 .plan-scene.filou-right .filou-edge:focus-visible {
-  transform: rotate(9deg) scaleX(-1) translateY(-7px);
+  transform: scaleX(-1) translateY(-7px);
 }
 .plan-scene.filou-right .fe-hint { transform: scaleX(-1); }
 /* le plongeon : il disparaît le temps de changer de côté */
-.filou-edge.fe-dive { transform: translateY(26px) rotate(-2deg) scale(0.85); opacity: 0; }
-.plan-scene.filou-right .filou-edge.fe-dive { transform: translateY(26px) rotate(2deg) scaleX(-1) scale(0.85); opacity: 0; }
+.filou-edge.fe-dive { transform: translateY(26px) scale(0.85); opacity: 0; }
+.plan-scene.filou-right .filou-edge.fe-dive { transform: translateY(26px) scaleX(-1) scale(0.85); opacity: 0; }
 /* le bond du départ : il se hisse avant d'ouvrir l'accueil */
 .filou-edge.fe-hop { animation: feHop .55s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
 @keyframes feHop {
-  0%   { transform: rotate(-9deg); }
+  0%   { transform: none; }
   45%  { transform: rotate(-3deg) translate(10px, -18px) scale(1.06); }
   100% { transform: rotate(0deg) translate(16px, -8px); }
 }
@@ -878,6 +940,28 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
   to   { opacity: 0; transform: translateY(70px) scale(0.4); }
 }
 .fox-out img { width: 100%; height: auto; filter: drop-shadow(0 10px 18px rgba(120,70,18,0.3)); }
+
+/* ------ Le bouton d'appel de Filou : toujours à portée de main,
+   en bas à droite de l'encart. Il s'efface quand le panneau est
+   ouvert (Filou est déjà là). ------ */
+.filou-call {
+  position: absolute; right: 14px; bottom: 14px; z-index: 21;
+  display: inline-flex; align-items: center; gap: 7px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 8px 16px 8px 12px; min-height: 42px;
+  font-family: var(--font-display);
+  font-size: 0.82rem; font-weight: 700; color: var(--accent-ink);
+  box-shadow: var(--edge-light), 2px 5px 12px rgba(120, 70, 18, 0.16);
+  transition: transform .25s var(--ease-out), box-shadow .2s ease;
+}
+.filou-call:hover, .filou-call:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: var(--edge-light), 3px 8px 18px rgba(120, 70, 18, 0.22);
+}
+.filou-call .fc-fox { font-size: 1.05rem; line-height: 1; }
+.workspace.filou-out .filou-call { opacity: 0; pointer-events: none; }
 
 .burrow-panel {
   position: absolute; right: 14px; bottom: 200px;
@@ -1205,7 +1289,7 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
 .av-list { list-style: none; margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 6px; animation: bubbleIn .25s ease both; }
 .av-row {
   display: grid;
-  grid-template-columns: 16px minmax(72px, auto) 14px minmax(0, 1fr);
+  grid-template-columns: 16px minmax(72px, auto) 14px minmax(0, 1fr) auto;
   align-items: center; gap: 9px;
   width: 100%; text-align: left;
   border: none; background: transparent;
@@ -1226,6 +1310,12 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
 .av-reason { font-size: 0.73rem; font-weight: 500; color: var(--muted); line-height: 1.35; }
 .av-row.rouge .av-reason { color: var(--danger); }
 .av-row.ambre .av-reason { color: var(--warn); }
+/* l'impact compteur : ce que ce choix ferait au total de la période */
+.av-count {
+  font-size: 0.68rem; font-weight: 600; color: var(--soft);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+  text-align: right;
+}
 
 /* Dialogue de confirmation de violation (garde-fou Filou dans la modale) */
 .gf-card {
@@ -1481,7 +1571,7 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
     <button type="button" class="filou-edge" id="filou-edge" aria-label="Demander l'assistance de Filou — ouvre l'accueil">
       <span class="fe-crop" aria-hidden="true">
         <video id="fe-video" muted playsinline preload="auto">
-          <source src="../filou/filou-accroche-cote.webm" type="video/webm">
+          <source src="../filou/filou-accroche-gauche.webm" type="video/webm">
         </video>
         <img id="fe-img" src="../filou/filou avatar de base.png" alt="">
       </span>
@@ -1524,7 +1614,7 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
         <h2 id="month-label">Janvier 2026</h2>
         <button type="button" class="mn-btn" id="next-month" aria-label="Mois suivant">→</button>
       </div>
-      <span class="meta">Clique sur une garde pour la réattribuer</span>
+      <span class="meta">Clique une garde pour la réattribuer · le passé est verrouillé 🔒</span>
       <div class="head-actions">
         <button type="button" class="head-btn" id="counters-toggle" aria-pressed="true" aria-controls="counters-panel">Compteurs</button>
         <button type="button" class="head-btn ghost" id="btn-pdf" title="Exporter le planning en PDF">🖨 PDF</button>
@@ -1558,7 +1648,8 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
             <p>Ils bougent en direct, à chaque changement manuel.</p>
           </div>
           <div id="cnt-grid"><!-- rempli par le JS --></div>
-          <p class="cnt-foot">Les colonnes suivent le <b>catalogue du cabinet</b> : le créneau sur-mesure « Samedi matin » (1 place) a la sienne. « 1er WE » = 1er de garde du week-end (avantage financier), suivi à part.</p>
+          <p class="cnt-ecart" id="cnt-ecart"><!-- rempli par le JS --></p>
+          <p class="cnt-foot">Colonnes du <b>catalogue du cabinet</b> · « 1er WE » = 1er de garde (avantage financier) · « Sam. matin » = créneau sur-mesure.</p>
         </aside>
       </div>
     </div>
@@ -1574,6 +1665,11 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
 
     <!-- Filou qui surgit (garde-fou des actions) -->
     <div class="fox-out" id="fox-out" aria-hidden="true"><img src="../fox-1.png" alt=""></div>
+
+    <!-- Bouton d'appel : faire venir Filou sans attendre une alerte -->
+    <button type="button" class="filou-call" id="filou-call">
+      <span class="fc-fox" aria-hidden="true">🦊</span>Appeler Filou
+    </button>
 
     <!-- Panneau compact de conversation -->
     <aside class="burrow-panel" id="burrow-panel" aria-label="Panneau de conversation avec Filou">
@@ -1733,6 +1829,15 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
     { n: "Thomas",   c: "var(--vet-thomas)",  role: "" }
   ];
   var ACT = ["Anne-So", "Manon", "Victor", "Camille", "Julie", "Thomas"];
+
+  /* ---------- Configuration du cabinet : affichage du week-end ----------
+     L'affichage SUIT la structure réelle du cabinet, il ne la répète pas.
+     Val d'Allier : le binôme du vendredi soir est INVERSÉ par rapport au
+     samedi/dimanche (règle R8) → le vendredi garde sa propre fiche, et
+     samedi + dimanche fusionnent en un seul bandeau continu.
+     Un cabinet au week-end identique sur 3 jours aurait un bandeau
+     ven → dim (vendrediInverse: false). */
+  var WE_CONFIG = { vendrediInverse: true };
   function vetColor(name) {
     for (var i = 0; i < VETS.length; i++) if (VETS[i].n === name) return VETS[i].c;
     return "var(--soft)";
@@ -1987,21 +2092,26 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
     return { w: Math.floor(diff / 7), dow: diff % 7 };
   }
 
-  function pillHtml(name, ref, place, rankLabel) {
+  /* Une ligne de vétérinaire dans une fiche : point de couleur + nom.
+     roleLabel (« 1er », « 2e », …) ne s'affiche que là où il informe. */
+  function vetRowHtml(name, ref, place, roleLabel) {
     var locked = slotLocked(ref);
     var key = slotKey(ref, place);
     var warned = warnedMap[key];
     var refAttr = ' data-w="' + ref.w + '" data-kind="' + ref.kind + '" data-d="' + (ref.d || 0) + '"';
     if (!name) {
-      return '<button type="button" class="pill empty"' + refAttr +
-        ' aria-label="Place à pourvoir · ' + slotTitle(ref) + '">À pourvoir</button>';
+      return '<button type="button" class="vet-row empty"' + refAttr +
+        ' aria-label="Place à pourvoir · ' + slotTitle(ref) + '">' +
+        '<span class="vdot" aria-hidden="true"></span>À pourvoir</button>';
     }
-    var cls = "pill" + (rankLabel === "2" ? " second" : "") + (warned ? " warned" : "");
-    var rk = rankLabel ? ' <span class="rank">' + rankLabel + "</span>" : "";
-    return '<button type="button" class="' + cls + '" style="background:' + vetColor(name) + '"' + refAttr +
+    var cls = "vet-row" + (warned ? " warned" : "");
+    var roleTxt = (warned ? "⚠ " : "") + (roleLabel || "");
+    var role = roleTxt.trim() ? '<span class="role">' + roleTxt.trim() + "</span>" : "";
+    return '<button type="button" class="' + cls + '"' + refAttr +
       (warned ? ' title="' + warned.replace(/"/g, "&quot;") + '"' : "") +
       ' aria-label="' + slotTitle(ref) + " · " + name + (locked ? " · verrouillée" : "") + '">' +
-      name + rk + "</button>";
+      '<span class="vdot" style="background:' + vetColor(name) + '" aria-hidden="true"></span>' +
+      name + role + "</button>";
   }
 
   function dayCellHtml(d, monthIdx) {
@@ -2029,37 +2139,54 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
     }
 
     var w = info.w, wk = WEEKS[w];
-    var lockAny = false;
 
-    /* corps du jour */
+    /* corps du jour · plus de libellé « Nuit » répété (c'est le cas
+       par défaut), plus de cadenas par case (le passé est éteint) */
     var body = "";
     congesOn(dIso).forEach(function (c) {
       body += '<span class="conge-chip' + (c.statut === "souhait" ? " souhait" : "") + '">' +
+        '<span class="vdot" style="border-color:' + vetColor(c.who) + '" aria-hidden="true"></span>' +
         (c.statut === "souhait" ? "Souhait" : "Congé") + " · " + c.who + "</span>";
     });
 
     if (info.dow <= 3) {
       var refN = { w: w, kind: "night", d: info.dow };
-      if (slotLocked(refN)) lockAny = true;
-      body += '<span class="slot-label">Nuit</span><span class="pill-stack">' +
-        pillHtml(wk.nights[info.dow][0], refN, 0, "") +
-        pillHtml(wk.nights[info.dow][1], refN, 1, "") + "</span>";
+      body += '<div class="slot-card">' +
+        vetRowHtml(wk.nights[info.dow][0], refN, 0, "") +
+        vetRowHtml(wk.nights[info.dow][1], refN, 1, "") + "</div>";
     } else {
       var refWe = { w: w, kind: "we" };
+      if (info.dow === 4) {
+        if (WE_CONFIG.vendrediInverse) {
+          /* vendredi : binôme inversé (config cabinet) → fiche propre */
+          body += '<div class="slot-card">' +
+            '<span class="sc-tag">dès le soir · inversé</span>' +
+            vetRowHtml(wk.we.v2, refWe, 2, "1er") +
+            vetRowHtml(wk.we.v1, refWe, 1, "2e") + "</div>";
+        } else {
+          /* week-end homogène : UN bandeau continu ven → dim */
+          body += '<div class="slot-card we-span-3 we-band-card">' +
+            '<span class="sc-tag">week-end · dès le soir</span>' +
+            vetRowHtml(wk.we.v1, refWe, 1, "1er") +
+            vetRowHtml(wk.we.v2, refWe, 2, "2e") + "</div>";
+        }
+      }
       if (info.dow === 5) {
         var refS = { w: w, kind: "sam", d: 0 };
-        if (slotLocked(refS)) lockAny = true;
-        body += '<span class="slot-label">Sam. matin · sur-mesure</span>' +
-          '<span class="pill-stack">' + pillHtml(wk.sam, refS, 0, "") + "</span>";
+        body += '<div class="slot-card">' +
+          '<span class="sc-tag">matin · sur-mesure</span>' +
+          vetRowHtml(wk.sam, refS, 0, "") + "</div>";
+        if (WE_CONFIG.vendrediInverse) {
+          /* le bandeau week-end traverse samedi + dimanche */
+          body += '<div class="slot-card we-span-2 we-band-card">' +
+            '<span class="sc-tag">week-end</span>' +
+            vetRowHtml(wk.we.v1, refWe, 1, "1er") +
+            vetRowHtml(wk.we.v2, refWe, 2, "2e") + "</div>";
+        }
       }
-      if (slotLocked(refWe)) lockAny = true;
-      body += '<span class="slot-label">' + (info.dow === 4 ? "Week-end · dès le soir" : "Week-end") + "</span>" +
-        '<span class="pill-stack">' +
-        pillHtml(wk.we.v1, refWe, 1, "1") +
-        pillHtml(wk.we.v2, refWe, 2, "2") + "</span>";
+      /* dimanche : couvert par le bandeau du samedi — rien à répéter */
     }
 
-    if (lockAny) html += '<span class="d-lock" title="Garde verrouillée (passée ou notifiée)">🔒</span>';
     html += "</div>";
     html += body;
     html += "</div>";
@@ -2132,6 +2259,27 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
     });
     return c;
   }
+  function colMax(counts, k) {
+    var mx = 0;
+    VETS.forEach(function (v) { if (counts[v.n][k] > mx) mx = counts[v.n][k]; });
+    return mx;
+  }
+  function barHtml(val, mx) {
+    var f = mx ? (val / mx) : 0;
+    return '<i class="bar" aria-hidden="true"><b style="transform:scaleX(' + f.toFixed(3) + ')"></b></i>';
+  }
+  /* L'équité en une phrase : l'écart de nuits entre les vétos actifs */
+  function updateEcart(counts) {
+    var mn = Infinity, mx = -Infinity;
+    ACT.forEach(function (n) {
+      var v = counts[n].n;
+      if (v < mn) mn = v;
+      if (v > mx) mx = v;
+    });
+    $("#cnt-ecart").textContent = mx === mn
+      ? "Équité nuits : parfaite (" + mx + " chacun, hors Anne-Cat)."
+      : "Équité nuits : de " + mn + " à " + mx + " → écart de " + (mx - mn) + " (hors Anne-Cat).";
+  }
   function buildCounters() {
     var grid = $("#cnt-grid");
     var counts = computeCounts();
@@ -2142,15 +2290,26 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
     html += "</div>";
     VETS.forEach(function (v) {
       var k = counts[v.n];
-      html += '<div class="cnt-row"><span class="cnt-vet"><i style="background:' + v.c + '"></i>' +
+      html += '<div class="cnt-row' + (v.n === "Anne-Cat" ? " cnt-aside" : "") + '"><span class="cnt-vet"><i style="background:' + v.c + '"></i>' +
         v.n + (v.n === "Anne-Cat" ? ' <small>dern. recours</small>' : "") + "</span>";
       CATALOGUE_COLS.forEach(function (col) {
-        html += '<span class="cnt-num' + (k[col.k] === 0 ? " zero" : "") + '" data-vet="' + v.n + '" data-m="' + col.k + '">' + k[col.k] + "</span>";
+        html += '<span class="cnt-num' + (k[col.k] === 0 ? " zero" : "") + '" data-vet="' + v.n + '" data-m="' + col.k + '">' + k[col.k] +
+          barHtml(k[col.k], colMax(counts, col.k)) + "</span>";
       });
       html += "</div>";
     });
     grid.innerHTML = html;
+    updateEcart(counts);
     prevCounts = counts;
+  }
+  function refreshBars(counts) {
+    CATALOGUE_COLS.forEach(function (col) {
+      var mx = colMax(counts, col.k);
+      VETS.forEach(function (v) {
+        var el = document.querySelector('.cnt-num[data-vet="' + v.n + '"][data-m="' + col.k + '"] .bar b');
+        if (el) el.style.transform = "scaleX(" + (mx ? (counts[v.n][col.k] / mx) : 0).toFixed(3) + ")";
+      });
+    });
   }
   function updateCounters() {
     if (!prevCounts) { buildCounters(); return; }
@@ -2163,7 +2322,7 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
         if (oldV === newV) return;
         var el = document.querySelector('.cnt-num[data-vet="' + v.n + '"][data-m="' + m + '"]');
         if (!el) return;
-        el.textContent = newV;
+        el.childNodes[0].textContent = newV; /* le nombre, sans toucher la jauge */
         el.classList.toggle("zero", newV === 0);
         el.classList.remove("bump-up", "bump-down");
         void el.offsetWidth;
@@ -2175,6 +2334,8 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
         setTimeout(function () { dd.remove(); }, 1500);
       });
     });
+    refreshBars(counts);
+    updateEcart(counts);
     prevCounts = counts;
   }
   var workspace = $("#workspace");
@@ -2210,7 +2371,7 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
   var feVideo = $("#fe-video");
   var feVideoActif = false;
   var feCycles = 0;
-  var FE_DEBUT = 0.45; /* saute les résidus de détourage des 1res images */
+  var FE_DEBUT = 0; /* la boucle est propre de bout en bout (trim + boucle-parfaite) */
   function feRelance() {
     try { feVideo.currentTime = FE_DEBUT; } catch (e) {}
     var p = feVideo.play();
@@ -2227,7 +2388,8 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
       feCycles++;
       var occupe = filouBusy || filouOut ||
         filouEdge.matches(":hover") || filouEdge === document.activeElement;
-      if (!occupe && feCycles % 3 === 0) planScene.classList.toggle("filou-right");
+      /* ~30 s par côté : la boucle dure ~5 s, il migre tous les 6 cycles */
+      if (!occupe && feCycles % 6 === 0) planScene.classList.toggle("filou-right");
       feRelance();
     });
     feVideo.addEventListener("error", function () {
@@ -2264,6 +2426,14 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
     setTimeout(function () { window.location.href = "m6-accueil-epicentre.html"; }, 760);
   });
   $("#panel-reduce").addEventListener("click", foxRentre);
+
+  /* Le bouton d'appel : Filou vient sans attendre une alerte */
+  $("#filou-call").addEventListener("click", function () {
+    if (filouOut) return;
+    foxSort();
+    appendPanelBubble("filou", "🦊 Filou",
+      "Je suis là ! Pose-moi ta question en bas, ou dis-moi ce qui te chiffonne sur ce brouillon.");
+  });
 
   var panelScroll = $("#panel-scroll");
   function appendPanelBubble(kind, who, html) {
@@ -2347,14 +2517,14 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
   function sectionsFor(ref) {
     if (ref.kind === "we") {
       return [
-        { place: 1, label: "1er de garde", sub: "avantage financier · suivi à part dans les compteurs" },
-        { place: 2, label: "2nd de garde", sub: "renfort du binôme, du vendredi soir au dimanche" }
+        { place: 1, label: "1er de garde", sub: "avantage financier" + (WE_CONFIG.vendrediInverse ? " · 2nd le vendredi soir (règle du cabinet)" : " · du vendredi soir au dimanche") },
+        { place: 2, label: "2nd de garde", sub: "renfort du binôme" + (WE_CONFIG.vendrediInverse ? " · 1er le vendredi soir" : "") }
       ];
     }
     if (ref.kind === "night") {
       return [
-        { place: 0, label: "Place 1", sub: "effectif de 2 réglé sur cette période" },
-        { place: 1, label: "Place 2", sub: "effectif de 2 réglé sur cette période" }
+        { place: 0, label: "1er vétérinaire", sub: "" },
+        { place: 1, label: "2e vétérinaire", sub: "" }
       ];
     }
     return [{ place: 0, label: "Vétérinaire du samedi matin", sub: "créneau sur-mesure du cabinet · 1 place" }];
@@ -2367,7 +2537,8 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
     var ferie = dates.map(function (d) { return FERIES[iso(d)]; }).filter(Boolean)[0];
 
     $("#gm-kicker").textContent =
-      (ref.kind === "we" ? "Week-end en binôme" : ref.kind === "sam" ? "Créneau sur-mesure" : "Garde de nuit") +
+      (ref.kind === "we" ? "Week-end en binôme" : ref.kind === "sam" ? "Créneau sur-mesure" :
+        "Garde de nuit · 2 vétos par nuit") +
       " · semaine " + (ref.w + 1) + " sur 12";
     $("#gm-title").textContent = slotTitle(ref);
 
@@ -2405,7 +2576,7 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
       var warned = warnedMap[slotKey(ref, s.place)];
       html += '<div class="gm-section' + (disabled ? " disabled" : "") + '" data-place="' + s.place + '">' +
         '<div class="gm-slot-row">' +
-        '<span class="gm-slot-label">' + s.label + "<small>" + s.sub + "</small></span>" +
+        '<span class="gm-slot-label">' + s.label + (s.sub ? "<small>" + s.sub + "</small>" : "") + "</span>" +
         (current
           ? '<span class="gm-current"><span class="dot" style="background:' + vetColor(current) + '"></span>' + current + "</span>"
           : '<span class="gm-current none">Aucun · à pourvoir</span>') +
@@ -2471,20 +2642,35 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
     var partnerPlaces = sectionsFor(ref).map(function (s) { return s.place; }).filter(function (p) { return p !== place; });
     var partners = partnerPlaces.map(function (p) { return getAssign(ref, p); });
 
-    var html = '<ul class="av-list">';
+    /* les disponibles d'abord — le bon choix saute aux yeux —,
+       et l'impact compteur affiché : ce que ce choix ferait au total */
+    var METRIC = { night: { k: "n", mot: "nuits" }, we: { k: "we", mot: "WE" }, sam: { k: "sam", mot: "sam. matins" } };
+    var metric = METRIC[ref.kind];
+    var counts = computeCounts();
+    var TONE_ORDER = { vert: 0, ambre: 1, rouge: 2 };
+    var rows = [];
     VETS.forEach(function (v) {
       if (v.n === current || partners.indexOf(v.n) >= 0) return;
-      var av = availability(v.n, ref, place);
-      html += '<li><button type="button" class="av-row ' + av.tone + '" data-name="' + v.n + '">' +
-        '<span class="dot" style="background:' + v.c + '"></span>' +
-        "<span>" + v.n + "</span>" +
-        '<span class="av-state ' + av.tone + '">●</span>' +
-        '<span class="av-reason">' + av.reason + "</span>" +
+      rows.push({ v: v, av: availability(v.n, ref, place) });
+    });
+    rows.sort(function (a, b) { return TONE_ORDER[a.av.tone] - TONE_ORDER[b.av.tone]; });
+
+    var html = '<ul class="av-list">';
+    rows.forEach(function (r) {
+      var now = counts[r.v.n][metric.k];
+      var impact = r.av.tone === "rouge" ? "" :
+        '<span class="av-count">' + now + " → " + (now + 1) + " " + metric.mot + "</span>";
+      html += '<li><button type="button" class="av-row ' + r.av.tone + '" data-name="' + r.v.n + '">' +
+        '<span class="dot" style="background:' + r.v.c + '"></span>' +
+        "<span>" + r.v.n + "</span>" +
+        '<span class="av-state ' + r.av.tone + '">●</span>' +
+        '<span class="av-reason">' + r.av.reason + "</span>" +
+        (impact || "<span></span>") +
         "</button></li>";
     });
     html += '<li><button type="button" class="av-row" data-name="">' +
       '<span class="dot none"></span><span>Aucun</span><span class="av-state">·</span>' +
-      '<span class="av-reason">Laisser la place à pourvoir</span></button></li>';
+      '<span class="av-reason">Laisser la place à pourvoir</span><span></span></button></li>';
     html += "</ul>";
     zone.innerHTML = html;
 
@@ -2563,7 +2749,7 @@ button.pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(120,
 
   /* clic sur une pastille de la grille */
   calBody.addEventListener("click", function (ev) {
-    var btn = ev.target.closest("button.pill");
+    var btn = ev.target.closest("button.vet-row");
     if (!btn) return;
     modalRef = {
       w: Number(btn.dataset.w),
