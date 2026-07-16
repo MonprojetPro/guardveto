@@ -70,6 +70,8 @@ def main():
     ap.add_argument("--model", default="veo-3.1-fast-generate-preview",
                     help="veo-3.1-fast-generate-preview (éco) | veo-3.1-generate-preview | veo-3.1-lite-generate-preview")
     ap.add_argument("--image", help="image de première frame (PNG) pour ancrer le personnage")
+    ap.add_argument("--lastframe", help="image imposée comme DERNIÈRE frame (boucle parfaite, cf. tape-tablette v2)")
+    ap.add_argument("--refimage", help="image de RÉFÉRENCE d'identité (asset) — garde le personnage sans imposer la pose ; incompatible negativePrompt (retiré automatiquement)")
     ap.add_argument("--prompt", help="prompt libre (à la place d'une scène du pack)")
     ap.add_argument("--aspect", default="9:16", help="9:16 (défaut, comme filou-attente) ou 16:9")
     args = ap.parse_args()
@@ -94,16 +96,27 @@ def main():
     key = get_api_key()
     os.makedirs(OUT_DIR, exist_ok=True)
 
-    instance = {"prompt": prompt}
-    if args.image:
-        with open(args.image, "rb") as f:
-            instance["image"] = {
+    def img_payload(path):
+        with open(path, "rb") as f:
+            return {
                 "bytesBase64Encoded": base64.b64encode(f.read()).decode("ascii"),
                 "mimeType": "image/png",
             }
+
+    instance = {"prompt": prompt}
+    if args.image:
+        instance["image"] = img_payload(args.image)
+    if args.lastframe:
+        instance["lastFrame"] = img_payload(args.lastframe)
+    if args.refimage:
+        instance["referenceImages"] = [{"image": img_payload(args.refimage), "referenceType": "asset"}]
+        negative = ""  # incompatible avec referenceImages (HTTP 400)
+    parameters = {"aspectRatio": args.aspect}
+    if negative:
+        parameters["negativePrompt"] = negative
     payload = {
         "instances": [instance],
-        "parameters": {"aspectRatio": args.aspect, "negativePrompt": negative},
+        "parameters": parameters,
     }
 
     print("Lancement Veo | modele %s | scene %s" % (args.model, scene_name))

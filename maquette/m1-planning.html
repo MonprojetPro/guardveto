@@ -630,11 +630,12 @@ img { display: block; }
    la nuit, elle, est le cas par défaut — elle n'a plus de libellé */
 .sc-tag {
   align-self: flex-start;
+  max-width: 100%;
   font-family: var(--font-display);
   font-size: 0.52rem; font-weight: 800; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--soft);
   padding: 2px 6px 0;
-  white-space: nowrap;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .vet-row {
   display: flex; align-items: center; gap: 5px;
@@ -664,15 +665,6 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 }
 .vet-row.empty .vdot { background: transparent; border: 1.5px dashed var(--border-strong); box-shadow: none; }
 .vet-row.empty:hover { color: var(--accent-ink); border-color: var(--accent-ink); background: transparent; }
-
-/* ------ Le bandeau week-end : UN seul objet continu qui traverse
-   les cases qu'il couvre (samedi + dimanche ici — l'affichage suit
-   la configuration du cabinet : binôme inversé le vendredi, donc le
-   vendredi garde sa propre fiche). Largeur : 100 % par case + les
-   6px de padding ×2, la gouttière de 5px et les bordures. ------ */
-.slot-card.we-span-2 { width: calc(200% + 19px); z-index: 1; }
-.slot-card.we-span-3 { width: calc(300% + 38px); z-index: 1; }
-.we-band-card { background: linear-gradient(180deg, var(--surface) 0%, #FCF4E2 100%); }
 
 /* ------ Congés : l'anneau de couleur « vidé » dit l'absence,
    le tireté dit « pas une garde » ------ */
@@ -837,7 +829,9 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .plan-scene { position: relative; }
 .filou-edge {
   position: absolute; top: 200px; left: -110px;
-  width: 110px; height: 168px;
+  /* 132px de large : les 22 derniers px chevauchent la carte, pour
+     que ses pattes posées SUR le rebord ne soient plus coupées */
+  width: 132px; height: 210px;
   z-index: 2; /* au-dessus de la carte : ses pattes se posent SUR le rebord */
   border: none; background: transparent; padding: 0;
   cursor: pointer;
@@ -850,8 +844,8 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   width: 100%; height: 100%;
   overflow: hidden;
   /* le bas s'estompe : il est « derrière » le rebord */
-  -webkit-mask-image: linear-gradient(180deg, #000 72%, transparent 97%);
-  mask-image: linear-gradient(180deg, #000 72%, transparent 97%);
+  -webkit-mask-image: linear-gradient(180deg, #000 84%, transparent 99%);
+  mask-image: linear-gradient(180deg, #000 84%, transparent 99%);
 }
 .filou-edge img {
   width: 210px; height: auto;
@@ -864,8 +858,8 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
    rebord de la carte. Orientée côté gauche nativement — côté droit,
    le miroir du conteneur suffit. */
 .filou-edge video {
-  width: 118px; height: auto; max-width: none;
-  margin-left: 15px; margin-top: -14px;
+  width: 109px; height: auto; max-width: none;
+  margin-left: 36px; margin-top: -18px;
   display: none;
 }
 .filou-edge.has-video video { display: block; }
@@ -881,14 +875,6 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 }
 .filou-edge .fe-paw.p1 { right: -8px; top: 84px; transform: rotate(6deg); }
 .filou-edge .fe-paw.p2 { right: -16px; top: 100px; transform: rotate(16deg); }
-.fe-hint {
-  position: absolute; left: -6px; top: calc(100% + 2px);
-  font-size: 0.68rem; font-weight: 700;
-  color: var(--accent-ink); white-space: nowrap;
-  background: var(--surface); border: 1px solid var(--border-strong);
-  border-radius: 999px; padding: 4px 11px;
-  box-shadow: 1px 2px 5px rgba(120, 70, 18, 0.12);
-}
 .filou-edge:hover, .filou-edge:focus-visible {
   transform: translateY(-7px);
 }
@@ -896,12 +882,12 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .plan-scene.filou-right .filou-edge {
   left: auto; right: -110px;
   transform: scaleX(-1);
+  /* le miroir suffit : l'arête vidéo retombe pile sur le rebord droit */
 }
 .plan-scene.filou-right .filou-edge:hover,
 .plan-scene.filou-right .filou-edge:focus-visible {
   transform: scaleX(-1) translateY(-7px);
 }
-.plan-scene.filou-right .fe-hint { transform: scaleX(-1); }
 /* le plongeon : il disparaît le temps de changer de côté */
 .filou-edge.fe-dive { transform: translateY(26px) scale(0.85); opacity: 0; }
 .plan-scene.filou-right .filou-edge.fe-dive { transform: translateY(26px) scaleX(-1) scale(0.85); opacity: 0; }
@@ -946,21 +932,40 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
    ouvert (Filou est déjà là). ------ */
 .filou-call {
   position: absolute; right: 14px; bottom: 14px; z-index: 21;
-  display: inline-flex; align-items: center; gap: 7px;
-  background: var(--surface);
+  display: inline-flex; align-items: center; gap: 10px;
+  background: linear-gradient(180deg, #FFFEF9 0%, #FBF3E1 100%);
   border: 1px solid var(--border-strong);
   border-radius: 999px;
-  padding: 8px 16px 8px 12px; min-height: 42px;
-  font-family: var(--font-display);
-  font-size: 0.82rem; font-weight: 700; color: var(--accent-ink);
+  padding: 5px 18px 5px 6px; min-height: 48px;
+  text-align: left;
   box-shadow: var(--edge-light), 2px 5px 12px rgba(120, 70, 18, 0.16);
-  transition: transform .25s var(--ease-out), box-shadow .2s ease;
+  transition: transform .25s var(--ease-out), box-shadow .2s ease, border-color .2s ease;
 }
 .filou-call:hover, .filou-call:focus-visible {
   transform: translateY(-2px);
+  border-color: var(--accent-ink);
   box-shadow: var(--edge-light), 3px 8px 18px rgba(120, 70, 18, 0.22);
 }
-.filou-call .fc-fox { font-size: 1.05rem; line-height: 1; }
+/* le médaillon : son vrai portrait, cadré sur la tête */
+.filou-call .fc-avatar {
+  width: 38px; height: 38px; border-radius: 50%; flex: none;
+  background: var(--accent-soft);
+  border: 1px solid var(--border-strong);
+  overflow: hidden;
+  display: flex; justify-content: center; align-items: flex-start;
+}
+.filou-call .fc-avatar img { width: 188%; height: auto; margin-top: 2px; }
+.filou-call:hover .fc-avatar { animation: fcPeek .5s var(--ease-out); }
+@keyframes fcPeek { 40% { transform: rotate(-7deg) scale(1.08); } }
+.filou-call .fc-txt {
+  display: flex; flex-direction: column; gap: 1px; line-height: 1.2;
+  font-family: var(--font-display);
+  font-size: 0.84rem; font-weight: 700; color: var(--accent-ink);
+}
+.filou-call .fc-txt small {
+  font-family: var(--font-body);
+  font-size: 0.64rem; font-weight: 500; color: var(--muted);
+}
 .workspace.filou-out .filou-call { opacity: 0; pointer-events: none; }
 
 .burrow-panel {
@@ -1577,7 +1582,6 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
       </span>
       <span class="fe-paw p1" aria-hidden="true"></span>
       <span class="fe-paw p2" aria-hidden="true"></span>
-      <span class="fe-hint">Un coup de main ? 🦊</span>
     </button>
 
   <div class="workspace" id="workspace">
@@ -1604,7 +1608,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
           <button type="button" class="pp-item" data-period="hiver2026" aria-current="true">Hiver 2026 <small>Brouillon · la période de travail</small></button>
           <button type="button" class="pp-item" data-period="automne2025">Automne 2025 <small>Publiée · close — consultation seule</small></button>
           <button type="button" class="pp-item" data-period="ete2025">Été 2025 <small>Verrouillée · archivée</small></button>
-          <a class="pp-new" href="m6-accueil-epicentre.html#filou=periode">🦊 Préparer la période suivante <small>Filou s'en charge sur l'accueil — il saura pourquoi tu viens</small></a>
+          <a class="pp-new" href="m6-accueil-epicentre.html#filou=periode">Préparer la période suivante <small>Filou s'en charge sur l'accueil — il saura pourquoi tu viens</small></a>
           <p class="pp-today">📌 Aujourd'hui simulé : jeu. 15 janv. 2026</p>
         </div>
       </div>
@@ -1666,9 +1670,11 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
     <!-- Filou qui surgit (garde-fou des actions) -->
     <div class="fox-out" id="fox-out" aria-hidden="true"><img src="../fox-1.png" alt=""></div>
 
-    <!-- Bouton d'appel : faire venir Filou sans attendre une alerte -->
+    <!-- Bouton d'appel : faire venir Filou sans attendre une alerte.
+         Son vrai portrait dans un médaillon, pas d'émoji. -->
     <button type="button" class="filou-call" id="filou-call">
-      <span class="fc-fox" aria-hidden="true">🦊</span>Appeler Filou
+      <span class="fc-avatar" aria-hidden="true"><img src="../filou/filou avatar de base.png" alt=""></span>
+      <span class="fc-txt">Appeler Filou<small>il explique, vérifie, renseigne</small></span>
     </button>
 
     <!-- Panneau compact de conversation -->
@@ -1683,7 +1689,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
       </div>
       <div class="panel-scroll" id="panel-scroll">
         <div class="bubble filou">
-          <span class="who">🦊 Filou</span>
+          <span class="who">Filou</span>
           Je veille sur ton brouillon : chaque alerte t'est expliquée ici, et tout est consigné au journal.
         </div>
       </div>
@@ -1785,7 +1791,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 
 <footer class="footer-lab">
   <span><b>Maquette M1 · Planning complet</b> · ambiance Terrier chaleureux, données fictives · MonProjetPro</span>
-  <span>Démos : clique une garde (modale) · Générer · Publier · « ▶ Simuler une génération impossible » · Filou au rebord 🦊</span>
+  <span>Démos : clique une garde (modale) · Générer · Publier · « ▶ Simuler une génération impossible » · Filou au rebord</span>
 </footer>
 
 <script>
@@ -2155,36 +2161,31 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
         vetRowHtml(wk.nights[info.dow][0], refN, 0, "") +
         vetRowHtml(wk.nights[info.dow][1], refN, 1, "") + "</div>";
     } else {
+      /* Week-end : une fiche PAR JOUR (choix MiKL — pouvoir viser un
+         seul jour, ex. remplacer quelqu'un juste le samedi) ; l'ordre
+         du binôme suit la config du cabinet (vendredi inversé — R8). */
       var refWe = { w: w, kind: "we" };
+      var v1 = wk.we.v1, v2 = wk.we.v2;
       if (info.dow === 4) {
-        if (WE_CONFIG.vendrediInverse) {
-          /* vendredi : binôme inversé (config cabinet) → fiche propre */
-          body += '<div class="slot-card">' +
-            '<span class="sc-tag">dès le soir · inversé</span>' +
-            vetRowHtml(wk.we.v2, refWe, 2, "1er") +
-            vetRowHtml(wk.we.v1, refWe, 1, "2e") + "</div>";
-        } else {
-          /* week-end homogène : UN bandeau continu ven → dim */
-          body += '<div class="slot-card we-span-3 we-band-card">' +
-            '<span class="sc-tag">week-end · dès le soir</span>' +
-            vetRowHtml(wk.we.v1, refWe, 1, "1er") +
-            vetRowHtml(wk.we.v2, refWe, 2, "2e") + "</div>";
-        }
+        body += '<div class="slot-card">' +
+          '<span class="sc-tag">dès le soir</span>' +
+          (WE_CONFIG.vendrediInverse
+            ? vetRowHtml(v2, refWe, 2, "1er") + vetRowHtml(v1, refWe, 1, "2e")
+            : vetRowHtml(v1, refWe, 1, "1er") + vetRowHtml(v2, refWe, 2, "2e")) +
+          "</div>";
       }
       if (info.dow === 5) {
         var refS = { w: w, kind: "sam", d: 0 };
         body += '<div class="slot-card">' +
-          '<span class="sc-tag">matin · sur-mesure</span>' +
+          '<span class="sc-tag">matin</span>' +
           vetRowHtml(wk.sam, refS, 0, "") + "</div>";
-        if (WE_CONFIG.vendrediInverse) {
-          /* le bandeau week-end traverse samedi + dimanche */
-          body += '<div class="slot-card we-span-2 we-band-card">' +
-            '<span class="sc-tag">week-end</span>' +
-            vetRowHtml(wk.we.v1, refWe, 1, "1er") +
-            vetRowHtml(wk.we.v2, refWe, 2, "2e") + "</div>";
-        }
       }
-      /* dimanche : couvert par le bandeau du samedi — rien à répéter */
+      if (info.dow >= 5) {
+        body += '<div class="slot-card">' +
+          '<span class="sc-tag">week-end</span>' +
+          vetRowHtml(v1, refWe, 1, "1er") +
+          vetRowHtml(v2, refWe, 2, "2e") + "</div>";
+      }
     }
 
     html += "</div>";
@@ -2388,9 +2389,18 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
       feCycles++;
       var occupe = filouBusy || filouOut ||
         filouEdge.matches(":hover") || filouEdge === document.activeElement;
-      /* ~30 s par côté : la boucle dure ~5 s, il migre tous les 6 cycles */
-      if (!occupe && feCycles % 6 === 0) planScene.classList.toggle("filou-right");
-      feRelance();
+      /* ~30 s par côté : la boucle dure ~5 s, il migre tous les 6 cycles.
+         En DOUCEUR : il plonge (fondu), change de côté, se hisse. */
+      if (!occupe && feCycles % 6 === 0) {
+        filouEdge.classList.add("fe-dive");
+        setTimeout(function () {
+          planScene.classList.toggle("filou-right");
+          filouEdge.classList.remove("fe-dive");
+          feRelance();
+        }, 480);
+      } else {
+        feRelance();
+      }
     });
     feVideo.addEventListener("error", function () {
       feVideoActif = false;
@@ -2431,7 +2441,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   $("#filou-call").addEventListener("click", function () {
     if (filouOut) return;
     foxSort();
-    appendPanelBubble("filou", "🦊 Filou",
+    appendPanelBubble("filou", "Filou",
       "Je suis là ! Pose-moi ta question en bas, ou dis-moi ce qui te chiffonne sur ce brouillon.");
   });
 
@@ -2472,7 +2482,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
     input.value = "";
     setTimeout(function () {
       if (/cong[ée]/i.test(val)) {
-        appendPanelBubble("filou", "🦊 Filou renseigne",
+        appendPanelBubble("filou", "Filou renseigne",
           "C'est simple, trois petites étapes :" +
           '<ul class="aide-steps">' +
           '<li><span class="n">1</span><span>Ouvre <b>Absences &amp; échanges</b>, puis « Poser un congé ».</span></li>' +
@@ -2480,10 +2490,10 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
           '<li><span class="n">3</span><span>Envoie : l’admin reçoit la demande et la valide.</span></li>' +
           "</ul>");
       } else if (/pourquoi|explique/i.test(val)) {
-        appendPanelBubble("filou", "🦊 Filou explique",
+        appendPanelBubble("filou", "Filou explique",
           "Bonne question ! Dans la vraie application, je rejoue le calcul et je te réponds en français : qui était disponible, quelle règle a tranché, et ce que ça change pour l'équité. Ici, essaie plutôt les boutons de démonstration.");
       } else {
-        appendPanelBubble("filou", "🦊 Filou",
+        appendPanelBubble("filou", "Filou",
           "Bien noté ! Dans cette maquette, je ne réponds qu'aux scénarios prévus (essaie « Comment je pose un congé ? »). Dans la vraie application, je répondrais à toute question sur le fonctionnement, et je reformulerais tes demandes avant d'agir.");
       }
     }, REDUCED ? 100 : 650);
@@ -2696,7 +2706,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 
     var html = '<div class="gf-card ' + (dure ? "dure" : "souple") + '">' +
       '<span class="gardefou-fox"><img src="../fox-4.png" alt="Filou lève un panneau d’alerte"></span>' +
-      '<p class="gf-title">🦊 Filou · ' + (dure ? "règle obligatoire" : "règle souple") + "</p>" +
+      '<p class="gf-title">Filou · ' + (dure ? "règle obligatoire" : "règle souple") + "</p>" +
       "Hop, une seconde ! Si je mets <b>" + name + "</b> ici : " + av.reason.toLowerCase() + "." +
       '<span class="gf-rule">' + av.rule + "</span>" +
       (sub ? '<span class="gf-verified"><b>✓ Vérifié</b> : <b>' + sub + "</b> est disponible sur ce créneau et ne casse aucune règle.</span>" : "") +
@@ -2781,7 +2791,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   $("#recap-cancel").addEventListener("click", function () {
     closeVeil(recapVeil);
     foxSort();
-    appendPanelBubble("filou", "🦊 Filou",
+    appendPanelBubble("filou", "Filou",
       "Pas de souci, je garde tout sous le coude. Reclique sur « Générer » quand tu veux, le récap t'attendra.");
   });
   recapVeil.addEventListener("click", function (ev) { if (ev.target === recapVeil) closeVeil(recapVeil); });
@@ -2806,11 +2816,11 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
       if (wasPublished) {
         setStatus("brouillon");
         addJournalEntry("Régénération d'une période publiée : gardes non verrouillées recalculées, 6 vétérinaires re-notifiés, agenda resynchronisé. La période repasse en brouillon.", "warn");
-        appendPanelBubble("filou", "🦊 Filou",
+        appendPanelBubble("filou", "Filou",
           "C'est refait : les gardes <b>non verrouillées</b> ont été recalculées, les vétos re-notifiés, et la période repasse en <b>brouillon</b> le temps que tu relises. (Dans cette maquette, la grille reste identique.)");
       } else {
         addJournalEntry("Brouillon regénéré : 12 semaines, 11 règles fermes respectées, équitable à une garde près.", "ok");
-        appendPanelBubble("filou", "🦊 Filou",
+        appendPanelBubble("filou", "Filou",
           "Et voilà : brouillon regénéré, <b>11 règles fermes respectées</b>, équitable à une garde près. Relis-le tranquillement, les compteurs racontent la même histoire à droite. (Dans cette maquette, la grille reste identique.)");
       }
       setTimeout(foxRentre, REDUCED ? 500 : 3600);
@@ -2850,7 +2860,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
     foxSort();
     var nbS = souhaitsEnAttente().length;
     var nbV = violationsConsignees();
-    var b = appendPanelBubble("gardefou", "🦊 Filou se hisse au rebord · avant de publier",
+    var b = appendPanelBubble("gardefou", "Filou se hisse au rebord · avant de publier",
       '<span class="gardefou-fox"><img src="../fox-4.png" alt="Filou lève un panneau d’alerte qui devient une coche verte"></span>' +
       "Avant de publier, deux réserves : <b>" + nbS + " souhaits de congé</b> sont encore en attente sur cette période, et " +
       (nbV > 0 ? "le <b>changement manuel de mardi 27</b> crée une violation souple (Victor enchaîne deux nuits)." : "aucun changement manuel ne pose problème.") +
@@ -2863,7 +2873,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 
     b.querySelector('[data-pub="show"]').addEventListener("click", function () {
       this.disabled = true; this.style.opacity = "0.45";
-      appendPanelBubble("filou", "🦊 Filou détaille",
+      appendPanelBubble("filou", "Filou détaille",
         '<span class="gf-rule">⏳ <b>Souhait de congé</b> · Camille, 2 → 6 mars : chevauche sa nuit du mer. 4 mars.' +
         ' <button type="button" class="gf-act" data-see="2026-03-04">Voir sur la grille</button></span>' +
         '<span class="gf-rule">⏳ <b>Souhait de congé</b> · Julie, 14 → 15 févr. : elle n’y est pas de garde, mais c’est à trancher avant publication.' +
@@ -2883,7 +2893,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 
     b.querySelector('[data-pub="fix"]').addEventListener("click", function () {
       disableActions(b);
-      appendPanelBubble("filou", "🦊 Filou",
+      appendPanelBubble("filou", "Filou",
         "Bonne idée. Je te laisse la main : la violation de mardi 27 est en surbrillance. Rappelle-moi avec « Publier » quand tu es prête.");
       currentMonth = 0;
       renderMonth();
@@ -2893,7 +2903,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 
     b.querySelector('[data-pub="go"]').addEventListener("click", function () {
       disableActions(b);
-      var c = appendPanelBubble("gardefou", "🦊 Filou · dernier point avant l'envoi",
+      var c = appendPanelBubble("gardefou", "Filou · dernier point avant l'envoi",
         "Je publie <b>Hiver 2026</b> :" +
         '<ul class="aide-steps">' +
         '<li><span class="n">✉</span><span>les <b>6 vétérinaires</b> reçoivent leur planning par e-mail ;</span></li>' +
@@ -2909,13 +2919,13 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
         setStatus("publiee");
         addJournalEntry("Planning publié : 12 semaines, 6 vétérinaires notifiés, 61 événements synchronisés dans Google Agenda. 2 souhaits de congé restent à trancher.", "ok");
         appendPanelBubble("note", null, "✓ Planning publié · 12 semaines, équitable à une garde près.");
-        appendPanelBubble("filou", "🦊 Filou",
-          "C'est en ligne 🦊 Je continue de veiller depuis mon rebord : si un congé validé ou un échange touche le planning publié, je te préviens aussitôt.");
+        appendPanelBubble("filou", "Filou",
+          "C'est en ligne. Je continue de veiller depuis mon rebord : si un congé validé ou un échange touche le planning publié, je te préviens aussitôt.");
         setTimeout(foxRentre, REDUCED ? 500 : 4200);
       });
       c.querySelector('[data-pub2="no"]').addEventListener("click", function () {
         disableActions(c);
-        appendPanelBubble("filou", "🦊 Filou", "Entendu, rien n'est parti. Le brouillon t'attend.");
+        appendPanelBubble("filou", "Filou", "Entendu, rien n'est parti. Le brouillon t'attend.");
       });
     });
   });
@@ -2925,7 +2935,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
      ============================================================ */
   $("#demo-impasse").addEventListener("click", function () {
     foxSort();
-    var b = appendPanelBubble("impasse", "🦊 Filou explique · génération impossible",
+    var b = appendPanelBubble("impasse", "Filou explique · génération impossible",
       '<span class="gardefou-fox" style="border-color: rgba(168,52,31,0.3)"><img src="../fox-2.png" alt="Filou présente le moteur de planning"></span>' +
       "Je n'ai pas réussi à générer, et je peux te dire pourquoi. Le blocage : le <b>week-end du 20 au 22 février</b>, aucun binôme complet possible." +
       '<span class="gf-rule" style="border-color: rgba(168,52,31,0.35)">En cause, trois choses qui se marchent dessus :' +
@@ -2950,7 +2960,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
     });
     b.querySelector('[data-imp="keep"]').addEventListener("click", function () {
       disableActions(b);
-      appendPanelBubble("filou", "🦊 Filou",
+      appendPanelBubble("filou", "Filou",
         "Entendu, tes règles restent telles quelles. D'autres portes de sortie : trancher le congé autrement, ou demander un dépannage à Anne-Cat sur ce week-end. Dis-moi, je vérifie avant de proposer.");
     });
   });
