@@ -49,6 +49,19 @@
 8. **Remplaçants externes (locum)** — pas de carnet de remplaçants ni de règle
    d'intégration au planning.
 
+8 bis. **Remplacement d'UN SEUL jour d'un week-end** (décision MiKL 2026-07-16,
+   recette maquette M1) — cas réel : un véto du binôme ne peut pas être présent
+   le samedi (ou le dimanche) seulement. Cadrage arbitré : ça reste de
+   l'**exceptionnel → parcours crise (M3)**, PAS une réattribution ordinaire du
+   planning — mais **le moteur doit le permettre** : aujourd'hui le week-end est
+   un créneau-bloc, tous les flux (réattribution, échanges, crise) opèrent au
+   créneau entier. Voie technique : s'appuyer sur les relations génériques entre
+   créneaux (verrou 4) pour porter un remplacement partiel jour-par-jour avec
+   re-validation des règles. Questions métier à trancher avec le cabinet avant
+   dev : ① qui touche l'avantage financier du 1er WE si le remplacement ne
+   couvre qu'un jour ; ② comment les compteurs d'équité comptent un WE partiel ;
+   ③ remplacement simple ou dépannage avec dette (M3).
+
 ### Produit / opérationnel
 
 9. **Monitoring d'erreurs (Sentry ou équivalent)** — aujourd'hui un échec

@@ -602,6 +602,8 @@ img { display: block; }
 .day.hors .d-num { color: var(--soft); }
 .d-hors-note { font-size: 0.6rem; color: var(--soft); font-style: italic; margin-top: 2px; }
 .day.today { border: 2px solid var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+/* Une règle outrepassée se voit DE LOIN : toute la case porte l'alerte */
+.day.alerte { border: 2px solid var(--warn); box-shadow: 0 0 0 4px var(--warn-soft); }
 .d-head { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; }
 .d-num { font-family: var(--font-display); font-weight: 700; font-size: 0.82rem; }
 .d-today-tag {
@@ -657,8 +659,18 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   font-family: var(--font-display);
   font-size: 0.56rem; font-weight: 700; color: var(--soft);
 }
-.vet-row.warned { box-shadow: inset 0 0 0 1.5px var(--warn); }
-.vet-row.warned .role { color: var(--warn); }
+/* Une règle outrepassée doit se voir SANS avoir le nez dessus :
+   lavis ambré + liseré + ⚠ plein format, l'un des seuls endroits
+   où la couleur pleine a droit de cité dans la grille. */
+.vet-row.warned {
+  background: var(--warn-soft);
+  box-shadow: inset 0 0 0 1.5px var(--warn);
+}
+.vet-row.warned:hover { background: var(--warn-soft); color: var(--text); }
+.vet-row.warned .role {
+  color: var(--warn);
+  font-size: 0.78rem; line-height: 1;
+}
 .vet-row.empty {
   color: var(--muted);
   border: 1.5px dashed var(--border-strong); border-radius: 7px;
@@ -829,9 +841,10 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .plan-scene { position: relative; }
 .filou-edge {
   position: absolute; top: 200px; left: -110px;
-  /* 132px de large : les 22 derniers px chevauchent la carte, pour
-     que ses pattes posées SUR le rebord ne soient plus coupées */
-  width: 132px; height: 210px;
+  /* 152px de large : les ~42 derniers px chevauchent la carte, pour
+     que ses pattes qui agrippent le rebord ne soient JAMAIS coupées
+     (les doigts dépassent de l'arête d'environ 25 px affichés) */
+  width: 152px; height: 210px;
   z-index: 2; /* au-dessus de la carte : ses pattes se posent SUR le rebord */
   border: none; background: transparent; padding: 0;
   cursor: pointer;
@@ -2120,6 +2133,18 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
       name + role + "</button>";
   }
 
+  /* La case porte-t-elle une violation consignée ? (alerte visible de loin) */
+  function dayHasWarn(info) {
+    if (!info) return false;
+    if (info.dow <= 3) {
+      return !!(warnedMap[info.w + "|night|" + info.dow + "|0"] ||
+                warnedMap[info.w + "|night|" + info.dow + "|1"]);
+    }
+    var weWarn = warnedMap[info.w + "|we|0|1"] || warnedMap[info.w + "|we|0|2"];
+    if (info.dow === 5) return !!(weWarn || warnedMap[info.w + "|sam|0|0"]);
+    return !!weWarn;
+  }
+
   function dayCellHtml(d, monthIdx) {
     var dIso = iso(d);
     var info = dateInfo(d);
@@ -2131,6 +2156,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
     if (d.getTime() < TODAY.getTime()) classes.push("past");
     if (dIso === iso(TODAY)) classes.push("today");
     if (!info) classes.push("hors");
+    if (dayHasWarn(info)) classes.push("alerte");
 
     var html = '<div class="' + classes.join(" ") + '" data-date="' + dIso + '">';
     html += '<div class="d-head"><span class="d-num">' + d.getDate() + "</span>";
@@ -2389,9 +2415,9 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
       feCycles++;
       var occupe = filouBusy || filouOut ||
         filouEdge.matches(":hover") || filouEdge === document.activeElement;
-      /* ~30 s par côté : la boucle dure ~5 s, il migre tous les 6 cycles.
+      /* ~30 s par côté : la boucle dure ~3,4 s, il migre tous les 9 cycles.
          En DOUCEUR : il plonge (fondu), change de côté, se hisse. */
-      if (!occupe && feCycles % 6 === 0) {
+      if (!occupe && feCycles % 9 === 0) {
         filouEdge.classList.add("fe-dive");
         setTimeout(function () {
           planScene.classList.toggle("filou-right");

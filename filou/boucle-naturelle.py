@@ -1,6 +1,10 @@
 """Boucle invisible SANS fantome : trouve le point de bouclage naturel.
 
-Usage : python boucle-naturelle.py <entree.webm> <sortie.webm> [frames_fantome_a_retirer]
+Usage : python boucle-naturelle.py <entree.webm> <sortie.webm> [frames_fantome_a_retirer] [fps] [ratio_duree_min]
+  fps            : cadence de sortie (defaut 24 ; 30 pour les exports Canva)
+  ratio_duree_min: part minimale de la video a conserver (defaut 0.40 ;
+                   monter a ~0.65 pour forcer un geste — ex. le coucou —
+                   a rester dans la boucle)
 
 Methode : cherche la paire d'images (i tot, j tard) la plus RESSEMBLANTE
 (difference pixel minimale sur miniature RGBA) et coupe la video de i a j-1 :
@@ -19,6 +23,8 @@ from PIL import Image
 entree = os.path.abspath(sys.argv[1])
 sortie = os.path.abspath(sys.argv[2])
 drop_fin = int(sys.argv[3]) if len(sys.argv) > 3 else 0
+fps = int(sys.argv[4]) if len(sys.argv) > 4 else 24
+ratio_min = float(sys.argv[5]) if len(sys.argv) > 5 else 0.40
 
 travail = tempfile.mkdtemp(prefix='filou-nat-')
 src = os.path.join(travail, 'src')
@@ -41,7 +47,7 @@ for f in frames:
     im = Image.open(os.path.join(src, f)).convert('RGBA').resize((108, 192))
     minis.append(np.asarray(im, dtype=np.float32))
 
-DUREE_MIN = int(n * 0.40)  # la boucle doit garder au moins ~40 % de la video
+DUREE_MIN = int(n * ratio_min)  # part minimale de la video conservee
 best = (1e18, 0, n)
 for i in range(0, min(100, n // 3)):
     for j in range(i + DUREE_MIN, n - 2):
@@ -54,7 +60,7 @@ for i in range(0, min(100, n // 3)):
         if d < best[0]:
             best = (d, i, j)
 score, i0, j0 = best
-print(f'      meilleur point : image {i0} -> {j0} (ecart moyen {score:.2f}/255, duree {j0-i0} img = {(j0-i0)/24:.1f} s)', flush=True)
+print(f'      meilleur point : image {i0} -> {j0} (ecart moyen {score:.2f}/255, duree {j0-i0} img = {(j0-i0)/fps:.1f} s)', flush=True)
 
 print('[3/4] assemblage avec micro-fondu (5 images)...', flush=True)
 K = 5
@@ -75,9 +81,9 @@ for j in range(K):
     idx += 1
 
 print('[4/4] reencodage VP9 alpha...', flush=True)
-subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-framerate', '24',
+subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-framerate', str(fps),
                 '-i', os.path.join(out, 'fr-%04d.png'),
                 '-c:v', 'libvpx-vp9', '-pix_fmt', 'yuva420p',
                 '-b:v', '0', '-crf', '34', '-auto-alt-ref', '0', '-an',
                 sortie], check=True)
-print(f'TERMINE -> {sortie} ({os.path.getsize(sortie)//1024} Ko, {idx} images, {idx/24:.1f} s)')
+print(f'TERMINE -> {sortie} ({os.path.getsize(sortie)//1024} Ko, {idx} images, {idx/fps:.1f} s)')
