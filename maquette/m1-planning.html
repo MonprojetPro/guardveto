@@ -602,8 +602,6 @@ img { display: block; }
 .day.hors .d-num { color: var(--soft); }
 .d-hors-note { font-size: 0.6rem; color: var(--soft); font-style: italic; margin-top: 2px; }
 .day.today { border: 2px solid var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
-/* Une règle outrepassée se voit DE LOIN : toute la case porte l'alerte */
-.day.alerte { border: 2px solid var(--warn); box-shadow: 0 0 0 4px var(--warn-soft); }
 .d-head { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; }
 .d-num { font-family: var(--font-display); font-weight: 700; font-size: 0.82rem; }
 .d-today-tag {
@@ -659,17 +657,19 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   font-family: var(--font-display);
   font-size: 0.56rem; font-weight: 700; color: var(--soft);
 }
-/* Une règle outrepassée doit se voir SANS avoir le nez dessus :
-   lavis ambré + liseré + ⚠ plein format, l'un des seuls endroits
-   où la couleur pleine a droit de cité dans la grille. */
+/* Une règle outrepassée doit se voir SANS avoir le nez dessus : le cadre
+   reste sur LA LIGNE fautive (pas de doublon avec le cadre du jour), mais
+   dans un orange vif qui tranche — l'un des seuls endroits où la couleur
+   pleine a droit de cité dans la grille. Ce marquage n'existe QU'EN
+   BROUILLON : publié = assumé, la trace vit au journal. */
 .vet-row.warned {
-  background: var(--warn-soft);
-  box-shadow: inset 0 0 0 1.5px var(--warn);
+  background: rgba(233, 88, 22, 0.14);
+  box-shadow: inset 0 0 0 2px #E95816, 1px 2px 6px rgba(233, 88, 22, 0.25);
 }
-.vet-row.warned:hover { background: var(--warn-soft); color: var(--text); }
+.vet-row.warned:hover { background: rgba(233, 88, 22, 0.2); color: var(--text); }
 .vet-row.warned .role {
-  color: var(--warn);
-  font-size: 0.78rem; line-height: 1;
+  color: #D64607;
+  font-size: 0.82rem; line-height: 1;
 }
 .vet-row.empty {
   color: var(--muted);
@@ -940,28 +940,28 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 }
 .fox-out img { width: 100%; height: auto; filter: drop-shadow(0 10px 18px rgba(120,70,18,0.3)); }
 
-/* ------ Le bouton d'appel de Filou : toujours à portée de main,
-   en bas à droite de l'encart. Il s'efface quand le panneau est
-   ouvert (Filou est déjà là). ------ */
+/* ------ Le bouton d'appel de Filou : dans la barre d'outils, à part
+   du groupe Compteurs/PDF/Publier (une fonction d'une autre nature).
+   Il s'estompe quand le panneau est ouvert (Filou est déjà là). ------ */
 .filou-call {
-  position: absolute; right: 14px; bottom: 14px; z-index: 21;
-  display: inline-flex; align-items: center; gap: 10px;
+  display: inline-flex; align-items: center; gap: 8px;
   background: linear-gradient(180deg, #FFFEF9 0%, #FBF3E1 100%);
   border: 1px solid var(--border-strong);
   border-radius: 999px;
-  padding: 5px 18px 5px 6px; min-height: 48px;
-  text-align: left;
-  box-shadow: var(--edge-light), 2px 5px 12px rgba(120, 70, 18, 0.16);
-  transition: transform .25s var(--ease-out), box-shadow .2s ease, border-color .2s ease;
+  padding: 3px 15px 3px 4px; min-height: 38px;
+  font-family: var(--font-display);
+  font-size: 0.8rem; font-weight: 700; color: var(--accent-ink);
+  box-shadow: var(--edge-light), 1px 3px 8px rgba(120, 70, 18, 0.14);
+  transition: transform .25s var(--ease-out), box-shadow .2s ease, border-color .2s ease, opacity .2s ease;
 }
 .filou-call:hover, .filou-call:focus-visible {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   border-color: var(--accent-ink);
-  box-shadow: var(--edge-light), 3px 8px 18px rgba(120, 70, 18, 0.22);
+  box-shadow: var(--edge-light), 2px 5px 12px rgba(120, 70, 18, 0.2);
 }
 /* le médaillon : son vrai portrait, cadré sur la tête */
 .filou-call .fc-avatar {
-  width: 38px; height: 38px; border-radius: 50%; flex: none;
+  width: 30px; height: 30px; border-radius: 50%; flex: none;
   background: var(--accent-soft);
   border: 1px solid var(--border-strong);
   overflow: hidden;
@@ -970,16 +970,8 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .filou-call .fc-avatar img { width: 188%; height: auto; margin-top: 2px; }
 .filou-call:hover .fc-avatar { animation: fcPeek .5s var(--ease-out); }
 @keyframes fcPeek { 40% { transform: rotate(-7deg) scale(1.08); } }
-.filou-call .fc-txt {
-  display: flex; flex-direction: column; gap: 1px; line-height: 1.2;
-  font-family: var(--font-display);
-  font-size: 0.84rem; font-weight: 700; color: var(--accent-ink);
-}
-.filou-call .fc-txt small {
-  font-family: var(--font-body);
-  font-size: 0.64rem; font-weight: 500; color: var(--muted);
-}
-.workspace.filou-out .filou-call { opacity: 0; pointer-events: none; }
+.ha-sep { width: 1px; height: 22px; background: var(--border-strong); margin: 0 5px; align-self: center; }
+.workspace.filou-out .filou-call { opacity: 0.35; pointer-events: none; }
 
 .burrow-panel {
   position: absolute; right: 14px; bottom: 200px;
@@ -1633,6 +1625,13 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
       </div>
       <span class="meta">Clique une garde pour la réattribuer · le passé est verrouillé 🔒</span>
       <div class="head-actions">
+        <!-- L'appel de Filou vit dans la barre d'outils, à part du groupe :
+             une fonction d'une autre nature que Compteurs/PDF/Publier -->
+        <button type="button" class="filou-call" id="filou-call">
+          <span class="fc-avatar" aria-hidden="true"><img src="../filou/filou avatar de base.png" alt=""></span>
+          Appeler Filou
+        </button>
+        <span class="ha-sep" aria-hidden="true"></span>
         <button type="button" class="head-btn" id="counters-toggle" aria-pressed="true" aria-controls="counters-panel">Compteurs</button>
         <button type="button" class="head-btn ghost" id="btn-pdf" title="Exporter le planning en PDF">🖨 PDF</button>
         <button type="button" class="head-btn" id="btn-generate">Générer</button>
@@ -1683,12 +1682,6 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
     <!-- Filou qui surgit (garde-fou des actions) -->
     <div class="fox-out" id="fox-out" aria-hidden="true"><img src="../fox-1.png" alt=""></div>
 
-    <!-- Bouton d'appel : faire venir Filou sans attendre une alerte.
-         Son vrai portrait dans un médaillon, pas d'émoji. -->
-    <button type="button" class="filou-call" id="filou-call">
-      <span class="fc-avatar" aria-hidden="true"><img src="../filou/filou avatar de base.png" alt=""></span>
-      <span class="fc-txt">Appeler Filou<small>il explique, vérifie, renseigne</small></span>
-    </button>
 
     <!-- Panneau compact de conversation -->
     <aside class="burrow-panel" id="burrow-panel" aria-label="Panneau de conversation avec Filou">
@@ -2116,7 +2109,9 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   function vetRowHtml(name, ref, place, roleLabel) {
     var locked = slotLocked(ref);
     var key = slotKey(ref, place);
-    var warned = warnedMap[key];
+    /* le marquage de violation ne vit qu'en brouillon : une fois publié,
+       l'équipe a assumé — la trace reste au journal, pas sur la grille */
+    var warned = periodStatus === "publiee" ? null : warnedMap[key];
     var refAttr = ' data-w="' + ref.w + '" data-kind="' + ref.kind + '" data-d="' + (ref.d || 0) + '"';
     if (!name) {
       return '<button type="button" class="vet-row empty"' + refAttr +
@@ -2133,18 +2128,6 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
       name + role + "</button>";
   }
 
-  /* La case porte-t-elle une violation consignée ? (alerte visible de loin) */
-  function dayHasWarn(info) {
-    if (!info) return false;
-    if (info.dow <= 3) {
-      return !!(warnedMap[info.w + "|night|" + info.dow + "|0"] ||
-                warnedMap[info.w + "|night|" + info.dow + "|1"]);
-    }
-    var weWarn = warnedMap[info.w + "|we|0|1"] || warnedMap[info.w + "|we|0|2"];
-    if (info.dow === 5) return !!(weWarn || warnedMap[info.w + "|sam|0|0"]);
-    return !!weWarn;
-  }
-
   function dayCellHtml(d, monthIdx) {
     var dIso = iso(d);
     var info = dateInfo(d);
@@ -2156,7 +2139,6 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
     if (d.getTime() < TODAY.getTime()) classes.push("past");
     if (dIso === iso(TODAY)) classes.push("today");
     if (!info) classes.push("hors");
-    if (dayHasWarn(info)) classes.push("alerte");
 
     var html = '<div class="' + classes.join(" ") + '" data-date="' + dIso + '">';
     html += '<div class="d-head"><span class="d-num">' + d.getDate() + "</span>";
@@ -2863,6 +2845,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 
   function setStatus(st) {
     periodStatus = st;
+    renderMonth(); /* publié → les marquages de violation quittent la grille */
     var badge = $("#status-badge");
     badge.classList.remove("st-brouillon", "st-publiee", "st-verrouillee", "pulse");
     if (st === "publiee") {

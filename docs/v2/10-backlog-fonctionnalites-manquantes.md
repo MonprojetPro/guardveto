@@ -57,10 +57,16 @@
    un créneau-bloc, tous les flux (réattribution, échanges, crise) opèrent au
    créneau entier. Voie technique : s'appuyer sur les relations génériques entre
    créneaux (verrou 4) pour porter un remplacement partiel jour-par-jour avec
-   re-validation des règles. Questions métier à trancher avec le cabinet avant
-   dev : ① qui touche l'avantage financier du 1er WE si le remplacement ne
-   couvre qu'un jour ; ② comment les compteurs d'équité comptent un WE partiel ;
-   ③ remplacement simple ou dépannage avec dette (M3).
+   re-validation des règles. **Questions métier : posées par FILOU au client,
+   pas tranchées d'avance** (décision MiKL 2026-07-17) — au premier cas
+   concret, Filou pose la question au moment où elle se présente (« qui touche
+   l'avantage financier du 1er WE si le remplacement ne couvre qu'un jour ? »,
+   « ce week-end partiel compte comment dans l'équité ? », « simple
+   remplacement ou dépannage avec dette ? ») et la réponse devient un
+   **réglage du cabinet**, mémorisé et re-proposé par défaut les fois
+   suivantes. Aligné sur le principe « toutes les règles réglables +
+   faisabilité jugée en direct par l'IA » (mémoire
+   backlog-regles-structurelles-modulables).
 
 ### Produit / opérationnel
 
