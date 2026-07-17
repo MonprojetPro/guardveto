@@ -112,6 +112,8 @@ def main():
         instance["referenceImages"] = [{"image": img_payload(args.refimage), "referenceType": "asset"}]
         negative = ""  # incompatible avec referenceImages (HTTP 400)
     parameters = {"aspectRatio": args.aspect}
+    # NB : generateAudio n'est pas supporté par veo-3.1-*-preview (HTTP 400) ;
+    # couper le son en aval : ffmpeg -an sur le MP4 livré.
     if negative:
         parameters["negativePrompt"] = negative
     payload = {
