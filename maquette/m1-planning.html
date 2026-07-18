@@ -840,11 +840,15 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
    ============================================================ */
 .plan-scene { position: relative; }
 .filou-edge {
-  position: absolute; top: 200px; left: -110px;
+  position: absolute; top: 200px; left: -140px;
   /* 152px de large : les ~42 derniers px chevauchent la carte, pour
      que ses pattes qui agrippent le rebord ne soient JAMAIS coupées
-     (les doigts dépassent de l'arête d'environ 25 px affichés) */
-  width: 152px; height: 210px;
+     (les doigts dépassent de l'arête vers l'intérieur de la carte) */
+  /* fenêtre 176px : assez large pour la PATTE DU COUCOU entière
+     (elle s'ouvre à côté de la tête, jusqu'à ~900 px natifs) ; à
+     1440 de large l'élément déborde ~12 px du viewport mais cette
+     zone est déjà transparente (fondu queue cuit dans l'asset) */
+  width: 176px; height: 195px;
   z-index: 2; /* au-dessus de la carte : ses pattes se posent SUR le rebord */
   border: none; background: transparent; padding: 0;
   cursor: pointer;
@@ -853,28 +857,46 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   transition: transform .45s cubic-bezier(0.34, 1.4, 0.64, 1), opacity .3s ease;
 }
 .filou-edge .fe-crop {
+  position: relative;
   display: block;
   width: 100%; height: 100%;
   overflow: hidden;
-  /* le bas s'estompe : il est « derrière » le rebord */
-  -webkit-mask-image: linear-gradient(180deg, #000 84%, transparent 99%);
-  mask-image: linear-gradient(180deg, #000 84%, transparent 99%);
+  /* Le métrage est orienté arête-À-GAUCHE du renard : le miroir du
+     .fe-crop le remet côté gauche ; côté droit, le miroir du conteneur
+     l'annule et la vidéo native convient.
+     ⚠ PAS de mask CSS ici : sur une <video> composited, le mask laisse
+     passer une ligne de bord à la limite de l'overflow (bug constaté
+     2026-07-18). Les fondus bas + côté queue sont CUITS dans l'alpha
+     des WebM (applique-fondu-alpha.py, natif y 742→1047 / x 900→1040 —
+     le latéral ne touche QUE la queue : la patte du coucou monte
+     jusqu'à ~900). Cadrage vidéo : width 200 / top -18. */
+  transform: scaleX(-1);
 }
 .filou-edge img {
-  width: 210px; height: auto;
-  /* recadré : sa tête au centre de la fenêtre visible */
-  margin-left: -58px;
+  width: 290px; height: auto;
+  /* repli statique : cadré sur la tête (l'avatar est un plan en pied),
+     vignette douce cuite en mask — sans bug de bord, une <img> n'est
+     pas une surface vidéo composited. Le miroir du .fe-crop est annulé
+     ici pour garder l'avatar dans le bon sens (badge lisible). */
+  margin-left: -60px; margin-top: -6px;
+  transform: scaleX(-1);
   filter: drop-shadow(3px 6px 10px rgba(120, 70, 18, 0.28));
+  -webkit-mask-image: radial-gradient(ellipse 52% 38% at 48% 22%, #000 62%, transparent 100%);
+  mask-image: radial-gradient(ellipse 52% 38% at 48% 22%, #000 62%, transparent 100%);
 }
-/* La vidéo « accroché au rebord » (Veo, pattes VISIBLES sur l'arête) :
-   cadrée pour que l'arête verticale qu'il agrippe tombe PILE sur le
-   rebord de la carte. Orientée côté gauche nativement — côté droit,
-   le miroir du conteneur suffit. */
+/* Les vidéos « accroché au rebord » (même métrage : idle + coucou),
+   superposées pour le fondu croisé. Cadrées pour que l'arête invisible
+   qu'il agrippe (~18 % de la largeur en natif) tombe PILE sur le
+   rebord de la carte une fois le .fe-crop miroité. */
 .filou-edge video {
-  width: 109px; height: auto; max-width: none;
-  margin-left: 36px; margin-top: -18px;
+  position: absolute; left: 0; top: -18px;
+  width: 200px; height: auto; max-width: none;
   display: none;
+  transition: opacity .3s ease;
 }
+#fe-coucou { opacity: 0; }
+.filou-edge.fe-wave #fe-coucou { opacity: 1; }
+.filou-edge.fe-wave #fe-idle { opacity: 0; }
 .filou-edge.has-video video { display: block; }
 .filou-edge.has-video #fe-img { display: none; }
 .filou-edge.has-video .fe-paw { display: none; } /* les vraies pattes sont dans la vidéo */
@@ -886,14 +908,16 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   border: 1.5px solid #B36414;
   box-shadow: 1px 2px 3px rgba(120, 70, 18, 0.25);
 }
-.filou-edge .fe-paw.p1 { right: -8px; top: 84px; transform: rotate(6deg); }
-.filou-edge .fe-paw.p2 { right: -16px; top: 100px; transform: rotate(16deg); }
+/* posées à cheval sur le rebord de la carte (à 140 px du bord gauche
+   de l'élément, soit right: 36 — elles le chevauchent de moitié) */
+.filou-edge .fe-paw.p1 { right: 28px; top: 108px; transform: rotate(6deg); }
+.filou-edge .fe-paw.p2 { right: 22px; top: 126px; transform: rotate(16deg); }
 .filou-edge:hover, .filou-edge:focus-visible {
   transform: translateY(-7px);
 }
 /* de l'autre côté : même pose, en miroir (les pattes suivent) */
 .plan-scene.filou-right .filou-edge {
-  left: auto; right: -110px;
+  left: auto; right: -140px;
   transform: scaleX(-1);
   /* le miroir suffit : l'arête vidéo retombe pile sur le rebord droit */
 }
@@ -1575,13 +1599,18 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   <div class="plan-scene" id="plan-scene">
 
     <!-- Filou accroché au rebord : il attend qu'on le sollicite.
-         Vidéo animée (il se penche, guette, se retire — comme sur
-         l'accueil) ; repli image si le WebM ne se décode pas.
-         Un clic = petit bond, puis l'accueil s'ouvre (sa tablette y vit). -->
+         DEUX vidéos tirées du MÊME métrage (identité garantie) :
+         l'idle en boucle continue, le coucou joué de temps en temps
+         et au survol (fondu croisé) ; repli image si le WebM ne se
+         décode pas. Un clic = petit bond, puis l'accueil s'ouvre
+         (sa tablette y vit). -->
     <button type="button" class="filou-edge" id="filou-edge" aria-label="Demander l'assistance de Filou — ouvre l'accueil">
       <span class="fe-crop" aria-hidden="true">
-        <video id="fe-video" muted playsinline preload="auto">
-          <source src="../filou/filou-accroche-gauche.webm" type="video/webm">
+        <video id="fe-idle" muted loop playsinline preload="auto">
+          <source src="../filou/filou-accroche-idle.webm" type="video/webm">
+        </video>
+        <video id="fe-coucou" muted playsinline preload="auto">
+          <source src="../filou/filou-accroche-coucou.webm" type="video/webm">
         </video>
         <img id="fe-img" src="../filou/filou avatar de base.png" alt="">
       </span>
@@ -2374,63 +2403,76 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   var filouEdge = $("#filou-edge");
   var filouBusy = false;
 
-  /* La vidéo « il se penche, guette, se retire » (comme l'accueil).
-     Chaque lecture est UN cycle complet ; à la fin d'un cycle sur
-     trois, il ressort de l'autre côté. Repli image si indécodable. */
-  var feVideo = $("#fe-video");
+  /* DEUX vidéos tirées du même métrage : l'idle (ping-pong, boucle
+     parfaite) tourne en continu ; le coucou (un seul geste) se joue
+     toutes les ~30-45 s et au survol, en fondu croisé (~0,3 s) —
+     les deux vivent dans la même pose, la couture est invisible.
+     Repli image si le WebM ne se décode pas. */
+  var feIdle = $("#fe-idle");
+  var feCoucou = $("#fe-coucou");
   var feVideoActif = false;
-  var feCycles = 0;
-  var FE_DEBUT = 0; /* la boucle est propre de bout en bout (trim + boucle-parfaite) */
-  function feRelance() {
-    try { feVideo.currentTime = FE_DEBUT; } catch (e) {}
-    var p = feVideo.play();
+  var feWaveEnCours = false;
+  var feWaveTimer = null;
+  var feDernierSurvol = 0;
+  function feJoue(v) {
+    var p = v.play();
     if (p && p.catch) p.catch(function () {});
   }
-  if (!REDUCED && feVideo) {
-    feVideo.addEventListener("canplay", function once() {
-      feVideo.removeEventListener("canplay", once);
+  function fePlanifieCoucou() {
+    clearTimeout(feWaveTimer);
+    feWaveTimer = setTimeout(feCoucouJoue, 30000 + Math.random() * 15000);
+  }
+  function feCoucouJoue() {
+    if (!feVideoActif || feWaveEnCours || filouBusy || filouOut) { fePlanifieCoucou(); return; }
+    feWaveEnCours = true;
+    try { feCoucou.currentTime = 0; } catch (e) {}
+    feJoue(feCoucou);
+    filouEdge.classList.add("fe-wave");
+  }
+  if (!REDUCED && feIdle && feCoucou) {
+    feIdle.addEventListener("canplay", function once() {
+      feIdle.removeEventListener("canplay", once);
       feVideoActif = true;
       filouEdge.classList.add("has-video");
-      feRelance();
+      feJoue(feIdle);
+      fePlanifieCoucou();
     });
-    feVideo.addEventListener("ended", function () {
-      feCycles++;
-      var occupe = filouBusy || filouOut ||
-        filouEdge.matches(":hover") || filouEdge === document.activeElement;
-      /* ~30 s par côté : la boucle dure ~3,4 s, il migre tous les 9 cycles.
-         En DOUCEUR : il plonge (fondu), change de côté, se hisse. */
-      if (!occupe && feCycles % 9 === 0) {
-        filouEdge.classList.add("fe-dive");
-        setTimeout(function () {
-          planScene.classList.toggle("filou-right");
-          filouEdge.classList.remove("fe-dive");
-          feRelance();
-        }, 480);
-      } else {
-        feRelance();
-      }
+    feCoucou.addEventListener("ended", function () {
+      filouEdge.classList.remove("fe-wave");
+      feWaveEnCours = false;
+      fePlanifieCoucou();
     });
-    feVideo.addEventListener("error", function () {
+    /* au survol : un coucou aussi (au plus un toutes les 8 s) */
+    filouEdge.addEventListener("mouseenter", function () {
+      var t = Date.now();
+      if (t - feDernierSurvol < 8000) return;
+      feDernierSurvol = t;
+      feCoucouJoue();
+    });
+    function feEchec() {
       feVideoActif = false;
-      filouEdge.classList.remove("has-video");
-    }, true);
+      feWaveEnCours = false;
+      filouEdge.classList.remove("has-video", "fe-wave");
+    }
+    feIdle.addEventListener("error", feEchec, true);
+    feCoucou.addEventListener("error", feEchec, true);
     window.setTimeout(function () {
-      if (feVideo.readyState < 2) filouEdge.classList.remove("has-video");
+      if (feIdle.readyState < 2) feEchec();
     }, 3000);
   }
 
-  /* Repli statique : sans vidéo, la migration reste au minuteur */
+  /* La migration de côté : l'idle boucle sans fin, elle vit donc au
+     minuteur (~40 s), jamais pendant un coucou ni une sollicitation. */
   if (!REDUCED) {
     setInterval(function () {
-      if (feVideoActif) return;
-      if (filouBusy || filouOut) return;
+      if (filouBusy || filouOut || feWaveEnCours) return;
       if (filouEdge.matches(":hover") || filouEdge === document.activeElement) return;
       filouEdge.classList.add("fe-dive");
       setTimeout(function () {
         planScene.classList.toggle("filou-right");
         filouEdge.classList.remove("fe-dive");
       }, 500);
-    }, 24000);
+    }, 40000);
   }
 
   /* Un clic : petit bond, puis l'accueil s'ouvre (sa tablette y vit) */
