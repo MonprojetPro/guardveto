@@ -909,36 +909,48 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   transition: transform .12s ease-out;
 }
 /* ============================================================
-   L'APPUI sur lequel Filou est accoudé.
-   ⚠ AUCUN fondu ici, et plus aucun dans les WebM : un fondu rendait
-   sa blouse translucide et ça se voyait (retour MiKL 2026-07-25).
-   Le bas du corps est coupé NET par .fe-crop, et cette planche
-   masque la coupe — comme un vrai rebord, ce qui rend enfin lisible
-   la pose « accroché » et ses pattes posées dessus.
+   LE SOCLE — l'ancien bouton « Appeler Filou », devenu l'appui.
+   Il rend deux services d'un coup :
+   ① il masque la coupe NETTE du métrage (qui n'a pas de fin : sans
+      lui il faudrait un fondu, et le fondu se voit) ;
+   ② il dit ce que Filou fait là — plus de bouton flottant dans la
+      barre d'outils, l'action est là où est le personnage.
+   Style repris à l'identique de l'ancien .filou-call pour qu'il
+   appartienne visiblement à la même famille que la barre d'outils.
    ============================================================ */
-.filou-edge .fe-appui {
-  /* elle mord sur le bord de la carte à droite : le rebord se lit alors
-     comme fixé À la carte, et non comme une étagère flottante */
-  position: absolute; left: 18px; right: 4px; bottom: 0;
-  height: 13px;
-  background:
-    linear-gradient(#FFFAF0 0 1px,
-                    #F4E7CD 1px 6px,
-                    #E7D5B2 6px 10px,
-                    #D8C094 100%);
-  border-radius: 3px 3px 6px 6px;
-  box-shadow: 0 4px 8px -2px rgba(120, 70, 18, 0.28),
-              inset 0 1px 0 rgba(255, 255, 255, 0.9),
-              inset 0 -1px 0 rgba(150, 105, 45, 0.35);
+.filou-edge .fe-socle {
+  position: absolute; left: 12px; right: 0; bottom: 0;
+  min-height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 4px 10px;
+  background: linear-gradient(180deg, #FFFEF9 0%, #FBF3E1 100%);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 0.72rem; font-weight: 700; letter-spacing: .01em;
+  color: var(--accent-ink);
+  box-shadow: var(--edge-light), 1px 3px 8px rgba(120, 70, 18, 0.14);
+  transition: transform .25s var(--ease-out), box-shadow .2s ease,
+              border-color .2s ease;
   z-index: 3;
 }
-/* l'ombre que Filou projette sur la planche : sans elle, il flotte */
-.filou-edge .fe-appui::before {
-  content: ""; position: absolute; left: 10px; right: 10px; top: -6px;
+/* l'ombre que Filou projette sur son socle : sans elle, il flotte */
+.filou-edge .fe-socle::before {
+  content: ""; position: absolute; left: 16px; right: 16px; top: -6px;
   height: 7px; border-radius: 50%;
   background: radial-gradient(ellipse at 50% 100%,
-              rgba(105, 62, 14, 0.34), rgba(105, 62, 14, 0) 74%);
+              rgba(105, 62, 14, 0.30), rgba(105, 62, 14, 0) 74%);
 }
+.filou-edge:hover .fe-socle,
+.filou-edge:focus-visible .fe-socle {
+  border-color: var(--accent-ink);
+  box-shadow: var(--edge-light), 2px 5px 12px rgba(120, 70, 18, 0.2);
+}
+/* Filou change de côté : le socle suit, mais son libellé se relit à
+   l'endroit (le parent est miroité en mode droite, on l'annule ici) */
+.plan-scene.filou-right .filou-edge .fe-socle-txt { display: inline-block; transform: scaleX(-1); }
+/* quand Filou est déjà sorti dans le panneau, l'appel n'a plus de sens */
+.plan-scene.filou-parti .fe-socle { opacity: .35; }
 .filou-edge .fx-scene {
   position: absolute; left: 0; top: 0;
   display: block; width: 1080px; height: 1920px;
@@ -1056,38 +1068,10 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 }
 .fox-out img { width: 100%; height: auto; filter: drop-shadow(0 10px 18px rgba(120,70,18,0.3)); }
 
-/* ------ Le bouton d'appel de Filou : dans la barre d'outils, à part
-   du groupe Compteurs/PDF/Publier (une fonction d'une autre nature).
-   Il s'estompe quand le panneau est ouvert (Filou est déjà là). ------ */
-.filou-call {
-  display: inline-flex; align-items: center; gap: 8px;
-  background: linear-gradient(180deg, #FFFEF9 0%, #FBF3E1 100%);
-  border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  padding: 3px 15px 3px 4px; min-height: 38px;
-  font-family: var(--font-display);
-  font-size: 0.8rem; font-weight: 700; color: var(--accent-ink);
-  box-shadow: var(--edge-light), 1px 3px 8px rgba(120, 70, 18, 0.14);
-  transition: transform .25s var(--ease-out), box-shadow .2s ease, border-color .2s ease, opacity .2s ease;
-}
-.filou-call:hover, .filou-call:focus-visible {
-  transform: translateY(-1px);
-  border-color: var(--accent-ink);
-  box-shadow: var(--edge-light), 2px 5px 12px rgba(120, 70, 18, 0.2);
-}
-/* le médaillon : son vrai portrait, cadré sur la tête */
-.filou-call .fc-avatar {
-  width: 30px; height: 30px; border-radius: 50%; flex: none;
-  background: var(--accent-soft);
-  border: 1px solid var(--border-strong);
-  overflow: hidden;
-  display: flex; justify-content: center; align-items: flex-start;
-}
-.filou-call .fc-avatar img { width: 188%; height: auto; margin-top: 2px; }
-.filou-call:hover .fc-avatar { animation: fcPeek .5s var(--ease-out); }
-@keyframes fcPeek { 40% { transform: rotate(-7deg) scale(1.08); } }
-.ha-sep { width: 1px; height: 22px; background: var(--border-strong); margin: 0 5px; align-self: center; }
-.workspace.filou-out .filou-call { opacity: 0.35; pointer-events: none; }
+/* (l'ancien bouton « Appeler Filou » de la barre d'outils est supprimé :
+   son rôle et son style sont passés sur le SOCLE sous Filou — voir
+   .fe-socle. Décision MiKL 2026-07-25 : l'appui devient l'action, ce
+   qui explique du même coup pourquoi Filou est sur la page.) */
 
 .burrow-panel {
   position: absolute; right: 14px; bottom: 200px;
@@ -1720,15 +1704,19 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
             </span>
           </span>
         </span>
-        <!-- L'APPUI : il masque franchement le bas de Filou. Avant, un
-             fondu rendait sa blouse translucide et ça se voyait. -->
-        <span class="fe-appui"></span>
+        <!-- (le socle est hors du .fe-crop : il ne doit pas subir le
+             miroir, sinon son libellé partirait à l'envers) -->
         <!-- COUCOU : le geste reste la vidéo (la patte n'existe pas
              dans les couches), joué toutes les ~30-45 s et au survol. -->
         <video id="fe-coucou" muted playsinline preload="auto">
           <source src="../filou/filou-accroche-coucou.webm" type="video/webm">
         </video>
       </span>
+      <!-- LE SOCLE : c'est lui, l'ancien bouton « Appeler Filou ». Il
+           sert deux fois — il masque la coupe nette du métrage (qui
+           n'a pas de fin : sans lui, il faut un fondu) et il dit à quoi
+           sert Filou. Hors du .fe-crop pour échapper au miroir. -->
+      <span class="fe-socle"><span class="fe-socle-txt">Appeler Filou</span></span>
     </button>
 
   <div class="workspace" id="workspace">
@@ -1767,13 +1755,10 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
       </div>
       <span class="meta">Clique une garde pour la réattribuer · le passé est verrouillé 🔒</span>
       <div class="head-actions">
-        <!-- L'appel de Filou vit dans la barre d'outils, à part du groupe :
-             une fonction d'une autre nature que Compteurs/PDF/Publier -->
-        <button type="button" class="filou-call" id="filou-call">
-          <span class="fc-avatar" aria-hidden="true"><img src="../filou/filou avatar de base.png" alt=""></span>
-          Appeler Filou
-        </button>
-        <span class="ha-sep" aria-hidden="true"></span>
+        <!-- Plus de bouton « Appeler Filou » ici : c'est le SOCLE sous
+             Filou qui porte l'appel (décision MiKL 2026-07-25). Le socle
+             sert deux fois — il masque la coupe du métrage ET il dit
+             pourquoi Filou est sur la page. -->
         <button type="button" class="head-btn" id="counters-toggle" aria-pressed="true" aria-controls="counters-panel">Compteurs</button>
         <button type="button" class="head-btn ghost" id="btn-pdf" title="Exporter le planning en PDF">🖨 PDF</button>
         <button type="button" class="head-btn" id="btn-generate">Générer</button>
@@ -2504,12 +2489,15 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
     filouOut = true;
     workspace.classList.remove("filou-in");
     workspace.classList.add("filou-out");
+    /* son socle s'estompe : l'appeler n'a plus de sens, il est déjà là */
+    if (planScene) planScene.classList.add("filou-parti");
   }
   function foxRentre() {
     if (!filouOut) return;
     filouOut = false;
     workspace.classList.remove("filou-out");
     workspace.classList.add("filou-in");
+    if (planScene) planScene.classList.remove("filou-parti");
   }
   /* --- Filou accroché au rebord --- */
   var planScene = $("#plan-scene");
@@ -2608,25 +2596,24 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
     }, 40000);
   }
 
-  /* Un clic : petit bond, puis l'accueil s'ouvre (sa tablette y vit) */
+  /* Un clic sur Filou OU sur son socle = « Appeler Filou » : petit bond,
+     puis il rejoint le panneau. C'est l'action qu'annonce le libellé du
+     socle, qui remplace l'ancien bouton de la barre d'outils. */
   filouEdge.addEventListener("click", function () {
-    if (filouBusy) return;
+    if (filouBusy || filouOut) return;
     filouBusy = true;
-    if (REDUCED) { window.location.href = "m6-accueil-epicentre.html"; return; }
-    planScene.classList.remove("filou-right");
     filouEdge.classList.add("fe-hop");
-    setTimeout(function () { $("#depart-veil").classList.add("show"); }, 320);
-    setTimeout(function () { window.location.href = "m6-accueil-epicentre.html"; }, 760);
+    setTimeout(function () {
+      filouEdge.classList.remove("fe-hop");
+      filouBusy = false;
+      foxSort();
+      appendPanelBubble("filou", "Filou",
+        "Je suis là ! Pose-moi ta question en bas, ou dis-moi ce qui te chiffonne sur ce brouillon.");
+    }, REDUCED ? 0 : 560);
   });
   $("#panel-reduce").addEventListener("click", foxRentre);
 
-  /* Le bouton d'appel : Filou vient sans attendre une alerte */
-  $("#filou-call").addEventListener("click", function () {
-    if (filouOut) return;
-    foxSort();
-    appendPanelBubble("filou", "Filou",
-      "Je suis là ! Pose-moi ta question en bas, ou dis-moi ce qui te chiffonne sur ce brouillon.");
-  });
+  /* (l'appel de Filou est passé sur son socle — voir plus haut) */
 
   var panelScroll = $("#panel-scroll");
   function appendPanelBubble(kind, who, html) {
