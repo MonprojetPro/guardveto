@@ -840,7 +840,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
    ============================================================ */
 .plan-scene { position: relative; }
 .filou-edge {
-  position: absolute; top: 200px; left: -172px;
+  position: absolute; top: 200px; left: -152px;
   /* 152px de large : les ~42 derniers px chevauchent la carte, pour
      que ses pattes qui agrippent le rebord ne soient JAMAIS coupées
      (les doigts dépassent de l'arête vers l'intérieur de la carte) */
@@ -927,20 +927,38 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   /* marges ÉGALES des deux bords : l'élément est retourné en miroir
      quand Filou passe à droite, donc toute asymétrie ici se traduit
      par un socle qui mord d'un côté et pas de l'autre. */
-  position: absolute; left: 24px; right: 24px; bottom: 0;
+  position: absolute; left: 26px; right: 26px; bottom: 0;
   min-height: 30px;
   display: flex; align-items: center; justify-content: center;
   padding: 4px 10px;
   background: linear-gradient(180deg, #FFFEF9 0%, #FBF3E1 100%);
-  border: 1px solid var(--border-strong);
+  /* liseré accent, plus affirmé qu'un bouton ordinaire : c'est la seule
+     invitation à parler à Filou sur cet écran, il doit se voir. On reste
+     dans la palette du terrier — pas de rouge d'alerte, l'assistance
+     n'est pas une urgence (demande MiKL 2026-07-25). */
+  border: 1.5px solid var(--accent);
   border-radius: 999px;
   font-family: var(--font-display);
   font-size: 0.72rem; font-weight: 700; letter-spacing: .01em;
   color: var(--accent-ink);
-  box-shadow: var(--edge-light), 1px 3px 8px rgba(120, 70, 18, 0.14);
+  box-shadow: var(--edge-light),
+              0 0 0 3px var(--accent-soft),
+              1px 3px 8px rgba(120, 70, 18, 0.16);
   transition: transform .25s var(--ease-out), box-shadow .2s ease,
               border-color .2s ease;
   z-index: 3;
+  /* un souffle très lent : il respire une fois toutes les 7 s, assez
+     pour attirer l'œil, trop doux pour agacer quelqu'un qui travaille */
+  animation: socleSouffle 7s ease-in-out infinite;
+}
+@keyframes socleSouffle {
+  0%, 62%, 100% { box-shadow: var(--edge-light),
+                              0 0 0 3px var(--accent-soft),
+                              1px 3px 8px rgba(120, 70, 18, 0.16); }
+  78%           { box-shadow: var(--edge-light),
+                              0 0 0 6px var(--accent-soft),
+                              0 0 14px var(--accent-glow),
+                              1px 3px 8px rgba(120, 70, 18, 0.16); }
 }
 /* l'ombre que Filou projette sur son socle : sans elle, il flotte */
 .filou-edge .fe-socle::before {
@@ -951,8 +969,12 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 }
 .filou-edge:hover .fe-socle,
 .filou-edge:focus-visible .fe-socle {
+  animation: none;
   border-color: var(--accent-ink);
-  box-shadow: var(--edge-light), 2px 5px 12px rgba(120, 70, 18, 0.2);
+  background: linear-gradient(180deg, #FFFFFF 0%, #FDF7E9 100%);
+  box-shadow: var(--edge-light),
+              0 0 0 5px var(--accent-soft),
+              2px 5px 12px rgba(120, 70, 18, 0.22);
 }
 /* Filou change de côté : le socle suit, mais son libellé se relit à
    l'endroit (le parent est miroité en mode droite, on l'annule ici) */
@@ -1031,7 +1053,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .plan-scene.filou-right .filou-edge {
   /* -160 comme à gauche : la pose doit être SYMÉTRIQUE, sinon le socle
      mord de 20 px de plus de ce côté (il grattait les compteurs) */
-  left: auto; right: -172px;
+  left: auto; right: -152px;
   transform: scaleX(-1);
   /* le miroir suffit : l'arête vidéo retombe pile sur le rebord droit */
 }
@@ -1603,7 +1625,8 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   .filou-edge, .burrow-panel, .modal-veil, .gv-modal, .status-badge { transition: none; }
   /* Filou en couches : plus de respiration ni de clignement — les pièces
      restent à leur place, on retrouve exactement l'image d'origine. */
-  .fx-corps, .fx-tete, .fx-or-g, .fx-or-d, .fx-oeil i { animation: none !important; }
+  .fx-corps, .fx-tete, .fx-or-g, .fx-or-d, .fx-oeil i,
+  .fe-socle { animation: none !important; }
   .workspace.filou-out .fox-out { animation: none; opacity: 1; transform: none; }
   .workspace.filou-in .fox-out { animation: none; opacity: 0; }
   .toast { transition: opacity .1s ease; }
