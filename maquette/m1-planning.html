@@ -840,15 +840,16 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
    ============================================================ */
 .plan-scene { position: relative; }
 .filou-edge {
-  position: absolute; top: 200px; left: -140px;
+  position: absolute; top: 200px; left: -160px;
   /* 152px de large : les ~42 derniers px chevauchent la carte, pour
      que ses pattes qui agrippent le rebord ne soient JAMAIS coupées
      (les doigts dépassent de l'arête vers l'intérieur de la carte) */
-  /* fenêtre 176px : assez large pour la PATTE DU COUCOU entière
-     (elle s'ouvre à côté de la tête, jusqu'à ~900 px natifs) ; à
-     1440 de large l'élément déborde ~12 px du viewport mais cette
-     zone est déjà transparente (fondu queue cuit dans l'asset) */
-  width: 176px; height: 195px;
+  /* fenêtre 196px : le contenu utile du métrage va de x=188 à x=1027
+     en natif (mesuré sur l'alpha), soit 155 px CSS à width:200 —
+     à partir de left:0 il court jusqu'à x≈190. Une fenêtre plus
+     étroite ROGNAIT l'oreille et la patte du coucou (constaté
+     2026-07-25). left compense pour garder l'arête à droite en 36. */
+  width: 196px; height: 195px;
   z-index: 2; /* au-dessus de la carte : ses pattes se posent SUR le rebord */
   border: none; background: transparent; padding: 0;
   cursor: pointer;
@@ -866,10 +867,11 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
      l'annule et la vidéo native convient.
      ⚠ PAS de mask CSS ici : sur une <video> composited, le mask laisse
      passer une ligne de bord à la limite de l'overflow (bug constaté
-     2026-07-18). Les fondus bas + côté queue sont CUITS dans l'alpha
-     des WebM (applique-fondu-alpha.py, natif y 742→1047 / x 900→1040 —
-     le latéral ne touche QUE la queue : la patte du coucou monte
-     jusqu'à ~900). Cadrage vidéo : width 200 / top -18. */
+     2026-07-18). Seul le fondu BAS est cuit dans l'alpha des WebM
+     (applique-fondu-alpha.py, natif y 950→1130, AUCUN fondu latéral).
+     ⚠ Ne JAMAIS remettre de fondu latéral : il rongeait l'oreille et
+     la patte du coucou, qui vont jusqu'à x=1027 natif (2026-07-25).
+     Cadrage vidéo : width 200 / top -18. */
   transform: scaleX(-1);
 }
 .filou-edge img {

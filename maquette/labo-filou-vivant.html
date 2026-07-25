@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Labo Filou — vidéo réparée vs Filou vivant (couches)</title>
+<style>
+  :root{
+    --panneau:#FBF3E2; --encre:#3A2E20; --trait:#E3D6BC;
+    --accent:#C9721B; --fond:#F6EFE0;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--fond); color:var(--encre);
+    font:15px/1.55 "Figtree","Noto Sans",system-ui,sans-serif;
+    padding:28px 20px 60px;
+  }
+  h1{font-size:22px;margin:0 0 4px}
+  .sous{color:#7A6A54;margin:0 0 26px;max-width:70ch}
+  .cols{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start}
+  .col{
+    background:var(--panneau);border:1px solid var(--trait);border-radius:14px;
+    padding:18px 18px 22px;flex:1 1 340px;min-width:330px;
+    box-shadow:0 2px 10px rgba(120,80,20,.06);
+  }
+  .col h2{font-size:15px;margin:0 0 2px;letter-spacing:.02em}
+  .col p.note{margin:0 0 16px;color:#7A6A54;font-size:13px;min-height:34px}
+  .etal{
+    background:
+      linear-gradient(#EFE4CC,#EFE4CC) 0 0/100% 100% no-repeat;
+    border:1px dashed var(--trait);border-radius:10px;
+    display:flex;align-items:flex-end;justify-content:center;
+    padding:14px 0 0;min-height:250px;position:relative;overflow:hidden;
+  }
+  .badge{
+    position:absolute;top:8px;left:10px;font-size:11px;letter-spacing:.06em;
+    text-transform:uppercase;color:#9A8767;
+  }
+  .poids{font-size:12px;color:#8A7A62;margin-top:10px}
+  .poids b{color:var(--encre)}
+
+  /* ---------- A : la vidéo (réparée) ---------- */
+  .video-wrap{position:relative;width:200px;height:215px;overflow:hidden}
+  .video-wrap video{
+    position:absolute;left:0;top:-18px;width:200px;height:auto;max-width:none;
+    transition:opacity .3s ease;
+  }
+  .video-wrap #va-coucou{opacity:0}
+  .video-wrap.wave #va-coucou{opacity:1}
+  .video-wrap.wave #va-idle{opacity:0}
+
+  /* ---------- B : Filou en couches ---------- */
+  .fx{
+    position:relative;
+    width:calc(1080px * var(--ech));
+    height:calc(1175px * var(--ech));
+    overflow:hidden;
+  }
+  .fx-scene{
+    position:absolute;left:0;top:0;width:1080px;height:1920px;
+    transform:scale(var(--ech));transform-origin:top left;
+  }
+  .fx-scene img{position:absolute;display:block}
+  .fx-corps{animation:respire 4.6s ease-in-out infinite}
+  .fx-tete{
+    position:absolute;left:0;top:0;width:1080px;height:1920px;
+    transform-origin:600px 930px;
+    animation:respire 4.6s ease-in-out infinite, penche 11s ease-in-out infinite;
+  }
+  .fx-or-g{transform-origin:132px 344px;animation:fremitG 8.5s ease-in-out infinite}
+  .fx-or-d{transform-origin:52px 312px;animation:fremitD 8.5s ease-in-out infinite .9s}
+
+  /* l'oeil est une FENÊTRE : la paupière coulisse dedans, invisible au repos */
+  .oeil{position:absolute;overflow:hidden;border-radius:50%}
+  .oeil i{
+    position:absolute;left:-4%;width:108%;height:150%;top:0;
+    transform:translateY(-101%);
+    border-radius:0 0 46% 46%/0 0 26% 26%;
+    box-shadow:inset 0 -7px 9px -4px rgba(110,58,8,.75);
+  }
+  .oeil.g i{
+    background:linear-gradient(#F09A3A 0%, var(--teinte-g) 62%, #A9530A 100%);
+    animation:cligne 5.4s ease-in-out infinite;
+  }
+  .oeil.d i{
+    background:linear-gradient(#F5A648 0%, var(--teinte-d) 62%, #B85C0B 100%);
+    animation:cligne 5.4s ease-in-out infinite .035s;
+  }
+
+  @keyframes respire{
+    0%,100%{translate:0 0}
+    50%    {translate:0 -7px}
+  }
+  @keyframes penche{
+    0%,100%{rotate:0deg}
+    28%    {rotate:-1.5deg}
+    62%    {rotate:1.1deg}
+  }
+  @keyframes fremitG{
+    0%,16%,100%{rotate:0deg}
+    19%{rotate:5deg} 22%{rotate:-2deg} 25%{rotate:3deg} 29%{rotate:0deg}
+    68%{rotate:0deg} 71%{rotate:4deg} 74%{rotate:0deg}
+  }
+  @keyframes fremitD{
+    0%,40%,100%{rotate:0deg}
+    43%{rotate:-5deg} 46%{rotate:2deg} 49%{rotate:-3deg} 53%{rotate:0deg}
+    86%{rotate:0deg} 89%{rotate:-4deg} 92%{rotate:0deg}
+  }
+  /* clignement : fermé ~90 ms, plus un second battement plus loin */
+  @keyframes cligne{
+    0%,88%   {transform:translateY(-101%)}
+    90.5%    {transform:translateY(0)}
+    92.5%    {transform:translateY(0)}
+    95%,100% {transform:translateY(-101%)}
+  }
+  .fx.fx-cache{opacity:0}
+  .b-video{position:absolute;left:0;top:0;opacity:0;transition:opacity .25s ease}
+  .b-video.on{opacity:1}
+
+  .barre{margin-top:18px;display:flex;gap:8px;flex-wrap:wrap}
+  button{
+    font:inherit;font-size:13px;padding:7px 13px;border-radius:9px;cursor:pointer;
+    border:1px solid var(--trait);background:#fff;color:var(--encre);
+  }
+  button:hover{border-color:var(--accent);color:var(--accent)}
+  .reel{margin-top:30px}
+  .reel h2{font-size:15px;margin:0 0 12px}
+  .reel-etal{
+    display:flex;gap:40px;align-items:flex-end;background:var(--panneau);
+    border:1px solid var(--trait);border-radius:14px;padding:22px 26px;
+  }
+  .reel-etal figcaption{font-size:12px;color:#8A7A62;text-align:center;margin-top:8px}
+  figure{margin:0}
+</style>
+</head>
+<body>
+
+<h1>Filou — comparaison honnête</h1>
+<p class="sous">
+  À gauche : le métrage 3D actuel, <b>réparé</b> (l'oreille et la patte étaient
+  rongées par un fondu de bord trop agressif cuit dans le fichier).
+  À droite : <b>le même métrage</b>, tranché en morceaux, animé par le code —
+  il respire, cligne des yeux, penche la tête et bouge les oreilles, en continu.
+</p>
+
+<div class="cols">
+
+  <div class="col">
+    <h2>A — La vidéo (réparée)</h2>
+    <p class="note">Le rendu 3D d'origine. Filou est entier, mais il ne fait
+      que rejouer les mêmes 2 secondes : pas de clignement, pas d'oreilles.</p>
+    <div class="etal">
+      <span class="badge">vidéo WebM</span>
+      <div class="video-wrap" id="vaWrap">
+        <video id="va-idle" autoplay muted loop playsinline>
+          <source src="../filou/filou-accroche-idle.webm" type="video/webm">
+        </video>
+        <video id="va-coucou" muted playsinline>
+          <source src="../filou/filou-accroche-coucou.webm" type="video/webm">
+        </video>
+      </div>
+    </div>
+    <p class="poids">Poids : <b>117 Ko</b> (attente) + <b>550 Ko</b> (coucou).
+      Chaque retouche = régénérer le métrage.</p>
+    <div class="barre">
+      <button type="button" data-coucou="a">Coucou</button>
+    </div>
+  </div>
+
+  <div class="col">
+    <h2>B — Filou vivant (couches)</h2>
+    <p class="note">Mêmes pixels 3D, découpés en 4 morceaux. Il est vivant en
+      permanence — et chaque réglage est un chiffre à changer, pas une
+      régénération.</p>
+    <div class="etal">
+      <span class="badge">4 images + CSS</span>
+      <div style="position:relative">
+        <div class="fx" id="fx" style="--ech:0.1852;--teinte-g:#CA6504;--teinte-d:#E57704">
+          <div class="fx-scene">
+            <img class="fx-corps" src="../filou/couches/corps.webp" style="left:183px;top:834px;width:627px;height:299px" alt="">
+            <div class="fx-tete">
+              <img class="fx-or-g" src="../filou/couches/oreille-g.webp" style="left:375px;top:149px;width:260px;height:358px" alt="">
+              <img class="fx-or-d" src="../filou/couches/oreille-d.webp" style="left:772px;top:344px;width:248px;height:327px" alt="">
+              <img src="../filou/couches/tete.webp" style="left:183px;top:149px;width:824px;height:794px" alt="">
+              <span class="oeil g" style="left:466px;top:511px;width:138px;height:138px"><i></i></span>
+              <span class="oeil d" style="left:661px;top:575px;width:128px;height:126px"><i></i></span>
+            </div>
+          </div>
+        </div>
+        <div class="b-video video-wrap" id="vbWrap">
+          <video id="vb-coucou" muted playsinline>
+            <source src="../filou/filou-accroche-coucou.webm" type="video/webm">
+          </video>
+        </div>
+      </div>
+    </div>
+    <p class="poids">Poids : <b>50 Ko</b> pour l'attente infinie
+      (le coucou reste la vidéo, 550 Ko, joué de temps en temps).</p>
+    <div class="barre">
+      <button type="button" data-coucou="b">Coucou</button>
+      <button type="button" id="plusVite">Plus vif</button>
+      <button type="button" id="moinsVite">Plus calme</button>
+    </div>
+  </div>
+
+</div>
+
+<div class="reel">
+  <h2>À la taille réelle, sur le rebord de la carte</h2>
+  <div class="reel-etal">
+    <figure>
+      <div class="video-wrap" style="height:200px">
+        <video autoplay muted loop playsinline>
+          <source src="../filou/filou-accroche-idle.webm" type="video/webm">
+        </video>
+      </div>
+      <figcaption>A — vidéo</figcaption>
+    </figure>
+    <figure>
+      <div class="fx" style="--ech:0.1852;--teinte-g:#CA6504;--teinte-d:#E57704">
+        <div class="fx-scene">
+          <img class="fx-corps" src="../filou/couches/corps.webp" style="left:183px;top:834px;width:627px;height:299px" alt="">
+          <div class="fx-tete">
+            <img class="fx-or-g" src="../filou/couches/oreille-g.webp" style="left:375px;top:149px;width:260px;height:358px" alt="">
+            <img class="fx-or-d" src="../filou/couches/oreille-d.webp" style="left:772px;top:344px;width:248px;height:327px" alt="">
+            <img src="../filou/couches/tete.webp" style="left:183px;top:149px;width:824px;height:794px" alt="">
+            <span class="oeil g" style="left:466px;top:511px;width:138px;height:138px"><i></i></span>
+            <span class="oeil d" style="left:661px;top:575px;width:128px;height:126px"><i></i></span>
+          </div>
+        </div>
+      </div>
+      <figcaption>B — couches</figcaption>
+    </figure>
+    <figure>
+      <div class="fx" style="--ech:0.32;--teinte-g:#CA6504;--teinte-d:#E57704">
+        <div class="fx-scene">
+          <img class="fx-corps" src="../filou/couches/corps.webp" style="left:183px;top:834px;width:627px;height:299px" alt="">
+          <div class="fx-tete">
+            <img class="fx-or-g" src="../filou/couches/oreille-g.webp" style="left:375px;top:149px;width:260px;height:358px" alt="">
+            <img class="fx-or-d" src="../filou/couches/oreille-d.webp" style="left:772px;top:344px;width:248px;height:327px" alt="">
+            <img src="../filou/couches/tete.webp" style="left:183px;top:149px;width:824px;height:794px" alt="">
+            <span class="oeil g" style="left:466px;top:511px;width:138px;height:138px"><i></i></span>
+            <span class="oeil d" style="left:661px;top:575px;width:128px;height:126px"><i></i></span>
+          </div>
+        </div>
+      </div>
+      <figcaption>B — en grand (le même fichier)</figcaption>
+    </figure>
+  </div>
+</div>
+
+<script>
+(function(){
+  var vaWrap = document.getElementById("vaWrap");
+  var vaCoucou = document.getElementById("va-coucou");
+  var fx = document.getElementById("fx");
+  var vbWrap = document.getElementById("vbWrap");
+  var vbCoucou = document.getElementById("vb-coucou");
+
+  function joueA(){
+    if (vaWrap.classList.contains("wave")) return;
+    vaWrap.classList.add("wave");
+    vaCoucou.currentTime = 0; vaCoucou.play();
+    setTimeout(function(){ vaWrap.classList.remove("wave"); vaCoucou.pause(); }, 3900);
+  }
+  function joueB(){
+    if (vbWrap.classList.contains("on")) return;
+    vbWrap.classList.add("on"); fx.classList.add("fx-cache");
+    vbCoucou.currentTime = 0; vbCoucou.play();
+    setTimeout(function(){
+      vbWrap.classList.remove("on"); fx.classList.remove("fx-cache");
+      vbCoucou.pause();
+    }, 3900);
+  }
+  document.querySelectorAll("[data-coucou]").forEach(function(b){
+    b.addEventListener("click", function(){
+      if (b.dataset.coucou === "a") joueA(); else joueB();
+    });
+  });
+
+  // réglage de vivacité : une seule variable, aucune régénération
+  var vif = 1;
+  function applique(){
+    document.querySelectorAll(".fx-tete, .fx-corps, .fx-or-g, .fx-or-d, .oeil i")
+      .forEach(function(el){
+        el.style.animationDuration = "";
+        var d = getComputedStyle(el).animationDuration.split(",").map(function(s){
+          return (parseFloat(s) / vif) + "s";
+        }).join(",");
+        el.dataset.base = el.dataset.base || d;
+      });
+    document.querySelectorAll(".fx-tete").forEach(function(el){
+      el.style.animationDuration = (4.6/vif)+"s, "+(11/vif)+"s";
+    });
+    document.querySelectorAll(".fx-corps").forEach(function(el){
+      el.style.animationDuration = (4.6/vif)+"s";
+    });
+    document.querySelectorAll(".fx-or-g, .fx-or-d").forEach(function(el){
+      el.style.animationDuration = (8.5/vif)+"s";
+    });
+    document.querySelectorAll(".oeil i").forEach(function(el){
+      el.style.animationDuration = (5.4/vif)+"s";
+    });
+  }
+  document.getElementById("plusVite").addEventListener("click", function(){
+    vif = Math.min(2.2, vif * 1.25); applique();
+  });
+  document.getElementById("moinsVite").addEventListener("click", function(){
+    vif = Math.max(0.45, vif / 1.25); applique();
+  });
+})();
+</script>
+</body>
+</html>
