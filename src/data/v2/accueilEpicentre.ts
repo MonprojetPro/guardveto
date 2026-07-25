@@ -35,6 +35,18 @@ export interface GardeDuSoir {
   second: { prenom: string; couleur: string } | null
 }
 
+/** Les pastilles de la barre — partagées par tous les écrans V2. */
+export interface DonneesDock {
+  nbSouhaits: number
+  nbEchanges: number
+  nbVetos: number
+  nbReglesFermes: number
+  nbReglesSouples: number
+  agendaConnecte: boolean
+  libellePlanning: string
+  statutPlanning: StatutPeriode | null
+}
+
 export interface SouhaitEnAttente {
   id: string
   prenom: string
@@ -71,16 +83,7 @@ export interface DonneesAccueil {
   periodeAPublier: Periode | null
   /** Jours restants avant la date limite de publication (préavis d'un mois). */
   joursAvantPublication: number | null
-  dock: {
-    nbSouhaits: number
-    nbEchanges: number
-    nbVetos: number
-    nbReglesFermes: number
-    nbReglesSouples: number
-    agendaConnecte: boolean
-    libellePlanning: string
-    statutPlanning: StatutPeriode | null
-  }
+  dock: DonneesDock
   ceSoir: GardeDuSoir | null
   demain: GardeDuSoir | null
   /** Souhaits de congé en attente de décision, du plus ancien au plus récent. */

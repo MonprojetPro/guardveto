@@ -1,0 +1,1054 @@
+/* ============================================================
+   GUARDVETO V2 — ÉCRAN PLANNING (« Terrier chaleureux »)
+   ============================================================
+   Porté de `maquette/m1-planning.html`. Complète `v2-terrier.css`,
+   qui porte déjà les jetons de couleur, le satin, la barre et le dock :
+   ce fichier n'ajoute QUE ce qui est propre au planning (espace de
+   travail, grille mensuelle, volet compteurs, Filou au rebord, modales).
+
+   Écarté volontairement du portage : le panneau de conversation
+   (`.burrow-panel`, `.journal`) — il arrive avec la boîte à outils de
+   Filou ; le renard qui surgit (`.fox-out`) et les réglettes de démo.
+   ============================================================ */
+
+/* ============================================================
+   BANDEAU · CARACTÉRISTIQUES DE LA PÉRIODE (retour MiKL n°1)
+   ============================================================ */
+/* Le titre de page ne s'affiche plus (le dock dit où on est) ;
+   il reste pour les lecteurs d'écran. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+/* LA PÉRIODE, un seul objet : une pilule « Hiver 2026 · Brouillon ▾ »
+   dans la rangée d'outils. On clique dessus pour voir sa carte
+   d'identité (dates, saison, profil, effectif), changer de période
+   ou en préparer une nouvelle (parcours Filou, sur l'accueil). */
+.period-pill {
+  position: relative;
+  display: inline-flex; align-items: center; gap: 9px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 6px 14px 6px 16px; min-height: 42px;
+  font-family: var(--font-display);
+  font-size: 0.95rem; font-weight: 800; letter-spacing: -0.01em;
+  color: var(--text);
+  box-shadow: var(--edge-light), 1px 2px 5px rgba(120, 70, 18, 0.08);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.period-pill:hover {
+  border-color: var(--accent-ink);
+  box-shadow: var(--edge-light), 2px 4px 10px rgba(120, 70, 18, 0.12);
+}
+.pp-caret {
+  font-size: 0.7rem; color: var(--muted);
+  transition: transform 0.25s var(--ease-out);
+}
+.period-pill[aria-expanded="true"] .pp-caret { transform: rotate(180deg); }
+.status-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.72rem; font-weight: 700;
+  padding: 5px 13px; border-radius: 999px;
+  border: 1px solid transparent;
+  transition: background-color .3s ease, color .3s ease;
+}
+.status-badge.st-brouillon { background: var(--warn-soft); color: var(--warn); border-color: rgba(196, 138, 20, 0.35); }
+.status-badge.st-publiee { background: var(--ok-soft); color: var(--ok); border-color: rgba(90, 150, 60, 0.35); }
+.status-badge.st-verrouillee { background: var(--surface-2); color: var(--muted); border-color: var(--border-strong); }
+.status-badge.pulse { animation: badgePulse 1.2s ease both; }
+@keyframes badgePulse {
+  0% { box-shadow: 0 0 0 0 var(--ok-soft); }
+  45% { box-shadow: 0 0 0 12px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+/* --- La carte d'identité de la période (popover de la pilule) --- */
+.period-pop {
+  position: absolute; top: calc(100% + 10px); left: 0;
+  width: min(360px, 86vw);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-panel);
+  padding: 16px 16px 12px;
+  z-index: 80;
+  text-align: left;
+  font-family: var(--font-body); font-weight: 500; letter-spacing: 0;
+}
+.pp-sub { color: var(--muted); font-size: 0.86rem; line-height: 1.55; }
+.pp-sub b { color: var(--text); font-family: var(--font-display); }
+.pb-chips { display: flex; flex-direction: column; align-items: stretch; gap: 6px; margin-top: 10px; }
+.pb-chip {
+  display: inline-flex; flex-direction: column; justify-content: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 7px 13px;
+  font-size: 0.8rem; font-weight: 600; line-height: 1.35;
+}
+.pb-chip small { font-size: 0.68rem; font-weight: 500; color: var(--muted); }
+.pb-chip.effectif { border-color: var(--border-strong); background: var(--accent-soft); }
+.pb-chip.effectif small { color: var(--accent-ink); font-weight: 600; }
+.pp-label {
+  margin: 14px 0 6px;
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--soft);
+  border-top: 1px solid var(--border); padding-top: 12px;
+}
+.pp-item {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  padding: 7px 11px;
+  font-size: 0.84rem; font-weight: 700; color: var(--text);
+  text-align: left;
+}
+.pp-item small { font-size: 0.7rem; font-weight: 500; color: var(--muted); }
+.pp-item:hover { background: var(--surface-2); }
+.pp-item[aria-current="true"] {
+  background: var(--accent-soft);
+  border-color: var(--border-strong);
+  color: var(--accent-ink);
+}
+.pp-new {
+  display: flex; flex-direction: column; gap: 1px;
+  margin-top: 8px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 8px 11px;
+  font-size: 0.82rem; font-weight: 700; color: var(--accent-ink);
+  text-decoration: none;
+}
+.pp-new small { font-size: 0.7rem; font-weight: 500; color: var(--muted); }
+.pp-new:hover { border-color: var(--accent-ink); background: var(--accent-soft); }
+.pp-today {
+  margin-top: 10px;
+  font-size: 0.7rem; color: var(--soft); text-align: center;
+}
+
+/* ============================================================
+   ESPACE DE TRAVAIL (workspace + Filou garde-fou)
+   ============================================================ */
+.workspace {
+  position: relative;
+  margin-bottom: 34px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  /* grammaire de profondeur M6 : lumière haut-gauche, ombres bas-droite */
+  box-shadow:
+    var(--edge-light),
+    2px 3px 8px rgba(110, 62, 14, 0.12),
+    8px 18px 38px -8px rgba(110, 62, 14, 0.18),
+    18px 60px 120px -18px rgba(110, 62, 14, 0.22);
+  overflow: hidden;
+  min-height: 680px;
+}
+.work-head {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.month-nav { display: flex; align-items: center; gap: 6px; }
+.month-nav h2 {
+  font-size: 1.02rem; font-weight: 700; min-width: 132px; text-align: center;
+}
+.mn-btn {
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2); color: var(--muted);
+  border-radius: 999px;
+  width: 36px; height: 36px;
+  font-size: 0.95rem; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.mn-btn:hover:not(:disabled) { color: var(--accent-ink); border-color: var(--accent-ink); }
+.mn-btn:disabled { opacity: 0.35; cursor: default; }
+.work-head .meta { font-size: 0.76rem; color: var(--muted); }
+.head-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+.head-btn {
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2); color: var(--muted);
+  border-radius: 999px; font-size: 0.78rem; font-weight: 700;
+  padding: 8px 14px; min-height: 38px;
+}
+.head-btn:hover:not(:disabled) { color: var(--accent-ink); border-color: var(--accent-ink); }
+.head-btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-ink); }
+.head-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.head-btn.primary:hover:not(:disabled) { filter: brightness(1.07); color: #fff; }
+.head-btn.primary:disabled { background: var(--ok); border-color: var(--ok); color: #fff; opacity: 0.85; cursor: default; }
+.head-btn.ghost { border-color: var(--border); background: transparent; }
+
+.work-body { padding: 18px 20px 130px; }
+/* La consigne d'usage, posée entre la barre d'outils et la grille.
+   Elle remplace le petit texte gris qui se perdait dans la barre :
+   ici elle est sur le trajet du regard, juste avant les cases. */
+.grid-hint {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: 0 0 14px;
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  font-size: 0.79rem; color: var(--muted); line-height: 1.4;
+}
+.grid-hint b { color: var(--text); font-weight: 700; }
+.grid-hint .gh-ico { font-size: 0.95rem; line-height: 1; }
+.grid-hint .gh-sep { color: var(--border-strong); }
+.grid-hint .gh-lock { color: var(--soft); }
+@media (max-width: 720px) {
+  .grid-hint .gh-sep { display: none; }
+  .grid-hint .gh-lock { flex-basis: 100%; }
+}
+.work-grid { display: grid; grid-template-columns: minmax(0, 1fr) 262px; gap: 20px; align-items: start; }
+.workspace.counters-closed .work-grid { grid-template-columns: 1fr; }
+.workspace.counters-closed .counters-panel { display: none; }
+
+/* ============================================================
+   GRILLE MENSUELLE
+   ============================================================ */
+.cal { min-width: 760px; }
+.cal-head {
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px;
+  margin-bottom: 5px;
+}
+.cal-head span {
+  font-family: var(--font-display);
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--soft);
+  text-align: center; padding: 2px 0;
+}
+.cal-body { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.cal-scroll { overflow-x: auto; padding-bottom: 4px; }
+.day {
+  position: relative;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 6px 6px 7px;
+  min-height: 96px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.day.we { background: var(--grid-we); }
+.day.fri { background: linear-gradient(180deg, var(--surface-2) 38%, var(--grid-we) 82%); }
+.day.other { border-style: dashed; }
+.day.other .d-num { color: var(--soft); }
+/* Grammaire de profondeur : le passé s'aplatit et s'éteint — la fiche
+   perd son relief, l'encre pâlit. Plus de cadenas par case : la barre
+   d'outils le dit une fois pour toutes. */
+.day.past { background: #EFE7D6; border-color: #E4D8BF; }
+.day.past .d-num { color: var(--soft); }
+.day.past .slot-card { background: transparent; border-color: var(--border); box-shadow: none; }
+.day.past .vet-row, .day.past .conge-chip { opacity: 0.6; filter: saturate(0.4); }
+.day.hors { background: transparent; border-style: dashed; }
+.day.hors .d-num { color: var(--soft); }
+.d-hors-note { font-size: 0.6rem; color: var(--soft); font-style: italic; margin-top: 2px; }
+.day.today { border: 2px solid var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.d-head { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; }
+.d-num { font-family: var(--font-display); font-weight: 700; font-size: 0.82rem; }
+.d-today-tag {
+  font-size: 0.56rem; font-weight: 800; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--accent-ink);
+  background: var(--accent-soft); border-radius: 999px; padding: 1px 7px;
+}
+.d-ferie {
+  font-size: 0.6rem; font-weight: 700; color: var(--accent-ink);
+  white-space: nowrap;
+}
+/* ------ La fiche de garde : point de couleur + nom, encre sur fond
+   neutre — le langage des compteurs et de la modale, étendu à la
+   grille. La couleur pleine est réservée aux états qui la méritent
+   (aujourd'hui, alerte, sélection). ------ */
+.slot-card {
+  position: relative;
+  display: flex; flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 2px;
+  box-shadow: var(--edge-light), 1px 2px 4px rgba(110, 62, 14, 0.08);
+}
+/* micro-étiquette réservée aux EXCEPTIONS (vendredi inversé, matin) :
+   la nuit, elle, est le cas par défaut — elle n'a plus de libellé */
+.sc-tag {
+  align-self: flex-start;
+  max-width: 100%;
+  font-family: var(--font-display);
+  font-size: 0.52rem; font-weight: 800; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--soft);
+  padding: 2px 6px 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.vet-row {
+  display: flex; align-items: center; gap: 5px;
+  width: 100%;
+  border: none; background: transparent;
+  color: var(--text);
+  font-size: 0.7rem; font-weight: 600; line-height: 1.35;
+  padding: 3px 6px; border-radius: 7px;
+  text-align: left;
+  transition: background-color .15s ease, color .15s ease;
+}
+button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink); }
+.vet-row .vdot {
+  width: 9px; height: 9px; border-radius: 50%; flex: none;
+  box-shadow: inset 0 0 0 1px rgba(58, 42, 28, 0.1);
+}
+.vet-row .role {
+  flex: none; margin-left: 2px;
+  font-family: var(--font-display);
+  font-size: 0.56rem; font-weight: 700; color: var(--soft);
+}
+/* Une règle outrepassée doit se voir SANS avoir le nez dessus : le cadre
+   reste sur LA LIGNE fautive (pas de doublon avec le cadre du jour), mais
+   dans un orange vif qui tranche — l'un des seuls endroits où la couleur
+   pleine a droit de cité dans la grille. Ce marquage n'existe QU'EN
+   BROUILLON : publié = assumé, la trace vit au journal. */
+.vet-row.warned {
+  background: rgba(233, 88, 22, 0.14);
+  box-shadow: inset 0 0 0 2px #E95816, 1px 2px 6px rgba(233, 88, 22, 0.25);
+}
+.vet-row.warned:hover { background: rgba(233, 88, 22, 0.2); color: var(--text); }
+.vet-row.warned .role {
+  color: #D64607;
+  font-size: 0.82rem; line-height: 1;
+}
+.vet-row.empty {
+  color: var(--muted);
+  border: 1.5px dashed var(--border-strong); border-radius: 7px;
+}
+.vet-row.empty .vdot { background: transparent; border: 1.5px dashed var(--border-strong); box-shadow: none; }
+.vet-row.empty:hover { color: var(--accent-ink); border-color: var(--accent-ink); background: transparent; }
+
+/* ------ Congés : l'anneau de couleur « vidé » dit l'absence,
+   le tireté dit « pas une garde » ------ */
+.conge-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  align-self: flex-start;
+  border: 1.5px dashed var(--border-strong);
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.62rem; font-weight: 600;
+  padding: 2px 8px 2px 5px; border-radius: 999px;
+  max-width: 100%;
+}
+.conge-chip .vdot {
+  width: 7px; height: 7px; border-radius: 50%; flex: none;
+  background: transparent; border: 2px solid var(--soft);
+}
+.conge-chip.souhait { border-style: dotted; color: var(--soft); font-style: italic; }
+
+/* ✓ discret qui s'évapore après un changement cohérent */
+.ok-flash {
+  position: absolute; top: 3px; right: 5px;
+  color: var(--ok); font-size: 0.95rem; font-weight: 700;
+  pointer-events: none;
+  animation: okEvaporate 1.8s ease-out both;
+  z-index: 2;
+}
+@keyframes okEvaporate {
+  0%   { opacity: 0; transform: translateY(4px) scale(0.7); }
+  25%  { opacity: 1; transform: none; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-10px) scale(0.9); }
+}
+/* Mise en évidence d'une cellule (réserve, impasse) */
+.day.spot { animation: spotCell 2.6s ease both; }
+@keyframes spotCell {
+  0%   { box-shadow: 0 0 0 0 var(--accent-glow); border-color: var(--accent); }
+  30%  { box-shadow: 0 0 0 10px transparent; border-color: var(--accent); }
+  100% { box-shadow: none; }
+}
+
+.archive-veil {
+  position: absolute; inset: 0; z-index: 40;
+  background: rgba(246, 238, 223, 0.82);
+  backdrop-filter: blur(2px);
+  display: none;
+  align-items: center; justify-content: center;
+  text-align: center; padding: 30px;
+}
+.archive-veil.show { display: flex; animation: veilIn .3s ease both; }
+@keyframes veilIn { from { opacity: 0; } to { opacity: 1; } }
+.archive-card {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-panel);
+  padding: 26px 30px;
+  max-width: 400px;
+}
+.archive-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
+.archive-card p { font-size: 0.86rem; color: var(--muted); line-height: 1.6; margin-bottom: 16px; }
+
+/* ============================================================
+   VOLET COMPTEURS EXTENSIBLE (retour MiKL n°2)
+   ============================================================ */
+.counters-panel {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 14px 14px 12px;
+  animation: panelIn .35s ease both;
+}
+@keyframes panelIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.cnt-head h4 { font-family: var(--font-display); font-size: 0.84rem; font-weight: 700; }
+.cnt-head p { font-size: 0.71rem; color: var(--muted); margin: 3px 0 10px; line-height: 1.45; }
+.cnt-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) repeat(4, 33px);
+  align-items: center; gap: 3px;
+  padding: 6px 2px;
+  border-bottom: 1px dashed var(--border);
+}
+.cnt-row:last-child { border-bottom: none; }
+.cnt-row.cnt-header { border-bottom: 1px solid var(--border-strong); padding-bottom: 4px; }
+.cnt-row.cnt-header span {
+  font-family: var(--font-display); font-size: 0.56rem; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--soft);
+  text-align: center; line-height: 1.25;
+}
+.cnt-row.cnt-header span.custom { color: var(--accent-ink); }
+.cnt-vet { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 600; min-width: 0; }
+.cnt-vet i { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+.cnt-vet small { font-size: 0.6rem; color: var(--soft); font-weight: 500; }
+.cnt-num {
+  position: relative;
+  text-align: center;
+  font-family: var(--font-display); font-weight: 700; font-size: 0.9rem;
+}
+.cnt-num.zero { color: var(--soft); font-weight: 500; }
+/* la jauge sous chaque nombre : l'équité se VOIT, sans comparer de tête */
+.cnt-num .bar {
+  display: block; height: 3px; margin: 2px 3px 0;
+  border-radius: 2px; background: var(--border);
+  overflow: hidden;
+}
+.cnt-num .bar b {
+  display: block; height: 100%;
+  background: var(--accent); opacity: 0.55;
+  border-radius: 2px;
+  transform-origin: left center;
+  transition: transform .5s var(--ease-out);
+}
+.cnt-num.zero .bar b { transform: scaleX(0) !important; }
+.cnt-row.cnt-aside { opacity: 0.62; }
+.cnt-ecart {
+  margin-top: 10px;
+  font-size: 0.7rem; font-weight: 600; color: var(--muted);
+  line-height: 1.5;
+}
+.cnt-num.bump-up { animation: bumpUp .8s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+.cnt-num.bump-down { animation: bumpDown .8s ease both; }
+@keyframes bumpUp { 30% { transform: scale(1.5); color: var(--ok); } }
+@keyframes bumpDown { 30% { transform: scale(0.7); color: var(--warn); } }
+.cnt-delta {
+  position: absolute; left: 50%; top: -13px;
+  transform: translateX(-50%);
+  font-style: normal; font-size: 0.62rem; font-weight: 800;
+  pointer-events: none;
+  animation: deltaUp 1.4s ease-out both;
+}
+.cnt-delta.plus { color: var(--ok); }
+.cnt-delta.minus { color: var(--warn); }
+@keyframes deltaUp {
+  0%   { opacity: 0; }
+  25%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-9px); }
+}
+.cnt-foot { margin-top: 10px; font-size: 0.67rem; color: var(--soft); line-height: 1.5; }
+.cnt-foot b { color: var(--accent-ink); }
+
+/* ============================================================
+   FILOU ACCROCHÉ AU REBORD · il se hisse sur le côté de l'encart
+   planning : haut du corps visible, le reste derrière la carte.
+   Si personne ne le sollicite, il plonge et ressort de l'autre
+   côté. Un clic = petite animation, puis l'accueil s'ouvre
+   (c'est là que vit sa tablette).
+   ============================================================ */
+.plan-scene { position: relative; }
+.filou-edge {
+  /* CALAGE — mesuré, pas ajusté au jugé.
+     Le détourage a TRANCHÉ Filou : le métrage a une arête verticale
+     franche qui coupe ses coussinets. On ne peut pas la réparer sans
+     regénérer, mais on peut la rendre invisible en la faisant tomber
+     PILE sur le bord gauche de la carte : la coupe coïncide alors avec
+     un changement de fond, et l'œil lit « la patte agrippe le rebord »
+     au lieu de « la patte est coupée ». Décalée de quelques px, la
+     coupe se voit et les doigts flottent (retours MiKL 2026-07-25).
+     ⚠ Le repère est l'arête VISIBLE — x ≈ 192 natif, constant de
+     y=620 à y=1120. Surtout PAS la bbox globale de la pièce (x=149) :
+     elle vient du bas du corps, qui est caché par le socle. C'est
+     l'erreur qui a fait rater deux calages.
+     192 natif × 200/1080 = 35,6 px CSS ; miroité : 196 − 35,6 = 160,4
+     → left = −160 met l'arête sur le bord de la carte. */
+  position: absolute; top: 200px; left: -160px;
+  /* 152px de large : les ~42 derniers px chevauchent la carte, pour
+     que ses pattes qui agrippent le rebord ne soient JAMAIS coupées
+     (les doigts dépassent de l'arête vers l'intérieur de la carte) */
+  /* fenêtre 196px : le contenu utile du métrage va de x=188 à x=1027
+     en natif (mesuré sur l'alpha), soit 155 px CSS à width:200 —
+     à partir de left:0 il court jusqu'à x≈190. Une fenêtre plus
+     étroite ROGNAIT l'oreille et la patte du coucou (constaté
+     2026-07-25). left compense pour garder l'arête à droite en 36. */
+  width: 196px; height: 195px;
+  z-index: 2; /* au-dessus de la carte : ses pattes se posent SUR le rebord */
+  border: none; background: transparent; padding: 0;
+  cursor: pointer;
+  /* plus de rotation : l'arête verticale de la vidéo doit rester
+     parallèle au rebord de la carte pour que les pattes s'y posent */
+  transition: transform .45s cubic-bezier(0.34, 1.4, 0.64, 1), opacity .3s ease;
+}
+.filou-edge .fe-crop {
+  position: relative;
+  display: block;
+  width: 100%; height: 100%;
+  overflow: hidden;
+  /* Le métrage est orienté arête-À-GAUCHE du renard : le miroir du
+     .fe-crop le remet côté gauche ; côté droit, le miroir du conteneur
+     l'annule et la vidéo native convient.
+     ⚠ PAS de mask CSS ici : sur une <video> composited, le mask laisse
+     passer une ligne de bord à la limite de l'overflow (bug constaté
+     2026-07-18). Seul le fondu BAS est cuit dans l'alpha des WebM
+     (applique-fondu-alpha.py, natif y 950→1130, AUCUN fondu latéral).
+     ⚠ Ne JAMAIS remettre de fondu latéral : il rongeait l'oreille et
+     la patte du coucou, qui vont jusqu'à x=1027 natif (2026-07-25).
+     Cadrage vidéo : width 200 / top -18. */
+  transform: scaleX(-1);
+}
+/* ============================================================
+   Filou VIVANT (phase d'attente) — le métrage 3D tranché en 4
+   pièces, animé par le code : il respire, cligne des yeux, penche
+   la tête et remue les oreilles, sans fin et sans fichier vidéo.
+   Chaque réglage ci-dessous est un chiffre : plus jamais de
+   régénération de métrage pour corriger un détail. 50 Ko.
+   Les pièces viennent de filou/decoupe-couches.py.
+   ⚠ Aux raccords, les pièces se CHEVAUCHENT : deux bords estompés
+   complémentaires ne se recomposent pas à alpha 255 (couture).
+   ============================================================ */
+.filou-edge .fx {
+  position: absolute; left: 0; top: -18px;
+  display: block;
+  width: 200px;              /* = --ech * 1080, comme la vidéo */
+  height: 240px;             /* le clip franc, c'est .fe-crop qui le pose */
+  --ech: 0.18519;
+  /* bascule quasi sèche (80 ms) : les couches sont d'abord ramenées à
+     leur pose neutre, qui est EXACTEMENT la 1re image du métrage — un
+     fondu croisé long superposait deux Filous décalés, et ça se voyait */
+  transition: opacity .08s linear;
+}
+/* pose neutre avant/après le coucou : on coupe les animations et on
+   laisse les transitions ramener chaque pièce à sa place d'origine */
+.filou-edge.fe-neutre .fx-corps,
+.filou-edge.fe-neutre .fx-tete,
+.filou-edge.fe-neutre .fx-or-g,
+.filou-edge.fe-neutre .fx-or-d {
+  animation: none;
+  transition: translate .22s ease-out, rotate .22s ease-out;
+}
+.filou-edge.fe-neutre .fx-oeil i {
+  animation: none;
+  transition: transform .12s ease-out;
+}
+/* ============================================================
+   LE SOCLE — l'ancien bouton « Appeler Filou », devenu l'appui.
+   Il rend deux services d'un coup :
+   ① il masque la coupe NETTE du métrage (qui n'a pas de fin : sans
+      lui il faudrait un fondu, et le fondu se voit) ;
+   ② il dit ce que Filou fait là — plus de bouton flottant dans la
+      barre d'outils, l'action est là où est le personnage.
+   Style repris à l'identique de l'ancien .filou-call pour qu'il
+   appartienne visiblement à la même famille que la barre d'outils.
+   ============================================================ */
+.filou-edge .fe-socle {
+  /* ⚠ il ne doit JAMAIS mordre sur la carte du planning (il grattait
+     les compteurs, retour MiKL 2026-07-25). L'élément fait 196 px et
+     déborde de 36 px sur la carte — seul Filou a le droit d'y poser
+     ses pattes. Le socle s'arrête donc 40 px avant le bord droit,
+     et la pose miroir est symétrique (voir .filou-right plus bas). */
+  /* marges ÉGALES des deux bords : l'élément est retourné en miroir
+     quand Filou passe à droite, donc toute asymétrie ici se traduit
+     par un socle qui mord d'un côté et pas de l'autre. */
+  position: absolute; left: 26px; right: 26px; bottom: 0;
+  min-height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 4px 10px;
+  background: linear-gradient(180deg, #FFFEF9 0%, #FBF3E1 100%);
+  /* liseré accent, plus affirmé qu'un bouton ordinaire : c'est la seule
+     invitation à parler à Filou sur cet écran, il doit se voir. On reste
+     dans la palette du terrier — pas de rouge d'alerte, l'assistance
+     n'est pas une urgence (demande MiKL 2026-07-25). */
+  border: 1.5px solid var(--accent);
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 0.72rem; font-weight: 700; letter-spacing: .01em;
+  color: var(--accent-ink);
+  box-shadow: var(--edge-light),
+              0 0 0 3px var(--accent-soft),
+              1px 3px 8px rgba(120, 70, 18, 0.16);
+  transition: transform .25s var(--ease-out), box-shadow .2s ease,
+              border-color .2s ease;
+  z-index: 3;
+  /* un souffle très lent : il respire une fois toutes les 7 s, assez
+     pour attirer l'œil, trop doux pour agacer quelqu'un qui travaille */
+  animation: socleSouffle 7s ease-in-out infinite;
+}
+@keyframes socleSouffle {
+  0%, 62%, 100% { box-shadow: var(--edge-light),
+                              0 0 0 3px var(--accent-soft),
+                              1px 3px 8px rgba(120, 70, 18, 0.16); }
+  78%           { box-shadow: var(--edge-light),
+                              0 0 0 6px var(--accent-soft),
+                              0 0 14px var(--accent-glow),
+                              1px 3px 8px rgba(120, 70, 18, 0.16); }
+}
+/* l'ombre que Filou projette sur son socle : sans elle, il flotte */
+.filou-edge .fe-socle::before {
+  content: ""; position: absolute; left: 16px; right: 16px; top: -6px;
+  height: 7px; border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 100%,
+              rgba(105, 62, 14, 0.30), rgba(105, 62, 14, 0) 74%);
+}
+.filou-edge:hover .fe-socle,
+.filou-edge:focus-visible .fe-socle {
+  animation: none;
+  border-color: var(--accent-ink);
+  background: linear-gradient(180deg, #FFFFFF 0%, #FDF7E9 100%);
+  box-shadow: var(--edge-light),
+              0 0 0 5px var(--accent-soft),
+              2px 5px 12px rgba(120, 70, 18, 0.22);
+}
+/* Filou change de côté : le socle suit, mais son libellé se relit à
+   l'endroit (le parent est miroité en mode droite, on l'annule ici) */
+.plan-scene.filou-right .filou-edge .fe-socle-txt { display: inline-block; transform: scaleX(-1); }
+/* quand Filou est déjà sorti dans le panneau, l'appel n'a plus de sens */
+.plan-scene.filou-parti .fe-socle { opacity: .35; }
+.filou-edge .fx-scene {
+  position: absolute; left: 0; top: 0;
+  display: block; width: 1080px; height: 1920px;
+  transform: scale(var(--ech)); transform-origin: top left;
+}
+.filou-edge .fx-scene img { position: absolute; display: block; max-width: none; }
+.fx-corps { animation: fxRespire 4.6s ease-in-out infinite; }
+.fx-tete {
+  position: absolute; left: 0; top: 0; display: block;
+  width: 1080px; height: 1920px;
+  transform-origin: 600px 930px;
+  animation: fxRespire 4.6s ease-in-out infinite,
+             fxPenche 11s ease-in-out infinite;
+}
+.fx-or-g { transform-origin: 132px 344px; animation: fxOreilleG 8.5s ease-in-out infinite; }
+.fx-or-d { transform-origin: 52px 312px;  animation: fxOreilleD 8.5s ease-in-out infinite .9s; }
+/* l'œil est une FENÊTRE : la paupière coulisse dedans, donc elle est
+   strictement invisible au repos (hors cadre), sans aplat sur le front */
+.fx-oeil { position: absolute; display: block; overflow: hidden; border-radius: 50%; }
+.fx-oeil i {
+  position: absolute; left: -4%; top: 0; width: 108%; height: 150%;
+  transform: translateY(-101%);
+  border-radius: 0 0 46% 46% / 0 0 26% 26%;
+  box-shadow: inset 0 -7px 9px -4px rgba(110, 58, 8, 0.75);
+}
+.fx-oeil.g i {
+  background: linear-gradient(#F09A3A 0%, #CA6504 62%, #A9530A 100%);
+  animation: fxCligne 5.4s ease-in-out infinite;
+}
+.fx-oeil.d i {
+  background: linear-gradient(#F5A648 0%, #E57704 62%, #B85C0B 100%);
+  animation: fxCligne 5.4s ease-in-out infinite .035s;
+}
+@keyframes fxRespire { 0%,100% { translate: 0 0 } 50% { translate: 0 -7px } }
+@keyframes fxPenche  { 0%,100% { rotate: 0deg } 28% { rotate: -1.5deg } 62% { rotate: 1.1deg } }
+@keyframes fxOreilleG {
+  0%,16%,100% { rotate: 0deg }
+  19% { rotate: 5deg } 22% { rotate: -2deg } 25% { rotate: 3deg } 29% { rotate: 0deg }
+  68% { rotate: 0deg } 71% { rotate: 4deg } 74% { rotate: 0deg }
+}
+@keyframes fxOreilleD {
+  0%,40%,100% { rotate: 0deg }
+  43% { rotate: -5deg } 46% { rotate: 2deg } 49% { rotate: -3deg } 53% { rotate: 0deg }
+  86% { rotate: 0deg } 89% { rotate: -4deg } 92% { rotate: 0deg }
+}
+/* clignement : fermé ~90 ms — assez court pour ne jamais se remarquer */
+@keyframes fxCligne {
+  0%,88%   { transform: translateY(-101%) }
+  90.5%    { transform: translateY(0) }
+  92.5%    { transform: translateY(0) }
+  95%,100% { transform: translateY(-101%) }
+}
+/* pendant le coucou, les couches s'effacent au profit du métrage */
+.filou-edge.fe-wave .fx { opacity: 0; }
+/* Les vidéos « accroché au rebord » (même métrage : idle + coucou),
+   superposées pour le fondu croisé. Cadrées pour que l'arête invisible
+   qu'il agrippe (~18 % de la largeur en natif) tombe PILE sur le
+   rebord de la carte une fois le .fe-crop miroité. */
+.filou-edge video {
+  position: absolute; left: 0; top: -18px;
+  width: 200px; height: auto; max-width: none;
+  display: block; opacity: 0;
+  transition: opacity .08s linear;
+}
+.filou-edge.fe-wave #fe-coucou { opacity: 1; }
+.filou-edge:hover, .filou-edge:focus-visible {
+  transform: translateY(-7px);
+}
+/* de l'autre côté : même pose, en miroir (les pattes suivent) */
+.plan-scene.filou-right .filou-edge {
+  /* -160 comme à gauche : la pose doit être SYMÉTRIQUE, sinon le socle
+     mord de 20 px de plus de ce côté (il grattait les compteurs) */
+  left: auto; right: -160px;
+  transform: scaleX(-1);
+  /* le miroir suffit : l'arête vidéo retombe pile sur le rebord droit */
+}
+.plan-scene.filou-right .filou-edge:hover,
+.plan-scene.filou-right .filou-edge:focus-visible {
+  transform: scaleX(-1) translateY(-7px);
+}
+/* le plongeon : il disparaît le temps de changer de côté */
+.filou-edge.fe-dive { transform: translateY(26px) scale(0.85); opacity: 0; }
+.plan-scene.filou-right .filou-edge.fe-dive { transform: translateY(26px) scaleX(-1) scale(0.85); opacity: 0; }
+/* le bond du départ : il se hisse avant d'ouvrir l'accueil */
+.filou-edge.fe-hop { animation: feHop .55s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+@keyframes feHop {
+  0%   { transform: none; }
+  45%  { transform: rotate(-3deg) translate(10px, -18px) scale(1.06); }
+  100% { transform: rotate(0deg) translate(16px, -8px); }
+}
+/* le voile de départ : la page s'efface, l'accueil s'ouvre */
+.depart-veil {
+  position: fixed; inset: 0; z-index: 400;
+  background: var(--bg);
+  opacity: 0; pointer-events: none;
+  transition: opacity .4s ease;
+}
+.depart-veil.show { opacity: 1; pointer-events: auto; }
+
+/* ============================================================
+   MODALES (voile commun repris du labo)
+   ============================================================ */
+.modal-veil {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(58, 42, 28, 0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 18px;
+  opacity: 0;
+  transition: opacity .25s ease;
+}
+.modal-veil[hidden] { display: none; }
+.modal-veil.open { opacity: 1; }
+.gv-modal {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-panel);
+  width: min(600px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 22px 24px 20px;
+  transform: translateY(14px) scale(0.97);
+  transition: transform .3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.modal-veil.open .gv-modal { transform: none; }
+.gm-kicker {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 6px;
+}
+.gm-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 6px; }
+.gm-head h3 { font-size: 1.15rem; font-weight: 700; line-height: 1.3; margin-top: 2px; flex: 1; }
+.gm-badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 14px; }
+.gm-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 0.68rem; font-weight: 700;
+  padding: 4px 11px; border-radius: 999px;
+}
+.gm-badge.ferie { background: var(--accent-soft); color: var(--accent-ink); }
+.gm-badge.lock { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border-strong); }
+.gm-badge.warn { background: var(--warn-soft); color: var(--warn); }
+
+.lock-encart {
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-size: 0.84rem; line-height: 1.55;
+}
+.lock-encart b { font-family: var(--font-display); }
+.lock-encart .reform-actions { margin-top: 8px; }
+.lock-confirm {
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px dashed var(--border-strong);
+  animation: bubbleIn .3s ease both;
+}
+
+.gm-section {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: var(--surface);
+}
+.gm-section.disabled { opacity: 0.55; }
+.gm-slot-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.gm-slot-label {
+  font-family: var(--font-display);
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--soft);
+  flex: 1 1 150px;
+}
+.gm-slot-label small { display: block; font-family: var(--font-body); font-weight: 500; text-transform: none; letter-spacing: 0; font-size: 0.68rem; color: var(--soft); margin-top: 1px; }
+.gm-current {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 0.88rem; font-weight: 700;
+}
+.gm-current .dot { width: 14px; height: 14px; border-radius: 50%; flex: none; }
+.gm-current.none { color: var(--muted); font-weight: 600; font-style: italic; }
+.gm-reassign {
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2); color: var(--muted);
+  border-radius: 999px; font-size: 0.74rem; font-weight: 700;
+  padding: 7px 13px; min-height: 34px;
+}
+.gm-reassign:hover:not(:disabled) { color: var(--accent-ink); border-color: var(--accent-ink); }
+.gm-reassign[aria-expanded="true"] { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent-ink); }
+.gm-reassign:disabled { opacity: 0.5; cursor: default; }
+.gm-done { font-size: 0.76rem; color: var(--ok); font-weight: 700; animation: bubbleIn .3s ease both; }
+
+.av-list { list-style: none; margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 6px; animation: bubbleIn .25s ease both; }
+.av-row {
+  display: grid;
+  grid-template-columns: 16px minmax(72px, auto) 14px minmax(0, 1fr) auto;
+  align-items: center; gap: 9px;
+  width: 100%; text-align: left;
+  border: none; background: transparent;
+  color: var(--text);
+  font-size: 0.84rem; font-weight: 600;
+  padding: 8px 8px; border-radius: var(--r-sm);
+  min-height: 40px;
+}
+.av-row:hover { background: var(--accent-soft); }
+.av-row .dot { width: 13px; height: 13px; border-radius: 50%; }
+.av-row .dot.none {
+  background: transparent; border: 1.5px dashed var(--border-strong);
+}
+.av-state { font-size: 0.8rem; line-height: 1; text-align: center; }
+.av-state.vert { color: var(--ok); }
+.av-state.ambre { color: var(--warn); }
+.av-state.rouge { color: var(--danger); }
+.av-reason { font-size: 0.73rem; font-weight: 500; color: var(--muted); line-height: 1.35; }
+.av-row.rouge .av-reason { color: var(--danger); }
+.av-row.ambre .av-reason { color: var(--warn); }
+/* l'impact compteur : ce que ce choix ferait au total de la période */
+.av-count {
+  font-size: 0.68rem; font-weight: 600; color: var(--soft);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+  text-align: right;
+}
+
+/* Dialogue de confirmation de violation (garde-fou Filou dans la modale) */
+.gf-card {
+  margin-top: 10px;
+  border-radius: var(--r-sm);
+  padding: 12px 13px;
+  font-size: 0.83rem; line-height: 1.55;
+  animation: bubbleIn .3s ease both;
+}
+.gf-card.souple { background: var(--warn-soft); border: 1px solid rgba(196, 138, 20, 0.4); }
+.gf-card.dure { background: var(--danger-soft); border: 1px solid rgba(168, 52, 31, 0.35); }
+.gf-card .gf-title {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em;
+  text-transform: uppercase; margin-bottom: 6px;
+}
+.gf-card.souple .gf-title { color: var(--warn); }
+.gf-card.dure .gf-title { color: var(--danger); }
+
+.gm-foot {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px; padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.gm-absent {
+  border: 1px solid var(--border-strong);
+  background: transparent; color: var(--muted);
+  border-radius: 999px; font-size: 0.78rem; font-weight: 700;
+  padding: 8px 15px; min-height: 38px;
+}
+.gm-absent:hover { color: var(--danger); border-color: var(--danger); }
+.gm-absent-note {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 10px 13px;
+  font-size: 0.8rem; line-height: 1.55;
+  animation: bubbleIn .3s ease both;
+}
+.gm-absent-note .reform-actions { margin-top: 8px; }
+
+/* Récap avant génération (repris du labo, + gate de régénération) */
+.recap-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+.recap-head h3 { font-size: 1.15rem; font-weight: 700; line-height: 1.3; margin-top: 2px; flex: 1; }
+.regen-warning {
+  background: var(--danger-soft);
+  border: 1px solid rgba(168, 52, 31, 0.35);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-size: 0.84rem; line-height: 1.6;
+}
+.regen-warning[hidden] { display: none; }
+.regen-warning b { color: var(--danger); }
+.regen-warning ul { margin: 6px 0 0 18px; }
+.recap-list { list-style: none; margin-bottom: 14px; }
+.recap-list li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px;
+  padding: 10px 2px;
+  border-bottom: 1px dashed var(--border);
+  font-size: 0.9rem; line-height: 1.5;
+}
+.recap-list li:last-child { border-bottom: none; }
+.recap-list b { font-family: var(--font-display); }
+.recap-edit {
+  margin-left: auto;
+  border: none; background: transparent;
+  color: var(--soft);
+  font-size: 0.74rem; font-weight: 600;
+  text-decoration: underline dotted; text-underline-offset: 3px;
+  padding: 4px 6px; min-height: 30px;
+}
+.recap-edit:hover { color: var(--accent-ink); }
+.recap-seg {
+  margin-left: auto;
+  display: inline-flex; gap: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px; padding: 3px;
+}
+.recap-seg button {
+  border: none; background: transparent; color: var(--muted);
+  font-size: 0.78rem; font-weight: 700;
+  padding: 4px 13px; border-radius: 999px; min-height: 28px;
+}
+.recap-seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.recap-prev {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+.recap-prev h4 {
+  font-family: var(--font-display);
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 6px;
+}
+.recap-prev p { font-size: 0.84rem; line-height: 1.6; }
+.recap-prev ul { list-style: none; margin-top: 4px; }
+.recap-prev li { font-size: 0.84rem; line-height: 1.6; padding: 2px 0; }
+.recap-hint-msg {
+  font-size: 0.78rem; color: var(--muted); font-style: italic;
+  margin-bottom: 12px;
+  animation: bubbleIn .3s ease both;
+}
+.recap-foot { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+.toast {
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
+  z-index: 400;
+  background: var(--text); color: var(--bg);
+  font-size: 0.82rem; font-weight: 600;
+  padding: 11px 20px; border-radius: 999px;
+  box-shadow: var(--shadow-panel);
+  opacity: 0; pointer-events: none;
+  transition: opacity .3s ease, transform .3s cubic-bezier(0.22, 1, 0.36, 1);
+  max-width: min(560px, calc(100vw - 40px));
+  text-align: center;
+}
+.toast.show { opacity: 1; transform: translateX(-50%); }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 1020px) {
+  .work-grid { grid-template-columns: 1fr; }
+  .counters-panel { max-width: 420px; }
+  .burrow-panel { bottom: 190px; }
+}
+@media (max-width: 640px) {
+  :root { --nav-h: 58px; }
+  .mq-brand small { display: none; }
+  .work-body { padding: 14px 12px 130px; }
+}
+
+/* ============================================================
+   ACCESSIBILITÉ · prefers-reduced-motion
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .silk i, .folds, .sheen, .rise { animation: none !important; }
+  .ok-flash, .day.spot, .cnt-num.bump-up, .cnt-num.bump-down, .cnt-delta,
+  .counters-panel, .bubble, .gf-card, .av-list, .lock-confirm, .gm-absent-note,
+  .status-badge.pulse, .archive-veil.show, .recap-hint-msg, .gm-done { animation: none !important; }
+  .filou-edge, .burrow-panel, .modal-veil, .gv-modal, .status-badge { transition: none; }
+  /* Filou en couches : plus de respiration ni de clignement — les pièces
+     restent à leur place, on retrouve exactement l'image d'origine. */
+  .fx-corps, .fx-tete, .fx-or-g, .fx-or-d, .fx-oeil i,
+  .fe-socle { animation: none !important; }
+  .workspace.filou-out .fox-out { animation: none; opacity: 1; transform: none; }
+  .workspace.filou-in .fox-out { animation: none; opacity: 0; }
+  .toast { transition: opacity .1s ease; }
+  * { scroll-behavior: auto !important; }
+}
+
+/* ============================================================
+   AJOUTS PRODUIT (absents de la maquette)
+   ============================================================ */
+
+/* Les alertes de re-validation, entre la barre et l'espace de travail.
+   Elles viennent de composants V1 (shadcn) : on leur donne juste la
+   place et le rythme de la page, sans les redessiner. */
+.v2-alertes { margin: 0 0 14px; }
+
+/* Skin des boutons d'administration (générer / publier / PDF) : ils sont
+   rendus par l'ActionBar V1, qui porte les garde-fous de publication. On
+   les habille ici plutôt que de réécrire 475 lignes de règles métier. */
+.head-actions button:not(.head-btn) {
+  border: 1px solid var(--border-strong) !important;
+  background: var(--surface-2) !important;
+  color: var(--muted) !important;
+  border-radius: 999px !important;
+  font-family: var(--font-body) !important;
+  font-size: 0.78rem !important;
+  font-weight: 700 !important;
+  min-height: 38px !important;
+  padding: 8px 14px !important;
+  box-shadow: none !important;
+}
+.head-actions button:not(.head-btn):hover:not(:disabled) {
+  color: var(--accent-ink) !important;
+  border-color: var(--accent-ink) !important;
+}
+/* Le bouton d'action principale garde son poids visuel. */
+.head-actions button:not(.head-btn).bg-primary,
+.head-actions button:not(.head-btn)[data-variant="default"] {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #fff !important;
+}
+.head-actions > div { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.head-actions select,
+.head-actions [role="combobox"] {
+  border-radius: 999px !important;
+  border-color: var(--border-strong) !important;
+  background: var(--surface-2) !important;
+  font-size: 0.78rem !important;
+  min-height: 38px !important;
+}
