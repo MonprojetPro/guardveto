@@ -2,7 +2,7 @@
 
 > Décisions MiKL du **2026-07-25**. Document de reprise : à lire en premier
 > au démarrage de la prochaine session sur ce sujet.
-> État : **décidé, non commencé**.
+> État : **décidé, non commencé — plus rien à arbitrer, prêt à démarrer**.
 
 ---
 
@@ -147,23 +147,36 @@ S'ajoute le coût : chaque pixel calé en maquette est du travail à refaire.
 ⚠ **Ne jamais réintroduire de fondu** dans les assets Filou : c'est ce qui avait
 détruit le métrage (cf. `docs/patch-log.md` et la mémoire projet).
 
-### À trancher au démarrage (non décidé)
+### TRANCHÉ — on bascule directement sur la nouvelle version, design ET fonctionnel
 
-La règle en vigueur dit : *« la refonte visuelle se fait en dernier, une fois
-que tout marche »*. Basculer maintenant revient à mélanger les deux.
+**Décision MiKL du 2026-07-25** : *« on bascule directement sur la nouvelle
+version design et fonctionnelle »*.
 
-**Question ouverte pour MiKL :**
-- (a) on porte Filou + le nouveau look **maintenant**, et tout se construit
-  ensuite dans le produit ; ou
-- (b) on garde le look pour la fin et on développe **d'abord les capacités**
-  de Filou dans l'app telle qu'elle est.
+Le design et les capacités avancent **ensemble**, dans le produit. On ne
+développe pas les fonctions dans l'ancienne interface pour refaire le look
+après.
 
-Rien ne démarre avant cet arbitrage.
+⚠ **Cette décision LÈVE la règle antérieure** *« la refonte UI/design = phase
+finale, après que tout le dev soit fini »* (2026-06-25). Elle ne s'applique
+plus à ce chantier.
 
-### Premiers pas concrets une fois arbitré
+Ce que ça implique concrètement :
+
+- Chaque écran refait arrive **en nouveau look + nouvelles capacités** d'un
+  seul tenant. Pas d'écran à moitié refait.
+- Le portage des assets Filou n'est pas un « en plus » : c'est la **première
+  brique**, puisque le nouveau look en dépend.
+- L'app reste utilisable pendant la bascule — le cabinet pilote s'en sert.
+  Donc on avance **écran par écran**, chacun livré fini, jamais un grand
+  chantier ouvert des semaines.
+- Ordre de bascule des écrans : celui du chantier fonctionnel (§4), le
+  planning vivant d'abord. Le design suit la même file.
+
+### Premiers pas concrets
 
 1. Créer le composant `FilouEdge` (couches + socle + coucou) et le poser sur
-   une page réelle — c'est le test de portage.
+   une page réelle — c'est le test de portage, et la première brique du
+   nouveau look.
 2. Poser la **boîte à outils** : un registre qui expose chaque action manuelle
    sous forme d'outil appelable, en réutilisant les `actions.ts` existants.
 3. Construire la **fiche de récap** branchée sur le validateur de règles réel
