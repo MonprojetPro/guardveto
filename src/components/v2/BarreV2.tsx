@@ -75,7 +75,7 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
         {estAdmin && (
           <Link
             className="dock-item"
-            href="/admin/veterinaires"
+            href="/equipe"
             aria-label={`Équipe · ${dock.nbVetos} vétérinaires`}
           >
             <span className="di-ico" aria-hidden="true">

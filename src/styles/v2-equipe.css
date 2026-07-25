@@ -1,0 +1,252 @@
+/* ============================================================
+   GUARDVETO V2 — ÉCRAN « ÉQUIPE »
+   ============================================================
+   Porté de `maquette/m4-accueil-equipe-historique-connexions.html`
+   (section 2). Complète `v2-terrier.css` (jetons, satin, barre, tête de
+   page, boutons, cartes) : ce fichier n'ajoute que la grille de fiches,
+   le panneau « créer une fiche » et le garde-fou de désactivation.
+
+   Écart assumé vs la maquette : le formulaire porte en plus le NOM et
+   l'E-MAIL. La maquette ne demandait qu'un prénom — mais sans e-mail on ne
+   peut pas inviter, et l'action serveur refuse la création. Un formulaire
+   qui ne peut pas aboutir est une coquille vide.
+   ============================================================ */
+
+/* ============================================================
+   BARRE D'OUTILS
+   ============================================================ */
+.team-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  margin-bottom: 16px;
+}
+.team-count { font-size: 0.84rem; color: var(--muted); }
+.team-toolbar .spacer { margin-left: auto; }
+
+/* ============================================================
+   LA GRILLE DE FICHES
+   ============================================================ */
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+.team-vide {
+  color: var(--muted); font-size: 0.9rem; line-height: 1.6;
+  padding: 26px 2px;
+}
+.vet-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
+  padding: 16px 18px 14px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.vet-card.inactive { opacity: 0.62; }
+.vet-card-top { display: flex; align-items: center; gap: 12px; }
+.vet-avatar {
+  width: 46px; height: 46px; border-radius: 50%;
+  color: #fff; font-family: var(--font-display);
+  font-weight: 800; font-size: 1rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none;
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.35);
+}
+.vet-card-top h3 { font-size: 1.02rem; font-weight: 700; line-height: 1.2; }
+.vet-card-top .vet-sub { font-size: 0.76rem; color: var(--muted); margin-top: 1px; }
+.vet-card-top .vet-mail {
+  font-size: 0.72rem; color: var(--soft); margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vet-flags { display: flex; flex-wrap: wrap; gap: 6px; }
+.flag {
+  font-size: 0.64rem; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 10px; border-radius: 999px;
+}
+.flag-admin { background: var(--accent-soft); color: var(--accent-ink); }
+.flag-recours { background: var(--warn-soft); color: var(--warn); }
+.flag-role { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+.vet-tags { display: flex; flex-wrap: wrap; gap: 6px; min-height: 24px; }
+.vet-tags .tag {
+  font-size: 0.7rem; font-weight: 600;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 3px 10px; border-radius: 999px;
+}
+.vet-tags .tag.vide { opacity: 0.55; font-style: italic; }
+
+/* -- L'état du compte : la seule information qui dit si la personne
+      peut réellement entrer dans l'app -- */
+.vet-account {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.78rem; font-weight: 600;
+  padding-top: 10px; border-top: 1px dashed var(--border);
+}
+.acct-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.acct-actif   .acct-dot { background: var(--ok); }
+.acct-invite  .acct-dot { background: var(--warn); }
+.acct-sans    .acct-dot { background: var(--soft); }
+.acct-inactif .acct-dot { background: var(--danger); }
+.acct-actif   { color: var(--ok); }
+.acct-invite  { color: var(--warn); }
+.acct-sans    { color: var(--muted); }
+.acct-inactif { color: var(--danger); }
+
+.vet-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.vet-actions button {
+  border: 1px solid var(--border-strong);
+  background: transparent; color: var(--muted);
+  border-radius: 999px;
+  font-size: 0.74rem; font-weight: 600;
+  padding: 6px 12px; min-height: 34px;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.vet-actions button:hover:not(:disabled) { color: var(--accent-ink); border-color: var(--accent-ink); }
+.vet-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+.vet-actions button.va-danger:hover:not(:disabled) {
+  color: var(--danger); border-color: var(--danger); background: var(--danger-soft);
+}
+.vet-actions button.va-invite {
+  background: var(--accent-soft); color: var(--accent-ink);
+  border-color: var(--border-strong); font-weight: 700;
+}
+.vet-actions button.va-invite:hover:not(:disabled) {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}
+.vet-actions button.va-on[aria-expanded='true'] {
+  background: var(--surface-2); color: var(--accent-ink); border-color: var(--accent-ink);
+}
+.va-pip {
+  font-family: var(--font-display); font-size: 0.64rem; font-weight: 800;
+  background: var(--accent); color: #fff;
+  border-radius: 999px; padding: 1px 6px; min-width: 18px; text-align: center;
+}
+
+/* -- Les desiderata d'un véto : composant V1 greffé sous la fiche -- */
+.vet-contraintes {
+  border-top: 1px dashed var(--border);
+  padding-top: 10px;
+  animation: vetPanelIn 0.32s var(--ease-out) both;
+}
+@keyframes vetPanelIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ============================================================
+   PANNEAU « CRÉER / MODIFIER UNE FICHE »
+   ============================================================
+   Un panneau qui se déplie, pas une modale : créer un confrère n'est pas
+   une décision assez lourde pour voiler tout l'écran. */
+.create-panel {
+  overflow: hidden; max-height: 0;
+  transition: max-height 0.5s var(--ease-out);
+  margin-bottom: 0;
+}
+.create-panel.open { max-height: 900px; margin-bottom: 18px; }
+.create-inner {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
+  padding: 18px 20px;
+}
+.create-inner h3 { font-size: 0.98rem; font-weight: 700; margin-bottom: 4px; }
+.create-inner .cf-lede {
+  font-size: 0.79rem; color: var(--muted); line-height: 1.55; margin-bottom: 14px;
+}
+.swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+.swatch {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+}
+.swatch[aria-pressed='true'] { border-color: var(--text); box-shadow: 0 0 0 2px var(--surface); }
+.check-line {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.84rem; padding-top: 22px;
+}
+.check-line input { width: 18px; height: 18px; accent-color: var(--accent); }
+.create-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; align-items: center; }
+.create-actions .cf-erreur {
+  color: var(--danger); font-size: 0.79rem; font-weight: 600;
+}
+
+/* Les étiquettes d'équipe, cliquables dans le formulaire. */
+.tag-picker { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tag-pick {
+  font-size: 0.72rem; font-weight: 600;
+  background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--muted); border-radius: 999px; padding: 5px 12px;
+}
+.tag-pick[aria-pressed='true'] {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+}
+.tag-libre {
+  width: 110px; min-height: 32px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 999px; padding: 5px 12px;
+  font-size: 0.72rem; color: var(--text); font-family: var(--font-body);
+}
+.tag-libre:focus { border-color: var(--accent); outline: none; }
+.cf-aide { font-size: 0.72rem; color: var(--soft); line-height: 1.5; margin-top: 6px; }
+
+/* ============================================================
+   GARDE-FOU DE DÉSACTIVATION
+   ============================================================
+   Il ne demande pas « êtes-vous sûr ? » : il MONTRE les gardes publiées
+   que la désactivation laisserait sans titulaire. Ces gardes sont lues en
+   base par l'action serveur — jamais devinées. */
+.modal-veil {
+  position: fixed; inset: 0; z-index: 90;
+  background: rgba(58, 42, 28, 0.42);
+  backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  opacity: 0; transition: opacity 0.25s ease;
+}
+.modal-veil.open { opacity: 1; }
+.guard-modal {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-panel);
+  width: min(540px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 22px 24px 20px;
+  transform: translateY(14px) scale(0.97);
+  transition: transform 0.3s var(--ease-out);
+}
+.modal-veil.open .guard-modal { transform: none; }
+.guard-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+.guard-head .gfox {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--warn-soft);
+  border: 1px solid rgba(196, 138, 20, 0.4);
+  overflow: hidden; flex: none;
+  display: flex; justify-content: center; align-items: flex-start;
+}
+.guard-head .gfox img { width: 130%; height: auto; margin-top: 2px; }
+.guard-head h3 { font-size: 1.08rem; font-weight: 700; line-height: 1.3; }
+.guard-head p { font-size: 0.82rem; color: var(--muted); margin-top: 3px; }
+.guard-list { list-style: none; margin: 12px 0 14px; max-height: 220px; overflow-y: auto; }
+.guard-list li {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--warn-soft);
+  border: 1px solid rgba(196, 138, 20, 0.35);
+  border-radius: var(--r-sm);
+  padding: 9px 13px;
+  font-size: 0.85rem;
+  margin-bottom: 7px;
+}
+.guard-list li .gl-date { font-family: var(--font-display); font-weight: 700; }
+.guard-list li .gl-role { margin-left: auto; font-size: 0.72rem; color: var(--warn); font-weight: 700; }
+.guard-note { font-size: 0.8rem; color: var(--muted); line-height: 1.55; margin-bottom: 14px; }
+.guard-foot { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+
+@media (max-width: 640px) {
+  .team-grid { grid-template-columns: 1fr; }
+}

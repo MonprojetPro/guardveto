@@ -6,6 +6,19 @@ import { createClient as createAdminClient, type SupabaseClient } from '@supabas
 import { revalidatePath } from 'next/cache'
 import type { StatutVeto, UserRole } from '@/types'
 
+/**
+ * Rafraîchit les DEUX écrans qui listent l'équipe.
+ *
+ * La V2 (`/equipe`) et la V1 (`/admin/veterinaires`) cohabitent le temps de la
+ * bascule : ne revalider que l'une laisse l'autre afficher l'état d'avant
+ * (fiche créée invisible, invitation qui a l'air de n'avoir rien fait). Quand
+ * la V1 sera retirée, il ne restera qu'une ligne à supprimer ici.
+ */
+function revaliderEquipe() {
+  revalidatePath('/admin/veterinaires')
+  revalidatePath('/equipe')
+}
+
 // ── Garde admin (même pattern que /regles et /admin/structure) ──
 async function assertAdmin(
   supabase: SupabaseClient<any, any, any>,
@@ -92,7 +105,7 @@ export async function createVeterinaire(data: VeterinaireFormData) {
 
   if (error) return { error: error.message }
 
-  revalidatePath('/admin/veterinaires')
+  revaliderEquipe()
   return { success: true }
 }
 
@@ -131,7 +144,7 @@ export async function updateVeterinaire(id: string, data: VeterinaireFormData) {
 
   if (error) return { error: error.message }
 
-  revalidatePath('/admin/veterinaires')
+  revaliderEquipe()
   return { success: true }
 }
 
@@ -204,7 +217,7 @@ export async function inviterVeterinaire(id: string) {
     .eq('id', id)
   if (updateError) return { error: updateError.message }
 
-  revalidatePath('/admin/veterinaires')
+  revaliderEquipe()
   return { success: true, email: vet.email }
 }
 
@@ -268,6 +281,6 @@ export async function toggleVeterinaireActif(
 
   if (error) return { error: error.message }
 
-  revalidatePath('/admin/veterinaires')
+  revaliderEquipe()
   return { success: true }
 }

@@ -13,35 +13,12 @@
    la boîte à outils de Filou).
    ============================================================ */
 
-/* ============================================================
-   TÊTE DE PAGE
-   ============================================================ */
-.page-head {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 14px 24px; align-items: end;
-  margin: 40px 0 20px;
-}
-.page-kicker {
-  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.16em;
-  text-transform: uppercase; color: var(--accent-ink);
-  margin-bottom: 8px;
-}
-.page-head h1 { font-size: clamp(1.4rem, 2.6vw, 1.85rem); font-weight: 800; line-height: 1.2; }
-.page-head .lede { margin-top: 8px; color: var(--muted); font-size: 0.93rem; line-height: 1.6; max-width: 62ch; }
-.page-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
-.btn-accent { background: var(--accent); color: #fff; box-shadow: 0 3px 10px var(--accent-glow); }
-.btn-accent:hover { filter: brightness(1.07); }
-.btn-outline {
-  background: var(--surface); color: var(--accent-ink);
-  border: 1px solid var(--border-strong);
-}
-.btn-outline:hover { background: var(--accent-soft); border-color: var(--accent-ink); }
-.btn-ok { background: var(--ok); color: #fff; }
-.btn-ok:hover { filter: brightness(1.08); }
-.btn-danger { background: var(--danger); color: #fff; }
-.btn-danger:hover { filter: brightness(1.08); }
-.btn-sm { font-size: 0.78rem; padding: 7px 14px; min-height: 34px; }
+/* NOTE — la tête de page (`.page-head`), les boutons d'action
+   (`.btn-accent`, `.btn-outline`, `.btn-ok`, `.btn-danger`, `.btn-sm`) et la
+   carte-section (`.card`, `.card-head`, `.section-count`) ont été REMONTÉS
+   dans `v2-terrier.css` : ils servent aussi à « Équipe », « Historique » et
+   « Réglages ». Ils ne sont plus définis ici pour qu'il n'en existe qu'une
+   version. */
 
 /* ============================================================
    ONGLETS DE LA PAGE
@@ -76,30 +53,9 @@
 @keyframes panelIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
 /* ============================================================
-   CARTES ET LISTES
-   ============================================================ */
-.card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-card);
-  margin-bottom: 24px;
-}
-.card-head {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
-  padding: 16px 22px 14px;
-  border-bottom: 1px solid var(--border);
-}
-.card-head h2 { font-size: 1.02rem; font-weight: 700; }
-.card-head .sub { width: 100%; font-size: 0.78rem; color: var(--muted); line-height: 1.5; }
-.card-head .spacer { margin-left: auto; }
-.section-count {
-  font-family: var(--font-display); font-size: 0.72rem; font-weight: 800;
-  background: var(--accent-soft); color: var(--accent-ink);
-  border-radius: 999px; padding: 3px 10px;
-}
-.section-count.zero { background: var(--surface-2); color: var(--soft); }
-
+   LISTES DE L'ÉCRAN
+   ============================================================
+   (`.card` / `.card-head` / `.section-count` vivent dans `v2-terrier.css`.) */
 .rows { list-style: none; }
 .row {
   display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 14px;
@@ -308,15 +264,8 @@
    produit (EchangesClient, DepannagesClient) encore habillés en V1. Ils
    portent des règles métier — on leur donne la matière et le rythme de la
    page plutôt que de les redessiner et risquer d'en perdre les garde-fous. */
-.v2-greffe {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  box-shadow: var(--elev-1);
-  padding: 18px 20px;
-}
-.v2-greffe h1,
-.v2-greffe h2 { font-family: var(--font-display); color: var(--text); }
+/* (`.v2-greffe` — le cadre d'accueil d'un composant V1 réutilisé tel quel —
+   vit dans `v2-terrier.css` : l'écran Équipe s'en sert aussi.) */
 
 /* La pastille de compte dans un onglet. */
 .tabs .count {

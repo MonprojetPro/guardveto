@@ -5,6 +5,12 @@ import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { revalidatePath } from 'next/cache'
 import type { ContrainteVeto } from '@/types'
 
+/** Les desiderata s'affichent sur les deux écrans d'équipe (V1 et V2). */
+function revaliderEquipe() {
+  revalidatePath('/admin/veterinaires')
+  revalidatePath('/equipe')
+}
+
 export type TypeContrainte = ContrainteVeto['type']
 
 export type ConfigJourReposFixe = {
@@ -56,7 +62,7 @@ export async function createContrainte(
     actif: true,
   })
   if (error) return { error: error.message }
-  revalidatePath('/admin/veterinaires')
+  revaliderEquipe()
   return { success: true }
 }
 
@@ -71,7 +77,7 @@ export async function updateContrainte(
     .update({ type, config })
     .eq('id', id)
   if (error) return { error: error.message }
-  revalidatePath('/admin/veterinaires')
+  revaliderEquipe()
   return { success: true }
 }
 
@@ -79,6 +85,6 @@ export async function deleteContrainte(id: string) {
   const supabase = await createClient()
   const { error } = await supabase.from('contraintes_veto').delete().eq('id', id)
   if (error) return { error: error.message }
-  revalidatePath('/admin/veterinaires')
+  revaliderEquipe()
   return { success: true }
 }
