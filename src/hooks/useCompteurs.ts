@@ -173,6 +173,68 @@ export async function queryVetsInfo(
 
 // ── Historique des fêtes (backlog n°14 — équité inter-annuelle) ──
 
+// ── Dépannages (« qui a repris la garde de qui ») ─────────
+
+export interface DepannagesRow {
+  veterinaire_id: string
+  /** Gardes reprises POUR quelqu'un d'autre. */
+  rendus: number
+  /** Gardes que quelqu'un a reprises À SA PLACE. */
+  recus: number
+  /** Dettes encore ouvertes (statut `a_compenser`) où il a été dépanné. */
+  dettesOuvertes: number
+}
+
+/**
+ * Compte les dépannages sur une plage de dates, par vétérinaire.
+ *
+ * La date qui compte est celle de la GARDE dépannée, pas celle de la saisie :
+ * un dépannage saisi en mars pour une garde de janvier appartient à janvier.
+ * Les compensations `annulee` sont ignorées — elles n'ont jamais eu lieu.
+ *
+ * BEST-EFFORT : la table peut être vide sur un cabinet qui n'a jamais eu
+ * d'absence. Une erreur renvoie une map vide plutôt que de faire tomber
+ * l'écran de compteurs.
+ */
+export async function queryDepannages(
+  supabase: SupabaseClient,
+  debut: string,
+  fin: string,
+): Promise<Map<string, DepannagesRow>> {
+  const parVeto = new Map<string, DepannagesRow>()
+
+  const { data, error } = await supabase
+    .from('compensations')
+    .select('remplacant_id, remplace_id, statut, gardes!inner(date)')
+    .gte('gardes.date', debut)
+    .lte('gardes.date', fin)
+
+  if (error || !data) return parVeto
+
+  const ligne = (id: string): DepannagesRow => {
+    let l = parVeto.get(id)
+    if (!l) {
+      l = { veterinaire_id: id, rendus: 0, recus: 0, dettesOuvertes: 0 }
+      parVeto.set(id, l)
+    }
+    return l
+  }
+
+  for (const c of data as {
+    remplacant_id: string
+    remplace_id: string
+    statut: string
+  }[]) {
+    if (c.statut === 'annulee') continue
+    ligne(c.remplacant_id).rendus += 1
+    const recu = ligne(c.remplace_id)
+    recu.recus += 1
+    if (c.statut === 'a_compenser') recu.dettesOuvertes += 1
+  }
+
+  return parVeto
+}
+
 export interface HistoriqueFeteAffichage {
   veterinaire_id: string
   fete: 'noel' | 'nouvel_an'

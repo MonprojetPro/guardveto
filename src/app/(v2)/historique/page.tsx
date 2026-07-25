@@ -1,0 +1,391 @@
+// ============================================================
+// GUARDVETO V2 — Historique & compteurs
+// ============================================================
+// Cinquième écran de la bascule (maquette M4, section 3). Il REGROUPE ce qui
+// était éclaté sur deux entrées de menu — `/compteurs` et `/admin/periodes` —
+// parce que c'est une seule question : qui a fait quoi, et sur quelle période.
+//
+// Les deux routes V1 restent en place jusqu'à la recette de celui-ci.
+//
+// Tous les chiffres viennent du moteur : la vue `compteurs_gardes`, la table
+// `compensations`, et `calculerBilans` pour les écarts — le MÊME calcul que le
+// bilan officiel de fin de période. Rien n'est ré-additionné ici.
+// ============================================================
+
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import '@/styles/v2-historique.css'
+import { Satin } from '@/components/v2/Satin'
+import { BarreV2 } from '@/components/v2/BarreV2'
+import { HistoriqueV2, type LignePeriode, type CumulLigne } from '@/components/v2/HistoriqueV2'
+import { BonusMalusCard } from '@/components/compteurs/BonusMalusCard'
+import { HistoriqueFetesCard } from '@/components/compteurs/HistoriqueFetesCard'
+import { CreerPeriodeDialog } from '@/components/admin/CreerPeriodeDialog'
+import { SupprimerPeriodeButton } from '@/components/admin/SupprimerPeriodeButton'
+import { EffectifPeriodeSelect } from '@/components/admin/EffectifPeriodeSelect'
+import { ProfilPeriodeSelect } from '@/components/admin/ProfilPeriodeSelect'
+import { chargerDock } from '@/data/v2/dock'
+import { calculerBilans } from '@/engine/bilan'
+import {
+  queryCompteurs,
+  queryCompteursPlage,
+  queryTotalWE,
+  queryDepannages,
+  queryBonusMalusHeritage,
+  queryBonusMalusCourant,
+  queryVetsInfo,
+  queryHistoriqueFetes,
+  type CompteursRow,
+} from '@/hooks/useCompteurs'
+import type { Periode, ProfilPlanning, Veterinaire } from '@/types'
+
+export const dynamic = 'force-dynamic'
+export const metadata = { title: 'GuardVeto — Historique & compteurs' }
+
+const RE_DATE = /^\d{4}-\d{2}-\d{2}$/
+
+function libellePeriode(p: Periode): string {
+  if (p.libelle) return p.libelle
+  const saison = p.saison === 'ete' ? 'Été' : 'Hiver'
+  return `${saison} ${p.date_debut.slice(0, 4)}${p.numero ? ` — P${p.numero}` : ''}`
+}
+
+function nbSemaines(p: Periode): number {
+  const jours =
+    (new Date(p.date_fin).getTime() - new Date(p.date_debut).getTime()) / 86_400_000 + 1
+  return Math.max(1, Math.round(jours / 7))
+}
+
+/**
+ * Effectif de nuit RÉELLEMENT appliqué par le moteur — même précédence que
+ * `engine/loader.ts` : période (surcharge) > profil > saison. Recopié de la
+ * page V1 `/admin/periodes` : afficher autre chose serait afficher un réglage
+ * que le moteur n'utilise pas.
+ */
+function effectifResolu(
+  p: Periode,
+  profilParId: Map<string, ProfilPlanning>,
+): { valeur: number; source: string | null } {
+  if (typeof p.nb_vetos_semaine_soir === 'number') {
+    return { valeur: p.nb_vetos_semaine_soir, source: null }
+  }
+  const profil = p.profil_id ? profilParId.get(p.profil_id) : undefined
+  if (profil && typeof profil.nb_vetos_semaine_soir === 'number') {
+    return { valeur: profil.nb_vetos_semaine_soir, source: `hérité du profil « ${profil.nom} »` }
+  }
+  return {
+    valeur: p.saison === 'hiver' ? 2 : 1,
+    source: `selon la saison (${p.saison === 'hiver' ? 'hiver' : 'été'})`,
+  }
+}
+
+export default async function HistoriquePage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    periodeId?: string
+    mode?: string
+    debut?: string
+    fin?: string
+    perimetre?: string
+  }>
+}) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: moi } = await supabase
+    .from('veterinaires')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('actif', true)
+    .single()
+
+  if (!moi) {
+    await supabase.auth.signOut()
+    redirect('/login')
+  }
+
+  const vet = moi as Veterinaire
+  const estAdmin = vet.role_app === 'admin'
+
+  // ── Périodes ───────────────────────────────────────────────────────────
+  const { data: periodesDb } = await supabase
+    .from('periodes')
+    .select('*')
+    .order('date_debut', { ascending: false })
+    .limit(20)
+
+  const periodes = (periodesDb as Periode[] | null) ?? []
+  const dock = await chargerDock(supabase, vet, periodes)
+
+  if (periodes.length === 0) {
+    return (
+      <>
+        <Satin />
+        <div className="shell">
+          <BarreV2 prenom={vet.prenom} estAdmin={estAdmin} dock={dock} />
+          <div className="page-head rise">
+            <div>
+              <p className="page-kicker">Historique &amp; compteurs</p>
+              <h1>Rien à raconter pour l&apos;instant.</h1>
+              <p className="lede">
+                Aucune période de planification n&apos;existe encore. Les compteurs
+                apparaîtront dès qu&apos;une période aura été créée et un planning généré.
+              </p>
+            </div>
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  // ── Résolution des filtres (même logique que la V1 `/compteurs`) ───────
+  const params = await searchParams
+  const mode = params.mode === 'plage' ? 'plage' : 'periode'
+  const perimetre = params.perimetre === 'valide' ? 'valide' : 'tout'
+
+  const today = new Date().toISOString().slice(0, 10)
+  const periodesAsc = [...periodes].reverse()
+  const periodeCourante =
+    periodes.find((p) => p.date_debut <= today && p.date_fin >= today) ??
+    periodesAsc.find((p) => p.date_debut >= today) ??
+    periodes[0]
+  const periodeSelectionnee = periodes.find((p) => p.id === params.periodeId) ?? periodeCourante
+
+  const plageValide =
+    mode === 'plage' &&
+    !!params.debut &&
+    RE_DATE.test(params.debut) &&
+    !!params.fin &&
+    RE_DATE.test(params.fin) &&
+    params.debut <= params.fin
+
+  const debut = plageValide
+    ? params.debut!
+    : params.debut && RE_DATE.test(params.debut)
+      ? params.debut
+      : periodeSelectionnee.date_debut
+  const fin = plageValide
+    ? params.fin!
+    : params.fin && RE_DATE.test(params.fin)
+      ? params.fin
+      : periodeSelectionnee.date_fin
+
+  // ── Compteurs du filtre courant ────────────────────────────────────────
+  let compteurs: CompteursRow[]
+  let totalWE: number
+  if (plageValide) {
+    const res = await queryCompteursPlage(supabase, debut, fin, perimetre === 'valide')
+    compteurs = res.compteurs
+    totalWE = res.totalWE
+  } else if (perimetre === 'valide' && periodeSelectionnee.statut === 'brouillon') {
+    // Périmètre « validées seulement » sur une période encore en brouillon :
+    // il n'y a rien à compter. On le dit plutôt que d'afficher les gardes du
+    // brouillon sous une étiquette « validées ».
+    compteurs = []
+    totalWE = 0
+  } else {
+    ;[compteurs, totalWE] = await Promise.all([
+      queryCompteurs(supabase, periodeSelectionnee.id),
+      queryTotalWE(supabase, periodeSelectionnee.id),
+    ])
+  }
+
+  const bilans = calculerBilans(compteurs, totalWE)
+  const depannages = [...(await queryDepannages(supabase, debut, fin)).values()]
+
+  // ── Qui est hors répartition ───────────────────────────────────────────
+  const { data: vetsDb } = await supabase
+    .from('veterinaires')
+    .select('id, dernier_recours')
+    .eq('dernier_recours', true)
+  const derniersRecours = ((vetsDb as { id: string }[] | null) ?? []).map((v) => v.id)
+
+  // ── Légende du filtre ──────────────────────────────────────────────────
+  const legende: Array<{ texte: string; fort?: boolean }> = []
+  if (plageValide) {
+    legende.push({ texte: 'Plage libre', fort: true })
+    legende.push({
+      texte: `du ${new Date(`${debut}T12:00:00`).toLocaleDateString('fr-FR')} au ${new Date(
+        `${fin}T12:00:00`,
+      ).toLocaleDateString('fr-FR')}`,
+    })
+    const chevauchees = periodes
+      .filter((p) => p.date_debut <= fin && p.date_fin >= debut)
+      .map((p) => libellePeriode(p))
+    legende.push({
+      texte: chevauchees.length > 0 ? `chevauche : ${chevauchees.join(', ')}` : 'aucune période',
+    })
+  } else {
+    legende.push({ texte: libellePeriode(periodeSelectionnee), fort: true })
+    legende.push({
+      texte: `${nbSemaines(periodeSelectionnee)} semaines · ${new Date(
+        `${periodeSelectionnee.date_debut}T12:00:00`,
+      ).toLocaleDateString('fr-FR')} → ${new Date(
+        `${periodeSelectionnee.date_fin}T12:00:00`,
+      ).toLocaleDateString('fr-FR')}`,
+    })
+  }
+  legende.push({
+    texte:
+      perimetre === 'valide'
+        ? 'gardes validées seulement (publiées ou verrouillées)'
+        : 'tout compris, brouillons inclus',
+  })
+
+  // ── Périodes + leurs réglages ──────────────────────────────────────────
+  const { data: profilsDb } = await supabase
+    .from('profils_planning')
+    .select('id, nom, est_defaut, saison_suggeree, nb_vetos_semaine_soir')
+    .eq('actif', true)
+    .order('ordre')
+  const profils = (profilsDb as ProfilPlanning[] | null) ?? []
+  const profilParId = new Map(profils.map((p) => [p.id, p]))
+  const defautId = profils.find((p) => p.est_defaut)?.id ?? null
+  const profilsNommes = profils.filter((p) => !p.est_defaut)
+
+  const lignesPeriodes: LignePeriode[] = periodes.map((p) => {
+    const eff = effectifResolu(p, profilParId)
+    return {
+      periode: p,
+      effectif: eff.valeur,
+      effectifSource: eff.source,
+      profilId: p.profil_id && p.profil_id !== defautId ? p.profil_id : null,
+      nbSemaines: nbSemaines(p),
+    }
+  })
+
+  // Les réglages d'une période (effectif, profil, suppression) restent les
+  // composants V1 : ils écrivent en base et savent quand se verrouiller.
+  const slotsReglagesPeriode: Record<string, React.ReactNode> = {}
+  const slotsSupprimerPeriode: Record<string, React.ReactNode> = {}
+  if (estAdmin) {
+    for (const l of lignesPeriodes) {
+      slotsReglagesPeriode[l.periode.id] = (
+        <>
+          <span className="pr-champ">
+            Nuit :
+            <EffectifPeriodeSelect
+              periodeId={l.periode.id}
+              valeur={l.effectif}
+              disabled={l.periode.statut === 'verrouille'}
+            />
+          </span>
+          <span className="pr-champ">
+            Profil :
+            <ProfilPeriodeSelect
+              periodeId={l.periode.id}
+              valeur={l.profilId}
+              profils={profilsNommes}
+              disabled={l.periode.statut === 'verrouille'}
+            />
+          </span>
+        </>
+      )
+      if (l.periode.statut === 'brouillon') {
+        slotsSupprimerPeriode[l.periode.id] = (
+          <SupprimerPeriodeButton periodeId={l.periode.id} label={libellePeriode(l.periode)} />
+        )
+      }
+    }
+  }
+
+  // ── Cumul sur toutes les périodes validées ─────────────────────────────
+  // Le cumul ne suit PAS le filtre : c'est justement la vue d'ensemble que le
+  // moteur relit d'une période à l'autre. Il ne compte que le validé — un
+  // brouillon peut encore changer.
+  const periodesValidees = periodes.filter((p) => p.statut !== 'brouillon')
+  let cumul: CumulLigne[] = []
+  let cumulResume: string | null = null
+  if (periodesValidees.length > 0) {
+    const bornes = periodesValidees.reduce(
+      (acc, p) => ({
+        debut: p.date_debut < acc.debut ? p.date_debut : acc.debut,
+        fin: p.date_fin > acc.fin ? p.date_fin : acc.fin,
+      }),
+      { debut: periodesValidees[0].date_debut, fin: periodesValidees[0].date_fin },
+    )
+    const res = await queryCompteursPlage(supabase, bornes.debut, bornes.fin, true)
+    cumul = res.compteurs.map((r) => ({
+      veterinaire_id: r.veterinaire_id,
+      prenom: r.prenom,
+      couleur: r.couleur,
+      we: r.we_total,
+      sem: r.sem_total,
+      feries: r.feries_total,
+    }))
+    const semaines = periodesValidees.reduce((s, p) => s + nbSemaines(p), 0)
+    const brouillons = periodes.length - periodesValidees.length
+    cumulResume = `${periodesValidees.length} période${
+      periodesValidees.length > 1 ? 's' : ''
+    } validée${periodesValidees.length > 1 ? 's' : ''} · ${semaines} semaines${
+      brouillons > 0
+        ? ` · ${brouillons} brouillon${brouillons > 1 ? 's' : ''} non compté${brouillons > 1 ? 's' : ''}`
+        : ''
+    }`
+  }
+
+  // ── Greffes V1 : bilan de période et historique des fêtes ──────────────
+  const afficherBilan =
+    estAdmin && mode === 'periode' && periodeSelectionnee.statut !== 'brouillon'
+
+  const [bonusMalusHeritage, bonusMalusCourant, vetsInfo, historiqueFetes] = await Promise.all([
+    estAdmin && mode === 'periode'
+      ? queryBonusMalusHeritage(supabase, periodeSelectionnee, periodes)
+      : Promise.resolve([]),
+    afficherBilan ? queryBonusMalusCourant(supabase, periodeSelectionnee.id) : Promise.resolve([]),
+    afficherBilan ? queryVetsInfo(supabase) : Promise.resolve([]),
+    estAdmin ? queryHistoriqueFetes(supabase) : Promise.resolve([]),
+  ])
+
+  return (
+    <>
+      <Satin />
+      <div className="shell">
+        <BarreV2 prenom={vet.prenom} estAdmin={estAdmin} dock={dock} />
+        <HistoriqueV2
+          periodes={periodes}
+          mode={plageValide ? 'plage' : mode}
+          periodeId={periodeSelectionnee.id}
+          debut={debut}
+          fin={fin}
+          perimetre={perimetre}
+          legende={legende}
+          compteurs={compteurs}
+          bilans={bilans}
+          depannages={depannages}
+          derniersRecours={derniersRecours}
+          totalWE={totalWE}
+          moiId={vet.id}
+          estAdmin={estAdmin}
+          lignesPeriodes={lignesPeriodes}
+          cumul={cumul}
+          cumulResume={cumulResume}
+          slotCreerPeriode={estAdmin ? <CreerPeriodeDialog profils={profilsNommes} /> : undefined}
+          slotsReglagesPeriode={slotsReglagesPeriode}
+          slotsSupprimerPeriode={slotsSupprimerPeriode}
+          slotBilan={
+            afficherBilan ? (
+              <BonusMalusCard
+                periodeId={periodeSelectionnee.id}
+                periodeStatut={periodeSelectionnee.statut}
+                existingBilan={bonusMalusCourant}
+                heritage={bonusMalusHeritage}
+                vetsInfo={vetsInfo}
+              />
+            ) : undefined
+          }
+          slotFetes={
+            estAdmin && historiqueFetes.length > 0 ? (
+              <HistoriqueFetesCard rows={historiqueFetes} />
+            ) : undefined
+          }
+        />
+      </div>
+    </>
+  )
+}

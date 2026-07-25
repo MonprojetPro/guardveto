@@ -5,6 +5,20 @@ import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+/**
+ * Rafraîchit les DEUX écrans qui listent les périodes.
+ *
+ * La V2 les affiche dans « Historique & compteurs » (`/historique`), la V1
+ * dans `/admin/periodes` ; les deux cohabitent le temps de la bascule. Ne
+ * revalider que l'une laisse l'autre montrer l'état d'avant — une période
+ * créée qui n'apparaît pas, un effectif qui a l'air de ne pas s'être
+ * enregistré.
+ */
+function revaliderPeriodes() {
+  revalidatePath('/admin/periodes')
+  revalidatePath('/historique')
+}
+
 // ── Garde admin (même pattern que /regles et /admin/structure) ──
 // La RLS periodes (write admin-only) protège déjà l'écriture ; cette garde
 // ajoute un refus explicite en français au lieu d'une erreur Postgres brute.
@@ -117,7 +131,7 @@ export async function creerPeriode(formData: FormData) {
 
   if (error) return { error: error.message }
 
-  revalidatePath('/admin/periodes')
+  revaliderPeriodes()
   return { success: true }
 }
 
@@ -148,7 +162,7 @@ export async function setProfilPeriode(periodeId: string, profilId: string | nul
     .eq('id', periodeId)
 
   if (error) return { error: error.message }
-  revalidatePath('/admin/periodes')
+  revaliderPeriodes()
   return { success: true }
 }
 
@@ -170,7 +184,7 @@ export async function setEffectifPeriode(periodeId: string, nb: number) {
     .eq('id', periodeId)
 
   if (error) return { error: error.message }
-  revalidatePath('/admin/periodes')
+  revaliderPeriodes()
   return { success: true }
 }
 
@@ -217,6 +231,6 @@ export async function supprimerPeriode(periodeId: string) {
 
   if (error) return { error: error.message }
 
-  revalidatePath('/admin/periodes')
+  revaliderPeriodes()
   return { success: true }
 }

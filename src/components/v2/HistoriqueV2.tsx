@@ -1,0 +1,643 @@
+'use client'
+
+// ============================================================
+// GUARDVETO V2 — Écran « Historique & compteurs »
+// ============================================================
+// Porté de `maquette/m4-accueil-equipe-historique-connexions.html` (section 3).
+//
+// Ce qui est PORTÉ (le look) : la barre de filtres à segments, les cartes de
+// compteurs avec l'écart à la juste part, la liste des périodes, le cumul.
+//
+// Ce qui est RÉUTILISÉ tel quel (les règles métier) : `calculerBilans` pour
+// les écarts — le MÊME calcul que le bilan officiel de fin de période, sinon
+// une carte dirait « +2 » là où le bilan dit « +1 » ; et les composants
+// `BonusMalusCard`, `HistoriqueFetesCard`, `CreerPeriodeDialog`,
+// `EffectifPeriodeSelect`, `ProfilPeriodeSelect`, `SupprimerPeriodeButton`,
+// greffés tels quels : ils écrivent en base et portent leurs garde-fous.
+//
+// Les filtres passent par l'URL (comme la V1 `/compteurs`) : tout le calcul
+// est côté serveur, donc un lien vers un filtre précis reste partageable.
+// ============================================================
+
+import { useRouter } from 'next/navigation'
+import { useState } from 'react'
+import type { Periode } from '@/types'
+import type { CompteursRow, DepannagesRow } from '@/hooks/useCompteurs'
+import type { BilanVet } from '@/engine/bilan'
+
+// ── Ce que la page a préparé ──────────────────────────────────────────────
+
+export interface LignePeriode {
+  periode: Periode
+  /** Effectif de nuit RÉELLEMENT appliqué, et d'où il vient. */
+  effectif: number
+  effectifSource: string | null
+  /** Profil nommé rattaché (null = profil par défaut du cabinet). */
+  profilId: string | null
+  nbSemaines: number
+}
+
+export interface CumulLigne {
+  veterinaire_id: string
+  prenom: string
+  couleur: string
+  we: number
+  sem: number
+  feries: number
+}
+
+interface Props {
+  periodes: Periode[]
+  /** Filtres actifs, lus dans l'URL par la page. */
+  mode: 'periode' | 'plage'
+  periodeId: string
+  debut: string
+  fin: string
+  perimetre: 'tout' | 'valide'
+  /**
+   * Ce que montrent les cartes, phrasé par la page, en morceaux.
+   * Surtout PAS une chaîne de HTML : elle contiendrait des libellés de période
+   * saisis par l'admin, et les injecter tels quels ouvrirait une porte XSS
+   * pour économiser deux balises.
+   */
+  legende: Array<{ texte: string; fort?: boolean }>
+
+  compteurs: CompteursRow[]
+  bilans: BilanVet[]
+  depannages: DepannagesRow[]
+  /** Les vétos « dernier recours » sortent de la répartition. */
+  derniersRecours: string[]
+  totalWE: number
+  moiId: string | null
+  estAdmin: boolean
+
+  /** Périodes + leurs réglages, pour la carte « Périodes planifiées ». */
+  lignesPeriodes: LignePeriode[]
+  cumul: CumulLigne[]
+  cumulResume: string | null
+
+  /** Composants V1 greffés, rendus côté serveur par la page. */
+  slotBilan?: React.ReactNode
+  slotFetes?: React.ReactNode
+  slotCreerPeriode?: React.ReactNode
+  slotsReglagesPeriode?: Record<string, React.ReactNode>
+  slotsSupprimerPeriode?: Record<string, React.ReactNode>
+}
+
+// ── Petits utilitaires d'affichage ────────────────────────────────────────
+
+function libellePeriode(p: Periode): string {
+  if (p.libelle) return p.libelle
+  const saison = p.saison === 'ete' ? 'Été' : 'Hiver'
+  return `${saison} ${p.date_debut.slice(0, 4)}${p.numero ? ` — P${p.numero}` : ''}`
+}
+
+function dateCourte(iso: string): string {
+  return new Date(`${iso}T12:00:00`).toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+const LIBELLE_STATUT: Record<Periode['statut'], { texte: string; classe: string }> = {
+  brouillon: { texte: 'Brouillon', classe: 'st-brouillon' },
+  publie: { texte: 'Publiée', classe: 'st-publiee' },
+  verrouille: { texte: 'Verrouillée', classe: 'st-archivee' },
+}
+
+/**
+ * La pastille d'écart. Les écarts arrivent déjà arrondis par `calculerBilans`
+ * (c'est la valeur qui part en base pour le rattrapage), donc on colore sur
+ * l'entier : 0 = dans la juste part, ±1 = surveillé, au-delà = à rattraper.
+ */
+function Ecart({ valeur, horsRepartition }: { valeur: number; horsRepartition: boolean }) {
+  if (horsRepartition) {
+    return (
+      <span className="ecart none" title="Dernier recours : hors répartition">
+        —
+      </span>
+    )
+  }
+  const abs = Math.abs(valeur)
+  const classe = abs === 0 ? 'ok' : abs === 1 ? 'warn' : 'bad'
+  const titre =
+    abs === 0
+      ? 'Dans la juste part'
+      : abs === 1
+        ? 'Léger écart, rattrapé à la prochaine génération'
+        : 'Écart à rattraper'
+  const texte = valeur === 0 ? '=' : valeur > 0 ? `+${valeur}` : `−${abs}`
+  return (
+    <span className={`ecart ${classe}`} title={titre}>
+      {texte}
+    </span>
+  )
+}
+
+function Nombre({ n }: { n: number }) {
+  return <td className={n === 0 ? 'zero' : undefined}>{n}</td>
+}
+
+// ── Composant ─────────────────────────────────────────────────────────────
+
+export function HistoriqueV2({
+  periodes,
+  mode,
+  periodeId,
+  debut,
+  fin,
+  perimetre,
+  legende,
+  compteurs,
+  bilans,
+  depannages,
+  derniersRecours,
+  totalWE,
+  moiId,
+  estAdmin,
+  lignesPeriodes,
+  cumul,
+  cumulResume,
+  slotBilan,
+  slotFetes,
+  slotCreerPeriode,
+  slotsReglagesPeriode,
+  slotsSupprimerPeriode,
+}: Props) {
+  const router = useRouter()
+  const [du, setDu] = useState(debut)
+  const [au, setAu] = useState(fin)
+
+  const recours = new Set(derniersRecours)
+  const bilanDe = new Map(bilans.map((b) => [b.veterinaire_id, b]))
+  const depannageDe = new Map(depannages.map((d) => [d.veterinaire_id, d]))
+
+  const versPeriode = (id: string) =>
+    router.push(`/historique?mode=periode&periodeId=${id}&perimetre=${perimetre}`)
+  const versPlage = (d: string, f: string, peri: 'tout' | 'valide' = perimetre) =>
+    router.push(`/historique?mode=plage&debut=${d}&fin=${f}&perimetre=${peri}`)
+  const changerPerimetre = (peri: 'tout' | 'valide') =>
+    mode === 'plage' ? versPlage(du, au, peri) : router.push(
+      `/historique?mode=periode&periodeId=${periodeId}&perimetre=${peri}`,
+    )
+
+  const aucuneDonnee = compteurs.length === 0
+
+  return (
+    <>
+      {/* ── Tête de page ─────────────────────────────────────────────── */}
+      <div className="page-head rise">
+        <div>
+          <p className="page-kicker">Historique &amp; compteurs</p>
+          <h1>Qui a fait quoi, sur la période que tu veux.</h1>
+          <p className="lede">
+            Les compteurs sont ceux du moteur, pas une addition faite ici : c&apos;est exactement
+            ce qu&apos;il relit à chaque génération pour rattraper les écarts de la période
+            précédente.
+          </p>
+        </div>
+        {estAdmin && slotCreerPeriode && <div className="page-actions">{slotCreerPeriode}</div>}
+      </div>
+
+      {/* ── Filtres ──────────────────────────────────────────────────── */}
+      <div className="hist-filters rise rise-2">
+        <span className="hf-label">Période</span>
+        <div className="seg" role="group" aria-label="Choix de la période">
+          {periodes.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              aria-pressed={mode === 'periode' && p.id === periodeId}
+              onClick={() => versPeriode(p.id)}
+            >
+              {libellePeriode(p)}
+            </button>
+          ))}
+          <button
+            type="button"
+            aria-pressed={mode === 'plage'}
+            onClick={() => versPlage(du, au)}
+          >
+            Plage libre
+          </button>
+        </div>
+
+        {mode === 'plage' && (
+          <div className="range-fields">
+            <input
+              type="date"
+              value={du}
+              aria-label="Date de début"
+              onChange={(e) => setDu(e.target.value)}
+            />
+            <span className="arrow" aria-hidden="true">
+              →
+            </span>
+            <input
+              type="date"
+              value={au}
+              aria-label="Date de fin"
+              onChange={(e) => setAu(e.target.value)}
+            />
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => versPlage(du, au)}
+              disabled={!du || !au || du > au}
+            >
+              Appliquer
+            </button>
+          </div>
+        )}
+
+        <span className="hf-label" style={{ marginLeft: 'auto' }}>
+          Périmètre
+        </span>
+        <div className="seg" role="group" aria-label="Périmètre des gardes comptées">
+          <button
+            type="button"
+            aria-pressed={perimetre === 'tout'}
+            onClick={() => changerPerimetre('tout')}
+          >
+            Tout, brouillons compris
+          </button>
+          <button
+            type="button"
+            aria-pressed={perimetre === 'valide'}
+            onClick={() => changerPerimetre('valide')}
+          >
+            Gardes validées seulement
+          </button>
+        </div>
+
+        <p className="hist-caption">
+          {legende.map((seg, i) => (
+            <span key={i}>
+              {i > 0 && ' · '}
+              {seg.fort ? <b>{seg.texte}</b> : seg.texte}
+            </span>
+          ))}
+        </p>
+      </div>
+
+      {/* ── Les cartes de compteurs ──────────────────────────────────── */}
+      {aucuneDonnee ? (
+        <section className="card rise rise-3">
+          <div className="card-head">
+            <h2>Aucune garde sur ce filtre</h2>
+          </div>
+          <p className="count-vide">
+            {perimetre === 'valide'
+              ? "Rien de validé ici : le planning de cette période est peut-être encore en brouillon. Passe le périmètre sur « Tout, brouillons compris » pour le voir."
+              : "Aucune garde n'a été attribuée sur cet intervalle."}
+          </p>
+        </section>
+      ) : (
+        <div className="count-grid rise rise-3">
+          {/* Week-ends */}
+          <section className="card count-card" aria-label="Compteur des week-ends">
+            <div className="card-head">
+              <h3>🧡 Week-ends</h3>
+              <span className="sub spacer">1er / 2nd de garde · écart à la juste part</span>
+            </div>
+            <table className="count-table">
+              <thead>
+                <tr>
+                  <th>Vétérinaire</th>
+                  <th>1er</th>
+                  <th>2nd</th>
+                  <th>Total</th>
+                  <th>Écart</th>
+                </tr>
+              </thead>
+              <tbody>
+                {compteurs.map((r) => (
+                  <tr key={r.veterinaire_id} className={r.veterinaire_id === moiId ? 'moi' : undefined}>
+                    <td>
+                      <span className="ct-vet">
+                        <i style={{ background: r.couleur }} />
+                        {r.prenom}
+                        {r.statut === 'salarie' && <span className="sal">sal.</span>}
+                      </span>
+                    </td>
+                    <Nombre n={r.we_premier} />
+                    <Nombre n={r.we_second} />
+                    <td>{r.we_total}</td>
+                    <td>
+                      <Ecart
+                        valeur={bilanDe.get(r.veterinaire_id)?.ecart_we ?? 0}
+                        horsRepartition={recours.has(r.veterinaire_id)}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+
+          {/* Nuits de semaine */}
+          <section className="card count-card" aria-label="Compteur des nuits de semaine">
+            <div className="card-head">
+              <h3>🌙 Semaine · 1er / 2nd</h3>
+              <span className="sub spacer">nuits en semaine</span>
+            </div>
+            <table className="count-table">
+              <thead>
+                <tr>
+                  <th>Vétérinaire</th>
+                  <th>1er</th>
+                  <th>2nd</th>
+                  <th>Total</th>
+                  <th>Écart</th>
+                </tr>
+              </thead>
+              <tbody>
+                {compteurs.map((r) => (
+                  <tr key={r.veterinaire_id} className={r.veterinaire_id === moiId ? 'moi' : undefined}>
+                    <td>
+                      <span className="ct-vet">
+                        <i style={{ background: r.couleur }} />
+                        {r.prenom}
+                      </span>
+                    </td>
+                    <Nombre n={r.sem_premier} />
+                    <Nombre n={r.sem_second} />
+                    <td>{r.sem_total}</td>
+                    <td>
+                      <Ecart
+                        valeur={bilanDe.get(r.veterinaire_id)?.ecart_semaine ?? 0}
+                        horsRepartition={recours.has(r.veterinaire_id)}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+
+          {/* Fériés */}
+          <section className="card count-card" aria-label="Compteur des jours fériés">
+            <div className="card-head">
+              <h3>🎈 Fériés</h3>
+              <span className="sub spacer">jours fériés de la zone du cabinet</span>
+            </div>
+            <table className="count-table">
+              <thead>
+                <tr>
+                  <th>Vétérinaire</th>
+                  <th>Total</th>
+                  <th>Écart</th>
+                </tr>
+              </thead>
+              <tbody>
+                {compteurs.map((r) => (
+                  <tr key={r.veterinaire_id} className={r.veterinaire_id === moiId ? 'moi' : undefined}>
+                    <td>
+                      <span className="ct-vet">
+                        <i style={{ background: r.couleur }} />
+                        {r.prenom}
+                      </span>
+                    </td>
+                    <Nombre n={r.feries_total} />
+                    <td>
+                      <Ecart
+                        valeur={bilanDe.get(r.veterinaire_id)?.ecart_feries ?? 0}
+                        horsRepartition={recours.has(r.veterinaire_id)}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+
+          {/* Week-ends libres — salariés */}
+          <section className="card count-card" aria-label="Compteur des week-ends libres">
+            <div className="card-head">
+              <h3>🌉 Week-ends libres</h3>
+              <span className="sub spacer">salariés · week-ends de la période non travaillés</span>
+            </div>
+            <table className="count-table">
+              <thead>
+                <tr>
+                  <th>Vétérinaire</th>
+                  <th>De garde</th>
+                  <th>Libres</th>
+                  <th>Écart</th>
+                </tr>
+              </thead>
+              <tbody>
+                {compteurs
+                  .filter((r) => r.statut === 'salarie')
+                  .map((r) => (
+                    <tr key={r.veterinaire_id} className={r.veterinaire_id === moiId ? 'moi' : undefined}>
+                      <td>
+                        <span className="ct-vet">
+                          <i style={{ background: r.couleur }} />
+                          {r.prenom}
+                        </span>
+                      </td>
+                      <Nombre n={r.we_total} />
+                      <td>{Math.max(0, totalWE - r.we_total)}</td>
+                      <td>
+                        <Ecart
+                          valeur={bilanDe.get(r.veterinaire_id)?.ecart_grands_we ?? 0}
+                          horsRepartition={recours.has(r.veterinaire_id)}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                {compteurs.every((r) => r.statut !== 'salarie') && (
+                  <tr>
+                    <td colSpan={4} className="zero">
+                      Aucun salarié sur ce filtre.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            <p className="count-note">
+              {totalWE} week-end{totalWE > 1 ? 's' : ''} sur l&apos;intervalle. Ce compteur ne
+              parle que des salariés : les associés n&apos;ont pas de quota de week-ends libres.
+            </p>
+          </section>
+
+          {/* Dépannages */}
+          <section className="card count-card" aria-label="Compteur des dépannages">
+            <div className="card-head">
+              <h3>🤝 Dépannages</h3>
+              <span className="sub spacer">qui a repris la garde de qui, suite à une absence</span>
+            </div>
+            <table className="count-table">
+              <thead>
+                <tr>
+                  <th>Vétérinaire</th>
+                  <th>Rendus</th>
+                  <th>Reçus</th>
+                  <th>Solde</th>
+                </tr>
+              </thead>
+              <tbody>
+                {compteurs.map((r) => {
+                  const d = depannageDe.get(r.veterinaire_id)
+                  const rendus = d?.rendus ?? 0
+                  const recus = d?.recus ?? 0
+                  const solde = rendus - recus
+                  return (
+                    <tr key={r.veterinaire_id} className={r.veterinaire_id === moiId ? 'moi' : undefined}>
+                      <td>
+                        <span className="ct-vet">
+                          <i style={{ background: r.couleur }} />
+                          {r.prenom}
+                        </span>
+                        {(d?.dettesOuvertes ?? 0) > 0 && (
+                          <span
+                            className="dette"
+                            title="Dépannage encore à rendre — visible dans Absences & échanges"
+                          >
+                            🤝 {d?.dettesOuvertes} à rendre
+                          </span>
+                        )}
+                      </td>
+                      <Nombre n={rendus} />
+                      <Nombre n={recus} />
+                      <td>
+                        <span
+                          className={`ecart ${solde === 0 ? 'ok' : solde > 0 ? 'ok' : 'warn'}`}
+                          title={
+                            solde > 0
+                              ? "A dépanné plus souvent qu'il n'a été dépanné"
+                              : solde < 0
+                                ? 'A été dépanné plus souvent — la dette reste ouverte tant qu\'elle n\'est pas soldée'
+                                : 'Entraide équilibrée'
+                          }
+                        >
+                          {solde === 0 ? '=' : solde > 0 ? `+${solde}` : `−${Math.abs(solde)}`}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            <p className="count-note">
+              Le solde n&apos;est pas un écart à une moyenne : un dépannage a toujours deux
+              faces, il s&apos;équilibre tout seul à l&apos;échelle du cabinet.
+            </p>
+          </section>
+        </div>
+      )}
+
+      {/* ── Bilan de fin de période (composant V1 greffé) ────────────── */}
+      {slotBilan && <div className="hist-greffe v2-greffe rise">{slotBilan}</div>}
+
+      {/* ── Historique des fêtes (composant V1 greffé) ───────────────── */}
+      {slotFetes && <div className="hist-greffe v2-greffe rise">{slotFetes}</div>}
+
+      {/* ── Périodes planifiées ──────────────────────────────────────── */}
+      <section className="card rise" aria-label="Périodes planifiées">
+        <div className="card-head">
+          <div>
+            <h3>Périodes planifiées</h3>
+            <p className="sub">De la plus récente à la plus ancienne</p>
+          </div>
+        </div>
+        <ul className="periods-list">
+          {lignesPeriodes.map((l) => {
+            const st = LIBELLE_STATUT[l.periode.statut]
+            return (
+              <li key={l.periode.id}>
+                <div className="period-name">
+                  <b>{libellePeriode(l.periode)}</b>
+                  <small>
+                    {l.nbSemaines} semaines · {dateCourte(l.periode.date_debut)} →{' '}
+                    {dateCourte(l.periode.date_fin)}
+                  </small>
+                  {estAdmin && (
+                    <div className="period-reglages">
+                      {slotsReglagesPeriode?.[l.periode.id]}
+                      {l.effectifSource && <span className="pr-source">{l.effectifSource}</span>}
+                    </div>
+                  )}
+                </div>
+                <span className={`status ${st.classe}`}>{st.texte}</span>
+                <button
+                  type="button"
+                  className="period-view"
+                  onClick={() => versPeriode(l.periode.id)}
+                >
+                  Ses compteurs
+                </button>
+                {estAdmin && slotsSupprimerPeriode?.[l.periode.id]}
+              </li>
+            )
+          })}
+          {lignesPeriodes.length === 0 && (
+            <li>
+              <span className="period-name">
+                <small>Aucune période créée pour l&apos;instant.</small>
+              </span>
+            </li>
+          )}
+        </ul>
+      </section>
+
+      {/* ── Compteurs cumulés ────────────────────────────────────────── */}
+      {cumul.length > 0 && (
+        <section className="card rise" aria-label="Compteurs cumulés sur toutes les périodes validées">
+          <div className="card-head">
+            <div>
+              <h3>Compteurs cumulés</h3>
+              <p className="sub">{cumulResume}</p>
+            </div>
+          </div>
+          <div className="cumul-body">
+            <div className="cm-row cm-header" aria-hidden="true">
+              <span>Vétérinaire</span>
+              <span>Week-ends</span>
+              <span>Nuits de semaine</span>
+              <span>Fériés</span>
+            </div>
+            {(() => {
+              const maxWE = Math.max(1, ...cumul.map((c) => c.we))
+              const maxSem = Math.max(1, ...cumul.map((c) => c.sem))
+              const maxFer = Math.max(1, ...cumul.map((c) => c.feries))
+              return cumul.map((c) => (
+                <div className="cm-row" key={c.veterinaire_id}>
+                  <span className="cm-vet">
+                    <i style={{ background: c.couleur }} />
+                    {c.prenom}
+                  </span>
+                  <span className="cm-cell">
+                    <b>{c.we}</b>
+                    <span className="bar">
+                      <i style={{ width: `${(c.we / maxWE) * 100}%`, background: c.couleur }} />
+                    </span>
+                  </span>
+                  <span className="cm-cell">
+                    <b>{c.sem}</b>
+                    <span className="bar">
+                      <i style={{ width: `${(c.sem / maxSem) * 100}%`, background: c.couleur }} />
+                    </span>
+                  </span>
+                  <span className="cm-cell">
+                    <b>{c.feries}</b>
+                    <span className="bar">
+                      <i style={{ width: `${(c.feries / maxFer) * 100}%`, background: c.couleur }} />
+                    </span>
+                  </span>
+                </div>
+              ))
+            })()}
+          </div>
+          <p className="lookback-note">
+            ⚖️ L&apos;équité entre les périodes est déjà dans le moteur : à chaque génération, il
+            relit ces compteurs et rattrape les écarts de la période précédente. Personne ne
+            « perd » un week-end en changeant de saison.
+          </p>
+        </section>
+      )}
+    </>
+  )
+}

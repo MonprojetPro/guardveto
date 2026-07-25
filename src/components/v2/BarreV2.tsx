@@ -114,7 +114,7 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
           </Link>
         )}
 
-        <Link className="dock-item" href="/compteurs" aria-label="Historique et compteurs">
+        <Link className="dock-item" href="/historique" aria-label="Historique et compteurs">
           <span className="di-ico" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12.6" r="7.4" />

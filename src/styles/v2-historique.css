@@ -1,0 +1,222 @@
+/* ============================================================
+   GUARDVETO V2 — ÉCRAN « HISTORIQUE & COMPTEURS »
+   ============================================================
+   Porté de `maquette/m4-accueil-equipe-historique-connexions.html`
+   (section 3). Complète `v2-terrier.css`.
+
+   Adaptations vs la maquette :
+   • ses `--bad` / `--bad-soft` deviennent `--danger` / `--danger-soft`,
+     les jetons réellement définis dans le Terrier ;
+   • la carte « Grands week-ends · 3 jours et plus (ponts) » devient
+     « Week-ends libres (salariés) » : c'est ce que le produit calcule
+     réellement (total des week-ends de la période − ceux de garde).
+     Aucun ordinateur ici ne sait ce qu'est un pont, et afficher un
+     chiffre sous un nom qu'il n'a pas serait pire que de ne rien montrer.
+   ============================================================ */
+
+/* ============================================================
+   BARRE DE FILTRES
+   ============================================================ */
+.hist-filters {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
+  padding: 14px 18px;
+  margin-bottom: 18px;
+}
+.hf-label {
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--soft);
+}
+.seg {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  background: var(--surface-2); padding: 4px;
+  border-radius: 999px; border: 1px solid var(--border);
+}
+.seg button {
+  border: none; background: transparent; color: var(--muted);
+  font-size: 0.78rem; font-weight: 600;
+  padding: 7px 13px; border-radius: 999px;
+  min-height: 34px;
+  white-space: nowrap;
+}
+.seg button:hover { color: var(--text); }
+.seg button[aria-pressed='true'] {
+  background: var(--accent); color: #fff;
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+.range-fields { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.range-fields input[type='date'] {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-size: 0.8rem;
+  min-height: 38px;
+  color: var(--text);
+  font-family: var(--font-body);
+}
+.range-fields input[type='date']:focus { border-color: var(--accent); outline: none; }
+.range-fields .arrow { color: var(--soft); font-weight: 700; }
+.hist-caption {
+  width: 100%;
+  font-size: 0.78rem; color: var(--muted);
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  margin-top: 4px;
+  line-height: 1.55;
+}
+.hist-caption b { color: var(--text); }
+
+/* ============================================================
+   LES CARTES DE COMPTEURS
+   ============================================================ */
+.count-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(430px, 100%), 1fr));
+  gap: 16px;
+  margin-bottom: 26px;
+}
+.count-card { border-radius: var(--r-md); margin-bottom: 0; }
+.count-card .card-head { padding: 13px 18px; }
+.count-card h3 { font-size: 0.94rem; }
+.count-table { width: 100%; border-collapse: collapse; }
+.count-table th {
+  font-family: var(--font-display);
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--soft);
+  padding: 9px 8px 7px; text-align: center;
+  border-bottom: 1px solid var(--border-strong);
+}
+.count-table th:first-child { text-align: left; padding-left: 18px; }
+.count-table td {
+  padding: 8px; text-align: center;
+  border-bottom: 1px dashed var(--border);
+  font-family: var(--font-display); font-weight: 700; font-size: 0.9rem;
+}
+.count-table tr:last-child td { border-bottom: none; }
+.count-table td.zero { color: var(--soft); font-weight: 500; }
+.count-table td:first-child { text-align: left; padding-left: 18px; }
+.count-table tr.moi td { background: var(--accent-soft); }
+.ct-vet {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--font-body); font-size: 0.82rem; font-weight: 600;
+}
+.ct-vet i { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+.ct-vet .sal {
+  font-size: 0.62rem; font-weight: 600; color: var(--soft);
+  border: 1px solid var(--border); border-radius: 5px; padding: 0 4px;
+}
+
+/* -- L'écart à la juste part -- */
+.ecart {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-size: 0.7rem; font-weight: 700;
+  padding: 2px 10px; border-radius: 999px;
+  min-width: 38px;
+}
+.ecart.ok   { background: var(--ok-soft);     color: var(--ok); }
+.ecart.warn { background: var(--warn-soft);   color: var(--warn); }
+.ecart.bad  { background: var(--danger-soft); color: var(--danger); }
+.ecart.none {
+  background: var(--surface-2); color: var(--soft);
+  border: 1px solid var(--border); font-weight: 500;
+}
+.dette {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-size: 0.62rem; font-weight: 700;
+  background: var(--warn-soft); color: var(--warn);
+  border: 1px dashed rgba(196, 138, 20, 0.5);
+  padding: 2px 8px; border-radius: 999px;
+  margin-left: 7px;
+  white-space: nowrap;
+  vertical-align: 1px;
+}
+.count-note {
+  padding: 10px 18px 13px;
+  border-top: 1px dashed var(--border);
+  font-size: 0.74rem; color: var(--soft); line-height: 1.55;
+}
+.count-vide {
+  padding: 22px 18px;
+  font-size: 0.86rem; color: var(--muted); line-height: 1.6;
+}
+
+/* ============================================================
+   BILAN, FÊTES, PÉRIODES, CUMUL
+   ============================================================ */
+.hist-greffe { margin-bottom: 26px; }
+
+.periods-list { list-style: none; }
+.periods-list li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+  padding: 13px 20px;
+  border-bottom: 1px dashed var(--border);
+}
+.periods-list li:last-child { border-bottom: none; }
+.period-name { flex: 1; min-width: 220px; }
+.period-name b { font-family: var(--font-display); font-size: 0.98rem; display: block; }
+.period-name small { font-size: 0.76rem; color: var(--muted); }
+.period-reglages {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  font-size: 0.76rem; color: var(--muted);
+}
+.period-reglages .pr-champ { display: flex; align-items: center; gap: 6px; }
+.period-reglages .pr-source { font-size: 0.68rem; color: var(--soft); }
+.status {
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 4px 11px; border-radius: 999px;
+}
+.st-brouillon { background: var(--warn-soft); color: var(--warn); }
+.st-publiee { background: var(--ok-soft); color: var(--ok); }
+.st-archivee { background: var(--surface-2); color: var(--soft); border: 1px solid var(--border); }
+.period-view {
+  border: 1px solid var(--border-strong);
+  background: transparent; color: var(--muted);
+  border-radius: 999px;
+  font-size: 0.76rem; font-weight: 600;
+  padding: 7px 14px; min-height: 36px;
+  text-decoration: none;
+  display: inline-flex; align-items: center;
+}
+.period-view:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
+
+.cumul-body { padding: 16px 20px 6px; }
+.cm-row {
+  display: grid;
+  grid-template-columns: 140px repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--border);
+}
+.cm-row:last-child { border-bottom: none; }
+.cm-row.cm-header { border-bottom: 1px solid var(--border-strong); padding-bottom: 5px; }
+.cm-row.cm-header span {
+  font-family: var(--font-display); font-size: 0.62rem; font-weight: 700;
+  letter-spacing: 0.07em; text-transform: uppercase; color: var(--soft);
+}
+.cm-vet { display: inline-flex; align-items: center; gap: 7px; font-size: 0.82rem; font-weight: 600; }
+.cm-vet i { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+.cm-cell { display: flex; align-items: center; gap: 8px; }
+.cm-cell b { font-family: var(--font-display); font-size: 0.88rem; min-width: 22px; text-align: right; }
+.cm-cell .bar { flex: 1; height: 6px; border-radius: 999px; background: var(--bg-deep); overflow: hidden; }
+.cm-cell .bar i { display: block; height: 100%; border-radius: 999px; opacity: 0.8; }
+.lookback-note {
+  margin: 14px 20px 18px;
+  background: var(--ok-soft);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 10px 14px;
+  font-size: 0.82rem; line-height: 1.55;
+}
+
+@media (max-width: 640px) {
+  .cm-row { grid-template-columns: 1fr; gap: 4px; }
+  .cm-row.cm-header { display: none; }
+}
