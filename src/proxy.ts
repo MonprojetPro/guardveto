@@ -49,10 +49,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Authentifié sur /login → redirige vers /planning
+  // Authentifié sur /login → redirige vers l'accueil (V2 depuis 2026-07-25 ;
+  // c'était /planning avant la bascule, l'accueil n'existant pas encore).
   if (user && isLoginPage) {
     const url = request.nextUrl.clone()
-    url.pathname = '/planning'
+    url.pathname = '/accueil'
     return NextResponse.redirect(url)
   }
 

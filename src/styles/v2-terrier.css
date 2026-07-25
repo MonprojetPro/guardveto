@@ -1,0 +1,1318 @@
+/* ============================================================
+   GRANDE MAQUETTE GUARDVETO · TRANCHE M6 · ACCUEIL ÉPICENTRE
+   Ambiance : Terrier chaleureux (design system du labo v3).
+   L'écran du matin : Filou en secrétaire médicale, la fenêtre
+   contextuelle qui s'ouvre à côté, et les six maisons à un clic.
+   Vue ADMIN (Anne-Sophie). Aujourd'hui simulé : jeu. 15 janv. 2026.
+   ============================================================ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  /* Les polices viennent de next/font (layout racine) : pas de requête
+     Google Fonts à l'exécution, contrairement à la maquette. */
+  --font-display: var(--font-figtree), "Figtree", "Segoe UI Variable Display", "Trebuchet MS", sans-serif;
+  --font-body: var(--font-noto-sans), "Noto Sans", "Segoe UI", Verdana, sans-serif;
+  /* Couleurs des vétérinaires : le langage visuel de l'équipe. */
+  --vet-anneso:  #3B6FD1;
+  --vet-annecat: #8153C7;
+  --vet-manon:   #B93A72;
+  --vet-victor:  #0B7D6C;
+  --vet-camille: #55700F;
+  --vet-julie:   #A0522D;
+  --vet-thomas:  #4B5D73;
+  --nav-h: 62px;
+
+  /* ---- Terrier chaleureux ---- */
+  --bg:            #F6EEDF;
+  --bg-deep:       #EFE2CB;
+  --surface:       #FFFCF4;
+  --surface-2:     #F6EBD6;
+  --text:          #3A2A1C;
+  --muted:         #7C6A55;
+  --soft:          #A08D75;
+  --border:        #E6D7BB;
+  --border-strong: #D8C4A1;
+  --accent:        #C7530F;
+  --accent-ink:    #AC4508;
+  --accent-soft:   rgba(224, 122, 47, 0.13);
+  --accent-glow:   rgba(230, 126, 34, 0.28);
+  --ok:            #3E7A2E;
+  --ok-soft:       rgba(90, 150, 60, 0.14);
+  --warn:          #9A6200;
+  --warn-soft:     rgba(196, 138, 20, 0.16);
+  --danger:        #A8341F;
+  --danger-soft:   rgba(168, 52, 31, 0.12);
+  --bubble-filou:  #FBF3E2;
+  --bubble-user:   #EFE0C4;
+  --r-lg: 26px; --r-md: 18px; --r-sm: 12px;
+  --shadow-card:  0 10px 30px rgba(140, 84, 24, 0.10), 0 2px 6px rgba(140, 84, 24, 0.06);
+  --shadow-panel: 4px 24px 60px rgba(120, 70, 18, 0.20), 2px 4px 12px rgba(120, 70, 18, 0.10);
+  --nav-bg: rgba(246, 238, 223, 0.9);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ---- Grammaire de profondeur : UNE source de lumière (haut-
+     gauche) → ombres portées vers le bas-droite, tranches hautes
+     et gauches éclairées. Matériaux réels : papier, craie. ---- */
+  --elev-1: 1px 2px 3px rgba(110, 62, 14, 0.10), 4px 8px 18px rgba(110, 62, 14, 0.08);
+  --elev-2: 2px 4px 8px rgba(110, 62, 14, 0.13), 10px 18px 34px rgba(110, 62, 14, 0.13);
+  --edge-light: inset 1px 1px 0 rgba(255, 253, 246, 0.95);
+}
+
+/* Racine de la V2 : un conteneur, pas <body> — la V1 cohabite dans la
+   même application et ne doit rien recevoir de cette feuille. */
+.v2 {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  flex: 1;
+  -webkit-font-smoothing: antialiased;
+}
+.v2 h1, .v2 h2, .v2 h3, .v2 h4, .v2 .display { font-family: var(--font-display); }
+.v2 button { font-family: var(--font-body); cursor: pointer; }
+.v2 button:focus-visible, .v2 input:focus-visible, .v2 a:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+.v2 img { display: block; }
+.shell { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 0 clamp(14px, 3vw, 36px); }
+
+/* ============================================================
+   DEUX PLANS · le matin dans le terrier
+   Plan 1 : le SATIN, fond d'écran de TOUTE la page, bord à bord,
+   derrière tout (nav maquette et dock compris). Plan 2 : la carte
+   Filou, seule posée dessus, ourlée d'une étincelle. Aucune
+   surface intermédiaire.
+   ============================================================ */
+.scene { position: relative; margin: 14px 0 26px; }
+.satin {
+  position: fixed; inset: -110px 0;
+  z-index: 0;
+  pointer-events: none;
+  will-change: transform;
+  background: linear-gradient(180deg, #F6EBD3 0%, var(--bg-deep) 72%, #E9DABC 100%);
+}
+/* Perf : plus AUCUN filtre plein écran. Les nappes sont des
+   dégradés radiaux naturellement doux (flou « intégré »), et tout
+   ce qui bouge n'anime QUE transform (composité GPU). */
+.silk { position: absolute; inset: -22% -12%; }
+.silk i { position: absolute; border-radius: 50%; will-change: transform; }
+.silk .s1 {
+  width: 62%; height: 76%; left: -12%; top: -20%;
+  background: radial-gradient(closest-side, rgba(255, 223, 174, 0.95), rgba(255, 223, 174, 0) 72%);
+  animation: silkDrift1 74s ease-in-out infinite alternate;
+}
+.silk .s2 {
+  width: 54%; height: 68%; right: -10%; top: -14%;
+  background: radial-gradient(closest-side, rgba(240, 188, 114, 0.7), rgba(240, 188, 114, 0) 72%);
+  animation: silkDrift2 86s ease-in-out infinite alternate;
+}
+.silk .s3 {
+  width: 42%; height: 56%; left: 34%; bottom: -18%;
+  background: radial-gradient(closest-side, rgba(199, 83, 15, 0.17), rgba(199, 83, 15, 0) 74%);
+  animation: silkDrift3 58s ease-in-out infinite alternate;
+}
+.silk .s4 {
+  width: 36%; height: 50%; left: 6%; bottom: -12%;
+  background: radial-gradient(closest-side, rgba(227, 232, 194, 0.36), rgba(227, 232, 194, 0) 72%);
+  animation: silkDrift2 98s ease-in-out infinite alternate-reverse;
+}
+@keyframes silkDrift1 { to { transform: translate(4%, 8%) scale(1.08); } }
+@keyframes silkDrift2 { to { transform: translate(-5%, 6%) scale(1.05); } }
+@keyframes silkDrift3 { to { transform: translate(6%, -5%) scale(0.95); } }
+/* Les PLIS DE VELOURS : flou statique appliqué à l'élément,
+   animation en transform uniquement — le tissu respire (46/58 s) */
+.folds {
+  position: absolute; inset: -14%;
+  mix-blend-mode: soft-light;
+  will-change: transform;
+}
+.folds.f1 {
+  background: repeating-linear-gradient(104deg,
+    rgba(255, 240, 208, 0) 0px,
+    rgba(255, 240, 208, 0.75) 70px,
+    rgba(171, 128, 70, 0.5) 150px,
+    rgba(255, 240, 208, 0) 230px);
+  filter: blur(6px);
+  animation: foldBreath1 46s ease-in-out infinite alternate;
+}
+.folds.f2 {
+  background: repeating-linear-gradient(64deg,
+    rgba(255, 236, 200, 0) 0px,
+    rgba(255, 236, 200, 0.6) 110px,
+    rgba(150, 110, 60, 0.42) 220px,
+    rgba(255, 236, 200, 0) 330px);
+  filter: blur(11px);
+  animation: foldBreath2 58s ease-in-out infinite alternate;
+}
+@keyframes foldBreath1 { to { transform: translate3d(-3.2%, 1.6%, 0); } }
+@keyframes foldBreath2 { to { transform: translate3d(2.8%, -2.2%, 0); } }
+/* Le reflet satiné : une nappe surdimensionnée qui TRAVERSE en
+   transform (plus jamais d'animation de background-position) */
+.sheen {
+  position: absolute; top: 0; bottom: 0; left: -130%; width: 340%;
+  background: linear-gradient(118deg,
+    transparent 34%,
+    rgba(255, 242, 212, 0.75) 42%,
+    transparent 50%,
+    rgba(255, 228, 182, 0.5) 58%,
+    transparent 66%);
+  mix-blend-mode: soft-light;
+  will-change: transform;
+  animation: sheenDrift 52s ease-in-out infinite alternate;
+}
+@keyframes sheenDrift { to { transform: translate3d(36%, 0, 0); } }
+
+/* ---- La carte Filou : LE seul objet posé sur le satin.
+   Profondeur évidente : ombres 3 couches, lisière. Le bord
+   supérieur reste dégagé (Filou s'y perchera). */
+.float-wrap { position: relative; z-index: 2; }
+.epicentre {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  /* plus d'overflow hidden : la tête de Filou dépasse du bord supérieur */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 252, 240, 0.98),    /* lisière lumineuse en tranche haute */
+    inset 1px 0 0 rgba(255, 252, 240, 0.55),    /* lueur discrète sur la tranche gauche */
+    2px 3px 8px rgba(110, 62, 14, 0.16),        /* ombre de contact, fuyante à droite */
+    8px 18px 38px -8px rgba(110, 62, 14, 0.24), /* ombre proche */
+    18px 60px 120px -18px rgba(110, 62, 14, 0.36); /* ombre ambiante large */
+}
+/* L'ÉTINCELLE : une tête blanc chaud éclatante qui circule sur le
+   contour, traîne d'or, deux particules scintillantes dans son
+   sillage, et un micro-halo (::before, même angle, flouté). */
+@property --sb {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.epicentre::after {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  padding: 3px;
+  background: conic-gradient(from var(--sb),
+    transparent 0deg,
+    transparent 248deg,
+    rgba(255, 210, 130, 0.25) 290deg,
+    rgba(246, 158, 62, 0.6) 322deg,
+    rgba(255, 244, 214, 0.95) 328deg,   /* particule 1 */
+    rgba(246, 158, 62, 0.55) 331deg,
+    rgba(243, 148, 50, 0.75) 340deg,
+    rgba(255, 250, 230, 1) 344.5deg,    /* particule 2 */
+    rgba(230, 120, 30, 0.85) 348deg,
+    rgba(255, 253, 244, 1) 353deg,      /* la tête, blanc chaud éclatant */
+    rgba(255, 238, 190, 0.85) 357deg,
+    rgba(255, 226, 168, 0.35) 360deg);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 2; /* sous le contenu (z 3) : elle passe derrière la tête de Filou */
+  animation: starBorder 16s linear infinite;
+}
+.epicentre::before {
+  /* le micro-halo de la tête : même conic, même angle, flouté */
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  padding: 7px;
+  background: conic-gradient(from var(--sb),
+    transparent 0deg,
+    transparent 336deg,
+    rgba(255, 216, 140, 0.9) 352deg,
+    rgba(255, 232, 180, 0.5) 357deg,
+    transparent 360deg);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  filter: blur(5px);
+  pointer-events: none;
+  z-index: 2;
+  animation: starBorder 16s linear infinite;
+}
+@keyframes starBorder { to { --sb: 360deg; } }
+.grain {
+  position: absolute; inset: 0; z-index: 2;
+  pointer-events: none;
+  opacity: 0.45;
+  mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+}
+.epicentre > .epi-inner { position: relative; z-index: 3; }
+
+.epi-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.26fr) minmax(320px, 0.74fr);
+  gap: clamp(18px, 3vw, 36px);
+  padding: clamp(22px, 3vw, 38px) clamp(20px, 3.4vw, 40px) clamp(20px, 3.4vw, 36px);
+  align-items: stretch;
+  min-height: 540px;
+}
+
+/* ---------------- Le bureau de Filou (gauche) ---------------- */
+.desk { display: flex; flex-direction: column; min-width: 0; }
+
+/* ---- LE CUBE DE FILOU · une niche chaleureuse dans la carte.
+   Filou y est assis (vidéo tablette, avatar provisoire) et SA
+   TÊTE DÉPASSE un peu du bord supérieur de la carte : il est
+   dedans, mais il déborde. L'étincelle du contour (z 2) passe
+   derrière sa tête (contenu z 3). Repli : « filou avatar de
+   base.png » si la vidéo n'est pas là. Jamais de trou. */
+.desk-top {
+  flex: 1; /* le duo cube + station occupe toute la hauteur de la carte */
+  display: flex; gap: 0; align-items: stretch; /* le chevauchement queue/objet fait l'espacement */
+  margin-top: calc(14px - clamp(22px, 3vw, 38px)); /* le cube frôle le bord haut */
+}
+.filou-cube {
+  /* L'emplacement, transparent. GÉOMÉTRIE RÉELLE de la vidéo
+     540×960 : assise à 62 % de la hauteur, pieds à 90 %, axe du
+     corps à 47 % de la largeur. Vidéo rendue à 270 px de large
+     (H ≈ 480). Ancrée en HAUT (top −44 → tête ~30 px au-dessus
+     de la carte) ; l'assise tombe donc à 253 px du haut de
+     l'emplacement, et le socle est calé dessous. */
+  position: relative;
+  flex: none;
+  width: 270px;
+  min-height: 404px;
+  z-index: 4; /* contexte : la tête de Filou passe devant l'étincelle */
+}
+.filou-cube video,
+.filou-cube img.filou-fallback {
+  position: absolute;
+  top: -44px; left: 0;
+  width: 270px; height: auto;
+  max-width: none;
+  z-index: 2;
+  /* perf : PAS de drop-shadow sur la vidéo (recalculé à chaque
+     image) — l'ombre de contact du socle fait le travail */
+}
+/* Fondu croisé attente <-> tape-tablette : les deux boucles sont
+   empilées, seule l'opacité bascule (composité GPU). 0,4 s :
+   assez long pour absorber le léger balancement de l'attente
+   au moment où la consigne part. */
+.filou-cube video { transition: opacity 0.4s ease; }
+#filou-video-tape { opacity: 0; z-index: 3; pointer-events: none; }
+.filou-cube.taping #filou-video { opacity: 0; }
+.filou-cube.taping #filou-video-tape { opacity: 1; }
+
+/* ---- LE SOCLE 3D · pavé blanc-crème en volume, même matière que
+   la carte. Face supérieure = ligne d'assise (62 % de H, soit
+   249 px dans l'emplacement, +4 px d'enfoncement) ; centre de la
+   face = axe du corps (47 % de 270 = 127 px). Les jambes
+   (62→90 %, ~134 px) pendent sur la face avant (150 px).
+   Lumière haut-gauche, cohérente avec le reste de la scène. ---- */
+.socle {
+  position: absolute;
+  left: 33px; top: 244px; /* ancré par le HAUT : la face supérieure
+     reste calée sous l'assise (62 %), quelle que soit la hauteur
+     que prend la rangée */
+  width: 154px; height: 150px; /* la face avant */
+  z-index: 1;
+  pointer-events: none;
+}
+.socle i { position: absolute; display: block; }
+.sc-front {
+  inset: 0;
+  background: linear-gradient(180deg, #FCF7EA 0%, #F0E6CF 100%);
+  border-radius: 0 0 5px 4px;
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 250, 0.85);
+}
+.sc-top {
+  left: 0; top: -16px; width: 100%; height: 16px;
+  transform: skewX(-52deg);
+  transform-origin: 0 100%;
+  background: linear-gradient(90deg, #FFFEF8 0%, #F6EEDA 100%);
+  border-radius: 2px 3px 0 0;
+}
+.sc-side {
+  left: 100%; top: 0; width: 20px; height: 150px;
+  transform: skewY(-38deg);
+  transform-origin: 0 0;
+  background: linear-gradient(180deg, #E9DCBF 0%, #DFCFAD 100%);
+  border-radius: 0 3px 3px 0;
+}
+.sc-shadow {
+  /* l'ombre portée du pavé sur la carte, fuyante vers la droite */
+  left: 8px; right: -34px; bottom: -10px; height: 20px;
+  background: radial-gradient(52% 100% at 44% 0%, rgba(110, 62, 14, 0.20), transparent 72%);
+  filter: blur(5px);
+}
+.sc-contact {
+  /* Filou assis : son ombre de contact sur la face du dessus */
+  left: 14%; top: -13px; width: 68%; height: 11px;
+  transform: skewX(-52deg);
+  background: radial-gradient(closest-side, rgba(110, 62, 14, 0.22), transparent 76%);
+  filter: blur(2.5px);
+}
+
+/* ---- LA TABLETTE DE FILOU (.convo) · arbitrage MiKL.
+   Filou tapote sur sa tablette dans la vidéo — et le panneau de
+   conversation à côté de lui EST l'écran de sa tablette en
+   grand : ce qu'il consulte, on le voit. Dedans : ① barre de
+   statut + date ② LE fil (le mot d'accueil de Filou en est la
+   première bulle — plus de bulle statique séparée) ③ la
+   consigne creusée + chips.
+   L'OBJET : bezel anthracite CHAUD (le border, jamais noir
+   brut), dalle crème claire (plus lumineuse que la carte, pas
+   de mode sombre), reflet oblique très léger en haut,
+   micro-caméra en pastille dans le bezel. Lumière haut-gauche :
+   lèvre écran/bezel, ombres portées vers le bas-droite.
+   LA QUEUE DERRIÈRE LA TABLETTE : la vidéo est coupée au bord
+   droit de son cadre (x = 270, coupe visible de y ≈ 222 à 334
+   dans l'emplacement) ; l'épaule gauche de la tablette chevauche
+   franchement le cadre (bord externe à x ≈ 226, genou de Filou
+   dégagé à ~205) : la queue glisse derrière un objet physique,
+   bezel et ombre à l'appui. ---- */
+.convo {
+  flex: 1; min-width: 0;
+  position: relative;
+  z-index: 5;               /* au-dessus de la vidéo (cube z 4) */
+  display: flex; flex-direction: column;
+  margin: 20px 0 2px -44px;
+  border: 11px solid #473E33;  /* le bezel */
+  border-radius: 30px;
+  background:
+    /* le reflet d'écran : une nappe oblique discrète en haut */
+    linear-gradient(115deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 30%),
+    /* la dalle allumée, crème clair */
+    linear-gradient(180deg, #FEFBF2 0%, #F9F2E0 100%);
+  padding: 13px 18px 14px 20px;
+  box-shadow:
+    inset 0 0 0 1px rgba(63, 52, 40, 0.18),        /* la lèvre écran/bezel */
+    2px 3px 6px rgba(110, 62, 14, 0.18),           /* ombre de contact, fuyante à droite */
+    12px 20px 44px -8px rgba(110, 62, 14, 0.30);   /* ombre ambiante de l'objet */
+}
+.convo::after {
+  /* la micro-caméra frontale, en pastille dans le bezel haut */
+  content: "";
+  position: absolute; top: -8px; left: 50%;
+  transform: translateX(-50%);
+  width: 6px; height: 6px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #6E6153, #221E19 68%);
+  pointer-events: none;
+}
+.convo::before {
+  /* pénombre de contact : la queue s'assombrit à peine en
+     glissant sous la tablette (occlusion, pas d'ombre projetée).
+     Décalée du bezel : les offsets se mesurent depuis la zone
+     de padding, le bord externe est 11 px plus loin. */
+  content: "";
+  position: absolute; left: -18px; top: -4px; bottom: -4px; width: 7px;
+  border-radius: 7px 0 0 7px;
+  background: linear-gradient(to left, rgba(110, 62, 14, 0.15), rgba(110, 62, 14, 0));
+  pointer-events: none;
+}
+.tab-marque {
+  /* la gravure constructeur sur le bezel bas : c'est SA tablette 🦊 */
+  position: absolute; left: 50%; bottom: -11px; height: 11px;
+  transform: translateX(-50%);
+  display: flex; align-items: center;
+  font-family: var(--font-display);
+  font-size: 7.5px; font-weight: 700;
+  letter-spacing: 0.32em; text-indent: 0.32em; /* recentre malgré l'espacement */
+  text-transform: uppercase;
+  color: rgba(255, 240, 210, 0.52);
+  pointer-events: none;
+}
+.tab-btn {
+  /* le bouton latéral (marche/veille), en saillie sur la tranche droite */
+  position: absolute; right: -14px; top: 56px;
+  width: 3px; height: 42px; border-radius: 2px;
+  background: linear-gradient(180deg, #5E5243 0%, #3B332B 100%);
+  box-shadow: 1px 1px 2px rgba(110, 62, 14, 0.25);
+  pointer-events: none;
+}
+.convo-head {
+  position: relative;
+  border-bottom: 1px dashed var(--border-strong);
+  padding-bottom: 10px;
+  margin-bottom: 4px;
+}
+/* La barre de statut de la tablette : heure + batterie, sur sa
+   propre ligne (comme un vrai écran), discrète en haut à droite */
+.tab-status {
+  display: flex; align-items: center; justify-content: flex-end; gap: 6px;
+  font-size: 0.64rem; font-weight: 600; color: var(--soft);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 5px;
+}
+.ts-batt {
+  position: relative; display: inline-block;
+  width: 17px; height: 9px;
+  border: 1px solid var(--soft); border-radius: 3px;
+}
+.ts-batt::after {
+  content: "";
+  position: absolute; right: -3px; top: 2px;
+  width: 2px; height: 3px;
+  background: var(--soft);
+  border-radius: 0 1px 1px 0;
+}
+.ts-batt i {
+  position: absolute; left: 1px; top: 1px; bottom: 1px;
+  width: 9px; border-radius: 1px;
+  background: var(--ok); opacity: 0.75;
+}
+.hello-kicker {
+  font-family: var(--font-display);
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 4px;
+}
+.convo-head h1 {
+  font-size: clamp(1.25rem, 2.1vw, 1.55rem); /* densité écran : plus compact */
+  font-weight: 800; letter-spacing: -0.012em; line-height: 1.1;
+}
+.convo-head h1 .sun {
+  display: inline-block;
+  font-size: 0.72em;
+  animation: sunRise 1.4s var(--ease-out) both;
+  transform-origin: 50% 90%;
+}
+@keyframes sunRise {
+  from { opacity: 0; transform: translateY(9px) rotate(-30deg) scale(0.6); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Entrée orchestrée du matin : chaque étage se révèle en cascade */
+.rise { animation: riseIn 0.7s var(--ease-out) both; }
+.rise-2 { animation-delay: 0.08s; }
+.rise-3 { animation-delay: 0.16s; }
+.rise-4 { animation-delay: 0.26s; }
+.rise-5 { animation-delay: 0.36s; }
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ------ Le fil de conversation · une VRAIE messagerie ------
+   Interface de chat dessinée pour l'écran de la tablette :
+   rangées de messages (.msg) avec mini-avatar 🦊 côté Filou
+   (plus d'étiquette « FILOU » dans chaque bulle), bulles
+   compactes, notes système centrées en pilule. LE fil est ancré
+   en bas (margin-top:auto sur la première rangée — flex-end
+   casserait le défilement) : le vide résiduel monte au-dessus. */
+.thread {
+  flex: 1 1 0;
+  margin: 10px 0;
+  display: flex; flex-direction: column; gap: 7px;
+  min-height: 88px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.thread > :first-child { margin-top: auto; }
+.msg {
+  display: flex; align-items: flex-end; gap: 7px;
+  animation: bubbleIn 0.35s ease both;
+}
+.msg.user { justify-content: flex-end; }
+.msg.note { justify-content: center; }
+.m-ava {
+  flex: none;
+  width: 22px; height: 22px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.72rem;
+  background: var(--accent-soft);
+  border: 1px solid var(--border-strong);
+  margin-bottom: 1px;
+}
+.vh { /* le locuteur, pour les lecteurs d'écran seulement */
+  position: absolute; width: 1px; height: 1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+.bubble {
+  max-width: 86%;
+  padding: 7px 11px;
+  border-radius: 14px;
+  font-size: 0.8rem; line-height: 1.5;
+  box-shadow: 1px 1px 3px rgba(110, 62, 14, 0.05);
+}
+@keyframes bubbleIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+.msg.filou .bubble {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+.msg.user .bubble {
+  background: var(--bubble-user);
+  border: 1px solid transparent;
+  border-bottom-right-radius: 4px;
+}
+.msg.note .bubble {
+  background: var(--ok-soft);
+  border: 1px dashed var(--border-strong);
+  color: var(--ok);
+  font-size: 0.7rem; font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 999px;
+  box-shadow: none;
+}
+.typing { display: inline-flex; gap: 4px; align-items: center; padding: 4px 2px 0; }
+.typing i {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--soft);
+  animation: typDot 1s ease-in-out infinite;
+}
+.typing i:nth-child(2) { animation-delay: 0.16s; }
+.typing i:nth-child(3) { animation-delay: 0.32s; }
+@keyframes typDot { 0%, 100% { opacity: 0.35; transform: none; } 45% { opacity: 1; transform: translateY(-3px); } }
+
+/* ------ Chat auto-nettoyant : l'échange fini s'évapore ------ */
+.msg.bye { animation: bubbleOut 0.4s ease both; pointer-events: none; }
+@keyframes bubbleOut {
+  to { opacity: 0; transform: translateY(-9px) scale(0.97); }
+}
+/* Chips de choix / de suite, à même les bulles de Filou */
+.mini-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.mini-chip {
+  border: 1px solid var(--border-strong);
+  background: var(--bubble-filou);
+  color: var(--accent-ink);
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-size: 0.7rem; font-weight: 700;
+  padding: 4px 10px; min-height: 26px;
+  display: inline-flex; align-items: center; gap: 5px;
+  text-decoration: none; cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+.mini-chip:hover { background: var(--accent-soft); transform: translateY(-1px); }
+.mini-chip.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.mini-chip.primary:hover { filter: brightness(1.07); background: var(--accent); }
+
+/* ------ La barre de saisie · dessinée POUR la tablette ------
+   Fini l'ancien composant hérité (grosse pilule creusée) : une
+   barre fine d'app de messagerie, bouton d'envoi carré-arrondi
+   intégré à droite, juste un soupçon de creux. */
+.consigne {
+  flex: none;
+  display: flex; gap: 8px; align-items: center;
+  background: #FFFDF6;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  padding: 4px 4px 4px 13px;
+  box-shadow: inset 0 1px 3px rgba(110, 62, 14, 0.07);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.consigne:focus-within {
+  border-color: var(--accent);
+  box-shadow:
+    inset 0 1px 3px rgba(110, 62, 14, 0.07),
+    0 0 0 3px var(--accent-soft);
+}
+.consigne input {
+  flex: 1; min-width: 0;
+  border: none; background: transparent;
+  font-family: var(--font-body);
+  font-size: 0.85rem; color: var(--text);
+  min-height: 34px;
+}
+.consigne input::placeholder { color: var(--soft); }
+.consigne input:focus { outline: none; }
+.consigne button {
+  flex: none;
+  width: 34px; height: 34px; border-radius: 10px;
+  border: none;
+  background: var(--accent); color: #fff;
+  font-size: 0.85rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 6px var(--accent-glow);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.consigne button:hover { filter: brightness(1.07); transform: scale(1.05); }
+.consigne button:active { transform: scale(0.94); }
+
+/* Les suggestions : chips compactes, 2 rangées maximum */
+.chips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-top: 9px;
+}
+.chip {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  font-size: 0.72rem; font-weight: 600;
+  padding: 5px 11px; min-height: 28px;
+  transition: color 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
+}
+.chip:hover {
+  color: var(--accent-ink); border-color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+
+/* ============================================================
+   LE TABLEAU D'AFFICHAGE DU CABINET (droite) · la scène se lit :
+   l'assistant et sa tablette / ta tablette / LE TABLEAU du
+   cabinet — l'objet qu'on trouve dans toute salle de repos.
+   Surface feutre crème dans un cadre fin bois clair ; les
+   widgets du coup d'œil sont des FICHES ÉPINGLÉES (épingle +
+   inclinaison ±0,5°) ; quand Filou montre quelque chose, sa
+   fenêtre arrive comme une fiche qu'il épingle par-dessus.
+   ============================================================ */
+.stage {
+  position: relative;
+  min-height: 520px;
+  min-width: 0;
+  /* le feutre, dans son cadre bois clair */
+  border: 6px solid #E5CFA5;
+  border-radius: 18px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, #F4E7CB 0%, #EEDEBB 100%);
+  background-blend-mode: soft-light, normal;
+  box-shadow:
+    0 0 0 1px var(--border-strong),               /* le liseré du cadre */
+    inset 0 2px 7px rgba(110, 62, 14, 0.13),      /* le feutre en retrait */
+    2px 4px 12px rgba(110, 62, 14, 0.10);         /* le tableau accroché à la carte */
+}
+
+/* ------ Coup d'œil du matin : les fiches épinglées ------ */
+.glance {
+  position: absolute; inset: 13px;
+  display: flex; flex-direction: column; gap: 11px;
+  transition: opacity 0.28s ease, transform 0.45s var(--ease-out);
+}
+.stage.open .glance {
+  opacity: 0; transform: translateX(-16px) scale(0.985);
+  pointer-events: none;
+}
+.glance-title {
+  font-family: var(--font-display);
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.13em;
+  text-transform: uppercase; color: var(--muted);
+  padding-left: 4px;
+}
+.widget {
+  --tilt: 0deg; /* chaque fiche est épinglée un peu de travers */
+  position: relative;
+  display: flex; align-items: center; gap: 14px;
+  text-align: left;
+  background: rgba(255, 252, 244, 0.94);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 13px 17px;
+  box-shadow: var(--edge-light), var(--elev-1);
+  transform: rotate(var(--tilt));
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.glance .widget:nth-of-type(1) { --tilt: -0.4deg; }
+.glance .widget:nth-of-type(2) { --tilt: 0.35deg; }
+.glance .widget:nth-of-type(3) { --tilt: -0.25deg; }
+.glance .widget:nth-of-type(4) { --tilt: 0.45deg; }
+.widget::after {
+  /* l'épingle */
+  content: "";
+  position: absolute; top: -5px; left: 50%; margin-left: -5px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: radial-gradient(circle at 32% 30%, #F09B5C, #A84B0F 72%);
+  box-shadow: 0 2px 3px rgba(110, 62, 14, 0.35), inset 0 -1px 1px rgba(0, 0, 0, 0.15);
+}
+.widget:hover {
+  transform: translateY(-3px) rotate(var(--tilt)); /* la fiche se soulève, épingle comprise */
+  border-color: var(--border-strong);
+  box-shadow: var(--edge-light), var(--elev-2);
+}
+.widget .w-ico {
+  flex: none;
+  width: 40px; height: 40px; border-radius: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 1.15rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.widget.w-ok .w-ico { background: var(--ok-soft); }
+.widget .w-body { flex: 1; min-width: 0; }
+.widget h3 { font-size: 0.92rem; font-weight: 700; line-height: 1.3; }
+.widget p { font-size: 0.76rem; color: var(--muted); margin-top: 2px; line-height: 1.45; }
+.widget .w-go {
+  flex: none; color: var(--soft); font-size: 0.95rem;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+.widget:hover .w-go { transform: translateX(3px); color: var(--accent-ink); }
+.widget .w-duo { display: inline-flex; gap: 5px; align-items: center; margin-top: 4px; }
+.vdot {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  color: #fff; font-family: var(--font-display);
+  font-size: 0.6rem; font-weight: 700;
+  flex: none;
+}
+.glance-foot {
+  margin-top: auto;
+  font-size: 0.72rem; color: var(--soft);
+  line-height: 1.55; padding: 4px 6px 0;
+}
+.glance-foot b { color: var(--muted); }
+
+/* ------ La fenêtre de Filou · la fiche qu'il épingle ------ */
+.fen {
+  position: absolute; inset: 13px;
+  display: flex; flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-panel);
+  opacity: 0;
+  /* la POSE DE FICHE : elle arrive d'un peu plus haut, à peine
+     de travers, et se plaque sur le tableau (ease-out) */
+  transform: translateY(-20px) rotate(0.9deg) scale(1.01);
+  transform-origin: 50% 0;
+  pointer-events: none;
+  transition: transform 0.45s var(--ease-out), opacity 0.3s ease;
+  visibility: hidden;
+}
+.stage.open .fen.active {
+  opacity: 1; transform: none;
+  pointer-events: auto;
+  visibility: visible;
+}
+.fen::after {
+  /* son épingle, un cran plus grosse : la fiche du dessus */
+  content: "";
+  position: absolute; top: -5px; left: 50%; margin-left: -6px;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: radial-gradient(circle at 32% 30%, #F09B5C, #A84B0F 72%);
+  box-shadow: 0 2px 4px rgba(110, 62, 14, 0.4), inset 0 -1px 1px rgba(0, 0, 0, 0.15);
+}
+.fen-head {
+  flex: none;
+  display: flex; align-items: center; gap: 11px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: calc(var(--r-md) - 1px) calc(var(--r-md) - 1px) 0 0;
+}
+.fen-head .f-ico {
+  flex: none;
+  width: 38px; height: 38px; border-radius: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 1.05rem;
+  background: var(--accent-soft);
+  border: 1px solid var(--border-strong);
+}
+.fen-head .f-titles { flex: 1; min-width: 0; }
+.fen-head h2 { font-size: 1.02rem; font-weight: 700; line-height: 1.25; outline: none; }
+.fen-head .f-sub { font-size: 0.71rem; color: var(--muted); margin-top: 1px; }
+.fen-close {
+  flex: none;
+  width: 38px; height: 38px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: var(--r-sm);
+  font-size: 0.95rem; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.fen-close:hover { color: var(--text); border-color: var(--border-strong); }
+.fen-body { flex: 1; overflow-y: auto; padding: 16px; }
+.fen-foot {
+  flex: none;
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 0 0 calc(var(--r-md) - 1px) calc(var(--r-md) - 1px);
+}
+.fen-foot .hint { font-size: 0.71rem; color: var(--soft); margin-left: auto; }
+
+.btn {
+  border: none; border-radius: 999px;
+  font-size: 0.82rem; font-weight: 600;
+  padding: 9px 18px; min-height: 38px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  text-decoration: none;
+}
+.btn-valider { background: var(--accent); color: #fff; box-shadow: 0 2px 8px var(--accent-glow); }
+.btn-valider:hover { filter: brightness(1.07); }
+.btn-ghost {
+  background: transparent; color: var(--muted);
+  border: 1px solid var(--border-strong);
+}
+.btn-ghost:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
+
+/* -- contenus des fenêtres -- */
+.f-section { margin-bottom: 15px; }
+.f-section:last-child { margin-bottom: 0; }
+.f-label {
+  font-family: var(--font-display);
+  font-size: 0.64rem; font-weight: 700; letter-spacing: 0.11em;
+  text-transform: uppercase; color: var(--soft);
+  margin-bottom: 7px;
+}
+.f-note {
+  background: var(--bubble-filou);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 10px 13px;
+  font-size: 0.8rem; line-height: 1.55; color: var(--text);
+}
+.f-note .who {
+  display: block;
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 3px;
+}
+
+/* fiche vétérinaire */
+.fiche-id {
+  display: flex; align-items: center; gap: 13px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  margin-bottom: 15px;
+}
+.fiche-id .big-dot {
+  width: 46px; height: 46px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; font-family: var(--font-display);
+  font-size: 0.95rem; font-weight: 700; flex: none;
+}
+.fiche-id h3 { font-size: 1rem; font-weight: 700; }
+.fiche-id .role { font-size: 0.74rem; color: var(--muted); margin-top: 1px; }
+.tag-recours {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-top: 5px;
+  font-size: 0.66rem; font-weight: 700;
+  background: var(--warn-soft); color: var(--warn);
+  border: 1px solid rgba(196, 138, 20, 0.35);
+  border-radius: 999px; padding: 2px 10px;
+}
+.conge-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 4px;
+  border-bottom: 1px dashed var(--border);
+  font-size: 0.83rem; line-height: 1.45;
+}
+.conge-row:last-child { border-bottom: none; }
+.conge-row .c-when { font-weight: 600; }
+.conge-row .c-meta { font-size: 0.7rem; color: var(--soft); }
+.conge-row .c-state {
+  margin-left: auto; flex: none;
+  font-size: 0.67rem; font-weight: 700;
+  border-radius: 999px; padding: 3px 10px;
+}
+.c-state.ok { background: var(--ok-soft); color: var(--ok); }
+.c-state.wait { background: var(--warn-soft); color: var(--warn); }
+.c-state.past { background: var(--surface-2); color: var(--soft); }
+.souhait-box {
+  background: var(--warn-soft);
+  border: 1px solid rgba(196, 138, 20, 0.35);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+}
+.souhait-box .s-when { font-weight: 700; font-size: 0.88rem; }
+.souhait-box .s-meta { font-size: 0.73rem; color: var(--muted); margin: 3px 0 10px; line-height: 1.5; }
+.souhait-box .s-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.souhait-done {
+  display: flex; align-items: center; gap: 9px;
+  background: var(--ok-soft);
+  border: 1px dashed rgba(90, 150, 60, 0.5);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  font-size: 0.83rem; font-weight: 600; color: var(--ok);
+  animation: bubbleIn 0.35s ease both;
+}
+
+/* compteurs comparés */
+.stat-row { padding: 9px 0 11px; border-bottom: 1px dashed var(--border); }
+.stat-row:last-of-type { border-bottom: none; }
+.stat-top { display: flex; align-items: baseline; gap: 8px; }
+.stat-top .s-name { font-size: 0.84rem; font-weight: 600; }
+.stat-top .s-val {
+  margin-left: auto;
+  font-family: var(--font-display); font-size: 1.15rem; font-weight: 800;
+}
+.stat-top .s-avg { font-size: 0.7rem; color: var(--soft); }
+.stat-track {
+  position: relative;
+  height: 10px; border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  margin-top: 7px;
+  overflow: visible;
+}
+.stat-fill {
+  height: 100%; border-radius: 999px;
+  width: 0;
+  transition: width 0.9s var(--ease-out) 0.25s;
+}
+.stat-avg-tick {
+  position: absolute; top: -4px; bottom: -4px;
+  width: 2px; border-radius: 2px;
+  background: var(--muted);
+}
+.stat-avg-tick::after {
+  content: "moy.";
+  position: absolute; top: -15px; left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.58rem; font-weight: 700; color: var(--soft);
+  letter-spacing: 0.04em;
+}
+
+/* carte du soir */
+.soir-date {
+  display: flex; align-items: baseline; gap: 10px;
+  margin-bottom: 13px;
+}
+.soir-date .sd-day {
+  font-family: var(--font-display);
+  font-size: 1.5rem; font-weight: 800; letter-spacing: -0.01em;
+}
+.soir-date .sd-slot { font-size: 0.78rem; color: var(--muted); }
+.garde-card {
+  display: flex; align-items: center; gap: 13px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  margin-bottom: 9px;
+}
+.garde-card .big-dot {
+  width: 44px; height: 44px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; font-family: var(--font-display);
+  font-size: 0.9rem; font-weight: 700; flex: none;
+}
+.garde-card .g-name { font-size: 0.94rem; font-weight: 700; }
+.garde-card .g-role { font-size: 0.72rem; color: var(--muted); margin-top: 1px; }
+.garde-card .g-hours {
+  margin-left: auto; text-align: right; flex: none;
+  font-family: var(--font-display);
+  font-size: 0.86rem; font-weight: 700;
+}
+.garde-card .g-hours small { display: block; font-family: var(--font-body); font-weight: 500; font-size: 0.66rem; color: var(--soft); }
+.demain {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 13px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--r-md);
+  font-size: 0.8rem; color: var(--muted); line-height: 1.5;
+}
+.demain b { color: var(--text); }
+
+/* récap période */
+.recap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.recap-chip {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+  font-size: 0.79rem; font-weight: 600; line-height: 1.4;
+}
+.recap-chip small { display: block; font-size: 0.66rem; font-weight: 500; color: var(--muted); margin-top: 1px; }
+.recap-chip.hero { grid-column: 1 / -1; background: var(--accent-soft); border-color: var(--border-strong); }
+.recap-chip.hero small { color: var(--accent-ink); }
+
+/* liste des souhaits */
+.souhait-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 4px;
+  border-bottom: 1px dashed var(--border);
+  font-size: 0.83rem; line-height: 1.5;
+}
+.souhait-row:last-child { border-bottom: none; }
+.souhait-row .vdot { margin-top: 2px; }
+.souhait-row .s-what b { font-weight: 700; }
+.souhait-row .s-flag { display: block; font-size: 0.7rem; margin-top: 1px; }
+.s-flag.ok { color: var(--ok); }
+.s-flag.warn { color: var(--warn); font-weight: 600; }
+
+/* vérification */
+.check-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 4px;
+  border-bottom: 1px dashed var(--border);
+  font-size: 0.84rem; line-height: 1.5;
+}
+.check-row:last-child { border-bottom: none; }
+.check-row .ck { flex: none; font-weight: 800; }
+.check-row .ck.ok { color: var(--ok); }
+.check-row .ck.warn { color: var(--warn); }
+
+/* ============================================================
+   DOCK DES MAISONS · signature « modern mobile menu »
+   Au repos : icônes SEULES, traits fins, dans une pilule épurée.
+   L'entrée survolée / au focus SE DÉPLIE : son libellé glisse
+   horizontalement à côté de l'icône (la pilule s'élargit pour
+   lui faire de la place), en orange renard, avec un trait
+   souligné. Une seule entrée dépliée à la fois — quand on passe
+   à la voisine, l'ancienne se replie pendant que la nouvelle
+   se déplie (transitions croisées). Né mobile, même geste partout.
+   ============================================================ */
+/* LA BARRE · une seule pilule cohérente, accolée à la carte :
+   [marque : GuardVeto · Anne-Sophie] [dock au centre]
+   [cagnotte solidaire à droite]. Fond PLEIN (blanc-crème net) :
+   le satin ne transparaît pas, rien ne bave dessus. */
+.app-bar {
+  display: flex; align-items: center; gap: 10px;
+  margin: 14px 0;
+  padding: 8px 9px 8px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: var(--edge-light), 3px 8px 22px rgba(120, 70, 18, 0.12), 1px 2px 5px rgba(120, 70, 18, 0.08);
+}
+.ab-ident { display: flex; align-items: center; gap: 10px; flex: none; }
+/* La marque, en lettres seules : Figtree serré, « Veto » en encre
+   renarde — le seul clin d'œil, typographique et sobre. */
+.ab-name {
+  font-family: var(--font-display);
+  font-weight: 800; font-size: 1rem; letter-spacing: -0.022em;
+  color: var(--text);
+}
+.ab-name em { font-style: normal; color: var(--accent-ink); }
+.ab-user {
+  font-size: 0.78rem; font-weight: 600; color: var(--muted);
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+  white-space: nowrap;
+}
+.dock-menu {
+  display: flex; align-items: center; gap: 2px;
+  width: max-content; max-width: 100%;
+  margin: 0 auto;
+  padding: 0;
+  overflow-x: auto;
+}
+/* La cagnotte solidaire : l'objet de FIERTÉ de la barre — une
+   part de chaque abonnement va à l'association du cabinet.
+   Carte-pilule crème : cœur dessiné main (trait organique,
+   ouvert) dans une pastille verte, montant pesé en Figtree,
+   micro-libellé « reversés ». Expliquée au survol / clic. */
+.cagnotte {
+  position: relative; flex: none;
+  display: inline-flex; align-items: center; gap: 9px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, #FFFEF9 0%, #FBF3E1 100%);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 5px 16px 5px 6px; min-height: 40px;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 252, 0.9), 1px 2px 5px rgba(120, 70, 18, 0.07);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.cagnotte:hover {
+  border-color: var(--border-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 252, 0.9), 2px 4px 10px rgba(120, 70, 18, 0.12);
+}
+.cg-heart {
+  flex: none;
+  width: 28px; height: 28px; padding: 5px;
+  border-radius: 50%;
+  background: var(--ok-soft);
+  color: var(--ok);
+  transform: rotate(-6deg); /* posé un peu de travers, à la main */
+  transition: transform 0.25s var(--ease-out);
+}
+.cg-heart svg { width: 100%; height: 100%; display: block; }
+.cagnotte:hover .cg-heart { transform: rotate(-6deg) scale(1.12); }
+.cg-txt {
+  display: flex; flex-direction: column; align-items: flex-start;
+  gap: 2px; line-height: 1; text-align: left;
+}
+.cg-num {
+  font-family: var(--font-display);
+  font-size: 0.92rem; font-weight: 800; letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.cg-txt small {
+  font-size: 0.56rem; font-weight: 700;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--ok);
+}
+.cagnotte-tip {
+  position: absolute; top: calc(100% + 9px); right: 0;
+  width: 244px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-panel);
+  padding: 9px 12px;
+  font-size: 0.72rem; font-weight: 500; line-height: 1.5; text-align: left;
+  opacity: 0; transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.25s var(--ease-out);
+  z-index: 60;
+}
+.cagnotte:hover .cagnotte-tip,
+.cagnotte:focus-visible .cagnotte-tip,
+.cagnotte.tip-open .cagnotte-tip { opacity: 1; transform: none; }
+@media (max-width: 980px) {
+  .app-bar { flex-wrap: wrap; border-radius: 24px; }
+  .app-bar .dock-menu { order: 3; width: 100%; }
+}
+.dock-item {
+  display: flex; align-items: center;
+  height: 56px; flex: none;
+  padding: 0 15px;
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--soft);
+  transition: color 0.25s ease;
+}
+.dock-item .di-ico {
+  position: relative;
+  width: 28px; height: 28px; flex: none;
+  transition: color 0.25s ease;
+}
+.dock-item .di-ico svg { width: 100%; height: 100%; display: block; }
+/* Le point d'état, discret, accroché au coin de l'icône */
+.di-pip {
+  position: absolute; top: -3px; right: -4px;
+  width: 9px; height: 9px; border-radius: 50%;
+  border: 2px solid var(--surface);
+  box-sizing: content-box;
+  font-style: normal;
+}
+.di-pip.warn { background: var(--warn); }
+.di-pip.ok { background: var(--ok); }
+.di-pip.count {
+  width: 17px; height: 17px; top: -7px; right: -10px;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 0.6rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1;
+}
+/* Le libellé replié : 0fr → 1fr, la pilule s'élargit en douceur */
+.di-flap {
+  display: grid; grid-template-columns: 0fr;
+  opacity: 0;
+  transition: grid-template-columns 0.38s var(--ease-out), opacity 0.22s ease;
+}
+.di-text {
+  min-width: 0; overflow: hidden; white-space: nowrap;
+  position: relative;
+  padding: 0 3px 5px 10px;
+  font-family: var(--font-display);
+  font-size: 0.84rem; font-weight: 700;
+  color: var(--accent-ink);
+}
+.di-text::after {
+  /* le trait souligné de l'entrée dépliée */
+  content: "";
+  position: absolute; left: 10px; right: 4px; bottom: 0;
+  height: 2px; border-radius: 2px;
+  background: var(--accent);
+  transform: scaleX(0); transform-origin: left center;
+  transition: transform 0.3s var(--ease-out) 0.12s;
+}
+.dock-item:hover, .dock-item:focus-visible { color: var(--accent); }
+.dock-item:hover .di-flap, .dock-item:focus-visible .di-flap {
+  grid-template-columns: 1fr;
+  opacity: 1;
+}
+.dock-item:hover .di-text::after, .dock-item:focus-visible .di-text::after {
+  transform: scaleX(1);
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 940px) {
+  .epi-inner { grid-template-columns: 1fr; min-height: 0; }
+  .stage { min-height: 0; padding: 12px; }
+  .glance { position: static; }
+  .stage.open .glance { display: none; }
+  .fen { position: static; visibility: hidden; display: none; max-height: none; }
+  .stage.open .fen.active { display: flex; visibility: visible; }
+  .thread { min-height: 132px; }
+  /* Même géométrie d'assise, à l'échelle 0,74 (vidéo 200 px) */
+  .filou-cube { width: 200px; min-height: 300px; }
+  .filou-cube video, .filou-cube img.filou-fallback { width: 200px; top: -32px; }
+  .socle { left: 37px; top: 185px; width: 114px; height: 112px; }
+  .sc-top { top: -12px; height: 12px; }
+  .sc-side { width: 15px; height: 112px; }
+  /* le recouvrement de coupe suit l'échelle ; la tablette s'affine */
+  .convo { margin-left: -32px; border-width: 9px; border-radius: 26px; padding: 12px 16px 12px 18px; }
+  .convo::before { left: -16px; }
+  .convo::after { top: -7px; width: 5px; height: 5px; }
+  .tab-marque { bottom: -9px; height: 9px; font-size: 7px; }
+  .tab-btn { right: -12px; top: 48px; height: 36px; }
+}
+@media (max-width: 560px) {
+  .recap-grid { grid-template-columns: 1fr; }
+  /* Échelle 0,59 (vidéo 160 px) */
+  .filou-cube { width: 160px; min-height: 240px; }
+  .filou-cube video, .filou-cube img.filou-fallback { width: 160px; top: -26px; }
+  .socle { left: 30px; top: 147px; width: 91px; height: 90px; }
+  .sc-top { top: -10px; height: 10px; }
+  .sc-side { width: 12px; height: 90px; }
+  .convo { margin-left: -18px; border-width: 7px; border-radius: 22px; padding: 11px 13px 11px 14px; }
+  .convo::before { left: -14px; }
+  .convo::after { top: -6px; width: 4px; height: 4px; }
+  .tab-marque { display: none; } /* illisible à cette taille de bezel */
+  .tab-btn { right: -10px; top: 40px; height: 30px; }
+  .ab-user { display: none; }
+}
+
+/* ============================================================
+   MOTION RÉDUITE : tout se calme, rien ne bouge
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001s !important;
+  }
+  .silk i, .folds, .sheen,
+  .typing i { animation: none !important; }
+  .stat-fill { transition: none; }
+  /* Étincelle : plus de circulation, un simple liseré chaud statique.
+     Le satin est figé ; la profondeur (ombres) reste, immobile. */
+  .epicentre::after {
+    animation: none !important;
+    background: rgba(199, 83, 15, 0.18);
+  }
+  .epicentre::before {
+    animation: none !important;
+    background: none;
+  }
+}
+
+/* ============================================================
+   AJOUTS PRODUIT (absents de la maquette)
+   La maquette n'avait ni déconnexion, ni état vide : elle montrait
+   toujours un cabinet bien rempli. Le produit, lui, doit savoir
+   dire « il n'y a rien ici » sans avoir l'air cassé.
+   ============================================================ */
+
+/* Sortie de session, à droite de la barre — même matière que le dock. */
+.ab-sortie {
+  flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  border-radius: 999px;
+  transition: color 0.18s var(--ease-out), border-color 0.18s var(--ease-out);
+}
+.ab-sortie svg { width: 19px; height: 19px; display: block; }
+.ab-sortie:hover { color: var(--accent-ink); border-color: var(--border-strong); }
+
+/* État vide d'une fenêtre : une phrase qui explique, pas un blanc. */
+.f-vide {
+  color: var(--muted);
+  font-size: 0.86rem; line-height: 1.55;
+  padding: 14px 2px;
+}
+
+/* Le drapeau d'un souhait sans verdict de conflit (le verdict réel
+   arrivera quand Filou saura interroger le moteur sur un congé). */
+.s-flag {
+  display: block; margin-top: 3px;
+  font-size: 0.74rem; font-weight: 600; color: var(--soft);
+}

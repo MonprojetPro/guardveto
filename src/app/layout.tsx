@@ -6,7 +6,7 @@ import "./globals.css";
 const figtree = Figtree({
   variable: "--font-figtree",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600", "700", "800"],
 });
 
 const notoSans = Noto_Sans({

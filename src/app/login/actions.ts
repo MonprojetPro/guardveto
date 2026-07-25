@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation'
 export async function login(formData: FormData) {
   // Mode dev : accès direct sans mot de passe
   if (process.env.DEV_BYPASS_AUTH === 'true') {
-    redirect('/planning')
+    redirect('/accueil')
   }
 
   const supabase = await createClient()
@@ -35,7 +35,8 @@ export async function login(formData: FormData) {
     }
   }
 
-  redirect('/planning')
+  // Depuis la bascule V2 (2026-07-25), on atterrit sur l'accueil épicentre.
+  redirect('/accueil')
 }
 
 export async function logout() {

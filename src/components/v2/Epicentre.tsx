@@ -1,0 +1,731 @@
+'use client'
+
+// ============================================================
+// GUARDVETO V2 — L'épicentre : Filou, sa tablette, le tableau du cabinet
+// ============================================================
+// La scène se lit en deux temps : à gauche Filou et ce qu'il a à dire, à
+// droite « le coup d'œil du matin » — quatre fiches qui résument la journée.
+// Cliquer une fiche ouvre une fenêtre détaillée À LA PLACE du coup d'œil ;
+// Échap ou ✕ referme et le tableau revient.
+//
+// Chaque chiffre affiché vient de la base (`chargerAccueil`). La fiche
+// « cohérence » est la seule à se charger après coup : elle fait tourner le
+// validateur indépendant sur les périodes publiées, ce qui prend une seconde.
+// Tant qu'elle n'a pas répondu, elle le dit — elle n'affiche jamais un
+// verdict qu'elle n'a pas.
+// ============================================================
+
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
+import { FilouCube, type FilouHandle } from './FilouCube'
+import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
+import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
+import type { DonneesAccueil, GardeDuSoir } from '@/data/v2/accueilEpicentre'
+
+type Fenetre = 'cesoir' | 'souhaits' | 'periode' | 'coherence'
+
+// ── Mise en français des dates (rien d'autre que de l'affichage) ──
+
+const JOUR_LONG = new Intl.DateTimeFormat('fr-FR', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  timeZone: 'Europe/Paris',
+})
+const JOUR_COURT = new Intl.DateTimeFormat('fr-FR', {
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  timeZone: 'Europe/Paris',
+})
+
+function dateLongue(iso: string) {
+  return JOUR_LONG.format(new Date(iso + 'T12:00:00Z'))
+}
+function dateCourte(iso: string) {
+  return JOUR_COURT.format(new Date(iso + 'T12:00:00Z'))
+}
+function majuscule(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+function initiale(prenom: string) {
+  return prenom.slice(0, 1).toUpperCase()
+}
+
+/** Libellé humain de l'horaire d'un créneau. */
+function horaire(type: string) {
+  if (type === 'weekend') return 'du samedi 8 h au lundi 8 h'
+  if (type === 'vendredi_soir') return '19 h 00 → 8 h 00'
+  return '19 h 00 → 8 h 00'
+}
+function natureCreneau(type: string) {
+  if (type === 'weekend') return 'week-end'
+  if (type === 'ferie') return 'jour férié'
+  if (type === 'vendredi_soir') return 'vendredi soir'
+  return 'nuit de semaine'
+}
+
+/** « il y a 3 jours », « aujourd'hui » — pour l'ancienneté d'un souhait. */
+function anciennete(iso: string) {
+  const jours = Math.floor((Date.now() - Date.parse(iso)) / 86_400_000)
+  if (jours <= 0) return "aujourd'hui"
+  if (jours === 1) return 'hier'
+  if (jours < 7) return `il y a ${jours} jours`
+  const semaines = Math.floor(jours / 7)
+  return semaines === 1 ? 'il y a une semaine' : `il y a ${semaines} semaines`
+}
+
+export function Epicentre({ data }: { data: DonneesAccueil }) {
+  const [ouverte, setOuverte] = useState<Fenetre | null>(null)
+  const [heure, setHeure] = useState('--:--')
+  const filou = useRef<FilouHandle>(null)
+  const stageRef = useRef<HTMLDivElement>(null)
+
+  // Verdict de cohérence : chargé après le rendu, jamais deviné. S'il n'y a
+  // rien à vérifier, on le sait dès le premier rendu — pas d'attente pour rien.
+  const [verdict, setVerdict] = useState<
+    { etat: 'attente' } | { etat: 'sans-objet' } | { etat: 'ok'; violations: ViolationRevalidation[] }
+  >(() =>
+    data.estAdmin && data.periodesPubliees.length > 0
+      ? { etat: 'attente' }
+      : { etat: 'sans-objet' },
+  )
+
+  useEffect(() => {
+    if (!data.estAdmin || data.periodesPubliees.length === 0) return
+    let vivant = true
+    revaliderPlanningPublie(data.periodesPubliees)
+      .then((violations) => {
+        if (vivant) setVerdict({ etat: 'ok', violations })
+      })
+      .catch(() => {
+        if (vivant) setVerdict({ etat: 'sans-objet' })
+      })
+    return () => {
+      vivant = false
+    }
+  }, [data.estAdmin, data.periodesPubliees])
+
+  // L'heure réelle sur la barre de statut de la tablette, recalée à la minute.
+  useEffect(() => {
+    const maj = () => {
+      const d = new Date()
+      setHeure(
+        new Intl.DateTimeFormat('fr-FR', {
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'Europe/Paris',
+        }).format(d),
+      )
+    }
+    maj()
+    // On se recale sur la minute pile, puis on bat la minute.
+    let battement: ReturnType<typeof setInterval> | null = null
+    const amorce = setTimeout(
+      () => {
+        maj()
+        battement = setInterval(maj, 60_000)
+      },
+      (60 - new Date().getSeconds()) * 1000 + 50,
+    )
+    return () => {
+      clearTimeout(amorce)
+      if (battement) clearInterval(battement)
+    }
+  }, [])
+
+  const ouvrir = useCallback((f: Fenetre) => {
+    setOuverte(f)
+    filou.current?.tape()
+  }, [])
+
+  // Échap referme la fenêtre et rend le tableau.
+  useEffect(() => {
+    if (!ouverte) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOuverte(null)
+    }
+    window.addEventListener('keydown', onKey)
+    // Le titre de la fenêtre prend le focus : le lecteur d'écran suit.
+    stageRef.current?.querySelector<HTMLElement>('.fen.active h2')?.focus()
+    return () => window.removeEventListener('keydown', onKey)
+  }, [ouverte])
+
+  const nbSouhaits = data.souhaits.length
+
+  return (
+    <section className="scene" aria-label="Accueil du matin : Filou et la fenêtre contextuelle">
+      <div className="float-wrap">
+        <div className="epicentre">
+          <div className="epi-inner">
+            {/* ------ Le bureau de Filou ------ */}
+            <div className="desk">
+              <div className="desk-top rise rise-2">
+                <FilouCube ref={filou} />
+
+                <div className="convo">
+                  <span className="tab-marque" aria-hidden="true">
+                    Filou
+                  </span>
+                  <span className="tab-btn" aria-hidden="true" />
+                  <header className="convo-head">
+                    <span className="tab-status" aria-hidden="true">
+                      <span>{heure}</span>{' '}
+                      <span className="ts-batt">
+                        <i />
+                      </span>
+                    </span>
+                    <p className="hello-kicker">
+                      {data.periodeCourante
+                        ? `Période ${data.dock.libellePlanning}`
+                        : 'Aucune période en cours'}
+                    </p>
+                    <h1>{majuscule(dateLongue(data.ceSoir?.date ?? aujourdhui()))}</h1>
+                  </header>
+
+                  <div className="thread" aria-live="polite" aria-label="Ce que Filou a préparé">
+                    <MotDAccueil data={data} />
+                  </div>
+
+                  <div className="chips" role="group" aria-label="Ouvrir une fiche">
+                    <button type="button" className="chip" onClick={() => ouvrir('cesoir')}>
+                      Garde de ce soir
+                    </button>
+                    {data.estAdmin && nbSouhaits > 0 && (
+                      <button type="button" className="chip" onClick={() => ouvrir('souhaits')}>
+                        Souhaits en attente
+                      </button>
+                    )}
+                    {data.estAdmin && data.recapPeriode && (
+                      <button type="button" className="chip" onClick={() => ouvrir('periode')}>
+                        Période à préparer
+                      </button>
+                    )}
+                    {data.estAdmin && (
+                      <button type="button" className="chip" onClick={() => ouvrir('coherence')}>
+                        Vérification du planning
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ------ Le tableau du cabinet ------ */}
+            <div className={`stage rise rise-5${ouverte ? ' open' : ''}`} ref={stageRef}>
+              <div className="glance" aria-label="Le coup d'œil du matin">
+                <p className="glance-title">Le coup d&apos;œil du matin</p>
+
+                <FicheCeSoir garde={data.ceSoir} onOpen={() => ouvrir('cesoir')} />
+
+                {data.estAdmin && nbSouhaits > 0 && (
+                  <button type="button" className="widget" onClick={() => ouvrir('souhaits')}>
+                    <span className="w-ico" aria-hidden="true">
+                      ⏳
+                    </span>
+                    <span className="w-body">
+                      <h3>
+                        {nbSouhaits} souhait{nbSouhaits > 1 ? 's' : ''} de congé en attente
+                      </h3>
+                      <p>Le plus ancien date d&apos;{anciennete(data.souhaits[0].depose)}</p>
+                    </span>
+                    <span className="w-go" aria-hidden="true">
+                      →
+                    </span>
+                  </button>
+                )}
+
+                {data.estAdmin && data.recapPeriode && data.joursAvantPublication !== null && (
+                  <button type="button" className="widget" onClick={() => ouvrir('periode')}>
+                    <span className="w-ico" aria-hidden="true">
+                      📣
+                    </span>
+                    <span className="w-body">
+                      <h3>
+                        {data.joursAvantPublication > 0
+                          ? `Publication de la période dans ${data.joursAvantPublication} jour${data.joursAvantPublication > 1 ? 's' : ''}`
+                          : 'Publication de la période à faire'}
+                      </h3>
+                      <p>
+                        {data.recapPeriode.libelle} ·{' '}
+                        {data.joursAvantPublication > 0
+                          ? "le préavis d'un mois sera respecté"
+                          : `le préavis d'un mois est dépassé de ${-data.joursAvantPublication} jour${-data.joursAvantPublication > 1 ? 's' : ''}`}
+                      </p>
+                    </span>
+                    <span className="w-go" aria-hidden="true">
+                      →
+                    </span>
+                  </button>
+                )}
+
+                {data.estAdmin && (
+                  <FicheCoherence verdict={verdict} onOpen={() => ouvrir('coherence')} />
+                )}
+
+                <p className="glance-foot">
+                  Chaque fiche s&apos;ouvre en grand ici même. <b>Filou n&apos;affiche que ce qu&apos;il a vérifié.</b>
+                </p>
+              </div>
+
+              {/* ===== Fenêtre · la garde de ce soir ===== */}
+              <article
+                className={`fen${ouverte === 'cesoir' ? ' active' : ''}`}
+                role="region"
+                aria-label="La garde de ce soir"
+              >
+                <header className="fen-head">
+                  <span className="f-ico" aria-hidden="true">
+                    🌙
+                  </span>
+                  <div className="f-titles">
+                    <h2 tabIndex={-1}>Ce soir, au cabinet</h2>
+                    <p className="f-sub">
+                      {data.ceSoir
+                        ? `${majuscule(natureCreneau(data.ceSoir.type))} · ${horaire(data.ceSoir.type)}`
+                        : 'Aucune garde enregistrée'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="fen-close"
+                    aria-label="Refermer la fenêtre"
+                    onClick={() => setOuverte(null)}
+                  >
+                    ✕
+                  </button>
+                </header>
+                <div className="fen-body">
+                  {data.ceSoir ? (
+                    <>
+                      <div className="soir-date">
+                        <span className="sd-day">{majuscule(dateLongue(data.ceSoir.date))}</span>
+                        <span className="sd-slot">{horaire(data.ceSoir.type)}</span>
+                      </div>
+                      {data.ceSoir.premier && (
+                        <CarteGarde
+                          prenom={data.ceSoir.premier.prenom}
+                          couleur={data.ceSoir.premier.couleur}
+                          role="1ʳᵉ de garde · prend les appels"
+                          type={data.ceSoir.type}
+                        />
+                      )}
+                      {data.ceSoir.second && (
+                        <CarteGarde
+                          prenom={data.ceSoir.second.prenom}
+                          couleur={data.ceSoir.second.couleur}
+                          role="2ᵈ de garde · en renfort"
+                          type={data.ceSoir.type}
+                        />
+                      )}
+                      {data.demain && (
+                        <div className="demain">
+                          <span aria-hidden="true">🔭</span>
+                          <span>
+                            <b>Demain :</b>{' '}
+                            {[data.demain.premier?.prenom, data.demain.second?.prenom]
+                              .filter(Boolean)
+                              .join(' & ')}{' '}
+                            prennent le relais ({natureCreneau(data.demain.type)}).
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="f-vide">
+                      Aucune garde n&apos;est enregistrée pour ce soir. Soit la période n&apos;est pas
+                      encore générée, soit la date sort des périodes connues.
+                    </p>
+                  )}
+                </div>
+                <footer className="fen-foot">
+                  <Link className="btn btn-ghost" href="/planning">
+                    Voir sur le planning
+                  </Link>
+                  <span className="hint">Échap pour refermer</span>
+                </footer>
+              </article>
+
+              {/* ===== Fenêtre · souhaits en attente ===== */}
+              {data.estAdmin && (
+                <article
+                  className={`fen${ouverte === 'souhaits' ? ' active' : ''}`}
+                  role="region"
+                  aria-label="Souhaits de congé en attente"
+                >
+                  <header className="fen-head">
+                    <span className="f-ico" aria-hidden="true">
+                      ⏳
+                    </span>
+                    <div className="f-titles">
+                      <h2 tabIndex={-1}>
+                        Souhaits de congé · {nbSouhaits} en attente
+                      </h2>
+                      <p className="f-sub">Par ordre d&apos;arrivée, du plus ancien au plus récent</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="fen-close"
+                      aria-label="Refermer la fenêtre"
+                      onClick={() => setOuverte(null)}
+                    >
+                      ✕
+                    </button>
+                  </header>
+                  <div className="fen-body">
+                    {data.souhaits.map((s) => (
+                      <div className="souhait-row" key={s.id}>
+                        <span className="vdot" style={{ background: s.couleur }} aria-hidden="true">
+                          {initiale(s.prenom)}
+                        </span>
+                        <span className="s-what">
+                          <b>{s.prenom}</b> ·{' '}
+                          {s.dateDebut === s.dateFin
+                            ? dateCourte(s.dateDebut)
+                            : `${dateCourte(s.dateDebut)} → ${dateCourte(s.dateFin)}`}
+                          <span className="s-flag">Déposé {anciennete(s.depose)}</span>
+                        </span>
+                      </div>
+                    ))}
+                    {nbSouhaits === 0 && (
+                      <p className="f-vide">Aucun souhait de congé n&apos;attend de décision.</p>
+                    )}
+                  </div>
+                  <footer className="fen-foot">
+                    <Link className="btn btn-valider" href="/conges">
+                      Traiter dans Congés →
+                    </Link>
+                    <span className="hint">Échap pour refermer</span>
+                  </footer>
+                </article>
+              )}
+
+              {/* ===== Fenêtre · préparer la période suivante ===== */}
+              {data.estAdmin && data.recapPeriode && (
+                <article
+                  className={`fen${ouverte === 'periode' ? ' active' : ''}`}
+                  role="region"
+                  aria-label="Préparer la période suivante"
+                >
+                  <header className="fen-head">
+                    <span className="f-ico" aria-hidden="true">
+                      🌱
+                    </span>
+                    <div className="f-titles">
+                      <h2 tabIndex={-1}>Période · {data.recapPeriode.libelle}</h2>
+                      <p className="f-sub">
+                        {data.recapPeriode.statut === 'brouillon'
+                          ? 'Encore en brouillon · rien n’est parti chez l’équipe'
+                          : 'Récap de la période'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="fen-close"
+                      aria-label="Refermer la fenêtre"
+                      onClick={() => setOuverte(null)}
+                    >
+                      ✕
+                    </button>
+                  </header>
+                  <div className="fen-body">
+                    <div className="recap-grid">
+                      <div className="recap-chip hero">
+                        {data.recapPeriode.saison === 'ete' ? '☀️' : '❄️'}{' '}
+                        {data.recapPeriode.nbSemaines} semaines · du{' '}
+                        {dateCourte(data.recapPeriode.dateDebut)} au{' '}
+                        {dateCourte(data.recapPeriode.dateFin)}
+                        <small>
+                          {data.recapPeriode.profil
+                            ? `profil « ${data.recapPeriode.profil} »`
+                            : 'profil par défaut du cabinet'}
+                        </small>
+                      </div>
+                      <div className="recap-chip">
+                        {data.recapPeriode.nbVetos} vétérinaires
+                        <small>actifs au cabinet</small>
+                      </div>
+                      <div className="recap-chip">
+                        Effectif de nuit
+                        <small>
+                          {data.recapPeriode.effectifNuitSemaine
+                            ? `${data.recapPeriode.effectifNuitSemaine} véto${data.recapPeriode.effectifNuitSemaine > 1 ? 's' : ''} par nuit de semaine`
+                            : 'selon la saison'}
+                        </small>
+                      </div>
+                      <div className="recap-chip">
+                        {data.recapPeriode.nbReglesFermes} règles fermes
+                        <small>toutes actives</small>
+                      </div>
+                      <div className="recap-chip">
+                        {data.recapPeriode.nbReglesSouples} préférences
+                        <small>règles souples actives</small>
+                      </div>
+                      <div className="recap-chip">
+                        {data.recapPeriode.nbCongesValides} congés validés
+                        <small>qui tombent dans la période</small>
+                      </div>
+                      <div className="recap-chip">
+                        Préavis d&apos;un mois
+                        <small>
+                          publication à prévoir avant le{' '}
+                          {dateCourte(data.recapPeriode.limitePublication)}
+                        </small>
+                      </div>
+                    </div>
+                    {nbSouhaits > 0 && (
+                      <div className="f-note">
+                        <span className="who">🦊 Filou signale</span>
+                        {nbSouhaits} souhait{nbSouhaits > 1 ? 's' : ''} de congé{' '}
+                        {nbSouhaits > 1 ? 'attendent' : 'attend'} encore une décision. Générer
+                        maintenant, c&apos;est prendre le risque de régénérer après coup.
+                      </div>
+                    )}
+                  </div>
+                  <footer className="fen-foot">
+                    <Link className="btn btn-valider" href="/planning">
+                      Continuer sur le planning →
+                    </Link>
+                    <span className="hint">Échap pour refermer</span>
+                  </footer>
+                </article>
+              )}
+
+              {/* ===== Fenêtre · vérification du planning ===== */}
+              {data.estAdmin && (
+                <article
+                  className={`fen${ouverte === 'coherence' ? ' active' : ''}`}
+                  role="region"
+                  aria-label="Vérification du planning"
+                >
+                  <header className="fen-head">
+                    <span className="f-ico" aria-hidden="true">
+                      🛡
+                    </span>
+                    <div className="f-titles">
+                      <h2 tabIndex={-1}>Vérification continue du planning</h2>
+                      <p className="f-sub">
+                        Le validateur indépendant repasse après chaque changement
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="fen-close"
+                      aria-label="Refermer la fenêtre"
+                      onClick={() => setOuverte(null)}
+                    >
+                      ✕
+                    </button>
+                  </header>
+                  <div className="fen-body">
+                    {verdict.etat === 'attente' && (
+                      <p className="f-vide">Vérification en cours…</p>
+                    )}
+                    {verdict.etat === 'sans-objet' && (
+                      <p className="f-vide">
+                        Aucune période publiée en cours : il n&apos;y a rien à re-vérifier pour le
+                        moment.
+                      </p>
+                    )}
+                    {verdict.etat === 'ok' && verdict.violations.length === 0 && (
+                      <div className="check-row">
+                        <span className="ck ok">✓</span>
+                        <span>
+                          <b>Aucune règle ferme enfreinte</b> sur{' '}
+                          {data.periodesPubliees.length === 1
+                            ? 'la période publiée'
+                            : `les ${data.periodesPubliees.length} périodes publiées`}{' '}
+                          en cours.
+                        </span>
+                      </div>
+                    )}
+                    {verdict.etat === 'ok' &&
+                      verdict.violations.map((v, i) => (
+                        <div className="check-row" key={`${v.regle}-${v.date}-${i}`}>
+                          <span className="ck warn">⚠</span>
+                          <span>
+                            <b>{v.regle}</b> · {dateCourte(v.date)} — {v.detail}
+                          </span>
+                        </div>
+                      ))}
+                    <div className="f-note">
+                      <span className="who">🦊 Filou veille</span>
+                      Le validateur est <b>indépendant du moteur</b> : il ne rejoue pas le
+                      raisonnement qui a construit le planning, il le recontrôle à froid. C&apos;est
+                      ce qui lui permet d&apos;attraper une erreur du moteur lui-même.
+                    </div>
+                  </div>
+                  <footer className="fen-foot">
+                    <Link className="btn btn-ghost" href="/planning">
+                      Ouvrir le planning
+                    </Link>
+                    <span className="hint">Échap pour refermer</span>
+                  </footer>
+                </article>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ── Fragments ───────────────────────────────────────────────
+
+function aujourdhui() {
+  return new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris' }).format(new Date())
+}
+
+function CarteGarde({
+  prenom,
+  couleur,
+  role,
+  type,
+}: {
+  prenom: string
+  couleur: string
+  role: string
+  type: string
+}) {
+  return (
+    <div className="garde-card">
+      <span className="big-dot" style={{ background: couleur }} aria-hidden="true">
+        {initiale(prenom)}
+      </span>
+      <div>
+        <p className="g-name">{prenom}</p>
+        <p className="g-role">{role}</p>
+      </div>
+      <p className="g-hours">{horaire(type)}</p>
+    </div>
+  )
+}
+
+function FicheCeSoir({ garde, onOpen }: { garde: GardeDuSoir | null; onOpen: () => void }) {
+  if (!garde) {
+    return (
+      <button type="button" className="widget" onClick={onOpen}>
+        <span className="w-ico" aria-hidden="true">
+          🌙
+        </span>
+        <span className="w-body">
+          <h3>Ce soir : personne d&apos;enregistré</h3>
+          <p>Aucune garde n&apos;est posée sur cette date</p>
+        </span>
+        <span className="w-go" aria-hidden="true">
+          →
+        </span>
+      </button>
+    )
+  }
+  const noms = [garde.premier?.prenom, garde.second?.prenom].filter(Boolean).join(' & ')
+  return (
+    <button type="button" className="widget" onClick={onOpen}>
+      <span className="w-ico" aria-hidden="true">
+        🌙
+      </span>
+      <span className="w-body">
+        <h3>Ce soir : {noms}</h3>
+        <p>
+          {horaire(garde.type)} · {natureCreneau(garde.type)}
+        </p>
+        <span className="w-duo" aria-hidden="true">
+          {garde.premier && (
+            <span className="vdot" style={{ background: garde.premier.couleur }}>
+              {initiale(garde.premier.prenom)}
+            </span>
+          )}
+          {garde.second && (
+            <span className="vdot" style={{ background: garde.second.couleur }}>
+              {initiale(garde.second.prenom)}
+            </span>
+          )}
+        </span>
+      </span>
+      <span className="w-go" aria-hidden="true">
+        →
+      </span>
+    </button>
+  )
+}
+
+function FicheCoherence({
+  verdict,
+  onOpen,
+}: {
+  verdict: { etat: 'attente' } | { etat: 'sans-objet' } | { etat: 'ok'; violations: ViolationRevalidation[] }
+  onOpen: () => void
+}) {
+  const sain = verdict.etat === 'ok' && verdict.violations.length === 0
+  return (
+    <button type="button" className={`widget${sain ? ' w-ok' : ''}`} onClick={onOpen}>
+      <span className="w-ico" aria-hidden="true">
+        {verdict.etat === 'ok' ? (sain ? '✓' : '⚠') : '…'}
+      </span>
+      <span className="w-body">
+        <h3>
+          {verdict.etat === 'attente' && 'Vérification du planning en cours'}
+          {verdict.etat === 'sans-objet' && 'Rien à vérifier'}
+          {verdict.etat === 'ok' &&
+            (sain
+              ? 'Planning cohérent'
+              : `${verdict.violations.length} règle${verdict.violations.length > 1 ? 's' : ''} enfreinte${verdict.violations.length > 1 ? 's' : ''}`)}
+        </h3>
+        <p>
+          {verdict.etat === 'attente' && 'Le validateur indépendant est en train de repasser'}
+          {verdict.etat === 'sans-objet' && 'Aucune période publiée en cours'}
+          {verdict.etat === 'ok' &&
+            (sain
+              ? 'Vérifié à l’instant · 0 règle ferme enfreinte'
+              : 'À regarder avant que ça gêne quelqu’un')}
+        </p>
+      </span>
+      <span className="w-go" aria-hidden="true">
+        →
+      </span>
+    </button>
+  )
+}
+
+/** Le mot d'accueil : ce que Filou a réellement trouvé, pas une formule. */
+function MotDAccueil({ data }: { data: DonneesAccueil }) {
+  const phrases: string[] = []
+
+  if (data.ceSoir) {
+    const noms = [data.ceSoir.premier?.prenom, data.ceSoir.second?.prenom]
+      .filter(Boolean)
+      .join(' et ')
+    phrases.push(`Ce soir, ${noms} ${data.ceSoir.second ? 'sont' : 'est'} de garde.`)
+  } else {
+    phrases.push("Je ne vois aucune garde posée pour ce soir.")
+  }
+
+  if (data.estAdmin) {
+    const n = data.souhaits.length
+    if (n > 0) {
+      phrases.push(
+        `${n} souhait${n > 1 ? 's' : ''} de congé ${n > 1 ? 'attendent' : 'attend'} ta décision.`,
+      )
+    }
+    if (data.joursAvantPublication !== null && data.recapPeriode) {
+      phrases.push(
+        data.joursAvantPublication > 0
+          ? `Il te reste ${data.joursAvantPublication} jours pour publier ${data.recapPeriode.libelle}.`
+          : `${data.recapPeriode.libelle} aurait dû être publiée : le préavis d'un mois est dépassé.`,
+      )
+    }
+  }
+
+  return (
+    <div className="msg filou">
+      <span className="m-ava" aria-hidden="true">
+        🦊
+      </span>
+      <div className="bubble">
+        <span className="vh">Filou : </span>
+        Bonjour {data.veterinaire.prenom}. {phrases.join(' ')}
+      </div>
+    </div>
+  )
+}
