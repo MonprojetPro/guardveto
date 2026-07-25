@@ -888,10 +888,56 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   position: absolute; left: 0; top: -18px;
   display: block;
   width: 200px;              /* = --ech * 1080, comme la vidéo */
-  height: 218px;             /* = --ech * 1175 : coupe sous le fondu bas */
-  overflow: hidden;
+  height: 240px;             /* le clip franc, c'est .fe-crop qui le pose */
   --ech: 0.18519;
-  transition: opacity .3s ease;
+  /* bascule quasi sèche (80 ms) : les couches sont d'abord ramenées à
+     leur pose neutre, qui est EXACTEMENT la 1re image du métrage — un
+     fondu croisé long superposait deux Filous décalés, et ça se voyait */
+  transition: opacity .08s linear;
+}
+/* pose neutre avant/après le coucou : on coupe les animations et on
+   laisse les transitions ramener chaque pièce à sa place d'origine */
+.filou-edge.fe-neutre .fx-corps,
+.filou-edge.fe-neutre .fx-tete,
+.filou-edge.fe-neutre .fx-or-g,
+.filou-edge.fe-neutre .fx-or-d {
+  animation: none;
+  transition: translate .22s ease-out, rotate .22s ease-out;
+}
+.filou-edge.fe-neutre .fx-oeil i {
+  animation: none;
+  transition: transform .12s ease-out;
+}
+/* ============================================================
+   L'APPUI sur lequel Filou est accoudé.
+   ⚠ AUCUN fondu ici, et plus aucun dans les WebM : un fondu rendait
+   sa blouse translucide et ça se voyait (retour MiKL 2026-07-25).
+   Le bas du corps est coupé NET par .fe-crop, et cette planche
+   masque la coupe — comme un vrai rebord, ce qui rend enfin lisible
+   la pose « accroché » et ses pattes posées dessus.
+   ============================================================ */
+.filou-edge .fe-appui {
+  /* elle mord sur le bord de la carte à droite : le rebord se lit alors
+     comme fixé À la carte, et non comme une étagère flottante */
+  position: absolute; left: 18px; right: 4px; bottom: 0;
+  height: 13px;
+  background:
+    linear-gradient(#FFFAF0 0 1px,
+                    #F4E7CD 1px 6px,
+                    #E7D5B2 6px 10px,
+                    #D8C094 100%);
+  border-radius: 3px 3px 6px 6px;
+  box-shadow: 0 4px 8px -2px rgba(120, 70, 18, 0.28),
+              inset 0 1px 0 rgba(255, 255, 255, 0.9),
+              inset 0 -1px 0 rgba(150, 105, 45, 0.35);
+  z-index: 3;
+}
+/* l'ombre que Filou projette sur la planche : sans elle, il flotte */
+.filou-edge .fe-appui::before {
+  content: ""; position: absolute; left: 10px; right: 10px; top: -6px;
+  height: 7px; border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 100%,
+              rgba(105, 62, 14, 0.34), rgba(105, 62, 14, 0) 74%);
 }
 .filou-edge .fx-scene {
   position: absolute; left: 0; top: 0;
@@ -955,7 +1001,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   position: absolute; left: 0; top: -18px;
   width: 200px; height: auto; max-width: none;
   display: block; opacity: 0;
-  transition: opacity .3s ease;
+  transition: opacity .08s linear;
 }
 .filou-edge.fe-wave #fe-coucou { opacity: 1; }
 .filou-edge:hover, .filou-edge:focus-visible {
@@ -1661,7 +1707,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
         <span class="fx" id="fe-fx">
           <span class="fx-scene">
             <img class="fx-corps" src="../filou/couches/corps.webp"
-                 style="left:183px;top:834px;width:627px;height:321px" alt="">
+                 style="left:143px;top:834px;width:667px;height:423px" alt="">
             <span class="fx-tete">
               <img class="fx-or-g" src="../filou/couches/oreille-g.webp"
                    style="left:375px;top:149px;width:260px;height:358px" alt="">
@@ -1674,6 +1720,9 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
             </span>
           </span>
         </span>
+        <!-- L'APPUI : il masque franchement le bas de Filou. Avant, un
+             fondu rendait sa blouse translucide et ça se voyait. -->
+        <span class="fe-appui"></span>
         <!-- COUCOU : le geste reste la vidéo (la patte n'existe pas
              dans les couches), joué toutes les ~30-45 s et au survol. -->
         <video id="fe-coucou" muted playsinline preload="auto">
@@ -2487,16 +2536,33 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
     clearTimeout(feWaveTimer);
     feWaveTimer = setTimeout(feCoucouJoue, 30000 + Math.random() * 15000);
   }
+  /* La bascule se fait en DEUX temps pour qu'aucun fondu ne se voie :
+     ① les couches reviennent à leur pose neutre (220 ms) — cette pose
+     est exactement la 1re image du métrage ; ② on échange les deux en
+     80 ms, sur deux images superposables. Au retour, même chose à
+     l'envers : la dernière image du coucou est aussi la pose neutre. */
+  var feNeutreTimer = null;
   function feCoucouJoue() {
     if (!feVideoActif || feWaveEnCours || filouBusy || filouOut) { fePlanifieCoucou(); return; }
     feWaveEnCours = true;
-    try { feCoucou.currentTime = 0; } catch (e) {}
-    feJoue(feCoucou);
-    filouEdge.classList.add("fe-wave");
+    filouEdge.classList.add("fe-neutre");
+    clearTimeout(feNeutreTimer);
+    feNeutreTimer = setTimeout(function () {
+      if (!feWaveEnCours) return;
+      try { feCoucou.currentTime = 0; } catch (e) {}
+      feJoue(feCoucou);
+      filouEdge.classList.add("fe-wave");
+    }, 240);
   }
   function feFinCoucou() {
     filouEdge.classList.remove("fe-wave");
     feWaveEnCours = false;
+    /* on ne relâche la pose neutre qu'une fois les couches revenues :
+       enlever .fe-neutre relance les animations à 0 %, donc au neutre */
+    clearTimeout(feNeutreTimer);
+    feNeutreTimer = setTimeout(function () {
+      filouEdge.classList.remove("fe-neutre");
+    }, 140);
   }
   if (!REDUCED && feCoucou) {
     feCoucou.addEventListener("canplay", function once() {

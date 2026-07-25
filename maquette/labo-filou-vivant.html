@@ -45,6 +45,12 @@
     position:absolute;left:0;top:-18px;width:200px;height:auto;max-width:none;
     transition:opacity .3s ease;
   }
+  .video-wrap::after{
+    content:"";position:absolute;left:18px;right:0;bottom:0;height:13px;
+    background:linear-gradient(#FFFAF0 0 1px,#F4E7CD 1px 6px,#E7D5B2 6px 10px,#D8C094 100%);
+    border-radius:3px 3px 6px 6px;
+    box-shadow:0 4px 8px -2px rgba(120,70,18,.28), inset 0 1px 0 rgba(255,255,255,.9);
+  }
   .video-wrap #va-coucou{opacity:0}
   .video-wrap.wave #va-coucou{opacity:1}
   .video-wrap.wave #va-idle{opacity:0}
@@ -55,6 +61,15 @@
     width:calc(1080px * var(--ech));
     height:calc(1175px * var(--ech));
     overflow:hidden;
+  }
+  /* l'appui : plus aucun fondu dans les assets, c'est cette planche qui
+     masque la coupe nette du bas (retour MiKL 2026-07-25) */
+  .fx::after{
+    content:"";position:absolute;left:calc(100px * var(--ech));right:0;bottom:0;
+    height:calc(70px * var(--ech));
+    background:linear-gradient(#FFFAF0 0 8%,#F4E7CD 8% 46%,#E7D5B2 46% 76%,#D8C094 100%);
+    border-radius:3px 3px 6px 6px;
+    box-shadow:0 4px 8px -2px rgba(120,70,18,.28), inset 0 1px 0 rgba(255,255,255,.9);
   }
   .fx-scene{
     position:absolute;left:0;top:0;width:1080px;height:1920px;
@@ -177,7 +192,7 @@
       <div style="position:relative">
         <div class="fx" id="fx" style="--ech:0.1852;--teinte-g:#CA6504;--teinte-d:#E57704">
           <div class="fx-scene">
-            <img class="fx-corps" src="../filou/couches/corps.webp" style="left:183px;top:834px;width:627px;height:321px" alt="">
+            <img class="fx-corps" src="../filou/couches/corps.webp" style="left:143px;top:834px;width:667px;height:423px" alt="">
             <div class="fx-tete">
               <img class="fx-or-g" src="../filou/couches/oreille-g.webp" style="left:375px;top:149px;width:260px;height:358px" alt="">
               <img class="fx-or-d" src="../filou/couches/oreille-d.webp" style="left:772px;top:344px;width:248px;height:327px" alt="">
@@ -219,7 +234,7 @@
     <figure>
       <div class="fx" style="--ech:0.1852;--teinte-g:#CA6504;--teinte-d:#E57704">
         <div class="fx-scene">
-          <img class="fx-corps" src="../filou/couches/corps.webp" style="left:183px;top:834px;width:627px;height:321px" alt="">
+          <img class="fx-corps" src="../filou/couches/corps.webp" style="left:143px;top:834px;width:667px;height:423px" alt="">
           <div class="fx-tete">
             <img class="fx-or-g" src="../filou/couches/oreille-g.webp" style="left:375px;top:149px;width:260px;height:358px" alt="">
             <img class="fx-or-d" src="../filou/couches/oreille-d.webp" style="left:772px;top:344px;width:248px;height:327px" alt="">
@@ -234,7 +249,7 @@
     <figure>
       <div class="fx" style="--ech:0.32;--teinte-g:#CA6504;--teinte-d:#E57704">
         <div class="fx-scene">
-          <img class="fx-corps" src="../filou/couches/corps.webp" style="left:183px;top:834px;width:627px;height:321px" alt="">
+          <img class="fx-corps" src="../filou/couches/corps.webp" style="left:143px;top:834px;width:667px;height:423px" alt="">
           <div class="fx-tete">
             <img class="fx-or-g" src="../filou/couches/oreille-g.webp" style="left:375px;top:149px;width:260px;height:358px" alt="">
             <img class="fx-or-d" src="../filou/couches/oreille-d.webp" style="left:772px;top:344px;width:248px;height:327px" alt="">

@@ -25,6 +25,10 @@ W, H = im.size
 # --- reperes mesures sur le metrage (natif 1080x1920) --------------------
 Y_COU = 930          # ligne de coupe tete / corps (sous le poitrail blanc)
 PIVOT_TETE = (600, Y_COU)
+# Bas du corps : coupe NETTE, jamais un fondu. Un fondu rend la blouse
+# translucide et ca se voit (retour MiKL 2026-07-25) ; c'est le rebord
+# dessine en CSS qui masque la coupe, comme un vrai appui.
+Y_BAS = 1250
 
 # polygones des oreilles, base large pour que la rotation ne decolle rien
 OREILLE_G = [(452, 138), (556, 214), (600, 372), (614, 470),
@@ -112,7 +116,9 @@ tete = applique(Image.fromarray(np.clip(m_sans_oreilles, 0, 255).astype(np.uint8
 # ca laissait une couture claire en travers du poitrail. Le corps remonte
 # donc de RECOUVREMENT px sous la tete, bord net : la tete le masque.
 RECOUVREMENT = 90
-corps = applique(masque_bande(Y_COU - RECOUVREMENT, flou=0.0, haut=False))
+m_corps = np.array(masque_bande(Y_COU - RECOUVREMENT, flou=0.0, haut=False), np.float32)
+m_corps *= np.array(masque_bande(Y_BAS, flou=0.0, haut=True), np.float32) / 255.0
+corps = applique(Image.fromarray(np.clip(m_corps, 0, 255).astype(np.uint8)))
 
 # --- 4. teinte de paupiere : moyenne de la fourrure juste au-dessus de l'oeil
 def teinte_paupiere(oeil):
