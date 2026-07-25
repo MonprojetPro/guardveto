@@ -874,18 +874,79 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
      Cadrage vidéo : width 200 / top -18. */
   transform: scaleX(-1);
 }
-.filou-edge img {
-  width: 290px; height: auto;
-  /* repli statique : cadré sur la tête (l'avatar est un plan en pied),
-     vignette douce cuite en mask — sans bug de bord, une <img> n'est
-     pas une surface vidéo composited. Le miroir du .fe-crop est annulé
-     ici pour garder l'avatar dans le bon sens (badge lisible). */
-  margin-left: -60px; margin-top: -6px;
-  transform: scaleX(-1);
-  filter: drop-shadow(3px 6px 10px rgba(120, 70, 18, 0.28));
-  -webkit-mask-image: radial-gradient(ellipse 52% 38% at 48% 22%, #000 62%, transparent 100%);
-  mask-image: radial-gradient(ellipse 52% 38% at 48% 22%, #000 62%, transparent 100%);
+/* ============================================================
+   Filou VIVANT (phase d'attente) — le métrage 3D tranché en 4
+   pièces, animé par le code : il respire, cligne des yeux, penche
+   la tête et remue les oreilles, sans fin et sans fichier vidéo.
+   Chaque réglage ci-dessous est un chiffre : plus jamais de
+   régénération de métrage pour corriger un détail. 50 Ko.
+   Les pièces viennent de filou/decoupe-couches.py.
+   ⚠ Aux raccords, les pièces se CHEVAUCHENT : deux bords estompés
+   complémentaires ne se recomposent pas à alpha 255 (couture).
+   ============================================================ */
+.filou-edge .fx {
+  position: absolute; left: 0; top: -18px;
+  display: block;
+  width: 200px;              /* = --ech * 1080, comme la vidéo */
+  height: 218px;             /* = --ech * 1175 : coupe sous le fondu bas */
+  overflow: hidden;
+  --ech: 0.18519;
+  transition: opacity .3s ease;
 }
+.filou-edge .fx-scene {
+  position: absolute; left: 0; top: 0;
+  display: block; width: 1080px; height: 1920px;
+  transform: scale(var(--ech)); transform-origin: top left;
+}
+.filou-edge .fx-scene img { position: absolute; display: block; max-width: none; }
+.fx-corps { animation: fxRespire 4.6s ease-in-out infinite; }
+.fx-tete {
+  position: absolute; left: 0; top: 0; display: block;
+  width: 1080px; height: 1920px;
+  transform-origin: 600px 930px;
+  animation: fxRespire 4.6s ease-in-out infinite,
+             fxPenche 11s ease-in-out infinite;
+}
+.fx-or-g { transform-origin: 132px 344px; animation: fxOreilleG 8.5s ease-in-out infinite; }
+.fx-or-d { transform-origin: 52px 312px;  animation: fxOreilleD 8.5s ease-in-out infinite .9s; }
+/* l'œil est une FENÊTRE : la paupière coulisse dedans, donc elle est
+   strictement invisible au repos (hors cadre), sans aplat sur le front */
+.fx-oeil { position: absolute; display: block; overflow: hidden; border-radius: 50%; }
+.fx-oeil i {
+  position: absolute; left: -4%; top: 0; width: 108%; height: 150%;
+  transform: translateY(-101%);
+  border-radius: 0 0 46% 46% / 0 0 26% 26%;
+  box-shadow: inset 0 -7px 9px -4px rgba(110, 58, 8, 0.75);
+}
+.fx-oeil.g i {
+  background: linear-gradient(#F09A3A 0%, #CA6504 62%, #A9530A 100%);
+  animation: fxCligne 5.4s ease-in-out infinite;
+}
+.fx-oeil.d i {
+  background: linear-gradient(#F5A648 0%, #E57704 62%, #B85C0B 100%);
+  animation: fxCligne 5.4s ease-in-out infinite .035s;
+}
+@keyframes fxRespire { 0%,100% { translate: 0 0 } 50% { translate: 0 -7px } }
+@keyframes fxPenche  { 0%,100% { rotate: 0deg } 28% { rotate: -1.5deg } 62% { rotate: 1.1deg } }
+@keyframes fxOreilleG {
+  0%,16%,100% { rotate: 0deg }
+  19% { rotate: 5deg } 22% { rotate: -2deg } 25% { rotate: 3deg } 29% { rotate: 0deg }
+  68% { rotate: 0deg } 71% { rotate: 4deg } 74% { rotate: 0deg }
+}
+@keyframes fxOreilleD {
+  0%,40%,100% { rotate: 0deg }
+  43% { rotate: -5deg } 46% { rotate: 2deg } 49% { rotate: -3deg } 53% { rotate: 0deg }
+  86% { rotate: 0deg } 89% { rotate: -4deg } 92% { rotate: 0deg }
+}
+/* clignement : fermé ~90 ms — assez court pour ne jamais se remarquer */
+@keyframes fxCligne {
+  0%,88%   { transform: translateY(-101%) }
+  90.5%    { transform: translateY(0) }
+  92.5%    { transform: translateY(0) }
+  95%,100% { transform: translateY(-101%) }
+}
+/* pendant le coucou, les couches s'effacent au profit du métrage */
+.filou-edge.fe-wave .fx { opacity: 0; }
 /* Les vidéos « accroché au rebord » (même métrage : idle + coucou),
    superposées pour le fondu croisé. Cadrées pour que l'arête invisible
    qu'il agrippe (~18 % de la largeur en natif) tombe PILE sur le
@@ -893,27 +954,10 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .filou-edge video {
   position: absolute; left: 0; top: -18px;
   width: 200px; height: auto; max-width: none;
-  display: none;
+  display: block; opacity: 0;
   transition: opacity .3s ease;
 }
-#fe-coucou { opacity: 0; }
 .filou-edge.fe-wave #fe-coucou { opacity: 1; }
-.filou-edge.fe-wave #fe-idle { opacity: 0; }
-.filou-edge.has-video video { display: block; }
-.filou-edge.has-video #fe-img { display: none; }
-.filou-edge.has-video .fe-paw { display: none; } /* les vraies pattes sont dans la vidéo */
-/* les pattes posées sur le rebord de la carte */
-.filou-edge .fe-paw {
-  position: absolute;
-  width: 13px; height: 20px; border-radius: 7px 7px 9px 9px;
-  background: #E8912C;
-  border: 1.5px solid #B36414;
-  box-shadow: 1px 2px 3px rgba(120, 70, 18, 0.25);
-}
-/* posées à cheval sur le rebord de la carte (à 140 px du bord gauche
-   de l'élément, soit right: 36 — elles le chevauchent de moitié) */
-.filou-edge .fe-paw.p1 { right: 28px; top: 108px; transform: rotate(6deg); }
-.filou-edge .fe-paw.p2 { right: 22px; top: 126px; transform: rotate(16deg); }
 .filou-edge:hover, .filou-edge:focus-visible {
   transform: translateY(-7px);
 }
@@ -1517,6 +1561,9 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   .counters-panel, .bubble, .gf-card, .av-list, .lock-confirm, .gm-absent-note,
   .status-badge.pulse, .archive-veil.show, .recap-hint-msg, .gm-done { animation: none !important; }
   .filou-edge, .burrow-panel, .modal-veil, .gv-modal, .status-badge { transition: none; }
+  /* Filou en couches : plus de respiration ni de clignement — les pièces
+     restent à leur place, on retrouve exactement l'image d'origine. */
+  .fx-corps, .fx-tete, .fx-or-g, .fx-or-d, .fx-oeil i { animation: none !important; }
   .workspace.filou-out .fox-out { animation: none; opacity: 1; transform: none; }
   .workspace.filou-in .fox-out { animation: none; opacity: 0; }
   .toast { transition: opacity .1s ease; }
@@ -1608,16 +1655,31 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
          (sa tablette y vit). -->
     <button type="button" class="filou-edge" id="filou-edge" aria-label="Demander l'assistance de Filou — ouvre l'accueil">
       <span class="fe-crop" aria-hidden="true">
-        <video id="fe-idle" muted loop playsinline preload="auto">
-          <source src="../filou/filou-accroche-idle.webm" type="video/webm">
-        </video>
+        <!-- ATTENTE : Filou en couches. Les pièces sont posées en
+             coordonnées NATIVES du métrage (1080x1920) dans .fx-scene,
+             que --ech ramène à 200 px de large. Voir filou/couches/. -->
+        <span class="fx" id="fe-fx">
+          <span class="fx-scene">
+            <img class="fx-corps" src="../filou/couches/corps.webp"
+                 style="left:183px;top:834px;width:627px;height:321px" alt="">
+            <span class="fx-tete">
+              <img class="fx-or-g" src="../filou/couches/oreille-g.webp"
+                   style="left:375px;top:149px;width:260px;height:358px" alt="">
+              <img class="fx-or-d" src="../filou/couches/oreille-d.webp"
+                   style="left:772px;top:344px;width:248px;height:327px" alt="">
+              <img src="../filou/couches/tete.webp"
+                   style="left:183px;top:149px;width:824px;height:794px" alt="">
+              <span class="fx-oeil g" style="left:466px;top:511px;width:138px;height:138px"><i></i></span>
+              <span class="fx-oeil d" style="left:661px;top:575px;width:128px;height:126px"><i></i></span>
+            </span>
+          </span>
+        </span>
+        <!-- COUCOU : le geste reste la vidéo (la patte n'existe pas
+             dans les couches), joué toutes les ~30-45 s et au survol. -->
         <video id="fe-coucou" muted playsinline preload="auto">
           <source src="../filou/filou-accroche-coucou.webm" type="video/webm">
         </video>
-        <img id="fe-img" src="../filou/filou avatar de base.png" alt="">
       </span>
-      <span class="fe-paw p1" aria-hidden="true"></span>
-      <span class="fe-paw p2" aria-hidden="true"></span>
     </button>
 
   <div class="workspace" id="workspace">
@@ -2405,12 +2467,13 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   var filouEdge = $("#filou-edge");
   var filouBusy = false;
 
-  /* DEUX vidéos tirées du même métrage : l'idle (ping-pong, boucle
-     parfaite) tourne en continu ; le coucou (un seul geste) se joue
-     toutes les ~30-45 s et au survol, en fondu croisé (~0,3 s) —
-     les deux vivent dans la même pose, la couture est invisible.
-     Repli image si le WebM ne se décode pas. */
-  var feIdle = $("#fe-idle");
+  /* L'ATTENTE est en couches (CSS pur, aucun fichier vidéo) : Filou y
+     respire, cligne et remue les oreilles sans fin. Le COUCOU reste le
+     métrage — la patte n'existe pas dans les couches — et se joue
+     toutes les ~30-45 s ET au survol, en fondu croisé (~0,3 s). Les
+     deux vivent dans la même pose, la couture est invisible. Si le
+     WebM ne se décode pas, Filou reste simplement en attente animée :
+     il n'y a plus de « repli dégradé » possible. */
   var feCoucou = $("#fe-coucou");
   var feVideoActif = false;
   var feWaveEnCours = false;
@@ -2431,17 +2494,18 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
     feJoue(feCoucou);
     filouEdge.classList.add("fe-wave");
   }
-  if (!REDUCED && feIdle && feCoucou) {
-    feIdle.addEventListener("canplay", function once() {
-      feIdle.removeEventListener("canplay", once);
+  function feFinCoucou() {
+    filouEdge.classList.remove("fe-wave");
+    feWaveEnCours = false;
+  }
+  if (!REDUCED && feCoucou) {
+    feCoucou.addEventListener("canplay", function once() {
+      feCoucou.removeEventListener("canplay", once);
       feVideoActif = true;
-      filouEdge.classList.add("has-video");
-      feJoue(feIdle);
       fePlanifieCoucou();
     });
     feCoucou.addEventListener("ended", function () {
-      filouEdge.classList.remove("fe-wave");
-      feWaveEnCours = false;
+      feFinCoucou();
       fePlanifieCoucou();
     });
     /* au survol : un coucou aussi (au plus un toutes les 8 s) */
@@ -2451,16 +2515,17 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
       feDernierSurvol = t;
       feCoucouJoue();
     });
+    /* ceinture : si "ended" ne part pas (onglet en arrière-plan, décodage
+       interrompu), on ne reste pas bloqué sur la dernière image du geste */
+    feCoucou.addEventListener("play", function () {
+      setTimeout(function () { if (feWaveEnCours) { feFinCoucou(); fePlanifieCoucou(); } }, 6000);
+    });
     function feEchec() {
       feVideoActif = false;
-      feWaveEnCours = false;
-      filouEdge.classList.remove("has-video", "fe-wave");
+      feFinCoucou();
+      clearTimeout(feWaveTimer);
     }
-    feIdle.addEventListener("error", feEchec, true);
     feCoucou.addEventListener("error", feEchec, true);
-    window.setTimeout(function () {
-      if (feIdle.readyState < 2) feEchec();
-    }, 3000);
   }
 
   /* La migration de côté : l'idle boucle sans fin, elle vit donc au
