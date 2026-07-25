@@ -840,7 +840,19 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
    ============================================================ */
 .plan-scene { position: relative; }
 .filou-edge {
-  position: absolute; top: 200px; left: -152px;
+  /* CALAGE — ne pas bidouiller au jugé, c'est mesuré.
+     Le détourage a TRANCHÉ les coussinets de Filou : le métrage a une
+     arête verticale franche à x=149 en natif, en plein milieu de sa
+     patte. On ne peut pas la réparer, mais on peut la rendre invisible
+     en la faisant tomber PILE sur le bord gauche de la carte : la
+     coupe coïncide alors avec un changement de fond, et l'œil lit
+     « la patte agrippe le rebord » au lieu de « la patte est coupée ».
+     Décalée ne serait-ce que de 9 px, la coupe se voit et les doigts
+     flottent (retours MiKL 2026-07-25).
+     149 natif × 200/1080 = 27,6 px CSS ; miroité : 196 − 27,6 = 168,4
+     → left = −168. Le reste de Filou est alors HORS de la carte, et
+     seul le socle occupe la marge blanche (21 px) sans la traverser. */
+  position: absolute; top: 200px; left: -168px;
   /* 152px de large : les ~42 derniers px chevauchent la carte, pour
      que ses pattes qui agrippent le rebord ne soient JAMAIS coupées
      (les doigts dépassent de l'arête vers l'intérieur de la carte) */
@@ -1053,7 +1065,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .plan-scene.filou-right .filou-edge {
   /* -160 comme à gauche : la pose doit être SYMÉTRIQUE, sinon le socle
      mord de 20 px de plus de ce côté (il grattait les compteurs) */
-  left: auto; right: -152px;
+  left: auto; right: -168px;
   transform: scaleX(-1);
   /* le miroir suffit : l'arête vidéo retombe pile sur le rebord droit */
 }
