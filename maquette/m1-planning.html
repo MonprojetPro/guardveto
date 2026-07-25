@@ -840,7 +840,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
    ============================================================ */
 .plan-scene { position: relative; }
 .filou-edge {
-  position: absolute; top: 200px; left: -160px;
+  position: absolute; top: 200px; left: -172px;
   /* 152px de large : les ~42 derniers px chevauchent la carte, pour
      que ses pattes qui agrippent le rebord ne soient JAMAIS coupées
      (les doigts dépassent de l'arête vers l'intérieur de la carte) */
@@ -919,7 +919,15 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
    appartienne visiblement à la même famille que la barre d'outils.
    ============================================================ */
 .filou-edge .fe-socle {
-  position: absolute; left: 12px; right: 0; bottom: 0;
+  /* ⚠ il ne doit JAMAIS mordre sur la carte du planning (il grattait
+     les compteurs, retour MiKL 2026-07-25). L'élément fait 196 px et
+     déborde de 36 px sur la carte — seul Filou a le droit d'y poser
+     ses pattes. Le socle s'arrête donc 40 px avant le bord droit,
+     et la pose miroir est symétrique (voir .filou-right plus bas). */
+  /* marges ÉGALES des deux bords : l'élément est retourné en miroir
+     quand Filou passe à droite, donc toute asymétrie ici se traduit
+     par un socle qui mord d'un côté et pas de l'autre. */
+  position: absolute; left: 24px; right: 24px; bottom: 0;
   min-height: 30px;
   display: flex; align-items: center; justify-content: center;
   padding: 4px 10px;
@@ -1021,7 +1029,9 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 }
 /* de l'autre côté : même pose, en miroir (les pattes suivent) */
 .plan-scene.filou-right .filou-edge {
-  left: auto; right: -140px;
+  /* -160 comme à gauche : la pose doit être SYMÉTRIQUE, sinon le socle
+     mord de 20 px de plus de ce côté (il grattait les compteurs) */
+  left: auto; right: -172px;
   transform: scaleX(-1);
   /* le miroir suffit : l'arête vidéo retombe pile sur le rebord droit */
 }
@@ -1716,7 +1726,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
            sert deux fois — il masque la coupe nette du métrage (qui
            n'a pas de fin : sans lui, il faut un fondu) et il dit à quoi
            sert Filou. Hors du .fe-crop pour échapper au miroir. -->
-      <span class="fe-socle"><span class="fe-socle-txt">Appeler Filou</span></span>
+      <span class="fe-socle"><span class="fe-socle-txt">Faire appel à Filou</span></span>
     </button>
 
   <div class="workspace" id="workspace">
@@ -2596,20 +2606,19 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
     }, 40000);
   }
 
-  /* Un clic sur Filou OU sur son socle = « Appeler Filou » : petit bond,
-     puis il rejoint le panneau. C'est l'action qu'annonce le libellé du
-     socle, qui remplace l'ancien bouton de la barre d'outils. */
+  /* Un clic sur Filou OU sur son socle : petit bond, puis l'accueil
+     s'ouvre (sa tablette y vit). On lui dit D'OÙ on l'appelle
+     (#filou=planning) pour qu'il accueille avec une phrase en lien
+     avec le planning, au lieu de son bonjour générique. */
   filouEdge.addEventListener("click", function () {
-    if (filouBusy || filouOut) return;
+    if (filouBusy) return;
     filouBusy = true;
+    var vers = "m6-accueil-epicentre.html#filou=planning";
+    if (REDUCED) { window.location.href = vers; return; }
+    planScene.classList.remove("filou-right");
     filouEdge.classList.add("fe-hop");
-    setTimeout(function () {
-      filouEdge.classList.remove("fe-hop");
-      filouBusy = false;
-      foxSort();
-      appendPanelBubble("filou", "Filou",
-        "Je suis là ! Pose-moi ta question en bas, ou dis-moi ce qui te chiffonne sur ce brouillon.");
-    }, REDUCED ? 0 : 560);
+    setTimeout(function () { $("#depart-veil").classList.add("show"); }, 320);
+    setTimeout(function () { window.location.href = vers; }, 760);
   });
   $("#panel-reduce").addEventListener("click", foxRentre);
 

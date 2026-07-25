@@ -2347,9 +2347,25 @@ img { display: block; }
   });
 
   /* ---------- le mot d'accueil : première bulle du fil ----------
-     (plus de bulle statique séparée — la conversation est UNE) */
+     (plus de bulle statique séparée — la conversation est UNE)
+     Filou se souvient D'OÙ on l'a appelé (#filou=<origine>) et ouvre
+     par une phrase en lien avec cet écran, au lieu de son bonjour
+     générique : on ne repart pas de zéro après avoir cliqué. */
+  var filouOrigine = (/[#&]filou=([\w-]+)/.exec(window.location.hash) || [])[1] || "";
+  var accroches = {
+    planning:
+      "Bonjour Anne-Sophie ! Tu m'appelles depuis le planning <b>Hiver 2026</b> — il est encore en brouillon. " +
+      "Je peux revérifier sa cohérence, déplacer une garde, ou préparer la période suivante. Qu'est-ce qui te chiffonne ?",
+    regles:
+      "Bonjour Anne-Sophie ! Tu viens des <b>règles du cabinet</b>. " +
+      "Je peux en ajouter une, en assouplir une, ou te montrer ce qu'elle changerait sur le planning en cours.",
+    absences:
+      "Bonjour Anne-Sophie ! Tu viens des <b>absences &amp; échanges</b>. " +
+      "Je peux saisir un congé, arbitrer un échange en attente, ou vérifier qui reste disponible."
+  };
   bubble("filou", "Filou",
-    "Bonjour Anne-Sophie ! Le brouillon <b>Hiver 2026</b> est cohérent, l'équipe est au complet. Que puis-je faire pour toi ?",
+    accroches[filouOrigine] ||
+      "Bonjour Anne-Sophie ! Le brouillon <b>Hiver 2026</b> est cohérent, l'équipe est au complet. Que puis-je faire pour toi ?",
     true);
 
   /* ---------- Filou arrive AVEC le contexte ----------
