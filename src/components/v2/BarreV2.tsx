@@ -57,7 +57,7 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
           </span>
         </Link>
 
-        <Link className="dock-item" href="/conges" aria-label={libelleAbsences}>
+        <Link className="dock-item" href="/absences" aria-label={libelleAbsences}>
           <span className="di-ico" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <path d="M7.3 9.2a5.6 5.6 0 0 1 9.6-2.5" />
