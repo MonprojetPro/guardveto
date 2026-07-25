@@ -558,6 +558,27 @@ img { display: block; }
 .head-btn.ghost { border-color: var(--border); background: transparent; }
 
 .work-body { padding: 18px 20px 130px; }
+/* La consigne d'usage, posée entre la barre d'outils et la grille.
+   Elle remplace le petit texte gris qui se perdait dans la barre :
+   ici elle est sur le trajet du regard, juste avant les cases. */
+.grid-hint {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: 0 0 14px;
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  font-size: 0.79rem; color: var(--muted); line-height: 1.4;
+}
+.grid-hint b { color: var(--text); font-weight: 700; }
+.grid-hint .gh-ico { font-size: 0.95rem; line-height: 1; }
+.grid-hint .gh-sep { color: var(--border-strong); }
+.grid-hint .gh-lock { color: var(--soft); }
+@media (max-width: 720px) {
+  .grid-hint .gh-sep { display: none; }
+  .grid-hint .gh-lock { flex-basis: 100%; }
+}
 .work-grid { display: grid; grid-template-columns: minmax(0, 1fr) 262px; gap: 20px; align-items: start; }
 .workspace.counters-closed .work-grid { grid-template-columns: 1fr; }
 .workspace.counters-closed .counters-panel { display: none; }
@@ -1800,7 +1821,9 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
         <h2 id="month-label">Janvier 2026</h2>
         <button type="button" class="mn-btn" id="next-month" aria-label="Mois suivant">→</button>
       </div>
-      <span class="meta">Clique une garde pour la réattribuer · le passé est verrouillé 🔒</span>
+      <!-- (la consigne « clique sur une case » a quitté cette barre :
+           elle vit maintenant juste au-dessus de la grille, là où le
+           regard se pose avant de cliquer — décision MiKL 2026-07-25) -->
       <div class="head-actions">
         <!-- Plus de bouton « Appeler Filou » ici : c'est le SOCLE sous
              Filou qui porte l'appel (décision MiKL 2026-07-25). Le socle
@@ -1814,6 +1837,19 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
     </div>
 
     <div class="work-body">
+
+      <!-- La consigne d'usage, juste avant la grille : c'est ici que le
+           regard passe avant de cliquer. Elle dit explicitement qu'une
+           case EST cliquable et ce qui se passe alors — sans ça, rien
+           n'indique que la grille est autre chose qu'un tableau. -->
+      <p class="grid-hint">
+        <span class="gh-ico" aria-hidden="true">👆</span>
+        <span><b>Clique sur une case pour agir dessus</b> — réattribuer une garde,
+        signaler une absence.</span>
+        <span class="gh-sep" aria-hidden="true">·</span>
+        <span class="gh-lock">Le passé est verrouillé 🔒</span>
+      </p>
+
       <div class="work-grid">
         <div class="work-main">
           <div class="cal-scroll">
