@@ -26,6 +26,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { EQUITY_DIMENSIONS, IMPORTANCE_LEVELS } from '@/engine/equity-weights'
 import { construireValiditeJson } from '@/lib/periodes'
 import { chargerCreneauModele } from '@/data/chargerCreneauModele'
+import { chargerContexteIA } from '@/lib/ia/contexteCabinet'
 import { proposerRegleIA, assistantIaDisponible, type TypeCreneauIA } from '@/lib/ia/proposerRegle'
 import {
   propositionVersPayload,
@@ -1407,48 +1408,11 @@ export async function proposerRegleDepuisTexte(phrase: string): Promise<Proposit
     return { error: 'Décris ta règle en quelques mots.' }
   }
 
-  const { data: vetsDb } = await supabase
-    .from('veterinaires')
-    .select('id, prenom, tags')
-    .eq('actif', true)
-    .order('prenom')
-  const vetsRows = ((vetsDb as Array<VetoResolu & { tags?: string[] | null }> | null) ?? [])
-  const vets: VetoResolu[] = vetsRows.map(({ id, prenom }) => ({ id, prenom }))
-  // Étiquettes d'équipe réellement portées (composition_equipe, n°6).
-  const tagsEquipe = [
-    ...new Set(
-      vetsRows
-        .flatMap((v) => v.tags ?? [])
-        .map((t) => t.trim().toLowerCase())
-        .filter((t) => t !== ''),
-    ),
-  ].sort()
-
-  // Types de créneaux DU cabinet (dynamiques — verrou 8) : l'IA peut proposer
-  // un filtre `creneaux` pour au_plus_n (« max 2 week-ends par mois », n°19).
-  // Best-effort : sans cabinet/catalogue → types historiques.
-  let typesCreneaux: TypeCreneauIA[] = []
-  let rolesCabinet: string[] = []
-  try {
-    const cabinetId = await resoudreCabinetId(supabase)
-    const modeles = await chargerCreneauModele(supabase, cabinetId)
-    typesCreneaux = modeles
-      .filter((m) => m.actif && m.code !== null && m.code !== 'ferie')
-      .map((m) => ({ code: m.code as string, nom: m.nom }))
-    rolesCabinet = [
-      ...new Set(modeles.filter((m) => m.actif).flatMap((m) => m.roles ?? [])),
-    ].filter((r) => typeof r === 'string' && r.trim() !== '')
-  } catch {
-    // silencieux : repli ci-dessous
-  }
-  if (typesCreneaux.length === 0) {
-    typesCreneaux = [
-      { code: 'semaine_soir', nom: 'Soirs de semaine' },
-      { code: 'vendredi_soir', nom: 'Vendredi soir' },
-      { code: 'weekend', nom: 'Week-end' },
-    ]
-  }
-  if (rolesCabinet.length === 0) rolesCabinet = ['premier', 'second']
+  // Les référentiels dynamiques du cabinet (vétos, étiquettes, créneaux, rôles)
+  // sont chargés par une source PARTAGÉE : le banc d'essai des modèles doit
+  // mesurer avec exactement le même contexte, sinon ses chiffres ne disent rien
+  // de la facture réelle.
+  const { vets, tagsEquipe, typesCreneaux, rolesCabinet } = await chargerContexteIA(supabase)
 
   let proposition: PropositionRegle
   try {

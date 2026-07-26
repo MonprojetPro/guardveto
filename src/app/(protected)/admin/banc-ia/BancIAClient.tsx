@@ -1,0 +1,189 @@
+'use client'
+
+// ============================================================
+// GUARDVETO — Écran du banc d'essai des modèles
+// ============================================================
+// Un bouton, et trois tableaux : le poids du prompt, le verdict par palier, le
+// détail phrase par phrase. Volontairement sobre — c'est un instrument de
+// mesure jetable, pas un écran produit.
+//
+// Le coût est annoncé AVANT le clic, et ce que l'exécution a réellement coûté
+// est affiché APRÈS. Un bouton qui dépense de l'argent sans le dire, c'est le
+// genre de chose qu'on découvre sur une facture.
+// ============================================================
+
+import { useState, useTransition } from 'react'
+import { lancerBanc } from './actions'
+import type { ResultatBanc } from '@/lib/ia/bancEssai'
+
+const centimes = (dollars: number) => `${(dollars * 100).toFixed(2)} ¢`
+const euros = (dollars: number) => `≈ ${(dollars * 0.92).toFixed(2)} €`
+
+export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
+  const [resultat, setResultat] = useState<ResultatBanc | null>(null)
+  const [erreur, setErreur] = useState<string | null>(null)
+  const [enCours, demarrer] = useTransition()
+
+  const lancer = () => {
+    setErreur(null)
+    demarrer(async () => {
+      const r = await lancerBanc()
+      if ('error' in r) setErreur(r.error)
+      else setResultat(r.resultat)
+    })
+  }
+
+  return (
+    <div className="max-w-4xl space-y-6 p-6">
+      <header className="space-y-2">
+        <h1 className="text-2xl font-bold">Banc d’essai des modèles IA</h1>
+        <p className="text-sm text-muted-foreground">
+          Compare ce que coûte et ce que vaut chaque palier de modèle sur les mêmes phrases.
+          Le moteur de Filou tourne aujourd’hui sur <code className="rounded bg-muted px-1">{modeleActuel}</code>.
+        </p>
+      </header>
+
+      <section className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 text-sm">
+        <p className="font-semibold">⚠️ Ce bouton dépense de l’argent réel</p>
+        <p className="mt-1 text-muted-foreground">
+          12 appels facturés (3 paliers × 4 phrases), soit <b>environ 30 à 40 centimes</b> par
+          exécution. Les 3 comptages de tokens, eux, sont gratuits. Ne relance que si tu as changé
+          quelque chose.
+        </p>
+      </section>
+
+      <button
+        type="button"
+        onClick={lancer}
+        disabled={enCours}
+        className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+      >
+        {enCours ? 'Mesure en cours… (1 à 3 minutes)' : 'Lancer la mesure'}
+      </button>
+
+      {enCours && (
+        <p className="text-sm text-muted-foreground" role="status">
+          Les appels partent un par un, pas en rafale : une rafale risquerait une limite de débit,
+          qui faussrait les temps mesurés. Laisse la page ouverte.
+        </p>
+      )}
+
+      {erreur && (
+        <p className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm" role="alert">
+          {erreur}
+        </p>
+      )}
+
+      {resultat && (
+        <div className="space-y-8">
+          {/* ── Le verdict ── */}
+          <section className="space-y-2">
+            <h2 className="font-semibold">Verdict par palier</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="py-2 pr-4">Modèle</th>
+                    <th className="py-2 pr-4">Traductions justes</th>
+                    <th className="py-2 pr-4">Coût par demande</th>
+                    <th className="py-2 pr-4">Temps moyen</th>
+                    <th className="py-2">1 000 demandes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {resultat.resume.map((r) => (
+                    <tr key={r.modele} className="border-b last:border-0">
+                      <td className="py-2 pr-4 font-medium">
+                        {r.nomModele}
+                        {r.actuel && (
+                          <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[11px] font-normal">
+                            actuel
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-4">
+                        <b className={r.justes === r.total ? 'text-green-700' : 'text-amber-700'}>
+                          {r.justes}/{r.total}
+                        </b>
+                      </td>
+                      <td className="py-2 pr-4">{centimes(r.dollarsMoyen)}</td>
+                      <td className="py-2 pr-4">{(r.msMoyen / 1000).toFixed(1)} s</td>
+                      <td className="py-2">{euros(r.dollarsMoyen * 1000)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Cette mesure vient de coûter <b>{centimes(resultat.dollarsDepenses)}</b>.
+            </p>
+          </section>
+
+          {/* ── Le poids du prompt ── */}
+          <section className="space-y-2">
+            <h2 className="font-semibold">Poids du prompt (le coût plancher)</h2>
+            <p className="text-sm text-muted-foreground">
+              Ce que coûte chaque demande <i>avant même</i> la réponse de Filou. Le prompt fait{' '}
+              {resultat.caracteresPrompt.toLocaleString('fr-FR')} caractères — c’est le catalogue
+              des types de règles, plus les vétos, étiquettes et créneaux du cabinet.
+            </p>
+            <table className="w-full text-sm">
+              <tbody>
+                {resultat.poids.map((p) => (
+                  <tr key={p.modele} className="border-b last:border-0">
+                    <td className="py-2 pr-4 font-medium">{p.nomModele}</td>
+                    <td className="py-2 pr-4">{p.tokens.toLocaleString('fr-FR')} tokens</td>
+                    <td className="py-2">{centimes(p.dollarsEntree)} par demande</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+
+          {/* ── Le détail ── */}
+          <section className="space-y-2">
+            <h2 className="font-semibold">Détail phrase par phrase</h2>
+            <p className="text-sm text-muted-foreground">
+              La dernière phrase est <b>hors sujet volontairement</b> : le bon comportement est de
+              refuser. Un modèle qui invente une règle est disqualifié, même s’il est moins cher.
+            </p>
+            {resultat.resume.map((r) => (
+              <div key={r.modele} className="space-y-1">
+                <h3 className="mt-3 text-sm font-semibold">{r.nomModele}</h3>
+                {resultat.lignes
+                  .filter((l) => l.modele === r.modele)
+                  .map((l, i) => (
+                    <div key={i} className="rounded-md border p-2.5 text-sm">
+                      <div className="flex flex-wrap items-baseline gap-2">
+                        <span aria-hidden="true">{l.juste ? '✅' : '❌'}</span>
+                        <b>{l.quoi}</b>
+                        <span className="text-xs text-muted-foreground">
+                          {l.brique ?? 'refusé'} · {centimes(l.dollars)} ·{' '}
+                          {l.tokensEntree.toLocaleString('fr-FR')} entrée /{' '}
+                          {l.tokensSortie.toLocaleString('fr-FR')} sortie
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs italic text-muted-foreground">
+                        « {l.phrase} »
+                      </p>
+                      <p className="mt-1 text-xs">{l.message}</p>
+                    </div>
+                  ))}
+              </div>
+            ))}
+          </section>
+
+          <section className="rounded-lg border bg-muted/30 p-4 text-sm">
+            <p className="font-semibold">Pour changer de modèle</p>
+            <p className="mt-1 text-muted-foreground">
+              Poser la variable d’environnement{' '}
+              <code className="rounded bg-background px-1">GUARDVETO_IA_MODELE</code> sur Vercel
+              (par exemple <code className="rounded bg-background px-1">claude-haiku-4-5</code>),
+              puis redéployer. Aucun changement de code n’est nécessaire.
+            </p>
+          </section>
+        </div>
+      )}
+    </div>
+  )
+}
