@@ -960,18 +960,23 @@
   letter-spacing: 0.04em;
 }
 
-/* carte du soir */
+/* carte du soir — la date, seule et pleine largeur. L'horaire du créneau est
+   dans le sous-titre de la fenêtre ; le mettre aussi ici (et une troisième
+   fois sur chaque carte de garde) le faisait bégayer et cassait la mise en
+   page dès que la colonne se resserrait. */
 .soir-date {
-  display: flex; align-items: baseline; gap: 10px;
   margin-bottom: 13px;
-}
-.soir-date .sd-day {
   font-family: var(--font-display);
-  font-size: 1.5rem; font-weight: 800; letter-spacing: -0.01em;
+  /* Suit la largeur disponible : « Dimanche 26 juillet » tient sur une ligne
+     en colonne large, et se réduit au lieu de se casser en deux quand la
+     fenêtre se resserre. */
+  font-size: clamp(1.18rem, 4.2vw, 1.5rem);
+  font-weight: 800; letter-spacing: -0.01em;
+  line-height: 1.15;
+  text-wrap: balance;
 }
-.soir-date .sd-slot { font-size: 0.78rem; color: var(--muted); }
 .garde-card {
-  display: flex; align-items: center; gap: 13px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px 13px;
   padding: 12px 14px;
   border-radius: var(--r-md);
   border: 1px solid var(--border);
@@ -984,14 +989,22 @@
   color: #fff; font-family: var(--font-display);
   font-size: 0.9rem; font-weight: 700; flex: none;
 }
+/* `min-width: 0` : sans lui, le nom refuse de céder et c'est la mission qui
+   gagne la largeur — le prénom finissait haché sur quatre lignes. */
+.garde-card .g-qui { flex: 1 1 auto; min-width: 0; }
 .garde-card .g-name { font-size: 0.94rem; font-weight: 700; }
-.garde-card .g-role { font-size: 0.72rem; color: var(--muted); margin-top: 1px; }
-.garde-card .g-hours {
-  margin-left: auto; text-align: right; flex: none;
+.garde-card .g-role {
   font-family: var(--font-display);
-  font-size: 0.86rem; font-weight: 700;
+  font-size: 0.74rem; font-weight: 700; color: var(--accent-ink);
+  margin-top: 1px;
 }
-.garde-card .g-hours small { display: block; font-family: var(--font-body); font-weight: 500; font-size: 0.66rem; color: var(--soft); }
+/* La mission se met à droite quand il y a la place, et passe à la ligne
+   entière quand il n'y en a plus. Jamais compressée. */
+.garde-card .g-mission {
+  margin-left: auto; text-align: right;
+  flex: 0 1 auto; min-width: 0;
+  font-size: 0.74rem; color: var(--muted);
+}
 .demain {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 13px;

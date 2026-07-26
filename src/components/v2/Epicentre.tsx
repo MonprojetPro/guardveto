@@ -298,24 +298,21 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
                 <div className="fen-body">
                   {data.ceSoir ? (
                     <>
-                      <div className="soir-date">
-                        <span className="sd-day">{majuscule(dateLongue(data.ceSoir.date))}</span>
-                        <span className="sd-slot">{horaire(data.ceSoir.type)}</span>
-                      </div>
+                      <p className="soir-date">{majuscule(dateLongue(data.ceSoir.date))}</p>
                       {data.ceSoir.premier && (
                         <CarteGarde
                           prenom={data.ceSoir.premier.prenom}
                           couleur={data.ceSoir.premier.couleur}
-                          role="1ʳᵉ de garde · prend les appels"
-                          type={data.ceSoir.type}
+                          rang="1ʳᵉ de garde"
+                          mission="prend les appels"
                         />
                       )}
                       {data.ceSoir.second && (
                         <CarteGarde
                           prenom={data.ceSoir.second.prenom}
                           couleur={data.ceSoir.second.couleur}
-                          role="2ᵈ de garde · en renfort"
-                          type={data.ceSoir.type}
+                          rang="2ᵈ de garde"
+                          mission="en renfort"
                         />
                       )}
                       {data.demain && (
@@ -577,27 +574,31 @@ function aujourdhui() {
   return new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris' }).format(new Date())
 }
 
+/** Une personne de garde : qui, à quel rang, et ce qu'elle fait.
+ *  Pas d'horaire ici — les deux vétos d'un même créneau ont le même, et il est
+ *  déjà écrit dans l'en-tête de la fenêtre. Le répéter par personne écrasait le
+ *  nom sur quatre lignes en colonne étroite. */
 function CarteGarde({
   prenom,
   couleur,
-  role,
-  type,
+  rang,
+  mission,
 }: {
   prenom: string
   couleur: string
-  role: string
-  type: string
+  rang: string
+  mission: string
 }) {
   return (
     <div className="garde-card">
       <span className="big-dot" style={{ background: couleur }} aria-hidden="true">
         {initiale(prenom)}
       </span>
-      <div>
+      <div className="g-qui">
         <p className="g-name">{prenom}</p>
-        <p className="g-role">{role}</p>
+        <p className="g-role">{rang}</p>
       </div>
-      <p className="g-hours">{horaire(type)}</p>
+      <p className="g-mission">{mission}</p>
     </div>
   )
 }
