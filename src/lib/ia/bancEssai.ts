@@ -134,7 +134,7 @@ export function phrasesCompletes(ctx: ContexteIA): PhraseEpreuve[] {
     { texte: `${a} préfère être de garde le mardi`, attendu: 'preferer_creneau', quoi: '10 · Préférence de créneau' },
     { texte: `${c} préfère être de garde avec ${b}`, attendu: 'preferer_avec', quoi: '11 · Préférence de binôme (souple)' },
     { texte: `${b} souhaite faire plus de gardes que les autres`, attendu: 'volume_gardes', quoi: '12 · Volume de gardes' },
-    { texte: 'Pas de garde de semaine juste après un week-end', attendu: 'succession_interdite', quoi: '13 · Succession interdite' },
+    { texte: `${a} ne fait pas de garde de semaine juste après un week-end`, attendu: 'succession_interdite', quoi: '13 · Succession interdite' },
     { texte: `Jamais plus de 3 jours de garde d’affilée pour ${a}`, attendu: 'serie_max', quoi: '14 · Série maximale' },
     { texte: `Après 2 jours de garde d’affilée, ${c} doit avoir 2 jours sans garde`, attendu: 'repos_apres_serie', quoi: '15 · Repos après série' },
     { texte: `${b} est pompier volontaire : il est pris un week-end sur trois à partir du samedi 5 septembre 2026`, attendu: 'cadencement_weekend', quoi: '16 · Cadencement ancré (piège : pas le type 7)' },

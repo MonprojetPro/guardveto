@@ -59,88 +59,74 @@ export interface TypeCreneauIA {
 }
 
 /** Décrit les briques disponibles pour guider l'IA (jours = lundi→vendredi). */
-const CATALOGUE_PROMPT = `Tu peux proposer UNIQUEMENT l'un de ces 19 types de règle :
+const CATALOGUE_PROMPT = `CONVENTIONS (valables pour TOUS les types ci-dessous) :
+- "creneaux" = liste de CODES de créneaux du cabinet (ceux listés plus haut, jamais d'autres) ; omets-le pour viser tous les créneaux.
+- Types 8, 9 et 18 : règles GLOBALES d'équipe → laisse veterinaire vide.
+- Types 10 à 12 : DESIDERATA, préférences POSITIVES d'un véto (« préfère », « aimerait », « veut plus »). Ils ne bloquent JAMAIS la génération → force TOUJOURS souple (si_possible ou evitee), JAMAIS "jamais".
+- Étiquette ("tag") demandée mais absente de la liste fournie → faisable=false, et invite à la poser d'abord sur les fiches (page Équipe).
+- "déf." = force par défaut conseillée si l'utilisateur ne précise rien.
+- Jours utilisables : lundi à vendredi (sauf mention contraire).
 
-1. interdire_creneau — un vétérinaire ne fait pas de garde un jour fixe de la semaine.
-   params: jour (lundi|mardi|mercredi|jeudi|vendredi), exception_vacances_scolaires (true/false).
+LES 19 TYPES — tu ne peux en proposer qu'UN SEUL :
+
+1. interdire_creneau — pas de garde un jour fixe de la semaine.
+   jour, exception_vacances_scolaires (true/false).
 2. repos_conditionnel — jour de repos différent selon la garde du week-end.
-   params: si_garde_we (jour si de garde le WE), sinon (jour de repos par défaut).
+   si_garde_we (jour si de garde le WE), sinon (jour de repos sinon).
 3. alternance_ancre — indisponible certains créneaux une semaine sur deux.
-   params: semaines (paires|impaires|toutes), periodes (sous-ensemble de [soir_semaine, weekend]).
-4. duo_interdit — deux vétérinaires ne sont jamais de garde seuls ensemble.
-   params: veterinaire = le premier, partenaire = le second (deux prénoms différents).
-5. au_plus_n — au plus N gardes sur une fenêtre.
-   params: n (entier ≥ 1), fenetre (semaine_civile|glissante_7_jours|glissante_14_jours|glissante_30_jours),
-   creneaux (optionnel : liste de CODES de créneaux du cabinet — voir la liste fournie — pour ne compter QUE ces types de garde ; null = toutes les gardes).
-   Ex. « Manon fait au plus 2 week-ends par mois » → au_plus_n, n=2, fenetre=glissante_30_jours, creneaux=["weekend"].
-6. espacement_min — au moins X jours entre deux gardes du même vétérinaire.
-   params: ecart_min_jours (entier ≥ 1).
-   ⚠️ C'est AUSSI le type à utiliser pour un REPOS entre gardes : « au moins N jours de repos entre mes gardes » = espacement_min avec ecart_min_jours = N+1 (2 jours de repos = 3 jours d'écart minimum).
-7. espacement_weekend — au plus 1 garde de WEEK-END toutes les N semaines (« un week-end sur N », limite la fréquence des week-ends d'un véto).
-   params: n_semaines (entier ≥ 2 ; « un week-end sur 3 » → n_semaines = 3).
-   ⚠️ N'utilise ce type QUE si la demande est une FRÉQUENCE de week-ends (« un WE sur N »). Un PLAFOND de week-ends (« au plus 2 WE par mois ») → au_plus_n avec creneaux=["weekend"]. Force par défaut conseillée : si_possible (préférence).
-8. composition_equipe — règle GLOBALE d'équipe basée sur une ÉTIQUETTE (pas un vétérinaire nominal → laisse veterinaire=null).
-   params: mode_composition ('au_moins_un' = chaque créneau ciblé doit compter au moins un véto portant l'étiquette ; 'pas_seuls' = les porteurs de l'étiquette ne sont jamais seuls sur un créneau), tag (une étiquette de la liste fournie), creneaux (optionnel : codes de créneaux ciblés ; null = tous).
-   Ex. « un junior n'est jamais seul de garde » → mode_composition=pas_seuls, tag="junior".
-   Ex. « toujours un senior le week-end » → mode_composition=au_moins_un, tag="senior", creneaux=["weekend"].
-   Force par défaut conseillée : jamais (exigence de sécurité).
-   ⚠️ Si la demande vise une étiquette QUE PERSONNE ne porte (hors liste fournie), faisable=false : demande d'abord de poser l'étiquette sur les fiches (page Équipe).
-9. role_interdit_tag — règle GLOBALE : les vétérinaires portant une ÉTIQUETTE ne tiennent jamais un RÔLE donné (laisse veterinaire=null).
-   params: tag (une étiquette de la liste fournie), role_interdit (un rôle de la liste des rôles fournie, ex. 'premier' pour « 1er de garde »), creneaux (optionnel : codes ciblés ; null = tous).
-   Ex. « un junior n'est jamais 1er de garde » → role_interdit_tag, tag="junior", role_interdit="premier".
-   Force par défaut conseillée : jamais. Même règle que le type 8 pour les étiquettes inconnues.
+   semaines (paires|impaires|toutes), periodes (parmi soir_semaine, weekend).
+4. duo_interdit — deux vétos jamais de garde SEULS ensemble.
+   veterinaire = le premier, partenaire = le second (deux prénoms différents).
+5. au_plus_n — PLAFOND : au plus N gardes sur une fenêtre.
+   n (≥1), fenetre (semaine_civile|glissante_7_jours|glissante_14_jours|glissante_30_jours), creneaux.
+   Ex. « au plus 2 week-ends par mois » → n=2, fenetre=glissante_30_jours, creneaux=["weekend"].
+6. espacement_min — au moins X jours entre deux gardes du même véto.
+   ecart_min_jours (≥1).
+7. espacement_weekend — FRÉQUENCE : au plus 1 week-end toutes les N semaines.
+   n_semaines (≥2 ; « un WE sur 3 » → 3). déf. si_possible.
+8. composition_equipe — chaque créneau ciblé doit respecter une règle d'ÉTIQUETTE.
+   mode_composition (au_moins_un = au moins un porteur de l'étiquette sur le créneau | pas_seuls = les porteurs ne sont jamais seuls), tag, creneaux. déf. jamais.
+   Ex. « un junior jamais seul » → pas_seuls, tag="junior". « toujours un senior le week-end » → au_moins_un, tag="senior", creneaux=["weekend"].
+9. role_interdit_tag — les porteurs d'une étiquette ne tiennent jamais un RÔLE.
+   tag, role_interdit (un rôle de la liste fournie, ex. "premier" = 1er de garde), creneaux. déf. jamais.
+10. preferer_creneau — un véto PRÉFÈRE certains jours et/ou créneaux.
+   jours (lundi..dimanche) et/ou creneaux — au moins l'un des deux.
+11. preferer_avec — un véto PRÉFÈRE (souhait souple) être avec un co-équipier.
+   veterinaire = qui préfère, partenaire = le co-équipier (prénoms différents).
+12. volume_gardes — un véto veut PLUS ou MOINS de gardes que la moyenne.
+   sens (plus|moins).
+13. succession_interdite — jamais tel type de garde le LENDEMAIN de tel autre.
+   type_avant, type_apres (deux codes de créneaux).
+   Ex. « pas de garde de semaine juste après un week-end » → type_avant="weekend", type_apres="semaine_soir".
+14. serie_max — jamais plus de N JOURS de garde d'affilée.
+   n_jours (≥1), creneaux.
+15. repos_apres_serie — après N jours d'affilée, imposer M jours SANS garde.
+   n_jours (longueur de série, ≥1), repos_jours (≥1).
+16. cadencement_weekend — week-ends calés sur un cycle « 1 sur N » ANCRÉ à une date fixe. Cas type : un pompier volontaire pris 1 week-end sur 3 à dates fixes, donc indisponible ces week-ends-là.
+   n_semaines (≥2), ancre (date ISO yyyy-MM-dd d'un week-end de référence qui fixe la phase, souvent un samedi), sens_cadence :
+     interdit = les week-ends du cycle sont interdits de garde, les autres restent libres ;
+     impose = les gardes week-end DOIVENT tomber sur ce cycle (c'est un filtre de position, ça n'oblige pas à être de garde à chaque fois).
+   Ex. « pompier volontaire, pris un week-end sur 3 à partir du samedi 5 septembre 2026 » → n_semaines=3, ancre="2026-09-05", sens_cadence="interdit", force="jamais".
+17. exclusion_dates — jamais de garde aux DEUX dates à la fois (l'une OUI, les deux NON — on n'oblige personne à en faire une). Renseigne UNE SEULE des deux formes :
+   fetes = ["noel","nouvel_an"] → dès que la demande parle de Noël, Nouvel An, réveillons ou fêtes de fin d'année (se reconduit chaque année) ;
+   dates = deux dates ISO yyyy-MM-dd → tout autre cas de deux dates à ne pas cumuler.
+   déf. sauf_crise.
+   Ex. « pas le 24 ET le 31 décembre » → fetes=["noel","nouvel_an"]. « pas le 14 juillet ET le 15 août 2026 » → dates=["2026-07-14","2026-08-15"].
+18. equilibrer — ÉQUITÉ répartie entre les porteurs d'une étiquette seulement.
+   dimension_equite (weekend | weekend_premier = rôle de 1er le WE | ferie | semaine_premier | semaine_second | grands_weekend), tag, importance_equite (peu_important|normal|important|essentiel). Ce type n'a PAS de force.
+   Ex. « répartis équitablement les week-ends entre les juniors » → dimension_equite="weekend", tag="junior", importance_equite="important".
+19. seulement_avec — A n'est de garde QUE si B l'est SUR LE MÊME CRÉNEAU (même date + même type). Sens UNIQUE : A dépend de B, jamais l'inverse.
+   veterinaire = A (celui qui a la condition), partenaire = B (le binôme requis), creneaux. déf. jamais.
+   Ex. « Antoine n'est de garde que si Victor est de garde avec lui » → veterinaire="Antoine", partenaire="Victor".
 
-Les types 10 à 12 sont des DESIDERATA : des préférences POSITIVES d'un vétérinaire (« préfère », « aimerait », « veut plus »). Elles ne bloquent JAMAIS la génération → force TOUJOURS souple (si_possible ou evitee, JAMAIS "jamais").
-10. preferer_creneau — un vétérinaire PRÉFÈRE certains jours et/ou certains créneaux (le moteur y concentre ses gardes).
-   params: jours (liste parmi lundi..dimanche, optionnel), creneaux (codes du cabinet, optionnel) — au moins l'un des deux.
-   Ex. « Manon préfère être de garde le mardi » → preferer_creneau, jours=["mardi"].
-   Ex. « Victor préfère les week-ends » → preferer_creneau, creneaux=["weekend"].
-11. preferer_avec — un vétérinaire PRÉFÈRE (souhait SOUPLE) être de garde avec un co-équipier donné (dans UN sens).
-   params: veterinaire = qui préfère, partenaire = le co-équipier préféré (deux prénoms différents).
-   ⚠️ NE PAS confondre avec le type 19 (seulement_avec) : ici c'est une simple PRÉFÉRENCE (« je préfère être avec Victor »). Si la demande est CONDITIONNELLE et ferme (« je ne veux être de garde QUE si Victor est de garde », « seulement si », « jamais sans ») → type 19.
-12. volume_gardes — un vétérinaire souhaite faire PLUS ou MOINS de gardes que la moyenne.
-   params: sens ('plus' | 'moins').
-   Ex. « Antoine veut faire plus de gardes » → volume_gardes, sens="plus".
-
-Les types 13 à 15 sont des règles de RYTHME (successions et repos entre gardes) d'un vétérinaire.
-13. succession_interdite — un vétérinaire ne fait jamais un type de garde le LENDEMAIN d'un autre type.
-   params: type_avant (code du créneau la veille), type_apres (code du créneau interdit le lendemain) — deux CODES de créneaux du cabinet (voir la liste fournie).
-   ⚠️ « lendemain » au sens JOUR CIVIL : le week-end couvre samedi+dimanche, donc son lendemain est le lundi.
-   Ex. « pas de garde de semaine juste après un week-end » → succession_interdite, type_avant="weekend", type_apres="semaine_soir".
-14. serie_max — jamais plus de N JOURS de garde d'affilée (jours consécutifs).
-   params: n_jours (entier ≥ 1), creneaux (optionnel : ne compter que ces CODES de créneaux ; null = tous).
-   Ex. « jamais plus de 3 jours de garde d'affilée » → serie_max, n_jours=3.
-15. repos_apres_serie — après N jours de garde d'affilée, imposer M jours SANS garde.
-   params: n_jours (longueur de série, entier ≥ 1), repos_jours (jours de repos imposés, entier ≥ 1).
-   Ex. « après 2 jours de garde d'affilée, au moins 2 jours de repos » → repos_apres_serie, n_jours=2, repos_jours=2.
-16. cadencement_weekend — CADENCEMENT FIXE des week-ends d'un vétérinaire, calé sur un cycle « 1 week-end sur N » ancré à une date de référence. Cas type : un pompier volontaire de garde 1 week-end sur 3 à dates FIXES, qui ne peut donc JAMAIS prendre de garde véto ces week-ends-là ; ou au contraire un véto qui VEUT ses gardes week-end calées sur un cycle régulier.
-   params: n_semaines (entier ≥ 2 ; « un week-end sur 3 » → 3), ancre (date ISO yyyy-MM-dd d'un week-end de RÉFÉRENCE qui fixe la phase du cycle — souvent un samedi), sens_cadence :
-     - 'interdit' : les week-ends du cycle sont INTERDITS de garde (le véto est déjà pris ailleurs) ; les autres week-ends restent libres.
-     - 'impose' : les gardes week-end du véto DOIVENT tomber sur ce cycle (hors cycle = interdit). ⚠️ Cela n'OBLIGE PAS le moteur à le mettre de garde à CHAQUE week-end du cycle : c'est seulement un filtre de POSITION.
-   ⚠️ NE PAS confondre avec espacement_weekend (type 7) qui limite juste la FRÉQUENCE (« au plus 1 WE sur N ») sans dates fixes. Ici les week-ends sont ANCRÉS à des DATES PRÉCISES. Cycle calendaire strict (indépendant des vacances).
-   Ex. « Victor est pompier volontaire, il est pris un week-end sur 3 à partir du samedi 5 septembre 2026 » → cadencement_weekend, veterinaire="Victor", n_semaines=3, ancre="2026-09-05", sens_cadence="interdit", force="jamais".
-
-17. exclusion_dates — un vétérinaire ne fait JAMAIS de garde aux DEUX dates/fêtes à la fois (il peut en faire UNE, jamais les deux — on n'oblige personne à en faire une). Règle par véto.
-   Sémantique : « pas les deux ». Deux formes possibles (renseigne UNE SEULE) :
-     - fetes : la paire ["noel", "nouvel_an"] — cas métier dominant « pas Noël ET Nouvel An la même année » (se reconduit seule chaque année). Utilise CETTE forme dès que la demande parle de Noël / Nouvel An / réveillons / fêtes de fin d'année.
-     - dates : une paire de deux dates ISO yyyy-MM-dd — pour tout autre cas de deux dates précises à ne pas cumuler.
-   Ex. « Manon ne veut pas faire le 24 ET le 31 décembre » → exclusion_dates, veterinaire="Manon", fetes=["noel","nouvel_an"].
-   Ex. « pas Noël et Nouvel An pour Victor » → exclusion_dates, veterinaire="Victor", fetes=["noel","nouvel_an"].
-   Ex. « Antoine ne peut pas être de garde le 14 juillet ET le 15 août 2026 » → exclusion_dates, dates=["2026-07-14","2026-08-15"].
-   Force par défaut conseillée : sauf_crise.
-
-18. equilibrer — règle GLOBALE d'ÉQUITÉ ciblée sur une COHORTE d'étiquette (pas un vétérinaire nominal → laisse veterinaire=null). Elle demande au moteur de répartir équitablement une DIMENSION de charge UNIQUEMENT entre les vétérinaires portant une étiquette (junior, senior…).
-   ⚠️ N'utilise ce type QUE si la demande vise une étiquette (« équilibrer les week-ends ENTRE LES JUNIORS », « que les seniors aient autant de fériés »). L'équilibrage GLOBAL (tous les vétos confondus) se règle dans les menus de l'application — PAS via toi (faisable=false, invite à utiliser les réglages d'équité).
-   params: dimension_equite (weekend = nombre de week-ends | weekend_premier = rôle de 1er le week-end | ferie = jours fériés | semaine_premier = soirs de semaine en 1er | semaine_second = soirs de semaine en 2nd | grands_weekend = grands week-ends des salariés), tag (une étiquette de la liste fournie), importance_equite (peu_important | normal | important | essentiel).
-   Ex. « répartis équitablement les week-ends entre les juniors » → equilibrer, dimension_equite="weekend", tag="junior", importance_equite="important".
-   Même règle que les types 8/9 pour une étiquette inconnue (faisable=false, invite à poser l'étiquette d'abord). Ce type n'a PAS de "force" (le cran d'importance suffit).
-
-19. seulement_avec — garde conditionnelle ORIENTÉE : un vétérinaire (A) n'est de garde QUE si un binôme précis (B) est de garde SUR LE MÊME CRÉNEAU (même date + même type). Règle par véto, dans UN SEUL sens : A dépend de B, JAMAIS l'inverse (B peut être de garde sans A).
-   params: veterinaire = A (celui qui a la condition), partenaire = B (le binôme REQUIS), creneaux (optionnel : liste de CODES de créneaux du cabinet à cibler ; null = tous).
-   ⚠️ DÉSAMBIGUÏSATION avec le type 11 (preferer_avec) : « je PRÉFÈRE être avec Victor » = souhait souple = type 11. « je ne veux être de garde QUE si Victor est de garde » / « seulement si » / « jamais sans lui » / « uniquement accompagné de Victor » = condition ferme = type 19.
-   Ex. « le jeune Antoine ne prend une garde que si Victor est de garde avec lui » → seulement_avec, veterinaire="Antoine", partenaire="Victor".
-   Ex. « Manon n'est de garde le week-end que si Victor est de garde » → seulement_avec, veterinaire="Manon", partenaire="Victor", creneaux=["weekend"].
-   ⚠️ Un créneau à UNE seule place ne peut pas accueillir A ET B → cible plutôt les créneaux à plusieurs places (week-end, soirs en hiver). Force par défaut conseillée : jamais (exigence de sécurité — accompagnement obligatoire).
+PIÈGES — vérifie ces distinctions AVANT de choisir :
+- PLAFOND (5) ou FRÉQUENCE (7) ? « au plus 2 WE par mois » = plafond → 5 avec creneaux=["weekend"]. « un WE sur 3 » = fréquence → 7.
+- FRÉQUENCE (7) ou CADENCEMENT (16) ? 7 limite la fréquence sans dates. 16 ancre le cycle à des DATES PRÉCISES (calendaire strict, indépendant des vacances).
+- PRÉFÉRENCE (11) ou CONDITION (19) ? « je préfère être avec X » = souple → 11. « seulement si X », « jamais sans X », « uniquement accompagné de X » = ferme → 19.
+- REPOS entre gardes = espacement (6), pas un type à part : « au moins N jours de repos entre mes gardes » → ecart_min_jours = N+1 (2 jours de repos = 3 jours d'écart).
+- « LENDEMAIN » (13) au sens JOUR CIVIL : le week-end couvre samedi+dimanche, son lendemain est donc le lundi.
+- ÉQUITÉ (18) : uniquement si la demande vise une ÉTIQUETTE. L'équilibrage de TOUTE l'équipe se règle dans les menus de l'application → faisable=false, invite à utiliser les réglages d'équité.
+- Créneau à UNE seule place : il ne peut accueillir ni un duo (4) ni un accompagnement (19) — vise plutôt les créneaux à plusieurs places.
 
 Niveau d'importance (force) :
 - jamais = interdiction ferme
