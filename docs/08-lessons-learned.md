@@ -251,3 +251,39 @@ envoyé à un modèle. Un nouveau type de règle = de nouveaux paramètres dans
 (À noter : un objet à clés libres n'est pas une alternative — Zod rend
 `z.record()` en `{properties: {}, additionalProperties: false}`, soit un objet
 obligatoirement vide.)
+
+## 2026-07-26 — Optimiser un prompt : mesurer d'abord, condenser ensuite
+
+**Le contexte.** L'assistant IA coûtait 3,96 ¢ par demande. Objectif : réduire
+sans rien perdre en qualité ni en exigence.
+
+**Ce que la mesure a appris, et qu'on aurait mal deviné.** 80 % du coût venait
+du **prompt lui-même** (6 179 tokens d'entrée contre 150-350 de réponse), pas du
+modèle. Chercher l'économie en changeant de modèle n'aurait touché qu'un
+cinquième du problème.
+
+**Deux leviers, dans cet ordre.**
+
+1. **La mise en cache du prompt** (−50 % immédiat). Le prompt est identique d'une
+   demande à l'autre : l'API le garde en mémoire et ne le refacture qu'au
+   dixième du prix. Condition impérative : il doit rester **identique à
+   l'octet** — donc jamais de date, d'horodatage ni d'identifiant de session
+   dedans.
+2. **Condenser le catalogue** (−39 % de caractères). La graisse était
+   **structurelle, pas dans le fond** : une convention répétée 8 fois, une
+   désambiguïsation écrite deux fois en entier, des exemples redondants. Aucun
+   type de règle ni avertissement n'a été retiré.
+
+**Le résultat, mesuré avant/après sur les 19 types de règles : 21/21 conservé**,
+coût par demande de 3,96 → 0,95 ¢ (cache actif), première demande de 4,79 → 3,54 ¢.
+
+**La règle à retenir.** *Ne jamais toucher à un prompt sans un banc qui couvre
+tous les cas.* Le jeu de test court n'exerçait que 3 types sur 19 : une
+régression sur les 16 autres serait passée inaperçue — et une règle mal traduite
+ne se voit qu'une fois le planning publié. Le filet est en place
+(`/admin/banc-ia`, mode « Vérifier les 19 types ») et doublé de 8 tests
+unitaires qui figent le contrat entre le schéma et le catalogue.
+
+**Corollaire observé deux fois dans la même journée** : quand un test échoue,
+suspecter le test avant le modèle. Les deux « échecs » mesurés étaient des
+phrases d'épreuve mal écrites — Filou avait raison de refuser dans les deux cas.
