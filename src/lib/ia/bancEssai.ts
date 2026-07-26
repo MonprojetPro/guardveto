@@ -78,6 +78,10 @@ export interface LigneBanc {
   tokensSortie: number
   dollars: number
   ms: number
+  /** Message d'erreur si CET appel a échoué. Une panne sur un modèle ne doit
+   *  pas emporter la mesure des deux autres : c'est justement en comparant
+   *  qui passe et qui échoue qu'on apprend quelque chose. */
+  erreur?: string
 }
 
 export interface PoidsPrompt {
@@ -86,6 +90,7 @@ export interface PoidsPrompt {
   tokens: number
   /** Coût de la seule entrée, par demande. */
   dollarsEntree: number
+  erreur?: string
 }
 
 export interface ResumeModele {
@@ -125,17 +130,27 @@ export async function lancerBancEssai(ctx: ContexteIA): Promise<ResultatBanc> {
   // ── 1. Le poids du prompt (comptage exact, non facturé) ──
   const poids: PoidsPrompt[] = []
   for (const p of PALIERS) {
-    const { input_tokens } = await client.messages.countTokens({
-      model: p.modele,
-      system,
-      messages: [{ role: 'user', content: PHRASES_EPREUVE[0].texte }],
-    })
-    poids.push({
-      modele: p.modele,
-      nomModele: p.nom,
-      tokens: input_tokens,
-      dollarsEntree: (input_tokens * p.entree) / 1_000_000,
-    })
+    try {
+      const { input_tokens } = await client.messages.countTokens({
+        model: p.modele,
+        system,
+        messages: [{ role: 'user', content: PHRASES_EPREUVE[0].texte }],
+      })
+      poids.push({
+        modele: p.modele,
+        nomModele: p.nom,
+        tokens: input_tokens,
+        dollarsEntree: (input_tokens * p.entree) / 1_000_000,
+      })
+    } catch (e) {
+      poids.push({
+        modele: p.modele,
+        nomModele: p.nom,
+        tokens: 0,
+        dollarsEntree: 0,
+        erreur: e instanceof Error ? e.message : 'erreur inconnue',
+      })
+    }
   }
 
   // ── 2. Qualité et coût réel, palier par palier ──
@@ -143,6 +158,7 @@ export async function lancerBancEssai(ctx: ContexteIA): Promise<ResultatBanc> {
   for (const p of PALIERS) {
     for (const phrase of PHRASES_EPREUVE) {
       const t0 = Date.now()
+      try {
       const reponse = await client.messages.parse({
         model: p.modele,
         max_tokens: 4000,
@@ -174,6 +190,24 @@ export async function lancerBancEssai(ctx: ContexteIA): Promise<ResultatBanc> {
         dollars: (tokensEntree * p.entree + u.output_tokens * p.sortie) / 1_000_000,
         ms,
       })
+      } catch (e) {
+        // On enregistre l'échec comme un résultat à part entière : « Haiku
+        // refuse ce schéma » est une information, pas une panne du banc.
+        lignes.push({
+          modele: p.modele,
+          nomModele: p.nom,
+          phrase: phrase.texte,
+          quoi: phrase.quoi,
+          brique: null,
+          juste: false,
+          message: '',
+          tokensEntree: 0,
+          tokensSortie: 0,
+          dollars: 0,
+          ms: Date.now() - t0,
+          erreur: e instanceof Error ? e.message : 'erreur inconnue',
+        })
+      }
     }
   }
 

@@ -11,6 +11,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import {
   PropositionRegleSchema,
+  normaliserProposition,
   type PropositionRegle,
   type VetoResolu,
 } from './regleSchema'
@@ -218,9 +219,11 @@ export async function proposerRegleIA(
     output_config: { format: zodOutputFormat(PropositionRegleSchema) },
   })
 
-  const proposition = response.parsed_output
-  if (!proposition) {
+  const brut = response.parsed_output
+  if (!brut) {
     throw new Error("L'assistant n'a pas pu structurer sa réponse. Reformule ta demande.")
   }
-  return proposition
+  // Les params omis reviennent `undefined` (schéma `optional`) : on les remet à
+  // `null` pour que l'aval n'ait qu'une seule forme d'absence à gérer.
+  return normaliserProposition(brut)
 }

@@ -64,7 +64,7 @@ export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
       {enCours && (
         <p className="text-sm text-muted-foreground" role="status">
           Les appels partent un par un, pas en rafale : une rafale risquerait une limite de débit,
-          qui faussrait les temps mesurés. Laisse la page ouverte.
+          qui fausserait les temps mesurés. Laisse la page ouverte.
         </p>
       )}
 
@@ -119,6 +119,16 @@ export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
             </p>
           </section>
 
+          {resultat.lignes.some((l) => l.erreur) && (
+            <section className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm">
+              <p className="font-semibold">Des appels ont échoué</p>
+              <p className="mt-1 text-muted-foreground">
+                Le détail plus bas donne le message brut de l’API pour chacun. Un échec sur un
+                palier n’invalide pas les autres — c’est même l’information utile.
+              </p>
+            </section>
+          )}
+
           {/* ── Le poids du prompt ── */}
           <section className="space-y-2">
             <h2 className="font-semibold">Poids du prompt (le coût plancher)</h2>
@@ -132,8 +142,16 @@ export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
                 {resultat.poids.map((p) => (
                   <tr key={p.modele} className="border-b last:border-0">
                     <td className="py-2 pr-4 font-medium">{p.nomModele}</td>
-                    <td className="py-2 pr-4">{p.tokens.toLocaleString('fr-FR')} tokens</td>
-                    <td className="py-2">{centimes(p.dollarsEntree)} par demande</td>
+                    {p.erreur ? (
+                      <td className="py-2 font-mono text-xs" colSpan={2}>
+                        💥 {p.erreur}
+                      </td>
+                    ) : (
+                      <>
+                        <td className="py-2 pr-4">{p.tokens.toLocaleString('fr-FR')} tokens</td>
+                        <td className="py-2">{centimes(p.dollarsEntree)} par demande</td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -153,20 +171,29 @@ export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
                 {resultat.lignes
                   .filter((l) => l.modele === r.modele)
                   .map((l, i) => (
-                    <div key={i} className="rounded-md border p-2.5 text-sm">
+                    <div
+                      key={i}
+                      className={`rounded-md border p-2.5 text-sm${l.erreur ? ' border-destructive/50 bg-destructive/5' : ''}`}
+                    >
                       <div className="flex flex-wrap items-baseline gap-2">
-                        <span aria-hidden="true">{l.juste ? '✅' : '❌'}</span>
+                        <span aria-hidden="true">{l.erreur ? '💥' : l.juste ? '✅' : '❌'}</span>
                         <b>{l.quoi}</b>
-                        <span className="text-xs text-muted-foreground">
-                          {l.brique ?? 'refusé'} · {centimes(l.dollars)} ·{' '}
-                          {l.tokensEntree.toLocaleString('fr-FR')} entrée /{' '}
-                          {l.tokensSortie.toLocaleString('fr-FR')} sortie
-                        </span>
+                        {!l.erreur && (
+                          <span className="text-xs text-muted-foreground">
+                            {l.brique ?? 'refusé'} · {centimes(l.dollars)} ·{' '}
+                            {l.tokensEntree.toLocaleString('fr-FR')} entrée /{' '}
+                            {l.tokensSortie.toLocaleString('fr-FR')} sortie
+                          </span>
+                        )}
                       </div>
                       <p className="mt-1 text-xs italic text-muted-foreground">
                         « {l.phrase} »
                       </p>
-                      <p className="mt-1 text-xs">{l.message}</p>
+                      {l.erreur ? (
+                        <p className="mt-1 font-mono text-xs">{l.erreur}</p>
+                      ) : (
+                        <p className="mt-1 text-xs">{l.message}</p>
+                      )}
                     </div>
                   ))}
               </div>

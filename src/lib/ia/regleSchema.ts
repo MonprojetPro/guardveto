@@ -59,6 +59,15 @@ export const FORCES_IA = ['jamais', 'sauf_crise', 'evitee', 'si_possible'] as co
  * Schéma de la proposition produite par l'IA (sortie structurée).
  * Tous les params sont optionnels (l'IA ne remplit que ceux de la brique
  * choisie) ; la validation métier STRICTE reste côté serveur (construireParams).
+ *
+ * ⚠️ `.optional()` et NON `.nullable()`, pour une raison d'API et non de style.
+ * Un champ `nullable` devient une UNION en JSON Schema (`type: [x, "null"]`), et
+ * l'API plafonne un schéma à 16 paramètres à union — la compilation coûte
+ * exponentiellement cher au-delà. Avec 30 params nullables, toute requête était
+ * rejetée en 400 « too many parameters with union types ». `optional` n'est pas
+ * une union : le champ est simplement absent de `required`.
+ *
+ * Le reste du code continue de voir des `null` grâce à `normaliserProposition`.
  */
 export const PropositionRegleSchema = z.object({
   /** Ce que l'IA a compris de la demande, reformulé en français. */
@@ -71,61 +80,91 @@ export const PropositionRegleSchema = z.object({
    */
   message: z.string(),
   /** Prénom du vétérinaire concerné (tel qu'écrit dans la liste fournie). */
-  veterinaire: z.string().nullable(),
-  brique_id: z.enum(BRIQUES_IA).nullable(),
-  force: z.enum(FORCES_IA).nullable(),
+  veterinaire: z.string().optional(),
+  brique_id: z.enum(BRIQUES_IA).optional(),
+  force: z.enum(FORCES_IA).optional(),
   // ── Paramètres (selon la brique) ───────────────────────────
-  jour: z.string().nullable(),
-  exception_vacances_scolaires: z.boolean().nullable(),
-  si_garde_we: z.string().nullable(),
-  sinon: z.string().nullable(),
-  semaines: z.enum(['paires', 'impaires', 'toutes']).nullable(),
-  periodes: z.array(z.enum(['soir_semaine', 'weekend'])).nullable(),
+  jour: z.string().optional(),
+  exception_vacances_scolaires: z.boolean().optional(),
+  si_garde_we: z.string().optional(),
+  sinon: z.string().optional(),
+  semaines: z.enum(['paires', 'impaires', 'toutes']).optional(),
+  periodes: z.array(z.enum(['soir_semaine', 'weekend'])).optional(),
   /** Prénom du second vétérinaire (duo interdit). */
-  partenaire: z.string().nullable(),
-  n: z.number().int().nullable(),
-  fenetre: z.enum(['semaine_civile', 'glissante_7_jours', 'glissante_14_jours', 'glissante_30_jours']).nullable(),
+  partenaire: z.string().optional(),
+  n: z.number().int().optional(),
+  fenetre: z.enum(['semaine_civile', 'glissante_7_jours', 'glissante_14_jours', 'glissante_30_jours']).optional(),
   /** au_plus_n : filtre optionnel par types de créneaux du cabinet (n°19).
    *  Codes EXACTS fournis dans le prompt (référentiel dynamique du cabinet).
    *  null / vide = toutes les gardes comptent. */
-  creneaux: z.array(z.string()).nullable(),
-  ecart_min_jours: z.number().int().nullable(),
+  creneaux: z.array(z.string()).optional(),
+  ecart_min_jours: z.number().int().optional(),
   /** espacement_weekend : « au plus 1 week-end sur N » (N ≥ 2). */
-  n_semaines: z.number().int().nullable(),
+  n_semaines: z.number().int().optional(),
   /** composition_equipe : mode de la règle d'équipe (règle GLOBALE, n°6). */
-  mode_composition: z.enum(['au_moins_un', 'pas_seuls']).nullable(),
+  mode_composition: z.enum(['au_moins_un', 'pas_seuls']).optional(),
   /** composition_equipe / role_interdit_tag : étiquette ciblée (parmi celles du cabinet). */
-  tag: z.string().nullable(),
+  tag: z.string().optional(),
   /** role_interdit_tag : label du rôle interdit (parmi les rôles du cabinet, ex. premier). */
-  role_interdit: z.string().nullable(),
+  role_interdit: z.string().optional(),
   /** preferer_creneau : jours préférés (lundi..dimanche). */
-  jours: z.array(z.enum(['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'])).nullable(),
+  jours: z.array(z.enum(['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'])).optional(),
   /** volume_gardes : souhaite plus ou moins de gardes que la moyenne. */
-  sens: z.enum(['plus', 'moins']).nullable(),
+  sens: z.enum(['plus', 'moins']).optional(),
   /** succession_interdite (#13) : codes de créneaux « veille » et « lendemain interdit ». */
-  type_avant: z.string().nullable(),
-  type_apres: z.string().nullable(),
+  type_avant: z.string().optional(),
+  type_apres: z.string().optional(),
   /** serie_max / repos_apres_serie (#13) : longueur de série en jours. */
-  n_jours: z.number().int().nullable(),
+  n_jours: z.number().int().optional(),
   /** repos_apres_serie (#13) : jours de repos imposés après la série. */
-  repos_jours: z.number().int().nullable(),
+  repos_jours: z.number().int().optional(),
   /** cadencement_weekend (#20) : date d'ancrage du cycle (un samedi, ISO yyyy-MM-dd). */
-  ancre: z.string().nullable(),
+  ancre: z.string().optional(),
   /** cadencement_weekend (#20) : sens du cadencement.
    *  interdit = WE du cycle interdits de garde (cas pompier) ;
    *  impose = gardes WE forcées sur le cycle. (n_semaines réutilisé pour le cycle N.) */
-  sens_cadence: z.enum(['interdit', 'impose']).nullable(),
+  sens_cadence: z.enum(['interdit', 'impose']).optional(),
   /** exclusion_dates (#15a) : XOR « pas les deux ». UNE seule forme :
    *  fetes = paire de codes fête (noel/nouvel_an) ; dates = paire de dates ISO. */
-  fetes: z.array(z.enum(['noel', 'nouvel_an'])).nullable(),
-  dates: z.array(z.string()).nullable(),
+  fetes: z.array(z.enum(['noel', 'nouvel_an'])).optional(),
+  dates: z.array(z.string()).optional(),
   /** equilibrer (#21) : dimension d'équité à équilibrer sur la cohorte du tag. */
-  dimension_equite: z.enum(DIMENSIONS_EQUITE_IA).nullable(),
+  dimension_equite: z.enum(DIMENSIONS_EQUITE_IA).optional(),
   /** equilibrer (#21) : niveau d'importance de l'équilibrage (cohorte). */
-  importance_equite: z.enum(['peu_important', 'normal', 'important', 'essentiel']).nullable(),
+  importance_equite: z.enum(['peu_important', 'normal', 'important', 'essentiel']).optional(),
 })
 
-export type PropositionRegle = z.infer<typeof PropositionRegleSchema>
+/** `{ jour?: string }` → `{ jour: string | null }` — voir `normaliserProposition`. */
+type ChampsNullables<T> = {
+  [K in keyof T]-?: undefined extends T[K] ? Exclude<T[K], undefined> | null : T[K]
+}
+
+/**
+ * La proposition telle que le RESTE DU CODE la manipule : chaque paramètre
+ * non concerné vaut `null`, jamais `undefined`.
+ *
+ * Le schéma envoyé à l'API, lui, déclare ces champs `optional` et non
+ * `nullable` — voir le commentaire du schéma. `normaliserProposition` fait le
+ * pont entre les deux.
+ */
+export type PropositionRegle = ChampsNullables<z.infer<typeof PropositionRegleSchema>>
+
+/**
+ * Remet à `null` tout paramètre que l'IA a omis.
+ *
+ * Sans ça, un champ absent arriverait en `undefined` et chaque lecture aval
+ * devrait gérer DEUX formes d'absence — le genre d'écart qui produit un
+ * `if (x !== null)` faussement rassurant.
+ */
+export function normaliserProposition(
+  brut: z.infer<typeof PropositionRegleSchema>,
+): PropositionRegle {
+  const sortie = {} as Record<string, unknown>
+  for (const cle of Object.keys(PropositionRegleSchema.shape)) {
+    sortie[cle] = (brut as Record<string, unknown>)[cle] ?? null
+  }
+  return sortie as PropositionRegle
+}
 
 /** Vétérinaire minimal pour la résolution prénom → id. */
 export interface VetoResolu {
