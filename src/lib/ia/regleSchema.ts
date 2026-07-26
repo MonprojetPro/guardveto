@@ -56,18 +56,17 @@ export const DIMENSIONS_EQUITE_IA = [
 export const FORCES_IA = ['jamais', 'sauf_crise', 'evitee', 'si_possible'] as const
 
 /**
- * Schéma de la proposition produite par l'IA (sortie structurée).
- * Tous les params sont optionnels (l'IA ne remplit que ceux de la brique
- * choisie) ; la validation métier STRICTE reste côté serveur (construireParams).
+ * Forme INTERNE de la proposition : tous les paramètres à plat, comme le reste
+ * du code les manipule (`construireParams`, les 62 tests, les payloads).
  *
- * ⚠️ `.optional()` et NON `.nullable()`, pour une raison d'API et non de style.
- * Un champ `nullable` devient une UNION en JSON Schema (`type: [x, "null"]`), et
- * l'API plafonne un schéma à 16 paramètres à union — la compilation coûte
- * exponentiellement cher au-delà. Avec 30 params nullables, toute requête était
- * rejetée en 400 « too many parameters with union types ». `optional` n'est pas
- * une union : le champ est simplement absent de `required`.
+ * ⚠️ CE SCHÉMA N'EST PAS CELUI ENVOYÉ À L'API — voir `SortieIaSchema` plus bas.
+ * L'API plafonne un schéma à 16 paramètres à union ET à 24 paramètres
+ * optionnels : avec un champ par paramètre de chaque type de règle, on dépassait
+ * les deux (30), et TOUTE requête était rejetée en 400. Pire, le compte
+ * augmentait à chaque nouveau type de règle — un plafond qu'on aurait re-crevé
+ * au chantier suivant.
  *
- * Le reste du code continue de voir des `null` grâce à `normaliserProposition`.
+ * La validation métier STRICTE reste côté serveur (construireParams).
  */
 export const PropositionRegleSchema = z.object({
   /** Ce que l'IA a compris de la demande, reformulé en français. */
@@ -150,18 +149,80 @@ type ChampsNullables<T> = {
 export type PropositionRegle = ChampsNullables<z.infer<typeof PropositionRegleSchema>>
 
 /**
- * Remet à `null` tout paramètre que l'IA a omis.
+ * Ce que l'IA renvoie RÉELLEMENT — la forme envoyée à l'API.
  *
- * Sans ça, un champ absent arriverait en `undefined` et chaque lecture aval
- * devrait gérer DEUX formes d'absence — le genre d'écart qui produit un
- * `if (x !== null)` faussement rassurant.
+ * Sept champs, dont quatre optionnels et aucune union : très en dessous des
+ * plafonds (24 optionnels, 16 unions), et surtout **ce compte ne bougera plus
+ * jamais**. Les paramètres du type choisi voyagent dans `params_json`, une
+ * chaîne JSON — un objet à clés libres n'était pas une option : Zod le rend en
+ * `{properties: {}, additionalProperties: false}`, c'est-à-dire un objet
+ * obligatoirement vide.
+ *
+ * On ne perd pas de garde-fou : les valeurs sont re-validées une par une contre
+ * le schéma interne par `normaliserProposition`, puis par `construireParams`.
  */
-export function normaliserProposition(
-  brut: z.infer<typeof PropositionRegleSchema>,
-): PropositionRegle {
+export const SortieIaSchema = z.object({
+  comprehension: z.string(),
+  faisable: z.boolean(),
+  message: z.string(),
+  veterinaire: z.string().optional(),
+  brique_id: z.enum(BRIQUES_IA).optional(),
+  force: z.enum(FORCES_IA).optional(),
+  params_json: z
+    .string()
+    .optional()
+    .describe(
+      'Objet JSON contenant UNIQUEMENT les paramètres du type de règle choisi, ' +
+        'avec les noms exacts listés pour ce type. Exemple : {"jour":"mercredi"}. ' +
+        'Omets ce champ si la demande n’est pas faisable.',
+    ),
+})
+
+export type SortieIa = z.infer<typeof SortieIaSchema>
+
+/**
+ * Traduit la sortie de l'IA vers la forme interne : déplie `params_json` et
+ * remet à `null` tout ce qui manque.
+ *
+ * Chaque paramètre est validé INDIVIDUELLEMENT contre le schéma interne. Un
+ * champ au mauvais type (l'IA écrit `"3"` là où on attend un entier) devient
+ * `null` plutôt que de traverser jusqu'au moteur de planning — et il devient
+ * `null` SEUL, sans emporter les paramètres voisins qui, eux, étaient corrects.
+ */
+export function normaliserProposition(brut: SortieIa): PropositionRegle {
+  let params: Record<string, unknown> = {}
+  if (brut.params_json) {
+    try {
+      const parse: unknown = JSON.parse(brut.params_json)
+      if (parse && typeof parse === 'object' && !Array.isArray(parse)) {
+        params = parse as Record<string, unknown>
+      }
+    } catch {
+      // JSON illisible : on continue sans paramètres. La proposition sera jugée
+      // non exploitable en aval, avec un message à l'utilisateur — c'est mieux
+      // que de faire tomber tout l'assistant sur une virgule mal placée.
+    }
+  }
+
+  const aplati: Record<string, unknown> = {
+    comprehension: brut.comprehension,
+    faisable: brut.faisable,
+    message: brut.message,
+    veterinaire: brut.veterinaire,
+    brique_id: brut.brique_id,
+    force: brut.force,
+    ...params,
+  }
+
   const sortie = {} as Record<string, unknown>
-  for (const cle of Object.keys(PropositionRegleSchema.shape)) {
-    sortie[cle] = (brut as Record<string, unknown>)[cle] ?? null
+  for (const [cle, champ] of Object.entries(PropositionRegleSchema.shape)) {
+    const valeur = aplati[cle]
+    if (valeur === undefined || valeur === null) {
+      sortie[cle] = null
+      continue
+    }
+    const verdict = champ.safeParse(valeur)
+    sortie[cle] = verdict.success ? verdict.data : null
   }
   return sortie as PropositionRegle
 }

@@ -25,7 +25,7 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
-import { PropositionRegleSchema } from './regleSchema'
+import { SortieIaSchema, normaliserProposition } from './regleSchema'
 import { construireSystemIA } from './proposerRegle'
 import type { ContexteIA } from './contexteCabinet'
 
@@ -165,10 +165,10 @@ export async function lancerBancEssai(ctx: ContexteIA): Promise<ResultatBanc> {
         thinking: { type: 'adaptive' },
         system,
         messages: [{ role: 'user', content: phrase.texte }],
-        output_config: { format: zodOutputFormat(PropositionRegleSchema) },
+        output_config: { format: zodOutputFormat(SortieIaSchema) },
       })
       const ms = Date.now() - t0
-      const prop = reponse.parsed_output
+      const prop = reponse.parsed_output ? normaliserProposition(reponse.parsed_output) : null
       const u = reponse.usage
       // Le cache compte comme de l'entrée : l'ignorer sous-estimerait la facture.
       const tokensEntree =

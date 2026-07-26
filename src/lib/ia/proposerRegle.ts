@@ -10,7 +10,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import {
-  PropositionRegleSchema,
+  SortieIaSchema,
   normaliserProposition,
   type PropositionRegle,
   type VetoResolu,
@@ -182,8 +182,10 @@ ${CATALOGUE_PROMPT}
 
 Règles de comportement :
 - Réponds toujours en français, dans "comprehension" reformule la demande, dans "message" explique brièvement ta proposition.
-- Si la demande correspond à un des types ci-dessus : faisable=true, remplis brique_id, veterinaire, force et SEULEMENT les params du type choisi (laisse les autres à null).
-- Si la demande est ambiguë (jour manquant, véto non précisé, etc.) OU n'est pas réalisable : faisable=false, brique_id=null, et explique dans "message".
+- Si la demande correspond à un des types ci-dessus : faisable=true, remplis brique_id, veterinaire, force, et mets les paramètres DE CE TYPE dans "params_json".
+- "params_json" est une CHAÎNE contenant un objet JSON valide, avec EXACTEMENT les noms de paramètres listés pour le type choisi, et RIEN d'autre. Exemples : {"jour":"mercredi","exception_vacances_scolaires":false} · {"n":2,"fenetre":"glissante_30_jours","creneaux":["weekend"]} · {"mode_composition":"pas_seuls","tag":"junior"}. N'y mets jamais les paramètres d'un autre type.
+- Respecte le TYPE de chaque paramètre : un nombre s'écrit 3 et non "3", un booléen true et non "true", une liste ["weekend"] et non "weekend".
+- Si la demande est ambiguë (jour manquant, véto non précisé, etc.) OU n'est pas réalisable : faisable=false, omets brique_id et params_json, et explique dans "message".
 - IMPORTANT — ton du "message" quand faisable=false : parle comme à un vétérinaire, AVEC SES MOTS. Ne mentionne JAMAIS « les 6 types de règles », « brique », ni aucun terme technique ou interne. Si c'est ambigu, demande simplement la précision manquante. Si la demande sort du périmètre (ce n'est pas une règle de planning de gardes), dis-le simplement et invite à reformuler autrement — sans lister de catalogue.
 - Choisis une force par défaut raisonnable si l'utilisateur ne la précise pas (souvent sauf_crise, ou jamais pour une interdiction nette).
 - N'invente jamais un prénom hors de la liste.
@@ -216,7 +218,7 @@ export async function proposerRegleIA(
     thinking: { type: 'adaptive' },
     system,
     messages: [{ role: 'user', content: phrase }],
-    output_config: { format: zodOutputFormat(PropositionRegleSchema) },
+    output_config: { format: zodOutputFormat(SortieIaSchema) },
   })
 
   const brut = response.parsed_output
