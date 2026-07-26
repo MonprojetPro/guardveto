@@ -45,6 +45,20 @@ import {
   type CreerRelationIaPayload,
 } from '@/lib/ia/relationSchema'
 
+/**
+ * Rafraîchit les DEUX écrans qui affichent les BRANCHEMENTS du cabinet
+ * (agenda, expéditeur d'e-mails, adresse → zone) : la V2 `/reglages` et la V1
+ * `/admin/structure`, le temps de la bascule.
+ *
+ * Réservé aux connexions : les autres actions de ce fichier touchent à la
+ * structure des créneaux, que la V2 n'affiche pas encore — elles continuent
+ * de ne revalider que `/admin/structure`.
+ */
+function revaliderConnexions() {
+  revalidatePath('/admin/structure')
+  revalidatePath('/reglages')
+}
+
 // ── Référentiels de validation ───────────────────────────────
 /** 'HH:MM' 24h strict (00:00 → 23:59). */
 const HEURE_RE = /^([01]\d|2[0-3]):[0-5]\d$/
@@ -995,7 +1009,7 @@ export async function configurerPartagesCabinet(input: {
   })
   if (error) return { error: error.message }
 
-  revalidatePath('/admin/structure')
+  revaliderConnexions()
   return { success: true }
 }
 
@@ -1027,7 +1041,7 @@ export async function configurerAdresseCabinet(input: {
   })
   if (error) return { error: error.message }
 
-  revalidatePath('/admin/structure')
+  revaliderConnexions()
   return {
     success: true as const,
     derive: { zone, region, departement },

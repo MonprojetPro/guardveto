@@ -36,6 +36,11 @@ mcp.json
 .DS_Store
 *.pem
 
+# Fichiers temporaires d'éditeur (un `.h-9.swp` traînait à la racine)
+*.swp
+*.swo
+*~
+
 # debug
 npm-debug.log*
 yarn-debug.log*

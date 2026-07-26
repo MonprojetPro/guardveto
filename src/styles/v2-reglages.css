@@ -1,0 +1,155 @@
+/* ============================================================
+   GUARDVETO V2 — ÉCRAN « RÉGLAGES & CONNEXIONS »
+   ============================================================
+   Porté de `maquette/m4-accueil-equipe-historique-connexions.html`
+   (section 4). Complète `v2-terrier.css`.
+
+   Écarté volontairement : la ligne « Dernière synchronisation : cette nuit
+   à 02:14 · 61 événements sur 61 ». Rien ne trace les synchronisations
+   passées en base — il n'existe pas de journal d'agenda. On affiche donc le
+   résultat RÉEL d'une synchronisation qu'on vient de lancer, et rien avant.
+   ============================================================ */
+
+.conn-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
+  gap: 16px;
+  margin-bottom: 26px;
+}
+.conn-card {
+  border-radius: var(--r-md);
+  display: flex; flex-direction: column;
+  margin-bottom: 0;
+}
+.conn-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 15px 18px 13px;
+  border-bottom: 1px solid var(--border);
+}
+.conn-ico {
+  width: 40px; height: 40px; border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 1.15rem; flex: none;
+}
+.conn-head h3 { font-size: 0.96rem; font-weight: 700; }
+.conn-head .sub { font-size: 0.74rem; color: var(--muted); margin-top: 1px; }
+.conn-state {
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.7rem; font-weight: 700;
+  padding: 4px 11px; border-radius: 999px;
+  white-space: nowrap;
+}
+.conn-state.on  { background: var(--ok-soft); color: var(--ok); }
+.conn-state.off { background: var(--surface-2); color: var(--soft); border: 1px solid var(--border); }
+.conn-state .cs-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.conn-body {
+  padding: 14px 18px 16px;
+  display: flex; flex-direction: column; gap: 12px; flex: 1;
+}
+.conn-line { font-size: 0.84rem; line-height: 1.55; color: var(--muted); }
+.conn-line b { color: var(--text); }
+.conn-line.ok { color: var(--ok); font-weight: 600; }
+.conn-line.bad { color: var(--danger); font-weight: 600; }
+.conn-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; align-items: center; }
+.conn-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mono {
+  font-family: 'Consolas', 'Menlo', monospace;
+  font-size: 0.78rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px 8px;
+  word-break: break-all;
+}
+.derived { display: flex; flex-wrap: wrap; gap: 8px; }
+.derived .dv {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: var(--ok-soft);
+  border: 1px dashed var(--border-strong);
+  color: var(--ok);
+  font-size: 0.76rem; font-weight: 700;
+  padding: 6px 12px; border-radius: 999px;
+}
+.derived-note { font-size: 0.74rem; color: var(--soft); font-style: italic; line-height: 1.5; }
+.sync-spin {
+  display: inline-block; width: 14px; height: 14px;
+  border: 2px solid var(--accent-soft);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+  vertical-align: -2px; margin-right: 6px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ============================================================
+   JOURNAL DES E-MAILS
+   ============================================================ */
+.mail-card { margin-bottom: 26px; }
+.mail-table { width: 100%; border-collapse: collapse; }
+.mail-table th {
+  font-family: var(--font-display);
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--soft);
+  padding: 10px 14px 8px; text-align: left;
+  border-bottom: 1px solid var(--border-strong);
+}
+.mail-table td {
+  padding: 10px 14px;
+  border-bottom: 1px dashed var(--border);
+  font-size: 0.83rem;
+  vertical-align: middle;
+}
+.mail-table tr:last-child td { border-bottom: none; }
+.mail-table .m-date { color: var(--muted); font-size: 0.76rem; white-space: nowrap; }
+.mail-type {
+  display: inline-block;
+  font-size: 0.7rem; font-weight: 700;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 3px 10px; border-radius: 999px;
+  white-space: nowrap;
+}
+.m-statut { display: inline-flex; align-items: center; gap: 6px; font-size: 0.76rem; font-weight: 700; }
+.m-statut .msd { width: 8px; height: 8px; border-radius: 50%; }
+.m-statut.envoye { color: var(--ok); }
+.m-statut.envoye .msd { background: var(--ok); }
+.m-statut.echec { color: var(--danger); }
+.m-statut.echec .msd { background: var(--danger); }
+.m-erreur {
+  display: block; font-size: 0.72rem; color: var(--danger);
+  margin-top: 3px; line-height: 1.45;
+}
+.mail-vide { padding: 22px 18px; font-size: 0.86rem; color: var(--muted); line-height: 1.6; }
+.mail-resume { display: flex; gap: 10px; flex-wrap: wrap; margin-left: auto; }
+.mr-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.74rem; font-weight: 700;
+  padding: 4px 12px; border-radius: 999px;
+}
+.mr-chip.ok { background: var(--ok-soft); color: var(--ok); }
+.mr-chip.bad { background: var(--danger-soft); color: var(--danger); }
+
+/* ============================================================
+   CE QUI RESTE EN V1
+   ============================================================
+   Un renvoi honnête vers les écrans pas encore refaits, plutôt qu'un
+   bouton mort ou une carte vide. */
+.reste-v1 { margin-bottom: 26px; }
+.reste-liste { list-style: none; }
+.reste-liste li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+  padding: 13px 20px;
+  border-bottom: 1px dashed var(--border);
+}
+.reste-liste li:last-child { border-bottom: none; }
+.reste-liste .rl-quoi { flex: 1; min-width: 220px; }
+.reste-liste .rl-quoi b { font-family: var(--font-display); font-size: 0.94rem; display: block; }
+.reste-liste .rl-quoi small { font-size: 0.76rem; color: var(--muted); line-height: 1.5; }
+
+@media (max-width: 520px) {
+  .conn-duo { grid-template-columns: 1fr; }
+}

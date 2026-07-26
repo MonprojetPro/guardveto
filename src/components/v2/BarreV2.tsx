@@ -130,7 +130,7 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
         {estAdmin && (
           <Link
             className="dock-item"
-            href="/admin/structure"
+            href="/reglages"
             aria-label={dock.agendaConnecte ? 'Réglages · agenda connecté' : 'Réglages du cabinet'}
           >
             <span className="di-ico" aria-hidden="true">
