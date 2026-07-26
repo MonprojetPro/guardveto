@@ -68,17 +68,11 @@ function accord(n: number, singulier: string, pluriel: string) {
   return n > 1 ? pluriel : singulier
 }
 
-/** Libellé humain de l'horaire d'un créneau. */
-function horaire(type: string) {
-  if (type === 'weekend') return 'du samedi 8 h au lundi 8 h'
-  if (type === 'vendredi_soir') return '19 h 00 → 8 h 00'
-  return '19 h 00 → 8 h 00'
-}
-function natureCreneau(type: string) {
-  if (type === 'weekend') return 'week-end'
-  if (type === 'ferie') return 'jour férié'
-  if (type === 'vendredi_soir') return 'vendredi soir'
-  return 'nuit de semaine'
+/** Nature + horaire d'une garde, tels que la donnée les porte. L'horaire vient
+ *  de `creneau_modele` (réglable par profil de planning) : il peut manquer, et
+ *  dans ce cas on annonce la nature seule plutôt qu'un horaire inventé. */
+function natureEtHoraire(garde: GardeDuSoir): string {
+  return garde.horaire ? `${garde.nature} · ${garde.horaire}` : garde.nature
 }
 
 /** « il y a 3 jours », « aujourd'hui » — pour l'ancienneté d'un souhait. */
@@ -298,7 +292,7 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
                     <h2 tabIndex={-1}>Ce soir, au cabinet</h2>
                     <p className="f-sub">
                       {data.ceSoir
-                        ? `${majuscule(natureCreneau(data.ceSoir.type))} · ${horaire(data.ceSoir.type)}`
+                        ? majuscule(natureEtHoraire(data.ceSoir))
                         : 'Aucune garde enregistrée'}
                     </p>
                   </div>
@@ -593,10 +587,10 @@ function Demain({ garde }: { garde: GardeDuSoir }) {
         {noms.length > 0 ? (
           <>
             {noms.join(' et ')} {accord(noms.length, 'prend', 'prennent')} le relais (
-            {natureCreneau(garde.type)}).
+            {garde.nature}).
           </>
         ) : (
-          <>personne n&apos;est encore inscrit ({natureCreneau(garde.type)}).</>
+          <>personne n&apos;est encore inscrit ({garde.nature}).</>
         )}
       </span>
     </div>
@@ -659,9 +653,7 @@ function FicheCeSoir({ garde, onOpen }: { garde: GardeDuSoir | null; onOpen: () 
       </span>
       <span className="w-body">
         <h3>Ce soir : {noms}</h3>
-        <p>
-          {horaire(garde.type)} · {natureCreneau(garde.type)}
-        </p>
+        <p>{majuscule(natureEtHoraire(garde))}</p>
         <span className="w-duo" aria-hidden="true">
           {garde.premier && (
             <span className="vdot" style={{ background: garde.premier.couleur }}>

@@ -14,6 +14,13 @@
 
 import type { createClient } from '@/lib/supabase/server'
 import type { Periode, StatutPeriode, Veterinaire } from '@/types'
+import {
+  catalogueDuProfil,
+  chargerHorairesCabinet,
+  horaireLisible,
+  natureCreneau,
+  type CatalogueHoraires,
+} from './horairesCreneaux'
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 
@@ -33,6 +40,12 @@ export interface GardeDuSoir {
   type: string
   premier: { prenom: string; couleur: string } | null
   second: { prenom: string; couleur: string } | null
+  /** Horaire RÉEL du créneau, lu en base — `null` si le catalogue est muet.
+   *  Calculé ici et pas dans le composant : l'écran n'a pas à redécouvrir que
+   *  le vendredi rangé sous « weekend » est en fait le créneau du vendredi. */
+  horaire: string | null
+  /** « nuit de semaine », « vendredi soir », « week-end », « jour férié ». */
+  nature: string
 }
 
 /** Les pastilles de la barre — partagées par tous les écrans V2. */
@@ -130,7 +143,10 @@ interface LigneSouhait {
 }
 
 /** Une ligne de la vue `planning_semaine` → la forme attendue par l'accueil. */
-function versGarde(row: Record<string, unknown> | undefined): GardeDuSoir | null {
+function versGarde(
+  row: Record<string, unknown> | undefined,
+  catalogue: CatalogueHoraires,
+): GardeDuSoir | null {
   if (!row) return null
   const premier = row.premier_prenom
     ? { prenom: String(row.premier_prenom), couleur: String(row.premier_couleur ?? '#7C6A55') }
@@ -139,7 +155,16 @@ function versGarde(row: Record<string, unknown> | undefined): GardeDuSoir | null
     ? { prenom: String(row.second_prenom), couleur: String(row.second_couleur ?? '#7C6A55') }
     : null
   if (!premier && !second) return null
-  return { date: String(row.date), type: String(row.type ?? 'semaine'), premier, second }
+  const date = String(row.date)
+  const type = String(row.type ?? 'semaine')
+  return {
+    date,
+    type,
+    premier,
+    second,
+    horaire: horaireLisible(catalogue, type, date),
+    nature: natureCreneau(type, date),
+  }
 }
 
 /**
@@ -164,6 +189,7 @@ export async function chargerAccueil(
     souhaitsRes,
     echangesRes,
     cabinetRes,
+    horairesCabinet,
   ] = await Promise.all([
     supabase
       .from('periodes')
@@ -195,6 +221,9 @@ export async function chargerAccueil(
       .select('id', { count: 'exact', head: true })
       .eq('statut', 'proposee'),
     supabase.from('cabinets').select('google_calendar_id').limit(1).maybeSingle(),
+    // Les horaires REELS des creneaux, tous profils confondus : on ne saura
+    // qu'apres quel profil s'applique a quelle date.
+    chargerHorairesCabinet(supabase),
   ] as const)
 
   const periodes = (periodesRes?.data ?? []) as Periode[]
@@ -218,8 +247,21 @@ export async function chargerAccueil(
     : null
 
   const lignes = (gardesRes?.data ?? []) as Record<string, unknown>[]
-  const ceSoir = versGarde(lignes.find((r) => String(r.date) === today))
-  const demain = versGarde(lignes.find((r) => String(r.date) === demainISO))
+  /** Le catalogue d'horaires de la période qui couvre CETTE date. Deux dates
+   *  voisines peuvent relever de deux périodes — donc de deux profils — deux
+   *  fois par an. */
+  const catalogueDu = (dateISO: string): CatalogueHoraires => {
+    const periode = periodes.find((p) => p.date_debut <= dateISO && p.date_fin >= dateISO)
+    return catalogueDuProfil(horairesCabinet, periode?.profil_id ?? null)
+  }
+  const ceSoir = versGarde(
+    lignes.find((r) => String(r.date) === today),
+    catalogueDu(today),
+  )
+  const demain = versGarde(
+    lignes.find((r) => String(r.date) === demainISO),
+    catalogueDu(demainISO),
+  )
 
   const regles = (reglesRes?.data ?? []) as { force: string }[]
   const nbReglesFermes = regles.filter((r) => FORCES_FERMES.includes(r.force)).length
