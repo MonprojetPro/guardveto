@@ -85,7 +85,8 @@ export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
                   <tr className="border-b text-left text-muted-foreground">
                     <th className="py-2 pr-4">Modèle</th>
                     <th className="py-2 pr-4">Traductions justes</th>
-                    <th className="py-2 pr-4">Coût par demande</th>
+                    <th className="py-2 pr-4">Coût / demande</th>
+                    <th className="py-2 pr-4">Sans cache</th>
                     <th className="py-2 pr-4">Temps moyen</th>
                     <th className="py-2">1 000 demandes</th>
                   </tr>
@@ -101,21 +102,40 @@ export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
                           </span>
                         )}
                       </td>
-                      <td className="py-2 pr-4">
-                        <b className={r.justes === r.total ? 'text-green-700' : 'text-amber-700'}>
-                          {r.justes}/{r.total}
-                        </b>
-                      </td>
-                      <td className="py-2 pr-4">{centimes(r.dollarsMoyen)}</td>
-                      <td className="py-2 pr-4">{(r.msMoyen / 1000).toFixed(1)} s</td>
-                      <td className="py-2">{euros(r.dollarsMoyen * 1000)}</td>
+                      {r.enEchec ? (
+                        <td className="py-2 text-muted-foreground" colSpan={5}>
+                          💥 non mesurable — voir le détail
+                        </td>
+                      ) : (
+                        <>
+                          <td className="py-2 pr-4">
+                            <b
+                              className={
+                                r.justes === r.total ? 'text-green-700' : 'text-amber-700'
+                              }
+                            >
+                              {r.justes}/{r.total}
+                            </b>
+                          </td>
+                          <td className="py-2 pr-4 font-medium">{centimes(r.dollarsMoyen)}</td>
+                          <td className="py-2 pr-4 text-muted-foreground line-through">
+                            {centimes(r.dollarsMoyenSansCache)}
+                          </td>
+                          <td className="py-2 pr-4">{(r.msMoyen / 1000).toFixed(1)} s</td>
+                          <td className="py-2">{euros(r.dollarsMoyen * 1000)}</td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             <p className="text-xs text-muted-foreground">
-              Cette mesure vient de coûter <b>{centimes(resultat.dollarsDepenses)}</b>.
+              Cette mesure vient de coûter <b>{centimes(resultat.dollarsDepenses)}</b>. La colonne
+              barrée montre ce que la même demande coûterait <b>sans la mise en cache</b> du
+              prompt : l’API garde le catalogue en mémoire et ne le refacture qu’au dixième du prix
+              aux demandes suivantes. Le cache tient 5 minutes, donc le gain vaut pour un admin qui
+              enchaîne plusieurs règles — la toute première demande, elle, paie le plein tarif.
             </p>
           </section>
 
@@ -180,9 +200,17 @@ export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
                         <b>{l.quoi}</b>
                         {!l.erreur && (
                           <span className="text-xs text-muted-foreground">
-                            {l.brique ?? 'refusé'} · {centimes(l.dollars)} ·{' '}
-                            {l.tokensEntree.toLocaleString('fr-FR')} entrée /{' '}
-                            {l.tokensSortie.toLocaleString('fr-FR')} sortie
+                            {l.brique ?? 'refusé'} · {centimes(l.dollars)}
+                            {l.tokensCacheLus > 0 && (
+                              <> (cache lu : {l.tokensCacheLus.toLocaleString('fr-FR')} tokens)</>
+                            )}
+                            {l.tokensCacheEcrits > 0 && (
+                              <>
+                                {' '}
+                                (cache écrit : {l.tokensCacheEcrits.toLocaleString('fr-FR')} tokens)
+                              </>
+                            )}{' '}
+                            · {l.tokensSortie.toLocaleString('fr-FR')} sortie
                           </span>
                         )}
                       </div>

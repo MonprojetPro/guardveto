@@ -216,7 +216,17 @@ export async function proposerRegleIA(
     model: modeleIA(),
     max_tokens: 4000,
     thinking: { type: 'adaptive' },
-    system,
+    // MISE EN CACHE DU PROMPT. Mesuré le 2026-07-26 : le prompt pèse 6 225
+    // tokens contre 150-350 de réponse, soit ~80 % du coût de chaque demande.
+    // Comme il est identique d'une demande à l'autre (même cabinet, mêmes
+    // créneaux), l'API peut le garder en mémoire et ne le refacturer qu'au
+    // dixième du prix. Sur un admin qui enchaîne plusieurs règles, la demande
+    // passe d'environ 3,9 ¢ à 1 ¢ — sans changer de modèle ni rien perdre.
+    //
+    // Le prompt doit rester IDENTIQUE À L'OCTET pour que le cache serve : c'est
+    // pour ça qu'il ne contient ni date, ni horodatage, ni identifiant de
+    // session. Ne jamais en ajouter.
+    system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: phrase }],
     output_config: { format: zodOutputFormat(SortieIaSchema) },
   })
