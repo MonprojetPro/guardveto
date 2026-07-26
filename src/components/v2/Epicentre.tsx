@@ -52,6 +52,22 @@ function initiale(prenom: string) {
   return prenom.slice(0, 1).toUpperCase()
 }
 
+/** Les prénoms d'une garde, dans l'ordre, prêts à entrer dans une phrase.
+ *  « Fanny et Antoine » — pas « Fanny & Antoine » : l'esperluette va dans un
+ *  titre, pas au milieu d'une phrase. */
+function prenomsDe(garde: GardeDuSoir): string[] {
+  return [garde.premier?.prenom, garde.second?.prenom].filter(
+    (p): p is string => Boolean(p),
+  )
+}
+
+/** Accorde un verbe sur un nombre de personnes. Le pluriel écrit en dur
+ *  donnait « Jean prennent le relais » les soirs où un seul véto est de
+ *  garde — et une nuit de semaine à un seul véto, c'est le cas courant. */
+function accord(n: number, singulier: string, pluriel: string) {
+  return n > 1 ? pluriel : singulier
+}
+
 /** Libellé humain de l'horaire d'un créneau. */
 function horaire(type: string) {
   if (type === 'weekend') return 'du samedi 8 h au lundi 8 h'
@@ -315,18 +331,7 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
                           mission="en renfort"
                         />
                       )}
-                      {data.demain && (
-                        <div className="demain">
-                          <span aria-hidden="true">🔭</span>
-                          <span>
-                            <b>Demain :</b>{' '}
-                            {[data.demain.premier?.prenom, data.demain.second?.prenom]
-                              .filter(Boolean)
-                              .join(' & ')}{' '}
-                            prennent le relais ({natureCreneau(data.demain.type)}).
-                          </span>
-                        </div>
-                      )}
+                      {data.demain && <Demain garde={data.demain} />}
                     </>
                   ) : (
                     <p className="f-vide">
@@ -574,6 +579,30 @@ function aujourdhui() {
   return new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris' }).format(new Date())
 }
 
+/** Le relais du lendemain. Deux pièges évités : l'accord du verbe quand un
+ *  seul véto est de garde, et la garde SANS titulaire — `data.demain` peut
+ *  exister avec ses deux places vides, et la phrase devenait alors
+ *  « Demain :  prennent le relais », soit une coquille vide affirmative. */
+function Demain({ garde }: { garde: GardeDuSoir }) {
+  const noms = prenomsDe(garde)
+  return (
+    <div className="demain">
+      <span aria-hidden="true">🔭</span>
+      <span>
+        <b>Demain :</b>{' '}
+        {noms.length > 0 ? (
+          <>
+            {noms.join(' et ')} {accord(noms.length, 'prend', 'prennent')} le relais (
+            {natureCreneau(garde.type)}).
+          </>
+        ) : (
+          <>personne n&apos;est encore inscrit ({natureCreneau(garde.type)}).</>
+        )}
+      </span>
+    </div>
+  )
+}
+
 /** Une personne de garde : qui, à quel rang, et ce qu'elle fait.
  *  Pas d'horaire ici — les deux vétos d'un même créneau ont le même, et il est
  *  déjà écrit dans l'en-tête de la fenêtre. Le répéter par personne écrasait le
@@ -604,7 +633,9 @@ function CarteGarde({
 }
 
 function FicheCeSoir({ garde, onOpen }: { garde: GardeDuSoir | null; onOpen: () => void }) {
-  if (!garde) {
+  // Une garde peut exister avec ses deux places vides : ce n'est pas la meme
+  // chose qu'aucune garde, mais ca s'annonce pareil — sans nom a montrer.
+  if (!garde || prenomsDe(garde).length === 0) {
     return (
       <button type="button" className="widget" onClick={onOpen}>
         <span className="w-ico" aria-hidden="true">
@@ -620,7 +651,7 @@ function FicheCeSoir({ garde, onOpen }: { garde: GardeDuSoir | null; onOpen: () 
       </button>
     )
   }
-  const noms = [garde.premier?.prenom, garde.second?.prenom].filter(Boolean).join(' & ')
+  const noms = prenomsDe(garde).join(' & ')  // titre : l'esperluette passe bien
   return (
     <button type="button" className="widget" onClick={onOpen}>
       <span className="w-ico" aria-hidden="true">
@@ -693,11 +724,15 @@ function FicheCoherence({
 function MotDAccueil({ data }: { data: DonneesAccueil }) {
   const phrases: string[] = []
 
-  if (data.ceSoir) {
-    const noms = [data.ceSoir.premier?.prenom, data.ceSoir.second?.prenom]
-      .filter(Boolean)
-      .join(' et ')
-    phrases.push(`Ce soir, ${noms} ${data.ceSoir.second ? 'sont' : 'est'} de garde.`)
+  const nomsCeSoir = data.ceSoir ? prenomsDe(data.ceSoir) : []
+  if (nomsCeSoir.length > 0) {
+    // L'accord suit le NOMBRE DE NOMS, pas la presence d'un second : une garde
+    // ou seule la 2e place est pourvue existe, et « Jean sont de garde » aussi.
+    phrases.push(
+      `Ce soir, ${nomsCeSoir.join(' et ')} ${accord(nomsCeSoir.length, 'est', 'sont')} de garde.`,
+    )
+  } else if (data.ceSoir) {
+    phrases.push("La garde de ce soir n'a encore personne d'inscrit.")
   } else {
     phrases.push("Je ne vois aucune garde posée pour ce soir.")
   }
@@ -712,7 +747,7 @@ function MotDAccueil({ data }: { data: DonneesAccueil }) {
     if (data.joursAvantPublication !== null && data.recapPeriode) {
       phrases.push(
         data.joursAvantPublication > 0
-          ? `Il te reste ${data.joursAvantPublication} jours pour publier ${data.recapPeriode.libelle}.`
+          ? `Il te reste ${data.joursAvantPublication} ${accord(data.joursAvantPublication, 'jour', 'jours')} pour publier ${data.recapPeriode.libelle}.`
           : `${data.recapPeriode.libelle} aurait dû être publiée : le préavis d'un mois est dépassé.`,
       )
     }
