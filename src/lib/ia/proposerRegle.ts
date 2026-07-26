@@ -20,6 +20,35 @@ export function assistantIaDisponible(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY)
 }
 
+/**
+ * Le modèle qui fait la traduction. Réglable SANS TOUCHER AU CODE, par la
+ * variable d'environnement `GUARDVETO_IA_MODELE`.
+ *
+ * Pourquoi : le coût varie d'un facteur 5 entre les paliers (Opus 5 $/25 $ le
+ * million de tokens, Haiku 1 $/5 $) pour une tâche — traduire une phrase en
+ * règle structurée — que les petits modèles font peut-être aussi bien. Sans ce
+ * réglage, en mesurer un demandait un déploiement.
+ *
+ * Défaut inchangé : le comportement recetté ne bouge pas tant que personne ne
+ * pose la variable. Relu à CHAQUE appel, pas figé au chargement du module :
+ * sinon un banc d'essai ne pourrait pas comparer deux modèles dans un même
+ * processus.
+ */
+export function modeleIA(): string {
+  return process.env.GUARDVETO_IA_MODELE || 'claude-opus-4-8'
+}
+
+/** Le prompt système exact, exposé pour pouvoir en COMPTER les tokens sans
+ *  refaire un appel facturé (cf. bancs d'essai). */
+export function construireSystemIA(
+  vets: VetoResolu[],
+  typesCreneaux: TypeCreneauIA[],
+  tagsEquipe: string[],
+  rolesCabinet: string[],
+): string {
+  return systemPour(vets, typesCreneaux, tagsEquipe, rolesCabinet)
+}
+
 /** Un type de créneau du cabinet, injecté dynamiquement dans le prompt (n°19). */
 export interface TypeCreneauIA {
   /** Code EXACT (celui que le moteur compare aux gardes du planning). */
@@ -118,24 +147,14 @@ Niveau d'importance (force) :
 - evitee = simple préférence (évitée)
 - si_possible = simple préférence (si possible)`
 
-/**
- * proposerRegleIA — appelle Claude pour traduire `phrase` en proposition.
- * @throws si ANTHROPIC_API_KEY absente, ou si la réponse ne parse pas.
- */
-export async function proposerRegleIA(
-  phrase: string,
+/** Le prompt système, construit à part pour être TESTABLE et COMPTABLE en
+ *  tokens sans passer par un appel facturé. */
+function systemPour(
   vets: VetoResolu[],
-  typesCreneaux: TypeCreneauIA[] = [],
-  // Étiquettes réellement portées par l'équipe (composition_equipe, n°6).
-  tagsEquipe: string[] = [],
-  // Labels de rôles du catalogue du cabinet (role_interdit_tag, n°22).
-  rolesCabinet: string[] = [],
-): Promise<PropositionRegle> {
-  if (!assistantIaDisponible()) {
-    throw new Error('Assistant IA non configuré (clé API manquante).')
-  }
-
-  const client = new Anthropic()
+  typesCreneaux: TypeCreneauIA[],
+  tagsEquipe: string[],
+  rolesCabinet: string[],
+): string {
   const prenoms = vets.map((v) => v.prenom).join(', ')
   // Référentiel DYNAMIQUE des créneaux du cabinet (verrou 8 : jamais d'enum
   // figé) — l'IA doit utiliser ces CODES exacts dans `creneaux` (au_plus_n).
@@ -154,7 +173,7 @@ export async function proposerRegleIA(
     ? `Rôles de garde DE CE CABINET (les seuls utilisables dans "role_interdit") : ${rolesCabinet.map((r) => `${r}${r === 'premier' ? ' (1er)' : r === 'second' ? ' (2nd)' : ''}`).join(', ')}.\n`
     : ''
 
-  const system = `Tu es l'assistant de configuration de GuardVeto, un logiciel de planning de gardes vétérinaires. Ton rôle : traduire une demande en langage naturel en UNE règle structurée que le moteur sait appliquer. Tu PROPOSES seulement — un humain validera avant création.
+  return `Tu es l'assistant de configuration de GuardVeto, un logiciel de planning de gardes vétérinaires. Ton rôle : traduire une demande en langage naturel en UNE règle structurée que le moteur sait appliquer. Tu PROPOSES seulement — un humain validera avant création.
 
 Vétérinaires du cabinet (utilise EXACTEMENT ces prénoms) : ${prenoms}.
 ${blocCreneaux}${blocTags}${blocRoles}
@@ -168,9 +187,30 @@ Règles de comportement :
 - Choisis une force par défaut raisonnable si l'utilisateur ne la précise pas (souvent sauf_crise, ou jamais pour une interdiction nette).
 - N'invente jamais un prénom hors de la liste.
 - N'invente jamais un code de créneau : "creneaux" n'accepte QUE les codes listés ci-dessus (sinon laisse creneaux=null).`
+}
+
+/**
+ * proposerRegleIA — appelle Claude pour traduire `phrase` en proposition.
+ * @throws si ANTHROPIC_API_KEY absente, ou si la réponse ne parse pas.
+ */
+export async function proposerRegleIA(
+  phrase: string,
+  vets: VetoResolu[],
+  typesCreneaux: TypeCreneauIA[] = [],
+  // Étiquettes réellement portées par l'équipe (composition_equipe, n°6).
+  tagsEquipe: string[] = [],
+  // Labels de rôles du catalogue du cabinet (role_interdit_tag, n°22).
+  rolesCabinet: string[] = [],
+): Promise<PropositionRegle> {
+  if (!assistantIaDisponible()) {
+    throw new Error('Assistant IA non configuré (clé API manquante).')
+  }
+
+  const client = new Anthropic()
+  const system = systemPour(vets, typesCreneaux, tagsEquipe, rolesCabinet)
 
   const response = await client.messages.parse({
-    model: 'claude-opus-4-8',
+    model: modeleIA(),
     max_tokens: 4000,
     thinking: { type: 'adaptive' },
     system,
