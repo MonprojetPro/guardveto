@@ -651,6 +651,110 @@
 }
 
 /* ============================================================
+   PARLER À FILOU · le champ de la tablette
+   ============================================================
+   La maquette montrait un fil de discussion sans champ pour répondre. Le
+   voici : une seule ligne qui grandit, la flèche d'envoi au bout. Entrée
+   envoie, Maj+Entrée passe à la ligne.
+   Réservé aux admins : l'assistant qui traduit une phrase en règle est
+   admin-only côté serveur, et un champ qui répondrait « accès refusé » à
+   chaque essai ne vaudrait pas mieux que pas de champ du tout. */
+.saisie {
+  display: flex; align-items: flex-end; gap: 7px;
+  margin-top: 9px;
+  padding: 5px 5px 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.saisie:focus-within {
+  border-color: var(--accent-ink);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.saisie-champ {
+  flex: 1 1 auto; min-width: 0;
+  border: none; background: none; resize: none;
+  padding: 7px 0;
+  font-family: var(--font-body);
+  font-size: 0.8rem; line-height: 1.45;
+  color: var(--text);
+  /* Grandit avec le texte jusqu'à 4 lignes, puis défile : la tablette ne doit
+     pas se faire manger par le champ. */
+  max-height: 4.6em;
+  field-sizing: content;
+}
+.saisie-champ:focus { outline: none; }
+.saisie-champ::placeholder { color: var(--soft); }
+.saisie-envoi {
+  flex: none;
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  border: none; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  box-shadow: 0 2px 7px var(--accent-glow);
+  transition: filter 0.18s ease, opacity 0.18s ease;
+}
+.saisie-envoi svg { width: 17px; height: 17px; }
+.saisie-envoi:hover:not(:disabled) { filter: brightness(1.08); }
+.saisie-envoi:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+/* Trois amorces, le temps de la première fois seulement. */
+.saisie-exemples { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.ex-chip {
+  border: 1px dashed var(--border-strong);
+  background: transparent; color: var(--soft);
+  border-radius: 999px;
+  font-size: 0.68rem; font-weight: 600;
+  padding: 4px 9px;
+  text-align: left;
+  transition: color 0.18s ease, border-color 0.18s ease;
+}
+.ex-chip:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
+
+/* ------ La proposition de Filou, dans sa bulle ------
+   Elle porte une DÉCISION : rien n'est enregistré tant que le bouton n'a pas
+   été cliqué. L'aperçu est donc mis en avant comme une citation, et la
+   puissance annoncée en clair — « interdiction ferme » et « préférence » ne
+   produisent pas le même planning. */
+.prop-apercu {
+  display: block;
+  margin: 5px 0 7px;
+  padding: 7px 9px;
+  border-left: 3px solid var(--accent);
+  border-radius: 4px 9px 9px 4px;
+  background: var(--accent-soft);
+  font-size: 0.79rem; line-height: 1.5;
+}
+.prop-force { font-size: 0.72rem; color: var(--muted); margin-bottom: 6px; }
+.prop-lien {
+  border: none; background: none; padding: 0;
+  color: var(--accent-ink);
+  font: inherit; font-weight: 700;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.prop-crans { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+.prop-cran {
+  border: 1px solid var(--border);
+  background: transparent; color: var(--muted);
+  border-radius: 999px;
+  font-size: 0.68rem; font-weight: 600;
+  padding: 4px 9px;
+  transition: color 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
+}
+.prop-cran:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
+.prop-cran.actif {
+  color: var(--text); font-weight: 700;
+  border-color: var(--accent); background: var(--accent-soft);
+}
+.prop-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.prop-verdict { font-size: 0.72rem; font-weight: 600; color: var(--muted); margin-top: 4px; }
+.prop-verdict.ok { color: var(--ok); }
+.bubble-attente { color: var(--muted); font-style: italic; }
+/* La bulle de proposition a besoin de largeur : 86 % coupait les boutons en
+   deux sur la tablette. */
+.msg.filou .bubble:has(.prop-apercu) { max-width: 100%; }
+
+/* ============================================================
    LE TABLEAU D'AFFICHAGE DU CABINET (droite) · la scène se lit :
    l'assistant et sa tablette / ta tablette / LE TABLEAU du
    cabinet — l'objet qu'on trouve dans toute salle de repos.

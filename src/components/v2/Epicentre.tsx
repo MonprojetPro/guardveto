@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { FilouCube, type FilouHandle } from './FilouCube'
+import { FilouChat } from './FilouChat'
 import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
 import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
 import type { DonneesAccueil, GardeDuSoir } from '@/data/v2/accueilEpicentre'
@@ -193,30 +194,37 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
                     <h1>{majuscule(dateLongue(data.ceSoir?.date ?? aujourdhui()))}</h1>
                   </header>
 
-                  <div className="thread" aria-live="polite" aria-label="Ce que Filou a préparé">
-                    <MotDAccueil data={data} />
-                  </div>
-
-                  <div className="chips" role="group" aria-label="Ouvrir une fiche">
-                    <button type="button" className="chip" onClick={() => ouvrir('cesoir')}>
-                      Garde de ce soir
-                    </button>
-                    {data.estAdmin && nbSouhaits > 0 && (
-                      <button type="button" className="chip" onClick={() => ouvrir('souhaits')}>
-                        Souhaits en attente
-                      </button>
-                    )}
-                    {data.estAdmin && data.recapPeriode && (
-                      <button type="button" className="chip" onClick={() => ouvrir('periode')}>
-                        Période à préparer
-                      </button>
-                    )}
-                    {data.estAdmin && (
-                      <button type="button" className="chip" onClick={() => ouvrir('coherence')}>
-                        Vérification du planning
-                      </button>
-                    )}
-                  </div>
+                  {/* Le fil, les pastilles, et le champ pour PARLER à Filou.
+                      C'est FilouChat qui tient la conversation : il appelle le
+                      même assistant que l'écran Règles et crée par les mêmes
+                      actions serveur. */}
+                  <FilouChat
+                    estAdmin={data.estAdmin}
+                    onFilouTape={() => filou.current?.tape()}
+                    enTete={<MotDAccueil data={data} />}
+                    pastilles={
+                      <div className="chips" role="group" aria-label="Ouvrir une fiche">
+                        <button type="button" className="chip" onClick={() => ouvrir('cesoir')}>
+                          Garde de ce soir
+                        </button>
+                        {data.estAdmin && nbSouhaits > 0 && (
+                          <button type="button" className="chip" onClick={() => ouvrir('souhaits')}>
+                            Souhaits en attente
+                          </button>
+                        )}
+                        {data.estAdmin && data.recapPeriode && (
+                          <button type="button" className="chip" onClick={() => ouvrir('periode')}>
+                            Période à préparer
+                          </button>
+                        )}
+                        {data.estAdmin && (
+                          <button type="button" className="chip" onClick={() => ouvrir('coherence')}>
+                            Vérification du planning
+                          </button>
+                        )}
+                      </div>
+                    }
+                  />
                 </div>
               </div>
             </div>
