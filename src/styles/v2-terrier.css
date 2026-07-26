@@ -1057,21 +1057,48 @@
 .app-bar {
   display: flex; align-items: center; gap: 10px;
   margin: 14px 0;
-  padding: 8px 9px 8px 20px;
+  /* À gauche, 9px comme à droite : la binette porte déjà son propre fond,
+     elle n'a pas besoin du retrait que réclamait le mot-marque en lettres. */
+  padding: 8px 9px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 999px;
   box-shadow: var(--edge-light), 3px 8px 22px rgba(120, 70, 18, 0.12), 1px 2px 5px rgba(120, 70, 18, 0.08);
 }
 .ab-ident { display: flex; align-items: center; gap: 10px; flex: none; }
-/* La marque, en lettres seules : Figtree serré, « Veto » en encre
-   renarde — le seul clin d'œil, typographique et sobre. */
-.ab-name {
-  font-family: var(--font-display);
-  font-weight: 800; font-size: 1rem; letter-spacing: -0.022em;
-  color: var(--text);
+/* LA BINETTE — la marque du produit, et le retour à l'accueil. Un squircle
+   plutôt qu'un rond : les oreilles de Filou survivent au cadrage, alors
+   qu'un cercle les rognerait aux quatre coins. */
+.ab-filou {
+  display: grid; place-items: center;
+  width: 42px; height: 42px; flex: none;
+  border-radius: 15px;
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--border);
+  transition: transform 0.28s var(--ease-out), box-shadow 0.28s ease, background 0.28s ease;
+  -webkit-tap-highlight-color: transparent;
 }
-.ab-name em { font-style: normal; color: var(--accent-ink); }
+.ab-filou-img {
+  width: 40px; height: 40px; display: block;
+  /* La tête est cadrée avec de l'air : on la remonte d'un cheveu pour que le
+     regard tombe au centre optique du squircle, pas au centre géométrique. */
+  transform: translateY(-1px);
+}
+.ab-filou:hover, .ab-filou:focus-visible {
+  transform: translateY(-1px) scale(1.05);
+  background: var(--accent-glow);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+/* Déjà chez lui : on le dit sans l'éteindre — Filou reste net, le contour
+   prend l'encre renarde, et le curseur cesse de promettre un ailleurs. */
+.ab-filou.ici {
+  cursor: default;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.ab-filou.ici:hover { transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .ab-filou, .ab-filou:hover, .ab-filou:focus-visible { transition: none; transform: none; }
+}
 .ab-user {
   font-size: 0.78rem; font-weight: 600; color: var(--muted);
   padding-left: 10px;
@@ -1217,6 +1244,15 @@
 .dock-item:hover .di-text::after, .dock-item:focus-visible .di-text::after {
   transform: scaleX(1);
 }
+/* L'ÉCRAN OÙ L'ON EST : son entrée reste dépliée, libellé compris. Le dock
+   répond ainsi à « où suis-je ? » sans qu'on ait à survoler pour deviner.
+   Même mécanique que le survol — donc rien de neuf à apprendre. */
+.dock-item.ici {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+.dock-item.ici .di-flap { grid-template-columns: 1fr; opacity: 1; }
+.dock-item.ici .di-text::after { transform: scaleX(1); }
 
 /* ============================================================
    RESPONSIVE

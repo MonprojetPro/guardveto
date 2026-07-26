@@ -1,5 +1,7 @@
+'use client'
+
 // ============================================================
-// GUARDVETO V2 — La barre : identité, dock des six espaces, compte
+// GUARDVETO V2 — La barre : la binette de Filou, le dock, le compte
 // ============================================================
 // Au repos, le dock n'affiche que des icônes ; l'entrée survolée SE DÉPLIE et
 // son libellé glisse à côté. Chaque pastille (`.di-pip`) porte une VRAIE
@@ -7,9 +9,20 @@
 // Aucune pastille décorative — une pastille qui ne veut rien dire apprend à
 // l'utilisateur à ne plus les regarder.
 // Porté depuis `maquette/m6-accueil-epicentre.html`.
+//
+// LA BINETTE, à gauche, RAMÈNE À L'ACCUEIL. Elle remplace le mot-marque
+// « GuardVeto » : l'accueil, c'est le bureau de Filou, donc c'est lui la porte.
+// Sans elle, quitter l'accueil était un aller sans retour — le dock ne le
+// listait pas (aucun chemin de retour hors saisie d'URL).
+//
+// Client, pour une seule raison : `usePathname()`. On sait ainsi OÙ ON EST et
+// on le montre (`aria-current` + entrée dépliée). Un dock sans page courante
+// laisse l'utilisateur se demander sur quel écran il a atterri.
 // ============================================================
 
 import Link from 'next/link'
+import Image from 'next/image'
+import { usePathname } from 'next/navigation'
 import { logout } from '@/app/login/actions'
 import type { DonneesAccueil } from '@/data/v2/accueilEpicentre'
 
@@ -20,6 +33,15 @@ interface Props {
 }
 
 export function BarreV2({ prenom, estAdmin, dock }: Props) {
+  const chemin = usePathname()
+  /** Vrai sur l'écran lui-même comme sur ses sous-pages. */
+  const ici = (href: string) => chemin === href || chemin.startsWith(href + '/')
+  /** Classes + `aria-current` d'un coup : la page courante se voit ET s'annonce. */
+  const entree = (href: string) => ({
+    className: `dock-item${ici(href) ? ' ici' : ''}`,
+    'aria-current': ici(href) ? ('page' as const) : undefined,
+  })
+
   const brouillon = dock.statutPlanning === 'brouillon'
   const libellePlanning = dock.statutPlanning
     ? `Planning · ${brouillon ? 'Brouillon ' : ''}${dock.libellePlanning}`
@@ -36,14 +58,27 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
   return (
     <header className="app-bar rise" aria-label="Barre GuardVeto">
       <div className="ab-ident">
-        <span className="ab-name">
-          Guard<em>Veto</em>
-        </span>
+        <Link
+          className={`ab-filou${ici('/accueil') ? ' ici' : ''}`}
+          href="/accueil"
+          aria-label="Accueil · le bureau de Filou"
+          aria-current={ici('/accueil') ? 'page' : undefined}
+          title="Accueil"
+        >
+          <Image
+            src="/filou/filou-tete.webp"
+            alt=""
+            width={40}
+            height={40}
+            priority
+            className="ab-filou-img"
+          />
+        </Link>
         <span className="ab-user">{prenom}</span>
       </div>
 
       <nav className="dock-menu" aria-label="Les espaces de GuardVeto">
-        <Link className="dock-item" href="/planning" aria-label={libellePlanning}>
+        <Link {...entree('/planning')} href="/planning" aria-label={libellePlanning}>
           <span className="di-ico" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3.5" y="5" width="17" height="15.5" rx="4.5" />
@@ -57,7 +92,7 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
           </span>
         </Link>
 
-        <Link className="dock-item" href="/absences" aria-label={libelleAbsences}>
+        <Link {...entree('/absences')} href="/absences" aria-label={libelleAbsences}>
           <span className="di-ico" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <path d="M7.3 9.2a5.6 5.6 0 0 1 9.6-2.5" />
@@ -74,7 +109,7 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
 
         {estAdmin && (
           <Link
-            className="dock-item"
+            {...entree('/equipe')}
             href="/equipe"
             aria-label={`Équipe · ${dock.nbVetos} vétérinaires`}
           >
@@ -94,7 +129,7 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
 
         {estAdmin && (
           <Link
-            className="dock-item"
+            {...entree('/regles')}
             href="/regles"
             aria-label={`Règles du cabinet · ${dock.nbReglesFermes} fermes, ${dock.nbReglesSouples} souples`}
           >
@@ -114,7 +149,7 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
           </Link>
         )}
 
-        <Link className="dock-item" href="/historique" aria-label="Historique et compteurs">
+        <Link {...entree('/historique')} href="/historique" aria-label="Historique et compteurs">
           <span className="di-ico" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12.6" r="7.4" />
@@ -129,7 +164,7 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
 
         {estAdmin && (
           <Link
-            className="dock-item"
+            {...entree('/reglages')}
             href="/reglages"
             aria-label={dock.agendaConnecte ? 'Réglages · agenda connecté' : 'Réglages du cabinet'}
           >
