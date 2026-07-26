@@ -26,7 +26,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { SortieIaSchema, normaliserProposition } from './regleSchema'
-import { construireSystemIA } from './proposerRegle'
+import { construireSystemIA, modeleIA } from './proposerRegle'
 import type { ContexteIA } from './contexteCabinet'
 
 /** Tarifs publics, en dollars par MILLION de tokens (relevés le 2026-07-26).
@@ -101,6 +101,57 @@ export function phrasesEpreuve(ctx: ContexteIA): PhraseEpreuve[] {
   ]
 }
 
+/**
+ * JEU COMPLET — une demande par type de règle, plus les pièges de
+ * désambiguïsation que le catalogue prend soin d'écarter.
+ *
+ * C'est le FILET DE SÉCURITÉ pour toucher au prompt : le jeu rapide n'exerce
+ * que 3 types sur 19, donc un catalogue raccourci pourrait casser les 16 autres
+ * sans que rien ne le signale. Ici, une régression se voit.
+ *
+ * Les étiquettes : trois types (composition_equipe, role_interdit_tag,
+ * equilibrer) n'ont de sens que si le cabinet en a posé. Quand ce n'est pas le
+ * cas, le contexte est ENRICHI de « junior » / « senior » — sans quoi la bonne
+ * réponse serait un refus et ces types resteraient intestés.
+ */
+export function phrasesCompletes(ctx: ContexteIA): PhraseEpreuve[] {
+  const a = ctx.vets[0]?.prenom ?? 'Manon'
+  const b = ctx.vets[1]?.prenom ?? 'Victor'
+  const c = ctx.vets[2]?.prenom ?? 'Antoine'
+  const tag = ctx.tagsEquipe[0] ?? 'junior'
+
+  return [
+    { texte: `${a} ne fait jamais de garde le mercredi`, attendu: 'interdire_creneau', quoi: '1 · Interdiction d’un jour' },
+    { texte: `${a} est en repos le lundi si elle a fait le week-end, sinon le mardi`, attendu: 'repos_conditionnel', quoi: '2 · Repos conditionnel' },
+    { texte: `${b} est indisponible les soirs de semaine une semaine sur deux, les semaines paires`, attendu: 'alternance_ancre', quoi: '3 · Alternance ancrée' },
+    { texte: `${a} et ${b} ne doivent jamais être de garde seuls tous les deux`, attendu: 'duo_interdit', quoi: '4 · Duo interdit' },
+    { texte: `${c} fait au plus 2 week-ends par mois`, attendu: 'au_plus_n', quoi: '5 · Plafond (piège : pas une fréquence)' },
+    { texte: `Au moins 3 jours entre deux gardes pour ${c}`, attendu: 'espacement_min', quoi: '6 · Espacement minimum' },
+    { texte: `${a} veut au moins 2 jours de repos entre ses gardes`, attendu: 'espacement_min', quoi: '6 bis · « repos entre gardes » = espacement' },
+    { texte: `${b} ne prend qu’un week-end sur trois`, attendu: 'espacement_weekend', quoi: '7 · Fréquence de week-ends' },
+    { texte: `Un ${tag} n’est jamais seul de garde`, attendu: 'composition_equipe', quoi: '8 · Composition d’équipe' },
+    { texte: `Un ${tag} n’est jamais 1er de garde`, attendu: 'role_interdit_tag', quoi: '9 · Rôle interdit par étiquette' },
+    { texte: `${a} préfère être de garde le mardi`, attendu: 'preferer_creneau', quoi: '10 · Préférence de créneau' },
+    { texte: `${c} préfère être de garde avec ${b}`, attendu: 'preferer_avec', quoi: '11 · Préférence de binôme (souple)' },
+    { texte: `${b} souhaite faire plus de gardes que les autres`, attendu: 'volume_gardes', quoi: '12 · Volume de gardes' },
+    { texte: 'Pas de garde de semaine juste après un week-end', attendu: 'succession_interdite', quoi: '13 · Succession interdite' },
+    { texte: `Jamais plus de 3 jours de garde d’affilée pour ${a}`, attendu: 'serie_max', quoi: '14 · Série maximale' },
+    { texte: `Après 2 jours de garde d’affilée, ${c} doit avoir 2 jours sans garde`, attendu: 'repos_apres_serie', quoi: '15 · Repos après série' },
+    { texte: `${b} est pompier volontaire : il est pris un week-end sur trois à partir du samedi 5 septembre 2026`, attendu: 'cadencement_weekend', quoi: '16 · Cadencement ancré (piège : pas le type 7)' },
+    { texte: `${a} ne veut pas faire Noël et le Nouvel An la même année`, attendu: 'exclusion_dates', quoi: '17 · Exclusion « pas les deux »' },
+    { texte: `Répartis équitablement les week-ends entre les ${tag}s`, attendu: 'equilibrer', quoi: '18 · Équité par cohorte' },
+    { texte: `${c} n’est de garde que si ${b} est de garde avec lui`, attendu: 'seulement_avec', quoi: '19 · Garde conditionnelle (piège : pas le type 11)' },
+    { texte: 'Il faudrait repeindre la salle d’attente en bleu', attendu: null, quoi: 'Hors sujet — doit être REFUSÉ' },
+  ]
+}
+
+/** Le contexte utilisé par le jeu complet : les étiquettes sont ajoutées si le
+ *  cabinet n'en a pas, sinon trois types resteraient intestés. */
+export function contextePourJeuComplet(ctx: ContexteIA): ContexteIA {
+  if (ctx.tagsEquipe.length > 0) return ctx
+  return { ...ctx, tagsEquipe: ['junior', 'senior'] }
+}
+
 export interface LigneBanc {
   modele: string
   nomModele: string
@@ -167,15 +218,39 @@ export interface ResultatBanc {
  * rafale parallèle sur trois modèles risquerait un 429 qui fausserait les
  * latences mesurées.
  */
-export async function lancerBancEssai(ctx: ContexteIA): Promise<ResultatBanc> {
+export interface OptionsBanc {
+  /** `rapide` : 4 phrases × 3 paliers, pour comparer les modèles.
+   *  `complet` : une demande par type de règle sur UN SEUL palier, pour vérifier
+   *  qu'une modification du prompt n'a rien cassé. */
+  jeu?: 'rapide' | 'complet'
+  /** Restreint la mesure à ces modèles (le jeu complet n'en teste qu'un). */
+  modeles?: string[]
+}
+
+export async function lancerBancEssai(
+  ctx: ContexteIA,
+  options: OptionsBanc = {},
+): Promise<ResultatBanc> {
+  const complet = options.jeu === 'complet'
   const client = new Anthropic()
+
+  // Le jeu complet enrichit le contexte d'étiquettes si le cabinet n'en a pas,
+  // sinon trois types de règles resteraient intestés.
+  const ctxUtilise = complet ? contextePourJeuComplet(ctx) : ctx
   const system = construireSystemIA(
-    ctx.vets,
-    ctx.typesCreneaux,
-    ctx.tagsEquipe,
-    ctx.rolesCabinet,
+    ctxUtilise.vets,
+    ctxUtilise.typesCreneaux,
+    ctxUtilise.tagsEquipe,
+    ctxUtilise.rolesCabinet,
   )
-  const phrases = phrasesEpreuve(ctx)
+  const phrases = complet ? phrasesCompletes(ctxUtilise) : phrasesEpreuve(ctxUtilise)
+  const paliers = options.modeles?.length
+    ? PALIERS.filter((p) => options.modeles!.includes(p.modele))
+    : complet
+      ? // Par défaut, le jeu complet tourne sur le modèle du produit : on
+        // vérifie le prompt, pas les paliers.
+        PALIERS.filter((p) => p.modele === modeleIA())
+      : PALIERS
   // Le prompt est mis en cache comme en production : sans ça, le banc mesurerait
   // un coût que le produit ne paie plus.
   const systemAvecCache = [
@@ -184,7 +259,7 @@ export async function lancerBancEssai(ctx: ContexteIA): Promise<ResultatBanc> {
 
   // ── 1. Le poids du prompt (comptage exact, non facturé) ──
   const poids: PoidsPrompt[] = []
-  for (const p of PALIERS) {
+  for (const p of paliers) {
     try {
       const { input_tokens } = await client.messages.countTokens({
         model: p.modele,
@@ -210,7 +285,7 @@ export async function lancerBancEssai(ctx: ContexteIA): Promise<ResultatBanc> {
 
   // ── 2. Qualité et coût réel, palier par palier ──
   const lignes: LigneBanc[] = []
-  for (const p of PALIERS) {
+  for (const p of paliers) {
     for (const phrase of phrases) {
       const t0 = Date.now()
       try {
@@ -283,7 +358,7 @@ export async function lancerBancEssai(ctx: ContexteIA): Promise<ResultatBanc> {
     }
   }
 
-  const resume: ResumeModele[] = PALIERS.map((p) => {
+  const resume: ResumeModele[] = paliers.map((p) => {
     const r = lignes.filter((l) => l.modele === p.modele)
     return {
       modele: p.modele,

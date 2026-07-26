@@ -27,7 +27,9 @@ export type ResultatBancAction = { error: string } | { resultat: ResultatBanc }
  * Lance le banc d'essai. Admin-only : la garde est ici, côté serveur — masquer
  * l'écran ne protégerait rien.
  */
-export async function lancerBanc(): Promise<ResultatBancAction> {
+export async function lancerBanc(
+  jeu: 'rapide' | 'complet' = 'rapide',
+): Promise<ResultatBancAction> {
   const supabase = await createClient()
 
   const {
@@ -52,7 +54,7 @@ export async function lancerBanc(): Promise<ResultatBancAction> {
 
   try {
     const ctx = await chargerContexteIA(supabase)
-    const resultat = await lancerBancEssai(ctx)
+    const resultat = await lancerBancEssai(ctx, { jeu })
     return { resultat }
   } catch (e) {
     // On rend l'erreur brute : sur un banc de mesure, une erreur d'API

@@ -24,10 +24,11 @@ export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
   const [erreur, setErreur] = useState<string | null>(null)
   const [enCours, demarrer] = useTransition()
 
-  const lancer = () => {
+  const lancer = (jeu: 'rapide' | 'complet') => {
     setErreur(null)
+    setResultat(null)
     demarrer(async () => {
-      const r = await lancerBanc()
+      const r = await lancerBanc(jeu)
       if ('error' in r) setErreur(r.error)
       else setResultat(r.resultat)
     })
@@ -44,22 +45,39 @@ export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
       </header>
 
       <section className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 text-sm">
-        <p className="font-semibold">⚠️ Ce bouton dépense de l’argent réel</p>
+        <p className="font-semibold">⚠️ Ces boutons dépensent de l’argent réel</p>
         <p className="mt-1 text-muted-foreground">
-          12 appels facturés (3 paliers × 4 phrases), soit <b>environ 30 à 40 centimes</b> par
-          exécution. Les 3 comptages de tokens, eux, sont gratuits. Ne relance que si tu as changé
-          quelque chose.
+          Chaque exécution fait de vrais appels facturés. Ne relance que si tu as changé quelque
+          chose. Les comptages de tokens, eux, sont gratuits.
         </p>
       </section>
 
-      <button
-        type="button"
-        onClick={lancer}
-        disabled={enCours}
-        className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-      >
-        {enCours ? 'Mesure en cours… (1 à 3 minutes)' : 'Lancer la mesure'}
-      </button>
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={() => lancer('rapide')}
+          disabled={enCours}
+          className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+        >
+          {enCours ? 'Mesure en cours…' : 'Comparer les 3 modèles (~15 ¢)'}
+        </button>
+        <button
+          type="button"
+          onClick={() => lancer('complet')}
+          disabled={enCours}
+          className="rounded-md border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+        >
+          {enCours ? 'Mesure en cours…' : 'Vérifier les 19 types de règles (~10 ¢)'}
+        </button>
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        <b>Comparer les 3 modèles</b> : 4 demandes sur chaque palier, pour décider lequel utiliser.
+        <br />
+        <b>Vérifier les 19 types</b> : une demande par type de règle, sur le modèle actuel
+        uniquement. C’est le filet de sécurité à passer <b>après toute modification du catalogue</b>
+        — le jeu court n’exerce que 3 types sur 19.
+      </p>
 
       {enCours && (
         <p className="text-sm text-muted-foreground" role="status">
