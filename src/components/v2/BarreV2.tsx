@@ -59,22 +59,29 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
     <header className="app-bar rise" aria-label="Barre GuardVeto">
       <div className="ab-ident">
         <Link
-          className={`ab-filou${ici('/accueil') ? ' ici' : ''}`}
+          className={`ab-porte${ici('/accueil') ? ' ici' : ''}`}
           href="/accueil"
           aria-label="Accueil · le bureau de Filou"
           aria-current={ici('/accueil') ? 'page' : undefined}
           title="Accueil"
         >
-          <Image
-            src="/filou/filou-tete.webp"
-            alt=""
-            width={40}
-            height={40}
-            priority
-            className="ab-filou-img"
-          />
+          <span className="ab-filou">
+            <Image
+              src="/filou/filou-tete.webp"
+              alt=""
+              width={40}
+              height={40}
+              priority
+              className="ab-filou-img"
+            />
+          </span>
+          <span className="ab-marque">
+            <span className="ab-name">
+              Guard<em>Veto</em>
+            </span>
+            <span className="ab-user">{prenom}</span>
+          </span>
         </Link>
-        <span className="ab-user">{prenom}</span>
       </div>
 
       <nav className="dock-menu" aria-label="Les espaces de GuardVeto">
