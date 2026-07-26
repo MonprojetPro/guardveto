@@ -206,3 +206,48 @@ Le message disait « plafond trop élevé (maximum 14) ». MiKL : *le 14 est arb
 1. **Tout texte nominatif dans un template = bombe multi-cabinet.** « Anne-Sophie » signait en dur les e-mails de congés (brevo.ts) : parfait pour le pilote, faux pour tout autre abonné. Règle : les templates reçoivent l'identité (signature, expéditeur) en PARAMÈTRE avec un repli générique — et le repli ne doit JAMAIS être une adresse/nom réels (D4 : refuser d'envoyer vaut mieux qu'usurper l'adresse du pilote).
 
 2. **Avant de gater une route « admin-only », grep ses consumers.** `/api/gardes/[id]/disponibilites` semblait réservée à la réattribution admin, mais la modale de garde est PARTAGÉE admin/véto : le véto en lit les métadonnées (verrouillage, type, échange). Un 403 sec aurait cassé le parcours véto en silence. Pattern retenu : dégrader la réponse par rôle (`vets: []`) plutôt que bloquer — la donnée sensible n'est ni calculée ni servie, l'UI existante ne change pas.
+
+## 2026-07-26 — Assistant IA cassé en silence, et le piège de la limite « pile »
+
+**Le fait.** L'assistant IA (traduction phrase → règle), recetté et validé
+plusieurs semaines plus tôt, était **cassé en production** : toute demande
+renvoyait un `400 invalid_request_error`. Découvert par hasard, en construisant
+un banc de mesure de coût. Personne ne s'en était aperçu : la panne ne se
+manifeste que quand on utilise la fonctionnalité, et plus personne n'y allait.
+
+**Deux plafonds API sur les schémas de sortie structurée**, découverts l'un
+après l'autre — le premier masquait le second :
+
+| Plafond | Ce qui compte | Notre schéma |
+|---|---|---|
+| **16** | paramètres à **union** (un champ `nullable` → `type: [x, "null"]`) | 30 ❌ |
+| **24** | paramètres **optionnels** | 30 ❌ |
+
+**Trois leçons.**
+
+1. **Une fonctionnalité recettée puis laissée sans usage peut casser en
+   silence.** Le code n'a pas changé — c'est la plateforme en face qui a évolué.
+   Tout ce qui dépend d'une API externe et n'est pas exercé régulièrement mérite
+   soit un test de fumée périodique, soit une vérification avant chaque
+   démonstration client.
+
+2. **Atteindre une limite « pile » est un piège quand le compte est condamné à
+   grandir.** Fusionner des champs pour passer de 30 à 24 aurait « marché » — et
+   recassé au prochain type de règle ajouté, alors que le projet a précisément
+   pour objectif de rendre *toutes* les règles configurables. La bonne réponse
+   était de **découpler la forme externe** (contrainte par l'API) **de la forme
+   interne** (dictée par le métier) : 7 champs figés côté API, les paramètres
+   variables voyageant dans une chaîne JSON. Le compte ne bougera plus jamais.
+
+3. **Découpler ne veut pas dire perdre la validation — elle se déplace.** Chaque
+   paramètre déplié est re-validé *individuellement* contre le schéma interne :
+   un champ mal typé devient `null` **seul**, sans emporter ses voisins corrects
+   ni traverser jusqu'au moteur de planning. Un JSON illisible dégrade la
+   proposition au lieu de faire tomber l'assistant.
+
+**Règle retenue.** Ne jamais remettre un champ par paramètre dans un schéma
+envoyé à un modèle. Un nouveau type de règle = de nouveaux paramètres dans
+`params_json` et dans le catalogue du prompt, **rien** dans `SortieIaSchema`.
+(À noter : un objet à clés libres n'est pas une alternative — Zod rend
+`z.record()` en `{properties: {}, additionalProperties: false}`, soit un objet
+obligatoirement vide.)
