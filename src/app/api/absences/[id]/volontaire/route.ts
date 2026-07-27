@@ -54,8 +54,9 @@ export const maxDuration = 60
 
 // ── Client service_role (écriture privilégiée APRÈS validation stricte) ──
 function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  // `.trim()` : retour à la ligne invisible collé par l'interface Vercel.
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
   if (!url || !key) throw new Error('Variables Supabase service manquantes.')
   return createServiceClient(url, key)
 }

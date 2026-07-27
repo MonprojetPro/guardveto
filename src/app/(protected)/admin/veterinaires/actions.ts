@@ -168,8 +168,8 @@ export async function inviterVeterinaire(id: string) {
 
   // Client admin avec service_role
   const adminClient = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_URL!.trim(),
+    process.env.SUPABASE_SERVICE_ROLE_KEY!.trim()
   )
 
   // Vérifie si un compte auth existe déjà pour cet email

@@ -15,6 +15,7 @@ import {
   PropositionRelationSchema,
   type PropositionRelation,
 } from './relationSchema'
+import { cleIA } from './proposerRegle'
 
 /** Décrit ce qu'est une liaison et son périmètre (anti-coquille-vide). */
 const STRUCTURE_PROMPT = `Une LIAISON relie deux types de garde d'un profil de planning. Le moteur relie chaque garde du SECOND créneau à la garde du PREMIER créneau qui la précède immédiatement (dans les 7 jours), puis applique la règle choisie :
@@ -42,11 +43,11 @@ export async function proposerRelationIA(
   phrase: string,
   catalogueTexte: string,
 ): Promise<PropositionRelation> {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!cleIA()) {
     throw new Error('Assistant IA non configuré (clé API manquante).')
   }
 
-  const client = new Anthropic()
+  const client = new Anthropic({ apiKey: cleIA() })
 
   const system = `Tu es l'assistant de configuration de GuardVeto, un logiciel de planning de gardes vétérinaires. Ton rôle : traduire une demande en langage naturel en UNE liaison entre deux types de garde. Tu PROPOSES seulement — un humain validera avant création.
 

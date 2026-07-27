@@ -18,7 +18,17 @@ import {
 
 /** L'assistant est-il configuré (clé API présente) ? */
 export function assistantIaDisponible(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY)
+  return Boolean(cleIA())
+}
+
+/**
+ * La clé API, nettoyée. Le SDK la lirait tout seul dans l'environnement, mais
+ * SANS la trimmer : une valeur collée dans l'interface Vercel embarque souvent
+ * un retour à la ligne invisible, qui rend l'en-tête d'authentification
+ * invalide. On la passe donc explicitement à chaque client.
+ */
+export function cleIA(): string | undefined {
+  return process.env.ANTHROPIC_API_KEY?.trim()
 }
 
 /**
@@ -199,7 +209,7 @@ export async function proposerRegleIA(
     throw new Error('Assistant IA non configuré (clé API manquante).')
   }
 
-  const client = new Anthropic()
+  const client = new Anthropic({ apiKey: cleIA() })
   const system = systemPour(vets, typesCreneaux, tagsEquipe, rolesCabinet)
 
   const response = await client.messages.parse({

@@ -70,7 +70,7 @@ function typeLabel(type: string): string {
 }
 
 function appUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL ?? 'https://guardveto.vercel.app'
+  return process.env.NEXT_PUBLIC_APP_URL?.trim() || 'https://guardveto.vercel.app'
 }
 
 // ── Envoi via API Brevo (fetch) ───────────────────────────────
@@ -79,17 +79,20 @@ async function sendViaBrevo(params: {
   subject: string
   html: string
 }): Promise<string | null> {
-  const apiKey = process.env.BREVO_API_KEY
+  // `.trim()` systématique : une valeur collée dans l'interface Vercel embarque
+  // souvent un retour à la ligne invisible. Dans un en-tête HTTP, c'est une
+  // requête rejetée ; dans une adresse d'expéditeur, un envoi refusé.
+  const apiKey = process.env.BREVO_API_KEY?.trim()
   if (!apiKey) {
     throw new Error('BREVO_API_KEY non définie')
   }
 
-  const fromEmail = process.env.BREVO_FROM_EMAIL
+  const fromEmail = process.env.BREVO_FROM_EMAIL?.trim()
   if (!fromEmail) {
     throw new Error('BREVO_FROM_EMAIL non définie')
   }
 
-  const fromName = process.env.BREVO_FROM_NAME ?? 'GuardVeto'
+  const fromName = process.env.BREVO_FROM_NAME?.trim() || 'GuardVeto'
 
   const res = await fetch(BREVO_API_URL, {
     method: 'POST',
@@ -662,7 +665,7 @@ function buildLienVolontaire(params: {
   // appUrl() renvoie toujours une valeur (défaut https://guardveto.vercel.app),
   // donc on a toujours un domaine absolu en pratique. On garde malgré tout la
   // garde explicite : si jamais la variable était vidée, on bascule en texte.
-  const base = process.env.NEXT_PUBLIC_APP_URL
+  const base = process.env.NEXT_PUBLIC_APP_URL?.trim()
   if (!base) return null
   const url = new URL('/crise/volontaire', base)
   url.searchParams.set('absence', params.absenceId)

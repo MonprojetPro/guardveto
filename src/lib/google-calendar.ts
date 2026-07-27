@@ -48,7 +48,7 @@ function getCalendarClient(calendarIdCabinet?: string | null) {
   // .trim() : protège contre les retours à la ligne / espaces parasites
   // ajoutés en collant les valeurs dans Vercel (sinon : "account not found").
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim()
-  const key = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, '\n')
+  const key = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.trim().replace(/\\n/g, '\n')
   const calendarId = resoudreCalendarId(calendarIdCabinet)
 
   if (!email || !key || !calendarId) {

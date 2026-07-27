@@ -23,7 +23,8 @@ export async function sendBrevoEmail({
   fromEmail?: string | null
   fromName?: string | null
 }) {
-  const apiKey = process.env.BREVO_API_KEY
+  // `.trim()` : un retour à la ligne collé à la clé rend l'en-tête HTTP invalide.
+  const apiKey = process.env.BREVO_API_KEY?.trim()
   if (!apiKey) {
     console.warn('[Brevo] BREVO_API_KEY manquante — email non envoyé')
     return { error: 'Config email manquante' }

@@ -18,8 +18,10 @@ import { calculerBilans } from '@/engine/bilan'
 
 // ── Client service role (pas de cookies — cron non authentifié) ──
 function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  // `.trim()` : une variable collée dans l'interface Vercel embarque souvent un
+  // retour à la ligne invisible, qui rend l'URL ou la clé inutilisable.
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
   if (!url || !key) throw new Error('Variables Supabase manquantes.')
   return createServiceClient(url, key)
 }
@@ -29,7 +31,7 @@ function getServiceClient() {
 export async function GET(req: NextRequest) {
   // ── Vérification du secret cron ──────────────────────
   const authHeader = req.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
+  const cronSecret = process.env.CRON_SECRET?.trim()
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Non autorisé.' }, { status: 401 })
   }

@@ -15,6 +15,7 @@ import {
   type PropositionProfil,
   type ProfilResolu,
 } from './profilSchema'
+import { cleIA } from './proposerRegle'
 
 /** Décrit ce qu'est un profil et le périmètre composable (anti-coquille-vide). */
 const STRUCTURE_PROMPT = `Un PROFIL de planning est une organisation de gardes réutilisable (ex. « Hiver », « Été »), qu'on choisit à la création d'une période. Un nouveau profil est TOUJOURS créé en dupliquant un profil existant (la SOURCE), puis en ajustant quelques réglages.
@@ -42,11 +43,11 @@ export async function proposerProfilIA(
   phrase: string,
   profils: ProfilResolu[],
 ): Promise<PropositionProfil> {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!cleIA()) {
     throw new Error('Assistant IA non configuré (clé API manquante).')
   }
 
-  const client = new Anthropic()
+  const client = new Anthropic({ apiKey: cleIA() })
   const listeProfils =
     profils.map((p) => `« ${p.nom} »${p.est_defaut ? ' (par défaut)' : ''}`).join(', ')
     || '(aucun profil pour l’instant)'

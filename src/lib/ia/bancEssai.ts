@@ -26,7 +26,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { SortieIaSchema, normaliserProposition } from './regleSchema'
-import { construireSystemIA, modeleIA } from './proposerRegle'
+import { cleIA, construireSystemIA, modeleIA } from './proposerRegle'
 import type { ContexteIA } from './contexteCabinet'
 
 /** Tarifs publics, en dollars par MILLION de tokens (relevés le 2026-07-26).
@@ -232,7 +232,7 @@ export async function lancerBancEssai(
   options: OptionsBanc = {},
 ): Promise<ResultatBanc> {
   const complet = options.jeu === 'complet'
-  const client = new Anthropic()
+  const client = new Anthropic({ apiKey: cleIA() })
 
   // Le jeu complet enrichit le contexte d'étiquettes si le cabinet n'en a pas,
   // sinon trois types de règles resteraient intestés.

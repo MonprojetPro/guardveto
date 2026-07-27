@@ -16,8 +16,10 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 
 // ── Client Supabase service_role (même pattern que les autres crons) ──────────
 function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  // `.trim()` : cf. commentaire dans /api/cron/lock-gardes — retour à la ligne
+  // invisible collé par l'interface Vercel.
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
   if (!url || !key) throw new Error('Variables Supabase manquantes.')
   return createServiceClient(url, key)
 }
@@ -144,7 +146,7 @@ async function fetchVacances(anneeCourante: number): Promise<VacancesRow[]> {
 export async function GET(req: NextRequest) {
   // ── Vérification du secret cron (même pattern que /api/cron/rappels) ──────
   const authHeader = req.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
+  const cronSecret = process.env.CRON_SECRET?.trim()
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Non autorisé.' }, { status: 401 })
   }
