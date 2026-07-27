@@ -12,6 +12,7 @@
 // serait la coquille vide qu'on refuse partout ailleurs.
 // ============================================================
 
+import { afficherSurLeTableau } from './afficher'
 import { lireEquipe, modifierVeterinaire } from './equipe'
 import { listerRegles, creerRegle, agirSurRegles } from './regles'
 import {
@@ -80,6 +81,8 @@ import type { ContexteOutil, Outil } from './types'
  *  tête ce qu'on veut qu'il consulte avant de conclure — l'équipe et les
  *  règles — et les gestes rares en fin de liste. */
 export const CATALOGUE: Outil[] = [
+  // Où la réponse s'affiche — en tête parce que ça vaut pour presque toutes
+  afficherSurLeTableau,
   // Qui fait quoi — à consulter avant toute conclusion sur une personne
   lireEquipe,
   listerRegles,

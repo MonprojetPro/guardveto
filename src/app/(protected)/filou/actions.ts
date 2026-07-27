@@ -39,6 +39,14 @@ export type ReponseFilou =
       charge?: unknown
       proposition: PropositionAction
     }
+  /** Filou pose une réponse sur le tableau : rien à décider, juste à lire. */
+  | {
+      genre: 'affichage'
+      texte: string
+      titre: string
+      introduction: string
+      lignes: string[]
+    }
 
 async function contexte(): Promise<{ error: string } | { ctx: ContexteOutil }> {
   const supabase = await createClient()
@@ -102,6 +110,15 @@ export async function parlerAFilou(phrase: string): Promise<ReponseFilou> {
 
   if (issue.genre === 'erreur') return { error: issue.texte }
   if (issue.genre === 'message') return { genre: 'message', texte: issue.texte }
+  if (issue.genre === 'affichage') {
+    return {
+      genre: 'affichage',
+      texte: issue.texte,
+      titre: issue.titre,
+      introduction: issue.introduction,
+      lignes: issue.lignes,
+    }
+  }
   return {
     genre: 'action',
     texte: issue.texte,

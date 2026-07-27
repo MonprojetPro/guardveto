@@ -70,7 +70,7 @@ export const listerRegles: OutilLecture<typeof ParamsLister> = {
 
 Appelle-le pour toute question sur ce qui contraint le planning : « quelles règles concernent Antoine ? », « pourquoi Manon n'a-t-elle jamais le mercredi ? », « qu'est-ce qui empêche X ? ».
 
-ATTENTION : une règle n'est pas la seule chose qui influence le planning. Le statut de dernier recours, l'inactivité d'un vétérinaire, un congé ou la structure des créneaux jouent aussi. Ne conclus « rien ne l'empêche » qu'après avoir regardé ailleurs aussi.`,
+La réponse contient aussi un champ « reglages_hors_regles » : ce sont des réglages de fiche qui pèsent sur le planning SANS être des règles (dernier recours, retrait du planning). Quand il n'est pas vide, tu DOIS en parler dans ta réponse — sinon tu dis vrai sur les règles et tu induis en erreur sur le fond. Un congé ou la structure des créneaux jouent aussi : va les lire avant de conclure « rien ne l'empêche ».`,
   params: ParamsLister,
 
   async executer(params, ctx) {
@@ -111,9 +111,20 @@ ATTENTION : une règle n'est pas la seule chose qui influence le planning. Le st
       ? rendues.filter((r) => r.regle.toLowerCase().includes(cible))
       : rendues
 
+    // CE QUI CONTRAINT SANS ÊTRE UNE RÈGLE.
+    // Une question sur « les règles de X » attend en réalité « ce qui contraint
+    // X ». Or le statut de dernier recours et le retrait du planning vivent sur
+    // la fiche du vétérinaire, pas dans les règles — et Filou répondait la
+    // liste des règles sans les mentionner : exact, et trompeur.
+    // On porte donc l'information DANS LA DONNÉE plutôt que d'espérer qu'il
+    // pense à consulter l'équipe : une consigne dans un prompt n'est pas un
+    // garde-fou, elle repose sur sa mémoire.
+    const horsRegles = await reglagesQuiContraignent(ctx, params.prenom)
+
     return {
       nombre: filtrees.length,
       regles: filtrees,
+      reglages_hors_regles: horsRegles,
       note: cible
         ? `Règles dont le texte mentionne « ${params.prenom} ». Les numéros restent ceux de la liste complète, tu peux donc les réutiliser tels quels. Les règles globales (équité, structure du week-end) ne nomment personne et n'apparaissent pas ici — demande la liste complète pour les voir.`
         : 'Les règles marquées « globale » règlent le planning dans son ensemble et ne visent personne en particulier.',
@@ -287,6 +298,46 @@ Préfère la mise en pause à la suppression : la pause se rattrape, l'effacemen
 }
 
 // ── Fragments partagés ──────────────────────────────────────
+
+/**
+ * Les réglages de fiche qui pèsent sur le planning sans être des règles :
+ * le dernier recours et le retrait du planning. Renvoyés AVEC la liste des
+ * règles pour qu'une réponse sur « ce qui contraint quelqu'un » ne puisse pas
+ * les oublier.
+ *
+ * Rendu en phrases toutes faites plutôt qu'en booléens : c'est ce qui doit
+ * arriver à l'écran, et une paire `dernier_recours: true` se reformule mal.
+ */
+async function reglagesQuiContraignent(
+  ctx: ContexteOutil,
+  prenom?: string,
+): Promise<string[]> {
+  const { data } = await ctx.supabase
+    .from('veterinaires')
+    .select('prenom, actif, dernier_recours')
+    .order('prenom')
+
+  const vets = (data as Array<{ prenom: string; actif: boolean; dernier_recours: boolean }> | null) ?? []
+  const cible = prenom?.trim().toLowerCase()
+  const concernes = cible
+    ? vets.filter((v) => v.prenom.toLowerCase() === cible)
+    : vets
+
+  const phrases: string[] = []
+  for (const v of concernes) {
+    if (v.dernier_recours) {
+      phrases.push(
+        `${v.prenom} est marqué DERNIER RECOURS sur sa fiche : ce n'est pas une règle et ça n'interdit rien, mais le moteur ne la programme qu'en tout dernier, sur tous les créneaux. C'est souvent la vraie raison quand quelqu'un n'a presque jamais de garde.`,
+      )
+    }
+    if (!v.actif) {
+      phrases.push(
+        `${v.prenom} est RETIRÉ DU PLANNING sur sa fiche : aucune garde ne lui sera attribuée, quelles que soient les règles.`,
+      )
+    }
+  }
+  return phrases
+}
 
 async function chargerReglesCabinet(ctx: ContexteOutil): Promise<Array<RegleRow>> {
   const { data } = await ctx.supabase

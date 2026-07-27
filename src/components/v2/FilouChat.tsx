@@ -52,6 +52,44 @@ import type { ContenuResultat, ResultatFilou } from './FilouResultat'
  *  résultats vont sur le tableau. */
 type Message = { id: number; de: 'moi' | 'filou'; texte: string }
 
+/** Où la conversation survit à une navigation.
+ *
+ *  `sessionStorage` et non la base : la conversation n'a pas vocation à être
+ *  archivée ni relue plus tard, elle doit juste survivre à un aller-retour vers
+ *  l'onglet Équipe. Elle disparaît donc à la fermeture de l'onglet — ce qui est
+ *  aussi ce qu'on veut sur un poste partagé au cabinet. */
+const CLE_CONVERSATION = 'guardveto.filou.conversation'
+
+function relireConversation(): Message[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const brut = window.sessionStorage.getItem(CLE_CONVERSATION)
+    if (!brut) return []
+    const lu: unknown = JSON.parse(brut)
+    if (!Array.isArray(lu)) return []
+    // On revalide la forme : une valeur écrite par une version précédente ne
+    // doit pas faire planter la tablette au chargement.
+    return lu.filter(
+      (m): m is Message =>
+        typeof m?.id === 'number' &&
+        typeof m?.texte === 'string' &&
+        (m?.de === 'moi' || m?.de === 'filou'),
+    )
+  } catch {
+    return []
+  }
+}
+
+function memoriserConversation(messages: Message[]) {
+  if (typeof window === 'undefined') return
+  try {
+    window.sessionStorage.setItem(CLE_CONVERSATION, JSON.stringify(messages))
+  } catch {
+    // Stockage plein ou refusé : la conversation vivra le temps de la page.
+    // Ce n'est pas une raison de casser l'écran.
+  }
+}
+
 /** Longueur maximale d'une consigne. Chaque envoi est un appel facturé au
  *  modèle : une garde de bon sens côté saisie évite qu'un copier-coller
  *  malheureux part en analyse. La vraie limite reste à poser côté serveur. */
@@ -79,16 +117,23 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
   ref,
 ) {
   const champId = useId()
-  const [messages, setMessages] = useState<Message[]>([])
+  // La conversation est relue depuis l'onglet AU PREMIER RENDU : aller voir une
+  // fiche puis revenir démonte ce composant, et sans ça on retrouvait une
+  // tablette vide — comme si Filou avait tout oublié le temps d'un aller-retour.
+  const [messages, setMessages] = useState<Message[]>(relireConversation)
   const [phrase, setPhrase] = useState('')
   const [enCours, demarrer] = useTransition()
   const filRef = useRef<HTMLDivElement>(null)
   const champRef = useRef<HTMLTextAreaElement>(null)
-  const compteur = useRef(0)
+  const compteur = useRef(messages.at(-1)?.id ?? 0)
 
   const ajouter = (de: Message['de'], texte: string) => {
     compteur.current += 1
-    setMessages((prec) => [...prec, { id: compteur.current, de, texte }])
+    setMessages((prec) => {
+      const suite = [...prec, { id: compteur.current, de, texte }]
+      memoriserConversation(suite)
+      return suite
+    })
   }
 
   useImperativeHandle(ref, () => ({
@@ -138,6 +183,20 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
       if (reponse.genre === 'message') {
         ajouter('filou', reponse.texte)
         requestAnimationFrame(() => champRef.current?.focus())
+        return
+      }
+
+      // Une réponse à lire : elle va sur le tableau, où il y a la place.
+      if (reponse.genre === 'affichage') {
+        annoncerEtMontrer(
+          {
+            genre: 'affichage',
+            titre: reponse.titre,
+            introduction: reponse.introduction,
+            lignes: reponse.lignes,
+          },
+          reponse.texte,
+        )
         return
       }
 

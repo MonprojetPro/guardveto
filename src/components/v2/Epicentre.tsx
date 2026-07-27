@@ -33,6 +33,37 @@ import type { DonneesAccueil, GardeDuSoir } from '@/data/v2/accueilEpicentre'
 
 type Fenetre = 'cesoir' | 'souhaits' | 'periode' | 'coherence' | 'filou'
 
+/** Ce que Filou a posé sur le tableau survit à une navigation, comme la
+ *  conversation (cf. `FilouChat`) : aller vérifier une fiche dans l'onglet
+ *  Équipe puis revenir ne doit pas effacer la réponse qu'on était en train de
+ *  lire. Même support, même durée de vie : l'onglet. */
+const CLE_RESULTAT = 'guardveto.filou.resultat'
+
+function relireResultat(): ResultatFilou | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const brut = window.sessionStorage.getItem(CLE_RESULTAT)
+    if (!brut) return null
+    const lu = JSON.parse(brut) as ResultatFilou | null
+    // Une valeur écrite par une version précédente ne doit pas casser l'accueil.
+    return lu && typeof lu.id === 'number' && (lu.genre === 'action' || lu.genre === 'affichage')
+      ? lu
+      : null
+  } catch {
+    return null
+  }
+}
+
+function memoriserResultat(r: ResultatFilou | null) {
+  if (typeof window === 'undefined') return
+  try {
+    if (r) window.sessionStorage.setItem(CLE_RESULTAT, JSON.stringify(r))
+    else window.sessionStorage.removeItem(CLE_RESULTAT)
+  } catch {
+    // Stockage refusé : la réponse vivra le temps de la page, sans casser rien.
+  }
+}
+
 // ── Mise en français des dates (rien d'autre que de l'affichage) ──
 
 const JOUR_LONG = new Intl.DateTimeFormat('fr-FR', {
@@ -101,7 +132,10 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
   // Ce que Filou a compris et pose sur le tableau. Conservé après fermeture :
   // rouvrir ne doit pas ressusciter une décision déjà prise, donc on l'efface
   // au moment de la décision, pas au moment de la fermeture.
-  const [resultatFilou, setResultatFilou] = useState<ResultatFilou | null>(null)
+  //
+  // Relu depuis l'onglet au premier rendu, comme la conversation : aller voir
+  // une fiche puis revenir ne doit pas effacer ce qu'on était en train de lire.
+  const [resultatFilou, setResultatFilou] = useState<ResultatFilou | null>(relireResultat)
   const filou = useRef<FilouHandle>(null)
   const chat = useRef<FilouChatHandle>(null)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -170,6 +204,7 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
    *  évite qu'un résultat s'ouvre hors de l'écran sans qu'on le voie. */
   const montrer = useCallback((r: ResultatFilou) => {
     setResultatFilou(r)
+    memoriserResultat(r)
     setOuverte('filou')
     requestAnimationFrame(() => {
       stageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -184,6 +219,7 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
       if (!fermer) return
       setOuverte(null)
       setResultatFilou(null)
+      memoriserResultat(null)
       // Les compteurs de la barre (règles fermes / souples) lisent la base :
       // sans ce refresh, le dock afficherait encore l'ancien décompte.
       router.refresh()

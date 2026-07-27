@@ -22,14 +22,22 @@ import Link from 'next/link'
 import { appliquerActionFilou } from '@/app/(protected)/filou/actions'
 import type { PropositionAction } from '@/lib/ia/outils/types'
 
-export type ContenuResultat = {
-  genre: 'action'
-  /** L'outil que Filou veut déclencher, et ce qu'il lui passerait. */
-  outil: string
-  params: unknown
-  charge?: unknown
-  proposition: PropositionAction
-}
+export type ContenuResultat =
+  | {
+      genre: 'action'
+      /** L'outil que Filou veut déclencher, et ce qu'il lui passerait. */
+      outil: string
+      params: unknown
+      charge?: unknown
+      proposition: PropositionAction
+    }
+  /** Une réponse à lire — pas de décision, pas de bouton. */
+  | {
+      genre: 'affichage'
+      titre: string
+      introduction: string
+      lignes: string[]
+    }
 
 export type ResultatFilou = ContenuResultat & {
   /** Numéro d'ordre dans la session. Sert de `key` : une nouvelle proposition
@@ -49,7 +57,69 @@ interface Props {
   onDecision: (d: DecisionFilou) => void
 }
 
-export function FenetreResultatFilou({ actif, resultat, onFermer, onDecision }: Props) {
+export function FenetreResultatFilou(props: Props) {
+  return props.resultat.genre === 'affichage' ? (
+    <FenetreReponse {...props} resultat={props.resultat} />
+  ) : (
+    <FenetreProposition {...props} resultat={props.resultat} />
+  )
+}
+
+/** Une réponse à lire. Rien à décider : le seul geste est de refermer. */
+function FenetreReponse({
+  actif,
+  resultat,
+  onFermer,
+}: Props & { resultat: Extract<ResultatFilou, { genre: 'affichage' }> }) {
+  return (
+    <article className={`fen${actif ? ' active' : ''}`} role="region" aria-label={resultat.titre}>
+      <header className="fen-head">
+        <span className="f-ico" aria-hidden="true">
+          🦊
+        </span>
+        <div className="f-titles">
+          <h2 tabIndex={-1}>{resultat.titre}</h2>
+          <p className="f-sub">Ce que Filou a trouvé</p>
+        </div>
+        <button
+          type="button"
+          className="fen-close"
+          aria-label="Refermer la fenêtre"
+          onClick={onFermer}
+        >
+          ✕
+        </button>
+      </header>
+
+      <div className="fen-body">
+        <p className="res-apercu">{resultat.introduction}</p>
+        {resultat.lignes.length > 0 && (
+          <ul className="res-regles">
+            {resultat.lignes.map((ligne, i) => (
+              <li key={i}>
+                <span>{ligne}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <footer className="fen-foot">
+        <button type="button" className="btn btn-ghost" onClick={onFermer}>
+          Refermer
+        </button>
+        <span className="hint">Échap pour refermer</span>
+      </footer>
+    </article>
+  )
+}
+
+function FenetreProposition({
+  actif,
+  resultat,
+  onFermer,
+  onDecision,
+}: Props & { resultat: Extract<ResultatFilou, { genre: 'action' }> }) {
   const [erreur, setErreur] = useState<string | null>(null)
   const [enCours, demarrer] = useTransition()
   const p = resultat.proposition

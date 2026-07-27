@@ -38,6 +38,16 @@ export type IssueFilou =
       proposition: PropositionAction
       outilsAppeles: string[]
     }
+  /** Filou a une réponse à POSER sur le tableau, pas à glisser dans le fil. */
+  | {
+      genre: 'affichage'
+      /** La phrase courte qui reste dans la tablette. */
+      texte: string
+      titre: string
+      introduction: string
+      lignes: string[]
+      outilsAppeles: string[]
+    }
   | { genre: 'erreur'; texte: string }
 
 /** Nombre d'allers-retours autorisés. Chaque tour est un appel facturé : sans
@@ -53,8 +63,9 @@ COMMENT TU TRAVAILLES
 
 1. Cherche avant de conclure. Si la question porte sur ce que le cabinet contient — qui, quand, quelles règles, quels congés — appelle les outils qui le disent. Plusieurs si nécessaire : une règle et une fiche vétérinaire ne disent pas la même chose.
 2. Recoupe. Une contrainte peut venir d'une règle, d'un réglage de fiche, d'un congé ou de la structure du planning. Ne conclus « rien ne l'empêche » qu'après avoir regardé partout où ça pouvait être.
-3. Réponds court, en français simple, et dis d'où vient ta réponse. Pas de jargon technique, pas d'identifiants à l'écran.
-4. Si tu n'as pas d'outil pour ce qu'on te demande, dis-le franchement plutôt que d'expliquer comment le faire à la main.
+3. Réponds en français simple, et dis d'où vient ta réponse. Pas de jargon technique, pas d'identifiants à l'écran.
+4. Si ta réponse est autre chose qu'une phrase — une liste, plusieurs éléments, des chiffres — pose-la sur le tableau avec afficher_sur_le_tableau. La conversation est étroite : tout ce qui dépasse deux phrases y devient illisible.
+5. Si tu n'as pas d'outil pour ce qu'on te demande, dis-le franchement plutôt que d'expliquer comment le faire à la main.
 
 QUAND TU AGIS
 
@@ -146,6 +157,25 @@ export async function faireTravaillerFilou(
           erreurOutil(appel.id, `Paramètres invalides : ${valides.error.issues.map((i) => i.message).join(', ')}`),
         )
         continue
+      }
+
+      // Poser une réponse sur le tableau termine le tour : il n'y a rien à
+      // rendre au modèle, ce qu'il vient d'écrire EST la réponse.
+      if (outil.genre === 'affichage') {
+        const p = valides.data as {
+          titre: string
+          introduction: string
+          lignes: string[]
+          mot_dans_la_conversation: string
+        }
+        return {
+          genre: 'affichage',
+          texte: p.mot_dans_la_conversation || texte,
+          titre: p.titre,
+          introduction: p.introduction,
+          lignes: p.lignes ?? [],
+          outilsAppeles,
+        }
       }
 
       if (outil.genre === 'lecture') {

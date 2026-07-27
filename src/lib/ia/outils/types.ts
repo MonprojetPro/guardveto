@@ -92,7 +92,21 @@ export interface OutilEcriture<S extends z.ZodType = z.ZodType> extends OutilCom
   executer(params: z.infer<S>, ctx: ContexteOutil, charge?: unknown): Promise<{ error?: string }>
 }
 
-export type Outil = OutilLecture | OutilEcriture
+/**
+ * Un outil qui n'agit ni ne lit : il POSE une réponse sur le tableau.
+ *
+ * Sans lui, tout ce que Filou trouve ressort dans la tablette — une liste de
+ * règles ou de compteurs y arrive illisible, dans une colonne étroite. Le
+ * tableau existe pour ça. On ne devine donc pas « cette réponse est longue,
+ * elle mérite le tableau » avec une heuristique : c'est Filou qui décide, en
+ * appelant l'outil, et c'est un geste qu'on peut lui décrire.
+ */
+export interface OutilAffichage<S extends z.ZodType = z.ZodType> extends OutilCommun {
+  genre: 'affichage'
+  params: S
+}
+
+export type Outil = OutilLecture | OutilEcriture | OutilAffichage
 
 /** Le catalogue tel que l'API le reçoit. Le schéma est dérivé du Zod de
  *  l'outil : une seule définition sert donc au modèle ET à la validation. */
