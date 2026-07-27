@@ -701,6 +701,22 @@
   font-size: 0.95rem; line-height: 1.5;
   font-weight: 600;
 }
+/* Ce que Filou a compris d'une demande portant sur des règles DÉJÀ posées :
+   sa phrase, puis la liste exacte de ce qu'il propose de toucher. La liste est
+   là pour qu'on décide sur pièces — jamais « 3 règles » sans dire lesquelles. */
+.res-explication { font-size: 0.88rem; line-height: 1.55; margin-bottom: 12px; }
+.res-regles { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.res-regles li {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--accent-soft);
+  font-size: 0.86rem; line-height: 1.45;
+}
+.rr-puce { flex: none; font-size: 0.7rem; line-height: 1.6; }
+.rr-etat { color: var(--muted); font-weight: 600; }
+
 .prop-force { font-size: 0.72rem; color: var(--muted); margin-bottom: 6px; }
 .prop-lien {
   border: none; background: none; padding: 0;

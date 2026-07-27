@@ -44,9 +44,9 @@ import {
   useTransition,
   type ReactNode,
 } from 'react'
-import { proposerRegleDepuisTexte } from '@/app/(protected)/regles/actions'
+import { demanderAFilou } from '@/app/(protected)/regles/actions'
 import { estCreable, sansErreur } from '@/components/ia/creerRegleProposee'
-import type { ResultatFilou } from './FilouResultat'
+import type { ContenuResultat, ResultatFilou } from './FilouResultat'
 
 /** Un tour de parole dans le fil. Il n'y a plus que de la parole : une
  *  proposition à décider n'est pas un message, c'est un résultat — et les
@@ -104,6 +104,16 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
     if (fil) fil.scrollTop = fil.scrollHeight
   }, [messages])
 
+  /** Le résultat part sur le tableau, et le fil dit où regarder : sans cette
+   *  phrase, quelque chose apparaîtrait à l'autre bout de l'écran sans que rien
+   *  ne l'annonce. */
+  const annoncerEtMontrer = (contenu: ContenuResultat) => {
+    ajouter('filou', 'J’ai compris ta demande — je l’affiche sur le tableau du cabinet.')
+    compteur.current += 1
+    onResultat({ ...contenu, id: compteur.current })
+    requestAnimationFrame(() => champRef.current?.focus())
+  }
+
   const envoyer = () => {
     const texte = phrase.trim()
     if (texte.length < 3 || enCours) return
@@ -112,8 +122,31 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
     onFilouTape?.()
 
     demarrer(async () => {
-      const res = await proposerRegleDepuisTexte(texte)
+      const reponse = await demanderAFilou(texte)
 
+      if ('error' in reponse) {
+        ajouter('filou', reponse.error)
+        return
+      }
+
+      // Rien d'actionnable : Filou explique, et ça reste dans la conversation.
+      if (reponse.genre === 'message') {
+        ajouter('filou', reponse.texte)
+        return
+      }
+
+      // Des règles existantes à lever, rétablir ou supprimer.
+      if (reponse.genre === 'action-regles') {
+        annoncerEtMontrer({
+          genre: 'action-regles',
+          action: reponse.action,
+          regles: reponse.regles,
+          explication: reponse.explication,
+        })
+        return
+      }
+
+      const res = reponse.resultat
       if (!sansErreur(res)) {
         ajouter('filou', res.error)
         return
@@ -129,13 +162,7 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
         )
         return
       }
-      // Compris : la décision se prend sur le tableau, où l'aperçu tient en
-      // entier. Le fil dit où regarder — sans ça, le résultat apparaîtrait
-      // ailleurs sans que rien ne l'annonce.
-      ajouter('filou', 'J’ai compris ta demande — je l’affiche sur le tableau du cabinet.')
-      compteur.current += 1
-      onResultat({ id: compteur.current, genre: 'regle', apercu: res.apercu, res })
-      requestAnimationFrame(() => champRef.current?.focus())
+      annoncerEtMontrer({ genre: 'regle', apercu: res.apercu, res })
     })
   }
 

@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog'
-import { rendreRegle } from '@/engine/briques/catalogue'
+import { phraseRegle, fusionnerDuos } from '@/lib/regles/libelle'
 import { setRegleActif, deleteRegle } from '@/app/(protected)/regles/actions'
 import { RegleFormDialog } from './RegleFormDialog'
 import { AssistantIA } from './AssistantIA'
@@ -100,51 +100,9 @@ function groupeDe(force: string): GroupeKey {
   return FORCE_META[force]?.groupe ?? 'confort'
 }
 
-// ── Rendu d'une règle en français (sujet + prédicat) ─────────
-
-interface ParamsJson {
-  qui?: { refs?: unknown }
-  params?: unknown
-}
-
-/**
- * Clé de paire non ordonnée d'un duo interdit (sinon null). Sert à n'afficher
- * QU'UNE ligne par duo, alors que la base en stocke deux (A→B + B→A, requis par
- * le moteur). Le toggle/suppression côté serveur gèrent déjà les deux sens.
- */
-function clePaireDuo(r: RegleRow): string | null {
-  if (r.brique_id !== 'duo_interdit') return null
-  const pj = r.params_json as { qui?: { refs?: unknown[] }; params?: { avec_veterinaire_id?: unknown } }
-  const owner = pj?.qui?.refs?.[0]
-  const partner = pj?.params?.avec_veterinaire_id
-  if (typeof owner !== 'string' || typeof partner !== 'string') return null
-  return [owner, partner].sort().join('|')
-}
-
-/** Retire le sens miroir des duos : on ne garde que la 1re ligne de chaque paire. */
-function fusionnerDuos(rows: RegleRow[]): RegleRow[] {
-  const vues = new Set<string>()
-  return rows.filter((r) => {
-    const cle = clePaireDuo(r)
-    if (!cle) return true
-    if (vues.has(cle)) return false
-    vues.add(cle)
-    return true
-  })
-}
-
-function phraseRegle(regle: RegleRow, nomVeto: (id: string) => string): string {
-  const pj = (regle.params_json ?? {}) as ParamsJson
-  const refs = pj.qui?.refs
-  // Multi-propriétaires (n°18) : le sujet affiche TOUTES les réfs — sauf pour
-  // un duo interdit où refs[1] est le PARTENAIRE (déjà rendu par le prédicat).
-  const refsStr = Array.isArray(refs) ? refs.filter((x): x is string => typeof x === 'string') : []
-  const sujets = regle.brique_id === 'duo_interdit' ? refsStr.slice(0, 1) : refsStr
-  const sujet = sujets.map(nomVeto).join(', ')
-  const params = (pj.params ?? {}) as Record<string, unknown>
-  const predicat = rendreRegle(regle.brique_id, params, { nomVeto })
-  return sujet ? `${sujet} ${predicat}` : predicat
-}
+// Le rendu d'une règle en français vit dans `@/lib/regles/libelle` : Filou s'en
+// sert aussi pour nommer les règles qu'il propose de supprimer, et deux rendus
+// séparés auraient divergé.
 
 // ── Composant ────────────────────────────────────────────────
 
