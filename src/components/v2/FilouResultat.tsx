@@ -1,48 +1,44 @@
 'use client'
 
 // ============================================================
-// GUARDVETO V2 — Ce que Filou RÉPOND s'affiche sur le tableau, pas dans sa tablette
+// GUARDVETO V2 — La fenêtre où Filou répond : une seule, pour tout
 // ============================================================
-// Règle de mise en scène, décidée avec MiKL : la tablette ne sert qu'à la
-// CONVERSATION — Filou demande une précision, on lui répond. Tout RÉSULTAT
-// s'affiche sur le tableau du cabinet, où il y a la place d'être lu et décidé.
+// Décidé avec MiKL : « à droite il doit y avoir la réponse avec les boutons
+// pour les propositions — ça doit être un modèle universel pour toutes les
+// demandes. »
 //
-// Cette fenêtre est GÉNÉRIQUE : elle affiche ce que l'outil a décrit (un titre,
-// une phrase, des lignes, un bouton, un avertissement) sans rien savoir du
-// domaine. Une nouvelle capacité de Filou n'a donc pas de composant à écrire —
-// seulement un outil à décrire. C'est ce qui rend la consigne « les résultats
-// vont à droite » vraie par construction plutôt qu'au cas par cas.
+// Donc UNE fenêtre, une seule forme : un titre, ce que Filou répond, le détail
+// ligne par ligne, et — quand il y a quelque chose à décider — le bouton qui
+// l'exécute. La seule différence entre « voilà ce que j'ai trouvé » et « je te
+// propose de faire ça » est la présence de ce bouton.
 //
-// GARDE-FOU : rien n'est écrit avant le clic, et le clic repasse par le serveur,
-// qui revérifie les droits et revalide les paramètres avant d'agir.
+// Deux fenêtres séparées obligeaient à deviner laquelle allait s'ouvrir, et
+// laissaient les réponses simples s'échouer dans la tablette, illisibles.
+//
+// GARDE-FOU : rien n'est écrit avant le clic, et le clic repasse par le
+// serveur, qui revérifie les droits et revalide les paramètres avant d'agir.
 // ============================================================
 
 import { useState, useTransition } from 'react'
-import Link from 'next/link'
 import { appliquerActionFilou } from '@/app/(protected)/filou/actions'
-import type { PropositionAction } from '@/lib/ia/outils/types'
 
-export type ContenuResultat =
-  | {
-      genre: 'action'
-      /** L'outil que Filou veut déclencher, et ce qu'il lui passerait. */
-      outil: string
-      params: unknown
-      charge?: unknown
-      proposition: PropositionAction
-    }
-  /** Une réponse à lire — pas de décision, pas de bouton. */
-  | {
-      genre: 'affichage'
-      titre: string
-      introduction: string
-      lignes: string[]
-    }
+export interface ContenuResultat {
+  titre: string
+  introduction: string
+  lignes: string[]
+  /** Présente seulement quand il y a quelque chose à décider. */
+  action?: {
+    outil: string
+    params: unknown
+    charge?: unknown
+    libelle: string
+    avertissement?: string
+  }
+}
 
 export type ResultatFilou = ContenuResultat & {
-  /** Numéro d'ordre dans la session. Sert de `key` : une nouvelle proposition
-   *  REMONTE la fenêtre, ce qui remet à zéro l'erreur affichée sans effet de
-   *  bord. */
+  /** Numéro d'ordre dans la session. Sert de `key` : une nouvelle réponse
+   *  REMONTE la fenêtre, ce qui remet à zéro l'erreur affichée. */
   id: number
 }
 
@@ -57,29 +53,40 @@ interface Props {
   onDecision: (d: DecisionFilou) => void
 }
 
-export function FenetreResultatFilou(props: Props) {
-  return props.resultat.genre === 'affichage' ? (
-    <FenetreReponse {...props} resultat={props.resultat} />
-  ) : (
-    <FenetreProposition {...props} resultat={props.resultat} />
-  )
-}
+export function FenetreResultatFilou({ actif, resultat, onFermer, onDecision }: Props) {
+  const [erreur, setErreur] = useState<string | null>(null)
+  const [enCours, demarrer] = useTransition()
+  const action = resultat.action
 
-/** Une réponse à lire. Rien à décider : le seul geste est de refermer. */
-function FenetreReponse({
-  actif,
-  resultat,
-  onFermer,
-}: Props & { resultat: Extract<ResultatFilou, { genre: 'affichage' }> }) {
+  const appliquer = () => {
+    if (!action) return
+    demarrer(async () => {
+      const r = await appliquerActionFilou(action.outil, action.params, action.charge)
+      if ('error' in r) {
+        // On reste ouvert : l'erreur se lit à côté du bouton qui l'a produite.
+        setErreur(r.error)
+        onDecision({ fermer: false, dire: r.error })
+        return
+      }
+      onDecision({ fermer: true, dire: 'C’est fait.' })
+    })
+  }
+
   return (
-    <article className={`fen${actif ? ' active' : ''}`} role="region" aria-label={resultat.titre}>
+    <article
+      className={`fen${actif ? ' active' : ''}`}
+      role="region"
+      aria-label={resultat.titre}
+    >
       <header className="fen-head">
         <span className="f-ico" aria-hidden="true">
           🦊
         </span>
         <div className="f-titles">
           <h2 tabIndex={-1}>{resultat.titre}</h2>
-          <p className="f-sub">Ce que Filou a trouvé</p>
+          <p className="f-sub">
+            {action ? 'Rien n’est enregistré tant que tu n’as pas validé' : 'Ce que Filou a trouvé'}
+          </p>
         </div>
         <button
           type="button"
@@ -93,76 +100,10 @@ function FenetreReponse({
 
       <div className="fen-body">
         <p className="res-apercu">{resultat.introduction}</p>
+
         {resultat.lignes.length > 0 && (
           <ul className="res-regles">
             {resultat.lignes.map((ligne, i) => (
-              <li key={i}>
-                <span>{ligne}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <footer className="fen-foot">
-        <button type="button" className="btn btn-ghost" onClick={onFermer}>
-          Refermer
-        </button>
-        <span className="hint">Échap pour refermer</span>
-      </footer>
-    </article>
-  )
-}
-
-function FenetreProposition({
-  actif,
-  resultat,
-  onFermer,
-  onDecision,
-}: Props & { resultat: Extract<ResultatFilou, { genre: 'action' }> }) {
-  const [erreur, setErreur] = useState<string | null>(null)
-  const [enCours, demarrer] = useTransition()
-  const p = resultat.proposition
-
-  const appliquer = () => {
-    demarrer(async () => {
-      const r = await appliquerActionFilou(resultat.outil, resultat.params, resultat.charge)
-      if ('error' in r) {
-        // On reste ouvert : l'erreur se lit à côté du bouton qui l'a produite.
-        setErreur(r.error)
-        onDecision({ fermer: false, dire: r.error })
-        return
-      }
-      onDecision({ fermer: true, dire: 'C’est fait.' })
-    })
-  }
-
-  return (
-    <article className={`fen${actif ? ' active' : ''}`} role="region" aria-label={p.titre}>
-      <header className="fen-head">
-        <span className="f-ico" aria-hidden="true">
-          🦊
-        </span>
-        <div className="f-titles">
-          <h2 tabIndex={-1}>{p.titre}</h2>
-          <p className="f-sub">Rien n’est enregistré tant que tu n’as pas validé</p>
-        </div>
-        <button
-          type="button"
-          className="fen-close"
-          aria-label="Refermer la fenêtre"
-          onClick={onFermer}
-        >
-          ✕
-        </button>
-      </header>
-
-      <div className="fen-body">
-        <p className="res-apercu">{p.phrase}</p>
-
-        {p.lignes && p.lignes.length > 0 && (
-          <ul className="res-regles">
-            {p.lignes.map((ligne, i) => (
               <li key={i}>
                 <span>{ligne}</span>
               </li>
@@ -176,29 +117,41 @@ function FenetreProposition({
           </p>
         )}
 
-        {p.avertissement && (
+        {action?.avertissement && (
           <div className="f-note">
             <span className="who">🦊 Filou prévient</span>
-            {p.avertissement}{' '}
-            <Link className="prop-lien" href="/regles">
-              Voir les règles
-            </Link>
+            {action.avertissement}
           </div>
         )}
       </div>
 
       <footer className="fen-foot">
-        <button type="button" className="btn btn-valider" onClick={appliquer} disabled={enCours}>
-          {enCours ? 'Un instant…' : p.action}
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={() => onDecision({ fermer: true, dire: 'D’accord, je ne touche à rien.' })}
-          disabled={enCours}
-        >
-          Laisse tomber
-        </button>
+        {action ? (
+          <>
+            <button
+              type="button"
+              className="btn btn-valider"
+              onClick={appliquer}
+              disabled={enCours}
+            >
+              {enCours ? 'Un instant…' : action.libelle}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() =>
+                onDecision({ fermer: true, dire: 'D’accord, je ne touche à rien.' })
+              }
+              disabled={enCours}
+            >
+              Laisse tomber
+            </button>
+          </>
+        ) : (
+          <button type="button" className="btn btn-ghost" onClick={onFermer}>
+            Refermer
+          </button>
+        )}
         <span className="hint">Échap pour refermer</span>
       </footer>
     </article>

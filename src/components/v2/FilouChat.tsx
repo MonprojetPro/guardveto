@@ -174,42 +174,24 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
     demarrer(async () => {
       const reponse = await parlerAFilou(texte)
 
+      // Une panne n'est pas une réponse : elle se dit dans la conversation,
+      // elle n'a rien à faire sur le tableau.
       if ('error' in reponse) {
         ajouter('filou', reponse.error)
-        return
-      }
-
-      // Une réponse, une explication, une question : ça reste dans la tablette.
-      if (reponse.genre === 'message') {
-        ajouter('filou', reponse.texte)
         requestAnimationFrame(() => champRef.current?.focus())
         return
       }
 
-      // Une réponse à lire : elle va sur le tableau, où il y a la place.
-      if (reponse.genre === 'affichage') {
-        annoncerEtMontrer(
-          {
-            genre: 'affichage',
-            titre: reponse.titre,
-            introduction: reponse.introduction,
-            lignes: reponse.lignes,
-          },
-          reponse.texte,
-        )
-        return
-      }
-
-      // Filou veut FAIRE quelque chose : ça part sur le tableau, avec un bouton.
+      // Tout le reste part sur le tableau, réponse comme proposition : c'est le
+      // même modèle, avec ou sans bouton.
       annoncerEtMontrer(
         {
-          genre: 'action',
-          outil: reponse.outil,
-          params: reponse.params,
-          charge: reponse.charge,
-          proposition: reponse.proposition,
+          titre: reponse.titre,
+          introduction: reponse.introduction,
+          lignes: reponse.lignes,
+          action: reponse.action,
         },
-        reponse.texte,
+        reponse.mot,
       )
     })
   }

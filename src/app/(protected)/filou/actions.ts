@@ -24,28 +24,23 @@ import { assistantIaDisponible } from '@/lib/ia/proposerRegle'
 import { outilsPour, trouverOutil } from '@/lib/ia/outils/registre'
 import type { ContexteOutil, PropositionAction } from '@/lib/ia/outils/types'
 
-/** Ce que la tablette reçoit. */
+/** Ce que la tablette reçoit. Une seule forme, toujours : la réponse va sur le
+ *  tableau, avec un bouton quand il y a quelque chose à décider. */
 export type ReponseFilou =
   | { error: string }
-  /** Filou a répondu — ça reste dans la conversation. */
-  | { genre: 'message'; texte: string }
-  /** Filou veut faire quelque chose : ça part sur le tableau, avec un bouton. */
   | {
-      genre: 'action'
-      /** Le mot d'accompagnement, s'il en a écrit un. */
-      texte: string
-      outil: string
-      params: unknown
-      charge?: unknown
-      proposition: PropositionAction
-    }
-  /** Filou pose une réponse sur le tableau : rien à décider, juste à lire. */
-  | {
-      genre: 'affichage'
-      texte: string
+      /** La phrase courte qui reste dans la conversation. */
+      mot: string
       titre: string
       introduction: string
       lignes: string[]
+      action?: {
+        outil: string
+        params: unknown
+        charge?: unknown
+        libelle: string
+        avertissement?: string
+      }
     }
 
 async function contexte(): Promise<{ error: string } | { ctx: ContexteOutil }> {
@@ -108,24 +103,13 @@ export async function parlerAFilou(phrase: string): Promise<ReponseFilou> {
     aujourdhuiEnFrancais(),
   )
 
-  if (issue.genre === 'erreur') return { error: issue.texte }
-  if (issue.genre === 'message') return { genre: 'message', texte: issue.texte }
-  if (issue.genre === 'affichage') {
-    return {
-      genre: 'affichage',
-      texte: issue.texte,
-      titre: issue.titre,
-      introduction: issue.introduction,
-      lignes: issue.lignes,
-    }
-  }
+  if (issue.erreur) return { error: issue.erreur }
   return {
-    genre: 'action',
-    texte: issue.texte,
-    outil: issue.outil,
-    params: issue.params,
-    charge: issue.charge,
-    proposition: issue.proposition,
+    mot: issue.mot,
+    titre: issue.titre,
+    introduction: issue.introduction,
+    lignes: issue.lignes,
+    action: issue.action,
   }
 }
 

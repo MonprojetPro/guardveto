@@ -22,33 +22,37 @@ import Anthropic from '@anthropic-ai/sdk'
 import { cleIA, modeleIA } from './proposerRegle'
 import { versDefinitionApi, type ContexteOutil, type Outil, type PropositionAction } from './outils/types'
 
-/** Ce que la boucle rend à l'appelant. */
-export type IssueFilou =
-  /** Filou a répondu — une lecture, une explication, une question. */
-  | { genre: 'message'; texte: string; outilsAppeles: string[] }
-  /** Filou veut FAIRE quelque chose et attend le feu vert. */
-  | {
-      genre: 'proposition'
-      /** Le mot d'accompagnement, s'il en a écrit un avant de proposer. */
-      texte: string
-      outil: string
-      params: unknown
-      /** Ce que l'aperçu a calculé et que l'exécution devra retrouver tel quel. */
-      charge?: unknown
-      proposition: PropositionAction
-      outilsAppeles: string[]
-    }
-  /** Filou a une réponse à POSER sur le tableau, pas à glisser dans le fil. */
-  | {
-      genre: 'affichage'
-      /** La phrase courte qui reste dans la tablette. */
-      texte: string
-      titre: string
-      introduction: string
-      lignes: string[]
-      outilsAppeles: string[]
-    }
-  | { genre: 'erreur'; texte: string }
+/**
+ * Ce que la boucle rend à l'appelant : TOUJOURS la même forme.
+ *
+ * Il n'y a qu'un seul modèle de réponse, et c'est voulu : une réponse à lire et
+ * une action à valider s'affichent au même endroit, dans la même fenêtre. La
+ * seule différence est la présence ou non d'un bouton. Deux formes séparées
+ * obligeaient à deviner laquelle allait arriver — et laissaient les réponses
+ * simples s'échouer dans la tablette, illisibles.
+ */
+export interface IssueFilou {
+  /** La phrase courte qui reste dans la conversation. */
+  mot: string
+  titre: string
+  /** Ce que Filou répond, en clair. */
+  introduction: string
+  /** Le détail, une ligne par élément. */
+  lignes: string[]
+  /** Présent seulement quand il y a quelque chose à décider. */
+  action?: {
+    outil: string
+    params: unknown
+    /** Ce que l'aperçu a calculé et que l'exécution devra retrouver tel quel. */
+    charge?: unknown
+    /** Le libellé du bouton qui exécute. */
+    libelle: string
+    avertissement?: string
+  }
+  outilsAppeles: string[]
+  /** Une panne, pas une réponse : à dire dans la conversation, pas à afficher. */
+  erreur?: string
+}
 
 /** Nombre d'allers-retours autorisés. Chaque tour est un appel facturé : sans
  *  plafond, une boucle qui se cherche coûterait sans fin. Six laisse la place à
@@ -63,13 +67,20 @@ COMMENT TU TRAVAILLES
 
 1. Cherche avant de conclure. Si la question porte sur ce que le cabinet contient — qui, quand, quelles règles, quels congés — appelle les outils qui le disent. Plusieurs si nécessaire : une règle et une fiche vétérinaire ne disent pas la même chose.
 2. Recoupe. Une contrainte peut venir d'une règle, d'un réglage de fiche, d'un congé ou de la structure du planning. Ne conclus « rien ne l'empêche » qu'après avoir regardé partout où ça pouvait être.
-3. Réponds en français simple, et dis d'où vient ta réponse. Pas de jargon technique, pas d'identifiants à l'écran.
-4. Si ta réponse est autre chose qu'une phrase — une liste, plusieurs éléments, des chiffres — pose-la sur le tableau avec afficher_sur_le_tableau. La conversation est étroite : tout ce qui dépasse deux phrases y devient illisible.
-5. Si tu n'as pas d'outil pour ce qu'on te demande, dis-le franchement plutôt que d'expliquer comment le faire à la main.
+3. Réponds en français simple, et dis d'où vient ta réponse. Pas de jargon technique, pas d'identifiants à l'écran, pas d'astérisques ni de mise en forme : ton texte s'affiche tel quel.
+4. Si tu n'as pas d'outil pour ce qu'on te demande, dis-le franchement plutôt que d'expliquer comment le faire à la main.
 
-QUAND TU AGIS
+OÙ TA RÉPONSE S'AFFICHE
 
-Les outils qui MODIFIENT quelque chose ne s'exécutent pas quand tu les appelles : ils préparent une proposition que la personne validera d'un clic. Appelle-les dès que la demande implique un changement — c'est le geste attendu, pas une audace. Un seul par réponse.
+Termine TOUJOURS par afficher_sur_le_tableau. C'est là que la personne lit : le grand tableau à côté de la conversation. Une réponse laissée dans la conversation est illisible et disparaît au message suivant.
+
+QUAND IL Y A QUELQUE CHOSE À FAIRE
+
+Les outils qui MODIFIENT quelque chose ne s'exécutent pas quand tu les appelles : ils préparent une proposition, et un bouton apparaît à côté de ta réponse. C'est ce bouton qui demande l'autorisation.
+
+Donc : NE DEMANDE JAMAIS LA PERMISSION PAR ÉCRIT. N'écris pas « veux-tu que je le fasse ? », « dois-je continuer ? », « faut-il que je… ? ». Appelle directement l'outil : la personne verra ce que tu proposes et cliquera, ou pas. Une question écrite lui fait perdre un aller-retour pour rien.
+
+Un seul outil de modification par réponse.
 
 CE QUE TU NE FAIS JAMAIS
 
@@ -118,7 +129,7 @@ export async function faireTravaillerFilou(
         messages,
       })
     } catch (e) {
-      return { genre: 'erreur', texte: e instanceof Error ? e.message : "Erreur de l'assistant." }
+      return issueVide(outilsAppeles, e instanceof Error ? e.message : "Erreur de l'assistant.")
     }
 
     const texte = reponse.content
@@ -128,9 +139,15 @@ export async function faireTravaillerFilou(
       .join('\n\n')
 
     if (reponse.stop_reason !== 'tool_use') {
+      // Filou a répondu en texte libre sans passer par l'outil d'affichage. On
+      // ne le laisse pas décider où sa réponse atterrit : elle va sur le
+      // tableau comme toutes les autres. La consigne du prompt obtient un beau
+      // titre ; ce filet-ci garantit l'emplacement même quand il l'oublie.
       return {
-        genre: 'message',
-        texte: texte || "Je n'ai pas su quoi répondre. Reformule autrement ?",
+        mot: 'Je te réponds sur le tableau.',
+        titre: 'Filou te répond',
+        introduction: texte || "Je n'ai pas su quoi répondre. Reformule autrement ?",
+        lignes: [],
         outilsAppeles,
       }
     }
@@ -169,8 +186,7 @@ export async function faireTravaillerFilou(
           mot_dans_la_conversation: string
         }
         return {
-          genre: 'affichage',
-          texte: p.mot_dans_la_conversation || texte,
+          mot: p.mot_dans_la_conversation || 'Je te réponds sur le tableau.',
           titre: p.titre,
           introduction: p.introduction,
           lignes: p.lignes ?? [],
@@ -211,13 +227,23 @@ export async function faireTravaillerFilou(
         continue
       }
 
+      // Une proposition s'affiche au même endroit qu'une réponse, avec un
+      // bouton en plus. Le mot que Filou a écrit avant d'appeler l'outil sert
+      // d'introduction s'il en a écrit un — c'est plus vivant que la phrase
+      // toute faite de l'outil.
+      const p = resume.proposition
       return {
-        genre: 'proposition',
-        texte,
-        outil: outil.nom,
-        params: valides.data,
-        charge: resume.charge,
-        proposition: resume.proposition,
+        mot: 'Je te propose ça sur le tableau.',
+        titre: p.titre,
+        introduction: texte || p.phrase,
+        lignes: p.lignes ?? [],
+        action: {
+          outil: outil.nom,
+          params: valides.data,
+          charge: resume.charge,
+          libelle: p.action,
+          avertissement: p.avertissement,
+        },
         outilsAppeles,
       }
     }
@@ -226,11 +252,18 @@ export async function faireTravaillerFilou(
   }
 
   return {
-    genre: 'message',
-    texte:
-      "Je tourne en rond sur cette demande — je préfère m'arrêter plutôt que de continuer à chercher. Reformule-la autrement ?",
+    mot: 'Je m’arrête là.',
+    titre: 'Je tourne en rond',
+    introduction:
+      "Je n'arrive pas à aboutir sur cette demande — je préfère m'arrêter plutôt que de continuer à chercher. Reformule-la autrement ?",
+    lignes: [],
     outilsAppeles,
   }
+}
+
+/** Une panne : rien à afficher, juste à dire. */
+function issueVide(outilsAppeles: string[], erreur: string): IssueFilou {
+  return { mot: erreur, titre: '', introduction: '', lignes: [], outilsAppeles, erreur }
 }
 
 function erreurOutil(id: string, texte: string): Anthropic.ToolResultBlockParam {

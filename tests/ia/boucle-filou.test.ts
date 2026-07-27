@@ -9,6 +9,9 @@
 // pendant que le modèle réfléchit — seul `resumer()` tourne, `executer()`
 // n'est appelé qu'après un clic humain que cette boucle ne simule jamais.
 //
+// `IssueFilou` n'a QU'UNE forme (voir agentFilou.ts) : une proposition se
+// reconnaît à la PRÉSENCE de `issue.action`, pas à un `genre` distinct.
+//
 // Le SDK Anthropic est simulé : on pilote nous-mêmes ce que « le modèle »
 // répond, tour par tour, et on observe avec des espions ce que la boucle fait
 // des outils — sans jamais appeler le vrai Claude ni la vraie base.
@@ -17,7 +20,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { z } from 'zod'
 import type Anthropic from '@anthropic-ai/sdk'
-import type { ContexteOutil, Outil, OutilEcriture, OutilLecture } from '@/lib/ia/outils/types'
+import type { ContexteOutil, Outil, OutilAffichage, OutilEcriture, OutilLecture } from '@/lib/ia/outils/types'
 
 // `vi.mock` est hissé au-dessus des imports : la fabrique ne peut référencer
 // que des variables déclarées via `vi.hoisted`, jamais un `const` du haut de
@@ -55,7 +58,8 @@ function reponseAvecOutils(blocs: ReturnType<typeof blocOutil>[], texte?: string
   } as unknown as Anthropic.Message
 }
 
-/** Le modèle conclut sans rien appeler. */
+/** Le modèle conclut en texte libre, SANS passer par l'outil d'affichage —
+ *  le cas que le filet de sécurité de la boucle doit rattraper. */
 function reponseFinale(texte: string) {
   return { content: [blocTexte(texte)], stop_reason: 'end_turn' } as unknown as Anthropic.Message
 }
@@ -64,6 +68,12 @@ function reponseFinale(texte: string) {
 
 const ParamsLecture = z.object({ question: z.string() })
 const ParamsEcriture = z.object({ cible: z.string() })
+const ParamsAffichage = z.object({
+  titre: z.string(),
+  introduction: z.string(),
+  lignes: z.array(z.string()),
+  mot_dans_la_conversation: z.string(),
+})
 
 function creerOutilLecture(
   overrides: Partial<OutilLecture<typeof ParamsLecture>> = {},
@@ -96,6 +106,18 @@ function creerOutilEcriture(
   }
 }
 
+function creerOutilAffichage(
+  overrides: Partial<OutilAffichage<typeof ParamsAffichage>> = {},
+): OutilAffichage<typeof ParamsAffichage> {
+  return {
+    genre: 'affichage',
+    nom: 'affichage_test',
+    description: 'Outil d’affichage factice, pour la boucle uniquement.',
+    params: ParamsAffichage,
+    ...overrides,
+  }
+}
+
 const CTX: ContexteOutil = {
   supabase: {} as ContexteOutil['supabase'],
   vetoId: 'veto-1',
@@ -118,12 +140,11 @@ describe('la boucle de Filou — frontière lecture/écriture', () => {
 
     expect(ecriture.resumer).toHaveBeenCalledTimes(1)
     expect(ecriture.executer).not.toHaveBeenCalled()
-    expect(issue.genre).toBe('proposition')
-    if (issue.genre === 'proposition') {
-      expect(issue.outil).toBe('ecriture_test')
-      expect(issue.params).toEqual({ cible: 'Manon' })
-      expect(issue.charge).toEqual({ note: 'charge de test' })
-    }
+    expect(issue.action).toBeDefined()
+    expect(issue.action?.outil).toBe('ecriture_test')
+    expect(issue.action?.params).toEqual({ cible: 'Manon' })
+    expect(issue.action?.charge).toEqual({ note: 'charge de test' })
+    expect(issue.action?.libelle).toBe('Appliquer')
   })
 
   it('un outil de lecture s’exécute et son résultat repart vers le modèle, qui continue', async () => {
@@ -149,8 +170,9 @@ describe('la boucle de Filou — frontière lecture/écriture', () => {
       { type: 'tool_result', tool_use_id: 'appel-1', content: JSON.stringify({ reponse: 'Manon est de garde mardi' }) },
     ])
 
-    expect(issue.genre).toBe('message')
-    if (issue.genre === 'message') expect(issue.texte).toBe('Manon est de garde mardi.')
+    // Pas d'écriture appelée : pas d'action à décider, une réponse simple.
+    expect(issue.action).toBeUndefined()
+    expect(issue.introduction).toBe('Manon est de garde mardi.')
   })
 
   it('un outil inexistant ne fait pas planter la boucle : une erreur repart vers le modèle', async () => {
@@ -160,7 +182,8 @@ describe('la boucle de Filou — frontière lecture/écriture', () => {
 
     const issue = await faireTravaillerFilou('fais un truc impossible', [] as Outil[], CTX, '2026-07-27')
 
-    expect(issue.genre).toBe('message')
+    expect(issue.action).toBeUndefined()
+    expect(issue.introduction).toBe('Je n’ai pas cette capacité.')
     const messagesDuTourSuivant = creerReponse.mock.calls[1][0].messages
     const dernierMessage = messagesDuTourSuivant.at(-1)
     expect(dernierMessage.content[0]).toMatchObject({
@@ -181,7 +204,7 @@ describe('la boucle de Filou — frontière lecture/écriture', () => {
     const issue = await faireTravaillerFilou('?', [lecture] as Outil[], CTX, '2026-07-27')
 
     expect(lecture.executer).not.toHaveBeenCalled()
-    expect(issue.genre).toBe('message')
+    expect(issue.action).toBeUndefined()
     const messagesDuTourSuivant = creerReponse.mock.calls[1][0].messages
     const dernierMessage = messagesDuTourSuivant.at(-1)
     expect(dernierMessage.content[0].is_error).toBe(true)
@@ -214,7 +237,7 @@ describe('la boucle de Filou — frontière lecture/écriture', () => {
 
     expect(ordre).toEqual(['lecture', 'ecriture'])
     expect(ecriture.executer).not.toHaveBeenCalled()
-    expect(issue.genre).toBe('proposition')
+    expect(issue.action?.outil).toBe('ecriture_test')
     // La boucle s'est arrêtée dès l'écriture : pas de 3e tour.
     expect(creerReponse).toHaveBeenCalledTimes(2)
   })
@@ -229,10 +252,8 @@ describe('la boucle de Filou — frontière lecture/écriture', () => {
 
     const issue = await faireTravaillerFilou('cherche indéfiniment', [lecture] as Outil[], CTX, '2026-07-27')
 
-    expect(issue.genre).toBe('message')
-    if (issue.genre === 'message') {
-      expect(issue.texte.length).toBeGreaterThan(0)
-    }
+    expect(issue.action).toBeUndefined()
+    expect(issue.introduction.length).toBeGreaterThan(0)
     // Le nombre d'appels au modèle doit être BORNÉ : c'est la preuve qu'il
     // n'y a pas de boucle infinie, pas un chiffre magique à préserver pour
     // lui-même.
@@ -253,7 +274,7 @@ describe('la boucle de Filou — frontière lecture/écriture', () => {
     const issue = await faireTravaillerFilou('change ça', [ecriture] as Outil[], CTX, '2026-07-27')
 
     expect(ecriture.executer).not.toHaveBeenCalled()
-    expect(issue.genre).toBe('message')
+    expect(issue.action).toBeUndefined()
 
     const messagesDuTourSuivant = creerReponse.mock.calls[1][0].messages
     const dernierMessage = messagesDuTourSuivant.at(-1)
@@ -263,7 +284,7 @@ describe('la boucle de Filou — frontière lecture/écriture', () => {
     })
   })
 
-  it('le mot d’accompagnement écrit avant de proposer est bien remonté dans l’issue', async () => {
+  it('le mot d’accompagnement écrit avant de proposer est bien remonté comme introduction de la proposition', async () => {
     const ecriture = creerOutilEcriture()
     creerReponse.mockResolvedValueOnce(
       reponseAvecOutils(
@@ -274,9 +295,41 @@ describe('la boucle de Filou — frontière lecture/écriture', () => {
 
     const issue = await faireTravaillerFilou('change ça', [ecriture] as Outil[], CTX, '2026-07-27')
 
-    expect(issue.genre).toBe('proposition')
-    if (issue.genre === 'proposition') {
-      expect(issue.texte).toBe('Je vais préparer ce changement pour toi.')
-    }
+    expect(issue.action).toBeDefined()
+    expect(issue.introduction).toBe('Je vais préparer ce changement pour toi.')
+  })
+
+  it('un outil d’affichage pose directement la réponse sur le tableau et arrête la boucle', async () => {
+    const affichage = creerOutilAffichage()
+    creerReponse.mockResolvedValueOnce(
+      reponseAvecOutils([
+        blocOutil('appel-1', 'affichage_test', {
+          titre: 'Les gardes de la semaine',
+          introduction: 'Voici qui est de garde.',
+          lignes: ['Lundi : Manon', 'Mardi : Antoine'],
+          mot_dans_la_conversation: 'Voilà le planning demandé.',
+        }),
+      ]),
+    )
+
+    const issue = await faireTravaillerFilou('qui est de garde cette semaine ?', [affichage] as Outil[], CTX, '2026-07-27')
+
+    expect(issue.titre).toBe('Les gardes de la semaine')
+    expect(issue.introduction).toBe('Voici qui est de garde.')
+    expect(issue.lignes).toEqual(['Lundi : Manon', 'Mardi : Antoine'])
+    expect(issue.mot).toBe('Voilà le planning demandé.')
+    expect(issue.action).toBeUndefined()
+    // L'outil d'affichage termine le tour lui-même : pas de second aller-retour.
+    expect(creerReponse).toHaveBeenCalledTimes(1)
+  })
+
+  it('un texte libre laissé en fin de tour (sans passer par l’outil d’affichage) est quand même capturé sur le tableau — Filou ne choisit pas de le laisser filer dans la conversation', async () => {
+    creerReponse.mockResolvedValueOnce(reponseFinale('Une réponse écrite sans appeler aucun outil.'))
+
+    const issue = await faireTravaillerFilou('une question simple', [] as Outil[], CTX, '2026-07-27')
+
+    expect(issue.introduction).toBe('Une réponse écrite sans appeler aucun outil.')
+    expect(issue.titre.length).toBeGreaterThan(0)
+    expect(issue.action).toBeUndefined()
   })
 })

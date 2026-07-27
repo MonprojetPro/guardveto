@@ -46,9 +46,7 @@ function relireResultat(): ResultatFilou | null {
     if (!brut) return null
     const lu = JSON.parse(brut) as ResultatFilou | null
     // Une valeur écrite par une version précédente ne doit pas casser l'accueil.
-    return lu && typeof lu.id === 'number' && (lu.genre === 'action' || lu.genre === 'affichage')
-      ? lu
-      : null
+    return lu && typeof lu.id === 'number' && typeof lu.titre === 'string' ? lu : null
   } catch {
     return null
   }
