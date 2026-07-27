@@ -36,7 +36,11 @@ export function assistantIaDisponible(): boolean {
  * processus.
  */
 export function modeleIA(): string {
-  return process.env.GUARDVETO_IA_MODELE || 'claude-opus-4-8'
+  // `trim()` obligatoire : un copier-coller dans l'interface Vercel colle
+  // facilement un retour à la ligne invisible en fin de valeur. L'API reçoit
+  // alors « claude-sonnet-5\n », qui n'est pas un modèle connu → 404
+  // not_found_error (incident 2026-07-27).
+  return process.env.GUARDVETO_IA_MODELE?.trim() || 'claude-opus-4-8'
 }
 
 /** Le prompt système exact, exposé pour pouvoir en COMPTER les tokens sans
