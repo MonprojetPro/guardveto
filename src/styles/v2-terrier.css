@@ -631,24 +631,8 @@
 .consigne button:hover { filter: brightness(1.07); transform: scale(1.05); }
 .consigne button:active { transform: scale(0.94); }
 
-/* Les suggestions : chips compactes, 2 rangées maximum */
-.chips {
-  display: flex; flex-wrap: wrap; gap: 6px;
-  margin-top: 9px;
-}
-.chip {
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--muted);
-  border-radius: 999px;
-  font-size: 0.72rem; font-weight: 600;
-  padding: 5px 11px; min-height: 28px;
-  transition: color 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
-}
-.chip:hover {
-  color: var(--accent-ink); border-color: var(--accent-ink);
-  background: var(--accent-soft);
-}
+/* Les pastilles de raccourci ont été retirées de la tablette : elles doublaient
+   les fiches du tableau, déjà cliquables, et encombraient la conversation. */
 
 /* ============================================================
    PARLER À FILOU · le champ de la tablette
@@ -698,32 +682,24 @@
 .saisie-envoi svg { width: 17px; height: 17px; }
 .saisie-envoi:hover:not(:disabled) { filter: brightness(1.08); }
 .saisie-envoi:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
-/* Trois amorces, le temps de la première fois seulement. */
-.saisie-exemples { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
-.ex-chip {
-  border: 1px dashed var(--border-strong);
-  background: transparent; color: var(--soft);
-  border-radius: 999px;
-  font-size: 0.68rem; font-weight: 600;
-  padding: 4px 9px;
-  text-align: left;
-  transition: color 0.18s ease, border-color 0.18s ease;
-}
-.ex-chip:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
+/* Les amorces d'exemple ont été retirées : la tablette ne porte que la
+   conversation, et le champ dit déjà par son placeholder ce qu'on peut écrire. */
 
-/* ------ La proposition de Filou, dans sa bulle ------
+/* ------ La proposition de Filou, SUR LE TABLEAU ------
    Elle porte une DÉCISION : rien n'est enregistré tant que le bouton n'a pas
    été cliqué. L'aperçu est donc mis en avant comme une citation, et la
    puissance annoncée en clair — « interdiction ferme » et « préférence » ne
-   produisent pas le même planning. */
-.prop-apercu {
+   produisent pas le même planning. Ces styles servaient dans la bulle de chat ;
+   ils vivent maintenant dans la fenêtre du tableau, où la place ne manque plus. */
+.res-apercu {
   display: block;
-  margin: 5px 0 7px;
-  padding: 7px 9px;
+  margin: 0 0 12px;
+  padding: 11px 13px;
   border-left: 3px solid var(--accent);
-  border-radius: 4px 9px 9px 4px;
+  border-radius: 4px 11px 11px 4px;
   background: var(--accent-soft);
-  font-size: 0.79rem; line-height: 1.5;
+  font-size: 0.95rem; line-height: 1.5;
+  font-weight: 600;
 }
 .prop-force { font-size: 0.72rem; color: var(--muted); margin-bottom: 6px; }
 .prop-lien {
@@ -746,13 +722,10 @@
   color: var(--text); font-weight: 700;
   border-color: var(--accent); background: var(--accent-soft);
 }
-.prop-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-.prop-verdict { font-size: 0.72rem; font-weight: 600; color: var(--muted); margin-top: 4px; }
-.prop-verdict.ok { color: var(--ok); }
+/* Le seul verdict qui reste à l'écran est un refus de création : la réussite,
+   elle, se dit dans la conversation et referme la fenêtre. */
+.prop-verdict { font-size: 0.78rem; font-weight: 600; color: var(--danger); margin: 4px 0 12px; }
 .bubble-attente { color: var(--muted); font-style: italic; }
-/* La bulle de proposition a besoin de largeur : 86 % coupait les boutons en
-   deux sur la tablette. */
-.msg.filou .bubble:has(.prop-apercu) { max-width: 100%; }
 
 /* ============================================================
    LE TABLEAU D'AFFICHAGE DU CABINET (droite) · la scène se lit :

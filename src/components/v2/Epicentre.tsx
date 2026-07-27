@@ -8,6 +8,12 @@
 // Cliquer une fiche ouvre une fenêtre détaillée À LA PLACE du coup d'œil ;
 // Échap ou ✕ referme et le tableau revient.
 //
+// PARTAGE DES RÔLES entre les deux moitiés (décidé avec MiKL) : la tablette ne
+// porte QUE la conversation — Filou demande une précision, on lui répond. Tout
+// RÉSULTAT s'affiche sur le tableau, où il a la place d'être lu et décidé. Ce
+// que Filou comprend arrive donc ici par `onResultat`, dans une fenêtre de plus,
+// exactement comme les quatre fiches.
+//
 // Chaque chiffre affiché vient de la base (`chargerAccueil`). La fiche
 // « cohérence » est la seule à se charger après coup : elle fait tourner le
 // validateur indépendant sur les périodes publiées, ce qui prend une seconde.
@@ -17,13 +23,15 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { FilouCube, type FilouHandle } from './FilouCube'
-import { FilouChat } from './FilouChat'
+import { FilouChat, type FilouChatHandle } from './FilouChat'
+import { FenetreResultatFilou, type ResultatFilou } from './FilouResultat'
 import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
 import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
 import type { DonneesAccueil, GardeDuSoir } from '@/data/v2/accueilEpicentre'
 
-type Fenetre = 'cesoir' | 'souhaits' | 'periode' | 'coherence'
+type Fenetre = 'cesoir' | 'souhaits' | 'periode' | 'coherence' | 'filou'
 
 // ── Mise en français des dates (rien d'autre que de l'affichage) ──
 
@@ -87,9 +95,15 @@ function anciennete(iso: string) {
 }
 
 export function Epicentre({ data }: { data: DonneesAccueil }) {
+  const router = useRouter()
   const [ouverte, setOuverte] = useState<Fenetre | null>(null)
   const [heure, setHeure] = useState('--:--')
+  // Ce que Filou a compris et pose sur le tableau. Conservé après fermeture :
+  // rouvrir ne doit pas ressusciter une décision déjà prise, donc on l'efface
+  // au moment de la décision, pas au moment de la fermeture.
+  const [resultatFilou, setResultatFilou] = useState<ResultatFilou | null>(null)
   const filou = useRef<FilouHandle>(null)
+  const chat = useRef<FilouChatHandle>(null)
   const stageRef = useRef<HTMLDivElement>(null)
 
   // Verdict de cohérence : chargé après le rendu, jamais deviné. S'il n'y a
@@ -150,6 +164,33 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
     filou.current?.tape()
   }, [])
 
+  /** Filou a compris quelque chose : ça s'affiche sur le tableau. Le
+   *  `scrollIntoView` n'a aucun effet quand le tableau est déjà en vue (grand
+   *  écran) ; en dessous de 940 px, où le tableau passe SOUS la tablette, il
+   *  évite qu'un résultat s'ouvre hors de l'écran sans qu'on le voie. */
+  const montrer = useCallback((r: ResultatFilou) => {
+    setResultatFilou(r)
+    setOuverte('filou')
+    requestAnimationFrame(() => {
+      stageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    })
+  }, [])
+
+  /** La décision prise sur le tableau revient se dire dans la conversation :
+   *  les deux moitiés de l'écran racontent la même histoire. */
+  const deciderResultat = useCallback(
+    ({ fermer, dire }: { fermer: boolean; dire: string }) => {
+      chat.current?.dit(dire)
+      if (!fermer) return
+      setOuverte(null)
+      setResultatFilou(null)
+      // Les compteurs de la barre (règles fermes / souples) lisent la base :
+      // sans ce refresh, le dock afficherait encore l'ancien décompte.
+      router.refresh()
+    },
+    [router],
+  )
+
   // Échap referme la fenêtre et rend le tableau.
   useEffect(() => {
     if (!ouverte) return
@@ -194,36 +235,16 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
                     <h1>{majuscule(dateLongue(data.ceSoir?.date ?? aujourdhui()))}</h1>
                   </header>
 
-                  {/* Le fil, les pastilles, et le champ pour PARLER à Filou.
+                  {/* Le fil et le champ pour PARLER à Filou — rien d'autre.
                       C'est FilouChat qui tient la conversation : il appelle le
-                      même assistant que l'écran Règles et crée par les mêmes
-                      actions serveur. */}
+                      même assistant que l'écran Règles. Ce qu'il comprend
+                      ressort par `onResultat` et s'affiche sur le tableau. */}
                   <FilouChat
+                    ref={chat}
                     estAdmin={data.estAdmin}
                     onFilouTape={() => filou.current?.tape()}
+                    onResultat={montrer}
                     enTete={<MotDAccueil data={data} />}
-                    pastilles={
-                      <div className="chips" role="group" aria-label="Ouvrir une fiche">
-                        <button type="button" className="chip" onClick={() => ouvrir('cesoir')}>
-                          Garde de ce soir
-                        </button>
-                        {data.estAdmin && nbSouhaits > 0 && (
-                          <button type="button" className="chip" onClick={() => ouvrir('souhaits')}>
-                            Souhaits en attente
-                          </button>
-                        )}
-                        {data.estAdmin && data.recapPeriode && (
-                          <button type="button" className="chip" onClick={() => ouvrir('periode')}>
-                            Période à préparer
-                          </button>
-                        )}
-                        {data.estAdmin && (
-                          <button type="button" className="chip" onClick={() => ouvrir('coherence')}>
-                            Vérification du planning
-                          </button>
-                        )}
-                      </div>
-                    }
                   />
                 </div>
               </div>
@@ -566,6 +587,17 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
                     <span className="hint">Échap pour refermer</span>
                   </footer>
                 </article>
+              )}
+
+              {/* ===== Fenêtre · ce que Filou a compris ===== */}
+              {resultatFilou && (
+                <FenetreResultatFilou
+                  key={resultatFilou.id}
+                  actif={ouverte === 'filou'}
+                  resultat={resultatFilou}
+                  onFermer={() => setOuverte(null)}
+                  onDecision={deciderResultat}
+                />
               )}
             </div>
           </div>

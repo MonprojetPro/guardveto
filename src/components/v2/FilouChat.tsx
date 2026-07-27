@@ -14,9 +14,14 @@
 // Règles, et la création passe par les MÊMES actions serveur
 // (`creerRegleProposee`) — pas une deuxième implémentation qui divergerait.
 //
+// LA TABLETTE NE PORTE QUE LA CONVERSATION. Ce que Filou COMPREND part sur le
+// tableau du cabinet via `onResultat` (cf. `FilouResultat.tsx`) : c'est là qu'il
+// y a la place de lire et de décider. Ici ne restent que les tours de parole —
+// ce qu'on demande, ce que Filou répond, ce qu'il n'a pas su faire.
+//
 // GARDE-FOU, non négociable : Filou PROPOSE, l'humain DÉCIDE. Rien n'est écrit
-// en base avant le clic sur « Créer cette règle ». Tant qu'il n'a pas cliqué,
-// une proposition n'est qu'une phrase à l'écran.
+// en base avant le clic sur « Créer cette règle », qui vit désormais sur le
+// tableau.
 //
 // ADMIN SEULEMENT : l'action serveur est admin-only. Afficher le champ à un
 // vétérinaire non-admin lui promettrait une conversation qui répondrait « accès
@@ -29,69 +34,67 @@
 // pas encore lire le planning pour répondre, et deviner serait mentir.
 // ============================================================
 
-import { useEffect, useId, useRef, useState, useTransition, type ReactNode } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { proposerRegleDepuisTexte, type ForceFormulaire } from '@/app/(protected)/regles/actions'
 import {
-  creerRegleProposee,
-  estCreable,
-  sansErreur,
-  forceProposee,
-  FORCE_LABEL,
-  FORCES_ORDRE,
-  type PropositionExploitable,
-} from '@/components/ia/creerRegleProposee'
+  forwardRef,
+  useEffect,
+  useId,
+  useImperativeHandle,
+  useRef,
+  useState,
+  useTransition,
+  type ReactNode,
+} from 'react'
+import { proposerRegleDepuisTexte } from '@/app/(protected)/regles/actions'
+import { estCreable, sansErreur } from '@/components/ia/creerRegleProposee'
+import type { ResultatFilou } from './FilouResultat'
 
-/** Un tour de parole dans le fil. */
-type Message =
-  | { id: number; de: 'moi'; texte: string }
-  | { id: number; de: 'filou'; texte: string }
-  /** Une proposition en attente de décision : le seul message qui porte des boutons. */
-  | { id: number; de: 'proposition'; texte: string; res: PropositionExploitable; etat: 'attente' | 'creee' | 'abandonnee' }
-
-/** `Omit` sur une union doit être DISTRIBUÉ, sinon il ne garde que les
- *  propriétés communes et perd `res`/`etat`. */
-type MessageSansId = Message extends infer M ? (M extends { id: number } ? Omit<M, 'id'> : never) : never
+/** Un tour de parole dans le fil. Il n'y a plus que de la parole : une
+ *  proposition à décider n'est pas un message, c'est un résultat — et les
+ *  résultats vont sur le tableau. */
+type Message = { id: number; de: 'moi' | 'filou'; texte: string }
 
 /** Longueur maximale d'une consigne. Chaque envoi est un appel facturé au
  *  modèle : une garde de bon sens côté saisie évite qu'un copier-coller
  *  malheureux part en analyse. La vraie limite reste à poser côté serveur. */
 const LONGUEUR_MAX = 400
 
-const EXEMPLES = [
-  'Manon ne fait jamais de garde le mercredi',
-  'Au moins 3 jours entre deux gardes pour Antoine',
-  'Un junior n’est jamais seul de garde',
-]
+/** Ce que l'Épicentre peut demander à la tablette : faire parler Filou. C'est
+ *  ce qui permet au tableau (« créée », « abandonnée ») de revenir commenter
+ *  dans la conversation, au lieu de laisser deux moitiés d'écran s'ignorer. */
+export interface FilouChatHandle {
+  dit: (texte: string) => void
+}
 
 interface Props {
   /** Le mot d'accueil : premier message du fil, toujours présent. */
   enTete: ReactNode
-  /** Les pastilles de raccourci, entre le fil et le champ. */
-  pastilles: ReactNode
   estAdmin: boolean
   /** Fait taper Filou sur sa tablette pendant qu'il réfléchit. */
   onFilouTape?: () => void
+  /** Ce que Filou a compris, à afficher sur le tableau du cabinet. */
+  onResultat: (r: ResultatFilou) => void
 }
 
-export function FilouChat({ enTete, pastilles, estAdmin, onFilouTape }: Props) {
-  const router = useRouter()
+export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
+  { enTete, estAdmin, onFilouTape, onResultat },
+  ref,
+) {
   const champId = useId()
   const [messages, setMessages] = useState<Message[]>([])
   const [phrase, setPhrase] = useState('')
-  const [force, setForce] = useState<ForceFormulaire | null>(null)
-  const [puissanceOuverte, setPuissanceOuverte] = useState(false)
   const [enCours, demarrer] = useTransition()
-  const [creation, demarrerCreation] = useTransition()
   const filRef = useRef<HTMLDivElement>(null)
   const champRef = useRef<HTMLTextAreaElement>(null)
   const compteur = useRef(0)
 
-  const ajouter = (m: MessageSansId) => {
+  const ajouter = (de: Message['de'], texte: string) => {
     compteur.current += 1
-    setMessages((prec) => [...prec, { ...m, id: compteur.current } as Message])
+    setMessages((prec) => [...prec, { id: compteur.current, de, texte }])
   }
+
+  useImperativeHandle(ref, () => ({
+    dit: (texte: string) => ajouter('filou', texte),
+  }))
 
   // Le fil descend sur le dernier message : sans ça, la réponse de Filou
   // arriverait sous la ligne de flottaison, invisible.
@@ -104,62 +107,36 @@ export function FilouChat({ enTete, pastilles, estAdmin, onFilouTape }: Props) {
   const envoyer = () => {
     const texte = phrase.trim()
     if (texte.length < 3 || enCours) return
-    ajouter({ de: 'moi', texte })
+    ajouter('moi', texte)
     setPhrase('')
-    setForce(null)
-    setPuissanceOuverte(false)
     onFilouTape?.()
 
     demarrer(async () => {
       const res = await proposerRegleDepuisTexte(texte)
 
       if (!sansErreur(res)) {
-        ajouter({ de: 'filou', texte: res.error })
+        ajouter('filou', res.error)
         return
       }
       if (!estCreable(res)) {
         // Non faisable : on rend la RAISON de l'assistant, pas une formule de
         // politesse. Savoir pourquoi ça ne marche pas, c'est ce qui permet de
         // reformuler utilement.
-        ajouter({
-          de: 'filou',
-          texte:
-            res.proposition.message ||
+        ajouter(
+          'filou',
+          res.proposition.message ||
             "Je n'arrive pas à traduire ça en règle du cabinet. Reformule autrement ?",
-        })
+        )
         return
       }
-      ajouter({ de: 'proposition', texte: res.apercu, res, etat: 'attente' })
-      setForce(forceProposee(res))
+      // Compris : la décision se prend sur le tableau, où l'aperçu tient en
+      // entier. Le fil dit où regarder — sans ça, le résultat apparaîtrait
+      // ailleurs sans que rien ne l'annonce.
+      ajouter('filou', 'J’ai compris ta demande — je l’affiche sur le tableau du cabinet.')
+      compteur.current += 1
+      onResultat({ id: compteur.current, genre: 'regle', apercu: res.apercu, res })
+      requestAnimationFrame(() => champRef.current?.focus())
     })
-  }
-
-  const creer = (msg: Extract<Message, { de: 'proposition' }>) => {
-    demarrerCreation(async () => {
-      const r = await creerRegleProposee(msg.res, force)
-      if (r.error) {
-        ajouter({ de: 'filou', texte: r.error })
-        return
-      }
-      setMessages((prec) =>
-        prec.map((m) => (m.id === msg.id ? { ...m, etat: 'creee' as const } : m)),
-      )
-      ajouter({
-        de: 'filou',
-        texte: 'C’est enregistré. La règle s’appliquera à la prochaine génération de planning.',
-      })
-      // Les compteurs de la barre (règles fermes / souples) lisent la base :
-      // sans ce refresh, le dock afficherait encore l'ancien décompte.
-      router.refresh()
-    })
-  }
-
-  const abandonner = (msg: Extract<Message, { de: 'proposition' }>) => {
-    setMessages((prec) =>
-      prec.map((m) => (m.id === msg.id ? { ...m, etat: 'abandonnee' as const } : m)),
-    )
-    ajouter({ de: 'filou', texte: 'D’accord, je n’enregistre rien.' })
-    requestAnimationFrame(() => champRef.current?.focus())
   }
 
   return (
@@ -172,16 +149,6 @@ export function FilouChat({ enTete, pastilles, estAdmin, onFilouTape }: Props) {
             <div className="msg user" key={m.id}>
               <div className="bubble">{m.texte}</div>
             </div>
-          ) : m.de === 'filou' ? (
-            <div className="msg filou" key={m.id}>
-              <span className="m-ava" aria-hidden="true">
-                🦊
-              </span>
-              <div className="bubble">
-                <span className="vh">Filou : </span>
-                {m.texte}
-              </div>
-            </div>
           ) : (
             <div className="msg filou" key={m.id}>
               <span className="m-ava" aria-hidden="true">
@@ -189,71 +156,7 @@ export function FilouChat({ enTete, pastilles, estAdmin, onFilouTape }: Props) {
               </span>
               <div className="bubble">
                 <span className="vh">Filou : </span>
-                <b>J’ai compris ça :</b>
-                <span className="prop-apercu">{m.texte}</span>
-
-                {m.etat === 'attente' && (
-                  <>
-                    {/* La puissance est annoncée en clair, pas cachée dans un
-                        réglage : « interdiction ferme » et « préférence » ne
-                        produisent pas du tout le même planning. */}
-                    {force && (
-                      <p className="prop-force">
-                        Puissance : <b>{FORCE_LABEL[force]}</b>{' '}
-                        <button
-                          type="button"
-                          className="prop-lien"
-                          onClick={() => setPuissanceOuverte((v) => !v)}
-                          aria-expanded={puissanceOuverte}
-                        >
-                          {puissanceOuverte ? 'garder celle-ci' : 'changer'}
-                        </button>
-                      </p>
-                    )}
-                    {puissanceOuverte && (
-                      <div className="prop-crans" role="group" aria-label="Puissance de la règle">
-                        {FORCES_ORDRE.map((f) => (
-                          <button
-                            key={f}
-                            type="button"
-                            aria-pressed={force === f}
-                            className={`prop-cran${force === f ? ' actif' : ''}`}
-                            onClick={() => setForce(f)}
-                          >
-                            {FORCE_LABEL[f]}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    <div className="prop-actions">
-                      <button
-                        type="button"
-                        className="btn btn-valider btn-sm"
-                        onClick={() => creer(m)}
-                        disabled={creation}
-                      >
-                        {creation ? 'J’enregistre…' : 'Créer cette règle'}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => abandonner(m)}
-                        disabled={creation}
-                      >
-                        Laisse tomber
-                      </button>
-                    </div>
-                  </>
-                )}
-                {m.etat === 'creee' && (
-                  <p className="prop-verdict ok">
-                    ✓ Créée ·{' '}
-                    <Link className="prop-lien" href="/regles">
-                      voir dans les règles
-                    </Link>
-                  </p>
-                )}
-                {m.etat === 'abandonnee' && <p className="prop-verdict">Abandonnée.</p>}
+                {m.texte}
               </div>
             </div>
           ),
@@ -276,8 +179,6 @@ export function FilouChat({ enTete, pastilles, estAdmin, onFilouTape }: Props) {
           </div>
         )}
       </div>
-
-      {pastilles}
 
       {estAdmin ? (
         <div className="saisie">
@@ -315,16 +216,6 @@ export function FilouChat({ enTete, pastilles, estAdmin, onFilouTape }: Props) {
           </button>
         </div>
       ) : null}
-
-      {estAdmin && messages.length === 0 && (
-        <div className="saisie-exemples">
-          {EXEMPLES.map((ex) => (
-            <button key={ex} type="button" className="ex-chip" onClick={() => setPhrase(ex)}>
-              {ex}
-            </button>
-          ))}
-        </div>
-      )}
     </>
   )
-}
+})
