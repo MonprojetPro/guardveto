@@ -44,8 +44,7 @@ import {
   useTransition,
   type ReactNode,
 } from 'react'
-import { demanderAFilou } from '@/app/(protected)/regles/actions'
-import { estCreable, sansErreur } from '@/components/ia/creerRegleProposee'
+import { parlerAFilou } from '@/app/(protected)/filou/actions'
 import type { ContenuResultat, ResultatFilou } from './FilouResultat'
 
 /** Un tour de parole dans le fil. Il n'y a plus que de la parole : une
@@ -107,8 +106,14 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
   /** Le résultat part sur le tableau, et le fil dit où regarder : sans cette
    *  phrase, quelque chose apparaîtrait à l'autre bout de l'écran sans que rien
    *  ne l'annonce. */
-  const annoncerEtMontrer = (contenu: ContenuResultat) => {
-    ajouter('filou', 'J’ai compris ta demande — je l’affiche sur le tableau du cabinet.')
+  const annoncerEtMontrer = (contenu: ContenuResultat, mot?: string) => {
+    // Le mot de Filou s'il en a écrit un, sinon une phrase qui dit où regarder :
+    // sans ça, quelque chose apparaîtrait à l'autre bout de l'écran sans que
+    // rien ne l'annonce.
+    ajouter(
+      'filou',
+      mot?.trim() || 'J’ai compris ta demande — je l’affiche sur le tableau du cabinet.',
+    )
     compteur.current += 1
     onResultat({ ...contenu, id: compteur.current })
     requestAnimationFrame(() => champRef.current?.focus())
@@ -122,47 +127,31 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
     onFilouTape?.()
 
     demarrer(async () => {
-      const reponse = await demanderAFilou(texte)
+      const reponse = await parlerAFilou(texte)
 
       if ('error' in reponse) {
         ajouter('filou', reponse.error)
         return
       }
 
-      // Rien d'actionnable : Filou explique, et ça reste dans la conversation.
+      // Une réponse, une explication, une question : ça reste dans la tablette.
       if (reponse.genre === 'message') {
         ajouter('filou', reponse.texte)
+        requestAnimationFrame(() => champRef.current?.focus())
         return
       }
 
-      // Des règles existantes à lever, rétablir ou supprimer.
-      if (reponse.genre === 'action-regles') {
-        annoncerEtMontrer({
-          genre: 'action-regles',
-          action: reponse.action,
-          regles: reponse.regles,
-          explication: reponse.explication,
-        })
-        return
-      }
-
-      const res = reponse.resultat
-      if (!sansErreur(res)) {
-        ajouter('filou', res.error)
-        return
-      }
-      if (!estCreable(res)) {
-        // Non faisable : on rend la RAISON de l'assistant, pas une formule de
-        // politesse. Savoir pourquoi ça ne marche pas, c'est ce qui permet de
-        // reformuler utilement.
-        ajouter(
-          'filou',
-          res.proposition.message ||
-            "Je n'arrive pas à traduire ça en règle du cabinet. Reformule autrement ?",
-        )
-        return
-      }
-      annoncerEtMontrer({ genre: 'regle', apercu: res.apercu, res })
+      // Filou veut FAIRE quelque chose : ça part sur le tableau, avec un bouton.
+      annoncerEtMontrer(
+        {
+          genre: 'action',
+          outil: reponse.outil,
+          params: reponse.params,
+          charge: reponse.charge,
+          proposition: reponse.proposition,
+        },
+        reponse.texte,
+      )
     })
   }
 

@@ -1,7 +1,10 @@
-'use client'
-
 // ============================================================
 // GUARDVETO — Créer la règle que l'IA vient de proposer
+// ============================================================
+// Module NEUTRE (ni 'use client' ni 'use server') : il ne fait qu'aiguiller
+// vers la bonne action serveur, sans hook ni état. La directive `'use client'`
+// qu'il portait empêchait les outils de Filou — qui tournent côté serveur — de
+// réutiliser cet aiguillage, et aurait imposé de le réécrire ailleurs.
 // ============================================================
 // Une proposition de l'assistant peut atterrir dans QUATRE familles de règles,
 // donc quatre actions serveur différentes. Cet aiguillage vivait en dur dans
