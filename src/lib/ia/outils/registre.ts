@@ -14,17 +14,128 @@
 
 import { lireEquipe, modifierVeterinaire } from './equipe'
 import { listerRegles, creerRegle, agirSurRegles } from './regles'
+import {
+  lireGardes,
+  lireEtatPeriodes,
+  verifierPreVolPeriode,
+  creerPeriode,
+  reglerPeriode,
+  publierPeriode,
+} from './planning'
+import {
+  lireConges,
+  lireSouhaitsEnAttente,
+  poserConge,
+  validerConge,
+  refuserConge,
+  supprimerConge,
+} from './conges'
+import {
+  lireAbsences,
+  lireCompensations,
+  lireCreneauxTouches,
+  declarerAbsence,
+  appelerVolontaires,
+  reparerAbsence,
+  marquerCompensation,
+} from './absences'
+import {
+  lireEchanges,
+  proposerEchangeOutil,
+  accepterEchangeOutil,
+  refuserEchangeOutil,
+  annulerEchangeOutil,
+  validerEchangeAdminOutil,
+  refuserEchangeAdminOutil,
+} from './echanges'
+import {
+  lireCompteurs,
+  verifierCoherencePlanning,
+  lireHistoriquePeriodes,
+  lireHistoriqueFetes,
+  lireReglagesEquite,
+  reglerEquite,
+} from './compteurs'
+import {
+  lireProfilsPlanning,
+  lireCreneauxProfil,
+  lireRelationsCreneaux,
+  lireReglagesCabinet,
+  creerProfilDepuisPhrase,
+  creerRelationDepuisPhrase,
+  agirSurCreneau,
+  agirSurRelation,
+  supprimerProfilDepuisNom,
+  reglerHorairesCreneau,
+  creerCreneauSurMesureDepuisPhrase,
+  configurerAdresseDepuisPhrase,
+  configurerPartagesDepuisPhrase,
+} from './structure'
 import type { ContexteOutil, Outil } from './types'
 
-/** Tout ce que Filou sait faire, tous rôles confondus. */
+/** Tout ce que Filou sait faire, tous rôles confondus.
+ *
+ *  L'ordre compte un peu : le catalogue est envoyé tel quel au modèle, et les
+ *  premiers outils pèsent dans ce qu'il envisage en premier. On met donc en
+ *  tête ce qu'on veut qu'il consulte avant de conclure — l'équipe et les
+ *  règles — et les gestes rares en fin de liste. */
 export const CATALOGUE: Outil[] = [
-  // Équipe
+  // Qui fait quoi — à consulter avant toute conclusion sur une personne
   lireEquipe,
-  modifierVeterinaire,
-  // Règles du cabinet
   listerRegles,
+  // Le planning et les compteurs
+  lireGardes,
+  lireEtatPeriodes,
+  lireCompteurs,
+  lireHistoriquePeriodes,
+  lireHistoriqueFetes,
+  verifierCoherencePlanning,
+  // Absences, congés, échanges — le quotidien
+  lireConges,
+  lireSouhaitsEnAttente,
+  lireAbsences,
+  lireCompensations,
+  lireCreneauxTouches,
+  lireEchanges,
+  // Les réglages
+  lireReglagesEquite,
+  lireProfilsPlanning,
+  lireCreneauxProfil,
+  lireRelationsCreneaux,
+  lireReglagesCabinet,
+
+  // ── Ce qui modifie : rien ne s'exécute sans un clic humain ──
+  modifierVeterinaire,
   creerRegle,
   agirSurRegles,
+  poserConge,
+  validerConge,
+  refuserConge,
+  supprimerConge,
+  declarerAbsence,
+  appelerVolontaires,
+  reparerAbsence,
+  marquerCompensation,
+  proposerEchangeOutil,
+  accepterEchangeOutil,
+  refuserEchangeOutil,
+  annulerEchangeOutil,
+  validerEchangeAdminOutil,
+  refuserEchangeAdminOutil,
+  creerPeriode,
+  reglerPeriode,
+  publierPeriode,
+  verifierPreVolPeriode,
+  reglerEquite,
+  creerProfilDepuisPhrase,
+  creerRelationDepuisPhrase,
+  agirSurCreneau,
+  agirSurRelation,
+  supprimerProfilDepuisNom,
+  reglerHorairesCreneau,
+  creerCreneauSurMesureDepuisPhrase,
+  configurerAdresseDepuisPhrase,
+  configurerPartagesDepuisPhrase,
 ]
 
 /** Le catalogue tel que cette personne y a droit. */

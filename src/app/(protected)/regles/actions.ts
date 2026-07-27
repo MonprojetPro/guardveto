@@ -27,18 +27,6 @@ import { EQUITY_DIMENSIONS, IMPORTANCE_LEVELS } from '@/engine/equity-weights'
 import { construireValiditeJson } from '@/lib/periodes'
 import { chargerCreneauModele } from '@/data/chargerCreneauModele'
 import { chargerContexteIA } from '@/lib/ia/contexteCabinet'
-import {
-  routerIntentionIA,
-  type RegleNumerotee,
-  type SortieIntention,
-} from '@/lib/ia/routerIntention'
-import {
-  phraseRegle,
-  fusionnerDuos,
-  reglesVisees,
-  type RegleNommable,
-  type RegleVisee,
-} from '@/lib/regles/libelle'
 import { proposerRegleIA, assistantIaDisponible, type TypeCreneauIA } from '@/lib/ia/proposerRegle'
 import {
   propositionVersPayload,
@@ -1496,136 +1484,13 @@ export async function proposerRegleDepuisTexte(phrase: string): Promise<Proposit
   return { proposition, apercu: apercuProposition(proposition), payload: conv.payload }
 }
 
-// ── Filou agit sur les règles EXISTANTES ─────────────────────
+// ── Agir sur les règles EXISTANTES ──────────────────────────
 //
-// Jusqu'ici Filou ne savait que créer. Une demande qui revenait à LEVER une
-// contrainte déjà posée (« Anne-Catherine peut désormais travailler le jeudi
-// soir ») se terminait par « allez la chercher dans la liste et supprimez-la » :
-// il renvoyait l'admin faire à la main ce qu'il pouvait faire lui-même.
-//
-// Le principe posé par MiKL est l'inverse : Filou fait TOUT ce qui est faisable
-// manuellement. Il lit donc maintenant les règles du cabinet, et propose de les
-// mettre en pause, de les rétablir ou de les supprimer. Il PROPOSE : rien n'est
-// touché avant un clic, et l'écriture passe par `setRegleActif` / `deleteRegle`,
-// les mêmes actions que les boutons de l'écran Règles (mêmes gardes admin,
-// même RLS, même traitement du miroir des duos).
-
-/** Règles GLOBALES : elles se RÈGLENT (importance, force), elles ne se
- *  suppriment pas. Les exposer à Filou l'inviterait à proposer d'effacer
- *  l'équilibrage des week-ends, ce qui ne veut rien dire. */
-const BRIQUES_GLOBALES = new Set([
-  'equilibrer', 'liaison_creneaux', 'inversion_role',
-  'composition_equipe', 'role_interdit_tag',
-  'eviter_we_consecutifs', 'eviter_we_avant_vacances',
-  'eviter_fete_fin_annee', 'inversion_role_ferie',
-])
-
-/** Ce que Filou renvoie à la tablette : une intention, jamais une écriture. */
-export type ReponseFilou =
-  | { error: string }
-  /** Rien d'actionnable : Filou explique, et c'est tout. */
-  | { genre: 'message'; texte: string }
-  /** Une règle à créer — exactement le résultat de `proposerRegleDepuisTexte`. */
-  | { genre: 'regle'; resultat: PropositionIaResultat }
-  /** Des règles existantes à mettre en pause, rétablir ou supprimer. */
-  | {
-      genre: 'action-regles'
-      action: 'desactiver' | 'supprimer' | 'activer'
-      regles: RegleVisee[]
-      explication: string
-    }
-
-/**
- * demanderAFilou — le point d'entrée unique de la conversation. Décide d'abord
- * CE QU'IL FAUT FAIRE de la phrase (créer / agir sur l'existant / rien), puis
- * n'appelle l'assistant de création que si c'est bien une création.
- *
- * Le chemin de création est inchangé : il délègue à `proposerRegleDepuisTexte`,
- * qui reste la fonction recettée utilisée aussi par l'écran Règles.
- */
-export async function demanderAFilou(phrase: string): Promise<ReponseFilou> {
-  const supabase = await createClient()
-
-  const garde = await assertAdmin(supabase)
-  if ('error' in garde) return garde
-
-  if (!assistantIaDisponible()) {
-    return { error: 'Assistant IA non configuré (clé API manquante côté serveur).' }
-  }
-  const texte = phrase?.trim() ?? ''
-  if (texte.length < 3) return { error: 'Décris ta demande en quelques mots.' }
-
-  // Les règles que Filou a le droit de toucher, nommées EXACTEMENT comme
-  // l'écran Règles les nomme (source unique `phraseRegle`).
-  const [{ data: reglesDb }, { data: vetsDb }] = await Promise.all([
-    supabase
-      .from('regles_cabinet')
-      .select('id, brique_id, params_json, actif')
-      .order('brique_id')
-      .order('id'),
-    supabase.from('veterinaires').select('id, prenom'),
-  ])
-
-  const prenoms = new Map(
-    ((vetsDb as Array<{ id: string; prenom: string }> | null) ?? []).map((v) => [v.id, v.prenom]),
-  )
-  const nomVeto = (id: string) => prenoms.get(id) ?? 'un vétérinaire'
-
-  const candidates = fusionnerDuos(
-    ((reglesDb as Array<RegleNommable & { actif: boolean }> | null) ?? []).filter(
-      (r) => !BRIQUES_GLOBALES.has(r.brique_id),
-    ),
-  )
-  const numerotees: RegleNumerotee[] = candidates.map((r, i) => ({
-    numero: i + 1,
-    phrase: phraseRegle(r, nomVeto),
-    actif: r.actif,
-  }))
-
-  let intention: SortieIntention
-  try {
-    intention = await routerIntentionIA(texte, numerotees)
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "Erreur de l'assistant IA." }
-  }
-
-  if (intention.intention === 'creer') {
-    const resultat = await proposerRegleDepuisTexte(texte)
-    return { genre: 'regle', resultat }
-  }
-
-  if (intention.intention === 'agir' && intention.action !== 'aucune') {
-    // On ne garde QUE les numéros qu'on a nous-mêmes envoyés : un numéro
-    // inventé par le modèle ne doit jamais devenir un identifiant de ligne.
-    const regles: RegleVisee[] = reglesVisees(
-      candidates,
-      numerotees.map((r) => r.phrase),
-      intention.regles,
-    )
-
-    if (regles.length === 0) {
-      return {
-        genre: 'message',
-        texte:
-          intention.explication ||
-          "Je ne retrouve pas de règle correspondante dans celles du cabinet.",
-      }
-    }
-    return {
-      genre: 'action-regles',
-      action: intention.action,
-      regles,
-      explication: intention.explication,
-    }
-  }
-
-  return {
-    genre: 'message',
-    texte:
-      intention.explication ||
-      "Je n'arrive pas à traduire ça en action sur les règles du cabinet. Reformule autrement ?",
-  }
-}
+// Le routage « créer ou agir sur l'existant » vivait ici, dans un appel IA
+// dédié. Il a été remplacé par le catalogue d'outils de Filou
+// (`src/lib/ia/outils/regles.ts`), qui laisse le modèle choisir entre lire,
+// créer et agir plutôt que de trancher pour lui en amont. Seule reste
+// l'écriture en lot ci-dessous, que l'outil `agir_sur_regles` appelle.
 
 /**
  * Applique en lot la décision prise sur le tableau. Aucune écriture directe :
