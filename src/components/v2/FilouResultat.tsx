@@ -27,7 +27,7 @@ export interface ContenuResultat {
   introduction: string
   lignes: string[]
   /** Ce que l'attente a été occupée à faire — administrateur seulement. */
-  mesure?: { ms: number; tours: number; modele: string }
+  mesure?: { ms: number; tours: number; modele: string; reflexion: string }
   /** Présente seulement quand il y a quelque chose à décider. */
   action?: {
     outil: string
@@ -138,7 +138,8 @@ export function FenetreResultatFilou({ actif, resultat, onFermer, onDecision }: 
           <p className="res-mesure">
             Préparé en {(resultat.mesure.ms / 1000).toFixed(1)} s ·{' '}
             {resultat.mesure.tours} aller{resultat.mesure.tours > 1 ? 's' : ''}-retour
-            {resultat.mesure.tours > 1 ? 's' : ''} · {resultat.mesure.modele}
+            {resultat.mesure.tours > 1 ? 's' : ''} · {resultat.mesure.modele} ·{' '}
+            {resultat.mesure.reflexion}
           </p>
         )}
       </div>

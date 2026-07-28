@@ -67,6 +67,9 @@ export interface MesureFilou {
   /** Le modèle réellement utilisé — la variable d'environnement prime sur le
    *  défaut du code, et personne ne peut le vérifier depuis l'écran autrement. */
   modele: string
+  /** Le réglage de réflexion en vigueur, pour la même raison : comparer deux
+   *  réglages demande de savoir lequel on regarde. */
+  reflexion: string
 }
 
 /**
@@ -82,10 +85,44 @@ export interface EchangeFilou {
   texte: string
 }
 
+/** Ce que Filou a rédigé pour le tableau — la forme rendue par l'outil
+ *  d'affichage, une fois passée par son schéma. */
+interface ReponseAffichee {
+  titre: string
+  introduction: string
+  lignes: string[]
+  mot_dans_la_conversation: string
+}
+
 /** Nombre d'allers-retours autorisés. Chaque tour est un appel facturé : sans
  *  plafond, une boucle qui se cherche coûterait sans fin. Six laisse la place à
  *  « je lis l'équipe, je lis les règles, je recoupe, je réponds ». */
 const TOURS_MAX = 6
+
+/**
+ * Combien Filou a le droit de réfléchir avant de parler.
+ *
+ * Mesuré le 2026-07-28 sur une question courante : 19,8 s pour 2 allers-retours,
+ * soit ~10 s par tour — le temps ne part donc pas dans la boucle mais DANS un
+ * tour, et la réflexion libre (`adaptive`, où le modèle décide seul de sa
+ * longueur) en est le premier suspect. Un budget explicite la borne.
+ *
+ * Réglable SANS TOUCHER AU CODE, comme le modèle (cf. `modeleIA`) :
+ * `GUARDVETO_IA_REFLEXION` accepte `adaptive` (libre, l'ancien comportement),
+ * `off` (aucune réflexion, le plus rapide), ou un nombre de jetons (≥ 1024).
+ * Le chronomètre affiché sous chaque réponse dit ce que chaque réglage donne.
+ *
+ * Le défaut est un budget court : sur ce produit, l'attente se paie à chaque
+ * question posée devant un client au comptoir.
+ */
+function reflexionIA(): Anthropic.ThinkingConfigParam {
+  const brut = process.env.GUARDVETO_IA_REFLEXION?.trim().toLowerCase()
+  if (brut === 'adaptive') return { type: 'adaptive' }
+  if (brut === 'off' || brut === 'aucune') return { type: 'disabled' }
+  const demande = Number(brut)
+  const budget = Number.isFinite(demande) && demande >= 1024 ? Math.floor(demande) : 1500
+  return { type: 'enabled', budget_tokens: budget }
+}
 
 const SYSTEM = `Tu es Filou, l'assistant de GuardVeto — le logiciel qui gère le planning de gardes d'un cabinet vétérinaire.
 
@@ -104,6 +141,8 @@ OÙ TA RÉPONSE S'AFFICHE
 
 Termine TOUJOURS par afficher_sur_le_tableau. C'est là que la personne lit : le grand tableau à côté de la conversation. Une réponse laissée dans la conversation est illisible et disparaît au message suivant.
 
+N'appelle jamais afficher_sur_le_tableau tant que tu es encore en train de chercher : ce que tu écrirais serait rédigé avant d'avoir vu les données. Consulte d'abord, réponds ensuite.
+
 QUAND IL Y A QUELQUE CHOSE À FAIRE
 
 Les outils qui MODIFIENT quelque chose ne s'exécutent pas quand tu les appelles : ils préparent une proposition, et un bouton apparaît à côté de ta réponse. C'est ce bouton qui demande l'autorisation.
@@ -111,6 +150,14 @@ Les outils qui MODIFIENT quelque chose ne s'exécutent pas quand tu les appelles
 Donc : NE DEMANDE JAMAIS LA PERMISSION PAR ÉCRIT. N'écris pas « veux-tu que je le fasse ? », « dois-je continuer ? », « faut-il que je… ? ». Appelle directement l'outil : la personne verra ce que tu proposes et cliquera, ou pas. Une question écrite lui fait perdre un aller-retour pour rien.
 
 Un seul outil de modification par réponse.
+
+NE T'ARRÊTE JAMAIS AU DIAGNOSTIC
+
+Quand tu as trouvé ce qui empêche ce que la personne veut, et que tu as un outil pour le changer, PROPOSE-LE dans la même réponse. Appelle l'outil de modification EN MÊME TEMPS que afficher_sur_le_tableau : ton explication et le bouton arrivent ensemble, dans la même fenêtre.
+
+« Voilà pourquoi elle n'est jamais programmée » sans bouton oblige la personne à redemander ce que tu viens toi-même de désigner. Elle t'a dit ce qu'elle voulait ; le réglage qui s'y oppose, tu viens de le nommer : propose de le lever.
+
+Dans le doute, propose. Un bouton ne fait rien tant qu'on ne clique pas dessus — c'est exactement pour ça qu'il existe.
 
 LA CONVERSATION CONTINUE
 
@@ -168,8 +215,17 @@ export async function faireTravaillerFilou(
   // d'aller vérifier dans le tableau de bord de l'hébergeur.
   const depart = Date.now()
   const modele = modeleIA()
+  const reflexion = reflexionIA()
   let tours = 0
-  const mesure = (): MesureFilou => ({ ms: Date.now() - depart, tours, modele })
+  const mesure = (): MesureFilou => ({
+    ms: Date.now() - depart,
+    tours,
+    modele,
+    reflexion:
+      reflexion.type === 'enabled'
+        ? `réflexion ${reflexion.budget_tokens}`
+        : `réflexion ${reflexion.type === 'adaptive' ? 'libre' : 'coupée'}`,
+  })
 
   const messages = assemblerMessages(historique, `Nous sommes le ${aujourdhui}.\n\n${phrase}`)
 
@@ -180,7 +236,7 @@ export async function faireTravaillerFilou(
       reponse = await client.messages.create({
         model: modele,
         max_tokens: 4000,
-        thinking: { type: 'adaptive' },
+        thinking: reflexion,
         system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
         tools: definitions,
         messages,
@@ -216,6 +272,20 @@ export async function faireTravaillerFilou(
     messages.push({ role: 'assistant', content: reponse.content })
 
     const resultats: Anthropic.ToolResultBlockParam[] = []
+
+    // Ce que ce tour a produit. On ne rend plus la main au PREMIER outil
+    // rencontré : un tour peut porter une réponse ET l'action qu'elle appelle,
+    // et le premier arrivé faisait disparaître l'autre. Concrètement, Filou
+    // expliquait très bien pourquoi Anne-Catherine n'était jamais programmée…
+    // sans le bouton qui l'aurait corrigé, parce que sa consigne lui dit de
+    // toujours finir par l'affichage.
+    let affichage: ReponseAffichee | null = null
+    let proposition: IssueFilou['action'] | null = null
+    let propositionTexte: { titre: string; phrase: string; lignes: string[] } | null = null
+    /** Une écriture refusée, ou une lecture faite dans le même tour : ce que
+     *  Filou a écrit repose sur du vent, il doit reprendre la main. */
+    let aRepasser = false
+
     for (const appel of appels) {
       const outil = parNom.get(appel.name)
       if (!outil) {
@@ -234,26 +304,23 @@ export async function faireTravaillerFilou(
         continue
       }
 
-      // Poser une réponse sur le tableau termine le tour : il n'y a rien à
-      // rendre au modèle, ce qu'il vient d'écrire EST la réponse.
+      // Poser une réponse sur le tableau : ce que Filou vient d'écrire EST la
+      // réponse. On la met de côté et on finit le tour — l'action qu'il propose
+      // dans le même souffle doit venir avec.
       if (outil.genre === 'affichage') {
-        const p = valides.data as {
-          titre: string
-          introduction: string
-          lignes: string[]
-          mot_dans_la_conversation: string
-        }
-        return {
-          mot: p.mot_dans_la_conversation || 'Je te réponds sur le tableau.',
-          titre: p.titre,
-          introduction: p.introduction,
-          lignes: p.lignes ?? [],
-          outilsAppeles,
-          mesure: mesure(),
-        }
+        affichage = valides.data as ReponseAffichee
+        resultats.push({
+          type: 'tool_result',
+          tool_use_id: appel.id,
+          content: 'Réponse affichée sur le tableau.',
+        })
+        continue
       }
 
       if (outil.genre === 'lecture') {
+        // Une lecture dans ce tour veut dire que Filou cherche encore : ce qu'il
+        // aurait affiché en même temps serait écrit AVANT d'avoir vu la donnée.
+        aRepasser = true
         try {
           const donnees = await outil.executer(valides.data, ctx)
           resultats.push({
@@ -281,28 +348,59 @@ export async function faireTravaillerFilou(
       }
       if (!resume.ok) {
         // Filou reprend la main avec la raison : il expliquera, ou tentera
-        // autrement. Un bouton qui échouerait au clic serait pire.
+        // autrement. Un bouton qui échouerait au clic serait pire. Ce qu'il
+        // avait rédigé dans le même tour tombe avec — il l'avait écrit en
+        // croyant l'action possible.
         resultats.push(erreurOutil(appel.id, resume.raison))
+        aRepasser = true
         continue
       }
 
-      // Une proposition s'affiche au même endroit qu'une réponse, avec un
-      // bouton en plus. Le mot que Filou a écrit avant d'appeler l'outil sert
-      // d'introduction s'il en a écrit un — c'est plus vivant que la phrase
-      // toute faite de l'outil.
+      // La première proposition du tour l'emporte : un seul bouton s'affiche,
+      // et la consigne n'autorise qu'une modification par réponse de toute
+      // façon.
+      if (proposition) {
+        resultats.push(
+          erreurOutil(appel.id, 'Une seule modification par réponse : celle-ci est ignorée.'),
+        )
+        continue
+      }
       const p = resume.proposition
+      proposition = {
+        outil: outil.nom,
+        params: valides.data,
+        charge: resume.charge,
+        libelle: p.action,
+        avertissement: p.avertissement,
+      }
+      propositionTexte = { titre: p.titre, phrase: p.phrase, lignes: p.lignes ?? [] }
+      resultats.push({
+        type: 'tool_result',
+        tool_use_id: appel.id,
+        content: 'Proposition préparée : le bouton s’affiche avec ta réponse.',
+      })
+    }
+
+    // Fin du tour. Il y a de quoi répondre dès que Filou a rédigé une réponse
+    // ou préparé une action — sauf s'il cherche encore, ou si son action a été
+    // refusée : dans ces deux cas ce qu'il a écrit repose sur du vent.
+    if (!aRepasser && (affichage || propositionTexte)) {
       return {
-        mot: 'Je te propose ça sur le tableau.',
-        titre: p.titre,
-        introduction: texte || p.phrase,
-        lignes: p.lignes ?? [],
-        action: {
-          outil: outil.nom,
-          params: valides.data,
-          charge: resume.charge,
-          libelle: p.action,
-          avertissement: p.avertissement,
-        },
+        mot: affichage?.mot_dans_la_conversation?.trim()
+          ? affichage.mot_dans_la_conversation
+          : proposition
+            ? 'Je te propose ça sur le tableau.'
+            : 'Je te réponds sur le tableau.',
+        // Ce que Filou a rédigé lui-même passe devant la phrase toute faite de
+        // l'outil : elle ne connaît que la modification, pas la question posée.
+        titre: affichage?.titre || propositionTexte?.titre || 'Filou te répond',
+        introduction: affichage?.introduction || texte || propositionTexte?.phrase || '',
+        // Les lignes de la proposition viennent de NOTRE code, pas du modèle :
+        // elles disent exactement ce qui va changer. Elles s'ajoutent à
+        // l'explication plutôt que de la remplacer — on ne clique pas sur un
+        // bouton sans lire ce qu'il fait.
+        lignes: [...(affichage?.lignes ?? []), ...(propositionTexte?.lignes ?? [])],
+        action: proposition ?? undefined,
         outilsAppeles,
         mesure: mesure(),
       }
