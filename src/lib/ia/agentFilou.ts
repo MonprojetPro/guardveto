@@ -67,8 +67,8 @@ export interface MesureFilou {
   /** Le modèle réellement utilisé — la variable d'environnement prime sur le
    *  défaut du code, et personne ne peut le vérifier depuis l'écran autrement. */
   modele: string
-  /** Le réglage de réflexion en vigueur, pour la même raison : comparer deux
-   *  réglages demande de savoir lequel on regarde. */
+  /** Le cran d'application demandé au modèle, pour la même raison : comparer
+   *  deux réglages demande de savoir lequel on regarde. */
   reflexion: string
 }
 
@@ -100,28 +100,31 @@ interface ReponseAffichee {
 const TOURS_MAX = 6
 
 /**
- * Combien Filou a le droit de réfléchir avant de parler.
+ * Combien d'application Filou met à répondre.
  *
  * Mesuré le 2026-07-28 sur une question courante : 19,8 s pour 2 allers-retours,
  * soit ~10 s par tour — le temps ne part donc pas dans la boucle mais DANS un
- * tour, et la réflexion libre (`adaptive`, où le modèle décide seul de sa
- * longueur) en est le premier suspect. Un budget explicite la borne.
+ * tour, et la profondeur de réflexion en est le premier suspect.
+ *
+ * ⚠️ Le budget de jetons de réflexion N'EXISTE PLUS sur les modèles récents :
+ * `thinking: { type: 'enabled', budget_tokens: N }` est refusé par l'API
+ * (400, incident du 2026-07-28 — Filou entièrement à terre le temps du
+ * correctif). La réflexion est toujours `adaptive` ; ce qui se règle, c'est
+ * l'application demandée, via `output_config.effort`.
  *
  * Réglable SANS TOUCHER AU CODE, comme le modèle (cf. `modeleIA`) :
- * `GUARDVETO_IA_REFLEXION` accepte `adaptive` (libre, l'ancien comportement),
- * `off` (aucune réflexion, le plus rapide), ou un nombre de jetons (≥ 1024).
- * Le chronomètre affiché sous chaque réponse dit ce que chaque réglage donne.
+ * `GUARDVETO_IA_EFFORT` accepte `low`, `medium`, `high`, `xhigh` ou `max`.
+ * Le chronomètre affiché sous chaque réponse dit ce que chaque cran donne.
  *
- * Le défaut est un budget court : sur ce produit, l'attente se paie à chaque
- * question posée devant un client au comptoir.
+ * Le défaut est `medium` : sur ce produit, l'attente se paie à chaque question
+ * posée devant un client au comptoir. Le défaut de l'API serait `high`.
  */
-function reflexionIA(): Anthropic.ThinkingConfigParam {
-  const brut = process.env.GUARDVETO_IA_REFLEXION?.trim().toLowerCase()
-  if (brut === 'adaptive') return { type: 'adaptive' }
-  if (brut === 'off' || brut === 'aucune') return { type: 'disabled' }
-  const demande = Number(brut)
-  const budget = Number.isFinite(demande) && demande >= 1024 ? Math.floor(demande) : 1500
-  return { type: 'enabled', budget_tokens: budget }
+const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
+type Effort = (typeof EFFORTS)[number]
+
+function effortIA(): Effort {
+  const brut = process.env.GUARDVETO_IA_EFFORT?.trim().toLowerCase()
+  return EFFORTS.includes(brut as Effort) ? (brut as Effort) : 'medium'
 }
 
 const SYSTEM = `Tu es Filou, l'assistant de GuardVeto — le logiciel qui gère le planning de gardes d'un cabinet vétérinaire.
@@ -215,16 +218,13 @@ export async function faireTravaillerFilou(
   // d'aller vérifier dans le tableau de bord de l'hébergeur.
   const depart = Date.now()
   const modele = modeleIA()
-  const reflexion = reflexionIA()
+  const effort = effortIA()
   let tours = 0
   const mesure = (): MesureFilou => ({
     ms: Date.now() - depart,
     tours,
     modele,
-    reflexion:
-      reflexion.type === 'enabled'
-        ? `réflexion ${reflexion.budget_tokens}`
-        : `réflexion ${reflexion.type === 'adaptive' ? 'libre' : 'coupée'}`,
+    reflexion: `application ${effort}`,
   })
 
   const messages = assemblerMessages(historique, `Nous sommes le ${aujourdhui}.\n\n${phrase}`)
@@ -236,7 +236,11 @@ export async function faireTravaillerFilou(
       reponse = await client.messages.create({
         model: modele,
         max_tokens: 4000,
-        thinking: reflexion,
+        // `adaptive` est le SEUL mode accepté sur les modèles récents : le
+        // budget de jetons explicite est refusé (400). La profondeur se règle
+        // par `effort`, juste en dessous.
+        thinking: { type: 'adaptive' },
+        output_config: { effort },
         system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
         tools: definitions,
         messages,
