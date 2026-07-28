@@ -19,7 +19,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { revalidatePath } from 'next/cache'
-import { faireTravaillerFilou, type EchangeFilou } from '@/lib/ia/agentFilou'
+import { faireTravaillerFilou, type EchangeFilou, type MesureFilou } from '@/lib/ia/agentFilou'
 import { assistantIaDisponible } from '@/lib/ia/proposerRegle'
 import { outilsPour, trouverOutil } from '@/lib/ia/outils/registre'
 import type { ContexteOutil, PropositionAction } from '@/lib/ia/outils/types'
@@ -41,6 +41,8 @@ export type ReponseFilou =
         libelle: string
         avertissement?: string
       }
+      /** Ce que l'attente a été occupée à faire. Admin seulement (cf. plus bas). */
+      mesure?: MesureFilou
     }
 
 async function contexte(): Promise<{ error: string } | { ctx: ContexteOutil }> {
@@ -148,6 +150,10 @@ export async function parlerAFilou(
     introduction: issue.introduction,
     lignes: issue.lignes,
     action: issue.action,
+    // Le chronomètre ne sort que pour un administrateur : c'est un outil de
+    // réglage, pas une information de cabinet. Un vétérinaire n'a rien à faire
+    // du nombre d'allers-retours ni du nom du modèle.
+    mesure: c.ctx.estAdmin ? issue.mesure : undefined,
   }
 }
 

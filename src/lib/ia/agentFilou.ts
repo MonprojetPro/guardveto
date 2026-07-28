@@ -52,6 +52,21 @@ export interface IssueFilou {
   outilsAppeles: string[]
   /** Une panne, pas une réponse : à dire dans la conversation, pas à afficher. */
   erreur?: string
+  /** Ce que la réponse a coûté en attente. Affiché en pied de tableau : une
+   *  attente de plusieurs secondes est supportable quand on voit ce qui l'a
+   *  occupée, et surtout elle devient diagnosticable — sans ça, « c'est lent »
+   *  ne dit pas si le temps part dans les allers-retours ou dans un seul. */
+  mesure?: MesureFilou
+}
+
+export interface MesureFilou {
+  /** Durée totale, du premier appel à la réponse rendue. */
+  ms: number
+  /** Nombre d'allers-retours avec le modèle. Chacun est une attente complète. */
+  tours: number
+  /** Le modèle réellement utilisé — la variable d'environnement prime sur le
+   *  défaut du code, et personne ne peut le vérifier depuis l'écran autrement. */
+  modele: string
 }
 
 /**
@@ -146,13 +161,24 @@ export async function faireTravaillerFilou(
   const definitions = outils.map(versDefinitionApi)
   const outilsAppeles: string[] = []
 
+  // Chronomètre. Il ne sert pas à décorer : « c'est lent » ne dit pas si le
+  // temps part dans quatre allers-retours ou dans un seul, et sans le savoir on
+  // corrige au hasard. Le modèle est relevé ici parce que la variable
+  // d'environnement prime sur le défaut du code — le lire depuis l'écran évite
+  // d'aller vérifier dans le tableau de bord de l'hébergeur.
+  const depart = Date.now()
+  const modele = modeleIA()
+  let tours = 0
+  const mesure = (): MesureFilou => ({ ms: Date.now() - depart, tours, modele })
+
   const messages = assemblerMessages(historique, `Nous sommes le ${aujourdhui}.\n\n${phrase}`)
 
   for (let tour = 0; tour < TOURS_MAX; tour++) {
+    tours = tour + 1
     let reponse: Anthropic.Message
     try {
       reponse = await client.messages.create({
-        model: modeleIA(),
+        model: modele,
         max_tokens: 4000,
         thinking: { type: 'adaptive' },
         system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
@@ -180,6 +206,7 @@ export async function faireTravaillerFilou(
         introduction: texte || "Je n'ai pas su quoi répondre. Reformule autrement ?",
         lignes: [],
         outilsAppeles,
+        mesure: mesure(),
       }
     }
 
@@ -222,6 +249,7 @@ export async function faireTravaillerFilou(
           introduction: p.introduction,
           lignes: p.lignes ?? [],
           outilsAppeles,
+          mesure: mesure(),
         }
       }
 
@@ -276,6 +304,7 @@ export async function faireTravaillerFilou(
           avertissement: p.avertissement,
         },
         outilsAppeles,
+        mesure: mesure(),
       }
     }
 
@@ -289,6 +318,7 @@ export async function faireTravaillerFilou(
       "Je n'arrive pas à aboutir sur cette demande — je préfère m'arrêter plutôt que de continuer à chercher. Reformule-la autrement ?",
     lignes: [],
     outilsAppeles,
+    mesure: mesure(),
   }
 }
 

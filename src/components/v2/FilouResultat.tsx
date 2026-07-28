@@ -26,6 +26,8 @@ export interface ContenuResultat {
   titre: string
   introduction: string
   lignes: string[]
+  /** Ce que l'attente a été occupée à faire — administrateur seulement. */
+  mesure?: { ms: number; tours: number; modele: string }
   /** Présente seulement quand il y a quelque chose à décider. */
   action?: {
     outil: string
@@ -125,6 +127,19 @@ export function FenetreResultatFilou({ actif, resultat, onFermer, onDecision }: 
             <span className="who">🦊 Filou prévient</span>
             {action.avertissement}
           </div>
+        )}
+
+        {/* Le chronomètre, en tout petit. Une attente de plusieurs secondes se
+            supporte mieux quand on voit ce qu'elle a fait — et surtout, elle
+            devient réglable : le temps part-il dans quatre allers-retours ou
+            dans un seul ? Le modèle est écrit là parce que c'est une variable
+            d'hébergement, invisible depuis l'application autrement. */}
+        {resultat.mesure && (
+          <p className="res-mesure">
+            Préparé en {(resultat.mesure.ms / 1000).toFixed(1)} s ·{' '}
+            {resultat.mesure.tours} aller{resultat.mesure.tours > 1 ? 's' : ''}-retour
+            {resultat.mesure.tours > 1 ? 's' : ''} · {resultat.mesure.modele}
+          </p>
         )}
       </div>
 

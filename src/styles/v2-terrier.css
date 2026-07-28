@@ -729,6 +729,13 @@
 /* Ce que Filou a compris d'une demande portant sur des règles DÉJÀ posées :
    sa phrase, puis la liste exacte de ce qu'il propose de toucher. La liste est
    là pour qu'on décide sur pièces — jamais « 3 règles » sans dire lesquelles. */
+/* Le chronomètre de Filou : présent pour être lu quand on le cherche, assez
+   discret pour ne pas peser dans la réponse. */
+.res-mesure {
+  margin-top: 14px;
+  font-size: 0.68rem; color: var(--soft);
+  font-variant-numeric: tabular-nums;
+}
 .res-explication { font-size: 0.88rem; line-height: 1.55; margin-bottom: 12px; }
 .res-regles { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 .res-regles li {

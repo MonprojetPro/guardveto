@@ -262,6 +262,7 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
           introduction: reponse.introduction,
           lignes: reponse.lignes,
           action: reponse.action,
+          mesure: reponse.mesure,
         },
         reponse.mot,
       )
