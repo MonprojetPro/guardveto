@@ -682,6 +682,31 @@
 .saisie-envoi svg { width: 17px; height: 17px; }
 .saisie-envoi:hover:not(:disabled) { filter: brightness(1.08); }
 .saisie-envoi:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+
+/* Repartir de zéro · à GAUCHE du champ, discret, en creux : c'est une sortie
+   de secours, pas l'action principale — l'envoi reste le seul bouton plein.
+   Il pose sa question avant d'agir (`.confirme`) et s'élargit alors pour
+   l'écrire en toutes lettres : « ↺ » seul ne dit pas ce qui va disparaître. */
+.saisie:has(.saisie-raz) { padding-left: 5px; }
+.saisie-raz {
+  flex: none;
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: none; color: var(--soft);
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+.saisie-raz svg { width: 15px; height: 15px; }
+.saisie-raz:hover:not(:disabled) {
+  color: var(--text); border-color: var(--border-strong); background: var(--surface-2);
+}
+.saisie-raz:disabled { opacity: 0.35; cursor: not-allowed; }
+.saisie-raz.confirme {
+  width: auto; padding: 0 11px;
+  border-color: var(--danger); color: var(--danger); background: var(--danger-soft);
+  font-weight: 700;
+}
+.raz-mot { font-size: 0.72rem; white-space: nowrap; }
 /* Les amorces d'exemple ont été retirées : la tablette ne porte que la
    conversation, et le champ dit déjà par son placeholder ce qu'on peut écrire. */
 

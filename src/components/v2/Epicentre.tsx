@@ -209,6 +209,15 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
     })
   }, [])
 
+  /** On repart de zéro depuis la tablette : le tableau se vide avec le fil.
+   *  Rien n'est touché en base — une proposition non décidée est simplement
+   *  abandonnée, ce qui était déjà le cas en fermant la fenêtre. */
+  const oublierResultat = useCallback(() => {
+    setResultatFilou(null)
+    memoriserResultat(null)
+    setOuverte((f) => (f === 'filou' ? null : f))
+  }, [])
+
   /** La décision prise sur le tableau revient se dire dans la conversation :
    *  les deux moitiés de l'écran racontent la même histoire. */
   const deciderResultat = useCallback(
@@ -278,6 +287,7 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
                     estAdmin={data.estAdmin}
                     onFilouTape={() => filou.current?.tape()}
                     onResultat={montrer}
+                    onRemiseAZero={oublierResultat}
                     enTete={<MotDAccueil data={data} />}
                   />
                 </div>

@@ -110,10 +110,14 @@ interface Props {
   onFilouTape?: () => void
   /** Ce que Filou a compris, à afficher sur le tableau du cabinet. */
   onResultat: (r: ResultatFilou) => void
+  /** On repart de zéro : le tableau doit se vider en même temps que le fil,
+   *  sinon on efface la conversation et la réponse reste affichée à droite,
+   *  orpheline de la question qui l'a produite. */
+  onRemiseAZero: () => void
 }
 
 export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
-  { enTete, estAdmin, onFilouTape, onResultat },
+  { enTete, estAdmin, onFilouTape, onResultat, onRemiseAZero },
   ref,
 ) {
   const champId = useId()
@@ -123,6 +127,10 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
   const [messages, setMessages] = useState<Message[]>(relireConversation)
   const [phrase, setPhrase] = useState('')
   const [enCours, demarrer] = useTransition()
+  // La remise à zéro demande confirmation : effacer un échange qu'on est en
+  // train de lire sur un clic malheureux serait irrattrapable (rien n'est
+  // archivé). Le bouton pose donc la question avant de faire.
+  const [confirmeRaz, setConfirmeRaz] = useState(false)
   const filRef = useRef<HTMLDivElement>(null)
   const champRef = useRef<HTMLTextAreaElement>(null)
   const compteur = useRef(messages.at(-1)?.id ?? 0)
@@ -139,6 +147,28 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
   useImperativeHandle(ref, () => ({
     dit: (texte: string) => ajouter('filou', texte),
   }))
+
+  /** On repart d'une page blanche : le fil, sa trace dans l'onglet, le champ,
+   *  et le tableau du cabinet. Le mot d'accueil (`enTete`) reste : il n'est pas
+   *  un tour de parole, c'est l'état du cabinet ce matin. */
+  const remettreAZero = () => {
+    if (enCours) return
+    setMessages([])
+    memoriserConversation([])
+    compteur.current = 0
+    setPhrase('')
+    setConfirmeRaz(false)
+    onRemiseAZero()
+    requestAnimationFrame(() => champRef.current?.focus())
+  }
+
+  // La demande de confirmation ne reste pas plantée sur l'écran : sans réponse,
+  // le bouton reprend son visage normal plutôt que de guetter un clic oublié.
+  useEffect(() => {
+    if (!confirmeRaz) return
+    const t = setTimeout(() => setConfirmeRaz(false), 6000)
+    return () => clearTimeout(t)
+  }, [confirmeRaz])
 
   // Le fil descend sur le dernier message : sans ça, la réponse de Filou
   // arriverait sous la ligne de flottaison, invisible.
@@ -169,6 +199,7 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
     if (texte.length < 3 || enCours) return
     ajouter('moi', texte)
     setPhrase('')
+    setConfirmeRaz(false)
     onFilouTape?.()
 
     demarrer(async () => {
@@ -239,6 +270,30 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
 
       {estAdmin ? (
         <div className="saisie">
+          {/* Repartir de zéro. N'apparaît qu'une fois qu'il y a quelque chose à
+              effacer : un bouton « effacer » sur un fil vide n'a rien à dire. */}
+          {messages.length > 0 && (
+            <button
+              type="button"
+              className={`saisie-raz${confirmeRaz ? ' confirme' : ''}`}
+              onClick={() => (confirmeRaz ? remettreAZero() : setConfirmeRaz(true))}
+              disabled={enCours}
+              aria-label={
+                confirmeRaz
+                  ? 'Confirmer : effacer la conversation et le tableau'
+                  : 'Repartir de zéro : effacer la conversation'
+              }
+              title="Repartir de zéro"
+            >
+              {confirmeRaz ? (
+                <span className="raz-mot">Tout effacer ?</span>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M20 11.5A8 8 0 1 1 17.6 6M20 4v5h-5" />
+                </svg>
+              )}
+            </button>
+          )}
           <label className="vh" htmlFor={champId}>
             Écrire à Filou : décris une règle du cabinet
           </label>
