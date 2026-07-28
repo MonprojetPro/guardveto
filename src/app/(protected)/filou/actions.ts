@@ -19,7 +19,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { revalidatePath } from 'next/cache'
-import { faireTravaillerFilou } from '@/lib/ia/agentFilou'
+import { faireTravaillerFilou, type EchangeFilou } from '@/lib/ia/agentFilou'
 import { assistantIaDisponible } from '@/lib/ia/proposerRegle'
 import { outilsPour, trouverOutil } from '@/lib/ia/outils/registre'
 import type { ContexteOutil, PropositionAction } from '@/lib/ia/outils/types'
@@ -86,7 +86,44 @@ function aujourdhuiEnFrancais(): string {
   }).format(new Date())
 }
 
-export async function parlerAFilou(phrase: string): Promise<ReponseFilou> {
+/** Combien de tours de parole Filou garde en tête. Assez pour qu'un échange
+ *  aille au bout (« qui peut le mardi ? » → « et Anne-Cat ? » → « alors
+ *  change-le »), pas assez pour qu'une longue matinée reparte en entier à
+ *  chaque phrase : chaque tour est facturé. */
+const TOURS_MEMORISES = 10
+
+/** Longueur retenue par tour. Une réponse de Filou tient largement dedans ;
+ *  au-delà, c'est du copier-coller qui n'apporte rien au fil. */
+const LONGUEUR_TOUR = 1500
+
+/**
+ * Le fil vient du NAVIGATEUR : il n'est pas de confiance, et il est borné ici.
+ *
+ * Ce qu'un fil trafiqué permettrait au pire : faire croire à Filou qu'il a dit
+ * quelque chose qu'il n'a pas dit, dans sa propre session. Ça ne lui donne
+ * aucun pouvoir de plus — les lectures restent filtrées par les droits et la
+ * RLS, et une modification passe toujours par `appliquerActionFilou`, qui
+ * revalide l'outil et ses paramètres avant d'écrire. Le bornage sert donc
+ * surtout à ce qu'un fil énorme ne parte pas en analyse à chaque phrase.
+ */
+function assainirHistorique(brut: unknown): EchangeFilou[] {
+  if (!Array.isArray(brut)) return []
+  const retenus: EchangeFilou[] = []
+  for (const e of brut) {
+    const role = (e as { role?: unknown })?.role
+    const texte = (e as { texte?: unknown })?.texte
+    if (role !== 'user' && role !== 'assistant') continue
+    if (typeof texte !== 'string') continue
+    const propre = texte.trim().slice(0, LONGUEUR_TOUR)
+    if (propre) retenus.push({ role, texte: propre })
+  }
+  return retenus.slice(-TOURS_MEMORISES)
+}
+
+export async function parlerAFilou(
+  phrase: string,
+  historique?: unknown,
+): Promise<ReponseFilou> {
   const c = await contexte()
   if ('error' in c) return c
 
@@ -101,6 +138,7 @@ export async function parlerAFilou(phrase: string): Promise<ReponseFilou> {
     outilsPour(c.ctx),
     c.ctx,
     aujourdhuiEnFrancais(),
+    assainirHistorique(historique),
   )
 
   if (issue.erreur) return { error: issue.erreur }

@@ -54,6 +54,19 @@ export interface IssueFilou {
   erreur?: string
 }
 
+/**
+ * Un tour de parole déjà échangé, tel qu'il repart vers le modèle.
+ *
+ * Le texte n'est PAS forcément celui qui s'affiche : ce que Filou dit dans la
+ * conversation est une phrase de renvoi (« je te réponds sur le tableau »), sa
+ * vraie réponse est sur le tableau. C'est celle-là qu'il faut lui rappeler,
+ * sinon il se souvient de la vitrine et pas du contenu.
+ */
+export interface EchangeFilou {
+  role: 'user' | 'assistant'
+  texte: string
+}
+
 /** Nombre d'allers-retours autorisés. Chaque tour est un appel facturé : sans
  *  plafond, une boucle qui se cherche coûterait sans fin. Six laisse la place à
  *  « je lis l'équipe, je lis les règles, je recoupe, je réponds ». */
@@ -82,6 +95,14 @@ Donc : NE DEMANDE JAMAIS LA PERMISSION PAR ÉCRIT. N'écris pas « veux-tu que j
 
 Un seul outil de modification par réponse.
 
+LA CONVERSATION CONTINUE
+
+Les tours précédents sont là : tu te souviens de ce que vous venez de vous dire. Quand la personne rebondit sur ta dernière réponse — « oui », « vas-y », « fais-le », ou une phrase qui reprend ce que tu venais de pointer —, elle parle de CE dont vous parliez. Fais ce qu'elle demande. Ne repars pas de zéro comme si la phrase arrivait seule.
+
+Ne redis jamais ce que tu viens de dire. Si ta réponse précédente désignait un réglage à changer et qu'elle acquiesce, appelle l'outil qui le change au lieu de réexpliquer le réglage.
+
+Le sujet de la conversation ne change pas parce que la personne l'écrit autrement. « Elle peut désormais faire des gardes le mardi soir » après une réponse sur son statut de dernier recours, c'est une demande de lever ce statut — pas une demande de règle sur le mardi soir.
+
 CE QUE TU NE FAIS JAMAIS
 
 - Affirmer un fait sur le cabinet sans l'avoir lu avec un outil.
@@ -98,24 +119,24 @@ CE QUE TU NE FAIS JAMAIS
  * @param aujourdhui date du jour au format ISO — passée dans le message et non
  *   dans le prompt système, qui doit rester identique à l'octet d'un appel à
  *   l'autre pour que sa mise en cache serve.
+ * @param historique les tours déjà échangés, DÉJÀ bornés et assainis par
+ *   l'appelant. Sans eux, Filou relit chaque phrase comme si elle arrivait
+ *   seule : il ne se souvient pas de la question qu'il vient de poser, et
+ *   répond à côté dès qu'on rebondit sur sa réponse.
  */
 export async function faireTravaillerFilou(
   phrase: string,
   outils: Outil[],
   ctx: ContexteOutil,
   aujourdhui: string,
+  historique: EchangeFilou[] = [],
 ): Promise<IssueFilou> {
   const client = new Anthropic({ apiKey: cleIA() })
   const parNom = new Map(outils.map((o) => [o.nom, o]))
   const definitions = outils.map(versDefinitionApi)
   const outilsAppeles: string[] = []
 
-  const messages: Anthropic.MessageParam[] = [
-    {
-      role: 'user',
-      content: `Nous sommes le ${aujourdhui}.\n\n${phrase}`,
-    },
-  ]
+  const messages = assemblerMessages(historique, `Nous sommes le ${aujourdhui}.\n\n${phrase}`)
 
   for (let tour = 0; tour < TOURS_MAX; tour++) {
     let reponse: Anthropic.Message
@@ -259,6 +280,45 @@ export async function faireTravaillerFilou(
     lignes: [],
     outilsAppeles,
   }
+}
+
+/**
+ * Le fil, mis en forme pour l'API.
+ *
+ * Deux exigences de l'API que l'historique venu de l'écran ne respecte pas
+ * spontanément : la conversation COMMENCE par la personne (un fil qui débute
+ * par une phrase de Filou est refusé), et deux tours du même côté à la suite
+ * sont fusionnés plutôt qu'empilés. Le cas arrive pour de bon : Filou répond,
+ * puis la décision prise sur le tableau vient s'annoncer dans le fil — deux
+ * messages de Filou d'affilée.
+ */
+export function assemblerMessages(
+  historique: EchangeFilou[],
+  dernier: string,
+): Anthropic.MessageParam[] {
+  const messages: Anthropic.MessageParam[] = []
+  for (const e of historique) {
+    const texte = e.texte.trim()
+    if (!texte) continue
+    // Rien avant la première prise de parole de la personne.
+    if (messages.length === 0 && e.role !== 'user') continue
+    const precedent = messages.at(-1)
+    if (precedent && precedent.role === e.role) {
+      precedent.content = `${precedent.content as string}\n\n${texte}`
+      continue
+    }
+    messages.push({ role: e.role, content: texte })
+  }
+
+  // La nouvelle demande ferme le fil. Si le dernier tour retenu venait déjà de
+  // la personne, on les fusionne plutôt que d'empiler deux « user ».
+  const precedent = messages.at(-1)
+  if (precedent && precedent.role === 'user') {
+    precedent.content = `${precedent.content as string}\n\n${dernier}`
+  } else {
+    messages.push({ role: 'user', content: dernier })
+  }
+  return messages
 }
 
 /** Une panne : rien à afficher, juste à dire. */

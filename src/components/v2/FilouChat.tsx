@@ -50,7 +50,17 @@ import type { ContenuResultat, ResultatFilou } from './FilouResultat'
 /** Un tour de parole dans le fil. Il n'y a plus que de la parole : une
  *  proposition à décider n'est pas un message, c'est un résultat — et les
  *  résultats vont sur le tableau. */
-type Message = { id: number; de: 'moi' | 'filou'; texte: string }
+type Message = {
+  id: number
+  de: 'moi' | 'filou'
+  texte: string
+  /** Ce que Filou doit se rappeler avoir dit, quand ce n'est pas ce qui
+   *  s'affiche. Sa vraie réponse est sur le tableau ; dans le fil il ne reste
+   *  qu'un renvoi (« je te réponds sur le tableau »). Lui renvoyer ce renvoi
+   *  revenait à lui donner la vitrine sans le contenu — il ne se souvenait de
+   *  rien et repartait de zéro à la phrase suivante. */
+  pourFilou?: string
+}
 
 /** Où la conversation survit à une navigation.
  *
@@ -73,7 +83,8 @@ function relireConversation(): Message[] {
       (m): m is Message =>
         typeof m?.id === 'number' &&
         typeof m?.texte === 'string' &&
-        (m?.de === 'moi' || m?.de === 'filou'),
+        (m?.de === 'moi' || m?.de === 'filou') &&
+        (m?.pourFilou === undefined || typeof m.pourFilou === 'string'),
     )
   } catch {
     return []
@@ -135,10 +146,10 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
   const champRef = useRef<HTMLTextAreaElement>(null)
   const compteur = useRef(messages.at(-1)?.id ?? 0)
 
-  const ajouter = (de: Message['de'], texte: string) => {
+  const ajouter = (de: Message['de'], texte: string, pourFilou?: string) => {
     compteur.current += 1
     setMessages((prec) => {
-      const suite = [...prec, { id: compteur.current, de, texte }]
+      const suite = [...prec, { id: compteur.current, de, texte, pourFilou }]
       memoriserConversation(suite)
       return suite
     })
@@ -185,9 +196,23 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
     // Le mot de Filou s'il en a écrit un, sinon une phrase qui dit où regarder :
     // sans ça, quelque chose apparaîtrait à l'autre bout de l'écran sans que
     // rien ne l'annonce.
+    //
+    // Ce qui part sur le tableau est ce dont Filou doit se souvenir : le mot du
+    // fil ne dit rien de ce qu'il a répondu. On lui garde donc le fond, plus la
+    // proposition en attente s'il y en a une — c'est elle que la personne
+    // s'apprête à commenter.
     ajouter(
       'filou',
       mot?.trim() || 'J’ai compris ta demande — je l’affiche sur le tableau du cabinet.',
+      [
+        contenu.introduction,
+        ...(contenu.lignes ?? []),
+        contenu.action
+          ? `(Proposition affichée, en attente de sa décision : ${contenu.action.libelle}.)`
+          : '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
     )
     compteur.current += 1
     onResultat({ ...contenu, id: compteur.current })
@@ -202,13 +227,25 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
     setConfirmeRaz(false)
     onFilouTape?.()
 
+    // Le fil PRÉCÉDENT part avec la demande : sans lui, Filou relisait chaque
+    // phrase comme si elle arrivait seule et réexpliquait ce qu'il venait de
+    // dire dès qu'on rebondissait sur sa réponse. Le serveur le borne et
+    // n'en tire aucun droit — cf. `assainirHistorique`.
+    const fil = messages.map((m) => ({
+      role: m.de === 'moi' ? ('user' as const) : ('assistant' as const),
+      texte: m.pourFilou ?? m.texte,
+    }))
+
     demarrer(async () => {
-      const reponse = await parlerAFilou(texte)
+      const reponse = await parlerAFilou(texte, fil)
 
       // Une panne n'est pas une réponse : elle se dit dans la conversation,
       // elle n'a rien à faire sur le tableau.
       if ('error' in reponse) {
-        ajouter('filou', reponse.error)
+        // Une panne se dit à la personne, mais ne se raconte pas à Filou : lui
+        // renvoyer son propre message d'erreur comme s'il l'avait pensé le
+        // ferait raisonner dessus au tour suivant. Texte vide = tour ignoré.
+        ajouter('filou', reponse.error, '')
         requestAnimationFrame(() => champRef.current?.focus())
         return
       }
