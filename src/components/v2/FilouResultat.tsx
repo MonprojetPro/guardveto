@@ -68,7 +68,10 @@ export function FenetreResultatFilou({ actif, resultat, onFermer, onDecision }: 
         onDecision({ fermer: false, dire: r.error })
         return
       }
-      onDecision({ fermer: true, dire: 'C’est fait.' })
+      // Le fil dit CE QUI a été fait, pas seulement que c'est fait : ce message
+      // repart vers Filou au tour suivant, et « c'est fait » tout seul ne lui
+      // apprend pas laquelle de ses propositions a été validée.
+      onDecision({ fermer: true, dire: `C’est fait : ${resultat.titre}.` })
     })
   }
 

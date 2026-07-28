@@ -198,9 +198,13 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
     // rien ne l'annonce.
     //
     // Ce qui part sur le tableau est ce dont Filou doit se souvenir : le mot du
-    // fil ne dit rien de ce qu'il a répondu. On lui garde donc le fond, plus la
-    // proposition en attente s'il y en a une — c'est elle que la personne
-    // s'apprête à commenter.
+    // fil ne dit rien de ce qu'il a répondu.
+    //
+    // Et s'il avait proposé quelque chose, on lui dit que cette proposition A
+    // DISPARU — le tableau n'affiche qu'un résultat à la fois, celui-ci l'a
+    // remplacée. Sans ça il renvoie vers un bouton qui n'existe plus (« je l'ai
+    // déjà proposé, rien à faire de plus »), et la personne n'a plus rien à
+    // cliquer nulle part.
     ajouter(
       'filou',
       mot?.trim() || 'J’ai compris ta demande — je l’affiche sur le tableau du cabinet.',
@@ -208,7 +212,7 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
         contenu.introduction,
         ...(contenu.lignes ?? []),
         contenu.action
-          ? `(Proposition affichée, en attente de sa décision : ${contenu.action.libelle}.)`
+          ? `(Tu as proposé « ${contenu.action.libelle} ». Cette proposition n’est plus affichée : ta prochaine réponse a pris sa place sur le tableau.)`
           : '',
       ]
         .filter(Boolean)
