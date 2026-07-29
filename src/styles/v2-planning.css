@@ -1017,38 +1017,13 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
    place et le rythme de la page, sans les redessiner. */
 .v2-alertes { margin: 0 0 14px; }
 
-/* Skin des boutons d'administration (générer / publier / PDF) : ils sont
-   rendus par l'ActionBar V1, qui porte les garde-fous de publication. On
-   les habille ici plutôt que de réécrire 475 lignes de règles métier. */
-.head-actions button:not(.head-btn) {
-  border: 1px solid var(--border-strong) !important;
-  background: var(--surface-2) !important;
-  color: var(--muted) !important;
-  border-radius: 999px !important;
-  font-family: var(--font-body) !important;
-  font-size: 0.78rem !important;
-  font-weight: 700 !important;
-  min-height: 38px !important;
-  padding: 8px 14px !important;
-  box-shadow: none !important;
-}
-.head-actions button:not(.head-btn):hover:not(:disabled) {
-  color: var(--accent-ink) !important;
-  border-color: var(--accent-ink) !important;
-}
-/* Le bouton d'action principale garde son poids visuel. */
-.head-actions button:not(.head-btn).bg-primary,
-.head-actions button:not(.head-btn)[data-variant="default"] {
-  background: var(--accent) !important;
-  border-color: var(--accent) !important;
-  color: #fff !important;
-}
-.head-actions > div { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.head-actions select,
-.head-actions [role="combobox"] {
-  border-radius: 999px !important;
-  border-color: var(--border-strong) !important;
-  background: var(--surface-2) !important;
-  font-size: 0.78rem !important;
-  min-height: 38px !important;
-}
+/* Les boutons de la barre sont désormais de vraies pilules `head-btn`
+   (cf. `outils-planning.tsx`) : plus besoin du skin de rattrapage qui
+   maquillait les boutons shadcn de l'ActionBar V1 à coups de !important. */
+.head-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* Les bandeaux d'avertissement du moteur (pré-vol, créneaux ignorés,
+   diagnostic d'impasse) : ils viennent de composants V1 (shadcn) et se
+   posent au-dessus de la grille, pas dans l'en-tête. */
+.work-body > .pre-vol-alert,
+.work-body > div:has(> [data-slot="alert"]) { margin-bottom: 14px; }

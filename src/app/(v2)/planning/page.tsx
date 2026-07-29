@@ -3,9 +3,9 @@
 // ============================================================
 // Deuxième écran de la bascule (maquette M1). Il REMPLACE le planning V1 :
 // même route, même données, même moteur — nouveau look et nouvelle mise en
-// scène. Les garde-fous de génération et de publication restent ceux de la
-// V1 (`ActionBar`) : ils portent des règles métier, on ne les réécrit pas
-// pour un changement d'habillage.
+// scène. Les garde-fous de génération et de publication sont repris tels
+// quels de la V1 dans `components/v2/outils-planning.tsx` : ils portent des
+// règles métier, on ne les réécrit pas pour un changement d'habillage.
 // ============================================================
 
 import { createClient } from '@/lib/supabase/server'
@@ -14,8 +14,6 @@ import '@/styles/v2-planning.css'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
 import { PlanningV2, type CongeAffiche } from '@/components/v2/PlanningV2'
-import { ActionBar } from '@/components/planning/ActionBar'
-import { ExportPdfButton } from '@/components/planning/ExportPdfButton'
 import { RealtimeRefresh } from '@/components/planning/RealtimeRefresh'
 import { RevalidationRealtime } from '@/components/planning/RevalidationRealtime'
 import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
@@ -103,7 +101,8 @@ export default async function PlanningPageV2({
         .select('id, date_debut, date_fin, statut, veterinaires(prenom, couleur)')
         .lte('date_debut', fin)
         .gte('date_fin', debut),
-      isAdmin ? supabase.from('gardes').select('periode_id').limit(500) : Promise.resolve({ data: null }),
+      // Chargé pour TOUS : le bouton PDF en dépend, pas seulement la publication.
+      supabase.from('gardes').select('periode_id').limit(500),
     ])
 
   const gardes = ((gardesRes?.data ?? []) as GardeDenormalisee[])
@@ -146,9 +145,9 @@ export default async function PlanningPageV2({
 
   // Re-validation continue : périodes publiées qui chevauchent le mois affiché
   // ET qui ont des gardes. Identique à la V1 — c'est un garde-fou, pas du décor.
-  const periodesAvecGardes = isAdmin
-    ? [...new Set(((gardesPeriodesRes?.data ?? []) as { periode_id: string }[]).map((g) => g.periode_id))]
-    : []
+  const periodesAvecGardes = [
+    ...new Set(((gardesPeriodesRes?.data ?? []) as { periode_id: string }[]).map((g) => g.periode_id)),
+  ]
   const periodeIdsARevalider = isAdmin
     ? periodes
         .filter(
@@ -191,17 +190,7 @@ export default async function PlanningPageV2({
           compteurs={compteurs as CompteursRow[]}
           conges={conges}
           profil={profil}
-          outils={
-            isAdmin ? (
-              <ActionBar
-                periodes={periodes}
-                periodesAvecGardes={periodesAvecGardes}
-                vets={vets}
-              />
-            ) : periodeAffichee ? (
-              <ExportPdfButton periodeId={periodeAffichee.id} />
-            ) : null
-          }
+          periodesAvecGardes={periodesAvecGardes}
         />
       </div>
     </>

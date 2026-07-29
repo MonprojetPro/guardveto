@@ -18,6 +18,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { FilouEdge } from './FilouEdge'
+import { useOutilsPlanning } from './outils-planning'
 import { GardeDetailModal } from '@/components/planning/GardeDetailModal'
 import { CriseModal, type VetCrise } from '@/components/planning/CriseModal'
 import { estJourFerie } from '@/engine/utils'
@@ -41,8 +42,8 @@ interface Props {
   conges: CongeAffiche[]
   /** Nom du profil de planning de la période, s'il y en a un. */
   profil: string | null
-  /** Barre d'outils d'administration (générer / publier / PDF), injectée. */
-  outils?: React.ReactNode
+  /** Périodes qui ont déjà des gardes — conditionne PDF et publication. */
+  periodesAvecGardes: string[]
 }
 
 export interface CongeAffiche {
@@ -118,7 +119,7 @@ export function PlanningV2({
   compteurs,
   conges,
   profil,
-  outils,
+  periodesAvecGardes,
 }: Props) {
   const router = useRouter()
   const [annee, mois] = anneeMois.split('-').map(Number)
@@ -131,6 +132,20 @@ export function PlanningV2({
 
   const today = aujourdhuiISO()
   const grille = genererGrille(annee, mois)
+
+  // Les outils de la barre (PDF, absence, générer, publier) et leurs
+  // garde-fous. La période vient de la PILULE — une seule source de vérité,
+  // là où la V1 embarquait un second sélecteur qui la contredisait.
+  const { pilules, alertes, modales } = useOutilsPlanning({
+    periode: periodeAffichee,
+    aDesGardes: periodeAffichee ? periodesAvecGardes.includes(periodeAffichee.id) : false,
+    isAdmin,
+    onSignalerAbsence: () => {
+      setCriseDate(undefined)
+      setCriseVetId(undefined)
+      setCriseOpen(true)
+    },
+  })
 
   // Index par date : plusieurs créneaux peuvent coexister le même jour (P3b).
   const parDate = new Map<string, GardeDenormalisee[]>()
@@ -233,6 +248,12 @@ export function PlanningV2({
                     </small>
                   </button>
                 ))}
+                {isAdmin && (
+                  <a className="pp-new" href="/admin/periodes">
+                    Gérer les périodes
+                    <small>Créer la période suivante, changer ses dates ou son profil</small>
+                  </a>
+                )}
                 <p className="pp-today">📌 Aujourd&apos;hui : {dateCourte(today)}</p>
               </div>
             )}
@@ -269,11 +290,15 @@ export function PlanningV2({
             >
               Compteurs
             </button>
-            {outils}
+            {pilules}
           </div>
         </div>
 
         <div className="work-body">
+          {/* Les avertissements du moteur vivent ICI, au-dessus de la grille —
+              pas dans la barre d'en-tête, qu'ils faisaient gonfler. */}
+          {alertes}
+
           <p className="grid-hint">
             <span className="gh-ico" aria-hidden="true">
               👆
@@ -369,6 +394,8 @@ export function PlanningV2({
           vetDefautId={criseVetId}
         />
       )}
+
+      {modales}
     </div>
   )
 }
