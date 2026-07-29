@@ -93,10 +93,13 @@ export function FenetreResultatFilou({ actif, resultat, onFermer, onDecision }: 
         onDecision({ fermer: false, dire: r.error })
         return
       }
-      // Le fil dit CE QUI a été fait, pas seulement que c'est fait : ce message
-      // repart vers Filou au tour suivant, et « c'est fait » tout seul ne lui
-      // apprend pas laquelle de ses propositions a été validée.
-      onDecision({ fermer: true, dire: `C’est fait : ${resultat.titre}.` })
+      // Le fil dit CE QUI a changé — pas le titre de la fenêtre. « C'est fait :
+      // Anne-Catherine et le mardi soir » ne dit rien de ce qui a bougé ; les
+      // lignes de la proposition, elles, viennent de notre code et le disent
+      // exactement. Ce message repart aussi vers Filou au tour suivant : il doit
+      // pouvoir y lire ce que son propre bouton a produit.
+      const quoi = (action.changements ?? []).join(' ').trim()
+      onDecision({ fermer: true, dire: quoi ? `C’est fait. ${quoi}` : `C’est fait : ${resultat.titre}.` })
     })
   }
 

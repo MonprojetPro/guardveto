@@ -150,11 +150,20 @@ const ParamsLireGardes = z.object({
 export const lireGardes: OutilLecture<typeof ParamsLireGardes> = {
   genre: 'lecture',
   nom: 'lire_gardes',
-  description: `Donne qui est 1er et 2nd de garde, jour par jour, sur une date ou une plage de dates.
+  description: `Donne qui est de garde, jour par jour, sur une date ou une plage de dates.
 
 Appelle-le pour toute question sur le planning concret : « qui est de garde demain ? », « qui travaille le week-end du 14 ? », « est-ce que j'ai une garde la semaine prochaine ? ».
 
-Un jour sans 1er ou sans 2nd est un TROU : personne n'y est programmé — signale-le clairement, ce n'est jamais anodin. Le champ « état de la période » dit si ce planning est encore un brouillon (donc pas définitif) ou déjà publié.`,
+COMBIEN DE PERSONNES SONT ATTENDUES DÉPEND DU CRÉNEAU. Le cabinet règle ce nombre lui-même : beaucoup de créneaux n'en attendent qu'UNE SEULE, et une nuit de semaine à un seul vétérinaire est alors parfaitement normale. Ne parle donc JAMAIS de « second manquant » de toi-même.
+
+Fie-toi à ces trois champs, jamais à ton intuition :
+- « places_attendues » : ce que le cabinet a réglé pour ce créneau.
+- « places_pourvues » : combien de personnes y sont réellement programmées.
+- « manque » : le nombre de places vides. C'est LE seul indicateur de trou. À 0, il n'y a rien à signaler ; au-dessus de 0, dis-le clairement, ce n'est jamais anodin.
+
+Si « places_attendues » vaut null, le réglage est indéterminé : dis simplement qui est programmé, sans conclure qu'il manque quelqu'un.
+
+Le champ « état de la période » dit si ce planning est encore un brouillon (donc pas définitif) ou déjà publié.`,
   params: ParamsLireGardes,
 
   async executer(params, ctx) {
@@ -166,12 +175,27 @@ Un jour sans 1er ou sans 2nd est un TROU : personne n'y est programmé — signa
         .gte('date', params.date_debut)
         .lte('date', dateFin)
         .order('date'),
-      ctx.supabase.from('creneau_modele').select('code, nom').not('code', 'is', null),
+      // `nb_places` est LA source de vérité du nombre de personnes attendues sur
+      // un créneau — réglable par le cabinet, profil par profil. Sans elle, on
+      // ne pouvait que supposer « toujours deux », et Filou annonçait un
+      // « second manquant » sur des créneaux qui n'en attendent qu'un.
+      ctx.supabase
+        .from('creneau_modele')
+        .select('code, nom, nb_places')
+        .eq('cabinet_id', ctx.cabinetId)
+        .not('code', 'is', null),
     ])
 
-    const nomsTypes: Record<string, string> = {}
-    for (const t of (typesDb as Array<{ code: string; nom: string }> | null) ?? []) {
-      nomsTypes[t.code] = t.nom
+    // Un même code peut exister dans plusieurs profils de planning, avec un
+    // nombre de places différent. On ne sait pas ici lequel s'applique à la
+    // date lue : en cas de désaccord, on préfère ne rien affirmer (null) plutôt
+    // que d'annoncer un trou imaginaire.
+    const infosTypes = new Map<string, { nom: string; places: number | null }>()
+    for (const t of (typesDb as Array<{ code: string; nom: string; nb_places: number | null }> | null) ?? []) {
+      const places = typeof t.nb_places === 'number' ? t.nb_places : null
+      const connu = infosTypes.get(t.code)
+      if (!connu) infosTypes.set(t.code, { nom: t.nom, places })
+      else if (connu.places !== places) connu.places = null
     }
 
     type Row = {
@@ -188,14 +212,24 @@ Un jour sans 1er ou sans 2nd est un TROU : personne n'y est programmé — signa
     }
 
     return {
-      jours: rows.map((r) => ({
-        date: r.date,
-        jour_semaine: jourSemaineFr(r.date),
-        creneau: nomsTypes[r.type] ?? r.type,
-        premier: r.premier_prenom ?? '⚠️ personne (trou)',
-        second: r.second_prenom ?? null,
-        etat_periode: STATUT_HUMAIN[r.periode_statut] ?? r.periode_statut,
-      })),
+      jours: rows.map((r) => {
+        const info = infosTypes.get(r.type)
+        const pourvues = [r.premier_prenom, r.second_prenom].filter(Boolean).length
+        const attendues = info?.places ?? null
+        // Le trou se CALCULE, il ne se devine pas : c'est la différence entre ce
+        // que le cabinet a réglé et ce qui est réellement programmé.
+        const manque = attendues === null ? null : Math.max(0, attendues - pourvues)
+        return {
+          date: r.date,
+          jour_semaine: jourSemaineFr(r.date),
+          creneau: info?.nom ?? r.type,
+          programmes: [r.premier_prenom, r.second_prenom].filter(Boolean),
+          places_attendues: attendues,
+          places_pourvues: pourvues,
+          manque,
+          etat_periode: STATUT_HUMAIN[r.periode_statut] ?? r.periode_statut,
+        }
+      }),
     }
   },
 }
