@@ -56,9 +56,16 @@ export type PlacesParCode = Map<string, number | null>
  * là-bas, le test `placesAttendues` tombe — c'est le but.
  */
 export function codeCatalogue(typePlanning: string): string {
-  if (typePlanning === 'semaine' || typePlanning === 'ferie') {
-    return typePlanning === 'ferie' ? 'ferie' : 'semaine_soir'
-  }
+  // ⚠️ 'ferie' suit 'semaine_soir', et ce n'est pas une erreur de recopie : le
+  // moteur traite un jour férié comme un soir de semaine, donc un férié en été
+  // n'attend qu'UNE personne même si le catalogue déclare 2 places pour son
+  // créneau. Aligner Filou sur le catalogue le ferait crier au manque sur
+  // chaque férié d'été — le bug d'origine, transposé.
+  //
+  // Le catalogue et le moteur se contredisent donc sur ce point précis. Filou
+  // dit ce QUI EST (le moteur a produit le planning) ; le contrôle de cohérence,
+  // lui, signale le désaccord pour qu'une décision soit prise.
+  if (typePlanning === 'semaine' || typePlanning === 'ferie') return 'semaine_soir'
   return typePlanning
 }
 

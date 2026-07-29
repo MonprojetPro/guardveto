@@ -46,9 +46,15 @@ describe('Traduction des deux vocabulaires', () => {
     expect(codeCatalogue('semaine')).toBe('semaine_soir')
   })
 
-  it('« ferie » et « weekend » portent le même code des deux côtés', () => {
-    expect(codeCatalogue('ferie')).toBe('ferie')
+  it('« weekend » porte le même code des deux côtés', () => {
     expect(codeCatalogue('weekend')).toBe('weekend')
+  })
+
+  it('« ferie » suit « semaine_soir » — comme le moteur, pas comme le catalogue', () => {
+    // Le catalogue déclare 2 places pour le créneau « Jour ferie », mais le
+    // moteur traite un férié comme un soir de semaine. Filou doit refléter ce
+    // qui EST : sinon il annonce un manque sur chaque férié d'été.
+    expect(codeCatalogue('ferie')).toBe('semaine_soir')
   })
 
   it('un créneau sur-mesure passe tel quel', () => {
@@ -126,12 +132,27 @@ describe('Places attendues — les deux pièges de production', () => {
     ).toBe(2)
   })
 
-  it('un férié suit le catalogue — le 14 juillet 2026 manquait bien quelqu’un', () => {
+  it('PIÈGE 3 : un férié d’été n’attend qu’une personne, malgré ses 2 places au catalogue', () => {
+    // Cas réel : mardi 14 juillet 2026, période « ete 2026 » réglée à 1 véto la
+    // nuit de semaine. Le moteur a généré une seule personne — c'est conforme.
+    // Juger avec le catalogue ferait crier au manque sur chaque férié d'été.
     const n = placesAttendues({
       typePlanning: 'ferie',
       date: '2026-07-14',
       catalogue: CATALOGUE,
       periodes: [ETE],
+      profils: SANS_PROFIL,
+    })
+    expect(n).toBe(1)
+    expect(manqueSurGarde(n, 1)).toBe(0)
+  })
+
+  it('un férié d’hiver en attend deux, par l’effectif de la période', () => {
+    const n = placesAttendues({
+      typePlanning: 'ferie',
+      date: '2026-12-25',
+      catalogue: CATALOGUE,
+      periodes: [HIVER],
       profils: SANS_PROFIL,
     })
     expect(n).toBe(2)

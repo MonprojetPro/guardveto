@@ -19,7 +19,12 @@
 // ============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { placesAttendues, manqueSurGarde, codeCatalogue } from '@/lib/planning/placesAttendues'
+import {
+  placesAttendues,
+  manqueSurGarde,
+  codeCatalogue,
+  effectifNuitSemaine as effectifNuitSemaineLocal,
+} from '@/lib/planning/placesAttendues'
 import type { PeriodeEffectif, ProfilEffectif } from '@/lib/planning/placesAttendues'
 
 export interface Controle {
@@ -204,7 +209,38 @@ export async function controlerCoherence(
     }),
   })
 
-  // ── ⑥ L'effectif de nuit de semaine, période par période ────
+  // ── ⑥ Le férié : deux règles qui se contredisent ────────────
+  // Trouvé le 29 juillet grâce à ce contrôle même. Le moteur traite un jour
+  // férié comme un soir de semaine ; le catalogue lui déclare son propre nombre
+  // de places. Tant que les deux disent la même chose, personne ne voit rien.
+  // Dès qu'ils divergent — un férié d'été, où la semaine n'attend qu'une
+  // personne mais le créneau en déclare deux — le planning généré paraît
+  // incomplet alors qu'il respecte le moteur.
+  //
+  // On ne tranche pas ici : c'est une décision de cabinet, pas de code.
+  const placesFerie = catalogue.get('ferie')
+  const desaccordsFerie: string[] = []
+  if (typeof placesFerie === 'number') {
+    for (const p of periodes) {
+      const effectif = effectifNuitSemaineLocal(p, profilParId)
+      if (effectif !== placesFerie) {
+        desaccordsFerie.push(
+          `${p.libelle ?? p.date_debut} : le moteur programme ${effectif} vétérinaire${effectif > 1 ? 's' : ''} un jour férié (règle du soir de semaine), le catalogue en déclare ${placesFerie}.`,
+        )
+      }
+    }
+  }
+  controles.push({
+    quoi: 'Un jour férié : le moteur et le catalogue s’accordent-ils ?',
+    etat: desaccordsFerie.length > 0 ? 'alerte' : 'ok',
+    verdict:
+      desaccordsFerie.length > 0
+        ? `Désaccord sur ${desaccordsFerie.length} période${desaccordsFerie.length > 1 ? 's' : ''}. Le planning suit le moteur ; à trancher avec le cabinet.`
+        : 'Le moteur et le catalogue programment le même effectif les jours fériés.',
+    lignes: desaccordsFerie,
+  })
+
+  // ── ⑦ L'effectif de nuit de semaine, période par période ────
   // Affiché en clair : c'est le réglage qui a produit le faux « second
   // manquant », et personne ne pouvait le lire depuis l'application.
   const lignesEffectif = periodes.slice(0, 8).map((p) => {
