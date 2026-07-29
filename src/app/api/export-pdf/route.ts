@@ -53,7 +53,8 @@ export async function GET(req: NextRequest) {
         .select(`
           id, date, type,
           premier:premier_id(id, prenom, nom, couleur),
-          second:second_id(id, prenom, nom, couleur)
+          second:second_id(id, prenom, nom, couleur),
+          garde_placements(place_index, veterinaire_id, veterinaires(prenom, nom, couleur))
         `)
         .eq('periode_id', periodeId)
         .order('date'),
@@ -96,6 +97,10 @@ export async function GET(req: NextRequest) {
     type: string
     premier: { id: string; prenom: string; nom: string; couleur: string } | null
     second:  { id: string; prenom: string; nom: string; couleur: string } | null
+    garde_placements?: {
+      place_index: number
+      veterinaires: { prenom: string; nom: string; couleur: string | null } | null
+    }[] | null
   }
 
   const gardes: GardePdf[] = (gardesDb as unknown as RawGarde[]).map((g) => ({
@@ -108,6 +113,16 @@ export async function GET(req: NextRequest) {
     second_prenom:  g.second?.prenom  ?? null,
     second_nom:     g.second?.nom     ?? null,
     second_couleur: g.second?.couleur ?? null,
+    // Places 3 et 4 (créneaux sur-mesure) : elles ne vivent que dans le
+    // miroir, les colonnes de `gardes` n'en portent que deux.
+    places_sup: (g.garde_placements ?? [])
+      .filter((p) => p.place_index >= 2 && p.veterinaires)
+      .map((p) => ({
+        place_index: p.place_index,
+        prenom: p.veterinaires!.prenom,
+        nom: p.veterinaires!.nom,
+        couleur: p.veterinaires!.couleur ?? '#6b7280',
+      })),
   }))
 
    

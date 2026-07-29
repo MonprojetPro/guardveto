@@ -68,6 +68,21 @@ export interface Garde {
   updated_at: string
 }
 
+/**
+ * Une place au-delà de la deuxième, telle que la vue `planning_semaine` la
+ * renvoie (colonne `places_sup`). Les places 0 et 1 restent portées par les
+ * colonnes `premier_` et `second_` : ce sont elles qui subissent l'inversion
+ * du vendredi.
+ */
+export interface PlaceSupplementaire {
+  place_index: number
+  role: string
+  id: string
+  prenom: string
+  nom: string
+  couleur: string
+}
+
 export interface GardeDenormalisee extends Garde {
   premier_prenom: string | null
   premier_nom: string | null
@@ -77,6 +92,12 @@ export interface GardeDenormalisee extends Garde {
   second_couleur: string | null
   saison: Saison
   periode_statut: StatutPeriode
+  /**
+   * Places 3 et 4 d'un créneau sur-mesure. Vide dans l'immense majorité des
+   * cas (un créneau a 1 ou 2 places) — absent si la donnée vient d'une source
+   * qui ne passe pas par la vue.
+   */
+  places_sup?: PlaceSupplementaire[]
 }
 
 export interface Conge {

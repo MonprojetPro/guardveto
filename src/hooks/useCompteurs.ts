@@ -82,13 +82,23 @@ export async function queryCompteursPlage(
   const vets = (vetsData as Array<{ id: string; prenom: string; nom: string; statut: 'associe' | 'salarie'; couleur: string }> | null) ?? []
 
   // 2. Gardes de la plage + statut de leur période
+  // `garde_placements` porte les places au-delà de la deuxième (créneaux
+  // sur-mesure à 3 ou 4 places) : sans elle, un vétérinaire de garde en 3e
+  // place ne serait compté nulle part — donc réputé moins chargé qu'il ne
+  // l'est, et resservi par le moteur.
   const { data: gardesData } = await supabase
     .from('gardes')
-    .select('type, premier_id, second_id, periodes!inner(statut)')
+    .select('type, premier_id, second_id, periodes!inner(statut), garde_placements(place_index, veterinaire_id)')
     .gte('date', debut)
     .lte('date', fin)
 
-  type GardeRow = { type: 'semaine' | 'weekend' | 'ferie'; premier_id: string | null; second_id: string | null; periodes: { statut: string } | { statut: string }[] }
+  type GardeRow = {
+    type: 'semaine' | 'weekend' | 'ferie'
+    premier_id: string | null
+    second_id: string | null
+    periodes: { statut: string } | { statut: string }[]
+    garde_placements?: { place_index: number; veterinaire_id: string | null }[] | null
+  }
   let gardes = (gardesData as GardeRow[] | null) ?? []
 
   const statutDe = (g: GardeRow): string =>
@@ -123,6 +133,15 @@ export async function queryCompteursPlage(
       // que la vue SQL compteurs_gardes (sinon les deux chemins divergeaient).
       if (p) p.total_gardes++
       if (s) s.total_gardes++
+    }
+
+    // Places 3 et 4 : elles comptent dans le TOTAL, comme les places 1 et 2
+    // d'un créneau sur-mesure — les colonnes détaillées (1er/2e) ne savent
+    // représenter que deux rôles.
+    for (const pl of g.garde_placements ?? []) {
+      if (pl.place_index < 2 || !pl.veterinaire_id) continue
+      const ligne = map.get(pl.veterinaire_id)
+      if (ligne) ligne.total_gardes++
     }
   }
 

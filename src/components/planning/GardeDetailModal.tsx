@@ -368,6 +368,13 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
   const estVerrouille = data?.garde.verrouille ?? false
   const modeEdition = isAdmin && (!estVerrouille || correctionMode)
 
+  // Places 3 et 4 (créneaux sur-mesure). Elles viennent de la garde affichée
+  // dans la grille, pas de l'API de disponibilités : celle-ci ne raisonne
+  // qu'en « premier / second ».
+  const placesSup = [...(garde?.places_sup ?? [])]
+    .filter((p) => p.place_index >= 2)
+    .sort((a, b) => a.place_index - b.place_index)
+
   // Véto : « proposer un échange » sur SA garde (publiée, future, non verrouillée).
   const aujourdHui = new Date().toISOString().slice(0, 10)
   const peutProposerEchange =
@@ -498,6 +505,46 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
                       : undefined
                   }
                 />
+              )}
+
+              {/* Places 3 et 4 d'un créneau sur-mesure. Elles s'AFFICHENT —
+                  ne pas les montrer laisserait croire que la garde n'a que
+                  deux vétérinaires. Leur réattribution passe encore par la
+                  régénération : le calcul de disponibilité ne connaît que les
+                  rôles « premier » et « second ». On le DIT plutôt que de
+                  laisser un bouton inerte. */}
+              {placesSup.map((p) => (
+                <div className="gm-section disabled" key={p.place_index}>
+                  <div className="gm-slot-row">
+                    <span className="gm-slot-label">
+                      {p.role || `${p.place_index + 1}e de garde`}
+                    </span>
+                    <span className="gm-current">
+                      <span className="dot" style={{ background: p.couleur }}>
+                        {p.prenom.charAt(0)}
+                      </span>
+                      {p.prenom} {p.nom}
+                    </span>
+                    {onDeclarerAbsent && garde.periode_statut === 'publie' && (
+                      <button
+                        type="button"
+                        className="gm-absent-link"
+                        title={`Déclarer ${p.prenom} absent·e`}
+                        onClick={() => onDeclarerAbsent(garde.date, p.id)}
+                      >
+                        <UserMinus className="w-3.5 h-3.5" />
+                        Absent·e
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {placesSup.length > 0 && modeEdition && (
+                <p className="av-legende" style={{ borderTop: 'none', paddingTop: 0 }}>
+                  Les places au-delà de la deuxième se modifient en régénérant
+                  le planning — pas encore à la main depuis cet écran.
+                </p>
               )}
             </>
           )}

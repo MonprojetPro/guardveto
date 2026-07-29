@@ -30,6 +30,12 @@ export interface GardeEventData {
   type: string
   prenomPremier: string
   prenomSecond: string | null
+  /**
+   * Prénoms des places 3 et 4 d'un créneau sur-mesure, dans l'ordre. Le
+   * couple premier/second ne sait pas les représenter — sans elles, un
+   * vétérinaire de garde n'apparaîtrait pas dans son propre agenda.
+   */
+  prenomsSuivants?: string[]
 }
 
 // ── Initialisation du client Google ─────────────────────────
@@ -112,6 +118,12 @@ function getEventTimes(
 // ── Construction du titre et de la description ───────────────
 
 function buildEventTitle(data: GardeEventData): string {
+  const suivants = data.prenomsSuivants ?? []
+  if (data.prenomSecond && suivants.length > 0) {
+    // Au-delà de deux, le titre listerait une file de prénoms : on garde le
+    // premier et on annonce le nombre, le détail est dans la description.
+    return `Garde — ${data.prenomPremier} (1er) + ${suivants.length + 1} autres`
+  }
   if (data.prenomSecond) {
     return `Garde — ${data.prenomPremier} (1er) + ${data.prenomSecond} (2nd)`
   }

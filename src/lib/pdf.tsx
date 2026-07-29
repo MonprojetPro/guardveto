@@ -27,6 +27,8 @@ export interface GardePdf {
   second_prenom: string | null
   second_nom: string | null
   second_couleur: string | null
+  /** Places 3 et 4 d'un créneau sur-mesure — absentes des colonnes V1. */
+  places_sup?: { place_index: number; prenom: string; nom: string; couleur: string }[]
 }
 
 export interface PeriodePdf {
@@ -316,6 +318,19 @@ function GardeVets({ garde }: { garde: GardePdf }) {
           </Text>
         </View>
       )}
+      {/* Places 3 et 4 : sans elles, un vétérinaire de garde serait absent du
+          planning affiché au cabinet — la pire des disparitions. */}
+      {(garde.places_sup ?? [])
+        .filter((p) => p.place_index >= 2)
+        .sort((a, b) => a.place_index - b.place_index)
+        .map((p) => (
+          <View style={S.vetRow} key={p.place_index}>
+            <View style={[S.vetDot, { backgroundColor: p.couleur ?? '#6b7280' }]} />
+            <Text style={S.vetNom}>
+              {p.prenom} {p.nom?.charAt(0)}.
+            </Text>
+          </View>
+        ))}
     </>
   )
 }

@@ -282,6 +282,18 @@ export function CatalogueCreneauxAdmin({
                     <option key={n} value={n}>{n}</option>
                   ))}
                 </select>
+                {/* Au-delà de deux places, l'affichage, le PDF, l'agenda et
+                    les compteurs suivent — mais la réattribution à la main
+                    depuis le planning ne sait encore traiter que les deux
+                    premières. On le dit ici plutôt que de le laisser
+                    découvrir sur un planning publié. */}
+                {nbPlaces > 2 && (
+                  <span className="block text-xs text-amber-700 dark:text-amber-400">
+                    À partir de 3 vétérinaires, les places suivantes se
+                    modifient en régénérant le planning — pas encore une par
+                    une depuis la grille.
+                  </span>
+                )}
               </label>
             </div>
 

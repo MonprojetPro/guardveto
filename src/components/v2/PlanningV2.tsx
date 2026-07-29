@@ -22,6 +22,7 @@ import { useOutilsPlanning } from './outils-planning'
 import { GardeDetailModal } from '@/components/planning/GardeDetailModal'
 import { CriseModal, type VetCrise } from '@/components/planning/CriseModal'
 import { estJourFerie } from '@/engine/utils'
+import { placesDeGarde } from '@/lib/gardes/places'
 import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
 import type { CompteursRow } from '@/hooks/useCompteurs'
 import type { GardeDenormalisee, Periode } from '@/types'
@@ -474,31 +475,31 @@ function CaseJour({
         </span>
       ))}
 
-      {gardes.map((g) => (
-        <div className="slot-card" key={g.id}>
-          <span className="sc-tag">{libelleTypeGardeDb(g.type, nomsTypes)}</span>
-          <LigneVet
-            prenom={g.premier_prenom}
-            couleur={g.premier_couleur}
-            role={g.second_prenom ? '1er' : ''}
-            titre={`${dateCourte(date)} · premier de garde`}
-            onClick={() => onOuvrir(g)}
-          />
-          {/* La seconde place ne s'affiche que si elle est occupée : on ne
-              connaît pas ici le nombre de places du créneau, et dessiner un
-              « à pourvoir » sur un créneau à une seule place inventerait un
-              trou qui n'existe pas. */}
-          {g.second_prenom && (
-            <LigneVet
-              prenom={g.second_prenom}
-              couleur={g.second_couleur}
-              role={g.premier_prenom ? '2e' : ''}
-              titre={`${dateCourte(date)} · second de garde`}
-              onClick={() => onOuvrir(g)}
-            />
-          )}
-        </div>
-      ))}
+      {gardes.map((g) => {
+        // TOUTES les places, pas seulement les deux premières : un créneau
+        // sur-mesure peut en compter jusqu'à quatre, et un vétérinaire de
+        // garde qui n'apparaît pas dans la case serait invisible partout.
+        const places = placesDeGarde(g)
+        return (
+          <div className="slot-card" key={g.id}>
+            <span className="sc-tag">{libelleTypeGardeDb(g.type, nomsTypes)}</span>
+            {/* Une place seule n'affiche pas son rôle : « 1er » n'a de sens
+                que s'il y a un 2e. Les places vides ne sont pas dessinées —
+                on ne connaît pas ici le nombre de places du créneau, et un
+                « à pourvoir » inventerait un trou qui n'existe pas. */}
+            {places.map((p) => (
+              <LigneVet
+                key={p.index}
+                prenom={p.prenom}
+                couleur={p.couleur}
+                role={places.length > 1 ? p.role : ''}
+                titre={`${dateCourte(date)} · ${p.role} de garde`}
+                onClick={() => onOuvrir(g)}
+              />
+            ))}
+          </div>
+        )
+      })}
 
       {horsPeriode && <span className="d-hors-note">hors période</span>}
     </div>

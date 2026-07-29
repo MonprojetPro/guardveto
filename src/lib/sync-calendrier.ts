@@ -17,6 +17,25 @@ import { chargerStructureProfilPeriode } from '@/data/chargerStructureCabinet'
 import type { StructureCreneauxResolue } from '@/engine/structure-creneaux'
 import { chargerRelationsAffichagePeriode } from '@/data/chargerRelationsAffichage'
 
+/**
+ * Prénoms des places 3 et 4, dans l'ordre. Les colonnes `premier_id` et
+ * `second_id` n'en portent que deux : les suivantes vivent dans le miroir
+ * `garde_placements`. Sans elles, un vétérinaire de garde ne verrait jamais
+ * la garde arriver dans son agenda.
+ */
+function prenomsPlacesSup(garde: {
+  garde_placements?: { place_index: number; veterinaires: { prenom: string } | { prenom: string }[] | null }[] | null
+}): string[] {
+  return (garde.garde_placements ?? [])
+    .filter((p) => p.place_index >= 2)
+    .sort((a, b) => a.place_index - b.place_index)
+    .map((p) => {
+      const v = Array.isArray(p.veterinaires) ? p.veterinaires[0] : p.veterinaires
+      return v?.prenom ?? ''
+    })
+    .filter(Boolean)
+}
+
 // ── Résolution du calendarId PAR CABINET (#10b) ──────────────
 // Le calendarId Google est désormais porté par le cabinet
 // (cabinets.google_calendar_id). On le résout ici depuis un cabinet_id ; la
@@ -63,6 +82,11 @@ interface GardeAvecVetos {
   cabinet_id?: string | null
   premier: { prenom: string } | null
   second:  { prenom: string } | null
+  /** Miroir des places 3 et 4 — absentes des colonnes de `gardes`. */
+  garde_placements?: {
+    place_index: number
+    veterinaires: { prenom: string } | { prenom: string }[] | null
+  }[] | null
 }
 
 /**
@@ -130,7 +154,8 @@ export async function syncCalendrier(
       type,
       google_event_id,
       premier:veterinaires!gardes_premier_id_fkey ( prenom ),
-      second:veterinaires!gardes_second_id_fkey  ( prenom )
+      second:veterinaires!gardes_second_id_fkey  ( prenom ),
+      garde_placements ( place_index, veterinaires ( prenom ) )
     `)
     .eq('periode_id', periodeId)
     .order('date')
@@ -166,6 +191,7 @@ export async function syncCalendrier(
           type:          garde.type,
           prenomPremier: garde.premier?.prenom ?? 'Inconnu',
           prenomSecond:  garde.second?.prenom  ?? null,
+          prenomsSuivants: prenomsPlacesSup(garde),
         }
         try {
           await avecReprise(async () => {
@@ -219,7 +245,8 @@ export async function syncGardeIndividuelle(
       periode_id,
       cabinet_id,
       premier:veterinaires!gardes_premier_id_fkey ( prenom ),
-      second:veterinaires!gardes_second_id_fkey  ( prenom )
+      second:veterinaires!gardes_second_id_fkey  ( prenom ),
+      garde_placements ( place_index, veterinaires ( prenom ) )
     `)
     .eq('id', gardeId)
     .single()
@@ -237,6 +264,7 @@ export async function syncGardeIndividuelle(
     type:          g.type,
     prenomPremier: g.premier?.prenom ?? 'Inconnu',
     prenomSecond:  g.second?.prenom  ?? null,
+    prenomsSuivants: prenomsPlacesSup(g),
   }
 
   // Structure horaire du cabinet (A1) — aligne l'agenda sur la base.
