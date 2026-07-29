@@ -13,9 +13,10 @@
 // ============================================================
 
 import { useState, useTransition } from 'react'
-import { lancerBanc, lancerRecetteFilou } from './actions'
+import { lancerBanc, lancerRecetteFilou, lancerControleCoherence } from './actions'
 import type { ResultatBanc } from '@/lib/ia/bancEssai'
 import type { ResultatRecette } from '@/lib/ia/bancRecette'
+import type { RapportCoherence } from '@/lib/ia/controleCoherence'
 
 const centimes = (dollars: number) => `${(dollars * 100).toFixed(2)} ¢`
 const euros = (dollars: number) => `≈ ${(dollars * 0.92).toFixed(2)} €`
@@ -23,6 +24,7 @@ const euros = (dollars: number) => `≈ ${(dollars * 0.92).toFixed(2)} €`
 export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
   const [resultat, setResultat] = useState<ResultatBanc | null>(null)
   const [recette, setRecette] = useState<ResultatRecette | null>(null)
+  const [coherence, setCoherence] = useState<RapportCoherence | null>(null)
   const [erreur, setErreur] = useState<string | null>(null)
   const [enCours, demarrer] = useTransition()
 
@@ -30,6 +32,7 @@ export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
     setErreur(null)
     setResultat(null)
     setRecette(null)
+    setCoherence(null)
     demarrer(async () => {
       const r = await lancerBanc(jeu)
       if ('error' in r) setErreur(r.error)
@@ -41,10 +44,23 @@ export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
     setErreur(null)
     setResultat(null)
     setRecette(null)
+    setCoherence(null)
     demarrer(async () => {
       const r = await lancerRecetteFilou()
       if ('error' in r) setErreur(r.error)
       else setRecette(r.resultat)
+    })
+  }
+
+  const controler = () => {
+    setErreur(null)
+    setResultat(null)
+    setRecette(null)
+    setCoherence(null)
+    demarrer(async () => {
+      const r = await lancerControleCoherence()
+      if ('error' in r) setErreur(r.error)
+      else setCoherence(r.rapport)
     })
   }
 
@@ -57,6 +73,61 @@ export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
           Le moteur de Filou tourne aujourd’hui sur <code className="rounded bg-muted px-1">{modeleActuel}</code>.
         </p>
       </header>
+
+      {/* Le contrôle gratuit passe DEVANT les boutons payants, et c'est
+          délibéré : ce sont les requêtes qui ont trouvé les vrais défauts du
+          29 juillet, pendant que le banc à 10 ¢ passait 5 cas sur 5. */}
+      <section className="rounded-lg border-2 border-emerald-600/50 bg-emerald-500/5 p-4">
+        <p className="font-semibold">Contrôle de cohérence — gratuit</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Aucun appel au modèle : que des lectures en base. Il vérifie que Filou peut savoir ce
+          qu’il affirme — les types de garde rattachés à un créneau, l’effectif attendu connu pour
+          chaque jour, les profils d’accord entre eux. <b>C’est ce contrôle-là</b> qui a trouvé les
+          deux vrais trous du 29 juillet, pendant que le banc payant passait 5 cas sur 5. Lance-le
+          autant que tu veux.
+        </p>
+        <button
+          type="button"
+          onClick={controler}
+          disabled={enCours}
+          className="mt-3 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {enCours ? 'Contrôle en cours…' : 'Lancer le contrôle (0 ¢)'}
+        </button>
+      </section>
+
+      {coherence && (
+        <div className="space-y-3">
+          <h2 className="font-semibold">
+            Cohérence — {coherence.alertes === 0 ? 'rien à signaler' : `${coherence.alertes} point${coherence.alertes > 1 ? 's' : ''} à regarder`}{' '}
+            <span className="font-normal text-muted-foreground">({coherence.ms} ms, 0 ¢)</span>
+          </h2>
+          {coherence.controles.map((c, i) => (
+            <article
+              key={i}
+              className={`rounded-lg border p-4 text-sm ${
+                c.etat === 'alerte'
+                  ? 'border-destructive/50 bg-destructive/5'
+                  : c.etat === 'info'
+                    ? 'border-muted-foreground/30'
+                    : 'border-emerald-500/40 bg-emerald-500/5'
+              }`}
+            >
+              <p className="font-semibold">
+                {c.etat === 'alerte' ? '⚠' : c.etat === 'info' ? 'ℹ' : '✓'} {c.quoi}
+              </p>
+              <p className="mt-1">{c.verdict}</p>
+              {c.lignes.length > 0 && (
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+                  {c.lignes.map((l, j) => (
+                    <li key={j}>{l}</li>
+                  ))}
+                </ul>
+              )}
+            </article>
+          ))}
+        </div>
+      )}
 
       <section className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 text-sm">
         <p className="font-semibold">⚠️ Ces boutons dépensent de l’argent réel</p>

@@ -22,9 +22,11 @@ import { assistantIaDisponible } from '@/lib/ia/proposerRegle'
 import { chargerContexteIA } from '@/lib/ia/contexteCabinet'
 import { lancerBancEssai, type ResultatBanc } from '@/lib/ia/bancEssai'
 import { lancerBancRecette, type ResultatRecette } from '@/lib/ia/bancRecette'
+import { controlerCoherence, type RapportCoherence } from '@/lib/ia/controleCoherence'
 
 export type ResultatBancAction = { error: string } | { resultat: ResultatBanc }
 export type ResultatRecetteAction = { error: string } | { resultat: ResultatRecette }
+export type RapportCoherenceAction = { error: string } | { rapport: RapportCoherence }
 
 /**
  * Lance le banc d'essai. Admin-only : la garde est ici, côté serveur — masquer
@@ -107,5 +109,37 @@ export async function lancerRecetteFilou(): Promise<ResultatRecetteAction> {
     return { resultat }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erreur inconnue pendant la recette.' }
+  }
+}
+
+/**
+ * Contrôle de cohérence — GRATUIT : aucun appel au modèle, que des lectures en
+ * base. C'est lui qui a trouvé les vrais trous du 29 juillet, pendant que le
+ * banc payant passait 5/5. À lancer sans compter.
+ */
+export async function lancerControleCoherence(): Promise<RapportCoherenceAction> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Session expirée — reconnecte-toi.' }
+
+  const { data: moi } = await supabase
+    .from('veterinaires')
+    .select('role_app')
+    .eq('user_id', user.id)
+    .eq('actif', true)
+    .maybeSingle()
+
+  if (moi?.role_app !== 'admin') {
+    return { error: 'Réservé aux administrateurs du cabinet.' }
+  }
+
+  try {
+    const cabinetId = await resoudreCabinetId(supabase)
+    return { rapport: await controlerCoherence(supabase, cabinetId) }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Erreur inconnue pendant le contrôle.' }
   }
 }
