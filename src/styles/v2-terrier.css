@@ -1011,13 +1011,18 @@
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   text-decoration: none;
 }
-.btn-valider { background: var(--accent); color: #fff; box-shadow: 0 2px 8px var(--accent-glow); }
+/* Ces boutons servent AUSSI à l'intérieur des modales, où `--accent` et
+   `--muted` désignent les jetons de shadcn : on passe par les copies
+   `-terrier`, de valeur identique, pour être juste des deux côtés. */
+.btn-valider { background: var(--accent-terrier); color: #fff; box-shadow: 0 2px 8px var(--accent-glow); }
 .btn-valider:hover { filter: brightness(1.07); }
-.btn-ghost {
-  background: transparent; color: var(--muted);
+.btn-ghost,
+.btn-corriger {
+  background: transparent; color: var(--muted-terrier);
   border: 1px solid var(--border-strong);
 }
-.btn-ghost:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
+.btn-ghost:hover,
+.btn-corriger:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
 
 /* -- contenus des fenêtres -- */
 .f-section { margin-bottom: 15px; }
@@ -1820,8 +1825,8 @@
    halo, et sans teindre la bordure du bouton. */
 [data-slot="dialog-content"] :focus-visible,
 [data-slot="alert-dialog-content"] :focus-visible {
-  outline: 2px solid var(--accent-ink);
-  outline-offset: 2px;
+  outline: 1.5px solid var(--accent-ink);
+  outline-offset: 1px;
   box-shadow: none !important;
   border-color: var(--border-strong) !important;
 }

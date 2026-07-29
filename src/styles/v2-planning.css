@@ -1040,6 +1040,14 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
    structure, `.av-*` pour la liste des vétérinaires disponibles. La logique
    métier du composant (réattribution, verrouillage, disponibilités,
    violations de règles) n'est pas touchée : seul son rendu change.
+
+   ⚠️ Piège : à l'intérieur d'une modale, `--muted` et `--accent` désignent
+   les jetons de shadcn (fond crème, teinte de survol) et NON les couleurs
+   du terrier — c'est `v2-terrier.css` qui les remappe là pour habiller les
+   surfaces flottantes. Les règles ci-dessous passent donc par les copies
+   `--muted-terrier` / `--accent-terrier`. Écrire `var(--muted)` ici rend le
+   texte crème sur crème, donc invisible (constaté le 2026-07-29 sur le
+   bouton « Réattribuer »).
    ============================================================ */
 
 .gv-modale .gm-kicker {
@@ -1054,8 +1062,8 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   padding: 4px 11px; border-radius: 999px;
 }
 .gm-badge.publie { background: var(--ok-soft); color: var(--ok); }
-.gm-badge.brouillon { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border-strong); }
-.gm-badge.lock { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border-strong); }
+.gm-badge.brouillon { background: var(--surface-2); color: var(--muted-terrier); border: 1px solid var(--border-strong); }
+.gm-badge.lock { background: var(--surface-2); color: var(--muted-terrier); border: 1px solid var(--border-strong); }
 .gm-badge.warn { background: var(--warn-soft); color: var(--warn); }
 
 /* -- L'encart de verrouillage, avec sa confirmation en ligne --
@@ -1089,8 +1097,11 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   font-family: var(--font-display);
   font-size: 0.7rem; font-weight: 700; letter-spacing: 0.07em;
   text-transform: uppercase; color: var(--soft);
-  flex: 1 1 130px;
+  flex: 0 0 auto;
 }
+/* C'est le nom du titulaire qui prend la place restante : le libellé et lui
+   se suivent, les actions restent groupées à droite. */
+.gm-current { flex: 1 1 auto; }
 .gm-current {
   display: inline-flex; align-items: center; gap: 7px;
   font-size: 0.88rem; font-weight: 700; color: var(--text);
@@ -1100,10 +1111,10 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   display: inline-flex; align-items: center; justify-content: center;
   color: #fff; font-size: 0.62rem; font-weight: 800;
 }
-.gm-current.none { color: var(--muted); font-weight: 600; font-style: italic; }
+.gm-current.none { color: var(--muted-terrier); font-weight: 600; font-style: italic; }
 .gm-reassign {
   border: 1px solid var(--border-strong);
-  background: var(--surface-2); color: var(--muted);
+  background: var(--surface-2); color: var(--muted-terrier);
   border-radius: 999px; font-size: 0.74rem; font-weight: 700;
   padding: 7px 13px; min-height: 34px;
 }
@@ -1115,7 +1126,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .gm-absent-link {
   display: inline-flex; align-items: center; gap: 5px;
   border: none; background: transparent;
-  color: var(--muted); font-size: 0.72rem; font-weight: 600;
+  color: var(--muted-terrier); font-size: 0.72rem; font-weight: 600;
   padding: 4px 8px; border-radius: 999px;
 }
 .gm-absent-link:hover { color: var(--danger); background: var(--danger-soft); }
@@ -1161,7 +1172,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .av-state.vert { color: var(--ok); }
 .av-state.ambre { color: var(--warn); }
 .av-state.rouge { color: var(--danger); }
-.av-reason { font-size: 0.73rem; font-weight: 500; color: var(--muted); line-height: 1.35; }
+.av-reason { font-size: 0.73rem; font-weight: 500; color: var(--muted-terrier); line-height: 1.35; }
 .av-row.rouge .av-reason { color: var(--danger); }
 .av-row.ambre .av-reason { color: var(--warn); }
 /* L'impact compteur : ce que ce choix ferait au total de la période. */
