@@ -32,6 +32,7 @@ import { GET as preVolGET } from '@/app/api/generate/pre-vol/route'
 import { POST as publierPOST } from '@/app/api/publish/route'
 import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
 import { compterSouhaitsCongesEnAttente } from '@/data/souhaitsCongesEnAttente'
+import { mapDbTypeToEngine } from '@/lib/crise/contexte'
 import type { ContexteOutil, OutilEcriture, OutilLecture } from './types'
 
 // ── Fragments partagés ──────────────────────────────────────
@@ -168,7 +169,7 @@ Le champ « état de la période » dit si ce planning est encore un brouillon (
 
   async executer(params, ctx) {
     const dateFin = params.date_fin ?? params.date_debut
-    const [{ data: gardesDb }, { data: typesDb }] = await Promise.all([
+    const [{ data: gardesDb }, { data: typesDb }, periodes, profils] = await Promise.all([
       ctx.supabase
         .from('planning_semaine')
         .select('date, type, premier_prenom, second_prenom, periode_statut')
@@ -184,19 +185,46 @@ Le champ « état de la période » dit si ce planning est encore un brouillon (
         .select('code, nom, nb_places')
         .eq('cabinet_id', ctx.cabinetId)
         .not('code', 'is', null),
+      chargerPeriodes(ctx),
+      chargerProfils(ctx),
     ])
 
-    // Un même code peut exister dans plusieurs profils de planning, avec un
-    // nombre de places différent. On ne sait pas ici lequel s'applique à la
-    // date lue : en cas de désaccord, on préfère ne rien affirmer (null) plutôt
-    // que d'annoncer un trou imaginaire.
+    // ⚠️ DEUX VOCABULAIRES DE CRÉNEAUX, et ils ne se parlent pas.
+    // Le planning stocke 'semaine' / 'weekend' / 'ferie' ; le catalogue déclare
+    // 'semaine_soir' / 'vendredi_soir' / 'weekend' / 'ferie'. Rapprocher les deux
+    // par égalité de code laissait 57 lignes sur 100 sans nombre de places —
+    // toutes les nuits de semaine. Filou n'inventait plus de manque, mais il
+    // était devenu incapable d'en voir un.
+    //
+    // On passe donc par `mapDbTypeToEngine`, la traduction déjà utilisée par le
+    // moteur et par les absences. Une copie locale de cette règle serait la
+    // troisième version du même vocabulaire — et divergerait un jour.
     const infosTypes = new Map<string, { nom: string; places: number | null }>()
     for (const t of (typesDb as Array<{ code: string; nom: string; nb_places: number | null }> | null) ?? []) {
       const places = typeof t.nb_places === 'number' ? t.nb_places : null
       const connu = infosTypes.get(t.code)
       if (!connu) infosTypes.set(t.code, { nom: t.nom, places })
+      // Un même code existe dans plusieurs profils de planning, parfois avec un
+      // nombre de places différent. On ne sait pas ici lequel s'applique à la
+      // date lue : en cas de désaccord, on préfère ne rien affirmer (null)
+      // plutôt que d'annoncer un trou imaginaire.
       else if (connu.places !== places) connu.places = null
     }
+
+    // ⚠️ PIÈGE : `semaine_soir` déclare 2 places dans le catalogue, mais le
+    // nombre réellement exigé une nuit de semaine est celui de la PÉRIODE
+    // (1 en été, 2 en hiver, sauf réglage). Se fier au catalogue ferait
+    // annoncer un manque sur chaque nuit de semaine — le bug d'origine, à
+    // l'envers. La précédence est celle du solveur : période > profil > saison.
+    const profilParId = new Map(profils.map((p) => [p.id, p]))
+    const effectifSemaine = (p: PeriodeRow): number => {
+      if (typeof p.nb_vetos_semaine_soir === 'number') return p.nb_vetos_semaine_soir
+      const profil = p.profil_id ? profilParId.get(p.profil_id) : undefined
+      if (profil && typeof profil.nb_vetos_semaine_soir === 'number') return profil.nb_vetos_semaine_soir
+      return p.saison === 'hiver' ? 2 : 1
+    }
+    const periodeDe = (date: string): PeriodeRow | undefined =>
+      periodes.find((p) => p.date_debut <= date && date <= p.date_fin)
 
     type Row = {
       date: string
@@ -213,9 +241,19 @@ Le champ « état de la période » dit si ce planning est encore un brouillon (
 
     return {
       jours: rows.map((r) => {
-        const info = infosTypes.get(r.type)
+        // Le code du planning, traduit dans le vocabulaire du catalogue. On
+        // essaie d'abord tel quel : un créneau sur-mesure porte le même code des
+        // deux côtés, et la traduction le laisse passer intact.
+        const typeEngine = mapDbTypeToEngine(r.type)
+        const info = infosTypes.get(r.type) ?? infosTypes.get(typeEngine)
         const pourvues = [r.premier_prenom, r.second_prenom].filter(Boolean).length
-        const attendues = info?.places ?? null
+        // Une nuit de semaine suit l'effectif de sa période ; tout le reste suit
+        // le nombre de places de son créneau.
+        const periode = periodeDe(r.date)
+        const attendues =
+          typeEngine === 'semaine_soir'
+            ? (periode ? effectifSemaine(periode) : null)
+            : (info?.places ?? null)
         // Le trou se CALCULE, il ne se devine pas : c'est la différence entre ce
         // que le cabinet a réglé et ce qui est réellement programmé.
         const manque = attendues === null ? null : Math.max(0, attendues - pourvues)

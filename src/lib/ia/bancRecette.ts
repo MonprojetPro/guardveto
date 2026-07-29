@@ -119,7 +119,7 @@ async function releverLesFaits(ctx: ContexteOutil): Promise<Faits> {
   const faits: Faits = {}
   const aujourdhui = new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris' }).format(new Date())
 
-  const [{ data: vetsDb }, { data: gardesDb }, { data: creneauxDb }] = await Promise.all([
+  const [{ data: vetsDb }, { data: gardesDb }, { data: creneauxDb }, { data: periodesDb }] = await Promise.all([
     ctx.supabase
       .from('veterinaires')
       .select('prenom, actif, dernier_recours')
@@ -132,6 +132,11 @@ async function releverLesFaits(ctx: ContexteOutil): Promise<Faits> {
       .order('date')
       .limit(60),
     ctx.supabase.from('creneau_modele').select('code, nb_places').eq('cabinet_id', ctx.cabinetId),
+    ctx.supabase
+      .from('periodes')
+      .select('date_debut, date_fin, saison, nb_vetos_semaine_soir')
+      .order('date_debut', { ascending: false })
+      .limit(30),
   ])
 
   const vets = (vetsDb as Array<{ prenom: string; dernier_recours: boolean }> | null) ?? []
@@ -149,13 +154,39 @@ async function releverLesFaits(ctx: ContexteOutil): Promise<Faits> {
     else if (places.get(c.code) !== n) places.set(c.code, null)
   }
 
+  // ⚠️ DUPLICATION ASSUMÉE, et c'est le point : ces trois lignes de traduction
+  // (« semaine » et « ferie » du planning = « semaine_soir » du catalogue) et la
+  // règle d'effectif de nuit de semaine sont RÉÉCRITES ici, au lieu d'importer
+  // celles du moteur. Un banc qui appellerait les mêmes fonctions que le code
+  // testé ne verrait jamais une erreur DANS ces fonctions — or c'est exactement
+  // le trou du 29 juillet : deux vocabulaires qui ne se parlaient pas. Le prix à
+  // payer est de tenir ces lignes à jour ; le bénéfice est un juge indépendant.
+  const periodes = (periodesDb as Array<{
+    date_debut: string
+    date_fin: string
+    saison: 'ete' | 'hiver'
+    nb_vetos_semaine_soir: number | null
+  }> | null) ?? []
+
+  const attenduPour = (date: string, type: string): number | null => {
+    if (type === 'semaine' || type === 'semaine_soir') {
+      const p = periodes.find((p) => p.date_debut <= date && date <= p.date_fin)
+      if (!p) return null
+      return p.nb_vetos_semaine_soir ?? (p.saison === 'hiver' ? 2 : 1)
+    }
+    const direct = places.get(type)
+    if (typeof direct === 'number') return direct
+    // 'ferie' porte le même code des deux côtés ; un code sur-mesure aussi.
+    return null
+  }
+
   for (const g of (gardesDb as Array<{
     date: string
     type: string
     premier_prenom: string | null
     second_prenom: string | null
   }> | null) ?? []) {
-    const attendues = places.get(g.type)
+    const attendues = attenduPour(g.date, g.type)
     if (typeof attendues !== 'number') continue
     const prenoms = [g.premier_prenom, g.second_prenom].filter((p): p is string => Boolean(p))
     if (!faits.gardeComplete && prenoms.length > 0 && prenoms.length >= attendues) {
