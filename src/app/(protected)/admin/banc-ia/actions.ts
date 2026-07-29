@@ -17,11 +17,14 @@
 // ============================================================
 
 import { createClient } from '@/lib/supabase/server'
+import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { assistantIaDisponible } from '@/lib/ia/proposerRegle'
 import { chargerContexteIA } from '@/lib/ia/contexteCabinet'
 import { lancerBancEssai, type ResultatBanc } from '@/lib/ia/bancEssai'
+import { lancerBancRecette, type ResultatRecette } from '@/lib/ia/bancRecette'
 
 export type ResultatBancAction = { error: string } | { resultat: ResultatBanc }
+export type ResultatRecetteAction = { error: string } | { resultat: ResultatRecette }
 
 /**
  * Lance le banc d'essai. Admin-only : la garde est ici, côté serveur — masquer
@@ -60,5 +63,49 @@ export async function lancerBanc(
     // On rend l'erreur brute : sur un banc de mesure, une erreur d'API
     // maquillée en « une erreur est survenue » ne sert à rien.
     return { error: e instanceof Error ? e.message : 'Erreur inconnue pendant la mesure.' }
+  }
+}
+
+/**
+ * Lance le banc de RECETTE : Filou répond-il juste aux vraies questions du
+ * cabinet ? (Le banc ci-dessus, lui, mesure le coût des modèles.)
+ *
+ * Il tourne avec les droits de la personne connectée — donc en admin, sur son
+ * cabinet et son catalogue d'outils réels. Un banc qui s'exécuterait avec des
+ * droits élargis validerait un Filou que personne n'utilise.
+ */
+export async function lancerRecetteFilou(): Promise<ResultatRecetteAction> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Session expirée — reconnecte-toi.' }
+
+  const { data: moi } = await supabase
+    .from('veterinaires')
+    .select('id, role_app')
+    .eq('user_id', user.id)
+    .eq('actif', true)
+    .maybeSingle()
+
+  if (moi?.role_app !== 'admin') {
+    return { error: 'Réservé aux administrateurs du cabinet.' }
+  }
+  if (!assistantIaDisponible()) {
+    return { error: 'Assistant IA non configuré (clé API manquante côté serveur).' }
+  }
+
+  try {
+    const cabinetId = await resoudreCabinetId(supabase)
+    const resultat = await lancerBancRecette({
+      supabase,
+      vetoId: (moi as { id: string }).id,
+      estAdmin: true,
+      cabinetId,
+    })
+    return { resultat }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Erreur inconnue pendant la recette.' }
   }
 }

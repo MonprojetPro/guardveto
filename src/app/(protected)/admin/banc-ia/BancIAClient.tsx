@@ -13,24 +13,38 @@
 // ============================================================
 
 import { useState, useTransition } from 'react'
-import { lancerBanc } from './actions'
+import { lancerBanc, lancerRecetteFilou } from './actions'
 import type { ResultatBanc } from '@/lib/ia/bancEssai'
+import type { ResultatRecette } from '@/lib/ia/bancRecette'
 
 const centimes = (dollars: number) => `${(dollars * 100).toFixed(2)} ¢`
 const euros = (dollars: number) => `≈ ${(dollars * 0.92).toFixed(2)} €`
 
 export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
   const [resultat, setResultat] = useState<ResultatBanc | null>(null)
+  const [recette, setRecette] = useState<ResultatRecette | null>(null)
   const [erreur, setErreur] = useState<string | null>(null)
   const [enCours, demarrer] = useTransition()
 
   const lancer = (jeu: 'rapide' | 'complet') => {
     setErreur(null)
     setResultat(null)
+    setRecette(null)
     demarrer(async () => {
       const r = await lancerBanc(jeu)
       if ('error' in r) setErreur(r.error)
       else setResultat(r.resultat)
+    })
+  }
+
+  const lancerRecette = () => {
+    setErreur(null)
+    setResultat(null)
+    setRecette(null)
+    demarrer(async () => {
+      const r = await lancerRecetteFilou()
+      if ('error' in r) setErreur(r.error)
+      else setRecette(r.resultat)
     })
   }
 
@@ -69,6 +83,14 @@ export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
         >
           {enCours ? 'Mesure en cours…' : 'Vérifier les 19 types de règles (~10 ¢)'}
         </button>
+        <button
+          type="button"
+          onClick={lancerRecette}
+          disabled={enCours}
+          className="rounded-md border-2 border-primary px-4 py-2 text-sm font-semibold disabled:opacity-50"
+        >
+          {enCours ? 'Recette en cours…' : 'Recette de Filou : répond-il juste ? (~10 ¢)'}
+        </button>
       </div>
 
       <p className="text-xs text-muted-foreground">
@@ -77,6 +99,11 @@ export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
         <b>Vérifier les 19 types</b> : une demande par type de règle, sur le modèle actuel
         uniquement. C’est le filet de sécurité à passer <b>après toute modification du catalogue</b>
         — le jeu court n’exerce que 3 types sur 19.
+        <br />
+        <b>Recette de Filou</b> : les vraies questions du cabinet, posées à l’assistant complet, et
+        les réponses confrontées à la base. Les cas sont construits sur tes données du jour ; ceux
+        qui n’ont pas de matière (aucun trou de planning, personne en dernier recours) sont écartés
+        plutôt que comptés faux. <b>À passer après toute modification d’un outil.</b>
       </p>
 
       {enCours && (
@@ -90,6 +117,68 @@ export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
         <p className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm" role="alert">
           {erreur}
         </p>
+      )}
+
+      {recette && (
+        <div className="space-y-4">
+          <section className="space-y-2">
+            <h2 className="font-semibold">
+              Recette de Filou — {recette.reussis} / {recette.total} cas passés
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Modèle {recette.modele || '—'} · {(recette.msTotal / 1000).toFixed(1)} s au total.
+              Chaque réponse est confrontée à ce que dit la base, lue directement — jamais à travers
+              les outils de Filou, qui valideraient leur propre erreur.
+            </p>
+          </section>
+
+          {recette.cas.map((c, i) => (
+            <article
+              key={i}
+              className={`rounded-lg border p-4 text-sm ${
+                c.ok ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-destructive/50 bg-destructive/5'
+              }`}
+            >
+              <p className="font-semibold">
+                {c.ok ? '✓' : '✕'} {c.quoi}
+              </p>
+              <p className="mt-1 text-muted-foreground">« {c.question} »</p>
+
+              {c.reproches.length > 0 && (
+                <ul className="mt-2 list-disc space-y-1 pl-5 font-medium text-destructive">
+                  {c.reproches.map((r, j) => (
+                    <li key={j}>{r}</li>
+                  ))}
+                </ul>
+              )}
+
+              <p className="mt-2 whitespace-pre-wrap text-muted-foreground">{c.reponse || '(aucune réponse)'}</p>
+
+              <p className="mt-2 text-xs text-muted-foreground">
+                Action : {c.actionProposee ?? 'aucune'}
+                {c.actionAttendue ? ` (attendue : ${c.actionAttendue})` : ' (aucune attendue)'} ·{' '}
+                {(c.ms / 1000).toFixed(1)} s · {c.tours} aller{c.tours > 1 ? 's' : ''}-retour
+                {c.tours > 1 ? 's' : ''}
+                {c.outilsAppeles.length > 0 ? ` · ${c.outilsAppeles.join(', ')}` : ''}
+              </p>
+            </article>
+          ))}
+
+          {recette.ecartes.length > 0 && (
+            <section className="rounded-lg border p-4 text-sm">
+              <p className="font-semibold">Cas écartés faute de matière</p>
+              <ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
+                {recette.ecartes.map((e, i) => (
+                  <li key={i}>{e}</li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Un cas sans données à contrôler ne prouve rien : il est retiré du compte plutôt que
+                déclaré réussi.
+              </p>
+            </section>
+          )}
+        </div>
       )}
 
       {resultat && (
