@@ -41,7 +41,14 @@ export interface ContenuResultat {
   introduction: string
   lignes: string[]
   /** Ce que l'attente a été occupée à faire — administrateur seulement. */
-  mesure?: { ms: number; tours: number; modele: string; reflexion: string }
+  mesure?: {
+    ms: number
+    tours: number
+    modele: string
+    reflexion: string
+    /** Le bouton vient du second regard, pas du tour principal. */
+    rattrapage?: boolean
+  }
   /** Présente seulement quand il y a quelque chose à décider. */
   action?: {
     outil: string
@@ -178,6 +185,7 @@ export function FenetreResultatFilou({ actif, resultat, onFermer, onDecision }: 
             {resultat.mesure.tours} aller{resultat.mesure.tours > 1 ? 's' : ''}-retour
             {resultat.mesure.tours > 1 ? 's' : ''} · {resultat.mesure.modele} ·{' '}
             {resultat.mesure.reflexion}
+            {resultat.mesure.rattrapage ? ' · action trouvée au 2ᵉ regard' : ''}
           </p>
         )}
       </div>

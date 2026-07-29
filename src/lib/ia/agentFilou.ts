@@ -75,6 +75,9 @@ export interface MesureFilou {
   /** Le cran d'application demandé au modèle, pour la même raison : comparer
    *  deux réglages demande de savoir lequel on regarde. */
   reflexion: string
+  /** Vrai quand le bouton vient du second gardien et non du tour principal.
+   *  Sans ce témoin, impossible de savoir si le dispositif sert encore. */
+  rattrapage?: boolean
 }
 
 /**
@@ -225,11 +228,13 @@ export async function faireTravaillerFilou(
   const modele = modeleIA()
   const effort = effortIA()
   let tours = 0
+  let rattrapage = false
   const mesure = (): MesureFilou => ({
     ms: Date.now() - depart,
     tours,
     modele,
     reflexion: `application ${effort}`,
+    rattrapage,
   })
 
   const messages = assemblerMessages(historique, `Nous sommes le ${aujourdhui}.\n\n${phrase}`)
@@ -395,6 +400,25 @@ export async function faireTravaillerFilou(
     // ou préparé une action — sauf s'il cherche encore, ou si son action a été
     // refusée : dans ces deux cas ce qu'il a écrit repose sur du vent.
     if (!aRepasser && (affichage || propositionTexte)) {
+      // Le second gardien : si ce tour n'a rien proposé, on demande explicitement
+      // s'il y avait une action à proposer. Une seule fois, sur la réponse
+      // rédigée — voir `chercherActionOubliee`.
+      if (!proposition && affichage) {
+        const trouve = await chercherActionOubliee(
+          client,
+          modele,
+          outils,
+          ctx,
+          phrase,
+          [affichage.introduction, ...(affichage.lignes ?? [])].filter(Boolean).join('\n'),
+        )
+        if (trouve) {
+          proposition = trouve.action
+          rattrapage = true
+          outilsAppeles.push(`${trouve.outil} (2ᵉ regard)`)
+        }
+      }
+
       return {
         mot: affichage?.mot_dans_la_conversation?.trim()
           ? affichage.mot_dans_la_conversation
@@ -468,6 +492,133 @@ export function assemblerMessages(
     messages.push({ role: 'user', content: dernier })
   }
   return messages
+}
+
+// ============================================================
+// LE SECOND GARDIEN — « et concrètement, on fait quoi ? »
+// ============================================================
+// Trois fois de suite, Filou a désigné le réglage qui bloquait puis s'est arrêté
+// là, sans bouton : « c'est ce statut dernier recours qu'il faut lever ». Le
+// chronomètre l'a prouvé — deux allers-retours seulement, donc l'outil de
+// modification n'avait même pas été TENTÉ. Il était pourtant dans son catalogue.
+//
+// La cause n'est pas un bug qu'on corrige : dans un tour où il jongle avec une
+// cinquantaine d'outils, un modèle qui vient de rédiger une belle explication
+// considère souvent sa réponse comme terminée. Trois versions du prompt n'y ont
+// rien changé, et une quatrième n'y changerait rien non plus.
+//
+// Alors on arrête de l'espérer et on POSE LA QUESTION. Un appel séparé, très
+// court, avec les seuls outils qui modifient et l'obligation de choisir : soit
+// une action, soit « rien à proposer ». Le bouton cesse d'être une faveur du
+// modèle dans un tour chargé — il devient le résultat d'une question isolée.
+//
+// C'est le même principe que les deux gardiens du moteur : ce qui compte n'est
+// jamais laissé au bon vouloir d'un seul passage.
+
+const NOM_RIEN = 'rien_a_proposer'
+
+const SYSTEM_GARDIEN = `Tu relis un échange dans GuardVeto, le logiciel de planning de gardes d'un cabinet vétérinaire.
+
+Une personne a demandé quelque chose. L'assistant lui a répondu. Ta seule question : cette personne attend-elle un CHANGEMENT dans le logiciel, et l'un des outils ci-dessous le réalise-t-il ?
+
+APPELLE L'OUTIL correspondant quand :
+- la personne demande explicitement un changement ;
+- elle énonce un fait nouveau qui n'est vrai qu'une fois le logiciel modifié (« Anne-Catherine peut désormais travailler le mardi soir » = elle demande de lever ce qui l'en empêche) ;
+- elle approuve un changement que l'assistant venait de proposer ou de désigner (« oui », « vas-y », « fais-le ») ;
+- la réponse de l'assistant nomme elle-même le réglage à changer pour obtenir ce que la personne veut.
+
+APPELLE ${NOM_RIEN} quand :
+- la personne pose une question et attend seulement une information ;
+- aucun outil ne correspond vraiment à ce qu'elle veut ;
+- tu devrais inventer un paramètre qui n'apparaît nulle part dans l'échange.
+
+Les paramètres se prennent DANS L'ÉCHANGE, jamais de mémoire : prénoms, dates et libellés doivent y figurer tels quels. Aucun outil ne s'exécute ici — tu prépares une proposition qu'un humain validera ou refusera d'un clic. Dans le doute entre proposer et ne rien faire, propose : un bouton non cliqué ne fait rien, une action manquante oblige la personne à tout redemander.`
+
+/**
+ * Cherche l'action que le tour principal n'a pas proposée.
+ *
+ * N'écrit rien : comme dans la boucle, une écriture n'est ici que RÉSUMÉE. Ne
+ * relance jamais la conversation non plus — un seul appel, une seule chance,
+ * pas de boucle qui s'emballe.
+ */
+async function chercherActionOubliee(
+  client: Anthropic,
+  modele: string,
+  outils: Outil[],
+  ctx: ContexteOutil,
+  demande: string,
+  reponse: string,
+): Promise<{ action: IssueFilou['action']; outil: string } | null> {
+  const ecritures = outils.filter((o): o is Extract<Outil, { genre: 'ecriture' }> => o.genre === 'ecriture')
+  if (ecritures.length === 0) return null
+
+  const definitions: Anthropic.Tool[] = [
+    ...ecritures.map(versDefinitionApi),
+    {
+      name: NOM_RIEN,
+      description:
+        "Aucune action n'est attendue : la personne voulait seulement une information, ou rien de ce catalogue ne correspond.",
+      input_schema: { type: 'object', properties: {} },
+    },
+  ]
+
+  let reponseApi: Anthropic.Message
+  try {
+    reponseApi = await client.messages.create({
+      model: modele,
+      max_tokens: 1500,
+      thinking: { type: 'adaptive' },
+      // Le cran le plus bas : la question est fermée, il n'y a rien à explorer.
+      // C'est ce qui garde ce second passage court.
+      output_config: { effort: 'low' },
+      system: [{ type: 'text', text: SYSTEM_GARDIEN, cache_control: { type: 'ephemeral' } }],
+      tools: definitions,
+      // L'OBLIGATION DE CHOISIR : c'est tout l'intérêt du dispositif. Sans elle,
+      // le modèle peut à nouveau se contenter de commenter — exactement ce qui
+      // nous a fait tourner en rond.
+      tool_choice: { type: 'any' },
+      messages: [
+        {
+          role: 'user',
+          content: `Demande de la personne :\n${demande}\n\nRéponse de l'assistant :\n${reponse}`,
+        },
+      ],
+    })
+  } catch {
+    // Le second gardien ne doit JAMAIS faire tomber une réponse déjà valable :
+    // en cas de panne, on rend la réponse sans bouton plutôt que rien du tout.
+    return null
+  }
+
+  const appel = reponseApi.content.find((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
+  if (!appel || appel.name === NOM_RIEN) return null
+
+  const outil = ecritures.find((o) => o.nom === appel.name)
+  if (!outil) return null
+
+  const valides = outil.params.safeParse(appel.input ?? {})
+  if (!valides.success) return null
+
+  try {
+    const resume = await outil.resumer(valides.data, ctx)
+    // Une action impossible ne devient pas un bouton mort : on n'affiche rien
+    // plutôt qu'un bouton qui échouerait au clic.
+    if (!resume.ok) return null
+    const p = resume.proposition
+    return {
+      outil: outil.nom,
+      action: {
+        outil: outil.nom,
+        params: valides.data,
+        charge: resume.charge,
+        libelle: p.action,
+        changements: p.lignes ?? [],
+        avertissement: p.avertissement,
+      },
+    }
+  } catch {
+    return null
+  }
 }
 
 /** Une panne : rien à afficher, juste à dire. */
