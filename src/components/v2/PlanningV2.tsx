@@ -15,7 +15,7 @@
 // métier pour du décor.
 // ============================================================
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { FilouEdge } from './FilouEdge'
 import { useOutilsPlanning } from './outils-planning'
@@ -133,6 +133,28 @@ export function PlanningV2({
   const today = aujourdhuiISO()
   const grille = genererGrille(annee, mois)
 
+  // Le panneau de période se referme comme n'importe quel menu : en cliquant
+  // ailleurs ou avec Échap. Sans ça, la flèche du menu était la SEULE sortie
+  // (retour MiKL 2026-07-29).
+  const periodeRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!popOuvert) return
+    function auClic(e: MouseEvent) {
+      if (!periodeRef.current?.contains(e.target as Node)) setPopOuvert(false)
+    }
+    function auClavier(e: KeyboardEvent) {
+      if (e.key === 'Escape') setPopOuvert(false)
+    }
+    // `mousedown` plutôt que `click` : le panneau disparaît dès l'appui,
+    // sans attendre le relâchement.
+    document.addEventListener('mousedown', auClic)
+    document.addEventListener('keydown', auClavier)
+    return () => {
+      document.removeEventListener('mousedown', auClic)
+      document.removeEventListener('keydown', auClavier)
+    }
+  }, [popOuvert])
+
   // Les outils de la barre (PDF, absence, générer, publier) et leurs
   // garde-fous. La période vient de la PILULE — une seule source de vérité,
   // là où la V1 embarquait un second sélecteur qui la contredisait.
@@ -187,7 +209,7 @@ export function PlanningV2({
         <div className="work-head">
           {/* La période est un seul objet : la pilule EST le sélecteur, et sa
               carte d'identité vit dans le panneau qu'elle ouvre. */}
-          <div className="period-wrap" style={{ position: 'relative' }}>
+          <div className="period-wrap" ref={periodeRef} style={{ position: 'relative' }}>
             <button
               type="button"
               className="period-pill"

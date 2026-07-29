@@ -1683,3 +1683,151 @@
 }
 .v2-greffe h1,
 .v2-greffe h2 { font-family: var(--font-display); color: var(--text); }
+
+/* ============================================================
+   LES SURFACES FLOTTANTES — modales, popovers, listes déroulantes
+   ============================================================
+   Les modales de l'app viennent de shadcn et sont rendues en PORTAL, donc
+   hors du `.shell` : elles ne recevaient aucun habillage V2 et sortaient
+   dans la palette V1 (blanc pur, gris ardoise, cyan, anneau de focus bleu)
+   au milieu du terrier. Retour MiKL 2026-07-29 : « toutes les pop-ups sont
+   pourries ».
+
+   Plutôt que de réécrire le contenu de chaque modale — elles portent des
+   règles métier, pas du décor —, on REMAPPE ici les jetons de couleur du
+   thème sur la palette du terrier. Toutes les classes déjà écrites
+   (`bg-muted`, `text-muted-foreground`, `border-border`, `bg-primary`…)
+   rendent alors dans la bonne palette, sans toucher une ligne de JSX.
+
+   La forme, elle, reprend `.modal-veil` / `.gv-modal` de la maquette
+   `m1-planning.html` : voile brun, surface crème, grands arrondis, ombre
+   de panneau. Ce fichier n'est chargé que par le layout (v2) — les écrans
+   V1 restants gardent leur habillage d'origine.
+   ============================================================ */
+
+[data-slot="dialog-content"],
+[data-slot="popover-content"],
+[data-slot="select-content"],
+[data-slot="dropdown-menu-content"],
+[data-slot="alert-dialog-content"] {
+  /* Jetons de surface */
+  --background: var(--surface);
+  --foreground: var(--text);
+  --card: var(--surface);
+  --card-foreground: var(--text);
+  --popover: var(--surface);
+  --popover-foreground: var(--text);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--muted-terrier);
+  --border: var(--border-terrier);
+  --input: var(--border-strong);
+  --ring: var(--accent);
+  /* Jetons d'action : l'orange du terrier remplace le cyan.
+     On passe par les copies `-terrier` : dans ce bloc, `var(--accent)`
+     désignerait la valeur qu'on est en train de lui donner juste en
+     dessous (shadcn appelle « accent » le survol, pas la couleur vive). */
+  --primary: var(--accent-terrier);
+  --primary-foreground: #fff;
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--text);
+  --accent: var(--accent-soft-terrier);
+  --accent-foreground: var(--accent-ink);
+  --destructive: var(--danger);
+
+  font-family: var(--font-body);
+  color: var(--text);
+}
+
+/* `--muted`, `--border` et `--accent` servent DEUX vocabulaires : celui du
+   terrier et celui de shadcn. On garde une copie des valeurs terrier sous
+   un autre nom pour pouvoir les réinjecter ci-dessus sans référence
+   circulaire (une variable ne peut pas se redéfinir à partir d'elle-même). */
+:root {
+  --muted-terrier:       #7C6A55;
+  --border-terrier:      #E6D7BB;
+  --accent-terrier:      #C7530F;
+  --accent-soft-terrier: rgba(224, 122, 47, 0.13);
+}
+
+/* ---- Le voile : brun chaud et franc, comme dans la maquette ---- */
+[data-slot="dialog-overlay"],
+[data-slot="alert-dialog-overlay"] {
+  background: rgba(58, 42, 28, 0.45) !important;
+}
+
+/* ---- Le panneau ---- */
+[data-slot="dialog-content"],
+[data-slot="alert-dialog-content"] {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-panel);
+  --radius: 18px; /* les arrondis internes (encarts, boutons) suivent */
+  padding: 22px 24px 20px;
+  max-width: min(600px, calc(100vw - 32px));
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  gap: 14px;
+}
+
+[data-slot="dialog-title"],
+[data-slot="alert-dialog-title"] {
+  font-family: var(--font-display);
+  font-size: 1.15rem; font-weight: 700; line-height: 1.3;
+  color: var(--text);
+}
+[data-slot="dialog-description"],
+[data-slot="alert-dialog-description"] { color: var(--muted-terrier); }
+
+/* Le pied reprend la bande de la maquette : crème, pas grise, et il épouse
+   les arrondis du panneau. Les marges négatives du composant (`-mx-4 -mb-4`)
+   sont calées sur SON padding de 1rem ; le nôtre vaut 22/24px, d'où le
+   `!important` : sans lui les boutons débordent du panneau sur la droite. */
+[data-slot="dialog-footer"],
+[data-slot="alert-dialog-footer"] {
+  margin: 8px -24px -20px !important;
+  padding: 14px 24px !important;
+  background: var(--surface-2);
+  border-top: 1px solid var(--border-terrier);
+  border-radius: 0 0 calc(var(--r-lg) - 1px) calc(var(--r-lg) - 1px);
+}
+
+/* ---- Les boutons : des pilules, comme partout ailleurs dans le terrier ---- */
+[data-slot="dialog-content"] button,
+[data-slot="alert-dialog-content"] button {
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-weight: 600;
+}
+/* La croix de fermeture reste ronde et discrète. */
+[data-slot="dialog-content"] > [data-slot="dialog-close"] {
+  border-radius: 999px;
+  color: var(--muted-terrier);
+}
+[data-slot="dialog-content"] > [data-slot="dialog-close"]:hover {
+  background: var(--accent-soft-terrier);
+  color: var(--accent-ink);
+}
+
+/* L'anneau de focus : orange, jamais bleu, et surtout DISCRET. Base UI
+   pose le focus sur le premier bouton dès l'ouverture — d'où le gros halo
+   coloré qu'on voyait autour de « Fermer » et « Annuler » à l'écran, alors
+   que personne n'avait navigué au clavier. On garde un liseré net, sans
+   halo, et sans teindre la bordure du bouton. */
+[data-slot="dialog-content"] :focus-visible,
+[data-slot="alert-dialog-content"] :focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+  box-shadow: none !important;
+  border-color: var(--border-strong) !important;
+}
+
+/* ---- Listes déroulantes et popovers ---- */
+[data-slot="popover-content"],
+[data-slot="select-content"],
+[data-slot="dropdown-menu-content"] {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
+}
