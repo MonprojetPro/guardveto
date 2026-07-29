@@ -1796,9 +1796,22 @@
 [data-slot="alert-dialog-footer"] {
   margin: 8px -24px -20px !important;
   padding: 14px 24px !important;
+  gap: 10px !important;
   background: var(--surface-2);
   border-top: 1px solid var(--border-terrier);
   border-radius: 0 0 calc(var(--r-lg) - 1px) calc(var(--r-lg) - 1px);
+}
+
+/* Les boutons du pied à la taille de la maquette : ceux de shadcn font 32px
+   de haut, ce qui les tasse l'un contre l'autre au bas d'un panneau de
+   600px. Ils respirent, et le principal se distingue par sa couleur — pas
+   par un liseré qui le ferait passer pour sélectionné. */
+[data-slot="dialog-footer"] button,
+[data-slot="alert-dialog-footer"] button {
+  min-height: 38px;
+  padding: 9px 18px;
+  font-size: 0.82rem;
+  font-weight: 600;
 }
 
 /* ---- Les boutons : des pilules, comme partout ailleurs dans le terrier ---- */
@@ -1825,8 +1838,9 @@
    halo, et sans teindre la bordure du bouton. */
 [data-slot="dialog-content"] :focus-visible,
 [data-slot="alert-dialog-content"] :focus-visible {
-  outline: 1.5px solid var(--accent-ink);
-  outline-offset: 1px;
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+  outline-style: dotted;
   box-shadow: none !important;
   border-color: var(--border-strong) !important;
 }

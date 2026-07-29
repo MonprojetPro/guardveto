@@ -248,16 +248,24 @@
 .day.hors .d-num { color: var(--soft); }
 .d-hors-note { font-size: 0.6rem; color: var(--soft); font-style: italic; margin-top: 2px; }
 .day.today { border: 2px solid var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
-.d-head { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; }
+/* Le numéro du jour et ses mentions tiennent sur UNE ligne : sinon la
+   pastille « Aujourd'hui » passait à la ligne et décalait vers le bas toutes
+   les fiches de la case, qui ne s'alignaient plus avec celles des jours
+   voisins (retour MiKL 2026-07-29). */
+.d-head {
+  display: flex; align-items: baseline; gap: 4px;
+  flex-wrap: nowrap; overflow: hidden;
+}
 .d-num { font-family: var(--font-display); font-weight: 700; font-size: 0.82rem; }
 .d-today-tag {
-  font-size: 0.56rem; font-weight: 800; letter-spacing: 0.08em;
+  font-size: 0.5rem; font-weight: 800; letter-spacing: 0.02em;
   text-transform: uppercase; color: var(--accent-ink);
-  background: var(--accent-soft); border-radius: 999px; padding: 1px 7px;
+  background: var(--accent-soft); border-radius: 999px; padding: 1px 5px;
+  white-space: nowrap; flex: none;
 }
 .d-ferie {
   font-size: 0.6rem; font-weight: 700; color: var(--accent-ink);
-  white-space: nowrap;
+  white-space: nowrap; flex: none;
 }
 /* ------ La fiche de garde : point de couleur + nom, encre sur fond
    neutre — le langage des compteurs et de la modale, étendu à la

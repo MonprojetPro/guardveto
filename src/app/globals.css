@@ -139,4 +139,24 @@
   html {
     @apply font-sans;
   }
+
+  /* La main au survol de tout ce qui se clique.
+     Tailwind v4 a retiré `cursor: pointer` de sa base sur les boutons : le
+     curseur restait une flèche partout dans l'app, y compris sur les cases
+     du planning et les boutons des modales (retour MiKL 2026-07-29 —
+     « ça aussi c'est valable partout, tout le temps »). On le remet ici,
+     une fois, pour toute l'application. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="option"],
+  [role="menuitem"],
+  summary,
+  label[for],
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: default;
+  }
 }
