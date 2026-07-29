@@ -88,6 +88,38 @@
     avertissement au moment du geste (la re-validation Realtime rattrape après
     coup, seulement si la page /planning est ouverte).
 
+13. **Places au-delà de la deuxième : les modifier à la main** *(ajouté le
+    2026-07-29)* — depuis `5fba4cb`, une garde à 3 ou 4 vétérinaires s'AFFICHE
+    partout (grille, modale, PDF, agenda) et se COMPTE (compteurs), mais ces
+    places ne se réattribuent qu'en régénérant le planning. Il faut généraliser
+    `GET /api/gardes/[id]/disponibilites` — qui ne calcule aujourd'hui que
+    `dispo_premier` / `dispo_second` — à un rôle quelconque du catalogue, puis
+    étendre le PATCH et l'écriture dans `garde_placements`. La modale et
+    l'écran catalogue disent explicitement cette limite en attendant.
+
+14. **Ajouter un vétérinaire EN PLUS de la structure (renfort ponctuel)**
+    *(demande MiKL du 2026-07-29)* — distinct du point 13. Là, il ne s'agit
+    pas de pourvoir une place prévue par le créneau, mais d'en **ajouter une
+    qui n'était pas prévue** : une nuit qu'on sait chargée, un remplaçant qui
+    double un junior, un renfort de dernière minute. La structure du cabinet
+    reste la référence pour la génération ; ce serait un ajout **manuel et
+    ponctuel sur UNE garde**, sans toucher au catalogue.
+
+    Questions ouvertes à trancher avec le cabinet avant de coder :
+    - Ce renfort compte-t-il dans l'équité (compteurs, dette inter-périodes) ?
+      Sinon un véto pourrait être resservi alors qu'il vient de doubler.
+    - Est-il notifié / synchronisé sur l'agenda comme une place normale ?
+      (a priori oui — sinon il ne le saurait pas)
+    - La régénération l'écrase-t-elle, ou le préserve-t-elle comme une garde
+      verrouillée ? C'est le point le plus risqué : un renfort ajouté à la main
+      puis effacé par une régénération, personne ne s'en apercevrait.
+    - Le moteur doit-il en tenir compte comme d'une contrainte (« ce soir-là,
+      2 vétos de plus sont déjà posés ») ?
+
+    Techniquement, le socle est déjà là : `garde_placements` porte N places et
+    la vue les expose. Le travail est surtout produit (les 4 questions ci-dessus)
+    puis UI (bouton « Ajouter un vétérinaire » dans la modale de garde).
+
 ## 🟠 MOYENNE probabilité
 
 13. ✅ **FAIT (2026-07-08, Vague 5)** — Successions/repos avancés : 3 briques
@@ -160,8 +192,11 @@
   reconstruisent le vendredi en présumant R8/R9 fermes. À trancher AVANT
   d'ouvrir le réglage R8/R9 aux cabinets : persister le vendredi réel (via
   `garde_placements`) ou verrouiller l'UI de réglage.
-- **`garde_placements` sans lecteur** (places 3+ perdues à toute édition) —
-  assumé P3b/P6 ; `attributions` V2 écrite mais jamais lue ni mise à jour par
+- ~~**`garde_placements` sans lecteur** (places 3+ perdues à toute édition)~~ —
+  **traité le 2026-07-29** (`5fba4cb`) pour la LECTURE : la vue expose
+  `places_sup`, et grille / modale / PDF / agenda / compteurs les consomment
+  via `src/lib/gardes/places.ts`. Restent l'ÉCRITURE manuelle (point 13) et
+  `attributions` V2, toujours écrite mais jamais relue ni mise à jour par
   l'édition manuelle/crise → données fausses garanties au futur cutover V2.
 - **Backtracking du seed sans plafond de nœuds** (pire cas infaisable vicieux
   non borné sous le maxDuration serverless).
