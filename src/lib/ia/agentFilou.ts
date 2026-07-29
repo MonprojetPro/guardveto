@@ -47,6 +47,11 @@ export interface IssueFilou {
     charge?: unknown
     /** Le libellé du bouton qui exécute. */
     libelle: string
+    /** Ce que le clic changerait, une ligne par changement. Écrit par NOTRE
+     *  code, pas par le modèle — et tenu à part du constat : ce qu'on a
+     *  constaté et ce qu'on s'apprête à modifier ne se lisent pas de la même
+     *  façon, et les mélanger dans une seule liste donnait un pavé indistinct. */
+    changements?: string[]
     avertissement?: string
   }
   outilsAppeles: string[]
@@ -375,6 +380,7 @@ export async function faireTravaillerFilou(
         params: valides.data,
         charge: resume.charge,
         libelle: p.action,
+        changements: p.lignes ?? [],
         avertissement: p.avertissement,
       }
       propositionTexte = { titre: p.titre, phrase: p.phrase, lignes: p.lignes ?? [] }
@@ -399,11 +405,12 @@ export async function faireTravaillerFilou(
         // l'outil : elle ne connaît que la modification, pas la question posée.
         titre: affichage?.titre || propositionTexte?.titre || 'Filou te répond',
         introduction: affichage?.introduction || texte || propositionTexte?.phrase || '',
-        // Les lignes de la proposition viennent de NOTRE code, pas du modèle :
-        // elles disent exactement ce qui va changer. Elles s'ajoutent à
-        // l'explication plutôt que de la remplacer — on ne clique pas sur un
-        // bouton sans lire ce qu'il fait.
-        lignes: [...(affichage?.lignes ?? []), ...(propositionTexte?.lignes ?? [])],
+        // Le constat SEUL. Ce que le clic changerait voyage dans `action`
+        // (cf. `changements`) et s'affiche à part : mélangé ici, on ne
+        // distinguait plus ce qui EST de ce qui SERAIT.
+        // (Sans affichage, il n'y a pas de constat : la proposition parle seule,
+        // et répéter ses lignes ici les afficherait deux fois.)
+        lignes: affichage?.lignes ?? [],
         action: proposition ?? undefined,
         outilsAppeles,
         mesure: mesure(),

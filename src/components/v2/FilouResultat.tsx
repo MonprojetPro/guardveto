@@ -15,6 +15,20 @@
 // Deux fenêtres séparées obligeaient à deviner laquelle allait s'ouvrir, et
 // laissaient les réponses simples s'échouer dans la tablette, illisibles.
 //
+// QUATRE NATURES DE CONTENU, quatre traitements (retour MiKL 2026-07-28 : « tout
+// est en bloc »). Une réponse mélange des choses qui ne se lisent pas pareil, et
+// les empiler dans une seule liste oblige à tout relire pour trouver ce qui
+// compte :
+//
+//   ① LA RÉPONSE       — la phrase qui répond, en gros, en premier.
+//   ② CE QUI EST ÉTABLI — les faits relevés dans le cabinet. Constat, au passé.
+//   ③ CE QUI CHANGERAIT — ce que le bouton ferait. Au conditionnel, encadré :
+//                          rien de tout ça n'existe encore.
+//   ④ L'ACTION          — le bouton, seul en pied de fenêtre.
+//
+// La frontière ②/③ est la seule qui compte vraiment : confondre ce qui EST avec
+// ce qui SERAIT, c'est cliquer sans savoir sur quoi.
+//
 // GARDE-FOU : rien n'est écrit avant le clic, et le clic repasse par le
 // serveur, qui revérifie les droits et revalide les paramètres avant d'agir.
 // ============================================================
@@ -34,6 +48,8 @@ export interface ContenuResultat {
     params: unknown
     charge?: unknown
     libelle: string
+    /** Ce que le clic changerait, une ligne par changement. */
+    changements?: string[]
     avertissement?: string
   }
 }
@@ -89,8 +105,11 @@ export function FenetreResultatFilou({ actif, resultat, onFermer, onDecision }: 
         </span>
         <div className="f-titles">
           <h2 tabIndex={-1}>{resultat.titre}</h2>
+          {/* Le rappel « rien n'est enregistré » a quitté ce sous-titre : il vit
+              maintenant DANS le bloc « ce que ça changerait », à côté de ce qu'il
+              qualifie. Ici il servait de garantie générale, loin de son objet. */}
           <p className="f-sub">
-            {action ? 'Rien n’est enregistré tant que tu n’as pas validé' : 'Ce que Filou a trouvé'}
+            {action ? 'Ce que Filou a trouvé, et ce qu’il propose' : 'Ce que Filou a trouvé'}
           </p>
         </div>
         <button
@@ -104,16 +123,35 @@ export function FenetreResultatFilou({ actif, resultat, onFermer, onDecision }: 
       </header>
 
       <div className="fen-body">
+        {/* ① La réponse — ce qu'on lit en premier, et parfois la seule chose
+            qu'on lit. */}
         <p className="res-apercu">{resultat.introduction}</p>
 
+        {/* ② Ce qui est établi — les faits relevés dans le cabinet. Sobre et
+            sans cadre : c'est du constat, ça ne demande rien à personne. */}
         {resultat.lignes.length > 0 && (
-          <ul className="res-regles">
-            {resultat.lignes.map((ligne, i) => (
-              <li key={i}>
-                <span>{ligne}</span>
-              </li>
-            ))}
-          </ul>
+          <section className="res-bloc" aria-label="Ce que Filou a relevé">
+            <h3 className="res-bloc-titre">Ce que j&apos;ai relevé</h3>
+            <ul className="res-constat">
+              {resultat.lignes.map((ligne, i) => (
+                <li key={i}>{ligne}</li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* ③ Ce qui changerait — encadré et au conditionnel : rien de tout ça
+            n'existe tant que le bouton du pied de page n'a pas été cliqué. */}
+        {action && action.changements && action.changements.length > 0 && (
+          <section className="res-bloc res-changements" aria-label="Ce que la validation changerait">
+            <h3 className="res-bloc-titre">Ce que ça changerait</h3>
+            <ul className="res-liste-changements">
+              {action.changements.map((ligne, i) => (
+                <li key={i}>{ligne}</li>
+              ))}
+            </ul>
+            <p className="res-pas-encore">Rien n&apos;est enregistré tant que tu n&apos;as pas validé.</p>
+          </section>
         )}
 
         {erreur && (

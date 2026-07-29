@@ -211,6 +211,10 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
       [
         contenu.introduction,
         ...(contenu.lignes ?? []),
+        // Ce qu'il proposait de changer vit désormais à part de son constat
+        // (cf. `FilouResultat`) : sans cette reprise, il ne se souviendrait plus
+        // de ce que son propre bouton faisait.
+        ...(contenu.action?.changements ?? []).map((c) => `Tu proposais : ${c}`),
         contenu.action
           ? `(Tu as proposé « ${contenu.action.libelle} ». Cette proposition n’est plus affichée : ta prochaine réponse a pris sa place sur le tableau.)`
           : '',

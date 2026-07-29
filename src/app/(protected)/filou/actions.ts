@@ -39,6 +39,8 @@ export type ReponseFilou =
         params: unknown
         charge?: unknown
         libelle: string
+        /** Ce que le clic changerait — tenu à part du constat. */
+        changements?: string[]
         avertissement?: string
       }
       /** Ce que l'attente a été occupée à faire. Admin seulement (cf. plus bas). */

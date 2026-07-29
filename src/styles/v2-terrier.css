@@ -716,13 +716,17 @@
    puissance annoncée en clair — « interdiction ferme » et « préférence » ne
    produisent pas le même planning. Ces styles servaient dans la bulle de chat ;
    ils vivent maintenant dans la fenêtre du tableau, où la place ne manque plus. */
+/* ① La réponse elle-même. Fond NEUTRE, et non teinté accent : la teinte accent
+      est réservée à ce qui attend une décision (« ce que ça changerait »).
+      Deux blocs de la même couleur, l'un informatif et l'autre en attente,
+      se lisaient comme un seul pavé. */
 .res-apercu {
   display: block;
-  margin: 0 0 12px;
+  margin: 0 0 14px;
   padding: 11px 13px;
   border-left: 3px solid var(--accent);
   border-radius: 4px 11px 11px 4px;
-  background: var(--accent-soft);
+  background: var(--surface-2);
   font-size: 0.95rem; line-height: 1.5;
   font-weight: 600;
 }
@@ -737,6 +741,56 @@
   font-variant-numeric: tabular-nums;
 }
 .res-explication { font-size: 0.88rem; line-height: 1.55; margin-bottom: 12px; }
+
+/* ------ Les quatre natures d'une réponse ------
+   MiKL, 2026-07-28 : « tout est en bloc ». Une réponse mêle du constat et du
+   conditionnel, et les empiler en pastilles identiques oblige à tout relire
+   pour trouver ce qui compte. Le constat se lit à plat ; ce qui CHANGERAIT est
+   encadré, parce que ça n'existe pas encore. */
+.res-bloc { margin-bottom: 14px; }
+.res-bloc-titre {
+  font-size: 0.66rem; font-weight: 800;
+  letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 7px;
+}
+
+/* ② Le constat : une liste sobre, filet à gauche, sans cadre ni fond — elle
+      ne demande rien, elle informe. */
+.res-constat {
+  list-style: none;
+  display: flex; flex-direction: column; gap: 7px;
+  padding-left: 11px;
+  border-left: 2px solid var(--border);
+}
+.res-constat li { font-size: 0.86rem; line-height: 1.5; color: var(--text); }
+
+/* ③ Ce qui changerait : encadré, teinté, chaque ligne précédée d'une flèche —
+      on doit voir d'un coup d'œil que c'est en attente de décision. */
+.res-changements {
+  padding: 12px 14px 11px;
+  border: 1px solid var(--accent);
+  border-radius: 13px;
+  background: var(--accent-soft);
+}
+.res-changements .res-bloc-titre { color: var(--accent-ink); }
+.res-liste-changements { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.res-liste-changements li {
+  position: relative;
+  padding-left: 20px;
+  font-size: 0.88rem; line-height: 1.5; font-weight: 600;
+}
+.res-liste-changements li::before {
+  content: "→";
+  position: absolute; left: 0; top: 0;
+  color: var(--accent-ink); font-weight: 700;
+}
+.res-pas-encore {
+  margin-top: 10px; padding-top: 9px;
+  border-top: 1px dashed var(--accent);
+  font-size: 0.72rem; color: var(--muted);
+}
+
 .res-regles { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 .res-regles li {
   display: flex; align-items: flex-start; gap: 9px;
