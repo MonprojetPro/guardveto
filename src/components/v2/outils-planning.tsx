@@ -323,8 +323,9 @@ export function useOutilsPlanning({
     <>
       {/* Modale de confirmation de publication */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent>
+        <DialogContent className="gv-modale">
           <DialogHeader>
+            <p className="gm-kicker">Planning · publication</p>
             <DialogTitle>Publier le planning ?</DialogTitle>
             <DialogDescription>
               Cette action a des conséquences immédiates pour le cabinet :
@@ -343,7 +344,6 @@ export function useOutilsPlanning({
             <Button
               onClick={() => handlePublier(false)}
               disabled={publishing}
-              className="bg-accent hover:bg-accent/90 text-accent-foreground"
             >
               {publishing ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -358,27 +358,28 @@ export function useOutilsPlanning({
 
       {/* Modale des RÉSERVES de publication (gate serveur) */}
       <Dialog open={reserves !== null} onOpenChange={(o) => { if (!publishing && !o) setReserves(null) }}>
-        <DialogContent>
+        <DialogContent className="gv-modale">
           <DialogHeader>
-            <DialogTitle>Des points méritent ton attention avant de publier</DialogTitle>
+            <p className="gm-kicker">Planning · réserves</p>
+            <DialogTitle>Des points méritent ton attention</DialogTitle>
             <DialogDescription>
               La vérification automatique du planning a relevé :
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-sm">
             {reserves && reserves.violations.length > 0 && (
-              <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30 p-3">
-                <p className="font-medium text-red-800 dark:text-red-300 mb-1.5">
+              <div className="gf-card dure">
+                <p className="gf-title">
                   {reserves.violations.length} règle{reserves.violations.length > 1 ? 's' : ''} non respectée{reserves.violations.length > 1 ? 's' : ''} :
                 </p>
-                <ul className="space-y-1 text-red-700 dark:text-red-400 list-disc pl-5">
+                <ul className="space-y-1 list-disc pl-5">
                   {reserves.violations.slice(0, 6).map((v, i) => (
                     <li key={i}>
                       <span className="font-medium">{v.date}</span> — {v.detail}
                     </li>
                   ))}
                   {reserves.violations.length > 6 && (
-                    <li className="list-none text-red-600/80 dark:text-red-500/80">
+                    <li className="list-none opacity-80">
                       … et {reserves.violations.length - 6} autre{reserves.violations.length - 6 > 1 ? 's' : ''}.
                     </li>
                   )}
@@ -386,7 +387,7 @@ export function useOutilsPlanning({
               </div>
             )}
             {reserves && reserves.souhaitsEnAttente > 0 && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 p-3 text-amber-800 dark:text-amber-300">
+              <div className="gf-card souple">
                 <span className="font-medium">{reserves.souhaitsEnAttente} demande{reserves.souhaitsEnAttente > 1 ? 's' : ''} de congé en attente</span>{' '}
                 chevauche{reserves.souhaitsEnAttente > 1 ? 'nt' : ''} cette période — valide-la/les ou refuse-la/les d&apos;abord si tu veux qu&apos;elle{reserves.souhaitsEnAttente > 1 ? 's' : ''} soi{reserves.souhaitsEnAttente > 1 ? 'ent' : 't'} prise{reserves.souhaitsEnAttente > 1 ? 's' : ''} en compte.
               </div>
@@ -402,7 +403,6 @@ export function useOutilsPlanning({
             <Button
               onClick={() => handlePublier(true)}
               disabled={publishing}
-              className="bg-accent hover:bg-accent/90 text-accent-foreground"
             >
               {publishing ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -417,8 +417,9 @@ export function useOutilsPlanning({
 
       {/* Modale de confirmation de RÉGÉNÉRATION d'une période publiée (Chantier B) */}
       <Dialog open={republishOpen} onOpenChange={(o) => { if (!generating) setRepublishOpen(o) }}>
-        <DialogContent>
+        <DialogContent className="gv-modale">
           <DialogHeader>
+            <p className="gm-kicker">Planning · régénération</p>
             <DialogTitle>Régénérer un planning publié ?</DialogTitle>
             <DialogDescription>
               Cette période est <strong>publiée</strong>. La régénérer va l’écraser :
@@ -437,7 +438,6 @@ export function useOutilsPlanning({
             <Button
               onClick={() => lancerGeneration(true)}
               disabled={generating}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               {generating ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />

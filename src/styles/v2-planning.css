@@ -1027,3 +1027,169 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
    posent au-dessus de la grille, pas dans l'en-tête. */
 .work-body > .pre-vol-alert,
 .work-body > div:has(> [data-slot="alert"]) { margin-bottom: 14px; }
+
+/* ============================================================
+   LA MODALE DE GARDE — portée de `maquette/m1-planning.html`
+   ============================================================
+   Le contenu de cette modale était resté celui de la V1 : cartes blanches
+   collées les unes aux autres, sélection en aplat orange plein, ascenseur
+   système par-dessus les pastilles, aucun rythme vertical. Retour MiKL
+   2026-07-29 : « c'est encore tellement dégueulasse ».
+
+   On reprend ici le vocabulaire exact de la maquette — `.gm-*` pour la
+   structure, `.av-*` pour la liste des vétérinaires disponibles. La logique
+   métier du composant (réattribution, verrouillage, disponibilités,
+   violations de règles) n'est pas touchée : seul son rendu change.
+   ============================================================ */
+
+.gv-modale .gm-kicker {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent-ink);
+}
+
+.gm-badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 4px; }
+.gm-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 0.68rem; font-weight: 700;
+  padding: 4px 11px; border-radius: 999px;
+}
+.gm-badge.publie { background: var(--ok-soft); color: var(--ok); }
+.gm-badge.brouillon { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border-strong); }
+.gm-badge.lock { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border-strong); }
+.gm-badge.warn { background: var(--warn-soft); color: var(--warn); }
+
+/* -- L'encart de verrouillage, avec sa confirmation en ligne --
+   La maquette confirme ICI plutôt que dans une seconde pop-up par-dessus
+   la première : une modale de moins à l'écran, même garde-fou. */
+.lock-encart {
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  font-size: 0.84rem; line-height: 1.55; color: var(--text);
+}
+.lock-encart b { font-family: var(--font-display); }
+.lock-confirm {
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px dashed var(--border-strong);
+}
+.reform-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+/* -- Une place de garde : libellé, qui la tient, et le bouton pour changer -- */
+.gm-section {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  background: var(--surface);
+}
+.gm-section + .gm-section { margin-top: 10px; }
+.gm-section.disabled { opacity: 0.55; }
+.gm-slot-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.gm-slot-label {
+  font-family: var(--font-display);
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--soft);
+  flex: 1 1 130px;
+}
+.gm-current {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 0.88rem; font-weight: 700; color: var(--text);
+}
+.gm-current .dot {
+  width: 22px; height: 22px; border-radius: 50%; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 0.62rem; font-weight: 800;
+}
+.gm-current.none { color: var(--muted); font-weight: 600; font-style: italic; }
+.gm-reassign {
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2); color: var(--muted);
+  border-radius: 999px; font-size: 0.74rem; font-weight: 700;
+  padding: 7px 13px; min-height: 34px;
+}
+.gm-reassign:hover:not(:disabled) { color: var(--accent-ink); border-color: var(--accent-ink); }
+.gm-reassign[aria-expanded="true"] { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent-ink); }
+.gm-reassign:disabled { opacity: 0.5; cursor: default; }
+
+/* Le lien de signalement d'absence : discret, il ne concurrence pas le titre. */
+.gm-absent-link {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: none; background: transparent;
+  color: var(--muted); font-size: 0.72rem; font-weight: 600;
+  padding: 4px 8px; border-radius: 999px;
+}
+.gm-absent-link:hover { color: var(--danger); background: var(--danger-soft); }
+
+/* -- La liste des vétérinaires : une grille en colonnes, pas des cartes --
+   Colonnes : pastille de couleur · nom · état · raison · impact compteur.
+   Tout s'aligne verticalement d'une ligne à l'autre, et la ligne survolée
+   se teinte à peine — jamais d'aplat orange plein. */
+.av-list {
+  list-style: none; margin-top: 10px; padding-top: 6px;
+  border-top: 1px dashed var(--border);
+  max-height: 260px; overflow-y: auto;
+  /* Ascenseur discret : celui du système masquait la colonne d'état. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.av-list::-webkit-scrollbar { width: 8px; }
+.av-list::-webkit-scrollbar-thumb {
+  background: var(--border-strong); border-radius: 999px;
+  border: 2px solid var(--surface);
+}
+.av-list::-webkit-scrollbar-track { background: transparent; }
+.av-row {
+  display: grid;
+  grid-template-columns: 16px minmax(72px, auto) 14px minmax(0, 1fr) auto;
+  align-items: center; gap: 9px;
+  width: 100%; text-align: left;
+  border: none; background: transparent;
+  color: var(--text);
+  font-size: 0.84rem; font-weight: 600;
+  padding: 8px; border-radius: var(--r-sm);
+  min-height: 40px;
+}
+.av-row:hover { background: var(--accent-soft); }
+.av-row[aria-current="true"] {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent-ink);
+  color: var(--accent-ink);
+}
+.av-row .dot { width: 13px; height: 13px; border-radius: 50%; }
+.av-row .dot.none { background: transparent; border: 1.5px dashed var(--border-strong); }
+.av-state { font-size: 0.8rem; line-height: 1; text-align: center; }
+.av-state.vert { color: var(--ok); }
+.av-state.ambre { color: var(--warn); }
+.av-state.rouge { color: var(--danger); }
+.av-reason { font-size: 0.73rem; font-weight: 500; color: var(--muted); line-height: 1.35; }
+.av-row.rouge .av-reason { color: var(--danger); }
+.av-row.ambre .av-reason { color: var(--warn); }
+/* L'impact compteur : ce que ce choix ferait au total de la période. */
+.av-count {
+  font-size: 0.68rem; font-weight: 600; color: var(--soft);
+  font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right;
+}
+.av-legende {
+  display: flex; flex-wrap: wrap; gap: 4px 12px;
+  margin-top: 8px; padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  font-size: 0.7rem; color: var(--soft);
+}
+.av-legende span { display: inline-flex; align-items: center; gap: 5px; }
+.av-legende i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+/* -- Encart d'avertissement (règle outrepassée, véto à confirmer) -- */
+.gf-card {
+  border-radius: var(--r-sm);
+  padding: 12px 13px;
+  font-size: 0.83rem; line-height: 1.55;
+}
+.gf-card.souple { background: var(--warn-soft); border: 1px solid rgba(196, 138, 20, 0.4); }
+.gf-card.dure { background: var(--danger-soft); border: 1px solid rgba(168, 52, 31, 0.35); }
+.gf-card .gf-title {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em;
+  text-transform: uppercase; margin-bottom: 6px;
+}
+.gf-card.souple .gf-title { color: var(--warn); }
+.gf-card.dure .gf-title { color: var(--danger); }

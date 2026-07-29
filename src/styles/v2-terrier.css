@@ -1764,11 +1764,15 @@
   box-shadow: var(--shadow-panel);
   --radius: 18px; /* les arrondis internes (encarts, boutons) suivent */
   padding: 22px 24px 20px;
-  max-width: min(600px, calc(100vw - 32px));
   max-height: calc(100vh - 40px);
   overflow-y: auto;
   gap: 14px;
 }
+
+/* La largeur de la maquette (600px) ne s'applique qu'aux modales qui la
+   demandent : certaines, comme le parcours de crise, sont volontairement
+   plus larges et gardent la leur. */
+.gv-modale { max-width: min(600px, calc(100vw - 32px)) !important; }
 
 [data-slot="dialog-title"],
 [data-slot="alert-dialog-title"] {

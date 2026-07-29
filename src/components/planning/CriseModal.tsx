@@ -614,10 +614,8 @@ export function CriseModal({
         {!resultat && (
           <>
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-amber-500" />
-                Signaler une absence
-              </DialogTitle>
+              <p className="gm-kicker">Planning · coup dur</p>
+              <DialogTitle>Signaler une absence</DialogTitle>
               <DialogDescription>
                 Déclare l&apos;absence imprévue d&apos;un vétérinaire. Le planning publié sera
                 analysé et une réparation te sera proposée pour chaque garde impactée.

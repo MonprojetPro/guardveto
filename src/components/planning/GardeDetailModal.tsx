@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Loader2, AlertTriangle, ArrowLeftRight, Lock, Wrench, UserMinus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -53,187 +52,151 @@ function labelTypeGarde(type: string, nomsTypes?: Record<string, string>): strin
   return libelleTypeGardeDb(type, nomsTypes)
 }
 
-function StatutBadge({ statut }: { statut: string }) {
-  if (statut === 'publie') return <Badge className="bg-green-100 text-green-800 border-green-200">Publié</Badge>
-  if (statut === 'verrouille') return <Badge variant="secondary">Verrouillé</Badge>
-  return <Badge variant="outline">Brouillon</Badge>
+/** Les trois états de disponibilité, dans l'ordre où la maquette les trie. */
+type Tone = 'vert' | 'ambre' | 'rouge'
+const ORDRE_TONE: Record<Tone, number> = { vert: 0, ambre: 1, rouge: 2 }
+
+function toneDe(dispo: { ok: boolean; warning?: string }): Tone {
+  if (!dispo.ok) return 'rouge'
+  return dispo.warning ? 'ambre' : 'vert'
 }
 
-// ── Avatar vétérinaire ───────────────────────────────────
-
-function VetAvatar({ prenom, couleur, size = 'md' }: { prenom: string; couleur: string; size?: 'sm' | 'md' }) {
-  const cls = size === 'sm'
-    ? 'w-6 h-6 text-[10px]'
-    : 'w-8 h-8 text-xs'
-  return (
-    <div
-      className={`${cls} rounded-full flex items-center justify-center text-white font-bold shrink-0`}
-      style={{ backgroundColor: couleur }}
-    >
-      {prenom.charAt(0)}
-    </div>
-  )
+/** Retire le préfixe technique « R7 : » des messages de règle. */
+function sansCodeRegle(texte?: string): string {
+  return (texte ?? '').replace(/^R\d+ : /, '')
 }
 
-// ── Résumé des gardes actuelles ──────────────────────────
+// ── Une place de garde : qui la tient, et de quoi en changer ──
 
-function GardeActuelle({ label, prenom, nom, couleur, onDeclarerAbsent }: {
-  label: string
-  prenom: string | null
-  nom: string | null
-  couleur: string | null
-  /** Présent (admin) → affiche un bouton « déclarer absent » pour ce véto. */
-  onDeclarerAbsent?: () => void
-}) {
-  return (
-    <div className="flex items-center gap-3">
-      <span className="text-xs font-medium text-muted-foreground w-20 shrink-0">{label}</span>
-      {prenom ? (
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <VetAvatar prenom={prenom} couleur={couleur ?? '#888'} />
-          <span className="text-sm font-medium text-foreground truncate">{prenom} {nom}</span>
-          {onDeclarerAbsent && (
-            <button
-              type="button"
-              onClick={onDeclarerAbsent}
-              className="ml-auto shrink-0 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/30 transition-colors"
-              title={`Déclarer ${prenom} absent·e`}
-            >
-              <UserMinus className="w-3.5 h-3.5" />
-              Déclarer absent·e
-            </button>
-          )}
-        </div>
-      ) : (
-        <span className="text-sm text-muted-foreground italic">Non attribué</span>
-      )}
-    </div>
-  )
-}
-
-// ── Ligne de sélection vétérinaire ───────────────────────
-
-function VetRow({
-  vet,
-  role,
-  selected,
-  onClick,
-}: {
-  vet: VetDispo
-  role: 'premier' | 'second'
-  selected: boolean
-  onClick: () => void
-}) {
-  const dispo = role === 'premier' ? vet.dispo_premier : vet.dispo_second
-  const isNone = vet.id === ''
-
-  return (
-    <button
-      onClick={onClick}
-      className={[
-        'w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-left transition-all',
-        selected
-          ? 'bg-primary text-primary-foreground shadow-sm'
-          : 'bg-card border border-border hover:bg-muted/50',
-      ].join(' ')}
-    >
-      {/* Avatar */}
-      {isNone ? (
-        <div className="w-7 h-7 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center shrink-0">
-          <span className="text-[10px] text-muted-foreground">—</span>
-        </div>
-      ) : (
-        <VetAvatar prenom={vet.prenom} couleur={selected ? '#ffffff44' : vet.couleur} size="sm" />
-      )}
-
-      {/* Nom + raison d'indispo */}
-      <span className="flex-1 min-w-0">
-        <span className={`block font-medium ${selected ? 'text-primary-foreground' : 'text-foreground'}`}>
-          {isNone ? 'Aucun' : `${vet.prenom} ${vet.nom}`}
-        </span>
-        {!isNone && !selected && !dispo.ok && (
-          <span className="block text-xs text-red-500 mt-0.5 leading-tight">
-            {dispo.raison?.replace(/^R\d+ : /, '')}
-          </span>
-        )}
-        {!isNone && !selected && dispo.warning && (
-          <span className="block text-xs text-amber-600 mt-0.5 leading-tight">
-            {dispo.warning.replace(/^R\d+ : /, '')}
-          </span>
-        )}
-      </span>
-
-      {/* Point de couleur dispo */}
-      {!isNone && !selected && (
-        <span className={[
-          'shrink-0 w-2 h-2 rounded-full mt-1',
-          dispo.ok && !dispo.warning ? 'bg-green-500' : '',
-          dispo.ok && dispo.warning ? 'bg-amber-400' : '',
-          !dispo.ok ? 'bg-red-400' : '',
-        ].join(' ')} />
-      )}
-    </button>
-  )
-}
-
-// ── Section sélecteur ────────────────────────────────────
-
-function SectionSelecteur({
+function PlaceGarde({
   label,
-  vets,
   role,
+  vets,
   selected,
   onSelect,
+  modeEdition,
+  ouvert,
+  onToggle,
+  typeGarde,
+  partenaireId,
+  onDeclarerAbsent,
 }: {
   label: string
-  vets: VetDispo[]
   role: 'premier' | 'second'
+  vets: VetDispo[]
   selected: string | null
   onSelect: (id: string | null) => void
+  modeEdition: boolean
+  /** La liste des vétérinaires est-elle dépliée pour cette place ? */
+  ouvert: boolean
+  onToggle: () => void
+  typeGarde: string
+  /** Véto tenant l'AUTRE place ce jour-là — il n'est pas proposé ici. */
+  partenaireId: string | null
+  /** Admin, garde publiée : signaler l'absence de celui qui tient la place. */
+  onDeclarerAbsent?: (vetId: string) => void
 }) {
-  const vetSelectionne = vets.find((v) => v.id === selected)
+  const titulaire = vets.find((v) => v.id === selected) ?? null
+
+  // Les disponibles d'abord : le bon choix saute aux yeux (maquette).
+  const lignes = vets
+    .filter((v) => v.id !== partenaireId)
+    .map((v) => ({ v, tone: toneDe(role === 'premier' ? v.dispo_premier : v.dispo_second) }))
+    .sort((a, b) => ORDRE_TONE[a.tone] - ORDRE_TONE[b.tone])
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-foreground">{label}</p>
-        {vetSelectionne && (
-          <span className="text-xs text-muted-foreground">
-            {vetSelectionne.prenom} {vetSelectionne.nom} sélectionné·e
+    <div className={`gm-section${modeEdition ? '' : ' disabled'}`}>
+      <div className="gm-slot-row">
+        <span className="gm-slot-label">{label}</span>
+
+        {titulaire ? (
+          <span className="gm-current">
+            <span className="dot" style={{ background: titulaire.couleur }}>
+              {titulaire.prenom.charAt(0)}
+            </span>
+            {titulaire.prenom} {titulaire.nom}
           </span>
+        ) : (
+          <span className="gm-current none">Aucun · à pourvoir</span>
+        )}
+
+        {onDeclarerAbsent && titulaire && (
+          <button
+            type="button"
+            className="gm-absent-link"
+            title={`Déclarer ${titulaire.prenom} absent·e`}
+            onClick={() => onDeclarerAbsent(titulaire.id)}
+          >
+            <UserMinus className="w-3.5 h-3.5" />
+            Absent·e
+          </button>
+        )}
+
+        {modeEdition && (
+          <button
+            type="button"
+            className="gm-reassign"
+            aria-expanded={ouvert}
+            onClick={onToggle}
+          >
+            {ouvert ? 'Fermer' : 'Réattribuer'}
+          </button>
         )}
       </div>
-      <div className="space-y-1 max-h-44 overflow-y-auto pr-0.5">
-        {/* Ligne Aucun */}
-        <VetRow
-          vet={{ id: '', prenom: 'Aucun', nom: '', couleur: '#ccc', dernier_recours: false, dispo_premier: { ok: true }, dispo_second: { ok: true }, nb_gardes_we_mois: 0 }}
-          role={role}
-          selected={selected === null}
-          onClick={() => onSelect(null)}
-        />
-        {vets.map((v) => (
-          <VetRow
-            key={v.id}
-            vet={v}
-            role={role}
-            selected={selected === v.id}
-            onClick={() => onSelect(v.id)}
-          />
-        ))}
-      </div>
-      <p className="text-[11px] text-muted-foreground">
-        <span className="inline-flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> Disponible
-        </span>
-        {' · '}
-        <span className="inline-flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /> Dernier recours
-        </span>
-        {' · '}
-        <span className="inline-flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-red-400 inline-block" /> Indisponible
-        </span>
-      </p>
+
+      {modeEdition && ouvert && (
+        <>
+          <ul className="av-list">
+            {lignes.map(({ v, tone }) => {
+              const dispo = role === 'premier' ? v.dispo_premier : v.dispo_second
+              const raison = sansCodeRegle(dispo.raison ?? dispo.warning)
+              // L'impact compteur : ce que ce choix ferait au total. Seul le
+              // décompte des week-ends nous est renvoyé — on ne l'affiche donc
+              // que là, plutôt que d'inventer un chiffre pour les autres types.
+              const impact =
+                typeGarde === 'weekend' && tone !== 'rouge'
+                  ? `${v.nb_gardes_we_mois} → ${v.nb_gardes_we_mois + 1} WE`
+                  : ''
+              return (
+                <li key={v.id}>
+                  <button
+                    type="button"
+                    className={`av-row ${tone}`}
+                    aria-current={selected === v.id ? 'true' : undefined}
+                    onClick={() => onSelect(v.id)}
+                  >
+                    <span className="dot" style={{ background: v.couleur }} />
+                    <span>{v.prenom} {v.nom}</span>
+                    <span className={`av-state ${tone}`}>●</span>
+                    <span className="av-reason">{raison || 'Disponible'}</span>
+                    <span className="av-count">{impact}</span>
+                  </button>
+                </li>
+              )
+            })}
+            <li>
+              <button
+                type="button"
+                className="av-row"
+                aria-current={selected === null ? 'true' : undefined}
+                onClick={() => onSelect(null)}
+              >
+                <span className="dot none" />
+                <span>Aucun</span>
+                <span className="av-state">·</span>
+                <span className="av-reason">Laisser la place à pourvoir</span>
+                <span className="av-count" />
+              </button>
+            </li>
+          </ul>
+
+          <p className="av-legende">
+            <span><i style={{ background: 'var(--ok)' }} /> Disponible</span>
+            <span><i style={{ background: 'var(--warn)' }} /> Sous réserve</span>
+            <span><i style={{ background: 'var(--danger)' }} /> Indisponible</span>
+          </p>
+        </>
+      )}
     </div>
   )
 }
@@ -250,6 +213,9 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
   const [secondSel, setSecondSel] = useState<string | null>(null)
   const [correctionMode, setCorrectionMode] = useState(false)
   const [showCorriger, setShowCorriger] = useState(false)
+  // Une seule liste de vétérinaires dépliée à la fois : on ne change qu'une
+  // place à la fois, et la modale reste courte (maquette).
+  const [placeOuverte, setPlaceOuverte] = useState<'premier' | 'second' | null>(null)
   // Violation de règle à confirmer avant sauvegarde
   const [violation, setViolation] = useState<{
     type: 'dure' | 'souple'
@@ -271,6 +237,7 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
     setData(null)
     setCorrectionMode(false)
     setShowCorriger(false)
+    setPlaceOuverte(null)
     /* eslint-enable react-hooks/set-state-in-effect */
 
     fetch(`/api/gardes/${garde.id}/disponibilites`)
@@ -415,21 +382,25 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose() }}>
-        <DialogContent className="max-w-md sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="gv-modale">
           <DialogHeader>
+            {garde && (
+              <p className="gm-kicker">{labelTypeGarde(garde.type, nomsTypes)}</p>
+            )}
             <DialogTitle className="capitalize">
               {date && formatDateLongue(date)}
             </DialogTitle>
             {garde && (
-              <div className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
-                <span>{labelTypeGarde(garde.type, nomsTypes)}</span>
-                <span>·</span>
-                <StatutBadge statut={garde.periode_statut} />
+              <div className="gm-badges">
+                {garde.periode_statut === 'publie' && (
+                  <span className="gm-badge publie">● Publiée</span>
+                )}
+                {garde.periode_statut === 'brouillon' && (
+                  <span className="gm-badge brouillon">● Brouillon</span>
+                )}
+                {estVerrouille && <span className="gm-badge lock">🔒 Verrouillée</span>}
                 {garde.modifie_manuellement && (
-                  <span className="text-xs text-amber-600 flex items-center gap-1">
-                    <Wrench className="w-3 h-3" />
-                    Modifié manuellement
-                  </span>
+                  <span className="gm-badge warn">✎ Modifiée à la main</span>
                 )}
               </div>
             )}
@@ -445,86 +416,90 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
           )}
 
           {garde && data && !loading && (
-            <div className="space-y-5">
-
-              {/* ── Garde actuelle (toujours visible) ──────── */}
-              <div className="rounded-lg bg-muted/40 p-4 space-y-3">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Garde actuelle</p>
-                <GardeActuelle
-                  label="1er de garde"
-                  prenom={garde.premier_prenom}
-                  nom={garde.premier_nom}
-                  couleur={garde.premier_couleur}
-                  onDeclarerAbsent={
-                    onDeclarerAbsent && garde.premier_id && garde.periode_statut === 'publie'
-                      ? () => onDeclarerAbsent(garde.date, garde.premier_id!)
-                      : undefined
-                  }
-                />
-                {!masquerSecond && (
-                  <GardeActuelle
-                    label="2nd de garde"
-                    prenom={garde.second_prenom}
-                    nom={garde.second_nom}
-                    couleur={garde.second_couleur}
-                    onDeclarerAbsent={
-                      onDeclarerAbsent && garde.second_id && garde.periode_statut === 'publie'
-                        ? () => onDeclarerAbsent(garde.date, garde.second_id!)
-                        : undefined
-                    }
-                  />
-                )}
-              </div>
-
-              {/* ── Garde verrouillée ───────────────────────── */}
+            <>
+              {/* ── Garde verrouillée : l'encart, et sa confirmation EN LIGNE.
+                     La maquette confirme ici plutôt que dans une seconde
+                     pop-up par-dessus la première — même garde-fou, une
+                     fenêtre de moins à l'écran. ──────────────────────── */}
               {estVerrouille && isAdmin && !correctionMode && (
-                <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/20">
-                  <Lock className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-amber-800 dark:text-amber-400">Garde verrouillée</p>
-                    <p className="text-xs text-amber-700 mt-0.5">Impossible de modifier sans déverrouiller.</p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0 border-amber-300 text-amber-700 hover:bg-amber-100"
-                    onClick={() => setShowCorriger(true)}
-                  >
-                    <Wrench className="w-3.5 h-3.5 mr-1.5" />
-                    Corriger
-                  </Button>
+                <div className="lock-encart">
+                  <b><Lock className="inline w-3.5 h-3.5 mb-0.5" /> Cette garde est verrouillée</b>{' '}
+                  : elle est passée, ou les vétérinaires en ont déjà été notifiés. On ne la
+                  modifie pas par accident.
+                  {!showCorriger ? (
+                    <div className="reform-actions">
+                      <button type="button" className="btn btn-corriger" onClick={() => setShowCorriger(true)}>
+                        <Wrench className="w-3.5 h-3.5 mr-1.5" />
+                        Corriger cette garde
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="lock-confirm">
+                      Les vétérinaires concernés seront prévenus de la correction, et Google
+                      Agenda resynchronisé. On continue ?
+                      <div className="reform-actions">
+                        <button
+                          type="button"
+                          className="btn btn-valider"
+                          onClick={() => { setCorrectionMode(true); setShowCorriger(false) }}
+                        >
+                          Oui, corriger
+                        </button>
+                        <button type="button" className="btn btn-corriger" onClick={() => setShowCorriger(false)}>
+                          Annuler
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* ── Sélecteurs admin ────────────────────────── */}
-              {modeEdition && (
-                <>
-                  <div className="border-t pt-4">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-                      Modifier la garde
-                    </p>
-                    <div className="space-y-5">
-                      <SectionSelecteur
-                        label="1er de garde"
-                        vets={data.vets}
-                        role="premier"
-                        selected={premierSel}
-                        onSelect={setPremierSel}
-                      />
-                      {!masquerSecond && (
-                        <SectionSelecteur
-                          label="2nd de garde"
-                          vets={data.vets}
-                          role="second"
-                          selected={secondSel}
-                          onSelect={setSecondSel}
-                        />
-                      )}
-                    </div>
-                  </div>
-                </>
+              {estVerrouille && correctionMode && (
+                <div className="lock-encart">
+                  <b>🔓 Correction ouverte</b> · les vétérinaires seront prévenus à
+                  l’enregistrement.
+                </div>
               )}
-            </div>
+
+              {/* ── Les places de garde ─────────────────────── */}
+              <PlaceGarde
+                label="1er de garde"
+                role="premier"
+                vets={data.vets}
+                selected={premierSel}
+                onSelect={(id) => { setPremierSel(id); setPlaceOuverte(null) }}
+                modeEdition={modeEdition}
+                ouvert={placeOuverte === 'premier'}
+                onToggle={() => setPlaceOuverte((p) => (p === 'premier' ? null : 'premier'))}
+                typeGarde={garde.type}
+                partenaireId={masquerSecond ? null : secondSel}
+                onDeclarerAbsent={
+                  onDeclarerAbsent && garde.periode_statut === 'publie'
+                    ? (vetId) => onDeclarerAbsent(garde.date, vetId)
+                    : undefined
+                }
+              />
+
+              {!masquerSecond && (
+                <PlaceGarde
+                  label="2nd de garde"
+                  role="second"
+                  vets={data.vets}
+                  selected={secondSel}
+                  onSelect={(id) => { setSecondSel(id); setPlaceOuverte(null) }}
+                  modeEdition={modeEdition}
+                  ouvert={placeOuverte === 'second'}
+                  onToggle={() => setPlaceOuverte((p) => (p === 'second' ? null : 'second'))}
+                  typeGarde={garde.type}
+                  partenaireId={premierSel}
+                  onDeclarerAbsent={
+                    onDeclarerAbsent && garde.periode_statut === 'publie'
+                      ? (vetId) => onDeclarerAbsent(garde.date, vetId)
+                      : undefined
+                  }
+                />
+              )}
+            </>
           )}
 
           <DialogFooter>
@@ -565,58 +540,37 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
         />
       )}
 
-      {/* ── Avertissement métier serveur (véto inactif / en congé) ── */}
+      {/* ── Avertissement métier serveur (véto inactif / en congé) ──
+             La confirmation de garde verrouillée, elle, se fait désormais
+             dans l'encart de la modale principale : plus de pop-up par-dessus
+             la pop-up. ─────────────────────────────────────────────── */}
       <Dialog open={!!avertServeur} onOpenChange={(open) => { if (!open) setAvertServeur(null) }}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="gv-modale">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-500" />
-              Affectation à confirmer
-            </DialogTitle>
+            <p className="gm-kicker">Garde · vérification</p>
+            <DialogTitle>Affectation à confirmer</DialogTitle>
           </DialogHeader>
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-1 dark:border-amber-800 dark:bg-amber-950/20">
+          <div className="gf-card souple">
+            <p className="gf-title">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              Ce que la vérification a relevé
+            </p>
             {(avertServeur ?? []).map((w, i) => (
-              <p key={i} className="text-xs leading-relaxed text-amber-800 dark:text-amber-300">{w}</p>
+              <p key={i}>{w}</p>
             ))}
           </div>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Voulez-vous enregistrer cette affectation malgré tout ?
+          <p className="text-sm text-muted-foreground">
+            Veux-tu enregistrer cette affectation malgré tout ?
           </p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAvertServeur(null)} disabled={saving}>
               Annuler
             </Button>
             <Button
-              className="bg-amber-600 hover:bg-amber-700 text-white"
               disabled={saving}
               onClick={async () => { setAvertServeur(null); await performSave(true) }}
             >
               Enregistrer quand même
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Confirmation "Corriger" ──────────────────────── */}
-      <Dialog open={showCorriger} onOpenChange={(open) => { if (!open) setShowCorriger(false) }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-500" />
-              Modifier une garde verrouillée
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Cette garde est verrouillée. La modifier la déverrouillera et la marquera comme modifiée manuellement.
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCorriger(false)}>Annuler</Button>
-            <Button
-              className="bg-amber-600 hover:bg-amber-700 text-white"
-              onClick={() => { setCorrectionMode(true); setShowCorriger(false) }}
-            >
-              <Wrench className="w-4 h-4 mr-2" />
-              Corriger quand même
             </Button>
           </DialogFooter>
         </DialogContent>
