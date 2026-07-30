@@ -43,15 +43,37 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  initialFocus,
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
 }) {
+  // À l'ouverture, le focus va sur le PANNEAU et non sur le premier champ.
+  //
+  // Pourquoi : par défaut Base UI donne le focus au premier élément tabbable
+  // du panneau (`initialFocus` vaut `true` → cf. DialogPopup, « first tabbable
+  // element or popup »). Le premier champ se retrouvait donc focalisé sans que
+  // personne n'ait touché au clavier, et le navigateur lui peignait son anneau
+  // de focus dès l'ouverture — le liseré pointillé orange signalé par MiKL le
+  // 2026-07-30. Aucune retouche du liseré ne peut supprimer ce symptôme : tant
+  // que le focus est posé là, l'anneau est légitime. On enlève donc la cause.
+  //
+  // Ce que ça ne change pas : le panneau porte `tabIndex={-1}`, il reste dans
+  // le piège à focus de Base UI (première Tab → premier champ, Maj+Tab →
+  // dernier, Échap ferme). C'est le repli prévu par la bibliothèque elle-même
+  // quand le panneau n'a aucun enfant tabbable, pas un détournement.
+  // Bénéfice annexe : les lecteurs d'écran annoncent le titre de la modale au
+  // lieu de démarrer au milieu du formulaire.
+  // Un appelant qui a besoin d'un autre point d'entrée passe `initialFocus`.
+  const panneauRef = React.useRef<HTMLDivElement>(null)
+
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
+        ref={panneauRef}
+        initialFocus={initialFocus ?? panneauRef}
         className={cn(
           "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className

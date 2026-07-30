@@ -27,7 +27,7 @@ import { useRouter } from 'next/navigation'
 import { FilouCube, type FilouHandle } from './FilouCube'
 import { FilouChat, type FilouChatHandle } from './FilouChat'
 import { FenetreResultatFilou, type ResultatFilou } from './FilouResultat'
-import { ACCROCHES, lireOrigine, portUneOrigine } from '@/lib/v2/filou-origine'
+import { accrocheDepuis, lireOrigine, portUneOrigine, MATIERE_VIDE } from '@/lib/v2/filou-origine'
 import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
 import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
 import type { DonneesAccueil, GardeDuSoir } from '@/data/v2/accueilEpicentre'
@@ -194,7 +194,12 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
     // normal, sans promesse en l'air.
     if (!data.estAdmin) return
 
-    const accroche = ACCROCHES[origine]
+    // Les exemples sont TAILLÉS DANS LA DONNÉE RÉELLE du cabinet (prénom du
+    // souhait réellement en attente, libellé exact d'une règle qui existe…).
+    // Une suggestion inventée coûte deux fois : l'aller-retour de la personne,
+    // et l'appel au modèle facturé pour une question sans objet. Là où il n'y a
+    // rien d'honnête à proposer, `accrocheDepuis` ne rend aucun exemple.
+    const accroche = accrocheDepuis(origine, data.matiereFilou ?? MATIERE_VIDE)
     // `saufSiDejaDit` : quatre allers-retours planning → accueil sont quatre
     // appels légitimes, et Filou doit répondre à chaque fois. Mais faire
     // l'aller-retour SANS rien lui dire entre-temps n'est pas une nouvelle
@@ -203,7 +208,7 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
       exemples: accroche.exemples,
       saufSiDejaDit: true,
     })
-  }, [data.estAdmin])
+  }, [data.estAdmin, data.matiereFilou])
 
   // L'heure réelle sur la barre de statut de la tablette, recalée à la minute.
   useEffect(() => {

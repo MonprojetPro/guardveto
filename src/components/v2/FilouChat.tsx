@@ -55,10 +55,14 @@ type Message = {
   id: number
   de: 'moi' | 'filou'
   texte: string
-  /** Des phrases toutes prêtes proposées sous la bulle. Un clic les DÉPOSE dans
-   *  le champ sans les envoyer : la personne relit, adapte le prénom ou la date,
-   *  puis décide. Envoyer au clic ferait partir une demande qu'elle n'a fait que
-   *  regarder. */
+  /** Des phrases toutes prêtes proposées sous la bulle. Un clic les ENVOIE
+   *  directement.
+   *
+   *  La version précédente les déposait dans le champ pour qu'on les relise :
+   *  ça se tenait tant qu'elles contenaient des prénoms et des dates inventés
+   *  qu'il fallait corriger à la main. Elles sont maintenant taillées dans la
+   *  donnée réelle du cabinet (cf. `filou-origine.ts`) — il n'y a plus rien à
+   *  corriger, et faire relire une phrase déjà juste était une étape pour rien. */
   exemples?: string[]
   /** Ce que Filou doit se rappeler avoir dit, quand ce n'est pas ce qui
    *  s'affiche. Sa vraie réponse est sur le tableau ; dans le fil il ne reste
@@ -165,6 +169,8 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
   const [confirmeRaz, setConfirmeRaz] = useState(false)
   const filRef = useRef<HTMLDivElement>(null)
   const champRef = useRef<HTMLTextAreaElement>(null)
+  /** Verrou d'envoi, lisible dans le même battement que le clic (cf. `envoyerTexte`). */
+  const envoiParti = useRef(false)
   const compteur = useRef(messages.at(-1)?.id ?? 0)
 
   // Le fil tel qu'il est MAINTENANT, lisible hors du rendu. `dit` doit pouvoir
@@ -271,39 +277,57 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
     requestAnimationFrame(() => champRef.current?.focus())
   }
 
-  /** Un exemple atterrit dans le champ, curseur au bout, sans partir. Filou
-   *  suggère une tournure ; le prénom ou la date sont presque toujours à
-   *  reprendre. */
-  const deposer = (texte: string) => {
-    if (enCours) return
-    setPhrase(texte.slice(0, LONGUEUR_MAX))
-    requestAnimationFrame(() => {
-      const champ = champRef.current
-      if (!champ) return
-      champ.focus()
-      champ.setSelectionRange(champ.value.length, champ.value.length)
+  /** Les pistes d'un message ont servi : elles disparaissent.
+   *
+   *  Les laisser sous une bulle devenue ancienne invite à recliquer la même
+   *  question — soit un second appel facturé au modèle pour une réponse déjà
+   *  obtenue. L'offre d'ouverture ne vaut qu'une fois ; ensuite, on écrit. */
+  const oublierPistes = (idMessage: number) => {
+    setMessages((prec) => {
+      const suite = prec.map((m) => (m.id === idMessage ? { ...m, exemples: undefined } : m))
+      memoriserConversation(suite)
+      return suite
     })
+    filActuel.current = filActuel.current.map((m) =>
+      m.id === idMessage ? { ...m, exemples: undefined } : m,
+    )
   }
 
-  const envoyer = () => {
-    const texte = phrase.trim()
-    if (texte.length < 3 || enCours) return
-    ajouter('moi', texte)
-    setPhrase('')
-    setConfirmeRaz(false)
-    onFilouTape?.()
+  /** Le geste unique d'envoi : depuis le champ comme depuis une piste. */
+  const envoyerTexte = (brut: string) => {
+    const texte = brut.trim().slice(0, LONGUEUR_MAX)
+    if (texte.length < 3 || enCours || envoiParti.current) return
+    // `enCours` vient d'une transition : il ne repasse à vrai qu'au rendu
+    // suivant. Deux clics dans le même battement passeraient donc tous les
+    // deux — et un envoi de trop, c'est un appel de trop facturé au modèle.
+    envoiParti.current = true
 
     // Le fil PRÉCÉDENT part avec la demande : sans lui, Filou relisait chaque
     // phrase comme si elle arrivait seule et réexpliquait ce qu'il venait de
     // dire dès qu'on rebondissait sur sa réponse. Le serveur le borne et
     // n'en tire aucun droit — cf. `assainirHistorique`.
-    const fil = messages.map((m) => ({
+    //
+    // Lu dans `filActuel` et pas dans `messages` : une piste cliquée vient de
+    // retirer ses propres exemples du fil, et l'état du rendu est en retard.
+    const fil = filActuel.current.map((m) => ({
       role: m.de === 'moi' ? ('user' as const) : ('assistant' as const),
       texte: m.pourFilou ?? m.texte,
     }))
 
+    ajouter('moi', texte)
+    setConfirmeRaz(false)
+    onFilouTape?.()
+
     demarrer(async () => {
-      const reponse = await parlerAFilou(texte, fil)
+      // `finally` et pas une simple ligne après l'attente : si l'action serveur
+      // part en exception (réseau coupé), le verrou resterait fermé et la
+      // tablette n'accepterait plus jamais rien.
+      let reponse: Awaited<ReturnType<typeof parlerAFilou>>
+      try {
+        reponse = await parlerAFilou(texte, fil)
+      } finally {
+        envoiParti.current = false
+      }
 
       // Une panne n'est pas une réponse : elle se dit dans la conversation,
       // elle n'a rien à faire sur le tableau.
@@ -329,6 +353,23 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
         reponse.mot,
       )
     })
+  }
+
+  /** Ce que fait le bouton d'envoi : prendre ce qui est écrit et le faire
+   *  partir. Le champ se vide ici, et pas dans `envoyerTexte` — une piste
+   *  cliquée ne doit pas effacer un brouillon en cours de frappe. */
+  const envoyer = () => {
+    if (enCours || phrase.trim().length < 3) return
+    const texte = phrase
+    setPhrase('')
+    envoyerTexte(texte)
+  }
+
+  /** Une piste part TELLE QUELLE, sans étape de relecture. */
+  const envoyerPiste = (idMessage: number, texte: string) => {
+    if (enCours) return
+    oublierPistes(idMessage)
+    envoyerTexte(texte)
   }
 
   return (
@@ -362,7 +403,7 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
                         key={ex}
                         type="button"
                         className="piste"
-                        onClick={() => deposer(ex)}
+                        onClick={() => envoyerPiste(m.id, ex)}
                         disabled={enCours}
                       >
                         {ex}

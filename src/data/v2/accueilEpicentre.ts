@@ -14,6 +14,8 @@
 
 import type { createClient } from '@/lib/supabase/server'
 import type { Periode, StatutPeriode, Veterinaire } from '@/types'
+import { phraseRegle } from '@/lib/regles/libelle'
+import { MATIERE_VIDE, type MatiereFilou } from '@/lib/v2/filou-origine'
 import {
   catalogueDuProfil,
   chargerHorairesCabinet,
@@ -105,6 +107,10 @@ export interface DonneesAccueil {
   recapPeriode: RecapPeriode | null
   /** Périodes publiées à re-vérifier côté client (fiche « cohérence »). */
   periodesPubliees: string[]
+  /** De quoi écrire les exemples de Filou avec la VRAIE matière du cabinet —
+   *  jamais un prénom ou une date de fantaisie (cf. `filou-origine.ts`).
+   *  `null` hors administrateur : lui seul a le champ de saisie. */
+  matiereFilou: MatiereFilou | null
 }
 
 /** Préavis dû à l'équipe avant le début d'une période, en jours. */
@@ -141,6 +147,50 @@ interface LigneSouhait {
   // Supabase renvoie l'objet joint, ou un tableau selon la cardinalité inférée.
   veterinaires?: { prenom: string; couleur: string } | { prenom: string; couleur: string }[] | null
 }
+
+/** Un joint Supabase arrive en objet ou en tableau selon la cardinalité que
+ *  PostgREST infère. On ne veut jamais avoir à s'en soucier plus haut. */
+function unSeul<T>(joint: T | T[] | null | undefined): T | null {
+  return (Array.isArray(joint) ? joint[0] : joint) ?? null
+}
+
+/** Ligne brute d'`echanges_gardes`, jointe aux deux vétérinaires concernés. */
+interface LigneEchange {
+  id: string
+  demandeur?: { prenom: string } | { prenom: string }[] | null
+  cible?: { prenom: string } | { prenom: string }[] | null
+}
+
+/** Ligne brute d'`absences`, jointe au vétérinaire absent. */
+interface LigneAbsence {
+  id: string
+  date_fin: string
+  veto?: { prenom: string } | { prenom: string }[] | null
+}
+
+/** Une règle du cabinet, telle qu'il faut la lire pour la NOMMER exactement
+ *  comme l'écran Règles la nomme (source unique : `phraseRegle`). */
+interface LigneRegle {
+  id: string
+  brique_id: string
+  params_json: unknown
+  force: string
+}
+
+/** Les codes de créneau du catalogue, dits en français dans une phrase.
+ *  Un code hors de cette liste (créneau sur mesure du cabinet) n'est PAS
+ *  traduit à la volée : on préfère ne rien proposer qu'inventer un libellé. */
+const CRENEAUX_EN_FRANCAIS: Record<string, string> = {
+  semaine_soir: 'la garde de nuit en semaine',
+  vendredi_soir: 'la garde du vendredi soir',
+  weekend: 'la garde de week-end',
+  ferie: 'la garde de jour férié',
+}
+
+/** Longueur au-delà de laquelle un libellé de règle ne tient plus dans un
+ *  bouton d'exemple. Le tronquer produirait une consigne incomplète — donc
+ *  une demande qui part au modèle sans pouvoir aboutir : on saute l'exemple. */
+const LIBELLE_REGLE_MAX = 70
 
 /** Une ligne de la vue `planning_semaine` → la forme attendue par l'accueil. */
 function versGarde(
@@ -190,6 +240,9 @@ export async function chargerAccueil(
     echangesRes,
     cabinetRes,
     horairesCabinet,
+    absencesRes,
+    dettesRes,
+    profilsRes,
   ] = await Promise.all([
     supabase
       .from('periodes')
@@ -204,11 +257,18 @@ export async function chargerAccueil(
       .gte('date', today)
       .lte('date', demainISO)
       .order('date'),
+    // L'équipe en entier, et plus seulement son décompte : Filou a besoin d'un
+    // VRAI prénom pour proposer une phrase d'exemple, et d'une table id →
+    // prénom pour nommer une règle comme l'écran Règles la nomme. Les inactifs
+    // sont chargés aussi (une règle peut encore citer un ancien) mais ne
+    // comptent pas dans l'effectif. Sept lignes : ça ne coûte rien.
+    supabase.from('veterinaires').select('id, prenom, actif').order('prenom'),
+    // De quoi compter les forces ET nommer une règle réelle (`phraseRegle`).
     supabase
-      .from('veterinaires')
-      .select('id', { count: 'exact', head: true })
-      .eq('actif', true),
-    supabase.from('regles_cabinet').select('force').eq('actif', true),
+      .from('regles_cabinet')
+      .select('id, brique_id, params_json, force')
+      .eq('actif', true)
+      .order('brique_id'),
     estAdmin
       ? supabase
           .from('conges')
@@ -216,14 +276,38 @@ export async function chargerAccueil(
           .eq('statut', 'souhait')
           .order('created_at', { ascending: true })
       : Promise.resolve({ data: [] as LigneSouhait[] }),
+    // Les deux prénoms de l'échange en plus du décompte : « valide l'échange
+    // entre X et Y » ne vaut que si X et Y ont vraiment quelque chose en cours.
     supabase
       .from('echanges_gardes')
-      .select('id', { count: 'exact', head: true })
-      .eq('statut', 'proposee'),
+      .select('id, demandeur:demandeur_id(prenom), cible:cible_id(prenom)')
+      .eq('statut', 'proposee')
+      .order('created_at', { ascending: true }),
     supabase.from('cabinets').select('google_calendar_id').limit(1).maybeSingle(),
     // Les horaires REELS des creneaux, tous profils confondus : on ne saura
     // qu'apres quel profil s'applique a quelle date.
     chargerHorairesCabinet(supabase),
+    // ── Les trois requêtes suivantes ne servent QU'aux exemples de Filou ──
+    // Elles ne sont donc lancées que pour un administrateur (lui seul a le
+    // champ de saisie), et chacune ramène au plus quelques lignes.
+    estAdmin
+      ? supabase
+          .from('absences')
+          .select('id, date_fin, veto:veterinaire_id(prenom)')
+          .eq('statut', 'active')
+          .gte('date_fin', today)
+          .order('date_debut', { ascending: true })
+          .limit(1)
+      : Promise.resolve({ data: [] as LigneAbsence[] }),
+    estAdmin
+      ? supabase
+          .from('compensations')
+          .select('id', { count: 'exact', head: true })
+          .eq('statut', 'a_compenser')
+      : Promise.resolve({ count: 0 }),
+    estAdmin
+      ? supabase.from('profils_planning').select('id, nom')
+      : Promise.resolve({ data: [] as { id: string; nom: string }[] }),
   ] as const)
 
   const periodes = (periodesRes?.data ?? []) as Periode[]
@@ -263,8 +347,17 @@ export async function chargerAccueil(
     catalogueDu(demainISO),
   )
 
-  const regles = (reglesRes?.data ?? []) as { force: string }[]
+  const regles = (reglesRes?.data ?? []) as unknown as LigneRegle[]
   const nbReglesFermes = regles.filter((r) => FORCES_FERMES.includes(r.force)).length
+
+  // L'équipe : l'effectif ne compte que les actifs, la table id → prénom garde
+  // tout le monde (une règle active peut encore citer quelqu'un de parti, et
+  // « ??? jamais de garde le mercredi » ne veut plus rien dire).
+  const equipe = (vetosRes?.data ?? []) as { id: string; prenom: string; actif: boolean }[]
+  const equipeActive = equipe.filter((v) => v.actif)
+  const nbVetos = equipeActive.length
+
+  const echangesEnAttente = (echangesRes?.data ?? []) as unknown as LigneEchange[]
 
   const lignesSouhaits = (souhaitsRes?.data ?? []) as LigneSouhait[]
   const souhaits: SouhaitEnAttente[] = lignesSouhaits.map((l) => {
@@ -312,7 +405,7 @@ export async function chargerAccueil(
       profil: profil?.nom ?? null,
       effectifNuitSemaine:
         periodeAPublier.nb_vetos_semaine_soir ?? profil?.nb_vetos_semaine_soir ?? null,
-      nbVetos: (vetosRes as { count?: number | null })?.count ?? 0,
+      nbVetos,
       nbReglesFermes,
       nbReglesSouples: regles.length - nbReglesFermes,
       nbCongesValides: (congesRes as { count?: number | null })?.count ?? 0,
@@ -324,6 +417,10 @@ export async function chargerAccueil(
   const calendarId = (cabinetRes as { data?: { google_calendar_id?: string | null } } | null)
     ?.data?.google_calendar_id
 
+  const periodesPubliees = periodes
+    .filter((p) => p.statut === 'publie' && p.date_fin >= today)
+    .map((p) => p.id)
+
   return {
     veterinaire,
     estAdmin,
@@ -332,8 +429,8 @@ export async function chargerAccueil(
     joursAvantPublication,
     dock: {
       nbSouhaits: souhaits.length,
-      nbEchanges: (echangesRes as { count?: number | null })?.count ?? 0,
-      nbVetos: (vetosRes as { count?: number | null })?.count ?? 0,
+      nbEchanges: echangesEnAttente.length,
+      nbVetos,
       nbReglesFermes,
       nbReglesSouples: regles.length - nbReglesFermes,
       agendaConnecte: Boolean(calendarId),
@@ -348,8 +445,101 @@ export async function chargerAccueil(
     recapPeriode,
     // Seules les périodes publiées ENCORE EN COURS sont re-vérifiées : re-valider
     // le passé coûterait cher pour un verdict que plus personne ne peut changer.
-    periodesPubliees: periodes
-      .filter((p) => p.statut === 'publie' && p.date_fin >= today)
-      .map((p) => p.id),
+    periodesPubliees,
+    matiereFilou: estAdmin
+      ? matiereFilou({
+          equipe,
+          equipeActive,
+          regles,
+          souhaits,
+          echangesEnAttente,
+          absence: unSeul((absencesRes as { data?: LigneAbsence[] | null })?.data ?? []),
+          nbDettes: (dettesRes as { count?: number | null })?.count ?? 0,
+          profils: ((profilsRes as { data?: { id: string; nom: string }[] | null })?.data ??
+            []) as { id: string; nom: string }[],
+          periodeCourante,
+          catalogueCourant: catalogueDu(today),
+          profilDefaut: horairesCabinet.profilDefaut,
+          aUnPlanningPublie: periodesPubliees.length > 0,
+          gardeCeSoir: ceSoir !== null,
+        })
+      : null,
+  }
+}
+
+/**
+ * Met en forme la matière brute pour les exemples de Filou.
+ *
+ * Une seule règle ici, et elle est plus importante que l'exhaustivité : ce qui
+ * n'existe pas reste `null`. `filou-origine.ts` retire alors l'exemple au lieu
+ * de le remplir avec un prénom ou une date de fantaisie — une suggestion
+ * inventée coûte un aller-retour à la personne ET un appel facturé au modèle,
+ * pour une question qui ne pouvait de toute façon pas aboutir.
+ */
+function matiereFilou(brut: {
+  equipe: { id: string; prenom: string; actif: boolean }[]
+  equipeActive: { id: string; prenom: string }[]
+  regles: LigneRegle[]
+  souhaits: SouhaitEnAttente[]
+  echangesEnAttente: LigneEchange[]
+  absence: LigneAbsence | null
+  nbDettes: number
+  profils: { id: string; nom: string }[]
+  periodeCourante: Periode | null
+  catalogueCourant: CatalogueHoraires
+  profilDefaut: string | null
+  aUnPlanningPublie: boolean
+  gardeCeSoir: boolean
+}): MatiereFilou {
+  const nomVeto = (id: string) => brut.equipe.find((v) => v.id === id)?.prenom ?? '?'
+
+  // Le libellé EXACT de l'écran Règles (source unique `phraseRegle`) : Filou
+  // doit pouvoir retrouver la règle dont on lui parle. Une règle trop longue
+  // pour un bouton est sautée plutôt que tronquée.
+  const regleActive =
+    brut.regles
+      .map((r) => {
+        try {
+          return phraseRegle(r, nomVeto)
+        } catch {
+          // Une brique inconnue du catalogue ne doit pas empêcher l'accueil de
+          // s'afficher : on renonce à cet exemple, c'est tout.
+          return ''
+        }
+      })
+      .find((libelle) => libelle.length > 0 && libelle.length <= LIBELLE_REGLE_MAX) ?? null
+
+  const souhait = brut.souhaits[0]
+  const echange = brut.echangesEnAttente[0]
+  const demandeur = unSeul(echange?.demandeur)?.prenom
+  const cible = unSeul(echange?.cible)?.prenom
+  const absent = unSeul(brut.absence?.veto)?.prenom
+
+  const profilVise = brut.periodeCourante?.profil_id ?? brut.profilDefaut
+  // On parcourt les codes CONNUS dans leur ordre de déclaration, et pas les
+  // clés du catalogue : l'ordre de PostgREST changerait l'exemple d'un
+  // chargement à l'autre sans raison.
+  const codeCreneau = Object.keys(CRENEAUX_EN_FRANCAIS).find(
+    (code) => brut.catalogueCourant[code],
+  )
+  const creneau = codeCreneau ? CRENEAUX_EN_FRANCAIS[codeCreneau] : null
+
+  return {
+    ...MATIERE_VIDE,
+    prenomVeto: brut.equipeActive[0]?.prenom ?? null,
+    souhait: souhait
+      ? { prenom: souhait.prenom, dateDebut: souhait.dateDebut, dateFin: souhait.dateFin }
+      : null,
+    // Les deux prénoms sont exigés : « valide l'échange entre X et ? » ne
+    // ressemble à rien, et Filou ne saurait pas quoi en faire.
+    echange: demandeur && cible ? { demandeur, cible } : null,
+    absence: absent ? { prenom: absent } : null,
+    aDesDettes: brut.nbDettes > 0,
+    regleActive,
+    profil: profilVise ? (brut.profils.find((p) => p.id === profilVise)?.nom ?? null) : null,
+    creneau,
+    aUnPlanning: brut.periodeCourante !== null,
+    planningPublie: brut.aUnPlanningPublie,
+    gardeCeSoir: brut.gardeCeSoir,
   }
 }

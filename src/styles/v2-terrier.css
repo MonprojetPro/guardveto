@@ -1864,15 +1864,73 @@
   color: var(--accent-ink);
 }
 
-/* L'anneau de focus : orange, jamais bleu, et surtout DISCRET. Base UI
-   pose le focus sur le premier bouton dès l'ouverture — d'où le gros halo
-   coloré qu'on voyait autour de « Fermer » et « Annuler » à l'écran, alors
-   que personne n'avait navigué au clavier. On garde un liseré net, sans
-   halo, et sans teindre la bordure du bouton. */
+/* ---- Libellés de formulaire : leur rendre leur hauteur de ligne ----
+   CAUSE RACINE du « liseré qui mord le libellé » (retour MiKL 2026-07-30).
+   Le composant `Label` porte `leading-none` : sa boîte fait exactement la
+   hauteur de la police (14 px pour du 14 px), si bien que les jambages des
+   g, y, p DÉBORDENT sous la boîte. Le balisage sépare ensuite le libellé de
+   son champ par `space-y-1.5`, soit 6 px. L'anneau de focus (2 px de trait
+   posé 2 px au-dessus du champ) occupait 4 de ces 6 px : il ne restait que
+   2 px, moins que le débordement des jambages — d'où le trait pointillé qui
+   traversait le bas de « Type de demande », « Ma garde à céder », etc.
+
+   On corrige à la source : le libellé retrouve une hauteur de ligne qui
+   contient ses jambages, et l'écart libellé → champ passe à 9 px. Si un
+   jour quelqu'un remet `leading-none` ici, le défaut revient. */
+[data-slot="dialog-content"] [data-slot="label"],
+[data-slot="dialog-content"] form label,
+[data-slot="alert-dialog-content"] [data-slot="label"] {
+  line-height: 1.35;
+  /* `space-y-*` de Tailwind 4 pose son écart en `margin-block-end` sur le
+     libellé, à travers un `:where()` de spécificité nulle : cette ligne
+     suffit à l'emporter, sans `!important`. */
+  margin-bottom: 9px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--soft);
+}
+
+/* ---- Champs de saisie : la tenue des écrans de réglage ----
+   Jusqu'ici AUCUNE règle V2 ne visait les champs à l'intérieur des modales :
+   ils gardaient le gabarit shadcn (32 px de haut, coins moyens, fond
+   transparent) au milieu d'un terrier dont tous les autres champs — ceux de
+   `.field`, écran Réglages — font 42 px sur fond crème. On aligne les deux :
+   même hauteur, même fond, même bordure, même arrondi.
+   Les cases à cocher et boutons radio gardent leur gabarit natif. */
+[data-slot="dialog-content"] :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+[data-slot="dialog-content"] [data-slot="select-trigger"] {
+  width: 100%;
+  min-height: 42px;
+  height: auto; /* shadcn impose `h-8` / `h-9` en classe : on le desserre */
+  padding: 9px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  /* Gagne sur la règle « les boutons sont des pilules » ci-dessus : un
+     déclencheur de liste déroulante est un champ, pas un bouton d'action. */
+  border-radius: var(--r-sm);
+  font-family: var(--font-body);
+  font-size: 0.86rem;
+  color: var(--text);
+}
+[data-slot="dialog-content"] textarea { min-height: 84px; line-height: 1.5; }
+[data-slot="dialog-content"] :is(input, select, textarea)::placeholder {
+  color: var(--soft);
+}
+
+/* L'anneau de focus : orange, jamais bleu, et surtout DISCRET.
+   Les deux `!important` ci-dessous ne sont pas décoratifs, NE PAS les retirer :
+   shadcn pose son halo en `box-shadow` (`ring-3`) et reteint la bordure du
+   champ (`focus-visible:border-ring`), toutes deux en classe utilitaire. Sans
+   eux, on retrouvait le gros halo coloré autour de « Fermer » et « Annuler ».
+   L'écart au champ retombe à 1 px : combiné aux 9 px ci-dessus, le trait ne
+   peut plus atteindre le libellé, y compris pour qui navigue au clavier —
+   et il reste parfaitement lisible, ce que ne permettrait pas un anneau
+   posé à l'intérieur du champ. */
 [data-slot="dialog-content"] :focus-visible,
 [data-slot="alert-dialog-content"] :focus-visible {
   outline: 2px solid var(--accent-ink);
-  outline-offset: 2px;
+  outline-offset: 1px;
   outline-style: dotted;
   box-shadow: none !important;
   border-color: var(--border-strong) !important;

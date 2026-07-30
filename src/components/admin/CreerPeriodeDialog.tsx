@@ -41,11 +41,23 @@ export function CreerPeriodeDialog({ profils = [] }: CreerPeriodeDialogProps) {
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
+          {/* Cette modale est écrite à la main (pas de composant `Dialog`), elle
+              échappait donc à tout l'habillage V2 et sortait en palette V1 au
+              milieu du terrier. Les `data-slot` sont le point d'accroche que
+              la feuille `v2-terrier.css` utilise pour toutes les autres : les
+              poser ici suffit à lui donner voile brun, surface crème, arrondis
+              et champs à 42 px, sans dupliquer une ligne de style.
+              Le padding vient désormais de la feuille, d'où la disparition du
+              `p-6` qui ferait doublon. */}
+          <div
+            data-slot="dialog-overlay"
+            className="absolute inset-0"
+            onClick={() => setOpen(false)}
+          />
 
-          <div className="relative z-10 w-full max-w-md rounded-xl border bg-card shadow-lg mx-4">
-            <div className="p-6">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Nouvelle période</h2>
+          <div data-slot="dialog-content" className="relative z-10 w-full max-w-md mx-4">
+            <div>
+              <h2 data-slot="dialog-title" className="mb-4">Nouvelle période</h2>
 
               <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
                 {/* Titre */}
