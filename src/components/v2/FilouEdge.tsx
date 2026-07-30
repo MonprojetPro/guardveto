@@ -1,9 +1,9 @@
 'use client'
 
 // ============================================================
-// GUARDVETO V2 — Filou accroché au rebord de la carte planning
+// GUARDVETO V2 — Filou accroché au rebord d'une carte
 // ============================================================
-// Il attend qu'on le sollicite, agrippé au bord gauche de l'espace de
+// Il attend qu'on le sollicite, agrippé au bord de l'espace de
 // travail. Son ATTENTE est en couches (4 WebP animés par le CSS : il respire,
 // cligne, remue les oreilles — 50 Ko, aucune vidéo). Son COUCOU reste du
 // métrage, parce que la patte n'existe pas dans les couches.
@@ -15,16 +15,19 @@
 //
 // ⚠ Le calage `left: -160px` n'est pas un réglage au jugé : l'arête visible
 // du détourage est à x≈192 natif, et c'est elle qui doit tomber PILE sur le
-// bord de la carte. Le détail est dans le CSS (v2-planning.css) — deux
+// bord de la carte. Le détail est dans le CSS (v2-filou-edge.css) — deux
 // calages ont raté pour avoir pris la bbox de la pièce à la place.
 //
-// Un clic ouvre l'accueil AVEC la mémoire de l'origine (`#filou=planning`) :
-// Filou accueille par une phrase liée au planning, pas par un bonjour générique.
+// Un clic ouvre l'accueil AVEC la mémoire de l'origine (`#filou=planning`).
+// Cette mémoire est désormais LUE à l'arrivée (`Epicentre`) : Filou accueille
+// par une phrase liée à l'écran quitté. Tant qu'elle ne l'était pas, la prop
+// `origine` ne servait à rien — d'où l'insistance ici.
 // Porté depuis `maquette/m1-planning.html`.
 // ============================================================
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { lienAccueilDepuis, type OrigineFilou } from '@/lib/v2/filou-origine'
 
 /** Le coucou se rejoue tout seul entre 30 et 45 s. */
 const COUCOU_MIN_MS = 30_000
@@ -34,7 +37,14 @@ const SURVOL_REPOS_MS = 8000
 /** Filet si `ended` ne vient pas (onglet en arrière-plan, décodage coupé). */
 const COUCOU_SECOURS_MS = 6000
 
-export function FilouEdge() {
+interface Props {
+  /** D'où on part — voyage dans le fragment d'URL jusqu'à l'accueil. */
+  origine: OrigineFilou
+  /** Le rebord auquel il s'accroche. 'gauche' = planning (défaut historique). */
+  cote?: 'gauche' | 'droite'
+}
+
+export function FilouEdge({ origine, cote = 'gauche' }: Props) {
   const router = useRouter()
   const bouton = useRef<HTMLButtonElement>(null)
   const coucou = useRef<HTMLVideoElement>(null)
@@ -120,7 +130,7 @@ export function FilouEdge() {
   function surClic() {
     if (part) return
     setPart(true)
-    const vers = '/accueil#filou=planning'
+    const vers = lienAccueilDepuis(origine)
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       router.push(vers)
       return
@@ -133,7 +143,7 @@ export function FilouEdge() {
     <>
       <button
         type="button"
-        className="filou-edge"
+        className={`filou-edge${cote === 'droite' ? ' filou-edge--droite' : ''}`}
         ref={bouton}
         onMouseEnter={surSurvol}
         onClick={surClic}

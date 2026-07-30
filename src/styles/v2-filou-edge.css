@@ -1,0 +1,347 @@
+/* ============================================================
+   GUARDVETO V2 — FILOU ACCROCHÉ AU REBORD (feuille partagée)
+   ============================================================
+   Ces règles vivaient dans `v2-planning.css`, où elles étaient
+   prisonnières d'un seul écran. Filou est maintenant posé sur
+   plusieurs pages : elles ont été DÉPLACÉES ici telles quelles pour
+   qu'il n'en existe qu'une version — deux copies divergentes d'un
+   calage aussi sensible seraient ingérables.
+
+   Chaque page qui pose un `<FilouEdge>` importe ce fichier et déclare
+   la scène qui l'ancre : `.plan-scene` (planning, rebord gauche),
+   `.abs-scene` (absences, rebord droit).
+   ============================================================ */
+
+/* Les scènes : elles ne servent qu'à donner un repère au positionnement
+   absolu de Filou, qui déborde volontairement de leur cadre. */
+.plan-scene { position: relative; }
+.abs-scene { position: relative; }
+
+/* ============================================================
+   FILOU ACCROCHÉ AU REBORD · il se hisse sur le côté de l'encart
+   planning : haut du corps visible, le reste derrière la carte.
+   Si personne ne le sollicite, il plonge et ressort de l'autre
+   côté. Un clic = petite animation, puis l'accueil s'ouvre
+   (c'est là que vit sa tablette).
+   ============================================================ */
+.filou-edge {
+  /* CALAGE — mesuré, pas ajusté au jugé.
+     Le détourage a TRANCHÉ Filou : le métrage a une arête verticale
+     franche qui coupe ses coussinets. On ne peut pas la réparer sans
+     regénérer, mais on peut la rendre invisible en la faisant tomber
+     PILE sur le bord gauche de la carte : la coupe coïncide alors avec
+     un changement de fond, et l'œil lit « la patte agrippe le rebord »
+     au lieu de « la patte est coupée ». Décalée de quelques px, la
+     coupe se voit et les doigts flottent (retours MiKL 2026-07-25).
+     ⚠ Le repère est l'arête VISIBLE — x ≈ 192 natif, constant de
+     y=620 à y=1120. Surtout PAS la bbox globale de la pièce (x=149) :
+     elle vient du bas du corps, qui est caché par le socle. C'est
+     l'erreur qui a fait rater deux calages.
+     192 natif × 200/1080 = 35,6 px CSS ; miroité : 196 − 35,6 = 160,4
+     → left = −160 met l'arête sur le bord de la carte. */
+  position: absolute; top: 200px; left: -160px;
+  /* 152px de large : les ~42 derniers px chevauchent la carte, pour
+     que ses pattes qui agrippent le rebord ne soient JAMAIS coupées
+     (les doigts dépassent de l'arête vers l'intérieur de la carte) */
+  /* fenêtre 196px : le contenu utile du métrage va de x=188 à x=1027
+     en natif (mesuré sur l'alpha), soit 155 px CSS à width:200 —
+     à partir de left:0 il court jusqu'à x≈190. Une fenêtre plus
+     étroite ROGNAIT l'oreille et la patte du coucou (constaté
+     2026-07-25). left compense pour garder l'arête à droite en 36. */
+  width: 196px; height: 195px;
+  z-index: 2; /* au-dessus de la carte : ses pattes se posent SUR le rebord */
+  border: none; background: transparent; padding: 0;
+  cursor: pointer;
+  /* plus de rotation : l'arête verticale de la vidéo doit rester
+     parallèle au rebord de la carte pour que les pattes s'y posent */
+  transition: transform .45s cubic-bezier(0.34, 1.4, 0.64, 1), opacity .3s ease;
+}
+.filou-edge .fe-crop {
+  position: relative;
+  display: block;
+  width: 100%; height: 100%;
+  overflow: hidden;
+  /* Le métrage est orienté arête-À-GAUCHE du renard : le miroir du
+     .fe-crop le remet côté gauche ; côté droit, le miroir du conteneur
+     l'annule et la vidéo native convient.
+     ⚠ PAS de mask CSS ici : sur une <video> composited, le mask laisse
+     passer une ligne de bord à la limite de l'overflow (bug constaté
+     2026-07-18). Seul le fondu BAS est cuit dans l'alpha des WebM
+     (applique-fondu-alpha.py, natif y 950→1130, AUCUN fondu latéral).
+     ⚠ Ne JAMAIS remettre de fondu latéral : il rongeait l'oreille et
+     la patte du coucou, qui vont jusqu'à x=1027 natif (2026-07-25).
+     Cadrage vidéo : width 200 / top -18. */
+  transform: scaleX(-1);
+}
+/* ============================================================
+   Filou VIVANT (phase d'attente) — le métrage 3D tranché en 4
+   pièces, animé par le code : il respire, cligne des yeux, penche
+   la tête et remue les oreilles, sans fin et sans fichier vidéo.
+   Chaque réglage ci-dessous est un chiffre : plus jamais de
+   régénération de métrage pour corriger un détail. 50 Ko.
+   Les pièces viennent de filou/decoupe-couches.py.
+   ⚠ Aux raccords, les pièces se CHEVAUCHENT : deux bords estompés
+   complémentaires ne se recomposent pas à alpha 255 (couture).
+   ============================================================ */
+.filou-edge .fx {
+  position: absolute; left: 0; top: -18px;
+  display: block;
+  width: 200px;              /* = --ech * 1080, comme la vidéo */
+  height: 240px;             /* le clip franc, c'est .fe-crop qui le pose */
+  --ech: 0.18519;
+  /* bascule quasi sèche (80 ms) : les couches sont d'abord ramenées à
+     leur pose neutre, qui est EXACTEMENT la 1re image du métrage — un
+     fondu croisé long superposait deux Filous décalés, et ça se voyait */
+  transition: opacity .08s linear;
+}
+/* pose neutre avant/après le coucou : on coupe les animations et on
+   laisse les transitions ramener chaque pièce à sa place d'origine */
+.filou-edge.fe-neutre .fx-corps,
+.filou-edge.fe-neutre .fx-tete,
+.filou-edge.fe-neutre .fx-or-g,
+.filou-edge.fe-neutre .fx-or-d {
+  animation: none;
+  transition: translate .22s ease-out, rotate .22s ease-out;
+}
+.filou-edge.fe-neutre .fx-oeil i {
+  animation: none;
+  transition: transform .12s ease-out;
+}
+/* ============================================================
+   LE SOCLE — l'ancien bouton « Appeler Filou », devenu l'appui.
+   Il rend deux services d'un coup :
+   ① il masque la coupe NETTE du métrage (qui n'a pas de fin : sans
+      lui il faudrait un fondu, et le fondu se voit) ;
+   ② il dit ce que Filou fait là — plus de bouton flottant dans la
+      barre d'outils, l'action est là où est le personnage.
+   Style repris à l'identique de l'ancien .filou-call pour qu'il
+   appartienne visiblement à la même famille que la barre d'outils.
+   ============================================================ */
+.filou-edge .fe-socle {
+  /* ⚠ il ne doit JAMAIS mordre sur la carte du planning (il grattait
+     les compteurs, retour MiKL 2026-07-25). L'élément fait 196 px et
+     déborde de 36 px sur la carte — seul Filou a le droit d'y poser
+     ses pattes. Le socle s'arrête donc 40 px avant le bord droit,
+     et la pose miroir est symétrique (voir .filou-right plus bas). */
+  /* marges ÉGALES des deux bords : l'élément est retourné en miroir
+     quand Filou passe à droite, donc toute asymétrie ici se traduit
+     par un socle qui mord d'un côté et pas de l'autre. */
+  position: absolute; left: 26px; right: 26px; bottom: 0;
+  min-height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 4px 10px;
+  background: linear-gradient(180deg, #FFFEF9 0%, #FBF3E1 100%);
+  /* liseré accent, plus affirmé qu'un bouton ordinaire : c'est la seule
+     invitation à parler à Filou sur cet écran, il doit se voir. On reste
+     dans la palette du terrier — pas de rouge d'alerte, l'assistance
+     n'est pas une urgence (demande MiKL 2026-07-25). */
+  border: 1.5px solid var(--accent);
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 0.72rem; font-weight: 700; letter-spacing: .01em;
+  color: var(--accent-ink);
+  box-shadow: var(--edge-light),
+              0 0 0 3px var(--accent-soft),
+              1px 3px 8px rgba(120, 70, 18, 0.16);
+  transition: transform .25s var(--ease-out), box-shadow .2s ease,
+              border-color .2s ease;
+  z-index: 3;
+  /* un souffle très lent : il respire une fois toutes les 7 s, assez
+     pour attirer l'œil, trop doux pour agacer quelqu'un qui travaille */
+  animation: socleSouffle 7s ease-in-out infinite;
+}
+@keyframes socleSouffle {
+  0%, 62%, 100% { box-shadow: var(--edge-light),
+                              0 0 0 3px var(--accent-soft),
+                              1px 3px 8px rgba(120, 70, 18, 0.16); }
+  78%           { box-shadow: var(--edge-light),
+                              0 0 0 6px var(--accent-soft),
+                              0 0 14px var(--accent-glow),
+                              1px 3px 8px rgba(120, 70, 18, 0.16); }
+}
+/* l'ombre que Filou projette sur son socle : sans elle, il flotte */
+.filou-edge .fe-socle::before {
+  content: ""; position: absolute; left: 16px; right: 16px; top: -6px;
+  height: 7px; border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 100%,
+              rgba(105, 62, 14, 0.30), rgba(105, 62, 14, 0) 74%);
+}
+.filou-edge:hover .fe-socle,
+.filou-edge:focus-visible .fe-socle {
+  animation: none;
+  border-color: var(--accent-ink);
+  background: linear-gradient(180deg, #FFFFFF 0%, #FDF7E9 100%);
+  box-shadow: var(--edge-light),
+              0 0 0 5px var(--accent-soft),
+              2px 5px 12px rgba(120, 70, 18, 0.22);
+}
+/* Filou change de côté : le socle suit, mais son libellé se relit à
+   l'endroit (le parent est miroité en mode droite, on l'annule ici) */
+.plan-scene.filou-right .filou-edge .fe-socle-txt { display: inline-block; transform: scaleX(-1); }
+/* quand Filou est déjà sorti dans le panneau, l'appel n'a plus de sens */
+.plan-scene.filou-parti .fe-socle { opacity: .35; }
+.filou-edge .fx-scene {
+  position: absolute; left: 0; top: 0;
+  display: block; width: 1080px; height: 1920px;
+  transform: scale(var(--ech)); transform-origin: top left;
+}
+.filou-edge .fx-scene img { position: absolute; display: block; max-width: none; }
+.fx-corps { animation: fxRespire 4.6s ease-in-out infinite; }
+.fx-tete {
+  position: absolute; left: 0; top: 0; display: block;
+  width: 1080px; height: 1920px;
+  transform-origin: 600px 930px;
+  animation: fxRespire 4.6s ease-in-out infinite,
+             fxPenche 11s ease-in-out infinite;
+}
+.fx-or-g { transform-origin: 132px 344px; animation: fxOreilleG 8.5s ease-in-out infinite; }
+.fx-or-d { transform-origin: 52px 312px;  animation: fxOreilleD 8.5s ease-in-out infinite .9s; }
+/* l'œil est une FENÊTRE : la paupière coulisse dedans, donc elle est
+   strictement invisible au repos (hors cadre), sans aplat sur le front */
+.fx-oeil { position: absolute; display: block; overflow: hidden; border-radius: 50%; }
+.fx-oeil i {
+  position: absolute; left: -4%; top: 0; width: 108%; height: 150%;
+  transform: translateY(-101%);
+  border-radius: 0 0 46% 46% / 0 0 26% 26%;
+  box-shadow: inset 0 -7px 9px -4px rgba(110, 58, 8, 0.75);
+}
+.fx-oeil.g i {
+  background: linear-gradient(#F09A3A 0%, #CA6504 62%, #A9530A 100%);
+  animation: fxCligne 5.4s ease-in-out infinite;
+}
+.fx-oeil.d i {
+  background: linear-gradient(#F5A648 0%, #E57704 62%, #B85C0B 100%);
+  animation: fxCligne 5.4s ease-in-out infinite .035s;
+}
+@keyframes fxRespire { 0%,100% { translate: 0 0 } 50% { translate: 0 -7px } }
+@keyframes fxPenche  { 0%,100% { rotate: 0deg } 28% { rotate: -1.5deg } 62% { rotate: 1.1deg } }
+@keyframes fxOreilleG {
+  0%,16%,100% { rotate: 0deg }
+  19% { rotate: 5deg } 22% { rotate: -2deg } 25% { rotate: 3deg } 29% { rotate: 0deg }
+  68% { rotate: 0deg } 71% { rotate: 4deg } 74% { rotate: 0deg }
+}
+@keyframes fxOreilleD {
+  0%,40%,100% { rotate: 0deg }
+  43% { rotate: -5deg } 46% { rotate: 2deg } 49% { rotate: -3deg } 53% { rotate: 0deg }
+  86% { rotate: 0deg } 89% { rotate: -4deg } 92% { rotate: 0deg }
+}
+/* clignement : fermé ~90 ms — assez court pour ne jamais se remarquer */
+@keyframes fxCligne {
+  0%,88%   { transform: translateY(-101%) }
+  90.5%    { transform: translateY(0) }
+  92.5%    { transform: translateY(0) }
+  95%,100% { transform: translateY(-101%) }
+}
+/* pendant le coucou, les couches s'effacent au profit du métrage */
+.filou-edge.fe-wave .fx { opacity: 0; }
+/* Les vidéos « accroché au rebord » (même métrage : idle + coucou),
+   superposées pour le fondu croisé. Cadrées pour que l'arête invisible
+   qu'il agrippe (~18 % de la largeur en natif) tombe PILE sur le
+   rebord de la carte une fois le .fe-crop miroité. */
+.filou-edge video {
+  position: absolute; left: 0; top: -18px;
+  width: 200px; height: auto; max-width: none;
+  display: block; opacity: 0;
+  transition: opacity .08s linear;
+}
+.filou-edge.fe-wave #fe-coucou { opacity: 1; }
+.filou-edge:hover, .filou-edge:focus-visible {
+  transform: translateY(-7px);
+}
+/* de l'autre côté : même pose, en miroir (les pattes suivent) */
+.plan-scene.filou-right .filou-edge {
+  /* -160 comme à gauche : la pose doit être SYMÉTRIQUE, sinon le socle
+     mord de 20 px de plus de ce côté (il grattait les compteurs) */
+  left: auto; right: -160px;
+  transform: scaleX(-1);
+  /* le miroir suffit : l'arête vidéo retombe pile sur le rebord droit */
+}
+.plan-scene.filou-right .filou-edge:hover,
+.plan-scene.filou-right .filou-edge:focus-visible {
+  transform: scaleX(-1) translateY(-7px);
+}
+/* le plongeon : il disparaît le temps de changer de côté */
+.filou-edge.fe-dive { transform: translateY(26px) scale(0.85); opacity: 0; }
+.plan-scene.filou-right .filou-edge.fe-dive { transform: translateY(26px) scaleX(-1) scale(0.85); opacity: 0; }
+/* le bond du départ : il se hisse avant d'ouvrir l'accueil */
+.filou-edge.fe-hop { animation: feHop .55s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+@keyframes feHop {
+  0%   { transform: none; }
+  45%  { transform: rotate(-3deg) translate(10px, -18px) scale(1.06); }
+  100% { transform: rotate(0deg) translate(16px, -8px); }
+}
+/* le voile de départ : la page s'efface, l'accueil s'ouvre */
+.depart-veil {
+  position: fixed; inset: 0; z-index: 400;
+  background: var(--bg);
+  opacity: 0; pointer-events: none;
+  transition: opacity .4s ease;
+}
+.depart-veil.show { opacity: 1; pointer-events: auto; }
+
+/* ============================================================
+   CÔTÉ DROIT — la pose miroir, portée par le composant
+   ============================================================
+   Même logique que `.plan-scene.filou-right` juste au-dessus, mais
+   demandée par une prop (`cote="droite"`) au lieu d'un état de la
+   scène. Le calage est repris à l'identique : `right: -160px` +
+   miroir du conteneur, qui annule celui du `.fe-crop` et remet le
+   métrage dans son orientation native, arête à droite. Rien n'est
+   recalculé ici — un « ajustement au jugé » a déjà coûté deux essais.
+   ============================================================ */
+.filou-edge--droite {
+  left: auto; right: -160px;
+  transform: scaleX(-1);
+}
+.filou-edge--droite:hover,
+.filou-edge--droite:focus-visible {
+  transform: scaleX(-1) translateY(-7px);
+}
+/* le libellé du socle se relit à l'endroit malgré le miroir du parent */
+.filou-edge--droite .fe-socle-txt { display: inline-block; transform: scaleX(-1); }
+/* le bond du départ doit CONSERVER le miroir : sans cette variante,
+   `feHop` repart de `transform: none` et Filou se retourne d'un coup
+   au moment même du clic. */
+.filou-edge--droite.fe-hop { animation: feHopDroite .55s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+@keyframes feHopDroite {
+  0%   { transform: scaleX(-1); }
+  45%  { transform: scaleX(-1) rotate(-3deg) translate(10px, -18px) scale(1.06); }
+  100% { transform: scaleX(-1) rotate(0deg) translate(16px, -8px); }
+}
+
+/* ============================================================
+   SCÈNE « ABSENCES » — Filou en haut à droite des cartes
+   ============================================================
+   La scène commence exactement où commence la première carte de
+   l'onglet ouvert (« Souhaits en attente » côté congés) : `top: 0`
+   pose donc sa tête à la hauteur du bord haut de la carte, et son
+   socle vient s'appuyer ~195 px plus bas, le long du rebord droit.
+   C'est l'endroit désigné sur la capture.
+   ============================================================ */
+.abs-scene .filou-edge { top: 0; }
+
+/* Il déborde de 160 px À DROITE de la carte. À droite, un débordement
+   ne se contente pas de sortir du cadre : il crée une barre de défilement
+   horizontale sur toute la page. On la coupe à la racine, et uniquement
+   sur les pages qui portent cette scène — `overflow-x: clip` (et pas
+   `hidden`) parce que lui seul laisse l'axe vertical intact et ne
+   transforme pas la page en conteneur de défilement. */
+html:has(.abs-scene) { overflow-x: clip; }
+
+/* Sous ~1100 px, la coquille occupe toute la largeur : il ne reste plus
+   de marge où Filou puisse se tenir, il chevaucherait le contenu. On le
+   retire — un renard à moitié sous le texte ne rend service à personne. */
+@media (max-width: 1100px) {
+  .abs-scene .filou-edge { display: none; }
+}
+
+/* ============================================================
+   ACCESSIBILITÉ · prefers-reduced-motion
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .filou-edge { transition: none; }
+  /* Filou en couches : plus de respiration ni de clignement — les pièces
+     restent à leur place, on retrouve exactement l'image d'origine. */
+  .fx-corps, .fx-tete, .fx-or-g, .fx-or-d, .fx-oeil i,
+  .fe-socle { animation: none !important; }
+}

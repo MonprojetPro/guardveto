@@ -27,6 +27,7 @@ import { useRouter } from 'next/navigation'
 import { FilouCube, type FilouHandle } from './FilouCube'
 import { FilouChat, type FilouChatHandle } from './FilouChat'
 import { FenetreResultatFilou, type ResultatFilou } from './FilouResultat'
+import { ACCROCHES, lireOrigine, portUneOrigine } from '@/lib/v2/filou-origine'
 import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
 import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
 import type { DonneesAccueil, GardeDuSoir } from '@/data/v2/accueilEpicentre'
@@ -162,6 +163,47 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
       vivant = false
     }
   }, [data.estAdmin, data.periodesPubliees])
+
+  // ── D'où l'on vient : Filou ouvre sur l'onglet qu'on venait de quitter ──
+  //
+  // Le fragment `#filou=depannages` est posé par le Filou accroché aux écrans
+  // (`FilouEdge`). Il n'était lu par PERSONNE jusqu'ici : le commentaire
+  // promettait une phrase liée à l'écran d'origine, et il n'arrivait rien.
+  //
+  // Deux gardes qui ne sont pas du zèle :
+  //  • `origineLue` — en développement React monte deux fois, et sans lui Filou
+  //    disait deux fois la même chose.
+  //  • le fragment est effacé AVANT toute autre décision — sinon un F5, ou un
+  //    lien recopié à un confrère, rejouerait l'accroche indéfiniment.
+  const origineLue = useRef(false)
+  useEffect(() => {
+    if (origineLue.current) return
+    origineLue.current = true
+
+    const hash = window.location.hash
+    if (!portUneOrigine(hash)) return
+    // Y compris quand l'origine est inconnue (lien tapé à la main) : un fragment
+    // qui ne fait rien n'a rien à faire dans la barre d'adresse.
+    window.history.replaceState(null, '', window.location.pathname + window.location.search)
+
+    const origine = lireOrigine(hash)
+    if (!origine) return
+    // Le champ de saisie n'existe que pour un administrateur (`FilouChat`).
+    // Poser la question à un vétérinaire qui n'a aucun moyen d'y répondre serait
+    // exactement la coquille vide qu'on traque : il arrive donc sur son accueil
+    // normal, sans promesse en l'air.
+    if (!data.estAdmin) return
+
+    const accroche = ACCROCHES[origine]
+    // `saufSiDejaDit` : quatre allers-retours planning → accueil sont quatre
+    // appels légitimes, et Filou doit répondre à chaque fois. Mais faire
+    // l'aller-retour SANS rien lui dire entre-temps n'est pas une nouvelle
+    // demande — empiler la même bulle quatre fois serait du bruit.
+    chat.current?.dit(accroche.question, {
+      exemples: accroche.exemples,
+      saufSiDejaDit: true,
+    })
+  }, [data.estAdmin])
 
   // L'heure réelle sur la barre de statut de la tablette, recalée à la minute.
   useEffect(() => {

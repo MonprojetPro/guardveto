@@ -11,6 +11,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import '@/styles/v2-planning.css'
+import '@/styles/v2-filou-edge.css'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
 import { PlanningV2, type CongeAffiche } from '@/components/v2/PlanningV2'

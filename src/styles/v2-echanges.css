@@ -1,0 +1,34 @@
+/* ============================================================
+   GUARDVETO V2 — ONGLET « ÉCHANGES DE GARDES »
+   ============================================================
+   Porté de `maquette/m3-absences-echanges.html` (panneau `#tab-echanges`).
+
+   Presque tout était DÉJÀ écrit ailleurs et servait à d'autres écrans :
+   les boutons (`.btn-accent`, `.btn-ok`, `.btn-ghost`, `.btn-outline`,
+   `.btn-sm`), la carte-section (`.card`, `.card-head`, `.section-count`,
+   `.sub`, `.spacer`) dans `v2-terrier.css` ; les listes (`.rows`, `.row`,
+   `.vet-dot`, `.row-main`, `.row-side`, `.row-actions`), les pastilles de
+   statut (`.st-attente-confrere`… `.st-expiree`), la légende
+   (`.status-legend`) et `.empty-row` dans `v2-absences.css`.
+
+   Ce fichier n'ajoute donc que les deux manques réels de cet onglet-là.
+   ============================================================ */
+
+/* La légende ouvre le panneau. `.status-legend` porte une marge haute
+   négative pour se coller sous une tête de page ; ici elle n'a rien
+   au-dessus d'elle et mordait sur les onglets. */
+.tab-panel > .status-legend:first-child { margin-top: 0; }
+
+/* Un motif de refus n'est pas un mot gentil : en italique gris, il se
+   confondait avec le message d'accompagnement de la proposition. */
+.row-refus {
+  font-size: 0.82rem;
+  color: var(--danger);
+  font-style: italic;
+  margin-top: 3px;
+}
+
+/* Le bouton logé dans une tête de carte (« + Proposer un échange ») :
+   sa pilule ne doit jamais se scinder sur deux lignes. C'est le défaut
+   signalé sur la greffe V1, où le libellé débordait de son fond. */
+.card-head > .btn { white-space: nowrap; }

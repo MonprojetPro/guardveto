@@ -829,6 +829,39 @@
 .prop-verdict { font-size: 0.78rem; font-weight: 600; color: var(--danger); margin: 4px 0 12px; }
 .bubble-attente { color: var(--muted); font-style: italic; }
 
+/* ---------- Les pistes : ce que Filou propose de lui demander ----------
+   Quand il ouvre sur un onglet d'origine (« tu reviens du planning… »), il
+   pose deux ou trois phrases toutes prêtes sous sa bulle. Un clic les DÉPOSE
+   dans le champ sans les envoyer.
+
+   Le sur-emballage `.msg-pistes` n'existe que pour ces messages-là : `.bubble`
+   est large de 86 % de son parent, et l'intercaler partout changerait la
+   largeur de toutes les bulles du fil. */
+.msg-pistes {
+  display: flex; flex-direction: column; align-items: flex-start;
+  gap: 6px;
+  max-width: 86%;
+}
+.msg-pistes .bubble { max-width: 100%; }
+.pistes { display: flex; flex-wrap: wrap; gap: 5px; padding-left: 2px; }
+.piste {
+  font-size: 0.71rem; font-weight: 600; line-height: 1.35;
+  text-align: left;
+  color: var(--accent-ink);
+  background: var(--surface);
+  border: 1px dashed var(--border-strong);
+  border-radius: 999px;
+  padding: 4px 10px;
+  transition: color 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
+}
+.piste:hover { border-color: var(--accent-ink); background: var(--accent-soft); }
+/* Le trait plein dit « celle-ci part si tu valides » — le pointillé, lui,
+   annonce une phrase encore à retoucher. */
+.piste:active { border-style: solid; }
+.piste:disabled { opacity: 0.5; cursor: not-allowed; }
+.piste:disabled:hover { border-color: var(--border-strong); background: var(--surface); }
+@media (prefers-reduced-motion: reduce) { .piste { transition: none; } }
+
 /* ============================================================
    LE TABLEAU D'AFFICHAGE DU CABINET (droite) · la scène se lit :
    l'assistant et sa tablette / ta tablette / LE TABLEAU du

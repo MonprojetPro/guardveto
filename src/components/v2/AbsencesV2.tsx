@@ -26,8 +26,12 @@ import { RefuserCongeDialog } from '@/components/conges/RefuserCongeDialog'
 import { ConflitPlanningDialog } from '@/components/conges/ConflitPlanningDialog'
 import type { ConflitPlanning } from '@/app/(protected)/conges/actions'
 import { CriseModal, type VetCrise } from '@/components/planning/CriseModal'
-import { EchangesClient, type EchangeRow, type GardeLite, type VetLite } from '@/components/echanges/EchangesClient'
-import { DepannagesClient, type CompensationLigne } from '@/components/admin/DepannagesClient'
+import type { EchangeRow, GardeLite, VetLite } from '@/components/echanges/EchangesClient'
+import type { CompensationLigne } from '@/components/admin/DepannagesClient'
+import { EchangesV2 } from './EchangesV2'
+import { DepannagesV2 } from './DepannagesV2'
+import { FilouEdge } from './FilouEdge'
+import type { OrigineFilou } from '@/lib/v2/filou-origine'
 import type { CreneauImpacte } from '@/lib/crise/contexte'
 import type { Conge, TypeConge, Veterinaire } from '@/types'
 
@@ -214,6 +218,13 @@ export function AbsencesV2({
         )}
       </nav>
 
+      {/* La scène porte Filou accroché au rebord DROIT des cartes. Il repart
+          avec la mémoire de l'onglet ouvert (`#filou=conges`…) : c'est ce qui
+          lui permet d'accueillir par la bonne question au lieu d'un bonjour
+          générique. Cf. `src/lib/v2/filou-origine.ts`. */}
+      <div className="abs-scene">
+        <FilouEdge origine={onglet as OrigineFilou} cote="droite" />
+
       {/* ── Onglet 1 · les congés ───────────────────────────── */}
       {onglet === 'conges' && (
         <section className="tab-panel" role="tabpanel">
@@ -394,24 +405,24 @@ export function AbsencesV2({
 
       {/* ── Onglet 2 · les échanges de gardes ───────────────── */}
       {onglet === 'echanges' && (
-        <section className="tab-panel v2-greffe" role="tabpanel">
-          <EchangesClient
+        <section className="tab-panel" role="tabpanel">
+          <EchangesV2
             moiId={moiId}
             isAdmin={isAdmin}
             echanges={echanges}
             gardesFutures={gardesFutures}
             vets={vetsEchange}
-            gardePreselectionnee={null}
           />
         </section>
       )}
 
       {/* ── Onglet 3 · qui a dépanné qui ────────────────────── */}
       {onglet === 'depannages' && isAdmin && (
-        <section className="tab-panel v2-greffe" role="tabpanel">
-          <DepannagesClient lignes={depannages} stats={statsDepannages} />
+        <section className="tab-panel" role="tabpanel">
+          <DepannagesV2 lignes={depannages} stats={statsDepannages} vets={vets} />
         </section>
       )}
+      </div>
 
       {/* ── Les dialogues du produit ────────────────────────── */}
       <CongeForm

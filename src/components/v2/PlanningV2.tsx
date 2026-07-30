@@ -204,7 +204,7 @@ export function PlanningV2({
 
   return (
     <div className="plan-scene">
-      <FilouEdge />
+      <FilouEdge origine="planning" />
 
       <div className={`workspace${compteursOuverts ? '' : ' counters-closed'}`}>
         <div className="work-head">

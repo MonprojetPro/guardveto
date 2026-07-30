@@ -13,6 +13,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import '@/styles/v2-absences.css'
+import '@/styles/v2-echanges.css'
+import '@/styles/v2-filou-edge.css'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
 import { AbsencesV2 } from '@/components/v2/AbsencesV2'

@@ -8,11 +8,12 @@
 // avait été volontairement écarté au portage — un champ qui ne fait rien est
 // une coquille vide. Il arrive maintenant qu'il y a de quoi le brancher.
 //
-// CE QUE FILOU SAIT VRAIMENT FAIRE, et rien de plus : traduire une phrase en
-// français en une règle du cabinet, via l'assistant déjà en place
-// (`proposerRegleDepuisTexte`, Palier 3). C'est le MÊME moteur que l'écran
-// Règles, et la création passe par les MÊMES actions serveur
-// (`creerRegleProposee`) — pas une deuxième implémentation qui divergerait.
+// CE QUE FILOU SAIT VRAIMENT FAIRE se lit à UN seul endroit : le catalogue
+// d'outils (`src/lib/ia/outils/registre.ts`). Il y lit le planning, les congés,
+// les échanges, les absences, l'équipe, les règles et la structure, et propose
+// des écritures que l'humain valide. Rien ici ne doit annoncer une capacité qui
+// n'y figure pas — et toute écriture repasse par les MÊMES actions serveur que
+// les boutons de l'application, jamais par une seconde implémentation.
 //
 // LA TABLETTE NE PORTE QUE LA CONVERSATION. Ce que Filou COMPREND part sur le
 // tableau du cabinet via `onResultat` (cf. `FilouResultat.tsx`) : c'est là qu'il
@@ -54,6 +55,11 @@ type Message = {
   id: number
   de: 'moi' | 'filou'
   texte: string
+  /** Des phrases toutes prêtes proposées sous la bulle. Un clic les DÉPOSE dans
+   *  le champ sans les envoyer : la personne relit, adapte le prénom ou la date,
+   *  puis décide. Envoyer au clic ferait partir une demande qu'elle n'a fait que
+   *  regarder. */
+  exemples?: string[]
   /** Ce que Filou doit se rappeler avoir dit, quand ce n'est pas ce qui
    *  s'affiche. Sa vraie réponse est sur le tableau ; dans le fil il ne reste
    *  qu'un renvoi (« je te réponds sur le tableau »). Lui renvoyer ce renvoi
@@ -84,7 +90,10 @@ function relireConversation(): Message[] {
         typeof m?.id === 'number' &&
         typeof m?.texte === 'string' &&
         (m?.de === 'moi' || m?.de === 'filou') &&
-        (m?.pourFilou === undefined || typeof m.pourFilou === 'string'),
+        (m?.pourFilou === undefined || typeof m.pourFilou === 'string') &&
+        (m?.exemples === undefined ||
+          (Array.isArray(m.exemples) &&
+            m.exemples.every((e: unknown) => typeof e === 'string'))),
     )
   } catch {
     return []
@@ -110,7 +119,19 @@ const LONGUEUR_MAX = 400
  *  ce qui permet au tableau (« créée », « abandonnée ») de revenir commenter
  *  dans la conversation, au lieu de laisser deux moitiés d'écran s'ignorer. */
 export interface FilouChatHandle {
-  dit: (texte: string) => void
+  dit: (texte: string, options?: OptionsDit) => void
+}
+
+export interface OptionsDit {
+  /** Phrases toutes prêtes à proposer sous la bulle. Ignorées hors
+   *  administrateur : sans champ de saisie, un exemple cliquable ne mènerait
+   *  nulle part. */
+  exemples?: string[]
+  /** Ne rien ajouter si Filou vient déjà de dire exactement ça. Sert aux
+   *  phrases déclenchées par une navigation (cf. l'accroche d'origine dans
+   *  `Epicentre`) : quatre allers-retours sans un mot entre-temps ne doivent pas
+   *  empiler quatre fois la même bulle. */
+  saufSiDejaDit?: boolean
 }
 
 interface Props {
@@ -146,17 +167,40 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
   const champRef = useRef<HTMLTextAreaElement>(null)
   const compteur = useRef(messages.at(-1)?.id ?? 0)
 
-  const ajouter = (de: Message['de'], texte: string, pourFilou?: string) => {
+  // Le fil tel qu'il est MAINTENANT, lisible hors du rendu. `dit` doit pouvoir
+  // comparer sa phrase au dernier message avant d'écrire, et il est appelé
+  // depuis un effet du parent — la variable `messages` capturée par la fermeture
+  // y serait celle du rendu précédent.
+  const filActuel = useRef(messages)
+  useEffect(() => {
+    filActuel.current = messages
+  }, [messages])
+
+  const ajouter = (
+    de: Message['de'],
+    texte: string,
+    extra?: { pourFilou?: string; exemples?: string[] },
+  ) => {
     compteur.current += 1
+    const message: Message = { id: compteur.current, de, texte, ...extra }
     setMessages((prec) => {
-      const suite = [...prec, { id: compteur.current, de, texte, pourFilou }]
+      const suite = [...prec, message]
       memoriserConversation(suite)
       return suite
     })
+    filActuel.current = [...filActuel.current, message]
   }
 
   useImperativeHandle(ref, () => ({
-    dit: (texte: string) => ajouter('filou', texte),
+    dit: (texte: string, options?: OptionsDit) => {
+      const dernier = filActuel.current.at(-1)
+      if (options?.saufSiDejaDit && dernier?.de === 'filou' && dernier.texte === texte) return
+      ajouter('filou', texte, {
+        // Sans champ de saisie, un exemple cliquable ne mène nulle part : on ne
+        // les propose donc qu'à qui peut s'en servir.
+        exemples: estAdmin && options?.exemples?.length ? options.exemples : undefined,
+      })
+    },
   }))
 
   /** On repart d'une page blanche : le fil, sa trace dans l'onglet, le champ,
@@ -208,7 +252,7 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
     ajouter(
       'filou',
       mot?.trim() || 'J’ai compris ta demande — je l’affiche sur le tableau du cabinet.',
-      [
+      { pourFilou: [
         contenu.introduction,
         ...(contenu.lignes ?? []),
         // Ce qu'il proposait de changer vit désormais à part de son constat
@@ -220,11 +264,25 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
           : '',
       ]
         .filter(Boolean)
-        .join('\n'),
+        .join('\n') },
     )
     compteur.current += 1
     onResultat({ ...contenu, id: compteur.current })
     requestAnimationFrame(() => champRef.current?.focus())
+  }
+
+  /** Un exemple atterrit dans le champ, curseur au bout, sans partir. Filou
+   *  suggère une tournure ; le prénom ou la date sont presque toujours à
+   *  reprendre. */
+  const deposer = (texte: string) => {
+    if (enCours) return
+    setPhrase(texte.slice(0, LONGUEUR_MAX))
+    requestAnimationFrame(() => {
+      const champ = champRef.current
+      if (!champ) return
+      champ.focus()
+      champ.setSelectionRange(champ.value.length, champ.value.length)
+    })
   }
 
   const envoyer = () => {
@@ -253,7 +311,7 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
         // Une panne se dit à la personne, mais ne se raconte pas à Filou : lui
         // renvoyer son propre message d'erreur comme s'il l'avait pensé le
         // ferait raisonner dessus au tour suivant. Texte vide = tour ignoré.
-        ajouter('filou', reponse.error, '')
+        ajouter('filou', reponse.error, { pourFilou: '' })
         requestAnimationFrame(() => champRef.current?.focus())
         return
       }
@@ -288,10 +346,36 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
               <span className="m-ava" aria-hidden="true">
                 🦊
               </span>
-              <div className="bubble">
-                <span className="vh">Filou : </span>
-                {m.texte}
-              </div>
+              {/* Le sur-emballage n'apparaît QUE s'il y a des pistes à poser
+                  sous la bulle : `.bubble` est large de 86 % de son parent, et
+                  intercaler un conteneur pour tous les messages changerait la
+                  largeur de toutes les bulles du fil. */}
+              {m.exemples?.length ? (
+                <div className="msg-pistes">
+                  <div className="bubble">
+                    <span className="vh">Filou : </span>
+                    {m.texte}
+                  </div>
+                  <div className="pistes">
+                    {m.exemples.map((ex) => (
+                      <button
+                        key={ex}
+                        type="button"
+                        className="piste"
+                        onClick={() => deposer(ex)}
+                        disabled={enCours}
+                      >
+                        {ex}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="bubble">
+                  <span className="vh">Filou : </span>
+                  {m.texte}
+                </div>
+              )}
             </div>
           ),
         )}
