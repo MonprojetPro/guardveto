@@ -20,14 +20,16 @@ import { Button } from '@/components/ui/button'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog'
-import { phraseRegle, fusionnerDuos } from '@/lib/regles/libelle'
+import { phraseRegle, fusionnerDuos, etageDe, symboleDe } from '@/lib/regles/libelle'
 import { setRegleActif, deleteRegle } from '@/app/(protected)/regles/actions'
 import { RegleFormDialog } from './RegleFormDialog'
 import { AssistantIA } from './AssistantIA'
 
 /** Briques que le formulaire P1A-007 sait éditer (= évaluables par le moteur).
- *  Doit rester aligné avec BRIQUES_EVALUABLES (actions.ts) + BRIQUES (RegleFormDialog). */
-const BRIQUES_EDITABLES = new Set([
+ *  Doit rester aligné avec BRIQUES_EVALUABLES (actions.ts) + BRIQUES (RegleFormDialog).
+ *  Exporté : l'écran Équipe ouvre le MÊME formulaire depuis la fiche d'un véto et
+ *  doit donc griser exactement les mêmes règles. */
+export const BRIQUES_EDITABLES = new Set([
   'interdire_creneau', 'repos_conditionnel', 'alternance_ancre', 'duo_interdit',
   'au_plus_n', 'espacement_min', 'espacement_weekend',
   // Desiderata (n°7) — préférences positives par véto.
@@ -75,13 +77,16 @@ export interface VetoMini {
 
 type GroupeKey = 'fermes' | 'sauf_crise' | 'confort' | 'reglementaires'
 
-const FORCE_META: Record<string, { etage: number; groupe: GroupeKey; symbole: string }> = {
-  invariant:     { etage: 0, groupe: 'fermes',         symbole: '🔴' },
-  reglementaire: { etage: 1, groupe: 'reglementaires', symbole: '⚪' },
-  jamais:        { etage: 2, groupe: 'fermes',         symbole: '🔴' },
-  sauf_crise:    { etage: 3, groupe: 'sauf_crise',     symbole: '🟠' },
-  evitee:        { etage: 4, groupe: 'confort',        symbole: '🟡' },
-  si_possible:   { etage: 5, groupe: 'confort',        symbole: '🟡' },
+// L'étage, le symbole et le mot de chaque force vivent dans `@/lib/regles/libelle`
+// (source unique partagée avec l'écran Équipe). Ne reste ici que le REGROUPEMENT
+// en sections, qui n'appartient qu'à cet écran.
+const GROUPE_PAR_FORCE: Record<string, GroupeKey> = {
+  invariant:     'fermes',
+  reglementaire: 'reglementaires',
+  jamais:        'fermes',
+  sauf_crise:    'sauf_crise',
+  evitee:        'confort',
+  si_possible:   'confort',
 }
 
 const GROUPES: { key: GroupeKey; titre: string; symbole: string }[] = [
@@ -90,14 +95,8 @@ const GROUPES: { key: GroupeKey; titre: string; symbole: string }[] = [
   { key: 'confort',    titre: 'Préférences de confort',  symbole: '🟡' },
 ]
 
-function etageDe(force: string): number {
-  return FORCE_META[force]?.etage ?? 99
-}
-function symboleDe(force: string): string {
-  return FORCE_META[force]?.symbole ?? '⚪'
-}
 function groupeDe(force: string): GroupeKey {
-  return FORCE_META[force]?.groupe ?? 'confort'
+  return GROUPE_PAR_FORCE[force] ?? 'confort'
 }
 
 // Le rendu d'une règle en français vit dans `@/lib/regles/libelle` : Filou s'en

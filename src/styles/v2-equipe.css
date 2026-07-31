@@ -53,37 +53,49 @@
   box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.35);
 }
 .vet-card-top h3 { font-size: 1.02rem; font-weight: 700; line-height: 1.2; }
-.vet-card-top .vet-sub { font-size: 0.76rem; color: var(--muted); margin-top: 1px; }
 .vet-card-top .vet-mail {
-  font-size: 0.72rem; color: var(--soft); margin-top: 2px;
+  font-size: 0.74rem; color: var(--soft); margin-top: 3px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.vet-flags { display: flex; flex-wrap: wrap; gap: 6px; }
-.flag {
-  font-size: 0.64rem; font-weight: 700; letter-spacing: 0.05em;
-  text-transform: uppercase;
-  padding: 3px 10px; border-radius: 999px;
+
+/* -- Ce qu'est la personne, sur UNE ligne de texte -----------------------
+   Remplace trois bandes de pilules (rôle+statut, étiquettes, et la fameuse
+   « aucune étiquette » qui occupait une ligne pour dire qu'il n'y avait
+   rien). Toutes se ressemblaient : l'œil ne savait plus laquelle comptait,
+   et l'état du compte — la seule information décisive — s'y noyait.
+   Retour MiKL 2026-07-31 : « c'est fouilli ». */
+.vet-ligne {
+  font-size: 0.78rem; line-height: 1.5; color: var(--muted);
+  /* Deux lignes réservées : sans ça, un véto à trois étiquettes fait grandir
+     sa carte et casse l'alignement de toute la rangée. */
+  min-height: 2.34em;
 }
-.flag-admin { background: var(--accent-soft); color: var(--accent-ink); }
-.flag-recours { background: var(--warn-soft); color: var(--warn); }
-.flag-role { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
-.vet-tags { display: flex; flex-wrap: wrap; gap: 6px; min-height: 24px; }
-.vet-tags .tag {
-  font-size: 0.7rem; font-weight: 600;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  color: var(--muted);
-  padding: 3px 10px; border-radius: 999px;
-}
-.vet-tags .tag.vide { opacity: 0.55; font-style: italic; }
+.vet-ligne strong { color: var(--accent-ink); font-weight: 700; }
+.vet-ligne .vl-sep { color: var(--border-strong); }
 
 /* -- L'état du compte : la seule information qui dit si la personne
       peut réellement entrer dans l'app -- */
+/* L'état PORTE son action : « Sans compte → Inviter », « Invitation envoyée →
+   Relancer ». C'était deux bandes séparées, et le bouton d'invitation se
+   noyait au milieu de quatre autres de même taille. Le bloc existe toujours,
+   même quand le compte est actif et qu'il n'y a rien à faire : c'est lui qui
+   garantit que toutes les cartes de la grille ont la même hauteur. */
 .vet-account {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
   font-size: 0.78rem; font-weight: 600;
+  min-height: 34px;
   padding-top: 10px; border-top: 1px dashed var(--border);
 }
+.acct-etat { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.acct-cta {
+  flex: none;
+  background: var(--accent-soft); color: var(--accent-ink);
+  border: 1px solid var(--border-strong); border-radius: 999px;
+  font-size: 0.74rem; font-weight: 700;
+  padding: 5px 14px; min-height: 30px;
+}
+.acct-cta:hover:not(:disabled) { background: var(--accent); color: #fff; border-color: var(--accent); }
+.acct-cta:disabled { opacity: 0.5; cursor: not-allowed; }
 .acct-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
 .acct-actif   .acct-dot { background: var(--ok); }
 .acct-invite  .acct-dot { background: var(--warn); }
@@ -94,45 +106,140 @@
 .acct-sans    { color: var(--muted); }
 .acct-inactif { color: var(--danger); }
 
-.vet-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+/* -- Les actions de gestion : trois au maximum, jamais de retour à la ligne --
+   Il y en avait jusqu'à cinq, toutes de même taille, qui wrappaient sur deux
+   rangs irréguliers — d'où des cartes de hauteurs différentes dans la grille.
+   L'action de compte est remontée sur la ligne d'état ; il ne reste ici que
+   ce qui n'est jamais urgent. */
+.vet-actions { display: flex; gap: 6px; }
 .vet-actions button {
   border: 1px solid var(--border-strong);
   background: transparent; color: var(--muted);
   border-radius: 999px;
   font-size: 0.74rem; font-weight: 600;
   padding: 6px 12px; min-height: 34px;
-  display: inline-flex; align-items: center; gap: 5px;
+  display: inline-flex; align-items: center; gap: 6px;
+  white-space: nowrap;
 }
 .vet-actions button:hover:not(:disabled) { color: var(--accent-ink); border-color: var(--accent-ink); }
 .vet-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Rouge AU REPOS, pas seulement au survol : sur tablette il n'y a pas de
+   survol, et « Désactiver » avait exactement l'air de « Modifier ». */
+.vet-actions button.va-danger { color: var(--danger); border-color: var(--danger-soft); }
 .vet-actions button.va-danger:hover:not(:disabled) {
   color: var(--danger); border-color: var(--danger); background: var(--danger-soft);
 }
-.vet-actions button.va-invite {
-  background: var(--accent-soft); color: var(--accent-ink);
-  border-color: var(--border-strong); font-weight: 700;
-}
-.vet-actions button.va-invite:hover:not(:disabled) {
-  background: var(--accent); color: #fff; border-color: var(--accent);
-}
-.vet-actions button.va-on[aria-expanded='true'] {
-  background: var(--surface-2); color: var(--accent-ink); border-color: var(--accent-ink);
-}
-.va-pip {
-  font-family: var(--font-display); font-size: 0.64rem; font-weight: 800;
-  background: var(--accent); color: #fff;
-  border-radius: 999px; padding: 1px 6px; min-width: 18px; text-align: center;
+
+/* Le compteur de contraintes. Ce n'était pas une notification à traiter :
+   la pastille orange vif lui donnait une urgence qu'elle n'a pas. */
+.va-nb {
+  font-family: var(--font-display); font-size: 0.66rem; font-weight: 800;
+  background: var(--surface-2); color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px; padding: 0 6px; min-width: 18px; text-align: center;
 }
 
-/* -- Les desiderata d'un véto : composant V1 greffé sous la fiche -- */
-.vet-contraintes {
-  border-top: 1px dashed var(--border);
-  padding-top: 10px;
-  animation: vetPanelIn 0.32s var(--ease-out) both;
+/* ============================================================
+   « SES CONTRAINTES » — la modale ouverte depuis une fiche
+   ============================================================
+   Elle remplace le composant V1 qui se dépliait SOUS la carte. Deux raisons
+   de passer en modale plutôt que de rhabiller le dépli : une liste dépliée
+   fait grandir une seule carte et décale toute la rangée de la grille ; et
+   ces règles méritent d'être lues au calme, pas dans une bande de 200 px.
+
+   Le châssis (voile brun, surface crème, arrondis) vient du Dialog partagé,
+   déjà remappé sur la palette du terrier dans `v2-terrier.css`. Ne sont
+   définis ici que la liste et ses lignes. */
+
+.cv-titre { display: flex; align-items: center; gap: 10px; }
+.cv-avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  color: #fff; font-family: var(--font-display);
+  font-weight: 800; font-size: 0.82rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35);
 }
-@keyframes vetPanelIn {
-  from { opacity: 0; transform: translateY(-6px); }
-  to { opacity: 1; transform: none; }
+
+.cv-vide {
+  color: var(--muted); font-size: 0.86rem; line-height: 1.65;
+  background: var(--surface-2);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-md);
+  padding: 16px 18px;
+}
+
+.cv-liste {
+  display: flex; flex-direction: column; gap: 10px;
+  max-height: min(46vh, 420px); overflow-y: auto;
+  /* Réserve la gouttière de l'ascenseur pour que les lignes ne se décalent
+     pas de quelques pixels dès que la liste devient assez longue. */
+  scrollbar-gutter: stable;
+  padding-right: 2px;
+}
+
+.cv-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+}
+.cv-item.en-pause { opacity: 0.6; }
+.cv-item-corps { flex: 1; min-width: 0; }
+
+/* La PHRASE d'abord : c'est elle qui dit ce que le moteur s'interdit.
+   L'ancien module affichait une étiquette de type au-dessus d'un texte qui
+   répétait la même chose — « Jour de repos fixe » deux fois de suite. */
+.cv-phrase { font-size: 0.88rem; line-height: 1.55; color: var(--text); }
+
+.cv-meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin-top: 6px;
+  font-size: 0.7rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.cv-force { display: inline-flex; align-items: center; gap: 5px; }
+/* Un duo interdit vit sur DEUX fiches : on le dit, sinon on croit l'avoir
+   retiré d'un côté seulement. */
+.cv-partagee, .cv-pause {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 999px; padding: 2px 8px; font-weight: 600;
+}
+
+.cv-item-actions { display: flex; flex-direction: column; gap: 5px; flex: none; }
+.cv-item-actions button {
+  border: 1px solid var(--border-strong);
+  background: var(--surface); color: var(--muted);
+  border-radius: 999px;
+  font-size: 0.71rem; font-weight: 600;
+  padding: 4px 11px; min-height: 28px;
+  white-space: nowrap;
+}
+.cv-item-actions button:hover:not(:disabled) { color: var(--accent-ink); border-color: var(--accent-ink); }
+.cv-item-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+.cv-item-actions button.cv-danger { color: var(--danger); border-color: var(--danger-soft); }
+.cv-item-actions button.cv-danger:hover:not(:disabled) {
+  border-color: var(--danger); background: var(--danger-soft);
+}
+
+.cv-pied { justify-content: space-between; }
+
+/* Le rappel de ce qu'on s'apprête à retirer, dans la confirmation. */
+.cv-rappel {
+  font-size: 0.86rem; line-height: 1.55;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+}
+
+@media (max-width: 520px) {
+  /* Sur téléphone, la colonne d'actions mange la phrase : on repasse en ligne. */
+  .cv-item { flex-direction: column; }
+  .cv-item-actions { flex-direction: row; flex-wrap: wrap; }
 }
 
 /* ============================================================

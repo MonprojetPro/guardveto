@@ -11,18 +11,38 @@
 //
 // Ce qui est RÉUTILISÉ tel quel (les règles métier) : les quatre actions
 // serveur de `/admin/veterinaires` (création, modification, invitation,
-// activation) et le composant `ContraintesSection` pour les desiderata d'un
-// véto. On ne réécrit pas une action qui porte une garde admin, une résolution
-// de cabinet et un garde-fou sur les gardes publiées.
+// activation). On ne réécrit pas une action qui porte une garde admin, une
+// résolution de cabinet et un garde-fou sur les gardes publiées.
 //
 // Ce qui est AJOUTÉ vs la maquette : nom de famille et e-mail dans le
 // formulaire. La maquette ne demandait qu'un prénom ; sans e-mail, la création
 // échoue côté serveur et l'invitation est impossible.
+//
+// ── Deux corrections du 2026-07-31 (retour MiKL « c'est fouilli ») ──────────
+//
+// 1. LA CARTE. Le portage avait empilé cinq bandes de pilules qui se
+//    ressemblaient toutes, et jusqu'à cinq boutons de même poids qui passaient
+//    à la ligne — d'où des cartes de hauteurs différentes dans la grille. On
+//    revient à quatre zones franches et à une barre d'action de forme FIXE :
+//    l'état du compte porte sa propre action (inviter / relancer / réactiver),
+//    les trois autres restent en dessous, discrètes.
+//
+// 2. LES CONTRAINTES. `ContraintesSection` (V1) se dépliait ici et lisait
+//    `contraintes_veto` — table que le moteur n'utilise plus depuis P1A-004.
+//    Elle montrait une copie figée et son crayon écrivait dans le vide. Elle
+//    est remplacée par `ContraintesVetoModale`, branchée sur `regles_cabinet`.
 // ============================================================
 
 import { useMemo, useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { ContraintesSection } from '@/components/admin/ContraintesSection'
+import { ContraintesVetoModale } from '@/components/v2/ContraintesVetoModale'
+import { reglesDuVeto } from '@/lib/regles/libelle'
+import type {
+  PeriodeOption,
+  RegleRow,
+  TypeCreneauOption,
+  VetoMini,
+} from '@/components/regles/ReglesClient'
 import {
   createVeterinaire,
   updateVeterinaire,
@@ -31,7 +51,7 @@ import {
   type GardeAVenir,
   type VeterinaireFormData,
 } from '@/app/(protected)/admin/veterinaires/actions'
-import type { ContrainteVeto, StatutVeto, UserRole, Veterinaire } from '@/types'
+import type { StatutVeto, UserRole, Veterinaire } from '@/types'
 
 /** Palette du Terrier — les valeurs partent en base, donc en dur, pas en var(). */
 const COULEURS = [
@@ -124,12 +144,15 @@ function formDepuisVeto(v: Veterinaire): FormState {
 
 interface Props {
   vets: Veterinaire[]
-  contraintes: ContrainteVeto[]
+  /** Les règles du cabinet — LA source du moteur. Filtrées par véto à l'affichage. */
+  regles: RegleRow[]
+  periodes: PeriodeOption[]
+  typesCreneaux: TypeCreneauOption[]
   /** Le véto connecté : on ne lui laisse pas retirer son propre accès admin. */
   moiId: string
 }
 
-export function EquipeV2({ vets, contraintes, moiId }: Props) {
+export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props) {
   const [isPending, startTransition] = useTransition()
 
   // Panneau de formulaire : fermé, en création, ou en modification d'une fiche.
@@ -138,8 +161,8 @@ export function EquipeV2({ vets, contraintes, moiId }: Props) {
   const [erreur, setErreur] = useState<string | null>(null)
   const [tagLibre, setTagLibre] = useState('')
 
-  // Desiderata dépliés, fiche par fiche.
-  const [contraintesOuvertes, setContraintesOuvertes] = useState<Set<string>>(new Set())
+  // La fiche dont on consulte les contraintes (modale).
+  const [ficheContraintes, setFicheContraintes] = useState<Veterinaire | null>(null)
 
   // Garde-fou : les gardes publiées que la désactivation laisserait orphelines.
   const [garde, setGarde] = useState<{ veto: Veterinaire; gardes: GardeAVenir[] } | null>(null)
@@ -149,7 +172,20 @@ export function EquipeV2({ vets, contraintes, moiId }: Props) {
     () => vets.filter((v) => v.actif && v.user_id && !v.invite_pending).length,
     [vets],
   )
-  const contraintesDe = (id: string) => contraintes.filter((c) => c.veterinaire_id === id)
+  // Le décompte affiché sur la carte doit être EXACTEMENT celui de la modale :
+  // même filtre, même dédoublonnage des duos. D'où l'appel au même sélecteur
+  // plutôt qu'à un `filter` maison qui aurait compté les duos deux fois.
+  const nbContraintes = useMemo(() => {
+    const par = new Map<string, number>()
+    for (const v of vets) par.set(v.id, reglesDuVeto(regles, v.id).filter((r) => r.actif).length)
+    return par
+  }, [regles, vets])
+
+  /** Les vétos tels que les attend le formulaire de règle (forme partagée). */
+  const vetsMini: VetoMini[] = useMemo(
+    () => vets.map((v) => ({ id: v.id, prenom: v.prenom, nom: v.nom, couleur: v.couleur })),
+    [vets],
+  )
 
   // ── Ouverture / fermeture du panneau ────────────────────────────────────
   const ouvrirCreation = () => {
@@ -289,15 +325,6 @@ export function EquipeV2({ vets, contraintes, moiId }: Props) {
     setTagLibre('')
     if (t === '' || form.tags.includes(t)) return
     setForm((f) => ({ ...f, tags: [...f.tags, t] }))
-  }
-
-  const basculerContraintes = (id: string) => {
-    setContraintesOuvertes((s) => {
-      const n = new Set(s)
-      if (n.has(id)) n.delete(id)
-      else n.add(id)
-      return n
-    })
   }
 
   const panneauOuvert = edition !== null
@@ -489,12 +516,25 @@ export function EquipeV2({ vets, contraintes, moiId }: Props) {
       <div className="team-grid rise rise-3">
         {vets.map((v) => {
           const etat = etatCompte(v)
-          const desiderata = contraintesDe(v.id)
-          const ouvert = contraintesOuvertes.has(v.id)
+          const nb = nbContraintes.get(v.id) ?? 0
           const cestMoi = v.id === moiId
+
+          // Les qualités de la personne tiennent sur UNE ligne de texte, dans
+          // l'ordre du plus structurant au plus anecdotique. Elles étaient
+          // réparties sur trois bandes de pilules qui se ressemblaient toutes,
+          // dont une qui disait « aucune étiquette » — une ligne pour dire
+          // qu'il n'y a rien.
+          const qualites: string[] = [
+            v.role_app === 'admin' ? 'Admin' : 'Véto',
+            v.statut === 'associe' ? 'Associé·e' : 'Salarié·e',
+            ...(v.dernier_recours ? ['dernier recours'] : []),
+            ...(v.tags ?? []),
+          ]
 
           return (
             <article key={v.id} className={`vet-card${v.actif ? '' : ' inactive'}`}>
+              {/* (A) Qui c'est. La phrase de rôle a sauté : elle répétait mot
+                  pour mot la pastille « Admin » posée 30 px plus bas. */}
               <div className="vet-card-top">
                 <span className="vet-avatar" style={{ background: v.couleur }} aria-hidden="true">
                   {v.prenom.charAt(0).toUpperCase()}
@@ -503,79 +543,63 @@ export function EquipeV2({ vets, contraintes, moiId }: Props) {
                   <h3>
                     {v.prenom} {v.nom}
                   </h3>
-                  <p className="vet-sub">
-                    {v.role_app === 'admin'
-                      ? 'Gère le cabinet et les plannings'
-                      : 'Consulte son planning et pose ses congés'}
-                  </p>
                   <p className="vet-mail">{v.email}</p>
                 </div>
               </div>
 
-              <div className="vet-flags">
-                <span className={`flag ${v.role_app === 'admin' ? 'flag-admin' : 'flag-role'}`}>
-                  {v.role_app === 'admin' ? 'Admin' : 'Véto'}
-                </span>
-                <span className="flag flag-role">
-                  {v.statut === 'associe' ? 'Associé·e' : 'Salarié·e'}
-                </span>
-                {v.dernier_recours && <span className="flag flag-recours">🛟 Dernier recours</span>}
-              </div>
+              {/* (B) Ce qu'elle est, d'un seul trait. Seul « Admin » est mis en
+                  avant : c'est le seul mot de la ligne qui donne un pouvoir. */}
+              <p className="vet-ligne">
+                {qualites.map((q, i) => (
+                  <span key={q}>
+                    {i > 0 && <span className="vl-sep"> · </span>}
+                    {q === 'Admin' ? <strong>Admin</strong> : q}
+                  </span>
+                ))}
+              </p>
 
-              <div className="vet-tags">
-                {(v.tags ?? []).length > 0 ? (
-                  (v.tags ?? []).map((t) => (
-                    <span key={t} className="tag">
-                      {t}
-                    </span>
-                  ))
-                ) : (
-                  <span className="tag vide">aucune étiquette</span>
+              {/* (C) L'état du compte PORTE son action : c'est la seule chose
+                  qui change vraiment d'une fiche à l'autre, et la seule action
+                  qui fasse avancer le dossier. Le bloc existe toujours, même
+                  sans bouton — c'est lui qui garantit des cartes de même
+                  hauteur, quel que soit l'état. */}
+              <div className={`vet-account acct-${etat}`}>
+                <span className="acct-etat">
+                  <span className="acct-dot" aria-hidden="true" />
+                  {LIBELLE_COMPTE[etat]}
+                </span>
+
+                {etat === 'sans' && (
+                  <button type="button" className="acct-cta" onClick={() => inviter(v)} disabled={isPending}>
+                    Inviter
+                  </button>
+                )}
+                {etat === 'invite' && (
+                  <button type="button" className="acct-cta" onClick={() => inviter(v)} disabled={isPending}>
+                    Relancer
+                  </button>
+                )}
+                {etat === 'inactif' && (
+                  <button type="button" className="acct-cta" onClick={() => basculerActif(v)} disabled={isPending}>
+                    Réactiver
+                  </button>
                 )}
               </div>
 
-              <div className={`vet-account acct-${etat}`}>
-                <span className="acct-dot" aria-hidden="true" />
-                {LIBELLE_COMPTE[etat]}
-              </div>
-
+              {/* (D) Les actions de gestion, toutes de même poids parce
+                  qu'aucune n'est urgente. « Désactiver » est rouge AU REPOS :
+                  au survol seulement, elle est invisible sur tablette. */}
               <div className="vet-actions">
                 <button type="button" onClick={() => ouvrirModification(v)} disabled={isPending}>
                   Modifier
                 </button>
 
-                <button
-                  type="button"
-                  className="va-on"
-                  aria-expanded={ouvert}
-                  onClick={() => basculerContraintes(v.id)}
-                >
-                  Ses desiderata
-                  {desiderata.length > 0 && <span className="va-pip">{desiderata.length}</span>}
+                <button type="button" onClick={() => setFicheContraintes(v)}>
+                  Ses contraintes
+                  {nb > 0 && <span className="va-nb">{nb}</span>}
                 </button>
 
-                {etat === 'sans' && (
-                  <button
-                    type="button"
-                    className="va-invite"
-                    onClick={() => inviter(v)}
-                    disabled={isPending}
-                  >
-                    Inviter
-                  </button>
-                )}
-                {etat === 'invite' && (
-                  <button
-                    type="button"
-                    className="va-invite"
-                    onClick={() => inviter(v)}
-                    disabled={isPending}
-                  >
-                    Renvoyer l&apos;invitation
-                  </button>
-                )}
-
-                {v.actif ? (
+                {v.actif && (
                   <button
                     type="button"
                     className="va-danger"
@@ -589,29 +613,8 @@ export function EquipeV2({ vets, contraintes, moiId }: Props) {
                   >
                     Désactiver
                   </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="va-invite"
-                    onClick={() => basculerActif(v)}
-                    disabled={isPending}
-                  >
-                    Réactiver
-                  </button>
                 )}
               </div>
-
-              {ouvert && (
-                <div className="vet-contraintes">
-                  <div className="v2-greffe" style={{ padding: '4px 10px 6px' }}>
-                    <ContraintesSection
-                      veterinaire_id={v.id}
-                      contraintes={desiderata}
-                      vets={vets}
-                    />
-                  </div>
-                </div>
-              )}
             </article>
           )
         })}
@@ -623,6 +626,23 @@ export function EquipeV2({ vets, contraintes, moiId }: Props) {
           </p>
         )}
       </div>
+
+      {/* ── Ses contraintes ──────────────────────────────────────────── */}
+      {ficheContraintes && (
+        <ContraintesVetoModale
+          veto={{
+            id: ficheContraintes.id,
+            prenom: ficheContraintes.prenom,
+            nom: ficheContraintes.nom,
+            couleur: ficheContraintes.couleur,
+          }}
+          regles={regles}
+          vets={vetsMini}
+          periodes={periodes}
+          typesCreneaux={typesCreneaux}
+          onClose={() => setFicheContraintes(null)}
+        />
+      )}
 
       {/* ── Garde-fou de désactivation ───────────────────────────────── */}
       {garde && (

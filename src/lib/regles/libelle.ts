@@ -21,6 +21,40 @@ export interface RegleNommable {
   params_json: unknown
 }
 
+// ── La force d'une règle, dite pareil partout ───────────────────────────────
+// L'écran Règles groupe par force et affiche une pastille de couleur. L'écran
+// Équipe montre les mêmes règles, fiche par fiche : il lui faut le MÊME
+// vocabulaire, sinon une contrainte serait « rouge » ici et « ferme » là.
+// `etage` est l'ordre de sévérité (0 = le plus dur) — il sert à trier.
+
+export interface ForceMeta {
+  etage: number
+  symbole: string
+  /** Le mot qu'on montre quand il n'y a pas la place d'un groupe entier. */
+  mot: string
+}
+
+export const FORCE_META: Record<string, ForceMeta> = {
+  invariant:     { etage: 0, symbole: '🔴', mot: 'Intouchable' },
+  reglementaire: { etage: 1, symbole: '⚪', mot: 'Réglementaire' },
+  jamais:        { etage: 2, symbole: '🔴', mot: 'Ferme' },
+  sauf_crise:    { etage: 3, symbole: '🟠', mot: 'Sauf crise' },
+  evitee:        { etage: 4, symbole: '🟡', mot: 'À éviter' },
+  si_possible:   { etage: 5, symbole: '🟡', mot: 'Souhait' },
+}
+
+export function etageDe(force: string): number {
+  return FORCE_META[force]?.etage ?? 99
+}
+
+export function symboleDe(force: string): string {
+  return FORCE_META[force]?.symbole ?? '⚪'
+}
+
+export function motForce(force: string): string {
+  return FORCE_META[force]?.mot ?? 'Règle'
+}
+
 interface ParamsJson {
   qui?: { refs?: unknown }
   params?: unknown
@@ -50,6 +84,43 @@ export function fusionnerDuos<T extends RegleNommable>(rows: T[]): T[] {
     vues.add(cle)
     return true
   })
+}
+
+/**
+ * Les règles qui concernent UN véto, telles qu'on les montre sur sa fiche.
+ *
+ * Trois pièges, tous vécus :
+ *
+ * 1. Un duo interdit est stocké en DEUX lignes (A→B et B→A, le moteur a besoin
+ *    des deux sens). Sur la fiche de A, la ligne B→A compte aussi : elle
+ *    contraint A tout autant. On récupère donc les deux, puis on n'en garde
+ *    qu'une (`fusionnerDuos`).
+ * 2. …mais laquelle ? Si on garde B→A, la fiche de A affiche « B ne peut pas
+ *    être seul avec A » — vrai, mais tourné à l'envers pour qui lit la fiche de
+ *    A. On trie donc pour que la ligne dont A est le sujet passe en premier.
+ * 3. Les règles du cabinet (équité, créneaux liés) n'ont pas de `qui` : elles
+ *    ne remontent jamais ici, et c'est voulu — elles vivent sur l'écran Règles.
+ */
+export function reglesDuVeto<T extends RegleNommable>(regles: T[], vetoId: string): T[] {
+  const concerne = regles.filter((r) => {
+    const pj = (r.params_json ?? {}) as {
+      qui?: { refs?: unknown }
+      params?: { avec_veterinaire_id?: unknown }
+    }
+    const refs = Array.isArray(pj.qui?.refs) ? pj.qui.refs : []
+    if (refs.includes(vetoId)) return true
+    return r.brique_id === 'duo_interdit' && pj.params?.avec_veterinaire_id === vetoId
+  })
+
+  const estSujet = (r: T) => {
+    const refs = ((r.params_json ?? {}) as { qui?: { refs?: unknown } }).qui?.refs
+    return Array.isArray(refs) && refs[0] === vetoId
+  }
+  // Tri STABLE : on ne fait que remonter les lignes dont le véto est le sujet,
+  // l'ordre d'arrivée est conservé pour tout le reste.
+  const ordonne = [...concerne].sort((a, b) => Number(estSujet(b)) - Number(estSujet(a)))
+
+  return fusionnerDuos(ordonne)
 }
 
 /** Une règle existante que Filou propose de toucher, telle qu'affichée. */

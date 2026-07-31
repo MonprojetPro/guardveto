@@ -16,7 +16,9 @@ import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
 import { EquipeV2 } from '@/components/v2/EquipeV2'
 import { chargerDock } from '@/data/v2/dock'
-import type { ContrainteVeto, Veterinaire } from '@/types'
+import { chargerOptionsRegles } from '@/data/optionsRegles'
+import type { RegleRow } from '@/components/regles/ReglesClient'
+import type { Veterinaire } from '@/types'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'GuardVeto — Équipe' }
@@ -44,10 +46,19 @@ export default async function EquipePage() {
   const vet = moi as Veterinaire
   if (vet.role_app !== 'admin') redirect('/accueil')
 
-  const [vetsRes, contraintesRes] = await Promise.all([
+  // Les contraintes affichées sur les fiches viennent de `regles_cabinet` — LA
+  // source du moteur depuis P1A-004. L'ancienne table `contraintes_veto` n'est
+  // plus lue nulle part : c'était une copie figée dont l'édition ne changeait
+  // rien au planning (constat du 2026-07-31).
+  const [vetsRes, reglesRes, options] = await Promise.all([
     // Les fiches désactivées comptent aussi : c'est de là qu'on réactive.
     supabase.from('veterinaires').select('*').order('actif', { ascending: false }).order('prenom'),
-    supabase.from('contraintes_veto').select('*').order('created_at'),
+    supabase
+      .from('regles_cabinet')
+      .select('id, brique_id, params_json, force, actif, periode_id')
+      .order('brique_id')
+      .order('id'),
+    chargerOptionsRegles(supabase),
   ])
 
   const vets = (vetsRes?.data ?? []) as Veterinaire[]
@@ -60,7 +71,9 @@ export default async function EquipePage() {
         <BarreV2 prenom={vet.prenom} estAdmin dock={dock} />
         <EquipeV2
           vets={vets}
-          contraintes={(contraintesRes?.data ?? []) as ContrainteVeto[]}
+          regles={(reglesRes?.data ?? []) as RegleRow[]}
+          periodes={options.periodes}
+          typesCreneaux={options.typesCreneaux}
           moiId={vet.id}
         />
       </div>

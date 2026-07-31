@@ -39,6 +39,19 @@ import {
   type CohorteEquitePayload,
 } from '@/lib/ia/regleSchema'
 
+/**
+ * Les DEUX écrans qui montrent les règles du cabinet.
+ *
+ * `/regles` les liste toutes ; `/equipe` en montre la part qui concerne chaque
+ * véto, sur sa fiche (« Ses contraintes »). Toucher à une règle sans revalider
+ * les deux, c'est le grand classique du consumer oublié : on modifie depuis une
+ * porte, et l'autre continue d'afficher l'ancienne version sans rien signaler.
+ */
+function revaliderRegles() {
+  revalidatePath('/regles')
+  revalidatePath('/equipe')
+}
+
 // ── Garde admin ──────────────────────────────────────────────
 
 async function getAuthVeto(
@@ -100,7 +113,7 @@ export async function setRegleActif(id: string, actif: boolean) {
     .in('id', ids)
 
   if (error) return { error: error.message }
-  revalidatePath('/regles')
+  revaliderRegles()
   return { success: true }
 }
 
@@ -136,7 +149,7 @@ export async function deleteRegle(id: string) {
 
   const { error } = await supabase.from('regles_cabinet').delete().in('id', ids)
   if (error) return { error: error.message }
-  revalidatePath('/regles')
+  revaliderRegles()
   return { success: true }
 }
 
@@ -213,7 +226,7 @@ export async function setEquiteImportance(dimension: string, importance: string)
     if (error) return { error: error.message }
   }
 
-  revalidatePath('/regles')
+  revaliderRegles()
   return { success: true }
 }
 
@@ -299,7 +312,7 @@ export async function setCohorteEquite(dimension: string, tag: string, importanc
       const { error } = await supabase.from('regles_cabinet').delete().eq('id', match.id)
       if (error) return { error: error.message }
     }
-    revalidatePath('/regles')
+    revaliderRegles()
     return { success: true }
   }
 
@@ -327,7 +340,7 @@ export async function setCohorteEquite(dimension: string, tag: string, importanc
     if (error) return { error: error.message }
   }
 
-  revalidatePath('/regles')
+  revaliderRegles()
   return { success: true }
 }
 
@@ -338,7 +351,7 @@ export async function deleteCohorteEquite(id: string) {
   if ('error' in garde) return garde
   const { error } = await supabase.from('regles_cabinet').delete().eq('id', id)
   if (error) return { error: error.message }
-  revalidatePath('/regles')
+  revaliderRegles()
   return { success: true }
 }
 
@@ -426,7 +439,7 @@ export async function setStructureRegle(briqueId: string, actif: boolean, force:
     if (error) return { error: error.message }
   }
 
-  revalidatePath('/regles')
+  revaliderRegles()
   return { success: true }
 }
 
@@ -548,7 +561,7 @@ export async function upsertCompositionRegle(payload: CompositionReglePayload) {
     if (error) return { error: error.message }
   }
 
-  revalidatePath('/regles')
+  revaliderRegles()
   return { success: true }
 }
 
@@ -683,7 +696,7 @@ export async function upsertRoleInterditRegle(payload: RoleInterditReglePayload)
     if (error) return { error: error.message }
   }
 
-  revalidatePath('/regles')
+  revaliderRegles()
   return { success: true }
 }
 
@@ -710,7 +723,7 @@ export async function setRoleAvantageFinancier(role: string) {
   const { error } = await supabase.rpc('set_role_avantage_financier', { p_role: role })
   if (error) return { error: error.message }
 
-  revalidatePath('/regles')
+  revaliderRegles()
   return { success: true }
 }
 
@@ -1294,7 +1307,7 @@ export async function upsertRegle(payload: UpsertReglePayload) {
       .from('regles_cabinet')
       .insert([ligne(a, b), ligne(b, a)])
     if (error) return { error: error.message }
-    revalidatePath('/regles')
+    revaliderRegles()
     return { success: true }
   }
 
@@ -1364,7 +1377,7 @@ export async function upsertRegle(payload: UpsertReglePayload) {
     if (error) return { error: error.message }
   }
 
-  revalidatePath('/regles')
+  revaliderRegles()
   return { success: true }
 }
 
@@ -1519,6 +1532,6 @@ export async function appliquerActionRegles(
     if ('error' in r && r.error) return { error: r.error }
   }
 
-  revalidatePath('/regles')
+  revaliderRegles()
   return { success: true, nb: ids.length }
 }

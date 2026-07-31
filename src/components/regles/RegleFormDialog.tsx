@@ -138,9 +138,17 @@ interface RegleFormDialogProps {
   /** Types de créneaux du cabinet — filtre optionnel de au_plus_n (n°19). */
   typesCreneaux: TypeCreneauOption[]
   regle?: RegleRow | null
+  /**
+   * Véto pré-sélectionné à la CRÉATION. Quand on ouvre le formulaire depuis la
+   * fiche de quelqu'un (écran Équipe → « Ses contraintes »), la règle porte
+   * évidemment sur cette personne-là : la proposer d'office évite le piège
+   * classique — enregistrer une contrainte sur le premier véto de la liste.
+   * Sans effet en édition, où le propriétaire vient de la règle elle-même.
+   */
+  ownerParDefaut?: string
 }
 
-export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, typesCreneaux, regle }: RegleFormDialogProps) {
+export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, typesCreneaux, regle, ownerParDefaut }: RegleFormDialogProps) {
   const router = useRouter()
   const isEdit = Boolean(regle)
   const [isPending, startTransition] = useTransition()
@@ -150,7 +158,10 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
     params?: Record<string, unknown>
   }
   const refs = pj.qui?.refs
-  const ownerInit = Array.isArray(refs) && typeof refs[0] === 'string' ? refs[0] : (vets[0]?.id ?? '')
+  const ownerInit =
+    Array.isArray(refs) && typeof refs[0] === 'string'
+      ? refs[0]
+      : (ownerParDefaut ?? vets[0]?.id ?? '')
   const p = pj.params ?? {}
 
   const [briqueId, setBriqueId] = useState<BriqueEvaluable>(
