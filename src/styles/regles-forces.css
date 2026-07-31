@@ -1,0 +1,71 @@
+/* ============================================================
+   GUARDVETO — Les quatre niveaux de fermeté d'une règle
+   ============================================================
+   Feuille à part, et importée par `RegleFormDialog` lui-même : ce formulaire
+   s'ouvre depuis DEUX écrans — `/regles` (V1, qui ne charge pas
+   `v2-terrier.css`) et la fiche véto de `/equipe` (V2). Chaque couleur du
+   terrier porte donc ici une valeur de repli, pour que les quatre niveaux se
+   lisent pareil des deux côtés.
+   ============================================================ */
+
+/* ============================================================
+   LES QUATRE NIVEAUX DE FERMETÉ — vocabulaire visuel partagé
+   ============================================================
+   Refonte du 2026-07-31. Les niveaux se choisissaient dans une liste
+   déroulante où « Préférence (évitée) » et « Préférence (si possible) »
+   partageaient le même premier mot ET la même pastille jaune. MiKL : « je me
+   mets à la place d'un admin, comment il va savoir choisir ? c'est vital ».
+
+   Trois réponses, ici et dans `lib/regles/libelle.ts` :
+    · les quatre choix sont visibles ENSEMBLE — on ne compare pas quatre
+      options dans un menu qu'il faut ouvrir et refermer ;
+    · chacun porte la phrase de ce que le moteur fera vraiment ;
+    · quatre teintes distinctes, du rouge au vert, qui se lisent comme une
+      échelle même sans lire le texte.
+   ============================================================ */
+
+.gv-forces { display: flex; flex-direction: column; gap: 8px; }
+
+.gv-force {
+  display: flex; align-items: flex-start; gap: 10px;
+  border: 1px solid var(--t-border, #E6D7BB);
+  border-left: 4px solid var(--gvf-teinte, var(--t-border, #E6D7BB));
+  border-radius: var(--r-sm, 12px);
+  background: var(--surface, #FFFCF4);
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color 0.18s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1)), background 0.18s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.gv-force:hover { background: var(--surface-2, #F6EBD6); }
+.gv-force input { margin-top: 3px; flex: none; accent-color: var(--gvf-teinte, var(--t-accent, #C7530F)); }
+.gv-force[data-choisi='true'] {
+  background: var(--gvf-fond, var(--surface-2, #F6EBD6));
+  border-color: var(--gvf-teinte, var(--t-accent, #C7530F));
+}
+
+.gvf-corps { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gvf-titre { font-size: 0.86rem; font-weight: 700; color: var(--text, #3A2A1C); line-height: 1.35; }
+.gv-force[data-choisi='true'] .gvf-titre { color: var(--gvf-encre, var(--text, #3A2A1C)); }
+.gvf-aide { font-size: 0.76rem; line-height: 1.5; color: var(--t-muted, #7C6A55); }
+
+/* Les quatre teintes. Elles servent AUSSI aux badges de force ailleurs dans
+   l'app (fiche véto, écran Règles) via les classes `.force-*` ci-dessous :
+   une seule échelle de couleur, partout. */
+.gv-force[data-force='jamais'],      .force-jamais      { --gvf-teinte: #A8341F; --gvf-fond: rgba(168, 52, 31, 0.09);  --gvf-encre: #8E2A18; }
+.gv-force[data-force='sauf_crise'],  .force-sauf_crise  { --gvf-teinte: #C2610B; --gvf-fond: rgba(194, 97, 11, 0.10);  --gvf-encre: #9A4C06; }
+.gv-force[data-force='evitee'],      .force-evitee      { --gvf-teinte: #9A6200; --gvf-fond: rgba(196, 138, 20, 0.13); --gvf-encre: #7C4E00; }
+.gv-force[data-force='si_possible'], .force-si_possible { --gvf-teinte: #3E7A2E; --gvf-fond: rgba(90, 150, 60, 0.12);  --gvf-encre: #2F5F23; }
+.force-invariant     { --gvf-teinte: #A8341F; --gvf-fond: rgba(168, 52, 31, 0.09); --gvf-encre: #8E2A18; }
+.force-reglementaire { --gvf-teinte: #7C6A55; --gvf-fond: rgba(124, 106, 85, 0.10); --gvf-encre: #5E5040; }
+
+/* Le badge de force, partout où une règle s'affiche en liste. */
+.force-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.68rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--gvf-encre, var(--t-muted, #7C6A55));
+  background: var(--gvf-fond, var(--surface-2, #F6EBD6));
+  border: 1px solid var(--gvf-teinte, var(--t-border, #E6D7BB));
+  border-radius: 999px;
+  padding: 3px 10px;
+}

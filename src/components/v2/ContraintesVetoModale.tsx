@@ -29,7 +29,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { phraseRegle, reglesDuVeto, etageDe, symboleDe, motForce } from '@/lib/regles/libelle'
+import { phraseRegle, reglesDuVeto, etageDe, symboleDe, motForce, aideForce } from '@/lib/regles/libelle'
+import '@/styles/regles-forces.css'
 import { setRegleActif, deleteRegle } from '@/app/(protected)/regles/actions'
 import {
   RegleFormDialog,
@@ -151,36 +152,55 @@ export function ContraintesVetoModale({
               {siennes.map((r) => {
                 const partagee = r.brique_id === 'duo_interdit'
                 return (
-                  <li key={r.id} className={`cv-item${r.actif ? '' : ' en-pause'}`}>
-                    <div className="cv-item-corps">
-                      <p className="cv-phrase">{phraseRegle(r, nomVeto)}</p>
-                      <p className="cv-meta">
-                        <span className="cv-force">
-                          <span aria-hidden="true">{symboleDe(r.force)}</span> {motForce(r.force)}
-                        </span>
-                        {partagee && <span className="cv-partagee">partagée</span>}
-                        {!r.actif && <span className="cv-pause">en pause</span>}
-                      </p>
+                  <li key={r.id} className={`cv-item${r.actif ? '' : ' en-pause'} force-${r.force}`}>
+                    {/* Le bandeau : ce que le moteur s'autorise, et les
+                        étiquettes de contexte. Les actions partagent cette
+                        ligne — elles étaient empilées à droite en colonne, ce
+                        qui laissait la moitié de la largeur vide. */}
+                    <div className="cv-item-tete">
+                      <span className="force-badge">
+                        <span aria-hidden="true">{symboleDe(r.force)}</span> {motForce(r.force)}
+                      </span>
+                      {partagee && <span className="cv-tag">à deux</span>}
+                      {!r.actif && <span className="cv-tag">en pause</span>}
+
+                      <span className="cv-item-actions">
+                        {r.actif && (
+                          <button type="button" onClick={() => ouvrirEdition(r)} disabled={isPending}>
+                            Modifier
+                          </button>
+                        )}
+                        <button type="button" onClick={() => basculer(r)} disabled={isPending}>
+                          {r.actif ? 'Mettre en pause' : 'Réactiver'}
+                        </button>
+                        <button
+                          type="button"
+                          className="cv-danger"
+                          onClick={() => setASupprimer(r)}
+                          disabled={isPending}
+                        >
+                          Retirer
+                        </button>
+                      </span>
                     </div>
 
-                    <div className="cv-item-actions">
-                      {r.actif && (
-                        <button type="button" onClick={() => ouvrirEdition(r)} disabled={isPending}>
-                          Modifier
-                        </button>
-                      )}
-                      <button type="button" onClick={() => basculer(r)} disabled={isPending}>
-                        {r.actif ? 'Mettre en pause' : 'Réactiver'}
-                      </button>
-                      <button
-                        type="button"
-                        className="cv-danger"
-                        onClick={() => setASupprimer(r)}
-                        disabled={isPending}
-                      >
-                        Retirer
-                      </button>
-                    </div>
+                    <p className="cv-phrase">{phraseRegle(r, nomVeto)}</p>
+
+                    {/* Ce que « 🔴 Jamais » veut dire concrètement. Sans cette
+                        phrase, la carte montrait une pastille de couleur et un
+                        bouton rouge — MiKL : « c'est pas assez parlant ». */}
+                    <p className="cv-effet">
+                      {r.actif
+                        ? aideForce(r.force)
+                        : "En pause : le moteur ne la lit plus du tout, comme si elle n'existait pas."}
+                    </p>
+
+                    {partagee && (
+                      <p className="cv-effet">
+                        Cette contrainte lie deux personnes : elle apparaît aussi sur l&apos;autre
+                        fiche, et la retirer la retire des deux côtés.
+                      </p>
+                    )}
                   </li>
                 )
               })}

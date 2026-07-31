@@ -29,12 +29,46 @@
   --surface:       #FFFCF4;
   --surface-2:     #F6EBD6;
   --text:          #3A2A1C;
-  --muted:         #7C6A55;
   --soft:          #A08D75;
-  --border:        #E6D7BB;
   --border-strong: #D8C4A1;
-  --accent:        #C7530F;
   --accent-ink:    #AC4508;
+
+  /* ⚠️⚠️ LES TROIS JETONS À PRÉFIXE `--t-` — À LIRE AVANT D'ÉCRIRE DU CSS ⚠️⚠️
+     ============================================================
+     `muted`, `border` et `accent` sont les SEULS noms que le terrier et shadcn
+     emploient tous les deux — avec des SENS OPPOSÉS :
+
+        terrier          shadcn (dans une modale, une liste déroulante…)
+        --muted  = texte gris        --muted  = FOND pâle
+        --border = liseré sable      --border = liseré, mais recalculé
+        --accent = orange vif        --accent = FOND de survol très pâle
+
+     Le bloc « surfaces flottantes » plus bas doit redéfinir les trois en
+     vocabulaire shadcn, sinon les pop-ups sortent en cyan. Résultat : tout CSS
+     maison qui écrivait `color: var(--muted)` devenait, DANS une modale,
+     « crème pâle sur crème pâle » — texte invisible. Ça s'est produit trois
+     fois (2026-07-29 les pop-ups, 07-30 le sélecteur, 07-31 les boutons de la
+     modale des contraintes). MiKL : « corrige ce truc une bonne fois pour
+     toutes ».
+
+     La parade : les trois valeurs du terrier vivent désormais sous un nom que
+     shadcn ne connaît pas. Elles ne peuvent PLUS être écrasées, où que soit
+     l'élément — dans la page, dans une modale, dans un portail.
+
+     👉 RÈGLE : dans tout CSS de ce projet, écrire `var(--t-muted)`,
+        `var(--t-border)`, `var(--t-accent)`. JAMAIS `var(--muted)`,
+        `var(--border)`, `var(--accent)` — ceux-là appartiennent à shadcn.
+     ============================================================ */
+  --t-muted:       #7C6A55;
+  --t-border:      #E6D7BB;
+  --t-accent:      #C7530F;
+
+  /* Les noms nus restent définis pour le thème shadcn hors modale et pour les
+     écrans V1 qui les utilisent encore. Ils SUIVENT les `--t-` ci-dessus :
+     une seule couleur à changer pour repeindre le terrier. */
+  --muted:         var(--t-muted);
+  --border:        var(--t-border);
+  --accent:        var(--t-accent);
   --accent-soft:   rgba(224, 122, 47, 0.13);
   --accent-glow:   rgba(230, 126, 34, 0.28);
   --ok:            #3E7A2E;
@@ -170,7 +204,7 @@
 .float-wrap { position: relative; z-index: 2; }
 .epicentre {
   position: relative;
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   border-radius: var(--r-lg);
   background: var(--surface);
   /* plus d'overflow hidden : la tête de Filou dépasse du bord supérieur */
@@ -539,7 +573,7 @@
 }
 .msg.filou .bubble {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   border-bottom-left-radius: 4px;
 }
 .msg.user .bubble {
@@ -586,8 +620,8 @@
   transition: transform 0.15s ease, background-color 0.15s ease;
 }
 .mini-chip:hover { background: var(--accent-soft); transform: translateY(-1px); }
-.mini-chip.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.mini-chip.primary:hover { filter: brightness(1.07); background: var(--accent); }
+.mini-chip.primary { background: var(--t-accent); border-color: var(--t-accent); color: #fff; }
+.mini-chip.primary:hover { filter: brightness(1.07); background: var(--t-accent); }
 
 /* ------ La barre de saisie · dessinée POUR la tablette ------
    Fini l'ancien composant hérité (grosse pilule creusée) : une
@@ -604,7 +638,7 @@
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .consigne:focus-within {
-  border-color: var(--accent);
+  border-color: var(--t-accent);
   box-shadow:
     inset 0 1px 3px rgba(110, 62, 14, 0.07),
     0 0 0 3px var(--accent-soft);
@@ -622,7 +656,7 @@
   flex: none;
   width: 34px; height: 34px; border-radius: 10px;
   border: none;
-  background: var(--accent); color: #fff;
+  background: var(--t-accent); color: #fff;
   font-size: 0.85rem;
   display: inline-flex; align-items: center; justify-content: center;
   box-shadow: 0 2px 6px var(--accent-glow);
@@ -647,7 +681,7 @@
   display: flex; align-items: flex-end; gap: 7px;
   margin-top: 9px;
   padding: 5px 5px 5px 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   border-radius: 18px;
   background: var(--surface);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -675,7 +709,7 @@
   width: 32px; height: 32px;
   display: grid; place-items: center;
   border: none; border-radius: 50%;
-  background: var(--accent); color: #fff;
+  background: var(--t-accent); color: #fff;
   box-shadow: 0 2px 7px var(--accent-glow);
   transition: filter 0.18s ease, opacity 0.18s ease;
 }
@@ -692,7 +726,7 @@
   flex: none;
   width: 30px; height: 30px;
   display: grid; place-items: center;
-  border: 1px solid var(--border); border-radius: 999px;
+  border: 1px solid var(--t-border); border-radius: 999px;
   background: none; color: var(--soft);
   transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
 }
@@ -724,7 +758,7 @@
   display: block;
   margin: 0 0 14px;
   padding: 11px 13px;
-  border-left: 3px solid var(--accent);
+  border-left: 3px solid var(--t-accent);
   border-radius: 4px 11px 11px 4px;
   background: var(--surface-2);
   font-size: 0.95rem; line-height: 1.5;
@@ -761,7 +795,7 @@
   list-style: none;
   display: flex; flex-direction: column; gap: 7px;
   padding-left: 11px;
-  border-left: 2px solid var(--border);
+  border-left: 2px solid var(--t-border);
 }
 .res-constat li { font-size: 0.86rem; line-height: 1.5; color: var(--text); }
 
@@ -769,7 +803,7 @@
       on doit voir d'un coup d'œil que c'est en attente de décision. */
 .res-changements {
   padding: 12px 14px 11px;
-  border: 1px solid var(--accent);
+  border: 1px solid var(--t-accent);
   border-radius: 13px;
   background: var(--accent-soft);
 }
@@ -787,23 +821,23 @@
 }
 .res-pas-encore {
   margin-top: 10px; padding-top: 9px;
-  border-top: 1px dashed var(--accent);
-  font-size: 0.72rem; color: var(--muted);
+  border-top: 1px dashed var(--t-accent);
+  font-size: 0.72rem; color: var(--t-muted);
 }
 
 .res-regles { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 .res-regles li {
   display: flex; align-items: flex-start; gap: 9px;
   padding: 10px 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   border-radius: 11px;
   background: var(--accent-soft);
   font-size: 0.86rem; line-height: 1.45;
 }
 .rr-puce { flex: none; font-size: 0.7rem; line-height: 1.6; }
-.rr-etat { color: var(--muted); font-weight: 600; }
+.rr-etat { color: var(--t-muted); font-weight: 600; }
 
-.prop-force { font-size: 0.72rem; color: var(--muted); margin-bottom: 6px; }
+.prop-force { font-size: 0.72rem; color: var(--t-muted); margin-bottom: 6px; }
 .prop-lien {
   border: none; background: none; padding: 0;
   color: var(--accent-ink);
@@ -812,8 +846,8 @@
 }
 .prop-crans { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
 .prop-cran {
-  border: 1px solid var(--border);
-  background: transparent; color: var(--muted);
+  border: 1px solid var(--t-border);
+  background: transparent; color: var(--t-muted);
   border-radius: 999px;
   font-size: 0.68rem; font-weight: 600;
   padding: 4px 9px;
@@ -822,12 +856,12 @@
 .prop-cran:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
 .prop-cran.actif {
   color: var(--text); font-weight: 700;
-  border-color: var(--accent); background: var(--accent-soft);
+  border-color: var(--t-accent); background: var(--accent-soft);
 }
 /* Le seul verdict qui reste à l'écran est un refus de création : la réussite,
    elle, se dit dans la conversation et referme la fenêtre. */
 .prop-verdict { font-size: 0.78rem; font-weight: 600; color: var(--danger); margin: 4px 0 12px; }
-.bubble-attente { color: var(--muted); font-style: italic; }
+.bubble-attente { color: var(--t-muted); font-style: italic; }
 
 /* ---------- Les pistes : ce que Filou propose de lui demander ----------
    Quand il ouvre sur un onglet d'origine (« tu reviens du planning… »), il
@@ -901,7 +935,7 @@
 .glance-title {
   font-family: var(--font-display);
   font-size: 0.7rem; font-weight: 700; letter-spacing: 0.13em;
-  text-transform: uppercase; color: var(--muted);
+  text-transform: uppercase; color: var(--t-muted);
   padding-left: 4px;
 }
 .widget {
@@ -910,7 +944,7 @@
   display: flex; align-items: center; gap: 14px;
   text-align: left;
   background: rgba(255, 252, 244, 0.94);
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   border-radius: var(--r-sm);
   padding: 13px 17px;
   box-shadow: var(--edge-light), var(--elev-1);
@@ -940,12 +974,12 @@
   display: inline-flex; align-items: center; justify-content: center;
   font-size: 1.15rem;
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
 }
 .widget.w-ok .w-ico { background: var(--ok-soft); }
 .widget .w-body { flex: 1; min-width: 0; }
 .widget h3 { font-size: 0.92rem; font-weight: 700; line-height: 1.3; }
-.widget p { font-size: 0.76rem; color: var(--muted); margin-top: 2px; line-height: 1.45; }
+.widget p { font-size: 0.76rem; color: var(--t-muted); margin-top: 2px; line-height: 1.45; }
 .widget .w-go {
   flex: none; color: var(--soft); font-size: 0.95rem;
   transition: transform 0.2s ease, color 0.2s ease;
@@ -964,7 +998,7 @@
   font-size: 0.72rem; color: var(--soft);
   line-height: 1.55; padding: 4px 6px 0;
 }
-.glance-foot b { color: var(--muted); }
+.glance-foot b { color: var(--t-muted); }
 
 /* ------ La fenêtre de Filou · la fiche qu'il épingle ------ */
 .fen {
@@ -1000,7 +1034,7 @@
   flex: none;
   display: flex; align-items: center; gap: 11px;
   padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--t-border);
   background: var(--surface-2);
   border-radius: calc(var(--r-md) - 1px) calc(var(--r-md) - 1px) 0 0;
 }
@@ -1014,13 +1048,13 @@
 }
 .fen-head .f-titles { flex: 1; min-width: 0; }
 .fen-head h2 { font-size: 1.02rem; font-weight: 700; line-height: 1.25; outline: none; }
-.fen-head .f-sub { font-size: 0.71rem; color: var(--muted); margin-top: 1px; }
+.fen-head .f-sub { font-size: 0.71rem; color: var(--t-muted); margin-top: 1px; }
 .fen-close {
   flex: none;
   width: 38px; height: 38px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   background: var(--surface);
-  color: var(--muted);
+  color: var(--t-muted);
   border-radius: var(--r-sm);
   font-size: 0.95rem; line-height: 1;
   display: inline-flex; align-items: center; justify-content: center;
@@ -1031,7 +1065,7 @@
   flex: none;
   display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
   padding: 12px 16px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--t-border);
   background: var(--surface);
   border-radius: 0 0 calc(var(--r-md) - 1px) calc(var(--r-md) - 1px);
 }
@@ -1047,11 +1081,11 @@
 /* Ces boutons servent AUSSI à l'intérieur des modales, où `--accent` et
    `--muted` désignent les jetons de shadcn : on passe par les copies
    `-terrier`, de valeur identique, pour être juste des deux côtés. */
-.btn-valider { background: var(--accent-terrier); color: #fff; box-shadow: 0 2px 8px var(--accent-glow); }
+.btn-valider { background: var(--t-accent); color: #fff; box-shadow: 0 2px 8px var(--accent-glow); }
 .btn-valider:hover { filter: brightness(1.07); }
 .btn-ghost,
 .btn-corriger {
-  background: transparent; color: var(--muted-terrier);
+  background: transparent; color: var(--t-muted);
   border: 1px solid var(--border-strong);
 }
 .btn-ghost:hover,
@@ -1085,7 +1119,7 @@
   display: flex; align-items: center; gap: 13px;
   padding: 12px 14px;
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   border-radius: var(--r-md);
   margin-bottom: 15px;
 }
@@ -1096,7 +1130,7 @@
   font-size: 0.95rem; font-weight: 700; flex: none;
 }
 .fiche-id h3 { font-size: 1rem; font-weight: 700; }
-.fiche-id .role { font-size: 0.74rem; color: var(--muted); margin-top: 1px; }
+.fiche-id .role { font-size: 0.74rem; color: var(--t-muted); margin-top: 1px; }
 .tag-recours {
   display: inline-flex; align-items: center; gap: 5px;
   margin-top: 5px;
@@ -1108,7 +1142,7 @@
 .conge-row {
   display: flex; align-items: center; gap: 10px;
   padding: 9px 4px;
-  border-bottom: 1px dashed var(--border);
+  border-bottom: 1px dashed var(--t-border);
   font-size: 0.83rem; line-height: 1.45;
 }
 .conge-row:last-child { border-bottom: none; }
@@ -1129,7 +1163,7 @@
   padding: 12px 14px;
 }
 .souhait-box .s-when { font-weight: 700; font-size: 0.88rem; }
-.souhait-box .s-meta { font-size: 0.73rem; color: var(--muted); margin: 3px 0 10px; line-height: 1.5; }
+.souhait-box .s-meta { font-size: 0.73rem; color: var(--t-muted); margin: 3px 0 10px; line-height: 1.5; }
 .souhait-box .s-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .souhait-done {
   display: flex; align-items: center; gap: 9px;
@@ -1142,7 +1176,7 @@
 }
 
 /* compteurs comparés */
-.stat-row { padding: 9px 0 11px; border-bottom: 1px dashed var(--border); }
+.stat-row { padding: 9px 0 11px; border-bottom: 1px dashed var(--t-border); }
 .stat-row:last-of-type { border-bottom: none; }
 .stat-top { display: flex; align-items: baseline; gap: 8px; }
 .stat-top .s-name { font-size: 0.84rem; font-weight: 600; }
@@ -1155,7 +1189,7 @@
   position: relative;
   height: 10px; border-radius: 999px;
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   margin-top: 7px;
   overflow: visible;
 }
@@ -1167,7 +1201,7 @@
 .stat-avg-tick {
   position: absolute; top: -4px; bottom: -4px;
   width: 2px; border-radius: 2px;
-  background: var(--muted);
+  background: var(--t-muted);
 }
 .stat-avg-tick::after {
   content: "moy.";
@@ -1196,7 +1230,7 @@
   display: flex; align-items: center; flex-wrap: wrap; gap: 6px 13px;
   padding: 12px 14px;
   border-radius: var(--r-md);
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   background: var(--surface-2);
   margin-bottom: 9px;
 }
@@ -1220,14 +1254,14 @@
 .garde-card .g-mission {
   margin-left: auto; text-align: right;
   flex: 0 1 auto; min-width: 0;
-  font-size: 0.74rem; color: var(--muted);
+  font-size: 0.74rem; color: var(--t-muted);
 }
 .demain {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 13px;
   border: 1.5px dashed var(--border-strong);
   border-radius: var(--r-md);
-  font-size: 0.8rem; color: var(--muted); line-height: 1.5;
+  font-size: 0.8rem; color: var(--t-muted); line-height: 1.5;
 }
 .demain b { color: var(--text); }
 
@@ -1235,12 +1269,12 @@
 .recap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .recap-chip {
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   border-radius: var(--r-sm);
   padding: 9px 12px;
   font-size: 0.79rem; font-weight: 600; line-height: 1.4;
 }
-.recap-chip small { display: block; font-size: 0.66rem; font-weight: 500; color: var(--muted); margin-top: 1px; }
+.recap-chip small { display: block; font-size: 0.66rem; font-weight: 500; color: var(--t-muted); margin-top: 1px; }
 .recap-chip.hero { grid-column: 1 / -1; background: var(--accent-soft); border-color: var(--border-strong); }
 .recap-chip.hero small { color: var(--accent-ink); }
 
@@ -1248,7 +1282,7 @@
 .souhait-row {
   display: flex; align-items: flex-start; gap: 10px;
   padding: 10px 4px;
-  border-bottom: 1px dashed var(--border);
+  border-bottom: 1px dashed var(--t-border);
   font-size: 0.83rem; line-height: 1.5;
 }
 .souhait-row:last-child { border-bottom: none; }
@@ -1262,7 +1296,7 @@
 .check-row {
   display: flex; align-items: center; gap: 10px;
   padding: 9px 4px;
-  border-bottom: 1px dashed var(--border);
+  border-bottom: 1px dashed var(--t-border);
   font-size: 0.84rem; line-height: 1.5;
 }
 .check-row:last-child { border-bottom: none; }
@@ -1295,7 +1329,7 @@
      elle n'a pas besoin du retrait que réclamait le mot-marque seul. */
   padding: 8px 9px;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   border-radius: var(--r-lg);
   box-shadow: var(--edge-light), 3px 8px 22px rgba(120, 70, 18, 0.12), 1px 2px 5px rgba(120, 70, 18, 0.08);
 }
@@ -1320,7 +1354,7 @@
   width: 42px; height: 42px; flex: none;
   border-radius: calc(var(--r-lg) - 12px);
   background: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px var(--border);
+  box-shadow: inset 0 0 0 1px var(--t-border);
   transition: transform 0.28s var(--ease-out), box-shadow 0.28s ease, background 0.28s ease;
 }
 .ab-filou-img {
@@ -1332,12 +1366,12 @@
 .ab-porte:hover .ab-filou, .ab-porte:focus-visible .ab-filou {
   transform: translateY(-1px) scale(1.05);
   background: var(--accent-glow);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  box-shadow: inset 0 0 0 1px var(--t-accent);
 }
 /* Déjà chez lui : on le dit sans l'éteindre — Filou reste net, le contour
    prend l'encre renarde, et le curseur cesse de promettre un ailleurs. */
 .ab-porte.ici { cursor: default; }
-.ab-porte.ici .ab-filou { box-shadow: inset 0 0 0 2px var(--accent); }
+.ab-porte.ici .ab-filou { box-shadow: inset 0 0 0 2px var(--t-accent); }
 .ab-porte.ici:hover { background: none; }
 .ab-porte.ici:hover .ab-filou { transform: none; }
 @media (prefers-reduced-motion: reduce) {
@@ -1360,7 +1394,7 @@
 }
 .ab-name em { font-style: normal; color: var(--accent-ink); }
 .ab-user {
-  font-size: 0.72rem; font-weight: 600; color: var(--muted);
+  font-size: 0.72rem; font-weight: 600; color: var(--t-muted);
   line-height: 1.1;
   white-space: nowrap;
 }
@@ -1379,7 +1413,7 @@
 .cagnotte {
   position: relative; flex: none;
   display: inline-flex; align-items: center; gap: 9px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   background: linear-gradient(180deg, #FFFEF9 0%, #FBF3E1 100%);
   color: var(--text);
   border-radius: 999px;
@@ -1465,7 +1499,7 @@
 .di-pip.ok { background: var(--ok); }
 .di-pip.count {
   width: 17px; height: 17px; top: -7px; right: -10px;
-  background: var(--accent);
+  background: var(--t-accent);
   color: #fff;
   font-family: var(--font-display);
   font-size: 0.6rem; font-weight: 700;
@@ -1491,11 +1525,11 @@
   content: "";
   position: absolute; left: 10px; right: 4px; bottom: 0;
   height: 2px; border-radius: 2px;
-  background: var(--accent);
+  background: var(--t-accent);
   transform: scaleX(0); transform-origin: left center;
   transition: transform 0.3s var(--ease-out) 0.12s;
 }
-.dock-item:hover, .dock-item:focus-visible { color: var(--accent); }
+.dock-item:hover, .dock-item:focus-visible { color: var(--t-accent); }
 .dock-item:hover .di-flap, .dock-item:focus-visible .di-flap {
   grid-template-columns: 1fr;
   opacity: 1;
@@ -1592,9 +1626,9 @@
   flex: none;
   display: inline-flex; align-items: center; justify-content: center;
   width: 38px; height: 38px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   background: var(--surface-2);
-  color: var(--muted);
+  color: var(--t-muted);
   border-radius: 999px;
   transition: color 0.18s var(--ease-out), border-color 0.18s var(--ease-out);
 }
@@ -1603,7 +1637,7 @@
 
 /* État vide d'une fenêtre : une phrase qui explique, pas un blanc. */
 .f-vide {
-  color: var(--muted);
+  color: var(--t-muted);
   font-size: 0.86rem; line-height: 1.55;
   padding: 14px 2px;
 }
@@ -1639,11 +1673,11 @@
   margin-bottom: 8px;
 }
 .page-head h1 { font-size: clamp(1.4rem, 2.6vw, 1.85rem); font-weight: 800; line-height: 1.2; }
-.page-head .lede { margin-top: 8px; color: var(--muted); font-size: 0.93rem; line-height: 1.6; max-width: 62ch; }
+.page-head .lede { margin-top: 8px; color: var(--t-muted); font-size: 0.93rem; line-height: 1.6; max-width: 62ch; }
 .page-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 
 /* -- Boutons d'action (complètent `.btn` / `.btn-valider` / `.btn-ghost`) -- */
-.btn-accent { background: var(--accent); color: #fff; box-shadow: 0 3px 10px var(--accent-glow); }
+.btn-accent { background: var(--t-accent); color: #fff; box-shadow: 0 3px 10px var(--accent-glow); }
 .btn-accent:hover { filter: brightness(1.07); }
 .btn-outline {
   background: var(--surface); color: var(--accent-ink);
@@ -1660,7 +1694,7 @@
 /* -- Carte-section : le conteneur de toutes les listes et tableaux -- */
 .card {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-card);
   margin-bottom: 24px;
@@ -1668,11 +1702,11 @@
 .card-head {
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
   padding: 16px 22px 14px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--t-border);
 }
 .card-head h2 { font-size: 1.02rem; font-weight: 700; }
 .card-head h3 { font-size: 1.02rem; font-weight: 700; }
-.card-head .sub { width: 100%; font-size: 0.78rem; color: var(--muted); line-height: 1.5; }
+.card-head .sub { width: 100%; font-size: 0.78rem; color: var(--t-muted); line-height: 1.5; }
 .card-head .spacer { margin-left: auto; }
 .section-count {
   font-family: var(--font-display); font-size: 0.72rem; font-weight: 800;
@@ -1694,7 +1728,7 @@
 .field select {
   width: 100%;
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   border-radius: var(--r-sm);
   padding: 9px 12px;
   font-size: 0.86rem;
@@ -1702,7 +1736,7 @@
   color: var(--text);
   font-family: var(--font-body);
 }
-.field input:focus, .field select:focus { border-color: var(--accent); outline: none; }
+.field input:focus, .field select:focus { border-color: var(--t-accent); outline: none; }
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -1714,7 +1748,7 @@
    règles métier qu'on ne redessine pas au risque d'en perdre un garde-fou. */
 .v2-greffe {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   border-radius: var(--r-lg);
   box-shadow: var(--elev-1);
   padding: 18px 20px;
@@ -1772,40 +1806,26 @@
   --card-foreground: var(--text);
   --popover: var(--surface);
   --popover-foreground: var(--text);
+  /* Ces trois-là passent en vocabulaire shadcn : ici, `muted` et `accent`
+     désignent des FONDS, pas du texte ni la couleur vive. C'est justement
+     cette bascule de sens qui rendait le CSS maison illisible dans les
+     modales — d'où les jetons `--t-` du haut de fichier, qui ne sont, eux,
+     jamais réécrits. */
   --muted: var(--surface-2);
-  --muted-foreground: var(--muted-terrier);
-  --border: var(--border-terrier);
+  --muted-foreground: var(--t-muted);
+  --border: var(--t-border);
   --input: var(--border-strong);
-  /* `var(--accent)` ne peut PAS servir ici : deux lignes plus bas, ce même bloc
-     redéfinit `--accent` sur le fond de survol pâle du vocabulaire shadcn, et
-     c'est cette valeur-là que la variable prendrait. L'anneau de mise en avant
-     sortait donc en orange à 13 % — presque invisible. */
-  --ring: var(--accent-terrier);
-  /* Jetons d'action : l'orange du terrier remplace le cyan.
-     On passe par les copies `-terrier` : dans ce bloc, `var(--accent)`
-     désignerait la valeur qu'on est en train de lui donner juste en
-     dessous (shadcn appelle « accent » le survol, pas la couleur vive). */
-  --primary: var(--accent-terrier);
+  --ring: var(--t-accent);
+  --primary: var(--t-accent);
   --primary-foreground: #fff;
   --secondary: var(--surface-2);
   --secondary-foreground: var(--text);
-  --accent: var(--accent-soft-terrier);
+  --accent: var(--accent-soft);
   --accent-foreground: var(--accent-ink);
   --destructive: var(--danger);
 
   font-family: var(--font-body);
   color: var(--text);
-}
-
-/* `--muted`, `--border` et `--accent` servent DEUX vocabulaires : celui du
-   terrier et celui de shadcn. On garde une copie des valeurs terrier sous
-   un autre nom pour pouvoir les réinjecter ci-dessus sans référence
-   circulaire (une variable ne peut pas se redéfinir à partir d'elle-même). */
-:root {
-  --muted-terrier:       #7C6A55;
-  --border-terrier:      #E6D7BB;
-  --accent-terrier:      #C7530F;
-  --accent-soft-terrier: rgba(224, 122, 47, 0.13);
 }
 
 /* ---- Le voile : brun chaud et franc, comme dans la maquette ---- */
@@ -1850,7 +1870,7 @@
 }
 [data-slot="dialog-description"],
 [data-slot="alert-dialog-description"] {
-  color: var(--muted-terrier);
+  color: var(--t-muted);
   font-size: 0.82rem;
   line-height: 1.55;
 }
@@ -1865,7 +1885,7 @@
   padding: 15px 26px !important;
   gap: 10px !important;
   background: var(--surface-2);
-  border-top: 1px solid var(--border-terrier);
+  border-top: 1px solid var(--t-border);
   border-radius: 0 0 calc(var(--r-lg) - 1px) calc(var(--r-lg) - 1px);
 }
 
@@ -1915,10 +1935,10 @@
 /* La croix de fermeture reste ronde et discrète. */
 [data-slot="dialog-content"] > [data-slot="dialog-close"] {
   border-radius: 999px;
-  color: var(--muted-terrier);
+  color: var(--t-muted);
 }
 [data-slot="dialog-content"] > [data-slot="dialog-close"]:hover {
-  background: var(--accent-soft-terrier);
+  background: var(--accent-soft);
   color: var(--accent-ink);
 }
 
@@ -1957,7 +1977,7 @@
   font-size: 0.76rem;
   font-weight: 700;
   letter-spacing: 0.04em;
-  color: var(--muted-terrier);
+  color: var(--t-muted);
 }
 
 /* ---- Champs de saisie : la tenue des écrans de réglage ----
@@ -1974,12 +1994,12 @@
   height: auto; /* shadcn impose `h-8` / `h-9` en classe : on le desserre */
   padding: 9px 12px;
   background: var(--surface-2);
-  /* La copie `-terrier`, pas `var(--border)` : ici on est DANS le panneau, où
+  /* La copie `-terrier`, pas `var(--t-border)` : ici on est DANS le panneau, où
      `--border` a été remappé sur le vocabulaire shadcn. La valeur se trouve
      être la même aujourd'hui, mais écrire le nom ambigu, c'est laisser une
      mine — celle qui vient de rendre invisible un bouton dont la couleur était
-     déclarée `var(--muted)`. */
-  border: 1px solid var(--border-terrier);
+     déclarée `var(--t-muted)`. */
+  border: 1px solid var(--t-border);
   /* Gagne sur la règle « les boutons sont des pilules » ci-dessus : un
      déclencheur de liste déroulante est un champ, pas un bouton d'action. */
   border-radius: var(--r-sm);
@@ -2083,7 +2103,7 @@
   margin: 4px 0;
   padding: 8px 12px;
   background: var(--surface-2);
-  border: 1px solid var(--border-terrier); /* même raison qu'au-dessus */
+  border: 1px solid var(--t-border); /* même raison qu'au-dessus */
   border-radius: var(--r-sm);
   font-size: 0.86rem;
   font-weight: 600;
@@ -2101,7 +2121,7 @@
   /* Dans ce bloc, `--accent` a été remappé sur le fond de survol pâle du
      vocabulaire shadcn : la coche sortait en orange à 13 %, presque blanche.
      On prend la copie qui porte vraiment l'orange. */
-  accent-color: var(--accent-terrier);
+  accent-color: var(--t-accent);
   cursor: pointer;
 }
 
@@ -2233,7 +2253,7 @@
    la réserve de 38 px prévue par le padding de l'item. */
 [data-slot="select-item-indicator"] {
   right: 12px;
-  color: var(--accent);
+  color: var(--t-accent);
 }
 
 /* ---- En-têtes de groupe et séparateurs ----
@@ -2253,7 +2273,7 @@
 }
 [data-slot="select-separator"] {
   margin: 5px 6px;
-  background: var(--border);
+  background: var(--t-border);
 }
 
 /* ---- Les flèches de défilement (liste longue) ----
@@ -2285,7 +2305,7 @@
   color: var(--text);
 }
 .v2 [data-slot="select-trigger"]:hover { border-color: var(--accent-ink); }
-[data-slot="select-trigger"][data-popup-open] { border-color: var(--accent); }
+[data-slot="select-trigger"][data-popup-open] { border-color: var(--t-accent); }
 
 /* ---- Les infobulles ----
    Même portail, même oubli : elles sortaient sur le noir du thème d'origine.

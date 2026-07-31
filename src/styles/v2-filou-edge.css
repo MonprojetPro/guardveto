@@ -135,7 +135,7 @@
      invitation à parler à Filou sur cet écran, il doit se voir. On reste
      dans la palette du terrier — pas de rouge d'alerte, l'assistance
      n'est pas une urgence (demande MiKL 2026-07-25). */
-  border: 1.5px solid var(--accent);
+  border: 1.5px solid var(--t-accent);
   border-radius: 999px;
   font-family: var(--font-display);
   font-size: 0.72rem; font-weight: 700; letter-spacing: .01em;

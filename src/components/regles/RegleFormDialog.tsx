@@ -29,6 +29,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { rendreRegle } from '@/engine/briques/catalogue'
+import { choixForce, symboleDe, aideForce } from '@/lib/regles/libelle'
+import '@/styles/regles-forces.css'
 import { upsertRegle, type BriqueEvaluable, type ForceFormulaire } from '@/app/(protected)/regles/actions'
 import type { RegleRow, VetoMini, PeriodeOption, TypeCreneauOption } from './ReglesClient'
 
@@ -88,11 +90,22 @@ const FENETRES = [
   { value: 'glissante_30_jours', label: 'sur 30 jours glissants' },
 ]
 
-const FORCES: { value: ForceFormulaire; label: string; symbole: string }[] = [
-  { value: 'jamais', label: 'Interdiction ferme', symbole: '🔴' },
-  { value: 'sauf_crise', label: 'À éviter sauf crise', symbole: '🟠' },
-  { value: 'evitee', label: 'Préférence (évitée)', symbole: '🟡' },
-  { value: 'si_possible', label: 'Préférence (si possible)', symbole: '🟡' },
+/** Les 4 niveaux proposables, dans l'ordre du plus dur au plus souple.
+ *  Libellés, symboles et aides viennent de `lib/regles/libelle` — source unique
+ *  partagée avec la fiche véto et l'écran Règles. */
+const FORCES: { value: ForceFormulaire; label: string; symbole: string; aide: string }[] = (
+  ['jamais', 'sauf_crise', 'evitee', 'si_possible'] as ForceFormulaire[]
+).map((value) => ({
+  value,
+  label: choixForce(value),
+  symbole: symboleDe(value),
+  aide: aideForce(value),
+}))
+
+const SEMAINES = [
+  { value: 'paires', label: 'Semaines paires' },
+  { value: 'impaires', label: 'Semaines impaires' },
+  { value: 'toutes', label: 'Toutes les semaines' },
 ]
 
 const PERIODES = [
@@ -510,7 +523,7 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
           {/* QUOI */}
           <div className="space-y-1.5">
             <Label>Type de règle</Label>
-            <Select value={briqueId} onValueChange={(v) => v && choisirBrique(v as BriqueEvaluable)}>
+            <Select value={briqueId} onValueChange={(v) => v && choisirBrique(v as BriqueEvaluable)} items={BRIQUES}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {BRIQUES.map((b) => (
@@ -528,7 +541,7 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
             <div className="space-y-3">
               <div className="space-y-1.5">
                 <Label>Jour de repos</Label>
-                <Select value={jour} onValueChange={(v) => v && setJour(v)}>
+                <Select value={jour} onValueChange={(v) => v && setJour(v)} items={JOURS}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {JOURS.map((j) => <SelectItem key={j.value} value={j.value}>{j.label}</SelectItem>)}
@@ -546,7 +559,7 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Si garde le week-end</Label>
-                <Select value={siWe} onValueChange={(v) => v && setSiWe(v)}>
+                <Select value={siWe} onValueChange={(v) => v && setSiWe(v)} items={JOURS}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {JOURS.map((j) => <SelectItem key={j.value} value={j.value}>{j.label}</SelectItem>)}
@@ -555,7 +568,7 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
               </div>
               <div className="space-y-1.5">
                 <Label>Sinon</Label>
-                <Select value={sinon} onValueChange={(v) => v && setSinon(v)}>
+                <Select value={sinon} onValueChange={(v) => v && setSinon(v)} items={JOURS}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {JOURS.map((j) => <SelectItem key={j.value} value={j.value}>{j.label}</SelectItem>)}
@@ -569,7 +582,7 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
             <div className="space-y-3">
               <div className="space-y-1.5">
                 <Label>Semaines concernées</Label>
-                <Select value={semaines} onValueChange={(v) => v && setSemaines(v)}>
+                <Select value={semaines} onValueChange={(v) => v && setSemaines(v)} items={SEMAINES}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="paires">Semaines paires</SelectItem>
@@ -635,7 +648,7 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
                 </div>
                 <div className="space-y-1.5">
                   <Label>Fenêtre de comptage</Label>
-                  <Select value={fenetre} onValueChange={(v) => v && setFenetre(v)}>
+                  <Select value={fenetre} onValueChange={(v) => v && setFenetre(v)} items={FENETRES}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {FENETRES.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
@@ -1031,22 +1044,37 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
             </div>
           )}
 
-          {/* FORCE — les desiderata (préférences pures) excluent « Interdiction ferme » */}
-          <div className="space-y-1.5">
-            <Label>Niveau d&apos;importance</Label>
-            <Select value={force} onValueChange={(v) => v && setForce(v as ForceFormulaire)}>
-              <SelectTrigger>
-                {(() => { const f = FORCES.find((x) => x.value === force); return f ? `${f.symbole} ${f.label}` : '' })()}
-              </SelectTrigger>
-              <SelectContent>
-                {FORCES.filter(
-                  (f) => !(BRIQUES_SOUPLES_SEULEMENT.has(briqueId) && f.value === 'jamais'),
-                ).map((f) => (
-                  <SelectItem key={f.value} value={f.value}>{f.symbole} {f.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* FORCE — les desiderata (préférences pures) excluent « Jamais ».
+              Ce n'est plus une liste déroulante : quatre choix dont deux se
+              ressemblaient beaucoup ne se comparent pas dans un menu qu'il faut
+              ouvrir. Ici les quatre sont visibles ensemble, chacun avec ce que
+              le moteur fera vraiment — c'est ça qui permet de trancher. */}
+          <fieldset className="space-y-1.5">
+            <legend className="text-sm font-medium leading-none mb-1.5">
+              Jusqu&apos;où le moteur doit-il aller pour la respecter ?
+            </legend>
+            <div className="gv-forces">
+              {FORCES.filter(
+                (f) => !(BRIQUES_SOUPLES_SEULEMENT.has(briqueId) && f.value === 'jamais'),
+              ).map((f) => (
+                <label key={f.value} className="gv-force" data-force={f.value} data-choisi={force === f.value}>
+                  <input
+                    type="radio"
+                    name="gv-force"
+                    value={f.value}
+                    checked={force === f.value}
+                    onChange={() => setForce(f.value)}
+                  />
+                  <span className="gvf-corps">
+                    <span className="gvf-titre">
+                      <span aria-hidden="true">{f.symbole}</span> {f.label}
+                    </span>
+                    <span className="gvf-aide">{f.aide}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
 
           {/* VALIDITÉ (permanente ou limitée à une période) */}
           <div className="space-y-1.5">

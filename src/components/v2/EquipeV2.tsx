@@ -519,18 +519,6 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
           const nb = nbContraintes.get(v.id) ?? 0
           const cestMoi = v.id === moiId
 
-          // Les qualités de la personne tiennent sur UNE ligne de texte, dans
-          // l'ordre du plus structurant au plus anecdotique. Elles étaient
-          // réparties sur trois bandes de pilules qui se ressemblaient toutes,
-          // dont une qui disait « aucune étiquette » — une ligne pour dire
-          // qu'il n'y a rien.
-          const qualites: string[] = [
-            v.role_app === 'admin' ? 'Admin' : 'Véto',
-            v.statut === 'associe' ? 'Associé·e' : 'Salarié·e',
-            ...(v.dernier_recours ? ['dernier recours'] : []),
-            ...(v.tags ?? []),
-          ]
-
           return (
             <article key={v.id} className={`vet-card${v.actif ? '' : ' inactive'}`}>
               {/* (A) Qui c'est. La phrase de rôle a sauté : elle répétait mot
@@ -547,13 +535,30 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
                 </div>
               </div>
 
-              {/* (B) Ce qu'elle est, d'un seul trait. Seul « Admin » est mis en
-                  avant : c'est le seul mot de la ligne qui donne un pouvoir. */}
+              {/* (B) Ce qu'elle est. Trois natures d'information, trois formes
+                  visuelles — au lieu d'une file de mots gris où « dernier
+                  recours » se fondait dans « Associé·e » (retour MiKL) :
+                    · le statut, en texte : c'est le fond de la fiche ;
+                    · « Admin », en jeton plein : c'est un POUVOIR, ça se voit ;
+                    · « dernier recours », en jeton ambre à bouée : c'est une
+                      exception de planning, elle doit sauter aux yeux ;
+                    · les étiquettes, en jetons sable : ce sont des mots libres
+                      que lisent les règles de composition.
+                  « Véto » n'est plus écrit : c'est le cas de tout le monde, et
+                  nommer le cas par défaut n'apprend rien. */}
               <p className="vet-ligne">
-                {qualites.map((q, i) => (
-                  <span key={q}>
-                    {i > 0 && <span className="vl-sep"> · </span>}
-                    {q === 'Admin' ? <strong>Admin</strong> : q}
+                <span className="vl-statut">
+                  {v.statut === 'associe' ? 'Associé·e' : 'Salarié·e'}
+                </span>
+                {v.role_app === 'admin' && <span className="vl-jeton vl-admin">Admin</span>}
+                {v.dernier_recours && (
+                  <span className="vl-jeton vl-recours">
+                    <span aria-hidden="true">🛟</span> Dernier recours
+                  </span>
+                )}
+                {(v.tags ?? []).map((t) => (
+                  <span key={t} className="vl-jeton vl-tag">
+                    {t}
                   </span>
                 ))}
               </p>

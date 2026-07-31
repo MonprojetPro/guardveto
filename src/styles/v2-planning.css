@@ -43,7 +43,7 @@
   box-shadow: var(--edge-light), 2px 4px 10px rgba(120, 70, 18, 0.12);
 }
 .pp-caret {
-  font-size: 0.7rem; color: var(--muted);
+  font-size: 0.7rem; color: var(--t-muted);
   transition: transform 0.25s var(--ease-out);
 }
 .period-pill[aria-expanded="true"] .pp-caret { transform: rotate(180deg); }
@@ -56,7 +56,7 @@
 }
 .status-badge.st-brouillon { background: var(--warn-soft); color: var(--warn); border-color: rgba(196, 138, 20, 0.35); }
 .status-badge.st-publiee { background: var(--ok-soft); color: var(--ok); border-color: rgba(90, 150, 60, 0.35); }
-.status-badge.st-verrouillee { background: var(--surface-2); color: var(--muted); border-color: var(--border-strong); }
+.status-badge.st-verrouillee { background: var(--surface-2); color: var(--t-muted); border-color: var(--border-strong); }
 .status-badge.pulse { animation: badgePulse 1.2s ease both; }
 @keyframes badgePulse {
   0% { box-shadow: 0 0 0 0 var(--ok-soft); }
@@ -76,25 +76,25 @@
   text-align: left;
   font-family: var(--font-body); font-weight: 500; letter-spacing: 0;
 }
-.pp-sub { color: var(--muted); font-size: 0.86rem; line-height: 1.55; }
+.pp-sub { color: var(--t-muted); font-size: 0.86rem; line-height: 1.55; }
 .pp-sub b { color: var(--text); font-family: var(--font-display); }
 .pb-chips { display: flex; flex-direction: column; align-items: stretch; gap: 6px; margin-top: 10px; }
 .pb-chip {
   display: inline-flex; flex-direction: column; justify-content: center;
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   border-radius: var(--r-sm);
   padding: 7px 13px;
   font-size: 0.8rem; font-weight: 600; line-height: 1.35;
 }
-.pb-chip small { font-size: 0.68rem; font-weight: 500; color: var(--muted); }
+.pb-chip small { font-size: 0.68rem; font-weight: 500; color: var(--t-muted); }
 .pb-chip.effectif { border-color: var(--border-strong); background: var(--accent-soft); }
 .pb-chip.effectif small { color: var(--accent-ink); font-weight: 600; }
 .pp-label {
   margin: 14px 0 6px;
   font-size: 0.66rem; font-weight: 700; letter-spacing: 0.12em;
   text-transform: uppercase; color: var(--soft);
-  border-top: 1px solid var(--border); padding-top: 12px;
+  border-top: 1px solid var(--t-border); padding-top: 12px;
 }
 .pp-item {
   display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
@@ -106,7 +106,7 @@
   font-size: 0.84rem; font-weight: 700; color: var(--text);
   text-align: left;
 }
-.pp-item small { font-size: 0.7rem; font-weight: 500; color: var(--muted); }
+.pp-item small { font-size: 0.7rem; font-weight: 500; color: var(--t-muted); }
 .pp-item:hover { background: var(--surface-2); }
 .pp-item[aria-current="true"] {
   background: var(--accent-soft);
@@ -122,7 +122,7 @@
   font-size: 0.82rem; font-weight: 700; color: var(--accent-ink);
   text-decoration: none;
 }
-.pp-new small { font-size: 0.7rem; font-weight: 500; color: var(--muted); }
+.pp-new small { font-size: 0.7rem; font-weight: 500; color: var(--t-muted); }
 .pp-new:hover { border-color: var(--accent-ink); background: var(--accent-soft); }
 .pp-today {
   margin-top: 10px;
@@ -135,7 +135,7 @@
 .workspace {
   position: relative;
   margin-bottom: 34px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   border-radius: var(--r-lg);
   background: var(--surface);
   /* grammaire de profondeur M6 : lumière haut-gauche, ombres bas-droite */
@@ -150,7 +150,7 @@
 .work-head {
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
   padding: 14px 20px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--t-border);
   background: var(--surface);
 }
 .month-nav { display: flex; align-items: center; gap: 6px; }
@@ -159,7 +159,7 @@
 }
 .mn-btn {
   border: 1px solid var(--border-strong);
-  background: var(--surface-2); color: var(--muted);
+  background: var(--surface-2); color: var(--t-muted);
   border-radius: 999px;
   width: 36px; height: 36px;
   font-size: 0.95rem; line-height: 1;
@@ -167,20 +167,20 @@
 }
 .mn-btn:hover:not(:disabled) { color: var(--accent-ink); border-color: var(--accent-ink); }
 .mn-btn:disabled { opacity: 0.35; cursor: default; }
-.work-head .meta { font-size: 0.76rem; color: var(--muted); }
+.work-head .meta { font-size: 0.76rem; color: var(--t-muted); }
 .head-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
 .head-btn {
   border: 1px solid var(--border-strong);
-  background: var(--surface-2); color: var(--muted);
+  background: var(--surface-2); color: var(--t-muted);
   border-radius: 999px; font-size: 0.78rem; font-weight: 700;
   padding: 8px 14px; min-height: 38px;
 }
 .head-btn:hover:not(:disabled) { color: var(--accent-ink); border-color: var(--accent-ink); }
 .head-btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-ink); }
-.head-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.head-btn.primary { background: var(--t-accent); border-color: var(--t-accent); color: #fff; }
 .head-btn.primary:hover:not(:disabled) { filter: brightness(1.07); color: #fff; }
 .head-btn.primary:disabled { background: var(--ok); border-color: var(--ok); color: #fff; opacity: 0.85; cursor: default; }
-.head-btn.ghost { border-color: var(--border); background: transparent; }
+.head-btn.ghost { border-color: var(--t-border); background: transparent; }
 
 .work-body { padding: 18px 20px 130px; }
 /* La consigne d'usage, posée entre la barre d'outils et la grille.
@@ -190,11 +190,11 @@
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   margin: 0 0 14px;
   padding: 9px 14px;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
+  border: 1px solid var(--t-border);
+  border-left: 3px solid var(--t-accent);
   border-radius: var(--r-sm);
   background: var(--surface-2);
-  font-size: 0.79rem; color: var(--muted); line-height: 1.4;
+  font-size: 0.79rem; color: var(--t-muted); line-height: 1.4;
 }
 .grid-hint b { color: var(--text); font-weight: 700; }
 .grid-hint .gh-ico { font-size: 0.95rem; line-height: 1; }
@@ -227,7 +227,7 @@
 .day {
   position: relative;
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   border-radius: var(--r-sm);
   padding: 6px 6px 7px;
   min-height: 96px;
@@ -242,12 +242,12 @@
    d'outils le dit une fois pour toutes. */
 .day.past { background: #EFE7D6; border-color: #E4D8BF; }
 .day.past .d-num { color: var(--soft); }
-.day.past .slot-card { background: transparent; border-color: var(--border); box-shadow: none; }
+.day.past .slot-card { background: transparent; border-color: var(--t-border); box-shadow: none; }
 .day.past .vet-row, .day.past .conge-chip { opacity: 0.6; filter: saturate(0.4); }
 .day.hors { background: transparent; border-style: dashed; }
 .day.hors .d-num { color: var(--soft); }
 .d-hors-note { font-size: 0.6rem; color: var(--soft); font-style: italic; margin-top: 2px; }
-.day.today { border: 2px solid var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.day.today { border: 2px solid var(--t-accent); box-shadow: 0 0 0 4px var(--accent-soft); }
 /* Le numéro du jour et ses mentions tiennent sur UNE ligne : sinon la
    pastille « Aujourd'hui » passait à la ligne et décalait vers le bas toutes
    les fiches de la case, qui ne s'alignaient plus avec celles des jours
@@ -275,7 +275,7 @@
   position: relative;
   display: flex; flex-direction: column;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   border-radius: 9px;
   padding: 2px;
   box-shadow: var(--edge-light), 1px 2px 4px rgba(110, 62, 14, 0.08);
@@ -326,7 +326,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   font-size: 0.82rem; line-height: 1;
 }
 .vet-row.empty {
-  color: var(--muted);
+  color: var(--t-muted);
   border: 1.5px dashed var(--border-strong); border-radius: 7px;
 }
 .vet-row.empty .vdot { background: transparent; border: 1.5px dashed var(--border-strong); box-shadow: none; }
@@ -339,7 +339,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   align-self: flex-start;
   border: 1.5px dashed var(--border-strong);
   background: transparent;
-  color: var(--muted);
+  color: var(--t-muted);
   font-size: 0.62rem; font-weight: 600;
   padding: 2px 8px 2px 5px; border-radius: 999px;
   max-width: 100%;
@@ -367,8 +367,8 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 /* Mise en évidence d'une cellule (réserve, impasse) */
 .day.spot { animation: spotCell 2.6s ease both; }
 @keyframes spotCell {
-  0%   { box-shadow: 0 0 0 0 var(--accent-glow); border-color: var(--accent); }
-  30%  { box-shadow: 0 0 0 10px transparent; border-color: var(--accent); }
+  0%   { box-shadow: 0 0 0 0 var(--accent-glow); border-color: var(--t-accent); }
+  30%  { box-shadow: 0 0 0 10px transparent; border-color: var(--t-accent); }
   100% { box-shadow: none; }
 }
 
@@ -391,26 +391,26 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   max-width: 400px;
 }
 .archive-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
-.archive-card p { font-size: 0.86rem; color: var(--muted); line-height: 1.6; margin-bottom: 16px; }
+.archive-card p { font-size: 0.86rem; color: var(--t-muted); line-height: 1.6; margin-bottom: 16px; }
 
 /* ============================================================
    VOLET COMPTEURS EXTENSIBLE (retour MiKL n°2)
    ============================================================ */
 .counters-panel {
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   border-radius: var(--r-md);
   padding: 14px 14px 12px;
   animation: panelIn .35s ease both;
 }
 @keyframes panelIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .cnt-head h4 { font-family: var(--font-display); font-size: 0.84rem; font-weight: 700; }
-.cnt-head p { font-size: 0.71rem; color: var(--muted); margin: 3px 0 10px; line-height: 1.45; }
+.cnt-head p { font-size: 0.71rem; color: var(--t-muted); margin: 3px 0 10px; line-height: 1.45; }
 .cnt-row {
   display: grid; grid-template-columns: minmax(0, 1fr) repeat(4, 33px);
   align-items: center; gap: 3px;
   padding: 6px 2px;
-  border-bottom: 1px dashed var(--border);
+  border-bottom: 1px dashed var(--t-border);
 }
 .cnt-row:last-child { border-bottom: none; }
 .cnt-row.cnt-header { border-bottom: 1px solid var(--border-strong); padding-bottom: 4px; }
@@ -432,12 +432,12 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 /* la jauge sous chaque nombre : l'équité se VOIT, sans comparer de tête */
 .cnt-num .bar {
   display: block; height: 3px; margin: 2px 3px 0;
-  border-radius: 2px; background: var(--border);
+  border-radius: 2px; background: var(--t-border);
   overflow: hidden;
 }
 .cnt-num .bar b {
   display: block; height: 100%;
-  background: var(--accent); opacity: 0.55;
+  background: var(--t-accent); opacity: 0.55;
   border-radius: 2px;
   transform-origin: left center;
   transition: transform .5s var(--ease-out);
@@ -446,7 +446,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .cnt-row.cnt-aside { opacity: 0.62; }
 .cnt-ecart {
   margin-top: 10px;
-  font-size: 0.7rem; font-weight: 600; color: var(--muted);
+  font-size: 0.7rem; font-weight: 600; color: var(--t-muted);
   line-height: 1.5;
 }
 .cnt-num.bump-up { animation: bumpUp .8s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
@@ -523,7 +523,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
    shadcn redéfinit `--muted` comme une couleur de FOND crème — le texte y
    devenait invisible. Une seconde déclaration plus bas dans ce fichier la
    sauvait par la cascade ; on ne compte pas là-dessus. */
-.gm-badge.lock { background: var(--surface-2); color: var(--muted-terrier); border: 1px solid var(--border-strong); }
+.gm-badge.lock { background: var(--surface-2); color: var(--t-muted); border: 1px solid var(--border-strong); }
 .gm-badge.warn { background: var(--warn-soft); color: var(--warn); }
 
 .lock-encart {
@@ -543,7 +543,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 }
 
 .gm-section {
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   border-radius: var(--r-md);
   padding: 12px 14px;
   margin-bottom: 10px;
@@ -563,10 +563,10 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   font-size: 0.88rem; font-weight: 700;
 }
 .gm-current .dot { width: 14px; height: 14px; border-radius: 50%; flex: none; }
-.gm-current.none { color: var(--muted); font-weight: 600; font-style: italic; }
+.gm-current.none { color: var(--t-muted); font-weight: 600; font-style: italic; }
 .gm-reassign {
   border: 1px solid var(--border-strong);
-  background: var(--surface-2); color: var(--muted);
+  background: var(--surface-2); color: var(--t-muted);
   border-radius: 999px; font-size: 0.74rem; font-weight: 700;
   padding: 7px 13px; min-height: 34px;
 }
@@ -575,7 +575,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .gm-reassign:disabled { opacity: 0.5; cursor: default; }
 .gm-done { font-size: 0.76rem; color: var(--ok); font-weight: 700; animation: bubbleIn .3s ease both; }
 
-.av-list { list-style: none; margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 6px; animation: bubbleIn .25s ease both; }
+.av-list { list-style: none; margin-top: 10px; border-top: 1px dashed var(--t-border); padding-top: 6px; animation: bubbleIn .25s ease both; }
 .av-row {
   display: grid;
   grid-template-columns: 16px minmax(72px, auto) 14px minmax(0, 1fr) auto;
@@ -597,7 +597,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .av-state.ambre { color: var(--warn); }
 .av-state.rouge { color: var(--danger); }
 /* `-terrier` : rendu dans une modale — cf. la note sur `.gm-badge.lock`. */
-.av-reason { font-size: 0.73rem; font-weight: 500; color: var(--muted-terrier); line-height: 1.35; }
+.av-reason { font-size: 0.73rem; font-weight: 500; color: var(--t-muted); line-height: 1.35; }
 .av-row.rouge .av-reason { color: var(--danger); }
 .av-row.ambre .av-reason { color: var(--warn); }
 /* l'impact compteur : ce que ce choix ferait au total de la période */
@@ -629,11 +629,11 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   display: flex; justify-content: space-between; align-items: center; gap: 10px;
   flex-wrap: wrap;
   margin-top: 14px; padding-top: 14px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--t-border);
 }
 .gm-absent {
   border: 1px solid var(--border-strong);
-  background: transparent; color: var(--muted);
+  background: transparent; color: var(--t-muted);
   border-radius: 999px; font-size: 0.78rem; font-weight: 700;
   padding: 8px 15px; min-height: 38px;
 }
@@ -667,7 +667,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .recap-list li {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px;
   padding: 10px 2px;
-  border-bottom: 1px dashed var(--border);
+  border-bottom: 1px dashed var(--t-border);
   font-size: 0.9rem; line-height: 1.5;
 }
 .recap-list li:last-child { border-bottom: none; }
@@ -685,18 +685,18 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   margin-left: auto;
   display: inline-flex; gap: 3px;
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   border-radius: 999px; padding: 3px;
 }
 .recap-seg button {
-  border: none; background: transparent; color: var(--muted);
+  border: none; background: transparent; color: var(--t-muted);
   font-size: 0.78rem; font-weight: 700;
   padding: 4px 13px; border-radius: 999px; min-height: 28px;
 }
-.recap-seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.recap-seg button[aria-pressed="true"] { background: var(--t-accent); color: #fff; }
 .recap-prev {
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   border-radius: var(--r-sm);
   padding: 12px 14px;
   margin-bottom: 12px;
@@ -711,7 +711,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .recap-prev ul { list-style: none; margin-top: 4px; }
 .recap-prev li { font-size: 0.84rem; line-height: 1.6; padding: 2px 0; }
 .recap-hint-msg {
-  font-size: 0.78rem; color: var(--muted); font-style: italic;
+  font-size: 0.78rem; color: var(--t-muted); font-style: italic;
   margin-bottom: 12px;
   animation: bubbleIn .3s ease both;
 }
@@ -797,13 +797,14 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
    métier du composant (réattribution, verrouillage, disponibilités,
    violations de règles) n'est pas touchée : seul son rendu change.
 
-   ⚠️ Piège : à l'intérieur d'une modale, `--muted` et `--accent` désignent
-   les jetons de shadcn (fond crème, teinte de survol) et NON les couleurs
-   du terrier — c'est `v2-terrier.css` qui les remappe là pour habiller les
-   surfaces flottantes. Les règles ci-dessous passent donc par les copies
-   `--muted-terrier` / `--accent-terrier`. Écrire `var(--muted)` ici rend le
-   texte crème sur crème, donc invisible (constaté le 2026-07-29 sur le
-   bouton « Réattribuer »).
+   ⚠️ Piège, désormais désamorcé à la source : à l'intérieur d'une modale,
+   `--muted` et `--accent` désignent les jetons de shadcn (fond crème, teinte
+   de survol) et NON les couleurs du terrier. Écrire `var(--muted)` ici rendait
+   le texte crème sur crème, donc invisible (constaté le 2026-07-29 sur le
+   bouton « Réattribuer », puis à nouveau le 07-31 sur la modale des
+   contraintes). Depuis, les couleurs du terrier vivent sous `--t-muted`,
+   `--t-border`, `--t-accent`, que shadcn ne connaît pas et ne peut donc plus
+   écraser — voir l'encadré en tête de `v2-terrier.css`.
    ============================================================ */
 
 .gv-modale .gm-kicker {
@@ -818,8 +819,8 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   padding: 4px 11px; border-radius: 999px;
 }
 .gm-badge.publie { background: var(--ok-soft); color: var(--ok); }
-.gm-badge.brouillon { background: var(--surface-2); color: var(--muted-terrier); border: 1px solid var(--border-strong); }
-.gm-badge.lock { background: var(--surface-2); color: var(--muted-terrier); border: 1px solid var(--border-strong); }
+.gm-badge.brouillon { background: var(--surface-2); color: var(--t-muted); border: 1px solid var(--border-strong); }
+.gm-badge.lock { background: var(--surface-2); color: var(--t-muted); border: 1px solid var(--border-strong); }
 .gm-badge.warn { background: var(--warn-soft); color: var(--warn); }
 
 /* -- L'encart de verrouillage, avec sa confirmation en ligne --
@@ -841,7 +842,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 
 /* -- Une place de garde : libellé, qui la tient, et le bouton pour changer -- */
 .gm-section {
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   border-radius: var(--r-md);
   padding: 12px 14px;
   background: var(--surface);
@@ -867,10 +868,10 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   display: inline-flex; align-items: center; justify-content: center;
   color: #fff; font-size: 0.62rem; font-weight: 800;
 }
-.gm-current.none { color: var(--muted-terrier); font-weight: 600; font-style: italic; }
+.gm-current.none { color: var(--t-muted); font-weight: 600; font-style: italic; }
 .gm-reassign {
   border: 1px solid var(--border-strong);
-  background: var(--surface-2); color: var(--muted-terrier);
+  background: var(--surface-2); color: var(--t-muted);
   border-radius: 999px; font-size: 0.74rem; font-weight: 700;
   padding: 7px 13px; min-height: 34px;
 }
@@ -882,7 +883,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .gm-absent-link {
   display: inline-flex; align-items: center; gap: 5px;
   border: none; background: transparent;
-  color: var(--muted-terrier); font-size: 0.72rem; font-weight: 600;
+  color: var(--t-muted); font-size: 0.72rem; font-weight: 600;
   padding: 4px 8px; border-radius: 999px;
 }
 .gm-absent-link:hover { color: var(--danger); background: var(--danger-soft); }
@@ -893,7 +894,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
    se teinte à peine — jamais d'aplat orange plein. */
 .av-list {
   list-style: none; margin-top: 10px; padding-top: 6px;
-  border-top: 1px dashed var(--border);
+  border-top: 1px dashed var(--t-border);
   max-height: 260px; overflow-y: auto;
   /* Ascenseur discret : celui du système masquait la colonne d'état. */
   scrollbar-width: thin;
@@ -928,7 +929,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .av-state.vert { color: var(--ok); }
 .av-state.ambre { color: var(--warn); }
 .av-state.rouge { color: var(--danger); }
-.av-reason { font-size: 0.73rem; font-weight: 500; color: var(--muted-terrier); line-height: 1.35; }
+.av-reason { font-size: 0.73rem; font-weight: 500; color: var(--t-muted); line-height: 1.35; }
 .av-row.rouge .av-reason { color: var(--danger); }
 .av-row.ambre .av-reason { color: var(--warn); }
 /* L'impact compteur : ce que ce choix ferait au total de la période. */
@@ -939,7 +940,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .av-legende {
   display: flex; flex-wrap: wrap; gap: 4px 12px;
   margin-top: 8px; padding-top: 8px;
-  border-top: 1px dashed var(--border);
+  border-top: 1px dashed var(--t-border);
   font-size: 0.7rem; color: var(--soft);
 }
 .av-legende span { display: inline-flex; align-items: center; gap: 5px; }

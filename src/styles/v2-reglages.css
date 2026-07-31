@@ -24,17 +24,17 @@
 .conn-head {
   display: flex; align-items: center; gap: 12px;
   padding: 15px 18px 13px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--t-border);
 }
 .conn-ico {
   width: 40px; height: 40px; border-radius: var(--r-sm);
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   display: inline-flex; align-items: center; justify-content: center;
   font-size: 1.15rem; flex: none;
 }
 .conn-head h3 { font-size: 0.96rem; font-weight: 700; }
-.conn-head .sub { font-size: 0.74rem; color: var(--muted); margin-top: 1px; }
+.conn-head .sub { font-size: 0.74rem; color: var(--t-muted); margin-top: 1px; }
 .conn-state {
   margin-left: auto;
   display: inline-flex; align-items: center; gap: 6px;
@@ -43,13 +43,13 @@
   white-space: nowrap;
 }
 .conn-state.on  { background: var(--ok-soft); color: var(--ok); }
-.conn-state.off { background: var(--surface-2); color: var(--soft); border: 1px solid var(--border); }
+.conn-state.off { background: var(--surface-2); color: var(--soft); border: 1px solid var(--t-border); }
 .conn-state .cs-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .conn-body {
   padding: 14px 18px 16px;
   display: flex; flex-direction: column; gap: 12px; flex: 1;
 }
-.conn-line { font-size: 0.84rem; line-height: 1.55; color: var(--muted); }
+.conn-line { font-size: 0.84rem; line-height: 1.55; color: var(--t-muted); }
 .conn-line b { color: var(--text); }
 .conn-line.ok { color: var(--ok); font-weight: 600; }
 .conn-line.bad { color: var(--danger); font-weight: 600; }
@@ -59,7 +59,7 @@
   font-family: 'Consolas', 'Menlo', monospace;
   font-size: 0.78rem;
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   border-radius: 8px;
   padding: 3px 8px;
   word-break: break-all;
@@ -77,7 +77,7 @@
 .sync-spin {
   display: inline-block; width: 14px; height: 14px;
   border: 2px solid var(--accent-soft);
-  border-top-color: var(--accent);
+  border-top-color: var(--t-accent);
   border-radius: 50%;
   animation: spin 0.9s linear infinite;
   vertical-align: -2px; margin-right: 6px;
@@ -98,18 +98,18 @@
 }
 .mail-table td {
   padding: 10px 14px;
-  border-bottom: 1px dashed var(--border);
+  border-bottom: 1px dashed var(--t-border);
   font-size: 0.83rem;
   vertical-align: middle;
 }
 .mail-table tr:last-child td { border-bottom: none; }
-.mail-table .m-date { color: var(--muted); font-size: 0.76rem; white-space: nowrap; }
+.mail-table .m-date { color: var(--t-muted); font-size: 0.76rem; white-space: nowrap; }
 .mail-type {
   display: inline-block;
   font-size: 0.7rem; font-weight: 700;
   background: var(--surface-2);
-  border: 1px solid var(--border);
-  color: var(--muted);
+  border: 1px solid var(--t-border);
+  color: var(--t-muted);
   padding: 3px 10px; border-radius: 999px;
   white-space: nowrap;
 }
@@ -123,7 +123,7 @@
   display: block; font-size: 0.72rem; color: var(--danger);
   margin-top: 3px; line-height: 1.45;
 }
-.mail-vide { padding: 22px 18px; font-size: 0.86rem; color: var(--muted); line-height: 1.6; }
+.mail-vide { padding: 22px 18px; font-size: 0.86rem; color: var(--t-muted); line-height: 1.6; }
 .mail-resume { display: flex; gap: 10px; flex-wrap: wrap; margin-left: auto; }
 .mr-chip {
   display: inline-flex; align-items: center; gap: 6px;
@@ -143,12 +143,12 @@
 .reste-liste li {
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
   padding: 13px 20px;
-  border-bottom: 1px dashed var(--border);
+  border-bottom: 1px dashed var(--t-border);
 }
 .reste-liste li:last-child { border-bottom: none; }
 .reste-liste .rl-quoi { flex: 1; min-width: 220px; }
 .reste-liste .rl-quoi b { font-family: var(--font-display); font-size: 0.94rem; display: block; }
-.reste-liste .rl-quoi small { font-size: 0.76rem; color: var(--muted); line-height: 1.5; }
+.reste-liste .rl-quoi small { font-size: 0.76rem; color: var(--t-muted); line-height: 1.5; }
 
 @media (max-width: 520px) {
   .conn-duo { grid-template-columns: 1fr; }

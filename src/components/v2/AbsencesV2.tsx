@@ -323,7 +323,7 @@ export function AbsencesV2({
                   aria-pressed={filtreVet === 'tous'}
                   onClick={() => setFiltreVet('tous')}
                 >
-                  <i style={{ ['--c' as string]: 'var(--accent)' }} />
+                  <i style={{ ['--c' as string]: 'var(--t-accent)' }} />
                   Toute l&apos;équipe
                 </button>
                 {vets

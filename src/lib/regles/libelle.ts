@@ -30,17 +30,62 @@ export interface RegleNommable {
 export interface ForceMeta {
   etage: number
   symbole: string
-  /** Le mot qu'on montre quand il n'y a pas la place d'un groupe entier. */
+  /** Le mot du badge — quatre mots DIFFÉRENTS, quatre couleurs DIFFÉRENTES. */
   mot: string
+  /** Le choix, tel qu'il se lit dans le formulaire. Une décision, pas un grade. */
+  choix: string
+  /** Ce que le moteur fera vraiment. C'est ça qui permet de choisir. */
+  aide: string
 }
 
+/**
+ * Les quatre niveaux de fermeté, dits pareil PARTOUT (formulaire, fiche véto,
+ * écran Règles).
+ *
+ * Refonte du 2026-07-31. Ils s'appelaient « Interdiction ferme », « À éviter
+ * sauf crise », « Préférence (évitée) » et « Préférence (si possible) ». Les
+ * deux derniers commençaient par le même mot ET portaient la même pastille
+ * jaune. MiKL : « je me mets à la place d'un admin, comment il va savoir
+ * choisir ? faut revoir ce truc, c'est vital ».
+ *
+ * Trois principes appliqués :
+ *  · quatre mots d'attaque tous différents — Jamais / Sauf / Éviter / Souhait ;
+ *  · quatre couleurs distinctes, du rouge au vert, qui se lisent comme une
+ *    échelle même sans lire le texte ;
+ *  · chaque niveau dit ce que le MOTEUR fera, pas à quel point c'est
+ *    « important » — un adjectif ne se compare pas, un comportement si.
+ */
 export const FORCE_META: Record<string, ForceMeta> = {
-  invariant:     { etage: 0, symbole: '🔴', mot: 'Intouchable' },
-  reglementaire: { etage: 1, symbole: '⚪', mot: 'Réglementaire' },
-  jamais:        { etage: 2, symbole: '🔴', mot: 'Ferme' },
-  sauf_crise:    { etage: 3, symbole: '🟠', mot: 'Sauf crise' },
-  evitee:        { etage: 4, symbole: '🟡', mot: 'À éviter' },
-  si_possible:   { etage: 5, symbole: '🟡', mot: 'Souhait' },
+  invariant: {
+    etage: 0, symbole: '🔴', mot: 'Intouchable',
+    choix: 'Intouchable',
+    aide: "Règle de fond du cabinet — elle ne se modifie pas ici.",
+  },
+  reglementaire: {
+    etage: 1, symbole: '⚪', mot: 'Réglementaire',
+    choix: 'Réglementaire',
+    aide: 'Imposée par la loi ou la convention. Fournie pré-assemblée.',
+  },
+  jamais: {
+    etage: 2, symbole: '🔴', mot: 'Jamais',
+    choix: 'Jamais — c’est interdit',
+    aide: "Le moteur ne le fera en aucun cas. Quitte à ne pas trouver de planning du tout et à te demander d'arbitrer.",
+  },
+  sauf_crise: {
+    etage: 3, symbole: '🟠', mot: 'Sauf urgence',
+    choix: "Sauf s'il n'a vraiment plus le choix",
+    aide: "Il l'évite toujours. Il ne s'y résout que si aucune autre combinaison ne marche — plutôt que de rendre un planning incomplet.",
+  },
+  evitee: {
+    etage: 4, symbole: '🟡', mot: 'À éviter',
+    choix: "Il fait tout pour l'éviter",
+    aide: "Il accepte de déséquilibrer un peu la répartition des gardes pour ne pas avoir à le faire. Mais il le fera plutôt que de bloquer.",
+  },
+  si_possible: {
+    etage: 5, symbole: '🟢', mot: 'Souhait',
+    choix: 'Un souhait, si ça n’embête personne',
+    aide: "Il en tient compte en dernier, une fois l'équité assurée. Ne coûte jamais une garde à quelqu'un d'autre.",
+  },
 }
 
 export function etageDe(force: string): number {
@@ -53,6 +98,14 @@ export function symboleDe(force: string): string {
 
 export function motForce(force: string): string {
   return FORCE_META[force]?.mot ?? 'Règle'
+}
+
+export function choixForce(force: string): string {
+  return FORCE_META[force]?.choix ?? 'Règle'
+}
+
+export function aideForce(force: string): string {
+  return FORCE_META[force]?.aide ?? ''
 }
 
 interface ParamsJson {

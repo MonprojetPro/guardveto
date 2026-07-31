@@ -48,7 +48,7 @@
   grid-template-columns: 1fr 1fr;
   gap: 4px;
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--t-border);
   border-radius: 999px;
   padding: 4px;
 }
@@ -58,13 +58,13 @@
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
-  /* `-terrier` et NON `var(--muted)` : ce sélecteur vit dans une modale, où
+  /* `-terrier` et NON `var(--t-muted)` : ce sélecteur vit dans une modale, où
      le remappage des jetons shadcn (`v2-terrier.css`) redéfinit `--muted`
      comme une couleur de FOND crème pâle. Le choix inactif sortait donc en
      crème sur crème — invisible, il ne restait qu'un bouton à l'écran
      (retour MiKL 2026-07-31). Même piège pour `--border` et `--accent` :
      dans une modale, toujours passer par les copies `-terrier`. */
-  color: var(--muted-terrier);
+  color: var(--t-muted);
   font-family: var(--font-body);
   font-size: 0.82rem;
   font-weight: 600;
