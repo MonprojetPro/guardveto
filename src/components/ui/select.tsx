@@ -125,9 +125,16 @@ function SelectItem({
       <SelectPrimitive.ItemText className="flex flex-1 shrink-0 gap-2 whitespace-nowrap">
         {children}
       </SelectPrimitive.ItemText>
+      {/* `data-slot` ajouté le 2026-07-31 : la coche était le SEUL élément de la
+          liste déroulante sans nom stable. Les feuilles de style devaient viser
+          `> span:last-child`, ce qui casse au premier enfant ajouté ici. Ajout
+          purement additif — aucun style existant (V1 comprise) ne s'y accroche. */}
       <SelectPrimitive.ItemIndicator
         render={
-          <span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center" />
+          <span
+            data-slot="select-item-indicator"
+            className="pointer-events-none absolute right-2 flex size-4 items-center justify-center"
+          />
         }
       >
         <CheckIcon className="pointer-events-none" />

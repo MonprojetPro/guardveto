@@ -1743,6 +1743,23 @@
    V1 restants gardent leur habillage d'origine.
    ============================================================ */
 
+/* ⚠️ AVERTISSEMENT — CSS MORT, vérifié le 2026-07-31.
+   Les sélecteurs `alert-dialog-*`, `dropdown-menu-*` et `popover-content` qui
+   apparaissent dans tout ce qui suit ne visent AUCUN composant de ce projet :
+   `src/components/ui/` ne contient que button, card, dialog, input, label,
+   select, sonner, textarea, tooltip. Aucun fichier de `src/` n'émet ces
+   `data-slot` (grep intégral : zéro résultat hors cette feuille).
+
+   Ils viennent d'un copier-coller de thème shadcn générique. On les laisse —
+   ils ne coûtent rien et serviront le jour où l'un de ces composants sera
+   installé — mais ILS NE PROUVENT RIEN : lire cette liste donne l'impression
+   que toutes les surfaces flottantes sont traitées, alors que la seule qui
+   existe vraiment est `select-*`. C'est exactement le piège dans lequel la
+   revue du 2026-07-30 est tombée : le cadre `select-content` était habillé, on
+   a cru le sujet couvert, et personne n'est descendu jusqu'aux items.
+   AVANT de conclure qu'une surface est traitée : vérifier qu'un composant
+   l'émet, puis vérifier ses ENFANTS, pas seulement son cadre. */
+
 [data-slot="dialog-content"],
 [data-slot="popover-content"],
 [data-slot="select-content"],
@@ -1876,10 +1893,15 @@
 
    On corrige à la source : le libellé retrouve une hauteur de ligne qui
    contient ses jambages, et l'écart libellé → champ passe à 9 px. Si un
-   jour quelqu'un remet `leading-none` ici, le défaut revient. */
-[data-slot="dialog-content"] [data-slot="label"],
-[data-slot="dialog-content"] form label,
-[data-slot="alert-dialog-content"] [data-slot="label"] {
+   jour quelqu'un remet `leading-none` ici, le défaut revient.
+
+   Le `:not(:has(input))` écarte les libellés qui ENVELOPPENT leur contrôle
+   (les cases à cocher : « Je reprends une de ses gardes en échange »). Ceux-là
+   ne sont pas un intitulé posé au-dessus d'un champ, ils SONT la ligne
+   cliquable ; ils ont leur propre traitement plus bas. */
+[data-slot="dialog-content"] [data-slot="label"]:not(:has(input)),
+[data-slot="dialog-content"] form label:not(:has(input)),
+[data-slot="alert-dialog-content"] [data-slot="label"]:not(:has(input)) {
   line-height: 1.35;
   /* `space-y-*` de Tailwind 4 pose son écart en `margin-block-end` sur le
      libellé, à travers un `:where()` de spécificité nulle : cette ligne
@@ -1936,7 +1958,97 @@
   border-color: var(--border-strong) !important;
 }
 
-/* ---- Listes déroulantes et popovers ---- */
+/* ---- L'AÉRATION DES FORMULAIRES DE MODALE ----
+   Retour MiKL 2026-07-31 : « celle-là ça fait encore comprimé, aère un peu ».
+
+   Le défaut n'est PAS un manque d'espace global — l'écart libellé → champ
+   (9 px, réglé ci-dessus) est bon. Le défaut est que TOUT était à la même
+   distance : 16 px entre deux groupes de champs (`space-y-4`) contre 9 px
+   entre un libellé et son champ. Deux valeurs trop proches pour que l'œil
+   regroupe : le lecteur ne voyait plus quel intitulé allait avec quel champ,
+   et la page paraissait tassée alors qu'elle ne l'était pas.
+
+   On écarte donc les GROUPES (22 px) sans toucher à l'intérieur des groupes.
+   Le rapport passe de 16/9 à 22/9 : la loi de proximité rejoue, chaque
+   libellé se rattache visuellement à son champ.
+
+   `space-y-*` de Tailwind 4 pose son écart en `margin-block-end` sur tous les
+   enfants sauf le dernier, à travers un `:where()` de spécificité nulle : ces
+   règles l'emportent sans `!important`. Réglage CENTRAL — toutes les modales
+   en bénéficient, pas seulement celle de la capture d'écran. */
+[data-slot="dialog-content"] .space-y-4 > :not(:last-child) {
+  margin-block-end: 22px;
+}
+/* `space-y-3` sert surtout DANS des encarts (`CriseModal`, `CongesList` :
+   une carte `p-3` avec ses lignes) : on l'ouvre aussi, mais un cran en
+   dessous, pour ne pas faire éclater l'encart qui les contient. */
+[data-slot="dialog-content"] .space-y-3 > :not(:last-child) {
+  margin-block-end: 18px;
+}
+/* `space-y-2` sert d'écart INTRA-groupe (une case à cocher et le champ
+   qu'elle déverrouille) : il reste serré, mais pas collé. */
+[data-slot="dialog-content"] .space-y-2 > :not(:last-child) {
+  margin-block-end: 12px;
+}
+
+/* La case à cocher isolée était écrasée entre le champ du dessus et le
+   libellé du dessous. On lui donne le gabarit d'une ligne cliquable à part
+   entière : hauteur de cible confortable, fond de champ, et surtout de l'air
+   au-dessus et en dessous. Elle se lit alors comme un réglage, plus comme une
+   ligne de texte égarée au milieu du formulaire. */
+[data-slot="dialog-content"] label:has(> input[type="checkbox"]),
+[data-slot="dialog-content"] label:has(> input[type="radio"]) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  margin: 4px 0;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+[data-slot="dialog-content"] label:has(> input[type="checkbox"]):hover,
+[data-slot="dialog-content"] label:has(> input[type="radio"]):hover {
+  border-color: var(--border-strong);
+}
+[data-slot="dialog-content"] label > :is(input[type="checkbox"], input[type="radio"]) {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* ============================================================
+   LES LISTES DÉROULANTES — JUSQU'AU DERNIER ÉTAGE
+   ============================================================
+   Retour MiKL 2026-07-31 : « t'as même pas été voir jusqu'au menu déroulant
+   des pop-ups, ils sont pas bons non plus ».
+
+   Le correctif de la veille avait habillé le CADRE de la liste (fond,
+   bordure, arrondi, ombre) et s'était arrêté là. Les ITEMS à l'intérieur
+   n'avaient jamais été touchés : ils gardaient le gabarit brut du composant
+   — 6 px à gauche, 4 px de haut, aucune marge sur le conteneur — au milieu du
+   terrier. D'où la première lettre qui semble rognée, les lignes qui se
+   touchent, et le survol pêche pâle qui n'est pas une couleur d'ici.
+
+   ⚠️ PIÈGE DE PORTÉE, à lire avant de toucher à ce bloc.
+   Ces surfaces sont rendues en PORTAIL, à la racine du document : elles ne
+   sont enfants NI de `[data-slot="dialog-content"]`, NI de `.v2`. Toute règle
+   écrite comme leur descendante ne s'applique jamais — c'est très exactement
+   pour cette raison que le correctif précédent les a manquées, et que
+   l'anneau de focus orange défini plus haut (`… dialog-content :focus-visible`)
+   ne les atteint pas non plus. Les sélecteurs ci-dessous sont donc VOLONTAIREMENT
+   à la racine. Ils ne fuient pas vers la V1 : cette feuille n'est importée que
+   par `src/app/(v2)/layout.tsx`, elle n'est jamais chargée sur les écrans V1.
+   ============================================================ */
+
+/* ---- Le cadre ---- */
 [data-slot="popover-content"],
 [data-slot="select-content"],
 [data-slot="dropdown-menu-content"] {
@@ -1944,4 +2056,173 @@
   border: 1px solid var(--border-strong);
   border-radius: var(--r-md);
   box-shadow: var(--shadow-card);
+  font-family: var(--font-body);
+  color: var(--text);
+  /* Marge intérieure : sans elle, le premier et le dernier item étaient
+     collés au bord du cadre, et leur coin arrondi mordait sur celui-ci. */
+  padding: 6px;
+  /* Liste longue (une trentaine de gardes) : on plafonne pour que le menu
+     reste un menu et non un mur. `--available-height` est posé par la
+     bibliothèque de positionnement et garantit déjà qu'on ne sort pas de
+     l'écran ; on prend le plus petit des deux. Au-delà, la liste défile et
+     les deux flèches ci-dessous prennent le relais. */
+  max-height: min(var(--available-height, 100vh), 22rem);
+}
+
+/* Le menu faisait EXACTEMENT la largeur de son déclencheur, contenu masqué au
+   débordement. Sur un libellé long — « mardi 4 août · 19h → 8h · Nuit » — la
+   fin du texte disparaissait, et le peu de marge qui restait à gauche donnait
+   l'impression que la première lettre était coupée. Il peut désormais
+   s'élargir jusqu'à ce que ses libellés tiennent, sans jamais devenir plus
+   étroit que son déclencheur ni déborder de l'écran. */
+[data-slot="select-content"] {
+  min-width: var(--anchor-width, 12rem);
+  width: max-content;
+  max-width: min(92vw, 26rem);
+}
+
+/* ---- L'item, état par état ----
+   Hauteur de cible 40 px : l'appli se manipule vite, parfois dans l'urgence
+   d'une garde à replacer. La place à droite (38 px) est celle de la coche,
+   qui ne doit jamais chevaucher le texte, même sur un libellé long. */
+[data-slot="select-item"] {
+  min-height: 40px;
+  padding: 9px 38px 9px 14px;
+  border-radius: 10px;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color 0.12s var(--ease-out), color 0.12s var(--ease-out);
+}
+/* Au-delà de la largeur maximale du cadre, un libellé exceptionnellement long
+   se termine par des points de suspension au lieu de sortir du menu. Le
+   `data-slot` de la coche sert ici : c'est lui qui permet de viser le texte
+   sans dépendre de l'ordre des enfants. */
+[data-slot="select-item"] > :not([data-slot="select-item-indicator"]) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Les items ne se touchent plus : une ligne = une ligne. */
+[data-slot="select-item"] + [data-slot="select-item"] {
+  margin-top: 2px;
+}
+
+/* Survolé et parcouru au clavier. La bibliothèque marque l'item courant par
+   `data-highlighted` (souris ET flèches) ; on couvre aussi `:hover` et le
+   focus DOM, que le composant vise par ailleurs en classe utilitaire. */
+[data-slot="select-item"]:hover,
+[data-slot="select-item"][data-highlighted],
+[data-slot="select-item"]:focus {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+/* Sélectionné : c'est le choix en cours, il se lit sans survol. */
+[data-slot="select-item"][data-selected] {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+/* Sélectionné ET survolé : on appuie un cran, sinon les deux se confondent. */
+[data-slot="select-item"][data-selected]:hover,
+[data-slot="select-item"][data-selected][data-highlighted] {
+  background: rgba(224, 122, 47, 0.22);
+}
+
+/* Focus clavier : le même trait pointillé orange que dans les modales.
+   Rappel du piège ci-dessus — la règle des modales ne descend pas jusqu'ici,
+   il faut la réécrire, pas la « factoriser ». */
+[data-slot="select-item"]:focus-visible {
+  outline: 2px dotted var(--accent-ink);
+  outline-offset: -2px;
+}
+
+/* Désactivé : lisible, mais visiblement hors d'atteinte. */
+[data-slot="select-item"][data-disabled] {
+  color: var(--soft);
+  background: transparent;
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* La coche : elle était au ras du bord droit. Elle s'aligne maintenant sur
+   la réserve de 38 px prévue par le padding de l'item. */
+[data-slot="select-item-indicator"] {
+  right: 12px;
+  color: var(--accent);
+}
+
+/* ---- En-têtes de groupe et séparateurs ----
+   Aucun écran ne s'en sert aujourd'hui, mais le composant sait les rendre :
+   autant qu'ils naissent déjà dans la bonne palette plutôt qu'en gris ardoise
+   le jour où quelqu'un groupe une liste de vétérinaires. */
+[data-slot="select-group"] {
+  padding: 0;
+}
+[data-slot="select-label"] {
+  padding: 8px 14px 5px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+[data-slot="select-separator"] {
+  margin: 5px 6px;
+  background: var(--border);
+}
+
+/* ---- Les flèches de défilement (liste longue) ----
+   Elles se posent en haut et en bas du cadre : sans fond opaque, les items
+   qui passent dessous les traversent. Le fond doit être celui du cadre. */
+[data-slot="select-scroll-up-button"],
+[data-slot="select-scroll-down-button"] {
+  height: 22px;
+  background: var(--surface);
+  color: var(--accent-ink);
+  border-radius: 10px;
+}
+
+/* ---- Le déclencheur DANS LES ÉCRANS ----
+   La règle de gabarit écrite plus haut ne vise que les déclencheurs situés
+   dans une modale. Ceux posés à même un écran (choix de l'effectif et du
+   profil sur « Historique ») restaient au gabarit brut. Ici on est bien dans
+   `.v2` : le déclencheur, lui, n'est PAS en portail. */
+.v2 [data-slot="select-trigger"] {
+  min-height: 40px;
+  height: auto;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  font-family: var(--font-body);
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.v2 [data-slot="select-trigger"]:hover { border-color: var(--accent-ink); }
+[data-slot="select-trigger"][data-popup-open] { border-color: var(--accent); }
+
+/* ---- Les infobulles ----
+   Même portail, même oubli : elles sortaient sur le noir du thème d'origine.
+   Le terrier les veut brunes, comme ses ombres. */
+[data-slot="tooltip-content"] {
+  background: var(--text);
+  color: var(--bg);
+  font-family: var(--font-body);
+  font-size: 0.74rem;
+  line-height: 1.4;
+  padding: 7px 11px;
+  border-radius: 10px;
+  box-shadow: var(--elev-1);
+}
+/* La petite pointe de l'infobulle : elle est rendue sans `data-slot`, on la
+   reconnaît à sa rotation. Sans cette ligne, elle reste dans l'ancienne
+   couleur et forme un triangle sombre détaché de la bulle. */
+[data-slot="tooltip-content"] > [class*="rotate-45"] {
+  background: var(--text);
+  fill: var(--text);
 }
