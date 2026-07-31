@@ -58,6 +58,30 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
+/* -- Les deux gestes qui portent sur la FICHE, dans le coin --------------
+   Modifier et Désactiver s'écrivaient en toutes lettres tout en bas, où ils
+   pesaient autant que « Ses contraintes » alors qu'on ne s'en sert presque
+   jamais. En icônes ici, ils libèrent une ligne entière (MiKL : « l'histoire
+   d'aérer encore plus le visuel »). Discrets au repos, ils se colorent au
+   survol — et gardent chacun leur `title` + `aria-label` en toutes lettres. */
+.vet-outils { display: flex; gap: 2px; margin-left: auto; align-self: flex-start; }
+.vet-outils button {
+  width: 30px; height: 30px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; background: transparent;
+  color: var(--soft);
+  transition: color 0.16s var(--ease-out), background 0.16s var(--ease-out),
+              border-color 0.16s var(--ease-out);
+}
+.vet-outils button svg { width: 15px; height: 15px; }
+.vet-outils button:hover:not(:disabled) {
+  color: var(--accent-ink); background: var(--accent-soft); border-color: var(--border-strong);
+}
+.vet-outils button.vo-danger:hover:not(:disabled) {
+  color: var(--danger); background: var(--danger-soft); border-color: var(--danger);
+}
+.vet-outils button:disabled { opacity: 0.32; cursor: not-allowed; }
+
 /* -- Ce qu'est la personne, sur UNE ligne de texte -----------------------
    Remplace trois bandes de pilules (rôle+statut, étiquettes, et la fameuse
    « aucune étiquette » qui occupait une ligne pour dire qu'il n'y avait
@@ -70,21 +94,31 @@
      sa carte et casse l'alignement de toute la rangée. */
   min-height: 46px;
 }
-.vl-statut {
-  font-size: 0.79rem; font-weight: 600; color: var(--t-muted);
-  margin-right: 2px;
-}
 .vl-jeton {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: 0.68rem; font-weight: 700;
   border-radius: 999px; padding: 3px 10px;
   white-space: nowrap;
 }
-/* Un pouvoir : plein, franc, impossible à confondre avec une étiquette. */
+/* Un pouvoir : plein, franc, impossible à confondre avec une étiquette. Placé
+   EN PREMIER — c'est le jeton le plus lourd visuellement, il tient mieux la
+   ligne en tête qu'au milieu (retour MiKL 2026-07-31). */
 .vl-admin {
   background: var(--t-accent); color: #fff;
   letter-spacing: 0.04em; text-transform: uppercase;
   box-shadow: 0 1px 3px rgba(140, 84, 24, 0.28);
+}
+
+/* -- Associé·e vs Salarié·e : deux teintes, pas deux mots gris -----------
+   Ils s'écrivaient pareil, donc ne se distinguaient qu'à la lecture. Un
+   associé est co-propriétaire du cabinet — ça ne se lit pas, ça se voit. */
+.vl-associe {
+  background: rgba(46, 122, 140, 0.13); color: #1F5F70;
+  border: 1px solid rgba(46, 122, 140, 0.34);
+}
+.vl-salarie {
+  background: var(--surface-2); color: var(--t-muted);
+  border: 1px solid var(--t-border);
 }
 /* Une exception de planning : ambre, avec sa bouée. Elle se fondait dans le
    statut quand tout était gris (retour MiKL 2026-07-31). */
@@ -138,25 +172,25 @@
    rangs irréguliers — d'où des cartes de hauteurs différentes dans la grille.
    L'action de compte est remontée sur la ligne d'état ; il ne reste ici que
    ce qui n'est jamais urgent. */
-.vet-actions { display: flex; gap: 6px; }
+/* -- La seule action qu'on vient vraiment faire ici ----------------------
+   Il y avait jusqu'à cinq boutons de même poids qui passaient à la ligne.
+   Les gestes sur la fiche sont remontés en icônes dans le coin ; il ne reste
+   que celui-ci, seul sur sa ligne et sur toute la largeur. */
+.vet-actions { display: flex; }
 .vet-actions button {
+  flex: 1;
   border: 1px solid var(--border-strong);
-  background: transparent; color: var(--t-muted);
+  background: var(--surface-2); color: var(--t-muted);
   border-radius: 999px;
-  font-size: 0.74rem; font-weight: 600;
-  padding: 6px 12px; min-height: 34px;
-  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.78rem; font-weight: 700;
+  padding: 7px 14px; min-height: 36px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   white-space: nowrap;
 }
-.vet-actions button:hover:not(:disabled) { color: var(--accent-ink); border-color: var(--accent-ink); }
-.vet-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
-
-/* Rouge AU REPOS, pas seulement au survol : sur tablette il n'y a pas de
-   survol, et « Désactiver » avait exactement l'air de « Modifier ». */
-.vet-actions button.va-danger { color: var(--danger); border-color: var(--danger-soft); }
-.vet-actions button.va-danger:hover:not(:disabled) {
-  color: var(--danger); border-color: var(--danger); background: var(--danger-soft);
+.vet-actions button:hover:not(:disabled) {
+  color: var(--accent-ink); border-color: var(--accent-ink); background: var(--accent-soft);
 }
+.vet-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* Le compteur de contraintes. Ce n'était pas une notification à traiter :
    la pastille orange vif lui donnait une urgence qu'elle n'a pas. */
@@ -296,13 +330,35 @@
 .create-inner .cf-lede {
   font-size: 0.79rem; color: var(--t-muted); line-height: 1.55; margin-bottom: 14px;
 }
-.swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+/* Les quatorze couleurs, sur UNE ligne : elles y tiennent, et deux rangs
+   cassaient la lecture de la roue chromatique (retour MiKL 2026-07-31 :
+   « pourquoi les mettre sur 2 lignes alors que ça rentre sur une seule ? »).
+   Le champ occupe toute la largeur du panneau pour ça. Le `wrap` reste, en
+   filet, pour les petits écrans. */
+.swatches { display: flex; gap: 7px; flex-wrap: wrap; }
 .swatch {
-  width: 30px; height: 30px; border-radius: 50%;
+  width: 28px; height: 28px; border-radius: 50%;
   border: 2px solid transparent;
-  padding: 0;
+  padding: 0; flex: none;
+  transition: transform 0.16s var(--ease-out);
 }
-.swatch[aria-pressed='true'] { border-color: var(--text); box-shadow: 0 0 0 2px var(--surface); }
+.swatch:hover { transform: scale(1.12); }
+.swatch[aria-pressed='true'] {
+  border-color: var(--text); box-shadow: 0 0 0 2px var(--surface);
+  transform: scale(1.08);
+}
+/* La couleur héritée d'avant le terrier : on la montre, séparée du reste, pour
+   qu'on voie qu'elle EST la couleur actuelle sans croire qu'elle fait partie
+   de la palette. */
+.swatch-hors-palette {
+  margin-right: 9px;
+  position: relative;
+}
+.swatch-hors-palette::after {
+  content: ''; position: absolute; right: -9px; top: 50%;
+  width: 1px; height: 20px; margin-top: -10px;
+  background: var(--border-strong);
+}
 .check-line {
   display: flex; align-items: center; gap: 8px;
   font-size: 0.84rem; padding-top: 22px;

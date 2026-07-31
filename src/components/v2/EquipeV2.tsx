@@ -35,6 +35,7 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { toast } from 'sonner'
+import { Pencil, Power } from 'lucide-react'
 import { ContraintesVetoModale } from '@/components/v2/ContraintesVetoModale'
 import { reglesDuVeto } from '@/lib/regles/libelle'
 import type {
@@ -53,16 +54,34 @@ import {
 } from '@/app/(protected)/admin/veterinaires/actions'
 import type { StatutVeto, UserRole, Veterinaire } from '@/types'
 
-/** Palette du Terrier — les valeurs partent en base, donc en dur, pas en var(). */
+/**
+ * Palette du Terrier — les valeurs partent en base, donc en dur, pas en var().
+ *
+ * Quatorze teintes réparties sur toute la roue chromatique, à saturation et
+ * luminosité constantes : elles se distinguent entre elles ET restent de la
+ * même famille, celle du terrier. Elles étaient huit, dont deux bleus et deux
+ * oranges qu'on confondait (retour MiKL 2026-07-31 : « certaines se
+ * ressemblent un peu trop et il n'y a pas assez de choix »).
+ *
+ * L'ordre n'est pas décoratif : il suit la roue, du rouge au violet. Deux
+ * pastilles voisines dans la liste sont donc voisines à l'œil — on trouve « le
+ * vert » sans balayer toute la ligne.
+ */
 const COULEURS = [
+  { hex: '#C0392B', nom: 'Rouge brique' },
   { hex: '#C7530F', nom: 'Orange terrier' },
-  { hex: '#2E7A8C', nom: 'Bleu canard' },
-  { hex: '#7A5FBE', nom: 'Violet doux' },
+  { hex: '#B5761A', nom: 'Ambre' },
   { hex: '#8A7A1E', nom: 'Olive doré' },
-  { hex: '#3B6FD1', nom: 'Bleu franc' },
-  { hex: '#B93A72', nom: 'Framboise' },
+  { hex: '#5E7D1B', nom: 'Vert pousse' },
+  { hex: '#2F7D3F', nom: 'Vert forêt' },
   { hex: '#0B7D6C', nom: 'Vert lagon' },
-  { hex: '#A0522D', nom: 'Terre de Sienne' },
+  { hex: '#2E7A8C', nom: 'Bleu canard' },
+  { hex: '#2C6BA8', nom: 'Bleu ardoise' },
+  { hex: '#3B4FC4', nom: 'Bleu franc' },
+  { hex: '#6B4FBE', nom: 'Violet doux' },
+  { hex: '#8E3FA8', nom: 'Prune' },
+  { hex: '#B93A72', nom: 'Framboise' },
+  { hex: '#8A5A3C', nom: 'Terre de Sienne' },
 ]
 
 /** Étiquettes proposées d'office — la saisie libre reste possible. */
@@ -438,9 +457,25 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
                 <option value="admin">Admin — gère le cabinet</option>
               </select>
             </div>
-            <div className="field">
+            <div className="field" style={{ gridColumn: '1 / -1' }}>
               <label id="cf-couleur-label">Couleur</label>
               <div className="swatches" role="group" aria-labelledby="cf-couleur-label">
+                {/* La couleur déjà en base d'abord, si elle n'est plus dans la
+                    palette. Les fiches existantes portent encore les couleurs
+                    d'avant le terrier : sans cette pastille, « Modifier »
+                    n'affichait AUCUNE sélection, et on croyait la fiche sans
+                    couleur alors qu'elle en avait une. */}
+                {form.couleur && !COULEURS.some((c) => c.hex === form.couleur) && (
+                  <button
+                    type="button"
+                    className="swatch swatch-hors-palette"
+                    style={{ background: form.couleur }}
+                    aria-pressed
+                    aria-label={`Couleur actuelle (${form.couleur})`}
+                    title="Couleur actuelle — hors palette"
+                    onClick={() => setForm({ ...form, couleur: form.couleur })}
+                  />
+                )}
                 {COULEURS.map((c) => (
                   <button
                     key={c.hex}
@@ -449,6 +484,7 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
                     style={{ background: c.hex }}
                     aria-pressed={form.couleur === c.hex}
                     aria-label={c.nom}
+                    title={c.nom}
                     onClick={() => setForm({ ...form, couleur: c.hex })}
                   />
                 ))}
@@ -521,8 +557,13 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
 
           return (
             <article key={v.id} className={`vet-card${v.actif ? '' : ' inactive'}`}>
-              {/* (A) Qui c'est. La phrase de rôle a sauté : elle répétait mot
-                  pour mot la pastille « Admin » posée 30 px plus bas. */}
+              {/* (A) Qui c'est — et, dans le coin, les deux gestes qui portent
+                  sur la FICHE elle-même. Ils étaient en toutes lettres tout en
+                  bas, où ils pesaient autant que « Ses contraintes » alors
+                  qu'on ne s'en sert presque jamais. En icônes ici, ils libèrent
+                  le bas de la carte (MiKL : « l'histoire d'aérer encore plus le
+                  visuel »). La phrase de rôle a sauté : elle répétait mot pour
+                  mot la pastille « Admin » posée 30 px plus bas. */}
               <div className="vet-card-top">
                 <span className="vet-avatar" style={{ background: v.couleur }} aria-hidden="true">
                   {v.prenom.charAt(0).toUpperCase()}
@@ -532,6 +573,34 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
                     {v.prenom} {v.nom}
                   </h3>
                   <p className="vet-mail">{v.email}</p>
+                </div>
+
+                <div className="vet-outils">
+                  <button
+                    type="button"
+                    onClick={() => ouvrirModification(v)}
+                    disabled={isPending}
+                    title={`Modifier la fiche de ${v.prenom}`}
+                    aria-label={`Modifier la fiche de ${v.prenom}`}
+                  >
+                    <Pencil aria-hidden="true" />
+                  </button>
+                  {v.actif && (
+                    <button
+                      type="button"
+                      className="vo-danger"
+                      onClick={() => basculerActif(v)}
+                      disabled={isPending || cestMoi}
+                      title={
+                        cestMoi
+                          ? 'Tu ne peux pas désactiver ta propre fiche.'
+                          : `Désactiver la fiche de ${v.prenom} — elle n'entrera plus dans les générations`
+                      }
+                      aria-label={`Désactiver la fiche de ${v.prenom}`}
+                    >
+                      <Power aria-hidden="true" />
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -547,10 +616,12 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
                   « Véto » n'est plus écrit : c'est le cas de tout le monde, et
                   nommer le cas par défaut n'apprend rien. */}
               <p className="vet-ligne">
-                <span className="vl-statut">
+                {v.role_app === 'admin' && <span className="vl-jeton vl-admin">Admin</span>}
+                <span
+                  className={`vl-jeton ${v.statut === 'associe' ? 'vl-associe' : 'vl-salarie'}`}
+                >
                   {v.statut === 'associe' ? 'Associé·e' : 'Salarié·e'}
                 </span>
-                {v.role_app === 'admin' && <span className="vl-jeton vl-admin">Admin</span>}
                 {v.dernier_recours && (
                   <span className="vl-jeton vl-recours">
                     <span aria-hidden="true">🛟</span> Dernier recours
@@ -591,34 +662,14 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
                 )}
               </div>
 
-              {/* (D) Les actions de gestion, toutes de même poids parce
-                  qu'aucune n'est urgente. « Désactiver » est rouge AU REPOS :
-                  au survol seulement, elle est invisible sur tablette. */}
+              {/* (D) La seule chose qu'on vient VRAIMENT faire ici, donc seule
+                  sur sa ligne et en toutes lettres. « Modifier » et
+                  « Désactiver » sont remontés en icônes dans le coin. */}
               <div className="vet-actions">
-                <button type="button" onClick={() => ouvrirModification(v)} disabled={isPending}>
-                  Modifier
-                </button>
-
                 <button type="button" onClick={() => setFicheContraintes(v)}>
                   Ses contraintes
-                  {nb > 0 && <span className="va-nb">{nb}</span>}
+                  <span className="va-nb">{nb}</span>
                 </button>
-
-                {v.actif && (
-                  <button
-                    type="button"
-                    className="va-danger"
-                    onClick={() => basculerActif(v)}
-                    disabled={isPending || cestMoi}
-                    title={
-                      cestMoi
-                        ? 'Tu ne peux pas désactiver ta propre fiche.'
-                        : 'Retirer des prochaines générations'
-                    }
-                  >
-                    Désactiver
-                  </button>
-                )}
               </div>
             </article>
           )
