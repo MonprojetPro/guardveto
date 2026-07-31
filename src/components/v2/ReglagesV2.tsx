@@ -482,40 +482,11 @@ export function ReglagesV2({ valeurs, periodesPubliees, emails }: Props) {
         )}
       </section>
 
-      {/* ── Ce qui n'est pas encore refait ───────────────────────────── */}
-      <section className="card reste-v1 rise" aria-label="Réglages pas encore refaits">
-        <div className="card-head">
-          <div>
-            <h3>Le reste des réglages</h3>
-            <p className="sub">
-              Ces écrans fonctionnent, mais n&apos;ont pas encore leur nouvelle allure. Le lien
-              ouvre l&apos;ancienne version.
-            </p>
-          </div>
-        </div>
-        <ul className="reste-liste">
-          <li>
-            <div className="rl-quoi">
-              <b>Structure des gardes</b>
-              <small>
-                Les créneaux, les profils de planning, les horaires et les liens entre créneaux.
-              </small>
-            </div>
-            <a className="period-view" href="/admin/structure">
-              Ouvrir
-            </a>
-          </li>
-          <li>
-            <div className="rl-quoi">
-              <b>Règles du cabinet</b>
-              <small>Ce que le moteur a le droit de faire, et ce qu&apos;il ne doit jamais faire.</small>
-            </div>
-            <a className="period-view" href="/regles">
-              Ouvrir
-            </a>
-          </li>
-        </ul>
-      </section>
+      {/* Le bloc « Le reste des réglages » a disparu d'ici : il renvoyait vers
+          les deux écrans V1 « Structure des gardes » et « Règles du cabinet »,
+          qui sont maintenant refaits et RÉUNIS dans `/regles`. Le dock y mène
+          déjà ; deux liens vers le même écran se marchent dessus au clavier
+          comme au lecteur d'écran. */}
     </>
   )
 }

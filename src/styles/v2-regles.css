@@ -1,0 +1,881 @@
+/* ============================================================
+   GUARDVETO V2 — Règles & structure
+   ============================================================
+   Écran de configuration : profils, types de garde, enchaînements, règles.
+   Quatre onglets qui parlent d'objets différents mais doivent se ressembler —
+   une carte qui n'a pas le même rayon d'un onglet à l'autre, c'est le genre de
+   détail qui fait « pas fini ». D'où un vocabulaire commun ici, et rien de
+   redéclaré : `.card`, `.btn*`, `.field`, `.page-head*` viennent de
+   `v2-terrier.css` ; `.tabs`, `.rows`, `.filters`, `.empty-row` de
+   `v2-absences.css`.
+
+   ⚠️ COULEURS : dans tout ce fichier, `--t-muted` / `--t-border` / `--t-accent`
+   et JAMAIS `--muted` / `--border` / `--accent`. Ces trois noms nus ont un sens
+   OPPOSÉ à l'intérieur d'une modale ou d'un menu déroulant (fond crème pâle au
+   lieu de texte gris) — trois écrans ont déjà servi du crème sur crème pour
+   l'avoir oublié.
+   ============================================================ */
+
+/* ── La scène : le repère de calage de Filou au rebord ────────
+   Rien d'autre qu'un `position: relative`. Filou déborde volontairement du
+   cadre ; son calage vit dans `v2-filou-edge.css`, en un seul exemplaire. */
+.v2 .reg-scene {
+  position: relative;
+}
+
+/* ── Le sélecteur de profil : le contexte de la page ──────────
+   Il n'est pas un filtre parmi d'autres, il dit DE QUOI la page parle. D'où
+   sa place en tête, à côté du titre, et son étiquette écrite. */
+.v2 .profil-pilote {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px 7px 16px;
+  background: var(--surface);
+  border: 1px solid var(--t-border);
+  border-radius: 999px;
+  box-shadow: var(--shadow-card);
+}
+
+.v2 .profil-pilote label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+  white-space: nowrap;
+}
+
+.v2 .profil-pilote select {
+  min-height: 36px;
+  padding: 0 32px 0 14px;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  background-color: var(--surface-2);
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237C6A55' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 15px;
+  border: 1px solid var(--t-border);
+  border-radius: 999px;
+  appearance: none;
+  cursor: pointer;
+  transition: border-color 0.18s var(--ease-out);
+}
+
+.v2 .profil-pilote select:hover {
+  border-color: var(--border-strong);
+}
+
+.v2 .profil-pilote select:focus-visible {
+  outline: 2px dashed var(--accent-ink);
+  outline-offset: 2px;
+}
+
+/* ── Grammaire commune aux quatre onglets ─────────────────────── */
+
+/* Un fait affiché sous forme d'étiquette + valeur, en colonne. Sert partout où
+   on montre une donnée établie qu'on ne modifie pas d'un clic. */
+.v2 .faits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 26px;
+  padding: 14px 22px;
+}
+
+.v2 .fait {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.v2 .fait > span {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+
+.v2 .fait > b {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Petite étiquette d'état, posée à côté d'un nom. */
+.v2 .etiq {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.v2 .etiq.neutre {
+  color: var(--t-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--t-border);
+}
+
+.v2 .etiq.eteint {
+  color: var(--t-muted);
+  background: transparent;
+  border: 1px dashed var(--border-strong);
+}
+
+/* Une ligne de réglage : ce qu'on règle à gauche, avec quoi on le règle à
+   droite. Le même objet dans les quatre onglets, pour que « régler quelque
+   chose » ait toujours la même forme. */
+.v2 .reglage {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px 20px;
+  padding: 15px 22px;
+  border-bottom: 1px dashed var(--t-border);
+}
+
+.v2 .reglage:last-child {
+  border-bottom: none;
+}
+
+.v2 .reglage-titre {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.94rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.v2 .reglage-aide {
+  margin-top: 3px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--t-muted);
+  max-width: 64ch;
+}
+
+.v2 .reglage-valeur {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--t-muted);
+  text-align: right;
+}
+
+/* Le select « à même l'écran » (hors modale) : natif, habillé comme les
+   filtres, pour ne pas ouvrir un portail Radix par ligne de réglage. */
+.v2 .select-plat {
+  min-width: 210px;
+  min-height: 40px;
+  padding: 0 34px 0 14px;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  background-color: var(--surface);
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237C6A55' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 15px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-sm);
+  appearance: none;
+  cursor: pointer;
+  transition: border-color 0.18s var(--ease-out);
+}
+
+.v2 .select-plat:hover {
+  border-color: var(--border-strong);
+}
+
+.v2 .select-plat:focus-visible {
+  outline: 2px dashed var(--accent-ink);
+  outline-offset: 2px;
+  border-color: var(--accent-ink);
+}
+
+.v2 .select-plat:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.v2 .select-plat.court {
+  min-width: 150px;
+}
+
+/* Le panneau de création / d'édition dépliée. Il pousse le contenu au lieu de
+   flotter : ce qu'on remplit reste dans le fil de ce qu'on regardait. */
+.v2 .panneau {
+  margin: 0 22px 18px;
+  padding: 18px 20px 20px;
+  background: var(--surface-2);
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-md);
+  animation: panneauIn 0.24s var(--ease-out) both;
+}
+
+@keyframes panneauIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.v2 .panneau-titre {
+  margin-bottom: 14px;
+  font-family: var(--font-display);
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.v2 .panneau-pied {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+/* Champs du panneau : mêmes hauteurs que dans les modales (42px), pour qu'un
+   formulaire n'ait pas deux densités selon l'endroit où il s'ouvre.
+   `.cre-form` (l'édition dépliée dans une carte de créneau) partage ce même
+   habillage : c'est le MÊME formulaire que celui de création, à un endroit
+   différent. Deux habillages auraient fini par diverger. */
+.v2 .panneau label,
+.v2 .cre-form label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+
+.v2 .panneau input[type='text'],
+.v2 .panneau input[type='time'],
+.v2 .panneau input[type='number'],
+.v2 .panneau select,
+.v2 .cre-form input[type='text'],
+.v2 .cre-form input[type='time'],
+.v2 .cre-form input[type='number'],
+.v2 .cre-form select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-sm);
+}
+
+.v2 .panneau input:focus-visible,
+.v2 .panneau select:focus-visible,
+.v2 .cre-form input:focus-visible,
+.v2 .cre-form select:focus-visible {
+  outline: 2px dashed var(--accent-ink);
+  outline-offset: 1px;
+  border-color: var(--accent-ink);
+}
+
+.v2 .panneau .grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px 16px;
+}
+
+.v2 .panneau .grille .large {
+  grid-column: 1 / -1;
+}
+
+/* Sélecteur de jours : sept pastilles, l'ordre humain (lundi d'abord). */
+.v2 .jours-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.v2 .jours-pick button {
+  min-width: 46px;
+  min-height: 38px;
+  padding: 0 10px;
+  font-family: var(--font-body);
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--t-muted);
+  background: var(--surface);
+  border: 1px solid var(--t-border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background 0.16s var(--ease-out),
+    color 0.16s var(--ease-out),
+    border-color 0.16s var(--ease-out);
+}
+
+.v2 .jours-pick button:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.v2 .jours-pick button[aria-pressed='true'] {
+  color: #fff;
+  background: var(--t-accent);
+  border-color: var(--t-accent);
+}
+
+/* Chips à cocher (créneaux concernés, étiquettes suggérées…). */
+.v2 .chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.v2 .chips button {
+  min-height: 36px;
+  padding: 0 14px;
+  font-family: var(--font-body);
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--t-muted);
+  background: var(--surface);
+  border: 1px solid var(--t-border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background 0.16s var(--ease-out),
+    color 0.16s var(--ease-out),
+    border-color 0.16s var(--ease-out);
+}
+
+.v2 .chips button:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.v2 .chips button[aria-pressed='true'] {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border-color: var(--accent-ink);
+}
+
+/* Note explicative sous un champ ou en pied de carte. */
+.v2 .note {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--t-muted);
+}
+
+.v2 .note.attention {
+  padding: 11px 14px;
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-radius: var(--r-sm);
+}
+
+/* Une note qui suit un champ ou clôt un formulaire respire un peu plus que les
+   champs entre eux. Une seule valeur, partout : trois marges différentes pour
+   trois notes identiques, ça se voit. */
+.v2 .panneau .note,
+.v2 .cre-form .note,
+.v2 .ench-niveau .note + .note {
+  margin-top: 12px;
+}
+
+/* La case fériés suit immédiatement le sélecteur de jours : c'est la même
+   question — « quand ce créneau s'applique-t-il ? ». */
+.v2 .jours-pick + .case-ligne {
+  margin-top: 11px;
+}
+
+/* Une case à cocher et son libellé, en une ligne cliquable de bout en bout.
+   Cliquer un libellé de 4 mots ne devrait pas demander de viser un carré de
+   14 pixels. */
+.v2 .case-ligne {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 0 12px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+
+.v2 .case-ligne:hover {
+  border-color: var(--border-strong);
+}
+
+.v2 .case-ligne input[type='checkbox'] {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--t-accent);
+  cursor: pointer;
+}
+
+.v2 .case-ligne.inerte {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* ── Boutons-icônes ───────────────────────────────────────────
+   `.icon-btn` de `v2-absences.css` vire au ROUGE au survol : là-bas il ne
+   sert qu'à supprimer, donc l'avertissement est juste. Ici, le même carré
+   porte aussi un crayon et un interrupteur — annoncer un danger sur
+   « modifier » apprend à ne plus lire l'avertissement. D'où une variante
+   neutre, à employer partout sauf sur la corbeille. */
+.v2 .icon-btn.doux:hover {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+
+/* ── Dans les modales : le portail ne descend PAS de `.v2` ─────
+   Les panneaux de dialogue sont rendus à la racine du document, hors de
+   `<div class="v2">`. Toute règle écrite `.v2 .quelquechose` y est donc
+   inopérante — c'est la mine déjà rencontrée sur les listes déroulantes.
+   Ces trois classes-ci sont volontairement écrites À LA RACINE, et scopées
+   au panneau de dialogue pour ne pas fuir ailleurs. Elles ne peuvent pas
+   déborder sur les écrans V1 : cette feuille n'est chargée que par
+   `/regles`. */
+[data-slot='dialog-content'] .gv-note {
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--t-muted);
+}
+
+/* Le rappel de CE SUR QUOI on est en train de décider : la règle qu'on
+   supprime, la liaison qu'on coupe. Une confirmation qui demande « êtes-vous
+   sûr ? » sans redire de quoi il s'agit force à fermer pour aller revérifier. */
+[data-slot='dialog-content'] .gv-rappel {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 13px 15px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-md);
+}
+
+/* La précision secondaire d'un rappel (« cette règle lie deux personnes… ») :
+   elle éclaire la décision sans se disputer la place avec elle. */
+[data-slot='dialog-content'] .gv-rappel .gv-appoint {
+  font-size: 0.79rem;
+  line-height: 1.5;
+  color: var(--t-muted);
+}
+
+/* Les conséquences d'une action irréversible, énumérées. Une phrase unique
+   qui enchaîne trois effets se lit comme un seul effet. */
+[data-slot='dialog-content'] .gv-consequences {
+  display: grid;
+  gap: 7px;
+  padding-left: 18px;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--t-muted);
+  list-style: disc;
+}
+
+[data-slot='dialog-content'] .gv-consequences li::marker {
+  color: var(--accent-ink);
+}
+
+/* ── Onglet 1 · Profils ───────────────────────────────────────── */
+
+.v2 .prof-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  padding: 18px 22px 22px;
+}
+
+.v2 .prof-carte {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 18px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-md);
+  transition: border-color 0.18s var(--ease-out);
+}
+
+.v2 .prof-carte:hover {
+  border-color: var(--border-strong);
+}
+
+/* Le profil qu'on est en train de regarder dans les autres onglets : on le
+   dit, sinon le sélecteur de la tête de page et cette grille racontent deux
+   histoires différentes. */
+.v2 .prof-carte.courant {
+  border-color: var(--accent-ink);
+  box-shadow: 0 0 0 1px var(--accent-ink) inset;
+}
+
+.v2 .prof-tete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.v2 .prof-nom {
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.v2 .prof-reglages {
+  display: grid;
+  gap: 10px;
+}
+
+.v2 .prof-reglage {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.v2 .prof-reglage > span {
+  font-size: 0.82rem;
+  color: var(--t-muted);
+}
+
+.v2 .prof-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+/* ── Onglet 2 · Types de garde ────────────────────────────────── */
+
+.v2 .cre-liste {
+  display: grid;
+  gap: 12px;
+  padding: 18px 22px 22px;
+}
+
+.v2 .cre-carte {
+  background: var(--surface-2);
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-md);
+  transition:
+    border-color 0.18s var(--ease-out),
+    opacity 0.18s var(--ease-out),
+    box-shadow 0.18s var(--ease-out);
+}
+
+.v2 .cre-carte:hover {
+  border-color: var(--border-strong);
+}
+
+/* Un créneau désactivé n'émet plus aucune garde : il doit se voir comme éteint,
+   pas comme absent — c'est réversible et il faut pouvoir le retrouver. */
+.v2 .cre-carte.eteint {
+  opacity: 0.62;
+  border-style: dashed;
+}
+
+/* Pendant un glisser : la carte prise et sa place d'arrivée. */
+.v2 .cre-carte.prise {
+  opacity: 0.4;
+}
+
+.v2 .cre-carte.cible {
+  border-color: var(--accent-ink);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.v2 .cre-tete {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 14px 10px;
+}
+
+/* La poignée de glisser : elle n'existe que si l'ordre est modifiable, et elle
+   se prend au clavier aussi (flèches haut/bas). */
+.v2 .cre-poignee {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  min-height: 34px;
+  color: var(--soft);
+  background: none;
+  border: none;
+  border-radius: var(--r-sm);
+  cursor: grab;
+  touch-action: none;
+}
+
+.v2 .cre-poignee:hover {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+
+.v2 .cre-poignee:active {
+  cursor: grabbing;
+}
+
+.v2 .cre-poignee:focus-visible {
+  outline: 2px dashed var(--accent-ink);
+  outline-offset: 1px;
+}
+
+.v2 .cre-titre {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.v2 .cre-nom {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.v2 .cre-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Les trois faits d'un créneau : jours, places, horaires. Toujours dans cet
+   ordre, toujours au même endroit — on les compare d'une carte à l'autre. */
+.v2 .cre-faits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 26px;
+  padding: 0 16px 14px 52px;
+}
+
+.v2 .cre-faits .fait {
+  min-width: 0;
+}
+
+.v2 .cre-form {
+  padding: 4px 16px 18px 52px;
+}
+
+.v2 .cre-form .grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px 16px;
+}
+
+.v2 .cre-form .grille .large {
+  grid-column: 1 / -1;
+}
+
+/* Les libellés de places : autant de champs que de places demandées. */
+.v2 .places-champs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px 12px;
+}
+
+/* ── Onglet 3 · Enchaînements ─────────────────────────────────── */
+
+/* Le niveau d'un genre de liaison (ferme / souple). Il vit dans une autre
+   table que les liaisons elles-mêmes — mais c'est un détail de rangement,
+   pas deux sujets : on les montre ensemble. */
+.v2 .ench-niveaux {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
+  padding: 18px 22px 22px;
+}
+
+.v2 .ench-niveau {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  background: var(--surface-2);
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-md);
+}
+
+.v2 .ench-niveau h3 {
+  font-family: var(--font-display);
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.v2 .ench-niveau .note {
+  flex: 1;
+}
+
+/* Une liaison : source → cible, et ce qu'elle impose. */
+.v2 .ench-lien {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.v2 .ench-creneau {
+  font-size: 0.94rem;
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.v2 .ench-fleche {
+  display: inline-flex;
+  color: var(--accent-ink);
+}
+
+/* ── Onglet 4 · Règles du moteur ──────────────────────────────── */
+
+/* Une règle : son symbole de fermeté, sa phrase, sa portée. La phrase est
+   construite par `lib/regles/libelle.ts` — source unique du vocabulaire. */
+.v2 .reg-ligne {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 13px 22px;
+  border-bottom: 1px dashed var(--t-border);
+}
+
+.v2 .reg-ligne:last-child {
+  border-bottom: none;
+}
+
+.v2 .reg-symbole {
+  flex-shrink: 0;
+  width: 26px;
+  padding-top: 1px;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.v2 .reg-corps {
+  flex: 1;
+  min-width: 0;
+}
+
+.v2 .reg-phrase {
+  font-size: 0.94rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.v2 .reg-portee {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+  font-size: 0.8rem;
+  color: var(--t-muted);
+}
+
+.v2 .reg-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Une règle désactivée reste lisible : on doit pouvoir décider de la rallumer. */
+.v2 .reg-ligne.eteinte .reg-phrase,
+.v2 .reg-ligne.eteinte .reg-symbole {
+  opacity: 0.55;
+}
+
+/* Le halo de `?focus=` : on arrive ici depuis un diagnostic d'impasse qui
+   désigne UN réglage. Sans le halo, on atterrit dans une liste et on cherche. */
+.v2 .cible-focus {
+  animation: cibleFocus 2.6s var(--ease-out) both;
+  border-radius: var(--r-sm);
+}
+
+@keyframes cibleFocus {
+  0%,
+  70% {
+    background: var(--accent-soft);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  100% {
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
+/* ── Étroit ───────────────────────────────────────────────────── */
+
+@media (max-width: 860px) {
+  .v2 .reglage,
+  .v2 .prof-reglage {
+    grid-template-columns: 1fr;
+  }
+
+  .v2 .reglage-valeur {
+    text-align: left;
+  }
+
+  .v2 .select-plat {
+    width: 100%;
+  }
+
+  .v2 .cre-faits,
+  .v2 .cre-form {
+    padding-left: 16px;
+  }
+
+  .v2 .profil-pilote {
+    width: 100%;
+  }
+
+  .v2 .profil-pilote select {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2 .panneau,
+  .v2 .cible-focus {
+    animation: none;
+  }
+}

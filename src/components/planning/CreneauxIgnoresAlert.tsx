@@ -60,10 +60,10 @@ export function CreneauxIgnoresAlert({ creneaux }: { creneaux: CreneauIgnore[] }
 
       <p className="text-xs text-amber-700 dark:text-amber-400 pl-8">
         <Link
-          href="/admin/structure"
+          href="/regles?onglet=creneaux"
           className="underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-200"
         >
-          Revoir la structure des gardes →
+          Revoir les types de garde →
         </Link>
       </p>
     </div>

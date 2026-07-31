@@ -200,11 +200,14 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Congés',        href: '/conges',              icon: 'CalendarOff',  roles: ['admin', 'veto'] },
   { label: 'Échanges',      href: '/echanges',            icon: 'ArrowLeftRight', roles: ['admin', 'veto'] },
   { label: 'Compteurs',     href: '/compteurs',           icon: 'BarChart3',    roles: ['admin', 'veto'] },
-  { label: 'Règles',        href: '/regles',              icon: 'ScrollText',   roles: ['admin', 'veto'] },
+  // « Règles » mène désormais à l'écran V2 « Règles & structure », qui a
+  // absorbé l'ancienne page /admin/structure — d'où la disparition de l'entrée
+  // « Structure » juste en dessous. L'écran est admin : tout y est de la
+  // configuration de cabinet, et le dock V2 ne l'a jamais proposé aux vétos.
+  { label: 'Règles',        href: '/regles',              icon: 'ScrollText',   roles: ['admin'] },
   { label: 'Demandes',      href: '/admin/demandes',      icon: 'Inbox',        roles: ['admin'] },
   { label: 'Dépannages',    href: '/admin/depannages',    icon: 'LifeBuoy',     roles: ['admin'] },
   { label: 'Périodes',      href: '/admin/periodes',      icon: 'CalendarRange', roles: ['admin'] },
-  { label: 'Structure',     href: '/admin/structure',     icon: 'Clock',        roles: ['admin'] },
   { label: 'Vétérinaires',  href: '/admin/veterinaires',  icon: 'Users',        roles: ['admin'] },
   { label: 'Journal e-mails', href: '/admin/journal-emails', icon: 'MailWarning', roles: ['admin'] },
 ]

@@ -47,15 +47,14 @@ import {
 
 /**
  * Rafraîchit les DEUX écrans qui affichent les BRANCHEMENTS du cabinet
- * (agenda, expéditeur d'e-mails, adresse → zone) : la V2 `/reglages` et la V1
- * `/admin/structure`, le temps de la bascule.
+ * (agenda, expéditeur d'e-mails, adresse → zone) : `/reglages`, qui les édite,
+ * et `/regles`, qui affiche la structure du même cabinet.
  *
  * Réservé aux connexions : les autres actions de ce fichier touchent à la
- * structure des créneaux, que la V2 n'affiche pas encore — elles continuent
- * de ne revalider que `/admin/structure`.
+ * structure des créneaux et ne revalident que `/regles`.
  */
 function revaliderConnexions() {
-  revalidatePath('/admin/structure')
+  revalidatePath('/regles')
   revalidatePath('/reglages')
 }
 
@@ -213,7 +212,7 @@ export async function creerProfil(payload: CreerProfilPayload) {
     return { error: error.message }
   }
 
-  revalidatePath('/admin/structure')
+  revalidatePath('/regles')
   revalidatePath('/admin/periodes')
   return { success: true }
 }
@@ -239,7 +238,7 @@ export async function renommerProfil(profilId: string, nom: string) {
     return { error: error.message }
   }
 
-  revalidatePath('/admin/structure')
+  revalidatePath('/regles')
   revalidatePath('/admin/periodes')
   return { success: true }
 }
@@ -278,7 +277,7 @@ export async function setProfilMeta(
     .eq('id', profilId)
 
   if (error) return { error: error.message }
-  revalidatePath('/admin/structure')
+  revalidatePath('/regles')
   revalidatePath('/admin/periodes')
   return { success: true }
 }
@@ -326,7 +325,7 @@ export async function setHorairesProfilCreneau(
   if (error) return { error: error.message }
   if (count === 0) return { error: 'Créneau introuvable pour ce cabinet.' }
 
-  revalidatePath('/admin/structure')
+  revalidatePath('/regles')
   return { success: true }
 }
 
@@ -358,7 +357,7 @@ export async function supprimerProfil(profilId: string) {
     .eq('id', profilId)
 
   if (error) return { error: error.message }
-  revalidatePath('/admin/structure')
+  revalidatePath('/regles')
   revalidatePath('/admin/periodes')
   return { success: true }
 }
@@ -494,7 +493,7 @@ export async function creerProfilComplet(payload: CreerProfilCompletPayload) {
     }
   }
 
-  revalidatePath('/admin/structure')
+  revalidatePath('/regles')
   revalidatePath('/admin/periodes')
   return { success: true }
 }
@@ -672,7 +671,162 @@ export async function creerCreneauSurMesure(payload: CreerCreneauSurMesurePayloa
     return { error: error.message }
   }
 
-  revalidatePath('/admin/structure')
+  revalidatePath('/regles')
+  return { success: true }
+}
+
+export interface ModifierCreneauPayload {
+  id: string
+  nom: string
+  /** Jours d'application (0=dim … 6=sam). Ignoré sur un créneau du seed. */
+  jours_semaine: number[]
+  sur_feries: boolean
+  heure_debut: string // 'HH:MM'
+  heure_fin: string // 'HH:MM'
+  offset_jours_fin: number // 0..3
+  nb_places: number // 1..N_PLACES_MAX
+  /** Labels des places — longueur = nb_places, distincts. */
+  roles: string[]
+}
+
+/**
+ * Modifie un créneau EXISTANT du catalogue : nom, jours, fériés, horaires,
+ * nombre de places et libellés des rôles.
+ *
+ * Comble un manque réel : jusqu'ici, une fois un créneau créé, seuls ses
+ * HORAIRES étaient modifiables (`setHorairesProfilCreneau`) — corriger un jour
+ * ou ajouter une place obligeait à supprimer et recréer, ce qui est impossible
+ * sur un créneau du seed et fait perdre les liaisons qui le référencent.
+ *
+ * ⚠️ GARDE-FOU SUR LE SEED : sur les 4 créneaux du seed (`semaine_soir`,
+ * `vendredi_soir`, `weekend`, `ferie`), les JOURS et les FÉRIÉS restent figés.
+ * L'ancrage jour → type de garde (`typeGardePourJour`) est ré-implémenté
+ * exprès dans le validateur indépendant, en contrôle croisé du moteur :
+ * déplacer les jours d'un seed depuis l'UI désaligne silencieusement les deux.
+ * Un cabinet qui veut d'autres jours désactive le seed et crée du sur-mesure —
+ * c'est le chemin prévu. Tout le reste (nom, horaires, places, rôles) est
+ * modifiable partout.
+ */
+export async function modifierCreneau(payload: ModifierCreneauPayload) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  const nom = payload.nom?.trim()
+  if (!nom) return { error: 'Le nom du créneau est obligatoire.' }
+  if (nom.length > 60) return { error: 'Le nom du créneau est trop long (60 caractères max).' }
+
+  const invalide = validerHoraire(payload)
+  if (invalide) return { error: invalide }
+
+  const nbPlaces = payload.nb_places
+  if (!Number.isInteger(nbPlaces) || nbPlaces < 1 || nbPlaces > N_PLACES_MAX) {
+    return { error: `Nombre de vétérinaires invalide (entre 1 et ${N_PLACES_MAX}).` }
+  }
+  const roles = (payload.roles ?? []).map((r) => r.trim())
+  if (roles.length !== nbPlaces || roles.some((r) => !r || r.length > 30)) {
+    return { error: 'Chaque place doit avoir un nom (30 caractères max).' }
+  }
+  if (new Set(roles).size !== roles.length) {
+    return { error: 'Les noms des places doivent être différents.' }
+  }
+
+  // On relit le créneau pour savoir s'il est du seed (RLS = son cabinet).
+  const { data: existant } = await supabase
+    .from('creneau_modele')
+    .select('id, code')
+    .eq('id', payload.id)
+    .maybeSingle()
+  if (!existant) return { error: 'Créneau introuvable pour ce cabinet.' }
+
+  const estSeed = CODES_SEED.has((existant as { code: string | null }).code ?? '')
+
+  const maj: Record<string, unknown> = {
+    nom,
+    heure_debut: payload.heure_debut,
+    heure_fin: payload.heure_fin,
+    offset_jours_fin: payload.offset_jours_fin,
+    nb_places: nbPlaces,
+    roles,
+  }
+
+  if (!estSeed) {
+    const jours = [...new Set(payload.jours_semaine ?? [])].sort()
+    if (jours.length === 0) return { error: 'Choisis au moins un jour de la semaine.' }
+    if (jours.some((j) => !Number.isInteger(j) || j < 0 || j > 6)) {
+      return { error: 'Jour de semaine invalide.' }
+    }
+    maj.jours_semaine = jours
+    maj.sur_feries = payload.sur_feries === true
+  }
+
+  const { error, count } = await supabase
+    .from('creneau_modele')
+    .update(maj, { count: 'exact' })
+    .eq('id', payload.id)
+
+  if (error) {
+    if (error.code === '23505') {
+      return { error: 'Un créneau au nom trop proche existe déjà dans ce profil — choisis un autre nom.' }
+    }
+    return { error: error.message }
+  }
+  if (count === 0) return { error: 'Créneau introuvable pour ce cabinet.' }
+
+  revalidatePath('/regles')
+  return { success: true }
+}
+
+/**
+ * Réordonne les créneaux d'un profil : `ids` est la liste COMPLÈTE des créneaux
+ * du profil, dans le nouvel ordre d'affichage. La colonne `ordre` existait
+ * depuis le début mais n'était modifiable nulle part — l'ordre subi était celui
+ * de la création.
+ *
+ * On écrit un `ordre` dense (1, 2, 3…) plutôt que de permuter deux lignes : le
+ * résultat ne dépend pas de l'état antérieur, donc deux glissers rapprochés ne
+ * peuvent pas se marcher dessus.
+ */
+export async function reordonnerCreneaux(profilId: string, ids: string[]) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  if (!Array.isArray(ids) || ids.length === 0) return { error: 'Aucun créneau à réordonner.' }
+  if (new Set(ids).size !== ids.length) return { error: 'Ordre invalide (doublon).' }
+
+  let cabinetId: string
+  try {
+    cabinetId = await resoudreCabinetId(supabase)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
+  }
+
+  // Les ids envoyés doivent être EXACTEMENT les créneaux de ce profil : un
+  // ordre partiel laisserait des lignes à un rang périmé (donc un affichage
+  // qui dépend de l'ordre d'arrivée en base).
+  const { data: duProfil } = await supabase
+    .from('creneau_modele')
+    .select('id')
+    .eq('cabinet_id', cabinetId)
+    .eq('profil_id', profilId)
+  const attendus = new Set(((duProfil as { id: string }[] | null) ?? []).map((r) => r.id))
+  if (attendus.size !== ids.length || ids.some((id) => !attendus.has(id))) {
+    return { error: 'La liste ne correspond plus au catalogue — rafraîchis la page.' }
+  }
+
+  for (let i = 0; i < ids.length; i++) {
+    const { error } = await supabase
+      .from('creneau_modele')
+      .update({ ordre: i + 1 })
+      .eq('id', ids[i])
+      .eq('cabinet_id', cabinetId)
+    if (error) return { error: error.message }
+  }
+
+  revalidatePath('/regles')
   return { success: true }
 }
 
@@ -695,7 +849,7 @@ export async function setCreneauActif(creneauId: string, actif: boolean) {
   if (error) return { error: error.message }
   if (count === 0) return { error: 'Créneau introuvable pour ce cabinet.' }
 
-  revalidatePath('/admin/structure')
+  revalidatePath('/regles')
   return { success: true }
 }
 
@@ -795,7 +949,7 @@ export async function creerRelationCreneau(payload: CreerRelationPayload) {
     return { error: error.message }
   }
 
-  revalidatePath('/admin/structure')
+  revalidatePath('/regles')
   return { success: true }
 }
 
@@ -814,7 +968,7 @@ export async function setRelationActive(relationId: string, actif: boolean) {
   if (error) return { error: error.message }
   if (count === 0) return { error: 'Liaison introuvable pour ce cabinet.' }
 
-  revalidatePath('/admin/structure')
+  revalidatePath('/regles')
   return { success: true }
 }
 
@@ -837,7 +991,7 @@ export async function supprimerRelation(relationId: string) {
   if (error) return { error: error.message }
   if (count === 0) return { error: 'Liaison introuvable pour ce cabinet.' }
 
-  revalidatePath('/admin/structure')
+  revalidatePath('/regles')
   return { success: true }
 }
 
@@ -978,7 +1132,7 @@ export async function supprimerCreneauSurMesure(creneauId: string) {
     .eq('id', creneauId)
 
   if (error) return { error: error.message }
-  revalidatePath('/admin/structure')
+  revalidatePath('/regles')
   return { success: true }
 }
 
