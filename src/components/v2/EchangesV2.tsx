@@ -642,12 +642,19 @@ function ProposerEchangeDialog({ open, onClose, moiId, gardesFutures, vets, onDo
 
           <div className="space-y-1.5">
             <Label>À proposer à</Label>
-            <div className="grid grid-cols-2 gap-2">
+            {/* Deux choix qui s'excluent : un sélecteur segmenté, pas deux
+                boutons. Le balisage venait du dialogue V1, en pilules plates de
+                28 px au milieu de champs qui en font 42 — d'où le « trop
+                compact » de MiKL le 2026-07-31. L'habillage vit dans
+                `v2-echanges.css` : une règle générique sur les boutons de
+                modale aurait redressé la hauteur sans rendre le motif lisible.
+                `aria-pressed` reste le porteur de l'état, pour que le choix
+                actif soit annoncé et pas seulement coloré. */}
+            <div className="segmente" role="group" aria-label="Destinataire de la proposition">
               <button
                 type="button"
                 onClick={() => setATous(false)}
                 aria-pressed={!aTous}
-                className={`rounded-md border px-3 py-2 text-sm transition-colors ${!aTous ? 'border-primary bg-primary/5 font-medium' : 'border-border text-muted-foreground hover:bg-muted/40'}`}
               >
                 Un confrère précis
               </button>
@@ -655,7 +662,6 @@ function ProposerEchangeDialog({ open, onClose, moiId, gardesFutures, vets, onDo
                 type="button"
                 onClick={() => { setATous(true); setCibleId(''); setAvecContrepartie(false); setContrepartieId('') }}
                 aria-pressed={aTous}
-                className={`rounded-md border px-3 py-2 text-sm transition-colors ${aTous ? 'border-primary bg-primary/5 font-medium' : 'border-border text-muted-foreground hover:bg-muted/40'}`}
               >
                 Tous les confrères
               </button>

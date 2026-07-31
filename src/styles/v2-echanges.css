@@ -32,3 +32,47 @@
    sa pilule ne doit jamais se scinder sur deux lignes. C'est le défaut
    signalé sur la greffe V1, où le libellé débordait de son fond. */
 .card-head > .btn { white-space: nowrap; }
+
+/* ---------- Sélecteur segmenté (« à qui je propose ») ----------
+   Deux choix qui s'excluent, dans une modale. Le balisage V1 en faisait
+   deux boutons indépendants de 28 px, plats et gris, au milieu de champs
+   qui en font 42 : MiKL a lu l'ensemble comme « trop compact » (2026-07-31).
+
+   Le motif est celui des onglets du terrier (`.tabs`) : une gouttière
+   crème, et le choix actif posé dessus. On le reprend plutôt que de le
+   réinventer, pour que l'app n'ait qu'UNE façon de dire « c'est celui-ci ».
+   Il n'entre pas dans `.tabs` pour autant : ces boutons ne changent pas de
+   panneau, et leur état se lit dans `aria-pressed`, pas `aria-selected`. */
+.segmente {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px;
+}
+.segmente button {
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.35;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+.segmente button:hover { color: var(--text); }
+/* Le choix actif : fond plein et texte foncé. Le liseré seul ne suffisait
+   pas — sur fond crème, une bordure orange pâle se lit comme un survol. */
+.segmente button[aria-pressed='true'] {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--accent-ink);
+  font-weight: 700;
+  box-shadow: var(--elev-1);
+}
+@media (prefers-reduced-motion: reduce) { .segmente button { transition: none; } }

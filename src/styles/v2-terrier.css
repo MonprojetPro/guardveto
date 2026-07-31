@@ -1776,7 +1776,11 @@
   --muted-foreground: var(--muted-terrier);
   --border: var(--border-terrier);
   --input: var(--border-strong);
-  --ring: var(--accent);
+  /* `var(--accent)` ne peut PAS servir ici : deux lignes plus bas, ce même bloc
+     redéfinit `--accent` sur le fond de survol pâle du vocabulaire shadcn, et
+     c'est cette valeur-là que la variable prendrait. L'anneau de mise en avant
+     sortait donc en orange à 13 % — presque invisible. */
+  --ring: var(--accent-terrier);
   /* Jetons d'action : l'orange du terrier remplace le cyan.
      On passe par les copies `-terrier` : dans ce bloc, `var(--accent)`
      désignerait la valeur qu'on est en train de lui donner juste en
@@ -1818,10 +1822,14 @@
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-panel);
   --radius: 18px; /* les arrondis internes (encarts, boutons) suivent */
-  padding: 22px 24px 20px;
+  /* Marges intérieures ouvertes d'un cran (24/26 au lieu de 22/24) et écart de
+     grille porté à 16 px. Retour MiKL 2026-07-31 : « c'est trop compact ». Le
+     panneau serrait son contenu contre ses bords, ce qui écrase la perception
+     de tout ce qu'il y a dedans, même bien espacé. */
+  padding: 24px 26px 22px;
   max-height: calc(100vh - 40px);
   overflow-y: auto;
-  gap: 14px;
+  gap: 16px;
 }
 
 /* La largeur de la maquette (600px) ne s'applique qu'aux modales qui la
@@ -1829,39 +1837,36 @@
    plus larges et gardent la leur. */
 .gv-modale { max-width: min(600px, calc(100vw - 32px)) !important; }
 
+/* La tête : le titre, sa phrase, et l'air qui les sépare du corps. */
+[data-slot="dialog-header"] { gap: 6px; }
 [data-slot="dialog-title"],
 [data-slot="alert-dialog-title"] {
   font-family: var(--font-display);
   font-size: 1.15rem; font-weight: 700; line-height: 1.3;
   color: var(--text);
+  /* La croix de fermeture est posée en absolu dans le coin : sans cette
+     réserve, un titre long passait dessous. */
+  padding-right: 34px;
 }
 [data-slot="dialog-description"],
-[data-slot="alert-dialog-description"] { color: var(--muted-terrier); }
+[data-slot="alert-dialog-description"] {
+  color: var(--muted-terrier);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
 
 /* Le pied reprend la bande de la maquette : crème, pas grise, et il épouse
    les arrondis du panneau. Les marges négatives du composant (`-mx-4 -mb-4`)
-   sont calées sur SON padding de 1rem ; le nôtre vaut 22/24px, d'où le
+   sont calées sur SON padding de 1rem ; le nôtre vaut 24/26px, d'où le
    `!important` : sans lui les boutons débordent du panneau sur la droite. */
 [data-slot="dialog-footer"],
 [data-slot="alert-dialog-footer"] {
-  margin: 8px -24px -20px !important;
-  padding: 14px 24px !important;
+  margin: 10px -26px -22px !important;
+  padding: 15px 26px !important;
   gap: 10px !important;
   background: var(--surface-2);
   border-top: 1px solid var(--border-terrier);
   border-radius: 0 0 calc(var(--r-lg) - 1px) calc(var(--r-lg) - 1px);
-}
-
-/* Les boutons du pied à la taille de la maquette : ceux de shadcn font 32px
-   de haut, ce qui les tasse l'un contre l'autre au bas d'un panneau de
-   600px. Ils respirent, et le principal se distingue par sa couleur — pas
-   par un liseré qui le ferait passer pour sélectionné. */
-[data-slot="dialog-footer"] button,
-[data-slot="alert-dialog-footer"] button {
-  min-height: 38px;
-  padding: 9px 18px;
-  font-size: 0.82rem;
-  font-weight: 600;
 }
 
 /* ---- Les boutons : des pilules, comme partout ailleurs dans le terrier ---- */
@@ -1870,6 +1875,42 @@
   border-radius: 999px;
   font-family: var(--font-body);
   font-weight: 600;
+}
+
+/* LA TENUE DES BOUTONS D'ACTION — correctif du 2026-07-31.
+   Seuls les boutons du PIED avaient reçu une hauteur minimale (38 px, hier).
+   Ceux du CORPS n'avaient rien : ils gardaient le `h-8` / `h-7` de shadcn, soit
+   28 à 32 px, au milieu de champs qui en font 42. Sur la modale « Proposer un
+   échange », les deux pilules « Un confrère précis » / « Tous les confrères »
+   paraissaient écrasées entre deux listes déroulantes. 40 px les met à la
+   hauteur des champs sans les faire passer devant. Une seule règle couvre
+   désormais le corps ET le pied : deux réglages séparés, c'était la porte
+   ouverte à ce qu'ils divergent une fois de plus.
+
+   Les exclusions ne sont pas cosmétiques :
+     · `dialog-close`  — la croix du coin, ronde et discrète, ne doit ni
+                         grossir ni s'allonger en pilule ;
+     · `select-trigger`— c'est un champ, pas un bouton d'action : il a son
+                         gabarit à lui plus bas (42 px, coins moyens) ;
+     · `size-6/7/8/9`  — les boutons-icônes carrés, dont la largeur est calée
+                         sur la hauteur : leur imposer 40 px de haut et 18 px
+                         de marge latérale en ferait des rectangles ;
+     · `.segmente`     — le sélecteur segmenté a son propre dessin dans
+                         `v2-echanges.css` (une gouttière crème, le choix actif
+                         posé dessus, sur le motif des onglets du terrier). Ses
+                         boutons font 38 px dans un cadre qui en fait 46 : leur
+                         imposer 40 px et 18 px de marge ferait éclater la
+                         gouttière. Un motif dessiné exprès l'emporte sur une
+                         règle générique — c'est la seule raison d'être de cette
+                         exclusion, ne pas l'élargir « au cas où ».
+   Les cases à cocher ne sont pas concernées : ce sont des `input`, pas des
+   `button`. */
+[data-slot="dialog-content"] button:not([data-slot="dialog-close"]):not([data-slot="select-trigger"]):not([class~="size-6"]):not([class~="size-7"]):not([class~="size-8"]):not([class~="size-9"]):not(.segmente > *),
+[data-slot="alert-dialog-content"] button:not([data-slot="dialog-close"]):not([data-slot="select-trigger"]):not([class~="size-6"]):not([class~="size-7"]):not([class~="size-8"]):not([class~="size-9"]):not(.segmente > *) {
+  min-height: 40px;
+  padding: 9px 18px;
+  font-size: 0.82rem;
+  line-height: 1.3;
 }
 /* La croix de fermeture reste ronde et discrète. */
 [data-slot="dialog-content"] > [data-slot="dialog-close"] {
@@ -1907,10 +1948,16 @@
      libellé, à travers un `:where()` de spécificité nulle : cette ligne
      suffit à l'emporter, sans `!important`. */
   margin-bottom: 9px;
-  font-size: 0.78rem;
+  /* La tenue des libellés de l'écran Réglages (`.field label`) : même graisse,
+     même espacement de lettres. On garde en revanche la casse naturelle, là où
+     Réglages met en capitales — les modales portent des intitulés-phrases
+     (« De garde seulement si ce binôme est de garde ») que les capitales
+     rendraient pénibles à lire. `--soft` était trop pâle pour un intitulé qu'on
+     doit pouvoir balayer du regard : on passe au brun moyen. */
+  font-size: 0.76rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--soft);
+  letter-spacing: 0.04em;
+  color: var(--muted-terrier);
 }
 
 /* ---- Champs de saisie : la tenue des écrans de réglage ----
@@ -1927,15 +1974,38 @@
   height: auto; /* shadcn impose `h-8` / `h-9` en classe : on le desserre */
   padding: 9px 12px;
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  /* La copie `-terrier`, pas `var(--border)` : ici on est DANS le panneau, où
+     `--border` a été remappé sur le vocabulaire shadcn. La valeur se trouve
+     être la même aujourd'hui, mais écrire le nom ambigu, c'est laisser une
+     mine — celle qui vient de rendre invisible un bouton dont la couleur était
+     déclarée `var(--muted)`. */
+  border: 1px solid var(--border-terrier);
   /* Gagne sur la règle « les boutons sont des pilules » ci-dessus : un
      déclencheur de liste déroulante est un champ, pas un bouton d'action. */
   border-radius: var(--r-sm);
   font-family: var(--font-body);
   font-size: 0.86rem;
+  line-height: 1.4;
   color: var(--text);
+  transition: border-color 0.16s var(--ease-out);
 }
-[data-slot="dialog-content"] textarea { min-height: 84px; line-height: 1.5; }
+/* Le champ répond à la souris avant même qu'on clique : sans ça, rien ne
+   distinguait une zone saisissable d'un simple encart crème. */
+[data-slot="dialog-content"] :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="color"]):hover,
+[data-slot="dialog-content"] [data-slot="select-trigger"]:hover {
+  border-color: var(--border-strong);
+}
+/* La zone de texte, plus haute qu'un champ d'une ligne. Le sélecteur reprend
+   les mêmes `:not()` que la règle ci-dessus : sans eux il était MOINS
+   spécifique qu'elle, son `min-height: 84px` perdait contre le `42px`
+   générique, et toutes les zones de commentaire des modales sortaient à la
+   hauteur d'un champ ordinaire (mesuré : 42 px au lieu de 84). */
+[data-slot="dialog-content"] textarea:not([type="checkbox"]):not([type="radio"]):not([type="color"]) {
+  min-height: 84px;
+  line-height: 1.5;
+  padding: 11px 12px;
+  resize: vertical;
+}
 [data-slot="dialog-content"] :is(input, select, textarea)::placeholder {
   color: var(--soft);
 }
@@ -1990,6 +2060,14 @@
 [data-slot="dialog-content"] .space-y-2 > :not(:last-child) {
   margin-block-end: 12px;
 }
+/* `space-y-1.5` est l'écart libellé → contrôle quand le contrôle n'est pas un
+   champ : un groupe segmenté, une phrase d'aide. Il valait 6 px là où un
+   libellé posé sur un champ en a 9 — le même formulaire séparait donc ses
+   intitulés de deux façons, à trois pixels près, ce qui se voit sans qu'on
+   sache dire pourquoi. */
+[data-slot="dialog-content"] .space-y-1\.5 > :not(:last-child) {
+  margin-block-end: 9px;
+}
 
 /* La case à cocher isolée était écrasée entre le champ du dessus et le
    libellé du dessous. On lui donne le gabarit d'une ligne cliquable à part
@@ -2005,7 +2083,7 @@
   margin: 4px 0;
   padding: 8px 12px;
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-terrier); /* même raison qu'au-dessus */
   border-radius: var(--r-sm);
   font-size: 0.86rem;
   font-weight: 600;
@@ -2020,7 +2098,10 @@
   flex: 0 0 auto;
   width: 16px;
   height: 16px;
-  accent-color: var(--accent);
+  /* Dans ce bloc, `--accent` a été remappé sur le fond de survol pâle du
+     vocabulaire shadcn : la coche sortait en orange à 13 %, presque blanche.
+     On prend la copie qui porte vraiment l'orange. */
+  accent-color: var(--accent-terrier);
   cursor: pointer;
 }
 
