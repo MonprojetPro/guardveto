@@ -58,7 +58,13 @@
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
-  color: var(--muted);
+  /* `-terrier` et NON `var(--muted)` : ce sélecteur vit dans une modale, où
+     le remappage des jetons shadcn (`v2-terrier.css`) redéfinit `--muted`
+     comme une couleur de FOND crème pâle. Le choix inactif sortait donc en
+     crème sur crème — invisible, il ne restait qu'un bouton à l'écran
+     (retour MiKL 2026-07-31). Même piège pour `--border` et `--accent` :
+     dans une modale, toujours passer par les copies `-terrier`. */
+  color: var(--muted-terrier);
   font-family: var(--font-body);
   font-size: 0.82rem;
   font-weight: 600;

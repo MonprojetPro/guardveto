@@ -519,7 +519,11 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   padding: 4px 11px; border-radius: 999px;
 }
 .gm-badge.ferie { background: var(--accent-soft); color: var(--accent-ink); }
-.gm-badge.lock { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border-strong); }
+/* `-terrier` : cette pastille vit DANS une modale, où le remappage des jetons
+   shadcn redéfinit `--muted` comme une couleur de FOND crème — le texte y
+   devenait invisible. Une seconde déclaration plus bas dans ce fichier la
+   sauvait par la cascade ; on ne compte pas là-dessus. */
+.gm-badge.lock { background: var(--surface-2); color: var(--muted-terrier); border: 1px solid var(--border-strong); }
 .gm-badge.warn { background: var(--warn-soft); color: var(--warn); }
 
 .lock-encart {
@@ -592,7 +596,8 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .av-state.vert { color: var(--ok); }
 .av-state.ambre { color: var(--warn); }
 .av-state.rouge { color: var(--danger); }
-.av-reason { font-size: 0.73rem; font-weight: 500; color: var(--muted); line-height: 1.35; }
+/* `-terrier` : rendu dans une modale — cf. la note sur `.gm-badge.lock`. */
+.av-reason { font-size: 0.73rem; font-weight: 500; color: var(--muted-terrier); line-height: 1.35; }
 .av-row.rouge .av-reason { color: var(--danger); }
 .av-row.ambre .av-reason { color: var(--warn); }
 /* l'impact compteur : ce que ce choix ferait au total de la période */
