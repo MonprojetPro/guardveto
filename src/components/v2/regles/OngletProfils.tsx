@@ -71,6 +71,7 @@ import {
   creerProfil, renommerProfil, setProfilMeta, supprimerProfil,
 } from '@/app/(protected)/admin/structure/actions'
 import type { ProfilUI } from './types'
+import { useErreurBloquante } from './ErreurBloquante'
 
 interface Props {
   profils: ProfilUI[]
@@ -134,6 +135,10 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
   // Réglages déjà appliqués à l'écran, pas encore confirmés par le serveur.
   const [meta, setMeta] = useState<Record<string, MetaLocale>>({})
 
+  // Les refus s'affichent en modale (cf. `ErreurBloquante`) : une vignette de
+  // quelques secondes en bas d'écran ne suffit pas à expliquer un refus.
+  const { ouvrirErreur, dialogueErreur } = useErreurBloquante()
+
   const profilDefaut = profils.find((p) => p.estDefaut) ?? profils[0]
 
   /** La valeur à afficher : l'optimiste si elle existe, sinon celle du serveur. */
@@ -160,11 +165,11 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
   const creer = () => {
     const propre = nom.trim()
     if (!propre) {
-      toast.error('Donne un nom à cette période type (« Hiver », « Été », « Vacances »…).')
+      ouvrirErreur('Donne un nom à cette période type (« Hiver », « Été », « Vacances »…).')
       return
     }
     if (propre.length > 60) {
-      toast.error('Le nom de la période type est trop long (60 caractères max).')
+      ouvrirErreur('Le nom de la période type est trop long (60 caractères max).')
       return
     }
     startTransition(async () => {
@@ -177,7 +182,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
           EFFECTIFS.includes(Number(effectifNouveau)) ? Number(effectifNouveau) : null,
       })
       if (res?.error) {
-        toast.error(res.error)
+        ouvrirErreur(res.error)
         return
       }
       toast.success(`Période type « ${propre} » créée, avec les types de garde de sa source.`)
@@ -189,7 +194,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
   const renommer = (p: ProfilUI) => {
     const propre = nomEdite.trim()
     if (!propre) {
-      toast.error('Le nom de la période type est obligatoire.')
+      ouvrirErreur('Le nom de la période type est obligatoire.')
       return
     }
     if (propre === p.nom) {
@@ -199,7 +204,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
     startTransition(async () => {
       const res: Reponse = await renommerProfil(p.id, propre)
       if (res?.error) {
-        toast.error(res.error)
+        ouvrirErreur(res.error)
         return
       }
       toast.success('Période type renommée.')
@@ -229,7 +234,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
           else delete suivant[p.id]
           return suivant
         })
-        toast.error(res.error)
+        ouvrirErreur(res.error)
         return
       }
       toast.success(message)
@@ -243,7 +248,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
     startTransition(async () => {
       const res: Reponse = await supprimerProfil(cible.id)
       if (res?.error) {
-        toast.error(res.error)
+        ouvrirErreur(res.error)
         return
       }
       toast.success(`Période type « ${cible.nom} » supprimée.`)
@@ -650,6 +655,8 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {dialogueErreur}
     </>
   )
 }

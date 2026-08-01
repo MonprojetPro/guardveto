@@ -128,11 +128,13 @@ import {
   setEquiteImportance, setCohorteEquite, deleteCohorteEquite,
   setStructureRegle, setRoleAvantageFinancier,
   upsertCompositionRegle, upsertRoleInterditRegle,
+  poserEtiquetteSurVetos,
   type CohorteEquiteUI, type CompositionReglePayload,
   type RoleInterditReglePayload, type ForceFormulaire,
 } from '@/app/(protected)/regles/actions'
 import { RegleFormDialog } from '@/components/regles/RegleFormDialog'
 import { AideFilou } from './AideFilou'
+import { useErreurBloquante } from './ErreurBloquante'
 import {
   BRIQUES_EDITABLES,
   type RegleRow, type PeriodeOption, type TypeCreneauOption,
@@ -181,7 +183,11 @@ const FORCES_SOUPLES = ['sauf_crise', 'evitee', 'si_possible'] as const
 const DESACTIVEE = 'desactivee'
 
 /** Sentinelle du menu d'étiquettes : « celle que je vais écrire ». La liste
- *  déroulante du projet refuse la valeur vide, d'où une valeur nommée. */
+ *  déroulante du projet refuse la valeur vide, d'où une valeur nommée.
+ *
+ *  Choisir cette entrée ouvre DEUX champs : le nom de l'étiquette, et « qui la
+ *  porte ? ». Le second n'est pas un confort — sans porteur, le serveur refuse
+ *  la règle (cf. `poserEtiquetteSurVetos`), et l'option n'était qu'une impasse. */
 const NOUVELLE_ETIQUETTE = '__nouvelle__'
 
 /** Les 3 formes de règle d'équipe proposées au panneau (pour 2 briques). */
@@ -391,6 +397,10 @@ export function OngletMoteur({
     tagsEquipe[0] ?? NOUVELLE_ETIQUETTE,
   )
   const [compoTagLibre, setCompoTagLibre] = useState('')
+  /** Les fiches sur lesquelles poser l'étiquette inédite, avant de créer la
+   *  règle. Ignoré quand l'étiquette vient de la liste : elle a déjà ses
+   *  porteurs, et cet écran n'est pas l'endroit où l'on gère les fiches. */
+  const [compoPorteurs, setCompoPorteurs] = useState<string[]>([])
   const [compoRole, setCompoRole] = useState(rolesCabinet[0] ?? 'premier')
   const [compoCreneaux, setCompoCreneaux] = useState<string[]>([])
   const [compoForce, setCompoForce] = useState<string>('jamais')
@@ -405,8 +415,18 @@ export function OngletMoteur({
   // ── Carte 2 (suite) : équilibrages par étiquette (« cohortes » en base) ──
   const [cohorteOuverte, setCohorteOuverte] = useState(false)
   const [coDim, setCoDim] = useState<EquityDimension>('weekend')
-  const [coTag, setCoTag] = useState(tagsEquipe[0] ?? '')
+  // Même mécanique que le panneau de règle : une liste de ce qui existe, plus
+  // l'entrée « nouvelle étiquette » qui demande aussitôt ses porteurs. Avant,
+  // un cabinet sans aucune étiquette n'avait ici qu'un panneau qui disait
+  // d'aller voir ailleurs.
+  const [coTagChoix, setCoTagChoix] = useState<string>(tagsEquipe[0] ?? NOUVELLE_ETIQUETTE)
+  const [coTagLibre, setCoTagLibre] = useState('')
+  const [coPorteurs, setCoPorteurs] = useState<string[]>([])
   const [coImp, setCoImp] = useState<ImportanceLevel>('important')
+
+  // Les refus serveur de cet écran s'affichent en modale (titre + explication +
+  // porte de sortie), pas en vignette éphémère : cf. `ErreurBloquante`.
+  const { ouvrirErreur, dialogueErreur } = useErreurBloquante()
 
   /**
    * Le halo de `?focus=`. On arrive ici depuis un diagnostic d'impasse qui
@@ -483,6 +503,47 @@ export function OngletMoteur({
 
   /** L'étiquette réellement retenue par le panneau d'ajout de règle d'équipe. */
   const compoTag = compoTagChoix === NOUVELLE_ETIQUETTE ? compoTagLibre : compoTagChoix
+  /** Idem pour le panneau d'équilibrage par étiquette. */
+  const coTag = coTagChoix === NOUVELLE_ETIQUETTE ? coTagLibre : coTagChoix
+
+  /**
+   * Une étiquette inédite se saisit au clavier — soit parce qu'on a choisi
+   * « + Une nouvelle étiquette… », soit parce que l'équipe n'en porte aucune et
+   * qu'il n'y a donc pas de liste à proposer. Dans les deux cas il faut
+   * demander QUI la porte : c'est ce qui rend la règle acceptable.
+   */
+  const compoTagInedit = tagsEquipe.length === 0 || compoTagChoix === NOUVELLE_ETIQUETTE
+  const coTagInedit = tagsEquipe.length === 0 || coTagChoix === NOUVELLE_ETIQUETTE
+
+  /** Seules les fiches ACTIVES peuvent recevoir une étiquette (cf. `VetoUI`).
+   *  `actif` est optionnel dans le type : un chargeur qui ne le fournirait pas
+   *  ne doit pas vider la liste — d'où le `!== false` plutôt que `=== true`. */
+  const vetsActifs = useMemo(() => vets.filter((v) => v.actif !== false), [vets])
+
+  /** Les vétérinaires proposés comme porteurs : ceux de l'écran, dans l'ordre. */
+  const basculerPorteur = (
+    setter: (maj: (p: string[]) => string[]) => void,
+    id: string,
+  ) => setter((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]))
+
+  /**
+   * Pose l'étiquette inédite sur les fiches cochées, AVANT l'écriture de la
+   * règle. Renvoie `false` si ça a échoué (la modale est déjà ouverte) — dans
+   * ce cas l'appelant renonce à écrire la règle, qui serait refusée juste après.
+   */
+  const poserSiInedit = async (inedit: boolean, tag: string, porteurs: string[]) => {
+    if (!inedit) return true
+    const res: Reponse = await poserEtiquetteSurVetos(tag, porteurs)
+    if (res?.error) {
+      ouvrirErreur(res.error, {
+        titre: 'L’étiquette n’a pas pu être posée',
+        explication:
+          'La règle n’a donc pas été créée non plus : sans porteur, le moteur la refuserait. Vérifie la sélection, ou pose l’étiquette directement sur les fiches depuis la page Équipe.',
+      })
+      return false
+    }
+    return true
+  }
 
   // ── Carte 1 — actions ──────────────────────────────────────
 
@@ -495,7 +556,13 @@ export function OngletMoteur({
     // Certaines briques (équité, liaisons…) n'ont pas de formulaire : on le dit
     // plutôt que d'ouvrir une fenêtre qui ne saurait pas les remplir.
     if (!BRIQUES_EDITABLES.has(regle.brique_id)) {
-      toast.info("Ce type de règle ne s'édite pas depuis le formulaire.")
+      // Un crayon qui ouvre une vignette et rien d'autre passe pour une panne :
+      // on dit ce que c'est, et où ça se règle vraiment.
+      ouvrirErreur("Ce type de règle ne s'édite pas depuis le formulaire.", {
+        titre: 'Cette règle se règle ailleurs',
+        explication:
+          'Certaines règles (équilibrage, enchaînements entre types de garde) n’ont pas de formulaire : elles se modifient là où elles sont définies — la carte « Équilibrage des charges » ci-dessous, ou l’onglet « Enchaînements ». Tu peux en revanche changer sa fermeté ou la mettre en pause depuis sa ligne.',
+      })
       return
     }
     setAEditer(regle)
@@ -506,7 +573,7 @@ export function OngletMoteur({
     startTransition(async () => {
       const res: Reponse = await setRegleActif(regle.id, !regle.actif)
       if (res?.error) {
-        toast.error(res.error)
+        ouvrirErreur(res.error)
         return
       }
       toast.success(
@@ -524,7 +591,7 @@ export function OngletMoteur({
     startTransition(async () => {
       const res: Reponse = await deleteRegle(cible.id)
       if (res?.error) {
-        toast.error(res.error)
+        ouvrirErreur(res.error)
         return
       }
       toast.success('Règle supprimée.')
@@ -569,7 +636,7 @@ export function OngletMoteur({
       if (choix === DESACTIVEE) {
         const res: Reponse = await setRegleActif(r.id, false)
         if (res?.error) {
-          toast.error(res.error)
+          ouvrirErreur(res.error)
           return
         }
         toast.success('Règle mise en pause.')
@@ -578,7 +645,7 @@ export function OngletMoteur({
       }
       const res: Reponse = await reecrireEquipe(r, choix as ForceFormulaire)
       if (res?.error) {
-        toast.error(res.error)
+        ouvrirErreur(res.error)
         return
       }
       if (!r.actif) await setRegleActif(r.id, true)
@@ -591,7 +658,7 @@ export function OngletMoteur({
     startTransition(async () => {
       const res: Reponse = await deleteRegle(r.id)
       if (res?.error) {
-        toast.error(res.error)
+        ouvrirErreur(res.error)
         return
       }
       toast.success('Règle d’équipe supprimée.')
@@ -603,6 +670,7 @@ export function OngletMoteur({
     setCompoType('au_moins_un')
     setCompoTagChoix(tagsEquipe[0] ?? NOUVELLE_ETIQUETTE)
     setCompoTagLibre('')
+    setCompoPorteurs([])
     setCompoRole(rolesCabinet[0] ?? 'premier')
     setCompoCreneaux([])
     setCompoForce('jamais')
@@ -612,10 +680,26 @@ export function OngletMoteur({
   const creerEquipe = () => {
     const tag = compoTag.trim().toLowerCase()
     if (tag === '') {
-      toast.error('Indique l’étiquette concernée (junior, senior…).')
+      ouvrirErreur('Indique l’étiquette concernée (junior, senior…).', {
+        titre: 'Il manque l’étiquette',
+        explication:
+          'Une règle par étiquette vise un groupe, pas une personne : « senior », « junior », « chirurgien »… C’est ce mot qui relie la règle aux fiches de l’équipe.',
+      })
+      return
+    }
+    // Une étiquette inédite se pose AVANT la règle : dans l'autre ordre, le
+    // serveur refuserait la règle parce que personne ne la porte encore.
+    if (compoTagInedit && compoPorteurs.length === 0) {
+      ouvrirErreur(`Personne ne porte encore l’étiquette « ${tag} ».`, {
+        titre: 'Coche qui porte cette étiquette',
+        explication:
+          'Une étiquette n’existe qu’à travers ses porteurs. Coche les vétérinaires concernés juste en dessous du champ : ils la recevront sur leur fiche au moment où la règle sera créée.',
+      })
       return
     }
     startTransition(async () => {
+      if (!(await poserSiInedit(compoTagInedit, tag, compoPorteurs))) return
+
       const res: Reponse =
         compoType === 'role_interdit'
           ? await upsertRoleInterditRegle({
@@ -627,10 +711,14 @@ export function OngletMoteur({
               force: compoForce as ForceFormulaire,
             })
       if (res?.error) {
-        toast.error(res.error)
+        ouvrirErreur(res.error)
         return
       }
-      toast.success('Règle d’équipe créée — appliquée à la prochaine génération.')
+      toast.success(
+        compoTagInedit
+          ? `Étiquette « ${tag} » posée et règle créée — appliquée à la prochaine génération.`
+          : 'Règle d’équipe créée — appliquée à la prochaine génération.',
+      )
       setCompoOuvert(false)
       router.refresh()
     })
@@ -650,7 +738,7 @@ export function OngletMoteur({
     startTransition(async () => {
       const res: Reponse = await setEquiteImportance(dim, niveau)
       if (res?.error) {
-        toast.error(res.error)
+        ouvrirErreur(res.error)
         setEq((p) => ({ ...p, [dim]: avant }))
         return
       }
@@ -665,7 +753,7 @@ export function OngletMoteur({
     startTransition(async () => {
       const res: Reponse = await setCohorteEquite(c.dimension, c.tag, imp)
       if (res?.error) {
-        toast.error(res.error)
+        ouvrirErreur(res.error)
         return
       }
       toast.success(MSG_ENREGISTRE)
@@ -677,7 +765,7 @@ export function OngletMoteur({
     startTransition(async () => {
       const res: Reponse = await deleteCohorteEquite(c.id)
       if (res?.error) {
-        toast.error(res.error)
+        ouvrirErreur(res.error)
         return
       }
       toast.success('Équilibrage par étiquette retiré.')
@@ -688,13 +776,27 @@ export function OngletMoteur({
   const ajouterCohorte = () => {
     const tag = coTag.trim().toLowerCase()
     if (tag === '') {
-      toast.error('Choisis une étiquette.')
+      ouvrirErreur('Choisis une étiquette.', {
+        titre: 'Il manque l’étiquette',
+        explication:
+          'Un équilibrage « entre certains seulement » a besoin de savoir entre QUI : c’est l’étiquette qui désigne ce groupe.',
+      })
+      return
+    }
+    if (coTagInedit && coPorteurs.length === 0) {
+      ouvrirErreur(`Personne ne porte encore l’étiquette « ${tag} ».`, {
+        titre: 'Coche qui porte cette étiquette',
+        explication:
+          'Un équilibrage entre porteurs d’une étiquette que personne ne porte n’équilibrerait rien du tout. Coche les vétérinaires concernés juste en dessous du champ.',
+      })
       return
     }
     startTransition(async () => {
+      if (!(await poserSiInedit(coTagInedit, tag, coPorteurs))) return
+
       const res: Reponse = await setCohorteEquite(coDim, tag, coImp)
       if (res?.error) {
-        toast.error(res.error)
+        ouvrirErreur(res.error)
         return
       }
       toast.success('Équilibrage par étiquette ajouté — appliqué à la prochaine génération.')
@@ -723,7 +825,7 @@ export function OngletMoteur({
     startTransition(async () => {
       const res: Reponse = await setStructureRegle(brique, suivant.actif, suivant.force)
       if (res?.error) {
-        toast.error(res.error)
+        ouvrirErreur(res.error)
         setPs((p) => ({ ...p, [brique]: avant }))
         return
       }
@@ -738,7 +840,7 @@ export function OngletMoteur({
     startTransition(async () => {
       const res: Reponse = await setRoleAvantageFinancier(role)
       if (res?.error) {
-        toast.error(res.error)
+        ouvrirErreur(res.error)
         setRoleAv(avant)
         return
       }
@@ -894,6 +996,38 @@ export function OngletMoteur({
       .filter((l) => groupeDe(l.force) === key)
       .sort((a, b) => etageDe(a.force) - etageDe(b.force) || a.tri.localeCompare(b.tri))
 
+  /**
+   * « Qui porte cette étiquette ? » — la moitié manquante de l'étiquette
+   * inédite. Rendu en `.chips` comme les types de garde : même geste, même
+   * apparence, et la sélection reste visible d'un coup d'œil (une liste
+   * déroulante multiple aurait caché le choix derrière un clic).
+   */
+  const selecteurPorteurs = (
+    idLabel: string,
+    porteurs: string[],
+    setter: (maj: (p: string[]) => string[]) => void,
+  ) => (
+    <div className="large">
+      <label id={idLabel}>Qui porte cette étiquette ?</label>
+      <div className="chips" role="group" aria-labelledby={idLabel}>
+        {vetsActifs.map((v) => (
+          <button
+            key={v.id}
+            type="button"
+            aria-pressed={porteurs.includes(v.id)}
+            onClick={() => basculerPorteur(setter, v.id)}
+          >
+            {v.prenom}
+          </button>
+        ))}
+      </div>
+      <p className="note">
+        L&apos;étiquette sera posée sur leurs fiches (page Équipe) au moment où tu valides. Tu
+        pourras l&apos;y ajouter ou l&apos;y retirer à tout moment ensuite.
+      </p>
+    </div>
+  )
+
   /** Le panneau de saisie d'une règle par étiquette (bouton « + Par étiquette »). */
   const panneauEquipe = () => (
     <div className="panneau">
@@ -956,9 +1090,8 @@ export function OngletMoteur({
               placeholder={compoType === 'au_moins_un' ? 'senior' : 'junior'}
             />
             <p className="note">
-              Aucune étiquette n&apos;est encore posée sur l&apos;équipe. Écris-la ici, puis va la
-              poser sur les fiches concernées, page Équipe : sans porteur, le serveur refusera la
-              règle.
+              Aucune étiquette n&apos;est encore posée sur l&apos;équipe : écris-la ici, puis
+              indique qui la porte juste en dessous.
             </p>
           </div>
         )}
@@ -977,6 +1110,10 @@ export function OngletMoteur({
             />
           </div>
         )}
+
+        {/* La moitié qui manquait : une étiquette inédite n'existe pour le
+            moteur qu'une fois posée sur des fiches. */}
+        {compoTagInedit && selecteurPorteurs('compo-porteurs-lbl', compoPorteurs, setCompoPorteurs)}
 
         {compoType === 'role_interdit' && (
           <div>
@@ -1040,8 +1177,8 @@ export function OngletMoteur({
       </div>
 
       <p className="note">
-        L&apos;étiquette doit déjà être portée par au moins un vétérinaire actif : sinon la règle
-        serait soit impossible à tenir, soit sans aucun effet. Le serveur la refusera en le disant.
+        Une règle par étiquette a besoin d&apos;au moins un porteur : sans personne pour la porter,
+        elle serait soit impossible à tenir, soit sans le moindre effet sur le planning.
       </p>
 
       <div className="panneau-pied">
@@ -1213,7 +1350,9 @@ export function OngletMoteur({
             type="button"
             className="btn btn-outline btn-sm"
             onClick={() => {
-              setCoTag(tagsEquipe[0] ?? '')
+              setCoTagChoix(tagsEquipe[0] ?? NOUVELLE_ETIQUETTE)
+              setCoTagLibre('')
+              setCoPorteurs([])
               setCoDim('weekend')
               setCoImp('important')
               setCohorteOuverte(true)
@@ -1229,25 +1368,7 @@ export function OngletMoteur({
           </p>
         </div>
 
-        {cohorteOuverte &&
-          (tagsEquipe.length === 0 ? (
-            <div className="panneau">
-              <p className="note">
-                Aucune étiquette n&apos;est posée sur l&apos;équipe : cet équilibrage n&apos;aurait
-                personne à équilibrer. Ajoute d&apos;abord des étiquettes sur les fiches, page
-                Équipe.
-              </p>
-              <div className="panneau-pied">
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => setCohorteOuverte(false)}
-                >
-                  Fermer
-                </button>
-              </div>
-            </div>
-          ) : (
+        {cohorteOuverte && (
             <div className="panneau">
               <p className="panneau-titre">Nouvel équilibrage par étiquette</p>
 
@@ -1272,25 +1393,57 @@ export function OngletMoteur({
                   </Select>
                 </div>
 
-                <div>
-                  <label id="co-tag-lbl">Entre les vétérinaires…</label>
-                  <Select
-                    value={coTag}
-                    onValueChange={(v) => setCoTag(String(v))}
-                    disabled={isPending}
-                  >
-                    <SelectTrigger className="w-full" aria-labelledby="co-tag-lbl">
-                      {coTag || 'Choisir…'}
-                    </SelectTrigger>
-                    <SelectContent>
-                      {tagsEquipe.map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {t}
+                {tagsEquipe.length > 0 ? (
+                  <div>
+                    <label id="co-tag-lbl">Entre les vétérinaires…</label>
+                    <Select
+                      value={coTagChoix}
+                      onValueChange={(v) => setCoTagChoix(String(v))}
+                      disabled={isPending}
+                    >
+                      <SelectTrigger className="w-full" aria-labelledby="co-tag-lbl">
+                        {coTagChoix === NOUVELLE_ETIQUETTE ? 'Une nouvelle étiquette…' : coTagChoix}
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tagsEquipe.map((t) => (
+                          <SelectItem key={t} value={t}>
+                            {t}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value={NOUVELLE_ETIQUETTE}>
+                          + Une nouvelle étiquette…
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div>
+                    <label htmlFor="co-tag-libre">Entre les vétérinaires…</label>
+                    <input
+                      id="co-tag-libre"
+                      type="text"
+                      maxLength={30}
+                      value={coTagLibre}
+                      onChange={(e) => setCoTagLibre(e.target.value)}
+                      placeholder="senior"
+                    />
+                  </div>
+                )}
+
+                {tagsEquipe.length > 0 && coTagChoix === NOUVELLE_ETIQUETTE && (
+                  <div>
+                    <label htmlFor="co-tag-libre">Laquelle ?</label>
+                    <input
+                      id="co-tag-libre"
+                      type="text"
+                      autoFocus
+                      maxLength={30}
+                      value={coTagLibre}
+                      onChange={(e) => setCoTagLibre(e.target.value)}
+                      placeholder="senior"
+                    />
+                  </div>
+                )}
 
                 <div>
                   <label id="co-imp-lbl">Importance</label>
@@ -1311,6 +1464,8 @@ export function OngletMoteur({
                     </SelectContent>
                   </Select>
                 </div>
+
+                {coTagInedit && selecteurPorteurs('co-porteurs-lbl', coPorteurs, setCoPorteurs)}
               </div>
 
               <div className="panneau-pied">
@@ -1332,7 +1487,7 @@ export function OngletMoteur({
                 </button>
               </div>
             </div>
-          ))}
+          )}
 
         {cohortes.length === 0 ? (
           <p className="empty-row">
@@ -1533,6 +1688,8 @@ export function OngletMoteur({
           regle={aEditer}
         />
       )}
+
+      {dialogueErreur}
     </>
   )
 }

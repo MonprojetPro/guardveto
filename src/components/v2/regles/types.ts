@@ -98,4 +98,13 @@ export interface VetoUI {
   nom: string
   couleur: string
   tags: string[] | null
+  /**
+   * Les fiches DÉSACTIVÉES sont chargées elles aussi : une règle peut viser
+   * quelqu'un qui ne fait plus de gardes, et la masquer afficherait un identifiant
+   * brut à la place de son prénom. Mais on ne PROPOSE que les actifs quand il
+   * s'agit de poser une étiquette : le serveur ne la pose que sur des fiches
+   * actives (`poserEtiquetteSurVetos`), et une case à cocher sans effet est pire
+   * qu'une case absente.
+   */
+  actif?: boolean
 }

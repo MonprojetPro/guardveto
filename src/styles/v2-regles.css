@@ -693,6 +693,49 @@
   color: var(--accent-ink);
 }
 
+/* ── La modale des refus (`ErreurBloquante`) ────────────────────────────────
+   Un refus arrivait en vignette `sonner` : petite, en bas à droite, effacée
+   toute seule au bout de quelques secondes — juste après qu'on ait rempli un
+   panneau entier. MiKL, en recette : « le message en pop-up minuscule en bas
+   c'est nul ».
+
+   Ce qui distingue cette modale des autres : le titre porte un triangle
+   d'alerte et le TEXTE SERVEUR est en tête (`DialogDescription`), à taille
+   normale ; l'explication vient en dessous, dans un encart. On ne teinte PAS
+   le fond en rouge — un refus n'est pas une catastrophe, et un panneau écarlate
+   à chaque étiquette manquante finirait par ne plus rien vouloir dire. */
+.gv-modale-erreur [data-slot='dialog-title'] {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.gv-modale-erreur [data-slot='dialog-title'] svg {
+  flex: none;
+  color: var(--danger);
+}
+
+/* Le message brut du serveur : c'est LE fait, il garde la taille du corps. */
+.gv-modale-erreur [data-slot='dialog-description'] {
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+/* Ce que ça veut dire, et quoi faire. Le filet reprend celui de `.consequence`
+   (l'encart qui, dans les panneaux, dit ce que le moteur FERA d'un choix) :
+   même rôle — expliquer une conséquence — donc même signal visuel. */
+.gv-modale-erreur .gv-explication {
+  margin: 2px 0 4px;
+  padding: 12px 14px;
+  font-size: 0.87rem;
+  line-height: 1.6;
+  color: var(--t-muted);
+  background: var(--surface-2);
+  border-left: 3px solid var(--t-accent);
+  border-radius: var(--r-md);
+}
+
 /* ── Onglet 1 · Profils ───────────────────────────────────────── */
 
 .v2 .prof-grille {

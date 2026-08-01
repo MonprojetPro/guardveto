@@ -137,7 +137,7 @@ export default async function ReglesStructurePage({
       .select('id, brique_id, params_json, force, actif, periode_id')
       .order('brique_id')
       .order('id'),
-    supabase.from('veterinaires').select('id, prenom, nom, couleur, tags').order('nom'),
+    supabase.from('veterinaires').select('id, prenom, nom, couleur, tags, actif').order('nom'),
     // R11b : rôle à avantage financier (RLS cabinets = lecture de SON cabinet).
     supabase.from('cabinets').select('role_avantage_financier').maybeSingle(),
     chargerProfilsStructure(supabase),

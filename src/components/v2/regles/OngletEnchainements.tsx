@@ -58,6 +58,7 @@ import {
 } from '@/app/(protected)/admin/structure/actions'
 import { AideFilou } from './AideFilou'
 import type { GenreRelationUI, NiveauLiaisonUI, ProfilUI, RelationUI } from './types'
+import { useErreurBloquante } from './ErreurBloquante'
 
 interface Props {
   /** Faux pour un vétérinaire : aucune commande d'écriture n'est rendue. */
@@ -191,6 +192,9 @@ export function OngletEnchainements({ estAdmin, profil, niveaux, focus }: Props)
   const genreCible = focus ? FOCUS_VERS_GENRE[focus] : undefined
   const blocs = useRef<Partial<Record<GenreRelationUI, HTMLDivElement | null>>>({})
 
+  // Les refus s'affichent en modale (cf. `ErreurBloquante`).
+  const { ouvrirErreur, dialogueErreur } = useErreurBloquante()
+
   useEffect(() => {
     if (!genreCible) return
     const el = blocs.current[genreCible]
@@ -215,7 +219,7 @@ export function OngletEnchainements({ estAdmin, profil, niveaux, focus }: Props)
       const err = messageErreur(res)
       if (err) {
         setNiveauxLocaux((n) => ({ ...n, [g]: avant }))
-        toast.error(err)
+        ouvrirErreur(err)
         return
       }
       toast.success(
@@ -248,7 +252,7 @@ export function OngletEnchainements({ estAdmin, profil, niveaux, focus }: Props)
       })
       const err = messageErreur(res)
       if (err) {
-        toast.error(err)
+        ouvrirErreur(err)
         return
       }
       toast.success('Enchaînement créé — il s’applique dès la prochaine génération.')
@@ -264,7 +268,7 @@ export function OngletEnchainements({ estAdmin, profil, niveaux, focus }: Props)
       const res = await setRelationActive(r.id, !r.actif)
       const err = messageErreur(res)
       if (err) {
-        toast.error(err)
+        ouvrirErreur(err)
         return
       }
       toast.success(
@@ -283,7 +287,7 @@ export function OngletEnchainements({ estAdmin, profil, niveaux, focus }: Props)
       const res = await supprimerRelation(cible.id)
       const err = messageErreur(res)
       if (err) {
-        toast.error(err)
+        ouvrirErreur(err)
         return
       }
       toast.success('Enchaînement supprimé.')
@@ -664,6 +668,8 @@ export function OngletEnchainements({ estAdmin, profil, niveaux, focus }: Props)
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {dialogueErreur}
     </>
   )
 }

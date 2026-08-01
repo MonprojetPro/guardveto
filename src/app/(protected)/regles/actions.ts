@@ -448,6 +448,88 @@ export async function setStructureRegle(briqueId: string, actif: boolean, force:
 const MODES_COMPOSITION = new Set(['au_moins_un', 'pas_seuls'])
 const TAG_MAX_LONGUEUR = 30
 
+/**
+ * Pose une étiquette sur les fiches de plusieurs vétérinaires, en une fois.
+ *
+ * POURQUOI CETTE ACTION EXISTE
+ *
+ * Les trois écritures « par étiquette » de cet écran (composition, rôle
+ * interdit, cohorte d'équité) refusent une étiquette que PERSONNE ne porte —
+ * à raison : la règle serait soit impossible à tenir, soit inerte. Mais l'écran
+ * proposait quand même « + Une nouvelle étiquette… », sans aucun moyen de la
+ * poser sur une fiche depuis là : une porte qui ne pouvait mener qu'au refus.
+ * MiKL, en recette : « on peut rajouter une nouvelle étiquette mais finalement
+ * quand on le fait le système ne veut pas, à quoi ça sert ? »
+ *
+ * Plutôt que de retirer l'option, on la rend vraie : le panneau demande QUI
+ * porte l'étiquette, cette action la pose, et la règle est créée dans la
+ * foulée. Le refus reste en place côté serveur — il garde tout son sens pour
+ * les appels qui ne passent pas par le panneau (assistant IA, appel direct).
+ *
+ * NON TRANSACTIONNEL, ET C'EST VOULU : si la règle échoue ensuite (doublon,
+ * créneau inconnu…), les étiquettes restent posées. Une étiquette est un fait
+ * d'équipe (« Victor est junior »), pas un effet de bord de la règle — la
+ * défaire serait plus surprenant que la garder.
+ */
+export async function poserEtiquetteSurVetos(tag: string, vetoIds: string[]) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  const tagNorm = (tag ?? '').trim().toLowerCase()
+  if (tagNorm === '' || tagNorm.length > TAG_MAX_LONGUEUR) {
+    return { error: `Étiquette invalide (1 à ${TAG_MAX_LONGUEUR} caractères).` }
+  }
+
+  const ids = [...new Set((vetoIds ?? []).filter((x) => typeof x === 'string' && x.trim() !== ''))]
+  if (ids.length === 0) {
+    return { error: 'Indique au moins un vétérinaire qui porte cette étiquette.' }
+  }
+
+  let cabinetId: string
+  try {
+    cabinetId = await resoudreCabinetId(supabase)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
+  }
+
+  // Le filtre cabinet_id double la RLS (défense en profondeur) ET borne le
+  // `actif` : une étiquette posée sur une fiche désactivée ne compterait pas
+  // comme un porteur — on refuserait la règle juste après, sans rien expliquer.
+  const { data: cibles, error: lectureErr } = await supabase
+    .from('veterinaires')
+    .select('id, prenom, tags')
+    .eq('cabinet_id', cabinetId)
+    .eq('actif', true)
+    .in('id', ids)
+  if (lectureErr) return { error: lectureErr.message }
+
+  const rows = (cibles ?? []) as Array<{ id: string; prenom: string; tags: string[] | null }>
+  if (rows.length === 0) {
+    return { error: 'Aucun vétérinaire actif ne correspond à cette sélection.' }
+  }
+
+  const poses: string[] = []
+  for (const v of rows) {
+    const actuels = v.tags ?? []
+    // Comparaison normalisée : « Junior » et « junior » sont la même étiquette.
+    if (actuels.some((t) => t.trim().toLowerCase() === tagNorm)) continue
+    const { error } = await supabase
+      .from('veterinaires')
+      .update({ tags: [...actuels, tagNorm] })
+      .eq('id', v.id)
+    if (error) return { error: error.message }
+    poses.push(v.prenom)
+  }
+
+  // Consumers de `veterinaires.tags` : la page Équipe (les fiches), l'écran
+  // Organisation (la liste des étiquettes des menus). Le moteur, le pré-vol et
+  // Filou relisent la base à chaque appel — rien à revalider pour eux.
+  revaliderRegles()
+  return { success: true, poses }
+}
+
 /** Payload du formulaire composition (règle GLOBALE avec params). */
 export interface CompositionReglePayload {
   id?: string // présent = édition

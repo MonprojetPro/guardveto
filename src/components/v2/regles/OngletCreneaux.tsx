@@ -98,6 +98,7 @@ import {
   supprimerCreneauSurMesure,
 } from '@/app/(protected)/admin/structure/actions'
 import type { CreneauUI, ProfilUI } from './types'
+import { useErreurBloquante } from './ErreurBloquante'
 
 // ── Référentiels d'affichage ────────────────────────────────────────────────
 
@@ -464,6 +465,9 @@ export function OngletCreneaux({ profil }: Props) {
   const [aDesactiver, setADesactiver] = useState<CreneauUI | null>(null)
   const [aSupprimer, setASupprimer] = useState<CreneauUI | null>(null)
 
+  // Les refus s'affichent en modale (cf. `ErreurBloquante`).
+  const { ouvrirErreur, dialogueErreur } = useErreurBloquante()
+
   // Le catalogue arrive trié du serveur : on l'affiche tel quel, sans état
   // local. Rien ne le réordonne côté écran.
   const liste = profil.creneaux
@@ -495,7 +499,7 @@ export function OngletCreneaux({ profil }: Props) {
         roles: f.roles.map((r) => r.trim()),
       })
       if (res && 'error' in res) {
-        toast.error(res.error)
+        ouvrirErreur(res.error)
         return
       }
       toast.success(
@@ -535,7 +539,7 @@ export function OngletCreneaux({ profil }: Props) {
         roles: f.roles.map((r) => r.trim()),
       })
       if (res && 'error' in res) {
-        toast.error(res.error)
+        ouvrirErreur(res.error)
         return
       }
       toast.success(`« ${f.nom.trim()} » enregistré — effet à la prochaine génération.`)
@@ -558,7 +562,7 @@ export function OngletCreneaux({ profil }: Props) {
     startTransition(async () => {
       const res = await setCreneauActif(c.id, true)
       if (res && 'error' in res) {
-        toast.error(res.error)
+        ouvrirErreur(res.error)
         return
       }
       toast.success(`« ${c.nom} » réactivé — il engendrera de nouveau des gardes.`)
@@ -572,7 +576,7 @@ export function OngletCreneaux({ profil }: Props) {
     startTransition(async () => {
       const res = await setCreneauActif(c.id, false)
       if (res && 'error' in res) {
-        toast.error(res.error)
+        ouvrirErreur(res.error)
         return
       }
       toast.success(`« ${c.nom} » désactivé — plus aucune garde ne sera engendrée dessus.`)
@@ -588,7 +592,7 @@ export function OngletCreneaux({ profil }: Props) {
     startTransition(async () => {
       const res = await supprimerCreneauSurMesure(c.id)
       if (res && 'error' in res) {
-        toast.error(res.error)
+        ouvrirErreur(res.error)
         return
       }
       toast.success(`« ${c.nom} » supprimé du profil ${profil.nom}.`)
@@ -919,6 +923,8 @@ export function OngletCreneaux({ profil }: Props) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {dialogueErreur}
     </>
   )
 }

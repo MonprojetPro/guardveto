@@ -1,0 +1,143 @@
+'use client'
+
+// ============================================================
+// GUARDVETO V2 — La modale des refus BLOQUANTS de l'Organisation
+// ============================================================
+// POURQUOI CE FICHIER EXISTE
+//
+// Un refus serveur arrivait ici en `toast.error` : une vignette de la taille
+// d'une carte de visite, en bas à droite, qui s'efface toute seule au bout de
+// quelques secondes. C'est le bon format pour « Réglage enregistré » — c'est le
+// pire pour « ta règle n'a pas été créée », au moment précis où l'on vient de
+// remplir un panneau entier. MiKL, en recette : « le message en pop-up
+// minuscule en bas c'est nul, mets en place de vraies pop-ups qui avertissent
+// vraiment et qui expliquent, limite y aurait un CTA pour aller au bon
+// endroit ».
+//
+// Donc : les SUCCÈS restent des toasts (les transformer en modales obligerait à
+// cliquer après chaque réglage), les REFUS deviennent une modale qui dit trois
+// choses — ce qui s'est passé, POURQUOI, et où aller pour le régler.
+//
+// CE QUI EST ICI, ET CE QUI EST AILLEURS
+//
+// Ce fichier ne fait que RENDRE la modale. La traduction d'un message serveur
+// en titre + explication + porte de sortie vit dans `lib/regles/refus.ts` :
+// c'est de la logique pure, donc testable — et le test vérifie qu'aucun message
+// de `regles/actions.ts` n'a glissé hors de ses motifs.
+//
+// Le texte serveur n'est jamais réécrit : il est repris mot pour mot en tête de
+// la modale. Le décodeur AJOUTE une explication en dessous, il ne remplace pas.
+// ============================================================
+
+import { useCallback, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { AlertTriangle } from 'lucide-react'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { decoderRefus } from '@/lib/regles/refus'
+
+/** Une porte de sortie proposée dans le pied de la modale. */
+export interface CtaErreur {
+  label: string
+  /** Navigation interne (`/equipe`…). Exclusif avec `onClick`. */
+  href?: string
+  /** Action locale (rouvrir un panneau, corriger un champ…). */
+  onClick?: () => void
+}
+
+export interface ContenuErreur {
+  /** Titre de la modale — ce qui n'a PAS eu lieu, pas « Erreur ». */
+  titre: string
+  /** Le message brut du serveur, repris tel quel. */
+  message: string
+  /** Ce que ça veut dire, en français, et ce qu'il faut faire. */
+  explication?: string
+  cta?: CtaErreur
+}
+
+/** Ce que l'appelant peut imposer par-dessus le décodeur. */
+export type OptionsErreur = Partial<Omit<ContenuErreur, 'message'>>
+
+// ── Du décodage au contenu affichable ───────────────────────
+
+/** Habille le refus décodé : le message brut en tête, l'action en bouton. */
+function contenuDepuis(
+  message: string,
+  aller: (href: string) => void,
+): ContenuErreur {
+  const { titre, explication, action } = decoderRefus(message)
+  const cta: CtaErreur | undefined =
+    action?.genre === 'aller'
+      ? { label: action.label, onClick: () => aller(action.href) }
+      : action?.genre === 'recharger'
+        ? { label: action.label, onClick: () => window.location.reload() }
+        : undefined
+  return { titre, message, explication, cta }
+}
+
+// ── Le hook ─────────────────────────────────────────────────
+
+/**
+ * Rend une modale d'erreur et son ouvreur.
+ *
+ *   const { ouvrirErreur, dialogueErreur } = useErreurBloquante()
+ *   if (res?.error) { ouvrirErreur(res.error); return }
+ *   …
+ *   return (<>{…}{dialogueErreur}</>)
+ *
+ * `ouvrirErreur` est stable (useCallback sans dépendance d'état) : on peut donc
+ * l'employer dans un `useEffect` sans relancer l'effet à chaque rendu.
+ */
+export function useErreurBloquante() {
+  const router = useRouter()
+  const [contenu, setContenu] = useState<ContenuErreur | null>(null)
+
+  const aller = useCallback((href: string) => router.push(href), [router])
+
+  const ouvrirErreur = useCallback(
+    (message: string, options?: OptionsErreur) => {
+      setContenu({ ...contenuDepuis(message, aller), ...options })
+    },
+    [aller],
+  )
+
+  const fermer = () => setContenu(null)
+
+  const dialogueErreur = (
+    <Dialog open={Boolean(contenu)} onOpenChange={(o) => { if (!o) fermer() }}>
+      <DialogContent className="gv-modale gv-modale-erreur">
+        <DialogHeader>
+          <DialogTitle>
+            <AlertTriangle size={18} aria-hidden="true" />
+            {contenu?.titre}
+          </DialogTitle>
+          <DialogDescription>{contenu?.message}</DialogDescription>
+        </DialogHeader>
+
+        {contenu?.explication && <p className="gv-explication">{contenu.explication}</p>}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={fermer}>
+            {contenu?.cta ? 'Rester ici' : 'J’ai compris'}
+          </Button>
+          {contenu?.cta && (
+            <Button
+              onClick={() => {
+                const { cta } = contenu
+                fermer()
+                if (cta?.onClick) cta.onClick()
+                else if (cta?.href) aller(cta.href)
+              }}
+            >
+              {contenu.cta.label}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+
+  return { ouvrirErreur, dialogueErreur }
+}
