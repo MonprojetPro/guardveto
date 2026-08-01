@@ -604,7 +604,7 @@ export function OngletCreneaux({ profil }: Props) {
     <>
       <section className="card">
         <div className="card-head">
-          <h2>Types de garde</h2>
+          <h2>Structure des gardes</h2>
           <span className={`section-count${total === 0 ? ' zero' : ''}`}>
             {actifs} actif{actifs > 1 ? 's' : ''}
             {total !== actifs ? ` / ${total}` : ''}
@@ -618,19 +618,19 @@ export function OngletCreneaux({ profil }: Props) {
             disabled={enCours}
           >
             <Plus size={16} aria-hidden="true" />
-            Créer un type sur-mesure
+            Ajouter une garde
           </button>
           <p className="sub">
-            Le catalogue du profil « {profil.nom} » : ce que le moteur a le droit de planifier,
-            avec ses jours, ses places et ses horaires. Tout ce qui change ici s&apos;applique à
-            la prochaine génération — les plannings déjà publiés ne bougent pas.
+            Les gardes de la période type « {profil.nom} » : ce que le moteur a le droit de
+            planifier, avec leurs jours, leurs places et leurs horaires. Tout ce qui change ici
+            s&apos;applique au prochain planning généré — ceux déjà publiés ne bougent pas.
           </p>
         </div>
 
-        {/* ── Création d'un type sur-mesure ────────────────────────────── */}
+        {/* ── Ajouter une garde à la structure ─────────────────────────── */}
         {creation && (
           <div className="panneau">
-            <p className="panneau-titre">Nouveau type de garde dans « {profil.nom} »</p>
+            <p className="panneau-titre">Nouvelle garde dans « {profil.nom} »</p>
 
             <ChampsCreneau
               cle="cre-nouveau"
@@ -661,7 +661,7 @@ export function OngletCreneaux({ profil }: Props) {
                 onClick={creer}
                 disabled={enCours || formIncomplet(formNouveau, false)}
               >
-                {enCours ? 'Un instant…' : 'Créer le type de garde'}
+                {enCours ? 'Un instant…' : 'Ajouter la garde'}
               </button>
             </div>
           </div>

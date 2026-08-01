@@ -155,9 +155,9 @@ export function ReglesStructureV2({
           <p className="page-kicker">Organisation</p>
           <h1>Comment votre cabinet organise ses gardes.</h1>
           <p className="lede">
-            Vos périodes types — l&apos;hiver, l&apos;été — avec leurs types de garde, leurs
-            horaires, leurs enchaînements et leurs règles. Tout ce qui est réglé ici s&apos;applique
-            au prochain planning que vous générerez.
+            Vos périodes types — l&apos;hiver, l&apos;été — avec la structure de leurs gardes,
+            leurs horaires, leurs enchaînements et leurs règles. Tout ce qui est réglé ici
+            s&apos;applique au prochain planning que vous générerez.
           </p>
         </div>
 
@@ -195,7 +195,7 @@ export function ReglesStructureV2({
           Périodes types {profils.length > 0 && <span className="count">{profils.length}</span>}
         </button>
         <button {...tab('creneaux')}>
-          Types de garde{' '}
+          Structure des gardes{' '}
           {nbCreneauxActifs > 0 && <span className="count">{nbCreneauxActifs}</span>}
         </button>
         <button {...tab('enchainements')}>
@@ -226,7 +226,7 @@ export function ReglesStructureV2({
             Sans remontage, un formulaire à demi rempli garderait des types de
             garde qui n'existent pas dans celle qu'on vient d'ouvrir. */}
         {onglet === 'creneaux' && profil && (
-          <section className="tab-panel" role="tabpanel" aria-label="Types de garde">
+          <section className="tab-panel" role="tabpanel" aria-label="Structure des gardes">
             <OngletCreneaux key={profil.id} profil={profil} />
           </section>
         )}
@@ -264,8 +264,8 @@ export function ReglesStructureV2({
         {profils.length === 0 && onglet !== 'moteur' && (
           <section className="card">
             <p className="empty-row">
-              Aucune période type n&apos;est configurée pour ce cabinet. Les types de garde et leurs
-              enchaînements se règlent par période type — commence par en créer une.
+              Aucune période type n&apos;est configurée pour ce cabinet. La structure des gardes
+              et leurs enchaînements se règlent par période type — commence par en créer une.
             </p>
           </section>
         )}

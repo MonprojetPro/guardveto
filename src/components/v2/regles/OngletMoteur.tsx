@@ -80,7 +80,7 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
-  CalendarClock, Info, MessageCircle, Pencil, Plus, Power, Trash2,
+  CalendarClock, Info, Pencil, Plus, Power, Trash2,
 } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -106,6 +106,7 @@ import {
   type RoleInterditReglePayload, type ForceFormulaire,
 } from '@/app/(protected)/regles/actions'
 import { RegleFormDialog } from '@/components/regles/RegleFormDialog'
+import { AideFilou } from './AideFilou'
 import {
   BRIQUES_EDITABLES,
   type RegleRow, type PeriodeOption, type TypeCreneauOption,
@@ -1106,6 +1107,8 @@ export function OngletMoteur({
         <div className="card-head">
           <h2>Équilibrage des charges</h2>
           <span className="section-count">{EQUITY_DIMENSIONS.length}</span>
+          <span className="spacer" />
+          <AideFilou sujet="ajuster l’équilibrage, ou comprendre pourquoi une charge penche" />
           <p className="sub">
             Ce que le moteur cherche à répartir également entre tout le monde. Chaque ligne a son
             propre poids : « Ignorée » revient à ne pas équilibrer cette charge du tout, «
@@ -1334,6 +1337,8 @@ export function OngletMoteur({
       <section className="card">
         <div className="card-head">
           <h2>Préférences du planning</h2>
+          <span className="spacer" />
+          <AideFilou sujet="demander un égard que le moteur ne sait pas encore tenir" />
           <p className="sub">
             Des égards que le moteur essaie d&apos;avoir, jamais des interdictions : ils ne
             bloquent pas la génération. C&apos;est pourquoi le choix « Jamais » n&apos;est pas
@@ -1403,30 +1408,17 @@ export function OngletMoteur({
 
         {/* Il n'y a pas de bouton « nouvelle préférence », et ce n'est pas un
             oubli : ces quatre égards-là sont câblés dans le moteur, on n'en
-            écrit pas un cinquième depuis un écran. Plutôt que de laisser le mur
-            sans l'expliquer, on ouvre la seule porte qui existe — la
-            conversation avec Filou, qui connaît les règles posées et sait dire
-            si une demande tient debout. Le bouton NAVIGUE, rien de plus : c'est
-            le trajet de Filou au rebord (`#filou=regles`), et l'accueil accroche
-            la conversation sur le bon sujet. */}
-        <div className="invite">
-          <div>
-            <p className="invite-titre">Il vous faudrait un autre égard ?</p>
-            <p className="note">
-              Ces quatre-là sont ceux que le moteur sait tenir aujourd&apos;hui. Si un vétérinaire
-              demande autre chose, dites-le à Filou : il connaît les règles déjà posées et vous
-              dira si c&apos;est réalisable avec ce qui existe. Sinon, il fait remonter la demande
-              — il ne décide rien à votre place.
-            </p>
-          </div>
-          <button
-            type="button"
-            className="btn btn-outline btn-sm"
-            onClick={() => router.push('/accueil#filou=regles')}
-          >
-            <MessageCircle size={15} aria-hidden="true" /> Demander à Filou
-          </button>
-        </div>
+            écrit pas un cinquième depuis un écran. La porte de sortie est le
+            bouton « Demander à Filou » posé EN HAUT de cette carte, là où les
+            autres sections ont leur « + Ajouter ». Elle vivait auparavant dans
+            un encart en pied de carte : un pavé gris qu'on ne lisait qu'après
+            avoir renoncé à trouver le bouton. Ne reste ici que la phrase qui
+            explique le mur — pas une seconde fois le même bouton. */}
+        <p className="note pied-carte">
+          Ces quatre égards sont ceux que le moteur sait tenir aujourd&apos;hui. Si un
+          vétérinaire en demande un autre, Filou vous dira si c&apos;est réalisable avec ce qui
+          existe — et sinon, il fait remonter la demande sans rien décider à votre place.
+        </p>
       </section>
 
       {/* Confirmation de suppression. Elle RAPPELLE la règle concernée : on

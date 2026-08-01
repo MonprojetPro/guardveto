@@ -56,6 +56,7 @@ import {
   setRelationActive,
   supprimerRelation,
 } from '@/app/(protected)/admin/structure/actions'
+import { AideFilou } from './AideFilou'
 import type { GenreRelationUI, NiveauLiaisonUI, ProfilUI, RelationUI } from './types'
 
 interface Props {
@@ -332,6 +333,8 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
       <section className="card" aria-label="Ce que les enchaînements imposent">
         <div className="card-head">
           <h2>Ce que les enchaînements imposent</h2>
+          <span className="spacer" />
+          <AideFilou sujet="comprendre ce qu’un niveau change, ou décrire l’enchaînement voulu" />
           <p className="sub">
             Deux réglages pour tout le cabinet : à quel point le moteur doit tenir les
             enchaînements que vous avez déclarés plus bas. Ils valent pour tous les enchaînements

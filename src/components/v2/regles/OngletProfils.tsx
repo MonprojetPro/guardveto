@@ -277,7 +277,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
             <CopyPlus size={15} aria-hidden="true" /> Nouvelle période type
           </button>
           <p className="sub">
-            Une période type, c&apos;est une façon d&apos;organiser les gardes : ses types de garde, leurs
+            Une période type, c&apos;est une façon d&apos;organiser les gardes : sa structure de gardes, leurs
             horaires et leurs enchaînements. On en applique un à chaque période — « Hiver » quand
             les nuits sont longues, « Été » quand l&apos;équipe est réduite. Choisis une carte pour
             que les trois onglets suivants décrivent cette période type-là.
@@ -303,7 +303,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
               </div>
 
               <div className="large">
-                <label id="lbl-source">Copier les types de garde de</label>
+                <label id="lbl-source">Copier la structure des gardes de</label>
                 <Select value={sourceId} onValueChange={(v) => v && setSourceId(String(v))}>
                   <SelectTrigger aria-labelledby="lbl-source" className="w-full">
                     {profils.find((p) => p.id === sourceId)?.nom ?? 'Choisir…'}
@@ -360,7 +360,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
             <p className="note">
               La nouvelle période type part avec les types de garde de celle qu&apos;on copie :
               elle est générable immédiatement. On ajuste ensuite ses horaires dans l&apos;onglet
-              « Types de garde ». La saison suggérée sert juste à la proposer d&apos;office quand
+              « Structure des gardes ». La saison suggérée sert juste à la proposer d&apos;office quand
               on crée un planning de cette saison-là.
             </p>
 

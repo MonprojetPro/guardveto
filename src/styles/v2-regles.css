@@ -343,6 +343,37 @@
   max-width: 62ch;
 }
 
+/* Une phrase de fin de carte : elle explique une limite (« le moteur ne sait
+   tenir que ces quatre égards ») sans porter d'action. L'action, elle, est
+   remontée en tête de carte — cf. `.btn-filou` juste en dessous. */
+.v2 .note.pied-carte {
+  margin: 2px 22px 20px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--t-border);
+  max-width: 78ch;
+}
+
+/* ── Le bouton « Demander à Filou » d'une carte sans bouton d'ajout ──
+   Il occupe, en haut à droite de la carte, la place exacte du « + Ajouter »
+   des autres sections — c'est là que l'œil cherche quoi faire. Il doit donc
+   peser autant qu'un bouton d'action, sans se faire passer pour l'action
+   principale de la page : d'où le fond d'accent estompé plutôt que plein.
+
+   Il porte la couleur de Filou et non celle des autres boutons du terrier :
+   sur une carte qui n'offre rien d'autre, c'est la seule porte — elle doit se
+   reconnaître au premier coup d'œil, et se relier à l'assistant qu'on
+   retrouve au rebord et sur l'accueil. */
+.v2 .btn.btn-filou {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent-ink) 22%, transparent);
+}
+
+.v2 .btn.btn-filou:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent-ink) 14%, var(--accent-soft));
+  border-color: color-mix(in srgb, var(--accent-ink) 38%, transparent);
+}
+
 /* Sélecteur de jours : sept pastilles, l'ordre humain (lundi d'abord). */
 .v2 .jours-pick {
   display: flex;
@@ -818,15 +849,47 @@
 
 /* Les trois faits d'un créneau : jours, places, horaires. Toujours dans cet
    ordre, toujours au même endroit — on les compare d'une carte à l'autre. */
+/* ── Les trois faits d'un type de garde ───────────────────────
+   GRILLE À COLONNES FIXES, pas un `flex-wrap`. En flex, chaque carte
+   dimensionnait ses colonnes sur SON contenu : « Ven » poussait « PLACES »
+   sous le J de « JOURS » de la carte du dessus, et les trois en-têtes
+   dansaient d'une carte à l'autre. On compare ces faits verticalement — ils
+   doivent donc s'aligner verticalement.
+
+   La première colonne est plus large : elle porte les jours en toutes lettres
+   (« Lundi, mardi, mercredi et jeudi »), la plus longue des trois valeurs. */
 .v2 .cre-faits {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 26px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 10px;
   padding: 0 16px 16px 66px;
 }
 
+/* Chaque fait dans son encart : un léger fond, une bordure douce, et la valeur
+   qui respire. Trois colonnes de texte nu se lisaient comme un seul bloc gris ;
+   l'encart dit où commence et où finit chaque information. */
 .v2 .cre-faits .fait {
   min-width: 0;
+  gap: 4px;
+  padding: 10px 14px;
+  border: 1px solid var(--t-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--t-muted) 55%, transparent);
+}
+
+/* Une carte éteinte garde ses encarts, mais en retrait : l'information reste
+   lisible sans réclamer l'attention d'une ligne active. */
+.v2 .cre-carte.eteint .cre-faits .fait {
+  background: transparent;
+  border-style: dashed;
+}
+
+/* Sous 900 px, trois colonnes deviennent trois colonnes étranglées : on
+   empile. Les cartes restent alignées entre elles, ligne à ligne. */
+@media (max-width: 900px) {
+  .v2 .cre-faits {
+    grid-template-columns: 1fr;
+  }
 }
 
 .v2 .cre-form {

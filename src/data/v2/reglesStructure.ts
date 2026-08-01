@@ -26,8 +26,14 @@ type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 /** Les 4 codes du seed : insupprimables, et jours figés. */
 const CODES_SEED = new Set(['semaine_soir', 'vendredi_soir', 'weekend', 'ferie'])
 
-/** Jours en clair (0 = dimanche … 6 = samedi). */
-const JOURS_COURTS = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
+/**
+ * Jours en clair (0 = dimanche … 6 = samedi).
+ *
+ * EN TOUTES LETTRES, pas en abrégé. « Lun, Mar, Mer, Jeu » économisait des
+ * caractères dans une carte qui en a des centaines à perdre : on abrège quand
+ * la place manque, et elle ne manque pas ici.
+ */
+const JOURS_LONGS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi']
 
 /** Jour de fin en clair — miroir des libellés figés du reste du produit. */
 const OFFSET_CLAIR: Record<number, string> = {
@@ -49,13 +55,25 @@ export function roleClair(role: string): string {
   return map[role] ?? role
 }
 
-/** « Lun, Mar, Mer + jours fériés ». */
+/**
+ * Une énumération française : « lundi, mardi et jeudi ». Le « et » avant le
+ * dernier terme, pas une virgule — c'est ce qui distingue une phrase d'une
+ * liste de codes.
+ */
+function enumerer(termes: string[]): string {
+  if (termes.length <= 1) return termes[0] ?? ''
+  return `${termes.slice(0, -1).join(', ')} et ${termes[termes.length - 1]}`
+}
+
+/** « Lundi, mardi, mercredi et jeudi » · « Les jours fériés ». */
 function joursClair(jours: number[], surFeries: boolean): string {
-  const noms = [...jours].sort((a, b) => a - b).map((j) => JOURS_COURTS[j])
+  const noms = [...jours].sort((a, b) => a - b).map((j) => JOURS_LONGS[j])
   const parts: string[] = []
-  if (noms.length > 0) parts.push(noms.join(', '))
-  if (surFeries) parts.push('jours fériés')
-  return parts.length > 0 ? parts.join(' + ') : '—'
+  if (noms.length > 0) parts.push(enumerer(noms))
+  if (surFeries) parts.push('les jours fériés')
+  if (parts.length === 0) return '—'
+  const phrase = enumerer(parts)
+  return phrase.charAt(0).toUpperCase() + phrase.slice(1)
 }
 
 /** « 2 places : 1er, 2nd ». */
