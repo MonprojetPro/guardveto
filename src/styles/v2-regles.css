@@ -944,6 +944,26 @@
   border-style: dashed;
 }
 
+/* ════════════════════════════════════════════════════════════
+   Sous-section d'une carte (étape 3 : 5 cartes → 3)
+   ════════════════════════════════════════════════════════════
+   Quand une carte absorbe un réglage avancé — « Équilibrer entre certains
+   seulement » sous l'équilibrage général — sa tête de section réutilise
+   `.card-head`, mais elle ne doit PAS se lire comme une carte de plus : elle
+   dépend de ce qui la précède. D'où le trait EN HAUT (elle ferme le bloc du
+   dessus) là où `.card-head` en porte un en bas, un titre plus petit, et un
+   léger renfoncement du fond qui dit « ceci est un cran plus bas ». */
+.v2 .card-head.sous-section {
+  margin-top: 6px;
+  border-top: 1px solid var(--t-border);
+  border-bottom: 1px solid var(--t-border);
+  background: color-mix(in srgb, var(--t-border) 22%, transparent);
+}
+
+.v2 .card-head.sous-section h3 {
+  font-size: 0.94rem;
+}
+
 /* Sous 900 px, trois colonnes deviennent trois colonnes étranglées : on
    empile. Les cartes restent alignées entre elles, ligne à ligne. */
 @media (max-width: 900px) {

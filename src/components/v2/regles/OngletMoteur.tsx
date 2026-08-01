@@ -7,9 +7,34 @@
 // plus gros des quatre onglets : il reprend l'INTÉGRALITÉ de l'ancienne page
 // `/regles` V1, qui était éclatée en trois composants sans lien visuel entre
 // eux (`ReglesClient`, `CompositionEquipeClient`, `ReglagesPlanningClient`).
-// Cinq cartes ici, de la plus concrète à la plus abstraite : les règles qui
-// nomment quelqu'un, celles qui parlent d'étiquettes, l'équilibrage, ses
-// équilibrages par étiquette, puis les préférences de confort.
+//
+// TROIS CARTES — ET POURQUOI PAS CINQ (étape 3 de la refonte Organisation)
+//
+// L'écran en portait cinq. Deux d'entre elles répondaient à une question déjà
+// posée par une autre, et cette redite était le vrai coût : à cinq entrées,
+// l'admin ne cherche plus un réglage, il cherche d'abord DANS QUELLE CARTE il
+// vit.
+//
+//  1. RÈGLES DU CABINET ← a absorbé « Composition d'équipe ». C'est la même
+//     question — *qui peut faire quoi ?* — posée deux fois : une fois en
+//     nommant quelqu'un (« Fanny ne prend jamais le mardi »), une fois en
+//     nommant une étiquette (« un junior n'est jamais seul »). Les deux
+//     produisent une règle, avec la même échelle de fermeté, lue par le même
+//     moteur. Elles sont donc rangées ENSEMBLE, dans les mêmes groupes de
+//     fermeté : ce qui compte pour relire un cabinet, c'est ce que le moteur
+//     s'interdit, pas la façon dont la personne a été désignée.
+//     Deux boutons subsistent en tête, parce que ce sont deux gestes de
+//     saisie différents (un formulaire nominatif riche · un petit panneau).
+//
+//  2. ÉQUILIBRAGE DES CHARGES ← a absorbé « Équilibrer entre certains
+//     seulement ». Un équilibrage par étiquette n'est pas un autre sujet :
+//     c'est un RÉGLAGE AVANCÉ du même équilibrage, qui s'ajoute à la ligne
+//     générale (et qui ne se comprend qu'en la voyant). Séparées, les deux
+//     cartes se contredisaient à distance — on mettait « Week-ends » sur
+//     Essentielle en haut sans voir la cohorte qui la rejouait plus bas.
+//
+//  3. PRÉFÉRENCES DU PLANNING — inchangée : ni des interdictions, ni de
+//     l'équilibrage. Des égards. Elle reste seule parce qu'elle est seule.
 //
 // CE QUI EST REPRIS TEL QUEL, ET POURQUOI
 //
@@ -351,12 +376,12 @@ export function OngletMoteur({
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
-  // ── Carte 1 : règles du cabinet ──
+  // ── Carte 1 : règles nominatives ──
   const [aSupprimer, setASupprimer] = useState<RegleRow | null>(null)
   const [formOuvert, setFormOuvert] = useState(false)
   const [aEditer, setAEditer] = useState<RegleRow | null>(null)
 
-  // ── Carte 2 : composition d'équipe ──
+  // ── Carte 1 (suite) : règles par étiquette (ex-carte « Composition ») ──
   const [compoOuvert, setCompoOuvert] = useState(false)
   const [compoType, setCompoType] = useState<TypeRegleEquipe>('au_moins_un')
   // L'étiquette se choisit dans la liste de ce que l'équipe porte ; la
@@ -370,14 +395,14 @@ export function OngletMoteur({
   const [compoCreneaux, setCompoCreneaux] = useState<string[]>([])
   const [compoForce, setCompoForce] = useState<string>('jamais')
 
-  // ── Cartes 3 et 5 : réglages optimistes (affichés avant la réponse serveur,
+  // ── Cartes 2 et 3 : réglages optimistes (affichés avant la réponse serveur,
   //    repris en arrière si elle refuse — sinon le menu montrerait une valeur
   //    que la base n'a pas). ──
   const [eq, setEq] = useState(equite)
   const [ps, setPs] = useState(penalitesSouples)
   const [roleAv, setRoleAv] = useState(roleAvantage)
 
-  // ── Carte 4 : cohortes d'équité ──
+  // ── Carte 2 (suite) : équilibrages par étiquette (« cohortes » en base) ──
   const [cohorteOuverte, setCohorteOuverte] = useState(false)
   const [coDim, setCoDim] = useState<EquityDimension>('weekend')
   const [coTag, setCoTag] = useState(tagsEquipe[0] ?? '')
@@ -417,6 +442,44 @@ export function OngletMoteur({
   // moteur a besoin des deux, l'écran n'en montre qu'un.
   const actives = useMemo(() => fusionnerDuos(regles.filter((r) => r.actif)), [regles])
   const inactives = useMemo(() => fusionnerDuos(regles.filter((r) => !r.actif)), [regles])
+
+  /**
+   * Les deux familles de règles réunies en UNE liste (étape 3). Le `kind` ne
+   * sert qu'au rendu : une règle nominative s'édite dans le gros formulaire et
+   * se met en pause au bouton, une règle par étiquette se règle au menu de
+   * fermeté. Mais elles se RANGENT ensemble, par ce que le moteur en fait.
+   */
+  type LigneUnifiee =
+    | { kind: 'nom'; id: string; force: string; tri: string; regle: RegleRow }
+    | { kind: 'tag'; id: string; force: string; tri: string; regle: RegleEquipeUI }
+
+  const toutesActives: LigneUnifiee[] = useMemo(
+    () => [
+      ...actives.map((r): LigneUnifiee => ({
+        kind: 'nom', id: r.id, force: r.force, tri: r.brique_id, regle: r,
+      })),
+      ...reglesEquipe
+        .filter((r) => r.actif)
+        .map((r): LigneUnifiee => ({
+          kind: 'tag', id: r.id, force: r.force, tri: r.brique, regle: r,
+        })),
+    ],
+    [actives, reglesEquipe],
+  )
+
+  const toutesInactives: LigneUnifiee[] = useMemo(
+    () => [
+      ...inactives.map((r): LigneUnifiee => ({
+        kind: 'nom', id: r.id, force: r.force, tri: r.brique_id, regle: r,
+      })),
+      ...reglesEquipe
+        .filter((r) => !r.actif)
+        .map((r): LigneUnifiee => ({
+          kind: 'tag', id: r.id, force: r.force, tri: r.brique, regle: r,
+        })),
+    ],
+    [inactives, reglesEquipe],
+  )
 
   /** L'étiquette réellement retenue par le panneau d'ajout de règle d'équipe. */
   const compoTag = compoTagChoix === NOUVELLE_ETIQUETTE ? compoTagLibre : compoTagChoix
@@ -753,13 +816,254 @@ export function OngletMoteur({
     </div>
   )
 
+  // ── Rendu d'une règle par étiquette ────────────────────────
+
+  // Des FONCTIONS de rendu, pas des composants : un composant défini dans le
+  // corps est un type neuf à chaque rendu, donc React démonte et remonte son
+  // sous-arbre — un menu ouvert se refermerait, un champ perdrait le focus.
+  const ligneEquipe = (r: RegleEquipeUI) => {
+    const courant = r.actif ? r.force : DESACTIVEE
+    return (
+      <div
+        key={r.id}
+        className={`reg-ligne${r.actif ? '' : ' eteinte'}`}
+        data-regle-cible={r.id}
+      >
+        <span className="reg-symbole" aria-hidden="true">
+          {r.actif ? symboleDe(r.force) : '⚪'}
+        </span>
+
+        <div className="reg-corps">
+          <p className="reg-phrase">{phraseEquipe(r)}</p>
+          <p className="reg-portee">
+            <span className="etiq neutre">{r.tag}</span>
+            {r.role && <span>Rôle : {roleLisible(r.role)}</span>}
+            <span>
+              {r.creneaux.length > 0
+                ? r.creneaux.map(nomCreneau).join(', ')
+                : 'Tous les types de garde'}
+            </span>
+          </p>
+          <Consequence texte={r.actif ? aideForce(r.force) : EFFET_ETEINTE} />
+        </div>
+
+        <div className="reg-actions">
+          <Select
+            value={courant}
+            onValueChange={(v) => changerForceEquipe(r, String(v))}
+            disabled={isPending}
+          >
+            <SelectTrigger
+              className="w-44"
+              aria-label={`Ce que le moteur fait de la règle : ${phraseEquipe(r)}`}
+            >
+              <EtiquetteForce force={courant} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={DESACTIVEE}>
+                <span aria-hidden="true">⚪</span> Désactivée
+              </SelectItem>
+              {FORCES_CHOISISSABLES.map((f) => (
+                <SelectItem key={f} value={f}>
+                  <span aria-hidden="true">{symboleDe(f)}</span> {choixForce(f)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={() => supprimerEquipe(r)}
+            disabled={isPending}
+            aria-label="Supprimer cette règle d’équipe"
+            title="Supprimer"
+          >
+            <Trash2 size={15} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  /** Une ligne, quelle que soit sa famille. */
+  const ligne = (l: LigneUnifiee) =>
+    l.kind === 'nom' ? <LigneRegle key={l.id} regle={l.regle} /> : ligneEquipe(l.regle)
+
   const lignesDuGroupe = (key: GroupeKey) =>
-    actives
-      .filter((r) => groupeDe(r.force) === key)
-      .sort(
-        (a, b) =>
-          etageDe(a.force) - etageDe(b.force) || a.brique_id.localeCompare(b.brique_id),
-      )
+    toutesActives
+      .filter((l) => groupeDe(l.force) === key)
+      .sort((a, b) => etageDe(a.force) - etageDe(b.force) || a.tri.localeCompare(b.tri))
+
+  /** Le panneau de saisie d'une règle par étiquette (bouton « + Par étiquette »). */
+  const panneauEquipe = () => (
+    <div className="panneau">
+      <p className="panneau-titre">Nouvelle règle par étiquette</p>
+
+      <div className="grille">
+        <div className="large">
+          <label id="compo-type-lbl">Type de règle</label>
+          <Select
+            value={compoType}
+            onValueChange={(v) => setCompoType(String(v) as TypeRegleEquipe)}
+            disabled={isPending}
+          >
+            <SelectTrigger className="w-full" aria-labelledby="compo-type-lbl">
+              {TYPE_REGLE_EQUIPE_LABELS[compoType]}
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(TYPE_REGLE_EQUIPE_LABELS) as TypeRegleEquipe[]).map((t) => (
+                <SelectItem key={t} value={t}>
+                  {TYPE_REGLE_EQUIPE_LABELS[t]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* L'étiquette : une liste de ce que l'équipe porte réellement. Le
+            champ libre n'apparaît que si on demande une étiquette inédite —
+            et il est seul quand l'équipe n'en porte aucune. */}
+        {tagsEquipe.length > 0 ? (
+          <div>
+            <label id="compo-tag-lbl">Étiquette</label>
+            <Select
+              value={compoTagChoix}
+              onValueChange={(v) => setCompoTagChoix(String(v))}
+              disabled={isPending}
+            >
+              <SelectTrigger className="w-full" aria-labelledby="compo-tag-lbl">
+                {compoTagChoix === NOUVELLE_ETIQUETTE ? 'Une nouvelle étiquette…' : compoTagChoix}
+              </SelectTrigger>
+              <SelectContent>
+                {tagsEquipe.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
+                <SelectItem value={NOUVELLE_ETIQUETTE}>+ Une nouvelle étiquette…</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        ) : (
+          <div className="large">
+            <label htmlFor="compo-tag-libre">Étiquette</label>
+            <input
+              id="compo-tag-libre"
+              type="text"
+              maxLength={30}
+              value={compoTagLibre}
+              onChange={(e) => setCompoTagLibre(e.target.value)}
+              placeholder={compoType === 'au_moins_un' ? 'senior' : 'junior'}
+            />
+            <p className="note">
+              Aucune étiquette n&apos;est encore posée sur l&apos;équipe. Écris-la ici, puis va la
+              poser sur les fiches concernées, page Équipe : sans porteur, le serveur refusera la
+              règle.
+            </p>
+          </div>
+        )}
+
+        {tagsEquipe.length > 0 && compoTagChoix === NOUVELLE_ETIQUETTE && (
+          <div>
+            <label htmlFor="compo-tag-libre">Laquelle ?</label>
+            <input
+              id="compo-tag-libre"
+              type="text"
+              autoFocus
+              maxLength={30}
+              value={compoTagLibre}
+              onChange={(e) => setCompoTagLibre(e.target.value)}
+              placeholder={compoType === 'au_moins_un' ? 'senior' : 'junior'}
+            />
+          </div>
+        )}
+
+        {compoType === 'role_interdit' && (
+          <div>
+            <label id="compo-role-lbl">Rôle interdit</label>
+            <Select
+              value={compoRole}
+              onValueChange={(v) => setCompoRole(String(v))}
+              disabled={isPending}
+            >
+              <SelectTrigger className="w-full" aria-labelledby="compo-role-lbl">
+                {roleLisible(compoRole)}
+              </SelectTrigger>
+              <SelectContent>
+                {rolesCabinet.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {roleLisible(r)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        <div className="large">
+          <label id="compo-creneaux-lbl">Types de garde concernés</label>
+          <div className="chips" role="group" aria-labelledby="compo-creneaux-lbl">
+            {typesCreneaux.map((t) => (
+              <button
+                key={t.code}
+                type="button"
+                aria-pressed={compoCreneaux.includes(t.code)}
+                onClick={() => basculerCreneauCompo(t.code)}
+              >
+                {t.nom}
+              </button>
+            ))}
+          </div>
+          <p className="note">Aucun coché = la règle s&apos;applique à tous les types de garde.</p>
+        </div>
+
+        <div className="large">
+          <label id="compo-force-lbl">Ce que le moteur en fait</label>
+          <Select
+            value={compoForce}
+            onValueChange={(v) => setCompoForce(String(v))}
+            disabled={isPending}
+          >
+            <SelectTrigger className="w-full" aria-labelledby="compo-force-lbl">
+              <EtiquetteForce force={compoForce} />
+            </SelectTrigger>
+            <SelectContent>
+              {FORCES_CHOISISSABLES.map((f) => (
+                <SelectItem key={f} value={f}>
+                  <span aria-hidden="true">{symboleDe(f)}</span> {choixForce(f)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Consequence texte={aideForce(compoForce)} />
+        </div>
+      </div>
+
+      <p className="note">
+        L&apos;étiquette doit déjà être portée par au moins un vétérinaire actif : sinon la règle
+        serait soit impossible à tenir, soit sans aucun effet. Le serveur la refusera en le disant.
+      </p>
+
+      <div className="panneau-pied">
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={() => setCompoOuvert(false)}
+          disabled={isPending}
+        >
+          Annuler
+        </button>
+        <button
+          type="button"
+          className="btn btn-accent btn-sm"
+          onClick={creerEquipe}
+          disabled={isPending || compoTag.trim() === ''}
+        >
+          {isPending ? 'Un instant…' : 'Créer la règle'}
+        </button>
+      </div>
+    </div>
+  )
 
   return (
     <>
@@ -767,28 +1071,42 @@ export function OngletMoteur({
       <section className="card">
         <div className="card-head">
           <h2>Règles du cabinet</h2>
-          <span className={`section-count${actives.length === 0 ? ' zero' : ''}`}>
-            {actives.length}
+          <span className={`section-count${toutesActives.length === 0 ? ' zero' : ''}`}>
+            {toutesActives.length}
           </span>
           <span className="spacer" />
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={ouvrirCompo}
+            disabled={isPending || compoOuvert}
+            title="Une règle qui ne nomme personne : elle vise une étiquette (junior, senior…)"
+          >
+            <Plus size={15} aria-hidden="true" /> Par étiquette
+          </button>
           <button
             type="button"
             className="btn btn-accent btn-sm"
             onClick={ouvrirCreation}
             disabled={isPending}
+            title="Une règle qui vise une personne précise"
           >
             <Plus size={15} aria-hidden="true" /> Nouvelle règle
           </button>
           <p className="sub">
-            Ce que le moteur doit respecter pour telle ou telle personne : un jour de repos fixe,
-            une indisponibilité qui revient, deux vétérinaires qu&apos;on ne met pas seuls
-            ensemble, une préférence de confort. Elles sont rangées par ce que le moteur en fait —
-            d&apos;une interdiction qu&apos;il ne franchira jamais, à un souhait qu&apos;il honore
-            si ça n&apos;embête personne.
+            Ce que le moteur doit respecter quand il compose une équipe. Soit pour{' '}
+            <strong>quelqu&apos;un</strong> — un jour de repos fixe, une indisponibilité qui
+            revient, deux vétérinaires qu&apos;on ne met pas seuls ensemble. Soit pour une{' '}
+            <strong>étiquette</strong> de l&apos;équipe — « au moins un senior par week-end », « un
+            junior jamais 1er » (les étiquettes se posent sur les fiches, page Équipe). Les deux
+            sont rangées ici par ce que le moteur en fait : d&apos;une interdiction qu&apos;il ne
+            franchira jamais, à un souhait qu&apos;il honore si ça n&apos;embête personne.
           </p>
         </div>
 
-        {actives.length === 0 && inactives.length === 0 ? (
+        {compoOuvert && panneauEquipe()}
+
+        {toutesActives.length === 0 && toutesInactives.length === 0 ? (
           <p className="empty-row">
             Aucune règle pour ce cabinet. Le moteur ne s&apos;interdit donc rien d&apos;autre que
             ce que la structure impose — c&apos;est rarement ce qu&apos;on veut : commence par les
@@ -809,304 +1127,33 @@ export function OngletMoteur({
                     </h3>
                     <span className="section-count">{lignes.length}</span>
                   </div>
-                  {lignes.map((r) => (
-                    <LigneRegle key={r.id} regle={r} />
-                  ))}
+                  {lignes.map(ligne)}
                 </div>
               )
             })}
 
             {/* Les règles en pause restent LISIBLES : on doit pouvoir décider de
                 les rallumer, ce qui suppose de les relire. */}
-            {inactives.length > 0 && (
+            {toutesInactives.length > 0 && (
               <div>
                 <div className="card-head">
                   <h3>Désactivées</h3>
-                  <span className="section-count zero">{inactives.length}</span>
+                  <span className="section-count zero">{toutesInactives.length}</span>
                   <p className="sub">
                     Le moteur ne les lit plus du tout, comme si elles n&apos;existaient pas. Elles
                     restent là pour être rallumées d&apos;un clic.
                   </p>
                 </div>
-                {[...inactives]
+                {[...toutesInactives]
                   .sort((a, b) => etageDe(a.force) - etageDe(b.force))
-                  .map((r) => (
-                    <LigneRegle key={r.id} regle={r} />
-                  ))}
+                  .map(ligne)}
               </div>
             )}
           </>
         )}
       </section>
 
-      {/* ══════════════ Carte 2 · Composition d'équipe ══════════════ */}
-      <section className="card">
-        <div className="card-head">
-          <h2>Composition d&apos;équipe</h2>
-          <span className={`section-count${reglesEquipe.length === 0 ? ' zero' : ''}`}>
-            {reglesEquipe.length}
-          </span>
-          <span className="spacer" />
-          <button
-            type="button"
-            className="btn btn-outline btn-sm"
-            onClick={ouvrirCompo}
-            disabled={isPending || compoOuvert}
-          >
-            <Plus size={15} aria-hidden="true" /> Ajouter
-          </button>
-          <p className="sub">
-            Des règles qui ne nomment personne : elles parlent des{' '}
-            <strong>étiquettes</strong> de l&apos;équipe (junior, senior…). « Au moins un senior
-            par week-end », « un junior jamais seul », « un junior jamais 1er ». Les étiquettes se
-            posent sur les fiches, page Équipe.
-          </p>
-        </div>
-
-        {compoOuvert && (
-          <div className="panneau">
-            <p className="panneau-titre">Nouvelle règle d&apos;équipe</p>
-
-            <div className="grille">
-              <div className="large">
-                <label id="compo-type-lbl">Type de règle</label>
-                <Select
-                  value={compoType}
-                  onValueChange={(v) => setCompoType(String(v) as TypeRegleEquipe)}
-                  disabled={isPending}
-                >
-                  <SelectTrigger className="w-full" aria-labelledby="compo-type-lbl">
-                    {TYPE_REGLE_EQUIPE_LABELS[compoType]}
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(Object.keys(TYPE_REGLE_EQUIPE_LABELS) as TypeRegleEquipe[]).map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {TYPE_REGLE_EQUIPE_LABELS[t]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* L'étiquette : une liste de ce que l'équipe porte réellement.
-                  Le champ libre n'apparaît que si on demande une étiquette
-                  inédite — et il est seul quand l'équipe n'en porte aucune. */}
-              {tagsEquipe.length > 0 ? (
-                <div>
-                  <label id="compo-tag-lbl">Étiquette</label>
-                  <Select
-                    value={compoTagChoix}
-                    onValueChange={(v) => setCompoTagChoix(String(v))}
-                    disabled={isPending}
-                  >
-                    <SelectTrigger className="w-full" aria-labelledby="compo-tag-lbl">
-                      {compoTagChoix === NOUVELLE_ETIQUETTE
-                        ? 'Une nouvelle étiquette…'
-                        : compoTagChoix}
-                    </SelectTrigger>
-                    <SelectContent>
-                      {tagsEquipe.map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {t}
-                        </SelectItem>
-                      ))}
-                      <SelectItem value={NOUVELLE_ETIQUETTE}>
-                        + Une nouvelle étiquette…
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : (
-                <div className="large">
-                  <label htmlFor="compo-tag-libre">Étiquette</label>
-                  <input
-                    id="compo-tag-libre"
-                    type="text"
-                    maxLength={30}
-                    value={compoTagLibre}
-                    onChange={(e) => setCompoTagLibre(e.target.value)}
-                    placeholder={compoType === 'au_moins_un' ? 'senior' : 'junior'}
-                  />
-                  <p className="note">
-                    Aucune étiquette n&apos;est encore posée sur l&apos;équipe. Écris-la ici, puis
-                    va la poser sur les fiches concernées, page Équipe : sans porteur, le serveur
-                    refusera la règle.
-                  </p>
-                </div>
-              )}
-
-              {tagsEquipe.length > 0 && compoTagChoix === NOUVELLE_ETIQUETTE && (
-                <div>
-                  <label htmlFor="compo-tag-libre">Laquelle ?</label>
-                  <input
-                    id="compo-tag-libre"
-                    type="text"
-                    autoFocus
-                    maxLength={30}
-                    value={compoTagLibre}
-                    onChange={(e) => setCompoTagLibre(e.target.value)}
-                    placeholder={compoType === 'au_moins_un' ? 'senior' : 'junior'}
-                  />
-                </div>
-              )}
-
-              {compoType === 'role_interdit' && (
-                <div>
-                  <label id="compo-role-lbl">Rôle interdit</label>
-                  <Select
-                    value={compoRole}
-                    onValueChange={(v) => setCompoRole(String(v))}
-                    disabled={isPending}
-                  >
-                    <SelectTrigger className="w-full" aria-labelledby="compo-role-lbl">
-                      {roleLisible(compoRole)}
-                    </SelectTrigger>
-                    <SelectContent>
-                      {rolesCabinet.map((r) => (
-                        <SelectItem key={r} value={r}>
-                          {roleLisible(r)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <div className="large">
-                <label id="compo-creneaux-lbl">Créneaux concernés</label>
-                <div className="chips" role="group" aria-labelledby="compo-creneaux-lbl">
-                  {typesCreneaux.map((t) => (
-                    <button
-                      key={t.code}
-                      type="button"
-                      aria-pressed={compoCreneaux.includes(t.code)}
-                      onClick={() => basculerCreneauCompo(t.code)}
-                    >
-                      {t.nom}
-                    </button>
-                  ))}
-                </div>
-                <p className="note">Aucun coché = la règle s&apos;applique à tous les types de garde.</p>
-              </div>
-
-              <div className="large">
-                <label id="compo-force-lbl">Ce que le moteur en fait</label>
-                <Select
-                  value={compoForce}
-                  onValueChange={(v) => setCompoForce(String(v))}
-                  disabled={isPending}
-                >
-                  <SelectTrigger className="w-full" aria-labelledby="compo-force-lbl">
-                    <EtiquetteForce force={compoForce} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FORCES_CHOISISSABLES.map((f) => (
-                      <SelectItem key={f} value={f}>
-                        <span aria-hidden="true">{symboleDe(f)}</span> {choixForce(f)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Consequence texte={aideForce(compoForce)} />
-              </div>
-            </div>
-
-            <p className="note">
-              L&apos;étiquette doit déjà être portée par au moins un vétérinaire actif : sinon la
-              règle serait soit impossible à tenir, soit sans aucun effet. Le serveur la refusera
-              en le disant.
-            </p>
-
-            <div className="panneau-pied">
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => setCompoOuvert(false)}
-                disabled={isPending}
-              >
-                Annuler
-              </button>
-              <button
-                type="button"
-                className="btn btn-accent btn-sm"
-                onClick={creerEquipe}
-                disabled={isPending || compoTag.trim() === ''}
-              >
-                {isPending ? 'Un instant…' : 'Créer la règle'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {reglesEquipe.length === 0 ? (
-          <p className="empty-row">
-            Aucune règle d&apos;équipe. Le moteur compose donc librement, sans regarder qui est
-            junior ni qui est senior.
-          </p>
-        ) : (
-          reglesEquipe.map((r) => {
-            const courant = r.actif ? r.force : DESACTIVEE
-            return (
-              <div key={r.id} className="reg-ligne" data-regle-cible={r.id}>
-                <span className="reg-symbole" aria-hidden="true">
-                  {r.actif ? symboleDe(r.force) : '⚪'}
-                </span>
-
-                <div className="reg-corps">
-                  <p className="reg-phrase">{phraseEquipe(r)}</p>
-                  <p className="reg-portee">
-                    <span className="etiq neutre">{r.tag}</span>
-                    {r.role && <span>Rôle : {roleLisible(r.role)}</span>}
-                    <span>
-                      {r.creneaux.length > 0
-                        ? r.creneaux.map(nomCreneau).join(', ')
-                        : 'Tous les types de garde'}
-                    </span>
-                  </p>
-                  <Consequence texte={r.actif ? aideForce(r.force) : EFFET_ETEINTE} />
-                </div>
-
-                <div className="reg-actions">
-                  <Select
-                    value={courant}
-                    onValueChange={(v) => changerForceEquipe(r, String(v))}
-                    disabled={isPending}
-                  >
-                    <SelectTrigger
-                      className="w-44"
-                      aria-label={`Ce que le moteur fait de la règle : ${phraseEquipe(r)}`}
-                    >
-                      <EtiquetteForce force={courant} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={DESACTIVEE}>
-                        <span aria-hidden="true">⚪</span> Désactivée
-                      </SelectItem>
-                      {FORCES_CHOISISSABLES.map((f) => (
-                        <SelectItem key={f} value={f}>
-                          <span aria-hidden="true">{symboleDe(f)}</span> {choixForce(f)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    onClick={() => supprimerEquipe(r)}
-                    disabled={isPending}
-                    aria-label="Supprimer cette règle d’équipe"
-                    title="Supprimer"
-                  >
-                    <Trash2 size={15} aria-hidden="true" />
-                  </button>
-                </div>
-              </div>
-            )
-          })
-        )}
-      </section>
-
-      {/* ══════════════ Carte 3 · Équilibrage des charges ══════════════ */}
+      {/* ══════════════ Carte 2 · Équilibrage des charges ══════════════ */}
       <section className="card">
         <div className="card-head">
           <h2>Équilibrage des charges</h2>
@@ -1149,12 +1196,15 @@ export function OngletMoteur({
             </Select>
           </div>
         ))}
-      </section>
 
-      {/* ═══════ Carte 4 · Équilibrage entre certains seulement ═══════ */}
-      <section className="card">
-        <div className="card-head">
-          <h2>Équilibrer entre certains seulement</h2>
+        {/* ── Réglage avancé : équilibrer entre certains seulement ──
+            C'était une carte à part. Elle ne se comprend qu'en voyant les
+            lignes ci-dessus (« ça s'AJOUTE à l'équilibrage général ») : à
+            distance, on réglait « Week-ends » sur Essentielle sans voir la
+            cohorte qui la rejouait. En base et côté moteur, ces lignes
+            s'appellent des cohortes. */}
+        <div className="card-head sous-section">
+          <h3>Équilibrer entre certains seulement</h3>
           <span className={`section-count${cohortes.length === 0 ? ' zero' : ''}`}>
             {cohortes.length}
           </span>
@@ -1278,7 +1328,7 @@ export function OngletMoteur({
                   onClick={ajouterCohorte}
                   disabled={isPending || coTag.trim() === ''}
                 >
-                  {isPending ? 'Un instant…' : 'Ajouter la cohorte'}
+                  {isPending ? 'Un instant…' : 'Ajouter'}
                 </button>
               </div>
             </div>
@@ -1311,7 +1361,7 @@ export function OngletMoteur({
                 >
                   <SelectTrigger
                     className="w-44"
-                    aria-label={`Importance de la cohorte « ${c.tag} »`}
+                    aria-label={`Importance de l’équilibrage entre « ${c.tag} »`}
                   >
                     {libelleImportance(c.importance)}
                   </SelectTrigger>
@@ -1328,8 +1378,8 @@ export function OngletMoteur({
                   className="icon-btn"
                   onClick={() => supprimerCohorte(c)}
                   disabled={isPending}
-                  aria-label={`Retirer la cohorte « ${c.tag} »`}
-                  title="Retirer la cohorte"
+                  aria-label={`Retirer l’équilibrage entre « ${c.tag} »`}
+                  title="Retirer"
                 >
                   <Trash2 size={15} aria-hidden="true" />
                 </button>
@@ -1339,7 +1389,7 @@ export function OngletMoteur({
         )}
       </section>
 
-      {/* ══════════════ Carte 5 · Préférences du planning ══════════════ */}
+      {/* ══════════════ Carte 3 · Préférences du planning ══════════════ */}
       <section className="card">
         <div className="card-head">
           <h2>Préférences du planning</h2>
