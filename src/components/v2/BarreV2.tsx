@@ -138,7 +138,7 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
           <Link
             {...entree('/regles')}
             href="/regles"
-            aria-label={`Organisation du cabinet · ${dock.nbReglesFermes} règles fermes, ${dock.nbReglesSouples} souples`}
+            aria-label="Organisation du cabinet"
           >
             <span className="di-ico" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -149,9 +149,7 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
               </svg>
             </span>
             <span className="di-flap" aria-hidden="true">
-              <span className="di-text">
-                Organisation · {dock.nbReglesFermes} règles fermes, {dock.nbReglesSouples} souples
-              </span>
+              <span className="di-text">Organisation</span>
             </span>
           </Link>
         )}

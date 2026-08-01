@@ -50,13 +50,19 @@ export interface GardeDuSoir {
   nature: string
 }
 
-/** Les pastilles de la barre — partagées par tous les écrans V2. */
+/** Les pastilles de la barre — partagées par tous les écrans V2.
+ *
+ * Le dock a longtemps porté `nbReglesFermes` / `nbReglesSouples`, affichés sur
+ * l'entrée « Organisation » (« · 10 règles fermes, 8 souples »). MiKL :
+ * « ça n'a aucune valeur » — et il a raison : un compteur de règles ne dit ni
+ * si le planning sortira, ni ce qu'il faut faire. Retirés le 2026-08-01, avec
+ * la requête `regles_cabinet` qu'ils coûtaient sur CHAQUE écran V2.
+ * (L'Épicentre garde les siens : là-bas ils décrivent une période précise
+ * qu'on s'apprête à générer — cf. `RecapPeriode`.) */
 export interface DonneesDock {
   nbSouhaits: number
   nbEchanges: number
   nbVetos: number
-  nbReglesFermes: number
-  nbReglesSouples: number
   agendaConnecte: boolean
   libellePlanning: string
   statutPlanning: StatutPeriode | null
@@ -431,8 +437,6 @@ export async function chargerAccueil(
       nbSouhaits: souhaits.length,
       nbEchanges: echangesEnAttente.length,
       nbVetos,
-      nbReglesFermes,
-      nbReglesSouples: regles.length - nbReglesFermes,
       agendaConnecte: Boolean(calendarId),
       libellePlanning: periodeCourante
         ? (periodeCourante.libelle ?? `${periodeCourante.saison === 'ete' ? 'Été' : 'Hiver'} ${periodeCourante.date_debut.slice(0, 4)}`)

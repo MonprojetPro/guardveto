@@ -17,9 +17,6 @@ import { aujourdhuiISO } from './accueilEpicentre'
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 
-/** Force du seuil : au-delà, la règle n'est plus « ferme ». */
-const FORCES_FERMES = ['invariant', 'reglementaire', 'jamais']
-
 export async function chargerDock(
   supabase: SupabaseServerClient,
   veterinaire: Veterinaire,
@@ -29,13 +26,12 @@ export async function chargerDock(
   const estAdmin = veterinaire.role_app === 'admin'
   const today = aujourdhuiISO()
 
-  const [periodesRes, vetosRes, reglesRes, souhaitsRes, echangesRes, cabinetRes] =
+  const [periodesRes, vetosRes, souhaitsRes, echangesRes, cabinetRes] =
     await Promise.all([
       periodesConnues
         ? Promise.resolve({ data: periodesConnues })
         : supabase.from('periodes').select('*').order('date_debut', { ascending: false }).limit(20),
       supabase.from('veterinaires').select('id', { count: 'exact', head: true }).eq('actif', true),
-      supabase.from('regles_cabinet').select('force').eq('actif', true),
       estAdmin
         ? supabase.from('conges').select('id', { count: 'exact', head: true }).eq('statut', 'souhait')
         : Promise.resolve({ count: 0 }),
@@ -53,11 +49,6 @@ export async function chargerDock(
     periodes[0] ??
     null
 
-  const regles = ((reglesRes as { data?: { force: string }[] | null })?.data ?? []) as {
-    force: string
-  }[]
-  const nbReglesFermes = regles.filter((r) => FORCES_FERMES.includes(r.force)).length
-
   const calendarId = (cabinetRes as { data?: { google_calendar_id?: string | null } | null })?.data
     ?.google_calendar_id
 
@@ -65,8 +56,6 @@ export async function chargerDock(
     nbSouhaits: (souhaitsRes as { count?: number | null })?.count ?? 0,
     nbEchanges: (echangesRes as { count?: number | null })?.count ?? 0,
     nbVetos: (vetosRes as { count?: number | null })?.count ?? 0,
-    nbReglesFermes,
-    nbReglesSouples: regles.length - nbReglesFermes,
     agendaConnecte: Boolean(calendarId),
     libellePlanning: courante
       ? (courante.libelle ??
