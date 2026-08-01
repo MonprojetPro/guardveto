@@ -53,6 +53,7 @@ import {
   desequilibreFeries,
   desequilibreSemainePremier,
   desequilibreSemaineSecond,
+  desequilibreSemaineRenfort,
   desequilibreGrandsWeSalaries,
   variance,
   type CompteurVet,
@@ -400,6 +401,7 @@ export function scorerPlanning(
     desequilibreFeries(compteurs) * weights.FERIES +
     desequilibreSemainePremier(compteurs) * weights.SEMAINE_PREMIER +
     desequilibreSemaineSecond(compteurs) * weights.SEMAINE_SECOND +
+    desequilibreSemaineRenfort(compteurs) * weights.SEMAINE_RENFORT +
     desequilibreGrandsWeSalaries(compteurs, vets) * weights.GRANDS_WE
 
   // ── COHORTES D'ÉQUITÉ PAR TAG (Vague 6 tranche A — #21) ──

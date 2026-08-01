@@ -91,7 +91,7 @@ describe('Équité réglable — B. scorerPlanning thread les poids', () => {
   it('mettre tous les poids à 0 annule le coût d’équité', () => {
     const zero: EquityWeights = {
       WE_GARDE: 0, WE_PREMIER_ROLE: 0, FERIES: 0,
-      SEMAINE_PREMIER: 0, SEMAINE_SECOND: 0, GRANDS_WE: 0,
+      SEMAINE_PREMIER: 0, SEMAINE_SECOND: 0, SEMAINE_RENFORT: 0, GRANDS_WE: 0,
     }
     expect(scorerPlanning(planningDeseq, vets, 'hiver', zero).etages[Etage.EQUITE]).toBe(0)
   })
@@ -101,7 +101,7 @@ describe('Équité réglable — B. scorerPlanning thread les poids', () => {
 describe('Équité réglable — C. le solveur utilise les poids', () => {
   const extreme: EquityWeights = {
     WE_GARDE: 0, WE_PREMIER_ROLE: 0, FERIES: 0,
-    SEMAINE_PREMIER: 0, SEMAINE_SECOND: 1000, GRANDS_WE: 0,
+    SEMAINE_PREMIER: 0, SEMAINE_SECOND: 1000, SEMAINE_RENFORT: 1000, GRANDS_WE: 0,
   }
 
   it('un profil de poids extrême change le planning produit (pas une coquille vide)', () => {

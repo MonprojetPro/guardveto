@@ -31,6 +31,14 @@ export interface CompteurVet {
   /** R14 — Nombre de gardes de semaine en qualité de 2nd */
   semaineSecond: number
   /**
+   * Nombre de gardes de semaine tenues à partir de la 3ᵉ place (renfort).
+   * Reste à 0 pour tout cabinet qui n'a que 2 places le soir — c'est-à-dire
+   * l'immense majorité, et la raison pour laquelle l'ajout de cette dimension
+   * ne change aucun planning existant : la variance d'un compteur toujours nul
+   * est nulle.
+   */
+  semaineRenfort: number
+  /**
    * R15 — Pour les salariés : nombre de WE où ils étaient de garde
    * (= WE "perdus" sans grand week-end libre).
    * Non pertinent pour les associés.
@@ -65,14 +73,38 @@ function estFerieGarde(
   return false
 }
 
+/** Les deux créneaux « de semaine » au sens de l'équité (R13/R14). */
+function estCreneauSemaine(attr: AttributionGarde): boolean {
+  return attr.type === 'semaine_soir' || attr.type === 'vendredi_soir'
+}
+
 function estSemainePremier(attr: AttributionGarde, vetId: string): boolean {
-  return (attr.type === 'semaine_soir' || attr.type === 'vendredi_soir') &&
-    vetPourRole(attr, 'premier') === vetId
+  return estCreneauSemaine(attr) && vetPourRole(attr, 'premier') === vetId
 }
 
 function estSemaineSecond(attr: AttributionGarde, vetId: string): boolean {
-  return (attr.type === 'semaine_soir' || attr.type === 'vendredi_soir') &&
-    vetPourRole(attr, 'second') === vetId
+  return estCreneauSemaine(attr) && vetPourRole(attr, 'second') === vetId
+}
+
+/**
+ * Une garde de semaine tenue à partir de la TROISIÈME place.
+ *
+ * Pourquoi cette dimension existe : `estSemainePremier` et `estSemaineSecond`
+ * testent des rôles NOMMÉS en dur. Un cabinet qui met 3 ou 4 vétérinaires le
+ * soir voyait donc ses places de renfort n'incrémenter aucun compteur : ces
+ * gardes-là étaient gratuites pour l'équité, et le moteur n'avait aucune
+ * raison de les répartir. Les week-ends et les fériés n'avaient pas ce trou
+ * (`estWEGarde` / `estFerieGarde` comptent « qui est de garde », sans regarder
+ * la place) — seuls les créneaux de semaine étaient concernés.
+ *
+ * On compte par POSITION et non par libellé de rôle : un cabinet nomme ses
+ * places comme il veut (« renfort », « astreinte »…), et une dimension d'équité
+ * qui dépendrait de ces mots ne survivrait pas au premier renommage.
+ */
+function estSemaineRenfort(attr: AttributionGarde, vetId: string): boolean {
+  if (!estCreneauSemaine(attr)) return false
+  const place = attr.placements.findIndex((p) => p.vetId === vetId)
+  return place >= 2
 }
 
 // ── Compteurs ────────────────────────────────────────────
@@ -103,6 +135,7 @@ export function compterParVet(
       feriesGardes: 0,
       semainePremier: 0,
       semaineSecond: 0,
+      semaineRenfort: 0,
       grandsWePerdus: 0,
     }
 
@@ -124,6 +157,7 @@ export function compterParVet(
       if (estFerieGarde(attr, vet.id, calendrier)) compteur.feriesGardes++
       if (estSemainePremier(attr, vet.id)) compteur.semainePremier++
       if (estSemaineSecond(attr, vet.id)) compteur.semaineSecond++
+      if (estSemaineRenfort(attr, vet.id)) compteur.semaineRenfort++
     }
 
     return compteur
@@ -186,6 +220,16 @@ export function desequilibreSemainePremier(compteurs: CompteurVet[]): number {
  */
 export function desequilibreSemaineSecond(compteurs: CompteurVet[]): number {
   return variance(compteurs.map((c) => c.semaineSecond))
+}
+
+/**
+ * Déséquilibre des gardes de semaine tenues EN RENFORT (3ᵉ place et au-delà).
+ * Vaut 0 pour tout cabinet à deux places le soir : le compteur y est nul chez
+ * tout le monde, donc sa variance aussi — c'est ce qui rend cette dimension
+ * inoffensive pour les plannings existants.
+ */
+export function desequilibreSemaineRenfort(compteurs: CompteurVet[]): number {
+  return variance(compteurs.map((c) => c.semaineRenfort))
 }
 
 /**

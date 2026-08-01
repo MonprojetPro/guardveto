@@ -190,6 +190,10 @@ const EQUITE_META: Record<EquityDimension, { titre: string; aide: string }> = {
     titre: 'Soirs de semaine — 2nd',
     aide: 'Équilibrer les soirs de semaine assurés en 2nd.',
   },
+  semaine_renfort: {
+    titre: 'Soirs de semaine — renfort',
+    aide: 'Équilibrer les soirs de semaine tenus à partir de la 3ᵉ place. Sans objet tant qu’un type de garde n’a que deux places.',
+  },
   grands_weekend: {
     titre: 'Grands week-ends (salariés)',
     aide: 'Répartir les grands week-ends perdus par les salariés.',
@@ -203,6 +207,7 @@ const DIMENSION_LABELS: Record<EquityDimension, string> = {
   ferie: 'Jours fériés',
   semaine_premier: 'Soirs de semaine — 1er',
   semaine_second: 'Soirs de semaine — 2nd',
+  semaine_renfort: 'Soirs de semaine — renfort',
   grands_weekend: 'Grands week-ends (salariés)',
 }
 

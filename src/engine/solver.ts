@@ -357,6 +357,20 @@ function genererSteps(
 // ── Scoring des candidats ────────────────────────────────
 
 /**
+ * La PLACE qu'occupe ce step dans son créneau (0 = première). On la lit dans le
+ * catalogue (`rolesCreneau`) et non dans le nom du rôle : un cabinet renomme
+ * ses places comme il veut, et un scoring qui dépendrait de ces mots ne
+ * survivrait pas au premier renommage. Repli sur les noms historiques quand le
+ * step vient du chemin legacy (pas de catalogue).
+ */
+function placeDuStep(step: SolverStep): number {
+  const i = step.rolesCreneau?.indexOf(step.role)
+  if (typeof i === 'number' && i >= 0) return i
+  return step.role === 'premier' ? 0 : 1
+}
+
+
+/**
  * Malus d'équité du rôle portant l'AVANTAGE FINANCIER (R11b) — P4 slice 1.
  *
  * Le rôle avantagé est équilibré : un véto qui l'a déjà eu souvent
@@ -447,6 +461,7 @@ function scorerCandidat(
     feriesGardes: 0,
     semainePremier: 0,
     semaineSecond: 0,
+    semaineRenfort: 0,
     grandsWePerdus: 0,
   }
   const bm = bonusMalus[vet.id] ?? 0
@@ -505,13 +520,21 @@ function scorerCandidat(
     return c.feriesGardes * weights.FERIES + pen
   }
 
-  if (step.role === 'premier') {
+  const place = placeDuStep(step)
+  if (place === 0) {
     // R13 : équité gardes semaine en 1er
     return c.semainePremier * weights.SEMAINE_PREMIER + pen
   }
+  if (place === 1) {
+    // R14 : équité 2nd de garde
+    return c.semaineSecond * weights.SEMAINE_SECOND + pen
+  }
 
-  // R14 : équité 2nd de garde
-  return c.semaineSecond * weights.SEMAINE_SECOND + pen
+  // 3ᵉ place et au-delà. Ce cas retombait dans la branche du 2nd : le candidat
+  // était donc départagé sur un compteur qui ne comptait PAS ses gardes de
+  // renfort — un coût figé, identique pour tout le monde, donc aucune raison
+  // de répartir ces gardes équitablement.
+  return c.semaineRenfort * weights.SEMAINE_RENFORT + pen
 }
 
 // ── Gestion du planning ──────────────────────────────────
@@ -889,6 +912,7 @@ export function scorerCandidatLNS(
     feriesGardes: 0,
     semainePremier: 0,
     semaineSecond: 0,
+    semaineRenfort: 0,
     grandsWePerdus: 0,
   }
 
@@ -930,8 +954,10 @@ export function scorerCandidatLNS(
     return c.weGardes * weights.WE_GARDE + malusRole + pen
   }
   if (estJourFerie(step.date, calendrier)) return c.feriesGardes * weights.FERIES + pen
-  if (step.role === 'premier') return c.semainePremier * weights.SEMAINE_PREMIER + pen
-  return c.semaineSecond * weights.SEMAINE_SECOND + pen
+  const place = placeDuStep(step)
+  if (place === 0) return c.semainePremier * weights.SEMAINE_PREMIER + pen
+  if (place === 1) return c.semaineSecond * weights.SEMAINE_SECOND + pen
+  return c.semaineRenfort * weights.SEMAINE_RENFORT + pen
 }
 
 /** Réparation greedy d'une semaine détruite. Retourne null si impasse. */

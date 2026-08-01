@@ -125,7 +125,7 @@ describe('Cohortes #21 — D. la variance ne compte que les porteurs', () => {
     // Poids globaux à 0 pour ISOLER la contribution cohorte.
     const w: EquityWeights = {
       WE_GARDE: 0, WE_PREMIER_ROLE: 0, FERIES: 0,
-      SEMAINE_PREMIER: 0, SEMAINE_SECOND: 0, GRANDS_WE: 0,
+      SEMAINE_PREMIER: 0, SEMAINE_SECOND: 0, SEMAINE_RENFORT: 0, GRANDS_WE: 0,
       cohortes: [{ dimension: 'weekend', tag: 'junior', poids: 100 }],
     }
     const eq = scorerPlanning(planning, vets, 'hiver', w).etages[Etage.EQUITE]
@@ -136,7 +136,7 @@ describe('Cohortes #21 — D. la variance ne compte que les porteurs', () => {
   it('cohorte senior sur weekend = coût 0 (seniors équilibrés : 1 WE chacun)', () => {
     const w: EquityWeights = {
       WE_GARDE: 0, WE_PREMIER_ROLE: 0, FERIES: 0,
-      SEMAINE_PREMIER: 0, SEMAINE_SECOND: 0, GRANDS_WE: 0,
+      SEMAINE_PREMIER: 0, SEMAINE_SECOND: 0, SEMAINE_RENFORT: 0, GRANDS_WE: 0,
       cohortes: [{ dimension: 'weekend', tag: 'senior', poids: 100 }],
     }
     expect(scorerPlanning(planning, vets, 'hiver', w).etages[Etage.EQUITE]).toBe(0)
@@ -147,7 +147,7 @@ describe('Cohortes #21 — D. la variance ne compte que les porteurs', () => {
 describe('Cohortes #21 — E. deux cohortes = deux variances additionnées', () => {
   it('junior (coût) + senior (0) = la somme du junior seul', () => {
     const vets = vetsTagues()
-    const commun = { WE_GARDE: 0, WE_PREMIER_ROLE: 0, FERIES: 0, SEMAINE_PREMIER: 0, SEMAINE_SECOND: 0, GRANDS_WE: 0 }
+    const commun = { WE_GARDE: 0, WE_PREMIER_ROLE: 0, FERIES: 0, SEMAINE_PREMIER: 0, SEMAINE_SECOND: 0, SEMAINE_RENFORT: 0, GRANDS_WE: 0 }
     const jSeul: EquityWeights = { ...commun, cohortes: [{ dimension: 'weekend', tag: 'junior', poids: 100 }] }
     const deux: EquityWeights = {
       ...commun,
@@ -166,7 +166,7 @@ describe('Cohortes #21 — E. deux cohortes = deux variances additionnées', () 
 // ── F. Inertie 0 / 1 porteur ─────────────────────────────────
 describe('Cohortes #21 — F. cohorte sans porteur / à 1 porteur = inerte', () => {
   const vets = vetsTagues()
-  const commun = { WE_GARDE: 0, WE_PREMIER_ROLE: 0, FERIES: 0, SEMAINE_PREMIER: 0, SEMAINE_SECOND: 0, GRANDS_WE: 0 }
+  const commun = { WE_GARDE: 0, WE_PREMIER_ROLE: 0, FERIES: 0, SEMAINE_PREMIER: 0, SEMAINE_SECOND: 0, SEMAINE_RENFORT: 0, GRANDS_WE: 0 }
 
   it('tag qu’aucun véto ne porte → coût 0 (jamais de crash)', () => {
     const w: EquityWeights = { ...commun, cohortes: [{ dimension: 'weekend', tag: 'fantome', poids: 100 }] }

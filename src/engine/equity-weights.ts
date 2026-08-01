@@ -27,6 +27,8 @@ export interface EquityWeights {
   SEMAINE_PREMIER: number
   /** R14 — équité des gardes de semaine en 2nd. */
   SEMAINE_SECOND: number
+  /** Équité des gardes de semaine tenues à partir de la 3ᵉ place (renfort). */
+  SEMAINE_RENFORT: number
   /** R15 — équité des « grands week-ends perdus » par les salariés. */
   GRANDS_WE: number
   /**
@@ -74,6 +76,9 @@ export const DEFAULT_EQUITY_WEIGHTS: EquityWeights = {
   FERIES: 60,
   SEMAINE_PREMIER: 30,
   SEMAINE_SECOND: 10,
+  // Même poids que le 2nd : une place de renfort est la même nature de garde.
+  // Sans effet sur les plannings existants (compteur nul → variance nulle).
+  SEMAINE_RENFORT: 10,
   GRANDS_WE: 60,
 }
 
@@ -115,6 +120,7 @@ export const EQUITY_DIMENSIONS = [
   'ferie',
   'semaine_premier',
   'semaine_second',
+  'semaine_renfort',
   'grands_weekend',
 ] as const
 export type EquityDimension = (typeof EQUITY_DIMENSIONS)[number]
@@ -122,7 +128,7 @@ export type EquityDimension = (typeof EQUITY_DIMENSIONS)[number]
 /** Les champs NUMÉRIQUES de poids d'EquityWeights (hors `cohortes`). */
 export type EquityWeightField =
   | 'WE_GARDE' | 'WE_PREMIER_ROLE' | 'FERIES'
-  | 'SEMAINE_PREMIER' | 'SEMAINE_SECOND' | 'GRANDS_WE'
+  | 'SEMAINE_PREMIER' | 'SEMAINE_SECOND' | 'SEMAINE_RENFORT' | 'GRANDS_WE'
 
 /** dimension (clé règle) → champ EquityWeights consommé par le moteur. */
 export const DIMENSION_TO_FIELD: Record<EquityDimension, EquityWeightField> = {
@@ -131,6 +137,7 @@ export const DIMENSION_TO_FIELD: Record<EquityDimension, EquityWeightField> = {
   ferie: 'FERIES',
   semaine_premier: 'SEMAINE_PREMIER',
   semaine_second: 'SEMAINE_SECOND',
+  semaine_renfort: 'SEMAINE_RENFORT',
   grands_weekend: 'GRANDS_WE',
 }
 
@@ -147,6 +154,10 @@ export const DEFAULT_IMPORTANCE: Record<EquityDimension, ImportanceLevel> = {
   semaine_premier: 'normal',
   weekend_premier: 'normal',
   semaine_second: 'peu_important',
+  // Même cran que le 2nd : c'est la même nature de garde, une place de plus.
+  // Aucun effet sur les cabinets à 2 places — le compteur y reste nul, et la
+  // variance d'un compteur toujours nul est nulle.
+  semaine_renfort: 'peu_important',
 }
 
 /** Une dimension réglée (telle qu'extraite d'une règle `equilibrer`). */
@@ -226,12 +237,14 @@ export function buildEquityWeights(rules: EquityRule[]): EquityWeights {
  *  global des 6 dimensions). Les 5 autres dimensions comptent tous les vétos. */
 export const DIMENSION_TO_COMPTEUR: Record<
   EquityDimension,
-  'weGardes' | 'weekendPremier' | 'feriesGardes' | 'semainePremier' | 'semaineSecond' | 'grandsWePerdus'
+  | 'weGardes' | 'weekendPremier' | 'feriesGardes'
+  | 'semainePremier' | 'semaineSecond' | 'semaineRenfort' | 'grandsWePerdus'
 > = {
   weekend: 'weGardes',
   weekend_premier: 'weekendPremier',
   ferie: 'feriesGardes',
   semaine_premier: 'semainePremier',
   semaine_second: 'semaineSecond',
+  semaine_renfort: 'semaineRenfort',
   grands_weekend: 'grandsWePerdus',
 }

@@ -159,6 +159,7 @@ const LIBELLE_DIMENSION: Record<EquityDimension, string> = {
   ferie: 'gardes de jours fériés',
   semaine_premier: 'gardes de semaine en 1er',
   semaine_second: 'gardes de semaine en 2nd',
+  semaine_renfort: 'gardes de semaine tenues en renfort (3ᵉ place et au-delà)',
   grands_weekend: 'grands week-ends libres perdus (salariés uniquement)',
 }
 
