@@ -1,9 +1,9 @@
 'use client'
 
 // ============================================================
-// GUARDVETO V2 — Onglet « Enchaînements » : les liaisons entre types de garde
+// GUARDVETO V2 — Onglet « Enchaînements » entre types de garde
 // ============================================================
-// Une liaison dit que deux créneaux ne s'attribuent pas indépendamment l'un de
+// Un enchaînement dit que deux types de garde ne s'attribuent pas indépendamment l'un de
 // l'autre : soit les mêmes vétérinaires enchaînent les deux gardes (« même
 // équipe » — le vendredi soir et le week-end qui suit), soit un vétérinaire
 // présent sur les deux doit y changer de rôle (« rôles différents »).
@@ -12,11 +12,11 @@
 // créait la liaison dans `/admin/structure` (table `relation_creneau`) mais on
 // réglait sa fermeté dans `/regles` (table `regles_cabinet`, briques
 // `liaison_creneaux` et `inversion_role`). Deux tables, donc deux pages — sauf
-// que « quels créneaux sont liés » et « à quel point c'est impératif » sont UNE
-// seule question pour l'admin. Un cabinet pouvait très bien créer sa liaison
+// que « quels types de garde sont liés » et « à quel point c'est impératif »
+// sont UNE seule question pour l'admin. Un cabinet pouvait créer son enchaînement
 // vendredi → week-end et ne jamais comprendre pourquoi le moteur ne la
 // respectait pas : le niveau, lui, était resté désactivé sur l'autre écran.
-// Ici, le niveau est affiché EN PREMIER, et chaque liaison rappelle sous son
+// Ici, le niveau est affiché EN PREMIER, et chaque enchaînement rappelle sous son
 // nom ce que ce niveau lui fait faire.
 //
 // La frontière de persistance reste inchangée : deux tables, deux actions
@@ -59,7 +59,7 @@ import {
 import type { GenreRelationUI, NiveauLiaisonUI, ProfilUI, RelationUI } from './types'
 
 interface Props {
-  /** Le profil courant, avec ses créneaux et ses relations. */
+  /** La période type courante, avec ses types de garde et ses enchaînements. */
   profil: ProfilUI
   /** Le niveau (ferme/souple) de chaque genre de liaison, lu dans `regles_cabinet`. */
   niveaux: Record<GenreRelationUI, NiveauLiaisonUI>
@@ -116,7 +116,7 @@ const GENRE_EXPLICATION: Record<GenreRelationUI, string> = {
     'Un vétérinaire présent sur les deux gardes liées doit y changer de rôle — 1er sur l’une, 2nd sur l’autre. Personne ne cumule deux fois la même place sur un enchaînement.',
 }
 
-/** L'étiquette posée sur chaque ligne de liaison. */
+/** L'étiquette posée sur chaque ligne d'enchaînement. */
 const GENRE_ETIQ: Record<GenreRelationUI, string> = {
   meme_binome: 'Même équipe',
   inversion_role: 'Rôles différents',
@@ -160,9 +160,9 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
     setNiveauxLocaux(niveaux)
   }
 
-  // Changer de profil remonte tout le composant (`key` posée par la coquille) :
-  // les créneaux d'un panneau à demi rempli n'existent peut-être plus dans le
-  // profil qu'on vient d'ouvrir.
+  // Changer de période type remonte tout le composant (`key` posée par la
+  // coquille) : les types de garde d'un panneau à demi rempli n'existent
+  // peut-être plus dans la période type qu'on vient d'ouvrir.
   const [panneauOuvert, setPanneauOuvert] = useState(false)
   const [sourceId, setSourceId] = useState(CHOISIR)
   const [cibleId, setCibleId] = useState(CHOISIR)
@@ -248,7 +248,7 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
         toast.error(err)
         return
       }
-      toast.success('Liaison créée — elle s’applique dès la prochaine génération.')
+      toast.success('Enchaînement créé — il s’applique dès la prochaine génération.')
       setPanneauOuvert(false)
       setSourceId(CHOISIR)
       setCibleId(CHOISIR)
@@ -266,8 +266,8 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
       }
       toast.success(
         r.actif
-          ? 'Liaison désactivée — le moteur ne l’appliquera plus.'
-          : 'Liaison réactivée.',
+          ? 'Enchaînement désactivé — le moteur ne l’appliquera plus.'
+          : 'Enchaînement réactivé.',
       )
       router.refresh()
     })
@@ -283,7 +283,7 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
         toast.error(err)
         return
       }
-      toast.success('Liaison supprimée.')
+      toast.success('Enchaînement supprimé.')
       setASupprimer(null)
       router.refresh()
     })
@@ -301,7 +301,7 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
     if (!r.actif) {
       return (
         <>
-          <b>Inactive</b> — le moteur apparie ces deux créneaux comme s’ils n’étaient pas liés.
+          <b>Inactif</b> — le moteur apparie ces deux types de garde comme s’ils n’étaient pas liés.
         </>
       )
     }
@@ -309,7 +309,7 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
       return (
         <>
           <b>Sans effet pour l’instant</b> — le réglage « {GENRE_TITRE[r.genre]} » est désactivé
-          plus haut, le moteur ne lit aucune liaison de ce genre.
+          plus haut, le moteur ne lit aucun enchaînement de ce genre.
         </>
       )
     }
@@ -329,13 +329,13 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
       {/* ══ Le niveau : ce que les liaisons IMPOSENT ══════════════
           En premier, exprès. Régler une liaison sans savoir si elle est ferme
           ou souple, c'est régler la moitié de la question. */}
-      <section className="card" aria-label="Ce que les liaisons imposent">
+      <section className="card" aria-label="Ce que les enchaînements imposent">
         <div className="card-head">
-          <h2>Ce que les liaisons imposent</h2>
+          <h2>Ce que les enchaînements imposent</h2>
           <p className="sub">
             Deux réglages pour tout le cabinet : à quel point le moteur doit tenir les
-            enchaînements que vous avez déclarés plus bas. Ils valent pour toutes les liaisons
-            de ce genre, sur tous les profils.
+            enchaînements que vous avez déclarés plus bas. Ils valent pour tous les enchaînements
+            de ce genre, sur toutes les périodes types.
           </p>
         </div>
 
@@ -399,8 +399,8 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
                         </>
                       ) : (
                         <>
-                          <b>Désactivé</b> — le moteur attribue ces créneaux sans regarder les
-                          liaisons de ce genre. Elles restent enregistrées et se rallument d’un
+                          <b>Désactivé</b> — le moteur attribue ces types de garde sans regarder les
+                          enchaînements de ce genre. Ils restent enregistrés et se rallument d’un
                           choix.
                         </>
                       )}
@@ -413,7 +413,7 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
         </div>
       </section>
 
-      {/* ══ Les liaisons du profil ════════════════════════════════ */}
+      {/* ══ Les enchaînements de la période type ══════════════════ */}
       <section className="card" aria-label="Créneaux liés">
         <div className="card-head">
           <h2>Créneaux liés</h2>
@@ -426,22 +426,23 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
             onClick={() => setPanneauOuvert((o) => !o)}
           >
             <Plus size={15} aria-hidden="true" />
-            Lier deux créneaux
+            Lier deux types de garde
           </button>
           <p className="sub">
-            Les enchaînements du profil « {profil.nom} ». Le moteur relie chaque garde du second
-            créneau à la garde du premier qui la précède immédiatement, dans les sept jours.
+            Les enchaînements de la période type « {profil.nom} ». Le moteur relie chaque garde du
+            second type de garde à la garde du premier qui la précède immédiatement, dans les sept
+            jours.
           </p>
         </div>
 
         {/* ── Créer une liaison ────────────────────────────────── */}
         {panneauOuvert && (
           <div className="panneau">
-            <p className="panneau-titre">Nouvelle liaison</p>
+            <p className="panneau-titre">Nouvel enchaînement</p>
 
             <div className="grille">
               <div>
-                <label htmlFor="ench-source">Premier créneau</label>
+                <label htmlFor="ench-source">Premier type de garde</label>
                 <Select
                   value={sourceId}
                   disabled={isPending}
@@ -467,7 +468,7 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
               </div>
 
               <div>
-                <label htmlFor="ench-genre">Ce que la liaison impose</label>
+                <label htmlFor="ench-genre">Ce que l’enchaînement impose</label>
                 <Select
                   value={genre}
                   disabled={isPending}
@@ -490,7 +491,7 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
               </div>
 
               <div>
-                <label htmlFor="ench-cible">Second créneau</label>
+                <label htmlFor="ench-cible">Second type de garde</label>
                 <Select
                   value={cibleId}
                   disabled={isPending}
@@ -525,7 +526,7 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
                 <span>
                   {genre === 'meme_binome' ? (
                     <>
-                      Deux créneaux qui couvrent <b>un même jour</b> ne peuvent pas exiger la même
+                      Deux types de garde qui couvrent <b>un même jour</b> ne peuvent pas exiger la même
                       équipe : personne ne tient deux gardes le même jour. Pour ce cas-là,
                       choisissez « rôles différents ».
                     </>
@@ -555,7 +556,7 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
                 onClick={creer}
               >
                 <Link2 size={15} aria-hidden="true" />
-                Créer la liaison
+                Créer l’enchaînement
               </button>
             </div>
           </div>
@@ -564,8 +565,8 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
         {/* ── La liste ─────────────────────────────────────────── */}
         {relations.length === 0 ? (
           <p className="empty-row">
-            Aucun enchaînement pour ce profil : chaque type de garde est attribué indépendamment
-            des autres. Une liaison sert à dire qu’un créneau ne se tire pas tout seul — par
+            Aucun enchaînement pour cette période type : chaque type de garde est attribué indépendamment
+            des autres. Un enchaînement sert à dire qu’un type de garde ne se tire pas tout seul — par
             exemple que le vendredi soir et le week-end qui suit reviennent à la même équipe,
             pour ne pas couper une continuité de soins en deux.
           </p>
@@ -603,7 +604,7 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
                       <button
                         type="button"
                         className="icon-btn"
-                        aria-label={`Supprimer la liaison ${r.sourceNom} vers ${r.cibleNom}`}
+                        aria-label={`Supprimer l’enchaînement ${r.sourceNom} vers ${r.cibleNom}`}
                         disabled={isPending}
                         onClick={() => setASupprimer(r)}
                       >
@@ -629,9 +630,9 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
       >
         <DialogContent className="gv-modale">
           <DialogHeader>
-            <DialogTitle>Supprimer cette liaison ?</DialogTitle>
+            <DialogTitle>Supprimer cet enchaînement ?</DialogTitle>
             <DialogDescription>
-              Dès la prochaine génération, le moteur cessera d’apparier ces deux créneaux : il
+              Dès la prochaine génération, le moteur cessera d’apparier ces deux types de garde : il
               les attribuera séparément. Les plannings déjà générés ne bougent pas. Pour
               suspendre l’enchaînement sans le perdre, préférez « Désactiver ».
             </DialogDescription>

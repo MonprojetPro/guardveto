@@ -22,7 +22,7 @@
 //      autre liste, sous un autre nom de section.
 //   2. Chaque section avait SON sélecteur de profil, et les deux se
 //      désynchronisaient : on lisait le catalogue d'« Hiver » en réglant les
-//      horaires d'« Été ». Ici, le profil est le contexte de la PAGE
+//      horaires d'« Été ». Ici, la période type est le contexte de la PAGE
 //      (`ReglesStructureV2`) — cet onglet ne fait qu'en recevoir un.
 //
 // Une carte par type de garde, dépliable pour éditer. On modifie celui qu'on
@@ -423,14 +423,14 @@ function ChampsCreneau({ cle, form, setForm, joursFiges, bloque, code }: ChampsP
 
       {/* ⚠️ LE SOIR DE SEMAINE A DEUX MAÎTRES. C'est le seul créneau dont le
           nombre de places est PLAFONNÉ par un second réglage : « Le soir en
-          semaine », porté par le profil et surchargeable par période. Le moteur
+          semaine », porté par la période type et surchargeable par planning. Le moteur
           retient le plus petit des deux. Déclarer 4 places ici sans toucher à
           l'autre réglage ne produit donc pas 4 gardes — et rien ne le disait
           jusqu'ici : le planning sortait simplement plus petit que demandé. */}
       {code === 'semaine_soir' && (
         <p className="note attention large">
           Ce type de garde est le seul à dépendre aussi du réglage «&nbsp;Le soir en
-          semaine&nbsp;» de l&apos;onglet Profils : c&apos;est le plus petit des deux qui
+          semaine&nbsp;» de l&apos;onglet Périodes types : c&apos;est le plus petit des deux qui
           s&apos;applique. Pour {form.nbPlaces} vétérinaire{form.nbPlaces > 1 ? 's' : ''} par
           nuit, réglez-le sur {form.nbPlaces} lui aussi — sinon la génération s&apos;arrêtera au
           plus petit chiffre.
@@ -443,7 +443,7 @@ function ChampsCreneau({ cle, form, setForm, joursFiges, bloque, code }: ChampsP
 // ── L'onglet ────────────────────────────────────────────────────────────────
 
 interface Props {
-  /** Le profil courant, avec son catalogue déjà trié par `ordre`. */
+  /** La période type courante, avec son catalogue déjà trié par `ordre`. */
   profil: ProfilUI
 }
 

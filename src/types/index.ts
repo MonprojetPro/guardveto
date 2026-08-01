@@ -204,7 +204,7 @@ export const NAV_ITEMS: NavItem[] = [
   // absorbé l'ancienne page /admin/structure — d'où la disparition de l'entrée
   // « Structure » juste en dessous. L'écran est admin : tout y est de la
   // configuration de cabinet, et le dock V2 ne l'a jamais proposé aux vétos.
-  { label: 'Règles',        href: '/regles',              icon: 'ScrollText',   roles: ['admin'] },
+  { label: 'Organisation',  href: '/regles',              icon: 'ScrollText',   roles: ['admin'] },
   { label: 'Demandes',      href: '/admin/demandes',      icon: 'Inbox',        roles: ['admin'] },
   { label: 'Dépannages',    href: '/admin/depannages',    icon: 'LifeBuoy',     roles: ['admin'] },
   // Les deux pages V1 correspondantes ont été supprimées : `/admin/periodes`

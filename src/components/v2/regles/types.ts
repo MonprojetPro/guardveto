@@ -12,7 +12,7 @@
 // construite à deux endroits est une phrase qui finit par différer.
 // ============================================================
 
-/** Un profil de planning du cabinet (« Hiver », « Été »…). */
+/** Une période type du cabinet (« Hiver », « Été »…) — table `profils_planning`. */
 export interface ProfilUI {
   id: string
   nom: string

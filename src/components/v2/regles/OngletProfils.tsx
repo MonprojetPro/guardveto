@@ -1,37 +1,45 @@
 'use client'
 
 // ============================================================
-// GUARDVETO V2 — Onglet 1 · Profils de planning
+// GUARDVETO V2 — Onglet 1 · Périodes types
 // ============================================================
-// Un profil est une ORGANISATION DE GARDES réutilisable (« Hiver », « Été »,
-// « Vacances »…) : un catalogue de types de garde avec leurs horaires, qu'on
-// applique ensuite à une période. C'est l'objet le plus haut de cet écran —
-// les trois onglets suivants ne décrivent qu'UN profil, celui qu'on a désigné.
+// Une PÉRIODE TYPE est une façon de tourner, réutilisable (« Hiver », « Été »,
+// « Été 2 »…) : un catalogue de types de garde avec leurs horaires, qu'on
+// applique ensuite à un planning. C'est l'objet le plus haut de cet écran —
+// les trois onglets suivants ne décrivent QU'UNE période type, celle qu'on a
+// désignée. Plusieurs plannings peuvent partager la même (« Hiver 1 », « Hiver
+// 2 » tournent tous les deux sur « Hiver ») : c'est un MODÈLE, pas une tranche
+// de calendrier.
 //
-// CET ONGLET EST LE SÉLECTEUR DE PROFIL. Il y avait au départ un menu déroulant
-// « Profil » en tête de page, y compris ici : une case à droite pour choisir,
-// et juste en dessous une grille qui montrait les mêmes profils sans qu'on
-// puisse en choisir aucun. Deux commandes pour un seul geste. Désormais la
+// ⚠️ Côté base, l'objet s'appelle encore `profils_planning` et les actions
+//    serveur `creerProfil` / `renommerProfil` / `supprimerProfil`. Frontière
+//    assumée : on renomme ce que l'utilisateur lit, pas ce que Postgres
+//    stocke. Le mot « profil » ne doit plus apparaître à l'écran.
+//
+// CET ONGLET EST LE SÉLECTEUR. Il y avait au départ un menu déroulant en tête
+// de page, y compris ici : une case à droite pour choisir, et juste en dessous
+// une grille qui montrait les mêmes cartes sans qu'on
+// puisse en choisir aucune. Deux commandes pour un seul geste. Désormais la
 // tête de page ne porte le menu que sur « Types de garde » et « Enchaînements »
 // (là où la grille n'est pas visible), et ICI c'est la carte elle-même qu'on
 // clique. Une carte = un choix, avec son `aria-pressed`.
 //
 // TROIS DÉCISIONS PORTÉES ICI :
 //
-//  · On CRÉE PAR DUPLICATION, jamais à partir de rien. Un profil vide ne
+//  · On CRÉE PAR DUPLICATION, jamais à partir de rien. Une période type vide ne
 //    génère aucune garde — ce serait une coquille. La RPC `dupliquer_profil`
-//    copie le catalogue de la source, donc le nouveau profil est générable
+//    copie le catalogue de la source, donc la nouvelle est générable
 //    dès sa création ; on l'ajuste ensuite dans « Types de garde ».
 //
 //  · La création s'ouvre en PANNEAU DÉPLIÉ, pas en modale. C'est le pattern de
 //    cet écran : ce qu'on remplit reste dans le fil de ce qu'on regardait, et
-//    on voit les profils existants pendant qu'on choisit lequel dupliquer.
+//    on voit les périodes types existantes pendant qu'on choisit laquelle dupliquer.
 //
 //  · La suppression, elle, passe par une MODALE de confirmation qui dit la
 //    conséquence réelle. La V1 posait un `window.confirm()` avec un texte faux
 //    (« les périodes repasseront au profil par défaut ») : en base, elles
-//    perdent simplement leur profil (`profil_id` → NULL) et le catalogue du
-//    profil part en cascade. On ne fait pas signer un geste destructeur sur
+//    perdent simplement leur rattachement (`profil_id` → NULL) et le
+//    catalogue part en cascade. On ne fait pas signer un geste destructeur sur
 //    une phrase inexacte.
 //
 // AUCUN `<select>` NATIF ici : un select natif ouvre le menu du NAVIGATEUR
@@ -66,9 +74,9 @@ import type { ProfilUI } from './types'
 
 interface Props {
   profils: ProfilUI[]
-  /** Le profil regardé dans les autres onglets — à signaler visuellement (classe `courant`). */
+  /** La période type regardée dans les autres onglets — à signaler visuellement (classe `courant`). */
   profilCourantId: string
-  /** Désigne le profil que décriront les onglets suivants. */
+  /** Désigne la période type que décriront les onglets suivants. */
   onChoisir: (id: string) => void
 }
 
@@ -85,7 +93,7 @@ interface MetaLocale {
 const AUCUNE = '__aucune__'
 
 /**
- * Un clic parti d'un de ces éléments ne choisit PAS le profil : on manipulait
+ * Un clic parti d'un de ces éléments ne choisit PAS la période type : on manipulait
  * un réglage de la carte, pas la carte. Le déclencheur de menu est visé par son
  * `data-slot` — c'est un `button`, mais la liste qu'il ouvre part en portail,
  * donc les clics sur les options ne remontent jamais jusqu'ici.
@@ -100,7 +108,7 @@ function saisonClair(s: string | null): string {
 const EFFECTIFS = [1, 2, 3, 4]
 
 function effectifClair(n: number | null): string {
-  if (n === null || !EFFECTIFS.includes(n)) return 'Selon la période'
+  if (n === null || !EFFECTIFS.includes(n)) return 'Selon la saison'
   return n === 1 ? '1 véto' : `${n} vétos`
 }
 
@@ -116,11 +124,11 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
   const [saisonNouveau, setSaisonNouveau] = useState<string>(AUCUNE)
   const [effectifNouveau, setEffectifNouveau] = useState<string>(AUCUNE)
 
-  // Renommage en ligne : un seul profil à la fois en édition.
+  // Renommage en ligne : une seule période type à la fois en édition.
   const [renommeId, setRenommeId] = useState<string | null>(null)
   const [nomEdite, setNomEdite] = useState('')
 
-  // Suppression : le profil visé par la modale de confirmation.
+  // Suppression : la période type visée par la modale de confirmation.
   const [aSupprimer, setASupprimer] = useState<ProfilUI | null>(null)
 
   // Réglages déjà appliqués à l'écran, pas encore confirmés par le serveur.
@@ -152,11 +160,11 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
   const creer = () => {
     const propre = nom.trim()
     if (!propre) {
-      toast.error('Donne un nom à ce profil (« Hiver », « Été », « Vacances »…).')
+      toast.error('Donne un nom à cette période type (« Hiver », « Été », « Vacances »…).')
       return
     }
     if (propre.length > 60) {
-      toast.error('Le nom du profil est trop long (60 caractères max).')
+      toast.error('Le nom de la période type est trop long (60 caractères max).')
       return
     }
     startTransition(async () => {
@@ -172,7 +180,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
         toast.error(res.error)
         return
       }
-      toast.success(`Profil « ${propre} » créé, avec les types de garde de sa source.`)
+      toast.success(`Période type « ${propre} » créée, avec les types de garde de sa source.`)
       setCreationOuverte(false)
       router.refresh()
     })
@@ -181,7 +189,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
   const renommer = (p: ProfilUI) => {
     const propre = nomEdite.trim()
     if (!propre) {
-      toast.error('Le nom du profil est obligatoire.')
+      toast.error('Le nom de la période type est obligatoire.')
       return
     }
     if (propre === p.nom) {
@@ -194,7 +202,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
         toast.error(res.error)
         return
       }
-      toast.success('Profil renommé.')
+      toast.success('Période type renommée.')
       setRenommeId(null)
       router.refresh()
     })
@@ -238,13 +246,13 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
         toast.error(res.error)
         return
       }
-      toast.success(`Profil « ${cible.nom} » supprimé.`)
+      toast.success(`Période type « ${cible.nom} » supprimée.`)
       setASupprimer(null)
       router.refresh()
     })
   }
 
-  /** Un clic sur la carte choisit le profil — sauf s'il visait un réglage. */
+  /** Un clic sur la carte choisit la période type — sauf s'il visait un réglage. */
   const cliquerCarte = (p: ProfilUI, cible: EventTarget | null) => {
     if (p.id === profilCourantId) return
     if (cible instanceof Element && cible.closest(ZONES_NEUTRES)) return
@@ -255,7 +263,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
     <>
       <section className="card">
         <div className="card-head">
-          <h2>Profils de planning</h2>
+          <h2>Périodes types</h2>
           <span className={`section-count${profils.length === 0 ? ' zero' : ''}`}>
             {profils.length}
           </span>
@@ -266,23 +274,23 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
             onClick={ouvrirCreation}
             disabled={isPending || creationOuverte || profils.length === 0}
           >
-            <CopyPlus size={15} aria-hidden="true" /> Nouveau profil
+            <CopyPlus size={15} aria-hidden="true" /> Nouvelle période type
           </button>
           <p className="sub">
-            Un profil, c&apos;est une façon d&apos;organiser les gardes : ses types de garde, leurs
+            Une période type, c&apos;est une façon d&apos;organiser les gardes : ses types de garde, leurs
             horaires et leurs enchaînements. On en applique un à chaque période — « Hiver » quand
             les nuits sont longues, « Été » quand l&apos;équipe est réduite. Choisis une carte pour
-            que les trois onglets suivants décrivent ce profil-là.
+            que les trois onglets suivants décrivent cette période type-là.
           </p>
         </div>
 
         {creationOuverte && (
           <div className="panneau">
-            <p className="panneau-titre">Nouveau profil de planning</p>
+            <p className="panneau-titre">Nouvelle période type</p>
 
             <div className="grille">
               <div className="large">
-                <label htmlFor="prof-nom">Nom du profil</label>
+                <label htmlFor="prof-nom">Nom de la période type</label>
                 <input
                   id="prof-nom"
                   type="text"
@@ -350,10 +358,10 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
             </div>
 
             <p className="note">
-              Le nouveau profil part avec les types de garde du profil copié : il est générable
-              immédiatement. On ajuste ensuite ses horaires dans l&apos;onglet « Types de garde ».
-              La saison suggérée sert juste à le proposer d&apos;office quand on crée une période
-              de cette saison-là.
+              La nouvelle période type part avec les types de garde de celle qu&apos;on copie :
+              elle est générable immédiatement. On ajuste ensuite ses horaires dans l&apos;onglet
+              « Types de garde ». La saison suggérée sert juste à la proposer d&apos;office quand
+              on crée un planning de cette saison-là.
             </p>
 
             <div className="panneau-pied">
@@ -371,7 +379,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
                 onClick={creer}
                 disabled={isPending}
               >
-                {isPending ? 'Un instant…' : 'Créer le profil'}
+                {isPending ? 'Un instant…' : 'Créer la période type'}
               </button>
             </div>
           </div>
@@ -379,10 +387,10 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
 
         {profils.length === 0 ? (
           <p className="empty-row">
-            Aucun profil de planning pour ce cabinet. Un profil se crée en copiant un profil
-            existant — il n&apos;y en a aucun à copier ici, c&apos;est le signe que la structure du
-            cabinet n&apos;a jamais été initialisée. Demande à Filou, il sait poser la première
-            organisation de gardes.
+            Aucune période type pour ce cabinet. Une période type se crée en copiant une
+            existante — il n&apos;y en a aucune à copier ici, c&apos;est le signe que
+            l&apos;organisation du cabinet n&apos;a jamais été initialisée. Demande à Filou, il sait
+            poser la première.
           </p>
         ) : (
           <div className="prof-grille">
@@ -405,8 +413,8 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
                   aria-pressed={courant}
                   aria-label={
                     courant
-                      ? `Profil ${p.nom}, actuellement décrit par les onglets suivants`
-                      : `Voir le profil ${p.nom} dans les onglets suivants`
+                      ? `Période type ${p.nom}, actuellement décrite par les onglets suivants`
+                      : `Voir la période type ${p.nom} dans les onglets suivants`
                   }
                   onClick={(e) => cliquerCarte(p, e.target)}
                   onKeyDown={(e) => {
@@ -418,7 +426,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
                 >
                   {enEdition ? (
                     <div className="field">
-                      <label htmlFor={`renommer-${p.id}`}>Nom du profil</label>
+                      <label htmlFor={`renommer-${p.id}`}>Nom de la période type</label>
                       <input
                         id={`renommer-${p.id}`}
                         type="text"
@@ -439,7 +447,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
                       {courant ? (
                         <span className="etiq neutre">Affiché ici</span>
                       ) : (
-                        <span className="etiq eteint">Voir ce profil</span>
+                        <span className="etiq eteint">Voir cette période type</span>
                       )}
                     </div>
                   )}
@@ -448,7 +456,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
                     {p.creneaux.length} type{p.creneaux.length > 1 ? 's' : ''} de garde,{' '}
                     {actifs === 0 ? 'aucun actif' : `dont ${actifs} actif${actifs > 1 ? 's' : ''}`}.
                     {courant
-                      ? ' C’est ce profil que décrivent les onglets suivants.'
+                      ? ' C’est cette période type que décrivent les onglets suivants.'
                       : ' Clique la carte pour le décrire dans les onglets suivants.'}
                   </p>
 
@@ -557,9 +565,9 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
                           <Pencil size={15} aria-hidden="true" /> Renommer
                         </button>
 
-                        {/* Le profil par défaut ne se supprime pas : c'est celui
-                            sur lequel retombe toute période qui n'en désigne
-                            aucun. On laisse le bouton visible mais éteint —
+                        {/* La période type par défaut ne se supprime pas :
+                            c'est celle sur laquelle retombe tout planning qui
+                            n'en désigne aucune. Bouton visible mais éteint —
                             l'absence de bouton se lit comme un oubli. */}
                         <button
                           type="button"
@@ -568,7 +576,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
                           disabled={isPending || p.estDefaut}
                           title={
                             p.estDefaut
-                              ? 'Le profil par défaut ne peut pas être supprimé : c’est celui qui sert quand une période n’en désigne aucun.'
+                              ? 'La période type par défaut ne peut pas être supprimée : c’est celle qui sert quand un planning n’en désigne aucune.'
                               : undefined
                           }
                         >
@@ -580,8 +588,8 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
 
                   {p.estDefaut && !enEdition && (
                     <p className="note">
-                      Profil par défaut : il sert de repli pour toute période qui n&apos;en désigne
-                      aucun. Il ne peut donc pas être supprimé.
+                      Période type par défaut : elle sert de repli pour tout planning qui n&apos;en
+                      désigne aucune. Elle ne peut donc pas être supprimée.
                     </p>
                   )}
                 </article>
@@ -602,9 +610,9 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
       >
         <DialogContent className="gv-modale">
           <DialogHeader>
-            <DialogTitle>Supprimer le profil « {aSupprimer?.nom} » ?</DialogTitle>
+            <DialogTitle>Supprimer la période type « {aSupprimer?.nom} » ?</DialogTitle>
             <DialogDescription>
-              C&apos;est définitif, et ça ne touche pas qu&apos;à ce profil.
+              C&apos;est définitif, et ça ne touche pas qu&apos;à cette période type.
             </DialogDescription>
           </DialogHeader>
 
@@ -613,11 +621,11 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
               <li>
                 Ses {aSupprimer.creneaux.length} type
                 {aSupprimer.creneaux.length > 1 ? 's' : ''} de garde et leurs horaires disparaissent
-                avec lui, ainsi que ses enchaînements.
+                avec elle, ainsi que ses enchaînements.
               </li>
               <li>
-                Les périodes qui l&apos;utilisaient se retrouvent <strong>sans profil</strong> : à
-                leur prochaine génération, il faudra leur en désigner un.
+                Les plannings qui l&apos;utilisaient se retrouvent <strong>sans période
+                type</strong> : à leur prochaine génération, il faudra leur en désigner une.
               </li>
               <li>
                 Les plannings <strong>déjà générés</strong> ne bougent pas — ce qui est publié
@@ -628,7 +636,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
 
           <p className="gv-note">
             Pour garder cette organisation sous la main sans la voir partout, mieux vaut la laisser
-            en place : un profil inutilisé ne coûte rien et ne s&apos;applique à aucune période
+            en place : une période type inutilisé ne coûte rien et ne s&apos;applique à aucune période
             tant qu&apos;on ne le choisit pas.
           </p>
 
@@ -637,7 +645,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
               Annuler
             </Button>
             <Button variant="destructive" onClick={supprimer} disabled={isPending}>
-              {isPending ? 'Un instant…' : 'Supprimer le profil'}
+              {isPending ? 'Un instant…' : 'Supprimer la période type'}
             </Button>
           </DialogFooter>
         </DialogContent>

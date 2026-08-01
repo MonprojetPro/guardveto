@@ -132,17 +132,17 @@ function resoudreProfil(
   if (!nom || !nom.trim()) {
     const def = actifs.find((p) => p.est_defaut)
     if (def) return { ok: true, profil: def }
-    return { ok: false, raison: 'Aucun profil par défaut disponible pour ce cabinet.' }
+    return { ok: false, raison: 'Aucune période type par défaut disponible pour ce cabinet.' }
   }
   const exacts = actifs.filter((p) => memeNom(p.nom, nom))
   if (exacts.length === 1) return { ok: true, profil: exacts[0] }
   if (exacts.length > 1) {
-    return { ok: false, raison: `Plusieurs profils s'appellent « ${nom} ». Précise lequel.` }
+    return { ok: false, raison: `Plusieurs périodes types s'appellent « ${nom} ». Précise laquelle.` }
   }
   const connus = actifs.map((p) => p.nom).join(', ')
   return {
     ok: false,
-    raison: `Aucun profil ne s'appelle « ${nom} ». Les profils du cabinet sont : ${connus}.`,
+    raison: `Aucune période type ne s'appelle « ${nom} ». Les périodes types du cabinet sont : ${connus}.`,
   }
 }
 
@@ -156,12 +156,12 @@ function resoudreCreneau(
   const exacts = duProfil.filter((c) => memeNom(c.nom, nom))
   if (exacts.length === 1) return { ok: true, creneau: exacts[0] }
   if (exacts.length > 1) {
-    return { ok: false, raison: `Plusieurs créneaux s'appellent « ${nom} » dans ce profil. Précise lequel.` }
+    return { ok: false, raison: `Plusieurs types de garde s'appellent « ${nom} » dans cette période type. Précise lequel.` }
   }
   const connus = duProfil.map((c) => c.nom).join(', ') || '(aucun)'
   return {
     ok: false,
-    raison: `Aucun créneau ne s'appelle « ${nom} » dans ce profil. Les créneaux du profil sont : ${connus}.`,
+    raison: `Aucun type de garde ne s'appelle « ${nom} » dans cette période type. Ceux qui existent : ${connus}.`,
   }
 }
 
@@ -197,7 +197,9 @@ const GENRE_HUMAIN: Record<string, string> = {
 export const lireProfilsPlanning: OutilLecture<typeof SANS_PARAMETRE> = {
   genre: 'lecture',
   nom: 'lire_profils_planning',
-  description: `Donne la liste des profils de planning du cabinet (« Hiver », « Été »…) : nom, s'il est actif, la saison suggérée, l'effectif de nuit en semaine (1 ou 2 vétérinaires), et lequel est le profil PAR DÉFAUT.
+  description: `Donne la liste des PÉRIODES TYPES du cabinet (« Hiver », « Été »… — appelées « profils de planning » dans la base) : nom, si elle est active, la saison suggérée, l'effectif de nuit en semaine, et laquelle est celle PAR DÉFAUT.
+
+À l'écran, l'utilisateur dit « période type » : emploie ce mot-là dans tes réponses, jamais « profil ».
 
 Appelle-le pour toute question sur les profils existants, avant de créer un profil (pour vérifier qu'un équivalent n'existe pas déjà), ou avant de désigner un profil source pour une création.
 
@@ -225,7 +227,9 @@ const ParamsLireCreneaux = z.object({
 export const lireCreneauxProfil: OutilLecture<typeof ParamsLireCreneaux> = {
   genre: 'lecture',
   nom: 'lire_creneaux_profil',
-  description: `Donne le catalogue des créneaux d'un profil de planning : nom, jours de la semaine couverts, horaires (début/fin, jour de fin), nombre de places et rôles, actif ou non.
+  description: `Donne le catalogue des TYPES DE GARDE d'une période type : nom, jours de la semaine couverts, horaires (début/fin, jour de fin), nombre de places et rôles, actif ou non.
+
+Dis « type de garde » et « période type » dans tes réponses — ce sont les mots de l'écran.
 
 Appelle-le pour toute question sur les horaires d'un profil, sa composition, ou avant de créer une liaison entre deux créneaux (il faut connaître leurs noms exacts).`,
   params: ParamsLireCreneaux,

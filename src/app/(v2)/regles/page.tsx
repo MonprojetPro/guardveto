@@ -1,5 +1,5 @@
 // ============================================================
-// GUARDVETO V2 — Règles & structure (écran fusionné)
+// GUARDVETO V2 — Organisation du cabinet (écran fusionné)
 // ============================================================
 // Quatrième écran de la bascule. Il RÉUNIT deux pages V1 qui répondaient à une
 // seule question — « comment mon cabinet fonctionne-t-il ? » — sans jamais se
@@ -47,7 +47,7 @@ import {
 import type { Veterinaire } from '@/types'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'GuardVeto — Règles & structure' }
+export const metadata = { title: 'GuardVeto — Organisation du cabinet' }
 
 const BRIQUE_EQUILIBRER = 'equilibrer'
 const BRIQUE_LIAISON = 'liaison_creneaux' // R9 — même équipe

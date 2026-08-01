@@ -9,7 +9,7 @@
 // eux (`ReglesClient`, `CompositionEquipeClient`, `ReglagesPlanningClient`).
 // Cinq cartes ici, de la plus concrète à la plus abstraite : les règles qui
 // nomment quelqu'un, celles qui parlent d'étiquettes, l'équilibrage, ses
-// cohortes, puis les préférences de confort.
+// équilibrages par étiquette, puis les préférences de confort.
 //
 // CE QUI EST REPRIS TEL QUEL, ET POURQUOI
 //
@@ -200,7 +200,7 @@ const EQUITE_META: Record<EquityDimension, { titre: string; aide: string }> = {
   },
 }
 
-/** Libellé court d'une dimension, pour la liste des cohortes. */
+/** Libellé court d'une charge, pour la liste des équilibrages par étiquette. */
 const DIMENSION_LABELS: Record<EquityDimension, string> = {
   weekend: 'Week-ends',
   weekend_premier: 'Rôle de 1er le week-end',
@@ -211,8 +211,9 @@ const DIMENSION_LABELS: Record<EquityDimension, string> = {
   grands_weekend: 'Grands week-ends (salariés)',
 }
 
-/** Les crans proposés à une COHORTE : « Ignorée » est exclu à dessein — un
- *  poids nul ne se stocke pas, on retire la cohorte par la corbeille. */
+/** Les crans proposés à un équilibrage PAR ÉTIQUETTE : « Ignorée » est exclu
+ *  à dessein — un poids nul ne se stocke pas, on retire la ligne par la
+ *  corbeille. (En base et côté moteur, ces lignes s'appellent des cohortes.) */
 const IMPORTANCE_ACTIVES = IMPORTANCE_LEVELS.filter((n) => n !== 'ignoree')
 
 /** Les 4 pénalités souples réglables (R10 / R10c / R10b / R8b). */
@@ -611,7 +612,7 @@ export function OngletMoteur({
         toast.error(res.error)
         return
       }
-      toast.success('Cohorte retirée.')
+      toast.success('Équilibrage par étiquette retiré.')
       router.refresh()
     })
   }
@@ -628,7 +629,7 @@ export function OngletMoteur({
         toast.error(res.error)
         return
       }
-      toast.success('Cohorte ajoutée — appliquée à la prochaine génération.')
+      toast.success('Équilibrage par étiquette ajouté — appliqué à la prochaine génération.')
       setCohorteOuverte(false)
       router.refresh()
     })
@@ -980,7 +981,7 @@ export function OngletMoteur({
                     </button>
                   ))}
                 </div>
-                <p className="note">Aucun coché = la règle s&apos;applique à tous les créneaux.</p>
+                <p className="note">Aucun coché = la règle s&apos;applique à tous les types de garde.</p>
               </div>
 
               <div className="large">
@@ -1054,7 +1055,7 @@ export function OngletMoteur({
                     <span>
                       {r.creneaux.length > 0
                         ? r.creneaux.map(nomCreneau).join(', ')
-                        : 'Tous les créneaux'}
+                        : 'Tous les types de garde'}
                     </span>
                   </p>
                   <Consequence texte={r.actif ? aideForce(r.force) : EFFET_ETEINTE} />
@@ -1141,10 +1142,10 @@ export function OngletMoteur({
         ))}
       </section>
 
-      {/* ══════════════ Carte 4 · Cohortes d'équité ══════════════ */}
+      {/* ═══════ Carte 4 · Équilibrage entre certains seulement ═══════ */}
       <section className="card">
         <div className="card-head">
-          <h2>Cohortes d&apos;équité</h2>
+          <h2>Équilibrer entre certains seulement</h2>
           <span className={`section-count${cohortes.length === 0 ? ' zero' : ''}`}>
             {cohortes.length}
           </span>
@@ -1173,7 +1174,7 @@ export function OngletMoteur({
           (tagsEquipe.length === 0 ? (
             <div className="panneau">
               <p className="note">
-                Aucune étiquette n&apos;est posée sur l&apos;équipe : une cohorte n&apos;aurait
+                Aucune étiquette n&apos;est posée sur l&apos;équipe : cet équilibrage n&apos;aurait
                 personne à équilibrer. Ajoute d&apos;abord des étiquettes sur les fiches, page
                 Équipe.
               </p>
@@ -1189,7 +1190,7 @@ export function OngletMoteur({
             </div>
           ) : (
             <div className="panneau">
-              <p className="panneau-titre">Nouvelle cohorte d&apos;équité</p>
+              <p className="panneau-titre">Nouvel équilibrage par étiquette</p>
 
               <div className="grille">
                 <div>
@@ -1276,7 +1277,7 @@ export function OngletMoteur({
 
         {cohortes.length === 0 ? (
           <p className="empty-row">
-            Aucune cohorte. Les charges ci-dessus sont donc équilibrées entre tout le monde, sans
+            Rien ici. Les charges ci-dessus sont donc équilibrées entre tout le monde, sans
             distinction d&apos;étiquette.
           </p>
         ) : (
@@ -1292,8 +1293,8 @@ export function OngletMoteur({
               </div>
               <div className="reg-actions">
                 {/* Pas de « Ignorée » ici : un poids nul ne se stocke pas. Pour
-                    ne plus équilibrer cette cohorte, on la retire — c'est plus
-                    franc qu'un cran qui ne fait rien. */}
+                    ne plus équilibrer ce groupe, on retire la ligne — c'est
+                    plus franc qu'un cran qui ne fait rien. */}
                 <Select
                   value={c.importance}
                   onValueChange={(v) => changerImportanceCohorte(c, String(v))}

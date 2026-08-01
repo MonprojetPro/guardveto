@@ -1,17 +1,34 @@
 'use client'
 
 // ============================================================
-// GUARDVETO V2 — Règles & structure : la coquille et ses quatre onglets
+// GUARDVETO V2 — Organisation du cabinet : la coquille et ses quatre onglets
 // ============================================================
 // Une seule porte pour « comment mon cabinet fonctionne » : ce qu'il est
-// (profils, types de garde, enchaînements) et ce qu'il exige (les règles du
-// moteur). En V1, c'était deux pages qui ne se connaissaient pas.
+// (périodes types, types de garde, enchaînements) et ce qu'il exige (les
+// règles). En V1, c'était deux pages qui ne se connaissaient pas.
 //
-// LE PROFIL EST LE CONTEXTE DE LA PAGE, pas un widget local. Il y avait trois
-// sélecteurs de profil en V1, désynchronisés — et le catalogue de créneaux
-// était en plus codé en dur sur le profil DÉFAUT : un admin qui avait un profil
-// « Été » ne voyait jamais ses créneaux d'été. Ici, un seul sélecteur, en tête,
-// et les onglets 1 à 3 en découlent.
+// ── LE VOCABULAIRE (décidé avec MiKL le 2026-08-01) ──────────────
+//
+//   ORGANISATION DU CABINET   ce que porte cet écran
+//     └── PÉRIODE TYPE        « Hiver », « Été », « Été 2 »… un MODÈLE
+//                             réutilisable : ses types de garde, ses
+//                             horaires, son effectif, ses règles
+//   PLANNING                  des dates à remplir en appliquant UNE période
+//                             type. C'est le RÉSULTAT, pas un réglage — il ne
+//                             se configure pas ici.
+//
+// Le mot « profil » ne doit plus apparaître à l'écran : il ne disait à
+// personne ce qu'il faisait, au point que MiKL a dû inventer « période
+// structurelle » pour se faire comprendre. Côté BASE, la table s'appelle
+// encore `profils_planning` et les actions serveur `…Profil` — c'est la
+// frontière assumée de cette étape : on renomme ce que l'utilisateur lit,
+// pas ce que Postgres stocke. Les deux se rejoindront (ou pas) plus tard.
+//
+// LA PÉRIODE TYPE EST LE CONTEXTE DE LA PAGE, pas un widget local. Il y avait
+// trois sélecteurs en V1, désynchronisés — et le catalogue de créneaux était
+// en plus codé en dur sur celle par DÉFAUT : un admin qui avait un « Été » ne
+// voyait jamais ses créneaux d'été. Ici, un seul sélecteur, en tête, et les
+// onglets 1 à 3 en découlent.
 //
 // PAS D'ASSISTANT IA INLINE. La V1 en avait trois (règles, profils, liaisons),
 // trois encarts qui faisaient chacun un bout du travail de Filou. C'est Filou,
@@ -135,25 +152,26 @@ export function ReglesStructureV2({
     <>
       <div className="page-head rise">
         <div>
-          <p className="page-kicker">Règles &amp; structure</p>
+          <p className="page-kicker">Organisation</p>
           <h1>Comment votre cabinet organise ses gardes.</h1>
           <p className="lede">
-            Les types de garde, leurs horaires, leurs enchaînements et les règles que le moteur doit
-            respecter. Tout ce qui est réglé ici s&apos;applique à la prochaine génération de
-            planning.
+            Vos périodes types — l&apos;hiver, l&apos;été — avec leurs types de garde, leurs
+            horaires, leurs enchaînements et leurs règles. Tout ce qui est réglé ici s&apos;applique
+            au prochain planning que vous générerez.
           </p>
         </div>
 
-        {/* Le sélecteur de profil n'apparaît QUE sur les onglets qui décrivent
-            un profil. Sur l'onglet « Profils », il faisait doublon avec la
-            grille juste en dessous — deux commandes pour un même choix, à
-            30 cm l'une de l'autre. Là-bas, on désigne le profil en cliquant sa
-            carte. Sur « Règles du moteur », il ne veut rien dire : les règles
-            ne dépendent pas du profil. */}
+        {/* Le sélecteur n'apparaît QUE sur les onglets qui décrivent UNE
+            période type. Sur l'onglet « Périodes types », il faisait doublon
+            avec la grille juste en dessous — deux commandes pour un même
+            choix, à 30 cm l'une de l'autre. Là-bas, on désigne la période type
+            en cliquant sa carte. Sur « Règles », il ne veut rien dire
+            aujourd'hui : une règle ne dépend encore d'aucune période type
+            (c'est justement l'étape 4 du chantier). */}
         {profils.length > 1 && (onglet === 'creneaux' || onglet === 'enchainements') && (
           <div className="page-actions">
             <div className="profil-pilote">
-              <span id="profil-courant-label">Profil</span>
+              <span id="profil-courant-label">Période type</span>
               <Select value={profilId} onValueChange={(v) => v && setProfilId(v)}>
                 <SelectTrigger aria-labelledby="profil-courant-label" className="w-[230px]">
                   {profil?.nom ?? 'Choisir…'}
@@ -172,9 +190,9 @@ export function ReglesStructureV2({
         )}
       </div>
 
-      <nav className="tabs" role="tablist" aria-label="Sections de Règles et structure">
+      <nav className="tabs" role="tablist" aria-label="Sections de l’organisation du cabinet">
         <button {...tab('profils')}>
-          Profils {profils.length > 0 && <span className="count">{profils.length}</span>}
+          Périodes types {profils.length > 0 && <span className="count">{profils.length}</span>}
         </button>
         <button {...tab('creneaux')}>
           Types de garde{' '}
@@ -184,7 +202,7 @@ export function ReglesStructureV2({
           Enchaînements {nbLiaisons > 0 && <span className="count">{nbLiaisons}</span>}
         </button>
         <button {...tab('moteur')}>
-          Règles du moteur {nbRegles > 0 && <span className="count">{nbRegles}</span>}
+          Règles {nbRegles > 0 && <span className="count">{nbRegles}</span>}
         </button>
       </nav>
 
@@ -195,7 +213,7 @@ export function ReglesStructureV2({
         <FilouEdge origine="regles" cote="droite" />
 
         {onglet === 'profils' && (
-          <section className="tab-panel" role="tabpanel" aria-label="Profils de planning">
+          <section className="tab-panel" role="tabpanel" aria-label="Périodes types">
             <OngletProfils
               profils={profils}
               profilCourantId={profilId}
@@ -204,9 +222,9 @@ export function ReglesStructureV2({
           </section>
         )}
 
-        {/* `key={profil.id}` : changer de profil change le catalogue. Sans
-            remontage, un formulaire à demi rempli garderait des créneaux qui
-            n'existent plus dans le profil qu'on vient d'ouvrir. */}
+        {/* `key={profil.id}` : changer de période type change le catalogue.
+            Sans remontage, un formulaire à demi rempli garderait des types de
+            garde qui n'existent pas dans celle qu'on vient d'ouvrir. */}
         {onglet === 'creneaux' && profil && (
           <section className="tab-panel" role="tabpanel" aria-label="Types de garde">
             <OngletCreneaux key={profil.id} profil={profil} />
@@ -225,7 +243,7 @@ export function ReglesStructureV2({
         )}
 
         {onglet === 'moteur' && (
-          <section className="tab-panel" role="tabpanel" aria-label="Règles du moteur">
+          <section className="tab-panel" role="tabpanel" aria-label="Règles">
             <OngletMoteur
               regles={regles}
               reglesEquipe={reglesEquipe}
@@ -246,8 +264,8 @@ export function ReglesStructureV2({
         {profils.length === 0 && onglet !== 'moteur' && (
           <section className="card">
             <p className="empty-row">
-              Aucun profil de planning n&apos;est configuré pour ce cabinet. Les types de garde et
-              leurs enchaînements se règlent par profil — commence par en créer un.
+              Aucune période type n&apos;est configurée pour ce cabinet. Les types de garde et leurs
+              enchaînements se règlent par période type — commence par en créer une.
             </p>
           </section>
         )}
