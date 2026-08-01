@@ -73,6 +73,14 @@ const FOCUS_ENCHAINEMENTS = new Set([
 ])
 
 interface Props {
+  /**
+   * Faux pour un vétérinaire : l'écran devient une VITRINE. Aucun bouton
+   * d'action n'est rendu, et tout le contenu est enveloppé d'un
+   * `<fieldset disabled>` — ceinture ET bretelles, parce qu'un bouton oublié
+   * dans 3 500 lignes de JSX ne se voit qu'en production, le jour où un véto
+   * clique dessus et reçoit une erreur serveur.
+   */
+  estAdmin: boolean
   /** `?onglet=` — permet de faire un lien direct vers une section. */
   ongletInitial?: string
   /** `?focus=` — ancre d'un réglage précis, venue du diagnostic d'impasse. */
@@ -101,6 +109,7 @@ function ongletDeDepart(ongletInitial?: string, focus?: string): Onglet {
 }
 
 export function ReglesStructureV2({
+  estAdmin,
   ongletInitial,
   focus,
   profils,
@@ -159,6 +168,16 @@ export function ReglesStructureV2({
             leurs horaires, leurs enchaînements et leurs règles. Tout ce qui est réglé ici
             s&apos;applique au prochain planning que vous générerez.
           </p>
+
+          {/* La vitrine se DIT. Un écran dont les boutons ont simplement
+              disparu se lit comme un écran incomplet ; celui-ci annonce sa
+              nature, et à qui s'adresser. */}
+          {!estAdmin && (
+            <p className="ro-bandeau">
+              Vous consultez l&apos;organisation du cabinet. Seul un administrateur peut la
+              modifier — dites à Filou ce qui vous conviendrait, il fera remonter la demande.
+            </p>
+          )}
         </div>
 
         {/* Le sélecteur n'apparaît QUE sur les onglets qui décrivent UNE
@@ -209,7 +228,16 @@ export function ReglesStructureV2({
       {/* La scène porte Filou accroché au rebord DROIT des cartes. Il repart
           avec la mémoire de l'écran (`#filou=regles`) : c'est ce qui lui permet
           d'accueillir par la bonne question. Cf. `src/lib/v2/filou-origine.ts`. */}
-      <div className="reg-scene">
+      {/* `<fieldset disabled>` : le NAVIGATEUR rend inertes tous les contrôles
+          qu'il contient, y compris ceux qu'on aurait oublié de masquer. C'est
+          une garantie structurelle, pas une consigne — et elle ne remplace pas
+          l'`assertAdmin` de chaque action serveur, qui reste le vrai gardien.
+          `.ro-shell` neutralise l'habillage par défaut du fieldset (bordure,
+          marges) et l'opacité que certains navigateurs appliquent. */}
+      <fieldset
+        className={`reg-scene${estAdmin ? '' : ' ro-shell'}`}
+        disabled={!estAdmin}
+      >
         <FilouEdge origine="regles" cote="droite" />
 
         {onglet === 'profils' && (
@@ -235,6 +263,7 @@ export function ReglesStructureV2({
           <section className="tab-panel" role="tabpanel" aria-label="Enchaînements">
             <OngletEnchainements
               key={profil.id}
+              estAdmin={estAdmin}
               profil={profil}
               niveaux={niveauxLiaison}
               focus={focus}
@@ -245,6 +274,7 @@ export function ReglesStructureV2({
         {onglet === 'moteur' && (
           <section className="tab-panel" role="tabpanel" aria-label="Règles">
             <OngletMoteur
+              estAdmin={estAdmin}
               regles={regles}
               reglesEquipe={reglesEquipe}
               vets={vets}
@@ -269,7 +299,7 @@ export function ReglesStructureV2({
             </p>
           </section>
         )}
-      </div>
+      </fieldset>
     </>
   )
 }

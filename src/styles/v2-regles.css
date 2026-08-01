@@ -74,6 +74,59 @@
   outline-offset: 2px;
 }
 
+/* ── Vitrine : l'écran vu par un vétérinaire ──────────────────
+   Le contenu est enveloppé d'un `<fieldset disabled>` — c'est le navigateur
+   qui rend les contrôles inertes, y compris ceux qu'on aurait oublié de
+   masquer. Un fieldset arrive avec sa propre bordure, ses marges et, sur
+   certains navigateurs, une opacité réduite quand il est désactivé : tout
+   cela doit sauter, sinon la page consultée paraît en panne. */
+.v2 fieldset.ro-shell {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0; /* un fieldset refuse de rétrécir sans ça — grilles cassées */
+  opacity: 1;
+}
+
+/* TOUTES les commandes disparaissent, d'un seul geste. On aurait pu
+   conditionner une vingtaine de boutons en JSX ; il aurait suffi d'en oublier
+   un — ou d'en ajouter un plus tard — pour qu'un vétérinaire tombe sur une
+   erreur serveur. Ici la règle est structurelle : dans une vitrine, rien de
+   cliquable n'existe. Les MENUS, eux, restent affichés : c'est là que se lit
+   la valeur d'un réglage (« Jamais », « Essentiel »…), et un véto vient
+   précisément pour la lire. */
+.v2 .ro-shell .btn,
+.v2 .ro-shell .icon-btn {
+  display: none;
+}
+
+/* Un contrôle désactivé s'estompe pour dire « pas maintenant ». Dans une
+   vitrine, il n'y a pas de « maintenant » : ternir toutes les valeurs de la
+   page ferait passer une consultation pour une panne. On rend donc leur
+   pleine encre aux menus, en leur retirant l'apparence du cliquable. */
+.v2 .ro-shell .select-plat:disabled,
+.v2 .ro-shell [data-slot='select-trigger']:disabled {
+  opacity: 1;
+  cursor: default;
+  background-image: none;
+  background-color: var(--surface-2);
+}
+
+/* Le bandeau qui DIT que l'écran est en consultation. Sans lui, un écran dont
+   les boutons ont disparu se lit comme un écran qui ne marche pas. */
+.v2 .ro-bandeau {
+  margin-top: 12px;
+  padding: 10px 14px;
+  max-width: 72ch;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--t-muted);
+  background: var(--surface);
+  border: 1px solid var(--t-border);
+  border-left: 3px solid var(--accent-ink);
+  border-radius: var(--r-sm);
+}
+
 /* ── Grammaire commune aux quatre onglets ─────────────────────── */
 
 /* Un fait affiché sous forme d'étiquette + valeur, en colonne. Sert partout où

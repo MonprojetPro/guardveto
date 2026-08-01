@@ -16,8 +16,9 @@
 // dans `/reglages` ; les reprendre créerait deux portes d'écriture sur la même
 // table `cabinets`.
 //
-// Admin seulement : le dock V2 n'a jamais proposé cette entrée aux
-// vétérinaires, et tout y est de la configuration de cabinet.
+// OUVERT À TOUTE L'ÉQUIPE, EN ÉCRITURE ADMIN. Un vétérinaire y lit ce qui
+// fabrique son planning — les horaires, les enchaînements, les règles — sans
+// pouvoir rien changer. Voir le commentaire sur `estAdmin` plus bas.
 // ============================================================
 
 import { createClient } from '@/lib/supabase/server'
@@ -111,7 +112,24 @@ export default async function ReglesStructurePage({
   }
 
   const vet = moi as Veterinaire
-  if (vet.role_app !== 'admin') redirect('/accueil')
+
+  // OUVERT AUX VÉTÉRINAIRES, EN LECTURE SEULE.
+  //
+  // Les deux pages V1 fusionnées ici l'étaient déjà : leur `isAdmin` grisait
+  // les boutons, il ne fermait pas la porte, et chaque section affichait
+  // « (Lecture seule — seul l'administrateur peut modifier.) ». La bascule V2 a
+  // posé un `redirect` à la place, et un vétérinaire s'est retrouvé sans aucun
+  // moyen de voir les horaires et les règles qui produisent SON planning.
+  //
+  // Rétabli le 2026-08-01 sur décision de MiKL. La doctrine du produit est
+  // « le véto propose, l'admin ancre » : proposer suppose de voir ce qui existe.
+  //
+  // L'écriture, elle, reste fermée à trois niveaux : les boutons ne sont pas
+  // rendus, le contenu est enveloppé d'un `<fieldset disabled>`, et surtout
+  // chaque action serveur porte son propre `assertAdmin` — c'est celui-là qui
+  // protège réellement, les deux autres ne font qu'éviter de promettre un
+  // geste impossible.
+  const estAdmin = vet.role_app === 'admin'
 
   const [reglesRes, vetsRes, cabinetRes, profils, options] = await Promise.all([
     supabase
@@ -256,8 +274,9 @@ export default async function ReglesStructurePage({
     <>
       <Satin />
       <div className="shell">
-        <BarreV2 prenom={vet.prenom} estAdmin dock={dock} />
+        <BarreV2 prenom={vet.prenom} estAdmin={estAdmin} dock={dock} />
         <ReglesStructureV2
+          estAdmin={estAdmin}
           ongletInitial={onglet}
           focus={focus}
           profils={profils}

@@ -134,25 +134,24 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
           </Link>
         )}
 
-        {estAdmin && (
-          <Link
-            {...entree('/regles')}
-            href="/regles"
-            aria-label="Organisation du cabinet"
-          >
-            <span className="di-ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 7.4h2.9M11 7.4h9M4 12h8.9M17 12h3M4 16.6h4.9M13 16.6h7" />
-                <circle cx="9" cy="7.4" r="2" />
-                <circle cx="15" cy="12" r="2" />
-                <circle cx="11" cy="16.6" r="2" />
-              </svg>
-            </span>
-            <span className="di-flap" aria-hidden="true">
-              <span className="di-text">Organisation</span>
-            </span>
-          </Link>
-        )}
+        {/* Ouverte à TOUTE l'équipe : un vétérinaire y consulte les horaires,
+            les enchaînements et les règles qui fabriquent son planning — la
+            page le reçoit en vitrine, sans aucune commande. L'entrée était
+            réservée aux admins depuis la bascule V2 ; c'était une porte fermée
+            sur une information qui le concerne au premier chef. */}
+        <Link {...entree('/regles')} href="/regles" aria-label="Organisation du cabinet">
+          <span className="di-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 7.4h2.9M11 7.4h9M4 12h8.9M17 12h3M4 16.6h4.9M13 16.6h7" />
+              <circle cx="9" cy="7.4" r="2" />
+              <circle cx="15" cy="12" r="2" />
+              <circle cx="11" cy="16.6" r="2" />
+            </svg>
+          </span>
+          <span className="di-flap" aria-hidden="true">
+            <span className="di-text">Organisation</span>
+          </span>
+        </Link>
 
         <Link {...entree('/historique')} href="/historique" aria-label="Historique et compteurs">
           <span className="di-ico" aria-hidden="true">

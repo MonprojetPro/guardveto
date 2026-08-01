@@ -60,6 +60,8 @@ import { AideFilou } from './AideFilou'
 import type { GenreRelationUI, NiveauLiaisonUI, ProfilUI, RelationUI } from './types'
 
 interface Props {
+  /** Faux pour un vétérinaire : aucune commande d'écriture n'est rendue. */
+  estAdmin: boolean
   /** La période type courante, avec ses types de garde et ses enchaînements. */
   profil: ProfilUI
   /** Le niveau (ferme/souple) de chaque genre de liaison, lu dans `regles_cabinet`. */
@@ -142,7 +144,7 @@ function messageErreur(res: unknown): string | null {
   return null
 }
 
-export function OngletEnchainements({ profil, niveaux, focus }: Props) {
+export function OngletEnchainements({ estAdmin, profil, niveaux, focus }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -334,7 +336,9 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
         <div className="card-head">
           <h2>Ce que les enchaînements imposent</h2>
           <span className="spacer" />
-          <AideFilou sujet="comprendre ce qu’un niveau change, ou décrire l’enchaînement voulu" />
+          {estAdmin && (
+            <AideFilou sujet="comprendre ce qu’un niveau change, ou décrire l’enchaînement voulu" />
+          )}
           <p className="sub">
             Deux réglages pour tout le cabinet : à quel point le moteur doit tenir les
             enchaînements que vous avez déclarés plus bas. Ils valent pour tous les enchaînements

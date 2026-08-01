@@ -27,7 +27,6 @@ loadEnvLocal()
 // qu'une seule cible passerait à côté de la moitié des cas.
 const ADMIN_ONLY_ROUTES: { route: string; renvoiVers: RegExp }[] = [
   { route: '/equipe', renvoiVers: /\/accueil/ },
-  { route: '/regles', renvoiVers: /\/accueil/ },
   { route: '/admin/demandes', renvoiVers: /\/planning/ },
 ]
 
@@ -62,6 +61,25 @@ test.describe('Contrôle des rôles', () => {
 
     await page.goto('/compteurs')
     await expect(page).toHaveURL(/\/compteurs/)
+  })
+
+  test('un véto CONSULTE l’Organisation, sans aucune commande', async ({ page }) => {
+    // Régression tenue par ce test : la bascule V2 avait remplacé le « lecture
+    // seule » des deux pages V1 par un `redirect`, privant les vétérinaires de
+    // l'accès aux horaires et aux règles qui produisent leur propre planning.
+    await login(page, USERS.vetoB.email, USERS.vetoB.password)
+    await page.goto('/regles')
+
+    await expect(page).toHaveURL(/\/regles/)
+    await expect(page.getByRole('heading', { name: /Comment votre cabinet organise/ })).toBeVisible()
+
+    // La vitrine se DIT…
+    await expect(page.getByText(/Seul un administrateur peut la modifier/)).toBeVisible()
+
+    // …et ne porte AUCUN bouton d'action. Le sélecteur de période type reste
+    // hors du fieldset (changer de vue n'écrit rien) : on vise donc les
+    // commandes à l'intérieur de la scène.
+    await expect(page.locator('.ro-shell button')).toHaveCount(0)
   })
 
   test('un admin accède bien à l’écran Équipe', async ({ page }) => {

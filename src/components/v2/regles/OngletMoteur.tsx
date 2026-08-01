@@ -314,6 +314,8 @@ function Consequence({ texte }: { texte: string }) {
 // ════════════════════════════════════════════════════════════
 
 interface Props {
+  /** Faux pour un vétérinaire : aucune commande d'écriture n'est rendue. */
+  estAdmin: boolean
   /** Toutes les règles nominatives du cabinet (actives ET désactivées). */
   regles: RegleRow[]
   /** Les règles d'équipe par étiquette (composition + rôle interdit). */
@@ -332,6 +334,7 @@ interface Props {
 }
 
 export function OngletMoteur({
+  estAdmin,
   regles,
   reglesEquipe,
   vets,
@@ -1109,7 +1112,9 @@ export function OngletMoteur({
           <h2>Équilibrage des charges</h2>
           <span className="section-count">{EQUITY_DIMENSIONS.length}</span>
           <span className="spacer" />
-          <AideFilou sujet="ajuster l’équilibrage, ou comprendre pourquoi une charge penche" />
+          {estAdmin && (
+            <AideFilou sujet="ajuster l’équilibrage, ou comprendre pourquoi une charge penche" />
+          )}
           <p className="sub">
             Ce que le moteur cherche à répartir également entre tout le monde. Chaque ligne a son
             propre poids : « Ignorée » revient à ne pas équilibrer cette charge du tout, «
@@ -1339,7 +1344,9 @@ export function OngletMoteur({
         <div className="card-head">
           <h2>Préférences du planning</h2>
           <span className="spacer" />
-          <AideFilou sujet="demander un égard que le moteur ne sait pas encore tenir" />
+          {estAdmin && (
+            <AideFilou sujet="demander un égard que le moteur ne sait pas encore tenir" />
+          )}
           <p className="sub">
             Des égards que le moteur essaie d&apos;avoir, jamais des interdictions : ils ne
             bloquent pas la génération. C&apos;est pourquoi le choix « Jamais » n&apos;est pas
