@@ -779,58 +779,6 @@ export async function modifierCreneau(payload: ModifierCreneauPayload) {
 }
 
 /**
- * Réordonne les créneaux d'un profil : `ids` est la liste COMPLÈTE des créneaux
- * du profil, dans le nouvel ordre d'affichage. La colonne `ordre` existait
- * depuis le début mais n'était modifiable nulle part — l'ordre subi était celui
- * de la création.
- *
- * On écrit un `ordre` dense (1, 2, 3…) plutôt que de permuter deux lignes : le
- * résultat ne dépend pas de l'état antérieur, donc deux glissers rapprochés ne
- * peuvent pas se marcher dessus.
- */
-export async function reordonnerCreneaux(profilId: string, ids: string[]) {
-  const supabase = await createClient()
-
-  const garde = await assertAdmin(supabase)
-  if ('error' in garde) return garde
-
-  if (!Array.isArray(ids) || ids.length === 0) return { error: 'Aucun créneau à réordonner.' }
-  if (new Set(ids).size !== ids.length) return { error: 'Ordre invalide (doublon).' }
-
-  let cabinetId: string
-  try {
-    cabinetId = await resoudreCabinetId(supabase)
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
-  }
-
-  // Les ids envoyés doivent être EXACTEMENT les créneaux de ce profil : un
-  // ordre partiel laisserait des lignes à un rang périmé (donc un affichage
-  // qui dépend de l'ordre d'arrivée en base).
-  const { data: duProfil } = await supabase
-    .from('creneau_modele')
-    .select('id')
-    .eq('cabinet_id', cabinetId)
-    .eq('profil_id', profilId)
-  const attendus = new Set(((duProfil as { id: string }[] | null) ?? []).map((r) => r.id))
-  if (attendus.size !== ids.length || ids.some((id) => !attendus.has(id))) {
-    return { error: 'La liste ne correspond plus au catalogue — rafraîchis la page.' }
-  }
-
-  for (let i = 0; i < ids.length; i++) {
-    const { error } = await supabase
-      .from('creneau_modele')
-      .update({ ordre: i + 1 })
-      .eq('id', ids[i])
-      .eq('cabinet_id', cabinetId)
-    if (error) return { error: error.message }
-  }
-
-  revalidatePath('/regles')
-  return { success: true }
-}
-
-/**
  * Active / désactive un créneau du catalogue (seed compris — c'est ainsi qu'un
  * cabinet remplace le week-end atomique par un samedi + un dimanche sur-mesure).
  * Un créneau inactif n'émet plus aucun slot à la génération.

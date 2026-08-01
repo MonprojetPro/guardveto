@@ -6,10 +6,15 @@
 // Un profil est une ORGANISATION DE GARDES réutilisable (« Hiver », « Été »,
 // « Vacances »…) : un catalogue de types de garde avec leurs horaires, qu'on
 // applique ensuite à une période. C'est l'objet le plus haut de cet écran —
-// les trois onglets suivants ne parlent que du profil sélectionné en tête de
-// page. D'où sa place en premier, et le repère visuel sur la carte du profil
-// courant (`.prof-carte.courant`) : sans lui, le sélecteur du haut et cette
-// grille racontent deux histoires différentes.
+// les trois onglets suivants ne décrivent qu'UN profil, celui qu'on a désigné.
+//
+// CET ONGLET EST LE SÉLECTEUR DE PROFIL. Il y avait au départ un menu déroulant
+// « Profil » en tête de page, y compris ici : une case à droite pour choisir,
+// et juste en dessous une grille qui montrait les mêmes profils sans qu'on
+// puisse en choisir aucun. Deux commandes pour un seul geste. Désormais la
+// tête de page ne porte le menu que sur « Types de garde » et « Enchaînements »
+// (là où la grille n'est pas visible), et ICI c'est la carte elle-même qu'on
+// clique. Une carte = un choix, avec son `aria-pressed`.
 //
 // TROIS DÉCISIONS PORTÉES ICI :
 //
@@ -29,9 +34,17 @@
 //    profil part en cascade. On ne fait pas signer un geste destructeur sur
 //    une phrase inexacte.
 //
+// AUCUN `<select>` NATIF ici : un select natif ouvre le menu du NAVIGATEUR
+// (carré, bleu système), à côté de boutons en pilule et de champs aux coins
+// arrondis. Tous les menus passent par le composant `ui/select` du projet, qui
+// est habillé de bout en bout dans `v2-terrier.css` (le déclencheur à même
+// l'écran ET la liste en portail). Sa contrainte : il refuse `value=""`, d'où
+// la sentinelle `AUCUNE` pour dire « pas de valeur », traduite en `null` avant
+// d'atteindre le serveur.
+//
 // Saison et effectif s'enregistrent AU CHANGEMENT, sans bouton « Enregistrer » :
 // ce sont deux valeurs parmi trois, le geste est déjà la décision. L'affichage
-// est optimiste et revient en arrière si le serveur refuse — sinon le select
+// est optimiste et revient en arrière si le serveur refuse — sinon le menu
 // montrerait la nouvelle valeur alors que la base a gardé l'ancienne.
 // ============================================================
 
@@ -44,6 +57,9 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import {
+  Select, SelectContent, SelectItem, SelectTrigger,
+} from '@/components/ui/select'
+import {
   creerProfil, renommerProfil, setProfilMeta, supprimerProfil,
 } from '@/app/(protected)/admin/structure/actions'
 import type { ProfilUI } from './types'
@@ -52,6 +68,8 @@ interface Props {
   profils: ProfilUI[]
   /** Le profil regardé dans les autres onglets — à signaler visuellement (classe `courant`). */
   profilCourantId: string
+  /** Désigne le profil que décriront les onglets suivants. */
+  onChoisir: (id: string) => void
 }
 
 /** Ce qu'une action serveur de cet écran peut répondre. */
@@ -63,8 +81,16 @@ interface MetaLocale {
   effectifSoirSemaine?: number | null
 }
 
-/** Le select natif interdit `null` : sentinelle pour « pas de valeur ». */
-const AUCUNE = ''
+/** Le composant de menu refuse la valeur vide : sentinelle pour « aucune valeur ». */
+const AUCUNE = '__aucune__'
+
+/**
+ * Un clic parti d'un de ces éléments ne choisit PAS le profil : on manipulait
+ * un réglage de la carte, pas la carte. Le déclencheur de menu est visé par son
+ * `data-slot` — c'est un `button`, mais la liste qu'il ouvre part en portail,
+ * donc les clics sur les options ne remontent jamais jusqu'ici.
+ */
+const ZONES_NEUTRES = 'button, input, a, [data-slot="select-trigger"]'
 
 function saisonClair(s: string | null): string {
   return s === 'ete' ? 'Été' : s === 'hiver' ? 'Hiver' : 'Aucune'
@@ -74,7 +100,7 @@ function effectifClair(n: number | null): string {
   return n === 1 ? '1 véto' : n === 2 ? '2 vétos' : 'Selon la période'
 }
 
-export function OngletProfils({ profils, profilCourantId }: Props) {
+export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -214,6 +240,13 @@ export function OngletProfils({ profils, profilCourantId }: Props) {
     })
   }
 
+  /** Un clic sur la carte choisit le profil — sauf s'il visait un réglage. */
+  const cliquerCarte = (p: ProfilUI, cible: EventTarget | null) => {
+    if (p.id === profilCourantId) return
+    if (cible instanceof Element && cible.closest(ZONES_NEUTRES)) return
+    onChoisir(p.id)
+  }
+
   return (
     <>
       <section className="card">
@@ -234,8 +267,8 @@ export function OngletProfils({ profils, profilCourantId }: Props) {
           <p className="sub">
             Un profil, c&apos;est une façon d&apos;organiser les gardes : ses types de garde, leurs
             horaires et leurs enchaînements. On en applique un à chaque période — « Hiver » quand
-            les nuits sont longues, « Été » quand l&apos;équipe est réduite. Les trois onglets
-            suivants décrivent le profil choisi en haut de page.
+            les nuits sont longues, « Été » quand l&apos;équipe est réduite. Choisis une carte pour
+            que les trois onglets suivants décrivent ce profil-là.
           </p>
         </div>
 
@@ -258,45 +291,54 @@ export function OngletProfils({ profils, profilCourantId }: Props) {
               </div>
 
               <div className="large">
-                <label htmlFor="prof-source">Copier les types de garde de</label>
-                <select
-                  id="prof-source"
-                  value={sourceId}
-                  onChange={(e) => setSourceId(e.target.value)}
-                >
-                  {profils.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nom}
-                      {p.estDefaut ? ' (par défaut)' : ''}
-                    </option>
-                  ))}
-                </select>
+                <label id="lbl-source">Copier les types de garde de</label>
+                <Select value={sourceId} onValueChange={(v) => v && setSourceId(String(v))}>
+                  <SelectTrigger aria-labelledby="lbl-source" className="w-full">
+                    {profils.find((p) => p.id === sourceId)?.nom ?? 'Choisir…'}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {profils.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.nom}
+                        {p.estDefaut ? ' (par défaut)' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
-                <label htmlFor="prof-saison">Saison suggérée</label>
-                <select
-                  id="prof-saison"
+                <label id="lbl-saison-neuf">Saison suggérée</label>
+                <Select
                   value={saisonNouveau}
-                  onChange={(e) => setSaisonNouveau(e.target.value)}
+                  onValueChange={(v) => v && setSaisonNouveau(String(v))}
                 >
-                  <option value={AUCUNE}>Aucune</option>
-                  <option value="ete">Été</option>
-                  <option value="hiver">Hiver</option>
-                </select>
+                  <SelectTrigger aria-labelledby="lbl-saison-neuf" className="w-full">
+                    {saisonClair(saisonNouveau === AUCUNE ? null : saisonNouveau)}
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={AUCUNE}>Aucune</SelectItem>
+                    <SelectItem value="ete">Été</SelectItem>
+                    <SelectItem value="hiver">Hiver</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
-                <label htmlFor="prof-effectif">Le soir en semaine</label>
-                <select
-                  id="prof-effectif"
+                <label id="lbl-effectif-neuf">Le soir en semaine</label>
+                <Select
                   value={effectifNouveau}
-                  onChange={(e) => setEffectifNouveau(e.target.value)}
+                  onValueChange={(v) => v && setEffectifNouveau(String(v))}
                 >
-                  <option value={AUCUNE}>Selon la période</option>
-                  <option value="1">1 véto</option>
-                  <option value="2">2 vétos</option>
-                </select>
+                  <SelectTrigger aria-labelledby="lbl-effectif-neuf" className="w-full">
+                    {effectifClair(effectifNouveau === AUCUNE ? null : Number(effectifNouveau))}
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={AUCUNE}>Selon la période</SelectItem>
+                    <SelectItem value="1">1 véto</SelectItem>
+                    <SelectItem value="2">2 vétos</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -343,10 +385,29 @@ export function OngletProfils({ profils, profilCourantId }: Props) {
               const courant = p.id === profilCourantId
 
               return (
+                /* La carte EST le choix. Elle porte `role="button"` plutôt que
+                   d'être un vrai `<button>` : elle contient déjà des boutons et
+                   des menus, et un bouton dans un bouton est du HTML invalide.
+                   Les clics partis de ces réglages sont filtrés (ZONES_NEUTRES),
+                   et le clavier n'agit que si le focus est bien sur la carte. */
                 <article
                   key={p.id}
                   className={`prof-carte${courant ? ' courant' : ''}`}
-                  aria-label={`Profil ${p.nom}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={courant}
+                  aria-label={
+                    courant
+                      ? `Profil ${p.nom}, actuellement décrit par les onglets suivants`
+                      : `Voir le profil ${p.nom} dans les onglets suivants`
+                  }
+                  onClick={(e) => cliquerCarte(p, e.target)}
+                  onKeyDown={(e) => {
+                    if (e.target !== e.currentTarget) return
+                    if (e.key !== 'Enter' && e.key !== ' ') return
+                    e.preventDefault()
+                    cliquerCarte(p, null)
+                  }}
                 >
                   {enEdition ? (
                     <div className="field">
@@ -368,27 +429,32 @@ export function OngletProfils({ profils, profilCourantId }: Props) {
                     <div className="prof-tete">
                       <span className="prof-nom">{p.nom}</span>
                       {p.estDefaut && <span className="etiq">Par défaut</span>}
-                      {courant && !p.estDefaut && <span className="etiq neutre">Affiché ici</span>}
+                      {courant ? (
+                        <span className="etiq neutre">Affiché ici</span>
+                      ) : (
+                        <span className="etiq eteint">Voir ce profil</span>
+                      )}
                     </div>
                   )}
 
                   <p className="note">
                     {p.creneaux.length} type{p.creneaux.length > 1 ? 's' : ''} de garde,{' '}
                     {actifs === 0 ? 'aucun actif' : `dont ${actifs} actif${actifs > 1 ? 's' : ''}`}.
-                    {courant && ' C’est ce profil que décrivent les onglets suivants.'}
+                    {courant
+                      ? ' C’est ce profil que décrivent les onglets suivants.'
+                      : ' Clique la carte pour le décrire dans les onglets suivants.'}
                   </p>
 
                   <div className="prof-reglages">
                     <div className="prof-reglage">
                       <span id={`lbl-saison-${p.id}`}>Saison suggérée</span>
-                      <select
-                        className="select-plat court"
-                        aria-labelledby={`lbl-saison-${p.id}`}
+                      <Select
                         value={saisonDe(p) ?? AUCUNE}
                         disabled={isPending}
-                        onChange={(e) => {
-                          const v = e.target.value
-                          const valeur = v === 'ete' || v === 'hiver' ? v : null
+                        onValueChange={(v) => {
+                          if (!v) return
+                          const brut = String(v)
+                          const valeur = brut === 'ete' || brut === 'hiver' ? brut : null
                           reglerMeta(
                             p,
                             { saisonSuggeree: valeur },
@@ -399,22 +465,29 @@ export function OngletProfils({ profils, profilCourantId }: Props) {
                           )
                         }}
                       >
-                        <option value={AUCUNE}>Aucune</option>
-                        <option value="ete">Été</option>
-                        <option value="hiver">Hiver</option>
-                      </select>
+                        <SelectTrigger
+                          aria-labelledby={`lbl-saison-${p.id}`}
+                          className="w-[150px]"
+                        >
+                          {saisonClair(saisonDe(p))}
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={AUCUNE}>Aucune</SelectItem>
+                          <SelectItem value="ete">Été</SelectItem>
+                          <SelectItem value="hiver">Hiver</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div className="prof-reglage">
                       <span id={`lbl-effectif-${p.id}`}>Le soir en semaine</span>
-                      <select
-                        className="select-plat court"
-                        aria-labelledby={`lbl-effectif-${p.id}`}
+                      <Select
                         value={effectifDe(p) === null ? AUCUNE : String(effectifDe(p))}
                         disabled={isPending}
-                        onChange={(e) => {
-                          const v = e.target.value
-                          const valeur = v === '1' || v === '2' ? Number(v) : null
+                        onValueChange={(v) => {
+                          if (!v) return
+                          const brut = String(v)
+                          const valeur = brut === '1' || brut === '2' ? Number(brut) : null
                           reglerMeta(
                             p,
                             { effectifSoirSemaine: valeur },
@@ -425,10 +498,18 @@ export function OngletProfils({ profils, profilCourantId }: Props) {
                           )
                         }}
                       >
-                        <option value={AUCUNE}>Selon la période</option>
-                        <option value="1">1 véto</option>
-                        <option value="2">2 vétos</option>
-                      </select>
+                        <SelectTrigger
+                          aria-labelledby={`lbl-effectif-${p.id}`}
+                          className="w-[150px]"
+                        >
+                          {effectifClair(effectifDe(p))}
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={AUCUNE}>Selon la période</SelectItem>
+                          <SelectItem value="1">1 véto</SelectItem>
+                          <SelectItem value="2">2 vétos</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 

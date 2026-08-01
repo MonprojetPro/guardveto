@@ -19,16 +19,44 @@
 //    le redessiner, c'était perdre ses garde-fous pour gagner un dégradé.
 //
 //  · Le vocabulaire de fermeté vient UNIQUEMENT de `lib/regles/libelle.ts`
-//    (`phraseRegle`, `choixForce`, `symboleDe`). La V1 en avait TROIS versions
-//    divergentes — une par composant, plus une dans l'assistant IA, qui datait
-//    d'avant la refonte des quatre niveaux. Une même règle s'appelait donc
-//    « Ferme » ici et « Jamais » là. Rien n'est réécrit à la main dans ce
-//    fichier : un libellé de force qu'on tape, c'est un quatrième vocabulaire.
+//    (`phraseRegle`, `choixForce`, `motForce`, `aideForce`, `symboleDe`). La V1
+//    en avait TROIS versions divergentes — une par composant, plus une dans
+//    l'assistant IA, qui datait d'avant la refonte des quatre niveaux. Une même
+//    règle s'appelait donc « Ferme » ici et « Jamais » là. Rien n'est réécrit à
+//    la main dans ce fichier : un libellé de force qu'on tape, c'est un
+//    quatrième vocabulaire.
 //
 //  · La fusion des DUOS INTERDITS (`fusionnerDuos`). La base stocke deux lignes
 //    symétriques (A→B et B→A) parce que le solver a besoin des deux sens ;
 //    l'écran n'en montre qu'une, sinon chaque duo apparaît en double. Les
 //    actions serveur traitent déjà le miroir au toggle et à la suppression.
+//
+// QUATRE DÉCISIONS D'INTERFACE, PRISES EN RECETTE
+//
+//  · AUCUN `<select>` NATIF. Un menu natif ouvre la liste du NAVIGATEUR :
+//    carrée, bleue, étrangère au terrier, à côté de boutons en pilule. Tous les
+//    choix passent donc par le `Select` du projet (`@/components/ui/select`),
+//    habillé de bout en bout dans `v2-terrier.css` — déclencheur, cadre, items,
+//    coche et focus. MiKL : « je veux que tout soit uniforme dans les
+//    composants, appuie-toi sur ce qui existe et qui a déjà été validé ».
+//
+//  · LES ÉTIQUETTES SE CHOISISSENT DANS UNE LISTE. C'était un champ libre avec
+//    des pastilles de suggestion en dessous : personne ne les voyait, et il
+//    fallait deviner l'orthographe exacte d'une étiquette déjà posée. Le menu
+//    liste ce que l'équipe porte réellement, et garde une dernière entrée
+//    « + Une nouvelle étiquette… » pour le cas rare.
+//
+//  · LA CONSÉQUENCE D'UN CHOIX SE VOIT (`.consequence`). Deux paragraphes gris
+//    superposés se lisent comme un seul pavé : on ne sait plus lequel répond au
+//    menu. `.reglage-aide` dit de quoi parle la ligne ; `.consequence`, avec son
+//    filet orange, dit ce que le moteur FERA du niveau choisi — et elle change
+//    quand on change de niveau.
+//
+//  · LES PRÉFÉRENCES OUVRENT SUR FILOU. Il n'y a pas de bouton « nouvelle
+//    préférence » : ces quatre égards-là sont câblés dans le moteur. Plutôt que
+//    de laisser le mur sans l'expliquer, la carte se termine par une invitation
+//    à en parler à Filou — une simple NAVIGATION vers l'accueil, aucun appel,
+//    aucune écriture, aucune promesse.
 //
 // CE QUI A ÉTÉ ÉCARTÉ, ET POURQUOI
 //
@@ -51,13 +79,18 @@
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { CalendarClock, Pencil, Plus, Power, Trash2 } from 'lucide-react'
+import {
+  CalendarClock, Info, MessageCircle, Pencil, Plus, Power, Trash2,
+} from 'lucide-react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import {
-  phraseRegle, fusionnerDuos, etageDe, symboleDe, motForce, choixForce,
+  Select, SelectContent, SelectItem, SelectTrigger,
+} from '@/components/ui/select'
+import {
+  phraseRegle, fusionnerDuos, etageDe, symboleDe, motForce, choixForce, aideForce,
 } from '@/lib/regles/libelle'
 import { rendreRegle, IMPORTANCE_LABELS } from '@/engine/briques/catalogue'
 import {
@@ -108,8 +141,8 @@ function groupeDe(force: string): GroupeKey {
   return GROUPE_PAR_FORCE[force] ?? 'confort'
 }
 
-/** Les 4 forces sélectionnables par l'admin, dans l'ordre du plus dur au plus
- *  souple. Leurs libellés viennent de `choixForce` — jamais d'ici. */
+/** Les 4 forces sélectionnables par l'admin, du plus dur au plus souple. Leurs
+ *  libellés viennent de `libelle.ts` — jamais d'ici. */
 const FORCES_CHOISISSABLES = ['jamais', 'sauf_crise', 'evitee', 'si_possible'] as const
 
 /** Les briques structurellement SOUPLES refusent « Jamais » côté serveur
@@ -119,6 +152,10 @@ const FORCES_SOUPLES = ['sauf_crise', 'evitee', 'si_possible'] as const
 /** Sentinelle des menus de fermeté : elle n'existe pas en base — c'est
  *  `actif = false` (cf. `setRegleActif`). */
 const DESACTIVEE = 'desactivee'
+
+/** Sentinelle du menu d'étiquettes : « celle que je vais écrire ». La liste
+ *  déroulante du projet refuse la valeur vide, d'où une valeur nommée. */
+const NOUVELLE_ETIQUETTE = '__nouvelle__'
 
 /** Les 3 formes de règle d'équipe proposées au panneau (pour 2 briques). */
 type TypeRegleEquipe = 'au_moins_un' | 'pas_seuls' | 'role_interdit'
@@ -223,10 +260,46 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
  *  Importante / Essentielle) — source unique : le catalogue de briques. */
 const libelleImportance = (n: string) => cap(IMPORTANCE_LABELS[n] ?? n)
 
+/** Ce que le moteur fait d'une règle éteinte. Dit une fois, employé partout. */
+const EFFET_ETEINTE =
+  'Désactivée : le moteur ne la lit plus du tout, comme si elle n’existait pas. Elle reste là pour être rallumée d’un choix.'
+
 /** Ce qu'une action serveur de cet écran peut répondre. */
 type Reponse = { error?: string; success?: boolean } | undefined
 
 const MSG_ENREGISTRE = 'Réglage enregistré — appliqué à la prochaine génération.'
+
+/**
+ * Le déclencheur d'un menu de fermeté : la pastille de couleur, puis le MOT du
+ * niveau (`motForce`). Les items, eux, portent la phrase de décision complète
+ * (`choixForce`) : on choisit sur une phrase, on relit sur un mot. Les deux
+ * viennent de `libelle.ts`, aucun n'est écrit ici — et le mot court garde tous
+ * les déclencheurs d'une carte à la même largeur, sans texte tronqué.
+ */
+function EtiquetteForce({ force }: { force: string }) {
+  if (force === DESACTIVEE) {
+    return (
+      <>
+        <span aria-hidden="true">⚪</span> Désactivée
+      </>
+    )
+  }
+  return (
+    <>
+      <span aria-hidden="true">{symboleDe(force)}</span> {motForce(force)}
+    </>
+  )
+}
+
+/** Ce que le moteur fera du niveau choisi. `.consequence` — filet orange. */
+function Consequence({ texte }: { texte: string }) {
+  return (
+    <p className="consequence">
+      <Info size={15} aria-hidden="true" />
+      <span>{texte}</span>
+    </p>
+  )
+}
 
 // ════════════════════════════════════════════════════════════
 // Composant
@@ -275,7 +348,13 @@ export function OngletMoteur({
   // ── Carte 2 : composition d'équipe ──
   const [compoOuvert, setCompoOuvert] = useState(false)
   const [compoType, setCompoType] = useState<TypeRegleEquipe>('au_moins_un')
-  const [compoTag, setCompoTag] = useState('')
+  // L'étiquette se choisit dans la liste de ce que l'équipe porte ; la
+  // sentinelle ouvre le champ libre à côté (cas rare, mais il doit rester
+  // possible : on pose parfois la règle avant l'étiquette).
+  const [compoTagChoix, setCompoTagChoix] = useState<string>(
+    tagsEquipe[0] ?? NOUVELLE_ETIQUETTE,
+  )
+  const [compoTagLibre, setCompoTagLibre] = useState('')
   const [compoRole, setCompoRole] = useState(rolesCabinet[0] ?? 'premier')
   const [compoCreneaux, setCompoCreneaux] = useState<string[]>([])
   const [compoForce, setCompoForce] = useState<string>('jamais')
@@ -327,6 +406,9 @@ export function OngletMoteur({
   // moteur a besoin des deux, l'écran n'en montre qu'un.
   const actives = useMemo(() => fusionnerDuos(regles.filter((r) => r.actif)), [regles])
   const inactives = useMemo(() => fusionnerDuos(regles.filter((r) => !r.actif)), [regles])
+
+  /** L'étiquette réellement retenue par le panneau d'ajout de règle d'équipe. */
+  const compoTag = compoTagChoix === NOUVELLE_ETIQUETTE ? compoTagLibre : compoTagChoix
 
   // ── Carte 1 — actions ──────────────────────────────────────
 
@@ -438,14 +520,15 @@ export function OngletMoteur({
         toast.error(res.error)
         return
       }
-      toast.success("Règle d’équipe supprimée.")
+      toast.success('Règle d’équipe supprimée.')
       router.refresh()
     })
   }
 
   const ouvrirCompo = () => {
     setCompoType('au_moins_un')
-    setCompoTag('')
+    setCompoTagChoix(tagsEquipe[0] ?? NOUVELLE_ETIQUETTE)
+    setCompoTagLibre('')
     setCompoRole(rolesCabinet[0] ?? 'premier')
     setCompoCreneaux([])
     setCompoForce('jamais')
@@ -473,7 +556,7 @@ export function OngletMoteur({
         toast.error(res.error)
         return
       }
-      toast.success("Règle d’équipe créée — appliquée à la prochaine génération.")
+      toast.success('Règle d’équipe créée — appliquée à la prochaine génération.')
       setCompoOuvert(false)
       router.refresh()
     })
@@ -555,10 +638,9 @@ export function OngletMoteur({
    */
   const changerPenalite = (brique: PenaliteSouple, choix: string) => {
     const avant = ps[brique] ?? { actif: true, force: PENALITE_FORCE_REPLI[brique] }
-    const forceGardee =
-      (FORCES_SOUPLES as readonly string[]).includes(avant.force)
-        ? avant.force
-        : PENALITE_FORCE_REPLI[brique]
+    const forceGardee = (FORCES_SOUPLES as readonly string[]).includes(avant.force)
+      ? avant.force
+      : PENALITE_FORCE_REPLI[brique]
     const suivant: StructureRegleUI =
       choix === DESACTIVEE
         ? { actif: false, force: forceGardee }
@@ -617,6 +699,9 @@ export function OngletMoteur({
       </div>
 
       <div className="reg-actions">
+        {/* Variante douce : ces deux boutons-là ne détruisent rien. Un
+            avertissement rouge sur « modifier » apprend à ne plus lire les
+            avertissements rouges. */}
         <button
           type="button"
           className="icon-btn doux"
@@ -773,64 +858,106 @@ export function OngletMoteur({
 
             <div className="grille">
               <div className="large">
-                <label htmlFor="compo-type">Type de règle</label>
-                <select
-                  id="compo-type"
+                <label id="compo-type-lbl">Type de règle</label>
+                <Select
                   value={compoType}
-                  onChange={(e) => setCompoType(e.target.value as TypeRegleEquipe)}
+                  onValueChange={(v) => setCompoType(String(v) as TypeRegleEquipe)}
+                  disabled={isPending}
                 >
-                  {(Object.keys(TYPE_REGLE_EQUIPE_LABELS) as TypeRegleEquipe[]).map((t) => (
-                    <option key={t} value={t}>
-                      {TYPE_REGLE_EQUIPE_LABELS[t]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className={compoType === 'role_interdit' ? '' : 'large'}>
-                <label htmlFor="compo-tag">Étiquette</label>
-                <input
-                  id="compo-tag"
-                  type="text"
-                  maxLength={30}
-                  value={compoTag}
-                  onChange={(e) => setCompoTag(e.target.value)}
-                  placeholder={compoType === 'au_moins_un' ? 'senior' : 'junior'}
-                />
-              </div>
-
-              {compoType === 'role_interdit' && (
-                <div>
-                  <label htmlFor="compo-role">Rôle interdit</label>
-                  <select
-                    id="compo-role"
-                    value={compoRole}
-                    onChange={(e) => setCompoRole(e.target.value)}
-                  >
-                    {rolesCabinet.map((r) => (
-                      <option key={r} value={r}>
-                        {roleLisible(r)}
-                      </option>
+                  <SelectTrigger className="w-full" aria-labelledby="compo-type-lbl">
+                    {TYPE_REGLE_EQUIPE_LABELS[compoType]}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(TYPE_REGLE_EQUIPE_LABELS) as TypeRegleEquipe[]).map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {TYPE_REGLE_EQUIPE_LABELS[t]}
+                      </SelectItem>
                     ))}
-                  </select>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* L'étiquette : une liste de ce que l'équipe porte réellement.
+                  Le champ libre n'apparaît que si on demande une étiquette
+                  inédite — et il est seul quand l'équipe n'en porte aucune. */}
+              {tagsEquipe.length > 0 ? (
+                <div>
+                  <label id="compo-tag-lbl">Étiquette</label>
+                  <Select
+                    value={compoTagChoix}
+                    onValueChange={(v) => setCompoTagChoix(String(v))}
+                    disabled={isPending}
+                  >
+                    <SelectTrigger className="w-full" aria-labelledby="compo-tag-lbl">
+                      {compoTagChoix === NOUVELLE_ETIQUETTE
+                        ? 'Une nouvelle étiquette…'
+                        : compoTagChoix}
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tagsEquipe.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {t}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value={NOUVELLE_ETIQUETTE}>
+                        + Une nouvelle étiquette…
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="large">
+                  <label htmlFor="compo-tag-libre">Étiquette</label>
+                  <input
+                    id="compo-tag-libre"
+                    type="text"
+                    maxLength={30}
+                    value={compoTagLibre}
+                    onChange={(e) => setCompoTagLibre(e.target.value)}
+                    placeholder={compoType === 'au_moins_un' ? 'senior' : 'junior'}
+                  />
+                  <p className="note">
+                    Aucune étiquette n&apos;est encore posée sur l&apos;équipe. Écris-la ici, puis
+                    va la poser sur les fiches concernées, page Équipe : sans porteur, le serveur
+                    refusera la règle.
+                  </p>
                 </div>
               )}
 
-              {tagsEquipe.length > 0 && (
-                <div className="large">
-                  <label id="compo-tags-lbl">Étiquettes déjà posées sur l&apos;équipe</label>
-                  <div className="chips" role="group" aria-labelledby="compo-tags-lbl">
-                    {tagsEquipe.map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        aria-pressed={compoTag.trim().toLowerCase() === t}
-                        onClick={() => setCompoTag(t)}
-                      >
-                        {t}
-                      </button>
-                    ))}
-                  </div>
+              {tagsEquipe.length > 0 && compoTagChoix === NOUVELLE_ETIQUETTE && (
+                <div>
+                  <label htmlFor="compo-tag-libre">Laquelle ?</label>
+                  <input
+                    id="compo-tag-libre"
+                    type="text"
+                    autoFocus
+                    maxLength={30}
+                    value={compoTagLibre}
+                    onChange={(e) => setCompoTagLibre(e.target.value)}
+                    placeholder={compoType === 'au_moins_un' ? 'senior' : 'junior'}
+                  />
+                </div>
+              )}
+
+              {compoType === 'role_interdit' && (
+                <div>
+                  <label id="compo-role-lbl">Rôle interdit</label>
+                  <Select
+                    value={compoRole}
+                    onValueChange={(v) => setCompoRole(String(v))}
+                    disabled={isPending}
+                  >
+                    <SelectTrigger className="w-full" aria-labelledby="compo-role-lbl">
+                      {roleLisible(compoRole)}
+                    </SelectTrigger>
+                    <SelectContent>
+                      {rolesCabinet.map((r) => (
+                        <SelectItem key={r} value={r}>
+                          {roleLisible(r)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
 
@@ -848,24 +975,28 @@ export function OngletMoteur({
                     </button>
                   ))}
                 </div>
-                <p className="note">
-                  Aucun coché = la règle s&apos;applique à tous les créneaux.
-                </p>
+                <p className="note">Aucun coché = la règle s&apos;applique à tous les créneaux.</p>
               </div>
 
               <div className="large">
-                <label htmlFor="compo-force">Ce que le moteur en fait</label>
-                <select
-                  id="compo-force"
+                <label id="compo-force-lbl">Ce que le moteur en fait</label>
+                <Select
                   value={compoForce}
-                  onChange={(e) => setCompoForce(e.target.value)}
+                  onValueChange={(v) => setCompoForce(String(v))}
+                  disabled={isPending}
                 >
-                  {FORCES_CHOISISSABLES.map((f) => (
-                    <option key={f} value={f}>
-                      {choixForce(f)}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full" aria-labelledby="compo-force-lbl">
+                    <EtiquetteForce force={compoForce} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FORCES_CHOISISSABLES.map((f) => (
+                      <SelectItem key={f} value={f}>
+                        <span aria-hidden="true">{symboleDe(f)}</span> {choixForce(f)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Consequence texte={aideForce(compoForce)} />
               </div>
             </div>
 
@@ -921,23 +1052,32 @@ export function OngletMoteur({
                         : 'Tous les créneaux'}
                     </span>
                   </p>
+                  <Consequence texte={r.actif ? aideForce(r.force) : EFFET_ETEINTE} />
                 </div>
 
                 <div className="reg-actions">
-                  <select
-                    className="select-plat"
+                  <Select
                     value={courant}
+                    onValueChange={(v) => changerForceEquipe(r, String(v))}
                     disabled={isPending}
-                    aria-label={`Fermeté de la règle : ${phraseEquipe(r)}`}
-                    onChange={(e) => changerForceEquipe(r, e.target.value)}
                   >
-                    <option value={DESACTIVEE}>Désactivée</option>
-                    {FORCES_CHOISISSABLES.map((f) => (
-                      <option key={f} value={f}>
-                        {choixForce(f)}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger
+                      className="w-44"
+                      aria-label={`Ce que le moteur fait de la règle : ${phraseEquipe(r)}`}
+                    >
+                      <EtiquetteForce force={courant} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={DESACTIVEE}>
+                        <span aria-hidden="true">⚪</span> Désactivée
+                      </SelectItem>
+                      {FORCES_CHOISISSABLES.map((f) => (
+                        <SelectItem key={f} value={f}>
+                          <span aria-hidden="true">{symboleDe(f)}</span> {choixForce(f)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <button
                     type="button"
                     className="icon-btn"
@@ -973,19 +1113,25 @@ export function OngletMoteur({
               <div className="reglage-titre">{EQUITE_META[dim].titre}</div>
               <p className="reglage-aide">{EQUITE_META[dim].aide}</p>
             </div>
-            <select
-              className="select-plat"
+            <Select
               value={eq[dim]}
+              onValueChange={(v) => changerEquite(dim, String(v) as ImportanceLevel)}
               disabled={isPending}
-              aria-label={`Importance de l’équilibrage : ${EQUITE_META[dim].titre}`}
-              onChange={(e) => changerEquite(dim, e.target.value as ImportanceLevel)}
             >
-              {IMPORTANCE_LEVELS.map((n) => (
-                <option key={n} value={n}>
-                  {libelleImportance(n)}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger
+                className="w-44"
+                aria-label={`Importance de l’équilibrage : ${EQUITE_META[dim].titre}`}
+              >
+                {libelleImportance(eq[dim])}
+              </SelectTrigger>
+              <SelectContent>
+                {IMPORTANCE_LEVELS.map((n) => (
+                  <SelectItem key={n} value={n}>
+                    {libelleImportance(n)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         ))}
       </section>
@@ -1042,44 +1188,63 @@ export function OngletMoteur({
 
               <div className="grille">
                 <div>
-                  <label htmlFor="co-dim">Charge à équilibrer</label>
-                  <select
-                    id="co-dim"
+                  <label id="co-dim-lbl">Charge à équilibrer</label>
+                  <Select
                     value={coDim}
-                    onChange={(e) => setCoDim(e.target.value as EquityDimension)}
+                    onValueChange={(v) => setCoDim(String(v) as EquityDimension)}
+                    disabled={isPending}
                   >
-                    {EQUITY_DIMENSIONS.map((d) => (
-                      <option key={d} value={d}>
-                        {DIMENSION_LABELS[d]}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full" aria-labelledby="co-dim-lbl">
+                      {DIMENSION_LABELS[coDim]}
+                    </SelectTrigger>
+                    <SelectContent>
+                      {EQUITY_DIMENSIONS.map((d) => (
+                        <SelectItem key={d} value={d}>
+                          {DIMENSION_LABELS[d]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
-                  <label htmlFor="co-tag">Entre les vétérinaires…</label>
-                  <select id="co-tag" value={coTag} onChange={(e) => setCoTag(e.target.value)}>
-                    {tagsEquipe.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
+                  <label id="co-tag-lbl">Entre les vétérinaires…</label>
+                  <Select
+                    value={coTag}
+                    onValueChange={(v) => setCoTag(String(v))}
+                    disabled={isPending}
+                  >
+                    <SelectTrigger className="w-full" aria-labelledby="co-tag-lbl">
+                      {coTag || 'Choisir…'}
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tagsEquipe.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {t}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
-                  <label htmlFor="co-imp">Importance</label>
-                  <select
-                    id="co-imp"
+                  <label id="co-imp-lbl">Importance</label>
+                  <Select
                     value={coImp}
-                    onChange={(e) => setCoImp(e.target.value as ImportanceLevel)}
+                    onValueChange={(v) => setCoImp(String(v) as ImportanceLevel)}
+                    disabled={isPending}
                   >
-                    {IMPORTANCE_ACTIVES.map((n) => (
-                      <option key={n} value={n}>
-                        {libelleImportance(n)}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full" aria-labelledby="co-imp-lbl">
+                      {libelleImportance(coImp)}
+                    </SelectTrigger>
+                    <SelectContent>
+                      {IMPORTANCE_ACTIVES.map((n) => (
+                        <SelectItem key={n} value={n}>
+                          {libelleImportance(n)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -1124,19 +1289,25 @@ export function OngletMoteur({
                 {/* Pas de « Ignorée » ici : un poids nul ne se stocke pas. Pour
                     ne plus équilibrer cette cohorte, on la retire — c'est plus
                     franc qu'un cran qui ne fait rien. */}
-                <select
-                  className="select-plat"
+                <Select
                   value={c.importance}
+                  onValueChange={(v) => changerImportanceCohorte(c, String(v))}
                   disabled={isPending}
-                  aria-label={`Importance de la cohorte « ${c.tag} »`}
-                  onChange={(e) => changerImportanceCohorte(c, e.target.value)}
                 >
-                  {IMPORTANCE_ACTIVES.map((n) => (
-                    <option key={n} value={n}>
-                      {libelleImportance(n)}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger
+                    className="w-44"
+                    aria-label={`Importance de la cohorte « ${c.tag} »`}
+                  >
+                    {libelleImportance(c.importance)}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {IMPORTANCE_ACTIVES.map((n) => (
+                      <SelectItem key={n} value={n}>
+                        {libelleImportance(n)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <button
                   type="button"
                   className="icon-btn"
@@ -1173,21 +1344,27 @@ export function OngletMoteur({
               <div>
                 <div className="reglage-titre">{PENALITES_META[brique].titre}</div>
                 <p className="reglage-aide">{PENALITES_META[brique].aide}</p>
+                <Consequence texte={v.actif ? aideForce(v.force) : EFFET_ETEINTE} />
               </div>
-              <select
-                className="select-plat"
+              <Select
                 value={courant}
+                onValueChange={(val) => changerPenalite(brique, String(val))}
                 disabled={isPending}
-                aria-label={PENALITES_META[brique].titre}
-                onChange={(e) => changerPenalite(brique, e.target.value)}
               >
-                <option value={DESACTIVEE}>Désactivée</option>
-                {FORCES_SOUPLES.map((f) => (
-                  <option key={f} value={f}>
-                    {choixForce(f)}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-44" aria-label={PENALITES_META[brique].titre}>
+                  <EtiquetteForce force={courant} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={DESACTIVEE}>
+                    <span aria-hidden="true">⚪</span> Désactivée
+                  </SelectItem>
+                  {FORCES_SOUPLES.map((f) => (
+                    <SelectItem key={f} value={f}>
+                      <span aria-hidden="true">{symboleDe(f)}</span> {choixForce(f)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )
         })}
@@ -1200,25 +1377,55 @@ export function OngletMoteur({
               c&apos;est la charge « Rôle de 1er le week-end » de l&apos;équilibrage ci-dessus.
             </p>
           </div>
-          <select
-            className="select-plat"
+          <Select
             value={roleAv}
+            onValueChange={(v) => changerRoleAvantage(String(v))}
             disabled={isPending}
-            aria-label="Rôle payé du week-end"
-            onChange={(e) => changerRoleAvantage(e.target.value)}
           >
-            {ROLE_AVANTAGE_OPTIONS.map((r) => (
-              <option key={r} value={r}>
-                {ROLE_AVANTAGE_LABELS[r]}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-44" aria-label="Rôle payé du week-end">
+              {ROLE_AVANTAGE_LABELS[roleAv] ?? roleAv}
+            </SelectTrigger>
+            <SelectContent>
+              {ROLE_AVANTAGE_OPTIONS.map((r) => (
+                <SelectItem key={r} value={r}>
+                  {ROLE_AVANTAGE_LABELS[r]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Il n'y a pas de bouton « nouvelle préférence », et ce n'est pas un
+            oubli : ces quatre égards-là sont câblés dans le moteur, on n'en
+            écrit pas un cinquième depuis un écran. Plutôt que de laisser le mur
+            sans l'expliquer, on ouvre la seule porte qui existe — la
+            conversation avec Filou, qui connaît les règles posées et sait dire
+            si une demande tient debout. Le bouton NAVIGUE, rien de plus : c'est
+            le trajet de Filou au rebord (`#filou=regles`), et l'accueil accroche
+            la conversation sur le bon sujet. */}
+        <div className="invite">
+          <div>
+            <p className="invite-titre">Il vous faudrait un autre égard ?</p>
+            <p className="note">
+              Ces quatre-là sont ceux que le moteur sait tenir aujourd&apos;hui. Si un vétérinaire
+              demande autre chose, dites-le à Filou : il connaît les règles déjà posées et vous
+              dira si c&apos;est réalisable avec ce qui existe. Sinon, il fait remonter la demande
+              — il ne décide rien à votre place.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={() => router.push('/accueil#filou=regles')}
+          >
+            <MessageCircle size={15} aria-hidden="true" /> Demander à Filou
+          </button>
         </div>
       </section>
 
       {/* Confirmation de suppression. Elle RAPPELLE la règle concernée : on
-          décide sur pièce, pas sur un « êtes-vous sûr ? ». Le rappel est en
-          style posé plutôt qu'en classe : la modale est rendue dans un portail,
+          décide sur pièce, pas sur un « êtes-vous sûr ? ». `.gv-rappel` est
+          écrite à la racine du CSS, exprès : la modale est rendue en portail,
           hors du conteneur `.v2` qui porte le vocabulaire de l'écran. */}
       <Dialog
         open={Boolean(aSupprimer)}

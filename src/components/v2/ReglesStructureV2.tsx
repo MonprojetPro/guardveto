@@ -20,6 +20,12 @@
 // ============================================================
 
 import { useMemo, useState } from 'react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from '@/components/ui/select'
 import { FilouEdge } from './FilouEdge'
 import { OngletProfils } from './regles/OngletProfils'
 import { OngletCreneaux } from './regles/OngletCreneaux'
@@ -138,22 +144,29 @@ export function ReglesStructureV2({
           </p>
         </div>
 
-        {profils.length > 0 && (
+        {/* Le sélecteur de profil n'apparaît QUE sur les onglets qui décrivent
+            un profil. Sur l'onglet « Profils », il faisait doublon avec la
+            grille juste en dessous — deux commandes pour un même choix, à
+            30 cm l'une de l'autre. Là-bas, on désigne le profil en cliquant sa
+            carte. Sur « Règles du moteur », il ne veut rien dire : les règles
+            ne dépendent pas du profil. */}
+        {profils.length > 1 && (onglet === 'creneaux' || onglet === 'enchainements') && (
           <div className="page-actions">
             <div className="profil-pilote">
-              <label htmlFor="profil-courant">Profil</label>
-              <select
-                id="profil-courant"
-                value={profilId}
-                onChange={(e) => setProfilId(e.target.value)}
-              >
-                {profils.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nom}
-                    {p.estDefaut ? ' · par défaut' : ''}
-                  </option>
-                ))}
-              </select>
+              <span id="profil-courant-label">Profil</span>
+              <Select value={profilId} onValueChange={(v) => v && setProfilId(v)}>
+                <SelectTrigger aria-labelledby="profil-courant-label" className="w-[230px]">
+                  {profil?.nom ?? 'Choisir…'}
+                </SelectTrigger>
+                <SelectContent>
+                  {profils.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.nom}
+                      {p.estDefaut ? ' · par défaut' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         )}
@@ -183,7 +196,11 @@ export function ReglesStructureV2({
 
         {onglet === 'profils' && (
           <section className="tab-panel" role="tabpanel" aria-label="Profils de planning">
-            <OngletProfils profils={profils} profilCourantId={profilId} />
+            <OngletProfils
+              profils={profils}
+              profilCourantId={profilId}
+              onChoisir={setProfilId}
+            />
           </section>
         )}
 

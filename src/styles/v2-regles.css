@@ -305,6 +305,44 @@
   grid-column: 1 / -1;
 }
 
+/* ── L'invite ─────────────────────────────────────────────────
+   À ne pas confondre avec `.panneau`, qui est un formulaire qu'on DÉPLIE :
+   celui-ci s'anime à l'ouverture et prend le fond des zones de saisie. Une
+   invite, elle, est là en permanence et ne demande rien — elle propose une
+   porte de sortie quand l'écran ne sait pas faire ce qu'on cherche (« créer une
+   préférence qui n'existe pas → demande à Filou »). D'où le fond discret, le
+   filet pointillé, et aucune animation. */
+.v2 .invite {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 18px;
+  margin: 4px 22px 20px;
+  padding: 15px 18px;
+  background: transparent;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-md);
+}
+
+.v2 .invite > div {
+  flex: 1;
+  min-width: 220px;
+}
+
+.v2 .invite-titre {
+  margin-bottom: 4px;
+  font-family: var(--font-display);
+  font-size: 0.94rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.v2 .invite .note {
+  margin-top: 0;
+  max-width: 62ch;
+}
+
 /* Sélecteur de jours : sept pastilles, l'ordre humain (lundi d'abord). */
 .v2 .jours-pick {
   display: flex;
@@ -429,6 +467,21 @@
   border-color: var(--border-strong);
 }
 
+/* ⚠️ Cette règle DOIT battre `.v2 .panneau label` / `.v2 .cre-form label`, qui
+   met les libellés en petites capitales gris pâle. Sans elle, « S'applique
+   aussi les jours fériés » s'affichait en gris clair sur crème — illisible.
+   Un libellé de case n'est pas une étiquette de champ : c'est une PHRASE, elle
+   se lit en texte courant. */
+.v2 .panneau label.case-ligne,
+.v2 .cre-form label.case-ligne,
+.v2 label.case-ligne {
+  font-size: 0.88rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--text);
+}
+
 .v2 .case-ligne input[type='checkbox'] {
   width: 17px;
   height: 17px;
@@ -439,6 +492,65 @@
 .v2 .case-ligne.inerte {
   cursor: default;
   opacity: 0.6;
+}
+
+/* ── La conséquence d'un choix ────────────────────────────────
+   À ne PAS confondre avec `.note`, qui explique de quoi on parle. Celle-ci dit
+   ce que le moteur fera avec le choix qu'on vient de faire — elle change quand
+   le choix change. Deux paragraphes gris identiques, l'un avant l'autre après
+   un menu, se lisent comme un seul pavé : on ne voit plus lequel répond au
+   réglage. D'où le filet orange et le retrait. */
+.v2 .consequence {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 11px;
+  padding: 10px 13px;
+  font-size: 0.83rem;
+  line-height: 1.5;
+  color: var(--t-muted);
+  background: var(--surface);
+  border-left: 3px solid var(--accent-ink);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+}
+
+.v2 .consequence svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--accent-ink);
+}
+
+.v2 .consequence b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ── L'identité d'un type de garde ────────────────────────────
+   Quatre cartes de texte sombre alignées, ça se lit comme un tableau : rien
+   n'accroche l'œil, on relit les trois mots pour retrouver la bonne. Chaque
+   type porte donc sa teinte et son icône, comme les pastilles de type sur
+   l'écran des congés. La teinte vient d'une variable locale `--c` posée par le
+   composant — pas d'une classe par créneau, puisqu'un cabinet en crée. */
+.v2 .cre-ico {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  color: #fff;
+  background: var(--c, var(--t-accent));
+  border-radius: 12px;
+  box-shadow: var(--elev-1, 0 1px 2px rgba(58, 42, 28, 0.14));
+}
+
+/* Le liseré de gauche reprend la teinte : on repère la bonne carte au coin de
+   l'œil, sans lire. */
+.v2 .cre-carte {
+  border-left: 4px solid var(--c, var(--t-border));
+}
+
+.v2 .cre-carte.eteint .cre-ico {
+  background: var(--soft);
 }
 
 /* ── Boutons-icônes ───────────────────────────────────────────
@@ -495,6 +607,7 @@
 [data-slot='dialog-content'] .gv-consequences {
   display: grid;
   gap: 7px;
+  margin-top: 4px;
   padding-left: 18px;
   font-size: 0.86rem;
   line-height: 1.5;
@@ -528,6 +641,31 @@
 
 .v2 .prof-carte:hover {
   border-color: var(--border-strong);
+}
+
+/* La carte EST le sélecteur de profil sur cet onglet : elle doit se dire
+   cliquable au pointeur comme au clavier. Une carte qu'on peut choisir sans
+   qu'aucun signe ne l'annonce, personne ne la choisit. */
+.v2 .prof-carte[role='button'] {
+  cursor: pointer;
+}
+
+.v2 .prof-carte[role='button']:focus-visible {
+  outline: 2px dashed var(--accent-ink);
+  outline-offset: 3px;
+}
+
+/* L'invite « Voir ce profil » ne s'allume qu'au survol ou au focus : affichée
+   en permanence sur chaque carte non courante, elle se lisait comme une
+   étiquette d'état de plus, au milieu des vraies. */
+.v2 .prof-carte[role='button'] .etiq.eteint {
+  opacity: 0;
+  transition: opacity 0.16s var(--ease-out);
+}
+
+.v2 .prof-carte[role='button']:hover .etiq.eteint,
+.v2 .prof-carte[role='button']:focus-visible .etiq.eteint {
+  opacity: 1;
 }
 
 /* Le profil qu'on est en train de regarder dans les autres onglets : on le
@@ -622,7 +760,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 16px 14px 10px;
+  padding: 14px 16px;
 }
 
 /* La poignée de glisser : elle n'existe que si l'ordre est modifiable, et elle
@@ -684,7 +822,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 10px 26px;
-  padding: 0 16px 14px 52px;
+  padding: 0 16px 16px 66px;
 }
 
 .v2 .cre-faits .fait {
@@ -692,7 +830,14 @@
 }
 
 .v2 .cre-form {
-  padding: 4px 16px 18px 52px;
+  padding: 2px 16px 18px 66px;
+}
+
+/* Une conséquence posée directement dans une carte de créneau (ex. « ce type
+   est éteint, ces jours ne sont plus couverts ») s'aligne sous le nom, comme
+   les faits — sans avoir à l'envelopper dans un faux formulaire. */
+.v2 .cre-carte > .consequence {
+  margin: 0 16px 16px 66px;
 }
 
 .v2 .cre-form .grille {

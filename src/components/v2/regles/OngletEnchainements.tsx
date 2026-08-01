@@ -27,12 +27,18 @@
 // ⚠️ Le vocabulaire de fermeté n'est JAMAIS écrit à la main ici : il vient de
 // `lib/regles/libelle.ts`, source unique. Quatre niveaux, quatre formulations,
 // et une seule liste à maintenir le jour où elles bougent.
+//
+// ⚠️ AUCUN `<select>` natif. Un menu natif s'ouvre avec l'habillage du système
+// — cadre carré, surlignage bleu — à côté de boutons arrondis couleur terrier.
+// Tous les choix passent donc par le `Select` du projet, habillé de bout en
+// bout dans `v2-terrier.css`. Conséquence technique : il refuse la valeur vide,
+// d'où les deux sentinelles ci-dessous.
 // ============================================================
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowRight, Link2, Plus, Trash2 } from 'lucide-react'
+import { ArrowRight, Info, Link2, Plus, Trash2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -41,6 +47,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { aideForce, choixForce, motForce, symboleDe } from '@/lib/regles/libelle'
 import { setStructureRegle } from '@/app/(protected)/regles/actions'
@@ -87,8 +94,14 @@ const FOCUS_VERS_GENRE: Record<string, GenreRelationUI> = {
 /** Les quatre niveaux de fermeté, du plus dur au plus souple (cf. `FORCE_META`). */
 const FORCES = ['jamais', 'sauf_crise', 'evitee', 'si_possible'] as const
 
-/** Valeur sentinelle du sélecteur : « Désactivée » n'existe pas en base. */
+/**
+ * Valeur sentinelle du sélecteur de niveau : « Désactivée » n'existe pas en
+ * base — c'est le drapeau `actif` de la brique, pas une cinquième force.
+ */
 const DESACTIVEE = '__desactivee__'
+
+/** Sentinelle du « Choisir… » des menus de création (la valeur vide est refusée). */
+const CHOISIR = '__choisir__'
 
 /** Ce que chaque genre veut dire, en une phrase, pour l'admin qui arrive ici. */
 const GENRE_TITRE: Record<GenreRelationUI, string> = {
@@ -151,8 +164,8 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
   // les créneaux d'un panneau à demi rempli n'existent peut-être plus dans le
   // profil qu'on vient d'ouvrir.
   const [panneauOuvert, setPanneauOuvert] = useState(false)
-  const [sourceId, setSourceId] = useState('')
-  const [cibleId, setCibleId] = useState('')
+  const [sourceId, setSourceId] = useState(CHOISIR)
+  const [cibleId, setCibleId] = useState(CHOISIR)
   const [genre, setGenre] = useState<GenreRelationUI>('meme_binome')
   const [aSupprimer, setASupprimer] = useState<RelationUI | null>(null)
 
@@ -213,6 +226,15 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
 
   // ── Les liaisons elles-mêmes (table `relation_creneau`) ─────
 
+  /** Le libellé affiché sur le déclencheur d'un menu de créneau. */
+  function nomCreneau(id: string): string {
+    const c = creneaux.find((x) => x.id === id)
+    if (!c) return 'Choisir…'
+    return c.actif ? c.nom : `${c.nom} (inactif)`
+  }
+
+  const choixComplet = sourceId !== CHOISIR && cibleId !== CHOISIR
+
   function creer() {
     startTransition(async () => {
       const res = await creerRelationCreneau({
@@ -228,8 +250,8 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
       }
       toast.success('Liaison créée — elle s’applique dès la prochaine génération.')
       setPanneauOuvert(false)
-      setSourceId('')
-      setCibleId('')
+      setSourceId(CHOISIR)
+      setCibleId(CHOISIR)
       router.refresh()
     })
   }
@@ -270,17 +292,36 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
   /**
    * Ce que CETTE liaison fait vraiment, en tenant compte du niveau de son genre.
    * C'est la phrase qui manquait en V1 : la liaison existait, son niveau dormait
-   * ailleurs, et le moteur ne faisait rien sans que personne ne comprenne.
+   * sur l'autre écran, et le moteur ne faisait rien sans que personne ne
+   * comprenne. Même forme que sous les sélecteurs de niveau (`.consequence`) :
+   * c'est la même nature de texte — le résultat d'un choix, pas une définition.
    */
-  function effetLigne(r: RelationUI): string {
+  function consequenceLigne(r: RelationUI) {
     const niveau = niveauxLocaux[r.genre]
     if (!r.actif) {
-      return 'Inactive : le moteur apparie ces deux créneaux comme s’ils n’étaient pas liés.'
+      return (
+        <>
+          <b>Inactive</b> — le moteur apparie ces deux créneaux comme s’ils n’étaient pas liés.
+        </>
+      )
     }
     if (!niveau?.actif) {
-      return `Sans effet pour l’instant : le niveau « ${GENRE_TITRE[r.genre]} » est désactivé plus haut.`
+      return (
+        <>
+          <b>Sans effet pour l’instant</b> — le réglage « {GENRE_TITRE[r.genre]} » est désactivé
+          plus haut, le moteur ne lit aucune liaison de ce genre.
+        </>
+      )
     }
-    return `${symboleDe(niveau.force)} ${motForce(niveau.force)} — ${aideForce(niveau.force)}`
+    const force = forceValide(niveau.force)
+    return (
+      <>
+        <b>
+          {symboleDe(force)} {motForce(force)}
+        </b>{' '}
+        — {aideForce(force)}
+      </>
+    )
   }
 
   return (
@@ -317,25 +358,53 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
                 <p className="note">{GENRE_EXPLICATION[g]}</p>
 
                 <div>
-                  <select
-                    className="select-plat"
-                    aria-label={`Niveau du réglage « ${GENRE_TITRE[g]} »`}
+                  <Select
                     value={niveau.actif ? forceValide(niveau.force) : DESACTIVEE}
                     disabled={isPending}
-                    onChange={(e) => changerNiveau(g, e.target.value)}
+                    onValueChange={(v) => {
+                      if (typeof v === 'string' && v) changerNiveau(g, v)
+                    }}
                   >
-                    <option value={DESACTIVEE}>Désactivée</option>
-                    {FORCES.map((f) => (
-                      <option key={f} value={f}>
-                        {symboleDe(f)} {choixForce(f)}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger
+                      className="w-full"
+                      aria-label={`Niveau du réglage « ${GENRE_TITRE[g]} »`}
+                    >
+                      <span className="min-w-0 truncate">
+                        {niveau.actif
+                          ? `${symboleDe(forceValide(niveau.force))} ${choixForce(forceValide(niveau.force))}`
+                          : 'Désactivée'}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={DESACTIVEE}>Désactivée</SelectItem>
+                      {FORCES.map((f) => (
+                        <SelectItem key={f} value={f}>
+                          {symboleDe(f)} {choixForce(f)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-                  <p className="reglage-aide">
-                    {niveau.actif
-                      ? aideForce(forceValide(niveau.force))
-                      : 'Désactivé : le moteur attribue ces créneaux sans regarder les liaisons de ce genre. Elles restent enregistrées et se rallument d’un choix.'}
+                  {/* Ce que le moteur fera AVEC le choix ci-dessus. La `.note`
+                      du dessus dit de quoi on parle, celle-ci dit ce qui va se
+                      passer : deux pavés gris identiques se lisaient comme un
+                      seul, et on ne voyait plus lequel répondait au réglage. */}
+                  <p className="consequence">
+                    <Info size={15} aria-hidden="true" />
+                    <span>
+                      {niveau.actif ? (
+                        <>
+                          <b>{motForce(forceValide(niveau.force))}</b> —{' '}
+                          {aideForce(forceValide(niveau.force))}
+                        </>
+                      ) : (
+                        <>
+                          <b>Désactivé</b> — le moteur attribue ces créneaux sans regarder les
+                          liaisons de ce genre. Elles restent enregistrées et se rallument d’un
+                          choix.
+                        </>
+                      )}
+                    </span>
                   </p>
                 </div>
               </div>
@@ -373,66 +442,100 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
             <div className="grille">
               <div>
                 <label htmlFor="ench-source">Premier créneau</label>
-                <select
-                  id="ench-source"
+                <Select
                   value={sourceId}
                   disabled={isPending}
-                  onChange={(e) => {
-                    setSourceId(e.target.value)
-                    if (e.target.value === cibleId) setCibleId('')
+                  onValueChange={(v) => {
+                    if (typeof v !== 'string' || !v) return
+                    setSourceId(v)
+                    if (v === cibleId) setCibleId(CHOISIR)
                   }}
                 >
-                  <option value="">Choisir…</option>
-                  {creneaux.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nom}
-                      {c.actif ? '' : ' (inactif)'}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id="ench-source" className="w-full">
+                    <span className="min-w-0 truncate">{nomCreneau(sourceId)}</span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={CHOISIR}>Choisir…</SelectItem>
+                    {creneaux.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.nom}
+                        {c.actif ? '' : ' (inactif)'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
                 <label htmlFor="ench-genre">Ce que la liaison impose</label>
-                <select
-                  id="ench-genre"
+                <Select
                   value={genre}
                   disabled={isPending}
-                  onChange={(e) => setGenre(e.target.value as GenreRelationUI)}
+                  onValueChange={(v) => {
+                    if (typeof v === 'string' && v) setGenre(v as GenreRelationUI)
+                  }}
                 >
-                  <option value="meme_binome">Même équipe sur les deux</option>
-                  <option value="inversion_role">Rôles différents entre les deux</option>
-                </select>
+                  <SelectTrigger id="ench-genre" className="w-full">
+                    <span className="min-w-0 truncate">
+                      {genre === 'meme_binome'
+                        ? 'Même équipe sur les deux'
+                        : 'Rôles différents entre les deux'}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="meme_binome">Même équipe sur les deux</SelectItem>
+                    <SelectItem value="inversion_role">Rôles différents entre les deux</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
                 <label htmlFor="ench-cible">Second créneau</label>
-                <select
-                  id="ench-cible"
+                <Select
                   value={cibleId}
                   disabled={isPending}
-                  onChange={(e) => setCibleId(e.target.value)}
+                  onValueChange={(v) => {
+                    if (typeof v === 'string' && v) setCibleId(v)
+                  }}
                 >
-                  <option value="">Choisir…</option>
-                  {creneaux
-                    .filter((c) => c.id !== sourceId)
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nom}
-                        {c.actif ? '' : ' (inactif)'}
-                      </option>
-                    ))}
-                </select>
+                  <SelectTrigger id="ench-cible" className="w-full">
+                    <span className="min-w-0 truncate">{nomCreneau(cibleId)}</span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={CHOISIR}>Choisir…</SelectItem>
+                    {creneaux
+                      .filter((c) => c.id !== sourceId)
+                      .map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.nom}
+                          {c.actif ? '' : ' (inactif)'}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
               </div>
 
-              {/* Garde métier R22, annoncée AVANT le refus : un vétérinaire ne
-                  peut pas tenir deux gardes le même jour. Exiger la même équipe
+              {/* Ce que le genre choisi juste au-dessus implique — dont la garde
+                  métier R22, annoncée AVANT le refus : un vétérinaire ne peut
+                  pas tenir deux gardes le même jour, donc exiger la même équipe
                   sur deux créneaux qui partagent un jour, c'est se fabriquer un
-                  planning ingénérable — le serveur refuse, et il a raison. */}
-              <p className="note large">
-                {genre === 'meme_binome'
-                  ? 'Deux créneaux qui couvrent un même jour ne peuvent pas exiger la même équipe : personne ne tient deux gardes le même jour. Pour ce cas-là, choisissez « rôles différents ».'
-                  : 'Un vétérinaire qui se retrouve sur les deux gardes y change de place. Les autres sont attribués normalement.'}
+                  planning ingénérable. Le serveur refuse, et il a raison. */}
+              <p className="consequence large">
+                <Info size={15} aria-hidden="true" />
+                <span>
+                  {genre === 'meme_binome' ? (
+                    <>
+                      Deux créneaux qui couvrent <b>un même jour</b> ne peuvent pas exiger la même
+                      équipe : personne ne tient deux gardes le même jour. Pour ce cas-là,
+                      choisissez « rôles différents ».
+                    </>
+                  ) : (
+                    <>
+                      Un vétérinaire qui se retrouve sur les deux gardes y{' '}
+                      <b>change de place</b>. Les autres sont attribués normalement.
+                    </>
+                  )}
+                </span>
               </p>
             </div>
 
@@ -448,7 +551,7 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
               <button
                 type="button"
                 className="btn btn-accent btn-sm"
-                disabled={isPending || !sourceId || !cibleId}
+                disabled={isPending || !choixComplet}
                 onClick={creer}
               >
                 <Link2 size={15} aria-hidden="true" />
@@ -481,7 +584,10 @@ export function OngletEnchainements({ profil, niveaux, focus }: Props) {
                       <span className="etiq">{GENRE_ETIQ[r.genre]}</span>
                       {!r.actif && <span className="etiq eteint">Inactive</span>}
                     </div>
-                    <p className="row-dates">{effetLigne(r)}</p>
+                    <p className="consequence">
+                      <Info size={15} aria-hidden="true" />
+                      <span>{consequenceLigne(r)}</span>
+                    </p>
                   </div>
 
                   <div className="row-side">

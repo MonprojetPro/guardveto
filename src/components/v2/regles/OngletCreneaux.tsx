@@ -25,31 +25,62 @@
 //      horaires d'« Été ». Ici, le profil est le contexte de la PAGE
 //      (`ReglesStructureV2`) — cet onglet ne fait qu'en recevoir un.
 //
-// Une carte par créneau, dépliable pour éditer. On modifie le créneau qu'on
+// Une carte par type de garde, dépliable pour éditer. On modifie celui qu'on
 // regarde, pas son homonyme dans une autre liste. D'où l'édition en place
 // plutôt qu'en modale.
 //
+// ── CE QUI N'EXISTE PAS ICI, ET POURQUOI ──────────────────────────────────
+//
+// PAS DE GLISSER-DÉPOSER. Une première version permettait de réordonner les
+// cartes. Retiré : la colonne `ordre` ne pilote que l'affichage de ce
+// catalogue, elle n'a aucun effet sur la génération. Un geste qui donne
+// l'impression de changer le planning sans rien changer coûte plus cher qu'il
+// ne rapporte. La liste s'affiche dans l'ordre reçu du serveur.
+//
+// PAS DE MENU DÉROULANT NATIF. Un `<select>` ouvre le menu du navigateur —
+// carré, gris, hors du terrier, juste à côté de boutons arrondis. Tous les
+// choix de cet écran passent par le `Select` du projet, déjà habillé de bout
+// en bout.
+//
+// ── CE QUI SE VOIT ────────────────────────────────────────────────────────
+//
+// Chaque type de garde porte sa teinte et son icône (`.cre-ico`, plus le
+// liseré gauche de la carte). Quatre cartes de texte sombre alignées se lisent
+// comme un tableau : on relit trois mots pour retrouver la bonne. Une couleur
+// se reconnaît sans lire.
+//
 // ── DEUX GARDE-FOUS QU'ON EXPLIQUE PLUTÔT QUE DE LES SUBIR ────────────────
 //
-// · Les JOURS et les FÉRIÉS d'un créneau du seed sont figés. L'ancrage
-//   « tel jour → tel type de garde » est ré-implémenté exprès dans le
-//   validateur indépendant, en contrôle croisé du moteur : les déplacer
-//   depuis l'écran désaligne silencieusement les deux. Le chemin prévu est
-//   de désactiver le seed et de créer du sur-mesure — c'est écrit dans le
-//   formulaire, à l'endroit où le champ est grisé.
-// · Les 4 créneaux du seed sont insupprimables. Le bouton n'est pas là plutôt
-//   que désactivé sans un mot : on dit pourquoi, et on renvoie sur
+// · Les JOURS et les FÉRIÉS d'un type de garde de base sont figés — tout le
+//   calage du planning repose dessus. On le dit en français, à l'endroit où le
+//   champ est grisé, et on donne le chemin de sortie (désactiver, puis créer
+//   du sur-mesure).
+// · Les 4 types de garde de base sont insupprimables. Le bouton n'est pas là
+//   plutôt que désactivé sans un mot : on dit pourquoi, et on renvoie sur
 //   « Désactiver », qui fait ce que l'utilisateur cherchait.
 //
-// La suppression passe par une vraie modale. La V1 posait DEUX
-// `window.confirm()` — une boîte grise du navigateur, hors du terrier, qui ne
-// disait pas ce qu'on perdait.
+// Désactiver et supprimer passent tous les deux par une vraie modale qui NOMME
+// les jours qui ne seront plus couverts. Désactiver « les soirs de semaine »,
+// c'est arrêter d'engendrer des gardes du lundi au jeudi : ça ne peut pas se
+// deviner au survol d'un interrupteur. La V1 posait deux `window.confirm()` —
+// une boîte grise du navigateur, qui ne disait pas ce qu'on perdait.
 // ============================================================
 
-import { useEffect, useState, useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { GripVertical, Pencil, Plus, Power, Trash2 } from 'lucide-react'
+import {
+  CalendarClock,
+  Moon,
+  PartyPopper,
+  Pencil,
+  Plus,
+  Power,
+  Sun,
+  Sunset,
+  Trash2,
+  type LucideIcon,
+} from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -59,10 +90,10 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import {
   creerCreneauSurMesure,
   modifierCreneau,
-  reordonnerCreneaux,
   setCreneauActif,
   supprimerCreneauSurMesure,
 } from '@/app/(protected)/admin/structure/actions'
@@ -86,18 +117,44 @@ const JOURS = [
 ]
 
 /** Les quatre valeurs d'`offset_jours_fin`, en français. */
-const FIN_LABELS: Record<number, string> = {
-  0: 'le jour même',
-  1: 'le lendemain',
-  2: 'le surlendemain',
-  3: 'trois jours après',
+const FIN_LABELS: Record<string, string> = {
+  '0': 'le jour même',
+  '1': 'le lendemain',
+  '2': 'le surlendemain',
+  '3': 'trois jours après',
 }
 
 /** Libellés proposés d'office pour les places — renommables. */
 const ROLES_AUTO = ['premier', 'second', 'troisieme', 'quatrieme']
 
-/** Bornes du serveur, reprises ici pour ne pas proposer l'invalide. */
+/** Borne du serveur, reprise ici pour ne pas proposer l'invalide. */
 const PLACES_MAX = 4
+
+/**
+ * La teinte et l'icône d'un type de garde. Les quatre types de base ont la
+ * leur ; tout le sur-mesure partage la sarcelle, qui n'est prise par aucun des
+ * quatre — un cabinet peut en créer autant qu'il veut, on ne va pas lui
+ * distribuer des couleurs au hasard.
+ */
+function identite(code: string | null): { teinte: string; Icone: LucideIcon } {
+  switch (code) {
+    case 'semaine_soir':
+      return { teinte: '#5B6B8C', Icone: Moon }
+    case 'vendredi_soir':
+      return { teinte: '#8A5A9B', Icone: Sunset }
+    case 'weekend':
+      return { teinte: '#C7530F', Icone: Sun }
+    case 'ferie':
+      return { teinte: '#3E7A2E', Icone: PartyPopper }
+    default:
+      return { teinte: '#2F7D7A', Icone: CalendarClock }
+  }
+}
+
+/** La variable locale `--c` que lisent `.cre-ico` et le liseré de `.cre-carte`. */
+function teinteCss(teinte: string): React.CSSProperties {
+  return { '--c': teinte } as React.CSSProperties
+}
 
 // ── L'état d'un formulaire (création comme édition) ─────────────────────────
 
@@ -163,7 +220,7 @@ function ajusterRoles(roles: string[], n: number): string[] {
   })
 }
 
-/** Ce qui manque pour pouvoir enregistrer — null si le formulaire est complet. */
+/** Vrai s'il manque quelque chose pour pouvoir enregistrer. */
 function formIncomplet(f: FormCreneau, joursFiges: boolean): boolean {
   if (!f.nom.trim()) return true
   if (!joursFiges && f.jours.length === 0) return true
@@ -180,12 +237,14 @@ interface ChampsProps {
   cle: string
   form: FormCreneau
   setForm: (f: FormCreneau) => void
-  /** Créneau du seed : jours et fériés figés (cf. en-tête). */
+  /** Type de garde de base : jours et fériés figés (cf. en-tête). */
   joursFiges: boolean
   bloque: boolean
+  /** Code du créneau édité — `semaine_soir` a un plafond à part (cf. plus bas). */
+  code?: string | null
 }
 
-function ChampsCreneau({ cle, form, setForm, joursFiges, bloque }: ChampsProps) {
+function ChampsCreneau({ cle, form, setForm, joursFiges, bloque, code }: ChampsProps) {
   const basculerJour = (idx: number) => {
     setForm({
       ...form,
@@ -194,6 +253,8 @@ function ChampsCreneau({ cle, form, setForm, joursFiges, bloque }: ChampsProps) 
         : [...form.jours, idx],
     })
   }
+
+  const joursBloques = bloque || joursFiges
 
   return (
     <div className="grille">
@@ -220,7 +281,7 @@ function ChampsCreneau({ cle, form, setForm, joursFiges, bloque }: ChampsProps) 
               type="button"
               aria-pressed={form.jours.includes(j.idx)}
               aria-label={j.long}
-              disabled={bloque || joursFiges}
+              disabled={joursBloques}
               onClick={() => basculerJour(j.idx)}
             >
               {j.court}
@@ -228,17 +289,17 @@ function ChampsCreneau({ cle, form, setForm, joursFiges, bloque }: ChampsProps) 
           ))}
         </div>
 
-        {/* La case fériés vit avec les jours : c'est le même sujet — « quand ce
-            créneau s'applique-t-il ? ». */}
+        {/* La case fériés suit immédiatement les jours : c'est la même question
+            — « quand ce type de garde s'applique-t-il ? ». */}
         <label
           htmlFor={`${cle}-feries`}
-          className={`case-ligne${joursFiges || bloque ? ' inerte' : ''}`}
+          className={`case-ligne${joursBloques ? ' inerte' : ''}`}
         >
           <input
             id={`${cle}-feries`}
             type="checkbox"
             checked={form.surFeries}
-            disabled={bloque || joursFiges}
+            disabled={joursBloques}
             onChange={(e) => setForm({ ...form, surFeries: e.target.checked })}
           />
           S&apos;applique aussi les jours fériés
@@ -246,12 +307,9 @@ function ChampsCreneau({ cle, form, setForm, joursFiges, bloque }: ChampsProps) 
 
         {joursFiges && (
           <p className="note">
-            Les jours et les fériés de ce type de garde sont figés. L&apos;association
-            « tel jour → tel type de garde » est écrite à deux endroits volontairement : dans
-            le moteur, et dans le validateur qui le contrôle après coup. Les déplacer d&apos;ici
-            ne changerait qu&apos;un des deux, et le planning serait refusé sans qu&apos;on
-            comprenne pourquoi. Pour couvrir d&apos;autres jours : désactive ce type de garde
-            et crée un type sur-mesure. Le nom, les horaires et les places restent modifiables.
+            Les jours de ce type de garde ne se modifient pas : c&apos;est sur eux que tout le
+            planning est calé. Pour couvrir d&apos;autres jours, désactive-le et crée un type
+            sur-mesure — le nom, les horaires et les places restent modifiables ici.
           </p>
         )}
       </div>
@@ -279,38 +337,47 @@ function ChampsCreneau({ cle, form, setForm, joursFiges, bloque }: ChampsProps) 
       </div>
 
       <div>
-        <label htmlFor={`${cle}-offset`}>La garde se rend…</label>
-        <select
-          id={`${cle}-offset`}
-          value={form.offset}
+        <label id={`${cle}-offset-label`}>La garde se rend…</label>
+        <Select
+          value={String(form.offset)}
+          onValueChange={(v) => v && setForm({ ...form, offset: Number(v) })}
           disabled={bloque}
-          onChange={(e) => setForm({ ...form, offset: Number(e.target.value) })}
         >
-          {[0, 1, 2, 3].map((o) => (
-            <option key={o} value={o}>
-              {FIN_LABELS[o]}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger className="w-full" aria-labelledby={`${cle}-offset-label`}>
+            {FIN_LABELS[String(form.offset)]}
+          </SelectTrigger>
+          <SelectContent>
+            {['0', '1', '2', '3'].map((o) => (
+              <SelectItem key={o} value={o}>
+                {FIN_LABELS[o]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div>
-        <label htmlFor={`${cle}-places`}>Vétérinaires de garde</label>
-        <select
-          id={`${cle}-places`}
-          value={form.nbPlaces}
-          disabled={bloque}
-          onChange={(e) => {
-            const n = Number(e.target.value)
+        <label id={`${cle}-places-label`}>Vétérinaires de garde</label>
+        <Select
+          value={String(form.nbPlaces)}
+          onValueChange={(v) => {
+            if (!v) return
+            const n = Number(v)
             setForm({ ...form, nbPlaces: n, roles: ajusterRoles(form.roles, n) })
           }}
+          disabled={bloque}
         >
-          {Array.from({ length: PLACES_MAX }, (_, i) => i + 1).map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger className="w-full" aria-labelledby={`${cle}-places-label`}>
+            {form.nbPlaces} vétérinaire{form.nbPlaces > 1 ? 's' : ''}
+          </SelectTrigger>
+          <SelectContent>
+            {Array.from({ length: PLACES_MAX }, (_, i) => String(i + 1)).map((n) => (
+              <SelectItem key={n} value={n}>
+                {n} vétérinaire{n === '1' ? '' : 's'}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="large">
@@ -337,17 +404,34 @@ function ChampsCreneau({ cle, form, setForm, joursFiges, bloque }: ChampsProps) 
         </div>
         <p className="note">
           Ces noms se retrouvent partout : sur le planning, dans le PDF, dans l&apos;agenda et
-          dans les compteurs d&apos;équité. Ils doivent être différents les uns des autres.
+          dans les compteurs. Ils doivent être différents les uns des autres.
         </p>
       </div>
 
-      {/* Au-delà de deux places, tout suit SAUF la réattribution à la main
-          depuis la grille du planning. On le dit avant, pas après publication. */}
+      {/* Au-delà de deux places, trois choses ne suivent pas encore. On les dit
+          AVANT, au moment où le chiffre est saisi — pas après publication,
+          quand le planning est déjà sorti à côté de ce qui était attendu. */}
       {form.nbPlaces > 2 && (
         <p className="note attention large">
-          À partir de 3 vétérinaires, les places suivantes ne se réattribuent pas une par une
-          depuis le planning : il faut régénérer. L&apos;affichage, le PDF, l&apos;agenda et les
-          compteurs, eux, les suivent normalement.
+          À partir de 3 vétérinaires par garde, deux limites à connaître : on ne peut plus changer
+          une personne à la main depuis le planning (il faut relancer une génération), et sur les
+          soirs de semaine, la 3ᵉ et la 4ᵉ place ne sont pas encore comptées dans l&apos;équilibrage
+          des charges — ces gardes-là ne seront donc pas réparties équitablement. Le week-end et les
+          jours fériés, eux, comptent bien tout le monde.
+        </p>
+      )}
+
+      {/* ⚠️ LE PIÈGE À DIRE. Le moteur plafonne le créneau « soir de semaine »
+          au réglage « le soir en semaine » du profil, qui ne va aujourd'hui que
+          jusqu'à 2. Déclarer 3 ou 4 places ici ne produit donc que 2 gardes, et
+          RIEN ne le signalait : le planning sortait simplement plus petit que
+          demandé. Un réglage qu'on saisit et que le moteur ignore en silence
+          est pire qu'un réglage absent. */}
+      {code === 'semaine_soir' && form.nbPlaces > 2 && (
+        <p className="note attention large">
+          ⚠️ Attention : pour l&apos;instant, les soirs de semaine sont plafonnés à 2 vétérinaires
+          par le réglage « Le soir en semaine » du profil. Même en demandant {form.nbPlaces} places
+          ici, la génération n&apos;en pourvoira que 2.
         </p>
       )}
     </div>
@@ -365,44 +449,22 @@ export function OngletCreneaux({ profil }: Props) {
   const router = useRouter()
   const [enCours, startTransition] = useTransition()
 
-  /**
-   * L'ordre affiché. Il part du serveur, et le glisser-déposer le change
-   * localement AVANT la réponse (sinon la carte revient à sa place le temps de
-   * l'aller-retour, et on croit que le geste a raté). Le serveur reste maître :
-   * chaque `router.refresh()` réaligne cette liste.
-   */
-  // La resynchronisation se fait PENDANT LE RENDU et non dans un effet : après
-  // un `router.refresh()`, un effet afficherait d'abord l'ancien ordre puis le
-  // nouveau — la carte qu'on vient de déplacer sauterait une fois de plus.
-  // (Pattern « ajuster un état quand une prop change » de la doc React.)
-  const [liste, setListe] = useState<CreneauUI[]>(profil.creneaux)
-  const [listeServeur, setListeServeur] = useState<CreneauUI[]>(profil.creneaux)
-  if (listeServeur !== profil.creneaux) {
-    setListeServeur(profil.creneaux)
-    setListe(profil.creneaux)
-  }
-
   // Panneau de création (en tête de liste) et son formulaire.
   const [creation, setCreation] = useState(false)
   const [formNouveau, setFormNouveau] = useState<FormCreneau>(FORM_VIDE)
 
-  // Édition en place : l'id du créneau déplié, et son formulaire.
+  // Édition en place : l'id du type de garde déplié, et son formulaire.
   const [editId, setEditId] = useState<string | null>(null)
   const [formEdit, setFormEdit] = useState<FormCreneau>(FORM_VIDE)
   const [empreinteInitiale, setEmpreinteInitiale] = useState('')
 
-  // Confirmation de suppression.
+  // Les deux confirmations : arrêter un type de garde, et l'effacer.
+  const [aDesactiver, setADesactiver] = useState<CreneauUI | null>(null)
   const [aSupprimer, setASupprimer] = useState<CreneauUI | null>(null)
 
-  // Glisser-déposer : la carte tirée, la position visée, et la carte dont la
-  // poignée est enfoncée. Cette dernière est un ÉTAT et non une ref : c'est
-  // elle qui pose `draggable` sur la carte, donc elle doit provoquer un rendu.
-  // Sans ça, on ne peut tirer une carte qu'à partir du deuxième essai —
-  // et seulement une carte qui n'est pas la sienne.
-  const [prise, setPrise] = useState<number | null>(null)
-  const [cible, setCible] = useState<number | null>(null)
-  const [poigneeId, setPoigneeId] = useState<string | null>(null)
-
+  // Le catalogue arrive trié du serveur : on l'affiche tel quel, sans état
+  // local. Rien ne le réordonne côté écran.
+  const liste = profil.creneaux
   const total = liste.length
   const actifs = liste.filter((c) => c.actif).length
 
@@ -480,19 +542,39 @@ export function OngletCreneaux({ profil }: Props) {
     })
   }
 
-  // ── Activation ───────────────────────────────────────────────────────────
-  const basculerActif = (c: CreneauUI) => {
+  // ── Arrêt / reprise ──────────────────────────────────────────────────────
+  /**
+   * Réactiver est sans risque : on le fait tout de suite. Désactiver arrête
+   * d'engendrer des gardes sur des jours entiers — ça passe par la modale, qui
+   * nomme ces jours.
+   */
+  const cliquerInterrupteur = (c: CreneauUI) => {
+    if (c.actif) {
+      setADesactiver(c)
+      return
+    }
     startTransition(async () => {
-      const res = await setCreneauActif(c.id, !c.actif)
+      const res = await setCreneauActif(c.id, true)
       if (res && 'error' in res) {
         toast.error(res.error)
         return
       }
-      toast.success(
-        c.actif
-          ? `« ${c.nom} » désactivé — il n'émettra plus aucune garde.`
-          : `« ${c.nom} » réactivé — il émettra de nouveau des gardes.`,
-      )
+      toast.success(`« ${c.nom} » réactivé — il engendrera de nouveau des gardes.`)
+      router.refresh()
+    })
+  }
+
+  const confirmerDesactivation = () => {
+    if (!aDesactiver) return
+    const c = aDesactiver
+    startTransition(async () => {
+      const res = await setCreneauActif(c.id, false)
+      if (res && 'error' in res) {
+        toast.error(res.error)
+        return
+      }
+      toast.success(`« ${c.nom} » désactivé — plus aucune garde ne sera engendrée dessus.`)
+      setADesactiver(null)
       router.refresh()
     })
   }
@@ -512,51 +594,6 @@ export function OngletCreneaux({ profil }: Props) {
       if (editId === c.id) setEditId(null)
       router.refresh()
     })
-  }
-
-  // ── Réordonnancement ─────────────────────────────────────────────────────
-  /**
-   * Déplace un créneau de `depuis` vers `vers`. Optimiste : on montre le
-   * nouvel ordre tout de suite, et on revient exactement à l'ancien si le
-   * serveur refuse (catalogue modifié ailleurs, droits, réseau).
-   */
-  const deplacer = (depuis: number, vers: number) => {
-    if (depuis === vers || vers < 0 || vers >= liste.length) return
-    const avant = liste
-    const apres = [...liste]
-    const [tire] = apres.splice(depuis, 1)
-    apres.splice(vers, 0, tire)
-    setListe(apres)
-
-    startTransition(async () => {
-      const res = await reordonnerCreneaux(
-        profil.id,
-        apres.map((c) => c.id),
-      )
-      if (res && 'error' in res) {
-        setListe(avant)
-        toast.error(res.error)
-        return
-      }
-      router.refresh()
-    })
-  }
-
-  /** Flèches Haut/Bas sur la poignée — un glisser sans clavier est inaccessible. */
-  const clavierPoignee = (e: React.KeyboardEvent, i: number) => {
-    if (e.key === 'ArrowUp' && i > 0) {
-      e.preventDefault()
-      deplacer(i, i - 1)
-    } else if (e.key === 'ArrowDown' && i < liste.length - 1) {
-      e.preventDefault()
-      deplacer(i, i + 1)
-    }
-  }
-
-  const finDuGlisser = () => {
-    setPrise(null)
-    setCible(null)
-    setPoigneeId(null)
   }
 
   const rienAEnregistrer = empreinte(formEdit) === empreinteInitiale
@@ -583,8 +620,8 @@ export function OngletCreneaux({ profil }: Props) {
           </button>
           <p className="sub">
             Le catalogue du profil « {profil.nom} » : ce que le moteur a le droit de planifier,
-            avec ses jours, ses places et ses horaires. L&apos;ordre de cette liste est celui de
-            l&apos;affichage — glisse une carte pour le changer.
+            avec ses jours, ses places et ses horaires. Tout ce qui change ici s&apos;applique à
+            la prochaine génération — les plannings déjà publiés ne bougent pas.
           </p>
         </div>
 
@@ -604,7 +641,7 @@ export function OngletCreneaux({ profil }: Props) {
             <p className="note">
               Il sera planifié dès la prochaine génération, avec les mêmes garanties que les
               autres : un vétérinaire différent par place, jamais deux gardes le même jour pour
-              une même personne, congés respectés, attributions réparties équitablement.
+              une même personne, congés respectés, tours répartis équitablement.
             </p>
 
             <div className="panneau-pied">
@@ -636,59 +673,20 @@ export function OngletCreneaux({ profil }: Props) {
           </p>
         ) : (
           <div className="cre-liste">
-            {liste.map((c, i) => {
+            {liste.map((c) => {
               const ouvert = editId === c.id
-              const classes = [
-                'cre-carte',
-                c.actif ? '' : 'eteint',
-                prise === i ? 'prise' : '',
-                cible === i && prise !== null && prise !== i ? 'cible' : '',
-              ]
-                .filter(Boolean)
-                .join(' ')
+              const { teinte, Icone } = identite(c.code)
 
               return (
                 <article
                   key={c.id}
-                  className={classes}
-                  draggable={poigneeId === c.id}
-                  onDragStart={(e) => {
-                    if (poigneeId !== c.id) {
-                      e.preventDefault()
-                      return
-                    }
-                    e.dataTransfer.effectAllowed = 'move'
-                    e.dataTransfer.setData('text/plain', c.id)
-                    setPrise(i)
-                  }}
-                  onDragOver={(e) => {
-                    if (prise === null) return
-                    e.preventDefault()
-                    e.dataTransfer.dropEffect = 'move'
-                    setCible(i)
-                  }}
-                  onDrop={(e) => {
-                    if (prise === null) return
-                    e.preventDefault()
-                    const depuis = prise
-                    finDuGlisser()
-                    deplacer(depuis, i)
-                  }}
-                  onDragEnd={finDuGlisser}
+                  className={`cre-carte${c.actif ? '' : ' eteint'}`}
+                  style={teinteCss(teinte)}
                 >
                   <div className="cre-tete">
-                    <button
-                      type="button"
-                      className="cre-poignee"
-                      aria-label={`Déplacer « ${c.nom} » dans la liste — position ${i + 1} sur ${liste.length}. Flèches Haut et Bas pour changer d'ordre.`}
-                      disabled={enCours || liste.length < 2}
-                      onMouseDown={() => setPoigneeId(c.id)}
-                      onTouchStart={() => setPoigneeId(c.id)}
-                      onKeyDown={(e) => clavierPoignee(e, i)}
-                      onBlur={finDuGlisser}
-                    >
-                      <GripVertical size={17} aria-hidden="true" />
-                    </button>
+                    <span className="cre-ico" aria-hidden="true">
+                      <Icone size={19} />
+                    </span>
 
                     <div className="cre-titre">
                       <span className="cre-nom">{c.nom}</span>
@@ -711,13 +709,9 @@ export function OngletCreneaux({ profil }: Props) {
                       <button
                         type="button"
                         className="icon-btn doux"
-                        onClick={() => basculerActif(c)}
+                        onClick={() => cliquerInterrupteur(c)}
                         disabled={enCours}
-                        title={
-                          c.actif
-                            ? `Désactiver « ${c.nom} » — il n'émettra plus aucune garde`
-                            : `Réactiver « ${c.nom} »`
-                        }
+                        title={c.actif ? `Désactiver « ${c.nom} »` : `Réactiver « ${c.nom} »`}
                         aria-label={
                           c.actif ? `Désactiver « ${c.nom} »` : `Réactiver « ${c.nom} »`
                         }
@@ -757,9 +751,25 @@ export function OngletCreneaux({ profil }: Props) {
                     </div>
                   </div>
 
-                  {/* L'édition se déplie DANS la carte : on veut voir le créneau
-                      qu'on modifie. C'est tout l'objet de cet onglet — la V1
-                      obligeait à le retrouver dans une seconde liste. */}
+                  {/* Une carte éteinte doit DIRE ce qu'elle a arrêté. Une
+                      étiquette « Désactivé » nomme un état ; elle ne dit pas
+                      que des jours entiers ne sont plus couverts. */}
+                  {!c.actif && (
+                    <div className="cre-form">
+                      <p className="consequence">
+                        <Power size={15} aria-hidden="true" />
+                        <span>
+                          Aucune garde n&apos;est engendrée sur ce type : <b>{c.joursClair}</b> ne
+                          sont plus couverts par la génération. Les plannings déjà publiés ne
+                          changent pas. Réactive-le quand tu veux.
+                        </span>
+                      </p>
+                    </div>
+                  )}
+
+                  {/* L'édition se déplie DANS la carte : on veut voir le type de
+                      garde qu'on modifie. C'est tout l'objet de cet onglet — la
+                      V1 obligeait à le retrouver dans une seconde liste. */}
                   {ouvert && (
                     <div className="cre-form">
                       <ChampsCreneau
@@ -768,15 +778,16 @@ export function OngletCreneaux({ profil }: Props) {
                         setForm={setFormEdit}
                         joursFiges={c.estSeed}
                         bloque={enCours}
+                        code={c.code}
                       />
 
                       {c.estSeed && (
                         <p className="note">
                           Ce type de garde fait partie des quatre de base : il ne peut pas être
-                          supprimé, parce qu&apos;il sert de filet au cabinet — sans lui, une
-                          période entière pourrait ne plus être couverte sans que personne ne le
-                          remarque. Si tu ne veux plus qu&apos;il produise de gardes, désactive-le
-                          : c&apos;est réversible et il reste ici.
+                          supprimé, parce qu&apos;il sert de filet au cabinet — sans lui, des
+                          semaines entières pourraient se retrouver sans garde sans que personne
+                          ne le remarque. Si tu ne veux plus qu&apos;il engendre de gardes,
+                          désactive-le : c&apos;est réversible et il reste dans la liste.
                         </p>
                       )}
 
@@ -809,6 +820,57 @@ export function OngletCreneaux({ profil }: Props) {
         )}
       </section>
 
+      {/* ── Confirmation de désactivation ────────────────────────────────
+          Un interrupteur de 34 pixels arrête la production de gardes sur des
+          jours entiers. Personne ne peut le deviner : on l'écrit, avec les
+          vrais jours du type de garde sous les yeux. */}
+      <Dialog
+        open={Boolean(aDesactiver)}
+        onOpenChange={(o) => {
+          if (!o && !enCours) setADesactiver(null)
+        }}
+      >
+        <DialogContent className="gv-modale">
+          <DialogHeader>
+            <DialogTitle>Désactiver « {aDesactiver?.nom} » ?</DialogTitle>
+            <DialogDescription>
+              À la prochaine génération, plus aucune garde de ce type ne sera créée.
+              C&apos;est réversible à tout moment : il reste dans la liste, éteint, et se
+              rallume d&apos;un clic.
+            </DialogDescription>
+          </DialogHeader>
+
+          {aDesactiver && (
+            <p className="gv-rappel">
+              <span>
+                Jours qui ne seront plus couverts : <b>{aDesactiver.joursClair}</b>
+              </span>
+              <span className="gv-appoint">
+                {aDesactiver.placesClair} · {aDesactiver.horairesClair}
+              </span>
+            </p>
+          )}
+
+          <ul className="gv-consequences">
+            <li>Les plannings déjà générés ne bougent pas : les gardes publiées restent.</li>
+            <li>Les périodes générées ensuite n&apos;auront plus aucune garde de ce type.</li>
+            <li>
+              Si aucun autre type de garde ne couvre ces jours-là, ils resteront sans
+              vétérinaire de garde.
+            </li>
+          </ul>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setADesactiver(null)} disabled={enCours}>
+              Annuler
+            </Button>
+            <Button variant="destructive" onClick={confirmerDesactivation} disabled={enCours}>
+              {enCours ? 'Un instant…' : 'Désactiver'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ── Confirmation de suppression ──────────────────────────────────
           Une vraie modale, pas un `window.confirm()` : elle dit ce qu'on perd,
           et elle propose le geste réversible que l'utilisateur cherchait
@@ -823,23 +885,27 @@ export function OngletCreneaux({ profil }: Props) {
           <DialogHeader>
             <DialogTitle>Supprimer « {aSupprimer?.nom} » ?</DialogTitle>
             <DialogDescription>
-              C&apos;est définitif. Ce type de garde disparaît du profil « {profil.nom} », et avec
-              lui ses horaires, ses places et les enchaînements qui le désignent. Le moteur
-              n&apos;en produira plus aucune garde. Pour l&apos;arrêter sans rien perdre, préfère
-              « Désactiver » : il reste dans la liste, éteint, et se rallume d&apos;un clic.
+              C&apos;est définitif. Pour l&apos;arrêter sans rien perdre, préfère
+              « Désactiver » : il reste dans la liste et se rallume d&apos;un clic.
             </DialogDescription>
           </DialogHeader>
 
           {aSupprimer && (
-            <p className="note">
-              {aSupprimer.joursClair} · {aSupprimer.placesClair} · {aSupprimer.horairesClair}
+            <p className="gv-rappel">
+              <span>
+                Jours qui ne seront plus couverts : <b>{aSupprimer.joursClair}</b>
+              </span>
+              <span className="gv-appoint">
+                {aSupprimer.placesClair} · {aSupprimer.horairesClair}
+              </span>
             </p>
           )}
 
-          <p className="note">
-            Les plannings déjà générés ne sont pas modifiés : les gardes publiées restent telles
-            quelles.
-          </p>
+          <ul className="gv-consequences">
+            <li>Ses horaires et le nom de ses places sont perdus.</li>
+            <li>Les enchaînements qui le désignent disparaissent avec lui.</li>
+            <li>Les plannings déjà générés ne bougent pas : les gardes publiées restent.</li>
+          </ul>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setASupprimer(null)} disabled={enCours}>
