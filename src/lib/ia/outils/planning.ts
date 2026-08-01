@@ -63,7 +63,7 @@ const STATUT_HUMAIN: Record<string, string> = {
   verrouille: 'verrouillée',
 }
 
-/** Même libellé que l'écran /admin/periodes quand la période n'a pas de
+/** Même libellé que l'écran /historique quand la période n'a pas de
  *  titre : « Été » ou « Hiver Pn ». Duplication assumée (3 lignes pures) —
  *  si l'écran change cette règle d'affichage, ce texte divergera et personne
  *  n'est prévenu ; à surveiller si le libellé de période évolue un jour. */
@@ -299,7 +299,7 @@ Appelle-le pour toute question sur les périodes elles-mêmes plutôt que sur le
     return {
       periodes: selection.map((p) => {
         // Précédence effectif : période (surcharge) > profil > saison — MÊME
-        // ordre que le moteur (engine/loader.ts) et que l'écran /admin/periodes.
+        // ordre que le moteur (engine/loader.ts) et que l'écran /historique.
         let effectif: number
         let effectifProvenance: string
         if (typeof p.nb_vetos_semaine_soir === 'number') {

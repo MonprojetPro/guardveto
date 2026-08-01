@@ -1,12 +1,15 @@
 // ============================================================
 // GUARDVETO V2 — Équipe
 // ============================================================
-// Quatrième écran de la bascule (maquette M4, section 2). Il remplace, côté
-// look, la page V1 `/admin/veterinaires` — qui reste en place et fonctionnelle
-// jusqu'à la recette de celui-ci.
+// Quatrième écran de la bascule (maquette M4, section 2). Il REMPLACE la page
+// V1 `/admin/veterinaires`, désormais supprimée : celle-ci lisait et écrivait
+// dans `contraintes_veto`, une table que le moteur n'ouvre plus — un admin y
+// réglait une contrainte en croyant agir sur le planning, sans que rien ne
+// bouge. Cet écran-ci branche « Ses contraintes » sur `regles_cabinet`, la
+// table que le moteur lit vraiment.
 //
-// Réservé à l'admin, comme la V1 : c'est lui qui crée les fiches, invite les
-// comptes et décide qui entre dans les générations.
+// Réservé à l'admin : c'est lui qui crée les fiches, invite les comptes et
+// décide qui entre dans les générations.
 // ============================================================
 
 import { createClient } from '@/lib/supabase/server'

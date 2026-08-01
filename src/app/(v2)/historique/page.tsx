@@ -5,7 +5,11 @@
 // était éclaté sur deux entrées de menu — `/compteurs` et `/admin/periodes` —
 // parce que c'est une seule question : qui a fait quoi, et sur quelle période.
 //
-// Les deux routes V1 restent en place jusqu'à la recette de celui-ci.
+// `/admin/periodes` a depuis été SUPPRIMÉE — c'était un doublon complet de la
+// section « périodes » ci-dessous, et le planning V2 renvoyait vers elle plutôt
+// que vers ici. Cet écran est désormais le seul endroit où l'on gère les
+// périodes ; son fichier d'actions, lui, survit et sert aussi les outils de
+// Filou.
 //
 // Tous les chiffres viennent du moteur : la vue `compteurs_gardes`, la table
 // `compensations`, et `calculerBilans` pour les écarts — le MÊME calcul que le
@@ -58,9 +62,12 @@ function nbSemaines(p: Periode): number {
 
 /**
  * Effectif de nuit RÉELLEMENT appliqué par le moteur — même précédence que
- * `engine/loader.ts` : période (surcharge) > profil > saison. Recopié de la
- * page V1 `/admin/periodes` : afficher autre chose serait afficher un réglage
- * que le moteur n'utilise pas.
+ * `engine/loader.ts` : période (surcharge) > profil > saison. Afficher autre
+ * chose serait afficher un réglage que le moteur n'utilise pas.
+ *
+ * ⚠️ Cette cascade est réimplémentée à sept endroits dans le projet (audit du
+ * 2026-08-01). Toute correction ici doit être portée partout — c'est le piège
+ * « cécité params » déjà payé sur ce projet.
  */
 function effectifResolu(
   p: Periode,

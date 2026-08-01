@@ -8,30 +8,36 @@ import { PERIODE_B_ID, TEST_EMAIL_DOMAIN, USERS } from './fixtures/test-data'
 // GUARDVETO — E2E Rôles (admin vs veto)
 // ════════════════════════════════════════════════════════════════
 // Un user rôle `veto` :
-//   • est redirigé vers /planning quand il tente une page admin
-//     (admin/veterinaires, admin/periodes, admin/demandes) ;
+//   • est renvoyé sur son propre écran quand il tente une page admin ;
 //   • ne voit pas les entrées de nav admin dans la sidebar ;
 //   • peut accéder aux pages communes (planning, congés, compteurs).
 // Un admin, lui, accède bien aux pages admin.
+//
+// ⚠️ Les deux écrans V1 `/admin/veterinaires` et `/admin/periodes` ont été
+//    supprimés (doublons de `/equipe` et `/historique`, et le premier écrivait
+//    dans la table morte `contraintes_veto`). Ce test vise donc désormais les
+//    écrans V2 qui portent réellement ces sujets.
 // ════════════════════════════════════════════════════════════════
 
 loadEnvLocal()
 
-// Pages réservées aux admins (cf. (protected)/admin/*/page.tsx : redirect veto → /planning)
-const ADMIN_ONLY_ROUTES = [
-  '/admin/veterinaires',
-  '/admin/periodes',
-  '/admin/demandes',
+// Pages réservées aux admins, avec la destination du renvoi. Elle n'est PAS la
+// même partout : les écrans V2 renvoient sur `/accueil` (leur propre point
+// d'entrée), les écrans V1 restants sur `/planning`. Un test qui n'attendrait
+// qu'une seule cible passerait à côté de la moitié des cas.
+const ADMIN_ONLY_ROUTES: { route: string; renvoiVers: RegExp }[] = [
+  { route: '/equipe', renvoiVers: /\/accueil/ },
+  { route: '/regles', renvoiVers: /\/accueil/ },
+  { route: '/admin/demandes', renvoiVers: /\/planning/ },
 ]
 
 test.describe('Contrôle des rôles', () => {
-  test('un véto est redirigé vers /planning sur chaque page admin', async ({ page }) => {
+  test('un véto est renvoyé de chaque page admin', async ({ page }) => {
     await login(page, USERS.vetoB.email, USERS.vetoB.password)
 
-    for (const route of ADMIN_ONLY_ROUTES) {
+    for (const { route, renvoiVers } of ADMIN_ONLY_ROUTES) {
       await page.goto(route)
-      // Les pages admin redirigent les vétos vers /planning.
-      await expect(page, `route ${route} doit rediriger un véto`).toHaveURL(/\/planning/)
+      await expect(page, `route ${route} doit rediriger un véto`).toHaveURL(renvoiVers)
     }
   })
 
@@ -58,13 +64,13 @@ test.describe('Contrôle des rôles', () => {
     await expect(page).toHaveURL(/\/compteurs/)
   })
 
-  test('un admin accède bien à la page admin/veterinaires', async ({ page }) => {
+  test('un admin accède bien à l’écran Équipe', async ({ page }) => {
     await login(page, USERS.adminB.email, USERS.adminB.password)
-    await page.goto('/admin/veterinaires')
+    await page.goto('/equipe')
 
-    await expect(page).toHaveURL(/\/admin\/veterinaires/)
+    await expect(page).toHaveURL(/\/equipe/)
     await expect(
-      page.getByRole('heading', { name: 'Gestion des vétérinaires' })
+      page.getByRole('heading', { name: /Une fiche par personne/ })
     ).toBeVisible()
   })
 

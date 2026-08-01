@@ -10,8 +10,9 @@
 // les gardes plutôt que de demander « êtes-vous sûr ? ».
 //
 // Ce qui est RÉUTILISÉ tel quel (les règles métier) : les quatre actions
-// serveur de `/admin/veterinaires` (création, modification, invitation,
-// activation). On ne réécrit pas une action qui porte une garde admin, une
+// serveur de `admin/veterinaires/actions.ts` (création, modification,
+// invitation, activation) — le fichier survit à la suppression de la page V1
+// qui le rendait. On ne réécrit pas une action qui porte une garde admin, une
 // résolution de cabinet et un garde-fou sur les gardes publiées.
 //
 // Ce qui est AJOUTÉ vs la maquette : nom de famille et e-mail dans le

@@ -207,7 +207,13 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Règles',        href: '/regles',              icon: 'ScrollText',   roles: ['admin'] },
   { label: 'Demandes',      href: '/admin/demandes',      icon: 'Inbox',        roles: ['admin'] },
   { label: 'Dépannages',    href: '/admin/depannages',    icon: 'LifeBuoy',     roles: ['admin'] },
-  { label: 'Périodes',      href: '/admin/periodes',      icon: 'CalendarRange', roles: ['admin'] },
-  { label: 'Vétérinaires',  href: '/admin/veterinaires',  icon: 'Users',        roles: ['admin'] },
+  // Les deux pages V1 correspondantes ont été supprimées : `/admin/periodes`
+  // était un doublon complet de la section « périodes » de `/historique`, et
+  // `/admin/veterinaires` lisait ET écrivait dans `contraintes_veto` — une
+  // table que le moteur n'ouvre plus. Un admin qui y réglait une contrainte
+  // croyait agir sur le planning sans que rien ne bouge. Les entrées mènent
+  // désormais aux écrans V2 qui portent réellement ces sujets.
+  { label: 'Périodes',      href: '/historique',          icon: 'CalendarRange', roles: ['admin'] },
+  { label: 'Vétérinaires',  href: '/equipe',              icon: 'Users',        roles: ['admin'] },
   { label: 'Journal e-mails', href: '/admin/journal-emails', icon: 'MailWarning', roles: ['admin'] },
 ]

@@ -41,7 +41,7 @@ test.describe('Authentification', () => {
   })
 
   test('route admin sans session → redirige vers /login', async ({ page }) => {
-    await page.goto('/admin/veterinaires')
+    await page.goto('/equipe')
     await expectOnLogin(page)
   })
 

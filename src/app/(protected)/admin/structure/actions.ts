@@ -219,7 +219,7 @@ export async function creerProfil(payload: CreerProfilPayload) {
   }
 
   revalidatePath('/regles')
-  revalidatePath('/admin/periodes')
+  revalidatePath('/historique')
   return { success: true }
 }
 
@@ -245,7 +245,7 @@ export async function renommerProfil(profilId: string, nom: string) {
   }
 
   revalidatePath('/regles')
-  revalidatePath('/admin/periodes')
+  revalidatePath('/historique')
   return { success: true }
 }
 
@@ -284,7 +284,7 @@ export async function setProfilMeta(
 
   if (error) return { error: error.message }
   revalidatePath('/regles')
-  revalidatePath('/admin/periodes')
+  revalidatePath('/historique')
   return { success: true }
 }
 
@@ -364,7 +364,7 @@ export async function supprimerProfil(profilId: string) {
 
   if (error) return { error: error.message }
   revalidatePath('/regles')
-  revalidatePath('/admin/periodes')
+  revalidatePath('/historique')
   return { success: true }
 }
 
@@ -500,7 +500,7 @@ export async function creerProfilComplet(payload: CreerProfilCompletPayload) {
   }
 
   revalidatePath('/regles')
-  revalidatePath('/admin/periodes')
+  revalidatePath('/historique')
   return { success: true }
 }
 

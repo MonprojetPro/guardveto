@@ -3,7 +3,7 @@
 // ============================================================
 // Fonctions PURES réutilisées par l'écran /regles (formulaire + liste) et
 // par le server action upsertRegle. Le libellé reste aligné sur celui de
-// /admin/periodes (même base : libellé custom > « Été » > « Hiver P{n} »),
+// /historique (même base : libellé custom > « Été » > « Hiver P{n} »),
 // enrichi des dates pour lever l'ambiguïté entre deux périodes homonymes.
 //
 // ⚠️ La validité d'une règle est portée par `regles_cabinet.periode_id`
@@ -30,7 +30,7 @@ function moisAnnee(d: string): string {
   })
 }
 
-/** Libellé de base SANS dates — aligné avec /admin/periodes. */
+/** Libellé de base SANS dates — aligné avec /historique. */
 export function periodeLabelBase(p: {
   saison: string
   numero: number | null

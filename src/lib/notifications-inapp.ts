@@ -143,12 +143,12 @@ export function contenuRappelCreationPeriode(dateFinDerniere: string, dejaFinie:
     ? {
         titre: '🚨 Plus aucune période de planning',
         message: `La dernière période s'est terminée le ${formatDateFr(dateFinDerniere)} et aucune ne la suit : les gardes ne sont plus planifiées. Crée la période suivante dès que possible.`,
-        lien: '/admin/periodes',
+        lien: '/historique',
       }
     : {
         titre: 'Pense à créer la période suivante',
         message: `La dernière période de planning se termine le ${formatDateFr(dateFinDerniere)} et aucune ne la suit. Crée la prochaine période pour laisser le temps de générer et publier le planning.`,
-        lien: '/admin/periodes',
+        lien: '/historique',
       }
 }
 

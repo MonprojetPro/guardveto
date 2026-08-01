@@ -272,7 +272,7 @@ export function PlanningV2({
                   </button>
                 ))}
                 {isAdmin && (
-                  <a className="pp-new" href="/admin/periodes">
+                  <a className="pp-new" href="/historique">
                     Gérer les périodes
                     <small>Créer la période suivante, changer ses dates ou son profil</small>
                   </a>

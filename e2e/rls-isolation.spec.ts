@@ -19,8 +19,8 @@ import {
 // Deux niveaux de vérification :
 //   1. Couche données (RLS pure) : requêtes Supabase avec un JWT réel
 //      du user → la RLS doit filtrer côté serveur.
-//   2. Couche UI : la page admin/veterinaires n'affiche que les vétos
-//      du cabinet de l'admin connecté.
+//   2. Couche UI : l'écran /equipe n'affiche que les vétos du cabinet de
+//      l'admin connecté.
 // ════════════════════════════════════════════════════════════════
 
 // Le worker de spec n'hérite pas du chargement .env de Next.
@@ -101,18 +101,20 @@ test.describe('Isolation multi-tenant (RLS)', () => {
     await clientB.auth.signOut()
   })
 
-  test('UI : admin B ne voit que ses vétos sur /admin/veterinaires', async ({ page }) => {
+  test('UI : admin B ne voit que ses vétos sur /equipe', async ({ page }) => {
     await login(page, USERS.adminB.email, USERS.adminB.password)
-    await page.goto('/admin/veterinaires')
+    await page.goto('/equipe')
 
     await expect(
-      page.getByRole('heading', { name: 'Gestion des vétérinaires' })
+      page.getByRole('heading', { name: /Une fiche par personne/ })
     ).toBeVisible()
 
-    // Les vétos du cabinet B sont listés… (scopé au contenu principal :
-    // le nom de l'admin connecté apparaît aussi dans la barre latérale).
-    await expect(page.getByRole('main').getByText(USERS.adminB.nom, { exact: false }).first()).toBeVisible()
-    await expect(page.getByRole('main').getByText(USERS.vetoB.nom, { exact: false }).first()).toBeVisible()
+    // Les vétos du cabinet B sont listés… On vise la GRILLE DES FICHES et non
+    // `role=main` : la coquille V2 n'a pas d'élément <main>, et le prénom de
+    // l'admin connecté apparaît de toute façon dans la barre du haut.
+    const grille = page.locator('.team-grid')
+    await expect(grille.getByText(USERS.adminB.nom, { exact: false }).first()).toBeVisible()
+    await expect(grille.getByText(USERS.vetoB.nom, { exact: false }).first()).toBeVisible()
 
     // …et AUCUN véto du cabinet C n'apparaît.
     await expect(page.getByText(USERS.adminC.nom, { exact: false })).toHaveCount(0)

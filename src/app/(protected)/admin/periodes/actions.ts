@@ -6,16 +6,13 @@ import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
- * Rafraîchit les DEUX écrans qui listent les périodes.
+ * Rafraîchit le seul écran qui liste les périodes : « Historique & compteurs ».
  *
- * La V2 les affiche dans « Historique & compteurs » (`/historique`), la V1
- * dans `/admin/periodes` ; les deux cohabitent le temps de la bascule. Ne
- * revalider que l'une laisse l'autre montrer l'état d'avant — une période
- * créée qui n'apparaît pas, un effectif qui a l'air de ne pas s'être
- * enregistré.
+ * Le doublon V1 `/admin/periodes` a été supprimé — deux écrans complets pour
+ * un seul sujet, et le planning V2 renvoyait vers le mauvais. Ce fichier
+ * d'actions, lui, reste : il sert `/historique` ET les outils de Filou.
  */
 function revaliderPeriodes() {
-  revalidatePath('/admin/periodes')
   revalidatePath('/historique')
 }
 
