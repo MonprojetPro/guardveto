@@ -162,8 +162,14 @@ function validerHoraire(p: {
 
 /** Saisons acceptées par la suggestion (miroir du CHECK profils_planning). */
 const SAISONS_VALIDES = new Set(['ete', 'hiver'])
-/** Effectifs acceptés (miroir du CHECK nb_vetos_semaine_soir IN (1,2)). */
-const EFFECTIFS_VALIDES = new Set([1, 2])
+/**
+ * Effectifs acceptés le soir en semaine (miroir du CHECK 1..4, migration
+ * 20260801090000). Ce réglage PLAFONNE le nombre de places du créneau
+ * « soir de semaine » à la génération : tant qu'il était borné à 2, un cabinet
+ * pouvait déclarer 4 places et n'en voir pourvoir que 2, en silence.
+ */
+const EFFECTIF_SOIR_MAX = 4
+const EFFECTIFS_VALIDES = new Set([1, 2, 3, 4])
 
 export interface CreerProfilPayload {
   nom: string

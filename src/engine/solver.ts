@@ -89,9 +89,15 @@ export interface SolverInput {
   /** Données calendaires résolues depuis Supabase. Fallback sur les listes en dur si absent. */
   calendrier?: CalendrierResolu
   /**
-   * Effectif configurable : nombre de vétos la nuit en semaine (1 ou 2).
+   * Effectif configurable : nombre de vétos la nuit en semaine (1 à 4).
    * Absent → repli sur la saison (hiver = 2, été = 1) — comportement historique.
-   * Les vendredi_soir et week-ends restent toujours à 2.
+   * Les vendredi_soir et week-ends suivent, eux, leur catalogue.
+   *
+   * Ce nombre PLAFONNE le `nbPlaces` du créneau `semaine_soir` : le moteur
+   * retient le plus petit des deux. Il circule comme un nombre de bout en
+   * bout — tant qu'il transitait en booléen « faut-il un second ? », tout
+   * réglage ≥ 2 retombait à 2, et un cabinet réglé à 4 n'obtenait que 2 gardes
+   * sans qu'aucun message ne le signale.
    */
   nbVetosSemaineSoir?: number
   /**
@@ -259,7 +265,7 @@ interface Blocage {
  * sa propre dérivation — cf. typeGardePourJour (structure-creneaux).
  */
 function stepsForDay(
-  date: string, saison: Saison, besoinSecondSemaine: boolean, creneaux?: CreneauModele[],
+  date: string, saison: Saison, effectifSemaineSoir: number, creneaux?: CreneauModele[],
 ): SolverStep[] {
   const idx = jourIndex(date) // 0=dim … 6=sam
 
@@ -273,15 +279,21 @@ function stepsForDay(
   // configurable — les autres créneaux émettent toutes leurs places. Pour le
   // catalogue par DÉFAUT (un seul créneau par jour, codes historiques), le
   // résultat est byte-identique à l'ancien comportement (banc d'équivalence).
+  //
+  // ⚠️ L'effectif circule ici comme un NOMBRE (1 à 4), plus comme un booléen
+  // « il faut un second ». Tant qu'il transitait en booléen, l'information
+  // était écrasée en route : un cabinet réglé à 3 vétérinaires le soir voyait
+  // `effectif >= 2` devenir `true`, puis `true` redevenir `2`. Le plafond
+  // rabotait donc à 2 un créneau qui en demandait 3 ou 4, sans que rien ne le
+  // signale — le planning sortait simplement plus petit que demandé.
   if (creneaux && creneaux.length > 0) {
     const steps: SolverStep[] = []
     for (const c of creneaux) {
       if (!c.actif || c.surFeries || !c.joursSemaine.includes(idx)) continue
       const t = c.code
       if (t === null || t === 'ferie') continue
-      const effectifSemaine = besoinSecondSemaine ? 2 : 1
       const nbAEmettre = t === 'semaine_soir'
-        ? Math.min(c.nbPlaces, effectifSemaine)
+        ? Math.min(c.nbPlaces, effectifSemaineSoir)
         : c.nbPlaces
       const roles = c.roles.slice(0, nbAEmettre)
       const besoinSecond = nbAEmettre >= 2 // « le créneau a-t-il ≥ 2 places ? » (R17/R18)
@@ -302,7 +314,13 @@ function stepsForDay(
     ]
   }
   if (t === 'semaine_soir') {
-    // Lundi à jeudi. Effectif configurable : 2 (1er+2nd) ou 1 (1er seul).
+    // Lundi à jeudi. Effectif : 2 (1er + 2nd) ou 1 (1er seul).
+    //
+    // Ce chemin ne connaît QUE ces deux rôles — il sert les contextes sans
+    // catalogue de créneaux, où il n'existe aucun libellé de 3ᵉ ni de 4ᵉ place
+    // à donner aux gardes. On borne donc à 2 : au-delà, c'est le catalogue qui
+    // décrit l'organisation, et c'est le chemin du dessus qui s'applique.
+    const besoinSecondSemaine = effectifSemaineSoir >= 2
     const nbPlaces = besoinSecondSemaine ? 2 : 1
     const steps: SolverStep[] = [
       { date, type: t, saison, role: 'premier', besoinSecond: besoinSecondSemaine, nbPlaces },
@@ -321,11 +339,13 @@ function genererSteps(
 ): SolverStep[] {
   const weSteps: SolverStep[] = []
   const semaineSteps: SolverStep[] = []
-  const besoinSecondSemaine = effectifSemaine(saison, nbVetosSemaineSoir) >= 2
+  // Le NOMBRE, pas « faut-il un second » : c'est lui que le plafond du
+  // catalogue doit comparer à `nbPlaces` (cf. `stepsForDay`).
+  const effectifSoir = effectifSemaine(saison, nbVetosSemaineSoir)
 
   let current = dateDebut
   while (current <= dateFin) {
-    for (const s of stepsForDay(current, saison, besoinSecondSemaine, creneaux)) {
+    for (const s of stepsForDay(current, saison, effectifSoir, creneaux)) {
       (s.type === 'semaine_soir' ? semaineSteps : weSteps).push(s)
     }
     current = addDays(current, 1)
@@ -816,11 +836,13 @@ function genererStepsSemaine(
 ): SolverStep[] {
   const weSteps: SolverStep[] = []
   const semaineSteps: SolverStep[] = []
-  const besoinSecondSemaine = effectifSemaine(saison, nbVetosSemaineSoir) >= 2
+  // Le NOMBRE, pas « faut-il un second » : c'est lui que le plafond du
+  // catalogue doit comparer à `nbPlaces` (cf. `stepsForDay`).
+  const effectifSoir = effectifSemaine(saison, nbVetosSemaineSoir)
 
   for (let i = 0; i <= 6; i++) {
     const date = addDays(lundi, i)
-    for (const s of stepsForDay(date, saison, besoinSecondSemaine, creneaux)) {
+    for (const s of stepsForDay(date, saison, effectifSoir, creneaux)) {
       (s.type === 'semaine_soir' ? semaineSteps : weSteps).push(s)
     }
   }

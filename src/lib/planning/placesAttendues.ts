@@ -99,10 +99,18 @@ export function placesAttendues(args: {
 }): number | null {
   const code = codeCatalogue(args.typePlanning)
 
-  // Une nuit de semaine ne suit PAS le catalogue : elle suit sa période.
+  // Une nuit de semaine est le SEUL créneau à deux maîtres : son catalogue et
+  // l'effectif de sa période. Le moteur retient le plus petit des deux
+  // (`Math.min(nbPlaces, effectif)` dans `solver.ts`) — il faut retenir le même
+  // ici, sinon l'écran annonce un manque que le moteur n'avait jamais eu
+  // l'intention de pourvoir : un cabinet réglé à 2 le soir mais dont le
+  // créneau ne déclare qu'une place verrait un trou imaginaire sur chaque nuit.
   if (code === 'semaine_soir') {
     const periode = args.periodes.find((p) => p.date_debut <= args.date && args.date <= p.date_fin)
-    return periode ? effectifNuitSemaine(periode, args.profils) : null
+    if (!periode) return null
+    const effectif = effectifNuitSemaine(periode, args.profils)
+    const duCatalogue = args.catalogue.get(code)
+    return typeof duCatalogue === 'number' ? Math.min(duCatalogue, effectif) : effectif
   }
 
   // Tout le reste suit le nombre de places de son créneau. On tente le code brut

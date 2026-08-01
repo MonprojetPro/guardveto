@@ -172,7 +172,9 @@ export async function setProfilPeriode(periodeId: string, profilId: string | nul
  * génération du planning de la période.
  */
 export async function setEffectifPeriode(periodeId: string, nb: number) {
-  if (nb !== 1 && nb !== 2) return { error: 'Effectif invalide (1 ou 2).' }
+  if (!Number.isInteger(nb) || nb < 1 || nb > 4) {
+    return { error: 'Effectif invalide (entre 1 et 4 vétérinaires).' }
+  }
   const supabase = await createClient()
 
   const garde = await assertAdmin(supabase)

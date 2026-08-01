@@ -96,8 +96,12 @@ function saisonClair(s: string | null): string {
   return s === 'ete' ? 'Été' : s === 'hiver' ? 'Hiver' : 'Aucune'
 }
 
+/** Les effectifs proposables le soir en semaine (miroir du CHECK 1..4). */
+const EFFECTIFS = [1, 2, 3, 4]
+
 function effectifClair(n: number | null): string {
-  return n === 1 ? '1 véto' : n === 2 ? '2 vétos' : 'Selon la période'
+  if (n === null || !EFFECTIFS.includes(n)) return 'Selon la période'
+  return n === 1 ? '1 véto' : `${n} vétos`
 }
 
 export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
@@ -162,7 +166,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
         saison_suggeree:
           saisonNouveau === 'ete' || saisonNouveau === 'hiver' ? saisonNouveau : null,
         nb_vetos_semaine_soir:
-          effectifNouveau === '1' || effectifNouveau === '2' ? Number(effectifNouveau) : null,
+          EFFECTIFS.includes(Number(effectifNouveau)) ? Number(effectifNouveau) : null,
       })
       if (res?.error) {
         toast.error(res.error)
@@ -335,8 +339,11 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={AUCUNE}>Selon la période</SelectItem>
-                    <SelectItem value="1">1 véto</SelectItem>
-                    <SelectItem value="2">2 vétos</SelectItem>
+                    {EFFECTIFS.map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {effectifClair(n)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -487,7 +494,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
                         onValueChange={(v) => {
                           if (!v) return
                           const brut = String(v)
-                          const valeur = brut === '1' || brut === '2' ? Number(brut) : null
+                          const valeur = EFFECTIFS.includes(Number(brut)) ? Number(brut) : null
                           reglerMeta(
                             p,
                             { effectifSoirSemaine: valeur },
@@ -506,8 +513,11 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value={AUCUNE}>Selon la période</SelectItem>
-                          <SelectItem value="1">1 véto</SelectItem>
-                          <SelectItem value="2">2 vétos</SelectItem>
+                          {EFFECTIFS.map((n) => (
+                            <SelectItem key={n} value={String(n)}>
+                              {effectifClair(n)}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>

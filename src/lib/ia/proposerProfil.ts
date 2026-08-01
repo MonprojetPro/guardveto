@@ -24,7 +24,7 @@ Ce que tu peux régler sur un profil :
 1. nom — le nom du nouveau profil (obligatoire).
 2. source_profil — le nom EXACT du profil à dupliquer, si l'utilisateur le mentionne (« comme l'hiver », « à partir de X »). Si rien n'est précisé, laisse null : on part du profil par défaut.
 3. saison_suggeree — "ete" ou "hiver" si l'utilisateur associe le profil à une saison, sinon null.
-4. nb_vetos_semaine_soir — combien de vétérinaires sont de garde le SOIR EN SEMAINE : 1 ou 2. Sinon null (au cas par cas selon la période).
+4. nb_vetos_semaine_soir — combien de vétérinaires sont de garde le SOIR EN SEMAINE : de 1 à 4. Sinon null (au cas par cas selon la période).
 5. horaires — les horaires à CHANGER, uniquement pour les types que l'utilisateur cite explicitement. Chaque entrée : code + heure_debut + heure_fin (format 24h "HH:MM") + offset_jours_fin (0 = la garde finit le jour même, 1 = le lendemain, 2 = le surlendemain, 3 = trois jours après).
    Les 4 types de garde dont tu peux changer l'horaire :
    - semaine_soir : le soir en semaine (lundi à jeudi)

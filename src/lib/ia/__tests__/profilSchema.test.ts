@@ -110,9 +110,20 @@ describe('propositionVersProfilPayload', () => {
     if (!r.ok) expect(r.raison).toContain('Plusieurs')
   })
 
-  it('effectif hors {1,2} → rejeté', () => {
+  // L'effectif du soir en semaine accepte 1 à 4 depuis la migration
+  // 20260801090000 (avant : 1 ou 2, ce qui rabotait silencieusement les
+  // créneaux déclarant 3 ou 4 places). La borne haute reste gâtée.
+  it('effectif de 3 → accepté (le catalogue va jusqu’à 4 places)', () => {
     const r = propositionVersProfilPayload(prop({ nom: 'Été', nb_vetos_semaine_soir: 3 }), PROFILS)
-    expect(r.ok).toBe(false)
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.payload.nb_vetos_semaine_soir).toBe(3)
+  })
+
+  it('effectif hors 1..4 → rejeté', () => {
+    for (const n of [0, 5, 12]) {
+      const r = propositionVersProfilPayload(prop({ nom: 'Été', nb_vetos_semaine_soir: n }), PROFILS)
+      expect(r.ok).toBe(false)
+    }
   })
 
   it('horaire au mauvais format → rejeté', () => {

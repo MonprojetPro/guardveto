@@ -3,9 +3,12 @@
 // ============================================================
 // GUARDVETO — Sélecteur d'effectif semaine par période (Vague 1)
 // ============================================================
-// Permet à l'admin de régler le nombre de vétos la nuit en semaine (1 ou 2)
-// pour une période. S'applique à la prochaine génération du planning.
-// Verrouillé quand la période est verrouillée.
+// Permet à l'admin de régler le nombre de vétos la nuit en semaine (1 à 4)
+// pour une période — il SURCHARGE celui du profil. S'applique à la prochaine
+// génération du planning. Verrouillé quand la période est verrouillée.
+//
+// Ce réglage plafonne le nombre de places du créneau « soir de semaine » :
+// régler 2 ici sur un créneau qui en déclare 4 donne bien 2 gardes.
 // ============================================================
 
 import { useState, useTransition } from 'react'
@@ -15,6 +18,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from '@/components/ui/select'
 import { setEffectifPeriode } from '@/app/(protected)/admin/periodes/actions'
+
+/** Effectifs proposables le soir en semaine (miroir du CHECK 1..4). */
+const EFFECTIFS = [1, 2, 3, 4]
+
+const libelle = (n: number) => (n === 1 ? '1 véto' : `${n} vétos`)
 
 interface EffectifPeriodeSelectProps {
   periodeId: string
@@ -37,7 +45,11 @@ export function EffectifPeriodeSelect({ periodeId, valeur, disabled }: EffectifP
         toast.error(res.error)
         setVal(String(valeur)) // rollback visuel
       } else {
-        toast.success(nb === 1 ? 'Effectif : 1 véto la nuit en semaine.' : 'Effectif : 2 vétos (1er + 2nd).')
+        toast.success(
+          nb === 1
+            ? 'Effectif : 1 véto la nuit en semaine.'
+            : `Effectif : ${nb} vétos la nuit en semaine.`,
+        )
         router.refresh()
       }
     })
@@ -45,20 +57,19 @@ export function EffectifPeriodeSelect({ periodeId, valeur, disabled }: EffectifP
 
   if (disabled) {
     return (
-      <span className="text-xs text-muted-foreground">
-        {valeur === 1 ? '1 véto' : '2 vétos'}
-      </span>
+      <span className="text-xs text-muted-foreground">{libelle(valeur)}</span>
     )
   }
 
   return (
     <Select value={val} onValueChange={(v) => v && onChange(v)} disabled={isPending}>
-      <SelectTrigger className="h-8 w-[120px] text-xs">
-        {val === '1' ? '1 véto' : '2 vétos'}
-      </SelectTrigger>
+      <SelectTrigger className="h-8 w-[120px] text-xs">{libelle(Number(val))}</SelectTrigger>
       <SelectContent>
-        <SelectItem value="1">1 véto</SelectItem>
-        <SelectItem value="2">2 vétos</SelectItem>
+        {EFFECTIFS.map((n) => (
+          <SelectItem key={n} value={String(n)}>
+            {libelle(n)}
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   )

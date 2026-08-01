@@ -63,7 +63,7 @@ export const PropositionProfilSchema = z.object({
   /** Nom du profil SOURCE à dupliquer (tel qu'écrit) ; null → profil par défaut. */
   source_profil: z.string().nullable(),
   saison_suggeree: z.enum(['ete', 'hiver']).nullable(),
-  /** Effectif de garde le soir en semaine : 1 ou 2 ; null → selon la période. */
+  /** Effectif de garde le soir en semaine : 1 à 4 ; null → selon la période. */
   nb_vetos_semaine_soir: z.number().int().nullable(),
   /** Horaires à ajuster (sparse) ; null → hérite de la source. */
   horaires: z.array(HoraireIaSchema).nullable(),
@@ -150,8 +150,11 @@ export function propositionVersProfilPayload(
   }
 
   const effectif = p.nb_vetos_semaine_soir
-  if (effectif !== null && effectif !== undefined && effectif !== 1 && effectif !== 2) {
-    return { ok: false, raison: 'Pour l’effectif du soir en semaine, indique 1 ou 2 vétérinaires.' }
+  if (
+    effectif !== null && effectif !== undefined &&
+    (!Number.isInteger(effectif) || effectif < 1 || effectif > 4)
+  ) {
+    return { ok: false, raison: 'Pour l’effectif du soir en semaine, indique entre 1 et 4 vétérinaires.' }
   }
 
   // Horaires à ajuster : format strict + cohérence + pas de doublon de type.
@@ -206,8 +209,8 @@ export function apercuProfil(p: PropositionProfil): string {
     : 'basé sur le profil par défaut'
   parts.push(`Créer le profil « ${nom} », ${base}.`)
   if (p.saison_suggeree) parts.push(`Saison suggérée : ${p.saison_suggeree === 'ete' ? 'été' : 'hiver'}.`)
-  if (p.nb_vetos_semaine_soir === 1 || p.nb_vetos_semaine_soir === 2) {
-    const n = p.nb_vetos_semaine_soir
+  const n = p.nb_vetos_semaine_soir
+  if (typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 4) {
     parts.push(`Effectif du soir en semaine : ${n} vétérinaire${n > 1 ? 's' : ''}.`)
   }
   const hs = (p.horaires ?? []).filter((h) => HEURE_RE.test(h.heure_debut) && HEURE_RE.test(h.heure_fin))

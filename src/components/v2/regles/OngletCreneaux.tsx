@@ -421,17 +421,19 @@ function ChampsCreneau({ cle, form, setForm, joursFiges, bloque, code }: ChampsP
         </p>
       )}
 
-      {/* ⚠️ LE PIÈGE À DIRE. Le moteur plafonne le créneau « soir de semaine »
-          au réglage « le soir en semaine » du profil, qui ne va aujourd'hui que
-          jusqu'à 2. Déclarer 3 ou 4 places ici ne produit donc que 2 gardes, et
-          RIEN ne le signalait : le planning sortait simplement plus petit que
-          demandé. Un réglage qu'on saisit et que le moteur ignore en silence
-          est pire qu'un réglage absent. */}
-      {code === 'semaine_soir' && form.nbPlaces > 2 && (
+      {/* ⚠️ LE SOIR DE SEMAINE A DEUX MAÎTRES. C'est le seul créneau dont le
+          nombre de places est PLAFONNÉ par un second réglage : « Le soir en
+          semaine », porté par le profil et surchargeable par période. Le moteur
+          retient le plus petit des deux. Déclarer 4 places ici sans toucher à
+          l'autre réglage ne produit donc pas 4 gardes — et rien ne le disait
+          jusqu'ici : le planning sortait simplement plus petit que demandé. */}
+      {code === 'semaine_soir' && (
         <p className="note attention large">
-          ⚠️ Attention : pour l&apos;instant, les soirs de semaine sont plafonnés à 2 vétérinaires
-          par le réglage « Le soir en semaine » du profil. Même en demandant {form.nbPlaces} places
-          ici, la génération n&apos;en pourvoira que 2.
+          Ce type de garde est le seul à dépendre aussi du réglage «&nbsp;Le soir en
+          semaine&nbsp;» de l&apos;onglet Profils : c&apos;est le plus petit des deux qui
+          s&apos;applique. Pour {form.nbPlaces} vétérinaire{form.nbPlaces > 1 ? 's' : ''} par
+          nuit, réglez-le sur {form.nbPlaces} lui aussi — sinon la génération s&apos;arrêtera au
+          plus petit chiffre.
         </p>
       )}
     </div>
