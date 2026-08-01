@@ -52,11 +52,12 @@
 //    filet orange, dit ce que le moteur FERA du niveau choisi — et elle change
 //    quand on change de niveau.
 //
-//  · LES PRÉFÉRENCES OUVRENT SUR FILOU. Il n'y a pas de bouton « nouvelle
-//    préférence » : ces quatre égards-là sont câblés dans le moteur. Plutôt que
-//    de laisser le mur sans l'expliquer, la carte se termine par une invitation
-//    à en parler à Filou — une simple NAVIGATION vers l'accueil, aucun appel,
-//    aucune écriture, aucune promesse.
+//  · FILOU EST EN HAUT À DROITE DES CARTES SANS « + AJOUTER ». Trois cartes
+//    n'ont rien à ajouter (l'équilibrage a ses six charges câblées, les
+//    préférences leurs quatre égards) : elles se retrouvaient muettes à
+//    l'endroit exact où l'œil cherche quoi faire. Le composant `AideFilou` y
+//    pose un bouton « Demander à Filou », à la place du « + Ajouter » absent.
+//    Il NAVIGUE vers l'accueil, rien de plus : aucun appel, aucune écriture.
 //
 // CE QUI A ÉTÉ ÉCARTÉ, ET POURQUOI
 //
@@ -1410,15 +1411,10 @@ export function OngletMoteur({
             oubli : ces quatre égards-là sont câblés dans le moteur, on n'en
             écrit pas un cinquième depuis un écran. La porte de sortie est le
             bouton « Demander à Filou » posé EN HAUT de cette carte, là où les
-            autres sections ont leur « + Ajouter ». Elle vivait auparavant dans
-            un encart en pied de carte : un pavé gris qu'on ne lisait qu'après
-            avoir renoncé à trouver le bouton. Ne reste ici que la phrase qui
-            explique le mur — pas une seconde fois le même bouton. */}
-        <p className="note pied-carte">
-          Ces quatre égards sont ceux que le moteur sait tenir aujourd&apos;hui. Si un
-          vétérinaire en demande un autre, Filou vous dira si c&apos;est réalisable avec ce qui
-          existe — et sinon, il fait remonter la demande sans rien décider à votre place.
-        </p>
+            autres sections ont leur « + Ajouter » — et c'est tout. Il y avait
+            ici un paragraphe qui redisait la même chose en quatre lignes :
+            une fois le bouton remonté, il ne restait qu'un pavé de plus en bas
+            de page. */}
       </section>
 
       {/* Confirmation de suppression. Elle RAPPELLE la règle concernée : on

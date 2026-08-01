@@ -343,16 +343,6 @@
   max-width: 62ch;
 }
 
-/* Une phrase de fin de carte : elle explique une limite (« le moteur ne sait
-   tenir que ces quatre égards ») sans porter d'action. L'action, elle, est
-   remontée en tête de carte — cf. `.btn-filou` juste en dessous. */
-.v2 .note.pied-carte {
-  margin: 2px 22px 20px;
-  padding-top: 14px;
-  border-top: 1px dashed var(--t-border);
-  max-width: 78ch;
-}
-
 /* ── Le bouton « Demander à Filou » d'une carte sans bouton d'ajout ──
    Il occupe, en haut à droite de la carte, la place exacte du « + Ajouter »
    des autres sections — c'est là que l'œil cherche quoi faire. Il doit donc
@@ -865,16 +855,33 @@
   padding: 0 16px 16px 66px;
 }
 
-/* Chaque fait dans son encart : un léger fond, une bordure douce, et la valeur
-   qui respire. Trois colonnes de texte nu se lisaient comme un seul bloc gris ;
-   l'encart dit où commence et où finit chaque information. */
+/* Chaque fait dans son encart : le crème CLAIR des surfaces, posé sur le crème
+   moyen de la carte. Trois colonnes de texte nu se lisaient comme un seul bloc
+   gris ; l'encart dit où commence et où finit chaque information.
+
+   ⚠️ `--surface`, PAS `--t-muted` : ce dernier est la couleur du TEXTE atténué
+   (#7C6A55, un brun). Employé en fond, il a produit trois pavés bruns opaques
+   avec des étiquettes illisibles dessus. La règle « ne jamais confondre un
+   jeton de texte et un jeton de fond » vaut dans les deux sens — la note en
+   tête de `v2-terrier.css` prévient du cas inverse (crème sur crème). */
 .v2 .cre-faits .fait {
   min-width: 0;
-  gap: 4px;
-  padding: 10px 14px;
+  gap: 3px;
+  padding: 9px 13px;
   border: 1px solid var(--t-border);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--t-muted) 55%, transparent);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+
+/* L'étiquette d'un encart n'a plus besoin de crier : le cadre fait déjà le
+   travail de séparation. On lui rend une taille lisible et on lui retire un
+   peu de graisse — trois capitales grasses par carte, c'était trois fois le
+   même bruit au-dessus de l'information utile. */
+.v2 .cre-faits .fait > span {
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--soft);
 }
 
 /* Une carte éteinte garde ses encarts, mais en retrait : l'information reste
