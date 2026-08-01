@@ -4,6 +4,8 @@ import {
   validerPlanning,
   type ValidationInput,
 } from '../../src/engine/validation/validerPlanning'
+import { scorerPlanning, Etage } from '../../src/engine/score-lexicographique'
+import { normaliserContraintesVets } from '../../src/engine/normaliserContraintes'
 import type { VetEngine } from '../../src/engine/types'
 
 // ============================================================
@@ -71,5 +73,45 @@ describe('R17 — conditionné à l\'effectif résolu, pas à la saison', () => 
   it('hiver sans réglage (repli saison → 2) : pas de R17', () => {
     const violations = validerPlanning(planningAvecSecond, inputPour('hiver'))
     expect(violations.filter((v) => v.regle === 'R17')).toEqual([])
+  })
+})
+
+// ============================================================
+// Le SCOREUR aussi — fix 2026-08-01
+// ============================================================
+// Le validateur avait été corrigé en juillet 2026 ; le scoreur global, non.
+// `listerSlotRoles` reconstruisait ses slots SANS `besoinSecond`, si bien que
+// le re-check de l'étage 0 retombait sur le repli historique
+// `slot.besoinSecond ?? (saison === 'hiver')`. Résultat : pour un cabinet EN
+// ÉTÉ réglé à 2 vétérinaires le soir, chaque 2nd de semaine comptait comme une
+// violation d'invariant — sur un planning que le solver venait pourtant de
+// construire légitimement. L'étage 0 servant au départage du LNS, le scoreur
+// pénalisait ces plannings sans raison.
+//
+// Le scoreur n'a pas accès à l'effectif de la période : il déduit le besoin de
+// ce que le planning contient RÉELLEMENT.
+// ============================================================
+
+describe('Scoreur global — pas de violation R17 fantôme en été', () => {
+  const vetsN = normaliserContraintesVets(vets)
+
+  it('été, un 2nd en semaine : étage INVARIANT à zéro', () => {
+    const score = scorerPlanning(planningAvecSecond, vetsN, 'ete')
+    expect(score.etages[Etage.INVARIANT_SYSTEME]).toBe(0)
+  })
+
+  it('le même planning jugé en hiver donne le même verdict', () => {
+    // La saison ne doit plus rien décider ici : seul compte ce qui est posé.
+    const ete = scorerPlanning(planningAvecSecond, vetsN, 'ete')
+    const hiver = scorerPlanning(planningAvecSecond, vetsN, 'hiver')
+    expect(ete.etages[Etage.INVARIANT_SYSTEME]).toBe(hiver.etages[Etage.INVARIANT_SYSTEME])
+  })
+
+  it('un 1er seul en semaine reste sans violation, dans les deux saisons', () => {
+    const seul = gardesVersPlanningPartiel([
+      { date: MARDI, type: 'semaine', premier_id: 'A', second_id: null },
+    ])
+    expect(scorerPlanning(seul, vetsN, 'ete').etages[Etage.INVARIANT_SYSTEME]).toBe(0)
+    expect(scorerPlanning(seul, vetsN, 'hiver').etages[Etage.INVARIANT_SYSTEME]).toBe(0)
   })
 })

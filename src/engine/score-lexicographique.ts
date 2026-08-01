@@ -144,7 +144,28 @@ interface SlotRole {
 function listerSlotRoles(planning: PlanningPartiel, saison: 'ete' | 'hiver'): SlotRole[] {
   const out: SlotRole[] = []
   for (const a of planning.attributions) {
-    const slot: SlotGarde = { date: a.date, type: a.type, saison }
+    // `besoinSecond` DOIT être posé, et il se déduit du planning lui-même.
+    //
+    // Sans lui, le re-check de l'étage 0 retombait sur le repli historique
+    // `slot.besoinSecond ?? (slot.saison === 'hiver')` (hard-constraints) : tout
+    // cabinet EN ÉTÉ réglé à 2 vétérinaires le soir se voyait donc compter des
+    // violations R17 FANTÔMES sur des plannings que le solver avait pourtant
+    // construits légitimement — et l'étage 0 sert au départage du LNS. Le
+    // validateur indépendant avait été corrigé pour ce cas (audit 2026-07-03),
+    // le scoreur non.
+    //
+    // On compte les places POURVUES et non les places déclarées : le catalogue
+    // peut en déclarer 4 alors que l'effectif de la période n'en fait pourvoir
+    // que 2. Ce que le solver a réellement posé est le témoin fidèle de ce
+    // qu'il avait le droit de poser.
+    const pourvues = a.placements.filter((p) => p.vetId !== null).length
+    const slot: SlotGarde = {
+      date: a.date,
+      type: a.type,
+      saison,
+      besoinSecond: pourvues >= 2,
+      nbPlaces: pourvues,
+    }
     for (const p of a.placements) {
       if (p.vetId) out.push({ slot, role: p.role, vetId: p.vetId })
     }
@@ -221,7 +242,19 @@ export function scorerPlanning(
         if (!vetId) continue
         const vet = vetById.get(vetId)
         if (!vet) continue
-        const slot: SlotGarde = { date: a.date, type: a.type, saison, nbPlaces: nbPoses }
+        // `besoinSecond` se déduit du nombre de poses, comme dans
+        // `listerSlotRoles` — même raison, même formule. Omis, il retombait sur
+        // `slot.besoinSecond ?? (saison === 'hiver')` et faisait compter une
+        // violation R17 fantôme à chaque 2nd de semaine d'un cabinet d'été
+        // réglé à 2. C'est l'étage qui départage le LNS : ces plannings
+        // parfaitement légitimes étaient pénalisés.
+        const slot: SlotGarde = {
+          date: a.date,
+          type: a.type,
+          saison,
+          besoinSecond: nbPoses >= 2,
+          nbPlaces: nbPoses,
+        }
         // #17 : les règles de rythme (R3/espacement/au_plus_n) voient le lookback
         // via `contexteAnterieur` — cohérent avec le solver (mêmes invariants).
         const res = isValid(slot, vet, role, vets, cumul, calendrier, structure, contexteAnterieur)
