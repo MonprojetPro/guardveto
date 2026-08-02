@@ -38,6 +38,8 @@
 
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
+import { MessageCircle } from 'lucide-react'
+import { lienAccueilAvecSujet } from '@/lib/v2/filou-origine'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
@@ -146,6 +148,25 @@ export function GardienFilou({
             ))}
           </div>
         )}
+
+        {/* La porte de sortie quand aucune correction toute faite ne convient.
+            Filou arrive AVEC le sujet — le message du moteur, mot pour mot —
+            au lieu d'un « bonjour » générique qui perdrait en route la seule
+            chose qui comptait. Le texte vient du moteur, jamais d'une phrase
+            fabriquée ici : c'est ce qui autorise à le lui envoyer. */}
+        <button
+          type="button"
+          className="btn btn-filou btn-sm gv-gardien-filou"
+          onClick={() => {
+            const sujet = avertissements.map((a) => a.message).join(' ')
+            onAnnuler()
+            router.push(lienAccueilAvecSujet('regles', sujet))
+          }}
+          disabled={enCours}
+        >
+          <MessageCircle size={15} aria-hidden="true" />
+          En parler avec moi
+        </button>
 
         <DialogFooter>
           <Button variant="outline" onClick={onAnnuler} disabled={enCours}>

@@ -60,6 +60,15 @@ export interface ContenuErreur {
 /** Ce que l'appelant peut imposer par-dessus le décodeur. */
 export type OptionsErreur = Partial<Omit<ContenuErreur, 'message'>>
 
+/** Ce qu'une action serveur peut répondre à cet écran. `regleExistante` est
+ *  l'identifiant de la règle qui fait doublon : il transforme « retrouve-la
+ *  dans la liste » en un bouton qui y emmène. */
+export interface ReponseAction {
+  error?: string
+  success?: boolean
+  regleExistante?: string
+}
+
 // ── Du décodage au contenu affichable ───────────────────────
 
 /** Habille le refus décodé : le message brut en tête, l'action en bouton. */
@@ -103,6 +112,33 @@ export function useErreurBloquante() {
     [aller],
   )
 
+  /**
+   * Le refus + la règle qui le provoque, en un seul geste.
+   *
+   * « Une règle identique existe déjà » sans moyen d'aller la voir, c'est une
+   * impasse polie : on ferme, on cherche dans une liste de vingt lignes, et on
+   * ne sait pas laquelle. Le serveur connaît son identifiant — l'ancre
+   * `?focus=` de l'écran fait le reste (défilement + halo, le même mécanisme
+   * que le diagnostic d'impasse).
+   */
+  const ouvrirRefus = useCallback(
+    (res: ReponseAction, options?: OptionsErreur) => {
+      if (!res.error) return
+      ouvrirErreur(res.error, {
+        ...(res.regleExistante
+          ? {
+              cta: {
+                label: 'Voir la règle existante',
+                onClick: () => aller(`/regles?focus=${encodeURIComponent(res.regleExistante!)}`),
+              },
+            }
+          : {}),
+        ...options,
+      })
+    },
+    [ouvrirErreur, aller],
+  )
+
   const fermer = () => setContenu(null)
 
   const dialogueErreur = (
@@ -139,5 +175,5 @@ export function useErreurBloquante() {
     </Dialog>
   )
 
-  return { ouvrirErreur, dialogueErreur }
+  return { ouvrirErreur, ouvrirRefus, dialogueErreur }
 }

@@ -138,7 +138,7 @@ import type { ForceFormulaire } from '@/lib/regles/paramsRegle'
 import type { VerdictGardien } from '@/data/verifierRegleCandidate'
 import { RegleFormDialog } from '@/components/regles/RegleFormDialog'
 import { AideFilou } from './AideFilou'
-import { useErreurBloquante } from './ErreurBloquante'
+import { useErreurBloquante, type ReponseAction } from './ErreurBloquante'
 import { GardienFilou } from './GardienFilou'
 import {
   BRIQUES_EDITABLES,
@@ -308,8 +308,9 @@ const libelleImportance = (n: string) => cap(IMPORTANCE_LABELS[n] ?? n)
 const EFFET_ETEINTE =
   'Désactivée : le moteur ne la lit plus du tout, comme si elle n’existait pas. Elle reste là pour être rallumée d’un choix.'
 
-/** Ce qu'une action serveur de cet écran peut répondre. */
-type Reponse = { error?: string; success?: boolean } | undefined
+/** Ce qu'une action serveur de cet écran peut répondre — `regleExistante`
+ *  compris, l'identifiant de la règle qui fait doublon (cf. `ErreurBloquante`). */
+type Reponse = ReponseAction | undefined
 
 const MSG_ENREGISTRE = 'Réglage enregistré — appliqué à la prochaine génération.'
 
@@ -431,7 +432,7 @@ export function OngletMoteur({
 
   // Les refus serveur de cet écran s'affichent en modale (titre + explication +
   // porte de sortie), pas en vignette éphémère : cf. `ErreurBloquante`.
-  const { ouvrirErreur, dialogueErreur } = useErreurBloquante()
+  const { ouvrirErreur, ouvrirRefus, dialogueErreur } = useErreurBloquante()
 
   /**
    * Le gardien : ce que le moteur a trouvé sur la règle en cours, et l'écriture
@@ -777,8 +778,10 @@ export function OngletMoteur({
             mode: compoType, tag, creneaux: compoCreneaux,
             force: compoForce as ForceFormulaire,
           })
+    // `ouvrirRefus` plutôt que `ouvrirErreur` : c'est ici qu'un doublon peut
+    // remonter, et le serveur joint l'identifiant de la règle en cause.
     if (res?.error) {
-      ouvrirErreur(res.error)
+      ouvrirRefus(res)
       return
     }
     toast.success(

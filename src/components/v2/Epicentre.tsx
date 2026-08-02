@@ -27,7 +27,9 @@ import { useRouter } from 'next/navigation'
 import { FilouCube, type FilouHandle } from './FilouCube'
 import { FilouChat, type FilouChatHandle } from './FilouChat'
 import { FenetreResultatFilou, type ResultatFilou } from './FilouResultat'
-import { accrocheDepuis, lireOrigine, portUneOrigine, MATIERE_VIDE } from '@/lib/v2/filou-origine'
+import {
+  accrocheDepuis, lireOrigine, lireSujet, portUneOrigine, MATIERE_VIDE,
+} from '@/lib/v2/filou-origine'
 import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
 import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
 import type { DonneesAccueil, GardeDuSoir } from '@/data/v2/accueilEpicentre'
@@ -204,6 +206,20 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
     // appels légitimes, et Filou doit répondre à chaque fois. Mais faire
     // l'aller-retour SANS rien lui dire entre-temps n'est pas une nouvelle
     // demande — empiler la même bulle quatre fois serait du bruit.
+    // Un SUJET précis l'emporte sur l'accroche générique : quand on arrive
+    // depuis un avertissement du gardien des règles, la question « de quoi
+    // veux-tu parler ? » est déjà répondue. Le texte vient du moteur (message
+    // d'avertissement, libellé de règle du catalogue) — jamais d'une phrase
+    // fabriquée pour l'occasion, cf. la règle dure n°2 de `filou-origine.ts`.
+    const sujet = lireSujet(hash)
+    if (sujet) {
+      chat.current?.dit(
+        `Tu viens de me demander de l’aide là-dessus : « ${sujet} » — on le reprend ensemble ?`,
+        { exemples: [`Comment corriger ça ?`], saufSiDejaDit: true },
+      )
+      return
+    }
+
     chat.current?.dit(accroche.question, {
       exemples: accroche.exemples,
       saufSiDejaDit: true,

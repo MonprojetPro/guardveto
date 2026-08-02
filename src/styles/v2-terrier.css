@@ -2423,6 +2423,15 @@
   flex: none;
 }
 
+/* « En parler avec moi » — la porte de sortie quand aucune correction toute
+   faite ne convient. Posé À GAUCHE, au-dessus du pied : ce n'est ni une
+   décision (le pied porte les deux issues), ni une correction (elles sont
+   au-dessus). C'est une troisième voie, et elle doit se lire comme telle. */
+.gv-gardien-filou {
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
 
 /* ═══════════════════════════════════════════════════════════════════════════
    MODALE DES REFUS — déplacée ici depuis `v2-regles.css` le 2026-08-02, pour

@@ -73,7 +73,9 @@ const BRIQUES: { value: BriqueEvaluable; label: string; aide: string }[] = [
   // Cadencement « 1 WE sur N ancré » (#20).
   { value: 'cadencement_weekend', label: 'Week-ends calés sur un cycle fixe', aide: 'Cas type : pompier volontaire de garde 1 week-end sur 3 à dates fixes. Ces week-ends lui sont interdits (ou au contraire ses gardes doivent tomber dessus).' },
   // Exclusion de dates / XOR « pas les deux » (#15a).
-  { value: 'exclusion_dates', label: 'Pas les deux dates (ex. 24 XOR 31 déc)', aide: 'Le vétérinaire ne fait jamais de garde aux DEUX dates à la fois (mais peut en faire une). Cas type : Noël ou Nouvel An, pas les deux.' },
+  // « XOR » est le nom technique de cette règle (ou exclusif) : il reste dans
+  // le code, jamais dans ce que lit une vétérinaire.
+  { value: 'exclusion_dates', label: 'L’une ou l’autre, jamais les deux (ex. 24 ou 31 déc)', aide: 'Le vétérinaire ne fait jamais de garde aux DEUX dates à la fois (mais peut en faire une). Cas type : Noël ou Nouvel An, pas les deux.' },
   { value: 'seulement_avec', label: 'De garde seulement avec…', aide: 'Le vétérinaire n’est de garde QUE si un binôme précis est de garde sur le même créneau (dans un seul sens). Cas type : un jeune véto accompagné d’un senior. L’inverse n’est PAS imposé.' },
 ]
 
@@ -190,7 +192,7 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
   // pourries en bas de page ». Ce formulaire en avait vingt-et-une — il était
   // resté à l'écart de la bascule du 1er août parce qu'il vit hors du dossier
   // des onglets V2, alors qu'il s'ouvre depuis les mêmes écrans.
-  const { ouvrirErreur, dialogueErreur } = useErreurBloquante()
+  const { ouvrirErreur, ouvrirRefus, dialogueErreur } = useErreurBloquante()
 
   const pj = (regle?.params_json ?? {}) as {
     qui?: { refs?: unknown }
@@ -536,7 +538,9 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
   /** L'écriture — rejouée telle quelle si l'admin passe outre l'avertissement. */
   const ecrire = async (aEcrire: Parameters<typeof upsertRegle>[0]) => {
     const res = await upsertRegle(aEcrire)
-    if (res?.error) { ouvrirErreur(res.error); return }
+    // Un refus d'écriture peut être un DOUBLON : le serveur joint alors
+    // l'identifiant de la règle existante, et la modale sait y emmener.
+    if (res?.error) { ouvrirRefus(res); return }
     toast.success(isEdit ? 'Règle modifiée.' : 'Règle créée.')
     setGardien(null)
     onClose()

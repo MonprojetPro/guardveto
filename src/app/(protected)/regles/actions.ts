@@ -26,6 +26,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { EQUITY_DIMENSIONS, IMPORTANCE_LEVELS } from '@/engine/equity-weights'
 import { construireValiditeJson } from '@/lib/periodes'
 import { chargerCreneauModele } from '@/data/chargerCreneauModele'
+import { empreinteRegle, paramsDeRow } from '@/lib/regles/identiteRegle'
 import {
   BRIQUES_EVALUABLES, BRIQUES_DESIDERATA, FORCES_VALIDES,
   CODES_CRENEAUX_HISTORIQUES,
@@ -645,11 +646,13 @@ export async function upsertCompositionRegle(payload: CompositionReglePayload) {
       .select('id, params_json')
       .eq('cabinet_id', cabinetId)
       .eq('brique_id', 'composition_equipe')
-    const cible = JSON.stringify(params)
+    const cible = empreinteRegle('composition_equipe', params)
     for (const r of existantes ?? []) {
-      const p = (r.params_json as { params?: unknown })?.params ?? {}
-      if (JSON.stringify(p) === cible) {
-        return { error: 'Une règle de composition identique existe déjà.' }
+      if (empreinteRegle('composition_equipe', paramsDeRow(r.params_json)) === cible) {
+        return {
+          error: 'Une règle de composition identique existe déjà.',
+          regleExistante: r.id as string,
+        }
       }
     }
   }
@@ -959,11 +962,13 @@ export async function upsertRoleInterditRegle(payload: RoleInterditReglePayload)
       .select('id, params_json')
       .eq('cabinet_id', cabinetId)
       .eq('brique_id', 'role_interdit_tag')
-    const cible = JSON.stringify(params)
+    const cible = empreinteRegle('role_interdit_tag', params)
     for (const r of existantes ?? []) {
-      const p = (r.params_json as { params?: unknown })?.params ?? {}
-      if (JSON.stringify(p) === cible) {
-        return { error: 'Une règle identique existe déjà.' }
+      if (empreinteRegle('role_interdit_tag', paramsDeRow(r.params_json)) === cible) {
+        return {
+          error: 'Une règle identique existe déjà.',
+          regleExistante: r.id as string,
+        }
       }
     }
   }
@@ -1075,19 +1080,21 @@ async function trouverEquivalent(
   briqueId: BriqueEvaluable,
   ownerId: string,
   params: Record<string, unknown>,
-): Promise<boolean> {
+): Promise<string | null> {
   const { data } = await supabase
     .from('regles_cabinet')
     .select('id, params_json')
     .eq('cabinet_id', cabinetId)
     .eq('brique_id', briqueId)
-  const cible = JSON.stringify(params)
+  // Comparaison sur ce que le MOTEUR LIT, pas sur le JSON stocké : deux règles
+  // peuvent différer par un texte décoratif et faire strictement la même chose
+  // (cf. `lib/regles/identiteRegle.ts` — le mercredi d'Anne-Catherine).
+  const cible = empreinteRegle(briqueId, params)
   for (const r of data ?? []) {
     if (lireOwner(r.params_json) !== ownerId) continue
-    const p = (r.params_json as { params?: unknown })?.params ?? {}
-    if (JSON.stringify(p) === cible) return true
+    if (empreinteRegle(briqueId, paramsDeRow(r.params_json)) === cible) return r.id as string
   }
-  return false
+  return null
 }
 
 /** Cherche l'id d'un duo owner→partner pour ce cabinet (RLS scope auto). */
@@ -1208,7 +1215,12 @@ export async function upsertRegle(payload: UpsertReglePayload) {
     // Anti-doublon (création seulement) : la paire existe-t-elle déjà ?
     if (!payload.id) {
       const dejaLa = (await trouverDuo(supabase, a, b)) ?? (await trouverDuo(supabase, b, a))
-      if (dejaLa) return { error: 'Ce duo interdit existe déjà dans les règles du cabinet.' }
+      if (dejaLa) {
+        return {
+          error: 'Ce duo interdit existe déjà dans les règles du cabinet.',
+          regleExistante: dejaLa,
+        }
+      }
     }
 
     let actif = true
@@ -1292,7 +1304,12 @@ export async function upsertRegle(payload: UpsertReglePayload) {
     const dejaLa = await trouverEquivalent(
       supabase, cabinetId, payload.brique_id, payload.owner_id, construit.params,
     )
-    if (dejaLa) return { error: 'Une règle identique existe déjà pour ce vétérinaire.' }
+    if (dejaLa) {
+      return {
+        error: 'Une règle identique existe déjà pour ce vétérinaire.',
+        regleExistante: dejaLa,
+      }
+    }
   }
 
   const params_json = envelopper(payload.owner_id, payload.brique_id, construit.quand, construit.params)

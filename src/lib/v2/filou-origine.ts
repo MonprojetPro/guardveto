@@ -264,6 +264,46 @@ export function lienAccueilDepuis(origine: OrigineFilou): string {
   return `/accueil#filou=${origine}`
 }
 
+/**
+ * Longueur maximale d'un sujet transporté dans le fragment. Au-delà, on
+ * tronque : une URL n'est pas un canal de données, et un message du moteur
+ * qui déborderait ne doit ni casser la navigation ni s'afficher en pavé.
+ */
+const SUJET_MAX = 400
+
+/**
+ * Le même lien, mais en emportant CE DONT ON VEUT PARLER.
+ *
+ * Écrit pour le gardien des règles : cliquer « Demander à Filou » depuis un
+ * avertissement et arriver sur un « bonjour » générique, c'est perdre en route
+ * la seule chose qui comptait. Le sujet voyage donc avec l'origine.
+ *
+ * ⚠️ Le texte passé ici doit venir du MOTEUR (message d'avertissement, libellé
+ *    de règle du catalogue), jamais d'une formulation inventée pour
+ *    l'occasion — c'est la règle dure n°2 en tête de ce fichier. Un sujet
+ *    fabriqué ferait exactement ce qu'on a déjà payé une fois : une question
+ *    précise et fausse, un aller-retour perdu, un appel facturé pour rien.
+ */
+export function lienAccueilAvecSujet(origine: OrigineFilou, sujet: string): string {
+  const propre = sujet.trim().slice(0, SUJET_MAX)
+  if (propre === '') return lienAccueilDepuis(origine)
+  return `/accueil#filou=${origine}&sujet=${encodeURIComponent(propre)}`
+}
+
+/** Lit le sujet transporté par le fragment. `null` s'il n'y en a pas. */
+export function lireSujet(hash: string): string | null {
+  const m = /(?:^#|[#&])sujet=([^&]+)/.exec(hash)
+  if (!m?.[1]) return null
+  try {
+    const brut = decodeURIComponent(m[1]).trim()
+    return brut === '' ? null : brut.slice(0, SUJET_MAX)
+  } catch {
+    // Fragment mal encodé (recopié à la main, tronqué par un client mail) :
+    // on l'ignore plutôt que de faire dire n'importe quoi à Filou.
+    return null
+  }
+}
+
 /** Vrai si ce fragment prétend porter une origine — connue ou non.
  *
  *  Sert au nettoyage : un `#filou=depannage` mal orthographié doit disparaître
