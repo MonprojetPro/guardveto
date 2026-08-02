@@ -56,14 +56,59 @@ export type CodeAvertissementPreVol =
   | 'seulement_avec_partenaire_sorti' // « A seulement avec B » (#15b) dont B n'est plus dans l'effectif → A écarté
 
 /**
- * Un avertissement du pré-vol — TOUJOURS non bloquant.
+ * Deux poids, deux mesures (décision MiKL du 2026-08-02).
+ *
+ * `bloquant`   — le moteur échouera à COUP SÛR : arithmétique impossible
+ *                (places > vétos disponibles), ou règle dure que personne ne
+ *                peut satisfaire. Lancer la génération est une perte de temps
+ *                garantie, donc le parcours barre la route.
+ * `surveiller` — la règle est inerte, ou mal réglée : le planning sortira,
+ *                simplement sans l'effet attendu. On avertit, on laisse passer.
+ *
+ * Dérivé du CODE, pas décidé au cas par cas : les douze points de production
+ * n'ont pas à s'en soucier, et deux avertissements du même code ne peuvent pas
+ * se retrouver classés différemment.
+ */
+export type GraviteAvertissement = 'bloquant' | 'surveiller'
+
+const GRAVITE: Record<CodeAvertissementPreVol, GraviteAvertissement> = {
+  creneau_impossible:             'bloquant',
+  charge_globale_insuffisante:    'bloquant',
+  weekends_insuffisants:          'bloquant',
+  composition_sans_porteur:       'bloquant',
+  role_interdit_intenable:        'bloquant',
+  seulement_avec_partenaire_sorti:'bloquant',
+  regle_veto_sorti:               'surveiller',
+  duo_veto_sorti:                 'surveiller',
+  veto_jamais_disponible:         'surveiller',
+  sequence_inerte:                'surveiller',
+  cohorte_equite_sans_porteur:    'surveiller',
+}
+
+export function graviteAvertissement(code: CodeAvertissementPreVol): GraviteAvertissement {
+  return GRAVITE[code] ?? 'surveiller'
+}
+
+/**
+ * Un avertissement du pré-vol.
+ *
  * `regles` : libellés en clair (formulations du catalogue) des règles en cause.
  * `message` : phrase compréhensible par une vétérinaire, sans jargon.
+ * `gravite` : cf. `GraviteAvertissement` — posé à la sortie de `preVolRegles`.
+ * `regleIds` : ids `regles_cabinet` des règles en cause. C'est CE champ qui
+ *   permet d'agir depuis l'écran (assouplir, mettre en pause) au lieu de
+ *   renvoyer l'admin chercher la règle à la main — retour MiKL du 2026-08-02 :
+ *   « il faut qu'il aille à droite à gauche, revienne, vérifie… c'est chiant ».
+ * `tag` : l'étiquette concernée quand l'avertissement en vise une (composition,
+ *   rôle interdit, cohorte d'équité) — de quoi la poser sans quitter l'écran.
  */
 export interface AvertissementPreVol {
   code: CodeAvertissementPreVol
   regles: string[]
   message: string
+  gravite?: GraviteAvertissement
+  regleIds?: string[]
+  tag?: string
 }
 
 /** Fiche minimale d'un véto de l'annuaire (actifs ET sortis) — pour nommer. */
@@ -248,6 +293,7 @@ function detecterReglesFantomes(
       out.push({
         code: 'regle_veto_sorti',
         regles: [libelleRegle(prenom, c, nomVeto)],
+        regleIds: [c.id],
         message: fiche
           ? `Une règle concerne ${fiche.prenom} ${fiche.nom}, qui ne fait plus partie de l’équipe de garde : elle n’a plus aucun effet. Tu peux la supprimer depuis l’écran Règles.`
           : `Une règle concerne un vétérinaire qui a été retiré de l’équipe : elle n’a plus aucun effet. Tu peux la supprimer depuis l’écran Règles.`,
@@ -294,6 +340,7 @@ function detecterDuosFantomes(
         out.push({
           code: 'duo_veto_sorti',
           regles: [libelleRegle(vet.prenom, c, nomVeto)],
+          regleIds: [c.id],
           message: `La règle « jamais ensemble » de ${vet.prenom} mentionne ${nomPartenaire}, qui ne fait plus partie de l’équipe de garde : cette règle n’a plus aucun effet.`,
         })
       }
@@ -336,6 +383,7 @@ function detecterPartenaireRequisSorti(
       out.push({
         code: 'seulement_avec_partenaire_sorti',
         regles: [libelleRegle(vet.prenom, c, nomVeto)],
+        regleIds: [c.id],
         message: `La règle « ${vet.prenom} seulement de garde avec ${nomPartenaire} » est INTENABLE : ${fiche ? fiche.prenom : 'ce vétérinaire'} ne fait plus partie de l’équipe de garde, donc ${vet.prenom} ne pourrait plus jamais être de garde là où cette règle s’applique. Supprime la règle ou choisis un autre binôme depuis l’écran Règles.`,
       })
     }
@@ -664,7 +712,10 @@ export function preVolRegles(input: PreVolInput): AvertissementPreVol[] {
   const slots = enumererSlots(input)
   const dispos = calculerDisponibilites(slots, vetsN, input)
 
-  return [
+  // La gravité est posée ICI, en sortie, à partir du seul code : aucun des
+  // douze points de production n'a à y penser, et deux avertissements du même
+  // code ne peuvent pas diverger.
+  return ([
     // (b) règles fantômes — véto sorti
     ...detecterReglesFantomes(input, actifsIds, nomVeto),
     ...detecterDuosFantomes(vetsN, input, actifsIds, nomVeto),
@@ -683,7 +734,7 @@ export function preVolRegles(input: PreVolInput): AvertissementPreVol[] {
     ...detecterSequencesInertes(vetsN, nomVeto),
     // (f) cohortes d'équité (#21) dont aucun véto actif ne porte le tag → inerte
     ...detecterCohortesEquiteSansPorteur(vetsN, input),
-  ]
+  ] as AvertissementPreVol[]).map((a) => ({ ...a, gravite: graviteAvertissement(a.code) }))
 }
 
 // ── (f) Cohortes d'équité — tag sans porteur (Vague 6 #21) ──
@@ -712,6 +763,7 @@ function detecterCohortesEquiteSansPorteur(
     out.push({
       code: 'cohorte_equite_sans_porteur',
       regles: [`équilibrage réservé aux vétérinaires « ${tag} »`],
+      tag,
       message: `Un réglage d'équité vise l'étiquette « ${tag} », mais aucun vétérinaire actif ne la porte : ce réglage n'a aucun effet. Ajoutez l'étiquette sur les fiches concernées (page Équipe) ou retirez la cohorte depuis l'écran Règles.`,
     })
   }
@@ -781,6 +833,7 @@ function detecterSequencesInertes(
         out.push({
           code: 'sequence_inerte',
           regles: [libelleRegle(vet.prenom, c, nomVeto)],
+          regleIds: [c.id],
           message: estRythme
             ? `Une règle de rythme de ${vet.prenom} est mal paramétrée (valeur nulle ou incomplète) : elle n'aura aucun effet. Modifie-la ou supprime-la depuis l'écran Règles.`
             : `Une règle « pas les deux dates » de ${vet.prenom} est mal paramétrée (dates identiques ou incomplètes) : elle n'aura aucun effet. Modifie-la ou supprime-la depuis l'écran Règles.`,
@@ -812,12 +865,16 @@ function detecterRolesInterditsIntenables(
       out.push({
         code: 'role_interdit_intenable',
         regles: [libelle],
+        regleIds: [regle.regleId],
+        tag: tagNorm,
         message: `La règle « ${libelle} » est active mais aucun vétérinaire actif ne porte l'étiquette « ${regle.tag} » : elle est sans effet. Ajoutez l'étiquette sur les fiches concernées (Équipe) ou supprimez la règle.`,
       })
     } else if (porteurs.length === vets.length && regle.etage <= ETAGE_DUR_MAX) {
       out.push({
         code: 'role_interdit_intenable',
         regles: [libelle],
+        regleIds: [regle.regleId],
+        tag: tagNorm,
         message: `TOUS les vétérinaires actifs portent l'étiquette « ${regle.tag} » : personne ne peut tenir le rôle « ${regle.role} » sur les créneaux concernés — la génération échouera. Retirez l'étiquette d'au moins un vétérinaire ou assouplissez la règle.`,
       })
     }
@@ -848,6 +905,8 @@ function detecterCompositionsSansPorteur(
       out.push({
         code: 'composition_sans_porteur',
         regles: [`au moins un vétérinaire « ${regle.tag} » par créneau`],
+        regleIds: [regle.regleId],
+        tag: tagNorm,
         message: dure
           ? `La règle « au moins un vétérinaire ${regle.tag} » est active mais AUCUN vétérinaire actif ne porte l'étiquette « ${regle.tag} » : les créneaux concernés seront impossibles à pourvoir. Ajoutez l'étiquette sur les fiches de l'équipe (Équipe) ou désactivez la règle.`
           : `La préférence « au moins un vétérinaire ${regle.tag} » est active mais aucun vétérinaire actif ne porte l'étiquette « ${regle.tag} » : elle ne pourra jamais être satisfaite. Ajoutez l'étiquette sur les fiches de l'équipe ou désactivez la règle.`,
@@ -856,6 +915,8 @@ function detecterCompositionsSansPorteur(
       out.push({
         code: 'composition_sans_porteur',
         regles: [`les vétérinaires « ${regle.tag} » ne sont jamais seuls`],
+        regleIds: [regle.regleId],
+        tag: tagNorm,
         message: `La règle « les vétérinaires ${regle.tag} ne sont jamais seuls » est active mais aucun vétérinaire actif ne porte l'étiquette « ${regle.tag} » : elle est sans effet. Ajoutez l'étiquette sur les fiches concernées (Équipe) ou supprimez la règle.`,
       })
     }

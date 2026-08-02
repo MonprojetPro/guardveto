@@ -3,53 +3,34 @@
 // ============================================================
 // GUARDVETO V2 — Les outils du planning (pilules d'en-tête)
 // ============================================================
-// Reprend INTÉGRALEMENT les garde-fous de l'`ActionBar` V1 (pré-vol,
-// diagnostic d'impasse, créneaux ignorés, confirmation de publication,
-// réserves du gate serveur, confirmation de régénération d'une période
-// publiée) — ce sont des règles métier, pas du décor : on ne les
-// réécrit pas pour un changement d'habillage.
+// REFONTE DU 2026-08-02 (demande MiKL). Ce fichier ne PILOTE plus la
+// génération : il ouvre le PARCOURS (`ParcoursGeneration`), qui accompagne
+// l'admin du choix du planning jusqu'au résultat, et la PUBLICATION
+// (`DialogPublication`), qui contrôle avant de déclencher les automatisations.
+// Les garde-fous métier n'ont pas disparu — ils sont devenus des étapes de ces
+// deux parcours (confirmation d'écrasement d'un planning publié, diagnostic
+// d'impasse, créneaux ignorés, réserves du gate serveur).
 //
-// Ce qui change, c'est UNIQUEMENT la mise en scène, conforme à
-// `maquette/m1-planning.html` (ligne 1826) :
+// CE QUI RESTE ICI : la barre d'outils elle-même, et le bandeau de pré-vol
+// affiché en permanence au-dessus de la grille (le signal « quelque chose
+// cloche » qu'on voit sans rien ouvrir).
 //
-//   • la période vient de la PILULE V2 (donc du mois affiché) — l'ActionBar
-//     V1 embarquait son propre `<Select>` de période et son propre badge de
-//     statut, ce qui donnait deux sélecteurs affichant deux périodes
-//     différentes avec deux statuts contradictoires ;
-//   • les boutons sont des pilules `head-btn`, pas des boutons shadcn
-//     rectangulaires maquillés au CSS ;
-//   • les bandeaux d'alerte descendent dans le corps de la page, au-dessus
-//     de la grille — dans l'ActionBar ils étaient coincés dans la barre
-//     d'en-tête, qu'ils faisaient gonfler à trois étages.
-//
-// D'où la forme en HOOK plutôt qu'en composant : `PlanningV2` récupère les
-// trois morceaux (pilules / alertes / modales) et les pose chacun au bon
-// endroit de la page, tout en gardant un seul état partagé.
+// DEUX CORRECTIONS D'AFFICHAGE, MÊME RETOUR :
+//   • « Générer » est le geste central de l'application — il porte donc
+//     l'accent et une icône, au lieu d'être la quatrième pilule grise d'une
+//     rangée de quatre.
+//   • Un planning déjà publié affichait un bouton vert plein « Publiée ».
+//     MiKL : « on dirait un bouton alors que ce n'est qu'un label, ça crée la
+//     confusion ». C'est désormais un ÉTAT (pastille), pas un bouton.
 // ============================================================
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
-import { Loader2, Send, Wand2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { DiagnosticImpasse } from '@/components/planning/DiagnosticImpasse'
-import { CreneauxIgnoresAlert } from '@/components/planning/CreneauxIgnoresAlert'
 import { PreVolAlert } from '@/components/planning/PreVolAlert'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog'
+import { ParcoursGeneration } from '@/components/v2/ParcoursGeneration'
+import { DialogPublication } from '@/components/v2/DialogPublication'
+import type { VetEtiquette } from '@/components/planning/PointPreVol'
 import type { AvertissementPreVol } from '@/engine/pre-vol'
-import type { CreneauIgnore } from '@/engine/creneau-modele'
-import type { JourNonCouvert } from '@/components/planning/types-impasse'
-import type { DiagnosticImpasse as DiagnosticImpasseData } from '@/engine/diagnostic'
-import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
 import type { Periode, ProfilPlanning } from '@/types'
-import { AssistantGeneration } from '@/components/v2/AssistantGeneration'
 
 // ── Types ────────────────────────────────────────────────
 
@@ -61,24 +42,14 @@ interface OptionsOutils {
   isAdmin: boolean
   /** Ouvre la modale de signalement d'absence, portée par `PlanningV2`. */
   onSignalerAbsence: () => void
-  /** Tous les plannings du cabinet — l'assistant de génération en a besoin. */
+  /** Tous les plannings du cabinet — le parcours en a besoin. */
   periodes: Periode[]
   /** Les périodes types actives (`profils_planning`), pour la voie « nouveau ». */
   periodesTypes: ProfilPlanning[]
+  /** Vétérinaires actifs — pour régler un point d'étiquette sur place. */
+  vets: VetEtiquette[]
   /** Va au mois donné (« AAAA-MM ») — porté par `PlanningV2`. */
   onNaviguerVersMois: (anneeMois: string) => void
-}
-
-/** Réponse d'impasse renvoyée par /api/generate (success:false). */
-interface ImpasseState {
-  diagnostic: DiagnosticImpasseData | null
-  joursNonCouverts: JourNonCouvert[]
-}
-
-/** Réserves renvoyées par le gate de /api/publish (requiresConfirmation). */
-interface ReservesPublication {
-  violations: ViolationRevalidation[]
-  souhaitsEnAttente: number
 }
 
 /** Résultat du pré-vol (backlog n°23 + n°24) — GET /api/generate/pre-vol. */
@@ -96,39 +67,25 @@ export function useOutilsPlanning({
   onSignalerAbsence,
   periodes,
   periodesTypes,
+  vets,
   onNaviguerVersMois,
 }: OptionsOutils) {
-  const router = useRouter()
-  const [generating, setGenerating] = useState(false)
-  // « Générer » ne vise plus forcément la période du mois affiché : l'assistant
-  // permet d'en cibler une autre, ou d'en créer une à l'instant. La cible est
-  // donc un état à part — la période affichée ne sert plus qu'à PROPOSER.
-  const [assistantOuvert, setAssistantOuvert] = useState(false)
+  const [parcoursOuvert, setParcoursOuvert] = useState(false)
+  const [publicationOuverte, setPublicationOuverte] = useState(false)
   // Le raccourci du menu de période ouvre directement la voie « nouveau » :
   // l'admin a déjà dit ce qu'il voulait, lui reposer la question serait un clic
   // pour rien.
-  const [etapeAssistant, setEtapeAssistant] = useState<'choix' | 'nouveau'>('choix')
-  const [cible, setCible] = useState<string | null>(null)
-  const [publishing, setPublishing] = useState(false)
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  const [republishOpen, setRepublishOpen] = useState(false)
-  const [reserves, setReserves] = useState<ReservesPublication | null>(null)
-  const [impasse, setImpasse] = useState<ImpasseState | null>(null)
-  // Créneaux du catalogue ignorés par le moteur (backlog n°4, tranche 1) —
-  // affichés APRÈS la génération, succès comme impasse (fin du silence).
-  const [creneauxIgnores, setCreneauxIgnores] = useState<CreneauIgnore[]>([])
-  // Pré-vol (backlog n°23 + n°24) : congés en attente + cohérence des règles,
-  // AVANT le clic « Générer ». Le résultat est CLÉ sur sa période : changer de
-  // mois invalide l'affichage sans setState synchrone dans l'effet.
+  const [etapeParcours, setEtapeParcours] = useState<'choix' | 'nouveau'>('choix')
+
+  // Pré-vol du planning AFFICHÉ — le signal permanent au-dessus de la grille.
+  // Clé sur sa période : changer de mois invalide l'affichage sans setState
+  // synchrone dans l'effet.
   const [preVol, setPreVol] = useState<(PreVolState & { periodeId: string }) | null>(null)
-  // Bumpé après chaque génération : les règles/congés ont pu changer entre-temps
-  // (assouplissement via le diagnostic, congé traité dans un autre onglet…).
+  // Bumpé après chaque correction ou génération : les règles ont pu changer.
   const [preVolVersion, setPreVolVersion] = useState(0)
 
   const periodeId = periode?.id ?? ''
 
-  // Charge le pré-vol dès qu'une période est affichée (best-effort : un échec
-  // réseau laisse simplement l'écran sans avertissement — jamais bloquant).
   useEffect(() => {
     if (!periodeId || !isAdmin) return
     let annule = false
@@ -146,120 +103,23 @@ export function useOutilsPlanning({
     return () => { annule = true }
   }, [periodeId, isAdmin, preVolVersion])
 
-  // Changer de mois peut changer de période : les résultats de la précédente
-  // (impasse, créneaux ignorés) ne la concernent plus.
-  useEffect(() => {
-    setImpasse(null)
-    setCreneauxIgnores([])
-  }, [periodeId])
-
   // Seul le pré-vol de la période AFFICHÉE est montré (l'ancien devient inerte).
   const preVolActuel = preVol && preVol.periodeId === periodeId ? preVol : null
 
+  const estPublie = periode?.statut === 'publie'
+  const estVerrouille = periode?.statut === 'verrouille'
   const peutPublier = aDesGardes && periode?.statut === 'brouillon'
 
-  /**
-   * Cible retenue par l'assistant. Si elle est PUBLIÉE, on demande confirmation
-   * AVANT d'écraser (garde-fou Chantier B) — sinon on génère directement.
-   * Un planning tout juste créé n'est pas encore dans `periodes` (le rendu
-   * serveur n'a pas rejoué) : absent de la liste = brouillon neuf, on génère.
-   */
-  function demarrerGeneration(id: string) {
-    setCible(id)
-    const p = periodes.find((x) => x.id === id)
-    if (p?.statut === 'publie') {
-      setRepublishOpen(true)
-      return
-    }
-    void lancerGeneration(id, false)
-  }
-
-  async function lancerGeneration(periodeId: string, confirmRepublication: boolean) {
-    if (!periodeId) return
-    setGenerating(true)
-    setImpasse(null)
-    setCreneauxIgnores([])
-    try {
-      const res = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ periodeId, confirmRepublication }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        toast.error(data.error ?? 'Erreur lors de la génération.')
-        return
-      }
-      // Filet de sécurité serveur : période publiée sans confirmation → dialogue.
-      if (data.requiresConfirmation) {
-        setRepublishOpen(true)
-        return
-      }
-      setCreneauxIgnores((data.creneauxIgnores ?? []) as CreneauIgnore[])
-      if (data.success) {
-        setRepublishOpen(false)
-        toast.success(`${data.nbGardes} gardes générées en ${data.dureeMs}ms`)
-        router.refresh()
-      } else if (data.interrompu) {
-        // Coupe propre du backtracking (calcul trop long) — PAS une impasse
-        // prouvée : message dédié, on n'affiche pas de diagnostic (il n'y en a pas).
-        setImpasse(null)
-        toast.error(data.error ?? 'Génération interrompue : le planning est trop contraint (calcul trop long).')
-      } else {
-        const jours: JourNonCouvert[] = data.joursNonCouverts ?? []
-        setImpasse({
-          diagnostic: (data.diagnostic ?? null) as DiagnosticImpasseData | null,
-          joursNonCouverts: jours,
-        })
-        toast.error('Aucun planning possible avec les règles actuelles.')
-      }
-    } catch {
-      toast.error('Impossible de joindre le serveur.')
-    } finally {
-      setGenerating(false)
-      // Re-vérifie le pré-vol : les règles/congés ont pu changer depuis l'affichage.
-      setPreVolVersion((v) => v + 1)
-    }
-  }
-
-  async function handlePublier(confirmAvecReserves = false) {
-    if (!periodeId) return
-    setPublishing(true)
-    try {
-      const res = await fetch('/api/publish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ periodeId, confirmAvecReserves }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        toast.error(data.error ?? 'Erreur lors de la publication.')
-        return
-      }
-      // Gate serveur : violations dures ou souhaits de congé en attente →
-      // on montre les réserves et on demande une confirmation explicite.
-      if (data.requiresConfirmation) {
-        setConfirmOpen(false)
-        setReserves({
-          violations: data.violations ?? [],
-          souhaitsEnAttente: data.souhaitsEnAttente ?? 0,
-        })
-        return
-      }
-      toast.success('Planning publié — les vétérinaires peuvent y accéder.')
-      setConfirmOpen(false)
-      setReserves(null)
-      router.refresh()
-    } catch {
-      toast.error('Impossible de joindre le serveur.')
-    } finally {
-      setPublishing(false)
-    }
+  /** Ouvre le parcours, éventuellement droit sur la création d'un planning. */
+  function ouvrirParcours(etape: 'choix' | 'nouveau' = 'choix') {
+    setEtapeParcours(etape)
+    setParcoursOuvert(true)
   }
 
   // ── Les pilules, dans l'ordre de la maquette ───────────
-  // Compteurs (rendu par PlanningV2) · PDF · Absence · Générer · [Publier]
-  // Le bouton principal ferme la ligne : c'est lui qui porte l'accent.
+  // Compteurs (rendu par PlanningV2) · PDF · Absence · [état] · Générer
+  // C'est « Générer » qui ferme la ligne et porte l'accent : c'est le geste
+  // central de l'application, pas une option parmi d'autres.
 
   const pilules = (
     <>
@@ -286,228 +146,90 @@ export function useOutilsPlanning({
             Absence
           </button>
 
-          {/* Plus de `!periodeId` ici : un mois sans planning grisait le bouton
-              sans un mot, et il fallait deviner qu'on créait un planning depuis
-              « Historique ». C'est justement ce trou que l'assistant comble. */}
-          <button
-            type="button"
-            className="head-btn"
-            disabled={generating}
-            title="Générer un planning — nouveau, ou en refaire un existant"
-            onClick={() => { setEtapeAssistant('choix'); setAssistantOuvert(true) }}
-          >
-            {generating ? 'Génération…' : 'Générer'}
-          </button>
+          {/* Un planning DÉJÀ publié n'a plus d'action « publier » : afficher un
+              bouton vert plein « Publiée » faisait croire à un geste possible.
+              C'est un état — il en a la forme. */}
+          {estPublie ? (
+            <span className="head-etat publie" title="Ce planning est publié : l’équipe le voit">
+              ✓ Publié
+            </span>
+          ) : estVerrouille ? (
+            <span className="head-etat" title="Planning verrouillé : consultation seule">
+              🔒 Verrouillé
+            </span>
+          ) : (
+            <button
+              type="button"
+              className="head-btn valider"
+              disabled={!peutPublier}
+              title={aDesGardes ? 'Publier le planning auprès de l’équipe' : 'Génère d’abord le planning'}
+              onClick={() => setPublicationOuverte(true)}
+            >
+              Publier
+            </button>
+          )}
 
+          {/* Le geste central : accentué, avec sa baguette. Plus de `disabled`
+              quand le mois n'a pas de planning — c'est justement le cas où il
+              faut pouvoir en créer un. */}
           <button
             type="button"
-            className="head-btn primary"
-            disabled={publishing || !peutPublier}
-            title={
-              periode?.statut === 'publie'
-                ? 'Cette période est déjà publiée'
-                : !aDesGardes
-                  ? 'Génère d’abord le planning'
-                  : 'Publier le planning auprès de l’équipe'
-            }
-            onClick={() => setConfirmOpen(true)}
+            className="head-btn generer"
+            title="Générer un planning — nouveau, ou en refaire un existant"
+            onClick={() => ouvrirParcours('choix')}
           >
-            {publishing ? 'Publication…' : periode?.statut === 'publie' ? 'Publiée' : 'Publier'}
+            <span className="hb-etincelle" aria-hidden>✨</span>
+            Générer
           </button>
         </>
       )}
     </>
   )
 
-  // ── Les bandeaux, au-dessus de la grille ───────────────
+  // ── Le bandeau, au-dessus de la grille ─────────────────
+  // Chaque point y est RÉGLABLE sur place : corriger déclenche un rechargement
+  // du pré-vol, donc la liste se vide au fur et à mesure.
 
-  const alertes = isAdmin ? (
-    <>
-      {/* Pré-vol (backlog n°23 + n°24) : congés en attente + cohérence des
-          règles — AVANT le clic « Générer ». Rien détecté → rien d'affiché. */}
-      {preVolActuel && !generating && (
-        <PreVolAlert
-          avertissements={preVolActuel.avertissements}
-          souhaitsEnAttente={preVolActuel.souhaitsEnAttente}
-        />
-      )}
-
-      {/* Créneaux du catalogue ignorés par le moteur (backlog n°4, tranche 1) */}
-      {!generating && <CreneauxIgnoresAlert creneaux={creneauxIgnores} />}
-
-      {/* Diagnostic d'impasse actionnable (Lot 5) */}
-      {impasse && !generating && (
-        <DiagnosticImpasse
-          diagnostic={impasse.diagnostic}
-          joursNonCouverts={impasse.joursNonCouverts}
-        />
-      )}
-    </>
+  const alertes = isAdmin && preVolActuel ? (
+    <PreVolAlert
+      avertissements={preVolActuel.avertissements}
+      souhaitsEnAttente={preVolActuel.souhaitsEnAttente}
+      vets={vets}
+      onCorrige={() => setPreVolVersion((v) => v + 1)}
+    />
   ) : null
 
-  // ── Les modales de garde-fou ───────────────────────────
+  // ── Les deux parcours ──────────────────────────────────
 
   const modales = isAdmin ? (
     <>
-      {/* L'assistant : la première étape de « Générer » (nouveau / existant) */}
       {/* `key` sur l'étape d'entrée : la modale reste montée entre deux
           ouvertures, un simple `useState(etapeInitiale)` ne la verrait donc
           jamais changer. Changer la clé la remonte sur la bonne étape — sans
           poser un setState dans un effet (interdit par le lint du projet). */}
-      <AssistantGeneration
-        key={etapeAssistant}
-        open={assistantOuvert}
-        onOpenChange={setAssistantOuvert}
+      <ParcoursGeneration
+        key={etapeParcours}
+        open={parcoursOuvert}
+        onOpenChange={(o) => {
+          setParcoursOuvert(o)
+          if (!o) setPreVolVersion((v) => v + 1)
+        }}
         periodes={periodes}
         periodeAffichee={periode}
         periodesTypes={periodesTypes}
-        etapeInitiale={etapeAssistant}
-        onGenerer={demarrerGeneration}
+        vets={vets}
         onNaviguerVersMois={onNaviguerVersMois}
+        etapeInitiale={etapeParcours}
       />
 
-      {/* Modale de confirmation de publication */}
-      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent className="gv-modale">
-          <DialogHeader>
-            <p className="gm-kicker">Planning · publication</p>
-            <DialogTitle>Publier le planning ?</DialogTitle>
-            <DialogDescription>
-              Cette action a des conséquences immédiates pour le cabinet :
-            </DialogDescription>
-          </DialogHeader>
-          <ul className="text-sm text-muted-foreground space-y-1.5 list-disc pl-5">
-            <li>Tous les <strong>vétérinaires verront le planning</strong> (il ne sera plus en brouillon).</li>
-            <li>Des <strong>e-mails de notification</strong> sont envoyés aux vétérinaires concernés.</li>
-            <li>Le planning est <strong>synchronisé sur Google Agenda</strong>.</li>
-            <li>Tu pourras toujours <strong>modifier une garde manuellement</strong> ensuite (les compteurs se mettront à jour).</li>
-          </ul>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={publishing}>
-              Annuler
-            </Button>
-            <Button
-              onClick={() => handlePublier(false)}
-              disabled={publishing}
-            >
-              {publishing ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Send className="w-4 h-4 mr-2" />
-              )}
-              Confirmer la publication
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modale des RÉSERVES de publication (gate serveur) */}
-      <Dialog open={reserves !== null} onOpenChange={(o) => { if (!publishing && !o) setReserves(null) }}>
-        <DialogContent className="gv-modale">
-          <DialogHeader>
-            <p className="gm-kicker">Planning · réserves</p>
-            <DialogTitle>Des points méritent ton attention</DialogTitle>
-            <DialogDescription>
-              La vérification automatique du planning a relevé :
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 text-sm">
-            {reserves && reserves.violations.length > 0 && (
-              <div className="gf-card dure">
-                <p className="gf-title">
-                  {reserves.violations.length} règle{reserves.violations.length > 1 ? 's' : ''} non respectée{reserves.violations.length > 1 ? 's' : ''} :
-                </p>
-                <ul className="space-y-1 list-disc pl-5">
-                  {reserves.violations.slice(0, 6).map((v, i) => (
-                    <li key={i}>
-                      <span className="font-medium">{v.date}</span> — {v.detail}
-                    </li>
-                  ))}
-                  {reserves.violations.length > 6 && (
-                    <li className="list-none opacity-80">
-                      … et {reserves.violations.length - 6} autre{reserves.violations.length - 6 > 1 ? 's' : ''}.
-                    </li>
-                  )}
-                </ul>
-              </div>
-            )}
-            {reserves && reserves.souhaitsEnAttente > 0 && (
-              <div className="gf-card souple">
-                <span className="font-medium">{reserves.souhaitsEnAttente} demande{reserves.souhaitsEnAttente > 1 ? 's' : ''} de congé en attente</span>{' '}
-                chevauche{reserves.souhaitsEnAttente > 1 ? 'nt' : ''} cette période — valide-la/les ou refuse-la/les d&apos;abord si tu veux qu&apos;elle{reserves.souhaitsEnAttente > 1 ? 's' : ''} soi{reserves.souhaitsEnAttente > 1 ? 'ent' : 't'} prise{reserves.souhaitsEnAttente > 1 ? 's' : ''} en compte.
-              </div>
-            )}
-            <p className="text-muted-foreground">
-              Tu peux corriger d&apos;abord, ou publier quand même en connaissance de cause.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setReserves(null)} disabled={publishing}>
-              Corriger d&apos;abord
-            </Button>
-            <Button
-              onClick={() => handlePublier(true)}
-              disabled={publishing}
-            >
-              {publishing ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Send className="w-4 h-4 mr-2" />
-              )}
-              Publier quand même
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modale de confirmation de RÉGÉNÉRATION d'une période publiée (Chantier B) */}
-      <Dialog open={republishOpen} onOpenChange={(o) => { if (!generating) setRepublishOpen(o) }}>
-        <DialogContent className="gv-modale">
-          <DialogHeader>
-            <p className="gm-kicker">Planning · régénération</p>
-            <DialogTitle>Régénérer un planning publié ?</DialogTitle>
-            {/* On NOMME la cible : depuis l'assistant elle peut être un autre
-                planning que celui affiché à l'écran. */}
-            <DialogDescription>
-              Le planning{' '}
-              <strong>
-                {periodes.find((p) => p.id === cible)?.libelle ?? 'ciblé'}
-              </strong>{' '}
-              est <strong>publié</strong>. Le régénérer va l’écraser :
-            </DialogDescription>
-          </DialogHeader>
-          <ul className="text-sm text-muted-foreground space-y-1.5 list-disc pl-5">
-            <li>Le planning actuel est <strong>remplacé</strong> (sauf les gardes verrouillées).</li>
-            <li>La période <strong>repasse en brouillon</strong> : les vétérinaires ne la verront plus tant qu’elle n’est pas republiée.</li>
-            <li>Les <strong>événements Google Agenda</strong> de la période sont supprimés puis recréés à la republication.</li>
-            <li>Republier <strong>renvoie des e-mails</strong> de notification aux vétérinaires.</li>
-          </ul>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRepublishOpen(false)} disabled={generating}>
-              Annuler
-            </Button>
-            <Button
-              onClick={() => { if (cible) void lancerGeneration(cible, true) }}
-              disabled={generating || !cible}
-            >
-              {generating ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Wand2 className="w-4 h-4 mr-2" />
-              )}
-              Régénérer quand même
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DialogPublication
+        open={publicationOuverte}
+        onOpenChange={setPublicationOuverte}
+        periode={periode}
+        aDesGardes={aDesGardes}
+      />
     </>
   ) : null
 
-  /** Ouvre l'assistant, éventuellement droit sur la création d'un planning. */
-  function ouvrirAssistant(etape: 'choix' | 'nouveau' = 'choix') {
-    setEtapeAssistant(etape)
-    setAssistantOuvert(true)
-  }
-
-  return { pilules, alertes, modales, ouvrirAssistant }
+  return { pilules, alertes, modales, ouvrirAssistant: ouvrirParcours }
 }

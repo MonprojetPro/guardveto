@@ -1241,3 +1241,220 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   .gva-tete { flex-wrap: wrap; }
   .gva-toggle, .gva-tete > .gva-lien { margin-left: 29px; }
 }
+
+/* ============================================================
+   LE PARCOURS DE GÉNÉRATION + LA PUBLICATION
+   ------------------------------------------------------------
+   « On touche le cœur de l'application, la génération du planning !! faut que
+   ça pète » (MiKL, 2026-08-02). D'où : un bouton « Générer » qui porte
+   l'accent, un état publié qui ne se déguise plus en bouton, et des étapes
+   qui ressemblent à un accompagnement plutôt qu'à des boîtes de dialogue.
+   ============================================================ */
+
+/* -- Le geste central : Générer -- */
+.head-btn.generer {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--accent-ink), #b4682a);
+  color: #fff;
+  box-shadow: var(--edge-light), 2px 4px 12px rgba(120, 70, 18, 0.28);
+  padding-left: 15px; padding-right: 17px;
+  letter-spacing: 0.01em;
+}
+.head-btn.generer:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow: var(--edge-light), 3px 6px 16px rgba(120, 70, 18, 0.34);
+}
+.hb-etincelle {
+  margin-right: 7px; font-size: 0.9em;
+  display: inline-block;
+  animation: etincelle 2.6s ease-in-out infinite;
+}
+@keyframes etincelle {
+  0%, 88%, 100% { transform: scale(1) rotate(0); opacity: 1; }
+  93%           { transform: scale(1.22) rotate(-12deg); opacity: 0.85; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hb-etincelle { animation: none; }
+}
+
+/* Publier reste une ACTION (vert), mais discrète tant qu'elle n'est pas
+   possible — l'accent appartient à Générer. */
+.head-btn.valider {
+  border-color: rgba(90, 150, 60, 0.5);
+  background: var(--ok-soft);
+  color: var(--ok);
+  font-weight: 800;
+}
+.head-btn.valider:hover:not(:disabled) { border-color: var(--ok); }
+
+/* -- L'ÉTAT publié : surtout pas un bouton --
+   Un bouton vert plein « Publiée » faisait croire à un geste possible. Une
+   pastille sans ombre, sans curseur, en pointillés : on la lit, c'est tout. */
+.head-etat {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 38px; padding: 0 14px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px dashed var(--border-strong);
+  font-size: 0.78rem; font-weight: 700; color: var(--t-muted);
+  cursor: default;
+}
+.head-etat.publie {
+  background: var(--ok-soft);
+  border-style: solid;
+  border-color: rgba(90, 150, 60, 0.4);
+  color: var(--ok);
+}
+
+/* -- La fenêtre du parcours -- */
+.gv-parcours { max-width: min(680px, calc(100vw - 32px)) !important; }
+.gp-fil { font-weight: 600; opacity: 0.75; text-transform: none; letter-spacing: 0; }
+
+.gp-controle, .gp-resultat { display: grid; gap: 10px; }
+.gp-controle { max-height: 54vh; overflow-y: auto; }
+
+.gp-attente {
+  display: flex; align-items: center; gap: 9px;
+  padding: 16px 4px;
+  font-size: 0.86rem; color: var(--soft);
+}
+
+/* Le feu vert : ce qu'on veut voir le plus souvent. */
+.gp-feu-vert {
+  display: flex; align-items: flex-start; gap: 11px;
+  background: var(--ok-soft);
+  border: 1px solid rgba(90, 150, 60, 0.35);
+  border-radius: var(--r-md);
+  padding: 13px 15px;
+}
+.gp-feu-ico { width: 20px; height: 20px; color: var(--ok); flex: 0 0 auto; margin-top: 1px; }
+.gp-feu-titre {
+  font-family: var(--font-display);
+  font-size: 0.95rem; font-weight: 800; color: var(--ok);
+}
+.gp-feu-sous { margin-top: 2px; font-size: 0.83rem; line-height: 1.55; color: var(--text); }
+
+/* Un lot de points (bloquants / à surveiller). */
+.gp-lot { display: grid; gap: 8px; }
+.gp-lot-titre {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 0.72rem; font-weight: 800; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--soft);
+  margin-top: 4px;
+}
+.gp-lot.bloquant .gp-lot-titre { color: var(--danger); }
+.gp-lot-ico { width: 15px; height: 15px; }
+
+/* -- Ça tourne -- */
+.gp-travail { padding: 18px 4px 6px; text-align: center; }
+.gp-jauge {
+  height: 6px; border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.gp-jauge span {
+  display: block; height: 100%; width: 38%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent-ink), #d08a4a);
+  animation: jauge 1.5s ease-in-out infinite;
+}
+@keyframes jauge {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gp-jauge span { animation: none; width: 100%; opacity: 0.5; }
+}
+.gp-travail-txt { font-size: 0.88rem; line-height: 1.6; color: var(--text); }
+.gp-travail-note { margin-top: 7px; font-size: 0.78rem; color: var(--soft); }
+
+/* -- Les automatisations de la publication -- */
+.gp-automatisations { display: grid; gap: 8px; margin: 2px 0; }
+.gp-automatisations li {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  font-size: 0.83rem; line-height: 1.5; color: var(--text);
+  list-style: none;
+}
+.gp-automatisations .gp-auto-ico {
+  width: 17px; height: 17px; flex: 0 0 auto; margin-top: 1px;
+  color: var(--accent-ink);
+}
+.gp-automatisations.fait li { background: var(--ok-soft); border-color: rgba(90, 150, 60, 0.3); }
+.gp-automatisations.fait .gp-auto-ico { color: var(--ok); }
+.gp-note { font-size: 0.79rem; line-height: 1.55; color: var(--soft); }
+
+/* Le planning suggéré dans la liste (celui du mois regardé). */
+.gen-ligne.suggere { border-color: var(--accent-ink); }
+
+/* ============================================================
+   UN POINT DE PRÉ-VOL ACTIONNABLE (`.ppv`)
+   ------------------------------------------------------------
+   « Y a rien qui permette à l'utilisateur de changer quoi que ce soit
+   directement à partir de l'encart » — les gestes vivent donc DANS la carte.
+   ============================================================ */
+.ppv {
+  background: var(--surface);
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-sm);
+  padding: 11px 13px;
+}
+.ppv.bloquant { border-left: 3px solid var(--danger); }
+.ppv-message { font-size: 0.84rem; line-height: 1.55; color: var(--text); }
+
+.ppv-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
+.ppv-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-family: inherit;
+  font-size: 0.78rem; font-weight: 700; color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.ppv-btn:hover:not(:disabled) { border-color: var(--accent-ink); background: var(--accent-soft); }
+.ppv-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ppv-btn.fort {
+  background: var(--accent-soft);
+  border-color: var(--accent-ink);
+  color: var(--accent-ink);
+}
+.ppv-btn.lien {
+  background: transparent; border-color: transparent;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.ppv-spin { width: 13px; height: 13px; animation: ppvspin 1s linear infinite; }
+@keyframes ppvspin { to { transform: rotate(360deg); } }
+
+/* Le choix des vétérinaires quand le geste porte sur une étiquette. */
+.ppv-choix {
+  margin-top: 9px; padding-top: 9px;
+  border-top: 1px dashed var(--t-border);
+}
+.ppv-choix-titre {
+  font-size: 0.78rem; font-weight: 700; color: var(--text);
+  margin-bottom: 7px;
+}
+.ppv-vets { display: flex; flex-wrap: wrap; gap: 6px; }
+.ppv-vet {
+  height: 30px; padding: 0 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  font-family: inherit;
+  font-size: 0.78rem; font-weight: 600; color: var(--text);
+  cursor: pointer;
+}
+.ppv-vet.choisi {
+  background: var(--accent-soft);
+  border-color: var(--accent-ink);
+  color: var(--accent-ink);
+  font-weight: 800;
+}

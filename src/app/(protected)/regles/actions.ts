@@ -1495,3 +1495,127 @@ export async function appliquerActionRegles(
   revaliderRegles()
   return { success: true, nb: ids.length }
 }
+
+// ── Corriger un point de pré-vol SANS quitter l'écran ────────
+//
+// Retour MiKL du 2026-08-02 : « y a rien qui permette à l'utilisateur de
+// changer quoi que ce soit directement à partir de l'encart, il faut qu'il
+// aille à droite à gauche, revienne, et vérifie… bref c'est chiant ».
+//
+// Le pré-vol dit ce qui coince ET pointe désormais les règles fautives par
+// leur id (`AvertissementPreVol.regleIds`). Ces deux actions sont les gestes
+// que l'admin faisait à la main, en trois écrans : assouplir, ou mettre en
+// pause. Elles ne sont volontairement PAS génériques — pas de « applique ce
+// que tu veux sur cette règle » télécommandé depuis le client.
+
+/**
+ * Assouplit une règle jusqu'au premier cran qui laisse le moteur passer outre :
+ * « sauf urgence ». La règle RESTE — le moteur la respecte partout où il peut,
+ * et signale quand il l'enfreint. C'est la correction la moins destructrice, et
+ * de loin la plus fréquente (cf. `lib/regles/corrections.ts`).
+ */
+export async function assouplirRegle(id: string) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  const { data: row } = await supabase
+    .from('regles_cabinet')
+    .select('id, force')
+    .eq('id', id)
+    .maybeSingle()
+  if (!row) return { error: 'Règle introuvable.' }
+
+  // Déjà souple : ne rien faire plutôt que de la durcir par mégarde. Assouplir
+  // doit rester une opération qui ne peut jamais resserrer une règle.
+  const actuelle = (row as { force?: string }).force
+  if (actuelle && FORCES_SOUPLES.has(actuelle as ForceFormulaire)) {
+    return { success: true, inchange: true }
+  }
+
+  const { error } = await supabase
+    .from('regles_cabinet')
+    .update({ force: 'sauf_crise' })
+    .eq('id', id)
+
+  if (error) return { error: error.message }
+  revaliderRegles()
+  revalidatePath('/planning')
+  return { success: true }
+}
+
+/**
+ * Met une règle en pause depuis l'écran Planning. S'appuie sur `setRegleActif`
+ * — donc le miroir d'un duo interdit est traité, comme partout ailleurs — et
+ * revalide EN PLUS `/planning`, d'où part l'action.
+ */
+export async function mettreEnPauseRegle(id: string) {
+  const res = await setRegleActif(id, false)
+  if ('error' in res) return res
+  revalidatePath('/planning')
+  return { success: true }
+}
+
+/**
+ * Retire une étiquette de fiches vétérinaires. Le pendant exact de
+ * `poserEtiquetteSurVetos`, requis par le cas « TOUS les vétos portent
+ * l'étiquette, donc personne ne peut tenir le rôle » : la seule correction est
+ * d'en retirer au moins un, et jusqu'ici il fallait aller le faire fiche par
+ * fiche sur l'écran Équipe.
+ *
+ * Comparaison NORMALISÉE (« Junior » et « junior » sont la même étiquette) —
+ * même règle que partout ailleurs, sinon on retirerait la minuscule en laissant
+ * la majuscule, et le porteur resterait porteur sans que rien ne le dise.
+ */
+export async function retirerEtiquetteDeVetos(tag: string, vetoIds: string[]) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  const tagNorm = (tag ?? '').trim().toLowerCase()
+  if (tagNorm === '') return { error: 'Étiquette invalide.' }
+
+  const ids = [...new Set((vetoIds ?? []).filter((x) => typeof x === 'string' && x.trim() !== ''))]
+  if (ids.length === 0) {
+    return { error: 'Indique au moins un vétérinaire.' }
+  }
+
+  let cabinetId: string
+  try {
+    cabinetId = await resoudreCabinetId(supabase)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
+  }
+
+  const { data: cibles, error: lectureErr } = await supabase
+    .from('veterinaires')
+    .select('id, prenom, tags')
+    .eq('cabinet_id', cabinetId)
+    .eq('actif', true)
+    .in('id', ids)
+  if (lectureErr) return { error: lectureErr.message }
+
+  const rows = (cibles ?? []) as Array<{ id: string; prenom: string; tags: string[] | null }>
+  if (rows.length === 0) {
+    return { error: 'Aucun vétérinaire actif ne correspond à cette sélection.' }
+  }
+
+  const retires: string[] = []
+  for (const v of rows) {
+    const actuels = v.tags ?? []
+    const restants = actuels.filter((t) => t.trim().toLowerCase() !== tagNorm)
+    if (restants.length === actuels.length) continue // ne la portait pas
+    const { error } = await supabase
+      .from('veterinaires')
+      .update({ tags: restants })
+      .eq('id', v.id)
+    if (error) return { error: error.message }
+    retires.push(v.prenom)
+  }
+
+  revaliderRegles()
+  revalidatePath('/planning')
+  return { success: true, retires }
+}

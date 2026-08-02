@@ -168,6 +168,7 @@ export function PlanningV2({
     isAdmin,
     periodes,
     periodesTypes,
+    vets,
     onNaviguerVersMois: (anneeMois) => router.push(`/planning?mois=${anneeMois}`),
     onSignalerAbsence: () => {
       setCriseDate(undefined)
