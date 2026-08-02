@@ -13,6 +13,8 @@
 import { z } from 'zod'
 import type {
   BriqueEvaluable, ForceFormulaire, UpsertReglePayload,
+} from '@/lib/regles/paramsRegle'
+import type {
   CompositionReglePayload, RoleInterditReglePayload,
 } from '@/app/(protected)/regles/actions'
 import { rendreRegle } from '@/engine/briques/catalogue'

@@ -31,10 +31,12 @@ import {
 import { rendreRegle } from '@/engine/briques/catalogue'
 import { choixForce, symboleDe, aideForce } from '@/lib/regles/libelle'
 import '@/styles/regles-forces.css'
-import {
-  upsertRegle, verifierRegle,
-  type BriqueEvaluable, type ForceFormulaire, type VerdictGardien,
-} from '@/app/(protected)/regles/actions'
+import { upsertRegle, verifierRegle } from '@/app/(protected)/regles/actions'
+// Les TYPES viennent de leur module, jamais de `actions.ts` : ce fichier est en
+// `'use server'`, et un type qu'il réexporte devient un export runtime fantôme
+// (ReferenceError en production — incident du 2026-08-02).
+import type { BriqueEvaluable, ForceFormulaire } from '@/lib/regles/paramsRegle'
+import type { VerdictGardien } from '@/data/verifierRegleCandidate'
 import { GardienFilou } from '@/components/v2/regles/GardienFilou'
 import type { RegleRow, VetoMini, PeriodeOption, TypeCreneauOption } from './ReglesClient'
 
@@ -507,6 +509,14 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
       // (aucune période en base, chargement en échec) n'empêche jamais
       // d'enregistrer — il se tait, simplement.
       const verdict = await verifierRegle({ genre: 'nominative', payload })
+      // Panne du contrôle : on l'annonce et on enregistre quand même — mais on
+      // ne laisse jamais croire que la règle a été vérifiée.
+      if (verdict.diagnostic) {
+        toast.warning('Je n’ai pas pu vérifier cette règle avec les autres.', {
+          description: verdict.diagnostic,
+          duration: 20000,
+        })
+      }
       if (verdict.verifie && verdict.avertissements.length > 0) {
         setGardien({ verdict, payload })
         return

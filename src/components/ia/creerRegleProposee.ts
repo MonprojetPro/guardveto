@@ -20,9 +20,9 @@ import {
   upsertCompositionRegle,
   upsertRoleInterditRegle,
   setCohorteEquite,
-  type ForceFormulaire,
   type PropositionIaResultat,
 } from '@/app/(protected)/regles/actions'
+import type { ForceFormulaire } from '@/lib/regles/paramsRegle'
 
 /** Les quatre libellés de puissance, du plus contraignant au plus souple. */
 export const FORCE_LABEL: Record<ForceFormulaire, string> = {

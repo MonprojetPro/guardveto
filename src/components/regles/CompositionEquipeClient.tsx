@@ -28,8 +28,9 @@ import {
 import { rendreRegle } from '@/engine/briques/catalogue'
 import {
   upsertCompositionRegle, upsertRoleInterditRegle, setRegleActif, deleteRegle,
-  type CompositionReglePayload, type RoleInterditReglePayload, type ForceFormulaire,
+  type CompositionReglePayload, type RoleInterditReglePayload,
 } from '@/app/(protected)/regles/actions'
+import type { ForceFormulaire } from '@/lib/regles/paramsRegle'
 
 // ── Types des props (résolus côté page serveur) ──────────────
 

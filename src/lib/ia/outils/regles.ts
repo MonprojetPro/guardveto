@@ -22,8 +22,8 @@ import {
   proposerRegleDepuisTexte,
   appliquerActionRegles,
   setRegleActif,
-  type ForceFormulaire,
 } from '@/app/(protected)/regles/actions'
+import type { ForceFormulaire } from '@/lib/regles/paramsRegle'
 import {
   creerRegleProposee,
   estCreable,

@@ -130,9 +130,12 @@ import {
   upsertCompositionRegle, upsertRoleInterditRegle,
   poserEtiquetteSurVetos, verifierRegle,
   type CohorteEquiteUI, type CompositionReglePayload,
-  type RoleInterditReglePayload, type ForceFormulaire,
-  type VerdictGardien,
+  type RoleInterditReglePayload,
 } from '@/app/(protected)/regles/actions'
+// Types depuis leur module : `actions.ts` est en `'use server'` et ne peut pas
+// les réexporter (cf. le commentaire en tête de ce fichier-là).
+import type { ForceFormulaire } from '@/lib/regles/paramsRegle'
+import type { VerdictGardien } from '@/data/verifierRegleCandidate'
 import { RegleFormDialog } from '@/components/regles/RegleFormDialog'
 import { AideFilou } from './AideFilou'
 import { useErreurBloquante } from './ErreurBloquante'
@@ -442,6 +445,20 @@ export function OngletMoteur({
   } | null>(null)
 
   /**
+   * Le gardien est tombé en panne. La règle s'enregistre quand même (le
+   * contrôle est facultatif par nature), mais on le DIT : un contrôle
+   * silencieusement hors service laisserait croire que la règle a été vérifiée.
+   * Le message technique est affiché tel quel — sans lui, une panne en
+   * production se corrige au hasard.
+   */
+  const signalerGardienEnPanne = (diagnostic: string) => {
+    toast.warning('Je n’ai pas pu vérifier cette règle avec les autres.', {
+      description: diagnostic,
+      duration: 20000,
+    })
+  }
+
+  /**
    * Le halo de `?focus=`. On arrive ici depuis un diagnostic d'impasse qui
    * désigne UN réglage : sans repère, on atterrit dans une longue liste et on
    * cherche. Purement cosmétique et défensif — une ancre inconnue ne casse
@@ -733,6 +750,7 @@ export function OngletMoteur({
               },
             },
       )
+      if (verdict.diagnostic) signalerGardienEnPanne(verdict.diagnostic)
       if (verdict.verifie && verdict.avertissements.length > 0) {
         setGardien({ verdict, ecrire: ecrireEquipe })
         return
@@ -847,6 +865,7 @@ export function OngletMoteur({
         genre: 'cohorte',
         payload: { dimension: coDim, tag, importance: coImp },
       })
+      if (verdict.diagnostic) signalerGardienEnPanne(verdict.diagnostic)
       if (verdict.verifie && verdict.avertissements.length > 0) {
         setGardien({ verdict, ecrire: ecrireCohorte })
         return

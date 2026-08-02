@@ -33,16 +33,28 @@ import {
   type BriqueEvaluable, type ForceFormulaire, type UpsertReglePayload,
 } from '@/lib/regles/paramsRegle'
 
-// Les écrans importent ces trois types DEPUIS CE FICHIER depuis toujours (le
-// formulaire, l'assistant IA, les panneaux). On les réexporte plutôt que de
-// réécrire une douzaine d'imports : un `export type` est effacé à la
-// compilation, il ne viole donc pas la règle « un fichier 'use server'
-// n'exporte que des fonctions async ».
-export type { BriqueEvaluable, ForceFormulaire, UpsertReglePayload }
+// ⛔ NE JAMAIS RÉEXPORTER UN TYPE DEPUIS CE FICHIER.
+//
+//    `export type { X }` paraît inoffensif — le type est effacé à la
+//    compilation, donc « ça ne peut pas violer la règle des exports async ».
+//    C'est FAUX ici, et ça a mis la production à terre le 2026-08-02 :
+//
+//        ReferenceError: BriqueEvaluable is not defined
+//        at module evaluation (.next/server/chunks/…)
+//
+//    Le transformateur `'use server'` recense les exports du module pour les
+//    enregistrer comme actions AVANT que les types ne soient effacés : il émet
+//    donc un vrai export runtime pour un symbole qui n'existe pas. Le build
+//    passe, `tsc` passe, et la page tombe en blanc à la première validation.
+//
+//    Les types se déclarent ICI (`export interface`, `export type X = …` :
+//    ceux-là vont bien, ils sont reconnus comme des déclarations de type) ou
+//    s'importent DEPUIS LEUR MODULE (`@/lib/regles/paramsRegle`,
+//    `@/data/verifierRegleCandidate`) — jamais réexportés au passage.
 
-import { verifierRegleCandidate, type VerdictGardien } from '@/data/verifierRegleCandidate'
+import { verifierRegleCandidate } from '@/data/verifierRegleCandidate'
+import type { VerdictGardien } from '@/data/verifierRegleCandidate'
 import type { RegleCabinetRow } from '@/data/mapReglesCabinet'
-export type { VerdictGardien }
 import { chargerContexteIA } from '@/lib/ia/contexteCabinet'
 import { proposerRegleIA, assistantIaDisponible, type TypeCreneauIA } from '@/lib/ia/proposerRegle'
 import {
@@ -697,41 +709,53 @@ const ID_CANDIDATE = '00000000-0000-0000-0000-0000000c0de0'
  * seule n'a aucune règle à valider.
  */
 export async function verifierRegle(candidat: CandidatRegle): Promise<VerdictGardien> {
-  const supabase = await createClient()
-
-  const garde = await assertAdmin(supabase)
-  if ('error' in garde) return { verifie: false, avertissements: [] }
-
-  let cabinetId: string
+  // ⚠️ FILET TOTAL. Une exception qui s'échappe d'une server action ne produit
+  //    pas un message : elle produit une PAGE BLANCHE « a server error
+  //    occurred », qui fait perdre la saisie et ne dit rien. Or ce contrôle est
+  //    facultatif par nature — il ne doit JAMAIS empêcher d'enregistrer une
+  //    règle. Tout ce qui casse ici se solde donc par « je n'ai pas pu
+  //    vérifier », et l'écriture suit son cours.
+  //    (Incident du 2026-08-02 : page blanche à la première validation de règle
+  //    après la mise en service du gardien.)
   try {
-    cabinetId = await resoudreCabinetId(supabase)
-  } catch {
-    return { verifie: false, avertissements: [] }
-  }
+    const supabase = await createClient()
 
-  const rows = await construireRowsCandidates(supabase, cabinetId, candidat)
-  if (rows.length === 0) return { verifie: false, avertissements: [] }
+    const garde = await assertAdmin(supabase)
+    if ('error' in garde) return { verifie: false, avertissements: [] }
 
-  // Un duo interdit s'écrit en DEUX lignes symétriques (A→B et B→A) : le solver
-  // a besoin des deux sens. On simule donc les deux, sinon le gardien jugerait
-  // une moitié de règle. Le module de vérification n'en prend qu'une comme
-  // « candidate » (pour le remplacement en édition) ; les autres sont fusionnées
-  // dans le monde simulé par le même chemin.
-  let verdict = await verifierRegleCandidate(supabase, cabinetId, rows[0])
-  for (const suivante of rows.slice(1)) {
-    const v = await verifierRegleCandidate(supabase, cabinetId, suivante)
-    if (!v.verifie) continue
-    const connus = new Set(verdict.avertissements.map((a) => `${a.code}::${a.message}`))
-    verdict = {
-      ...verdict,
-      verifie: verdict.verifie || v.verifie,
-      avertissements: [
-        ...verdict.avertissements,
-        ...v.avertissements.filter((a) => !connus.has(`${a.code}::${a.message}`)),
-      ],
+    const cabinetId = await resoudreCabinetId(supabase)
+
+    const rows = await construireRowsCandidates(supabase, cabinetId, candidat)
+    if (rows.length === 0) return { verifie: false, avertissements: [] }
+
+    // Un duo interdit s'écrit en DEUX lignes symétriques (A→B et B→A) : le solver
+    // a besoin des deux sens. On simule donc les deux, sinon le gardien jugerait
+    // une moitié de règle. Le module de vérification n'en prend qu'une comme
+    // « candidate » (pour le remplacement en édition) ; les autres sont fusionnées
+    // dans le monde simulé par le même chemin.
+    let verdict = await verifierRegleCandidate(supabase, cabinetId, rows[0])
+    for (const suivante of rows.slice(1)) {
+      const v = await verifierRegleCandidate(supabase, cabinetId, suivante)
+      if (!v.verifie) continue
+      const connus = new Set(verdict.avertissements.map((a) => `${a.code}::${a.message}`))
+      verdict = {
+        ...verdict,
+        verifie: verdict.verifie || v.verifie,
+        avertissements: [
+          ...verdict.avertissements,
+          ...v.avertissements.filter((a) => !connus.has(`${a.code}::${a.message}`)),
+        ],
+      }
     }
+    return verdict
+  } catch (e) {
+    // Le message part AUSSI vers l'écran (`diagnostic`) : les logs runtime de
+    // l'hébergeur ne sont pas consultables depuis ici, et une panne qu'on ne
+    // peut pas lire est une panne qu'on corrige au hasard.
+    const message = e instanceof Error ? `${e.message}` : String(e)
+    console.error('[gardien] vérification impossible :', e)
+    return { verifie: false, avertissements: [], diagnostic: message }
   }
-  return verdict
 }
 
 /**

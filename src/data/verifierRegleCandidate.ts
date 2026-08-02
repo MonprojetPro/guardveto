@@ -64,6 +64,13 @@ export interface VerdictGardien {
   avertissements: AvertissementPreVol[]
   /** Libellé de la période sur laquelle le contrôle a tourné (pour le dire). */
   periodeTestee?: string
+  /**
+   * Pourquoi le contrôle n'a pas pu tourner, quand la raison est une panne et
+   * non une absence de période. Remonté jusqu'à l'écran À DESSEIN : les logs
+   * runtime de l'hébergeur ne se lisent pas depuis le poste de développement,
+   * et une panne muette se corrige au hasard. Jamais affiché quand tout va bien.
+   */
+  diagnostic?: string
 }
 
 /** Les colonnes de `regles_cabinet` que le mapper attend. */
@@ -171,10 +178,15 @@ export async function verifierRegleCandidate(
       avertissements: apres.filter((a) => !dejaLa.has(cle(a))),
       periodeTestee: periode.label,
     }
-  } catch {
+  } catch (e) {
     // Un contrôle qui échoue ne doit JAMAIS empêcher d'enregistrer une règle :
-    // il s'annonce simplement comme n'ayant pas tourné.
-    return { verifie: false, avertissements: [] }
+    // il s'annonce simplement comme n'ayant pas tourné, en disant pourquoi.
+    console.error('[gardien] pré-vol impossible :', e)
+    return {
+      verifie: false,
+      avertissements: [],
+      diagnostic: e instanceof Error ? e.message : String(e),
+    }
   }
 }
 
