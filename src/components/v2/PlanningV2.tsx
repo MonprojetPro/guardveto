@@ -25,7 +25,7 @@ import { estJourFerie } from '@/engine/utils'
 import { placesDeGarde } from '@/lib/gardes/places'
 import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
 import type { CompteursRow } from '@/hooks/useCompteurs'
-import type { GardeDenormalisee, Periode } from '@/types'
+import type { GardeDenormalisee, Periode, ProfilPlanning } from '@/types'
 
 interface Props {
   gardes: GardeDenormalisee[]
@@ -45,6 +45,8 @@ interface Props {
   profil: string | null
   /** Périodes qui ont déjà des gardes — conditionne PDF et publication. */
   periodesAvecGardes: string[]
+  /** Périodes types actives du cabinet — proposées à la création d'un planning. */
+  periodesTypes: ProfilPlanning[]
 }
 
 export interface CongeAffiche {
@@ -121,6 +123,7 @@ export function PlanningV2({
   conges,
   profil,
   periodesAvecGardes,
+  periodesTypes,
 }: Props) {
   const router = useRouter()
   const [annee, mois] = anneeMois.split('-').map(Number)
@@ -163,6 +166,9 @@ export function PlanningV2({
     periode: periodeAffichee,
     aDesGardes: periodeAffichee ? periodesAvecGardes.includes(periodeAffichee.id) : false,
     isAdmin,
+    periodes,
+    periodesTypes,
+    onNaviguerVersMois: (anneeMois) => router.push(`/planning?mois=${anneeMois}`),
     onSignalerAbsence: () => {
       setCriseDate(undefined)
       setCriseVetId(undefined)

@@ -220,3 +220,19 @@
   .cm-row { grid-template-columns: 1fr; gap: 4px; }
   .cm-row.cm-header { display: none; }
 }
+
+/* -- Le renvoi vers l'écran Planning --------------------------------------
+   « + Créer une période » vivait ici jusqu'au 2026-08-02 ; la création est
+   devenue la première étape de « Générer ». On garde le CHEMIN sous forme de
+   lien, pour que l'admin venu chercher le bouton sache où il est parti. */
+.hist-vers-planning {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 38px; padding: 0 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.84rem; font-weight: 600; color: var(--text);
+  text-decoration: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.hist-vers-planning:hover { border-color: var(--accent-ink); background: var(--surface-2); }

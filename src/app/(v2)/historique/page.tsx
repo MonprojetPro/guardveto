@@ -24,7 +24,6 @@ import { BarreV2 } from '@/components/v2/BarreV2'
 import { HistoriqueV2, type LignePeriode, type CumulLigne } from '@/components/v2/HistoriqueV2'
 import { BonusMalusCard } from '@/components/compteurs/BonusMalusCard'
 import { HistoriqueFetesCard } from '@/components/compteurs/HistoriqueFetesCard'
-import { CreerPeriodeDialog } from '@/components/admin/CreerPeriodeDialog'
 import { SupprimerPeriodeButton } from '@/components/admin/SupprimerPeriodeButton'
 import { EffectifPeriodeSelect } from '@/components/admin/EffectifPeriodeSelect'
 import { ProfilPeriodeSelect } from '@/components/admin/ProfilPeriodeSelect'
@@ -372,7 +371,6 @@ export default async function HistoriquePage({
           lignesPeriodes={lignesPeriodes}
           cumul={cumul}
           cumulResume={cumulResume}
-          slotCreerPeriode={estAdmin ? <CreerPeriodeDialog profils={profilsNommes} /> : undefined}
           slotsReglagesPeriode={slotsReglagesPeriode}
           slotsSupprimerPeriode={slotsSupprimerPeriode}
           slotBilan={

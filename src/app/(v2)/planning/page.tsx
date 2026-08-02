@@ -22,7 +22,7 @@ import { chargerDock } from '@/data/v2/dock'
 import { queryCompteurs } from '@/hooks/useCompteurs'
 import type { VetCrise } from '@/components/planning/CriseModal'
 import type { CompteursRow } from '@/hooks/useCompteurs'
-import type { GardeDenormalisee, Periode, Veterinaire } from '@/types'
+import type { GardeDenormalisee, Periode, ProfilPlanning, Veterinaire } from '@/types'
 
 export const metadata = { title: 'GuardVeto — Planning' }
 
@@ -130,7 +130,7 @@ export default async function PlanningPageV2({
   const periodeAffichee =
     periodes.find((p) => p.date_debut <= fin && p.date_fin >= debut) ?? null
 
-  const [dock, profilRes, compteurs] = await Promise.all([
+  const [dock, profilRes, compteurs, typesRes2] = await Promise.all([
     chargerDock(supabase, vet, periodes),
     periodeAffichee?.profil_id
       ? supabase.from('profils_planning').select('nom').eq('id', periodeAffichee.profil_id).maybeSingle()
@@ -138,9 +138,19 @@ export default async function PlanningPageV2({
     periodeAffichee
       ? queryCompteurs(supabase, periodeAffichee.id)
       : Promise.resolve([] as CompteursRow[]),
+    // Les périodes types, proposées quand l'admin crée un planning depuis
+    // « Générer ». Chargées pour lui seul : un véto ne génère rien.
+    isAdmin
+      ? supabase
+          .from('profils_planning')
+          .select('id, nom, est_defaut, saison_suggeree, nb_vetos_semaine_soir')
+          .eq('actif', true)
+          .order('ordre')
+      : Promise.resolve({ data: null }),
   ])
 
   const profil = (profilRes as { data?: { nom: string } | null })?.data?.nom ?? null
+  const periodesTypes = ((typesRes2?.data ?? []) as ProfilPlanning[])
 
   const vets: VetCrise[] = isAdmin ? ((vetsRes?.data as VetCrise[] | null) ?? []) : []
 
@@ -192,6 +202,7 @@ export default async function PlanningPageV2({
           conges={conges}
           profil={profil}
           periodesAvecGardes={periodesAvecGardes}
+          periodesTypes={periodesTypes}
         />
       </div>
     </>

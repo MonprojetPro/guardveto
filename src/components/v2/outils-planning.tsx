@@ -48,7 +48,8 @@ import type { CreneauIgnore } from '@/engine/creneau-modele'
 import type { JourNonCouvert } from '@/components/planning/types-impasse'
 import type { DiagnosticImpasse as DiagnosticImpasseData } from '@/engine/diagnostic'
 import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
-import type { Periode } from '@/types'
+import type { Periode, ProfilPlanning } from '@/types'
+import { AssistantGeneration } from '@/components/v2/AssistantGeneration'
 
 // ── Types ────────────────────────────────────────────────
 
@@ -60,6 +61,12 @@ interface OptionsOutils {
   isAdmin: boolean
   /** Ouvre la modale de signalement d'absence, portée par `PlanningV2`. */
   onSignalerAbsence: () => void
+  /** Tous les plannings du cabinet — l'assistant de génération en a besoin. */
+  periodes: Periode[]
+  /** Les périodes types actives (`profils_planning`), pour la voie « nouveau ». */
+  periodesTypes: ProfilPlanning[]
+  /** Va au mois donné (« AAAA-MM ») — porté par `PlanningV2`. */
+  onNaviguerVersMois: (anneeMois: string) => void
 }
 
 /** Réponse d'impasse renvoyée par /api/generate (success:false). */
@@ -87,9 +94,17 @@ export function useOutilsPlanning({
   aDesGardes,
   isAdmin,
   onSignalerAbsence,
+  periodes,
+  periodesTypes,
+  onNaviguerVersMois,
 }: OptionsOutils) {
   const router = useRouter()
   const [generating, setGenerating] = useState(false)
+  // « Générer » ne vise plus forcément la période du mois affiché : l'assistant
+  // permet d'en cibler une autre, ou d'en créer une à l'instant. La cible est
+  // donc un état à part — la période affichée ne sert plus qu'à PROPOSER.
+  const [assistantOuvert, setAssistantOuvert] = useState(false)
+  const [cible, setCible] = useState<string | null>(null)
   const [publishing, setPublishing] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [republishOpen, setRepublishOpen] = useState(false)
@@ -139,18 +154,23 @@ export function useOutilsPlanning({
 
   const peutPublier = aDesGardes && periode?.statut === 'brouillon'
 
-  // Clic « Générer » : si la période est publiée, on demande confirmation AVANT
-  // d'écraser le planning publié (garde-fou Chantier B). Sinon on génère direct.
-  function handleGenerer() {
-    if (!periodeId) return
-    if (periode?.statut === 'publie') {
+  /**
+   * Cible retenue par l'assistant. Si elle est PUBLIÉE, on demande confirmation
+   * AVANT d'écraser (garde-fou Chantier B) — sinon on génère directement.
+   * Un planning tout juste créé n'est pas encore dans `periodes` (le rendu
+   * serveur n'a pas rejoué) : absent de la liste = brouillon neuf, on génère.
+   */
+  function demarrerGeneration(id: string) {
+    setCible(id)
+    const p = periodes.find((x) => x.id === id)
+    if (p?.statut === 'publie') {
       setRepublishOpen(true)
       return
     }
-    void lancerGeneration(false)
+    void lancerGeneration(id, false)
   }
 
-  async function lancerGeneration(confirmRepublication: boolean) {
+  async function lancerGeneration(periodeId: string, confirmRepublication: boolean) {
     if (!periodeId) return
     setGenerating(true)
     setImpasse(null)
@@ -262,11 +282,15 @@ export function useOutilsPlanning({
             Absence
           </button>
 
+          {/* Plus de `!periodeId` ici : un mois sans planning grisait le bouton
+              sans un mot, et il fallait deviner qu'on créait un planning depuis
+              « Historique ». C'est justement ce trou que l'assistant comble. */}
           <button
             type="button"
             className="head-btn"
-            disabled={generating || !periodeId}
-            onClick={handleGenerer}
+            disabled={generating}
+            title="Générer un planning — nouveau, ou en refaire un existant"
+            onClick={() => setAssistantOuvert(true)}
           >
             {generating ? 'Génération…' : 'Générer'}
           </button>
@@ -321,6 +345,17 @@ export function useOutilsPlanning({
 
   const modales = isAdmin ? (
     <>
+      {/* L'assistant : la première étape de « Générer » (nouveau / existant) */}
+      <AssistantGeneration
+        open={assistantOuvert}
+        onOpenChange={setAssistantOuvert}
+        periodes={periodes}
+        periodeAffichee={periode}
+        periodesTypes={periodesTypes}
+        onGenerer={demarrerGeneration}
+        onNaviguerVersMois={onNaviguerVersMois}
+      />
+
       {/* Modale de confirmation de publication */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent className="gv-modale">
@@ -421,8 +456,14 @@ export function useOutilsPlanning({
           <DialogHeader>
             <p className="gm-kicker">Planning · régénération</p>
             <DialogTitle>Régénérer un planning publié ?</DialogTitle>
+            {/* On NOMME la cible : depuis l'assistant elle peut être un autre
+                planning que celui affiché à l'écran. */}
             <DialogDescription>
-              Cette période est <strong>publiée</strong>. La régénérer va l’écraser :
+              Le planning{' '}
+              <strong>
+                {periodes.find((p) => p.id === cible)?.libelle ?? 'ciblé'}
+              </strong>{' '}
+              est <strong>publié</strong>. Le régénérer va l’écraser :
             </DialogDescription>
           </DialogHeader>
           <ul className="text-sm text-muted-foreground space-y-1.5 list-disc pl-5">
@@ -436,8 +477,8 @@ export function useOutilsPlanning({
               Annuler
             </Button>
             <Button
-              onClick={() => lancerGeneration(true)}
-              disabled={generating}
+              onClick={() => { if (cible) void lancerGeneration(cible, true) }}
+              disabled={generating || !cible}
             >
               {generating ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />

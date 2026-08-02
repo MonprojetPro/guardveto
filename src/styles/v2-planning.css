@@ -961,3 +961,131 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 }
 .gf-card.souple .gf-title { color: var(--warn); }
 .gf-card.dure .gf-title { color: var(--danger); }
+
+/* ============================================================
+   L'ASSISTANT DE GÉNÉRATION (`components/v2/AssistantGeneration.tsx`)
+   ------------------------------------------------------------
+   Le bouton « Générer » pose d'abord la question : nouveau planning, ou
+   on en refait un existant. Deux cartes, puis un formulaire court.
+
+   ⚠️ Rappel du piège maison : à l'intérieur d'une modale, `--muted`,
+   `--border` et `--accent` appartiennent à shadcn. Les couleurs du terrier
+   s'écrivent `--t-muted`, `--t-border`, `--t-accent`.
+   ============================================================ */
+
+.gen-choix { display: grid; gap: 10px; }
+
+.gen-carte {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 12px; row-gap: 2px;
+  text-align: left;
+  padding: 14px 16px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+}
+.gen-carte:hover:not(:disabled) {
+  border-color: var(--accent-ink);
+  background: var(--surface-2);
+}
+.gen-carte:active:not(:disabled) { transform: translateY(1px); }
+.gen-carte:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.gen-carte-ico {
+  grid-row: 1 / 3;
+  width: 22px; height: 22px;
+  color: var(--accent-ink);
+  align-self: center;
+}
+.gen-carte-titre {
+  font-family: var(--font-display);
+  font-size: 0.98rem; font-weight: 700; color: var(--text);
+}
+.gen-carte-sous { font-size: 0.8rem; line-height: 1.45; color: var(--soft); }
+
+/* -- Le formulaire du nouveau planning -- */
+.gen-form { display: grid; gap: 14px; }
+.gen-champ { display: grid; gap: 5px; }
+.gen-label {
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--soft);
+}
+.gen-label em { font-style: normal; color: var(--accent-ink); }
+
+.gen-input {
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9rem;
+  width: 100%;
+}
+.gen-input:focus {
+  outline: none;
+  border-color: var(--accent-ink);
+  box-shadow: 0 0 0 3px var(--accent-soft, rgba(140, 92, 46, 0.16));
+}
+.gen-input-nb { width: 88px; text-align: center; font-variant-numeric: tabular-nums; }
+
+.gen-duree { display: flex; align-items: center; gap: 9px; }
+.gen-unite { font-size: 0.88rem; color: var(--text); }
+
+.gen-aide { font-size: 0.78rem; line-height: 1.5; color: var(--soft); }
+.gen-aide b { color: var(--text); font-weight: 700; }
+.gen-aide.alerte { color: var(--warn); font-weight: 600; }
+
+/* Le repli « date de fin précise » : un lien discret, pas un réglage de plus
+   posé à l'écran en permanence. */
+.gen-lien {
+  justify-self: start;
+  font-size: 0.78rem; font-weight: 600;
+  color: var(--accent-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  background: none; border: none; padding: 0; cursor: pointer;
+}
+.gen-lien:hover { opacity: 0.75; }
+
+.gen-erreur {
+  font-size: 0.83rem; line-height: 1.5;
+  background: var(--danger-soft);
+  border: 1px solid rgba(168, 52, 31, 0.35);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  color: var(--danger);
+}
+
+/* -- La liste des plannings existants -- */
+.gen-liste { display: grid; gap: 7px; max-height: 46vh; overflow-y: auto; }
+.gen-ligne {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 10px;
+  align-items: center;
+  text-align: left;
+  padding: 11px 13px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.gen-ligne:hover { background: var(--surface-2); }
+.gen-ligne.active {
+  border-color: var(--accent-ink);
+  box-shadow: inset 0 0 0 1px var(--accent-ink);
+}
+.gen-ligne-nom {
+  font-family: var(--font-display);
+  font-size: 0.92rem; font-weight: 700; color: var(--text);
+}
+.gen-ligne-dates {
+  grid-column: 1; font-size: 0.76rem; color: var(--soft);
+}
+.gen-ligne .gm-badge { grid-column: 2; grid-row: 1 / 3; }

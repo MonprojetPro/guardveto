@@ -11,7 +11,7 @@
 // Ce qui est RÉUTILISÉ tel quel (les règles métier) : `calculerBilans` pour
 // les écarts — le MÊME calcul que le bilan officiel de fin de période, sinon
 // une carte dirait « +2 » là où le bilan dit « +1 » ; et les composants
-// `BonusMalusCard`, `HistoriqueFetesCard`, `CreerPeriodeDialog`,
+// `BonusMalusCard`, `HistoriqueFetesCard`,
 // `EffectifPeriodeSelect`, `ProfilPeriodeSelect`, `SupprimerPeriodeButton`,
 // greffés tels quels : ils écrivent en base et portent leurs garde-fous.
 //
@@ -21,6 +21,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import Link from 'next/link'
 import type { Periode } from '@/types'
 import type { CompteursRow, DepannagesRow } from '@/hooks/useCompteurs'
 import type { BilanVet } from '@/engine/bilan'
@@ -79,7 +80,6 @@ interface Props {
   /** Composants V1 greffés, rendus côté serveur par la page. */
   slotBilan?: React.ReactNode
   slotFetes?: React.ReactNode
-  slotCreerPeriode?: React.ReactNode
   slotsReglagesPeriode?: Record<string, React.ReactNode>
   slotsSupprimerPeriode?: Record<string, React.ReactNode>
 }
@@ -161,7 +161,6 @@ export function HistoriqueV2({
   cumulResume,
   slotBilan,
   slotFetes,
-  slotCreerPeriode,
   slotsReglagesPeriode,
   slotsSupprimerPeriode,
 }: Props) {
@@ -197,7 +196,16 @@ export function HistoriqueV2({
             précédente.
           </p>
         </div>
-        {estAdmin && slotCreerPeriode && <div className="page-actions">{slotCreerPeriode}</div>}
+        {/* La création d'un planning a quitté cet écran (2026-08-02) : elle est
+            devenue la première étape de « Générer », là où on le regarde.
+            Historique CONSULTE. On laisse le chemin, pas un cul-de-sac. */}
+        {estAdmin && (
+          <div className="page-actions">
+            <Link href="/planning" className="hist-vers-planning">
+              Créer un planning →
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* ── Filtres ──────────────────────────────────────────────────── */}

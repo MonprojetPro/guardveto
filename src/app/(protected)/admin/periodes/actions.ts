@@ -6,14 +6,30 @@ import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
- * Rafraîchit le seul écran qui liste les périodes : « Historique & compteurs ».
+ * Rafraîchit TOUS les écrans qui lisent la table `periodes`.
  *
- * Le doublon V1 `/admin/periodes` a été supprimé — deux écrans complets pour
- * un seul sujet, et le planning V2 renvoyait vers le mauvais. Ce fichier
- * d'actions, lui, reste : il sert `/historique` ET les outils de Filou.
+ * Longtemps limité à `/historique`, le seul qui les listait. Depuis que la
+ * création d'un planning se fait depuis « Générer » (2026-08-02), l'inventaire
+ * des lecteurs a été refait :
+ *
+ *   • `/planning`  — la pilule de période ET l'assistant de génération.
+ *                    Couvert aussi par `RealtimeRefresh` (il écoute `periodes`),
+ *                    mais on ne s'en remet pas au seul Realtime : il ne tourne
+ *                    que sur l'écran ouvert.
+ *   • `/historique` — la liste des plannings et leurs réglages.
+ *   • `/accueil`    — l'épicentre (`data/v2/accueilEpicentre.ts`) y lit la
+ *                    période courante ; sans ça il restait figé sur l'ancienne.
+ *   • `/regles`     — `data/optionsRegles.ts` propose les périodes quand on
+ *                    limite une règle à l'une d'elles.
+ *
+ * Le dock de la barre V2 (`data/v2/dock.ts`) lit lui aussi les périodes, mais
+ * il est rendu à l'intérieur de ces routes : les revalider le couvre.
  */
 function revaliderPeriodes() {
   revalidatePath('/historique')
+  revalidatePath('/planning')
+  revalidatePath('/accueil')
+  revalidatePath('/regles')
 }
 
 // ── Garde admin (même pattern que /regles et /admin/structure) ──
@@ -60,6 +76,14 @@ export async function creerPeriode(formData: FormData) {
   const jour = new Date(dateDebut + 'T12:00:00Z').getUTCDay()
   if (jour !== 1) {
     return { error: 'La date de début doit être un lundi.' }
+  }
+
+  // Un planning qui finit avant de commencer passait jusqu'ici sans un mot :
+  // le test de chevauchement ci-dessous (date_debut <= dateFin ET date_fin >=
+  // dateDebut) ne peut PAS l'attraper, la fenêtre étant vide. On repartait donc
+  // avec une période inerte que le moteur remplissait de zéro garde.
+  if (dateFin < dateDebut) {
+    return { error: 'La date de fin doit venir après la date de début.' }
   }
 
   // Vérification : chevauchement avec une période existante
@@ -115,21 +139,28 @@ export async function creerPeriode(formData: FormData) {
     profilId = (parSaison as { id: string } | null)?.id ?? null
   }
 
-  const { error } = await supabase.from('periodes').insert({
-    cabinet_id: cabinetId,
-    saison,
-    numero:     null,
-    libelle,
-    date_debut: dateDebut,
-    date_fin:   dateFin,
-    statut:     'brouillon',
-    profil_id:  profilId,
-  })
+  // `select('id')` : l'assistant de l'écran Planning enchaîne la génération sur
+  // le planning qu'il vient de créer — sans cet id il devrait le retrouver à
+  // tâtons par ses dates, et générerait le mauvais en cas d'homonyme.
+  const { data: creee, error } = await supabase
+    .from('periodes')
+    .insert({
+      cabinet_id: cabinetId,
+      saison,
+      numero:     null,
+      libelle,
+      date_debut: dateDebut,
+      date_fin:   dateFin,
+      statut:     'brouillon',
+      profil_id:  profilId,
+    })
+    .select('id')
+    .single()
 
   if (error) return { error: error.message }
 
   revaliderPeriodes()
-  return { success: true }
+  return { success: true, id: (creee as { id: string }).id }
 }
 
 /**
