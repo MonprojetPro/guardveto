@@ -78,39 +78,61 @@ const COLONNES_REGLES =
   'id, cabinet_id, periode_id, brique_id, params_json, force, validite_json, version, actif'
 
 /**
- * La période sur laquelle simuler : celle qui court aujourd'hui, sinon la
- * prochaine à venir, sinon la plus récente. On ne prend pas les périodes
- * VERROUILLÉES : leur planning est figé, une règle nouvelle ne les concernera
- * jamais — les compter fabriquerait des avertissements sans objet.
+ * La période sur laquelle simuler.
+ *
+ * ORDRE DE PRÉFÉRENCE — et il n'est pas arbitraire : une règle qu'on écrit
+ * aujourd'hui s'appliquera à la PROCHAINE génération. On cherche donc d'abord
+ * un planning pas encore publié (c'est lui qui subira la règle), puis la
+ * période en cours, puis la plus récente comme terrain d'essai par défaut.
+ *
+ * Les périodes VERROUILLÉES sont exclues : leur planning est figé, une règle
+ * nouvelle ne les concernera jamais — les compter fabriquerait des
+ * avertissements sans objet. (Et `resoudreContexte` refuse de les charger.)
+ *
+ * ⚠️ La colonne du nom lisible est `libelle`, PAS `nom`. Demander une colonne
+ *    inexistante ne lève pas d'exception côté client Supabase : la requête
+ *    renvoie `data: null` et une `error`. Ignorer cette `error` — ce que faisait
+ *    la première version — se traduisait par « aucune période », donc par un
+ *    gardien MUET. C'est le bug du 2026-08-02 : Filou ne disait rien, et rien
+ *    ne disait qu'il ne disait rien.
  */
 async function periodeDeReference(
   supabase: SupabaseClient<any, any, any>,
   cabinetId: string,
 ): Promise<{ id: string; label: string } | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('periodes')
-    .select('id, nom, date_debut, date_fin, statut')
+    .select('id, libelle, date_debut, date_fin, statut')
     .eq('cabinet_id', cabinetId)
     .neq('statut', 'verrouille')
     .order('date_debut', { ascending: false })
+
+  // Une lecture EN ÉCHEC n'est pas une absence de période : on le fait remonter
+  // comme une panne (le `catch` de l'appelant l'habille en `diagnostic`).
+  if (error) throw new Error(`lecture des périodes impossible : ${error.message}`)
+
   const rows = (data ?? []) as Array<{
-    id: string; nom: string | null; date_debut: string; date_fin: string
+    id: string; libelle: string | null; date_debut: string; date_fin: string; statut: string
   }>
   if (rows.length === 0) return null
 
-  const label = (r: { id: string; nom: string | null }) => ({
+  const label = (r: { id: string; libelle: string | null }) => ({
     id: r.id,
-    label: r.nom ?? 'la période en cours',
+    label: r.libelle ?? 'la période en cours',
   })
 
   const aujourdhui = new Date().toISOString().slice(0, 10)
+
+  // 1. Un planning pas encore publié : c'est lui que la règle touchera.
+  //    `rows` est trié du plus récent au plus ancien → le PLUS PROCHE est le
+  //    dernier de la liste filtrée.
+  const aGenerer = rows.filter((r) => r.statut !== 'publie' && r.date_fin >= aujourdhui)
+  if (aGenerer.length > 0) return label(aGenerer[aGenerer.length - 1])
+
+  // 2. Sinon la période en cours (elle a un planning, mais le contrôle porte
+  //    sur la FAISABILITÉ des règles, pas sur le planning déjà produit).
   const enCours = rows.find((r) => r.date_debut <= aujourdhui && aujourdhui <= r.date_fin)
   if (enCours) return label(enCours)
-
-  // `rows` est trié du plus récent au plus ancien : la prochaine à venir est
-  // donc la DERNIÈRE de celles qui commencent après aujourd'hui.
-  const aVenir = rows.filter((r) => r.date_debut > aujourdhui)
-  if (aVenir.length > 0) return label(aVenir[aVenir.length - 1])
 
   return label(rows[0])
 }
@@ -135,34 +157,45 @@ export async function verifierRegleCandidate(
   cabinetId: string,
   rowCandidate: RegleCabinetRow,
 ): Promise<VerdictGardien> {
-  const periode = await periodeDeReference(supabase, cabinetId)
-  if (!periode) return { verifie: false, avertissements: [] }
-
   try {
+    // DANS le try : une lecture en échec doit ressortir comme une panne
+    // annoncée, pas comme un « aucune période » silencieux.
+    const periode = await periodeDeReference(supabase, cabinetId)
+    if (!periode) return { verifie: false, avertissements: [] }
+
     const contexte = await resoudreContexte(periode.id, cabinetId)
 
     // Les règles telles qu'elles sont en base — mêmes colonnes, même filtre
     // « permanente OU de cette période » que le loader du moteur. Un filtre
     // différent ici comparerait deux mondes, et le delta ne voudrait rien dire.
-    const { data: reglesDb } = await supabase
+    // ⚠️ Chaque `error` est levée, jamais avalée. Une requête qui échoue et
+    //    qu'on traite comme « zéro ligne » fabrique un monde simulé FAUX : le
+    //    delta serait calculé contre un cabinet sans règles, et le gardien
+    //    dirait n'importe quoi — ou plus vraisemblablement se tairait.
+    const { data: reglesDb, error: errRegles } = await supabase
       .from('regles_cabinet')
       .select(COLONNES_REGLES)
       .eq('cabinet_id', cabinetId)
       .or(`periode_id.is.null,periode_id.eq.${periode.id}`)
       .order('id')
+    if (errRegles) throw new Error(`lecture des règles impossible : ${errRegles.message}`)
     const rows = ((reglesDb ?? []) as RegleCabinetRow[]).filter((r) => r.actif)
 
-    const { data: briquesDb } = await supabase.from('briques_regles').select('id')
+    const { data: briquesDb, error: errBriques } = await supabase
+      .from('briques_regles')
+      .select('id')
+    if (errBriques) throw new Error(`lecture du catalogue impossible : ${errBriques.message}`)
     const briquesConnues = new Set(
       ((briquesDb ?? []) as Array<{ id: string }>).map((b) => b.id),
     )
 
     // L'annuaire COMPLET (actifs + sortis) : c'est ce qui permet au pré-vol de
     // nommer un véto qui n'est plus dans l'effectif au lieu d'afficher un UUID.
-    const { data: vetsDb } = await supabase
+    const { data: vetsDb, error: errVets } = await supabase
       .from('veterinaires')
       .select('id, prenom, nom, actif')
       .eq('cabinet_id', cabinetId)
+    if (errVets) throw new Error(`lecture de l'équipe impossible : ${errVets.message}`)
     const annuaire = (vetsDb ?? []) as VetAnnuaire[]
 
     // En ÉDITION, la candidate remplace la version enregistrée : sans ce

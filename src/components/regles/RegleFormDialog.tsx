@@ -38,6 +38,7 @@ import { upsertRegle, verifierRegle } from '@/app/(protected)/regles/actions'
 import type { BriqueEvaluable, ForceFormulaire } from '@/lib/regles/paramsRegle'
 import type { VerdictGardien } from '@/data/verifierRegleCandidate'
 import { GardienFilou } from '@/components/v2/regles/GardienFilou'
+import { useErreurBloquante } from '@/components/v2/regles/ErreurBloquante'
 import type { RegleRow, VetoMini, PeriodeOption, TypeCreneauOption } from './ReglesClient'
 
 /** Valeur sentinelle du sélecteur de validité = règle permanente (periode_id null). */
@@ -183,6 +184,13 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
     verdict: VerdictGardien
     payload: Parameters<typeof upsertRegle>[0]
   } | null>(null)
+
+  // Les refus de saisie s'affichent en MODALE, plus en vignette de bas d'écran.
+  // MiKL, 2026-08-02 : « on a dit qu'on arrêtait avec ces petites modales
+  // pourries en bas de page ». Ce formulaire en avait vingt-et-une — il était
+  // resté à l'écart de la bascule du 1er août parce qu'il vit hors du dossier
+  // des onglets V2, alors qu'il s'ouvre depuis les mêmes écrans.
+  const { ouvrirErreur, dialogueErreur } = useErreurBloquante()
 
   const pj = (regle?.params_json ?? {}) as {
     qui?: { refs?: unknown }
@@ -409,59 +417,59 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
   }, [briqueId, ownerId, jour, exVac, siWe, sinon, semaines, periodes, avecId, n, fenetre, creneauxFiltre, ecartMin, nSemaines, joursPref, sens, typeAvant, typeApres, nJoursSerie, nJoursRepos, reposJours, nSemainesCadence, ancre, sensCadence, formeExclusion, dateExcl1, dateExcl2, vets])
 
   const handleSubmit = () => {
-    if (!ownerId) { toast.error('Sélectionnez le vétérinaire concerné.'); return }
+    if (!ownerId) { ouvrirErreur('Sélectionnez le vétérinaire concerné.'); return }
     if (briqueId === 'alternance_ancre' && periodes.length === 0) {
-      toast.error('Sélectionnez au moins une période.'); return
+      ouvrirErreur('Sélectionnez au moins une période.'); return
     }
     if (briqueId === 'duo_interdit') {
-      if (!avecId) { toast.error('Sélectionnez le second vétérinaire.'); return }
-      if (avecId === ownerId) { toast.error('Choisissez deux vétérinaires différents.'); return }
+      if (!avecId) { ouvrirErreur('Sélectionnez le second vétérinaire.'); return }
+      if (avecId === ownerId) { ouvrirErreur('Choisissez deux vétérinaires différents.'); return }
     }
     if (briqueId === 'au_plus_n') {
       const v = Number(n)
-      if (!Number.isInteger(v) || v < 1) { toast.error('Indiquez un nombre de gardes valide (≥ 1).'); return }
+      if (!Number.isInteger(v) || v < 1) { ouvrirErreur('Indiquez un nombre de gardes valide (≥ 1).'); return }
     }
     if (briqueId === 'espacement_min') {
       const v = Number(ecartMin)
-      if (!Number.isInteger(v) || v < 1) { toast.error('Indiquez un écart valide (≥ 1 jour).'); return }
+      if (!Number.isInteger(v) || v < 1) { ouvrirErreur('Indiquez un écart valide (≥ 1 jour).'); return }
     }
     if (briqueId === 'espacement_weekend') {
       const v = Number(nSemaines)
-      if (!Number.isInteger(v) || v < 2) { toast.error('Indiquez une fréquence valide (un week-end sur 2 minimum).'); return }
+      if (!Number.isInteger(v) || v < 2) { ouvrirErreur('Indiquez une fréquence valide (un week-end sur 2 minimum).'); return }
     }
     if (briqueId === 'preferer_creneau' && joursPref.length === 0 && creneauxFiltre.length === 0) {
-      toast.error('Sélectionnez au moins un jour ou un type de créneau préféré.'); return
+      ouvrirErreur('Sélectionnez au moins un jour ou un type de créneau préféré.'); return
     }
     if (briqueId === 'preferer_avec') {
-      if (!avecId) { toast.error('Sélectionnez le co-équipier préféré.'); return }
-      if (avecId === ownerId) { toast.error('Choisissez deux vétérinaires différents.'); return }
+      if (!avecId) { ouvrirErreur('Sélectionnez le co-équipier préféré.'); return }
+      if (avecId === ownerId) { ouvrirErreur('Choisissez deux vétérinaires différents.'); return }
     }
     if (briqueId === 'seulement_avec') {
-      if (!avecId) { toast.error('Sélectionnez le binôme requis.'); return }
-      if (avecId === ownerId) { toast.error('Choisissez deux vétérinaires différents.'); return }
+      if (!avecId) { ouvrirErreur('Sélectionnez le binôme requis.'); return }
+      if (avecId === ownerId) { ouvrirErreur('Choisissez deux vétérinaires différents.'); return }
     }
     if (briqueId === 'succession_interdite') {
-      if (!typeAvant || !typeApres) { toast.error('Choisissez les deux créneaux.'); return }
+      if (!typeAvant || !typeApres) { ouvrirErreur('Choisissez les deux créneaux.'); return }
     }
     if (briqueId === 'serie_max') {
       const v = Number(nJoursSerie)
-      if (!Number.isInteger(v) || v < 1) { toast.error('Indiquez un nombre de jours valide (≥ 1).'); return }
+      if (!Number.isInteger(v) || v < 1) { ouvrirErreur('Indiquez un nombre de jours valide (≥ 1).'); return }
     }
     if (briqueId === 'repos_apres_serie') {
       const a = Number(nJoursRepos), b = Number(reposJours)
-      if (!Number.isInteger(a) || a < 1) { toast.error('Indiquez une longueur de série valide (≥ 1).'); return }
-      if (!Number.isInteger(b) || b < 1) { toast.error('Indiquez un nombre de jours de repos valide (≥ 1).'); return }
+      if (!Number.isInteger(a) || a < 1) { ouvrirErreur('Indiquez une longueur de série valide (≥ 1).'); return }
+      if (!Number.isInteger(b) || b < 1) { ouvrirErreur('Indiquez un nombre de jours de repos valide (≥ 1).'); return }
     }
     if (briqueId === 'cadencement_weekend') {
       const v = Number(nSemainesCadence)
-      if (!Number.isInteger(v) || v < 2) { toast.error('Indiquez un cycle valide (un week-end sur 2 minimum).'); return }
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(ancre)) { toast.error('Choisissez la date de départ du cycle.'); return }
+      if (!Number.isInteger(v) || v < 2) { ouvrirErreur('Indiquez un cycle valide (un week-end sur 2 minimum).'); return }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(ancre)) { ouvrirErreur('Choisissez la date de départ du cycle.'); return }
     }
     if (briqueId === 'exclusion_dates' && formeExclusion === 'dates') {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(dateExcl1) || !/^\d{4}-\d{2}-\d{2}$/.test(dateExcl2)) {
-        toast.error('Choisissez les deux dates.'); return
+        ouvrirErreur('Choisissez les deux dates.'); return
       }
-      if (dateExcl1 === dateExcl2) { toast.error('Choisissez deux dates différentes.'); return }
+      if (dateExcl1 === dateExcl2) { ouvrirErreur('Choisissez deux dates différentes.'); return }
     }
 
     // Le payload est bâti UNE fois : le gardien doit examiner exactement ce qui
@@ -528,7 +536,7 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
   /** L'écriture — rejouée telle quelle si l'admin passe outre l'avertissement. */
   const ecrire = async (aEcrire: Parameters<typeof upsertRegle>[0]) => {
     const res = await upsertRegle(aEcrire)
-    if (res?.error) { toast.error(res.error); return }
+    if (res?.error) { ouvrirErreur(res.error); return }
     toast.success(isEdit ? 'Règle modifiée.' : 'Règle créée.')
     setGardien(null)
     onClose()
@@ -1183,6 +1191,8 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
           toast.info('Fermeté ramenée à « sauf urgence ». Revalide quand tu veux.')
         }}
       />
+
+      {dialogueErreur}
     </>
   )
 }
