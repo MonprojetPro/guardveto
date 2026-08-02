@@ -85,7 +85,17 @@ const COULEURS = [
   { hex: '#8A5A3C', nom: 'Terre de Sienne' },
 ]
 
-/** Étiquettes proposées d'office — la saisie libre reste possible. */
+/**
+ * Étiquettes proposées d'office, même quand personne ne les porte encore : ce
+ * sont celles que les exemples de l'écran Règles citent en toutes lettres
+ * (« un junior jamais seul », « au moins un senior par week-end »). Elles
+ * amorcent la pompe sur un cabinet qui n'a rien étiqueté.
+ *
+ * ⚠️ Ce n'est PAS le référentiel des étiquettes : celui-ci se déduit de ce que
+ *    l'équipe porte réellement (cf. `tagsProposes`). Les traiter comme un
+ *    référentiel a produit un bug — une étiquette hors de cette liste
+ *    disparaissait du choix dès qu'on la décochait, sans moyen de la recocher.
+ */
 const TAGS_PRESETS = ['junior', 'senior']
 
 const LIBELLE_TYPE_GARDE: Record<string, string> = {
@@ -200,6 +210,37 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
     for (const v of vets) par.set(v.id, reglesDuVeto(regles, v.id).filter((r) => r.actif).length)
     return par
   }, [regles, vets])
+
+  /**
+   * Les étiquettes que le sélecteur propose : les deux d'office, TOUTES celles
+   * que l'équipe porte déjà, celles tapées à la volée dans cette session, et
+   * celles de la fiche en cours.
+   *
+   * Les deux dernières sources ne sont pas du zèle : sans « tapées à la
+   * volée », une étiquette qu'on vient d'écrire disparaîtrait si on la décoche
+   * avant d'enregistrer ; sans « celles de l'équipe », une étiquette posée
+   * depuis l'écran Règles (`poserEtiquetteSurVetos`) s'effaçait du choix au
+   * premier décochage — c'est exactement ce que MiKL a constaté avec
+   * « veteran » sur la fiche de Victor, le 2026-08-02.
+   *
+   * Dédoublonnage sur la forme minuscule : la base peut contenir « Senior »
+   * et « senior », qui sont la même étiquette pour le moteur.
+   */
+  const [tagsSession, setTagsSession] = useState<string[]>([])
+
+  const tagsProposes = useMemo(() => {
+    const vus = new Map<string, string>()
+    for (const t of [
+      ...TAGS_PRESETS,
+      ...vets.flatMap((v) => v.tags ?? []),
+      ...tagsSession,
+      ...form.tags,
+    ]) {
+      const cle = t.trim().toLowerCase()
+      if (cle !== '' && !vus.has(cle)) vus.set(cle, t)
+    }
+    return [...vus.values()]
+  }, [vets, tagsSession, form.tags])
 
   /** Les vétos tels que les attend le formulaire de règle (forme partagée). */
   const vetsMini: VetoMini[] = useMemo(
@@ -333,17 +374,32 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
   }
 
   // ── Étiquettes ──────────────────────────────────────────────────────────
+
+  /** « Senior » et « senior » sont la même étiquette pour le moteur : toute
+   *  comparaison passe donc par la forme minuscule, jamais par l'égalité
+   *  stricte — sinon une pastille se montrerait décochée alors que la fiche
+   *  porte bien l'étiquette, dans une autre casse. */
+  const memeTag = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+
+  const porte = (tag: string) => form.tags.some((t) => memeTag(t, tag))
+
   const basculerTag = (tag: string) => {
     setForm((f) => ({
       ...f,
-      tags: f.tags.includes(tag) ? f.tags.filter((t) => t !== tag) : [...f.tags, tag],
+      tags: f.tags.some((t) => memeTag(t, tag))
+        ? f.tags.filter((t) => !memeTag(t, tag))
+        : [...f.tags, tag],
     }))
   }
 
   const ajouterTagLibre = () => {
     const t = tagLibre.trim().toLowerCase()
     setTagLibre('')
-    if (t === '' || form.tags.includes(t)) return
+    if (t === '') return
+    // Mémorisée pour la session : décocher une étiquette qu'on vient d'écrire
+    // ne doit pas la faire disparaître du choix — sinon il faut la retaper.
+    setTagsSession((s) => (s.some((x) => memeTag(x, t)) ? s : [...s, t]))
+    if (porte(t)) return
     setForm((f) => ({ ...f, tags: [...f.tags, t] }))
   }
 
@@ -494,12 +550,12 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
             <div className="field" style={{ gridColumn: '1 / -1' }}>
               <label>Étiquettes d&apos;équipe</label>
               <div className="tag-picker">
-                {[...new Set([...TAGS_PRESETS, ...form.tags])].map((tag) => (
+                {tagsProposes.map((tag) => (
                   <button
                     key={tag}
                     type="button"
                     className="tag-pick"
-                    aria-pressed={form.tags.includes(tag)}
+                    aria-pressed={porte(tag)}
                     onClick={() => basculerTag(tag)}
                   >
                     {tag}
