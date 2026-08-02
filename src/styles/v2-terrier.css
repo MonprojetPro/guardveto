@@ -2327,3 +2327,98 @@
   background: var(--text);
   fill: var(--text);
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FILOU GARDIEN — déplacé ici depuis `v2-regles.css` le 2026-08-02.
+   La fenêtre s'ouvre depuis DEUX écrans : « Organisation » (nouvelle règle) et
+   « Équipe » (les contraintes d'un véto, via `RegleFormDialog`). Or
+   `v2-regles.css` n'est chargé que par `/regles` : laissée là-bas, la fenêtre
+   se serait affichée nue sur la fiche d'un vétérinaire. Une feuille se choisit
+   sur la portée du COMPOSANT, pas sur l'écran où on l'a écrit.
+   ═══════════════════════════════════════════════════════════════════════════ */
+/* ── Filou gardien (`GardienFilou`) ─────────────────────────────────────────
+   La fenêtre qui s'ouvre quand une règle qu'on vient de saisir casse quelque
+   chose. Ce N'EST PAS un refus : le moteur a trouvé, Filou le dit, et l'admin
+   garde le dernier mot. D'où un traitement volontairement PLUS DOUX que celui
+   de `.gv-modale-erreur` — pas de triangle rouge, pas de rouge du tout : c'est
+   la binette de Filou qui ouvre, comme quand il parle depuis son rebord. */
+.gv-gardien [data-slot='dialog-title'] {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gv-gardien-binette {
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* Ce que le moteur a trouvé. Chaque point est un ENCART : trois constats à la
+   suite, en simple paragraphe, se lisent comme un seul pavé — et on ne sait
+   plus si on a un problème ou trois. */
+.gv-gardien-liste {
+  display: grid;
+  gap: 9px;
+  margin: 2px 0 4px;
+  padding: 0;
+  list-style: none;
+}
+
+.gv-gardien-liste > li {
+  padding: 11px 13px;
+  background: var(--surface-2);
+  border: 1px solid var(--t-border);
+  border-left: 3px solid var(--danger);
+  border-radius: var(--r-md);
+}
+
+.gv-gardien-quoi {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+/* Les règles en cause, et le détail d'une correction : secondaires, mais
+   jamais absents — « ça coince » sans dire À CAUSE DE QUOI oblige à fermer la
+   fenêtre pour aller chercher. */
+.gv-gardien-regles {
+  margin-top: 4px;
+  font-size: 0.79rem;
+  line-height: 1.5;
+  color: var(--t-muted);
+}
+
+.gv-gardien-titre {
+  margin: 6px 0 2px;
+  font-size: 0.79rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--t-muted);
+}
+
+.gv-gardien-corrections {
+  display: grid;
+  gap: 8px;
+}
+
+/* Une correction = ce qu'elle fait, et le bouton qui la fait. Les corrections
+   que l'écran ne sait PAS appliquer restent affichées sans bouton : dire quoi
+   faire vaut mieux que taire ce qu'on ne sait pas automatiser. */
+.gv-gardien-correction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 13px;
+  background: var(--surface-2);
+  border: 1px solid var(--t-border);
+  border-left: 3px solid var(--t-accent);
+  border-radius: var(--r-md);
+}
+
+.gv-gardien-correction .btn {
+  flex: none;
+}

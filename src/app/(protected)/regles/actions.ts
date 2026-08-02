@@ -26,6 +26,23 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { EQUITY_DIMENSIONS, IMPORTANCE_LEVELS } from '@/engine/equity-weights'
 import { construireValiditeJson } from '@/lib/periodes'
 import { chargerCreneauModele } from '@/data/chargerCreneauModele'
+import {
+  BRIQUES_EVALUABLES, BRIQUES_DESIDERATA, FORCES_VALIDES,
+  CODES_CRENEAUX_HISTORIQUES,
+  construireParams, envelopper, lireOwner, lirePartenaire,
+  type BriqueEvaluable, type ForceFormulaire, type UpsertReglePayload,
+} from '@/lib/regles/paramsRegle'
+
+// Les écrans importent ces trois types DEPUIS CE FICHIER depuis toujours (le
+// formulaire, l'assistant IA, les panneaux). On les réexporte plutôt que de
+// réécrire une douzaine d'imports : un `export type` est effacé à la
+// compilation, il ne viole donc pas la règle « un fichier 'use server'
+// n'exporte que des fonctions async ».
+export type { BriqueEvaluable, ForceFormulaire, UpsertReglePayload }
+
+import { verifierRegleCandidate, type VerdictGardien } from '@/data/verifierRegleCandidate'
+import type { RegleCabinetRow } from '@/data/mapReglesCabinet'
+export type { VerdictGardien }
 import { chargerContexteIA } from '@/lib/ia/contexteCabinet'
 import { proposerRegleIA, assistantIaDisponible, type TypeCreneauIA } from '@/lib/ia/proposerRegle'
 import {
@@ -647,6 +664,173 @@ export async function upsertCompositionRegle(payload: CompositionReglePayload) {
   return { success: true }
 }
 
+// ── Le gardien : « cette règle tient-elle avec les autres ? » ────────────
+//
+// Rappel du principe du projet : le MOTEUR décide, Filou n'est que le porte-
+// parole. Ce contrôle est donc du calcul (`data/verifierRegleCandidate.ts`),
+// pas un appel d'IA — instantané, gratuit, et incapable d'inventer une
+// incohérence qui n'existerait pas.
+//
+// ⚠️ Il ne REMPLACE aucune validation d'écriture. Les actions ci-dessus gardent
+//    tous leurs refus (étiquette sans porteur, doublon, anti-impasse) : ce sont
+//    des refus, ils bloquent. Le gardien, lui, AVERTIT — l'admin garde le
+//    dernier mot, parce qu'une règle « intenable » sur la période testée peut
+//    être exactement ce qu'il veut poser pour la suivante.
+
+/** La règle en cours de saisie, dans l'une de ses quatre formes. */
+export type CandidatRegle =
+  | { genre: 'nominative'; payload: UpsertReglePayload }
+  | { genre: 'composition'; payload: CompositionReglePayload }
+  | { genre: 'role_interdit'; payload: RoleInterditReglePayload }
+  | { genre: 'cohorte'; payload: { dimension: string; tag: string; importance: string } }
+
+/** Id de la règle simulée. En création, un id qui n'existe nulle part —
+ *  la simulation ne doit jamais entrer en collision avec une règle réelle. */
+const ID_CANDIDATE = '00000000-0000-0000-0000-0000000c0de0'
+
+/**
+ * Vérifie une règle AVANT de l'écrire : renvoie ce que cette règle-là casserait,
+ * et rien d'autre (le pré-vol tourne avec et sans elle, on ne garde que la
+ * différence). Ne modifie rien.
+ *
+ * Réservée à l'admin, comme les écritures qu'elle précède : un véto en lecture
+ * seule n'a aucune règle à valider.
+ */
+export async function verifierRegle(candidat: CandidatRegle): Promise<VerdictGardien> {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return { verifie: false, avertissements: [] }
+
+  let cabinetId: string
+  try {
+    cabinetId = await resoudreCabinetId(supabase)
+  } catch {
+    return { verifie: false, avertissements: [] }
+  }
+
+  const rows = await construireRowsCandidates(supabase, cabinetId, candidat)
+  if (rows.length === 0) return { verifie: false, avertissements: [] }
+
+  // Un duo interdit s'écrit en DEUX lignes symétriques (A→B et B→A) : le solver
+  // a besoin des deux sens. On simule donc les deux, sinon le gardien jugerait
+  // une moitié de règle. Le module de vérification n'en prend qu'une comme
+  // « candidate » (pour le remplacement en édition) ; les autres sont fusionnées
+  // dans le monde simulé par le même chemin.
+  let verdict = await verifierRegleCandidate(supabase, cabinetId, rows[0])
+  for (const suivante of rows.slice(1)) {
+    const v = await verifierRegleCandidate(supabase, cabinetId, suivante)
+    if (!v.verifie) continue
+    const connus = new Set(verdict.avertissements.map((a) => `${a.code}::${a.message}`))
+    verdict = {
+      ...verdict,
+      verifie: verdict.verifie || v.verifie,
+      avertissements: [
+        ...verdict.avertissements,
+        ...v.avertissements.filter((a) => !connus.has(`${a.code}::${a.message}`)),
+      ],
+    }
+  }
+  return verdict
+}
+
+/**
+ * Bâtit la (ou les) ligne(s) `regles_cabinet` que l'écriture produirait.
+ *
+ * ⚠️ La forme est construite par les MÊMES fonctions que l'écriture
+ *    (`construireParams`, `envelopper`) : un gardien qui vérifierait une autre
+ *    forme que celle qui sera enregistrée ne garderait rien du tout. Une
+ *    saisie mal formée renvoie [] — l'écriture la refusera de toute façon, avec
+ *    un message précis que le gardien n'a pas à doubler.
+ */
+async function construireRowsCandidates(
+  supabase: SupabaseClient<any, any, any>,
+  cabinetId: string,
+  candidat: CandidatRegle,
+): Promise<RegleCabinetRow[]> {
+  const base = (
+    id: string,
+    brique_id: string,
+    params_json: unknown,
+    force: string,
+    periode_id: string | null = null,
+  ): RegleCabinetRow => ({
+    id, cabinet_id: cabinetId, periode_id, brique_id, params_json,
+    force, validite_json: construireValiditeJson(periode_id), actif: true,
+  })
+
+  if (candidat.genre === 'nominative') {
+    const p = candidat.payload
+    if (!p.owner_id || !(p.brique_id in BRIQUES_EVALUABLES)) return []
+    const periode_id = p.periode_id ?? null
+
+    if (p.brique_id === 'duo_interdit') {
+      const b = p.avec_veterinaire_id
+      if (!b || b === p.owner_id) return []
+      const ligne = (owner: string, partner: string, id: string) =>
+        base(
+          id, 'duo_interdit',
+          envelopper(owner, 'duo_interdit', null, { avec_veterinaire_id: partner }),
+          p.force, periode_id,
+        )
+      return [
+        ligne(p.owner_id, b, p.id ?? ID_CANDIDATE),
+        ligne(b, p.owner_id, `${p.id ?? ID_CANDIDATE}-miroir`),
+      ]
+    }
+
+    const codesCreneaux = await chargerCodesCreneauxValides(supabase, cabinetId)
+    const construit = construireParams(p, codesCreneaux)
+    if ('error' in construit) return []
+    return [
+      base(
+        p.id ?? ID_CANDIDATE, p.brique_id,
+        envelopper(p.owner_id, p.brique_id, construit.quand, construit.params),
+        p.force, periode_id,
+      ),
+    ]
+  }
+
+  if (candidat.genre === 'composition') {
+    const p = candidat.payload
+    const tag = (p.tag ?? '').trim().toLowerCase()
+    if (tag === '' || !MODES_COMPOSITION.has(p.mode)) return []
+    const creneaux = [...new Set((p.creneaux ?? []).filter((x) => x.trim() !== ''))]
+    return [
+      base(p.id ?? ID_CANDIDATE, 'composition_equipe', {
+        qui: null, quand: null,
+        params: { mode: p.mode, tag, ...(creneaux.length > 0 ? { creneaux } : {}) },
+      }, p.force),
+    ]
+  }
+
+  if (candidat.genre === 'role_interdit') {
+    const p = candidat.payload
+    const tag = (p.tag ?? '').trim().toLowerCase()
+    const role = (p.role ?? '').trim()
+    if (tag === '' || role === '') return []
+    const creneaux = [...new Set((p.creneaux ?? []).filter((x) => x.trim() !== ''))]
+    return [
+      base(p.id ?? ID_CANDIDATE, 'role_interdit_tag', {
+        qui: null, quand: null,
+        params: { tag, role, ...(creneaux.length > 0 ? { creneaux } : {}) },
+      }, p.force),
+    ]
+  }
+
+  // Cohorte d'équité : sa « force » n'est pas réglable (toujours si_possible —
+  // c'est une préférence de répartition, jamais une interdiction).
+  const p = candidat.payload
+  const tag = (p.tag ?? '').trim().toLowerCase()
+  if (tag === '' || p.importance === 'ignoree') return []
+  return [
+    base(ID_CANDIDATE, 'equilibrer', {
+      qui: null, quand: null,
+      params: { dimension: p.dimension, importance: p.importance, tag },
+    }, 'si_possible'),
+  ]
+}
+
 // ── Rôle interdit par tag (backlog n°22 — « un junior jamais 1er ») ──
 
 /** Payload du formulaire rôle interdit (règle GLOBALE avec params). */
@@ -810,139 +994,14 @@ export async function setRoleAvantageFinancier(role: string) {
 }
 
 // ── Création / édition guidée (P1A-007) ──────────────────────
-
-/** Les briques que le moteur sait réellement évaluer (mapReglesCabinet). */
-const BRIQUES_EVALUABLES = {
-  interdire_creneau: 'jour_repos_fixe',
-  repos_conditionnel: 'jour_repos_conditionnel',
-  alternance_ancre: 'indisponibilite_cyclique',
-  duo_interdit: 'duo_interdit',
-  au_plus_n: 'au_plus_n',           // limite de charge réglable
-  espacement_min: 'espacement_min', // écart minimal entre deux gardes
-  espacement_weekend: 'espacement_weekend', // fréquence WE : au plus 1 WE sur N
-  // Desiderata (n°7) — préférences positives, TOUJOURS souples (force
-  // « jamais » refusée plus bas : aucun gardien dur n'existe pour elles).
-  preferer_creneau: 'preferer_creneau',
-  preferer_avec: 'preferer_avec',
-  volume_gardes: 'volume_gardes',
-  // Successions / séries / repos avancés (Vague 5 tranche B — #13).
-  succession_interdite: 'succession_interdite',
-  serie_max: 'serie_max',
-  repos_apres_serie: 'repos_apres_serie',
-  // Cadencement « 1 WE sur N ancré » (Vague 5 tranche C — #20).
-  cadencement_weekend: 'cadencement_weekend',
-  // Exclusion de dates / XOR « pas les deux » (Vague 6 tranche B — #15a).
-  exclusion_dates: 'exclusion_dates',
-  // Garde conditionnelle ORIENTÉE « seulement avec B » (Vague 6 tranche C — #15b).
-  seulement_avec: 'seulement_avec',
-} as const
-export type BriqueEvaluable = keyof typeof BRIQUES_EVALUABLES
-
-/** Briques desiderata : préférences pures — jamais d'interdiction ferme. */
-const BRIQUES_DESIDERATA = new Set<BriqueEvaluable>([
-  'preferer_creneau', 'preferer_avec', 'volume_gardes',
-])
-
-/** Forces sélectionnables par l'admin (les niveaux système sont exclus). */
-const FORCES_VALIDES = ['jamais', 'sauf_crise', 'evitee', 'si_possible'] as const
-export type ForceFormulaire = (typeof FORCES_VALIDES)[number]
-
-const JOURS_VALIDES = new Set(['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi'])
-// Préférences de jours (preferer_creneau) : les 7 jours (un créneau weekend
-// est daté du samedi ; le vendredi soir du vendredi).
-const JOURS_VALIDES_TOUS = new Set([
-  'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche',
-])
-const SEMAINES_VALIDES = new Set(['paires', 'impaires', 'toutes'])
-const PERIODES_VALIDES = new Set(['soir_semaine', 'weekend']) // seules évaluées par R2
-// Fenêtres de comptage acceptées par checkAuPlusN (hard-constraints.ts) :
-// « semaine_civile » (lundi→dimanche) ou « glissante_K_jours » (regex moteur).
-const FENETRES_VALIDES = new Set([
-  'semaine_civile', 'glissante_7_jours', 'glissante_14_jours', 'glissante_30_jours',
-])
-const N_MAX_GARDES = 14    // borne haute raisonnable (au plus N gardes / fenêtre)
-const ECART_MAX_JOURS = 30 // borne haute raisonnable (espacement minimal)
-// Fréquence WE : « 1 week-end sur N ». N=1 = aucune contrainte (inerte) → min 2.
-const N_SEM_WE_MIN = 2
-const N_SEM_WE_MAX = 26    // une période fait 12-17 semaines : 26 couvre large
-// Séries / repos avancés (#13) : bornes hautes raisonnables (jours).
-const SERIE_MAX_JOURS = 31 // « pas plus de N jours d'affilée » — 31 couvre large
-const REPOS_APRES_MAX = 30 // jours de repos imposés après une série
-// Cadencement WE « 1 sur N ancré » (#20) : N=1 = tous les WE (inerte) → min 2.
-// Max 12 : au-delà, un cycle plus long qu'une période hiver n'a guère de sens.
-const N_SEM_CADENCE_MIN = 2
-const N_SEM_CADENCE_MAX = 12
-const SENS_CADENCE_VALIDES = new Set(['interdit', 'impose'])
-// Exclusion « pas les deux » (#15a) : codes fête reconnus (référentiel historique).
-const CODES_FETE_VALIDES = new Set(['noel', 'nouvel_an'])
-
-/** Payload envoyé par le formulaire (champs simples — le JSON est bâti ici). */
-export interface UpsertReglePayload {
-  id?: string // présent = édition
-  brique_id: BriqueEvaluable
-  owner_id: string
-  force: ForceFormulaire
-  /** null/absent = règle permanente ; un id = règle limitée à cette période. */
-  periode_id?: string | null
-  // interdire_creneau
-  jour?: string
-  exception_vacances_scolaires?: boolean
-  // repos_conditionnel
-  si_garde_we?: string
-  sinon?: string
-  // alternance_ancre
-  semaines?: string
-  periodes?: string[]
-  // duo_interdit
-  avec_veterinaire_id?: string
-  // au_plus_n
-  n?: number
-  fenetre?: string
-  /** Filtre optionnel par types de créneaux du cabinet (axe `quoi`, n°19).
-   *  Vide/absent = toutes les gardes comptent (comportement historique). */
-  creneaux?: string[]
-  // espacement_min
-  ecart_min_jours?: number
-  // espacement_weekend
-  n_semaines?: number
-  // preferer_creneau (n°7) : jours et/ou créneaux préférés (creneaux réutilisé)
-  jours?: string[]
-  // volume_gardes (n°7)
-  sens?: string
-  // succession_interdite (#13) : « pas de B le lendemain de A »
-  type_avant?: string
-  type_apres?: string
-  // serie_max (#13) : « jamais plus de N jours d'affilée » (creneaux réutilisé)
-  n_jours?: number
-  // repos_apres_serie (#13) : « après N jours, M jours de repos »
-  repos_jours?: number
-  // cadencement_weekend (#20) : « 1 WE sur N ancré » — n_semaines réutilisé.
-  // `sens` est partagé avec volume_gardes (plus/moins) mais porte ici interdit/impose.
-  ancre?: string // date ISO yyyy-MM-dd (un samedi de référence)
-  // exclusion_dates (#15a) : XOR « pas les deux ». UNE seule forme :
-  //   fetes = paire de codes fête (noel/nouvel_an) ; dates = paire de dates ISO.
-  fetes?: string[]
-  dates?: string[]
-}
-
-/** Parse un entier dans [1, max]. Retourne null si invalide (frontière de confiance). */
-function entierBorne(v: unknown, max: number): number | null {
-  const n = typeof v === 'number' ? v : typeof v === 'string' ? parseInt(v, 10) : NaN
-  if (!Number.isInteger(n) || n < 1 || n > max) return null
-  return n
-}
-
-function lireOwner(pj: unknown): string | null {
-  const refs = (pj as { qui?: { refs?: unknown } })?.qui?.refs
-  return Array.isArray(refs) && typeof refs[0] === 'string' ? refs[0] : null
-}
-function lirePartenaire(pj: unknown): string | null {
-  const a = (pj as { params?: { avec_veterinaire_id?: unknown } })?.params?.avec_veterinaire_id
-  return typeof a === 'string' ? a : null
-}
-
-/** Types de créneaux historiques — repli quand le cabinet n'a pas de catalogue. */
-const CODES_CRENEAUX_HISTORIQUES = ['semaine_soir', 'vendredi_soir', 'weekend'] as const
+//
+// La CONSTRUCTION des params (briques évaluables, bornes, formes acceptées) a
+// déménagé dans `lib/regles/paramsRegle.ts` le 2026-08-02 : le gardien de
+// cohérence doit bâtir la règle en cours de saisie — sans l'écrire — pour la
+// soumettre au pré-vol, et un fichier `'use server'` ne peut exporter que des
+// fonctions async. La forme est donc construite là-bas, par la MÊME fonction
+// des deux côtés ; tout ce qui exige la BASE (existence d'un véto, catalogue de
+// créneaux, anti-doublon, anti-impasse) reste ici.
 
 /**
  * Codes de créneaux VALIDES du cabinet (référentiel dynamique — verrou 8 :
@@ -958,231 +1017,6 @@ async function chargerCodesCreneauxValides(
     .filter((m) => m.actif && m.code !== null && m.code !== 'ferie')
     .map((m) => m.code as string)
   return new Set(codes.length > 0 ? codes : CODES_CRENEAUX_HISTORIQUES)
-}
-
-/** Construit { quand, params } pour les briques NON-duo. Null = erreur (raison).
- *  `codesCreneaux` : référentiel du cabinet, requis SEULEMENT si un filtre de
- *  créneaux est demandé (au_plus_n, n°19). */
-function construireParams(
-  p: UpsertReglePayload,
-  codesCreneaux?: Set<string>,
-): { quand: unknown; params: Record<string, unknown> } | { error: string } {
-  switch (p.brique_id) {
-    case 'interdire_creneau': {
-      if (!p.jour || !JOURS_VALIDES.has(p.jour)) return { error: 'Jour de repos invalide.' }
-      return {
-        quand: p.jour,
-        params: { jour: p.jour, exception_vacances_scolaires: Boolean(p.exception_vacances_scolaires) },
-      }
-    }
-    case 'repos_conditionnel': {
-      if (!p.si_garde_we || !JOURS_VALIDES.has(p.si_garde_we)) return { error: 'Jour « si garde WE » invalide.' }
-      if (!p.sinon || !JOURS_VALIDES.has(p.sinon)) return { error: 'Jour « sinon » invalide.' }
-      return { quand: null, params: { si_garde_we: p.si_garde_we, sinon: p.sinon } }
-    }
-    case 'alternance_ancre': {
-      if (!p.semaines || !SEMAINES_VALIDES.has(p.semaines)) return { error: 'Cadence (semaines) invalide.' }
-      const periodes = (p.periodes ?? []).filter((x) => PERIODES_VALIDES.has(x))
-      if (periodes.length === 0) return { error: 'Sélectionnez au moins une période (soirs / week-ends).' }
-      return { quand: periodes[0], params: { semaines: p.semaines, periodes } }
-    }
-    case 'au_plus_n': {
-      const n = entierBorne(p.n, N_MAX_GARDES)
-      if (n === null) return { error: `Nombre de gardes invalide (1 à ${N_MAX_GARDES}).` }
-      if (!p.fenetre || !FENETRES_VALIDES.has(p.fenetre)) return { error: 'Fenêtre de comptage invalide.' }
-      // Axe `quoi` (n°19) : filtre optionnel par types de créneaux du cabinet.
-      // Frontière de confiance : chaque code DOIT exister dans le référentiel
-      // du cabinet (un code fantôme rendrait la règle silencieusement inerte).
-      const creneaux = [
-        ...new Set((p.creneaux ?? []).filter((x) => typeof x === 'string' && x.trim() !== '')),
-      ]
-      if (creneaux.length > 0) {
-        if (!codesCreneaux) return { error: 'Types de créneaux du cabinet indisponibles.' }
-        const inconnus = creneaux.filter((c) => !codesCreneaux.has(c))
-        if (inconnus.length > 0) {
-          return { error: `Type(s) de créneau inconnu(s) pour ce cabinet : ${inconnus.join(', ')}.` }
-        }
-        return { quand: null, params: { n, fenetre: p.fenetre, creneaux } }
-      }
-      return { quand: null, params: { n, fenetre: p.fenetre } }
-    }
-    case 'espacement_min': {
-      const ecart = entierBorne(p.ecart_min_jours, ECART_MAX_JOURS)
-      if (ecart === null) return { error: `Écart minimal invalide (1 à ${ECART_MAX_JOURS} jours).` }
-      return { quand: null, params: { ecart_min_jours: ecart } }
-    }
-    case 'espacement_weekend': {
-      const n = entierBorne(p.n_semaines, N_SEM_WE_MAX)
-      if (n === null || n < N_SEM_WE_MIN) {
-        return { error: `Fréquence de week-end invalide (un week-end sur ${N_SEM_WE_MIN} à ${N_SEM_WE_MAX}).` }
-      }
-      return { quand: null, params: { n_semaines: n } }
-    }
-    // ── Desiderata (n°7) — préférences positives, toujours souples ──
-    case 'preferer_creneau': {
-      const jours = [...new Set((p.jours ?? []).filter((x) => JOURS_VALIDES_TOUS.has(x)))]
-      const creneaux = [
-        ...new Set((p.creneaux ?? []).filter((x) => typeof x === 'string' && x.trim() !== '')),
-      ]
-      if (jours.length === 0 && creneaux.length === 0) {
-        return { error: 'Sélectionnez au moins un jour ou un type de créneau préféré.' }
-      }
-      if (creneaux.length > 0) {
-        if (!codesCreneaux) return { error: 'Types de créneaux du cabinet indisponibles.' }
-        const inconnus = creneaux.filter((c) => !codesCreneaux.has(c))
-        if (inconnus.length > 0) {
-          return { error: `Type(s) de créneau inconnu(s) pour ce cabinet : ${inconnus.join(', ')}.` }
-        }
-      }
-      return {
-        quand: null,
-        params: {
-          ...(jours.length > 0 ? { jours } : {}),
-          ...(creneaux.length > 0 ? { creneaux } : {}),
-        },
-      }
-    }
-    case 'preferer_avec': {
-      if (!p.avec_veterinaire_id) return { error: 'Sélectionnez le co-équipier préféré.' }
-      if (p.avec_veterinaire_id === p.owner_id) {
-        return { error: 'Le co-équipier préféré doit être un autre vétérinaire.' }
-      }
-      return { quand: null, params: { avec_veterinaire_id: p.avec_veterinaire_id } }
-    }
-    case 'volume_gardes': {
-      if (p.sens !== 'plus' && p.sens !== 'moins') {
-        return { error: 'Précisez le souhait : plus ou moins de gardes.' }
-      }
-      return { quand: null, params: { sens: p.sens } }
-    }
-    // ── Successions / séries / repos avancés (#13) ──
-    case 'succession_interdite': {
-      const avant = typeof p.type_avant === 'string' ? p.type_avant.trim() : ''
-      const apres = typeof p.type_apres === 'string' ? p.type_apres.trim() : ''
-      if (avant === '' || apres === '') {
-        return { error: 'Choisissez le créneau « veille » et le créneau interdit le lendemain.' }
-      }
-      // Frontière de confiance : les deux codes DOIVENT exister dans le
-      // référentiel du cabinet (un code fantôme rendrait la règle inerte).
-      if (!codesCreneaux) return { error: 'Types de créneaux du cabinet indisponibles.' }
-      const inconnus = [avant, apres].filter((c) => !codesCreneaux.has(c))
-      if (inconnus.length > 0) {
-        return { error: `Type(s) de créneau inconnu(s) pour ce cabinet : ${inconnus.join(', ')}.` }
-      }
-      return { quand: null, params: { type_avant: avant, type_apres: apres } }
-    }
-    case 'serie_max': {
-      const n = entierBorne(p.n_jours, SERIE_MAX_JOURS)
-      if (n === null) return { error: `Nombre de jours invalide (1 à ${SERIE_MAX_JOURS}).` }
-      // Filtre optionnel de créneaux (mêmes règles que au_plus_n).
-      const creneaux = [
-        ...new Set((p.creneaux ?? []).filter((x) => typeof x === 'string' && x.trim() !== '')),
-      ]
-      if (creneaux.length > 0) {
-        if (!codesCreneaux) return { error: 'Types de créneaux du cabinet indisponibles.' }
-        const inconnus = creneaux.filter((c) => !codesCreneaux.has(c))
-        if (inconnus.length > 0) {
-          return { error: `Type(s) de créneau inconnu(s) pour ce cabinet : ${inconnus.join(', ')}.` }
-        }
-        return { quand: null, params: { n_jours: n, creneaux } }
-      }
-      return { quand: null, params: { n_jours: n } }
-    }
-    case 'repos_apres_serie': {
-      const n = entierBorne(p.n_jours, SERIE_MAX_JOURS)
-      if (n === null) return { error: `Longueur de série invalide (1 à ${SERIE_MAX_JOURS}).` }
-      const repos = entierBorne(p.repos_jours, REPOS_APRES_MAX)
-      if (repos === null) return { error: `Jours de repos invalides (1 à ${REPOS_APRES_MAX}).` }
-      return { quand: null, params: { n_jours: n, repos_jours: repos } }
-    }
-    // ── Cadencement « 1 WE sur N ancré » (#20) ──
-    case 'cadencement_weekend': {
-      const n = entierBorne(p.n_semaines, N_SEM_CADENCE_MAX)
-      if (n === null || n < N_SEM_CADENCE_MIN) {
-        return { error: `Cycle invalide (un week-end sur ${N_SEM_CADENCE_MIN} à ${N_SEM_CADENCE_MAX}).` }
-      }
-      const ancre = typeof p.ancre === 'string' ? p.ancre.trim() : ''
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(ancre) || Number.isNaN(new Date(ancre + 'T12:00:00Z').getTime())) {
-        return { error: 'Date d’ancrage invalide (format attendu : une date de week-end).' }
-      }
-      const sens = typeof p.sens === 'string' ? p.sens : ''
-      if (!SENS_CADENCE_VALIDES.has(sens)) {
-        return { error: 'Précisez le sens : week-ends interdits ou gardes forcées sur le cycle.' }
-      }
-      // On stocke l'ancre TELLE QUE saisie : le moteur la ramène au samedi de sa
-      // semaine (aucune dépendance à ce que l'admin ait pile choisi un samedi).
-      return { quand: null, params: { n_semaines: n, ancre, sens } }
-    }
-    // ── Exclusion « pas les deux » (#15a) ──
-    // Une SEULE forme par règle : `fetes` (paire de codes fête) prioritaire si
-    // fournie, sinon `dates` (paire de dates ISO distinctes). Frontière de
-    // confiance : validation stricte ici (le moteur est inerte si mal formé,
-    // mais on refuse à l'écriture pour ne pas créer de coquille vide).
-    case 'exclusion_dates': {
-      const fetes = Array.isArray(p.fetes)
-        ? [...new Set((p.fetes as unknown[]).filter((x): x is string => typeof x === 'string'))]
-        : []
-      if (fetes.length > 0) {
-        if (fetes.length !== 2) return { error: 'Sélectionnez exactement deux fêtes.' }
-        if (fetes.some((f) => !CODES_FETE_VALIDES.has(f))) {
-          return { error: 'Fête inconnue (Noël ou Nouvel An).' }
-        }
-        // fetes.length===2 après dédoublonnage ⇒ déjà distinctes.
-        return { quand: null, params: { fetes } }
-      }
-      const dates = Array.isArray(p.dates)
-        ? (p.dates as unknown[]).filter((x): x is string => typeof x === 'string')
-        : []
-      if (dates.length !== 2) {
-        return { error: 'Indiquez deux dates (ou choisissez la forme « fêtes »).' }
-      }
-      const isISO = (x: string) =>
-        /^\d{4}-\d{2}-\d{2}$/.test(x) && !Number.isNaN(new Date(x + 'T12:00:00Z').getTime())
-      if (!isISO(dates[0]) || !isISO(dates[1])) return { error: 'Date invalide.' }
-      if (dates[0] === dates[1]) return { error: 'Les deux dates doivent être différentes.' }
-      return { quand: null, params: { dates: [dates[0], dates[1]] } }
-    }
-    // ── Garde conditionnelle ORIENTÉE « seulement avec B » (#15b) ──
-    // A ne peut être de garde QUE si B l'est sur le même créneau. B ≠ A. Ciblage
-    // `creneaux` optionnel (mêmes règles de validation que au_plus_n). L'existence
-    // et l'activité de B + la garde anti-impasse sont vérifiées dans upsertRegle
-    // (elles nécessitent la base : effectif actif + catalogue nbPlaces).
-    case 'seulement_avec': {
-      if (!p.avec_veterinaire_id) return { error: 'Sélectionnez le binôme requis.' }
-      if (p.avec_veterinaire_id === p.owner_id) {
-        return { error: 'Le binôme requis doit être un autre vétérinaire.' }
-      }
-      const creneaux = [
-        ...new Set((p.creneaux ?? []).filter((x) => typeof x === 'string' && x.trim() !== '')),
-      ]
-      if (creneaux.length > 0) {
-        if (!codesCreneaux) return { error: 'Types de créneaux du cabinet indisponibles.' }
-        const inconnus = creneaux.filter((c) => !codesCreneaux.has(c))
-        if (inconnus.length > 0) {
-          return { error: `Type(s) de créneau inconnu(s) pour ce cabinet : ${inconnus.join(', ')}.` }
-        }
-        return { quand: null, params: { avec_veterinaire_id: p.avec_veterinaire_id, creneaux } }
-      }
-      return { quand: null, params: { avec_veterinaire_id: p.avec_veterinaire_id } }
-    }
-    default:
-      return { error: 'Brique non gérée par ce constructeur.' }
-  }
-}
-
-/** Enveloppe params_json complète attendue par le mapper + le rendu. */
-function envelopper(
-  ownerId: string,
-  briqueId: BriqueEvaluable,
-  quand: unknown,
-  params: Record<string, unknown>,
-): Record<string, unknown> {
-  return {
-    qui: { type: 'veterinaire', refs: [ownerId] },
-    quand: quand ?? null,
-    params,
-    _source: { type_v1: BRIQUES_EVALUABLES[briqueId] },
-  }
 }
 
 /**

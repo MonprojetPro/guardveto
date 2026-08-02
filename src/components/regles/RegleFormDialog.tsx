@@ -31,7 +31,11 @@ import {
 import { rendreRegle } from '@/engine/briques/catalogue'
 import { choixForce, symboleDe, aideForce } from '@/lib/regles/libelle'
 import '@/styles/regles-forces.css'
-import { upsertRegle, type BriqueEvaluable, type ForceFormulaire } from '@/app/(protected)/regles/actions'
+import {
+  upsertRegle, verifierRegle,
+  type BriqueEvaluable, type ForceFormulaire, type VerdictGardien,
+} from '@/app/(protected)/regles/actions'
+import { GardienFilou } from '@/components/v2/regles/GardienFilou'
 import type { RegleRow, VetoMini, PeriodeOption, TypeCreneauOption } from './ReglesClient'
 
 /** Valeur sentinelle du sélecteur de validité = règle permanente (periode_id null). */
@@ -165,6 +169,18 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
   const router = useRouter()
   const isEdit = Boolean(regle)
   const [isPending, startTransition] = useTransition()
+
+  /**
+   * Filou gardien : ce que le moteur a trouvé sur cette règle, et le payload
+   * qu'il retient tant que l'admin n'a pas tranché. On conserve le payload
+   * EXAMINÉ plutôt que de le reconstruire au moment du « quand même » : entre
+   * les deux, un champ pourrait avoir changé, et on écrirait alors une règle
+   * que personne n'a vérifiée.
+   */
+  const [gardien, setGardien] = useState<{
+    verdict: VerdictGardien
+    payload: Parameters<typeof upsertRegle>[0]
+  } | null>(null)
 
   const pj = (regle?.params_json ?? {}) as {
     qui?: { refs?: unknown }
@@ -446,8 +462,9 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
       if (dateExcl1 === dateExcl2) { toast.error('Choisissez deux dates différentes.'); return }
     }
 
-    startTransition(async () => {
-      const res = await upsertRegle({
+    // Le payload est bâti UNE fois : le gardien doit examiner exactement ce qui
+    // sera écrit, pas une reconstitution approchante.
+    const payload = {
         id: regle?.id,
         brique_id: briqueId,
         owner_id: ownerId,
@@ -482,15 +499,34 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
         dates: briqueId === 'exclusion_dates' && formeExclusion === 'dates'
           ? [dateExcl1, dateExcl2] : undefined,
         periode_id: validite === PERMANENTE ? null : validite,
-      })
-      if (res?.error) { toast.error(res.error); return }
-      toast.success(isEdit ? 'Règle modifiée.' : 'Règle créée.')
-      onClose()
-      router.refresh()
+    }
+
+    startTransition(async () => {
+      // Filou gardien : le moteur rejoue son pré-vol avec et sans cette règle,
+      // et on ne montre que ce qu'elle apporte. Un verdict `verifie: false`
+      // (aucune période en base, chargement en échec) n'empêche jamais
+      // d'enregistrer — il se tait, simplement.
+      const verdict = await verifierRegle({ genre: 'nominative', payload })
+      if (verdict.verifie && verdict.avertissements.length > 0) {
+        setGardien({ verdict, payload })
+        return
+      }
+      await ecrire(payload)
     })
   }
 
+  /** L'écriture — rejouée telle quelle si l'admin passe outre l'avertissement. */
+  const ecrire = async (aEcrire: Parameters<typeof upsertRegle>[0]) => {
+    const res = await upsertRegle(aEcrire)
+    if (res?.error) { toast.error(res.error); return }
+    toast.success(isEdit ? 'Règle modifiée.' : 'Règle créée.')
+    setGardien(null)
+    onClose()
+    router.refresh()
+  }
+
   return (
+    <>
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -1116,5 +1152,27 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+      {/* Filou gardien — FRÈRE du formulaire, pas son enfant : deux dialogues
+          imbriqués se disputent le piège à focus, et le second se ferme en
+          emportant le premier. Le formulaire reste ouvert DERRIÈRE, pour que
+          « Revenir à ma règle » retrouve la saisie intacte. Le bouton
+          d'assouplissement retombe sur le sélecteur de fermeté de ce
+          formulaire : il n'écrit rien tout seul. */}
+      <GardienFilou
+        verdict={gardien?.verdict ?? null}
+        enCours={isPending}
+        onAnnuler={() => setGardien(null)}
+        onPasserOutre={() => {
+          const aEcrire = gardien?.payload
+          if (!aEcrire) return
+          startTransition(async () => { await ecrire(aEcrire) })
+        }}
+        onAssouplir={(f) => {
+          setForce(f as ForceFormulaire)
+          toast.info('Fermeté ramenée à « sauf urgence ». Revalide quand tu veux.')
+        }}
+      />
+    </>
   )
 }

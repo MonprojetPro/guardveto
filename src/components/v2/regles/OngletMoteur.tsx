@@ -128,13 +128,15 @@ import {
   setEquiteImportance, setCohorteEquite, deleteCohorteEquite,
   setStructureRegle, setRoleAvantageFinancier,
   upsertCompositionRegle, upsertRoleInterditRegle,
-  poserEtiquetteSurVetos,
+  poserEtiquetteSurVetos, verifierRegle,
   type CohorteEquiteUI, type CompositionReglePayload,
   type RoleInterditReglePayload, type ForceFormulaire,
+  type VerdictGardien,
 } from '@/app/(protected)/regles/actions'
 import { RegleFormDialog } from '@/components/regles/RegleFormDialog'
 import { AideFilou } from './AideFilou'
 import { useErreurBloquante } from './ErreurBloquante'
+import { GardienFilou } from './GardienFilou'
 import {
   BRIQUES_EDITABLES,
   type RegleRow, type PeriodeOption, type TypeCreneauOption,
@@ -429,6 +431,17 @@ export function OngletMoteur({
   const { ouvrirErreur, dialogueErreur } = useErreurBloquante()
 
   /**
+   * Le gardien : ce que le moteur a trouvé sur la règle en cours, et l'écriture
+   * qu'il retient en otage tant que l'admin n'a pas tranché. Garder la fonction
+   * d'écriture ICI plutôt qu'un drapeau évite d'avoir à deviner, au moment du
+   * « Enregistrer quand même », de QUELLE règle on parlait.
+   */
+  const [gardien, setGardien] = useState<{
+    verdict: VerdictGardien
+    ecrire: () => Promise<void>
+  } | null>(null)
+
+  /**
    * Le halo de `?focus=`. On arrive ici depuis un diagnostic d'impasse qui
    * désigne UN réglage : sans repère, on atterrit dans une longue liste et on
    * cherche. Purement cosmétique et défensif — une ancre inconnue ne casse
@@ -700,28 +713,64 @@ export function OngletMoteur({
     startTransition(async () => {
       if (!(await poserSiInedit(compoTagInedit, tag, compoPorteurs))) return
 
-      const res: Reponse =
+      // L'étiquette est posée AVANT le contrôle : sans porteur, le gardien
+      // signalerait une « étiquette sans porteur » qui n'existera plus une
+      // seconde plus tard — un avertissement pour un problème déjà résolu.
+      const verdict = await verifierRegle(
         compoType === 'role_interdit'
-          ? await upsertRoleInterditRegle({
-              tag, role: compoRole, creneaux: compoCreneaux,
-              force: compoForce as ForceFormulaire,
-            })
-          : await upsertCompositionRegle({
-              mode: compoType, tag, creneaux: compoCreneaux,
-              force: compoForce as ForceFormulaire,
-            })
-      if (res?.error) {
-        ouvrirErreur(res.error)
+          ? {
+              genre: 'role_interdit',
+              payload: {
+                tag, role: compoRole, creneaux: compoCreneaux,
+                force: compoForce as ForceFormulaire,
+              },
+            }
+          : {
+              genre: 'composition',
+              payload: {
+                mode: compoType, tag, creneaux: compoCreneaux,
+                force: compoForce as ForceFormulaire,
+              },
+            },
+      )
+      if (verdict.verifie && verdict.avertissements.length > 0) {
+        setGardien({ verdict, ecrire: ecrireEquipe })
         return
       }
-      toast.success(
-        compoTagInedit
-          ? `Étiquette « ${tag} » posée et règle créée — appliquée à la prochaine génération.`
-          : 'Règle d’équipe créée — appliquée à la prochaine génération.',
-      )
-      setCompoOuvert(false)
-      router.refresh()
+      await ecrireEquipe()
     })
+  }
+
+  /**
+   * L'écriture proprement dite — extraite pour être rejouable telle quelle
+   * après « Enregistrer quand même ». Refaire la saisie depuis les états au
+   * moment du clic garantit que ce qui s'écrit est bien ce que le gardien a
+   * examiné (les états n'ont pas bougé entre-temps : le panneau est verrouillé).
+   */
+  const ecrireEquipe = async () => {
+    const tag = compoTag.trim().toLowerCase()
+    const res: Reponse =
+      compoType === 'role_interdit'
+        ? await upsertRoleInterditRegle({
+            tag, role: compoRole, creneaux: compoCreneaux,
+            force: compoForce as ForceFormulaire,
+          })
+        : await upsertCompositionRegle({
+            mode: compoType, tag, creneaux: compoCreneaux,
+            force: compoForce as ForceFormulaire,
+          })
+    if (res?.error) {
+      ouvrirErreur(res.error)
+      return
+    }
+    toast.success(
+      compoTagInedit
+        ? `Étiquette « ${tag} » posée et règle créée — appliquée à la prochaine génération.`
+        : 'Règle d’équipe créée — Filou l’a vérifiée avec les autres.',
+    )
+    setGardien(null)
+    setCompoOuvert(false)
+    router.refresh()
   }
 
   const basculerCreneauCompo = (code: string) => {
@@ -794,15 +843,30 @@ export function OngletMoteur({
     startTransition(async () => {
       if (!(await poserSiInedit(coTagInedit, tag, coPorteurs))) return
 
-      const res: Reponse = await setCohorteEquite(coDim, tag, coImp)
-      if (res?.error) {
-        ouvrirErreur(res.error)
+      const verdict = await verifierRegle({
+        genre: 'cohorte',
+        payload: { dimension: coDim, tag, importance: coImp },
+      })
+      if (verdict.verifie && verdict.avertissements.length > 0) {
+        setGardien({ verdict, ecrire: ecrireCohorte })
         return
       }
-      toast.success('Équilibrage par étiquette ajouté — appliqué à la prochaine génération.')
-      setCohorteOuverte(false)
-      router.refresh()
+      await ecrireCohorte()
     })
+  }
+
+  /** L'écriture de l'équilibrage — rejouable après « Enregistrer quand même ». */
+  const ecrireCohorte = async () => {
+    const tag = coTag.trim().toLowerCase()
+    const res: Reponse = await setCohorteEquite(coDim, tag, coImp)
+    if (res?.error) {
+      ouvrirErreur(res.error)
+      return
+    }
+    toast.success('Équilibrage par étiquette ajouté — appliqué à la prochaine génération.')
+    setGardien(null)
+    setCohorteOuverte(false)
+    router.refresh()
   }
 
   // ── Carte 5 — préférences ──────────────────────────────────
@@ -1688,6 +1752,30 @@ export function OngletMoteur({
           regle={aEditer}
         />
       )}
+
+      {/* Le gardien. Il ne s'ouvre QUE si le moteur a trouvé quelque chose que
+          cette règle-là apporte : une règle saine s'enregistre sans un clic de
+          plus. `onAssouplir` n'est proposé que pour les règles par étiquette —
+          ce sont les seules dont le panneau porte encore la fermeté au moment
+          où le gardien parle. */}
+      <GardienFilou
+        verdict={gardien?.verdict ?? null}
+        enCours={isPending}
+        onAnnuler={() => setGardien(null)}
+        onPasserOutre={() => {
+          const ecrire = gardien?.ecrire
+          if (!ecrire) return
+          startTransition(async () => { await ecrire() })
+        }}
+        onAssouplir={
+          compoOuvert
+            ? (force) => {
+                setCompoForce(force)
+                toast.info('Fermeté ramenée à « sauf urgence ». Revalide quand tu veux.')
+              }
+            : undefined
+        }
+      />
 
       {dialogueErreur}
     </>
