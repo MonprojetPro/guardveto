@@ -360,7 +360,11 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
     let params: Record<string, unknown> = {}
     switch (briqueId) {
       case 'interdire_creneau':
-        params = { jour, exception_vacances_scolaires: exVac }
+        params = {
+          jour,
+          exception_vacances_scolaires: exVac,
+          creneaux: creneauxFiltre.length > 0 ? creneauxFiltre : undefined,
+        }
         break
       case 'repos_conditionnel':
         params = { si_garde_we: siWe, sinon }
@@ -496,7 +500,7 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
         avec_veterinaire_id: avecId,
         n: Number(n),
         fenetre,
-        creneaux: (briqueId === 'au_plus_n' || briqueId === 'preferer_creneau' || briqueId === 'serie_max' || briqueId === 'seulement_avec') && creneauxFiltre.length > 0 ? creneauxFiltre : undefined,
+        creneaux: (briqueId === 'au_plus_n' || briqueId === 'preferer_creneau' || briqueId === 'serie_max' || briqueId === 'seulement_avec' || briqueId === 'interdire_creneau') && creneauxFiltre.length > 0 ? creneauxFiltre : undefined,
         ecart_min_jours: Number(ecartMin),
         // n_semaines sert à espacement_weekend ET à cadencement_weekend (#20).
         n_semaines: briqueId === 'cadencement_weekend' ? Number(nSemainesCadence) : Number(nSemaines),
@@ -616,6 +620,38 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
                 <input type="checkbox" checked={exVac} onChange={(e) => setExVac(e.target.checked)} className="rounded" />
                 <span className="text-sm">Sauf pendant les vacances scolaires</span>
               </label>
+
+              {/* Ciblage par type de garde — n'apparaît QUE si le cabinet a
+                  plusieurs gardes ce jour-là. Sur un cabinet qui n'en a qu'une
+                  par jour (le cas courant), « le mercredi » et « la garde du
+                  mercredi » sont la même chose : proposer un choix sans objet
+                  ferait douter d'une portée qui n'existe pas.
+                  Le jour où une garde de jour s'ajoute, la question devient
+                  réelle — et sans ce champ, la règle interdirait les deux en
+                  n'en annonçant qu'une. */}
+              {typesCreneaux.length > 1 && (
+                <div className="space-y-1.5">
+                  <Label>Quelles gardes ce jour-là ? (optionnel)</Label>
+                  <div className="space-y-2 mt-1">
+                    {typesCreneaux.map((t) => (
+                      <label key={t.code} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={creneauxFiltre.includes(t.code)}
+                          onChange={() => toggleCreneauFiltre(t.code)}
+                          className="rounded"
+                        />
+                        <span className="text-sm">{t.nom}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Rien de coché = toute la journée. À cocher seulement si le
+                    vétérinaire est indisponible pour <em>certaines</em> gardes de ce
+                    jour et pas pour les autres.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

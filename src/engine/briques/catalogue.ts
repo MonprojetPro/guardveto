@@ -138,9 +138,17 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
       }
       // Forme simple « un jour ».
       if (typeof params.jour === 'string') {
-        const per = params.periode ? ` ${periodeLisible(params.periode)}` : ''
+        // ⚠️ `periode` ('apres_midi'…) vient des données V1 et n'a JAMAIS été
+        //    évalué par le moteur : l'afficher promettait une portée partielle
+        //    que le planning n'appliquait pas. On ne le dit plus que si un
+        //    ciblage RÉEL l'accompagne — sinon la phrase mentait à l'endroit
+        //    précis où l'admin décide.
+        const cibles = Array.isArray(params.creneaux) ? (params.creneaux as unknown[]) : []
+        const sur = cibles.length > 0
+          ? ` (${cibles.map(creneauLisible).join(', ')} seulement)`
+          : ''
         const sauf = params.exception_vacances_scolaires ? ' (sauf vacances scolaires)' : ''
-        return `ne fait pas de garde le ${params.jour}${per}${sauf}`
+        return `ne fait pas de garde le ${params.jour}${sur}${sauf}`
       }
       // Forme « créneaux » (schéma seed).
       if (Array.isArray(params.creneaux)) {

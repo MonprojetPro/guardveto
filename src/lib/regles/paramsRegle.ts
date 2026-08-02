@@ -166,9 +166,27 @@ export function construireParams(
   switch (p.brique_id) {
     case 'interdire_creneau': {
       if (!p.jour || !JOURS_VALIDES.has(p.jour)) return { error: 'Jour de repos invalide.' }
+      // Ciblage par type de garde (2026-08-02). Vide = toute la journée, ce qui
+      // est le comportement historique ET celui de toutes les règles déjà en
+      // base : la clé n'est même pas écrite dans ce cas, pour que l'empreinte
+      // d'une règle non ciblée reste identique à ce qu'elle était.
+      const creneaux = [
+        ...new Set((p.creneaux ?? []).filter((x) => typeof x === 'string' && x.trim() !== '')),
+      ]
+      if (creneaux.length > 0) {
+        if (!codesCreneaux) return { error: 'Types de créneaux du cabinet indisponibles.' }
+        const inconnus = creneaux.filter((c) => !codesCreneaux.has(c))
+        if (inconnus.length > 0) {
+          return { error: `Type(s) de créneau inconnu(s) pour ce cabinet : ${inconnus.join(', ')}.` }
+        }
+      }
       return {
         quand: p.jour,
-        params: { jour: p.jour, exception_vacances_scolaires: Boolean(p.exception_vacances_scolaires) },
+        params: {
+          jour: p.jour,
+          exception_vacances_scolaires: Boolean(p.exception_vacances_scolaires),
+          ...(creneaux.length > 0 ? { creneaux } : {}),
+        },
       }
     }
     case 'repos_conditionnel': {

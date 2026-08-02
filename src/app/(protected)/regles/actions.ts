@@ -1272,7 +1272,10 @@ export async function upsertRegle(payload: UpsertReglePayload) {
     ((payload.brique_id === 'au_plus_n' ||
       payload.brique_id === 'preferer_creneau' ||
       payload.brique_id === 'serie_max' ||
-      payload.brique_id === 'seulement_avec') &&
+      payload.brique_id === 'seulement_avec' ||
+      // Repos fixe ciblé par type de garde (2026-08-02) : un cabinet peut
+      // déclarer plusieurs gardes le même jour, et ne s'absenter que de l'une.
+      payload.brique_id === 'interdire_creneau') &&
       (payload.creneaux ?? []).length > 0)
   const codesCreneaux = besoinCodes
     ? await chargerCodesCreneauxValides(supabase, cabinetId)

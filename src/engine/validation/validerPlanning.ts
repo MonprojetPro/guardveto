@@ -180,6 +180,22 @@ function estSemaineImpaireISO(date: string): boolean {
   return numeroSemaineISO(date) % 2 !== 0
 }
 
+/**
+ * Un repos fixe vise-t-il CE type de garde ? Absent ou vide = toute la journée.
+ *
+ * ⚠️ MIROIR EXACT de `viseCeCreneau` (hard-constraints.ts). Les deux gardiens
+ *    doivent lire la règle de la MÊME façon : si le validateur ignorait le
+ *    ciblage, il compterait comme violation une garde que le solver a placée en
+ *    toute légalité — et le planning s'afficherait « incohérent » sans l'être.
+ *    Le projet a déjà payé ce prix sur R8/R9 (une config threadée au moteur mais
+ *    pas au validateur).
+ */
+function viseCeCreneau(cfg: Record<string, unknown>, typeSlot: string): boolean {
+  const cibles = cfg.creneaux
+  if (!Array.isArray(cibles) || cibles.length === 0) return true
+  return (cibles as unknown[]).some((code) => code === typeSlot)
+}
+
 /** Résout la parité « impaire » d'une date selon la config de contrainte */
 function estImpaire(
   date: string,
@@ -584,9 +600,9 @@ export function validerPlanning(
 
         // ── R1 — jour de repos fixe ──
         if (c.type === 'jour_repos_fixe') {
-          // Forme simple { jour, flexible_vacances }
+          // Forme simple { jour, flexible_vacances, creneaux? }
           if (typeof cfg.jour === 'string') {
-            if (cfg.jour === jour) {
+            if (cfg.jour === jour && viseCeCreneau(cfg, a.type)) {
               const flexible =
                 Boolean(cfg.flexible_vacances ?? cfg.exception_vacances_scolaires) &&
                 estEnVacances(a.date, cal)
@@ -604,9 +620,12 @@ export function validerPlanning(
           }
           // Forme avec tableau de règles (ex. Anne-Sophie)
           if (Array.isArray(cfg.regles)) {
-            type Regle = { jour: string; periode?: string; semaine?: string; ancre?: string }
+            type Regle = {
+              jour: string; periode?: string; semaine?: string; ancre?: string; creneaux?: unknown
+            }
             for (const regle of cfg.regles as Regle[]) {
               if (regle.jour !== jour) continue
+              if (!viseCeCreneau(regle as unknown as Record<string, unknown>, a.type)) continue
               if (regle.semaine === 'impaire' || regle.semaine === 'paire') {
                 const imp = estImpaire(a.date, regle.ancre, cal)
                 if (regle.semaine === 'impaire' && !imp) continue

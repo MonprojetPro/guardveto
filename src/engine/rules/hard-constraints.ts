@@ -153,15 +153,38 @@ function lireDuoInterditIds(config: Record<string, unknown>): string[] {
  * R1 — Jours de repos fixes
  * Vérifie les contraintes `jour_repos_fixe` actives du vétérinaire.
  */
+/**
+ * Le repos fixe vise-t-il CE type de garde ?
+ *
+ * `creneaux` absent ou vide = toute la journée (comportement historique, et
+ * celui de toutes les règles déjà en base). Une liste = seulement ces gardes-là.
+ *
+ * POURQUOI CE CIBLAGE EXISTE — un cabinet peut déclarer plusieurs gardes le
+ * même jour (une de jour, une de soir : la structure le permet, il suffit de
+ * les ajouter). Sans ciblage, « ne fait pas de garde le mercredi » les bloque
+ * TOUTES, y compris quand la contrainte réelle ne porte que sur l'après-midi.
+ * La donnée d'origine du cabinet pilote porte d'ailleurs un `periode:
+ * 'apres_midi'` qu'aucun code n'a jamais évalué — la règle promettait une
+ * portée partielle et bloquait la journée entière. Tant qu'il n'y a qu'une
+ * garde par jour, les deux se confondent ; le jour où ce n'est plus vrai, la
+ * règle interdit trois fois ce qu'elle annonce, sans que rien ne le signale.
+ */
+function viseCeCreneau(cfg: Record<string, unknown>, slot: SlotGarde): boolean {
+  const cibles = cfg.creneaux
+  if (!Array.isArray(cibles) || cibles.length === 0) return true
+  return (cibles as unknown[]).some((code) => code === slot.type)
+}
+
 function violeReposFixe(
   c: ContrainteEngine, slot: SlotGarde, calendrier?: CalendrierResolu,
 ): boolean {
   const jour = jourDeLaSemaine(slot.date)
   const cfg = c.config as Record<string, unknown>
 
-  // Format simple : { jour, flexible_vacances }
+  // Format simple : { jour, flexible_vacances, creneaux? }
   if (typeof cfg.jour === 'string') {
     if (cfg.jour !== jour) return false
+    if (!viseCeCreneau(cfg, slot)) return false
     // Exception vacances scolaires — deux noms tolérés (V1 flexible_vacances
     // / V2 exception_vacances_scolaires).
     const flexibleVac = Boolean(cfg.flexible_vacances ?? cfg.exception_vacances_scolaires)
@@ -171,9 +194,14 @@ function violeReposFixe(
 
   // Format avec tableau de règles (Anne-Sophie)
   if (Array.isArray(cfg.regles)) {
-    type Regle = { jour: string; periode?: string; semaine?: string; ancre?: string }
+    type Regle = {
+      jour: string; periode?: string; semaine?: string; ancre?: string; creneaux?: unknown
+    }
     for (const regle of cfg.regles as Regle[]) {
       if (regle.jour !== jour) continue
+      // Le ciblage se lit AUSSI par entrée : un cabinet peut ne bloquer que la
+      // garde de jour le lundi et toute la journée le mercredi.
+      if (!viseCeCreneau(regle as unknown as Record<string, unknown>, slot)) continue
       if (regle.semaine === 'impaire' || regle.semaine === 'paire') {
         // Utiliser l'ancre mobile si disponible (F7-001 fix parité ISO 53)
         let estImpaire: boolean
