@@ -104,6 +104,10 @@ export function useOutilsPlanning({
   // permet d'en cibler une autre, ou d'en créer une à l'instant. La cible est
   // donc un état à part — la période affichée ne sert plus qu'à PROPOSER.
   const [assistantOuvert, setAssistantOuvert] = useState(false)
+  // Le raccourci du menu de période ouvre directement la voie « nouveau » :
+  // l'admin a déjà dit ce qu'il voulait, lui reposer la question serait un clic
+  // pour rien.
+  const [etapeAssistant, setEtapeAssistant] = useState<'choix' | 'nouveau'>('choix')
   const [cible, setCible] = useState<string | null>(null)
   const [publishing, setPublishing] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -290,7 +294,7 @@ export function useOutilsPlanning({
             className="head-btn"
             disabled={generating}
             title="Générer un planning — nouveau, ou en refaire un existant"
-            onClick={() => setAssistantOuvert(true)}
+            onClick={() => { setEtapeAssistant('choix'); setAssistantOuvert(true) }}
           >
             {generating ? 'Génération…' : 'Générer'}
           </button>
@@ -346,12 +350,18 @@ export function useOutilsPlanning({
   const modales = isAdmin ? (
     <>
       {/* L'assistant : la première étape de « Générer » (nouveau / existant) */}
+      {/* `key` sur l'étape d'entrée : la modale reste montée entre deux
+          ouvertures, un simple `useState(etapeInitiale)` ne la verrait donc
+          jamais changer. Changer la clé la remonte sur la bonne étape — sans
+          poser un setState dans un effet (interdit par le lint du projet). */}
       <AssistantGeneration
+        key={etapeAssistant}
         open={assistantOuvert}
         onOpenChange={setAssistantOuvert}
         periodes={periodes}
         periodeAffichee={periode}
         periodesTypes={periodesTypes}
+        etapeInitiale={etapeAssistant}
         onGenerer={demarrerGeneration}
         onNaviguerVersMois={onNaviguerVersMois}
       />
@@ -493,5 +503,11 @@ export function useOutilsPlanning({
     </>
   ) : null
 
-  return { pilules, alertes, modales }
+  /** Ouvre l'assistant, éventuellement droit sur la création d'un planning. */
+  function ouvrirAssistant(etape: 'choix' | 'nouveau' = 'choix') {
+    setEtapeAssistant(etape)
+    setAssistantOuvert(true)
+  }
+
+  return { pilules, alertes, modales, ouvrirAssistant }
 }

@@ -76,6 +76,8 @@ interface Props {
   onGenerer: (periodeId: string) => void
   /** Après création : aller sur le mois du nouveau planning. */
   onNaviguerVersMois: (anneeMois: string) => void
+  /** Étape d'entrée — « nouveau » quand l'admin a déjà dit ce qu'il voulait. */
+  etapeInitiale?: Etape
 }
 
 type Etape = 'choix' | 'nouveau' | 'existant'
@@ -88,8 +90,9 @@ export function AssistantGeneration({
   periodesTypes,
   onGenerer,
   onNaviguerVersMois,
+  etapeInitiale = 'choix',
 }: Props) {
-  const [etape, setEtape] = useState<Etape>('choix')
+  const [etape, setEtape] = useState<Etape>(etapeInitiale)
   const [creation, setCreation] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
 
@@ -116,7 +119,7 @@ export function AssistantGeneration({
   )
 
   function reinitialiser() {
-    setEtape('choix')
+    setEtape(etapeInitiale)
     setErreur(null)
     setCreation(false)
     setLibelle('')
@@ -345,7 +348,12 @@ export function AssistantGeneration({
               </div>
             )}
 
-            {erreur && <p className="gen-erreur">{erreur}</p>}
+            {erreur && (
+              <p className="gen-erreur">
+                <span className="gen-erreur-titre">Je ne peux pas créer ce planning</span>
+                {erreur}
+              </p>
+            )}
           </div>
         )}
 

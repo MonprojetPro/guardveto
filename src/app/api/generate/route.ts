@@ -164,13 +164,18 @@ export async function POST(req: NextRequest) {
   // Compare-and-swap sur periodes.generation_lock_at : une seule génération à
   // la fois par période. Un verrou plus vieux que VERROU_PERIME_MS est réputé
   // abandonné (crash serverless) et peut être volé.
+  //
+  // ⚠️ Ce compare-and-swap vit en SQL (`acquerir_verrou_generation`) et NON
+  // ici. Écrit en `.update().or()`, il répondait 500 à CHAQUE génération —
+  // « column periodes.generation_lock_at does not exist » alors que la colonne
+  // existe. PostgREST accepte un filtre `or=` en lecture mais le qualifie
+  // `periodes.colonne` en écriture, où la requête utilise un alias. Prouvé par
+  // sonde le 2026-08-02. Ne PAS revenir à un `.or()` sur un update.
   const cutoffVerrou = new Date(Date.now() - VERROU_PERIME_MS).toISOString()
-  const { data: verrouAcquis, error: verrouErr } = await supabase
-    .from('periodes')
-    .update({ generation_lock_at: new Date().toISOString() })
-    .eq('id', periodeId)
-    .or(`generation_lock_at.is.null,generation_lock_at.lt.${cutoffVerrou}`)
-    .select('id')
+  const { data: verrouAcquis, error: verrouErr } = await supabase.rpc(
+    'acquerir_verrou_generation',
+    { p_periode_id: periodeId, p_cutoff: cutoffVerrou },
+  )
 
   if (verrouErr) {
     return NextResponse.json(
@@ -178,7 +183,7 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     )
   }
-  if (!verrouAcquis || verrouAcquis.length === 0) {
+  if (verrouAcquis !== true) {
     return NextResponse.json(
       { error: 'Une génération est déjà en cours pour cette période. Attends quelques secondes puis réessaie.' },
       { status: 409 }

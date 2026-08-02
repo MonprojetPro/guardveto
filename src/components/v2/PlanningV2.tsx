@@ -162,7 +162,7 @@ export function PlanningV2({
   // Les outils de la barre (PDF, absence, générer, publier) et leurs
   // garde-fous. La période vient de la PILULE — une seule source de vérité,
   // là où la V1 embarquait un second sélecteur qui la contredisait.
-  const { pilules, alertes, modales } = useOutilsPlanning({
+  const { pilules, alertes, modales, ouvrirAssistant } = useOutilsPlanning({
     periode: periodeAffichee,
     aDesGardes: periodeAffichee ? periodesAvecGardes.includes(periodeAffichee.id) : false,
     isAdmin,
@@ -277,11 +277,23 @@ export function PlanningV2({
                     </small>
                   </button>
                 ))}
+                {/* Menait à `/historique` du temps où la création vivait
+                    là-bas. Depuis le 2026-08-02 elle est ici, dans l'assistant
+                    de génération — le raccourci ouvre donc directement la voie
+                    « nouveau planning » au lieu de renvoyer sur un écran de
+                    consultation qui ne sait plus le faire. */}
                 {isAdmin && (
-                  <a className="pp-new" href="/historique">
-                    Gérer les périodes
-                    <small>Créer la période suivante, changer ses dates ou son profil</small>
-                  </a>
+                  <button
+                    type="button"
+                    className="pp-new"
+                    onClick={() => {
+                      setPopOuvert(false)
+                      ouvrirAssistant('nouveau')
+                    }}
+                  >
+                    Créer un nouveau planning
+                    <small>Des dates, une période type — et le moteur le remplit</small>
+                  </button>
                 )}
                 <p className="pp-today">📌 Aujourd&apos;hui : {dateCourte(today)}</p>
               </div>

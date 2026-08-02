@@ -20,9 +20,11 @@
 // ============================================================
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle } from 'lucide-react'
+import Link from 'next/link'
+import { AlertTriangle, ChevronDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
+import { grouperViolations } from '@/lib/regles/libelleViolation'
 import type { ViolationRevalidation } from './types-revalidation'
 
 interface RevalidationRealtimeProps {
@@ -41,7 +43,8 @@ const TABLES_SURVEILLEES = [
   'regles_cabinet',
 ] as const
 
-const MAX_AFFICHEES = 12
+/** Dates montrées par cause avant de basculer sur « et N autres ». */
+const MAX_DATES_PAR_CAUSE = 8
 
 function formatDateFr(iso: string): string {
   return new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR', {
@@ -56,6 +59,9 @@ export function RevalidationRealtime({
   initialViolations,
 }: RevalidationRealtimeProps) {
   const [violations, setViolations] = useState<ViolationRevalidation[]>(initialViolations)
+  // Replié par défaut : c'est un signal, pas un rapport. Déplié d'office, il
+  // repoussait le calendrier hors de l'écran (retour MiKL du 2026-08-02).
+  const [ouvert, setOuvert] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Re-validation serveur (debounced) — déclenchée par les events Realtime.
@@ -94,50 +100,76 @@ export function RevalidationRealtime({
 
   if (violations.length === 0) return null
 
-  const affichees = violations.slice(0, MAX_AFFICHEES)
-  const reste = violations.length - affichees.length
+  // Regroupé par CAUSE : « 64 incohérences » n'est presque jamais 64 problèmes,
+  // c'est deux règles qui se répètent sur 64 dates. Le tout à plat rendait le
+  // planning invisible sous le bandeau, sans dire quoi corriger.
+  const causes = grouperViolations(violations)
 
   return (
-    <div
-      className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950/20"
-      role="alert"
-    >
-      <div className="flex items-start gap-3">
-        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400" aria-hidden />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium leading-snug text-red-800 dark:text-red-300">
+    <div className="gv-alerte danger" role="alert">
+      <div className="gva-tete">
+        <AlertTriangle className="gva-ico" aria-hidden />
+        <div className="gva-titres">
+          <p className="gva-titre">
             {violations.length === 1
-              ? '1 incohérence détectée sur le planning publié'
-              : `${violations.length} incohérences détectées sur le planning publié`}
+              ? 'Une incohérence sur le planning publié'
+              : `${violations.length} incohérences sur le planning publié`}
+            {causes.length > 1 && (
+              <span className="gva-compte">
+                {' '}· {causes.length} causes
+              </span>
+            )}
           </p>
-          <p className="mt-0.5 text-xs leading-relaxed text-red-700 dark:text-red-400">
-            Le planning ne respecte plus toutes les règles depuis sa publication
-            (congé validé, règle modifiée, édition manuelle…). Vérifiez et corrigez
-            les créneaux concernés.
+          <p className="gva-sous">
+            Depuis sa publication, le planning ne respecte plus toutes les règles
+            (congé validé, règle modifiée, garde réattribuée…).
           </p>
-
-          <ul className="mt-2 space-y-1">
-            {affichees.map((v, i) => (
-              <li
-                key={`${v.regle}-${v.date}-${v.type}-${v.vetId ?? i}`}
-                className="text-xs leading-relaxed text-red-700 dark:text-red-300"
-              >
-                <span className="font-semibold">{formatDateFr(v.date)}</span>
-                {' — '}
-                <span className="font-mono text-[11px] opacity-70">{v.regle}</span>
-                {' · '}
-                {v.detail}
-              </li>
-            ))}
-          </ul>
-
-          {reste > 0 && (
-            <p className="mt-1 text-xs italic text-red-600 dark:text-red-400">
-              … et {reste} autre{reste > 1 ? 's' : ''}.
-            </p>
-          )}
         </div>
+        <button
+          type="button"
+          className="gva-toggle"
+          aria-expanded={ouvert}
+          onClick={() => setOuvert((v) => !v)}
+        >
+          {ouvert ? 'Masquer' : 'Voir le détail'}
+          <ChevronDown className={`gva-chevron${ouvert ? ' ouvert' : ''}`} aria-hidden />
+        </button>
       </div>
+
+      {ouvert && (
+        <div className="gva-corps">
+          {causes.map((cause) => {
+            const dates = cause.items.slice(0, MAX_DATES_PAR_CAUSE)
+            const reste = cause.items.length - dates.length
+            return (
+              <div key={cause.code} className="gva-cause">
+                <p className="gva-cause-tete">
+                  <span className="gva-cause-nb">
+                    {cause.items.length} date{cause.items.length > 1 ? 's' : ''}
+                  </span>
+                  <span className="gva-cause-nom">{cause.intitule}</span>
+                </p>
+                {/* Le `detail` est déjà rédigé en français par le validateur :
+                    celui de la première date suffit à comprendre la cause, les
+                    autres ne font que répéter la même phrase à d'autres dates. */}
+                <p className="gva-cause-detail">{cause.items[0].detail}</p>
+                <p className="gva-cause-dates">
+                  {dates.map((v) => formatDateFr(v.date)).join(' · ')}
+                  {reste > 0 && ` · et ${reste} autre${reste > 1 ? 's' : ''}`}
+                </p>
+              </div>
+            )
+          })}
+
+          <div className="gva-actions">
+            <Link href="/regles" className="gva-lien">Revoir les règles →</Link>
+            <span className="gva-note">
+              Régénérer le planning depuis « Générer » le remet d’aplomb — il
+              repassera en brouillon jusqu’à sa republication.
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -52,6 +52,24 @@ async function assertAdmin(
   return { veto: vet }
 }
 
+/** Une date ISO telle qu'on la lit à voix haute : « lundi 21 septembre 2026 ». */
+function dateFr(iso: string): string {
+  return new Date(`${iso}T12:00:00Z`).toLocaleDateString('fr-FR', {
+    timeZone: 'UTC',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
+/** Le lendemain — le premier jour redevenu libre après un planning. */
+function jourSuivant(iso: string): string {
+  const d = new Date(`${iso}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + 1)
+  return d.toISOString().slice(0, 10)
+}
+
 // Détection automatique de la saison depuis la date de début
 // Mai (5) → Août (8) = été, le reste = hiver
 function detecterSaison(dateDebut: string): 'ete' | 'hiver' {
@@ -96,7 +114,16 @@ export async function creerPeriode(formData: FormData) {
   if (chevauchements && chevauchements.length > 0) {
     const c = chevauchements[0]
     const label = c.libelle ?? (c.saison === 'ete' ? 'Été' : `Hiver P${c.numero ?? ''}`)
-    return { error: `Les dates chevauchent la période "${label}" (${c.date_debut} → ${c.date_fin}).` }
+    // Message lisible par le cabinet : des dates en français, pas des ISO, et
+    // la sortie indiquée. Un refus qui montre le mur sans montrer la porte
+    // oblige l'admin à aller chercher lui-même les dates du planning fautif.
+    return {
+      error:
+        `Ces dates se chevauchent avec le planning « ${label} », `
+        + `qui va du ${dateFr(c.date_debut)} au ${dateFr(c.date_fin)}. `
+        + `Choisis un départ après le ${dateFr(jourSuivant(c.date_fin))}, `
+        + `ou raccourcis la durée.`,
+    }
   }
 
   const saison = detecterSaison(dateDebut)
