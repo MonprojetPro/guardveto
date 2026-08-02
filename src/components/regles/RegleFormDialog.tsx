@@ -192,7 +192,13 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
   // pourries en bas de page ». Ce formulaire en avait vingt-et-une — il était
   // resté à l'écart de la bascule du 1er août parce qu'il vit hors du dossier
   // des onglets V2, alors qu'il s'ouvre depuis les mêmes écrans.
-  const { ouvrirErreur, ouvrirRefus, dialogueErreur } = useErreurBloquante()
+  // `avantDeQuitter` referme CE formulaire quand la modale emmène ailleurs
+  // (« Voir la règle existante ») : il est rendu par-dessus l'écran, et une
+  // navigation vers `/regles?focus=…` ne le démonte pas — il masquerait la
+  // règle qu'on vient d'aller voir.
+  const { ouvrirErreur, ouvrirRefus, dialogueErreur } = useErreurBloquante({
+    avantDeQuitter: onClose,
+  })
 
   const pj = (regle?.params_json ?? {}) as {
     qui?: { refs?: unknown }

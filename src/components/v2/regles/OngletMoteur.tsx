@@ -432,7 +432,14 @@ export function OngletMoteur({
 
   // Les refus serveur de cet écran s'affichent en modale (titre + explication +
   // porte de sortie), pas en vignette éphémère : cf. `ErreurBloquante`.
-  const { ouvrirErreur, ouvrirRefus, dialogueErreur } = useErreurBloquante()
+  // Idem : le panneau de saisie se referme avant que la modale n'emmène voir
+  // la règle en double, sinon il resterait ouvert par-dessus.
+  const { ouvrirErreur, ouvrirRefus, dialogueErreur } = useErreurBloquante({
+    avantDeQuitter: () => {
+      setCompoOuvert(false)
+      setCohorteOuverte(false)
+    },
+  })
 
   /**
    * Le gardien : ce que le moteur a trouvé sur la règle en cours, et l'écriture

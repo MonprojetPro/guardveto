@@ -99,9 +99,19 @@ function contenuDepuis(
  * `ouvrirErreur` est stable (useCallback sans dépendance d'état) : on peut donc
  * l'employer dans un `useEffect` sans relancer l'effet à chaque rendu.
  */
-export function useErreurBloquante() {
+export function useErreurBloquante(options?: {
+  /**
+   * Appelé juste avant qu'un bouton de la modale n'emmène ailleurs. Sert à
+   * refermer le panneau ou le formulaire qui a déclenché le refus : il est
+   * rendu PAR-DESSUS l'écran, et une navigation ne le démonte pas (on reste
+   * sur la même route, seul un paramètre change). Sans ça, on arrive bien sur
+   * la règle visée — mais derrière un formulaire qui masque tout.
+   */
+  avantDeQuitter?: () => void
+}) {
   const router = useRouter()
   const [contenu, setContenu] = useState<ContenuErreur | null>(null)
+  const avantDeQuitter = options?.avantDeQuitter
 
   const aller = useCallback((href: string) => router.push(href), [router])
 
@@ -155,14 +165,25 @@ export function useErreurBloquante() {
         {contenu?.explication && <p className="gv-explication">{contenu.explication}</p>}
 
         <DialogFooter>
+          {/* Le bouton neutre dit ce qu'il FAIT, pas où l'on est. « Rester ici »
+              (première version) décrivait une position, pas une action : on ne
+              savait pas si ça fermait, si ça enregistrait, ni ce qu'on gardait.
+              MiKL, en recette : « c'est pas ouf comme mots pour faire comprendre
+              à l'utilisateur ». « Corriger ma saisie » dit la suite du geste —
+              le panneau est toujours là derrière, avec ce qu'on avait tapé. */}
           <Button variant="outline" onClick={fermer}>
-            {contenu?.cta ? 'Rester ici' : 'J’ai compris'}
+            {contenu?.cta ? 'Corriger ma saisie' : 'J’ai compris'}
           </Button>
           {contenu?.cta && (
             <Button
               onClick={() => {
                 const { cta } = contenu
                 fermer()
+                // Le panneau qui a déclenché le refus doit se fermer AVANT la
+                // navigation : sans ça on arrive bien sur la règle visée, mais
+                // le formulaire reste ouvert par-dessus et masque tout — on
+                // voit qu'on est arrivé quelque part sans pouvoir rien y faire.
+                avantDeQuitter?.()
                 if (cta?.onClick) cta.onClick()
                 else if (cta?.href) aller(cta.href)
               }}
