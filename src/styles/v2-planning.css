@@ -1492,3 +1492,58 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
    information. Il ne doit donc pas emprunter la couleur d'avertissement. */
 .gen-aide.cale { color: var(--accent-ink); }
 .gen-aide.cale b { color: var(--accent-ink); }
+
+/* ── La liste des plannings : choisir, et faire le ménage ────────────────
+   Une rangée = un planning choisissable + son bouton de suppression. Avant le
+   2026-08-03 la ligne entière était le bouton ; il fallait donc un conteneur
+   pour loger la corbeille sans imbriquer deux boutons (interdit en HTML). */
+.gen-rangee {
+  display: flex; align-items: stretch; gap: 6px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  padding-right: 6px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.gen-rangee:hover { background: var(--surface-2); }
+.gen-rangee.suggere { border-color: var(--accent-ink); }
+
+/* La ligne redevient un bouton simple à l'intérieur de la rangée. */
+.gen-rangee .gen-ligne {
+  flex: 1 1 auto;
+  border: none;
+  background: transparent;
+  border-radius: var(--r-sm);
+}
+.gen-rangee .gen-ligne:hover { background: transparent; }
+.gen-rangee .gen-ligne:disabled { opacity: 0.5; cursor: default; }
+
+/* La corbeille : discrète tant qu'on ne survole pas la rangée, franche au
+   survol. Elle ne doit pas attirer l'œil autant que le choix du planning. */
+.gen-suppr {
+  flex: 0 0 auto;
+  align-self: center;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--soft);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+}
+.gen-rangee:hover .gen-suppr { opacity: 1; }
+.gen-suppr:hover {
+  color: var(--danger);
+  border-color: rgba(168, 52, 31, 0.35);
+  background: var(--danger-soft);
+}
+
+/* La confirmation en ligne — pas une seconde pop-up par-dessus la première. */
+.gen-confirm {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  align-self: center;
+  padding-left: 4px;
+  font-size: 0.78rem; font-weight: 700; color: var(--danger);
+}

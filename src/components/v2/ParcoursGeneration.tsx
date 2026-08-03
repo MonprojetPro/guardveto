@@ -33,7 +33,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   CalendarPlus, RotateCcw, Wand2, Loader2, ShieldAlert, CheckCircle2, AlertTriangle,
-  RefreshCw,
+  RefreshCw, Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -43,7 +43,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/u
 import { DiagnosticImpasse } from '@/components/planning/DiagnosticImpasse'
 import { CreneauxIgnoresAlert } from '@/components/planning/CreneauxIgnoresAlert'
 import { PointPreVol, type VetEtiquette } from '@/components/planning/PointPreVol'
-import { creerPeriode } from '@/app/(protected)/admin/periodes/actions'
+import { creerPeriode, supprimerPeriode } from '@/app/(protected)/admin/periodes/actions'
 import { estLundi, lundiDeLaSemaine, dureeProposee, finApres } from '@/lib/planning/duree'
 import type { AvertissementPreVol } from '@/engine/pre-vol'
 import type { CreneauIgnore } from '@/engine/creneau-modele'
@@ -142,6 +142,11 @@ export function ParcoursGeneration({
   // ── Étape ④ : le résultat ──────────────────────────────
   const [resultat, setResultat] = useState<Resultat | null>(null)
 
+  // Suppression d'un planning vide depuis la liste — en deux temps (on demande
+  // confirmation sur la ligne), jamais sur un simple clic.
+  const [aSupprimer, setASupprimer] = useState<string | null>(null)
+  const [suppressionEnCours, setSuppressionEnCours] = useState(false)
+
   // Tout le formulaire raisonne sur la date CALÉE : la durée annoncée, la date
   // de fin affichée et celle envoyée au serveur parlent du même planning.
   const debutCale = lundiDeLaSemaine(debut) ?? debut
@@ -162,9 +167,18 @@ export function ParcoursGeneration({
    * de sa période type), mais on ne peut pas le laisser orphelin : on propose
    * de le REPRENDRE, en tête du choix. Le plus récent d'abord.
    */
-  const brouillonEnCours = periodes.find(
+  const vides = periodes.filter(
     (p) => p.statut === 'brouillon' && !periodesAvecGardes.includes(p.id),
-  ) ?? null
+  )
+  // Le plus récemment CRÉÉ, pas le premier de la liste (qui est triée par date
+  // de début). MiKL, 2026-08-03 : « il y en a qu'un de proposé ? c'est quoi,
+  // le dernier consulté ? » — c'est le dernier créé, et la carte le dit
+  // maintenant. Les autres restent accessibles dans la liste complète, où ils
+  // portent le même marqueur « jamais rempli ».
+  const brouillonEnCours = vides.length > 0
+    ? [...vides].sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))[0]
+    : null
+  const idsVides = new Set(vides.map((p) => p.id))
 
   const bloquants = (preVol ?? []).filter((a) => a.gravite === 'bloquant')
   const aSurveiller = (preVol ?? []).filter((a) => a.gravite !== 'bloquant')
@@ -228,6 +242,11 @@ export function ParcoursGeneration({
 
   /** Voie « existant » : on vise, puis on passe au contrôle. */
   function viserExistant(p: Periode) {
+    // On se place sur son mois DÈS le ciblage : à la fermeture du parcours,
+    // l'écran montre le planning qu'on vient de remplir et pas celui d'où on
+    // était parti (retour MiKL du 2026-08-03 : « il ne m'a pas renvoyé au bon
+    // endroit sur l'agenda, il m'a laissé là où j'étais »).
+    onNaviguerVersMois(p.date_debut.slice(0, 7))
     setCible(p.id)
     setNomCible(nomPlanning(p))
     setCibleEstPubliee(p.statut === 'publie')
@@ -276,6 +295,27 @@ export function ParcoursGeneration({
     setNomCible(nom)
     setCibleEstPubliee(false)
     allerAuControle(res.id)
+  }
+
+  /**
+   * Supprimer un planning resté vide. Le serveur ne l'autorise que sur un
+   * BROUILLON SANS GARDES — c'est ce garde-fou qui rend le bouton sûr : on ne
+   * peut pas effacer un planning que l'équipe a déjà vu, ni un travail de
+   * génération. Sans lui, les essais s'empilaient sans moyen de faire le
+   * ménage (retour MiKL du 2026-08-03).
+   */
+  async function supprimer(id: string) {
+    setSuppressionEnCours(true)
+    const res = await supprimerPeriode(id)
+    setSuppressionEnCours(false)
+    setASupprimer(null)
+    if ('error' in res && res.error) {
+      toast.error(res.error)
+      return
+    }
+    toast.success('Planning supprimé.')
+    if (cible === id) setCible('')
+    router.refresh()
   }
 
   /** ③ Le moteur travaille. `confirmRepublication` : cf. garde-fou Chantier B. */
@@ -398,8 +438,13 @@ export function ParcoursGeneration({
                   Reprendre « {nomPlanning(brouillonEnCours)} »
                 </span>
                 <span className="gen-carte-sous">
-                  Créé le {dateCourte(brouillonEnCours.date_debut)} et jamais rempli —
-                  on repart de là plutôt que d’en créer un de plus.
+                  Le dernier que tu as créé, jamais rempli — on repart de là plutôt
+                  que d’en créer un de plus.
+                  {vides.length > 1 && (
+                    <> {vides.length - 1} autre{vides.length > 2 ? 's' : ''} planning
+                      {vides.length > 2 ? 's' : ''} vide{vides.length > 2 ? 's' : ''} t’
+                      attend{vides.length > 2 ? 'ent' : ''} dans la liste complète.</>
+                  )}
                 </span>
               </button>
             )}
@@ -545,22 +590,69 @@ export function ParcoursGeneration({
         {/* ── ①c Reprendre un planning existant ─────────── */}
         {etape === 'existant' && (
           <div className="gen-liste">
-            {periodes.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                className={`gen-ligne${p.id === (periodeAffichee?.id ?? '') ? ' suggere' : ''}`}
-                onClick={() => viserExistant(p)}
-              >
-                <span className="gen-ligne-nom">{nomPlanning(p)}</span>
-                <span className="gen-ligne-dates">
-                  du {dateCourte(p.date_debut)} au {dateCourte(p.date_fin)}
-                </span>
-                <span className={`gm-badge ${p.statut === 'publie' ? 'publie' : p.statut === 'verrouille' ? 'lock' : 'brouillon'}`}>
-                  {STATUT[p.statut]}
-                </span>
-              </button>
-            ))}
+            {periodes.map((p) => {
+              const vide = idsVides.has(p.id)
+              const enConfirmation = aSupprimer === p.id
+              return (
+                <div
+                  key={p.id}
+                  className={`gen-rangee${p.id === (periodeAffichee?.id ?? '') ? ' suggere' : ''}`}
+                >
+                  <button
+                    type="button"
+                    className="gen-ligne"
+                    onClick={() => viserExistant(p)}
+                    disabled={enConfirmation}
+                  >
+                    <span className="gen-ligne-nom">{nomPlanning(p)}</span>
+                    <span className="gen-ligne-dates">
+                      du {dateCourte(p.date_debut)} au {dateCourte(p.date_fin)}
+                    </span>
+                    <span className={`gm-badge ${p.statut === 'publie' ? 'publie' : p.statut === 'verrouille' ? 'lock' : 'brouillon'}`}>
+                      {vide ? 'Jamais rempli' : STATUT[p.statut]}
+                    </span>
+                  </button>
+
+                  {/* Le ménage n'est possible QUE sur un planning vide : un
+                      planning rempli représente un travail, un planning publié
+                      a été vu par l'équipe. Le serveur refuse les deux autres
+                      cas de toute façon. */}
+                  {vide && !enConfirmation && (
+                    <button
+                      type="button"
+                      className="gen-suppr"
+                      title="Supprimer ce planning vide"
+                      aria-label={`Supprimer le planning ${nomPlanning(p)}`}
+                      onClick={() => setASupprimer(p.id)}
+                    >
+                      <Trash2 className="ppv-ico" aria-hidden />
+                    </button>
+                  )}
+                  {enConfirmation && (
+                    <span className="gen-confirm">
+                      Supprimer&nbsp;?
+                      <button
+                        type="button"
+                        className="ppv-btn"
+                        disabled={suppressionEnCours}
+                        onClick={() => setASupprimer(null)}
+                      >
+                        Non
+                      </button>
+                      <button
+                        type="button"
+                        className="ppv-btn fort"
+                        disabled={suppressionEnCours}
+                        onClick={() => void supprimer(p.id)}
+                      >
+                        {suppressionEnCours && <Loader2 className="ppv-spin" aria-hidden />}
+                        Oui, supprimer
+                      </button>
+                    </span>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
 
@@ -732,7 +824,11 @@ export function ParcoursGeneration({
             <>
               <Button variant="outline" onClick={() => setEtape('choix')}>Retour</Button>
               {/* Après une correction faite dans l'autre onglet : on relit sans
-                  refaire tout le parcours (retour MiKL du 2026-08-03). */}
+                  refaire tout le parcours (retour MiKL du 2026-08-03).
+                  Masqué quand rien ne coince : il n'y a rien à revérifier, et
+                  un bouton actif à côté de « Rien ne coince » laisse croire
+                  qu'il reste quelque chose à faire. */}
+              {(preVol?.length ?? 0) > 0 && (
               <Button
                 variant="outline"
                 onClick={() => void chargerPreVol(cible)}
@@ -743,6 +839,7 @@ export function ParcoursGeneration({
                   : <RefreshCw className="w-4 h-4 mr-2" />}
                 J’ai corrigé — revérifier
               </Button>
+              )}
               <Button
                 onClick={() => void lancer(cibleEstPubliee)}
                 disabled={chargementPreVol || bloquants.length > 0}

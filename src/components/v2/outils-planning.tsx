@@ -111,7 +111,13 @@ export function useOutilsPlanning({
 
   const estPublie = periode?.statut === 'publie'
   const estVerrouille = periode?.statut === 'verrouille'
-  const peutPublier = aDesGardes && periode?.statut === 'brouillon'
+  // Volontairement SANS `aDesGardes` : un bouton grisé ne dit pas pourquoi il
+  // l'est. MiKL, 2026-08-03 : « je ne peux pas le publier ? c'est parce que je
+  // n'ai rien généré ? juste pour vérifier que c'est bien ça ». Le clic ouvre
+  // désormais le contrôle de publication, qui répond noir sur blanc — « Ce
+  // planning n'a aucune garde, génère-le d'abord » — au lieu de laisser
+  // deviner. C'est ce contrôle qui interdit ensuite la publication à vide.
+  const peutPublier = periode?.statut === 'brouillon'
 
   /** Ouvre le parcours, éventuellement droit sur la création d'un planning. */
   function ouvrirParcours(etape: 'choix' | 'nouveau' = 'choix') {
@@ -165,7 +171,7 @@ export function useOutilsPlanning({
               type="button"
               className="head-btn valider"
               disabled={!peutPublier}
-              title={aDesGardes ? 'Publier le planning auprès de l’équipe' : 'Génère d’abord le planning'}
+              title="Publier le planning auprès de l’équipe" 
               onClick={() => setPublicationOuverte(true)}
             >
               Publier
