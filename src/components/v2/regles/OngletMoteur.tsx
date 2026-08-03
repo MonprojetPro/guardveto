@@ -147,6 +147,8 @@ import {
 import type { RegleEquipeUI } from '@/components/regles/CompositionEquipeClient'
 import type { StructureRegleUI } from '@/components/regles/ReglagesPlanningClient'
 import { ancresDeFocus } from '@/lib/regles/focusRegles'
+import { GardienImpact } from '@/components/v2/GardienImpact'
+import type { Impact } from '@/data/controleImpact'
 import type { VetoUI } from './types'
 
 // ════════════════════════════════════════════════════════════
@@ -509,6 +511,9 @@ export function OngletMoteur({
 
   const nomVeto = (id: string) => vets.find((v) => v.id === id)?.prenom ?? id
 
+  /** Refus du contrôle d'impact sur une pose d'étiquette (palier 3). */
+  const [impactTag, setImpactTag] = useState<Impact | null>(null)
+
   const labelPeriode = (id?: string | null) =>
     id ? (periodes.find((p) => p.id === id)?.label ?? 'période supprimée') : null
 
@@ -592,6 +597,14 @@ export function OngletMoteur({
     if (!inedit) return true
     const res: Reponse = await poserEtiquetteSurVetos(tag, porteurs)
     if (res?.error) {
+      // Un refus PORTEUR d'impact s'explique dans la fenêtre de Filou, qui
+      // porte les gestes de correction (palier 3). Poser une étiquette change
+      // qui peut tenir quel rôle : le refus vient du moteur, pas d'une faute
+      // de saisie — une modale d'erreur sèche n'aurait rien à en dire.
+      if ('impact' in res && res.impact) {
+        setImpactTag(res.impact as Impact)
+        return false
+      }
       ouvrirErreur(res.error, {
         titre: 'L’étiquette n’a pas pu être posée',
         explication:
@@ -1316,6 +1329,17 @@ export function OngletMoteur({
 
   return (
     <>
+      {/* Filou explique une pose d'étiquette que le moteur refuse, et porte les
+          gestes pour la régler sur place (palier 3). */}
+      <GardienImpact
+        impact={impactTag}
+        geste="poser cette étiquette"
+        origine="regles"
+        vets={vets.map((v) => ({ id: v.id, prenom: v.prenom, nom: v.nom ?? '' }))}
+        onAnnuler={() => setImpactTag(null)}
+        onCorrige={() => setImpactTag(null)}
+      />
+
       {/* ══════════════ Carte 1 · Les règles du cabinet ══════════════ */}
       <section className="card">
         <div className="card-head">

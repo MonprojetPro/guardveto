@@ -211,12 +211,28 @@ describe('les refus arrivent à l’écran avec de quoi les régler', () => {
     expect(gardien).toContain('!estBloquant && onPasserOutre')
   })
 
-  it('les écrans concernés ouvrent bien la fenêtre', () => {
+  it('les QUATRE écrans concernés ouvrent bien la fenêtre', () => {
+    // Les quatre portes du palier 2 ont chacune leur écran. En laisser une en
+    // toast, c'est laisser un utilisateur devant un refus sans issue — et on
+    // ne s'en apercevrait qu'en recette, sur ce cas-là précisément.
     for (const ecran of [
-      'components/conges/ValiderCongeDialog.tsx',
-      'components/v2/EquipeV2.tsx',
+      'components/conges/ValiderCongeDialog.tsx',      // valider un congé
+      'components/v2/EquipeV2.tsx',                     // retirer de l'équipe
+      'components/admin/EffectifPeriodeSelect.tsx',     // effectif de nuit
+      'components/v2/regles/OngletMoteur.tsx',          // poser une étiquette
     ]) {
       expect(lire(ecran)).toContain('GardienImpact')
+    }
+  })
+
+  it('les quatre actions renvoient l’impact, pas seulement un message', () => {
+    for (const fichier of [
+      'app/(protected)/conges/actions.ts',
+      'app/(protected)/admin/veterinaires/actions.ts',
+      'app/(protected)/admin/periodes/actions.ts',
+      'app/(protected)/regles/actions.ts',
+    ]) {
+      expect(lire(fichier)).toContain('impact: refus.impact')
     }
   })
 })

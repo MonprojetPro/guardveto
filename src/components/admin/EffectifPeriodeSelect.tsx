@@ -18,6 +18,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from '@/components/ui/select'
 import { setEffectifPeriode } from '@/app/(protected)/admin/periodes/actions'
+import { GardienImpact } from '@/components/v2/GardienImpact'
+import type { Impact } from '@/data/controleImpact'
+import type { VetEtiquette } from '@/components/planning/PointPreVol'
 
 /** Effectifs proposables le soir en semaine (miroir du CHECK 1..4). */
 const EFFECTIFS = [1, 2, 3, 4]
@@ -29,22 +32,40 @@ interface EffectifPeriodeSelectProps {
   /** Valeur effective : explicite si réglée, sinon repli saison (hiver 2 / été 1). */
   valeur: number
   disabled?: boolean
+  /**
+   * Vétérinaires actifs — pour les gestes de correction qui portent sur une
+   * étiquette. Absents, la fenêtre de Filou reste utile (assouplir, mettre en
+   * pause, ouvrir les règles) : demander deux vétos par nuit se corrige
+   * rarement en posant une étiquette.
+   */
+  vetsActifs?: VetEtiquette[]
 }
 
-export function EffectifPeriodeSelect({ periodeId, valeur, disabled }: EffectifPeriodeSelectProps) {
+export function EffectifPeriodeSelect({
+  periodeId, valeur, disabled, vetsActifs = [],
+}: EffectifPeriodeSelectProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [val, setVal] = useState(String(valeur))
+  // Le refus du contrôle d'impact : demander plus de monde qu'il n'y en a est
+  // LE cas d'école de ce réglage. Il s'explique en fenêtre, avec ses gestes.
+  const [impact, setImpact] = useState<Impact | null>(null)
+  const [nbVise, setNbVise] = useState<number | null>(null)
 
-  const onChange = (v: string) => {
-    const nb = Number(v)
-    setVal(v)
+  const appliquer = (nb: number, confirme: boolean) => {
+    setNbVise(nb)
     startTransition(async () => {
-      const res = await setEffectifPeriode(periodeId, nb)
+      const res = await setEffectifPeriode(periodeId, nb, confirme)
       if (res?.error) {
+        if ('impact' in res && res.impact) {
+          setImpact(res.impact)
+          setVal(String(valeur)) // rollback visuel : le réglage n'a pas pris
+          return
+        }
         toast.error(res.error)
         setVal(String(valeur)) // rollback visuel
       } else {
+        setImpact(null)
         toast.success(
           nb === 1
             ? 'Effectif : 1 véto la nuit en semaine.'
@@ -55,6 +76,12 @@ export function EffectifPeriodeSelect({ periodeId, valeur, disabled }: EffectifP
     })
   }
 
+  const onChange = (v: string) => {
+    const nb = Number(v)
+    setVal(v)
+    appliquer(nb, false)
+  }
+
   if (disabled) {
     return (
       <span className="text-xs text-muted-foreground">{libelle(valeur)}</span>
@@ -62,6 +89,17 @@ export function EffectifPeriodeSelect({ periodeId, valeur, disabled }: EffectifP
   }
 
   return (
+    <>
+    <GardienImpact
+      impact={impact}
+      geste="changer l’effectif des nuits de semaine"
+      origine="historique"
+      vets={vetsActifs}
+      enCours={isPending}
+      onAnnuler={() => setImpact(null)}
+      onCorrige={() => { if (nbVise !== null) appliquer(nbVise, false) }}
+      onPasserOutre={() => { if (nbVise !== null) appliquer(nbVise, true) }}
+    />
     <Select value={val} onValueChange={(v) => v && onChange(v)} disabled={isPending}>
       <SelectTrigger className="h-8 w-[120px] text-xs">{libelle(Number(val))}</SelectTrigger>
       <SelectContent>
@@ -72,5 +110,6 @@ export function EffectifPeriodeSelect({ periodeId, valeur, disabled }: EffectifP
         ))}
       </SelectContent>
     </Select>
+    </>
   )
 }

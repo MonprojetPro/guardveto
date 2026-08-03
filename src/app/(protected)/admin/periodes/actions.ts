@@ -253,7 +253,7 @@ export async function setEffectifPeriode(
       { genre: 'effectif_nuit', nb },
       confirmeImpact,
     )
-    if (refus) return { error: refus.error }
+    if (refus) return { error: refus.error, impact: refus.impact }
   } catch {
     // Cabinet irrésolu : on n'empêche pas un réglage légitime.
   }

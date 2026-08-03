@@ -554,7 +554,7 @@ export async function poserEtiquetteSurVetos(tag: string, vetoIds: string[]) {
       { genre: 'veto_tags', vetId: v.id, tags: [...actuels, tagNorm] },
       false,
     )
-    if (refus) return { error: refus.error }
+    if (refus) return { error: refus.error, impact: refus.impact }
   }
 
   const poses: string[] = []

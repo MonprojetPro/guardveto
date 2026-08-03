@@ -222,6 +222,15 @@ export default async function HistoriquePage({
     .eq('dernier_recours', true)
   const derniersRecours = ((vetsDb as { id: string }[] | null) ?? []).map((v) => v.id)
 
+  // L'équipe active — les gestes de correction de Filou en ont besoin quand un
+  // réglage d'effectif se corrige en posant une étiquette.
+  const { data: actifsDb } = await supabase
+    .from('veterinaires')
+    .select('id, prenom, nom')
+    .eq('actif', true)
+    .order('nom')
+  const vetsActifs = (actifsDb ?? []) as Array<{ id: string; prenom: string; nom: string }>
+
   // ── Légende du filtre ──────────────────────────────────────────────────
   const legende: Array<{ texte: string; fort?: boolean }> = []
   if (plageValide) {
@@ -287,6 +296,7 @@ export default async function HistoriquePage({
           <span className="pr-champ">
             Nuit :
             <EffectifPeriodeSelect
+              vetsActifs={vetsActifs}
               periodeId={l.periode.id}
               valeur={l.effectif}
               disabled={l.periode.statut === 'verrouille'}
