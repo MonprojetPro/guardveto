@@ -245,40 +245,80 @@ export async function setEffectifPeriode(periodeId: string, nb: number) {
   return { success: true }
 }
 
+/**
+ * Supprime un planning. **Uniquement un BROUILLON** — c'est la seule ligne
+ * rouge, et elle est double : le `.eq('statut', 'brouillon')` du delete la
+ * tient même si l'appelant se trompe.
+ *
+ * CE QUI A CHANGÉ LE 2026-08-03 (demande explicite de MiKL : « je veux pouvoir
+ * supprimer un brouillon déjà généré mais non publié »). L'action refusait tout
+ * planning ayant des gardes. C'était trop prudent : un brouillon généré n'a
+ * JAMAIS été vu par l'équipe, aucun e-mail n'est parti, aucun événement
+ * d'agenda n'existe — tout cela se déclenche à la publication. Le seul travail
+ * perdu est un calcul de quelques secondes, refaisable d'un clic. En échange,
+ * les essais s'accumulaient sans aucun moyen de faire le ménage.
+ *
+ * CE QUE LA SUPPRESSION EMPORTE — inventaire refait à la source (contraintes
+ * FK réelles, pas de mémoire) :
+ *   • `gardes`, `attributions`, `bonus_malus` → ON DELETE CASCADE, la base s'en
+ *     charge ;
+ *   • `email_log`, `historique_fete` → ON DELETE SET NULL, les traces restent ;
+ *   • `compteurs_gardes`, `planning_semaine` → ce sont des VUES, elles suivent ;
+ *   • `regles_cabinet.periode_id` → NO ACTION : une règle limitée à ce planning
+ *     BLOQUERAIT le delete. On le détecte AVANT pour l'expliquer, au lieu de
+ *     laisser remonter une erreur de contrainte Postgres.
+ *
+ * Renvoie le nombre de gardes effacées, pour que l'écran puisse le dire.
+ */
 export async function supprimerPeriode(periodeId: string) {
   const supabase = await createClient()
 
   const garde = await assertAdmin(supabase)
   if ('error' in garde) return { error: garde.error }
 
-  // Sécurité : seulement les brouillons sans gardes peuvent être supprimés
-  const { count } = await supabase
+  const { data: per } = await supabase
+    .from('periodes')
+    .select('statut, libelle')
+    .eq('id', periodeId)
+    .maybeSingle()
+  if (!per) return { error: 'Planning introuvable.' }
+
+  const statut = (per as { statut?: string }).statut
+  if (statut !== 'brouillon') {
+    return {
+      error: statut === 'publie'
+        ? 'Ce planning est publié : l’équipe l’a déjà vu. Il faut le dépublier avant de pouvoir le supprimer.'
+        : 'Ce planning est verrouillé : il fait partie de l’historique du cabinet.',
+    }
+  }
+
+  // Règles limitées à CE planning : la FK est en NO ACTION, le delete
+  // échouerait avec une erreur Postgres illisible. On l'annonce en français.
+  const { count: nbRegles } = await supabase
+    .from('regles_cabinet')
+    .select('id', { count: 'exact', head: true })
+    .eq('periode_id', periodeId)
+  if (nbRegles && nbRegles > 0) {
+    return {
+      error: `${nbRegles} règle${nbRegles > 1 ? 's sont limitées' : ' est limitée'} à ce planning. `
+        + `Supprime-la${nbRegles > 1 ? 's' : ''} ou rends-la${nbRegles > 1 ? 's' : ''} permanente${nbRegles > 1 ? 's' : ''} avant d’effacer le planning.`,
+    }
+  }
+
+  const { count: nbGardes } = await supabase
     .from('gardes')
-    .select('*', { count: 'exact', head: true })
+    .select('id', { count: 'exact', head: true })
     .eq('periode_id', periodeId)
 
-  if (count && count > 0) {
-    return { error: 'Cette période a des gardes générées. Impossible de la supprimer.' }
-  }
-
-  // Purge V2 (P6 verrou n°7, étape 3) : `attributions.planning_id` n'a pas de
-  // FK vers periodes — une génération dont l'écriture V1 a échoué à mi-course
-  // peut avoir laissé des lignes V2 sans gardes. On les retire AVANT de
-  // supprimer la période, sinon elles resteraient orphelines à jamais.
-  // Borné aux BROUILLONS (même garde-fou que le delete de la période juste
-  // en dessous) : on ne touche pas la V2 d'une période publiée par erreur.
-  const { data: perStatut } = await supabase
-    .from('periodes')
-    .select('statut')
-    .eq('id', periodeId)
-    .single()
-  if ((perStatut as { statut?: string } | null)?.statut === 'brouillon') {
-    const { error: attribErr } = await supabase
-      .from('attributions')
-      .delete()
-      .eq('planning_id', periodeId)
-    if (attribErr) return { error: attribErr.message }
-  }
+  // `attributions.planning_id` cascade désormais, mais on garde ce nettoyage
+  // explicite : une génération dont l'écriture V1 a échoué à mi-course peut
+  // avoir laissé des lignes V2 rattachées à un planning qui, lui, n'existe
+  // plus vraiment. Le faire AVANT coûte une requête et ne peut pas nuire.
+  const { error: attribErr } = await supabase
+    .from('attributions')
+    .delete()
+    .eq('planning_id', periodeId)
+  if (attribErr) return { error: attribErr.message }
 
   const { error } = await supabase
     .from('periodes')
@@ -289,5 +329,5 @@ export async function supprimerPeriode(periodeId: string) {
   if (error) return { error: error.message }
 
   revaliderPeriodes()
-  return { success: true }
+  return { success: true, nbGardes: nbGardes ?? 0 }
 }

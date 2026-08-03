@@ -1547,3 +1547,37 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   padding-left: 4px;
   font-size: 0.78rem; font-weight: 700; color: var(--danger);
 }
+
+/* ── La confirmation de suppression : la rangée BASCULE ──────────────────
+   Glissées à côté du nom du planning, la question et ses deux réponses se
+   chevauchaient et on ne savait plus à quelle ligne elles se rapportaient
+   (retour MiKL du 2026-08-03). Elles occupent maintenant toute la rangée. */
+.gen-rangee.confirmation {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+  border-color: rgba(168, 52, 31, 0.4);
+  background: var(--danger-soft);
+  padding: 11px 13px;
+}
+.gen-confirm-txt { flex: 1 1 220px; min-width: 0; }
+.gen-confirm-titre {
+  font-family: var(--font-display);
+  font-size: 0.9rem; font-weight: 800; color: var(--danger);
+}
+.gen-confirm-sous {
+  margin-top: 2px;
+  font-size: 0.79rem; line-height: 1.5; color: var(--text);
+}
+.gen-confirm-actions { flex: 0 0 auto; display: flex; gap: 7px; }
+
+/* Le bouton qui détruit : rouge franc, jamais l'accent du parcours (qui, lui,
+   fait avancer). On ne doit pas pouvoir confondre les deux d'un coup d'œil. */
+.ppv-btn.danger {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.ppv-btn.danger:hover:not(:disabled) {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}

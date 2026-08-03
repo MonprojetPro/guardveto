@@ -128,6 +128,17 @@ export default async function HistoriquePage({
   const periodes = (periodesDb as Periode[] | null) ?? []
   const dock = await chargerDock(supabase, vet, periodes)
 
+  // Quels plannings ont réellement des gardes : la corbeille doit prévenir
+  // qu'elle en efface (le serveur accepte de supprimer un brouillon rempli
+  // depuis le 2026-08-03 — il n'a jamais été vu par l'équipe).
+  const { data: gardesParPeriode } = await supabase
+    .from('gardes')
+    .select('periode_id')
+    .limit(500)
+  const periodesAvecGardes = new Set(
+    ((gardesParPeriode ?? []) as { periode_id: string }[]).map((g) => g.periode_id),
+  )
+
   if (periodes.length === 0) {
     return (
       <>
@@ -294,7 +305,11 @@ export default async function HistoriquePage({
       )
       if (l.periode.statut === 'brouillon') {
         slotsSupprimerPeriode[l.periode.id] = (
-          <SupprimerPeriodeButton periodeId={l.periode.id} label={libellePeriode(l.periode)} />
+          <SupprimerPeriodeButton
+            periodeId={l.periode.id}
+            label={libellePeriode(l.periode)}
+            aDesGardes={periodesAvecGardes.has(l.periode.id)}
+          />
         )
       }
     }

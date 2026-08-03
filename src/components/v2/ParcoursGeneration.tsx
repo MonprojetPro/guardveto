@@ -160,6 +160,25 @@ export function ParcoursGeneration({
   )
 
   /**
+   * Ce que « Selon la saison » va RÉELLEMENT prendre — MiKL, 2026-08-03 :
+   * « sur quelle période type le moteur se base quand il y a "selon la
+   * saison" ? ». La question était légitime : l'option ne disait rien.
+   *
+   * On rejoue ici la règle du serveur (`creerPeriode`) : mai→août = été, le
+   * reste = hiver ; puis la première période type ACTIVE dont la saison
+   * suggérée correspond. À défaut, c'est le profil par défaut du cabinet.
+   * ⚠️ Si cette règle change côté serveur, elle doit changer ici aussi —
+   * sinon l'écran promettrait une période type et le moteur en prendrait une
+   * autre, exactement le genre d'écart qui ne se voit qu'à la génération.
+   */
+  const typeSelonSaison = useMemo(() => {
+    if (!debutCale) return null
+    const mois = Number(debutCale.slice(5, 7))
+    const saison = mois >= 5 && mois <= 8 ? 'ete' : 'hiver'
+    return periodesTypes.find((p) => p.saison_suggeree === saison) ?? null
+  }, [debutCale, periodesTypes])
+
+  /**
    * Un planning CRÉÉ mais jamais rempli — typiquement celui d'un parcours
    * abandonné en cours de route. MiKL, 2026-08-03 : « comment ça se fait que
    * l'été P1 soit créé alors que je ne suis pas allé au bout ? ». Le planning
@@ -561,19 +580,31 @@ export function ParcoursGeneration({
                 <Select value={typeChoisi} onValueChange={(v) => v && setTypeChoisi(v)}>
                   <SelectTrigger className="w-full">
                     {typeChoisi === AUTO
-                      ? 'Selon la saison'
+                      ? (typeSelonSaison
+                          ? `Selon la saison — « ${typeSelonSaison.nom} »`
+                          : 'Selon la saison')
                       : typesProposables.find((p) => p.id === typeChoisi)?.nom ?? 'Selon la saison'}
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={AUTO}>Selon la saison</SelectItem>
+                    <SelectItem value={AUTO}>
+                      {typeSelonSaison
+                        ? `Selon la saison — « ${typeSelonSaison.nom} »`
+                        : 'Selon la saison'}
+                    </SelectItem>
                     {typesProposables.map((p) => (
                       <SelectItem key={p.id} value={p.id}>{p.nom}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <span className="gen-aide">
-                  Elle décide des gardes à couvrir et de l’effectif. « Selon la saison »
-                  prend celle réglée pour l’été ou l’hiver dans l’Organisation.
+                  Elle décide des gardes à couvrir et de l’effectif.{' '}
+                  {typeSelonSaison ? (
+                    <>Ton départ tombe en {Number(debutCale.slice(5, 7)) >= 5 && Number(debutCale.slice(5, 7)) <= 8 ? 'été' : 'hiver'},
+                      donc « Selon la saison » prendra <b>{typeSelonSaison.nom}</b>.</>
+                  ) : (
+                    <>Aucune période type n’est réglée pour cette saison dans l’Organisation :
+                      « Selon la saison » prendra la structure par défaut du cabinet.</>
+                  )}
                 </span>
               </div>
             )}
@@ -592,7 +623,46 @@ export function ParcoursGeneration({
           <div className="gen-liste">
             {periodes.map((p) => {
               const vide = idsVides.has(p.id)
-              const enConfirmation = aSupprimer === p.id
+              const supprimable = p.statut === 'brouillon'
+              // En confirmation, la rangée bascule ENTIÈREMENT : la question
+              // et ses deux réponses occupent la place du planning. Glissées
+              // à côté du nom, elles se chevauchaient et on ne savait plus à
+              // quelle ligne elles se rapportaient (retour MiKL 2026-08-03).
+              if (aSupprimer === p.id) {
+                return (
+                  <div key={p.id} className="gen-rangee confirmation">
+                    <div className="gen-confirm-txt">
+                      <p className="gen-confirm-titre">
+                        Supprimer « {nomPlanning(p)} » ?
+                      </p>
+                      <p className="gen-confirm-sous">
+                        {vide
+                          ? 'Ce planning est vide — rien à perdre.'
+                          : 'Ses gardes seront effacées. Personne ne les a vues : ce planning n’est pas publié, aucun e-mail n’est parti, aucun agenda n’a été rempli.'}
+                      </p>
+                    </div>
+                    <div className="gen-confirm-actions">
+                      <button
+                        type="button"
+                        className="ppv-btn"
+                        disabled={suppressionEnCours}
+                        onClick={() => setASupprimer(null)}
+                      >
+                        Annuler
+                      </button>
+                      <button
+                        type="button"
+                        className="ppv-btn danger"
+                        disabled={suppressionEnCours}
+                        onClick={() => void supprimer(p.id)}
+                      >
+                        {suppressionEnCours && <Loader2 className="ppv-spin" aria-hidden />}
+                        Supprimer
+                      </button>
+                    </div>
+                  </div>
+                )
+              }
               return (
                 <div
                   key={p.id}
@@ -602,7 +672,6 @@ export function ParcoursGeneration({
                     type="button"
                     className="gen-ligne"
                     onClick={() => viserExistant(p)}
-                    disabled={enConfirmation}
                   >
                     <span className="gen-ligne-nom">{nomPlanning(p)}</span>
                     <span className="gen-ligne-dates">
@@ -613,42 +682,20 @@ export function ParcoursGeneration({
                     </span>
                   </button>
 
-                  {/* Le ménage n'est possible QUE sur un planning vide : un
-                      planning rempli représente un travail, un planning publié
-                      a été vu par l'équipe. Le serveur refuse les deux autres
-                      cas de toute façon. */}
-                  {vide && !enConfirmation && (
+                  {/* Tous les BROUILLONS sont supprimables depuis le 2026-08-03,
+                      remplis ou non : tant qu'un planning n'est pas publié,
+                      l'équipe ne l'a jamais vu et rien n'a été envoyé. Publiés
+                      et verrouillés restent intouchables. */}
+                  {supprimable && (
                     <button
                       type="button"
                       className="gen-suppr"
-                      title="Supprimer ce planning vide"
+                      title={vide ? 'Supprimer ce planning vide' : 'Supprimer ce brouillon et ses gardes'}
                       aria-label={`Supprimer le planning ${nomPlanning(p)}`}
                       onClick={() => setASupprimer(p.id)}
                     >
                       <Trash2 className="ppv-ico" aria-hidden />
                     </button>
-                  )}
-                  {enConfirmation && (
-                    <span className="gen-confirm">
-                      Supprimer&nbsp;?
-                      <button
-                        type="button"
-                        className="ppv-btn"
-                        disabled={suppressionEnCours}
-                        onClick={() => setASupprimer(null)}
-                      >
-                        Non
-                      </button>
-                      <button
-                        type="button"
-                        className="ppv-btn fort"
-                        disabled={suppressionEnCours}
-                        onClick={() => void supprimer(p.id)}
-                      >
-                        {suppressionEnCours && <Loader2 className="ppv-spin" aria-hidden />}
-                        Oui, supprimer
-                      </button>
-                    </span>
                   )}
                 </div>
               )
