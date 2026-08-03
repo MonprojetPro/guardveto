@@ -543,6 +543,8 @@ function detecterCreneauxImpossibles(
 interface CapaciteVet {
   cap: number
   reglesLimitantes: string[]
+  /** ids `regles_cabinet` des règles limitantes — pour agir dessus depuis l'UI. */
+  idsLimitants: string[]
 }
 
 function capaciteVet(
@@ -554,6 +556,7 @@ function capaciteVet(
 ): CapaciteVet {
   let cap = nbSlots // sans limite : au plus une garde par créneau
   const limitantes: string[] = []
+  const ids: string[] = []
 
   for (const c of vet.contraintes) {
     if (!c.actif || !estDure(c)) continue
@@ -574,6 +577,7 @@ function capaciteVet(
       if (borne < cap) {
         cap = borne
         limitantes.push(libelleRegle(vet.prenom, c, nomVeto))
+        ids.push(c.id)
       }
     }
 
@@ -585,10 +589,11 @@ function capaciteVet(
       if (borne < cap) {
         cap = borne
         limitantes.push(libelleRegle(vet.prenom, c, nomVeto))
+        ids.push(c.id)
       }
     }
   }
-  return { cap: Math.max(0, cap), reglesLimitantes: limitantes }
+  return { cap: Math.max(0, cap), reglesLimitantes: limitantes, idsLimitants: ids }
 }
 
 function detecterChargeInsuffisante(
@@ -606,16 +611,21 @@ function detecterChargeInsuffisante(
 
   let somme = 0
   const regles: string[] = []
+  const ids: string[] = []
   for (const vet of vetsN) {
-    const { cap, reglesLimitantes } = capaciteVet(vet, nbSemaines, nbJours, slots.length, nomVeto)
+    const { cap, reglesLimitantes, idsLimitants } = capaciteVet(vet, nbSemaines, nbJours, slots.length, nomVeto)
     somme += cap
-    if (cap < slots.length) regles.push(...reglesLimitantes)
+    if (cap < slots.length) {
+      regles.push(...reglesLimitantes)
+      ids.push(...idsLimitants)
+    }
   }
 
   if (somme >= totalPlaces) return []
   return [{
     code: 'charge_globale_insuffisante',
     regles: [...new Set(regles)],
+    regleIds: [...new Set(ids)],
     message: `Les limites de charge configurées ne permettent pas de couvrir la période : ${totalPlaces} gardes sont à pourvoir, mais les règles n’en autorisent que ${somme} au total. Assouplis une de ces règles ou ajoute un vétérinaire, sinon la génération échouera.`,
   }]
 }
@@ -647,6 +657,7 @@ function detecterWeekendsInsuffisants(
 
   let somme = 0
   const regles: string[] = []
+  const ids: string[] = []
   for (const vet of vetsN) {
     let cap = nbWe
     for (const c of vet.contraintes) {
@@ -660,6 +671,7 @@ function detecterWeekendsInsuffisants(
         if (borne < cap) {
           cap = borne
           regles.push(libelleRegle(vet.prenom, c, nomVeto))
+          ids.push(c.id)
         }
       } else if (c.type === 'cadencement_weekend' && p.sens === 'interdit') {
         // Cadencement pompier « interdit » : le véto ne peut couvrir QUE les WE
@@ -675,6 +687,7 @@ function detecterWeekendsInsuffisants(
         if (horsCycle < cap) {
           cap = horsCycle
           regles.push(libelleRegle(vet.prenom, c, nomVeto))
+          ids.push(c.id)
         }
       }
     }
@@ -685,6 +698,7 @@ function detecterWeekendsInsuffisants(
   return [{
     code: 'weekends_insuffisants',
     regles: [...new Set(regles)],
+    regleIds: [...new Set(ids)],
     message: `Les règles d’espacement des week-ends ne permettent pas de couvrir tous les week-ends de la période : ${wePlaces} places de week-end sont à pourvoir, mais les règles n’en autorisent que ${somme} au total. Assouplis une de ces règles ou ajoute un vétérinaire.`,
   }]
 }

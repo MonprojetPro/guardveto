@@ -281,8 +281,16 @@ function checkR2IndispoCyclique(vet: VetEngine, slot: SlotGarde, calendrier?: Ca
   for (const c of vet.contraintes) {
     if (!c.actif || c.type !== 'indisponibilite_cyclique') continue
     if (estDure(c) && violeIndispoCyclique(c, slot, calendrier)) {
+      // « est indisponible impairess » : le `s` collé produisait un mot qui
+      // n'existe pas, et la phrase n'avait de toute façon pas de sens sans le
+      // nom de ce qui est pair ou impair (retour MiKL du 2026-08-03). Ces
+      // libellés remontent jusqu'aux cartes du pré-vol : ils se lisent.
       const semaines = (c.config as Record<string, unknown>).semaines as string | undefined
-      return invalid(`R2 : ${vet.prenom} est indisponible ${semaines}s`)
+      const quand =
+        semaines === 'paires' ? 'les semaines paires'
+        : semaines === 'impaires' ? 'les semaines impaires'
+        : 'une semaine sur deux'
+      return invalid(`R2 : ${vet.prenom} est indisponible ${quand}`)
     }
   }
   return ok()

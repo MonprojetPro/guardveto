@@ -20,6 +20,30 @@ export function estLundi(iso: string): boolean {
 }
 
 /**
+ * Le lundi de la semaine d'une date. `null` si la date est illisible.
+ *
+ * POURQUOI LE MOTEUR EXIGE UN LUNDI (question MiKL du 2026-08-03)
+ * Ce n'est pas une contrainte d'interface : le solveur compte en semaines
+ * PLEINES. Les rythmes (« 1 week-end sur N », les séries, les repos entre
+ * gardes), le report d'équité et le lookback inter-périodes s'ancrent tous sur
+ * le lundi (`lundisDePeriode` dans `engine/solver.ts` remonte au lundi de la
+ * date de début). Un planning démarré un mercredi ferait donc calculer le
+ * moteur à partir du lundi précédent — deux jours HORS de la période affichée,
+ * qui pourraient déjà appartenir au planning d'avant.
+ *
+ * D'où le choix de CALER plutôt que de refuser : l'écran annonce le lundi
+ * retenu, et personne n'a à connaître cette mécanique.
+ */
+export function lundiDeLaSemaine(iso: string): string | null {
+  if (!ISO.test(iso)) return null
+  const d = new Date(`${iso}T12:00:00Z`)
+  // getUTCDay : dimanche = 0. On recule de 0 à 6 jours pour retomber sur lundi.
+  const recul = (d.getUTCDay() + 6) % 7
+  d.setUTCDate(d.getUTCDate() - recul)
+  return d.toISOString().slice(0, 10)
+}
+
+/**
  * Durée proposée par défaut selon le mois de départ : 17 semaines pour l'été
  * (mai → août), 12 le reste de l'année. Le découpage des mois est le MÊME que
  * `detecterSaison` côté serveur — s'ils divergeaient, l'écran proposerait une

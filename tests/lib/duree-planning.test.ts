@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { estLundi, dureeProposee, finApres } from '@/lib/planning/duree'
+import { estLundi, lundiDeLaSemaine, dureeProposee, finApres } from '@/lib/planning/duree'
 
 describe('estLundi', () => {
   it('reconnaît un lundi', () => {
@@ -67,5 +67,41 @@ describe('finApres', () => {
     expect(finApres('2027-01-04', 0)).toBeNull()
     expect(finApres('2027-01-04', -3)).toBeNull()
     expect(finApres('', 12)).toBeNull()
+  })
+})
+
+describe('lundiDeLaSemaine', () => {
+  it('laisse un lundi tel quel', () => {
+    expect(lundiDeLaSemaine('2027-01-04')).toBe('2027-01-04')
+  })
+
+  it('recule jusqu’au lundi de la même semaine', () => {
+    // mercredi 6 janvier → lundi 4 ; dimanche 10 → lundi 4 (pas le 11 !)
+    expect(lundiDeLaSemaine('2027-01-06')).toBe('2027-01-04')
+    expect(lundiDeLaSemaine('2027-01-10')).toBe('2027-01-04')
+  })
+
+  it('gère le dimanche, le piège du calcul (jour 0)', () => {
+    const lundi = lundiDeLaSemaine('2027-01-10')!
+    expect(estLundi(lundi)).toBe(true)
+    // Un dimanche recule de 6 jours, jamais d'un seul.
+    expect(lundi).toBe('2027-01-04')
+  })
+
+  it('franchit un changement de mois et d’année', () => {
+    expect(lundiDeLaSemaine('2027-01-01')).toBe('2026-12-28') // vendredi
+    expect(estLundi('2026-12-28')).toBe(true)
+  })
+
+  it('rend toujours un lundi, quel que soit le jour donné', () => {
+    for (const jour of ['2027-03-01', '2027-03-02', '2027-03-03', '2027-03-04',
+                        '2027-03-05', '2027-03-06', '2027-03-07']) {
+      expect(estLundi(lundiDeLaSemaine(jour)!)).toBe(true)
+    }
+  })
+
+  it('refuse ce qui n’est pas une date ISO', () => {
+    expect(lundiDeLaSemaine('')).toBeNull()
+    expect(lundiDeLaSemaine('06/01/2027')).toBeNull()
   })
 })

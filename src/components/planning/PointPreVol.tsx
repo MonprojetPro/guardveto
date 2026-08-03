@@ -32,9 +32,8 @@
 // ============================================================
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { toast } from 'sonner'
-import { Loader2 } from 'lucide-react'
+import { Loader2, ExternalLink } from 'lucide-react'
 import {
   assouplirRegle,
   mettreEnPauseRegle,
@@ -65,7 +64,16 @@ const ASSOUPLIR_INUTILE = new Set([
   'cohorte_equite_sans_porteur',
 ])
 
-/** Où aller quand le geste ne peut pas être fait ici sans deviner l'intention. */
+/**
+ * Où aller quand le geste ne peut pas être fait ici sans deviner l'intention
+ * (relever un plafond de combien ? réécrire quelle valeur ?).
+ *
+ * ⚠️ Ces renvois s'ouvrent dans un NOUVEL ONGLET, et c'est délibéré. MiKL,
+ * 2026-08-03 : « ça m'a sorti du parcours […] et surtout je suis sorti de la
+ * génération, il faut que je recommence tout ». Un parcours en cours ne doit
+ * jamais être détruit par un lien : l'admin corrige à côté, revient sur son
+ * onglet, clique « J'ai corrigé — revérifier », et reprend où il en était.
+ */
 const ECRAN: Record<string, { href: string; label: string }> = {
   charge_globale_insuffisante: { href: '/regles', label: 'Relever les plafonds' },
   weekends_insuffisants:       { href: '/regles', label: 'Relever les limites de week-end' },
@@ -74,6 +82,10 @@ const ECRAN: Record<string, { href: string; label: string }> = {
   regle_veto_sorti:            { href: '/regles', label: 'Ouvrir les règles' },
   duo_veto_sorti:              { href: '/regles', label: 'Ouvrir les règles' },
   seulement_avec_partenaire_sorti: { href: '/regles', label: 'Choisir un autre binôme' },
+  // Sans lui, une carte « créneau impossible » n'avait AUCUN bouton : le
+  // pré-vol nomme les raisons sans pouvoir remonter à la règle exacte (elles
+  // viennent du rejeu du moteur, pas d'une ligne identifiée).
+  creneau_impossible:          { href: '/regles', label: 'Ouvrir les règles' },
 }
 
 export function PointPreVol({ avertissement: a, vets, onCorrige }: Props) {
@@ -256,7 +268,16 @@ export function PointPreVol({ avertissement: a, vets, onCorrige }: Props) {
           )}
 
           {ecran && (
-            <Link href={ecran.href} className="ppv-btn lien">{ecran.label} →</Link>
+            <a
+              href={ecran.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ppv-btn"
+              title="S’ouvre dans un nouvel onglet — ton parcours reste ouvert ici"
+            >
+              <ExternalLink className="ppv-ico" aria-hidden />
+              {ecran.label}
+            </a>
           )}
         </div>
       )}

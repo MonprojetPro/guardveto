@@ -131,7 +131,10 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
       if (Array.isArray(params.regles)) {
         const items = (params.regles as Array<Record<string, unknown>>).map((r) => {
           const per = r.periode ? ` ${periodeLisible(r.periode)}` : ''
-          const sem = r.semaine ? ` (semaines ${String(r.semaine)}s)` : ''
+          // Le `s` collé sortait « semaines impairess » quand la valeur porte
+          // déjà sa marque du pluriel. On la retire d'abord, comme le fait le
+          // rendu de l'alternance ancrée juste plus bas.
+          const sem = r.semaine ? ` (semaines ${String(r.semaine).replace(/s$/, '')}s)` : ''
           return `${String(r.jour ?? '?')}${per}${sem}`
         })
         return `a des repos fixes : ${items.join(', ')}`

@@ -1458,3 +1458,37 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   color: var(--accent-ink);
   font-weight: 800;
 }
+
+/* ── Correctifs du 2026-08-03 (recette MiKL) ─────────────────────────────
+   Le survol de « Générer » rendait son libellé illisible : la règle générique
+   `.head-btn:hover` repeint la couleur du texte en `--accent-ink`, soit du
+   brun sur un fond brun. Le bouton accentué doit garder son texte blanc — on
+   le réaffirme sur tous les états, plutôt que d'affaiblir la règle générique
+   dont dépendent les autres pilules. */
+.head-btn.generer,
+.head-btn.generer:hover,
+.head-btn.generer:hover:not(:disabled),
+.head-btn.generer:focus-visible,
+.head-btn.generer:active {
+  color: #fff;
+}
+.head-btn.generer:hover:not(:disabled) {
+  border-color: transparent;
+  background: linear-gradient(135deg, #b4682a, var(--accent-ink));
+}
+
+/* La carte « Reprendre le planning en cours » : elle passe devant les deux
+   autres choix, donc elle se distingue sans crier. */
+.gen-carte.reprise {
+  border-color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+.gen-carte.reprise .gen-carte-titre { color: var(--accent-ink); }
+
+/* L'icône « s'ouvre à côté » des renvois : même gabarit que le spinner. */
+.ppv-ico { width: 13px; height: 13px; flex: 0 0 auto; }
+
+/* Le calage automatique sur le lundi n'est pas une alerte : c'est une
+   information. Il ne doit donc pas emprunter la couleur d'avertissement. */
+.gen-aide.cale { color: var(--accent-ink); }
+.gen-aide.cale b { color: var(--accent-ink); }

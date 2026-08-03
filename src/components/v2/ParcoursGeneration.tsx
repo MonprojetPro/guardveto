@@ -33,6 +33,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   CalendarPlus, RotateCcw, Wand2, Loader2, ShieldAlert, CheckCircle2, AlertTriangle,
+  RefreshCw,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -43,7 +44,7 @@ import { DiagnosticImpasse } from '@/components/planning/DiagnosticImpasse'
 import { CreneauxIgnoresAlert } from '@/components/planning/CreneauxIgnoresAlert'
 import { PointPreVol, type VetEtiquette } from '@/components/planning/PointPreVol'
 import { creerPeriode } from '@/app/(protected)/admin/periodes/actions'
-import { estLundi, dureeProposee, finApres } from '@/lib/planning/duree'
+import { estLundi, lundiDeLaSemaine, dureeProposee, finApres } from '@/lib/planning/duree'
 import type { AvertissementPreVol } from '@/engine/pre-vol'
 import type { CreneauIgnore } from '@/engine/creneau-modele'
 import type { JourNonCouvert } from '@/components/planning/types-impasse'
@@ -98,6 +99,8 @@ interface Props {
   periodesTypes: ProfilPlanning[]
   /** Vétérinaires actifs — pour régler un point d'étiquette sur place. */
   vets: VetEtiquette[]
+  /** Plannings qui ont déjà des gardes — sert à repérer un brouillon en cours. */
+  periodesAvecGardes: string[]
   onNaviguerVersMois: (anneeMois: string) => void
   etapeInitiale?: Etape
 }
@@ -109,6 +112,7 @@ export function ParcoursGeneration({
   periodeAffichee,
   periodesTypes,
   vets,
+  periodesAvecGardes,
   onNaviguerVersMois,
   etapeInitiale = 'choix',
 }: Props) {
@@ -138,14 +142,29 @@ export function ParcoursGeneration({
   // ── Étape ④ : le résultat ──────────────────────────────
   const [resultat, setResultat] = useState<Resultat | null>(null)
 
-  const semainesEffectives = semaines === '' ? dureeProposee(debut) : Number(semaines)
-  const finCalculee = finApres(debut, semainesEffectives)
+  // Tout le formulaire raisonne sur la date CALÉE : la durée annoncée, la date
+  // de fin affichée et celle envoyée au serveur parlent du même planning.
+  const debutCale = lundiDeLaSemaine(debut) ?? debut
+  const semainesEffectives = semaines === '' ? dureeProposee(debutCale) : Number(semaines)
+  const finCalculee = finApres(debutCale, semainesEffectives)
   const fin = datesPrecises ? (finSaisie || null) : finCalculee
 
   const typesProposables = useMemo(
     () => periodesTypes.filter((p) => !p.est_defaut),
     [periodesTypes],
   )
+
+  /**
+   * Un planning CRÉÉ mais jamais rempli — typiquement celui d'un parcours
+   * abandonné en cours de route. MiKL, 2026-08-03 : « comment ça se fait que
+   * l'été P1 soit créé alors que je ne suis pas allé au bout ? ». Le planning
+   * doit bien être créé avant le contrôle (le pré-vol a besoin de ses dates et
+   * de sa période type), mais on ne peut pas le laisser orphelin : on propose
+   * de le REPRENDRE, en tête du choix. Le plus récent d'abord.
+   */
+  const brouillonEnCours = periodes.find(
+    (p) => p.statut === 'brouillon' && !periodesAvecGardes.includes(p.id),
+  ) ?? null
 
   const bloquants = (preVol ?? []).filter((a) => a.gravite === 'bloquant')
   const aSurveiller = (preVol ?? []).filter((a) => a.gravite !== 'bloquant')
@@ -222,17 +241,23 @@ export function ParcoursGeneration({
 
     const nom = libelle.trim()
     if (!nom) return setErreur('Donne un nom à ce planning (« Hiver 2027 », « Été P2 »…).')
-    if (!debut) return setErreur('Indique le lundi de départ.')
-    if (!estLundi(debut)) return setErreur('Un planning commence un lundi — choisis le lundi de la semaine.')
+    if (!debut) return setErreur('Indique la date de départ.')
     if (!fin) {
       return setErreur(datesPrecises ? 'Indique la date de fin.' : 'Indique une durée d’au moins une semaine.')
     }
-    if (fin < debut) return setErreur('La date de fin doit venir après le lundi de départ.')
+    if (fin < debutCale) return setErreur('La date de fin doit venir après le lundi de départ.')
 
     setCreation(true)
     const fd = new FormData()
     fd.set('libelle', nom)
-    fd.set('date_debut', debut)
+    // On CALE sur le lundi plutôt que de refuser (retour MiKL du 2026-08-03 :
+    // « d'où vient cette règle que les plannings commencent le lundi ? »).
+    // Ce n'est pas une lubie d'interface : le moteur compte en semaines
+    // PLEINES — les rythmes « 1 week-end sur N », les séries et l'équité
+    // s'ancrent tous sur le lundi. Un départ en milieu de semaine ferait
+    // remonter le calcul au lundi précédent, donc hors de la période affichée.
+    // L'écran le dit avant, il n'y a pas de surprise.
+    fd.set('date_debut', debutCale)
     fd.set('date_fin', fin)
     if (typeChoisi !== AUTO) fd.set('profil_id', typeChoisi)
 
@@ -246,7 +271,7 @@ export function ParcoursGeneration({
 
     // On se place sur son mois AVANT la suite : quand le parcours se refermera,
     // l'écran montrera le bon planning et pas celui d'où on était parti.
-    onNaviguerVersMois(debut.slice(0, 7))
+    onNaviguerVersMois(debutCale.slice(0, 7))
     setCible(res.id)
     setNomCible(nom)
     setCibleEstPubliee(false)
@@ -362,6 +387,23 @@ export function ParcoursGeneration({
         {/* ── ① La question ─────────────────────────────── */}
         {etape === 'choix' && (
           <div className="gen-choix">
+            {brouillonEnCours && (
+              <button
+                type="button"
+                className="gen-carte reprise"
+                onClick={() => viserExistant(brouillonEnCours)}
+              >
+                <RotateCcw className="gen-carte-ico" aria-hidden="true" />
+                <span className="gen-carte-titre">
+                  Reprendre « {nomPlanning(brouillonEnCours)} »
+                </span>
+                <span className="gen-carte-sous">
+                  Créé le {dateCourte(brouillonEnCours.date_debut)} et jamais rempli —
+                  on repart de là plutôt que d’en créer un de plus.
+                </span>
+              </button>
+            )}
+
             <button
               type="button"
               className="gen-carte"
@@ -407,7 +449,7 @@ export function ParcoursGeneration({
             </label>
 
             <label className="gen-champ">
-              <span className="gen-label">Il commence le <em>lundi</em></span>
+              <span className="gen-label">Il commence la semaine du</span>
               <input
                 type="date"
                 className="gen-input"
@@ -415,8 +457,9 @@ export function ParcoursGeneration({
                 onChange={(e) => setDebut(e.target.value)}
               />
               {debut && !estLundi(debut) && (
-                <span className="gen-aide alerte">
-                  Ce jour n’est pas un lundi — les semaines de garde démarrent le lundi.
+                <span className="gen-aide cale">
+                  Les semaines de garde démarrent le lundi : je pars du{' '}
+                  <b>{dateLongue(debutCale)}</b>.
                 </span>
               )}
             </label>
@@ -430,7 +473,7 @@ export function ParcoursGeneration({
                     min={1}
                     max={104}
                     className="gen-input gen-input-nb"
-                    value={semaines === '' ? String(dureeProposee(debut)) : semaines}
+                    value={semaines === '' ? String(dureeProposee(debutCale)) : semaines}
                     onChange={(e) => setSemaines(e.target.value)}
                   />
                   <span className="gen-unite">semaines</span>
@@ -688,6 +731,18 @@ export function ParcoursGeneration({
           {etape === 'controle' && (
             <>
               <Button variant="outline" onClick={() => setEtape('choix')}>Retour</Button>
+              {/* Après une correction faite dans l'autre onglet : on relit sans
+                  refaire tout le parcours (retour MiKL du 2026-08-03). */}
+              <Button
+                variant="outline"
+                onClick={() => void chargerPreVol(cible)}
+                disabled={chargementPreVol}
+              >
+                {chargementPreVol
+                  ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  : <RefreshCw className="w-4 h-4 mr-2" />}
+                J’ai corrigé — revérifier
+              </Button>
               <Button
                 onClick={() => void lancer(cibleEstPubliee)}
                 disabled={chargementPreVol || bloquants.length > 0}

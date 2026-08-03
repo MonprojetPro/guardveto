@@ -48,6 +48,8 @@ interface OptionsOutils {
   periodesTypes: ProfilPlanning[]
   /** Vétérinaires actifs — pour régler un point d'étiquette sur place. */
   vets: VetEtiquette[]
+  /** Plannings qui ont déjà des gardes — repère un brouillon jamais rempli. */
+  periodesAvecGardes: string[]
   /** Va au mois donné (« AAAA-MM ») — porté par `PlanningV2`. */
   onNaviguerVersMois: (anneeMois: string) => void
 }
@@ -68,6 +70,7 @@ export function useOutilsPlanning({
   periodes,
   periodesTypes,
   vets,
+  periodesAvecGardes,
   onNaviguerVersMois,
 }: OptionsOutils) {
   const [parcoursOuvert, setParcoursOuvert] = useState(false)
@@ -218,6 +221,7 @@ export function useOutilsPlanning({
         periodeAffichee={periode}
         periodesTypes={periodesTypes}
         vets={vets}
+        periodesAvecGardes={periodesAvecGardes}
         onNaviguerVersMois={onNaviguerVersMois}
         etapeInitiale={etapeParcours}
       />
