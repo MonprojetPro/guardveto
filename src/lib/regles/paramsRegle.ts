@@ -87,6 +87,15 @@ const CODES_FETE_VALIDES = new Set(['noel', 'nouvel_an'])
 /** Payload envoyé par le formulaire (champs simples — le JSON est bâti ici). */
 export interface UpsertReglePayload {
   id?: string // présent = édition
+  /**
+   * L'admin a vu les conséquences et veut écrire quand même.
+   *
+   * Sans ce drapeau, le serveur REFUSE une règle qui rend la génération
+   * impossible (contrôle d'impact, audit du 2026-08-03). Il n'est jamais posé
+   * par Filou : un assistant ne passe pas outre un blocage à la place de
+   * l'humain, il rapporte le refus et laisse trancher.
+   */
+  confirmeImpact?: boolean
   brique_id: BriqueEvaluable
   owner_id: string
   force: ForceFormulaire

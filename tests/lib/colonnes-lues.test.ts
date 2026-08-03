@@ -47,7 +47,11 @@ const SCHEMA: Record<string, string[]> = {
 
 /** Les fichiers dont on vérifie les `.from(...).select(...)`. */
 const SURVEILLES = [
-  'src/data/verifierRegleCandidate.ts',
+  // Les requêtes ont déménagé de `verifierRegleCandidate.ts` vers ce module le
+  // 2026-08-03 (le gardien est descendu au niveau serveur, pour toutes les
+  // portes d'entrée). C'est ce test qui l'a signalé : il exige au moins un
+  // `select` par fichier surveillé, et l'ancien n'en avait plus aucun.
+  'src/data/controleImpact.ts',
 ]
 
 /**

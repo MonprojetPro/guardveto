@@ -54,6 +54,7 @@ import {
 //    `@/data/verifierRegleCandidate`) — jamais réexportés au passage.
 
 import { verifierRegleCandidate } from '@/data/verifierRegleCandidate'
+import { refusSiBloquant } from '@/data/controleImpact'
 import type { VerdictGardien } from '@/data/verifierRegleCandidate'
 import type { RegleCabinetRow } from '@/data/mapReglesCabinet'
 import { chargerContexteIA } from '@/lib/ia/contexteCabinet'
@@ -1223,6 +1224,32 @@ export async function upsertRegle(payload: UpsertReglePayload) {
       }
     }
 
+    // Le duo interdit a son propre chemin d'écriture (deux lignes miroir), il
+    // lui faut donc SON passage par le contrôle d'impact : sans ça, la seule
+    // famille de règles écrite hors du tronc commun serait aussi la seule à
+    // échapper au principe. Le sens A→B suffit à la simulation, le miroir
+    // étant symétrique pour le moteur.
+    const refusDuo = await refusSiBloquant(
+      supabase,
+      cabinetId,
+      {
+        genre: 'regle_ajout',
+        row: {
+          id: payload.id ?? '__candidate__',
+          cabinet_id: cabinetId,
+          periode_id,
+          brique_id: 'duo_interdit',
+          params_json: envelopper(a, 'duo_interdit', null, { avec_veterinaire_id: b }),
+          force: payload.force,
+          validite_json,
+          version: 1,
+          actif: true,
+        } as RegleCabinetRow,
+      },
+      payload.confirmeImpact === true,
+    )
+    if (refusDuo) return refusDuo
+
     let actif = true
     // Édition : on retire l'ancienne paire avant de réécrire la nouvelle.
     if (payload.id) {
@@ -1316,6 +1343,33 @@ export async function upsertRegle(payload: UpsertReglePayload) {
   }
 
   const params_json = envelopper(payload.owner_id, payload.brique_id, construit.quand, construit.params)
+
+  // ── LE PASSAGE OBLIGÉ (audit du 2026-08-03) ──────────────
+  // Le contrôle d'impact vit ICI, côté serveur, et plus seulement dans
+  // l'écran : Filou et toute autre porte d'entrée le traversent aussi. Seul
+  // l'IMPOSSIBLE barre la route ; le reste est signalé à l'écran, qui décide
+  // quoi en montrer. `confirmeImpact` est la porte de sortie de l'admin à qui
+  // les conséquences ont déjà été présentées.
+  const refus = await refusSiBloquant(
+    supabase,
+    cabinetId,
+    {
+      genre: 'regle_ajout',
+      row: {
+        id: payload.id ?? '__candidate__',
+        cabinet_id: cabinetId,
+        periode_id,
+        brique_id: payload.brique_id,
+        params_json,
+        force: payload.force,
+        validite_json,
+        version: 1,
+        actif: true,
+      } as RegleCabinetRow,
+    },
+    payload.confirmeImpact === true,
+  )
+  if (refus) return refus
 
   if (payload.id) {
     const { error } = await supabase

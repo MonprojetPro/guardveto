@@ -1230,7 +1230,12 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
         onPasserOutre={() => {
           const aEcrire = gardien?.payload
           if (!aEcrire) return
-          startTransition(async () => { await ecrire(aEcrire) })
+          // `confirmeImpact` : le serveur refuse désormais lui-même une règle
+          // qui rend la génération impossible (contrôle d'impact du
+          // 2026-08-03). L'admin a vu les conséquences dans cette modale — ce
+          // drapeau porte SA décision jusqu'au serveur, sinon le « quand
+          // même » se heurterait à un mur muet.
+          startTransition(async () => { await ecrire({ ...aEcrire, confirmeImpact: true }) })
         }}
         onAssouplir={(f) => {
           setForce(f as ForceFormulaire)
