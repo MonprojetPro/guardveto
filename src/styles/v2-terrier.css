@@ -2481,3 +2481,40 @@
   border-left: 3px solid var(--t-accent);
   border-radius: var(--r-md);
 }
+
+/* ── Filou porte-parole, quelle que soit la porte (palier 3) ─────────────
+   `GardienImpact` sert les congés, l'équipe, l'effectif et les étiquettes. Il
+   reprend l'habillage du gardien de l'écran Règles pour que la vérification
+   ait le même visage partout : ce n'est pas le même écran qui parle, c'est le
+   même Filou. */
+.gi-mot {
+  display: flex; align-items: flex-start; gap: 12px;
+  background: var(--accent-soft);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  margin-bottom: 4px;
+}
+.gi-filou {
+  flex: 0 0 auto;
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--surface);
+}
+.gi-phrase {
+  font-size: 0.88rem; line-height: 1.55; color: var(--text);
+  align-self: center;
+}
+
+/* Ce que la modification RÉPARE — le seul retour positif du système, il ne
+   doit pas se noyer parmi les avertissements. */
+.gi-repare {
+  display: flex; flex-direction: column; gap: 2px;
+  background: var(--ok-soft);
+  border: 1px solid rgba(90, 150, 60, 0.35);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  font-size: 0.82rem; line-height: 1.5; color: var(--text);
+}
+.gi-repare b { color: var(--ok); font-size: 0.78rem; }

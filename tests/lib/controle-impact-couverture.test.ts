@@ -175,3 +175,48 @@ describe('les portes du palier 2 contrôlent aussi', () => {
     expect(orphelines).toEqual(['regle_retrait'])
   })
 })
+
+// ============================================================
+// PALIER 3 — Filou porte-parole, quelle que soit la porte
+// ============================================================
+// Un refus qui remonte en toast d'erreur est correct et parfaitement muet sur
+// la suite à donner. Le contrôle d'impact doit REMONTER son détail jusqu'à
+// l'écran, sinon les gestes de correction (`PointPreVol`) restent inatteignables
+// et l'utilisateur repart chercher lui-même la règle en cause — exactement ce
+// que les paliers 1 et 2 voulaient supprimer.
+
+describe('les refus arrivent à l’écran avec de quoi les régler', () => {
+  const PORTEUSES = [
+    'app/(protected)/conges/actions.ts',
+    'app/(protected)/admin/veterinaires/actions.ts',
+  ]
+
+  it.each(PORTEUSES)('%s renvoie l’impact, pas seulement un message', (fichier) => {
+    const source = lire(fichier)
+    expect(source).toContain('impact: refus.impact')
+  })
+
+  it('la fenêtre de Filou porte les gestes de correction', () => {
+    const gardien = lire('components/v2/GardienImpact.tsx')
+    // Sans `PointPreVol`, on aurait refait un joli message sans issue.
+    expect(gardien).toContain('PointPreVol')
+    // Et corriger doit relancer le contrôle, sinon la liste ne se vide jamais.
+    expect(gardien).toContain('onCorrige')
+  })
+
+  it('aucun « quand même » n’est proposé sur un blocage', () => {
+    // Proposer de passer outre un blocage promettrait un planning qui ne peut
+    // pas exister. L'issue est de corriger.
+    const gardien = lire('components/v2/GardienImpact.tsx')
+    expect(gardien).toContain('!estBloquant && onPasserOutre')
+  })
+
+  it('les écrans concernés ouvrent bien la fenêtre', () => {
+    for (const ecran of [
+      'components/conges/ValiderCongeDialog.tsx',
+      'components/v2/EquipeV2.tsx',
+    ]) {
+      expect(lire(ecran)).toContain('GardienImpact')
+    }
+  })
+})

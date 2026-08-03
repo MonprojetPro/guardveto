@@ -53,6 +53,8 @@ import {
   type GardeAVenir,
   type VeterinaireFormData,
 } from '@/app/(protected)/admin/veterinaires/actions'
+import { GardienImpact } from '@/components/v2/GardienImpact'
+import type { Impact } from '@/data/controleImpact'
 import type { StatutVeto, UserRole, Veterinaire } from '@/types'
 
 /**
@@ -196,6 +198,9 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
 
   // Garde-fou : les gardes publiées que la désactivation laisserait orphelines.
   const [garde, setGarde] = useState<{ veto: Veterinaire; gardes: GardeAVenir[] } | null>(null)
+  // Le refus du contrôle d'impact sur un retrait d'équipe (palier 3) : il ouvre
+  // la fenêtre de Filou avec les gestes de correction, au lieu d'un toast.
+  const [impactVeto, setImpactVeto] = useState<{ veto: Veterinaire; impact: Impact } | null>(null)
 
   const actifs = useMemo(() => vets.filter((v) => v.actif), [vets])
   const comptesActifs = useMemo(
@@ -338,6 +343,12 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
     startTransition(async () => {
       const res = await toggleVeterinaireActif(v.id, !v.actif)
       if ('error' in res && res.error) {
+        // Un refus PORTEUR d'impact s'explique en fenêtre, avec ses gestes de
+        // correction (palier 3) ; les autres restent des toasts.
+        if ('impact' in res && res.impact) {
+          setImpactVeto({ veto: v, impact: res.impact })
+          return
+        }
         toast.error(res.error)
         return
       }
@@ -351,6 +362,23 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
           ? `${v.prenom} n'entre plus dans les prochaines générations`
           : `${v.prenom} est de retour dans l'équipe`,
       )
+    })
+  }
+
+  /** Le refus du contrôle d'impact sur un retrait d'équipe, s'il y en a un. */
+  const relancerDesactivation = (v: Veterinaire, confirme: boolean) => {
+    startTransition(async () => {
+      const res = await toggleVeterinaireActif(v.id, false, confirme)
+      if ('error' in res && res.error) {
+        if ('impact' in res && res.impact) {
+          setImpactVeto({ veto: v, impact: res.impact })
+          return
+        }
+        toast.error(res.error)
+        return
+      }
+      setImpactVeto(null)
+      toast.success(`${v.prenom} n’entre plus dans les prochaines générations`)
     })
   }
 
@@ -408,6 +436,19 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
 
   return (
     <>
+      {/* Filou explique un retrait d'équipe qui casserait la génération, et
+          porte les gestes pour le régler sur place (palier 3). */}
+      <GardienImpact
+        impact={impactVeto?.impact ?? null}
+        geste={`retirer ${impactVeto?.veto.prenom ?? 'ce vétérinaire'} de l’équipe de garde`}
+        origine="equipe"
+        vets={vets.filter((v) => v.actif)}
+        enCours={isPending}
+        onAnnuler={() => setImpactVeto(null)}
+        onCorrige={() => { if (impactVeto) relancerDesactivation(impactVeto.veto, false) }}
+        onPasserOutre={() => { if (impactVeto) relancerDesactivation(impactVeto.veto, true) }}
+      />
+
       {/* ── Tête de page ─────────────────────────────────────────────── */}
       <div className="page-head rise">
         <div>

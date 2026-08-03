@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { refusSiBloquant } from '@/data/controleImpact'
+import type { Impact } from '@/data/controleImpact'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { revalidatePath } from 'next/cache'
 import { sendBrevoEmail, emailCongeValide, emailCongeRefuse } from '@/lib/brevo'
@@ -93,8 +94,14 @@ export interface CongeFormData {
  *   UNIQUEMENT si l'enregistrement chevauche une garde déjà publiée.
  */
 export type CongeActionResult =
-  | { error: string; success?: undefined; conflit?: undefined }
-  | { success: true; error?: undefined; conflit?: ConflitPlanning }
+  /**
+   * `impact` accompagne un refus du contrôle d'impact (palier 3 de l'audit du
+   * 2026-08-03). Sans lui, l'écran n'avait qu'une phrase : correcte, et muette
+   * sur ce qu'il fallait faire ensuite. Avec, il peut ouvrir `GardienImpact`,
+   * qui porte les gestes de correction.
+   */
+  | { error: string; success?: undefined; conflit?: undefined; impact?: Impact }
+  | { success: true; error?: undefined; conflit?: ConflitPlanning; impact?: undefined }
 
 export async function createConge(
   data: CongeFormData,
@@ -261,7 +268,7 @@ export async function validerConge(
         },
         confirmeImpact === true,
       )
-      if (refus) return { error: refus.error }
+      if (refus) return { error: refus.error, impact: refus.impact }
     }
   }
 

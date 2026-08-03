@@ -9,6 +9,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { validerConge, type ConflitPlanning } from '@/app/(protected)/conges/actions'
+import { GardienImpact } from '@/components/v2/GardienImpact'
+import type { Impact } from '@/data/controleImpact'
+import type { VetEtiquette } from '@/components/planning/PointPreVol'
 import type { Conge, Veterinaire } from '@/types'
 
 interface ValiderCongeDialogProps {
@@ -22,26 +25,56 @@ interface ValiderCongeDialogProps {
    * (cas « Antoine »). Le parent ouvre alors l'alerte ConflitPlanningDialog.
    */
   onConflit?: (conflit: ConflitPlanning) => void
+  /** Vétérinaires actifs — les gestes de correction sur étiquette en ont besoin. */
+  vetsActifs?: VetEtiquette[]
 }
 
 export function ValiderCongeDialog({
-  open, onClose, conge, vet, currentVetoId, onConflit,
+  open, onClose, conge, vet, currentVetoId, onConflit, vetsActifs = [],
 }: ValiderCongeDialogProps) {
   const [isPending, startTransition] = useTransition()
   const [dateDebut, setDateDebut] = useState(conge.date_debut)
   const [dateFin, setDateFin] = useState(conge.date_fin)
+  // Le refus du contrôle d'impact, quand il y en a un : il ouvre la fenêtre de
+  // Filou, qui porte les gestes de correction (palier 3 de l'audit du
+  // 2026-08-03). Avant, ce refus tombait en toast — correct, et muet sur la
+  // suite à donner.
+  const [impact, setImpact] = useState<Impact | null>(null)
 
-  const handleValider = () => {
+  const lancer = (confirme: boolean) => {
     startTransition(async () => {
-      const result = await validerConge(conge.id, currentVetoId, dateDebut, dateFin)
-      if (result.error) { toast.error(result.error); return }
+      const result = await validerConge(conge.id, currentVetoId, dateDebut, dateFin, confirme)
+      if (result.error) {
+        // Un refus PORTEUR d'impact s'explique en fenêtre ; les autres restent
+        // des toasts (ils n'ont rien à proposer).
+        if (result.impact) { setImpact(result.impact); return }
+        toast.error(result.error)
+        return
+      }
+      setImpact(null)
       toast.success('Congé validé')
       onClose()
       if (result.conflit) onConflit?.(result.conflit)
     })
   }
 
+  const handleValider = () => lancer(false)
+
   return (
+    <>
+    <GardienImpact
+      impact={impact}
+      geste="valider ce congé"
+      origine="conges"
+      vets={vetsActifs}
+      enCours={isPending}
+      onAnnuler={() => setImpact(null)}
+      // Corriger relance la validation : si le point est réglé, elle passe.
+      onCorrige={() => lancer(false)}
+      // Pas d'issue « quand même » sur un blocage — `GardienImpact` ne
+      // l'affiche que si l'impact n'est pas bloquant.
+      onPasserOutre={() => lancer(true)}
+    />
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
@@ -99,5 +132,6 @@ export function ValiderCongeDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   )
 }

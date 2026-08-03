@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { refusSiBloquant } from '@/data/controleImpact'
+import type { Impact } from '@/data/controleImpact'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { createClient as createAdminClient, type SupabaseClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
@@ -228,7 +229,12 @@ export interface GardeAVenir {
 }
 
 type ToggleActifResult =
-  | { error: string }
+  /**
+   * `impact` accompagne un refus du contrôle d'impact (palier 3 de l'audit du
+   * 2026-08-03) : l'écran ouvre alors la fenêtre de Filou, qui porte les gestes
+   * de correction, au lieu d'un toast muet sur la suite à donner.
+   */
+  | { error: string; impact?: Impact }
   | { success: true }
   | { requiresConfirmation: true; gardesAVenir: GardeAVenir[] }
 
@@ -295,7 +301,7 @@ export async function toggleVeterinaireActif(
         { genre: 'veto_retire', vetId: id },
         confirm,
       )
-      if (refus) return { error: refus.error }
+      if (refus) return { error: refus.error, impact: refus.impact }
     }
   }
 
