@@ -110,3 +110,68 @@ describe('Filou ne se passe jamais outre à la place de l’humain', () => {
     }
   })
 })
+
+// ============================================================
+// PALIER 2 — les autres sources d'impact
+// ============================================================
+// Une règle n'est pas la seule chose qui change le monde que le moteur lit.
+// Valider un congé retire quelqu'un de la circulation ; désactiver un
+// vétérinaire vide l'effectif et rend fantômes toutes les règles qui le
+// visent ; relever l'effectif de nuit peut demander plus de monde qu'il n'y en
+// a ; poser une étiquette change qui peut tenir quel rôle.
+//
+// Ces quatre portes passaient sans un mot avant le 2026-08-03 : l'échec
+// n'apparaissait qu'à la génération, des jours plus tard, quand plus personne
+// ne faisait le lien avec le geste qui l'avait causé.
+
+describe('les portes du palier 2 contrôlent aussi', () => {
+  const PORTES: Array<{ fichier: string; quoi: string; genre: string }> = [
+    {
+      fichier: 'app/(protected)/conges/actions.ts',
+      quoi: 'valider un congé',
+      genre: "genre: 'conge_ajoute'",
+    },
+    {
+      fichier: 'app/(protected)/admin/veterinaires/actions.ts',
+      quoi: 'retirer un vétérinaire de l’effectif',
+      genre: "genre: 'veto_retire'",
+    },
+    {
+      fichier: 'app/(protected)/admin/periodes/actions.ts',
+      quoi: 'changer l’effectif de nuit',
+      genre: "genre: 'effectif_nuit'",
+    },
+    {
+      fichier: 'app/(protected)/regles/actions.ts',
+      quoi: 'poser une étiquette sur des fiches',
+      genre: "genre: 'veto_tags'",
+    },
+  ]
+
+  it.each(PORTES)('$quoi passe par le contrôle d’impact', ({ fichier, genre }) => {
+    const source = lire(fichier)
+    expect(source).toContain('refusSiBloquant')
+    expect(source).toContain(genre)
+  })
+
+  it('toute mutation déclarée est réellement utilisée quelque part', () => {
+    // Une variante de `Mutation` que personne n'appelle est un contrôle qu'on
+    // a écrit sans le brancher — le pire des deux mondes : le code donne
+    // l'impression que la porte est couverte.
+    const module = lire('data/controleImpact.ts')
+    const genres = [...module.matchAll(/\{ genre: '(\w+)'/g)].map((m) => m[1])
+    expect(genres.length).toBeGreaterThanOrEqual(6)
+
+    const sources = [
+      lire('app/(protected)/regles/actions.ts'),
+      lire('app/(protected)/conges/actions.ts'),
+      lire('app/(protected)/admin/veterinaires/actions.ts'),
+      lire('app/(protected)/admin/periodes/actions.ts'),
+    ].join(String.fromCharCode(10))
+
+    const orphelines = genres.filter((g) => !sources.includes(`genre: '${g}'`))
+    // `regle_retrait` reste à brancher (mise en pause / suppression) : on le
+    // tolère explicitement plutôt que de l'oublier en silence.
+    expect(orphelines).toEqual(['regle_retrait'])
+  })
+})

@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { refusSiBloquant } from '@/data/controleImpact'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { createClient as createAdminClient, type SupabaseClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
@@ -271,6 +272,30 @@ export async function toggleVeterinaireActif(
           type: g.type,
         })),
       }
+    }
+  }
+
+  // ── LE PASSAGE OBLIGÉ (palier 2 de l'audit du 2026-08-03) ──
+  // Le contrôle ci-dessus regarde les gardes DÉJÀ ATTRIBUÉES ; celui-ci
+  // regarde l'avenir : retirer quelqu'un de l'effectif peut rendre un créneau
+  // impossible à pourvoir, ou changer en règles fantômes toutes celles qui le
+  // visent. C'est une modification du monde comme une autre, et c'était l'une
+  // des plus lourdes à passer sans un mot.
+  if (!actif) {
+    let cabinetId: string | null = null
+    try {
+      cabinetId = await resoudreCabinetId(supabase)
+    } catch {
+      cabinetId = null // cabinet irrésolu : on ne bloque pas une désactivation
+    }
+    if (cabinetId) {
+      const refus = await refusSiBloquant(
+        supabase,
+        cabinetId,
+        { genre: 'veto_retire', vetId: id },
+        confirm,
+      )
+      if (refus) return { error: refus.error }
     }
   }
 

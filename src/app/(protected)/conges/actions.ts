@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { refusSiBloquant } from '@/data/controleImpact'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { revalidatePath } from 'next/cache'
 import { sendBrevoEmail, emailCongeValide, emailCongeRefuse } from '@/lib/brevo'
@@ -218,7 +219,13 @@ export async function validerConge(
   id: string,
   valide_par: string,
   date_debut?: string,
-  date_fin?: string
+  date_fin?: string,
+  /**
+   * L'admin a vu les conséquences et valide quand même. Sans ce drapeau, un
+   * congé qui rend un créneau impossible à pourvoir est REFUSÉ — cf. le
+   * contrôle d'impact ci-dessous.
+   */
+  confirmeImpact?: boolean,
 ): Promise<CongeActionResult> {
   const supabase = await createClient()
 
@@ -228,6 +235,35 @@ export async function validerConge(
     .select('veterinaire_id, date_debut, date_fin, type, creneau')
     .eq('id', id)
     .single()
+
+  // ── LE PASSAGE OBLIGÉ (palier 2 de l'audit du 2026-08-03) ──
+  // Valider un congé est une modification du monde comme une autre : il retire
+  // un vétérinaire de la circulation sur une plage de dates. C'était même le
+  // trou le plus coûteux du produit — le planning n'était re-validé qu'APRÈS
+  // coup, une fois le mal fait, et il fallait tout régénérer.
+  if (conge) {
+    const c = conge as { veterinaire_id: string; date_debut: string; date_fin: string }
+    let cabinetId: string | null = null
+    try {
+      cabinetId = await resoudreCabinetId(supabase)
+    } catch {
+      cabinetId = null // cabinet irrésolu : on ne bloque pas une validation
+    }
+    if (cabinetId) {
+      const refus = await refusSiBloquant(
+        supabase,
+        cabinetId,
+        {
+          genre: 'conge_ajoute',
+          vetId: c.veterinaire_id,
+          dateDebut: date_debut ?? c.date_debut,
+          dateFin: date_fin ?? c.date_fin,
+        },
+        confirmeImpact === true,
+      )
+      if (refus) return { error: refus.error }
+    }
+  }
 
   const update: Record<string, unknown> = { statut: 'valide', valide_par }
   if (date_debut) update.date_debut = date_debut

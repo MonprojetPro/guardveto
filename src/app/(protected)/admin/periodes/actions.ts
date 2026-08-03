@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { revalidatePath } from 'next/cache'
+import { refusSiBloquant } from '@/data/controleImpact'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
@@ -226,7 +227,12 @@ export async function setProfilPeriode(periodeId: string, profilId: string | nul
  * RLS periodes (write admin-only) sécurise l'écriture. S'applique à la PROCHAINE
  * génération du planning de la période.
  */
-export async function setEffectifPeriode(periodeId: string, nb: number) {
+export async function setEffectifPeriode(
+  periodeId: string,
+  nb: number,
+  /** L'admin a vu les conséquences et veut l'appliquer quand même. */
+  confirmeImpact = false,
+) {
   if (!Number.isInteger(nb) || nb < 1 || nb > 4) {
     return { error: 'Effectif invalide (entre 1 et 4 vétérinaires).' }
   }
@@ -234,6 +240,23 @@ export async function setEffectifPeriode(periodeId: string, nb: number) {
 
   const garde = await assertAdmin(supabase)
   if ('error' in garde) return { error: garde.error }
+
+  // ── LE PASSAGE OBLIGÉ (palier 2 de l'audit du 2026-08-03) ──
+  // Demander deux vétérinaires par nuit là où l'équipe ne peut en fournir
+  // qu'un est le cas d'école : le réglage passe sans un mot, et l'échec
+  // n'apparaît qu'à la génération, des jours plus tard.
+  try {
+    const cabinetId = await resoudreCabinetId(supabase)
+    const refus = await refusSiBloquant(
+      supabase,
+      cabinetId,
+      { genre: 'effectif_nuit', nb },
+      confirmeImpact,
+    )
+    if (refus) return { error: refus.error }
+  } catch {
+    // Cabinet irrésolu : on n'empêche pas un réglage légitime.
+  }
 
   const { error } = await supabase
     .from('periodes')

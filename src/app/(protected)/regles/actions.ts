@@ -541,6 +541,22 @@ export async function poserEtiquetteSurVetos(tag: string, vetoIds: string[]) {
     return { error: 'Aucun vétérinaire actif ne correspond à cette sélection.' }
   }
 
+  // ── LE PASSAGE OBLIGÉ (palier 2 de l'audit du 2026-08-03) ──
+  // Poser une étiquette change qui peut tenir quel rôle : c'est exactement ce
+  // que lisent les règles de composition d'équipe et de rôle interdit. On
+  // simule le monde tel qu'il sera pour CHAQUE fiche touchée.
+  for (const v of rows) {
+    const actuels = (v.tags ?? []).map((t) => t.trim().toLowerCase())
+    if (actuels.includes(tagNorm)) continue
+    const refus = await refusSiBloquant(
+      supabase,
+      cabinetId,
+      { genre: 'veto_tags', vetId: v.id, tags: [...actuels, tagNorm] },
+      false,
+    )
+    if (refus) return { error: refus.error }
+  }
+
   const poses: string[] = []
   for (const v of rows) {
     const actuels = v.tags ?? []
