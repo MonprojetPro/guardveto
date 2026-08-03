@@ -1612,3 +1612,88 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 }
 .pp-confirme-actions { display: flex; gap: 6px; }
 .pp-confirme-actions .ppv-btn { height: 28px; font-size: 0.74rem; }
+
+/* ── L'encart compteurs à colonnes réglables (2026-08-03) ────────────────
+   La grille était figée à quatre colonnes chiffrées alors que trois seulement
+   étaient rendues — d'où le vide que MiKL a repéré. Elle suit maintenant le
+   nombre réel de colonnes choisies, plafonné à 4 par la largeur de l'encart. */
+.cnt-row { grid-template-columns: minmax(0, 1fr) repeat(var(--nb-col, 4), 33px); }
+
+/* Le réglage : un bouton discret, pas un titre de plus. */
+.cnt-reglage-barre { display: flex; justify-content: flex-end; margin: -4px 0 6px; }
+.cnt-reglage-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 26px; padding: 0 10px;
+  border: 1px solid var(--t-border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-family: inherit;
+  font-size: 0.68rem; font-weight: 700; color: var(--soft);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.cnt-reglage-btn:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
+
+.cnt-reglage {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  padding: 9px 10px;
+  margin-bottom: 10px;
+}
+.cnt-reglage-titre {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  font-size: 0.66rem; font-weight: 800; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--soft);
+  margin-bottom: 6px;
+}
+.cnt-reglage-compte { font-size: 0.68rem; color: var(--accent-ink); letter-spacing: 0; }
+
+.cnt-reglage-item {
+  display: flex; align-items: flex-start; gap: 8px;
+  width: 100%; text-align: left;
+  padding: 6px 7px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+}
+.cnt-reglage-item:hover:not(:disabled) { background: var(--surface); }
+.cnt-reglage-item.active { background: var(--accent-soft); border-color: var(--border-strong); }
+/* Grisé = plafond atteint. Il reste lisible : il faut comprendre ce qu'on
+   pourrait cocher en libérant une place. */
+.cnt-reglage-item:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.cnt-reglage-case {
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; margin-top: 1px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--accent-ink);
+}
+.cnt-reglage-item.active .cnt-reglage-case { border-color: var(--accent-ink); }
+.cnt-reglage-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.cnt-reglage-txt b { font-size: 0.76rem; font-weight: 700; color: var(--text); }
+.cnt-reglage-txt small { font-size: 0.66rem; line-height: 1.4; color: var(--soft); }
+.cnt-reglage-note {
+  margin-top: 7px; padding-top: 6px;
+  border-top: 1px dashed var(--t-border);
+  font-size: 0.65rem; line-height: 1.45; color: var(--soft);
+}
+
+/* La pastille d'écart — mêmes couleurs que l'écran Historique, pour qu'un
+   « +2 » veuille dire la même chose des deux côtés. */
+.cnt-ecart-pastille {
+  display: inline-block;
+  min-width: 26px; padding: 2px 5px;
+  border-radius: 999px;
+  font-size: 0.7rem; font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.cnt-ecart-pastille.ok { background: var(--ok-soft); color: var(--ok); }
+.cnt-ecart-pastille.warn { background: var(--warn-soft); color: var(--warn); }
+.cnt-ecart-pastille.bad { background: var(--danger-soft); color: var(--danger); }
+.cnt-ecart-pastille.none { color: var(--soft); }

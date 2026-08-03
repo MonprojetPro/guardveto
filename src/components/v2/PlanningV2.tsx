@@ -27,7 +27,10 @@ import { CriseModal, type VetCrise } from '@/components/planning/CriseModal'
 import { estJourFerie } from '@/engine/utils'
 import { placesDeGarde } from '@/lib/gardes/places'
 import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
+import { CompteursPanel } from './CompteursPanel'
 import type { CompteursRow } from '@/hooks/useCompteurs'
+import type { BilanVet } from '@/engine/bilan'
+import type { CleColonne } from '@/lib/planning/colonnesCompteurs'
 import type { GardeDenormalisee, Periode, ProfilPlanning } from '@/types'
 
 interface Props {
@@ -50,6 +53,10 @@ interface Props {
   periodesAvecGardes: string[]
   /** Périodes types actives du cabinet — proposées à la création d'un planning. */
   periodesTypes: ProfilPlanning[]
+  /** Écarts à la juste part — source unique `calculerBilans`, comme l'Historique. */
+  bilans: BilanVet[]
+  /** Colonnes de l'encart compteurs choisies par la personne connectée. */
+  colonnesCompteurs: CleColonne[]
 }
 
 export interface CongeAffiche {
@@ -127,6 +134,8 @@ export function PlanningV2({
   profil,
   periodesAvecGardes,
   periodesTypes,
+  bilans,
+  colonnesCompteurs,
 }: Props) {
   const router = useRouter()
   const [annee, mois] = anneeMois.split('-').map(Number)
@@ -464,7 +473,7 @@ export function PlanningV2({
                 <h4>Compteurs · période</h4>
                 <p>Ils bougent à chaque changement, manuel comme automatique.</p>
               </div>
-              <Compteurs lignes={compteurs} />
+              <CompteursPanel lignes={compteurs} bilans={bilans} colonnes={colonnesCompteurs} />
               <p className="cnt-foot">
                 « 1er WE » = premier de garde du week-end (celui qui porte l&apos;avantage
                 financier).
@@ -630,56 +639,4 @@ function LigneVet({
 
 // ── Le volet compteurs ──────────────────────────────────────
 
-function Compteurs({ lignes }: { lignes: CompteursRow[] }) {
-  if (lignes.length === 0) {
-    return <p className="cnt-ecart">Aucune garde comptée sur cette période pour l&apos;instant.</p>
-  }
-
-  const maxWe = Math.max(1, ...lignes.map((l) => l.we_total))
-  const maxSem = Math.max(1, ...lignes.map((l) => l.sem_total))
-
-  // L'écart d'équité qui se voit : entre le plus et le moins chargé en week-ends.
-  const weMin = Math.min(...lignes.map((l) => l.we_total))
-  const weMax = Math.max(...lignes.map((l) => l.we_total))
-
-  return (
-    <>
-      <div>
-        <div className="cnt-row cnt-header">
-          <span>Vétérinaire</span>
-          <span>WE</span>
-          <span>Nuits</span>
-          <span>1er WE</span>
-        </div>
-        {lignes.map((l) => (
-          <div className="cnt-row" key={l.veterinaire_id}>
-            <span className="cnt-vet">
-              <i style={{ background: l.couleur }} />
-              {l.prenom}
-              <small>{l.statut === 'associe' ? 'assoc.' : 'sal.'}</small>
-            </span>
-            <span className={`cnt-num${l.we_total === 0 ? ' zero' : ''}`}>
-              {l.we_total}
-              <span className="bar">
-                <b style={{ transform: `scaleX(${l.we_total / maxWe})` }} />
-              </span>
-            </span>
-            <span className={`cnt-num${l.sem_total === 0 ? ' zero' : ''}`}>
-              {l.sem_total}
-              <span className="bar">
-                <b style={{ transform: `scaleX(${l.sem_total / maxSem})` }} />
-              </span>
-            </span>
-            <span className={`cnt-num${l.we_premier === 0 ? ' zero' : ''}`}>{l.we_premier}</span>
-          </div>
-        ))}
-      </div>
-      <p className="cnt-ecart">
-        {weMax - weMin === 0
-          ? 'Week-ends parfaitement répartis.'
-          : `Écart de ${weMax - weMin} week-end${weMax - weMin > 1 ? 's' : ''} entre le plus et le moins chargé.`}
-      </p>
-    </>
-  )
-}
 

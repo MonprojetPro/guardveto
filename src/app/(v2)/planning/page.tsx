@@ -19,7 +19,9 @@ import { RealtimeRefresh } from '@/components/planning/RealtimeRefresh'
 import { RevalidationRealtime } from '@/components/planning/RevalidationRealtime'
 import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
 import { chargerDock } from '@/data/v2/dock'
-import { queryCompteurs } from '@/hooks/useCompteurs'
+import { queryCompteurs, queryTotalWE } from '@/hooks/useCompteurs'
+import { calculerBilans } from '@/engine/bilan'
+import { normaliserColonnes } from '@/lib/planning/colonnesCompteurs'
 import type { VetCrise } from '@/components/planning/CriseModal'
 import type { CompteursRow } from '@/hooks/useCompteurs'
 import type { GardeDenormalisee, Periode, ProfilPlanning, Veterinaire } from '@/types'
@@ -130,7 +132,7 @@ export default async function PlanningPageV2({
   const periodeAffichee =
     periodes.find((p) => p.date_debut <= fin && p.date_fin >= debut) ?? null
 
-  const [dock, profilRes, compteurs, typesRes2] = await Promise.all([
+  const [dock, profilRes, compteurs, totalWE, prefsRes, typesRes2] = await Promise.all([
     chargerDock(supabase, vet, periodes),
     periodeAffichee?.profil_id
       ? supabase.from('profils_planning').select('nom').eq('id', periodeAffichee.profil_id).maybeSingle()
@@ -138,6 +140,19 @@ export default async function PlanningPageV2({
     periodeAffichee
       ? queryCompteurs(supabase, periodeAffichee.id)
       : Promise.resolve([] as CompteursRow[]),
+    // Total de week-ends de la période : `calculerBilans` en a besoin pour
+    // établir la juste part. Sans lui, la colonne « écart » comparerait à une
+    // moyenne fausse — pire qu'une colonne absente.
+    periodeAffichee
+      ? queryTotalWE(supabase, periodeAffichee.id)
+      : Promise.resolve(0),
+    // Les colonnes choisies par la personne connectée. Absente = les colonnes
+    // par défaut ; jamais bloquant (l'encart doit s'afficher quoi qu'il arrive).
+    supabase
+      .from('preferences_affichage')
+      .select('colonnes_compteurs')
+      .eq('veterinaire_id', vet.id)
+      .maybeSingle(),
     // Les périodes types, proposées quand l'admin crée un planning depuis
     // « Générer ». Chargées pour lui seul : un véto ne génère rien.
     isAdmin
@@ -151,6 +166,10 @@ export default async function PlanningPageV2({
 
   const profil = (profilRes as { data?: { nom: string } | null })?.data?.nom ?? null
   const periodesTypes = ((typesRes2?.data ?? []) as ProfilPlanning[])
+  const bilans = calculerBilans(compteurs as CompteursRow[], totalWE as number)
+  const colonnesCompteurs = normaliserColonnes(
+    (prefsRes as { data?: { colonnes_compteurs?: string[] | null } | null })?.data?.colonnes_compteurs,
+  )
 
   const vets: VetCrise[] = isAdmin ? ((vetsRes?.data as VetCrise[] | null) ?? []) : []
 
@@ -203,6 +222,8 @@ export default async function PlanningPageV2({
           profil={profil}
           periodesAvecGardes={periodesAvecGardes}
           periodesTypes={periodesTypes}
+          bilans={bilans}
+          colonnesCompteurs={colonnesCompteurs}
         />
       </div>
     </>
