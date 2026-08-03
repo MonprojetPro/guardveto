@@ -43,6 +43,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/u
 import { DiagnosticImpasse } from '@/components/planning/DiagnosticImpasse'
 import { CreneauxIgnoresAlert } from '@/components/planning/CreneauxIgnoresAlert'
 import { PointPreVol, type VetEtiquette } from '@/components/planning/PointPreVol'
+import { SignalerLimite } from '@/components/planning/SignalerLimite'
 import { creerPeriode, supprimerPeriode } from '@/app/(protected)/admin/periodes/actions'
 import { estLundi, lundiDeLaSemaine, dureeProposee, finApres } from '@/lib/planning/duree'
 import type { AvertissementPreVol } from '@/engine/pre-vol'
@@ -840,6 +841,30 @@ export function ParcoursGeneration({
                     joursNonCouverts={resultat.joursNonCouverts ?? []}
                   />
                 )}
+
+                {/* Le filet du filet (palier 4) : on ne saura jamais tout
+                    prévoir, et un cabinet coincé ne doit pas rester seul
+                    devant un message. Montré UNIQUEMENT sur un échec réel — un
+                    « signaler un problème » permanent dirait qu'on s'attend à
+                    ce que ça casse. */}
+                <div className="gp-secours">
+                  <p className="gp-secours-txt">
+                    Tu as réglé ce qu’on te proposait et ça bloque encore ? Ce n’est
+                    pas de ta faute : certaines configurations n’ont pas encore été
+                    prévues. Dis-le, et l’équipe corrigera à distance.
+                  </p>
+                  <SignalerLimite
+                    origine="génération de planning"
+                    contexte={{
+                      planning: nomCible,
+                      periodeId: cible,
+                      interrompu: resultat.interrompu ?? false,
+                      message: resultat.message ?? null,
+                      joursNonCouverts: (resultat.joursNonCouverts ?? []).length,
+                      pointsPreVol: (preVol ?? []).map((a) => a.code),
+                    }}
+                  />
+                </div>
               </>
             )}
           </div>

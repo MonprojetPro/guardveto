@@ -1697,3 +1697,51 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .cnt-ecart-pastille.warn { background: var(--warn-soft); color: var(--warn); }
 .cnt-ecart-pastille.bad { background: var(--danger-soft); color: var(--danger); }
 .cnt-ecart-pastille.none { color: var(--soft); }
+
+/* ── Le filet du filet : prévenir l'équipe (palier 4) ────────────────────
+   Volontairement DISCRET et en bas du résultat d'échec : c'est une sortie de
+   secours, pas une invitation. Un « signaler un problème » permanent dirait à
+   l'utilisateur qu'on s'attend à ce que ça casse. */
+.gp-secours {
+  margin-top: 4px; padding-top: 11px;
+  border-top: 1px dashed var(--t-border);
+  display: grid; gap: 8px; justify-items: start;
+}
+.gp-secours-txt { font-size: 0.79rem; line-height: 1.55; color: var(--soft); }
+
+.sig-panneau {
+  width: 100%;
+  display: grid; gap: 7px;
+  background: var(--surface-2);
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-sm);
+  padding: 11px 12px;
+}
+.sig-titre { font-size: 0.85rem; font-weight: 700; color: var(--text); }
+.sig-sous { font-size: 0.74rem; line-height: 1.5; color: var(--soft); }
+.sig-zone {
+  width: 100%;
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  padding: 9px 11px;
+  font-family: inherit;
+  font-size: 0.84rem; line-height: 1.5; color: var(--text);
+  resize: vertical;
+}
+.sig-zone:focus {
+  outline: none;
+  border-color: var(--accent-ink);
+  box-shadow: 0 0 0 3px var(--accent-soft, rgba(140, 92, 46, 0.16));
+}
+
+.sig-fait {
+  display: flex; align-items: flex-start; gap: 9px;
+  background: var(--ok-soft);
+  border: 1px solid rgba(90, 150, 60, 0.35);
+  border-radius: var(--r-sm);
+  padding: 11px 12px;
+  font-size: 0.83rem; line-height: 1.55; color: var(--text);
+}
+.sig-fait .ppv-ico { color: var(--ok); margin-top: 2px; }
+.sig-fait b { color: var(--ok); }
