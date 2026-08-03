@@ -1581,3 +1581,34 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   border-color: var(--danger);
   color: #fff;
 }
+
+/* ── Le menu de période : choisir, et faire le ménage ────────────────────
+   La corbeille rejoint le menu déroulant (demande MiKL du 2026-08-03) : le
+   geste doit exister là où on choisit ses plannings, pas seulement au fond du
+   parcours de génération. Une rangée enveloppe la ligne pour loger la
+   corbeille sans imbriquer deux boutons (interdit en HTML). */
+.pp-rangee { display: flex; align-items: stretch; gap: 2px; }
+.pp-rangee .pp-item { flex: 1 1 auto; }
+.pp-rangee .gen-suppr { align-self: center; width: 28px; height: 28px; }
+.pp-rangee .gen-suppr { opacity: 0; }
+.pp-rangee:hover .gen-suppr,
+.pp-rangee .gen-suppr:focus-visible { opacity: 1; }
+
+/* En confirmation, la ligne bascule entièrement — même parti pris que la
+   liste du parcours : jamais un « oui/non » glissé à côté d'un nom. */
+.pp-item.confirme {
+  display: flex; flex-direction: column; align-items: stretch; gap: 8px;
+  background: var(--danger-soft);
+  border: 1px solid rgba(168, 52, 31, 0.4);
+  border-radius: var(--r-sm);
+  padding: 10px 11px;
+}
+.pp-confirme-txt {
+  display: flex; flex-direction: column; gap: 2px;
+  font-size: 0.83rem; font-weight: 700; color: var(--danger);
+}
+.pp-confirme-txt small {
+  font-size: 0.72rem; font-weight: 500; line-height: 1.45; color: var(--text);
+}
+.pp-confirme-actions { display: flex; gap: 6px; }
+.pp-confirme-actions .ppv-btn { height: 28px; font-size: 0.74rem; }

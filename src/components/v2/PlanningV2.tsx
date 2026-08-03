@@ -17,6 +17,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { Trash2 } from 'lucide-react'
+import { supprimerPeriode } from '@/app/(protected)/admin/periodes/actions'
 import { FilouEdge } from './FilouEdge'
 import { useOutilsPlanning } from './outils-planning'
 import { GardeDetailModal } from '@/components/planning/GardeDetailModal'
@@ -133,6 +136,25 @@ export function PlanningV2({
   const [criseOpen, setCriseOpen] = useState(false)
   const [criseDate, setCriseDate] = useState<string | undefined>()
   const [criseVetId, setCriseVetId] = useState<string | undefined>()
+  // Suppression d'un planning depuis le menu de période (demande MiKL du
+  // 2026-08-03 : le geste doit exister là où on choisit les plannings, pas
+  // seulement au fond du parcours de génération).
+  const [supprimerId, setSupprimerId] = useState<string | null>(null)
+  const [suppressionEnCours, setSuppressionEnCours] = useState(false)
+
+  async function supprimerLePlanning(id: string) {
+    setSuppressionEnCours(true)
+    const res = await supprimerPeriode(id)
+    setSuppressionEnCours(false)
+    setSupprimerId(null)
+    if ('error' in res && res.error) {
+      toast.error(res.error)
+      return
+    }
+    toast.success('Planning supprimé.')
+    setPopOuvert(false)
+    router.refresh()
+  }
 
   const today = aujourdhuiISO()
   const grille = genererGrille(annee, mois)
@@ -263,22 +285,72 @@ export function PlanningV2({
                 )}
 
                 <p className="pp-label">Changer de période</p>
-                {periodes.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className="pp-item"
-                    aria-current={p.id === periodeAffichee?.id ? 'true' : undefined}
-                    onClick={() => allerVersPeriode(p)}
-                  >
-                    {nomPeriode(p)}
-                    <small>
-                      {p.statut === 'brouillon' && 'Brouillon · en cours de préparation'}
-                      {p.statut === 'publie' && 'Publiée · connue de l’équipe'}
-                      {p.statut === 'verrouille' && 'Verrouillée · consultation seule'}
-                    </small>
-                  </button>
-                ))}
+                {periodes.map((p) => {
+                  // La corbeille tient sur les BROUILLONS seulement, comme
+                  // partout ailleurs (le serveur refuse les autres de toute
+                  // façon). En confirmation, la rangée bascule entièrement :
+                  // pas de « oui/non » glissé à côté d'un nom de planning.
+                  if (supprimerId === p.id) {
+                    return (
+                      <div key={p.id} className="pp-item confirme">
+                        <span className="pp-confirme-txt">
+                          Supprimer « {nomPeriode(p)} » ?
+                          <small>
+                            {periodesAvecGardes.includes(p.id)
+                              ? 'Ses gardes seront effacées — personne ne les a vues.'
+                              : 'Ce planning est vide.'}
+                          </small>
+                        </span>
+                        <span className="pp-confirme-actions">
+                          <button
+                            type="button"
+                            className="ppv-btn"
+                            disabled={suppressionEnCours}
+                            onClick={() => setSupprimerId(null)}
+                          >
+                            Annuler
+                          </button>
+                          <button
+                            type="button"
+                            className="ppv-btn danger"
+                            disabled={suppressionEnCours}
+                            onClick={() => void supprimerLePlanning(p.id)}
+                          >
+                            Supprimer
+                          </button>
+                        </span>
+                      </div>
+                    )
+                  }
+                  return (
+                    <div key={p.id} className="pp-rangee">
+                      <button
+                        type="button"
+                        className="pp-item"
+                        aria-current={p.id === periodeAffichee?.id ? 'true' : undefined}
+                        onClick={() => allerVersPeriode(p)}
+                      >
+                        {nomPeriode(p)}
+                        <small>
+                          {p.statut === 'brouillon' && 'Brouillon · en cours de préparation'}
+                          {p.statut === 'publie' && 'Publiée · connue de l’équipe'}
+                          {p.statut === 'verrouille' && 'Verrouillée · consultation seule'}
+                        </small>
+                      </button>
+                      {isAdmin && p.statut === 'brouillon' && (
+                        <button
+                          type="button"
+                          className="gen-suppr"
+                          title={`Supprimer « ${nomPeriode(p)} »`}
+                          aria-label={`Supprimer le planning ${nomPeriode(p)}`}
+                          onClick={() => setSupprimerId(p.id)}
+                        >
+                          <Trash2 className="ppv-ico" aria-hidden />
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
                 {/* Menait à `/historique` du temps où la création vivait
                     là-bas. Depuis le 2026-08-02 elle est ici, dans l'assistant
                     de génération — le raccourci ouvre donc directement la voie
