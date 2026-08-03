@@ -40,6 +40,7 @@ import {
   poserEtiquetteSurVetos,
   retirerEtiquetteDeVetos,
 } from '@/app/(protected)/regles/actions'
+import { lienVersRegles, libelleRenvoiRegles } from '@/lib/regles/focusRegles'
 import type { AvertissementPreVol } from '@/engine/pre-vol'
 
 export interface VetEtiquette {
@@ -97,6 +98,22 @@ export function PointPreVol({ avertissement: a, vets, onCorrige }: Props) {
   const bloquant = a.gravite === 'bloquant'
   const ids = a.regleIds ?? []
   const ecran = ECRAN[a.code]
+
+  /**
+   * Le renvoi vers l'écran Règles, CIBLÉ quand on connaît les règles en cause :
+   * `?focus=` défile jusqu'à elles et les entoure d'un halo (même mécanisme que
+   * « Voir la règle existante » des refus de doublon). Toutes les ancres sont
+   * passées d'un coup — un point met souvent plusieurs règles en cause, et n'en
+   * éclairer qu'une renverrait chercher les autres à la main.
+   *
+   * Sans ids (« créneau impossible » : ses raisons viennent du rejeu du moteur,
+   * pas d'une ligne identifiée), on retombe sur l'écran nu — mieux vaut ça que
+   * haloter une règle qu'on aurait devinée.
+   */
+  const href = ids.length > 0
+    ? lienVersRegles(ids, ecran?.href ?? '/regles')
+    : ecran?.href
+  const labelRenvoi = libelleRenvoiRegles(ids.length, ecran?.label ?? 'Ouvrir les règles')
 
   // « TOUS portent l'étiquette » se corrige en la RETIRANT ; « personne ne la
   // porte » en la POSANT. Le code seul ne suffit pas à trancher pour
@@ -267,16 +284,20 @@ export function PointPreVol({ avertissement: a, vets, onCorrige }: Props) {
             </button>
           )}
 
-          {ecran && (
+          {href && (
             <a
-              href={ecran.href}
+              href={href}
               target="_blank"
               rel="noopener noreferrer"
               className="ppv-btn"
-              title="S’ouvre dans un nouvel onglet — ton parcours reste ouvert ici"
+              title={
+                ids.length > 0
+                  ? 'S’ouvre dans un nouvel onglet, directement sur la règle — ton parcours reste ouvert ici'
+                  : 'S’ouvre dans un nouvel onglet — ton parcours reste ouvert ici'
+              }
             >
               <ExternalLink className="ppv-ico" aria-hidden />
-              {ecran.label}
+              {labelRenvoi}
             </a>
           )}
         </div>

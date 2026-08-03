@@ -146,6 +146,7 @@ import {
 } from '@/components/regles/ReglesClient'
 import type { RegleEquipeUI } from '@/components/regles/CompositionEquipeClient'
 import type { StructureRegleUI } from '@/components/regles/ReglagesPlanningClient'
+import { ancresDeFocus } from '@/lib/regles/focusRegles'
 import type { VetoUI } from './types'
 
 // ════════════════════════════════════════════════════════════
@@ -467,24 +468,42 @@ export function OngletMoteur({
   }
 
   /**
-   * Le halo de `?focus=`. On arrive ici depuis un diagnostic d'impasse qui
-   * désigne UN réglage : sans repère, on atterrit dans une longue liste et on
+   * Le halo de `?focus=`. On arrive ici depuis un diagnostic d'impasse ou d'un
+   * point de pré-vol : sans repère, on atterrit dans une longue liste et on
    * cherche. Purement cosmétique et défensif — une ancre inconnue ne casse
    * rien, elle ne fait simplement rien.
+   *
+   * PLUSIEURS ANCRES, séparées par des virgules (2026-08-03). Un point de
+   * pré-vol met souvent SIX règles en cause — « les limites cumulées de
+   * week-end » les met toutes. N'en éclairer qu'une renverrait l'admin
+   * chercher les cinq autres à la main, exactement ce qu'on voulait éviter.
+   * Un id seul reste traité comme avant.
    */
   useEffect(() => {
     if (!focus) return
-    const safe =
+    const ancres = ancresDeFocus(focus)
+    if (ancres.length === 0) return
+
+    const echapper = (a: string) =>
       typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
-        ? CSS.escape(focus)
-        : focus.replace(/["\\]/g, '\\$&')
-    const el = document.querySelector<HTMLElement>(
-      `[data-regle-cible="${safe}"], [data-regle-cible-alt="${safe}"]`,
-    )
-    if (!el) return
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    el.classList.add('cible-focus')
-    const timer = window.setTimeout(() => el.classList.remove('cible-focus'), 2600)
+        ? CSS.escape(a)
+        : a.replace(/["\\]/g, '\\$&')
+
+    const selecteur = ancres
+      .map((a) => `[data-regle-cible="${echapper(a)}"], [data-regle-cible-alt="${echapper(a)}"]`)
+      .join(', ')
+
+    const els = Array.from(document.querySelectorAll<HTMLElement>(selecteur))
+    if (els.length === 0) return
+
+    // On défile vers la PREMIÈRE trouvée dans l'ordre du document (pas dans
+    // l'ordre des ancres) : c'est celle du haut de l'écran, donc celle à
+    // partir de laquelle les autres sont visibles en descendant.
+    els[0].scrollIntoView({ behavior: 'smooth', block: 'center' })
+    for (const el of els) el.classList.add('cible-focus')
+    const timer = window.setTimeout(() => {
+      for (const el of els) el.classList.remove('cible-focus')
+    }, 2600)
     return () => window.clearTimeout(timer)
   }, [focus])
 
