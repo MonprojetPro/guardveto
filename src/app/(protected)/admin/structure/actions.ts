@@ -173,16 +173,25 @@ const EFFECTIFS_VALIDES = new Set([1, 2, 3, 4])
 
 export interface CreerProfilPayload {
   nom: string
-  /** Profil dont on copie le catalogue (défaut du cabinet si omis). */
+  /**
+   * Période type dont on copie les CHOIX (2026-08-04). Plus le catalogue : la
+   * structure est commune au cabinet, seuls les nombres de vétérinaires se
+   * recopient. Omis → la nouvelle période type part de tout le socle.
+   */
   source_profil_id?: string | null
+  /** @deprecated Réglages supprimés le 2026-08-04 — ignorés côté serveur. */
   saison_suggeree?: 'ete' | 'hiver' | null
+  /** @deprecated Idem. */
   nb_vetos_semaine_soir?: number | null
 }
 
 /**
- * Crée un profil en DUPLIQUANT le catalogue d'un profil source (atomique via la
- * RPC dupliquer_profil). Le nouveau profil est immédiatement générable (il porte
- * les mêmes types que sa source). Nom en doublon → message clair.
+ * Crée une période type (atomique via la RPC `dupliquer_profil`, dont la
+ * promesse a changé le 2026-08-04 : elle ne duplique plus la structure, qui est
+ * commune au cabinet, mais les CHOIX de la source — combien de vétérinaires sur
+ * chaque garde). Sans source, la nouvelle période type prend tout le socle :
+ * elle est générable immédiatement, et on retire ensuite ce qu'on ne veut pas.
+ * Nom en doublon → message clair.
  */
 export async function creerProfil(payload: CreerProfilPayload) {
   const supabase = await createClient()
@@ -284,6 +293,68 @@ export async function setProfilMeta(
 
   if (error) return { error: error.message }
   revalidatePath('/regles')
+  revalidatePath('/historique')
+  return { success: true }
+}
+
+/**
+ * COMBIEN DE VÉTÉRINAIRES CETTE PÉRIODE TYPE VEUT SUR CETTE GARDE (2026-08-04).
+ *
+ * C'est le geste central du modèle « le socle donne les possibilités, les
+ * périodes types les affinent » : le créneau appartient au cabinet, seul le
+ * nombre est propre à la période.
+ *
+ * `nbVetos = 0` retire la garde de cette période — le moteur n'en posera
+ * aucune ces jours-là (demande explicite de MiKL : « laisse la possibilité
+ * qu'il n'y ait rien… faut que le planning en tienne compte »).
+ *
+ * Le plafond est celui du SOCLE : on le relit en base plutôt que de croire
+ * l'écran, qui peut être resté ouvert pendant qu'on réduisait le créneau.
+ */
+export async function setAffinagePeriodeType(
+  profilId: string,
+  creneauId: string,
+  nbVetos: number,
+) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return garde
+
+  if (!Number.isInteger(nbVetos) || nbVetos < 0) {
+    return { error: 'Nombre de vétérinaires invalide.' }
+  }
+
+  const { data: creneau } = await supabase
+    .from('creneau_modele')
+    .select('id, nom, nb_places, cabinet_id, profil_id')
+    .eq('id', creneauId)
+    .maybeSingle()
+  if (!creneau) return { error: 'Cette garde n’existe pas.' }
+
+  const c = creneau as { nom: string; nb_places: number; cabinet_id: string; profil_id: string | null }
+  if (c.profil_id !== null) {
+    // Garde-fou de cohérence : seul le socle s'affine. Un créneau encore
+    // rattaché à une période type signale une migration incomplète.
+    return { error: 'Cette garde n’appartient pas à la structure du cabinet.' }
+  }
+  if (nbVetos > c.nb_places) {
+    return {
+      error: `« ${c.nom} » n’a que ${c.nb_places} place${c.nb_places > 1 ? 's' : ''} dans la structure du cabinet. `
+        + 'Augmente-la d’abord dans « Structure des gardes ».',
+    }
+  }
+
+  const { error } = await supabase
+    .from('periode_type_creneau')
+    .upsert(
+      { cabinet_id: c.cabinet_id, profil_id: profilId, creneau_id: creneauId, nb_vetos: nbVetos, mis_a_jour_le: new Date().toISOString() },
+      { onConflict: 'profil_id,creneau_id' },
+    )
+
+  if (error) return { error: error.message }
+  revalidatePath('/regles')
+  revalidatePath('/planning')
   revalidatePath('/historique')
   return { success: true }
 }

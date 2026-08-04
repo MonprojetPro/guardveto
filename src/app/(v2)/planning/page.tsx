@@ -173,26 +173,44 @@ export default async function PlanningPageV2({
   // confirme rien — on ne sait pas ce qu'on valide. On descend donc les
   // gardes qu'elle fait couvrir, pour que la confirmation porte sur du réel.
   // Une seule requête pour toutes les périodes types, groupée ensuite.
+  // Le SOCLE du cabinet, puis ce que chaque période type en retient — même
+  // règle que le moteur (`appliquerAffinage`) : absence de choix = le créneau
+  // tel quel, 0 = la garde n'existe pas sur cette période.
   const idsTypes = periodesTypes.map((p) => p.id)
-  const { data: creneauxTypes } = idsTypes.length > 0
-    ? await supabase
-        .from('creneau_modele')
-        .select('profil_id, nom, nb_places, actif, ordre')
-        .in('profil_id', idsTypes)
-        .eq('actif', true)
-        .order('ordre')
-    : { data: null }
+  const [socleRes, affinagesRes] = await Promise.all([
+    supabase
+      .from('creneau_modele')
+      .select('id, nom, nb_places, actif, ordre')
+      .is('profil_id', null)
+      .eq('actif', true)
+      .order('ordre'),
+    idsTypes.length > 0
+      ? supabase
+          .from('periode_type_creneau')
+          .select('profil_id, creneau_id, nb_vetos')
+          .in('profil_id', idsTypes)
+      : Promise.resolve({ data: null }),
+  ])
+
+  const socleCreneaux = (socleRes?.data ?? []) as {
+    id: string; nom: string; nb_places: number
+  }[]
+  const affinages = (affinagesRes?.data ?? []) as {
+    profil_id: string; creneau_id: string; nb_vetos: number
+  }[]
 
   const gardesParType: Record<string, string[]> = {}
-  for (const c of (creneauxTypes ?? []) as {
-    profil_id: string; nom: string; nb_places: number
-  }[]) {
-    // Le nombre est TOUJOURS écrit, même à 1 : depuis le 2026-08-04 c'est le
-    // seul endroit où l'effectif d'une garde se règle, donc le seul endroit où
-    // il se lit. Le taire à 1 obligerait à deviner.
-    ;(gardesParType[c.profil_id] ??= []).push(
-      `${c.nom} — ${c.nb_places} véto${c.nb_places > 1 ? 's' : ''}`,
+  for (const t of periodesTypes) {
+    const choix = new Map(
+      affinages.filter((a) => a.profil_id === t.id).map((a) => [a.creneau_id, a.nb_vetos]),
     )
+    gardesParType[t.id] = socleCreneaux.flatMap((c) => {
+      const n = Math.min(choix.get(c.id) ?? c.nb_places, c.nb_places)
+      if (n <= 0) return [] // pas de garde de ce type sur cette période
+      // Le nombre est TOUJOURS écrit, même à 1 : c'est le réglage que la
+      // période type porte, donc ce que la confirmation doit montrer.
+      return [`${c.nom} — ${n} véto${n > 1 ? 's' : ''}`]
+    })
   }
   const bilans = calculerBilans(compteurs as CompteursRow[], totalWE as number)
   const colonnesCompteurs = normaliserColonnes(

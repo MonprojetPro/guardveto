@@ -48,7 +48,7 @@ import { OngletProfils } from './regles/OngletProfils'
 import { OngletCreneaux } from './regles/OngletCreneaux'
 import { OngletEnchainements } from './regles/OngletEnchainements'
 import { OngletMoteur } from './regles/OngletMoteur'
-import type { ProfilUI, NiveauLiaisonUI, VetoUI } from './regles/types'
+import type { ProfilUI, NiveauLiaisonUI, VetoUI, CreneauUI, RelationUI } from './regles/types'
 import type { RegleRow, PeriodeOption, TypeCreneauOption } from '@/components/regles/ReglesClient'
 import type { RegleEquipeUI } from '@/components/regles/CompositionEquipeClient'
 import type { StructureRegleUI } from '@/components/regles/ReglagesPlanningClient'
@@ -86,6 +86,10 @@ interface Props {
   /** `?focus=` — ancre d'un réglage précis, venue du diagnostic d'impasse. */
   focus?: string
   profils: ProfilUI[]
+  /** LE SOCLE du cabinet — ce que « Structure des gardes » édite. */
+  socle: CreneauUI[]
+  /** Les enchaînements du socle. */
+  relationsSocle: RelationUI[]
   /** Plannings encore rattachés à AUCUNE période type — cf. `OngletProfils`. */
   planningsSansPeriodeType: number
   regles: RegleRow[]
@@ -115,6 +119,8 @@ export function ReglesStructureV2({
   ongletInitial,
   focus,
   profils,
+  socle,
+  relationsSocle,
   planningsSansPeriodeType,
   regles,
   reglesEquipe,
@@ -154,8 +160,28 @@ export function ReglesStructureV2({
   const profilId = profil?.id ?? ''
   const setProfilId = setProfilChoisi
 
-  const nbCreneauxActifs = profil?.creneaux.filter((c) => c.actif).length ?? 0
-  const nbLiaisons = profil?.relations.filter((r) => r.actif).length ?? 0
+  /**
+   * Le socle présenté comme un `ProfilUI` — la forme qu'attendent déjà les
+   * onglets « Structure des gardes » et « Enchaînements ». `id: ''` désigne le
+   * socle côté serveur (`profil_id NULL` en base) : ces onglets créent et
+   * modifient des créneaux du CABINET, plus d'une période type.
+   */
+  const profilSocle = useMemo<ProfilUI>(
+    () => ({
+      id: '',
+      nom: 'la structure du cabinet',
+      estDefaut: false,
+      affinage: {},
+      creneaux: socle,
+      relations: relationsSocle,
+    }),
+    [socle, relationsSocle],
+  )
+
+  // Les compteurs d'onglet portent sur le SOCLE : ils annoncent ce que le
+  // cabinet a défini, pas ce qu'une période type en retient.
+  const nbCreneauxActifs = socle.filter((c) => c.actif).length
+  const nbLiaisons = relationsSocle.filter((r) => r.actif).length
   const nbRegles = regles.filter((r) => r.actif).length + reglesEquipe.filter((r) => r.actif).length
 
   /** Classes + `aria-selected` d'un onglet : l'état se lit sur l'attribut, pas sur une classe. */
@@ -196,38 +222,29 @@ export function ReglesStructureV2({
             en cliquant sa carte. Sur « Règles », il ne veut rien dire
             aujourd'hui : une règle ne dépend encore d'aucune période type
             (c'est justement l'étape 4 du chantier). */}
-        {profils.length > 1 && (onglet === 'creneaux' || onglet === 'enchainements') && (
-          <div className="page-actions">
-            <div className="profil-pilote">
-              <span id="profil-courant-label">Période type</span>
-              <Select value={profilId} onValueChange={(v) => v && setProfilId(v)}>
-                <SelectTrigger aria-labelledby="profil-courant-label" className="w-[230px]">
-                  {profil?.nom ?? 'Choisir…'}
-                </SelectTrigger>
-                <SelectContent>
-                  {profils.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.nom}
-                      {p.estDefaut ? ' · par défaut' : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        )}
+        {/* Le sélecteur de période type a disparu de la tête de page
+            (2026-08-04). « Structure des gardes » et « Enchaînements » ne
+            décrivent plus UNE période type : ils décrivent le SOCLE du cabinet,
+            le même pour toutes. Le laisser aurait fait croire qu'on édite une
+            saison alors qu'on édite le socle commun. */}
       </div>
 
+      {/* L'ORDRE DES ONGLETS SUIT LA DÉPENDANCE (MiKL, 2026-08-04 : « les
+          périodes types doivent être en dernière position »). On décrit
+          d'abord ce qui est POSSIBLE — les gardes, puis leurs enchaînements —
+          et seulement ensuite comment chaque période type s'en sert. Ranger
+          l'affinage avant le socle demandait de choisir des nombres sur des
+          gardes qu'on n'avait pas encore définies. */}
       <nav className="tabs" role="tablist" aria-label="Sections de l’organisation du cabinet">
-        <button {...tab('profils')}>
-          Périodes types {profils.length > 0 && <span className="count">{profils.length}</span>}
-        </button>
         <button {...tab('creneaux')}>
           Structure des gardes{' '}
           {nbCreneauxActifs > 0 && <span className="count">{nbCreneauxActifs}</span>}
         </button>
         <button {...tab('enchainements')}>
           Enchaînements {nbLiaisons > 0 && <span className="count">{nbLiaisons}</span>}
+        </button>
+        <button {...tab('profils')}>
+          Périodes types {profils.length > 0 && <span className="count">{profils.length}</span>}
         </button>
         <button {...tab('moteur')}>
           Règles {nbRegles > 0 && <span className="count">{nbRegles}</span>}
@@ -249,34 +266,35 @@ export function ReglesStructureV2({
       >
         <FilouEdge origine="regles" cote="droite" />
 
-        {onglet === 'profils' && (
-          <section className="tab-panel" role="tabpanel" aria-label="Périodes types">
-            <OngletProfils
-              profils={profils}
-              planningsSansPeriodeType={planningsSansPeriodeType}
-              profilCourantId={profilId}
-              onChoisir={setProfilId}
+        {/* Ces deux onglets éditent LE SOCLE du cabinet — plus une période type.
+            `profilSocle` est une vue de ce socle à la forme qu'ils attendaient
+            déjà (`ProfilUI`) : ils affichent et modifient des créneaux, ce qui
+            ne change pas ; c'est ce qu'ils modifient qui change. */}
+        {onglet === 'creneaux' && (
+          <section className="tab-panel" role="tabpanel" aria-label="Structure des gardes">
+            <OngletCreneaux profil={profilSocle} />
+          </section>
+        )}
+
+        {onglet === 'enchainements' && (
+          <section className="tab-panel" role="tabpanel" aria-label="Enchaînements">
+            <OngletEnchainements
+              estAdmin={estAdmin}
+              profil={profilSocle}
+              niveaux={niveauxLiaison}
+              focus={focus}
             />
           </section>
         )}
 
-        {/* `key={profil.id}` : changer de période type change le catalogue.
-            Sans remontage, un formulaire à demi rempli garderait des types de
-            garde qui n'existent pas dans celle qu'on vient d'ouvrir. */}
-        {onglet === 'creneaux' && profil && (
-          <section className="tab-panel" role="tabpanel" aria-label="Structure des gardes">
-            <OngletCreneaux key={profil.id} profil={profil} />
-          </section>
-        )}
-
-        {onglet === 'enchainements' && profil && (
-          <section className="tab-panel" role="tabpanel" aria-label="Enchaînements">
-            <OngletEnchainements
-              key={profil.id}
-              estAdmin={estAdmin}
-              profil={profil}
-              niveaux={niveauxLiaison}
-              focus={focus}
+        {onglet === 'profils' && (
+          <section className="tab-panel" role="tabpanel" aria-label="Périodes types">
+            <OngletProfils
+              profils={profils}
+              socle={socle}
+              planningsSansPeriodeType={planningsSansPeriodeType}
+              profilCourantId={profilId}
+              onChoisir={setProfilId}
             />
           </section>
         )}

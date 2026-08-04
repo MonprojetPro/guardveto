@@ -71,7 +71,8 @@ function makeBuilder(table: string) {
   const b: Record<string, unknown> = {}
   const chain = () => b
   b.select = (cols?: string) => { selectCols = cols ?? ''; return b }
-  b.eq = chain; b.lte = chain; b.gte = chain; b.lt = chain
+  // `.is()` depuis le 2026-08-04 : le socle se lit `.is('profil_id', null)`.
+  b.eq = chain; b.lte = chain; b.gte = chain; b.lt = chain; b.is = chain
   b.or = chain; b.order = chain; b.limit = chain
   const resolved = () => ({ data: dataFor(table, selectCols), error: null })
   b.single = () => Promise.resolve(resolved())

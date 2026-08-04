@@ -289,7 +289,9 @@ export default async function ReglesStructurePage({
           estAdmin={estAdmin}
           ongletInitial={onglet}
           focus={focus}
-          profils={profils}
+          profils={profils.profils}
+          socle={profils.socle}
+          relationsSocle={profils.relations}
           planningsSansPeriodeType={planningsSansPeriodeType ?? 0}
           regles={reglesClassiques}
           reglesEquipe={reglesEquipe}

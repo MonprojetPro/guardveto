@@ -19,7 +19,9 @@
 
 import type { createClient } from '@/lib/supabase/server'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
-import type { CreneauUI, ProfilUI, RelationUI, GenreRelationUI } from '@/components/v2/regles/types'
+import type {
+  CreneauUI, ProfilUI, RelationUI, GenreRelationUI, StructureCabinetUI,
+} from '@/components/v2/regles/types'
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 
@@ -127,100 +129,140 @@ interface RelationRow {
   actif: boolean
 }
 
+/** Une ligne d'affinage : ce qu'une période type veut sur un créneau du socle. */
+interface AffinageRow {
+  profil_id: string
+  creneau_id: string
+  nb_vetos: number
+}
+
 /**
  * Tous les profils du cabinet, chacun avec son catalogue et ses liaisons,
  * déjà mis en clair. Liste vide si le cabinet n'est pas résolu.
  */
 export async function chargerProfilsStructure(
   supabase: SupabaseServerClient,
-): Promise<ProfilUI[]> {
+): Promise<StructureCabinetUI> {
+  const vide: StructureCabinetUI = { socle: [], relations: [], profils: [] }
+
   let cabinetId: string
   try {
     cabinetId = await resoudreCabinetId(supabase)
   } catch {
-    return []
+    return vide
   }
 
-  const [profilsRes, creneauxRes, relationsRes] = await Promise.all([
+  const [profilsRes, creneauxRes, relationsRes, affinagesRes] = await Promise.all([
     supabase
       .from('profils_planning')
       .select('id, nom, est_defaut, saison_suggeree, nb_vetos_semaine_soir, ordre')
       .eq('cabinet_id', cabinetId)
       .eq('actif', true)
       .order('ordre'),
+    // LE SOCLE seul (`profil_id IS NULL`) : les créneaux ne sont plus dupliqués
+    // par période type depuis le 2026-08-04.
     supabase
       .from('creneau_modele')
       .select(
         'id, profil_id, code, nom, jours_semaine, sur_feries, heure_debut, heure_fin, offset_jours_fin, nb_places, roles, actif, ordre',
       )
       .eq('cabinet_id', cabinetId)
+      .is('profil_id', null)
       .order('ordre'),
     supabase
       .from('relation_creneau')
       .select('id, profil_id, source_id, cible_id, genre, actif')
       .eq('cabinet_id', cabinetId)
+      .is('profil_id', null)
       .order('cree_le'),
+    supabase
+      .from('periode_type_creneau')
+      .select('profil_id, creneau_id, nb_vetos')
+      .eq('cabinet_id', cabinetId),
   ])
 
   const profilsRows = ((profilsRes as { data?: ProfilRow[] | null }).data ?? []) as ProfilRow[]
   const creneauxRows = ((creneauxRes as { data?: CreneauRow[] | null }).data ?? []) as CreneauRow[]
   const relationsRows = ((relationsRes as { data?: RelationRow[] | null }).data ??
     []) as RelationRow[]
+  const affinagesRows = ((affinagesRes as { data?: AffinageRow[] | null }).data ??
+    []) as AffinageRow[]
+
+  const enClair = (c: CreneauRow, nbPlaces: number): CreneauUI => {
+    const jours = c.jours_semaine ?? []
+    const roles = (c.roles ?? []).slice(0, nbPlaces)
+    const debut = hhmm(c.heure_debut)
+    const fin = hhmm(c.heure_fin)
+    return {
+      id: c.id,
+      code: c.code,
+      nom: c.nom,
+      joursSemaine: jours,
+      surFeries: c.sur_feries,
+      heureDebut: debut,
+      heureFin: fin,
+      offsetJoursFin: c.offset_jours_fin,
+      nbPlaces,
+      roles,
+      actif: c.actif,
+      ordre: c.ordre,
+      estSeed: c.code !== null && CODES_SEED.has(c.code),
+      joursClair: joursClair(jours, c.sur_feries),
+      placesClair: placesClair(nbPlaces, roles),
+      horairesClair: horairesClair(debut, fin, c.offset_jours_fin),
+    }
+  }
+
+  const socle = creneauxRows
+    .slice()
+    .sort((a, b) => a.ordre - b.ordre)
+    .map((c) => enClair(c, c.nb_places))
 
   const nomParCreneau = new Map(creneauxRows.map((r) => [r.id, r.nom]))
 
-  return profilsRows.map((p): ProfilUI => {
+  const relations = relationsRows
+    .filter((r) => r.genre === 'meme_binome' || r.genre === 'inversion_role')
+    .map(
+      (r): RelationUI => ({
+        id: r.id,
+        sourceId: r.source_id,
+        cibleId: r.cible_id,
+        sourceNom: nomParCreneau.get(r.source_id) ?? '?',
+        cibleNom: nomParCreneau.get(r.cible_id) ?? '?',
+        genre: r.genre as GenreRelationUI,
+        actif: r.actif,
+      }),
+    )
+
+  const profils = profilsRows.map((p): ProfilUI => {
+    const affinage: Record<string, number> = {}
+    for (const a of affinagesRows) {
+      if (a.profil_id === p.id) affinage[a.creneau_id] = a.nb_vetos
+    }
+
+    // Le socle affiné — MÊME RÈGLE que `appliquerAffinage` côté moteur : absence
+    // de choix = le créneau tel quel, 0 = il disparaît, jamais plus que le socle.
     const creneaux = creneauxRows
-      .filter((c) => c.profil_id === p.id)
+      .slice()
       .sort((a, b) => a.ordre - b.ordre)
-      .map((c): CreneauUI => {
-        const jours = c.jours_semaine ?? []
-        const roles = c.roles ?? []
-        const debut = hhmm(c.heure_debut)
-        const fin = hhmm(c.heure_fin)
-        return {
-          id: c.id,
-          code: c.code,
-          nom: c.nom,
-          joursSemaine: jours,
-          surFeries: c.sur_feries,
-          heureDebut: debut,
-          heureFin: fin,
-          offsetJoursFin: c.offset_jours_fin,
-          nbPlaces: c.nb_places,
-          roles,
-          actif: c.actif,
-          ordre: c.ordre,
-          estSeed: c.code !== null && CODES_SEED.has(c.code),
-          joursClair: joursClair(jours, c.sur_feries),
-          placesClair: placesClair(c.nb_places, roles),
-          horairesClair: horairesClair(debut, fin, c.offset_jours_fin),
-        }
+      .flatMap((c): CreneauUI[] => {
+        const voulu = affinage[c.id]
+        if (voulu === undefined) return [enClair(c, c.nb_places)]
+        if (voulu <= 0) return []
+        return [enClair(c, Math.min(voulu, c.nb_places))]
       })
 
-    const relations = relationsRows
-      .filter((r) => r.profil_id === p.id)
-      .filter((r) => r.genre === 'meme_binome' || r.genre === 'inversion_role')
-      .map(
-        (r): RelationUI => ({
-          id: r.id,
-          sourceId: r.source_id,
-          cibleId: r.cible_id,
-          sourceNom: nomParCreneau.get(r.source_id) ?? '?',
-          cibleNom: nomParCreneau.get(r.cible_id) ?? '?',
-          genre: r.genre as GenreRelationUI,
-          actif: r.actif,
-        }),
-      )
-
+    const gardes = new Set(creneaux.map((c) => c.id))
     return {
       id: p.id,
       nom: p.nom,
       estDefaut: p.est_defaut,
-      saisonSuggeree: p.saison_suggeree,
-      effectifSoirSemaine: p.nb_vetos_semaine_soir,
+      affinage,
       creneaux,
-      relations,
+      // Une liaison dont un bout a été retiré ne s'applique pas ici.
+      relations: relations.filter((r) => gardes.has(r.sourceId) && gardes.has(r.cibleId)),
     }
   })
+
+  return { socle, relations, profils }
 }

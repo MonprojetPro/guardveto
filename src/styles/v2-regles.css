@@ -717,6 +717,41 @@
   border-color: var(--border-strong);
 }
 
+/* ── CE QU'UNE PÉRIODE TYPE RETIENT DU SOCLE (2026-08-04) ────────────────
+   Une ligne par garde du cabinet : à gauche ce que la structure permet, à
+   droite ce que cette période-là en fait. La lecture verticale doit répondre
+   d'un coup d'œil à « qu'est-ce qui tourne cet hiver ? ». */
+.v2 .ptc-liste {
+  display: grid;
+  gap: 8px;
+  padding: 12px 13px;
+  background: var(--surface);
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-sm);
+}
+.v2 .ptc-ligne {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.v2 .ptc-garde {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  font-size: 0.86rem;
+}
+.v2 .ptc-garde small {
+  font-size: 0.72rem;
+  color: var(--soft);
+}
+/* Le menu ne rétrécit pas quand le nom de la garde est long : c'est lui qu'on
+   vient chercher, il doit rester à la même place d'une ligne à l'autre. */
+.v2 .ptc-ligne [data-slot='select-trigger'] { flex: 0 0 auto; }
+.v2 .ptc-liste .note { margin-top: 2px; }
+
 /* La carte EST le sélecteur de profil sur cet onglet : elle doit se dire
    cliquable au pointeur comme au clavier. Une carte qu'on peut choisir sans
    qu'aucun signe ne l'annonce, personne ne la choisit. */

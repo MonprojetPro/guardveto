@@ -68,13 +68,15 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from '@/components/ui/select'
 import {
-  creerProfil, renommerProfil, supprimerProfil,
+  creerProfil, renommerProfil, supprimerProfil, setAffinagePeriodeType,
 } from '@/app/(protected)/admin/structure/actions'
-import type { ProfilUI } from './types'
+import type { ProfilUI, CreneauUI } from './types'
 import { useErreurBloquante } from './ErreurBloquante'
 
 interface Props {
   profils: ProfilUI[]
+  /** LE SOCLE du cabinet : les gardes possibles, avec leur maximum de places. */
+  socle: CreneauUI[]
   /**
    * Combien de plannings ne désignent AUCUNE période type (`profil_id` NULL) et
    * tournent donc encore sur « Configuration standard ». Voir `montrerDefaut`.
@@ -98,7 +100,7 @@ type Reponse = { error?: string; success?: boolean } | undefined
 const ZONES_NEUTRES = 'button, input, a, [data-slot="select-trigger"]'
 
 export function OngletProfils({
-  profils, planningsSansPeriodeType, profilCourantId, onChoisir,
+  profils, socle, planningsSansPeriodeType, profilCourantId, onChoisir,
 }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -115,6 +117,10 @@ export function OngletProfils({
 
   // Suppression : la période type visée par la modale de confirmation.
   const [aSupprimer, setASupprimer] = useState<ProfilUI | null>(null)
+
+  // Affinages déjà appliqués à l'écran, pas encore confirmés par le serveur :
+  // profilId → creneauId → nombre de vétérinaires.
+  const [local, setLocal] = useState<Record<string, Record<string, number>>>({})
 
   // Les refus s'affichent en modale (cf. `ErreurBloquante`) : une vignette de
   // quelques secondes en bas d'écran ne suffit pas à expliquer un refus.
@@ -197,10 +203,36 @@ export function OngletProfils({
     })
   }
 
-  // `reglerMeta` vivait ici : il enregistrait en optimiste les deux menus de la
-  // carte (saison suggérée, effectif du soir). Les deux ayant disparu, plus
-  // personne ne l'appelle. `setProfilMeta` reste côté serveur — Filou s'en sert
-  // encore — mais l'écran n'a plus de réglage à pousser.
+  /**
+   * Enregistre « cette période type veut N vétérinaires sur cette garde ».
+   *
+   * Affichage OPTIMISTE, repris si le serveur refuse : sans lui, le menu
+   * reviendrait à sa valeur d'avant le temps de l'aller-retour, et on croirait
+   * que le clic n'a pas pris.
+   */
+  const reglerAffinage = (p: ProfilUI, creneauId: string, nbVetos: number, nomGarde: string) => {
+    const avant = local[p.id]?.[creneauId]
+    setLocal((prev) => ({ ...prev, [p.id]: { ...prev[p.id], [creneauId]: nbVetos } }))
+    startTransition(async () => {
+      const res: Reponse = await setAffinagePeriodeType(p.id, creneauId, nbVetos)
+      if (res?.error) {
+        setLocal((prev) => {
+          const suivant = { ...prev, [p.id]: { ...prev[p.id] } }
+          if (avant === undefined) delete suivant[p.id][creneauId]
+          else suivant[p.id][creneauId] = avant
+          return suivant
+        })
+        ouvrirErreur(res.error)
+        return
+      }
+      toast.success(
+        nbVetos === 0
+          ? `« ${nomGarde} » : aucune garde sur « ${p.nom} ».`
+          : `« ${nomGarde} » : ${nbVetos} véto${nbVetos > 1 ? 's' : ''} sur « ${p.nom} ».`,
+      )
+      router.refresh()
+    })
+  }
 
   const supprimer = () => {
     if (!aSupprimer) return
@@ -389,29 +421,69 @@ export function OngletProfils({
                     </div>
                   )}
 
-                  <p className="note">
-                    {p.creneaux.length} type{p.creneaux.length > 1 ? 's' : ''} de garde,{' '}
-                    {actifs === 0 ? 'aucun actif' : `dont ${actifs} actif${actifs > 1 ? 's' : ''}`}.
-                    {courant
-                      ? ' C’est cette période type que décrivent les onglets suivants.'
-                      : ' Clique la carte pour le décrire dans les onglets suivants.'}
-                  </p>
-
-                  {/* ── LES DEUX RÉGLAGES DE CARTE ONT DISPARU (2026-08-04) ──
-                      « Saison suggérée » ne pilotait plus rien : son unique rôle
-                      était de proposer cette période type d'office à la création
-                      d'un planning — supprimé le matin même, la période type
-                      étant devenue un choix explicite. Un réglage affiché que
-                      rien n'évalue est pire qu'un réglage absent : on croit
-                      avoir agi.
-
-                      « Le soir en semaine » décrivait quelque chose de réel,
-                      mais EN DOUBLE : la structure des gardes règle déjà le
-                      nombre de vétérinaires, pour TOUTES les gardes et pas
-                      seulement la semaine. MiKL : « pourquoi on ne définit que
-                      le nb de véto pour les soirs de la semaine et pas les
-                      week-ends ? ». Réponse : on le définit ailleurs, et c'est
-                      là que ça doit rester. */}
+                  {/* ── CE QUE LA PÉRIODE TYPE AFFINE (2026-08-04) ───────────
+                      Le cœur de la carte : pour chaque garde du SOCLE, combien
+                      de vétérinaires cette période-là veut réellement.
+                      MiKL : « si jamais il y a marqué vendredi 2 places, dans
+                      période type l'utilisateur a le choix de ne programmer
+                      qu'un des 2 vétos sur la période hiver, et pour le
+                      week-end 2, et pour les soirs de semaine 1 ».
+                      « Aucune » est un choix à part entière : la garde n'existe
+                      pas sur cette période, et le moteur n'en pose aucune. */}
+                  {socle.length === 0 ? (
+                    <p className="note">
+                      Aucune garde dans la structure du cabinet — commence par l’onglet
+                      « Structure des gardes », il n’y a rien à affiner ici pour l’instant.
+                    </p>
+                  ) : (
+                    <div className="ptc-liste">
+                      {socle.map((c) => {
+                        const max = c.nbPlaces
+                        // L'optimiste l'emporte sur le serveur tant qu'il vit.
+                        const valeur = local[p.id]?.[c.id] ?? p.affinage[c.id] ?? max
+                        return (
+                          <div className="ptc-ligne" key={c.id}>
+                            <span className="ptc-garde">
+                              <b>{c.nom}</b>
+                              <small>{c.joursClair} · jusqu’à {max} véto{max > 1 ? 's' : ''}</small>
+                            </span>
+                            <Select
+                              value={String(valeur)}
+                              disabled={isPending}
+                              onValueChange={(v) => {
+                                if (v === null || v === undefined) return
+                                reglerAffinage(p, c.id, Number(v), c.nom)
+                              }}
+                            >
+                              <SelectTrigger
+                                className="w-[140px]"
+                                aria-label={`Vétérinaires sur « ${c.nom} » pour ${p.nom}`}
+                              >
+                                {valeur === 0
+                                  ? 'Aucune garde'
+                                  : `${valeur} véto${valeur > 1 ? 's' : ''}`}
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="0">Aucune garde</SelectItem>
+                                {Array.from({ length: max }, (_, i) => i + 1).map((n) => (
+                                  <SelectItem key={n} value={String(n)}>
+                                    {n} véto{n > 1 ? 's' : ''}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )
+                      })}
+                      <p className="note">
+                        {actifs === 0
+                          ? 'Aucune garde retenue : cette période type ne produirait aucun planning.'
+                          : `${actifs} garde${actifs > 1 ? 's' : ''} sur cette période.`}
+                        {' '}Les jours et les horaires se règlent dans « Structure des gardes »,
+                        pour tout le cabinet.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="prof-actions">
                     {enEdition ? (

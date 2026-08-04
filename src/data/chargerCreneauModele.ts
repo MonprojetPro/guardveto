@@ -102,20 +102,22 @@ export async function chargerCreneauModele(
 ): Promise<CreneauModele[]> {
   if (!cabinetId) return []
 
-  // Résoudre le profil : demandé, sinon le profil défaut du cabinet.
-  const profil = await resoudreProfilId(supabase, cabinetId, profilId)
-  if (!profil) return []
-
+  // ── LE SOCLE, PUIS L'AFFINAGE (2026-08-04) ──────────────────────────────
+  // Les créneaux ne sont plus dupliqués par période type : il existe UN socle
+  // par cabinet (`profil_id IS NULL`) qui décrit ce qui est possible, et chaque
+  // période type dit ensuite combien de vétérinaires elle veut sur chacun.
+  // MiKL : « la structure donne l'ensemble des possibilités, les périodes types
+  // les affinent par période ».
   const { data, error } = await supabase
     .from('creneau_modele')
     .select('id, code, nom, jours_semaine, sur_feries, heure_debut, heure_fin, offset_jours_fin, nb_places, roles, actif, ordre')
     .eq('cabinet_id', cabinetId)
-    .eq('profil_id', profil)
+    .is('profil_id', null)
     .order('ordre')
 
   if (error || !data) return []
 
-  return (data as CreneauModeleRow[]).map((r) => ({
+  const socle = (data as CreneauModeleRow[]).map((r) => ({
     id: r.id,
     code: r.code,
     nom: r.nom,
@@ -129,6 +131,62 @@ export async function chargerCreneauModele(
     actif: r.actif,
     ordre: r.ordre,
   }))
+
+  // Quelle période type affine ? Celle demandée, sinon celle par défaut du
+  // cabinet (les plannings d'avant la règle du 2026-08-04 n'en désignent
+  // aucune). Sans période type résolue, le socle s'applique tel quel.
+  const profil = await resoudreProfilId(supabase, cabinetId, profilId)
+  if (!profil) return socle
+
+  return appliquerAffinage(socle, await chargerAffinage(supabase, profil))
+}
+
+/** Les choix d'une période type : `creneau_id` → nombre de vétérinaires voulu. */
+export async function chargerAffinage(
+  supabase: SupabaseClient,
+  profilId: string,
+): Promise<Map<string, number>> {
+  const { data } = await supabase
+    .from('periode_type_creneau')
+    .select('creneau_id, nb_vetos')
+    .eq('profil_id', profilId)
+  const m = new Map<string, number>()
+  for (const r of (data ?? []) as { creneau_id: string; nb_vetos: number }[]) {
+    m.set(r.creneau_id, r.nb_vetos)
+  }
+  return m
+}
+
+/**
+ * Applique les choix d'une période type au socle. FONCTION PURE — testée sans
+ * base, parce que c'est ici que se joue « il n'y a pas de garde ce jour-là ».
+ *
+ * ⚠️ `nb_vetos = 0` RETIRE le créneau (MiKL : « laisse la possibilité qu'il n'y
+ * ait rien… faut que le planning en tienne compte »). On le sort de la liste
+ * plutôt que de le laisser à zéro place : un créneau à 0 place traverserait
+ * tout le moteur en émettant zéro slot, mais resterait compté par les écrans,
+ * le diagnostic d'impasse et le validateur comme un type de garde du cabinet.
+ * Absent, il ne peut mentir nulle part.
+ *
+ * Un créneau SANS ligne d'affinage garde le nombre de places du socle : c'est
+ * l'état d'une période type neuve, qui part de tout ce qui est possible.
+ */
+export function appliquerAffinage(
+  socle: CreneauModele[],
+  affinage: ReadonlyMap<string, number>,
+): CreneauModele[] {
+  const resultat: CreneauModele[] = []
+  for (const c of socle) {
+    const voulu = affinage.get(c.id)
+    if (voulu === undefined) { resultat.push(c); continue }
+    if (voulu <= 0) continue // pas de garde de ce type sur cette période
+    // On ne dépasse jamais le socle : il dit ce qui est POSSIBLE, et les rôles
+    // disponibles y sont nommés. Demander plus que ses places ne produirait
+    // que des slots sans libellé.
+    const n = Math.min(voulu, c.nbPlaces)
+    resultat.push({ ...c, nbPlaces: n, roles: c.roles.slice(0, n) })
+  }
+  return resultat
 }
 
 /**
@@ -147,22 +205,36 @@ export async function chargerRelationsCreneau(
 ): Promise<RelationCreneau[]> {
   if (!cabinetId) return []
 
-  const profil = await resoudreProfilId(supabase, cabinetId, profilId)
-  if (!profil) return []
-
+  // Les enchaînements appartiennent au SOCLE depuis le 2026-08-04 : ils
+  // décrivent la structure (« le vendredi et le week-end, même binôme »), pas
+  // un choix de saison. Ils suivent donc les créneaux, et une période type qui
+  // retire un créneau (0 véto) neutralise mécaniquement les liaisons qui le
+  // visaient — le filtrage ci-dessous.
   const { data, error } = await supabase
     .from('relation_creneau')
     .select('id, source_id, cible_id, genre, actif')
     .eq('cabinet_id', cabinetId)
-    .eq('profil_id', profil)
+    .is('profil_id', null)
 
   if (error || !data) return []
 
-  return (data as RelationCreneauRow[]).map((r) => ({
+  const relations = (data as RelationCreneauRow[]).map((r) => ({
     id: r.id,
     sourceId: r.source_id,
     cibleId: r.cible_id,
     genre: r.genre as GenreRelationCreneau,
     actif: r.actif,
   }))
+
+  // Une liaison dont un bout n'existe pas sur cette période type est une
+  // liaison morte : la garder ferait raisonner le moteur sur un créneau qu'il
+  // ne posera jamais.
+  const profil = await resoudreProfilId(supabase, cabinetId, profilId)
+  if (!profil) return relations
+  const affinage = await chargerAffinage(supabase, profil)
+  const retires = new Set(
+    [...affinage.entries()].filter(([, n]) => n <= 0).map(([id]) => id),
+  )
+  if (retires.size === 0) return relations
+  return relations.filter((r) => !retires.has(r.sourceId) && !retires.has(r.cibleId))
 }

@@ -12,19 +12,36 @@
 // construite à deux endroits est une phrase qui finit par différer.
 // ============================================================
 
-/** Une période type du cabinet (« Hiver », « Été »…) — table `profils_planning`. */
+/**
+ * Une période type du cabinet (« Hiver », « Été »…) — table `profils_planning`.
+ *
+ * ⚠️ DEPUIS LE 2026-08-04, elle ne possède plus de structure : elle AFFINE le
+ * socle du cabinet. MiKL : « la structure donne l'ensemble des possibilités,
+ * les périodes types les affinent par période ».
+ */
 export interface ProfilUI {
   id: string
   nom: string
   estDefaut: boolean
-  /** 'ete' | 'hiver' | null — proposé automatiquement à la création d'une période. */
-  saisonSuggeree: string | null
-  /** Vétérinaires de garde le soir en semaine (1 ou 2), ou null = selon la saison. */
-  effectifSoirSemaine: number | null
-  /** Catalogue de ce profil, déjà trié par `ordre`. */
+  /**
+   * Ses choix : `creneauId` → nombre de vétérinaires voulu. **0 = pas de garde
+   * de ce type sur cette période**. Un créneau du socle absent de cette table
+   * est pris tel quel (toutes ses places) — l'état d'une période type neuve.
+   */
+  affinage: Record<string, number>
+  /** Le socle DÉJÀ affiné : ce que cette période type produit réellement. */
   creneaux: CreneauUI[]
-  /** Liaisons de ce profil. */
+  /** Les liaisons qui survivent à son affinage (les deux bouts existent). */
   relations: RelationUI[]
+}
+
+/** Ce que l'écran « Organisation » lit d'un coup : le socle, et qui l'affine. */
+export interface StructureCabinetUI {
+  /** LE SOCLE — ce qui est possible dans ce cabinet. `nbPlaces` = le maximum. */
+  socle: CreneauUI[]
+  /** Les enchaînements, portés par le socle eux aussi. */
+  relations: RelationUI[]
+  profils: ProfilUI[]
 }
 
 /** Un type de garde du catalogue, tel que le moteur le consomme. */

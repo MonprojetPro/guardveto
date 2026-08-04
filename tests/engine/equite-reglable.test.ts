@@ -196,6 +196,7 @@ function makeBuilder(table: string) {
   const chain = () => builder
   builder.select = chain
   builder.eq = chain
+  builder.is = chain // le socle se lit `.is('profil_id', null)` (2026-08-04)
   builder.lte = chain
   builder.gte = chain
   builder.lt = chain
