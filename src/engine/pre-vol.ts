@@ -36,6 +36,7 @@ import { isValid } from './rules/hard-constraints'
 import { normaliserContraintesVets } from './normaliserContraintes'
 import { rendreRegle } from './briques/catalogue'
 import { lundiDeSemaine, samediDeSemaine } from './utils'
+import { plafondNuitSemaine } from './structure-creneaux'
 import { DEFAULT_STRUCTURE_CONFIG, type StructureConfig } from './structure-config'
 import type { CreneauModele } from './creneau-modele'
 import type { EquityCohorte } from './equity-weights'
@@ -236,7 +237,14 @@ interface SlotPreVol {
 }
 
 function enumererSlots(input: PreVolInput): SlotPreVol[] {
-  const effectifSemaine = input.nbVetosSemaineSoir ?? (input.saison === 'hiver' ? 2 : 1)
+  // Le pré-vol annonce ce que la génération VA demander : il doit donc plafonner
+  // la nuit de semaine exactement comme le solver, d'où la source partagée
+  // (2026-08-04 — sans surcharge du planning, c'est la structure qui décide).
+  const effectifSemaine = plafondNuitSemaine(
+    input.saison,
+    input.nbVetosSemaineSoir,
+    Boolean(input.creneaux && input.creneaux.length > 0),
+  )
   const slots: SlotPreVol[] = []
   let cur = input.dateDebut
   while (cur <= input.dateFin) {

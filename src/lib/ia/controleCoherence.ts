@@ -222,8 +222,12 @@ export async function controlerCoherence(
   const desaccordsFerie: string[] = []
   if (typeof placesFerie === 'number') {
     for (const p of periodes) {
+      // `null` depuis le 2026-08-04 = aucune surcharge de planning, donc c'est
+      // le créneau du soir qui décide. Il n'y a alors PLUS de désaccord
+      // possible : les deux lisent le même catalogue. On ne compare que les
+      // périodes qui portent une surcharge — les seules à pouvoir contredire.
       const effectif = effectifNuitSemaineLocal(p, profilParId)
-      if (effectif !== placesFerie) {
+      if (effectif !== null && effectif !== placesFerie) {
         desaccordsFerie.push(
           `${p.libelle ?? p.date_debut} : le moteur programme ${effectif} vétérinaire${effectif > 1 ? 's' : ''} un jour férié (règle du soir de semaine), le catalogue en déclare ${placesFerie}.`,
         )
@@ -244,12 +248,15 @@ export async function controlerCoherence(
   // Affiché en clair : c'est le réglage qui a produit le faux « second
   // manquant », et personne ne pouvait le lire depuis l'application.
   const lignesEffectif = periodes.slice(0, 8).map((p) => {
+    // Deux provenances depuis le 2026-08-04 (la troisième, « hérité de la
+    // période type », a disparu avec le réglage qui la portait).
+    const duCatalogue = catalogue.get('semaine_soir')
     const effectif =
       typeof p.nb_vetos_semaine_soir === 'number'
-        ? `${p.nb_vetos_semaine_soir} (réglé sur la période)`
-        : p.profil_id && typeof profilParId.get(p.profil_id)?.nb_vetos_semaine_soir === 'number'
-          ? `${profilParId.get(p.profil_id)!.nb_vetos_semaine_soir} (hérité du profil « ${profilParId.get(p.profil_id)!.nom} »)`
-          : `${p.saison === 'hiver' ? 2 : 1} (défaut de la saison ${p.saison === 'hiver' ? 'hiver' : 'été'})`
+        ? `${p.nb_vetos_semaine_soir} (réglé sur ce planning)`
+        : typeof duCatalogue === 'number'
+          ? `${duCatalogue} (structure des gardes de sa période type)`
+          : `${p.saison === 'hiver' ? 2 : 1} (aucune structure : défaut de la saison ${p.saison === 'hiver' ? 'hiver' : 'été'})`
     return `${p.libelle ?? p.date_debut} — ${effectif}`
   })
   controles.push({

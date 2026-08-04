@@ -86,6 +86,8 @@ interface Props {
   /** `?focus=` — ancre d'un réglage précis, venue du diagnostic d'impasse. */
   focus?: string
   profils: ProfilUI[]
+  /** Plannings encore rattachés à AUCUNE période type — cf. `OngletProfils`. */
+  planningsSansPeriodeType: number
   regles: RegleRow[]
   reglesEquipe: RegleEquipeUI[]
   vets: VetoUI[]
@@ -113,6 +115,7 @@ export function ReglesStructureV2({
   ongletInitial,
   focus,
   profils,
+  planningsSansPeriodeType,
   regles,
   reglesEquipe,
   vets,
@@ -138,8 +141,14 @@ export function ReglesStructureV2({
   // sinon le profil par défaut. C'est une valeur DÉRIVÉE, pas un état à
   // resynchroniser : quand on supprime le profil courant depuis l'onglet 1, la
   // page doit retomber sur le défaut au même rendu, pas au rendu suivant.
+  // À défaut de choix explicite, on montre une VRAIE période type avant celle
+  // par défaut (2026-08-04) : « Configuration standard » peut être masquée de
+  // la grille, et les onglets suivants décriraient alors une carte invisible.
   const profil = useMemo(
-    () => profils.find((p) => p.id === profilChoisi) ?? profils.find((p) => p.estDefaut) ?? profils[0],
+    () => profils.find((p) => p.id === profilChoisi)
+      ?? profils.find((p) => !p.estDefaut)
+      ?? profils.find((p) => p.estDefaut)
+      ?? profils[0],
     [profils, profilChoisi],
   )
   const profilId = profil?.id ?? ''
@@ -244,6 +253,7 @@ export function ReglesStructureV2({
           <section className="tab-panel" role="tabpanel" aria-label="Périodes types">
             <OngletProfils
               profils={profils}
+              planningsSansPeriodeType={planningsSansPeriodeType}
               profilCourantId={profilId}
               onChoisir={setProfilId}
             />

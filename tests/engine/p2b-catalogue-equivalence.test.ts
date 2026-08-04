@@ -12,6 +12,21 @@ import eteCongesLourds from './scenarios/ete-conges-lourds.json'
 // STRICTEMENT IDENTIQUE avec le catalogue par défaut (branche catalogue) et
 // sans catalogue (repli sur le mapping en dur). C'est le filet qui autorise
 // la bascule du moteur sans toucher à la fiabilité prouvée.
+//
+// ⚠️ UNE HYPOTHÈSE EST DEVENUE EXPLICITE LE 2026-08-04.
+//
+// L'équivalence reposait en silence sur un point d'accord entre les deux
+// chemins : sans effectif réglé, tous deux appliquaient « hiver = 2, été = 1 ».
+// Ce repli a été retiré du chemin CATALOGUE — c'est désormais le nombre de
+// places du créneau qui décide (la structure des gardes du cabinet, plutôt que
+// deux lignes en dur dans le moteur). Le chemin legacy, lui, n'a aucun créneau
+// à lire : il garde le repli saison, faute de mieux.
+//
+// Les deux chemins ne peuvent donc plus s'accorder tout seuls sur l'effectif de
+// nuit en été. On fixe l'effectif des DEUX côtés pour continuer à comparer ce
+// que ce test a toujours voulu comparer : les types de garde, les jours, les
+// rôles, les week-ends, les fériés. Supprimer le test aurait coûté ce filet-là ;
+// le laisser rouge en aurait fait un test qu'on apprend à ignorer.
 // ============================================================
 
 function cm(over: Partial<CreneauModele>): CreneauModele {
@@ -37,13 +52,17 @@ interface ScenarioMin {
 }
 
 function buildInput(scenario: ScenarioMin, creneaux?: CreneauModele[]): SolverInput {
+  const saison = scenario.periode.saison as 'hiver' | 'ete'
   return {
     dateDebut: scenario.periode.dateDebut,
     dateFin: scenario.periode.dateFin,
-    saison: scenario.periode.saison as 'hiver' | 'ete',
+    saison,
     vets: scenario.vets as unknown as VetEngine[],
     bonusMalus: scenario.bonusMalus ?? {},
     creneaux,
+    // L'effectif de nuit, posé à l'identique des deux côtés — c'est l'ancien
+    // repli saison, écrit noir sur blanc au lieu d'être supposé partagé.
+    nbVetosSemaineSoir: saison === 'hiver' ? 2 : 1,
   }
 }
 

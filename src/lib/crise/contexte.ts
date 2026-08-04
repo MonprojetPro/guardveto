@@ -83,6 +83,13 @@ export interface ContexteCrisePeriode {
    */
   nbVetosSemaineSoir?: number
   /**
+   * Places déclarées par le créneau « soir de semaine » de la période type
+   * (2026-08-04). Sans surcharge de planning, c'est LUI qui décide de l'effectif
+   * d'une nuit — le repli saison ne s'applique plus qu'aux contextes sans
+   * structure de gardes. Absent = pas de créneau semaine_soir au catalogue.
+   */
+  placesNuitSemaine?: number
+  /**
    * R11b — rôle à avantage financier (réglage cabinet). Threadé au classement
    * des candidats (scorerCandidatLNS) pour que la crise trie avec le MÊME
    * critère d'équité que la génération. undefined → défaut moteur ('premier').
@@ -98,20 +105,29 @@ export interface ContexteCrisePeriode {
 }
 
 /**
- * besoinSecondCreneau — un créneau a-t-il besoin d'un 2nd, selon l'effectif
- * configuré de la période ? Weekend → toujours. semaine_soir → effectif ≥ 2
- * (config si fournie, sinon repli saison hiver=2/été=1). Doit refléter EXACTEMENT
- * la logique du solver (`effectifSemaine`) pour que la réparation soit cohérente.
+ * besoinSecondCreneau — un créneau a-t-il besoin d'un 2nd ? Weekend → toujours.
+ * semaine_soir → effectif ≥ 2.
+ *
+ * ⚠️ Doit refléter EXACTEMENT la résolution du solver, sinon la réparation
+ * d'une absence ne remplace pas ce que la génération avait posé. Depuis le
+ * 2026-08-04 : surcharge du planning si elle existe, sinon les places du
+ * créneau « soir de semaine » de la période type, sinon (aucune structure) le
+ * repli saison.
+ *
+ * `placesNuitSemaine` est optionnel pour ne pas casser les appelants qui n'ont
+ * pas de catalogue sous la main : sans lui, le comportement reste l'ancien.
  */
 export function besoinSecondCreneau(
   typeEngine: CodeCreneau,
   saison: Saison,
   nbVetosSemaineSoir?: number,
+  placesNuitSemaine?: number,
 ): boolean {
   if (typeEngine === 'weekend') return true
   if (typeEngine === 'semaine_soir') {
-    const effectif = nbVetosSemaineSoir ?? (saison === 'hiver' ? 2 : 1)
-    return effectif >= 2
+    if (typeof nbVetosSemaineSoir === 'number') return nbVetosSemaineSoir >= 2
+    if (typeof placesNuitSemaine === 'number') return placesNuitSemaine >= 2
+    return saison === 'hiver'
   }
   // Type SUR-MESURE : le besoin d'un 2nd = la garde en avait un (colonne V1).
   // On ne peut pas le déduire du type seul ; le caller passe l'info réelle via
@@ -261,6 +277,9 @@ export async function chargerContextePourPeriode(
     equityWeights: contexte.equityWeights,
     saison: contexte.saison,
     nbVetosSemaineSoir: contexte.nbVetosSemaineSoir,
+    placesNuitSemaine: contexte.creneaux?.find(
+      (c) => c.code === 'semaine_soir' && c.actif,
+    )?.nbPlaces,
     roleAvantageFinancier: contexte.roleAvantageFinancier,
     // #17 — lookback inter-périodes (résolu par resoudreContexte, best-effort).
     contexteAnterieur: contexte.contexteAnterieur,

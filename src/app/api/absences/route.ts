@@ -157,7 +157,7 @@ export async function POST(req: NextRequest) {
       role: imp.role,
       saison: imp.saison,
       // Effectif configuré de la période (besoin d'un 2nd ?) — cohérent génération.
-      besoinSecond: besoinSecondCreneau(imp.typeEngine, imp.saison, ctx.nbVetosSemaineSoir),
+      besoinSecond: besoinSecondCreneau(imp.typeEngine, imp.saison, ctx.nbVetosSemaineSoir, ctx.placesNuitSemaine),
     }
 
     const resultat = proposerReparation({

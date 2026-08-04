@@ -126,13 +126,31 @@ describe('Le plafond reste un plafond', () => {
   })
 })
 
-describe('Sans réglage explicite, le repli saison est INCHANGÉ', () => {
-  it('été sans effectif réglé → 1 par nuit, même si le catalogue en déclare 4', () => {
+// ============================================================
+// CE BLOC A CHANGÉ DE SENS LE 2026-08-04 — et c'est le cœur de la décision.
+//
+// Il vérifiait : « sans réglage explicite, le repli saison s'applique — été = 1,
+// hiver = 2 — MÊME SI le catalogue en déclare 4 ». Autrement dit, deux lignes en
+// dur dans le moteur pouvaient contredire la structure de gardes que le cabinet
+// avait lui-même écrite, sur le seul créneau du soir.
+//
+// MiKL, 2026-08-04 : « pourquoi on ne définit que le nb de véto pour les soirs
+// de la semaine et pas les week-ends ? ». Parce que les week-ends, eux, ont
+// toujours suivi leur créneau. La nuit de semaine était l'exception, et c'est
+// l'exception qui part : sans surcharge portée par le planning lui-même, la
+// structure des gardes décide — pour toutes les gardes, saison comprise.
+//
+// La saison ne disparaît pas de l'application : elle ne décide simplement plus
+// à la place du cabinet. Un cabinet qui veut 1 véto l'été règle son créneau à 1
+// dans sa période type « Été » — ce qui se voit, se lit et s'explique.
+// ============================================================
+describe('Sans surcharge de planning, la structure des gardes décide', () => {
+  it('été, 4 places au catalogue et aucun effectif réglé → 4 par nuit', () => {
     const nuits = placesPourvuesParNuit(4, undefined)
-    expect(nuits.every((n) => n === 1)).toBe(true)
+    expect(nuits.every((n) => n === 4)).toBe(true)
   })
 
-  it('hiver sans effectif réglé → 2 par nuit, même si le catalogue en déclare 4', () => {
+  it('hiver, 4 places au catalogue et aucun effectif réglé → 4 par nuit', () => {
     const res = genererPlanningPur({
       ...SEMAINE,
       saison: 'hiver',
@@ -140,6 +158,47 @@ describe('Sans réglage explicite, le repli saison est INCHANGÉ', () => {
       bonusMalus: {},
       lnsTimeoutMs: 0,
       creneaux: catalogueSoirSemaine(4),
+    })
+    expect(res.success).toBe(true)
+    if (!res.success) return
+    const nuits = res.planning.attributions
+      .filter((a) => a.type === 'semaine_soir')
+      .map((a) => a.placements.filter((p) => p.vetId !== null).length)
+    expect(nuits.every((n) => n === 4)).toBe(true)
+  })
+
+  it('un créneau à 1 place suffit à n’avoir qu’un véto la nuit, en hiver comme en été', () => {
+    // La contrepartie du changement : ce qui se réglait par la saison se règle
+    // maintenant par le créneau — donc ce réglage doit vraiment fonctionner,
+    // sinon on aurait retiré un levier sans en donner un autre.
+    expect(placesPourvuesParNuit(1, undefined).every((n) => n === 1)).toBe(true)
+  })
+
+  it('la surcharge du planning garde le dernier mot sur le créneau', () => {
+    // Le seul maillon conservé : « cet été-là, on n'était que cinq ».
+    expect(placesPourvuesParNuit(4, 1).every((n) => n === 1)).toBe(true)
+  })
+})
+
+describe('Sans AUCUNE structure de gardes, le repli saison reste', () => {
+  // Contextes legacy et tests hors-structure : aucun créneau ne porte de nombre
+  // de places, il faut bien un chiffre. C'est le seul endroit où « hiver = 2,
+  // été = 1 » survit — et il ne concerne aucun cabinet réel.
+  it('été sans catalogue → 1 par nuit', () => {
+    const res = genererPlanningPur({
+      ...SEMAINE, saison: 'ete', vets: VETS, bonusMalus: {}, lnsTimeoutMs: 0,
+    })
+    expect(res.success).toBe(true)
+    if (!res.success) return
+    const nuits = res.planning.attributions
+      .filter((a) => a.type === 'semaine_soir')
+      .map((a) => a.placements.filter((p) => p.vetId !== null).length)
+    expect(nuits.every((n) => n === 1)).toBe(true)
+  })
+
+  it('hiver sans catalogue → 2 par nuit', () => {
+    const res = genererPlanningPur({
+      ...SEMAINE, saison: 'hiver', vets: VETS, bonusMalus: {}, lnsTimeoutMs: 0,
     })
     expect(res.success).toBe(true)
     if (!res.success) return

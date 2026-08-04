@@ -288,7 +288,7 @@ Appelle-le pour préparer une réparation ou un appel aux volontaires : « quell
         type: imp.typeEngine,
         role: imp.role,
         saison: imp.saison,
-        besoinSecond: besoinSecondCreneau(imp.typeEngine, imp.saison, periodeCtx.nbVetosSemaineSoir),
+        besoinSecond: besoinSecondCreneau(imp.typeEngine, imp.saison, periodeCtx.nbVetosSemaineSoir, periodeCtx.placesNuitSemaine),
       }
       const rep = proposerReparation({
         creneau,
@@ -477,7 +477,7 @@ Appelle-le quand l'admin veut solliciter l'équipe plutôt que trancher lui-mêm
         type: imp.typeEngine,
         role: imp.role,
         saison: imp.saison,
-        besoinSecond: besoinSecondCreneau(imp.typeEngine, imp.saison, periodeCtx.nbVetosSemaineSoir),
+        besoinSecond: besoinSecondCreneau(imp.typeEngine, imp.saison, periodeCtx.nbVetosSemaineSoir, periodeCtx.placesNuitSemaine),
       }
       const rep = proposerReparation({
         creneau,
@@ -555,7 +555,7 @@ Appelle-le quand l'admin veut solliciter l'équipe plutôt que trancher lui-mêm
         type: imp.typeEngine,
         role: imp.role,
         saison: imp.saison,
-        besoinSecond: besoinSecondCreneau(imp.typeEngine, imp.saison, periodeCtx.nbVetosSemaineSoir),
+        besoinSecond: besoinSecondCreneau(imp.typeEngine, imp.saison, periodeCtx.nbVetosSemaineSoir, periodeCtx.placesNuitSemaine),
       }
       const rep = proposerReparation({
         creneau,
@@ -659,7 +659,7 @@ Chaque remplacement est revérifié LÉGAL (mêmes règles que la génération d
         type: imp.typeEngine,
         role: imp.role,
         saison: imp.saison,
-        besoinSecond: besoinSecondCreneau(imp.typeEngine, imp.saison, periodeCtx.nbVetosSemaineSoir),
+        besoinSecond: besoinSecondCreneau(imp.typeEngine, imp.saison, periodeCtx.nbVetosSemaineSoir, periodeCtx.placesNuitSemaine),
       }
       const resultat = proposerReparation({
         creneau,
@@ -737,7 +737,7 @@ Chaque remplacement est revérifié LÉGAL (mêmes règles que la génération d
         type: imp.typeEngine,
         role: imp.role,
         saison: imp.saison,
-        besoinSecond: besoinSecondCreneau(imp.typeEngine, imp.saison, periodeCtx.nbVetosSemaineSoir),
+        besoinSecond: besoinSecondCreneau(imp.typeEngine, imp.saison, periodeCtx.nbVetosSemaineSoir, periodeCtx.placesNuitSemaine),
       }
       const resultat = proposerReparation({
         creneau,

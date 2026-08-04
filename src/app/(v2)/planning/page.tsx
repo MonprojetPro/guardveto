@@ -187,8 +187,11 @@ export default async function PlanningPageV2({
   for (const c of (creneauxTypes ?? []) as {
     profil_id: string; nom: string; nb_places: number
   }[]) {
+    // Le nombre est TOUJOURS écrit, même à 1 : depuis le 2026-08-04 c'est le
+    // seul endroit où l'effectif d'une garde se règle, donc le seul endroit où
+    // il se lit. Le taire à 1 obligerait à deviner.
     ;(gardesParType[c.profil_id] ??= []).push(
-      c.nb_places > 1 ? `${c.nom} (${c.nb_places} vétos)` : c.nom,
+      `${c.nom} — ${c.nb_places} véto${c.nb_places > 1 ? 's' : ''}`,
     )
   }
   const bilans = calculerBilans(compteurs as CompteursRow[], totalWE as number)

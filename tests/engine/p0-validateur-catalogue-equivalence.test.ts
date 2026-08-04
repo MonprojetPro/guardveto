@@ -46,12 +46,23 @@ interface ScenarioMin {
   bonusMalus?: Record<string, number>
 }
 
+// ⚠️ 2026-08-04 — l'effectif de nuit est posé EXPLICITEMENT des deux côtés.
+// Le chemin catalogue ne retombe plus sur « hiver = 2, été = 1 » : sans
+// surcharge, c'est le nombre de places du créneau qui décide. Les deux chemins
+// ne s'accordent donc plus tout seuls en été, et sans cette valeur explicite le
+// test comparerait deux effectifs différents au lieu de comparer les slots.
+// Même parti pris que `p2b-catalogue-equivalence` — cf. son en-tête.
+function effectifDe(scenario: ScenarioMin): number {
+  return scenario.periode.saison === 'hiver' ? 2 : 1
+}
+
 function baseInput(scenario: ScenarioMin): ValidationInput {
   return {
     dateDebut: scenario.periode.dateDebut,
     dateFin: scenario.periode.dateFin,
     saison: scenario.periode.saison as 'hiver' | 'ete',
     vets: scenario.vets as unknown as VetEngine[],
+    nbVetosSemaineSoir: effectifDe(scenario),
   }
 }
 
@@ -62,6 +73,7 @@ function solverInput(scenario: ScenarioMin): SolverInput {
     saison: scenario.periode.saison as 'hiver' | 'ete',
     vets: scenario.vets as unknown as VetEngine[],
     bonusMalus: scenario.bonusMalus ?? {},
+    nbVetosSemaineSoir: effectifDe(scenario),
   }
 }
 

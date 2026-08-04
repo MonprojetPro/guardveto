@@ -39,6 +39,18 @@ const HIVER: PeriodeEffectif = {
   saison: 'hiver',
   nb_vetos_semaine_soir: null,
 }
+/**
+ * L'été TEL QU'IL EST EN BASE chez le cabinet : « ete 2026 » porte bien
+ * `nb_vetos_semaine_soir = 1`. Les deux pièges de production ci-dessous ont été
+ * payés avec CETTE donnée-là — c'est donc avec elle qu'il faut les rejouer.
+ *
+ * Avant le 2026-08-04, le test les rejouait sans surcharge, en s'appuyant sur le
+ * repli saison pour retomber sur 1. Ce repli ayant disparu, s'appuyer dessus
+ * aurait fait passer le test pour une mauvaise raison — ou l'aurait fait
+ * supprimer comme « obsolète » alors que le piège, lui, existe toujours.
+ */
+const ETE_REGLE: PeriodeEffectif = { ...ETE, nb_vetos_semaine_soir: 1 }
+
 const SANS_PROFIL = new Map<string, ProfilEffectif>()
 
 describe('Traduction des deux vocabulaires', () => {
@@ -62,21 +74,27 @@ describe('Traduction des deux vocabulaires', () => {
   })
 })
 
-describe('Effectif d’une nuit de semaine — précédence période > profil > saison', () => {
-  it('la surcharge de la période gagne sur tout', () => {
+// ⚠️ CONTRAT CHANGÉ LE 2026-08-04. La précédence était période > période type >
+// saison. Les deux derniers maillons ont sauté : la période type réglait
+// l'effectif de la seule nuit de semaine alors que sa structure de gardes règle
+// déjà celui de toutes les gardes, et le repli saison décidait en dur à la
+// place du cabinet. Reste la surcharge du planning — sinon `null`, qui veut
+// dire « je ne tranche pas, c'est le créneau qui décide ».
+describe('Effectif d’une nuit de semaine — la surcharge du planning, ou rien', () => {
+  it('la surcharge du planning gagne sur tout', () => {
     expect(
       effectifNuitSemaine({ ...HIVER, nb_vetos_semaine_soir: 1 }, SANS_PROFIL),
     ).toBe(1)
   })
 
-  it('à défaut, le profil de la période', () => {
+  it('la période type n’est plus consultée, même quand elle porte un effectif', () => {
     const profils = new Map([['p1', { id: 'p1', nb_vetos_semaine_soir: 2 }]])
-    expect(effectifNuitSemaine({ ...ETE, profil_id: 'p1' }, profils)).toBe(2)
+    expect(effectifNuitSemaine({ ...ETE, profil_id: 'p1' }, profils)).toBeNull()
   })
 
-  it('à défaut, la saison : été = 1, hiver = 2', () => {
-    expect(effectifNuitSemaine(ETE, SANS_PROFIL)).toBe(1)
-    expect(effectifNuitSemaine(HIVER, SANS_PROFIL)).toBe(2)
+  it('sans surcharge, aucun verdict : ni été = 1 ni hiver = 2', () => {
+    expect(effectifNuitSemaine(ETE, SANS_PROFIL)).toBeNull()
+    expect(effectifNuitSemaine(HIVER, SANS_PROFIL)).toBeNull()
   })
 })
 
@@ -87,11 +105,26 @@ describe('Places attendues — les deux pièges de production', () => {
       typePlanning: 'semaine',
       date: '2026-07-30',
       catalogue: CATALOGUE,
-      periodes: [ETE, HIVER],
+      periodes: [ETE_REGLE, HIVER],
       profils: SANS_PROFIL,
     })
     expect(n).toBe(1)
     expect(manqueSurGarde(n, 1)).toBe(0)
+  })
+
+  it('sans surcharge, une nuit suit simplement son créneau — comme toute autre garde', () => {
+    // Le pendant du piège 1 depuis le 2026-08-04 : plus de repli saison, donc
+    // plus d'écart possible entre ce que le moteur pose et ce qu'on annonce —
+    // les deux lisent le même catalogue.
+    expect(
+      placesAttendues({
+        typePlanning: 'semaine',
+        date: '2026-07-30',
+        catalogue: CATALOGUE,
+        periodes: [ETE, HIVER],
+        profils: SANS_PROFIL,
+      }),
+    ).toBe(CATALOGUE.get('semaine_soir'))
   })
 
   it('une nuit d’hiver en attend deux — le détecteur n’est pas devenu aveugle', () => {
@@ -140,7 +173,7 @@ describe('Places attendues — les deux pièges de production', () => {
       typePlanning: 'ferie',
       date: '2026-07-14',
       catalogue: CATALOGUE,
-      periodes: [ETE],
+      periodes: [ETE_REGLE],
       profils: SANS_PROFIL,
     })
     expect(n).toBe(1)

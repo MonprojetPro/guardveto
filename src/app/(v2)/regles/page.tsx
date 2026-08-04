@@ -155,6 +155,16 @@ export default async function ReglesStructurePage({
 
   const periodes = options.periodes
   const typesCreneaux = options.typesCreneaux as TypeCreneauOption[]
+
+  // Combien de plannings s'appuient ENCORE sur la période type par défaut
+  // (`profil_id` NULL) ? Depuis le 2026-08-04, plus aucun nouveau planning ne
+  // peut être dans ce cas — mais les anciens y sont, et tant qu'il en reste un,
+  // « Configuration standard » doit rester visible et réglable : la masquer
+  // reviendrait à cacher la structure sur laquelle ces plannings tournent.
+  const { count: planningsSansPeriodeType } = await supabase
+    .from('periodes')
+    .select('id', { count: 'exact', head: true })
+    .is('profil_id', null)
   const rolesCabinet = options.rolesCabinet
 
   // Étiquettes réellement portées par l'équipe : les suggestions des formulaires
@@ -280,6 +290,7 @@ export default async function ReglesStructurePage({
           ongletInitial={onglet}
           focus={focus}
           profils={profils}
+          planningsSansPeriodeType={planningsSansPeriodeType ?? 0}
           regles={reglesClassiques}
           reglesEquipe={reglesEquipe}
           vets={vets}

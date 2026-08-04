@@ -192,7 +192,7 @@ export async function POST(
     type: imp.typeEngine,
     role: imp.role,
     saison: imp.saison,
-    besoinSecond: besoinSecondCreneau(imp.typeEngine, imp.saison, ctx.nbVetosSemaineSoir),
+    besoinSecond: besoinSecondCreneau(imp.typeEngine, imp.saison, ctx.nbVetosSemaineSoir, ctx.placesNuitSemaine),
   }
 
   const resultat = proposerReparation({

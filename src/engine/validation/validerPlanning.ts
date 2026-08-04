@@ -294,8 +294,31 @@ interface SlotAttendu {
  * catalogue PAR DÉFAUT, le résultat est identique au mapping en dur (banc
  * d'équivalence).
  */
+/**
+ * Le plafond d'effectif d'une nuit de semaine, RÉ-IMPLÉMENTÉ ICI À DESSEIN.
+ *
+ * Le moteur a `plafondNuitSemaine()` dans structure-creneaux.ts ; ce validateur
+ * ne l'importe pas, par la même règle qui lui interdit `typeGardePourJour` : il
+ * doit rester un contrôle CROISÉ, capable de contredire le moteur. S'il partage
+ * la fonction, une erreur dedans devient invisible — les deux se trompent
+ * ensemble et se donnent raison.
+ *
+ * La contrepartie est que les deux définitions doivent bouger ensemble. Le
+ * garde-fou n'est pas la mémoire mais les tests d'équivalence : un désaccord
+ * fait remonter des violations fantômes sur des plannings sains.
+ *
+ * Règle (2026-08-04) : la surcharge du planning si elle existe ; sinon la
+ * structure des gardes décide (aucun plafond) ; sinon, à défaut de structure,
+ * le repli saison.
+ */
+function plafondNuitSemaineLocal(input: ValidationInput): number {
+  if (typeof input.nbVetosSemaineSoir === 'number') return input.nbVetosSemaineSoir
+  const avecCatalogue = Boolean(input.creneaux && input.creneaux.length > 0)
+  return avecCatalogue ? Number.POSITIVE_INFINITY : (input.saison === 'hiver' ? 2 : 1)
+}
+
 function slotsAttendus(input: ValidationInput): SlotAttendu[] {
-  const effectifSemaine = input.nbVetosSemaineSoir ?? (input.saison === 'hiver' ? 2 : 1)
+  const effectifSemaine = plafondNuitSemaineLocal(input)
   const slots: SlotAttendu[] = []
   let cur = input.dateDebut
   while (cur <= input.dateFin) {
@@ -412,12 +435,19 @@ export function validerPlanning(
   }
 
   // ── R17 — effectif nuit semaine = 1 : pas de 2nd en semaine_soir ──
-  // Conditionné à l'effectif RÉSOLU (période > profil > saison), comme le
-  // moteur (`slot.besoinSecond`) et la section COUVERTURE ci-dessus — et non
-  // plus au seul `saison === 'ete'` : un cabinet peut régler 2 vétos/nuit en
-  // été (fix audit 2026-07-03 : violations fantômes sur été + effectif 2).
-  const effectifSemaineR17 = input.nbVetosSemaineSoir ?? (input.saison === 'hiver' ? 2 : 1)
-  if (effectifSemaineR17 < 2) {
+  // Conditionné à l'effectif RÉSOLU, comme le moteur (`slot.besoinSecond`) et
+  // la section COUVERTURE ci-dessus — et non au seul `saison === 'ete'` : un
+  // cabinet peut régler 2 vétos/nuit en été (fix audit 2026-07-03 : violations
+  // fantômes sur été + effectif 2).
+  //
+  // ⚠️ On lit le nombre de places RÉELLEMENT attendues sur une nuit de semaine
+  // (`attendus`), au lieu de recalculer le plafond (2026-08-04). Depuis que la
+  // structure des gardes décide en l'absence de surcharge, le plafond seul ne
+  // suffit plus : il vaut « aucune limite », alors que le créneau peut très
+  // bien n'avoir qu'une place. Recalculer aurait rendu R17 muette là où elle
+  // doit parler — et une règle muette ne se remarque jamais.
+  const placesNuitSemaine = attendus.find((s) => s.type === 'semaine_soir')?.roles.length
+  if (placesNuitSemaine !== undefined && placesNuitSemaine < 2) {
     for (const a of planning.attributions) {
       const second = vetRole(a, 'second')
       if (a.type === 'semaine_soir' && second) {

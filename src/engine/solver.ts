@@ -34,7 +34,7 @@ import type {
 } from './types'
 import { jourIndex, addDays, estJourFerie, lundiDeSemaine } from './utils'
 import { attributionVide, avecVet, clonerAttribution, estAttribue } from './attribution'
-import { typeGardePourJour, effectifSemaineParDefaut } from './structure-creneaux'
+import { typeGardePourJour, plafondNuitSemaine } from './structure-creneaux'
 import type { CreneauModele } from './creneau-modele'
 import { normaliserContraintesVets } from './normaliserContraintes'
 import { isValid } from './rules/hard-constraints'
@@ -156,10 +156,9 @@ export interface SolverInput {
   contexteAnterieur?: AttributionGarde[]
 }
 
-/** Effectif semaine effectif : config si fournie, sinon repli saison (hiver 2 / été 1). */
-function effectifSemaine(saison: Saison, nbVetosSemaineSoir?: number): number {
-  return nbVetosSemaineSoir ?? effectifSemaineParDefaut(saison)
-}
+// Le plafond d'une nuit de semaine vient de `plafondNuitSemaine`
+// (structure-creneaux.ts), partagé avec le validateur, le pré-vol, le contexte
+// de crise et les places attendues — cf. son en-tête pour le pourquoi.
 
 export interface JourNonCouvert {
   date: string
@@ -341,7 +340,9 @@ function genererSteps(
   const semaineSteps: SolverStep[] = []
   // Le NOMBRE, pas « faut-il un second » : c'est lui que le plafond du
   // catalogue doit comparer à `nbPlaces` (cf. `stepsForDay`).
-  const effectifSoir = effectifSemaine(saison, nbVetosSemaineSoir)
+  const effectifSoir = plafondNuitSemaine(
+    saison, nbVetosSemaineSoir, Boolean(creneaux && creneaux.length > 0),
+  )
 
   let current = dateDebut
   while (current <= dateFin) {
@@ -861,7 +862,9 @@ function genererStepsSemaine(
   const semaineSteps: SolverStep[] = []
   // Le NOMBRE, pas « faut-il un second » : c'est lui que le plafond du
   // catalogue doit comparer à `nbPlaces` (cf. `stepsForDay`).
-  const effectifSoir = effectifSemaine(saison, nbVetosSemaineSoir)
+  const effectifSoir = plafondNuitSemaine(
+    saison, nbVetosSemaineSoir, Boolean(creneaux && creneaux.length > 0),
+  )
 
   for (let i = 0; i <= 6; i++) {
     const date = addDays(lundi, i)

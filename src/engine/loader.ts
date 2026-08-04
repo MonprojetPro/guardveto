@@ -21,7 +21,7 @@ import {
   type RegleCabinetRow,
 } from '@/data/mapReglesCabinet'
 import {
-  chargerCreneauModele, chargerRelationsCreneau, resoudreProfilId, chargerEffectifProfil,
+  chargerCreneauModele, chargerRelationsCreneau, resoudreProfilId,
 } from '@/data/chargerCreneauModele'
 import { resoudreRelationsStructure } from './relations-structure'
 import { chargerHistoriqueFetes } from '@/data/historiqueFetes'
@@ -398,12 +398,23 @@ export async function chargerInputDepuisSupabase(
     ? await resoudreProfilId(supabase, cabinetId, (periode as { profil_id?: string | null }).profil_id ?? undefined)
     : undefined
 
-  // Effectif configurable — PRÉCÉDENCE : période (surcharge) > profil > saison.
-  // Lecture BEST-EFFORT (jamais de throw) : une colonne absente (déploiement
-  // avant migration) → undefined → repli saison (hiver = 2, été = 1) en aval.
-  // Byte-identique : toutes les périodes existantes portent déjà une valeur
-  // explicite (backfill P1-B) → la branche période gagne toujours pour elles ;
-  // le profil ne s'applique qu'aux périodes sans surcharge (ex. profil « Été »).
+  // ── EFFECTIF DE NUIT : DEUX MAILLONS AU LIEU DE TROIS (2026-08-04) ──
+  //
+  // La chaîne était : période (surcharge) > PÉRIODE TYPE > saison. Le maillon
+  // du milieu a disparu, et le dernier avec lui sur ce chemin.
+  //
+  // Pourquoi — MiKL : « pourquoi on ne définit que le nb de véto pour les soirs
+  // de la semaine et pas les week-ends ? ». Parce que ce réglage était un
+  // DOUBLON partiel : la structure des gardes fixe déjà le nombre de places de
+  // CHAQUE garde (`creneau_modele.nb_places`), week-ends et fériés compris. La
+  // nuit de semaine était le seul créneau à avoir un second maître, qui ne
+  // pouvait que le RABOTER (`Math.min` dans le solver) — un cabinet réglé à 2
+  // places sur son créneau mais à 1 sur sa période type tournait à 1 sans
+  // qu'aucun écran ne le dise.
+  //
+  // Ce qui reste : la surcharge portée par LE PLANNING lui-même, qui garde tout
+  // son sens (« cet été-là, on n'était que cinq »). Sans elle, c'est le créneau
+  // de la période type qui décide — un seul endroit, toutes les gardes.
   let nbVetosSemaineSoir: number | undefined
   {
     const { data: eff } = await supabase
@@ -412,13 +423,9 @@ export async function chargerInputDepuisSupabase(
       .eq('id', periodeId)
       .single()
     const vPeriode = (eff as { nb_vetos_semaine_soir?: number | null } | null)?.nb_vetos_semaine_soir
-    if (typeof vPeriode === 'number') {
-      nbVetosSemaineSoir = vPeriode
-    } else if (profilId) {
-      // Pas de surcharge période → l'effectif porté par le profil de la période.
-      nbVetosSemaineSoir = await chargerEffectifProfil(supabase, profilId)
-    }
-    // Sinon undefined → le solver retombe sur la saison.
+    if (typeof vPeriode === 'number') nbVetosSemaineSoir = vPeriode
+    // Sinon undefined → le créneau de la période type décide (chemin catalogue),
+    // ou la saison pour les contextes sans catalogue (chemin legacy).
   }
 
   // Poids d'équité : déjà calculés ci-dessus par chargerReglesCabinet (extraits

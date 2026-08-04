@@ -70,18 +70,27 @@ export function codeCatalogue(typePlanning: string): string {
 }
 
 /**
- * L'effectif exigé une nuit de semaine, avec la précédence du solveur :
- * période > profil > saison. Toute autre précédence produirait un planning jugé
- * faux par le validateur alors que le moteur l'a construit juste.
+ * L'effectif exigé une nuit de semaine, avec la précédence du solveur.
+ *
+ * ⚠️ ELLE A CHANGÉ LE 2026-08-04. C'était période > PÉRIODE TYPE > saison ; le
+ * maillon du milieu a disparu (la structure des gardes règle déjà le nombre de
+ * places de chaque garde, week-ends compris — un second réglage pour la seule
+ * nuit de semaine ne pouvait que la raboter en silence).
+ *
+ * Reste : la surcharge du planning, sinon `null` — « je ne tranche pas, c'est
+ * le créneau qui décide ». `placesAttendues` applique alors simplement le
+ * nombre de places du catalogue, comme pour tous les autres créneaux.
+ *
+ * Toute autre précédence produirait un planning jugé faux par le validateur
+ * alors que le moteur l'a construit juste.
  */
 export function effectifNuitSemaine(
   periode: PeriodeEffectif,
-  profils: ReadonlyMap<string, ProfilEffectif>,
-): number {
+  /** Conservé pour la compatibilité d'appel ; plus consulté depuis 2026-08-04. */
+  _profils?: ReadonlyMap<string, ProfilEffectif>,
+): number | null {
   if (typeof periode.nb_vetos_semaine_soir === 'number') return periode.nb_vetos_semaine_soir
-  const profil = periode.profil_id ? profils.get(periode.profil_id) : undefined
-  if (profil && typeof profil.nb_vetos_semaine_soir === 'number') return profil.nb_vetos_semaine_soir
-  return periode.saison === 'hiver' ? 2 : 1
+  return null
 }
 
 /**
@@ -110,6 +119,11 @@ export function placesAttendues(args: {
     if (!periode) return null
     const effectif = effectifNuitSemaine(periode, args.profils)
     const duCatalogue = args.catalogue.get(code)
+    // Sans surcharge de planning (`effectif === null`), le créneau décide seul —
+    // même règle que `plafondNuitSemaine` côté moteur. Sans catalogue NI
+    // surcharge, on ne peut rien affirmer : `null`, et Filou se tait plutôt que
+    // d'annoncer un trou imaginaire.
+    if (effectif === null) return typeof duCatalogue === 'number' ? duCatalogue : null
     return typeof duCatalogue === 'number' ? Math.min(duCatalogue, effectif) : effectif
   }
 

@@ -115,12 +115,12 @@ function FicheType({ type, gardes }: { type: ProfilPlanning; gardes: string[] })
         <dt>Période type</dt>
         <dd><b>{type.nom}</b></dd>
       </div>
-      {type.saison_suggeree && (
-        <div className="type-ligne">
-          <dt>Saison</dt>
-          <dd>{type.saison_suggeree === 'ete' ? '☀️ été' : '❄️ hiver'}</dd>
-        </div>
-      )}
+      {/* Ni « saison suggérée » ni « le soir en semaine » : les deux réglages
+          ont disparu le 2026-08-04 (l'un ne pilotait plus rien, l'autre faisait
+          doublon avec la structure des gardes). Les afficher ici les ferait
+          survivre à l'écran alors qu'on ne peut plus les changer nulle part —
+          le pire des deux mondes. Le nombre de vétérinaires se lit maintenant
+          garde par garde, ci-dessous. */}
       <div className="type-ligne">
         <dt>Gardes à couvrir</dt>
         <dd>
@@ -129,12 +129,6 @@ function FicheType({ type, gardes }: { type: ProfilPlanning; gardes: string[] })
             : <i>aucune garde réglée — le planning sortirait vide</i>}
         </dd>
       </div>
-      {typeof type.nb_vetos_semaine_soir === 'number' && (
-        <div className="type-ligne">
-          <dt>Nuits de semaine</dt>
-          <dd>{type.nb_vetos_semaine_soir} vétérinaire{type.nb_vetos_semaine_soir > 1 ? 's' : ''}</dd>
-        </div>
-      )}
     </dl>
   )
 }
@@ -231,21 +225,13 @@ export function ParcoursGeneration({
   )
 
   /**
-   * La saison du départ ne CHOISIT plus rien — elle SUGGÈRE, à voix haute.
-   * On garde le calcul (mai→août = été) uniquement pour aider l'admin à
-   * reconnaître la bonne période type dans sa liste : « ton départ tombe en
-   * hiver ». La décision reste la sienne, et le serveur refuse sans elle.
+   * La saison du départ ne CHOISIT plus rien et ne suggère plus aucune période
+   * type (le réglage « saison suggérée » a été supprimé le 2026-08-04, il ne
+   * pilotait plus rien). Elle sert uniquement à situer le planning dans
+   * l'année, à voix haute. La décision est entièrement à l'admin.
    */
-  // Pas de `useMemo` : deux comparaisons de nombres et un `find` sur une liste
-  // de trois éléments. Le mémoriser coûterait plus cher que le recalculer, et
-  // le compilateur React refuse la mémo manuelle sur cette dépendance.
   const saisonDuDepart = debutCale
     ? (Number(debutCale.slice(5, 7)) >= 5 && Number(debutCale.slice(5, 7)) <= 8 ? 'été' : 'hiver')
-    : null
-  const typeSuggere = saisonDuDepart
-    ? (periodesTypes.find(
-        (p) => !p.est_defaut && p.saison_suggeree === (saisonDuDepart === 'été' ? 'ete' : 'hiver'),
-      ) ?? null)
     : null
 
   /** Le cabinet n'a programmé AUCUNE période type : rien n'est générable. */
@@ -769,10 +755,10 @@ export function ParcoursGeneration({
                 {ficheDe(typeChoisi)}
 
                 <span className="gen-aide">
-                  Elle décide des gardes à couvrir et de l’effectif.{' '}
-                  {saisonDuDepart && typeSuggere && !typeChoisi && (
-                    <>Ton départ tombe en {saisonDuDepart} — <b>{typeSuggere.nom}</b> est
-                      réglée pour cette saison, mais c’est toi qui décides.</>
+                  Elle décide des gardes à couvrir et du nombre de vétérinaires sur
+                  chacune.{' '}
+                  {saisonDuDepart && !typeChoisi && (
+                    <>Ton planning démarre en {saisonDuDepart}.</>
                   )}
                 </span>
 

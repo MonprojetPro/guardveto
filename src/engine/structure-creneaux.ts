@@ -158,6 +158,37 @@ export function effectifSemaineParDefaut(saison: Saison): number {
   return saison === 'hiver' ? 2 : 1
 }
 
+/**
+ * LE PLAFOND D'EFFECTIF D'UNE NUIT DE SEMAINE — source unique (2026-08-04).
+ *
+ * La nuit de semaine est le seul créneau à ne pas suivre simplement le nombre
+ * de places de son créneau : un planning peut porter une surcharge (« cet
+ * été-là, on n'était que cinq »). Le moteur applique donc
+ * `Math.min(nbPlaces, plafond)`.
+ *
+ * ⚠️ POURQUOI CETTE FONCTION EXISTE. La règle était recopiée à l'identique dans
+ * CINQ modules — solver, validateur indépendant, pré-vol, contexte de crise,
+ * places attendues — chacun écrivant `?? (saison === 'hiver' ? 2 : 1)`. Le jour
+ * où la règle change (aujourd'hui), en oublier un ne casse rien visiblement :
+ * le moteur construit un planning que le validateur déclare faux, ou l'écran
+ * annonce un manque que le moteur n'a jamais voulu pourvoir. Ces désaccords ne
+ * se voient qu'APRÈS génération. Un seul endroit, donc, et des appelants qui
+ * disent seulement dans quel contexte ils sont.
+ *
+ * @param avecCatalogue le contexte a-t-il une structure de gardes ? Si oui,
+ *   c'est elle qui décide en l'absence de surcharge (pas de plafond) ; sinon
+ *   (contextes legacy, tests hors-structure) il faut bien un chiffre, et le
+ *   repli saison s'applique.
+ */
+export function plafondNuitSemaine(
+  saison: Saison,
+  surchargePlanning: number | null | undefined,
+  avecCatalogue: boolean,
+): number {
+  if (typeof surchargePlanning === 'number') return surchargePlanning
+  return avecCatalogue ? Number.POSITIVE_INFINITY : effectifSemaineParDefaut(saison)
+}
+
 // ============================================================
 // STRUCTURE RÉSOLUE — horaires effectifs (défaut + surcharge cabinet)
 // ============================================================

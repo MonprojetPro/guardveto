@@ -68,13 +68,18 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from '@/components/ui/select'
 import {
-  creerProfil, renommerProfil, setProfilMeta, supprimerProfil,
+  creerProfil, renommerProfil, supprimerProfil,
 } from '@/app/(protected)/admin/structure/actions'
 import type { ProfilUI } from './types'
 import { useErreurBloquante } from './ErreurBloquante'
 
 interface Props {
   profils: ProfilUI[]
+  /**
+   * Combien de plannings ne désignent AUCUNE période type (`profil_id` NULL) et
+   * tournent donc encore sur « Configuration standard ». Voir `montrerDefaut`.
+   */
+  planningsSansPeriodeType: number
   /** La période type regardée dans les autres onglets — à signaler visuellement (classe `courant`). */
   profilCourantId: string
   /** Désigne la période type que décriront les onglets suivants. */
@@ -84,15 +89,6 @@ interface Props {
 /** Ce qu'une action serveur de cet écran peut répondre. */
 type Reponse = { error?: string; success?: boolean } | undefined
 
-/** Les deux réglages qu'on peut avoir modifiés en optimiste, en attendant le serveur. */
-interface MetaLocale {
-  saisonSuggeree?: string | null
-  effectifSoirSemaine?: number | null
-}
-
-/** Le composant de menu refuse la valeur vide : sentinelle pour « aucune valeur ». */
-const AUCUNE = '__aucune__'
-
 /**
  * Un clic parti d'un de ces éléments ne choisit PAS la période type : on manipulait
  * un réglage de la carte, pas la carte. Le déclencheur de menu est visé par son
@@ -101,19 +97,9 @@ const AUCUNE = '__aucune__'
  */
 const ZONES_NEUTRES = 'button, input, a, [data-slot="select-trigger"]'
 
-function saisonClair(s: string | null): string {
-  return s === 'ete' ? 'Été' : s === 'hiver' ? 'Hiver' : 'Aucune'
-}
-
-/** Les effectifs proposables le soir en semaine (miroir du CHECK 1..4). */
-const EFFECTIFS = [1, 2, 3, 4]
-
-function effectifClair(n: number | null): string {
-  if (n === null || !EFFECTIFS.includes(n)) return 'Selon la saison'
-  return n === 1 ? '1 véto' : `${n} vétos`
-}
-
-export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
+export function OngletProfils({
+  profils, planningsSansPeriodeType, profilCourantId, onChoisir,
+}: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -122,8 +108,6 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
   const [creationOuverte, setCreationOuverte] = useState(false)
   const [nom, setNom] = useState('')
   const [sourceId, setSourceId] = useState('')
-  const [saisonNouveau, setSaisonNouveau] = useState<string>(AUCUNE)
-  const [effectifNouveau, setEffectifNouveau] = useState<string>(AUCUNE)
 
   // Renommage en ligne : une seule période type à la fois en édition.
   const [renommeId, setRenommeId] = useState<string | null>(null)
@@ -132,33 +116,35 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
   // Suppression : la période type visée par la modale de confirmation.
   const [aSupprimer, setASupprimer] = useState<ProfilUI | null>(null)
 
-  // Réglages déjà appliqués à l'écran, pas encore confirmés par le serveur.
-  const [meta, setMeta] = useState<Record<string, MetaLocale>>({})
-
   // Les refus s'affichent en modale (cf. `ErreurBloquante`) : une vignette de
   // quelques secondes en bas d'écran ne suffit pas à expliquer un refus.
   const { ouvrirErreur, dialogueErreur } = useErreurBloquante()
 
   const profilDefaut = profils.find((p) => p.estDefaut) ?? profils[0]
 
-  /** La valeur à afficher : l'optimiste si elle existe, sinon celle du serveur. */
-  const saisonDe = (p: ProfilUI): string | null => {
-    const local = meta[p.id]
-    return local && local.saisonSuggeree !== undefined ? local.saisonSuggeree : p.saisonSuggeree
-  }
-
-  const effectifDe = (p: ProfilUI): number | null => {
-    const local = meta[p.id]
-    return local && local.effectifSoirSemaine !== undefined
-      ? local.effectifSoirSemaine
-      : p.effectifSoirSemaine
-  }
+  /**
+   * « Supprime-moi cette configuration standard, elle ne veut rien dire »
+   * (MiKL, 2026-08-04).
+   *
+   * Elle ne peut pas disparaître de la BASE : c'est le repli du moteur pour
+   * tout planning qui ne désigne aucune période type, et plusieurs fonctions
+   * SQL s'appuient dessus. Mais elle n'a plus rien à faire à l'écran DÈS
+   * QU'ELLE NE SERT PLUS À RIEN — c'est-à-dire quand le cabinet a ses propres
+   * périodes types ET qu'aucun planning ne s'appuie encore dessus.
+   *
+   * Les deux conditions comptent, et la seconde surtout : la masquer alors que
+   * des plannings tournent dessus reviendrait à cacher la structure qui les
+   * fabrique. On la garde alors visible, en disant pourquoi — c'est une
+   * information utile, pas un réglage de plus.
+   */
+  const montrerDefaut = planningsSansPeriodeType > 0 || profils.length <= 1
+  const visibles = montrerDefaut ? profils : profils.filter((p) => !p.estDefaut)
 
   const ouvrirCreation = () => {
     setNom('')
-    setSourceId(profilDefaut?.id ?? '')
-    setSaisonNouveau(AUCUNE)
-    setEffectifNouveau(AUCUNE)
+    // On copie depuis une période type VISIBLE : proposer comme source une
+    // carte qu'on a masquée juste au-dessus serait incompréhensible.
+    setSourceId(visibles[0]?.id ?? profilDefaut?.id ?? '')
     setCreationOuverte(true)
   }
 
@@ -173,13 +159,11 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
       return
     }
     startTransition(async () => {
+      // Ni saison ni effectif : tout ce qui décrit la période type vit dans sa
+      // structure de gardes, copiée depuis la source (2026-08-04).
       const res: Reponse = await creerProfil({
         nom: propre,
         source_profil_id: sourceId || null,
-        saison_suggeree:
-          saisonNouveau === 'ete' || saisonNouveau === 'hiver' ? saisonNouveau : null,
-        nb_vetos_semaine_soir:
-          EFFECTIFS.includes(Number(effectifNouveau)) ? Number(effectifNouveau) : null,
       })
       if (res?.error) {
         ouvrirErreur(res.error)
@@ -213,34 +197,10 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
     })
   }
 
-  /**
-   * Enregistre un réglage de carte (saison ou effectif) en affichant tout de
-   * suite la nouvelle valeur, et en la reprenant si le serveur refuse.
-   */
-  const reglerMeta = (
-    p: ProfilUI,
-    optimiste: MetaLocale,
-    patch: { saison_suggeree?: 'ete' | 'hiver' | null; nb_vetos_semaine_soir?: number | null },
-    message: string,
-  ) => {
-    const avant = meta[p.id]
-    setMeta((prev) => ({ ...prev, [p.id]: { ...prev[p.id], ...optimiste } }))
-    startTransition(async () => {
-      const res: Reponse = await setProfilMeta(p.id, patch)
-      if (res?.error) {
-        setMeta((prev) => {
-          const suivant = { ...prev }
-          if (avant) suivant[p.id] = avant
-          else delete suivant[p.id]
-          return suivant
-        })
-        ouvrirErreur(res.error)
-        return
-      }
-      toast.success(message)
-      router.refresh()
-    })
-  }
+  // `reglerMeta` vivait ici : il enregistrait en optimiste les deux menus de la
+  // carte (saison suggérée, effectif du soir). Les deux ayant disparu, plus
+  // personne ne l'appelle. `setProfilMeta` reste côté serveur — Filou s'en sert
+  // encore — mais l'écran n'a plus de réglage à pousser.
 
   const supprimer = () => {
     if (!aSupprimer) return
@@ -269,8 +229,8 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
       <section className="card">
         <div className="card-head">
           <h2>Périodes types</h2>
-          <span className={`section-count${profils.length === 0 ? ' zero' : ''}`}>
-            {profils.length}
+          <span className={`section-count${visibles.length === 0 ? ' zero' : ''}`}>
+            {visibles.length}
           </span>
           <span className="spacer" />
           <button
@@ -287,6 +247,14 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
             les nuits sont longues, « Été » quand l&apos;équipe est réduite. Choisis une carte pour
             que les trois onglets suivants décrivent cette période type-là.
           </p>
+          {montrerDefaut && planningsSansPeriodeType > 0 && profils.length > 1 && (
+            <p className="sub">
+              « Configuration standard » reste affichée parce que{' '}
+              <b>{planningsSansPeriodeType} planning{planningsSansPeriodeType > 1 ? 's' : ''}</b>{' '}
+              {planningsSansPeriodeType > 1 ? 'tournent' : 'tourne'} encore dessus.
+              Donne-leur une vraie période type depuis « Générer », et elle disparaîtra d&apos;ici.
+            </p>
+          )}
         </div>
 
         {creationOuverte && (
@@ -311,10 +279,10 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
                 <label id="lbl-source">Copier la structure des gardes de</label>
                 <Select value={sourceId} onValueChange={(v) => v && setSourceId(String(v))}>
                   <SelectTrigger aria-labelledby="lbl-source" className="w-full">
-                    {profils.find((p) => p.id === sourceId)?.nom ?? 'Choisir…'}
+                    {visibles.find((p) => p.id === sourceId)?.nom ?? 'Choisir…'}
                   </SelectTrigger>
                   <SelectContent>
-                    {profils.map((p) => (
+                    {visibles.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.nom}
                         {p.estDefaut ? ' (par défaut)' : ''}
@@ -324,49 +292,13 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
                 </Select>
               </div>
 
-              <div>
-                <label id="lbl-saison-neuf">Saison suggérée</label>
-                <Select
-                  value={saisonNouveau}
-                  onValueChange={(v) => v && setSaisonNouveau(String(v))}
-                >
-                  <SelectTrigger aria-labelledby="lbl-saison-neuf" className="w-full">
-                    {saisonClair(saisonNouveau === AUCUNE ? null : saisonNouveau)}
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={AUCUNE}>Aucune</SelectItem>
-                    <SelectItem value="ete">Été</SelectItem>
-                    <SelectItem value="hiver">Hiver</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label id="lbl-effectif-neuf">Le soir en semaine</label>
-                <Select
-                  value={effectifNouveau}
-                  onValueChange={(v) => v && setEffectifNouveau(String(v))}
-                >
-                  <SelectTrigger aria-labelledby="lbl-effectif-neuf" className="w-full">
-                    {effectifClair(effectifNouveau === AUCUNE ? null : Number(effectifNouveau))}
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={AUCUNE}>Selon la période</SelectItem>
-                    {EFFECTIFS.map((n) => (
-                      <SelectItem key={n} value={String(n)}>
-                        {effectifClair(n)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
 
             <p className="note">
               La nouvelle période type part avec les types de garde de celle qu&apos;on copie :
-              elle est générable immédiatement. On ajuste ensuite ses horaires dans l&apos;onglet
-              « Structure des gardes ». La saison suggérée sert juste à la proposer d&apos;office quand
-              on crée un planning de cette saison-là.
+              elle est générable immédiatement. Tout se règle ensuite dans l&apos;onglet
+              « Structure des gardes » — les jours, les horaires, et combien de vétérinaires
+              sur chaque garde.
             </p>
 
             <div className="panneau-pied">
@@ -390,7 +322,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
           </div>
         )}
 
-        {profils.length === 0 ? (
+        {visibles.length === 0 ? (
           <p className="empty-row">
             Aucune période type pour ce cabinet. Une période type se crée en copiant une
             existante — il n&apos;y en a aucune à copier ici, c&apos;est le signe que
@@ -399,7 +331,7 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
           </p>
         ) : (
           <div className="prof-grille">
-            {profils.map((p) => {
+            {visibles.map((p) => {
               const actifs = p.creneaux.filter((c) => c.actif).length
               const enEdition = renommeId === p.id
               const courant = p.id === profilCourantId
@@ -465,76 +397,21 @@ export function OngletProfils({ profils, profilCourantId, onChoisir }: Props) {
                       : ' Clique la carte pour le décrire dans les onglets suivants.'}
                   </p>
 
-                  <div className="prof-reglages">
-                    <div className="prof-reglage">
-                      <span id={`lbl-saison-${p.id}`}>Saison suggérée</span>
-                      <Select
-                        value={saisonDe(p) ?? AUCUNE}
-                        disabled={isPending}
-                        onValueChange={(v) => {
-                          if (!v) return
-                          const brut = String(v)
-                          const valeur = brut === 'ete' || brut === 'hiver' ? brut : null
-                          reglerMeta(
-                            p,
-                            { saisonSuggeree: valeur },
-                            { saison_suggeree: valeur },
-                            valeur
-                              ? `« ${p.nom} » sera proposé pour les périodes d’${saisonClair(valeur).toLowerCase()}.`
-                              : `« ${p.nom} » ne sera plus proposé d’office.`,
-                          )
-                        }}
-                      >
-                        <SelectTrigger
-                          aria-labelledby={`lbl-saison-${p.id}`}
-                          className="w-[150px]"
-                        >
-                          {saisonClair(saisonDe(p))}
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={AUCUNE}>Aucune</SelectItem>
-                          <SelectItem value="ete">Été</SelectItem>
-                          <SelectItem value="hiver">Hiver</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  {/* ── LES DEUX RÉGLAGES DE CARTE ONT DISPARU (2026-08-04) ──
+                      « Saison suggérée » ne pilotait plus rien : son unique rôle
+                      était de proposer cette période type d'office à la création
+                      d'un planning — supprimé le matin même, la période type
+                      étant devenue un choix explicite. Un réglage affiché que
+                      rien n'évalue est pire qu'un réglage absent : on croit
+                      avoir agi.
 
-                    <div className="prof-reglage">
-                      <span id={`lbl-effectif-${p.id}`}>Le soir en semaine</span>
-                      <Select
-                        value={effectifDe(p) === null ? AUCUNE : String(effectifDe(p))}
-                        disabled={isPending}
-                        onValueChange={(v) => {
-                          if (!v) return
-                          const brut = String(v)
-                          const valeur = EFFECTIFS.includes(Number(brut)) ? Number(brut) : null
-                          reglerMeta(
-                            p,
-                            { effectifSoirSemaine: valeur },
-                            { nb_vetos_semaine_soir: valeur },
-                            valeur
-                              ? `Le soir en semaine : ${effectifClair(valeur)} sur « ${p.nom} ».`
-                              : `« ${p.nom} » suivra de nouveau l’effectif de la période.`,
-                          )
-                        }}
-                      >
-                        <SelectTrigger
-                          aria-labelledby={`lbl-effectif-${p.id}`}
-                          className="w-[150px]"
-                        >
-                          {effectifClair(effectifDe(p))}
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={AUCUNE}>Selon la période</SelectItem>
-                          {EFFECTIFS.map((n) => (
-                            <SelectItem key={n} value={String(n)}>
-                              {effectifClair(n)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+                      « Le soir en semaine » décrivait quelque chose de réel,
+                      mais EN DOUBLE : la structure des gardes règle déjà le
+                      nombre de vétérinaires, pour TOUTES les gardes et pas
+                      seulement la semaine. MiKL : « pourquoi on ne définit que
+                      le nb de véto pour les soirs de la semaine et pas les
+                      week-ends ? ». Réponse : on le définit ailleurs, et c'est
+                      là que ça doit rester. */}
 
                   <div className="prof-actions">
                     {enEdition ? (
