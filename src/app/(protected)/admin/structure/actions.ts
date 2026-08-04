@@ -179,6 +179,12 @@ export interface CreerProfilPayload {
    * recopient. Omis → la nouvelle période type part de tout le socle.
    */
   source_profil_id?: string | null
+  /**
+   * Ce que la nouvelle période type retient de chaque garde du socle, décidé
+   * AVANT sa création : `creneau_id` → nombre de vétérinaires (0 = pas de
+   * garde). Omis → elle prend les réglages de sa source, ou tout le socle.
+   */
+  affinage?: Record<string, number>
   /** @deprecated Réglages supprimés le 2026-08-04 — ignorés côté serveur. */
   saison_suggeree?: 'ete' | 'hiver' | null
   /** @deprecated Idem. */
@@ -203,31 +209,63 @@ export async function creerProfil(payload: CreerProfilPayload) {
   if (!nom) return { error: 'Le nom du profil est obligatoire.' }
   if (nom.length > 60) return { error: 'Le nom du profil est trop long (60 caractères max).' }
 
-  const saison = payload.saison_suggeree ?? null
-  if (saison !== null && !SAISONS_VALIDES.has(saison)) {
-    return { error: 'Saison suggérée invalide.' }
-  }
-  const effectif = payload.nb_vetos_semaine_soir ?? null
-  if (effectif !== null && !EFFECTIFS_VALIDES.has(effectif)) {
-    return { error: 'Effectif invalide (1 ou 2).' }
-  }
-
-  const { error } = await supabase.rpc('dupliquer_profil', {
+  const { data: nouvelId, error } = await supabase.rpc('dupliquer_profil', {
     p_nom: nom,
     p_source_profil_id: payload.source_profil_id ?? null,
-    p_saison: saison,
-    p_effectif: effectif,
+    p_saison: null,
+    p_effectif: null,
   })
 
   if (error) {
     // 23505 = unique_violation (nom déjà pris pour ce cabinet).
     if (error.code === '23505') {
-      return { error: `Un profil « ${nom} » existe déjà.` }
+      return { error: `Une période type « ${nom} » existe déjà.` }
     }
     return { error: error.message }
   }
 
+  // ── LES RÉGLAGES CHOISIS À LA CRÉATION (2026-08-04) ──────────────────────
+  // La période type naît avec ce que l'admin vient de décider garde par garde,
+  // au lieu de naître « comme sa source » puis d'être corrigée. Écrit APRÈS la
+  // RPC — elle a déjà posé les réglages copiés, on les remplace.
+  //
+  // Chaque valeur est bornée par le socle relu EN BASE : l'écran a pu rester
+  // ouvert pendant qu'on réduisait un créneau ailleurs.
+  const profilId = nouvelId as string | null
+  if (profilId && payload.affinage && Object.keys(payload.affinage).length > 0) {
+    const { data: socle } = await supabase
+      .from('creneau_modele')
+      .select('id, nb_places, cabinet_id')
+      .is('profil_id', null)
+
+    const lignes = ((socle ?? []) as { id: string; nb_places: number; cabinet_id: string }[])
+      .filter((c) => payload.affinage?.[c.id] !== undefined)
+      .map((c) => ({
+        cabinet_id: c.cabinet_id,
+        profil_id: profilId,
+        creneau_id: c.id,
+        nb_vetos: Math.max(0, Math.min(payload.affinage![c.id], c.nb_places)),
+      }))
+
+    if (lignes.length > 0) {
+      const { error: errAff } = await supabase
+        .from('periode_type_creneau')
+        .upsert(lignes, { onConflict: 'profil_id,creneau_id' })
+      // La période type EXISTE déjà à ce stade : on ne la supprime pas pour
+      // autant, on dit ce qui n'a pas été appliqué. Un échec silencieux ici
+      // donnerait une période type qui ne fait pas ce qu'on a demandé.
+      if (errAff) {
+        revalidatePath('/regles')
+        return {
+          error: `« ${nom} » a été créée, mais ses réglages n’ont pas pu être enregistrés `
+            + `(${errAff.message}). Ajuste-les sur sa carte.`,
+        }
+      }
+    }
+  }
+
   revalidatePath('/regles')
+  revalidatePath('/planning')
   revalidatePath('/historique')
   return { success: true }
 }

@@ -110,6 +110,16 @@ export function OngletProfils({
   const [creationOuverte, setCreationOuverte] = useState(false)
   const [nom, setNom] = useState('')
   const [sourceId, setSourceId] = useState('')
+  /**
+   * Ce que la NOUVELLE période type retiendra, garde par garde — réglable
+   * AVANT de créer (MiKL, 2026-08-04 : « pourquoi quand je crée une période
+   * type je ne peux pas la paramétrer ? »).
+   *
+   * Il fallait auparavant créer, puis régler sur la carte : deux gestes pour
+   * une seule intention, et entre les deux une période type qui ne
+   * correspondait à rien de ce qu'on voulait.
+   */
+  const [affinageNeuf, setAffinageNeuf] = useState<Record<string, number>>({})
 
   // Renommage en ligne : une seule période type à la fois en édition.
   const [renommeId, setRenommeId] = useState<string | null>(null)
@@ -146,12 +156,28 @@ export function OngletProfils({
   const montrerDefaut = planningsSansPeriodeType > 0 || profils.length <= 1
   const visibles = montrerDefaut ? profils : profils.filter((p) => !p.estDefaut)
 
+  /** Ce que la source retient de chaque garde — le point de départ des réglages. */
+  const affinageDe = (profilId: string): Record<string, number> => {
+    const src = profils.find((p) => p.id === profilId)
+    const r: Record<string, number> = {}
+    for (const c of socle) r[c.id] = src?.affinage[c.id] ?? c.nbPlaces
+    return r
+  }
+
   const ouvrirCreation = () => {
     setNom('')
     // On copie depuis une période type VISIBLE : proposer comme source une
     // carte qu'on a masquée juste au-dessus serait incompréhensible.
-    setSourceId(visibles[0]?.id ?? profilDefaut?.id ?? '')
+    const source = visibles[0]?.id ?? profilDefaut?.id ?? ''
+    setSourceId(source)
+    setAffinageNeuf(affinageDe(source))
     setCreationOuverte(true)
+  }
+
+  /** Changer de source repart de SES réglages : c'est ce que « copier » veut dire. */
+  const choisirSource = (id: string) => {
+    setSourceId(id)
+    setAffinageNeuf(affinageDe(id))
   }
 
   const creer = () => {
@@ -165,17 +191,23 @@ export function OngletProfils({
       return
     }
     startTransition(async () => {
-      // Ni saison ni effectif : tout ce qui décrit la période type vit dans sa
-      // structure de gardes, copiée depuis la source (2026-08-04).
+      // La période type naît DÉJÀ réglée : le serveur reçoit ce que l'admin
+      // vient de choisir garde par garde, pas seulement un nom.
       const res: Reponse = await creerProfil({
         nom: propre,
         source_profil_id: sourceId || null,
+        affinage: affinageNeuf,
       })
       if (res?.error) {
         ouvrirErreur(res.error)
         return
       }
-      toast.success(`Période type « ${propre} » créée, avec les types de garde de sa source.`)
+      const retirees = socle.filter((c) => (affinageNeuf[c.id] ?? c.nbPlaces) === 0).length
+      toast.success(
+        retirees > 0
+          ? `Période type « ${propre} » créée — ${retirees} garde${retirees > 1 ? 's' : ''} en moins.`
+          : `Période type « ${propre} » créée.`,
+      )
       setCreationOuverte(false)
       router.refresh()
     })
@@ -283,7 +315,7 @@ export function OngletProfils({
             <p className="sub">
               « Configuration standard » reste affichée parce que{' '}
               <b>{planningsSansPeriodeType} planning{planningsSansPeriodeType > 1 ? 's' : ''}</b>{' '}
-              {planningsSansPeriodeType > 1 ? 'tournent' : 'tourne'} encore dessus.
+              {planningsSansPeriodeType > 1 ? ' tournent' : ' tourne'} encore dessus.
               Donne-leur une vraie période type depuis « Générer », et elle disparaîtra d&apos;ici.
             </p>
           )}
@@ -308,8 +340,8 @@ export function OngletProfils({
               </div>
 
               <div className="large">
-                <label id="lbl-source">Copier la structure des gardes de</label>
-                <Select value={sourceId} onValueChange={(v) => v && setSourceId(String(v))}>
+                <label id="lbl-source">Partir des réglages de</label>
+                <Select value={sourceId} onValueChange={(v) => v && choisirSource(String(v))}>
                   <SelectTrigger aria-labelledby="lbl-source" className="w-full">
                     {visibles.find((p) => p.id === sourceId)?.nom ?? 'Choisir…'}
                   </SelectTrigger>
@@ -324,13 +356,62 @@ export function OngletProfils({
                 </Select>
               </div>
 
+              {/* ── ON LA PARAMÈTRE AVANT DE LA CRÉER (2026-08-04) ──────────
+                  MiKL : « pourquoi quand je crée une période type je ne peux
+                  pas la paramétrer ? ». Il fallait créer d'abord, régler
+                  ensuite sur la carte — deux gestes pour une seule intention,
+                  et entre les deux une période type qui ne correspondait à
+                  rien de ce qu'on voulait. Ce sont les mêmes menus que sur la
+                  carte, pré-remplis depuis la source choisie. */}
+              {socle.length > 0 && (
+                <div className="large">
+                  <label>Combien de vétérinaires sur chaque garde</label>
+                  <div className="ptc-liste">
+                    {socle.map((c) => {
+                      const max = c.nbPlaces
+                      const valeur = affinageNeuf[c.id] ?? max
+                      return (
+                        <div className="ptc-ligne" key={c.id}>
+                          <span className="ptc-garde">
+                            <b>{c.nom}</b>
+                            <small>{c.joursClair} · jusqu’à {max} véto{max > 1 ? 's' : ''}</small>
+                          </span>
+                          <Select
+                            value={String(valeur)}
+                            onValueChange={(v) => {
+                              if (v === null || v === undefined) return
+                              setAffinageNeuf((prev) => ({ ...prev, [c.id]: Number(v) }))
+                            }}
+                          >
+                            <SelectTrigger
+                              className="w-[140px]"
+                              aria-label={`Vétérinaires sur « ${c.nom} »`}
+                            >
+                              {valeur === 0
+                                ? 'Aucune garde'
+                                : `${valeur} véto${valeur > 1 ? 's' : ''}`}
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="0">Aucune garde</SelectItem>
+                              {Array.from({ length: max }, (_, i) => i + 1).map((n) => (
+                                <SelectItem key={n} value={String(n)}>
+                                  {n} véto{n > 1 ? 's' : ''}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             <p className="note">
-              La nouvelle période type part avec les types de garde de celle qu&apos;on copie :
-              elle est générable immédiatement. Tout se règle ensuite dans l&apos;onglet
-              « Structure des gardes » — les jours, les horaires, et combien de vétérinaires
-              sur chaque garde.
+              Elle est générable dès sa création. Les jours et les horaires, eux, sont communs
+              à toutes les périodes types : ils se règlent dans « Structure des gardes ».
+              Tout reste modifiable ensuite.
             </p>
 
             <div className="panneau-pied">

@@ -695,9 +695,13 @@
 
 /* ── Onglet 1 · Profils ───────────────────────────────────────── */
 
+/* 380 px et non 300 : depuis que la carte porte le réglage de chaque garde
+   (2026-08-04), 300 px forçaient le nom de la garde et son menu à se marcher
+   dessus. Une carte de période type n'est plus une vignette, c'est un tableau
+   de bord. */
 .v2 .prof-grille {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
   gap: 16px;
   padding: 18px 22px 22px;
 }
@@ -729,13 +733,22 @@
   border: 1px solid var(--t-border);
   border-radius: var(--r-sm);
 }
+/* ⚠️ GRILLE, PAS FLEX (correction du 2026-08-04 — MiKL : « la présentation est
+   claquée… c'est anarchique »). En `flex` + `flex-wrap`, chaque ligne décidait
+   seule : un nom de garde court laissait le menu à côté, un nom long le
+   renvoyait à la ligne suivante. Résultat, quatre lignes et quatre mises en
+   page différentes dans la même carte. Une grille impose UNE colonne de menus,
+   commune à toutes les lignes : l'œil descend en ligne droite. */
 .v2 .ptc-ligne {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--t-border);
 }
+.v2 .ptc-ligne:last-of-type { padding-bottom: 0; border-bottom: none; }
+
 .v2 .ptc-garde {
   display: flex;
   flex-direction: column;
@@ -747,10 +760,14 @@
   font-size: 0.72rem;
   color: var(--soft);
 }
-/* Le menu ne rétrécit pas quand le nom de la garde est long : c'est lui qu'on
-   vient chercher, il doit rester à la même place d'une ligne à l'autre. */
-.v2 .ptc-ligne [data-slot='select-trigger'] { flex: 0 0 auto; }
 .v2 .ptc-liste .note { margin-top: 2px; }
+
+/* Sous 420 px (carte étroite sur mobile), le menu passe SOUS le nom — mais
+   pour toutes les lignes à la fois, ce qui reste régulier. */
+@media (max-width: 420px) {
+  .v2 .ptc-ligne { grid-template-columns: minmax(0, 1fr); }
+  .v2 .ptc-ligne [data-slot='select-trigger'] { width: 100%; }
+}
 
 /* La carte EST le sélecteur de profil sur cet onglet : elle doit se dire
    cliquable au pointeur comme au clavier. Une carte qu'on peut choisir sans
