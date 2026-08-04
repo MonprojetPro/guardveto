@@ -29,6 +29,7 @@
 // ============================================================
 
 import { useCallback, useMemo, useState } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
@@ -44,7 +45,7 @@ import { DiagnosticImpasse } from '@/components/planning/DiagnosticImpasse'
 import { CreneauxIgnoresAlert } from '@/components/planning/CreneauxIgnoresAlert'
 import { PointPreVol, type VetEtiquette } from '@/components/planning/PointPreVol'
 import { SignalerLimite } from '@/components/planning/SignalerLimite'
-import { creerPeriode, supprimerPeriode } from '@/app/(protected)/admin/periodes/actions'
+import { creerPeriode, supprimerPeriode, setProfilPeriode } from '@/app/(protected)/admin/periodes/actions'
 import { estLundi, lundiDeLaSemaine, dureeProposee, finApres } from '@/lib/planning/duree'
 import type { AvertissementPreVol } from '@/engine/pre-vol'
 import type { CreneauIgnore } from '@/engine/creneau-modele'
@@ -52,8 +53,21 @@ import type { JourNonCouvert } from '@/components/planning/types-impasse'
 import type { DiagnosticImpasse as DiagnosticImpasseData } from '@/engine/diagnostic'
 import type { Periode, ProfilPlanning } from '@/types'
 
-// Radix Select interdit la valeur vide → sentinelle pour « selon la saison ».
-const AUTO = '__auto__'
+// ── LA PÉRIODE TYPE NE SE DEVINE PLUS (MiKL, 2026-08-04) ──────────────────
+// Il y avait ici une sentinelle `AUTO` pour l'option « Selon la saison » :
+// mai→août = été, sinon hiver, et on prenait la première période type de cette
+// saison — à défaut la structure « par défaut » du cabinet.
+//
+// MiKL : « cette notion de selon la saison ne me plaît pas […] je ne veux pas
+// qu'il y ait une période par défaut ». La raison est solide : la période type
+// décide des gardes à couvrir et de l'effectif de tout le trimestre. Un
+// automatisme qui la choisit à la place du cabinet produit un planning que
+// personne n'a paramétré — et l'écart ne se voit qu'une fois les gardes posées.
+//
+// Ce qui remplace : le cabinet DOIT en avoir programmé au moins une, il DOIT
+// dire laquelle, et Filou le lui fait CONFIRMER avant de lancer le moteur.
+// Le champ démarre donc vide.
+const AUCUN_TYPE = ''
 
 function dateLongue(iso: string): string {
   return new Date(`${iso}T12:00:00`).toLocaleDateString('fr-FR', {
@@ -133,12 +147,19 @@ export function ParcoursGeneration({
   const [semaines, setSemaines] = useState<string>('')
   const [datesPrecises, setDatesPrecises] = useState(false)
   const [finSaisie, setFinSaisie] = useState('')
-  const [typeChoisi, setTypeChoisi] = useState<string>(AUTO)
+  const [typeChoisi, setTypeChoisi] = useState<string>(AUCUN_TYPE)
 
   // ── Étape ② : le contrôle avant vol ────────────────────
   const [preVol, setPreVol] = useState<AvertissementPreVol[] | null>(null)
   const [souhaits, setSouhaits] = useState(0)
   const [chargementPreVol, setChargementPreVol] = useState(false)
+
+  // La période type de la CIBLE, et la confirmation que Filou en demande.
+  // Remise à zéro à chaque entrée dans le contrôle : on ne confirme jamais
+  // pour un planning ce qu'on a confirmé pour un autre.
+  const [typeCibleId, setTypeCibleId] = useState<string | null>(null)
+  const [typeConfirme, setTypeConfirme] = useState(false)
+  const [rattachement, setRattachement] = useState(false)
 
   // ── Étape ④ : le résultat ──────────────────────────────
   const [resultat, setResultat] = useState<Resultat | null>(null)
@@ -161,23 +182,29 @@ export function ParcoursGeneration({
   )
 
   /**
-   * Ce que « Selon la saison » va RÉELLEMENT prendre — MiKL, 2026-08-03 :
-   * « sur quelle période type le moteur se base quand il y a "selon la
-   * saison" ? ». La question était légitime : l'option ne disait rien.
-   *
-   * On rejoue ici la règle du serveur (`creerPeriode`) : mai→août = été, le
-   * reste = hiver ; puis la première période type ACTIVE dont la saison
-   * suggérée correspond. À défaut, c'est le profil par défaut du cabinet.
-   * ⚠️ Si cette règle change côté serveur, elle doit changer ici aussi —
-   * sinon l'écran promettrait une période type et le moteur en prendrait une
-   * autre, exactement le genre d'écart qui ne se voit qu'à la génération.
+   * La saison du départ ne CHOISIT plus rien — elle SUGGÈRE, à voix haute.
+   * On garde le calcul (mai→août = été) uniquement pour aider l'admin à
+   * reconnaître la bonne période type dans sa liste : « ton départ tombe en
+   * hiver ». La décision reste la sienne, et le serveur refuse sans elle.
    */
-  const typeSelonSaison = useMemo(() => {
-    if (!debutCale) return null
-    const mois = Number(debutCale.slice(5, 7))
-    const saison = mois >= 5 && mois <= 8 ? 'ete' : 'hiver'
-    return periodesTypes.find((p) => p.saison_suggeree === saison) ?? null
-  }, [debutCale, periodesTypes])
+  // Pas de `useMemo` : deux comparaisons de nombres et un `find` sur une liste
+  // de trois éléments. Le mémoriser coûterait plus cher que le recalculer, et
+  // le compilateur React refuse la mémo manuelle sur cette dépendance.
+  const saisonDuDepart = debutCale
+    ? (Number(debutCale.slice(5, 7)) >= 5 && Number(debutCale.slice(5, 7)) <= 8 ? 'été' : 'hiver')
+    : null
+  const typeSuggere = saisonDuDepart
+    ? (periodesTypes.find(
+        (p) => !p.est_defaut && p.saison_suggeree === (saisonDuDepart === 'été' ? 'ete' : 'hiver'),
+      ) ?? null)
+    : null
+
+  /** Le cabinet n'a programmé AUCUNE période type : rien n'est générable. */
+  const aucuneTypeProgrammee = typesProposables.length === 0
+
+  const nomTypeCible = typeCibleId
+    ? (periodesTypes.find((p) => p.id === typeCibleId)?.nom ?? null)
+    : null
 
   /**
    * Un planning CRÉÉ mais jamais rempli — typiquement celui d'un parcours
@@ -231,8 +258,10 @@ export function ParcoursGeneration({
    * et les quatre portes d'entrée sont connues — les nommer vaut mieux que de
    * les deviner depuis une dépendance.
    */
-  function allerAuControle(periodeId: string) {
+  function allerAuControle(periodeId: string, profilId: string | null) {
     setEtape('controle')
+    setTypeCibleId(profilId)
+    setTypeConfirme(false) // la confirmation se redemande à chaque passage
     void chargerPreVol(periodeId)
   }
 
@@ -245,13 +274,15 @@ export function ParcoursGeneration({
     setSemaines('')
     setDatesPrecises(false)
     setFinSaisie('')
-    setTypeChoisi(AUTO)
+    setTypeChoisi(AUCUN_TYPE)
     setCible('')
     setNomCible('')
     setCibleEstPubliee(false)
     setPreVol(null)
     setSouhaits(0)
     setResultat(null)
+    setTypeCibleId(null)
+    setTypeConfirme(false)
   }
 
   function fermer(o: boolean) {
@@ -271,7 +302,10 @@ export function ParcoursGeneration({
     setNomCible(nomPlanning(p))
     setCibleEstPubliee(p.statut === 'publie')
     setErreur(null)
-    allerAuControle(p.id)
+    // Un planning d'avant la règle du 2026-08-04 peut n'avoir aucune période
+    // type : `profil_id` vaut alors NULL, et le contrôle le traitera comme un
+    // point bloquant à régler sur place.
+    allerAuControle(p.id, p.profil_id ?? null)
   }
 
   /** Voie « nouveau » : créer, puis passer au contrôle sur le planning créé. */
@@ -285,6 +319,12 @@ export function ParcoursGeneration({
       return setErreur(datesPrecises ? 'Indique la date de fin.' : 'Indique une durée d’au moins une semaine.')
     }
     if (fin < debutCale) return setErreur('La date de fin doit venir après le lundi de départ.')
+    // Le serveur refuse aussi — mais le dire ICI évite un aller-retour et
+    // désigne le champ fautif au lieu d'un message générique en bas de modale.
+    if (aucuneTypeProgrammee) {
+      return setErreur('Ton cabinet n’a encore aucune période type. Il en faut au moins une avant de pouvoir ouvrir un planning.')
+    }
+    if (!typeChoisi) return setErreur('Choisis la période type de ce planning.')
 
     setCreation(true)
     const fd = new FormData()
@@ -298,7 +338,7 @@ export function ParcoursGeneration({
     // L'écran le dit avant, il n'y a pas de surprise.
     fd.set('date_debut', debutCale)
     fd.set('date_fin', fin)
-    if (typeChoisi !== AUTO) fd.set('profil_id', typeChoisi)
+    fd.set('profil_id', typeChoisi)
 
     const res = await creerPeriode(fd)
     setCreation(false)
@@ -314,7 +354,26 @@ export function ParcoursGeneration({
     setCible(res.id)
     setNomCible(nom)
     setCibleEstPubliee(false)
-    allerAuControle(res.id)
+    allerAuControle(res.id, typeChoisi)
+  }
+
+  /**
+   * Rattacher une période type à un planning qui n'en a pas — le cas des
+   * plannings créés avant la règle du 2026-08-04. On le règle SUR PLACE,
+   * comme tous les autres points du contrôle, plutôt que de renvoyer l'admin
+   * dans un autre écran en lui faisant perdre son parcours.
+   */
+  async function rattacherType(profilId: string) {
+    if (!cible) return
+    setRattachement(true)
+    const res = await setProfilPeriode(cible, profilId)
+    setRattachement(false)
+    if ('error' in res && res.error) {
+      toast.error(res.error)
+      return
+    }
+    setTypeCibleId(profilId)
+    router.refresh()
   }
 
   /**
@@ -360,7 +419,7 @@ export function ParcoursGeneration({
       // contrôle, qui porte l'avertissement d'écrasement.
       if (data.requiresConfirmation) {
         setCibleEstPubliee(true)
-        allerAuControle(cible)
+        allerAuControle(cible, typeCibleId)
         return
       }
 
@@ -575,23 +634,36 @@ export function ParcoursGeneration({
               </div>
             )}
 
-            {typesProposables.length > 0 && (
+            {/* ── LA PÉRIODE TYPE : un choix, jamais un défaut ──────────
+                Sans période type programmée, on ne cache plus le champ (ce qui
+                laissait croire qu'il n'y avait rien à décider) : on barre la
+                route et on montre la porte. */}
+            {aucuneTypeProgrammee ? (
+              <div className="gen-champ">
+                <span className="gen-label">Période type</span>
+                <div className="gen-manque">
+                  <p className="gen-manque-titre">Ton cabinet n’en a encore aucune</p>
+                  <p className="gen-manque-txt">
+                    La période type dit quelles gardes couvrir et avec combien de
+                    vétérinaires — un hiver et un été ne se couvrent pas pareil. Sans
+                    elle, je ne saurais pas quoi remplir. Programmes-en au moins une,
+                    puis reviens : ça prend deux minutes.
+                  </p>
+                  <a className="gen-manque-lien" href="/regles?onglet=profils">
+                    Créer une période type
+                  </a>
+                </div>
+              </div>
+            ) : (
               <div className="gen-champ">
                 <span className="gen-label">Période type</span>
                 <Select value={typeChoisi} onValueChange={(v) => v && setTypeChoisi(v)}>
                   <SelectTrigger className="w-full">
-                    {typeChoisi === AUTO
-                      ? (typeSelonSaison
-                          ? `Selon la saison — « ${typeSelonSaison.nom} »`
-                          : 'Selon la saison')
-                      : typesProposables.find((p) => p.id === typeChoisi)?.nom ?? 'Selon la saison'}
+                    {typeChoisi
+                      ? (typesProposables.find((p) => p.id === typeChoisi)?.nom ?? 'Choisis une période type')
+                      : 'Choisis une période type'}
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={AUTO}>
-                      {typeSelonSaison
-                        ? `Selon la saison — « ${typeSelonSaison.nom} »`
-                        : 'Selon la saison'}
-                    </SelectItem>
                     {typesProposables.map((p) => (
                       <SelectItem key={p.id} value={p.id}>{p.nom}</SelectItem>
                     ))}
@@ -599,12 +671,9 @@ export function ParcoursGeneration({
                 </Select>
                 <span className="gen-aide">
                   Elle décide des gardes à couvrir et de l’effectif.{' '}
-                  {typeSelonSaison ? (
-                    <>Ton départ tombe en {Number(debutCale.slice(5, 7)) >= 5 && Number(debutCale.slice(5, 7)) <= 8 ? 'été' : 'hiver'},
-                      donc « Selon la saison » prendra <b>{typeSelonSaison.nom}</b>.</>
-                  ) : (
-                    <>Aucune période type n’est réglée pour cette saison dans l’Organisation :
-                      « Selon la saison » prendra la structure par défaut du cabinet.</>
+                  {saisonDuDepart && typeSuggere && !typeChoisi && (
+                    <>Ton départ tombe en {saisonDuDepart} — <b>{typeSuggere.nom}</b> est
+                      réglée pour cette saison, mais c’est toi qui décides.</>
                   )}
                 </span>
               </div>
@@ -707,6 +776,86 @@ export function ParcoursGeneration({
         {/* ── ② Avant de lancer ─────────────────────────── */}
         {etape === 'controle' && (
           <div className="gp-controle">
+            {/* ── LA CONFIRMATION DE FILOU, AVANT LES VÉRIFICATIONS ──────
+                Demande MiKL du 2026-08-04 : « juste avant les vérifs, que
+                Filou lui demande de confirmer qu'il veut bien générer le
+                planning avec les conditions paramétrées selon la période type
+                hiver, ou été ». Elle passe DEVANT les points de contrôle parce
+                qu'elle porte sur le socle : régler dix détails sur la mauvaise
+                structure, c'est dix réglages perdus.
+
+                Elle vient AUSSI cadenasser un vieux planning sans période type
+                — et là, elle se règle sur place. */}
+            {typeCibleId === null ? (
+              <div className="gp-lot bloquant">
+                <p className="gp-lot-titre">
+                  <AlertTriangle className="gp-lot-ico" aria-hidden />
+                  Ce planning n’a pas de période type
+                </p>
+                <div className="gp-type">
+                  <p className="gp-type-txt">
+                    Il a été créé avant que la période type devienne obligatoire.
+                    Sans elle, je ne sais pas quelles gardes couvrir ni avec combien
+                    de vétérinaires. Dis-moi laquelle s’applique :
+                  </p>
+                  {aucuneTypeProgrammee ? (
+                    <a className="gen-manque-lien" href="/regles?onglet=profils">
+                      Ton cabinet n’en a aucune — créer une période type
+                    </a>
+                  ) : (
+                    <Select value="" onValueChange={(v) => v && void rattacherType(v)}>
+                      <SelectTrigger className="w-full" disabled={rattachement}>
+                        {rattachement ? 'J’enregistre…' : 'Choisis une période type'}
+                      </SelectTrigger>
+                      <SelectContent>
+                        {typesProposables.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>{p.nom}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className={`gp-type-filou${typeConfirme ? ' confirme' : ''}`}>
+                <Image
+                  src="/filou/filou-tete.webp"
+                  alt=""
+                  width={34}
+                  height={34}
+                  className="gv-gardien-binette"
+                />
+                <div className="gp-type-corps">
+                  {typeConfirme ? (
+                    <p className="gp-type-phrase">
+                      <CheckCircle2 className="gp-type-ok" aria-hidden />
+                      C’est noté : je remplis avec <b>{nomTypeCible ?? 'la période type choisie'}</b>.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="gp-type-phrase">
+                        Je vais remplir <b>{nomCible}</b> avec la période type{' '}
+                        <b>{nomTypeCible ?? '— introuvable'}</b> : c’est elle qui décide
+                        des gardes à couvrir et de l’effectif. On y va comme ça ?
+                      </p>
+                      <div className="gp-type-actions">
+                        <button
+                          type="button"
+                          className="ppv-btn fort"
+                          onClick={() => setTypeConfirme(true)}
+                        >
+                          Oui, c’est la bonne
+                        </button>
+                        <a className="ppv-btn" href="/regles?onglet=profils">
+                          Voir ses réglages
+                        </a>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
             {chargementPreVol && (
               <p className="gp-attente">
                 <Loader2 className="ppv-spin" aria-hidden /> Je passe les règles en revue…
@@ -881,7 +1030,11 @@ export function ParcoursGeneration({
               <Button variant="outline" onClick={() => { setEtape('choix'); setErreur(null) }} disabled={creation}>
                 Retour
               </Button>
-              <Button onClick={creerPuisControler} disabled={creation}>
+              <Button
+                onClick={creerPuisControler}
+                disabled={creation || aucuneTypeProgrammee}
+                title={aucuneTypeProgrammee ? 'Programme d’abord une période type' : undefined}
+              >
                 {creation ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                 {creation ? 'Création…' : 'Créer et vérifier'}
               </Button>
@@ -914,11 +1067,13 @@ export function ParcoursGeneration({
               )}
               <Button
                 onClick={() => void lancer(cibleEstPubliee)}
-                disabled={chargementPreVol || bloquants.length > 0}
+                disabled={chargementPreVol || bloquants.length > 0 || !typeConfirme}
                 title={
                   bloquants.length > 0
                     ? 'Règle d’abord les points bloquants — la génération échouerait'
-                    : undefined
+                    : !typeConfirme
+                      ? 'Confirme d’abord la période type'
+                      : undefined
                 }
               >
                 <Wand2 className="w-4 h-4 mr-2" />
@@ -930,7 +1085,7 @@ export function ParcoursGeneration({
           {etape === 'resultat' && (
             <>
               {!resultat?.ok && (
-                <Button variant="outline" onClick={() => allerAuControle(cible)}>
+                <Button variant="outline" onClick={() => allerAuControle(cible, typeCibleId)}>
                   Revenir aux réglages
                 </Button>
               )}

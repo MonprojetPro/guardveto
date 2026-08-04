@@ -3,9 +3,15 @@
 // ============================================================
 // GUARDVETO — Sélecteur de profil de planning par période (P5 slice 3c)
 // ============================================================
-// Rattache une période à un profil de planning nommé (structure + effectif).
-// NULL = profil défaut du cabinet. S'applique à la prochaine génération.
-// Verrouillé quand la période est verrouillée (comme l'effectif).
+// Rattache une période à une PÉRIODE TYPE nommée (structure + effectif).
+// S'applique à la prochaine génération. Verrouillé quand la période l'est.
+//
+// CE QUI A CHANGÉ LE 2026-08-04 (MiKL : « je ne veux pas qu'il y ait une
+// période par défaut ») : l'option « Par défaut » a disparu de la liste. Elle
+// laissait un planning sans structure désignée, et le moteur retombait en
+// silence sur le profil `est_defaut` du cabinet. Un planning existant qui est
+// encore dans cet état l'AFFICHE (« Aucune — à choisir ») : on peut en sortir,
+// on ne peut plus y revenir.
 // ============================================================
 
 import { useState, useTransition } from 'react'
@@ -17,12 +23,13 @@ import {
 import { setProfilPeriode } from '@/app/(protected)/admin/periodes/actions'
 import type { ProfilPlanning } from '@/types'
 
-// Radix Select interdit la valeur vide → sentinelle pour « profil défaut ».
-const DEFAUT = '__defaut__'
+// Le Select interdit la valeur vide → sentinelle pour l'état « pas encore
+// choisie » d'un planning d'avant la règle. Jamais proposée dans la liste.
+const AUCUNE = '__aucune__'
 
 interface ProfilPeriodeSelectProps {
   periodeId: string
-  /** Profil actuel de la période (NULL = profil défaut du cabinet). */
+  /** Période type actuelle (NULL = planning d'avant la règle, à corriger). */
   valeur: string | null
   /** Profils du cabinet (déjà scopés par RLS côté page). */
   profils: ProfilPlanning[]
@@ -32,15 +39,16 @@ interface ProfilPeriodeSelectProps {
 export function ProfilPeriodeSelect({ periodeId, valeur, profils, disabled }: ProfilPeriodeSelectProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [val, setVal] = useState(valeur ?? DEFAUT)
+  const [val, setVal] = useState(valeur ?? AUCUNE)
 
   const labelDe = (v: string) => {
-    if (v === DEFAUT) return 'Par défaut'
-    return profils.find((p) => p.id === v)?.nom ?? 'Par défaut'
+    if (v === AUCUNE) return 'Aucune — à choisir'
+    return profils.find((p) => p.id === v)?.nom ?? 'Aucune — à choisir'
   }
 
   const onChange = (v: string) => {
-    const profilId = v === DEFAUT ? null : v
+    if (v === AUCUNE) return // on ne revient jamais à « aucune »
+    const profilId = v
     const precedent = val
     setVal(v)
     startTransition(async () => {
@@ -49,7 +57,7 @@ export function ProfilPeriodeSelect({ periodeId, valeur, profils, disabled }: Pr
         toast.error(res.error)
         setVal(precedent) // rollback visuel
       } else {
-        toast.success(`Profil : ${labelDe(v)}.`)
+        toast.success(`Période type : ${labelDe(v)}.`)
         router.refresh()
       }
     })
@@ -65,7 +73,6 @@ export function ProfilPeriodeSelect({ periodeId, valeur, profils, disabled }: Pr
         {labelDe(val)}
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={DEFAUT}>Par défaut</SelectItem>
         {profils
           .filter((p) => !p.est_defaut)
           .map((p) => (

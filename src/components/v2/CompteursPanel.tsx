@@ -174,8 +174,13 @@ export function CompteursPanel({ lignes, bilans, colonnes }: Props) {
             >
               <span className="cnt-vet">
                 <i style={{ background: l.couleur }} />
+                {/* Le statut (assoc./sal.) vivait ici en petit à côté du prénom.
+                    Retiré le 2026-08-04 (MiKL) : il ne sert à rien dans un
+                    tableau de CHIFFRES — il n'explique aucun écart, l'équité ne
+                    se calcule pas dessus — et sur un prénom long il débordait
+                    sur la colonne « WE ». L'information reste sur la fiche du
+                    vétérinaire, là où elle a un sens. */}
                 {l.prenom}
-                <small>{l.statut === 'associe' ? 'assoc.' : 'sal.'}</small>
               </span>
               {choix.map((c) => {
                 if (c === 'ecart') {

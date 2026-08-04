@@ -138,34 +138,46 @@ export async function creerPeriode(formData: FormData) {
     return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
   }
 
-  // Profil de planning choisi (P5 slice 3c). Si l'admin en choisit un, on VÉRIFIE
-  // qu'il appartient à son cabinet (garde tenant : la RLS restrictive borne déjà
-  // la lecture, ce check rejette proprement un id étranger/inexistant). Sinon on
-  // PROPOSE le profil dont saison_suggeree = saison détectée ; à défaut NULL
-  // (= profil défaut du cabinet → byte-identique avec l'existant).
+  // ── LA PÉRIODE TYPE EST UN CHOIX, PLUS UN REPLI (MiKL, 2026-08-04) ──
+  //
+  // Ce qui existait avant : sans `profil_id`, on cherchait le premier profil
+  // actif dont `saison_suggeree` correspondait au mois de départ, et à défaut
+  // on insérait NULL — ce qui fait retomber le moteur sur le profil `est_defaut`
+  // du cabinet. Deux replis successifs, tous les deux SILENCIEUX.
+  //
+  // Pourquoi c'est un problème et pas une commodité : la période type décide
+  // des gardes à couvrir et de l'effectif. Un planning généré sur une structure
+  // que personne n'a désignée est un planning dont on ne peut pas dire, après
+  // coup, pourquoi il contient ce qu'il contient. MiKL : « je ne veux pas qu'il
+  // y ait une période par défaut ». Le cabinet DOIT en programmer au moins une
+  // et dire laquelle.
+  //
+  // `est_defaut` reste en base : c'est le filet du MOTEUR pour les plannings
+  // créés avant cette règle (cf. `chargerCreneauModele`). Ce qui disparaît,
+  // c'est le droit d'en créer un NOUVEAU sans avoir choisi.
   const profilChoisi = (formData.get('profil_id') as string | null)?.trim() || null
-  let profilId: string | null = null
-  if (profilChoisi) {
-    const { data: owned } = await supabase
-      .from('profils_planning')
-      .select('id')
-      .eq('id', profilChoisi)
-      .eq('cabinet_id', cabinetId)
-      .maybeSingle()
-    if (!owned) return { error: 'Profil invalide pour ce cabinet.' }
-    profilId = profilChoisi
-  } else {
-    const { data: parSaison } = await supabase
-      .from('profils_planning')
-      .select('id')
-      .eq('cabinet_id', cabinetId)
-      .eq('saison_suggeree', saison)
-      .eq('actif', true)
-      .order('ordre')
-      .limit(1)
-      .maybeSingle()
-    profilId = (parSaison as { id: string } | null)?.id ?? null
+  if (!profilChoisi) {
+    return {
+      error: 'Choisis la période type de ce planning : c’est elle qui décide '
+        + 'des gardes à couvrir et de l’effectif. Si tu n’en as aucune, '
+        + 'crée-la d’abord dans Organisation › Périodes types.',
+    }
   }
+  // On VÉRIFIE qu'elle appartient au cabinet (garde tenant : la RLS restrictive
+  // borne déjà la lecture, ce check rejette proprement un id étranger,
+  // inexistant — ou désactivé, qu'on ne veut pas voir arriver par une URL ou un
+  // écran resté ouvert pendant qu'on la retirait).
+  const { data: owned } = await supabase
+    .from('profils_planning')
+    .select('id, actif')
+    .eq('id', profilChoisi)
+    .eq('cabinet_id', cabinetId)
+    .maybeSingle()
+  if (!owned) return { error: 'Cette période type n’existe pas pour ce cabinet.' }
+  if ((owned as { actif?: boolean }).actif === false) {
+    return { error: 'Cette période type est désactivée — réactive-la ou choisis-en une autre.' }
+  }
+  const profilId: string = profilChoisi
 
   // `select('id')` : l'assistant de l'écran Planning enchaîne la génération sur
   // le planning qu'il vient de créer — sans cet id il devrait le retrouver à
@@ -203,13 +215,24 @@ export async function setProfilPeriode(periodeId: string, profilId: string | nul
   const garde = await assertAdmin(supabase)
   if ('error' in garde) return { error: garde.error }
 
-  if (profilId) {
+  // Depuis le 2026-08-04, on ne peut plus RETIRER la période type d'un planning
+  // — même règle qu'à la création : plus de repli silencieux sur le profil par
+  // défaut du cabinet. La signature garde `null` parce que d'anciens plannings
+  // en portent encore un ; on peut les corriger, pas les remettre dans cet état.
+  if (!profilId) {
+    return {
+      error: 'Choisis une période type — un planning ne peut pas rester sans. '
+        + 'C’est elle qui décide des gardes à couvrir et de l’effectif.',
+    }
+  }
+
+  {
     const { data: owned } = await supabase
       .from('profils_planning')
       .select('id')
       .eq('id', profilId)
       .maybeSingle()
-    if (!owned) return { error: 'Profil introuvable.' }
+    if (!owned) return { error: 'Période type introuvable.' }
   }
 
   const { error } = await supabase

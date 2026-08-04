@@ -303,7 +303,7 @@ export default async function HistoriquePage({
             />
           </span>
           <span className="pr-champ">
-            Profil :
+            Période type :
             <ProfilPeriodeSelect
               periodeId={l.periode.id}
               valeur={l.profilId}

@@ -276,7 +276,13 @@ export function PlanningV2({
                       <span className="pb-chip">
                         {periodeAffichee.saison === 'ete' ? '☀️ Saison été' : '❄️ Saison hiver'}
                       </span>
-                      {profil && <span className="pb-chip">Profil de planning « {profil} »</span>}
+                      {/* Sans période type, on ne se tait plus : depuis le
+                          2026-08-04 elle est obligatoire, et un planning qui
+                          n'en a pas est un planning d'avant la règle qu'il faut
+                          rattacher (le parcours de génération le propose). */}
+                      {profil
+                        ? <span className="pb-chip">Période type « {profil} »</span>
+                        : isAdmin && <span className="pb-chip">Aucune période type — à choisir</span>}
                       {periodeAffichee.nb_vetos_semaine_soir && (
                         <span className="pb-chip effectif">
                           <b>

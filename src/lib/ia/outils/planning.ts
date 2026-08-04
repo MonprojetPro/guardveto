@@ -125,14 +125,9 @@ function resoudrePeriode(
   return { ok: false, raison: `Aucune période ne correspond à « ${texte} ». Les périodes connues sont : ${connues}.` }
 }
 
-/** Mai (5) → Août (8) = été, le reste = hiver — MIROIR de `detecterSaison()`
- *  dans admin/periodes/actions.ts. Fonction pure de 2 lignes, dupliquée ici
- *  pour prévisualiser sans écrire ; si la coupure été/hiver change là-bas,
- *  la répercuter ici. */
-function detecterSaison(dateDebut: string): 'ete' | 'hiver' {
-  const mois = new Date(dateDebut + 'T12:00:00Z').getUTCMonth() + 1
-  return mois >= 5 && mois <= 8 ? 'ete' : 'hiver'
-}
+// `detecterSaison()` vivait ici, dupliqué depuis admin/periodes/actions.ts pour
+// annoncer la période type que la saison ferait choisir. Retiré le 2026-08-04 :
+// plus rien n'est choisi d'après la saison, la période type est toujours dite.
 
 function jourSemaineFr(date: string): string {
   return new Date(date + 'T12:00:00Z').toLocaleDateString('fr-FR', { weekday: 'long' })
@@ -388,10 +383,12 @@ const ParamsCreerPeriode = z.object({
   libelle: z.string().describe('Le titre de la période, ex. « Hiver P3 » ou « Été 2027 ».'),
   date_debut: z.string().describe('Date ISO (AAAA-MM-JJ) du premier jour — doit être un LUNDI.'),
   date_fin: z.string().describe('Date ISO (AAAA-MM-JJ) du dernier jour.'),
+  // OBLIGATOIRE depuis le 2026-08-04 : plus de choix automatique selon la
+  // saison. Si la personne n'a pas dit laquelle, Filou DEMANDE — il ne devine
+  // pas la structure sur laquelle tout un trimestre de gardes sera calculé.
   profil: z
     .string()
-    .optional()
-    .describe('Nom du profil de planning à appliquer. Laisse vide pour laisser le cabinet choisir automatiquement selon la saison.'),
+    .describe('Nom de la période type à appliquer — OBLIGATOIRE. Si la personne ne l’a pas précisée, demande-lui laquelle avant d’appeler cet outil.'),
 })
 
 export const creerPeriode: OutilEcriture<typeof ParamsCreerPeriode> = {
@@ -400,6 +397,8 @@ export const creerPeriode: OutilEcriture<typeof ParamsCreerPeriode> = {
   description: `Prépare la création d'une nouvelle période (une fenêtre de planning à générer et publier).
 
 Appelle-le quand on demande d'ouvrir une nouvelle période — « crée la période d'été 2027 », « ouvre Hiver P3 du 5 janvier au 30 mars ».
+
+La PÉRIODE TYPE est obligatoire : c'est elle qui décide des gardes à couvrir et de l'effectif. Si on ne t'a pas dit laquelle, demande-la — ne choisis jamais à la place du cabinet.
 
 La période est créée en BROUILLON, sans aucune garde : générer et publier sont des étapes séparées, qui ne se font pas ici. Rien n'est enregistré tant que la personne n'a pas validé.`,
   params: ParamsCreerPeriode,
@@ -423,24 +422,26 @@ La période est créée en BROUILLON, sans aucune garde : générer et publier s
       }
     }
 
-    const saison = detecterSaison(params.date_debut)
-    let profilId: string | null = null
-    let profilLigne: string
-    if (params.profil) {
-      const profils = await chargerProfils(ctx)
-      const cible = normaliser(params.profil)
-      const candidats = profils.filter((p) => normaliser(p.nom).includes(cible) || cible.includes(normaliser(p.nom)))
-      if (candidats.length === 0) {
-        return { ok: false, raison: `Aucun profil ne s’appelle « ${params.profil} ». Les profils sont : ${profils.map((p) => p.nom).join(', ') || 'aucun profil défini'}.` }
+    const profils = await chargerProfils(ctx)
+    const nommees = profils.filter((p) => !p.est_defaut)
+    if (nommees.length === 0) {
+      return {
+        ok: false,
+        raison: 'Le cabinet n’a aucune période type. Il faut en créer au moins une '
+          + '(Organisation › Périodes types) avant de pouvoir ouvrir un planning : '
+          + 'c’est elle qui décide des gardes à couvrir et de l’effectif.',
       }
-      if (candidats.length > 1) {
-        return { ok: false, raison: `Plusieurs profils correspondent à « ${params.profil} » : ${candidats.map((p) => p.nom).join(', ')}. Précise lequel.` }
-      }
-      profilId = candidats[0].id
-      profilLigne = `Profil : ${candidats[0].nom}`
-    } else {
-      profilLigne = `Profil : choisi automatiquement selon la saison (${saison === 'ete' ? 'été' : 'hiver'})`
     }
+    const cible = normaliser(params.profil)
+    const candidats = nommees.filter((p) => normaliser(p.nom).includes(cible) || cible.includes(normaliser(p.nom)))
+    if (candidats.length === 0) {
+      return { ok: false, raison: `Aucune période type ne s’appelle « ${params.profil} ». Il y a : ${nommees.map((p) => p.nom).join(', ')}.` }
+    }
+    if (candidats.length > 1) {
+      return { ok: false, raison: `Plusieurs périodes types correspondent à « ${params.profil} » : ${candidats.map((p) => p.nom).join(', ')}. Précise laquelle.` }
+    }
+    const profilId: string = candidats[0].id
+    const profilLigne = `Période type : ${candidats[0].nom}`
 
     return {
       ok: true,
@@ -477,7 +478,7 @@ const ParamsReglerPeriode = z.object({
   profil: z
     .string()
     .optional()
-    .describe('Nom du profil de planning à appliquer. Dis « défaut » ou « aucun » pour revenir au profil par défaut du cabinet.'),
+    .describe('Nom de la période type à appliquer. On ne peut pas retirer la période type d’un planning — seulement en désigner une autre.'),
   effectif: z
     .union([z.literal(1), z.literal(2)])
     .optional()
@@ -489,7 +490,7 @@ export const reglerPeriode: OutilEcriture<typeof ParamsReglerPeriode> = {
   nom: 'regler_periode',
   description: `Prépare un changement de profil de planning et/ou d'effectif de nuit en semaine pour une période.
 
-Appelle-le pour « mets le profil X sur Hiver P2 », « passe l'été à 1 véto la nuit », « remets le profil par défaut sur cette période ».
+Appelle-le pour « mets la période type X sur Hiver P2 », « passe l'été à 1 véto la nuit ».
 
 S'applique à la PROCHAINE génération de cette période — le planning déjà généré ne bouge pas tout seul. Rien n'est enregistré tant que la personne n'a pas validé.`,
   params: ParamsReglerPeriode,
@@ -510,30 +511,30 @@ S'applique à la PROCHAINE génération de cette période — le planning déjà
     let nouveauProfilNom: string | undefined
 
     if (params.profil) {
-      const remiseADefaut = /d[ée]faut|aucun/i.test(params.profil.trim())
-      if (remiseADefaut) {
-        if (p.profil_id === null) {
-          return { ok: false, raison: `« ${libellePeriode(p)} » est déjà sur le profil par défaut du cabinet.` }
+      // « remets le profil par défaut » n'existe plus (2026-08-04) : un planning
+      // ne peut pas redevenir sans période type. On le dit au lieu de le faire.
+      if (/d[ée]faut|aucun/i.test(params.profil.trim())) {
+        return {
+          ok: false,
+          raison: 'Un planning ne peut plus revenir « sans période type » : c’est elle qui '
+            + 'décide des gardes à couvrir et de l’effectif. Dis-moi laquelle appliquer.',
         }
-        nouveauProfilId = null
-        nouveauProfilNom = 'profil par défaut du cabinet'
-      } else {
-        const profils = await chargerProfils(ctx)
-        const cible = normaliser(params.profil)
-        const candidats = profils.filter((pr) => normaliser(pr.nom).includes(cible) || cible.includes(normaliser(pr.nom)))
-        if (candidats.length === 0) {
-          return { ok: false, raison: `Aucun profil ne s’appelle « ${params.profil} ». Les profils sont : ${profils.map((pr) => pr.nom).join(', ') || 'aucun profil défini'}.` }
-        }
-        if (candidats.length > 1) {
-          return { ok: false, raison: `Plusieurs profils correspondent à « ${params.profil} » : ${candidats.map((pr) => pr.nom).join(', ')}. Précise lequel.` }
-        }
-        if (candidats[0].id === p.profil_id) {
-          return { ok: false, raison: `« ${libellePeriode(p)} » utilise déjà le profil « ${candidats[0].nom} ».` }
-        }
-        nouveauProfilId = candidats[0].id
-        nouveauProfilNom = candidats[0].nom
       }
-      lignes.push(`Profil : ${nouveauProfilNom}`)
+      const profils = (await chargerProfils(ctx)).filter((pr) => !pr.est_defaut)
+      const cible = normaliser(params.profil)
+      const candidats = profils.filter((pr) => normaliser(pr.nom).includes(cible) || cible.includes(normaliser(pr.nom)))
+      if (candidats.length === 0) {
+        return { ok: false, raison: `Aucune période type ne s’appelle « ${params.profil} ». Il y a : ${profils.map((pr) => pr.nom).join(', ') || 'aucune période type définie'}.` }
+      }
+      if (candidats.length > 1) {
+        return { ok: false, raison: `Plusieurs périodes types correspondent à « ${params.profil} » : ${candidats.map((pr) => pr.nom).join(', ')}. Précise laquelle.` }
+      }
+      if (candidats[0].id === p.profil_id) {
+        return { ok: false, raison: `« ${libellePeriode(p)} » utilise déjà la période type « ${candidats[0].nom} ».` }
+      }
+      nouveauProfilId = candidats[0].id
+      nouveauProfilNom = candidats[0].nom
+      lignes.push(`Période type : ${nouveauProfilNom}`)
     }
 
     let nouvelEffectif: number | undefined
