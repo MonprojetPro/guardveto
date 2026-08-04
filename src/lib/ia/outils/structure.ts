@@ -34,6 +34,7 @@ import {
   supprimerRelation,
   supprimerProfil,
   setHorairesProfilCreneau,
+  setAffinagePeriodeType,
   creerCreneauSurMesure,
   configurerAdresseCabinet,
   configurerPartagesCabinet,
@@ -86,10 +87,22 @@ async function chargerProfils(ctx: ContexteOutil): Promise<ProfilRow[]> {
   return (data as ProfilRow[] | null) ?? []
 }
 
+/**
+ * LE SOCLE du cabinet (2026-08-04). Les créneaux ne sont plus dupliqués par
+ * période type : il en existe un jeu unique (`profil_id IS NULL`), et chaque
+ * période type dit seulement combien de vétérinaires elle veut sur chacun.
+ *
+ * ⚠️ Sans ce filtre, la requête rendait aussi d'éventuels résidus rattachés à
+ * une période type — et surtout, tout le code qui filtrait ensuite sur
+ * `profil_id === <celui de la période>` ne trouvait plus RIEN : Filou
+ * répondait « aucun type de garde dans cette période type » sur un cabinet
+ * parfaitement configuré.
+ */
 async function chargerCreneaux(ctx: ContexteOutil): Promise<CreneauRow[]> {
   const { data } = await ctx.supabase
     .from('creneau_modele')
     .select('id, profil_id, code, nom, jours_semaine, heure_debut, heure_fin, offset_jours_fin, nb_places, roles, actif')
+    .is('profil_id', null)
     .order('ordre')
   return (data as CreneauRow[] | null) ?? []
 }
@@ -98,7 +111,35 @@ async function chargerRelations(ctx: ContexteOutil): Promise<RelationRow[]> {
   const { data } = await ctx.supabase
     .from('relation_creneau')
     .select('id, profil_id, source_id, cible_id, genre, actif')
+    .is('profil_id', null)
   return (data as RelationRow[] | null) ?? []
+}
+
+/** Ce que chaque période type retient : `profil_id|creneau_id` → nb de vétos. */
+async function chargerAffinages(ctx: ContexteOutil): Promise<Map<string, number>> {
+  const { data } = await ctx.supabase
+    .from('periode_type_creneau')
+    .select('profil_id, creneau_id, nb_vetos')
+  const m = new Map<string, number>()
+  for (const r of (data ?? []) as { profil_id: string; creneau_id: string; nb_vetos: number }[]) {
+    m.set(`${r.profil_id}|${r.creneau_id}`, r.nb_vetos)
+  }
+  return m
+}
+
+/**
+ * Combien de vétérinaires une période type retient sur une garde du socle.
+ * MÊME RÈGLE que `appliquerAffinage` côté moteur : aucune ligne = le créneau
+ * tel quel, jamais plus que le socle. `0` = pas de garde de ce type ici.
+ */
+function vetosRetenus(
+  affinages: ReadonlyMap<string, number>,
+  profilId: string,
+  creneau: { id: string; nb_places: number },
+): number {
+  const voulu = affinages.get(`${profilId}|${creneau.id}`)
+  if (voulu === undefined) return creneau.nb_places
+  return Math.max(0, Math.min(voulu, creneau.nb_places))
 }
 
 /** Compte les périodes qui référencent explicitement ce profil (repli défaut
@@ -146,22 +187,27 @@ function resoudreProfil(
   }
 }
 
-/** Résout un nom de créneau dans un profil donné. */
+/**
+ * Résout un nom de garde DANS LE SOCLE du cabinet.
+ *
+ * Le paramètre `profilId` a disparu (2026-08-04) : une garde n'appartient plus
+ * à une période type, elle appartient au cabinet. Chercher « Soir du vendredi
+ * dans Hiver » n'a plus de sens — il n'y en a qu'un, et Hiver dit seulement
+ * combien de personnes elle y met.
+ */
 function resoudreCreneau(
   creneaux: CreneauRow[],
-  profilId: string,
   nom: string,
 ): { ok: true; creneau: CreneauRow } | { ok: false; raison: string } {
-  const duProfil = creneaux.filter((c) => c.profil_id === profilId)
-  const exacts = duProfil.filter((c) => memeNom(c.nom, nom))
+  const exacts = creneaux.filter((c) => memeNom(c.nom, nom))
   if (exacts.length === 1) return { ok: true, creneau: exacts[0] }
   if (exacts.length > 1) {
-    return { ok: false, raison: `Plusieurs types de garde s'appellent « ${nom} » dans cette période type. Précise lequel.` }
+    return { ok: false, raison: `Plusieurs types de garde s'appellent « ${nom} ». Précise lequel.` }
   }
-  const connus = duProfil.map((c) => c.nom).join(', ') || '(aucun)'
+  const connus = creneaux.map((c) => c.nom).join(', ') || '(aucun)'
   return {
     ok: false,
-    raison: `Aucun type de garde ne s'appelle « ${nom} » dans cette période type. Ceux qui existent : ${connus}.`,
+    raison: `Aucun type de garde ne s'appelle « ${nom} » dans la structure du cabinet. Ceux qui existent : ${connus}.`,
   }
 }
 
@@ -197,22 +243,26 @@ const GENRE_HUMAIN: Record<string, string> = {
 export const lireProfilsPlanning: OutilLecture<typeof SANS_PARAMETRE> = {
   genre: 'lecture',
   nom: 'lire_profils_planning',
-  description: `Donne la liste des PÉRIODES TYPES du cabinet (« Hiver », « Été »… — appelées « profils de planning » dans la base) : nom, si elle est active, la saison suggérée, l'effectif de nuit en semaine, et laquelle est celle PAR DÉFAUT.
+  description: `Donne la liste des PÉRIODES TYPES du cabinet (« Hiver », « Été »…) : leur nom, si elle est active, et laquelle sert de repli par défaut.
 
-À l'écran, l'utilisateur dit « période type » : emploie ce mot-là dans tes réponses, jamais « profil ».
+COMMENT S'ORGANISE UN CABINET (à savoir avant de répondre sur la structure) :
+· LA STRUCTURE DES GARDES est le SOCLE, commun à tout le cabinet : quels types de garde existent, quels jours, quels horaires, et jusqu'à combien de vétérinaires chacun peut accueillir.
+· UNE PÉRIODE TYPE AFFINE ce socle : elle dit, pour chaque garde, combien de vétérinaires elle veut réellement — et « aucun », ce qui retire complètement cette garde de la période.
+Autrement dit : le socle donne les possibilités, la période type choisit dedans. Une période type ne possède PAS ses propres horaires.
 
-Appelle-le pour toute question sur les profils existants, avant de créer un profil (pour vérifier qu'un équivalent n'existe pas déjà), ou avant de désigner un profil source pour une création.
+À l'écran, l'utilisateur dit « période type » et « type de garde » : emploie ces mots-là, jamais « profil » ni « créneau ».
 
-Un profil ne définit QUE la structure des créneaux ; il ne dit pas quel profil est utilisé par quelle période — regarde lire_creneaux_profil si la question porte sur son contenu.`,
+Appelle-le avant de créer une période type (pour vérifier qu'un équivalent n'existe pas), ou pour toute question sur celles qui existent. Pour savoir ce que l'une d'elles retient, appelle lire_creneaux_profil.`,
   params: SANS_PARAMETRE,
   async executer(_params, ctx) {
     const profils = await chargerProfils(ctx)
+    // Ni saison suggérée ni effectif de nuit : les deux réglages ont été
+    // supprimés le 2026-08-04. Les annoncer ferait parler Filou de leviers
+    // que le cabinet ne trouverait nulle part à l'écran.
     return profils.map((p) => ({
       nom: p.nom,
       actif: p.actif,
-      profil_par_defaut: p.est_defaut,
-      saison_suggeree: p.saison_suggeree,
-      effectif_soir_semaine: p.nb_vetos_semaine_soir,
+      periode_type_par_defaut: p.est_defaut,
     }))
   },
 }
@@ -227,32 +277,41 @@ const ParamsLireCreneaux = z.object({
 export const lireCreneauxProfil: OutilLecture<typeof ParamsLireCreneaux> = {
   genre: 'lecture',
   nom: 'lire_creneaux_profil',
-  description: `Donne le catalogue des TYPES DE GARDE d'une période type : nom, jours de la semaine couverts, horaires (début/fin, jour de fin), nombre de places et rôles, actif ou non.
+  description: `Donne les TYPES DE GARDE du cabinet et ce qu'une période type en retient : nom, jours couverts, horaires, le maximum de vétérinaires possible (le socle) et le nombre réellement retenu par cette période type.
 
-Dis « type de garde » et « période type » dans tes réponses — ce sont les mots de l'écran.
+Quand « vetos_sur_cette_periode » vaut 0, la garde N'EXISTE PAS sur cette période type : le moteur n'en posera aucune ces jours-là. Dis-le clairement si on te pose la question.
 
-Appelle-le pour toute question sur les horaires d'un profil, sa composition, ou avant de créer une liaison entre deux créneaux (il faut connaître leurs noms exacts).`,
+Les jours et les horaires appartiennent au CABINET (le socle) : ils sont les mêmes pour toutes les périodes types. Seul le nombre de vétérinaires change de l'une à l'autre. Ne laisse jamais croire qu'on peut changer un horaire « pour l'hiver seulement ».
+
+Appelle-le pour toute question sur les horaires, la composition d'une période type, ou avant de créer une liaison entre deux gardes (il faut leurs noms exacts).`,
   params: ParamsLireCreneaux,
   async executer(params, ctx) {
     const profils = await chargerProfils(ctx)
     const trouve = resoudreProfil(profils, params.profil)
     if (!trouve.ok) return { erreur: trouve.raison }
 
-    const creneaux = await chargerCreneaux(ctx)
-    const duProfil = creneaux.filter((c) => c.profil_id === trouve.profil.id)
+    const [creneaux, affinages] = await Promise.all([
+      chargerCreneaux(ctx),
+      chargerAffinages(ctx),
+    ])
 
     return {
-      profil: trouve.profil.nom,
-      creneaux: duProfil.map((c) => ({
-        nom: c.nom,
-        jours: joursHumains(c.jours_semaine),
-        heure_debut: c.heure_debut,
-        heure_fin: c.heure_fin,
-        jour_de_fin: c.offset_jours_fin === 0 ? 'même jour' : `+${c.offset_jours_fin} jour(s)`,
-        nombre_de_places: c.nb_places,
-        roles: c.roles ?? [],
-        actif: c.actif,
-      })),
+      periode_type: trouve.profil.nom,
+      gardes: creneaux.map((c) => {
+        const retenus = vetosRetenus(affinages, trouve.profil.id, c)
+        return {
+          nom: c.nom,
+          jours: joursHumains(c.jours_semaine),
+          heure_debut: c.heure_debut,
+          heure_fin: c.heure_fin,
+          jour_de_fin: c.offset_jours_fin === 0 ? 'même jour' : `+${c.offset_jours_fin} jour(s)`,
+          maximum_possible: c.nb_places,
+          vetos_sur_cette_periode: retenus,
+          absente_de_cette_periode: retenus === 0,
+          roles: (c.roles ?? []).slice(0, retenus),
+          actif: c.actif,
+        }
+      }),
     }
   },
 }
@@ -267,26 +326,35 @@ const ParamsLireRelations = z.object({
 export const lireRelationsCreneaux: OutilLecture<typeof ParamsLireRelations> = {
   genre: 'lecture',
   nom: 'lire_relations_creneaux',
-  description: `Donne les liaisons entre créneaux d'un profil : « même équipe » (les deux créneaux doivent être tenus par les mêmes vétérinaires) ou « rôles différents » (l'équipe s'inverse d'un créneau à l'autre).
+  description: `Donne les liaisons entre types de garde : « même équipe » (les deux gardes sont tenues par les mêmes vétérinaires) ou « rôles différents » (l'équipe s'inverse de l'une à l'autre).
 
-Appelle-le pour répondre à des questions comme « le vendredi soir et le week-end sont-ils liés ? », ou avant de proposer une nouvelle liaison (pour vérifier qu'elle n'existe pas déjà).`,
+Les liaisons appartiennent au CABINET, comme les gardes elles-mêmes : elles sont les mêmes pour toutes les périodes types. Une liaison dont l'une des deux gardes est absente d'une période type (0 vétérinaire) ne s'y applique simplement pas — c'est signalé par « sans_effet_sur_cette_periode ».
+
+Appelle-le pour « le vendredi soir et le week-end sont-ils liés ? », ou avant de proposer une nouvelle liaison (pour vérifier qu'elle n'existe pas déjà).`,
   params: ParamsLireRelations,
   async executer(params, ctx) {
     const profils = await chargerProfils(ctx)
     const trouve = resoudreProfil(profils, params.profil)
     if (!trouve.ok) return { erreur: trouve.raison }
 
-    const [creneaux, relations] = await Promise.all([chargerCreneaux(ctx), chargerRelations(ctx)])
-    const nomCreneau = (id: string) => creneaux.find((c) => c.id === id)?.nom ?? 'un créneau'
-    const duProfil = relations.filter((r) => r.profil_id === trouve.profil.id)
+    const [creneaux, relations, affinages] = await Promise.all([
+      chargerCreneaux(ctx), chargerRelations(ctx), chargerAffinages(ctx),
+    ])
+    const parId = new Map(creneaux.map((c) => [c.id, c]))
+    const nomCreneau = (id: string) => parId.get(id)?.nom ?? 'une garde'
+    const absente = (id: string) => {
+      const c = parId.get(id)
+      return c ? vetosRetenus(affinages, trouve.profil.id, c) === 0 : false
+    }
 
     return {
-      profil: trouve.profil.nom,
-      liaisons: duProfil.map((r) => ({
+      periode_type: trouve.profil.nom,
+      liaisons: relations.map((r) => ({
         de: nomCreneau(r.source_id),
         vers: nomCreneau(r.cible_id),
         regle: GENRE_HUMAIN[r.genre] ?? r.genre,
         active: r.actif,
+        sans_effet_sur_cette_periode: absente(r.source_id) || absente(r.cible_id),
       })),
     }
   },
@@ -483,7 +551,7 @@ Préfère la désactivation à la suppression : elle se rattrape, l'effacement n
     if (!trouveProfil.ok) return { ok: false, raison: trouveProfil.raison }
 
     const creneaux = await chargerCreneaux(ctx)
-    const trouve = resoudreCreneau(creneaux, trouveProfil.profil.id, params.creneau)
+    const trouve = resoudreCreneau(creneaux, params.creneau)
     if (!trouve.ok) return { ok: false, raison: trouve.raison }
     const cr = trouve.creneau
 
@@ -746,9 +814,9 @@ Appelle TOUJOURS lire_relations_creneaux juste avant pour connaître les noms ex
     if (!trouveProfil.ok) return { ok: false, raison: trouveProfil.raison }
 
     const [creneaux, relations] = await Promise.all([chargerCreneaux(ctx), chargerRelations(ctx)])
-    const source = resoudreCreneau(creneaux, trouveProfil.profil.id, params.de)
+    const source = resoudreCreneau(creneaux, params.de)
     if (!source.ok) return { ok: false, raison: source.raison }
-    const cible = resoudreCreneau(creneaux, trouveProfil.profil.id, params.vers)
+    const cible = resoudreCreneau(creneaux, params.vers)
     if (!cible.ok) return { ok: false, raison: cible.raison }
 
     const relation = relations.find(
@@ -897,7 +965,7 @@ Si le créneau n'existe pas encore, ce n'est pas cet outil : propose de créer u
     if (!trouveProfil.ok) return { ok: false, raison: trouveProfil.raison }
 
     const creneaux = await chargerCreneaux(ctx)
-    const trouve = resoudreCreneau(creneaux, trouveProfil.profil.id, params.creneau)
+    const trouve = resoudreCreneau(creneaux, params.creneau)
     if (!trouve.ok) return { ok: false, raison: trouve.raison }
     const cr = trouve.creneau
 
@@ -922,19 +990,19 @@ Si le créneau n'existe pas encore, ce n'est pas cet outil : propose de créer u
       return { ok: false, raison: `« ${cr.nom} » a déjà ces horaires.` }
     }
 
-    const periodesConcernees = await comptePeriodesSurProfil(ctx, trouveProfil.profil.id)
-
     return {
       ok: true,
       proposition: {
         titre: `Régler les horaires de « ${cr.nom} »`,
-        phrase: `Profil « ${trouveProfil.profil.nom} », créneau « ${cr.nom} » : ${avant} → ${apres}.`,
+        phrase: `Garde « ${cr.nom} » : ${avant} → ${apres}.`,
         action: 'Appliquer',
+        // Un horaire appartient au SOCLE depuis le 2026-08-04 : le dire, sinon
+        // le cabinet croit ne changer que « son hiver » et découvre l'effet
+        // partout à la génération suivante.
         avertissement:
-          'Le planning déjà généré ne bouge pas : le changement vaut pour la prochaine génération sur ce profil.' +
-          (periodesConcernees > 0
-            ? ` ${periodesConcernees} période(s) utilisent explicitement le profil « ${trouveProfil.profil.nom} ».`
-            : ''),
+          'Les horaires appartiennent à la structure du cabinet : ce changement vaut pour TOUTES '
+          + 'les périodes types. Les plannings déjà générés ne bougent pas — il s’applique aux '
+          + 'prochaines générations.',
       },
       charge: {
         creneauId: cr.id,
@@ -957,6 +1025,109 @@ Si le créneau n'existe pas encore, ce n'est pas cet outil : propose de créer u
       heure_fin: c.heure_fin,
       offset_jours_fin: c.offset_jours_fin,
     })
+  },
+}
+
+// ════════════════════════════════════════════════════════════
+// Écriture — ce qu'une période type retient d'une garde
+// ════════════════════════════════════════════════════════════
+
+const ParamsAffinage = z.object({
+  periode_type: z
+    .string()
+    .describe('Le nom de la période type à régler, ex. « Hiver ». Laisse vide pour celle par défaut.')
+    .optional(),
+  garde: z.string().describe('Le nom du type de garde, ex. « Soir du vendredi ».'),
+  vetos: z
+    .number()
+    .int()
+    .describe('Combien de vétérinaires sur cette garde pour cette période type. 0 = pas de garde de ce type sur cette période.'),
+})
+
+export const reglerVetosSurPeriodeType: OutilEcriture<typeof ParamsAffinage> = {
+  genre: 'ecriture',
+  nom: 'regler_vetos_sur_periode_type',
+  description: `Prépare le réglage du nombre de VÉTÉRINAIRES qu'une période type met sur une garde.
+
+C'est LE geste propre aux périodes types : la structure du cabinet dit ce qui est possible (jusqu'à 2 vétérinaires le vendredi, par exemple), et chaque période type choisit dedans.
+
+Appelle-le pour « en hiver, on veut 2 vétos le week-end », « l'été, un seul le soir de semaine », « pas de garde le vendredi soir pendant les vacances » (→ vetos = 0).
+
+vetos = 0 SUPPRIME la garde de cette période type : le moteur n'en posera aucune ces jours-là. C'est un vrai choix, pas une désactivation temporaire — annonce-le clairement.
+
+Ne l'utilise PAS pour changer un horaire, un jour ou le maximum possible : ceux-là appartiennent à la structure du cabinet et valent pour toutes les périodes types.`,
+  params: ParamsAffinage,
+  adminSeulement: true,
+
+  async resumer(params, ctx) {
+    const profils = await chargerProfils(ctx)
+    const trouveProfil = resoudreProfil(profils, params.periode_type)
+    if (!trouveProfil.ok) return { ok: false, raison: trouveProfil.raison }
+
+    const [creneaux, affinages] = await Promise.all([
+      chargerCreneaux(ctx), chargerAffinages(ctx),
+    ])
+    const trouve = resoudreCreneau(creneaux, params.garde)
+    if (!trouve.ok) return { ok: false, raison: trouve.raison }
+    const cr = trouve.creneau
+
+    if (!Number.isInteger(params.vetos) || params.vetos < 0) {
+      return { ok: false, raison: 'Le nombre de vétérinaires doit être 0 ou plus.' }
+    }
+    // Le socle borne : demander 3 là où la structure en permet 2 n'est pas une
+    // erreur de saisie mais une confusion de niveau — on l'explique, et on
+    // indique où se règle le maximum.
+    if (params.vetos > cr.nb_places) {
+      return {
+        ok: false,
+        raison: `« ${cr.nom} » ne peut accueillir que ${cr.nb_places} vétérinaire(s) : c'est le maximum `
+          + `fixé par la structure du cabinet. Pour aller au-delà, il faut d'abord augmenter ce maximum `
+          + `dans « Structure des gardes » — et cela vaudrait pour toutes les périodes types.`,
+      }
+    }
+
+    const actuel = vetosRetenus(affinages, trouveProfil.profil.id, cr)
+    if (actuel === params.vetos) {
+      return {
+        ok: false,
+        raison: params.vetos === 0
+          ? `« ${cr.nom} » est déjà absente de « ${trouveProfil.profil.nom} ».`
+          : `« ${cr.nom} » est déjà à ${params.vetos} vétérinaire(s) sur « ${trouveProfil.profil.nom} ».`,
+      }
+    }
+
+    const dire = (n: number) => (n === 0 ? 'aucune garde' : `${n} vétérinaire${n > 1 ? 's' : ''}`)
+    const periodesConcernees = await comptePeriodesSurProfil(ctx, trouveProfil.profil.id)
+
+    return {
+      ok: true,
+      proposition: {
+        titre: `« ${cr.nom} » sur « ${trouveProfil.profil.nom} »`,
+        phrase: `${dire(actuel)} → ${dire(params.vetos)}.`,
+        lignes: [
+          `Jours : ${joursHumains(cr.jours_semaine)}`,
+          `Maximum possible (structure du cabinet) : ${cr.nb_places}`,
+        ],
+        action: params.vetos === 0 ? 'Retirer cette garde' : 'Appliquer',
+        avertissement:
+          (params.vetos === 0
+            ? `Plus aucune garde « ${cr.nom} » ne sera posée sur les plannings de cette période type. `
+            : '')
+          + 'Les plannings déjà générés ne bougent pas — le changement vaut pour les prochaines générations.'
+          + (periodesConcernees > 0
+            ? ` ${periodesConcernees} planning(s) utilisent « ${trouveProfil.profil.nom} ».`
+            : ''),
+      },
+      charge: { profilId: trouveProfil.profil.id, creneauId: cr.id, vetos: params.vetos },
+    }
+  },
+
+  async executer(_params, _ctx, charge) {
+    const c = charge as { profilId?: string; creneauId?: string; vetos?: number } | undefined
+    if (!c?.profilId || !c.creneauId || c.vetos === undefined) {
+      return { error: 'La proposition a été perdue — redemande-la à Filou.' }
+    }
+    return setAffinagePeriodeType(c.profilId, c.creneauId, c.vetos)
   },
 }
 

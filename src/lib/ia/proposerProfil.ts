@@ -17,23 +17,28 @@ import {
 } from './profilSchema'
 import { cleIA } from './proposerRegle'
 
-/** Décrit ce qu'est un profil et le périmètre composable (anti-coquille-vide). */
-const STRUCTURE_PROMPT = `Un PROFIL de planning est une organisation de gardes réutilisable (ex. « Hiver », « Été »), qu'on choisit à la création d'une période. Un nouveau profil est TOUJOURS créé en dupliquant un profil existant (la SOURCE), puis en ajustant quelques réglages.
+/** Décrit ce qu'est une période type et le périmètre composable (anti-coquille-vide). */
+const STRUCTURE_PROMPT = `Une PÉRIODE TYPE est une façon de tourner, réutilisable (ex. « Hiver », « Été »), qu'on choisit à la création d'un planning.
 
-Ce que tu peux régler sur un profil :
-1. nom — le nom du nouveau profil (obligatoire).
-2. source_profil — le nom EXACT du profil à dupliquer, si l'utilisateur le mentionne (« comme l'hiver », « à partir de X »). Si rien n'est précisé, laisse null : on part du profil par défaut.
-3. saison_suggeree — "ete" ou "hiver" si l'utilisateur associe le profil à une saison, sinon null.
-4. nb_vetos_semaine_soir — combien de vétérinaires sont de garde le SOIR EN SEMAINE : de 1 à 4. Sinon null (au cas par cas selon la période).
-5. horaires — les horaires à CHANGER, uniquement pour les types que l'utilisateur cite explicitement. Chaque entrée : code + heure_debut + heure_fin (format 24h "HH:MM") + offset_jours_fin (0 = la garde finit le jour même, 1 = le lendemain, 2 = le surlendemain, 3 = trois jours après).
+COMMENT S'ORGANISE UN CABINET — à comprendre avant de proposer quoi que ce soit :
+· LA STRUCTURE DES GARDES est le SOCLE, commun à tout le cabinet : quels types de garde existent, quels jours ils couvrent, à quels horaires, et jusqu'à combien de vétérinaires chacun peut accueillir.
+· UNE PÉRIODE TYPE AFFINE ce socle : elle dit seulement, pour chaque garde, combien de vétérinaires elle veut — de zéro au maximum permis. Zéro signifie que cette garde n'existe pas sur cette période.
+Le socle donne les possibilités, la période type choisit dedans.
+
+Ce que tu peux régler ici :
+1. nom — le nom de la nouvelle période type (obligatoire).
+2. source_profil — le nom EXACT de la période type dont on reprend les réglages, si l'utilisateur le mentionne (« comme l'hiver », « à partir de X »). Sinon null : on part de celle par défaut.
+3. horaires — les horaires à CHANGER, uniquement pour les types que l'utilisateur cite explicitement. Chaque entrée : code + heure_debut + heure_fin ("HH:MM") + offset_jours_fin (0 = la garde finit le jour même, 1 = le lendemain, 2 = le surlendemain, 3 = trois jours après).
    Les 4 types de garde dont tu peux changer l'horaire :
    - semaine_soir : le soir en semaine (lundi à jeudi)
    - vendredi_soir : le vendredi soir
    - weekend : le week-end (samedi/dimanche)
    - ferie : les jours fériés
-   ⚠️ Ne remplis "horaires" QUE pour les types explicitement mentionnés. Si l'utilisateur ne parle pas d'horaires, laisse horaires = null (le profil garde ceux de sa source).
+   ⚠️ Un horaire appartient au SOCLE : le changer vaut pour TOUTES les périodes types, pas seulement celle qu'on crée. Ne remplis "horaires" que si l'utilisateur le demande explicitement ; sinon laisse null.
 
-PÉRIMÈTRE — tu ne peux PAS : inventer un nouveau type de garde, mettre plus de 2 vétérinaires, ni changer les jours couverts, le nombre de places ou les rôles. Si la demande sort de là, faisable=false et explique simplement qu'on ne peut pas encore le faire ici.`
+PÉRIMÈTRE — tu ne peux PAS ici : inventer un nouveau type de garde, changer les jours couverts, le maximum de places ou les rôles.
+⚠️ Le NOMBRE DE VÉTÉRINAIRES par garde (« 2 le week-end », « un seul le soir en semaine », « pas de garde le vendredi ») ne se règle PAS ici : il se règle garde par garde, une fois la période type créée. Si la demande porte là-dessus, propose quand même la création avec son nom, et dis que les nombres se règlent ensuite.
+Si la demande sort de tout ça, faisable=false et explique simplement qu'on ne peut pas encore le faire ici.`
 
 /**
  * proposerProfilIA — appelle Claude pour traduire `phrase` en proposition de profil.
