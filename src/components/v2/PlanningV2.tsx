@@ -53,6 +53,8 @@ interface Props {
   periodesAvecGardes: string[]
   /** Périodes types actives du cabinet — proposées à la création d'un planning. */
   periodesTypes: ProfilPlanning[]
+  /** Les gardes que chaque période type fait couvrir, par id de période type. */
+  gardesParType: Record<string, string[]>
   /** Écarts à la juste part — source unique `calculerBilans`, comme l'Historique. */
   bilans: BilanVet[]
   /** Colonnes de l'encart compteurs choisies par la personne connectée. */
@@ -134,6 +136,7 @@ export function PlanningV2({
   profil,
   periodesAvecGardes,
   periodesTypes,
+  gardesParType,
   bilans,
   colonnesCompteurs,
 }: Props) {
@@ -199,6 +202,7 @@ export function PlanningV2({
     isAdmin,
     periodes,
     periodesTypes,
+    gardesParType,
     vets,
     periodesAvecGardes,
     onNaviguerVersMois: (anneeMois) => router.push(`/planning?mois=${anneeMois}`),

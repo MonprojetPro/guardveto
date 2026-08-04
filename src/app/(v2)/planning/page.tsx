@@ -166,6 +166,31 @@ export default async function PlanningPageV2({
 
   const profil = (profilRes as { data?: { nom: string } | null })?.data?.nom ?? null
   const periodesTypes = ((typesRes2?.data ?? []) as ProfilPlanning[])
+
+  // ── CE QUE CONTIENT CHAQUE PÉRIODE TYPE ─────────────────────────────────
+  // Retour MiKL du 2026-08-04 : « pourquoi ce n'est pas juste indiqué :
+  // période type = hiver = telles caractéristiques ». Confirmer un NOM ne
+  // confirme rien — on ne sait pas ce qu'on valide. On descend donc les
+  // gardes qu'elle fait couvrir, pour que la confirmation porte sur du réel.
+  // Une seule requête pour toutes les périodes types, groupée ensuite.
+  const idsTypes = periodesTypes.map((p) => p.id)
+  const { data: creneauxTypes } = idsTypes.length > 0
+    ? await supabase
+        .from('creneau_modele')
+        .select('profil_id, nom, nb_places, actif, ordre')
+        .in('profil_id', idsTypes)
+        .eq('actif', true)
+        .order('ordre')
+    : { data: null }
+
+  const gardesParType: Record<string, string[]> = {}
+  for (const c of (creneauxTypes ?? []) as {
+    profil_id: string; nom: string; nb_places: number
+  }[]) {
+    ;(gardesParType[c.profil_id] ??= []).push(
+      c.nb_places > 1 ? `${c.nom} (${c.nb_places} vétos)` : c.nom,
+    )
+  }
   const bilans = calculerBilans(compteurs as CompteursRow[], totalWE as number)
   const colonnesCompteurs = normaliserColonnes(
     (prefsRes as { data?: { colonnes_compteurs?: string[] | null } | null })?.data?.colonnes_compteurs,
@@ -222,6 +247,7 @@ export default async function PlanningPageV2({
           profil={profil}
           periodesAvecGardes={periodesAvecGardes}
           periodesTypes={periodesTypes}
+          gardesParType={gardesParType}
           bilans={bilans}
           colonnesCompteurs={colonnesCompteurs}
         />

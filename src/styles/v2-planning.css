@@ -1394,13 +1394,59 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   border-color: var(--t-border);
 }
 .gp-type-corps { display: grid; gap: 10px; min-width: 0; }
+
+/* ⚠️ Cette phrase reste en `display: block`.
+   Elle était en `display: flex` : chaque morceau de texte et chaque <b>
+   devenait un ITEM FLEX, et la phrase se cassait en colonnes verticales
+   (« Je vais / remplir | hiver / 2027 | avec la / période / type … ») — le
+   « c'est quoi cette présentation ? » de MiKL, 2026-08-04. Une phrase
+   contenant du gras se met en page en flux normal, jamais en flex. L'icône
+   éventuelle est mise en `inline-block` et alignée sur la ligne. */
 .gp-type-phrase {
-  display: flex; align-items: flex-start; gap: 7px;
   font-size: 0.87rem; line-height: 1.6; color: var(--text);
 }
 .gp-type-phrase b { font-weight: 800; }
-.gp-type-ok { width: 16px; height: 16px; color: var(--ok); flex: none; margin-top: 2px; }
+.gp-type-ok {
+  display: inline-block; vertical-align: -3px;
+  width: 16px; height: 16px; margin-right: 5px;
+  color: var(--ok);
+}
 .gp-type-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+
+/* ── « Période type = hiver = telles caractéristiques » ──────────────────
+   La fiche de ce que contient la période type (MiKL, 2026-08-04). Deux
+   colonnes alignées : l'intitulé à gauche, la valeur à droite — on lit les
+   caractéristiques en descendant, sans avoir à reconstituer une phrase. */
+.type-fiche {
+  display: grid; gap: 5px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-sm);
+  font-size: 0.82rem; line-height: 1.5;
+}
+.type-ligne {
+  display: grid;
+  grid-template-columns: minmax(0, 8.5rem) 1fr;
+  gap: 4px 10px;
+  align-items: baseline;
+}
+.type-ligne dt {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--soft);
+}
+.type-ligne dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+.type-ligne dd b { font-weight: 800; }
+.type-ligne dd i { font-style: normal; color: var(--danger); font-weight: 600; }
+/* Sur mobile la fiche se replie en une colonne — deux colonnes de 8 rem dans
+   une modale étroite couperaient chaque valeur en bouillie. */
+@media (max-width: 520px) {
+  .type-ligne { grid-template-columns: 1fr; }
+}
+
+/* Les deux portes de sortie du champ « Période type » : en créer une, ou
+   recharger la liste après en avoir créé une dans l'autre onglet. */
+.gen-sortie { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 2px; }
 
 /* Le rattachement d'un vieux planning resté sans période type. */
 .gp-type { display: grid; gap: 9px; padding: 2px 0 1px; }

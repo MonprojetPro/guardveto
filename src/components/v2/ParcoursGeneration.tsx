@@ -93,6 +93,49 @@ const STATUT: Record<Periode['statut'], string> = {
 
 type Etape = 'choix' | 'nouveau' | 'existant' | 'controle' | 'travail' | 'resultat'
 
+/**
+ * « Période type = hiver = telles caractéristiques » (MiKL, 2026-08-04).
+ *
+ * Confirmer un NOM ne confirme rien : personne ne sait par cœur ce que contient
+ * « hiver periode 1 ». La fiche montre ce sur quoi on s'engage — les gardes
+ * couvertes et l'effectif de nuit — pour que le « oui » porte sur le contenu et
+ * pas sur une étiquette.
+ *
+ * Les gardes viennent du SERVEUR (`creneau_modele`, descendu en props) plutôt
+ * que d'être redécrites ici : deux descriptions de la même structure divergent
+ * au premier réglage changé, et l'écart ne se verrait qu'après la génération.
+ */
+function FicheType({ type, gardes }: { type: ProfilPlanning; gardes: string[] }) {
+  return (
+    <dl className="type-fiche">
+      <div className="type-ligne">
+        <dt>Période type</dt>
+        <dd><b>{type.nom}</b></dd>
+      </div>
+      {type.saison_suggeree && (
+        <div className="type-ligne">
+          <dt>Saison</dt>
+          <dd>{type.saison_suggeree === 'ete' ? '☀️ été' : '❄️ hiver'}</dd>
+        </div>
+      )}
+      <div className="type-ligne">
+        <dt>Gardes à couvrir</dt>
+        <dd>
+          {gardes.length > 0
+            ? gardes.join(' · ')
+            : <i>aucune garde réglée — le planning sortirait vide</i>}
+        </dd>
+      </div>
+      {typeof type.nb_vetos_semaine_soir === 'number' && (
+        <div className="type-ligne">
+          <dt>Nuits de semaine</dt>
+          <dd>{type.nb_vetos_semaine_soir} vétérinaire{type.nb_vetos_semaine_soir > 1 ? 's' : ''}</dd>
+        </div>
+      )}
+    </dl>
+  )
+}
+
 interface Resultat {
   ok: boolean
   nbGardes?: number
@@ -112,6 +155,8 @@ interface Props {
   periodes: Periode[]
   periodeAffichee: Periode | null
   periodesTypes: ProfilPlanning[]
+  /** Les gardes que chaque période type fait couvrir, par id de période type. */
+  gardesParType: Record<string, string[]>
   /** Vétérinaires actifs — pour régler un point d'étiquette sur place. */
   vets: VetEtiquette[]
   /** Plannings qui ont déjà des gardes — sert à repérer un brouillon en cours. */
@@ -126,6 +171,7 @@ export function ParcoursGeneration({
   periodes,
   periodeAffichee,
   periodesTypes,
+  gardesParType,
   vets,
   periodesAvecGardes,
   onNaviguerVersMois,
@@ -205,6 +251,28 @@ export function ParcoursGeneration({
   const nomTypeCible = typeCibleId
     ? (periodesTypes.find((p) => p.id === typeCibleId)?.nom ?? null)
     : null
+  /**
+   * Un refus PÉRIMÉ est pire qu'un silence — retour MiKL du 2026-08-04 : le
+   * champ affichait « hiver periode 1 » et le bandeau rouge continuait de dire
+   * « Choisis la période type de ce planning ». Le message datait du clic
+   * PRÉCÉDENT, avant la correction ; rien ne l'effaçait. On l'efface donc dès
+   * que l'admin touche à quoi que ce soit dans le formulaire : ce qu'il vient
+   * de changer a peut-être réglé le problème, et c'est au prochain « Créer et
+   * vérifier » de trancher, pas à un message figé.
+   */
+  function modifie<T>(setter: (v: T) => void) {
+    return (v: T) => {
+      if (erreur) setErreur(null)
+      setter(v)
+    }
+  }
+
+  /** Rend la fiche de la période type `id`, ou rien si elle est introuvable. */
+  function ficheDe(id: string | null | undefined) {
+    const t = id ? periodesTypes.find((p) => p.id === id) : undefined
+    if (!t) return null
+    return <FicheType type={t} gardes={gardesParType[t.id] ?? []} />
+  }
 
   /**
    * Un planning CRÉÉ mais jamais rempli — typiquement celui d'un parcours
@@ -567,7 +635,7 @@ export function ParcoursGeneration({
                 className="gen-input"
                 placeholder="ex. Hiver 2027 — P1"
                 value={libelle}
-                onChange={(e) => setLibelle(e.target.value)}
+                onChange={(e) => modifie(setLibelle)(e.target.value)}
                 autoFocus
               />
             </label>
@@ -578,7 +646,7 @@ export function ParcoursGeneration({
                 type="date"
                 className="gen-input"
                 value={debut}
-                onChange={(e) => setDebut(e.target.value)}
+                onChange={(e) => modifie(setDebut)(e.target.value)}
               />
               {debut && !estLundi(debut) && (
                 <span className="gen-aide cale">
@@ -598,7 +666,7 @@ export function ParcoursGeneration({
                     max={104}
                     className="gen-input gen-input-nb"
                     value={semaines === '' ? String(dureeProposee(debutCale)) : semaines}
-                    onChange={(e) => setSemaines(e.target.value)}
+                    onChange={(e) => modifie(setSemaines)(e.target.value)}
                   />
                   <span className="gen-unite">semaines</span>
                 </div>
@@ -622,7 +690,7 @@ export function ParcoursGeneration({
                   type="date"
                   className="gen-input"
                   value={finSaisie}
-                  onChange={(e) => setFinSaisie(e.target.value)}
+                  onChange={(e) => modifie(setFinSaisie)(e.target.value)}
                 />
                 <button
                   type="button"
@@ -657,7 +725,7 @@ export function ParcoursGeneration({
             ) : (
               <div className="gen-champ">
                 <span className="gen-label">Période type</span>
-                <Select value={typeChoisi} onValueChange={(v) => v && setTypeChoisi(v)}>
+                <Select value={typeChoisi} onValueChange={(v) => v && modifie(setTypeChoisi)(v)}>
                   <SelectTrigger className="w-full">
                     {typeChoisi
                       ? (typesProposables.find((p) => p.id === typeChoisi)?.nom ?? 'Choisis une période type')
@@ -669,6 +737,12 @@ export function ParcoursGeneration({
                     ))}
                   </SelectContent>
                 </Select>
+
+                {/* Ce que la période type CHOISIE contient — dès le formulaire,
+                    et plus seulement au moment de confirmer. Un nom ne dit rien
+                    de ce qu'on est en train de décider. */}
+                {ficheDe(typeChoisi)}
+
                 <span className="gen-aide">
                   Elle décide des gardes à couvrir et de l’effectif.{' '}
                   {saisonDuDepart && typeSuggere && !typeChoisi && (
@@ -676,6 +750,31 @@ export function ParcoursGeneration({
                       réglée pour cette saison, mais c’est toi qui décides.</>
                   )}
                 </span>
+
+                {/* AUCUNE ne correspond ? On ne laisse pas l'admin coincé entre
+                    trois périodes types qui ne vont pas et un bouton refusé
+                    (MiKL, 2026-08-04 : « on avait pas dit que l'utilisateur
+                    pouvait être envoyé à créer une nouvelle période type ? »).
+                    Nouvel onglet : un lien qui quitte le parcours le détruit —
+                    on garde le formulaire en l'état, et « je viens d'en créer
+                    une » recharge la liste sans repartir de zéro. */}
+                <div className="gen-sortie">
+                  <a
+                    className="gen-lien"
+                    href="/regles?onglet=profils"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Aucune ne correspond — en créer une ↗
+                  </a>
+                  <button
+                    type="button"
+                    className="gen-lien"
+                    onClick={() => { setErreur(null); router.refresh() }}
+                  >
+                    J’en ai créé une — rafraîchir la liste
+                  </button>
+                </div>
               </div>
             )}
 
@@ -829,15 +928,17 @@ export function ParcoursGeneration({
                   {typeConfirme ? (
                     <p className="gp-type-phrase">
                       <CheckCircle2 className="gp-type-ok" aria-hidden />
-                      C’est noté : je remplis avec <b>{nomTypeCible ?? 'la période type choisie'}</b>.
+                      <span>
+                        C’est noté : je remplis <b>{nomCible}</b> avec{' '}
+                        <b>{nomTypeCible ?? 'la période type choisie'}</b>.
+                      </span>
                     </p>
                   ) : (
                     <>
                       <p className="gp-type-phrase">
-                        Je vais remplir <b>{nomCible}</b> avec la période type{' '}
-                        <b>{nomTypeCible ?? '— introuvable'}</b> : c’est elle qui décide
-                        des gardes à couvrir et de l’effectif. On y va comme ça ?
+                        Voilà avec quoi je vais remplir <b>{nomCible}</b>. On y va comme ça ?
                       </p>
+                      {ficheDe(typeCibleId)}
                       <div className="gp-type-actions">
                         <button
                           type="button"
@@ -846,8 +947,13 @@ export function ParcoursGeneration({
                         >
                           Oui, c’est la bonne
                         </button>
-                        <a className="ppv-btn" href="/regles?onglet=profils">
-                          Voir ses réglages
+                        <a
+                          className="ppv-btn"
+                          href="/regles?onglet=profils"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Changer ses réglages ↗
                         </a>
                       </div>
                     </>

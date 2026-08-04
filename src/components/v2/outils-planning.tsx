@@ -46,6 +46,8 @@ interface OptionsOutils {
   periodes: Periode[]
   /** Les périodes types actives (`profils_planning`), pour la voie « nouveau ». */
   periodesTypes: ProfilPlanning[]
+  /** Les gardes que chaque période type fait couvrir, par id de période type. */
+  gardesParType: Record<string, string[]>
   /** Vétérinaires actifs — pour régler un point d'étiquette sur place. */
   vets: VetEtiquette[]
   /** Plannings qui ont déjà des gardes — repère un brouillon jamais rempli. */
@@ -69,6 +71,7 @@ export function useOutilsPlanning({
   onSignalerAbsence,
   periodes,
   periodesTypes,
+  gardesParType,
   vets,
   periodesAvecGardes,
   onNaviguerVersMois,
@@ -226,6 +229,7 @@ export function useOutilsPlanning({
         periodes={periodes}
         periodeAffichee={periode}
         periodesTypes={periodesTypes}
+        gardesParType={gardesParType}
         vets={vets}
         periodesAvecGardes={periodesAvecGardes}
         onNaviguerVersMois={onNaviguerVersMois}
