@@ -1444,9 +1444,16 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   .type-ligne { grid-template-columns: 1fr; }
 }
 
-/* Les deux portes de sortie du champ « Période type » : en créer une, ou
-   recharger la liste après en avoir créé une dans l'autre onglet. */
-.gen-sortie { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 2px; }
+/* « + Créer une période type… » : dernière entrée du menu déroulant, pas un
+   lien posé sous le champ (MiKL, 2026-08-04 : « mets-les dans le menu
+   déroulant, comme ça c'est propre »). Un filet la sépare des vraies valeurs
+   — c'est une PORTE, pas un choix de plus dans la liste. */
+.gen-item-creer {
+  margin-top: 3px;
+  border-top: 1px solid var(--t-border);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
 
 /* Le rattachement d'un vieux planning resté sans période type. */
 .gp-type { display: grid; gap: 9px; padding: 2px 0 1px; }

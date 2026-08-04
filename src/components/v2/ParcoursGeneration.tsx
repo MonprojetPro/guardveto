@@ -69,6 +69,9 @@ import type { Periode, ProfilPlanning } from '@/types'
 // Le champ démarre donc vide.
 const AUCUN_TYPE = ''
 
+/** Dernière entrée du menu déroulant : « en créer une », pas une vraie valeur. */
+const CREER_TYPE = '__creer__'
+
 function dateLongue(iso: string): string {
   return new Date(`${iso}T12:00:00`).toLocaleDateString('fr-FR', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
@@ -725,7 +728,26 @@ export function ParcoursGeneration({
             ) : (
               <div className="gen-champ">
                 <span className="gen-label">Période type</span>
-                <Select value={typeChoisi} onValueChange={(v) => v && modifie(setTypeChoisi)(v)}>
+                <Select
+                  value={typeChoisi}
+                  onValueChange={(v) => {
+                    if (!v) return
+                    // « En créer une » vit DANS la liste, en dernière entrée —
+                    // MiKL, 2026-08-04 : « pourquoi tu les mets pas dans le menu
+                    // déroulant, comme ça c'est propre ». Deux liens posés sous
+                    // le champ, mal alignés, faisaient du bruit pour un geste
+                    // rare. Ici, la porte est là où on cherche déjà.
+                    if (v === CREER_TYPE) {
+                      window.open('/regles?onglet=profils', '_blank', 'noopener')
+                      return // on ne sélectionne pas la sentinelle
+                    }
+                    modifie(setTypeChoisi)(v)
+                  }}
+                  // La liste se relit à chaque ouverture : celle créée dans
+                  // l'autre onglet est là au retour, sans bouton « rafraîchir »
+                  // à demander à l'admin.
+                  onOpenChange={(ouvert) => { if (ouvert) router.refresh() }}
+                >
                   <SelectTrigger className="w-full">
                     {typeChoisi
                       ? (typesProposables.find((p) => p.id === typeChoisi)?.nom ?? 'Choisis une période type')
@@ -735,6 +757,9 @@ export function ParcoursGeneration({
                     {typesProposables.map((p) => (
                       <SelectItem key={p.id} value={p.id}>{p.nom}</SelectItem>
                     ))}
+                    <SelectItem value={CREER_TYPE} className="gen-item-creer">
+                      + Créer une période type…
+                    </SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -751,30 +776,6 @@ export function ParcoursGeneration({
                   )}
                 </span>
 
-                {/* AUCUNE ne correspond ? On ne laisse pas l'admin coincé entre
-                    trois périodes types qui ne vont pas et un bouton refusé
-                    (MiKL, 2026-08-04 : « on avait pas dit que l'utilisateur
-                    pouvait être envoyé à créer une nouvelle période type ? »).
-                    Nouvel onglet : un lien qui quitte le parcours le détruit —
-                    on garde le formulaire en l'état, et « je viens d'en créer
-                    une » recharge la liste sans repartir de zéro. */}
-                <div className="gen-sortie">
-                  <a
-                    className="gen-lien"
-                    href="/regles?onglet=profils"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Aucune ne correspond — en créer une ↗
-                  </a>
-                  <button
-                    type="button"
-                    className="gen-lien"
-                    onClick={() => { setErreur(null); router.refresh() }}
-                  >
-                    J’en ai créé une — rafraîchir la liste
-                  </button>
-                </div>
               </div>
             )}
 
@@ -902,7 +903,18 @@ export function ParcoursGeneration({
                       Ton cabinet n’en a aucune — créer une période type
                     </a>
                   ) : (
-                    <Select value="" onValueChange={(v) => v && void rattacherType(v)}>
+                    <Select
+                      value=""
+                      onValueChange={(v) => {
+                        if (!v) return
+                        if (v === CREER_TYPE) {
+                          window.open('/regles?onglet=profils', '_blank', 'noopener')
+                          return
+                        }
+                        void rattacherType(v)
+                      }}
+                      onOpenChange={(ouvert) => { if (ouvert) router.refresh() }}
+                    >
                       <SelectTrigger className="w-full" disabled={rattachement}>
                         {rattachement ? 'J’enregistre…' : 'Choisis une période type'}
                       </SelectTrigger>
@@ -910,6 +922,9 @@ export function ParcoursGeneration({
                         {typesProposables.map((p) => (
                           <SelectItem key={p.id} value={p.id}>{p.nom}</SelectItem>
                         ))}
+                        <SelectItem value={CREER_TYPE} className="gen-item-creer">
+                          + Créer une période type…
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   )}
