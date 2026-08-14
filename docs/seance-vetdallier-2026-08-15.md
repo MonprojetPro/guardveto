@@ -23,7 +23,15 @@ Quatre réglages ont été corrigés ce matin pour coller à ce que les deux ass
 
 **Vérifié après ces changements** : un planning de 12 semaines se construit désormais en moins d'une seconde, sans aucune place vide et sans aucune règle enfreinte. Idem sur 6 semaines, à 6 comme à 7 vétérinaires, et sur l'été.
 
-Une **période type « Été »** a également été créée : soir de semaine à **1 vétérinaire**, les autres gardes à 2. C'est la demande n°1 d'Anne-Catherine (« il faut qu'on puisse rentrer cette règle manuellement »).
+### 🌡️ La période type « Été » se crée EN DIRECT, avec elles
+
+C'est la demande n°1 d'Anne-Catherine — elle écrivait en juin : « ça garde les deux vétos de garde […] **il faut qu'on puisse rentrer cette règle manuellement** ». Elle avait été préparée à l'avance, puis **volontairement retirée** : la créer devant elles répond mieux à sa demande que la lui montrer déjà faite. C'est le moment de la séance où on démontre que le logiciel a changé.
+
+**Le geste, quand le sujet arrive :** Règles → onglet **Périodes types** → créer « Été » → mettre **Soir de semaine à 1 vétérinaire**, laisser les trois autres gardes à 2. Ne pas la cocher « par défaut ».
+
+**Ce qu'il faut lui dire :** en juin, le logiciel décidait tout seul de la saison — et il se trompait. Maintenant c'est le cabinet qui décide : on nomme des périodes types, on choisit celle qu'on applique en créant le planning. Le logiciel ne devine plus rien.
+
+**Les deux périodes types existantes** : « Configuration standard » (2 vétos partout, celle par défaut) et « hiver periode 1 » (2 partout aussi).
 
 ---
 
@@ -53,7 +61,9 @@ Les neuf questions ci-dessous sont classées de la plus structurante à la plus 
 
 > « L'été, vous n'êtes plus qu'un seul de garde la nuit en semaine. Je voudrais la date exacte. J'ai trois versions différentes dans mes notes : "du premier lundi de mai au dernier dimanche d'août", "de mi-mai à fin août ou début septembre", et un essai que tu avais fait, Anne-Catherine, du 4 avril au 23 mai. **Quelles dates pour l'été prochain ?** Et je confirme : ça commence un lundi et ça se termine un vendredi, c'est bien ça ? »
 
-*À savoir :* le logiciel ne devine plus la saison tout seul. C'est vous qui choisissez la période type « Été » quand vous créez le planning, et elle met automatiquement un seul vétérinaire par nuit de semaine.
+*À savoir :* le logiciel ne devine plus la saison tout seul. C'est le cabinet qui décide — on nomme une période type, et on choisit laquelle s'applique en créant le planning.
+
+👉 **C'est le bon moment pour créer la période type « Été » avec elles** (voir en tête de fiche) : Règles → Périodes types → « Été » → Soir de semaine à **1 vétérinaire**. La réponse à cette question donne les dates, la période type donne l'effectif.
 
 ---
 
@@ -203,9 +213,9 @@ Une règle exigeait « au moins un vétérinaire senior sur le week-end et le ve
 
 ### Piège n°2 — Le champ « période type » démarre vide, et c'est exprès
 
-Quand on crée un planning, il faut **choisir** la période type : « hiver periode 1 », « Été », ou « Configuration standard ». Le champ est vide au départ pour qu'on ne génère jamais par inadvertance avec le mauvais réglage.
+Quand on crée un planning, il faut **choisir** la période type. Deux existent aujourd'hui : « Configuration standard » et « hiver periode 1 » — **toutes les deux à 2 vétérinaires partout**. Le champ est vide au départ pour qu'on ne génère jamais par inadvertance avec le mauvais réglage.
 
-**Le piège :** si on prend une période type d'hiver pour montrer l'été, le planning sortira avec **2 vétérinaires par nuit** au lieu d'un seul — et c'est précisément le défaut qu'Anne-Catherine avait signalé en juin. Vérifier le champ avant de cliquer sur « Générer ».
+**Le piège :** il n'existe **aucune période type d'été** tant qu'on ne l'a pas créée en séance. Si on veut montrer l'été sans l'avoir créée, le planning sortira avec **2 vétérinaires par nuit** au lieu d'un seul — et c'est précisément le défaut qu'Anne-Catherine avait signalé en juin. Donc : créer « Été » d'abord, la choisir ensuite, générer en dernier.
 
 ### Piège n°3 — Une règle modifiée ne change pas le planning déjà affiché
 
