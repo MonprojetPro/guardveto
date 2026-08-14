@@ -217,10 +217,21 @@ Si aucune garde n'a encore été générée pour la période demandée, l'outil 
     if (!resolue.ok) return { erreur: resolue.raison }
     const periode = resolue.periode
 
-    const [compteurs, totalWE] = await Promise.all([
+    const [{ compteurs, erreur: errCompteurs }, { totalWE, erreur: errWE }] = await Promise.all([
       queryCompteurs(ctx.supabase, periode.id),
       queryTotalWE(ctx.supabase, periode.id),
     ])
+
+    // Exactement le piège décrit en tête de fichier : sans ce test, une lecture
+    // en échec repartirait dans la branche « aucune garde » juste en dessous, et
+    // Filou annoncerait « personne n'a de garde » alors qu'il n'a rien pu lire.
+    const erreurLecture = errCompteurs ?? errWE
+    if (erreurLecture) {
+      return {
+        periode: periodeLabelCourt(periode),
+        erreur: `Je n'ai pas pu LIRE les compteurs de cette période (${erreurLecture}). Ce n'est pas « zéro garde » : je ne sais pas. Ne donne aucun chiffre.`,
+      }
+    }
 
     if (compteurs.length === 0) {
       return {

@@ -216,5 +216,49 @@
 
 ---
 
+## Écran « Mon compte » — à créer (ajouté le 2026-08-14)
+
+Aucun écran de profil n'existe aujourd'hui, ni pour un admin ni pour un véto.
+Constaté à l'audit Réglages du 2026-08-14 : un vétérinaire ne peut **rien**
+modifier le concernant — ni son e-mail, ni son téléphone, ni sa couleur. En
+base, aucune policy `UPDATE` ne l'y autorise (`vet_read_all` est en SELECT
+seul), donc même une Server Action écrite naïvement écrirait zéro ligne en
+silence.
+
+Ce que cet écran doit porter :
+
+- **Changer son adresse e-mail soi-même** (demande MiKL, 2026-08-14).
+  ⚠️ Deux e-mails coexistent : `auth.users.email` (identifiant de connexion) et
+  `veterinaires.email` (destinataire des envois + clé de rapprochement à
+  l'invitation). Passer par `supabase.auth.updateUser({ email })` — qui envoie
+  un lien de confirmation — et n'aligner `veterinaires.email` qu'une fois la
+  confirmation revenue. Le plus robuste : une **réconciliation au login**
+  (`auth.users` = source de vérité, `veterinaires.email` = miroir).
+- **Saisir son adresse postale** (demande MiKL, 2026-08-14 : « faudra prévoir
+  la fonction rentrer l'adresse dans mon compte quand on s'occupera de cette
+  partie-là »). Distincte de l'adresse du CABINET, qui vit dans Réglages et
+  pilote la zone scolaire + la région des jours fériés du moteur.
+- Changer son mot de passe depuis l'application (aujourd'hui : uniquement via
+  « mot de passe oublié » sur `/login`).
+- Préférences de notification par véto (qui reçoit quoi).
+
+**🐛 Bug déjà présent, à corriger avec ce chantier** : `updateVeterinaire`
+(`(protected)/admin/veterinaires/actions.ts:132-145`) écrit `veterinaires.email`
+sans jamais toucher `auth.users`. Si l'admin corrige l'e-mail d'un véto déjà
+invité, le toast annonce « Fiche mise à jour » mais ce véto continue de se
+connecter avec son ANCIEN e-mail pendant que ses notifications partent au
+NOUVEAU — et la ré-invitation ne le retrouve plus (le rapprochement se fait par
+e-mail). La réconciliation au login décrite ci-dessus répare aussi ce cas.
+
+**Écriture : par RPC `SECURITY DEFINER`, pas par une policy `UPDATE`.** La RLS
+ne sait pas restreindre par colonne : une policy « le véto met à jour sa ligne »
+le laisserait aussi se passer `role_app = 'admin'`.
+
+⚠️ Chantier sur le chemin d'authentification : tests E2E obligatoires avant
+merge, jamais à la veille d'une démonstration.
+
+---
+
 *Généré le 2026-07-03 à partir de l'audit 360° (6 agents Fable). Source de
 vérité des arbitrages : MiKL.*
+*Complété le 2026-08-14 (audit Réglages, veille de la séance VetdAllier).*

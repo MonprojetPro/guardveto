@@ -18,6 +18,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import '@/styles/v2-historique.css'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
@@ -38,6 +39,7 @@ import {
   queryBonusMalusCourant,
   queryVetsInfo,
   queryHistoriqueFetes,
+  queryPeriodesAvecGardes,
   type CompteursRow,
 } from '@/hooks/useCompteurs'
 import type { Periode, ProfilPlanning, Veterinaire } from '@/types'
@@ -130,16 +132,20 @@ export default async function HistoriquePage({
 
   // Quels plannings ont réellement des gardes : la corbeille doit prévenir
   // qu'elle en efface (le serveur accepte de supprimer un brouillon rempli
-  // depuis le 2026-08-03 — il n'a jamais été vu par l'équipe).
-  const { data: gardesParPeriode } = await supabase
-    .from('gardes')
-    .select('periode_id')
-    .limit(500)
-  const periodesAvecGardes = new Set(
-    ((gardesParPeriode ?? []) as { periode_id: string }[]).map((g) => g.periode_id),
-  )
+  // depuis le 2026-08-03 — il n'a jamais été vu par l'équipe). Seuls les
+  // BROUILLONS portent un bouton de suppression : inutile d'interroger les
+  // autres.
+  const periodesAvecGardes = estAdmin
+    ? await queryPeriodesAvecGardes(
+        supabase,
+        periodes.filter((p) => p.statut === 'brouillon').map((p) => p.id),
+      )
+    : new Set<string>()
 
   if (periodes.length === 0) {
+    // Écran d'un cabinet neuf — c'est le PREMIER que voit un nouvel abonné.
+    // Il n'avait aucune sortie : un titre, un paragraphe, et rien à faire.
+    // Une page qui explique ce qui manque doit dire où on va le chercher.
     return (
       <>
         <Satin />
@@ -154,15 +160,38 @@ export default async function HistoriquePage({
                 apparaîtront dès qu&apos;une période aura été créée et un planning généré.
               </p>
             </div>
+            {estAdmin && (
+              <div className="page-actions">
+                <Link href="/planning" className="hist-vers-planning">
+                  Créer un planning →
+                </Link>
+              </div>
+            )}
           </div>
+          <section className="card rise rise-2">
+            <div className="card-head">
+              <h2>Ce qui apparaîtra ici</h2>
+            </div>
+            <p className="count-vide">
+              {estAdmin
+                ? "Les week-ends, nuits et fériés tenus par chacun, l'écart de chaque vétérinaire à sa juste part, les dépannages, et le cumul de toutes les périodes validées. Tout se remplit tout seul à la première génération : commence par créer un planning."
+                : "Les week-ends, nuits et fériés que tu auras tenus, et ton écart à la juste part. Ta ligne apparaîtra dès que l'administrateur aura généré le premier planning."}
+            </p>
+          </section>
         </div>
       </>
     )
   }
 
-  // ── Résolution des filtres (même logique que la V1 `/compteurs`) ───────
+  // ── Résolution des filtres ─────────────────────────────────────────────
+  // La PLAGE LIBRE est réservée à l'administrateur : elle traverse les
+  // périodes et donne une vue de gestion du cabinet (« qui a fait quoi entre
+  // ces deux dates »), là où un vétérinaire consulte une période. Le filtre
+  // vit dans l'URL : le refuser ici, côté serveur, est le seul contrôle qui
+  // vaille — cacher le bouton ne ferme pas la porte, il la rend juste
+  // discrète.
   const params = await searchParams
-  const mode = params.mode === 'plage' ? 'plage' : 'periode'
+  const mode = params.mode === 'plage' && estAdmin ? 'plage' : 'periode'
   const perimetre = params.perimetre === 'valide' ? 'valide' : 'tout'
 
   const today = new Date().toISOString().slice(0, 10)
@@ -193,12 +222,17 @@ export default async function HistoriquePage({
       : periodeSelectionnee.date_fin
 
   // ── Compteurs du filtre courant ────────────────────────────────────────
+  // `erreurLecture` n'est PAS la même chose qu'une liste vide : vide veut dire
+  // « personne n'a de garde ici », l'erreur veut dire « je n'ai pas pu
+  // compter ». Les confondre afficherait un tableau serein et faux.
   let compteurs: CompteursRow[]
   let totalWE: number
+  let erreurLecture: string | null = null
   if (plageValide) {
     const res = await queryCompteursPlage(supabase, debut, fin, perimetre === 'valide')
     compteurs = res.compteurs
     totalWE = res.totalWE
+    erreurLecture = res.erreur
   } else if (perimetre === 'valide' && periodeSelectionnee.statut === 'brouillon') {
     // Périmètre « validées seulement » sur une période encore en brouillon :
     // il n'y a rien à compter. On le dit plutôt que d'afficher les gardes du
@@ -206,10 +240,13 @@ export default async function HistoriquePage({
     compteurs = []
     totalWE = 0
   } else {
-    ;[compteurs, totalWE] = await Promise.all([
+    const [resC, resWE] = await Promise.all([
       queryCompteurs(supabase, periodeSelectionnee.id),
       queryTotalWE(supabase, periodeSelectionnee.id),
     ])
+    compteurs = resC.compteurs
+    totalWE = resWE.totalWE
+    erreurLecture = resC.erreur ?? resWE.erreur
   }
 
   const bilans = calculerBilans(compteurs, totalWE)
@@ -341,6 +378,9 @@ export default async function HistoriquePage({
       { debut: periodesValidees[0].date_debut, fin: periodesValidees[0].date_fin },
     )
     const res = await queryCompteursPlage(supabase, bornes.debut, bornes.fin, true)
+    // Un cumul partiel serait pire que pas de cumul : il additionne plusieurs
+    // périodes, personne ne peut vérifier le total de tête.
+    if (res.erreur) erreurLecture = erreurLecture ?? res.erreur
     cumul = res.compteurs.map((r) => ({
       veterinaire_id: r.veterinaire_id,
       prenom: r.prenom,
@@ -386,6 +426,7 @@ export default async function HistoriquePage({
           fin={fin}
           perimetre={perimetre}
           legende={legende}
+          erreurLecture={erreurLecture}
           compteurs={compteurs}
           bilans={bilans}
           depannages={depannages}

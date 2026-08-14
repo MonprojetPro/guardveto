@@ -29,7 +29,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { phraseRegle, reglesDuVeto, etageDe, symboleDe, motForce, aideForce } from '@/lib/regles/libelle'
+import {
+  phraseRegle, reglesDuVeto, reglesParEtiquetteDuVeto,
+  etageDe, symboleDe, motForce, aideForce,
+} from '@/lib/regles/libelle'
 import '@/styles/regles-forces.css'
 import { setRegleActif, deleteRegle } from '@/app/(protected)/regles/actions'
 import {
@@ -44,8 +47,10 @@ import {
 } from '@/components/regles/ReglesClient'
 
 interface Props {
-  /** La fiche depuis laquelle on a ouvert : sujet de toutes ces règles. */
-  veto: VetoMini
+  /** La fiche depuis laquelle on a ouvert : sujet de toutes ces règles.
+   *  `tags` fait remonter les règles qui le visent PAR ÉTIQUETTE (lecture
+   *  seule) ; optionnel pour ne casser aucun appelant. */
+  veto: VetoMini & { tags?: string[] | null }
   /** TOUTES les règles du cabinet — le filtrage par véto se fait ici. */
   regles: RegleRow[]
   vets: VetoMini[]
@@ -77,6 +82,14 @@ export function ContraintesVetoModale({
   }, [regles, veto.id])
 
   const actives = siennes.filter((r) => r.actif).length
+
+  // Celles qui le contraignent À TRAVERS UNE ÉTIQUETTE. Elles ne lui
+  // appartiennent pas : on les montre, on ne les édite pas d'ici. En pause,
+  // elles ne pèsent sur personne — inutile de les faire figurer.
+  const parEtiquette = useMemo(
+    () => reglesParEtiquetteDuVeto(regles, veto.tags).filter((r) => r.actif),
+    [regles, veto.tags],
+  )
 
   const ouvrirCreation = () => {
     setAEditer(null)
@@ -143,9 +156,18 @@ export function ContraintesVetoModale({
 
           {siennes.length === 0 ? (
             <p className="cv-vide">
-              Rien de particulier pour {veto.prenom}. Une contrainte, c&apos;est un jour de
-              repos fixe, une indisponibilité qui revient, ou une personne avec qui elle ou
-              il ne doit pas se retrouver seul.
+              {parEtiquette.length > 0 ? (
+                <>
+                  Aucune contrainte qui lui soit propre — mais les règles d&apos;étiquette
+                  ci-dessous s&apos;appliquent à {veto.prenom}.
+                </>
+              ) : (
+                <>
+                  Rien de particulier pour {veto.prenom}. Une contrainte, c&apos;est un jour de
+                  repos fixe, une indisponibilité qui revient, ou une personne avec qui elle ou
+                  il ne doit pas se retrouver seul.
+                </>
+              )}
             </p>
           ) : (
             <ul className="cv-liste">
@@ -205,6 +227,46 @@ export function ContraintesVetoModale({
                 )
               })}
             </ul>
+          )}
+
+          {/* Ce qui pèse sur cette personne SANS lui appartenir. Sans cette
+              section, on pouvait ouvrir une fiche, n'y voir aucune contrainte,
+              et en conclure que rien n'était réglé — alors qu'une règle
+              d'étiquette la contraignait à chaque génération.
+
+              Aucun bouton ici, volontairement : ces règles se modifient là où
+              l'étiquette se règle, et « modifier » depuis une fiche laisserait
+              croire qu'on ne change les choses que pour une personne. */}
+          {parEtiquette.length > 0 && (
+            <section className="cv-etiquettes">
+              <h4>Par son étiquette</h4>
+              <p className="cv-effet">
+                {parEtiquette.length === 1 ? 'Cette règle vise' : 'Ces règles visent'} un groupe
+                dont {veto.prenom} fait partie. {parEtiquette.length === 1 ? 'Elle compte' : 'Elles comptent'}{' '}
+                autant que les contraintes ci-dessus, mais se {parEtiquette.length === 1 ? 'modifie' : 'modifient'}{' '}
+                depuis l&apos;écran Organisation — {parEtiquette.length === 1 ? 'la' : 'les'} changer ici,
+                ce serait {parEtiquette.length === 1 ? 'la' : 'les'} changer pour toute l&apos;équipe concernée.
+              </p>
+              <ul className="cv-liste">
+                {parEtiquette.map((r) => (
+                  <li key={r.id} className={`cv-item lecture-seule force-${r.force}`}>
+                    <div className="cv-item-tete">
+                      <span className="force-badge">
+                        <span aria-hidden="true">{symboleDe(r.force)}</span> {motForce(r.force)}
+                      </span>
+                      <span className="cv-tag">
+                        étiquette «&nbsp;
+                        {String(
+                          ((r.params_json ?? {}) as { params?: { tag?: unknown } }).params?.tag ?? '',
+                        )}
+                        &nbsp;»
+                      </span>
+                    </div>
+                    <p className="cv-phrase">{phraseRegle(r, nomVeto)}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
 
           <DialogFooter className="cv-pied">

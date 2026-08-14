@@ -362,6 +362,28 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
               <div className="glance" aria-label="Le coup d'œil du matin">
                 <p className="glance-title">Le coup d&apos;œil du matin</p>
 
+                {/* Le tout premier jour : le tableau n'aurait sinon que des
+                    constats de manque (« personne ce soir », « rien à
+                    vérifier ») — la lecture d'un produit cassé plutôt que
+                    d'un produit neuf. Une seule tuile, en tête, qui porte le
+                    seul geste qui compte à ce stade. */}
+                {data.estAdmin && !data.periodeCourante && (
+                  <Link className="widget" href="/planning">
+                    <span className="w-ico" aria-hidden="true">
+                      ✨
+                    </span>
+                    <span className="w-body">
+                      <h3>Créer le premier planning</h3>
+                      <p>
+                        L&apos;équipe et les règles sont prêtes — il ne manque que les gardes
+                      </p>
+                    </span>
+                    <span className="w-go" aria-hidden="true">
+                      →
+                    </span>
+                  </Link>
+                )}
+
                 <FicheCeSoir garde={data.ceSoir} onOpen={() => ouvrir('cesoir')} />
 
                 {data.estAdmin && nbSouhaits > 0 && (
@@ -862,6 +884,40 @@ function FicheCoherence({
 /** Le mot d'accueil : ce que Filou a réellement trouvé, pas une formule. */
 function MotDAccueil({ data }: { data: DonneesAccueil }) {
   const phrases: string[] = []
+
+  // ── Le tout premier jour du cabinet ───────────────────────────────────
+  // `periodeCourante` ne vaut `null` que si AUCUNE période n'existe en base
+  // (le chargeur retombe sinon sur la plus récente connue, même passée).
+  // C'est donc le signal fiable du démarrage — et il mérite autre chose que
+  // « je ne vois aucune garde posée pour ce soir », qui décrit un manque là
+  // où il n'y a qu'un commencement. Première impression d'un nouveau cabinet :
+  // on dit ce qui est DÉJÀ prêt, puis le seul geste qui reste.
+  if (!data.periodeCourante) {
+    return (
+      <div className="msg filou">
+        <span className="m-ava" aria-hidden="true">
+          🦊
+        </span>
+        <div className="bubble">
+          <span className="vh">Filou : </span>
+          Bonjour {data.veterinaire.prenom}.{' '}
+          {data.estAdmin ? (
+            <>
+              Le cabinet est en place — {data.dock.nbVetos} vétérinaire
+              {data.dock.nbVetos > 1 ? 's' : ''} et leurs règles m’attendent. Il ne manque
+              que le premier planning : va sur <Link href="/planning">Planning</Link> et
+              clique sur « Générer », je t’accompagne pas à pas.
+            </>
+          ) : (
+            <>
+              Aucun planning n’est encore publié. Dès qu’il le sera, tu verras ici tes gardes
+              à venir — et je te préviendrai.
+            </>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   const nomsCeSoir = data.ceSoir ? prenomsDe(data.ceSoir) : []
   if (nomsCeSoir.length > 0) {

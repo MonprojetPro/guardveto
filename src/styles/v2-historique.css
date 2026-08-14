@@ -236,3 +236,36 @@
   transition: border-color 0.15s, background 0.15s;
 }
 .hist-vers-planning:hover { border-color: var(--accent-ink); background: var(--surface-2); }
+
+/* -- États : recalcul en cours, saisie refusée, lecture impossible ---------
+   Trois moments où l'écran doit parler plutôt que rester figé. Tout le calcul
+   des compteurs est côté serveur : entre le clic et le tableau, il s'écoule un
+   aller-retour pendant lequel les segments avaient l'air simplement morts. */
+.seg button:disabled,
+.period-view:disabled,
+.range-fields button:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+.hist-encours { color: var(--t-muted); font-style: italic; }
+.range-erreur {
+  font-size: 0.78rem;
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-radius: var(--r-sm);
+  padding: 4px 9px;
+}
+/* Le détail brut de l'erreur : lisible pour qui le recopie, discret pour qui
+   ne le comprend pas — la phrase au-dessus dit déjà tout ce qui compte. */
+.hist-detail-technique {
+  display: inline-block;
+  margin-top: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.74rem;
+  color: var(--t-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-sm);
+  padding: 5px 9px;
+  word-break: break-word;
+}

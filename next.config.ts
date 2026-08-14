@@ -10,6 +10,21 @@ const nextConfig: NextConfig = {
   // jamais et le formulaire part en GET natif -> on reste sur /login.
   // Aucune incidence en production (build) : ce reglage est dev-only.
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
+
+  experimental: {
+    serverActions: {
+      // Le plafond par defaut d'une action serveur est de 1 Mo. C'est
+      // largement assez pour une phrase envoyee a Filou, et beaucoup trop peu
+      // pour une PHOTO d'ancien planning prise au telephone (3 a 5 Mo, et un
+      // tiers de plus une fois encodee en base64). Sans ce reglage, le depot
+      // d'un document echoue avec une erreur de plateforme illisible.
+      //
+      // 16 Mo laisse passer les 12 Mo autorises cote lecture (cf.
+      // TAILLE_MAX_OCTETS) avec la marge du base64. Au-dela, le refus est
+      // rendu en francais par l'action elle-meme.
+      bodySizeLimit: '16mb',
+    },
+  },
 };
 
 export default nextConfig;

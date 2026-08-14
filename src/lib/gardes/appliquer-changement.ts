@@ -197,12 +197,20 @@ export async function appliquerChangementGarde(
   const periodeStatut = Array.isArray(periodeRel) ? periodeRel[0]?.statut : periodeRel?.statut
 
   if (periodeStatut === 'publie' || periodeStatut === 'verrouille') {
-    const [compteurs, totalWE] = await Promise.all([
+    const [{ compteurs, erreur: errCompteurs }, { totalWE, erreur: errWE }] = await Promise.all([
       queryCompteurs(supabase, garde.periode_id),
       queryTotalWE(supabase, garde.periode_id),
     ])
 
-    if (compteurs.length > 0) {
+    // Lecture en échec → on ne recalcule PAS le bilan. Le bilan précédent, même
+    // périmé d'un échange, vaut mieux qu'un bilan calculé sur des compteurs
+    // qu'on n'a pas réussi à lire : c'est lui que le moteur relira.
+    const erreurLecture = errCompteurs ?? errWE
+    if (erreurLecture) {
+      console.error(
+        `[appliquerChangementGarde] compteurs illisibles pour la periode ${garde.periode_id} (${erreurLecture}) — bilan laissé en l'état`,
+      )
+    } else if (compteurs.length > 0) {
       // Priorité au cabinetId fourni par l'appelant (indispensable en
       // service_role sans session). Sinon, résolution via la session.
       let cabinetId: string | null = cabinetIdFourni ?? null

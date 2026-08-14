@@ -1,0 +1,216 @@
+/* ============================================================
+   GUARDVETO V2 — L'écran de relecture d'un ancien planning
+   ============================================================
+   Complète `v2-terrier.css` : les jetons du terrier (`--t-muted`,
+   `--t-border`, `--t-accent`) sont la seule source de couleur ici. Ne jamais
+   écrire `var(--muted)` / `var(--border)` / `var(--accent)` — ce sont les
+   jetons shadcn, remappés, et les réécrire redonne « crème sur crème ».
+
+   LE TABLEAU DÉFILE DANS SON PROPRE CADRE, pas dans la fenêtre : un import
+   de soixante gardes ferait sinon disparaître les boutons d'enregistrement
+   sous la ligne de flottaison, et il faudrait faire défiler toute la modale
+   pour retrouver ce qui valide. Les commandes s'ancrent hors de la zone qui
+   défile.
+   ============================================================ */
+
+.imp {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Ce que Filou n'a pas su lire ─────────────────────────── */
+/* En premier, et visuellement à part : un trou déclaré est une information,
+   pas une note de bas de page. */
+.imp-trous {
+  border: 1px solid var(--t-accent);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--t-accent) 7%, transparent);
+}
+.imp-trous h3 {
+  font-size: 0.86rem;
+  font-weight: 650;
+  margin: 0 0 6px;
+}
+.imp-trous ul {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.86rem;
+}
+.imp-note {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  color: var(--t-muted);
+}
+
+.imp-vide {
+  font-size: 0.9rem;
+  border: 1px dashed var(--t-border);
+  border-radius: 12px;
+  padding: 14px;
+  margin: 0;
+}
+
+/* ── Les lignes lues ──────────────────────────────────────── */
+.imp-scroll {
+  max-height: 46vh;
+  overflow: auto;
+  border: 1px solid var(--t-border);
+  border-radius: 12px;
+}
+
+.imp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+.imp-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.76rem;
+  color: var(--t-muted);
+  background: var(--card, #fff);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--t-border);
+}
+.imp-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--t-border) 55%, transparent);
+  vertical-align: middle;
+}
+.imp-table tr:last-child td {
+  border-bottom: none;
+}
+.imp-date {
+  white-space: nowrap;
+}
+
+/* Décochée : encore lisible, mais visiblement hors du compte. */
+.imp-ecartee td {
+  opacity: 0.45;
+}
+/* Un nom qui n'a pas été reconnu : la ligne se signale d'elle-même. */
+.imp-douteuse {
+  background: color-mix(in srgb, var(--t-accent) 6%, transparent);
+}
+
+.imp-choix {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 150px;
+}
+.imp-orphelin {
+  font-size: 0.72rem;
+  color: var(--t-accent);
+}
+
+/* ── Le nom de la période ─────────────────────────────────── */
+.imp-nom {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.imp-nom label {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.imp-nom input {
+  border: 1px solid var(--t-border);
+  border-radius: 10px;
+  padding: 8px 11px;
+  font: inherit;
+  font-size: 0.88rem;
+  background: transparent;
+  color: inherit;
+}
+.imp-nom input:focus {
+  outline: none;
+  border-color: var(--t-accent);
+}
+
+/* ── Le reçu, une fois écrit ──────────────────────────────── */
+.imp-recu {
+  border: 1px solid var(--t-accent);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: color-mix(in srgb, var(--t-accent) 8%, transparent);
+}
+.imp-recu-annule {
+  border-color: var(--t-border);
+  background: transparent;
+}
+.imp-recu h3 {
+  margin: 0 0 6px;
+  font-size: 0.98rem;
+  font-weight: 650;
+}
+.imp-recu p {
+  margin: 0;
+  font-size: 0.88rem;
+}
+.imp-suites {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.83rem;
+}
+
+/* ── Les commandes, ancrées hors de la zone qui défile ────── */
+.imp-pied {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding-top: 4px;
+}
+
+/* ── Le bouton « déposer un document » de la tablette ─────── */
+.saisie-doc {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--t-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--t-muted);
+  cursor: pointer;
+}
+.saisie-doc svg {
+  width: 16px;
+  height: 16px;
+}
+.saisie-doc:hover:not(:disabled) {
+  border-color: var(--t-accent);
+  color: var(--t-accent);
+}
+.saisie-doc:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.saisie:has(.saisie-doc) {
+  padding-left: 5px;
+}
+
+@media (max-width: 640px) {
+  .imp-scroll {
+    max-height: 40vh;
+  }
+  .imp-table {
+    font-size: 0.79rem;
+  }
+  .imp-choix {
+    min-width: 120px;
+  }
+}

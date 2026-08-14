@@ -951,6 +951,14 @@
   transform: rotate(var(--tilt));
   transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
+/* Une tuile peut être un lien plutôt qu'un bouton (l'amorçage « Créer le
+   premier planning » mène à un autre écran, il DOIT être un vrai lien :
+   clic milieu, nouvel onglet, lecture d'écran). Sans ça elle héritait du
+   souligné et du bleu par défaut du navigateur, au milieu de tuiles qui n'en
+   ont pas. Le penchant, lui, reste géré par les `nth-of-type` ci-dessous —
+   ils comptent par balise, mais l'écart est décoratif (moins d'un degré). */
+a.widget { color: inherit; text-decoration: none; }
+
 .glance .widget:nth-of-type(1) { --tilt: -0.4deg; }
 .glance .widget:nth-of-type(2) { --tilt: 0.35deg; }
 .glance .widget:nth-of-type(3) { --tilt: -0.25deg; }

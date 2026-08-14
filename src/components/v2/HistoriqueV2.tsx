@@ -20,7 +20,7 @@
 // ============================================================
 
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import type { Periode } from '@/types'
 import type { CompteursRow, DepannagesRow } from '@/hooks/useCompteurs'
@@ -62,6 +62,13 @@ interface Props {
    * pour économiser deux balises.
    */
   legende: Array<{ texte: string; fort?: boolean }>
+  /**
+   * Ce qui a empêché de LIRE les compteurs, s'il y a lieu. À ne surtout pas
+   * confondre avec `compteurs: []` : l'un veut dire « je ne sais pas », l'autre
+   * « personne n'a de garde ». Un écran qui affiche le second à la place du
+   * premier ment avec aplomb.
+   */
+  erreurLecture?: string | null
 
   compteurs: CompteursRow[]
   bilans: BilanVet[]
@@ -149,6 +156,7 @@ export function HistoriqueV2({
   fin,
   perimetre,
   legende,
+  erreurLecture,
   compteurs,
   bilans,
   depannages,
@@ -167,19 +175,25 @@ export function HistoriqueV2({
   const router = useRouter()
   const [du, setDu] = useState(debut)
   const [au, setAu] = useState(fin)
+  // Tout le calcul est côté serveur : sans ça, une seconde s'écoule entre le
+  // clic et le nouveau tableau, pendant laquelle les segments ont l'air morts
+  // et on reclique.
+  const [enCours, demarrer] = useTransition()
 
   const recours = new Set(derniersRecours)
   const bilanDe = new Map(bilans.map((b) => [b.veterinaire_id, b]))
   const depannageDe = new Map(depannages.map((d) => [d.veterinaire_id, d]))
 
+  const aller = (url: string) => demarrer(() => router.push(url))
+
   const versPeriode = (id: string) =>
-    router.push(`/historique?mode=periode&periodeId=${id}&perimetre=${perimetre}`)
+    aller(`/historique?mode=periode&periodeId=${id}&perimetre=${perimetre}`)
   const versPlage = (d: string, f: string, peri: 'tout' | 'valide' = perimetre) =>
-    router.push(`/historique?mode=plage&debut=${d}&fin=${f}&perimetre=${peri}`)
+    aller(`/historique?mode=plage&debut=${d}&fin=${f}&perimetre=${peri}`)
   const changerPerimetre = (peri: 'tout' | 'valide') =>
-    mode === 'plage' ? versPlage(du, au, peri) : router.push(
-      `/historique?mode=periode&periodeId=${periodeId}&perimetre=${peri}`,
-    )
+    mode === 'plage'
+      ? versPlage(du, au, peri)
+      : aller(`/historique?mode=periode&periodeId=${periodeId}&perimetre=${peri}`)
 
   const aucuneDonnee = compteurs.length === 0
 
@@ -209,7 +223,7 @@ export function HistoriqueV2({
       </div>
 
       {/* ── Filtres ──────────────────────────────────────────────────── */}
-      <div className="hist-filters rise rise-2">
+      <div className="hist-filters rise rise-2" aria-busy={enCours}>
         <span className="hf-label">Période</span>
         <div className="seg" role="group" aria-label="Choix de la période">
           {periodes.map((p) => (
@@ -217,21 +231,28 @@ export function HistoriqueV2({
               key={p.id}
               type="button"
               aria-pressed={mode === 'periode' && p.id === periodeId}
+              disabled={enCours}
               onClick={() => versPeriode(p.id)}
             >
               {libellePeriode(p)}
             </button>
           ))}
-          <button
-            type="button"
-            aria-pressed={mode === 'plage'}
-            onClick={() => versPlage(du, au)}
-          >
-            Plage libre
-          </button>
+          {/* La plage libre traverse les périodes : c'est une vue de gestion du
+              cabinet, réservée à l'admin — et refusée côté serveur, pas
+              seulement cachée ici. */}
+          {estAdmin && (
+            <button
+              type="button"
+              aria-pressed={mode === 'plage'}
+              disabled={enCours}
+              onClick={() => versPlage(du, au)}
+            >
+              Plage libre
+            </button>
+          )}
         </div>
 
-        {mode === 'plage' && (
+        {estAdmin && mode === 'plage' && (
           <div className="range-fields">
             <input
               type="date"
@@ -252,10 +273,15 @@ export function HistoriqueV2({
               type="button"
               className="btn btn-outline btn-sm"
               onClick={() => versPlage(du, au)}
-              disabled={!du || !au || du > au}
+              disabled={enCours || !du || !au || du > au}
             >
-              Appliquer
+              {enCours ? 'Calcul…' : 'Appliquer'}
             </button>
+            {du && au && du > au && (
+              <span className="range-erreur" role="alert">
+                La date de fin est avant la date de début.
+              </span>
+            )}
           </div>
         )}
 
@@ -266,6 +292,7 @@ export function HistoriqueV2({
           <button
             type="button"
             aria-pressed={perimetre === 'tout'}
+            disabled={enCours}
             onClick={() => changerPerimetre('tout')}
           >
             Tout, brouillons compris
@@ -273,6 +300,7 @@ export function HistoriqueV2({
           <button
             type="button"
             aria-pressed={perimetre === 'valide'}
+            disabled={enCours}
             onClick={() => changerPerimetre('valide')}
           >
             Gardes validées seulement
@@ -286,11 +314,27 @@ export function HistoriqueV2({
               {seg.fort ? <b>{seg.texte}</b> : seg.texte}
             </span>
           ))}
+          {enCours && <span className="hist-encours"> · recalcul en cours…</span>}
         </p>
       </div>
 
       {/* ── Les cartes de compteurs ──────────────────────────────────── */}
-      {aucuneDonnee ? (
+      {erreurLecture ? (
+        /* « Je n'ai pas pu compter » — surtout pas un tableau à zéro, qui se
+           lirait comme « personne n'a de garde ». */
+        <section className="card rise rise-3">
+          <div className="card-head">
+            <h2>Les compteurs n&apos;ont pas pu être lus</h2>
+          </div>
+          <p className="count-vide">
+            Aucun chiffre n&apos;est affiché ici, volontairement : ce n&apos;est pas
+            « zéro garde », c&apos;est « je ne sais pas ». Réessaie dans un instant ; si
+            cela persiste, signale-le avec ce détail technique.
+            <br />
+            <code className="hist-detail-technique">{erreurLecture}</code>
+          </p>
+        </section>
+      ) : aucuneDonnee ? (
         <section className="card rise rise-3">
           <div className="card-head">
             <h2>Aucune garde sur ce filtre</h2>
@@ -573,6 +617,7 @@ export function HistoriqueV2({
                 <button
                   type="button"
                   className="period-view"
+                  disabled={enCours}
                   onClick={() => versPeriode(l.periode.id)}
                 >
                   Ses compteurs

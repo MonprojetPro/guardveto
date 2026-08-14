@@ -789,6 +789,10 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
             prenom: ficheContraintes.prenom,
             nom: ficheContraintes.nom,
             couleur: ficheContraintes.couleur,
+            // Fait remonter les règles qui le visent PAR ÉTIQUETTE : elles le
+            // contraignent autant que les nominatives, mais `reglesDuVeto` ne
+            // peut pas les voir (leur `qui` est nul, la cible est un tag).
+            tags: ficheContraintes.tags,
           }}
           regles={regles}
           vets={vetsMini}

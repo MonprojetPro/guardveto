@@ -89,10 +89,22 @@ export async function GET(req: NextRequest) {
   const bilanResults: Array<{ periodeId: string; nbVets: number }> = []
 
   for (const periodeId of periodesNouveauxVerrous) {
-    const [compteurs, totalWE] = await Promise.all([
+    const [{ compteurs, erreur: errCompteurs }, { totalWE, erreur: errWE }] = await Promise.all([
       queryCompteurs(supabase, periodeId),
       queryTotalWE(supabase, periodeId),
     ])
+
+    // Ce cron tourne sans personne devant l'écran, et ce qu'il écrit dans
+    // `bonus_malus` sera relu par le moteur à la génération suivante. Une
+    // lecture en échec traitée comme « zéro garde » figerait un bilan faux
+    // dans une période VERROUILLÉE — celle qu'on ne rejoue plus.
+    const erreurLecture = errCompteurs ?? errWE
+    if (erreurLecture) {
+      console.error(
+        `[lock-gardes] periode ${periodeId} : compteurs illisibles (${erreurLecture}) — bilan NON écrit`,
+      )
+      continue
+    }
 
     if (compteurs.length === 0) continue
 

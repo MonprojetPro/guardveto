@@ -1340,10 +1340,17 @@ export function OngletMoteur({
         onCorrige={() => setImpactTag(null)}
       />
 
-      {/* ══════════════ Carte 1 · Les règles du cabinet ══════════════ */}
+      {/* ══════════════ Carte 1 · Les règles des équipes ══════════════
+          « Équipes » et non « cabinet » (MiKL, 2026-08-14) : ce que cette carte
+          rassemble, ce sont les contraintes qui portent sur DES GENS — soit
+          nommément (« Victor ne fait pas de nuit »), soit par étiquette
+          (« les juniors ne sont jamais seuls »). Ce sont exactement les
+          contraintes qu'on pose depuis l'onglet Équipe, vues d'ici. Les règles
+          qui ne visent personne (équilibrage, préférences) ont leurs propres
+          cartes plus bas. */}
       <section className="card">
         <div className="card-head">
-          <h2>Règles du cabinet</h2>
+          <h2>Règles des équipes</h2>
           <span className={`section-count${toutesActives.length === 0 ? ' zero' : ''}`}>
             {toutesActives.length}
           </span>

@@ -199,7 +199,11 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Planning',      href: '/planning',            icon: 'Calendar',     roles: ['admin', 'veto'] },
   { label: 'Congés',        href: '/conges',              icon: 'CalendarOff',  roles: ['admin', 'veto'] },
   { label: 'Échanges',      href: '/echanges',            icon: 'ArrowLeftRight', roles: ['admin', 'veto'] },
-  { label: 'Compteurs',     href: '/compteurs',           icon: 'BarChart3',    roles: ['admin', 'veto'] },
+  // « Compteurs » menait à l'écran V1 `/compteurs`, resté en ligne à côté de
+  // `/historique` (V2) qui affiche les MÊMES chiffres. Deux écrans, deux
+  // habillages, aucun des deux ne disant lequel faisait foi. L'URL V1 redirige
+  // désormais ici ; l'entrée de menu y va directement.
+  { label: 'Compteurs',     href: '/historique',          icon: 'BarChart3',    roles: ['admin', 'veto'] },
   // « Règles » mène désormais à l'écran V2 « Règles & structure », qui a
   // absorbé l'ancienne page /admin/structure — d'où la disparition de l'entrée
   // « Structure » juste en dessous. L'écran est admin : tout y est de la
@@ -213,7 +217,10 @@ export const NAV_ITEMS: NavItem[] = [
   // table que le moteur n'ouvre plus. Un admin qui y réglait une contrainte
   // croyait agir sur le planning sans que rien ne bouge. Les entrées mènent
   // désormais aux écrans V2 qui portent réellement ces sujets.
-  { label: 'Périodes',      href: '/historique',          icon: 'CalendarRange', roles: ['admin'] },
+  // Plus d'entrée « Périodes » séparée : elle pointait déjà sur `/historique`,
+  // tout comme « Compteurs » ci-dessus depuis que la V1 a été repliée. Deux
+  // entrées sur la même adresse s'allumaient ensemble à chaque visite, sans
+  // qu'aucune ne mène ailleurs que l'autre.
   { label: 'Vétérinaires',  href: '/equipe',              icon: 'Users',        roles: ['admin'] },
   { label: 'Journal e-mails', href: '/admin/journal-emails', icon: 'MailWarning', roles: ['admin'] },
 ]

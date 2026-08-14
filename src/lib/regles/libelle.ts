@@ -176,6 +176,54 @@ export function reglesDuVeto<T extends RegleNommable>(regles: T[], vetoId: strin
   return fusionnerDuos(ordonne)
 }
 
+/**
+ * Les briques qui visent une ÉTIQUETTE plutôt qu'une personne.
+ *
+ * Elles ne rangent pas leur cible dans `qui.refs` (qui vaut `null`) mais dans
+ * `params.tag` — c'est pour ça que `reglesDuVeto` ne peut pas les voir, et
+ * c'est normal : elle cherche un identifiant de véto, il n'y en a pas.
+ *
+ * `equilibrer` est volontairement ABSENTE de cette liste, bien qu'elle accepte
+ * un `tag` : une cohorte d'équité règle la façon dont le moteur RÉPARTIT la
+ * charge, elle n'interdit rien à personne. L'afficher parmi les contraintes
+ * d'un vétérinaire ferait passer un réglage de justice pour une restriction.
+ */
+const BRIQUES_PAR_ETIQUETTE = new Set(['composition_equipe', 'role_interdit_tag'])
+
+/**
+ * Les règles qui pèsent sur un véto À TRAVERS UNE DE SES ÉTIQUETTES.
+ *
+ * POURQUOI CETTE FONCTION EXISTE — audit du 2026-08-14
+ *
+ * « Les seniors ne sont jamais 1er de garde » contraint Anne-Catherine aussi
+ * sûrement qu'un repos fixe nominatif. Pourtant sa fiche n'en montrait rien :
+ * `reglesDuVeto` filtre sur `qui.refs`, et ces règles-là ont `qui = null`.
+ * Résultat, on pouvait ouvrir la fiche d'un vétérinaire, n'y voir aucune
+ * contrainte, et en conclure que le cabinet n'avait rien réglé pour lui.
+ *
+ * Ces règles sont rendues EN LECTURE SEULE sur la fiche : elles ne lui
+ * appartiennent pas — elles appartiennent à l'étiquette, et se modifient
+ * là où l'étiquette se règle. Proposer un crayon ici mènerait au mieux à
+ * une surprise (modifier pour un, c'est modifier pour tous), au pire à un
+ * refus serveur.
+ *
+ * La comparaison est faite en minuscules : la base peut contenir « Senior » et
+ * « senior », qui sont la même étiquette pour le moteur.
+ */
+export function reglesParEtiquetteDuVeto<T extends RegleNommable>(
+  regles: T[],
+  tags: readonly string[] | null | undefined,
+): T[] {
+  const siens = new Set((tags ?? []).map((t) => t.trim().toLowerCase()).filter((t) => t !== ''))
+  if (siens.size === 0) return []
+
+  return regles.filter((r) => {
+    if (!BRIQUES_PAR_ETIQUETTE.has(r.brique_id)) return false
+    const tag = ((r.params_json ?? {}) as { params?: { tag?: unknown } }).params?.tag
+    return typeof tag === 'string' && siens.has(tag.trim().toLowerCase())
+  })
+}
+
 /** Une règle existante que Filou propose de toucher, telle qu'affichée. */
 export interface RegleVisee {
   id: string

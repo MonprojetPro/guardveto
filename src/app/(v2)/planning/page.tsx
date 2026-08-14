@@ -132,20 +132,20 @@ export default async function PlanningPageV2({
   const periodeAffichee =
     periodes.find((p) => p.date_debut <= fin && p.date_fin >= debut) ?? null
 
-  const [dock, profilRes, compteurs, totalWE, prefsRes, typesRes2] = await Promise.all([
+  const [dock, profilRes, compteursRes, totalWERes, prefsRes, typesRes2] = await Promise.all([
     chargerDock(supabase, vet, periodes),
     periodeAffichee?.profil_id
       ? supabase.from('profils_planning').select('nom').eq('id', periodeAffichee.profil_id).maybeSingle()
       : Promise.resolve({ data: null }),
     periodeAffichee
       ? queryCompteurs(supabase, periodeAffichee.id)
-      : Promise.resolve([] as CompteursRow[]),
+      : Promise.resolve({ compteurs: [] as CompteursRow[], erreur: null }),
     // Total de week-ends de la période : `calculerBilans` en a besoin pour
     // établir la juste part. Sans lui, la colonne « écart » comparerait à une
     // moyenne fausse — pire qu'une colonne absente.
     periodeAffichee
       ? queryTotalWE(supabase, periodeAffichee.id)
-      : Promise.resolve(0),
+      : Promise.resolve({ totalWE: 0, erreur: null }),
     // Les colonnes choisies par la personne connectée. Absente = les colonnes
     // par défaut ; jamais bloquant (l'encart doit s'afficher quoi qu'il arrive).
     supabase
@@ -212,7 +212,23 @@ export default async function PlanningPageV2({
       return [`${c.nom} — ${n} véto${n > 1 ? 's' : ''}`]
     })
   }
-  const bilans = calculerBilans(compteurs as CompteursRow[], totalWE as number)
+  // L'encart compteurs du planning. Les deux `as` qui traînaient ici (« as
+  // CompteursRow[] », « as number ») ont masqué à `tsc` un changement de forme
+  // de `queryCompteurs` : le cast compilait, et la page tombait à l'exécution
+  // sur `compteurs.reduce is not a function` dès qu'un mois chevauchait une
+  // période. Un cast n'est pas une vérification — on destructure.
+  const { compteurs, erreur: erreurCompteurs } = compteursRes
+  const { totalWE, erreur: erreurTotalWE } = totalWERes
+  if (erreurCompteurs ?? erreurTotalWE) {
+    // Best-effort assumé : l'encart compteurs n'est PAS la raison d'être de
+    // l'écran planning, il ne doit pas l'empêcher de s'afficher. Mais on ne
+    // fait pas passer un échec de lecture pour « personne n'a de garde » en
+    // silence — la trace serveur dit lequel des deux a échoué.
+    console.error(
+      `[planning] encart compteurs indisponible pour la periode ${periodeAffichee?.id} : ${erreurCompteurs ?? erreurTotalWE}`,
+    )
+  }
+  const bilans = calculerBilans(compteurs, totalWE)
   const colonnesCompteurs = normaliserColonnes(
     (prefsRes as { data?: { colonnes_compteurs?: string[] | null } | null })?.data?.colonnes_compteurs,
   )
@@ -263,7 +279,7 @@ export default async function PlanningPageV2({
           vets={vets}
           moiVetId={vet.id}
           nomsTypes={nomsTypes}
-          compteurs={compteurs as CompteursRow[]}
+          compteurs={compteurs}
           conges={conges}
           profil={profil}
           periodesAvecGardes={periodesAvecGardes}

@@ -74,10 +74,25 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Chargement des compteurs ─────────────────────────────
-  const [compteurs, totalWE] = await Promise.all([
+  // Une erreur de LECTURE doit stopper net : le bilan calculé ici part en
+  // base dans `bonus_malus`, et le moteur le relit à la génération suivante
+  // pour rattraper les écarts. Un compteur partiel écrit ici deviendrait un
+  // planning injuste, sans que rien ne l'ait jamais signalé.
+  const [{ compteurs, erreur: errCompteurs }, { totalWE, erreur: errWE }] = await Promise.all([
     queryCompteurs(supabase, periodeId),
     queryTotalWE(supabase, periodeId),
   ])
+
+  const erreurLecture = errCompteurs ?? errWE
+  if (erreurLecture) {
+    return NextResponse.json(
+      {
+        error:
+          `Impossible de lire les compteurs de la période — le bilan n'a PAS été enregistré : ${erreurLecture}`,
+      },
+      { status: 500 }
+    )
+  }
 
   if (compteurs.length === 0) {
     return NextResponse.json(

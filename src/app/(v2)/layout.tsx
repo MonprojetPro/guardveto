@@ -13,6 +13,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import '@/styles/v2-terrier.css'
+// L'écran de relecture d'un ancien planning importé (déposé dans la
+// conversation de Filou, affiché sur le tableau).
+import '@/styles/v2-import.css'
 
 export default async function LayoutV2({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()

@@ -1,12 +1,52 @@
 // ============================================================
 // GUARDVETO — useCompteurs
 // ============================================================
-// Fonctions de requête server-side pour la page /compteurs.
-// Interroge la vue compteurs_gardes + la table bonus_malus.
+// Fonctions de requête server-side pour l'écran « Historique & compteurs »
+// (`/historique`). Interroge la vue compteurs_gardes + la table bonus_malus.
+//
+// DEUX RÈGLES DE MAISON, toutes deux payées au prix fort sur ce projet :
+//
+// ① Une erreur Supabase ne devient JAMAIS « zéro ligne ». Un `?? []` avalé
+//    transforme « je n'ai pas pu lire » en « personne n'a de garde » — et
+//    l'écran affiche sereinement un vide qui est un mensonge. Les fonctions
+//    de lecture remontent donc `erreur` en plus des lignes, et leurs
+//    appelants ont le devoir de la montrer. (cf. mémoire projet
+//    « supabase-erreur-avalee-devient-zero-ligne ».)
+//
+// ② Aucune lecture de `gardes` n'est laissée à la limite par défaut de
+//    PostgREST (1000 lignes). Une période de 17 semaines pèse déjà ~120
+//    gardes : le cumul sur huit périodes franchit le plafond, et la coupure
+//    est SILENCIEUSE — les compteurs seraient simplement faux, sans erreur.
+//    D'où `lireTout()`, qui pagine jusqu'à épuisement.
 // ============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Periode } from '@/types'
+
+/** Taille de page pour les lectures paginées (limite PostgREST par défaut). */
+const TAILLE_PAGE = 1000
+
+/**
+ * Lit une table par tranches de 1000 jusqu'à épuisement.
+ *
+ * `construire(de, a)` doit renvoyer la requête déjà filtrée, à laquelle on
+ * n'ajoute que le `.range()`. Une erreur interrompt la boucle et remonte —
+ * mieux vaut dire « je n'ai pas pu lire » que de rendre un total tronqué qui
+ * a l'air normal.
+ */
+async function lireTout<T>(
+  construire: (de: number, a: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+): Promise<{ lignes: T[]; erreur: string | null }> {
+  const lignes: T[] = []
+  for (let page = 0; ; page++) {
+    const de = page * TAILLE_PAGE
+    const { data, error } = await construire(de, de + TAILLE_PAGE - 1)
+    if (error) return { lignes, erreur: error.message }
+    const lot = (data as T[] | null) ?? []
+    lignes.push(...lot)
+    if (lot.length < TAILLE_PAGE) return { lignes, erreur: null }
+  }
+}
 
 // ── Types exportés ───────────────────────────────────────
 
@@ -38,18 +78,31 @@ export interface BonusMalusRow {
 
 // ── Requêtes ─────────────────────────────────────────────
 
+/**
+ * Résultat d'une lecture de compteurs : les lignes, et ce qui a empêché de
+ * les lire. `erreur` non nulle veut dire « je n'ai pas pu compter » — ce qui
+ * n'est PAS la même chose que `compteurs: []`, qui veut dire « personne n'a
+ * de garde sur ce filtre ». L'écran doit distinguer les deux.
+ */
+export interface ResultatCompteurs {
+  compteurs: CompteursRow[]
+  totalWE: number
+  erreur: string | null
+}
+
 /** Charge les compteurs de gardes pour une période donnée */
 export async function queryCompteurs(
   supabase: SupabaseClient,
   periodeId: string
-): Promise<CompteursRow[]> {
-  const { data } = await supabase
+): Promise<{ compteurs: CompteursRow[]; erreur: string | null }> {
+  const { data, error } = await supabase
     .from('compteurs_gardes')
     .select('*')
     .eq('periode_id', periodeId)
     .order('nom')
 
-  return (data as CompteursRow[] | null) ?? []
+  if (error) return { compteurs: [], erreur: error.message }
+  return { compteurs: (data as CompteursRow[] | null) ?? [], erreur: null }
 }
 
 // ── Compteurs sur une plage de dates libre ───────────────
@@ -72,13 +125,14 @@ export async function queryCompteursPlage(
   debut: string,
   fin: string,
   valideOnly: boolean
-): Promise<{ compteurs: CompteursRow[]; totalWE: number }> {
+): Promise<ResultatCompteurs> {
   // 1. Vétérinaires actifs (noms + couleurs + statut)
-  const { data: vetsData } = await supabase
+  const { data: vetsData, error: vetsErr } = await supabase
     .from('veterinaires')
     .select('id, prenom, nom, statut, couleur')
     .eq('actif', true)
     .order('nom')
+  if (vetsErr) return { compteurs: [], totalWE: 0, erreur: vetsErr.message }
   const vets = (vetsData as Array<{ id: string; prenom: string; nom: string; statut: 'associe' | 'salarie'; couleur: string }> | null) ?? []
 
   // 2. Gardes de la plage + statut de leur période
@@ -86,12 +140,9 @@ export async function queryCompteursPlage(
   // sur-mesure à 3 ou 4 places) : sans elle, un vétérinaire de garde en 3e
   // place ne serait compté nulle part — donc réputé moins chargé qu'il ne
   // l'est, et resservi par le moteur.
-  const { data: gardesData } = await supabase
-    .from('gardes')
-    .select('type, premier_id, second_id, periodes!inner(statut), garde_placements(place_index, veterinaire_id)')
-    .gte('date', debut)
-    .lte('date', fin)
-
+  //
+  // PAGINÉ : une plage large dépasse les 1000 lignes par défaut de PostgREST,
+  // et la coupure ne se voit nulle part — les compteurs seraient juste faux.
   type GardeRow = {
     type: 'semaine' | 'weekend' | 'ferie'
     premier_id: string | null
@@ -99,7 +150,17 @@ export async function queryCompteursPlage(
     periodes: { statut: string } | { statut: string }[]
     garde_placements?: { place_index: number; veterinaire_id: string | null }[] | null
   }
-  let gardes = (gardesData as GardeRow[] | null) ?? []
+  const { lignes: gardesLues, erreur: gardesErr } = await lireTout<GardeRow>((de, a) =>
+    supabase
+      .from('gardes')
+      .select('type, premier_id, second_id, periodes!inner(statut), garde_placements(place_index, veterinaire_id)')
+      .gte('date', debut)
+      .lte('date', fin)
+      .order('date')
+      .range(de, a),
+  )
+  if (gardesErr) return { compteurs: [], totalWE: 0, erreur: gardesErr }
+  let gardes = gardesLues
 
   const statutDe = (g: GardeRow): string =>
     Array.isArray(g.periodes) ? g.periodes[0]?.statut : g.periodes?.statut
@@ -147,21 +208,49 @@ export async function queryCompteursPlage(
 
   // On ne garde que les vétos ayant au moins une garde (cohérent avec la vue)
   const compteurs = [...map.values()].filter((r) => r.total_gardes > 0)
-  return { compteurs, totalWE }
+  return { compteurs, totalWE, erreur: null }
 }
 
 /** Compte le nombre total de week-ends dans une période */
 export async function queryTotalWE(
   supabase: SupabaseClient,
   periodeId: string
-): Promise<number> {
-  const { count } = await supabase
+): Promise<{ totalWE: number; erreur: string | null }> {
+  const { count, error } = await supabase
     .from('gardes')
     .select('*', { count: 'exact', head: true })
     .eq('periode_id', periodeId)
     .eq('type', 'weekend')
 
-  return count ?? 0
+  if (error) return { totalWE: 0, erreur: error.message }
+  return { totalWE: count ?? 0, erreur: null }
+}
+
+/**
+ * Quelles périodes contiennent au moins une garde.
+ *
+ * Sert au bouton « supprimer » de la corbeille : il doit prévenir qu'il
+ * efface un planning rempli. Avant, cette réponse venait d'un
+ * `.select('periode_id').limit(500)` — passé 500 gardes, les périodes les
+ * plus anciennes disparaissaient de l'ensemble et la corbeille annonçait
+ * « aucune garde » sur un planning plein. Ici on interroge période par
+ * période, en `head` : un compte, pas des lignes, donc aucun plafond.
+ */
+export async function queryPeriodesAvecGardes(
+  supabase: SupabaseClient,
+  periodeIds: string[],
+): Promise<Set<string>> {
+  const avec = new Set<string>()
+  await Promise.all(
+    periodeIds.map(async (id) => {
+      const { count } = await supabase
+        .from('gardes')
+        .select('*', { count: 'exact', head: true })
+        .eq('periode_id', id)
+      if ((count ?? 0) > 0) avec.add(id)
+    }),
+  )
+  return avec
 }
 
 /** Charge les bonus/malus déjà calculés pour une période donnée (bilan courant) */

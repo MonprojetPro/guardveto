@@ -252,6 +252,26 @@
 }
 .cv-item.en-pause { opacity: 0.62; }
 
+/* Les règles qui viennent d'une ÉTIQUETTE : elles pèsent sur la personne sans
+   lui appartenir. Le fond rayé les distingue au premier coup d'oeil des
+   contraintes qu'on peut modifier ici — sans les faire passer pour éteintes
+   (ce que ferait une simple opacité, déjà prise par « en pause »). */
+.cv-etiquettes { margin-top: 16px; }
+.cv-etiquettes h4 {
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--t-muted);
+  margin: 0 0 6px;
+}
+.cv-etiquettes .cv-liste { max-height: min(30vh, 260px); margin-top: 8px; }
+.cv-item.lecture-seule {
+  background:
+    repeating-linear-gradient(
+      135deg,
+      var(--surface-2) 0 10px,
+      color-mix(in srgb, var(--surface-2) 92%, var(--t-border)) 10px 20px
+    );
+}
+
 /* Bandeau : niveau + etiquettes a gauche, actions poussees a droite. Elles
    etaient empilees en colonne, ce qui laissait la moitie de la largeur vide
    et faisait grandir la ligne pour rien. */

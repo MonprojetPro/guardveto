@@ -299,11 +299,21 @@ export function PlanningV2({
                       )}
                     </div>
                   </>
+                ) : periodes.length === 0 ? (
+                  // Aucune période DU TOUT n'est un état de démarrage, pas une
+                  // erreur de navigation : dire « le mois affiché ne tombe dans
+                  // aucune période » laisserait croire qu'il suffit de changer
+                  // de mois pour en trouver une.
+                  <p className="pp-sub">
+                    {isAdmin
+                      ? 'Aucun planning n’existe encore. Le bouton « Générer », en haut de l’écran, crée le premier.'
+                      : 'Aucun planning n’a encore été créé. Tes gardes apparaîtront ici dès qu’il sera publié.'}
+                  </p>
                 ) : (
                   <p className="pp-sub">Le mois affiché ne tombe dans aucune période.</p>
                 )}
 
-                <p className="pp-label">Changer de période</p>
+                {periodes.length > 0 && <p className="pp-label">Changer de période</p>}
                 {periodes.map((p) => {
                   // La corbeille tient sur les BROUILLONS seulement, comme
                   // partout ailleurs (le serveur refuse les autres de toute

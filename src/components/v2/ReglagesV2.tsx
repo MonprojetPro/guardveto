@@ -23,9 +23,15 @@
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import {
+  Select, SelectContent, SelectItem, SelectTrigger,
+} from '@/components/ui/select'
+import {
   configurerPartagesCabinet,
   configurerAdresseCabinet,
 } from '@/app/(protected)/admin/structure/actions'
+import { envoyerEmailDeTest } from '@/app/(v2)/reglages/actions'
+import { useErreurBloquante } from '@/components/v2/regles/ErreurBloquante'
+import { raisonEchec } from '@/lib/emails/echec'
 import type { Periode } from '@/types'
 
 export interface ValeursCabinet {
@@ -69,6 +75,11 @@ const TYPE_EMAIL: Record<string, string> = {
   depannage_confirme: 'Dépannage confirmé',
   conge_valide: 'Congé validé',
   conge_refuse: 'Congé refusé',
+  email_test: 'Essai d’envoi',
+}
+
+function libellePeriode(p: Periode): string {
+  return p.libelle ?? `${p.saison === 'ete' ? 'Été' : 'Hiver'} ${p.date_debut.slice(0, 4)}`
 }
 
 function dateHeure(iso: string): string {
@@ -89,6 +100,7 @@ interface Props {
 
 export function ReglagesV2({ valeurs, periodesPubliees, emails }: Props) {
   const [isPending, startTransition] = useTransition()
+  const { ouvrirErreur, dialogueErreur } = useErreurBloquante()
 
   // Agenda + expéditeur passent par la même action : un seul état de saisie.
   const [calendarId, setCalendarId] = useState(valeurs.googleCalendarId)
@@ -98,6 +110,8 @@ export function ReglagesV2({ valeurs, periodesPubliees, emails }: Props) {
   const [adresse, setAdresse] = useState(valeurs.adresse)
   const [codePostal, setCodePostal] = useState(valeurs.codePostal)
   const [ville, setVille] = useState(valeurs.ville)
+
+  const [testEnCours, setTestEnCours] = useState(false)
 
   const [periodeSync, setPeriodeSync] = useState(periodesPubliees[0]?.id ?? '')
   const [syncEnCours, setSyncEnCours] = useState(false)
@@ -149,6 +163,35 @@ export function ReglagesV2({ valeurs, periodesPubliees, emails }: Props) {
           : "Adresse enregistrée. Le code postal n'a pas permis de conclure sur la zone — l'ancienne est conservée.",
       )
     })
+  }
+
+  // ── Envoyer un e-mail d'essai ───────────────────────────────────────────
+  // Le destinataire n'est pas saisissable : c'est l'adresse de l'admin
+  // connecté, lue en base par l'action. Un champ libre serait un relais de
+  // spam, et un champ de plus à rater en démonstration.
+  const envoyerTest = async () => {
+    setTestEnCours(true)
+    try {
+      const res = await envoyerEmailDeTest()
+      if ('error' in res) {
+        // Un échec d'envoi n'est pas une vignette qui s'efface toute seule :
+        // c'est le moment précis où l'on découvre que la tuyauterie est
+        // bouchée. Modale pour les refus, toast pour les succès.
+        ouvrirErreur(res.error, {
+          titre: 'L’e-mail d’essai n’est pas parti',
+          explication:
+            'Rien n’est cassé dans GuardVeto : c’est le service qui expédie les e-mails qui a refusé. Tant que ce point n’est pas réglé, les plannings publiés et les réponses aux congés ne partiront pas non plus.',
+        })
+        return
+      }
+      toast.success(`E-mail d’essai envoyé à ${res.destinataire}`)
+    } catch {
+      ouvrirErreur("L’appel n’a pas abouti. Réessaie dans un instant.", {
+        titre: 'L’essai n’a pas pu être lancé',
+      })
+    } finally {
+      setTestEnCours(false)
+    }
   }
 
   // ── Relancer une synchronisation d'agenda ───────────────────────────────
@@ -245,17 +288,22 @@ export function ReglagesV2({ valeurs, periodesPubliees, emails }: Props) {
             {periodesPubliees.length > 0 && (
               <div className="field">
                 <label htmlFor="cn-per">Période à renvoyer</label>
-                <select
-                  id="cn-per"
-                  value={periodeSync}
-                  onChange={(e) => setPeriodeSync(e.target.value)}
-                >
-                  {periodesPubliees.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.libelle ?? `${p.saison === 'ete' ? 'Été' : 'Hiver'} ${p.date_debut.slice(0, 4)}`}
-                    </option>
-                  ))}
-                </select>
+                <Select value={periodeSync} onValueChange={(v) => v && setPeriodeSync(v)}>
+                  <SelectTrigger id="cn-per" className="w-full">
+                    <span className="flex-1 text-left truncate text-sm">
+                      {periodeSync
+                        ? libellePeriode(periodesPubliees.find((p) => p.id === periodeSync)!)
+                        : 'Choisir une période…'}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {periodesPubliees.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {libellePeriode(p)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
 
@@ -335,6 +383,11 @@ export function ReglagesV2({ valeurs, periodesPubliees, emails }: Props) {
               Le domaine de cette adresse doit être <b>autorisé chez l&apos;expéditeur</b> ;
               sinon les e-mails partent en spam, ou ne partent pas du tout.
             </p>
+            <p className="conn-line">
+              L&apos;essai part à <b>ta propre adresse</b> et emprunte le chemin des vrais
+              e-mails : s&apos;il arrive, les plannings publiés arriveront aussi.
+              {!expediteurRegle && ' Sans adresse enregistrée ici, il utilisera la configuration générale.'}
+            </p>
             <div className="conn-actions">
               <button
                 type="button"
@@ -343,6 +396,15 @@ export function ReglagesV2({ valeurs, periodesPubliees, emails }: Props) {
                 disabled={isPending}
               >
                 Enregistrer
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={envoyerTest}
+                disabled={testEnCours}
+              >
+                {testEnCours && <span className="sync-spin" aria-hidden="true" />}
+                {testEnCours ? 'Envoi…' : 'Envoyer un e-mail de test'}
               </button>
             </div>
           </div>
@@ -434,7 +496,11 @@ export function ReglagesV2({ valeurs, periodesPubliees, emails }: Props) {
             </p>
           </div>
           <div className="mail-resume">
-            <span className="mr-chip ok">{emails.length - nbEchecs} envoyés</span>
+            {/* Une pastille verte « 0 envoyés » est un contresens : on ne
+                montre le succès que s'il y en a un. */}
+            {emails.length - nbEchecs > 0 && (
+              <span className="mr-chip ok">{emails.length - nbEchecs} envoyés</span>
+            )}
             {nbEchecs > 0 && <span className="mr-chip bad">{nbEchecs} en échec</span>}
           </div>
         </div>
@@ -473,7 +539,11 @@ export function ReglagesV2({ valeurs, periodesPubliees, emails }: Props) {
                       <span className="msd" aria-hidden="true" />
                       {e.statut === 'erreur' ? 'Échec' : 'Envoyé'}
                     </span>
-                    {e.erreur && <span className="m-erreur">{e.erreur}</span>}
+                    {e.erreur && (
+                      <span className="m-erreur" title={e.erreur}>
+                        {raisonEchec(e.erreur)}
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -487,6 +557,8 @@ export function ReglagesV2({ valeurs, periodesPubliees, emails }: Props) {
           qui sont maintenant refaits et RÉUNIS dans `/regles`. Le dock y mène
           déjà ; deux liens vers le même écran se marchent dessus au clavier
           comme au lecteur d'écran. */}
+
+      {dialogueErreur}
     </>
   )
 }
