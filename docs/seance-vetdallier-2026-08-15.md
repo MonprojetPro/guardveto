@@ -8,9 +8,13 @@
 
 ## 1. Où en est l'application ce matin
 
-L'équipe est saisie (7 vétérinaires), les 4 types de garde sont en place, et **18 règles sont actives** (sur 27 enregistrées). Il n'existe **aucun planning** : la séance commencera donc par en créer un, ce qui est exactement ce qu'on veut montrer.
+**Le compte est vierge, volontairement.** Il ne contient plus que ce que le cabinet a réellement dit : **7 vétérinaires**, **4 types de garde**, **18 règles — toutes actives, aucune en pause**, 2 liens de structure, et une seule période type neutre (« Configuration standard », 2 vétérinaires partout).
 
-Quatre réglages ont été corrigés ce matin pour coller à ce que les deux associées avaient écrit, et un cinquième a été mis en pause par précaution :
+Tout le reste a été effacé : aucun planning, aucune garde, aucun congé, aucune absence, aucune notification, aucun e-mail au journal. Ce sont des données de test qui n'avaient rien à faire là. **La séance commencera donc par créer le premier planning** — ce qui est exactement ce qu'on veut montrer, et ce que vivra n'importe quel cabinet qui s'abonne.
+
+Les 18 règles restantes, en clair : l'indisponibilité d'Anne-Sophie une semaine sur deux · Manon et Antoine jamais en duo · les jours de repos fixes d'Anne-Catherine, Anne-Sophie et Fanny · les repos liés au week-end de Jean, Antoine, Manon et Victor · le vendredi soir lié au week-end · l'inversion des rôles · les 6 dimensions d'équité.
+
+Quatre réglages ont été corrigés ce matin pour coller à ce que les deux associées avaient écrit :
 
 | Ce qui a changé | Pourquoi |
 |---|---|
@@ -18,7 +22,7 @@ Quatre réglages ont été corrigés ce matin pour coller à ce que les deux ass
 | « Inversion 1er/2nd entre vendredi et week-end » repasse en **interdiction ferme** | Idem. Anne-Catherine : « Ça marche capitaine ! » |
 | Le repos de **Jean** (vendredi, ou mardi s'il est de garde le week-end) passe en **« Sauf urgence »** | Anne-Catherine : « Pour moi c'est une règle molle. » Il était en interdiction ferme. |
 | L'équité sur les **jours fériés** descend à **priorité faible** | Anne-Sophie : « je mettrai le nombre de jours fériés en dernier. » Elle était au même niveau que tout le reste. |
-| La règle **« au moins un senior le week-end et le vendredi soir »** est **mise en pause** | Personne ne l'a jamais demandée, et elle bloquait tout (voir piège n°1). Réactivable en un clic si elles la réclament. |
+| **Neuf règles ont été supprimées** — dont « au moins un senior le week-end » | **Aucune ne venait du cabinet** : c'étaient des essais de développement restés en base. Un « un seul week-end tous les six mois » par vétérinaire, une exigence portant sur une étiquette que personne ne porte, une autre sur une étiquette que tout le monde porte. Elles étaient déjà en pause ; les garder n'aurait servi qu'à ce que quelqu'un les rallume par curiosité. Si elles réclament une règle « au moins un senior », on l'installera proprement en étiquetant plusieurs vétérinaires — pas une seule personne. |
 | Un lien **« le binôme du week-end tient aussi les soirs de semaine »** est **retiré** | Ce lien obligeait les deux vétérinaires de garde le week-end à assurer en plus toutes les gardes du lundi au jeudi. C'est l'inverse exact de ce que demande Anne-Sophie, et surtout : **cela rendait le planning impossible à construire au-delà de deux semaines** — le logiciel cherchait une minute puis renonçait. Aucun échange avec le cabinet ne le demande ; tout indique un essai resté allumé. Désactivé, pas supprimé. |
 
 **Vérifié après ces changements** : un planning de 12 semaines se construit désormais en moins d'une seconde, sans aucune place vide et sans aucune règle enfreinte. Idem sur 6 semaines, à 6 comme à 7 vétérinaires, et sur l'été.
@@ -31,7 +35,7 @@ C'est la demande n°1 d'Anne-Catherine — elle écrivait en juin : « ça garde
 
 **Ce qu'il faut lui dire :** en juin, le logiciel décidait tout seul de la saison — et il se trompait. Maintenant c'est le cabinet qui décide : on nomme des périodes types, on choisit celle qu'on applique en créant le planning. Le logiciel ne devine plus rien.
 
-**Les deux périodes types existantes** : « Configuration standard » (2 vétos partout, celle par défaut) et « hiver periode 1 » (2 partout aussi).
+**La seule période type existante** : « Configuration standard » — 2 vétérinaires partout, sans aucun affinage. Elle est là parce qu'il en faut au moins une pour générer, et elle est volontairement neutre. « Été » sera la première que le cabinet aura créée lui-même.
 
 ---
 
@@ -201,53 +205,23 @@ Ce ne sont pas des trous, mais elles sautent aux yeux sur le tableau des compteu
 
 ---
 
-## 4. Les quatre pièges à ne pas déclencher en direct
+## 4. Les deux pièges à ne pas déclencher en direct
 
-### Piège n°1 — Ne pas réactiver la règle « au moins un senior »
+> **Deux pièges ont disparu depuis la première version de cette fiche**, et c'est le vidage du compte qui les a réglés. Les neuf règles en pause — dont « au moins un senior », qui aurait bloqué toute génération dès qu'on aurait parlé du départ d'Anne-Catherine — **n'existent plus**. Il ne reste aucune règle en sommeil à rallumer par curiosité. **On peut donc laisser les vétérinaires manipuler l'écran Règles sans arrière-pensée.**
+>
+> Une réserve technique subsiste, sans danger aujourd'hui puisqu'il n'y a plus rien à réactiver : quand on **crée** une règle, le logiciel prévient si elle pose problème ; quand on **réactive** une règle existante ou qu'on change son niveau de fermeté, il ne prévient pas — la sanction arrive à l'étape « Générer », qui refuse de partir en expliquant pourquoi. Pour démontrer une modification de règle en direct, préférer une règle **nominative** (un repos fixe, une indisponibilité, un duo) : celles-là avertissent bien au moment du clic.
 
-Une règle exigeait « au moins un vétérinaire senior sur le week-end et le vendredi soir ». Personne ne l'a jamais demandée — elle vient de l'équipe de développement.
+### Piège n°1 — Le champ « période type » démarre vide, et c'est exprès
 
-**Le problème :** Anne-Catherine est la **seule** à porter l'étiquette « senior ». Donc si la conversation aboutit à la sortir des gardes, cette règle rend **toute génération impossible**, et le message d'erreur parle d'une étiquette, pas d'une personne. Impossible à expliquer sur le moment.
-
-**Elle a été mise en pause ce matin.** Ne pas la remettre en marche pendant la séance. Si elles la réclament, la noter et l'installer proprement après, en étiquetant plusieurs vétérinaires.
-
-### Piège n°2 — Le champ « période type » démarre vide, et c'est exprès
-
-Quand on crée un planning, il faut **choisir** la période type. Deux existent aujourd'hui : « Configuration standard » et « hiver periode 1 » — **toutes les deux à 2 vétérinaires partout**. Le champ est vide au départ pour qu'on ne génère jamais par inadvertance avec le mauvais réglage.
+Quand on crée un planning, il faut **choisir** la période type. Une seule existe aujourd'hui : « Configuration standard », **2 vétérinaires partout**. Le champ est vide au départ pour qu'on ne génère jamais par inadvertance avec le mauvais réglage.
 
 **Le piège :** il n'existe **aucune période type d'été** tant qu'on ne l'a pas créée en séance. Si on veut montrer l'été sans l'avoir créée, le planning sortira avec **2 vétérinaires par nuit** au lieu d'un seul — et c'est précisément le défaut qu'Anne-Catherine avait signalé en juin. Donc : créer « Été » d'abord, la choisir ensuite, générer en dernier.
 
-### Piège n°3 — Une règle modifiée ne change pas le planning déjà affiché
+### Piège n°2 — Une règle modifiée ne change pas le planning déjà affiché
 
 Si, pendant la séance, on change un réglage (par exemple passer le duo Manon + Antoine en souple), **le planning à l'écran ne bouge pas**. Les règles s'appliquent à la **prochaine génération**.
 
 **Le piège :** montrer un changement de règle, regarder l'écran, et conclure devant elles que « ça n'a pas marché ». Il faut relancer la génération pour voir l'effet. Le dire à voix haute avant de toucher au moindre réglage.
-
-### Piège n°4 — Réactiver une règle en pause n'affiche AUCUN avertissement
-
-Il y a **neuf règles en pause** dans l'écran Règles. Elles ont toutes été vérifiées ce matin en faisant tourner le moteur dessus : **aucune n'est inoffensive**. C'est bien pour ça qu'elles sont en pause.
-
-| Si on réactive… | Ce qui se passe |
-|---|---|
-| « les *toutes* ne sont jamais 1er de garde » | Les 7 vétérinaires portent cette étiquette → plus personne ne peut être 1er |
-| « au moins un *veteran* le vendredi soir » | Personne ne porte cette étiquette → tous les vendredis impossibles à pourvoir |
-| Les 6 règles « un week-end toutes les 25 semaines » | 24 week-ends à pourvoir sur la période, 7 autorisés |
-| « au moins un *senior* » (cf. piège n°1) | Anne-Catherine serait de garde **tous** les week-ends et **tous** les vendredis |
-
-**Le piège :** quand on crée une règle, le logiciel prévient si elle pose problème. Quand on **réactive** une règle existante, ou qu'on change son niveau de fermeté, **il ne prévient de rien** — le clic passe en silence.
-
-⚠️ Détail qui compte : sur la carte « Règles des équipes », **choisir un niveau de fermeté sur une règle en pause la rallume automatiquement**. C'est exactement le geste qu'une vétérinaire fera en découvrant le menu déroulant.
-
-**Ce qui protège quand même :** rien de faux ne peut sortir. Le contrôle est rejoué au moment de générer, et le bouton « Générer » **refuse de partir** en affichant la raison en français — par exemple : *« 24 places de week-end sont à pourvoir, mais les règles n'en autorisent que 7. »* La sanction arrive donc plus tard, mais elle arrive, et elle est lisible.
-
-**La phrase à dire si ça arrive :**
-> « Cette règle-là était en pause pour une bonne raison : elle vise une étiquette que tout le monde porte. Le système me le dit avant de générer — je la remets en pause et on continue. »
-
-**Pour démontrer sereinement une modification de règle en direct**, la faire sur une règle **nominative** (un repos fixe, une indisponibilité, un duo interdit) : celles-là avertissent bien au moment du clic, avec le détail de ce qui change.
-
-*(Correctif identifié — une vingtaine de lignes — volontairement reporté après la séance : le blocage à la génération existe déjà, et on ne touche pas au chemin d'écriture des règles la veille d'une démonstration.)*
-
----
 
 ## 5. Aide-mémoire — où se trouve quoi
 
