@@ -33,6 +33,7 @@ import { calculerBilans } from '@/engine/bilan'
 import {
   queryCompteurs,
   queryCompteursPlage,
+  completerCompteursPourAffichage,
   queryTotalWE,
   queryDepannages,
   queryBonusMalusHeritage,
@@ -260,13 +261,33 @@ export default async function HistoriquePage({
   const derniersRecours = ((vetsDb as { id: string }[] | null) ?? []).map((v) => v.id)
 
   // L'équipe active — les gestes de correction de Filou en ont besoin quand un
-  // réglage d'effectif se corrige en posant une étiquette.
+  // réglage d'effectif se corrige en posant une étiquette, et le tableau des
+  // compteurs en a besoin pour ne laisser personne de côté (juste en dessous).
   const { data: actifsDb } = await supabase
     .from('veterinaires')
-    .select('id, prenom, nom')
+    .select('id, prenom, nom, statut, couleur')
     .eq('actif', true)
     .order('nom')
-  const vetsActifs = (actifsDb ?? []) as Array<{ id: string; prenom: string; nom: string }>
+  const vetsActifs = (actifsDb ?? []) as Array<{
+    id: string
+    prenom: string
+    nom: string
+    statut: 'associe' | 'salarie'
+    couleur: string
+  }>
+
+  // ── Personne ne disparaît du tableau ───────────────────────────────────
+  // Un vétérinaire sans aucune garde sur le filtre courant n'a PAS de ligne
+  // dans la vue : il ne s'affiche pas à zéro, il disparaît. Sur un écran qui
+  // prétend montrer la répartition de toute l'équipe, c'est un mensonge par
+  // omission — et il frappe d'abord le vétérinaire de dernier recours, dont le
+  // rôle EST de n'avoir aucune garde tant que tout va bien.
+  //
+  // Le complément se fait APRÈS `calculerBilans` (ci-dessus) et volontairement :
+  // la quote-part reste calculée sur les seuls vétérinaires qui participent à
+  // la rotation, donc aucun écart affiché ne bouge. Les lignes rajoutées n'ont
+  // pas de bilan, ce que `CompteursPanel` rend déjà « hors répartition ».
+  compteurs = completerCompteursPourAffichage(compteurs, vetsActifs)
 
   // ── Légende du filtre ──────────────────────────────────────────────────
   const legende: Array<{ texte: string; fort?: boolean }> = []

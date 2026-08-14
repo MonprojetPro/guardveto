@@ -19,7 +19,12 @@ import { RealtimeRefresh } from '@/components/planning/RealtimeRefresh'
 import { RevalidationRealtime } from '@/components/planning/RevalidationRealtime'
 import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
 import { chargerDock } from '@/data/v2/dock'
-import { queryCompteurs, queryTotalWE } from '@/hooks/useCompteurs'
+import {
+  queryCompteurs,
+  queryTotalWE,
+  completerCompteursPourAffichage,
+  type VetoPourCompteurs,
+} from '@/hooks/useCompteurs'
 import { calculerBilans } from '@/engine/bilan'
 import { normaliserColonnes } from '@/lib/planning/colonnesCompteurs'
 import type { VetCrise } from '@/components/planning/CriseModal'
@@ -132,7 +137,7 @@ export default async function PlanningPageV2({
   const periodeAffichee =
     periodes.find((p) => p.date_debut <= fin && p.date_fin >= debut) ?? null
 
-  const [dock, profilRes, compteursRes, totalWERes, prefsRes, typesRes2] = await Promise.all([
+  const [dock, profilRes, compteursRes, totalWERes, prefsRes, typesRes2, equipeRes] = await Promise.all([
     chargerDock(supabase, vet, periodes),
     periodeAffichee?.profil_id
       ? supabase.from('profils_planning').select('nom').eq('id', periodeAffichee.profil_id).maybeSingle()
@@ -162,6 +167,15 @@ export default async function PlanningPageV2({
           .eq('actif', true)
           .order('ordre')
       : Promise.resolve({ data: null }),
+    // L'équipe active, pour que personne ne disparaisse de l'encart compteurs
+    // (cf. plus bas). Chargée pour TOUS, véto compris : l'encart s'affiche pour
+    // tout le monde, et c'est justement à un véto qu'on ne peut pas expliquer
+    // pourquoi un collègue manque du tableau.
+    supabase
+      .from('veterinaires')
+      .select('id, prenom, nom, statut, couleur')
+      .eq('actif', true)
+      .order('nom'),
   ])
 
   const profil = (profilRes as { data?: { nom: string } | null })?.data?.nom ?? null
@@ -229,6 +243,23 @@ export default async function PlanningPageV2({
     )
   }
   const bilans = calculerBilans(compteurs, totalWE)
+
+  // ── Personne ne disparaît de l'encart ──────────────────────────────────
+  // La vue `compteurs_gardes` n'émet aucune ligne pour un vétérinaire sans
+  // garde sur la période : il ne s'affiche pas à zéro, il DISPARAÎT. C'est
+  // d'abord le vétérinaire de dernier recours que ça frappe — celui dont le
+  // rôle EST de n'avoir aucune garde tant que tout va bien.
+  //
+  // APRÈS `calculerBilans`, volontairement : la juste part reste calculée sur
+  // les seuls vétérinaires qui participent à la rotation, donc aucun écart
+  // affiché ne bouge. Les lignes ajoutées n'ont pas de bilan, ce que
+  // `CompteursPanel` rend déjà « hors répartition ». Même geste que l'écran
+  // Historique — les deux encarts doivent raconter la même chose.
+  const compteursAffiches = completerCompteursPourAffichage(
+    compteurs,
+    (equipeRes?.data ?? []) as VetoPourCompteurs[],
+  )
+
   const colonnesCompteurs = normaliserColonnes(
     (prefsRes as { data?: { colonnes_compteurs?: string[] | null } | null })?.data?.colonnes_compteurs,
   )
@@ -279,7 +310,7 @@ export default async function PlanningPageV2({
           vets={vets}
           moiVetId={vet.id}
           nomsTypes={nomsTypes}
-          compteurs={compteurs}
+          compteurs={compteursAffiches}
           conges={conges}
           profil={profil}
           periodesAvecGardes={periodesAvecGardes}

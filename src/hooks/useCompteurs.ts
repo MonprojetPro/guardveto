@@ -110,7 +110,17 @@ export async function queryCompteurs(
 // autant de périodes que nécessaire. `valideOnly` ne compte que les
 // gardes appartenant à des périodes publiées ou verrouillées.
 
-function ligneVide(v: { id: string; prenom: string; nom: string; statut: 'associe' | 'salarie'; couleur: string }): CompteursRow {
+/** Le minimum qu'il faut connaître d'un vétérinaire pour lui fabriquer une
+ *  ligne de compteurs à zéro. */
+export interface VetoPourCompteurs {
+  id: string
+  prenom: string
+  nom: string
+  statut: 'associe' | 'salarie'
+  couleur: string
+}
+
+export function ligneVide(v: VetoPourCompteurs): CompteursRow {
   return {
     veterinaire_id: v.id, prenom: v.prenom, nom: v.nom, statut: v.statut, couleur: v.couleur,
     we_premier: 0, we_second: 0, we_total: 0,
@@ -209,6 +219,38 @@ export async function queryCompteursPlage(
   // On ne garde que les vétos ayant au moins une garde (cohérent avec la vue)
   const compteurs = [...map.values()].filter((r) => r.total_gardes > 0)
   return { compteurs, totalWE, erreur: null }
+}
+
+/**
+ * Complète une liste de compteurs avec les vétérinaires actifs qui n'y sont
+ * pas, à zéro. Rend la liste inchangée quand personne ne manque.
+ *
+ * POURQUOI CE N'EST PAS FAIT DANS LES REQUÊTES. La vue `compteurs_gardes` et
+ * `queryCompteursPlage` (cf. son filtre final) n'émettent volontairement
+ * aucune ligne pour un vétérinaire sans garde, et les TROIS chemins qui
+ * écrivent `bonus_malus` s'appuient là-dessus : la quote-part de
+ * `calculerBilans` se calcule sur les seuls vétérinaires qui participent à la
+ * rotation, et deux d'entre eux (`cron/lock-gardes`, `appliquer-changement`)
+ * testent `compteurs.length` pour décider s'il y a quelque chose à écrire.
+ * Élargir les requêtes casserait ces deux gardes et changerait l'écart de
+ * toute l'équipe.
+ *
+ * Ce complément est donc réservé à l'AFFICHAGE et s'applique APRÈS
+ * `calculerBilans`. Sans lui, un vétérinaire sans garde ne s'affiche pas à
+ * zéro : il DISPARAÎT du tableau — ce qui tombe pile sur le vétérinaire de
+ * dernier recours, dont le rôle est justement de n'avoir aucune garde tant
+ * que tout va bien. Les lignes ajoutées n'ont pas de bilan, ce que
+ * `CompteursPanel` rend déjà comme « hors répartition ».
+ */
+export function completerCompteursPourAffichage(
+  compteurs: CompteursRow[],
+  vetsActifs: VetoPourCompteurs[],
+): CompteursRow[] {
+  const presents = new Set(compteurs.map((c) => c.veterinaire_id))
+  const manquants = vetsActifs.filter((v) => !presents.has(v.id)).map((v) => ligneVide(v))
+  if (manquants.length === 0) return compteurs
+  // Même ordre que les deux chemins de lecture : par nom.
+  return [...compteurs, ...manquants].sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
 }
 
 /** Compte le nombre total de week-ends dans une période */

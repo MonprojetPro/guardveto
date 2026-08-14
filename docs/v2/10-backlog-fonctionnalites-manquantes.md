@@ -259,6 +259,309 @@ merge, jamais à la veille d'une démonstration.
 
 ---
 
+## Import d'un ancien planning — 4 défauts relevés à la recette (2026-08-14)
+
+Relevés en testant la chaîne d'import (`lirePlanningImporte.ts`,
+`import-actions.ts`, `ImportPlanning.tsx`) sur la vraie base et sur des
+documents fabriqués. **Aucun n'a été corrigé** — la recette se tenait la veille
+d'une démonstration.
+
+### 1. 🔴 Un vétérinaire absent d'un planning sort du calcul d'équité
+
+**Symptôme.** On importe un ancien planning où quelqu'un ne figure pas — parce
+qu'il rentrait de congé maternité, parce qu'il venait d'arriver, ou simplement
+parce que l'import ne couvre qu'une partie de l'équipe. Cette personne n'a
+aucune ligne de rattrapage d'équité, et **les écarts de tous les autres sont
+faussés en même temps**. Rien ne le signale : l'import s'annonce réussi, le
+panneau affiche « Import enregistré », les compteurs paraissent justes.
+
+Constaté en test : 8 gardes importées sur 7 vétérinaires actifs, dont un sans
+aucune garde → **6 lignes `bonus_malus` écrites au lieu de 7**, et `bilanEcrit`
+à `true` — donc aucun avertissement.
+
+**Cause — deux étages, et c'est le second qui fait le plus de dégâts.**
+
+1. La vue `compteurs_gardes` se termine par
+   `WHERE v.actif = true AND (v.id = g.premier_id OR v.id = g.second_id)`.
+   Un vétérinaire sans garde sur la période **n'a pas de ligne du tout** : il
+   n'est pas à zéro, il n'existe pas.
+2. `calculerBilans` (`src/engine/bilan.ts`) fait `const n = compteurs.length`
+   et divise par ce `n`. Il divise donc **par le nombre de lignes reçues, pas
+   par le nombre de vétérinaires du cabinet**. Sur l'exemple ci-dessus la
+   moyenne week-end vaut **1,33 au lieu de 1,14** : l'écart de *tout le monde*
+   est surévalué, pas seulement celui de l'absent.
+
+**Le panneau promet pourtant l'inverse.** `ImportPlanning.tsx` affiche « La
+prochaine génération rattraperait le retard et l'avance de chacun » et, sur le
+reçu, « Le retard et l'avance de chacun sont repris ». C'est vrai pour ceux qui
+figurent au planning, **faux pour les autres** — et c'est exactement la raison
+d'être de la fonctionnalité.
+
+**⚠️ Ce sont deux problèmes distincts, qu'il ne faut pas confondre** — ils ont
+la même origine mais pas le même correctif, ni la même urgence.
+
+**(a) L'AFFICHAGE : le véto disparaît du tableau.** `CompteursPanel` itère les
+lignes de compteurs ; un vétérinaire sans ligne n'est pas rendu du tout. Sur
+l'écran Compteurs et sur l'encart du Planning, le tableau montre 6 personnes
+au lieu de 7, sans rien dire. C'est visible immédiatement, y compris par la
+personne concernée.
+
+**(b) L'ÉQUITÉ : le dénominateur est faux.** `calculerBilans` divise par le
+nombre de lignes reçues, donc par le nombre de participants, pas par
+l'effectif. Invisible, et durable puisque `bonus_malus` est relu par le moteur.
+
+**Le correctif de (a) est petit et sans risque** — c'est celui qui a été
+préparé le 2026-08-14 (non posé, en attente d'arbitrage) : compléter la liste
+**d'affichage** avec les vétérinaires actifs manquants **après** l'appel à
+`calculerBilans`, via `completerCompteursPourAffichage` dans
+`src/hooks/useCompteurs.ts`. La quote-part reste calculée sur les seuls
+participants — aucun écart affiché ne bouge — et la colonne « écart » des
+lignes rajoutées affiche « hors répartition », ce que `CompteursPanel` sait
+déjà faire (`horsRepartition={bilan === undefined}`).
+
+**Ne PAS élargir les requêtes de lecture pour régler (a).** C'est le piège :
+`queryCompteurs` et `queryCompteursPlage` excluent toutes deux les vétérinaires
+sans garde, **délibérément et de façon cohérente** — `queryCompteursPlage`
+initialise bien une ligne à zéro par vétérinaire actif, mais **la refiltre à la
+fin** (`filter((r) => r.total_gardes > 0)`, avec le commentaire « cohérent avec
+la vue »). Les élargir toucherait **7 appelants**, dont les **3 qui écrivent
+`bonus_malus`** (import, `api/cron/lock-gardes`, `lib/gardes/appliquer-changement`),
+et **casserait deux garde-fous** : `cron/lock-gardes` teste
+`if (compteurs.length === 0) continue` et `appliquer-changement` teste
+`else if (compteurs.length > 0)` pour décider s'il y a un bilan à écrire. Avec
+des lignes à zéro, `compteurs.length` ne vaut plus jamais 0 : les deux gardes
+deviennent mortes et une période verrouillée sans garde écrirait un jeu complet
+de bilans à zéro.
+
+**Le correctif de (b) demande d'abord une décision produit, pas du code :
+un vétérinaire `dernier_recours` doit-il compter dans le dénominateur
+d'équité ?** Aujourd'hui il en est exclu **par accident** (parce qu'il n'a pas
+de gardes), pas par choix. Les deux populations que le code confond :
+
+- un `dernier_recours` à 0 garde → **doit** rester hors du dénominateur ; son
+  rôle est de ne pas servir tant que tout va bien. L'afficher à zéro avec
+  « hors répartition » est la bonne réponse, et c'est ce que fait (a).
+- un vétérinaire ordinaire à 0 garde (retour de congé maternité, arrivée en
+  cours de période) → **doit** entrer dans le dénominateur et recevoir une
+  ligne de dette, sinon il ne rattrapera jamais.
+
+Tant que ce point n'est pas tranché, élargir le dénominateur changerait les
+écarts de toute l'équipe sur un jugement que personne n'a pris.
+`calculerBilans` n'a d'ailleurs pas de bug en soi : c'est une fonction pure qui
+divise correctement par ce qu'on lui donne. Le jour où (b) sera traité, la voie
+propre est de lui passer **l'effectif concerné** en plus des compteurs, plutôt
+que de déduire le dénominateur de la longueur d'une liste construite pour
+l'affichage.
+
+> ⚠️ **Le correctif d'affichage (a) NE RÈGLE PAS (b), et c'est volontaire.**
+> Après (a), le tableau montre bien tout le monde — mais un vétérinaire à zéro
+> garde n'a toujours aucune ligne dans `bonus_malus`, et la quote-part des
+> autres est toujours calculée sur les seuls participants. Le cas qui coûtera
+> cher un jour : **un vétérinaire ordinaire qui rentre de congé maternité**. Il
+> apparaîtra à zéro à l'écran (donc plus personne ne signalera d'anomalie), et
+> le moteur continuera de l'ignorer au rattrapage. **(a) rend le symptôme
+> invisible sans traiter la cause** — raison de plus pour garder cette entrée
+> ouverte, et pour ne pas la refermer en voyant le tableau redevenu complet.
+
+### 2. 🔴 La limite de taille réelle est ~3 Mo, pas les 12 Mo annoncés
+
+**Symptôme.** Une vétérinaire dépose la photo de son planning prise au
+téléphone, ou un PDF scanné par le photocopieur du cabinet. Au lieu du message
+soigné du produit, elle reçoit une erreur technique brute (« Failed to fetch »
+ou une erreur interne Next), sans rien qui lui dise quoi faire.
+
+**Cause.** Le fichier transite par une Server Action, donc par une fonction
+serverless Vercel. **Vercel plafonne le corps d'une requête à 4,5 Mo**
+(documentation « Vercel Functions Limits », section *Request body size*, régime
+Fluid compute) et renvoie une erreur `413 FUNCTION_PAYLOAD_TOO_LARGE`. Le
+plafond est le même sur tous les plans : passer en Pro ne débloque rien.
+
+Trois conséquences en chaîne :
+
+- Le fichier est encodé en base64 avant l'envoi : **4 octets transmis pour
+  3 octets de fichier**, soit +33 %. `4 500 000 × 3/4 = 3 375 000` →
+  **le seuil réel est d'environ 3,3 Mo de fichier source. Retenir 3 Mo.**
+- **`bodySizeLimit: '16mb'` dans `next.config.ts` n'y change rien.** Ce réglage
+  lève le plafond *interne* à Next.js (1 Mo par défaut) — il agit *dans* la
+  fonction. Le plafond Vercel agit *avant* elle, au niveau de la plateforme, et
+  n'est pas relevable depuis le code. Le commentaire du fichier est lucide sur
+  la limite Next mais ignore celle de la plateforme.
+- **Le message français du produit n'est jamais atteint.** Le contrôle de
+  `TAILLE_MAX_OCTETS` vit dans `lireDocumentPlanning`, donc *après* le point de
+  rupture. Côté navigateur, l'échec tombe dans le `catch` générique de
+  `deposerDocument` (`FilouChat.tsx`) qui affiche le message brut de
+  l'exception.
+
+**Zone de danger.** CSV, TXT, capture d'écran et PDF exporté d'un tableur : sans
+risque (< 1 Mo). **Photo de téléphone (2–5 Mo) et PDF scanné (2–10 Mo) : au
+cœur de la zone qui casse.** Ce sont précisément les deux formes qu'un cabinet
+apportera spontanément.
+
+**Correctif minimal — une ligne, à faire de toute façon.** Descendre
+`TAILLE_MAX_OCTETS` de `12 * 1024 * 1024` à `3 * 1024 * 1024`
+(`src/lib/ia/lirePlanningImporte.ts`). Ça ne fait pas passer un fichier de plus,
+mais ça transforme une erreur de plateforme illisible en **la phrase française
+déjà écrite**, qui dit quoi faire (« refais la photo en qualité normale, ou
+découpe le PDF »). Le message annoncera alors 3 Mo, ce qui sera la vérité.
+
+**Correctif réel — réduire l'image dans le navigateur avant l'envoi.** Faisable,
+mais huit points à ne pas rater :
+
+1. **Ça ne couvre pas le PDF.** Un PDF ne se redimensionne pas sur un canvas —
+   et c'est justement le format le plus lourd. Le traiter supposerait de le
+   rendre via pdf.js puis de le ré-encoder en image, ce qui ferait perdre le
+   texte natif que le modèle lit bien mieux qu'une image. **Prévoir de toute
+   façon un message honnête pour les PDF lourds.**
+2. **Viser 2576 px sur le grand côté, pas 2000 px de large.** Le modèle lit en
+   haute résolution jusqu'à 2576 px sur le grand côté ; en dessous, on jette de
+   la finesse exploitable — et c'est sur les grilles denses qu'on en a besoin.
+   Raisonner sur le *grand côté* et non la largeur : un planning mural est en
+   paysage, un planning en liste est en portrait. Au-delà de 2576 px, on
+   transmet des octets pour rien.
+3. **L'orientation EXIF.** Une photo de téléphone porte une balise
+   d'orientation. Les navigateurs l'appliquent sur une balise `<img>`, mais
+   `createImageBitmap(blob)` **l'ignore** sauf à passer
+   `{ imageOrientation: 'from-image' }`. S'en dispenser livre un planning
+   couché. À tester sur une vraie photo de téléphone : un fichier généré n'a pas
+   d'EXIF et ne révélerait pas le bug.
+4. **Ne pas ré-encoder les PNG en JPEG.** Une capture d'écran de tableur passée
+   en JPEG donne des contours baveux — exactement ce qui fait rater une lecture
+   de chiffres. Règle : photo → JPEG qualité 0,85 ; capture d'écran ou export →
+   garder le PNG, redimensionnement seul.
+5. **GIF animé** : le canvas ne garde que la première image. Sans conséquence
+   pour un planning, mais `image/gif` est dans les formats acceptés.
+6. **Mémoire sur mobile.** Une photo de 48 Mpx décodée en canvas occupe ~190 Mo
+   de RAM ; sur un téléphone d'entrée de gamme l'onglet peut être tué. Passer
+   par `createImageBitmap(blob, { resizeWidth, resizeHeight, resizeQuality:
+   'high', imageOrientation: 'from-image' })`, qui décode **et** redimensionne
+   en une passe sans matérialiser l'image pleine taille. Pas `new Image()` +
+   canvas.
+7. **Ne déclencher qu'au-delà du seuil.** Un CSV de 268 octets ou un PNG de
+   13 Ko ne doivent pas être touchés : on dégraderait gratuitement ce qui
+   passait très bien.
+8. **Aligner le message.** Continuer d'annoncer « au-delà de 12 Mo » après
+   coup entretiendrait la confusion.
+
+**À vérifier en 2 minutes avant tout développement** : déposer une image
+d'environ 5 Mo sur le déploiement. Si le message affiché est la phrase française
+du produit, le plafond ne s'applique pas comme décrit ici et tout ce point
+tombe. Si c'est une erreur technique, il est confirmé.
+
+### 3. 🟠 `DEV_BYPASS_AUTH` est cassé depuis le rapatriement sur la base MPP
+
+**Symptôme.** « Jamais rendu en local, pas de bypass auth » traîne dans les
+notes du projet depuis des semaines, traité comme une fatalité — d'où des écrans
+entiers poussés en production sans avoir jamais été vus tourner
+(cf. la recette de `/regles` V2). En pratique : on pose `DEV_BYPASS_AUTH=true`
+dans `.env.local`, on lance `npm run dev`, et l'application se comporte comme si
+personne n'était connecté.
+
+**Cause racine.** `src/lib/supabase/server.ts` code en dur
+`DEV_USER_ID = '649a9035-5c29-4b47-8dcc-f8fb8e0ff4a6'`, avec le commentaire
+« user_id lié à Anne-Sophie (admin) ». **Cet identifiant n'existe dans aucune
+ligne `veterinaires` de la base actuelle** (`mpvrok…`) — vérifié par requête
+directe : zéro résultat. C'est un vestige de l'ancienne base, d'avant le
+rapatriement du SaaS sur la base MPP.
+
+Le bypass fabrique donc bien un client service-role et un `getUser()` mocké,
+mais sur un utilisateur fantôme. Toute la couche applicative fait ensuite
+`select … from veterinaires where user_id = <fantôme>` et récupère `null` : plus
+de profil, plus de rôle, plus de `cabinet_id`. **Et ça échoue en silence**, en
+se présentant comme « non authentifié » — d'où le diagnostic erroné qui a duré
+des semaines.
+
+**Correctif — dans cet ordre de préférence :**
+
+1. **Résoudre l'identifiant depuis la base au lieu de le coder en dur.** Au
+   démarrage du bypass, lire le premier `veterinaires.user_id` non nul dont
+   `role_app = 'admin'` pour le cabinet visé. Le bypass survit alors à tout
+   changement de base, y compris à un futur passage sur la base d'un client.
+2. **À défaut : rendre l'identifiant configurable** par une variable
+   `DEV_BYPASS_USER_ID` dans `.env.local`, avec la valeur en dur comme repli.
+3. **Dans tous les cas : échouer bruyamment.** Si le `user_id` du bypass ne
+   correspond à aucune ligne `veterinaires`, lever une erreur explicite
+   (« DEV_BYPASS_AUTH : l'utilisateur X n'existe pas dans cette base ») plutôt
+   que de laisser l'application se dégrader en « non authentifié ». C'est le
+   point qui aurait fait gagner des semaines : le mode dégradé silencieux a
+   coûté plus cher que la panne elle-même.
+
+**Gain attendu** : pouvoir à nouveau recetter en local avant de pousser. La
+mémoire du projet porte plusieurs écrans « livrés mais non recettés » dont c'est
+la cause directe.
+
+### 4. 🟡 `max_tokens: 8000` partagé entre la réflexion et la restitution
+
+**Symptôme.** Sur un document long — un planning couvrant une année entière, ou
+une grille très dense — la lecture échoue avec « Ce que j'ai lu n'était pas
+exploitable. Réessaie ? ». **Le second essai échoue exactement pareil**, sans
+que rien n'explique pourquoi. Sur un document court, tout va bien.
+
+**Cause.** L'appel de `lirePlanningDepuisFichier` demande `max_tokens: 8000`
+avec `thinking: { type: 'adaptive' }`. Ce plafond couvre **la réflexion ET la
+sortie**, pas seulement la sortie. À environ 30 tokens par garde restituée, une
+période de 12 à 17 semaines passe confortablement ; un planning annuel
+(300+ lignes) peut saturer le budget. La réponse est alors tronquée en cours de
+route, le bloc d'outil arrive incomplet, `ParamsRestituer.safeParse` échoue, et
+le code retourne son message générique.
+
+**Le code ne lit pas `stop_reason`.** L'API signale pourtant explicitement une
+troncature (`stop_reason: 'max_tokens'`), ce qui permettrait de distinguer « le
+document est trop long » d'une vraie réponse illisible.
+
+**Correctif :**
+
+- **Lire `stop_reason`** et rendre un message qui dit la vraie raison : « Ce
+  planning est trop long pour être lu d'un coup — découpe-le en deux périodes. »
+  Un message qui oriente vaut mieux qu'un « Réessaie ? » qui envoie dans le mur.
+- **Relever `max_tokens`** (le modèle en tolère bien davantage), en gardant à
+  l'esprit que ça allonge l'attente devant l'écran.
+- En attendant : **une période à la fois, pas une année**.
+
+### 5. 💣 Mine — deux garde-fous qui encodent une règle métier dans une longueur
+
+**Pas un bug aujourd'hui. Une mine amorcée**, du même genre que celles trouvées
+dans l'écran Règles : le code est correct, mais il le restera pour une raison
+qui n'est écrite nulle part et qui finira par disparaître.
+
+**Les deux endroits :**
+
+- `src/app/api/cron/lock-gardes/route.ts` — `if (compteurs.length === 0) continue`
+- `src/lib/gardes/appliquer-changement.ts` — `else if (compteurs.length > 0)`
+
+**Ce qu'ils veulent dire** : « cette période ne contient aucune garde, il n'y a
+pas de bilan à écrire ». **Ce qu'ils testent réellement** : la longueur d'une
+liste. Les deux coïncident uniquement parce que la vue `compteurs_gardes`
+n'émet aucune ligne pour un vétérinaire sans garde — c'est-à-dire à cause d'une
+**propriété de forme** de la requête, pas d'une règle métier énoncée quelque
+part.
+
+**Le jour où ça pète.** Quelqu'un complétera un jour la liste des vétérinaires
+— pour régler le point 1(b) ci-dessus, ou simplement parce que « c'est plus
+logique que tout le monde y soit ». Ce jour-là, `compteurs.length` ne vaudra
+plus jamais 0 : il vaudra toujours au moins l'effectif actif. **Les deux gardes
+deviendront muettes sans que rien ne le signale**, et une période verrouillée
+sans aucune garde se mettra à écrire un jeu complet de bilans à zéro dans
+`bonus_malus` — que le moteur relira. Le tout sur un cron qui tourne la nuit,
+sans personne devant l'écran.
+
+**Correctif (quand on y touchera, pas avant) :** tester la chose qu'on veut
+vraiment savoir, pas son ombre. Deux voies possibles :
+
+- `if (totalGardes === 0)` à partir d'un `count` explicite sur `gardes` pour la
+  période — c'est la question posée, formulée telle quelle ;
+- ou `if (compteurs.every((c) => c.total_gardes === 0))`, qui reste juste que la
+  liste soit complétée ou non.
+
+**Le vrai correctif, à défaut de tout réécrire ce soir : écrire l'invariant
+au-dessus des deux lignes.** Une phrase qui dit « ceci suppose que la vue
+n'émet aucune ligne pour un véto sans garde » transformerait une mine en piège
+visible — c'est ce qui manque, plus que le code lui-même.
+
+---
+
 *Généré le 2026-07-03 à partir de l'audit 360° (6 agents Fable). Source de
 vérité des arbitrages : MiKL.*
 *Complété le 2026-08-14 (audit Réglages, veille de la séance VetdAllier).*
+*Complété le 2026-08-14 (recette de l'import d'un ancien planning : équité des
+absents, limite de taille réelle, cause racine du bypass auth, plafond de
+tokens, mine des garde-fous `compteurs.length`).*
