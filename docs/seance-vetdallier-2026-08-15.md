@@ -223,7 +223,81 @@ Si, pendant la séance, on change un réglage (par exemple passer le duo Manon +
 
 **Le piège :** montrer un changement de règle, regarder l'écran, et conclure devant elles que « ça n'a pas marché ». Il faut relancer la génération pour voir l'effet. Le dire à voix haute avant de toucher au moindre réglage.
 
-## 5. Aide-mémoire — où se trouve quoi
+## 5. Import d'un ancien planning — montrer ou ne pas montrer
+
+Filou sait lire l'ancien planning du cabinet (photo, PDF, CSV) et en tirer l'historique des gardes, pour que les compteurs ne repartent pas de zéro. C'est la nouveauté de la nuit. **Lis d'abord l'encadré ci-dessous : il décide de tout.**
+
+### ⚠️ Ce qui est prouvé, et ce qui ne l'est pas
+
+> **La lecture d'un document par l'intelligence artificielle n'a jamais été exécutée. Pas une seule fois, ni en test ni ailleurs.**
+>
+> La clé qui donne accès au modèle est marquée « Sensitive » sur Vercel : elle fonctionne en ligne, mais elle n'est pas retéléchargeable, donc elle n'a pas pu être mise dans l'environnement de test. **En production, la fonction devrait marcher. Personne ne l'a vue marcher.**
+
+**Ce qui a été vérifié pour de vrai, sur la vraie base :**
+
+- **L'enregistrement.** La période et les gardes s'écrivent correctement, les compteurs se remplissent, le rattrapage d'équité s'écrit, un second import sur les mêmes dates est refusé proprement, et **l'annulation remet tout exactement comme avant** — recompté, rien ne traîne.
+- **La reconnaissance des noms.** 57 façons d'écrire un nom ont été testées sur la vraie équipe : « Victor », « victor », « COELHO », « VC », « Anne-So », « AS », « JDT », « Anne-Cath »… **Zéro attribution erronée.** Les cas douteux — « Fany » mal orthographié, « Sophie » face à Anne-Sophie, « Anne » qui pourrait viser deux personnes — sont **refusés**, jamais devinés.
+- **Les refus.** Fichier vide, format non géré, fichier trop lourd : message clair en français, avec la marche à suivre.
+
+**Ce qui n'a PAS pu être vérifié — et c'est le point qui compte :**
+
+> **Le modèle invente-t-il ?** Ajoute-t-il une garde qui n'était pas sur le document, complète-t-il une série, devine-t-il une année qui n'est pas écrite ? Le programme le lui interdit explicitement et un second garde-fou rattrape les noms inventés. **Mais rien de tout cela n'a été mis à l'épreuve sur un vrai document.**
+
+C'est donc le seul risque réel : que le tableau affiche une garde qui n'existe pas. **Il ne devient dangereux que si on valide sans regarder** — d'où l'étape de vérification ci-dessous, qui n'est pas une formalité.
+
+### Le geste, pas à pas
+
+1. **Accueil**, la tablette de Filou (visible pour un administrateur).
+2. Dans la barre de saisie, à droite du champ où on écrit à Filou : un **petit bouton en forme de dossier avec un +**. Infobulle : « Déposer un ancien planning ». C'est lui.
+3. Choisir le fichier dans la fenêtre du système.
+4. **Pendant la lecture** : la phrase « Voici notre ancien planning : "*nom du fichier*" » s'affiche côté utilisateur, et Filou se met à écrire. **Je n'ai pas pu mesurer la durée** — compte plusieurs dizaines de secondes sur une photo. **Annonce-le avant de cliquer** (« il va le lire, ça prend un moment »), sinon le silence se remarque.
+5. **Le résultat s'affiche sur le tableau, à droite**, sous le titre « Ce que j'ai lu dans "*nom du fichier*" ». Filou dit dans la conversation combien de gardes il a reconnues.
+
+**Ce qu'il faut vérifier AVANT de valider** — dans cet ordre :
+
+- **En haut, le bloc « Ce que je n'ai pas su lire ».** S'il est là, le lire à voix haute : ce sont les endroits où Filou a préféré se taire plutôt que deviner. C'est une bonne nouvelle, pas un défaut.
+- **Chaque ligne du tableau** : la date, le type de garde, les deux noms. C'est **le seul moment** où une garde inventée peut être attrapée.
+- **Les lignes signalées et décochées d'office** : ce sont celles dont un nom n'a pas été reconnu. À côté de la case, le texte « lu "…" » montre ce qui était écrit sur le document. On corrige avec le menu déroulant, ou on laisse décoché.
+- **Le pavé « Ce que ça changerait »**, juste au-dessus du bouton : il annonce le nombre de gardes qui vont entrer dans l'historique. Le comparer à ce qu'on attend.
+
+6. Donner un nom à la période (« Gardes de l'hiver dernier »).
+7. Cliquer **« Enregistrer N gardes dans l'historique »**. Rien n'est écrit avant ce clic.
+8. **Si c'est raté : le bouton « Annuler cet import »** apparaît sur le reçu, juste après. Il supprime la période et toutes ses gardes, et remet les compteurs exactement comme avant. **C'est vérifié.** On peut donc se rattraper devant elles sans dommage.
+
+### Quel document proposer, et lequel éviter
+
+| Risque | Type de document | Pourquoi |
+|---|---|---|
+| ✅ **Le plus sûr** | **CSV**, ou une **capture d'écran** d'un tableur | Léger, texte net. Un CSV est même envoyé en texte brut, sans passer par la reconnaissance d'image : c'est le chemin le plus fiable et le plus rapide. |
+| ✅ Correct | **PDF exporté** d'un tableur | Léger et net lui aussi. |
+| ⚠️ **Risqué** | **Photo prise au téléphone** | Au-delà d'environ **3 Mo**, le refus vient de l'hébergeur et **le message affiché est incompréhensible** (une erreur technique, pas une phrase en français). Une photo de téléphone fait couramment 2 à 5 Mo : c'est pile la zone. |
+| ⚠️ **Risqué** | **PDF scanné** par un photocopieur | Même problème de poids, en pire (2 à 10 Mo), et on ne peut pas le réduire facilement. |
+
+**Le conseil pratique à donner si elles apportent un papier** : prendre la photo en **qualité normale** (pas en qualité maximale), ou mieux — **faire une capture d'écran plutôt qu'une photo** si le planning existe déjà sur un ordinateur.
+
+**Et dans tous les cas : une période, pas une année.** Un planning couvrant douze mois peut dépasser la capacité de lecture en une fois ; la réponse serait tronquée et le message d'erreur ne l'expliquerait pas. Douze ou dix-sept semaines, c'est le bon format.
+
+### Les trois phrases à avoir en tête
+
+**Si un nom n'est pas reconnu** — c'est le cas le plus probable, et c'est une force :
+
+> « Il ne devine jamais un nom dont il n'est pas sûr. Quand il hésite, il vous le montre et vous demande, plutôt que d'attribuer une garde à la mauvaise personne. »
+
+**Si une ligne part dans « je n'ai pas su lire »** :
+
+> « Là, il a préféré ne rien mettre plutôt que d'inventer. C'est exactement ce qu'on lui demande : ce qu'il ne lit pas, il le dit — on l'ajoutera à la main si ça compte. »
+
+**Si l'import échoue complètement** — pour passer à la suite sans que la séance s'arrête :
+
+> « C'est tout neuf, ça date de cette nuit, et je préfère ne pas le forcer devant vous. Je le reprends au calme avec votre planning et je vous montre le résultat. On continue. »
+
+### 👉 Ma recommandation
+
+**Montre-le — mais uniquement avec un CSV ou une capture d'écran que tu auras testés toi-même avant la séance, et présente-le comme une nouveauté que tu découvres avec elles.** Si tu n'as rien pu tester avant, ne le lance pas sur le document qu'elles apportent : parles-en, montre où se trouve le bouton, et propose de le faire ensuite avec leur vrai planning. Une fonctionnalité annoncée et essayée plus tard laisse une bien meilleure impression qu'une fonctionnalité qui invente une garde devant la personne concernée.
+
+---
+
+## 6. Aide-mémoire — où se trouve quoi
 
 | Ce qu'on veut faire | Où |
 |---|---|
