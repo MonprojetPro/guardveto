@@ -162,7 +162,7 @@ export async function inviterVeterinaire(id: string) {
   // la cible appartient au cabinet du caller (scope tenant vérifié ici).
   const { data: vet } = await supabase
     .from('veterinaires')
-    .select('email, prenom, nom, user_id')
+    .select('email, prenom, nom, user_id, cabinet_id, role_app')
     .eq('id', id)
     .single()
 
@@ -211,6 +211,39 @@ export async function inviterVeterinaire(id: string) {
   )
   if (inviteError) return { error: inviteError.message }
   authUserId = inviteData.user.id
+
+  // ── Le rattachement au cabinet, DANS LE JETON ────────────────────────────
+  // Sans ceci, le compte est créé, l'invitation part, le mot de passe se
+  // définit… et la connexion échoue sur « Votre compte n'est pas encore
+  // activé ». Incident vécu le 2026-08-15 sur le compte d'Anne-Catherine, à
+  // quelques heures d'une démonstration client.
+  //
+  // Pourquoi : toute la sécurité repose sur `auth_cabinet_actif()`, qui lit
+  // `app_metadata.cabinet_id` DU JETON — pas la colonne `veterinaires.cabinet_id`.
+  // Sans cette clé, la policy RESTRICTIVE d'isolation refuse TOUT, y compris la
+  // propre fiche du vétérinaire. `login/actions.ts` ne la trouve pas et conclut
+  // que le compte est inactif — un message exact sur la forme et trompeur sur le
+  // fond, qui envoie chercher du côté de l'activation alors que le compte l'est.
+  //
+  // `inviteUserByEmail(..., { data })` n'alimente QUE `user_metadata` : il n'y a
+  // aucun moyen de poser `app_metadata` à l'invitation, d'où cette seconde passe.
+  // `role` est posé en même temps par cohérence — les droits eux-mêmes sont
+  // décidés par `get_user_role()`, qui lit la table, jamais le jeton.
+  const { error: metaError } = await adminClient.auth.admin.updateUserById(authUserId, {
+    app_metadata: { cabinet_id: vet.cabinet_id },
+    user_metadata: { veterinaire_id: id, role: vet.role_app },
+  })
+  if (metaError) {
+    // On ne laisse pas passer un compte à moitié créé en annonçant « invitation
+    // envoyée » : il ne pourrait jamais se connecter, et personne ne saurait
+    // pourquoi. On efface le compte auth pour que la ré-invitation reparte
+    // d'une base saine.
+    await adminClient.auth.admin.deleteUser(authUserId)
+    return {
+      error:
+        "L'invitation n'a pas pu être finalisée (rattachement au cabinet). Réessaie — si ça persiste, préviens l'assistance.",
+    }
+  }
 
   // Met à jour user_id et invite_pending (toujours, car l'auth user peut avoir changé)
   const { error: updateError } = await adminClient
