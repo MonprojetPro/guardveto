@@ -247,11 +247,13 @@ C'est donc le seul risque réel : que le tableau affiche une garde qui n'existe 
 
 ### Le geste, pas à pas
 
-1. **Accueil**, la tablette de Filou (visible pour un administrateur).
-2. Dans la barre de saisie, à droite du champ où on écrit à Filou : un **petit bouton en forme de dossier avec un +**. Infobulle : « Déposer un ancien planning ». C'est lui.
-3. Choisir le fichier dans la fenêtre du système.
-4. **Pendant la lecture** : la phrase « Voici notre ancien planning : "*nom du fichier*" » s'affiche côté utilisateur, et Filou se met à écrire. **Je n'ai pas pu mesurer la durée** — compte plusieurs dizaines de secondes sur une photo. **Annonce-le avant de cliquer** (« il va le lire, ça prend un moment »), sinon le silence se remarque.
-5. **Le résultat s'affiche sur le tableau, à droite**, sous le titre « Ce que j'ai lu dans "*nom du fichier*" ». Filou dit dans la conversation combien de gardes il a reconnues.
+> **Le geste a changé de place le 15 août** (décision MiKL) : il vivait derrière un trombone dans la conversation de Filou, où personne ne comprenait à quoi il servait. Il est maintenant **dans l'écran Compteurs**, là où on regarde justement les compteurs qu'il sert à amorcer. **Il n'y a plus qu'une seule porte** — le trombone n'existe plus.
+
+1. **Compteurs**, dans la barre du haut.
+2. **Aujourd'hui l'écran est vide** (« Rien à raconter pour l'instant »), et c'est le cas idéal : sous la carte « Ce qui apparaîtra ici », une **deuxième carte** propose le geste en entier — **« Tu as déjà un planning, sur papier ou dans un tableur ? »** — avec un **bouton plein « Importer un ancien planning »**.
+3. Cliquer dessus : la fenêtre de choix de fichier du système s'ouvre.
+4. **Pendant la lecture** : le bouton passe à « Lecture en cours… » et un bandeau apparaît juste dessous — un point qui bat, et la phrase « Filou lit "*nom du fichier*"… Ça peut prendre un moment : il relit le document ligne par ligne avant de te montrer quoi que ce soit. » **Je n'ai pas pu mesurer la durée** — compte plusieurs dizaines de secondes sur une photo. **Annonce-le avant de cliquer** (« il va le lire, ça prend un moment »), sinon le silence se remarque.
+5. **Le résultat s'ouvre juste en dessous du bouton**, dans une carte titrée « Ce que Filou a lu dans "*nom du fichier*" ». On ne quitte pas l'écran : le geste et son résultat sont l'un sous l'autre.
 
 **Ce qu'il faut vérifier AVANT de valider** — dans cet ordre :
 
@@ -263,6 +265,10 @@ C'est donc le seul risque réel : que le tableau affiche une garde qui n'existe 
 6. Donner un nom à la période (« Gardes de l'hiver dernier »).
 7. Cliquer **« Enregistrer N gardes dans l'historique »**. Rien n'est écrit avant ce clic.
 8. **Si c'est raté : le bouton « Annuler cet import »** apparaît sur le reçu, juste après. Il supprime la période et toutes ses gardes, et remet les compteurs exactement comme avant. **C'est vérifié.** On peut donc se rattraper devant elles sans dommage.
+
+**Deux détails d'affichage, pour ne pas être surpris** : un refus (format non géré, fichier vide, trop lourd, dates déjà occupées) s'affiche en **fenêtre qui barre la route** — impossible de la manquer ; un succès s'affiche en **petit bandeau de confirmation** en bas de l'écran, et la période apparaît aussitôt dans la liste.
+
+**Une fois qu'un premier planning existera**, l'écran ne sera plus vide : le bouton « Importer un ancien planning » devient alors une **action discrète alignée à droite**, juste sous le titre de la page et au-dessus des filtres. Le résultat s'ouvre toujours au même endroit, directement dessous.
 
 ### Quel document proposer, et lequel éviter
 
@@ -294,6 +300,8 @@ C'est donc le seul risque réel : que le tableau affiche une garde qui n'existe 
 ### 👉 Ma recommandation
 
 **Montre-le — mais uniquement avec un CSV ou une capture d'écran que tu auras testés toi-même avant la séance, et présente-le comme une nouveauté que tu découvres avec elles.** Si tu n'as rien pu tester avant, ne le lance pas sur le document qu'elles apportent : parles-en, montre où se trouve le bouton, et propose de le faire ensuite avec leur vrai planning. Une fonctionnalité annoncée et essayée plus tard laisse une bien meilleure impression qu'une fonctionnalité qui invente une garde devant la personne concernée.
+
+**Et c'est maintenant faisable, ce qui change tout.** Tu es connecté et l'application est en ligne : tu peux faire l'essai toi-même avant la séance. Quatre documents t'ont été envoyés — un CSV simple, un planning en semaines × jours, une image de tableau, et un fichier sans année qui est le piège (le bon comportement est qu'il **refuse de deviner** l'année et le dise dans « Ce que je n'ai pas su lire »). **Passes-en deux ou trois, et tu sauras s'il invente** — c'est-à-dire la seule chose que personne n'a encore vérifiée. Si les lectures sont propres, prends le premier point de cette section pour ce qu'il devient alors : un avertissement levé, et tu peux montrer franchement.
 
 ---
 
