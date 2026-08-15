@@ -1,12 +1,28 @@
 'use client'
 
+// ============================================================
+// GUARDVETO — LA PORTE DU TERRIER (connexion)
+// ============================================================
+// Premier écran du produit, et le seul qui soit resté en V1 quand tout
+// le reste est passé au « Terrier chaleureux » : aplat bleu canard sur
+// la moitié gauche, carte blanche, bouton pleine largeur bleu. Il est
+// ici accordé au reste — mêmes surfaces, mêmes rayons, mêmes ombres,
+// même encre renarde, et Filou qui accueille à l'entrée.
+//
+// La logique n'a pas bougé d'une ligne : `actions.ts` (login /
+// resetPassword), les champs, les messages et les enchaînements sont
+// ceux d'avant. Seule la présentation change.
+//
+// Les deux feuilles sont importées ici parce que `/login` vit hors du
+// groupe de routes (v2) — il ne peut pas, il redirige vers lui-même.
+// ============================================================
+
 import { useState, useTransition } from 'react'
 import { login, resetPassword } from './actions'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Stethoscope, Calendar, Shield } from 'lucide-react'
+import { Satin } from '@/components/v2/Satin'
+import { Calendar, Shield } from 'lucide-react'
+import '@/styles/v2-terrier.css'
+import '@/styles/v2-connexion.css'
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(() => {
@@ -30,137 +46,155 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="v2 co-page">
+      <Satin />
 
-      {/* Panel de marque — desktop uniquement */}
-      <div className="hidden lg:flex flex-col justify-between w-[42%] bg-primary px-14 py-12">
-        {/* Logo */}
-        <div className="flex items-center gap-3">
-          <Stethoscope className="w-7 h-7 text-primary-foreground/80" />
-          <span className="font-heading font-bold text-primary-foreground text-xl tracking-tight">
-            GuardVeto
-          </span>
-        </div>
+      <main className="co-scene">
+        {/* ── Le panneau d'identité — posé sur le satin, pas un aplat ── */}
+        <section className="co-marque">
+          <div className="co-lockup">
+            <span className="co-binette">
+              {/* eslint-disable-next-line @next/next/no-img-element -- pièce à
+                  alpha servie telle quelle, comme dans la barre de l'app. */}
+              <img src="/filou/filou-tete.webp" alt="" width={44} height={44} />
+            </span>
+            <span className="co-nom">
+              Guard<em>Veto</em>
+            </span>
+          </div>
 
-        {/* Accroche centrale */}
-        <div className="space-y-6">
-          <h2 className="font-heading text-4xl font-bold text-primary-foreground leading-tight">
-            Les gardes,<br />organisées.
-          </h2>
-          <p className="text-primary-foreground/75 text-base leading-relaxed max-w-xs">
-            Planning des gardes vétérinaires — génération automatique, publication et suivi des compteurs.
-          </p>
+          {/* Slogan, pas titre de section : `Connexion` reste le seul h1 de
+              l'écran, et l'ordre des titres ne part pas à l'envers. */}
+          <div className="co-accroche">
+            <p className="co-titre">
+              Les gardes,
+              <br />
+              organisées.
+            </p>
+            <p className="co-lede">
+              Planning des gardes vétérinaires — génération automatique, publication et suivi
+              des compteurs.
+            </p>
+          </div>
 
-          <div className="space-y-3 pt-2">
+          <ul className="co-points">
             {[
               { icon: Calendar, label: "Planning mensuel en un coup d'oeil" },
               { icon: Shield, label: 'Règles de répartition respectées' },
             ].map(({ icon: Icon, label }) => (
-              <div key={label} className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-primary-foreground/15 flex items-center justify-center shrink-0">
-                  <Icon className="w-4 h-4 text-primary-foreground" />
-                </div>
-                <span className="text-primary-foreground/80 text-sm">{label}</span>
-              </div>
+              <li key={label} className="co-point">
+                <span className="co-ico">
+                  <Icon strokeWidth={1.8} />
+                </span>
+                {label}
+              </li>
             ))}
-          </div>
-        </div>
+          </ul>
 
-        {/* Bas du panel */}
-        <p className="text-primary-foreground/40 text-xs">
-          Cabinet vétérinaire — accès réservé
-        </p>
-      </div>
-
-      {/* Panel formulaire */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-background">
-        <div className="w-full max-w-sm">
-
-          {/* Logo mobile uniquement */}
-          <div className="lg:hidden text-center mb-8">
-            <div className="inline-flex items-center gap-2.5 mb-3">
-              <Stethoscope className="w-6 h-6 text-primary" />
-              <h1 className="font-heading text-2xl font-bold text-primary">GuardVeto</h1>
+          {/* Filou accoudé au rebord : il tient la porte. */}
+          <div>
+            <div className="co-filou">
+              {/* eslint-disable-next-line @next/next/no-img-element -- pièce
+                  découpée dont le cadrage dépend de l'alpha natif (cf. CSS). */}
+              <img src="/filou/filou-pose-fixe.webp" alt="" />
             </div>
-            <p className="text-muted-foreground text-sm">
-              Planning des gardes vétérinaires
-            </p>
+            <div className="co-rebord" />
           </div>
 
-          <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="font-heading text-xl">Connexion</CardTitle>
-              <CardDescription>
-                Entrez vos identifiants pour accéder au planning.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="prenom@cabinet.fr"
-                    required
-                    autoComplete="email"
-                    disabled={isPending}
-                  />
-                </div>
+          <p className="co-pied">Cabinet vétérinaire — accès réservé</p>
+        </section>
 
-                <div className="space-y-2">
-                  <Label htmlFor="password">Mot de passe</Label>
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    placeholder="••••••••"
-                    required
-                    autoComplete="current-password"
-                    disabled={isPending}
-                  />
-                </div>
+        {/* ── La carte : le seul objet posé sur le satin ── */}
+        <div>
+          {/* En écran étroit, le panneau disparaît : l'identité repasse ici. */}
+          <div className="co-entete">
+            <div className="co-lockup">
+              <span className="co-binette">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/filou/filou-tete.webp" alt="" width={44} height={44} />
+              </span>
+              <span className="co-nom">
+                Guard<em>Veto</em>
+              </span>
+            </div>
+            <p className="co-lede">Planning des gardes vétérinaires</p>
+          </div>
 
-                {error && (
-                  <div className="rounded-md bg-destructive/10 border border-destructive/20 px-4 py-3">
-                    <p className="text-sm text-destructive">{error}</p>
-                  </div>
-                )}
+          <section className="co-carte">
+            <p className="co-kicker">Bienvenue</p>
+            <h1>Connexion</h1>
+            <p className="co-sous">Entrez vos identifiants pour accéder au planning.</p>
 
-                <Button
-                  type="submit"
-                  className="w-full"
+            <form onSubmit={handleSubmit} className="co-form">
+              <div className="co-champ">
+                <label htmlFor="email">Email</label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="prenom@cabinet.fr"
+                  required
+                  autoComplete="email"
                   disabled={isPending}
-                >
-                  {isPending ? 'Connexion en cours…' : 'Se connecter'}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+                  aria-describedby={error ? 'co-erreur' : undefined}
+                />
+              </div>
 
-          <p className="text-center text-xs text-muted-foreground mt-6">
-            {resetSent ? (
-              <span className="text-emerald-600">Email de réinitialisation envoyé.</span>
-            ) : (
-              <button
-                className="underline underline-offset-2 hover:text-foreground transition-colors"
-                onClick={() => {
-                  const email = (document.getElementById('email') as HTMLInputElement)?.value
-                  if (!email) { setError('Entrez votre email puis cliquez sur ce lien.'); return }
-                  startTransition(async () => {
-                    const result = await resetPassword(email)
-                    if (result?.error) { setError(result.error); return }
-                    setResetSent(true)
-                  })
-                }}
-              >
-                Mot de passe oublié ?
+              <div className="co-champ">
+                <label htmlFor="password">Mot de passe</label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  placeholder="••••••••"
+                  required
+                  autoComplete="current-password"
+                  disabled={isPending}
+                  aria-describedby={error ? 'co-erreur' : undefined}
+                />
+              </div>
+
+              {error && (
+                <p className="co-refus" id="co-erreur" role="alert">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7.5v5.2M12 16.3v.2" />
+                  </svg>
+                  {error}
+                </p>
+              )}
+
+              <button type="submit" className="co-valider" disabled={isPending}>
+                {isPending && <span className="co-spin" aria-hidden="true" />}
+                {isPending ? 'Connexion en cours…' : 'Se connecter'}
               </button>
-            )}
-          </p>
+            </form>
+
+            <p className="co-pied-carte">
+              {resetSent ? (
+                <span className="co-envoye">Email de réinitialisation envoyé.</span>
+              ) : (
+                <button
+                  type="button"
+                  className="co-lien"
+                  disabled={isPending}
+                  onClick={() => {
+                    const email = (document.getElementById('email') as HTMLInputElement)?.value
+                    if (!email) { setError('Entrez votre email puis cliquez sur ce lien.'); return }
+                    startTransition(async () => {
+                      const result = await resetPassword(email)
+                      if (result?.error) { setError(result.error); return }
+                      setResetSent(true)
+                    })
+                  }}
+                >
+                  Mot de passe oublié ?
+                </button>
+              )}
+            </p>
+          </section>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

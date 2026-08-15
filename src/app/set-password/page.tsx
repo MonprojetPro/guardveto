@@ -1,10 +1,21 @@
 'use client'
 
+// ============================================================
+// GUARDVETO — DÉFINIR SON MOT DE PASSE (suite de l'invitation)
+// ============================================================
+// Même parcours que `/login`, donc même habillage : traiter l'un sans
+// l'autre recréerait à un écran de distance l'incohérence qu'on vient
+// de corriger. Pas de panneau d'identité ici (`.co-scene.seule`) : on
+// arrive par un lien d'invitation, on sait déjà où on est.
+// La logique (session, RPC `marquer_invite_complete`, redirection) est
+// inchangée — seule la présentation bouge.
+// ============================================================
+
 import { useState, useTransition, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Satin } from '@/components/v2/Satin'
+import '@/styles/v2-terrier.css'
+import '@/styles/v2-connexion.css'
 
 export default function SetPasswordPage() {
   const [password, setPassword] = useState('')
@@ -77,55 +88,89 @@ export default function SetPasswordPage() {
 
   if (!ready) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <p className="text-sm text-muted-foreground">Connexion en cours…</p>
+      <div className="v2 co-page">
+        <Satin />
+        <p className="co-attente">
+          <span className="co-spin" aria-hidden="true" />
+          Connexion en cours…
+        </p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="text-center space-y-1">
-          <h1 className="font-heading text-2xl font-bold text-foreground">Définir mon mot de passe</h1>
-          <p className="text-sm text-muted-foreground">Choisissez un mot de passe pour accéder à GuardVeto</p>
+    <div className="v2 co-page">
+      <Satin />
+
+      <main className="co-scene seule">
+        <div>
+          <div className="co-entete-fixe">
+            <span className="co-binette">
+              {/* eslint-disable-next-line @next/next/no-img-element -- pièce à
+                  alpha servie telle quelle, comme dans la barre de l'app. */}
+              <img src="/filou/filou-tete.webp" alt="" width={44} height={44} />
+            </span>
+            <span className="co-nom">
+              Guard<em>Veto</em>
+            </span>
+          </div>
+
+          <section className="co-carte">
+            <h1>Définir mon mot de passe</h1>
+            <p className="co-sous">Choisissez un mot de passe pour accéder à GuardVeto</p>
+
+            <form onSubmit={handleSubmit} className="co-form">
+              <div className="co-champ">
+                <label htmlFor="password">Mot de passe</label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="8 caractères minimum"
+                  required
+                  autoFocus
+                  autoComplete="new-password"
+                  disabled={isPending}
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? 'co-erreur' : undefined}
+                />
+              </div>
+
+              <div className="co-champ">
+                <label htmlFor="confirm">Confirmer le mot de passe</label>
+                <input
+                  id="confirm"
+                  type="password"
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  placeholder="Répétez le mot de passe"
+                  required
+                  autoComplete="new-password"
+                  disabled={isPending}
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? 'co-erreur' : undefined}
+                />
+              </div>
+
+              {error && (
+                <p className="co-refus" id="co-erreur" role="alert">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7.5v5.2M12 16.3v.2" />
+                  </svg>
+                  {error}
+                </p>
+              )}
+
+              <button type="submit" className="co-valider" disabled={isPending}>
+                {isPending && <span className="co-spin" aria-hidden="true" />}
+                {isPending ? 'Enregistrement...' : 'Valider le mot de passe'}
+              </button>
+            </form>
+          </section>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="password">Mot de passe</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="8 caractères minimum"
-              required
-              autoFocus
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="confirm">Confirmer le mot de passe</Label>
-            <Input
-              id="confirm"
-              type="password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              placeholder="Répétez le mot de passe"
-              required
-            />
-          </div>
-
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
-
-          <Button type="submit" className="w-full" disabled={isPending}>
-            {isPending ? 'Enregistrement...' : 'Valider le mot de passe'}
-          </Button>
-        </form>
-      </div>
+      </main>
     </div>
   )
 }

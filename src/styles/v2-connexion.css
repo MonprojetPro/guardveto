@@ -1,0 +1,386 @@
+/* ============================================================
+   GUARDVETO V2 — LE PARCOURS D'ENTRÉE (connexion, mot de passe)
+   ============================================================
+   La porte du terrier. C'est le PREMIER écran du produit : il était
+   resté en V1 (aplat bleu canard sur la moitié gauche, carte blanche,
+   bouton pleine largeur) pendant que tout le reste passait au
+   « Terrier chaleureux ». Cette feuille l'accorde au reste.
+
+   Elle complète `v2-terrier.css`, qui doit être importé AVANT :
+   les jetons (`--t-accent`, `--surface`, `--r-lg`…), le satin
+   (`.satin` + `.silk`/`.folds`/`.sheen`), la propriété animée `--sb`
+   et l'animation `starBorder` viennent de là. Rien n'est redéfini ici.
+
+   ⚠️ COULEURS — on n'écrit JAMAIS `var(--muted)`, `var(--border)` ni
+   `var(--accent)` : ces trois noms appartiennent aussi à shadcn, avec
+   des sens opposés (l'affaire « crème sur crème », trois passes de
+   correction). Toujours `--t-muted`, `--t-border`, `--t-accent`.
+
+   PARTI PRIS — le panneau de gauche ne porte plus d'aplat. Le décor
+   de la V2, c'est le satin : il court d'un bord à l'autre, et
+   l'identité se pose DESSUS, sans le couper en deux. Le seul objet
+   posé sur le satin est la carte de connexion, comme la carte
+   `.epicentre` l'est sur l'accueil — même surface crème, mêmes
+   ombres à trois couches, même étincelle qui fait le tour.
+   ============================================================ */
+
+/* -- La scène : deux colonnes qui n'en font qu'une en écran étroit -- */
+.co-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(20px, 4vw, 48px) clamp(16px, 4vw, 40px);
+}
+.co-scene {
+  position: relative;
+  z-index: 1; /* au-dessus du satin (z 0) */
+  width: 100%;
+  max-width: 1000px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
+  align-items: center;
+  gap: clamp(24px, 5vw, 64px);
+}
+/* Un seul écran du parcours n'a pas de panneau d'identité (définir son
+   mot de passe : on sait déjà où on est). La carte se centre alors. */
+.co-scene.seule {
+  max-width: 440px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* ============================================================
+   ① LE PANNEAU D'IDENTITÉ · posé sur le satin, sans aplat
+   ============================================================ */
+.co-marque {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding-bottom: 6px;
+}
+
+/* La marque, reprise mot pour mot de la barre de l'application
+   (`.ab-filou` / `.ab-name`) : c'est le même produit, ça doit être le
+   même bloc — la binette dans son squircle, « Veto » en encre renarde. */
+.co-lockup { display: flex; align-items: center; gap: 11px; }
+.co-binette {
+  display: grid; place-items: center;
+  width: 46px; height: 46px; flex: none;
+  border-radius: 15px;
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--t-border);
+}
+.co-binette img { width: 44px; height: 44px; display: block; transform: translateY(-1px); }
+.co-nom {
+  font-family: var(--font-display);
+  font-weight: 800; font-size: 1.16rem; letter-spacing: -0.022em;
+  line-height: 1.05; color: var(--text);
+}
+.co-nom em { font-style: normal; color: var(--accent-ink); }
+
+.co-titre {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4.4vw, 3rem);
+  font-weight: 800; letter-spacing: -0.025em; line-height: 1.06;
+  color: var(--text);
+}
+.co-lede {
+  font-size: 0.95rem; line-height: 1.65; color: var(--t-muted);
+  max-width: 40ch;
+}
+.co-accroche .co-lede { margin-top: 14px; }
+
+/* Les deux promesses : des fiches, pas des puces — même famille que
+   les `.widget` épinglés du tableau de l'accueil, en plus léger. */
+/* Même laisse que la phrase d'accroche (40ch) : deux fiches étirées sur
+   toute la colonne se lisaient comme des barres vides. */
+.co-points {
+  list-style: none; display: flex; flex-direction: column; gap: 10px;
+  max-width: 40ch;
+}
+.co-point {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 15px;
+  background: rgba(255, 252, 244, 0.72);
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-sm);
+  box-shadow: var(--edge-light), var(--elev-1);
+  font-size: 0.86rem; color: var(--text);
+}
+.co-point .co-ico {
+  flex: none;
+  width: 32px; height: 32px; border-radius: 10px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface-2);
+  border: 1px solid var(--t-border);
+  color: var(--accent-ink);
+}
+.co-point .co-ico svg { width: 16px; height: 16px; }
+
+.co-pied {
+  margin-top: auto;
+  font-size: 0.74rem; color: var(--soft);
+}
+
+/* ---- Filou accoudé au rebord ----------------------------------
+   Le métrage `filou-pose-fixe.webp` est une pièce à alpha (contenu
+   utile : x 144→1019, y 150→1257 sur 1080×1920) qui se termine par
+   une COUPE FRANCHE — il tient un bord dans sa patte. Rendu à 240 px
+   de large, ce contenu occupe 32→226 en x et 33→280 en y : la fenêtre
+   fait donc 240×280 et la coupe tombe pile sur son bord bas, où on
+   pose un rebord. Il est accoudé, il ne flotte pas.
+   ⚠ Ne pas « recadrer au jugé » : c'est l'erreur qui a coûté deux
+   calages sur `FilouEdge`. Les chiffres viennent de l'alpha. */
+.co-filou {
+  position: relative;
+  width: 240px; height: 280px;
+  margin: 6px 0 0 -26px; /* la coupe alpha à gauche (32 px) ramenée au bord */
+  overflow: hidden;
+  flex: none;
+}
+.co-filou img {
+  width: 240px; height: auto; max-width: none;
+  display: block;
+  animation: coRespire 5.2s ease-in-out infinite;
+}
+/* le rebord sur lequel il s'appuie : c'est lui qui absorbe la coupe.
+   Il déborde de quelques pixels de part et d'autre du corps — un rebord
+   exactement à la largeur du renard se lit comme un trait sous ses
+   pattes, pas comme un appui. */
+.co-rebord {
+  width: 268px; height: 3px;
+  margin-left: -40px;
+  border-radius: 999px;
+  background: linear-gradient(90deg,
+    rgba(216, 196, 161, 0) 0%,
+    var(--border-strong) 22%,
+    var(--border-strong) 74%,
+    rgba(216, 196, 161, 0) 100%);
+  box-shadow: 0 3px 9px -2px rgba(110, 62, 14, 0.28);
+}
+@keyframes coRespire { 0%, 100% { transform: none; } 50% { transform: translateY(-5px); } }
+
+/* ============================================================
+   ② LA CARTE · le seul objet posé sur le satin
+   ============================================================
+   Même matière que `.epicentre` (accueil) : surface crème, grand
+   rayon, lisière lumineuse en tranche haute, ombres à trois couches.
+   L'étincelle réutilise la propriété `--sb` et l'animation
+   `starBorder` déclarées dans `v2-terrier.css` — une seule source. */
+.co-carte {
+  position: relative;
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  padding: clamp(24px, 3.4vw, 34px) clamp(22px, 3.2vw, 32px) clamp(22px, 3vw, 30px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 252, 240, 0.98),
+    inset 1px 0 0 rgba(255, 252, 240, 0.55),
+    2px 3px 8px rgba(110, 62, 14, 0.16),
+    8px 18px 38px -8px rgba(110, 62, 14, 0.24),
+    18px 60px 120px -18px rgba(110, 62, 14, 0.36);
+}
+.co-carte::after {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  padding: 3px;
+  background: conic-gradient(from var(--sb),
+    transparent 0deg,
+    transparent 248deg,
+    rgba(255, 210, 130, 0.25) 290deg,
+    rgba(246, 158, 62, 0.6) 322deg,
+    rgba(255, 244, 214, 0.95) 328deg,
+    rgba(246, 158, 62, 0.55) 331deg,
+    rgba(243, 148, 50, 0.75) 340deg,
+    rgba(255, 250, 230, 1) 344.5deg,
+    rgba(230, 120, 30, 0.85) 348deg,
+    rgba(255, 253, 244, 1) 353deg,
+    rgba(255, 238, 190, 0.85) 357deg,
+    rgba(255, 226, 168, 0.35) 360deg);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 1;
+  animation: starBorder 16s linear infinite;
+}
+.co-carte > * { position: relative; z-index: 2; }
+
+.co-kicker {
+  font-family: var(--font-display);
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin-bottom: 5px;
+}
+.co-carte h1 {
+  font-family: var(--font-display);
+  font-size: 1.45rem; font-weight: 800; letter-spacing: -0.015em;
+  line-height: 1.15; color: var(--text);
+}
+.co-sous { margin-top: 7px; font-size: 0.85rem; line-height: 1.55; color: var(--t-muted); }
+
+/* ---- Les champs -------------------------------------------------
+   Reprise de `.field` (feuille commune) : étiquette en capitales
+   discrètes, creux crème, rayon court. La différence : un vrai
+   anneau au focus, parce qu'ici on tape au clavier de bout en bout. */
+.co-form { margin-top: 22px; display: flex; flex-direction: column; gap: 15px; }
+.co-champ label {
+  display: block;
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--soft);
+  margin-bottom: 6px;
+}
+.co-champ input {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-sm);
+  padding: 11px 14px;
+  min-height: 46px;
+  font-family: var(--font-body);
+  font-size: 0.9rem; color: var(--text);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+.co-champ input::placeholder { color: var(--soft); }
+.co-champ input:hover:not(:disabled) { border-color: var(--border-strong); }
+.co-champ input:focus,
+.co-champ input:focus-visible {
+  outline: none;
+  background: #FFFDF6;
+  border-color: var(--t-accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.co-champ input:disabled { opacity: 0.6; cursor: not-allowed; }
+/* En erreur, le champ le dit lui-même : le bandeau seul obligeait à
+   faire l'aller-retour entre le message et le champ fautif. */
+.co-champ input[aria-invalid='true'] { border-color: var(--danger); }
+.co-champ input[aria-invalid='true']:focus { box-shadow: 0 0 0 3px var(--danger-soft); }
+
+/* ---- Le refus ---------------------------------------------------
+   Vocabulaire du produit (`--danger` / `--danger-soft`), pas le pavé
+   rose de la V1. Un filet à gauche, comme les blocs de constat du
+   terrier : c'est une réponse, pas une alarme. */
+.co-refus {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 11px 13px;
+  border: 1px solid rgba(168, 52, 31, 0.32);
+  border-left: 3px solid var(--danger);
+  border-radius: 4px 11px 11px 4px;
+  background: var(--danger-soft);
+  font-size: 0.84rem; line-height: 1.5; color: var(--danger);
+  font-weight: 600;
+}
+.co-refus svg { flex: none; width: 16px; height: 16px; margin-top: 1px; }
+
+/* ---- Le bouton --------------------------------------------------
+   Même famille que `.btn-accent` (encre renarde, halo), en pleine
+   largeur parce qu'il est seul et qu'il termine le formulaire. */
+.co-valider {
+  width: 100%;
+  min-height: 46px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: none; border-radius: 999px;
+  background: var(--t-accent); color: #fff;
+  font-family: var(--font-body);
+  font-size: 0.9rem; font-weight: 700;
+  box-shadow: 0 3px 12px var(--accent-glow);
+  transition: filter 0.18s ease, transform 0.15s ease, box-shadow 0.18s ease;
+}
+.co-valider:hover:not(:disabled) { filter: brightness(1.07); transform: translateY(-1px); }
+.co-valider:active:not(:disabled) { transform: translateY(0); }
+.co-valider:disabled { opacity: 0.62; cursor: not-allowed; filter: none; box-shadow: none; }
+/* Le rouet de l'attente — même dessin que `.sync-spin` (Réglages),
+   sous un nom propre à cette feuille : deux définitions d'une même
+   classe dans deux fichiers, c'est la porte ouverte à la divergence. */
+.co-spin {
+  display: inline-block; width: 15px; height: 15px; flex: none;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: coSpin 0.9s linear infinite;
+}
+@keyframes coSpin { to { transform: rotate(360deg); } }
+
+/* ---- Le pied de carte : mot de passe oublié --------------------- */
+.co-pied-carte {
+  margin-top: 18px; padding-top: 15px;
+  border-top: 1px dashed var(--t-border);
+  text-align: center;
+  font-size: 0.79rem;
+}
+.co-lien {
+  border: none; background: none; padding: 2px 4px;
+  font: inherit; font-weight: 700;
+  color: var(--accent-ink);
+  text-decoration: underline; text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  border-radius: 6px;
+  transition: color 0.18s ease, background-color 0.18s ease;
+}
+.co-lien:hover:not(:disabled) { background: var(--accent-soft); }
+.co-lien:disabled { opacity: 0.5; cursor: not-allowed; }
+.co-envoye {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 13px; border-radius: 999px;
+  background: var(--ok-soft); border: 1px dashed var(--border-strong);
+  color: var(--ok); font-weight: 700;
+}
+
+/* ---- L'attente d'ouverture de session (définir son mot de passe) -- */
+.co-attente {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 60vh;
+  font-size: 0.9rem; color: var(--t-muted);
+}
+.co-attente .co-spin { border-color: var(--accent-soft); border-top-color: var(--t-accent); }
+
+/* ============================================================
+   ③ ÉCRANS ÉTROITS · le panneau s'efface, il ne se tasse pas
+   ============================================================
+   Sous 900 px, deux colonnes de 400 px n'existent plus : le panneau
+   d'identité disparaît d'un bloc (Filou compris — un renard à moitié
+   sous le formulaire ne rend service à personne) et l'identité passe
+   en tête, au-dessus de la carte, sur une seule ligne.
+   ============================================================ */
+.co-entete { display: none; }
+
+/* La même marque, mais toujours visible : `/set-password` n'a pas de
+   panneau d'identité, elle est donc sa seule signature. */
+.co-entete-fixe {
+  display: flex; align-items: center; justify-content: center; gap: 11px;
+  margin-bottom: 18px;
+}
+
+@media (max-width: 900px) {
+  .co-scene {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 440px;
+    gap: 22px;
+  }
+  .co-marque { display: none; }
+  .co-entete {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    text-align: center;
+  }
+  .co-entete .co-lede { font-size: 0.85rem; }
+}
+
+@media (max-width: 420px) {
+  .co-page { padding: 18px 14px 26px; }
+  .co-carte { padding: 22px 18px 20px; border-radius: var(--r-md); }
+  .co-carte h1 { font-size: 1.28rem; }
+}
+
+/* Écran court (portable en visio, 1440×720) : la scène ne doit pas
+   déborder — on décolle du centrage vertical et on laisse défiler. */
+@media (max-height: 700px) {
+  .co-page { align-items: flex-start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .co-carte::after,
+  .co-filou img { animation: none; }
+  .co-valider:hover:not(:disabled) { transform: none; }
+}
