@@ -22,6 +22,7 @@ import Link from 'next/link'
 import '@/styles/v2-historique.css'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
+import { ImportPlanningLanceur } from '@/components/v2/ImportPlanningLanceur'
 import { HistoriqueV2, type LignePeriode, type CumulLigne } from '@/components/v2/HistoriqueV2'
 import { BonusMalusCard } from '@/components/compteurs/BonusMalusCard'
 import { HistoriqueFetesCard } from '@/components/compteurs/HistoriqueFetesCard'
@@ -179,6 +180,11 @@ export default async function HistoriquePage({
                 : "Les week-ends, nuits et fériés que tu auras tenus, et ton écart à la juste part. Ta ligne apparaîtra dès que l'administrateur aura généré le premier planning."}
             </p>
           </section>
+          {/* L'écran d'un cabinet qui démarre est EXACTEMENT celui où importer
+              l'ancien planning a du sens : c'est le seul moment où les
+              compteurs sont à zéro et où on peut encore leur donner un passé.
+              Le geste est donc présenté en entier, pas rangé dans un coin. */}
+          {estAdmin && <ImportPlanningLanceur variante="evident" />}
         </div>
       </>
     )

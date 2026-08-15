@@ -40,9 +40,19 @@ export interface ContenuImport {
 
 interface Props {
   contenu: ContenuImport
-  /** Pour que le fil de la conversation raconte la même histoire que le
-   *  tableau : « c'est enregistré », « j'ai tout annulé ». */
+  /** Ce qui s'est passé, en une phrase : « c'est enregistré », « j'ai tout
+   *  annulé ». Dans la conversation de Filou, ça alimente le fil ; depuis
+   *  l'écran Compteurs, ça devient un toast. */
   onDire: (phrase: string) => void
+  /**
+   * Un refus du serveur pendant l'écriture (collision de dates, droits…).
+   *
+   * Quand il est fourni, il REMPLACE le passage par `onDire` : un refus n'est
+   * pas une nouvelle, il doit barrer la route. Absent (la conversation de
+   * Filou), le refus repart dans le fil comme avant. Dans les deux cas il
+   * reste aussi affiché en clair sous le bouton qui l'a produit.
+   */
+  onErreur?: (message: string) => void
   onFermer: () => void
 }
 
@@ -87,7 +97,10 @@ function etatInitial(lignes: LignePlanningLue[]): Record<number, EtatLigne> {
   return etat
 }
 
-export function ImportPlanning({ contenu, onDire, onFermer }: Props) {
+export function ImportPlanning({ contenu, onDire, onErreur, onFermer }: Props) {
+  /** Un refus : en modale quand l'écran en fournit une, dans le fil sinon. */
+  const direRefus = (message: string) => (onErreur ? onErreur(message) : onDire(message))
+
   const router = useRouter()
   const { lecture, vets, fichier } = contenu
   const [etats, setEtats] = useState<Record<number, EtatLigne>>(() => etatInitial(lecture.lignes))
@@ -137,7 +150,7 @@ export function ImportPlanning({ contenu, onDire, onFermer }: Props) {
       )
       if ('error' in r) {
         setErreur(r.error)
-        onDire(r.error)
+        direRefus(r.error)
         return
       }
       // Les écrans lisent la base côté serveur : sans ce rafraîchissement,
@@ -168,7 +181,7 @@ export function ImportPlanning({ contenu, onDire, onFermer }: Props) {
       const r = await supprimerPlanningImporte(recu.periodeId)
       if ('error' in r) {
         setErreur(r.error)
-        onDire(r.error)
+        direRefus(r.error)
         return
       }
       router.refresh()

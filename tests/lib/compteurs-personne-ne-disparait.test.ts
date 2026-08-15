@@ -94,6 +94,16 @@ describe('completerCompteursPourAffichage', () => {
     expect(affiche.find((l) => l.veterinaire_id === 'v-ac')).toBeDefined()
   })
 
+  it('ne transforme PAS « aucune garde sur ce filtre » en grille de zéros', () => {
+    // Régression trouvée le 2026-08-15. Les écrans distinguent trois choses :
+    // « je n'ai pas pu lire », « aucune garde sur ce filtre » et « voici les
+    // compteurs ». Compléter une liste VIDE écrasait le deuxième cas par une
+    // grille de zéros, et la phrase qui explique quoi faire (« le planning est
+    // peut-être encore en brouillon, passe le périmètre sur Tout ») ne
+    // s'affichait plus.
+    expect(completerCompteursPourAffichage([], EQUIPE)).toEqual([])
+  })
+
   it('laisse `compteurs.length` utilisable comme garde « aucune garde »', () => {
     // Les deux écrivains de bonus_malus (cron/lock-gardes, appliquer-changement)
     // testent `compteurs.length` pour savoir s'il y a quelque chose à écrire.

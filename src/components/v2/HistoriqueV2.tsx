@@ -25,6 +25,7 @@ import Link from 'next/link'
 import type { Periode } from '@/types'
 import type { CompteursRow, DepannagesRow } from '@/hooks/useCompteurs'
 import type { BilanVet } from '@/engine/bilan'
+import { ImportPlanningLanceur } from './ImportPlanningLanceur'
 
 // ── Ce que la page a préparé ──────────────────────────────────────────────
 
@@ -221,6 +222,14 @@ export function HistoriqueV2({
           </div>
         )}
       </div>
+
+      {/* ── Importer un ancien planning ──────────────────────────────────
+          Amorcer les compteurs avec le passé du cabinet. Le geste vit ici,
+          là où on regarde les compteurs — et non plus derrière un trombone
+          dans la conversation, où personne ne comprenait à quoi il servait
+          (retour MiKL, 2026-08-15). Sa place hors de `.page-actions` est
+          voulue : le panneau de relecture s'ouvre juste sous le bouton. */}
+      {estAdmin && <ImportPlanningLanceur />}
 
       {/* ── Filtres ──────────────────────────────────────────────────── */}
       <div className="hist-filters rise rise-2" aria-busy={enCours}>

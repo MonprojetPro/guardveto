@@ -246,6 +246,14 @@ export function completerCompteursPourAffichage(
   compteurs: CompteursRow[],
   vetsActifs: VetoPourCompteurs[],
 ): CompteursRow[] {
+  // ON COMPLÈTE UN TABLEAU, ON N'EN INVENTE PAS UN. Une liste vide ne veut pas
+  // dire « tout le monde est à zéro » : elle veut dire « aucune garde sur ce
+  // filtre » (ou « période encore en brouillon »), et les écrans le disent avec
+  // une phrase qui explique quoi faire. La compléter afficherait à la place une
+  // grille de zéros — exactement le « tableau à zéro qui se lit comme personne
+  // n'a de garde » que le reste de ce fichier s'applique à éviter.
+  if (compteurs.length === 0) return compteurs
+
   const presents = new Set(compteurs.map((c) => c.veterinaire_id))
   const manquants = vetsActifs.filter((v) => !presents.has(v.id)).map((v) => ligneVide(v))
   if (manquants.length === 0) return compteurs

@@ -174,34 +174,10 @@
   padding-top: 4px;
 }
 
-/* ── Le bouton « déposer un document » de la tablette ─────── */
-.saisie-doc {
-  flex: none;
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--t-border);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--t-muted);
-  cursor: pointer;
-}
-.saisie-doc svg {
-  width: 16px;
-  height: 16px;
-}
-.saisie-doc:hover:not(:disabled) {
-  border-color: var(--t-accent);
-  color: var(--t-accent);
-}
-.saisie-doc:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-.saisie:has(.saisie-doc) {
-  padding-left: 5px;
-}
+/* Le bouton « déposer un document » de la tablette a été retiré le 2026-08-15
+   (décision MiKL) : le geste vit désormais dans l'écran Compteurs, où on
+   comprend à quoi il sert. Ses styles (`.saisie-doc`) sont partis avec lui —
+   du CSS orphelin ferait croire dans six mois que le bouton existe encore. */
 
 @media (max-width: 640px) {
   .imp-scroll {
@@ -213,4 +189,66 @@
   .imp-choix {
     min-width: 120px;
   }
+}
+
+/* ============================================================
+   LE LANCEUR — depuis l'écran Compteurs
+   ============================================================
+   Le geste a quitté le trombone de la conversation (retour MiKL du
+   2026-08-15 : « on comprend pas à quoi il sert »). Il vit désormais là où
+   on regarde les compteurs, et son résultat s'ouvre JUSTE EN DESSOUS du
+   bouton qui l'a demandé. */
+
+.imp-lanceur {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.imp-lanceur-barre {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.imp-lanceur-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+/* L'attente se voit. La lecture d'un document prend plusieurs dizaines de
+   secondes : un bouton grisé sans un mot passerait pour un écran figé. */
+.imp-lanceur-attente {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 0.86rem;
+  color: var(--t-muted);
+  border: 1px dashed var(--t-border);
+  border-radius: 12px;
+}
+
+.imp-lanceur-point {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--t-accent);
+  animation: imp-lanceur-battement 1.4s ease-in-out infinite;
+}
+
+@keyframes imp-lanceur-battement {
+  0%, 100% { opacity: 0.25; transform: scale(0.8); }
+  50%      { opacity: 1;    transform: scale(1.15); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .imp-lanceur-point { animation: none; opacity: 0.8; }
+}
+
+/* Le panneau de relecture, une fois le document lu. */
+.imp-lanceur-resultat .card-head {
+  margin-bottom: 12px;
 }

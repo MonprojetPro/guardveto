@@ -46,7 +46,6 @@ import {
   type ReactNode,
 } from 'react'
 import { parlerAFilou } from '@/app/(protected)/filou/actions'
-import { lireDocumentPlanning } from '@/app/(protected)/filou/import-actions'
 import type { ContenuResultat, ResultatFilou } from './FilouResultat'
 
 /** Un tour de parole dans le fil. Il n'y a plus que de la parole : une
@@ -120,40 +119,6 @@ function memoriserConversation(messages: Message[]) {
  *  malheureux part en analyse. La vraie limite reste à poser côté serveur. */
 const LONGUEUR_MAX = 400
 
-/** Ce que le sélecteur de fichiers propose, et ce que le serveur sait lire.
- *  Les deux listes doivent dire la même chose : proposer un format qui sera
- *  refusé deux secondes plus tard est une porte qui ne mène qu'au refus. */
-const FORMATS_ACCEPTES = '.png,.jpg,.jpeg,.webp,.gif,.pdf,.csv,.txt'
-
-/** Lit un fichier local et rend son contenu en base64, SANS le préfixe
- *  `data:…;base64,` — l'API attend la charge nue. */
-function enBase64(fichier: File): Promise<string> {
-  return new Promise((resoudre, rejeter) => {
-    const lecteur = new FileReader()
-    lecteur.onerror = () => rejeter(new Error('Je n’ai pas réussi à ouvrir ce fichier.'))
-    lecteur.onload = () => {
-      const brut = String(lecteur.result ?? '')
-      const virgule = brut.indexOf(',')
-      resoudre(virgule >= 0 ? brut.slice(virgule + 1) : brut)
-    }
-    lecteur.readAsDataURL(fichier)
-  })
-}
-
-/** Le type MIME du fichier, retrouvé par son extension quand le navigateur ne
- *  le donne pas (fréquent pour les CSV sous Windows, où le champ arrive vide
- *  ou vaut `application/vnd.ms-excel`). */
-function formatDe(fichier: File): string {
-  const nom = fichier.name.toLowerCase()
-  if (nom.endsWith('.csv')) return 'text/csv'
-  if (nom.endsWith('.txt')) return 'text/plain'
-  if (nom.endsWith('.pdf')) return 'application/pdf'
-  if (nom.endsWith('.jpg') || nom.endsWith('.jpeg')) return 'image/jpeg'
-  if (nom.endsWith('.png')) return 'image/png'
-  if (nom.endsWith('.webp')) return 'image/webp'
-  if (nom.endsWith('.gif')) return 'image/gif'
-  return fichier.type || ''
-}
 
 /** Ce que l'Épicentre peut demander à la tablette : faire parler Filou. C'est
  *  ce qui permet au tableau (« créée », « abandonnée ») de revenir commenter
@@ -206,10 +171,8 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
   // La lecture d'un document a son propre témoin d'attente : elle prend dix à
   // trente secondes (une photo de planning se lit page par page), là où une
   // phrase revient en cinq. Les confondre ferait croire à un blocage.
-  const [lectureEnCours, setLectureEnCours] = useState(false)
   const filRef = useRef<HTMLDivElement>(null)
   const champRef = useRef<HTMLTextAreaElement>(null)
-  const fichierRef = useRef<HTMLInputElement>(null)
   /** Verrou d'envoi, lisible dans le même battement que le clic (cf. `envoyerTexte`). */
   const envoiParti = useRef(false)
   const compteur = useRef(messages.at(-1)?.id ?? 0)
@@ -337,7 +300,7 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
   /** Le geste unique d'envoi : depuis le champ comme depuis une piste. */
   const envoyerTexte = (brut: string) => {
     const texte = brut.trim().slice(0, LONGUEUR_MAX)
-    if (texte.length < 3 || enCours || lectureEnCours || envoiParti.current) return
+    if (texte.length < 3 || enCours || envoiParti.current) return
     // `enCours` vient d'une transition : il ne repasse à vrai qu'au rendu
     // suivant. Deux clics dans le même battement passeraient donc tous les
     // deux — et un envoi de trop, c'est un appel de trop facturé au modèle.
@@ -400,65 +363,15 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
    *  partir. Le champ se vide ici, et pas dans `envoyerTexte` — une piste
    *  cliquée ne doit pas effacer un brouillon en cours de frappe. */
   const envoyer = () => {
-    if (enCours || lectureEnCours || phrase.trim().length < 3) return
+    if (enCours || phrase.trim().length < 3) return
     const texte = phrase
     setPhrase('')
     envoyerTexte(texte)
   }
 
-  /**
-   * Un document déposé : l'ancien planning du cabinet.
-   *
-   * Ce chemin ne passe PAS par `parlerAFilou` : ce n'est pas une phrase, et le
-   * résultat n'est pas une réponse mais une lecture à relire ligne par ligne.
-   * Il arrive quand même sur le tableau, comme tout le reste — la tablette
-   * porte la conversation, le tableau porte ce qu'on vient chercher.
-   */
-  const deposerDocument = async (fichier: File) => {
-    if (lectureEnCours || enCours) return
-    setLectureEnCours(true)
-    ajouter('moi', `Voici notre ancien planning : « ${fichier.name} »`)
-    onFilouTape?.()
-
-    try {
-      const base64 = await enBase64(fichier)
-      const reponse = await lireDocumentPlanning(fichier.name, formatDe(fichier), base64)
-
-      if ('error' in reponse) {
-        // Une panne se dit dans la conversation et ne se raconte pas à Filou :
-        // lui renvoyer son propre message d'erreur le ferait raisonner dessus.
-        ajouter('filou', reponse.error, { pourFilou: '' })
-        return
-      }
-
-      const nb = reponse.lecture.lignes.length
-      annoncerEtMontrer(
-        {
-          titre: `Ce que j’ai lu dans « ${reponse.fichier} »`,
-          introduction: reponse.lecture.remarque,
-          lignes: [],
-          import: reponse,
-        },
-        nb === 0
-          ? 'Je n’ai reconnu aucune garde là-dedans — regarde le tableau.'
-          : `J’y ai reconnu ${nb} garde${nb > 1 ? 's' : ''}. Vérifie-les sur le tableau avant que je n’enregistre.`,
-      )
-    } catch (e) {
-      ajouter('filou', e instanceof Error ? e.message : 'Je n’ai pas réussi à lire ce fichier.', {
-        pourFilou: '',
-      })
-    } finally {
-      setLectureEnCours(false)
-      // Le champ se vide : sans ça, redéposer LE MÊME fichier ne déclencherait
-      // rien (le navigateur ne signale pas un changement vers la même valeur).
-      if (fichierRef.current) fichierRef.current.value = ''
-      requestAnimationFrame(() => champRef.current?.focus())
-    }
-  }
-
   /** Une piste part TELLE QUELLE, sans étape de relecture. */
   const envoyerPiste = (idMessage: number, texte: string) => {
-    if (enCours || lectureEnCours) return
+    if (enCours) return
     oublierPistes(idMessage)
     envoyerTexte(texte)
   }
@@ -512,16 +425,14 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
           ),
         )}
 
-        {(enCours || lectureEnCours) && (
+        {enCours && (
           <div className="msg filou" key="attente">
             <span className="m-ava" aria-hidden="true">
               🦊
             </span>
             <div className="bubble bubble-attente" role="status">
               <span className="vh">Filou : </span>
-              {/* Une lecture de document dure bien plus longtemps qu'une
-                  réponse : le dire évite de croire que rien ne se passe. */}
-              {lectureEnCours ? 'Je déchiffre ton planning, ça prend un moment' : 'Je regarde ça'}
+              Je regarde ça
               <span className="typing" aria-hidden="true">
                 <i />
                 <i />
@@ -558,35 +469,6 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
               )}
             </button>
           )}
-          {/* Déposer l'ancien planning du cabinet. Le champ de fichier reste
-              hors de l'écran : c'est le bouton qui se voit, et il porte un
-              titre — sur un écran tactile, une icône qui ne s'explique qu'au
-              survol n'existe pas. */}
-          <input
-            ref={fichierRef}
-            type="file"
-            className="vh"
-            accept={FORMATS_ACCEPTES}
-            tabIndex={-1}
-            aria-hidden="true"
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              if (f) void deposerDocument(f)
-            }}
-          />
-          <button
-            type="button"
-            className="saisie-doc"
-            onClick={() => fichierRef.current?.click()}
-            disabled={enCours || lectureEnCours}
-            aria-label="Déposer un ancien planning (photo, PDF ou CSV)"
-            title="Déposer un ancien planning"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M21 11.5V8.5a2 2 0 0 0-2-2h-6l-1.5-2H5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h9" />
-              <path d="M18 14v7M14.5 17.5h7" />
-            </svg>
-          </button>
           <label className="vh" htmlFor={champId}>
             Écrire à Filou : décris une règle du cabinet
           </label>
@@ -612,7 +494,7 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
             type="button"
             className="saisie-envoi"
             onClick={envoyer}
-            disabled={enCours || lectureEnCours || phrase.trim().length < 3}
+            disabled={enCours || phrase.trim().length < 3}
             aria-label="Envoyer à Filou"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
