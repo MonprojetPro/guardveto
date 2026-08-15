@@ -35,18 +35,11 @@
 
 import { useState, useTransition } from 'react'
 import { appliquerActionFilou } from '@/app/(protected)/filou/actions'
-import { ImportPlanning, type ContenuImport } from './ImportPlanning'
 
 export interface ContenuResultat {
   titre: string
   introduction: string
   lignes: string[]
-  /** UNE CINQUIÈME NATURE DE CONTENU : ce que Filou a lu dans un document
-   *  déposé (un ancien planning). Elle ne se valide pas d'un bouton — chaque
-   *  ligne se relit, se corrige, se décoche — donc elle remplace le corps de
-   *  la fenêtre au lieu de s'ajouter aux quatre autres. Le garde-fou est le
-   *  même : rien n'est écrit avant un clic humain. */
-  import?: ContenuImport
   /** Ce que l'attente a été occupée à faire — administrateur seulement. */
   mesure?: {
     ms: number
@@ -89,7 +82,6 @@ export function FenetreResultatFilou({ actif, resultat, onFermer, onDecision }: 
   const [erreur, setErreur] = useState<string | null>(null)
   const [enCours, demarrer] = useTransition()
   const action = resultat.action
-  const lectureImport = resultat.import
 
   const appliquer = () => {
     if (!action) return
@@ -127,11 +119,7 @@ export function FenetreResultatFilou({ actif, resultat, onFermer, onDecision }: 
               maintenant DANS le bloc « ce que ça changerait », à côté de ce qu'il
               qualifie. Ici il servait de garantie générale, loin de son objet. */}
           <p className="f-sub">
-            {lectureImport
-              ? 'Ce que Filou a lu dans ton document — à vérifier avant d’enregistrer'
-              : action
-                ? 'Ce que Filou a trouvé, et ce qu’il propose'
-                : 'Ce que Filou a trouvé'}
+            {action ? 'Ce que Filou a trouvé, et ce qu’il propose' : 'Ce que Filou a trouvé'}
           </p>
         </div>
         <button
@@ -144,19 +132,6 @@ export function FenetreResultatFilou({ actif, resultat, onFermer, onDecision }: 
         </button>
       </header>
 
-      {/* La lecture d'un document prend toute la fenêtre : elle a son propre
-          corps, son propre pied, et son propre garde-fou humain. Le modèle à
-          quatre blocs ci-dessous ne saurait pas la porter — on n'y valide pas
-          une action, on relit un document ligne par ligne. */}
-      {lectureImport ? (
-        <div className="fen-body">
-          <ImportPlanning
-            contenu={lectureImport}
-            onDire={(phrase) => onDecision({ fermer: false, dire: phrase })}
-            onFermer={onFermer}
-          />
-        </div>
-      ) : (
       <div className="fen-body">
         {/* ① La réponse — ce qu'on lit en premier, et parfois la seule chose
             qu'on lit. */}
@@ -217,12 +192,7 @@ export function FenetreResultatFilou({ actif, resultat, onFermer, onDecision }: 
           </p>
         )}
       </div>
-      )}
 
-      {/* Le pied standard n'a rien à dire sur une lecture de document : ses
-          boutons vivent dans le panneau, au contact des lignes qu'ils
-          enregistrent. */}
-      {lectureImport ? null : (
       <footer className="fen-foot">
         {action ? (
           <>
@@ -252,7 +222,6 @@ export function FenetreResultatFilou({ actif, resultat, onFermer, onDecision }: 
         )}
         <span className="hint">Échap pour refermer</span>
       </footer>
-      )}
     </article>
   )
 }
