@@ -25,7 +25,7 @@ import Link from 'next/link'
 import type { Periode } from '@/types'
 import type { CompteursRow, DepannagesRow } from '@/hooks/useCompteurs'
 import type { BilanVet } from '@/engine/bilan'
-import { ImportPlanningLanceur } from './ImportPlanningLanceur'
+import { useImportPlanning } from './ImportPlanningLanceur'
 
 // ── Ce que la page a préparé ──────────────────────────────────────────────
 
@@ -180,6 +180,7 @@ export function HistoriqueV2({
   // clic et le nouveau tableau, pendant laquelle les segments ont l'air morts
   // et on reclique.
   const [enCours, demarrer] = useTransition()
+  const imp = useImportPlanning()
 
   const recours = new Set(derniersRecours)
   const bilanDe = new Map(bilans.map((b) => [b.veterinaire_id, b]))
@@ -214,22 +215,25 @@ export function HistoriqueV2({
         {/* La création d'un planning a quitté cet écran (2026-08-02) : elle est
             devenue la première étape de « Générer », là où on le regarde.
             Historique CONSULTE. On laisse le chemin, pas un cul-de-sac. */}
+        {/* Deux actions du même niveau : partir de zéro, ou partir de ce
+            qu'on a déjà. Elles se présentent ensemble, au moment où l'on
+            choisit — « Créer » reste l'action principale, « Importer » la
+            secondaire (retour MiKL, 2026-08-15). */}
         {estAdmin && (
           <div className="page-actions">
             <Link href="/planning" className="hist-vers-planning">
               Créer un planning →
             </Link>
+            {imp.bouton}
           </div>
         )}
       </div>
 
-      {/* ── Importer un ancien planning ──────────────────────────────────
-          Amorcer les compteurs avec le passé du cabinet. Le geste vit ici,
-          là où on regarde les compteurs — et non plus derrière un trombone
-          dans la conversation, où personne ne comprenait à quoi il servait
-          (retour MiKL, 2026-08-15). Sa place hors de `.page-actions` est
-          voulue : le panneau de relecture s'ouvre juste sous le bouton. */}
-      {estAdmin && <ImportPlanningLanceur />}
+      {/* Le résultat de la lecture s'ouvre sous l'en-tête, pas dans la rangée
+          d'actions : le lien entre le geste et son résultat reste vertical. */}
+      {imp.attente}
+      {imp.panneau}
+      {imp.dialogueErreur}
 
       {/* ── Filtres ──────────────────────────────────────────────────── */}
       <div className="hist-filters rise rise-2" aria-busy={enCours}>

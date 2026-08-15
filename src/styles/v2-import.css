@@ -199,21 +199,21 @@
    on regarde les compteurs, et son résultat s'ouvre JUSTE EN DESSOUS du
    bouton qui l'a demandé. */
 
-.imp-lanceur {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+/* Action SECONDAIRE, à côté de « Créer un planning ». Même pilule, même
+   hauteur — on ne fabrique pas un troisième traitement — mais moins appuyée :
+   créer un planning reste ce que fera l'immense majorité des cabinets. */
+.hist-vers-import {
+  border-color: var(--t-border);
+  color: var(--t-muted);
+  cursor: pointer;
 }
-
-.imp-lanceur-barre {
-  display: flex;
-  justify-content: flex-end;
+.hist-vers-import:hover:not(:disabled) {
+  border-color: var(--t-accent);
+  color: var(--t-accent);
 }
-
-.imp-lanceur-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 12px;
+.hist-vers-import:disabled {
+  opacity: 0.55;
+  cursor: progress;
 }
 
 /* L'attente se voit. La lecture d'un document prend plusieurs dizaines de
