@@ -75,3 +75,6 @@ code google cloud.json
 # pas les sous-dossiers : celui-ci attrape supabase/_backups/ et consorts)
 **/_backups/
 filou/veo-out/
+
+# Documents de test pour l import d un ancien planning (25 Mo, jetables)
+_plannings-test/

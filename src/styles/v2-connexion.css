@@ -24,18 +24,50 @@
    ombres à trois couches, même étincelle qui fait le tour.
    ============================================================ */
 
-/* -- La scène : deux colonnes qui n'en font qu'une en écran étroit -- */
+/* ============================================================
+   ⓪ LA CONTRAINTE DE CET ÉCRAN, C'EST LA HAUTEUR
+   ============================================================
+   Un formulaire à deux champs ne doit JAMAIS faire défiler. Or la
+   fenêtre utile d'un portable en visio, barre d'adresse et onglets
+   déduits, tombe à 700-800 px — et une première version calée sur la
+   largeur seule sortait Filou et le bas de la carte sous la ligne de
+   flottaison (retour MiKL, en production, 2026-08-15).
+
+   La parade tient en trois points, appliqués partout ci-dessous :
+
+   ① `100dvh`, jamais `100vh` — sur mobile la barre d'adresse fausse
+      `vh` et réserve une bande qui n'existe pas.
+   ② TOUTES les tailles verticales sont fluides et dépendent de la
+      HAUTEUR (`vh`) autant que de la largeur : le titre, les
+      respirations, Filou. Une taille fixe est une promesse qu'on ne
+      peut pas tenir sur un écran court.
+   ③ Ce qui ne peut pas rétrécir DISPARAÎT au lieu d'être coupé. Filou
+      tronqué par le bord de l'écran se lit comme un bug, pas comme un
+      choix : sous 660 px de haut, il s'en va — le satin et la carte
+      portent déjà l'identité.
+
+   `--co-air` est l'unité de respiration verticale de l'écran : tout ce
+   qui empile s'y accroche, donc un seul chiffre gouverne la densité.
+   ============================================================ */
 .co-page {
+  --co-air: clamp(12px, 3.2vh, 44px);
+  /* La largeur de Filou — déclarée ICI parce que le rebord est son
+     FRÈRE dans le balisage, pas son enfant : sur `.co-filou` seul, il
+     n'en hériterait pas et reprendrait sa valeur de repli. */
+  --co-fw: clamp(132px, 26vh, 240px);
+  min-height: 100dvh;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: clamp(20px, 4vw, 48px) clamp(16px, 4vw, 40px);
+  padding: var(--co-air) clamp(16px, 4vw, 40px);
 }
 .co-scene {
   position: relative;
   z-index: 1; /* au-dessus du satin (z 0) */
   width: 100%;
   max-width: 1000px;
+  /* `margin: auto` plutôt que `align-items: center` : le centrage par
+     l'alignement ROGNE le haut du contenu dès qu'il dépasse (on ne peut
+     plus remonter au-dessus du bord), la marge automatique non. */
+  margin: auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
   align-items: center;
@@ -55,7 +87,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: var(--co-air);
   padding-bottom: 6px;
 }
 
@@ -78,29 +110,35 @@
 }
 .co-nom em { font-style: normal; color: var(--accent-ink); }
 
+/* Le titre suit la HAUTEUR disponible en premier (2,6vh) : c'est lui qui
+   mangeait le plus de place sur un écran court. À 1080 px de haut il
+   pèse ses ~40 px, à 700 il redescend à ~30 sans jamais casser sa
+   composition sur deux lignes. */
 .co-titre {
   font-family: var(--font-display);
-  font-size: clamp(2rem, 4.4vw, 3rem);
+  font-size: clamp(1.5rem, 0.6vw + 2.6vh, 2.9rem);
   font-weight: 800; letter-spacing: -0.025em; line-height: 1.06;
   color: var(--text);
 }
 .co-lede {
-  font-size: 0.95rem; line-height: 1.65; color: var(--t-muted);
+  font-size: clamp(0.85rem, 0.25vw + 0.8vh, 0.95rem);
+  line-height: 1.6; color: var(--t-muted);
   max-width: 40ch;
 }
-.co-accroche .co-lede { margin-top: 14px; }
+.co-accroche .co-lede { margin-top: clamp(8px, 1.6vh, 14px); }
 
 /* Les deux promesses : des fiches, pas des puces — même famille que
    les `.widget` épinglés du tableau de l'accueil, en plus léger. */
 /* Même laisse que la phrase d'accroche (40ch) : deux fiches étirées sur
    toute la colonne se lisaient comme des barres vides. */
 .co-points {
-  list-style: none; display: flex; flex-direction: column; gap: 10px;
+  list-style: none; display: flex; flex-direction: column;
+  gap: clamp(7px, 1.1vh, 10px);
   max-width: 40ch;
 }
 .co-point {
   display: flex; align-items: center; gap: 12px;
-  padding: 10px 15px;
+  padding: clamp(7px, 1.2vh, 10px) 15px;
   background: rgba(255, 252, 244, 0.72);
   border: 1px solid var(--t-border);
   border-radius: var(--r-sm);
@@ -130,16 +168,22 @@
    fait donc 240×280 et la coupe tombe pile sur son bord bas, où on
    pose un rebord. Il est accoudé, il ne flotte pas.
    ⚠ Ne pas « recadrer au jugé » : c'est l'erreur qui a coûté deux
-   calages sur `FilouEdge`. Les chiffres viennent de l'alpha. */
+   calages sur `FilouEdge`. Les chiffres viennent de l'alpha.
+   ⚠ Il ne doit JAMAIS être coupé par le bord de l'écran : sa largeur
+   `--co-fw` suit la hauteur disponible (26vh), et TOUT le reste s'en
+   déduit par proportion — la fenêtre (280/240), le rattrapage de la
+   coupe alpha à gauche (26/240) et le rebord (268/240). Un seul chiffre
+   à bouger, aucun recadrage au jugé. */
 .co-filou {
   position: relative;
-  width: 240px; height: 280px;
-  margin: 6px 0 0 -26px; /* la coupe alpha à gauche (32 px) ramenée au bord */
+  width: var(--co-fw);
+  height: calc(var(--co-fw) * 280 / 240);
+  margin: 6px 0 0 calc(var(--co-fw) * -26 / 240);
   overflow: hidden;
   flex: none;
 }
 .co-filou img {
-  width: 240px; height: auto; max-width: none;
+  width: var(--co-fw); height: auto; max-width: none;
   display: block;
   animation: coRespire 5.2s ease-in-out infinite;
 }
@@ -148,8 +192,8 @@
    exactement à la largeur du renard se lit comme un trait sous ses
    pattes, pas comme un appui. */
 .co-rebord {
-  width: 268px; height: 3px;
-  margin-left: -40px;
+  width: calc(var(--co-fw, 240px) * 268 / 240); height: 3px;
+  margin-left: calc(var(--co-fw, 240px) * -40 / 240);
   border-radius: 999px;
   background: linear-gradient(90deg,
     rgba(216, 196, 161, 0) 0%,
@@ -172,7 +216,7 @@
   border: 1px solid var(--t-border);
   border-radius: var(--r-lg);
   background: var(--surface);
-  padding: clamp(24px, 3.4vw, 34px) clamp(22px, 3.2vw, 32px) clamp(22px, 3vw, 30px);
+  padding: clamp(18px, 3vh, 34px) clamp(22px, 3.2vw, 32px) clamp(17px, 2.6vh, 30px);
   box-shadow:
     inset 0 1px 0 rgba(255, 252, 240, 0.98),
     inset 1px 0 0 rgba(255, 252, 240, 0.55),
@@ -225,7 +269,11 @@
    Reprise de `.field` (feuille commune) : étiquette en capitales
    discrètes, creux crème, rayon court. La différence : un vrai
    anneau au focus, parce qu'ici on tape au clavier de bout en bout. */
-.co-form { margin-top: 22px; display: flex; flex-direction: column; gap: 15px; }
+.co-form {
+  margin-top: clamp(15px, 2.4vh, 22px);
+  display: flex; flex-direction: column;
+  gap: clamp(11px, 1.7vh, 15px);
+}
 .co-champ label {
   display: block;
   font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em;
@@ -305,7 +353,7 @@
 
 /* ---- Le pied de carte : mot de passe oublié --------------------- */
 .co-pied-carte {
-  margin-top: 18px; padding-top: 15px;
+  margin-top: clamp(12px, 2vh, 18px); padding-top: clamp(11px, 1.7vh, 15px);
   border-top: 1px dashed var(--t-border);
   text-align: center;
   font-size: 0.79rem;
@@ -331,7 +379,7 @@
 /* ---- L'attente d'ouverture de session (définir son mot de passe) -- */
 .co-attente {
   display: flex; align-items: center; justify-content: center; gap: 10px;
-  min-height: 60vh;
+  margin: auto;
   font-size: 0.9rem; color: var(--t-muted);
 }
 .co-attente .co-spin { border-color: var(--accent-soft); border-top-color: var(--t-accent); }
@@ -357,7 +405,7 @@
   .co-scene {
     grid-template-columns: minmax(0, 1fr);
     max-width: 440px;
-    gap: 22px;
+    gap: clamp(14px, 2.4vh, 22px);
   }
   .co-marque { display: none; }
   .co-entete {
@@ -368,15 +416,33 @@
 }
 
 @media (max-width: 420px) {
-  .co-page { padding: 18px 14px 26px; }
+  .co-page { padding: var(--co-air) 14px; }
   .co-carte { padding: 22px 18px 20px; border-radius: var(--r-md); }
   .co-carte h1 { font-size: 1.28rem; }
 }
 
-/* Écran court (portable en visio, 1440×720) : la scène ne doit pas
-   déborder — on décolle du centrage vertical et on laisse défiler. */
-@media (max-height: 700px) {
-  .co-page { align-items: flex-start; }
+/* ============================================================
+   ④ ÉCRANS COURTS · les paliers de renoncement
+   ============================================================
+   Les tailles fluides encaissent la descente jusqu'à ~660 px de haut.
+   En dessous, elles ne peuvent plus rétrécir sans devenir illisibles :
+   on retire alors, dans l'ordre de ce qui coûte le plus de hauteur
+   pour ce qu'il apporte. Le formulaire, lui, n'est jamais amputé —
+   c'est la seule chose que la page ait à faire.
+   ============================================================ */
+
+/* ① Filou s'en va. 280 px de haut, et un renard tronqué par le bord de
+      l'écran se lit comme un bug — entier ou absent, jamais coupé. */
+@media (max-height: 660px) {
+  .co-filou, .co-rebord { display: none; }
+}
+
+/* ② Les deux promesses s'en vont : elles occupent ~110 px pour deux
+      arguments que la cliente lit une fois, jamais deux. La marque,
+      l'accroche et la carte suffisent à dire de quoi il s'agit. */
+@media (max-height: 560px) {
+  .co-points { display: none; }
+  .co-pied { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
