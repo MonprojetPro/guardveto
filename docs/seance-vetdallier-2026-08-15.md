@@ -250,10 +250,10 @@ C'est donc le seul risque réel : que le tableau affiche une garde qui n'existe 
 > **Le geste a changé de place le 15 août** (décision MiKL) : il vivait derrière un trombone dans la conversation de Filou, où personne ne comprenait à quoi il servait. Il est maintenant **dans l'écran Compteurs**, là où on regarde justement les compteurs qu'il sert à amorcer. **Il n'y a plus qu'une seule porte** — le trombone n'existe plus.
 
 1. **Compteurs**, dans la barre du haut.
-2. **Aujourd'hui l'écran est vide** (« Rien à raconter pour l'instant »), et c'est le cas idéal : sous la carte « Ce qui apparaîtra ici », une **deuxième carte** propose le geste en entier — **« Tu as déjà un planning, sur papier ou dans un tableur ? »** — avec un **bouton plein « Importer un ancien planning »**.
+2. **En haut à droite, deux boutons côte à côte** : « Créer un planning → » et **« Importer un ancien planning »**. Ce sont les deux façons de commencer — partir de zéro, ou partir de ce qu'on a déjà. Le second est volontairement plus discret : créer un planning reste ce que fera la plupart des cabinets. *(Au survol, une infobulle rappelle à quoi il sert.)*
 3. Cliquer dessus : la fenêtre de choix de fichier du système s'ouvre.
-4. **Pendant la lecture** : le bouton passe à « Lecture en cours… » et un bandeau apparaît juste dessous — un point qui bat, et la phrase « Filou lit "*nom du fichier*"… Ça peut prendre un moment : il relit le document ligne par ligne avant de te montrer quoi que ce soit. » **Je n'ai pas pu mesurer la durée** — compte plusieurs dizaines de secondes sur une photo. **Annonce-le avant de cliquer** (« il va le lire, ça prend un moment »), sinon le silence se remarque.
-5. **Le résultat s'ouvre juste en dessous du bouton**, dans une carte titrée « Ce que Filou a lu dans "*nom du fichier*" ». On ne quitte pas l'écran : le geste et son résultat sont l'un sous l'autre.
+4. **Pendant la lecture** : le bouton passe à « Lecture en cours… » et un bandeau apparaît sous l'en-tête — un point qui bat, et la phrase « Filou lit "*nom du fichier*"… Ça peut prendre un moment : il relit le document ligne par ligne avant de te montrer quoi que ce soit. » **Je n'ai pas pu mesurer la durée** — compte plusieurs dizaines de secondes sur une photo. **Annonce-le avant de cliquer** (« il va le lire, ça prend un moment »), sinon le silence se remarque.
+5. **Le résultat s'ouvre juste en dessous**, dans une carte titrée « Ce que Filou a lu dans "*nom du fichier*" ». On ne quitte pas l'écran : le geste et son résultat sont l'un sous l'autre.
 
 **Ce qu'il faut vérifier AVANT de valider** — dans cet ordre :
 
@@ -268,7 +268,7 @@ C'est donc le seul risque réel : que le tableau affiche une garde qui n'existe 
 
 **Deux détails d'affichage, pour ne pas être surpris** : un refus (format non géré, fichier vide, trop lourd, dates déjà occupées) s'affiche en **fenêtre qui barre la route** — impossible de la manquer ; un succès s'affiche en **petit bandeau de confirmation** en bas de l'écran, et la période apparaît aussitôt dans la liste.
 
-**Une fois qu'un premier planning existera**, l'écran ne sera plus vide : le bouton « Importer un ancien planning » devient alors une **action discrète alignée à droite**, juste sous le titre de la page et au-dessus des filtres. Le résultat s'ouvre toujours au même endroit, directement dessous.
+**Une fois qu'un premier planning existera**, rien ne bouge : les deux boutons restent au même endroit, en haut à droite, et le résultat s'ouvre toujours dessous. Un seul geste à retenir, quel que soit l'état de l'écran.
 
 ### Quel document proposer, et lequel éviter
 
