@@ -3,6 +3,13 @@
 // ============================================================
 // GUARDVETO V2 — Importer un ancien planning, depuis les Compteurs
 // ============================================================
+// ⚠️ FONCTION ÉTEINTE DEPUIS LE 2026-08-18 — décision produit, pas panne.
+// Le bouton ne s'affiche plus et le serveur refuse : la reprise d'historique est
+// devenue une prestation d'accompagnement. Le code ci-dessous est INTACT et
+// fonctionnel, il attend derrière `IMPORT_PLANNING_ACTIF` (`lib/import/actif.ts`,
+// qui porte le raisonnement complet). Tout ce qui suit décrit donc la fonction
+// telle qu'elle se comportera si on la rallume.
+//
 // POURQUOI ICI ET PLUS DANS LA CONVERSATION. Le geste vivait derrière un
 // trombone dans la tablette de Filou. Retour de MiKL après l'avoir vu en vrai :
 // « on comprend pas à quoi il sert ». Il avait raison — personne ne va chercher
@@ -32,6 +39,7 @@ import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { useErreurBloquante } from '@/components/v2/regles/ErreurBloquante'
+import { IMPORT_PLANNING_ACTIF } from '@/lib/import/actif'
 import { ImportPlanning, type ContenuImport } from './ImportPlanning'
 
 /** Ce que le sélecteur de fichiers propose, et ce que le serveur sait lire.
@@ -315,7 +323,12 @@ export function useImportPlanning() {
   // Action SECONDAIRE : même forme et même hauteur que « Créer un planning »
   // (on ne fabrique pas un troisième traitement), mais moins appuyée — créer
   // un planning reste ce que fera l'immense majorité des cabinets.
-  const bouton = (
+  //
+  // ⚠️ ÉTEINT depuis le 2026-08-18 (cf. `lib/import/actif.ts`). Le bouton
+  // disparaît entièrement au lieu d'être grisé : un bouton grisé promet qu'il
+  // s'allumera un jour tout seul, et invite à chercher pourquoi il ne s'allume
+  // pas. Ici il n'y a rien à attendre — la reprise passe par un accompagnement.
+  const bouton = !IMPORT_PLANNING_ACTIF ? null : (
     <>
       {champ}
       <button
@@ -384,7 +397,11 @@ export function EnteteHistoriqueVide({ estAdmin }: { estAdmin: boolean }) {
           <p className="lede">
             Aucune période de planification n&apos;existe encore. Les compteurs apparaîtront dès
             qu&apos;une période aura été créée et un planning généré
-            {estAdmin
+            {/* ⚠️ CETTE PHRASE SUIT L'INTERRUPTEUR, elle ne vit pas sa vie. Annoncer
+                « si tu importes un ancien planning » alors que le bouton a disparu
+                enverrait chercher pendant dix minutes une action qui n'existe plus —
+                c'est exactement la coquille vide qu'on s'interdit. */}
+            {estAdmin && IMPORT_PLANNING_ACTIF
               ? ' — ou tout de suite, si tu importes un ancien planning : les compteurs démarrent alors avec le passé du cabinet au lieu de repartir de zéro.'
               : '.'}
           </p>

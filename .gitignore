@@ -78,3 +78,14 @@ filou/veo-out/
 
 # Documents de test pour l import d un ancien planning (25 Mo, jetables)
 _plannings-test/
+
+# DONNEES REELLES DU CABINET — JAMAIS sur GitHub.
+# Exports d agenda et plannings fournis par le client pour les essais : ce sont
+# des donnees personnelles (qui travaille quand, absences, vie privee). Neuf ans
+# d historique dans un seul fichier. Elles servent a mettre au point, elles ne
+# se versionnent pas.
+*.ical/
+*.ics
+planning*.pdf
+vetvalallier*
+vetovaldallier*

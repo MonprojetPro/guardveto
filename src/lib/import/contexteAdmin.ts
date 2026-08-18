@@ -17,6 +17,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
+import { IMPORT_PLANNING_ACTIF, IMPORT_PLANNING_ETEINT } from './actif'
 
 export type ContexteAdmin =
   | { error: string }
@@ -26,6 +27,13 @@ export type ContexteAdmin =
  *  L'import écrit dans l'historique du cabinet — ce n'est pas un geste de
  *  vétérinaire. */
 export async function contexteAdmin(): Promise<ContexteAdmin> {
+  // ⚠️ LA COUPURE EST ICI, ET NULLE PART AILLEURS. Ce module est le passage
+  // obligé des DEUX portes de l'import — la route de lecture et l'action
+  // d'écriture. Éteindre l'import à cet endroit les ferme toutes les deux d'un
+  // seul geste, et rend impossible d'en rouvrir une en oubliant l'autre.
+  // Cf. `actif.ts` pour la décision produit du 2026-08-18.
+  if (!IMPORT_PLANNING_ACTIF) return { error: IMPORT_PLANNING_ETEINT }
+
   const supabase = await createClient()
   const {
     data: { user },
