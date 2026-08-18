@@ -1,14 +1,17 @@
 'use server'
 
 // ============================================================
-// GUARDVETO — Importer un ancien planning : lire, valider, écrire
+// GUARDVETO — Importer un ancien planning : écrire, défaire
 // ============================================================
-// Trois actions, et la frontière entre la première et les deux autres est
-// tout le dispositif :
-//
-//   lireDocumentPlanning()      — le modèle LIT le document. N'écrit JAMAIS.
 //   enregistrerPlanningImporte() — écrit, APRÈS que l'admin a vu et validé.
 //   supprimerPlanningImporte()   — défait l'import, en entier.
+//
+// LA LECTURE N'EST PLUS ICI. Elle vit dans `POST /api/import/lire` depuis le
+// 2026-08-18 : en Server Action, le document voyageait dans les arguments, que
+// le décodeur de Next borne à ~1 Mo — tout fichier un peu lourd échouait sur
+// « Maximum array nesting exceeded » avant même d'atteindre notre code. La
+// frontière lecture / écriture, elle, n'a pas bougé : lire n'écrit JAMAIS, et
+// l'écriture attend que l'admin ait relu ligne par ligne.
 //
 // POURQUOI ÉCRIRE DE VRAIES GARDES plutôt qu'un compteur de départ à part.
 // Les compteurs (`compteurs_gardes`) et le planning affiché
@@ -30,124 +33,19 @@
 // monte la garde).
 // ============================================================
 
-import { createClient } from '@/lib/supabase/server'
-import { resoudreCabinetId } from '@/lib/supabase/cabinet'
+import { contexteAdmin } from '@/lib/import/contexteAdmin'
 import { revalidatePath } from 'next/cache'
 import { queryCompteurs, queryTotalWE } from '@/hooks/useCompteurs'
 import { calculerBilans } from '@/engine/bilan'
 import {
-  FORMATS_LUS,
-  TAILLE_MAX_OCTETS,
   ancrerSamedi,
   dimancheDeLaSemaine,
-  lirePlanningDepuisFichier,
   lundiDeLaSemaine,
   saisonDe,
-  type FormatLu,
-  type LecturePlanning,
-  type VetoConnu,
 } from '@/lib/ia/lirePlanningImporte'
-import { assistantIaDisponible } from '@/lib/ia/proposerRegle'
-import type { ReponseImport, ReponseEcritureImport, LigneAEcrire } from '@/lib/ia/importTypes'
+import type { ReponseEcritureImport, LigneAEcrire } from '@/lib/ia/importTypes'
 
-/** Le contexte commun : qui parle, et est-ce bien un administrateur.
- *  L'import écrit dans l'historique du cabinet — ce n'est pas un geste de
- *  vétérinaire. */
-async function contexteAdmin(): Promise<
-  { error: string } | { cabinetId: string; supabase: Awaited<ReturnType<typeof createClient>> }
-> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { error: 'Non authentifié.' }
 
-  const { data: vet } = await supabase
-    .from('veterinaires')
-    .select('role_app')
-    .eq('user_id', user.id)
-    .single()
-  if (!vet) return { error: 'Profil vétérinaire introuvable.' }
-  if ((vet.role_app as string) !== 'admin') {
-    return { error: "L'import d'un ancien planning est réservé à l'administrateur." }
-  }
-
-  try {
-    return { cabinetId: await resoudreCabinetId(supabase), supabase }
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
-  }
-}
-
-/**
- * Fait lire un document déposé dans la conversation. N'écrit rien en base.
- *
- * @param nom     le nom du fichier, pour pouvoir le nommer à l'écran
- * @param format  le type MIME, vérifié ici contre la liste des formats lus
- * @param base64  le contenu, SANS le préfixe `data:`
- */
-export async function lireDocumentPlanning(
-  nom: string,
-  format: string,
-  base64: string,
-): Promise<ReponseImport> {
-  const c = await contexteAdmin()
-  if ('error' in c) return c
-
-  if (!assistantIaDisponible()) {
-    return { error: 'Assistant IA non configuré (clé API manquante côté serveur).' }
-  }
-
-  if (!(FORMATS_LUS as readonly string[]).includes(format)) {
-    return {
-      error:
-        'Je ne sais pas lire ce format. Une photo (JPEG, PNG), un PDF ou un fichier CSV, oui — un tableur Excel, enregistre-le d’abord en CSV ou prends-en une capture d’écran.',
-    }
-  }
-
-  // La taille se vérifie AVANT l'appel : au-delà, l'API refuse la requête
-  // entière et la personne attend pour rien devant son écran.
-  //
-  // ⚠️ Ce contrôle s'applique à ce qui est REÇU, donc APRÈS la réduction faite
-  // par le navigateur : une photo de 5 Mo réduite à 900 Ko passe, et c'est
-  // voulu. La refuser sur sa taille d'origine reviendrait à refuser le cas
-  // d'usage principal — un cabinet qui photographie sa feuille papier.
-  //
-  // Une décimale au dénominateur : « trop lourd (3 Mo), au-delà de 3 Mo » est
-  // une phrase qui ne veut rien dire.
-  const octets = Math.floor((base64.length * 3) / 4)
-  if (octets > TAILLE_MAX_OCTETS) {
-    return {
-      error: `Ce fichier est trop lourd (${(octets / 1024 / 1024).toFixed(1)} Mo). Au-delà de ${(
-        TAILLE_MAX_OCTETS /
-        1024 /
-        1024
-      ).toFixed(0)} Mo je ne peux pas le recevoir — refais la photo en qualité normale, ou découpe le PDF.`,
-    }
-  }
-  if (octets < 32) return { error: 'Ce fichier est vide.' }
-
-  const { data: vetsDb } = await c.supabase
-    .from('veterinaires')
-    .select('id, prenom, nom')
-    .eq('cabinet_id', c.cabinetId)
-    .eq('actif', true)
-    .order('nom')
-
-  const vets = (vetsDb as VetoConnu[] | null) ?? []
-  if (vets.length === 0) {
-    return { error: "Aucun vétérinaire actif dans le cabinet : je n'aurais personne à qui rattacher les gardes." }
-  }
-
-  const lu = await lirePlanningDepuisFichier({ nom, format: format as FormatLu, base64 }, vets)
-  if (!lu.ok) return { error: lu.raison }
-
-  return {
-    fichier: nom,
-    lecture: lu.lecture satisfies LecturePlanning,
-    vets,
-  }
-}
 
 /**
  * Écrit ce que l'humain a validé. C'est le SEUL endroit qui écrit.

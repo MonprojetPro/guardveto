@@ -31,7 +31,6 @@
 import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { lireDocumentPlanning } from '@/app/(protected)/filou/import-actions'
 import { useErreurBloquante } from '@/components/v2/regles/ErreurBloquante'
 import { ImportPlanning, type ContenuImport } from './ImportPlanning'
 
@@ -81,15 +80,21 @@ const FORMATS_ACCEPTES = '.png,.jpg,.jpeg,.webp,.gif,.pdf,.csv,.txt'
    de 13 Ko n'ont aucune raison de passer par un décodeur d'images.
    ============================================================ */
 
-/** Le plafond réel d'un envoi, et donc la cible de la réduction. Même valeur
- *  que `TAILLE_MAX_OCTETS` côté serveur, et pour la même raison : le corps
- *  d'une requête ne dépasse pas 4,5 Mo sur la plateforme, base64 compris.
- *
- *  Il joue deux rôles à la fois, et c'est volontaire : on ne réduit qu'AU-DELÀ
- *  (en dessous, rien à gagner à dégrader ce qui passe déjà) et on réduit
- *  JUSQU'EN DESSOUS. Un seul chiffre, donc pas de fenêtre absurde où on
- *  dégraderait une image sans réussir à la faire passer. */
-const PLAFOND_ENVOI_OCTETS = 3 * 1024 * 1024
+/** Le plafond réel d'un envoi. Même valeur que `TAILLE_MAX_OCTETS` côté
+ *  serveur, et pour la même raison : le corps d'une requête ne dépasse pas
+ *  4,5 Mo sur la plateforme. La valeur est recopiée plutôt qu'importée —
+ *  `lirePlanningImporte` embarque le SDK Anthropic, qu'on ne tire pas dans le
+ *  paquet envoyé au navigateur pour un seul nombre. Les deux commentaires se
+ *  citent l'un l'autre ; si l'un bouge, l'autre doit suivre. */
+const PLAFOND_ENVOI_OCTETS = 4 * 1024 * 1024
+
+/** Au-delà de ce poids, on réduit l'image. Volontairement PLUS BAS que le
+ *  plafond : viser le plafond tout juste laisserait passer des envois de
+ *  3,9 Mo pour rien, alors qu'une photo ramenée à 2576 px pèse une fraction de
+ *  ça sans rien perdre de lisible. L'écart entre les deux chiffres est la marge
+ *  qui absorbe une réduction moins efficace que prévu — un scan photographique
+ *  enregistré en PNG, typiquement. */
+const SEUIL_REDUCTION_OCTETS = 3 * 1024 * 1024
 
 /** Le grand côté visé après réduction. Voir ① ci-dessus. */
 const COTE_MAX = 2576
@@ -97,14 +102,6 @@ const COTE_MAX = 2576
 /** Qualité du JPEG produit. 0,85 : au-dessus le gain visuel est nul sur du
  *  texte imprimé, en dessous les caractères fins commencent à baver. */
 const QUALITE_JPEG = 0.85
-
-/** Ce qui part au serveur : la charge encodée et le format à annoncer. Le
- *  format peut différer de celui du fichier d'origine (un GIF réduit sort en
- *  PNG), et c'est CE format-là que le serveur doit recevoir. */
-interface ChargeEnvoyee {
-  base64: string
-  format: string
-}
 
 /**
  * Réduit une image trop lourde. Rend `null` si le fichier n'a pas à être
@@ -115,7 +112,7 @@ interface ChargeEnvoyee {
  */
 async function reduireImage(fichier: File, format: string): Promise<Blob | null> {
   if (!format.startsWith('image/')) return null
-  if (fichier.size <= PLAFOND_ENVOI_OCTETS) return null
+  if (fichier.size <= SEUIL_REDUCTION_OCTETS) return null
   if (typeof createImageBitmap !== 'function') return null
 
   let bitmap: ImageBitmap | null = null
@@ -188,21 +185,6 @@ async function reduireImage(fichier: File, format: string): Promise<Blob | null>
   }
 }
 
-/** Lit un fichier local et rend son contenu en base64, SANS le préfixe
- *  `data:…;base64,` — l'action serveur attend la charge nue. */
-function enBase64(fichier: Blob): Promise<string> {
-  return new Promise((resoudre, rejeter) => {
-    const lecteur = new FileReader()
-    lecteur.onerror = () => rejeter(new Error('Je n’ai pas réussi à ouvrir ce fichier.'))
-    lecteur.onload = () => {
-      const brut = String(lecteur.result ?? '')
-      const virgule = brut.indexOf(',')
-      resoudre(virgule >= 0 ? brut.slice(virgule + 1) : brut)
-    }
-    lecteur.readAsDataURL(fichier)
-  })
-}
-
 /** Le type MIME du fichier, retrouvé par son extension quand le navigateur ne
  *  le donne pas (fréquent pour les CSV sous Windows, où le champ arrive vide
  *  ou vaut `application/vnd.ms-excel`). */
@@ -235,40 +217,32 @@ export function useImportPlanning() {
     setEnLecture(fichier.name)
     try {
       const formatSource = formatDe(fichier)
-      // La réduction d'abord, l'encodage ensuite : c'est la charge RÉELLEMENT
-      // envoyée qui doit tenir sous le plafond de la plateforme.
+      // La réduction d'abord : c'est la charge RÉELLEMENT envoyée qui doit
+      // tenir sous le plafond de la plateforme.
       const reduite = await reduireImage(fichier, formatSource)
-      const charge: ChargeEnvoyee = reduite
-        ? { base64: await enBase64(reduite), format: reduite.type || formatSource }
-        : { base64: await enBase64(fichier), format: formatSource }
+      const charge: Blob = reduite ?? fichier
 
-      // ⚠️ LE REFUS DOIT TOMBER ICI, PAS AU SERVEUR. C'est le point qui manquait
-      // au 2026-08-18 : le contrôle `TAILLE_MAX_OCTETS` de l'action serveur est
+      // ⚠️ LE REFUS DOIT TOMBER ICI, PAS AU SERVEUR. C'est le piège du
+      // 2026-08-18 : le contrôle `TAILLE_MAX_OCTETS` de la route est
       // INATTEIGNABLE au-delà du plafond de la plateforme. Vercel refuse le
-      // corps de la requête AVANT d'entrer dans la fonction — notre belle phrase
-      // en français n'est jamais lue, et la personne reçoit « An unexpected
-      // response was received from the server ».
+      // corps de la requête AVANT d'entrer dans la fonction — notre phrase en
+      // français n'est jamais lue, et la personne reçoit un message d'erreur
+      // technique en anglais.
       //
       // On mesure donc ce qui va RÉELLEMENT partir — la charge après réduction,
       // pas le fichier de départ — et on refuse nous-mêmes avant d'envoyer. Le
-      // contrôle serveur reste en place : il garde la porte pour tout appelant
-      // qui ne passerait pas par cet écran.
+      // contrôle de la route reste en place : il garde la porte pour tout
+      // appelant qui ne passerait pas par cet écran.
       //
       // Ça vise le PDF SCANNÉ, qu'on ne sait pas alléger dans le navigateur et
       // qui pèse couramment 2 à 10 Mo. Le message le dit franchement plutôt que
       // de laisser croire à une panne : il n'y a pas de « réessaie » utile ici,
       // il y a un geste à faire sur le document.
-      //
-      // On mesure les octets DÉCODÉS, exactement comme le fait le serveur
-      // (`base64.length * 3 / 4`) : comparer la longueur du base64 à un plafond
-      // exprimé en taille de fichier refuserait à tort tout ce qui pèse entre
-      // 2,3 et 3 Mo, puisque l'encodage gonfle de 33 %.
-      const octetsEnvoyes = Math.floor((charge.base64.length * 3) / 4)
-      if (octetsEnvoyes > PLAFOND_ENVOI_OCTETS) {
+      if (charge.size > PLAFOND_ENVOI_OCTETS) {
         // Le poids annoncé est celui de ce qui PART, pas celui du fichier
         // d'origine : après réduction, dire « 8 Mo » alors qu'on en envoie 3,2
         // ferait passer le refus pour une erreur de notre part.
-        const poids = (octetsEnvoyes / 1024 / 1024).toFixed(1)
+        const poids = (charge.size / 1024 / 1024).toFixed(1)
         // Trois issues différentes, parce que le geste à faire n'est pas le
         // même : un PDF se découpe, une photo se refait, un tableau se scinde.
         // Un message unique dirait « refais la photo » à qui vient de déposer
@@ -285,7 +259,27 @@ export function useImportPlanning() {
         return
       }
 
-      const reponse = await lireDocumentPlanning(fichier.name, charge.format, charge.base64)
+      // Le document part en BINAIRE, dans un multipart ordinaire. C'est tout
+      // l'intérêt de la route : une Server Action l'aurait fait voyager en
+      // base64 dans ses arguments, +33 % de poids et surtout un décodeur qui
+      // plafonne à ~1 Mo (cf. l'en-tête de `api/import/lire/route.ts`).
+      // L'encodage base64 que le modèle réclame se fait côté serveur.
+      const formulaire = new FormData()
+      formulaire.append('fichier', charge, fichier.name)
+
+      const httpReponse = await fetch('/api/import/lire', {
+        method: 'POST',
+        body: formulaire,
+      })
+
+      // Une réponse non-JSON veut dire qu'on n'a pas atteint notre code : c'est
+      // la plateforme qui a parlé (corps refusé, fonction expirée). On ne laisse
+      // pas remonter un message technique en anglais.
+      const reponse = await httpReponse.json().catch(() => ({
+        error:
+          'Le serveur n’a pas répondu comme prévu. Si le fichier est volumineux, essaie avec une version plus légère.',
+      }))
+
       if ('error' in reponse) {
         // Un refus barre la route : format non géré, fichier vide, trop lourd.
         // En toast, il défilerait pendant qu'on cherche encore le fichier.

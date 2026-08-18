@@ -45,29 +45,35 @@ export const FORMATS_LUS = [
 
 export type FormatLu = (typeof FORMATS_LUS)[number]
 
-/** Plafond de taille, avant encodage base64.
+/** Plafond de taille du fichier déposé.
  *
  *  ⚠️ CE CHIFFRE N'EST PAS UN CONFORT, C'EST UNE LIMITE DE PLATEFORME.
  *  ============================================================
  *  Vercel plafonne le corps d'une requête à **4,5 Mo**, quel que soit
  *  l'abonnement. Ce plafond agit AVANT la fonction : `bodySizeLimit` dans
  *  `next.config.ts` ne desserre que ce qui se passe DEDANS, il ne peut rien
- *  contre lui. Le corps transporte du base64, qui gonfle de ~33 % : la vraie
- *  limite de fichier source est donc d'environ 3,3 Mo, et on garde la marge
- *  de l'enveloppe de l'action serveur.
+ *  contre lui. On se tient à 4 Mo pour garder la marge de l'enveloppe
+ *  multipart.
  *
- *  Ce que coûtait l'ancienne valeur (12 Mo, 2026-08-18) : elle n'était JAMAIS
- *  atteinte. Un fichier de 8 Mo comme de 16 Mo était rejeté par la plateforme
- *  avant d'arriver ici, et la personne lisait « An unexpected response was
- *  received from the server » au lieu d'une phrase en français. Annoncer un
- *  plafond qu'on ne fait pas respecter soi-même, c'est promettre ce qu'un
- *  autre refusera.
+ *  ⚠️ Ce chiffre ne vaut QUE parce que le fichier voyage en BINAIRE, par
+ *  `POST /api/import/lire`. Deux limites bien plus basses ont été payées avant
+ *  d'arriver là, et les rouvrir suffirait à tout casser :
  *
- *  Ce plafond ne concerne en pratique presque plus les photos : le navigateur
+ *  ① 12 Mo (avant le 2026-08-18) — jamais atteint. La plateforme refusait bien
+ *     avant, et la personne lisait « An unexpected response was received from
+ *     the server » au lieu d'une phrase en français. Annoncer un plafond qu'on
+ *     ne fait pas respecter soi-même, c'est promettre ce qu'un autre refusera.
+ *  ② 3 Mo (le 2026-08-18) — encore trop haut, mais pour une raison invisible :
+ *     tant que la lecture passait par une SERVER ACTION, le document voyageait
+ *     dans ses arguments, et le décodeur de Next borne cette charge à ~1 Mo
+ *     (« Maximum array nesting exceeded »). Le déménagement vers une route API
+ *     a levé cette limite-là — cf. l'en-tête de `api/import/lire/route.ts`.
+ *
+ *  En pratique ce plafond ne concerne presque plus les photos : le navigateur
  *  les réduit avant l'envoi (cf. `ImportPlanningLanceur`). Il reste le
- *  garde-fou des PDF, qu'on ne sait pas alléger côté client — un PDF scanné
+ *  garde-fou du PDF, qu'on ne sait pas alléger côté client — un PDF scanné
  *  pèse couramment 2 à 10 Mo. */
-export const TAILLE_MAX_OCTETS = 3 * 1024 * 1024
+export const TAILLE_MAX_OCTETS = 4 * 1024 * 1024
 
 /** Une ligne telle que le modèle l'a lue, AVANT résolution des prénoms. */
 const LigneLue = z.object({
