@@ -107,12 +107,22 @@ export async function lireDocumentPlanning(
 
   // La taille se vérifie AVANT l'appel : au-delà, l'API refuse la requête
   // entière et la personne attend pour rien devant son écran.
+  //
+  // ⚠️ Ce contrôle s'applique à ce qui est REÇU, donc APRÈS la réduction faite
+  // par le navigateur : une photo de 5 Mo réduite à 900 Ko passe, et c'est
+  // voulu. La refuser sur sa taille d'origine reviendrait à refuser le cas
+  // d'usage principal — un cabinet qui photographie sa feuille papier.
+  //
+  // Une décimale au dénominateur : « trop lourd (3 Mo), au-delà de 3 Mo » est
+  // une phrase qui ne veut rien dire.
   const octets = Math.floor((base64.length * 3) / 4)
   if (octets > TAILLE_MAX_OCTETS) {
     return {
-      error: `Ce fichier est trop lourd (${Math.round(octets / 1024 / 1024)} Mo). Au-delà de ${Math.round(
-        TAILLE_MAX_OCTETS / 1024 / 1024,
-      )} Mo je ne peux pas le lire — refais la photo en qualité normale, ou découpe le PDF.`,
+      error: `Ce fichier est trop lourd (${(octets / 1024 / 1024).toFixed(1)} Mo). Au-delà de ${(
+        TAILLE_MAX_OCTETS /
+        1024 /
+        1024
+      ).toFixed(0)} Mo je ne peux pas le recevoir — refais la photo en qualité normale, ou découpe le PDF.`,
     }
   }
   if (octets < 32) return { error: 'Ce fichier est vide.' }

@@ -47,12 +47,27 @@ export type FormatLu = (typeof FORMATS_LUS)[number]
 
 /** Plafond de taille, avant encodage base64.
  *
- *  L'API accepte 32 Mo par requête, base64 compris — or le base64 gonfle de
- *  ~33 %. On plafonne donc bien en dessous : une photo de planning fait 2 à
- *  5 Mo, un PDF exporté d'un tableur moins d'1 Mo. Au-delà, c'est un scan
- *  haute définition inutilement lourd, et l'attente devient insupportable
- *  devant un client. */
-export const TAILLE_MAX_OCTETS = 12 * 1024 * 1024
+ *  ⚠️ CE CHIFFRE N'EST PAS UN CONFORT, C'EST UNE LIMITE DE PLATEFORME.
+ *  ============================================================
+ *  Vercel plafonne le corps d'une requête à **4,5 Mo**, quel que soit
+ *  l'abonnement. Ce plafond agit AVANT la fonction : `bodySizeLimit` dans
+ *  `next.config.ts` ne desserre que ce qui se passe DEDANS, il ne peut rien
+ *  contre lui. Le corps transporte du base64, qui gonfle de ~33 % : la vraie
+ *  limite de fichier source est donc d'environ 3,3 Mo, et on garde la marge
+ *  de l'enveloppe de l'action serveur.
+ *
+ *  Ce que coûtait l'ancienne valeur (12 Mo, 2026-08-18) : elle n'était JAMAIS
+ *  atteinte. Un fichier de 8 Mo comme de 16 Mo était rejeté par la plateforme
+ *  avant d'arriver ici, et la personne lisait « An unexpected response was
+ *  received from the server » au lieu d'une phrase en français. Annoncer un
+ *  plafond qu'on ne fait pas respecter soi-même, c'est promettre ce qu'un
+ *  autre refusera.
+ *
+ *  Ce plafond ne concerne en pratique presque plus les photos : le navigateur
+ *  les réduit avant l'envoi (cf. `ImportPlanningLanceur`). Il reste le
+ *  garde-fou des PDF, qu'on ne sait pas alléger côté client — un PDF scanné
+ *  pèse couramment 2 à 10 Mo. */
+export const TAILLE_MAX_OCTETS = 3 * 1024 * 1024
 
 /** Une ligne telle que le modèle l'a lue, AVANT résolution des prénoms. */
 const LigneLue = z.object({

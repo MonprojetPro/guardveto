@@ -40,9 +40,157 @@ import { ImportPlanning, type ContenuImport } from './ImportPlanning'
  *  refusé deux secondes plus tard est une porte qui ne mène qu'au refus. */
 const FORMATS_ACCEPTES = '.png,.jpg,.jpeg,.webp,.gif,.pdf,.csv,.txt'
 
+/* ============================================================
+   RÉDUIRE LA PHOTO AVANT DE L'ENVOYER
+   ============================================================
+   LE PROBLÈME, tel qu'il s'est manifesté (2026-08-18) : déposer une photo de
+   8 Mo affichait « An unexpected response was received from the server ».
+   Ce refus n'est pas le nôtre — Vercel plafonne le corps d'une requête à
+   4,5 Mo, quel que soit l'abonnement, et ce plafond agit AVANT la fonction :
+   `bodySizeLimit` dans `next.config.ts` ne desserre que ce qui se passe
+   dedans. En base64 (+33 %), la vraie limite est d'environ 3 Mo de fichier.
+
+   POURQUOI ÇA COMPTE AU-DELÀ DU TEST : une photo de planning prise au
+   téléphone pèse 2 à 5 Mo. C'est exactement la zone de casse, et c'est LE cas
+   d'usage de cette fonction — un cabinet qui photographie sa feuille papier.
+
+   Réduire côté navigateur est la vraie réponse : une photo ramenée à 2576 px
+   passe sous la barre sans rien perdre de lisible. Les quatre décisions qui
+   comptent, et pourquoi :
+
+   ① 2576 px sur le GRAND CÔTÉ — pas sur la largeur. Un planning mural est en
+      paysage, une liste imprimée en portrait ; borner la largeur laisserait
+      une photo portrait à 3400 px de haut. C'est la résolution que le modèle
+      exploite réellement : au-delà on transmet des octets pour rien, en deçà
+      on jette de la finesse utile sur les grilles denses.
+   ② `createImageBitmap` avec options de redimensionnement, JAMAIS
+      `new Image()` + canvas. Le second matérialise l'image pleine taille :
+      une photo de 48 Mpx, c'est ~190 Mo en mémoire et un onglet tué sur un
+      téléphone d'entrée de gamme. Le premier décode et réduit en une passe et
+      n'expose jamais le plein format au JavaScript.
+   ③ `imageOrientation: 'from-image'` n'est PAS optionnel. Les navigateurs
+      appliquent l'orientation EXIF au rendu d'une `<img>`, mais pas à
+      `createImageBitmap` : sans ce réglage, une photo de téléphone part
+      COUCHÉE, et le modèle lit un planning à 90°.
+   ④ On ne ré-encode pas un PNG en JPEG. Une capture d'écran de tableur
+      ré-encodée donne des contours baveux autour des chiffres — exactement ce
+      qui fait rater une lecture. Photo → JPEG 0,85 ; capture ou export → PNG,
+      redimensionnement seul.
+
+   Et on ne touche à RIEN en dessous du seuil : un CSV de 268 octets ou un PNG
+   de 13 Ko n'ont aucune raison de passer par un décodeur d'images.
+   ============================================================ */
+
+/** Le plafond réel d'un envoi, et donc la cible de la réduction. Même valeur
+ *  que `TAILLE_MAX_OCTETS` côté serveur, et pour la même raison : le corps
+ *  d'une requête ne dépasse pas 4,5 Mo sur la plateforme, base64 compris.
+ *
+ *  Il joue deux rôles à la fois, et c'est volontaire : on ne réduit qu'AU-DELÀ
+ *  (en dessous, rien à gagner à dégrader ce qui passe déjà) et on réduit
+ *  JUSQU'EN DESSOUS. Un seul chiffre, donc pas de fenêtre absurde où on
+ *  dégraderait une image sans réussir à la faire passer. */
+const PLAFOND_ENVOI_OCTETS = 3 * 1024 * 1024
+
+/** Le grand côté visé après réduction. Voir ① ci-dessus. */
+const COTE_MAX = 2576
+
+/** Qualité du JPEG produit. 0,85 : au-dessus le gain visuel est nul sur du
+ *  texte imprimé, en dessous les caractères fins commencent à baver. */
+const QUALITE_JPEG = 0.85
+
+/** Ce qui part au serveur : la charge encodée et le format à annoncer. Le
+ *  format peut différer de celui du fichier d'origine (un GIF réduit sort en
+ *  PNG), et c'est CE format-là que le serveur doit recevoir. */
+interface ChargeEnvoyee {
+  base64: string
+  format: string
+}
+
+/**
+ * Réduit une image trop lourde. Rend `null` si le fichier n'a pas à être
+ * touché (format non-image, taille sous le seuil) ou si la réduction a échoué
+ * — dans ce dernier cas, l'appelant envoie l'original et c'est le contrôle de
+ * taille du serveur qui rendra un refus en français. Cette fonction ne jette
+ * jamais : un navigateur qui ne sait pas faire ne doit pas casser le dépôt.
+ */
+async function reduireImage(fichier: File, format: string): Promise<Blob | null> {
+  if (!format.startsWith('image/')) return null
+  if (fichier.size <= PLAFOND_ENVOI_OCTETS) return null
+  if (typeof createImageBitmap !== 'function') return null
+
+  let bitmap: ImageBitmap | null = null
+  try {
+    // Première passe : on borne la LARGEUR. Elle suffit pour une image
+    // paysage, et elle nous apprend le rapport de forme sans avoir jamais
+    // décodé le plein format.
+    bitmap = await createImageBitmap(fichier, {
+      resizeWidth: COTE_MAX,
+      resizeQuality: 'high',
+      imageOrientation: 'from-image',
+    })
+
+    // Portrait : c'est la HAUTEUR qu'il fallait borner. On repart de la
+    // source pour une réduction propre en une seule passe, plutôt que de
+    // réduire une réduction — deux rééchantillonnages successifs, ça se voit
+    // sur des chiffres manuscrits.
+    if (bitmap.height > COTE_MAX) {
+      const premier = bitmap
+      bitmap = await createImageBitmap(fichier, {
+        resizeHeight: COTE_MAX,
+        resizeQuality: 'high',
+        imageOrientation: 'from-image',
+      })
+      premier.close()
+    }
+
+    const toile = document.createElement('canvas')
+    toile.width = bitmap.width
+    toile.height = bitmap.height
+    const pinceau = toile.getContext('2d')
+    if (!pinceau) return null
+    pinceau.drawImage(bitmap, 0, 0)
+
+    const encoder = (type: string) =>
+      new Promise<Blob | null>((resoudre) => {
+        toile.toBlob(resoudre, type, type === 'image/jpeg' ? QUALITE_JPEG : undefined)
+      })
+
+    // ④ : le PNG (et le GIF, qui est du même registre — capture, export) ne
+    // passe pas en JPEG. Tout le reste est une photo.
+    const sansPerte = format === 'image/png' || format === 'image/gif'
+    let blob = await encoder(sansPerte ? 'image/png' : 'image/jpeg')
+
+    // REPLI, trouvé par le banc d'essai (2026-08-18) : une image
+    // PHOTOGRAPHIQUE enregistrée en PNG (un scan, une photo réenregistrée) ne
+    // redescend pas sous le plafond en restant en PNG — le ré-encodage du
+    // navigateur, moins optimisé que celui d'un outil d'image, peut même
+    // ALOURDIR. On renonçait alors à réduire, et l'envoi échouait à coup sûr.
+    // Mieux vaut un JPEG lisible qu'un refus : la règle « on n'abîme pas un
+    // PNG » protège les captures d'écran de tableur, qui sont légères et
+    // n'atteindront jamais ce repli.
+    if (sansPerte && (!blob || blob.size > PLAFOND_ENVOI_OCTETS)) {
+      const enJpeg = await encoder('image/jpeg')
+      if (enJpeg && (!blob || enJpeg.size < blob.size)) blob = enJpeg
+    }
+
+    // Réduire ne doit jamais ALOURDIR : sur une image déjà bien compressée, le
+    // ré-encodage peut gonfler. Dans ce cas on garde l'original — le serveur
+    // rendra un refus en français, ce qui vaut mieux qu'un envoi plus lourd
+    // que le fichier de départ.
+    if (!blob || blob.size >= fichier.size) return null
+    return blob
+  } catch {
+    // Format exotique, image corrompue, mémoire insuffisante : on renonce en
+    // silence et on laisse partir l'original.
+    return null
+  } finally {
+    bitmap?.close()
+  }
+}
+
 /** Lit un fichier local et rend son contenu en base64, SANS le préfixe
  *  `data:…;base64,` — l'action serveur attend la charge nue. */
-function enBase64(fichier: File): Promise<string> {
+function enBase64(fichier: Blob): Promise<string> {
   return new Promise((resoudre, rejeter) => {
     const lecteur = new FileReader()
     lecteur.onerror = () => rejeter(new Error('Je n’ai pas réussi à ouvrir ce fichier.'))
@@ -86,8 +234,15 @@ export function useImportPlanning() {
     setContenu(null)
     setEnLecture(fichier.name)
     try {
-      const base64 = await enBase64(fichier)
-      const reponse = await lireDocumentPlanning(fichier.name, formatDe(fichier), base64)
+      const formatSource = formatDe(fichier)
+      // La réduction d'abord, l'encodage ensuite : c'est la charge RÉELLEMENT
+      // envoyée qui doit tenir sous le plafond de la plateforme.
+      const reduite = await reduireImage(fichier, formatSource)
+      const charge: ChargeEnvoyee = reduite
+        ? { base64: await enBase64(reduite), format: reduite.type || formatSource }
+        : { base64: await enBase64(fichier), format: formatSource }
+
+      const reponse = await lireDocumentPlanning(fichier.name, charge.format, charge.base64)
       if ('error' in reponse) {
         // Un refus barre la route : format non géré, fichier vide, trop lourd.
         // En toast, il défilerait pendant qu'on cherche encore le fichier.

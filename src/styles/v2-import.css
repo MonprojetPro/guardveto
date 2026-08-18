@@ -42,8 +42,19 @@
      (700 px utiles), seize pixels entre chaque bloc repoussaient le bouton
      d'enregistrement d'un écran entier. */
   gap: clamp(11px, 1.8vh, 16px);
-  /* La mesure de lecture. Le panneau vit dans une carte large (jusqu'à
-     1240 px) : sans borne, la date d'un côté et les noms de l'autre. */
+}
+
+/* Les BLOCS DE TEXTE gardent une laisse de lecture — une phrase de 1200 px de
+   large ne se lit pas. Le TABLEAU, lui, prend toute la place disponible : il
+   n'a pas de longueur de ligne, il a des colonnes à relier (retour MiKL du
+   2026-08-18 : « il y a encore une partie de l'écran qui n'est pas utilisée »).
+   Une borne posée sur `.imp` tout entier laissait une bande vide à droite. */
+.imp-dit,
+.imp-trous,
+.imp-effets,
+.imp-vide,
+.imp-refus,
+.imp-recu {
   max-width: 900px;
 }
 
@@ -147,23 +158,41 @@
 }
 
 /* ── Les lignes lues ──────────────────────────────────────── */
-/* La hauteur du cadre suit celle de la fenêtre : 8 lignes tiennent en entier,
-   60 défilent dans le cadre sans jamais pousser le bouton d'enregistrement
-   hors de l'écran. Bornée en bas (220 px ≈ 5 lignes, en dessous ça ne se
-   relit plus) comme en haut. */
+/* PAR DÉFAUT, LE CADRE NE DÉFILE PAS. Une zone qui défile dans une page qui
+   défile déjà est un piège connu de ce projet, et huit lignes n'ont aucune
+   raison d'être enfermées derrière une barre : elles tiennent à l'écran.
+   La hauteur maximale ne s'applique qu'aux imports vraiment longs, par la
+   classe `imp-scroll--long` que pose le composant (au-delà de 12 gardes).
+   C'est la seule façon honnête de le faire : le CSS ne sait pas compter les
+   lignes d'un tableau. */
 .imp-scroll {
-  max-height: clamp(220px, 44vh, 430px);
   overflow: auto;
   border: 1px solid var(--t-border);
   border-radius: var(--r-sm);
   background: var(--surface);
   box-shadow: var(--edge-light), var(--elev-1);
 }
+/* Import long : le cadre se borne à la fenêtre. L'en-tête de colonnes reste
+   collé en haut (`position: sticky` sur les `th`, fond `--surface-2`), donc
+   on sait toujours quelle colonne on lit. Borné en bas à 260 px (≈ 6 lignes) :
+   en dessous, le cadre ne se relit plus. */
+.imp-scroll--long {
+  max-height: clamp(260px, 46vh, 520px);
+}
 
 .imp-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.84rem;
+}
+/* Les deux colonnes de noms absorbent la largeur disponible ; la date, la
+   nature et la case gardent leur largeur naturelle. Sans ces deux pourcentages,
+   la mise en page automatique serrait tout à gauche et laissait le tiers droit
+   du tableau vide. En pourcentage plutôt qu'en pixels : la carte change de
+   largeur avec la fenêtre, les colonnes doivent suivre. */
+.imp-table th:nth-child(4),
+.imp-table th:nth-child(5) {
+  width: 31%;
 }
 .imp-table th {
   position: sticky;
@@ -518,7 +547,7 @@
     padding-left: 14px;
     padding-right: 14px;
   }
-  .imp-scroll { max-height: clamp(200px, 38vh, 340px); }
+  .imp-scroll--long { max-height: clamp(220px, 40vh, 360px); }
   .imp-table { font-size: 0.79rem; }
   .imp-table td { padding: 4px 8px; }
   .imp-table th { padding: 8px 8px; }

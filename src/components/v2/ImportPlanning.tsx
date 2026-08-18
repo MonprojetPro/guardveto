@@ -285,7 +285,14 @@ export function ImportPlanning({ contenu, onDire, onErreur, onFermer }: Props) {
             <h3 className="imp-titre">
               Ce que j’ai lu — {lecture.lignes.length} garde{lecture.lignes.length > 1 ? 's' : ''}
             </h3>
-            <div className="imp-scroll">
+            {/* Le cadre ne se borne — et donc ne défile — qu'au-delà de douze
+                gardes. En deçà, elles tiennent à l'écran et une barre de
+                défilement interne dans une page qui défile déjà n'apporte
+                qu'un piège. Le seuil vit ici parce que le CSS ne sait pas
+                compter les lignes d'un tableau. */}
+            <div
+              className={`imp-scroll${lecture.lignes.length > 12 ? ' imp-scroll--long' : ''}`}
+            >
               <table className="imp-table">
                 <thead>
                   <tr>
