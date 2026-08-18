@@ -242,6 +242,49 @@ export function useImportPlanning() {
         ? { base64: await enBase64(reduite), format: reduite.type || formatSource }
         : { base64: await enBase64(fichier), format: formatSource }
 
+      // ⚠️ LE REFUS DOIT TOMBER ICI, PAS AU SERVEUR. C'est le point qui manquait
+      // au 2026-08-18 : le contrôle `TAILLE_MAX_OCTETS` de l'action serveur est
+      // INATTEIGNABLE au-delà du plafond de la plateforme. Vercel refuse le
+      // corps de la requête AVANT d'entrer dans la fonction — notre belle phrase
+      // en français n'est jamais lue, et la personne reçoit « An unexpected
+      // response was received from the server ».
+      //
+      // On mesure donc ce qui va RÉELLEMENT partir — la charge après réduction,
+      // pas le fichier de départ — et on refuse nous-mêmes avant d'envoyer. Le
+      // contrôle serveur reste en place : il garde la porte pour tout appelant
+      // qui ne passerait pas par cet écran.
+      //
+      // Ça vise le PDF SCANNÉ, qu'on ne sait pas alléger dans le navigateur et
+      // qui pèse couramment 2 à 10 Mo. Le message le dit franchement plutôt que
+      // de laisser croire à une panne : il n'y a pas de « réessaie » utile ici,
+      // il y a un geste à faire sur le document.
+      //
+      // On mesure les octets DÉCODÉS, exactement comme le fait le serveur
+      // (`base64.length * 3 / 4`) : comparer la longueur du base64 à un plafond
+      // exprimé en taille de fichier refuserait à tort tout ce qui pèse entre
+      // 2,3 et 3 Mo, puisque l'encodage gonfle de 33 %.
+      const octetsEnvoyes = Math.floor((charge.base64.length * 3) / 4)
+      if (octetsEnvoyes > PLAFOND_ENVOI_OCTETS) {
+        // Le poids annoncé est celui de ce qui PART, pas celui du fichier
+        // d'origine : après réduction, dire « 8 Mo » alors qu'on en envoie 3,2
+        // ferait passer le refus pour une erreur de notre part.
+        const poids = (octetsEnvoyes / 1024 / 1024).toFixed(1)
+        // Trois issues différentes, parce que le geste à faire n'est pas le
+        // même : un PDF se découpe, une photo se refait, un tableau se scinde.
+        // Un message unique dirait « refais la photo » à qui vient de déposer
+        // un CSV.
+        const conseil =
+          formatSource === 'application/pdf'
+            ? 'Je ne peux pas alléger un PDF moi-même. Deux façons de s’en sortir : n’envoyer que les pages qui portent les gardes, ou faire une photo de la page affichée à l’écran — celle-là, je saurai la réduire.'
+            : formatSource.startsWith('image/')
+              ? 'J’ai essayé de la réduire, mais elle reste au-dessus. Refais la photo en qualité normale, ou dépose le planning en deux fois — une moitié des dates, puis l’autre.'
+              : 'Découpe-le en deux fichiers, une moitié des dates dans chacun, et dépose-les l’un après l’autre.'
+        ouvrirErreur(
+          `Ce fichier est trop lourd pour être envoyé (${poids} Mo, et la limite est d’environ 3 Mo). ${conseil}`,
+        )
+        return
+      }
+
       const reponse = await lireDocumentPlanning(fichier.name, charge.format, charge.base64)
       if ('error' in reponse) {
         // Un refus barre la route : format non géré, fichier vide, trop lourd.
