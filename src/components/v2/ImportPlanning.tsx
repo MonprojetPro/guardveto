@@ -222,7 +222,7 @@ export function ImportPlanning({ contenu, onDire, onErreur, onFermer }: Props) {
         </div>
 
         {erreur && (
-          <p className="prop-verdict" role="alert">
+          <p className="imp-refus" role="alert">
             {erreur}
           </p>
         )}
@@ -244,9 +244,19 @@ export function ImportPlanning({ contenu, onDire, onErreur, onFermer }: Props) {
   // ── L'écran de validation ───────────────────────────────────
   return (
     <div className="imp">
-      <p className="res-apercu">
-        {lecture.remarque || `J’ai lu « ${fichier} ». Vérifie avant que je n’enregistre quoi que ce soit.`}
-      </p>
+      {/* C'est FILOU qui parle : sa binette et une bulle, comme partout où il
+          s'adresse à quelqu'un. En pavé anonyme, sa remarque se lisait comme
+          une note de bas de page du logiciel. */}
+      <div className="imp-dit">
+        <span className="imp-dit-binette" aria-hidden="true">
+          {/* eslint-disable-next-line @next/next/no-img-element -- pièce à alpha
+              servie telle quelle, comme dans la barre et les gardiens. */}
+          <img src="/filou/filou-tete.webp" alt="" width={34} height={34} />
+        </span>
+        <p className="imp-bulle">
+          {lecture.remarque || `J’ai lu « ${fichier} ». Vérifie avant que je n’enregistre quoi que ce soit.`}
+        </p>
+      </div>
 
       {/* ① Ce que je n'ai pas su lire — en premier, jamais en bas de page. */}
       {lecture.illisibles.length > 0 && (
@@ -272,7 +282,7 @@ export function ImportPlanning({ contenu, onDire, onErreur, onFermer }: Props) {
       ) : (
         <>
           <section className="imp-liste" aria-label="Les gardes que j’ai lues">
-            <h3 className="res-bloc-titre">
+            <h3 className="imp-titre">
               Ce que j’ai lu — {lecture.lignes.length} garde{lecture.lignes.length > 1 ? 's' : ''}
             </h3>
             <div className="imp-scroll">
@@ -292,14 +302,22 @@ export function ImportPlanning({ contenu, onDire, onErreur, onFermer }: Props) {
                   {lecture.lignes.map((l) => {
                     const etat = etats[l.cle]
                     const douteuse = l.inconnus.length > 0
+                    // Cochée mais vide : elle sera ignorée à l'écriture. Elle
+                    // doit se repérer au même titre qu'un nom non reconnu,
+                    // sinon on la découvre dans le décompte final.
+                    const creuse =
+                      Boolean(etat?.retenue) && !etat?.premierId && !etat?.secondId
                     return (
                       <tr
                         key={l.cle}
-                        className={`${etat?.retenue ? '' : 'imp-ecartee'}${douteuse ? ' imp-douteuse' : ''}`}
+                        className={`imp-ligne${etat?.retenue ? '' : ' imp-ecartee'}${
+                          douteuse || creuse ? ' imp-douteuse' : ''
+                        }`}
                       >
-                        <td>
+                        <td className="imp-cell-check">
                           <input
                             type="checkbox"
+                            className="imp-check"
                             checked={Boolean(etat?.retenue)}
                             onChange={(e) => majLigne(l.cle, { retenue: e.target.checked })}
                             disabled={enCours}
@@ -307,7 +325,9 @@ export function ImportPlanning({ contenu, onDire, onErreur, onFermer }: Props) {
                           />
                         </td>
                         <td className="imp-date">{dateLisible(l.date)}</td>
-                        <td>{LIBELLE_TYPE[l.type] ?? l.type}</td>
+                        <td>
+                          <span className="imp-type">{LIBELLE_TYPE[l.type] ?? l.type}</span>
+                        </td>
                         <td>
                           <ChoixVeto
                             valeur={etat?.premierId ?? null}
@@ -352,9 +372,9 @@ export function ImportPlanning({ contenu, onDire, onErreur, onFermer }: Props) {
           </div>
 
           {/* ③ Ce qui sera écrit, juste au-dessus du bouton qui l'écrit. */}
-          <section className="res-bloc res-changements" aria-label="Ce que l’enregistrement changerait">
-            <h3 className="res-bloc-titre">Ce que ça changerait</h3>
-            <ul className="res-liste-changements">
+          <section className="imp-effets" aria-label="Ce que l’enregistrement changerait">
+            <h3 className="imp-titre">Ce que ça changerait</h3>
+            <ul className="imp-effets-liste">
               <li>
                 {nbRetenues} garde{nbRetenues > 1 ? 's' : ''} entrerai
                 {nbRetenues > 1 ? 'ent' : 't'} dans l’historique du cabinet.
@@ -368,22 +388,26 @@ export function ImportPlanning({ contenu, onDire, onErreur, onFermer }: Props) {
                 </li>
               )}
             </ul>
-            <p className="res-pas-encore">Rien n’est enregistré tant que tu n’as pas validé.</p>
+            <p className="imp-pas-encore">Rien n’est enregistré tant que tu n’as pas validé.</p>
           </section>
         </>
       )}
 
       {erreur && (
-        <p className="prop-verdict" role="alert">
+        <p className="imp-refus" role="alert">
           {erreur}
         </p>
       )}
 
-      <p className="res-mesure">
+      {/* La provenance de la lecture : utile quand on doute, jamais au même
+          niveau que ce qu'on doit relire. Elle ferme le contenu, derrière un
+          filet, en petit — et reste AVANT les commandes, qui s'ancrent en bas
+          de la fenêtre sur un écran court. */}
+      <p className="imp-mesure">
         Lu en {(lecture.ms / 1000).toFixed(1)} s · {lecture.modele} · document «&nbsp;{fichier}&nbsp;»
       </p>
 
-      <div className="imp-pied">
+      <div className="imp-pied imp-pied-ancre">
         <button
           type="button"
           className="btn btn-valider"
@@ -405,7 +429,16 @@ export function ImportPlanning({ contenu, onDire, onErreur, onFermer }: Props) {
 /** Le choix d'un vétérinaire pour une case.
  *
  *  Jamais un `<select>` natif : le menu qui s'ouvrirait serait celui du
- *  navigateur, étranger au terrier. Toujours le `Select` du projet. */
+ *  navigateur, étranger au terrier. Toujours le `Select` du projet.
+ *
+ *  C'EST UN ÉCRAN DE RELECTURE, PAS DE SAISIE. Dans l'immense majorité des
+ *  lignes, le nom lu est le bon et n'a pas à être touché : le déclencheur se
+ *  fait donc passer pour du texte (pas de cadre, pas de chevron) et ne
+ *  reprend son apparence de champ qu'au survol, au focus clavier, ou sur les
+ *  lignes qui posent question (`imp-choix-attention`) — là où il faut
+ *  justement agir. Le contrôle, lui, ne change pas : c'est le même `Select`,
+ *  utilisable au clavier de la même façon. Toute l'apparence est dans le CSS,
+ *  aucun état JavaScript de survol n'est introduit ici. */
 function ChoixVeto({
   valeur,
   vets,
@@ -430,7 +463,7 @@ function ChoixVeto({
   const orphelin = lu && !valeur
 
   return (
-    <div className="imp-choix">
+    <div className={`imp-choix${orphelin || !valeur ? ' imp-choix-attention' : ''}`}>
       <Select
         value={valeur ?? AUCUN}
         onValueChange={(v) => onChange(!v || v === AUCUN ? null : v)}

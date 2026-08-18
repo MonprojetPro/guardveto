@@ -6,6 +6,28 @@
    écrire `var(--muted)` / `var(--border)` / `var(--accent)` — ce sont les
    jetons shadcn, remappés, et les réécrire redonne « crème sur crème ».
 
+   ⚠️ LE PRINCIPE DE CET ÉCRAN : ON RELIT, ON NE SAISIT PAS.
+   ============================================================
+   Refonte du 2026-08-15 (retour MiKL sur la livraison : « change également le
+   design qui n'est pas bon »). La version d'avant traitait chaque ligne comme
+   un formulaire à remplir — case native du navigateur, déclencheur de liste
+   déroulante pleine largeur pour CHAQUE nom, sur toute la largeur de l'écran.
+   Or dans 95 % des cas la valeur lue est juste et personne n'y touchera :
+   l'écran demandait le geste le plus lourd pour le cas le plus rare.
+
+   Ce qui en découle, et qui gouverne tout le fichier :
+
+   ① UNE LIGNE JUSTE SE LIT COMME UNE PHRASE. Le nom s'affiche en texte
+      simple ; le déclencheur ne reprend son cadre et son chevron qu'au survol,
+      au focus clavier, ou quand la ligne pose question. Le contrôle reste le
+      même `Select` (jamais de `<select>` natif), au clavier comme avant.
+   ② CE QUI DEMANDE ATTENTION SE SIGNALE, ET EN AMBRE. Nom non reconnu ou
+      ligne cochée sans personne : liseré `--warn` sur la tranche gauche. Pas
+      en `--t-accent` — l'encre renarde appartient à ce qu'on ACTIONNE, et le
+      bouton d'enregistrement doit rester le seul point d'arrivée du regard.
+   ③ LA COLONNE DE LECTURE EST BORNÉE. Étalée sur 1200 px, l'œil traversait
+      l'écran pour relier une date à ses deux vétérinaires.
+
    LE TABLEAU DÉFILE DANS SON PROPRE CADRE, pas dans la fenêtre : un import
    de soixante gardes ferait sinon disparaître les boutons d'enregistrement
    sous la ligne de flottaison, et il faudrait faire défiler toute la modale
@@ -16,22 +38,76 @@
 .imp {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  /* La respiration suit la hauteur de la fenêtre : sur un portable en visio
+     (700 px utiles), seize pixels entre chaque bloc repoussaient le bouton
+     d'enregistrement d'un écran entier. */
+  gap: clamp(11px, 1.8vh, 16px);
+  /* La mesure de lecture. Le panneau vit dans une carte large (jusqu'à
+     1240 px) : sans borne, la date d'un côté et les noms de l'autre. */
+  max-width: 900px;
+}
+
+/* Posé dans la carte du lanceur, le panneau n'avait aucune marge : son
+   contenu touchait le liseré. On reprend la gouttière des autres corps de
+   carte du produit (22 px, cf. `.panneau` de `v2-regles.css`). */
+.imp-lanceur-resultat .imp {
+  padding: 0 22px 20px;
+}
+
+/* ── Filou parle ──────────────────────────────────────────────
+   Sa remarque n'est pas une note du logiciel, c'est LUI. On reprend le
+   vocabulaire de ses bulles (`--bubble-filou`, coin bas-gauche cassé) et sa
+   binette, comme dans les gardiens et la barre. */
+.imp-dit {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.imp-dit-binette {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--t-border);
+}
+.imp-dit-binette img {
+  width: 34px;
+  height: 34px;
+  display: block;
+  transform: translateY(-1px);
+}
+.imp-bulle {
+  margin: 0;
+  padding: 10px 14px;
+  background: var(--bubble-filou);
+  border: 1px solid var(--t-border);
+  border-radius: 14px;
+  border-bottom-left-radius: 4px;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  box-shadow: 1px 1px 3px rgba(110, 62, 14, 0.05);
 }
 
 /* ── Ce que Filou n'a pas su lire ─────────────────────────── */
 /* En premier, et visuellement à part : un trou déclaré est une information,
-   pas une note de bas de page. */
+   pas une note de bas de page. C'est le seul bloc qui garde l'encre renarde —
+   il ne rivalise pas avec le bouton, il est ailleurs sur la page. */
 .imp-trous {
   border: 1px solid var(--t-accent);
-  border-radius: 12px;
-  padding: 12px 14px;
-  background: color-mix(in srgb, var(--t-accent) 7%, transparent);
+  border-left-width: 3px;
+  border-radius: 4px 13px 13px 4px;
+  padding: 12px 15px;
+  background: var(--accent-soft);
 }
 .imp-trous h3 {
+  font-family: var(--font-display);
   font-size: 0.86rem;
-  font-weight: 650;
-  margin: 0 0 6px;
+  font-weight: 700;
+  color: var(--accent-ink);
+  margin: 0 0 7px;
 }
 .imp-trous ul {
   margin: 0;
@@ -40,27 +116,48 @@
   flex-direction: column;
   gap: 4px;
   font-size: 0.86rem;
+  line-height: 1.5;
 }
 .imp-note {
-  margin: 8px 0 0;
+  margin: 9px 0 0;
   font-size: 0.78rem;
+  line-height: 1.5;
   color: var(--t-muted);
 }
 
 .imp-vide {
   font-size: 0.9rem;
+  line-height: 1.55;
   border: 1px dashed var(--t-border);
-  border-radius: 12px;
-  padding: 14px;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  padding: 14px 16px;
   margin: 0;
 }
 
+/* ── Les titres de section du panneau ─────────────────────── */
+.imp-titre {
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin: 0 0 8px;
+}
+
 /* ── Les lignes lues ──────────────────────────────────────── */
+/* La hauteur du cadre suit celle de la fenêtre : 8 lignes tiennent en entier,
+   60 défilent dans le cadre sans jamais pousser le bouton d'enregistrement
+   hors de l'écran. Bornée en bas (220 px ≈ 5 lignes, en dessous ça ne se
+   relit plus) comme en haut. */
 .imp-scroll {
-  max-height: 46vh;
+  max-height: clamp(220px, 44vh, 430px);
   overflow: auto;
   border: 1px solid var(--t-border);
-  border-radius: 12px;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  box-shadow: var(--edge-light), var(--elev-1);
 }
 
 .imp-table {
@@ -73,96 +170,282 @@
   top: 0;
   z-index: 1;
   text-align: left;
-  font-weight: 600;
-  font-size: 0.76rem;
-  color: var(--t-muted);
-  background: var(--card, #fff);
-  padding: 8px 10px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.66rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--soft);
+  /* ⚠ Était `var(--card, #fff)` : une bande BLANCHE en tête d'un tableau
+     crème, qui se voyait dès qu'on faisait défiler. */
+  background: var(--surface-2);
+  padding: 9px 12px;
   border-bottom: 1px solid var(--t-border);
 }
 .imp-table td {
-  padding: 6px 10px;
+  padding: 4px 12px;
   border-bottom: 1px solid color-mix(in srgb, var(--t-border) 55%, transparent);
   vertical-align: middle;
 }
 .imp-table tr:last-child td {
   border-bottom: none;
 }
+.imp-ligne { transition: background-color 0.15s var(--ease-out); }
+.imp-ligne:hover td { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
 .imp-date {
   white-space: nowrap;
+  font-weight: 600;
+}
+.imp-cell-check { width: 1%; padding-right: 2px; }
+/* La nature de la garde : une pastille discrète, pas une colonne de texte de
+   plus — elle se lit d'un coup et laisse la place aux noms. */
+.imp-type {
+  display: inline-block;
+  white-space: nowrap;
+  font-size: 0.71rem;
+  font-weight: 700;
+  color: var(--t-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--t-border);
+  border-radius: 999px;
+  padding: 2px 9px;
 }
 
-/* Décochée : encore lisible, mais visiblement hors du compte. */
-.imp-ecartee td {
-  opacity: 0.45;
+/* ---- La case à cocher, au langage du produit ----------------
+   Elle reste un vrai `<input type="checkbox">` : cochable au clavier,
+   annoncée par les lecteurs d'écran, associée à son libellé. Seul son dessin
+   change — la case bleue vive du navigateur n'appartenait à personne ici. */
+.imp-check {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  display: grid;
+  place-content: center;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: var(--edge-light);
+  cursor: pointer;
+  transition: background-color 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
 }
-/* Un nom qui n'a pas été reconnu : la ligne se signale d'elle-même. */
-.imp-douteuse {
-  background: color-mix(in srgb, var(--t-accent) 6%, transparent);
+.imp-check:hover:not(:disabled) { border-color: var(--accent-ink); }
+.imp-check:checked {
+  background: var(--t-accent);
+  border-color: var(--t-accent);
+}
+/* La coche : deux tranches de bordure pivotées — pas d'image, pas de police
+   d'icônes, elle suit la couleur du texte à l'impression comme à l'écran. */
+.imp-check:checked::after {
+  content: "";
+  width: 10px;
+  height: 5px;
+  margin-top: -2px;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  border-radius: 1px;
+  transform: rotate(-45deg);
+}
+.imp-check:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+.imp-check:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Décochée : encore lisible, mais visiblement hors du compte. L'opacité
+   d'avant (0,45) la rendait illisible — or on doit pouvoir relire ce qu'on
+   vient d'écarter pour se raviser. */
+.imp-ecartee td { color: var(--soft); }
+.imp-ecartee .imp-date { font-weight: 500; }
+.imp-ecartee .imp-type { opacity: 0.6; }
+/* Le nom porte sa couleur en propre (le déclencheur force `--text`) : sans
+   cette ligne, la date d'une ligne écartée pâlissait et son nom restait noir
+   — la ligne avait l'air à moitié éteinte. */
+.imp-ecartee .imp-choix [data-slot='select-trigger'] { color: var(--soft); }
+
+/* ---- Ce qui demande attention ------------------------------
+   Nom non reconnu, ou ligne cochée sans personne. Liseré AMBRE sur la tranche
+   gauche : au milieu de quarante lignes correctes, c'est ça qu'on doit voir
+   sans lire. L'ambre est déjà le registre « regarde ça » du terrier
+   (`--warn`, les gardes menacées de l'écran Équipe) ; l'encre renarde, elle,
+   reste au bouton. */
+.imp-douteuse td { background: var(--warn-soft); }
+/* Un cran plus appuyé au survol — écrit en clair : `--warn-soft` est DÉJÀ
+   translucide, un `color-mix` au-delà de 100 % serait invalide. */
+.imp-douteuse:hover td { background: rgba(196, 138, 20, 0.24); }
+.imp-douteuse td:first-child {
+  box-shadow: inset 3px 0 0 var(--warn);
 }
 
+/* ---- Le choix d'un vétérinaire, en habit de texte -----------
+   Au repos : du texte. Au survol, au focus, ou sur une ligne qui pose
+   question : un champ. Voir l'encadré en tête de fichier. */
 .imp-choix {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  min-width: 150px;
+  gap: 1px;
+  min-width: 148px;
+}
+.imp .imp-choix [data-slot='select-trigger'] {
+  width: 100%;
+  min-height: 32px;
+  padding: 5px 8px;
+  background: transparent;
+  border-color: transparent;
+  border-radius: 9px;
+  font-weight: 500;
+  color: var(--text);
+  box-shadow: none;
+  transition: background-color 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
+}
+/* Le chevron ne s'affiche que quand le champ se montre : au repos, il
+   transformait chaque ligne en formulaire. Il garde sa place (opacité, pas
+   `display`), donc rien ne saute quand il apparaît. */
+.imp .imp-choix [data-slot='select-trigger'] svg {
+  opacity: 0;
+  transition: opacity 0.15s var(--ease-out);
+}
+.imp-ligne:hover .imp-choix [data-slot='select-trigger'],
+.imp-ligne:focus-within .imp-choix [data-slot='select-trigger'],
+.imp .imp-choix [data-slot='select-trigger']:hover,
+.imp .imp-choix [data-slot='select-trigger']:focus-visible,
+.imp .imp-choix [data-slot='select-trigger'][data-popup-open],
+.imp .imp-choix-attention [data-slot='select-trigger'] {
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+.imp-ligne:hover .imp-choix [data-slot='select-trigger'] svg,
+.imp-ligne:focus-within .imp-choix [data-slot='select-trigger'] svg,
+.imp .imp-choix [data-slot='select-trigger']:hover svg,
+.imp .imp-choix [data-slot='select-trigger']:focus-visible svg,
+.imp .imp-choix [data-slot='select-trigger'][data-popup-open] svg,
+.imp .imp-choix-attention [data-slot='select-trigger'] svg {
+  opacity: 1;
+}
+/* Personne : c'est un manque, ça se dit en creux, jamais comme un nom. */
+.imp .imp-choix-attention [data-slot='select-trigger'] {
+  color: var(--warn);
+  font-weight: 600;
 }
 .imp-orphelin {
-  font-size: 0.72rem;
-  color: var(--t-accent);
+  font-size: 0.71rem;
+  font-weight: 600;
+  color: var(--warn);
+  padding-left: 8px;
 }
 
 /* ── Le nom de la période ─────────────────────────────────── */
 .imp-nom {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
+  max-width: 420px;
 }
 .imp-nom label {
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--soft);
 }
 .imp-nom input {
+  background: var(--surface-2);
   border: 1px solid var(--t-border);
-  border-radius: 10px;
-  padding: 8px 11px;
-  font: inherit;
+  border-radius: var(--r-sm);
+  padding: 10px 13px;
+  min-height: 42px;
+  font-family: var(--font-body);
   font-size: 0.88rem;
-  background: transparent;
-  color: inherit;
+  color: var(--text);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
 }
-.imp-nom input:focus {
+.imp-nom input::placeholder { color: var(--soft); }
+.imp-nom input:hover:not(:disabled) { border-color: var(--border-strong); }
+.imp-nom input:focus,
+.imp-nom input:focus-visible {
   outline: none;
+  background: #FFFDF6;
   border-color: var(--t-accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* ── Ce que ça changerait ─────────────────────────────────── */
+/* Allégé : c'était un pavé encadré et teinté qui rivalisait avec le bouton
+   d'enregistrement. Ce n'est pas une décision à prendre, c'est la conséquence
+   annoncée de celle qu'on s'apprête à prendre — donc un constat, et les
+   constats du terrier se lisent à plat, filet à gauche (`.res-constat`). */
+.imp-effets {
+  padding-left: 13px;
+  border-left: 2px solid var(--t-border);
+}
+.imp-effets-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.imp-effets-liste li {
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+/* Le premier point porte le décompte : c'est LUI qu'on relit avant de
+   cliquer, les autres sont les conséquences en cascade. */
+.imp-effets-liste li:first-child { font-weight: 700; }
+.imp-pas-encore {
+  margin: 9px 0 0;
+  font-size: 0.72rem;
+  color: var(--t-muted);
+}
+
+/* ── Un refus du serveur ──────────────────────────────────── */
+.imp-refus {
+  margin: 0;
+  padding: 11px 13px;
+  border: 1px solid rgba(168, 52, 31, 0.32);
+  border-left: 3px solid var(--danger);
+  border-radius: 4px 11px 11px 4px;
+  background: var(--danger-soft);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  font-weight: 600;
+  color: var(--danger);
 }
 
 /* ── Le reçu, une fois écrit ──────────────────────────────── */
 .imp-recu {
-  border: 1px solid var(--t-accent);
-  border-radius: 12px;
+  border: 1px solid var(--ok);
+  border-left-width: 3px;
+  border-radius: 4px 13px 13px 4px;
   padding: 14px 16px;
-  background: color-mix(in srgb, var(--t-accent) 8%, transparent);
+  background: var(--ok-soft);
 }
 .imp-recu-annule {
   border-color: var(--t-border);
-  background: transparent;
+  background: var(--surface-2);
 }
 .imp-recu h3 {
   margin: 0 0 6px;
-  font-size: 0.98rem;
-  font-weight: 650;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
 }
 .imp-recu p {
   margin: 0;
   font-size: 0.88rem;
+  line-height: 1.55;
 }
 .imp-suites {
-  margin: 10px 0 0;
+  margin: 11px 0 0;
   padding-left: 18px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
   font-size: 0.83rem;
+  line-height: 1.5;
 }
 
 /* ── Les commandes, ancrées hors de la zone qui défile ────── */
@@ -174,21 +457,80 @@
   padding-top: 4px;
 }
 
+/* Les commandes s'ancrent EN BAS DE LA FENÊTRE tant que le panneau dépasse.
+   Un import de soixante gardes fait un panneau plus haut que l'écran ; sans
+   ça, il fallait dérouler toute la page pour retrouver le bouton qui valide —
+   et la promesse écrite en tête de ce fichier n'était tenue qu'à moitié (le
+   tableau défilait dans son cadre, mais la page, elle, s'allongeait quand
+   même). Le `sticky` ne se déclenche que si le conteneur dépasse : sur un
+   grand écran, où tout tient, rien ne bouge. */
+.imp-pied-ancre {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding: 12px 0 10px;
+  background: linear-gradient(180deg, rgba(255, 252, 244, 0) 0%, var(--surface) 22%);
+}
+/* Le voile doit couvrir toute la largeur de la carte, gouttières comprises,
+   sinon le contenu réapparaît sur les côtés en défilant dessous. Les marges
+   négatives sont donc calées sur la gouttière du conteneur — et déclarées
+   AVEC lui, jamais en dur sur `.imp-pied-ancre` : posé ailleurs (la fenêtre de
+   Filou), le pied sortirait de son cadre. */
+.imp-lanceur-resultat .imp-pied-ancre {
+  margin: 0 -22px -20px;
+  padding-left: 22px;
+  padding-right: 22px;
+}
+
+/* La provenance de la lecture : la dernière ligne du contenu, derrière un
+   filet, en petit. Utile quand on doute d'une lecture, jamais au même niveau
+   que ce qu'on relit. */
+.imp-mesure {
+  margin: 0;
+  padding-top: 11px;
+  border-top: 1px dashed var(--t-border);
+  font-size: 0.7rem;
+  color: var(--soft);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Le bouton « déposer un document » de la tablette a été retiré le 2026-08-15
    (décision MiKL) : le geste vit désormais dans l'écran Compteurs, où on
    comprend à quoi il sert. Ses styles (`.saisie-doc`) sont partis avec lui —
    du CSS orphelin ferait croire dans six mois que le bouton existe encore. */
 
+/* ── Écrans étroits ──────────────────────────────────────────
+   Le survol n'existe pas au doigt : sur tactile, le champ ne peut pas
+   attendre un survol qui ne viendra jamais. Il reprend donc son cadre en
+   permanence dès qu'on n'a plus de souris. */
+@media (hover: none) {
+  .imp .imp-choix [data-slot='select-trigger'] {
+    background: var(--surface);
+    border-color: var(--border-strong);
+  }
+  .imp .imp-choix [data-slot='select-trigger'] svg { opacity: 1; }
+}
+
 @media (max-width: 640px) {
-  .imp-scroll {
-    max-height: 40vh;
+  .imp-lanceur-resultat .imp { padding: 0 14px 16px; }
+  .imp-lanceur-resultat .imp-pied-ancre {
+    margin: 0 -14px -16px;
+    padding-left: 14px;
+    padding-right: 14px;
   }
-  .imp-table {
-    font-size: 0.79rem;
-  }
-  .imp-choix {
-    min-width: 120px;
-  }
+  .imp-scroll { max-height: clamp(200px, 38vh, 340px); }
+  .imp-table { font-size: 0.79rem; }
+  .imp-table td { padding: 4px 8px; }
+  .imp-table th { padding: 8px 8px; }
+  .imp-choix { min-width: 112px; }
+  .imp-type { font-size: 0.66rem; padding: 2px 7px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .imp-ligne,
+  .imp .imp-choix [data-slot='select-trigger'],
+  .imp .imp-choix [data-slot='select-trigger'] svg,
+  .imp-check { transition: none; }
 }
 
 /* ============================================================
@@ -250,5 +592,5 @@
 
 /* Le panneau de relecture, une fois le document lu. */
 .imp-lanceur-resultat .card-head {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
