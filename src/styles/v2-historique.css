@@ -47,6 +47,36 @@
   background: var(--t-accent); color: #fff;
   box-shadow: 0 2px 8px var(--accent-glow);
 }
+/* Le choix de la période est un MENU, mais il doit se lire comme les autres
+   segments : même pilule, même hauteur, même accent quand il est actif. Le
+   composant `Select` arrive avec ses propres classes utilitaires — d'où les
+   valeurs reposées ici, et le `!important` sur les seules qu'il impose. */
+.seg [data-slot='select-trigger'].hf-periode {
+  border: none;
+  background: transparent;
+  color: var(--t-muted);
+  font-family: var(--font-body);
+  font-size: 0.78rem; font-weight: 600;
+  padding: 7px 10px 7px 13px;
+  border-radius: 999px;
+  height: 34px !important;
+  min-height: 34px;
+  white-space: nowrap;
+  gap: 6px;
+}
+.seg [data-slot='select-trigger'].hf-periode:hover { color: var(--text); }
+.seg [data-slot='select-trigger'].hf-periode[data-actif='true'] {
+  background: var(--t-accent); color: #fff;
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+.seg [data-slot='select-trigger'].hf-periode[data-actif='true'] svg { color: #fff; }
+.seg [data-slot='select-trigger'].hf-periode:disabled { opacity: 0.55; }
+
+/* Une ligne du menu : le nom d'abord, ce qui le situe en dessous. */
+.hf-opt { display: flex; flex-direction: column; gap: 1px; text-align: left; }
+.hf-opt b { font-family: var(--font-display); font-size: 0.86rem; font-weight: 700; }
+.hf-opt small { font-size: 0.72rem; color: var(--t-muted); }
+
 .range-fields { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .range-fields input[type='date'] {
   background: var(--surface-2);

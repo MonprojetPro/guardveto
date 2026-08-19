@@ -22,12 +22,9 @@ import '@/styles/v2-historique.css'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
 import { EnteteHistoriqueVide } from '@/components/v2/ImportPlanningLanceur'
-import { HistoriqueV2, type LignePeriode, type CumulLigne } from '@/components/v2/HistoriqueV2'
+import { HistoriqueV2, type CumulLigne } from '@/components/v2/HistoriqueV2'
 import { BonusMalusCard } from '@/components/compteurs/BonusMalusCard'
 import { HistoriqueFetesCard } from '@/components/compteurs/HistoriqueFetesCard'
-import { SupprimerPeriodeButton } from '@/components/admin/SupprimerPeriodeButton'
-import { EffectifPeriodeSelect } from '@/components/admin/EffectifPeriodeSelect'
-import { ProfilPeriodeSelect } from '@/components/admin/ProfilPeriodeSelect'
 import { chargerDock } from '@/data/v2/dock'
 import { calculerBilans } from '@/engine/bilan'
 import {
@@ -40,10 +37,9 @@ import {
   queryBonusMalusCourant,
   queryVetsInfo,
   queryHistoriqueFetes,
-  queryPeriodesAvecGardes,
   type CompteursRow,
 } from '@/hooks/useCompteurs'
-import type { Periode, ProfilPlanning, Veterinaire } from '@/types'
+import type { Periode, Veterinaire } from '@/types'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'GuardVeto — Historique & compteurs' }
@@ -62,31 +58,10 @@ function nbSemaines(p: Periode): number {
   return Math.max(1, Math.round(jours / 7))
 }
 
-/**
- * Effectif de nuit RÉELLEMENT appliqué par le moteur — même précédence que
- * `engine/loader.ts` : période (surcharge) > profil > saison. Afficher autre
- * chose serait afficher un réglage que le moteur n'utilise pas.
- *
- * ⚠️ Cette cascade est réimplémentée à sept endroits dans le projet (audit du
- * 2026-08-01). Toute correction ici doit être portée partout — c'est le piège
- * « cécité params » déjà payé sur ce projet.
- */
-function effectifResolu(
-  p: Periode,
-  profilParId: Map<string, ProfilPlanning>,
-): { valeur: number; source: string | null } {
-  if (typeof p.nb_vetos_semaine_soir === 'number') {
-    return { valeur: p.nb_vetos_semaine_soir, source: null }
-  }
-  const profil = p.profil_id ? profilParId.get(p.profil_id) : undefined
-  if (profil && typeof profil.nb_vetos_semaine_soir === 'number') {
-    return { valeur: profil.nb_vetos_semaine_soir, source: `hérité du profil « ${profil.nom} »` }
-  }
-  return {
-    valeur: p.saison === 'hiver' ? 2 : 1,
-    source: `selon la saison (${p.saison === 'hiver' ? 'hiver' : 'été'})`,
-  }
-}
+// La cascade « effectif de nuit réellement appliqué » (période > profil >
+// saison) vivait ici pour l'encart des périodes, retiré le 2026-08-19. Elle
+// reste réimplémentée ailleurs dans le projet — un endroit de moins où la
+// « cécité params » peut mordre.
 
 export default async function HistoriquePage({
   searchParams,
@@ -136,12 +111,6 @@ export default async function HistoriquePage({
   // depuis le 2026-08-03 — il n'a jamais été vu par l'équipe). Seuls les
   // BROUILLONS portent un bouton de suppression : inutile d'interroger les
   // autres.
-  const periodesAvecGardes = estAdmin
-    ? await queryPeriodesAvecGardes(
-        supabase,
-        periodes.filter((p) => p.statut === 'brouillon').map((p) => p.id),
-      )
-    : new Set<string>()
 
   if (periodes.length === 0) {
     // Écran d'un cabinet neuf — c'est le PREMIER que voit un nouvel abonné.
@@ -308,67 +277,12 @@ export default async function HistoriquePage({
         : 'tout compris, brouillons inclus',
   })
 
-  // ── Périodes + leurs réglages ──────────────────────────────────────────
-  const { data: profilsDb } = await supabase
-    .from('profils_planning')
-    .select('id, nom, est_defaut, saison_suggeree, nb_vetos_semaine_soir')
-    .eq('actif', true)
-    .order('ordre')
-  const profils = (profilsDb as ProfilPlanning[] | null) ?? []
-  const profilParId = new Map(profils.map((p) => [p.id, p]))
-  const defautId = profils.find((p) => p.est_defaut)?.id ?? null
-  const profilsNommes = profils.filter((p) => !p.est_defaut)
-
-  const lignesPeriodes: LignePeriode[] = periodes.map((p) => {
-    const eff = effectifResolu(p, profilParId)
-    return {
-      periode: p,
-      effectif: eff.valeur,
-      effectifSource: eff.source,
-      profilId: p.profil_id && p.profil_id !== defautId ? p.profil_id : null,
-      nbSemaines: nbSemaines(p),
-    }
-  })
-
-  // Les réglages d'une période (effectif, profil, suppression) restent les
-  // composants V1 : ils écrivent en base et savent quand se verrouiller.
-  const slotsReglagesPeriode: Record<string, React.ReactNode> = {}
-  const slotsSupprimerPeriode: Record<string, React.ReactNode> = {}
-  if (estAdmin) {
-    for (const l of lignesPeriodes) {
-      slotsReglagesPeriode[l.periode.id] = (
-        <>
-          <span className="pr-champ">
-            Nuit :
-            <EffectifPeriodeSelect
-              vetsActifs={vetsActifs}
-              periodeId={l.periode.id}
-              valeur={l.effectif}
-              disabled={l.periode.statut === 'verrouille'}
-            />
-          </span>
-          <span className="pr-champ">
-            Période type :
-            <ProfilPeriodeSelect
-              periodeId={l.periode.id}
-              valeur={l.profilId}
-              profils={profilsNommes}
-              disabled={l.periode.statut === 'verrouille'}
-            />
-          </span>
-        </>
-      )
-      if (l.periode.statut === 'brouillon') {
-        slotsSupprimerPeriode[l.periode.id] = (
-          <SupprimerPeriodeButton
-            periodeId={l.periode.id}
-            label={libellePeriode(l.periode)}
-            aDesGardes={periodesAvecGardes.has(l.periode.id)}
-          />
-        )
-      }
-    }
-  }
+  // Les réglages d'une période (effectif de nuit, période type) et sa
+  // suppression ne sont plus proposés ici : la période type et l'effectif
+  // appartiennent à Organisation, la suppression vit dans l'écran Planning et
+  // dans « Générer ». Cet écran CONSULTE — il ne lit donc plus ni les profils
+  // de planning ni les périodes qui portent des gardes.
+  // (2026-08-19, demande de MiKL.)
 
   // ── Cumul sur toutes les périodes validées ─────────────────────────────
   // Le cumul ne suit PAS le filtre : c'est justement la vue d'ensemble que le
@@ -442,11 +356,8 @@ export default async function HistoriquePage({
           totalWE={totalWE}
           moiId={vet.id}
           estAdmin={estAdmin}
-          lignesPeriodes={lignesPeriodes}
           cumul={cumul}
           cumulResume={cumulResume}
-          slotsReglagesPeriode={slotsReglagesPeriode}
-          slotsSupprimerPeriode={slotsSupprimerPeriode}
           slotBilan={
             afficherBilan ? (
               <BonusMalusCard

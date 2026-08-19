@@ -27,18 +27,11 @@ import type { CompteursRow, DepannagesRow } from '@/hooks/useCompteurs'
 import type { BilanVet } from '@/engine/bilan'
 import { useImportPlanning } from './ImportPlanningLanceur'
 import { Ecart } from './Ecart'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger,
+} from '@/components/ui/select'
 
 // ── Ce que la page a préparé ──────────────────────────────────────────────
-
-export interface LignePeriode {
-  periode: Periode
-  /** Effectif de nuit RÉELLEMENT appliqué, et d'où il vient. */
-  effectif: number
-  effectifSource: string | null
-  /** Profil nommé rattaché (null = profil par défaut du cabinet). */
-  profilId: string | null
-  nbSemaines: number
-}
 
 export interface CumulLigne {
   veterinaire_id: string
@@ -81,16 +74,12 @@ interface Props {
   moiId: string | null
   estAdmin: boolean
 
-  /** Périodes + leurs réglages, pour la carte « Périodes planifiées ». */
-  lignesPeriodes: LignePeriode[]
   cumul: CumulLigne[]
   cumulResume: string | null
 
-  /** Composants V1 greffés, rendus côté serveur par la page. */
+  /** Rendus côté serveur par la page (le bilan porte sa propre carte V2). */
   slotBilan?: React.ReactNode
   slotFetes?: React.ReactNode
-  slotsReglagesPeriode?: Record<string, React.ReactNode>
-  slotsSupprimerPeriode?: Record<string, React.ReactNode>
 }
 
 // ── Petits utilitaires d'affichage ────────────────────────────────────────
@@ -137,13 +126,10 @@ export function HistoriqueV2({
   totalWE,
   moiId,
   estAdmin,
-  lignesPeriodes,
   cumul,
   cumulResume,
   slotBilan,
   slotFetes,
-  slotsReglagesPeriode,
-  slotsSupprimerPeriode,
 }: Props) {
   const router = useRouter()
   const [du, setDu] = useState(debut)
@@ -211,17 +197,44 @@ export function HistoriqueV2({
       <div className="hist-filters rise rise-2" aria-busy={enCours}>
         <span className="hf-label">Période</span>
         <div className="seg" role="group" aria-label="Choix de la période">
-          {periodes.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              aria-pressed={mode === 'periode' && p.id === periodeId}
-              disabled={enCours}
-              onClick={() => versPeriode(p.id)}
+          {/* Un MENU, pas une rangée de boutons : la barre listait toutes les
+              périodes côte à côte, donc elle grandissait à chaque planning
+              généré. Le menu porte aussi ce que la rangée ne pouvait pas dire
+              — les dates et le statut — ce qui rend inutile l'ancien encart
+              « Périodes planifiées » plus bas dans la page (retiré). */}
+          <Select
+            value={mode === 'periode' ? periodeId : ''}
+            onValueChange={(v) => {
+              if (typeof v === 'string' && v) versPeriode(v)
+            }}
+          >
+            <SelectTrigger
+              className="hf-periode"
+              data-actif={mode === 'periode' ? 'true' : undefined}
+              disabled={enCours || periodes.length === 0}
             >
-              {libellePeriode(p)}
-            </button>
-          ))}
+              {mode === 'periode'
+                ? (periodes.find((p) => p.id === periodeId)
+                    ? libellePeriode(periodes.find((p) => p.id === periodeId)!)
+                    : 'Choisir un planning')
+                : periodes.length === 0
+                  ? 'Aucun planning'
+                  : 'Choisir un planning'}
+            </SelectTrigger>
+            <SelectContent>
+              {periodes.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  <span className="hf-opt">
+                    <b>{libellePeriode(p)}</b>
+                    <small>
+                      {dateCourte(p.date_debut)} → {dateCourte(p.date_fin)} ·{' '}
+                      {LIBELLE_STATUT[p.statut].texte.toLowerCase()}
+                    </small>
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {/* La plage libre traverse les périodes : c'est une vue de gestion du
               cabinet, réservée à l'admin — et refusée côté serveur, pas
               seulement cachée ici. */}
@@ -575,54 +588,12 @@ export function HistoriqueV2({
       {/* ── Historique des fêtes (composant V1 greffé) ───────────────── */}
       {slotFetes && <div className="hist-greffe v2-greffe rise">{slotFetes}</div>}
 
-      {/* ── Périodes planifiées ──────────────────────────────────────── */}
-      <section className="card rise" aria-label="Périodes planifiées">
-        <div className="card-head">
-          <div>
-            <h3>Périodes planifiées</h3>
-            <p className="sub">De la plus récente à la plus ancienne</p>
-          </div>
-        </div>
-        <ul className="periods-list">
-          {lignesPeriodes.map((l) => {
-            const st = LIBELLE_STATUT[l.periode.statut]
-            return (
-              <li key={l.periode.id}>
-                <div className="period-name">
-                  <b>{libellePeriode(l.periode)}</b>
-                  <small>
-                    {l.nbSemaines} semaines · {dateCourte(l.periode.date_debut)} →{' '}
-                    {dateCourte(l.periode.date_fin)}
-                  </small>
-                  {estAdmin && (
-                    <div className="period-reglages">
-                      {slotsReglagesPeriode?.[l.periode.id]}
-                      {l.effectifSource && <span className="pr-source">{l.effectifSource}</span>}
-                    </div>
-                  )}
-                </div>
-                <span className={`status ${st.classe}`}>{st.texte}</span>
-                <button
-                  type="button"
-                  className="period-view"
-                  disabled={enCours}
-                  onClick={() => versPeriode(l.periode.id)}
-                >
-                  Ses compteurs
-                </button>
-                {estAdmin && slotsSupprimerPeriode?.[l.periode.id]}
-              </li>
-            )
-          })}
-          {lignesPeriodes.length === 0 && (
-            <li>
-              <span className="period-name">
-                <small>Aucune période créée pour l&apos;instant.</small>
-              </span>
-            </li>
-          )}
-        </ul>
-      </section>
+      {/* L'encart « Périodes planifiées » vivait ici. Il faisait doublon avec
+          le menu de la barre de filtres (choisir une période) et portait des
+          réglages qui appartiennent à Organisation — la période type et
+          l'effectif de nuit se règlent là-bas, la suppression d'un planning
+          depuis l'écran Planning et depuis « Générer ». Rien n'est perdu.
+          (Retiré le 2026-08-19, demande de MiKL.) */}
 
       {/* ── Compteurs cumulés ────────────────────────────────────────── */}
       {cumul.length > 0 && (
