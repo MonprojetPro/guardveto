@@ -271,11 +271,22 @@ export default async function PlanningPageV2({
   const periodesAvecGardes = [
     ...new Set(((gardesPeriodesRes?.data ?? []) as { periode_id: string }[]).map((g) => g.periode_id)),
   ]
+  // Les périodes PUBLIÉES restent contrôlées, y compris après une retouche à
+  // la main : l'admin doit savoir quelle règle ou quel congé entre en conflit
+  // — et reste libre de programmer quand même (MiKL, 2026-08-19). Le système
+  // informe, il n'interdit pas.
+  //
+  // Les périodes VERROUILLÉES, elles, sortent du contrôle : elles ne se
+  // modifient plus (api/generate les refuse, chaque garde est verrouillée),
+  // donc signaler une règle enfreinte n'ouvre aucune décision — c'est du bruit
+  // devant une porte fermée. Le cas se voit dès qu'on reprend l'historique d'un
+  // cabinet : un extrait de passé n'a jamais tous ses créneaux couverts, et la
+  // page criait « 32 créneaux non couverts » sur un planning d'archive.
   const periodeIdsARevalider = isAdmin
     ? periodes
         .filter(
           (p) =>
-            (p.statut === 'publie' || p.statut === 'verrouille') &&
+            p.statut === 'publie' &&
             p.date_debut <= fin &&
             p.date_fin >= debut &&
             periodesAvecGardes.includes(p.id),
