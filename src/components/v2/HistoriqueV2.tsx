@@ -70,7 +70,6 @@ interface Props {
   depannages: DepannagesRow[]
   /** Les vétos « dernier recours » sortent de la répartition. */
   derniersRecours: string[]
-  totalWE: number
   moiId: string | null
   estAdmin: boolean
 
@@ -123,7 +122,6 @@ export function HistoriqueV2({
   bilans,
   depannages,
   derniersRecours,
-  totalWE,
   moiId,
   estAdmin,
   cumul,
@@ -508,56 +506,20 @@ export function HistoriqueV2({
             </table>
           </section>
 
-          {/* Week-ends libres — salariés */}
-          <section className="card count-card" aria-label="Compteur des week-ends libres">
-            <div className="card-head">
-              <h3>🌉 Week-ends libres</h3>
-              <span className="sub spacer">salariés · week-ends de la période non travaillés</span>
-            </div>
-            <table className="count-table">
-              <thead>
-                <tr>
-                  <th>Vétérinaire</th>
-                  <th>De garde</th>
-                  <th>Libres</th>
-                  <th>Écart</th>
-                </tr>
-              </thead>
-              <tbody>
-                {compteurs
-                  .filter((r) => r.statut === 'salarie')
-                  .map((r) => (
-                    <tr key={r.veterinaire_id} className={r.veterinaire_id === moiId ? 'moi' : undefined}>
-                      <td>
-                        <span className="ct-vet">
-                          <i style={{ background: r.couleur }} />
-                          {r.prenom}
-                        </span>
-                      </td>
-                      <Nombre n={r.we_total} />
-                      <td>{Math.max(0, totalWE - r.we_total)}</td>
-                      <td>
-                        <Ecart
-                          valeur={bilanDe.get(r.veterinaire_id)?.ecart_grands_we ?? 0}
-                          horsRepartition={recours.has(r.veterinaire_id)}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                {compteurs.every((r) => r.statut !== 'salarie') && (
-                  <tr>
-                    <td colSpan={4} className="zero">
-                      Aucun salarié sur ce filtre.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-            <p className="count-note">
-              {totalWE} week-end{totalWE > 1 ? 's' : ''} sur l&apos;intervalle. Ce compteur ne
-              parle que des salariés : les associés n&apos;ont pas de quota de week-ends libres.
-            </p>
-          </section>
+          {/* Le compteur « Week-ends libres » vivait ici (retiré le 2026-08-19,
+              demande de MiKL). Il n'affichait qu'une SOUSTRACTION du tableau
+              ci-dessus (libres = total − de garde), avec deux pièges de
+              lecture : le moteur compte des week-ends « perdus » là où l'écran
+              disait « libres », et son « + » voulait dire « a été libre plus
+              souvent » alors que partout ailleurs sur cette page « + » veut
+              dire « a travaillé plus que sa part ».
+
+              ⚠️ La RÈGLE, elle, continue de s'appliquer : R15 (équité des
+              grands week-ends entre salariés) est une dimension d'équité à
+              part entière, de poids « important », réglable dans Organisation
+              (« Grands week-ends (salariés) »). Seul son affichage disparaît —
+              et il n'entrait pas dans le rattrapage inter-périodes, que le
+              moteur fonde sur le seul `ecart_we`. */}
 
           {/* Dépannages */}
           <section className="card count-card" aria-label="Compteur des dépannages">

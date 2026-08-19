@@ -353,7 +353,6 @@ export default async function HistoriquePage({
           bilans={bilans}
           depannages={depannages}
           derniersRecours={derniersRecours}
-          totalWE={totalWE}
           moiId={vet.id}
           estAdmin={estAdmin}
           cumul={cumul}
