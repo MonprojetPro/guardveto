@@ -439,6 +439,33 @@ export function PlanningV2({
         </div>
 
         <div className="work-body">
+          {/* Un BANDEAU, plus un voile. Le voile couvrait tout le plan de
+              travail en promettant « elle se consulte » — et c'est exactement
+              ce qu'il empêchait (retour MiKL, 2026-08-19). Ce qu'il protégeait
+              est déjà tenu, et mieux : chaque garde verrouillée ferme son
+              propre mode édition (GardeDetailModal), la barre affiche
+              « 🔒 Verrouillé » au lieu de « Publier », et la régénération est
+              refusée côté SERVEUR (api/generate) — pas seulement masquée ici. */}
+          {consultationSeule && (
+            <div className="archive-bandeau" role="status">
+              <span className="ab-ico" aria-hidden>🔒</span>
+              <div className="ab-txt">
+                <b>{nomPeriode(periodeAffichee)} · lecture seule</b>
+                <p>
+                  Cette période est verrouillée : tu peux la consulter dans le détail, mais plus la
+                  modifier. Ouvre la période de travail pour agir.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => setPopOuvert(true)}
+              >
+                Changer de période
+              </button>
+            </div>
+          )}
+
           {/* Les avertissements du moteur vivent ICI, au-dessus de la grille —
               pas dans la barre d'en-tête, qu'ils faisaient gonfler. */}
           {alertes}
@@ -502,20 +529,6 @@ export function PlanningV2({
           </div>
         </div>
 
-        {consultationSeule && (
-          <div className="archive-veil show" role="region" aria-label="Période verrouillée">
-            <div className="archive-card">
-              <h3>{nomPeriode(periodeAffichee)}</h3>
-              <p>
-                Cette période est verrouillée : elle se consulte, elle ne se modifie plus. Ouvre la
-                période de travail pour agir.
-              </p>
-              <button type="button" className="btn btn-valider" onClick={() => setPopOuvert(true)}>
-                Choisir une autre période
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       <GardeDetailModal

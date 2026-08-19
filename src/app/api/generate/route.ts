@@ -145,6 +145,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Période introuvable.' }, { status: 404 })
     }
 
+    // Une période VERROUILLÉE est de l'histoire : elle se consulte, elle ne se
+    // regénère pas. Le refus vit ICI et pas seulement dans l'écran : jusqu'au
+    // 2026-08-19, seul un voile côté client l'empêchait — et ce voile empêchait
+    // AUSSI la simple consultation, qu'il promettait pourtant. En le levant, il
+    // fallait fermer la porte pour de bon, côté serveur.
+    // (Le filtre `verrouille = false` plus bas protège les GARDES une à une ;
+    // il n'a jamais rien dit du statut de la période.)
+    if (periode.statut === 'verrouille') {
+      return NextResponse.json(
+        {
+          error:
+            'Cette période est verrouillée : elle se consulte, elle ne se régénère plus. Ouvre la période de travail pour agir.',
+        },
+        { status: 409 },
+      )
+    }
+
     if (periode.statut === 'publie' && !confirmRepublication) {
       const { count } = await supabase
         .from('gardes')

@@ -379,26 +379,26 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   100% { box-shadow: none; }
 }
 
-.archive-veil {
-  position: absolute; inset: 0; z-index: 40;
-  background: rgba(246, 238, 223, 0.82);
-  backdrop-filter: blur(2px);
-  display: none;
-  align-items: center; justify-content: center;
-  text-align: center; padding: 30px;
+/* Le bandeau « lecture seule ». Il a remplacé un voile plein écran qui
+   couvrait le plan de travail : il annonce, il n'empêche pas de lire. */
+.archive-bandeau {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  background: var(--surface-2);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-md);
+  padding: 12px 16px;
+  margin-bottom: 14px;
 }
-.archive-veil.show { display: flex; animation: veilIn .3s ease both; }
-@keyframes veilIn { from { opacity: 0; } to { opacity: 1; } }
-.archive-card {
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-panel);
-  padding: 26px 30px;
-  max-width: 400px;
+.archive-bandeau .ab-ico { font-size: 1.1rem; line-height: 1; }
+.archive-bandeau .ab-txt { flex: 1; min-width: 240px; }
+.archive-bandeau b {
+  font-family: var(--font-display);
+  font-size: 0.9rem; font-weight: 700; color: var(--text);
 }
-.archive-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
-.archive-card p { font-size: 0.86rem; color: var(--t-muted); line-height: 1.6; margin-bottom: 16px; }
+.archive-bandeau p {
+  margin-top: 2px;
+  font-size: 0.78rem; color: var(--t-muted); line-height: 1.5;
+}
 
 /* ============================================================
    VOLET COMPTEURS EXTENSIBLE (retour MiKL n°2)
@@ -764,7 +764,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   .silk i, .folds, .sheen, .rise { animation: none !important; }
   .ok-flash, .day.spot, .cnt-num.bump-up, .cnt-num.bump-down, .cnt-delta,
   .counters-panel, .bubble, .gf-card, .av-list, .lock-confirm, .gm-absent-note,
-  .status-badge.pulse, .archive-veil.show, .recap-hint-msg, .gm-done { animation: none !important; }
+  .status-badge.pulse, .recap-hint-msg, .gm-done { animation: none !important; }
   .burrow-panel, .modal-veil, .gv-modal, .status-badge { transition: none; }
   /* (le garde-fou de Filou accroché est passé dans `v2-filou-edge.css`) */
   .workspace.filou-out .fox-out { animation: none; opacity: 1; transform: none; }
