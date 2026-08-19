@@ -156,22 +156,9 @@ export default async function ReglesStructurePage({
   const periodes = options.periodes
   const typesCreneaux = options.typesCreneaux as TypeCreneauOption[]
 
-  // Combien de plannings s'appuient ENCORE sur la période type par défaut
-  // (`profil_id` NULL) ? Depuis le 2026-08-04, plus aucun nouveau planning ne
-  // peut être dans ce cas — mais les anciens y sont, et tant qu'il en reste un,
-  // « Configuration standard » doit rester visible et réglable : la masquer
-  // reviendrait à cacher la structure sur laquelle ces plannings tournent.
-  //
-  // Les périodes VERROUILLÉES sont hors du compte : elles ne se régénèrent plus
-  // (api/generate les refuse), donc elles ne « tournent » sur aucune structure —
-  // leur planning est figé. Sans ce filtre, une simple reprise d'historique
-  // (période d'archive, sans période type) faisait réapparaître « Configuration
-  // standard » que le cabinet venait justement de remplacer par la sienne.
-  const { count: planningsSansPeriodeType } = await supabase
-    .from('periodes')
-    .select('id', { count: 'exact', head: true })
-    .is('profil_id', null)
-    .neq('statut', 'verrouille')
+  // On comptait ici les plannings encore rattachés à AUCUNE période type, pour
+  // décider s'il fallait montrer « Configuration standard ». Elle ne se montre
+  // désormais JAMAIS (MiKL, 2026-08-19) : le compte n'a plus d'objet.
   const rolesCabinet = options.rolesCabinet
 
   // Étiquettes réellement portées par l'équipe : les suggestions des formulaires
@@ -299,7 +286,6 @@ export default async function ReglesStructurePage({
           profils={profils.profils}
           socle={profils.socle}
           relationsSocle={profils.relations}
-          planningsSansPeriodeType={planningsSansPeriodeType ?? 0}
           regles={reglesClassiques}
           reglesEquipe={reglesEquipe}
           vets={vets}

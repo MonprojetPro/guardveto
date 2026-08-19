@@ -77,11 +77,6 @@ interface Props {
   profils: ProfilUI[]
   /** LE SOCLE du cabinet : les gardes possibles, avec leur maximum de places. */
   socle: CreneauUI[]
-  /**
-   * Combien de plannings ne désignent AUCUNE période type (`profil_id` NULL) et
-   * tournent donc encore sur « Configuration standard ». Voir `montrerDefaut`.
-   */
-  planningsSansPeriodeType: number
   /** La période type regardée dans les autres onglets — à signaler visuellement (classe `courant`). */
   profilCourantId: string
   /** Désigne la période type que décriront les onglets suivants. */
@@ -100,7 +95,7 @@ type Reponse = { error?: string; success?: boolean } | undefined
 const ZONES_NEUTRES = 'button, input, a, [data-slot="select-trigger"]'
 
 export function OngletProfils({
-  profils, socle, planningsSansPeriodeType, profilCourantId, onChoisir,
+  profils, socle, profilCourantId, onChoisir,
 }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -136,25 +131,29 @@ export function OngletProfils({
   // quelques secondes en bas d'écran ne suffit pas à expliquer un refus.
   const { ouvrirErreur, dialogueErreur } = useErreurBloquante()
 
-  const profilDefaut = profils.find((p) => p.estDefaut) ?? profils[0]
-
   /**
    * « Supprime-moi cette configuration standard, elle ne veut rien dire »
-   * (MiKL, 2026-08-04).
+   * (MiKL, 2026-08-04), puis « je veux bien qu'elle n'apparaisse JAMAIS »
+   * (2026-08-19).
    *
    * Elle ne peut pas disparaître de la BASE : c'est le repli du moteur pour
    * tout planning qui ne désigne aucune période type, et plusieurs fonctions
-   * SQL s'appuient dessus. Mais elle n'a plus rien à faire à l'écran DÈS
-   * QU'ELLE NE SERT PLUS À RIEN — c'est-à-dire quand le cabinet a ses propres
-   * périodes types ET qu'aucun planning ne s'appuie encore dessus.
+   * SQL s'appuient dessus. Mais elle ne se montre plus comme une période type
+   * du cabinet — jamais, quelles que soient les circonstances. Les conditions
+   * qui la ramenaient (« un planning tourne encore dessus ») la faisaient
+   * réapparaître au pire moment : juste après que le cabinet ait créé la
+   * sienne, parce qu'une simple reprise d'historique laisse derrière elle une
+   * période d'archive sans période type.
    *
-   * Les deux conditions comptent, et la seconde surtout : la masquer alors que
-   * des plannings tournent dessus reviendrait à cacher la structure qui les
-   * fabrique. On la garde alors visible, en disant pourquoi — c'est une
-   * information utile, pas un réglage de plus.
+   * Rien à craindre pour la CRÉATION, qui se fait pourtant en copiant une
+   * période type existante : quand aucune source n'est transmise, le serveur
+   * retombe de lui-même sur le profil par défaut du cabinet
+   * (`admin/structure/actions.ts`). Le premier cabinet venu crée donc sa
+   * première période type sans jamais voir « Configuration standard » — elle
+   * travaille en coulisses, elle ne se montre plus. Et générer sans période
+   * type reste impossible : « Générer » le refuse et renvoie ici.
    */
-  const montrerDefaut = planningsSansPeriodeType > 0 || profils.length <= 1
-  const visibles = montrerDefaut ? profils : profils.filter((p) => !p.estDefaut)
+  const visibles = profils.filter((p) => !p.estDefaut)
 
   /** Ce que la source retient de chaque garde — le point de départ des réglages. */
   const affinageDe = (profilId: string): Record<string, number> => {
@@ -167,8 +166,11 @@ export function OngletProfils({
   const ouvrirCreation = () => {
     setNom('')
     // On copie depuis une période type VISIBLE : proposer comme source une
-    // carte qu'on a masquée juste au-dessus serait incompréhensible.
-    const source = visibles[0]?.id ?? profilDefaut?.id ?? ''
+    // carte qu'on a masquée juste au-dessus serait incompréhensible. Le repli
+    // sur la configuration standard ne joue que si le cabinet n'en a aucune.
+    // Vide quand le cabinet n'a encore aucune période type : le serveur prend
+    // alors le profil par défaut tout seul. On ne le nomme jamais ici.
+    const source = visibles[0]?.id ?? ''
     setSourceId(source)
     setAffinageNeuf(affinageDe(source))
     setCreationOuverte(true)
@@ -311,14 +313,6 @@ export function OngletProfils({
             les nuits sont longues, « Été » quand l&apos;équipe est réduite. Choisis une carte pour
             que les trois onglets suivants décrivent cette période type-là.
           </p>
-          {montrerDefaut && planningsSansPeriodeType > 0 && profils.length > 1 && (
-            <p className="sub">
-              « Configuration standard » reste affichée parce que{' '}
-              <b>{planningsSansPeriodeType} planning{planningsSansPeriodeType > 1 ? 's' : ''}</b>{' '}
-              {planningsSansPeriodeType > 1 ? ' tournent' : ' tourne'} encore dessus.
-              Donne-leur une vraie période type depuis « Générer », et elle disparaîtra d&apos;ici.
-            </p>
-          )}
         </div>
 
         {creationOuverte && (
@@ -339,22 +333,32 @@ export function OngletProfils({
                 />
               </div>
 
-              <div className="large">
-                <label id="lbl-source">Partir des réglages de</label>
-                <Select value={sourceId} onValueChange={(v) => v && choisirSource(String(v))}>
-                  <SelectTrigger aria-labelledby="lbl-source" className="w-full">
-                    {visibles.find((p) => p.id === sourceId)?.nom ?? 'Choisir…'}
-                  </SelectTrigger>
-                  <SelectContent>
-                    {visibles.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.nom}
-                        {p.estDefaut ? ' (par défaut)' : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* La toute PREMIÈRE période type d'un cabinet n'a rien à
+                  copier : on ne montre pas un choix à une seule option qu'on
+                  refuse par ailleurs de nommer. Elle part des gardes du socle,
+                  réglables juste en dessous avant même d'être créée. */}
+              {visibles.length > 0 ? (
+                <div className="large">
+                  <label id="lbl-source">Partir des réglages de</label>
+                  <Select value={sourceId} onValueChange={(v) => v && choisirSource(String(v))}>
+                    <SelectTrigger aria-labelledby="lbl-source" className="w-full">
+                      {visibles.find((p) => p.id === sourceId)?.nom ?? 'Choisir…'}
+                    </SelectTrigger>
+                    <SelectContent>
+                      {visibles.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.nom}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <p className="large sub">
+                  C&apos;est la première période type du cabinet : elle part des gardes du socle,
+                  que tu ajustes ci-dessous.
+                </p>
+              )}
 
               {/* ── ON LA PARAMÈTRE AVANT DE LA CRÉER (2026-08-04) ──────────
                   MiKL : « pourquoi quand je crée une période type je ne peux
@@ -437,10 +441,9 @@ export function OngletProfils({
 
         {visibles.length === 0 ? (
           <p className="empty-row">
-            Aucune période type pour ce cabinet. Une période type se crée en copiant une
-            existante — il n&apos;y en a aucune à copier ici, c&apos;est le signe que
-            l&apos;organisation du cabinet n&apos;a jamais été initialisée. Demande à Filou, il sait
-            poser la première.
+            Aucune période type pour ce cabinet. Crée la première avec «&nbsp;Nouvelle période
+            type&nbsp;» : elle partira d&apos;une configuration de départ que tu ajusteras — quelles
+            gardes couvrir, et combien de vétérinaires sur chacune.
           </p>
         ) : (
           <div className="prof-grille">

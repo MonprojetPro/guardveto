@@ -90,8 +90,6 @@ interface Props {
   socle: CreneauUI[]
   /** Les enchaînements du socle. */
   relationsSocle: RelationUI[]
-  /** Plannings encore rattachés à AUCUNE période type — cf. `OngletProfils`. */
-  planningsSansPeriodeType: number
   regles: RegleRow[]
   reglesEquipe: RegleEquipeUI[]
   vets: VetoUI[]
@@ -121,7 +119,6 @@ export function ReglesStructureV2({
   profils,
   socle,
   relationsSocle,
-  planningsSansPeriodeType,
   regles,
   reglesEquipe,
   vets,
@@ -292,7 +289,6 @@ export function ReglesStructureV2({
             <OngletProfils
               profils={profils}
               socle={socle}
-              planningsSansPeriodeType={planningsSansPeriodeType}
               profilCourantId={profilId}
               onChoisir={setProfilId}
             />
