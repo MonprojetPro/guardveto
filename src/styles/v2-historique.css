@@ -25,6 +25,13 @@
   box-shadow: var(--shadow-card);
   padding: 14px 18px;
   margin-bottom: 18px;
+  /* La barre porte un menu qui déborde sur les compteurs. Sans être elle-même
+     empilée, elle se peint AVANT les cartes qui la suivent — et le menu
+     passait derrière le tableau des week-ends, quel que soit son z-index :
+     les cartes animées (`.rise`) gardent une couche de composition, donc un
+     contexte d'empilement, et l'ordre du DOM les faisait gagner. */
+  position: relative;
+  z-index: 40;
 }
 .hf-label {
   font-size: 0.66rem; font-weight: 700; letter-spacing: 0.1em;
