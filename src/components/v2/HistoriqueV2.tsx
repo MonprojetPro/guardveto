@@ -26,6 +26,7 @@ import type { Periode } from '@/types'
 import type { CompteursRow, DepannagesRow } from '@/hooks/useCompteurs'
 import type { BilanVet } from '@/engine/bilan'
 import { useImportPlanning } from './ImportPlanningLanceur'
+import { Ecart } from './Ecart'
 
 // ── Ce que la page a préparé ──────────────────────────────────────────────
 
@@ -112,35 +113,6 @@ const LIBELLE_STATUT: Record<Periode['statut'], { texte: string; classe: string 
   brouillon: { texte: 'Brouillon', classe: 'st-brouillon' },
   publie: { texte: 'Publiée', classe: 'st-publiee' },
   verrouille: { texte: 'Verrouillée', classe: 'st-archivee' },
-}
-
-/**
- * La pastille d'écart. Les écarts arrivent déjà arrondis par `calculerBilans`
- * (c'est la valeur qui part en base pour le rattrapage), donc on colore sur
- * l'entier : 0 = dans la juste part, ±1 = surveillé, au-delà = à rattraper.
- */
-function Ecart({ valeur, horsRepartition }: { valeur: number; horsRepartition: boolean }) {
-  if (horsRepartition) {
-    return (
-      <span className="ecart none" title="Dernier recours : hors répartition">
-        —
-      </span>
-    )
-  }
-  const abs = Math.abs(valeur)
-  const classe = abs === 0 ? 'ok' : abs === 1 ? 'warn' : 'bad'
-  const titre =
-    abs === 0
-      ? 'Dans la juste part'
-      : abs === 1
-        ? 'Léger écart, rattrapé à la prochaine génération'
-        : 'Écart à rattraper'
-  const texte = valeur === 0 ? '=' : valeur > 0 ? `+${valeur}` : `−${abs}`
-  return (
-    <span className={`ecart ${classe}`} title={titre}>
-      {texte}
-    </span>
-  )
 }
 
 function Nombre({ n }: { n: number }) {
@@ -594,8 +566,11 @@ export function HistoriqueV2({
         </div>
       )}
 
-      {/* ── Bilan de fin de période (composant V1 greffé) ────────────── */}
-      {slotBilan && <div className="hist-greffe v2-greffe rise">{slotBilan}</div>}
+      {/* ── Bilan de fin de période ──────────────────────────────────
+          Plus une greffe : le composant porte désormais sa propre carte V2
+          (`.card.count-card`). Pas de `.v2-greffe` ici, sinon carte dans
+          carte — le cadre d'accueil ne sert qu'aux composants restés V1. */}
+      {slotBilan && <div className="hist-greffe rise">{slotBilan}</div>}
 
       {/* ── Historique des fêtes (composant V1 greffé) ───────────────── */}
       {slotFetes && <div className="hist-greffe v2-greffe rise">{slotFetes}</div>}

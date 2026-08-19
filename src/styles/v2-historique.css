@@ -151,6 +151,23 @@
    ============================================================ */
 .hist-greffe { margin-bottom: 26px; }
 
+/* -- Le bilan de la période (bonus / malus) --
+   Une carte de compteur comme les autres : le bilan montre la MÊME donnée
+   que les compteurs du dessus, il doit se lire de la même façon. Seules
+   deux choses lui sont propres : le bouton de recalcul dans l'en-tête, et
+   le détail « réalisé sur part » glissé sous la pastille d'écart. */
+.bm-card .card-head { padding: 13px 18px; }
+.bm-card .count-table td { vertical-align: middle; }
+.bm-recalc { flex: none; }
+.bm-part {
+  display: block;
+  margin-top: 3px;
+  font-family: var(--font-body);
+  font-size: 0.66rem; font-weight: 500;
+  color: var(--soft);
+  white-space: nowrap;
+}
+
 .periods-list { list-style: none; }
 .periods-list li {
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;

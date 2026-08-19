@@ -1,18 +1,24 @@
 'use client'
 
 // ============================================================
-// GUARDVETO — BonusMalusCard
+// GUARDVETO — Le bilan de la période (bonus / malus)
 // ============================================================
-// Carte de bilan de fin de période.
-//   - Affiche les écarts réalisé / quote-part pour chaque véto
-//   - Bouton "Calculer / Recalculer le bilan" (admin)
-//   - Interprétation : écart+ = malus, écart- = bonus
+// Ce que chacun a fait par rapport à sa juste part, et ce que le moteur en
+// retiendra pour le tour suivant. Habillé V2 (« Terrier ») comme les
+// compteurs qui le précèdent sur la page : même carte, même tableau, MÊME
+// pastille d'écart (`components/v2/Ecart`) — c'est la même donnée.
+//
+// Deux états de lecture, à ne pas confondre :
+//   • bilan RECALCULÉ dans la session → on connaît le réalisé ET la part ;
+//   • bilan RELU DE LA BASE → `bonus_malus` ne stocke que les écarts, jamais
+//     les totaux. Les cases « réalisé » sont alors vides, et on le DIT, au
+//     lieu d'aligner des tirets muets.
 // ============================================================
 
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Calculator, TrendingUp, TrendingDown, Minus } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Loader2 } from 'lucide-react'
+import { Ecart } from '@/components/v2/Ecart'
 import type { BilanVet } from '@/engine/bilan'
 import type { BonusMalusRow } from '@/hooks/useCompteurs'
 
@@ -21,42 +27,38 @@ import type { BonusMalusRow } from '@/hooks/useCompteurs'
 interface BonusMalusCardProps {
   periodeId: string
   periodeStatut: 'brouillon' | 'publie' | 'verrouille'
-  /** Bilan déjà calculé en base (peut être null si jamais calculé) */
+  /** Bilan déjà calculé en base (vide s'il ne l'a jamais été) */
   existingBilan: BonusMalusRow[]
-  /** Bonus/malus hérités de la période précédente (pour comparaison) */
+  /** Écarts hérités de la période précédente (ce que le moteur traînait déjà) */
   heritage: BonusMalusRow[]
   /** Noms et couleurs des vétos (pour l'affichage) */
   vetsInfo: Array<{ id: string; prenom: string; nom: string; couleur: string }>
 }
 
-// ── Helpers ──────────────────────────────────────────────
-
-function EcartBadge({ ecart }: { ecart: number }) {
-  if (ecart === 0) return (
-    <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400">
-      <Minus className="w-3 h-3" /> 0
-    </span>
-  )
-  if (ecart > 0) return (
-    <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600 dark:text-red-400">
-      <TrendingUp className="w-3 h-3" /> +{ecart} malus
-    </span>
-  )
-  return (
-    <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400">
-      <TrendingDown className="w-3 h-3" /> {ecart} bonus
-    </span>
-  )
+interface Ligne {
+  veterinaire_id: string
+  prenom: string
+  nom: string
+  couleur: string
+  we_realise: number
+  we_quota: number
+  ecart_we: number
+  sem_realise: number
+  sem_quota: number
+  ecart_semaine: number
+  feries_realise: number
+  feries_quota: number
+  ecart_feries: number
+  heritage_we: number | null
 }
 
-function EcartNumero({ ecart }: { ecart: number }) {
-  const sign = ecart > 0 ? '+' : ''
-  const cls = ecart === 0
-    ? 'text-muted-foreground'
-    : ecart > 0
-      ? 'text-red-600 dark:text-red-400 font-semibold'
-      : 'text-blue-600 dark:text-blue-400 font-semibold'
-  return <span className={`tabular-nums ${cls}`}>{sign}{ecart}</span>
+/** « 3 sur 2,3 » — le réalisé face à la part théorique, en français. */
+function Part({ realise, quota }: { realise: number; quota: number }) {
+  return (
+    <small className="bm-part">
+      {realise} sur {quota.toLocaleString('fr-FR', { maximumFractionDigits: 1 })}
+    </small>
+  )
 }
 
 // ── Composant ────────────────────────────────────────────
@@ -68,14 +70,14 @@ export function BonusMalusCard({
   heritage,
   vetsInfo,
 }: BonusMalusCardProps) {
-  const [calculating, setCalculating] = useState(false)
+  const [calcul, setCalcul] = useState(false)
   const [bilan, setBilan] = useState<BilanVet[] | null>(null)
 
   const heritageMap = new Map(heritage.map((b) => [b.veterinaire_id, b]))
-  const hasExisting = existingBilan.length > 0
+  const dejaCalcule = existingBilan.length > 0
 
-  async function handleCalculer() {
-    setCalculating(true)
+  async function recalculer() {
+    setCalcul(true)
     try {
       const res = await fetch('/api/bilan', {
         method: 'POST',
@@ -84,40 +86,35 @@ export function BonusMalusCard({
       })
       const data = await res.json()
       if (!res.ok) {
-        toast.error(data.error ?? 'Erreur lors du calcul.')
+        toast.error(data.error ?? 'Je n’ai pas pu calculer le bilan.')
         return
       }
       setBilan(data.bilans)
-      toast.success('Bilan calculé et sauvegardé.')
+      toast.success('Bilan recalculé.')
     } catch {
       toast.error('Impossible de joindre le serveur.')
     } finally {
-      setCalculating(false)
+      setCalcul(false)
     }
   }
 
-  // Données à afficher : bilan fraîchement calculé OU données existantes converties
-  const lignes: Array<{
-    veterinaire_id: string
-    prenom: string
-    nom: string
-    couleur: string
-    statut: string
-    we_realise: number
-    we_quota: number
-    ecart_we: number
-    sem_realise: number
-    sem_quota: number
-    ecart_semaine: number
-    feries_realise: number
-    feries_quota: number
-    ecart_feries: number
-    grands_we_realise: number
-    ecart_grands_we: number
-    heritage_we: number | null
-  }> = bilan
+  // Le bilan fraîchement calculé porte les totaux ; celui relu en base ne
+  // porte que les écarts (la table ne stocke rien d'autre).
+  const lignes: Ligne[] = bilan
     ? bilan.map((b) => ({
-        ...b,
+        veterinaire_id: b.veterinaire_id,
+        prenom: b.prenom,
+        nom: b.nom,
+        couleur: b.couleur,
+        we_realise: b.we_realise,
+        we_quota: b.we_quota,
+        ecart_we: b.ecart_we,
+        sem_realise: b.sem_realise,
+        sem_quota: b.sem_quota,
+        ecart_semaine: b.ecart_semaine,
+        feries_realise: b.feries_realise,
+        feries_quota: b.feries_quota,
+        ecart_feries: b.ecart_feries,
         heritage_we: heritageMap.get(b.veterinaire_id)?.ecart_we ?? null,
       }))
     : existingBilan.map((eb) => {
@@ -126,8 +123,7 @@ export function BonusMalusCard({
           veterinaire_id: eb.veterinaire_id,
           prenom: info?.prenom ?? '—',
           nom: info?.nom ?? '',
-          couleur: info?.couleur ?? '#888',
-          statut: 'inconnu',
+          couleur: info?.couleur ?? 'var(--soft)',
           we_realise: 0,
           we_quota: 0,
           ecart_we: eb.ecart_we,
@@ -137,116 +133,105 @@ export function BonusMalusCard({
           feries_realise: 0,
           feries_quota: 0,
           ecart_feries: eb.ecart_feries,
-          grands_we_realise: 0,
-          ecart_grands_we: eb.ecart_grands_we,
           heritage_we: heritageMap.get(eb.veterinaire_id)?.ecart_we ?? null,
         }
       })
 
+  const detaille = bilan !== null
+  const unReport = lignes.some((l) => l.heritage_we !== null)
+
   return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden">
-      {/* ── Header ─────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-4 px-4 py-3 border-b bg-muted/30">
-        <div>
-          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <Calculator className="w-4 h-4 text-primary" />
-            Bilan de période — Bonus / Malus
-          </h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Écart vs quote-part théorique ·{' '}
-            <span className="text-red-600">+N = malus</span>
-            {' · '}
-            <span className="text-blue-600">−N = bonus</span>
-          </p>
-        </div>
+    <section className="card count-card bm-card" aria-label="Bilan de la période">
+      <div className="card-head">
+        <h3>⚖️ Bilan de la période</h3>
         {periodeStatut !== 'brouillon' && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleCalculer}
-            disabled={calculating}
+          <button
+            type="button"
+            className="btn btn-outline btn-sm spacer bm-recalc"
+            onClick={recalculer}
+            disabled={calcul}
           >
-            {calculating
-              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Calcul…</>
-              : hasExisting || bilan ? 'Recalculer' : 'Calculer le bilan'
-            }
-          </Button>
+            {calcul ? (
+              <>
+                <Loader2 className="ppv-spin" aria-hidden /> Je calcule…
+              </>
+            ) : dejaCalcule || bilan ? (
+              'Recalculer'
+            ) : (
+              'Calculer le bilan'
+            )}
+          </button>
         )}
+        <span className="sub">ce que chacun a fait par rapport à sa juste part</span>
       </div>
 
-      {/* ── Tableau ──────────────────────────────────────── */}
       {lignes.length > 0 ? (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <>
+          <table className="count-table">
             <thead>
-              <tr className="border-b border-border bg-muted/10">
-                <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Vétérinaire</th>
-                <th className="text-center px-3 py-2 text-xs font-medium text-muted-foreground" colSpan={2}>Week-ends</th>
-                <th className="text-center px-3 py-2 text-xs font-medium text-muted-foreground" colSpan={2}>Semaine</th>
-                <th className="text-center px-3 py-2 text-xs font-medium text-muted-foreground" colSpan={2}>Fériés</th>
-                <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">BM hérité</th>
-              </tr>
-              <tr className="border-b border-border text-[11px] text-muted-foreground/70">
-                <th />
-                <th className="text-center px-3 pb-2">Réalisé / quota</th>
-                <th className="text-center px-3 pb-2">Écart</th>
-                <th className="text-center px-3 pb-2">Réalisé / quota</th>
-                <th className="text-center px-3 pb-2">Écart</th>
-                <th className="text-center px-3 pb-2">Réalisé / quota</th>
-                <th className="text-center px-3 pb-2">Écart</th>
-                <th className="text-right px-3 pb-2">(WE)</th>
+              <tr>
+                <th>Vétérinaire</th>
+                <th>Week-ends</th>
+                <th>Nuits de semaine</th>
+                <th>Jours fériés</th>
+                {unReport && <th>Report du tour d’avant</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody>
               {lignes.map((l) => (
-                <tr key={l.veterinaire_id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-3 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: l.couleur }} />
-                      <span className="text-sm font-medium">{l.prenom} {l.nom}</span>
-                    </div>
+                <tr key={l.veterinaire_id}>
+                  <td>
+                    <span className="ct-vet">
+                      <i style={{ background: l.couleur }} />
+                      {l.prenom} {l.nom}
+                    </span>
                   </td>
-                  {/* WE */}
-                  <td className="px-3 py-2.5 text-center tabular-nums text-xs">
-                    {bilan ? `${l.we_realise} / ${l.we_quota}` : '—'}
+                  <td>
+                    <Ecart valeur={l.ecart_we} />
+                    {detaille && <Part realise={l.we_realise} quota={l.we_quota} />}
                   </td>
-                  <td className="px-3 py-2.5 text-center">
-                    <EcartBadge ecart={l.ecart_we} />
+                  <td>
+                    <Ecart valeur={l.ecart_semaine} />
+                    {detaille && <Part realise={l.sem_realise} quota={l.sem_quota} />}
                   </td>
-                  {/* Semaine */}
-                  <td className="px-3 py-2.5 text-center tabular-nums text-xs">
-                    {bilan ? `${l.sem_realise} / ${l.sem_quota}` : '—'}
+                  <td>
+                    <Ecart valeur={l.ecart_feries} />
+                    {detaille && <Part realise={l.feries_realise} quota={l.feries_quota} />}
                   </td>
-                  <td className="px-3 py-2.5 text-center">
-                    <EcartNumero ecart={l.ecart_semaine} />
-                  </td>
-                  {/* Fériés */}
-                  <td className="px-3 py-2.5 text-center tabular-nums text-xs">
-                    {bilan ? `${l.feries_realise} / ${l.feries_quota}` : '—'}
-                  </td>
-                  <td className="px-3 py-2.5 text-center">
-                    <EcartNumero ecart={l.ecart_feries} />
-                  </td>
-                  {/* Héritage */}
-                  <td className="px-3 py-2.5 text-right">
-                    {l.heritage_we !== null
-                      ? <EcartNumero ecart={l.heritage_we} />
-                      : <span className="text-muted-foreground text-xs">—</span>
-                    }
-                  </td>
+                  {unReport && (
+                    <td>
+                      {l.heritage_we !== null ? (
+                        <Ecart valeur={l.heritage_we} />
+                      ) : (
+                        <span className="ecart none">—</span>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+
+          <p className="count-note">
+            <b>+</b> signifie qu’il a fait <b>plus</b> que sa part : le moteur lui en
+            donnera moins au prochain tour. <b>−</b> signifie l’inverse : il passera
+            devant. <b>=</b> signifie qu’il est dans sa juste part.
+            {!detaille && (
+              <>
+                {' '}
+                Le détail du réalisé n’est pas conservé en base — clique sur
+                «&nbsp;Recalculer&nbsp;» pour le voir.
+              </>
+            )}
+          </p>
+        </>
       ) : (
-        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+        <p className="count-vide">
           {periodeStatut === 'brouillon'
-            ? 'Le bilan est disponible une fois la période publiée.'
-            : 'Cliquez sur "Calculer le bilan" pour générer les bonus/malus.'
-          }
-        </div>
+            ? 'Le bilan sera disponible une fois la période publiée.'
+            : 'Aucun bilan pour cette période — clique sur « Calculer le bilan ».'}
+        </p>
       )}
-    </div>
+    </section>
   )
 }
