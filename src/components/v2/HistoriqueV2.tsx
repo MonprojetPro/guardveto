@@ -20,7 +20,7 @@
 // ============================================================
 
 import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import type { Periode } from '@/types'
 import type { CompteursRow, DepannagesRow } from '@/hooks/useCompteurs'
@@ -140,6 +140,28 @@ export function HistoriqueV2({
   const [enCours, demarrer] = useTransition()
   const imp = useImportPlanning()
 
+  // Les deux dates de la plage vivent dans un MENU, pas dans la barre : elles
+  // s'y ajoutaient en poussant le périmètre à la ligne, donc l'encart changeait
+  // de forme au clic. Même mécanique que la pilule de période du planning —
+  // on sort en cliquant ailleurs ou avec Échap, jamais par la seule flèche.
+  const [plageOuverte, setPlageOuverte] = useState(false)
+  const plageRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!plageOuverte) return
+    function auClic(e: MouseEvent) {
+      if (!plageRef.current?.contains(e.target as Node)) setPlageOuverte(false)
+    }
+    function auClavier(e: KeyboardEvent) {
+      if (e.key === 'Escape') setPlageOuverte(false)
+    }
+    document.addEventListener('mousedown', auClic)
+    document.addEventListener('keydown', auClavier)
+    return () => {
+      document.removeEventListener('mousedown', auClic)
+      document.removeEventListener('keydown', auClavier)
+    }
+  }, [plageOuverte])
+
   const recours = new Set(derniersRecours)
   const bilanDe = new Map(bilans.map((b) => [b.veterinaire_id, b]))
   const depannageDe = new Map(depannages.map((d) => [d.veterinaire_id, d]))
@@ -237,51 +259,75 @@ export function HistoriqueV2({
           </Select>
           {/* La plage libre traverse les périodes : c'est une vue de gestion du
               cabinet, réservée à l'admin — et refusée côté serveur, pas
-              seulement cachée ici. */}
+              seulement cachée ici. Ses deux dates s'ouvrent EN MENU : dans la
+              barre, elles la faisaient changer de forme au clic. */}
           {estAdmin && (
-            <button
-              type="button"
-              aria-pressed={mode === 'plage'}
-              disabled={enCours}
-              onClick={() => versPlage(du, au)}
-            >
-              Plage libre
-            </button>
+            <div className="hf-plage" ref={plageRef}>
+              <button
+                type="button"
+                aria-pressed={mode === 'plage'}
+                aria-expanded={plageOuverte}
+                disabled={enCours}
+                onClick={() => setPlageOuverte((v) => !v)}
+              >
+                Plage libre
+              </button>
+
+              {plageOuverte && (
+                <div className="hf-pop" role="dialog" aria-label="Choisir une plage de dates">
+                  <p className="hf-pop-titre">Sur quelles dates ?</p>
+                  <p className="hf-pop-sous">
+                    Les compteurs se calculent sur l’intervalle choisi, toutes périodes
+                    confondues.
+                  </p>
+                  <div className="hf-pop-dates">
+                    <label>
+                      <span>Du</span>
+                      <input
+                        type="date"
+                        value={du}
+                        onChange={(e) => setDu(e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      <span>Au</span>
+                      <input
+                        type="date"
+                        value={au}
+                        onChange={(e) => setAu(e.target.value)}
+                      />
+                    </label>
+                  </div>
+                  {du && au && du > au && (
+                    <p className="range-erreur" role="alert">
+                      La date de fin est avant la date de début.
+                    </p>
+                  )}
+                  <div className="hf-pop-actions">
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() => setPlageOuverte(false)}
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-accent btn-sm"
+                      onClick={() => {
+                        setPlageOuverte(false)
+                        versPlage(du, au)
+                      }}
+                      disabled={enCours || !du || !au || du > au}
+                    >
+                      {enCours ? 'Calcul…' : 'Voir ces dates'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
-
-        {estAdmin && mode === 'plage' && (
-          <div className="range-fields">
-            <input
-              type="date"
-              value={du}
-              aria-label="Date de début"
-              onChange={(e) => setDu(e.target.value)}
-            />
-            <span className="arrow" aria-hidden="true">
-              →
-            </span>
-            <input
-              type="date"
-              value={au}
-              aria-label="Date de fin"
-              onChange={(e) => setAu(e.target.value)}
-            />
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              onClick={() => versPlage(du, au)}
-              disabled={enCours || !du || !au || du > au}
-            >
-              {enCours ? 'Calcul…' : 'Appliquer'}
-            </button>
-            {du && au && du > au && (
-              <span className="range-erreur" role="alert">
-                La date de fin est avant la date de début.
-              </span>
-            )}
-          </div>
-        )}
 
         <span className="hf-label" style={{ marginLeft: 'auto' }}>
           Périmètre

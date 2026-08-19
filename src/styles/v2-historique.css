@@ -77,6 +77,55 @@
 .hf-opt b { font-family: var(--font-display); font-size: 0.86rem; font-weight: 700; }
 .hf-opt small { font-size: 0.72rem; color: var(--t-muted); }
 
+/* -- Le menu de la plage libre --
+   Les deux dates s'ouvrent PAR-DESSUS la barre. Posées dedans, elles
+   poussaient le périmètre à la ligne : l'encart changeait de forme au clic.
+   Même ancrage que la pilule de période du planning. */
+.hf-plage { position: relative; display: inline-flex; }
+.hf-pop {
+  position: absolute; top: calc(100% + 12px); left: 0;
+  width: min(320px, 88vw);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-panel);
+  padding: 15px 16px 13px;
+  z-index: 80;
+  text-align: left;
+}
+.hf-pop-titre {
+  font-family: var(--font-display);
+  font-size: 0.92rem; font-weight: 700; color: var(--text);
+}
+.hf-pop-sous {
+  margin-top: 3px;
+  font-size: 0.74rem; color: var(--t-muted); line-height: 1.5;
+}
+.hf-pop-dates { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.hf-pop-dates label { display: flex; align-items: center; gap: 10px; }
+.hf-pop-dates label span {
+  width: 26px;
+  font-size: 0.72rem; font-weight: 700; color: var(--soft);
+}
+.hf-pop-dates input[type='date'] {
+  flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-sm);
+  padding: 7px 11px;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  min-height: 36px;
+  color: var(--text);
+}
+.hf-pop-dates input[type='date']:focus { border-color: var(--t-accent); outline: none; }
+.hf-pop-actions {
+  display: flex; justify-content: flex-end; gap: 8px;
+  margin-top: 14px;
+  border-top: 1px dashed var(--t-border);
+  padding-top: 12px;
+}
+
 .range-fields { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .range-fields input[type='date'] {
   background: var(--surface-2);
