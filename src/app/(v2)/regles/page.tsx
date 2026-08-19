@@ -161,10 +161,17 @@ export default async function ReglesStructurePage({
   // peut être dans ce cas — mais les anciens y sont, et tant qu'il en reste un,
   // « Configuration standard » doit rester visible et réglable : la masquer
   // reviendrait à cacher la structure sur laquelle ces plannings tournent.
+  //
+  // Les périodes VERROUILLÉES sont hors du compte : elles ne se régénèrent plus
+  // (api/generate les refuse), donc elles ne « tournent » sur aucune structure —
+  // leur planning est figé. Sans ce filtre, une simple reprise d'historique
+  // (période d'archive, sans période type) faisait réapparaître « Configuration
+  // standard » que le cabinet venait justement de remplacer par la sienne.
   const { count: planningsSansPeriodeType } = await supabase
     .from('periodes')
     .select('id', { count: 'exact', head: true })
     .is('profil_id', null)
+    .neq('statut', 'verrouille')
   const rolesCabinet = options.rolesCabinet
 
   // Étiquettes réellement portées par l'équipe : les suggestions des formulaires
