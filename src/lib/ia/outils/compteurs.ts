@@ -97,14 +97,29 @@ async function resoudrePeriode(
   ctx: ContexteOutil,
   query: string | undefined,
 ): Promise<{ ok: true; periode: Periode } | { ok: false; raison: string }> {
-  const { data } = await ctx.supabase
+  // Bornée au CABINET et, pour un vétérinaire, aux périodes DIFFUSÉES.
+  // C'est le point d'entrée de TOUS les outils de comptage : une période
+  // retenue ici devient lisible plus bas dans `compteurs_gardes`, vue qui
+  // n'a aucune RLS. Le filtre doit donc être posé ICI, une fois.
+  let requete = ctx.supabase
     .from('periodes')
     .select('*')
+    .eq('cabinet_id', ctx.cabinetId)
     .order('date_debut', { ascending: false })
     .limit(50)
+  if (!ctx.estAdmin) requete = requete.not('publie_at', 'is', null)
+  const { data } = await requete
   const periodes = (data as Periode[] | null) ?? []
   if (periodes.length === 0) {
-    return { ok: false, raison: "Ce cabinet n'a encore aucune période de planification créée." }
+    // Formulation neutre côté vétérinaire : dire « il existe un brouillon mais
+    // tu n'y as pas accès » trahirait déjà l'existence et l'état d'un planning
+    // qu'il n'est pas censé connaître.
+    return {
+      ok: false,
+      raison: ctx.estAdmin
+        ? "Ce cabinet n'a encore aucune période de planification créée."
+        : "Aucun planning ne t'a encore été diffusé.",
+    }
   }
 
   const q = query?.trim().toLowerCase()
@@ -242,12 +257,45 @@ Si aucune garde n'a encore été générée pour la période demandée, l'outil 
       }
     }
 
-    let lignes: CompteursRow[] = compteurs
+    // ⛔ L'ÉQUITÉ DE TOUTE L'ÉQUIPE EST UNE INFORMATION D'ADMIN.
+    //
+    // L'écran /historique, qui montre exactement ces tableaux, est réservé aux
+    // administratrices depuis le 2026-08-21 : c'est un outil de PRÉPARATION,
+    // « un véto n'en a pas l'usage ». Filou ne peut pas être la porte de
+    // service par laquelle on obtient au chat ce que l'écran refuse.
+    //
+    // Un vétérinaire garde en revanche accès à SES propres compteurs — savoir
+    // combien de week-ends on a faits est légitime, et le lui refuser serait
+    // absurde. C'est le principe « Filou pour tous, périmètre par droits ».
+    let lignes: CompteursRow[] = ctx.estAdmin
+      ? compteurs
+      : compteurs.filter((c) => c.veterinaire_id === ctx.vetoId)
+
+    if (!ctx.estAdmin && lignes.length === 0) {
+      return {
+        periode: periodeLabelCourt(periode),
+        statut: LIBELLE_STATUT[periode.statut],
+        erreur: "Tu n'as aucune garde comptée sur cette période.",
+      }
+    }
+
     if (params.veto) {
       const vets = await chargerVets(ctx)
       const trouve = resoudreVeto(vets, params.veto)
       if (!trouve.ok) return { erreur: trouve.raison }
-      lignes = compteurs.filter((c) => c.veterinaire_id === trouve.veto.id)
+
+      // Un vétérinaire qui nomme quelqu'un d'autre se voit refuser NETTEMENT.
+      // Sans ce test, la restriction ci-dessus tombait : il suffisait de
+      // demander « les compteurs de Manon » pour les obtenir — le filtre
+      // repartait de la liste complète, pas de la liste déjà restreinte.
+      if (!ctx.estAdmin && trouve.veto.id !== ctx.vetoId) {
+        return {
+          erreur:
+            "Les compteurs des autres vétérinaires ne sont visibles que par l'administratrice du cabinet. Je peux te donner les tiens.",
+        }
+      }
+
+      lignes = lignes.filter((c) => c.veterinaire_id === trouve.veto.id)
       if (lignes.length === 0) {
         return {
           periode: periodeLabelCourt(periode),
@@ -408,11 +456,21 @@ Appelle-le pour situer une période dans le temps, savoir combien il y en a eu, 
     const { data } = await ctx.supabase
       .from('periodes')
       .select('*')
+      .eq('cabinet_id', ctx.cabinetId)
       .order('date_debut', { ascending: false })
       .limit(params.limite ?? 10)
-    const periodes = (data as Periode[] | null) ?? []
+    const periodes = ((data as Periode[] | null) ?? [])
+      // Un vétérinaire n'apprend pas l'EXISTENCE ni l'état d'avancement d'un
+      // planning qu'on ne lui a pas diffusé. La barre du haut a cessé de le
+      // faire le 2026-08-21 ; lister ici « Historique été 2026 — verrouillée »
+      // reviendrait à le lui dire par une autre bouche.
+      .filter((p) => ctx.estAdmin || Boolean((p as { publie_at?: string | null }).publie_at))
     if (periodes.length === 0) {
-      return { erreur: "Ce cabinet n'a encore aucune période de planification créée." }
+      return {
+        erreur: ctx.estAdmin
+          ? "Ce cabinet n'a encore aucune période de planification créée."
+          : "Aucun planning ne t'a encore été diffusé.",
+      }
     }
     return {
       periodes: periodes.map((p) => {

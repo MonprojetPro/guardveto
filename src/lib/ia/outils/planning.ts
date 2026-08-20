@@ -34,6 +34,7 @@ import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
 import { compterSouhaitsCongesEnAttente } from '@/data/souhaitsCongesEnAttente'
 import { placesAttendues, manqueSurGarde, codeCatalogue } from '@/lib/planning/placesAttendues'
 import type { ContexteOutil, OutilEcriture, OutilLecture } from './types'
+import { perimetrePeriodes, messagePerimetreVide } from './perimetre'
 
 // ── Fragments partagés ──────────────────────────────────────
 
@@ -83,11 +84,19 @@ function normaliser(s: string): string {
 }
 
 async function chargerPeriodes(ctx: ContexteOutil): Promise<PeriodeRow[]> {
-  const { data } = await ctx.supabase
+  // Bornée au CABINET et, pour un vétérinaire, aux périodes DIFFUSÉES. La
+  // table `periodes` porte bien une RLS, mais elle raisonne sur le statut
+  // (`publie` ou `verrouille`), pas sur la diffusion : une période verrouillée
+  // jamais publiée y passait — c'est précisément la seule qui existe chez le
+  // cabinet pilote. Le filtre explicite ferme cet écart.
+  let requete = ctx.supabase
     .from('periodes')
     .select('id, libelle, saison, numero, date_debut, date_fin, statut, profil_id, nb_vetos_semaine_soir')
+    .eq('cabinet_id', ctx.cabinetId)
     .order('date_debut', { ascending: false })
     .limit(30)
+  if (!ctx.estAdmin) requete = requete.not('publie_at', 'is', null)
+  const { data } = await requete
   return (data as PeriodeRow[] | null) ?? []
 }
 
@@ -164,10 +173,22 @@ Le champ « état de la période » dit si ce planning est encore un brouillon (
 
   async executer(params, ctx) {
     const dateFin = params.date_fin ?? params.date_debut
+
+    // ⚠️ LA VUE `planning_semaine` N'A AUCUNE RLS (elle appartient à `postgres`
+    // et n'est pas `security_invoker`) : sans le filtre ci-dessous, cette
+    // requête traversait le cabinet ET le rôle. Un vétérinaire obtenait ici le
+    // planning non diffusé que son écran avait justement cessé de lui montrer.
+    // Le périmètre borne les trois d'un coup — cabinet, rôle, diffusion.
+    const perimetre = await perimetrePeriodes(ctx)
+    if (perimetre.vide) {
+      return { jours: [], note: messagePerimetreVide(ctx) }
+    }
+
     const [{ data: gardesDb }, { data: typesDb }, periodes, profils] = await Promise.all([
       ctx.supabase
         .from('planning_semaine')
         .select('date, type, premier_prenom, second_prenom, periode_statut')
+        .in('periode_id', perimetre.ids)
         .gte('date', params.date_debut)
         .lte('date', dateFin)
         .order('date'),
