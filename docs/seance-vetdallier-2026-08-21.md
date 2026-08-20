@@ -1,40 +1,35 @@
 # Fiche de séance — VetdAllier, 21 août 2026
 
 > À garder sous les yeux pendant la séance.
-> Préparée le 20 août 2026, après le contrôle complet du premier planning généré par Anne-Sophie elle-même.
+> Mise à jour le 20 août au soir, après une longue session de recette et quatre correctifs livrés.
 > Interlocutrice principale : **Anne-Sophie** (associée, c'est elle qui construit le planning).
 > Fiche précédente : `seance-vetdallier-2026-08-15.md`.
 
 ---
 
-## 1. Ce qui s'est passé depuis la dernière séance
+## 1. Où on en est ce matin
 
-**Anne-Sophie a généré son premier planning toute seule.** C'est le franchissement qu'on attendait : elle n'a eu besoin de personne.
+**Anne-Sophie a généré son premier planning toute seule.** C'est le franchissement qu'on attendait.
 
-Le planning s'appelle **« Hiver 1 »**, il couvre du **21 septembre au 29 novembre 2026** (10 semaines), il est en **brouillon** — donc rien n'est encore parti chez les vétérinaires. Il contient 50 gardes, toutes pourvues à 2 vétérinaires, sans un seul trou, et personne n'y a touché à la main.
+Le planning s'appelle **« Hiver 1 »**, du **21 septembre au 29 novembre** (10 semaines), en **brouillon** — rien n'est parti chez les vétérinaires. 50 gardes, toutes pourvues à 2, aucun trou.
 
-**J'ai vérifié chacune des 18 règles du cabinet, une par une, directement dans les données.** Résultat : **aucune règle enfreinte**. En clair, sur les points qui comptent pour elle :
+Il a été régénéré plusieurs fois hier soir, au fil des réglages. **Les 22 règles du cabinet sont respectées**, vérifiées une par une dans les données :
 
-- L'indisponibilité d'Anne-Sophie une semaine sur deux : respectée sur les 10 semaines.
-- Manon et Antoine jamais de garde ensemble : jamais arrivé, sur les 60 binômes.
-- Le binôme du vendredi soir est bien celui du week-end, avec les rôles inversés : 10 fois sur 10.
-- Les jours de repos fixes d'Anne-Catherine, d'Anne-Sophie et de Fanny : tous tenus.
-- Les 4 congés validés (Jean, Manon, Anne-Catherine, Victor) : aucun n'a reçu de garde.
-- Le 11 novembre est traité comme un jour férié à part entière ; le 1ᵉʳ novembre, qui tombe un dimanche, est couvert par le week-end.
+- l'indisponibilité d'Anne-Sophie une semaine sur deux · Manon et Antoine jamais ensemble · les repos fixes d'Anne-Catherine, Anne-Sophie et Fanny · les repos liés au week-end · le binôme du vendredi = celui du week-end, rôles inversés (10/10) · les congés validés · **la nouvelle règle de Victor : aucun lundi**.
 
-**Et la répartition est juste** : entre les cinq vétérinaires pleinement disponibles, il n'y a que 2 gardes d'écart au total, et **une seule** d'écart sur les postes de premier. C'est très propre.
+**Répartition** : 18-18-17-17-16 gardes pour les cinq vétérinaires pleinement disponibles, 14 pour Anne-Sophie (qui n'est là qu'une semaine sur deux). Une seule garde d'écart sur les postes de premier en week-end.
 
-> **Le message à lui faire passer** : le logiciel n'a rien enfreint. Ce dont on va parler maintenant, ce ne sont pas des erreurs — ce sont des choses qu'on ne lui a jamais demandées.
+> **À lui dire d'emblée** : le logiciel n'enfreint aucune de vos règles. Ce dont on va parler, ce sont des choix, pas des erreurs.
 
 ---
 
-## 2. ⚠️ LA question à lui poser en premier — ses semaines de disponibilité
+## 2. ⚠️ LA question à poser en premier — ses semaines de disponibilité
 
-**C'est le point le plus important de la séance. Il doit passer avant tout le reste.**
+**C'est le seul point qui peut invalider tout le planning. Il passe avant le reste.**
 
-Le logiciel considère qu'Anne-Sophie est disponible **une semaine sur deux**, et il a construit tout le planning là-dessus. Mais la semaine où il la croit disponible n'a **jamais été confirmée par elle**. Si le calage est décalé d'une seule semaine, le planning est parfaitement conforme à la règle… et **totalement faux dans la vraie vie** : elle serait de garde exactement les semaines où elle ne peut pas.
+Le logiciel considère qu'Anne-Sophie est disponible **une semaine sur deux** et a construit tout le planning là-dessus. Mais **elle n'a jamais confirmé quelle semaine**. Si le calage est décalé d'une seule semaine, le planning est parfaitement conforme à la règle… et **faux dans la vraie vie**.
 
-**Le geste : lui montrer cette liste et lui demander si c'est bien la bonne.**
+**Le geste : lui montrer cette liste.**
 
 > Sur ce planning, tu es de garde les semaines du :
 > **28 septembre · 12 octobre · 26 octobre · 9 novembre · 23 novembre**
@@ -44,149 +39,109 @@ Le logiciel considère qu'Anne-Sophie est disponible **une semaine sur deux**, e
 >
 > **C'est bien dans ce sens-là ?**
 
-Si elle dit non → **c'est inversé, et il faut décaler le calage d'une semaine avant toute publication.** Ce n'est pas un bug, c'est un réglage qui n'a jamais été confirmé par quelqu'un qui sait.
+Si elle dit non → **c'est inversé, il faut décaler d'une semaine avant toute publication.**
 
-**Pourquoi on se pose la question** : sur l'historique de juillet importé, le logiciel avait signalé qu'elle était de garde un jour où sa règle la dit indisponible. On avait supposé une exception d'été. Il faut trancher maintenant, avant qu'elle publie.
+**Pourquoi on se pose la question** : sur l'historique de juillet, le logiciel avait signalé qu'elle était de garde un jour où sa règle la dit indisponible. On avait supposé une exception d'été, sans trancher.
 
-### Le point de vigilance qui va avec — les vacances scolaires
+### Le point de vigilance qui va avec
 
-Le logiciel **recale son alternance à chaque début de vacances scolaires**. Sur cette période-ci, ça n'a rien changé (le recalage des vacances de la Toussaint est tombé juste) — mais sur une période suivante, ça peut faire basculer son rythme d'une semaine sans que personne le demande.
+Le logiciel **recale son alternance à chaque début de vacances scolaires**. Sur cette période, le recalage de la Toussaint est tombé juste et n'a rien changé — mais sur la période suivante, il peut faire basculer son rythme d'une semaine.
 
-**À lui demander** : *« ton "une semaine sur deux", il repart de zéro aux vacances scolaires, ou il continue sans s'arrêter toute l'année ? »* Sa réponse conditionne le prochain planning.
-
----
-
-## 3. Ce qu'on lui fait faire elle-même — la fréquence des week-ends
-
-C'est **le vrai sujet du jour**, et le geste doit être fait **par elle**, dans l'écran Règles.
-
-### Le problème, à lui montrer en ouvrant le planning
-
-Prendre **Jean** comme exemple, c'est le plus parlant :
-
-| Ses 3 week-ends | Quand |
-|---|---|
-| 1ᵉʳ | 26 septembre |
-| 2ᵉ | **7 novembre** |
-| 3ᵉ | **21 novembre** |
-
-Il fait son week-end fin septembre, puis **plus rien pendant six semaines**, puis **deux week-ends en quinze jours**. Et ses deux week-ends de novembre sont avec **exactement le même binôme, dans les mêmes rôles** (Antoine premier, Jean second, les deux fois).
-
-**L'explication à lui donner, en une phrase :** *« On a demandé au logiciel que tout le monde ait le même NOMBRE de week-ends. On ne lui a jamais demandé qu'ils soient bien répartis dans le temps. Il a fait exactement ce qu'on lui a demandé — trois week-ends pour chacun — mais il s'est permis de les grouper. »*
-
-### Le geste, à lui faire faire
-
-> **Règles → Ajouter une règle → « Fréquence des week-ends »**
-> → Vétérinaire concerné : **« Tous les vétérinaires »** (première ligne de la liste)
-> → *De garde au plus un week-end sur…* : **3**
-> → laisser la fermeté sur **« Si possible »**
-> → Enregistrer. **C'est tout — une seule règle pour tout le cabinet.**
-
-**Pourquoi « si possible » et pas une interdiction ferme** : une règle trop rigide peut rendre le planning impossible à construire. En « si possible », le logiciel fait tout pour la tenir sans jamais se retrouver bloqué. On durcira plus tard si le résultat ne suffit pas.
-
-**Pourquoi 3 et pas 2** : avec 6 vétérinaires disponibles et 10 week-ends, chacun en fait trois. Un espacement de trois semaines les étale sur toute la période sans jamais coincer.
-
-### ✨ Nouveau depuis hier soir — « Tous les vétérinaires »
-
-Jusqu'à hier, cette règle aurait dû être créée **six fois, une par vétérinaire**. C'était fastidieux, et surtout dangereux : un vétérinaire oublié — ou embauché plus tard — serait reparti sans la règle, sans que personne le voie.
-
-**Une ligne « Tous les vétérinaires » a été ajoutée en tête de la liste des vétérinaires.** Une seule règle couvre désormais tout le cabinet, **y compris les vétérinaires qui arriveront plus tard** : la règle n'est pas figée sur une liste de noms, elle s'applique à l'effectif du moment.
-
-C'est un bon moment de séance : *« vous nous aviez fait remarquer que c'était pénible de le faire un par un — c'est réglé. »* (À moduler : c'est MiKL qui l'a vu venir, mais le retour vaut pour elle aussi.)
-
-L'option n'apparaît pas pour les règles qui désignent un binôme (« jamais en duo avec… ») : « tous » n'y aurait aucun sens.
+**À lui demander** : *« ton "une semaine sur deux", il repart de zéro aux vacances scolaires, ou il tourne en continu toute l'année ? »*
 
 ---
 
-## 3 bis. 🆕 La demande de Victor — déjà en place
+## 3. Les trois arbitrages à lui soumettre
 
-Reçue par mail la veille au soir. **La règle est déjà posée**, il n'y a rien à saisir devant elle : juste à lui montrer et à faire regénérer.
+Ce ne sont pas des bugs. Ce sont des questions dont **elle seule a la réponse**.
 
-**Ce qu'elle a demandé** : à partir de la semaine du 21 septembre, Victor veut tous ses mardis de repos — donc pas de garde le lundi soir. Mais elle l'a prévenu que « ça coincerait sûrement à certains moments ».
+### ① Anne-Sophie enchaîne quatre nuits d'affilée, quatre fois
 
-**Ce qui a été réglé** : *Victor — pas de garde le lundi*, en fermeté **« Sauf s'il n'a vraiment plus le choix »**. C'est mot pour mot ce qu'elle a annoncé à Victor : le logiciel l'évitera toujours, et ne s'y résoudra que si aucune autre combinaison ne marche — plutôt que de rendre un planning incomplet.
+Jeudi soir → vendredi soir → tout le week-end, **sans interruption du jeudi 18 h 30 au lundi 8 h 30**. Ça arrive les 1ᵉʳ-4 octobre, 15-18 octobre, 29 octobre-1ᵉʳ novembre et 26-29 novembre — soit **quatre de ses cinq semaines de présence**.
 
-**Pourquoi le lundi entier et pas seulement « le soir »** : une garde du lundi soir court jusqu'au mardi 8 h 30. Elle mange donc son mardi matin. Bloquer « le lundi » couvre le cas, y compris un lundi férié.
+**C'est structurel** : elle n'est là qu'une semaine sur deux, et elle ne peut ni le lundi ni le mercredi. Il ne lui reste que mardi, jeudi et le week-end. Lui donner trois gardes dans la semaine sans coller jeudi et vendredi est presque impossible.
 
-### ⚠️ Ce qu'il faut lui dire — ça va bouger beaucoup
+> *« Quatre nuits de suite quand tu es là, ça te va, ou on t'en enlève une ? »*
 
-Sur le planning actuel, **Victor tient 5 des 10 lundis** (28/09, 05/10, 26/10, 02/11, 23/11). Le retirer des lundis reporte la moitié de ces gardes sur les autres.
+Si elle veut moins : il faudra soit réduire son nombre de gardes, soit assouplir son indisponibilité une semaine sur deux.
 
-Restent disponibles le lundi : **Jean, Fanny, Antoine, Manon** — et Anne-Catherine en dernier recours. Anne-Sophie n'en fait aucun (elle a déjà le lundi bloqué une semaine sur deux).
+### ② Chacun a « son » jour de la semaine
 
-**Deux issues possibles, à annoncer avant de regénérer :**
-- soit ça passe, et les lundis se répartissent sur les quatre autres ;
-- soit ça coince, et le logiciel remettra Victor sur un ou deux lundis — **c'est exactement ce qu'elle a annoncé à Victor**, donc c'est un résultat acceptable, pas un échec.
+**Victor fait 9 mardis sur 10. Jean fait 8 mercredis sur 10. Fanny fait 7 lundis et aucun mardi.**
 
-Le vrai verdict ne viendra qu'à la regénération. **Regarder les lundis en priorité juste après.**
+Le logiciel équilibre le **nombre** de gardes, pas leur variété. Une fois les totaux justes, coller quelqu'un tous les mardis ne lui coûte rien.
 
----
+> *« Est-ce que la régularité vous arrange — chacun sait quel jour il est de garde — ou est-ce que ça vous pèse ? »*
 
-## 4. Les 6 souhaits de congé en attente — à traiter AVANT de regénérer
+Certains cabinets adorent, d'autres détestent. Sa réponse décide si on s'en occupe.
 
-L'écran affiche « 6 demandes de congé en attente chevauchent cette période ».
+### ③ Anne-Catherine n'a aucune garde
 
-**Ce qu'il faut lui expliquer** : le logiciel ne tient compte que des congés **validés**. Un souhait qui n'a pas encore été traité est ignoré — et c'est normal, il ne peut pas deviner sa décision à sa place.
+Zéro sur dix semaines. C'est cohérent avec son statut de **dernier recours** — mais c'est aussi ce qui serre tout le reste.
 
-**Résultat concret : trois de ces souhaits tombent pile sur une garde qui a été attribuée.**
+**Le cabinet a sept vétérinaires et tourne à six.** J'ai fait le calcul : avec six personnes, il est **mathématiquement impossible** de garantir « un week-end sur trois » à tout le monde. Si Anne-Catherine prenait deux ou trois week-ends, ça deviendrait tenable.
 
-| Qui | Quand | Ce qui a été attribué |
-|---|---|---|
-| Jean | week-end du 26 septembre | il est **premier** |
-| Anne-Sophie | week-end du 3 octobre | elle est **seconde** |
-| Fanny | week-end du 17 octobre | elle est **seconde** |
+> *« Anne-Catherine à zéro garde, c'est bien l'intention ? »*
 
-**Le message** : *« ces six demandes, il faut les accepter ou les refuser avant de relancer. Sinon vous validerez un congé après coup et il faudra tout regénérer. »*
-
-Les six : Victor (21/09), Jean (23/09), Jean (26/09), Anne-Sophie (03/10), Victor (09/10), Fanny (17/10).
+C'est le levier qui débloquerait le plus de marge. La décision leur appartient.
 
 ---
 
-## 5. Deux choses à lui signaler sans en faire un sujet
+## 4. Les 5 souhaits de congé encore en attente
 
-**Anne-Catherine n'a aucune garde sur toute la période.** C'est cohérent avec son statut de « dernier recours » : les six autres suffisent largement. **Mais c'est à confirmer avec elles deux** — est-ce bien l'intention, ou attendent-elles qu'elle en prenne quelques-unes ?
+Un a déjà été traité hier (Jean, 26 septembre — accepté, planning régénéré derrière).
 
-**Jean est de garde le mardi 3 novembre alors que c'est son jour de repos cette semaine-là** (sa règle dit : repos le vendredi, ou le mardi s'il est de garde le week-end — et il a le week-end du 7). Sa règle est réglée en **« Sauf urgence »**, donc le logiciel avait le droit de passer outre. **Décision prise : on laisse comme ça pour l'instant.** À mentionner seulement si elle le repère, et lui rappeler que c'est elle qui a choisi cette fermeté-là en juin (Anne-Catherine : *« pour moi c'est une règle molle »*).
+L'écran indique maintenant, pour chacun, s'il percute une garde du planning en brouillon :
 
-⚠️ **Ce point devient plus sensible avec la demande de Victor.** Elle écrit elle-même : *« sachant que déjà Jean veut son mardi de repos quand il est de garde le week-end »*. Elle a raison de le signaler : les deux demandes serrent le début de semaine. Victor sort des lundis, et Jean doit garder certains mardis libres — avec quatre vétérinaires disponibles le lundi au lieu de cinq, ces deux souhaits vont se disputer les mêmes créneaux. Si l'un des deux doit céder à la regénération, ce sera visible là. **Les deux règles sont souples, donc le planning ne bloquera pas — il arbitrera.**
+| Qui | Quand | Motif | Conflit ? |
+|---|---|---|---|
+| Victor | 21 sept. | *« Repos si possible »* | ✅ aucune garde |
+| **Jean** | 23 sept. | *« Pas de garde svp — crèche »* | ⚠️ **1 garde** |
+| **Anne-Sophie** | 3 oct. | *« Pas de garde si possible »* | ⚠️ **1 garde** |
+| **Victor** | 9 oct. | *« Pas de garde svp — embouteillage Lapalisse »* | ⚠️ **1 garde** (le vendredi soir de son week-end) |
+| Fanny | 17 oct. | *« Pas de garde si possible »* | ✅ aucune garde |
 
----
+**Ce qu'il faut lui expliquer** : le logiciel ne tient compte que des congés **validés**. Accepter l'un des trois marqués ⚠️ oblige à **regénérer** — et tout le planning se redistribue derrière, comme hier avec Jean.
 
-## 6. ✅ Le risque « ancien écran » est levé
-
-**Corrigé le 20 août au soir.** Un audit complet a été fait sur toutes les façons d'atterrir par accident dans l'ancienne interface depuis les écrans d'aujourd'hui.
-
-Les deux portes réelles sont fermées :
-- le bandeau **« Voir les demandes »** du planning → mène maintenant à **Absences** ;
-- le bouton de l'accueil, devenu **« Traiter dans Absences »** → idem.
-
-Il n'en reste **aucune** sur les écrans de la séance. Vérifié aussi : la cloche de notifications n'est pas montée sur les nouveaux écrans, le bouton « Proposer un échange » n'apparaît que pour un compte vétérinaire sur un planning publié (donc jamais demain), et la redirection de connexion mène bien au nouvel accueil.
-
-**Tu peux cliquer partout sans crainte.**
-
-Seule réserve, très improbable : si tu tapes une adresse à la main (`/conges`, `/notifications`, `/echanges`), l'ancienne interface répond encore. Ces écrans existent toujours, ils ne sont juste plus atteignables en cliquant.
+**À décider avec elle** : traiter les cinq d'un coup puis regénérer **une seule fois**, plutôt que d'enchaîner les régénérations.
 
 ---
 
-## 7. Le déroulé proposé
+## 5. Ce qui a été livré hier soir
 
-1. **Ouvrir le planning qu'elle a généré** et lui dire que tout est conforme — la commencer sur une réussite, c'est la sienne.
-2. **Confirmer ses semaines de disponibilité** (§2). Bloquant : si c'est décalé, tout le reste attend.
-3. **Traiter les 6 souhaits de congé** dans « Absences » (§4).
-4. **Lui faire poser la règle « un week-end sur 3 »** sur chaque vétérinaire (§3).
-5. **Regénérer devant elle** et regarder ensemble les week-ends de Jean.
-6. Si le résultat lui convient → **elle publie**.
+Quatre choses, toutes visibles à l'écran :
+
+**« Tous les vétérinaires »** — une règle qui concerne tout le cabinet se pose maintenant **en une seule fois** au lieu de sept, et elle s'appliquera automatiquement aux vétérinaires qui arriveront plus tard.
+
+**Les vacances scolaires se voient sur le planning** — un liseré doré et une légende. C'est ce qui explique pourquoi Fanny est de garde le mercredi 21 octobre alors qu'elle a le mercredi en repos : sa règle prévoit l'exception « sauf vacances scolaires », et on est en pleine Toussaint.
+
+**Les demandes de congé disent la vérité** — l'écran affichait « aucun conflit avec le planning publié » sur toutes les demandes, alors qu'il n'existe aucun planning publié. Il annonce maintenant les conflits avec le planning **en brouillon**, et sait dire « aucune garde prévue » quand c'est le cas.
+
+**Deux corrections de rythme** :
+- plus jamais **deux week-ends consécutifs**, y compris à cheval sur deux périodes (Antoine enchaînait le 19 et le 26 septembre — c'est réglé) ;
+- les **trois nuits d'affilée** d'Antoine (16, 17, 18 novembre) ont disparu.
 
 ---
 
-## 8. Ce qu'on lui doit après la séance
+## 6. Le déroulé proposé
 
-- [x] ~~Une ligne « Tous les vétérinaires » dans le choix du vétérinaire~~ — **livré le 20 août au soir.**
-- [x] ~~Rebrancher les liens congés sur la nouvelle version~~ — **livré le 20 août au soir** (avec l'ajout dans Absences de la modification et de la suppression d'un congé, qui manquaient).
-- [ ] Refaire les écrans **Notifications** et **Échanges** en version 2 : ils n'ont pas d'équivalent et restent atteignables en tapant l'adresse.
+1. **Ouvrir le planning qu'elle a généré**, dire que tout est conforme. Commencer sur sa réussite.
+2. **Confirmer ses semaines de disponibilité** (§2). Bloquant : si c'est décalé, le reste attend.
+3. **Traiter les 5 souhaits** dans « Absences », en regardant les verdicts de conflit.
+4. **Regénérer une seule fois**, devant elle.
+5. **Vérifier ensemble** : ses semaines, les lundis (Victor n'en a aucun), les week-ends.
+6. Poser les **trois arbitrages** du §3 — sans chercher à les trancher sur le moment.
+7. Si le résultat lui convient → **elle publie**.
+
+---
+
+## 7. Ce qu'on lui doit après la séance
+
+- [ ] Refaire les écrans **Notifications** et **Échanges** en version 2 (les seuls qui restent en ancienne version ; ils ne sont plus atteignables en cliquant, mais répondent encore si on tape l'adresse).
 - [ ] Corriger les liens des notifications internes, qui pointent encore vers l'ancien écran des échanges.
-- [ ] Trancher son rythme d'alternance face aux vacances scolaires, selon sa réponse au §2.
+- [ ] Selon ses réponses au §3 : la densité de ses semaines, la variété des jours.
+- [ ] Trancher son rythme d'alternance face aux vacances scolaires (§2).
 
 ---
 
-*Préparée le 20 août 2026. Contrôle du planning « Hiver 1 » fait sur les données réelles, règle par règle.*
+*Mise à jour le 20 août 2026 au soir. Tous les contrôles faits sur les données réelles, règle par règle.*
