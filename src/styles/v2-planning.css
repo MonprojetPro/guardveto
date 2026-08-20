@@ -914,6 +914,17 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   color: #fff; font-size: 0.62rem; font-weight: 800;
 }
 .gm-current.none { color: var(--t-muted); font-weight: 600; font-style: italic; }
+
+/* La garde vue par un vétérinaire : une fiche de LECTURE, pas un réglage
+   éteint. `.disabled` (opacité 0.55) aurait dit « c'est désactivé pour toi »,
+   donc « il existe un bouton quelque part » — alors qu'il n'y a simplement
+   rien à régler ici. Pleine opacité : l'information est complète, elle est
+   juste en lecture. */
+.gm-section.lecture { opacity: 1; }
+.gm-moi {
+  font-style: normal; font-weight: 700; font-size: 0.76rem;
+  color: var(--t-accent);
+}
 .gm-reassign {
   border: 1px solid var(--border-strong);
   background: var(--surface-2); color: var(--t-muted);

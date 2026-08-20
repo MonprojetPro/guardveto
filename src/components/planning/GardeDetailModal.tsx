@@ -15,6 +15,7 @@ import {
 import type { GardeDenormalisee } from '@/types'
 import type { VetDispo, DisponibilitesData } from '@/app/api/gardes/[id]/disponibilites/route'
 import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
+import { placesDeGarde, vetsDeGarde } from '@/lib/gardes/places'
 import { ViolationDialog } from './ViolationDialog'
 
 // ── Types ────────────────────────────────────────────────
@@ -64,6 +65,34 @@ function toneDe(dispo: { ok: boolean; warning?: string }): Tone {
 /** Retire le préfixe technique « R7 : » des messages de règle. */
 function sansCodeRegle(texte?: string): string {
   return (texte ?? '').replace(/^R\d+ : /, '')
+}
+
+/**
+ * Le SEUL geste qu'un vétérinaire peut poser sur une garde depuis le planning :
+ * proposer un échange, sur une des SIENNES, tant qu'elle est encore à venir.
+ *
+ * ⚠️ Exporté exprès, et utilisé par les DEUX bouts : la grille s'en sert pour
+ * décider si une ligne est cliquable, la modale pour décider si le bouton
+ * existe. Deux tests séparés finiraient par diverger, et la divergence a une
+ * seule forme possible — une case qui ouvre une fenêtre sans aucune action,
+ * c'est-à-dire un bouton qui ne fait rien.
+ *
+ * `vetsDeGarde` plutôt que `premier_id`/`second_id` : un créneau sur-mesure
+ * peut compter jusqu'à quatre places, et le titulaire d'une 3e place a
+ * exactement les mêmes raisons de vouloir échanger.
+ */
+export function peutProposerUnEchange(
+  garde: GardeDenormalisee | null | undefined,
+  moiVetId: string | undefined,
+  aujourdHui: string,
+): boolean {
+  if (!garde || !moiVetId) return false
+  // Non publiée : le véto n'est pas censé la connaître. Passée ou verrouillée :
+  // il n'y a plus rien à échanger.
+  if (garde.periode_statut !== 'publie') return false
+  if (garde.date <= aujourdHui) return false
+  if (garde.verrouille) return false
+  return vetsDeGarde(garde).includes(moiVetId)
 }
 
 // ── Une place de garde : qui la tient, et de quoi en changer ──
@@ -237,6 +266,19 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
 
   useEffect(() => {
     if (!garde || !isOpen) return
+    // ⛔ ON N'INTERROGE PAS `/api/gardes/[id]/disponibilites` POUR UN VÉTO.
+    //
+    // Cette route ne lui sert AUCUNE ligne de `vets` — la liste porte les
+    // raisons d'indisponibilité de toute l'équipe, réservées à l'admin (D8).
+    // La modale s'en servait quand même pour retrouver qui tient la place :
+    // avec une liste vide, elle affichait « Aucun · à pourvoir » sur une garde
+    // que la grille montrait pourvue (constat MiKL du 2026-08-20). Un écran qui
+    // se contredit lui-même est pire qu'un écran qui se tait.
+    //
+    // Tout ce dont la vue lecture seule a besoin (titulaires, verrouillage,
+    // statut de période) est DÉJÀ dans `garde`, servi par `planning_semaine` —
+    // la même source que la case du calendrier, donc aucune divergence possible.
+    if (!isAdmin) return
     // Réinitialisation volontaire de l'état à chaque ouverture de la modale,
     // juste avant de recharger les disponibilités de la garde sélectionnée.
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -396,7 +438,9 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
   const masquerSecond =
     (data?.garde.saison === 'ete' && data?.garde.type === 'semaine' && !data?.garde.second_id)
     || (!estTypeV1 && !data?.garde.second_id)
-  const estVerrouille = data?.garde.verrouille ?? false
+  // Le verrouillage vient de l'API pour l'admin, et de la garde affichée pour
+  // le véto (même colonne, deux chemins) : la modale véto ne fait plus d'appel.
+  const estVerrouille = data?.garde.verrouille ?? garde?.verrouille ?? false
   const modeEdition = isAdmin && (!estVerrouille || correctionMode)
 
   // ── Backlog 8 bis : le jour, et le bloc ──────────────────
@@ -444,16 +488,12 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
     .filter((p) => p.place_index >= 2)
     .sort((a, b) => a.place_index - b.place_index)
 
-  // Véto : « proposer un échange » sur SA garde (publiée, future, non verrouillée).
+  // Véto : « proposer un échange » sur SA garde (publiée, future, non
+  // verrouillée). Le test vit dans `peutProposerUnEchange`, partagé avec la
+  // grille — c'est lui qui décide aussi qu'une case est cliquable, donc une
+  // modale ouverte a forcément ce bouton.
   const aujourdHui = new Date().toISOString().slice(0, 10)
-  const peutProposerEchange =
-    !isAdmin &&
-    Boolean(moiVetId) &&
-    Boolean(garde) &&
-    garde!.periode_statut === 'publie' &&
-    garde!.date > aujourdHui &&
-    !estVerrouille &&
-    (garde!.premier_id === moiVetId || garde!.second_id === moiVetId)
+  const peutProposerEchange = !isAdmin && peutProposerUnEchange(garde, moiVetId, aujourdHui)
 
   return (
     <>
@@ -466,7 +506,12 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
             <DialogTitle className="capitalize">
               {date && formatDateLongue(date)}
             </DialogTitle>
-            {garde && (
+            {/* Les badges disent l'état INTERNE du planning — verrouillage,
+                retouche manuelle, brouillon. C'est le vocabulaire de celle qui
+                prépare le planning, pas de celui qui le subit : un véto n'a
+                rien à faire de « Modifiée à la main », et « Verrouillée » lui
+                annonce une porte qu'on ne lui a jamais proposé d'ouvrir. */}
+            {garde && isAdmin && (
               <div className="gm-badges">
                 {garde.periode_statut === 'publie' && (
                   <span className="gm-badge publie">● Publiée</span>
@@ -484,7 +529,40 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
 
           {!garde && <p className="text-sm text-muted-foreground py-4">Aucune garde planifiée ce jour.</p>}
 
-          {garde && loading && (
+          {/* ── La garde vue par un vétérinaire ───────────────────────
+                 Qui est de garde, et rien d'autre. Les places viennent de
+                 `placesDeGarde`, exactement comme la case du calendrier : c'est
+                 ce qui garantit que la modale ne pourra jamais raconter autre
+                 chose que la grille dont elle sort. Aucun réglage n'est
+                 affiché — pas même grisé : proposer un geste impossible est
+                 une promesse en l'air. */}
+          {garde && !isAdmin && (
+            <div className="gm-lecture">
+              {placesDeGarde(garde).map((p) => (
+                <div className="gm-section lecture" key={p.index}>
+                  <div className="gm-slot-row">
+                    <span className="gm-slot-label">
+                      {placesDeGarde(garde).length > 1 ? `${p.role} de garde` : 'De garde'}
+                    </span>
+                    <span className="gm-current">
+                      <span className="dot" style={{ background: p.couleur ?? 'var(--soft)' }}>
+                        {(p.prenom ?? '?').charAt(0)}
+                      </span>
+                      {p.prenom} {p.nom}
+                      {p.vetId === moiVetId && <em className="gm-moi">— toi</em>}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {placesDeGarde(garde).length === 0 && (
+                <p className="text-sm text-muted-foreground py-2">
+                  Personne n’est encore affecté à cette garde.
+                </p>
+              )}
+            </div>
+          )}
+
+          {garde && isAdmin && loading && (
             <div className="flex items-center justify-center py-8 gap-2 text-sm text-muted-foreground">
               <Loader2 className="w-4 h-4 animate-spin" />
               Chargement…

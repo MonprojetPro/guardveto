@@ -28,6 +28,7 @@ import {
 } from '@/hooks/useCompteurs'
 import { calculerBilans } from '@/engine/bilan'
 import { normaliserColonnes } from '@/lib/planning/colonnesCompteurs'
+import { lignesDesPeriodes, periodesVisibles } from '@/lib/planning/diffusion'
 import type { VetCrise } from '@/components/planning/CriseModal'
 import type { CompteursRow } from '@/hooks/useCompteurs'
 import type { GardeDenormalisee, Periode, ProfilPlanning, Veterinaire } from '@/types'
@@ -157,8 +158,28 @@ export default async function PlanningPageV2({
     (vacancesRes?.data ?? []) as { debut: string; fin: string; label: string | null }[]
   ).map((v) => ({ debut: v.debut, fin: v.fin, label: v.label ?? 'Vacances scolaires' }))
 
-  const gardes = ((gardesRes?.data ?? []) as GardeDenormalisee[])
-  const periodes = ((periodesRes?.data ?? []) as Periode[])
+  // ⚠️ UN BROUILLON NE SORT PAS DU LOGICIEL — l'écran d'un vétérinaire est un
+  // canal de diffusion comme l'agenda Google.
+  //
+  // La RLS laisse volontairement passer toutes les périodes du cabinet (l'admin
+  // et le véto lisent la même table) : c'est donc ICI que se fait le tri, et
+  // rien en amont ne le fait à notre place. Sans ce filtre, un véto ouvrant
+  // `/planning` voyait le mois d'octobre entièrement rempli alors qu'aucune
+  // période n'avait jamais été publiée (constat MiKL du 2026-08-20) — il
+  // aurait organisé sa vie sur des gardes que personne ne lui a annoncées.
+  //
+  // Le critère est `publie_at`, pas le statut : une période « verrouillée »
+  // peut n'avoir jamais été diffusée (historique amorcé en base). Source unique
+  // du test : `lib/planning/diffusion.ts`.
+  const toutesPeriodes = ((periodesRes?.data ?? []) as Periode[])
+  const periodes = periodesVisibles(toutesPeriodes, isAdmin)
+  //
+  // Le filtre des gardes n'est appliqué QU'au véto, volontairement : la liste
+  // des périodes est plafonnée à 20, et une garde relevant d'une période plus
+  // ancienne disparaîtrait de l'écran de l'admin — un trou silencieux, pire
+  // que ce qu'on corrige.
+  const toutesGardes = (gardesRes?.data ?? []) as GardeDenormalisee[]
+  const gardes = isAdmin ? toutesGardes : lignesDesPeriodes(toutesGardes, periodes)
 
   const nomsTypes: Record<string, string> = {}
   for (const r of (typesRes?.data ?? []) as { code: string; nom: string }[]) {
@@ -312,8 +333,16 @@ export default async function PlanningPageV2({
 
   // Re-validation continue : périodes publiées qui chevauchent le mois affiché
   // ET qui ont des gardes. Identique à la V1 — c'est un garde-fou, pas du décor.
+  // Même tri que ci-dessus : c'est cette liste qui allume le bouton PDF, et un
+  // PDF est encore un canal sortant. Un véto ne doit pas pouvoir exporter un
+  // planning qu'il n'a pas le droit de lire.
   const periodesAvecGardes = [
-    ...new Set(((gardesPeriodesRes?.data ?? []) as { periode_id: string }[]).map((g) => g.periode_id)),
+    ...new Set(
+      (isAdmin
+        ? ((gardesPeriodesRes?.data ?? []) as { periode_id: string }[])
+        : lignesDesPeriodes((gardesPeriodesRes?.data ?? []) as { periode_id: string }[], periodes)
+      ).map((g) => g.periode_id),
+    ),
   ]
   // Les périodes PUBLIÉES restent contrôlées, y compris après une retouche à
   // la main : l'admin doit savoir quelle règle ou quel congé entre en conflit

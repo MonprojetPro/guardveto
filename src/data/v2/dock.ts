@@ -14,6 +14,7 @@ import type { createClient } from '@/lib/supabase/server'
 import type { Periode, Veterinaire } from '@/types'
 import type { DonneesDock } from './accueilEpicentre'
 import { aujourdhuiISO } from './accueilEpicentre'
+import { periodesVisibles } from '@/lib/planning/diffusion'
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 
@@ -42,7 +43,15 @@ export async function chargerDock(
       supabase.from('cabinets').select('google_calendar_id').limit(1).maybeSingle(),
     ])
 
-  const periodes = ((periodesRes as { data?: Periode[] | null })?.data ?? []) as Periode[]
+  // La pastille annonce le planning « en cours » à tout l'écran : pour un
+  // vétérinaire, elle ne peut donc parler que de ce qui lui a été DIFFUSÉ.
+  // Sans ce tri, la barre affichait « Historique été 2026 · Brouillon » à un
+  // véto — soit l'existence ET l'état d'avancement d'un planning qu'il n'était
+  // pas censé connaître. Le critère est `publie_at`, jamais le statut.
+  const periodes = periodesVisibles(
+    ((periodesRes as { data?: Periode[] | null })?.data ?? []) as Periode[],
+    estAdmin,
+  )
   const courante =
     periodes.find((p) => p.date_debut <= today && p.date_fin >= today) ??
     [...periodes].reverse().find((p) => p.date_debut > today) ??

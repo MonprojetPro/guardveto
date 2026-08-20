@@ -22,7 +22,7 @@ import { Trash2 } from 'lucide-react'
 import { supprimerPeriode } from '@/app/(protected)/admin/periodes/actions'
 import { FilouEdge } from './FilouEdge'
 import { useOutilsPlanning } from './outils-planning'
-import { GardeDetailModal } from '@/components/planning/GardeDetailModal'
+import { GardeDetailModal, peutProposerUnEchange } from '@/components/planning/GardeDetailModal'
 import { CriseModal, type VetCrise } from '@/components/planning/CriseModal'
 import { estJourFerie } from '@/engine/utils'
 import { placesDeGarde } from '@/lib/gardes/places'
@@ -267,9 +267,28 @@ export function PlanningV2({
     setCriseOpen(true)
   }
 
+  /**
+   * Une fiche de garde n'est un BOUTON que si le clic mène quelque part.
+   *
+   * L'admin agit sur tout — c'est son écran. Un vétérinaire n'a qu'un geste
+   * possible, l'échange, et seulement sur ses propres gardes à venir : ailleurs,
+   * le clic ouvrait une fenêtre sans la moindre action (« un bouton qui ne fait
+   * rien »). On dessine donc une ligne inerte plutôt qu'un bouton menteur — et
+   * le test est le MÊME que celui qui décide du bouton dans la modale, ce qui
+   * rend la divergence impossible.
+   */
+  function estCliquable(g: GardeDenormalisee): boolean {
+    return isAdmin || peutProposerUnEchange(g, moiVetId, today)
+  }
+
   const statut = periodeAffichee ? libelleStatut(periodeAffichee.statut) : null
+  // Le bandeau « lecture seule » s'adresse à celle qui, d'habitude, PEUT
+  // modifier : il explique une exception, et propose d'aller travailler
+  // ailleurs. Pour un vétérinaire, tout est en lecture seule en permanence —
+  // le bandeau n'annoncerait aucune exception, et « ouvre la période de travail
+  // pour agir » lui désignerait un pouvoir qu'il n'a pas.
   const consultationSeule =
-    periodeAffichee !== null && periodeAffichee.statut === 'verrouille'
+    isAdmin && periodeAffichee !== null && periodeAffichee.statut === 'verrouille'
 
   return (
     <div className="plan-scene">
@@ -333,7 +352,12 @@ export function PlanningV2({
                   <p className="pp-sub">
                     {isAdmin
                       ? 'Aucun planning n’existe encore. Le bouton « Générer », en haut de l’écran, crée le premier.'
-                      : 'Aucun planning n’a encore été créé. Tes gardes apparaîtront ici dès qu’il sera publié.'}
+                      : // Côté véto, « aucun planning n'existe » serait un
+                        // mensonge dès qu'un brouillon est en préparation — et
+                        // dire qu'il en existe un en trahirait le contenu. On
+                        // parle donc de ce qui le concerne : ce qui lui a été
+                        // diffusé.
+                        'Aucun planning ne t’a encore été diffusé. Tes gardes apparaîtront ici dès qu’il sera publié.'}
                   </p>
                 ) : (
                   <p className="pp-sub">Le mois affiché ne tombe dans aucune période.</p>
@@ -496,19 +520,41 @@ export function PlanningV2({
               pas dans la barre d'en-tête, qu'ils faisaient gonfler. */}
           {alertes}
 
-          <p className="grid-hint">
-            <span className="gh-ico" aria-hidden="true">
-              👆
-            </span>
-            <span>
-              <b>Clique sur une case pour agir dessus</b> — réattribuer une garde, signaler une
-              absence.
-            </span>
-            <span className="gh-sep" aria-hidden="true">
-              ·
-            </span>
-            <span className="gh-lock">Le passé est verrouillé 🔒</span>
-          </p>
+          {/* La consigne doit décrire ce que CETTE personne peut faire.
+              Annoncer « réattribuer une garde, signaler une absence » à un
+              vétérinaire, c'est lui promettre deux gestes que le serveur lui
+              refuse — et lui faire chercher pendant dix minutes le bouton qui
+              n'existe pas (constat MiKL du 2026-08-20). Un véto n'a qu'un
+              geste ici : proposer un échange sur une de SES gardes à venir. */}
+          {isAdmin ? (
+            <p className="grid-hint">
+              <span className="gh-ico" aria-hidden="true">
+                👆
+              </span>
+              <span>
+                <b>Clique sur une case pour agir dessus</b> — réattribuer une garde, signaler une
+                absence.
+              </span>
+              <span className="gh-sep" aria-hidden="true">
+                ·
+              </span>
+              <span className="gh-lock">Le passé est verrouillé 🔒</span>
+            </p>
+          ) : (
+            <p className="grid-hint">
+              <span className="gh-ico" aria-hidden="true">
+                🔄
+              </span>
+              <span>
+                <b>Clique sur une de tes gardes à venir</b> pour proposer un échange à un
+                collègue.
+              </span>
+              <span className="gh-sep" aria-hidden="true">
+                ·
+              </span>
+              <span className="gh-lock">Les autres gardes sont en lecture seule</span>
+            </p>
+          )}
 
           <div className="work-grid">
             <div className="work-main">
@@ -531,6 +577,7 @@ export function PlanningV2({
                           (date < periodeAffichee.date_debut || date > periodeAffichee.date_fin)
                         }
                         gardes={parDate.get(date) ?? []}
+                        estCliquable={estCliquable}
                         conges={conges.filter((c) => c.dateDebut <= date && c.dateFin >= date)}
                         nomsTypes={nomsTypes}
                         vacances={vacances.find((v) => v.debut <= date && v.fin >= date)?.label ?? null}
@@ -607,6 +654,7 @@ function CaseJour({
   today,
   horsPeriode,
   gardes,
+  estCliquable,
   conges,
   nomsTypes,
   vacances,
@@ -618,6 +666,8 @@ function CaseJour({
   /** Le jour tombe en dehors des bornes de la période affichée. */
   horsPeriode: boolean
   gardes: GardeDenormalisee[]
+  /** Le clic sur cette garde mène-t-il à une action réelle pour la personne connectée ? */
+  estCliquable: (g: GardeDenormalisee) => boolean
   conges: CongeAffiche[]
   nomsTypes: Record<string, string>
   /** Nom des vacances scolaires couvrant ce jour, ou null. */
@@ -664,6 +714,7 @@ function CaseJour({
         // sur-mesure peut en compter jusqu'à quatre, et un vétérinaire de
         // garde qui n'apparaît pas dans la case serait invisible partout.
         const places = placesDeGarde(g)
+        const cliquable = estCliquable(g)
         return (
           <div className="slot-card" key={g.id}>
             <span className="sc-tag">{libelleTypeGardeDb(g.type, nomsTypes)}</span>
@@ -678,7 +729,7 @@ function CaseJour({
                 couleur={p.couleur}
                 role={places.length > 1 ? p.role : ''}
                 titre={`${dateCourte(date)} · ${p.role} de garde`}
-                onClick={() => onOuvrir(g)}
+                onClick={cliquable ? () => onOuvrir(g) : undefined}
               />
             ))}
           </div>
@@ -690,7 +741,16 @@ function CaseJour({
   )
 }
 
-/** Une place dans une fiche : point de couleur + prénom, ou « à pourvoir ». */
+/**
+ * Une place dans une fiche : point de couleur + prénom, ou « à pourvoir ».
+ *
+ * `onClick` absent = la ligne se DESSINE mais ne se clique pas. On rend alors
+ * un `<span>`, pas un `<button disabled>` : un bouton grisé annonce une action
+ * momentanément indisponible, alors qu'ici il n'y a rien à faire du tout — et
+ * le clavier n'a aucune raison de s'arrêter dessus. Les styles `.vet-row` sont
+ * neutres quant à la balise (seul `button.vet-row:hover` réagit), le rendu est
+ * donc identique à l'œil, sans l'affordance de clic.
+ */
 function LigneVet({
   prenom,
   couleur,
@@ -702,20 +762,32 @@ function LigneVet({
   couleur: string | null
   role: string
   titre: string
-  onClick: () => void
+  onClick?: () => void
 }) {
-  if (!prenom) {
-    return (
-      <button type="button" className="vet-row empty" onClick={onClick} aria-label={`${titre} · place à pourvoir`}>
-        <span className="vdot" aria-hidden="true" />À pourvoir
-      </button>
-    )
-  }
-  return (
-    <button type="button" className="vet-row" onClick={onClick} aria-label={`${titre} · ${prenom}`}>
+  const contenu = !prenom ? (
+    <>
+      <span className="vdot" aria-hidden="true" />À pourvoir
+    </>
+  ) : (
+    <>
       <span className="vdot" style={{ background: couleur ?? 'var(--soft)' }} aria-hidden="true" />
       {prenom}
       {role && <span className="role">{role}</span>}
+    </>
+  )
+  const classe = prenom ? 'vet-row' : 'vet-row empty'
+  const libelle = prenom ? `${titre} · ${prenom}` : `${titre} · place à pourvoir`
+
+  if (!onClick) {
+    return (
+      <span className={classe} aria-label={libelle}>
+        {contenu}
+      </span>
+    )
+  }
+  return (
+    <button type="button" className={classe} onClick={onClick} aria-label={libelle}>
+      {contenu}
     </button>
   )
 }

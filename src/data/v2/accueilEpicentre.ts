@@ -15,6 +15,7 @@
 import type { createClient } from '@/lib/supabase/server'
 import type { Periode, StatutPeriode, Veterinaire } from '@/types'
 import { phraseRegle } from '@/lib/regles/libelle'
+import { lignesDesPeriodes, periodesVisibles } from '@/lib/planning/diffusion'
 import { MATIERE_VIDE, type MatiereFilou } from '@/lib/v2/filou-origine'
 import {
   catalogueDuProfil,
@@ -316,7 +317,14 @@ export async function chargerAccueil(
       : Promise.resolve({ data: [] as { id: string; nom: string }[] }),
   ] as const)
 
-  const periodes = (periodesRes?.data ?? []) as Periode[]
+  // ⚠️ MÊME RÈGLE QUE L'ÉCRAN PLANNING ET QUE L'AGENDA GOOGLE : un brouillon
+  // ne sort pas du logiciel. « Ce soir » et « demain » sont l'information la
+  // plus engageante de l'accueil — annoncer un binôme de garde tiré d'un
+  // planning non publié, c'est faire venir quelqu'un sur une promesse que
+  // personne n'a faite. Le critère est `publie_at`, pas le statut (une période
+  // verrouillée peut n'avoir jamais été diffusée). Source unique du test :
+  // `lib/planning/diffusion.ts`.
+  const periodes = periodesVisibles((periodesRes?.data ?? []) as Periode[], estAdmin)
 
   // La période « courante » est celle qui couvre aujourd'hui ; à défaut la
   // prochaine à démarrer ; à défaut la plus récente connue.
@@ -336,7 +344,13 @@ export async function chargerAccueil(
     ? ecartEnJours(today, moinsJours(periodeAPublier.date_debut, PREAVIS_JOURS))
     : null
 
-  const lignes = (gardesRes?.data ?? []) as Record<string, unknown>[]
+  // Les gardes du soir suivent le même tri, par `periode_id` : la vue
+  // `planning_semaine` n'expose pas `publie_at`, et relire son `periode_statut`
+  // reviendrait à laisser passer le verrouillé-jamais-diffusé.
+  const toutesLignes = (gardesRes?.data ?? []) as (Record<string, unknown> & {
+    periode_id: string
+  })[]
+  const lignes = estAdmin ? toutesLignes : lignesDesPeriodes(toutesLignes, periodes)
   /** Le catalogue d'horaires de la période qui couvre CETTE date. Deux dates
    *  voisines peuvent relever de deux périodes — donc de deux profils — deux
    *  fois par an. */
