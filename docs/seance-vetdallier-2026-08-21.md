@@ -98,6 +98,30 @@ L'option n'apparaît pas pour les règles qui désignent un binôme (« jamais e
 
 ---
 
+## 3 bis. 🆕 La demande de Victor — déjà en place
+
+Reçue par mail la veille au soir. **La règle est déjà posée**, il n'y a rien à saisir devant elle : juste à lui montrer et à faire regénérer.
+
+**Ce qu'elle a demandé** : à partir de la semaine du 21 septembre, Victor veut tous ses mardis de repos — donc pas de garde le lundi soir. Mais elle l'a prévenu que « ça coincerait sûrement à certains moments ».
+
+**Ce qui a été réglé** : *Victor — pas de garde le lundi*, en fermeté **« Sauf s'il n'a vraiment plus le choix »**. C'est mot pour mot ce qu'elle a annoncé à Victor : le logiciel l'évitera toujours, et ne s'y résoudra que si aucune autre combinaison ne marche — plutôt que de rendre un planning incomplet.
+
+**Pourquoi le lundi entier et pas seulement « le soir »** : une garde du lundi soir court jusqu'au mardi 8 h 30. Elle mange donc son mardi matin. Bloquer « le lundi » couvre le cas, y compris un lundi férié.
+
+### ⚠️ Ce qu'il faut lui dire — ça va bouger beaucoup
+
+Sur le planning actuel, **Victor tient 5 des 10 lundis** (28/09, 05/10, 26/10, 02/11, 23/11). Le retirer des lundis reporte la moitié de ces gardes sur les autres.
+
+Restent disponibles le lundi : **Jean, Fanny, Antoine, Manon** — et Anne-Catherine en dernier recours. Anne-Sophie n'en fait aucun (elle a déjà le lundi bloqué une semaine sur deux).
+
+**Deux issues possibles, à annoncer avant de regénérer :**
+- soit ça passe, et les lundis se répartissent sur les quatre autres ;
+- soit ça coince, et le logiciel remettra Victor sur un ou deux lundis — **c'est exactement ce qu'elle a annoncé à Victor**, donc c'est un résultat acceptable, pas un échec.
+
+Le vrai verdict ne viendra qu'à la regénération. **Regarder les lundis en priorité juste après.**
+
+---
+
 ## 4. Les 6 souhaits de congé en attente — à traiter AVANT de regénérer
 
 L'écran affiche « 6 demandes de congé en attente chevauchent cette période ».
@@ -123,6 +147,8 @@ Les six : Victor (21/09), Jean (23/09), Jean (26/09), Anne-Sophie (03/10), Victo
 **Anne-Catherine n'a aucune garde sur toute la période.** C'est cohérent avec son statut de « dernier recours » : les six autres suffisent largement. **Mais c'est à confirmer avec elles deux** — est-ce bien l'intention, ou attendent-elles qu'elle en prenne quelques-unes ?
 
 **Jean est de garde le mardi 3 novembre alors que c'est son jour de repos cette semaine-là** (sa règle dit : repos le vendredi, ou le mardi s'il est de garde le week-end — et il a le week-end du 7). Sa règle est réglée en **« Sauf urgence »**, donc le logiciel avait le droit de passer outre. **Décision prise : on laisse comme ça pour l'instant.** À mentionner seulement si elle le repère, et lui rappeler que c'est elle qui a choisi cette fermeté-là en juin (Anne-Catherine : *« pour moi c'est une règle molle »*).
+
+⚠️ **Ce point devient plus sensible avec la demande de Victor.** Elle écrit elle-même : *« sachant que déjà Jean veut son mardi de repos quand il est de garde le week-end »*. Elle a raison de le signaler : les deux demandes serrent le début de semaine. Victor sort des lundis, et Jean doit garder certains mardis libres — avec quatre vétérinaires disponibles le lundi au lieu de cinq, ces deux souhaits vont se disputer les mêmes créneaux. Si l'un des deux doit céder à la regénération, ce sera visible là. **Les deux règles sont souples, donc le planning ne bloquera pas — il arbitrera.**
 
 ---
 
