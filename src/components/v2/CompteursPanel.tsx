@@ -97,6 +97,7 @@ export function CompteursPanel({ lignes, bilans, colonnes }: Props) {
       case 'premier': return l.we_premier
       case 'feries': return l.feries_total
       case 'total': return l.total_gardes
+      case 'premierExcept': return l.jours_1er_we_exceptionnels ?? 0
       case 'ecart': return bilanDe.get(l.veterinaire_id)?.ecart_we ?? 0
     }
   }

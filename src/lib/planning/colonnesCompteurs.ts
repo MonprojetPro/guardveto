@@ -26,6 +26,7 @@ export type CleColonne =
   | 'ecart'     // écart à la juste part — la seule qui dise si c'est ÉQUITABLE
   | 'feries'    // gardes de jours fériés (Noël, 1er mai…)
   | 'total'     // toutes gardes confondues
+  | 'premierExcept' // jours de 1ᵉʳ de garde pris à titre exceptionnel
 
 export interface DefinitionColonne {
   cle: CleColonne
@@ -74,10 +75,21 @@ export const COLONNES: Record<CleColonne, DefinitionColonne> = {
     description: 'Toutes gardes confondues',
     barre: true,
   },
+  // Backlog 8 bis. Compte des JOURS, pas des week-ends — d'où l'en-tête
+  // distinct de « 1ᵉʳ WE » : mélanger les deux unités dans une même colonne
+  // ferait valoir un dimanche autant qu'un week-end entier. N'apparaît que si
+  // le cabinet la choisit : la plupart n'auront jamais d'exception.
+  premierExcept: {
+    cle: 'premierExcept',
+    entete: '1ᵉʳ except.',
+    description:
+      'Jours de 1ᵉʳ de garde pris à titre exceptionnel (remplacement d’un seul jour, quand l’admin a dit qu’il comptait)',
+    barre: false,
+  },
 }
 
 /** L'ordre du menu de réglage — le plus parlant en premier. */
-export const ORDRE_CATALOGUE: CleColonne[] = ['we', 'nuits', 'premier', 'ecart', 'feries', 'total']
+export const ORDRE_CATALOGUE: CleColonne[] = ['we', 'nuits', 'premier', 'ecart', 'feries', 'total', 'premierExcept']
 
 /**
  * Ce qu'on affiche quand personne n'a rien réglé. « Écart » en fait partie :

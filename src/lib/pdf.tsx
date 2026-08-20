@@ -46,9 +46,30 @@ export interface VetoPdf {
   couleur: string
 }
 
+/**
+ * Backlog 8 bis — un remplacement qui ne vaut que pour UN jour du bloc.
+ *
+ * Le papier est le support le plus consulté du planning, et le seul qu'on ne
+ * peut pas rafraîchir : une exception qu'il n'imprimerait pas serait invisible
+ * pour tout le cabinet. Elle doit donc s'y voir, et se voir COMME une
+ * exception — pas se fondre dans l'attribution ordinaire.
+ */
+export interface ExceptionPdf {
+  garde_id: string
+  /** Le jour concerné, tel qu'il s'affiche au calendrier. */
+  date: string
+  role: 'premier' | 'second'
+  /** null = place laissée vacante, à imprimer vide plutôt que remplie à tort. */
+  prenom: string | null
+  nom: string | null
+  couleur: string | null
+}
+
 export interface PlanningPdfData {
   periode: PeriodePdf
   gardes: GardePdf[]
+  /** Remplacements d'un seul jour. Vide dans l'immense majorité des cas. */
+  exceptions?: ExceptionPdf[]
   vets: VetoPdf[]
   jours_feries: Array<{ date: string; nom: string }>
   /**
@@ -259,6 +280,16 @@ const S = StyleSheet.create({
   cellNumero: { fontSize: 7, color: '#9ca3af', marginBottom: 2 },
   cellNumeroFerie: { fontSize: 7, color: '#b45309', marginBottom: 1, fontFamily: 'Helvetica-Bold' },
   ferieName: { fontSize: 6, color: '#92400e', marginBottom: 2 },
+  // Backlog 8 bis — le repère d'un jour remplacé. Volontairement sobre : il
+  // doit se remarquer sans voler la vedette aux noms, qui restent
+  // l'information qu'on vient chercher.
+  exceptionTag: {
+    fontSize: 5,
+    fontFamily: 'Helvetica-Bold',
+    color: '#b45309',
+    letterSpacing: 0.4,
+    marginBottom: 1.5,
+  },
 
   // Ligne vétérinaire (point couleur + nom)
   vetRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 1.5 },
@@ -387,6 +418,7 @@ interface PageCalendrierProps {
   mois: number
   periode: PeriodePdf
   gardes: GardePdf[]
+  exceptions: ExceptionPdf[]
   vets: VetoPdf[]
   jours_feries: Array<{ date: string; nom: string }>
   relations: readonly RelationStructure[]
@@ -399,6 +431,7 @@ function PageCalendrier({
   mois,
   periode,
   gardes,
+  exceptions,
   vets,
   jours_feries,
   relations,
@@ -416,6 +449,47 @@ function PageCalendrier({
     const liste = gardesParDate.get(g.date)
     if (liste) liste.push(g)
     else gardesParDate.set(g.date, [g])
+  }
+
+  // ── Backlog 8 bis : les remplacements d'UN jour ───────────
+  //
+  // Indexés par (garde, jour, rôle affiché). Le rôle affiché compte : le
+  // vendredi peut inverser les rôles, et l'exception a été posée sur ce que
+  // l'admin voyait. Elle s'applique donc APRÈS l'inversion, jamais avant.
+  const exceptionsParCle = new Map<string, ExceptionPdf>()
+  for (const e of exceptions) {
+    exceptionsParCle.set(`${e.garde_id}|${e.date}|${e.role}`, e)
+  }
+
+  /**
+   * Renvoie la garde telle qu'elle doit s'IMPRIMER ce jour-là. Sans exception,
+   * c'est la garde elle-même — mêmes objets, aucun coût. Avec, une copie dont
+   * les rôles touchés portent le remplaçant.
+   */
+  const pourLeJour = (
+    garde: GardePdf | null,
+    jour: string | null,
+  ): { garde: GardePdf | null; exceptionnel: boolean } => {
+    if (!garde || !jour) return { garde, exceptionnel: false }
+    const ep = exceptionsParCle.get(`${garde.id}|${jour}|premier`)
+    const es = exceptionsParCle.get(`${garde.id}|${jour}|second`)
+    if (!ep && !es) return { garde, exceptionnel: false }
+    return {
+      garde: {
+        ...garde,
+        ...(ep && {
+          premier_prenom: ep.prenom,
+          premier_nom: ep.nom,
+          premier_couleur: ep.couleur,
+        }),
+        ...(es && {
+          second_prenom: es.prenom,
+          second_nom: es.nom,
+          second_couleur: es.couleur,
+        }),
+      },
+      exceptionnel: true,
+    }
   }
 
   const feriesMap = new Map<string, string>()
@@ -572,9 +646,13 @@ function PageCalendrier({
                           second_couleur: ordonnesVen[1]?.couleur ?? null,
                         }
                       : null
-                  const gardeAffichee = gardeWEestWeekend
+                  const gardeDuJour = gardeWEestWeekend
                     ? (wi === 0 ? gardeVendrediInversee : wi === 2 ? (garde ?? gardeWE) : garde)
                     : garde
+                  // L'exception passe EN DERNIER, sur la garde déjà orientée
+                  // pour ce jour : sur un vendredi inversé, l'appliquer avant
+                  // remplacerait l'autre place que celle qui a été choisie.
+                  const { garde: gardeAffichee, exceptionnel } = pourLeJour(gardeDuJour, date)
                   const baseStyle = ferieNom
                     ? (estDerniere ? S.weCellFerieLast : S.weCellFerie)
                     : (estDerniere ? S.weCellDim : wi === 0 ? S.weCellVen : S.weCellSam)
@@ -589,6 +667,10 @@ function PageCalendrier({
                         </Text>
                       )}
                       {ferieNom && <Text style={S.ferieName}>{ferieNom}</Text>}
+                      {/* Un jour remplacé ne doit PAS se lire comme les deux
+                          autres : sans repère, on croit lire l'équipe du
+                          week-end et on se trompe de personne au téléphone. */}
+                      {exceptionnel && <Text style={S.exceptionTag}>EXCEPTION</Text>}
                       {/* Détail complet — sur les trois jours du bloc (Ven/Sam/Dim) */}
                       {gardeAffichee?.premier_prenom && (
                         <View style={S.vetRow}>
@@ -670,6 +752,7 @@ function PlanningDocument({ data }: { data: PlanningPdfData }) {
           mois={m.mois}
           periode={data.periode}
           gardes={data.gardes}
+          exceptions={data.exceptions ?? []}
           vets={data.vets}
           jours_feries={data.jours_feries}
           relations={relations}

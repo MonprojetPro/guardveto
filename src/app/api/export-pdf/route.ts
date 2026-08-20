@@ -11,7 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { genererPdfPlanning } from '@/lib/pdf'
-import type { GardePdf, VetoPdf } from '@/lib/pdf'
+import type { GardePdf, VetoPdf, ExceptionPdf } from '@/lib/pdf'
 import { chargerRelationsAffichagePeriode } from '@/data/chargerRelationsAffichage'
 
 export async function GET(req: NextRequest) {
@@ -125,7 +125,37 @@ export async function GET(req: NextRequest) {
       })),
   }))
 
-   
+  // ── Backlog 8 bis : les remplacements d'UN jour ──────────
+  //
+  // Chargés à part et APRÈS les gardes : la requête est bornée aux gardes de
+  // la période qu'on vient de lire, donc elle ne coûte rien quand il n'y a
+  // aucune exception — le cas de l'immense majorité des périodes. Le papier
+  // est le seul support qu'on ne peut pas rafraîchir : une exception qu'il
+  // n'imprimerait pas serait invisible pour tout le cabinet.
+  const { data: exceptionsDb } = await supabase
+    .from('gardes_exceptions')
+    .select('garde_id, date, role, veterinaires:veterinaire_id(prenom, nom, couleur)')
+    .in('garde_id', gardes.map((g) => g.id))
+
+  interface RawException {
+    garde_id: string
+    date: string
+    role: 'premier' | 'second'
+    veterinaires: { prenom: string; nom: string; couleur: string | null } | null
+  }
+
+  const exceptions: ExceptionPdf[] = ((exceptionsDb as unknown as RawException[] | null) ?? []).map((e) => ({
+    garde_id: e.garde_id,
+    date:     e.date,
+    role:     e.role,
+    // Pas de vétérinaire = place laissée vacante : elle s'imprime VIDE. La
+    // remplir avec le titulaire enverrait quelqu'un qui ne viendra pas.
+    prenom:   e.veterinaires?.prenom ?? null,
+    nom:      e.veterinaires?.nom ?? null,
+    couleur:  e.veterinaires?.couleur ?? null,
+  }))
+
+
   const vets: VetoPdf[] = (vetsDb ?? []).map((v: any) => ({
     id:     v.id,
     prenom: v.prenom,
@@ -155,6 +185,7 @@ export async function GET(req: NextRequest) {
         publie_at:  periode.publie_at,
       },
       gardes,
+      exceptions,
       vets,
       jours_feries,
       relations,

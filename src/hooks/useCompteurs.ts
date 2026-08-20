@@ -66,6 +66,17 @@ export interface CompteursRow {
   feries_second: number
   feries_total: number
   total_gardes: number
+  /**
+   * Backlog 8 bis — des JOURS, pas des week-ends. Ils ne s'ajoutent pas aux
+   * compteurs ci-dessus, qui restent immobiles quand une exception est posée :
+   * un jour exceptionnel ne change rien à l'équité. Seul se compte, et
+   * seulement si l'admin l'a explicitement dit, le jour de 1er de garde —
+   * parce que ce rôle est payé davantage.
+   *
+   * Absents des sources qui ne passent pas par la vue `compteurs_gardes`.
+   */
+  jours_1er_we_exceptionnels?: number
+  jours_exceptionnels_pris?: number
 }
 
 export interface BonusMalusRow {
