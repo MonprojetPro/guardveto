@@ -9,12 +9,13 @@
 // ============================================================
 
 import { createClient } from '@/lib/supabase/server'
+import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { redirect } from 'next/navigation'
 import '@/styles/v2-planning.css'
 import '@/styles/v2-filou-edge.css'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
-import { PlanningV2, type CongeAffiche } from '@/components/v2/PlanningV2'
+import { PlanningV2, type CongeAffiche, type PlageVacances } from '@/components/v2/PlanningV2'
 import { RealtimeRefresh } from '@/components/planning/RealtimeRefresh'
 import { RevalidationRealtime } from '@/components/planning/RevalidationRealtime'
 import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
@@ -42,6 +43,13 @@ function moisCourant(): string {
   })
     .format(new Date())
     .slice(0, 7)
+}
+
+/** Décale une date ISO de N jours (N peut être négatif). */
+function decalerJours(iso: string, n: number): string {
+  const d = new Date(iso + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
 }
 
 function bornesMois(anneeMois: string): { debut: string; fin: string } {
@@ -90,7 +98,16 @@ export default async function PlanningPageV2({
   const anneeMois = moisParam && /^\d{4}-\d{2}$/.test(moisParam) ? moisParam : moisCourant()
   const { debut, fin } = bornesMois(anneeMois)
 
-  const [gardesRes, periodesRes, vetsRes, typesRes, congesRes, gardesPeriodesRes] =
+  // VACANCES SCOLAIRES — la grille déborde du mois (elle commence au lundi de
+  // la 1re semaine et finit au dimanche de la dernière) : on élargit la fenêtre
+  // de 7 jours de chaque côté, sinon les cases débordantes seraient les seules
+  // à ne pas être marquées.
+  const fenetreVac = {
+    debut: decalerJours(debut, -7),
+    fin: decalerJours(fin, 7),
+  }
+
+  const [gardesRes, periodesRes, vetsRes, typesRes, congesRes, gardesPeriodesRes, cabinetRes] =
     await Promise.all([
       supabase.from('planning_semaine').select('*').gte('date', debut).lte('date', fin).order('date'),
       supabase.from('periodes').select('*').order('date_debut', { ascending: false }).limit(20),
@@ -111,7 +128,34 @@ export default async function PlanningPageV2({
         .gte('date_fin', debut),
       // Chargé pour TOUS : le bouton PDF en dépend, pas seulement la publication.
       supabase.from('gardes').select('periode_id').limit(500),
+      // La ZONE du cabinet — indispensable pour les vacances scolaires. Ne
+      // JAMAIS retomber sur la constante `VACANCES_SCOLAIRES` de engine/utils :
+      // elle est figée sur la zone C, et ce cabinet-ci est en zone A. C'est
+      // exactement le bug « zone-aware » déjà corrigé côté moteur.
+      // `cabinet_id` vient du JETON (source de vérité du projet), pas de la
+      // fiche véto. Le try/catch est délibéré : une zone introuvable ne doit
+      // jamais faire tomber l'écran planning pour un simple repère visuel.
+      resoudreCabinetId(supabase)
+        .then((id) => supabase.from('cabinets').select('zone_scolaire').eq('id', id).maybeSingle())
+        .catch(() => ({ data: null })),
     ])
+
+  // Vacances de CETTE zone qui chevauchent la fenêtre affichée. Une zone
+  // absente (donnée cabinet incomplète) → aucune plage : la grille s'affiche
+  // sans marquage plutôt que de mentir avec la zone d'un autre cabinet.
+  const zone = (cabinetRes?.data as { zone_scolaire: string | null } | null)?.zone_scolaire ?? null
+  const vacancesRes = zone
+    ? await supabase
+        .from('vacances_scolaires')
+        .select('debut, fin, label')
+        .eq('zone', zone)
+        .lte('debut', fenetreVac.fin)
+        .gte('fin', fenetreVac.debut)
+    : { data: [] }
+
+  const vacances: PlageVacances[] = (
+    (vacancesRes?.data ?? []) as { debut: string; fin: string; label: string | null }[]
+  ).map((v) => ({ debut: v.debut, fin: v.fin, label: v.label ?? 'Vacances scolaires' }))
 
   const gardes = ((gardesRes?.data ?? []) as GardeDenormalisee[])
   const periodes = ((periodesRes?.data ?? []) as Periode[])
@@ -329,6 +373,7 @@ export default async function PlanningPageV2({
           gardesParType={gardesParType}
           bilans={bilans}
           colonnesCompteurs={colonnesCompteurs}
+          vacances={vacances}
         />
       </div>
     </>

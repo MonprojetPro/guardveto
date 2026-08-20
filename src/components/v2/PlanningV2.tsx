@@ -59,6 +59,20 @@ interface Props {
   bilans: BilanVet[]
   /** Colonnes de l'encart compteurs choisies par la personne connectée. */
   colonnesCompteurs: CleColonne[]
+  /**
+   * Vacances scolaires de la ZONE du cabinet, chevauchant la grille affichée.
+   * Elles ne décorent pas : plusieurs règles en dépendent (le repos du mercredi
+   * de Fanny saute pendant les vacances, l'alternance d'Anne-Sophie s'y recale).
+   * Sans repère visuel, une garde parfaitement légitime passe pour une erreur.
+   */
+  vacances?: PlageVacances[]
+}
+
+/** Une période de vacances scolaires, telle que servie par la page. */
+export interface PlageVacances {
+  debut: string
+  fin: string
+  label: string
 }
 
 export interface CongeAffiche {
@@ -139,6 +153,7 @@ export function PlanningV2({
   gardesParType,
   bilans,
   colonnesCompteurs,
+  vacances = [],
 }: Props) {
   const router = useRouter()
   const [annee, mois] = anneeMois.split('-').map(Number)
@@ -170,6 +185,17 @@ export function PlanningV2({
 
   const today = aujourdhuiISO()
   const grille = genererGrille(annee, mois)
+
+  // Noms des vacances réellement VISIBLES dans la grille affichée — on charge
+  // une fenêtre un peu plus large que le mois, la légende ne doit pas annoncer
+  // une période qu'on ne voit nulle part.
+  const vacancesDuMois = [
+    ...new Set(
+      vacances
+        .filter((v) => grille.some((d) => v.debut <= d && v.fin >= d))
+        .map((v) => v.label),
+    ),
+  ]
 
   // Le panneau de période se referme comme n'importe quel menu : en cliquant
   // ailleurs ou avec Échap. Sans ça, la flèche du menu était la SEULE sortie
@@ -507,12 +533,28 @@ export function PlanningV2({
                         gardes={parDate.get(date) ?? []}
                         conges={conges.filter((c) => c.dateDebut <= date && c.dateFin >= date)}
                         nomsTypes={nomsTypes}
+                        vacances={vacances.find((v) => v.debut <= date && v.fin >= date)?.label ?? null}
                         onOuvrir={setGardeModal}
                       />
                     ))}
                   </div>
                 </div>
               </div>
+
+              {/* Légende — n'apparaît QUE si le mois affiché contient des
+                  vacances. Un repère visuel sans mode d'emploi n'explique
+                  rien ; une légende affichée en permanence serait du bruit
+                  onze mois sur douze. */}
+              {vacancesDuMois.length > 0 && (
+                <p className="cal-legende">
+                  <span className="lg-vac" aria-hidden="true" />
+                  {vacancesDuMois.length === 1
+                    ? vacancesDuMois[0]
+                    : vacancesDuMois.join(' · ')}{' '}
+                  — vacances scolaires. Certaines règles changent pendant ces
+                  périodes.
+                </p>
+              )}
             </div>
 
             <aside className="counters-panel" aria-label="Compteurs de la période">
@@ -567,6 +609,7 @@ function CaseJour({
   gardes,
   conges,
   nomsTypes,
+  vacances,
   onOuvrir,
 }: {
   date: string
@@ -577,6 +620,8 @@ function CaseJour({
   gardes: GardeDenormalisee[]
   conges: CongeAffiche[]
   nomsTypes: Record<string, string>
+  /** Nom des vacances scolaires couvrant ce jour, ou null. */
+  vacances: string | null
   onOuvrir: (g: GardeDenormalisee) => void
 }) {
   const jour = new Date(date + 'T12:00:00Z')
@@ -591,11 +636,16 @@ function CaseJour({
   if (date < today) classes.push('past')
   if (date === today) classes.push('today')
   if (horsPeriode) classes.push('hors')
+  // Vacances scolaires : marquage par LISERÉ, pas par fond. Les fonds portent
+  // déjà quatre états (week-end, vendredi, passé, hors période) — en ajouter un
+  // cinquième les ferait se recouvrir, et on ne saurait plus lire ni l'un ni
+  // l'autre. Le liseré se superpose à tous sans en effacer aucun.
+  if (vacances) classes.push('vac')
 
   const ferie = estJourFerie(date)
 
   return (
-    <div className={classes.join(' ')} data-date={date}>
+    <div className={classes.join(' ')} data-date={date} title={vacances ?? undefined}>
       <div className="d-head">
         <span className="d-num">{numero}</span>
         {ferie && <span className="d-ferie">★ Férié</span>}

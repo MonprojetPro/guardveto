@@ -255,6 +255,42 @@
 .day.hors .d-num { color: var(--soft); }
 .d-hors-note { font-size: 0.6rem; color: var(--soft); font-style: italic; margin-top: 2px; }
 .day.today { border: 2px solid var(--t-accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+
+/* ------ Vacances scolaires ---------------------------------------------
+   Marquées par un LISERÉ HAUT, jamais par un fond : les fonds portent déjà
+   quatre états (week-end, vendredi, passé, hors période) et un cinquième les
+   rendrait tous illisibles. Le liseré se superpose à n'importe lequel.
+
+   Ce n'est pas décoratif — plusieurs règles du cabinet changent pendant les
+   vacances (le repos du mercredi de Fanny saute, l'alternance d'Anne-Sophie
+   se recale). Sans ce repère, une garde légitime passe pour une erreur.
+
+   Teinte dédiée : ni l'accent (réservé à « aujourd'hui » et aux actions), ni
+   warn/danger — des vacances ne sont pas une alerte. Un doré sourd, dans la
+   famille chaude de la charte. */
+:root { --vac: #B08A3E; }
+.day.vac { border-top-color: transparent; }
+.day.vac::before {
+  content: '';
+  position: absolute; inset: -1px -1px auto -1px; height: 3px;
+  background: var(--vac);
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+}
+/* Le passé s'éteint : le liseré suit la même grammaire de profondeur que le
+   reste de la case, sinon il ressortirait plus qu'un jour à venir. */
+.day.past.vac::before, .day.hors.vac::before { opacity: 0.45; }
+/* « Aujourd'hui » garde sa bordure épaisse : on décale le liseré pour ne pas
+   le faire chevaucher (sinon les deux repères se mangent). */
+.day.today.vac::before { inset: 0 0 auto 0; }
+
+.cal-legende {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  margin-top: 9px; font-size: 0.76rem; color: var(--t-muted);
+}
+.lg-vac {
+  display: inline-block; width: 22px; height: 3px; border-radius: 2px;
+  background: var(--vac); flex: none;
+}
 /* Le numéro du jour et ses mentions tiennent sur UNE ligne : sinon la
    pastille « Aujourd'hui » passait à la ligne et décalait vers le bas toutes
    les fiches de la case, qui ne s'alignaient plus avec celles des jours
