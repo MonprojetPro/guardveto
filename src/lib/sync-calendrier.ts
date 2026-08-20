@@ -105,7 +105,14 @@ async function structurePourPeriode(
 export interface SyncResult {
   synced: number
   errors: string[]
-  skipped: boolean  // true si Google non configuré
+  skipped: boolean  // true si Google non configuré, ou planning non publié
+  /**
+   * Pourquoi rien n'a été envoyé. Sans elle, l'écran affichait « 0 garde
+   * synchronisée » sans dire si c'était une panne, une absence de réglage ou
+   * un refus volontaire — trois situations qui n'appellent pas du tout la
+   * même réaction.
+   */
+  raison?: string
 }
 
 // ── Synchronisation d'une période complète ───────────────────
@@ -137,12 +144,39 @@ export async function syncCalendrier(
   supabase: SupabaseClient,
   periodeId: string
 ): Promise<SyncResult> {
+  // ⚠️ UN BROUILLON NE SORT PAS DU LOGICIEL.
+  //
+  // L'agenda du cabinet est un canal de DIFFUSION : ce qui s'y écrit est lu
+  // par toute l'équipe, et par des gens qui n'ouvriront jamais GuardVeto. Rien
+  // n'empêchait jusqu'ici d'y déverser un planning non publié — et c'est
+  // exactement ce qui s'est produit chez Val d'Allier : 38 événements de
+  // brouillon dans l'agenda du client, pour zéro planning publié. Chaque
+  // retouche manuelle en ajoutait un.
+  //
+  // Le critère est `publie_at`, pas le statut : une période peut être
+  // « verrouillée » sans avoir jamais été diffusée (c'est le cas d'un
+  // historique amorcé en base), et son passé n'a rien à faire dans l'agenda.
+  const { data: per } = await supabase
+    .from('periodes')
+    .select('publie_at')
+    .eq('id', periodeId)
+    .maybeSingle()
+
+  if (!(per as { publie_at: string | null } | null)?.publie_at) {
+    return {
+      synced: 0,
+      errors: [],
+      skipped: true,
+      raison: "Ce planning n'a pas encore été publié : rien n'est envoyé vers l'agenda.",
+    }
+  }
+
   // calendarId scopé au cabinet de la période (fallback env en aval).
   const cabinetId = await cabinetIdDePeriode(supabase, periodeId)
   const calendarId = await calendarIdDuCabinet(supabase, cabinetId)
 
   if (!isGoogleCalendarConfigured(calendarId)) {
-    return { synced: 0, errors: [], skipped: true }
+    return { synced: 0, errors: [], skipped: true, raison: "Aucun agenda Google n'est configuré." }
   }
 
   // ── Récupération des gardes avec les prénoms des vétos ───
@@ -269,12 +303,27 @@ export async function syncGardeIndividuelle(
       cabinet_id,
       premier:veterinaires!gardes_premier_id_fkey ( prenom ),
       second:veterinaires!gardes_second_id_fkey  ( prenom ),
-      garde_placements ( place_index, veterinaires ( prenom ) )
+      garde_placements ( place_index, veterinaires ( prenom ) ),
+      periodes!inner ( publie_at )
     `)
     .eq('id', gardeId)
     .single()
 
   if (!garde) return
+
+  // ⚠️ C'EST ICI QUE LE BROUILLON FUYAIT.
+  //
+  // Cette fonction est appelée à CHAQUE modification manuelle d'une garde.
+  // Sans ce garde-fou, retoucher un planning non publié écrivait l'événement
+  // dans l'agenda du cabinet : chez Val d'Allier, 38 événements s'y étaient
+  // accumulés pour zéro planning publié. Le client voyait des gardes qui
+  // n'engageaient personne, et personne ne pouvait deviner d'où elles
+  // venaient.
+  //
+  // Tant qu'un planning n'est pas publié, il ne sort pas du logiciel.
+  const perGarde = (garde as unknown as { periodes?: { publie_at: string | null } | Array<{ publie_at: string | null }> }).periodes
+  const publieAt = Array.isArray(perGarde) ? perGarde[0]?.publie_at : perGarde?.publie_at
+  if (!publieAt) return
 
   const g = garde as unknown as GardeAvecVetos
 

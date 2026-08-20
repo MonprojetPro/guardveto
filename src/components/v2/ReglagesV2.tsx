@@ -222,9 +222,15 @@ export function ReglagesV2({ valeurs, periodesPubliees, emails, agendaParDefaut 
         return
       }
       if (data?.skipped) {
+        // Le serveur dit POURQUOI il n'a rien envoyé. « Aucun agenda branché »
+        // était le seul motif imaginé, et il est faux depuis qu'un planning non
+        // publié est refusé : on enverrait chercher une panne de réglage là où
+        // il n'y a qu'un planning encore en brouillon.
         setResultatSync({
           ok: false,
-          message: "Rien n'a été envoyé : aucun agenda n'est branché pour ce cabinet.",
+          message:
+            data?.raison
+            ?? "Rien n'a été envoyé : aucun agenda n'est branché pour ce cabinet.",
         })
         return
       }

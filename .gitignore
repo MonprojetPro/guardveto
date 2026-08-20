@@ -89,3 +89,7 @@ _plannings-test/
 planning*.pdf
 vetvalallier*
 vetovaldallier*
+
+# Script de nettoyage a usage unique + sa trace (2026-08-20)
+nettoyer-agenda.mts
+agenda-avant-nettoyage.json
