@@ -1933,3 +1933,47 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 }
 .sig-fait .ppv-ico { color: var(--ok); margin-top: 2px; }
 .sig-fait b { color: var(--ok); }
+
+/* ── Backlog 8 bis : les deux questions du remplacement d'un jour ──
+   Le périmètre (ce jour / tout le week-end) et l'avantage financier du 1er
+   de garde. Deux questions posées dans la modale d'édition, avant le choix
+   du remplaçant pour la première, après pour la seconde.
+
+   Elles reprennent la boîte `.gm-section` pour ne pas introduire un
+   troisième vocabulaire visuel dans une modale qui en a déjà deux. Les
+   couleurs passent par --t-border / --t-muted / --t-accent uniquement :
+   c'est ce qui avait résolu le « crème sur crème » des modales. */
+.perimetre-choix .gm-label,
+.avantage-choix .gm-label {
+  font-family: var(--font-display);
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--t-muted);
+  margin: 0 0 8px;
+}
+.avantage-choix .gm-hint {
+  font-size: 0.76rem; color: var(--t-muted);
+  margin: -4px 0 8px;
+}
+.perimetre-option {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 8px 10px; margin-bottom: 6px;
+  border: 1px solid var(--t-border); border-radius: var(--r-md);
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+}
+.perimetre-option:last-child { margin-bottom: 0; }
+.perimetre-option:hover { border-color: var(--t-accent); }
+.perimetre-option:has(input:checked) {
+  border-color: var(--t-accent);
+  background: color-mix(in srgb, var(--t-accent) 8%, transparent);
+}
+.perimetre-option input { margin-top: 3px; flex: none; accent-color: var(--t-accent); }
+.perimetre-option span { font-size: 0.85rem; line-height: 1.35; }
+.perimetre-option b { font-weight: 700; }
+/* Le « pourquoi » de chaque option, sous son libellé : sans lui, « ce seul
+   jour » et « tout le week-end » se ressemblent trop pour qu'on mesure
+   l'écart de conséquences. */
+.perimetre-option small {
+  display: block; margin-top: 2px;
+  font-size: 0.74rem; color: var(--t-muted);
+}

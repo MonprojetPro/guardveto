@@ -212,6 +212,13 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
   const [premierSel, setPremierSel] = useState<string | null>(null)
   const [secondSel, setSecondSel] = useState<string | null>(null)
   const [correctionMode, setCorrectionMode] = useState(false)
+  // Backlog 8 bis — les deux questions du remplacement d'un seul jour. `null`
+  // = pas encore répondu, et c'est volontaire : ni l'une ni l'autre n'a de
+  // défaut raisonnable. Pré-cocher « tout le week-end » réattribuerait trois
+  // jours à l'insu de l'admin ; pré-cocher l'avantage financier déciderait
+  // d'une question de paie à sa place.
+  const [perimetre, setPerimetre] = useState<'jour' | 'bloc' | null>(null)
+  const [compte1erWe, setCompte1erWe] = useState<boolean | null>(null)
   const [showCorriger, setShowCorriger] = useState(false)
   // Une seule liste de vétérinaires dépliée à la fois : on ne change qu'une
   // place à la fois, et la modale reste courte (maquette).
@@ -238,6 +245,11 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
     setCorrectionMode(false)
     setShowCorriger(false)
     setPlaceOuverte(null)
+    // Les deux questions du backlog 8 bis repartent SANS réponse à chaque
+    // ouverture : garder celle de la garde précédente, c'est appliquer au
+    // dimanche suivant un choix fait pour un autre week-end.
+    setPerimetre(null)
+    setCompte1erWe(null)
     /* eslint-enable react-hooks/set-state-in-effect */
 
     fetch(`/api/gardes/${garde.id}/disponibilites`)
@@ -316,10 +328,17 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          premier_id: premierSel,
-          second_id: secondSel,
+          // En périmètre JOUR, ce sont les rôles AFFICHÉS ce jour-là qui
+          // partent (le vendredi peut être inversé) ; en périmètre BLOC, les
+          // rôles natifs de la garde, comme avant.
+          premier_id: perimetre === 'jour' ? premierDuJour : premierSel,
+          second_id: perimetre === 'jour' ? secondDuJour : secondSel,
           force: correctionMode,
           confirmerAvertissements,
+          // Absent = bloc, soit exactement le comportement d'avant.
+          perimetre: perimetre ?? 'bloc',
+          jour: jourAffiche,
+          compte1erWe: compte1erWe === true,
         }),
       })
       const json = await res.json()
@@ -349,6 +368,18 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
       toast.error('Le même vétérinaire ne peut pas être à la fois 1er et 2nd de garde.')
       return
     }
+    // Backlog 8 bis — les deux questions doivent avoir une réponse. On refuse
+    // d'enregistrer plutôt que de choisir un défaut : « tout le week-end » et
+    // « ce seul jour » n'ont pas du tout les mêmes conséquences, et l'admin
+    // ne verrait la différence qu'après coup.
+    if (estBlocMultiJours && perimetre === null) {
+      toast.error('Précisez si le changement concerne ce seul jour ou tout le week-end.')
+      return
+    }
+    if (perimetre === 'jour' && premierChange && compte1erWe === null) {
+      toast.error('Précisez si ce jour compte comme un jour de 1er de garde.')
+      return
+    }
     const v = detecterViolation()
     if (v) {
       setViolation(v)
@@ -367,6 +398,44 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
     || (!estTypeV1 && !data?.garde.second_id)
   const estVerrouille = data?.garde.verrouille ?? false
   const modeEdition = isAdmin && (!estVerrouille || correctionMode)
+
+  // ── Backlog 8 bis : le jour, et le bloc ──────────────────
+  //
+  // `garde.date` vient de la vue `planning_semaine` : c'est le jour CLIQUÉ au
+  // calendrier (le dimanche, si on a cliqué dimanche). `data.garde.date`, lui,
+  // vient de la table et vaut toujours le samedi. Les confondre, c'est poser
+  // l'exception sur le mauvais jour — ou proposer de modifier « le samedi »
+  // à quelqu'un qui a cliqué sur le dimanche.
+  const jourAffiche = date ?? garde?.date ?? ''
+  const estBlocMultiJours = (data?.garde.type ?? garde?.type) === 'weekend'
+
+  // ⚠️ DEUX RÉFÉRENTIELS DE RÔLES, et il ne faut pas les confondre.
+  //
+  // Les listes de cette modale (`premierSel` / `secondSel`) portent les rôles
+  // NATIFS, ceux de la ligne `gardes`. Mais le vendredi s'affiche au
+  // calendrier avec les rôles INVERSÉS quand le cabinet l'a configuré ainsi :
+  // le 1er du week-end y est 2nd, et réciproquement.
+  //
+  // Tant qu'on modifiait le bloc entier, aucune importance — on écrivait dans
+  // la garde, en natif. Une exception, elle, porte sur le rôle TEL QU'IL
+  // S'AFFICHE ce jour-là. Envoyer le rôle natif un vendredi inversé
+  // remplacerait donc l'autre personne que celle sur laquelle l'admin a
+  // cliqué. On détecte l'inversion en croisant ce que montre la vue (`garde`,
+  // issue de `planning_semaine`) avec le natif (`data.garde`, issu de la
+  // table).
+  const estVendrediDuBloc = Boolean(
+    data?.garde.date && jourAffiche && jourAffiche < data.garde.date,
+  )
+  const rolesInversesCeJour = Boolean(
+    estVendrediDuBloc &&
+      garde?.premier_id &&
+      data?.garde.second_id &&
+      garde.premier_id === data.garde.second_id,
+  )
+  /** Qui tiendra le rôle affiché « 1er de garde » ce jour-là. */
+  const premierDuJour = rolesInversesCeJour ? secondSel : premierSel
+  const secondDuJour = rolesInversesCeJour ? premierSel : secondSel
+  const premierChange = premierDuJour !== (garde?.premier_id ?? null)
 
   // Places 3 et 4 (créneaux sur-mesure). Elles viennent de la garde affichée
   // dans la grille, pas de l'API de disponibilités : celle-ci ne raisonne
@@ -468,6 +537,49 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
                 </div>
               )}
 
+              {/* ── Périmètre du changement (backlog 8 bis) ───
+                  Une garde de week-end occupe trois jours du calendrier.
+                  Avant de savoir QUI remplace, il faut savoir SUR QUOI porte
+                  le remplacement : ce seul jour, ou le bloc entier. La
+                  question est posée sans réponse pré-cochée — un défaut
+                  déciderait à la place de l'admin, et il ne s'en rendrait
+                  compte qu'une fois le week-end entier réattribué. */}
+              {modeEdition && estBlocMultiJours && (
+                <div className="gm-section perimetre-choix">
+                  <p className="gm-label">Ce changement concerne…</p>
+                  <label className="perimetre-option">
+                    <input
+                      type="radio"
+                      name="perimetre"
+                      checked={perimetre === 'jour'}
+                      onChange={() => setPerimetre('jour')}
+                    />
+                    <span>
+                      <b>ce seul jour</b> — {formatDateLongue(jourAffiche)}
+                      <small>
+                        Exceptionnel. Le reste du week-end ne bouge pas, et les
+                        compteurs non plus.
+                      </small>
+                    </span>
+                  </label>
+                  <label className="perimetre-option">
+                    <input
+                      type="radio"
+                      name="perimetre"
+                      checked={perimetre === 'bloc'}
+                      onChange={() => { setPerimetre('bloc'); setCompte1erWe(null) }}
+                    />
+                    <span>
+                      <b>tout le week-end</b>, vendredi compris
+                      <small>
+                        Réattribution ordinaire. Les compteurs et l’équité
+                        suivent.
+                      </small>
+                    </span>
+                  </label>
+                </div>
+              )}
+
               {/* ── Les places de garde ─────────────────────── */}
               <PlaceGarde
                 label="1er de garde"
@@ -505,6 +617,44 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
                       : undefined
                   }
                 />
+              )}
+
+              {/* ── L'avantage financier du 1er de garde (backlog 8 bis) ──
+                  Dans ce cabinet, le 1er de garde d'un week-end est payé
+                  davantage. Quand quelqu'un ne prend qu'UN jour à la place du
+                  titulaire, la question « est-ce que ce jour compte comme un
+                  jour de 1er de garde ? » n'a pas de réponse évidente : elle
+                  dépend de l'arrangement pris entre les deux. On la POSE donc,
+                  au moment du geste, plutôt que de trancher à leur place —
+                  et seulement quand elle se pose vraiment : périmètre « jour »
+                  et 1er de garde effectivement changé. */}
+              {modeEdition && perimetre === 'jour' && premierChange && (
+                <div className="gm-section avantage-choix">
+                  <p className="gm-label">
+                    Ce jour compte-t-il comme un jour de 1er de garde&nbsp;?
+                  </p>
+                  <p className="gm-hint">
+                    C’est le rôle qui porte l’avantage financier du week-end.
+                  </p>
+                  <label className="perimetre-option">
+                    <input
+                      type="radio"
+                      name="compte1erWe"
+                      checked={compte1erWe === true}
+                      onChange={() => setCompte1erWe(true)}
+                    />
+                    <span><b>Oui</b> — jour de 1er de garde exceptionnel</span>
+                  </label>
+                  <label className="perimetre-option">
+                    <input
+                      type="radio"
+                      name="compte1erWe"
+                      checked={compte1erWe === false}
+                      onChange={() => setCompte1erWe(false)}
+                    />
+                    <span><b>Non</b> — un jour comme un autre</span>
+                  </label>
+                </div>
               )}
 
               {/* Places 3 et 4 d'un créneau sur-mesure. Elles s'AFFICHENT —

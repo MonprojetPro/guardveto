@@ -22,6 +22,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { appliquerChangementGarde } from '@/lib/gardes/appliquer-changement'
+import { appliquerExceptionJour } from '@/lib/gardes/appliquer-exception'
 
 /**
  * Contrôle métier « ce véto est-il légalement affectable sur cette date ? » au
@@ -109,6 +110,14 @@ export async function PATCH(
   let second_id: string | null
   let force: boolean
   let confirmerAvertissements: boolean
+  // Backlog 8 bis — périmètre du changement. Une garde de week-end occupe
+  // trois jours ; l'admin dit s'il touche le bloc entier (comportement
+  // historique, défaut) ou ce SEUL jour. Le défaut est volontairement le
+  // bloc : un client qui n'envoie pas le champ garde exactement l'ancien
+  // comportement.
+  let perimetre: 'bloc' | 'jour'
+  let jour: string | null
+  let compte1erWe: boolean
 
   try {
     const body = await req.json()
@@ -117,8 +126,18 @@ export async function PATCH(
     force = body?.force === true
     // Confirmation explicite « affecter quand même » malgré un avertissement métier.
     confirmerAvertissements = body?.confirmerAvertissements === true
+    perimetre = body?.perimetre === 'jour' ? 'jour' : 'bloc'
+    jour = typeof body?.jour === 'string' ? body.jour : null
+    compte1erWe = body?.compte1erWe === true
   } catch {
     return NextResponse.json({ error: 'Corps de requête invalide.' }, { status: 400 })
+  }
+
+  if (perimetre === 'jour' && !jour) {
+    return NextResponse.json(
+      { error: 'Impossible de savoir quel jour modifier.' },
+      { status: 400 },
+    )
   }
 
   // ── Garde-fou métier : véto inactif / en congé validé (backlog n°12) ──
@@ -132,9 +151,14 @@ export async function PATCH(
       .eq('id', gardeId)
       .single()
 
-    if (gardeDate?.date) {
+    // En périmètre JOUR, on contrôle la disponibilité sur LE JOUR touché, pas
+    // sur la date de la ligne. Un remplaçant peut être en congé le samedi et
+    // parfaitement libre le dimanche : vérifier le samedi refuserait à tort.
+    const dateControlee = perimetre === 'jour' ? jour : (gardeDate?.date ?? null)
+
+    if (dateControlee) {
       const warnings = await avertissementsAffectation(
-        supabase, gardeDate.date, premier_id, second_id,
+        supabase, dateControlee, premier_id, second_id,
       )
       if (warnings.length > 0) {
         return NextResponse.json(
@@ -151,15 +175,32 @@ export async function PATCH(
     }
   }
 
-  // ── Application (helper partagé) ─────────────────────────
-  const res = await appliquerChangementGarde({
-    supabase,
-    gardeId,
-    premier_id,
-    second_id,
-    force,
-    auteurVetId: vet.id,
-  })
+  // ── Application ──────────────────────────────────────────
+  //
+  // Deux mailles, deux helpers. Le bloc écrit dans `gardes` et fait bouger
+  // l'équité ; le jour pose une exception par-dessus, sans y toucher — c'est
+  // toute la différence entre « ce week-end est réattribué » et « untel ne
+  // peut pas ce dimanche-là ».
+  const res = perimetre === 'jour' && jour
+    ? await appliquerExceptionJour({
+        supabase,
+        gardeId,
+        jour,
+        premier_id,
+        second_id,
+        compte1erWe,
+        motif: 'exception',
+        force,
+        auteurVetId: vet.id,
+      })
+    : await appliquerChangementGarde({
+        supabase,
+        gardeId,
+        premier_id,
+        second_id,
+        force,
+        auteurVetId: vet.id,
+      })
 
   if (!res.ok) {
     return NextResponse.json({ error: res.error }, { status: res.status })

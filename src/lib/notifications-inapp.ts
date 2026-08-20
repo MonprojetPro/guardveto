@@ -102,6 +102,28 @@ export function contenuGardeModifiee(date: string, typeGarde: string) {
   }
 }
 
+/**
+ * Backlog 8 bis — un SEUL jour d'un bloc week-end a changé de titulaire.
+ *
+ * Le message dit le jour, pas la garde : « votre garde du samedi a changé »
+ * serait faux quand c'est le dimanche qui bouge, et le vétérinaire irait
+ * vérifier le mauvais jour. Il précise aussi que le reste du week-end ne
+ * bouge pas — sans ça, chacun se demande s'il est encore de garde les autres
+ * jours, et rappelle l'admin pour le lui demander.
+ */
+export function contenuJourExceptionnel(
+  date: string,
+  { prend }: { prend: boolean },
+) {
+  return {
+    titre: prend ? 'Vous prenez une garde exceptionnelle' : 'Vous êtes remplacé·e sur une journée',
+    message: prend
+      ? `Vous êtes de garde le ${formatDateFr(date)}, à titre exceptionnel. Le reste du week-end est inchangé.`
+      : `Quelqu'un vous remplace le ${formatDateFr(date)}. Le reste du week-end reste à votre charge.`,
+    lien: '/planning',
+  }
+}
+
 export function contenuRappelPublication(periodeLabel: string, joursRestants: number) {
   const urgence = joursRestants <= 7
   const joursTxt = `${joursRestants} jour${joursRestants > 1 ? 's' : ''}`
