@@ -21,8 +21,8 @@
 **4. « Manon disparaît de ses trois gardes du 14 au 18 septembre. Que s'est-il passé ? »**
 → « Man 1 » le 14, « Man2 » le 16, « Man j » le 18 : supprimés. Victor et Antoine ont pris le relais. Changement d'organisation, ou nettoyage de doublons ?
 
-**5. « Victor et Manon ont échangé les 1er et 2 septembre — c'est voulu ? »**
-→ Les deux dates s'inversent exactement. Vrai échange, ou correction d'une erreur de saisie ?
+**5. « Victor et Manon ont échangé les 1er et 2 septembre — c'est bien un échange entre eux ? »**
+→ Ce sont **les deux mêmes événements** qui ont été déplacés, chacun sur la date de l'autre (comparaison faite sur l'identifiant Google, pas sur le titre — donc ce n'est ni une ressaisie ni un doublon). L'échange est réel ; reste à savoir s'il est définitif.
 
 **6. « Les "AS am" à répétition — c'est un rythme régulier ou des dates ponctuelles ? »**
 → S'il y a une régularité (tous les jeudis matin, par exemple), on peut la poser une fois pour toutes comme règle au lieu de la ressaisir chaque mois.
