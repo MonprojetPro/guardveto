@@ -182,6 +182,28 @@ export async function syncCalendrier(
   const PAUSE_MS = 250
   const toutes = gardes as unknown as GardeAvecVetos[]
 
+  // Backlog 8 bis — toutes les exceptions de la période EN UNE FOIS, indexées
+  // par garde. Une requête par garde dans la boucle ci-dessous en ferait des
+  // dizaines pour un résultat presque toujours vide, sur un chemin déjà
+  // contraint par le rate-limit Google.
+  const { data: excDb } = await supabase
+    .from('gardes_exceptions')
+    .select('garde_id, date, role, veterinaires:veterinaire_id(prenom)')
+    .in('garde_id', toutes.map((g) => g.id as string))
+
+  type RawExc = {
+    garde_id: string
+    date: string
+    role: 'premier' | 'second'
+    veterinaires: { prenom: string } | null
+  }
+  const exceptionsParGarde = new Map<string, GardeEventData['exceptions']>()
+  for (const e of ((excDb as unknown as RawExc[] | null) ?? [])) {
+    const liste = exceptionsParGarde.get(e.garde_id) ?? []
+    liste.push({ date: e.date, role: e.role, prenom: e.veterinaires?.prenom ?? null })
+    exceptionsParGarde.set(e.garde_id, liste)
+  }
+
   for (let i = 0; i < toutes.length; i += BATCH) {
     const lot = toutes.slice(i, i + BATCH)
     const resultats = await Promise.all(
@@ -192,6 +214,7 @@ export async function syncCalendrier(
           prenomPremier: garde.premier?.prenom ?? 'Inconnu',
           prenomSecond:  garde.second?.prenom  ?? null,
           prenomsSuivants: prenomsPlacesSup(garde),
+          exceptions: exceptionsParGarde.get(garde.id as string) ?? [],
         }
         try {
           await avecReprise(async () => {
@@ -259,12 +282,29 @@ export async function syncGardeIndividuelle(
   const calendarId = await calendarIdDuCabinet(supabase, g.cabinet_id)
   if (!isGoogleCalendarConfigured(calendarId)) return
 
+  // Backlog 8 bis — les jours remplacés à titre exceptionnel. Une requête de
+  // plus par garde synchronisée, mais elle ne rapporte rien dans l'immense
+  // majorité des cas, et sans elle l'agenda afficherait le bloc entier au nom
+  // du titulaire alors que quelqu'un le remplace un jour.
+  const { data: exceptionsDb } = await supabase
+    .from('gardes_exceptions')
+    .select('date, role, veterinaires:veterinaire_id(prenom)')
+    .eq('garde_id', gardeId)
+
+  type RawExc = { date: string; role: 'premier' | 'second'; veterinaires: { prenom: string } | null }
+  const exceptions = ((exceptionsDb as unknown as RawExc[] | null) ?? []).map((e) => ({
+    date: e.date,
+    role: e.role,
+    prenom: e.veterinaires?.prenom ?? null,
+  }))
+
   const data: GardeEventData = {
     date:          g.date,
     type:          g.type,
     prenomPremier: g.premier?.prenom ?? 'Inconnu',
     prenomSecond:  g.second?.prenom  ?? null,
     prenomsSuivants: prenomsPlacesSup(g),
+    exceptions,
   }
 
   // Structure horaire du cabinet (A1) — aligne l'agenda sur la base.

@@ -36,6 +36,24 @@ export interface GardeEventData {
    * vétérinaire de garde n'apparaîtrait pas dans son propre agenda.
    */
   prenomsSuivants?: string[]
+  /**
+   * Backlog 8 bis — remplacements ne valant que pour UN jour du bloc.
+   *
+   * L'agenda porte UN événement par garde, qui couvre les trois jours du
+   * week-end. Sans ces lignes, un vétérinaire consultant son agenda verrait
+   * le bloc entier à son nom alors que quelqu'un le remplace le dimanche —
+   * et l'agenda est, pour beaucoup, le seul endroit qu'ils regardent.
+   *
+   * `prenom: null` = place laissée vacante ce jour-là.
+   */
+  exceptions?: Array<{ date: string; role: 'premier' | 'second'; prenom: string | null }>
+}
+
+/** Décale une date ISO de n jours (UTC, pur) — pour les jours du bloc. */
+function decalerJour(dateISO: string, n: number): string {
+  const d = new Date(dateISO + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
 }
 
 // ── Initialisation du client Google ─────────────────────────
@@ -119,15 +137,24 @@ function getEventTimes(
 
 function buildEventTitle(data: GardeEventData): string {
   const suivants = data.prenomsSuivants ?? []
+  // Backlog 8 bis — dans une grille d'agenda, on lit les titres et on
+  // n'ouvre presque jamais l'événement. Un bloc dont un jour a changé doit
+  // donc le dire DANS son titre : sans ça, le détail écrit dans la
+  // description ne serait vu par personne.
+  const nbJoursModifies = new Set((data.exceptions ?? []).map((e) => e.date)).size
+  const suffixe = nbJoursModifies > 0
+    ? ` · ⚠️ ${nbJoursModifies} jour${nbJoursModifies > 1 ? 's' : ''} modifié${nbJoursModifies > 1 ? 's' : ''}`
+    : ''
+
   if (data.prenomSecond && suivants.length > 0) {
     // Au-delà de deux, le titre listerait une file de prénoms : on garde le
     // premier et on annonce le nombre, le détail est dans la description.
-    return `Garde — ${data.prenomPremier} (1er) + ${suivants.length + 1} autres`
+    return `Garde — ${data.prenomPremier} (1er) + ${suivants.length + 1} autres${suffixe}`
   }
   if (data.prenomSecond) {
-    return `Garde — ${data.prenomPremier} (1er) + ${data.prenomSecond} (2nd)`
+    return `Garde — ${data.prenomPremier} (1er) + ${data.prenomSecond} (2nd)${suffixe}`
   }
-  return `Garde — ${data.prenomPremier} (1er)`
+  return `Garde — ${data.prenomPremier} (1er)${suffixe}`
 }
 
 function buildEventDescription(
@@ -154,11 +181,51 @@ function buildEventDescription(
       COUPLE_HISTORIQUE.source,
       COUPLE_HISTORIQUE.cible,
     )
+
+    // Backlog 8 bis — la substitution s'applique au rôle TEL QU'IL S'AFFICHE
+    // ce jour-là. D'où le passage après l'ordonnancement du vendredi : sur un
+    // vendredi aux rôles inversés, l'appliquer avant désignerait l'autre place.
+    const exceptions = data.exceptions ?? []
+    const nomDuJour = (
+      jour: string,
+      role: 'premier' | 'second',
+      defaut: string | null,
+    ): string => {
+      const e = exceptions.find((x) => x.date === jour && x.role === role)
+      // Une place sans personne se DIT, elle ne se laisse pas deviner : un
+      // blanc dans l'agenda se lit comme un oubli d'affichage, pas comme un
+      // trou réel qu'il faut combler.
+      if (e) return e.prenom ?? 'personne (place à pourvoir)'
+      return defaut ?? 'Inconnu'
+    }
+    const jourTouche = (jour: string) => exceptions.some((x) => x.date === jour)
+
+    const vendredi = decalerJour(data.date, -1)
+    const dimanche = decalerJour(data.date, 1)
+
     const lignes = [typeLabel, '']
     if (ordonnes) {
-      lignes.push(`Vendredi soir : ${ordonnes[0]} (1er) + ${ordonnes[1]} (2nd)`)
+      const marque = jourTouche(vendredi) ? '  ⚠️ exceptionnel' : ''
+      lignes.push(
+        `Vendredi soir : ${nomDuJour(vendredi, 'premier', ordonnes[0])} (1er)`
+        + ` + ${nomDuJour(vendredi, 'second', ordonnes[1])} (2nd)${marque}`,
+      )
     }
-    lignes.push(`Samedi & dimanche : ${data.prenomPremier} (1er) + ${data.prenomSecond} (2nd)`)
+
+    // Samedi et dimanche restent groupés TANT QU'ILS SONT IDENTIQUES. Les
+    // séparer d'office allongerait la description de tout le monde pour un cas
+    // rare ; les garder groupés quand ils diffèrent serait un mensonge.
+    if (!jourTouche(data.date) && !jourTouche(dimanche)) {
+      lignes.push(`Samedi & dimanche : ${data.prenomPremier} (1er) + ${data.prenomSecond} (2nd)`)
+    } else {
+      for (const [jour, libelle] of [[data.date, 'Samedi'], [dimanche, 'Dimanche']] as const) {
+        const marque = jourTouche(jour) ? '  ⚠️ exceptionnel' : ''
+        lignes.push(
+          `${libelle} : ${nomDuJour(jour, 'premier', data.prenomPremier)} (1er)`
+          + ` + ${nomDuJour(jour, 'second', data.prenomSecond)} (2nd)${marque}`,
+        )
+      }
+    }
     return lignes.join('\n')
   }
 
@@ -170,6 +237,25 @@ function buildEventDescription(
     lines.push(`2nd de garde : ${data.prenomSecond}`)
   }
   return lines.join('\n')
+}
+
+/**
+ * Ce que Google recevra, sans appeler Google.
+ *
+ * Le titre et la description sont la seule chose que les vétérinaires lisent
+ * vraiment de leur planning — beaucoup ne consultent que leur agenda. Les
+ * rendre observables permet d'en écrire des tests, plutôt que de découvrir en
+ * production qu'un bloc affiche encore le titulaire d'un jour qu'on lui a
+ * retiré.
+ */
+export function construireApercuEvenement(
+  data: GardeEventData,
+  relations: readonly RelationStructure[] = RELATIONS_STRUCTURE_DEFAUT,
+): { titre: string; description: string } {
+  return {
+    titre: buildEventTitle(data),
+    description: buildEventDescription(data, relations),
+  }
 }
 
 // ── API publique ─────────────────────────────────────────────

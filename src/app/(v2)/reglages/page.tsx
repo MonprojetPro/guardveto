@@ -135,7 +135,17 @@ export default async function ReglagesPage() {
       <Satin />
       <div className="shell">
         <BarreV2 prenom={vet.prenom} estAdmin dock={dock} />
-        <ReglagesV2 valeurs={valeurs} periodesPubliees={periodesPubliees} emails={emails} />
+        <ReglagesV2
+          valeurs={valeurs}
+          periodesPubliees={periodesPubliees}
+          emails={emails}
+          // L'agenda de repli, lu côté SERVEUR : le navigateur n'a aucun moyen
+          // de connaître les variables d'environnement. Sans lui, l'écran
+          // annonçait « Non branché » alors que les gardes s'écrivaient
+          // réellement dans Google — un indicateur qui ment est pire que pas
+          // d'indicateur du tout, il envoie chercher une panne qui n'existe pas.
+          agendaParDefaut={(process.env.GOOGLE_CALENDAR_ID ?? '').trim()}
+        />
       </div>
     </>
   )

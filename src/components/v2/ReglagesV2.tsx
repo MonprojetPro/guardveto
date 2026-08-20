@@ -96,9 +96,16 @@ interface Props {
   /** Périodes publiées, seules resynchronisables vers l'agenda. */
   periodesPubliees: Periode[]
   emails: LigneEmail[]
+  /**
+   * Agenda de repli défini côté serveur (variable d'environnement), utilisé
+   * quand le cabinet n'a pas renseigné le sien. Le navigateur ne peut pas le
+   * connaître : sans cette prop, l'écran annonçait « Non branché » alors que
+   * les gardes s'écrivaient bel et bien dans Google.
+   */
+  agendaParDefaut?: string
 }
 
-export function ReglagesV2({ valeurs, periodesPubliees, emails }: Props) {
+export function ReglagesV2({ valeurs, periodesPubliees, emails, agendaParDefaut = '' }: Props) {
   const [isPending, startTransition] = useTransition()
   const { ouvrirErreur, dialogueErreur } = useErreurBloquante()
 
@@ -125,7 +132,11 @@ export function ReglagesV2({ valeurs, periodesPubliees, emails }: Props) {
       }`
     : null
 
-  const agendaBranche = valeurs.googleCalendarId.trim() !== ''
+  // Ce qui compte n'est pas « le cabinet a-t-il saisi un identifiant » mais
+  // « les gardes partent-elles quelque part ». Le repli serveur suffit à
+  // l'assurer — c'est d'ailleurs par lui que ça fonctionne aujourd'hui.
+  const agendaSaisi = valeurs.googleCalendarId.trim() !== ''
+  const agendaBranche = agendaSaisi || agendaParDefaut !== ''
   const expediteurRegle = valeurs.brevoFromEmail.trim() !== ''
 
   // ── Enregistrer agenda + expéditeur ─────────────────────────────────────
@@ -280,6 +291,17 @@ export function ReglagesV2({ valeurs, periodesPubliees, emails }: Props) {
                 style={{ width: '100%', minHeight: 42 }}
               />
             </div>
+            {/* Un champ vide et un voyant vert, c'est incompréhensible sans
+                explication : on DIT sur quel agenda les gardes partent, et
+                d'où vient ce réglage. */}
+            {!agendaSaisi && agendaParDefaut !== '' && (
+              <p className="conn-line">
+                Ce champ est vide, mais les gardes partent bien vers l&apos;agenda
+                configuré au niveau du serveur&nbsp;:<br />
+                <span className="mono">{agendaParDefaut}</span><br />
+                Renseignez un identifiant ci-dessus pour utiliser un autre agenda.
+              </p>
+            )}
             <p className="conn-line">
               L&apos;agenda doit être <b>partagé en écriture</b> avec le compte de service
               GuardVeto, sinon rien ne s&apos;y écrira.
