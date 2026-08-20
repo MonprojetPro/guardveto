@@ -131,7 +131,7 @@ describe('règle « tous les vétérinaires »', () => {
   it('la phrase affichée nomme le sujet — jamais un prédicat orphelin', () => {
     const regle = ligneTous('r1', 'espacement_weekend', { n_semaines: 3 })
     const phrase = phraseRegle(
-      { brique_id: regle.brique_id, params_json: regle.params_json, force: regle.force },
+      { id: regle.id, brique_id: regle.brique_id, params_json: regle.params_json },
       (id) => (id === ANNE_SO ? 'Anne-Sophie' : id),
     )
     expect(phrase).toContain('Tous les vétérinaires')

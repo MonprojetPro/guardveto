@@ -18,9 +18,18 @@
 // les garde-fous.
 // ============================================================
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+// Modale de confirmation : on réutilise le Dialog du produit (celui des
+// dialogues congés) plutôt qu'un habillage maison — il porte le focus trap,
+// la fermeture au clavier et les jetons de couleur déjà arbitrés.
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import { CongeForm } from '@/components/conges/CongeForm'
+import { deleteConge } from '@/app/(protected)/conges/actions'
 import { ValiderCongeDialog } from '@/components/conges/ValiderCongeDialog'
 import { RefuserCongeDialog } from '@/components/conges/RefuserCongeDialog'
 import { ConflitPlanningDialog } from '@/components/conges/ConflitPlanningDialog'
@@ -115,6 +124,9 @@ export function AbsencesV2({
   const [criseOuverte, setCriseOuverte] = useState(false)
   const [aValider, setAValider] = useState<Conge | null>(null)
   const [aRefuser, setARefuser] = useState<Conge | null>(null)
+  const [aEditer, setAEditer] = useState<Conge | null>(null)
+  const [aSupprimer, setASupprimer] = useState<Conge | null>(null)
+  const [suppressionEnCours, demarrerSuppression] = useTransition()
   const [conflit, setConflit] = useState<ConflitPlanning | null>(null)
   const [repareConflit, setRepareConflit] = useState(false)
   const [filtreVet, setFiltreVet] = useState('tous')
@@ -135,13 +147,22 @@ export function AbsencesV2({
     [conges],
   )
 
-  const traites = useMemo(
-    () =>
-      conges
-        .filter((c) => c.statut !== 'souhait')
-        .sort((a, b) => b.date_debut.localeCompare(a.date_debut)),
-    [conges],
-  )
+  // PÉRIMÈTRE DE LECTURE — aligné sur la V1 (`CongesList.tsx:101-105`), qui
+  // reste la référence connue du cabinet :
+  //   • admin    → tout le cabinet, souhaits présentés à part (bloc au-dessus) ;
+  //   • véto     → SES congés seulement, souhaits INCLUS dans la liste.
+  // Deux corrections en une :
+  //   1. la liste s'appelait « Mes congés » pour un véto mais montrait ceux de
+  //      TOUT LE MONDE — le titre mentait ;
+  //   2. un véto ne voyait sa propre demande en attente NULLE PART (le bloc
+  //      « souhaits » est réservé à l'admin) : il posait un congé et le perdait
+  //      de vue jusqu'à la décision.
+  const traites = useMemo(() => {
+    const visibles = isAdmin ? conges : conges.filter((c) => c.veterinaire_id === moiId)
+    return visibles
+      .filter((c) => (isAdmin ? c.statut !== 'souhait' : true))
+      .sort((a, b) => b.date_debut.localeCompare(a.date_debut))
+  }, [conges, isAdmin, moiId])
 
   const traitesFiltres = traites.filter(
     (c) =>
@@ -388,10 +409,53 @@ export function AbsencesV2({
                         </div>
                         <div className="row-side">
                           <span
-                            className={`status-pill ${c.statut === 'valide' ? 'st-valide' : 'st-refuse'}`}
+                            className={`status-pill ${
+                              c.statut === 'souhait'
+                                ? 'st-attente-validation'
+                                : c.statut === 'valide'
+                                  ? 'st-valide'
+                                  : 'st-refuse'
+                            }`}
                           >
-                            {c.statut === 'valide' ? 'Validé' : 'Refusé'}
+                            {c.statut === 'souhait'
+                              ? 'En attente'
+                              : c.statut === 'valide'
+                                ? 'Validé'
+                                : 'Refusé'}
                           </span>
+                          {/* Modifier / supprimer — mêmes droits qu'en V1
+                              (`CongesList.tsx:133-135`) : l'admin touche à tout,
+                              un véto ne modifie qu'un souhait encore en attente
+                              mais peut toujours ANNULER un congé à lui. */}
+                          <div className="row-actions">
+                            {(isAdmin || c.statut === 'souhait') && (
+                              <button
+                                type="button"
+                                className="btn btn-outline btn-sm"
+                                onClick={() => setAEditer(c)}
+                                aria-label={`Modifier le congé de ${vet?.prenom ?? 'ce vétérinaire'}`}
+                              >
+                                Modifier
+                              </button>
+                            )}
+                            {/* Un véto ne peut supprimer QUE son propre souhait
+                                encore en attente — c'est ce qu'autorise la RLS
+                                (`conges_veto_delete_souhait`). La V1 proposait
+                                le bouton sur n'importe quel congé à lui : sur un
+                                congé validé, la base refusait et l'utilisateur
+                                se prenait une erreur brute. On n'affiche donc
+                                que les portes que le serveur ouvre vraiment. */}
+                            {(isAdmin || (c.veterinaire_id === moiId && c.statut === 'souhait')) && (
+                              <button
+                                type="button"
+                                className="btn btn-danger btn-sm"
+                                onClick={() => setASupprimer(c)}
+                                aria-label={`Supprimer le congé de ${vet?.prenom ?? 'ce vétérinaire'}`}
+                              >
+                                {c.statut === 'souhait' && !isAdmin ? 'Annuler ma demande' : 'Supprimer'}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </li>
@@ -436,6 +500,75 @@ export function AbsencesV2({
         isAdmin={isAdmin}
         onConflit={setConflit}
       />
+
+      {/* Édition — MÊME dialogue que la création : `CongeForm` bascule en mode
+          édition dès qu'on lui passe un `conge` (il porte déjà les règles et
+          les effets de bord). La clé force le remontage d'un congé à l'autre,
+          sinon le formulaire garderait les valeurs du précédent. */}
+      {aEditer && (
+        <CongeForm
+          key={`edit-${aEditer.id}`}
+          open
+          onClose={() => {
+            setAEditer(null)
+            router.refresh()
+          }}
+          conge={aEditer}
+          vets={vets}
+          currentUserId={moiId}
+          isAdmin={isAdmin}
+          onConflit={setConflit}
+        />
+      )}
+
+      {/* Suppression TOUJOURS confirmée — reprise de la V1, où la règle vient
+          d'un audit (2026-07-03) : c'était la seule suppression de l'app sans
+          garde-fou, et un tap de travers sur mobile effaçait un congé validé
+          sans retour arrière. Ne pas retirer cette confirmation. */}
+      {aSupprimer && (
+        <Dialog open onOpenChange={(o) => { if (!o) setASupprimer(null) }}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="font-heading">Supprimer ce congé ?</DialogTitle>
+              <DialogDescription>
+                {parVet.get(aSupprimer.veterinaire_id)?.prenom ?? 'Ce vétérinaire'} ·{' '}
+                {periodeLisible(aSupprimer)}
+                <br />
+                C’est définitif. Si le planning est déjà publié, les gardes ne se
+                réattribuent pas toutes seules — il faudra les reprendre.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setASupprimer(null)}
+                disabled={suppressionEnCours}
+              >
+                Annuler
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={suppressionEnCours}
+                onClick={() => {
+                  const cible = aSupprimer
+                  demarrerSuppression(async () => {
+                    const res = await deleteConge(cible.id)
+                    if (res?.error) {
+                      toast.error(res.error)
+                      return
+                    }
+                    toast.success('Congé supprimé')
+                    setASupprimer(null)
+                    router.refresh()
+                  })
+                }}
+              >
+                {suppressionEnCours ? 'Suppression…' : 'Supprimer'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {aValider && (
         <ValiderCongeDialog

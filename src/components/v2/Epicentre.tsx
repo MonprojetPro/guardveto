@@ -546,8 +546,11 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
                     )}
                   </div>
                   <footer className="fen-foot">
-                    <Link className="btn btn-valider" href="/conges">
-                      Traiter dans Congés →
+                    {/* → `/absences` (V2). L'accueil renvoyait vers l'écran
+                        congés V1 : depuis le premier écran de l'application,
+                        on basculait dans l'ancienne interface. */}
+                    <Link className="btn btn-valider" href="/absences">
+                      Traiter dans Absences →
                     </Link>
                     <span className="hint">Échap pour refermer</span>
                   </footer>

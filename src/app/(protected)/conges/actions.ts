@@ -143,6 +143,7 @@ export async function createConge(
 
   if (error) return { error: error.message }
   revalidatePath('/conges')
+  revalidatePath('/absences') // écran V2 — lecteur des mêmes congés
   revalidatePath('/admin/demandes')
 
   // ── Détection de conflit congé ↔ planning publié (cas « Antoine ») ──────
@@ -209,6 +210,7 @@ export async function updateConge(id: string, data: CongeFormData) {
 
   if (error) return { error: error.message }
   revalidatePath('/conges')
+  revalidatePath('/absences') // écran V2 — lecteur des mêmes congés
   revalidatePath('/admin/demandes')
   return { success: true }
 }
@@ -218,6 +220,7 @@ export async function deleteConge(id: string) {
   const { error } = await supabase.from('conges').delete().eq('id', id)
   if (error) return { error: error.message }
   revalidatePath('/conges')
+  revalidatePath('/absences') // écran V2 — lecteur des mêmes congés
   revalidatePath('/admin/demandes')
   return { success: true }
 }
@@ -320,6 +323,7 @@ export async function validerConge(
   }
 
   revalidatePath('/conges')
+  revalidatePath('/absences') // écran V2 — lecteur des mêmes congés
   revalidatePath('/admin/demandes')
 
   // ── Détection de conflit congé ↔ planning publié (cas « Antoine ») ──────
@@ -404,6 +408,7 @@ export async function refuserConge(id: string, raison?: string) {
   }
 
   revalidatePath('/conges')
+  revalidatePath('/absences') // écran V2 — lecteur des mêmes congés
   revalidatePath('/admin/demandes')
   return { success: true }
 }

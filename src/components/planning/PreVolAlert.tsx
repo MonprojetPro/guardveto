@@ -65,7 +65,11 @@ export function PreVolAlert({
                 Un congé validé après coup obligera à régénérer le planning.
               </p>
             </div>
-            <Link href="/conges" className="gva-lien">Voir les demandes →</Link>
+            {/* → `/absences` (V2) et non plus `/conges` (V1) : ce bandeau
+                s'affiche sur le planning V2, et l'ancien écran renvoyait
+                l'utilisateur dans une autre génération d'interface, sans
+                chemin de retour évident. */}
+            <Link href="/absences" className="gva-lien">Voir les demandes →</Link>
           </div>
         </div>
       )}
