@@ -49,7 +49,19 @@
 8. **Remplaçants externes (locum)** — pas de carnet de remplaçants ni de règle
    d'intégration au planning.
 
-8 bis. **Remplacement d'UN SEUL jour d'un week-end** (décision MiKL 2026-07-16,
+8 bis. ✅ **FAIT le 2026-08-20.** Surcouche `gardes_exceptions` : la garde reste
+   intacte et porte toujours l'équité, une ligne d'exception dit « ce jour-là,
+   sur ce rôle, c'est untel ». Appliquée dans la vue `planning_semaine`, donc
+   vue par ses 14 lecteurs d'un coup. Deux questions posées à l'admin au
+   moment du geste — le périmètre (ce jour / tout le week-end vendredi
+   compris) et, si le 1er de garde change, l'avantage financier. Neutralité
+   d'équité acquise par construction. Corrigé au passage : une absence
+   déclarée sur un vendredi ou un dimanche ne trouvait AUCUN créneau, en
+   silence. **Restent ouverts** : l'agenda Google ne mentionne pas encore
+   l'exception dans sa description, et les échanges de gardes opèrent
+   toujours au bloc. Détail du cadrage d'origine ci-dessous.
+
+~~8 bis.~~ **Remplacement d'UN SEUL jour d'un week-end** (décision MiKL 2026-07-16,
    recette maquette M1) — cas réel : un véto du binôme ne peut pas être présent
    le samedi (ou le dimanche) seulement. Cadrage arbitré : ça reste de
    l'**exceptionnel → parcours crise (M3)**, PAS une réattribution ordinaire du
