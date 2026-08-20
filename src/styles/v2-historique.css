@@ -372,3 +372,32 @@
   padding: 5px 9px;
   word-break: break-word;
 }
+
+/* ── Backlog 8 bis : le jour pris en remplacement exceptionnel ──
+   Il ne bouge aucun chiffre de la ligne — l'équité reste indexée sur le
+   week-end, qui n'a pas changé de titulaire. Sans repère visible, ce jour
+   n'existait donc nulle part à l'écran.
+
+   Un badge et non une colonne : ces jours ne s'additionnent PAS aux
+   week-ends, les aligner en colonne inviterait à les confondre. Même
+   grammaire visuelle que `.dette`, qui signale déjà « quelque chose en marge
+   du décompte » — un troisième vocabulaire n'apprendrait rien de plus. */
+.except {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-size: 0.62rem; font-weight: 700;
+  background: color-mix(in srgb, var(--t-accent) 12%, transparent);
+  color: var(--t-accent);
+  border: 1px dashed color-mix(in srgb, var(--t-accent) 45%, transparent);
+  padding: 2px 8px; border-radius: 999px;
+  margin-left: 7px;
+  white-space: nowrap;
+  vertical-align: 1px;
+}
+/* Sans effet sur l'avantage financier : plus discret, pour que l'œil aille
+   d'abord sur celui qui compte. */
+.except.neutre {
+  background: transparent;
+  color: var(--t-muted);
+  border-color: var(--t-border);
+}

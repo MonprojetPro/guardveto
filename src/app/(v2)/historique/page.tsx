@@ -269,6 +269,17 @@ export default async function HistoriquePage({
         `${periodeSelectionnee.date_fin}T12:00:00`,
       ).toLocaleDateString('fr-FR')}`,
     })
+    // Les tableaux du haut portent la période SÉLECTIONNÉE, quel que soit son
+    // statut ; le cumul du bas ne compte QUE le validé. Sur un brouillon, les
+    // deux affichent donc des chiffres différents pour la même personne — et
+    // rien ne le disait. On lisait « 3 week-ends » ici et « 2 » dix
+    // centimètres plus bas, sans aucun moyen de comprendre lequel croire.
+    if (periodeSelectionnee.statut === 'brouillon') {
+      legende.push({
+        texte: 'brouillon — ces chiffres ne sont pas encore comptés dans le cumul plus bas',
+        fort: true,
+      })
+    }
   }
   legende.push({
     texte:

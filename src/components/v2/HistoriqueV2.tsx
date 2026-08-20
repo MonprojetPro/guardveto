@@ -414,6 +414,31 @@ export function HistoriqueV2({
                         {r.prenom}
                         {r.statut === 'salarie' && <span className="sal">sal.</span>}
                       </span>
+                      {/* Un remplacement d'UN SEUL jour (backlog 8 bis) ne
+                          bouge AUCUN des chiffres de cette ligne : l'équité
+                          reste indexée sur le week-end, qui n'a pas changé de
+                          titulaire. Sans ce repère, le jour exceptionnel
+                          n'existe donc nulle part à l'écran — MiKL l'a
+                          cherché en vain après en avoir posé un.
+                          Un badge plutôt qu'une colonne : ces jours ne
+                          s'additionnent pas aux week-ends, les mettre côte à
+                          côte inviterait à les confondre. */}
+                      {(r.jours_1er_we_exceptionnels ?? 0) > 0 && (
+                        <span
+                          className="except"
+                          title={`${r.jours_1er_we_exceptionnels} jour(s) de 1er de garde pris à titre exceptionnel — compté à part, sans effet sur les week-ends ci-contre`}
+                        >
+                          ⚡ {r.jours_1er_we_exceptionnels} j. 1ᵉʳ except.
+                        </span>
+                      )}
+                      {(r.jours_exceptionnels_pris ?? 0) > (r.jours_1er_we_exceptionnels ?? 0) && (
+                        <span
+                          className="except neutre"
+                          title="Jours pris en remplacement exceptionnel, sans effet sur l’équité ni sur l’avantage financier"
+                        >
+                          ⚡ {(r.jours_exceptionnels_pris ?? 0) - (r.jours_1er_we_exceptionnels ?? 0)} j. except.
+                        </span>
+                      )}
                     </td>
                     <Nombre n={r.we_premier} />
                     <Nombre n={r.we_second} />
