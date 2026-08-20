@@ -63,6 +63,26 @@ export interface CreneauImpacte {
   saison: Saison
   /** Période de la garde. */
   periodeId: string
+  /**
+   * Les JOURS du calendrier réellement couverts par l'absence sur ce créneau.
+   *
+   * Une garde de week-end est une ligne unique posée le SAMEDI qui occupe en
+   * réalité vendredi, samedi et dimanche. Tant qu'on cherchait sur la seule
+   * date de la ligne, une absence déclarée sur le seul vendredi ou le seul
+   * dimanche ne trouvait AUCUN créneau : le système répondait « rien à
+   * réparer » et le vétérinaire restait de garde, sans que personne ne soit
+   * prévenu. C'était le trou le plus dangereux, parce que silencieux.
+   *
+   * Toujours au moins un jour. Plusieurs = l'absence couvre plusieurs jours
+   * du bloc, l'admin choisira le périmètre (le jour seul ou le bloc entier).
+   */
+  joursTouches: string[]
+  /**
+   * Le créneau occupe-t-il plusieurs jours du calendrier ? Vrai pour un
+   * week-end, faux pour un soir de semaine. C'est ce qui décide si la
+   * question « ce seul jour ou tout le bloc ? » a un sens à poser.
+   */
+  blocMultiJours: boolean
 }
 
 // ── Contexte moteur par période ──────────────────────────
@@ -189,11 +209,21 @@ export async function recenserCreneauxImpactes(
   // Borne basse = max(début absence, aujourd'hui) — on ne répare jamais le passé.
   const borneBasse = dateDebut > aujourdhui ? dateDebut : aujourdhui
 
-  // Gardes du cabinet où le véto absent est 1er OU 2nd, dans la fenêtre future.
-  const { data: gardesDb, error } = await supabase
-    .from('gardes')
-    .select('id, date, type, premier_id, second_id, periode_id, periodes!inner(saison, statut)')
-    .eq('cabinet_id', cabinetId)
+  // ⚠️ On interroge `planning_semaine`, PAS `gardes`.
+  //
+  // `gardes` ne dit que la date de la LIGNE : un week-end y vit sur le seul
+  // samedi, alors qu'il occupe le calendrier du vendredi soir au lundi matin.
+  // Chercher là-dedans, c'était rater toute absence déclarée sur un vendredi
+  // ou un dimanche — en silence, ce qui est le pire des cas : le système
+  // annonçait « aucun créneau impacté » et le vétérinaire restait de garde.
+  //
+  // La vue, elle, matérialise chaque jour réellement occupé, applique
+  // l'inversion des rôles du vendredi quand le cabinet l'a configurée, et
+  // n'invente pas de vendredi quand le binôme est découplé. C'est la seule
+  // source qui répond juste à « qui est de garde CE jour-là ».
+  const { data: joursDb, error } = await supabase
+    .from('planning_semaine')
+    .select('id, date, type, premier_id, second_id, periode_id, saison, periode_statut')
     .gte('date', borneBasse)
     .lte('date', dateFin)
     .or(`premier_id.eq.${absentId},second_id.eq.${absentId}`)
@@ -203,33 +233,78 @@ export async function recenserCreneauxImpactes(
     throw new Error(`Erreur lecture des gardes impactées : ${error.message}`)
   }
 
-  type Row = GardeRow & { periodes: { saison: Saison; statut: string } | { saison: Saison; statut: string }[] }
+  interface JourRow {
+    id: string
+    date: string
+    type: TypeGardeDb
+    premier_id: string | null
+    second_id: string | null
+    periode_id: string
+    saison: Saison
+    periode_statut: string
+  }
 
-  const impactes: CreneauImpacte[] = []
-  for (const g of ((gardesDb as Row[] | null) ?? [])) {
-    const per = Array.isArray(g.periodes) ? g.periodes[0] : g.periodes
-    // On ne répare que des plannings DIFFUSÉS (publié/verrouillé) — un brouillon
-    // se régénère, il n'a pas de « crise ».
-    if (per?.statut !== 'publie' && per?.statut !== 'verrouille') continue
+  // Le RÔLE natif (celui que porte la ligne `gardes`) reste nécessaire : c'est
+  // lui que `proposerReparation` répare. Le rôle affiché un vendredi peut être
+  // l'inverse — réparer d'après l'affichage remplacerait la mauvaise place.
+  const jours = ((joursDb as JourRow[] | null) ?? []).filter(
+    (j) => j.periode_statut === 'publie' || j.periode_statut === 'verrouille',
+  )
+  if (jours.length === 0) return []
 
-    // Le véto absent peut être 1er, 2nd, ou les deux (cas limite) → un créneau par rôle.
+  const { data: gardesDb, error: erreurGardes } = await supabase
+    .from('gardes')
+    .select('id, date, type, premier_id, second_id, periode_id')
+    .eq('cabinet_id', cabinetId)
+    .in('id', [...new Set(jours.map((j) => j.id))])
+
+  if (erreurGardes) {
+    throw new Error(`Erreur lecture des gardes impactées : ${erreurGardes.message}`)
+  }
+
+  const gardesParId = new Map<string, GardeRow>()
+  for (const g of ((gardesDb as GardeRow[] | null) ?? [])) gardesParId.set(g.id, g)
+
+  // Un créneau par (garde, rôle natif) — comme avant — mais en portant
+  // désormais la liste des jours que l'absence touche vraiment.
+  const parCle = new Map<string, CreneauImpacte>()
+  for (const j of jours) {
+    // Le scope cabinet vient de la jointure sur `gardes` : la vue ne porte pas
+    // de cabinet_id, et une garde absente de la liste n'appartient pas au
+    // cabinet courant (ou a disparu entre les deux lectures).
+    const garde = gardesParId.get(j.id)
+    if (!garde) continue
+
+    // Rôles natifs libérés par l'absence. Le véto peut être 1er, 2nd, ou les
+    // deux (cas limite) → un créneau par rôle.
     const roles: RoleGarde[] = []
-    if (g.premier_id === absentId) roles.push('premier')
-    if (g.second_id === absentId) roles.push('second')
+    if (garde.premier_id === absentId) roles.push('premier')
+    if (garde.second_id === absentId) roles.push('second')
 
     for (const role of roles) {
-      impactes.push({
-        gardeId: g.id,
-        date: g.date,
-        type: g.type,
-        typeEngine: mapDbTypeToEngine(g.type),
+      const cle = `${garde.id}|${role}`
+      const deja = parCle.get(cle)
+      if (deja) {
+        if (!deja.joursTouches.includes(j.date)) deja.joursTouches.push(j.date)
+        continue
+      }
+      parCle.set(cle, {
+        gardeId: garde.id,
+        date: garde.date,
+        type: garde.type,
+        typeEngine: mapDbTypeToEngine(garde.type),
         role,
-        saison: per.saison,
-        periodeId: g.periode_id,
+        saison: j.saison,
+        periodeId: garde.periode_id,
+        joursTouches: [j.date],
+        blocMultiJours: garde.type === 'weekend',
       })
     }
   }
 
+  const impactes = [...parCle.values()]
+  for (const c of impactes) c.joursTouches.sort()
+  impactes.sort((a, b) => (a.date !== b.date ? a.date.localeCompare(b.date) : a.role.localeCompare(b.role)))
   return impactes
 }
 

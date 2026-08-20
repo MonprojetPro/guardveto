@@ -49,6 +49,10 @@ function creneau(partial: Partial<CreneauImpacte> = {}): CreneauImpacte {
     role: 'premier',
     saison: 'ete',
     periodeId: 'per-1',
+    // Un week-end occupe trois jours du calendrier ; la ligne, elle, vit sur
+    // le seul samedi. Le défaut du fixture reflète ce bloc réel.
+    joursTouches: ['2026-07-07', '2026-07-08', '2026-07-09'],
+    blocMultiJours: true,
     ...partial,
   }
 }
