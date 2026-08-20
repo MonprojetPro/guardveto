@@ -110,6 +110,22 @@
   cursor: pointer;
 }
 .conflict.warn:hover { background: rgba(196, 138, 20, 0.24); }
+/* Conflit avec un planning EN BROUILLON : réel, mais réparable — personne n'a
+   encore reçu ce planning, une régénération suffit. Il lui faut donc son propre
+   ton : le vert dirait « rien à signaler » (c'est faux, il y a une garde), et
+   l'orange dirait « problème » (c'est excessif, rien n'est diffusé). Teinte
+   d'information, plus froide et plus sourde que l'avertissement. */
+.conflict.info {
+  background: rgba(76, 96, 122, 0.12);
+  color: #40536E;
+  border-color: rgba(76, 96, 122, 0.32);
+  cursor: help;
+  /* Le libellé porte le nom du planning : il peut être long, on l'autorise à
+     passer à la ligne plutôt que de déborder la carte sur mobile. */
+  white-space: normal;
+  text-align: right;
+}
+.conflict.info:hover { background: rgba(76, 96, 122, 0.2); }
 
 .status-pill {
   display: inline-flex; align-items: center; gap: 5px;

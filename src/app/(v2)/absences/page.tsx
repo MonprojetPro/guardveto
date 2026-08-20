@@ -20,8 +20,10 @@ import { BarreV2 } from '@/components/v2/BarreV2'
 import { AbsencesV2 } from '@/components/v2/AbsencesV2'
 import { chargerDock } from '@/data/v2/dock'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
-import { detecterConflitPlanningPublie } from '@/lib/conges/detection-conflit'
-import type { CreneauImpacte } from '@/lib/crise/contexte'
+import {
+  detecterConflitsPourDecision,
+  type VerdictSouhait,
+} from '@/lib/conges/detection-conflit'
 import type { EchangeRow, GardeLite, VetLite } from '@/components/echanges/EchangesClient'
 import type { CompensationLigne } from '@/components/admin/DepannagesClient'
 import type { VetCrise } from '@/components/planning/CriseModal'
@@ -106,9 +108,14 @@ export default async function AbsencesPage() {
   const conges = ((congesRes?.data ?? []) as Conge[])
 
   // ── Verdict de conflit sur les souhaits en attente (admin) ──
-  // Le même détecteur que la V1, calculé en amont pour que la ligne l'affiche
-  // sans clic. Fail-open : un détecteur muet n'empêche jamais l'écran de vivre.
-  const conflitsParConge: Record<string, CreneauImpacte[]> = {}
+  // Calculé en amont pour que la ligne l'affiche sans clic. Couvre les
+  // plannings PUBLIÉS et les BROUILLONS : l'écran n'annonçait que le publié,
+  // et affichait donc « aucun conflit » à un cabinet qui n'avait aucun planning
+  // publié — pendant que six souhaits percutaient un brouillon (retour MiKL du
+  // 2026-08-20).
+  // Fail-open : un détecteur muet n'empêche jamais l'écran de vivre — la clé
+  // reste alors absente, et la ligne n'affirme rien plutôt que de rassurer à tort.
+  const verdicts: Record<string, VerdictSouhait> = {}
   if (isAdmin) {
     const souhaits = conges.filter((c) => c.statut === 'souhait')
     if (souhaits.length > 0) {
@@ -121,20 +128,18 @@ export default async function AbsencesPage() {
       if (cabinetId) {
         const cid = cabinetId
         const resultats = await Promise.all(
-          souhaits.map(async (c) => {
-            const { aConflit, creneauxImpactes } = await detecterConflitPlanningPublie({
+          souhaits.map(async (c) => ({
+            id: c.id,
+            verdict: await detecterConflitsPourDecision({
               supabase,
               cabinetId: cid,
               veterinaireId: c.veterinaire_id,
               dateDebut: c.date_debut,
               dateFin: c.date_fin,
-            })
-            return { id: c.id, aConflit, creneauxImpactes }
-          }),
+            }),
+          })),
         )
-        for (const r of resultats) {
-          if (r.aConflit) conflitsParConge[r.id] = r.creneauxImpactes
-        }
+        for (const r of resultats) verdicts[r.id] = r.verdict
       }
     }
   }
@@ -178,7 +183,7 @@ export default async function AbsencesPage() {
           vets={vets}
           moiId={vet.id}
           isAdmin={isAdmin}
-          conflitsParConge={conflitsParConge}
+          verdicts={verdicts}
           echanges={(echangesRes?.data ?? []) as unknown as EchangeRow[]}
           gardesFutures={(gardesRes?.data ?? []) as unknown as GardeLite[]}
           vetsEchange={

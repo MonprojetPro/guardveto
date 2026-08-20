@@ -42,6 +42,7 @@ import { DepannagesV2 } from './DepannagesV2'
 import { FilouEdge } from './FilouEdge'
 import type { OrigineFilou } from '@/lib/v2/filou-origine'
 import type { CreneauImpacte } from '@/lib/crise/contexte'
+import type { VerdictSouhait } from '@/lib/conges/detection-conflit'
 import type { Conge, TypeConge, Veterinaire } from '@/types'
 
 type Onglet = 'conges' | 'echanges' | 'depannages'
@@ -51,8 +52,13 @@ interface Props {
   vets: Veterinaire[]
   moiId: string
   isAdmin: boolean
-  /** Conflits avec le planning publié, pré-calculés : { congeId → créneaux }. */
-  conflitsParConge: Record<string, CreneauImpacte[]>
+  /**
+   * Verdict de conflit pré-calculé par souhait : { congeId → verdict }.
+   * Couvre les plannings PUBLIÉS **et** les BROUILLONS — un souhait validé sur
+   * un brouillon oblige à régénérer, l'admin doit le savoir avant de trancher.
+   * Une entrée absente = détection en échec → l'écran n'affirme rien.
+   */
+  verdicts: Record<string, VerdictSouhait>
   echanges: EchangeRow[]
   gardesFutures: GardeLite[]
   vetsEchange: VetLite[]
@@ -105,12 +111,71 @@ function periodeLisible(c: Conge) {
   return `Du ${dateLongue(c.date_debut)} au ${dateLongue(c.date_fin)} · ${n} jours`
 }
 
+/**
+ * Le verdict d'un souhait, en QUATRE états distincts.
+ *
+ * L'écran n'en affichait qu'un : « ✓ Aucun conflit avec le planning publié »,
+ * servi même quand le cabinet n'avait AUCUN planning publié (retour MiKL du
+ * 2026-08-20). Le message était littéralement vrai et pratiquement trompeur :
+ * il a l'air d'un contrôle rassurant, alors qu'il n'a rien contrôlé. Les six
+ * souhaits tombaient en réalité dans un planning en brouillon, dont trois sur
+ * une garde déjà attribuée.
+ *
+ * Les quatre états répondent à la seule question que se pose qui décide :
+ * « si je valide, qu'est-ce que ça casse ? »
+ */
+function VerdictConflit({ verdict }: { verdict?: VerdictSouhait }) {
+  // Détection en échec (fail-open) : on ne dit RIEN plutôt que d'affirmer une
+  // absence de conflit qu'on n'a pas vérifiée. Le silence est honnête.
+  if (!verdict) return null
+
+  const { publiees, brouillon, aucunPlanning } = verdict
+  const pluriel = (n: number) => (n > 1 ? 's' : '')
+
+  // ① Le plus grave : le planning est parti chez les vétérinaires.
+  if (publiees.length > 0) {
+    return (
+      <span
+        className="conflict warn"
+        title={publiees.map((g) => `${g.date} · ${g.role}`).join('\n')}
+      >
+        ⚠ {publiees.length} garde{pluriel(publiees.length)} déjà publiée
+        {pluriel(publiees.length)} — {publiees[0].periodeLibelle}
+      </span>
+    )
+  }
+
+  // ② Conflit avec un brouillon : réel, mais réparable par une régénération.
+  //    On le dit AVEC la sortie, pour que l'information ouvre une décision
+  //    plutôt que d'inquiéter.
+  if (brouillon.length > 0) {
+    return (
+      <span
+        className="conflict info"
+        title={brouillon.map((g) => `${g.date} · ${g.role}`).join('\n')}
+      >
+        ◆ {brouillon.length} garde{pluriel(brouillon.length)} en brouillon —{' '}
+        {brouillon[0].periodeLibelle} · à regénérer après validation
+      </span>
+    )
+  }
+
+  // ③ Vérifié, et il n'y a réellement rien sur ces dates.
+  if (aucunPlanning) {
+    return <span className="conflict ok">✓ Aucune garde prévue sur ces dates</span>
+  }
+
+  // ④ Des gardes existent, mais dans une période verrouillée : plus modifiable,
+  //    donc rien à décider. Alerter devant une porte fermée n'aide personne.
+  return <span className="conflict ok">✓ Sans effet sur les plannings en cours</span>
+}
+
 export function AbsencesV2({
   conges,
   vets,
   moiId,
   isAdmin,
-  conflitsParConge,
+  verdicts,
   echanges,
   gardesFutures,
   vetsEchange,
@@ -255,8 +320,9 @@ export function AbsencesV2({
                 <h2>Souhaits en attente</h2>
                 {souhaits.length > 0 && <span className="section-count">{souhaits.length}</span>}
                 <p className="sub">
-                  Le verdict de conflit est calculé d&apos;avance sur chaque demande : les gardes
-                  déjà publiées que ce congé toucherait.
+                  Le verdict de conflit est calculé d&apos;avance sur chaque demande : les
+                  gardes que ce congé toucherait, qu&apos;elles soient déjà publiées ou
+                  encore en brouillon.
                 </p>
               </div>
 
@@ -268,7 +334,6 @@ export function AbsencesV2({
                 <ul className="rows">
                   {souhaits.map((c) => {
                     const vet = parVet.get(c.veterinaire_id)
-                    const impacts = conflitsParConge[c.id]
                     return (
                       <li key={c.id}>
                         <div className="row">
@@ -289,17 +354,7 @@ export function AbsencesV2({
                             {c.commentaire && <p className="row-motif">« {c.commentaire} »</p>}
                           </div>
                           <div className="row-side">
-                            {impacts && impacts.length > 0 ? (
-                              <span className="conflict warn">
-                                ⚠ {impacts.length} garde{impacts.length > 1 ? 's' : ''} publiée
-                                {impacts.length > 1 ? 's' : ''} touchée
-                                {impacts.length > 1 ? 's' : ''}
-                              </span>
-                            ) : (
-                              <span className="conflict ok">
-                                ✓ Aucun conflit avec le planning publié
-                              </span>
-                            )}
+                            <VerdictConflit verdict={verdicts[c.id]} />
                             <div className="row-actions">
                               <button
                                 type="button"
