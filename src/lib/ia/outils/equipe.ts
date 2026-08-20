@@ -106,10 +106,14 @@ DERNIER RECOURS est important : ce n'est pas une interdiction, c'est un ordre de
       prenom: v.prenom,
       nom: v.nom,
       actif_dans_le_planning: v.actif,
+      // Le RÔLE reste visible de tous : savoir à qui s'adresser pour un congé
+      // est une question banale, et l'identité de l'administratrice n'a rien
+      // d'un secret — c'est elle qui signe les e-mails de validation. La
+      // masquer forçait Filou à répondre « je ne sais pas », ou pire à deviner.
+      role: v.role_app === 'admin' ? 'administrateur' : 'vétérinaire',
       ...(detail(v.id)
         ? {
             statut: v.statut,
-            role: v.role_app === 'admin' ? 'administrateur' : 'vétérinaire',
             dernier_recours: v.dernier_recours,
             etiquettes: v.tags ?? [],
           }

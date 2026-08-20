@@ -57,7 +57,12 @@ export async function controlerCoherence(
     await Promise.all([
       supabase
         .from('planning_semaine')
+        // La vue n'a AUCUNE RLS. Sans cette borne, le rapport de cohérence du
+        // cabinet A intégrait les gardes du cabinet B et annonçait des trous
+        // imaginaires — un diagnostic faux est pire qu'une absence de
+        // diagnostic, parce qu'on le croit.
         .select('date, type, premier_prenom, second_prenom, periode_statut')
+        .eq('cabinet_id', cabinetId)
         .order('date'),
       supabase
         .from('creneau_modele')

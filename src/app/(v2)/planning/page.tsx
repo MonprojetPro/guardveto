@@ -137,7 +137,7 @@ export default async function PlanningPageV2({
       // fiche véto. Le try/catch est délibéré : une zone introuvable ne doit
       // jamais faire tomber l'écran planning pour un simple repère visuel.
       resoudreCabinetId(supabase)
-        .then((id) => supabase.from('cabinets').select('zone_scolaire').eq('id', id).maybeSingle())
+        .then((id) => supabase.from('cabinets').select('id, zone_scolaire').eq('id', id).maybeSingle())
         .catch(() => ({ data: null })),
     ])
 
@@ -173,12 +173,26 @@ export default async function PlanningPageV2({
   // du test : `lib/planning/diffusion.ts`.
   const toutesPeriodes = ((periodesRes?.data ?? []) as Periode[])
   const periodes = periodesVisibles(toutesPeriodes, isAdmin)
+
+  // ⚠️ DEUX BORNES, ET ELLES NE FONT PAS LE MÊME TRAVAIL.
   //
-  // Le filtre des gardes n'est appliqué QU'au véto, volontairement : la liste
-  // des périodes est plafonnée à 20, et une garde relevant d'une période plus
-  // ancienne disparaîtrait de l'écran de l'admin — un trou silencieux, pire
-  // que ce qu'on corrige.
-  const toutesGardes = (gardesRes?.data ?? []) as GardeDenormalisee[]
+  // ① LE CABINET, pour tout le monde, administratrice comprise. La vue
+  //    `planning_semaine` n'a AUCUNE RLS (propriétaire postgres, pas
+  //    security_invoker) : sans ce filtre, l'écran affiche les gardes de TOUS
+  //    les cabinets. Invisible aujourd'hui — il n'y en a qu'un — et c'est
+  //    précisément ce qui rend la faute facile à laisser passer jusqu'au jour
+  //    du deuxième client. La colonne `cabinet_id` a été ajoutée à la vue le
+  //    2026-08-21 pour rendre ce filtre possible.
+  //
+  // ② LA DIFFUSION, pour le seul vétérinaire : il ne voit que les périodes
+  //    publiées. L'administratrice, elle, voit ses brouillons — c'est son
+  //    métier de les préparer. Le filtre par période ne lui est PAS appliqué :
+  //    la liste des périodes est plafonnée à 20, et une garde relevant d'une
+  //    période plus ancienne disparaîtrait de son écran — un trou silencieux,
+  //    pire que ce qu'on corrige.
+  const cabinetIdCourant = (cabinetRes?.data as { id?: string } | null)?.id ?? null
+  const toutesGardes = ((gardesRes?.data ?? []) as GardeDenormalisee[])
+    .filter((g) => !cabinetIdCourant || g.cabinet_id === cabinetIdCourant)
   const gardes = isAdmin ? toutesGardes : lignesDesPeriodes(toutesGardes, periodes)
 
   const nomsTypes: Record<string, string> = {}

@@ -99,6 +99,12 @@ export interface GardeDenormalisee extends Garde {
    */
   places_sup?: PlaceSupplementaire[]
   /**
+   * Cabinet propriétaire, exposé par la vue `planning_semaine` depuis le
+   * 2026-08-21. La vue n'ayant AUCUNE RLS, c'est la seule chose qui permette à
+   * ses lecteurs de se borner à leur propre cabinet.
+   */
+  cabinet_id?: string
+  /**
    * Backlog 8 bis — ce JOUR précis porte-t-il un remplacement exceptionnel ?
    * Une garde de week-end couvre trois jours ; l'exception n'en concerne
    * qu'un. La garde, elle, n'a pas bougé — elle porte toujours l'équité et le

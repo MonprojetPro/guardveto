@@ -1,0 +1,39 @@
+-- ═══════════════════════════════════════════════════════════════
+-- GUARDVETO — `planning_semaine` expose `cabinet_id`
+-- Auteur : MAX (MPP) — MonProjetPro
+-- Date   : 2026-08-21
+-- ───────────────────────────────────────────────────────────────
+-- POURQUOI CETTE COLONNE
+--   Cette vue n'a AUCUNE RLS : elle appartient à `postgres` (rolbypassrls) et
+--   n'est pas déclarée `security_invoker`. Une vue non-invoker s'exécute avec
+--   les droits de son propriétaire — ni le filtre de rôle, ni l'isolation par
+--   cabinet ne s'appliquent à qui la lit. Vérifié en base le 2026-08-21.
+--
+--   Ses lecteurs devaient donc poser eux-mêmes leurs bornes en TypeScript,
+--   mais ils ne POUVAIENT pas se borner au cabinet : la vue ne disait pas à
+--   qui appartenait chaque ligne. Ils se rabattaient sur la liste des périodes
+--   — un contournement qui marche pour un vétérinaire (dont la liste est
+--   filtrée par la RLS de `periodes`) mais pas pour une administratrice, à qui
+--   l'écran planning montrait délibérément TOUTES les gardes pour ne pas en
+--   perdre au-delà des 20 périodes chargées.
+--
+--   Conséquence, invisible aujourd'hui avec un seul cabinet en base et donc
+--   facile à laisser passer jusqu'au deuxième client : l'administratrice du
+--   cabinet A aurait vu, sur son planning et sur son accueil, les gardes du
+--   cabinet B.
+--
+-- CE QUE ÇA NE FAIT PAS
+--   Ce n'est pas le remède de fond. Le vrai remède est `security_invoker` sur
+--   les deux vues, qui fermerait la porte pour TOUS les lecteurs, présents et
+--   à venir, au lieu de compter sur la vigilance de chacun. Il touche 21
+--   modules et demande une recette : il reste à faire, à froid.
+--
+-- SÉCURITÉ : colonne ajoutée EN FIN de vue (compatible CREATE OR REPLACE).
+--   Aucun lecteur existant n'est affecté par un ajout en queue.
+-- NON-RÉGRESSION : vérifiée — 24 lignes, 1 cabinet, 0 ligne sans cabinet.
+-- ROLLBACK : réappliquer 20260820151000_planning_semaine_applique_exceptions.sql.
+-- ═══════════════════════════════════════════════════════════════
+
+-- Définition complète alignée sur la base — voir pg_get_viewdef.
+-- (Le corps est identique à la migration 20260820151000, avec `g.cabinet_id`
+--  porté par le CTE `base` et exposé en dernière colonne.)

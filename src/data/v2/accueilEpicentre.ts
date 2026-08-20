@@ -350,7 +350,19 @@ export async function chargerAccueil(
   const toutesLignes = (gardesRes?.data ?? []) as (Record<string, unknown> & {
     periode_id: string
   })[]
-  const lignes = estAdmin ? toutesLignes : lignesDesPeriodes(toutesLignes, periodes)
+  // ⚠️ LE FILTRE S'APPLIQUE AUSSI À L'ADMINISTRATRICE, et c'est nouveau.
+  //
+  // La vue `planning_semaine` n'a AUCUNE RLS : sans borne, « ce soir » et
+  // « demain » annonceraient les gardes de TOUS les cabinets. La liste
+  // `periodes`, elle, vient de la table `periodes`, dont l'isolation par
+  // cabinet est RESTRICTIVE — la borner par elle borne donc au cabinet.
+  //
+  // On ne perd rien au passage : l'accueil ne regarde que deux jours, qui
+  // relèvent forcément d'une période récente. C'est l'écran planning, qui
+  // remonte des mois en arrière, qui avait besoin d'un traitement à part.
+  // `periodes` est déjà borné plus haut par `periodesVisibles(…, estAdmin)` :
+  // il porte donc les deux filtres à la fois, le cabinet et la diffusion.
+  const lignes = lignesDesPeriodes(toutesLignes, periodes)
   /** Le catalogue d'horaires de la période qui couvre CETTE date. Deux dates
    *  voisines peuvent relever de deux périodes — donc de deux profils — deux
    *  fois par an. */

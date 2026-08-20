@@ -127,7 +127,13 @@ async function releverLesFaits(ctx: ContexteOutil): Promise<Faits> {
       .order('prenom'),
     ctx.supabase
       .from('planning_semaine')
+      // La vue n'a AUCUNE RLS : sans cette borne, le banc de recette de
+      // l'admin du cabinet A compterait les gardes du cabinet B, et
+      // conclurait à une incohérence que personne ne saurait expliquer.
+      // Invisible tant qu'il n'y a qu'un cabinet — donc facile à oublier
+      // jusqu'au jour du deuxième client.
       .select('date, type, premier_prenom, second_prenom')
+      .eq('cabinet_id', ctx.cabinetId)
       .gte('date', aujourdhui)
       .order('date')
       .limit(60),
