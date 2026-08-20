@@ -169,6 +169,8 @@ async function chargerReglesCabinet(
   supabase: SupabaseServerClient,
   cabinetId: string,
   periodeId: string,
+  /** Effectif ACTIF du cabinet — déplie les règles « tous les vétérinaires ». */
+  tousLesVetoIds: readonly string[],
 ): Promise<{
   contraintesParVet: Map<string, ContrainteEngine[]>
   equityWeights: EquityWeights
@@ -202,7 +204,7 @@ async function chargerReglesCabinet(
 
   const rows = (reglesDb as RegleCabinetRow[] | null) ?? []
 
-  const { contraintesParVet, rejets } = mapperReglesCabinet(rows, briquesConnues)
+  const { contraintesParVet, rejets } = mapperReglesCabinet(rows, briquesConnues, tousLesVetoIds)
   for (const r of rejets) {
     console.warn(`[P1A-004] Règle ${r.regleId} écartée : ${r.raison}`)
   }
@@ -275,8 +277,12 @@ export async function chargerInputDepuisSupabase(
   //     Scopé cabinet + validité de période ; sans cabinetId (contextes
   //     hors-DB / legacy) aucune règle n'est appliquée. Inclut les poids
   //     d'équité (extraits des règles `equilibrer`, défaut si absentes).
+  //     L'effectif actif est passé au mapper : c'est lui qui déplie les règles
+  //     « tous les vétérinaires » sur chaque véto (une règle collective créée
+  //     avant l'arrivée d'un véto doit le couvrir lui aussi).
+  const idsVetosActifs = ((vetsDb as { id: string }[] | null) ?? []).map((v) => v.id)
   const { contraintesParVet, equityWeights, structureConfig } = cabinetId
-    ? await chargerReglesCabinet(supabase, cabinetId, periodeId)
+    ? await chargerReglesCabinet(supabase, cabinetId, periodeId, idsVetosActifs)
     : {
         contraintesParVet: new Map<string, ContrainteEngine[]>(),
         equityWeights: buildEquityWeights([]),

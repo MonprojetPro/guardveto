@@ -247,7 +247,15 @@ export async function POST(req: NextRequest) {
       ((briquesDb as { id: string }[] | null) ?? []).map((b) => b.id),
     )
 
-    const { contraintesParVet } = mapperReglesCabinet(rows, briquesConnues)
+    // Effectif du contexte COURANT pour déplier les règles « tous les
+    // vétérinaires » : le snapshot n'a jamais figé la liste des vétos d'une
+    // règle collective (c'est tout l'intérêt), on rejoue donc sur l'effectif
+    // que le replay a sous la main — le même que celui des `vetsRejoues`.
+    const { contraintesParVet } = mapperReglesCabinet(
+      rows,
+      briquesConnues,
+      contexte.vets.map((v) => v.id),
+    )
     const equityWeights = buildEquityWeights(extraireEquityRules(rows))
     const structureConfig = extraireStructureConfig(rows)
     // Historique des fêtes (backlog n°14) : donnée du MONDE courant (comme les

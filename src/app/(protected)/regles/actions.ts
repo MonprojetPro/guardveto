@@ -29,7 +29,7 @@ import { chargerCreneauModele } from '@/data/chargerCreneauModele'
 import { empreinteRegle, paramsDeRow } from '@/lib/regles/identiteRegle'
 import {
   BRIQUES_EVALUABLES, BRIQUES_DESIDERATA, FORCES_VALIDES,
-  CODES_CRENEAUX_HISTORIQUES,
+  CODES_CRENEAUX_HISTORIQUES, OWNER_TOUS, BRIQUES_SANS_TOUS,
   construireParams, envelopper, lireOwner, lirePartenaire,
   type BriqueEvaluable, type ForceFormulaire, type UpsertReglePayload,
 } from '@/lib/regles/paramsRegle'
@@ -1206,6 +1206,13 @@ export async function upsertRegle(payload: UpsertReglePayload) {
   }
   if (!payload.owner_id) {
     return { error: 'Sélectionnez le vétérinaire concerné.' }
+  }
+  // « Tous les vétérinaires » ne s'applique pas aux règles qui désignent un
+  // partenaire nommé : dépliée, une telle règle se contredirait sur son propre
+  // partenaire. Le formulaire masque déjà l'option — on refuse aussi ici, car
+  // Filou et les imports écrivent par ce même chemin.
+  if (payload.owner_id === OWNER_TOUS && BRIQUES_SANS_TOUS.has(payload.brique_id)) {
+    return { error: 'Cette règle désigne un binôme : choisissez un vétérinaire précis.' }
   }
 
   let cabinetId: string

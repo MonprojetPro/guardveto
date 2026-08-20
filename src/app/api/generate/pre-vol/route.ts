@@ -59,11 +59,17 @@ async function chargerDonneesFantomes(
   const briquesConnues = new Set<string>(
     ((briquesDb as { id: string }[] | null) ?? []).map((b) => b.id),
   )
+  const annuaire = ((vetsDb as VetAnnuaire[] | null) ?? [])
+  // Dépliage « tous les vétérinaires » sur les seuls vétos ACTIFS : ce chargeur
+  // lit volontairement AUSSI les inactifs (c'est son rôle : débusquer les règles
+  // fantômes). Déplier une règle collective sur un véto inactif inventerait un
+  // fantôme qui n'existe pas — le pré-vol crierait pour rien.
+  const idsVetosActifs = annuaire.filter((v) => v.actif).map((v) => v.id)
   const { contraintesParVet } = mapperReglesCabinet(
     (reglesDb as RegleCabinetRow[] | null) ?? [],
     briquesConnues,
+    idsVetosActifs,
   )
-  const annuaire = ((vetsDb as VetAnnuaire[] | null) ?? [])
   return { contraintesParVet, annuaire }
 }
 

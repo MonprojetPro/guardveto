@@ -365,12 +365,24 @@ export function extraireStructureConfig(regles: RegleCabinetRow[]): StructureCon
  *
  * @param regles          lignes brutes (déjà scopées cabinet + validité par le loader)
  * @param briquesConnues  ids présents dans le catalogue briques_regles
+ * @param tousLesVetoIds  effectif du cabinet — REQUIS dès qu'une règle porte
+ *                        `qui.type = 'tous'` (règle collective, dépliée ici sur
+ *                        chaque véto). Omis → ces règles sont rejetées AVEC une
+ *                        raison explicite, jamais ignorées en silence.
+ *                        ⚠️ Les QUATRE appelants doivent le passer (loader,
+ *                        controleImpact, api/generate/replay, api/generate/pre-vol) :
+ *                        un seul oubli et la règle s'applique à la génération
+ *                        mais pas au contrôle de cohérence — ou l'inverse.
  * @returns               contraintes par véto (triées) + liste des rejets
  */
 export function mapperReglesCabinet(
   regles: RegleCabinetRow[],
   briquesConnues: ReadonlySet<string>,
+  tousLesVetoIds?: readonly string[],
 ): ResultatMapping {
+  // Effectif réel du cabinet — support des règles « tous les vétérinaires »
+  // (`qui.type = 'tous'`). Dédoublonné et figé pour toute la passe.
+  const effectif = [...new Set((tousLesVetoIds ?? []).filter((x) => typeof x === 'string' && x !== ''))]
   const contraintesParVet = new Map<string, ContrainteEngine[]>()
   const rejets: RegleRejetee[] = []
 
@@ -423,11 +435,32 @@ export function mapperReglesCabinet(
     }
     const pj = row.params_json as ParamsJson
 
-    // 4. qui.refs présent, propriétaire identifiable
-    const refs = pj.qui?.refs
-    if (!Array.isArray(refs) || refs.length === 0 || typeof refs[0] !== 'string') {
-      rejet('qui.refs absent ou vide (propriétaire indéterminable)')
-      continue
+    // 4. Propriétaires : soit TOUT l'effectif (`qui.type = 'tous'`), soit les
+    //    vétos nommés dans `qui.refs`.
+    //
+    //    « tous » ne fige AUCUNE ref à l'écriture : c'est ici, au chargement,
+    //    qu'on déplie sur l'effectif du moment — pour qu'un véto embauché après
+    //    la création de la règle en hérite sans que personne ait à y penser.
+    //
+    //    ⚠️ Si l'appelant n'a pas fourni l'effectif, on REJETTE en le disant.
+    //    Silence interdit : une règle collective ignorée sans trace, c'est le
+    //    « ça marche à la génération mais pas au contrôle de cohérence » qu'on
+    //    a déjà payé. Le rejet est tracé par chaque appelant.
+    const estTous = pj.qui?.type === 'tous'
+    let refsUniques: string[]
+    if (estTous) {
+      if (effectif.length === 0) {
+        rejet('règle « tous les vétérinaires » : effectif non fourni par l’appelant')
+        continue
+      }
+      refsUniques = effectif
+    } else {
+      const refs = pj.qui?.refs
+      if (!Array.isArray(refs) || refs.length === 0 || typeof refs[0] !== 'string') {
+        rejet('qui.refs absent ou vide (propriétaire indéterminable)')
+        continue
+      }
+      refsUniques = [...new Set(refs.filter((x): x is string => typeof x === 'string'))]
     }
     // MULTI-PROPRIÉTAIRES (backlog n°18) : une règle « pour Manon ET Antoine »
     // s'applique à CHAQUE réf — plus de troncature silencieuse de refs[1..n].
@@ -435,7 +468,8 @@ export function mapperReglesCabinet(
     //    (migration P1A-003 + écriture symétrique A→B/B→A d'upsertRegle). refs[1]
     //    y est le PARTENAIRE, pas un co-propriétaire → refs[0] seul, comme avant.
     //    (La symétrie du duo est déjà garantie par la ligne miroir.)
-    const refsUniques = [...new Set(refs.filter((x): x is string => typeof x === 'string'))]
+    //    C'est aussi pourquoi `tous` est refusé pour les briques à partenaire
+    //    (BRIQUES_SANS_TOUS) : le dépliage y serait auto-contradictoire.
 
     // 5. type V1 reconstructible (depuis _source, sinon repli brique→type)
     const typeBrut = pj._source?.type_v1 ?? BRIQUE_VERS_TYPE[row.brique_id]
@@ -462,6 +496,14 @@ export function mapperReglesCabinet(
     // Dépliage n°18 : une instance de contrainte PAR propriétaire (duo → refs[0]
     // seul, cf. exception ci-dessus). Objets DISTINCTS par véto (pas de partage
     // de référence : normaliserContraintes copie, mais on reste défensif).
+    // Garde : « tous » sur une brique à partenaire n'a pas de sens et se
+    // contredirait en se dépliant sur son propre partenaire. Le formulaire ne
+    // le propose pas ; on refuse quand même ici (défense en profondeur — une
+    // règle écrite par un autre chemin ne doit jamais passer en silence).
+    if (estTous && type === 'duo_interdit') {
+      rejet('« tous les vétérinaires » n’est pas applicable à un duo interdit')
+      continue
+    }
     const proprietaires = type === 'duo_interdit' ? [refsUniques[0]] : refsUniques
     for (const proprietaireId of proprietaires) {
       const contrainte: ContrainteEngine = {

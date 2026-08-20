@@ -13,6 +13,8 @@
 // ============================================================
 
 import { rendreRegle } from '@/engine/briques/catalogue'
+// `paramsRegle` n'importe rien (module de FORME pur) : aucun cycle possible.
+import { estRegleTous, LIBELLE_OWNER_TOUS } from '@/lib/regles/paramsRegle'
 
 /** Le minimum dont on a besoin pour nommer une règle. */
 export interface RegleNommable {
@@ -261,6 +263,14 @@ export function reglesVisees<T extends { id: string; actif: boolean }>(
 
 export function phraseRegle(regle: RegleNommable, nomVeto: (id: string) => string): string {
   const pj = (regle.params_json ?? {}) as ParamsJson
+  // Règle collective (`qui.type = 'tous'`) : aucune réf n'est figée, le sujet
+  // ne peut donc pas se déduire des refs. Sans ce cas, la phrase s'afficherait
+  // SANS sujet (« de garde au plus un week-end sur 3 ») — l'admin ne saurait
+  // pas à qui elle s'applique. Traité ici : `phraseRegle` est la source unique
+  // de l'écran Règles ET de la fiche du véto dans l'écran Équipe.
+  if (estRegleTous(pj)) {
+    return `${LIBELLE_OWNER_TOUS} ${rendreRegle(regle.brique_id, (pj.params ?? {}) as Record<string, unknown>, { nomVeto })}`
+  }
   const refs = pj.qui?.refs
   // Multi-propriétaires (n°18) : le sujet affiche TOUTES les réfs — sauf pour
   // un duo interdit où refs[1] est le PARTENAIRE (déjà rendu par le prédicat).

@@ -51,6 +51,34 @@ export const BRIQUES_DESIDERATA = new Set<BriqueEvaluable>([
   'preferer_creneau', 'preferer_avec', 'volume_gardes',
 ])
 
+// ── Règle « tous les vétérinaires » (2026-08-20) ──────────────
+// Une règle de rythme (fréquence des week-ends, espacement, limite de charge)
+// concerne en pratique TOUT le cabinet. La créer véto par véto est fastidieux
+// et surtout DANGEREUX : un véto oublié — ou embauché après coup — repart sans
+// la règle, en silence. On écrit donc UNE ligne `qui.type = 'tous'`, dépliée
+// sur l'effectif RÉEL au moment du chargement (cf. mapperReglesCabinet).
+//
+// ⚠️ Le dépliage est fait par le mapper, PAS à l'écriture : figer les ids à la
+//    création réintroduirait exactement le trou qu'on ferme (nouveau véto sans
+//    la règle). C'est la raison d'être de ce mode — ne pas « optimiser » en
+//    écrivant la liste des refs.
+
+/** Valeur sentinelle du champ « propriétaire » côté formulaire = tout l'effectif. */
+export const OWNER_TOUS = '__tous__'
+
+/** Libellé unique — l'écran Règles, la fiche Équipe et Filou disent la MÊME chose. */
+export const LIBELLE_OWNER_TOUS = 'Tous les vétérinaires'
+
+/**
+ * Briques qui désignent un PARTENAIRE nommé (`avec_veterinaire_id`) : « tous »
+ * n'y a aucun sens (« personne ne peut être avec personne ») et produirait une
+ * règle qui se contredit elle-même dès qu'elle se déplie sur son partenaire.
+ * Le formulaire n'offre pas l'option pour elles, et le serveur la refuse.
+ */
+export const BRIQUES_SANS_TOUS = new Set<BriqueEvaluable>([
+  'duo_interdit', 'preferer_avec', 'seulement_avec',
+])
+
 /** Forces sélectionnables par l'admin (les niveaux système sont exclus). */
 export const FORCES_VALIDES = ['jamais', 'sauf_crise', 'evitee', 'si_possible'] as const
 export type ForceFormulaire = (typeof FORCES_VALIDES)[number]
@@ -149,7 +177,17 @@ export function entierBorne(v: unknown, max: number): number | null {
   return n
 }
 
+/** Vrai si la règle vise TOUT l'effectif (et non un véto nommé). */
+export function estRegleTous(pj: unknown): boolean {
+  return (pj as { qui?: { type?: unknown } })?.qui?.type === 'tous'
+}
+
 export function lireOwner(pj: unknown): string | null {
+  // Une règle « tous » n'a pas de propriétaire nommé : on rend la sentinelle
+  // pour que le formulaire rouvre sur « Tous les vétérinaires » en édition
+  // (sinon il retomberait sur le 1er véto de la liste et transformerait
+  // silencieusement une règle collective en règle individuelle).
+  if (estRegleTous(pj)) return OWNER_TOUS
   const refs = (pj as { qui?: { refs?: unknown } })?.qui?.refs
   return Array.isArray(refs) && typeof refs[0] === 'string' ? refs[0] : null
 }
@@ -400,6 +438,15 @@ export function envelopper(
   quand: unknown,
   params: Record<string, unknown>,
 ): Record<string, unknown> {
+  // « Tous » : aucune ref figée — le mapper déplie sur l'effectif du moment.
+  if (ownerId === OWNER_TOUS) {
+    return {
+      qui: { type: 'tous', refs: [] },
+      quand: quand ?? null,
+      params,
+      _source: { type_v1: BRIQUES_EVALUABLES[briqueId] },
+    }
+  }
   return {
     qui: { type: 'veterinaire', refs: [ownerId] },
     quand: quand ?? null,

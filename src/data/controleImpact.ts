@@ -332,7 +332,14 @@ function lancerPreVol(
   monde: Monde,
   briquesConnues: ReadonlySet<string>,
 ): AvertissementPreVol[] {
-  const { contraintesParVet } = mapperReglesCabinet(monde.rows, briquesConnues)
+  // L'effectif du MONDE simulé déplie les règles « tous les vétérinaires » :
+  // le contrôle doit voir exactement ce que verra la génération, sinon une
+  // règle collective serait appliquée au planning sans jamais être contrôlée.
+  const { contraintesParVet } = mapperReglesCabinet(
+    monde.rows,
+    briquesConnues,
+    monde.vets.map((v) => v.id),
+  )
   const structureConfig = extraireStructureConfig(monde.rows)
   const equityWeights = buildEquityWeights(extraireEquityRules(monde.rows))
 

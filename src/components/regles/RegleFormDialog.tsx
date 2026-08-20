@@ -36,6 +36,11 @@ import { upsertRegle, verifierRegle } from '@/app/(protected)/regles/actions'
 // `'use server'`, et un type qu'il réexporte devient un export runtime fantôme
 // (ReferenceError en production — incident du 2026-08-02).
 import type { BriqueEvaluable, ForceFormulaire } from '@/lib/regles/paramsRegle'
+// Valeurs runtime (constantes + lecteur pur) : `paramsRegle` n'est PAS 'use server',
+// on peut donc les importer normalement — cf. la note ci-dessus sur actions.ts.
+import {
+  OWNER_TOUS, LIBELLE_OWNER_TOUS, BRIQUES_SANS_TOUS, lireOwner,
+} from '@/lib/regles/paramsRegle'
 import type { VerdictGardien } from '@/data/verifierRegleCandidate'
 import { GardienFilou } from '@/components/v2/regles/GardienFilou'
 import { useErreurBloquante } from '@/components/v2/regles/ErreurBloquante'
@@ -204,11 +209,10 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
     qui?: { refs?: unknown }
     params?: Record<string, unknown>
   }
-  const refs = pj.qui?.refs
-  const ownerInit =
-    Array.isArray(refs) && typeof refs[0] === 'string'
-      ? refs[0]
-      : (ownerParDefaut ?? vets[0]?.id ?? '')
+  // `lireOwner` rend OWNER_TOUS pour une règle collective : sans lui, rouvrir
+  // une règle « tous » la ferait retomber sur le 1er véto de la liste et la
+  // transformerait silencieusement en règle individuelle à l'enregistrement.
+  const ownerInit = lireOwner(pj) ?? (ownerParDefaut ?? vets[0]?.id ?? '')
   const p = pj.params ?? {}
 
   const [briqueId, setBriqueId] = useState<BriqueEvaluable>(
@@ -338,11 +342,21 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
     : PERMANENTE
   const [validite, setValidite] = useState<string>(periodeInit)
 
-  const nomVeto = (id: string) => vets.find((v) => v.id === id)?.prenom ?? id
+  const nomVeto = (id: string) =>
+    id === OWNER_TOUS ? LIBELLE_OWNER_TOUS : (vets.find((v) => v.id === id)?.prenom ?? id)
+
+  /** « Tous » n'a de sens que pour les règles qui ne nomment pas de partenaire. */
+  const peutViserTous = !BRIQUES_SANS_TOUS.has(briqueId)
 
   const choisirBrique = (b: BriqueEvaluable) => {
     setBriqueId(b)
     setForce(FORCE_DEFAUT[b])
+    // Passer sur une règle « avec un partenaire » alors que « tous » était
+    // sélectionné laisserait un propriétaire que le serveur refuse. On retombe
+    // sur un véto réel plutôt que de laisser l'admin buter sur une erreur.
+    if (BRIQUES_SANS_TOUS.has(b) && ownerId === OWNER_TOUS) {
+      setOwnerId(ownerParDefaut ?? vets[0]?.id ?? '')
+    }
   }
 
   const togglePeriode = (p: string) =>
@@ -576,16 +590,32 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
             <Label>Vétérinaire concerné</Label>
             <Select value={ownerId} onValueChange={(v) => v && setOwnerId(v)}>
               <SelectTrigger>
-                {ownerId
-                  ? (() => { const v = vets.find((x) => x.id === ownerId); return v ? `${v.prenom} ${v.nom}` : '' })()
-                  : <span className="text-muted-foreground">Sélectionner…</span>}
+                {ownerId === OWNER_TOUS
+                  ? LIBELLE_OWNER_TOUS
+                  : ownerId
+                    ? (() => { const v = vets.find((x) => x.id === ownerId); return v ? `${v.prenom} ${v.nom}` : '' })()
+                    : <span className="text-muted-foreground">Sélectionner…</span>}
               </SelectTrigger>
               <SelectContent>
+                {/* Une règle de rythme concerne en général TOUT le cabinet : la
+                    poser une fois évite d'en créer sept — et évite surtout le
+                    véto oublié, ou celui qui arrivera plus tard. Masquée pour
+                    les règles qui désignent un partenaire nommé (un duo « avec
+                    tout le monde » n'a pas de sens). */}
+                {peutViserTous && (
+                  <SelectItem value={OWNER_TOUS}>{LIBELLE_OWNER_TOUS}</SelectItem>
+                )}
                 {vets.map((v) => (
                   <SelectItem key={v.id} value={v.id}>{v.prenom} {v.nom}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {ownerId === OWNER_TOUS && (
+              <p className="text-xs text-muted-foreground">
+                S’applique à chaque vétérinaire du cabinet, y compris à ceux qui
+                arriveront plus tard.
+              </p>
+            )}
           </div>
 
           {/* QUOI */}
