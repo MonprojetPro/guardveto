@@ -126,15 +126,19 @@ Les six : Victor (21/09), Jean (23/09), Jean (26/09), Anne-Sophie (03/10), Victo
 
 ---
 
-## 6. 🚫 À NE PAS FAIRE pendant la séance
+## 6. ✅ Le risque « ancien écran » est levé
 
-**Ne pas cliquer sur « Voir les demandes » dans le bandeau orange du planning.**
-**Ne pas cliquer sur « Traiter dans Congés » sur l'écran d'accueil.**
-**Ne pas cliquer sur la cloche des notifications.**
+**Corrigé le 20 août au soir.** Un audit complet a été fait sur toutes les façons d'atterrir par accident dans l'ancienne interface depuis les écrans d'aujourd'hui.
 
-Ces trois boutons ouvrent d'anciens écrans qui n'ont pas encore été refaits — l'affichage change complètement (fond turquoise, autre menu) et on ne revient pas facilement en arrière. C'est identifié et rangé comme chantier à part ; ce n'est pas le sujet de demain.
+Les deux portes réelles sont fermées :
+- le bandeau **« Voir les demandes »** du planning → mène maintenant à **Absences** ;
+- le bouton de l'accueil, devenu **« Traiter dans Absences »** → idem.
 
-**Pour traiter les congés devant elle, passer par le menu « Absences ».** C'est l'écran à jour, et il est même meilleur : il signale de lui-même quand un souhait tombe sur une garde déjà attribuée.
+Il n'en reste **aucune** sur les écrans de la séance. Vérifié aussi : la cloche de notifications n'est pas montée sur les nouveaux écrans, le bouton « Proposer un échange » n'apparaît que pour un compte vétérinaire sur un planning publié (donc jamais demain), et la redirection de connexion mène bien au nouvel accueil.
+
+**Tu peux cliquer partout sans crainte.**
+
+Seule réserve, très improbable : si tu tapes une adresse à la main (`/conges`, `/notifications`, `/echanges`), l'ancienne interface répond encore. Ces écrans existent toujours, ils ne sont juste plus atteignables en cliquant.
 
 ---
 
@@ -152,7 +156,9 @@ Ces trois boutons ouvrent d'anciens écrans qui n'ont pas encore été refaits �
 ## 8. Ce qu'on lui doit après la séance
 
 - [x] ~~Une ligne « Tous les vétérinaires » dans le choix du vétérinaire~~ — **livré le 20 août au soir.**
-- [ ] Rebrancher les anciens écrans (congés, notifications, échanges) sur la nouvelle version.
+- [x] ~~Rebrancher les liens congés sur la nouvelle version~~ — **livré le 20 août au soir** (avec l'ajout dans Absences de la modification et de la suppression d'un congé, qui manquaient).
+- [ ] Refaire les écrans **Notifications** et **Échanges** en version 2 : ils n'ont pas d'équivalent et restent atteignables en tapant l'adresse.
+- [ ] Corriger les liens des notifications internes, qui pointent encore vers l'ancien écran des échanges.
 - [ ] Trancher son rythme d'alternance face aux vacances scolaires, selon sa réponse au §2.
 
 ---
