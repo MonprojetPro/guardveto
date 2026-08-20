@@ -314,14 +314,25 @@ async function reglagesQuiContraignent(
 ): Promise<string[]> {
   const { data } = await ctx.supabase
     .from('veterinaires')
-    .select('prenom, actif, dernier_recours')
+    .select('id, prenom, actif, dernier_recours')
     .order('prenom')
 
-  const vets = (data as Array<{ prenom: string; actif: boolean; dernier_recours: boolean }> | null) ?? []
+  const vets = (data as Array<{ id: string; prenom: string; actif: boolean; dernier_recours: boolean }> | null) ?? []
   const cible = prenom?.trim().toLowerCase()
-  const concernes = cible
+  let concernes = cible
     ? vets.filter((v) => v.prenom.toLowerCase() === cible)
     : vets
+
+  // ⛔ MEME DONNEE QUE lire_equipe, PAR UNE AUTRE BOUCHE.
+  //
+  // Sans prenom precis, cette fonction enumerait toute l'equipe et poussait une
+  // phrase nominative pour chaque personne marquee DERNIER RECOURS. Restreindre
+  // lire_equipe sans restreindre ceci n'aurait servi a rien.
+  //
+  // Un veterinaire garde le droit de savoir que LUI est en dernier recours —
+  // c'est meme la reponse la plus utile qu'il puisse recevoir, celle qui
+  // explique pourquoi il n'a presque jamais de garde.
+  if (!ctx.estAdmin) concernes = concernes.filter((v) => v.id === ctx.vetoId)
 
   const phrases: string[] = []
   for (const v of concernes) {

@@ -453,18 +453,27 @@ Appelle-le pour situer une période dans le temps, savoir combien il y en a eu, 
   params: ParamsHistoriquePeriodes,
 
   async executer(params, ctx) {
-    const { data } = await ctx.supabase
+    // Un vétérinaire n'apprend pas l'EXISTENCE ni l'état d'avancement d'un
+    // planning qu'on ne lui a pas diffusé. La barre du haut a cessé de le faire
+    // le 2026-08-21 ; lister ici « Historique été 2026 — verrouillée »
+    // reviendrait à le lui dire par une autre bouche.
+    //
+    // ⚠️ LE FILTRE EST POSÉ EN SQL, DONC AVANT LA LIMITE. Filtrer après aurait
+    // donné un faux négatif : dix brouillons récents auraient suffi à répondre
+    // « aucun planning ne t'a été diffusé » à quelqu'un qui en a. C'est le
+    // piège « une absence de donnée devient un zéro » que ce fichier dénonce en
+    // tête — il se glisse aussi dans l'ORDRE des opérations, pas seulement dans
+    // les valeurs.
+    let requete = ctx.supabase
       .from('periodes')
       .select('*')
       .eq('cabinet_id', ctx.cabinetId)
+    if (!ctx.estAdmin) requete = requete.not('publie_at', 'is', null)
+
+    const { data } = await requete
       .order('date_debut', { ascending: false })
       .limit(params.limite ?? 10)
     const periodes = ((data as Periode[] | null) ?? [])
-      // Un vétérinaire n'apprend pas l'EXISTENCE ni l'état d'avancement d'un
-      // planning qu'on ne lui a pas diffusé. La barre du haut a cessé de le
-      // faire le 2026-08-21 ; lister ici « Historique été 2026 — verrouillée »
-      // reviendrait à le lui dire par une autre bouche.
-      .filter((p) => ctx.estAdmin || Boolean((p as { publie_at?: string | null }).publie_at))
     if (periodes.length === 0) {
       return {
         erreur: ctx.estAdmin

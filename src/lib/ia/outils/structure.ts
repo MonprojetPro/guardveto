@@ -363,6 +363,12 @@ Appelle-le pour « le vendredi soir et le week-end sont-ils liés ? », ou avant
 export const lireReglagesCabinet: OutilLecture<typeof SANS_PARAMETRE> = {
   genre: 'lecture',
   nom: 'lire_reglages_cabinet',
+  // Reserve a l'admin, comme l'ecran /reglages qui montre exactement ces
+  // champs et redirige un veterinaire vers l'accueil. Ce sont des
+  // branchements d'infrastructure — identifiant de l'agenda Google, adresse
+  // d'expedition des e-mails, adresse d'exercice : rien qu'un veterinaire ait
+  // a connaitre, et la RLS de `cabinets` ne pose aucune condition de role.
+  adminSeulement: true,
   description: `Donne les réglages généraux du cabinet : adresse, zone scolaire (A/B/C) et région des fériés (dérivées de l'adresse), agenda Google partagé, expéditeur des e-mails.
 
 Appelle-le pour toute question sur ces branchements — « quelle est notre zone scolaire ? », « quel agenda est partagé ? », « qui envoie les e-mails ? ».`,

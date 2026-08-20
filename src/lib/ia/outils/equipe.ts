@@ -88,14 +88,32 @@ DERNIER RECOURS est important : ce n'est pas une interdiction, c'est un ordre de
   params: SANS_PARAMETRE,
   async executer(_params, ctx) {
     const equipe = await chargerEquipe(ctx)
+
+    // ⛔ CE QUI REGARDE L'ORGANISATION NE REGARDE PAS TOUTE L'EQUIPE.
+    //
+    // L'ecran Equipe est ferme aux veterinaires : statut contractuel
+    // (associe / salarie), role applicatif, etiquettes et surtout DERNIER
+    // RECOURS sont des donnees d'organisation — la derniere est meme un
+    // jugement que l'administratrice porte sur l'ordre de passage.
+    //
+    // On ne ferme pas l'outil pour autant : il fonde presque toutes les
+    // reponses qui nomment quelqu'un, et un veterinaire a besoin de savoir qui
+    // compose son equipe. On restreint les CHAMPS, et chacun garde le detail
+    // de SA propre ligne — meme principe que lire_compteurs.
+    const detail = (id: string) => ctx.estAdmin || id === ctx.vetoId
+
     return equipe.map((v) => ({
       prenom: v.prenom,
       nom: v.nom,
-      statut: v.statut,
-      role: v.role_app === 'admin' ? 'administrateur' : 'vétérinaire',
       actif_dans_le_planning: v.actif,
-      dernier_recours: v.dernier_recours,
-      etiquettes: v.tags ?? [],
+      ...(detail(v.id)
+        ? {
+            statut: v.statut,
+            role: v.role_app === 'admin' ? 'administrateur' : 'vétérinaire',
+            dernier_recours: v.dernier_recours,
+            etiquettes: v.tags ?? [],
+          }
+        : {}),
     }))
   },
 }

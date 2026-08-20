@@ -127,14 +127,36 @@ async function chargerEchanges(ctx: ContexteOutil): Promise<EchangeVM[]> {
     .select(`
       id, statut, message, motif_refus, role_demandeur, role_contrepartie,
       demandeur_id, cible_id,
-      garde:garde_id(id, date, type),
+      garde:garde_id(id, date, type, periode_id),
       gardeContrepartie:garde_contrepartie_id(id, date, type),
       demandeur:demandeur_id(id, prenom, nom),
       cible:cible_id(id, prenom, nom)
     `)
     .order('created_at', { ascending: false })
     .limit(200)
-  return ((data as EchangeBrut[] | null) ?? []).map(versVM).filter((v): v is EchangeVM => v !== null)
+
+  // La RLS des échanges laisse passer toute proposition OUVERTE du cabinet
+  // (`cible_id IS NULL`) : c'est voulu, un appel à volontaires s'adresse à
+  // tout le monde. Mais elle expose alors la date, le type de garde et le nom
+  // du demandeur.
+  //
+  // Aujourd'hui sans conséquence, parce qu'un échange ne peut naître que sur
+  // une période publiée. C'est exactement la situation d'avant le correctif de
+  // `gardesDuVetoCeJour` : la protection tenait à un invariant respecté
+  // AILLEURS, pas à un filtre posé ici. Le jour où ce chemin change, personne
+  // ne pense à revenir dans ce fichier. On ferme donc par un filtre explicite.
+  const perimetre = await perimetrePeriodes(ctx)
+  const autorisees = new Set(perimetre.ids)
+
+  return ((data as EchangeBrut[] | null) ?? [])
+    .filter((e) => {
+      const garde = unRel(e.garde) as (GardeJoin & { periode_id?: string }) | null
+      // Une garde sans période lisible : on écarte plutôt que de laisser
+      // passer. Le doute profite à la discrétion, pas à l'affichage.
+      return garde?.periode_id ? autorisees.has(garde.periode_id) : false
+    })
+    .map(versVM)
+    .filter((v): v is EchangeVM => v !== null)
 }
 
 // ── Helpers de résolution prénom / date (jamais d'UUID côté modèle) ──
