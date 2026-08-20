@@ -96,6 +96,18 @@ export default async function HistoriquePage({
   const vet = moi as Veterinaire
   const estAdmin = vet.role_app === 'admin'
 
+  // ⛔ ÉCRAN RÉSERVÉ AUX ADMINS — décision MiKL du 2026-08-20.
+  //
+  // C'est un outil de PRÉPARATION : on y regarde qui a accumulé quoi pour
+  // équilibrer la période suivante. Un vétérinaire n'en a pas l'usage, et
+  // l'y laisser entrer contredisait ce qu'on venait de corriger ailleurs :
+  // son écran planning ne lui montre plus que ce qui lui a été diffusé,
+  // pendant que l'historique lui détaillait des périodes non publiées.
+  //
+  // Le refus est ICI, pas seulement dans le menu : retirer une entrée de la
+  // navigation ne ferme aucune porte à qui connaît l'adresse.
+  if (!estAdmin) redirect('/planning')
+
   // ── Périodes ───────────────────────────────────────────────────────────
   const { data: periodesDb } = await supabase
     .from('periodes')
@@ -323,14 +335,23 @@ export default async function HistoriquePage({
       feries: r.feries_total,
     }))
     const semaines = periodesValidees.reduce((s, p) => s + nbSemaines(p), 0)
-    const brouillons = periodes.length - periodesValidees.length
-    cumulResume = `${periodesValidees.length} période${
-      periodesValidees.length > 1 ? 's' : ''
-    } validée${periodesValidees.length > 1 ? 's' : ''} · ${semaines} semaines${
-      brouillons > 0
-        ? ` · ${brouillons} brouillon${brouillons > 1 ? 's' : ''} non compté${brouillons > 1 ? 's' : ''}`
-        : ''
-    }`
+    const exclus = periodes.filter((p) => p.statut === 'brouillon')
+
+    // « 1 période validée · 8 semaines · 1 brouillon non compté » ne disait ni
+    // LESQUELLES, ni sur quelle plage — MiKL : « c'est quoi au juste, toutes
+    // les périodes cumulées ? les publiées ? les brouillons ? ». Un total dont
+    // on ignore l'assiette n'est pas vérifiable, et un chiffre invérifiable
+    // dans un écran d'équité ne sert à rien : on NOMME ce qui est compté, et
+    // ce qui ne l'est pas.
+    const nommees = periodesValidees.map((p) => libellePeriode(p)).join(', ')
+    const dateCourte = (d: string) =>
+      new Date(`${d}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: '2-digit' })
+
+    cumulResume =
+      `Compte ${nommees} — du ${dateCourte(bornes.debut)} au ${dateCourte(bornes.fin)}, ${semaines} semaines`
+      + (exclus.length > 0
+        ? ` · NON compté : ${exclus.map((p) => libellePeriode(p)).join(', ')} (brouillon${exclus.length > 1 ? 's' : ''}, encore modifiable${exclus.length > 1 ? 's' : ''})`
+        : '')
   }
 
   // ── Greffes V1 : bilan de période et historique des fêtes ──────────────

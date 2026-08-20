@@ -153,18 +153,32 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
           </span>
         </Link>
 
-        <Link {...entree('/historique')} href="/historique" aria-label="Historique et compteurs">
-          <span className="di-ico" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12.6" r="7.4" />
-              <path d="M12 8.6v4l2.9 1.9" />
-              <path d="M4.6 5.4 6.9 3.7M19.4 5.4 17.1 3.7" />
-            </svg>
-          </span>
-          <span className="di-flap" aria-hidden="true">
-            <span className="di-text">Historique &amp; compteurs</span>
-          </span>
-        </Link>
+        {/* RÉSERVÉ AUX ADMINS — décision MiKL du 2026-08-20.
+            Cet écran est un outil de PRÉPARATION : il sert à voir qui a
+            accumulé quoi pour équilibrer la période suivante. Un vétérinaire
+            n'a rien à en faire, et l'y laisser entrer avait deux défauts. Le
+            premier, de fond : il y lisait des périodes qui ne lui ont jamais
+            été diffusées — l'écran planning venait justement de cesser de les
+            lui montrer, l'historique continuait. Le second, de cohérence :
+            « aucune garde sur ton planning » d'un côté, et le détail de
+            l'historique été de l'autre.
+            L'entrée disparaît ICI, et la page elle-même refuse l'accès : une
+            porte qu'on se contente de retirer du menu reste ouverte à qui
+            connaît l'adresse. */}
+        {estAdmin && (
+          <Link {...entree('/historique')} href="/historique" aria-label="Historique et compteurs">
+            <span className="di-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12.6" r="7.4" />
+                <path d="M12 8.6v4l2.9 1.9" />
+                <path d="M4.6 5.4 6.9 3.7M19.4 5.4 17.1 3.7" />
+              </svg>
+            </span>
+            <span className="di-flap" aria-hidden="true">
+              <span className="di-text">Historique &amp; compteurs</span>
+            </span>
+          </Link>
+        )}
 
         {estAdmin && (
           <Link
