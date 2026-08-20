@@ -577,3 +577,32 @@ vérité des arbitrages : MiKL.*
 *Complété le 2026-08-14 (recette de l'import d'un ancien planning : équité des
 absents, limite de taille réelle, cause racine du bypass auth, plafond de
 tokens, mine des garde-fous `compteurs.length`).*
+
+---
+
+## 🔓 DETTE DE SÉCURITÉ — les vues ignorent la RLS (`security_invoker`)
+
+**Décidé le 2026-08-21, reporté volontairement** (MiKL) : le correctif touche 21 modules
+lecteurs et demande une recette complète.
+
+**Le fait**, vérifié en base : `planning_semaine` et `compteurs_gardes` appartiennent à
+`postgres` (`rolbypassrls = true`) et n'ont pas `security_invoker` (`reloptions = null`).
+Une vue non-invoker s'exécute avec les droits de son propriétaire : **aucune politique RLS
+ne s'y applique**, ni le filtre de rôle, ni l'isolation par `cabinet_id`. Les tables
+sous-jacentes, elles, sont correctement protégées.
+
+**Ce qui tient en attendant** : 13 bornes posées à la main lors des 4 passes d'audit du
+20-21/08 (voir `docs/audits/2026-08-21-*.md`). Elles tiennent parce que treize fois
+quelqu'un y a pensé. **Le quatorzième lecteur écrit rouvrira la porte**, sans que rien ne
+l'en avertisse — c'est la définition d'une dette, pas d'un correctif.
+
+**Ce que ça coûte de ne pas le faire** : invisible aujourd'hui (un seul cabinet en base).
+Au deuxième client : l'administratrice du cabinet A voit les gardes du cabinet B, et son
+rapport de cohérence compte les gardes de l'autre en annonçant des trous imaginaires.
+
+**Quand le faire** : avant le deuxième cabinet client. Pas après.
+
+**Comment** : `ALTER VIEW … SET (security_invoker = true)` sur les deux vues, puis recette
+des 21 lecteurs — en distinguant ceux qui tournent en `service_role` (insensibles) de ceux
+qui tournent en session utilisateur. Le module `src/lib/ia/outils/perimetre.ts` reste utile
+ensuite : il porte aussi le critère de DIFFUSION (`publie_at`), que la RLS ne connaît pas.
