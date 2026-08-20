@@ -103,9 +103,19 @@ interface Props {
    * les gardes s'écrivaient bel et bien dans Google.
    */
   agendaParDefaut?: string
+  /**
+   * Le nom de l'agenda chez Google (« gardes véto »). L'identifiant technique
+   * d'un agenda secondaire est une suite de 64 caractères hexadécimaux :
+   * illisible, impossible à reconnaître, et inquiétant dans un écran de
+   * réglages. Le nom est le seul repère partagé avec le cabinet, qui le voit
+   * dans sa propre interface Google. null = agenda injoignable.
+   */
+  nomAgenda?: string | null
 }
 
-export function ReglagesV2({ valeurs, periodesPubliees, emails, agendaParDefaut = '' }: Props) {
+export function ReglagesV2({
+  valeurs, periodesPubliees, emails, agendaParDefaut = '', nomAgenda = null,
+}: Props) {
   const [isPending, startTransition] = useTransition()
   const { ouvrirErreur, dialogueErreur } = useErreurBloquante()
 
@@ -302,9 +312,17 @@ export function ReglagesV2({ valeurs, periodesPubliees, emails, agendaParDefaut 
                 d'où vient ce réglage. */}
             {!agendaSaisi && agendaParDefaut !== '' && (
               <p className="conn-line">
-                Ce champ est vide, mais les gardes partent bien vers l&apos;agenda
-                configuré au niveau du serveur&nbsp;:<br />
-                <span className="mono">{agendaParDefaut}</span><br />
+                Ce champ est vide, mais les gardes partent bien — vers
+                l&apos;agenda{' '}
+                {/* Le NOM, pas l'identifiant. Un agenda secondaire Google a
+                    pour adresse 64 caractères hexadécimaux : les afficher
+                    n'apprend rien et donne l'impression d'un réglage cassé.
+                    Sans nom (agenda injoignable), on reste vague plutôt que
+                    de désigner un agenda dont on n'est plus sûr. */}
+                {nomAgenda
+                  ? <><b>«&nbsp;{nomAgenda}&nbsp;»</b>, configuré au niveau du serveur.</>
+                  : <>configuré au niveau du serveur.</>}
+                <br />
                 Renseignez un identifiant ci-dessus pour utiliser un autre agenda.
               </p>
             )}

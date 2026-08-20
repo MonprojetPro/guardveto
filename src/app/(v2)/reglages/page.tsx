@@ -18,6 +18,7 @@ import '@/styles/v2-reglages.css'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
 import { ReglagesV2, type LigneEmail, type ValeursCabinet } from '@/components/v2/ReglagesV2'
+import { nomLisibleAgenda } from '@/lib/google-calendar'
 import { chargerDock } from '@/data/v2/dock'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import type { Periode, Veterinaire } from '@/types'
@@ -145,6 +146,12 @@ export default async function ReglagesPage() {
           // réellement dans Google — un indicateur qui ment est pire que pas
           // d'indicateur du tout, il envoie chercher une panne qui n'existe pas.
           agendaParDefaut={(process.env.GOOGLE_CALENDAR_ID ?? '').trim()}
+          // Son NOM chez Google (« gardes véto »). L'identifiant d'un agenda
+          // secondaire est une suite de 64 caractères hexadécimaux : afficher
+          // ça dans un écran de réglages ne renseigne personne et fait peur.
+          // Le nom est ce que le cabinet voit dans sa propre interface Google,
+          // donc le seul repère qu'on partage avec lui.
+          nomAgenda={await nomLisibleAgenda(valeurs.googleCalendarId || null)}
         />
       </div>
     </>

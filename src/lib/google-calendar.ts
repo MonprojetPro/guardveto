@@ -347,3 +347,34 @@ export function isGoogleCalendarConfigured(calendarIdCabinet?: string | null): b
     resoudreCalendarId(calendarIdCabinet)
   )
 }
+
+/**
+ * Le NOM de l'agenda tel que Google l'affiche — « gardes véto », et non
+ * `b69598ef…@group.calendar.google.com`.
+ *
+ * Un agenda secondaire Google a pour identifiant une suite de 64 caractères
+ * hexadécimaux. C'est une adresse technique, jamais montrée par Google
+ * lui-même, et l'afficher telle quelle dans un écran de réglages ne renseigne
+ * personne : on ne peut ni la lire, ni la reconnaître, ni vérifier qu'on parle
+ * du bon agenda. Le nom, lui, est celui que le cabinet voit dans sa propre
+ * interface Google — c'est le seul repère commun.
+ *
+ * Renvoie null si l'agenda est injoignable : mieux vaut ne rien annoncer que
+ * de nommer un agenda auquel on n'a peut-être plus accès.
+ */
+export async function nomLisibleAgenda(
+  calendarIdCabinet?: string | null,
+): Promise<string | null> {
+  const cal = getCalendarClient(calendarIdCabinet)
+  if (!cal) return null
+
+  try {
+    const r = await cal.client.calendars.get({ calendarId: cal.calendarId })
+    return r.data.summary?.trim() || null
+  } catch (err) {
+    // Injoignable : identifiant erroné, partage retiré, quota. Ce n'est pas
+    // bloquant — l'écran retombera sur une formulation générique.
+    console.error('[google-calendar] nom de l’agenda illisible :', err instanceof Error ? err.message : err)
+    return null
+  }
+}
