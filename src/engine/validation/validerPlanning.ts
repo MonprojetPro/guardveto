@@ -848,25 +848,45 @@ export function validerPlanning(
 
       // #17 : on inclut les gardes du LOOKBACK → une garde en fin de période
       // précédente trop proche d'une garde du début de la période courante est
-      // détectée (jonction). Le tri place la date antérieure en `dates[i-1]`.
-      const dates = planningRythme.attributions
+      // détectée (jonction). Le tri place la date antérieure en `[i-1]`.
+      //
+      // On conserve le TYPE, et pas seulement la date : le couple imposé par la
+      // structure (vendredi soir ↔ week-end, même binôme) est TOUJOURS à un jour
+      // d'écart. Sans cette distinction, le validateur signalait une violation
+      // sur CHAQUE week-end — dix fausses alertes qui noyaient les vraies
+      // (recette MiKL, 2026-08-20). Ré-implémenté ici INDÉPENDAMMENT du moteur,
+      // conformément au principe des deux gardiens.
+      const couples = input.structureConfig?.relations ?? RELATIONS_STRUCTURE_DEFAUT
+      const lieParStructure = (tA: string, tB: string): boolean =>
+        couples.some(
+          (r) =>
+            r.genre === 'meme_binome' &&
+            ((r.sourceCode === tA && r.cibleCode === tB) ||
+              (r.sourceCode === tB && r.cibleCode === tA)),
+        )
+
+      const gardes = planningRythme.attributions
         .filter((a) => surCreneau(a, vet.id))
-        .map((a) => a.date)
-        .sort()
+        .map((a) => ({ date: a.date, type: a.type }))
+        .sort((x, y) => x.date.localeCompare(y.date))
       const vues = new Set<string>()
-      for (let i = 1; i < dates.length; i++) {
-        if (dates[i - 1] === dates[i]) continue
-        const j = joursEntre(dates[i - 1], dates[i])
+      for (let i = 1; i < gardes.length; i++) {
+        const prec = gardes[i - 1]
+        const cur = gardes[i]
+        if (prec.date === cur.date) continue
+        const j = joursEntre(prec.date, cur.date)
+        // Une seule garde étalée sur deux créneaux liés n'est pas un enchaînement.
+        if (j === 1 && lieParStructure(prec.type, cur.type)) continue
         if (j < ecart) {
-          const cle = `${dates[i - 1]}|${dates[i]}`
+          const cle = `${prec.date}|${cur.date}`
           if (vues.has(cle)) continue
           vues.add(cle)
           violations.push({
             regle: 'ESPACEMENT',
-            date: dates[i],
+            date: cur.date,
             type: 'espacement',
             vetId: vet.id,
-            detail: `ESPACEMENT : ${vet.prenom} — seulement ${j} jour(s) entre le ${dates[i - 1]} et le ${dates[i]} (min ${ecart})`,
+            detail: `ESPACEMENT : ${vet.prenom} — seulement ${j} jour(s) entre le ${prec.date} et le ${cur.date} (min ${ecart})`,
           })
         }
       }

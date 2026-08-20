@@ -757,9 +757,47 @@ function joursEntreDates(a: string, b: string): number {
   return Math.round(Math.abs(db - da) / 86_400_000)
 }
 
+/**
+ * Deux créneaux ADJACENTS que la structure impose de tenir ENSEMBLE
+ * (relation « même binôme » : vendredi soir ↔ week-end).
+ *
+ * POURQUOI CETTE EXCEPTION EXISTE (recette MiKL, 2026-08-20)
+ *
+ * Un vétérinaire qui prend le week-end prend AUSSI le vendredi soir — R9 l'y
+ * oblige. Ces deux gardes sont donc toujours à un jour d'écart. Sans cette
+ * exception, « au moins 2 jours entre deux gardes » se déclenchait sur CHAQUE
+ * week-end : la règle protestait dix fois pour du normal, et sa pénalité,
+ * diluée, ne pesait plus rien face aux VRAIS enchaînements (Antoine de garde
+ * les 16, 17 et 18 novembre). Un détecteur qui sonne à chaque cuisson n'empêche
+ * plus aucun incendie.
+ *
+ * Conséquence non moins importante : la règle ne pouvait pas être durcie. En
+ * « Jamais », elle aurait rendu TOUT week-end impossible à attribuer.
+ *
+ * La règle voisine `espacement_weekend` exclut déjà explicitement le vendredi
+ * (cf. son en-tête) ; l'oubli portait sur celle-ci seule.
+ */
+function estCoupleStructurelAdjacent(
+  typeA: string, dateA: string, typeB: string, dateB: string,
+  relations: readonly RelationStructure[],
+): boolean {
+  // Adjacents au sens calendaire : la veille ou le lendemain.
+  if (joursEntreDates(dateA, dateB) !== 1) return false
+  // Lié par une relation de structure, dans un sens ou dans l'autre. Seul le
+  // « même binôme » impose de tenir les deux créneaux : l'inversion des rôles
+  // ne dit QUE l'ordre 1er/2nd, elle n'oblige personne à faire les deux.
+  return relations.some(
+    (r) =>
+      r.genre === 'meme_binome' &&
+      ((r.sourceCode === typeA && r.cibleCode === typeB) ||
+        (r.sourceCode === typeB && r.cibleCode === typeA)),
+  )
+}
+
 /** Poser `vet` sur `slot` violerait-il l'espacement minimal de cette contrainte ? */
 function violeEspacementMin(
   c: ContrainteEngine, vetId: string, slot: SlotGarde, planning: PlanningPartiel,
+  relations: readonly RelationStructure[] = RELATIONS_STRUCTURE_DEFAUT,
 ): boolean {
   const cfg = c.config as Record<string, unknown>
   const eRaw = cfg.ecart_min_jours
@@ -768,15 +806,21 @@ function violeEspacementMin(
   for (const a of planning.attributions) {
     if (!estAttribue(a, vetId)) continue
     if (a.date === slot.date) continue // même jour : géré ailleurs (R21/effectif)
+    // Le couple imposé par la structure n'est pas un enchaînement SUBI : c'est
+    // une seule et même garde, étalée sur deux créneaux. On ne le compte pas.
+    if (estCoupleStructurelAdjacent(a.type, a.date, slot.type, slot.date, relations)) continue
     if (joursEntreDates(a.date, slot.date) < ecart) return true
   }
   return false
 }
 
-function checkEspacementMin(vet: VetEngine, slot: SlotGarde, planning: PlanningPartiel): ValidationResult {
+function checkEspacementMin(
+  vet: VetEngine, slot: SlotGarde, planning: PlanningPartiel,
+  relations: readonly RelationStructure[] = RELATIONS_STRUCTURE_DEFAUT,
+): ValidationResult {
   for (const c of vet.contraintes) {
     if (!c.actif || c.type !== 'espacement_min') continue
-    if (estDure(c) && violeEspacementMin(c, vet.id, slot, planning)) {
+    if (estDure(c) && violeEspacementMin(c, vet.id, slot, planning, relations)) {
       const e = (c.config as Record<string, unknown>).ecart_min_jours
       return invalid(`ESPACEMENT : ${vet.prenom} doit espacer ses gardes d'au moins ${e} jour(s)`)
     }
@@ -1270,6 +1314,12 @@ export function penaliteContraintesConfig(
       case 'au_plus_n':
         viole = violeAuPlusN(c, vet.id, slot, planningRythme); break
       case 'espacement_min':
+        // ⚠️ Le scoreur souple ne reçoit pas la StructureConfig (il n'a que
+        //    `penalitesSouples`) : l'exclusion du couple lié retombe donc sur
+        //    RELATIONS_STRUCTURE_DEFAUT — vendredi_soir ↔ weekend, qui EST le
+        //    couple de tous les cabinets connus à ce jour. Un cabinet qui
+        //    définirait un autre couple verrait la pénalité et le contrôle dur
+        //    diverger : à threader si ce cas apparaît.
         viole = violeEspacementMin(c, vet.id, slot, planningRythme); break
       case 'espacement_weekend':
         viole = violeEspacementWeekend(c, vet.id, slot, planningRythme); break
@@ -1344,7 +1394,9 @@ export function isValid(
     checkR22UneGardeParJour(vet, slot, planning),
     // Rythme (fenêtres glissantes / espacements) : voient le lookback → étendu.
     checkAuPlusN(vet, slot, planningRythme),
-    checkEspacementMin(vet, slot, planningRythme),
+    // `relations` : le couple vendredi↔WE ne compte PAS comme un enchaînement
+    // (il est imposé par R9) — sinon la règle proteste sur chaque week-end.
+    checkEspacementMin(vet, slot, planningRythme, relations),
     checkEspacementWeekend(vet, slot, planningRythme),
     // Cadencement « 1 WE sur N ancré » (#20) : jugé par rapport à l'ancre SEULE
     // (pas le planning ni le lookback — l'ancrage absolu suffit).
