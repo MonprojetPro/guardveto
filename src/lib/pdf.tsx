@@ -531,7 +531,19 @@ function PageCalendrier({
                   // Affichage des vétos selon le jour du bloc week-end :
                   //  • Vendredi (wi 0) : R8 → paire INVERSÉE (1er du WE devient 2nd, et inversement)
                   //  • Samedi   (wi 1) : paire du week-end telle quelle (garde stockée sur Sam)
-                  //  • Dimanche (wi 2) : indicateur "↕ week-end" (même équipe que samedi)
+                  //  • Dimanche (wi 2) : paire du week-end, RÉPÉTÉE en toutes lettres
+                  //
+                  // Le dimanche affichait auparavant un simple renvoi « ↕ week-end »
+                  // au lieu des noms, au motif que c'est la même équipe que le samedi.
+                  // C'était un angle mort : une garde posée sur la DATE du dimanche
+                  // (modification exceptionnelle) restait invisible sur le papier, et
+                  // le lecteur croyait lire le samedi. On répète donc les noms, et on
+                  // donne la priorité à une éventuelle garde propre au dimanche
+                  // (`garde`) sur celle héritée du samedi (`gardeWE`) — c'est
+                  // précisément l'exception qu'il faut voir. Même règle que l'écran
+                  // planning, qui matérialise déjà le dimanche en « continuation »
+                  // (resoudrePlanningAffichage). Pas d'inversion des rôles ici :
+                  // seul le vendredi est inversé.
                   // Vendredi DÉRIVÉ du week-end via les relations (P6 verrou
                   // n°3 — plus d'inversion R8 câblée). Défaut → rôles inversés,
                   // byte-identique. Inversion coupée → vendredi non inversé ;
@@ -561,7 +573,7 @@ function PageCalendrier({
                         }
                       : null
                   const gardeAffichee = gardeWEestWeekend
-                    ? (wi === 0 ? gardeVendrediInversee : wi === 2 ? null : garde)
+                    ? (wi === 0 ? gardeVendrediInversee : wi === 2 ? (garde ?? gardeWE) : garde)
                     : garde
                   const baseStyle = ferieNom
                     ? (estDerniere ? S.weCellFerieLast : S.weCellFerie)
@@ -577,11 +589,7 @@ function PageCalendrier({
                         </Text>
                       )}
                       {ferieNom && <Text style={S.ferieName}>{ferieNom}</Text>}
-                      {/* Sur Dim avec garde WE : juste un indicateur (même équipe que samedi) */}
-                      {gardeWEestWeekend && wi === 2 && jourNum && !ferieNom && (
-                        <Text style={{ fontSize: 6, color: '#93c5fd', marginTop: 2 }}>↕ week-end</Text>
-                      )}
-                      {/* Sur Sam (ou si pas de WE) : détail complet */}
+                      {/* Détail complet — sur les trois jours du bloc (Ven/Sam/Dim) */}
                       {gardeAffichee?.premier_prenom && (
                         <View style={S.vetRow}>
                           <View style={[S.vetDot, { backgroundColor: gardeAffichee.premier_couleur ?? '#6b7280' }]} />
