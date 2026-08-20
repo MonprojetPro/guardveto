@@ -168,7 +168,9 @@ Fie-toi à ces trois champs, jamais à ton intuition :
 
 Si « places_attendues » vaut null, le réglage est indéterminé : dis simplement qui est programmé, sans conclure qu'il manque quelqu'un.
 
-Le champ « état de la période » dit si ce planning est encore un brouillon (donc pas définitif) ou déjà publié.`,
+Le champ « état de la période » dit si ce planning est encore un brouillon (donc pas définitif) ou déjà publié.
+
+REMPLACEMENT EXCEPTIONNEL : si un jour porte « remplacement_exceptionnel », c'est que quelqu'un tient cette place UNIQUEMENT ce jour-là — le reste du bloc week-end revient à son titulaire habituel. Dis-le : « c'est bien toi dimanche, en remplacement exceptionnel » n'appelle pas la même réaction que « tu es de garde tout le week-end ». Ne le déduis jamais de toi-même : ce champ est absent quand la garde est ordinaire.`,
   params: ParamsLireGardes,
 
   async executer(params, ctx) {
@@ -187,7 +189,13 @@ Le champ « état de la période » dit si ce planning est encore un brouillon (
     const [{ data: gardesDb }, { data: typesDb }, periodes, profils] = await Promise.all([
       ctx.supabase
         .from('planning_semaine')
-        .select('date, type, premier_prenom, second_prenom, periode_statut')
+        // `jour_exceptionnel` : ce jour-là porte un remplacement qui ne vaut
+        // QUE pour lui (backlog 8 bis). La vue applique déjà la substitution —
+        // Filou donnait donc le bon nom sans le savoir — mais il ne pouvait pas
+        // dire que c'était exceptionnel. Or c'est précisément ce qu'il faut
+        // dire : « c'est bien toi dimanche, en remplacement » n'appelle pas la
+        // même réaction que « tu es de garde tout le week-end ».
+        .select('date, type, premier_prenom, second_prenom, periode_statut, jour_exceptionnel')
         .in('periode_id', perimetre.ids)
         .gte('date', params.date_debut)
         .lte('date', dateFin)
@@ -241,6 +249,7 @@ Le champ « état de la période » dit si ce planning est encore un brouillon (
       premier_prenom: string | null
       second_prenom: string | null
       periode_statut: 'brouillon' | 'publie' | 'verrouille'
+      jour_exceptionnel: boolean | null
     }
     const rows = (gardesDb as Row[] | null) ?? []
 
@@ -276,6 +285,9 @@ Le champ « état de la période » dit si ce planning est encore un brouillon (
           places_pourvues: pourvues,
           manque,
           etat_periode: STATUT_HUMAIN[r.periode_statut] ?? r.periode_statut,
+          // Présent uniquement quand c'est vrai : un `false` sur chaque jour
+          // ordinaire encombrerait la réponse et finirait par être ignoré.
+          ...(r.jour_exceptionnel ? { remplacement_exceptionnel: true } : {}),
         }
       }),
     }
