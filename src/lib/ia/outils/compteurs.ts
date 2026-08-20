@@ -500,6 +500,11 @@ const ParamsHistoriqueFetes = z.object({
 export const lireHistoriqueFetes: OutilLecture<typeof ParamsHistoriqueFetes> = {
   genre: 'lecture',
   nom: 'lire_historique_fetes',
+  // Reserve a l'admin, comme l'ecran qui montre la meme chose : /historique est
+  // ferme aux veterinaires depuis le 2026-08-21. Laisser Filou le restituer au
+  // chat aurait ete la porte de service du meme tableau — et les deux auraient
+  // diverge en silence, ce qui est pire que l'un ou l'autre choix.
+  adminSeulement: true,
   description: `Donne qui a fait Noël et le Nouvel An, année par année, aussi loin que le cabinet a renseigné cet historique.
 
 Appelle-le pour toute question du type « qui a fait Noël l'an dernier ? », « c'est à qui le tour cette année ? », « est-ce que j'ai déjà fait le nouvel an ? ».

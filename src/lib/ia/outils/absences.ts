@@ -165,7 +165,9 @@ export const lireAbsences: OutilLecture<typeof ParamsLireAbsences> = {
   nom: 'lire_absences',
   description: `Liste les absences imprévues déclarées après publication du planning (maladie, urgence…) — à ne pas confondre avec les congés posés à l'avance. Donne pour chacune : qui, du combien au combien, le motif, un éventuel commentaire, et le statut (active = pas encore entièrement réparée, résolue = tous les créneaux ont un remplaçant, annulée).
 
-Appelle-le pour toute question sur qui est absent, depuis quand, ou si une absence est déjà réglée — « qui est absent en ce moment », « l'absence de Camille est-elle réglée », « pourquoi Fanny n'apparaît plus sur le planning cette semaine ».`,
+Appelle-le pour toute question sur qui est absent, depuis quand, ou si une absence est déjà réglée — « qui est absent en ce moment », « l'absence de Camille est-elle réglée », « pourquoi Fanny n'apparaît plus sur le planning cette semaine ».
+
+LE MOTIF DES AUTRES N'EST PAS VISIBLE si tu parles à un vétérinaire : il vaut alors simplement « absence », et le commentaire est vide. C'est voulu — la raison d'une absence est une donnée personnelle. N'essaie pas de la deviner ni de la reconstituer : dis que la personne est absente, sans plus.`,
   params: ParamsLireAbsences,
   async executer(params, ctx) {
     let requete = ctx.supabase
@@ -185,12 +187,26 @@ Appelle-le pour toute question sur qui est absent, depuis quand, ou si une absen
       lignes = lignes.filter((l) => l.veterinaire_id === trouve.veto.id)
     }
 
+    // ⛔ LE MOTIF ET LE COMMENTAIRE NE SONT PAS PUBLICS.
+    //
+    // Savoir qu'un confrere est absent est legitime — on s'organise autour.
+    // Savoir POURQUOI ne l'est pas : « maladie » est une donnee de sante, et le
+    // commentaire libre peut contenir n'importe quelle precision.
+    //
+    // L'outil `declarer_absence` decrit d'ailleurs ce champ, dans ce meme
+    // fichier, comme « visible par l'administrateur » : l'administratrice
+    // l'ecrit en le croyant. Le distribuer a toute l'equipe par le chat
+    // trahissait cette promesse.
+    //
+    // Chacun garde acces a SES propres absences, motif compris.
+    const peutVoirLeDetail = (vetId: string) => ctx.estAdmin || vetId === ctx.vetoId
+
     return lignes.map((l) => ({
       veterinaire: l.veto ? `${l.veto.prenom} ${l.veto.nom}` : 'inconnu',
       date_debut: l.date_debut,
       date_fin: l.date_fin,
-      motif: l.motif,
-      commentaire: l.commentaire,
+      motif: peutVoirLeDetail(l.veterinaire_id) ? l.motif : 'absence',
+      commentaire: peutVoirLeDetail(l.veterinaire_id) ? l.commentaire : null,
       statut: l.statut,
     }))
   },

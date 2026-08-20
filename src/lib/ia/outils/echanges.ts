@@ -35,6 +35,7 @@ import {
 } from '@/app/(protected)/echanges/actions'
 import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
 import { SANS_PARAMETRE, type ContexteOutil, type OutilEcriture, type OutilLecture } from './types'
+import { perimetrePeriodes } from './perimetre'
 
 type Role = 'premier' | 'second'
 
@@ -186,9 +187,29 @@ interface GardeCandidate {
 /** Toutes les gardes d'un véto à une date donnée — un jour peut porter
  *  plusieurs créneaux (jour/nuit) sur un planning sur-mesure. */
 async function gardesDuVetoCeJour(ctx: ContexteOutil, vetId: string, date: string): Promise<GardeCandidate[]> {
+  // ⛔ SANS CETTE BORNE, ON RECONSTITUE UN PLANNING BROUILLON QUESTION PAR
+  // QUESTION.
+  //
+  // Cette fonction est appelée sur soi PUIS sur un collègue. Ses trois réponses
+  // possibles — « X n'a aucune garde ce jour-là », « X en a deux, de tel et tel
+  // type », ou la proposition qui aboutit et nomme le rôle — sont autant de
+  // fragments du planning. En répétant la demande date après date, un
+  // vétérinaire redessinait le planning non diffusé de n'importe lequel de ses
+  // confrères, alors que son écran ne lui en montre rien.
+  //
+  // La RLS ne rattrape rien : `gardes_veto_read` autorise tout vétérinaire à
+  // lire toutes les gardes du cabinet, brouillons compris. Et le périmètre posé
+  // au commit 55ea8ab ne couvrait pas ce chemin — il bornait les lectures de
+  // VUES, celle-ci lit la TABLE.
+  //
+  // Métier : on ne cède pas une garde que personne ne connaît encore.
+  const perimetre = await perimetrePeriodes(ctx)
+  if (perimetre.vide) return []
+
   const { data } = await ctx.supabase
     .from('gardes')
     .select('id, type, premier_id, second_id')
+    .in('periode_id', perimetre.ids)
     .eq('date', date)
     .or(`premier_id.eq.${vetId},second_id.eq.${vetId}`)
   return ((data as { id: string; type: string; premier_id: string | null; second_id: string | null }[] | null) ?? []).map(
