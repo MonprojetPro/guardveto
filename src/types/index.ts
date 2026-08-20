@@ -98,6 +98,24 @@ export interface GardeDenormalisee extends Garde {
    * qui ne passe pas par la vue.
    */
   places_sup?: PlaceSupplementaire[]
+  /**
+   * Backlog 8 bis — ce JOUR précis porte-t-il un remplacement exceptionnel ?
+   * Une garde de week-end couvre trois jours ; l'exception n'en concerne
+   * qu'un. La garde, elle, n'a pas bougé — elle porte toujours l'équité et le
+   * roulement. Ces drapeaux servent à SIGNALER l'exception, pour qu'elle ne
+   * passe pas pour l'attribution ordinaire.
+   *
+   * Absents si la donnée ne vient pas de la vue `planning_semaine`.
+   */
+  jour_exceptionnel?: boolean
+  exception_premier?: boolean
+  exception_second?: boolean
+  /**
+   * Réponse de l'admin à « ce jour compte-t-il comme un jour de 1er de garde
+   * (celui qui porte l'avantage financier) ? ». Jamais deviné : la question
+   * est posée au moment du changement.
+   */
+  compte_1er_we?: boolean
 }
 
 export interface Conge {
