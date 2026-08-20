@@ -381,9 +381,15 @@ export function AbsencesV2({
             </section>
           )}
 
-          <section className="card" aria-label="Congés du cabinet">
+          {/* « Souhaits traités » et non « Congés du cabinet » : les deux
+              encarts de cet onglet montrent la MÊME chose à deux moments de sa
+              vie — un souhait en attente, puis ce souhait une fois tranché.
+              Deux noms sans rapport laissaient croire à deux natures
+              différentes, et on cherchait où était passée la demande qu'on
+              venait de valider (demande MiKL du 2026-08-21). */}
+          <section className="card" aria-label="Souhaits de congé traités">
             <div className="card-head">
-              <h2>{isAdmin ? 'Congés du cabinet' : 'Mes congés'}</h2>
+              <h2>{isAdmin ? 'Souhaits traités' : 'Mes congés'}</h2>
               {traites.length > 0 && <span className="section-count">{traites.length}</span>}
               <p className="sub">
                 Validés et refusés. Chaque prénom compte et filtre d&apos;un même geste.
