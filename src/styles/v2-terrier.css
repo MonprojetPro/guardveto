@@ -1680,7 +1680,12 @@ a.widget { color: inherit; text-decoration: none; }
   text-transform: uppercase; color: var(--accent-ink);
   margin-bottom: 8px;
 }
-.page-head h1 { font-size: clamp(1.4rem, 2.6vw, 1.85rem); font-weight: 800; line-height: 1.2; }
+/* Le titre porte SEUL l'identité de l'écran depuis qu'on a retiré les
+   paragraphes d'introduction : « Historique & compteurs » se comprend sans
+   qu'on l'explique, et trois lignes de prose au-dessus du contenu utile ne
+   se lisent de toute façon jamais deux fois. D'où une taille de vraie
+   enseigne, et non de simple sur-titre. */
+.page-head h1 { font-size: clamp(1.75rem, 3.4vw, 2.4rem); font-weight: 800; line-height: 1.15; letter-spacing: -0.01em; }
 .page-head .lede { margin-top: 8px; color: var(--t-muted); font-size: 0.93rem; line-height: 1.6; max-width: 62ch; }
 .page-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 

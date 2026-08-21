@@ -268,13 +268,7 @@ export function ReglagesV2({
       {/* ── Tête de page ─────────────────────────────────────────────── */}
       <div className="page-head rise">
         <div>
-          <p className="page-kicker">Réglages · la tuyauterie</p>
-          <h1>Trois branchements, réglés une fois, puis oubliés.</h1>
-          <p className="lede">
-            Rien ici ne parle de gardes : uniquement ce qui relie GuardVeto au monde extérieur.
-            Laissés vides, ces réglages retombent sur la configuration générale — c&apos;est
-            volontaire, pas un oubli.
-          </p>
+          <h1>Réglages &amp; connexions</h1>
         </div>
       </div>
 
@@ -296,7 +290,12 @@ export function ReglagesV2({
           </div>
           <div className="conn-body">
             <div className="field">
-              <label htmlFor="cn-cal">Identifiant de l&apos;agenda</label>
+              {/* « Identifiant » se lisait comme « ton adresse Gmail ». C'en est
+                  une, mais celle DE L'AGENDA, pas du compte : Google la donne
+                  dans les paramètres de l'agenda, et elle finit toujours par
+                  `@group.calendar.google.com`. Le libellé le dit maintenant,
+                  plutôt que de laisser chercher. */}
+              <label htmlFor="cn-cal">Adresse de l&apos;agenda Google</label>
               <input
                 id="cn-cal"
                 type="text"
@@ -306,6 +305,11 @@ export function ReglagesV2({
                 placeholder="cabinet@group.calendar.google.com"
                 style={{ width: '100%', minHeight: 42 }}
               />
+              <p className="field-aide">
+                Dans Google Agenda : paramètres de l&apos;agenda → « Intégrer l&apos;agenda » →
+                <b> ID de l&apos;agenda</b>. Ce n&apos;est pas l&apos;adresse d&apos;un compte
+                Google, et elle ne sert pas à envoyer les e-mails.
+              </p>
             </div>
             {/* Un champ vide et un voyant vert, c'est incompréhensible sans
                 explication : on DIT sur quel agenda les gardes partent, et
@@ -327,8 +331,7 @@ export function ReglagesV2({
               </p>
             )}
             <p className="conn-line">
-              L&apos;agenda doit être <b>partagé en écriture</b> avec le compte de service
-              GuardVeto, sinon rien ne s&apos;y écrira.
+              Cet agenda doit être <b>partagé en écriture</b> avec GuardVeto.
             </p>
 
             {periodesPubliees.length > 0 && (
@@ -425,14 +428,17 @@ export function ReglagesV2({
                 placeholder="Cabinet vétérinaire"
               />
             </div>
+            {/* Deux pavés pour dire deux choses simples : « laisse vide, ça
+                marche quand même » et « le bouton envoie un vrai e-mail ».
+                Une ligne chacun suffit. */}
             <p className="conn-line">
-              Le domaine de cette adresse doit être <b>autorisé chez l&apos;expéditeur</b> ;
-              sinon les e-mails partent en spam, ou ne partent pas du tout.
+              {expediteurRegle
+                ? 'C’est cette adresse qui apparaîtra comme expéditeur des e-mails aux vétos.'
+                : 'Laissé vide, GuardVeto envoie depuis sa propre adresse. Rien à faire.'}
             </p>
             <p className="conn-line">
-              L&apos;essai part à <b>ta propre adresse</b> et emprunte le chemin des vrais
-              e-mails : s&apos;il arrive, les plannings publiés arriveront aussi.
-              {!expediteurRegle && ' Sans adresse enregistrée ici, il utilisera la configuration générale.'}
+              Le bouton d&apos;essai t&apos;envoie un vrai e-mail : s&apos;il arrive, tout le
+              reste arrivera aussi.
             </p>
             <div className="conn-actions">
               <button
@@ -512,10 +518,8 @@ export function ReglagesV2({
               </div>
             )}
             <p className="derived-note">
-              C&apos;est le code postal qui décide : il donne la zone de vacances scolaires et la
-              région des jours fériés utilisées par le moteur. Si le code postal ne permet pas de
-              conclure (Corse, outre-mer, saisie incomplète), la zone actuelle est conservée
-              plutôt que remplacée par une valeur douteuse.
+              Le code postal donne la zone de vacances scolaires et la région des jours fériés
+              utilisées par le moteur.
             </p>
             <div className="conn-actions">
               <button

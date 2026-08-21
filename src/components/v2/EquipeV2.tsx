@@ -452,13 +452,7 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
       {/* ── Tête de page ─────────────────────────────────────────────── */}
       <div className="page-head rise">
         <div>
-          <p className="page-kicker">Équipe</p>
-          <h1>Une fiche par personne. L&apos;app reconnaît les gens.</h1>
-          <p className="lede">
-            La couleur suit chaque véto partout : sur le planning, dans les compteurs, dans les
-            échanges. L&apos;état du compte dit qui peut réellement entrer dans l&apos;app —
-            créer une fiche n&apos;ouvre pas d&apos;accès, il faut inviter.
-          </p>
+          <h1>Équipe</h1>
         </div>
         <div className="page-actions">
           <button

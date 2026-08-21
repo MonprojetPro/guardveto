@@ -71,7 +71,7 @@ test.describe('Contrôle des rôles', () => {
     await page.goto('/regles')
 
     await expect(page).toHaveURL(/\/regles/)
-    await expect(page.getByRole('heading', { name: /Comment votre cabinet organise/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Organisation des gardes/ })).toBeVisible()
 
     // La vitrine se DIT…
     await expect(page.getByText(/Seul un administrateur peut la modifier/)).toBeVisible()
@@ -88,7 +88,7 @@ test.describe('Contrôle des rôles', () => {
 
     await expect(page).toHaveURL(/\/equipe/)
     await expect(
-      page.getByRole('heading', { name: /Une fiche par personne/ })
+      page.getByRole('heading', { name: /^Équipe$/, level: 1 })
     ).toBeVisible()
   })
 

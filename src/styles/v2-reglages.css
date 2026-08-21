@@ -50,6 +50,13 @@
   display: flex; flex-direction: column; gap: 12px; flex: 1;
 }
 .conn-line { font-size: 0.84rem; line-height: 1.55; color: var(--t-muted); }
+/* L'aide qui appartient à UN champ se colle sous lui, plus petite que les
+   lignes d'information de la carte : sinon les deux se lisent comme un même
+   bloc de prose, ce qu'on vient justement de supprimer. */
+.field-aide {
+  margin-top: 6px; font-size: 0.78rem; line-height: 1.5; color: var(--t-muted);
+}
+.field-aide b { color: var(--text); }
 .conn-line b { color: var(--text); }
 .conn-line.ok { color: var(--ok); font-weight: 600; }
 .conn-line.bad { color: var(--danger); font-weight: 600; }

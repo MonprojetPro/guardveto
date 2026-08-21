@@ -106,7 +106,7 @@ test.describe('Isolation multi-tenant (RLS)', () => {
     await page.goto('/equipe')
 
     await expect(
-      page.getByRole('heading', { name: /Une fiche par personne/ })
+      page.getByRole('heading', { name: /^Équipe$/, level: 1 })
     ).toBeVisible()
 
     // Les vétos du cabinet B sont listés… On vise la GRILLE DES FICHES et non

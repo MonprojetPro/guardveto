@@ -182,13 +182,11 @@ export function HistoriqueV2({
       {/* ── Tête de page ─────────────────────────────────────────────── */}
       <div className="page-head rise">
         <div>
-          <p className="page-kicker">Historique &amp; compteurs</p>
-          <h1>Qui a fait quoi, sur la période que tu veux.</h1>
-          <p className="lede">
-            Les compteurs sont ceux du moteur, pas une addition faite ici : c&apos;est exactement
-            ce qu&apos;il relit à chaque génération pour rattraper les écarts de la période
-            précédente.
-          </p>
+          {/* Le nom de l'écran EST le titre. Le sur-titre discret doublé d'une
+              phrase littéraire et de trois lignes d'explication a été retiré
+              partout : personne ne les lit, et « Historique & compteurs » dit
+              déjà ce qu'on vient chercher. */}
+          <h1>Historique &amp; compteurs</h1>
         </div>
         {/* La création d'un planning a quitté cet écran (2026-08-02) : elle est
             devenue la première étape de « Générer », là où on le regarde.

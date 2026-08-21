@@ -80,7 +80,22 @@ export default function SetPasswordPage() {
       // invite_pending est mis à jour côté serveur via RPC SECURITY DEFINER :
       // la RLS de `veterinaires` réserve l'UPDATE aux admins, donc un véto ne
       // peut pas modifier sa fiche directement (la fonction borne sur auth.uid()).
-      await supabase.rpc('marquer_invite_complete')
+      //
+      // ⚠️ On LIT le retour. Cet appel était un `await` nu, et Supabase RETOURNE
+      // ses erreurs au lieu de les lever : quand la fonction s'est avérée absente
+      // de la base (migration 013 jamais jouée), l'échec n'a alerté personne et
+      // tout véto ayant défini son mot de passe est resté affiché « Invitation
+      // envoyée » — pendant deux mois, jusqu'au 2026-08-21.
+      //
+      // Le mot de passe, lui, EST enregistré : on ne bloque donc pas l'entrée
+      // dans l'app pour une pastille de statut. On trace, et on continue.
+      const { error: rpcError } = await supabase.rpc('marquer_invite_complete')
+      if (rpcError) {
+        console.error(
+          `[set-password] marquer_invite_complete a échoué (${rpcError.message}) — `
+          + `la fiche restera affichée « Invitation envoyée ». La migration 013 est-elle appliquée ?`,
+        )
+      }
 
       window.location.href = '/planning'
     })

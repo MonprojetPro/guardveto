@@ -250,15 +250,7 @@ export function AbsencesV2({
     <>
       <div className="page-head">
         <div>
-          <p className="page-kicker">
-            Absences &amp; échanges{isAdmin ? ' · vue administratrice' : ''}
-          </p>
-          <h1>Congés, échanges et coups durs : une seule porte.</h1>
-          <p className="lede">
-            {isAdmin
-              ? 'Chaque souhait arrive avec son verdict déjà calculé : les gardes publiées qu’il toucherait. Rien ne surprend au moment de valider.'
-              : 'Poser un congé, proposer un échange, suivre tes demandes — tout est ici.'}
-          </p>
+          <h1>Absences &amp; échanges</h1>
         </div>
         <div className="page-actions">
           <button type="button" className="btn btn-outline" onClick={() => setCreerOuvert(true)}>

@@ -392,17 +392,18 @@ export function EnteteHistoriqueVide({ estAdmin }: { estAdmin: boolean }) {
     <>
       <div className="page-head rise">
         <div>
-          <p className="page-kicker">Historique &amp; compteurs</p>
-          <h1>Rien à raconter pour l&apos;instant.</h1>
+          <h1>Historique &amp; compteurs</h1>
+          {/* Seule prose conservée dans une tête de page : celle-ci n'explique
+              pas l'écran, elle dit pourquoi il est VIDE. Sans elle, la page
+              n'aurait littéralement rien à montrer.
+              ⚠️ CETTE PHRASE SUIT L'INTERRUPTEUR, elle ne vit pas sa vie. Annoncer
+              « si tu importes un ancien planning » alors que le bouton a disparu
+              enverrait chercher pendant dix minutes une action qui n'existe plus —
+              c'est exactement la coquille vide qu'on s'interdit. */}
           <p className="lede">
-            Aucune période de planification n&apos;existe encore. Les compteurs apparaîtront dès
-            qu&apos;une période aura été créée et un planning généré
-            {/* ⚠️ CETTE PHRASE SUIT L'INTERRUPTEUR, elle ne vit pas sa vie. Annoncer
-                « si tu importes un ancien planning » alors que le bouton a disparu
-                enverrait chercher pendant dix minutes une action qui n'existe plus —
-                c'est exactement la coquille vide qu'on s'interdit. */}
+            Aucun planning généré pour l&apos;instant : les compteurs apparaîtront ici
             {estAdmin && IMPORT_PLANNING_ACTIF
-              ? ' — ou tout de suite, si tu importes un ancien planning : les compteurs démarrent alors avec le passé du cabinet au lieu de repartir de zéro.'
+              ? ' — ou tout de suite, si tu importes un ancien planning.'
               : '.'}
           </p>
         </div>

@@ -193,13 +193,7 @@ export function ReglesStructureV2({
     <>
       <div className="page-head rise">
         <div>
-          <p className="page-kicker">Organisation</p>
-          <h1>Comment votre cabinet organise ses gardes.</h1>
-          <p className="lede">
-            Vos périodes types — l&apos;hiver, l&apos;été — avec la structure de leurs gardes,
-            leurs horaires, leurs enchaînements et leurs règles. Tout ce qui est réglé ici
-            s&apos;applique au prochain planning que vous générerez.
-          </p>
+          <h1>Organisation des gardes</h1>
 
           {/* La vitrine se DIT. Un écran dont les boutons ont simplement
               disparu se lit comme un écran incomplet ; celui-ci annonce sa
