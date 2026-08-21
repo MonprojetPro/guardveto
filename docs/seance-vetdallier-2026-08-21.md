@@ -100,9 +100,15 @@ Zéro sur dix semaines. Cohérent avec son statut de **dernier recours** — mai
 6. Poser les questions ❷ à ❻ — **sans chercher à les trancher sur le moment**.
 7. Si ça lui convient → **elle publie.**
 
-### Démonstration bonus : inviter un vétérinaire
+### Démonstration bonus : inviter un vétérinaire — **testée, elle marche**
 
-Le compte de **Fanny** a été remis à zéro exprès. Depuis l'écran « Équipe » : bouton **Inviter** → elle reçoit le mail → elle choisit son mot de passe → son état passe à **« Compte actif »**.
+Le compte de **Fanny** est remis à zéro exprès : sa fiche existe, elle n'a **pas d'accès**.
+
+Depuis l'écran « Équipe » : bouton **Inviter** → elle reçoit le mail → elle clique → elle choisit son mot de passe → son état passe à **« Compte actif »**.
+
+Le parcours complet a été fait en vrai à 15 h, de bout en bout. Les e-mails partent maintenant au nom de **« Cabinet vétérinaire du Val d'Allier »**.
+
+> **À dire** : *« créer une fiche n'ouvre aucun accès — il faut inviter. C'est vous qui décidez qui entre. »*
 
 ---
 ---
@@ -137,6 +143,13 @@ Le compte de **Fanny** a été remis à zéro exprès. Depuis l'écran « Équip
 
 ---
 
+## Ce qui a été livré ce matin même
+
+- **Les e-mails repartent.** Ils étaient bloqués : le service d'expédition refusait l'adresse utilisée. Ils partent maintenant au nom du cabinet, depuis son propre compte. *(Ne pas en parler spontanément — c'est réglé.)*
+- **Les écrans respirent** : plus de paragraphes d'explication en haut des pages, le titre suffit.
+- **L'œil** pour relire son mot de passe à la connexion et à l'inscription.
+- **Le journal des e-mails dit la vérité** : « Parti » quand le message quitte GuardVeto, « Remis » seulement quand l'arrivée est confirmée.
+
 ## Ce qui a été livré hier soir
 
 - **« Tous les vétérinaires »** — une règle qui concerne tout le cabinet se pose en une fois au lieu de sept, et s'appliquera aux futurs arrivants.
@@ -155,4 +168,4 @@ Le compte de **Fanny** a été remis à zéro exprès. Depuis l'écran « Équip
 
 ---
 
-*Mise à jour le 21 août 2026. Tous les contrôles faits sur les données réelles, règle par règle.*
+*Mise à jour le 21 août 2026 à 15 h 15. Tous les contrôles faits sur les données réelles, règle par règle. Journal des e-mails vidé et accès de Fanny retiré pour la démonstration en direct.*
