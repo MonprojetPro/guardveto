@@ -548,16 +548,28 @@ export function ReglagesV2({
         <div className="card-head">
           <div>
             <h3>Journal des e-mails</h3>
+            {/* ⚠️ « Parti », pas « Envoyé ». Ce journal enregistre le moment où
+                le message quitte GuardVeto — c'est-à-dire le moment où le
+                service d'expédition l'ACCEPTE. Il ne sait rien de la suite.
+                Le 2026-08-21, trois essais affichaient « Envoyé » alors que
+                Brevo les avait rejetés dans la seconde (expéditeur non validé),
+                et trois e-mails de la veille étaient « Envoyé » vers des
+                adresses `@guardveto.local`, qui n'existent pas. Un mot qui
+                promet la remise là où on ne constate que le départ envoie
+                chercher la panne partout sauf où elle est.
+                ➡️ Le vrai correctif reste à venir : brancher le webhook Brevo
+                   pour que ce journal apprenne ce que le message est devenu. */}
             <p className="sub">
-              Chaque e-mail parti aux vétos laisse une trace ici. Un échec déclenche aussi une
-              alerte dans la cloche.
+              Ce que GuardVeto a réellement expédié. « Parti » veut dire que le message a bien
+              quitté l&apos;application — si un véto ne reçoit rien malgré ça, la cause est chez
+              le service d&apos;expédition.
             </p>
           </div>
           <div className="mail-resume">
-            {/* Une pastille verte « 0 envoyés » est un contresens : on ne
+            {/* Une pastille verte « 0 partis » est un contresens : on ne
                 montre le succès que s'il y en a un. */}
             {emails.length - nbEchecs > 0 && (
-              <span className="mr-chip ok">{emails.length - nbEchecs} envoyés</span>
+              <span className="mr-chip ok">{emails.length - nbEchecs} partis</span>
             )}
             {nbEchecs > 0 && <span className="mr-chip bad">{nbEchecs} en échec</span>}
           </div>
@@ -595,7 +607,7 @@ export function ReglagesV2({
                   <td>
                     <span className={`m-statut ${e.statut === 'erreur' ? 'echec' : 'envoye'}`}>
                       <span className="msd" aria-hidden="true" />
-                      {e.statut === 'erreur' ? 'Échec' : 'Envoyé'}
+                      {e.statut === 'erreur' ? 'Refusé' : 'Parti'}
                     </span>
                     {e.erreur && (
                       <span className="m-erreur" title={e.erreur}>
