@@ -104,7 +104,11 @@ export default async function JournalEmailsPage() {
     logs = (data ?? []) as EmailLogRow[]
   }
 
-  const nbErreurs = logs.filter((l) => l.statut === 'erreur').length
+  // Depuis le webhook Brevo (2026-08-21), un e-mail peut être refusé APRÈS son
+  // départ : « rejete » et « spam » sont des échecs au même titre que « erreur ».
+  const nbErreurs = logs.filter(
+    (l) => l.statut === 'erreur' || l.statut === 'rejete' || l.statut === 'spam',
+  ).length
   const nbEnvoyes = logs.length - nbErreurs
 
   return (
@@ -131,7 +135,7 @@ export default async function JournalEmailsPage() {
             <CheckCircle2 className="h-4 w-4" />
             <span className="text-2xl font-semibold tabular-nums">{nbEnvoyes}</span>
           </div>
-          <p className="mt-0.5 text-xs text-muted-foreground">Envoyés (200 derniers)</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Partis (200 derniers)</p>
         </div>
         <div
           className={
@@ -156,7 +160,19 @@ export default async function JournalEmailsPage() {
       ) : (
         <ul className="space-y-2">
           {logs.map((log) => {
-            const erreur = log.statut === 'erreur'
+            const erreur =
+              log.statut === 'erreur' || log.statut === 'rejete' || log.statut === 'spam'
+            // « Envoyé » promettait une remise qu'on ne constatait jamais : on
+            // n'affiche « Remis » que si l'expéditeur l'a confirmé.
+            const libelleStatut =
+              ({
+                envoye: 'Parti',
+                remis: 'Remis',
+                differe: 'En attente',
+                spam: 'Indésirable',
+                rejete: 'Rejeté',
+                erreur: 'Échec',
+              } as Record<string, string>)[log.statut] ?? log.statut
             const nom = log.veterinaire_id ? nomParVet.get(log.veterinaire_id) : null
             return (
               <li
@@ -181,7 +197,7 @@ export default async function JournalEmailsPage() {
                       ) : (
                         <CheckCircle2 className="h-3 w-3" />
                       )}
-                      {erreur ? 'Échec' : 'Envoyé'}
+                      {libelleStatut}
                     </span>
                     <span className="text-sm font-medium text-foreground">{typeLabel(log.type)}</span>
                   </div>

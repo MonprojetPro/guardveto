@@ -154,6 +154,11 @@ export async function envoyerEmailDeTest(): Promise<
       // ferait repasser le texte dans `raisonEchec` au rendu, qui ne
       // reconnaîtrait plus rien et le tronquerait.
       erreur: erreurBrute,
+      // La prise du webhook (`/api/webhooks/brevo`) sur ce message : c'est par
+      // cet identifiant qu'un « rejeté » annoncé plus tard retrouve sa ligne.
+      // Sans lui, l'essai resterait « Parti » même refusé — exactement ce qui
+      // s'est produit le 2026-08-21.
+      resend_id: 'messageId' in resultat ? resultat.messageId : null,
     })
     if (erreurLog) {
       console.error(

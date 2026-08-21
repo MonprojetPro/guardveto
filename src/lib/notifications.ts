@@ -73,11 +73,54 @@ function appUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL?.trim() || 'https://guardveto.vercel.app'
 }
 
+// ── L'expéditeur DU CABINET ───────────────────────────────────
+// ⚠️ INCIDENT DU 2026-08-21 — ce fichier avait son propre chemin d'envoi, qui
+// lisait `BREVO_FROM_EMAIL` en dur et ignorait complètement les colonnes
+// `cabinets.brevo_from_*`. Résultat : régler l'expéditeur d'un cabinet ne
+// changeait QUE l'e-mail d'essai et les réponses aux congés (qui passent par
+// `lib/brevo.ts`). Planning publié, garde modifiée, rappels, appel aux
+// volontaires et dépannage continuaient de partir sous l'identité générique —
+// et donc de se faire REJETER quand elle n'est pas validée chez l'expéditeur.
+//
+// Le pire n'était pas la panne, c'était le message de l'écran de réglages :
+// « s'il arrive, les plannings publiés arriveront aussi ». L'essai passait par
+// le seul chemin corrigé, et promettait pour les cinq autres.
+//
+// Un cache par appel suffit : un cabinet n'est lu qu'une fois, même pour une
+// boucle de sept vétérinaires. Pas de cache au niveau du module — en
+// « serverless » l'instance survit entre deux requêtes, et un réglage tout
+// juste modifié resterait invisible.
+type Expediteur = { email: string | null; nom: string | null }
+
+function lecteurExpediteur(supabase: SupabaseClient) {
+  const cache = new Map<string, Expediteur>()
+  return async (cabinetId: string | null | undefined): Promise<Expediteur> => {
+    if (!cabinetId) return { email: null, nom: null }
+    const connu = cache.get(cabinetId)
+    if (connu) return connu
+
+    const { data } = await supabase
+      .from('cabinets')
+      .select('brevo_from_email, brevo_from_name')
+      .eq('id', cabinetId)
+      .maybeSingle()
+
+    const exp: Expediteur = {
+      email: (data?.brevo_from_email as string | null) ?? null,
+      nom: (data?.brevo_from_name as string | null) ?? null,
+    }
+    cache.set(cabinetId, exp)
+    return exp
+  }
+}
+
 // ── Envoi via API Brevo (fetch) ───────────────────────────────
 async function sendViaBrevo(params: {
   to: { email: string; name: string }[]
   subject: string
   html: string
+  /** Expéditeur du cabinet ; à défaut, les variables d'environnement. */
+  from?: Expediteur
 }): Promise<string | null> {
   // `.trim()` systématique : une valeur collée dans l'interface Vercel embarque
   // souvent un retour à la ligne invisible. Dans un en-tête HTTP, c'est une
@@ -87,12 +130,15 @@ async function sendViaBrevo(params: {
     throw new Error('BREVO_API_KEY non définie')
   }
 
-  const fromEmail = process.env.BREVO_FROM_EMAIL?.trim()
+  // Le cabinet d'abord, l'environnement ensuite — même ordre de priorité que
+  // `lib/brevo.ts`, pour qu'un seul réglage gouverne TOUS les e-mails.
+  const fromEmail = params.from?.email?.trim() || process.env.BREVO_FROM_EMAIL?.trim()
   if (!fromEmail) {
     throw new Error('BREVO_FROM_EMAIL non définie')
   }
 
-  const fromName = process.env.BREVO_FROM_NAME?.trim() || 'GuardVeto'
+  const fromName =
+    params.from?.nom?.trim() || process.env.BREVO_FROM_NAME?.trim() || 'GuardVeto'
 
   const res = await fetch(BREVO_API_URL, {
     method: 'POST',
@@ -348,6 +394,8 @@ export async function sendRappelPublication(
   let sent = 0
   let errors = 0
 
+  const expediteur = lecteurExpediteur(supabase)
+
   for (const admin of admins) {
     const html = buildRappelPublicationHtml(admin, periode, joursRestants)
 
@@ -356,6 +404,7 @@ export async function sendRappelPublication(
         to:      [{ email: admin.email, name: `${admin.prenom} ${admin.nom}` }],
         subject,
         html,
+        from: await expediteur(admin.cabinet_id),
       })
 
       await logEmail(supabase, {
@@ -457,8 +506,8 @@ export async function sendPlanningPublie(
     .from('gardes')
     .select(`
       id, date, type,
-      premier:premier_id(id, nom, prenom, email),
-      second:second_id(id, nom, prenom, email)
+      premier:premier_id(id, nom, prenom, email, cabinet_id),
+      second:second_id(id, nom, prenom, email, cabinet_id)
     `)
     .eq('periode_id', periodeId)
     .order('date')
@@ -474,6 +523,8 @@ export async function sendPlanningPublie(
   let sent = 0
   let errors = 0
 
+  const expediteur = lecteurExpediteur(supabase)
+
   for (const vet of vets) {
     const mesGardes = gardes.filter(
       (g) => g.premier?.id === vet.id || g.second?.id === vet.id
@@ -487,6 +538,7 @@ export async function sendPlanningPublie(
         to:      [{ email: vet.email, name: `${vet.prenom} ${vet.nom}` }],
         subject,
         html,
+        from: await expediteur(vet.cabinet_id),
       })
 
       await logEmail(supabase, {
@@ -540,8 +592,8 @@ export async function sendGardeModifiee(
     .from('gardes')
     .select(`
       id, date, type,
-      premier:premier_id(id, nom, prenom, email),
-      second:second_id(id, nom, prenom, email)
+      premier:premier_id(id, nom, prenom, email, cabinet_id),
+      second:second_id(id, nom, prenom, email, cabinet_id)
     `)
     .eq('id', gardeId)
     .single()
@@ -573,6 +625,8 @@ export async function sendGardeModifiee(
   let sent = 0
   let errors = 0
 
+  const expediteur = lecteurExpediteur(supabase)
+
   for (const vet of destinataires) {
     const html = buildGardeModifieeHtml(
       vet,
@@ -588,6 +642,7 @@ export async function sendGardeModifiee(
         to:      [{ email: vet.email, name: `${vet.prenom} ${vet.nom}` }],
         subject,
         html,
+        from: await expediteur(vet.cabinet_id),
       })
 
       await logEmail(supabase, {
@@ -794,6 +849,8 @@ export async function sendAppelVolontaires(
   let sent = 0
   let errors = 0
 
+  const expediteur = lecteurExpediteur(supabase)
+
   for (const vet of candidats as Veterinaire[]) {
     const html = buildAppelVolontairesHtml(
       vet,
@@ -807,6 +864,7 @@ export async function sendAppelVolontaires(
         to:      [{ email: vet.email, name: `${vet.prenom} ${vet.nom}` }],
         subject,
         html,
+        from: await expediteur(vet.cabinet_id),
       })
 
       await logEmail(supabase, {
@@ -933,6 +991,7 @@ export async function sendDepannageConfirme(
       to:      [{ email: v.email, name: `${v.prenom} ${v.nom}` }],
       subject,
       html,
+      from: await lecteurExpediteur(supabase)(v.cabinet_id),
     })
     await logEmail(supabase, {
       type: 'depannage_confirme',

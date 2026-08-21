@@ -126,6 +126,13 @@
 .m-statut.envoye .msd { background: var(--ok); }
 .m-statut.echec { color: var(--danger); }
 .m-statut.echec .msd { background: var(--danger); }
+/* « Parti » et « Remis » ne se ressemblent pas par hasard : ce sont deux bonnes
+   nouvelles, mais la seconde est CONFIRMÉE. Le vert plein la distingue du vert
+   discret d'un départ dont on ignore encore la suite. */
+.m-statut.remis { color: var(--ok); font-weight: 800; }
+.m-statut.remis .msd { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent); }
+.m-statut.attente { color: var(--t-muted); }
+.m-statut.attente .msd { background: var(--t-muted); }
 .m-erreur {
   display: block; font-size: 0.72rem; color: var(--danger);
   margin-top: 3px; line-height: 1.45;

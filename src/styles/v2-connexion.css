@@ -304,6 +304,27 @@
 /* En erreur, le champ le dit lui-même : le bandeau seul obligeait à
    faire l'aller-retour entre le message et le champ fautif. */
 .co-champ input[aria-invalid='true'] { border-color: var(--danger); }
+
+/* ── L'œil « afficher / masquer » ──────────────────────────────
+   Le bouton se pose DANS le champ, et celui-ci réserve la place à droite :
+   sans ce `padding-right`, un mot de passe long passait sous l'icône.
+   La zone tactile fait 44 px de haut — un œil de 16 px sur un téléphone se
+   rate une fois sur deux. */
+.co-champ-oeil { position: relative; }
+.co-champ-oeil input { padding-right: 46px; }
+.co-oeil {
+  position: absolute; top: 50%; right: 4px;
+  transform: translateY(-50%);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px;
+  border: none; background: transparent; cursor: pointer;
+  border-radius: var(--r-sm);
+  color: var(--soft);
+  transition: color 0.18s ease, background-color 0.18s ease;
+}
+.co-oeil svg { width: 19px; height: 19px; }
+.co-oeil:hover:not(:disabled) { color: var(--t-accent); background: var(--accent-soft); }
+.co-oeil:disabled { opacity: 0.5; cursor: not-allowed; }
 .co-champ input[aria-invalid='true']:focus { box-shadow: 0 0 0 3px var(--danger-soft); }
 
 /* ---- Le refus ---------------------------------------------------

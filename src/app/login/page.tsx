@@ -20,6 +20,7 @@
 import { useState, useTransition } from 'react'
 import { login, resetPassword } from './actions'
 import { Satin } from '@/components/v2/Satin'
+import { ChampMotDePasse } from '@/components/v2/ChampMotDePasse'
 import { Calendar, Shield } from 'lucide-react'
 import '@/styles/v2-terrier.css'
 import '@/styles/v2-connexion.css'
@@ -140,19 +141,16 @@ export default function LoginPage() {
                 />
               </div>
 
-              <div className="co-champ">
-                <label htmlFor="password">Mot de passe</label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  placeholder="••••••••"
-                  required
-                  autoComplete="current-password"
-                  disabled={isPending}
-                  aria-describedby={error ? 'co-erreur' : undefined}
-                />
-              </div>
+              <ChampMotDePasse
+                id="password"
+                name="password"
+                label="Mot de passe"
+                placeholder="••••••••"
+                required
+                autoComplete="current-password"
+                disabled={isPending}
+                aria-describedby={error ? 'co-erreur' : undefined}
+              />
 
               {error && (
                 <p className="co-refus" id="co-erreur" role="alert">

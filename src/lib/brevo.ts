@@ -22,7 +22,7 @@ export async function sendBrevoEmail({
   /** Expéditeur propre au cabinet (fallback env puis défaut si absent). */
   fromEmail?: string | null
   fromName?: string | null
-}) {
+}): Promise<{ error: string } | { success: true; messageId: string | null }> {
   // `.trim()` : un retour à la ligne collé à la clé rend l'en-tête HTTP invalide.
   const apiKey = process.env.BREVO_API_KEY?.trim()
   if (!apiKey) {
@@ -67,7 +67,13 @@ export async function sendBrevoEmail({
       return { error: err }
     }
 
-    return { success: true }
+    // L'identifiant du message est la SEULE prise sur ce qu'il devient ensuite :
+    // c'est par lui que `/api/webhooks/brevo` retrouve la ligne du journal quand
+    // Brevo annonce « remis », « rejeté » ou « spam ». Sans lui, on reste au
+    // constat du départ — ce qui a laissé trois « Envoyé » affichés pour des
+    // messages rejetés (2026-08-21).
+    const json = (await response.json().catch(() => null)) as { messageId?: string } | null
+    return { success: true, messageId: json?.messageId ?? null }
   } catch (e) {
     console.error('[Brevo] Exception:', e)
     return { error: String(e) }

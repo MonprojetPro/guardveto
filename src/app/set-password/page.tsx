@@ -14,6 +14,7 @@
 import { useState, useTransition, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Satin } from '@/components/v2/Satin'
+import { ChampMotDePasse } from '@/components/v2/ChampMotDePasse'
 import '@/styles/v2-terrier.css'
 import '@/styles/v2-connexion.css'
 
@@ -135,38 +136,35 @@ export default function SetPasswordPage() {
             <p className="co-sous">Choisissez un mot de passe pour accéder à GuardVeto</p>
 
             <form onSubmit={handleSubmit} className="co-form">
-              <div className="co-champ">
-                <label htmlFor="password">Mot de passe</label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="8 caractères minimum"
-                  required
-                  autoFocus
-                  autoComplete="new-password"
-                  disabled={isPending}
-                  aria-invalid={error ? true : undefined}
-                  aria-describedby={error ? 'co-erreur' : undefined}
-                />
-              </div>
+              {/* L'œil compte double ici : on CHOISIT un mot de passe, et on
+                  doit le retaper à l'identique. Sans lui, deux frappes exactes
+                  à l'aveugle, et un refus qui ne dit pas laquelle est fautive. */}
+              <ChampMotDePasse
+                id="password"
+                label="Mot de passe"
+                value={password}
+                onChange={setPassword}
+                placeholder="8 caractères minimum"
+                required
+                autoFocus
+                autoComplete="new-password"
+                disabled={isPending}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? 'co-erreur' : undefined}
+              />
 
-              <div className="co-champ">
-                <label htmlFor="confirm">Confirmer le mot de passe</label>
-                <input
-                  id="confirm"
-                  type="password"
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  placeholder="Répétez le mot de passe"
-                  required
-                  autoComplete="new-password"
-                  disabled={isPending}
-                  aria-invalid={error ? true : undefined}
-                  aria-describedby={error ? 'co-erreur' : undefined}
-                />
-              </div>
+              <ChampMotDePasse
+                id="confirm"
+                label="Confirmer le mot de passe"
+                value={confirm}
+                onChange={setConfirm}
+                placeholder="Répétez le mot de passe"
+                required
+                autoComplete="new-password"
+                disabled={isPending}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? 'co-erreur' : undefined}
+              />
 
               {error && (
                 <p className="co-refus" id="co-erreur" role="alert">

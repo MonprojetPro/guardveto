@@ -48,7 +48,7 @@ async function journaliserEmailConge(
     type: 'conge_valide' | 'conge_refuse'
     destinataire: string
     veterinaire_id: string
-    resultat: { error?: string; success?: boolean }
+    resultat: { error?: string; success?: boolean; messageId?: string | null }
   },
 ): Promise<void> {
   const erreur = params.resultat.error ?? null
@@ -59,6 +59,9 @@ async function journaliserEmailConge(
       veterinaire_id: params.veterinaire_id,
       statut: erreur ? 'erreur' : 'envoye',
       erreur,
+      // La prise du webhook sur ce message : sans elle, la ligne resterait
+      // « Partie » même après un rejet annoncé par l'expéditeur.
+      resend_id: params.resultat.messageId ?? null,
     })
   } catch (e) {
     console.error('[conges] Journalisation email_log échouée:', e)

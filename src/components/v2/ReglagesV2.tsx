@@ -78,6 +78,35 @@ const TYPE_EMAIL: Record<string, string> = {
   email_test: 'Essai d’envoi',
 }
 
+/**
+ * L'état d'un e-mail, en français.
+ *
+ * « Parti » est volontairement modeste : c'est tout ce qu'on sait au moment de
+ * l'envoi — le service d'expédition a accepté le message. « Remis » n'apparaît
+ * que lorsque Brevo nous rappelle pour le confirmer (`/api/webhooks/brevo`).
+ * Tant que ce webhook n'est pas branché côté Brevo, toutes les lignes restent
+ * « Parti » : c'est honnête, et c'était tout l'objet du correctif du
+ * 2026-08-21, où « Envoyé » désignait des messages rejetés.
+ */
+const LIBELLE_STATUT: Record<string, string> = {
+  envoye: 'Parti',
+  remis: 'Remis',
+  differe: 'En attente',
+  spam: 'Indésirable',
+  rejete: 'Rejeté',
+  erreur: 'Refusé',
+}
+
+/** Le ton de la pastille. Tout ce qui n'est pas arrivé se voit en rouge. */
+const TON_STATUT: Record<string, string> = {
+  envoye: 'envoye',
+  remis: 'remis',
+  differe: 'attente',
+  spam: 'echec',
+  rejete: 'echec',
+  erreur: 'echec',
+}
+
 function libellePeriode(p: Periode): string {
   return p.libelle ?? `${p.saison === 'ete' ? 'Été' : 'Hiver'} ${p.date_debut.slice(0, 4)}`
 }
@@ -272,7 +301,12 @@ export function ReglagesV2({
     }
   }
 
-  const nbEchecs = emails.filter((e) => e.statut === 'erreur').length
+  // Tout ce qui n'est pas arrivé compte comme un échec — pas seulement le refus
+  // au moment de l'envoi. Un rejet annoncé par le webhook une minute plus tard
+  // est exactement le même problème pour le cabinet.
+  const nbEchecs = emails.filter(
+    (e) => e.statut === 'erreur' || e.statut === 'rejete' || e.statut === 'spam',
+  ).length
 
   return (
     <>
@@ -605,9 +639,9 @@ export function ReglagesV2({
                     )}
                   </td>
                   <td>
-                    <span className={`m-statut ${e.statut === 'erreur' ? 'echec' : 'envoye'}`}>
+                    <span className={`m-statut ${TON_STATUT[e.statut] ?? 'envoye'}`}>
                       <span className="msd" aria-hidden="true" />
-                      {e.statut === 'erreur' ? 'Refusé' : 'Parti'}
+                      {LIBELLE_STATUT[e.statut] ?? e.statut}
                     </span>
                     {e.erreur && (
                       <span className="m-erreur" title={e.erreur}>
