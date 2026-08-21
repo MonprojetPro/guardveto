@@ -16,7 +16,7 @@ Anne-Sophie a généré son premier planning **toute seule**. C'est la marche qu
 
 # ⓵ CE QUE JE DOIS DEMANDER
 
-Six questions. Les cinq premières sont pour elle, la sixième est bloquante.
+Six questions. **La première est bloquante** — les cinq autres peuvent attendre sa réflexion.
 
 ---
 
