@@ -132,14 +132,26 @@ Si c'est « ce serait bien » → on la passe en **souple**, et le moteur récup
 
 # ⓶ CE QU'ON FAIT ENSEMBLE, À L'ÉCRAN
 
-1. **Ouvrir son planning** et dire que tout est conforme. Commencer sur sa réussite.
-2. **Question ❶** — bloquante. Si c'est décalé, le reste attend.
-3. **Traiter les 5 souhaits de congé** dans « Absences ».
-4. **Regénérer une seule fois**, devant elle.
-5. **Vérifier ensemble** : ses semaines · les lundis de Victor (aucun) · les week-ends.
-6. Poser les questions ❷ à ❻ — **sans chercher à les trancher sur le moment**.
-7. **Régler ❼ et ❽ tout de suite**, dans « Organisation » : ce sont des réglages, pas des débats. Le mardi soir de Victor, la fermeté du vendredi de Manon.
+**Le planning est reparti de zéro : on le construit EN DIRECT avec elle.**
+D'où l'ordre ci-dessous — on règle tout ce qui compte **avant** de lancer le moteur, pour qu'il sorte le bon planning du premier coup.
+
+1. **Commencer sur sa réussite.** *« Tu as généré ton premier planning toute seule hier soir, et il respectait vos 22 règles. On va le refaire ensemble, en y mettant ce que tu viens de m'apprendre sur Victor et Manon. »*
+
+2. **Question ❶ — bloquante.** Ses semaines de disponibilité. Si c'est décalé, tout le reste attend.
+
+3. **Régler ❼ et ❽ dans « Organisation »**, devant elle. Le mardi soir de Victor, la fermeté du vendredi de Manon. *C'est là que se joue la qualité du planning qui va sortir.*
+
+4. **Traiter les souhaits de congé** dans « Absences » — les cinq d'un coup.
+
+5. **🚀 GÉNÉRER, en direct.** C'est le moment fort de la séance : elle voit le moteur travailler avec ses règles à elle.
+
+6. **Vérifier ensemble** : ses semaines · **Victor n'a plus aucun mardi soir** · les week-ends · les quatre nuits d'affilée.
+
+7. Poser les questions ❷ à ❻ — **sans chercher à les trancher sur le moment**.
+
 8. Si ça lui convient → **elle publie.**
+
+> ⚠️ **Le planning qui sortira ne sera pas identique à celui d'hier.** Les règles auront changé, et le moteur peut trouver une autre solution tout aussi valable. Les chiffres du § ⓸ sont donc un **ordre de grandeur**, pas une prédiction : à relire à l'écran une fois généré, pas à annoncer d'avance.
 
 ### Démonstration bonus : inviter un vétérinaire — **testée, elle marche**
 
@@ -171,14 +183,15 @@ Le parcours complet a été fait en vrai à 15 h, de bout en bout. Les e-mails p
 ---
 ---
 
-# ⓸ LE PLANNING, EN CHIFFRES
+# ⓸ LE PLANNING D'HIER, EN CHIFFRES
 
-*Pour répondre si elle demande — pas à réciter.*
+⚠️ **Ce sont les chiffres du planning d'hier soir, effacé pour le regénérer en direct.** Ils servent de **repère** — « voilà ce que ça donnait » — pas de promesse. Le nouveau sera différent, et c'est normal : les règles auront changé.
 
-**« Hiver 1 »** · 21 septembre → 29 novembre (10 semaines) · **en brouillon**, rien n'est parti chez les vétos.
-**50 gardes**, toutes pourvues à 2, **aucun trou**.
+**« Hiver 1 »** · 21 septembre → 29 novembre (10 semaines) · **50 gardes**, toutes pourvues à 2, **aucun trou**.
 
-**Répartition** : 18 · 18 · 17 · 17 · 16 pour les cinq pleinement disponibles, **14 pour Anne-Sophie** (une semaine sur deux). Une seule garde d'écart sur les postes de premier en week-end.
+**Répartition obtenue** : 18 · 18 · 17 · 17 · 16 pour les cinq pleinement disponibles, **14 pour Anne-Sophie** (une semaine sur deux). Une seule garde d'écart sur les postes de premier en week-end.
+
+*C'est le niveau d'équité à retrouver sur le nouveau planning. S'il s'en écarte beaucoup, c'est qu'une règle ajoutée serre trop — et on le verra tout de suite à l'écran.*
 
 **Les 22 règles du cabinet sont respectées**, vérifiées une par une dans les données : indisponibilité d'Anne-Sophie une semaine sur deux · Manon et Antoine jamais ensemble · repos fixes d'Anne-Catherine, Anne-Sophie et Fanny · repos liés au week-end · binôme du vendredi = celui du week-end, rôles inversés (10/10) · congés validés · aucun lundi pour Victor.
 
@@ -211,4 +224,4 @@ Le parcours complet a été fait en vrai à 15 h, de bout en bout. Les e-mails p
 
 ---
 
-*Mise à jour le 21 août 2026 à 15 h 15. Tous les contrôles faits sur les données réelles, règle par règle. Journal des e-mails vidé et accès de Fanny retiré pour la démonstration en direct.*
+*Mise à jour le 21 août 2026 à 15 h 30. Contrôles faits sur les données réelles, règle par règle. Journal des e-mails vidé, accès de Fanny retiré et planning effacé : **tout se fait en direct devant elle**. Les 22 règles et les souhaits de congé sont intacts.*
