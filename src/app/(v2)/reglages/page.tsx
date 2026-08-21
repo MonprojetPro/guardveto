@@ -152,6 +152,13 @@ export default async function ReglagesPage() {
           // Le nom est ce que le cabinet voit dans sa propre interface Google,
           // donc le seul repère qu'on partage avec lui.
           nomAgenda={await nomLisibleAgenda(valeurs.googleCalendarId || null)}
+          // Même raison que l'agenda : seul le serveur sait si l'envoi est
+          // réellement possible (clé + adresse d'expédition). Un booléen, jamais
+          // les valeurs elles-mêmes — le navigateur n'a rien à faire d'une clé.
+          envoiConfigure={
+            !!process.env.BREVO_API_KEY?.trim()
+            && !!(valeurs.brevoFromEmail.trim() || process.env.BREVO_FROM_EMAIL?.trim())
+          }
         />
       </div>
     </>

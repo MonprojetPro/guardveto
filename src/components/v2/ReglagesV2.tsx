@@ -111,17 +111,29 @@ interface Props {
    * dans sa propre interface Google. null = agenda injoignable.
    */
   nomAgenda?: string | null
+  /**
+   * L'envoi d'e-mails est-il réellement possible (clé + adresse d'expédition
+   * connues du serveur) ? Le navigateur ne peut pas le savoir, et un voyant
+   * qui ment envoie chercher une panne qui n'existe pas — c'est exactement ce
+   * qu'avait fait celui de l'agenda.
+   */
+  envoiConfigure?: boolean
 }
 
 export function ReglagesV2({
   valeurs, periodesPubliees, emails, agendaParDefaut = '', nomAgenda = null,
+  envoiConfigure = false,
 }: Props) {
   const [isPending, startTransition] = useTransition()
   const { ouvrirErreur, dialogueErreur } = useErreurBloquante()
 
   // Agenda + expéditeur passent par la même action : un seul état de saisie.
   const [calendarId, setCalendarId] = useState(valeurs.googleCalendarId)
-  const [fromEmail, setFromEmail] = useState(valeurs.brevoFromEmail)
+  // Plus de setter : l'adresse d'envoi n'est plus saisissable ici (elle piégeait
+  // le cabinet, cf. la carte « E-mails aux vétos »). On garde la VALEUR pour la
+  // renvoyer inchangée à l'enregistrement — sans quoi une simple modification du
+  // nom affiché effacerait l'adresse réglée par l'assistance.
+  const [fromEmail] = useState(valeurs.brevoFromEmail)
   const [fromName, setFromName] = useState(valeurs.brevoFromName)
 
   const [adresse, setAdresse] = useState(valeurs.adresse)
@@ -147,7 +159,6 @@ export function ReglagesV2({
   // l'assurer — c'est d'ailleurs par lui que ça fonctionne aujourd'hui.
   const agendaSaisi = valeurs.googleCalendarId.trim() !== ''
   const agendaBranche = agendaSaisi || agendaParDefaut !== ''
-  const expediteurRegle = valeurs.brevoFromEmail.trim() !== ''
 
   // ── Enregistrer agenda + expéditeur ─────────────────────────────────────
   const enregistrerPartages = () => {
@@ -392,32 +403,34 @@ export function ReglagesV2({
           </div>
         </section>
 
-        {/* ── Expéditeur des e-mails ─────────────────────────────────── */}
-        <section className="card conn-card" aria-label="Expéditeur des e-mails">
+        {/* ── E-mails aux vétos ──────────────────────────────────────────
+            L'ADRESSE d'envoi a été retirée de cet écran le 2026-08-21, sur
+            constat de MiKL (« je ne saurais pas l'expliquer aux clients »).
+            Elle n'était pas seulement obscure, elle était PIÉGÉE : Brevo refuse
+            d'expédier depuis un domaine qu'il ne connaît pas, et l'autoriser
+            demande une intervention dans notre compte + le DNS du client. Un
+            cabinet qui remplissait cette case tout seul coupait ses propres
+            e-mails, avec pour tout retour « l'adresse ou le domaine d'envoi
+            n'est pas validé chez lui » (cf. lib/emails/echec.ts).
+            Le NOM affiché, lui, ne demande aucune validation : il reste, parce
+            qu'il est immédiatement utile et sans risque.
+            La valeur en base n'est pas perdue : `fromEmail` continue d'être
+            renvoyé tel qu'il a été chargé, donc réglable par l'assistance. */}
+        <section className="card conn-card" aria-label="E-mails aux vétos">
           <div className="conn-head">
             <span className="conn-ico" aria-hidden="true">
               ✉️
             </span>
             <div>
-              <h3>Expéditeur des e-mails</h3>
-              <p className="sub">Le nom que verront les vétos</p>
+              <h3>E-mails aux vétos</h3>
+              <p className="sub">Le nom qu&apos;ils verront comme expéditeur</p>
             </div>
-            <span className={`conn-state ${expediteurRegle ? 'on' : 'off'}`}>
+            <span className={`conn-state ${envoiConfigure ? 'on' : 'off'}`}>
               <span className="cs-dot" aria-hidden="true" />
-              {expediteurRegle ? 'Réglé' : 'Par défaut'}
+              {envoiConfigure ? 'Actif' : 'À configurer'}
             </span>
           </div>
           <div className="conn-body">
-            <div className="field">
-              <label htmlFor="cn-mail">Adresse d&apos;envoi</label>
-              <input
-                id="cn-mail"
-                type="email"
-                value={fromEmail}
-                onChange={(e) => setFromEmail(e.target.value)}
-                placeholder="contact@cabinet.fr"
-              />
-            </div>
             <div className="field">
               <label htmlFor="cn-nom">Nom affiché</label>
               <input
@@ -428,17 +441,12 @@ export function ReglagesV2({
                 placeholder="Cabinet vétérinaire"
               />
             </div>
-            {/* Deux pavés pour dire deux choses simples : « laisse vide, ça
-                marche quand même » et « le bouton envoie un vrai e-mail ».
-                Une ligne chacun suffit. */}
-            <p className="conn-line">
-              {expediteurRegle
-                ? 'C’est cette adresse qui apparaîtra comme expéditeur des e-mails aux vétos.'
-                : 'Laissé vide, GuardVeto envoie depuis sa propre adresse. Rien à faire.'}
+            <p className="field-aide">
+              Laissé vide, les e-mails arrivent au nom de GuardVeto.
             </p>
             <p className="conn-line">
-              Le bouton d&apos;essai t&apos;envoie un vrai e-mail : s&apos;il arrive, tout le
-              reste arrivera aussi.
+              Le bouton d&apos;essai t&apos;envoie un vrai e-mail : s&apos;il arrive, les
+              plannings et les réponses aux congés arriveront aussi.
             </p>
             <div className="conn-actions">
               <button
@@ -456,7 +464,7 @@ export function ReglagesV2({
                 disabled={testEnCours}
               >
                 {testEnCours && <span className="sync-spin" aria-hidden="true" />}
-                {testEnCours ? 'Envoi…' : 'Envoyer un e-mail de test'}
+                {testEnCours ? 'Envoi…' : 'Vérifier que les e-mails partent'}
               </button>
             </div>
           </div>

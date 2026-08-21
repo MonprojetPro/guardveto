@@ -252,18 +252,13 @@ export function AbsencesV2({
         <div>
           <h1>Absences &amp; échanges</h1>
         </div>
-        <div className="page-actions">
-          <button type="button" className="btn btn-outline" onClick={() => setCreerOuvert(true)}>
-            + {isAdmin ? 'Créer un congé' : 'Poser un congé'}
-          </button>
-          {isAdmin && vetsCrise.length > 0 && (
-            <button type="button" className="btn btn-accent" onClick={() => setCriseOuverte(true)}>
-              🚨 Déclarer une absence
-            </button>
-          )}
-        </div>
       </div>
 
+      {/* Les deux commandes se posent sur la ligne des ONGLETS, pas sur celle du
+          titre : elles agissent sur ce que les onglets montrent, et le titre
+          seul respire mieux depuis qu'il a grandi. Même rangée, donc même
+          hauteur de regard que le choix d'onglet. */}
+      <div className="abs-barre">
       <nav className="tabs" role="tablist" aria-label="Sections d'Absences et échanges">
         <button
           type="button"
@@ -295,6 +290,18 @@ export function AbsencesV2({
           </button>
         )}
       </nav>
+
+        <div className="page-actions">
+          <button type="button" className="btn btn-outline" onClick={() => setCreerOuvert(true)}>
+            + {isAdmin ? 'Créer un congé' : 'Poser un congé'}
+          </button>
+          {isAdmin && vetsCrise.length > 0 && (
+            <button type="button" className="btn btn-accent" onClick={() => setCriseOuverte(true)}>
+              🚨 Déclarer une absence
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* La scène porte Filou accroché au rebord DROIT des cartes. Il repart
           avec la mémoire de l'onglet ouvert (`#filou=conges`…) : c'est ce qui

@@ -60,9 +60,12 @@ const MOTIFS: Array<{ quand: RegExp; alors: string }> = [
     alors: "La clé d’envoi n’est pas configurée sur le serveur (BREVO_API_KEY).",
   },
   {
+    // ⚠️ Ne renvoie plus vers un champ de l'écran : l'adresse d'expédition en a
+    // été retirée le 2026-08-21 (elle exige une autorisation de domaine chez
+    // Brevo, hors de portée du cabinet). C'est donc à l'assistance de la poser.
     quand: /Expéditeur email manquant/i,
     alors:
-      "Aucune adresse d’expéditeur n’est configurée, ni pour le cabinet ni au niveau général — renseigne-la ci-dessus avant d’envoyer.",
+      "Aucune adresse d’expéditeur n’est configurée, ni pour le cabinet ni au niveau général — préviens l’assistance, ce réglage est de son ressort.",
   },
 ]
 

@@ -32,6 +32,18 @@
   width: fit-content; max-width: 100%;
   margin-bottom: 26px;
 }
+/* La rangée qui porte les onglets À GAUCHE et les commandes À DROITE.
+   Les boutons vivaient sur la ligne du titre ; ils agissent sur ce que les
+   onglets montrent, leur place est donc ici. La marge basse passe sur la
+   rangée : laissée sur `.tabs`, elle décalait la pilule des boutons. */
+.abs-barre {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+  margin-bottom: 26px;
+}
+.abs-barre .tabs { margin-bottom: 0; }
+.abs-barre .page-actions { flex-shrink: 0; }
+
 .tabs button {
   border: none; background: transparent; color: var(--t-muted);
   font-size: 0.88rem; font-weight: 600;
