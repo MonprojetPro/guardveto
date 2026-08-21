@@ -16,7 +16,9 @@ Anne-Sophie a généré son premier planning **toute seule**. C'est la marche qu
 
 # ⓵ CE QUE JE DOIS DEMANDER
 
-Six questions. **La première est bloquante** — les cinq autres peuvent attendre sa réflexion.
+Huit questions. **La première est bloquante** — les autres peuvent attendre sa réflexion.
+
+**❼ et ❽ viennent de son message d'aujourd'hui** sur Victor et Manon : ce sont les plus concrètes, et ❼ signale une règle qui protège le mauvais soir.
 
 ---
 
@@ -77,6 +79,8 @@ Jeudi soir → vendredi soir → tout le week-end. **Du jeudi 18 h 30 au lundi 8
 
 *Le logiciel équilibre le nombre de gardes, pas leur variété. Certains cabinets adorent, d'autres détestent. Sa réponse décide si on s'en occupe.*
 
+> ⚠️ **Pour Victor, ce n'est plus une question de confort** — voir le point ❼ ci-dessous : ces 9 mardis tombent exactement sur son sport.
+
 ---
 
 ## ❻ Anne-Catherine à zéro garde
@@ -86,6 +90,42 @@ Zéro sur dix semaines. Cohérent avec son statut de **dernier recours** — mai
 > **« Anne-Catherine à zéro garde, c'est bien l'intention ? »**
 
 *Le cabinet a sept vétérinaires et tourne à six. À six, « un week-end sur trois » pour tout le monde est **mathématiquement impossible**. Si elle prenait deux ou trois week-ends, ça deviendrait tenable. **C'est le levier qui débloque le plus de marge.***
+
+---
+
+## ❼ 🔴 Victor : on protège le mauvais soir
+
+*Ce point vient de son message d'aujourd'hui. C'est le plus concret de la liste.*
+
+**Ce qu'elle nous écrit** : ce que Victor veut vraiment, c'est **aller au sport le MARDI soir**. Le lundi serait un bonus, « ce n'est pas une obligation ».
+
+**Ce qui est réglé dans le logiciel** : *pas de garde le **lundi***, en règle souple. Le mardi soir, lui, n'est protégé par **rien**.
+
+**Ce que ça donne** : sur le planning généré, Victor était de garde **9 mardis sur 10**. Soit neuf séances de sport ratées, sur les dix semaines.
+
+> **« Si je comprends bien, ce qu'il ne faut surtout pas, c'est le mardi soir —
+> parce que c'est là qu'il a son sport. On inverse la règle ? »**
+
+**Sa solution rend l'inversion possible.** Elle propose que Victor prenne **deux demi-journées** de repos au lieu d'une journée entière : une garde du lundi soir n'entamerait alors plus sa matinée du mardi. Le lundi soir se libère donc pour le planning, et on peut dépenser cette marge à protéger le mardi soir.
+
+**À confirmer avec elle avant de rien changer :**
+- On interdit le **mardi soir** (le sport) → en règle **ferme** ou souple ?
+- On lève l'interdiction du **lundi soir**, ou on la garde en simple préférence ?
+- Victor est-il d'accord pour les deux demi-journées ? *(c'est sa proposition à elle, pas encore sa réponse à lui)*
+
+---
+
+## ❽ Manon : sa règle est plus stricte que son besoin
+
+**Ce qu'elle nous écrit** : l'entraînement de Manon ne commence pas avant **19 h ou 20 h**. Elle n'a donc **aucun besoin** que son jour de repos tombe le lundi ou le mercredi. Elle aime bien le **vendredi de temps en temps**, et le **jeudi quand elle est de garde le week-end**.
+
+**Ce qui est réglé dans le logiciel** : *jeudi si garde le week-end, vendredi sinon* — posé en **« Jamais »**, c'est-à-dire une règle **dure**, que le moteur ne peut jamais enfreindre.
+
+**Le fond est juste, la fermeté ne l'est pas.** « De temps en temps » n'est pas « toujours ». En l'état, cette règle immobilise un jour de repos toutes les semaines pour un souhait occasionnel — et le cabinet tourne à six, chaque contrainte dure coûte cher aux autres.
+
+> **« Le vendredi de Manon, c'est un "il faut" ou un "ce serait bien" ? »**
+
+Si c'est « ce serait bien » → on la passe en **souple**, et le moteur récupère de la marge pour tout le monde. *(C'est peut-être ce qui débloquerait aussi le point ❹ d'Anne-Sophie.)*
 
 ---
 ---
@@ -98,7 +138,8 @@ Zéro sur dix semaines. Cohérent avec son statut de **dernier recours** — mai
 4. **Regénérer une seule fois**, devant elle.
 5. **Vérifier ensemble** : ses semaines · les lundis de Victor (aucun) · les week-ends.
 6. Poser les questions ❷ à ❻ — **sans chercher à les trancher sur le moment**.
-7. Si ça lui convient → **elle publie.**
+7. **Régler ❼ et ❽ tout de suite**, dans « Organisation » : ce sont des réglages, pas des débats. Le mardi soir de Victor, la fermeté du vendredi de Manon.
+8. Si ça lui convient → **elle publie.**
 
 ### Démonstration bonus : inviter un vétérinaire — **testée, elle marche**
 
@@ -164,6 +205,8 @@ Le parcours complet a été fait en vrai à 15 h, de bout en bout. Les e-mails p
 - [ ] Refaire les écrans **Notifications** et **Échanges** en version 2 (les seuls encore en ancienne version).
 - [ ] Corriger les liens des notifications internes, qui pointent vers l'ancien écran des échanges.
 - [ ] Selon ses réponses : juniors/seniors (❸), la densité de ses semaines (❹), la variété des jours (❺).
+- [ ] Vérifier, sur le planning regénéré, que Victor n'a **plus aucun mardi soir** (❼).
+- [ ] Confirmer auprès de Victor lui-même l'accord sur les deux demi-journées de repos (❼).
 - [ ] Trancher son rythme d'alternance face aux vacances scolaires (❷).
 
 ---
