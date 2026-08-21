@@ -24,17 +24,20 @@ Huit questions. **La première est bloquante** — les autres peuvent attendre s
 
 ## ❶ BLOQUANT — Ses semaines de disponibilité
 
-*Si c'est décalé d'une semaine, tout le planning est faux. À poser en premier, avant tout le reste.*
+*Si c'est décalé d'une semaine, tout le planning est faux. **À poser AVANT de générer** — c'est le réglage qui commande tout le reste.*
 
-> Sur ce planning, **tu es de garde** les semaines du :
-> **28 sept · 12 oct · 26 oct · 9 nov · 23 nov**
->
-> Et **tu n'as rien** les semaines du :
-> **21 sept · 5 oct · 19 oct · 2 nov · 16 nov**
->
-> ### C'est bien dans ce sens-là ?
+Le logiciel la croit disponible **une semaine sur deux**, mais elle n'a jamais confirmé **laquelle**. Une semaine d'écart, et le planning est parfaitement conforme à la règle… et faux dans la vraie vie.
 
-→ Si elle dit non : **on décale d'une semaine avant toute publication.**
+> **« Sur la période qui vient, tu es disponible les semaines du :
+> 28 sept · 12 oct · 26 oct · 9 nov · 23 nov —
+> et tu n'as rien les semaines du :
+> 21 sept · 5 oct · 19 oct · 2 nov · 16 nov.**
+>
+> ### C'est bien dans ce sens-là ? »
+
+→ Si elle dit **non** : on décale d'une semaine dans « Organisation », **avant de lancer la génération**.
+
+*Pourquoi on se pose la question : sur l'historique de juillet, le logiciel avait signalé qu'elle était de garde un jour où sa règle la dit indisponible. On avait supposé une exception d'été, sans trancher.*
 
 ---
 
@@ -61,8 +64,10 @@ Huit questions. **La première est bloquante** — les autres peuvent attendre s
 
 ## ❹ Quatre nuits d'affilée pour elle
 
+*Constaté sur le planning d'hier — **à revérifier sur le nouveau**, une fois généré.*
+
 Jeudi soir → vendredi soir → tout le week-end. **Du jeudi 18 h 30 au lundi 8 h 30, sans interruption.**
-Ça arrive **quatre fois sur ses cinq semaines de présence**.
+Ça arrivait **quatre fois sur ses cinq semaines de présence**.
 
 > **« Quatre nuits de suite quand tu es là, ça te va, ou on t'en enlève une ? »**
 
@@ -72,7 +77,7 @@ Jeudi soir → vendredi soir → tout le week-end. **Du jeudi 18 h 30 au lundi 8
 
 ## ❺ Chacun a « son » jour de la semaine
 
-**Victor : 9 mardis sur 10. Jean : 8 mercredis. Fanny : 7 lundis et aucun mardi.**
+*Constaté sur le planning d'hier.* **Victor : 9 mardis sur 10. Jean : 8 mercredis. Fanny : 7 lundis et aucun mardi.**
 
 > **« La régularité vous arrange — chacun sait quel jour il est de garde —
 > ou est-ce que ça vous pèse ? »**
@@ -101,7 +106,7 @@ Zéro sur dix semaines. Cohérent avec son statut de **dernier recours** — mai
 
 **Ce qui est réglé dans le logiciel** : *pas de garde le **lundi***, en règle souple. Le mardi soir, lui, n'est protégé par **rien**.
 
-**Ce que ça donne** : sur le planning généré, Victor était de garde **9 mardis sur 10**. Soit neuf séances de sport ratées, sur les dix semaines.
+**Ce que ça donnait** : sur le planning d'hier, Victor était de garde **9 mardis sur 10**. Soit neuf séances de sport ratées sur dix semaines. C'est le contrôle le plus parlant à faire ensemble après la génération.
 
 > **« Si je comprends bien, ce qu'il ne faut surtout pas, c'est le mardi soir —
 > parce que c'est là qu'il a son sport. On inverse la règle ? »**
