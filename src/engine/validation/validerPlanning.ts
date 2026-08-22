@@ -35,6 +35,10 @@ import type {
   JourSemaine,
 } from '../types'
 import { normaliserContraintesVets } from '../normaliserContraintes'
+// Les `detail` de ce fichier ne sont PAS des journaux techniques : ils
+// s'affichent tels quels dans la fenêtre de publication et dans le bandeau
+// d'incohérences, sous les yeux du cabinet. Une date y va donc en français.
+import { dateFr, periodeFr } from '@/lib/dates-fr'
 import {
   DEFAULT_STRUCTURE_CONFIG, estStructureDure, RELATIONS_STRUCTURE_DEFAUT,
   type StructureConfig, type RelationStructure,
@@ -393,7 +397,7 @@ export function validerPlanning(
         regle: 'COUVERTURE',
         date: s.date,
         type: s.type,
-        detail: `Créneau attendu absent du planning (${s.type} du ${s.date})`,
+        detail: `Créneau attendu absent du planning (${s.type} du ${dateFr(s.date)})`,
       })
       continue
     }
@@ -407,7 +411,7 @@ export function validerPlanning(
           date: s.date,
           type: s.type,
           role: 'premier',
-          detail: `Aucun 1er de garde assigné (${s.type} du ${s.date})`,
+          detail: `Aucun 1er de garde assigné (${s.type} du ${dateFr(s.date)})`,
         })
       } else if (role === 'second') {
         violations.push({
@@ -428,7 +432,7 @@ export function validerPlanning(
           date: s.date,
           type: s.type,
           role,
-          detail: `Place « ${role} » non pourvue (${s.type} du ${s.date})`,
+          detail: `Place « ${role} » non pourvue (${s.type} du ${dateFr(s.date)})`,
         })
       }
     }
@@ -457,7 +461,7 @@ export function validerPlanning(
           type: a.type,
           role: 'second',
           vetId: second,
-          detail: `R17 : une seule garde de nuit en semaine (effectif réglé à 1) — un 2nd a été assigné (${a.date})`,
+          detail: `R17 : une seule garde de nuit en semaine (effectif réglé à 1) — un 2nd a été assigné (${dateFr(a.date)})`,
         })
       }
     }
@@ -476,7 +480,7 @@ export function validerPlanning(
           date: a.date,
           type: a.type,
           vetId,
-          detail: `R21 : le même vétérinaire occupe deux places du créneau (${a.type} du ${a.date})`,
+          detail: `R21 : le même vétérinaire occupe deux places du créneau (${a.type} du ${dateFr(a.date)})`,
         })
       } else {
         vus.add(vetId)
@@ -510,7 +514,7 @@ export function validerPlanning(
             regle: 'COMPOSITION',
             date: a.date,
             type: a.type,
-            detail: `COMPOSITION : aucun vétérinaire « ${regle.tag} » sur ce créneau (${a.type} du ${a.date})`,
+            detail: `COMPOSITION : aucun vétérinaire « ${regle.tag} » sur ce créneau (${a.type} du ${dateFr(a.date)})`,
           })
         }
         if (regle.mode === 'pas_seuls' && nbPorteurs > 0 && nbPorteurs === equipe.length) {
@@ -519,7 +523,7 @@ export function validerPlanning(
             date: a.date,
             type: a.type,
             vetId: equipe[0],
-            detail: `COMPOSITION : uniquement des vétérinaires « ${regle.tag} » sur ce créneau (${a.type} du ${a.date}) — il en faut au moins un sans ce tag`,
+            detail: `COMPOSITION : uniquement des vétérinaires « ${regle.tag} » sur ce créneau (${a.type} du ${dateFr(a.date)}) — il en faut au moins un sans ce tag`,
           })
         }
       }
@@ -549,7 +553,7 @@ export function validerPlanning(
             type: a.type,
             role: regle.role,
             vetId,
-            detail: `ROLE_TAG : ${vt.prenom} porte le tag « ${regle.tag} » — le rôle « ${regle.role} » lui est interdit (${a.type} du ${a.date})`,
+            detail: `ROLE_TAG : ${vt.prenom} porte le tag « ${regle.tag} » — le rôle « ${regle.role} » lui est interdit (${a.type} du ${dateFr(a.date)})`,
           })
         }
       }
@@ -572,7 +576,7 @@ export function validerPlanning(
             date: a.date,
             type: a.type,
             vetId,
-            detail: `R22 : le même vétérinaire tient deux gardes le ${a.date} (${deja} + ${a.type})`,
+            detail: `R22 : le même vétérinaire tient deux gardes le ${dateFr(a.date)} (${deja} + ${a.type})`,
           })
         } else {
           parJourVet.set(cle, a.type)
@@ -593,7 +597,7 @@ export function validerPlanning(
           type: a.type,
           role,
           vetId,
-          detail: `Vétérinaire inconnu assigné (${vetId}) sur ${a.type} du ${a.date}`,
+          detail: `Vétérinaire inconnu assigné (${vetId}) sur ${a.type} du ${dateFr(a.date)}`,
         })
         continue
       }
@@ -607,7 +611,7 @@ export function validerPlanning(
             type: a.type,
             role,
             vetId,
-            detail: `R16 : ${vet.prenom} est en congé (${conge.date_debut}→${conge.date_fin}) mais de garde le ${a.date}`,
+            detail: `R16 : ${vet.prenom} est en congé ${periodeFr(conge.date_debut, conge.date_fin)} mais de garde le ${dateFr(a.date)}`,
           })
         }
       }
@@ -643,7 +647,7 @@ export function validerPlanning(
                   type: a.type,
                   role,
                   vetId,
-                  detail: `R1 : ${vet.prenom} a un repos fixe le ${jour} mais de garde le ${a.date}`,
+                  detail: `R1 : ${vet.prenom} a un repos fixe le ${jour} mais de garde le ${dateFr(a.date)}`,
                 })
               }
             }
@@ -667,7 +671,12 @@ export function validerPlanning(
                 type: a.type,
                 role,
                 vetId,
-                detail: `R1 : ${vet.prenom} a un repos fixe le ${jour} (règle ${JSON.stringify(regle)}) mais de garde le ${a.date}`,
+                // Le `JSON.stringify(regle)` d'origine crachait la règle brute
+                // dans la phrase : « (règle {"jour":"lundi","semaine":"impaire",
+                // "ancre":"2026-09-21"}) ». Illisible, et servi au cabinet dans
+                // la fenêtre de publication. La semaine visée se dit en trois
+                // mots ; le reste appartient aux journaux, pas à l'écran.
+                detail: `R1 : ${vet.prenom} a un repos fixe le ${jour} (une semaine sur deux) mais de garde le ${dateFr(a.date)}`,
               })
             }
           }
@@ -691,7 +700,7 @@ export function validerPlanning(
                 type: a.type,
                 role,
                 vetId,
-                detail: `R2 : ${vet.prenom} indisponible soirs semaines ${semaines} mais de garde le ${a.date}`,
+                detail: `R2 : ${vet.prenom} indisponible soirs semaines ${semaines} mais de garde le ${dateFr(a.date)}`,
               })
             }
             if (periodes.includes('weekend') && estWe) {
@@ -701,7 +710,7 @@ export function validerPlanning(
                 type: a.type,
                 role,
                 vetId,
-                detail: `R2 : ${vet.prenom} indisponible week-ends ${semaines} mais de garde le ${a.date}`,
+                detail: `R2 : ${vet.prenom} indisponible week-ends ${semaines} mais de garde le ${dateFr(a.date)}`,
               })
             }
             // Créneau SUR-MESURE : miroir du choix conservateur du moteur —
@@ -714,7 +723,7 @@ export function validerPlanning(
                 type: a.type,
                 role,
                 vetId,
-                detail: `R2 : ${vet.prenom} indisponible semaines ${semaines} mais de garde (${a.type}) le ${a.date}`,
+                detail: `R2 : ${vet.prenom} indisponible semaines ${semaines} mais de garde (${a.type}) le ${dateFr(a.date)}`,
               })
             }
           }
@@ -734,7 +743,7 @@ export function validerPlanning(
               type: a.type,
               role,
               vetId,
-              detail: `R3/R5 : ${vet.prenom} doit se reposer le ${jour} (garde WE cette semaine) mais de garde le ${a.date}`,
+              detail: `R3/R5 : ${vet.prenom} doit se reposer le ${jour} (garde WE cette semaine) mais de garde le ${dateFr(a.date)}`,
             })
           }
           if (!gardeWe && sinon === jour) {
@@ -744,7 +753,7 @@ export function validerPlanning(
               type: a.type,
               role,
               vetId,
-              detail: `R3/R5 : ${vet.prenom} doit se reposer le ${jour} (pas de garde WE cette semaine) mais de garde le ${a.date}`,
+              detail: `R3/R5 : ${vet.prenom} doit se reposer le ${jour} (pas de garde WE cette semaine) mais de garde le ${dateFr(a.date)}`,
             })
           }
         }
@@ -761,7 +770,7 @@ export function validerPlanning(
                 date: a.date,
                 type: a.type,
                 vetId,
-                detail: `R6 : duo interdit ${vet.prenom} + ${autreVet?.prenom ?? autre} sur ${a.type} du ${a.date}`,
+                detail: `R6 : duo interdit ${vet.prenom} + ${autreVet?.prenom ?? autre} sur ${a.type} du ${dateFr(a.date)}`,
               })
             }
           }
@@ -820,7 +829,7 @@ export function validerPlanning(
             date: debut,
             type: 'fenetre',
             vetId: vet.id,
-            detail: `AU_PLUS_N : ${vet.prenom} a ${count} gardes (max ${n}) sur la fenêtre du ${debut}${mGliss ? ` (${mGliss[1]}j glissants)` : ' (semaine civile)'}`,
+            detail: `AU_PLUS_N : ${vet.prenom} a ${count} gardes (max ${n}) sur la fenêtre du ${dateFr(debut)}${mGliss ? ` (${mGliss[1]}j glissants)` : ' (semaine civile)'}`,
           })
         }
       }
@@ -886,7 +895,7 @@ export function validerPlanning(
             date: cur.date,
             type: 'espacement',
             vetId: vet.id,
-            detail: `ESPACEMENT : ${vet.prenom} — seulement ${j} jour(s) entre le ${prec.date} et le ${cur.date} (min ${ecart})`,
+            detail: `ESPACEMENT : ${vet.prenom} — seulement ${j} jour(s) entre le ${dateFr(prec.date)} et le ${dateFr(cur.date)} (min ${ecart})`,
           })
         }
       }
@@ -928,7 +937,7 @@ export function validerPlanning(
             date: datesWe[i],
             type: 'espacement_weekend',
             vetId: vet.id,
-            detail: `FREQ_WE : ${vet.prenom} — deux week-ends à ${j} jour(s) d'écart (${datesWe[i - 1]} → ${datesWe[i]}), min 1 toutes les ${n} semaines`,
+            detail: `FREQ_WE : ${vet.prenom} — deux week-ends à ${j} jour(s) d'écart (${dateFr(datesWe[i - 1])} → ${dateFr(datesWe[i])}), min 1 toutes les ${n} semaines`,
           })
         }
       }
@@ -1041,7 +1050,7 @@ export function validerPlanning(
                 date: b.date,
                 type: b.type,
                 vetId: vet.id,
-                detail: `SUCCESSION : ${vet.prenom} fait « ${typeApres} » le ${b.date}, lendemain de « ${typeAvant} » (${a.date}) — interdit`,
+                detail: `SUCCESSION : ${vet.prenom} fait « ${typeApres} » le ${dateFr(b.date)}, lendemain de « ${typeAvant} » (${dateFr(a.date)}) — interdit`,
               })
             }
           }
@@ -1072,7 +1081,7 @@ export function validerPlanning(
               date: j,
               type: 'serie',
               vetId: vet.id,
-              detail: `SERIE_MAX : ${vet.prenom} enchaîne ${len} jours de garde d'affilée à partir du ${j} (max ${n})`,
+              detail: `SERIE_MAX : ${vet.prenom} enchaîne ${len} jours de garde d'affilée à partir du ${dateFr(j)} (max ${n})`,
             })
           }
         }
@@ -1102,7 +1111,7 @@ export function validerPlanning(
                 date: jour,
                 type: 'repos_serie',
                 vetId: vet.id,
-                detail: `REPOS_SERIE : ${vet.prenom} est de garde le ${jour} alors qu'une série d'au moins ${n} jours (fin le ${fin}) impose ${m} jour(s) de repos`,
+                detail: `REPOS_SERIE : ${vet.prenom} est de garde le ${dateFr(jour)} alors qu'une série d'au moins ${n} jours (fin le ${dateFr(fin)}) impose ${m} jour(s) de repos`,
               })
             }
           }
@@ -1217,7 +1226,7 @@ export function validerPlanning(
               date: dates[1],
               type: 'exclusion_dates',
               vetId: vet.id,
-              detail: `XOR_DATES : ${vet.prenom} est de garde à la fois le ${dates[0]} (${couvre0}) et le ${dates[1]} (${couvre1}) — interdit : pas les deux`,
+              detail: `XOR_DATES : ${vet.prenom} est de garde à la fois le ${dateFr(dates[0])} (${couvre0}) et le ${dateFr(dates[1])} (${couvre1}) — interdit : pas les deux`,
             })
           }
         }
@@ -1256,7 +1265,7 @@ export function validerPlanning(
               date: a.date,
               type: a.type,
               vetId: vet.id,
-              detail: `SEULEMENT_AVEC : ${vet.prenom} est de garde le ${a.date} (${a.type}) sans ${nomB}, alors qu'il ne peut être de garde QUE si ${nomB} l'est sur le même créneau`,
+              detail: `SEULEMENT_AVEC : ${vet.prenom} est de garde le ${dateFr(a.date)} (${a.type}) sans ${nomB}, alors qu'il ne peut être de garde QUE si ${nomB} l'est sur le même créneau`,
             })
           }
         }

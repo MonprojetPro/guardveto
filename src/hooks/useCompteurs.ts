@@ -361,9 +361,27 @@ export interface DepannagesRow {
  * un dépannage saisi en mars pour une garde de janvier appartient à janvier.
  * Les compensations `annulee` sont ignorées — elles n'ont jamais eu lieu.
  *
- * BEST-EFFORT : la table peut être vide sur un cabinet qui n'a jamais eu
- * d'absence. Une erreur renvoie une map vide plutôt que de faire tomber
- * l'écran de compteurs.
+ * ⚠️ DEUX TABLES, UNE SEULE NOTION — corrigé le 2026-08-21.
+ *
+ * « Qui a repris la garde de qui » s'écrit à DEUX endroits, selon la porte
+ * empruntée :
+ *   • `compensations`   — l'admin déclare une absence et réattribue (crise) ;
+ *   • `echanges_gardes` — un véto demande, un autre accepte (écran Échanges).
+ *
+ * Ce compteur ne lisait que la première. Fanny a demandé à Anne-Sophie de
+ * prendre sa garde du 30 septembre, Anne-Sophie a accepté, la garde a bel et
+ * bien changé de main… et le tableau des dépannages affichait **0 partout**.
+ * Un tableau de zéros ne se lit pas comme un défaut : il se lit comme « personne
+ * ne s'est jamais dépanné ici », ce qui est le contraire de la vérité.
+ *
+ * NUANCE qui justifie le filtre : un échange AVEC contrepartie
+ * (`garde_contrepartie_id` renseigné) n'est PAS un dépannage — les deux
+ * vétérinaires échangent, personne ne doit rien à personne. Seul l'échange
+ * **sans** contrepartie est un service rendu à sens unique.
+ *
+ * BEST-EFFORT : les deux tables peuvent être vides sur un cabinet qui n'a
+ * jamais eu d'absence. Une erreur sur l'une n'empêche pas de compter l'autre —
+ * un demi-tableau reste plus utile qu'un écran de compteurs effondré.
  */
 export async function queryDepannages(
   supabase: SupabaseClient,
@@ -371,14 +389,6 @@ export async function queryDepannages(
   fin: string,
 ): Promise<Map<string, DepannagesRow>> {
   const parVeto = new Map<string, DepannagesRow>()
-
-  const { data, error } = await supabase
-    .from('compensations')
-    .select('remplacant_id, remplace_id, statut, gardes!inner(date)')
-    .gte('gardes.date', debut)
-    .lte('gardes.date', fin)
-
-  if (error || !data) return parVeto
 
   const ligne = (id: string): DepannagesRow => {
     let l = parVeto.get(id)
@@ -389,16 +399,48 @@ export async function queryDepannages(
     return l
   }
 
-  for (const c of data as {
-    remplacant_id: string
-    remplace_id: string
-    statut: string
-  }[]) {
-    if (c.statut === 'annulee') continue
-    ligne(c.remplacant_id).rendus += 1
-    const recu = ligne(c.remplace_id)
-    recu.recus += 1
-    if (c.statut === 'a_compenser') recu.dettesOuvertes += 1
+  // ── Porte 1 : les réattributions après une absence déclarée ──────────
+  const { data, error } = await supabase
+    .from('compensations')
+    .select('remplacant_id, remplace_id, statut, gardes!inner(date)')
+    .gte('gardes.date', debut)
+    .lte('gardes.date', fin)
+
+  if (!error && data) {
+    for (const c of data as {
+      remplacant_id: string
+      remplace_id: string
+      statut: string
+    }[]) {
+      if (c.statut === 'annulee') continue
+      ligne(c.remplacant_id).rendus += 1
+      const recu = ligne(c.remplace_id)
+      recu.recus += 1
+      if (c.statut === 'a_compenser') recu.dettesOuvertes += 1
+    }
+  }
+
+  // ── Porte 2 : les échanges acceptés SANS contrepartie ────────────────
+  // `cible_id` a repris la garde, `demandeur_id` a été dépanné.
+  const { data: echanges, error: errEchanges } = await supabase
+    .from('echanges_gardes')
+    .select('demandeur_id, cible_id, garde_contrepartie_id, gardes!inner(date)')
+    .eq('statut', 'validee')
+    .is('garde_contrepartie_id', null)
+    .gte('gardes.date', debut)
+    .lte('gardes.date', fin)
+
+  if (!errEchanges && echanges) {
+    for (const e of echanges as {
+      demandeur_id: string
+      cible_id: string | null
+    }[]) {
+      // Un échange ouvert à toute l'équipe peut être validé sans cible
+      // nommée ; sans repreneur identifié, il n'y a personne à créditer.
+      if (!e.cible_id) continue
+      ligne(e.cible_id).rendus += 1
+      ligne(e.demandeur_id).recus += 1
+    }
   }
 
   return parVeto

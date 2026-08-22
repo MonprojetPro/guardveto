@@ -17,6 +17,9 @@ import {
   type StructureConfig, type StructureRegleConfig, type RelationStructure,
 } from '../structure-config'
 import { apparierSourcePourCible, apparierCiblePourSource } from '../relations-structure'
+// Les motifs de refus (`invalid(...)`) s'affichent au cabinet — liste des
+// remplaçants, fenêtre de crise. Une date y va en français.
+import { periodeFr } from '@/lib/dates-fr'
 import {
   violeCompositionPose, messageComposition,
   violeRoleInterdit, messageRoleInterdit,
@@ -503,7 +506,11 @@ function checkR9VendrediLieWE(
 function checkR16Conge(vet: VetEngine, slot: SlotGarde): ValidationResult {
   for (const conge of vet.conges) {
     if (slot.date >= conge.date_debut && slot.date <= conge.date_fin) {
-      return invalid(`R16 : ${vet.prenom} est en congé du ${conge.date_debut} au ${conge.date_fin}`)
+      // Ce refus s'affiche dans la liste des remplaçants possibles, à côté du
+      // nom du vétérinaire : c'est du texte pour le cabinet, pas un journal.
+      // Il disait « en congé du 2026-10-03 au 2026-10-03 » — deux fois une date
+      // illisible, pour un congé d'un seul jour.
+      return invalid(`R16 : ${vet.prenom} est en congé ${periodeFr(conge.date_debut, conge.date_fin)}`)
     }
   }
   return ok()
