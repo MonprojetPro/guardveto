@@ -9,13 +9,27 @@ import impasseData from './scenarios/impasse.json'
 
 // ── Helpers ──────────────────────────────────────────────
 
-function buildInput(scenario: typeof hiverStandard): SolverInput {
+/**
+ * Forme MINIMALE qu'un scénario doit avoir pour être monté en `SolverInput`.
+ *
+ * Elle est DÉCLARÉE, pas déduite d'un fichier. `typeof hiverStandard` figeait
+ * les tableaux vides de ce scénario-là en `never[]` : tout scénario portant de
+ * vrais congés était alors refusé à la compilation — précisément ceux qu'on
+ * veut tester. Le contrat décrit donc ce que `buildInput` LIT, et rien de plus.
+ */
+interface ScenarioSolver {
+  periode: { dateDebut: string; dateFin: string; saison: string }
+  vets: unknown[]
+  bonusMalus?: Record<string, number>
+}
+
+function buildInput(scenario: ScenarioSolver): SolverInput {
   return {
     dateDebut: scenario.periode.dateDebut,
     dateFin: scenario.periode.dateFin,
     saison: scenario.periode.saison as 'hiver' | 'ete',
     vets: scenario.vets as unknown as VetEngine[],
-    bonusMalus: (scenario as Record<string, unknown>).bonusMalus as Record<string, number> ?? {},
+    bonusMalus: scenario.bonusMalus ?? {},
   }
 }
 
