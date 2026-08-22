@@ -11,6 +11,10 @@
 // collision) : un lien forwardé ne contourne aucun contrôle. Cette UI se contente
 // d'envoyer la demande et de traduire HONNÊTEMENT la réponse :
 //   • succès          → « C'est noté, merci ! »
+//   • 409 needsConfirmation → règles enfreintes : on les affiche et on
+//                       redemande. Le dépannage reste possible (le système
+//                       INFORME, il n'interdit pas) — un mur devant quelqu'un
+//                       qui rend service laisserait surtout le créneau vide.
 //   • 409             → « Ce créneau a déjà été pourvu »
 //   • 400 (inéligible)→ affiche la raison renvoyée par le serveur
 //   • réseau / autre  → message générique
@@ -19,7 +23,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Loader2, CheckCircle2, CircleAlert, Ban, Calendar } from 'lucide-react'
+import { Loader2, CheckCircle2, CircleAlert, Ban, Calendar, AlertTriangle } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import {
   Card,
@@ -37,6 +41,8 @@ type Etat =
   | { kind: 'succes' }
   | { kind: 'deja_pourvu' }
   | { kind: 'refus'; message: string }
+  /** Règles dures enfreintes : on montre, on redemande, on n'interdit pas. */
+  | { kind: 'a_confirmer'; warnings: string[] }
   | { kind: 'erreur'; message: string }
 
 interface VolontaireConfirmProps {
@@ -59,22 +65,33 @@ export function VolontaireConfirm({
 }: VolontaireConfirmProps) {
   const [etat, setEtat] = useState<Etat>({ kind: 'idle' })
 
-  async function handlePrendre() {
+  async function handlePrendre(confirmerAvertissements = false) {
     setEtat({ kind: 'loading' })
     try {
       const res = await fetch(`/api/absences/${absenceId}/volontaire`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gardeId, role }),
+        body: JSON.stringify({ gardeId, role, confirmerAvertissements }),
       })
 
-      // 409 = créneau déjà pourvu / absence déjà résolue (anti-collision serveur).
+      const json = await res.json().catch(() => ({}))
+
+      // 409 porte DEUX cas distincts : le créneau vient d'être pris (rien à
+      // faire), ou le dépannage enfreint des règles (à confirmer). On lit donc
+      // le corps AVANT de conclure — les confondre dirait « trop tard » à
+      // quelqu'un qui peut encore parfaitement rendre service.
+      if (res.status === 409 && json?.needsConfirmation) {
+        const warnings: string[] =
+          Array.isArray(json.warnings) && json.warnings.length > 0
+            ? json.warnings
+            : [json.error ?? 'Ce dépannage demande une confirmation.']
+        setEtat({ kind: 'a_confirmer', warnings })
+        return
+      }
       if (res.status === 409) {
         setEtat({ kind: 'deja_pourvu' })
         return
       }
-
-      const json = await res.json().catch(() => ({}))
 
       // 400 / 422 = non éligible ou état invalide → on affiche la raison serveur.
       if (!res.ok) {
@@ -155,6 +172,43 @@ export function VolontaireConfirm({
     )
   }
 
+  // ── Règles enfreintes : on montre, et on laisse la porte ouverte ──
+  // Le ton compte : la personne rend service. On ne l'accuse de rien, on lui
+  // dit ce que son geste change, et le bouton principal reste « je prends ».
+  if (etat.kind === 'a_confirmer') {
+    return (
+      <Card className="max-w-md w-full">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-amber-600">
+            <AlertTriangle className="w-5 h-5" aria-hidden />
+            Ce dépannage enfreint des règles
+          </CardTitle>
+          <CardDescription>
+            Rien ne t&apos;empêche de prendre ce créneau — mais autant que tu le saches
+            avant. L&apos;administrateur en sera informé.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {recap}
+          <div className="rounded-md border border-amber-200 bg-amber-50/60 p-3 space-y-1.5 dark:bg-amber-950/20 dark:border-amber-900">
+            {etat.warnings.map((w, i) => (
+              <p key={i} className="text-xs text-foreground">{w}</p>
+            ))}
+          </div>
+        </CardContent>
+        <CardFooter className="gap-2">
+          <Button onClick={() => handlePrendre(true)}>Je prends quand même</Button>
+          <Link
+            href="/planning"
+            className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+          >
+            Finalement non
+          </Link>
+        </CardFooter>
+      </Card>
+    )
+  }
+
   if (etat.kind === 'refus') {
     return (
       <Card className="max-w-md w-full">
@@ -198,7 +252,7 @@ export function VolontaireConfirm({
       </CardContent>
 
       <CardFooter className="gap-2">
-        <Button onClick={handlePrendre} disabled={etat.kind === 'loading'}>
+        <Button onClick={() => handlePrendre()} disabled={etat.kind === 'loading'}>
           {etat.kind === 'loading' ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />

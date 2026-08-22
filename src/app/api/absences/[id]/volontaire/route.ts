@@ -20,6 +20,10 @@
 //      génération) : le volontaire doit figurer dans `candidats`. Sinon 400.
 //   4. (intégré au 2/3) on rejoue tout côté serveur : un lien email forwardé
 //      ne contourne aucun contrôle.
+//   5. Règles DURES re-confrontées au validateur de la publication
+//      (`validerPlanning`, via `lib/gardes/avertissements-regles`) : le verrou 3
+//      n'interroge que le juge du SOLVER, et ces deux juges ont déjà divergé.
+//      Celui-ci n'INTERDIT pas — il remonte le delta au volontaire, qui tranche.
 //
 // ────────────────────────────────────────────────────────────
 // AUTORISATION ÉCRITURE `gardes` (point audité par CERBÈRE) :
@@ -44,6 +48,10 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { proposerReparation, type CreneauCrise } from '@/engine/crise/reparer'
 import { appliquerChangementGarde } from '@/lib/gardes/appliquer-changement'
 import {
+  avertissementsReglesDures,
+  tracerConfirmationMalgreAvertissement,
+} from '@/lib/gardes/avertissements-regles'
+import {
   recenserCreneauxImpactes,
   chargerContextePourPeriode,
   besoinSecondCreneau,
@@ -64,6 +72,12 @@ function getServiceClient() {
 interface Corps {
   gardeId: string
   role: 'premier' | 'second'
+  /**
+   * « J'ai vu les règles enfreintes et je prends quand même. » Drapeau DISTINCT
+   * de `force` : `force` déverrouille la garde au passage, s'en servir pour
+   * porter une simple confirmation déverrouillerait en silence.
+   */
+  confirmerAvertissements?: boolean
 }
 
 function estCorps(v: unknown): v is Corps {
@@ -259,6 +273,50 @@ export async function POST(
   const premier_id = corps.role === 'premier' ? volontaireId : gardeActuelle.premier_id
   const second_id = corps.role === 'second' ? volontaireId : gardeActuelle.second_id
 
+  // ── Garde-fou RÈGLES DURES — le MÊME que l'édition manuelle ──
+  //
+  // Ce chemin avait déjà un gardien : `proposerReparation` rejoue `isValid`, le
+  // contrôle du SOLVER, et refuse un volontaire illégal. Il lui manquait l'autre
+  // juge — `validerPlanning`, celui de la publication. Ces deux-là ont déjà
+  // divergé par le passé (c'est l'incident fondateur du projet) : passer l'un
+  // sans passer l'autre ne prouve rien. On confronte donc aussi le geste au
+  // validateur, et on ne remonte que le DELTA.
+  //
+  // QUI EST AVERTI : LE VOLONTAIRE LUI-MÊME, et il peut passer outre.
+  //
+  // C'est un geste de bonne volonté : personne d'autre n'est devant l'écran, et
+  // lui dresser un mur laisserait le créneau vide — ce qui est franchement pire
+  // qu'une règle de rythme enfreinte. On l'informe donc de ce que son dépannage
+  // enfreint, il tranche, et sa décision laisse une trace dans `audit_log` que
+  // l'admin retrouvera. C'est exactement la doctrine du projet : le système
+  // INFORME, il n'interdit pas.
+  //
+  // Le contrôle tourne DANS LES DEUX CAS (avec ou sans confirmation) pour que la
+  // trace dise ce qui a réellement été enfreint, plutôt que de recopier une
+  // liste renvoyée par le navigateur.
+  //
+  // Lecture avec le client RLS-aware DU VÉTO, jamais le service : le contrôle
+  // n'a aucune raison de voir plus loin que la personne qui agit.
+  const avertissements = await avertissementsReglesDures(
+    supabase,
+    [{ gardeId: corps.gardeId, premier_id, second_id }],
+    imp.periodeId,
+    cabinetId,
+  )
+
+  if (avertissements.length > 0 && corps.confirmerAvertissements !== true) {
+    return NextResponse.json(
+      {
+        error: avertissements.length === 1
+          ? avertissements[0]
+          : `${avertissements.length} règles seraient enfreintes par ce dépannage.`,
+        warnings: avertissements,
+        needsConfirmation: true,
+      },
+      { status: 409 },
+    )
+  }
+
   // ── Application via le cycle PARTAGÉ (update + audit + bilan + agenda + email).
   //    force:true (planning publié/verrouillé). auteur = le volontaire lui-même.
   //    Le helper reçoit le client SERVICE → l'écriture `gardes` passe la RLS.
@@ -279,6 +337,25 @@ export async function POST(
       { error: `Échec de l'application : ${appRes.error}` },
       { status: appRes.status },
     )
+  }
+
+  // ── Trace d'un dépannage accepté MALGRÉ des règles enfreintes ──
+  // Via le service : `audit_log` n'est pas ouvert en écriture à un véto.
+  // Le volontaire a le droit de passer outre, mais l'admin doit pouvoir le
+  // retrouver — sinon « informer sans interdire » revient à ne rien dire.
+  if (avertissements.length > 0) {
+    await tracerConfirmationMalgreAvertissement(service, {
+      gardeId: corps.gardeId,
+      chemin: 'depannage-volontaire',
+      auteurVetId: volontaireId,
+      avertissements,
+      avant: {
+        premier_id: gardeActuelle.premier_id,
+        second_id: gardeActuelle.second_id,
+      },
+      apres: { premier_id, second_id },
+      contexte: { absence_id: absenceId, role: corps.role },
+    })
   }
 
   // ── Trace de compensation (qui a dépanné qui) — via service (cohérence) ──

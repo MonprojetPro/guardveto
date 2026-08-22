@@ -187,7 +187,7 @@ describe('Lot 1 — remplacement d’un seul jour (exception)', () => {
 
   it('signale un remplaçant en congé validé CE jour-là', () => {
     const vets = [anneSo(), enCongeLe('autre', 'Camille', SAT3), sansContrainte('tiers', 'Léa')]
-    const duJour = planningDuJour(gardesVersPlanningPartiel(gardes), SAT3)
+    const duJour = planningDuJour(gardes, SAT3)
     expect(duJour.attributions).toHaveLength(1)
 
     const inp = inputJour(SAT3, vets)
@@ -218,7 +218,7 @@ describe('Lot 1 — remplacement d’un seul jour (exception)', () => {
 
     // Le MÊME geste à la maille du jour ne dit rien : Anne-So dépanne un jour,
     // elle ne prend pas un week-end.
-    const duJour = planningDuJour(gardesVersPlanningPartiel(gardesRapprochees), SAT2)
+    const duJour = planningDuJour(gardesRapprochees, SAT2)
     const inp = inputJour(SAT2, vets)
     const surJour = violationsIntroduites(
       validerPlanning(remplacerOccupantsDuJour(duJour, SAT2, 'autre', null), inp),
@@ -227,9 +227,128 @@ describe('Lot 1 — remplacement d’un seul jour (exception)', () => {
     expect(surJour.some((v) => v.regle === 'FREQ_WE')).toBe(false)
   })
 
-  it('un jour SANS créneau propre (le dimanche d’un week-end) ne donne rien à juger', () => {
-    // Le bloc est daté du samedi ; le dimanche n'a pas d'attribution à lui.
-    const dimanche = '2026-10-04'
-    expect(planningDuJour(gardesVersPlanningPartiel(gardes), dimanche).attributions).toHaveLength(0)
+})
+
+// ============================================================
+// PARITÉ SAMEDI / DIMANCHE
+// ============================================================
+// « Je pensais que c'était fait, ça me semblait logique que ça puisse être
+// pareil que pour le samedi » (MiKL). Le remplacement d'un seul jour marchait
+// déjà pour le dimanche ; c'est le GARDIEN qui ne trouvait rien à regarder,
+// parce qu'un dimanche n'a pas de ligne à lui dans `gardes` — le bloc est posé
+// le samedi et couvre les deux jours.
+//
+// Le dimanche est désormais résolu par l'aval d'affichage, exactement comme la
+// vue le présente : continuation du week-end. Les deux moitiés du test sont
+// écrites CÔTE À CÔTE et sur les mêmes données, pour qu'une régression d'un
+// seul des deux jours fasse rougir la comparaison au lieu de passer inaperçue.
+
+describe('Lot 1 — parité samedi / dimanche sur le remplacement d’un jour', () => {
+  const SAMEDI = SAT1
+  const DIMANCHE = '2026-10-04' // le lendemain de SAT1, porté par le même bloc
+
+  const enCongeLe = (id: string, prenom: string, d: string) => {
+    const v: VetEngine = {
+      id, prenom, nom: 'X', statut: 'associe', dernier_recours: false,
+      conges: [{ id: 'c1', date_debut: d, date_fin: d, statut: 'valide', type: 'conge' }],
+      contraintes: [],
+    } as unknown as VetEngine
+    return normaliserContraintesVets([v])[0]
+  }
+
+  const gardes: GardeRow[] = [we('g1', SAMEDI, 'anneso')]
+
+  /** Le pipeline exact du gardien, à la maille jour. */
+  const gesteSurLeJour = (jour: string, vets: ReturnType<typeof anneSo>[]) => {
+    const duJour = planningDuJour(gardes, jour)
+    if (duJour.attributions.length === 0) return null
+    const inp = { ...input, dateDebut: jour, dateFin: jour, vets, contexteAnterieur: undefined }
+    return violationsIntroduites(
+      validerPlanning(remplacerOccupantsDuJour(duJour, jour, 'tiers', null), inp),
+      validerPlanning(remplacerOccupantsDuJour(duJour, jour, 'autre', null), inp),
+    )
+  }
+
+  it('le dimanche est bien rattaché au bloc de son samedi', () => {
+    const samedi = planningDuJour(gardes, SAMEDI)
+    const dimanche = planningDuJour(gardes, DIMANCHE)
+
+    // Les deux jours trouvent un créneau, et c'est le MÊME type de créneau.
+    expect(samedi.attributions).toHaveLength(1)
+    expect(dimanche.attributions).toHaveLength(1)
+    expect(dimanche.attributions[0].type).toBe(samedi.attributions[0].type)
+
+    // Mais chacun est daté de SON jour : c'est ce qui fait que les règles
+    // indexées sur le jour répondent sur le bon jour.
+    expect(samedi.attributions[0].date).toBe(SAMEDI)
+    expect(dimanche.attributions[0].date).toBe(DIMANCHE)
+  })
+
+  it('un geste fautif est détecté le DIMANCHE comme il l’est le SAMEDI', () => {
+    // Camille est en congé validé le samedi ET le dimanche : les deux jours
+    // doivent la refuser de la même façon.
+    const vets = [
+      anneSo(),
+      enCongeLe('autre', 'Camille', SAMEDI),
+      sansContrainte('tiers', 'Léa'),
+    ]
+    const vetsDimanche = [
+      anneSo(),
+      enCongeLe('autre', 'Camille', DIMANCHE),
+      sansContrainte('tiers', 'Léa'),
+    ]
+
+    const surSamedi = gesteSurLeJour(SAMEDI, vets)
+    const surDimanche = gesteSurLeJour(DIMANCHE, vetsDimanche)
+
+    expect(surSamedi?.some((v) => v.regle === 'R16' && v.vetId === 'autre')).toBe(true)
+    // LA moitié qui manquait : avant, `surDimanche` valait `null` (silence).
+    expect(surDimanche?.some((v) => v.regle === 'R16' && v.vetId === 'autre')).toBe(true)
+  })
+
+  it('le congé du SEUL dimanche ne fait pas crier le samedi, et réciproquement', () => {
+    // La raison d'être du remplacement à la journée : quelqu'un peut être
+    // disponible le samedi et pas le dimanche. Le gardien doit voir la
+    // différence, sinon il refuse des gestes parfaitement légitimes.
+    const congeDimanche = [anneSo(), enCongeLe('autre', 'Camille', DIMANCHE), sansContrainte('tiers', 'Léa')]
+
+    expect(gesteSurLeJour(SAMEDI, congeDimanche)?.some((v) => v.regle === 'R16')).toBe(false)
+    expect(gesteSurLeJour(DIMANCHE, congeDimanche)?.some((v) => v.regle === 'R16')).toBe(true)
+  })
+
+  it('le dimanche ne réveille pas plus les règles de rythme que le samedi', () => {
+    // La sémantique tranchée au lot 1 vaut pour les deux jours : dépanner un
+    // jour n'est pas prendre un week-end.
+    const vets = [anneSo(), sansContrainte('autre', 'Camille'), sansContrainte('tiers', 'Léa')]
+    expect(gesteSurLeJour(SAMEDI, vets)?.some((v) => v.regle === 'FREQ_WE')).toBe(false)
+    expect(gesteSurLeJour(DIMANCHE, vets)?.some((v) => v.regle === 'FREQ_WE')).toBe(false)
+  })
+
+  it('les TROIS jours du bloc sont résolus, chacun avec son propre créneau', () => {
+    const VENDREDI = '2026-10-02' // la veille de SAT1
+
+    const vendredi = planningDuJour(gardes, VENDREDI).attributions[0]
+    const samedi = planningDuJour(gardes, SAMEDI).attributions[0]
+    const dimanche = planningDuJour(gardes, DIMANCHE).attributions[0]
+
+    expect(vendredi).toBeDefined()
+    expect(samedi).toBeDefined()
+    expect(dimanche).toBeDefined()
+
+    // Le vendredi est un créneau À PART (il est lié, pas continué) ; samedi et
+    // dimanche sont le même créneau week-end, vu deux jours de suite.
+    expect(vendredi.type).toBe('vendredi_soir')
+    expect(samedi.type).toBe('weekend')
+    expect(dimanche.type).toBe('weekend')
+
+    // Et le vendredi porte bien les rôles INVERSÉS du week-end (R8) — preuve
+    // qu'on hérite de la résolution d'affichage, sans la réécrire.
+    expect(samedi.placements.find((p) => p.role === 'premier')?.vetId).toBe('anneso')
+    expect(vendredi.placements.find((p) => p.role === 'second')?.vetId).toBe('anneso')
+  })
+
+  it('un jour hors de toute garde ne donne toujours rien à juger', () => {
+    const mardi = '2026-10-06'
+    expect(planningDuJour(gardes, mardi).attributions).toHaveLength(0)
   })
 })

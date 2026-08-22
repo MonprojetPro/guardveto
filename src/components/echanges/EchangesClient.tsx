@@ -11,7 +11,7 @@
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowLeftRight, Check, Plus, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeftRight, Check, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
@@ -115,6 +115,12 @@ export function EchangesClient({ moiId, isAdmin, echanges, gardesFutures, vets, 
   const [refusEnCours, setRefusEnCours] = useState<{ id: string; admin: boolean } | null>(null)
   const [motifRefus, setMotifRefus] = useState('')
   const [annulationEnCours, setAnnulationEnCours] = useState<string | null>(null)
+  // Règles dures enfreintes par l'échange que l'admin s'apprête à valider.
+  // Le serveur les a calculées sur l'état réel ; on les montre telles quelles et
+  // on laisse l'admin trancher — le système INFORME, il n'interdit pas.
+  const [avertEchange, setAvertEchange] = useState<
+    { id: string; warnings: string[] } | null
+  >(null)
 
   const vetById = useMemo(() => new Map(vets.map((v) => [v.id, v])), [vets])
   const nomDe = (id: string) => {
@@ -144,6 +150,26 @@ export function EchangesClient({ moiId, isAdmin, echanges, gardesFutures, vets, 
       setRefusEnCours(null)
       setMotifRefus('')
       setAnnulationEnCours(null)
+      router.refresh()
+    })
+  }
+
+  /**
+   * Validation admin — le seul geste de cet écran qui écrit dans le planning,
+   * donc le seul soumis au garde-fou des règles dures. Premier appel sans
+   * confirmation : si le serveur remonte des règles enfreintes, on les affiche
+   * au lieu d'appliquer. Second appel, après le clic de l'admin, avec `true`.
+   */
+  const validerEchange = (id: string, confirmer = false) => {
+    startTransition(async () => {
+      const result = await validerEchangeAdmin(id, confirmer)
+      if ('needsConfirmation' in result) {
+        setAvertEchange({ id, warnings: result.warnings })
+        return
+      }
+      if ('error' in result) { toast.error(result.error); return }
+      toast.success('Échange validé — le planning est à jour.')
+      setAvertEchange(null)
       router.refresh()
     })
   }
@@ -225,7 +251,7 @@ export function EchangesClient({ moiId, isAdmin, echanges, gardesFutures, vets, 
                       size="sm"
                       className="bg-emerald-600 hover:bg-emerald-700 text-white"
                       disabled={isPending}
-                      onClick={() => lancer(() => validerEchangeAdmin(e.id), 'Échange validé — le planning est à jour.')}
+                      onClick={() => validerEchange(e.id)}
                     >
                       <Check className="w-3.5 h-3.5 mr-1.5" /> Valider et appliquer
                     </Button>
@@ -414,6 +440,47 @@ export function EchangesClient({ moiId, isAdmin, echanges, gardesFutures, vets, 
               onClick={() => annulationEnCours && lancer(() => annulerEchange(annulationEnCours), 'Demande annulée.')}
             >
               {isPending ? 'Annulation…' : 'Annuler la demande'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialogue : règles enfreintes par l'échange à valider.
+          Même vocabulaire que la modale d'édition d'une garde — c'est le même
+          garde-fou, il ne doit pas parler deux langues selon l'écran. */}
+      <Dialog
+        open={avertEchange !== null}
+        onOpenChange={(o) => { if (!o && !isPending) setAvertEchange(null) }}
+      >
+        <DialogContent className="gv-modale">
+          <DialogHeader>
+            <DialogTitle className="font-heading">Cet échange enfreint des règles</DialogTitle>
+            <DialogDescription>
+              L&apos;échange reste possible : à toi de juger s&apos;il est acceptable.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="gf-card souple">
+            <p className="gf-title">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              Ce que la vérification a relevé
+            </p>
+            {(avertEchange?.warnings ?? []).map((w, i) => (
+              <p key={i}>{w}</p>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAvertEchange(null)}
+              disabled={isPending}
+            >
+              Ne pas valider
+            </Button>
+            <Button
+              disabled={isPending}
+              onClick={() => avertEchange && validerEchange(avertEchange.id, true)}
+            >
+              {isPending ? 'Application…' : 'Valider quand même'}
             </Button>
           </DialogFooter>
         </DialogContent>

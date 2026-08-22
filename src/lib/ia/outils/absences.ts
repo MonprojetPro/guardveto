@@ -35,6 +35,12 @@
 import { z } from 'zod'
 import { changerStatutCompensation as changerStatutCompensationAction } from '@/app/(protected)/admin/depannages/actions'
 import { appliquerChangementGarde } from '@/lib/gardes/appliquer-changement'
+import {
+  avertissementsReglesDuresMultiPeriodes,
+  fusionnerChangementsParGarde,
+  tracerConfirmationMalgreAvertissement,
+  type ChangementGardeSitue,
+} from '@/lib/gardes/avertissements-regles'
 import { sendAppelVolontaires } from '@/lib/notifications'
 import { proposerReparation, type CreneauCrise } from '@/engine/crise/reparer'
 import {
@@ -606,6 +612,55 @@ Appelle-le quand l'admin veut solliciter l'équipe plutôt que trancher lui-mêm
   },
 }
 
+/** Une décision de remplacement, telle que l'aperçu et l'exécution la portent. */
+interface DecisionReparation {
+  gardeId: string
+  role: RoleGarde
+  remplacant_id: string
+}
+
+/**
+ * Traduit des décisions de remplacement (une garde, un rôle, un remplaçant) en
+ * changements d'attribution complets — ce que le garde-fou des règles dures
+ * attend, puisqu'il raisonne sur la PAIRE de chaque garde et pas sur un rôle.
+ *
+ * Le binôme de l'autre rôle est relu en base, jamais déduit : c'est lui qui fait
+ * la différence entre « untel remplace » et « untel remplace ET se retrouve avec
+ * quelqu'un avec qui il ne peut pas être de garde ».
+ *
+ * Une garde introuvable ou sans période est simplement écartée : c'est un
+ * contrôle informatif, il n'a pas à provoquer d'échec là où l'écriture, elle,
+ * saura dire proprement ce qui manque.
+ */
+async function changementsPourDecisions(
+  ctx: ContexteOutil,
+  decisions: readonly DecisionReparation[],
+): Promise<ChangementGardeSitue[]> {
+  if (decisions.length === 0) return []
+
+  const { data, error } = await ctx.supabase
+    .from('gardes')
+    .select('id, periode_id, premier_id, second_id')
+    .in('id', decisions.map((d) => d.gardeId))
+    .eq('cabinet_id', ctx.cabinetId)
+  if (error || !data) return []
+
+  type Row = { id: string; periode_id: string | null; premier_id: string | null; second_id: string | null }
+  const base: ChangementGardeSitue[] = (data as Row[])
+    .filter((g): g is Row & { periode_id: string } => Boolean(g.periode_id))
+    .map((g) => ({
+      gardeId: g.id,
+      periodeId: g.periode_id,
+      premier_id: g.premier_id,
+      second_id: g.second_id,
+    }))
+
+  // Plusieurs décisions peuvent viser LA MÊME garde (les deux rôles d'un même
+  // créneau) : la fusion les empile sur un seul changement — sinon la seconde
+  // effacerait la première et on jugerait un état qui n'existera jamais.
+  return fusionnerChangementsParGarde(base, decisions)
+}
+
 const ParamsReparer = z.object({
   prenom: z.string().describe('Le prénom du vétérinaire absent dont on répare le planning.'),
   decisions: z
@@ -703,25 +758,65 @@ Chaque remplacement est revérifié LÉGAL (mêmes règles que la génération d
       )
     }
 
+    // ── Garde-fou RÈGLES DURES — le MÊME que l'édition manuelle ──
+    //
+    // `proposerReparation` ci-dessus n'interroge qu'UN des deux juges du projet :
+    // `isValid`, celui du solver. L'autre — `validerPlanning`, celui de la
+    // publication — n'avait jamais été consulté sur ce chemin, alors que ces
+    // deux-là ont déjà divergé (c'est l'incident fondateur). On le consulte donc
+    // ici, et on ne remonte que le DELTA introduit par CES remplacements.
+    //
+    // FILOU ANNONCE, IL NE CONTOURNE NI NE DÉCIDE. Principe fondamental du
+    // projet : le moteur et les garde-fous décident, Filou est le porte-parole.
+    // Les règles enfreintes partent donc dans la PROPOSITION, en français, sous
+    // les yeux de l'admin AVANT son clic — jamais dans un silence poli, jamais
+    // en refusant à la place du moteur (le validateur, lui, n'interdit pas).
+    const changements = await changementsPourDecisions(ctx, resolues)
+    const avertissements = await avertissementsReglesDuresMultiPeriodes(
+      ctx.supabase,
+      ctx.cabinetId,
+      changements,
+    )
+
+    const avertissementBase =
+      'Chaque vétérinaire remplaçant reçoit un email de confirmation. Si toutes les gardes de l’absence sont couvertes après cette action, l’absence passera au statut « résolue ».'
+
     return {
       ok: true,
       proposition: {
         titre: `Réparer le planning de ${absent.veto.prenom}`,
         phrase: `Voici les remplacements que j'appliquerais pour l'absence de ${absent.veto.prenom}.`,
-        lignes,
+        lignes: avertissements.length > 0
+          ? [...lignes, '', 'Ce que ces remplacements enfreignent :', ...avertissements]
+          : lignes,
         action: 'Appliquer les remplacements',
-        avertissement:
-          'Chaque vétérinaire remplaçant reçoit un email de confirmation. Si toutes les gardes de l’absence sont couvertes après cette action, l’absence passera au statut « résolue ».',
+        avertissement: avertissements.length > 0
+          ? `Ces remplacements enfreignent ${avertissements.length === 1 ? 'une règle du cabinet' : `${avertissements.length} règles du cabinet`} (détail ci-dessus). Ils restent applicables — c'est toi qui tranches. ${avertissementBase}`
+          : avertissementBase,
       },
-      charge: { absenceId: absence.id, absentId: absent.veto.id, decisions: resolues },
+      charge: {
+        absenceId: absence.id,
+        absentId: absent.veto.id,
+        decisions: resolues,
+        // Ce qui a été MONTRÉ. L'exécution recalcule et compare : si le planning
+        // a bougé entre-temps et qu'une règle de plus serait enfreinte, on
+        // n'écrit pas en douce quelque chose que l'admin n'a pas vu.
+        avertissements,
+      },
     }
   },
 
   async executer(_params, ctx, charge) {
     const c = charge as
-      | { absenceId: string; absentId: string; decisions: Array<{ gardeId: string; role: RoleGarde; remplacant_id: string }> }
+      | {
+          absenceId: string
+          absentId: string
+          decisions: DecisionReparation[]
+          avertissements?: string[]
+        }
       | undefined
     if (!c || c.decisions.length === 0) return { error: 'Rien à appliquer.' }
+    const dejaMontres = new Set(c.avertissements ?? [])
 
     // Tout est revalidé ici, à froid — jamais confiance en la légalité déjà
     // vue au résumé : le planning a pu changer entre les deux (autre décision
@@ -741,6 +836,30 @@ Chaque remplacement est revérifié LÉGAL (mêmes règles que la génération d
       absenceRow.date_debut,
       absenceRow.date_fin,
     )
+    // ── Garde-fou RÈGLES DURES, rejoué À FROID ──
+    //
+    // L'admin a cliqué sur une proposition qui affichait N règles enfreintes. Le
+    // planning a pu bouger depuis. On recalcule donc, et on refuse d'écrire si
+    // le geste enfreint désormais quelque chose qui n'était PAS sous ses yeux :
+    // afficher A et écrire B est précisément ce que la `charge` existe pour
+    // empêcher. Une règle qui a DISPARU entre-temps, elle, ne bloque rien.
+    //
+    // Filou annonce et se range derrière le moteur ; il ne décide ni de passer
+    // outre, ni d'interdire — il renvoie la main à l'admin.
+    const changementsAFroid = await changementsPourDecisions(ctx, c.decisions)
+    const avertissementsAFroid = await avertissementsReglesDuresMultiPeriodes(
+      ctx.supabase,
+      ctx.cabinetId,
+      changementsAFroid,
+    )
+    const nouveaux = avertissementsAFroid.filter((a) => !dejaMontres.has(a))
+    if (nouveaux.length > 0) {
+      return {
+        error:
+          `Le planning a changé depuis ma proposition : ces remplacements enfreindraient maintenant ${nouveaux.length === 1 ? 'une règle' : `${nouveaux.length} règles`} que je ne t'avais pas montrée${nouveaux.length === 1 ? '' : 's'} — ${nouveaux.join(' ')} Redemande-moi la réparation pour que je te la${nouveaux.length === 1 ? '' : 'les'} présente avant d'appliquer.`,
+      }
+    }
+
     const cache = new Map<string, ContexteCrisePeriode>()
 
     for (const dec of c.decisions) {
@@ -793,6 +912,23 @@ Chaque remplacement est revérifié LÉGAL (mêmes règles que la génération d
         cabinetId: ctx.cabinetId,
       })
       if (!appRes.ok) return { error: `Échec de l'application sur la garde du ${imp.date} : ${appRes.error}` }
+
+      // Trace d'une écriture faite MALGRÉ des règles enfreintes : l'admin avait
+      // la liste sous les yeux, sa décision doit rester retrouvable.
+      if (avertissementsAFroid.length > 0) {
+        await tracerConfirmationMalgreAvertissement(ctx.supabase, {
+          gardeId: dec.gardeId,
+          chemin: 'filou-reparer-absence',
+          auteurVetId: ctx.vetoId,
+          avertissements: avertissementsAFroid,
+          avant: {
+            premier_id: gardeActuelle.premier_id,
+            second_id: gardeActuelle.second_id,
+          },
+          apres: { premier_id, second_id },
+          contexte: { absence_id: c.absenceId, role: dec.role },
+        })
+      }
 
       const { error: compErr } = await ctx.supabase.from('compensations').insert({
         cabinet_id: ctx.cabinetId,

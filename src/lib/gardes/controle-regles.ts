@@ -37,6 +37,9 @@
 import type { Violation } from '@/engine/validation/validerPlanning'
 import type { GardeRow } from '@/engine/validation/gardesVersPlanning'
 import type { PlanningPartiel } from '@/engine/types'
+import type { RelationStructure } from '@/engine/structure-config'
+import type { CreneauModele } from '@/engine/creneau-modele'
+import { resoudrePlanningAffichage } from '@/engine/aval/resoudrePlanningAffichage'
 
 /**
  * Rejoue le changement demandé sur un jeu de gardes, EN MÉMOIRE. Rien n'est
@@ -83,10 +86,49 @@ export function simulerChangementGarde(
 // rythme se taisent d'elles-mêmes, sans qu'on ait à les désactiver — un seul
 // créneau ne forme ni paire, ni série, ni fenêtre. C'est la propriété qui rend
 // ce découpage honnête plutôt que bricolé.
+//
+// TROUVER LE CRÉNEAU D'UN JOUR — on ne le recalcule pas, on le DEMANDE
+//
+// Un jour donné n'a pas forcément de ligne à lui dans `gardes`. Un week-end est
+// une ligne unique posée le samedi qui occupe aussi le dimanche ; le vendredi,
+// lui, est une dérivation. C'est exactement le problème que l'aval d'affichage
+// résout déjà pour la vue `planning_semaine` : `resoudrePlanningAffichage` rend,
+// pour chaque jour, la cellule qui le porte — native (samedi, soir de semaine),
+// liée (vendredi) ou continuation (dimanche). On lui pose donc la question au
+// lieu d'ajouter un « + 1 jour » de notre cru quelque part.
+//
+// Le bénéfice n'est pas cosmétique : la portée d'un créneau y est dérivée du
+// CATALOGUE du cabinet (`offsetJoursFin`), pas figée sur « le week-end couvre le
+// dimanche ». Un cabinet dont les créneaux couvrent d'autres jours sera jugé sur
+// ses jours à lui, sans qu'on retouche ce fichier. Et l'écran, la vue et le
+// gardien répondent tous les trois sur la même résolution — c'est précisément
+// l'écart entre deux résolutions concurrentes qui a créé le bug d'origine.
 
-/** Réduit un planning au seul créneau porté par ce jour (0 ou 1 attribution). */
-export function planningDuJour(planning: PlanningPartiel, jour: string): PlanningPartiel {
-  return { attributions: planning.attributions.filter((a) => a.date === jour) }
+/**
+ * Le créneau qui porte ce jour, réduit à une attribution unique (ou aucune).
+ *
+ * L'attribution est datée du JOUR CONTRÔLÉ, pas du jour de début du créneau :
+ * pour un dimanche, on rend le créneau `weekend` daté du dimanche. C'est ce qui
+ * fait que les règles indexées sur le jour (congé ce jour-là, jour de repos,
+ * indisponibilité) répondent sur le BON jour, tout en gardant le type de
+ * créneau — donc les règles de composition (rôles, duo, qui peut tenir un
+ * week-end) restent celles du week-end. Sans cette date, on jugerait le
+ * dimanche avec le calendrier du samedi : un gardien à moitié juste, c'est-à-dire
+ * pire qu'un gardien absent.
+ */
+export function planningDuJour(
+  gardes: readonly GardeRow[],
+  jour: string,
+  options?: { relations?: readonly RelationStructure[]; creneaux?: CreneauModele[] },
+): PlanningPartiel {
+  const cellule = resoudrePlanningAffichage(gardes, {
+    relations: options?.relations,
+    creneaux: options?.creneaux,
+  }).find((c) => c.date === jour)
+
+  return cellule
+    ? { attributions: [{ date: jour, type: cellule.type, placements: cellule.placements }] }
+    : { attributions: [] }
 }
 
 /**

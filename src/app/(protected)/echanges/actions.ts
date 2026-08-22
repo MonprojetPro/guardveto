@@ -26,6 +26,11 @@ import { createClient as createAdminClient, type SupabaseClient } from '@supabas
 import { revalidatePath } from 'next/cache'
 import { appliquerChangementGarde } from '@/lib/gardes/appliquer-changement'
 import {
+  avertissementsReglesDuresMultiPeriodes,
+  tracerConfirmationMalgreAvertissement,
+  type ChangementGardeSitue,
+} from '@/lib/gardes/avertissements-regles'
+import {
   creerNotification,
   contenuEchangePropose,
   contenuEchangeAccepte,
@@ -78,6 +83,8 @@ interface GardeRow {
   second_id: string | null
   verrouille: boolean
   cabinet_id: string | null
+  /** Nécessaire au garde-fou des règles dures : le juge travaille par période. */
+  periode_id: string | null
   periode: { statut?: string } | { statut?: string }[] | null
 }
 
@@ -107,7 +114,7 @@ async function chargerGardeEchangeable(
 ): Promise<{ garde: GardeRow } | { error: string }> {
   const { data } = await supabase
     .from('gardes')
-    .select('id, date, type, premier_id, second_id, verrouille, cabinet_id, periode:periode_id(statut)')
+    .select('id, date, type, premier_id, second_id, verrouille, cabinet_id, periode_id, periode:periode_id(statut)')
     .eq('id', gardeId)
     .single()
 
@@ -477,13 +484,77 @@ export async function annulerEchange(echangeId: string) {
 // 4. VALIDER / REFUSER (admin) — la validation APPLIQUE l'échange
 // ============================================================
 
-export async function validerEchangeAdmin(echangeId: string) {
-  const supabase = await createClient()
-  const moi = await getAuthVeto(supabase)
-  if (!moi) return { error: 'Non authentifié.' }
-  if (moi.role_app !== 'admin') return { error: 'Action réservée à l\'administrateur du cabinet.' }
-  if (!moi.cabinet_id) return { error: 'Cabinet introuvable.' }
+// ── GARDE-FOU RÈGLES DURES sur ce chemin ──
+//
+// Jusqu'ici il n'en avait aucun. Il vérifiait que les gardes étaient futures,
+// publiées, non verrouillées, tenues par les bonnes personnes et hors congé
+// validé — mais AUCUNE règle de rythme (espacement, fréquence des week-ends,
+// séries). Deux vétos pouvaient donc s'échanger une garde et placer l'un d'eux
+// sur trois week-ends d'affilée sans qu'un mot soit dit : le bug du lot 1, par
+// une autre porte.
+//
+// QUI EST AVERTI, ET QUAND — l'ADMIN, au moment de valider.
+//
+// Ni le demandeur ni le confrère : c'est un choix, pas un oubli. Trois raisons.
+// ① C'est ici, et nulle part avant, que quelque chose s'écrit — une proposition
+//   et une acceptation ne touchent pas au planning. ② La doctrine du projet ne
+//   demande pas « avant ou après publication » mais « peut-on encore agir ? » :
+//   l'admin est la seule personne qui peut décider de passer outre ou de
+//   refuser ; avertir deux vétos qui ne peuvent rien en faire serait du bruit.
+//   ③ Le planning bouge entre la proposition et la validation ; un avertissement
+//   montré trois jours plus tôt serait périmé au moment de l'écriture. On le
+//   calcule donc au dernier instant, sur l'état réel.
+//
+// LES DEUX GARDES SONT JUGÉES ENSEMBLE. Un échange avec contrepartie déplace
+// deux attributions d'un seul geste : les confronter l'une après l'autre
+// donnerait deux verdicts faux (la première ignorerait la seconde, la seconde
+// compterait la première comme acquise). D'où l'appel unique et groupé.
 
+/**
+ * Ce que `validerEchangeAdmin` peut répondre.
+ *
+ * Type NON exporté À DESSEIN : un fichier `'use server'` ne doit exposer que des
+ * fonctions asynchrones, et ce projet a déjà payé une page blanche en prod pour
+ * un type sorti d'un tel fichier. Les appelants reconnaissent la forme
+ * (`'needsConfirmation' in result`), ils n'ont pas besoin du nom.
+ */
+type ResultatValidationEchange =
+  | { success: true }
+  | { error: string }
+  /** Règles dures enfreintes : l'admin voit, tranche, et rappelle avec `true`. */
+  | { needsConfirmation: true; warnings: string[] }
+
+/** Ce que la préparation d'une validation a établi, avant toute écriture. */
+type PreparationEchange =
+  | { error: string }
+  | {
+      ok: true
+      echange: NonNullable<Awaited<ReturnType<typeof chargerEchangePour>>>
+      gardeA: GardeRow
+      gardeB: GardeRow | null
+      nouveauxA: { premier_id: string | null; second_id: string | null }
+      nouveauxB: { premier_id: string | null; second_id: string | null } | null
+      /** Règles dures que CET échange ajouterait. Vide = rien à signaler. */
+      warnings: string[]
+    }
+
+/**
+ * Tout ce qui précède l'écriture d'un échange : re-vérifications au moment T,
+ * calcul de ce qui SERAIT écrit, et confrontation aux règles dures.
+ *
+ * Extrait parce que deux appelants en ont besoin, et qu'ils doivent voir la même
+ * chose : la validation elle-même, et l'aperçu que Filou montre à l'admin avant
+ * de proposer un bouton. Un aperçu qui recalculerait de son côté finirait par
+ * annoncer autre chose que ce qui s'écrit — c'est précisément le genre d'écart
+ * que ce lot existe pour supprimer.
+ *
+ * N'écrit RIEN.
+ */
+async function preparerValidationEchange(
+  supabase: SupabaseClient<any, any, any>,
+  moi: AuthVeto & { cabinet_id: string },
+  echangeId: string,
+): Promise<PreparationEchange> {
   const echange = await chargerEchangePour(supabase, echangeId)
   if (!echange) return { error: 'Échange introuvable.' }
   if (echange.statut !== 'acceptee') {
@@ -519,12 +590,98 @@ export async function validerEchangeAdmin(echangeId: string) {
     }
   }
 
-  // ── Application via le chemin d'édition manuelle EXISTANT ──
-  // (gardes + garde_placements + bilan + agenda + email hérités.)
+  // ── Ce que l'échange VA écrire (calculé avant tout, pour pouvoir le juger) ──
   const nouveauxA = {
     premier_id: echange.role_demandeur === 'premier' ? echange.cible_id : gardeA.premier_id,
     second_id: echange.role_demandeur === 'second' ? echange.cible_id : gardeA.second_id,
   }
+  const nouveauxB =
+    gardeB && echange.role_contrepartie
+      ? {
+          premier_id:
+            echange.role_contrepartie === 'premier' ? echange.demandeur_id : gardeB.premier_id,
+          second_id:
+            echange.role_contrepartie === 'second' ? echange.demandeur_id : gardeB.second_id,
+        }
+      : null
+
+  // ── Garde-fou RÈGLES DURES — le MÊME que l'édition manuelle ──
+  // On ne bloque pas : on remonte le DELTA (ce que CET échange ajoute comme
+  // règles enfreintes) et on laisse l'admin trancher. Un planning publié porte
+  // souvent des violations préexistantes ; les servir toutes ferait payer aux
+  // deux vétos les fautes des autres et noierait le vrai avertissement.
+  //
+  // Le contrôle tourne DANS LES DEUX CAS, y compris quand l'admin a déjà
+  // confirmé : c'est ce qui permet à la trace d'`audit_log` de dire ce qui a
+  // réellement été enfreint, plutôt que de recopier une liste que le navigateur
+  // aurait renvoyée — et qu'on ne pourrait pas croire sur parole.
+  const changements: ChangementGardeSitue[] = []
+  if (gardeA.periode_id) {
+    changements.push({
+      gardeId: gardeA.id,
+      periodeId: gardeA.periode_id,
+      premier_id: nouveauxA.premier_id,
+      second_id: nouveauxA.second_id,
+    })
+  }
+  if (gardeB?.periode_id && nouveauxB) {
+    changements.push({
+      gardeId: gardeB.id,
+      periodeId: gardeB.periode_id,
+      premier_id: nouveauxB.premier_id,
+      second_id: nouveauxB.second_id,
+    })
+  }
+
+  const warnings = await avertissementsReglesDuresMultiPeriodes(
+    supabase,
+    moi.cabinet_id,
+    changements,
+  )
+
+  return { ok: true, echange, gardeA, gardeB, nouveauxA, nouveauxB, warnings }
+}
+
+/**
+ * Ce qu'une validation d'échange ferait, sans le faire — pour que Filou puisse
+ * ANNONCER les règles enfreintes dans sa proposition, avant le clic de l'admin.
+ * Principe du projet : le moteur et les garde-fous décident, Filou est le
+ * porte-parole. Il ne contourne rien et n'agit jamais en silence.
+ */
+export async function previsualiserValidationEchange(
+  echangeId: string,
+): Promise<{ error: string } | { warnings: string[] }> {
+  const supabase = await createClient()
+  const moi = await getAuthVeto(supabase)
+  if (!moi) return { error: 'Non authentifié.' }
+  if (moi.role_app !== 'admin') return { error: 'Action réservée à l\'administrateur du cabinet.' }
+  if (!moi.cabinet_id) return { error: 'Cabinet introuvable.' }
+
+  const prep = await preparerValidationEchange(supabase, { ...moi, cabinet_id: moi.cabinet_id }, echangeId)
+  if ('error' in prep) return { error: prep.error }
+  return { warnings: prep.warnings }
+}
+
+export async function validerEchangeAdmin(
+  echangeId: string,
+  confirmerAvertissements = false,
+): Promise<ResultatValidationEchange> {
+  const supabase = await createClient()
+  const moi = await getAuthVeto(supabase)
+  if (!moi) return { error: 'Non authentifié.' }
+  if (moi.role_app !== 'admin') return { error: 'Action réservée à l\'administrateur du cabinet.' }
+  if (!moi.cabinet_id) return { error: 'Cabinet introuvable.' }
+
+  const prep = await preparerValidationEchange(supabase, { ...moi, cabinet_id: moi.cabinet_id }, echangeId)
+  if ('error' in prep) return { error: prep.error }
+  const { echange, gardeA, gardeB, nouveauxA, nouveauxB, warnings } = prep
+
+  if (warnings.length > 0 && !confirmerAvertissements) {
+    return { needsConfirmation: true, warnings }
+  }
+
+  // ── Application via le chemin d'édition manuelle EXISTANT ──
+  // (gardes + garde_placements + bilan + agenda + email hérités.)
   const resA = await appliquerChangementGarde({
     supabase,
     gardeId: gardeA.id,
@@ -536,11 +693,7 @@ export async function validerEchangeAdmin(echangeId: string) {
   })
   if (!resA.ok) return { error: `Application impossible : ${resA.error}` }
 
-  if (gardeB && echange.role_contrepartie) {
-    const nouveauxB = {
-      premier_id: echange.role_contrepartie === 'premier' ? echange.demandeur_id : gardeB.premier_id,
-      second_id: echange.role_contrepartie === 'second' ? echange.demandeur_id : gardeB.second_id,
-    }
+  if (gardeB && nouveauxB) {
     const resB = await appliquerChangementGarde({
       supabase,
       gardeId: gardeB.id,
@@ -565,6 +718,33 @@ export async function validerEchangeAdmin(echangeId: string) {
     }
   }
 
+  // ── Trace d'une validation faite MALGRÉ un avertissement ──
+  // On ne passe par `force` sur AUCUNE des deux gardes (il déverrouillerait au
+  // passage) : la trace se pose ici, explicitement, une ligne par garde
+  // déplacée. Sans elle, « informer sans interdire » reviendrait à ne rien dire.
+  if (warnings.length > 0) {
+    await tracerConfirmationMalgreAvertissement(supabase, {
+      gardeId: gardeA.id,
+      chemin: 'echange',
+      auteurVetId: moi.id,
+      avertissements: warnings,
+      avant: { premier_id: gardeA.premier_id, second_id: gardeA.second_id },
+      apres: nouveauxA,
+      contexte: { echange_id: echangeId, contrepartie: Boolean(gardeB) },
+    })
+    if (gardeB && nouveauxB) {
+      await tracerConfirmationMalgreAvertissement(supabase, {
+        gardeId: gardeB.id,
+        chemin: 'echange',
+        auteurVetId: moi.id,
+        avertissements: warnings,
+        avant: { premier_id: gardeB.premier_id, second_id: gardeB.second_id },
+        apres: nouveauxB,
+        contexte: { echange_id: echangeId, contrepartie: true },
+      })
+    }
+  }
+
   const { error } = await supabase
     .from('echanges_gardes')
     .update({ statut: 'validee' })
@@ -579,7 +759,12 @@ export async function validerEchangeAdmin(echangeId: string) {
   // appliquerChangementGarde).
   const notifs = clientNotifs()
   const c = contenuEchangeValide(gardeA.date)
-  for (const vetId of [echange.demandeur_id, echange.cible_id]) {
+  // `cible_id` ne peut pas être nul ici (la préparation l'a exigé), mais le
+  // filtre garde la promesse au niveau du type plutôt que d'un commentaire.
+  const aPrevenir = [echange.demandeur_id, echange.cible_id].filter(
+    (id): id is string => Boolean(id),
+  )
+  for (const vetId of aPrevenir) {
     await creerNotification(notifs, {
       veterinaireId: vetId,
       type: 'echange_valide',

@@ -1,0 +1,63 @@
+-- ═══════════════════════════════════════════════════════════════
+-- GUARDVETO — `security_invoker` REPOSÉ sur les deux vues
+-- Auteur : CERBÈRE (MPP) — MonProjetPro
+-- Date   : 2026-08-22
+-- ───────────────────────────────────────────────────────────────
+-- CE QUI ÉTAIT OUVERT
+--   `planning_semaine` et `compteurs_gardes` avaient `reloptions = NULL` :
+--   l'option `security_invoker` n'était pas posée. Une vue sans cette option
+--   s'exécute avec les droits de son PROPRIÉTAIRE — ici `postgres`, qui porte
+--   `rolbypassrls = true`. Ni le filtre de rôle, ni l'isolation par cabinet ne
+--   s'appliquaient donc à qui la lisait.
+--
+--   Mesuré en base le 2026-08-22, avant ce correctif :
+--
+--     set role anon;  select count(*) from planning_semaine;  →  66
+--
+--   `anon` est le rôle du visiteur NON CONNECTÉ, et les deux vues lui sont
+--   accordées en SELECT. La clé publishable qui l'active vit dans le bundle
+--   JavaScript servi au navigateur : elle est publique par construction.
+--   N'importe qui pouvait donc lire, en un appel REST direct sur
+--   `/rest/v1/planning_semaine`, le planning de gardes de TOUS les cabinets.
+--
+--   Les bornes posées à la main dans les lecteurs TypeScript (`.eq('cabinet_id',
+--   …)`, `.in('periode_id', …)`) protégeaient les ÉCRANS. Elles ne protégeaient
+--   rien contre un appel direct à l'API, qui ne passe par aucune d'elles.
+--
+-- LE MODE DE PANNE À RETENIR
+--   `CREATE OR REPLACE VIEW` NE PRÉSERVE PAS `security_invoker`. L'option avait
+--   bien été posée en migration 010, et consciencieusement re-posée par les
+--   quatre migrations suivantes qui recréaient la vue (014, 20260617160000,
+--   20260706210000, 20260729180000). Elle est tombée les 20 et 21 août 2026,
+--   sur trois migrations d'affilée qui ont recréé les vues sans la reposer :
+--     • 20260820151000_planning_semaine_applique_exceptions.sql
+--     • 20260820152000_compteurs_jours_1er_we_exceptionnels.sql
+--     • 20260821010000_vues_exposent_cabinet_id.sql
+--
+--   Le garde-fou qui empêche la récidive est un test, pas un commentaire :
+--   `tests/lib/vues-security-invoker.test.ts` relit les migrations dans l'ordre
+--   et échoue si une vue est recréée sans que l'option soit reposée derrière.
+--
+-- POURQUOI `ALTER VIEW` ET SURTOUT PAS `CREATE OR REPLACE VIEW`
+--   Redéfinir la vue ici, c'est refaire exactement le geste qui a causé
+--   l'accident. Cette migration ne touche QUE l'option : la définition des deux
+--   vues reste bit pour bit celle qui est en production.
+--
+-- IMPACT MESURÉ AVANT APPLICATION (simulation en transaction annulée)
+--   admin Anne-Sophie : 66 lignes planning / 13 compteurs → INCHANGÉ
+--   véto Fanny        : 66 lignes planning / 13 compteurs → INCHANGÉ
+--                       0 nom manquant, 2 périodes vues, 1 cabinet
+--   anon              : 66 → 0   et   13 → 0   (la fuite se ferme)
+--
+--   Aucun lecteur légitime ne perd de ligne : les policies `gardes_veto_read`,
+--   `periodes_read_publie` et `vet_read_all` couvrent le vétérinaire, et les
+--   policies `*_admin_all` couvrent l'administratrice. Les 7 vétérinaires sont
+--   actifs et les 2 périodes en base sont publiée / verrouillée.
+--
+-- ROLLBACK (une ligne, effet immédiat)
+--   ALTER VIEW public.planning_semaine RESET (security_invoker);
+--   ALTER VIEW public.compteurs_gardes RESET (security_invoker);
+-- ═══════════════════════════════════════════════════════════════
+
+ALTER VIEW public.planning_semaine SET (security_invoker = true);
+ALTER VIEW public.compteurs_gardes SET (security_invoker = true);

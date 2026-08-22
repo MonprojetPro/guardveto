@@ -36,15 +36,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { appliquerChangementGarde } from '@/lib/gardes/appliquer-changement'
 import { appliquerExceptionJour } from '@/lib/gardes/appliquer-exception'
-import { monterValidationPeriode } from '@/data/monterValidationPeriode'
-import { validerPlanning } from '@/engine/validation/validerPlanning'
 import {
-  simulerChangementGarde,
-  violationsIntroduites,
-  phraseAvertissement,
-  planningDuJour,
-  remplacerOccupantsDuJour,
-} from '@/lib/gardes/controle-regles'
+  avertissementsReglesDures,
+  avertissementsReglesDuresJour,
+} from '@/lib/gardes/avertissements-regles'
 
 /**
  * Contrôle métier « ce véto est-il légalement affectable sur cette date ? » au
@@ -103,124 +98,10 @@ async function avertissementsAffectation(
   return warnings
 }
 
-/**
- * Confronte le changement demandé aux RÈGLES DURES du cabinet, sans rien écrire.
- *
- * Le montage (`monterValidationPeriode`) et le juge (`validerPlanning`) sont
- * EXACTEMENT ceux de la re-validation continue : aucune règle n'est
- * réimplémentée ici — c'est la faute qui a créé ce bug, on ne la refait pas.
- *
- * Best-effort ASSUMÉ : période introuvable, contexte illisible, exception
- * inattendue → tableau vide, l'édition passe. Un contrôle informatif qui
- * empêcherait l'admin de travailler quand il tombe en panne serait pire que son
- * absence — et la re-validation continue rattrapera l'écart de toute façon.
- */
-async function avertissementsReglesDures(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  gardeId: string,
-  periodeId: string,
-  cabinetId: string,
-  premier_id: string | null,
-  second_id: string | null,
-): Promise<string[]> {
-  try {
-    const montage = await monterValidationPeriode(supabase, periodeId, cabinetId)
-    if (!montage) return []
-
-    // La garde touchée n'a plus le miroir `garde_placements` à jour (il porte
-    // encore l'ANCIENNE paire) : on la reconstruit depuis premier_id/second_id.
-    const avant = validerPlanning(
-      montage.construirePlanning(montage.gardes, [gardeId]),
-      montage.input,
-    )
-    const apres = validerPlanning(
-      montage.construirePlanning(
-        simulerChangementGarde(montage.gardes, gardeId, premier_id, second_id),
-        [gardeId],
-      ),
-      montage.input,
-    )
-
-    return violationsIntroduites(avant, apres).map(phraseAvertissement)
-  } catch (e) {
-    console.error(
-      '[PATCH garde] contrôle des règles dures indisponible (édition laissée passer):',
-      e instanceof Error ? e.message : String(e),
-    )
-    return []
-  }
-}
-
-/**
- * Même garde-fou, mais pour l'AUTRE mécanisme d'écriture de cette route : le
- * remplacement d'UN SEUL JOUR (`appliquerExceptionJour`).
- *
- * L'exception s'écrit dans `gardes_exceptions` ; la table `gardes` ne bouge pas,
- * donc le validateur ne verrait rien si on lui donnait la période telle quelle.
- * On lui soumet donc une période RÉDUITE À CE JOUR : les règles qui jugent
- * l'occupant d'un créneau répondent exactement, les règles de rythme se taisent
- * d'elles-mêmes (un seul créneau ne forme ni paire ni série) — ce qui est le
- * comportement VOULU, un jour exceptionnel n'étant pas une garde au sens de
- * l'équité. Raisonnement complet dans `lib/gardes/controle-regles.ts`.
- *
- * L'état « avant » est lu sur la VUE, pas sur `gardes` : elle applique déjà les
- * exceptions posées précédemment, donc corriger deux fois le même jour compare
- * bien au remplaçant en place, et non au titulaire d'origine.
- */
-async function avertissementsReglesDuresJour(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  gardeId: string,
-  jour: string,
-  periodeId: string,
-  cabinetId: string,
-  premier_id: string | null,
-  second_id: string | null,
-): Promise<string[]> {
-  try {
-    const montage = await monterValidationPeriode(supabase, periodeId, cabinetId)
-    if (!montage) return []
-
-    // Le créneau de ce jour, seul. Vide (cas du DIMANCHE d'un week-end, qui n'a
-    // pas de créneau propre — le bloc est daté du samedi) → rien à confronter.
-    const duJour = planningDuJour(montage.construirePlanning(montage.gardes), jour)
-    if (duJour.attributions.length === 0) return []
-
-    const { data: vue } = await supabase
-      .from('planning_semaine')
-      .select('premier_id, second_id')
-      .eq('id', gardeId)
-      .eq('date', jour)
-      .maybeSingle()
-    const occupants = vue as { premier_id: string | null; second_id: string | null } | null
-
-    const input = {
-      ...montage.input,
-      dateDebut: jour,
-      dateFin: jour,
-      // Pas de lookback : on ne juge pas le rythme sur un jour isolé.
-      contexteAnterieur: undefined,
-    }
-
-    const avant = validerPlanning(
-      occupants
-        ? remplacerOccupantsDuJour(duJour, jour, occupants.premier_id, occupants.second_id)
-        : duJour,
-      input,
-    )
-    const apres = validerPlanning(
-      remplacerOccupantsDuJour(duJour, jour, premier_id, second_id),
-      input,
-    )
-
-    return violationsIntroduites(avant, apres).map(phraseAvertissement)
-  } catch (e) {
-    console.error(
-      '[PATCH garde] contrôle des règles dures (jour) indisponible (édition laissée passer):',
-      e instanceof Error ? e.message : String(e),
-    )
-    return []
-  }
-}
+// Le garde-fou des règles dures vit désormais dans
+// `lib/gardes/avertissements-regles.ts` : les quatre chemins d'écriture d'une
+// garde (édition manuelle, dépannage volontaire, échanges, outil de Filou)
+// appellent LE MÊME, plutôt qu'un contrôle chacun qui finirait par diverger.
 
 // La route attend la synchro agenda + l'envoi email avant de répondre
 export const maxDuration = 60
@@ -323,7 +204,10 @@ export async function PATCH(
               supabase, gardeId, jour, periodeId, cabinetIdGarde, premier_id, second_id,
             )
           : await avertissementsReglesDures(
-              supabase, gardeId, periodeId, cabinetIdGarde, premier_id, second_id,
+              supabase,
+              [{ gardeId, premier_id, second_id }],
+              periodeId,
+              cabinetIdGarde,
             )),
       )
     }

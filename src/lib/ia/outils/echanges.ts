@@ -30,6 +30,7 @@ import {
   refuserEchange,
   annulerEchange,
   validerEchangeAdmin,
+  previsualiserValidationEchange,
   refuserEchangeAdmin,
   type ProposerEchangePayload,
 } from '@/app/(protected)/echanges/actions'
@@ -696,19 +697,35 @@ Appelle-le quand l'administrateur veut valider un échange en attente — « val
       lignes.push(`En retour, ${e.demandeurPrenom} reprend la garde du ${decrireGarde(e.contrepartieDate, e.contrepartieType!, e.roleContrepartie!)}.`)
     }
 
+    // ── Garde-fou RÈGLES DURES — annoncé, jamais contourné ──
+    // La validation est le seul geste de ce parcours qui écrit dans un planning
+    // publié. On demande à l'action serveur ce qu'elle enfreindrait — le MÊME
+    // calcul que celui de l'écran Échanges, pas un second — et on le pose sous
+    // les yeux de l'admin AVANT le bouton. Filou est le porte-parole du moteur :
+    // il n'interdit pas à sa place, il ne se tait pas non plus.
+    const apercu = await previsualiserValidationEchange(e.id)
+    const avertissements = 'warnings' in apercu ? apercu.warnings : []
+
+    const baseAvertissement =
+      'Le planning déjà publié est modifié tout de suite : emails et notifications partent automatiquement aux deux vétérinaires.'
+
     return {
       ok: true,
       proposition: {
         titre: 'Valider l’échange',
         phrase: 'Voici l’échange que tu validerais.',
-        lignes,
+        lignes: avertissements.length > 0
+          ? [...lignes, '', 'Ce que cet échange enfreint :', ...avertissements]
+          : lignes,
         action: 'Valider',
-        avertissement:
-          'Le planning déjà publié est modifié tout de suite : emails et notifications partent automatiquement aux deux vétérinaires.',
+        avertissement: avertissements.length > 0
+          ? `Cet échange enfreint ${avertissements.length === 1 ? 'une règle du cabinet' : `${avertissements.length} règles du cabinet`} (détail ci-dessus). Il reste applicable — c'est toi qui tranches. ${baseAvertissement}`
+          : baseAvertissement,
       },
+      charge: { echangeId: e.id, avertissements },
     }
   },
-  async executer(params, ctx) {
+  async executer(params, ctx, charge) {
     const echanges = await chargerEchanges(ctx)
     const filtre = (e: EchangeVM) => e.statut === 'acceptee'
     const res = trouverEchangeUnique(echanges, params.date, filtre, {
@@ -716,7 +733,29 @@ Appelle-le quand l'administrateur veut valider un échange en attente — « val
       cible: params.prenom_cible,
     })
     if (!res.ok) return { error: res.raison }
-    return validerEchangeAdmin(res.echange.id)
+
+    // Premier appel SANS confirmation : c'est l'action serveur qui recalcule et
+    // qui tranche, pas Filou. S'il remonte des règles que l'admin avait déjà
+    // sous les yeux, on confirme ; s'il en remonte une NOUVELLE (le planning a
+    // bougé depuis l'aperçu), on n'écrit pas en douce ce qui n'a pas été montré.
+    const premier = await validerEchangeAdmin(res.echange.id)
+    if (!('needsConfirmation' in premier)) {
+      return 'error' in premier ? { error: premier.error } : {}
+    }
+
+    const montres = new Set(
+      ((charge as { avertissements?: string[] } | undefined)?.avertissements) ?? [],
+    )
+    const nouveaux = premier.warnings.filter((w) => !montres.has(w))
+    if (nouveaux.length > 0) {
+      return {
+        error: `Le planning a changé depuis ma proposition : cet échange enfreindrait maintenant ${nouveaux.length === 1 ? 'une règle' : `${nouveaux.length} règles`} que je ne t'avais pas montrée${nouveaux.length === 1 ? '' : 's'} — ${nouveaux.join(' ')} Redemande-moi la validation pour que je te présente la situation à jour.`,
+      }
+    }
+
+    const second = await validerEchangeAdmin(res.echange.id, true)
+    if ('error' in second) return { error: second.error }
+    return {}
   },
 }
 

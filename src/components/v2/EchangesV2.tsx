@@ -121,6 +121,11 @@ export function EchangesV2({ moiId, isAdmin, echanges, gardesFutures, vets }: Pr
   const [refusEnCours, setRefusEnCours] = useState<{ id: string; admin: boolean } | null>(null)
   const [motifRefus, setMotifRefus] = useState('')
   const [annulationEnCours, setAnnulationEnCours] = useState<string | null>(null)
+  // Règles dures enfreintes par l'échange que l'admin s'apprête à valider
+  // (même garde-fou que l'édition manuelle d'une garde — cf. actions.ts).
+  const [avertEchange, setAvertEchange] = useState<
+    { id: string; warnings: string[] } | null
+  >(null)
 
   const aujourdHui = useJourCourant()
 
@@ -154,6 +159,26 @@ export function EchangesV2({ moiId, isAdmin, echanges, gardesFutures, vets }: Pr
       setRefusEnCours(null)
       setMotifRefus('')
       setAnnulationEnCours(null)
+      router.refresh()
+    })
+  }
+
+  /**
+   * Validation admin — le seul geste de cet écran qui écrit dans le planning,
+   * donc le seul soumis au garde-fou des règles dures. Premier appel sans
+   * confirmation : si le serveur remonte des règles enfreintes, on les affiche
+   * au lieu d'appliquer. Second appel, après le clic de l'admin, avec `true`.
+   */
+  const validerEchange = (id: string, confirmer = false) => {
+    startTransition(async () => {
+      const result = await validerEchangeAdmin(id, confirmer)
+      if ('needsConfirmation' in result) {
+        setAvertEchange({ id, warnings: result.warnings })
+        return
+      }
+      if ('error' in result) { toast.error(result.error); return }
+      toast.success('Échange validé — le planning est à jour.')
+      setAvertEchange(null)
       router.refresh()
     })
   }
@@ -308,7 +333,7 @@ export function EchangesV2({ moiId, isAdmin, echanges, gardesFutures, vets }: Pr
                         type="button"
                         className="btn btn-ok btn-sm"
                         disabled={isPending}
-                        onClick={() => lancer(() => validerEchangeAdmin(e.id), 'Échange validé — le planning est à jour.')}
+                        onClick={() => validerEchange(e.id)}
                       >
                         Valider l’échange
                       </button>
@@ -527,6 +552,39 @@ export function EchangesV2({ moiId, isAdmin, echanges, gardesFutures, vets }: Pr
               onClick={() => annulationEnCours && lancer(() => annulerEchange(annulationEnCours), 'Demande annulée.')}
             >
               {isPending ? 'Annulation…' : 'Annuler la demande'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Règles enfreintes par l'échange à valider — même vocabulaire que la
+          modale d'édition d'une garde : c'est le même garde-fou. */}
+      <Dialog
+        open={avertEchange !== null}
+        onOpenChange={(o) => { if (!o && !isPending) setAvertEchange(null) }}
+      >
+        <DialogContent className="gv-modale">
+          <DialogHeader>
+            <DialogTitle className="font-heading">Cet échange enfreint des règles</DialogTitle>
+            <DialogDescription>
+              L’échange reste possible : à toi de juger s’il est acceptable.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="gf-card souple">
+            <p className="gf-title">Ce que la vérification a relevé</p>
+            {(avertEchange?.warnings ?? []).map((w, i) => (
+              <p key={i}>{w}</p>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAvertEchange(null)} disabled={isPending}>
+              Ne pas valider
+            </Button>
+            <Button
+              disabled={isPending}
+              onClick={() => avertEchange && validerEchange(avertEchange.id, true)}
+            >
+              {isPending ? 'Application…' : 'Valider quand même'}
             </Button>
           </DialogFooter>
         </DialogContent>
