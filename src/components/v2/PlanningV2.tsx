@@ -609,11 +609,13 @@ export function PlanningV2({
                 <h4>Compteurs · période</h4>
                 <p>Ils bougent à chaque changement, manuel comme automatique.</p>
               </div>
+              {/* La légende vivait ici, en dur, et n'expliquait QUE « 1er WE » —
+                  même quand cette colonne n'était pas choisie, et jamais les
+                  trois autres. Elle est maintenant produite par le panneau
+                  lui-même, à partir des colonnes réellement affichées : une
+                  légende qui décrit un tableau qu'on ne voit pas est pire que
+                  pas de légende. */}
               <CompteursPanel lignes={compteurs} bilans={bilans} colonnes={colonnesCompteurs} />
-              <p className="cnt-foot">
-                « 1er WE » = premier de garde du week-end (celui qui porte l&apos;avantage
-                financier).
-              </p>
             </aside>
           </div>
         </div>

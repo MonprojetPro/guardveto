@@ -494,6 +494,26 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   font-size: 0.7rem; font-weight: 600; color: var(--t-muted);
   line-height: 1.5;
 }
+/* La raison d'une ligne à zéro, plus discrète que le constat qu'elle nuance :
+   c'est une précision, pas une seconde information de même poids. */
+.cnt-ecart-note { font-weight: 500; opacity: 0.85; }
+
+/* Légende des colonnes affichées. En-tête et sens sur la même ligne : c'est un
+   glossaire, on le parcourt du regard sans le lire en entier. */
+.cnt-legende {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--t-border);
+  display: grid; gap: 5px;
+  font-size: 0.68rem; line-height: 1.45;
+}
+.cnt-legende > div { display: flex; gap: 7px; align-items: baseline; }
+.cnt-legende dt {
+  flex-shrink: 0;
+  font-weight: 800; color: var(--accent-ink);
+  min-width: 44px;
+}
+.cnt-legende dd { margin: 0; color: var(--t-muted); }
 .cnt-num.bump-up { animation: bumpUp .8s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
 .cnt-num.bump-down { animation: bumpDown .8s ease both; }
 @keyframes bumpUp { 30% { transform: scale(1.5); color: var(--ok); } }
@@ -512,8 +532,8 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   25%  { opacity: 1; }
   100% { opacity: 0; transform: translateX(-50%) translateY(-9px); }
 }
-.cnt-foot { margin-top: 10px; font-size: 0.67rem; color: var(--soft); line-height: 1.5; }
-.cnt-foot b { color: var(--accent-ink); }
+/* `.cnt-foot` retiré le 2026-08-21 : la légende figée qu'il habillait est
+   remplacée par `.cnt-legende`, produite depuis les colonnes affichées. */
 
 /* ============================================================
    FILOU ACCROCHÉ AU REBORD → `v2-filou-edge.css`

@@ -105,8 +105,25 @@ export function CompteursPanel({ lignes, bilans, colonnes }: Props) {
     choix.map((c) => [c, Math.max(1, ...lignes.map((l) => Math.abs(valeurDe(l, c))))]),
   )
 
-  const weMin = Math.min(...lignes.map((l) => l.we_total))
-  const weMax = Math.max(...lignes.map((l) => l.we_total))
+  // ⚠️ L'écart se mesure entre les vétérinaires QUI PARTICIPENT — corrigé le
+  // 2026-08-21 (MiKL : « cette histoire de compteur, c'est pas clair »).
+  //
+  // Anne-Catherine est en dernier recours : elle a 0 week-end, et c'est
+  // l'intention, pas un déséquilibre. En la comptant, la phrase annonçait
+  // « Écart de 3 week-ends » là où les vétérinaires en répartition allaient de
+  // 1 à 3 — soit 2. Le nombre était donc FAUX au sens propre : il mesurait la
+  // distance à quelqu'un qui n'est pas dans la course, et il ne pouvait que
+  // grandir à mesure que le planning devenait juste.
+  //
+  // Le critère est le même que celui de la colonne « Écart » : un vétérinaire
+  // sans ligne de bilan est hors répartition. Une seule notion, deux endroits.
+  const enRepartition = lignes.filter((l) => bilanDe.has(l.veterinaire_id))
+  const horsRepartition = lignes.length - enRepartition.length
+  // Si personne n'a de bilan (période jamais close), on retombe sur tout le
+  // monde : mieux vaut un écart approximatif qu'une phrase absente.
+  const base = enRepartition.length > 0 ? enRepartition : lignes
+  const weMin = Math.min(...base.map((l) => l.we_total))
+  const weMax = Math.max(...base.map((l) => l.we_total))
 
   return (
     <>
@@ -215,7 +232,34 @@ export function CompteursPanel({ lignes, bilans, colonnes }: Props) {
         {weMax - weMin === 0
           ? 'Week-ends parfaitement répartis.'
           : `Écart de ${weMax - weMin} week-end${weMax - weMin > 1 ? 's' : ''} entre le plus et le moins chargé.`}
+        {/* Sans cette précision, une ligne à zéro se lit comme un oubli du
+            moteur. C'est l'inverse : c'est la règle du cabinet qui s'applique. */}
+        {horsRepartition > 0 && (
+          <>
+            {' '}
+            <span className="cnt-ecart-note">
+              {horsRepartition > 1
+                ? `${horsRepartition} vétérinaires de dernier recours ne sont pas comptés.`
+                : 'Le vétérinaire de dernier recours n’est pas compté.'}
+            </span>
+          </>
+        )}
       </p>
+
+      {/* La légende des colonnes RÉELLEMENT affichées.
+          Avant, une phrase figée expliquait « 1er WE » — la seule des quatre, et
+          même lorsque le cabinet ne l'avait pas choisie. Les en-têtes n'étaient
+          sinon explicités que par une infobulle au survol, c'est-à-dire par
+          rien du tout sur la tablette où cet écran se consulte (leçon déjà
+          payée : une icône visible au seul survol n'existe pas sur tactile). */}
+      <dl className="cnt-legende">
+        {choix.map((c) => (
+          <div key={c}>
+            <dt>{COLONNES[c].entete}</dt>
+            <dd>{COLONNES[c].description}</dd>
+          </div>
+        ))}
+      </dl>
     </>
   )
 }
