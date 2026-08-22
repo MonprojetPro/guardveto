@@ -22,4 +22,19 @@ export interface ViolationRevalidation {
   vetId?: string
   /** Détail concret lisible (déjà rédigé en français par le validateur) */
   detail: string
+  /**
+   * D'où vient la violation, quand le validateur regarde aussi ~10 jours en
+   * arrière (lookback inter-périodes) : 'anterieure' = les dates en cause
+   * appartiennent à la période PRÉCÉDENTE (historique saisi), pas au planning
+   * courant qu'on est en train de publier/afficher — ce n'est pas une faute du
+   * planning affiché, elle se corrige en déverrouillant l'historique.
+   * Absent/'courante' : violation normale du planning en cours.
+   *
+   * ✅ CONFIRMÉ (Lot 1) : le moteur pose bien `origine: 'anterieure'`, et
+   * UNIQUEMENT cette valeur — « courante » n'est jamais écrit, c'est l'absence
+   * du champ. Blocs marqués : ESPACEMENT, FREQ_WE, AU_PLUS_N, SUCCESSION,
+   * SERIE_MAX, REPOS_SERIE. R3 ne l'est jamais (sa garde fautive est toujours
+   * dans la période — cf. commentaire dans `validerPlanning.ts`).
+   */
+  origine?: 'courante' | 'anterieure'
 }

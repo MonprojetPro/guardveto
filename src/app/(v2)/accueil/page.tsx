@@ -13,6 +13,10 @@ import { BarreV2 } from '@/components/v2/BarreV2'
 import { Epicentre } from '@/components/v2/Epicentre'
 import { chargerAccueil } from '@/data/v2/accueilEpicentre'
 import type { Veterinaire } from '@/types'
+// Fenêtre « Vérification du planning » d'Epicentre : consomme `CartesViolations`
+// (`.gva-cause*`), défini dans v2-planning.css — importé ici pour que les
+// cartes de violation aient le même rendu que dans le planning et la publication.
+import '@/styles/v2-planning.css'
 
 export const metadata = {
   title: 'GuardVeto — Accueil',

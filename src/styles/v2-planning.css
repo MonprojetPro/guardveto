@@ -1304,6 +1304,20 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   font-size: 0.76rem; line-height: 1.5; color: var(--soft);
 }
 
+/* -- Une ligne par vétérinaire concerné par la cause -- */
+.gva-cause-liste {
+  margin: 4px 0 0; padding-left: 18px;
+  display: grid; gap: 4px;
+  list-style: disc;
+}
+.gva-cause-item {
+  font-size: 0.83rem; line-height: 1.55; color: var(--text);
+}
+.gva-cause-reste { color: var(--soft); list-style: none; margin-left: -18px; }
+.gva-cause-heritee {
+  color: var(--soft); font-style: italic;
+}
+
 /* -- Les règles en cause : des pastilles, pas une liste à puces qui se
       confond avec le constat juste au-dessus. -- */
 .gva-puces {

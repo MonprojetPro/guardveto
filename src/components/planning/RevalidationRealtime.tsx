@@ -25,6 +25,7 @@ import { AlertTriangle, ChevronDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
 import { grouperViolations } from '@/lib/regles/libelleViolation'
+import { CartesViolations } from './CartesViolations'
 import type { ViolationRevalidation } from './types-revalidation'
 
 interface RevalidationRealtimeProps {
@@ -42,17 +43,6 @@ const TABLES_SURVEILLEES = [
   'veterinaires',
   'regles_cabinet',
 ] as const
-
-/** Dates montrées par cause avant de basculer sur « et N autres ». */
-const MAX_DATES_PAR_CAUSE = 8
-
-function formatDateFr(iso: string): string {
-  return new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  })
-}
 
 export function RevalidationRealtime({
   periodeIds,
@@ -138,28 +128,7 @@ export function RevalidationRealtime({
 
       {ouvert && (
         <div className="gva-corps">
-          {causes.map((cause) => {
-            const dates = cause.items.slice(0, MAX_DATES_PAR_CAUSE)
-            const reste = cause.items.length - dates.length
-            return (
-              <div key={cause.code} className="gva-cause">
-                <p className="gva-cause-tete">
-                  <span className="gva-cause-nb">
-                    {cause.items.length} date{cause.items.length > 1 ? 's' : ''}
-                  </span>
-                  <span className="gva-cause-nom">{cause.intitule}</span>
-                </p>
-                {/* Le `detail` est déjà rédigé en français par le validateur :
-                    celui de la première date suffit à comprendre la cause, les
-                    autres ne font que répéter la même phrase à d'autres dates. */}
-                <p className="gva-cause-detail">{cause.items[0].detail}</p>
-                <p className="gva-cause-dates">
-                  {dates.map((v) => formatDateFr(v.date)).join(' · ')}
-                  {reste > 0 && ` · et ${reste} autre${reste > 1 ? 's' : ''}`}
-                </p>
-              </div>
-            )
-          })}
+          <CartesViolations violations={violations} />
 
           <div className="gva-actions">
             <Link href="/regles" className="gva-lien">Revoir les règles →</Link>

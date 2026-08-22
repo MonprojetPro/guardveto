@@ -14,6 +14,7 @@ import { CriseModal, type VetCrise } from '@/components/planning/CriseModal'
 import type { CreneauIgnore } from '@/engine/creneau-modele'
 import type { JourNonCouvert } from '@/components/planning/types-impasse'
 import type { DiagnosticImpasse as DiagnosticImpasseData } from '@/engine/diagnostic'
+import { CartesViolations } from '@/components/planning/CartesViolations'
 import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
 import {
   Select,
@@ -385,23 +386,7 @@ export function ActionBar({ periodes, periodesAvecGardes, vets }: ActionBarProps
           </DialogHeader>
           <div className="space-y-3 text-sm">
             {reserves && reserves.violations.length > 0 && (
-              <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30 p-3">
-                <p className="font-medium text-red-800 dark:text-red-300 mb-1.5">
-                  {reserves.violations.length} règle{reserves.violations.length > 1 ? 's' : ''} non respectée{reserves.violations.length > 1 ? 's' : ''} :
-                </p>
-                <ul className="space-y-1 text-red-700 dark:text-red-400 list-disc pl-5">
-                  {reserves.violations.slice(0, 6).map((v, i) => (
-                    <li key={i}>
-                      <span className="font-medium">{v.date}</span> — {v.detail}
-                    </li>
-                  ))}
-                  {reserves.violations.length > 6 && (
-                    <li className="list-none text-red-600/80 dark:text-red-500/80">
-                      … et {reserves.violations.length - 6} autre{reserves.violations.length - 6 > 1 ? 's' : ''}.
-                    </li>
-                  )}
-                </ul>
-              </div>
+              <CartesViolations violations={reserves.violations} />
             )}
             {reserves && reserves.souhaitsEnAttente > 0 && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 p-3 text-amber-800 dark:text-amber-300">

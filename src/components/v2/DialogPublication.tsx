@@ -28,6 +28,7 @@ import { Button } from '@/components/ui/button'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
+import { CartesViolations } from '@/components/planning/CartesViolations'
 import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
 import type { Periode } from '@/types'
 
@@ -167,25 +168,7 @@ export function DialogPublication({ open, onOpenChange, periode, aDesGardes }: P
         {/* ── ② Les réserves du gate serveur ────────────── */}
         {etape === 'reserves' && (
           <div className="gp-controle">
-            {violations.length > 0 && (
-              <div className="gf-card dure">
-                <p className="gf-title">
-                  {violations.length} règle{violations.length > 1 ? 's' : ''} non respectée{violations.length > 1 ? 's' : ''}
-                </p>
-                <ul className="space-y-1 list-disc pl-5">
-                  {violations.slice(0, 6).map((v, i) => (
-                    <li key={i}>
-                      <span className="font-medium">{v.date}</span> — {v.detail}
-                    </li>
-                  ))}
-                  {violations.length > 6 && (
-                    <li className="list-none opacity-80">
-                      … et {violations.length - 6} autre{violations.length - 6 > 1 ? 's' : ''}.
-                    </li>
-                  )}
-                </ul>
-              </div>
-            )}
+            {violations.length > 0 && <CartesViolations violations={violations} />}
             {souhaits > 0 && (
               <div className="gf-card souple">
                 <span className="font-medium">

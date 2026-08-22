@@ -23,12 +23,8 @@
 // ============================================================
 
 import { createClient } from '@/lib/supabase/server'
-import { resoudreContexte } from '@/data/resoudreContexte'
-import { validerPlanning, type ValidationInput } from '@/engine/validation/validerPlanning'
-import {
-  gardesVersPlanningPartiel,
-  type GardeRow,
-} from '@/engine/validation/gardesVersPlanning'
+import { monterValidationPeriode } from '@/data/monterValidationPeriode'
+import { validerPlanning } from '@/engine/validation/validerPlanning'
 import {
   comparerAttributionsV1V2,
   type AttributionLue,
@@ -76,55 +72,15 @@ export async function revaliderPlanningPublie(
   const vues = new Set<string>() // dédoublonnage inter-périodes
 
   for (const periodeId of [...new Set(periodeIds)]) {
-    // 1. Contexte (vets + contraintes + congés + calendrier + structure + effectif).
-    //    autoriserVerrouille : une période publiée peut aussi être verrouillée.
-    let ctx
-    try {
-      ctx = await resoudreContexte(periodeId, cabinetId, { autoriserVerrouille: true })
-    } catch {
-      continue // période introuvable / inaccessible → on ignore (best-effort)
-    }
+    // 1-2. Montage PARTAGÉ avec le garde-fou du chemin manuel (PATCH garde) :
+    //      contexte + gardes réelles + reconstruction (vendredi synthétisé,
+    //      places sur-mesure, lookback #17). Extrait ici pour que les deux
+    //      appelants ne puissent pas juger sur une reconstruction différente.
+    //      null = période introuvable / vide → on ignore (best-effort).
+    const montage = await monterValidationPeriode(supabase, periodeId, cabinetId)
+    if (!montage) continue
 
-    // 2. Gardes publiées de la période (source de vérité V1).
-    const { data: gardes, error } = await supabase
-      .from('gardes')
-      .select('id, date, type, premier_id, second_id')
-      .eq('periode_id', periodeId)
-      .eq('cabinet_id', cabinetId)
-    if (error || !gardes || gardes.length === 0) continue
-
-    // 2b. Reconstruction SUR-MESURE (P3b) : rôles du catalogue + miroir
-    //     garde_placements (les colonnes V1 ne portent que 2 places, et des
-    //     labels premier/second — la couverture attend les rôles réels).
-    const rolesParCode: Record<string, string[]> = {}
-    for (const c of ctx.creneaux ?? []) {
-      if (c.code) rolesParCode[c.code] = c.roles
-    }
-    const typesV1 = new Set(['semaine', 'weekend', 'ferie'])
-    const idsSurMesure = (gardes as GardeRow[])
-      .filter((g) => !typesV1.has(g.type))
-      .map((g) => g.id)
-      .filter((id): id is string => Boolean(id))
-    const placementsParGarde: Record<string, { garde_id: string; place_index: number; role: string; veterinaire_id: string | null }[]> = {}
-    if (idsSurMesure.length > 0) {
-      const { data: placs } = await supabase
-        .from('garde_placements')
-        .select('garde_id, place_index, role, veterinaire_id')
-        .in('garde_id', idsSurMesure)
-      for (const p of ((placs ?? []) as { garde_id: string; place_index: number; role: string; veterinaire_id: string | null }[])) {
-        (placementsParGarde[p.garde_id] ??= []).push(p)
-      }
-    }
-
-    const planning = gardesVersPlanningPartiel(gardes as GardeRow[], {
-      rolesParCode,
-      placementsParGarde,
-      // P6 (verrou n°3) : la synthèse du vendredi APPLIQUE les MÊMES relations
-      // que le validateur ci-dessous (ctx.structureConfig.relations) — sinon la
-      // reconstruction et le contrôle divergeraient pour un cabinet qui pilote
-      // ses relations. undefined → couple historique (byte-identique).
-      relations: ctx.structureConfig?.relations,
-    })
+    const planning = montage.construirePlanning(montage.gardes)
 
     // 2c. DÉTECTEUR DE DÉRIVE V1 ↔ V2 (P6 verrou n°7, étape 3) — premier
     //     LECTEUR réel d'`attributions` : contrôle de cohérence EN COMPLÉMENT
@@ -135,24 +91,7 @@ export async function revaliderPlanningPublie(
     await detecterDeriveV1V2(supabase, periodeId, cabinetId, planning)
 
     // 3. Re-validation indépendante.
-    const input: ValidationInput = {
-      dateDebut: ctx.dateDebut,
-      dateFin: ctx.dateFin,
-      saison: ctx.saison,
-      vets: ctx.vets,
-      calendrier: ctx.calendrier,
-      nbVetosSemaineSoir: ctx.nbVetosSemaineSoir,
-      structureConfig: ctx.structureConfig,
-      // Catalogue-aware (P0) : MÊME source que le moteur → validateur et solver
-      // voient la même structure de gardes. Défaut (seed 4 types) = comportement
-      // historique, prouvé équivalent par p0-validateur-catalogue-equivalence.
-      creneaux: ctx.creneaux,
-      // #17 — MÊME lookback inter-périodes que le solver a vu à la génération :
-      // les deux gardiens jugent la jonction de périodes sur la même donnée.
-      contexteAnterieur: ctx.contexteAnterieur,
-    }
-
-    for (const v of validerPlanning(planning, input)) {
+    for (const v of validerPlanning(planning, montage.input)) {
       const cle = `${v.regle}|${v.date}|${v.type}|${v.role ?? ''}|${v.vetId ?? ''}`
       if (vues.has(cle)) continue
       vues.add(cle)
@@ -163,6 +102,9 @@ export async function revaliderPlanningPublie(
         role: v.role,
         vetId: v.vetId,
         detail: v.detail,
+        // Lot 1 : l'origine traverse la Server Action telle quelle. Absente =
+        // violation du planning affiché ; 'anterieure' = héritée de l'historique.
+        origine: v.origine,
       })
     }
   }

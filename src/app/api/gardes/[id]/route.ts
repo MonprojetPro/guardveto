@@ -17,12 +17,34 @@
 // contrôle métier (contrat) : c'est la route appelante qui décide. La crise
 // (POST /api/absences/[id]/reparer) valide de son côté via proposerReparation —
 // ce garde-fou ne concerne donc QUE l'édition manuelle.
+//
+// GARDE-FOU RÈGLES DURES (lot 1) — LE trou par lequel le bug est passé :
+// il existait TROIS chemins d'écriture d'une garde (solver, validateur,
+// modification manuelle) et seulement DEUX gardiens. Cette route ne regardait
+// que « véto inactif » et « congé validé » ; toutes les règles de rythme
+// (espacement, fréquence des week-ends, séries…) passaient sans un mot. L'admin
+// a ainsi pu se placer sur trois week-ends consécutifs contre une règle DURE.
+//
+// On rejoue donc le changement EN MÉMOIRE et on le confronte au MÊME juge que
+// la publication — `validerPlanning`, jamais un contrôle réécrit ici — puis on
+// ne remonte que le DELTA (ce que ce geste ajoute). Conformément à la doctrine
+// « le système INFORME, il n'interdit pas », ça ne bloque rien : l'admin
+// confirme et l'écriture se fait, avec sa trace dans `audit_log` si elle force.
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { appliquerChangementGarde } from '@/lib/gardes/appliquer-changement'
 import { appliquerExceptionJour } from '@/lib/gardes/appliquer-exception'
+import { monterValidationPeriode } from '@/data/monterValidationPeriode'
+import { validerPlanning } from '@/engine/validation/validerPlanning'
+import {
+  simulerChangementGarde,
+  violationsIntroduites,
+  phraseAvertissement,
+  planningDuJour,
+  remplacerOccupantsDuJour,
+} from '@/lib/gardes/controle-regles'
 
 /**
  * Contrôle métier « ce véto est-il légalement affectable sur cette date ? » au
@@ -79,6 +101,125 @@ async function avertissementsAffectation(
   }
 
   return warnings
+}
+
+/**
+ * Confronte le changement demandé aux RÈGLES DURES du cabinet, sans rien écrire.
+ *
+ * Le montage (`monterValidationPeriode`) et le juge (`validerPlanning`) sont
+ * EXACTEMENT ceux de la re-validation continue : aucune règle n'est
+ * réimplémentée ici — c'est la faute qui a créé ce bug, on ne la refait pas.
+ *
+ * Best-effort ASSUMÉ : période introuvable, contexte illisible, exception
+ * inattendue → tableau vide, l'édition passe. Un contrôle informatif qui
+ * empêcherait l'admin de travailler quand il tombe en panne serait pire que son
+ * absence — et la re-validation continue rattrapera l'écart de toute façon.
+ */
+async function avertissementsReglesDures(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  gardeId: string,
+  periodeId: string,
+  cabinetId: string,
+  premier_id: string | null,
+  second_id: string | null,
+): Promise<string[]> {
+  try {
+    const montage = await monterValidationPeriode(supabase, periodeId, cabinetId)
+    if (!montage) return []
+
+    // La garde touchée n'a plus le miroir `garde_placements` à jour (il porte
+    // encore l'ANCIENNE paire) : on la reconstruit depuis premier_id/second_id.
+    const avant = validerPlanning(
+      montage.construirePlanning(montage.gardes, [gardeId]),
+      montage.input,
+    )
+    const apres = validerPlanning(
+      montage.construirePlanning(
+        simulerChangementGarde(montage.gardes, gardeId, premier_id, second_id),
+        [gardeId],
+      ),
+      montage.input,
+    )
+
+    return violationsIntroduites(avant, apres).map(phraseAvertissement)
+  } catch (e) {
+    console.error(
+      '[PATCH garde] contrôle des règles dures indisponible (édition laissée passer):',
+      e instanceof Error ? e.message : String(e),
+    )
+    return []
+  }
+}
+
+/**
+ * Même garde-fou, mais pour l'AUTRE mécanisme d'écriture de cette route : le
+ * remplacement d'UN SEUL JOUR (`appliquerExceptionJour`).
+ *
+ * L'exception s'écrit dans `gardes_exceptions` ; la table `gardes` ne bouge pas,
+ * donc le validateur ne verrait rien si on lui donnait la période telle quelle.
+ * On lui soumet donc une période RÉDUITE À CE JOUR : les règles qui jugent
+ * l'occupant d'un créneau répondent exactement, les règles de rythme se taisent
+ * d'elles-mêmes (un seul créneau ne forme ni paire ni série) — ce qui est le
+ * comportement VOULU, un jour exceptionnel n'étant pas une garde au sens de
+ * l'équité. Raisonnement complet dans `lib/gardes/controle-regles.ts`.
+ *
+ * L'état « avant » est lu sur la VUE, pas sur `gardes` : elle applique déjà les
+ * exceptions posées précédemment, donc corriger deux fois le même jour compare
+ * bien au remplaçant en place, et non au titulaire d'origine.
+ */
+async function avertissementsReglesDuresJour(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  gardeId: string,
+  jour: string,
+  periodeId: string,
+  cabinetId: string,
+  premier_id: string | null,
+  second_id: string | null,
+): Promise<string[]> {
+  try {
+    const montage = await monterValidationPeriode(supabase, periodeId, cabinetId)
+    if (!montage) return []
+
+    // Le créneau de ce jour, seul. Vide (cas du DIMANCHE d'un week-end, qui n'a
+    // pas de créneau propre — le bloc est daté du samedi) → rien à confronter.
+    const duJour = planningDuJour(montage.construirePlanning(montage.gardes), jour)
+    if (duJour.attributions.length === 0) return []
+
+    const { data: vue } = await supabase
+      .from('planning_semaine')
+      .select('premier_id, second_id')
+      .eq('id', gardeId)
+      .eq('date', jour)
+      .maybeSingle()
+    const occupants = vue as { premier_id: string | null; second_id: string | null } | null
+
+    const input = {
+      ...montage.input,
+      dateDebut: jour,
+      dateFin: jour,
+      // Pas de lookback : on ne juge pas le rythme sur un jour isolé.
+      contexteAnterieur: undefined,
+    }
+
+    const avant = validerPlanning(
+      occupants
+        ? remplacerOccupantsDuJour(duJour, jour, occupants.premier_id, occupants.second_id)
+        : duJour,
+      input,
+    )
+    const apres = validerPlanning(
+      remplacerOccupantsDuJour(duJour, jour, premier_id, second_id),
+      input,
+    )
+
+    return violationsIntroduites(avant, apres).map(phraseAvertissement)
+  } catch (e) {
+    console.error(
+      '[PATCH garde] contrôle des règles dures (jour) indisponible (édition laissée passer):',
+      e instanceof Error ? e.message : String(e),
+    )
+    return []
+  }
 }
 
 // La route attend la synchro agenda + l'envoi email avant de répondre
@@ -144,34 +285,60 @@ export async function PATCH(
   // On charge la date de la garde puis on vérifie les vétos affectés. Sans
   // confirmation explicite, on RENVOIE les avertissements (409) au lieu
   // d'appliquer en silence — l'UI d'édition les affiche et propose de forcer.
-  if (!confirmerAvertissements) {
-    const { data: gardeDate } = await supabase
-      .from('gardes')
-      .select('date')
-      .eq('id', gardeId)
-      .single()
+  // L'état AVANT sert deux fois : aux contrôles ci-dessous, et — si l'admin
+  // confirme malgré un avertissement — à la trace dans `audit_log`.
+  const { data: gardeAvant } = await supabase
+    .from('gardes')
+    .select('date, periode_id, cabinet_id, premier_id, second_id, verrouille, modifie_manuellement')
+    .eq('id', gardeId)
+    .single()
 
+  if (!confirmerAvertissements) {
     // En périmètre JOUR, on contrôle la disponibilité sur LE JOUR touché, pas
     // sur la date de la ligne. Un remplaçant peut être en congé le samedi et
     // parfaitement libre le dimanche : vérifier le samedi refuserait à tort.
-    const dateControlee = perimetre === 'jour' ? jour : (gardeDate?.date ?? null)
+    const dateControlee = perimetre === 'jour' ? jour : (gardeAvant?.date ?? null)
+
+    const warnings: string[] = []
 
     if (dateControlee) {
-      const warnings = await avertissementsAffectation(
-        supabase, dateControlee, premier_id, second_id,
+      warnings.push(
+        ...(await avertissementsAffectation(
+          supabase, dateControlee, premier_id, second_id,
+        )),
       )
-      if (warnings.length > 0) {
-        return NextResponse.json(
-          {
-            error: warnings.length === 1
-              ? warnings[0]
-              : `${warnings.length} points de vigilance sur cette affectation.`,
-            warnings,
-            needsConfirmation: true,
-          },
-          { status: 409 },
-        )
-      }
+    }
+
+    // Règles dures (lot 1) — LES DEUX mécanismes d'écriture de cette route.
+    // Le bloc réécrit `gardes` : on rejoue la période entière, rythme compris.
+    // Le jour pose une exception par-dessus : on juge le créneau de ce jour
+    // seul, ce qui répond exactement sur l'occupant sans inventer un week-end
+    // que le remplaçant n'a pas fait.
+    if (gardeAvant?.periode_id && gardeAvant?.cabinet_id) {
+      const periodeId = gardeAvant.periode_id as string
+      const cabinetIdGarde = gardeAvant.cabinet_id as string
+      warnings.push(
+        ...(perimetre === 'jour' && jour
+          ? await avertissementsReglesDuresJour(
+              supabase, gardeId, jour, periodeId, cabinetIdGarde, premier_id, second_id,
+            )
+          : await avertissementsReglesDures(
+              supabase, gardeId, periodeId, cabinetIdGarde, premier_id, second_id,
+            )),
+      )
+    }
+
+    if (warnings.length > 0) {
+      return NextResponse.json(
+        {
+          error: warnings.length === 1
+            ? warnings[0]
+            : `${warnings.length} points de vigilance sur cette affectation.`,
+          warnings,
+          needsConfirmation: true,
+        },
+        { status: 409 },
+      )
     }
   }
 
@@ -204,6 +371,42 @@ export async function PATCH(
 
   if (!res.ok) {
     return NextResponse.json({ error: res.error }, { status: res.status })
+  }
+
+  // ── Trace d'une confirmation MALGRÉ un avertissement ─────
+  //
+  // `force` n'est PAS le véhicule de « je confirme quand même » : il déverrouille
+  // la garde au passage (`verrouille = false`). S'en servir pour tracer une simple
+  // confirmation déverrouillerait des gardes en silence — un effet de bord au
+  // mauvais endroit. Quand `force` est déjà vrai, `appliquerChangementGarde` a
+  // écrit sa propre ligne ; on ne double pas. Sinon, on pose ICI la trace : un
+  // avertissement qu'on décide d'ignorer doit rester retrouvable, sinon
+  // « informer sans interdire » revient à ne rien dire du tout.
+  //
+  // Best-effort : la garde est déjà écrite, un échec d'audit ne doit pas faire
+  // croire à l'admin que son geste a échoué.
+  if (confirmerAvertissements && !force) {
+    const { error: auditErr } = await supabase.from('audit_log').insert({
+      table_name: 'gardes',
+      record_id: gardeId,
+      action: 'update',
+      old_data: {
+        premier_id: gardeAvant?.premier_id ?? null,
+        second_id: gardeAvant?.second_id ?? null,
+        modifie_manuellement: gardeAvant?.modifie_manuellement ?? null,
+        confirmation_malgre_avertissement: true,
+        perimetre,
+        jour,
+      },
+      new_data: { premier_id, second_id, modifie_manuellement: true },
+      user_id: vet.id,
+    })
+    if (auditErr) {
+      console.error(
+        '[PATCH garde] trace de confirmation non écrite dans audit_log:',
+        auditErr.message,
+      )
+    }
   }
 
   return NextResponse.json({ success: true })

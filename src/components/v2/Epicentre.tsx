@@ -31,6 +31,7 @@ import {
   accrocheDepuis, lireOrigine, lireSujet, portUneOrigine, MATIERE_VIDE,
 } from '@/lib/v2/filou-origine'
 import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
+import { CartesViolations } from '@/components/planning/CartesViolations'
 import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
 import type { DonneesAccueil, GardeDuSoir } from '@/data/v2/accueilEpicentre'
 
@@ -696,15 +697,11 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
                         </span>
                       </div>
                     )}
-                    {verdict.etat === 'ok' &&
-                      verdict.violations.map((v, i) => (
-                        <div className="check-row" key={`${v.regle}-${v.date}-${i}`}>
-                          <span className="ck warn">⚠</span>
-                          <span>
-                            <b>{v.regle}</b> · {dateCourte(v.date)} — {v.detail}
-                          </span>
-                        </div>
-                      ))}
+                    {verdict.etat === 'ok' && verdict.violations.length > 0 && (
+                      <div className="gva-corps">
+                        <CartesViolations violations={verdict.violations} />
+                      </div>
+                    )}
                     <div className="f-note">
                       <span className="who">🦊 Filou veille</span>
                       Le validateur est <b>indépendant du moteur</b> : il ne rejoue pas le
