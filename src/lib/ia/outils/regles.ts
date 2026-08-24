@@ -32,6 +32,7 @@ import {
   FORCE_LABEL,
   FORCES_ORDRE,
 } from '@/components/ia/creerRegleProposee'
+import { lignesLues } from './lecture'
 import type { ContexteOutil, OutilEcriture, OutilLecture } from './types'
 
 /** Familles de règles qui ne visent personne en particulier : elles règlent le
@@ -74,7 +75,7 @@ La réponse contient aussi un champ « reglages_hors_regles » : ce sont des ré
   params: ParamsLister,
 
   async executer(params, ctx) {
-    const [{ data: reglesDb }, { data: vetsDb }] = await Promise.all([
+    const [repRegles, repVets] = await Promise.all([
       ctx.supabase
         .from('regles_cabinet')
         .select('id, brique_id, params_json, force, actif, periode_id')
@@ -82,11 +83,13 @@ La réponse contient aussi un champ « reglages_hors_regles » : ce sont des ré
       ctx.supabase.from('veterinaires').select('id, prenom'),
     ])
 
-    const vets = (vetsDb as Array<{ id: string; prenom: string }> | null) ?? []
+    // « Aucune règle ne concerne Antoine » est une affirmation catégorique : une
+    // lecture en panne ne doit jamais la produire.
+    const vets = lignesLues<{ id: string; prenom: string }>(repVets, "la liste de l'équipe")
     const prenoms = new Map(vets.map((v) => [v.id, v.prenom]))
     const nomVeto = (id: string) => prenoms.get(id) ?? 'un vétérinaire'
 
-    const rows = fusionnerDuos((reglesDb as RegleRow[] | null) ?? [])
+    const rows = fusionnerDuos(lignesLues<RegleRow>(repRegles, 'les règles du cabinet'))
 
     // Le filtre par prénom se fait sur la PHRASE rendue, pas sur les
     // identifiants : une règle peut viser plusieurs personnes, et le nom
@@ -312,12 +315,13 @@ async function reglagesQuiContraignent(
   ctx: ContexteOutil,
   prenom?: string,
 ): Promise<string[]> {
-  const { data } = await ctx.supabase
-    .from('veterinaires')
-    .select('id, prenom, actif, dernier_recours')
-    .order('prenom')
-
-  const vets = (data as Array<{ id: string; prenom: string; actif: boolean; dernier_recours: boolean }> | null) ?? []
+  const vets = lignesLues<{ id: string; prenom: string; actif: boolean; dernier_recours: boolean }>(
+    await ctx.supabase
+      .from('veterinaires')
+      .select('id, prenom, actif, dernier_recours')
+      .order('prenom'),
+    "la liste de l'équipe",
+  )
   const cible = prenom?.trim().toLowerCase()
   let concernes = cible
     ? vets.filter((v) => v.prenom.toLowerCase() === cible)
@@ -351,12 +355,16 @@ async function reglagesQuiContraignent(
 }
 
 async function chargerReglesCabinet(ctx: ContexteOutil): Promise<Array<RegleRow>> {
-  const { data } = await ctx.supabase
-    .from('regles_cabinet')
-    .select('id, brique_id, params_json, force, actif, periode_id')
-    .order('brique_id')
-    .order('id')
-  return fusionnerDuos((data as RegleRow[] | null) ?? [])
+  return fusionnerDuos(
+    lignesLues<RegleRow>(
+      await ctx.supabase
+        .from('regles_cabinet')
+        .select('id, brique_id, params_json, force, actif, periode_id')
+        .order('brique_id')
+        .order('id'),
+      'les règles du cabinet',
+    ),
+  )
 }
 
 /** Traduit les numéros donnés par le modèle en règles réelles, sur la liste
@@ -370,9 +378,11 @@ async function resoudreNumeros(
   | { ok: false; raison: string }
 > {
   const rows = await chargerReglesCabinet(ctx)
-  const { data: vetsDb } = await ctx.supabase.from('veterinaires').select('id, prenom')
   const prenoms = new Map(
-    ((vetsDb as Array<{ id: string; prenom: string }> | null) ?? []).map((v) => [v.id, v.prenom]),
+    lignesLues<{ id: string; prenom: string }>(
+      await ctx.supabase.from('veterinaires').select('id, prenom'),
+      "la liste de l'équipe",
+    ).map((v) => [v.id, v.prenom]),
   )
   const libelles = rows.map((r) => phraseRegle(r, (id) => prenoms.get(id) ?? 'un vétérinaire'))
 

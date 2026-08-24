@@ -35,11 +35,16 @@
 
 import { useState, useTransition } from 'react'
 import { appliquerActionFilou } from '@/app/(protected)/filou/actions'
+import { AUCUNE_LECTURE, phraseDApres } from '@/lib/ia/sources-texte'
 
 export interface ContenuResultat {
   titre: string
   introduction: string
   lignes: string[]
+  /** Ce que Filou a consulté, en français et déjà prêt à lire. Vide = il n'a
+   *  rien consulté du tout, et c'est ce qu'il faut dire le plus fort. */
+  sources?: string[]
+  sansLecture?: boolean
   /** Ce que l'attente a été occupée à faire — administrateur seulement. */
   mesure?: {
     ms: number
@@ -176,6 +181,33 @@ export function FenetreResultatFilou({ actif, resultat, onFermer, onDecision }: 
             {action.avertissement}
           </div>
         )}
+
+        {/* D'OÙ VIENT CETTE RÉPONSE.
+            Le système informe, il n'interdit pas : on n'a pas bloqué les
+            réponses non fondées, on les rend reconnaissables. La ligne est
+            volontairement sobre — Anne-Sophie ne doit pas lire un pavé
+            technique sous chaque phrase — SAUF quand rien n'a été consulté :
+            c'est justement le moment où il faut se méfier, et le silence s'y
+            lirait comme une absence d'information plutôt que comme un
+            avertissement.
+
+            Rien au survol : une explication qui n'existe qu'au passage de la
+            souris n'existe pas sur une tablette, et c'est sur tablette que ce
+            produit se lit au comptoir. */}
+        {resultat.sansLecture ? (
+          <p className="res-sources res-sources-vide">{AUCUNE_LECTURE}</p>
+        ) : (resultat.sources?.length ?? 0) > 3 ? (
+          <details className="res-sources">
+            <summary>D’après {resultat.sources!.length} sources consultées</summary>
+            <ul>
+              {resultat.sources!.map((s, i) => (
+                <li key={i}>{s}</li>
+              ))}
+            </ul>
+          </details>
+        ) : (resultat.sources?.length ?? 0) > 0 ? (
+          <p className="res-sources">{phraseDApres(resultat.sources!)}</p>
+        ) : null}
 
         {/* Le chronomètre, en tout petit. Une attente de plusieurs secondes se
             supporte mieux quand on voit ce qu'elle a fait — et surtout, elle

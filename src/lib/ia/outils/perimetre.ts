@@ -28,6 +28,7 @@
 // base), et c'est exactement le cas du cabinet pilote aujourd'hui.
 // ============================================================
 
+import { lignesLues } from './lecture'
 import type { ContexteOutil } from './types'
 
 export interface PeriodeAutorisee {
@@ -77,8 +78,10 @@ export async function perimetrePeriodes(ctx: ContexteOutil): Promise<PerimetrePe
 
   if (!ctx.estAdmin) requete = requete.not('publie_at', 'is', null)
 
-  const { data } = await requete
-  const periodes = (data as PeriodeAutorisee[] | null) ?? []
+  // ⚠️ `vide: true` est une AFFIRMATION : « aucun planning ne t'a été diffusé ».
+  // Une lecture en panne ne doit jamais la produire — c'est la différence entre
+  // informer et mentir poliment.
+  const periodes = lignesLues<PeriodeAutorisee>(await requete, 'la liste des plannings du cabinet')
   return {
     periodes,
     ids: periodes.map((p) => p.id),

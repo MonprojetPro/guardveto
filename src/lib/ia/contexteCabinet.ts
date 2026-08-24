@@ -19,6 +19,7 @@ import type { VetoResolu } from './regleSchema'
 import type { TypeCreneauIA } from './proposerRegle'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { chargerCreneauModele } from '@/data/chargerCreneauModele'
+import { lignesLues } from './outils/lecture'
 
 export interface ContexteIA {
   vets: VetoResolu[]
@@ -40,13 +41,19 @@ const CRENEAUX_REPLI: TypeCreneauIA[] = [
 export async function chargerContexteIA(
   supabase: SupabaseClient,
 ): Promise<ContexteIA> {
-  const { data: vetsDb } = await supabase
-    .from('veterinaires')
-    .select('id, prenom, tags')
-    .eq('actif', true)
-    .order('prenom')
-
-  const vetsRows = (vetsDb as Array<VetoResolu & { tags?: string[] | null }> | null) ?? []
+  // ⚠️ Le catalogue de créneaux plus bas est BEST-EFFORT et retombe sur des
+  // replis — l'équipe, elle, ne peut pas l'être : un contexte sans le moindre
+  // vétérinaire part dans le prompt et le modèle propose alors une règle qui ne
+  // vise personne, ou invente un prénom. Une équipe vide n'existe pas ; c'est
+  // toujours une panne, et elle doit se voir.
+  const vetsRows = lignesLues<VetoResolu & { tags?: string[] | null }>(
+    await supabase
+      .from('veterinaires')
+      .select('id, prenom, tags')
+      .eq('actif', true)
+      .order('prenom'),
+    "la liste de l'équipe",
+  )
   const vets: VetoResolu[] = vetsRows.map(({ id, prenom }) => ({ id, prenom }))
 
   const tagsEquipe = [

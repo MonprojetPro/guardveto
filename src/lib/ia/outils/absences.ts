@@ -50,6 +50,7 @@ import {
   type ContexteCrisePeriode,
 } from '@/lib/crise/contexte'
 import type { RoleGarde } from '@/engine/types'
+import { lignesLues } from './lecture'
 import type { MotifAbsence, StatutAbsence, StatutCompensation } from '@/types'
 import { SANS_PARAMETRE, type ContexteOutil, type OutilEcriture, type OutilLecture } from './types'
 
@@ -64,8 +65,10 @@ interface FicheVetoLegere {
 }
 
 async function chargerEquipeLegere(ctx: ContexteOutil): Promise<FicheVetoLegere[]> {
-  const { data } = await ctx.supabase.from('veterinaires').select('id, prenom, nom').order('prenom')
-  return (data as FicheVetoLegere[] | null) ?? []
+  return lignesLues<FicheVetoLegere>(
+    await ctx.supabase.from('veterinaires').select('id, prenom, nom').order('prenom'),
+    "la liste de l'équipe",
+  )
 }
 
 const DIACRITIQUES = /[̀-ͯ]/g
@@ -116,14 +119,17 @@ async function trouverAbsenceActive(
   ctx: ContexteOutil,
   vetoId: string,
 ): Promise<{ id: string; date_debut: string; date_fin: string } | null> {
-  const { data } = await ctx.supabase
-    .from('absences')
-    .select('id, date_debut, date_fin')
-    .eq('veterinaire_id', vetoId)
-    .eq('statut', 'active')
-    .order('date_debut', { ascending: false })
-    .limit(1)
-  return (data?.[0] as { id: string; date_debut: string; date_fin: string } | undefined) ?? null
+  const lignes = lignesLues<{ id: string; date_debut: string; date_fin: string }>(
+    await ctx.supabase
+      .from('absences')
+      .select('id, date_debut, date_fin')
+      .eq('veterinaire_id', vetoId)
+      .eq('statut', 'active')
+      .order('date_debut', { ascending: false })
+      .limit(1),
+    "l'absence en cours de cette personne",
+  )
+  return lignes[0] ?? null
 }
 
 /** Le contexte moteur d'une période, avec cache : plusieurs créneaux d'une
@@ -183,8 +189,7 @@ LE MOTIF DES AUTRES N'EST PAS VISIBLE si tu parles à un vétérinaire : il vaut
 
     if (params.statut) requete = requete.eq('statut', params.statut)
 
-    const { data } = await requete
-    let lignes = ((data ?? []) as unknown as AbsenceRow[])
+    let lignes = lignesLues<AbsenceRow>(await requete, 'les absences du cabinet')
 
     if (params.prenom) {
       const equipe = await chargerEquipeLegere(ctx)
@@ -258,8 +263,7 @@ Appelle-le pour « qui a dépanné qui récemment », « est-ce que la garde que
 
     if (params.statut) requete = requete.eq('statut', params.statut)
 
-    const { data } = await requete
-    return ((data ?? []) as unknown as CompensationRow[]).map((c) => ({
+    return lignesLues<CompensationRow>(await requete, 'les dépannages du cabinet').map((c) => ({
       remplacant: c.remplacant ? `${c.remplacant.prenom} ${c.remplacant.nom}` : 'inconnu',
       remplace: c.remplace ? `${c.remplace.prenom} ${c.remplace.nom}` : 'inconnu',
       date_garde: c.garde?.date ?? null,
@@ -821,11 +825,18 @@ Chaque remplacement est revérifié LÉGAL (mêmes règles que la génération d
     // Tout est revalidé ici, à froid — jamais confiance en la légalité déjà
     // vue au résumé : le planning a pu changer entre les deux (autre décision
     // appliquée, garde reprise par ailleurs).
-    const { data: absenceRow } = await ctx.supabase
+    const { data: absenceRow, error: absErr } = await ctx.supabase
       .from('absences')
       .select('id, date_debut, date_fin, statut')
       .eq('id', c.absenceId)
       .single()
+    // On distingue « elle n'existe plus » (la base a répondu) de « la base n'a
+    // pas répondu » : la première phrase est un fait, la seconde une panne, et
+    // les confondre enverrait l'admin chercher une absence supprimée par
+    // quelqu'un d'autre.
+    if (absErr && absErr.code !== 'PGRST116') {
+      return { error: `Je n'ai pas pu relire cette absence : la base de données n'a pas répondu (${absErr.message}). Rien n'a été modifié — réessaie dans un instant.` }
+    }
     if (!absenceRow) return { error: "Cette absence n'existe plus." }
     if (absenceRow.statut === 'annulee') return { error: 'Cette absence est annulée.' }
 
@@ -889,12 +900,15 @@ Chaque remplacement est revérifié LÉGAL (mêmes règles que la génération d
         return { error: `Le remplacement du ${imp.date} n'est plus légal (le planning a changé entre-temps).` }
       }
 
-      const { data: gardeActuelle } = await ctx.supabase
+      const { data: gardeActuelle, error: gardeErr } = await ctx.supabase
         .from('gardes')
         .select('id, premier_id, second_id')
         .eq('id', dec.gardeId)
         .eq('cabinet_id', ctx.cabinetId)
         .single()
+      if (gardeErr && gardeErr.code !== 'PGRST116') {
+        return { error: `Je n'ai pas pu relire la garde du ${imp.date} : la base de données n'a pas répondu (${gardeErr.message}). Réessaie dans un instant.` }
+      }
       if (!gardeActuelle) return { error: `Garde ${dec.gardeId} introuvable.` }
 
       const premier_id = dec.role === 'premier' ? dec.remplacant_id : gardeActuelle.premier_id
@@ -947,12 +961,28 @@ Chaque remplacement est revérifié LÉGAL (mêmes règles que la génération d
     }
 
     // L'absence est-elle entièrement réparée ? Même calcul que la route.
-    const { data: compsExistantes } = await ctx.supabase
+    // ⚠️ CE BLOC EST LE PLUS TRAÎTRE DU FICHIER : les gardes sont déjà écrites,
+    // et ce qui suit décide seulement si l'absence bascule en « résolue ».
+    //
+    // Avant, les deux échecs possibles étaient muets, et le symptôme était le
+    // même par les deux chemins : Filou annonçait « c'est réglé » sur une
+    // absence restée ACTIVE. Une lecture ratée rendait `couverts` vide, donc
+    // `tousCouverts` faux, donc pas de bascule ; et l'update lui-même ne
+    // regardait pas son erreur.
+    //
+    // On ne lève pas : les remplacements, eux, ont bien eu lieu. On le DIT, ce
+    // qui laisse à l'admin de quoi comprendre pourquoi l'absence reste ouverte.
+    const { data: compsExistantes, error: compsErr } = await ctx.supabase
       .from('compensations')
       .select('garde_id, role')
       .eq('absence_id', c.absenceId)
       .eq('cabinet_id', ctx.cabinetId)
       .neq('statut', 'annulee')
+    if (compsErr) {
+      return {
+        error: `Les remplacements ont bien été enregistrés, mais je n'ai pas pu vérifier si l'absence est entièrement couverte (${compsErr.message}) : elle reste marquée « active ». Rouvre-la pour la clore à la main.`,
+      }
+    }
 
     const couverts = new Set(
       ((compsExistantes ?? []) as { garde_id: string; role: string | null }[]).map(
@@ -961,7 +991,16 @@ Chaque remplacement est revérifié LÉGAL (mêmes règles que la génération d
     )
     const tousCouverts = impactes.every((i) => couverts.has(`${i.gardeId}|${i.role}`))
     if (tousCouverts && impactes.length > 0) {
-      await ctx.supabase.from('absences').update({ statut: 'resolue' }).eq('id', c.absenceId).eq('cabinet_id', ctx.cabinetId)
+      const { error: cloreErr } = await ctx.supabase
+        .from('absences')
+        .update({ statut: 'resolue' })
+        .eq('id', c.absenceId)
+        .eq('cabinet_id', ctx.cabinetId)
+      if (cloreErr) {
+        return {
+          error: `Les remplacements ont bien été enregistrés, mais l'absence n'a pas pu être marquée comme résolue (${cloreErr.message}) : elle reste « active ». Referme-la depuis la fiche de l'absence.`,
+        }
+      }
     }
 
     return {}
@@ -987,7 +1026,7 @@ Appelle-le quand l'admin règle un dépannage : « la garde que Camille a couver
   adminSeulement: true,
 
   async resumer(params, ctx) {
-    const { data } = await ctx.supabase.from('compensations').select(
+    const reponseComps = await ctx.supabase.from('compensations').select(
       `id, role, statut,
        garde:gardes ( date, type ),
        remplacant:veterinaires!compensations_remplacant_id_fkey ( prenom, nom ),
@@ -1003,7 +1042,10 @@ Appelle-le quand l'admin règle un dépannage : « la garde que Camille a couver
       remplace: { prenom: string } | null
     }
 
-    const candidates = ((data ?? []) as unknown as Ligne[]).filter(
+    // Sans cette lecture contrôlée, une panne donnait zéro candidat et donc la
+    // phrase « Aucun dépannage de X trouvé pour la garde du … » — un fait,
+    // affirmé sur une base qui n'avait rien dit.
+    const candidates = lignesLues<Ligne>(reponseComps, 'les dépannages du cabinet').filter(
       (l) =>
         l.garde?.date === params.date &&
         l.remplacant &&

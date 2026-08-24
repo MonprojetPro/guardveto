@@ -22,6 +22,7 @@ import { revalidatePath } from 'next/cache'
 import { faireTravaillerFilou, type EchangeFilou, type MesureFilou } from '@/lib/ia/agentFilou'
 import { assistantIaDisponible } from '@/lib/ia/proposerRegle'
 import { outilsPour, trouverOutil } from '@/lib/ia/outils/registre'
+import { sourcesLisibles, sansAucuneLecture } from '@/lib/ia/outils/sources'
 import type { ContexteOutil, PropositionAction } from '@/lib/ia/outils/types'
 
 /** Ce que la tablette reçoit. Une seule forme, toujours : la réponse va sur le
@@ -45,6 +46,13 @@ export type ReponseFilou =
       }
       /** Ce que l'attente a été occupée à faire. Admin seulement (cf. plus bas). */
       mesure?: MesureFilou
+      /** Sur quoi la réponse s'appuie, déjà en français et prêt à afficher.
+       *  Rendu à TOUT LE MONDE, contrairement au chronomètre : savoir d'où
+       *  vient une affirmation n'est pas un réglage d'administrateur, c'est ce
+       *  qui permet de décider si on s'y fie. */
+      sources: string[]
+      /** Vrai quand AUCUNE lecture n'a fondé la réponse. Le cas qui compte. */
+      sansLecture: boolean
     }
 
 async function contexte(): Promise<{ error: string } | { ctx: ContexteOutil }> {
@@ -156,6 +164,11 @@ export async function parlerAFilou(
     // réglage, pas une information de cabinet. Un vétérinaire n'a rien à faire
     // du nombre d'allers-retours ni du nom du modèle.
     mesure: c.ctx.estAdmin ? issue.mesure : undefined,
+    // `outilsAppeles` était constitué à chaque tour puis jamais utilisé, et pas
+    // même transmis ici. Traduit en français, il devient la seule chose qui dise
+    // à la personne si Filou a regardé son cabinet ou s'il a parlé tout seul.
+    sources: sourcesLisibles(issue.outilsAppeles),
+    sansLecture: sansAucuneLecture(issue.outilsAppeles),
   }
 }
 
@@ -176,7 +189,16 @@ export async function appliquerActionFilou(
   const valides = outil.params.safeParse(params ?? {})
   if (!valides.success) return { error: 'Paramètres invalides.' }
 
-  const r = await outil.executer(valides.data, c.ctx, charge)
+  // Une lecture en panne LÈVE désormais (cf. `lib/ia/outils/lecture.ts`). Dans
+  // la boucle de Filou, la boucle la rattrape ; ici, personne ne le faisait —
+  // une panne serait ressortie en erreur générique de l'hébergeur, à côté d'un
+  // bouton qu'on vient de cliquer, sans dire si quelque chose a été écrit.
+  let r: Awaited<ReturnType<typeof outil.executer>>
+  try {
+    r = await outil.executer(valides.data, c.ctx, charge)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Cette action n'a pas pu aboutir." }
+  }
   if (r.error) return { error: r.error }
 
   // Les écrans lisent la base : sans ça, le tableau et la barre garderaient

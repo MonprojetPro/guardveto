@@ -26,6 +26,7 @@ import {
   effectifNuitSemaine as effectifNuitSemaineLocal,
 } from '@/lib/planning/placesAttendues'
 import type { PeriodeEffectif, ProfilEffectif } from '@/lib/planning/placesAttendues'
+import { lignesLues } from './outils/lecture'
 
 export interface Controle {
   /** Ce qui est vérifié, en français. */
@@ -53,7 +54,12 @@ export async function controlerCoherence(
 ): Promise<RapportCoherence> {
   const depart = Date.now()
 
-  const [{ data: gardesDb }, { data: creneauxDb }, { data: periodesDb }, { data: profilsDb }] =
+  // ⚠️ Même exigence que la borne `cabinet_id` juste en dessous, et pour la même
+  // raison : « un diagnostic faux est pire qu'une absence de diagnostic, parce
+  // qu'on le croit ». Une lecture en panne lue comme un vide ferait annoncer
+  // « aucune incohérence » sur un cabinet qu'on n'a pas regardé. On lève —
+  // l'action serveur du banc rattrape et affiche la panne telle quelle.
+  const [repGardes, repCreneaux, repPeriodes, repProfils] =
     await Promise.all([
       supabase
         .from('planning_semaine')
@@ -79,24 +85,27 @@ export async function controlerCoherence(
         .eq('cabinet_id', cabinetId),
     ])
 
-  const gardes = (gardesDb as Array<{
+  const gardes = lignesLues<{
     date: string
     type: string
     premier_prenom: string | null
     second_prenom: string | null
     periode_statut: string
-  }> | null) ?? []
+  }>(repGardes, 'le planning du cabinet')
 
-  const creneaux = (creneauxDb as Array<{
+  const creneaux = lignesLues<{
     code: string | null
     nom: string
     nb_places: number | null
     actif: boolean
     profil_id: string | null
-  }> | null) ?? []
+  }>(repCreneaux, 'les types de garde du cabinet')
 
-  const periodes = (periodesDb as Array<PeriodeEffectif & { libelle: string | null; statut: string }> | null) ?? []
-  const profils = (profilsDb as Array<ProfilEffectif & { nom: string }> | null) ?? []
+  const periodes = lignesLues<PeriodeEffectif & { libelle: string | null; statut: string }>(
+    repPeriodes,
+    'la liste des plannings du cabinet',
+  )
+  const profils = lignesLues<ProfilEffectif & { nom: string }>(repProfils, 'les périodes types du cabinet')
   const profilParId = new Map(profils.map((p) => [p.id, p]))
 
   // Le catalogue, avec la même règle de désaccord que l'outil : deux profils qui

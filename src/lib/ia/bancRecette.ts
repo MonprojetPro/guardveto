@@ -37,6 +37,7 @@
 
 import { faireTravaillerFilou } from './agentFilou'
 import { outilsPour } from './outils/registre'
+import { lignesLues } from './outils/lecture'
 import type { ContexteOutil } from './outils/types'
 
 /** Ce qu'un cas exige de la réponse. Tout est vérifiable mécaniquement. */
@@ -119,7 +120,11 @@ async function releverLesFaits(ctx: ContexteOutil): Promise<Faits> {
   const faits: Faits = {}
   const aujourdhui = new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris' }).format(new Date())
 
-  const [{ data: vetsDb }, { data: gardesDb }, { data: creneauxDb }, { data: periodesDb }] = await Promise.all([
+  // ⚠️ Ces chiffres SERVENT DE JUGE aux réponses de Filou. Une lecture en panne
+  // lue comme un vide rendrait le banc muet sur tout — et un banc qui ne trouve
+  // rien se lit comme un banc qui valide. On lève ; l'action serveur du banc
+  // rattrape et affiche la panne telle quelle.
+  const [repVets, repGardes, repCreneaux, repPeriodes] = await Promise.all([
     ctx.supabase
       .from('veterinaires')
       .select('prenom, actif, dernier_recours')
@@ -145,7 +150,7 @@ async function releverLesFaits(ctx: ContexteOutil): Promise<Faits> {
       .limit(30),
   ])
 
-  const vets = (vetsDb as Array<{ prenom: string; dernier_recours: boolean }> | null) ?? []
+  const vets = lignesLues<{ prenom: string; dernier_recours: boolean }>(repVets, "la liste de l'équipe")
   faits.unVeto = vets[0]?.prenom
   faits.dernierRecours = vets.find((v) => v.dernier_recours)?.prenom
 
@@ -153,7 +158,10 @@ async function releverLesFaits(ctx: ContexteOutil): Promise<Faits> {
   // avec des nombres différents est ignoré : on ne sait pas lequel s'applique,
   // et un cas de test ambigu ne prouve rien.
   const places = new Map<string, number | null>()
-  for (const c of (creneauxDb as Array<{ code: string | null; nb_places: number | null }> | null) ?? []) {
+  for (const c of lignesLues<{ code: string | null; nb_places: number | null }>(
+    repCreneaux,
+    'les types de garde du cabinet',
+  )) {
     if (!c.code) continue
     const n = typeof c.nb_places === 'number' ? c.nb_places : null
     if (!places.has(c.code)) places.set(c.code, n)
@@ -167,12 +175,12 @@ async function releverLesFaits(ctx: ContexteOutil): Promise<Faits> {
   // testé ne verrait jamais une erreur DANS ces fonctions — or c'est exactement
   // le trou du 29 juillet : deux vocabulaires qui ne se parlaient pas. Le prix à
   // payer est de tenir ces lignes à jour ; le bénéfice est un juge indépendant.
-  const periodes = (periodesDb as Array<{
+  const periodes = lignesLues<{
     date_debut: string
     date_fin: string
     saison: 'ete' | 'hiver'
     nb_vetos_semaine_soir: number | null
-  }> | null) ?? []
+  }>(repPeriodes, 'la liste des plannings du cabinet')
 
   const attenduPour = (date: string, type: string): number | null => {
     if (type === 'semaine' || type === 'semaine_soir') {
@@ -186,12 +194,12 @@ async function releverLesFaits(ctx: ContexteOutil): Promise<Faits> {
     return null
   }
 
-  for (const g of (gardesDb as Array<{
+  for (const g of lignesLues<{
     date: string
     type: string
     premier_prenom: string | null
     second_prenom: string | null
-  }> | null) ?? []) {
+  }>(repGardes, 'le planning du cabinet')) {
     const attendues = attenduPour(g.date, g.type)
     if (typeof attendues !== 'number') continue
     const prenoms = [g.premier_prenom, g.second_prenom].filter((p): p is string => Boolean(p))

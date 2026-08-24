@@ -44,6 +44,7 @@ import {
 import { adresseBienFormee } from '@/lib/emails/destinataire'
 import type { CreerProfilCompletPayload } from '@/lib/ia/profilSchema'
 import type { CreerRelationIaPayload } from '@/lib/ia/relationSchema'
+import { lignesLues, ligneLue } from './lecture'
 import { SANS_PARAMETRE, type ContexteOutil, type OutilEcriture, type OutilLecture, type PropositionAction } from './types'
 
 // ── Chargement des données de structure (partagé lecture + résolution) ──────
@@ -81,11 +82,13 @@ interface RelationRow {
 }
 
 async function chargerProfils(ctx: ContexteOutil): Promise<ProfilRow[]> {
-  const { data } = await ctx.supabase
-    .from('profils_planning')
-    .select('id, nom, actif, est_defaut, saison_suggeree, nb_vetos_semaine_soir')
-    .order('ordre')
-  return (data as ProfilRow[] | null) ?? []
+  return lignesLues<ProfilRow>(
+    await ctx.supabase
+      .from('profils_planning')
+      .select('id, nom, actif, est_defaut, saison_suggeree, nb_vetos_semaine_soir')
+      .order('ordre'),
+    'les périodes types du cabinet',
+  )
 }
 
 /**
@@ -100,29 +103,37 @@ async function chargerProfils(ctx: ContexteOutil): Promise<ProfilRow[]> {
  * parfaitement configuré.
  */
 async function chargerCreneaux(ctx: ContexteOutil): Promise<CreneauRow[]> {
-  const { data } = await ctx.supabase
-    .from('creneau_modele')
-    .select('id, profil_id, code, nom, jours_semaine, heure_debut, heure_fin, offset_jours_fin, nb_places, roles, actif')
-    .is('profil_id', null)
-    .order('ordre')
-  return (data as CreneauRow[] | null) ?? []
+  // Même symptôme que le piège documenté juste au-dessus, par un autre chemin :
+  // une lecture en panne faisait dire « aucun type de garde dans cette période
+  // type » sur un cabinet parfaitement configuré.
+  return lignesLues<CreneauRow>(
+    await ctx.supabase
+      .from('creneau_modele')
+      .select('id, profil_id, code, nom, jours_semaine, heure_debut, heure_fin, offset_jours_fin, nb_places, roles, actif')
+      .is('profil_id', null)
+      .order('ordre'),
+    'les types de garde du cabinet',
+  )
 }
 
 async function chargerRelations(ctx: ContexteOutil): Promise<RelationRow[]> {
-  const { data } = await ctx.supabase
-    .from('relation_creneau')
-    .select('id, profil_id, source_id, cible_id, genre, actif')
-    .is('profil_id', null)
-  return (data as RelationRow[] | null) ?? []
+  return lignesLues<RelationRow>(
+    await ctx.supabase
+      .from('relation_creneau')
+      .select('id, profil_id, source_id, cible_id, genre, actif')
+      .is('profil_id', null),
+    'les liens entre types de garde',
+  )
 }
 
 /** Ce que chaque période type retient : `profil_id|creneau_id` → nb de vétos. */
 async function chargerAffinages(ctx: ContexteOutil): Promise<Map<string, number>> {
-  const { data } = await ctx.supabase
-    .from('periode_type_creneau')
-    .select('profil_id, creneau_id, nb_vetos')
+  const lignes = lignesLues<{ profil_id: string; creneau_id: string; nb_vetos: number }>(
+    await ctx.supabase.from('periode_type_creneau').select('profil_id, creneau_id, nb_vetos'),
+    'les réglages des périodes types',
+  )
   const m = new Map<string, number>()
-  for (const r of (data ?? []) as { profil_id: string; creneau_id: string; nb_vetos: number }[]) {
+  for (const r of lignes) {
     m.set(`${r.profil_id}|${r.creneau_id}`, r.nb_vetos)
   }
   return m
@@ -375,15 +386,7 @@ export const lireReglagesCabinet: OutilLecture<typeof SANS_PARAMETRE> = {
 Appelle-le pour toute question sur ces branchements — « quelle est notre zone scolaire ? », « quel agenda est partagé ? », « qui envoie les e-mails ? ».`,
   params: SANS_PARAMETRE,
   async executer(_params, ctx) {
-    const { data } = await ctx.supabase
-      .from('cabinets')
-      .select(
-        'adresse, code_postal, ville, zone_scolaire, region_feries, google_calendar_id, brevo_from_email, brevo_from_name',
-      )
-      .eq('id', ctx.cabinetId)
-      .maybeSingle()
-
-    const c = data as {
+    const c = ligneLue<{
       adresse: string | null
       code_postal: string | null
       ville: string | null
@@ -392,7 +395,16 @@ Appelle-le pour toute question sur ces branchements — « quelle est notre zone
       google_calendar_id: string | null
       brevo_from_email: string | null
       brevo_from_name: string | null
-    } | null
+    }>(
+      await ctx.supabase
+        .from('cabinets')
+        .select(
+          'adresse, code_postal, ville, zone_scolaire, region_feries, google_calendar_id, brevo_from_email, brevo_from_name',
+        )
+        .eq('id', ctx.cabinetId)
+        .maybeSingle(),
+      'les réglages du cabinet',
+    )
 
     if (!c) return { erreur: 'Réglages du cabinet introuvables.' }
 
@@ -1168,12 +1180,17 @@ Appelle-le quand la demande donne ou change l'adresse du cabinet — « le cabin
       return { ok: false, raison: "L'adresse et la ville sont obligatoires." }
     }
 
-    const { data } = await ctx.supabase
-      .from('cabinets')
-      .select('adresse, code_postal, ville')
-      .eq('id', ctx.cabinetId)
-      .maybeSingle()
-    const actuel = data as { adresse: string | null; code_postal: string | null; ville: string | null } | null
+    // L'adresse actuelle s'affiche dans la proposition : une panne qui la
+    // rendrait `null` ferait dire « aucune adresse enregistrée » à quelqu'un qui
+    // en a une, et il validerait un remplacement en croyant à une création.
+    const actuel = ligneLue<{ adresse: string | null; code_postal: string | null; ville: string | null }>(
+      await ctx.supabase
+        .from('cabinets')
+        .select('adresse, code_postal, ville')
+        .eq('id', ctx.cabinetId)
+        .maybeSingle(),
+      "l'adresse actuelle du cabinet",
+    )
 
     return {
       ok: true,
@@ -1226,14 +1243,21 @@ Appelle-le quand la demande change l'un de ces branchements — « change l'exp�
   adminSeulement: true,
 
   async resumer(params, ctx) {
-    const { data } = await ctx.supabase
-      .from('cabinets')
-      .select('google_calendar_id, brevo_from_email, brevo_from_name')
-      .eq('id', ctx.cabinetId)
-      .maybeSingle()
-    const actuel = data as
-      | { google_calendar_id: string | null; brevo_from_email: string | null; brevo_from_name: string | null }
-      | null
+    // Les trois valeurs actuelles servent de REPLI quand la demande n'en change
+    // qu'une. Une panne lue comme un vide les effacerait toutes les trois — un
+    // agenda dépublié et un expéditeur perdu, sans que personne l'ait demandé.
+    const actuel = ligneLue<{
+      google_calendar_id: string | null
+      brevo_from_email: string | null
+      brevo_from_name: string | null
+    }>(
+      await ctx.supabase
+        .from('cabinets')
+        .select('google_calendar_id, brevo_from_email, brevo_from_name')
+        .eq('id', ctx.cabinetId)
+        .maybeSingle(),
+      'les branchements actuels du cabinet',
+    )
 
     const agenda = params.agenda_google?.trim() ?? actuel?.google_calendar_id ?? ''
     const email = params.email_expediteur?.trim() ?? actuel?.brevo_from_email ?? ''

@@ -16,6 +16,7 @@
 import { z } from 'zod'
 import { updateVeterinaire } from '@/app/(protected)/admin/veterinaires/actions'
 import { etiquettesProches } from '@/lib/equipe/etiquettes'
+import { lignesLues } from './lecture'
 import { SANS_PARAMETRE, type ContexteOutil, type OutilEcriture, type OutilLecture } from './types'
 
 interface FicheVeto {
@@ -33,11 +34,16 @@ interface FicheVeto {
 }
 
 async function chargerEquipe(ctx: ContexteOutil): Promise<FicheVeto[]> {
-  const { data } = await ctx.supabase
-    .from('veterinaires')
-    .select('id, prenom, nom, email, statut, role_app, actif, dernier_recours, couleur, tags')
-    .order('prenom')
-  return (data as FicheVeto[] | null) ?? []
+  // Une équipe vide n'existe pas dans la vraie vie : c'est toujours une panne.
+  // Et c'est celle qui coûte le plus cher, parce que `resoudrePrenom` la
+  // transforme en « Aucun vétérinaire ne s'appelle "Camille" dans ce cabinet ».
+  return lignesLues<FicheVeto>(
+    await ctx.supabase
+      .from('veterinaires')
+      .select('id, prenom, nom, email, statut, role_app, actif, dernier_recours, couleur, tags')
+      .order('prenom'),
+    "la liste de l'équipe",
+  )
 }
 
 /** Les signes diacritiques, écrits en échappements : la classe de caractères

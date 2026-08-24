@@ -35,6 +35,7 @@ import {
   type ProposerEchangePayload,
 } from '@/app/(protected)/echanges/actions'
 import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
+import { lignesLues } from './lecture'
 import { SANS_PARAMETRE, type ContexteOutil, type OutilEcriture, type OutilLecture } from './types'
 import { perimetrePeriodes } from './perimetre'
 
@@ -123,9 +124,10 @@ function versVM(e: EchangeBrut): EchangeVM | null {
 /** Charge tout ce que la RLS laisse voir à cette personne (demandeur, cible,
  *  ou tout le cabinet si admin) — même requête que la page /echanges. */
 async function chargerEchanges(ctx: ContexteOutil): Promise<EchangeVM[]> {
-  const { data } = await ctx.supabase
-    .from('echanges_gardes')
-    .select(`
+  const brut = lignesLues<EchangeBrut>(
+    await ctx.supabase
+      .from('echanges_gardes')
+      .select(`
       id, statut, message, motif_refus, role_demandeur, role_contrepartie,
       demandeur_id, cible_id,
       garde:garde_id(id, date, type, periode_id),
@@ -133,8 +135,10 @@ async function chargerEchanges(ctx: ContexteOutil): Promise<EchangeVM[]> {
       demandeur:demandeur_id(id, prenom, nom),
       cible:cible_id(id, prenom, nom)
     `)
-    .order('created_at', { ascending: false })
-    .limit(200)
+      .order('created_at', { ascending: false })
+      .limit(200),
+    'les échanges de gardes',
+  )
 
   // La RLS des échanges laisse passer toute proposition OUVERTE du cabinet
   // (`cible_id IS NULL`) : c'est voulu, un appel à volontaires s'adresse à
@@ -149,7 +153,7 @@ async function chargerEchanges(ctx: ContexteOutil): Promise<EchangeVM[]> {
   const perimetre = await perimetrePeriodes(ctx)
   const autorisees = new Set(perimetre.ids)
 
-  return ((data as EchangeBrut[] | null) ?? [])
+  return brut
     .filter((e) => {
       const garde = unRel(e.garde) as (GardeJoin & { periode_id?: string }) | null
       // Une garde sans période lisible : on écarte plutôt que de laisser
@@ -182,8 +186,10 @@ interface FicheVeto {
 }
 
 async function chargerVeterinaires(ctx: ContexteOutil): Promise<FicheVeto[]> {
-  const { data } = await ctx.supabase.from('veterinaires').select('id, prenom, nom, actif').order('prenom')
-  return (data as FicheVeto[] | null) ?? []
+  return lignesLues<FicheVeto>(
+    await ctx.supabase.from('veterinaires').select('id, prenom, nom, actif').order('prenom'),
+    "la liste de l'équipe",
+  )
 }
 
 /** Résout un prénom en fiche parmi TOUT le cabinet (actifs et inactifs — un
@@ -229,15 +235,15 @@ async function gardesDuVetoCeJour(ctx: ContexteOutil, vetId: string, date: strin
   const perimetre = await perimetrePeriodes(ctx)
   if (perimetre.vide) return []
 
-  const { data } = await ctx.supabase
-    .from('gardes')
-    .select('id, type, premier_id, second_id')
-    .in('periode_id', perimetre.ids)
-    .eq('date', date)
-    .or(`premier_id.eq.${vetId},second_id.eq.${vetId}`)
-  return ((data as { id: string; type: string; premier_id: string | null; second_id: string | null }[] | null) ?? []).map(
-    (g) => ({ id: g.id, type: g.type, role: (g.premier_id === vetId ? 'premier' : 'second') as Role }),
-  )
+  return lignesLues<{ id: string; type: string; premier_id: string | null; second_id: string | null }>(
+    await ctx.supabase
+      .from('gardes')
+      .select('id, type, premier_id, second_id')
+      .in('periode_id', perimetre.ids)
+      .eq('date', date)
+      .or(`premier_id.eq.${vetId},second_id.eq.${vetId}`),
+    'les gardes de cette journée',
+  ).map((g) => ({ id: g.id, type: g.type, role: (g.premier_id === vetId ? 'premier' : 'second') as Role }))
 }
 
 /** Choisit LA garde visée parmi les candidates du jour, en s'appuyant sur une

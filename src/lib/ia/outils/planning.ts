@@ -33,6 +33,7 @@ import { POST as publierPOST } from '@/app/api/publish/route'
 import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
 import { compterSouhaitsCongesEnAttente } from '@/data/souhaitsCongesEnAttente'
 import { placesAttendues, manqueSurGarde, codeCatalogue } from '@/lib/planning/placesAttendues'
+import { lignesLues } from './lecture'
 import type { ContexteOutil, OutilEcriture, OutilLecture } from './types'
 import { perimetrePeriodes, messagePerimetreVide } from './perimetre'
 
@@ -96,17 +97,18 @@ async function chargerPeriodes(ctx: ContexteOutil): Promise<PeriodeRow[]> {
     .order('date_debut', { ascending: false })
     .limit(30)
   if (!ctx.estAdmin) requete = requete.not('publie_at', 'is', null)
-  const { data } = await requete
-  return (data as PeriodeRow[] | null) ?? []
+  return lignesLues<PeriodeRow>(await requete, 'la liste des plannings du cabinet')
 }
 
 async function chargerProfils(ctx: ContexteOutil): Promise<ProfilRow[]> {
-  const { data } = await ctx.supabase
-    .from('profils_planning')
-    .select('id, nom, est_defaut, saison_suggeree, nb_vetos_semaine_soir')
-    .eq('actif', true)
-    .order('ordre')
-  return (data as ProfilRow[] | null) ?? []
+  return lignesLues<ProfilRow>(
+    await ctx.supabase
+      .from('profils_planning')
+      .select('id, nom, est_defaut, saison_suggeree, nb_vetos_semaine_soir')
+      .eq('actif', true)
+      .order('ordre'),
+    'les périodes types du cabinet',
+  )
 }
 
 /** Résout un texte libre (« Hiver P2 », « Été 2027 »…) en période. Match
@@ -186,7 +188,7 @@ REMPLACEMENT EXCEPTIONNEL : si un jour porte « remplacement_exceptionnel », c'
       return { jours: [], note: messagePerimetreVide(ctx) }
     }
 
-    const [{ data: gardesDb }, { data: typesDb }, periodes, profils] = await Promise.all([
+    const [repGardes, repTypes, periodes, profils] = await Promise.all([
       ctx.supabase
         .from('planning_semaine')
         // `jour_exceptionnel` : ce jour-là porte un remplacement qui ne vaut
@@ -212,6 +214,14 @@ REMPLACEMENT EXCEPTIONNEL : si un jour porte « remplacement_exceptionnel », c'
       chargerPeriodes(ctx),
       chargerProfils(ctx),
     ])
+    // ⚠️ Sans ces deux lignes, une lecture en panne rendait `rows = []`, et la
+    // note plus bas affirmait « Aucune garde trouvée sur cette période » à
+    // quelqu'un dont le planning est publié depuis un mois.
+    const gardesDb = lignesLues<unknown>(repGardes, 'le planning de ces journées')
+    const typesDb = lignesLues<{ code: string; nom: string; nb_places: number | null }>(
+      repTypes,
+      'le catalogue des types de garde',
+    )
 
     // ⚠️ DEUX VOCABULAIRES DE CRÉNEAUX, et ils ne se parlent pas.
     // Le planning stocke 'semaine' / 'weekend' / 'ferie' ; le catalogue déclare
@@ -224,7 +234,7 @@ REMPLACEMENT EXCEPTIONNEL : si un jour porte « remplacement_exceptionnel », c'
     // moteur et par les absences. Une copie locale de cette règle serait la
     // troisième version du même vocabulaire — et divergerait un jour.
     const infosTypes = new Map<string, { nom: string; places: number | null }>()
-    for (const t of (typesDb as Array<{ code: string; nom: string; nb_places: number | null }> | null) ?? []) {
+    for (const t of typesDb) {
       const places = typeof t.nb_places === 'number' ? t.nb_places : null
       const connu = infosTypes.get(t.code)
       if (!connu) infosTypes.set(t.code, { nom: t.nom, places })
@@ -251,7 +261,7 @@ REMPLACEMENT EXCEPTIONNEL : si un jour porte « remplacement_exceptionnel », c'
       periode_statut: 'brouillon' | 'publie' | 'verrouille'
       jour_exceptionnel: boolean | null
     }
-    const rows = (gardesDb as Row[] | null) ?? []
+    const rows = gardesDb as Row[]
 
     if (rows.length === 0) {
       return { jours: [], note: 'Aucune garde trouvée sur cette période — elle est peut-être hors de toute période créée, ou pas encore générée.' }

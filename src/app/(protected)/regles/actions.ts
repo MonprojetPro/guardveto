@@ -1462,7 +1462,16 @@ export async function proposerRegleDepuisTexte(phrase: string): Promise<Proposit
   // sont chargés par une source PARTAGÉE : le banc d'essai des modèles doit
   // mesurer avec exactement le même contexte, sinon ses chiffres ne disent rien
   // de la facture réelle.
-  const { vets, tagsEquipe, typesCreneaux, rolesCabinet } = await chargerContexteIA(supabase)
+  //
+  // Une lecture en panne remonte ici plutôt que de partir en contexte vide :
+  // proposer une règle sans connaître l'équipe, c'est la proposer sur du vent.
+  let contexteIA: Awaited<ReturnType<typeof chargerContexteIA>>
+  try {
+    contexteIA = await chargerContexteIA(supabase)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Contexte du cabinet illisible.' }
+  }
+  const { vets, tagsEquipe, typesCreneaux, rolesCabinet } = contexteIA
 
   let proposition: PropositionRegle
   try {

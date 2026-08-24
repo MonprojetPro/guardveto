@@ -30,6 +30,7 @@ import {
   validerConge as validerCongeAction,
 } from '@/app/(protected)/conges/actions'
 import { detecterConflitPlanningPublie } from '@/lib/conges/detection-conflit'
+import { lignesLues } from './lecture'
 import { SANS_PARAMETRE, type ContexteOutil, type OutilEcriture, type OutilLecture } from './types'
 
 // ── Vocabulaire commun : les mêmes mots que l'écran Congés ─────
@@ -82,20 +83,24 @@ interface CongeDb {
 }
 
 async function chargerEquipeLegere(ctx: ContexteOutil): Promise<FicheVetoLegere[]> {
-  const { data } = await ctx.supabase.from('veterinaires').select('id, prenom, nom').order('prenom')
-  return (data as FicheVetoLegere[] | null) ?? []
+  return lignesLues<FicheVetoLegere>(
+    await ctx.supabase.from('veterinaires').select('id, prenom, nom').order('prenom'),
+    "la liste de l'équipe",
+  )
 }
 
 async function chargerConges(ctx: ContexteOutil): Promise<CongeDb[]> {
   // RLS fait déjà le premier tri : un non-admin ne reçoit ici que ses propres
   // lignes, quels que soient les filtres appliqués ensuite dans ce fichier.
-  const { data } = await ctx.supabase
-    .from('conges')
-    .select(
-      'id, veterinaire_id, date_debut, date_fin, type, creneau, statut, commentaire, raison_refus, created_at',
-    )
-    .order('date_debut')
-  return (data as CongeDb[] | null) ?? []
+  return lignesLues<CongeDb>(
+    await ctx.supabase
+      .from('conges')
+      .select(
+        'id, veterinaire_id, date_debut, date_fin, type, creneau, statut, commentaire, raison_refus, created_at',
+      )
+      .order('date_debut'),
+    'les congés du cabinet',
+  )
 }
 
 const DIACRITIQUES = /[̀-ͯ]/g

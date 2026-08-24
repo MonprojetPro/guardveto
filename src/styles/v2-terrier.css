@@ -774,6 +774,44 @@
   font-size: 0.68rem; color: var(--soft);
   font-variant-numeric: tabular-nums;
 }
+/* D'où vient la réponse. Sobre par défaut : une ligne, sous le contenu, dans
+   le gris des mentions — on la trouve quand on la cherche, elle ne concurrence
+   pas la réponse. Aucune information ne se cache derrière un survol : sur
+   tablette, un survol n'existe pas. */
+.res-sources {
+  margin-top: 14px;
+  font-size: 0.72rem; line-height: 1.5;
+  color: var(--soft);
+}
+.res-sources summary {
+  cursor: pointer;
+  list-style: none;
+}
+.res-sources summary::-webkit-details-marker { display: none; }
+.res-sources summary::before {
+  content: '▸ ';
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+.res-sources[open] summary::before { content: '▾ '; }
+.res-sources ul {
+  list-style: none;
+  margin: 6px 0 0;
+  padding-left: 11px;
+  border-left: 2px solid var(--t-border);
+  display: flex; flex-direction: column; gap: 3px;
+}
+/* Rien n'a été consulté : ce n'est plus une mention, c'est un avertissement.
+   Il reste une ligne — on prévient, on ne fait pas la leçon. */
+.res-sources-vide {
+  padding: 8px 11px;
+  border-left: 3px solid var(--danger);
+  border-radius: 4px 9px 9px 4px;
+  background: var(--danger-soft);
+  color: var(--text);
+  font-weight: 600;
+}
+
 .res-explication { font-size: 0.88rem; line-height: 1.55; margin-bottom: 12px; }
 
 /* ------ Les quatre natures d'une réponse ------

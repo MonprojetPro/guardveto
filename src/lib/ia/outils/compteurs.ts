@@ -40,6 +40,7 @@ import {
 } from '@/engine/equity-weights'
 import { extraireEquityRules, type RegleCabinetRow } from '@/data/mapReglesCabinet'
 import { periodeLabelCourt, periodeLabelBase } from '@/lib/periodes'
+import { lignesLues } from './lecture'
 import { SANS_PARAMETRE, type ContexteOutil, type OutilEcriture, type OutilLecture } from './types'
 import type { Periode, StatutPeriode } from '@/types'
 
@@ -63,8 +64,10 @@ interface VetoMini {
 }
 
 async function chargerVets(ctx: ContexteOutil): Promise<VetoMini[]> {
-  const { data } = await ctx.supabase.from('veterinaires').select('id, prenom, nom')
-  return (data as VetoMini[] | null) ?? []
+  return lignesLues<VetoMini>(
+    await ctx.supabase.from('veterinaires').select('id, prenom, nom'),
+    "la liste de l'équipe",
+  )
 }
 
 /** Résout un prénom en véto. Refuse l'à-peu-près, comme `equipe.ts`. */
@@ -108,8 +111,7 @@ async function resoudrePeriode(
     .order('date_debut', { ascending: false })
     .limit(50)
   if (!ctx.estAdmin) requete = requete.not('publie_at', 'is', null)
-  const { data } = await requete
-  const periodes = (data as Periode[] | null) ?? []
+  const periodes = lignesLues<Periode>(await requete, 'la liste des plannings du cabinet')
   if (periodes.length === 0) {
     // Formulation neutre côté vétérinaire : dire « il existe un brouillon mais
     // tu n'y as pas accès » trahirait déjà l'existence et l'état d'un planning
@@ -193,11 +195,13 @@ const LIBELLE_STATUT: Record<StatutPeriode, string> = {
 }
 
 async function chargerReglesEquite(ctx: ContexteOutil): Promise<RegleCabinetRow[]> {
-  const { data } = await ctx.supabase
-    .from('regles_cabinet')
-    .select('id, cabinet_id, periode_id, brique_id, params_json, force, actif')
-    .eq('brique_id', 'equilibrer')
-  return (data as RegleCabinetRow[] | null) ?? []
+  return lignesLues<RegleCabinetRow>(
+    await ctx.supabase
+      .from('regles_cabinet')
+      .select('id, cabinet_id, periode_id, brique_id, params_json, force, actif')
+      .eq('brique_id', 'equilibrer'),
+    "les réglages d'équité du cabinet",
+  )
 }
 
 // ── Lecture : compteurs de gardes + écarts d'équité ──────────
@@ -470,10 +474,10 @@ Appelle-le pour situer une période dans le temps, savoir combien il y en a eu, 
       .eq('cabinet_id', ctx.cabinetId)
     if (!ctx.estAdmin) requete = requete.not('publie_at', 'is', null)
 
-    const { data } = await requete
-      .order('date_debut', { ascending: false })
-      .limit(params.limite ?? 10)
-    const periodes = ((data as Periode[] | null) ?? [])
+    const periodes = lignesLues<Periode>(
+      await requete.order('date_debut', { ascending: false }).limit(params.limite ?? 10),
+      'la liste des plannings du cabinet',
+    )
     if (periodes.length === 0) {
       return {
         erreur: ctx.estAdmin
