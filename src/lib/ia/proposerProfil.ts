@@ -4,8 +4,8 @@
 // SERVER-ONLY. Traduit une phrase FR → proposition de PROFIL de planning
 // structurée (sortie structurée Zod). Un seul appel. L'IA ne crée jamais rien :
 // elle PROPOSE, l'humain crée ensuite via creerProfilComplet (frontière de
-// confiance + RLS). Modèle : claude-opus-4-8, thinking adaptatif — mêmes réglages
-// que l'assistant de règles (proposerRegle.ts).
+// confiance + RLS). Modèle : celui de `modeleIA()` — mêmes réglages que
+// l'assistant de règles (proposerRegle.ts), thinking adaptatif.
 // ============================================================
 
 import Anthropic from '@anthropic-ai/sdk'
@@ -15,7 +15,7 @@ import {
   type PropositionProfil,
   type ProfilResolu,
 } from './profilSchema'
-import { cleIA } from './proposerRegle'
+import { cleIA, modeleIA } from './proposerRegle'
 
 /** Décrit ce qu'est une période type et le périmètre composable (anti-coquille-vide). */
 const STRUCTURE_PROMPT = `Une PÉRIODE TYPE est une façon de tourner, réutilisable (ex. « Hiver », « Été »), qu'on choisit à la création d'un planning.
@@ -71,7 +71,12 @@ Règles de comportement :
 - N'invente jamais un nom de profil source hors de la liste ci-dessus.`
 
   const response = await client.messages.parse({
-    model: 'claude-opus-4-8',
+    // Le modèle vient de `modeleIA()`, comme partout ailleurs. Il était câblé
+    // en dur ici : le réglage posé le 2026-07-26 ne pilotait donc que
+    // `proposerRegle`, et changer de palier laissait cet appel sur Opus sans
+    // que rien ne le signale. Un réglage qui ne couvre pas tous ses appels
+    // donne l'illusion d'avoir tranché.
+    model: modeleIA(),
     max_tokens: 4000,
     thinking: { type: 'adaptive' },
     system,

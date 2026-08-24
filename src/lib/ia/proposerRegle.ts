@@ -4,7 +4,7 @@
 // SERVER-ONLY. Traduit une phrase FR → proposition de règle structurée
 // (sortie structurée Zod). Un seul appel (Tier 1). L'IA ne calcule jamais de
 // planning et ne touche jamais la base : elle PROPOSE, l'humain crée ensuite
-// via upsertRegle. Modèle : claude-opus-4-8 (défaut maison), thinking adaptatif.
+// via upsertRegle. Modèle : claude-sonnet-5 par défaut, thinking adaptatif.
 // ============================================================
 
 import Anthropic from '@anthropic-ai/sdk'
@@ -40,17 +40,28 @@ export function cleIA(): string | undefined {
  * règle structurée — que les petits modèles font peut-être aussi bien. Sans ce
  * réglage, en mesurer un demandait un déploiement.
  *
- * Défaut inchangé : le comportement recetté ne bouge pas tant que personne ne
- * pose la variable. Relu à CHAQUE appel, pas figé au chargement du module :
- * sinon un banc d'essai ne pourrait pas comparer deux modèles dans un même
- * processus.
+ * Défaut : SONNET, décidé par MiKL. Le banc du 2026-07-26 avait mesuré les
+ * trois paliers sur le même jeu — tous 4/4, mais Haiku dit le jargon interne
+ * (« je propose une règle "Interdire un créneau" ») et Opus mélange le tu et le
+ * vous ; Sonnet était le seul régulier. La décision était restée « ouverte » et
+ * le défaut, lui, était resté Opus : un mois durant, Filou a donc tourné sur le
+ * palier le plus cher alors que le choix était fait. Le défaut porte désormais
+ * la décision, au lieu d'une variable que personne ne pose.
+ *
+ * L'enjeu n'est pas la création de règles (ponctuelle, 2-3 $ par cabinet à vie)
+ * mais l'usage quotidien : 7 vétos × 3 questions/jour ≈ 630 appels par mois et
+ * par cabinet, et chaque question peut coûter jusqu'à 6 tours plus le second
+ * gardien.
+ *
+ * Relu à CHAQUE appel, pas figé au chargement du module : sinon un banc d'essai
+ * ne pourrait pas comparer deux modèles dans un même processus.
  */
 export function modeleIA(): string {
   // `trim()` obligatoire : un copier-coller dans l'interface Vercel colle
   // facilement un retour à la ligne invisible en fin de valeur. L'API reçoit
   // alors « claude-sonnet-5\n », qui n'est pas un modèle connu → 404
   // not_found_error (incident 2026-07-27).
-  return process.env.GUARDVETO_IA_MODELE?.trim() || 'claude-opus-4-8'
+  return process.env.GUARDVETO_IA_MODELE?.trim() || 'claude-sonnet-5'
 }
 
 /** Le prompt système exact, exposé pour pouvoir en COMPTER les tokens sans

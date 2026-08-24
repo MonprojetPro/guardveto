@@ -5,8 +5,8 @@
 // créneaux (« même équipe » = ex R9, « rôles différents » = ex R8), en sortie
 // structurée Zod. Un seul appel. L'IA ne crée jamais rien : elle PROPOSE,
 // l'humain crée ensuite via creerRelationCreneau (frontière de confiance +
-// RLS). Mêmes réglages que les assistants règles/profil (claude-opus-4-8,
-// thinking adaptatif).
+// RLS). Mêmes réglages que les assistants règles/profil : modèle de
+// `modeleIA()`, thinking adaptatif.
 // ============================================================
 
 import Anthropic from '@anthropic-ai/sdk'
@@ -15,7 +15,7 @@ import {
   PropositionRelationSchema,
   type PropositionRelation,
 } from './relationSchema'
-import { cleIA } from './proposerRegle'
+import { cleIA, modeleIA } from './proposerRegle'
 
 /** Décrit ce qu'est une liaison et son périmètre (anti-coquille-vide). */
 const STRUCTURE_PROMPT = `Une LIAISON relie deux types de garde d'un profil de planning. Le moteur relie chaque garde du SECOND créneau à la garde du PREMIER créneau qui la précède immédiatement (dans les 7 jours), puis applique la règle choisie :
@@ -64,7 +64,9 @@ Règles de comportement :
 - N'invente jamais un nom de créneau ou de profil hors de la liste ci-dessus.`
 
   const response = await client.messages.parse({
-    model: 'claude-opus-4-8',
+    // Voir `proposerProfil` : même câblage en dur, même correction. Les trois
+    // appels IA du projet suivent désormais le même réglage.
+    model: modeleIA(),
     max_tokens: 4000,
     thinking: { type: 'adaptive' },
     system,
