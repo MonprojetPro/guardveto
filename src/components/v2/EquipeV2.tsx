@@ -528,9 +528,11 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
                 autoComplete="off"
                 aria-describedby="cf-email-aide"
               />
+              {/* Trois lignes d'aide pour dire ce que l'étiquette « (facultatif) »
+                  dit déjà à moitié : il en reste ce qu'elle ne dit pas — à quel
+                  moment l'adresse finit par manquer. */}
               <p id="cf-email-aide" className="cf-aide">
-                Tu peux la laisser vide et créer la fiche maintenant. L&apos;adresse
-                n&apos;est nécessaire qu&apos;au moment d&apos;inviter la personne.
+                Nécessaire seulement pour inviter la personne.
               </p>
             </div>
             <div className="field">
@@ -555,13 +557,18 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
                 <option value="admin">Admin — gère le cabinet</option>
               </select>
             </div>
-            <div className="field" style={{ gridColumn: '1 / -1' }}>
+            {/* La couleur est un CHAMP, pas un atelier posé au milieu du
+                formulaire. Elle occupait toute la largeur (`gridColumn: 1/-1`)
+                pour loger l'outil déplié, et laissait la moitié droite vide —
+                l'asymétrie que MiKL a relevée en recette. Elle reprend ici sa
+                place de cellule ordinaire ; l'outil complet s'ouvre au clic.
+                Plus de « couleur hors palette » à rattraper : il n'y a plus de
+                palette dont on puisse être dehors. La teinte en base est la
+                teinte affichée, d'où qu'elle vienne — et la pastille montre les
+                initiales de la personne, avec l'encre que le planning posera
+                vraiment dessus. */}
+            <div className="field">
               <label id="cf-couleur-label">Couleur</label>
-              {/* Plus de « couleur hors palette » à rattraper : il n'y a plus
-                  de palette dont on puisse être dehors. La teinte en base est
-                  la teinte affichée, d'où qu'elle vienne — et l'aperçu montre
-                  les initiales de la personne, avec l'encre que le planning
-                  posera vraiment dessus. */}
               <SelecteurCouleur
                 valeur={form.couleur}
                 onChange={(hex) => setForm((f) => ({ ...f, couleur: hex }))}
@@ -601,8 +608,7 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
                 />
               </div>
               <p className="cf-aide">
-                Ce sont elles que lisent les règles de composition (« un junior jamais seul »,
-                « au moins un senior par week-end »), sur l&apos;écran Règles.
+                Lues par les règles de composition (« un junior jamais seul »), écran Règles.
               </p>
             </div>
             <div className="check-line">

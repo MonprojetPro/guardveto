@@ -360,34 +360,23 @@
 .create-inner .cf-lede {
   font-size: 0.79rem; color: var(--t-muted); line-height: 1.55; margin-bottom: 14px;
 }
-/* Les quatorze couleurs, sur UNE ligne : elles y tiennent, et deux rangs
-   cassaient la lecture de la roue chromatique (retour MiKL 2026-07-31 :
-   « pourquoi les mettre sur 2 lignes alors que ça rentre sur une seule ? »).
-   Le champ occupe toute la largeur du panneau pour ça. Le `wrap` reste, en
-   filet, pour les petits écrans. */
-.swatches { display: flex; gap: 7px; flex-wrap: wrap; }
+/* Les raccourcis de couleur, sur UNE ligne : deux rangs cassaient la lecture
+   de la roue chromatique (retour MiKL 2026-07-31 : « pourquoi les mettre sur
+   2 lignes alors que ça rentre sur une seule ? »). Elles sont neuf depuis le
+   2026-08-24 : dix-sept ne tenaient pas sur une ligne, et un raccourci qui
+   déborde n'est plus un raccourci. Le `wrap` reste, en filet, pour les très
+   petits écrans. */
 .swatch {
-  width: 28px; height: 28px; border-radius: 50%;
+  width: 26px; height: 26px; border-radius: 50%;
   border: 2px solid transparent;
   padding: 0; flex: none;
+  cursor: pointer;
   transition: transform 0.16s var(--ease-out);
 }
 .swatch:hover { transform: scale(1.12); }
 .swatch[aria-pressed='true'] {
   border-color: var(--text); box-shadow: 0 0 0 2px var(--surface);
   transform: scale(1.08);
-}
-/* La couleur héritée d'avant le terrier : on la montre, séparée du reste, pour
-   qu'on voie qu'elle EST la couleur actuelle sans croire qu'elle fait partie
-   de la palette. */
-.swatch-hors-palette {
-  margin-right: 9px;
-  position: relative;
-}
-.swatch-hors-palette::after {
-  content: ''; position: absolute; right: -9px; top: 50%;
-  width: 1px; height: 20px; margin-top: -10px;
-  background: var(--border-strong);
 }
 .check-line {
   display: flex; align-items: center; gap: 8px;
@@ -479,13 +468,19 @@
 /* ══════════════════════════════════════════════════════════════════════════
    LE SÉLECTEUR DE COULEUR (2026-08-24)
    ──────────────────────────────────────────────────────────────────────────
-   La palette fermée est devenue un choix libre. Trois contraintes de forme
+   La palette fermée est devenue un choix libre. Quatre contraintes de forme
    commandent tout ce qui suit :
 
+   · UN CHAMP, PUIS UN PANNEAU. L'outil complet dépliait le formulaire sur deux
+     écrans et le laissait bancal — un bloc haut, collé à gauche, la moitié
+     droite vide (retour MiKL après recette : « la fenêtre est asymétrique et
+     chargée »). Dans la grille, il ne reste qu'un DÉCLENCHEUR de la taille des
+     autres champs ; l'outil s'ouvre par-dessus.
    · LE DOIGT. Le rectangle fait 150 px de haut et la barre 16 px : au-dessous,
      on ne vise plus rien au pouce. Les deux portent `touch-action: none`, sans
      quoi le navigateur interprète le glissement comme un défilement de page et
-     la couleur ne bouge pas d'un pixel.
+     la couleur ne bouge pas d'un pixel. Le panneau flottant ne change rien à
+     ça : le geste est retenu par `setPointerCapture` (cf. le composant).
    · L'HABILLAGE reste sur les jetons du terrier (--t-border, --t-muted,
      --t-accent). Les seules couleurs en dur ici sont les DONNÉES : les deux
      voiles du dégradé et l'arc-en-ciel de la barre, qui sont l'espace des
@@ -494,7 +489,81 @@
      focus invisible aurait rendu ce chemin inutilisable.
    ══════════════════════════════════════════════════════════════════════════ */
 
-.selcoul { display: flex; flex-direction: column; gap: 10px; max-width: 340px; }
+/* ── Le déclencheur : ce que la fiche montre, panneau fermé ────────────────
+   Mêmes hauteur, fond, liseré et rayon que les `input` de `.field` : dans la
+   grille, la couleur est un champ parmi les autres, elle n'attire pas l'œil
+   plus que le prénom. */
+.selcoul-declencheur {
+  width: 100%; min-height: 42px;
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-sm);
+  padding: 5px 10px 5px 6px;
+  text-align: left;
+  color: var(--text);
+  font-family: var(--font-body);
+}
+.selcoul-declencheur:hover:not(:disabled) { border-color: var(--t-accent); }
+.selcoul-declencheur[data-popup-open] { border-color: var(--t-accent); }
+.selcoul-declencheur:disabled { opacity: 0.55; cursor: not-allowed; }
+/* La pastille du déclencheur porte les initiales et son encre calculée : la
+   fiche montre son RÉSULTAT sans qu'on ait à ouvrir le panneau. */
+.selcoul-pastille {
+  width: 30px; height: 30px; flex: none;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--font-display);
+  font-weight: 800; font-size: 0.78rem;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+.selcoul-valeur {
+  flex: 1; min-width: 0;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.82rem; letter-spacing: 0.06em;
+  color: var(--t-muted);
+}
+.selcoul-chevron { width: 15px; height: 15px; flex: none; color: var(--t-muted); }
+
+/* ── Le panneau flottant ───────────────────────────────────────────────────
+   Il vit dans un portail, donc hors du conteneur `.v2` : ni la police des
+   boutons, ni l'anneau de focus de la V2 ne l'atteignent. On les repose ici,
+   sur le panneau. Les jetons `--t-*`, eux, sont sur `:root` et suivent. */
+.selcoul-positionneur { z-index: 60; }
+.selcoul-popup {
+  width: min(320px, calc(100vw - 24px));
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-panel);
+  padding: 14px 16px 16px;
+  font-family: var(--font-body);
+  color: var(--text);
+  outline: none;
+}
+.selcoul-popup button { font-family: var(--font-body); cursor: pointer; }
+.selcoul-popup :focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
+.selcoul-popup-tete {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-bottom: 10px;
+}
+.selcoul-popup-titre {
+  font-family: var(--font-display);
+  font-size: 0.82rem; font-weight: 700;
+}
+/* Une croix, pas seulement Échap et le clic dehors : sur tactile, ces deux-là
+   ne se devinent pas. */
+.selcoul-fermer {
+  width: 26px; height: 26px; flex: none;
+  display: grid; place-items: center;
+  border: none; background: none; padding: 0;
+  border-radius: 50%;
+  color: var(--t-muted);
+}
+.selcoul-fermer:hover { background: var(--surface-2); color: var(--text); }
+.selcoul-fermer svg { width: 15px; height: 15px; }
+
+.selcoul { display: flex; flex-direction: column; gap: 10px; }
 
 /* ── Le rectangle saturation × luminosité ─────────────────────────────── */
 .selcoul-aire {
@@ -601,15 +670,17 @@
   font-size: 0.76rem; line-height: 1.5; color: var(--t-muted);
 }
 
+/* Neuf pastilles de 26 px et huit intervalles de 6 : 282 px, soit la largeur
+   utile du panneau (320 moins ses marges). La rangée tient, sans réglage fin à
+   refaire si on en retire une. */
 .selcoul-suggestions {
-  display: flex; gap: 7px; flex-wrap: wrap;
-  padding-top: 4px;
+  display: flex; gap: 6px; flex-wrap: wrap;
+  padding-top: 10px;
   border-top: 1px solid var(--t-border);
   margin-top: 2px;
 }
 
 @media (max-width: 640px) {
-  .selcoul { max-width: none; }
   /* Plus haut au doigt qu'à la souris : le pouce est moins précis, et l'écran
      est plus étroit — il faut compenser en hauteur ce qu'on perd en largeur. */
   .selcoul-aire { height: 180px; }

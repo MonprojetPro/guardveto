@@ -10,8 +10,23 @@
 // « trois teintes de plus », c'est « la teinte exacte que j'ai déjà ailleurs ».
 // Une palette fermée ne peut jamais répondre à ça, quelle que soit sa taille.
 //
-// D'où ce sélecteur libre. Trois façons d'y arriver, parce qu'on n'a pas la
-// même en tête selon ce qu'on cherche :
+// ── 2026-08-24, second temps : UN CHAMP, PAS UN PAVÉ ────────────────────────
+//
+// La première livraison posait tout l'outil à plat dans le formulaire : le
+// rectangle, la barre, l'aperçu, le champ, la pipette, dix-sept pastilles et
+// trois blocs d'aide, dépliés en permanence sur un tiers de la largeur. MiKL,
+// après recette : « la fenêtre est asymétrique et chargée ». Elle l'était pour
+// une raison de fond — un outil de composition n'a pas le même poids qu'un
+// champ de saisie, et le mettre dans la grille du formulaire lui donnait le
+// poids des deux réunis. La fiche faisait deux écrans pour changer un prénom.
+//
+// D'où la forme d'aujourd'hui, celle de la référence que MiKL avait fournie :
+// la COULEUR est un champ comme les autres — une pastille qui montre l'état
+// actuel — et l'OUTIL est un panneau qui s'ouvre par-dessus, au clic. Rien
+// n'est retiré : tout ce qui suit vit maintenant dans le panneau.
+//
+// Trois façons d'arriver à une couleur, parce qu'on n'a pas la même en tête
+// selon ce qu'on cherche :
 //
 //   · LE CHAMP HEXADÉCIMAL — le plus important des trois. C'est par lui
 //     qu'Anne-Sophie colle le code exact de Google Agenda. Il accepte donc ce
@@ -21,7 +36,8 @@
 //   · LE RECTANGLE ET LA BARRE — pour composer une couleur qu'on n'a pas sous
 //     la main, à l'œil.
 //   · LES RACCOURCIS — pour aller vite quand n'importe quelle teinte franche
-//     fait l'affaire. Ils ne remplacent plus le choix, ils le complètent.
+//     fait l'affaire. Neuf, sur UNE rangée : au-delà, ce n'est plus un
+//     raccourci, c'est une seconde palette qui concurrence le choix libre.
 //
 // ── Ce qui n'est pas décoratif ──────────────────────────────────────────────
 //
@@ -29,13 +45,26 @@
 // prénom se lira dessus. Celle-ci porte les initiales telles qu'elles
 // apparaîtront dans le planning, avec l'encre CALCULÉE (`encreLisible`) : sur
 // un jaune clair on voit le texte devenir sombre, en direct. Anne-Sophie voit
-// ce qu'elle obtient avant d'enregistrer, au lieu de le découvrir après.
+// ce qu'elle obtient avant d'enregistrer, au lieu de le découvrir après. C'est
+// aussi ce que porte le déclencheur, fermé : la fiche montre son résultat sans
+// qu'on ait à ouvrir quoi que ce soit.
 //
 // LE DOIGT AVANT LA SOURIS. Anne-Sophie travaille aussi au téléphone. Tout
 // passe par les événements `pointer*`, qui couvrent souris, doigt et stylet
 // d'un seul jeu — `mousedown` seul aurait rendu le rectangle inerte au doigt.
 // Et rien d'essentiel n'est dit au seul survol : sur tactile, le survol
 // n'existe pas (leçon du projet, 2026-07).
+//
+// ⚠️ LE PANNEAU FLOTTANT NE DOIT PAS TUER LE GLISSEMENT. C'est le risque
+// propre à cette refonte. Deux points le tiennent :
+//   · `setPointerCapture` sur le rectangle et sur la barre. Le geste commence
+//     DANS le panneau, donc la fermeture au clic extérieur (qui écoute le
+//     `pointerdown`) ne se déclenche pas ; et la capture retient la suite du
+//     geste même si le doigt sort du panneau, au lieu de la laisser filer au
+//     document. Sans elle, glisser jusqu'au bord aurait fermé le panneau.
+//   · `touch-action: none` sur les deux, sans quoi le navigateur lit le
+//     glissement comme un défilement de page.
+// Le panneau n'est pas modal : la page reste défilable, rien n'est verrouillé.
 //
 // LA PIPETTE N'APPARAÎT QUE SI ELLE MARCHE. `EyeDropper` n'existe que sur
 // Chrome et Edge, sur ordinateur. Ailleurs le bouton serait mort : on ne
@@ -45,11 +74,12 @@
 //
 // LE CLAVIER FAIT TOUT. Les deux curseurs sont des `slider` ARIA atteignables
 // au Tab et déplaçables aux flèches. Qui ne peut pas viser à la souris compose
-// quand même sa couleur.
+// quand même sa couleur. Échap referme le panneau et rend le focus au champ.
 // ============================================================
 
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react'
-import { Pipette } from 'lucide-react'
+import { Popover } from '@base-ui/react/popover'
+import { ChevronDown, Pipette, X } from 'lucide-react'
 import {
   encreLisible,
   hexVersTsv,
@@ -59,30 +89,29 @@ import {
 } from '@/lib/couleurs'
 
 /**
- * Les raccourcis. Les quatorze teintes du terrier — celles que portent déjà les
- * fiches existantes, et qu'il serait absurde de faire recomposer à la main —
- * suivies des trois qu'Anne-Sophie a demandées nommément.
+ * Les raccourcis. Une rangée, neuf teintes.
  *
- * L'ordre suit la roue chromatique, du rouge au violet : deux pastilles
- * voisines dans la rangée sont voisines à l'œil, on trouve « le vert » sans
- * balayer toute la ligne. Les trois claires ferment la marche, en groupe, parce
- * qu'elles ne sont pas de la même famille que le terrier.
+ * Elles étaient dix-sept : les quatorze du terrier plus les trois
+ * qu'Anne-Sophie a demandées nommément. Sur deux rangs, ça ne se lisait plus
+ * comme un raccourci mais comme la palette d'avant, revenue par la fenêtre —
+ * et ça pesait autant à l'écran que le choix libre qui, lui, couvre l'infini.
+ *
+ * Les six qui restent du terrier balaient la roue à intervalles réguliers, du
+ * rouge au violet : on trouve « le vert » ou « le bleu » d'un coup d'œil, et ce
+ * qu'on ne trouve pas se compose juste au-dessus. Les trois claires ferment la
+ * marche, en groupe — ce sont celles d'Anne-Sophie, elles ne sont pas de la
+ * même famille que le terrier et n'ont aucune raison de s'y fondre.
+ *
+ * Les huit teintes retirées d'ici ne disparaissent de NULLE PART : une fiche
+ * qui les porte les garde, elles sont une donnée en base, pas un choix offert.
  */
 export const COULEURS_SUGGEREES = [
   { hex: '#C0392B', nom: 'Rouge brique' },
   { hex: '#C7530F', nom: 'Orange terrier' },
-  { hex: '#B5761A', nom: 'Ambre' },
-  { hex: '#8A7A1E', nom: 'Olive doré' },
   { hex: '#5E7D1B', nom: 'Vert pousse' },
-  { hex: '#2F7D3F', nom: 'Vert forêt' },
   { hex: '#0B7D6C', nom: 'Vert lagon' },
-  { hex: '#2E7A8C', nom: 'Bleu canard' },
   { hex: '#2C6BA8', nom: 'Bleu ardoise' },
-  { hex: '#3B4FC4', nom: 'Bleu franc' },
   { hex: '#6B4FBE', nom: 'Violet doux' },
-  { hex: '#8E3FA8', nom: 'Prune' },
-  { hex: '#B93A72', nom: 'Framboise' },
-  { hex: '#8A5A3C', nom: 'Terre de Sienne' },
   { hex: '#F2D06B', nom: 'Jaune clair' },
   { hex: '#F5B884', nom: 'Orange clair' },
   { hex: '#F2AEC4', nom: 'Rose clair' },
@@ -106,11 +135,17 @@ interface Props {
    * la couleur. L'aperçu doit montrer la pastille RÉELLE, pas un carré abstrait.
    */
   initiales?: string
-  /** Relie le groupe à son intitulé de champ. */
+  /** Relie le champ à son intitulé, dans le formulaire. */
   ariaLabelledBy?: string
   disabled?: boolean
 }
 
+/**
+ * Le CHAMP : une pastille, son code, et le panneau à un clic.
+ *
+ * C'est lui qui vit dans la grille du formulaire, à la même taille que les
+ * autres champs. Tout l'outil est dans `PanneauCouleur`, en dessous.
+ */
 export function SelecteurCouleur({
   valeur,
   onChange,
@@ -118,6 +153,100 @@ export function SelecteurCouleur({
   ariaLabelledBy,
   disabled = false,
 }: Props) {
+  const idBase = useId()
+  const idValeur = `${idBase}-valeur`
+  const popupRef = useRef<HTMLDivElement>(null)
+
+  const hexCourant = normaliserHex(valeur) ?? '#6B7280'
+  const encre = encreLisible(hexCourant)
+
+  return (
+    <Popover.Root>
+      <Popover.Trigger
+        type="button"
+        className="selcoul-declencheur"
+        disabled={disabled}
+        // L'intitulé du champ, puis la couleur en toutes lettres : un lecteur
+        // d'écran annonce « Couleur, #C0392B, bouton », pas « bouton ».
+        aria-labelledby={ariaLabelledBy ? `${ariaLabelledBy} ${idValeur}` : idValeur}
+      >
+        <span
+          className="selcoul-pastille"
+          style={{ background: hexCourant, color: encre }}
+          aria-hidden="true"
+        >
+          {initiales}
+        </span>
+        <span className="selcoul-valeur" id={idValeur}>
+          {hexCourant}
+        </span>
+        <ChevronDown className="selcoul-chevron" aria-hidden="true" />
+      </Popover.Trigger>
+
+      <Popover.Portal>
+        <Popover.Positioner
+          className="selcoul-positionneur"
+          side="bottom"
+          align="start"
+          sideOffset={8}
+          collisionPadding={12}
+        >
+          {/* Le focus va sur le PANNEAU, pas sur le rectangle.
+              Par défaut Base UI focalise le premier élément atteignable au Tab
+              — ici le rectangle de dégradé, qui se serait peint son anneau de
+              focus à chaque ouverture, même à la souris. Même parade que la
+              modale du projet (cf. `ui/dialog.tsx`, 2026-07-30) : on focalise
+              le conteneur, le piège à focus et Échap continuent de marcher. */}
+          <Popover.Popup
+            ref={popupRef}
+            initialFocus={popupRef}
+            className="selcoul-popup"
+          >
+            <div className="selcoul-popup-tete">
+              {/* `render` force un h3 : Base UI pose un h2 par défaut, qui
+                  sauterait par-dessus le h3 du panneau de fiche — le portail
+                  place ce titre à la racine du document, pas sous lui. */}
+              <Popover.Title className="selcoul-popup-titre" render={<h3 />}>
+                Choisir la couleur
+              </Popover.Title>
+              <Popover.Close
+                type="button"
+                className="selcoul-fermer"
+                aria-label="Fermer le choix de couleur"
+              >
+                <X aria-hidden="true" />
+              </Popover.Close>
+            </div>
+
+            <PanneauCouleur
+              valeur={valeur}
+              onChange={onChange}
+              initiales={initiales}
+              disabled={disabled}
+            />
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
+  )
+}
+
+/**
+ * L'OUTIL lui-même. Il ne connaît pas le panneau flottant qui le porte : c'est
+ * ce qui permettrait de le reposer ailleurs (une modale, une page de réglages)
+ * sans y toucher.
+ */
+function PanneauCouleur({
+  valeur,
+  onChange,
+  initiales,
+  disabled,
+}: {
+  valeur: string
+  onChange: (hex: string) => void
+  initiales: string
+  disabled: boolean
+}) {
   const idBase = useId()
 
   /**
@@ -213,7 +342,10 @@ export function SelecteurCouleur({
     if (disabled) return
     // La capture est ce qui fait tenir le geste : sans elle, sortir du
     // rectangle en glissant coupe le suivi net, et la couleur se fige au
-    // dernier pixel survolé au lieu de suivre le doigt jusqu'au bord.
+    // dernier pixel survolé au lieu de suivre le doigt jusqu'au bord. Depuis
+    // que l'outil vit dans un panneau flottant, elle fait un second travail :
+    // elle empêche la suite du glissement d'atteindre le document, donc de
+    // passer pour un clic à l'extérieur qui refermerait le panneau.
     e.currentTarget.setPointerCapture(e.pointerId)
     e.preventDefault()
     aireRef.current?.focus()
@@ -338,7 +470,7 @@ export function SelecteurCouleur({
   const idAide = `${idBase}-aide`
 
   return (
-    <div className="selcoul" role="group" aria-labelledby={ariaLabelledBy}>
+    <div className="selcoul">
       {/* Le rectangle : saturation de gauche à droite, luminosité de haut en bas. */}
       <div
         ref={aireRef}
@@ -443,11 +575,14 @@ export function SelecteurCouleur({
       </div>
 
       {/* L'aide est TOUJOURS là, jamais en infobulle : sur téléphone, une
-          explication au survol n'existe pas. */}
+          explication au survol n'existe pas. Elle ne dit plus qu'UNE chose —
+          la raison d'être de tout ce panneau. Que l'encre des pastilles suive
+          la couleur, l'aperçu ci-dessus le MONTRE : l'écrire en plus, c'était
+          une ligne pour rien. */}
       <p id={idAide} className="selcoul-aide">
         {saisieDouteuse
           ? "Ce code n'est pas encore une couleur — la précédente reste en place. Six chiffres ou lettres de A à F, par exemple #CF9E64."
-          : 'Colle ici le code de ton agenda Google, avec ou sans le dièse. Le texte des pastilles s’adapte tout seul pour rester lisible.'}
+          : 'Colle ici le code de ton agenda Google, avec ou sans le dièse.'}
       </p>
 
       {/* Les raccourcis, après le choix libre : ils le complètent, ils ne le
