@@ -7,6 +7,8 @@
 // BREVO_FROM_EMAIL / BREVO_FROM_NAME, puis sur le défaut historique — le
 // comportement du cabinet pilote (colonnes nulles) est donc inchangé.
 
+import { adresseUtilisable } from '@/lib/emails/destinataire'
+
 export async function sendBrevoEmail({
   to,
   toName,
@@ -23,6 +25,18 @@ export async function sendBrevoEmail({
   fromEmail?: string | null
   fromName?: string | null
 }): Promise<{ error: string } | { success: true; messageId: string | null }> {
+  // ── Y a-t-il quelqu'un au bout ? ────────────────────────────────────────
+  // Depuis que l'e-mail d'un vétérinaire est facultatif (2026-08-22), un
+  // destinataire peut être vide. Ce refus est le DERNIER filet : les appelants
+  // filtrent déjà en amont (cf. lib/emails/destinataire.ts) et n'arrivent
+  // normalement jamais ici. Il est posé quand même, parce qu'un envoi vers `""`
+  // ne plante pas franchement — il part, Brevo le rejette, et la ligne du
+  // journal dit « erreur » sans dire que le problème est une fiche incomplète.
+  if (!adresseUtilisable(to)) {
+    console.warn('[Brevo] Destinataire sans adresse — envoi refusé avant tout appel réseau')
+    return { error: 'Destinataire sans adresse' }
+  }
+
   // `.trim()` : un retour à la ligne collé à la clé rend l'en-tête HTTP invalide.
   const apiKey = process.env.BREVO_API_KEY?.trim()
   if (!apiKey) {

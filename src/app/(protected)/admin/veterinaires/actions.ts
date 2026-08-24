@@ -7,6 +7,11 @@ import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { createClient as createAdminClient, type SupabaseClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 import type { StatutVeto, UserRole } from '@/types'
+import {
+  adresseBienFormee,
+  motifInvitationImpossible,
+  normaliserAdresse,
+} from '@/lib/emails/destinataire'
 
 /**
  * Rafraîchit les DEUX écrans qui listent l'équipe.
@@ -42,7 +47,18 @@ async function assertAdmin(
 export interface VeterinaireFormData {
   nom: string
   prenom: string
-  email: string
+  /**
+   * FACULTATIF — une fiche existe avant que la personne soit invitée.
+   *
+   * Avant le 2026-08-22, la base l'exigeait : pour créer la fiche de quelqu'un
+   * dont on n'avait pas encore l'adresse, il fallait en INVENTER une
+   * (`prenom@guardveto.local`). Ces fausses adresses se comportaient ensuite
+   * comme des vraies — elles passaient les contrôles et partaient chez
+   * l'expéditeur, qui les rejetait. Vide ou absent est enregistré `null`,
+   * jamais `''` : une chaîne vide se comporterait, elle aussi, comme une
+   * adresse.
+   */
+  email?: string | null
   statut: StatutVeto
   role_app: UserRole
   couleur: string
@@ -79,23 +95,34 @@ export async function createVeterinaire(data: VeterinaireFormData) {
     return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
   }
 
-  // Vérifie unicité email (au sein du cabinet)
-  const { data: existing } = await supabase
-    .from('veterinaires')
-    .select('id')
-    .eq('email', data.email.trim().toLowerCase())
-    .eq('cabinet_id', cabinetId)
-    .maybeSingle()
+  // L'adresse est facultative, mais si elle est là elle doit être exploitable.
+  // `normaliserAdresse` rend `null` pour une saisie vide — surtout pas `''`,
+  // qui compterait ensuite comme une adresse et bloquerait la deuxième fiche
+  // sans adresse du cabinet (index unique sur cabinet_id + email).
+  const email = normaliserAdresse(data.email)
+  if (email !== null && !adresseBienFormee(email)) {
+    return { error: "L'adresse e-mail n'a pas l'air valide." }
+  }
 
-  if (existing) {
-    return { error: 'Un vétérinaire avec cet email existe déjà.' }
+  // Vérifie unicité email (au sein du cabinet) — sans objet s'il n'y en a pas.
+  if (email !== null) {
+    const { data: existing } = await supabase
+      .from('veterinaires')
+      .select('id')
+      .eq('email', email)
+      .eq('cabinet_id', cabinetId)
+      .maybeSingle()
+
+    if (existing) {
+      return { error: 'Un vétérinaire avec cet email existe déjà.' }
+    }
   }
 
   const { error } = await supabase.from('veterinaires').insert({
     cabinet_id: cabinetId,
     nom: data.nom.trim(),
     prenom: data.prenom.trim(),
-    email: data.email.trim().toLowerCase(),
+    email,
     statut: data.statut,
     role_app: data.role_app,
     couleur: data.couleur,
@@ -117,16 +144,25 @@ export async function updateVeterinaire(id: string, data: VeterinaireFormData) {
   const garde = await assertAdmin(supabase)
   if ('error' in garde) return { error: garde.error }
 
-  // Vérifie unicité email (hors soi-même)
-  const { data: existing } = await supabase
-    .from('veterinaires')
-    .select('id')
-    .eq('email', data.email)
-    .neq('id', id)
-    .single()
+  const email = normaliserAdresse(data.email)
+  if (email !== null && !adresseBienFormee(email)) {
+    return { error: "L'adresse e-mail n'a pas l'air valide." }
+  }
 
-  if (existing) {
-    return { error: 'Un vétérinaire avec cet email existe déjà.' }
+  // Vérifie unicité email (hors soi-même) — sans objet s'il n'y en a pas.
+  // `maybeSingle` et non `single` : sans doublon il n'y a aucune ligne, et
+  // `single` ferait remonter une « erreur » pour le cas normal.
+  if (email !== null) {
+    const { data: existing } = await supabase
+      .from('veterinaires')
+      .select('id')
+      .eq('email', email)
+      .neq('id', id)
+      .maybeSingle()
+
+    if (existing) {
+      return { error: 'Un vétérinaire avec cet email existe déjà.' }
+    }
   }
 
   const { error } = await supabase
@@ -134,7 +170,7 @@ export async function updateVeterinaire(id: string, data: VeterinaireFormData) {
     .update({
       nom: data.nom.trim(),
       prenom: data.prenom.trim(),
-      email: data.email.trim().toLowerCase(),
+      email,
       statut: data.statut,
       role_app: data.role_app,
       couleur: data.couleur,
@@ -168,6 +204,18 @@ export async function inviterVeterinaire(id: string) {
 
   if (!vet) return { error: 'Vétérinaire introuvable.' }
 
+  // ── Pas d'adresse, pas d'invitation ─────────────────────────────────────
+  // Depuis que l'e-mail est facultatif, on peut arriver ici sur une fiche qui
+  // n'en a pas. Le refus est posé AVANT toute bascule en service_role, et il
+  // dit quoi faire : sans lui, `inviteUserByEmail(null)` renverrait une erreur
+  // technique brute, et surtout `listUsers().find(u => u.email === vet.email)`
+  // comparerait deux `null` — un compte auth sans adresse serait pris pour
+  // celui de ce vétérinaire, et pourrait être SUPPRIMÉ juste en dessous.
+  // L'écran désactive déjà le bouton ; ce contrôle-ci est celui qui compte.
+  const motifRefus = motifInvitationImpossible(vet)
+  if (motifRefus) return { error: motifRefus }
+  const adresseInvitation = vet.email as string
+
   // Client admin avec service_role
   const adminClient = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!.trim(),
@@ -179,7 +227,7 @@ export async function inviterVeterinaire(id: string) {
     page: 1,
     perPage: 1000,
   })
-  const existingUser = existingUsers?.users?.find((u) => u.email === vet.email)
+  const existingUser = existingUsers?.users?.find((u) => u.email === adresseInvitation)
 
   let authUserId: string
 
@@ -206,7 +254,7 @@ export async function inviterVeterinaire(id: string) {
 
   // Invite (nouveau ou après suppression)
   const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
-    vet.email,
+    adresseInvitation,
     { data: { veterinaire_id: id } }
   )
   if (inviteError) return { error: inviteError.message }
@@ -253,7 +301,7 @@ export async function inviterVeterinaire(id: string) {
   if (updateError) return { error: updateError.message }
 
   revaliderEquipe()
-  return { success: true, email: vet.email }
+  return { success: true, email: adresseInvitation }
 }
 
 export interface GardeAVenir {

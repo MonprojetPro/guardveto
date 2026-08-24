@@ -6,6 +6,7 @@ import type { Impact } from '@/data/controleImpact'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { revalidatePath } from 'next/cache'
 import { sendBrevoEmail, emailCongeValide, emailCongeRefuse } from '@/lib/brevo'
+import { adresseUtilisable } from '@/lib/emails/destinataire'
 import { detecterConflitPlanningPublie } from '@/lib/conges/detection-conflit'
 import type { CreneauImpacte } from '@/lib/crise/contexte'
 import type { CreneauConge, TypeConge } from '@/types'
@@ -297,10 +298,14 @@ export async function validerConge(
       .eq('id', conge.veterinaire_id)
       .single()
 
-    if (vet) {
+    // Sans adresse (fiche pas encore invitée), il n'y a personne à qui écrire.
+    // On ne tente PAS l'envoi : une tentative laisserait une ligne « erreur »
+    // dans le journal, et ferait passer une situation normale pour une panne.
+    if (vet && adresseUtilisable(vet.email)) {
+      const adresse = vet.email
       const expediteur = await chargerExpediteurCabinet(supabase)
       sendBrevoEmail({
-        to: vet.email,
+        to: adresse,
         toName: `${vet.prenom} ${vet.nom}`,
         subject: 'Votre demande a été validée — GuardVeto',
         htmlContent: emailCongeValide({
@@ -316,7 +321,7 @@ export async function validerConge(
         .then((res) =>
           journaliserEmailConge(supabase, {
             type: 'conge_valide',
-            destinataire: vet.email,
+            destinataire: adresse,
             veterinaire_id: conge.veterinaire_id,
             resultat: res,
           }),
@@ -381,10 +386,13 @@ export async function refuserConge(id: string, raison?: string) {
       .eq('id', conge.veterinaire_id)
       .single()
 
-    if (vet) {
+    // Même règle qu'à la validation : pas d'adresse, pas d'envoi, pas de faux
+    // échec dans le journal.
+    if (vet && adresseUtilisable(vet.email)) {
+      const adresse = vet.email
       const expediteur = await chargerExpediteurCabinet(supabase)
       sendBrevoEmail({
-        to: vet.email,
+        to: adresse,
         toName: `${vet.prenom} ${vet.nom}`,
         subject: 'Votre demande n\'a pas pu être acceptée — GuardVeto',
         htmlContent: emailCongeRefuse({
@@ -401,7 +409,7 @@ export async function refuserConge(id: string, raison?: string) {
         .then((res) =>
           journaliserEmailConge(supabase, {
             type: 'conge_refuse',
-            destinataire: vet.email,
+            destinataire: adresse,
             veterinaire_id: conge.veterinaire_id,
             resultat: res,
           }),

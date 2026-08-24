@@ -21,7 +21,8 @@ interface FicheVeto {
   id: string
   prenom: string
   nom: string
-  email: string
+  /** Facultatif : une fiche pas encore invitée n'a pas d'adresse. */
+  email: string | null
   statut: string
   role_app: string
   actif: boolean

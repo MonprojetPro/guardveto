@@ -28,6 +28,11 @@ import {
   contenuDepannageConfirme,
 } from './notifications-inapp'
 import { humaniserCodeGarde } from '@/lib/libelles-gardes'
+import {
+  adresseUtilisable,
+  trierDestinataires,
+  tracerSansAdresse,
+} from '@/lib/emails/destinataire'
 
 const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
 
@@ -36,7 +41,12 @@ interface Veterinaire {
   id: string
   nom: string
   prenom: string
-  email: string
+  /**
+   * FACULTATIF depuis le 2026-08-22 : une fiche existe avant d'être invitée.
+   * Le type le dit pour que le compilateur refuse tout envoi non filtré —
+   * c'est lui, désormais, le premier garde-fou.
+   */
+  email: string | null
   cabinet_id?: string | null
 }
 
@@ -128,6 +138,14 @@ async function sendViaBrevo(params: {
   const apiKey = process.env.BREVO_API_KEY?.trim()
   if (!apiKey) {
     throw new Error('BREVO_API_KEY non définie')
+  }
+
+  // Dernier filet : aucun message ne part vers une adresse absente. Les cinq
+  // envois de ce fichier trient déjà leurs destinataires en amont — si l'on
+  // arrive ici avec une adresse vide, c'est qu'un futur appelant aura oublié,
+  // et il vaut mieux une exception franche qu'un rejet Brevo à retardement.
+  if (params.to.some((d) => !adresseUtilisable(d.email))) {
+    throw new Error('Destinataire sans adresse')
   }
 
   // Le cabinet d'abord, l'environnement ensuite — même ordre de priorité que
@@ -396,38 +414,45 @@ export async function sendRappelPublication(
 
   const expediteur = lecteurExpediteur(supabase)
 
+  // Les fiches sans adresse ne sont pas une erreur : elles n'ont simplement
+  // personne au bout. On les trace, et la boucle continue pour les autres.
+  tracerSansAdresse('rappel_publication', trierDestinataires(admins).sansAdresse)
+
   for (const admin of admins) {
     const html = buildRappelPublicationHtml(admin, periode, joursRestants)
 
-    try {
-      const messageId = await sendViaBrevo({
-        to:      [{ email: admin.email, name: `${admin.prenom} ${admin.nom}` }],
-        subject,
-        html,
-        from: await expediteur(admin.cabinet_id),
-      })
+    if (adresseUtilisable(admin.email)) {
+      const adresse = admin.email
+      try {
+        const messageId = await sendViaBrevo({
+          to:      [{ email: adresse, name: `${admin.prenom} ${admin.nom}` }],
+          subject,
+          html,
+          from: await expediteur(admin.cabinet_id),
+        })
 
-      await logEmail(supabase, {
-        type: 'rappel_publication',
-        destinataire: admin.email,
-        veterinaire_id: admin.id,
-        periode_id: periodeId,
-        resend_id: messageId,
-        statut: 'envoye',
-      })
-      sent++
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      console.error(`[notifications] Erreur rappel_publication → ${admin.email}:`, msg)
-      await logEmail(supabase, {
-        type: 'rappel_publication',
-        destinataire: admin.email,
-        veterinaire_id: admin.id,
-        periode_id: periodeId,
-        statut: 'erreur',
-        erreur: msg,
-      })
-      errors++
+        await logEmail(supabase, {
+          type: 'rappel_publication',
+          destinataire: adresse,
+          veterinaire_id: admin.id,
+          periode_id: periodeId,
+          resend_id: messageId,
+          statut: 'envoye',
+        })
+        sent++
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error(`[notifications] Erreur rappel_publication → ${adresse}:`, msg)
+        await logEmail(supabase, {
+          type: 'rappel_publication',
+          destinataire: adresse,
+          veterinaire_id: admin.id,
+          periode_id: periodeId,
+          statut: 'erreur',
+          erreur: msg,
+        })
+        errors++
+      }
     }
 
     // Notif in-app (indépendante de l'email — créée même si Brevo échoue).
@@ -525,6 +550,13 @@ export async function sendPlanningPublie(
 
   const expediteur = lecteurExpediteur(supabase)
 
+  // ⚠️ Le cas qui aurait fait le plus de dégâts : au premier planning publié
+  // d'un cabinet tout neuf, une seule personne a une adresse. Sans ce tri, six
+  // envois seraient partis vers rien, l'écran aurait annoncé « 6 e-mails n'ont
+  // pas pu être envoyés » et personne n'aurait su que la cause était des fiches
+  // pas encore invitées. La notification in-app, elle, est créée pour TOUS.
+  tracerSansAdresse('planning_publie', trierDestinataires(vets).sansAdresse)
+
   for (const vet of vets) {
     const mesGardes = gardes.filter(
       (g) => g.premier?.id === vet.id || g.second?.id === vet.id
@@ -533,35 +565,38 @@ export async function sendPlanningPublie(
     const html    = buildPlanningPublieHtml(vet, periode, mesGardes)
     const subject = `[GuardVeto] Nouveau planning — ${periodeLabel}`
 
-    try {
-      const messageId = await sendViaBrevo({
-        to:      [{ email: vet.email, name: `${vet.prenom} ${vet.nom}` }],
-        subject,
-        html,
-        from: await expediteur(vet.cabinet_id),
-      })
+    if (adresseUtilisable(vet.email)) {
+      const adresse = vet.email
+      try {
+        const messageId = await sendViaBrevo({
+          to:      [{ email: adresse, name: `${vet.prenom} ${vet.nom}` }],
+          subject,
+          html,
+          from: await expediteur(vet.cabinet_id),
+        })
 
-      await logEmail(supabase, {
-        type: 'planning_publie',
-        destinataire: vet.email,
-        veterinaire_id: vet.id,
-        periode_id: periodeId,
-        resend_id: messageId,
-        statut: 'envoye',
-      })
-      sent++
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      console.error(`[notifications] Erreur envoi planning_publie → ${vet.email}:`, msg)
-      await logEmail(supabase, {
-        type: 'planning_publie',
-        destinataire: vet.email,
-        veterinaire_id: vet.id,
-        periode_id: periodeId,
-        statut: 'erreur',
-        erreur: msg,
-      })
-      errors++
+        await logEmail(supabase, {
+          type: 'planning_publie',
+          destinataire: adresse,
+          veterinaire_id: vet.id,
+          periode_id: periodeId,
+          resend_id: messageId,
+          statut: 'envoye',
+        })
+        sent++
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error(`[notifications] Erreur envoi planning_publie → ${adresse}:`, msg)
+        await logEmail(supabase, {
+          type: 'planning_publie',
+          destinataire: adresse,
+          veterinaire_id: vet.id,
+          periode_id: periodeId,
+          statut: 'erreur',
+          erreur: msg,
+        })
+        errors++
+      }
     }
 
     // Notif in-app (indépendante de l'email).
@@ -611,10 +646,14 @@ export async function sendGardeModifiee(
     second:  gardeRaw.second  as unknown as Veterinaire | null,
   }
 
-  // Destinataires = vétos touchés (anciens ET nouveaux), sans doublons
+  // Destinataires = vétos touchés (anciens ET nouveaux), sans doublons.
+  // On les retient sur leur `id`, PLUS sur leur adresse : un véto sans e-mail
+  // est quand même concerné par le changement et doit voir sa notification
+  // in-app. Le filtre sur l'adresse se fait plus bas, au seul moment où il a un
+  // sens — juste avant l'envoi.
   const destinatairesMap = new Map<string, Veterinaire>()
   for (const v of [oldPremier, oldSecond, garde.premier, garde.second]) {
-    if (v?.id && v?.email) destinatairesMap.set(v.id, v)
+    if (v?.id) destinatairesMap.set(v.id, v)
   }
   const destinataires = Array.from(destinatairesMap.values())
 
@@ -627,6 +666,8 @@ export async function sendGardeModifiee(
 
   const expediteur = lecteurExpediteur(supabase)
 
+  tracerSansAdresse('garde_modifiee', trierDestinataires(destinataires).sansAdresse)
+
   for (const vet of destinataires) {
     const html = buildGardeModifieeHtml(
       vet,
@@ -637,35 +678,38 @@ export async function sendGardeModifiee(
       garde.second,
     )
 
-    try {
-      const messageId = await sendViaBrevo({
-        to:      [{ email: vet.email, name: `${vet.prenom} ${vet.nom}` }],
-        subject,
-        html,
-        from: await expediteur(vet.cabinet_id),
-      })
+    if (adresseUtilisable(vet.email)) {
+      const adresse = vet.email
+      try {
+        const messageId = await sendViaBrevo({
+          to:      [{ email: adresse, name: `${vet.prenom} ${vet.nom}` }],
+          subject,
+          html,
+          from: await expediteur(vet.cabinet_id),
+        })
 
-      await logEmail(supabase, {
-        type: 'garde_modifiee',
-        destinataire: vet.email,
-        veterinaire_id: vet.id,
-        garde_id: gardeId,
-        resend_id: messageId,
-        statut: 'envoye',
-      })
-      sent++
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      console.error(`[notifications] Erreur envoi garde_modifiee → ${vet.email}:`, msg)
-      await logEmail(supabase, {
-        type: 'garde_modifiee',
-        destinataire: vet.email,
-        veterinaire_id: vet.id,
-        garde_id: gardeId,
-        statut: 'erreur',
-        erreur: msg,
-      })
-      errors++
+        await logEmail(supabase, {
+          type: 'garde_modifiee',
+          destinataire: adresse,
+          veterinaire_id: vet.id,
+          garde_id: gardeId,
+          resend_id: messageId,
+          statut: 'envoye',
+        })
+        sent++
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error(`[notifications] Erreur envoi garde_modifiee → ${adresse}:`, msg)
+        await logEmail(supabase, {
+          type: 'garde_modifiee',
+          destinataire: adresse,
+          veterinaire_id: vet.id,
+          garde_id: gardeId,
+          statut: 'erreur',
+          erreur: msg,
+        })
+        errors++
+      }
     }
 
     // Notif in-app (cabinet_id résolu depuis la table — destinataires hérités).
@@ -851,6 +895,10 @@ export async function sendAppelVolontaires(
 
   const expediteur = lecteurExpediteur(supabase)
 
+  // Un candidat sans adresse reste un candidat : il ne reçoit pas le message,
+  // mais sa notification in-app porte le même lien « Je prends ce créneau ».
+  tracerSansAdresse('appel_volontaires', trierDestinataires(candidats as Veterinaire[]).sansAdresse)
+
   for (const vet of candidats as Veterinaire[]) {
     const html = buildAppelVolontairesHtml(
       vet,
@@ -859,35 +907,38 @@ export async function sendAppelVolontaires(
       lien,
     )
 
-    try {
-      const messageId = await sendViaBrevo({
-        to:      [{ email: vet.email, name: `${vet.prenom} ${vet.nom}` }],
-        subject,
-        html,
-        from: await expediteur(vet.cabinet_id),
-      })
+    if (adresseUtilisable(vet.email)) {
+      const adresse = vet.email
+      try {
+        const messageId = await sendViaBrevo({
+          to:      [{ email: adresse, name: `${vet.prenom} ${vet.nom}` }],
+          subject,
+          html,
+          from: await expediteur(vet.cabinet_id),
+        })
 
-      await logEmail(supabase, {
-        type: 'appel_volontaires',
-        destinataire: vet.email,
-        veterinaire_id: vet.id,
-        garde_id: creneau.gardeId,
-        resend_id: messageId,
-        statut: 'envoye',
-      })
-      sent++
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      console.error(`[notifications] Erreur appel_volontaires → ${vet.email}:`, msg)
-      await logEmail(supabase, {
-        type: 'appel_volontaires',
-        destinataire: vet.email,
-        veterinaire_id: vet.id,
-        garde_id: creneau.gardeId,
-        statut: 'erreur',
-        erreur: msg,
-      })
-      errors++
+        await logEmail(supabase, {
+          type: 'appel_volontaires',
+          destinataire: adresse,
+          veterinaire_id: vet.id,
+          garde_id: creneau.gardeId,
+          resend_id: messageId,
+          statut: 'envoye',
+        })
+        sent++
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error(`[notifications] Erreur appel_volontaires → ${adresse}:`, msg)
+        await logEmail(supabase, {
+          type: 'appel_volontaires',
+          destinataire: adresse,
+          veterinaire_id: vet.id,
+          garde_id: creneau.gardeId,
+          statut: 'erreur',
+          erreur: msg,
+        })
+        errors++
+      }
     }
 
     // Notif in-app (indépendante de l'email).
@@ -986,16 +1037,24 @@ export async function sendDepannageConfirme(
   const html = buildDepannageConfirmeHtml(v, creneau)
   const subject = `[GuardVeto] Garde confirmée — ${formatDate(creneau.date)}`
 
+  // Sans adresse, la confirmation in-app ci-dessus est déjà partie : c'est elle
+  // qui porte l'information. Rien à envoyer, et surtout rien à compter en échec.
+  if (!adresseUtilisable(v.email)) {
+    tracerSansAdresse('depannage_confirme', [v])
+    return { sent: 0, errors: 0 }
+  }
+  const adresse = v.email
+
   try {
     const messageId = await sendViaBrevo({
-      to:      [{ email: v.email, name: `${v.prenom} ${v.nom}` }],
+      to:      [{ email: adresse, name: `${v.prenom} ${v.nom}` }],
       subject,
       html,
       from: await lecteurExpediteur(supabase)(v.cabinet_id),
     })
     await logEmail(supabase, {
       type: 'depannage_confirme',
-      destinataire: v.email,
+      destinataire: adresse,
       veterinaire_id: v.id,
       garde_id: creneau.gardeId,
       resend_id: messageId,
@@ -1004,10 +1063,10 @@ export async function sendDepannageConfirme(
     return { sent: 1, errors: 0 }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    console.error(`[notifications] Erreur depannage_confirme → ${v.email}:`, msg)
+    console.error(`[notifications] Erreur depannage_confirme → ${adresse}:`, msg)
     await logEmail(supabase, {
       type: 'depannage_confirme',
-      destinataire: v.email,
+      destinataire: adresse,
       veterinaire_id: v.id,
       garde_id: creneau.gardeId,
       statut: 'erreur',

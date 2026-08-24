@@ -33,7 +33,8 @@ export interface VetoNotif {
   id: string
   nom: string
   prenom: string
-  email: string
+  /** Facultatif : une fiche pas encore invitée n'a pas d'adresse. */
+  email: string | null
 }
 
 export interface AppliquerChangementParams {

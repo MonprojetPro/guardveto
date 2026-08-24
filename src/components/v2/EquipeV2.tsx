@@ -56,6 +56,11 @@ import {
 import { GardienImpact } from '@/components/v2/GardienImpact'
 import type { Impact } from '@/data/controleImpact'
 import type { StatutVeto, UserRole, Veterinaire } from '@/types'
+import {
+  adresseBienFormee,
+  adresseUtilisable,
+  motifInvitationImpossible,
+} from '@/lib/emails/destinataire'
 
 /**
  * Palette du Terrier — les valeurs partent en base, donc en dur, pas en var().
@@ -165,7 +170,7 @@ function formDepuisVeto(v: Veterinaire): FormState {
   return {
     prenom: v.prenom,
     nom: v.nom,
-    email: v.email,
+    email: v.email ?? '',
     statut: v.statut,
     role_app: v.role_app,
     couleur: v.couleur,
@@ -288,7 +293,11 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
 
     if (!prenom) return setErreur('Il manque le prénom.')
     if (!nom) return setErreur('Il manque le nom.')
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    // L'adresse est FACULTATIVE : on crée souvent la fiche avant d'avoir
+    // l'adresse de la personne. Elle n'est exigée qu'au moment d'inviter. Mais
+    // si elle est saisie, elle doit tenir debout — une adresse à moitié tapée
+    // ne se signale que le jour où l'invitation part.
+    if (email !== '' && !adresseBienFormee(email)) {
       return setErreur("L'e-mail n'a pas l'air valide — c'est lui qui sert à inviter.")
     }
     setErreur(null)
@@ -299,7 +308,9 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
     const donnees: VeterinaireFormData = {
       prenom,
       nom,
-      email,
+      // `null` et non `''` : une chaîne vide se comporterait comme une adresse
+      // partout en aval (contrôle d'unicité, envois).
+      email: email === '' ? null : email,
       statut: form.statut,
       role_app: form.role_app,
       couleur: form.couleur,
@@ -517,7 +528,7 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
               />
             </div>
             <div className="field">
-              <label htmlFor="cf-email">E-mail</label>
+              <label htmlFor="cf-email">E-mail (facultatif)</label>
               <input
                 id="cf-email"
                 type="email"
@@ -525,7 +536,12 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 placeholder="lea.marchand@cabinet.fr"
                 autoComplete="off"
+                aria-describedby="cf-email-aide"
               />
+              <p id="cf-email-aide" className="cf-aide">
+                Tu peux la laisser vide et créer la fiche maintenant. L&apos;adresse
+                n&apos;est nécessaire qu&apos;au moment d&apos;inviter la personne.
+              </p>
             </div>
             <div className="field">
               <label htmlFor="cf-statut">Statut</label>
@@ -664,7 +680,13 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
                   <h3>
                     {v.prenom} {v.nom}
                   </h3>
-                  <p className="vet-mail">{v.email}</p>
+                  {adresseUtilisable(v.email) ? (
+                    <p className="vet-mail">{v.email}</p>
+                  ) : (
+                    <p className="vet-mail sans-adresse">
+                      Pas encore d&apos;adresse e-mail
+                    </p>
+                  )}
                 </div>
 
                 <div className="vet-outils">
@@ -737,13 +759,30 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
                   {LIBELLE_COMPTE[etat]}
                 </span>
 
+                {/* Sans adresse, l'invitation n'a nulle part où aller. Le
+                    bouton est désactivé plutôt que masqué : masqué, il ne dirait
+                    pas POURQUOI, et l'admin chercherait du côté des droits. Le
+                    `title` porte le geste à faire — le serveur refuse de toute
+                    façon, avec exactement la même phrase. */}
                 {etat === 'sans' && (
-                  <button type="button" className="acct-cta" onClick={() => inviter(v)} disabled={isPending}>
+                  <button
+                    type="button"
+                    className="acct-cta"
+                    onClick={() => inviter(v)}
+                    disabled={isPending || !!motifInvitationImpossible(v)}
+                    title={motifInvitationImpossible(v) ?? `Inviter ${v.prenom}`}
+                  >
                     Inviter
                   </button>
                 )}
                 {etat === 'invite' && (
-                  <button type="button" className="acct-cta" onClick={() => inviter(v)} disabled={isPending}>
+                  <button
+                    type="button"
+                    className="acct-cta"
+                    onClick={() => inviter(v)}
+                    disabled={isPending || !!motifInvitationImpossible(v)}
+                    title={motifInvitationImpossible(v) ?? `Relancer l'invitation de ${v.prenom}`}
+                  >
                     Relancer
                   </button>
                 )}

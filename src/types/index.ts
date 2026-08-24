@@ -17,7 +17,12 @@ export interface Veterinaire {
   invite_pending: boolean
   nom: string
   prenom: string
-  email: string
+  /**
+   * FACULTATIF depuis le 2026-08-22 : une fiche existe avant que la personne
+   * soit invitée, et n'a alors pas encore d'adresse. `null` veut dire « pas
+   * encore invité », pas « adresse perdue ».
+   */
+  email: string | null
   statut: StatutVeto
   role_app: UserRole
   actif: boolean

@@ -37,6 +37,7 @@ export type NotifType =
   | 'echange_refuse'
   | 'echange_valide'
   | 'echange_refuse_admin'
+  | 'planning_retire'
 
 interface CreerNotifParams {
   /** Véto destinataire (propriétaire de la notif). */
@@ -90,6 +91,34 @@ export function contenuPlanningPublie(periodeLabel: string, nbGardes: number) {
   return {
     titre: 'Nouveau planning publié',
     message: `Le planning « ${periodeLabel} » est en ligne. ${gardesTxt}`,
+    lien: '/planning',
+  }
+}
+
+/**
+ * Un planning diffusé ne l'est plus — supprimé, ou remis en préparation.
+ *
+ * Le symétrique obligé de `contenuPlanningPublie` : on a prévenu l'équipe que
+ * le planning était en ligne, on ne peut pas le retirer sans un mot. Chacun a
+ * pu recopier ses gardes, poser un congé autour, prévenir sa famille. Le
+ * silence, ici, ce serait laisser sept personnes travailler sur un planning
+ * qui n'existe plus.
+ *
+ * @param definitif `true` = supprimé (rien à attendre) ;
+ *                  `false` = repassé en préparation (une nouvelle version vient).
+ */
+export function contenuPlanningRetire(
+  periodeLabel: string,
+  quand: string,
+  definitif: boolean,
+) {
+  return {
+    titre: definitif ? 'Un planning a été supprimé' : 'Un planning est repassé en préparation',
+    message: definitif
+      ? `Le planning « ${periodeLabel} » (${quand}) a été supprimé par l'administrateur. `
+        + `Ses gardes ne sont plus valables et ont été retirées de l'agenda du cabinet.`
+      : `Le planning « ${periodeLabel} » (${quand}) a été repassé en préparation. `
+        + `Ses gardes ont été retirées de l'agenda du cabinet en attendant une nouvelle version.`,
     lien: '/planning',
   }
 }

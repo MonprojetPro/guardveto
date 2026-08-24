@@ -57,6 +57,16 @@
   font-size: 0.74rem; color: var(--soft); margin-top: 3px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* Une fiche sans adresse ne laisse pas un blanc — un blanc se lit comme un
+   bug ou comme une adresse trop longue coupée. Elle DIT ce qu'il en est, en
+   italique pour qu'on voie au premier coup d'œil que ce n'est pas une adresse
+   mais un état. */
+.vet-card-top .vet-mail.sans-adresse { font-style: italic; }
+
+/* L'aide qui appartient à UN champ du formulaire de fiche. */
+.cf-aide {
+  margin-top: 6px; font-size: 0.78rem; line-height: 1.5; color: var(--t-muted);
+}
 
 /* -- Les deux gestes qui portent sur la FICHE, dans le coin --------------
    Modifier et Désactiver s'écrivaient en toutes lettres tout en bas, où ils
