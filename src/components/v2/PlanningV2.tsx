@@ -18,8 +18,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Trash2 } from 'lucide-react'
-import { supprimerPeriode } from '@/app/(protected)/admin/periodes/actions'
+import { Trash2, CalendarX2 } from 'lucide-react'
+import { RetirerPlanningModale, type GesteRetrait } from '@/components/planning/RetirerPlanningModale'
 import { FilouEdge } from './FilouEdge'
 import { useOutilsPlanning } from './outils-planning'
 import { GardeDetailModal, peutProposerUnEchange } from '@/components/planning/GardeDetailModal'
@@ -163,25 +163,21 @@ export function PlanningV2({
   const [criseOpen, setCriseOpen] = useState(false)
   const [criseDate, setCriseDate] = useState<string | undefined>()
   const [criseVetId, setCriseVetId] = useState<string | undefined>()
-  // Suppression d'un planning depuis le menu de période (demande MiKL du
-  // 2026-08-03 : le geste doit exister là où on choisit les plannings, pas
-  // seulement au fond du parcours de génération).
-  const [supprimerId, setSupprimerId] = useState<string | null>(null)
-  const [suppressionEnCours, setSuppressionEnCours] = useState(false)
-
-  async function supprimerLePlanning(id: string) {
-    setSuppressionEnCours(true)
-    const res = await supprimerPeriode(id)
-    setSuppressionEnCours(false)
-    setSupprimerId(null)
-    if ('error' in res && res.error) {
-      toast.error(res.error)
-      return
-    }
-    toast.success('Planning supprimé.')
-    setPopOuvert(false)
-    router.refresh()
-  }
+  // Retirer un planning depuis le menu de période (demande MiKL du 2026-08-03 :
+  // le geste doit exister là où on choisit les plannings, pas seulement au fond
+  // du parcours de génération).
+  //
+  // La rangée « Supprimer ? oui / non » qui vivait ici a disparu le 2026-08-22.
+  // Elle convenait à un brouillon d'essai, mais depuis que la suppression
+  // accepte un planning PUBLIÉ, il faut dire ce que le geste emporte — et le
+  // dire sur des données lues en base, pas dans un « — Ses gardes seront
+  // effacées » écrit une fois pour toutes. C'est le rôle de la fenêtre en deux
+  // temps ; elle sert aussi la dépublication, l'issue qui n'existait nulle part.
+  const [retrait, setRetrait] = useState<{
+    id: string
+    nom: string
+    geste: GesteRetrait
+  } | null>(null)
 
   const today = aujourdhuiISO()
   const grille = genererGrille(annee, mois)
@@ -365,42 +361,15 @@ export function PlanningV2({
 
                 {periodes.length > 0 && <p className="pp-label">Changer de période</p>}
                 {periodes.map((p) => {
-                  // La corbeille tient sur les BROUILLONS seulement, comme
-                  // partout ailleurs (le serveur refuse les autres de toute
-                  // façon). En confirmation, la rangée bascule entièrement :
-                  // pas de « oui/non » glissé à côté d'un nom de planning.
-                  if (supprimerId === p.id) {
-                    return (
-                      <div key={p.id} className="pp-item confirme">
-                        <span className="pp-confirme-txt">
-                          Supprimer « {nomPeriode(p)} » ?
-                          <small>
-                            {periodesAvecGardes.includes(p.id)
-                              ? 'Ses gardes seront effacées — personne ne les a vues.'
-                              : 'Ce planning est vide.'}
-                          </small>
-                        </span>
-                        <span className="pp-confirme-actions">
-                          <button
-                            type="button"
-                            className="ppv-btn"
-                            disabled={suppressionEnCours}
-                            onClick={() => setSupprimerId(null)}
-                          >
-                            Annuler
-                          </button>
-                          <button
-                            type="button"
-                            className="ppv-btn danger"
-                            disabled={suppressionEnCours}
-                            onClick={() => void supprimerLePlanning(p.id)}
-                          >
-                            Supprimer
-                          </button>
-                        </span>
-                      </div>
-                    )
-                  }
+                  // La corbeille tient désormais aussi sur les plannings
+                  // PUBLIÉS — c'était le trou : le serveur les refusait en
+                  // renvoyant vers une dépublication qui n'existait dans aucun
+                  // écran, donc un planning publié ne pouvait être retiré par
+                  // AUCUN chemin de l'application. Les deux confirmations sont
+                  // dans la fenêtre ; ici on ne fait que l'ouvrir.
+                  //
+                  // Un planning VERROUILLÉ n'a ni l'un ni l'autre : il est
+                  // l'historique du cabinet, et le serveur le refuse.
                   return (
                     <div key={p.id} className="pp-rangee">
                       <button
@@ -416,13 +385,28 @@ export function PlanningV2({
                           {p.statut === 'verrouille' && 'Verrouillée · consultation seule'}
                         </small>
                       </button>
-                      {isAdmin && p.statut === 'brouillon' && (
+                      {isAdmin && p.statut === 'publie' && (
+                        <button
+                          type="button"
+                          className="gen-suppr"
+                          title={`Repasser « ${nomPeriode(p)} » en préparation`}
+                          aria-label={`Repasser le planning ${nomPeriode(p)} en préparation`}
+                          onClick={() =>
+                            setRetrait({ id: p.id, nom: nomPeriode(p), geste: 'depublier' })
+                          }
+                        >
+                          <CalendarX2 className="ppv-ico" aria-hidden />
+                        </button>
+                      )}
+                      {isAdmin && p.statut !== 'verrouille' && (
                         <button
                           type="button"
                           className="gen-suppr"
                           title={`Supprimer « ${nomPeriode(p)} »`}
                           aria-label={`Supprimer le planning ${nomPeriode(p)}`}
-                          onClick={() => setSupprimerId(p.id)}
+                          onClick={() =>
+                            setRetrait({ id: p.id, nom: nomPeriode(p), geste: 'supprimer' })
+                          }
                         >
                           <Trash2 className="ppv-ico" aria-hidden />
                         </button>
@@ -640,6 +624,26 @@ export function PlanningV2({
           vets={vets}
           dateDefaut={criseDate}
           vetDefautId={criseVetId}
+        />
+      )}
+
+      {retrait && (
+        <RetirerPlanningModale
+          periodeId={retrait.id}
+          nomConnu={retrait.nom}
+          geste={retrait.geste}
+          onFerme={() => setRetrait(null)}
+          onFait={(message) => {
+            setRetrait(null)
+            setPopOuvert(false)
+            toast.success(message)
+            // Le menu de période, la grille, les compteurs et la barre d'outils
+            // lisent tous ce qui vient de disparaître : on repart du serveur.
+            // Les autres écrans sont couverts par `revaliderPeriodes()`, et
+            // ceux qui sont ouverts ailleurs par `RealtimeRefresh` (il écoute
+            // `periodes` ET `gardes`).
+            router.refresh()
+          }}
         />
       )}
 

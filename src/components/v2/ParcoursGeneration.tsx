@@ -45,7 +45,8 @@ import { DiagnosticImpasse } from '@/components/planning/DiagnosticImpasse'
 import { CreneauxIgnoresAlert } from '@/components/planning/CreneauxIgnoresAlert'
 import { PointPreVol, type VetEtiquette } from '@/components/planning/PointPreVol'
 import { SignalerLimite } from '@/components/planning/SignalerLimite'
-import { creerPeriode, supprimerPeriode, setProfilPeriode } from '@/app/(protected)/admin/periodes/actions'
+import { creerPeriode, setProfilPeriode } from '@/app/(protected)/admin/periodes/actions'
+import { RetirerPlanningModale, type GesteRetrait } from '@/components/planning/RetirerPlanningModale'
 import { estLundi, lundiDeLaSemaine, dureeProposee, finApres } from '@/lib/planning/duree'
 import type { AvertissementPreVol } from '@/engine/pre-vol'
 import type { CreneauIgnore } from '@/engine/creneau-modele'
@@ -207,10 +208,17 @@ export function ParcoursGeneration({
   // ── Étape ④ : le résultat ──────────────────────────────
   const [resultat, setResultat] = useState<Resultat | null>(null)
 
-  // Suppression d'un planning vide depuis la liste — en deux temps (on demande
-  // confirmation sur la ligne), jamais sur un simple clic.
-  const [aSupprimer, setASupprimer] = useState<string | null>(null)
-  const [suppressionEnCours, setSuppressionEnCours] = useState(false)
+  // Retirer un planning depuis la liste. La confirmation sur la ligne a cédé
+  // la place à la fenêtre en deux temps le 2026-08-22 : elle affirmait
+  // « aucun agenda n'a été rempli » pour un brouillon, ce qui n'est plus vrai
+  // depuis que le brouillon a fui dans l'agenda du client (Val d'Allier,
+  // 2026-08-20). Une phrase écrite une fois pour toutes ne peut pas savoir ;
+  // la fenêtre, elle, lit la base avant de parler.
+  const [retrait, setRetrait] = useState<{
+    id: string
+    nom: string
+    geste: GesteRetrait
+  } | null>(null)
 
   // Tout le formulaire raisonne sur la date CALÉE : la durée annoncée, la date
   // de fin affichée et celle envoyée au serveur parlent du même planning.
@@ -434,23 +442,14 @@ export function ParcoursGeneration({
   }
 
   /**
-   * Supprimer un planning resté vide. Le serveur ne l'autorise que sur un
-   * BROUILLON SANS GARDES — c'est ce garde-fou qui rend le bouton sûr : on ne
-   * peut pas effacer un planning que l'équipe a déjà vu, ni un travail de
-   * génération. Sans lui, les essais s'empilaient sans moyen de faire le
-   * ménage (retour MiKL du 2026-08-03).
+   * Le planning retiré vient d'être effacé (ou dépublié). S'il était la CIBLE
+   * du parcours, on la relâche : continuer à viser un planning qui n'existe
+   * plus enverrait le moteur travailler dans le vide.
    */
-  async function supprimer(id: string) {
-    setSuppressionEnCours(true)
-    const res = await supprimerPeriode(id)
-    setSuppressionEnCours(false)
-    setASupprimer(null)
-    if ('error' in res && res.error) {
-      toast.error(res.error)
-      return
-    }
-    toast.success('Planning supprimé.')
+  function apresRetrait(id: string, message: string) {
+    setRetrait(null)
     if (cible === id) setCible('')
+    toast.success(message)
     router.refresh()
   }
 
@@ -547,6 +546,7 @@ export function ParcoursGeneration({
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={fermer}>
       <DialogContent className="gv-modale gv-parcours">
         <DialogHeader>
@@ -779,46 +779,10 @@ export function ParcoursGeneration({
           <div className="gen-liste">
             {periodes.map((p) => {
               const vide = idsVides.has(p.id)
-              const supprimable = p.statut === 'brouillon'
-              // En confirmation, la rangée bascule ENTIÈREMENT : la question
-              // et ses deux réponses occupent la place du planning. Glissées
-              // à côté du nom, elles se chevauchaient et on ne savait plus à
-              // quelle ligne elles se rapportaient (retour MiKL 2026-08-03).
-              if (aSupprimer === p.id) {
-                return (
-                  <div key={p.id} className="gen-rangee confirmation">
-                    <div className="gen-confirm-txt">
-                      <p className="gen-confirm-titre">
-                        Supprimer « {nomPlanning(p)} » ?
-                      </p>
-                      <p className="gen-confirm-sous">
-                        {vide
-                          ? 'Ce planning est vide — rien à perdre.'
-                          : 'Ses gardes seront effacées. Personne ne les a vues : ce planning n’est pas publié, aucun e-mail n’est parti, aucun agenda n’a été rempli.'}
-                      </p>
-                    </div>
-                    <div className="gen-confirm-actions">
-                      <button
-                        type="button"
-                        className="ppv-btn"
-                        disabled={suppressionEnCours}
-                        onClick={() => setASupprimer(null)}
-                      >
-                        Annuler
-                      </button>
-                      <button
-                        type="button"
-                        className="ppv-btn danger"
-                        disabled={suppressionEnCours}
-                        onClick={() => void supprimer(p.id)}
-                      >
-                        {suppressionEnCours && <Loader2 className="ppv-spin" aria-hidden />}
-                        Supprimer
-                      </button>
-                    </div>
-                  </div>
-                )
-              }
+              // Le verrouillé seul reste intouchable : c'est l'historique du
+              // cabinet. Le publié se retire désormais, avec l'encadrement que
+              // ça demande — porté par la fenêtre, pas par cette liste.
+              const supprimable = p.statut !== 'verrouille'
               return (
                 <div
                   key={p.id}
@@ -838,17 +802,20 @@ export function ParcoursGeneration({
                     </span>
                   </button>
 
-                  {/* Tous les BROUILLONS sont supprimables depuis le 2026-08-03,
-                      remplis ou non : tant qu'un planning n'est pas publié,
-                      l'équipe ne l'a jamais vu et rien n'a été envoyé. Publiés
-                      et verrouillés restent intouchables. */}
+                  {/* Depuis le 2026-08-22, un planning PUBLIÉ se retire aussi :
+                      il n'existait aucun chemin pour le faire, et il a fallu
+                      passer par un script à la main. Ce qui protège n'est plus
+                      le statut, c'est ce que la fenêtre annonce et fait
+                      recopier. Le verrouillé, lui, reste l'historique. */}
                   {supprimable && (
                     <button
                       type="button"
                       className="gen-suppr"
-                      title={vide ? 'Supprimer ce planning vide' : 'Supprimer ce brouillon et ses gardes'}
+                      title={vide ? 'Supprimer ce planning vide' : `Supprimer « ${nomPlanning(p)} » et ses gardes`}
                       aria-label={`Supprimer le planning ${nomPlanning(p)}`}
-                      onClick={() => setASupprimer(p.id)}
+                      onClick={() =>
+                        setRetrait({ id: p.id, nom: nomPlanning(p), geste: 'supprimer' })
+                      }
                     >
                       <Trash2 className="ppv-ico" aria-hidden />
                     </button>
@@ -1204,5 +1171,19 @@ export function ParcoursGeneration({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Posée en FRÈRE du parcours, pas à l'intérieur : deux fenêtres imbriquées
+        dans le même arbre se disputent le piège de focus et la touche Échap.
+        Chacune s'affiche par son propre portail, la dernière ouverte devant. */}
+    {retrait && (
+      <RetirerPlanningModale
+        periodeId={retrait.id}
+        nomConnu={retrait.nom}
+        geste={retrait.geste}
+        onFerme={() => setRetrait(null)}
+        onFait={(message) => apresRetrait(retrait.id, message)}
+      />
+    )}
+    </>
   )
 }

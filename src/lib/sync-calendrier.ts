@@ -16,6 +16,7 @@ import {
 import { chargerStructureProfilPeriode } from '@/data/chargerStructureCabinet'
 import type { StructureCreneauxResolue } from '@/engine/structure-creneaux'
 import { chargerRelationsAffichagePeriode } from '@/data/chargerRelationsAffichage'
+import type { BilanAgenda } from '@/lib/planning/retrait-planning'
 
 /**
  * Prénoms des places 3 et 4, dans l'ordre. Les colonnes `premier_id` et
@@ -383,7 +384,18 @@ export async function syncGardeIndividuelle(
 
 /**
  * Supprime tous les événements Google Agenda d'une période.
- * Appelé avant une re-génération pour éviter les doublons.
+ *
+ * ⚠️ CE COMMENTAIRE A MENTI PENDANT DES MOIS. Il annonçait « appelé avant une
+ * re-génération pour éviter les doublons » et l'action de suppression de
+ * planning s'appuyait, à côté, sur l'idée qu'« un brouillon n'a aucun événement
+ * d'agenda ». C'était vrai tant que seule la publication écrivait dans
+ * l'agenda ; ça ne l'est plus depuis que le brouillon a fui chez Val d'Allier
+ * (38 événements pour zéro planning publié, 2026-08-20). Une garde peut porter
+ * un `google_event_id` quel que soit le statut de sa période.
+ *
+ * Best-effort : les échecs sont avalés. Pour un geste où l'état de l'agenda
+ * COMMANDE la suite (suppression, dépublication), passer par
+ * `retirerEvenementsAvecBilan` — qui, lui, dit ce qui a résisté.
  */
 export async function supprimerEvenementsCalendrier(
   supabase: SupabaseClient,
@@ -422,8 +434,55 @@ export async function supprimerEvenementsParIds(
   eventIds: string[],
   calendarId?: string | null,
 ): Promise<void> {
-  if (!isGoogleCalendarConfigured(calendarId)) return
-  if (eventIds.length === 0) return
+  // Une seule mécanique de suppression pour toute l'application ; ici on
+  // choisit simplement d'ignorer le bilan (régénération = best-effort).
+  await retirerEvenementsAvecBilan(eventIds, calendarId)
+}
+
+/** Le code HTTP porté par une erreur googleapis, quelle que soit sa forme. */
+function codeHttp(e: unknown): number | undefined {
+  const err = e as { code?: unknown; status?: unknown; response?: { status?: unknown } }
+  for (const brut of [err?.code, err?.status, err?.response?.status]) {
+    const n = typeof brut === 'string' ? Number(brut) : brut
+    if (typeof n === 'number' && Number.isFinite(n)) return n
+  }
+  return undefined
+}
+
+/**
+ * Retire une liste d'événements et DIT ce qui a résisté.
+ *
+ * La différence avec `supprimerEvenementsParIds` tient en une ligne — le
+ * `.catch(() => {})` qui existait ici avalait tout — mais elle change la nature
+ * de l'opération. Tant que les échecs sont muets, l'appelant ne peut que
+ * supposer que l'agenda est propre ; c'est cette supposition qui a laissé des
+ * événements orphelins chez le client. Un geste destructeur doit pouvoir
+ * s'arrêter sur la foi d'un CONSTAT.
+ *
+ * ⚠️ `404` / `410` ne sont PAS des échecs : Google ne connaît déjà plus
+ * l'événement, l'état visé est atteint. Ils sont comptés à part, et ne
+ * déclenchent aucune reprise (réessayer quatre fois d'effacer ce qui n'existe
+ * pas ne coûterait que du temps).
+ */
+export async function retirerEvenementsAvecBilan(
+  eventIds: string[],
+  calendarId?: string | null,
+): Promise<BilanAgenda> {
+  const bilan: BilanAgenda = { effaces: 0, dejaAbsents: 0, echecs: [] }
+  if (eventIds.length === 0) return bilan
+
+  // L'appelant est censé avoir vérifié avant (l'ordre des opérations le lui
+  // impose) ; sans ce garde-fou, `deleteGardeEvent` ne ferait rien EN SILENCE
+  // et on annoncerait un agenda nettoyé qui ne l'a jamais été.
+  if (!isGoogleCalendarConfigured(calendarId)) {
+    return {
+      ...bilan,
+      echecs: eventIds.map((eventId) => ({
+        eventId,
+        message: 'Aucun agenda Google joignable.',
+      })),
+    }
+  }
 
   // Suppression par petits lots espacés + reprise (anti rate-limit Google)
   const BATCH = 3
@@ -432,12 +491,37 @@ export async function supprimerEvenementsParIds(
   for (let i = 0; i < eventIds.length; i += BATCH) {
     const lot = eventIds.slice(i, i + BATCH)
     await Promise.all(
-      lot.map((eventId) =>
-        avecReprise(() => deleteGardeEvent(eventId, calendarId)).catch(() => {
-          // On continue même si un événement n'existe plus côté Google
-        })
-      )
+      lot.map(async (eventId) => {
+        try {
+          const issue = await avecReprise<'efface' | 'deja-absent'>(async () => {
+            try {
+              await deleteGardeEvent(eventId, calendarId)
+              return 'efface'
+            } catch (e) {
+              // Déjà absent : on ne réessaie pas, et ce n'est pas une erreur.
+              const code = codeHttp(e)
+              if (code === 404 || code === 410) return 'deja-absent'
+              throw e
+            }
+          })
+          if (issue === 'efface') bilan.effaces++
+          else bilan.dejaAbsents++
+        } catch (e) {
+          const code = codeHttp(e)
+          if (code === 404 || code === 410) {
+            bilan.dejaAbsents++
+            return
+          }
+          bilan.echecs.push({
+            eventId,
+            code,
+            message: e instanceof Error ? e.message : String(e),
+          })
+        }
+      })
     )
     if (i + BATCH < eventIds.length) await sleep(PAUSE_MS)
   }
+
+  return bilan
 }

@@ -4,6 +4,15 @@ import { createClient } from '@/lib/supabase/server'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { revalidatePath } from 'next/cache'
 import { refusSiBloquant } from '@/data/controleImpact'
+import { periodeFr, dateFrSansJour } from '@/lib/dates-fr'
+import { retirerEvenementsAvecBilan } from '@/lib/sync-calendrier'
+import { isGoogleCalendarConfigured } from '@/lib/google-calendar'
+import { creerNotification, contenuPlanningRetire } from '@/lib/notifications-inapp'
+import { executerRetraitPlanning } from '@/lib/planning/retrait-planning'
+import type {
+  BilanAgenda,
+  BilanPlanningARetirer,
+} from '@/lib/planning/retrait-planning'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
@@ -291,23 +300,260 @@ export async function setEffectifPeriode(
   return { success: true }
 }
 
+// ============================================================
+// RETIRER UN PLANNING — l'inventaire d'abord, le geste ensuite
+// ============================================================
+
+/** Le nom d'un planning tel qu'il s'affiche partout dans l'application. */
+function nomPlanning(p: {
+  libelle?: string | null
+  saison?: string | null
+  date_debut?: string | null
+}): string {
+  const l = (p.libelle ?? '').trim()
+  if (l) return l
+  const annee = (p.date_debut ?? '').slice(0, 4)
+  return `${p.saison === 'ete' ? 'Été' : 'Hiver'} ${annee}`.trim()
+}
+
+/** Deux noms sont « le même » aux espaces et à la casse près, pas au reste. */
+function memeNom(saisi: string, attendu: string): boolean {
+  const normaliser = (s: string) => s.trim().replace(/\s+/g, ' ').toLocaleLowerCase('fr-FR')
+  return normaliser(saisi) === normaliser(attendu)
+}
+
 /**
- * Supprime un planning. **Uniquement un BROUILLON** — c'est la seule ligne
- * rouge, et elle est double : le `.eq('statut', 'brouillon')` du delete la
- * tient même si l'appelant se trompe.
+ * Tout ce qu'un planning emporte avec lui — LU EN BASE, jamais supposé.
  *
- * CE QUI A CHANGÉ LE 2026-08-03 (demande explicite de MiKL : « je veux pouvoir
- * supprimer un brouillon déjà généré mais non publié »). L'action refusait tout
- * planning ayant des gardes. C'était trop prudent : un brouillon généré n'a
- * JAMAIS été vu par l'équipe, aucun e-mail n'est parti, aucun événement
- * d'agenda n'existe — tout cela se déclenche à la publication. Le seul travail
- * perdu est un calcul de quelques secondes, refaisable d'un clic. En échange,
- * les essais s'accumulaient sans aucun moyen de faire le ménage.
+ * Sert la première des deux confirmations. Le principe du projet est que « le
+ * système INFORME, il n'interdit pas » : on ne va pas retenir la main de
+ * l'admin, mais on ne la laisse pas non plus décider dans le noir. Un
+ * « êtes-vous sûr ? » ne dit rien ; « 118 gardes, 7 vétérinaires, 118
+ * rendez-vous dans l'agenda de tout le monde » dit tout.
+ *
+ * Lecture SEULE. Aucune écriture, aucun effet de bord — l'écran peut l'appeler
+ * à l'ouverture de la fenêtre sans rien engager.
+ */
+export async function bilanRetraitPlanning(
+  periodeId: string,
+): Promise<{ error: string } | { bilan: BilanPlanningARetirer }> {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return { error: garde.error }
+
+  const { data: per } = await supabase
+    .from('periodes')
+    .select('id, libelle, saison, date_debut, date_fin, statut, publie_at, cabinet_id')
+    .eq('id', periodeId)
+    .maybeSingle()
+  if (!per) return { error: 'Planning introuvable.' }
+
+  const p = per as {
+    id: string
+    libelle: string | null
+    saison: string | null
+    date_debut: string
+    date_fin: string
+    statut: string
+    publie_at: string | null
+    cabinet_id: string | null
+  }
+
+  // Les gardes, lues UNE fois : elles donnent le compte, les rendez-vous
+  // d'agenda, les vétérinaires concernés et les clés des tables enfants.
+  const { data: gardesData, error: gardesErr } = await supabase
+    .from('gardes')
+    .select('id, google_event_id, premier_id, second_id')
+    .eq('periode_id', periodeId)
+  if (gardesErr) return { error: gardesErr.message }
+
+  const gardes = (gardesData ?? []) as {
+    id: string
+    google_event_id: string | null
+    premier_id: string | null
+    second_id: string | null
+  }[]
+
+  const gardeIds = gardes.map((g) => g.id)
+  const nbEvenementsAgenda = gardes.filter((g) => g.google_event_id).length
+  const nbVetosConcernes = new Set(
+    gardes.flatMap((g) => [g.premier_id, g.second_id]).filter(Boolean) as string[],
+  ).size
+
+  // Les tables enfants qui partiront EN CASCADE, sans que la base ne dise rien.
+  // Elles ne bloquent pas — mais les taire reviendrait à effacer le travail de
+  // l'équipe (un échange accepté, un dépannage confirmé) en silence.
+  const compter = async (table: string, colonne: string): Promise<number> => {
+    if (gardeIds.length === 0) return 0
+    const { count, error } = await supabase
+      .from(table)
+      .select('id', { count: 'exact', head: true })
+      .in(colonne, gardeIds)
+    if (error) {
+      console.warn(`[bilanRetrait] comptage ${table} impossible :`, error.message)
+      return 0
+    }
+    return count ?? 0
+  }
+
+  const [nbEchanges, nbDepannages, nbExceptions] = await Promise.all([
+    compter('echanges_gardes', 'garde_id'),
+    compter('compensations', 'garde_id'),
+    compter('gardes_exceptions', 'garde_id'),
+  ])
+
+  // Ce qui empêcherait VRAIMENT le geste — la FK `regles_cabinet.periode_id`
+  // est en NO ACTION : sans ce contrôle, Postgres renverrait une erreur de
+  // contrainte illisible APRÈS que l'agenda ait été vidé.
+  const { count: nbRegles } = await supabase
+    .from('regles_cabinet')
+    .select('id', { count: 'exact', head: true })
+    .eq('periode_id', periodeId)
+
+  const bloquant = nbRegles && nbRegles > 0
+    ? `${nbRegles} règle${nbRegles > 1 ? 's sont limitées' : ' est limitée'} à ce planning. `
+      + `Supprime-la${nbRegles > 1 ? 's' : ''} ou rends-la${nbRegles > 1 ? 's' : ''} `
+      + `permanente${nbRegles > 1 ? 's' : ''} avant d’effacer le planning.`
+    : null
+
+  const calendarId = await calendarIdDuCabinet(supabase, p.cabinet_id)
+
+  return {
+    bilan: {
+      id: p.id,
+      nom: nomPlanning(p),
+      quand: periodeFr(p.date_debut, p.date_fin),
+      statut: p.statut,
+      publie: Boolean(p.publie_at),
+      publieLe: p.publie_at ? dateFrSansJour(p.publie_at.slice(0, 10)) : null,
+      nbGardes: gardes.length,
+      nbEvenementsAgenda,
+      nbVetosConcernes,
+      nbEchanges,
+      nbDepannages,
+      nbExceptions,
+      agendaJoignable: isGoogleCalendarConfigured(calendarId),
+      bloquant,
+      // Le nom se recopie dès que quelqu'un d'autre que l'admin a vu passer
+      // quelque chose : une diffusion, ou des rendez-vous posés dans l'agenda.
+      exigeSaisieDuNom: Boolean(p.publie_at) || nbEvenementsAgenda > 0,
+    },
+  }
+}
+
+/** Le calendarId du cabinet (colonne), sinon null → repli env en aval. */
+async function calendarIdDuCabinet(
+  supabase: SupabaseClient<any, any, any>,
+  cabinetId: string | null,
+): Promise<string | null> {
+  if (!cabinetId) return null
+  const { data } = await supabase
+    .from('cabinets')
+    .select('google_calendar_id')
+    .eq('id', cabinetId)
+    .maybeSingle()
+  const val = (data as { google_calendar_id?: string | null } | null)?.google_calendar_id
+  return (val ?? '').trim() || null
+}
+
+/** Les identifiants de rendez-vous portés par les gardes d'un planning. */
+async function eventIdsDuPlanning(
+  supabase: SupabaseClient<any, any, any>,
+  periodeId: string,
+): Promise<string[]> {
+  const { data } = await supabase
+    .from('gardes')
+    .select('google_event_id')
+    .eq('periode_id', periodeId)
+    .not('google_event_id', 'is', null)
+  return ((data ?? []) as { google_event_id: string | null }[])
+    .map((g) => g.google_event_id)
+    .filter((id): id is string => Boolean(id))
+}
+
+/** La trace : qui, quand, quel planning, combien de gardes. */
+async function tracerRetrait(
+  supabase: SupabaseClient<any, any, any>,
+  params: {
+    periodeId: string
+    action: 'delete' | 'update'
+    auteurId: string
+    detail: Record<string, unknown>
+  },
+): Promise<void> {
+  const { error } = await supabase.from('audit_log').insert({
+    table_name: 'periodes',
+    record_id: params.periodeId,
+    action: params.action,
+    old_data: params.detail,
+    new_data: null,
+    user_id: params.auteurId,
+  })
+  if (error) console.warn('[retrait-planning] audit_log non écrit :', error.message)
+}
+
+/**
+ * Prévient l'équipe qu'un planning diffusé ne l'est plus.
+ *
+ * Sans ça, le geste serait invisible pour les six autres : ils ont vu le
+ * planning, l'ont peut-être recopié, ont posé des congés autour. Best-effort —
+ * une notification qui ne part pas n'annule pas un retrait déjà fait.
+ */
+async function prevenirEquipeDuRetrait(
+  supabase: SupabaseClient<any, any, any>,
+  params: { cabinetId: string | null; nom: string; quand: string; definitif: boolean },
+): Promise<void> {
+  if (!params.cabinetId) return
+  try {
+    const { data: vets } = await supabase
+      .from('veterinaires')
+      .select('id')
+      .eq('cabinet_id', params.cabinetId)
+      .eq('actif', true)
+
+    const contenu = contenuPlanningRetire(params.nom, params.quand, params.definitif)
+    for (const v of (vets ?? []) as { id: string }[]) {
+      await creerNotification(supabase, {
+        veterinaireId: v.id,
+        type: 'planning_retire',
+        titre: contenu.titre,
+        message: contenu.message,
+        lien: contenu.lien,
+        cabinetId: params.cabinetId,
+      })
+    }
+  } catch (e) {
+    console.error('[retrait-planning] équipe non prévenue :', e)
+  }
+}
+
+/**
+ * Supprime un planning — **y compris publié**, depuis le 2026-08-22.
+ *
+ * CE QUI A CHANGÉ, ET POURQUOI. L'action refusait tout ce qui n'était pas un
+ * brouillon, en renvoyant vers une dépublication… qui n'existait nulle part
+ * dans l'application. Un planning publié était donc DÉFINITIVEMENT
+ * insupprimable : il a fallu passer par un script à la main
+ * (`scripts/nettoyer-periode-agenda.mjs`) le 2026-08-21. MiKL : « oui tu peux,
+ * mais il faut encadrer fermement cette possibilité ».
+ *
+ * L'ENCADREMENT — deux confirmations distinctes, et la seconde n'est pas un
+ * clic. `bilanRetraitPlanning` fournit à l'écran ce que le geste emporte
+ * réellement ; ici, on exige que le nom du planning ait été RECOPIÉ dès qu'il
+ * a été diffusé ou qu'il a posé des rendez-vous dans l'agenda. Ce contrôle
+ * vit côté serveur : une garde qui ne tient que dans l'écran ne tient pas.
+ *
+ * L'ORDRE — agenda d'abord, base ensuite, et rien si l'agenda résiste. C'est
+ * `executerRetraitPlanning` qui le tient, pas ce fichier.
  *
  * CE QUE LA SUPPRESSION EMPORTE — inventaire refait à la source (contraintes
  * FK réelles, pas de mémoire) :
  *   • `gardes`, `attributions`, `bonus_malus` → ON DELETE CASCADE, la base s'en
  *     charge ;
+ *   • et derrière `gardes` : `echanges_gardes`, `compensations`,
+ *     `garde_placements`, `gardes_exceptions` → CASCADE eux aussi. Ils sont
+ *     COMPTÉS et annoncés avant, parce qu'ils portent du travail d'équipe ;
  *   • `email_log`, `historique_fete` → ON DELETE SET NULL, les traces restent ;
  *   • `compteurs_gardes`, `planning_semaine` → ce sont des VUES, elles suivent ;
  *   • `regles_cabinet.periode_id` → NO ACTION : une règle limitée à ce planning
@@ -316,64 +562,197 @@ export async function setEffectifPeriode(
  *
  * Renvoie le nombre de gardes effacées, pour que l'écran puisse le dire.
  */
-export async function supprimerPeriode(periodeId: string) {
+export async function supprimerPeriode(periodeId: string, nomSaisi?: string) {
   const supabase = await createClient()
 
   const garde = await assertAdmin(supabase)
   if ('error' in garde) return { error: garde.error }
+  const auteurId = garde.veto.id
 
-  const { data: per } = await supabase
+  const bilanRes = await bilanRetraitPlanning(periodeId)
+  if ('error' in bilanRes) return { error: bilanRes.error }
+  const bilan = bilanRes.bilan
+
+  if (bilan.statut === 'verrouille') {
+    return { error: 'Ce planning est verrouillé : il fait partie de l’historique du cabinet.' }
+  }
+
+  if (bilan.bloquant) return { error: bilan.bloquant }
+
+  // La SECONDE confirmation, vérifiée là où elle compte.
+  if (bilan.exigeSaisieDuNom && !memeNom(nomSaisi ?? '', bilan.nom)) {
+    return {
+      error: `Pour supprimer « ${bilan.nom} », recopie son nom exactement. `
+        + `C’est volontairement un geste qui demande de s’arrêter : ce planning `
+        + `a été vu par l’équipe.`,
+    }
+  }
+
+  const { data: perCab } = await supabase
     .from('periodes')
-    .select('statut, libelle')
+    .select('cabinet_id')
     .eq('id', periodeId)
     .maybeSingle()
-  if (!per) return { error: 'Planning introuvable.' }
+  const cabinetId = (perCab as { cabinet_id: string | null } | null)?.cabinet_id ?? null
+  const calendarId = await calendarIdDuCabinet(supabase, cabinetId)
 
-  const statut = (per as { statut?: string }).statut
-  if (statut !== 'brouillon') {
-    return {
-      error: statut === 'publie'
-        ? 'Ce planning est publié : l’équipe l’a déjà vu. Il faut le dépublier avant de pouvoir le supprimer.'
-        : 'Ce planning est verrouillé : il fait partie de l’historique du cabinet.',
-    }
+  const resultat = await executerRetraitPlanning({
+    lireEventIds: () => eventIdsDuPlanning(supabase, periodeId),
+    agendaJoignable: async () => isGoogleCalendarConfigured(calendarId),
+    retirerDeLAgenda: (ids) => retirerEvenementsAvecBilan(ids, calendarId),
+    ecrireEnBase: async () => {
+      // `attributions.planning_id` cascade désormais, mais on garde ce nettoyage
+      // explicite : une génération dont l'écriture V1 a échoué à mi-course peut
+      // avoir laissé des lignes V2 rattachées à un planning qui, lui, n'existe
+      // plus vraiment. Le faire AVANT coûte une requête et ne peut pas nuire.
+      const { error: attribErr } = await supabase
+        .from('attributions')
+        .delete()
+        .eq('planning_id', periodeId)
+      if (attribErr) return { error: attribErr.message }
+
+      // Plus de `.eq('statut', 'brouillon')` ici : le filet a changé de nature.
+      // Ce n'est plus le statut qui protège, c'est le nom recopié — et on ne
+      // veut pas d'un delete qui « réussit » en n'effaçant aucune ligne.
+      const { error } = await supabase.from('periodes').delete().eq('id', periodeId)
+      return { error: error?.message ?? null }
+    },
+    tracer: (agenda) =>
+      tracerRetrait(supabase, {
+        periodeId,
+        action: 'delete',
+        auteurId,
+        detail: {
+          geste: 'suppression',
+          nom: bilan.nom,
+          quand: bilan.quand,
+          statut: bilan.statut,
+          nbGardes: bilan.nbGardes,
+          nbEchanges: bilan.nbEchanges,
+          nbDepannages: bilan.nbDepannages,
+          nbExceptions: bilan.nbExceptions,
+          agenda,
+        },
+      }),
+  })
+
+  if (!resultat.ok) return { error: resultat.error }
+
+  // L'équipe n'est prévenue que si elle avait quelque chose à savoir : un
+  // brouillon d'essai supprimé ne concerne personne d'autre que l'admin.
+  if (bilan.publie) {
+    await prevenirEquipeDuRetrait(supabase, {
+      cabinetId,
+      nom: bilan.nom,
+      quand: bilan.quand,
+      definitif: true,
+    })
   }
-
-  // Règles limitées à CE planning : la FK est en NO ACTION, le delete
-  // échouerait avec une erreur Postgres illisible. On l'annonce en français.
-  const { count: nbRegles } = await supabase
-    .from('regles_cabinet')
-    .select('id', { count: 'exact', head: true })
-    .eq('periode_id', periodeId)
-  if (nbRegles && nbRegles > 0) {
-    return {
-      error: `${nbRegles} règle${nbRegles > 1 ? 's sont limitées' : ' est limitée'} à ce planning. `
-        + `Supprime-la${nbRegles > 1 ? 's' : ''} ou rends-la${nbRegles > 1 ? 's' : ''} permanente${nbRegles > 1 ? 's' : ''} avant d’effacer le planning.`,
-    }
-  }
-
-  const { count: nbGardes } = await supabase
-    .from('gardes')
-    .select('id', { count: 'exact', head: true })
-    .eq('periode_id', periodeId)
-
-  // `attributions.planning_id` cascade désormais, mais on garde ce nettoyage
-  // explicite : une génération dont l'écriture V1 a échoué à mi-course peut
-  // avoir laissé des lignes V2 rattachées à un planning qui, lui, n'existe
-  // plus vraiment. Le faire AVANT coûte une requête et ne peut pas nuire.
-  const { error: attribErr } = await supabase
-    .from('attributions')
-    .delete()
-    .eq('planning_id', periodeId)
-  if (attribErr) return { error: attribErr.message }
-
-  const { error } = await supabase
-    .from('periodes')
-    .delete()
-    .eq('id', periodeId)
-    .eq('statut', 'brouillon')
-
-  if (error) return { error: error.message }
 
   revaliderPeriodes()
-  return { success: true, nbGardes: nbGardes ?? 0 }
+  return {
+    success: true,
+    nbGardes: bilan.nbGardes,
+    agenda: resultat.agenda as BilanAgenda,
+  }
+}
+
+/**
+ * Dépublie un planning : il redevient un brouillon, modifiable, et sort de
+ * l'agenda de l'équipe. **Rien n'est détruit.**
+ *
+ * POURQUOI CE GESTE EXISTE, alors que la suppression suffisait « techniquement »
+ * — se tromper de publication doit être réparable sans tout perdre. Publier un
+ * planning est aujourd'hui la seule décision de l'application qu'on ne peut
+ * pas défaire : le message de refus de la suppression réclamait une
+ * dépublication qui n'existait dans aucun écran. La capacité, elle, existait
+ * déjà en base — `/api/generate` repasse une période en brouillon avant de la
+ * régénérer. Elle n'était simplement offerte à personne, ce qui laissait
+ * l'admin sans autre issue que la destruction complète.
+ *
+ * ELLE NETTOIE L'AGENDA, comme la suppression. Un planning qui n'est plus
+ * diffusé mais dont les rendez-vous restent dans l'agenda de sept personnes
+ * n'est pas dépublié : c'est le sens même de l'incident Val d'Allier, à
+ * l'envers. Les `google_event_id` sont donc remis à zéro sur les gardes — sans
+ * ça, une republication tenterait de mettre à jour des rendez-vous effacés.
+ *
+ * L'ENCADREMENT est plus léger que celui de la suppression : une explication
+ * et une confirmation, sans recopier le nom. Le geste est RÉVERSIBLE — republier
+ * refait tout, y compris l'agenda et les e-mails. La fermeté d'un garde-fou se
+ * règle sur ce qu'on ne peut pas rattraper.
+ */
+export async function depublierPeriode(periodeId: string) {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return { error: garde.error }
+  const auteurId = garde.veto.id
+
+  const bilanRes = await bilanRetraitPlanning(periodeId)
+  if ('error' in bilanRes) return { error: bilanRes.error }
+  const bilan = bilanRes.bilan
+
+  if (bilan.statut === 'verrouille') {
+    return {
+      error: 'Ce planning est verrouillé : il fait partie de l’historique du cabinet '
+        + 'et ne se remet plus en préparation.',
+    }
+  }
+  if (bilan.statut !== 'publie') {
+    return { error: 'Ce planning n’est pas publié — il est déjà en préparation.' }
+  }
+
+  const { data: perCab } = await supabase
+    .from('periodes')
+    .select('cabinet_id')
+    .eq('id', periodeId)
+    .maybeSingle()
+  const cabinetId = (perCab as { cabinet_id: string | null } | null)?.cabinet_id ?? null
+  const calendarId = await calendarIdDuCabinet(supabase, cabinetId)
+
+  const resultat = await executerRetraitPlanning({
+    lireEventIds: () => eventIdsDuPlanning(supabase, periodeId),
+    agendaJoignable: async () => isGoogleCalendarConfigured(calendarId),
+    retirerDeLAgenda: (ids) => retirerEvenementsAvecBilan(ids, calendarId),
+    ecrireEnBase: async () => {
+      // Les poignées d'abord : les rendez-vous n'existent plus, les garder
+      // ferait échouer la prochaine synchronisation sur des identifiants morts.
+      const { error: majGardes } = await supabase
+        .from('gardes')
+        .update({ google_event_id: null })
+        .eq('periode_id', periodeId)
+      if (majGardes) return { error: majGardes.message }
+
+      const { error } = await supabase
+        .from('periodes')
+        .update({ statut: 'brouillon', publie_at: null })
+        .eq('id', periodeId)
+      return { error: error?.message ?? null }
+    },
+    tracer: (agenda) =>
+      tracerRetrait(supabase, {
+        periodeId,
+        action: 'update',
+        auteurId,
+        detail: {
+          geste: 'depublication',
+          nom: bilan.nom,
+          quand: bilan.quand,
+          nbGardes: bilan.nbGardes,
+          agenda,
+        },
+      }),
+  })
+
+  if (!resultat.ok) return { error: resultat.error }
+
+  await prevenirEquipeDuRetrait(supabase, {
+    cabinetId,
+    nom: bilan.nom,
+    quand: bilan.quand,
+    definitif: false,
+  })
+
+  revaliderPeriodes()
+  return { success: true, nbGardes: bilan.nbGardes, agenda: resultat.agenda as BilanAgenda }
 }

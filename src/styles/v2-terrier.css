@@ -2531,3 +2531,49 @@ a.widget { color: inherit; text-decoration: none; }
   font-size: 0.82rem; line-height: 1.5; color: var(--text);
 }
 .gi-repare b { color: var(--ok); font-size: 0.78rem; }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RETIRER UN PLANNING — les deux confirmations (`RetirerPlanningModale`)
+   Posé ici, et pas dans `v2-planning.css` : la fenêtre s'ouvre depuis la
+   pilule de période ET depuis l'assistant de génération, et elle a vocation à
+   servir partout où l'on peut retirer un planning. Une feuille se choisit sur
+   la portée du composant, pas sur l'écran où on l'a écrit.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.gv-retrait-attente {
+  display: flex; align-items: center; gap: 9px;
+  font-size: 0.9rem; color: var(--t-muted);
+}
+
+/* La période et la date de diffusion : le contexte, avant l'inventaire. */
+.gv-retrait-quand {
+  font-size: 0.95rem; line-height: 1.55; color: var(--text);
+}
+
+/* ── Recopier le nom ────────────────────────────────────────────────────────
+   Le geste NON RÉFLEXE. Le nom à recopier est affiché juste au-dessus du champ,
+   en évidence : on ne demande pas de le retrouver de mémoire — on demande de
+   s'arrêter assez longtemps pour le taper. */
+.gv-retrait-saisie {
+  display: grid; gap: 6px;
+  padding: 13px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--t-border);
+  border-left: 3px solid var(--danger);
+  border-radius: var(--r-md);
+}
+
+.gv-retrait-saisie label {
+  font-size: 0.82rem; font-weight: 600; color: var(--text);
+}
+
+.gv-retrait-modele {
+  font-size: 0.95rem; font-weight: 700; color: var(--t-accent);
+  /* Sélectionnable, mais pas « copiable d'un geste » : le but est de le taper. */
+  letter-spacing: 0.01em;
+}
+
+.gv-retrait-ecart {
+  font-size: 0.78rem; color: var(--t-muted);
+}
