@@ -15,6 +15,7 @@
 
 import { z } from 'zod'
 import { updateVeterinaire } from '@/app/(protected)/admin/veterinaires/actions'
+import { etiquettesProches } from '@/lib/equipe/etiquettes'
 import { SANS_PARAMETRE, type ContexteOutil, type OutilEcriture, type OutilLecture } from './types'
 
 interface FicheVeto {
@@ -145,7 +146,53 @@ const ParamsModifier = z.object({
     .describe(
       'Remplace TOUTES ses étiquettes (junior, senior…). Pour en ajouter une, reprends les existantes.',
     ),
+  confirmer_nouvelles_etiquettes: z
+    .boolean()
+    .optional()
+    .describe(
+      'Ne le mets à true QUE si la personne a confirmé vouloir créer une étiquette qui ressemble à une étiquette déjà utilisée dans le cabinet (par exemple « séniors » alors que « senior » existe). Sans cette confirmation, la modification est refusée et il faut lui demander laquelle elle veut.',
+    ),
 })
+
+/**
+ * Le vocabulaire d'étiquettes RÉELLEMENT en usage dans le cabinet, toutes
+ * fiches confondues. C'est lui qui sert de référence : une étiquette n'existe
+ * pas parce qu'elle est plausible, elle existe parce que quelqu'un la porte.
+ */
+function vocabulaireEtiquettes(equipe: FicheVeto[]): string[] {
+  return equipe.flatMap((v) => v.tags ?? [])
+}
+
+/**
+ * Barrage au JUMEAU ORTHOGRAPHIQUE.
+ *
+ * Écrire « séniors » quand l'équipe dit « senior » réussit sans un mot : la
+ * fiche affiche bien la nouvelle étiquette, et l'admin voit que ça a marché.
+ * Mais les règles de composition portent sur l'étiquette à la lettre près —
+ * elles cessent alors d'atteindre cette personne. Le contrôle de
+ * `regles/actions.ts` ne rattrape rien : l'étiquette fautive est désormais
+ * portée, donc valide à ses yeux.
+ *
+ * On ne bloque PAS la création d'une étiquette réellement nouvelle : c'est
+ * légitime, et le cabinet a le droit d'enrichir son vocabulaire. On ne bloque
+ * que la RESSEMBLANCE, et on la renvoie sous forme de question. La personne
+ * tranche, Filou rappelle l'outil avec sa réponse.
+ */
+function refusJumeauEtiquette(
+  etiquettes: string[] | undefined,
+  equipe: FicheVeto[],
+  confirme: boolean | undefined,
+): string | null {
+  if (!etiquettes || confirme) return null
+  const proches = etiquettesProches(etiquettes, vocabulaireEtiquettes(equipe))
+  if (proches.length === 0) return null
+
+  const questions = proches.map(
+    (p) =>
+      `« ${p.demandee} » n’existe pas encore dans le cabinet, mais ${p.proches.map((e) => `« ${e} »`).join(' et ')} oui`,
+  )
+  return `${questions.join(' ; ')}. Les règles du cabinet visent l’étiquette à la lettre près : une écriture voisine créerait un doublon et cette personne sortirait sans bruit des règles existantes. Tu veux laquelle ?`
+}
 
 export const modifierVeterinaire: OutilEcriture<typeof ParamsModifier> = {
   genre: 'ecriture',
@@ -154,7 +201,9 @@ export const modifierVeterinaire: OutilEcriture<typeof ParamsModifier> = {
 
 Appelle-le quand la demande revient à changer la façon dont quelqu'un est programmé sans passer par une règle — « ne la programme qu'en dépannage », « remets-le dans le planning », « marque-la comme senior ».
 
-Ne touche que ce que tu précises : les champs que tu laisses de côté ne bougent pas. Rien n'est enregistré tant que la personne n'a pas validé.`,
+Ne touche que ce que tu précises : les champs que tu laisses de côté ne bougent pas. Rien n'est enregistré tant que la personne n'a pas validé.
+
+ÉTIQUETTES — les règles du cabinet visent l'étiquette à la lettre près. Si tu demandes une étiquette qui ressemble à une étiquette déjà utilisée (« séniors » alors que « senior » existe), l'outil refuse et te dit laquelle existe : demande à la personne ce qu'elle veut, puis rappelle l'outil — avec l'étiquette existante, ou avec confirmer_nouvelles_etiquettes à true si elle veut vraiment créer la nouvelle.`,
   params: ParamsModifier,
   adminSeulement: true,
 
@@ -180,6 +229,8 @@ Ne touche que ce que tu précises : les champs que tu laisses de côté ne bouge
       )
     }
     if (params.etiquettes) {
+      const jumeau = refusJumeauEtiquette(params.etiquettes, equipe, params.confirmer_nouvelles_etiquettes)
+      if (jumeau) return { ok: false, raison: jumeau }
       const avant = (v.tags ?? []).join(', ') || 'aucune'
       const apres = params.etiquettes.join(', ') || 'aucune'
       if (avant !== apres) lignes.push(`Étiquettes : ${avant} → ${apres}`)
@@ -210,6 +261,13 @@ Ne touche que ce que tu précises : les champs que tu laisses de côté ne bouge
     const trouve = resoudre(equipe, params.prenom)
     if (!trouve.ok) return { error: trouve.raison }
     const v = trouve.veto
+
+    // Rejoué À FROID. Le résumé a barré le jumeau orthographique, mais rien ne
+    // garantit que ce qui arrive ici est ce qui a été résumé : l'équipe a pu
+    // changer entre les deux, et cette exécution ne relit pas une `charge`
+    // scellée — elle repart des paramètres.
+    const jumeau = refusJumeauEtiquette(params.etiquettes, equipe, params.confirmer_nouvelles_etiquettes)
+    if (jumeau) return { error: jumeau }
 
     // On repasse par l'action de l'écran Équipe : mêmes gardes admin, même RLS,
     // même contrôle d'unicité d'e-mail. La fiche est renvoyée ENTIÈRE, avec les

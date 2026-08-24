@@ -41,6 +41,7 @@ import {
   type CreerRelationPayload,
   type CreerCreneauSurMesurePayload,
 } from '@/app/(protected)/admin/structure/actions'
+import { adresseBienFormee } from '@/lib/emails/destinataire'
 import type { CreerProfilCompletPayload } from '@/lib/ia/profilSchema'
 import type { CreerRelationIaPayload } from '@/lib/ia/relationSchema'
 import { SANS_PARAMETRE, type ContexteOutil, type OutilEcriture, type OutilLecture, type PropositionAction } from './types'
@@ -1238,7 +1239,7 @@ Appelle-le quand la demande change l'un de ces branchements — « change l'exp�
     const email = params.email_expediteur?.trim() ?? actuel?.brevo_from_email ?? ''
     const nom = params.nom_expediteur?.trim() ?? actuel?.brevo_from_name ?? ''
 
-    if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    if (email && !adresseBienFormee(email)) {
       return { ok: false, raison: `« ${email} » n'est pas une adresse e-mail valide.` }
     }
 
@@ -1268,9 +1269,23 @@ Appelle-le quand la demande change l'un de ces branchements — « change l'exp�
     if (c?.googleCalendarId === undefined) {
       return { error: 'La proposition a été perdue — redemande-la à Filou.' }
     }
+
+    // La `charge` fait l'aller-retour par le NAVIGATEUR : la vérification faite
+    // au résumé ne prouve rien sur ce qui revient. Et ce champ-là n'est pas un
+    // réglage de confort — une adresse d'expéditeur bancale fait tomber les
+    // SEPT chemins d'envoi du cabinet (planning publié, rappels, échanges,
+    // congés…), silencieusement, comme le 21 août. On revérifie donc ici, au
+    // moment d'écrire. Vide reste permis : c'est le retour au réglage serveur.
+    const emailAEcrire = (c.brevoFromEmail ?? '').trim()
+    if (emailAEcrire !== '' && !adresseBienFormee(emailAEcrire)) {
+      return {
+        error: `« ${emailAEcrire} » n'est pas une adresse e-mail valide — je ne l'enregistre pas : plus aucun e-mail du cabinet ne partirait. Redonne-moi l'adresse expéditrice.`,
+      }
+    }
+
     const r = await configurerPartagesCabinet({
       googleCalendarId: c.googleCalendarId,
-      brevoFromEmail: c.brevoFromEmail ?? '',
+      brevoFromEmail: emailAEcrire,
       brevoFromName: c.brevoFromName ?? '',
     })
     return 'error' in r ? { error: r.error } : {}

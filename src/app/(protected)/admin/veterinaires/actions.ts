@@ -87,7 +87,17 @@ function normaliserCouleur(couleur: string | null | undefined): string {
   return normaliserHex(couleur) ?? COULEUR_DEFAUT
 }
 
-/** Normalise les étiquettes (frontière de confiance) : minuscules, uniques, bornées. */
+/**
+ * Normalise les étiquettes (frontière de confiance) : minuscules, uniques, bornées.
+ *
+ * ⚠️ Ce qui n'est PAS ici, et ne peut pas y être : le JUMEAU ORTHOGRAPHIQUE.
+ * « séniors » est une étiquette parfaitement bien formée ; seule la confrontation
+ * au vocabulaire déjà en usage dans le cabinet révèle que « senior » existe et
+ * que les règles portent dessus. Cette confrontation appartient à l'appelant,
+ * qui seul peut poser la question à l'humain plutôt que de trancher à sa place —
+ * voir `lib/equipe/etiquettes.ts` et son usage dans `lib/ia/outils/equipe.ts`.
+ * Refuser ici casserait l'enregistrement d'une fiche pour une étiquette valide.
+ */
 function normaliserTags(tags: string[] | undefined): string[] {
   return [
     ...new Set(

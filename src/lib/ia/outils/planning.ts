@@ -614,6 +614,29 @@ const ParamsPublierPeriode = z.object({
   periode: z.string().describe('La période à publier, ex. « Hiver P2 ».'),
 })
 
+/** Réponse de POST /api/publish, telle qu'on a besoin de la lire ici. */
+interface ReponsePublish {
+  success?: boolean
+  error?: string
+  requiresConfirmation?: boolean
+  violations?: Array<{ detail: string }>
+  souhaitsEnAttente?: number
+}
+
+/** Un aller-retour vers la route de publication. Isolé pour que l'exécution
+ *  puisse l'appeler DEUX fois : une première sans confirmation (c'est la route
+ *  qui recalcule les réserves), une seconde avec, une fois qu'on a vérifié que
+ *  rien de nouveau n'était apparu depuis l'aperçu. */
+async function appelerPublish(periodeId: string, confirmAvecReserves: boolean): Promise<ReponsePublish> {
+  const req = new Request('http://filou.local/api/publish', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ periodeId, confirmAvecReserves }),
+  })
+  const res = await publierPOST(req as unknown as Parameters<typeof publierPOST>[0])
+  return (await res.json()) as ReponsePublish
+}
+
 export const publierPeriode: OutilEcriture<typeof ParamsPublierPeriode> = {
   genre: 'ecriture',
   nom: 'publier_periode',
@@ -654,9 +677,9 @@ C'est une action qui touche toute l'équipe : les vétérinaires sont notifiés 
     // tout est sain — un `[]` par défaut serait indistinguable d'un vrai
     // zéro. Sur l'action la plus lourde de conséquences du produit
     // (notification à toute l'équipe, synchro agenda, écrasement d'un
-    // planning publié), on distingue les deux et on le dit en clair : la
-    // publication reste possible (c'est l'humain qui décide), mais il
-    // décide en sachant que la vérification n'a pas pu être faite.
+    // planning publié), on distingue les deux et on le dit en clair. Un
+    // contrôle en échec est reporté dans la `charge` : l'exécution refusera
+    // alors de publier, faute de pouvoir comparer l'avant et l'après.
     let violations: Array<{ detail: string }> = []
     let controleViolationsEchoue = false
     try {
@@ -672,13 +695,22 @@ C'est une action qui touche toute l'équipe : les vétérinaires sont notifiés 
       controleSouhaitsEchoue = true
     }
 
+    // Contrôle en panne : on ne propose PAS de bouton. Un bouton « Publier »
+    // qui refusera au clic est une coquille vide, et publier quand même serait
+    // prévenir toute l'équipe d'un planning que personne n'a relu.
+    if (controleViolationsEchoue || controleSouhaitsEchoue) {
+      const quoi = controleViolationsEchoue && controleSouhaitsEchoue
+        ? 'Les contrôles des règles du planning et des demandes de congé en attente n’ont pas pu être faits'
+        : controleViolationsEchoue
+          ? 'Le contrôle des règles du planning n’a pas pu être fait'
+          : 'Le contrôle des demandes de congé en attente n’a pas pu être fait'
+      return {
+        ok: false,
+        raison: `${quoi} — je ne te propose pas de publier « ${libellePeriode(p)} » sans savoir ce qu’il y a dedans : toute l’équipe serait prévenue. Redemande-moi dans un instant, ou passe par l’écran Planning si ça persiste.`,
+      }
+    }
+
     const lignes: string[] = []
-    if (controleViolationsEchoue) {
-      lignes.push('⚠️ Le contrôle des règles du planning n’a pas pu être fait — regarde l’écran Planning avant de continuer.')
-    }
-    if (controleSouhaitsEchoue) {
-      lignes.push('⚠️ Le contrôle des demandes de congé en attente n’a pas pu être fait — regarde l’écran Planning avant de continuer.')
-    }
     if (violations.length > 0) {
       lignes.push(`${violations.length} point${violations.length > 1 ? 's' : ''} de règle non respecté${violations.length > 1 ? 's' : ''} :`)
       lignes.push(...violations.slice(0, 8).map((v) => `• ${v.detail}`))
@@ -699,28 +731,80 @@ C'est une action qui touche toute l'équipe : les vétérinaires sont notifiés 
         action: 'Publier',
         avertissement: `Tous les vétérinaires seront notifiés et le planning sera synchronisé vers Google Agenda.${lignes.length > 0 ? ' Ces réserves resteront présentes après publication.' : ''}`,
       },
-      charge: { periodeId: p.id },
+      charge: {
+        periodeId: p.id,
+        // Ce qui a été MONTRÉ. L'exécution redemande le contrôle à la route et
+        // compare : une réserve apparue entre l'affichage et le clic n'est pas
+        // publiée en douce. Même patron que `reparer_absence` (absences.ts) et
+        // que la validation d'échange (echanges.ts).
+        violationsMontrees: violations.map((v) => v.detail),
+        souhaitsMontres: souhaitsEnAttente,
+        // Un contrôle qui a ÉCHOUÉ à l'aperçu ne donne aucun point de
+        // comparaison : on ne peut pas dire « rien de nouveau » quand on n'a
+        // jamais rien lu. L'exécution s'arrête plutôt que de confirmer à
+        // l'aveugle des réserves que l'admin n'a pas pu voir.
+        controleEchoue: controleViolationsEchoue || controleSouhaitsEchoue,
+      },
     }
   },
 
   async executer(_params, _ctx, charge) {
-    const c = charge as { periodeId?: string } | undefined
+    const c = charge as
+      | {
+          periodeId?: string
+          violationsMontrees?: string[]
+          souhaitsMontres?: number
+          controleEchoue?: boolean
+        }
+      | undefined
     if (!c?.periodeId) return { error: 'La proposition a été perdue — redemande-la à Filou.' }
 
-    // Délégation à la route réelle : c'est elle qui écrit le statut, envoie
-    // les e-mails et synchronise l'agenda — jamais dupliqué ici. On passe
-    // confirmAvecReserves systématiquement à true : les réserves ont déjà
-    // été montrées et validées au moment de l'aperçu, la route n'a pas à
-    // redemander une confirmation que Filou vient d'obtenir.
-    const req = new Request('http://filou.local/api/publish', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ periodeId: c.periodeId, confirmAvecReserves: true }),
-    })
-    const res = await publierPOST(req as unknown as Parameters<typeof publierPOST>[0])
-    const data = (await res.json()) as { success?: boolean; error?: string; requiresConfirmation?: boolean }
-    if (data.error) return { error: data.error }
-    if (data.requiresConfirmation) {
+    if (c.controleEchoue) {
+      return {
+        error:
+          "Je n'ai pas pu vérifier l'état du planning au moment de te faire la proposition — je ne publie pas sur un contrôle absent : toute l'équipe serait prévenue d'un planning que personne n'a relu. Redemande-moi de publier, je referai la vérification et je te montrerai ce qu'elle donne.",
+      }
+    }
+
+    // Délégation à la route réelle : c'est elle qui écrit le statut, envoie les
+    // e-mails et synchronise l'agenda — jamais dupliqué ici.
+    //
+    // PREMIER APPEL SANS CONFIRMATION. C'est la route qui recalcule et qui
+    // tranche, pas Filou. Trois issues :
+    //   • elle publie      → il n'y avait rien à signaler, terminé ;
+    //   • elle demande une confirmation avec EXACTEMENT les réserves déjà
+    //     montrées → on confirme, l'admin a tranché en connaissance de cause ;
+    //   • elle en remonte une NOUVELLE → on n'écrit pas. Publier reste possible
+    //     avec des réserves (le système informe, il n'interdit pas), mais pas
+    //     avec des réserves que personne n'a vues.
+    const premier = await appelerPublish(c.periodeId, false)
+    if (premier.error) return { error: premier.error }
+    if (!premier.requiresConfirmation) return {}
+
+    const montrees = new Set(c.violationsMontrees ?? [])
+    const nouvelles = (premier.violations ?? []).map((v) => v.detail).filter((d) => !montrees.has(d))
+    const souhaitsEnPlus = (premier.souhaitsEnAttente ?? 0) - (c.souhaitsMontres ?? 0)
+
+    if (nouvelles.length > 0 || souhaitsEnPlus > 0) {
+      const morceaux: string[] = []
+      if (nouvelles.length > 0) {
+        morceaux.push(
+          `${nouvelles.length === 1 ? 'un point de règle' : `${nouvelles.length} points de règle`} que je ne t'avais pas montré${nouvelles.length === 1 ? '' : 's'} — ${nouvelles.slice(0, 5).join(' ')}`,
+        )
+      }
+      if (souhaitsEnPlus > 0) {
+        morceaux.push(
+          `${souhaitsEnPlus === 1 ? 'une demande de congé de plus' : `${souhaitsEnPlus} demandes de congé de plus`} en attente sur ces dates`,
+        )
+      }
+      return {
+        error: `Le planning a changé depuis ma proposition : il y a maintenant ${morceaux.join(' et ')}. Je ne publie pas sans te l'avoir montré — redemande-moi de publier pour que je te présente la situation à jour.`,
+      }
+    }
+
+    const second = await appelerPublish(c.periodeId, true)
+    if (second.error) return { error: second.error }
+    if (second.requiresConfirmation) {
       return { error: 'La publication a été refusée par un contrôle imprévu — redemande à Filou de publier à nouveau.' }
     }
     return {}
