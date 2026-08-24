@@ -12,6 +12,7 @@ import {
   motifInvitationImpossible,
   normaliserAdresse,
 } from '@/lib/emails/destinataire'
+import { COULEUR_DEFAUT, normaliserHex } from '@/lib/couleurs'
 
 /**
  * Rafraîchit les DEUX écrans qui listent l'équipe.
@@ -66,6 +67,24 @@ export interface VeterinaireFormData {
   dernier_recours: boolean
   /** Étiquettes d'équipe (junior/senior…) — règles de composition (n°6). */
   tags?: string[]
+}
+
+/**
+ * Normalise la couleur (frontière de confiance), comme on le fait des tags.
+ *
+ * Tant que le formulaire n'offrait qu'une palette fermée de quatorze pastilles,
+ * rien d'autre qu'un hexadécimal valide ne pouvait arriver ici : le contrôle
+ * était dans la forme du choix. Depuis le 2026-08-24, la couleur se tape et se
+ * colle — et cette action n'est pas le seul chemin d'écriture : l'outil IA
+ * `lib/ia/outils/equipe.ts` repasse par elle. Une valeur bancale s'installerait
+ * en base (la colonne n'a aucun CHECK) et s'afficherait comme du vide.
+ *
+ * On ne refuse pas : la couleur n'est pas ce qu'on est venu régler, et bloquer
+ * l'enregistrement d'une fiche pour ça serait disproportionné. On replie sur le
+ * gris par défaut, celui de la migration 001.
+ */
+function normaliserCouleur(couleur: string | null | undefined): string {
+  return normaliserHex(couleur) ?? COULEUR_DEFAUT
 }
 
 /** Normalise les étiquettes (frontière de confiance) : minuscules, uniques, bornées. */
@@ -125,7 +144,7 @@ export async function createVeterinaire(data: VeterinaireFormData) {
     email,
     statut: data.statut,
     role_app: data.role_app,
-    couleur: data.couleur,
+    couleur: normaliserCouleur(data.couleur),
     actif: data.actif,
     dernier_recours: data.dernier_recours,
     tags: normaliserTags(data.tags),
@@ -173,7 +192,7 @@ export async function updateVeterinaire(id: string, data: VeterinaireFormData) {
       email,
       statut: data.statut,
       role_app: data.role_app,
-      couleur: data.couleur,
+      couleur: normaliserCouleur(data.couleur),
       actif: data.actif,
       dernier_recours: data.dernier_recours,
       tags: normaliserTags(data.tags),

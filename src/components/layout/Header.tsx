@@ -7,6 +7,7 @@ import { NotificationBell } from '@/components/notifications/NotificationBell'
 import type { NotificationsState } from '@/data/notifications'
 import type { Veterinaire } from '@/types'
 import { LogOut } from 'lucide-react'
+import { stylePastille } from '@/lib/couleurs'
 
 const ROLE_LABELS: Record<string, string> = {
   admin: 'Admin',
@@ -36,8 +37,8 @@ export function Header({ veterinaire, initialNotifications }: HeaderProps) {
 
         {/* Avatar couleur veto */}
         <div
-          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold shrink-0"
-          style={{ backgroundColor: veterinaire.couleur }}
+          className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold shrink-0"
+          style={stylePastille(veterinaire.couleur)}
           title={`${veterinaire.prenom} ${veterinaire.nom}`}
         >
           {veterinaire.prenom.charAt(0).toUpperCase()}

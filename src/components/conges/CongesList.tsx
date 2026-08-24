@@ -20,6 +20,7 @@ import { CriseModal, type VetCrise } from '@/components/planning/CriseModal'
 import { deleteConge, type ConflitPlanning } from '@/app/(protected)/conges/actions'
 import type { CreneauImpacte } from '@/lib/crise/contexte'
 import type { Conge, StatutConge, TypeConge, Veterinaire } from '@/types'
+import { stylePastille } from '@/lib/couleurs'
 
 const TYPE_LABELS: Record<TypeConge, string> = {
   vacances: 'Vacances', formation: 'Formation', sante: 'Santé',
@@ -145,8 +146,8 @@ export function CongesList({ conges, vets, currentUserId, isAdmin, conflitsParCo
       <div className="flex items-center gap-3 p-3.5 rounded-lg border border-border bg-card">
         {isAdmin && showVet ? (
           <div
-            className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
-            style={{ backgroundColor: vet?.couleur ?? '#ccc' }}
+            className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
+            style={stylePastille(vet?.couleur)}
           >
             {vet?.prenom.charAt(0) ?? '?'}
           </div>
@@ -283,7 +284,7 @@ export function CongesList({ conges, vets, currentUserId, isAdmin, conflitsParCo
                     : 'border-border bg-card hover:bg-muted/40'
                 }`}
               >
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: vet.couleur }}>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={stylePastille(vet.couleur)}>
                   {vet.prenom.charAt(0)}
                 </div>
                 <div className="min-w-0">

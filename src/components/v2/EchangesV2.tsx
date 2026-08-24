@@ -39,6 +39,7 @@ import {
 } from '@/app/(protected)/echanges/actions'
 import { humaniserCodeGarde } from '@/lib/libelles-gardes'
 import type { EchangeRow, GardeLite, VetLite } from '@/components/echanges/EchangesClient'
+import { stylePastilleVar } from '@/lib/couleurs'
 
 interface Props {
   moiId: string
@@ -258,7 +259,7 @@ export function EchangesV2({ moiId, isAdmin, echanges, gardesFutures, vets }: Pr
     return (
       <li>
         <div className="row">
-          <span className="vet-dot" style={{ ['--c' as string]: vet?.couleur ?? 'var(--soft)' }}>
+          <span className="vet-dot" style={stylePastilleVar(vet?.couleur)}>
             {(vet?.prenom ?? '?').slice(0, 1)}
           </span>
           <div className="row-main">

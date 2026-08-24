@@ -8,6 +8,7 @@ import { RefuserCongeDialog } from '@/components/conges/RefuserCongeDialog'
 import { ConflitPublieBadge } from '@/components/conges/ConflitPublieBadge'
 import type { CreneauImpacte } from '@/lib/crise/contexte'
 import type { Conge, Veterinaire } from '@/types'
+import { stylePastille } from '@/lib/couleurs'
 
 const TYPE_LABELS: Record<string, string> = {
   vacances: 'Vacances', formation: 'Formation', sante: 'Santé',
@@ -76,8 +77,8 @@ export function DemandesClient({ demandes, vets, currentVetoId, conflitsParConge
     return (
       <div className="flex items-center gap-3 p-3.5 rounded-lg border border-border bg-card">
         <div
-          className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
-          style={{ backgroundColor: vet?.couleur ?? '#ccc' }}
+          className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
+          style={stylePastille(vet?.couleur)}
         >
           {vet?.prenom.charAt(0) ?? '?'}
         </div>

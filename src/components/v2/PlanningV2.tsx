@@ -32,6 +32,7 @@ import type { CompteursRow } from '@/hooks/useCompteurs'
 import type { BilanVet } from '@/engine/bilan'
 import type { CleColonne } from '@/lib/planning/colonnesCompteurs'
 import type { GardeDenormalisee, Periode, ProfilPlanning } from '@/types'
+import { stylePoint } from '@/lib/couleurs'
 
 interface Props {
   gardes: GardeDenormalisee[]
@@ -776,7 +777,7 @@ function LigneVet({
     </>
   ) : (
     <>
-      <span className="vdot" style={{ background: couleur ?? 'var(--soft)' }} aria-hidden="true" />
+      <span className="vdot" style={stylePoint(couleur)} aria-hidden="true" />
       {prenom}
       {role && <span className="role">{role}</span>}
     </>

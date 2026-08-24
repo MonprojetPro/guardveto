@@ -54,6 +54,8 @@ import {
   type VeterinaireFormData,
 } from '@/app/(protected)/admin/veterinaires/actions'
 import { GardienImpact } from '@/components/v2/GardienImpact'
+import { SelecteurCouleur, COULEURS_SUGGEREES } from '@/components/v2/SelecteurCouleur'
+import { normaliserHex, stylePastille } from '@/lib/couleurs'
 import type { Impact } from '@/data/controleImpact'
 import type { StatutVeto, UserRole, Veterinaire } from '@/types'
 import {
@@ -63,34 +65,17 @@ import {
 } from '@/lib/emails/destinataire'
 
 /**
- * Palette du Terrier — les valeurs partent en base, donc en dur, pas en var().
+ * La couleur de départ d'une fiche neuve.
  *
- * Quatorze teintes réparties sur toute la roue chromatique, à saturation et
- * luminosité constantes : elles se distinguent entre elles ET restent de la
- * même famille, celle du terrier. Elles étaient huit, dont deux bleus et deux
- * oranges qu'on confondait (retour MiKL 2026-07-31 : « certaines se
- * ressemblent un peu trop et il n'y a pas assez de choix »).
- *
- * L'ordre n'est pas décoratif : il suit la roue, du rouge au violet. Deux
- * pastilles voisines dans la liste sont donc voisines à l'œil — on trouve « le
- * vert » sans balayer toute la ligne.
+ * ── 2026-08-24 : la palette fermée a disparu d'ici ─────────────────────────
+ * Quatorze teintes vivaient dans ce fichier, et le formulaire n'offrait
+ * qu'elles. Anne-Sophie demandait qu'on en ajoute trois pour retrouver les
+ * couleurs de son agenda Google ; MiKL a tranché plus large — un sélecteur
+ * libre, « comme ça on règle le problème définitivement ». Les quatorze teintes
+ * survivent comme RACCOURCIS dans `SelecteurCouleur` (`COULEURS_SUGGEREES`),
+ * avec les trois qu'elle voulait, mais elles ne bornent plus rien.
  */
-const COULEURS = [
-  { hex: '#C0392B', nom: 'Rouge brique' },
-  { hex: '#C7530F', nom: 'Orange terrier' },
-  { hex: '#B5761A', nom: 'Ambre' },
-  { hex: '#8A7A1E', nom: 'Olive doré' },
-  { hex: '#5E7D1B', nom: 'Vert pousse' },
-  { hex: '#2F7D3F', nom: 'Vert forêt' },
-  { hex: '#0B7D6C', nom: 'Vert lagon' },
-  { hex: '#2E7A8C', nom: 'Bleu canard' },
-  { hex: '#2C6BA8', nom: 'Bleu ardoise' },
-  { hex: '#3B4FC4', nom: 'Bleu franc' },
-  { hex: '#6B4FBE', nom: 'Violet doux' },
-  { hex: '#8E3FA8', nom: 'Prune' },
-  { hex: '#B93A72', nom: 'Framboise' },
-  { hex: '#8A5A3C', nom: 'Terre de Sienne' },
-]
+const COULEUR_INITIALE = COULEURS_SUGGEREES[0].hex
 
 /**
  * Étiquettes proposées d'office, même quand personne ne les porte encore : ce
@@ -161,7 +146,7 @@ const FORM_VIDE: FormState = {
   email: '',
   statut: 'salarie',
   role_app: 'veto',
-  couleur: COULEURS[0].hex,
+  couleur: COULEUR_INITIALE,
   dernier_recours: false,
   tags: [],
 }
@@ -173,7 +158,12 @@ function formDepuisVeto(v: Veterinaire): FormState {
     email: v.email ?? '',
     statut: v.statut,
     role_app: v.role_app,
-    couleur: v.couleur,
+    // La couleur en base est reprise TELLE QUELLE — c'est tout l'intérêt d'un
+    // choix libre : elle n'a plus à figurer dans une liste pour être gardée.
+    // Seule sa forme est remise d'aplomb (`#abc` et `#aabbcc` sont la même
+    // couleur, mais pas la même chaîne : sans ça, la pastille de raccourci
+    // correspondante ne se montrerait pas cochée).
+    couleur: normaliserHex(v.couleur) ?? COULEUR_INITIALE,
     dernier_recours: v.dernier_recours,
     tags: v.tags ?? [],
   }
@@ -567,36 +557,20 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
             </div>
             <div className="field" style={{ gridColumn: '1 / -1' }}>
               <label id="cf-couleur-label">Couleur</label>
-              <div className="swatches" role="group" aria-labelledby="cf-couleur-label">
-                {/* La couleur déjà en base d'abord, si elle n'est plus dans la
-                    palette. Les fiches existantes portent encore les couleurs
-                    d'avant le terrier : sans cette pastille, « Modifier »
-                    n'affichait AUCUNE sélection, et on croyait la fiche sans
-                    couleur alors qu'elle en avait une. */}
-                {form.couleur && !COULEURS.some((c) => c.hex === form.couleur) && (
-                  <button
-                    type="button"
-                    className="swatch swatch-hors-palette"
-                    style={{ background: form.couleur }}
-                    aria-pressed
-                    aria-label={`Couleur actuelle (${form.couleur})`}
-                    title="Couleur actuelle — hors palette"
-                    onClick={() => setForm({ ...form, couleur: form.couleur })}
-                  />
-                )}
-                {COULEURS.map((c) => (
-                  <button
-                    key={c.hex}
-                    type="button"
-                    className="swatch"
-                    style={{ background: c.hex }}
-                    aria-pressed={form.couleur === c.hex}
-                    aria-label={c.nom}
-                    title={c.nom}
-                    onClick={() => setForm({ ...form, couleur: c.hex })}
-                  />
-                ))}
-              </div>
+              {/* Plus de « couleur hors palette » à rattraper : il n'y a plus
+                  de palette dont on puisse être dehors. La teinte en base est
+                  la teinte affichée, d'où qu'elle vienne — et l'aperçu montre
+                  les initiales de la personne, avec l'encre que le planning
+                  posera vraiment dessus. */}
+              <SelecteurCouleur
+                valeur={form.couleur}
+                onChange={(hex) => setForm((f) => ({ ...f, couleur: hex }))}
+                initiales={
+                  `${form.prenom.trim().charAt(0)}${form.nom.trim().charAt(0)}`.toUpperCase() || '?'
+                }
+                ariaLabelledBy="cf-couleur-label"
+                disabled={isPending}
+              />
             </div>
             <div className="field" style={{ gridColumn: '1 / -1' }}>
               <label>Étiquettes d&apos;équipe</label>
@@ -673,7 +647,7 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
                   visuel »). La phrase de rôle a sauté : elle répétait mot pour
                   mot la pastille « Admin » posée 30 px plus bas. */}
               <div className="vet-card-top">
-                <span className="vet-avatar" style={{ background: v.couleur }} aria-hidden="true">
+                <span className="vet-avatar" style={stylePastille(v.couleur)} aria-hidden="true">
                   {v.prenom.charAt(0).toUpperCase()}
                 </span>
                 <div style={{ minWidth: 0 }}>

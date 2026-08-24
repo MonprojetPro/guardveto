@@ -22,6 +22,7 @@ import { useRouter } from 'next/navigation'
 import { changerStatutCompensation } from '@/app/(protected)/admin/depannages/actions'
 import type { CompensationLigne } from '@/components/admin/DepannagesClient'
 import type { RoleCompensation, StatutCompensation, TypeGarde, Veterinaire } from '@/types'
+import { stylePointVar } from '@/lib/couleurs'
 
 interface Props {
   lignes: CompensationLigne[]
@@ -106,7 +107,7 @@ export function DepannagesV2({ lignes, stats, vets }: Props) {
     if (!prenom) return <span className="dep-vet">—</span>
     return (
       <span className="dep-vet">
-        <i style={{ ['--c' as string]: couleurParPrenom.get(prenom) ?? 'var(--soft)' }} />
+        <i style={stylePointVar(couleurParPrenom.get(prenom))} />
         {prenom}
       </span>
     )

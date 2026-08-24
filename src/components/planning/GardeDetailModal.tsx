@@ -17,6 +17,7 @@ import type { VetDispo, DisponibilitesData } from '@/app/api/gardes/[id]/disponi
 import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
 import { placesDeGarde, vetsDeGarde } from '@/lib/gardes/places'
 import { ViolationDialog } from './ViolationDialog'
+import { stylePastille, stylePoint } from '@/lib/couleurs'
 
 // ── Types ────────────────────────────────────────────────
 
@@ -140,7 +141,7 @@ function PlaceGarde({
 
         {titulaire ? (
           <span className="gm-current">
-            <span className="dot" style={{ background: titulaire.couleur }}>
+            <span className="dot" style={stylePastille(titulaire.couleur)}>
               {titulaire.prenom.charAt(0)}
             </span>
             {titulaire.prenom} {titulaire.nom}
@@ -194,7 +195,7 @@ function PlaceGarde({
                     aria-current={selected === v.id ? 'true' : undefined}
                     onClick={() => onSelect(v.id)}
                   >
-                    <span className="dot" style={{ background: v.couleur }} />
+                    <span className="dot" style={stylePoint(v.couleur)} />
                     <span>{v.prenom} {v.nom}</span>
                     <span className={`av-state ${tone}`}>●</span>
                     <span className="av-reason">{raison || 'Disponible'}</span>
@@ -545,7 +546,7 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
                       {placesDeGarde(garde).length > 1 ? `${p.role} de garde` : 'De garde'}
                     </span>
                     <span className="gm-current">
-                      <span className="dot" style={{ background: p.couleur ?? 'var(--soft)' }}>
+                      <span className="dot" style={stylePastille(p.couleur)}>
                         {(p.prenom ?? '?').charAt(0)}
                       </span>
                       {p.prenom} {p.nom}
@@ -748,7 +749,7 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
                       {p.role || `${p.place_index + 1}e de garde`}
                     </span>
                     <span className="gm-current">
-                      <span className="dot" style={{ background: p.couleur }}>
+                      <span className="dot" style={stylePastille(p.couleur)}>
                         {p.prenom.charAt(0)}
                       </span>
                       {p.prenom} {p.nom}

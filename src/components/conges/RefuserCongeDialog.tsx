@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { refuserConge } from '@/app/(protected)/conges/actions'
 import type { Conge, Veterinaire } from '@/types'
+import { stylePastille } from '@/lib/couleurs'
 
 function formatDate(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString('fr-FR', {
@@ -48,8 +49,8 @@ export function RefuserCongeDialog({ open, onClose, conge, vet }: RefuserCongeDi
           {vet && (
             <div className="flex items-center gap-2.5 p-3 rounded-lg bg-muted/50">
               <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                style={{ backgroundColor: vet.couleur }}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                style={stylePastille(vet.couleur)}
               >
                 {vet.prenom.charAt(0)}
               </div>

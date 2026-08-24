@@ -61,6 +61,7 @@ import type {
   RegleEnCause,
 } from '@/engine/diagnostic'
 import { humaniserCodeGarde } from '@/lib/libelles-gardes'
+import { stylePastille, stylePoint } from '@/lib/couleurs'
 
 // ── Types des contrats API (LOT 3) ───────────────────────
 
@@ -154,8 +155,8 @@ const MOTIFS: { value: MotifAbsence; label: string }[] = [
 function VetAvatar({ prenom, couleur }: { prenom: string; couleur: string }) {
   return (
     <div
-      className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-      style={{ backgroundColor: couleur }}
+      className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+      style={stylePastille(couleur)}
     >
       {prenom.charAt(0)}
     </div>
@@ -317,7 +318,7 @@ function LigneReparation({
                 <span className="flex items-center gap-2">
                   <span
                     className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
-                    style={{ backgroundColor: remplacant.couleur }}
+                    style={stylePoint(remplacant.couleur)}
                   />
                   {remplacant.prenom} {remplacant.nom}
                 </span>
@@ -634,7 +635,7 @@ export function CriseModal({
                       <span className="flex items-center gap-2">
                         <span
                           className="w-2.5 h-2.5 rounded-full inline-block"
-                          style={{ backgroundColor: absentVet.couleur }}
+                          style={stylePoint(absentVet.couleur)}
                         />
                         {absentVet.prenom} {absentVet.nom}
                       </span>
@@ -648,7 +649,7 @@ export function CriseModal({
                         <span className="flex items-center gap-2">
                           <span
                             className="w-2.5 h-2.5 rounded-full inline-block"
-                            style={{ backgroundColor: v.couleur }}
+                            style={stylePoint(v.couleur)}
                           />
                           {v.prenom} {v.nom}
                         </span>

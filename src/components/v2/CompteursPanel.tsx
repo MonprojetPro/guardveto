@@ -29,6 +29,7 @@ import {
 } from '@/lib/planning/colonnesCompteurs'
 import type { CompteursRow } from '@/hooks/useCompteurs'
 import type { BilanVet } from '@/engine/bilan'
+import { stylePoint } from '@/lib/couleurs'
 
 interface Props {
   lignes: CompteursRow[]
@@ -191,7 +192,7 @@ export function CompteursPanel({ lignes, bilans, colonnes }: Props) {
               style={{ '--nb-col': choix.length } as React.CSSProperties}
             >
               <span className="cnt-vet">
-                <i style={{ background: l.couleur }} />
+                <i style={stylePoint(l.couleur)} />
                 {/* Le statut (assoc./sal.) vivait ici en petit à côté du prénom.
                     Retiré le 2026-08-04 (MiKL) : il ne sert à rien dans un
                     tableau de CHIFFRES — il n'explique aucun écart, l'équité ne

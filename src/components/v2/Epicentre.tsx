@@ -34,6 +34,7 @@ import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
 import { CartesViolations } from '@/components/planning/CartesViolations'
 import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
 import type { DonneesAccueil, GardeDuSoir } from '@/data/v2/accueilEpicentre'
+import { stylePastille } from '@/lib/couleurs'
 
 type Fenetre = 'cesoir' | 'souhaits' | 'periode' | 'coherence' | 'filou'
 
@@ -530,7 +531,7 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
                   <div className="fen-body">
                     {data.souhaits.map((s) => (
                       <div className="souhait-row" key={s.id}>
-                        <span className="vdot" style={{ background: s.couleur }} aria-hidden="true">
+                        <span className="vdot" style={stylePastille(s.couleur)} aria-hidden="true">
                           {initiale(s.prenom)}
                         </span>
                         <span className="s-what">
@@ -783,7 +784,7 @@ function CarteGarde({
 }) {
   return (
     <div className="garde-card">
-      <span className="big-dot" style={{ background: couleur }} aria-hidden="true">
+      <span className="big-dot" style={stylePastille(couleur)} aria-hidden="true">
         {initiale(prenom)}
       </span>
       <div className="g-qui">
@@ -825,12 +826,12 @@ function FicheCeSoir({ garde, onOpen }: { garde: GardeDuSoir | null; onOpen: () 
         <p>{majuscule(natureEtHoraire(garde))}</p>
         <span className="w-duo" aria-hidden="true">
           {garde.premier && (
-            <span className="vdot" style={{ background: garde.premier.couleur }}>
+            <span className="vdot" style={stylePastille(garde.premier.couleur)}>
               {initiale(garde.premier.prenom)}
             </span>
           )}
           {garde.second && (
-            <span className="vdot" style={{ background: garde.second.couleur }}>
+            <span className="vdot" style={stylePastille(garde.second.couleur)}>
               {initiale(garde.second.prenom)}
             </span>
           )}

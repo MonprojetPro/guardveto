@@ -30,6 +30,7 @@ import { Ecart } from './Ecart'
 import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from '@/components/ui/select'
+import { stylePoint } from '@/lib/couleurs'
 
 // ── Ce que la page a préparé ──────────────────────────────────────────────
 
@@ -408,7 +409,7 @@ export function HistoriqueV2({
                   <tr key={r.veterinaire_id} className={r.veterinaire_id === moiId ? 'moi' : undefined}>
                     <td>
                       <span className="ct-vet">
-                        <i style={{ background: r.couleur }} />
+                        <i style={stylePoint(r.couleur)} />
                         {r.prenom}
                         {r.statut === 'salarie' && <span className="sal">sal.</span>}
                       </span>
@@ -474,7 +475,7 @@ export function HistoriqueV2({
                   <tr key={r.veterinaire_id} className={r.veterinaire_id === moiId ? 'moi' : undefined}>
                     <td>
                       <span className="ct-vet">
-                        <i style={{ background: r.couleur }} />
+                        <i style={stylePoint(r.couleur)} />
                         {r.prenom}
                       </span>
                     </td>
@@ -512,7 +513,7 @@ export function HistoriqueV2({
                   <tr key={r.veterinaire_id} className={r.veterinaire_id === moiId ? 'moi' : undefined}>
                     <td>
                       <span className="ct-vet">
-                        <i style={{ background: r.couleur }} />
+                        <i style={stylePoint(r.couleur)} />
                         {r.prenom}
                       </span>
                     </td>
@@ -569,7 +570,7 @@ export function HistoriqueV2({
                     <tr key={r.veterinaire_id} className={r.veterinaire_id === moiId ? 'moi' : undefined}>
                       <td>
                         <span className="ct-vet">
-                          <i style={{ background: r.couleur }} />
+                          <i style={stylePoint(r.couleur)} />
                           {r.prenom}
                         </span>
                         {(d?.dettesOuvertes ?? 0) > 0 && (
@@ -649,25 +650,25 @@ export function HistoriqueV2({
               return cumul.map((c) => (
                 <div className="cm-row" key={c.veterinaire_id}>
                   <span className="cm-vet">
-                    <i style={{ background: c.couleur }} />
+                    <i style={stylePoint(c.couleur)} />
                     {c.prenom}
                   </span>
                   <span className="cm-cell">
                     <b>{c.we}</b>
                     <span className="bar">
-                      <i style={{ width: `${(c.we / maxWE) * 100}%`, background: c.couleur }} />
+                      <i style={{ width: `${(c.we / maxWE) * 100}%`, ...stylePoint(c.couleur) }} />
                     </span>
                   </span>
                   <span className="cm-cell">
                     <b>{c.sem}</b>
                     <span className="bar">
-                      <i style={{ width: `${(c.sem / maxSem) * 100}%`, background: c.couleur }} />
+                      <i style={{ width: `${(c.sem / maxSem) * 100}%`, ...stylePoint(c.couleur) }} />
                     </span>
                   </span>
                   <span className="cm-cell">
                     <b>{c.feries}</b>
                     <span className="bar">
-                      <i style={{ width: `${(c.feries / maxFer) * 100}%`, background: c.couleur }} />
+                      <i style={{ width: `${(c.feries / maxFer) * 100}%`, ...stylePoint(c.couleur) }} />
                     </span>
                   </span>
                 </div>

@@ -44,6 +44,7 @@ import type { OrigineFilou } from '@/lib/v2/filou-origine'
 import type { CreneauImpacte } from '@/lib/crise/contexte'
 import type { VerdictSouhait } from '@/lib/conges/detection-conflit'
 import type { Conge, TypeConge, Veterinaire } from '@/types'
+import { stylePastilleVar, stylePointVar } from '@/lib/couleurs'
 
 type Onglet = 'conges' | 'echanges' | 'depannages'
 
@@ -338,7 +339,7 @@ export function AbsencesV2({
                         <div className="row">
                           <span
                             className="vet-dot"
-                            style={{ ['--c' as string]: vet?.couleur ?? 'var(--soft)' }}
+                            style={stylePastilleVar(vet?.couleur)}
                           >
                             {(vet?.prenom ?? '?').slice(0, 1)}
                           </span>
@@ -417,7 +418,7 @@ export function AbsencesV2({
                       aria-pressed={filtreVet === v.id}
                       onClick={() => setFiltreVet(v.id)}
                     >
-                      <i style={{ ['--c' as string]: v.couleur }} />
+                      <i style={stylePointVar(v.couleur)} />
                       {v.prenom} · {compteParVet.get(v.id)}
                     </button>
                   ))}
@@ -451,7 +452,7 @@ export function AbsencesV2({
                       <div className="row">
                         <span
                           className="vet-dot"
-                          style={{ ['--c' as string]: vet?.couleur ?? 'var(--soft)' }}
+                          style={stylePastilleVar(vet?.couleur)}
                         >
                           {(vet?.prenom ?? '?').slice(0, 1)}
                         </span>

@@ -81,7 +81,7 @@
 
 .vet-dot {
   flex: none; width: 34px; height: 34px; border-radius: 50%;
-  background: var(--c, var(--soft)); color: #fff;
+  background: var(--c, var(--soft)); color: var(--encre, #fff);
   font-family: var(--font-display); font-weight: 800; font-size: 0.74rem;
   display: inline-flex; align-items: center; justify-content: center;
   margin-top: 2px;
@@ -194,7 +194,15 @@
   font-size: 0.78rem; font-weight: 600;
   padding: 6px 12px; border-radius: 999px; min-height: 34px;
 }
-.vet-filter i { width: 10px; height: 10px; border-radius: 50%; background: var(--c, var(--soft)); }
+/* `--lisere` : un point de 10 px dans une teinte quasi blanche fait un trou
+   dans la page plutôt qu'une pastille. `stylePoint*()` le pose seulement quand
+   la mesure le réclame — `none` partout ailleurs, donc rien ne change pour les
+   quatorze teintes du terrier. Voir `src/lib/couleurs.ts`. */
+.vet-filter i {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--c, var(--soft));
+  box-shadow: var(--lisere, none);
+}
 .vet-filter:hover { border-color: var(--accent-ink); color: var(--accent-ink); }
 .vet-filter[aria-pressed="true"] { background: var(--t-accent); border-color: var(--t-accent); color: #fff; }
 .vet-filter[aria-pressed="true"] i { background: #fff; }
@@ -238,7 +246,12 @@
 }
 .dep-table tr:last-child td { border-bottom: none; }
 .dep-table .dep-vet { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; white-space: nowrap; }
-.dep-table .dep-vet i { width: 10px; height: 10px; border-radius: 50%; background: var(--c, var(--soft)); flex: none; }
+.dep-table .dep-vet i {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--c, var(--soft));
+  box-shadow: var(--lisere, none);
+  flex: none;
+}
 .dep-table small { display: block; color: var(--soft); font-size: 0.72rem; margin-top: 2px; }
 .dep-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .dep-actions button {

@@ -45,6 +45,7 @@ import {
   type TypeCreneauOption,
   type VetoMini,
 } from '@/components/regles/ReglesClient'
+import { stylePastille } from '@/lib/couleurs'
 
 interface Props {
   /** La fiche depuis laquelle on a ouvert : sujet de toutes ces règles.
@@ -142,7 +143,7 @@ export function ContraintesVetoModale({
         <DialogContent className="gv-modale">
           <DialogHeader>
             <DialogTitle className="cv-titre">
-              <span className="cv-avatar" style={{ background: veto.couleur ?? '#C7530F' }} aria-hidden="true">
+              <span className="cv-avatar" style={stylePastille(veto.couleur)} aria-hidden="true">
                 {veto.prenom.charAt(0).toUpperCase()}
               </span>
               Les contraintes de {veto.prenom}

@@ -17,6 +17,7 @@ import {
   MailWarning,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { stylePastille } from '@/lib/couleurs'
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   ArrowLeftRight,
@@ -95,8 +96,8 @@ export function Sidebar({ veterinaire, nbSouhaits = 0, nbEchanges = 0 }: Sidebar
       <div className="p-4 border-t border-border">
         <div className="flex items-center gap-2">
           <div
-            className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-            style={{ backgroundColor: veterinaire.couleur }}
+            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+            style={stylePastille(veterinaire.couleur)}
           >
             {veterinaire.prenom.charAt(0)}
           </div>

@@ -46,7 +46,7 @@
 .vet-card-top { display: flex; align-items: center; gap: 12px; }
 .vet-avatar {
   width: 46px; height: 46px; border-radius: 50%;
-  color: #fff; font-family: var(--font-display);
+  color: var(--encre, #fff); font-family: var(--font-display);
   font-weight: 800; font-size: 1rem;
   display: inline-flex; align-items: center; justify-content: center;
   flex: none;
@@ -226,7 +226,7 @@
 .cv-titre { display: flex; align-items: center; gap: 10px; }
 .cv-avatar {
   width: 30px; height: 30px; border-radius: 50%;
-  color: #fff; font-family: var(--font-display);
+  color: var(--encre, #fff); font-family: var(--font-display);
   font-weight: 800; font-size: 0.82rem;
   display: inline-flex; align-items: center; justify-content: center;
   flex: none;
@@ -474,4 +474,145 @@
 
 @media (max-width: 640px) {
   .team-grid { grid-template-columns: 1fr; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   LE SÉLECTEUR DE COULEUR (2026-08-24)
+   ──────────────────────────────────────────────────────────────────────────
+   La palette fermée est devenue un choix libre. Trois contraintes de forme
+   commandent tout ce qui suit :
+
+   · LE DOIGT. Le rectangle fait 150 px de haut et la barre 16 px : au-dessous,
+     on ne vise plus rien au pouce. Les deux portent `touch-action: none`, sans
+     quoi le navigateur interprète le glissement comme un défilement de page et
+     la couleur ne bouge pas d'un pixel.
+   · L'HABILLAGE reste sur les jetons du terrier (--t-border, --t-muted,
+     --t-accent). Les seules couleurs en dur ici sont les DONNÉES : les deux
+     voiles du dégradé et l'arc-en-ciel de la barre, qui sont l'espace des
+     couleurs lui-même, pas de la décoration.
+   · LE FOCUS SE VOIT. Les deux curseurs se prennent au clavier ; un anneau de
+     focus invisible aurait rendu ce chemin inutilisable.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.selcoul { display: flex; flex-direction: column; gap: 10px; max-width: 340px; }
+
+/* ── Le rectangle saturation × luminosité ─────────────────────────────── */
+.selcoul-aire {
+  position: relative;
+  height: 150px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--t-border);
+  cursor: crosshair;
+  touch-action: none;
+  overflow: hidden;
+  user-select: none;
+}
+.selcoul-aire:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+/* Blanc vers la gauche (désaturation), noir vers le bas (assombrissement) :
+   les deux voiles superposés fabriquent le dégradé classique. */
+.selcoul-voile-blanc,
+.selcoul-voile-noir {
+  position: absolute; inset: 0; pointer-events: none;
+}
+.selcoul-voile-blanc { background: linear-gradient(90deg, #FFFFFF, rgba(255, 255, 255, 0)); }
+.selcoul-voile-noir  { background: linear-gradient(0deg, #000000, rgba(0, 0, 0, 0)); }
+
+/* ── La barre de teinte ───────────────────────────────────────────────── */
+.selcoul-barre {
+  position: relative;
+  height: 16px;
+  border-radius: 999px;
+  border: 1px solid var(--t-border);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  background: linear-gradient(90deg,
+    #FF0000 0%, #FFFF00 16.66%, #00FF00 33.33%,
+    #00FFFF 50%, #0000FF 66.66%, #FF00FF 83.33%, #FF0000 100%);
+}
+.selcoul-barre:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+
+/* ── Les deux curseurs ────────────────────────────────────────────────── */
+/* 18 px, double liseré blanc puis noir : il reste visible aussi bien sur un
+   coin blanc du dégradé que sur son coin noir. */
+.selcoul-curseur {
+  position: absolute;
+  width: 18px; height: 18px;
+  margin-left: -9px; margin-top: -9px;
+  border-radius: 50%;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+.selcoul-curseur-barre { top: 50%; }
+
+/* ── La ligne du bas : aperçu, code, pipette ──────────────────────────── */
+.selcoul-bas { display: flex; align-items: flex-end; gap: 10px; }
+
+/* L'aperçu porte les initiales : c'est la pastille du planning en vrai, pas un
+   carré de couleur. Mêmes dimensions et même graisse que `.vet-avatar`. */
+.selcoul-apercu {
+  width: 42px; height: 42px; flex: none;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--font-display);
+  font-weight: 800; font-size: 0.95rem;
+  border: 1px solid var(--t-border);
+}
+
+.selcoul-champ { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.selcoul-label {
+  font-size: 0.7rem; font-weight: 700; color: var(--t-muted);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.selcoul-hex {
+  width: 100%;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 9px 11px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text);
+}
+.selcoul-hex:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 1px; }
+/* Une saisie en cours qui ne fait pas encore une couleur : on la signale, on ne
+   la refuse pas — il faut bien passer par « #CF9E6 » pour écrire « #CF9E64 ». */
+.selcoul-hex.douteux { border-color: var(--warn); }
+
+.selcoul-pipette {
+  width: 42px; height: 42px; flex: none;
+  display: grid; place-items: center;
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--t-muted);
+  cursor: pointer;
+}
+.selcoul-pipette:hover:not(:disabled) {
+  border-color: var(--t-accent); color: var(--t-accent);
+}
+.selcoul-pipette:disabled { opacity: 0.5; cursor: not-allowed; }
+.selcoul-pipette svg { width: 17px; height: 17px; }
+
+.selcoul-aide {
+  font-size: 0.76rem; line-height: 1.5; color: var(--t-muted);
+}
+
+.selcoul-suggestions {
+  display: flex; gap: 7px; flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: 1px solid var(--t-border);
+  margin-top: 2px;
+}
+
+@media (max-width: 640px) {
+  .selcoul { max-width: none; }
+  /* Plus haut au doigt qu'à la souris : le pouce est moins précis, et l'écran
+     est plus étroit — il faut compenser en hauteur ce qu'on perd en largeur. */
+  .selcoul-aire { height: 180px; }
+  .selcoul-barre { height: 22px; }
+  .selcoul-curseur { width: 22px; height: 22px; margin-left: -11px; margin-top: -11px; }
 }

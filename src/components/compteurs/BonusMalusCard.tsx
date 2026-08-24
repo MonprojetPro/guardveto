@@ -21,6 +21,7 @@ import { Loader2 } from 'lucide-react'
 import { Ecart } from '@/components/v2/Ecart'
 import type { BilanVet } from '@/engine/bilan'
 import type { BonusMalusRow } from '@/hooks/useCompteurs'
+import { stylePoint } from '@/lib/couleurs'
 
 // ── Types ────────────────────────────────────────────────
 
@@ -182,7 +183,7 @@ export function BonusMalusCard({
                 <tr key={l.veterinaire_id}>
                   <td>
                     <span className="ct-vet">
-                      <i style={{ background: l.couleur }} />
+                      <i style={stylePoint(l.couleur)} />
                       {l.prenom} {l.nom}
                     </span>
                   </td>

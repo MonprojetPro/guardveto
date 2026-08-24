@@ -931,7 +931,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .gm-current .dot {
   width: 22px; height: 22px; border-radius: 50%; flex: none;
   display: inline-flex; align-items: center; justify-content: center;
-  color: #fff; font-size: 0.62rem; font-weight: 800;
+  color: var(--encre, #fff); font-size: 0.62rem; font-weight: 800;
 }
 .gm-current.none { color: var(--t-muted); font-weight: 600; font-style: italic; }
 

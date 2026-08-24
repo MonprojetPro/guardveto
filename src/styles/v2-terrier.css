@@ -994,10 +994,22 @@ a.widget { color: inherit; text-decoration: none; }
 }
 .widget:hover .w-go { transform: translateX(3px); color: var(--accent-ink); }
 .widget .w-duo { display: inline-flex; gap: 5px; align-items: center; margin-top: 4px; }
+/* ── `--encre` : pourquoi ce n'est plus `#fff` (2026-08-24) ────────────────
+   Sept règles de ce projet posaient du texte sur une couleur de vétérinaire en
+   écrivant `color: #fff` en dur. Ce n'était pas un oubli : les quatorze teintes
+   de la palette fermée étaient toutes moyennement sombres, le blanc passait
+   partout. Depuis que la couleur se choisit librement (un jaune clair pour
+   Fanny, un rose clair pour Anne-Sophie), l'hypothèse ne tient plus.
+   L'encre est calculée par `encreLisible()` et posée en variable par
+   `stylePastille()` — voir `src/lib/couleurs.ts`. Le `#fff` de repli garde le
+   rendu d'avant partout où la variable n'est pas fournie.
+   Les sept : .vet-avatar, .cv-avatar (v2-equipe) · .vet-dot (v2-absences) ·
+   .vdot, .fiche-id .big-dot, .garde-card .big-dot (ici) ·
+   .gm-current .dot (v2-planning). */
 .vdot {
   display: inline-flex; align-items: center; justify-content: center;
   width: 22px; height: 22px; border-radius: 50%;
-  color: #fff; font-family: var(--font-display);
+  color: var(--encre, #fff); font-family: var(--font-display);
   font-size: 0.6rem; font-weight: 700;
   flex: none;
 }
@@ -1134,7 +1146,7 @@ a.widget { color: inherit; text-decoration: none; }
 .fiche-id .big-dot {
   width: 46px; height: 46px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
-  color: #fff; font-family: var(--font-display);
+  color: var(--encre, #fff); font-family: var(--font-display);
   font-size: 0.95rem; font-weight: 700; flex: none;
 }
 .fiche-id h3 { font-size: 1rem; font-weight: 700; }
@@ -1245,7 +1257,7 @@ a.widget { color: inherit; text-decoration: none; }
 .garde-card .big-dot {
   width: 44px; height: 44px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
-  color: #fff; font-family: var(--font-display);
+  color: var(--encre, #fff); font-family: var(--font-display);
   font-size: 0.9rem; font-weight: 700; flex: none;
 }
 /* `min-width: 0` : sans lui, le nom refuse de céder et c'est la mission qui
