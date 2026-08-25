@@ -92,6 +92,47 @@ describe('Les limites du navigateur et celles du bucket disent la même chose', 
   })
 })
 
+describe('L’e-mail de support part sous une identité que Brevo accepte', () => {
+  // LE PIÈGE, ÉVITÉ DE JUSTESSE LE 2026-08-25.
+  //
+  // Le réflexe est d'expédier le support sous une identité générique : le
+  // message va vers l'éditeur, pas vers l'équipe. Sauf que le compte Brevo
+  // appartient au CLIENT et refuse toute adresse qu'il n'a pas vérifiée. Chez
+  // Val d'Allier, l'adresse MPP a été explicitement rejetée le 21/08
+  // (`sender not valid`) : un expéditeur générique aurait fait du support un
+  // huitième chemin d'envoi mort-né, silencieusement.
+  //
+  // Ce test lit le source. Il tombera le jour où quelqu'un refera le
+  // raisonnement de bon sens qui casse l'envoi.
+  const source = readFileSync(
+    join(__dirname, '..', '..', 'src', 'app', '(v2)', 'support', 'actions.ts'),
+    'utf8',
+  )
+
+  it('reprend l’expéditeur du cabinet, jamais une identité imposée', () => {
+    expect(source).toContain('fromEmail: cab.brevo_from_email')
+    expect(source).not.toMatch(/fromEmail:\s*null/)
+    expect(source).not.toMatch(/fromEmail:\s*'/)
+  })
+
+  it('emprunte `sendBrevoEmail`, comme les sept autres chemins', () => {
+    // Une tuyauterie à part serait un huitième endroit où la panne peut se
+    // cacher — c'est ce qui a laissé six chemins cassés pendant des semaines.
+    expect(source).toContain("from '@/lib/brevo'")
+    expect(source).not.toMatch(/fetch\(\s*['"`]https:\/\/api\.brevo\.com/)
+  })
+
+  it('enregistre la demande AVANT de tenter l’envoi', () => {
+    // L'ordre est la garantie qu'une panne de Brevo ne fait pas disparaître un
+    // signalement. Si l'insert passait après l'envoi, ce test tomberait.
+    const posInsert = source.indexOf("from('demandes_support').insert")
+    const posEnvoi = source.indexOf('await sendBrevoEmail(')
+    expect(posInsert).toBeGreaterThan(-1)
+    expect(posEnvoi).toBeGreaterThan(-1)
+    expect(posInsert).toBeLessThan(posEnvoi)
+  })
+})
+
 describe('Un fichier refusé sait dire pourquoi', () => {
   it('accepte une capture d’écran ordinaire', () => {
     expect(refusFichier({ name: 'capture.png', size: 850_000, type: 'image/png' })).toBeNull()

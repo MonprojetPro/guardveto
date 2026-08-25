@@ -183,10 +183,15 @@ export async function deposerDemandeSupport(
 
   const { data: cabinetDb } = await supabase
     .from('cabinets')
-    .select('nom')
+    .select('nom, brevo_from_email, brevo_from_name')
     .eq('id', cabinetId)
     .maybeSingle()
-  const nomCabinet = ((cabinetDb as { nom?: string | null } | null)?.nom ?? '').trim() || 'Cabinet'
+  const cab = (cabinetDb ?? {}) as {
+    nom?: string | null
+    brevo_from_email?: string | null
+    brevo_from_name?: string | null
+  }
+  const nomCabinet = (cab.nom ?? '').trim() || 'Cabinet'
 
   const quand = new Date().toLocaleString('fr-FR', {
     day: 'numeric',
@@ -220,13 +225,25 @@ export async function deposerDemandeSupport(
       contexte,
       quand,
     }),
-    // Expéditeur GÉNÉRIQUE, pas celui du cabinet : ce message va vers
-    // l'éditeur, pas vers l'équipe. L'adresse du cabinet sert à ce que les
-    // vétérinaires reconnaissent leur propre cabinet — elle n'a rien à faire
-    // ici, et une adresse cabinet mal réglée ferait tomber le support avec le
-    // reste (incident du 2026-08-21).
-    fromEmail: null,
-    fromName: 'GuardVeto',
+    // ⚠️ L'EXPÉDITEUR EST CELUI DU CABINET, et ce n'est pas un détail.
+    //
+    // Le premier réflexe est d'expédier sous une identité générique : le
+    // message va vers l'éditeur, pas vers l'équipe. C'était le choix initial,
+    // et il aurait cassé le support dès le premier essai.
+    //
+    // Le compte Brevo appartient au CLIENT, et Brevo refuse d'expédier depuis
+    // une adresse qu'il n'a pas vérifiée (`sender not valid`). Chez Val
+    // d'Allier, la seule vérifiée est `vetovaldallier@gmail.com` — l'adresse
+    // MPP y a été explicitement rejetée le 2026-08-21. Un expéditeur générique
+    // aurait donc produit un huitième chemin d'envoi mort-né, exactement comme
+    // les six trouvés ce jour-là.
+    //
+    // L'adresse du cabinet est donc utilisée, avec le repli d'environnement
+    // géré dans `sendBrevoEmail`. Le NOM affiché, lui, dit de quoi il s'agit :
+    // « … · Assistance » — sans quoi la boîte de l'éditeur reçoit un message
+    // qui a l'air d'un e-mail ordinaire du cabinet.
+    fromEmail: cab.brevo_from_email,
+    fromName: `${(cab.brevo_from_name ?? '').trim() || nomCabinet} · Assistance`,
   })
 
   const envoye = 'success' in resultat
