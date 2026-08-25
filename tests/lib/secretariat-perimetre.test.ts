@@ -165,6 +165,69 @@ describe('L’écran du secrétariat ne promet rien d’impossible', () => {
   })
 })
 
+describe('La gestion des fiches est réservée à l’administratrice', () => {
+  const actions = readFileSync(
+    join(RACINE, 'src', 'app', '(v2)', 'equipe', 'secretariat-actions.ts'),
+    'utf8',
+  )
+
+  it('chaque action pose sa garde admin, pas seulement l’écran', () => {
+    // Un écran qui masque un bouton n'empêche personne d'appeler l'action
+    // directement. Les quatre doivent donc vérifier elles-mêmes.
+    const nombreActions = (actions.match(/export async function/g) ?? []).length
+    const nombreGardes = (actions.match(/await assertAdmin\(supabase\)/g) ?? []).length
+    expect(nombreActions).toBe(4)
+    expect(nombreGardes).toBe(nombreActions)
+  })
+
+  it('invite par l’API officielle, jamais par un INSERT en base', () => {
+    // ⚠️ Leçon du 25/08 : un compte auth créé en SQL ne peut PAS se connecter
+    // (Supabase Auth exige des chaînes vides là où l'intuition met NULL), et
+    // le refus est générique — l'écran le traduit en « mot de passe
+    // incorrect », que personne ne peut relier à la vraie cause.
+    expect(actions).toContain('inviteUserByEmail')
+    expect(actions).not.toMatch(/from\('auth\.users'\)|insert into auth/i)
+  })
+
+  it('pose le cabinet dans le JETON après l’invitation', () => {
+    // `inviteUserByEmail` n'alimente que `user_metadata`. Sans cette seconde
+    // passe, le compte se crée, le mot de passe se définit, et la connexion
+    // échoue sur « compte pas activé » — incident du 2026-08-15.
+    expect(actions).toContain('app_metadata: { cabinet_id: sec.cabinet_id }')
+  })
+
+  it('n’annonce pas une invitation qui ne pourrait pas aboutir', () => {
+    // Si le rattachement au cabinet échoue, le compte est effacé : mieux vaut
+    // une invitation à refaire qu'un compte qui ne se connectera jamais sans
+    // que personne sache pourquoi.
+    const bloc = actions.slice(actions.indexOf('erreurMeta'))
+    expect(bloc).toContain('deleteUser(compteId)')
+  })
+
+  it('ne prétend pas savoir si la personne s’est connectée', () => {
+    // Le drapeau `invite_pending` des vétérinaires a menti deux mois sur la
+    // fiche de Fanny. Ici l'écran déduit son état de ce qu'il lit vraiment :
+    // il existe un compte, ou il n'en existe pas.
+    const section = readFileSync(
+      join(RACINE, 'src', 'components', 'v2', 'SecretariatSection.tsx'),
+      'utf8',
+    )
+    expect(section).not.toContain('invite_pending')
+    expect(section).toContain('aUnCompte')
+
+    // La nuance qui compte : « Invitation envoyée » en TOAST est un fait
+    // constaté à l'instant où l'action vient de réussir — c'est légitime. Ce
+    // qui est interdit, c'est d'en faire un ÉTAT affiché en permanence dans la
+    // liste, car plus rien ne le fait retomber le jour où la personne se
+    // connecte. On inspecte donc le dictionnaire des états, pas le fichier.
+    const dictionnaire = section.slice(
+      section.indexOf('const LIBELLE'),
+      section.indexOf('export function SecretariatSection'),
+    )
+    expect(dictionnaire).not.toMatch(/Invitation envoyée/)
+  })
+})
+
 describe('Aucun écran ne déconnecte le secrétariat par mégarde', () => {
   // L'ancien motif, recopié dans dix pages :
   //     const { data: moi } = await supabase.from('veterinaires')…single()

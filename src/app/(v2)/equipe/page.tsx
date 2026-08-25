@@ -15,6 +15,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { exigerVeterinaire } from '@/lib/identite'
+import { SecretariatSection, type FicheSecretariat } from '@/components/v2/SecretariatSection'
 import '@/styles/v2-equipe.css'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
@@ -60,6 +61,37 @@ export default async function EquipePage() {
   ])
 
   const vets = (vetsRes?.data ?? []) as Veterinaire[]
+
+  // ── Le secrétariat (B-017, lot 3) ──────────────────────────────────────
+  // Table à part, section à part : ce ne sont pas des vétérinaires, et le
+  // moteur de génération ne les lit jamais. Les fiches désactivées sont
+  // chargées aussi — c'est de là qu'on rétablit un accès.
+  //
+  // L'erreur est LUE : une section vide sur une lecture échouée ferait croire
+  // qu'aucun accès n'existe, et pousserait à en recréer un par-dessus.
+  const { data: secretairesDb, error: erreurSecretaires } = await supabase
+    .from('secretaires')
+    .select('id, nom, email, user_id, actif')
+    .order('actif', { ascending: false })
+    .order('nom')
+
+  if (erreurSecretaires) {
+    console.error('[Équipe] Lecture du secrétariat impossible :', erreurSecretaires.message)
+  }
+
+  const secretaires: FicheSecretariat[] = (
+    (secretairesDb ?? []) as { id: string; nom: string; email: string | null; user_id: string | null; actif: boolean }[]
+  ).map((s) => ({
+    id: s.id,
+    nom: s.nom,
+    email: s.email,
+    // On transmet un FAIT (« il existe un compte »), jamais une interprétation
+    // (« invitation envoyée ») : c'est le drapeau déclaratif qui a menti
+    // pendant deux mois sur la fiche de Fanny.
+    aUnCompte: s.user_id !== null,
+    actif: s.actif,
+  }))
+
   const dock = await chargerDock(supabase, vet)
 
   return (
@@ -74,6 +106,7 @@ export default async function EquipePage() {
           typesCreneaux={options.typesCreneaux}
           moiId={vet.id}
         />
+        <SecretariatSection fiches={secretaires} />
       </div>
     </>
   )
