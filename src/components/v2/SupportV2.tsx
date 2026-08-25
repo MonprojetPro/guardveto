@@ -213,13 +213,14 @@ export function SupportV2({ demandes, cabinetId, estAdmin }: Props) {
     <>
       {dialogueErreur}
 
+      {/* Le NOM de l'écran, et rien d'autre. Consigne MiKL du 2026-08-21,
+          re-appliquée ici le 25/08 : « je ne suis pas fan de tes paragraphes,
+          mets le titre plus en évidence, les gens comprendront ». Le lede qui
+          se trouvait ici décrivait ce que fait un formulaire posé juste en
+          dessous — une explication qui ne se lit jamais deux fois, et qui ne
+          se lisait déjà pas la première. Ne pas le réintroduire. */}
       <div className="page-head">
         <h1>Assistance</h1>
-        <p className="lede">
-          Un bouton qui ne répond pas, un planning qui s’affiche de travers, une idée pour la
-          suite : écris-le ici. C’est reçu directement, avec ce qu’il faut pour comprendre —
-          inutile de nous répéter quel écran ni quel navigateur.
-        </p>
       </div>
 
       {/* ── Le formulaire ──────────────────────────────────────────────── */}
