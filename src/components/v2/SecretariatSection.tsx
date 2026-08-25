@@ -34,7 +34,7 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Pencil, Power, UserPlus, X } from 'lucide-react'
+import { Pencil, Power, Trash2, UserPlus, X } from 'lucide-react'
 import { adresseUtilisable } from '@/lib/emails/destinataire'
 import { useErreurBloquante } from '@/components/v2/regles/ErreurBloquante'
 import {
@@ -42,6 +42,7 @@ import {
   creerSecretaire,
   inviterSecretaire,
   modifierSecretaire,
+  supprimerSecretaire,
 } from '@/app/(v2)/equipe/secretariat-actions'
 
 export interface FicheSecretariat {
@@ -77,6 +78,8 @@ export function SecretariatSection({ fiches }: { fiches: FicheSecretariat[] }) {
   const [edition, setEdition] = useState<string | null>(null)
   const [nom, setNom] = useState('')
   const [email, setEmail] = useState('')
+  /** La fiche dont on vient de demander la suppression — `null` = aucune. */
+  const [aSupprimer, setASupprimer] = useState<FicheSecretariat | null>(null)
 
   const ouvrirCreation = () => {
     setEdition('neuve')
@@ -116,6 +119,29 @@ export function SecretariatSection({ fiches }: { fiches: FicheSecretariat[] }) {
         return
       }
       toast.success(`Invitation envoyée à ${res.email}`)
+    })
+  }
+
+  const supprimer = (s: FicheSecretariat) => {
+    // Une confirmation, mais LÉGÈRE : le geste est irréversible, donc on
+    // demande — et il n'a aucune conséquence sur le planning, donc on ne
+    // déroule pas le garde-fou des vétérinaires (liste des gardes orphelines,
+    // double confirmation). Le poids de la question doit correspondre au poids
+    // de la conséquence.
+    setASupprimer(s)
+  }
+
+  const confirmerSuppression = () => {
+    const s = aSupprimer
+    if (!s) return
+    demarrer(async () => {
+      const res = await supprimerSecretaire(s.id)
+      setASupprimer(null)
+      if ('error' in res) {
+        ouvrirErreur(res.error, { titre: 'La fiche n’a pas été supprimée' })
+        return
+      }
+      toast.success(`Fiche « ${s.nom} » supprimée`)
     })
   }
 
@@ -265,7 +291,6 @@ export function SecretariatSection({ fiches }: { fiches: FicheSecretariat[] }) {
                     </button>
                     <button
                       type="button"
-                      className={s.actif ? 'vo-danger' : ''}
                       onClick={() => basculer(s)}
                       disabled={isPending}
                       title={
@@ -277,6 +302,22 @@ export function SecretariatSection({ fiches }: { fiches: FicheSecretariat[] }) {
                     >
                       {s.actif ? <Power aria-hidden="true" /> : <X aria-hidden="true" />}
                     </button>
+                    {/* La SUPPRESSION, à côté de l'extinction : les deux gestes
+                        ne disent pas la même chose. Éteindre retire l'accès en
+                        gardant la fiche (un remplacement d'été) ; supprimer
+                        efface fiche et compte. Sans enjeu de planning — une
+                        fiche de secrétariat n'est titulaire d'aucune garde —
+                        d'où l'absence du garde-fou des vétérinaires. */}
+                    <button
+                      type="button"
+                      className="vo-danger"
+                      onClick={() => supprimer(s)}
+                      disabled={isPending}
+                      title={`Supprimer definitivement la fiche de ${s.nom}`}
+                      aria-label={`Supprimer la fiche de ${s.nom}`}
+                    >
+                      <Trash2 aria-hidden="true" />
+                    </button>
                   </div>
                 </li>
               )
@@ -284,6 +325,60 @@ export function SecretariatSection({ fiches }: { fiches: FicheSecretariat[] }) {
           </ul>
         )}
       </section>
+
+      {/* La confirmation de suppression — volontairement SOBRE.
+          Le garde-fou des vétérinaires déroule la liste des gardes publiées
+          qui resteraient sans titulaire : ici il n'y en a aucune, par
+          construction. Poser la même question avec le même poids apprendrait
+          à cliquer sans lire, et userait l'alarme là où elle compte vraiment. */}
+      {aSupprimer && (
+        <div
+          className="modal-veil open"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="secr-suppr-titre"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isPending) setASupprimer(null)
+          }}
+        >
+          <div className="guard-modal">
+            <div className="guard-head">
+              <div>
+                <h3 id="secr-suppr-titre">Supprimer la fiche « {aSupprimer.nom} » ?</h3>
+                <p>
+                  {aSupprimer.aUnCompte
+                    ? 'La fiche et son compte de connexion sont effacés : la personne ne pourra plus se connecter. Rien d’autre ne bouge — le planning et les gardes ne sont pas concernés.'
+                    : 'La fiche est effacée. Rien d’autre ne bouge — le planning et les gardes ne sont pas concernés.'}
+                </p>
+              </div>
+            </div>
+
+            <p className="guard-note">
+              Pour retirer l’accès sans perdre la fiche — le temps d’un remplacement, par
+              exemple — utilise plutôt le bouton d’extinction.
+            </p>
+
+            <div className="guard-foot">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setASupprimer(null)}
+                disabled={isPending}
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={confirmerSuppression}
+                disabled={isPending}
+              >
+                {isPending ? 'Un instant…' : 'Supprimer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

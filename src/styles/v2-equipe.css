@@ -794,3 +794,8 @@
   .secr-carte { flex-wrap: wrap; }
   .secr-ident { flex-basis: 100%; order: 2; }
 }
+
+/* Le bas de l'écran Équipe respire. La section Secrétariat s'y termine, et sa
+   dernière carte touchait le bord de la fenêtre (retour MiKL, 2026-08-25) :
+   rien n'indiquait qu'on était arrivé au bout, la page semblait coupée. */
+.secr-bloc { padding-bottom: 48px; }

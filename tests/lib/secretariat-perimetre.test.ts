@@ -176,8 +176,17 @@ describe('La gestion des fiches est réservée à l’administratrice', () => {
     // directement. Les quatre doivent donc vérifier elles-mêmes.
     const nombreActions = (actions.match(/export async function/g) ?? []).length
     const nombreGardes = (actions.match(/await assertAdmin\(supabase\)/g) ?? []).length
-    expect(nombreActions).toBe(4)
-    expect(nombreGardes).toBe(nombreActions)
+
+    // On garde l'INVARIANT (autant de gardes que d'actions), pas un décompte
+    // figé : le 25/08, ce test a refusé l'ajout de `supprimerSecretaire` en
+    // exigeant exactement quatre actions. Il avait raison de se déclencher —
+    // une action de plus est bien un moment où l'on doit revérifier la garde —
+    // mais interdire d'en ajouter une n'est pas ce qu'on lui demande.
+    expect(nombreActions).toBeGreaterThanOrEqual(4)
+    expect(
+      nombreGardes,
+      `${nombreActions} actions exportées mais ${nombreGardes} gardes admin : l'une d'elles est ouverte à tout le monde.`,
+    ).toBe(nombreActions)
   })
 
   it('invite par l’API officielle, jamais par un INSERT en base', () => {

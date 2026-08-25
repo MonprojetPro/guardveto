@@ -79,7 +79,39 @@ async function assertAdmin(
     console.error('[Secrétariat] Lecture du profil impossible :', error.message)
     return { error: "Je n'arrive pas à vérifier tes droits pour le moment. Réessaie dans un instant." }
   }
-  if (!vet || vet.role_app !== 'admin') {
+  if (!vet) {
+    // ⚠️ CE CAS N'EST PAS « TU N'AS PAS LES DROITS ».
+    //
+    // Constaté le 2026-08-25 : MiKL, connecté en administratrice, crée une
+    // fiche de secrétariat avec SA propre adresse, ouvre l'invitation reçue
+    // dans le même navigateur — et la session bascule sur le compte
+    // secrétariat, 41 secondes après. L'écran Équipe, lui, reste affiché tel
+    // qu'il avait été rendu. Le clic suivant part donc avec la nouvelle
+    // session, et s'entend répondre « réservé à l'administrateur » alors
+    // qu'on se croit toujours administratrice.
+    //
+    // Le refus était juste ; le message était trompeur. On distingue donc le
+    // cas et on dit ce qui s'est réellement passé — sans quoi on cherche un
+    // problème de droits là où il y a un changement de session.
+    const { data: sec } = await supabase
+      .from('secretaires')
+      .select('nom')
+      .eq('user_id', user.id)
+      .eq('actif', true)
+      .maybeSingle()
+
+    if (sec) {
+      return {
+        error:
+          "Tu es maintenant connecté avec le compte « " +
+          sec.nom +
+          " », qui ne gère rien. Cet écran était encore affiché depuis ta session d’administratrice. Déconnecte-toi et reconnecte-toi avec ton compte habituel.",
+      }
+    }
+    return { error: "Réservé à l'administrateur du cabinet." }
+  }
+
+  if (vet.role_app !== 'admin') {
     return { error: "Réservé à l'administrateur du cabinet." }
   }
   return { ok: true as const }
@@ -286,6 +318,75 @@ export async function inviterSecretaire(id: string): Promise<ReponseInvitation> 
  * simplement l'accès — `get_user_role()` ne la reconnaît plus, donc plus
  * aucune des quatre lectures ne lui est accordée.
  */
+/**
+ * Supprime une fiche de secrétariat, et le compte qui va avec.
+ *
+ * Arbitrage MiKL du 2026-08-25 : « prévois une fonction suppression pour les
+ * secrétaires, de toute façon il n'y a pas d'enjeu comme pour les vétos ».
+ *
+ * C'est exact, et c'est ce qui distingue les deux gestes. Désactiver un
+ * VÉTÉRINAIRE demande un garde-fou : il peut rester titulaire de gardes
+ * publiées à venir, que la désactivation laisserait sans personne. Une fiche
+ * de secrétariat n'apparaît dans aucun planning, aucun compteur, aucune règle
+ * — la supprimer ne laisse rien d'orphelin. Le seul geste à ne pas oublier est
+ * de retirer AUSSI le compte : une fiche effacée sans son compte laisserait
+ * quelqu'un capable de se connecter sans que rien ne l'affiche à l'écran.
+ *
+ * La désactivation reste offerte à côté : elle sert à retirer un accès
+ * temporairement (un remplacement d'été) sans perdre la fiche.
+ */
+export async function supprimerSecretaire(id: string): Promise<ReponseSecretariat> {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return { error: garde.error }
+
+  const { data: sec, error: erreurLecture } = await supabase
+    .from('secretaires')
+    .select('id, user_id')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (erreurLecture) {
+    console.error('[Secrétariat] Lecture avant suppression impossible :', erreurLecture.message)
+    return { error: "Je n'arrive pas à lire cette fiche pour le moment. Réessaie dans un instant." }
+  }
+  if (!sec) return { error: 'Fiche de secrétariat introuvable.' }
+
+  // ── Le compte d'abord, la fiche ensuite ────────────────────────────────
+  // Dans cet ordre, une panne au milieu laisse une fiche SANS compte : c'est
+  // visible à l'écran (« jamais invitée ») et rattrapable. L'ordre inverse
+  // laisserait un compte capable de se connecter que plus rien n'affiche —
+  // invisible, donc jamais corrigé.
+  if (sec.user_id) {
+    const cle = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+    if (!cle) {
+      return {
+        error:
+          "Le compte lié ne peut pas être supprimé (réglage serveur manquant). Préviens l'assistance plutôt que de laisser un accès ouvert.",
+      }
+    }
+    const adminClient = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!.trim(), cle)
+    const { error: erreurCompte } = await adminClient.auth.admin.deleteUser(sec.user_id as string)
+    if (erreurCompte) {
+      console.error('[Secrétariat] Compte non supprimé :', erreurCompte.message)
+      return {
+        error:
+          "Le compte lié n'a pas pu être supprimé — la fiche est conservée pour ne pas laisser d'accès orphelin. Réessaie dans un instant.",
+      }
+    }
+  }
+
+  const { error } = await supabase.from('secretaires').delete().eq('id', id)
+  if (error) {
+    console.error('[Secrétariat] Suppression refusée :', error.message)
+    return { error: "La fiche n'a pas pu être supprimée. Réessaie dans un instant." }
+  }
+
+  revaliderEquipe()
+  return { success: true }
+}
+
 export async function basculerSecretaireActif(
   id: string,
   actif: boolean,
