@@ -200,6 +200,25 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
             </span>
           </Link>
         )}
+        {/* L'ASSISTANCE, ouverte à toute l'équipe (arbitrage MiKL du
+            2026-08-25). Le vétérinaire qui a vu le problème est celui qui sait
+            le décrire et joindre sa capture — le réserver à l'administrateur
+            aurait remis un intermédiaire entre le bug et le dépannage, ce que
+            ce chantier vient justement supprimer.
+            En dernier dans le dock : ce n'est pas un espace où l'on travaille,
+            c'est celui où l'on va quand quelque chose cloche. */}
+        <Link {...entree('/support')} href="/support" aria-label="Assistance">
+          <span className="di-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="8.4" />
+              <path d="M9.5 9.4a2.6 2.6 0 0 1 5 .9c0 1.8-2.5 2.2-2.5 3.8" />
+              <circle cx="12" cy="17" r="1" fill="currentColor" stroke="none" />
+            </svg>
+          </span>
+          <span className="di-flap" aria-hidden="true">
+            <span className="di-text">Assistance</span>
+          </span>
+        </Link>
       </nav>
 
       <form action={logout}>
