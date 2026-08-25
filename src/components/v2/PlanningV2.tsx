@@ -29,6 +29,7 @@ import { placesDeGarde } from '@/lib/gardes/places'
 import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
 import { CompteursPanel } from './CompteursPanel'
 import { AbsencesAVenirPanel, type AbsenceAVenir } from './AbsencesAVenirPanel'
+import { ImprimerPourSecretariat } from './ImprimerPourSecretariat'
 import type { CompteursRow } from '@/hooks/useCompteurs'
 import type { BilanVet } from '@/engine/bilan'
 import type { CleColonne } from '@/lib/planning/colonnesCompteurs'
@@ -328,8 +329,17 @@ export function PlanningV2({
           range. Pour l'équipe, le bouton « Compteurs » commande toujours. */}
       <div className={`workspace${compteursOuverts || lectureSeule ? '' : ' counters-closed'}`}>
         <div className="work-head">
-          {/* La période est un seul objet : la pilule EST le sélecteur, et sa
-              carte d'identité vit dans le panneau qu'elle ouvre. */}
+          {/* ⚠️ PAS DE NOTION DE PÉRIODE POUR LE SECRÉTARIAT.
+              MiKL, le 25/08, devant l'écran affichant « Hors période » :
+              « pas besoin de notion de période — tous les plannings publiés et
+              c'est tout ». La période est un outil de PRÉPARATION : on génère
+              et on publie par période. Le secrétariat ne prépare rien, il
+              regarde un calendrier. Pire, « Hors période » sur un mois sans
+              garde se lit comme une anomalie, alors que ce n'est qu'un mois
+              sans garde. Il navigue par mois, ce qui lui suffit — et le choix
+              de la période réapparaît au seul endroit où il a un sens :
+              l'impression. */}
+          {!lectureSeule && (
           <div className="period-wrap" ref={periodeRef} style={{ position: 'relative' }}>
             <button
               type="button"
@@ -472,6 +482,7 @@ export function PlanningV2({
               </div>
             )}
           </div>
+          )}
 
           <div className="month-nav">
             <button
@@ -510,7 +521,19 @@ export function PlanningV2({
                 Compteurs
               </button>
             )}
-            {pilules}
+            {/* Les pilules de l'équipe portent PDF, Absence, Générer,
+                Publier : trois gestes sur quatre lui sont refusés par le
+                serveur. On ne lui sert donc pas la même barre en espérant que
+                les boutons refusés ne soient pas cliqués — elle reçoit le seul
+                geste qui la concerne, l'impression, avec le choix de la
+                période au moment où la question se pose. */}
+            {lectureSeule ? (
+              <ImprimerPourSecretariat
+                periodes={periodes.filter((p) => periodesAvecGardes.includes(p.id))}
+              />
+            ) : (
+              pilules
+            )}
           </div>
         </div>
 

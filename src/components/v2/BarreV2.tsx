@@ -53,9 +53,15 @@ export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props
   })
 
   const brouillon = dock.statutPlanning === 'brouillon'
-  const libellePlanning = dock.statutPlanning
-    ? `Planning · ${brouillon ? 'Brouillon ' : ''}${dock.libellePlanning}`
-    : 'Planning · aucune période'
+  // Le secrétariat ne connaît pas les périodes (arbitrage MiKL du 25/08) :
+  // « Planning · Historique été 2026 » lui parlait d'un découpage qui ne le
+  // concerne pas, et « aucune période » se serait lu comme une panne. Le nom
+  // de l'espace suffit.
+  const libellePlanning = estSecretaire
+    ? 'Planning'
+    : dock.statutPlanning
+      ? `Planning · ${brouillon ? 'Brouillon ' : ''}${dock.libellePlanning}`
+      : 'Planning · aucune période'
 
   const libelleAbsences =
     dock.nbSouhaits > 0

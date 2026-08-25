@@ -2095,3 +2095,38 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   white-space: nowrap;
 }
 .abs-item.en-cours .abs-motif { color: var(--t-accent); }
+
+/* ── Le choix du planning à imprimer, côté secrétariat (B-017) ──────────
+   Le secrétariat n'a pas de sélecteur de période dans l'en-tête : la période
+   est un outil de préparation, il n'en prépare aucune. Elle ne réapparaît
+   qu'ici, à l'impression, parce qu'un PDF porte forcément une période
+   entière. */
+.pdf-choix { position: relative; }
+.pdf-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  min-width: 260px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
+  padding: 8px;
+}
+.pdf-menu-titre {
+  font-size: 0.7rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--t-muted);
+  padding: 4px 8px 8px;
+}
+.pdf-menu-item {
+  display: flex; flex-direction: column; gap: 2px;
+  width: 100%; text-align: left;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+}
+.pdf-menu-item:hover { background: var(--surface-2); border-color: var(--t-border); }
+.pdf-menu-item b { font-size: 0.82rem; font-weight: 700; }
+.pdf-menu-item span { font-size: 0.72rem; color: var(--t-muted); }

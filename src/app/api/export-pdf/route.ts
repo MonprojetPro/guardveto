@@ -13,6 +13,7 @@ import { createClient } from '@/lib/supabase/server'
 import { genererPdfPlanning } from '@/lib/pdf'
 import type { GardePdf, VetoPdf, ExceptionPdf } from '@/lib/pdf'
 import { chargerRelationsAffichagePeriode } from '@/data/chargerRelationsAffichage'
+import { resoudreIdentite } from '@/lib/identite'
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -23,15 +24,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
   }
 
-  const { data: vet } = await supabase
-    .from('veterinaires')
-    .select('role_app')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!vet || (vet.role_app !== 'admin' && vet.role_app !== 'veto')) {
-    return NextResponse.json({ error: 'Accès non autorisé.' }, { status: 403 })
+  // L'identité passe par la source unique : depuis le 2026-08-25, un compte
+  // peut être un secrétariat, qui n'a pas de fiche vétérinaire. La lecture
+  // directe de `veterinaires` renvoyait un 403 — donc le bouton PDF affiché
+  // dans son espace ne fonctionnait pas, alors que MiKL avait explicitement
+  // choisi de le lui laisser. Un bouton qui échoue vaut moins qu'un bouton
+  // absent.
+  const identite = await resoudreIdentite(supabase)
+  if (!identite.ok) {
+    return NextResponse.json(
+      {
+        error:
+          identite.raison === 'base-muette'
+            ? 'Base indisponible, réessaie dans un instant.'
+            : 'Accès non autorisé.',
+      },
+      { status: identite.raison === 'base-muette' ? 503 : 403 },
+    )
   }
+  const estAdmin = identite.identite.role === 'admin'
 
   // ── Paramètres ──────────────────────────────────────────────
   const periodeId = req.nextUrl.searchParams.get('periodeId')
@@ -78,8 +89,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Période introuvable.' }, { status: 404 })
   }
 
-  // Un véto ne peut exporter qu'un planning déjà publié (jamais un brouillon).
-  if (vet.role_app !== 'admin' && !['publie', 'verrouille'].includes(periode.statut)) {
+  // Personne d'autre que l'administratrice n'exporte un planning non DIFFUSÉ.
+  //
+  // ⚠️ Le critère est `publie_at`, pas le statut. Une période « verrouillée »
+  // peut n'avoir jamais été diffusée — c'est le cas de tout historique amorcé
+  // en base, et c'est précisément la distinction posée le 2026-08-20 dans
+  // `lib/planning/diffusion.ts`. Avec l'ancien test sur le statut, un
+  // vétérinaire pouvait exporter en PDF un planning que son propre écran ne
+  // lui montrait pas : un canal sortant plus permissif que l'écran, donc une
+  // fuite de brouillon par la porte de derrière.
+  if (!estAdmin && periode.publie_at === null) {
     return NextResponse.json({ error: "Ce planning n'est pas encore publié." }, { status: 403 })
   }
 
