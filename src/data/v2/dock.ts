@@ -20,11 +20,17 @@ type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 
 export async function chargerDock(
   supabase: SupabaseServerClient,
-  veterinaire: Veterinaire,
+  // Seul le rôle est lu ici. Le type est donc réduit à ce qu'on utilise
+  // vraiment, ce qui permet au secrétariat — qui n'a pas de fiche
+  // vétérinaire — de passer par la même fonction (B-017, 2026-08-25). Exiger
+  // un `Veterinaire` complet aurait obligé à en fabriquer un faux, et un faux
+  // vétérinaire qui circule dans le code finit toujours par arriver quelque
+  // part où on le prend pour un vrai.
+  qui: { role_app: string },
   /** Périodes déjà chargées par l'écran appelant — évite une requête de plus. */
   periodesConnues?: Periode[],
 ): Promise<DonneesDock> {
-  const estAdmin = veterinaire.role_app === 'admin'
+  const estAdmin = qui.role_app === 'admin'
   const today = aujourdhuiISO()
 
   const [periodesRes, vetosRes, souhaitsRes, echangesRes, cabinetRes] =

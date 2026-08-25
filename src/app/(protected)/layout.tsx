@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { exigerVeterinaire } from '@/lib/identite'
 import { Header } from '@/components/layout/Header'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { MobileNav } from '@/components/layout/MobileNav'
@@ -19,17 +20,11 @@ export default async function ProtectedLayout({
     redirect('/login')
   }
 
-  const { data: veterinaire } = await supabase
-    .from('veterinaires')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('actif', true)
-    .single()
-
-  if (!veterinaire) {
-    await supabase.auth.signOut()
-    redirect('/login')
-  }
+  // La coquille V1 est réservée aux vétérinaires. Le secrétariat qui taperait
+  // une de ces adresses est renvoyé vers le planning, pas déconnecté
+  // (B-017, 2026-08-25) : ces écrans portent tous des commandes, et aucun ne
+  // sait aujourd'hui se présenter en lecture seule.
+  const { veto: veterinaire } = await exigerVeterinaire(supabase)
 
   // Compteur souhaits en attente (admin uniquement)
   let nbSouhaits = 0

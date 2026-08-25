@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { resoudreIdentite } from '@/lib/identite'
 
 export async function login(formData: FormData) {
   // Mode dev : accès direct sans mot de passe
@@ -20,20 +21,32 @@ export async function login(formData: FormData) {
     return { error: 'Email ou mot de passe incorrect.' }
   }
 
-  // Vérifie que l'utilisateur a bien un profil vétérinaire lié
-  const { data: { user } } = await supabase.auth.getUser()
-  if (user) {
-    const { data: veto } = await supabase
-      .from('veterinaires')
-      .select('id, actif')
-      .eq('user_id', user.id)
-      .single()
+  // Le compte est-il rattaché à quelqu'un — vétérinaire OU secrétariat ?
+  //
+  // Avant le 2026-08-25 cette vérification ne connaissait que les
+  // vétérinaires : une secrétaire tapait le bon mot de passe et s'entendait
+  // répondre « votre compte n'est pas encore activé », ce qui était faux et
+  // sans issue. C'est le même motif que l'incident du 15/08 (un compte auth
+  // valide, rejeté par l'application faute d'être reconnu ailleurs).
+  const identite = await resoudreIdentite(supabase)
 
-    if (!veto || !veto.actif) {
-      await supabase.auth.signOut()
-      return { error: 'Votre compte n\'est pas encore activé. Contactez l\'administratrice.' }
+  if (!identite.ok) {
+    // On distingue les deux échecs. Dire « compte non activé » sur une panne
+    // de base enverrait le cabinet appeler l'administratrice pour rien, un
+    // jour où c'est justement le service qui est en cause.
+    await supabase.auth.signOut()
+    return {
+      error:
+        identite.raison === 'base-muette'
+          ? 'Je n’arrive pas à joindre la base pour le moment. Réessaie dans un instant.'
+          : "Votre compte n'est pas encore activé. Contactez l'administratrice.",
     }
   }
+
+  // Le secrétariat n'a pas d'accueil : l'épicentre est le bureau de Filou, et
+  // Filou ne lui est pas ouvert (arbitrage MiKL du 25/08). Son écran d'arrivée
+  // est le planning, qui est aussi sa raison d'être ici.
+  if (identite.identite.genre === 'secretaire') redirect('/planning')
 
   // Depuis la bascule V2 (2026-07-25), on atterrit sur l'accueil épicentre.
   redirect('/accueil')

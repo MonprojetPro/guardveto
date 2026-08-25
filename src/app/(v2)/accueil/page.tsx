@@ -8,6 +8,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { exigerVeterinaire } from '@/lib/identite'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
 import { Epicentre } from '@/components/v2/Epicentre'
@@ -29,19 +30,12 @@ export default async function AccueilPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: veterinaire } = await supabase
-    .from('veterinaires')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('actif', true)
-    .single()
-
-  // Même garde que la coquille V1 : un compte sans fiche véto active n'a rien
-  // à faire dans l'application.
-  if (!veterinaire) {
-    await supabase.auth.signOut()
-    redirect('/login')
-  }
+  // L'accueil est le bureau de FILOU, et Filou n'est pas ouvert au
+  // secrétariat (arbitrage MiKL du 25/08). `exigerVeterinaire` le renvoie donc
+  // vers le planning — son écran d'arrivée — au lieu de le déconnecter.
+  // Le refus est ici, côté serveur : masquer l'entrée dans la barre ne ferme
+  // aucune porte à qui tape l'adresse.
+  const { veto: veterinaire } = await exigerVeterinaire(supabase)
 
   const data = await chargerAccueil(supabase, veterinaire as Veterinaire)
 

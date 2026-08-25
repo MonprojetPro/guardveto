@@ -49,20 +49,38 @@ export async function resoudreCabinetId(
   if (fromJwt) return fromJwt
 
   // 2. Repli serveur (DEV_BYPASS ou JWT sans app_metadata) :
-  //    on lit le cabinet rattaché au profil véto de l'utilisateur.
+  //    on lit le cabinet rattaché au profil de l'utilisateur.
   //    Toujours côté serveur, jamais depuis le client.
   const { data: vet, error } = await supabase
     .from('veterinaires')
     .select('cabinet_id')
     .eq('user_id', user.id)
-    .single()
+    .maybeSingle()
 
-  if (error || !vet?.cabinet_id) {
+  if (vet?.cabinet_id) return vet.cabinet_id as string
+
+  // 2b. Le secrétariat (B-017, 2026-08-25). Un compte de secrétaire n'a pas de
+  //     fiche vétérinaire : sans ce second repli, `resoudreCabinetId` lèverait
+  //     pour elle alors que son cabinet est parfaitement connu — et tous les
+  //     écrans qui s'en servent la traiteraient comme un compte orphelin.
+  const { data: sec, error: erreurSec } = await supabase
+    .from('secretaires')
+    .select('cabinet_id')
+    .eq('user_id', user.id)
+    .eq('actif', true)
+    .maybeSingle()
+
+  if (sec?.cabinet_id) return sec.cabinet_id as string
+
+  if (error || erreurSec) {
     throw new CabinetIntrouvableError(
-      'Cabinet non configuré pour cet utilisateur '
-      + '(app_metadata.cabinet_id manquant et veterinaires.cabinet_id introuvable).'
+      'Cabinet illisible pour cet utilisateur : '
+      + (error?.message ?? erreurSec?.message ?? 'erreur inconnue')
     )
   }
 
-  return vet.cabinet_id as string
+  throw new CabinetIntrouvableError(
+    'Cabinet non configuré pour cet utilisateur '
+    + '(app_metadata.cabinet_id manquant, et aucune fiche vétérinaire ni secrétaire).'
+  )
 }

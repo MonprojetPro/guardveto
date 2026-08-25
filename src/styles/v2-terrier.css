@@ -802,14 +802,22 @@
   display: flex; flex-direction: column; gap: 3px;
 }
 /* Rien n'a été consulté : ce n'est plus une mention, c'est un avertissement.
-   Il reste une ligne — on prévient, on ne fait pas la leçon. */
+   Il reste UNE ligne — on prévient, on ne fait pas la leçon.
+   Ce qui le distingue est le POIDS et la taille, pas une couleur d'alerte :
+   une information portée par la seule couleur n'existe pas pour qui ne la
+   distingue pas, et le mot « Attention » en tête la porte pour tout le monde. */
 .res-sources-vide {
   padding: 8px 11px;
-  border-left: 3px solid var(--danger);
+  border-left: 3px solid var(--t-accent);
   border-radius: 4px 9px 9px 4px;
-  background: var(--danger-soft);
+  background: var(--surface-2);
   color: var(--text);
+  font-size: 0.78rem;
   font-weight: 600;
+}
+.res-sources-vide::before {
+  content: 'Attention — ';
+  font-weight: 800;
 }
 
 .res-explication { font-size: 0.88rem; line-height: 1.55; margin-bottom: 12px; }

@@ -29,10 +29,20 @@ import type { DonneesAccueil } from '@/data/v2/accueilEpicentre'
 interface Props {
   prenom: string
   estAdmin: boolean
+  /**
+   * Le secrétariat (B-017, 2026-08-25). Son dock se réduit à ce qu'il a le
+   * droit de consulter.
+   *
+   * ⚠️ Masquer une entrée ne FERME pas la porte : chaque page refuse aussi
+   * l'accès côté serveur. Ce drapeau évite de proposer des portes qui se
+   * referment, il ne protège rien par lui-même — leçon du projet, une porte
+   * retirée du menu reste ouverte à qui connaît l'adresse.
+   */
+  estSecretaire?: boolean
   dock: DonneesAccueil['dock']
 }
 
-export function BarreV2({ prenom, estAdmin, dock }: Props) {
+export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props) {
   const chemin = usePathname()
   /** Vrai sur l'écran lui-même comme sur ses sous-pages. */
   const ici = (href: string) => chemin === href || chemin.startsWith(href + '/')
@@ -58,12 +68,16 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
   return (
     <header className="app-bar rise" aria-label="Barre GuardVeto">
       <div className="ab-ident">
+        {/* La binette ramène à l'accueil — sauf pour le secrétariat, dont
+            l'accueil n'existe pas : l'épicentre est le bureau de Filou, et
+            Filou ne lui est pas ouvert (arbitrage MiKL du 25/08). Sa porte de
+            retour est donc le planning, qui est aussi sa raison d'être ici. */}
         <Link
-          className={`ab-porte${ici('/accueil') ? ' ici' : ''}`}
-          href="/accueil"
-          aria-label="Accueil · le bureau de Filou"
-          aria-current={ici('/accueil') ? 'page' : undefined}
-          title="Accueil"
+          className={`ab-porte${ici(estSecretaire ? '/planning' : '/accueil') ? ' ici' : ''}`}
+          href={estSecretaire ? '/planning' : '/accueil'}
+          aria-label={estSecretaire ? 'Le planning du cabinet' : 'Accueil · le bureau de Filou'}
+          aria-current={ici(estSecretaire ? '/planning' : '/accueil') ? 'page' : undefined}
+          title={estSecretaire ? 'Planning' : 'Accueil'}
         >
           <span className="ab-filou">
             <Image
@@ -99,6 +113,11 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
           </span>
         </Link>
 
+        {/* Absences & échanges : le secrétariat verra les absences au lot 2,
+            en lecture seule. Tant que cet écran porte des boutons d'action, on
+            ne lui ouvre pas une porte sur des commandes qui lui seraient
+            refusées — un bouton qui échoue vaut moins qu'un bouton absent. */}
+        {!estSecretaire && (
         <Link {...entree('/absences')} href="/absences" aria-label={libelleAbsences}>
           <span className="di-ico" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -113,6 +132,7 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
             <span className="di-text">{libelleAbsences}</span>
           </span>
         </Link>
+        )}
 
         {estAdmin && (
           <Link
@@ -139,6 +159,7 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
             page le reçoit en vitrine, sans aucune commande. L'entrée était
             réservée aux admins depuis la bascule V2 ; c'était une porte fermée
             sur une information qui le concerne au premier chef. */}
+        {!estSecretaire && (
         <Link {...entree('/regles')} href="/regles" aria-label="Organisation du cabinet">
           <span className="di-ico" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -152,6 +173,7 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
             <span className="di-text">Organisation</span>
           </span>
         </Link>
+        )}
 
         {/* RÉSERVÉ AUX ADMINS — décision MiKL du 2026-08-20.
             Cet écran est un outil de PRÉPARATION : il sert à voir qui a
@@ -207,6 +229,7 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
             ce chantier vient justement supprimer.
             En dernier dans le dock : ce n'est pas un espace où l'on travaille,
             c'est celui où l'on va quand quelque chose cloche. */}
+        {!estSecretaire && (
         <Link {...entree('/support')} href="/support" aria-label="Assistance">
           <span className="di-ico" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -219,6 +242,7 @@ export function BarreV2({ prenom, estAdmin, dock }: Props) {
             <span className="di-text">Assistance</span>
           </span>
         </Link>
+        )}
       </nav>
 
       <form action={logout}>

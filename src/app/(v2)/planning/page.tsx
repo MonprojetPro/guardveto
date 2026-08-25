@@ -11,6 +11,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { redirect } from 'next/navigation'
+import { exigerIdentite } from '@/lib/identite'
 import '@/styles/v2-planning.css'
 import '@/styles/v2-filou-edge.css'
 import { Satin } from '@/components/v2/Satin'
@@ -80,20 +81,14 @@ export default async function PlanningPageV2({
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: veterinaire } = await supabase
-    .from('veterinaires')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('actif', true)
-    .single()
-
-  if (!veterinaire) {
-    await supabase.auth.signOut()
-    redirect('/login')
-  }
-
-  const vet = veterinaire as Veterinaire
-  const isAdmin = vet.role_app === 'admin'
+  // Le planning est le SEUL écran ouvert au secrétariat : il accepte donc
+  // toute identité rattachée, pas seulement une fiche vétérinaire
+  // (B-017, 2026-08-25).
+  const identite = await exigerIdentite(supabase)
+  /** La fiche vétérinaire — absente pour une secrétaire, et c'est normal. */
+  const vet = identite.genre === 'veto' ? identite.veto : null
+  const isAdmin = identite.role === 'admin'
+  const estSecretaire = identite.genre === 'secretaire'
 
   const { mois: moisParam } = await searchParams
   const anneeMois = moisParam && /^\d{4}-\d{2}$/.test(moisParam) ? moisParam : moisCourant()
@@ -217,7 +212,7 @@ export default async function PlanningPageV2({
     periodes.find((p) => p.date_debut <= fin && p.date_fin >= debut) ?? null
 
   const [dock, profilRes, compteursRes, totalWERes, prefsRes, typesRes2, equipeRes] = await Promise.all([
-    chargerDock(supabase, vet, periodes),
+    chargerDock(supabase, { role_app: identite.role }, periodes),
     periodeAffichee?.profil_id
       ? supabase.from('profils_planning').select('nom').eq('id', periodeAffichee.profil_id).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -232,11 +227,17 @@ export default async function PlanningPageV2({
       : Promise.resolve({ totalWE: 0, erreur: null }),
     // Les colonnes choisies par la personne connectée. Absente = les colonnes
     // par défaut ; jamais bloquant (l'encart doit s'afficher quoi qu'il arrive).
-    supabase
-      .from('preferences_affichage')
-      .select('colonnes_compteurs')
-      .eq('veterinaire_id', vet.id)
-      .maybeSingle(),
+    // Les préférences sont rattachées à une fiche vétérinaire : le secrétariat
+    // n'en a pas, il prend donc les colonnes par défaut. On saute la requête
+    // plutôt que de l'envoyer avec un identifiant vide, qui produirait une
+    // erreur de type côté Postgres.
+    vet
+      ? supabase
+          .from('preferences_affichage')
+          .select('colonnes_compteurs')
+          .eq('veterinaire_id', vet.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
     // Les périodes types, proposées quand l'admin crée un planning depuis
     // « Générer ». Chargées pour lui seul : un véto ne génère rien.
     isAdmin
@@ -388,7 +389,12 @@ export default async function PlanningPageV2({
       <Satin />
       <RealtimeRefresh />
       <div className="shell">
-        <BarreV2 prenom={vet.prenom} estAdmin={isAdmin} dock={dock} />
+        <BarreV2
+          prenom={identite.nomAffiche}
+          estAdmin={isAdmin}
+          estSecretaire={estSecretaire}
+          dock={dock}
+        />
 
         {isAdmin && periodeIdsARevalider.length > 0 && (
           <div className="v2-alertes">
@@ -406,7 +412,10 @@ export default async function PlanningPageV2({
           anneeMois={anneeMois}
           isAdmin={isAdmin}
           vets={vets}
-          moiVetId={vet.id}
+          // Vide pour le secrétariat : ce champ sert à mettre en avant SES
+          // propres gardes, et elle n'en a aucune. Aucun identifiant ne
+          // correspondra, donc rien ne sera surligné — ce qui est exact.
+          moiVetId={vet?.id ?? ''}
           nomsTypes={nomsTypes}
           compteurs={compteursAffiches}
           conges={conges}

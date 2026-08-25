@@ -23,6 +23,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { exigerVeterinaire } from '@/lib/identite'
 import '@/styles/v2-absences.css'
 import '@/styles/v2-filou-edge.css'
 import '@/styles/v2-regles.css'
@@ -99,17 +100,11 @@ export default async function ReglesStructurePage({
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: moi } = await supabase
-    .from('veterinaires')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('actif', true)
-    .single()
-
-  if (!moi) {
-    await supabase.auth.signOut()
-    redirect('/login')
-  }
+  // Le secretariat n'a pas de fiche veterinaire : `exigerVeterinaire` le
+  // renvoie vers le planning au lieu de le deconnecter (B-017, 2026-08-25).
+  // C'est ce refus SERVEUR qui ferme la porte -- le dock reduit n'est qu'un
+  // confort d'affichage.
+  const { veto: moi } = await exigerVeterinaire(supabase)
 
   const vet = moi as Veterinaire
 

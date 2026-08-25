@@ -1,0 +1,143 @@
+// ============================================================
+// Le secrétariat reste-t-il dans son périmètre ?
+// ============================================================
+// CE QUI S'EST PASSÉ LE 2026-08-25, ET QUI JUSTIFIE CE FICHIER.
+//
+// La première migration du secrétariat accordait quatre lectures — gardes,
+// périodes diffusées, annuaire, congés validés — et s'arrêtait là, sur un
+// raisonnement vérifié : toutes les policies du projet testent une ÉGALITÉ
+// STRICTE (`= 'admin'`, `= 'veto'`), donc une troisième valeur de rôle
+// n'ouvre rien.
+//
+// Le raisonnement était juste. La conclusion était fausse. En se plaçant dans
+// la peau du compte et en comptant table par table, on a trouvé :
+//
+//     regles_cabinet=22   snapshots_regles=15   briques_regles=26
+//     profils_planning=2  periode_type_creneau=4  creneaux_catalogue=4
+//     relation_creneau=3
+//
+// Ces tables ne portent pas de policy par rôle : elles portent un
+// `read_auth USING (true)`, ouvert à tout compte authentifié. Une secrétaire
+// EST un compte authentifié. On avait vérifié ce qu'on ouvrait, pas ce qui
+// l'était déjà — exactement l'angle mort de la faille `security_invoker` du
+// 22/08.
+//
+// Ce test garde les deux moitiés du correctif, et surtout il garde le CHEMIN
+// D'IDENTITÉ : le jour où quelqu'un ajoute un écran V2 en recopiant l'ancien
+// motif (`.from('veterinaires')` + `signOut()`), il déconnectera le
+// secrétariat sans le savoir et sans le moindre message à l'écran.
+//
+// Aucune connexion réseau : on lit des fichiers.
+// ============================================================
+
+import { describe, expect, it } from 'vitest'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
+
+const RACINE = join(__dirname, '..', '..')
+const MIGRATIONS = join(RACINE, 'supabase', 'migrations')
+
+const socle = readFileSync(join(MIGRATIONS, '20260825160000_secretariat_socle.sql'), 'utf8')
+const resserrage = readFileSync(
+  join(MIGRATIONS, '20260825170000_secretariat_perimetre_mesure.sql'),
+  'utf8',
+)
+
+describe('Le secrétariat ne touche à rien', () => {
+  it('n’a aucune policy d’écriture, sur aucune table', () => {
+    // « Elle ne touche à rien » (MiKL, 25/08) est appliqué par l'ABSENCE de
+    // droit, pas par un écran qui masque les boutons. Un écran se contourne.
+    // `[\s\S]` plutôt que le drapeau `s` : la cible de compilation du projet
+    // est antérieure à es2018, qui l'a introduit.
+    const ecritures = /CREATE POLICY[^;]*FOR (INSERT|UPDATE|DELETE|ALL)[^;]*secretaire[^;]*;/gi
+    for (const sql of [socle, resserrage]) {
+      const trouve = sql.match(ecritures) ?? []
+      // Seule exception admise : `secretaires_admin_all`, qui vise l'ADMIN et
+      // porte le mot « secretaires » uniquement dans le nom de la table.
+      const fautives = trouve.filter((p) => !/secretaires_admin_all/i.test(p))
+      expect(fautives, `policy d'écriture accordée au secrétariat :\n${fautives.join('\n')}`).toHaveLength(0)
+    }
+  })
+
+  it('ne voit que les plannings réellement diffusés', () => {
+    // Elle répond au TÉLÉPHONE : annoncer une garde issue d'un brouillon
+    // reviendrait à diffuser hors du logiciel une version que l'équipe n'a
+    // jamais validée — l'incident de l'agenda Google du 20/08, transposé.
+    // La borne est en RLS, donc elle tient aussi par appel direct à l'API.
+    const policy = resserrage.slice(resserrage.indexOf('gardes_secretaire_read'))
+    expect(policy).toContain('publie_at IS NOT NULL')
+  })
+
+  it('n’accède ni aux règles, ni à leur historique, ni à la structure', () => {
+    for (const table of [
+      'regles_cabinet',
+      'snapshots_regles',
+      'briques_regles',
+      'profils_planning',
+      'periode_type_creneau',
+      'creneaux_catalogue',
+      'relation_creneau',
+    ]) {
+      expect(resserrage, `${table} n'est pas fermée au secrétariat`).toContain(`'${table}'`)
+    }
+    // La forme compte autant que la liste : une RESTRICTIVE ne peut rien
+    // ouvrir, et vaut `true` pour les autres rôles — donc elle ne change rien
+    // pour les vétérinaires. Une permissive réécrite l'aurait risqué.
+    expect(resserrage).toContain('AS RESTRICTIVE FOR SELECT')
+    expect(resserrage).toContain("IS DISTINCT FROM ''secretaire''")
+  })
+
+  it('garde les libellés dont le planning a besoin', () => {
+    // `creneau_modele` porte le NOM des créneaux (« Nuit semaine »). Le fermer
+    // afficherait des codes bruts à l'écran : on retirerait la légende de ce
+    // qu'elle a le droit de lire.
+    const fermees = resserrage.slice(resserrage.indexOf('FOREACH'))
+    expect(fermees).not.toContain("'creneau_modele'")
+    expect(fermees).not.toContain("'jours_feries'")
+    expect(fermees).not.toContain("'vacances_scolaires'")
+  })
+})
+
+describe('Aucun écran ne déconnecte le secrétariat par mégarde', () => {
+  // L'ancien motif, recopié dans dix pages :
+  //     const { data: moi } = await supabase.from('veterinaires')…single()
+  //     if (!moi) { await supabase.auth.signOut(); redirect('/login') }
+  // « Je ne te trouve pas dans les vétérinaires » y voulait dire « tu n'existes
+  // pas ». Depuis le 25/08 c'est faux, et la sanction — la déconnexion — est
+  // muette : on retape son mot de passe, et on retombe sur la connexion.
+  const dossierV2 = join(RACINE, 'src', 'app', '(v2)')
+
+  const pages = readdirSync(dossierV2, { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .map((e) => ({ nom: e.name, chemin: join(dossierV2, e.name, 'page.tsx') }))
+    .filter((p) => {
+      try {
+        readFileSync(p.chemin)
+        return true
+      } catch {
+        return false
+      }
+    })
+
+  it('trouve bien les écrans V2 (le test ne passe pas à vide)', () => {
+    expect(pages.length).toBeGreaterThanOrEqual(6)
+  })
+
+  for (const page of pages) {
+    it(`/${page.nom} passe par la source unique d’identité`, () => {
+      const src = readFileSync(page.chemin, 'utf8')
+      // Les trois portes légitimes : `exigerVeterinaire` (l'écran est réservé
+      // aux vétérinaires), `exigerIdentite` (il accepte les deux),
+      // `resoudreIdentite` (il gère lui-même les cas limites).
+      expect(src).toMatch(/exigerVeterinaire|exigerIdentite|resoudreIdentite/)
+    })
+
+    it(`/${page.nom} ne déconnecte pas un compte qu’il ne reconnaît pas`, () => {
+      const src = readFileSync(page.chemin, 'utf8')
+      // Un `signOut()` dans un écran ne peut plus signifier « inconnu » : c'est
+      // à `lib/identite` de faire la différence entre un compte sans
+      // rattachement, une secrétaire, et une base qui ne répond pas.
+      expect(src, `${page.nom} contient encore un signOut() direct`).not.toContain('auth.signOut()')
+    })
+  }
+})
