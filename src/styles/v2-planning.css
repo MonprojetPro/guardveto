@@ -2022,3 +2022,76 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   display: block; margin-top: 2px;
   font-size: 0.74rem; color: var(--t-muted);
 }
+
+/* ============================================================
+   « QUI EST ABSENT » — la colonne de droite du secrétariat (B-017)
+   ============================================================
+   Même emplacement et même largeur que les compteurs (`.counters-panel`,
+   réutilisé tel quel) : c'est le contenu qui change selon qui regarde, pas
+   la mise en page. Demande MiKL du 2026-08-25 — la place existait, et elle
+   était occupée par la seule information qu'on venait de retirer au
+   secrétariat.
+   ============================================================ */
+.abs-vide {
+  font-size: 0.78rem;
+  color: var(--t-muted);
+  line-height: 1.55;
+}
+.abs-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.abs-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+/* Une absence EN COURS se distingue : c'est la réponse la plus fréquente au
+   téléphone, et la chercher dans une liste uniforme fait perdre du temps. */
+.abs-item.en-cours {
+  border-color: var(--t-accent);
+  background: var(--surface);
+}
+.abs-pastille {
+  width: 28px;
+  height: 28px;
+  font-size: 0.68rem;
+  flex: none;
+}
+.abs-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+.abs-txt b {
+  font-size: 0.79rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.abs-quand {
+  font-size: 0.7rem;
+  color: var(--t-muted);
+  line-height: 1.4;
+}
+.abs-motif {
+  flex: none;
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--t-muted);
+  white-space: nowrap;
+}
+.abs-item.en-cours .abs-motif { color: var(--t-accent); }

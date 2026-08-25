@@ -137,13 +137,23 @@ describe('L’écran du secrétariat ne promet rien d’impossible', () => {
     // aurait ouvert un panneau vide.
     // Regex plutôt qu'une chaîne littérale : les fins de ligne et
     // l'indentation ne doivent pas faire tomber un test de sécurité.
-    expect(planning).toMatch(/\{!lectureSeule && \(\s*<aside className="counters-panel"/)
+    expect(planning).toMatch(
+      /lectureSeule \? \(\s*<AbsencesAVenirPanel[\s\S]{0,200}\) : \(\s*<aside className="counters-panel"/,
+    )
     expect(planning).toMatch(/\{!lectureSeule && \(\s*<button[\s\S]{0,200}Compteurs/)
   })
 
-  it('replie la mise en page quand le panneau est retiré', () => {
-    // Sans ça, la grille garderait une colonne vide à droite.
-    expect(planning).toContain('compteursOuverts && !lectureSeule')
+  it('lui donne les absences à venir à la place, au même endroit', () => {
+    // Demande MiKL du 25/08 : la colonne de droite existait, et elle était
+    // occupée par la seule information qu'on venait de lui retirer. Elle porte
+    // désormais la réponse à « il revient quand ? ».
+    expect(planning).toContain('<AbsencesAVenirPanel absences={absencesAVenir} />')
+  })
+
+  it('garde la colonne de droite ouverte pour lui', () => {
+    // Ce panneau n'a pas de bouton pour le replier : c'est la raison d'être de
+    // l'écran pour le secrétariat, pas un détail qu'on range.
+    expect(planning).toContain('compteursOuverts || lectureSeule')
   })
 
   it('remplace la consigne d’échange, qu’elle ne peut pas suivre', () => {

@@ -28,6 +28,7 @@ import { estJourFerie } from '@/engine/utils'
 import { placesDeGarde } from '@/lib/gardes/places'
 import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
 import { CompteursPanel } from './CompteursPanel'
+import { AbsencesAVenirPanel, type AbsenceAVenir } from './AbsencesAVenirPanel'
 import type { CompteursRow } from '@/hooks/useCompteurs'
 import type { BilanVet } from '@/engine/bilan'
 import type { CleColonne } from '@/lib/planning/colonnesCompteurs'
@@ -56,6 +57,16 @@ interface Props {
    * vérifié le 25/08) et le refus serveur des écrans qui ne le concernent pas.
    */
   lectureSeule?: boolean
+  /**
+   * Ce qui occupe la colonne de droite en lecture seule : les absences et
+   * congés À VENIR, à la place des compteurs d'équité.
+   *
+   * La place existait déjà et n'avait plus d'occupant — MiKL, le 25/08 :
+   * « remets le panneau, mais avec la liste des absences ». Le planning montre
+   * les congés dans les cases du jour, donc en contexte ; ce panneau répond à
+   * la question inverse, celle qu'on pose au téléphone : « il revient quand ? »
+   */
+  absencesAVenir?: AbsenceAVenir[]
   vets: VetCrise[]
   moiVetId?: string
   nomsTypes: Record<string, string>
@@ -158,6 +169,7 @@ export function PlanningV2({
   anneeMois,
   isAdmin,
   lectureSeule = false,
+  absencesAVenir = [],
   vets,
   moiVetId,
   nomsTypes,
@@ -310,10 +322,11 @@ export function PlanningV2({
           suffi de connaître l'adresse. */}
       {!lectureSeule && <FilouEdge origine="planning" />}
 
-      {/* Sans panneau de compteurs, la grille doit reprendre la largeur qu'il
-          occupait : la retirer sans replier la mise en page laisserait une
-          colonne vide à droite. */}
-      <div className={`workspace${compteursOuverts && !lectureSeule ? '' : ' counters-closed'}`}>
+      {/* La colonne de droite reste OUVERTE en lecture seule : elle porte les
+          absences à venir, qui n'ont pas de bouton pour les replier — c'est la
+          raison d'être de l'écran pour le secrétariat, pas un détail qu'on
+          range. Pour l'équipe, le bouton « Compteurs » commande toujours. */}
+      <div className={`workspace${compteursOuverts || lectureSeule ? '' : ' counters-closed'}`}>
         <div className="work-head">
           {/* La période est un seul objet : la pilule EST le sélecteur, et sa
               carte d'identité vit dans le panneau qu'elle ouvre. */}
@@ -636,7 +649,13 @@ export function PlanningV2({
               )}
             </div>
 
-            {!lectureSeule && (
+            {/* La colonne de droite, selon qui regarde : les compteurs
+                d'équité pour l'équipe, les absences à venir pour le
+                secrétariat. Même emplacement, même largeur — c'est le contenu
+                qui change, pas la mise en page. */}
+            {lectureSeule ? (
+              <AbsencesAVenirPanel absences={absencesAVenir} />
+            ) : (
             <aside className="counters-panel" aria-label="Compteurs de la période">
               <div className="cnt-head">
                 <h4>Compteurs · période</h4>

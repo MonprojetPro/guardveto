@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/server'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { redirect } from 'next/navigation'
 import { exigerIdentite } from '@/lib/identite'
+import type { AbsenceAVenir } from '@/components/v2/AbsencesAVenirPanel'
 import '@/styles/v2-planning.css'
 import '@/styles/v2-filou-edge.css'
 import { Satin } from '@/components/v2/Satin'
@@ -67,6 +68,37 @@ interface LigneConge {
   date_fin: string
   statut: string
   veterinaires?: { prenom: string; couleur: string } | { prenom: string; couleur: string }[] | null
+}
+
+/** Un congé ou une absence, tels qu'ils sortent de la base — les deux ont la même forme utile. */
+interface LigneAbsenceBrute {
+  id: string
+  date_debut: string
+  date_fin: string
+  /** `conges.type` d'un côté, `absences.motif` de l'autre. */
+  type?: string | null
+  motif?: string | null
+  veterinaires?: unknown
+}
+
+/**
+ * Le motif, en français lisible.
+ *
+ * Les deux tables n'emploient pas le même vocabulaire (`conges.type` vaut
+ * « vacances », `absences.motif` vaut « maladie ») : on les traduit dans un
+ * même registre, sinon la liste mélangerait deux façons de nommer la même
+ * chose. Un motif inconnu retombe sur un mot générique plutôt que de s'afficher
+ * en jargon de base de données.
+ */
+const LIBELLE_MOTIF: Record<string, string> = {
+  vacances: 'Vacances',
+  formation: 'Formation',
+  sante: 'Santé',
+  maladie: 'Maladie',
+  indisponibilite: 'Indisponible',
+  autre: 'Absent',
+  familial: 'Familial',
+  autre_motif: 'Absent',
 }
 
 export default async function PlanningPageV2({
@@ -258,6 +290,74 @@ export default async function PlanningPageV2({
       .order('nom'),
   ])
 
+  // ── « Qui est absent », pour le secrétariat ────────────────────────────
+  // Chargé UNIQUEMENT pour lui : c'est le panneau qui remplace les compteurs
+  // d'équité à droite de la grille (demande MiKL du 25/08). Deux origines —
+  // un congé posé et validé, une absence déclarée en cours de route — fondues
+  // en une seule liste : au téléphone, la distinction n'a pas d'importance.
+  //
+  // La fenêtre n'est PAS celle du mois affiché : la question posée est « il
+  // revient quand ? », donc on regarde devant, quel que soit le mois consulté.
+  const absencesAVenir: AbsenceAVenir[] = []
+  if (estSecretaire) {
+    const aujourdhui = new Date().toISOString().slice(0, 10)
+    const [congesFuturs, absencesFutures] = await Promise.all([
+      supabase
+        .from('conges')
+        .select('id, date_debut, date_fin, type, veterinaires(prenom, nom, couleur)')
+        .gte('date_fin', aujourdhui)
+        .order('date_debut')
+        .limit(40),
+      supabase
+        .from('absences')
+        .select('id, date_debut, date_fin, motif, veterinaires(prenom, nom, couleur)')
+        .eq('statut', 'active')
+        .gte('date_fin', aujourdhui)
+        .order('date_debut')
+        .limit(40),
+    ])
+
+    // Les erreurs sont LUES : une liste vide sur une lecture échouée ferait
+    // annoncer « tout le monde est là » à quelqu'un qui décroche le téléphone.
+    if (congesFuturs.error) console.error('[planning] congés à venir :', congesFuturs.error.message)
+    if (absencesFutures.error) console.error('[planning] absences à venir :', absencesFutures.error.message)
+
+    const vetDe = (v: unknown) => {
+      const x = Array.isArray(v) ? v[0] : v
+      return (x ?? {}) as { prenom?: string; nom?: string; couleur?: string }
+    }
+
+    for (const c of (congesFuturs.data ?? []) as LigneAbsenceBrute[]) {
+      const v = vetDe(c.veterinaires)
+      absencesAVenir.push({
+        id: `c-${c.id}`,
+        prenom: v.prenom ?? 'Vétérinaire',
+        nom: v.nom ?? '',
+        couleur: v.couleur ?? '#7C6A55',
+        dateDebut: c.date_debut,
+        dateFin: c.date_fin,
+        motif: LIBELLE_MOTIF[c.type ?? ''] ?? 'Congé',
+        enCours: c.date_debut <= aujourdhui,
+      })
+    }
+    for (const a of (absencesFutures.data ?? []) as LigneAbsenceBrute[]) {
+      const v = vetDe(a.veterinaires)
+      absencesAVenir.push({
+        id: `a-${a.id}`,
+        prenom: v.prenom ?? 'Vétérinaire',
+        nom: v.nom ?? '',
+        couleur: v.couleur ?? '#7C6A55',
+        dateDebut: a.date_debut,
+        dateFin: a.date_fin,
+        motif: LIBELLE_MOTIF[a.motif ?? ''] ?? 'Absence',
+        enCours: a.date_debut <= aujourdhui,
+      })
+    }
+    // Une seule liste, triée par date de début : c'est l'ordre dans lequel la
+    // question se pose.
+    absencesAVenir.sort((x, y) => x.dateDebut.localeCompare(y.dateDebut))
+  }
+
   const profil = (profilRes as { data?: { nom: string } | null })?.data?.nom ?? null
   const periodesTypes = ((typesRes2?.data ?? []) as ProfilPlanning[])
 
@@ -412,6 +512,7 @@ export default async function PlanningPageV2({
           anneeMois={anneeMois}
           isAdmin={isAdmin}
           lectureSeule={estSecretaire}
+          absencesAVenir={absencesAVenir}
           vets={vets}
           // Vide pour le secrétariat : ce champ sert à mettre en avant SES
           // propres gardes, et elle n'en a aucune. Aucun identifiant ne
