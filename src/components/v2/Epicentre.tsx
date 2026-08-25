@@ -433,6 +433,32 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
                   <FicheCoherence verdict={verdict} onOpen={() => ouvrir('coherence')} />
                 )}
 
+                {/* ------ Ce qui attend la personne connectée ------
+                    Ajouté le 2026-08-25. Ces fiches ne sont PAS écrites ici :
+                    elles viennent de `lib/produit/attentes.ts`, qu'un test
+                    empêche de rester muet quand une capacité nouvelle arrive.
+
+                    C'est tout l'objet du chantier. Les fiches au-dessus ont
+                    été écrites une par une, le jour où l'on travaillait sur
+                    leur sujet — et c'est pour ça que les échanges de gardes,
+                    les dépannages et les demandes de congé d'un vétérinaire
+                    n'ont jamais eu la leur. Ajouter une fiche de plus ici, en
+                    dur, aurait reproduit la cause en corrigeant le symptôme. */}
+                {data.enAttente.map((f) => (
+                  <Link key={f.cle} className="widget" href={f.href}>
+                    <span className="w-ico" aria-hidden="true">
+                      {f.icone}
+                    </span>
+                    <span className="w-body">
+                      <h3>{f.titre}</h3>
+                      <p>{f.detail}</p>
+                    </span>
+                    <span className="w-go" aria-hidden="true">
+                      →
+                    </span>
+                  </Link>
+                ))}
+
                 <p className="glance-foot">
                   Chaque fiche s&apos;ouvre en grand ici même. <b>Filou n&apos;affiche que ce qu&apos;il a vérifié.</b>
                 </p>

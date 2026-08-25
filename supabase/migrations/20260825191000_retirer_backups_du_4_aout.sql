@@ -1,0 +1,36 @@
+-- ============================================================
+-- GUARDVETO — Retirer les deux tables de sauvegarde du 4 août
+-- ============================================================
+-- CE QUE ÇA CORRIGE. Les deux seules erreurs rouges du Security Advisor
+-- Supabase, signalées par MiKL le 2026-08-25 :
+--
+--   public._backup_creneau_modele_20260804    RLS désactivée, 0 politique, 8 lignes
+--   public._backup_relation_creneau_20260804  RLS désactivée, 0 politique, 5 lignes
+--
+-- Ce sont des copies prises le 4 août pendant la migration « socle + affinage
+-- par période type » (`fedf3df`). Elles ont servi de filet le jour J et
+-- n'ont jamais été retirées.
+--
+-- POURQUOI C'ÉTAIT UN PROBLÈME. Une table du schéma `public` sans RLS est
+-- lisible par le rôle `anon`, et la clé anon vit dans le code du navigateur :
+-- n'importe qui pouvait les lire par appel REST direct, sans être connecté.
+-- C'est le mécanisme exact de l'incident des vues `security_invoker` du
+-- 22/08, en beaucoup moins grave — ici le contenu est de la configuration de
+-- créneaux, pas des données personnelles ni un planning nominatif.
+--
+-- POURQUOI ON SUPPRIME PLUTÔT QUE DE POSER UNE RLS. Poser une politique
+-- reviendrait à sécuriser un objet dont personne n'a l'usage : aucun code du
+-- produit ne lit ces deux tables (vérifié par recherche sur `_backup_` dans
+-- `src/` et `supabase/`), et une sauvegarde de trois semaines qu'on ne relit
+-- pas n'est plus une sauvegarde. La bonne fermeture d'une porte inutile est
+-- de retirer la porte.
+--
+-- ⚠️ IRRÉVERSIBLE. Le contenu (13 lignes de configuration de créneaux) n'est
+-- pas récupérable après coup autrement que par la sauvegarde du projet. La
+-- structure d'origine reste elle reconstructible : `creneau_modele` et
+-- `relation_creneau` existent toujours, ce sont les tables vivantes dont ces
+-- deux-là étaient la photo.
+-- ============================================================
+
+drop table if exists public._backup_creneau_modele_20260804;
+drop table if exists public._backup_relation_creneau_20260804;

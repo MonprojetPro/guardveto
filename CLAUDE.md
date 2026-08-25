@@ -84,6 +84,33 @@ Ne pas oublier, quand la réponse est `outil` : le **prompt système** (`agentFi
 
 ---
 
+## 📋 Règle permanente — LE TABLEAU NE PEUT PAS SE TAIRE
+
+> Question de MiKL, le 2026-08-25, devant un accueil qui affichait « Rien à vérifier » :
+> *« Comment ça se fait qu'il y a encore des trucs comme ça en attente et que je ne le sais que si je demande ? »*
+
+**Tout état du produit dans lequel une chose peut rester en plan oblige à décider ce que le tableau en dit.** Pas à ajouter une fiche — à **décider**, et à l'écrire.
+
+Le fichier `src/lib/produit/attentes.ts` porte cette décision, une ligne par état. Trois réponses sont admises :
+
+| Réponse | Quand |
+|---|---|
+| `{ fiche: 'clé' }` | Ça attend quelqu'un, et voici la fiche qui le dit |
+| `{ manque: '…' }` | Ça attend quelqu'un et le tableau ne le montre pas encore — assumé, daté, visible |
+| `{ hors: '…' }` | Personne n'attend rien dans cet état, et voici pourquoi |
+
+**La seule chose interdite est le silence.** `tests/lib/couverture-attentes.test.ts` échoue tant qu'un statut n'a pas sa ligne — dans les deux sens : un statut **ajouté** sans décision, comme une entrée qui désigne un statut **disparu**. Il vérifie aussi que chaque fiche citée existe vraiment, une faute de frappe déclarant sinon un affichage qui n'a jamais lieu.
+
+**La convention qui rend le test possible** : tout ce qui attend quelqu'un est un statut, et tout statut s'écrit `export type Statut<X> = 'a' | 'b' | …` dans `src/types/index.ts`. Le test recompose la liste attendue depuis les types eux-mêmes — rien à maintenir en double.
+
+⚠️ **Le vrai risque n'est jamais le tableau incomplet, c'est la phrase rassurante.** Quand une capacité apparaît, la question à se poser n'est pas *« faut-il une fiche ? »* mais **« une phrase déjà affichée devient-elle fausse ? »**. « Rien à vérifier » se lit comme une salle vide, jamais comme un angle mort — et personne ne va vérifier une bonne nouvelle.
+
+Ne pas oublier, quand la réponse est `fiche` : elle doit exister dans `src/data/v2/enAttente.ts` (avec son destinataire), et sa table doit figurer dans `TABLES_ECOUTEES` **et** dans la publication `supabase_realtime`. Un abonnement à une table non publiée **ne renvoie aucune erreur : il ne se déclenche jamais.**
+
+C'est le pendant, côté écrans, de la règle FILOU SUIT LE PRODUIT ci-dessus. Même cause, même remède : une consigne déjà oubliée ne se répare pas en la réécrivant.
+
+---
+
 ## Règles métier clés
 
 Voir `docs/regles-metier-gardes.md` et `docs/01-prd.md`

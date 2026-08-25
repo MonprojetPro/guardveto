@@ -17,6 +17,7 @@ import type { Periode, StatutPeriode, Veterinaire } from '@/types'
 import { phraseRegle } from '@/lib/regles/libelle'
 import { lignesDesPeriodes, periodesVisibles } from '@/lib/planning/diffusion'
 import { MATIERE_VIDE, type MatiereFilou } from '@/lib/v2/filou-origine'
+import { chargerEnAttente, type FicheEnAttente } from './enAttente'
 import {
   catalogueDuProfil,
   chargerHorairesCabinet,
@@ -114,6 +115,17 @@ export interface DonneesAccueil {
   recapPeriode: RecapPeriode | null
   /** Périodes publiées à re-vérifier côté client (fiche « cohérence »). */
   periodesPubliees: string[]
+  /**
+   * Tout ce qui attend LA PERSONNE CONNECTÉE et n'a pas déjà sa propre fiche
+   * dans l'Épicentre : échanges, dépannages, sa demande de congé.
+   *
+   * Ajouté le 2026-08-25. Avant, le tableau ne regardait que la garde du soir
+   * et la cohérence du planning, et disait « rien à vérifier » — ce qui était
+   * vrai de ces deux-là, et faux de tout le reste. La liste de ce qui doit
+   * remonter n'est plus écrite dans l'écran : elle vient de
+   * `lib/produit/attentes.ts`, qu'un test empêche de rester silencieux.
+   */
+  enAttente: FicheEnAttente[]
   /** De quoi écrire les exemples de Filou avec la VRAIE matière du cabinet —
    *  jamais un prénom ou une date de fantaisie (cf. `filou-origine.ts`).
    *  `null` hors administrateur : lui seul a le champ de saisie. */
@@ -250,6 +262,7 @@ export async function chargerAccueil(
     absencesRes,
     dettesRes,
     profilsRes,
+    enAttente,
   ] = await Promise.all([
     supabase
       .from('periodes')
@@ -315,6 +328,10 @@ export async function chargerAccueil(
     estAdmin
       ? supabase.from('profils_planning').select('id, nom')
       : Promise.resolve({ data: [] as { id: string; nom: string }[] }),
+    // Ce qui attend la personne connectée. Lancé dans la même passe que tout
+    // le reste : quatre `count` en tête, ça ne coûte rien, et surtout ça ne
+    // rallonge pas l'ouverture de l'écran.
+    chargerEnAttente(supabase, veterinaire),
   ] as const)
 
   // ⚠️ MÊME RÈGLE QUE L'ÉCRAN PLANNING ET QUE L'AGENDA GOOGLE : un brouillon
@@ -476,6 +493,7 @@ export async function chargerAccueil(
     // Seules les périodes publiées ENCORE EN COURS sont re-vérifiées : re-valider
     // le passé coûterait cher pour un verdict que plus personne ne peut changer.
     periodesPubliees,
+    enAttente,
     matiereFilou: estAdmin
       ? matiereFilou({
           equipe,

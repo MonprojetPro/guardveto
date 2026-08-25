@@ -12,6 +12,7 @@ import { exigerVeterinaire } from '@/lib/identite'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
 import { Epicentre } from '@/components/v2/Epicentre'
+import { AccueilRealtime } from '@/components/v2/AccueilRealtime'
 import { chargerAccueil } from '@/data/v2/accueilEpicentre'
 import type { Veterinaire } from '@/types'
 // Fenêtre « Vérification du planning » d'Epicentre : consomme `CartesViolations`
@@ -42,6 +43,9 @@ export default async function AccueilPage() {
   return (
     <>
       <Satin />
+      {/* Le tableau se met à jour sans qu'on ait à recharger : une demande
+          déposée pendant qu'on le regarde s'y affiche d'elle-même. */}
+      <AccueilRealtime />
       <div className="shell">
         <BarreV2
           prenom={data.veterinaire.prenom}

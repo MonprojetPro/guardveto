@@ -183,6 +183,30 @@ export interface BonusMalus {
   created_at: string
 }
 
+/**
+ * Les six états d'un échange de gardes.
+ *
+ * ⚠️ Ce type est arrivé le 2026-08-25, plus d'un an après la table : les
+ * échanges étaient le seul domaine du produit dont les statuts n'étaient
+ * écrits nulle part en TypeScript, seulement dans la contrainte SQL
+ * (`20260703150000_echanges_gardes.sql`). C'est aussi le domaine qui n'était
+ * remonté sur AUCUN tableau de bord — les deux oublis n'en font qu'un.
+ *
+ * Deux de ces états attendent quelqu'un, et c'est ce que
+ * `lib/produit/attentes.ts` enregistre :
+ *   • `proposee` attend le vétérinaire ciblé (ou n'importe qui si l'échange
+ *     est ouvert à l'équipe) ;
+ *   • `acceptee` attend l'administratrice, qui valide ou refuse.
+ * Les quatre autres sont des fins de parcours : plus personne n'a la main.
+ */
+export type StatutEchange =
+  | 'proposee'
+  | 'acceptee'
+  | 'validee'
+  | 'refusee'
+  | 'refusee_admin'
+  | 'annulee'
+
 // ── Gestion de crise (LOT 1) ────────────────────────────────
 export type MotifAbsence = 'maladie' | 'urgence' | 'autre'
 export type StatutAbsence = 'active' | 'resolue' | 'annulee'
