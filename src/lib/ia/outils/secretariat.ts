@@ -25,8 +25,10 @@
 
 import { z } from 'zod'
 import {
+  basculerSecretaireActif,
   creerSecretaire,
   inviterSecretaire,
+  modifierSecretaire,
   supprimerSecretaire,
 } from '@/app/(v2)/equipe/secretariat-actions'
 import { lignesLues } from './lecture'
@@ -274,6 +276,134 @@ Le planning et les gardes ne sont jamais touchés : un accès de secrétariat n'
     const trouve = resoudre(await chargerSecretariat(ctx), params.nom)
     if (!trouve.ok) return { error: trouve.raison }
     const res = await supprimerSecretaire(trouve.fiche.id)
+    return 'error' in res ? { error: res.error } : {}
+  },
+}
+
+const ParamsModifier = z.object({
+  nom: z.string().describe("Le nom affiché actuel de l'accès."),
+  nouveau_nom: z.string().optional().describe('Le nouveau nom affiché, si on le renomme.'),
+  email: z.string().optional().describe('La nouvelle adresse e-mail, si on la change ou l’ajoute.'),
+})
+
+export const modifierAccesSecretariat: OutilEcriture<typeof ParamsModifier> = {
+  genre: 'ecriture',
+  nom: 'modifier_acces_secretariat',
+  description: `Prépare la modification d'un accès de secrétariat : son nom affiché, son adresse e-mail, ou les deux.
+
+Appelle-le quand on te demande de corriger une fiche — « le secrétariat s'appelle Accueil maintenant », « ajoute l'adresse du secrétariat ».
+
+Ne touche que ce que tu précises : ce que tu laisses de côté ne bouge pas.`,
+  params: ParamsModifier,
+  adminSeulement: true,
+
+  async resumer(params, ctx) {
+    const trouve = resoudre(await chargerSecretariat(ctx), params.nom)
+    if (!trouve.ok) return { ok: false, raison: trouve.raison }
+    const f = trouve.fiche
+
+    const lignes: string[] = []
+    if (params.nouveau_nom?.trim() && params.nouveau_nom.trim() !== f.nom) {
+      lignes.push(`Nom affiché : ${f.nom} → ${params.nouveau_nom.trim()}`)
+    }
+    if (params.email !== undefined && (params.email.trim() || null) !== f.email) {
+      lignes.push(
+        params.email.trim()
+          ? `E-mail : ${f.email ?? 'aucun'} → ${params.email.trim()}`
+          : `E-mail retiré (il y avait ${f.email}).`,
+      )
+    }
+
+    if (lignes.length === 0) {
+      return { ok: false, raison: `L’accès « ${f.nom} » est déjà dans cet état — il n’y a rien à changer.` }
+    }
+
+    // Changer l'adresse d'un accès DÉJÀ invité ne déplace pas le compte : le
+    // compte reste attaché à l'ancienne adresse. On le dit, sinon on croit
+    // avoir déménagé quelqu'un qui se connectera toujours comme avant.
+    const avertissement =
+      f.user_id && params.email !== undefined
+        ? 'Le compte de connexion existant garde son adresse actuelle : changer l’e-mail ici ne le déplace pas.'
+        : undefined
+
+    return {
+      ok: true,
+      proposition: {
+        titre: `Modifier l’accès « ${f.nom} »`,
+        phrase: 'Voici ce que je changerais.',
+        lignes,
+        action: 'Enregistrer',
+        avertissement,
+      },
+    }
+  },
+
+  async executer(params, ctx) {
+    const trouve = resoudre(await chargerSecretariat(ctx), params.nom)
+    if (!trouve.ok) return { error: trouve.raison }
+    const f = trouve.fiche
+    const res = await modifierSecretaire(f.id, {
+      nom: params.nouveau_nom?.trim() || f.nom,
+      email: params.email !== undefined ? params.email : (f.email ?? ''),
+    })
+    return 'error' in res ? { error: res.error } : {}
+  },
+}
+
+const ParamsBasculer = z.object({
+  nom: z.string().describe("Le nom affiché de l'accès de secrétariat."),
+  actif: z
+    .boolean()
+    .describe('false pour retirer l’accès en gardant la fiche, true pour le rétablir.'),
+})
+
+export const basculerAccesSecretariat: OutilEcriture<typeof ParamsBasculer> = {
+  genre: 'ecriture',
+  nom: 'basculer_acces_secretariat',
+  description: `Prépare le retrait TEMPORAIRE d'un accès de secrétariat, ou son rétablissement. La fiche est conservée dans les deux cas.
+
+Appelle-le quand la demande est réversible — « suspends l'accès du secrétariat le temps de son congé », « remets l'accès de l'accueil ».
+
+C'est le geste à préférer chaque fois qu'on n'est pas certain de vouloir effacer : supprimer_acces_secretariat, lui, est définitif.`,
+  params: ParamsBasculer,
+  adminSeulement: true,
+
+  async resumer(params, ctx) {
+    const trouve = resoudre(await chargerSecretariat(ctx), params.nom)
+    if (!trouve.ok) return { ok: false, raison: trouve.raison }
+    const f = trouve.fiche
+
+    if (f.actif === params.actif) {
+      return {
+        ok: false,
+        raison: params.actif
+          ? `L’accès « ${f.nom} » est déjà actif.`
+          : `L’accès « ${f.nom} » est déjà retiré.`,
+      }
+    }
+
+    return {
+      ok: true,
+      proposition: {
+        titre: params.actif ? `Rétablir l’accès « ${f.nom} »` : `Retirer l’accès « ${f.nom} »`,
+        phrase: params.actif
+          ? `L’accès redevient utilisable : la connexion refonctionne.`
+          : `L’accès cesse immédiatement : la connexion ne donnera plus rien.`,
+        lignes: [
+          'La fiche est conservée dans les deux cas — rien n’est effacé.',
+          params.actif
+            ? 'Le mot de passe déjà choisi reste valable.'
+            : 'Le compte n’est pas supprimé : le rétablissement suffira à rouvrir l’accès.',
+        ],
+        action: params.actif ? 'Rétablir' : 'Retirer l’accès',
+      },
+    }
+  },
+
+  async executer(params, ctx) {
+    const trouve = resoudre(await chargerSecretariat(ctx), params.nom)
+    if (!trouve.ok) return { error: trouve.raison }
+    const res = await basculerSecretaireActif(trouve.fiche.id, params.actif)
     return 'error' in res ? { error: res.error } : {}
   },
 }

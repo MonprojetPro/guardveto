@@ -46,6 +46,7 @@ import type { CreerProfilCompletPayload } from '@/lib/ia/profilSchema'
 import type { CreerRelationIaPayload } from '@/lib/ia/relationSchema'
 import { lignesLues, ligneLue } from './lecture'
 import { SANS_PARAMETRE, type ContexteOutil, type OutilEcriture, type OutilLecture, type PropositionAction } from './types'
+import { envoyerEmailDeTest } from '@/app/(v2)/reglages/actions'
 
 // ── Chargement des données de structure (partagé lecture + résolution) ──────
 
@@ -1313,5 +1314,53 @@ Appelle-le quand la demande change l'un de ces branchements — « change l'exp�
       brevoFromName: c.brevoFromName ?? '',
     })
     return 'error' in r ? { error: r.error } : {}
+  },
+}
+
+// ── Vérifier que les e-mails partent ────────────────────────
+//
+// Comblé le 2026-08-25 (registre B-019). C'est un outil de DÉPANNAGE, et il
+// mérite d'exister ici pour une raison précise : quand quelqu'un dit « mes
+// vétos ne reçoivent rien », la bonne réponse n'est pas d'expliquer où
+// cliquer — c'est d'essayer. L'envoi emprunte exactement le chemin des vrais
+// e-mails, donc son échec dit la vérité sur tous les autres.
+//
+// ⚠️ Le destinataire n'est PAS saisissable : c'est l'adresse de la personne
+// connectée, lue en base par l'action. Un champ libre serait un relais d'envoi
+// ouvert, pilotable par une phrase.
+
+export const envoyerEmailTest: OutilEcriture<typeof SANS_PARAMETRE> = {
+  genre: 'ecriture',
+  nom: 'envoyer_email_de_test',
+  description: `Prépare l'envoi d'un e-mail d'essai à TA PROPRE adresse, par le chemin exact des vrais e-mails du cabinet.
+
+Appelle-le quand on soupçonne que les e-mails ne partent pas — « les vétos n'ont rien reçu », « est-ce que les notifications marchent ? », « le planning publié n'est pas arrivé ».
+
+S'il arrive, la tuyauterie fonctionne et le problème est ailleurs. S'il échoue, le message d'erreur dit précisément ce qui bloque — et alors AUCUN e-mail ne part, ni les plannings publiés, ni les réponses aux congés.
+
+Le destinataire n'est pas modifiable : c'est l'adresse de la personne connectée.`,
+  params: SANS_PARAMETRE,
+  adminSeulement: true,
+
+  async resumer(_params, ctx) {
+    void ctx
+    return {
+      ok: true,
+      proposition: {
+        titre: 'Envoyer un e-mail d’essai',
+        phrase: 'Un message de test partira à ta propre adresse, par le chemin des vrais e-mails.',
+        lignes: [
+          'S’il arrive, les plannings publiés et les réponses aux congés partiront aussi.',
+          'S’il échoue, je te dirai exactement ce qui bloque.',
+        ],
+        action: 'Envoyer l’essai',
+      },
+    }
+  },
+
+  async executer(_params, ctx) {
+    void ctx
+    const res = await envoyerEmailDeTest()
+    return 'error' in res ? { error: res.error } : {}
   },
 }

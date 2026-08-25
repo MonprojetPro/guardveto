@@ -13,11 +13,18 @@
 // ============================================================
 
 import { afficherSurLeTableau } from './afficher'
-import { inviterVeterinaireOutil, lireEquipe, modifierVeterinaire } from './equipe'
 import {
+  creerVeterinaireOutil,
+  inviterVeterinaireOutil,
+  lireEquipe,
+  modifierVeterinaire,
+} from './equipe'
+import {
+  basculerAccesSecretariat,
   creerAccesSecretariat,
   inviterAccesSecretariat,
   lireSecretariat,
+  modifierAccesSecretariat,
   supprimerAccesSecretariat,
 } from './secretariat'
 import { listerRegles, creerRegle, agirSurRegles } from './regles'
@@ -28,6 +35,8 @@ import {
   creerPeriode,
   reglerPeriode,
   publierPeriode,
+  retirerDiffusionPlanning,
+  supprimerPlanning,
 } from './planning'
 import {
   lireConges,
@@ -36,6 +45,7 @@ import {
   validerConge,
   refuserConge,
   supprimerConge,
+  deplacerConge,
 } from './conges'
 import {
   lireAbsences,
@@ -74,6 +84,7 @@ import {
   agirSurRelation,
   supprimerProfilDepuisNom,
   reglerHorairesCreneau,
+  envoyerEmailTest,
   reglerVetosSurPeriodeType,
   creerCreneauSurMesureDepuisPhrase,
   configurerAdresseDepuisPhrase,
@@ -120,9 +131,12 @@ export const CATALOGUE: Outil[] = [
 
   // ── Ce qui modifie : rien ne s'exécute sans un clic humain ──
   modifierVeterinaire,
+  creerVeterinaireOutil,
   inviterVeterinaireOutil,
   creerAccesSecretariat,
   inviterAccesSecretariat,
+  modifierAccesSecretariat,
+  basculerAccesSecretariat,
   supprimerAccesSecretariat,
   creerRegle,
   agirSurRegles,
@@ -130,6 +144,7 @@ export const CATALOGUE: Outil[] = [
   validerConge,
   refuserConge,
   supprimerConge,
+  deplacerConge,
   declarerAbsence,
   appelerVolontaires,
   reparerAbsence,
@@ -143,6 +158,8 @@ export const CATALOGUE: Outil[] = [
   creerPeriode,
   reglerPeriode,
   publierPeriode,
+  retirerDiffusionPlanning,
+  supprimerPlanning,
   verifierPreVolPeriode,
   reglerEquite,
   creerProfilDepuisPhrase,
@@ -151,6 +168,7 @@ export const CATALOGUE: Outil[] = [
   agirSurRelation,
   supprimerProfilDepuisNom,
   reglerHorairesCreneau,
+  envoyerEmailTest,
   reglerVetosSurPeriodeType,
   creerCreneauSurMesureDepuisPhrase,
   configurerAdresseDepuisPhrase,

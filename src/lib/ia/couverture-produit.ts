@@ -58,10 +58,7 @@ export type Couverture =
  */
 export const COUVERTURE_FILOU: Record<string, Couverture> = {
   // ── L'ÉQUIPE ────────────────────────────────────────────────────────────
-  'protected/admin/veterinaires#createVeterinaire': {
-    manque:
-      'Créer une fiche vétérinaire depuis la conversation. Geste rare (une arrivée dans l’équipe) et lourd de conséquences : couleur, statut, étiquettes, place dans la rotation.',
-  },
+  'protected/admin/veterinaires#createVeterinaire': { outil: 'creer_veterinaire' },
   'protected/admin/veterinaires#updateVeterinaire': { outil: 'modifier_veterinaire' },
   'protected/admin/veterinaires#toggleVeterinaireActif': { outil: 'modifier_veterinaire' },
   // Comblé le 25/08, le jour même où le registre a rendu l'écart visible :
@@ -71,21 +68,14 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
 
   // ── LE SECRÉTARIAT (B-017) ──────────────────────────────────────────────
   'v2/equipe/secretariat-actions#creerSecretaire': { outil: 'creer_acces_secretariat' },
-  'v2/equipe/secretariat-actions#modifierSecretaire': {
-    manque: 'Renommer un accès ou changer son adresse. Se fait en deux clics sur l’écran Équipe.',
-  },
+  'v2/equipe/secretariat-actions#modifierSecretaire': { outil: 'modifier_acces_secretariat' },
   'v2/equipe/secretariat-actions#inviterSecretaire': { outil: 'inviter_acces_secretariat' },
   'v2/equipe/secretariat-actions#supprimerSecretaire': { outil: 'supprimer_acces_secretariat' },
-  'v2/equipe/secretariat-actions#basculerSecretaireActif': {
-    manque:
-      'Retirer un accès temporairement. Filou sait le supprimer définitivement ; l’extinction lui manque, et c’est justement le geste réversible.',
-  },
+  'v2/equipe/secretariat-actions#basculerSecretaireActif': { outil: 'basculer_acces_secretariat' },
 
   // ── LES CONGÉS ET LES ABSENCES ──────────────────────────────────────────
   'protected/conges#createConge': { outil: 'poser_conge' },
-  'protected/conges#updateConge': {
-    manque: 'Déplacer un congé déjà posé. Aujourd’hui il faut le supprimer et le reposer.',
-  },
+  'protected/conges#updateConge': { outil: 'deplacer_conge' },
   'protected/conges#deleteConge': { outil: 'supprimer_conge' },
   'protected/conges#validerConge': { outil: 'valider_conge' },
   'protected/conges#refuserConge': { outil: 'refuser_conge' },
@@ -102,17 +92,18 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   },
 
   // ── LES PLANNINGS ───────────────────────────────────────────────────────
+  // Les deux gestes destructeurs (supprimer, retirer la diffusion) ont été
+  // ouverts à Filou le 2026-08-25. Ce qui l'a permis : leur bilan d'impact
+  // existe déjà comme fonction (`bilanRetraitPlanning`), donc la proposition
+  // affiche EXACTEMENT les chiffres de la modale — on ne remplace pas un
+  // garde-fou par un bouton nu, on lui donne le même contenu dans l'autre
+  // chemin. La seule sécurité non transposable, recopier le nom du planning,
+  // fait refuser l'outil et renvoie à l'écran.
   'protected/admin/periodes#creerPeriode': { outil: 'creer_periode' },
   'protected/admin/periodes#setProfilPeriode': { outil: 'regler_periode' },
   'protected/admin/periodes#setEffectifPeriode': { outil: 'regler_periode' },
-  'protected/admin/periodes#supprimerPeriode': {
-    manque:
-      'Supprimer un planning. Volontairement absent pour l’instant : c’est le geste le plus destructeur du produit, et il passe par une confirmation d’écran qui montre ce qu’on efface.',
-  },
-  'protected/admin/periodes#depublierPeriode': {
-    manque:
-      'Retirer un planning déjà diffusé. Même raison : l’écran montre l’impact (agenda, e-mails) avant de laisser faire.',
-  },
+  'protected/admin/periodes#supprimerPeriode': { outil: 'supprimer_planning' },
+  'protected/admin/periodes#depublierPeriode': { outil: 'retirer_diffusion_planning' },
   'protected/admin/periodes#bilanRetraitPlanning': {
     hors: 'Calcul d’impact affiché par la modale de retrait. Pas un geste.',
   },
@@ -178,10 +169,7 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   },
 
   // ── LES RÉGLAGES ET LE COMPTE ───────────────────────────────────────────
-  'v2/reglages#envoyerEmailDeTest': {
-    manque:
-      'Envoyer un e-mail d’essai. Utile en dépannage (« mes vétos ne reçoivent rien »), et Filou pourrait le proposer au lieu de décrire où cliquer.',
-  },
+  'v2/reglages#envoyerEmailDeTest': { outil: 'envoyer_email_de_test' },
   'protected/preferences#setColonnesCompteurs': {
     hors: 'Préférence d’affichage personnelle, sans effet sur le cabinet.',
   },

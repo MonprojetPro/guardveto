@@ -26,6 +26,8 @@ import { z } from 'zod'
 import {
   createConge,
   deleteConge,
+  updateConge,
+  type CongeFormData,
   refuserConge as refuserCongeAction,
   validerConge as validerCongeAction,
 } from '@/app/(protected)/conges/actions'
@@ -661,6 +663,126 @@ Appelle-le pour « supprime mon congé du... », « retire la formation de Manon
     }
 
     const resultat = await deleteConge(c.id)
+    return resultat.error ? { error: resultat.error } : {}
+  },
+}
+
+// ── Déplacer un congé déjà posé ─────────────────────────────
+//
+// Comblé le 2026-08-25 (registre de couverture B-019). Jusque-là, changer les
+// dates d'un congé demandait de le supprimer puis de le reposer : deux gestes,
+// deux boutons, et un moment où le congé n'existe plus — pendant lequel une
+// génération lancée aurait programmé la personne sur des jours où elle est
+// absente.
+
+const ParamsDeplacer = z.object({
+  prenom: z.string().describe('Le prénom de la personne concernée.'),
+  date_debut: z.string().describe('Date de début ACTUELLE du congé, au format AAAA-MM-JJ.'),
+  date_fin: z.string().describe('Date de fin ACTUELLE du congé, au format AAAA-MM-JJ.'),
+  nouvelle_date_debut: z.string().describe('La nouvelle date de début, au format AAAA-MM-JJ.'),
+  nouvelle_date_fin: z.string().describe('La nouvelle date de fin, au format AAAA-MM-JJ.'),
+})
+
+export const deplacerConge: OutilEcriture<typeof ParamsDeplacer> = {
+  genre: 'ecriture',
+  nom: 'deplacer_conge',
+  description: `Prépare le déplacement d'un congé ou d'un souhait déjà posé : ses dates changent, le reste ne bouge pas.
+
+Appelle-le quand on te dit qu'une absence tombe finalement à d'autres dates — « décale mon congé d'une semaine », « finalement c'est du 12 au 15 ».
+
+Tu dois donner les dates ACTUELLES pour retrouver le congé, et les nouvelles. Si tu ne connais pas les dates actuelles, appelle d'abord lister_conges.
+
+Un congé déjà REFUSÉ ne se déplace pas : il faut en poser un nouveau.`,
+  params: ParamsDeplacer,
+
+  async resumer(params, ctx) {
+    const [equipe, conges] = await Promise.all([chargerEquipeLegere(ctx), chargerConges(ctx)])
+    const trouveVeto = resoudreVeto(equipe, params.prenom)
+    if (!trouveVeto.ok) return { ok: false, raison: trouveVeto.raison }
+
+    // Un non-admin ne déplace QUE son propre souhait — la RLS le bloquerait de
+    // toute façon ailleurs, mais elle le ferait avec une erreur technique. On
+    // donne ici la vraie raison. Même patron que `supprimer_conge`, à dessein :
+    // deux formulations pour un même empêchement finiraient par diverger.
+    if (!ctx.estAdmin && trouveVeto.veto.id !== ctx.vetoId) {
+      return {
+        ok: false,
+        raison: `Tu n'es pas administrateur : tu ne peux déplacer que tes propres congés, pas ceux de ${trouveVeto.veto.prenom}.`,
+      }
+    }
+    const statutsAutorises = ctx.estAdmin ? ['souhait', 'valide'] : ['souhait']
+
+    const trouve = resoudreConge(conges, trouveVeto.veto, params.date_debut, params.date_fin, statutsAutorises)
+    if (!trouve.ok) {
+      if (!ctx.estAdmin) {
+        return {
+          ok: false,
+          raison: `${trouve.raison} Si ce congé est déjà validé, seul un administrateur peut le déplacer.`,
+        }
+      }
+      return { ok: false, raison: trouve.raison }
+    }
+    const c = trouve.conge
+
+    if (params.nouvelle_date_fin < params.nouvelle_date_debut) {
+      return { ok: false, raison: 'La date de fin arrive avant la date de début.' }
+    }
+    if (
+      params.nouvelle_date_debut === c.date_debut &&
+      params.nouvelle_date_fin === c.date_fin
+    ) {
+      return { ok: false, raison: 'Ce congé est déjà à ces dates — il n’y a rien à déplacer.' }
+    }
+
+    const lignes = [
+      `Du ${c.date_debut} au ${c.date_fin} → du ${params.nouvelle_date_debut} au ${params.nouvelle_date_fin}`,
+    ]
+    // Un congé VALIDÉ qu'on déplace peut découvrir une garde sur les nouvelles
+    // dates : l'action serveur le détecte et le remonte. On prévient ici, pour
+    // que le bouton ne soit pas cliqué en croyant que c'est sans effet.
+    if (c.statut === 'valide') {
+      lignes.push('Ce congé est validé : le planning déjà publié sera confronté aux nouvelles dates.')
+    }
+
+    return {
+      ok: true,
+      proposition: {
+        titre: `Déplacer le congé de ${trouveVeto.veto.prenom}`,
+        phrase: 'Voici les dates que je changerais.',
+        lignes,
+        action: 'Déplacer',
+      },
+    }
+  },
+
+  async executer(params, ctx) {
+    const [equipe, conges] = await Promise.all([chargerEquipeLegere(ctx), chargerConges(ctx)])
+    const trouveVeto = resoudreVeto(equipe, params.prenom)
+    if (!trouveVeto.ok) return { error: trouveVeto.raison }
+    if (!ctx.estAdmin && trouveVeto.veto.id !== ctx.vetoId) {
+      return { error: `Tu ne peux déplacer que tes propres congés.` }
+    }
+    const trouve = resoudreConge(
+      conges,
+      trouveVeto.veto,
+      params.date_debut,
+      params.date_fin,
+      ctx.estAdmin ? ['souhait', 'valide'] : ['souhait'],
+    )
+    if (!trouve.ok) return { error: trouve.raison }
+    const c = trouve.conge
+
+    // On ne recompose PAS le congé : on reprend ses champs et on ne change que
+    // les dates. Recomposer voudrait dire choisir un type et un créneau, donc
+    // risquer d'écraser en silence ce que la personne avait posé.
+    const resultat = await updateConge(c.id, {
+      veterinaire_id: c.veterinaire_id,
+      date_debut: params.nouvelle_date_debut,
+      date_fin: params.nouvelle_date_fin,
+      type: c.type as CongeFormData['type'],
+      creneau: c.creneau as CongeFormData['creneau'],
+      commentaire: c.commentaire ?? '',
+    })
     return resultat.error ? { error: resultat.error } : {}
   },
 }

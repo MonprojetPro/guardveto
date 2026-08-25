@@ -14,11 +14,21 @@
 // ============================================================
 
 import { z } from 'zod'
-import { inviterVeterinaire, updateVeterinaire } from '@/app/(protected)/admin/veterinaires/actions'
+import {
+  createVeterinaire,
+  inviterVeterinaire,
+  updateVeterinaire,
+  type VeterinaireFormData,
+} from '@/app/(protected)/admin/veterinaires/actions'
 import { motifInvitationImpossible } from '@/lib/emails/destinataire'
 import { etiquettesProches } from '@/lib/equipe/etiquettes'
 import { lignesLues } from './lecture'
 import { SANS_PARAMETRE, type ContexteOutil, type OutilEcriture, type OutilLecture } from './types'
+
+/** La teinte d'une fiche neuve — la meme que celle proposee par l'ecran
+ *  Equipe, pour qu'une fiche creee par la conversation ne se distingue pas
+ *  d'une fiche creee a la main. */
+const COULEUR_NOUVELLE_FICHE = '#C0392B'
 
 interface FicheVeto {
   id: string
@@ -377,6 +387,104 @@ Sans adresse e-mail sur la fiche, l'invitation n'a nulle part où aller : l'outi
     // le JETON — sans quoi la connexion réussit puis l'application rejette
     // (incident du 2026-08-15).
     const res = await inviterVeterinaire(trouve.veto.id)
+    return 'error' in res && res.error ? { error: res.error } : {}
+  },
+}
+
+// ── Créer une fiche vétérinaire ─────────────────────────────
+//
+// Le geste le plus lourd de cet écran : une fiche neuve entre dans le moteur,
+// donc dans la rotation, l'équité et les règles collectives. C'est pourquoi la
+// proposition MONTRE tout ce qu'elle pose, y compris ce que Filou a choisi
+// par défaut : personne ne doit découvrir après coup qu'un nouveau venu est
+// entré « salarié » alors qu'il est associé.
+
+const ParamsCreerVeto = z.object({
+  prenom: z.string().describe('Le prénom, tel qu’il s’affichera dans le planning.'),
+  nom: z.string().describe('Le nom de famille.'),
+  email: z
+    .string()
+    .optional()
+    .describe('Adresse e-mail, facultative. Sans elle, la fiche existe mais ne peut pas être invitée.'),
+  statut: z
+    .enum(['salarie', 'associe'])
+    .optional()
+    .describe('Salarié·e par défaut. Un associé est co-propriétaire du cabinet.'),
+  etiquettes: z
+    .array(z.string())
+    .optional()
+    .describe('Étiquettes lues par les règles de composition — « junior », « senior ».'),
+})
+
+export const creerVeterinaireOutil: OutilEcriture<typeof ParamsCreerVeto> = {
+  genre: 'ecriture',
+  nom: 'creer_veterinaire',
+  description: `Prépare la création d'une fiche vétérinaire : la personne entrera dans le planning et pourra être programmée.
+
+Appelle-le quand quelqu'un arrive dans l'équipe — « ajoute Camille à l'équipe », « on a une nouvelle vétérinaire ».
+
+La fiche est créée SANS COMPTE : l'invitation est un second geste, à faire quand on veut. Le rôle est toujours « vétérinaire » — pour donner les droits d'administration, cela se règle sur l'écran Équipe, jamais dans la foulée d'une création.
+
+Ne l'utilise pas pour un poste de secrétariat : c'est creer_acces_secretariat, et ce n'est pas la même chose — une secrétaire ne prend aucune garde.`,
+  params: ParamsCreerVeto,
+  adminSeulement: true,
+
+  async resumer(params, ctx) {
+    const equipe = await chargerEquipe(ctx)
+    const prenom = params.prenom.trim()
+
+    // Un homonyme n'est pas interdit, mais il rend TOUT ambigu ensuite : la
+    // résolution par prénom refuse net dès qu'il y en a deux, donc Filou ne
+    // pourrait plus agir sur aucun des deux. On le dit avant, pas après.
+    if (equipe.some((v) => memeNom(v.prenom, prenom))) {
+      return {
+        ok: false,
+        raison: `Un vétérinaire s'appelle déjà ${prenom}. Si c'est bien une deuxième personne, crée la fiche depuis l'écran Équipe : je ne saurais plus les distinguer par le prénom.`,
+      }
+    }
+
+    const etiquettes = params.etiquettes ?? []
+    const jumeau = refusJumeauEtiquette(etiquettes, equipe, false)
+    if (jumeau) return { ok: false, raison: jumeau }
+
+    const statut = params.statut ?? 'salarie'
+    const lignes = [
+      `${prenom} ${params.nom.trim()} — ${statut === 'associe' ? 'associé·e' : 'salarié·e'}`,
+      params.email?.trim()
+        ? `E-mail : ${params.email.trim()} — l'invitation pourra partir ensuite.`
+        : "Sans adresse e-mail : la fiche existera, l'invitation viendra plus tard.",
+      'Entre dans le planning : sera programmée dès la prochaine génération.',
+    ]
+    if (etiquettes.length > 0) lignes.push(`Étiquettes : ${etiquettes.join(', ')}`)
+
+    return {
+      ok: true,
+      proposition: {
+        titre: `Ajouter ${prenom} à l'équipe`,
+        phrase: `Voici la fiche que je créerais.`,
+        lignes,
+        action: 'Créer la fiche',
+        avertissement:
+          'Une couleur lui est attribuée automatiquement ; elle se change sur sa fiche. Les plannings déjà générés ne bougent pas.',
+      },
+    }
+  },
+
+  async executer(params, ctx) {
+    void ctx
+    const res = await createVeterinaire({
+      prenom: params.prenom.trim(),
+      nom: params.nom.trim(),
+      email: params.email?.trim() ?? '',
+      statut: (params.statut ?? 'salarie') as VeterinaireFormData['statut'],
+      // Jamais administrateur par une phrase : donner les pleins pouvoirs doit
+      // rester un geste délibéré, fait à l'écran, sur une fiche qu'on regarde.
+      role_app: 'veto' as VeterinaireFormData['role_app'],
+      couleur: COULEUR_NOUVELLE_FICHE,
+      actif: true,
+      dernier_recours: false,
+      tags: params.etiquettes ?? [],
+    })
     return 'error' in res && res.error ? { error: res.error } : {}
   },
 }

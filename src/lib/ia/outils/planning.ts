@@ -27,7 +27,14 @@
 // ============================================================
 
 import { z } from 'zod'
-import { creerPeriode as creerPeriodeAction, setProfilPeriode, setEffectifPeriode } from '@/app/(protected)/admin/periodes/actions'
+import {
+  bilanRetraitPlanning,
+  creerPeriode as creerPeriodeAction,
+  depublierPeriode,
+  setEffectifPeriode,
+  setProfilPeriode,
+  supprimerPeriode,
+} from '@/app/(protected)/admin/periodes/actions'
 import { GET as preVolGET } from '@/app/api/generate/pre-vol/route'
 import { POST as publierPOST } from '@/app/api/publish/route'
 import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
@@ -818,5 +825,153 @@ C'est une action qui touche toute l'équipe : les vétérinaires sont notifiés 
       return { error: 'La publication a été refusée par un contrôle imprévu — redemande à Filou de publier à nouveau.' }
     }
     return {}
+  },
+}
+
+// ── Retirer un planning ─────────────────────────────────────
+//
+// Ces deux gestes étaient volontairement absents du catalogue jusqu'au
+// 2026-08-25, et la raison n'était pas l'oubli : ce sont les plus destructeurs
+// du produit, et l'écran les fait passer par une modale qui MONTRE ce qu'on
+// efface — combien de gardes, combien d'événements dans l'agenda du cabinet,
+// combien d'échanges partiront avec.
+//
+// Ce qui a permis de les ouvrir à Filou, c'est que ce bilan existe déjà comme
+// fonction (`bilanRetraitPlanning`) : la proposition affiche EXACTEMENT les
+// mêmes chiffres que la modale. On ne remplace pas un garde-fou par un bouton
+// nu — on lui donne le même contenu, dans l'autre chemin.
+
+const ParamsRetrait = z.object({
+  periode: z.string().describe('Le nom du planning — « Hiver 2026 », « Historique été 2026 ».'),
+})
+
+/** Les lignes d'impact, formulées à partir du bilan réel. */
+function lignesImpact(b: {
+  nbGardes: number
+  nbVetosConcernes: number
+  nbEvenementsAgenda: number
+  nbEchanges: number
+  nbDepannages: number
+  nbExceptions: number
+  publie: boolean
+  publieLe: string | null
+}): string[] {
+  const lignes: string[] = []
+  lignes.push(`${b.nbGardes} garde${b.nbGardes > 1 ? 's' : ''} concernant ${b.nbVetosConcernes} vétérinaire${b.nbVetosConcernes > 1 ? 's' : ''}.`)
+  if (b.nbEvenementsAgenda > 0) {
+    lignes.push(`${b.nbEvenementsAgenda} rendez-vous seront retirés de l'agenda du cabinet.`)
+  }
+  if (b.nbEchanges > 0) lignes.push(`${b.nbEchanges} échange${b.nbEchanges > 1 ? 's' : ''} de garde partiront avec.`)
+  if (b.nbDepannages > 0) lignes.push(`${b.nbDepannages} dépannage${b.nbDepannages > 1 ? 's' : ''} rattaché${b.nbDepannages > 1 ? 's' : ''}.`)
+  if (b.nbExceptions > 0) lignes.push(`${b.nbExceptions} remplacement${b.nbExceptions > 1 ? 's' : ''} à la journée.`)
+  if (b.publie) lignes.push(`Ce planning a été diffusé à l'équipe${b.publieLe ? ` (${b.publieLe})` : ''}.`)
+  return lignes
+}
+
+export const retirerDiffusionPlanning: OutilEcriture<typeof ParamsRetrait> = {
+  genre: 'ecriture',
+  nom: 'retirer_diffusion_planning',
+  description: `Prépare le RETRAIT DE LA DIFFUSION d'un planning : il repasse en brouillon, l'équipe cesse de le voir, et ses rendez-vous sont retirés de l'agenda du cabinet. Les gardes, elles, ne sont pas effacées.
+
+Appelle-le quand on veut annuler une publication — « retire le planning d'octobre », « on a publié trop tôt », « remets-le en brouillon ».
+
+Ne le confonds pas avec supprimer_planning, qui efface tout. Ici on cache, on n'efface pas.`,
+  params: ParamsRetrait,
+  adminSeulement: true,
+
+  async resumer(params, ctx) {
+    const trouve = resoudrePeriode(await chargerPeriodes(ctx), params.periode)
+    if (!trouve.ok) return { ok: false, raison: trouve.raison }
+
+    const res = await bilanRetraitPlanning(trouve.periode.id)
+    if ('error' in res) return { ok: false, raison: res.error }
+    const b = res.bilan
+
+    if (!b.publie) {
+      return {
+        ok: false,
+        raison: `« ${b.nom} » n'a jamais été diffusé à l'équipe : il n'y a pas de publication à retirer.`,
+      }
+    }
+    if (b.bloquant) return { ok: false, raison: b.bloquant }
+
+    return {
+      ok: true,
+      proposition: {
+        titre: `Retirer la diffusion de « ${b.nom} »`,
+        phrase: `${b.nom}, ${b.quand}, repasserait en brouillon : l'équipe ne le verrait plus.`,
+        lignes: lignesImpact(b),
+        action: 'Retirer la diffusion',
+        avertissement:
+          "Les gardes ne sont pas effacées : le planning redevient modifiable et pourra être rediffusé. Personne n'est prévenu automatiquement du retrait.",
+      },
+    }
+  },
+
+  async executer(params, ctx) {
+    const trouve = resoudrePeriode(await chargerPeriodes(ctx), params.periode)
+    if (!trouve.ok) return { error: trouve.raison }
+    const res = await depublierPeriode(trouve.periode.id)
+    return 'error' in res && res.error ? { error: res.error } : {}
+  },
+}
+
+export const supprimerPlanning: OutilEcriture<typeof ParamsRetrait> = {
+  genre: 'ecriture',
+  nom: 'supprimer_planning',
+  description: `Prépare la SUPPRESSION DÉFINITIVE d'un planning : la période, ses gardes, ses échanges et ses dépannages disparaissent.
+
+Appelle-le seulement si la demande est explicite et définitive — « supprime le planning d'octobre », « efface cette période ».
+
+Si le doute existe, ou si la demande peut se satisfaire d'un retour en brouillon, propose plutôt retirer_diffusion_planning : il cache sans effacer, et se défait.
+
+Un planning VERROUILLÉ ne se supprime pas : il fait partie de l'historique du cabinet.`,
+  params: ParamsRetrait,
+  adminSeulement: true,
+
+  async resumer(params, ctx) {
+    const trouve = resoudrePeriode(await chargerPeriodes(ctx), params.periode)
+    if (!trouve.ok) return { ok: false, raison: trouve.raison }
+
+    const res = await bilanRetraitPlanning(trouve.periode.id)
+    if ('error' in res) return { ok: false, raison: res.error }
+    const b = res.bilan
+
+    if (b.statut === 'verrouille') {
+      return {
+        ok: false,
+        raison: `« ${b.nom} » est verrouillé : il fait partie de l'historique du cabinet et ne se supprime pas.`,
+      }
+    }
+    if (b.bloquant) return { ok: false, raison: b.bloquant }
+
+    // L'écran exige de RECOPIER le nom quand la suppression est lourde. Cette
+    // sécurité-là ne se transpose pas à une conversation — on ne va pas faire
+    // dicter un nom à Filou. On refuse donc, et on renvoie à l'écran : mieux
+    // vaut un chemin fermé qu'un garde-fou contourné par la porte d'à côté.
+    if (b.exigeSaisieDuNom) {
+      return {
+        ok: false,
+        raison: `« ${b.nom} » porte trop de choses pour être supprimé d'ici (${b.nbGardes} gardes, et il a été diffusé). L'écran Planning demande de recopier son nom avant d'effacer — c'est une sécurité que je ne peux pas prendre à ta place.`,
+      }
+    }
+
+    return {
+      ok: true,
+      proposition: {
+        titre: `Supprimer « ${b.nom} »`,
+        phrase: `${b.nom}, ${b.quand}, serait effacé définitivement.`,
+        lignes: lignesImpact(b),
+        action: 'Supprimer définitivement',
+        avertissement: "C'est irréversible. Pour simplement le cacher à l'équipe, préfère le retrait de diffusion.",
+      },
+    }
+  },
+
+  async executer(params, ctx) {
+    const trouve = resoudrePeriode(await chargerPeriodes(ctx), params.periode)
+    if (!trouve.ok) return { error: trouve.raison }
+    const res = await supprimerPeriode(trouve.periode.id)
+    return 'error' in res && res.error ? { error: res.error } : {}
   },
 }
