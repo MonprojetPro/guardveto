@@ -25,11 +25,30 @@
 -- pas n'est plus une sauvegarde. La bonne fermeture d'une porte inutile est
 -- de retirer la porte.
 --
--- ⚠️ IRRÉVERSIBLE. Le contenu (13 lignes de configuration de créneaux) n'est
--- pas récupérable après coup autrement que par la sauvegarde du projet. La
--- structure d'origine reste elle reconstructible : `creneau_modele` et
--- `relation_creneau` existent toujours, ce sont les tables vivantes dont ces
--- deux-là étaient la photo.
+-- ── CE QUE LE CONTENU CONTENAIT EXACTEMENT, vérifié avant suppression ──────
+--
+-- On ne supprime pas une sauvegarde sur la foi de son nom. Les 13 lignes ont
+-- été inventoriées et confrontées aux tables vivantes le 2026-08-25 :
+--
+--   _backup_creneau_modele    : 8 lignes — 4 encore présentes à l'identique
+--                               dans `creneau_modele`, 4 disparues
+--   _backup_relation_creneau  : 5 lignes — 3 encore présentes dans
+--                               `relation_creneau`, 2 disparues
+--
+-- Les 6 lignes disparues appartenaient TOUTES au profil de planning
+-- `b7990ef3-1c06-4f2f-8308-256974192ae8` — un profil qui **n'existe plus** :
+-- elles sont mortes avec lui, ce qui est le comportement attendu (les créneaux
+-- appartiennent à leur profil). Le profil survivant,
+-- `4d5e5444-06bf-4c55-bf2f-6732486d6aa4` (« Configuration standard »), a bien
+-- ses créneaux et ses relations dans les tables vivantes.
+--
+-- **Rien n'est donc perdu** : le contenu est soit redondant avec le vivant,
+-- soit orphelin d'un profil supprimé. C'est la vérification qui autorise la
+-- suppression, pas l'ancienneté du fichier.
+--
+-- ⚠️ IRRÉVERSIBLE malgré tout. La structure reste reconstructible :
+-- `creneau_modele` et `relation_creneau` existent toujours, ce sont les tables
+-- vivantes dont ces deux-là étaient la photo.
 -- ============================================================
 
 drop table if exists public._backup_creneau_modele_20260804;
