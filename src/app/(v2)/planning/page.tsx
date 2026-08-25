@@ -411,6 +411,7 @@ export default async function PlanningPageV2({
           periodeAffichee={periodeAffichee}
           anneeMois={anneeMois}
           isAdmin={isAdmin}
+          lectureSeule={estSecretaire}
           vets={vets}
           // Vide pour le secrétariat : ce champ sert à mettre en avant SES
           // propres gardes, et elle n'en a aucune. Aucun identifiant ne

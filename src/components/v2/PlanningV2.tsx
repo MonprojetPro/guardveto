@@ -42,6 +42,20 @@ interface Props {
   /** Format « YYYY-MM ». */
   anneeMois: string
   isAdmin: boolean
+  /**
+   * Le SECRÉTARIAT (B-017, 2026-08-25) : il consulte, il n'agit sur rien.
+   *
+   * Ce n'est pas « un vétérinaire avec moins de droits ». Un vétérinaire a un
+   * geste — proposer un échange sur SES gardes — et des compteurs qui le
+   * concernent. Le secrétariat n'a ni gardes ni compteurs : lui montrer la
+   * consigne d'échange, c'est lui promettre une action impossible, et lui
+   * montrer les écarts d'équité, c'est lui ouvrir la vie interne de l'équipe.
+   *
+   * ⚠️ Cette prop ne PROTÈGE rien : elle évite d'afficher ce qui n'a pas de
+   * sens. Ce qui protège, c'est la RLS (aucune écriture possible, HTTP 403
+   * vérifié le 25/08) et le refus serveur des écrans qui ne le concernent pas.
+   */
+  lectureSeule?: boolean
   vets: VetCrise[]
   moiVetId?: string
   nomsTypes: Record<string, string>
@@ -143,6 +157,7 @@ export function PlanningV2({
   periodeAffichee,
   anneeMois,
   isAdmin,
+  lectureSeule = false,
   vets,
   moiVetId,
   nomsTypes,
@@ -289,9 +304,16 @@ export function PlanningV2({
 
   return (
     <div className="plan-scene">
-      <FilouEdge origine="planning" />
+      {/* Filou n'existe pas pour le secrétariat (arbitrage MiKL du 25/08).
+          Son absence ici n'est que la moitié du travail : la conversation est
+          aussi REFUSÉE côté serveur (`filou/actions.ts`), sans quoi il aurait
+          suffi de connaître l'adresse. */}
+      {!lectureSeule && <FilouEdge origine="planning" />}
 
-      <div className={`workspace${compteursOuverts ? '' : ' counters-closed'}`}>
+      {/* Sans panneau de compteurs, la grille doit reprendre la largeur qu'il
+          occupait : la retirer sans replier la mise en page laisserait une
+          colonne vide à droite. */}
+      <div className={`workspace${compteursOuverts && !lectureSeule ? '' : ' counters-closed'}`}>
         <div className="work-head">
           {/* La période est un seul objet : la pilule EST le sélecteur, et sa
               carte d'identité vit dans le panneau qu'elle ouvre. */}
@@ -461,14 +483,20 @@ export function PlanningV2({
           </div>
 
           <div className="head-actions">
-            <button
-              type="button"
-              className="head-btn"
-              aria-pressed={compteursOuverts}
-              onClick={() => setCompteursOuverts((v) => !v)}
-            >
-              Compteurs
-            </button>
+            {/* Les compteurs mesurent l'ÉQUITÉ entre vétérinaires : combien de
+                week-ends chacun a faits, et de combien il s'écarte de sa juste
+                part. C'est la vie interne de l'équipe, pas une information de
+                comptoir — exclue du périmètre du secrétariat (MiKL, 25/08). */}
+            {!lectureSeule && (
+              <button
+                type="button"
+                className="head-btn"
+                aria-pressed={compteursOuverts}
+                onClick={() => setCompteursOuverts((v) => !v)}
+              >
+                Compteurs
+              </button>
+            )}
             {pilules}
           </div>
         </div>
@@ -511,7 +539,26 @@ export function PlanningV2({
               refuse — et lui faire chercher pendant dix minutes le bouton qui
               n'existe pas (constat MiKL du 2026-08-20). Un véto n'a qu'un
               geste ici : proposer un échange sur une de SES gardes à venir. */}
-          {isAdmin ? (
+          {lectureSeule ? (
+            /* Le secrétariat n'a AUCUN geste possible sur cette grille : ni
+               échange (il n'a pas de gardes), ni réattribution. Lui servir la
+               consigne d'un vétérinaire — « clique sur une de TES gardes » —
+               lui ferait chercher pendant dix minutes un bouton qui n'existe
+               pas, exactement le défaut relevé par MiKL le 20/08. La consigne
+               dit donc ce qui EST vrai : elle consulte, et elle peut imprimer. */
+            <p className="grid-hint">
+              <span className="gh-ico" aria-hidden="true">
+                👁️
+              </span>
+              <span>
+                <b>Le planning diffusé du cabinet</b> — qui est de garde, et qui est absent.
+              </span>
+              <span className="gh-sep" aria-hidden="true">
+                ·
+              </span>
+              <span className="gh-lock">Consultation seule · le PDF est imprimable</span>
+            </p>
+          ) : isAdmin ? (
             <p className="grid-hint">
               <span className="gh-ico" aria-hidden="true">
                 👆
@@ -589,6 +636,7 @@ export function PlanningV2({
               )}
             </div>
 
+            {!lectureSeule && (
             <aside className="counters-panel" aria-label="Compteurs de la période">
               <div className="cnt-head">
                 <h4>Compteurs · période</h4>
@@ -602,6 +650,7 @@ export function PlanningV2({
                   pas de légende. */}
               <CompteursPanel lignes={compteurs} bilans={bilans} colonnes={colonnesCompteurs} />
             </aside>
+            )}
           </div>
         </div>
 

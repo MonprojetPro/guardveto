@@ -98,6 +98,63 @@ describe('Le secrétariat ne touche à rien', () => {
   })
 })
 
+describe('Filou n’est pas ouvert au secrétariat', () => {
+  const actions = readFileSync(
+    join(RACINE, 'src', 'app', '(protected)', 'filou', 'actions.ts'),
+    'utf8',
+  )
+
+  it('le refuse EXPLICITEMENT, pas par effet de bord', () => {
+    // Avant le 25/08, une secrétaire était déjà refusée — mais par accident :
+    // pas de fiche vétérinaire, donc lecture vide, donc refus. Un refus obtenu
+    // par effet de bord disparaît au premier remaniement, et personne ne s'en
+    // aperçoit : Filou se met simplement à répondre à qui n'y a pas droit.
+    expect(actions).toContain("from('secretaires')")
+    expect(actions).toMatch(/Filou n’est pas ouvert au secrétariat/)
+  })
+
+  it('ne fait pas passer une panne de base pour un profil inexistant', () => {
+    // Leçon B-011 : « cette personne n'existe pas » a été affirmé pendant des
+    // semaines sur des lectures qui avaient simplement échoué.
+    expect(actions).toContain('erreurVet')
+  })
+
+  it('disparaît de l’écran du secrétariat', () => {
+    const planning = readFileSync(
+      join(RACINE, 'src', 'components', 'v2', 'PlanningV2.tsx'),
+      'utf8',
+    )
+    expect(planning).toContain('{!lectureSeule && <FilouEdge')
+  })
+})
+
+describe('L’écran du secrétariat ne promet rien d’impossible', () => {
+  const planning = readFileSync(join(RACINE, 'src', 'components', 'v2', 'PlanningV2.tsx'), 'utf8')
+
+  it('ne lui montre pas les compteurs d’équité', () => {
+    // Week-ends, nuits et surtout ÉCART à la juste part : c'est la vie interne
+    // de l'équipe. Le panneau ET son bouton disparaissent — laisser le bouton
+    // aurait ouvert un panneau vide.
+    // Regex plutôt qu'une chaîne littérale : les fins de ligne et
+    // l'indentation ne doivent pas faire tomber un test de sécurité.
+    expect(planning).toMatch(/\{!lectureSeule && \(\s*<aside className="counters-panel"/)
+    expect(planning).toMatch(/\{!lectureSeule && \(\s*<button[\s\S]{0,200}Compteurs/)
+  })
+
+  it('replie la mise en page quand le panneau est retiré', () => {
+    // Sans ça, la grille garderait une colonne vide à droite.
+    expect(planning).toContain('compteursOuverts && !lectureSeule')
+  })
+
+  it('remplace la consigne d’échange, qu’elle ne peut pas suivre', () => {
+    // « Clique sur une de TES gardes » : elle n'en a aucune. Lui servir cette
+    // consigne, c'est la faire chercher un bouton qui n'existe pas — le défaut
+    // relevé par MiKL le 20/08, sur les vétérinaires cette fois.
+    expect(planning).toContain('lectureSeule ? (')
+    expect(planning).toContain('Consultation seule')
+  })
+})
+
 describe('Aucun écran ne déconnecte le secrétariat par mégarde', () => {
   // L'ancien motif, recopié dans dix pages :
   //     const { data: moi } = await supabase.from('veterinaires')…single()

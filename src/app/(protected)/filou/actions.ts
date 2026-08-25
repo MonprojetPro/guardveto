@@ -62,12 +62,46 @@ async function contexte(): Promise<{ error: string } | { ctx: ContexteOutil }> {
   } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié.' }
 
-  const { data: vet } = await supabase
+  const { data: vet, error: erreurVet } = await supabase
     .from('veterinaires')
     .select('id, role_app')
     .eq('user_id', user.id)
-    .single()
-  if (!vet) return { error: 'Profil vétérinaire introuvable.' }
+    .maybeSingle()
+
+  // L'erreur est LUE : une base qui ne répond pas ne doit pas devenir « ton
+  // profil n'existe pas » (leçon B-011, 2026-08-24 — Filou affirmait qu'une
+  // personne n'existait pas alors que la lecture avait simplement échoué).
+  if (erreurVet) {
+    console.error('[Filou] Lecture du profil impossible :', erreurVet.message)
+    return { error: "Je n'arrive pas à lire ton profil pour le moment. Réessaie dans un instant." }
+  }
+
+  if (!vet) {
+    // ⚠️ REFUS EXPLICITE DU SECRÉTARIAT (arbitrage MiKL du 2026-08-25).
+    //
+    // Sans ce bloc, une secrétaire était DÉJÀ refusée — mais par accident :
+    // elle n'a pas de fiche vétérinaire, donc la lecture ne rendait rien, et
+    // le refus tombait sur un message technique (« Profil vétérinaire
+    // introuvable »). Un refus obtenu par effet de bord disparaît au premier
+    // remaniement de cette fonction, et personne ne s'en apercevrait : Filou
+    // se mettrait simplement à répondre à quelqu'un qui n'y a pas droit.
+    //
+    // On distingue donc les deux cas, et on le dit en français.
+    const { data: sec } = await supabase
+      .from('secretaires')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('actif', true)
+      .maybeSingle()
+
+    if (sec) {
+      return {
+        error:
+          "Filou n’est pas ouvert au secrétariat. Le planning et les absences se consultent directement à l’écran.",
+      }
+    }
+    return { error: 'Profil vétérinaire introuvable.' }
+  }
 
   let cabinetId: string
   try {
