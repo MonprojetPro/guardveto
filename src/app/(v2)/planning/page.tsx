@@ -151,7 +151,20 @@ export default async function PlanningPageV2({
       // case du jour, à côté des gardes — c'est ce qui explique un trou.
       supabase
         .from('conges')
-        .select('id, date_debut, date_fin, statut, veterinaires(prenom, couleur)')
+        // ⚠️ LA RELATION EST NOMMÉE, ET C'EST OBLIGATOIRE.
+        //
+        // `conges` porte TROIS liens vers `veterinaires` : le titulaire
+        // (`veterinaire_id`), celui qui a saisi (`saisi_par`) et celui qui a
+        // validé (`valide_par`). Écrire `veterinaires(...)` laisse PostgREST
+        // devant trois chemins possibles : il refuse la requête entière
+        // (PGRST201) et rend une erreur — donc, pour du code qui ne lit pas
+        // son `error`, une liste VIDE.
+        //
+        // C'est ce qui s'est passé ici du 2026-07-25 au 2026-08-25 : aucun
+        // congé n'a jamais été affiché dans les cases du planning, sans qu'un
+        // seul message le signale. Trouvé en cherchant pourquoi le panneau du
+        // secrétariat restait vide.
+        .select('id, date_debut, date_fin, statut, veterinaires!conges_veterinaire_id_fkey(prenom, couleur)')
         .lte('date_debut', fin)
         .gte('date_fin', debut),
       // Chargé pour TOUS : le bouton PDF en dépend, pas seulement la publication.
@@ -304,13 +317,13 @@ export default async function PlanningPageV2({
     const [congesFuturs, absencesFutures] = await Promise.all([
       supabase
         .from('conges')
-        .select('id, date_debut, date_fin, type, veterinaires(prenom, nom, couleur)')
+        .select('id, date_debut, date_fin, type, veterinaires!conges_veterinaire_id_fkey(prenom, nom, couleur)')
         .gte('date_fin', aujourdhui)
         .order('date_debut')
         .limit(40),
       supabase
         .from('absences')
-        .select('id, date_debut, date_fin, motif, veterinaires(prenom, nom, couleur)')
+        .select('id, date_debut, date_fin, motif, veterinaires!absences_veterinaire_id_fkey(prenom, nom, couleur)')
         .eq('statut', 'active')
         .gte('date_fin', aujourdhui)
         .order('date_debut')

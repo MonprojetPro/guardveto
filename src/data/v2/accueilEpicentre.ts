@@ -279,7 +279,7 @@ export async function chargerAccueil(
     estAdmin
       ? supabase
           .from('conges')
-          .select('id, created_at, date_debut, date_fin, veterinaires(prenom, couleur)')
+          .select('id, created_at, date_debut, date_fin, veterinaires!conges_veterinaire_id_fkey(prenom, couleur)')
           .eq('statut', 'souhait')
           .order('created_at', { ascending: true })
       : Promise.resolve({ data: [] as LigneSouhait[] }),
