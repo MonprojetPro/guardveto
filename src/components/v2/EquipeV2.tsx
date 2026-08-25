@@ -579,7 +579,17 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
                 disabled={isPending}
               />
             </div>
-            <div className="field" style={{ gridColumn: '1 / -1' }}>
+            {/* Les étiquettes tiennent la ligne de la couleur.
+                Le champ couleur, redevenu une cellule ordinaire, ouvrait une
+                rangée à lui seul et laissait quatre colonnes vides à sa droite —
+                le déséquilibre relevé en recette le 2026-08-25 : « même si tu as
+                compacté, ça fait déséquilibre ». Les étiquettes occupent
+                exactement ce vide (`grid-column: 2 / -1`), sans rien perdre de
+                leur largeur : elles restent le seul bloc qui ait besoin de place
+                pour aligner ses jetons. En dessous de 720 px la grille n'a plus
+                assez de colonnes pour partager la ligne : elles repassent en
+                pleine largeur. */}
+            <div className="field cf-etiquettes">
               <label>Étiquettes d&apos;équipe</label>
               <div className="tag-picker">
                 {tagsProposes.map((tag) => (
@@ -611,7 +621,7 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
                 Lues par les règles de composition (« un junior jamais seul »), écran Règles.
               </p>
             </div>
-            <div className="check-line">
+            <div className="check-line cf-recours">
               <input
                 id="cf-recours"
                 type="checkbox"

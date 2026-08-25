@@ -382,6 +382,15 @@
   display: flex; align-items: center; gap: 8px;
   font-size: 0.84rem; padding-top: 22px;
 }
+/* Les étiquettes prennent la place laissée libre par le champ couleur, à sa
+   droite, au lieu d'ouvrir une rangée à elles. Voir le commentaire du JSX. */
+.cf-etiquettes { grid-column: 2 / -1; }
+/* La case « dernier recours » n'a plus de champ à côté d'elle : elle tient sa
+   propre ligne, sans le décalage qui servait à l'aligner sur un voisin. */
+.cf-recours { grid-column: 1 / -1; padding-top: 4px; }
+@media (max-width: 720px) {
+  .cf-etiquettes { grid-column: 1 / -1; }
+}
 .check-line input { width: 18px; height: 18px; accent-color: var(--t-accent); }
 .create-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; align-items: center; }
 .create-actions .cf-erreur {
