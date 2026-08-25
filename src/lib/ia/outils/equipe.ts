@@ -14,7 +14,8 @@
 // ============================================================
 
 import { z } from 'zod'
-import { updateVeterinaire } from '@/app/(protected)/admin/veterinaires/actions'
+import { inviterVeterinaire, updateVeterinaire } from '@/app/(protected)/admin/veterinaires/actions'
+import { motifInvitationImpossible } from '@/lib/emails/destinataire'
 import { etiquettesProches } from '@/lib/equipe/etiquettes'
 import { lignesLues } from './lecture'
 import { SANS_PARAMETRE, type ContexteOutil, type OutilEcriture, type OutilLecture } from './types'
@@ -290,5 +291,92 @@ Ne touche que ce que tu précises : les champs que tu laisses de côté ne bouge
       dernier_recours: params.dernier_recours ?? v.dernier_recours,
       tags: params.etiquettes ?? v.tags ?? [],
     })
+  },
+}
+
+// ── Inviter quelqu'un à se connecter ────────────────────────
+//
+// Comblé le 2026-08-25, après que le registre de couverture (B-019) l'a rendu
+// visible : Filou savait inviter le SECRÉTARIAT, pas les vétérinaires. L'écart
+// n'avait aucune raison d'être — le secrétariat est simplement arrivé plus
+// tard, avec son outil. C'est exactement ce que le registre doit produire :
+// rendre voyantes les incohérences qu'aucune relecture ne trouve.
+
+const ParamsInviter = z.object({
+  prenom: z.string().describe('Le prénom du vétérinaire à inviter.'),
+})
+
+export const inviterVeterinaireOutil: OutilEcriture<typeof ParamsInviter> = {
+  genre: 'ecriture',
+  nom: 'inviter_veterinaire',
+  description: `Prépare l'envoi de l'invitation à un vétérinaire : il reçoit un e-mail pour choisir son mot de passe et accéder à l'application.
+
+Appelle-le quand on te demande d'ouvrir l'accès à quelqu'un de l'équipe — « envoie l'invitation à Manon », « elle peut se connecter maintenant ? », « il n'a jamais reçu son mot de passe ».
+
+Sans adresse e-mail sur la fiche, l'invitation n'a nulle part où aller : l'outil refuse et dit quoi faire. Si la personne a déjà un compte actif, il le dit aussi — un mot de passe oublié se réinitialise depuis l'écran de connexion, ce n'est pas une nouvelle invitation.`,
+  params: ParamsInviter,
+  adminSeulement: true,
+
+  async resumer(params, ctx) {
+    const equipe = await chargerEquipe(ctx)
+    const trouve = resoudre(equipe, params.prenom)
+    if (!trouve.ok) return { ok: false, raison: trouve.raison }
+    const v = trouve.veto
+
+    if (!v.actif) {
+      return {
+        ok: false,
+        raison: `${v.prenom} n'est plus dans le planning. Remets-la d'abord dans l'équipe avant de l'inviter.`,
+      }
+    }
+
+    // Le même refus, mot pour mot, que celui de l'écran Équipe : deux
+    // formulations pour un même empêchement finiraient par diverger, et la
+    // personne croirait à deux problèmes différents.
+    const motif = motifInvitationImpossible(v)
+    if (motif) return { ok: false, raison: motif }
+
+    // L'état du compte se lit sur la fiche, à part : `chargerEquipe` ne
+    // rapporte pas `user_id`, et c'est volontaire — un identifiant technique
+    // n'a rien à faire dans ce que le modèle manipule.
+    const { data: compte } = await ctx.supabase
+      .from('veterinaires')
+      .select('user_id, invite_pending')
+      .eq('id', v.id)
+      .maybeSingle()
+
+    const dejaInvite = (compte as { user_id: string | null } | null)?.user_id != null
+    const enAttente = (compte as { invite_pending: boolean | null } | null)?.invite_pending === true
+
+    if (dejaInvite && !enAttente) {
+      return {
+        ok: false,
+        raison: `${v.prenom} a déjà un compte actif : elle peut se connecter. Si elle a oublié son mot de passe, elle le réinitialise depuis l'écran de connexion.`,
+      }
+    }
+
+    return {
+      ok: true,
+      proposition: {
+        titre: dejaInvite ? `Relancer l'invitation de ${v.prenom}` : `Inviter ${v.prenom}`,
+        phrase: `Un e-mail partira à ${v.email} pour choisir un mot de passe.`,
+        lignes: dejaInvite
+          ? ['Une invitation avait déjà été envoyée : celle-ci la remplace.']
+          : [`${v.prenom} verra son planning, ses gardes et pourra poser ses congés.`],
+        action: dejaInvite ? "Relancer l'invitation" : "Envoyer l'invitation",
+      },
+    }
+  },
+
+  async executer(params, ctx) {
+    const equipe = await chargerEquipe(ctx)
+    const trouve = resoudre(equipe, params.prenom)
+    if (!trouve.ok) return { error: trouve.raison }
+    // On repasse par l'action de l'écran : elle porte la garde admin, la
+    // reprise d'un compte en attente, et surtout la pose de `cabinet_id` dans
+    // le JETON — sans quoi la connexion réussit puis l'application rejette
+    // (incident du 2026-08-15).
+    const res = await inviterVeterinaire(trouve.veto.id)
+    return 'error' in res && res.error ? { error: res.error } : {}
   },
 }

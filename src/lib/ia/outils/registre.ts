@@ -13,7 +13,7 @@
 // ============================================================
 
 import { afficherSurLeTableau } from './afficher'
-import { lireEquipe, modifierVeterinaire } from './equipe'
+import { inviterVeterinaireOutil, lireEquipe, modifierVeterinaire } from './equipe'
 import {
   creerAccesSecretariat,
   inviterAccesSecretariat,
@@ -120,6 +120,7 @@ export const CATALOGUE: Outil[] = [
 
   // ── Ce qui modifie : rien ne s'exécute sans un clic humain ──
   modifierVeterinaire,
+  inviterVeterinaireOutil,
   creerAccesSecretariat,
   inviterAccesSecretariat,
   supprimerAccesSecretariat,

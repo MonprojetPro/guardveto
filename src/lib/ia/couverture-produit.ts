@@ -64,10 +64,10 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   },
   'protected/admin/veterinaires#updateVeterinaire': { outil: 'modifier_veterinaire' },
   'protected/admin/veterinaires#toggleVeterinaireActif': { outil: 'modifier_veterinaire' },
-  'protected/admin/veterinaires#inviterVeterinaire': {
-    manque:
-      'Inviter un vétérinaire. Filou sait le faire pour le secrétariat, pas encore pour l’équipe — l’écart n’a pas de raison d’être, il est simplement antérieur.',
-  },
+  // Comblé le 25/08, le jour même où le registre a rendu l'écart visible :
+  // Filou savait inviter le secrétariat et pas l'équipe, sans qu'aucune raison
+  // le justifie. C'est le rendement attendu de ce fichier.
+  'protected/admin/veterinaires#inviterVeterinaire': { outil: 'inviter_veterinaire' },
 
   // ── LE SECRÉTARIAT (B-017) ──────────────────────────────────────────────
   'v2/equipe/secretariat-actions#creerSecretaire': { outil: 'creer_acces_secretariat' },
