@@ -160,7 +160,9 @@ chiffrer.
 
 | Quoi | Qui doit agir | Bloque quel item | Depuis |
 |---|---|---|---|
-| Decider si B-005 (page Absences, LOT 2) se lance maintenant | MiKL | B-005 | 2026-08-24 |
+| **① RECETTE A FAIRE — les nouvelles fiches du tableau apparaissent-elles SANS rafraichir ?** Ouvrir l'accueil sur le deploiement, faire deposer une demande de conge (ou proposer un echange) depuis un AUTRE compte, et regarder l'ecran sans y toucher. **C'est le seul point de B-005 qui n'a pas pu etre verifie cote dev**, et c'est celui qui repond a la question d'origine de MiKL (« pourquoi je ne le sais que si je demande ? »). Si rien n'apparait : la cause n°1 est la publication `supabase_realtime` — mais elle a ete verifiee en base le 25/08 (9 tables), donc regarder plutot la console du navigateur. | MiKL | B-005 | 2026-08-25 |
+| **② Activer la protection contre les mots de passe compromis** (Supabase → Authentication → Policies → « Leaked password protection »). Interrupteur de console, aucun code : MAX ne peut pas le faire a la place de MiKL. Verifie chaque mot de passe contre HaveIBeenPwned au moment ou il est defini. **Seul avertissement de securite qui demande une action humaine** — les 26 autres sont du code. | MiKL | B-020 | 2026-08-25 |
+| ~~Decider si B-005 (page Absences, LOT 2) se lance maintenant~~ — **tranche le 25/08 : lance et livre.** | MiKL | B-005 | 2026-08-24 |
 
 ---
 
