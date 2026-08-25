@@ -41,6 +41,7 @@ import { AUCUNE_LECTURE, phraseDApres } from '../sources-texte'
  */
 const LIBELLES: Record<string, string> = {
   lire_equipe: "les fiches de l'équipe",
+  lire_secretariat: 'les accès du secrétariat',
   lister_regles: 'les règles du cabinet',
   lire_gardes: 'le planning',
   lire_etat_periodes: "l'état des plannings",

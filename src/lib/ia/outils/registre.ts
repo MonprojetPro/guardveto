@@ -14,6 +14,12 @@
 
 import { afficherSurLeTableau } from './afficher'
 import { lireEquipe, modifierVeterinaire } from './equipe'
+import {
+  creerAccesSecretariat,
+  inviterAccesSecretariat,
+  lireSecretariat,
+  supprimerAccesSecretariat,
+} from './secretariat'
 import { listerRegles, creerRegle, agirSurRegles } from './regles'
 import {
   lireGardes,
@@ -86,6 +92,10 @@ export const CATALOGUE: Outil[] = [
   afficherSurLeTableau,
   // Qui fait quoi — à consulter avant toute conclusion sur une personne
   lireEquipe,
+  // Qui peut SE CONNECTER — ce n'est pas la même question que « qui compose
+  // l'équipe ». Sans cet outil, « qui a accès au planning ? » recevait la
+  // liste des vétérinaires, sans le secrétariat et sans le dire (25/08).
+  lireSecretariat,
   listerRegles,
   // Le planning et les compteurs
   lireGardes,
@@ -110,6 +120,9 @@ export const CATALOGUE: Outil[] = [
 
   // ── Ce qui modifie : rien ne s'exécute sans un clic humain ──
   modifierVeterinaire,
+  creerAccesSecretariat,
+  inviterAccesSecretariat,
+  supprimerAccesSecretariat,
   creerRegle,
   agirSurRegles,
   poserConge,

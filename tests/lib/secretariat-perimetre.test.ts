@@ -237,6 +237,62 @@ describe('La gestion des fiches est réservée à l’administratrice', () => {
   })
 })
 
+describe('Filou connaît le secrétariat, sans l’ouvrir à tout le monde', () => {
+  const outils = readFileSync(
+    join(RACINE, 'src', 'lib', 'ia', 'outils', 'secretariat.ts'),
+    'utf8',
+  )
+
+  it('réserve CHAQUE outil à l’administratrice', () => {
+    // Créer, inviter, supprimer un accès sont des gestes d'administration. Un
+    // outil oublié serait proposé à tout vétérinaire — et Filou ne demande pas
+    // la permission par écrit, il pose un bouton.
+    const nombreOutils = (outils.match(/^export const \w+: Outil/gm) ?? []).length
+    const nombreGardes = (outils.match(/adminSeulement: true/g) ?? []).length
+    expect(nombreOutils).toBeGreaterThanOrEqual(4)
+    expect(
+      nombreGardes,
+      `${nombreOutils} outils mais ${nombreGardes} marqués adminSeulement : l'un d'eux est offert à toute l'équipe.`,
+    ).toBe(nombreOutils)
+  })
+
+  it('passe par les actions de l’écran plutôt que d’écrire en direct', () => {
+    // Un second chemin d'écriture est un second endroit où les contrôles
+    // peuvent manquer : c'est ce qui a produit les quatre portes d'écriture de
+    // garde trouvées le 22/08. Les outils réutilisent les actions, qui portent
+    // déjà la garde admin, la normalisation d'adresse et l'unicité.
+    expect(outils).toContain("from '@/app/(v2)/equipe/secretariat-actions'")
+    expect(outils).not.toMatch(/from\('secretaires'\)[\s\S]{0,80}\.(insert|update|delete)\(/)
+  })
+
+  it('rend un FAIT sur le compte, pas une interprétation', () => {
+    expect(outils).toContain('a_un_compte')
+
+    // Hors commentaires : le fichier EXPLIQUE pourquoi il n'écrit pas
+    // « invitation envoyée », et cette explication ne doit pas déclencher le
+    // test qu'elle justifie.
+    const code = outils
+      .split('\n')
+      .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
+      .join('\n')
+    expect(code).not.toMatch(/invitation envoyée/i)
+  })
+
+  it('dit à Filou que « qui a accès » ne se répond pas avec la seule équipe', () => {
+    // Le vrai risque n'était pas « Filou ne sait pas faire » : c'était une
+    // réponse incomplète présentée comme complète. `lire_equipe` seul renvoie
+    // les vétérinaires, et rien ne signalait l'absence du secrétariat.
+    const agent = readFileSync(join(RACINE, 'src', 'lib', 'ia', 'agentFilou.ts'), 'utf8')
+    expect(agent).toContain('QUI PEUT SE CONNECTER')
+    expect(agent).toContain('lire_secretariat')
+  })
+
+  it('sait renvoyer vers l’Assistance pour un défaut du logiciel', () => {
+    const agent = readFileSync(join(RACINE, 'src', 'lib', 'ia', 'agentFilou.ts'), 'utf8')
+    expect(agent).toContain('ASSISTANCE')
+  })
+})
+
 describe('Aucun écran ne déconnecte le secrétariat par mégarde', () => {
   // L'ancien motif, recopié dans dix pages :
   //     const { data: moi } = await supabase.from('veterinaires')…single()
