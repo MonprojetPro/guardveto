@@ -75,11 +75,24 @@ La réponse contient aussi un champ « reglages_hors_regles » : ce sont des ré
   params: ParamsLister,
 
   async executer(params, ctx) {
-    const [repRegles, repVets] = await Promise.all([
-      ctx.supabase
-        .from('regles_cabinet')
-        .select('id, brique_id, params_json, force, actif, periode_id')
-        .order('brique_id'),
+    // ⚠️ MÊME lecture que `agir_sur_regles` — c'est ce qui donne son sens au
+    // numéro (B-036, 2026-08-26).
+    //
+    // Cette lecture-ci triait par `brique_id` SEUL, l'autre par `brique_id` puis
+    // `id`. Deux tris pour une seule numérotation : Postgres ne garantit aucun
+    // ordre entre lignes de même `brique_id`, donc « la n°13 » n'y désignait pas
+    // la même règle. Mesure sur les donnees reelles du cabinet de demonstration :
+    // 13 regles sur 22 changeaient de place, et les QUATRE `interdire_creneau`
+    // etaient integralement inversees. Filou lisait « n°13 = Victor, repos du
+    // lundi », demandait d'agir sur la 13, et l'action visait « Anne-Catherine,
+    // mercredi apres-midi ». Vu a l'ecran par MiKL, devant la cliente.
+    //
+    // Le correctif n'est donc pas d'ajouter le tri manquant ici — c'est de
+    // n'avoir qu'UNE lecture. Deux tris qu'il faut penser a garder identiques
+    // finissent toujours par diverger ; le commentaire de `resoudreNumeros`
+    // affirmait d'ailleurs qu'ils l'étaient déjà.
+    const [rows, repVets] = await Promise.all([
+      chargerReglesCabinet(ctx),
       ctx.supabase.from('veterinaires').select('id, prenom'),
     ])
 
@@ -88,8 +101,6 @@ La réponse contient aussi un champ « reglages_hors_regles » : ce sont des ré
     const vets = lignesLues<{ id: string; prenom: string }>(repVets, "la liste de l'équipe")
     const prenoms = new Map(vets.map((v) => [v.id, v.prenom]))
     const nomVeto = (id: string) => prenoms.get(id) ?? 'un vétérinaire'
-
-    const rows = fusionnerDuos(lignesLues<RegleRow>(repRegles, 'les règles du cabinet'))
 
     // Le filtre par prénom se fait sur la PHRASE rendue, pas sur les
     // identifiants : une règle peut viser plusieurs personnes, et le nom
@@ -354,6 +365,19 @@ async function reglagesQuiContraignent(
   return phrases
 }
 
+/**
+ * LA lecture des règles du cabinet — la seule. `lister_regles` (qui numérote) et
+ * `agir_sur_regles` (qui résout le numéro) passent tous les deux par ici.
+ *
+ * ⚠️ `.order('id')` n'est PAS un détail de confort : c'est lui qui rend l'ordre
+ * déterministe. Postgres ne garantit aucun ordre entre lignes de même
+ * `brique_id`, et ce cabinet en a quatre `interdire_creneau`, six `equilibrer`,
+ * trois `repos_conditionnel`. Sans ce second critère, deux lectures successives
+ * peuvent rendre des ordres différents — et le numéro, qui n'a de sens que par
+ * la position, désigne alors une autre règle. Ne jamais retirer ce tri, et ne
+ * jamais recopier cette requête ailleurs : c'est la duplication qui a causé
+ * B-036.
+ */
 async function chargerReglesCabinet(ctx: ContexteOutil): Promise<Array<RegleRow>> {
   return fusionnerDuos(
     lignesLues<RegleRow>(
@@ -369,7 +393,12 @@ async function chargerReglesCabinet(ctx: ContexteOutil): Promise<Array<RegleRow>
 
 /** Traduit les numéros donnés par le modèle en règles réelles, sur la liste
  *  COMPLÈTE et dans le même ordre que `lister_regles` — c'est ce qui garantit
- *  qu'un « R3 » désigne bien la règle que Filou a lue. */
+ *  qu'un « R3 » désigne bien la règle que Filou a lue.
+ *
+ *  Cette phrase était FAUSSE jusqu'au 2026-08-26 : les deux passaient par des
+ *  requêtes distinctes, aux tris différents. Elle n'est vraie que depuis qu'il
+ *  n'y a plus qu'une lecture (`chargerReglesCabinet`), et le test
+ *  `tests/lib/regles-numerotation-stable.test.ts` la maintient vraie. */
 async function resoudreNumeros(
   numeros: number[],
   ctx: ContexteOutil,
