@@ -359,3 +359,22 @@ constate » a fait très exactement ce pour quoi elle existe.
 formulaire désigne une ligne par son rang plutôt que par son identifiant, l'ordre
 est-il total ? Trier sur une colonne non unique suffit à faire d'un numéro un
 pointeur mouvant.
+
+---
+
+## 2026-08-26 — Une pénalité n'est pas une interdiction (dernier recours, B-046)
+
+**Contexte :** MiKL découvre Anne-Catherine de garde sur un planning généré, alors qu'elle est marquée « dernier recours uniquement » depuis le début. Sa demande : elle ne doit **jamais** entrer dans une génération.
+
+**Cause racine (lue dans le code, pas supposée) :** le dernier recours n'était pas exclu, il était **repoussé** — `scorerCandidat` et `scorerCandidatLNS` lui donnaient un score de `1_000_000`, et R7 dans `hard-constraints.ts` n'était qu'un `ok(warning)`. Un score très grand ordonne les candidats ; il n'en retire aucun. Dès que le moteur n'avait plus personne d'autre, il le prenait — exactement comme prévu par le code, et exactement à l'inverse de ce que le libellé laissait croire à l'écran.
+
+**Fix :** l'exclusion est posée sur l'**effectif**, en amont du moteur (`src/engine/effectif.ts`, appliqué par `resoudreContexte({ pourGeneration: true })` sur les trois portes : génération, replay, pré-vol). Le solver ne voit plus la personne, l'équité ne la compte plus, le pré-vol non plus.
+
+**Pourquoi PAS dans `isValid` :** le même `isValid` sert la modale de disponibilités et la réparation d'absence, où le dernier recours **doit** rester proposable — c'est toute sa raison d'être. Un refus posé dans les contraintes dures aurait supprimé la fonctionnalité en croyant l'appliquer. **Quand une règle dépend du CONTEXTE d'appel (auto vs manuel), elle ne se pose pas dans la couche partagée : elle se pose sur les données qu'on lui donne.**
+
+**À retenir :**
+1. **Un poids n'est pas un garde-fou.** « Très pénalisé » et « jamais » sont deux comportements différents ; seule l'exclusion des données garantit le second.
+2. **Une exclusion volontaire doit se dire quand elle bloque.** Une impasse causée par un réglage voulu, mais silencieuse, envoie chercher un coupable parmi les règles. D'où `exclusDernierRecours` remonté jusqu'à l'écran d'impasse.
+3. **Retirer quelqu'un de l'effectif fait mentir les contrôles voisins.** Le pré-vol prenait le dernier recours pour un véto sorti de l'équipe et conseillait de **supprimer** ses règles — un conseil destructeur. D'où `idsHorsGeneration` : « hors du moteur » et « hors de l'équipe » sont deux choses.
+4. **Quatre textes de Filou décrivaient l'ancien comportement** et sont devenus faux le jour du changement. La question à se poser n'est jamais « faut-il un outil ? » mais « une réponse déjà donnée devient-elle fausse ? ».
+5. Garde-fou posé : `tests/lib/generation-exclut-dernier-recours.test.ts` refuse tout appelant de `genererPlanningPur` qui ne passerait pas `pourGeneration: true`. Vérifié par mutation (drapeau retiré → test rouge).
