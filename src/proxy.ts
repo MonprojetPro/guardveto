@@ -42,10 +42,29 @@ export async function proxy(request: NextRequest) {
     || pathname.startsWith('/auth/')
     || pathname === '/set-password'
 
-  // Non authentifié → redirige vers /login
+  // Non authentifié → redirige vers /login, EN GARDANT OÙ L'ON ALLAIT.
+  //
+  // Sans le paramètre `suite`, la destination était perdue : on se connectait
+  // et on atterrissait sur l'accueil, quelle qu'ait été l'intention de départ.
+  //
+  // Ce n'est pas un détail de confort. Le lien de l'APPEL AUX VOLONTAIRES
+  // envoyé par e-mail pointe vers `/crise/volontaire?absence=…&garde=…&role=…`.
+  // Un vétérinaire qui le reçoit sur son téléphone n'a presque jamais de
+  // session ouverte : il cliquait, se connectait, et se retrouvait sur
+  // l'accueil sans savoir ce qu'on attendait de lui. Le geste entier — « je
+  // prends ce créneau » — était injoignable depuis l'e-mail qui l'invitait.
+  // (Trouvé le 2026-08-26 en préparant la recette du dépannage.)
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone()
+    const destination = pathname + request.nextUrl.search
     url.pathname = '/login'
+    url.search = ''
+    // Uniquement un chemin INTERNE. Sans cette borne, un lien fabriqué
+    // (`?suite=https://…`) ferait de l'écran de connexion un tremplin vers
+    // n'importe quel site, avec la confiance visuelle de GuardVeto derrière.
+    if (destination.startsWith('/') && !destination.startsWith('//')) {
+      url.searchParams.set('suite', destination)
+    }
     return NextResponse.redirect(url)
   }
 

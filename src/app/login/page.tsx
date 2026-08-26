@@ -33,10 +33,23 @@ export default function LoginPage() {
   const [resetSent, setResetSent] = useState(false)
   const [isPending, startTransition] = useTransition()
 
+
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
     const formData = new FormData(event.currentTarget)
+
+    // Où la personne allait avant d'être renvoyée ici. Lu directement sur
+    // l'URL plutôt qu'avec `useSearchParams` : ce hook impose d'envelopper la
+    // page dans un `<Suspense>` (Next refuse de la pré-rendre sinon), et ce
+    // serait beaucoup de cérémonie pour une chaîne de caractères.
+    //
+    // La valeur est REVALIDÉE côté serveur (`suiteSure`) : elle vient de
+    // l'URL, donc de l'utilisateur, donc on ne lui fait pas confiance ici.
+    // C'est ce qui rend cliquable, depuis un e-mail, le lien « je prends ce
+    // créneau » de l'appel aux volontaires.
+    const suite = new URLSearchParams(window.location.search).get('suite')
+    if (suite) formData.set('suite', suite)
 
     startTransition(async () => {
       const result = await login(formData)

@@ -4,6 +4,26 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { resoudreIdentite } from '@/lib/identite'
 
+/**
+ * La destination demandée avant la connexion, si elle est sûre.
+ *
+ * `suite` est posé par le middleware quand quelqu'un tombe sur la connexion en
+ * voulant aller ailleurs — typiquement le lien d'appel aux volontaires reçu par
+ * e-mail. On ne lui fait AUCUNE confiance : seul un chemin interne est accepté.
+ * Sans ce filtre, `?suite=https://…` ferait de notre écran de connexion un
+ * tremplin vers n'importe quel site, avec notre habillage pour caution.
+ */
+function suiteSure(formData: FormData): string | null {
+  const brut = (formData.get('suite') as string | null)?.trim()
+  if (!brut) return null
+  // `//exemple.com` est une URL absolue déguisée : le navigateur y voit un
+  // autre domaine. C'est le contournement classique d'un test naïf sur « / ».
+  if (!brut.startsWith('/') || brut.startsWith('//')) return null
+  // On ne renvoie pas non plus vers la connexion elle-même : on tournerait.
+  if (brut.startsWith('/login')) return null
+  return brut
+}
+
 export async function login(formData: FormData) {
   // Mode dev : accès direct sans mot de passe
   if (process.env.DEV_BYPASS_AUTH === 'true') {
@@ -47,6 +67,11 @@ export async function login(formData: FormData) {
   // Filou ne lui est pas ouvert (arbitrage MiKL du 25/08). Son écran d'arrivée
   // est le planning, qui est aussi sa raison d'être ici.
   if (identite.identite.genre === 'secretaire') redirect('/planning')
+
+  // On revient là où la personne allait, si elle allait quelque part. C'est ce
+  // qui rend le lien de l'appel aux volontaires utilisable depuis un e-mail.
+  const suite = suiteSure(formData)
+  if (suite) redirect(suite)
 
   // Depuis la bascule V2 (2026-07-25), on atterrit sur l'accueil épicentre.
   redirect('/accueil')

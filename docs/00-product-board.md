@@ -239,6 +239,10 @@ chiffrer.
 | B-033 | La conversation ne fuit plus d'un compte a l'autre | `cleConversation(idPersonne)` et `cleResultat(idPersonne)` — `grep CLE_CONVERSATION\|CLE_RESULTAT` ne rend plus aucune cle fixe. Les deux etats s'initialisent depuis la cle de la personne | OK |
 | B-032 | Un veterinaire ne voit plus une tablette sans issue | La branche non-admin rendait `null` ; elle rend une phrase d'explication (`.saisie-fermee`). Verifie a la lecture du JSX | OK |
 | B-032 | Ouvrir le champ aux veterinaires | **ABSENT — volontaire.** C'est une decision produit, pas un correctif : elle change ce que six personnes peuvent faire. Posee a MiKL, en attente | absent |
+| B-031 | Le lien de l'appel aux volontaires mene bien a la page de depannage | `src/proxy.ts` pose `suite` (chemin + parametres) avant de rediriger vers /login ; `login/actions.ts` y revient via `suiteSure()`. Verifie a la lecture des deux fichiers, build vert | OK |
+| B-031 | La destination ne peut pas devenir un tremplin vers l'exterieur | `suiteSure()` refuse tout ce qui ne commence pas par `/`, tout `//…` (URL absolue deguisee) et `/login` (boucle). Filtre cote SERVEUR ; le client ne fait que transmettre | OK |
+| B-031 | Le bac a sable peut reellement envoyer | 7 vetos dotes d'alias `culus.osteo+prenom@gmail.com` (verifie en base), expediteur du cabinet pose sur `vetovaldallier@gmail.com` — la seule adresse dont `email_log` prouve qu'elle est passee | OK |
+| B-031 | L'envoi lui-meme, le mail recu, le clic du veto | **ABSENT — c'est justement ce que MiKL va recetter.** Rien ne remplace l'essai reel : aucune ligne `appel_volontaires` n'existe encore dans `email_log` | absent |
 
 **Restes-a-faire crees plutot que passes sous silence** : B-024 (clonage), B-025
 (amorcage), B-026 (design). Aucun n'est bloquant pour la mise en service.
