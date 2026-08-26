@@ -33,9 +33,9 @@ const TYPE_COLORS: Record<TypeConge, string> = {
   indisponibilite: 'bg-orange-100 text-orange-700 border-orange-200',
   autre:           'bg-gray-100 text-gray-600 border-gray-200',
 }
-const CRENEAU_LABELS: Record<string, string> = {
-  journee: 'Journée', matin: 'Matin', 'apres-midi': 'Après-midi', soiree: 'Soirée',
-}
+// Les libellés de demi-journée ont été retirés (B-043) : le produit ne planifie
+// que les soirs et les week-ends, et le moteur n'a jamais lu ce champ — un congé
+// bloque la journée entière, quel que soit le créneau affiché ici.
 const STATUT_CONFIG: Record<StatutConge, { label: string; className: string }> = {
   souhait: { label: 'Souhait',  className: 'bg-orange-100 text-orange-700 border-orange-200' },
   valide:  { label: 'Validé',   className: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
@@ -165,9 +165,6 @@ export function CongesList({ conges, vets, currentUserId, isAdmin, conflitsParCo
             {c.type === 'indisponibilite'
               ? formatDate(c.date_debut)
               : <>{formatDate(c.date_debut)} → {formatDate(c.date_fin)}<span className="mx-1.5 opacity-30">·</span>{duree}</>}
-            {c.creneau && c.type === 'indisponibilite' && (
-              <><span className="mx-1.5 opacity-30">·</span>{CRENEAU_LABELS[c.creneau] ?? c.creneau}</>
-            )}
             {c.commentaire && <><span className="mx-1.5 opacity-30">·</span><span className="italic">{c.commentaire}</span></>}
           </p>
           {!isAdmin && c.statut === 'refuse' && c.raison_refus && (

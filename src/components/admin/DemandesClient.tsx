@@ -21,9 +21,7 @@ const TYPE_COLORS: Record<string, string> = {
   indisponibilite: 'bg-orange-100 text-orange-700',
   autre:           'bg-gray-100 text-gray-600',
 }
-const CRENEAU_LABELS: Record<string, string> = {
-  journee: 'Journée', matin: 'Matin', 'apres-midi': 'Après-midi', soiree: 'Soirée',
-}
+// Libellés de demi-journée retirés (B-043) — voir la note dans `CongeForm`.
 
 function formatDate(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString('fr-FR', {
@@ -91,7 +89,6 @@ export function DemandesClient({ demandes, vets, currentVetoId, conflitsParConge
             {isIndispo ? (
               <>
                 {formatDate(d.date_debut)}
-                {d.creneau && <> · <span className="font-medium text-foreground">{CRENEAU_LABELS[d.creneau]}</span></>}
               </>
             ) : (
               <>{formatDate(d.date_debut)} → {formatDate(d.date_fin)} · {sem} sem.</>

@@ -45,12 +45,10 @@ const TYPE_HUMAIN: Record<string, string> = {
   indisponibilite: 'indisponibilité',
 }
 
-const CRENEAU_HUMAIN: Record<string, string> = {
-  matin: 'matin',
-  'apres-midi': 'après-midi',
-  soiree: 'soirée',
-  journee: 'journée entière',
-}
+// ⚠️ Les demi-journées ont été RETIRÉES (B-043, 2026-08-26). Le produit ne
+// planifie que les soirs et les week-ends, et `checkR16Conge` n'a jamais lu ce
+// champ : un congé bloque la journée entière quoi qu'il affiche. Le faire dire
+// à Filou revenait à lui faire promettre une portée inexistante.
 
 const STATUT_HUMAIN: Record<string, string> = {
   souhait: 'souhait en attente',
@@ -58,9 +56,6 @@ const STATUT_HUMAIN: Record<string, string> = {
   refuse: 'refusé',
 }
 
-function creneauHumain(creneau: string | null): string {
-  return creneau ? (CRENEAU_HUMAIN[creneau] ?? creneau) : CRENEAU_HUMAIN.journee
-}
 
 // ── Chargement + résolution (dupliqué à dessein depuis equipe.ts : ce
 //    fichier ne doit toucher à aucun autre) ─────────────────────
@@ -266,7 +261,6 @@ Si tu n'es pas administrateur, tu ne verras ici que TES propres congés, même e
         date_debut: c.date_debut,
         date_fin: c.date_fin,
         type: TYPE_HUMAIN[c.type] ?? c.type,
-        creneau: creneauHumain(c.creneau),
         statut: STATUT_HUMAIN[c.statut] ?? c.statut,
         motif_refus: c.statut === 'refuse' ? c.raison_refus : undefined,
         commentaire: c.commentaire || undefined,
@@ -299,7 +293,6 @@ Appelle-le pour « qu'est-ce qu'il y a à valider ? », « y a-t-il des demandes
         date_debut: c.date_debut,
         date_fin: c.date_fin,
         type: TYPE_HUMAIN[c.type] ?? c.type,
-        creneau: creneauHumain(c.creneau),
         commentaire: c.commentaire || undefined,
         depose_le: c.created_at,
       })),
@@ -310,7 +303,6 @@ Appelle-le pour « qu'est-ce qu'il y a à valider ? », « y a-t-il des demandes
 // ── Écriture : poser un congé / déposer un souhait ──────────
 
 const TYPES_VALIDES = ['vacances', 'formation', 'sante', 'autre', 'indisponibilite'] as const
-const CRENEAUX_VALIDES = ['matin', 'apres-midi', 'soiree', 'journee'] as const
 
 const ParamsPoser = z.object({
   prenom: z
@@ -322,10 +314,6 @@ const ParamsPoser = z.object({
   date_debut: z.string().describe('Date ISO (AAAA-MM-JJ) de début.'),
   date_fin: z.string().describe('Date ISO (AAAA-MM-JJ) de fin, incluse. Peut être égale à la date de début.'),
   type: z.enum(TYPES_VALIDES).describe('vacances, formation, sante (raison médicale), autre, ou indisponibilite.'),
-  creneau: z
-    .enum(CRENEAUX_VALIDES)
-    .optional()
-    .describe('Laisse vide pour une absence sur la journée entière.'),
   commentaire: z.string().optional().describe('Note libre, visible par l’administrateur.'),
 })
 
@@ -372,7 +360,6 @@ Si tu es administrateur, le congé est enregistré directement VALIDÉ (c'est le
     const lignes = [
       `${params.date_debut} → ${params.date_fin}`,
       `Type : ${TYPE_HUMAIN[params.type]}`,
-      `Créneau : ${creneauHumain(params.creneau ?? null)}`,
     ]
     if (params.commentaire) lignes.push(`Commentaire : ${params.commentaire}`)
 
@@ -409,7 +396,8 @@ Si tu es administrateur, le congé est enregistré directement VALIDÉ (c'est le
         date_debut: params.date_debut,
         date_fin: params.date_fin,
         type: params.type,
-        creneau: params.creneau && params.creneau !== 'journee' ? params.creneau : null,
+        // Toujours `null` : voir la note sur les demi-journées plus haut.
+        creneau: null,
         commentaire: params.commentaire ?? '',
       },
       ctx.vetoId,

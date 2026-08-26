@@ -22,12 +22,24 @@ const TYPES_CONGE: { value: TypeConge; label: string }[] = [
   { value: 'autre',           label: 'Autre' },
 ]
 
-const CRENEAUX: { value: CreneauConge; label: string }[] = [
-  { value: 'journee',   label: 'Toute la journée' },
-  { value: 'matin',     label: 'Matin' },
-  { value: 'apres-midi', label: 'Après-midi' },
-  { value: 'soiree',    label: 'Soirée' },
-]
+// ⚠️ LE CHOIX DE CRÉNEAU A ÉTÉ RETIRÉ (B-043, 2026-08-26).
+//
+// Il proposait « Toute la journée / Matin / Après-midi / Soirée ». Or
+// `checkR16Conge` (hard-constraints.ts) n'a JAMAIS lu ce champ : quel que soit
+// le créneau choisi, le congé bloquait la journée entière. Quelqu'un posant une
+// matinée perdait sa garde du soir, sans que rien ne le signale.
+//
+// Et le choix n'avait de toute façon aucun sens ici : le produit ne planifie
+// que les soirs et les week-ends. « Matin » et « après-midi » ne peuvent rien
+// libérer ni rien bloquer.
+//
+// Mesuré avant de retirer : les 32 congés des deux cabinets portaient tous
+// `creneau = null`. Personne ne s'en était servi — on ne casse aucune donnée.
+//
+// La colonne `conges.creneau` reste en base, volontairement : la supprimer est
+// une migration, et le jour où le produit couvrira les journées de travail
+// (B-006), c'est là qu'elle reprendra du sens. Elle est simplement écrite
+// `null` désormais.
 
 function lundiDeSemaine(date: Date): Date {
   const d = new Date(date)
@@ -78,7 +90,6 @@ export function CongeForm({
     conge?.date_fin ?? toIso(dimancheDeSemaine(today))
   )
   const [type, setType] = useState<TypeConge>(conge?.type ?? 'vacances')
-  const [creneau, setCreneau] = useState<CreneauConge>(conge?.creneau ?? 'journee')
   const [commentaire, setCommentaire] = useState(conge?.commentaire ?? '')
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -90,7 +101,6 @@ export function CongeForm({
     setDateDebut(conge?.date_debut ?? toIso(lundi))
     setDateFin(conge?.date_fin ?? toIso(dimancheDeSemaine(lundi)))
     setType(conge?.type ?? 'vacances')
-    setCreneau(conge?.creneau ?? 'journee')
     setCommentaire(conge?.commentaire ?? '')
     setErrors({})
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -145,7 +155,8 @@ export function CongeForm({
         date_debut: dateDebut,
         date_fin: isIndispo ? dateDebut : dateFin,
         type,
-        creneau: isIndispo ? creneau : null,
+        // Toujours `null` depuis B-043 : voir la note en tête de fichier.
+        creneau: null,
         commentaire,
       }
       if (isEdit && conge) {
@@ -258,20 +269,7 @@ export function CongeForm({
             </p>
           )}
 
-          {/* Créneau — uniquement pour indisponibilité */}
-          {isIndispo && (
-            <div className="space-y-1.5">
-              <Label>Créneau</Label>
-              <Select value={creneau} onValueChange={(v) => v && setCreneau(v as CreneauConge)} items={CRENEAUX}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {CRENEAUX.map((c) => (
-                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+
 
           {/* Commentaire */}
           <div className="space-y-1.5">

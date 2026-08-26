@@ -107,9 +107,8 @@ const TYPE_LABELS: Record<string, string> = {
   indisponibilite: 'Indisponibilité ponctuelle', autre: 'Autre',
 }
 
-const CRENEAU_LABELS: Record<string, string> = {
-  journee: 'Journée entière', matin: 'Matin', 'apres-midi': 'Après-midi', soiree: 'Soirée',
-}
+// Demi-journées retirées des e-mails (B-043) : le produit ne planifie que les
+// soirs et les week-ends, et le moteur n'a jamais lu ce champ.
 
 /** Signature neutre côté cabinet (D3 — plus de « Anne-Sophie » en dur).
  *  Reçoit le nom d'expéditeur du cabinet ; repli générique si absent. */
@@ -131,7 +130,7 @@ export function emailCongeValide(params: {
   const isIndispo = type === 'indisponibilite'
   const typeLabel = TYPE_LABELS[type] ?? type
   const periode = isIndispo
-    ? `${formatDate(date_debut)}${creneau ? ` — ${CRENEAU_LABELS[creneau] ?? creneau}` : ''}`
+    ? formatDate(date_debut)
     : `du ${formatDate(date_debut)} au ${formatDate(date_fin)}`
 
   return `
@@ -168,7 +167,7 @@ export function emailCongeRefuse(params: {
   const isIndispo = type === 'indisponibilite'
   const typeLabel = TYPE_LABELS[type] ?? type
   const periode = isIndispo
-    ? `${formatDate(date_debut)}${creneau ? ` — ${CRENEAU_LABELS[creneau] ?? creneau}` : ''}`
+    ? formatDate(date_debut)
     : `du ${formatDate(date_debut)} au ${formatDate(date_fin)}`
 
   return `

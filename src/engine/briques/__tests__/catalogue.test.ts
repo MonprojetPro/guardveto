@@ -115,13 +115,29 @@ describe('catalogue — rendu en langage naturel', () => {
     expect(phrase).toContain('sauf vacances scolaires')
   })
 
-  it('interdire_creneau (tableau de règles — Anne-Sophie)', () => {
+  it('interdire_creneau (tableau de règles — Anne-Sophie) : la demi-journée ne s’affiche PLUS', () => {
+    // ⚠️ CE TEST A ÉTÉ RETOURNÉ le 2026-08-26 (B-043).
+    //
+    // Il exigeait auparavant que la phrase contienne « l'après-midi » — il
+    // VERROUILLAIT donc le défaut. La règle affichait « jeudi après-midi »
+    // alors que le moteur n'a jamais lu `periode` : le jeudi était bloqué en
+    // ENTIER. Le test garantissait la fidélité de l'affichage à la donnée, sans
+    // jamais poser la seule question qui comptait — le moteur en fait-il
+    // quelque chose ?
+    //
+    // Leçon à garder : un test peut protéger un mensonge avec la même rigueur
+    // qu'il protégerait une vérité. Écrire « la phrase dit X » ne vaut que si
+    // l'on a vérifié ailleurs que X est appliqué.
     const phrase = rendreRegle('interdire_creneau', {
       regles: [{ jour: 'jeudi', periode: 'apres_midi', semaine: 'impaire' }],
     })
     expect(phrase).toContain('jeudi')
-    expect(phrase).toContain("l'après-midi")
     expect(phrase).toContain('impaire')
+    expect(
+      phrase,
+      'La phrase annonce une portée partielle que le moteur n’applique pas : ' +
+        'la règle bloque le jour entier.',
+    ).not.toContain('après-midi')
   })
 
   it('repos_conditionnel — décrit les deux cas (WE / sinon)', () => {

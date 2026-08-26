@@ -104,9 +104,9 @@ function nbJours(debut: string, fin: string) {
 /** « Du lundi 16 au dimanche 22 mars 2026 · 7 jours », ou le jour seul. */
 function periodeLisible(c: Conge) {
   if (c.date_debut === c.date_fin) {
-    const creneau =
-      c.creneau && c.creneau !== 'journee' ? ` · créneau ${c.creneau.replace('-', ' ')}` : ''
-    return `${dateLongue(c.date_debut)}${creneau}`
+    // Le créneau (matin / après-midi / soirée) ne s'affiche plus : le moteur ne
+    // l'a jamais lu, et le produit ne planifie que les soirs et week-ends (B-043).
+    return dateLongue(c.date_debut)
   }
   const n = nbJours(c.date_debut, c.date_fin)
   return `Du ${dateLongue(c.date_debut)} au ${dateLongue(c.date_fin)} · ${n} jours`

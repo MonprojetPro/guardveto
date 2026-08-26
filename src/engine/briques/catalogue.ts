@@ -61,14 +61,25 @@ export interface DefinitionBrique {
 
 // ── Helpers de formulation (français lisible) ────────────────
 
-const JOURS_PERIODE: Record<string, string> = {
-  matin: 'le matin',
-  apres_midi: "l'après-midi",
-  journee: 'toute la journée',
-}
-function periodeLisible(p: unknown): string {
-  return typeof p === 'string' ? (JOURS_PERIODE[p] ?? p) : ''
-}
+// ⚠️ LES DEMI-JOURNÉES NE S'AFFICHENT PLUS (B-043, 2026-08-26).
+//
+// Ce tableau traduisait `matin` / `apres_midi` / `journee`. Or `periode` n'a
+// JAMAIS été évalué par le moteur : une règle « jeudi après-midi » bloquait le
+// JEUDI ENTIER. La phrase annonçait donc une portée que le planning n'appliquait
+// pas — à l'endroit précis où l'administratrice décide.
+//
+// Ce défaut avait déjà été corrigé sur la forme SIMPLE en août. La forme
+// TABLEAU avait été oubliée — c'est-à-dire précisément celle de la règle héritée
+// du cabinet pilote (« jeudi AP impaires + lundi AP paires + mercredi paires »).
+// Un correctif qui ne couvre pas toutes les formes d'une même donnée ne corrige
+// que le cas qu'on avait sous les yeux.
+//
+// Sur le fond, cette notion n'a pas lieu d'être ici : le produit ne planifie que
+// les soirs et les week-ends. Décision de MiKL le 2026-08-26 — on retire, et on
+// rouvrira le sujet avec les journées de travail (B-006) si elles arrivent.
+//
+// La donnée reste en base, intacte : on cesse de l'AFFICHER, on ne réécrit pas
+// les règles du client à son insu.
 
 const CRENEAUX: Record<string, string> = {
   weekend: 'le week-end',
@@ -136,9 +147,11 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
         // rendu de l'alternance ancrée juste plus bas.
         const paritePhrase = (v: unknown) => ` (semaines ${String(v).replace(/s$/, '')}s)`
         const items = entrees.map((r) => {
-          const per = r.periode ? ` ${periodeLisible(r.periode)}` : ''
+          // `periode` volontairement IGNORÉ (B-043) : voir la note en tête de
+          // fichier. L'afficher promettait une portée que le moteur n'applique
+          // pas — la règle bloque le jour entier.
           const sem = r.semaine ? paritePhrase(r.semaine) : ''
-          return `${String(r.jour ?? '?')}${per}${sem}`
+          return `${String(r.jour ?? '?')}${sem}`
         })
 
         // Un seul jour : la même phrase que la forme simple, au singulier.
