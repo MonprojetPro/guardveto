@@ -113,6 +113,7 @@ requalifie non bloquant). Detail integral → archive 3ter.
 | B-036 | Ne pas se contenter du symptome | Le tri manquant N'A PAS ete ajoute a la requete en double : c'est la duplication qui est retiree. Deux tris a garder identiques divergent toujours — le commentaire de `resoudreNumeros` affirmait deja qu'ils l'etaient | OK |
 | B-036 | Un garde-fou qui empeche le retour du defaut | `tests/lib/regles-numerotation-stable.test.ts` — 3 verifications : lecture unique, tri deterministe, `lister_regles` passe bien par la lecture partagee | OK |
 | B-036 | Le garde-fou peut REELLEMENT echouer | Verifie par regression provoquee : `.order('id')` retire → 1 failed / 2 passed, puis source restauree. Un test qui ne peut pas echouer ne garde rien | OK |
+| B-036 | Etat du code apres l'enquete du 26/08 (15h) | Identique au commit `f388974` : la sonde `tests/lib/sonde-temporaire.test.ts`, ecrite pour lire ce que `phraseRegle` rend REELLEMENT, a ete supprimee apres usage — verifie, le fichier n'existe plus. Aucune modification de `src/` depuis | OK |
 | B-036 | Preuves | `npx tsc --noEmit` → 0 erreur · `npm test` → 1365 passed (contre 1362 avant : +3) · `npm run build` → Compiled successfully | OK |
 
 **Regles :**
@@ -201,6 +202,7 @@ chiffrer.
 
 | Date | Evenement | Items | Decide par |
 |---|---|---|---|
+| 2026-08-26 | **Fausse alerte sur B-036, et une lecon d'enquete.** Apres le correctif, Filou annonce « une regle n°16 : Victor ne fait pas de garde le mardi, en interdiction ferme » — MiKL ne la reconnait pas et croit le correctif rate. **Sonde executee (`phraseRegle` appele sur la ligne reelle) : le code rend bien « le lundi »**, donc il ne s'agissait pas de cette regle. Verification en base : la regle decrite existe telle quelle, mais dans le cabinet **du Val d'Allier**, en 16e position exactement. **MiKL etait sur le cabinet REEL de la cliente, pas sur le bac a sable** — et toutes les analyses de la matinee (remplacants du 9 septembre, candidats a l'appel aux volontaires, e-mails) portaient sur « Demo MonProjetPro ». Les deux cabinets ont diverge : le repos du lundi de Victor y est `si_possible` d'un cote, `sauf_crise` de l'autre. **Lecon : etablir sur QUELLES donnees un ecran tourne avant de l'expliquer.** Une analyse juste sur le mauvais jeu de donnees est indiscernable d'une analyse fausse. | B-036 | MAX |
 | 2026-08-26 | **Session de soldage — et la lecon du jour n'est aucun des correctifs.**  Detail integral → archive 12. | tous | MiKL + MAX |
 | 2026-08-25 | **FORGE — le mecanisme « l'ecran se met a jour tout seul » entre au catalogue des modules reutilisables.**  Detail integral → archive 12. | FORGE, catalogue | MiKL |
 | 2026-08-24 | **GuardVeto est un produit MonProjetPro** ; les clients (dont Val d'Allier) y accedent par abonnement. Repo `MonprojetPro/guardveto` confirme au bon endroit, la regle projet-client→comptes-client ne s'applique pas. Corrige une question ouverte a tort par OTTO en section 7. | Gouvernance (en-tete) | MiKL |
