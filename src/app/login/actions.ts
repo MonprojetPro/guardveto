@@ -83,6 +83,23 @@ export async function logout() {
   redirect('/login')
 }
 
+/**
+ * Se déconnecter POUR REVENIR ICI (B-034, 2026-08-26).
+ *
+ * Écrit pour l'écran « ce lien n'est pas le tien » de l'appel aux volontaires :
+ * quelqu'un ouvre l'e-mail d'un confrère depuis sa propre session, ou depuis le
+ * poste partagé du cabinet. Le renvoyer vers une déconnexion sèche lui ferait
+ * perdre le créneau qu'il venait prendre — il faudrait retrouver l'e-mail et
+ * recliquer. On garde donc la destination, filtrée par le MÊME `suiteSure` que
+ * la connexion : la valeur vient d'un formulaire, on ne lui fait pas confiance.
+ */
+export async function changerDeCompte(formData: FormData) {
+  const suite = suiteSure(formData)
+  const supabase = await createClient()
+  await supabase.auth.signOut()
+  redirect(suite ? `/login?suite=${encodeURIComponent(suite)}` : '/login')
+}
+
 export async function resetPassword(email: string) {
   const supabase = await createClient()
   const { error } = await supabase.auth.resetPasswordForEmail(email, {

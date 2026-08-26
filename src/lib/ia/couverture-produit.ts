@@ -175,6 +175,9 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   },
   'login#login': { hors: 'Connexion. Filou ne parle qu’à quelqu’un de déjà connecté.' },
   'login#logout': { hors: 'Déconnexion.' },
+  'login#changerDeCompte': {
+    hors: 'Déconnexion pour revenir sur le même lien avec le bon compte. Geste de session, pas de métier.',
+  },
   'login#resetPassword': { hors: 'Réinitialisation de mot de passe, hors session.' },
 
   // ── FILOU LUI-MÊME ET SES BANCS D'ESSAI ─────────────────────────────────

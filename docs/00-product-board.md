@@ -108,7 +108,13 @@ requalifie non bloquant). Detail integral → archive 3ter.
 
 | ID | Ce qui etait annonce | Ce qui est reellement livre | Verdict |
 |---|---|---|---|
-| | | | |
+| B-034 | Le lien e-mail porte son destinataire | `buildLienVolontaire` prend `pourVetId` et pose `pour=` ; construit DANS la boucle des candidats (`src/lib/notifications.ts`) — un lien par personne, plus un lien pour tous | OK |
+| B-034 | La page refuse le decalage destinataire / session | `src/app/(protected)/crise/volontaire/page.tsx` : `pour` exige, `resoudreIdentite`, ecran « Cet appel ne t'etait pas adresse » avec le nom des deux personnes | OK |
+| B-034 | L'endpoint refuse aussi (pas seulement l'ecran) | verrou 1bis dans `src/app/api/absences/[id]/volontaire/route.ts` → 403 si `corps.pour !== volontaireId` ; `pour` rendu obligatoire dans `estCorps` | OK |
+| B-034 | Retour sur le creneau apres reconnexion | `changerDeCompte` (`src/app/login/actions.ts`) : signOut + `/login?suite=<ce lien>`, filtre par le `suiteSure` existant | OK |
+| B-034 | Liens deja partis (sans `pour`) | Refuses avec un ecran dedie « Lien d'une ancienne version » + marche a suivre — tolerer aurait laisse le trou ouvert precisement pour les e-mails qui circulent | OK |
+| B-034 | Filou : decision sur la nouvelle action serveur | `login#changerDeCompte` → `hors` dans `src/lib/ia/couverture-produit.ts` (le test avait refuse le silence) | OK |
+| B-034 | Preuves | `npx tsc --noEmit` → 0 erreur · `npm test` → 1362 passed, 1 skipped · `npm run build` → OK, route `/crise/volontaire` compilee | OK |
 
 **Regles :**
 
@@ -130,6 +136,7 @@ requalifie non bloquant). Detail integral → archive 3ter.
 
 | ID | Titre | Commit | Date | Perimetre |
 |---|---|---|---|---|
+| B-034 | **Le lien « Je prends ce creneau » ne disait pas a QUI il avait ete envoye.** Trouve par MiKL en recettant le depannage : e-mail adresse a Jean, ouvert depuis la session d'Anne-Sophie, l'app proposait le creneau de Jean a Anne-Sophie sans un mot. Pas une faille (le serveur refuse les non-candidats) mais un trou d'IDENTITE : les verrous demandaient « as-tu le droit », jamais « ce message etait-il pour toi ». Le lien porte desormais `pour=<veterinaire_id>` ; la page ET l'endpoint refusent le decalage ; la reconnexion revient sur le creneau. Cas reels vises : poste partage du cabinet, e-mail transfere. **A RECETTER par MiKL.** | a venir | 2026-08-26 | A qualifier |
 | B-017 | **Role SECRETAIRE — livre et complet le 25/08.** Table `secretaires` SEPAREE plutot que 66 filtres. Lecture stricte, ecriture refusee (403 mesure), Filou refuse cote serveur. Detail, mesures et 5 pieges payes → archive 11. | `23fd1b2`…`b1eee27` | 2026-08-25 | Interne |
 | B-005 | **REGLE PERMANENTE : le tableau ne peut plus se taire sur ce qui attend quelqu'un.** 4 fiches manquantes + refus structurel (`lib/produit/attentes.ts` + test qui echoue sur le silence, dans les deux sens). Deux decouvertes en passant : l'accueil n'avait AUCUN temps reel, et un abonnement a une table non publiee echoue EN SILENCE. Detail → archive 11. | `20260825190000` | 2026-08-25 | Interne |
 | B-020 | **Les 2 erreurs rouges du Security Advisor, ouvertes depuis le 4 aout.** Tables `_backup_*` lisibles par `anon`. Contenu inventorie AVANT suppression. Verifie APRES par le linter : 0 erreur restante. Cause du non-traitement : personne ne regardait ce tableau de bord. Detail → archive 11. | `20260825191000` (non joue) | 2026-08-25 | Interne |

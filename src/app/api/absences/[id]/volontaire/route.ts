@@ -14,6 +14,11 @@
 //   1. Auth : utilisateur authentifié + rattaché au cabinet de l'absence
 //      (cabinet_id lu dans app_metadata — jamais du client). Le volontaire =
 //      son propre veterinaire_id (il ne peut PAS s'engager pour autrui).
+//   1bis. IDENTITÉ (B-034) : le lien e-mail dit à QUI il a été envoyé (`pour`).
+//      S'il ne désigne pas la personne connectée → 403. Aucun des autres
+//      verrous ne posait cette question : ils demandent « as-tu le droit »,
+//      pas « ce message était-il pour toi » — et un confrère éligible passe
+//      les deux premiers sans être le destinataire.
 //   2. Le créneau est ENCORE un créneau impacté de CETTE absence ET encore
 //      attribué à l'absent sur ce rôle. Si déjà pourvu entre-temps → 409.
 //   3. Légalité re-vérifiée via proposerReparation (le moteur EXACT de la
@@ -73,6 +78,17 @@ interface Corps {
   gardeId: string
   role: 'premier' | 'second'
   /**
+   * Le vétérinaire À QUI l'e-mail d'appel était adressé (B-034, 2026-08-26).
+   *
+   * Le volontaire reste la session connectée — ce champ ne DÉSIGNE personne, il
+   * VÉRIFIE. Si le lien ouvert visait quelqu'un d'autre, on refuse : sans ça,
+   * ouvrir l'e-mail d'un confrère depuis sa propre session (poste partagé du
+   * cabinet, message transféré) lui prenait son créneau sans un mot. La page
+   * fait déjà cette comparaison ; on la refait ici parce qu'un contrôle qui ne
+   * vit que dans l'écran se contourne avec une requête à la main.
+   */
+  pour: string
+  /**
    * « J'ai vu les règles enfreintes et je prends quand même. » Drapeau DISTINCT
    * de `force` : `force` déverrouille la garde au passage, s'en servir pour
    * porter une simple confirmation déverrouillerait en silence.
@@ -83,7 +99,12 @@ interface Corps {
 function estCorps(v: unknown): v is Corps {
   if (typeof v !== 'object' || v === null) return false
   const c = v as Record<string, unknown>
-  return typeof c.gardeId === 'string' && (c.role === 'premier' || c.role === 'second')
+  return (
+    typeof c.gardeId === 'string' &&
+    (c.role === 'premier' || c.role === 'second') &&
+    typeof c.pour === 'string' &&
+    c.pour.length > 0
+  )
 }
 
 export async function POST(
@@ -131,13 +152,28 @@ export async function POST(
     const body = await req.json()
     if (!estCorps(body)) {
       return NextResponse.json(
-        { error: 'Corps invalide. Attendu : { gardeId, role }.' },
+        { error: 'Corps invalide. Attendu : { gardeId, role, pour }.' },
         { status: 400 },
       )
     }
     corps = body
   } catch {
     return NextResponse.json({ error: 'Corps de requête non parsable (JSON attendu).' }, { status: 400 })
+  }
+
+  // ── 1d. Le lien ouvert était-il ADRESSÉ à la personne connectée ? ──
+  // Verrou d'IDENTITÉ (B-034). Il ne remplace aucun des autres : il répond à
+  // une question qu'aucun ne posait — « ce message était-il pour toi ? ». Les
+  // verrous suivants demandent « as-tu le droit », ce qui n'est pas pareil :
+  // Anne-Sophie peut être parfaitement éligible au créneau proposé à Jean.
+  if (corps.pour !== volontaireId) {
+    return NextResponse.json(
+      {
+        error:
+          "Cet appel aux volontaires a été envoyé à un autre vétérinaire. Connectez-vous avec le compte destinataire de l'e-mail pour prendre ce créneau.",
+      },
+      { status: 403 },
+    )
   }
 
   // ── L'absence existe et appartient au cabinet du véto ────

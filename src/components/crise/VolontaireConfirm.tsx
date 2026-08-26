@@ -49,6 +49,13 @@ interface VolontaireConfirmProps {
   absenceId: string
   gardeId: string
   role: RoleGarde
+  /**
+   * Le vétérinaire à qui l'e-mail était adressé (B-034). La page a déjà vérifié
+   * qu'il s'agit bien de la personne connectée ; on le renvoie au serveur pour
+   * qu'il revérifie. Un garde-fou qui ne vit que dans l'écran se contourne avec
+   * une requête à la main.
+   */
+  pour: string
   /** Libellés pré-formatés FR (calculés côté serveur). */
   dateLabel: string
   typeLabel: string
@@ -59,6 +66,7 @@ export function VolontaireConfirm({
   absenceId,
   gardeId,
   role,
+  pour,
   dateLabel,
   typeLabel,
   roleLabel,
@@ -71,7 +79,7 @@ export function VolontaireConfirm({
       const res = await fetch(`/api/absences/${absenceId}/volontaire`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gardeId, role, confirmerAvertissements }),
+        body: JSON.stringify({ gardeId, role, pour, confirmerAvertissements }),
       })
 
       const json = await res.json().catch(() => ({}))

@@ -755,11 +755,24 @@ function roleLabel(role: 'premier' | 'second'): string {
  * /api/absences/[id]/volontaire. Les identifiants nécessaires (absence, garde,
  * rôle) sont passés en query — l'endpoint REVALIDE tout côté serveur (un lien
  * partagé/forwardé ne contourne aucun contrôle : auth + cabinet + éligibilité).
+ *
+ * ⚠️ `pour` — À QUI cet e-mail a été envoyé (B-034, 2026-08-26).
+ * Sans ce paramètre, le lien était RIGOUREUSEMENT LE MÊME pour tous les
+ * candidats : celui qui cliquait se portait volontaire avec la session ouverte
+ * dans SON navigateur, quelle que soit la personne à qui le message était
+ * adressé. Un e-mail transféré, ou un poste partagé au cabinet, et c'est
+ * quelqu'un d'autre qui prend le créneau sans qu'une ligne ne le signale.
+ * Le serveur refusait déjà les non-candidats — mais rien ne disait « ce lien
+ * n'est pas le tien » à un candidat qui l'ouvrait par la mauvaise session.
+ * Le lien porte donc désormais son destinataire, et la page comme l'endpoint
+ * refusent le décalage.
  */
 function buildLienVolontaire(params: {
   absenceId: string
   gardeId: string
   role: 'premier' | 'second'
+  /** Le vétérinaire À QUI cet e-mail précis est adressé. */
+  pourVetId: string
 }): string | null {
   // appUrl() renvoie toujours une valeur (défaut https://guardveto.vercel.app),
   // donc on a toujours un domaine absolu en pratique. On garde malgré tout la
@@ -770,6 +783,7 @@ function buildLienVolontaire(params: {
   url.searchParams.set('absence', params.absenceId)
   url.searchParams.set('garde', params.gardeId)
   url.searchParams.set('role', params.role)
+  url.searchParams.set('pour', params.pourVetId)
   return url.toString()
 }
 
@@ -882,12 +896,6 @@ export async function sendAppelVolontaires(
     .eq('id', absence.veterinaire_id)
     .single()
 
-  const lien = buildLienVolontaire({
-    absenceId: absence.id,
-    gardeId: creneau.gardeId,
-    role: creneau.role,
-  })
-
   const subject = `[GuardVeto] Garde à pourvoir — ${formatDate(creneau.date)}`
 
   let sent = 0
@@ -896,10 +904,22 @@ export async function sendAppelVolontaires(
   const expediteur = lecteurExpediteur(supabase)
 
   // Un candidat sans adresse reste un candidat : il ne reçoit pas le message,
-  // mais sa notification in-app porte le même lien « Je prends ce créneau ».
+  // mais sa notification in-app l'avertit quand même (elle renvoie au planning,
+  // et non au lien « Je prends ce créneau » — ce que ce commentaire prétendait à
+  // tort jusqu'au 2026-08-26).
   tracerSansAdresse('appel_volontaires', trierDestinataires(candidats as Veterinaire[]).sansAdresse)
 
   for (const vet of candidats as Veterinaire[]) {
+    // Un lien PAR destinataire : il porte l'identité de celui à qui on écrit.
+    // Le construire hors de la boucle — ce qu'on faisait — donnait à tout le
+    // monde le lien de tout le monde (B-034).
+    const lien = buildLienVolontaire({
+      absenceId: absence.id,
+      gardeId: creneau.gardeId,
+      role: creneau.role,
+      pourVetId: vet.id,
+    })
+
     const html = buildAppelVolontairesHtml(
       vet,
       { date: creneau.date, type: creneau.type, role: creneau.role },
