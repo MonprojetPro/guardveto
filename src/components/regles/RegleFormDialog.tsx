@@ -45,6 +45,7 @@ import type { VerdictGardien } from '@/data/verifierRegleCandidate'
 import { GardienFilou } from '@/components/v2/regles/GardienFilou'
 import { useErreurBloquante } from '@/components/v2/regles/ErreurBloquante'
 import type { RegleRow, VetoMini, PeriodeOption, TypeCreneauOption } from './ReglesClient'
+import { nomVetoOuRetire } from '@/lib/regles/libelle'
 
 /** Valeur sentinelle du sélecteur de validité = règle permanente (periode_id null). */
 const PERMANENTE = '__permanente__'
@@ -342,8 +343,9 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
     : PERMANENTE
   const [validite, setValidite] = useState<string>(periodeInit)
 
+  const repliVeto = nomVetoOuRetire(vets)
   const nomVeto = (id: string) =>
-    id === OWNER_TOUS ? LIBELLE_OWNER_TOUS : (vets.find((v) => v.id === id)?.prenom ?? id)
+    id === OWNER_TOUS ? LIBELLE_OWNER_TOUS : repliVeto(id)
 
   /** « Tous » n'a de sens que pour les règles qui ne nomment pas de partenaire. */
   const peutViserTous = !BRIQUES_SANS_TOUS.has(briqueId)

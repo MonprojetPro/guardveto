@@ -281,3 +281,11 @@ export function phraseRegle(regle: RegleNommable, nomVeto: (id: string) => strin
   const predicat = rendreRegle(regle.brique_id, params, { nomVeto })
   return sujet ? `${sujet} ${predicat}` : predicat
 }
+
+// ── Nommer un vétérinaire qui n'est plus là ─────────────────────────────────
+// La constante et son aide vivent dans `veto-absent.ts`, SANS import : ce
+// fichier-ci importe le catalogue de briques, qui a lui aussi besoin du repli.
+// Les y laisser aurait formé un cycle catalogue → libelle → catalogue.
+// Ré-exporté ici par commodité : c'est le point d'entrée naturel pour qui
+// cherche « comment on dit une règle en français ».
+export { VETO_RETIRE, nomVetoOuRetire } from '@/lib/regles/veto-absent'

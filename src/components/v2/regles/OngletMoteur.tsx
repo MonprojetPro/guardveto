@@ -150,6 +150,7 @@ import { ancresDeFocus } from '@/lib/regles/focusRegles'
 import { GardienImpact } from '@/components/v2/GardienImpact'
 import type { Impact } from '@/data/controleImpact'
 import type { VetoUI } from './types'
+import { nomVetoOuRetire } from '@/lib/regles/libelle'
 
 // ════════════════════════════════════════════════════════════
 // Référentiels d'affichage
@@ -509,7 +510,7 @@ export function OngletMoteur({
     return () => window.clearTimeout(timer)
   }, [focus])
 
-  const nomVeto = (id: string) => vets.find((v) => v.id === id)?.prenom ?? id
+  const nomVeto = nomVetoOuRetire(vets)
 
   /** Refus du contrôle d'impact sur une pose d'étiquette (palier 3). */
   const [impactTag, setImpactTag] = useState<Impact | null>(null)

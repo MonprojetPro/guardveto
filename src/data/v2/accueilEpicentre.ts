@@ -18,6 +18,7 @@ import { phraseRegle } from '@/lib/regles/libelle'
 import { lignesDesPeriodes, periodesVisibles } from '@/lib/planning/diffusion'
 import { MATIERE_VIDE, type MatiereFilou } from '@/lib/v2/filou-origine'
 import { chargerEnAttente, type FicheEnAttente } from './enAttente'
+import { nomVetoOuRetire } from '@/lib/regles/libelle'
 import {
   catalogueDuProfil,
   chargerHorairesCabinet,
@@ -539,7 +540,10 @@ function matiereFilou(brut: {
   aUnPlanningPublie: boolean
   gardeCeSoir: boolean
 }): MatiereFilou {
-  const nomVeto = (id: string) => brut.equipe.find((v) => v.id === id)?.prenom ?? '?'
+  // Repli commun : « un vétérinaire retiré de l'équipe », jamais `'?'` ni un
+  // identifiant. C'est ce que Filou lira ; lui donner un point d'interrogation
+  // l'amènerait à le répéter tel quel à quelqu'un.
+  const nomVeto = nomVetoOuRetire(brut.equipe)
 
   // Le libellé EXACT de l'écran Règles (source unique `phraseRegle`) : Filou
   // doit pouvoir retrouver la règle dont on lui parle. Une règle trop longue

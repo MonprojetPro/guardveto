@@ -28,6 +28,7 @@ import { isValid } from './rules/hard-constraints'
 import { normaliserContraintesVets } from './normaliserContraintes'
 import { rendreRegle } from './briques/catalogue'
 import type { StructureConfig, StructureRegleConfig } from './structure-config'
+import { VETO_RETIRE } from '@/lib/regles/veto-absent'
 
 /**
  * Une règle identifiée comme cause (ou cause possible) du blocage d'un créneau.
@@ -293,7 +294,8 @@ export function construireDiagnostic(args: ConstruireDiagnosticArgs): Diagnostic
   const { blocage, input, steps, joursNonCouverts, structure, resimuler } = args
 
   const ctxRendu = {
-    nomVeto: (id: string) => input.vets.find((v) => v.id === id)?.prenom ?? id,
+    // Repli commun (`lib/regles/libelle.ts`) : jamais l'identifiant technique.
+    nomVeto: (id: string) => input.vets.find((v) => v.id === id)?.prenom ?? VETO_RETIRE,
   }
 
   // ── Lot 2.a — raisons sur le créneau bloquant (contexte partiel réel) ──────

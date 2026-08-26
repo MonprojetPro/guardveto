@@ -46,6 +46,7 @@ import {
   type VetoMini,
 } from '@/components/regles/ReglesClient'
 import { stylePastille } from '@/lib/couleurs'
+import { nomVetoOuRetire } from '@/lib/regles/libelle'
 
 interface Props {
   /** La fiche depuis laquelle on a ouvert : sujet de toutes ces règles.
@@ -69,7 +70,7 @@ export function ContraintesVetoModale({
   const [formOuvert, setFormOuvert] = useState(false)
   const [aEditer, setAEditer] = useState<RegleRow | null>(null)
 
-  const nomVeto = (id: string) => vets.find((v) => v.id === id)?.prenom ?? id
+  const nomVeto = nomVetoOuRetire(vets)
 
   // Les siennes, duos dédoublonnés et tournées de son point de vue.
   // Tri : le plus contraignant d'abord, puis les désactivées en fin de liste.

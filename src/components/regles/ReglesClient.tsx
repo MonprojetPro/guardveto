@@ -23,6 +23,7 @@ import {
 import { phraseRegle, fusionnerDuos, etageDe, symboleDe } from '@/lib/regles/libelle'
 import { setRegleActif, deleteRegle } from '@/app/(protected)/regles/actions'
 import { RegleFormDialog } from './RegleFormDialog'
+import { nomVetoOuRetire } from '@/lib/regles/libelle'
 
 /** Briques que le formulaire P1A-007 sait éditer (= évaluables par le moteur).
  *  Doit rester aligné avec BRIQUES_EVALUABLES (actions.ts) + BRIQUES (RegleFormDialog).
@@ -122,10 +123,7 @@ export function ReglesClient({ regles, vets, periodes, typesCreneaux, isAdmin }:
   const [formOuvert, setFormOuvert] = useState(false)
   const [aEditer, setAEditer] = useState<RegleRow | null>(null)
 
-  const nomVeto = (id: string) => {
-    const v = vets.find((x) => x.id === id)
-    return v ? v.prenom : id
-  }
+  const nomVeto = nomVetoOuRetire(vets)
 
   // Une seule ligne par duo (la base en stocke deux sens — cf. fusionnerDuos).
   const actives = fusionnerDuos(regles.filter((r) => r.actif))

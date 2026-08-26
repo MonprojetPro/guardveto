@@ -17,6 +17,7 @@
 // ============================================================
 
 import type { AxesBrique } from './types'
+import { VETO_RETIRE } from '@/lib/regles/veto-absent'
 
 /** Familles d'opérateurs (miroir du CHECK `famille` de briques_regles). */
 export type Famille =
@@ -194,7 +195,7 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
     rendreLangageNaturel: (params, ctx) => {
       const ids = lirePartenaires(params)
       if (ids.length === 0) return "n'est jamais de garde avec un autre véto (non précisé)"
-      const noms = ids.map((id) => ctx?.nomVeto?.(id) ?? id)
+      const noms = ids.map((id) => ctx?.nomVeto?.(id) ?? VETO_RETIRE)
       return `n'est jamais de garde en même temps que ${noms.join(', ')}`
     },
   },
@@ -516,7 +517,7 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
     rendreLangageNaturel: (params, ctx) => {
       const id = typeof params.avec_veterinaire_id === 'string' ? params.avec_veterinaire_id : null
       if (!id) return 'préfère être de garde avec un autre vétérinaire (non précisé)'
-      return `préfère être de garde avec ${ctx?.nomVeto?.(id) ?? id}`
+      return `préfère être de garde avec ${ctx?.nomVeto?.(id) ?? VETO_RETIRE}`
     },
   },
 
@@ -545,7 +546,7 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
         ? ` (sur : ${creneaux.map(creneauLisible).join(', ')})`
         : ''
       if (!id) return 'ne veut être de garde que si un autre vétérinaire est de garde (non précisé)'
-      return `ne veut être de garde que si ${ctx?.nomVeto?.(id) ?? id} est de garde sur le même créneau${suffixe}`
+      return `ne veut être de garde que si ${ctx?.nomVeto?.(id) ?? VETO_RETIRE} est de garde sur le même créneau${suffixe}`
     },
   },
 
