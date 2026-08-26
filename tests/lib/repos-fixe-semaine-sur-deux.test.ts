@@ -264,7 +264,10 @@ describe('Plusieurs jours de repos dans une seule regle (B-041)', () => {
     const sortie = paramsMulti(['lundi', 'mardi'], 'paire')
     if ('error' in sortie) throw new Error(sortie.error)
     const phrase = rendreRegle('interdire_creneau', sortie.params)
-    expect(phrase).toContain('lundi et le mardi')
+    // « la nuit du lundi et du mardi » depuis B-044 : une garde de semaine est
+    // une nuit, pas un jour. C'est ce qui prete a confusion sur ce metier — la
+    // garde du lundi court jusqu'au mardi matin.
+    expect(phrase).toContain('nuit du lundi et du mardi')
     // Une seule mention de la parite, factorisee.
     expect(phrase.match(/semaines paires/g)).toHaveLength(1)
   })

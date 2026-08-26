@@ -22,7 +22,7 @@ const SYSTEM = construireSystemIA(
     { id: '2', prenom: 'Victor' },
   ],
   [
-    { code: 'semaine_soir', nom: 'Soir de semaine' },
+    { code: 'semaine_soir', nom: 'Nuit de semaine' },
     { code: 'weekend', nom: 'Week-end' },
   ],
   ['junior', 'senior'],

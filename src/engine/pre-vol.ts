@@ -216,7 +216,7 @@ function nomCreneau(type: string, creneaux?: CreneauModele[]): string {
   const c = creneaux?.find((x) => x.code === type)
   if (c) return c.nom
   const NOMS: Record<string, string> = {
-    semaine_soir: 'soir de semaine',
+    semaine_soir: 'nuit de semaine',
     vendredi_soir: 'vendredi soir',
     weekend: 'week-end',
   }

@@ -26,7 +26,7 @@ interface DepannagesClientProps {
 }
 
 const TYPE_GARDE_LABELS: Record<TypeGarde, string> = {
-  semaine: 'Soir semaine',
+  semaine: 'Nuit de semaine',
   weekend: 'Week-end',
   ferie: 'Férié',
 }

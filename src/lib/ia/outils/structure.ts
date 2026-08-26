@@ -1071,7 +1071,7 @@ export const reglerVetosSurPeriodeType: OutilEcriture<typeof ParamsAffinage> = {
 
 C'est LE geste propre aux périodes types : la structure du cabinet dit ce qui est possible (jusqu'à 2 vétérinaires le vendredi, par exemple), et chaque période type choisit dedans.
 
-Appelle-le pour « en hiver, on veut 2 vétos le week-end », « l'été, un seul le soir de semaine », « pas de garde le vendredi soir pendant les vacances » (→ vetos = 0).
+Appelle-le pour « en hiver, on veut 2 vétos le week-end », « l'été, un seul la nuit de semaine », « pas de garde le vendredi soir pendant les vacances » (→ vetos = 0).
 
 vetos = 0 SUPPRIME la garde de cette période type : le moteur n'en posera aucune ces jours-là. C'est un vrai choix, pas une désactivation temporaire — annonce-le clairement.
 

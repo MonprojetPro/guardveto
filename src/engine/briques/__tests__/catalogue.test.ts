@@ -163,7 +163,9 @@ describe('catalogue — rendu en langage naturel', () => {
       semaines: 'impaires',
     })
     expect(phrase).toContain('impaire')
-    expect(phrase.toLowerCase()).toContain('soir')
+    // « soir » est devenu « nuits de semaine » (B-044) : la garde commence le
+    // soir mais couvre la nuit entiere, jusqu'au lendemain matin.
+    expect(phrase.toLowerCase()).toContain('nuits de semaine')
   })
 
   it('cadencement_weekend — interdit vs impose (cycle ancré, #20)', () => {

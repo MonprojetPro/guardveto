@@ -511,7 +511,7 @@ export function OngletProfils({
                       MiKL : « si jamais il y a marqué vendredi 2 places, dans
                       période type l'utilisateur a le choix de ne programmer
                       qu'un des 2 vétos sur la période hiver, et pour le
-                      week-end 2, et pour les soirs de semaine 1 ».
+                      week-end 2, et pour les nuits de semaine 1 ».
                       « Aucune » est un choix à part entière : la garde n'existe
                       pas sur cette période, et le moteur n'en pose aucune. */}
                   {socle.length === 0 ? (

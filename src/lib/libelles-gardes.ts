@@ -29,7 +29,7 @@ export function libelleTypeGardeDb(
   // Types V1 d'abord : libellés historiques STABLES pour les cabinets existants.
   if (type === 'weekend') return 'Week-end'
   if (type === 'ferie') return 'Jour férié'
-  if (type === 'semaine') return 'Soir semaine'
+  if (type === 'semaine') return 'Nuit de semaine'
   const nom = nomsTypes?.[type]
   if (nom) return nom
   return humaniserCodeGarde(type)

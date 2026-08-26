@@ -55,6 +55,13 @@ export interface CreneauDef extends HorairesCreneau {
 export const CRENEAUX: Record<TypeGardeEngine, CreneauDef> = {
   semaine_soir: {
     code: 'semaine_soir',
+    // ⚠️ « Soir » et non « Nuit » ici, à dessein (B-044). Ce libellé est le
+    //    MIROIR du seed `creneaux_catalogue` : c'est une donnée de cabinet,
+    //    modifiable par l'admin dans l'écran Créneaux, pas un libellé produit.
+    //    Le changer dans le code seul ferait diverger le miroir de sa source —
+    //    un test le refuse, et il a raison. Pour renommer réellement ce créneau,
+    //    il faut passer par l'écran (ou une migration), et c'est la décision du
+    //    cabinet, pas la nôtre.
     libelle: 'Soir de semaine (lun-jeu)',
     heureDebut: '18:30',
     heureFin: '08:30',

@@ -33,7 +33,7 @@ export interface ContexteIA {
 
 /** Types de créneaux de repli quand le catalogue du cabinet est muet. */
 const CRENEAUX_REPLI: TypeCreneauIA[] = [
-  { code: 'semaine_soir', nom: 'Soirs de semaine' },
+  { code: 'semaine_soir', nom: 'Nuits de semaine' },
   { code: 'vendredi_soir', nom: 'Vendredi soir' },
   { code: 'weekend', nom: 'Week-end' },
 ]

@@ -135,7 +135,7 @@ function formatDateFr(dateIso: string): string {
 function labelType(type: string): string {
   if (type === 'weekend') return 'Week-end'
   if (type === 'ferie') return 'Jour férié'
-  if (type === 'semaine') return 'Soir de semaine'
+  if (type === 'semaine') return 'Nuit de semaine'
   // Type SUR-MESURE (P3b) : son nom humanisé.
   return humaniserCodeGarde(type)
 }

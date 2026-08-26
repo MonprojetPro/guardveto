@@ -81,7 +81,7 @@ const BRIQUES: { value: BriqueEvaluable; label: string; aide: string }[] = [
   { value: 'preferer_avec', label: 'Préfère être de garde avec…', aide: 'Le moteur essaie de le mettre en binôme avec ce co-équipier. Jamais bloquant.' },
   { value: 'volume_gardes', label: 'Souhaite plus / moins de gardes', aide: 'Biais assumé sur la répartition : le moteur lui donne plus (ou moins) de gardes que la moyenne. Jamais bloquant.' },
   // Successions / séries / repos avancés (#13).
-  { value: 'succession_interdite', label: 'Enchaînement interdit', aide: 'Ne fait jamais un type de garde le lendemain d’un autre (ex. pas de soir de semaine le lendemain d’un week-end).' },
+  { value: 'succession_interdite', label: 'Enchaînement interdit', aide: 'Ne fait jamais un type de garde le lendemain d’un autre (ex. pas de nuit de semaine le lendemain d’un week-end).' },
   { value: 'serie_max', label: 'Jours de garde d’affilée (max)', aide: 'Jamais plus de N jours de garde consécutifs.' },
   { value: 'repos_apres_serie', label: 'Repos après une série', aide: 'Après N jours de garde d’affilée, imposer M jours sans garde.' },
   // Cadencement « 1 WE sur N ancré » (#20).
@@ -132,7 +132,7 @@ const SEMAINES = [
 ]
 
 const PERIODES = [
-  { value: 'soir_semaine', label: 'Soirs de semaine' },
+  { value: 'soir_semaine', label: 'Nuits de semaine' },
   { value: 'weekend', label: 'Week-ends' },
 ]
 

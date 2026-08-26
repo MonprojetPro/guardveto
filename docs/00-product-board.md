@@ -110,13 +110,13 @@ requalifie non bloquant). Detail integral → archive 3ter.
 
 | ID | Ce qui etait annonce | Ce qui est reellement livre | Verdict |
 |---|---|---|---|
-| B-043 | Le choix de creneau disparait de la saisie d'un conge | `CongeForm.tsx` : selecteur retire, `creneau` ecrit `null` | OK |
-| B-043 | Il ne s'affiche plus nulle part | `CongesList`, `DemandesClient`, `AbsencesV2`, e-mails (`brevo.ts`) — 4 affichages supprimes | OK |
-| B-043 | Le libelle des regles ne promet plus une demi-journee | `periodeLisible` et `JOURS_PERIODE` supprimes ; la forme TABLEAU n'affiche plus `periode` (`catalogue.ts`). La regle d'Anne-Sophie se lit desormais « jeudi (semaines impaires) », ce que le moteur applique VRAIMENT | OK |
-| B-043 | Filou ne peut plus en poser ni en parler | Champ `creneau` retire de `poser_conge`, libelles retires de la lecture des conges (`outils/conges.ts`), et section « CE QUE CE PRODUIT PLANIFIE » ajoutee au prompt : soirs et week-ends, rien d'autre | OK |
-| B-043 | **Un test PROTEGEAIT le defaut** | `catalogue.test.ts` exigeait que la phrase contienne « l'apres-midi ». Il garantissait la fidelite de l'affichage a la donnee sans jamais demander si le moteur en faisait quelque chose. Retourne : il verifie maintenant que la demi-journee N'apparait PAS | OK |
-| B-043 | Aucune donnee client reecrite | La colonne `conges.creneau` et le `periode` des regles restent en base, intacts. On cesse d'AFFICHER, on ne modifie pas les regles du cabinet a son insu. Mesure prealable : les 32 conges avaient deja `creneau = null` | OK |
-| B-043 | Preuves | `npx tsc --noEmit` → 0 erreur · `npm test` → 1383 passed · `npm run build` → Compiled successfully | OK |
+| B-044 | Une garde de semaine se dit « nuit », pas « jour » | 19 fichiers : « Soir de semaine » → « Nuit de semaine », « Soirs de semaine » → « Nuits de semaine ». Ecrans de reglages, moteur de pre-vol, libelles de types, aides du formulaire, Filou | OK |
+| B-044 | Les phrases de repos disent la nuit visee | `ne fait pas de garde la nuit du lundi` (helper `nuitDe`, `catalogue.ts`). Plusieurs jours : « la nuit du lundi et du mardi » | OK |
+| B-044 | Les week-ends gardent le vocabulaire du jour | Aucun libelle week-end/samedi/dimanche touche — decision MiKL | OK |
+| B-044 | Le vendredi soir reste « vendredi soir » | Inchange, comme decide | OK |
+| B-044 | Les selecteurs gardent les jours | Les pastilles du formulaire disent toujours « Lundi, Mardi… » : on choisit un JOUR, on decrit une NUIT | OK |
+| B-044 | **Ce qui n'a PAS ete touche, et pourquoi** | `structure-creneaux.ts` porte « Soir de semaine (lun-jeu) » : c'est le MIROIR du seed `creneaux_catalogue`, une **donnee de cabinet** modifiable dans l'ecran Creneaux. Un test a refuse la divergence code/base — il a eu raison. Renommer ce creneau est une decision du cabinet, pas la notre | OK |
+| B-044 | Preuves | `npx tsc --noEmit` → 0 erreur · `npm test` → 1383 passed · `npm run build` → Compiled successfully | OK |
 
 **Regles :**
 
@@ -138,6 +138,7 @@ requalifie non bloquant). Detail integral → archive 3ter.
 
 | ID | Titre | Commit | Date | Perimetre |
 |---|---|---|---|---|
+| B-044 | **Le produit dit « nuit » la ou il disait « jour ».** Exigence de MiKL le 26/08 : une garde de semaine commence le soir et court jusqu'au lendemain matin — « de garde le lundi » veut dire la nuit du lundi au mardi. C'est exactement ce qui pretait a confusion : la regle de Victor porte « pas de garde le lundi » parce qu'il veut ses MARDIS libres. Week-ends et vendredi soir inchanges. **A RECETTER.** | `a venir` | 2026-08-26 | A qualifier |
 | B-043 | **Les demi-journees retirees du produit — elles annoncaient une portee que le moteur n'appliquait pas.** Decision de MiKL le 26/08. Conges (saisie, listes, e-mails, Filou) et libelles de regles. Un test verrouillait le defaut : il exigeait que « l'apres-midi » s'affiche. Donnees client intactes. **A RECETTER.** | `a venir` | 2026-08-26 | A qualifier |
 | B-041 | **Une regle de repos porte desormais PLUSIEURS jours.** La limite « un seul jour par regle » etait une simplification posee le matin meme (B-038) ; elle est tombee au premier usage reel — Filou, qui ne propose qu'une regle par reponse, abandonnait le mardi sans le dire. Les gardiens bouclaient deja sur les entrees : aucun code moteur ecrit. Le prompt lui interdit desormais de traiter une moitie de demande en silence. **A RECETTER.** | `a venir` | 2026-08-26 | A qualifier |
 | B-042 | **Filou distingue un conge ponctuel d'un repos permanent.** Une absence sans fin (« tous les lundis ») ne peut pas etre un conge : reclamer des dates etait une impasse. Il pose desormais la question qui tranche et propose la regle. **A RECETTER.** | `a venir` | 2026-08-26 | A qualifier |

@@ -85,8 +85,8 @@ const CRENEAUX: Record<string, string> = {
   weekend: 'le week-end',
   semaine: 'la semaine',
   vendredi_soir: 'le vendredi soir',
-  soir_semaine: 'les soirs de semaine',
-  semaine_soir: 'les soirs de semaine',
+  soir_semaine: 'les nuits de semaine',
+  semaine_soir: 'les nuits de semaine',
   ferie: 'les jours fériés',
 }
 function creneauLisible(c: unknown): string {
@@ -104,8 +104,8 @@ export const DIMENSION_EQUITE_LABELS: Record<string, string> = {
   weekend: 'les week-ends',
   weekend_premier: 'le rôle de 1er le week-end',
   ferie: 'les jours fériés',
-  semaine_premier: 'les soirs de semaine (1er)',
-  semaine_second: 'les soirs de semaine (2nd)',
+  semaine_premier: 'les nuits de semaine (1er)',
+  semaine_second: 'les nuits de semaine (2nd)',
   grands_weekend: 'les grands week-ends (salariés)',
 }
 
@@ -123,6 +123,23 @@ function lirePartenaires(params: Record<string, unknown>): string[] {
   if (typeof params.avec_veterinaire_id === 'string') return [params.avec_veterinaire_id]
   if (Array.isArray(params.membres)) return (params.membres as unknown[]).filter((m): m is string => typeof m === 'string')
   return []
+}
+
+/**
+ * Un jour visé par un repos désigne une NUIT de garde (B-044, 2026-08-26).
+ *
+ * Exigence de MiKL : « on ne devrait même pas parler de jour mais de nuits,
+ * sauf pour les week-ends ». C'est le métier qui l'impose — une garde de soir
+ * de semaine commence le soir et court jusqu'au lendemain matin. « De garde le
+ * lundi » veut donc dire la nuit du lundi au mardi, et c'est exactement ce qui
+ * prêtait à confusion : la règle de Victor porte « pas de garde le lundi »
+ * précisément parce qu'il veut ses MARDIS libres.
+ *
+ * Les week-ends gardent le vocabulaire du jour (samedi, dimanche) : on y parle
+ * de journées entières de garde, pas d'une nuit.
+ */
+function nuitDe(jour: string): string {
+  return `la nuit du ${jour}`
 }
 
 // ── Le catalogue — 10 briques (miroir du seed P1A-001) ───────
@@ -158,7 +175,7 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
         // « a des repos fixes : jeudi (semaines impaires) » se lisait comme une
         // liste amputée, et cette phrase-là est la plus courante.
         if (items.length === 1) {
-          return `ne fait pas de garde le ${items[0]}`
+          return `ne fait pas de garde ${nuitDe(items[0])}`
         }
 
         // Plusieurs jours de MÊME parité (B-041) : on factorise plutôt que de
@@ -172,10 +189,10 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
           const jours = entrees.map((r) => String(r.jour ?? '?'))
           const listeFr =
             jours.length === 2
-              ? `${jours[0]} et le ${jours[1]}`
-              : `${jours.slice(0, -1).join(', le ')} et le ${jours[jours.length - 1]}`
+              ? `${jours[0]} et du ${jours[1]}`
+              : `${jours.slice(0, -1).join(', du ')} et du ${jours[jours.length - 1]}`
           const sem = entrees[0].semaine ? paritePhrase(entrees[0].semaine) : ''
-          return `ne fait pas de garde le ${listeFr}${sem}`
+          return `ne fait pas de garde ${nuitDe(listeFr)}${sem}`
         }
 
         return `a des repos fixes : ${items.join(', ')}`
@@ -192,7 +209,7 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
           ? ` (${cibles.map(creneauLisible).join(', ')} seulement)`
           : ''
         const sauf = params.exception_vacances_scolaires ? ' (sauf vacances scolaires)' : ''
-        return `ne fait pas de garde le ${params.jour}${sur}${sauf}`
+        return `ne fait pas de garde ${nuitDe(String(params.jour))}${sur}${sauf}`
       }
       // Forme « créneaux » (schéma seed).
       if (Array.isArray(params.creneaux)) {

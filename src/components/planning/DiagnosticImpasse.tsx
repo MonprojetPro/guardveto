@@ -68,7 +68,7 @@ function labelType(type: string): string {
       return 'un jour férié'
     case 'semaine_soir':
     default:
-      return 'un soir de semaine'
+      return 'une nuit de semaine'
   }
 }
 

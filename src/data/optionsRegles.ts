@@ -22,7 +22,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 /** Repli quand le cabinet n'a pas (encore) de catalogue de créneaux. */
 const TYPES_HISTORIQUES: TypeCreneauOption[] = [
-  { code: 'semaine_soir', nom: 'Soirs de semaine' },
+  { code: 'semaine_soir', nom: 'Nuits de semaine' },
   { code: 'vendredi_soir', nom: 'Vendredi soir' },
   { code: 'weekend', nom: 'Week-end' },
 ]

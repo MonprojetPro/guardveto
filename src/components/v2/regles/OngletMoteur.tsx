@@ -225,16 +225,16 @@ const EQUITE_META: Record<EquityDimension, { titre: string; aide: string }> = {
     aide: 'Répartir équitablement les gardes des jours fériés.',
   },
   semaine_premier: {
-    titre: 'Soirs de semaine — 1er',
-    aide: 'Équilibrer les soirs de semaine assurés en 1er.',
+    titre: 'Nuits de semaine — 1er',
+    aide: 'Équilibrer les nuits de semaine assurés en 1er.',
   },
   semaine_second: {
-    titre: 'Soirs de semaine — 2nd',
-    aide: 'Équilibrer les soirs de semaine assurés en 2nd.',
+    titre: 'Nuits de semaine — 2nd',
+    aide: 'Équilibrer les nuits de semaine assurés en 2nd.',
   },
   semaine_renfort: {
-    titre: 'Soirs de semaine — renfort',
-    aide: 'Équilibrer les soirs de semaine tenus à partir de la 3ᵉ place. Sans objet tant qu’un type de garde n’a que deux places.',
+    titre: 'Nuits de semaine — renfort',
+    aide: 'Équilibrer les nuits de semaine tenus à partir de la 3ᵉ place. Sans objet tant qu’un type de garde n’a que deux places.',
   },
   grands_weekend: {
     titre: 'Grands week-ends (salariés)',
@@ -247,9 +247,9 @@ const DIMENSION_LABELS: Record<EquityDimension, string> = {
   weekend: 'Week-ends',
   weekend_premier: 'Rôle de 1er le week-end',
   ferie: 'Jours fériés',
-  semaine_premier: 'Soirs de semaine — 1er',
-  semaine_second: 'Soirs de semaine — 2nd',
-  semaine_renfort: 'Soirs de semaine — renfort',
+  semaine_premier: 'Nuits de semaine — 1er',
+  semaine_second: 'Nuits de semaine — 2nd',
+  semaine_renfort: 'Nuits de semaine — renfort',
   grands_weekend: 'Grands week-ends (salariés)',
 }
 

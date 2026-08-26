@@ -416,7 +416,7 @@ function ChampsCreneau({ cle, form, setForm, joursFiges, bloque, code }: ChampsP
         <p className="note attention large">
           À partir de 3 vétérinaires par garde, deux limites à connaître : on ne peut plus changer
           une personne à la main depuis le planning (il faut relancer une génération), et sur les
-          soirs de semaine, la 3ᵉ et la 4ᵉ place ne sont pas encore comptées dans l&apos;équilibrage
+          nuits de semaine, la 3ᵉ et la 4ᵉ place ne sont pas encore comptées dans l&apos;équilibrage
           des charges — ces gardes-là ne seront donc pas réparties équitablement. Le week-end et les
           jours fériés, eux, comptent bien tout le monde.
         </p>

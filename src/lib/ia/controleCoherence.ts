@@ -243,7 +243,7 @@ export async function controlerCoherence(
       const effectif = effectifNuitSemaineLocal(p, profilParId)
       if (effectif !== null && effectif !== placesFerie) {
         desaccordsFerie.push(
-          `${p.libelle ?? p.date_debut} : le moteur programme ${effectif} vétérinaire${effectif > 1 ? 's' : ''} un jour férié (règle du soir de semaine), le catalogue en déclare ${placesFerie}.`,
+          `${p.libelle ?? p.date_debut} : le moteur programme ${effectif} vétérinaire${effectif > 1 ? 's' : ''} un jour férié (règle de la nuit de semaine), le catalogue en déclare ${placesFerie}.`,
         )
       }
     }
