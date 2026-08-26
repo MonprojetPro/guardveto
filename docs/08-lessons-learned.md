@@ -320,3 +320,42 @@ insuffisant : la revalidation empêche l'illégitime, pas le mal-adressé.
 boucle d'envoi, puis collé dans chaque e-mail. C'est la forme du code qui
 rendait le défaut structurel — un lien commun ne peut pas être personnel. Le
 déplacer dans la boucle a été la moitié du correctif.
+
+---
+
+## 2026-08-26 — Un numéro de position n'est un identifiant que si l'ordre est total
+
+**Le symptôme** : en démonstration devant la cliente, MiKL demande à Filou de
+mettre en pause le repos du mardi de Victor. Filou rédige exactement cela. Et
+l'encadré « ce que ça changerait » annonce la mise en pause de *« Anne-Catherine
+ne fait pas de garde le mercredi »*. Une autre personne, un autre jour.
+
+**La cause** : Filou ne désigne pas une règle par son identifiant, mais par son
+**numéro de position** dans la liste qu'on lui a montrée. C'est un choix
+délibéré et raisonnable — un modèle recopie mal un UUID. Mais un numéro de
+position n'est un identifiant **que si l'ordre est total et stable**. Or les
+deux côtés avaient chacun leur requête : l'une triait par `brique_id` seul,
+l'autre par `brique_id` puis `id`. Et `brique_id` désigne un *type* de règle,
+partagé par plusieurs : Postgres est libre d'ordonner les ex aequo comme il veut.
+
+Mesuré sur les données réelles : **13 règles sur 22 changeaient de place**, et
+les quatre `interdire_creneau` étaient intégralement inversées — c'est-à-dire,
+exactement, la règle de Victor et celle d'Anne-Catherine.
+
+**Ce que le correctif n'était pas** : ajouter le tri manquant à la requête en
+double. Ça aurait réparé la journée et laissé le piège en place. Le correctif
+est d'avoir **supprimé la seconde lecture**. Deux requêtes qu'il faut penser à
+garder identiques divergent toujours — et la preuve était sous les yeux : le
+commentaire du code affirmait déjà qu'elles l'étaient. Une invariante confiée à
+la vigilance n'est pas une invariante, c'est un souhait.
+
+**Ce qui a sauvé la démonstration**, et qui mérite d'être noté comme un succès :
+l'encadré d'impact est **calculé par notre code**, pas rédigé par le modèle.
+C'est ce qui a rendu l'erreur visible à l'écran au lieu de la laisser s'appliquer
+en silence sous un texte rassurant. La séparation « le modèle raconte, le code
+constate » a fait très exactement ce pour quoi elle existe.
+
+**La question à se poser ailleurs** : partout où un modèle, une URL ou un
+formulaire désigne une ligne par son rang plutôt que par son identifiant, l'ordre
+est-il total ? Trier sur une colonne non unique suffit à faire d'un numéro un
+pointeur mouvant.
