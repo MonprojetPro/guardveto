@@ -14,8 +14,12 @@
 //
 // Accès : admin uniquement
 // Corps : { periodeId: string }
-// Réponse succès  : { success: true, nbGardes, snapshotId, creneauxIgnores[], dureeMs }
-// Réponse impasse : { success: false, joursNonCouverts[], creneauxIgnores[], dureeMs }
+// Réponse (B-053) — trois issues, le planning est TOUJOURS persisté sauf la 3e :
+//   { issue: 'complet', success: true,  nbGardes, snapshotId, creneauxVides: [] }
+//   { issue: 'partiel', success: false, nbGardes, creneauxVides[] } ← à compléter
+//   { issue: 'echec',   success: false, error }  ← rien n'a pu être attribué
+// ⚠️ `issue` et non `statut` : ce dernier désigne déjà le statut de la PÉRIODE
+//    dans la réponse `requiresConfirmation` — deux sens pour un nom, jamais.
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -251,31 +255,37 @@ export async function POST(req: NextRequest) {
     // serverless brutal (dette technique). Non déterministe → chemin serveur only.
     const result = genererPlanningPur({ ...contexte, seedDeadlineMs: SEED_DEADLINE_MS })
 
-    if (!result.success) {
-      // Interruption par le plafond de nœuds/temps (PAS une impasse prouvée) :
-      // on le dit clairement — sans diagnostic (il re-simule → ré-explosion).
-      if (result.interrompu) {
-        return NextResponse.json({
-          success: false,
-          interrompu: true,
-          error: result.raisonInterruption ?? 'Génération interrompue (calcul trop long).',
-          diagnostic: null,
-          joursNonCouverts: [],
-          creneauxIgnores,
-          // Même sur une interruption : un effectif amputé du dernier recours
-          // resserre la recherche et peut expliquer un calcul qui n'aboutit pas.
-          exclusDernierRecours,
-          dureeMs: result.dureeMs,
-        })
-      }
+    // ── B-053 — UN ÉCHEC N'EST PLUS UN MUR ──────────────────────
+    //
+    // Avant : sur impasse, la route retournait sans rien écrire. L'admin perdait
+    // 100 % du travail du moteur pour un seul enchaînement impossible, et n'avait
+    // aucun moyen de reprendre la main (on ne complète pas à la main un planning
+    // qui n'existe pas).
+    //
+    // Maintenant : le moteur rend TOUJOURS ce qu'il a pu remplir (`planningPartiel`,
+    // sans aucune règle dure enfreinte) + la liste des cases vraiment vides. On
+    // persiste ce planning comme un brouillon À COMPLÉTER, par le MÊME chemin que
+    // le succès — aucune seconde écriture à maintenir en parallèle.
+    const planningRetenu = result.success ? result.planning : result.planningPartiel
+    const creneauxVides = result.success ? [] : (result.creneauxVides ?? [])
+    const placesPourvues = planningRetenu.attributions.reduce(
+      (n, a) => n + a.placements.filter((p) => p.vetId).length, 0,
+    )
 
-      // Impasse : retourne le rapport complet sans modifier la base.
-      // Le diagnostic (créneau bloquant + règles en cause + suggestions) est
-      // ÉPHÉMÈRE — on ne persiste rien, on le renvoie tel quel à l'UI.
+    // Le seul cas qui reste un échec sec : le moteur n'a RIEN pu pourvoir.
+    // Écraser un planning existant par du vide serait une destruction, pas un
+    // secours. (Équipe absente, période aberrante… en pratique très rare.)
+    if (!result.success && placesPourvues === 0) {
       return NextResponse.json({
+        issue: 'echec',
         success: false,
+        interrompu: result.interrompu ?? false,
+        error: result.interrompu
+          ? (result.raisonInterruption ?? 'Génération interrompue (calcul trop long).')
+          : "Aucune garde n'a pu être attribuée sur cette période.",
         diagnostic: result.diagnostic ?? null,
         joursNonCouverts: result.joursNonCouverts,
+        creneauxVides,
         creneauxIgnores,
         exclusDernierRecours,
         dureeMs: result.dureeMs,
@@ -285,7 +295,7 @@ export async function POST(req: NextRequest) {
     // ── Persistence V2 (attributions) ───────────────────────────
     let persistenceResult
     try {
-      persistenceResult = await persisterResultat(result.planning, periodeId, cabinetId)
+      persistenceResult = await persisterResultat(planningRetenu, periodeId, cabinetId)
     } catch (err) {
       return NextResponse.json(
         { error: err instanceof Error ? err.message : String(err) },
@@ -375,7 +385,7 @@ export async function POST(req: NextRequest) {
     //    dates/type déjà verrouillés exclus — on conserve le verrou existant).
     //    On garde EN PARALLÈLE l'attribution source + sa clé de type DB, pour la
     //    double écriture P3b-1 (garde_placements) avec exactement le même filtre.
-    const attributionsInserees = result.planning.attributions
+    const attributionsInserees = planningRetenu.attributions
       .filter((a) => a.type !== 'vendredi_soir')
       .map((a) => ({ a, dbType: mapTypeGardeEnDb(a.type, a.date, contexte.calendrier) }))
       .filter(({ a, dbType }) => !clesVerrouillees.has(`${a.date}|${dbType}`))
@@ -515,11 +525,21 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // B-053 — trois issues, dites explicitement. `success` reste pour la
+    // rétro-compat, mais il ne suffit plus : un planning PARTIEL est bien en
+    // base et parfaitement utilisable, il a seulement des cases à pourvoir.
     return NextResponse.json({
-      success: true,
+      issue: creneauxVides.length > 0 ? 'partiel' : 'complet',
+      success: creneauxVides.length === 0,
       nbGardes: gardesAInserer.length,
       snapshotId: persistenceResult.snapshotId,
       creneauxIgnores,
+      creneauxVides,
+      exclusDernierRecours,
+      // Le calcul a été coupé avant d'avoir tout exploré : ce qui est en base
+      // est bon, mais une recherche complète aurait peut-être fait mieux.
+      interrompu: result.success ? false : (result.interrompu ?? false),
+      diagnostic: result.success ? null : (result.diagnostic ?? null),
       dureeMs: result.dureeMs,
     })
   } finally {

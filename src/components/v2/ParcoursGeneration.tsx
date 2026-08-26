@@ -34,7 +34,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   CalendarPlus, RotateCcw, Wand2, Loader2, ShieldAlert, CheckCircle2, AlertTriangle,
-  RefreshCw, Trash2,
+  RefreshCw, Trash2, CalendarClock,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -42,6 +42,7 @@ import {
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { DiagnosticImpasse, NoteDernierRecoursExclus } from '@/components/planning/DiagnosticImpasse'
+import { CasesAPourvoir, type CaseVide } from '@/components/planning/CasesAPourvoir'
 import { CreneauxIgnoresAlert } from '@/components/planning/CreneauxIgnoresAlert'
 import { PointPreVol, type VetEtiquette } from '@/components/planning/PointPreVol'
 import { SignalerLimite } from '@/components/planning/SignalerLimite'
@@ -135,7 +136,19 @@ function FicheType({ type, gardes }: { type: ProfilPlanning; gardes: string[] })
 }
 
 interface Resultat {
+  /** `ok` = planning COMPLET. Un planning partiel n'est pas un échec (B-053). */
   ok: boolean
+  /**
+   * B-053 — l'issue réelle de la génération :
+   *   `complet` : rien à faire de plus ;
+   *   `partiel` : le planning est EN BASE, il lui manque des cases ;
+   *   `echec`   : rien n'a pu être attribué (cas rare, équipe absente…).
+   * `ok` seul ne suffisait plus : il aurait rangé « partiel » avec « échec »,
+   * et l'admin serait reparti en croyant n'avoir rien.
+   */
+  issue?: 'complet' | 'partiel' | 'echec'
+  /** Les cases sans personne, avec le pourquoi de chaque véto écarté. */
+  casesVides?: CaseVide[]
   nbGardes?: number
   dureeMs?: number
   creneauxIgnores: CreneauIgnore[]
@@ -182,6 +195,12 @@ export function ParcoursGeneration({
   etapeInitiale = 'choix',
 }: Props) {
   const router = useRouter()
+  // B-053 — jamais un identifiant à l'écran : les raisons du moteur portent des
+  // ids de vétérinaire, cette table les rend en prénoms.
+  const prenomParVetId = useMemo(
+    () => new Map(vets.map((v) => [v.id, v.prenom])),
+    [vets],
+  )
   const [etape, setEtape] = useState<Etape>(etapeInitiale)
   const [creation, setCreation] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
@@ -488,9 +507,24 @@ export function ParcoursGeneration({
       if (data.success) {
         setResultat({
           ok: true,
+          issue: 'complet',
           nbGardes: data.nbGardes,
           dureeMs: data.dureeMs,
           creneauxIgnores: (data.creneauxIgnores ?? []) as CreneauIgnore[],
+        })
+        router.refresh()
+      } else if (data.issue === 'partiel') {
+        // B-053 — le planning EST écrit. On ne repart pas les mains vides :
+        // il reste des cases à pourvoir, et on dit lesquelles.
+        setResultat({
+          ok: false,
+          issue: 'partiel',
+          nbGardes: data.nbGardes,
+          dureeMs: data.dureeMs,
+          casesVides: (data.creneauxVides ?? []) as CaseVide[],
+          creneauxIgnores: (data.creneauxIgnores ?? []) as CreneauIgnore[],
+          exclusDernierRecours: (data.exclusDernierRecours ?? []) as string[],
+          interrompu: data.interrompu === true,
         })
         router.refresh()
       } else if (data.interrompu) {
@@ -545,11 +579,22 @@ export function ParcoursGeneration({
       titre: 'Je remplis le planning…',
       sous: 'Le moteur essaie les combinaisons et garde la plus équitable.',
     },
+    // B-053 — trois titres. Le planning partiel EST un résultat : le dire
+    // « je n'ai pas pu remplir le planning » ferait paniquer pour rien alors
+    // que tout est en base, à quelques cases près.
     resultat: {
-      titre: resultat?.ok ? 'C’est prêt' : 'Je n’ai pas pu remplir le planning',
-      sous: resultat?.ok
-        ? 'Regarde-le, ajuste ce que tu veux, puis publie quand il te convient.'
-        : 'Voici ce qui bloque — tu peux le régler et relancer.',
+      titre:
+        resultat?.issue === 'partiel'
+          ? 'Presque : il reste quelques cases'
+          : resultat?.ok
+            ? 'C’est prêt'
+            : 'Je n’ai pas pu remplir le planning',
+      sous:
+        resultat?.issue === 'partiel'
+          ? 'Le planning est enregistré en brouillon. Voici les cases sans personne, et ce sur quoi tu peux agir.'
+          : resultat?.ok
+            ? 'Regarde-le, ajuste ce que tu veux, puis publie quand il te convient.'
+            : 'Voici ce qui bloque — tu peux le régler et relancer.',
     },
   }
 
@@ -1038,7 +1083,44 @@ export function ParcoursGeneration({
         {/* ── ④ Le résultat ─────────────────────────────── */}
         {etape === 'resultat' && resultat && (
           <div className="gp-resultat">
-            {resultat.ok ? (
+            {/* ── B-053 · PARTIEL : le planning existe, il lui manque des cases ── */}
+            {resultat.issue === 'partiel' ? (
+              <>
+                <div className="gp-feu-ambre">
+                  <CalendarClock className="gp-feu-ico" aria-hidden />
+                  <div>
+                    <p className="gp-feu-titre">
+                      {resultat.nbGardes} garde{(resultat.nbGardes ?? 0) > 1 ? 's' : ''} placée
+                      {(resultat.nbGardes ?? 0) > 1 ? 's' : ''} ·{' '}
+                      {resultat.casesVides?.length ?? 0} case
+                      {(resultat.casesVides?.length ?? 0) > 1 ? 's' : ''} à pourvoir
+                    </p>
+                    <p className="gp-feu-sous">
+                      Le planning est <strong>enregistré en brouillon</strong> : l’équipe ne le
+                      voit pas encore, et rien n’est perdu. Complète les cases manquantes d’un
+                      clic sur le planning — la publication attendra qu’elles soient toutes
+                      pourvues.
+                    </p>
+                  </div>
+                </div>
+
+                <NoteDernierRecoursExclus prenoms={resultat.exclusDernierRecours ?? []} />
+
+                <CasesAPourvoir
+                  cases={resultat.casesVides ?? []}
+                  nomParVet={(id) => prenomParVetId.get(id)}
+                />
+
+                {resultat.interrompu && (
+                  <p className="gp-note-calcul">
+                    Le calcul a été arrêté avant d’avoir tout exploré : ce qui est enregistré
+                    est bon, mais une recherche plus longue aurait peut-être trouvé mieux.
+                  </p>
+                )}
+
+                <CreneauxIgnoresAlert creneaux={resultat.creneauxIgnores} />
+              </>
+            ) : resultat.ok ? (
               <>
                 <div className="gp-feu-vert">
                   <CheckCircle2 className="gp-feu-ico" aria-hidden />

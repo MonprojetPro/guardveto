@@ -349,7 +349,16 @@ function stepsForDay(
   return [] // dimanche : couvert par le weekend du samedi → aucun slot propre
 }
 
-function genererSteps(
+/**
+ * Toutes les places à pourvoir sur une période — LA source unique de « ce que
+ * le planning doit contenir ».
+ *
+ * Exportée (B-053) : la gate de publication doit savoir s'il reste des cases
+ * vides, et elle DOIT le savoir avec la même règle que le moteur. Un second
+ * calcul « places attendues » écrit à côté finirait par diverger, et on
+ * publierait un planning troué en croyant l'inverse.
+ */
+export function genererSteps(
   dateDebut: string, dateFin: string, saison: Saison, nbVetosSemaineSoir?: number,
   creneaux?: CreneauModele[],
 ): SolverStep[] {
@@ -703,8 +712,20 @@ export function remplirAuMieux(input: SolverInput): RemplissageAuMieux {
     )
 
     if (valides.length === 0) {
-      // La case reste vide — et on capture le pourquoi DANS CE CONTEXTE, pas sur
-      // un planning théorique : une règle de rythme ne se voit que là.
+      // La garde EXISTE, elle est simplement à pourvoir. Sans cette ligne, un
+      // créneau dont aucune place n'est pourvue n'apparaîtrait NULLE PART : ni
+      // en base, ni dans le calendrier — le trou serait invisible, et l'admin
+      // croirait qu'il n'y a pas de garde ce soir-là. On veut l'inverse exact :
+      // une case vide qui se voit et se clique.
+      const existe = planning.attributions.some((a) => a.date === step.date && a.type === step.type)
+      if (!existe) {
+        planning = {
+          attributions: [...planning.attributions, attributionVide(step.date, step.type, step.rolesCreneau)],
+        }
+      }
+
+      // On capture le pourquoi DANS CE CONTEXTE, pas sur un planning théorique :
+      // une règle de rythme ne se voit que là.
       creneauxVides.push({
         date: step.date,
         type: step.type,

@@ -18,6 +18,7 @@ import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
 import { placesDeGarde, vetsDeGarde } from '@/lib/gardes/places'
 import { ViolationDialog } from './ViolationDialog'
 import { stylePastille, stylePoint } from '@/lib/couleurs'
+import { sansCodeTechnique } from '@/lib/regles/sansCodeTechnique'
 
 // ── Types ────────────────────────────────────────────────
 
@@ -63,10 +64,13 @@ function toneDe(dispo: { ok: boolean; warning?: string }): Tone {
   return dispo.warning ? 'ambre' : 'vert'
 }
 
-/** Retire le préfixe technique « R7 : » des messages de règle. */
-function sansCodeRegle(texte?: string): string {
-  return (texte ?? '').replace(/^R\d+ : /, '')
-}
+/**
+ * Retire le préfixe technique des messages de règle.
+ *
+ * Délègue à la source unique (B-053) : la copie locale ne connaissait que
+ * `R\d+ : ` et laissait donc passer `ESPACEMENT : `, `FREQ_WE : `, `R3/R5 : `.
+ */
+const sansCodeRegle = (texte?: string): string => sansCodeTechnique(texte)
 
 /**
  * Le SEUL geste qu'un vétérinaire peut poser sur une garde depuis le planning :
@@ -325,14 +329,14 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
         if (!vet.dispo_premier.ok && vet.dispo_premier.raison) {
           return {
             type: 'dure',
-            message: vet.dispo_premier.raison.replace(/^R\d+ : /, ''),
+            message: sansCodeRegle(vet.dispo_premier.raison),
             vetPrenom: vet.prenom,
           }
         }
         if (vet.dispo_premier.warning) {
           return {
             type: 'souple',
-            message: vet.dispo_premier.warning.replace(/^R\d+ : /, ''),
+            message: sansCodeRegle(vet.dispo_premier.warning),
             vetPrenom: vet.prenom,
           }
         }
@@ -346,14 +350,14 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
         if (!vet.dispo_second.ok && vet.dispo_second.raison) {
           return {
             type: 'dure',
-            message: vet.dispo_second.raison.replace(/^R\d+ : /, ''),
+            message: sansCodeRegle(vet.dispo_second.raison),
             vetPrenom: vet.prenom,
           }
         }
         if (vet.dispo_second.warning) {
           return {
             type: 'souple',
-            message: vet.dispo_second.warning.replace(/^R\d+ : /, ''),
+            message: sansCodeRegle(vet.dispo_second.warning),
             vetPrenom: vet.prenom,
           }
         }

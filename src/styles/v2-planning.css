@@ -1561,6 +1561,57 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 }
 .gp-feu-sous { margin-top: 2px; font-size: 0.83rem; line-height: 1.55; color: var(--text); }
 
+/* B-053 — le feu AMBRE : le planning est là, il lui manque des cases.
+   Volontairement PAS rouge. Le rouge dit « c'est cassé, tu as tout perdu » et
+   c'est précisément la panique qu'on veut éviter : ici le travail est
+   enregistré, il reste un geste à faire. */
+.gp-feu-ambre {
+  display: flex; align-items: flex-start; gap: 11px;
+  background: var(--warn-soft);
+  border: 1px solid rgba(196, 138, 20, 0.35);
+  border-radius: var(--r-md);
+  padding: 13px 15px;
+}
+.gp-feu-ambre .gp-feu-ico { color: var(--warn); }
+.gp-feu-ambre .gp-feu-titre { color: var(--warn); }
+.gp-note-calcul {
+  font-size: 0.78rem; line-height: 1.5; color: var(--soft); font-style: italic;
+}
+
+/* -- Les cases à pourvoir (B-053) ------------------------------------------
+   Une carte par case, ses empêchements groupés par CAUSE, et le levier au bout.
+   Pas de fond alarmant : c'est une liste de choses à faire, pas un rapport
+   d'erreur. */
+.cap-bloc { display: grid; gap: 6px; margin-top: 4px; }
+.cap-titre {
+  display: flex; align-items: center; gap: 7px;
+  font-family: var(--font-display);
+  font-size: 0.86rem; font-weight: 800; color: var(--text);
+}
+.cap-ico { width: 16px; height: 16px; color: var(--warn); flex: 0 0 auto; }
+.cap-sous { font-size: 0.8rem; line-height: 1.55; color: var(--soft); }
+.cap-liste { display: grid; gap: 9px; margin-top: 5px; list-style: none; padding: 0; }
+.cap-item {
+  border: 1px solid var(--t-border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  padding: 10px 12px;
+}
+.cap-quand {
+  font-size: 0.83rem; font-weight: 700; color: var(--text);
+  text-transform: capitalize;
+}
+.cap-famille { margin-top: 7px; }
+.cap-raisons {
+  display: grid; gap: 3px; margin: 0; padding: 0 0 0 14px;
+  font-size: 0.79rem; line-height: 1.5; color: var(--t-muted);
+}
+.cap-raisons li { list-style: disc; }
+.cap-levier {
+  margin-top: 4px;
+  font-size: 0.79rem; line-height: 1.5; color: var(--accent-ink);
+}
+
 /* Un lot de points (bloquants / à surveiller). */
 .gp-lot { display: grid; gap: 8px; }
 .gp-lot-titre {

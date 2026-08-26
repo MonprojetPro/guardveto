@@ -62,6 +62,7 @@ import type {
 } from '@/engine/diagnostic'
 import { humaniserCodeGarde } from '@/lib/libelles-gardes'
 import { stylePastille, stylePoint } from '@/lib/couleurs'
+import { sansCodeTechnique } from '@/lib/regles/sansCodeTechnique'
 
 // ── Types des contrats API (LOT 3) ───────────────────────
 
@@ -385,7 +386,7 @@ function LigneReparation({
                     // Le code machine en tête (« R12 : ») est retiré : il ne
                     // dit rien au cabinet et fait passer une règle du
                     // cabinet pour une erreur du logiciel.
-                    <p key={i}>{w.replace(/^R\d+ : /, '')}</p>
+                    <p key={i}>{sansCodeTechnique(w)}</p>
                   ))}
                 </div>
               )
