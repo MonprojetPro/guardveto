@@ -95,7 +95,7 @@ const CATALOGUE_PROMPT = `CONVENTIONS (valables pour TOUS les types ci-dessous) 
 LES 19 TYPES — tu ne peux en proposer qu'UN SEUL :
 
 1. interdire_creneau — pas de garde un jour fixe de la semaine.
-   jour, exception_vacances_scolaires (true/false), semaine (toutes|paire|impaire).
+   jours (LISTE — « pas de garde le lundi et le mardi » est UNE seule regle), exception_vacances_scolaires (true/false), semaine (toutes|paire|impaire).
    « semaine » sert à « repos le jeudi une semaine sur deux ». Absent = toutes les
    semaines. Avec paire ou impaire, exception_vacances_scolaires est refusé.
    Ne pas confondre avec le type 3 : ici on vise UN JOUR, là-bas des CRÉNEAUX.

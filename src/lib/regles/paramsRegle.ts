@@ -219,7 +219,26 @@ export function construireParams(
 ): { quand: unknown; params: Record<string, unknown> } | { error: string } {
   switch (p.brique_id) {
     case 'interdire_creneau': {
-      if (!p.jour || !JOURS_VALIDES.has(p.jour)) return { error: 'Jour de repos invalide.' }
+      // ── PLUSIEURS jours (B-041, 2026-08-26) ───────────────────────────
+      //
+      // « lundi ET mardi, semaines paires » : Filou n'en avait retenu qu'un, et
+      // sans le dire. La limite venait de moi (« un seul jour par regle »,
+      // B-038) — pas des gardiens, qui bouclent sur `regles` depuis l'origine.
+      //
+      // `jours` (liste) prime sur `jour` (singulier), conserve pour les regles
+      // deja en base et pour la forme simple.
+      const joursDemandes = [
+        ...new Set(
+          (p.jours ?? []).filter((x): x is string => typeof x === 'string' && x.trim() !== ''),
+        ),
+      ]
+      const listeJours = joursDemandes.length > 0 ? joursDemandes : p.jour ? [p.jour] : []
+
+      if (listeJours.length === 0) return { error: 'Choisis au moins un jour de repos.' }
+      const invalides = listeJours.filter((j) => !JOURS_VALIDES.has(j))
+      if (invalides.length > 0) {
+        return { error: `Jour de repos invalide : ${invalides.join(', ')}.` }
+      }
       // Ciblage par type de garde (2026-08-02). Vide = toute la journée, ce qui
       // est le comportement historique ET celui de toutes les règles déjà en
       // base : la clé n'est même pas écrite dans ce cas, pour que l'empreinte
@@ -259,7 +278,13 @@ export function construireParams(
       if (semaine !== undefined && !PARITES_VALIDES.has(semaine)) {
         return { error: 'Cadence des semaines invalide (toutes, paires ou impaires).' }
       }
-      if (semaine === 'paire' || semaine === 'impaire') {
+      // Forme TABLEAU des qu'il y a une parite OU plusieurs jours. C'est la
+      // seule que les gardiens savent lire autrement que « ce jour, toutes les
+      // semaines » — et ils l'evaluent entree par entree, donc plusieurs jours
+      // ne leur demandent aucun code neuf.
+      const enTableau = semaine === 'paire' || semaine === 'impaire' || listeJours.length > 1
+
+      if (enTableau) {
         // L'exception « sauf vacances scolaires » n'est lue par les gardiens que
         // sur la forme SIMPLE. L'accepter ici afficherait un assouplissement que
         // le planning n'applique jamais — le défaut « un paramètre montré que le
@@ -269,27 +294,29 @@ export function construireParams(
         if (p.exception_vacances_scolaires) {
           return {
             error:
-              'L’exception « sauf vacances scolaires » n’est pas disponible sur un repos une semaine sur deux. Choisissez l’un ou l’autre.',
+              'L’exception « sauf vacances scolaires » n’est disponible que sur un repos d’un seul jour, toutes les semaines. Choisissez l’un ou l’autre.',
           }
         }
         return {
-          quand: p.jour,
+          quand: listeJours[0],
           params: {
-            regles: [
-              {
-                jour: p.jour,
-                semaine,
-                ...(creneaux.length > 0 ? { creneaux } : {}),
-              },
-            ],
+            regles: listeJours.map((jour) => ({
+              jour,
+              // `semaine` n'est ecrit que s'il vaut vraiment quelque chose : une
+              // cle `semaine: 'toutes'` serait lue comme « ni paire ni impaire »
+              // par les gardiens, donc ignoree — mais elle laisserait croire, en
+              // relisant la base, que la parite a ete choisie.
+              ...(semaine === 'paire' || semaine === 'impaire' ? { semaine } : {}),
+              ...(creneaux.length > 0 ? { creneaux } : {}),
+            })),
           },
         }
       }
 
       return {
-        quand: p.jour,
+        quand: listeJours[0],
         params: {
-          jour: p.jour,
+          jour: listeJours[0],
           exception_vacances_scolaires: Boolean(p.exception_vacances_scolaires),
           ...(creneaux.length > 0 ? { creneaux } : {}),
         },

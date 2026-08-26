@@ -233,7 +233,18 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
   )
 
   // interdire_creneau
-  const [jour, setJour] = useState(typeof p.jour === 'string' ? p.jour : 'mercredi')
+  // Plusieurs jours possibles depuis B-041. `jour` (singulier) reste lu pour
+  // les regles deja en base, qui sont toutes en forme simple.
+  const [jours, setJours] = useState<string[]>(() => {
+    const entrees = Array.isArray(p.regles) ? (p.regles as Array<Record<string, unknown>>) : []
+    const depuisTableau = entrees
+      .map((r) => r.jour)
+      .filter((j): j is string => typeof j === 'string')
+    if (depuisTableau.length > 0) return depuisTableau
+    return typeof p.jour === 'string' ? [p.jour] : ['mercredi']
+  })
+  const toggleJour = (j: string) =>
+    setJours((prev) => (prev.includes(j) ? prev.filter((x) => x !== j) : [...prev, j]))
   const [exVac, setExVac] = useState(Boolean(p.exception_vacances_scolaires))
   // Parité des semaines visées (B-038). Relue depuis la forme « tableau de
   // règles » — la seule que les deux gardiens savent évaluer avec une parité.
@@ -396,18 +407,16 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
         // Afficher l'autre forme donnerait à lire une phrase que la base ne
         // contiendra jamais.
         params =
-          parite === 'paire' || parite === 'impaire'
+          parite === 'paire' || parite === 'impaire' || jours.length > 1
             ? {
-                regles: [
-                  {
-                    jour,
-                    semaine: parite,
-                    ...(creneauxFiltre.length > 0 ? { creneaux: creneauxFiltre } : {}),
-                  },
-                ],
+                regles: jours.map((j) => ({
+                  jour: j,
+                  ...(parite === 'paire' || parite === 'impaire' ? { semaine: parite } : {}),
+                  ...(creneauxFiltre.length > 0 ? { creneaux: creneauxFiltre } : {}),
+                })),
               }
             : {
-                jour,
+                jour: jours[0],
                 exception_vacances_scolaires: exVac,
                 creneaux: creneauxFiltre.length > 0 ? creneauxFiltre : undefined,
               }
@@ -477,7 +486,7 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
     //    obstinement la phrase SANS la parite. Le `eslint-disable` ci-dessus a
     //    desactive exactement le controle qui l'aurait dit. Toute variable lue
     //    dans ce memo doit figurer dans cette liste, a la main.
-  }, [briqueId, ownerId, jour, exVac, parite, siWe, sinon, semaines, periodes, avecId, n, fenetre, creneauxFiltre, ecartMin, nSemaines, joursPref, sens, typeAvant, typeApres, nJoursSerie, nJoursRepos, reposJours, nSemainesCadence, ancre, sensCadence, formeExclusion, dateExcl1, dateExcl2, vets])
+  }, [briqueId, ownerId, jours, exVac, parite, siWe, sinon, semaines, periodes, avecId, n, fenetre, creneauxFiltre, ecartMin, nSemaines, joursPref, sens, typeAvant, typeApres, nJoursSerie, nJoursRepos, reposJours, nSemainesCadence, ancre, sensCadence, formeExclusion, dateExcl1, dateExcl2, vets])
 
   const handleSubmit = () => {
     if (!ownerId) { ouvrirErreur('Sélectionnez le vétérinaire concerné.'); return }
@@ -542,7 +551,11 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
         brique_id: briqueId,
         owner_id: ownerId,
         force,
-        jour,
+        jour: jours[0],
+        // La LISTE prime cote serveur (B-041) ; `jour` reste envoye pour les
+        // briques qui n'en attendent qu'un.
+        jours: briqueId === 'interdire_creneau' ? jours
+          : briqueId === 'preferer_creneau' && joursPref.length > 0 ? joursPref : undefined,
         exception_vacances_scolaires: exVac,
         // Parité (B-038) : n'est envoyée que par le repos fixe. Ailleurs elle
         // n'a pas de sens, et `construireParams` l'ignore de toute façon.
@@ -558,7 +571,6 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
         ecart_min_jours: Number(ecartMin),
         // n_semaines sert à espacement_weekend ET à cadencement_weekend (#20).
         n_semaines: briqueId === 'cadencement_weekend' ? Number(nSemainesCadence) : Number(nSemaines),
-        jours: briqueId === 'preferer_creneau' && joursPref.length > 0 ? joursPref : undefined,
         // `sens` porte plus/moins (volume_gardes) OU interdit/impose (cadencement).
         sens: briqueId === 'cadencement_weekend' ? sensCadence : sens,
         // Successions / séries / repos avancés (#13).
@@ -677,14 +689,37 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
           {/* Paramètres dynamiques */}
           {briqueId === 'interdire_creneau' && (
             <div className="space-y-3">
+              {/* Plusieurs jours (B-041). C'etait un choix UNIQUE : « lundi et
+                  mardi » obligeait a creer deux regles, et Filou, qui ne peut en
+                  proposer qu'une par reponse, en abandonnait une sans le dire.
+                  Les gardiens, eux, evaluent la liste entree par entree depuis
+                  l'origine. */}
               <div className="space-y-1.5">
-                <Label>Jour de repos</Label>
-                <Select value={jour} onValueChange={(v) => v && setJour(v)} items={JOURS}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {JOURS.map((j) => <SelectItem key={j.value} value={j.value}>{j.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Label>Jours de repos</Label>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {JOURS.map((j) => {
+                    const actif = jours.includes(j.value)
+                    return (
+                      <button
+                        key={j.value}
+                        type="button"
+                        onClick={() => toggleJour(j.value)}
+                        aria-pressed={actif}
+                        className={
+                          'rounded-full border px-3 py-1.5 text-sm transition-colors ' +
+                          (actif
+                            ? 'border-primary bg-primary text-primary-foreground font-medium'
+                            : 'border-border bg-background text-muted-foreground hover:border-primary/40')
+                        }
+                      >
+                        {j.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                {jours.length === 0 && (
+                  <p className="text-xs text-destructive">Choisis au moins un jour.</p>
+                )}
               </div>
               {/* Une semaine sur deux (B-038) — « repos le jeudi, mais une
                   semaine sur deux ». Le moteur ET le validateur savaient déjà
@@ -1304,11 +1339,11 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
               lire « voilà ce que tu t'apprêtes à écrire ».
               Cadre PLEIN et teinte d'accent, donc : le même vocabulaire que
               partout ailleurs où le produit annonce ce qui va se passer. */}
-          <div className="rounded-lg border border-primary/25 bg-primary/[0.06] p-3.5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary/80 mb-1.5">
+          <div className="rounded-lg border-2 border-primary bg-primary/[0.08] px-5 py-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary mb-2">
               Ce que tu vas enregistrer
             </p>
-            <p className="text-sm font-medium text-foreground leading-6">
+            <p className="text-[0.95rem] font-medium text-foreground leading-7">
               {(() => { const f = FORCES.find((x) => x.value === force); return f?.symbole })()} {apercu}
             </p>
           </div>

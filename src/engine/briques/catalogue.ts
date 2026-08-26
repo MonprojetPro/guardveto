@@ -131,21 +131,40 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
       // Forme « tableau de règles » (ex. Anne-Sophie : jeudi AP impaires + …).
       if (Array.isArray(params.regles)) {
         const entrees = params.regles as Array<Record<string, unknown>>
+        // Le `s` collé sortait « semaines impairess » quand la valeur porte
+        // déjà sa marque du pluriel. On la retire d'abord, comme le fait le
+        // rendu de l'alternance ancrée juste plus bas.
+        const paritePhrase = (v: unknown) => ` (semaines ${String(v).replace(/s$/, '')}s)`
         const items = entrees.map((r) => {
           const per = r.periode ? ` ${periodeLisible(r.periode)}` : ''
-          // Le `s` collé sortait « semaines impairess » quand la valeur porte
-          // déjà sa marque du pluriel. On la retire d'abord, comme le fait le
-          // rendu de l'alternance ancrée juste plus bas.
-          const sem = r.semaine ? ` (semaines ${String(r.semaine).replace(/s$/, '')}s)` : ''
+          const sem = r.semaine ? paritePhrase(r.semaine) : ''
           return `${String(r.jour ?? '?')}${per}${sem}`
         })
-        // Un seul jour — le cas de TOUTE règle créée depuis l'écran depuis
-        // B-038 : on écrit la même phrase que la forme simple, au singulier.
+
+        // Un seul jour : la même phrase que la forme simple, au singulier.
         // « a des repos fixes : jeudi (semaines impaires) » se lisait comme une
-        // liste amputée, et cette phrase-là est désormais la plus courante.
+        // liste amputée, et cette phrase-là est la plus courante.
         if (items.length === 1) {
           return `ne fait pas de garde le ${items[0]}`
         }
+
+        // Plusieurs jours de MÊME parité (B-041) : on factorise plutôt que de
+        // répéter « (semaines paires) » derrière chaque jour. « le lundi et le
+        // mardi (semaines paires) » se lit d'un coup d'œil ; « lundi (semaines
+        // paires), mardi (semaines paires) » oblige à comparer les parenthèses
+        // pour vérifier qu'elles disent la même chose.
+        const parites = new Set(entrees.map((r) => String(r.semaine ?? '')))
+        const periodes = new Set(entrees.map((r) => String(r.periode ?? '')))
+        if (parites.size === 1 && periodes.size === 1 && periodes.has('')) {
+          const jours = entrees.map((r) => String(r.jour ?? '?'))
+          const listeFr =
+            jours.length === 2
+              ? `${jours[0]} et le ${jours[1]}`
+              : `${jours.slice(0, -1).join(', le ')} et le ${jours[jours.length - 1]}`
+          const sem = entrees[0].semaine ? paritePhrase(entrees[0].semaine) : ''
+          return `ne fait pas de garde le ${listeFr}${sem}`
+        }
+
         return `a des repos fixes : ${items.join(', ')}`
       }
       // Forme simple « un jour ».

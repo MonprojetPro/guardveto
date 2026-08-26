@@ -183,3 +183,89 @@ describe('Repos une semaine sur deux — ce que le MOTEUR en fait', () => {
     expect(isValid(slotJeudi(JEUDI_IMPAIRE), v, 'premier', [v], planningVide).valid).toBe(false)
   })
 })
+
+// ── Plusieurs jours dans une seule regle (B-041) ─────────────────────────
+// « lundi ET mardi, semaines paires ». Filou n'en avait retenu qu'un, et sans
+// le dire — parce qu'il ne peut proposer qu'une regle par reponse et qu'une
+// regle ne portait qu'un jour. Les gardiens, eux, bouclent sur les entrees
+// depuis l'origine : la limite etait dans la SAISIE, nulle part ailleurs.
+describe('Plusieurs jours de repos dans une seule regle (B-041)', () => {
+  function paramsMulti(jours: string[], semaine = 'toutes') {
+    return construireParams(
+      {
+        brique_id: 'interdire_creneau',
+        owner_id: 'v',
+        force: 'jamais',
+        jours,
+        semaine,
+        exception_vacances_scolaires: false,
+      },
+      new Set(['semaine', 'weekend']),
+    )
+  }
+
+  it('ecrit une entree par jour demande', () => {
+    const sortie = paramsMulti(['lundi', 'mardi'], 'paire')
+    if ('error' in sortie) throw new Error(sortie.error)
+    const regles = sortie.params.regles as Array<Record<string, unknown>>
+    expect(regles).toHaveLength(2)
+    expect(regles.map((r) => r.jour)).toEqual(['lundi', 'mardi'])
+    expect(regles.every((r) => r.semaine === 'paire')).toBe(true)
+  })
+
+  it('passe en tableau meme SANS parite des lors qu il y a deux jours', () => {
+    // Sinon le second jour serait perdu : la forme simple ne porte qu'un `jour`.
+    const sortie = paramsMulti(['lundi', 'mardi'])
+    if ('error' in sortie) throw new Error(sortie.error)
+    const regles = sortie.params.regles as Array<Record<string, unknown>>
+    expect(regles).toHaveLength(2)
+    // Pas de cle `semaine` parasite : elle laisserait croire, en relisant la
+    // base, qu'une parite a ete choisie.
+    expect(regles.every((r) => r.semaine === undefined)).toBe(true)
+  })
+
+  it('refuse une liste vide plutot que de deviner un jour', () => {
+    const sortie = paramsMulti([])
+    expect('error' in sortie).toBe(true)
+  })
+
+  it('le MOTEUR refuse les deux jours, pas seulement le premier', () => {
+    // L'epreuve qui compte. Un bug qui ne garderait que la premiere entree
+    // passerait toutes les verifications de forme ci-dessus.
+    const sortie = paramsMulti(['lundi', 'mardi'], 'paire')
+    if ('error' in sortie) throw new Error(sortie.error)
+
+    const v: VetEngine = {
+      id: 'v', prenom: 'Victor', nom: 'X', statut: 'associe', dernier_recours: false,
+      conges: [],
+      contraintes: [
+        {
+          id: 'r1', type: 'jour_repos_fixe', actif: true,
+          config: { brique: 'interdire_creneau', force: 2, params: sortie.params, ...sortie.params },
+        } as ContrainteEngine,
+      ],
+    }
+    const vet = normaliserContraintesVets([v])[0]
+    const planning: PlanningPartiel = { attributions: [] }
+
+    // 2026-01-05 lundi et 2026-01-06 mardi — semaine ISO 2, paire.
+    const lundiPair = { date: '2026-01-05', type: 'semaine_soir', saison: 'hiver', besoinSecond: false } as SlotGarde
+    const mardiPair = { date: '2026-01-06', type: 'semaine_soir', saison: 'hiver', besoinSecond: false } as SlotGarde
+
+    expect(isValid(lundiPair, vet, 'premier', [vet], planning).valid).toBe(false)
+    expect(
+      isValid(mardiPair, vet, 'premier', [vet], planning).valid,
+      'Le mardi passe : seule la premiere entree de la regle est evaluee — ' +
+        'exactement le defaut que B-041 corrige.',
+    ).toBe(false)
+  })
+
+  it('se dit en francais sans repeter la parite derriere chaque jour', () => {
+    const sortie = paramsMulti(['lundi', 'mardi'], 'paire')
+    if ('error' in sortie) throw new Error(sortie.error)
+    const phrase = rendreRegle('interdire_creneau', sortie.params)
+    expect(phrase).toContain('lundi et le mardi')
+    // Une seule mention de la parite, factorisee.
+    expect(phrase.match(/semaines paires/g)).toHaveLength(1)
+  })
+})

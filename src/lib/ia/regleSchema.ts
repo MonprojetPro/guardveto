@@ -351,6 +351,10 @@ export function propositionVersPayload(
       // « une semaine sur deux » (B-038). Absent = toutes les semaines, ce qui
       // laisse le comportement d'avant strictement inchangé.
       payload.semaine = p.semaine ?? undefined
+      // Plusieurs jours (B-041). `jours` sert aussi a `preferer_creneau` ;
+      // `construireParams` ne le lit que pour la brique en cours, donc les deux
+      // cohabitent sans se marcher dessus.
+      payload.jours = p.jours ?? undefined
       break
     case 'repos_conditionnel':
       payload.si_garde_we = p.si_garde_we ?? undefined
@@ -710,10 +714,23 @@ export function apercuProposition(p: PropositionRegle): string {
     case 'interdire_creneau':
       // Comme le formulaire : avec une parité, l'aperçu doit montrer la forme
       // « tableau », celle qui sera réellement écrite en base.
-      params =
-        p.semaine === 'paire' || p.semaine === 'impaire'
-          ? { regles: [{ jour: p.jour, semaine: p.semaine }] }
-          : { jour: p.jour, exception_vacances_scolaires: p.exception_vacances_scolaires ?? false }
+      {
+        const listeJours =
+          Array.isArray(p.jours) && p.jours.length > 0 ? p.jours : p.jour ? [p.jour] : []
+        const avecParite = p.semaine === 'paire' || p.semaine === 'impaire'
+        params =
+          avecParite || listeJours.length > 1
+            ? {
+                regles: listeJours.map((j) => ({
+                  jour: j,
+                  ...(avecParite ? { semaine: p.semaine } : {}),
+                })),
+              }
+            : {
+                jour: listeJours[0],
+                exception_vacances_scolaires: p.exception_vacances_scolaires ?? false,
+              }
+      }
       break
     case 'repos_conditionnel':
       params = { si_garde_we: p.si_garde_we, sinon: p.sinon }
