@@ -287,3 +287,36 @@ unitaires qui figent le contrat entre le schéma et le catalogue.
 **Corollaire observé deux fois dans la même journée** : quand un test échoue,
 suspecter le test avant le modèle. Les deux « échecs » mesurés étaient des
 phrases d'épreuve mal écrites — Filou avait raison de refuser dans les deux cas.
+
+---
+
+## 2026-08-26 — Un lien nominatif sans destinataire est un lien au porteur
+
+**Le symptôme** : MiKL recette le dépannage. L'e-mail d'appel aux volontaires
+part bien, adressé à Jean. Il clique le bouton depuis son navigateur, où la
+session ouverte est celle d'Anne-Sophie. L'application lui propose de prendre
+le créneau — celui de Jean — sans une ligne pour signaler que ce message ne lui
+était pas adressé.
+
+**Ce qui rend le cas instructif, c'est que rien n'était bâclé.** L'endpoint
+porte quatre verrous documentés : authentification, rattachement au cabinet,
+créneau encore à pourvoir, éligibilité rejouée par le moteur exact de la
+génération. On peut relire cette liste et la trouver complète. Elle l'est — pour
+la question « as-tu le droit de prendre ce créneau ». Aucun des quatre ne pose
+l'autre question : **« ce message était-il pour toi ? »** Et un confrère
+parfaitement éligible passe les quatre sans être le destinataire.
+
+**La leçon générale** : plus les verrous d'AUTORISATION sont sérieux, plus un
+trou d'IDENTITÉ devient invisible. On ne le cherche pas, parce que la liste
+paraît exhaustive. Les deux familles de contrôle ne se remplacent pas.
+
+**Le corollaire de conception, réutilisable ailleurs** : tout lien envoyé
+nominativement doit porter son destinataire. Sans ça, il devient un lien au
+porteur dès qu'il quitte la boîte mail — transfert, poste partagé, capture
+d'écran envoyée dans un groupe. « Le serveur revalide tout » est vrai et
+insuffisant : la revalidation empêche l'illégitime, pas le mal-adressé.
+
+**Un détail qui n'en est pas un** : le lien était construit UNE FOIS, avant la
+boucle d'envoi, puis collé dans chaque e-mail. C'est la forme du code qui
+rendait le défaut structurel — un lien commun ne peut pas être personnel. Le
+déplacer dans la boucle a été la moitié du correctif.
