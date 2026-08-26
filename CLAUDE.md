@@ -2,7 +2,8 @@
 
 > Contexte projet pour Claude Code.
 > Aligné sur **MPP v4.0 hybride** (~/.claude/CLAUDE.md)
-> Mise à jour : 2026-05-27 (migration v4.0 — branche `feat/ruflo-v4-migration`)
+> Mise à jour : **2026-08-26** — phase, section ruflo et procédure de rollback corrigées ;
+> elles décrivaient encore la migration v4.0 de mai, terminée depuis.
 > Backup pré-v4 : `CLAUDE.md.v3-pre-v4-backup`
 
 ---
@@ -13,8 +14,10 @@
 - **Description** : Application web de gestion du planning de gardes vétérinaires
 - **Client** : Cabinet vétérinaire (7 vétos, admin = Anne-So)
 - **Repo GitHub** : `MonprojetPro/guardveto` (branche `master`)
-- **Branche migration v4.0** : `feat/ruflo-v4-migration` (tag rollback : `v-pre-v4`)
-- **Phase actuelle** : Sprint 1 — Foundation (TECH-001, TECH-002, STORY-001 à 003)
+- **Branche de travail** : `master`. *(`feat/ruflo-v4-migration` et le tag `v-pre-v4` existent encore mais sont des vestiges de mai 2026 — voir la section Rollback avant d'y toucher.)*
+- **Phase actuelle** : **mise en service chez le premier client abonné** (Cabinet du Val d'Allier). Le build est fait ; ce qui reste est de la recette, des décisions produit et des dettes.
+  ⚠️ *Cette ligne a affiché « Sprint 1 — Foundation » jusqu'au 2026-08-26, soit des mois après la fin du sprint. Une phase périmée dans ce fichier fait travailler tout le monde sur un projet qui n'existe plus — la mettre à jour à chaque changement de phase.*
+- **Où en est-on vraiment** : `docs/00-product-board.md` fait foi, jamais ce fichier-ci.
 
 ## Stack
 
@@ -122,19 +125,29 @@ Voir `docs/regles-metier-gardes.md` et `docs/01-prd.md`
 
 ---
 
-## Installation ruflo — à exécuter
+## Installation ruflo — ✅ FAITE, ne pas rejouer
 
-Sur cette branche `feat/ruflo-v4-migration` :
+Le serveur MCP `claude-flow` est enregistré au **scope User** depuis le 2026-08-19 : il est
+actif sur ce projet comme sur tous les autres, **sans aucune étape à refaire ici**.
+
+⚠️ *Cette section disait « à exécuter » jusqu'au 2026-08-26, avec un `cd` vers un chemin
+(`Projets BMAD/`) qui n'existe plus et une branche (`feat/ruflo-v4-migration`) déjà fusionnée.
+Suivre ces instructions aurait relancé un `init` inutile dans un dossier inexistant.*
+
+**Vérifier que ruflo répond** — par un appel réel, jamais par la présence des fichiers :
 
 ```bash
-cd "C:/Users/Mikaculus/Desktop/Projets BMAD/GuardVeto"
-npx -y ruflo@latest init --hybrid --with-embeddings --no-global
+claude mcp get claude-flow      # doit répondre « Status: ✔ Connected »
 ```
 
-**Vérifications post-install OBLIGATOIRES** :
-1. ✅ `~/.claude/CLAUDE.md` non modifié (incident 2026-05-05)
-2. ✅ `.gitignore` inclut `.claude-flow/`, `data/`, `logs/`, `sessions/`
-3. ✅ `.mcp.json` créé sans secrets en clair
+**Si ruflo est muet** : le signaler à MiKL et réactiver TESS + SCAN + CLEAN — la règle
+anti-conflit est suspendue tant qu'il ne répond pas. Ne jamais laisser les deux systèmes de
+contrôle éteints en même temps : c'est ce qui a coûté trois mois.
+
+**Anti-régression, à chaque `ruflo init` ou update** :
+1. `~/.claude/CLAUDE.md` non modifié (incident 2026-05-05)
+2. `.gitignore` inclut `.claude-flow/`, `data/`, `logs/`, `sessions/`
+3. `.mcp.json` sans secret en clair
 
 ---
 
@@ -148,13 +161,29 @@ npm run lint      # Vérification ESLint
 
 ---
 
-## Rollback
+## Rollback — ⛔ NE PLUS UTILISER CETTE PROCÉDURE
+
+Elle datait de la migration v4.0 (mai 2026) et disait :
 
 ```bash
 git checkout master
 git branch -D feat/ruflo-v4-migration
-# Si ruflo a touché : git reset --hard v-pre-v4
+git reset --hard v-pre-v4          # ⛔ NE JAMAIS EXÉCUTER
 ```
+
+**Le tag `v-pre-v4` existe toujours, et c'est bien ce qui rend cette section
+dangereuse.** La commande fonctionnerait — elle ramènerait `master` à son état
+de mai 2026 et **détruirait trois mois de travail** : moteur V2, écrans V2,
+Filou, secrétariat, support, toute la mise en service.
+
+La migration est terminée depuis longtemps ; il n'y a plus rien à annuler.
+Pour revenir en arrière sur un chantier récent, on repart du **commit** concerné
+(`git log`, puis `git revert <hash>`), jamais d'un tag vieux de trois mois.
+
+*Trouvé le 2026-08-26 en préparant une remise à zéro du contexte. Une procédure
+de secours périmée est plus dangereuse qu'une absence de procédure : elle a
+l'autorité du fichier de contexte, et on l'exécute sans la questionner un jour
+de panne.*
 
 ---
 
