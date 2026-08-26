@@ -16,7 +16,7 @@
 // ============================================================
 
 import { describe, it, expect } from 'vitest'
-import { genererPlanningPur, remplirAuMieux, type SolverInput } from '../solver'
+import { genererPlanningPur, remplirAuMieux, rattraperCasesVides, type SolverInput } from '../solver'
 import { premierId, secondId } from '../attribution'
 import type { VetEngine } from '../types'
 
@@ -161,5 +161,66 @@ describe('B-053 — la branche échec de genererPlanningPur', () => {
     // Et les vrais trous sont MOINS nombreux que l'ancien rapport, qui listait
     // tout ce qui suivait le point d'arrêt (B-049).
     expect(r.creneauxVides!.length).toBeLessThan(r.joursNonCouverts.length)
+  })
+})
+
+describe('B-060 — la passe de rattrapage', () => {
+  /**
+   * Idée de MiKL, le 26/08 : « une étape supplémentaire qui viendrait vérifier
+   * ce qui a été produit et qui remplirait le reste des cases vides — ou en tout
+   * cas qui vérifierait une dernière fois qu'aucune solution n'est possible ».
+   *
+   * Mesure sur Hiver P1 (vraies données) : 3 cases restantes → 1, en 1,5 s.
+   */
+  const CONGE_TOUT = [{ date_debut: DATE_DEBUT, date_fin: DATE_FIN, type: 'vacances' as const }]
+
+  it('ne rend jamais un planning MOINS rempli qu au départ', () => {
+    // La garantie qui compte : la reprise ne peut que gagner des places, jamais
+    // en perdre. Un échange à somme nulle serait déjà refusé.
+    const vets = [vet('v1', 'Alice'), vet('v2', 'Bob', CONGE_TOUT), vet('v3', 'Carol')]
+    const depart = remplirAuMieux(input(vets))
+    const apres = rattraperCasesVides(input(vets), depart, { budgetMs: 3000 })
+
+    expect(placesPourvues(apres.planning)).toBeGreaterThanOrEqual(placesPourvues(depart.planning))
+    expect(apres.gagnees).toBeGreaterThanOrEqual(0)
+  })
+
+  it('ne déclare « impossible » que ce qui l est quoi qu on réorganise', () => {
+    // Deux personnes, une absente toute la période : les week-ends demandent
+    // deux personnes distinctes, aucune réorganisation n'y changera rien —
+    // mais ce n'est pas pour autant que TOUT le monde est indisponible.
+    const vets = [vet('v1', 'Alice'), vet('v2', 'Bob', CONGE_TOUT)]
+    const depart = remplirAuMieux(input(vets))
+    const apres = rattraperCasesVides(input(vets), depart, { budgetMs: 3000 })
+
+    expect(apres.creneauxVides.length).toBeGreaterThan(0)
+    for (const c of apres.creneauxVides) {
+      expect(c.statut).toBeDefined()
+      // Alice reste disponible sur ces créneaux (c'est la 2e place qui manque) :
+      // on ne doit donc PAS annoncer une impossibilité de principe.
+      expect(c.statut).toBe('non_trouve')
+    }
+  })
+
+  it('ne conclut RIEN quand le temps a manqué', () => {
+    const vets = [vet('v1', 'Alice'), vet('v2', 'Bob', CONGE_TOUT)]
+    const depart = remplirAuMieux(input(vets))
+    // Budget nul : la reprise n'a pas pu chercher. Elle doit le dire, et ne
+    // surtout pas conclure à l'impossible — la faute que ce projet corrige.
+    const apres = rattraperCasesVides(input(vets), depart, { budgetMs: 0 })
+
+    expect(apres.budgetEpuise).toBe(true)
+    for (const c of apres.creneauxVides) expect(c.statut).toBe('non_trouve')
+  })
+
+  it('raconte ce qu elle fait', () => {
+    const vets = [vet('v1', 'Alice'), vet('v2', 'Bob', CONGE_TOUT)]
+    const messages: string[] = []
+    const depart = remplirAuMieux(input(vets))
+    rattraperCasesVides(input(vets), depart, { budgetMs: 3000, onProgres: (m) => messages.push(m) })
+
+    // La progression affichée à l'écran doit venir du moteur, jamais d'un
+    // décompte décoratif côté client.
+    expect(messages.length).toBeGreaterThan(0)
   })
 })

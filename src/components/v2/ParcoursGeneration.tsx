@@ -135,6 +135,52 @@ function FicheType({ type, gardes }: { type: ProfilPlanning; gardes: string[] })
   )
 }
 
+/**
+ * Lit le flux NDJSON de `/api/generate` : chaque ligne `progres` est affichée au
+ * fil de l'eau, la ligne `resultat` est renvoyée à l'appelant.
+ *
+ * Si le flux se termine SANS ligne de résultat (connexion coupée, fonction
+ * serveur tuée), on le dit franchement au lieu de laisser l'écran tourner :
+ * un parcours qui attend sans fin est pire qu'une erreur nommée.
+ */
+export async function lireLeFlux(
+  res: Response,
+  onProgres: (message: string) => void,
+): Promise<Record<string, unknown>> {
+  const lecteur = res.body?.getReader()
+  if (!lecteur) return { error: 'Réponse illisible du serveur.' }
+
+  const decodeur = new TextDecoder()
+  let tampon = ''
+  let resultat: Record<string, unknown> | null = null
+
+  for (;;) {
+    const { done, value } = await lecteur.read()
+    if (done) break
+    tampon += decodeur.decode(value, { stream: true })
+
+    const lignes = tampon.split(String.fromCharCode(10))
+    // La dernière peut être incomplète : elle attend le morceau suivant.
+    tampon = lignes.pop() ?? ''
+
+    for (const ligne of lignes) {
+      if (!ligne.trim()) continue
+      try {
+        const objet = JSON.parse(ligne) as { type?: string; message?: string; corps?: unknown; status?: number }
+        if (objet.type === 'progres' && objet.message) onProgres(objet.message)
+        if (objet.type === 'resultat') {
+          resultat = { ...(objet.corps as Record<string, unknown>), __status: objet.status }
+        }
+      } catch {
+        // Ligne tronquée ou corrompue : on l'ignore plutôt que de casser le
+        // parcours. Le résultat final, lui, ne peut pas passer inaperçu.
+      }
+    }
+  }
+
+  return resultat ?? { error: 'La génération s’est interrompue avant d’avoir répondu. Relance-la.' }
+}
+
 interface Resultat {
   /** `ok` = planning COMPLET. Un planning partiel n'est pas un échec (B-053). */
   ok: boolean
@@ -202,6 +248,9 @@ export function ParcoursGeneration({
     [vets],
   )
   const [etape, setEtape] = useState<Etape>(etapeInitiale)
+  // B-060 — ce que le SERVEUR dit être en train de faire. Jamais une phrase
+  // choisie ici : l'écran relaie, il n'invente pas.
+  const [etapeMoteur, setEtapeMoteur] = useState<string | null>(null)
   const [creation, setCreation] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
 
@@ -483,16 +532,41 @@ export function ParcoursGeneration({
     if (!cible) return
     setEtape('travail')
     setResultat(null)
+    setEtapeMoteur(null)
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ periodeId: cible, confirmRepublication }),
       })
-      const data = await res.json()
 
-      if (!res.ok) {
-        setResultat({ ok: false, creneauxIgnores: [], message: data.error ?? 'Erreur pendant la génération.' })
+      // B-060 — deux formes de réponse, et c'est voulu.
+      //
+      // Les refus d'AVANT le travail (auth, période introuvable, verrou) restent
+      // du JSON simple : ils sont immédiats, rien à raconter. Dès que le moteur
+      // se met en marche, la réponse devient un FLUX (NDJSON) : une ligne par
+      // étape, la dernière portant le résultat.
+      //
+      // MiKL, 26/08 : « je préfère prendre plus de temps et l'utilisateur le
+      // comprendra si tu indiques en direct ce qu'il se passe ». D'où une règle
+      // ferme : ce qui s'affiche vient du SERVEUR. Aucun message inventé ici,
+      // aucun décompte décoratif — sinon l'écran raconterait une histoire pendant
+      // que le moteur en vit une autre.
+      const data = res.headers.get('content-type')?.includes('ndjson')
+        ? await lireLeFlux(res, setEtapeMoteur)
+        : await res.json()
+
+      // Le statut : `res.ok` ne suffit plus. Un flux répond TOUJOURS 200 —
+      // l'entête part avant que le travail commence — et porte son vrai code
+      // dans la dernière ligne (`__status`). S'en tenir à `res.ok` ferait passer
+      // un refus 422 pour un succès.
+      const statut = typeof data.__status === 'number' ? data.__status : (res.ok ? 200 : res.status)
+      if (statut >= 400) {
+        setResultat({
+          ok: false,
+          creneauxIgnores: [],
+          message: (data.error as string) ?? 'Erreur pendant la génération.',
+        })
         setEtape('resultat')
         return
       }
@@ -1072,11 +1146,16 @@ export function ParcoursGeneration({
         {etape === 'travail' && (
           <div className="gp-travail">
             <div className="gp-jauge"><span /></div>
+            {/* B-060 — l'étape en cours, telle que le serveur l'annonce. Tant
+                qu'il n'a rien dit, on décrit le travail sans prétendre savoir
+                où il en est. */}
             <p className="gp-travail-txt">
-              Le moteur place les gardes une à une, revient sur ses pas quand une règle
-              coince, et garde la répartition la plus équitable qu’il trouve.
+              {etapeMoteur ?? 'Le moteur place les gardes une à une, revient sur ses pas quand une règle coince, et garde la répartition la plus équitable qu’il trouve.'}
             </p>
-            <p className="gp-travail-note">Quelques secondes, parfois un peu plus sur une longue période.</p>
+            <p className="gp-travail-note">
+              Quelques secondes, parfois un peu plus : il reprend les cases restées vides
+              avant de rendre son résultat.
+            </p>
           </div>
         )}
 

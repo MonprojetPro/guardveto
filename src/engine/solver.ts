@@ -157,6 +157,15 @@ export interface SolverInput {
    * historique BYTE-IDENTIQUE (les golden tests passent sans modification).
    */
   contexteAnterieur?: AttributionGarde[]
+  /**
+   * B-060 — la passe de RATTRAPAGE qui reprend les cases vides une fois le
+   * planning posé. Absente → aucune reprise.
+   *
+   * OPT-IN délibéré : le diagnostic d'impasse re-simule le moteur pour tester
+   * ses suggestions, et une reprise déclenchée à chaque re-simulation
+   * multiplierait le temps de calcul sans rien apporter à ce qu'il cherche.
+   */
+  rattrapage?: OptionsRattrapage
 }
 
 // Le plafond d'une nuit de semaine vient de `plafondNuitSemaine`
@@ -621,6 +630,22 @@ function assignerStep(
 // le « 25 créneaux non couverts » de l'ancien rapport, qui comptait en réalité
 // tout ce qui suivait le point d'arrêt (cf. B-049).
 
+/**
+ * Ce qu'on sait vraiment d'une case restée vide (B-060).
+ *
+ * `impossible_certain` — AUCUN vétérinaire ne peut tenir ce créneau, quelle que
+ *   soit l'organisation du reste : chacun en est écarté par une règle qui ne
+ *   dépend pas du planning (congé, repos fixe, indisponibilité). On peut donc
+ *   affirmer « pas de solution sans intervention humaine ».
+ * `non_trouve` — la recherche s'est arrêtée sans trouver. Une réorganisation
+ *   plus large existe peut-être.
+ *
+ * ⚠️ La distinction n'est pas cosmétique. Dire « impossible » quand on a
+ * seulement cherché sans trouver ferait lever un congé pour rien — c'est la
+ * faute que toute la journée du 26/08 a consisté à corriger.
+ */
+export type StatutCaseVide = 'impossible_certain' | 'non_trouve'
+
 /** Un créneau que le remplissage au mieux n'a pas pu pourvoir. */
 export interface CreneauVide {
   date: string
@@ -632,6 +657,8 @@ export interface CreneauVide {
    * que l'écran doit montrer — jamais un code machine seul.
    */
   raisons: RaisonVet[]
+  /** Ce qu'on peut honnêtement affirmer de cette case. Absent = pas encore jugé. */
+  statut?: StatutCaseVide
 }
 
 export interface RemplissageAuMieux {
@@ -926,6 +953,291 @@ export function remplirAuMieux(input: SolverInput): RemplissageAuMieux {
   return { planning, creneauxVides }
 }
 
+// ── LA PASSE DE RATTRAPAGE (B-060) ───────────────────────
+//
+// Idée de MiKL, le 26/08 : « pourquoi ne pas créer une étape supplémentaire qui
+// viendrait vérifier ce qui a été produit et qui remplirait le reste des cases
+// vides — ou en tout cas qui vérifierait une dernière fois qu'aucune solution
+// n'est possible sauf intervention humaine ? »
+//
+// CE QU'ELLE RATTRAPE. Le remplissage décide bloc par bloc, dans l'ordre du
+// calendrier. Le regroupement (B-059) a supprimé les trous causés par l'ordre à
+// l'INTÉRIEUR d'un bloc (un vendredi qui condamne son week-end). Restent ceux
+// causés par l'ordre ENTRE les blocs : une case du 14 octobre peut être vide à
+// cause d'un choix fait le 3. Aucune passe unique ne peut voir ça — il faudrait
+// tout réessayer, et c'est exactement ce qui fait exploser le calcul.
+//
+// COMMENT. On ne réessaie pas tout : pour chaque case vide, on défait ce qui
+// l'ENTOURE (les jours voisins, les créneaux liés), on force un candidat sur la
+// case, et on reconstruit ce petit morceau. On ne garde le résultat que si le
+// nombre de places pourvues augmente STRICTEMENT — jamais un échange qui
+// déshabille Pierre pour habiller Paul.
+//
+// CE QU'ELLE NE PROMET PAS. Ne rien trouver ne prouve rien. C'est pourquoi
+// chaque case restante repart avec un statut honnête : `impossible_certain`
+// quand personne ne peut y aller quoi qu'il arrive, `non_trouve` sinon.
+
+/** Fenêtre de jours défaite autour d'une case vide, de part et d'autre. */
+const FENETRE_RATTRAPAGE_JOURS = 7
+
+export interface OptionsRattrapage {
+  /** Temps maximum accordé. Épuisé → on s'arrête et on le DIT (`budgetEpuise`). */
+  budgetMs?: number
+  /** Progression, pour que l'écran raconte ce qui se passe vraiment. */
+  onProgres?: (message: string) => void
+}
+
+export interface ResultatRattrapage extends RemplissageAuMieux {
+  /** Nombre de places gagnées par la passe. */
+  gagnees: number
+  /** `true` = le temps a manqué. On ne peut donc RIEN conclure sur ce qui reste. */
+  budgetEpuise: boolean
+}
+
+/**
+ * Les vétérinaires qu'une règle INDÉPENDANTE DU PLANNING écarte de ce créneau.
+ *
+ * On rejoue `isValid` sur un planning VIDE : ce qui refuse encore là ne dépend
+ * ni des autres gardes ni de l'ordre — congé, repos fixe, indisponibilité
+ * cyclique. C'est ce qui permet de dire « impossible » sans mentir.
+ */
+function ecartesQuoiQuIlArrive(
+  step: SolverStep,
+  vets: VetEngineNormalise[],
+  calendrier: CalendrierResolu | undefined,
+  structure: StructureConfig,
+): Set<string> {
+  const slot: SlotGarde = {
+    date: step.date, type: step.type, saison: step.saison,
+    besoinSecond: step.besoinSecond, nbPlaces: step.nbPlaces,
+  }
+  const out = new Set<string>()
+  for (const vet of vets) {
+    // Rôle « premier » et planning vide : aucune règle de position ni de rythme
+    // ne peut s'appliquer, seules les indisponibilités propres à la personne
+    // subsistent. Un refus ici est donc structurel.
+    const r = isValid(slot, vet, 'premier', vets, { attributions: [] }, calendrier, structure)
+    if (!r.valid) out.add(vet.id)
+  }
+  return out
+}
+
+export function rattraperCasesVides(
+  input: SolverInput,
+  depart: RemplissageAuMieux,
+  options?: OptionsRattrapage,
+): ResultatRattrapage {
+  const vets = normaliserContraintesVets(input.vets)
+  const weights = input.equityWeights ?? DEFAULT_EQUITY_WEIGHTS
+  const structure = input.structureConfig ?? DEFAULT_STRUCTURE_CONFIG
+  const roleAvantage = input.roleAvantageFinancier === undefined
+    ? DEFAULT_ROLE_AVANTAGE_FINANCIER
+    : input.roleAvantageFinancier
+  const calendrier = input.calendrier
+
+  const steps = genererSteps(
+    input.dateDebut, input.dateFin, input.saison, input.nbVetosSemaineSoir, input.creneaux,
+  )
+  const groupes = grouperStepsLies(steps, structure)
+
+  const echeance = Date.now() + (options?.budgetMs ?? 15_000)
+  const tempsEcoule = () => Date.now() > echeance
+
+  let planning = depart.planning
+  let vides = [...depart.creneauxVides]
+  const departPourvues = comptePlacesPourvues(planning)
+  let budgetEpuise = false
+
+  // Point fixe : on recommence tant qu'un tour a gagné quelque chose. Une case
+  // comblée peut en débloquer une autre.
+  let tour = 0
+  let progression = true
+  while (progression && vides.length > 0 && !tempsEcoule()) {
+    progression = false
+    tour++
+    options?.onProgres?.(
+      `Reprise ${tour} — j'essaie de combler ${vides.length} case${vides.length > 1 ? 's' : ''} restante${vides.length > 1 ? 's' : ''}`,
+    )
+
+    for (const vide of [...vides]) {
+      if (tempsEcoule()) { budgetEpuise = true; break }
+
+      const step = steps.find(
+        (s) => s.date === vide.date && s.type === vide.type && s.role === vide.role,
+      )
+      if (!step) continue
+
+      const bloques = ecartesQuoiQuIlArrive(step, vets, calendrier, structure)
+      const candidats = vets.filter((v) => !bloques.has(v.id))
+      if (candidats.length === 0) continue // personne, quoi qu'on réorganise
+
+      for (const candidat of candidats) {
+        if (tempsEcoule()) { budgetEpuise = true; break }
+
+        const essai = essayerDePourvoir(
+          step, candidat, planning, groupes, vets, input.bonusMalus, weights,
+          structure, calendrier, roleAvantage, input.contexteAnterieur,
+        )
+        if (!essai) continue
+
+        // On ne garde QUE si on a gagné des places. Un échange à somme nulle
+        // rebattrait les cartes sans rien apporter — et rendrait le résultat
+        // instable d'une génération à l'autre.
+        if (comptePlacesPourvues(essai) > comptePlacesPourvues(planning)) {
+          planning = essai
+          progression = true
+          options?.onProgres?.(`${candidat.prenom} peut finalement prendre le ${vide.date}`)
+          break
+        }
+      }
+    }
+
+    if (progression) {
+      vides = recenserVides(steps, planning, vets, calendrier, structure, input.contexteAnterieur)
+    }
+  }
+
+  if (tempsEcoule()) budgetEpuise = true
+
+  // Le statut de chaque case restante — dit une fois, à la fin, sur le planning
+  // définitif. Si le temps a manqué, on ne conclut RIEN : on ne peut pas
+  // affirmer l'impossible quand on n'a pas fini de chercher.
+  const videsJugees = vides.map((v) => {
+    const step = steps.find((s) => s.date === v.date && s.type === v.type && s.role === v.role)
+    if (!step || budgetEpuise) return { ...v, statut: 'non_trouve' as StatutCaseVide }
+    const bloques = ecartesQuoiQuIlArrive(step, vets, calendrier, structure)
+    return {
+      ...v,
+      statut: (bloques.size === vets.length ? 'impossible_certain' : 'non_trouve') as StatutCaseVide,
+    }
+  })
+
+  return {
+    planning,
+    creneauxVides: videsJugees,
+    gagnees: comptePlacesPourvues(planning) - departPourvues,
+    budgetEpuise,
+  }
+}
+
+/** Le remplissage, puis la reprise — seulement si l'appelant l'a demandée. */
+function avecRattrapage(input: SolverInput, depart: RemplissageAuMieux): RemplissageAuMieux {
+  if (!input.rattrapage) return depart
+  return rattraperCasesVides(input, depart, input.rattrapage)
+}
+
+/** Places réellement pourvues d'un planning. */
+function comptePlacesPourvues(planning: PlanningPartiel): number {
+  return planning.attributions.reduce(
+    (n, a) => n + a.placements.filter((p) => p.vetId).length, 0,
+  )
+}
+
+/**
+ * Défait les jours autour d'une case, y force un candidat, puis reconstruit.
+ * Renvoie le planning obtenu, ou `null` si le candidat ne peut pas y aller même
+ * une fois le voisinage libéré.
+ */
+function essayerDePourvoir(
+  cible: SolverStep,
+  candidat: VetEngineNormalise,
+  planning: PlanningPartiel,
+  groupes: SolverStep[][],
+  vets: VetEngineNormalise[],
+  bonusMalus: BonusMalusMap,
+  weights: EquityWeights,
+  structure: StructureConfig,
+  calendrier: CalendrierResolu | undefined,
+  roleAvantage: string | null,
+  contexteAnterieur: AttributionGarde[] | undefined,
+): PlanningPartiel | null {
+  const debut = addDays(cible.date, -FENETRE_RATTRAPAGE_JOURS)
+  const fin = addDays(cible.date, FENETRE_RATTRAPAGE_JOURS)
+
+  // Les groupes concernés : ceux dont au moins une place tombe dans la fenêtre.
+  // On raisonne en GROUPES et non en jours pour ne jamais couper un bloc
+  // vendredi ↔ week-end en deux — ce serait rouvrir le défaut de B-059.
+  const dansLaFenetre = (g: SolverStep[]) => g.some((s) => s.date >= debut && s.date <= fin)
+  const aRefaire = groupes.filter(dansLaFenetre)
+  const datesLiberees = new Set(aRefaire.flatMap((g) => g.map((s) => `${s.date}|${s.type}`)))
+
+  // Planning amputé du voisinage (le reste de la période ne bouge pas).
+  let essai: PlanningPartiel = {
+    attributions: planning.attributions.filter((a) => !datesLiberees.has(`${a.date}|${a.type}`)),
+  }
+
+  // La case cible d'abord : c'est elle qu'on cherche à pourvoir, elle passe
+  // donc avant tout le monde dans la reconstruction.
+  const slotCible: SlotGarde = {
+    date: cible.date, type: cible.type, saison: cible.saison,
+    besoinSecond: cible.besoinSecond, nbPlaces: cible.nbPlaces,
+  }
+  if (!isValid(slotCible, candidat, cible.role, vets, essai, calendrier, structure, contexteAnterieur).valid) {
+    return null
+  }
+  essai = assignerStep(essai, cible, candidat.id)
+
+  // Puis on reconstruit le voisinage, la place forcée étant désormais figée.
+  for (const groupe of aRefaire) {
+    const restants = groupe.filter(
+      (s) => !(s.date === cible.date && s.type === cible.type && s.role === cible.role),
+    )
+    if (restants.length === 0) continue
+
+    const choix = resoudreGroupe(
+      restants, essai, vets, bonusMalus, weights, structure, calendrier,
+      roleAvantage, contexteAnterieur,
+    )
+    restants.forEach((step, i) => {
+      const vetId = choix.affectation[i]
+      if (vetId) essai = assignerStep(essai, step, vetId)
+    })
+  }
+
+  // Les créneaux vides doivent continuer d'exister (sinon ils disparaissent du
+  // calendrier — cf. B-053).
+  for (const groupe of aRefaire) {
+    for (const step of groupe) {
+      if (!essai.attributions.some((a) => a.date === step.date && a.type === step.type)) {
+        essai = {
+          attributions: [...essai.attributions, attributionVide(step.date, step.type, step.rolesCreneau)],
+        }
+      }
+    }
+  }
+
+  return essai
+}
+
+/** Recense les places vides d'un planning, avec le pourquoi de chacune. */
+function recenserVides(
+  steps: SolverStep[],
+  planning: PlanningPartiel,
+  vets: VetEngineNormalise[],
+  calendrier: CalendrierResolu | undefined,
+  structure: StructureConfig,
+  contexteAnterieur: AttributionGarde[] | undefined,
+): CreneauVide[] {
+  const out: CreneauVide[] = []
+  for (const step of steps) {
+    const attr = planning.attributions.find((a) => a.date === step.date && a.type === step.type)
+    const place = attr?.placements.find((p) => p.role === step.role)
+    if (place?.vetId) continue
+
+    const slot: SlotGarde = {
+      date: step.date, type: step.type, saison: step.saison,
+      besoinSecond: step.besoinSecond, nbPlaces: step.nbPlaces,
+    }
+    out.push({
+      date: step.date,
+      type: step.type,
+      role: step.role,
+      raisons: raisonsCompletes(step, slot, planning, vets, calendrier, structure, contexteAnterieur),
+    })
+  }
+  return out
+}
+
 // ── Backtracking ─────────────────────────────────────────
 
 /**
@@ -1115,7 +1427,7 @@ function genererSeedGreedy(input: SolverInput, avecDiagnostic = true): SolveResu
     // B-053 — même coupé, on ne rend pas les mains vides. Le remplissage au
     // mieux est LINÉAIRE : il ne peut pas ré-exploser là où la recherche
     // complète vient d'être coupée.
-    const secours = remplirAuMieux(input)
+    const secours = avecRattrapage(input, remplirAuMieux(input))
     return {
       success: false,
       joursNonCouverts: [],
@@ -1189,7 +1501,7 @@ function genererSeedGreedy(input: SolverInput, avecDiagnostic = true): SolveResu
   // n'existe ; on repasse en glouton tolérant pour rendre tout ce qui EST
   // possible, et la liste des créneaux réellement impossibles (avec leur
   // pourquoi). C'est ce que l'admin reçoit désormais à la place d'un mur.
-  const secours = remplirAuMieux(input)
+  const secours = avecRattrapage(input, remplirAuMieux(input))
 
   return {
     success: false,

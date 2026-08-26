@@ -45,7 +45,14 @@ export const maxDuration = 60
 // Plafond de TEMPS du backtracking du seed (dette technique : pire cas infaisable
 // vicieux non borné). Coupe PROPRE bien avant maxDuration (60 s), en gardant ~20 s
 // de marge pour la persistance + le nettoyage agenda.
-const SEED_DEADLINE_MS = 40_000
+const SEED_DEADLINE_MS = 30_000
+
+// B-060 — budget de la passe de rattrapage. MiKL, 26/08 : « ce n'est pas grave
+// de prendre quelques secondes en plus ». On les prend ici, pas ailleurs : le
+// seed passe de 40 à 30 s (il ne trouvait de toute façon rien de plus au-delà,
+// il prouvait l'impasse), et la reprise hérite du temps libéré. Total inchangé,
+// sous les 60 s de la fonction.
+const RATTRAPAGE_BUDGET_MS = 12_000
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -211,6 +218,80 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // ── LE FLUX : la génération raconte ce qu'elle fait ─────────
+  //
+  // Tout ce qui précède pouvait échouer AVANT que le travail commence (auth,
+  // période introuvable, verrou) : ces refus restent du JSON simple, immédiat.
+  // À partir d'ici on travaille, parfois plusieurs secondes — et on le DIT, au
+  // fil de l'eau, en NDJSON : une ligne par étape, la dernière portant le
+  // résultat. Le client affiche ce que le serveur annonce, jamais autre chose.
+  // NDJSON : un objet par ligne. Le séparateur est nommé plutôt qu'écrit en
+  // clair — un simple saut de ligne dans une chaîne se perd à la relecture.
+  const FIN_DE_LIGNE = String.fromCharCode(10)
+  const encodeur = new TextEncoder()
+  const flux = new ReadableStream({
+    async start(controleur) {
+      const ecrire = (objet: unknown) => {
+        controleur.enqueue(encodeur.encode(JSON.stringify(objet) + FIN_DE_LIGNE))
+      }
+      const emettre = (message: string) => ecrire({ type: 'progres', message })
+
+      try {
+        emettre('Je relis les règles et les congés du cabinet…')
+        const { status, corps } = await executerGeneration(supabase, periodeId, cabinetId, emettre)
+        ecrire({ type: 'resultat', status, corps })
+      } catch (err) {
+        // Une exception ici laisserait le client sur un flux muet : il attendrait
+        // un résultat qui ne viendrait jamais. On la transforme en résultat.
+        console.error('[generate] exception pendant la génération :', err)
+        ecrire({
+          type: 'resultat',
+          status: 500,
+          corps: { error: err instanceof Error ? err.message : String(err) },
+        })
+      } finally {
+        controleur.close()
+      }
+    },
+  })
+
+  return new Response(flux, {
+    headers: {
+      'Content-Type': 'application/x-ndjson; charset=utf-8',
+      'Cache-Control': 'no-store, no-transform',
+    },
+  })
+}
+
+/**
+ * Le résultat d'une étape, avant d'être mis en forme pour le client.
+ *
+ * B-060 — la génération DIT où elle en est pendant qu'elle travaille (flux
+ * NDJSON), et ne peut donc plus renvoyer des `NextResponse` en cours de route :
+ * elle rend un objet, et c'est le handler qui l'écrit dans le flux. Le nom
+ * `reponse` est choisi pour que la substitution reste mécanique et lisible dans
+ * l'historique — un seul mot change par retour.
+ */
+function reponse(corps: unknown, init?: { status?: number }) {
+  return { status: init?.status ?? 200, corps }
+}
+
+type ResultatEtape = ReturnType<typeof reponse>
+
+/**
+ * Le travail lui-même : contexte, moteur, rattrapage, persistance.
+ *
+ * `emettre` remonte les étapes en direct. Exigence de MiKL, le 26/08 : « je
+ * préfère prendre plus de temps et l'utilisateur le comprendra si tu indiques
+ * en direct ce qu'il se passe ». La progression vient donc du SERVEUR — un
+ * décompte joué côté client, sans lien avec le travail réel, serait décoratif.
+ */
+async function executerGeneration(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  periodeId: string,
+  cabinetId: string,
+  emettre: (message: string) => void,
+): Promise<ResultatEtape> {
   try {
     // ── Chargement du contexte (V2 : inclut le calendrier) ─────
     let contexte
@@ -218,7 +299,7 @@ export async function POST(req: NextRequest) {
       // B-046 — `pourGeneration` retire les « dernier recours » de l'effectif.
       contexte = await resoudreContexte(periodeId, cabinetId, { pourGeneration: true })
     } catch (err) {
-      return NextResponse.json(
+      return reponse(
         { error: err instanceof Error ? err.message : String(err) },
         { status: 404 }
       )
@@ -232,7 +313,7 @@ export async function POST(req: NextRequest) {
     const exclusDernierRecours = (contexte.exclusDernierRecours ?? []).map((v) => v.prenom)
 
     if (contexte.vets.length === 0) {
-      return NextResponse.json(
+      return reponse(
         {
           error:
             exclusDernierRecours.length > 0
@@ -253,7 +334,14 @@ export async function POST(req: NextRequest) {
     // ── Génération du planning (solver LNS) ─────────────────────
     // seedDeadlineMs : coupe PROPRE du backtracking du seed avant le timeout
     // serverless brutal (dette technique). Non déterministe → chemin serveur only.
-    const result = genererPlanningPur({ ...contexte, seedDeadlineMs: SEED_DEADLINE_MS })
+    emettre('Je cherche la répartition la plus équitable…')
+    const result = genererPlanningPur({
+      ...contexte,
+      seedDeadlineMs: SEED_DEADLINE_MS,
+      // B-060 — la reprise sur les cases vides. Elle ne se déclenche QUE sur un
+      // planning incomplet, et raconte ce qu'elle trouve.
+      rattrapage: { budgetMs: RATTRAPAGE_BUDGET_MS, onProgres: emettre },
+    })
 
     // ── B-053 — UN ÉCHEC N'EST PLUS UN MUR ──────────────────────
     //
@@ -276,7 +364,7 @@ export async function POST(req: NextRequest) {
     // Écraser un planning existant par du vide serait une destruction, pas un
     // secours. (Équipe absente, période aberrante… en pratique très rare.)
     if (!result.success && placesPourvues === 0) {
-      return NextResponse.json({
+      return reponse({
         issue: 'echec',
         success: false,
         interrompu: result.interrompu ?? false,
@@ -293,11 +381,16 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Persistence V2 (attributions) ───────────────────────────
+    emettre(
+      creneauxVides.length > 0
+        ? `J’enregistre le planning — ${creneauxVides.length} case${creneauxVides.length > 1 ? 's' : ''} restera${creneauxVides.length > 1 ? 'ont' : ''} à pourvoir`
+        : 'J’enregistre le planning…',
+    )
     let persistenceResult
     try {
       persistenceResult = await persisterResultat(planningRetenu, periodeId, cabinetId)
     } catch (err) {
-      return NextResponse.json(
+      return reponse(
         { error: err instanceof Error ? err.message : String(err) },
         { status: 500 }
       )
@@ -313,7 +406,7 @@ export async function POST(req: NextRequest) {
       .eq('id', periodeId)
 
     if (depubErr) {
-      return NextResponse.json(
+      return reponse(
         { error: `Erreur de dépublication avant régénération : ${depubErr.message}` },
         { status: 500 }
       )
@@ -352,7 +445,7 @@ export async function POST(req: NextRequest) {
       .eq('verrouille', false)
 
     if (deleteErr) {
-      return NextResponse.json(
+      return reponse(
         { error: `Erreur suppression du brouillon précédent : ${deleteErr.message}` },
         { status: 500 }
       )
@@ -370,7 +463,7 @@ export async function POST(req: NextRequest) {
       .eq('verrouille', true)
 
     if (lockedErr) {
-      return NextResponse.json(
+      return reponse(
         { error: `Erreur lecture des gardes verrouillées : ${lockedErr.message}` },
         { status: 500 }
       )
@@ -418,7 +511,7 @@ export async function POST(req: NextRequest) {
       })
 
     if (insertErr) {
-      return NextResponse.json(
+      return reponse(
         { error: `Erreur insertion des gardes : ${insertErr.message}` },
         { status: 500 }
       )
@@ -528,7 +621,7 @@ export async function POST(req: NextRequest) {
     // B-053 — trois issues, dites explicitement. `success` reste pour la
     // rétro-compat, mais il ne suffit plus : un planning PARTIEL est bien en
     // base et parfaitement utilisable, il a seulement des cases à pourvoir.
-    return NextResponse.json({
+    return reponse({
       issue: creneauxVides.length > 0 ? 'partiel' : 'complet',
       success: creneauxVides.length === 0,
       nbGardes: gardesAInserer.length,
