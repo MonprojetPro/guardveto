@@ -1993,42 +1993,26 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 }
 .gp-secours-txt { font-size: 0.79rem; line-height: 1.55; color: var(--soft); }
 
-.sig-panneau {
+/* B-048/B-050 — le bloc n'ENVOIE plus, il ORIENTE vers l'Assistance.
+   Les styles du champ libre et de la confirmation « C'est parti » sont partis
+   avec lui : cette confirmation s'affichait sans qu'aucun envoi soit prouvé. */
+.sig-orient {
   width: 100%;
-  display: grid; gap: 7px;
+  display: grid; gap: 8px; justify-items: start;
   background: var(--surface-2);
   border: 1px solid var(--t-border);
   border-radius: var(--r-sm);
-  padding: 11px 12px;
+  padding: 12px 13px;
 }
 .sig-titre { font-size: 0.85rem; font-weight: 700; color: var(--text); }
-.sig-sous { font-size: 0.74rem; line-height: 1.5; color: var(--soft); }
-.sig-zone {
-  width: 100%;
-  border: 1px solid var(--t-border);
-  border-radius: var(--r-sm);
-  background: var(--surface);
-  padding: 9px 11px;
-  font-family: inherit;
-  font-size: 0.84rem; line-height: 1.5; color: var(--text);
-  resize: vertical;
+.sig-sous { font-size: 0.78rem; line-height: 1.5; color: var(--soft); }
+.sig-etapes { display: grid; gap: 7px; margin: 2px 0 3px; padding: 0; list-style: none; }
+.sig-etapes li {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 0.79rem; line-height: 1.5; color: var(--t-muted);
 }
-.sig-zone:focus {
-  outline: none;
-  border-color: var(--accent-ink);
-  box-shadow: 0 0 0 3px var(--accent-soft, rgba(140, 92, 46, 0.16));
-}
-
-.sig-fait {
-  display: flex; align-items: flex-start; gap: 9px;
-  background: var(--ok-soft);
-  border: 1px solid rgba(90, 150, 60, 0.35);
-  border-radius: var(--r-sm);
-  padding: 11px 12px;
-  font-size: 0.83rem; line-height: 1.55; color: var(--text);
-}
-.sig-fait .ppv-ico { color: var(--ok); margin-top: 2px; }
-.sig-fait b { color: var(--ok); }
+.sig-etapes strong { color: var(--text); }
+.sig-ico { width: 15px; height: 15px; flex: 0 0 auto; margin-top: 2px; color: var(--accent-ink); }
 
 /* ── Backlog 8 bis : les deux questions du remplacement d'un jour ──
    Le périmètre (ce jour / tout le week-end) et l'avantage financier du 1er

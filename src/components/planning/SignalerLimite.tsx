@@ -1,100 +1,98 @@
 'use client'
 
 // ============================================================
-// GUARDVETO — « Je ne m'en sors pas » : prévenir l'équipe
+// GUARDVETO — « Je ne m'en sors pas » : demander de l'aide (B-048 + B-050)
 // ============================================================
-// PALIER 4 de l'audit du 2026-08-03. Le filet du filet.
+// CE QUE CE BOUTON FAISAIT, ET POURQUOI C'ÉTAIT PIRE QUE RIEN
 //
-// Les trois premiers paliers empêchent ce qu'on sait prévoir. Il restera
-// toujours des configurations que personne n'a imaginées — et à ce moment-là,
-// le cabinet se retrouve seul devant un message. Ce bouton est la sortie : il
-// envoie à l'éditeur le contexte technique et ce que l'utilisateur a écrit,
-// pour que le produit soit corrigé à distance.
+// Il ouvrait un champ libre FACULTATIF, envoyait un e-mail à l'éditeur, puis
+// affichait « L'équipe GuardVeto a reçu ta situation ». Deux défauts, mesurés
+// le 26/08 :
 //
-// DEUX PRÉCAUTIONS DE TON
+//  ① La confirmation était un MENSONGE. `signalerLimite` appelait
+//     `sendBrevoEmail` dans un try/catch — or cette fonction ne LÈVE jamais,
+//     elle RETOURNE `{ error }` (expéditeur manquant, clé absente, rejet Brevo).
+//     La valeur de retour n'était pas lue : « C'est parti » s'affichait dans
+//     tous les cas, y compris quand rien ne partait. Aucune trace en base non
+//     plus — impossible de savoir après coup. MiKL : « il va où le message ?
+//     je n'ai rien reçu comme mail ».
 //
-//  · On ne le montre QUE sur un échec réel. Un « signaler un problème »
-//    permanent dit à l'utilisateur qu'on s'attend à ce que ça casse.
-//  · On ne promet rien qu'on ne tienne : le message de confirmation dit ce qui
-//    se passe ensuite, sans annoncer de délai.
+//  ② Le message pouvait être VIDE. MiKL : « s'il ne met rien dans le message,
+//     comment je sais moi ce qui ne va pas ? ». Un signalement sans un mot ni
+//     capture d'écran coûte plus cher qu'il ne rapporte.
+//
+// CE QU'IL FAIT MAINTENANT : il ORIENTE vers l'onglet Assistance, qui existe
+// depuis le 25/08 et fait déjà tout ce qu'il faut — titre et description
+// obligatoires, pièces jointes (donc la capture), envoi journalisé dans
+// `demandes_support.email_envoye` / `email_erreur`, et statut affiché à l'écran.
+//
+// C'était d'ailleurs déjà la doctrine écrite du projet, dans la couverture de
+// Filou : « Signaler un défaut de GuardVeto passe par l'onglet Assistance, avec
+// capture d'écran et contexte technique ». Ce bouton la contredisait.
+//
+// Le contexte technique n'est pas perdu : il part dans la description
+// pré-remplie, sous les yeux de la personne — qui peut le corriger, contrairement
+// à un envoi silencieux.
 // ============================================================
 
-import { useState } from 'react'
-import { LifeBuoy, Check, Loader2 } from 'lucide-react'
-import { signalerLimite } from '@/app/(protected)/assistance/actions'
+import Link from 'next/link'
+import { LifeBuoy, Camera, PencilLine } from 'lucide-react'
 
 interface Props {
-  /** D'où vient le signalement : « génération », « règles »… */
+  /** D'où vient le signalement : « génération de planning », « règles »… */
   origine: string
-  /** Contexte technique déjà connu de l'écran (diagnostic, période, codes). */
+  /** Contexte technique déjà connu de l'écran (période, codes, diagnostic). */
   contexte?: Record<string, unknown>
 }
 
+/** Le contexte technique, en texte lisible — pas un JSON brut à l'écran. */
+function contexteLisible(contexte?: Record<string, unknown>): string {
+  const entrees = Object.entries(contexte ?? {})
+  if (entrees.length === 0) return ''
+  const lignes = entrees.map(([cle, valeur]) => {
+    const v = typeof valeur === 'string' ? valeur : JSON.stringify(valeur)
+    return `- ${cle} : ${v}`
+  })
+  return `\n\n---\nInformations techniques (laissées telles quelles, elles aident au diagnostic) :\n${lignes.join('\n')}`
+}
+
 export function SignalerLimite({ origine, contexte }: Props) {
-  const [ouvert, setOuvert] = useState(false)
-  const [message, setMessage] = useState('')
-  const [envoi, setEnvoi] = useState(false)
-  const [envoye, setEnvoye] = useState(false)
-  const [erreur, setErreur] = useState<string | null>(null)
+  const titre = `Blocage sur : ${origine}`
+  const description =
+    `Ce que j'essayais de faire :\n\n` +
+    `Ce qui s'est passé :\n\n` +
+    contexteLisible(contexte)
 
-  async function envoyer() {
-    setEnvoi(true)
-    setErreur(null)
-    const res = await signalerLimite({ origine, message: message.trim() || undefined, contexte })
-    setEnvoi(false)
-    if ('error' in res && res.error) {
-      setErreur(res.error)
-      return
-    }
-    setEnvoye(true)
-  }
-
-  if (envoye) {
-    return (
-      <div className="sig-fait">
-        <Check className="ppv-ico" aria-hidden />
-        <span>
-          <b>C’est parti.</b> L’équipe GuardVeto a reçu ta situation et ce qui bloque.
-          Elle peut corriger à distance — tu n’as rien d’autre à faire.
-        </span>
-      </div>
-    )
-  }
-
-  if (!ouvert) {
-    return (
-      <button type="button" className="ppv-btn" onClick={() => setOuvert(true)}>
-        <LifeBuoy className="ppv-ico" aria-hidden />
-        Je ne m’en sors pas — prévenir l’équipe
-      </button>
-    )
-  }
+  const lien =
+    `/support?titre=${encodeURIComponent(titre)}&description=${encodeURIComponent(description)}`
 
   return (
-    <div className="sig-panneau">
-      <p className="sig-titre">Qu’est-ce que tu essayais de faire ?</p>
+    <div className="sig-orient">
+      <p className="sig-titre">Tu veux qu’on regarde ?</p>
       <p className="sig-sous">
-        Ce que tu écris part avec le détail technique de ce qui a bloqué (période,
-        règles en cause, diagnostic du moteur). Aucun planning nominatif n’est envoyé.
+        Ça se passe dans l’onglet <strong>Assistance</strong>. Deux choses le rendent
+        vraiment utile&nbsp;:
       </p>
-      <textarea
-        className="sig-zone"
-        rows={3}
-        placeholder="ex. je veux que Fanny et Victor ne soient jamais de garde la même semaine, mais je n’y arrive pas…"
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        autoFocus
-      />
-      {erreur && <p className="gen-erreur">{erreur}</p>}
-      <div className="ppv-actions">
-        <button type="button" className="ppv-btn" disabled={envoi} onClick={() => setOuvert(false)}>
-          Annuler
-        </button>
-        <button type="button" className="ppv-btn fort" disabled={envoi} onClick={() => void envoyer()}>
-          {envoi && <Loader2 className="ppv-spin" aria-hidden />}
-          Envoyer à l’équipe
-        </button>
-      </div>
+      <ul className="sig-etapes">
+        <li>
+          <Camera className="sig-ico" aria-hidden />
+          <span>
+            <strong>Prends une capture d’écran</strong> de ce que tu as sous les yeux, avant
+            de quitter cette fenêtre — elle se joint à la demande.
+          </span>
+        </li>
+        <li>
+          <PencilLine className="sig-ico" aria-hidden />
+          <span>
+            <strong>Décris la situation</strong> : ce que tu voulais faire, et ce qui s’est
+            passé à la place. Le contexte technique est déjà rempli pour toi.
+          </span>
+        </li>
+      </ul>
+      <Link href={lien} className="ppv-btn fort">
+        <LifeBuoy className="ppv-ico" aria-hidden />
+        Ouvrir l’assistance
+      </Link>
     </div>
   )
 }

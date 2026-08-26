@@ -164,9 +164,11 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   'v2/support#deposerDemandeSupport': {
     hors: 'Signaler un défaut de GuardVeto passe par l’onglet Assistance, avec capture d’écran et contexte technique. Filou y ORIENTE (son prompt le dit) mais ne dépose pas : une demande écrite par un intermédiaire perd ce qui la rend utile — les mots de la personne et sa capture.',
   },
-  'protected/assistance#signalerLimite': {
-    hors: 'Trace interne posée quand Filou bute sur une limite. Il l’alimente, il ne l’appelle pas.',
-  },
+  // `protected/assistance#signalerLimite` a été SUPPRIMÉE le 2026-08-26 (B-048).
+  // Elle affichait « L'équipe GuardVeto a reçu ta situation » sans lire le retour
+  // de `sendBrevoEmail` — donc sans qu'aucun envoi soit prouvé, et sans trace en
+  // base. Le seul chemin de signalement est désormais l'onglet Assistance
+  // (`v2/support#deposerDemandeSupport`, juste au-dessus), qui journalise.
 
   // ── LES RÉGLAGES ET LE COMPTE ───────────────────────────────────────────
   'v2/reglages#envoyerEmailDeTest': { outil: 'envoyer_email_de_test' },

@@ -41,7 +41,23 @@ interface RangeeDemande {
   created_at: string
 }
 
-export default async function SupportPage() {
+/**
+ * B-050 — le formulaire peut arriver PRÉ-REMPLI.
+ *
+ * Quand un écran bute (aujourd'hui la génération de planning), il n'envoie plus
+ * un message à l'aveugle : il oriente ici avec le contexte technique déjà écrit
+ * dans la description. La personne le relit, le corrige, joint sa capture — ce
+ * qu'un envoi silencieux ne permettait pas.
+ *
+ * Lu côté SERVEUR et passé en props : `useSearchParams` dans le composant
+ * client obligerait à une frontière Suspense pour rien.
+ */
+export default async function SupportPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ titre?: string; description?: string }>
+}) {
+  const params = await searchParams
   const supabase = await createClient()
 
   const {
@@ -119,7 +135,13 @@ export default async function SupportPage() {
             valide. On préfère le dire que laisser essayer et échouer sur un
             refus du stockage, qui ne s'expliquerait pas tout seul. */}
         {cabinetId ? (
-          <SupportV2 demandes={demandes} cabinetId={cabinetId} estAdmin={estAdmin} />
+          <SupportV2
+            demandes={demandes}
+            cabinetId={cabinetId}
+            estAdmin={estAdmin}
+            titreInitial={params.titre}
+            descriptionInitiale={params.description}
+          />
         ) : (
           <div className="page-head">
             <h1>Assistance</h1>

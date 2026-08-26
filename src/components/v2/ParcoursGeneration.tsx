@@ -1179,7 +1179,9 @@ export function ParcoursGeneration({
                       periodeId: cible,
                       interrompu: resultat.interrompu ?? false,
                       message: resultat.message ?? null,
-                      joursNonCouverts: (resultat.joursNonCouverts ?? []).length,
+                      // B-053 — le VRAI nombre de trous, pas `joursNonCouverts`
+                      // (qui liste tout ce qui suit le point d'arrêt du moteur).
+                      casesAPourvoir: (resultat.casesVides ?? []).length,
                       pointsPreVol: (preVol ?? []).map((a) => a.code),
                     }}
                   />

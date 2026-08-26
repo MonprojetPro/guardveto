@@ -22,6 +22,18 @@
   margin-bottom: 16px;
 }
 
+/* B-050 — on arrive depuis un écran qui a buté, le formulaire est pré-rempli.
+   Ton informatif, pas alarmant : il ne s'est rien passé de grave ici, on a
+   seulement fait la moitié du travail à la place de la personne. */
+.sup-venu-de {
+  margin: -8px 0 16px;
+  padding: 10px 12px;
+  background: var(--accent-soft, rgba(140, 92, 46, 0.1));
+  border-left: 3px solid var(--accent-ink);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  font-size: 0.82rem; line-height: 1.55; color: var(--text);
+}
+
 /* ── Le choix « problème » ou « idée » ─────────────────────────────────
    Deux cartes plutôt qu'une liste déroulante : le choix est structurant
    (il change le ton du formulaire et l'étiquette de l'e-mail), et il n'a

@@ -57,6 +57,14 @@ interface Props {
   cabinetId: string
   /** Un administrateur voit les demandes de toute l'équipe ; un vétérinaire, les siennes. */
   estAdmin: boolean
+  /**
+   * B-050 — pré-remplissage quand on arrive depuis un écran qui a buté (la
+   * génération de planning aujourd'hui). Le contexte technique est DANS la
+   * description, relisible et modifiable : un envoi silencieux ne laissait ni
+   * l'un ni l'autre. Absents = formulaire vierge, comportement d'origine.
+   */
+  titreInitial?: string
+  descriptionInitiale?: string
 }
 
 /** Ce que l'écran dit d'un statut. Les trois derniers viendront du hub MPP. */
@@ -77,10 +85,18 @@ function dateLisible(iso: string): string {
   })
 }
 
-export function SupportV2({ demandes, cabinetId, estAdmin }: Props) {
+export function SupportV2({
+  demandes,
+  cabinetId,
+  estAdmin,
+  titreInitial,
+  descriptionInitiale,
+}: Props) {
+  // Arriver depuis un blocage veut dire signaler un défaut : `bug` est le bon
+  // point de départ, et il reste changeable.
   const [type, setType] = useState<TypeDemande>('bug')
-  const [titre, setTitre] = useState('')
-  const [description, setDescription] = useState('')
+  const [titre, setTitre] = useState(titreInitial ?? '')
+  const [description, setDescription] = useState(descriptionInitiale ?? '')
   const [fichiers, setFichiers] = useState<File[]>([])
   const [envoi, setEnvoi] = useState<null | 'depot' | 'enregistrement'>(null)
 
@@ -228,6 +244,18 @@ export function SupportV2({ demandes, cabinetId, estAdmin }: Props) {
         <h2 id="sup-titre-form" className="sup-card-titre">
           Signaler quelque chose
         </h2>
+
+        {/* B-050 — arrivée depuis un écran qui a buté. Le rappel de la capture
+            se fait ICI, au moment où on peut encore la joindre : le dire sur
+            l'écran d'origine seulement, c'est le dire trop tôt (on a navigué
+            depuis) ou trop tard (l'écran a disparu). */}
+        {titreInitial && (
+          <p className="sup-venu-de">
+            J’ai rempli ce que je savais du blocage. Complète avec tes mots — et
+            <strong> joins la capture d’écran</strong> si tu l’as prise&nbsp;: c’est
+            ce qui fait gagner le plus de temps.
+          </p>
+        )}
 
         <div className="sup-types" role="radiogroup" aria-label="Nature de la demande">
           <button
