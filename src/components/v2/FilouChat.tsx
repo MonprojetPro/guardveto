@@ -76,14 +76,35 @@ type Message = {
  *
  *  `sessionStorage` et non la base : la conversation n'a pas vocation à être
  *  archivée ni relue plus tard, elle doit juste survivre à un aller-retour vers
- *  l'onglet Équipe. Elle disparaît donc à la fermeture de l'onglet — ce qui est
- *  aussi ce qu'on veut sur un poste partagé au cabinet. */
-const CLE_CONVERSATION = 'guardveto.filou.conversation'
+ *  l'onglet Équipe. Elle disparaît à la fermeture de l'onglet.
+ *
+ *  ⚠️ LA CLÉ PORTE L'IDENTIFIANT DE LA PERSONNE — corrigé le 2026-08-26 après
+ *  une recette de MiKL.
+ *
+ *  Elle était fixe. Le raisonnement d'origine — « elle disparaît à la fermeture
+ *  de l'onglet, ce qui est ce qu'on veut sur un poste partagé » — était juste
+ *  pour une FERMETURE, et faux pour un CHANGEMENT DE COMPTE : au cabinet on se
+ *  déconnecte sans fermer le navigateur. La personne suivante retrouvait donc
+ *  la conversation de la précédente, sur le même écran.
+ *
+ *  Constaté en vrai : un compte vétérinaire affichait le fil d'une
+ *  administratrice, où l'on lisait « supprime le compte secrétariat » et
+ *  « C'est fait ». Ce n'est pas un défaut d'affichage, c'est une fuite entre
+ *  deux personnes du même cabinet.
+ *
+ *  Le vétérinaire n'ayant pas de champ de saisie, il voyait une conversation
+ *  qui n'était pas la sienne et à laquelle il ne pouvait pas répondre — ce qui
+ *  a donné le sentiment que la tablette était cassée. */
+function cleConversation(idPersonne: string | undefined): string {
+  // `anonyme` n'arrive qu'entre deux rendus, avant que l'identité descende. Une
+  // clé distincte vaut mieux qu'un partage : dans le doute, on ne mélange pas.
+  return `guardveto.filou.conversation.${idPersonne ?? 'anonyme'}`
+}
 
-function relireConversation(): Message[] {
+function relireConversation(cle: string): Message[] {
   if (typeof window === 'undefined') return []
   try {
-    const brut = window.sessionStorage.getItem(CLE_CONVERSATION)
+    const brut = window.sessionStorage.getItem(cle)
     if (!brut) return []
     const lu: unknown = JSON.parse(brut)
     if (!Array.isArray(lu)) return []
@@ -104,10 +125,10 @@ function relireConversation(): Message[] {
   }
 }
 
-function memoriserConversation(messages: Message[]) {
+function memoriserConversation(cle: string, messages: Message[]) {
   if (typeof window === 'undefined') return
   try {
-    window.sessionStorage.setItem(CLE_CONVERSATION, JSON.stringify(messages))
+    window.sessionStorage.setItem(cle, JSON.stringify(messages))
   } catch {
     // Stockage plein ou refusé : la conversation vivra le temps de la page.
     // Ce n'est pas une raison de casser l'écran.
@@ -143,6 +164,9 @@ interface Props {
   /** Le mot d'accueil : premier message du fil, toujours présent. */
   enTete: ReactNode
   estAdmin: boolean
+  /** L'identifiant de la personne connectée. Il isole SA conversation de celle
+   *  de quelqu'un d'autre sur le même navigateur — voir `cleConversation`. */
+  idPersonne: string
   /** Fait taper Filou sur sa tablette pendant qu'il réfléchit. */
   onFilouTape?: () => void
   /** Ce que Filou a compris, à afficher sur le tableau du cabinet. */
@@ -154,14 +178,18 @@ interface Props {
 }
 
 export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
-  { enTete, estAdmin, onFilouTape, onResultat, onRemiseAZero },
+  { enTete, estAdmin, idPersonne, onFilouTape, onResultat, onRemiseAZero },
   ref,
 ) {
   const champId = useId()
+  // La clé est calculée une fois par rendu et vaut pour tout le composant :
+  // elle isole la conversation de CETTE personne de celle d'une autre sur le
+  // même navigateur (défaut trouvé en recette le 26/08).
+  const cle = cleConversation(idPersonne)
   // La conversation est relue depuis l'onglet AU PREMIER RENDU : aller voir une
   // fiche puis revenir démonte ce composant, et sans ça on retrouvait une
   // tablette vide — comme si Filou avait tout oublié le temps d'un aller-retour.
-  const [messages, setMessages] = useState<Message[]>(relireConversation)
+  const [messages, setMessages] = useState<Message[]>(() => relireConversation(cle))
   const [phrase, setPhrase] = useState('')
   const [enCours, demarrer] = useTransition()
   // La remise à zéro demande confirmation : effacer un échange qu'on est en
@@ -195,7 +223,7 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
     const message: Message = { id: compteur.current, de, texte, ...extra }
     setMessages((prec) => {
       const suite = [...prec, message]
-      memoriserConversation(suite)
+      memoriserConversation(cle, suite)
       return suite
     })
     filActuel.current = [...filActuel.current, message]
@@ -219,7 +247,7 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
   const remettreAZero = () => {
     if (enCours) return
     setMessages([])
-    memoriserConversation([])
+    memoriserConversation(cle, [])
     compteur.current = 0
     setPhrase('')
     setConfirmeRaz(false)
@@ -289,7 +317,7 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
   const oublierPistes = (idMessage: number) => {
     setMessages((prec) => {
       const suite = prec.map((m) => (m.id === idMessage ? { ...m, exemples: undefined } : m))
-      memoriserConversation(suite)
+      memoriserConversation(cle, suite)
       return suite
     })
     filActuel.current = filActuel.current.map((m) =>
@@ -504,7 +532,26 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
             </svg>
           </button>
         </div>
-      ) : null}
+      ) : (
+        /* ── UN VÉTÉRINAIRE VOYAIT LA TABLETTE ET RIEN POUR ÉCRIRE ──
+           Corrigé le 2026-08-26 (recette MiKL : « j'ai même pas l'encart de
+           chat »). La branche rendait `null` : la tablette s'affichait, avec
+           le renard et le mot d'accueil, et aucune issue. La coquille vide
+           que ce projet refuse partout ailleurs.
+
+           ⚠️ CE N'EST PAS LE CORRECTIF DE FOND. Le serveur, lui, EST prêt à
+           répondre à un vétérinaire — le catalogue lui ouvre une vingtaine
+           d'outils (`outilsPour`, audit B-007). Lui ouvrir le champ est une
+           DÉCISION PRODUIT, pas un correctif : elle change ce que six
+           personnes peuvent faire. Elle est posée au board (B-032).
+
+           En attendant, on dit la vérité plutôt que de laisser deviner. */
+        <p className="saisie-fermee">
+          Filou répond aux questions de l’administratrice du cabinet. Ton
+          planning, tes gardes et tes congés se consultent directement à
+          l’écran.
+        </p>
+      )}
     </>
   )
 })

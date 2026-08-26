@@ -2635,3 +2635,14 @@ a.widget { color: inherit; text-decoration: none; }
 .gv-retrait-ecart {
   font-size: 0.78rem; color: var(--t-muted);
 }
+
+/* Ce qu'un vétérinaire lit à la place du champ de saisie (2026-08-26).
+   Discret : c'est une explication, pas un refus. Le ton d'un refus ferait
+   croire à un droit retiré, alors que la capacité n'a jamais été ouverte. */
+.saisie-fermee {
+  margin: 10px 2px 2px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--t-muted);
+  text-align: center;
+}

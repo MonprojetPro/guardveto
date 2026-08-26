@@ -42,12 +42,21 @@ type Fenetre = 'cesoir' | 'souhaits' | 'periode' | 'coherence' | 'filou'
  *  conversation (cf. `FilouChat`) : aller vérifier une fiche dans l'onglet
  *  Équipe puis revenir ne doit pas effacer la réponse qu'on était en train de
  *  lire. Même support, même durée de vie : l'onglet. */
-const CLE_RESULTAT = 'guardveto.filou.resultat'
+/** ⚠️ MÊME CORRECTIF QUE LA CONVERSATION (2026-08-26) : la clé porte
+ *  l'identifiant de la personne.
+ *
+ *  Elle était fixe, et le tableau du cabinet retenait donc la dernière réponse
+ *  de Filou d'un compte à l'autre sur le même navigateur. C'est le pendant
+ *  exact de la fuite trouvée dans `FilouChat` — et le plus visible des deux,
+ *  puisque cette réponse s'affiche en grand à droite de l'écran. */
+function cleResultat(idPersonne: string | undefined): string {
+  return `guardveto.filou.resultat.${idPersonne ?? 'anonyme'}`
+}
 
-function relireResultat(): ResultatFilou | null {
+function relireResultat(cle: string): ResultatFilou | null {
   if (typeof window === 'undefined') return null
   try {
-    const brut = window.sessionStorage.getItem(CLE_RESULTAT)
+    const brut = window.sessionStorage.getItem(cle)
     if (!brut) return null
     const lu = JSON.parse(brut) as ResultatFilou | null
     // Une valeur écrite par une version précédente ne doit pas casser l'accueil.
@@ -57,11 +66,11 @@ function relireResultat(): ResultatFilou | null {
   }
 }
 
-function memoriserResultat(r: ResultatFilou | null) {
+function memoriserResultat(cle: string, r: ResultatFilou | null) {
   if (typeof window === 'undefined') return
   try {
-    if (r) window.sessionStorage.setItem(CLE_RESULTAT, JSON.stringify(r))
-    else window.sessionStorage.removeItem(CLE_RESULTAT)
+    if (r) window.sessionStorage.setItem(cle, JSON.stringify(r))
+    else window.sessionStorage.removeItem(cle)
   } catch {
     // Stockage refusé : la réponse vivra le temps de la page, sans casser rien.
   }
@@ -138,7 +147,10 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
   //
   // Relu depuis l'onglet au premier rendu, comme la conversation : aller voir
   // une fiche puis revenir ne doit pas effacer ce qu'on était en train de lire.
-  const [resultatFilou, setResultatFilou] = useState<ResultatFilou | null>(relireResultat)
+  // Isole du reste : la reponse de Filou appartient a la personne connectee,
+  // pas au navigateur (fuite entre comptes trouvee en recette le 26/08).
+  const cleRes = cleResultat(data.veterinaire?.id)
+  const [resultatFilou, setResultatFilou] = useState<ResultatFilou | null>(() => relireResultat(cleRes))
   const filou = useRef<FilouHandle>(null)
   const chat = useRef<FilouChatHandle>(null)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -267,7 +279,7 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
    *  évite qu'un résultat s'ouvre hors de l'écran sans qu'on le voie. */
   const montrer = useCallback((r: ResultatFilou) => {
     setResultatFilou(r)
-    memoriserResultat(r)
+    memoriserResultat(cleRes, r)
     setOuverte('filou')
     requestAnimationFrame(() => {
       stageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -279,7 +291,7 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
    *  abandonnée, ce qui était déjà le cas en fermant la fenêtre. */
   const oublierResultat = useCallback(() => {
     setResultatFilou(null)
-    memoriserResultat(null)
+    memoriserResultat(cleRes, null)
     setOuverte((f) => (f === 'filou' ? null : f))
   }, [])
 
@@ -291,7 +303,7 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
       if (!fermer) return
       setOuverte(null)
       setResultatFilou(null)
-      memoriserResultat(null)
+      memoriserResultat(cleRes, null)
       // Les compteurs de la barre (règles fermes / souples) lisent la base :
       // sans ce refresh, le dock afficherait encore l'ancien décompte.
       router.refresh()
@@ -350,6 +362,7 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
                   <FilouChat
                     ref={chat}
                     estAdmin={data.estAdmin}
+                    idPersonne={data.veterinaire?.id ?? ''}
                     onFilouTape={() => filou.current?.tape()}
                     onResultat={montrer}
                     onRemiseAZero={oublierResultat}
