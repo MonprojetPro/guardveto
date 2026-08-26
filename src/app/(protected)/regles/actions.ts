@@ -403,6 +403,7 @@ const BRIQUES_PENALITES_SOUPLES = new Set([
   'eviter_we_avant_vacances', // R10c
   'eviter_fete_fin_annee',    // R10b
   'inversion_role_ferie',     // R8b
+  'eviter_veille_repos',      // R10d — B-063
 ])
 const FORCES_SOUPLES = new Set<ForceFormulaire>(['sauf_crise', 'evitee', 'si_possible'])
 

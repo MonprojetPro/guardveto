@@ -218,6 +218,7 @@ export const BRIQUES_PENALITES_SOUPLES: Record<string, PenaliteSoupleId> = {
   eviter_we_avant_vacances: 'we_avant_vacances', // R10c
   eviter_fete_fin_annee: 'fete_fin_annee',    // R10b
   inversion_role_ferie: 'inversion_ferie',    // R8b
+  eviter_veille_repos: 'veille_repos',        // R10d — B-063
 }
 
 /**

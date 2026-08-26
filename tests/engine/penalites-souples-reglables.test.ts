@@ -134,6 +134,62 @@ describe('penalite() (greedy) — FAITS DIRECTS par règle', () => {
     expect(penalite(slotWE1, enVacances, 'premier', vide, undefined, off('we_avant_vacances'))).toBe(0)
   })
 
+  // ── R10d (B-063) — « éviter les jours de garde la veille d'un repos » ──
+  //
+  // Demandé par MiKL le 26/08. Une garde de nuit déborde sur le lendemain
+  // matin : elle mord sur le repos qui suit.
+
+  it('R10d — la veille d’un congé posé : 40 par défaut, 0 si désactivée', () => {
+    // Précision de MiKL : « c'est valable dès qu'une personne est en congé DANS
+    // LE PLANNING, pas que dans les règles ». Et quel que soit le TYPE de congé
+    // — une formation ou un arrêt se respectent autant que des vacances.
+    const enFormation = vet('A', [
+      { type: 'formation', date_debut: '2026-01-15', date_fin: '2026-01-15' } as VetEngine['conges'][number],
+    ])
+    const veille: SlotGarde = { date: '2026-01-14', type: 'semaine_soir', saison: 'hiver', besoinSecond: false }
+    const vide: PlanningPartiel = { attributions: [] }
+
+    expect(penalite(veille, enFormation, 'premier', vide)).toBe(40)
+    expect(penalite(veille, enFormation, 'premier', vide, undefined, off('veille_repos'))).toBe(0)
+  })
+
+  it('R10d — un soir SANS absence le lendemain ne coûte rien', () => {
+    const veille: SlotGarde = { date: '2026-01-14', type: 'semaine_soir', saison: 'hiver', besoinSecond: false }
+    expect(penalite(veille, A, 'premier', { attributions: [] })).toBe(0)
+  })
+
+  it('R10d — pour un week-end, le lendemain est le LUNDI', () => {
+    // La garde de week-end court jusqu'au dimanche : c'est le lundi qui doit
+    // être libre, pas le samedi. Se tromper de jour rendrait la règle muette
+    // sur le seul créneau où elle compte le plus.
+    const congeLundi = vet('A', [
+      { type: 'autre', date_debut: '2026-01-12', date_fin: '2026-01-12' } as VetEngine['conges'][number],
+    ])
+    const we: SlotGarde = { date: SAM1, type: 'weekend', saison: 'hiver', besoinSecond: true }
+    expect(penalite(we, congeLundi, 'premier', { attributions: [] })).toBe(40)
+  })
+
+  it('R10d — PAS DE DOUBLE PEINE : elle cède là où R10c couvre déjà', () => {
+    // Le week-end avant des vacances est déjà pénalisé par R10c, et son
+    // lendemain tombe dans le congé. Sans cette précaution, la même situation
+    // serait comptée deux fois (85 au lieu de 45).
+    const enVacances = vet('A', [
+      { type: 'vacances', date_debut: '2026-01-12', date_fin: '2026-01-18' } as VetEngine['conges'][number],
+    ])
+    const we: SlotGarde = { date: SAM1, type: 'weekend', saison: 'hiver', besoinSecond: true }
+    expect(penalite(we, enVacances, 'premier', { attributions: [] })).toBe(45)
+  })
+
+  it('R10d — R10c désactivée ne la fait pas revenir par la bande', () => {
+    // Un cabinet qui a dit « je me fiche du week-end avant les vacances » ne
+    // doit pas voir la règle réapparaître sous un autre nom.
+    const enVacances = vet('A', [
+      { type: 'vacances', date_debut: '2026-01-12', date_fin: '2026-01-18' } as VetEngine['conges'][number],
+    ])
+    const we: SlotGarde = { date: SAM1, type: 'weekend', saison: 'hiver', besoinSecond: true }
+    expect(penalite(we, enVacances, 'premier', { attributions: [] }, undefined, off('we_avant_vacances'))).toBe(0)
+  })
+
   it('DÉFAUT byte-identique : config absente ≡ config vide ≡ historique', () => {
     const planningAvant: PlanningPartiel = { attributions: [planningWEConsecutifs.attributions[0]] }
     const sans = penalite(slotWE2, A, 'premier', planningAvant)

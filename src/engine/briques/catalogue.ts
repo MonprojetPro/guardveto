@@ -457,6 +457,20 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
       'le moteur évite de mettre un vétérinaire de garde le week-end qui précède ses vacances (R10c)',
   },
 
+  eviter_veille_repos: {
+    id: 'eviter_veille_repos',
+    famille: 'interdire',
+    operateur: 'EVITER_AVANT',
+    axes: ['quoi'],
+    schemaParams: {
+      _reglage:
+        "aucun paramètre — le réglage porte { actif, force } (R10d : pas de garde la veille d'un jour d'absence)",
+    },
+    widget: 'WidgetPenaliteSouple',
+    rendreLangageNaturel: () =>
+      "le moteur évite de mettre un vétérinaire de garde la veille d'un jour où il n'est pas là — un congé posé au planning comme un jour de repos fixe (R10d)",
+  },
+
   eviter_fete_fin_annee: {
     id: 'eviter_fete_fin_annee',
     famille: 'interdire',

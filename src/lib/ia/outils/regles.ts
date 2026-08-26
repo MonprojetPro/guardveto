@@ -42,6 +42,7 @@ const GLOBALES = new Set([
   'composition_equipe', 'role_interdit_tag',
   'eviter_we_consecutifs', 'eviter_we_avant_vacances',
   'eviter_fete_fin_annee', 'inversion_role_ferie',
+  'eviter_veille_repos',
 ])
 
 const FORCE_HUMAINE: Record<string, string> = {

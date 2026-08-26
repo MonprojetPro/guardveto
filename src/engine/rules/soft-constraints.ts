@@ -14,7 +14,7 @@
 
 import type { SlotGarde, VetEngine, PlanningPartiel, RoleGarde, CalendrierResolu, AttributionGarde } from '../types'
 import { samediDeSemaine, addDays, estJourFerie, estFeteFinAnnee, attributionsAvecContexte } from '../utils'
-import { penaliteContraintesConfig } from './hard-constraints'
+import { penaliteContraintesConfig, violeReposFixe } from './hard-constraints'
 import { estAttribue, vetPourRole } from '../attribution'
 import {
   PENALITE_SOUPLE_DEFAUT, poidsPenaliteSouple, type PenalitesSouplesConfig,
@@ -97,7 +97,23 @@ function penaliteWEAvantVacances(
   penalitesSouples?: PenalitesSouplesConfig
 ): number {
   void planning
-  if (slot.type !== 'weekend' && slot.type !== 'vendredi_soir') return 0
+  return estWeekEndAvantVacances(slot, vet)
+    ? poidsPenaliteSouple('we_avant_vacances', penalitesSouples)
+    : 0
+}
+
+/**
+ * La SITUATION que R10c vise : ce week-end précède-t-il immédiatement des
+ * vacances de ce vétérinaire ?
+ *
+ * Extraite du calcul de la pénalité (B-063) pour que R10d puisse lui céder le
+ * pas sur la SITUATION, et non sur le fait que R10c ait produit un chiffre.
+ * La nuance compte : R10c désactivée renvoie 0, et R10d aurait alors pris le
+ * relais — un cabinet qui a dit « je me fiche du week-end avant les vacances »
+ * aurait vu la règle revenir par la bande, sous un autre nom.
+ */
+function estWeekEndAvantVacances(slot: SlotGarde, vet: VetEngine): boolean {
+  if (slot.type !== 'weekend' && slot.type !== 'vendredi_soir') return false
 
   // Samedi de référence du week-end concerné
   const sam = slot.type === 'weekend' ? slot.date : addDays(slot.date, 1)
@@ -105,13 +121,12 @@ function penaliteWEAvantVacances(
   const lundiSuivant = addDays(sam, 2)
   const vendrediSuivant = addDays(sam, 6)
 
-  for (const conge of vet.conges) {
-    if (conge.type !== 'vacances') continue
-    if (conge.date_debut >= lundiSuivant && conge.date_debut <= vendrediSuivant) {
-      return poidsPenaliteSouple('we_avant_vacances', penalitesSouples)
-    }
-  }
-  return 0
+  return vet.conges.some(
+    (conge) =>
+      conge.type === 'vacances' &&
+      conge.date_debut >= lundiSuivant &&
+      conge.date_debut <= vendrediSuivant,
+  )
 }
 
 /**
@@ -126,6 +141,66 @@ function penaliteFeteFinAnnee(slot: SlotGarde, penalitesSouples?: PenalitesSoupl
   if (mmjj === '12-24' || mmjj === '12-31') {
     return poidsPenaliteSouple('fete_fin_annee', penalitesSouples)
   }
+  return 0
+}
+
+/**
+ * R10d (B-063) — ÉVITER UNE GARDE LA VEILLE D'UN JOUR D'ABSENCE.
+ *
+ * Demandé par MiKL le 26/08 : « éviter les jours de garde la veille d'un repos ».
+ * Une garde de nuit déborde sur le lendemain matin — elle mord donc sur le repos
+ * qui suit, et la personne le perd en partie.
+ *
+ * CE QUI COMPTE COMME ABSENCE. Précision de MiKL : *« c'est valable dès qu'une
+ * personne est en congé DANS LE PLANNING, pas que dans les règles »*. On regarde
+ * donc les deux :
+ *   • un CONGÉ posé au planning, quel qu'en soit le type — pas seulement les
+ *     vacances (une formation ou un arrêt se respectent autant) ;
+ *   • un REPOS FIXE déclaré en règle (`interdire_creneau` sur un jour).
+ *
+ * ⚠️ Elle GÉNÉRALISE `we_avant_vacances` (R10c), qui ne regardait qu'un cas :
+ * le week-end précédant des vacances. Les deux cohabitent — la plus ancienne
+ * reste réglable seule, et un cabinet qui l'a montée plus haut garde son
+ * réglage. Sur un week-end avant vacances, les deux pénalités s'ajoutent : le
+ * moteur y voit deux bonnes raisons de s'abstenir, ce qui est exact.
+ */
+function penaliteVeilleRepos(
+  slot: SlotGarde,
+  vet: VetEngine,
+  calendrier?: CalendrierResolu,
+  penalitesSouples?: PenalitesSouplesConfig,
+): number {
+  // Le lendemain de la garde : c'est lui qui doit être libre. Pour un week-end,
+  // la garde court jusqu'au dimanche — le lendemain est donc le lundi.
+  const lendemain = slot.type === 'weekend' ? addDays(slot.date, 2) : addDays(slot.date, 1)
+
+  // ⚠️ PAS DE DOUBLE PEINE AVEC R10c. Le week-end qui précède des vacances est
+  // déjà pénalisé par `we_avant_vacances`, et son lendemain (le lundi) tombe
+  // dans le congé : les deux règles se déclencheraient sur la MÊME situation.
+  // Deux pénalités pour un seul motif fausseraient l'arbitrage — et un cabinet
+  // qui baisse R10c verrait son réglage sans effet, l'autre prenant le relais.
+  // R10d cède donc le pas là où R10c couvre déjà.
+  if (estWeekEndAvantVacances(slot, vet)) return 0
+
+  // ① Un congé posé au planning — n'importe lequel.
+  for (const conge of vet.conges) {
+    if (conge.date_debut <= lendemain && lendemain <= conge.date_fin) {
+      return poidsPenaliteSouple('veille_repos', penalitesSouples)
+    }
+  }
+
+  // ② Un repos fixe déclaré en règle. On le lit par la MÊME porte que les
+  //    contraintes dures (`estIndisponibleLeJour`) : un second décodage des
+  //    `params` finirait par diverger du gardien, et la préférence porterait
+  //    alors sur un repos que le moteur ne reconnaît plus.
+  const slotLendemain: SlotGarde = { ...slot, date: lendemain }
+  for (const c of vet.contraintes) {
+    if (!c.actif || c.type !== 'jour_repos_fixe') continue
+    if (violeReposFixe(c, slotLendemain, calendrier)) {
+      return poidsPenaliteSouple('veille_repos', penalitesSouples)
+    }
+  }
+
   return 0
 }
 
@@ -195,6 +270,8 @@ export function penalite(
     penaliteR10WEConsecutif(slot, vet, planningRythme, penalitesSouples) +
     penaliteWEAvantVacances(slot, vet, planning, penalitesSouples) +
     penaliteFeteFinAnnee(slot, penalitesSouples) +
+    // R10d (B-063) — la veille d'un jour d'absence : congé posé OU repos fixe.
+    penaliteVeilleRepos(slot, vet, calendrier, penalitesSouples) +
     penaliteInversionFerie(slot, vet, role, planning, calendrier, penalitesSouples) +
     // Backlog n°14 : le véto a tenu cette fête L'AN DERNIER → pénalité souple.
     penaliteFeteHistorique(slot, vet.id, historiqueFetes) +

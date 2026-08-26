@@ -226,12 +226,13 @@ export function penaliteStructureEtage(etage: number): number {
 // l'ACTIVATION — pas de chiffres abstraits exposés (leçon UX équité).
 // Défaut (aucune ligne en base) = étage + poids historiques → byte-identique.
 
-/** Identifiants internes des 4 pénalités souples réglables. */
+/** Identifiants internes des pénalités souples réglables. */
 export const PENALITES_SOUPLES_IDS = [
   'we_consecutif',     // R10  — 2 week-ends de garde consécutifs
   'we_avant_vacances', // R10c — garde le WE qui précède des vacances du véto
   'fete_fin_annee',    // R10b — garde un soir de réveillon (24/31 déc)
   'inversion_ferie',   // R8b  — même rôle la veille d'un jour férié
+  'veille_repos',      // R10d — garde la veille d'un jour d'absence (B-063)
 ] as const
 export type PenaliteSoupleId = (typeof PENALITES_SOUPLES_IDS)[number]
 
@@ -244,6 +245,12 @@ export const PENALITE_SOUPLE_DEFAUT: Record<PenaliteSoupleId, { etage: number; p
   we_avant_vacances: { etage: 4, poids: 45 }, // 🟡 EVITEE
   fete_fin_annee:    { etage: 4, poids: 30 }, // 🟡 EVITEE
   inversion_ferie:   { etage: 5, poids: 20 }, // ⚪ SI_POSSIBLE
+  // R10d (B-063) — demandé par MiKL le 26/08 : « éviter les jours de garde la
+  // veille d'un repos ». Une garde de nuit déborde sur le lendemain matin :
+  // elle mord donc sur le repos qui suit. Réglé « à éviter » comme sa sœur
+  // `we_avant_vacances`, dont elle est la généralisation — celle-ci ne
+  // regardait que le week-end précédant des vacances.
+  veille_repos:      { etage: 4, poids: 40 }, // 🟡 EVITEE
 }
 
 /** Une pénalité souple entièrement résolue (consommable moteur + scoreur). */

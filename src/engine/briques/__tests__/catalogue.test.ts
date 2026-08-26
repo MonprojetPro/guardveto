@@ -29,6 +29,7 @@ const MIGRATIONS = [
   '20260708140000_cadencement_weekend.sql',
   '20260708170000_exclusion_dates.sql',
   '20260708180000_seulement_avec.sql',
+  '20260826230000_preference_veille_repos.sql',
 ].map((f) => fileURLToPath(new URL(`../../../../supabase/migrations/${f}`, import.meta.url)))
 
 interface SeedBrique {
@@ -68,8 +69,11 @@ function parserSeed(): Record<string, SeedBrique> {
 describe('catalogue ↔ seed briques_regles — cohérence (ne divergent pas)', () => {
   const seed = parserSeed()
 
-  it('le seed parsé contient bien les 26 briques (sanity du parser)', () => {
-    expect(Object.keys(seed)).toHaveLength(26)
+  // 27 depuis B-063 (26/08) : ajout de `eviter_veille_repos`. Ce compte est un
+  // garde-fou du PARSEUR, pas une limite du produit — s'il ne bougeait jamais,
+  // c'est qu'il aurait cessé de lire les migrations récentes.
+  it('le seed parsé contient bien les 27 briques (sanity du parser)', () => {
+    expect(Object.keys(seed)).toHaveLength(27)
   })
 
   it('catalogue et seed déclarent EXACTEMENT les mêmes briques', () => {

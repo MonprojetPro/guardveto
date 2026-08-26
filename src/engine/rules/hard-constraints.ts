@@ -178,7 +178,13 @@ function viseCeCreneau(cfg: Record<string, unknown>, slot: SlotGarde): boolean {
   return (cibles as unknown[]).some((code) => code === slot.type)
 }
 
-function violeReposFixe(
+/**
+ * Exportée (B-063) : la PRÉFÉRENCE « éviter la garde la veille d'un repos »
+ * doit reconnaître exactement le même repos que le gardien dur. Un second
+ * décodage des `params`, écrit à côté, finirait par diverger — et la préférence
+ * porterait alors sur un repos que le moteur ne voit plus.
+ */
+export function violeReposFixe(
   c: ContrainteEngine, slot: SlotGarde, calendrier?: CalendrierResolu,
 ): boolean {
   const jour = jourDeLaSemaine(slot.date)

@@ -68,6 +68,7 @@ const PENALITES_SOUPLES_DEFAUT_FORCE: Record<string, string> = {
   eviter_we_avant_vacances: 'evitee', // R10c (étage 4)
   eviter_fete_fin_annee: 'evitee', // R10b (étage 4)
   inversion_role_ferie: 'si_possible', // R8b  (étage 5)
+  eviter_veille_repos: 'evitee', // R10d (étage 4) — B-063
 }
 
 /** Résout {actif, force} d'une règle structurelle (défaut historique : ferme + active). */

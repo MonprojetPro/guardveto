@@ -264,6 +264,10 @@ const PENALITES_SOUPLES = [
   'eviter_we_avant_vacances',
   'eviter_fete_fin_annee',
   'inversion_role_ferie',
+  // B-063 — « éviter les jours de garde la veille d'un repos » (MiKL, 26/08).
+  // Sa place est ICI, dans les PRÉFÉRENCES, et non parmi les règles nominatives :
+  // elle ne vise personne en particulier et ne bloque jamais une génération.
+  'eviter_veille_repos',
 ] as const
 type PenaliteSouple = (typeof PENALITES_SOUPLES)[number]
 
@@ -284,10 +288,16 @@ const PENALITES_META: Record<PenaliteSouple, { titre: string; aide: string }> = 
     titre: 'Changer de rôle la veille d’un jour férié',
     aide: 'Le 1er de la veille devient si possible 2nd le jour férié, et inversement.',
   },
+  eviter_veille_repos: {
+    titre: 'Éviter la garde la veille d’un jour d’absence',
+    aide:
+      'Une garde de nuit déborde sur le lendemain matin. Le moteur évite donc de la poser la veille d’un jour où la personne n’est pas là — un congé posé au planning comme un jour de repos fixe.',
+  },
 }
 
 /** Force de repli quand on RALLUME une pénalité qui n'en avait plus de souple. */
 const PENALITE_FORCE_REPLI: Record<PenaliteSouple, string> = {
+  eviter_veille_repos: 'evitee',
   eviter_we_consecutifs: 'sauf_crise',
   eviter_we_avant_vacances: 'evitee',
   eviter_fete_fin_annee: 'evitee',
