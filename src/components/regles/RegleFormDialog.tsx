@@ -1339,13 +1339,25 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
               lire « voilà ce que tu t'apprêtes à écrire ».
               Cadre PLEIN et teinte d'accent, donc : le même vocabulaire que
               partout ailleurs où le produit annonce ce qui va se passer. */}
-          <div className="rounded-lg border-2 border-primary bg-primary/[0.08] px-5 py-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary mb-2">
+          <div className="rounded-xl border-2 border-primary bg-primary/[0.08] px-6 py-5 my-1">
+            <p className="text-xs font-semibold uppercase tracking-wider text-primary mb-2.5">
               Ce que tu vas enregistrer
             </p>
-            <p className="text-[0.95rem] font-medium text-foreground leading-7">
-              {(() => { const f = FORCES.find((x) => x.value === force); return f?.symbole })()} {apercu}
-            </p>
+            {/* Le symbole de fermeté est sorti du flux de texte (B-039).
+                Collé devant la phrase, il l'indentait sur la PREMIÈRE ligne
+                seulement : la suivante repartait sous la puce, et « (semaines
+                paires) » semblait s'échapper du cadre. En flex, la puce occupe
+                sa colonne et TOUTES les lignes de la phrase s'alignent entre
+                elles. `break-words` en plus : un nom de créneau sur-mesure un
+                peu long ne doit jamais pouvoir sortir du cadre. */}
+            <div className="flex items-start gap-2.5">
+              <span aria-hidden className="text-base leading-7 shrink-0">
+                {(() => { const f = FORCES.find((x) => x.value === force); return f?.symbole })()}
+              </span>
+              <p className="text-[0.95rem] font-medium text-foreground leading-7 break-words min-w-0">
+                {apercu}
+              </p>
+            </div>
           </div>
         </div>
 

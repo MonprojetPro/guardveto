@@ -110,13 +110,11 @@ requalifie non bloquant). Detail integral → archive 3ter.
 
 | ID | Ce qui etait annonce | Ce qui est reellement livre | Verdict |
 |---|---|---|---|
-| B-041 | Plusieurs jours dans une seule regle | `construireParams` accepte `jours` (liste) et ecrit une entree par jour ; l'ecran passe du choix unique a des pastilles cliquables (`RegleFormDialog`) | OK |
-| B-041 | Le MOTEUR refuse bien TOUS les jours | Epreuve dediee : lundi ET mardi refuses. Un bug qui ne garderait que la premiere entree passerait toutes les verifications de forme — c'est cette epreuve-la qui l'attrape | OK |
-| B-041 | Filou sait en proposer plusieurs | `jours` transmis dans `regleSchema` (payload + apercu) et decrit au type 1 du prompt : « pas de garde le lundi et le mardi est UNE seule regle » | OK |
-| B-041 | Filou DIT ce qu'il laisse de cote | Section « DIS CE QUE TU LAISSES DE COTE » ajoutee au prompt : la limite d'un seul outil ne l'autorise pas a traiter une moitie en silence. **Comportement de modele : non verifiable par un test** | partiel |
-| B-042 | Filou demande « ponctuel ou permanent ? » | Section « PONCTUEL OU PERMANENT » ajoutee au prompt : une absence sans fin est une regle, reclamer des dates est une impasse. **Comportement de modele : non verifiable par un test** | partiel |
-| B-039 | Apercu qui saute aux yeux | Liseret passe a `border-2 border-primary` (plein, pleine intensite), padding `px-5 py-4` au lieu de `p-3.5`, texte agrandi et interligne aere | OK |
-| B-041/B-042 | Preuves | `npx tsc --noEmit` → 0 erreur · `npm test` → 1378 passed (contre 1373 : +5) · `npm run build` → Compiled successfully | OK |
+| B-041 | **La regle tient sur une GENERATION COMPLETE** (demande explicite de MiKL : « t'es sur que ca fonctionne au niveau du moteur ? verifie ») | `tests/engine/repos-multi-jours-generation.test.ts` — 4 semaines, 7 vetos, tous creneaux, regle construite par le MEME code que le formulaire. 5 faits : generation aboutie · ZERO garde les jours vises en semaine paire · il en a LES MEMES JOURS en semaine impaire · validateur independant muet · chaque jour verifie separement | OK |
+| B-041 | Le discriminant qui rend l'epreuve honnete | Le fait ③ : sans lui, un moteur qui interdirait lundi et mercredi de TOUTE la periode passerait les autres verifications sans jamais lire la parite. Un test qui ne peut pas distinguer les deux ne prouve rien | OK |
+| B-039 | Le texte ne s'echappe plus du cadre | Le symbole de fermete est sorti du flux : colle devant la phrase, il n'indentait que la PREMIERE ligne et la suivante repartait sous la puce — d'ou « (semaines paires) » qui semblait sortir du cadre. Passe en flex (puce en colonne propre) + `break-words` + padding `px-6 py-5` | OK |
+| B-039 | Non verifie | Le rendu se juge a l'ecran. **La capture de MiKL a 17h28 precedait peut-etre le deploiement du padding pousse a 17h26** — a reconfirmer apres rechargement | partiel |
+| B-041/B-039 | Preuves | `npx tsc --noEmit` → 0 erreur · `npm test` → 1383 passed (contre 1378 : +5) · `npm run build` → Compiled successfully | OK |
 
 **Regles :**
 
