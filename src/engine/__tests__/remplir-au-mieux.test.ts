@@ -94,6 +94,59 @@ describe('remplirAuMieux', () => {
   })
 })
 
+describe('B-059 — les créneaux liés se décident ENSEMBLE', () => {
+  /**
+   * Le défaut mesuré le 26/08 sur Hiver P1, réduit à sa forme minimale.
+   *
+   * En vrai : le moteur donnait le vendredi soir à Fanny + Antoine, puis le
+   * week-end entier tombait — R9 impose au week-end le duo du vendredi, R8
+   * l'inversion, et FREQ_WE interdisait à Antoine un second week-end. Victor et
+   * Jean étaient libres. MiKL, en recette : « pourquoi Victor ne fait pas la
+   * garde du week-end du 25 ? Il n'a aucun WE au compteur et n'est pas absent ».
+   *
+   * Ici : Bob peut faire les soirs de semaine, JAMAIS les week-ends. Décidé
+   * seul, le vendredi soir peut échoir à Bob — et le week-end devient alors
+   * impossible pour tout le monde, puisqu'il doit reprendre le duo du vendredi.
+   *
+   * ⚠️ Ce test a été écrit d'abord avec un simple duo interdit : il passait
+   * AUSSI en remplissage place-par-place, donc il ne prouvait rien (vérifié par
+   * mutation). Celui-ci échoue bien sans le regroupement.
+   */
+  const jamaisEnWeekEnd = (): VetEngine['contraintes'][number] =>
+    ({
+      id: 'pas-de-we',
+      type: 'indisponibilite_cyclique',
+      actif: true,
+      config: {
+        axes: {}, force: 2, brique: 'indisponibilite_cyclique',
+        semaines: 'toutes', periodes: ['weekend'],
+        params: { description: 'jamais de week-end' },
+      },
+    }) as VetEngine['contraintes'][number]
+
+  const equipe = () => [
+    vet('v1', 'Alice'),
+    { ...vet('v2', 'Bob'), contraintes: [jamaisEnWeekEnd()] },
+    vet('v3', 'Carol'),
+    vet('v4', 'David'),
+  ]
+
+  it('ne condamne pas un week-end par le duo choisi la veille', () => {
+    const r = remplirAuMieux(input(equipe()))
+
+    // Chaque week-end doit être COMPLET : il y avait toujours une combinaison.
+    for (const we of r.planning.attributions.filter((a) => a.type === 'weekend')) {
+      const total = (we.placements ?? []).length
+      const pourvues = (we.placements ?? []).filter((p) => p.vetId).length
+      expect(`${we.date} ${pourvues}/${total}`).toBe(`${we.date} ${total}/${total}`)
+    }
+  })
+
+  it('ne laisse aucune case vide alors qu une combinaison existait', () => {
+    expect(remplirAuMieux(input(equipe())).creneauxVides).toEqual([])
+  })
+})
+
 describe('B-053 — la branche échec de genererPlanningPur', () => {
   it('ne renvoie plus un planning vide', () => {
     const r = genererPlanningPur(input([vet('v1', 'Alice'), vet('v2', 'Bob', CONGE_TOTAL)]))

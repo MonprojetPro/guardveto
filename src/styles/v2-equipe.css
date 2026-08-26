@@ -385,14 +385,26 @@
 /* Les étiquettes prennent la place laissée libre par le champ couleur, à sa
    droite, au lieu d'ouvrir une rangée à elles. Voir le commentaire du JSX. */
 .cf-etiquettes { grid-column: 2 / -1; }
-/* La case « dernier recours » n'a plus de champ à côté d'elle : elle tient sa
-   propre ligne, sans le décalage qui servait à l'aligner sur un voisin. */
-.cf-recours { grid-column: 1 / -1; padding-top: 4px; }
-/* B-046 — la note explicative sous la case. Pleine largeur (sinon la grille la
-   coince sur une colonne et elle se lit en colonne de journal), et retrait
-   aligné sur le libellé, pas sur la case : elle explique le réglage, elle n'en
-   est pas une deuxième ligne. */
-.cf-aide-recours { grid-column: 1 / -1; margin-top: 2px; padding-left: 28px; max-width: 62ch; }
+/* B-046 + B-057 — la case « dernier recours » et son explication forment UN
+   bloc, sur toute la largeur de la grille.
+   Empilees (case seule sur une ligne, note etroite en dessous), elles laissaient
+   la moitie droite vide et le texte se lisait sur cinq lignes de journal —
+   « c'est encore tout desequilibre » (MiKL, 26/08). Sur large ecran la note se
+   place A DROITE de la case et remplit l'espace ; en dessous d'une certaine
+   largeur elle repasse dessous, ou elle serait illisible. */
+.cf-bloc-recours {
+  grid-column: 1 / -1;
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 20px;
+  margin-top: 6px; padding-top: 12px;
+  border-top: 1px solid var(--t-border);
+}
+.cf-bloc-recours .check-line { padding-top: 0; flex: 0 0 auto; }
+.cf-aide-recours {
+  flex: 1 1 380px;
+  margin-top: 0;
+  /* Pas de `max-width` en `ch` ici : c'est lui qui bridait le texte a une
+     demi-largeur pendant que la moitie droite restait vide. */
+}
 @media (max-width: 720px) {
   .cf-etiquettes { grid-column: 1 / -1; }
 }

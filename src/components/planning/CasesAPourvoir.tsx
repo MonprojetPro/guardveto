@@ -58,17 +58,53 @@ function libelleCase(c: CaseVide): string {
  * La famille d'une raison — c'est elle qui porte le « comment débloquer ».
  * On lit le CODE (stable) et non le texte (qui change avec les libellés).
  */
-type Famille = 'conge' | 'deja_de_garde' | 'structure' | 'regle'
+type Famille = 'attente_premier' | 'conge' | 'deja_de_garde' | 'structure' | 'regle'
 
 function familleDe(code: string): Famille {
+  // R18/R19 — « le 1er doit être désigné avant le 2nd ». Ce n'est PAS un
+  // empêchement, c'est l'ordre de remplissage : cette place attend simplement
+  // que la précédente soit pourvue. Famille à part, sans levier propre.
+  if (code === 'R18' || code === 'R19') return 'attente_premier'
   if (code === 'R16') return 'conge'
-  if (code === 'R21' || code === 'R17' || code === 'R18' || code === 'R19') return 'deja_de_garde'
+  if (code === 'R21' || code === 'R17') return 'deja_de_garde'
   if (code === 'R8' || code === 'R9') return 'structure'
   return 'regle'
 }
 
+/**
+ * Une place qui n'attend QUE d'en voir une autre pourvue n'est pas un problème
+ * en soi (B-054).
+ *
+ * MiKL, en recette : « il répète plusieurs fois la même objection ». Sur le
+ * week-end du 26/09, cinq lignes identiques — « Le 1er de garde WE doit être
+ * désigné avant le 2nd » — une par vétérinaire. Or cette phrase ne dit rien de
+ * ce qui bloque : elle apparaît parce que la place du 1er est restée vide. La
+ * traiter comme une cause envoie chercher un empêchement qui n'existe pas.
+ */
+function estConsequence(c: CaseVide): boolean {
+  return c.raisons.length > 0 && c.raisons.every((r) => familleDe(r.code) === 'attente_premier')
+}
+
+/**
+ * Dédoublonne les raisons sur leur TEXTE.
+ *
+ * « Le 1er de garde WE doit être désigné avant le 2nd » est identique pour tout
+ * le monde — elle ne nomme personne. L'afficher cinq fois donne l'impression de
+ * cinq obstacles là où il n'y en a qu'un.
+ */
+function raisonsUniques(raisons: RaisonAffichee[]): RaisonAffichee[] {
+  const vues = new Set<string>()
+  return raisons.filter((r) => {
+    const cle = r.raison.trim()
+    if (vues.has(cle)) return false
+    vues.add(cle)
+    return true
+  })
+}
+
 /** Ce sur quoi on peut AGIR, par famille. Jamais une promesse de résultat. */
 const LEVIER: Record<Famille, string> = {
+  attente_premier: 'Pourvois d’abord la place précédente : celle-ci s’ouvrira ensuite.',
   conge: 'Un congé peut être décalé ou raccourci — c’est la voie la plus directe.',
   deja_de_garde: 'Il faudrait une personne de plus ce soir-là : la même ne peut pas tenir deux places.',
   structure: 'C’est l’enchaînement vendredi ↔ week-end qui impose le duo. Il se règle dans les règles de structure.',
@@ -102,9 +138,20 @@ export function CasesAPourvoir({
 
       <ul className="cap-liste">
         {cases.map((c) => {
+          // Une place qui attend seulement qu'une autre soit pourvue : on le dit
+          // en une phrase, sans dérouler cinq fois la même objection.
+          if (estConsequence(c)) {
+            return (
+              <li key={`${c.date}|${c.type}|${c.role}`} className="cap-item">
+                <p className="cap-quand">{libelleCase(c)}</p>
+                <p className="cap-levier">{LEVIER.attente_premier}</p>
+              </li>
+            )
+          }
+
           // Groupement par cause — jamais une liste de codes à plat.
           const parFamille = new Map<Famille, RaisonAffichee[]>()
-          for (const r of c.raisons) {
+          for (const r of raisonsUniques(c.raisons)) {
             const f = familleDe(r.code)
             parFamille.set(f, [...(parFamille.get(f) ?? []), r])
           }

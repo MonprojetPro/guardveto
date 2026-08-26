@@ -621,27 +621,33 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
                 Lues par les règles de composition (« un junior jamais seul »), écran Règles.
               </p>
             </div>
-            <div className="check-line cf-recours">
-              <input
-                id="cf-recours"
-                type="checkbox"
-                checked={form.dernier_recours}
-                onChange={(e) => setForm({ ...form, dernier_recours: e.target.checked })}
-              />
-              <label htmlFor="cf-recours" style={{ all: 'unset', fontSize: '0.84rem', cursor: 'pointer' }}>
-                Dernier recours uniquement
-              </label>
+            {/* B-057 — la case et son explication forment UN bloc, sur toute la
+                largeur. Empilées l'une sous l'autre dans la grille, elles
+                laissaient la moitié droite vide et le texte se lisait en colonne
+                de journal (MiKL : « c'est encore tout déséquilibré »). */}
+            <div className="cf-bloc-recours">
+              <div className="check-line">
+                <input
+                  id="cf-recours"
+                  type="checkbox"
+                  checked={form.dernier_recours}
+                  onChange={(e) => setForm({ ...form, dernier_recours: e.target.checked })}
+                />
+                <label htmlFor="cf-recours" style={{ all: 'unset', fontSize: '0.84rem', cursor: 'pointer' }}>
+                  Dernier recours uniquement
+                </label>
+              </div>
+              {/* B-046 — la case était nue. Sans un mot, « dernier recours » se
+                  lit comme « en dernier », alors que le moteur ne la mobilise
+                  JAMAIS. Une exclusion qui ne se dit pas se découvre sur une
+                  impasse, et on cherche ailleurs. */}
+              <p className="cf-aide cf-aide-recours">
+                Cette personne <strong>n&apos;entre jamais dans une génération de planning</strong> —
+                même s&apos;il ne reste personne d&apos;autre : le moteur préfère annoncer qu&apos;il
+                est bloqué. Elle reste proposée quand tu modifies une garde à la main ou que tu
+                remplaces quelqu&apos;un, et elle reçoit les appels aux volontaires comme les autres.
+              </p>
             </div>
-            {/* B-046 — la case était nue. Sans un mot, « dernier recours » se
-                lit comme « en dernier », alors que le moteur ne la mobilise
-                JAMAIS. Une exclusion qui ne se dit pas se découvre sur une
-                impasse, et on cherche ailleurs. */}
-            <p className="cf-aide cf-aide-recours">
-              Cette personne <strong>n&apos;entre jamais dans une génération de planning</strong> —
-              même s&apos;il ne reste personne d&apos;autre : le moteur préfère annoncer qu&apos;il
-              est bloqué. Elle reste proposée quand tu modifies une garde à la main ou que tu
-              remplaces quelqu&apos;un, et elle reçoit les appels aux volontaires comme les autres.
-            </p>
           </div>
 
           <div className="create-actions">

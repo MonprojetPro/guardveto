@@ -43,7 +43,7 @@ import { compterParVet, type CompteurVet } from './rules/optimization'
 import { comparerScores, scorerPlanning, type VecteurScore, type BonusMalusMap } from './score-lexicographique'
 import { DEFAULT_EQUITY_WEIGHTS, DEFAULT_ROLE_AVANTAGE_FINANCIER, type EquityWeights } from './equity-weights'
 import {
-  DEFAULT_STRUCTURE_CONFIG, compositionsSouples, rolesInterditsSouples,
+  DEFAULT_STRUCTURE_CONFIG, compositionsSouples, rolesInterditsSouples, relationsEffectives,
   type StructureConfig, type PenalitesSouplesConfig,
   type CompositionEquipeRegle, type RoleInterditTagRegle,
 } from './structure-config'
@@ -641,6 +641,183 @@ export interface RemplissageAuMieux {
   creneauxVides: CreneauVide[]
 }
 
+// ── Les créneaux qui se décident ENSEMBLE (B-059) ────────
+//
+// MESURE DU 26/08 QUI A IMPOSÉ CE DÉCOUPAGE. Le remplissage pas-à-pas donnait :
+//   vendredi 25/09 → Fanny (1re) + Antoine (2e)
+//   week-end 26/09 → PERSONNE, les deux places
+// alors que Victor et Jean étaient libres tout ce week-end-là. Pourquoi : R9
+// impose au week-end le duo du vendredi, R8 impose l'inversion (Fanny doit
+// passer 2e), et FREQ_WE interdit à Antoine un second week-end. Le choix du
+// vendredi — pris AVANT, sans regarder plus loin — condamnait le week-end.
+//
+// MiKL, en recette : « pourquoi Victor ne fait pas la garde du week-end du 25 ?
+// Il n'a aucun WE au compteur et n'est pas absent ». Il avait raison : le
+// planning n'était pas contraint, il était mal ordonné.
+//
+// Un vendredi soir et son week-end ne sont pas deux décisions, c'en est UNE.
+// Idem pour les deux places d'un même créneau : choisir le 1er sans regarder
+// qui pourra être 2nd, c'est se condamner de la même façon.
+//
+// On regroupe donc les steps liés, et on décide le groupe d'un bloc — en
+// minimisant d'abord le nombre de cases vides, puis le score d'équité. Les
+// groupes sont minuscules (2 à 4 places), l'exploration reste bornée.
+
+/** Fenêtre d'appariement des créneaux liés — miroir de `relations-structure`. */
+const FENETRE_GROUPE_JOURS = 3
+
+/** Plafond de nœuds par groupe. Jamais atteint sur un groupe réel (≤ 4 places). */
+const MAX_NOEUDS_GROUPE = 20_000
+
+/**
+ * Regroupe les steps qui doivent se décider ensemble :
+ *   • toutes les places d'un même créneau (même date + même type) ;
+ *   • les créneaux unis par une relation de structure (vendredi ↔ week-end).
+ *
+ * L'ordre des groupes suit celui du premier step de chaque groupe : le
+ * calendrier reste parcouru dans le même sens qu'avant.
+ */
+function grouperStepsLies(steps: SolverStep[], structure: StructureConfig): SolverStep[][] {
+  const cle = (s: SolverStep) => `${s.date}|${s.type}`
+
+  // Union-find minimal : chaque créneau pointe vers le représentant de son groupe.
+  const parent = new Map<string, string>()
+  const racine = (k: string): string => {
+    let r = k
+    while (parent.get(r) && parent.get(r) !== r) r = parent.get(r)!
+    return r
+  }
+  const unir = (a: string, b: string) => {
+    const ra = racine(a)
+    const rb = racine(b)
+    if (ra !== rb) parent.set(rb, ra)
+  }
+
+  for (const s of steps) if (!parent.has(cle(s))) parent.set(cle(s), cle(s))
+
+  // Les créneaux liés par une relation : on cherche la SOURCE en arrière depuis
+  // la cible, exactement comme `apparierSourcePourCible` le fait sur un planning.
+  const creneaux = new Set(steps.map(cle))
+  for (const rel of relationsEffectives(structure)) {
+    for (const s of steps) {
+      if (s.type !== rel.cibleCode) continue
+      for (let k = 1; k <= FENETRE_GROUPE_JOURS; k++) {
+        const source = `${addDays(s.date, -k)}|${rel.sourceCode}`
+        if (creneaux.has(source)) {
+          unir(source, cle(s))
+          break
+        }
+      }
+    }
+  }
+
+  const groupes = new Map<string, SolverStep[]>()
+  const ordre: string[] = []
+  for (const s of steps) {
+    const r = racine(cle(s))
+    if (!groupes.has(r)) {
+      groupes.set(r, [])
+      ordre.push(r)
+    }
+    groupes.get(r)!.push(s)
+  }
+  return ordre.map((r) => groupes.get(r)!)
+}
+
+/** Le meilleur remplissage d'un groupe : le moins de cases vides possible. */
+interface ChoixGroupe {
+  /** Une entrée par step du groupe, dans l'ordre : l'id posé, ou `null`. */
+  affectation: (string | null)[]
+  nbVides: number
+  scoreTotal: number
+}
+
+/**
+ * Décide un groupe d'un bloc, par exploration exhaustive bornée.
+ *
+ * Critère, dans cet ordre : ① le moins de cases vides — une garde pourvue vaut
+ * mieux qu'un planning élégant ; ② le meilleur score d'équité à nombre de cases
+ * égal. Les règles DURES ne sont jamais enfreintes : « laisser vide » est une
+ * option, « poser quelqu'un qui n'a pas le droit » n'en est pas une.
+ */
+function resoudreGroupe(
+  groupe: SolverStep[],
+  planningInitial: PlanningPartiel,
+  vets: VetEngineNormalise[],
+  bonusMalus: BonusMalusMap,
+  weights: EquityWeights,
+  structure: StructureConfig,
+  calendrier: CalendrierResolu | undefined,
+  roleAvantage: string | null,
+  contexteAnterieur: AttributionGarde[] | undefined,
+): ChoixGroupe {
+  let meilleur: ChoixGroupe = {
+    affectation: groupe.map(() => null),
+    nbVides: groupe.length,
+    scoreTotal: Number.POSITIVE_INFINITY,
+  }
+  let noeuds = 0
+
+  const explorer = (
+    index: number,
+    planning: PlanningPartiel,
+    affectation: (string | null)[],
+    nbVides: number,
+    scoreTotal: number,
+  ) => {
+    if (noeuds++ > MAX_NOEUDS_GROUPE) return
+
+    // Élagage : cette branche a déjà plus de trous que la meilleure connue.
+    if (nbVides > meilleur.nbVides) return
+
+    if (index === groupe.length) {
+      if (nbVides < meilleur.nbVides || (nbVides === meilleur.nbVides && scoreTotal < meilleur.scoreTotal)) {
+        meilleur = { affectation: [...affectation], nbVides, scoreTotal }
+      }
+      return
+    }
+
+    const step = groupe[index]
+    const slot: SlotGarde = {
+      date: step.date, type: step.type, saison: step.saison,
+      besoinSecond: step.besoinSecond, nbPlaces: step.nbPlaces,
+    }
+
+    const valides = vets.filter(
+      (v) => isValid(slot, v, step.role, vets, planning, calendrier, structure, contexteAnterieur).valid,
+    )
+    const compteurs =
+      valides.length > 1 ? compterParVet(planning, vets, roleAvantage, calendrier) : undefined
+    const candidats = valides
+      .map((vet) => ({
+        vet,
+        score: scorerCandidat(
+          step, vet, planning, bonusMalus, vets, weights, calendrier, roleAvantage,
+          compteurs, structure.penalitesSouples, structure.historiqueFetes,
+          compositionsSouples(structure), rolesInterditsSouples(structure), contexteAnterieur,
+        ),
+      }))
+      .sort((a, b) => a.score - b.score)
+
+    for (const { vet, score } of candidats) {
+      affectation[index] = vet.id
+      explorer(index + 1, assignerStep(planning, step, vet.id), affectation, nbVides, scoreTotal + score)
+      affectation[index] = null
+    }
+
+    // Laisser la place vide — dernière option, jamais la première : on ne
+    // renonce à une garde qu'après avoir essayé tout le monde.
+    const planningAvecVide = planning.attributions.some((a) => a.date === step.date && a.type === step.type)
+      ? planning
+      : { attributions: [...planning.attributions, attributionVide(step.date, step.type, step.rolesCreneau)] }
+    affectation[index] = null
+    explorer(index + 1, planningAvecVide, affectation, nbVides + 1, scoreTotal)
+  }
+
+  explorer(0, planningInitial, groupe.map(() => null), 0, 0)
+  return meilleur
+}
+
 /**
  * Le pourquoi de TOUS les vétérinaires écartés — sans exception.
  *
@@ -701,56 +878,49 @@ export function remplirAuMieux(input: SolverInput): RemplissageAuMieux {
   let planning: PlanningPartiel = { attributions: [] }
   const creneauxVides: CreneauVide[] = []
 
-  for (const step of steps) {
-    const slot: SlotGarde = {
-      date: step.date, type: step.type, saison: step.saison,
-      besoinSecond: step.besoinSecond, nbPlaces: step.nbPlaces,
-    }
-
-    const valides = vets.filter(
-      (vet) => isValid(slot, vet, step.role, vets, planning, calendrier, structure, input.contexteAnterieur).valid,
+  // On avance GROUPE par groupe, et non place par place (B-059) : un vendredi
+  // soir et son week-end se décident ensemble, comme les deux places d'un même
+  // créneau. Décidés séparément, le premier choix condamne le second.
+  for (const groupe of grouperStepsLies(steps, structure)) {
+    const choix = resoudreGroupe(
+      groupe, planning, vets, bonusMalus, weights, structure, calendrier,
+      roleAvantage, input.contexteAnterieur,
     )
 
-    if (valides.length === 0) {
-      // La garde EXISTE, elle est simplement à pourvoir. Sans cette ligne, un
-      // créneau dont aucune place n'est pourvue n'apparaîtrait NULLE PART : ni
-      // en base, ni dans le calendrier — le trou serait invisible, et l'admin
-      // croirait qu'il n'y a pas de garde ce soir-là. On veut l'inverse exact :
-      // une case vide qui se voit et se clique.
+    // ① On pose d'abord tout ce qui est pourvu. Les raisons des cases vides se
+    //    lisent ENSUITE, dans le planning complété : sinon on expliquerait un
+    //    trou par l'absence de ses propres voisins (« le 1er doit être désigné
+    //    avant le 2nd »), qui est une conséquence et non une cause.
+    groupe.forEach((step, i) => {
+      const vetId = choix.affectation[i]
+      if (vetId) planning = assignerStep(planning, step, vetId)
+    })
+
+    // ② Les cases restées vides : la garde EXISTE, elle est à pourvoir. Sans
+    //    cette ligne, un créneau dont aucune place n'est pourvue n'apparaîtrait
+    //    NULLE PART — ni en base, ni au calendrier. Le trou serait invisible.
+    groupe.forEach((step) => {
       const existe = planning.attributions.some((a) => a.date === step.date && a.type === step.type)
       if (!existe) {
         planning = {
           attributions: [...planning.attributions, attributionVide(step.date, step.type, step.rolesCreneau)],
         }
       }
+    })
 
-      // On capture le pourquoi DANS CE CONTEXTE, pas sur un planning théorique :
-      // une règle de rythme ne se voit que là.
+    groupe.forEach((step, i) => {
+      if (choix.affectation[i]) return
+      const slot: SlotGarde = {
+        date: step.date, type: step.type, saison: step.saison,
+        besoinSecond: step.besoinSecond, nbPlaces: step.nbPlaces,
+      }
       creneauxVides.push({
         date: step.date,
         type: step.type,
         role: step.role,
         raisons: raisonsCompletes(step, slot, planning, vets, calendrier, structure, input.contexteAnterieur),
       })
-      continue
-    }
-
-    // Même scoring que le backtracking : le planning de secours reste équitable,
-    // il n'est pas rempli « n'importe comment ».
-    const compteursStep =
-      valides.length > 1 ? compterParVet(planning, vets, roleAvantage, calendrier) : undefined
-    const meilleur = valides
-      .map((vet) => ({
-        vet,
-        score: scorerCandidat(
-          step, vet, planning, bonusMalus, vets, weights, calendrier, roleAvantage,
-          compteursStep, structure.penalitesSouples, structure.historiqueFetes,
-          compositionsSouples(structure), rolesInterditsSouples(structure), input.contexteAnterieur,
-        ),
-      }))
-      .sort((a, b) => a.score - b.score)[0].vet
-
-    planning = assignerStep(planning, step, meilleur.id)
+    })
   }
 
   return { planning, creneauxVides }
