@@ -378,3 +378,27 @@ pointeur mouvant.
 3. **Retirer quelqu'un de l'effectif fait mentir les contrôles voisins.** Le pré-vol prenait le dernier recours pour un véto sorti de l'équipe et conseillait de **supprimer** ses règles — un conseil destructeur. D'où `idsHorsGeneration` : « hors du moteur » et « hors de l'équipe » sont deux choses.
 4. **Quatre textes de Filou décrivaient l'ancien comportement** et sont devenus faux le jour du changement. La question à se poser n'est jamais « faut-il un outil ? » mais « une réponse déjà donnée devient-elle fausse ? ».
 5. Garde-fou posé : `tests/lib/generation-exclut-dernier-recours.test.ts` refuse tout appelant de `genererPlanningPur` qui ne passerait pas `pourGeneration: true`. Vérifié par mutation (drapeau retiré → test rouge).
+
+---
+
+## 2026-08-26 — Un moteur en tout-ou-rien fait paniquer (B-053)
+
+**Contexte :** MiKL relance une génération qui bute. L'écran affiche un mur rouge, dix règles avec leur code machine, « 25 créneaux non couverts », et **aucun planning**. Sa réaction : *« faut plus que le moteur réagisse comme ça, t'imagine un client qui tombe là-dessus, il panique !! on est censé être en prod »*.
+
+**Trois causes distinctes, empilées :**
+
+1. **Le moteur était en tout-ou-rien.** Le backtracking défait tout dès qu'un créneau n'a aucun candidat. Un seul enchaînement impossible sur un week-end = 100 % du travail perdu, et **aucun moyen de reprendre la main** : on ne complète pas à la main un planning qui n'existe pas.
+2. **Le chiffre affiché ne comptait pas des problèmes.** `joursNonCouverts = steps.slice(indexImpasse)` (`solver.ts`, commenté « rapport legacy ») renvoie **tout ce qui suit le point d'arrêt**. Un blocage rougissait trois semaines de calendrier. Mesure réelle : 5 vrais trous affichés comme 25.
+3. **Le champ de secours existait déjà… et était vide.** `planningPartiel` figurait dans le type de retour depuis toujours, valait `{ attributions: [] }` en dur, et n'était lu par personne.
+
+**Fix :** `remplirAuMieux` — passe gloutonne tolérante aux trous, mêmes règles dures et même scoring d'équité, aucun retour en arrière (linéaire, donc pas de ré-explosion là où la recherche complète vient d'échouer). Elle ne s'exécute QUE sur échec, jamais à la place. Le planning partiel est ensuite persisté **par le même chemin que le succès**, et la publication le refuse tant qu'une case est vide.
+
+**Mesure (Hiver P1, vraies données, dernier recours exclu) :** 43 places pourvues et 5 cases vides, là où le moteur ne rendait rien.
+
+**À retenir :**
+1. **Un calcul qui échoue doit rendre ce qu'il a trouvé.** « Tout ou rien » est un choix de solveur, pas un choix de produit. Le rendre visible à l'utilisateur transforme un résultat partiel utile en catastrophe apparente.
+2. **Un chiffre affiché doit compter ce que son libellé annonce.** « 25 créneaux non couverts » comptait autre chose. Un écran qui compte faux est plus grave qu'un écran illisible : le second se voit, le premier oriente les décisions.
+3. **Un champ optionnel jamais rempli est une coquille vide qui attend.** `planningPartiel` a traversé des mois de développement sans que son absence de contenu ne déclenche rien.
+4. **Le pourquoi doit être exhaustif ou il ment.** `raisonsSurCreneau` jetait toute raison sans code `R<n>` : un tiers des exclusions (`ESPACEMENT`, `FREQ_WE`) était muet. Une liste d'empêchements incomplète laisse croire que les absents étaient disponibles.
+5. **Le nettoyage d'affichage se duplique tout seul.** Six copies de `replace(/^R\d+ : /)` existaient, toutes avec la même lacune. Source unique posée (`sansCodeTechnique`), les six branchées dessus.
+6. **Un bouton de secours qui ment est pire que pas de bouton.** « L'équipe a reçu ta situation » s'affichait sans qu'aucun envoi soit prouvé (`sendBrevoEmail` **retourne** ses erreurs, elle ne les lève pas). Supprimé plutôt que rafistolé, au profit du chemin qui journalise déjà.
