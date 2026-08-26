@@ -68,6 +68,10 @@ const PARITES = [
   { value: 'impaire', label: 'Semaines impaires seulement' },
 ]
 
+/** Valeur sentinelle « pas de contrainte sur ce volet » (B-045). */
+const AUCUN = '__aucun__'
+const JOURS_OU_AUCUN = [{ value: AUCUN, label: 'Aucun' }, ...JOURS]
+
 const BRIQUES: { value: BriqueEvaluable; label: string; aide: string }[] = [
   { value: 'interdire_creneau', label: 'Repos fixe un jour', aide: 'Ne fait jamais de garde un jour précis de la semaine — toutes les semaines, ou une semaine sur deux.' },
   { value: 'repos_conditionnel', label: 'Repos selon la garde du week-end', aide: 'Jour de repos différent selon que le véto est de garde le week-end ou non.' },
@@ -255,8 +259,8 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
   })
 
   // repos_conditionnel
-  const [siWe, setSiWe] = useState(typeof p.si_garde_we === 'string' ? p.si_garde_we : 'jeudi')
-  const [sinon, setSinon] = useState(typeof p.sinon === 'string' ? p.sinon : 'vendredi')
+  const [siWe, setSiWe] = useState(typeof p.si_garde_we === 'string' ? p.si_garde_we : isEdit ? AUCUN : 'jeudi')
+  const [sinon, setSinon] = useState(typeof p.sinon === 'string' ? p.sinon : isEdit ? AUCUN : 'vendredi')
 
   // alternance_ancre
   const [semaines, setSemaines] = useState<string>(typeof p.semaines === 'string' ? p.semaines : 'impaires')
@@ -422,7 +426,10 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
               }
         break
       case 'repos_conditionnel':
-        params = { si_garde_we: siWe, sinon }
+        params = {
+          ...(siWe === AUCUN ? {} : { si_garde_we: siWe }),
+          ...(sinon === AUCUN ? {} : { sinon }),
+        }
         break
       case 'alternance_ancre':
         params = { semaines, periodes }
@@ -560,8 +567,8 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
         // Parité (B-038) : n'est envoyée que par le repos fixe. Ailleurs elle
         // n'a pas de sens, et `construireParams` l'ignore de toute façon.
         semaine: briqueId === 'interdire_creneau' ? parite : undefined,
-        si_garde_we: siWe,
-        sinon,
+        si_garde_we: siWe === AUCUN ? undefined : siWe,
+        sinon: sinon === AUCUN ? undefined : sinon,
         semaines,
         periodes,
         avec_veterinaire_id: avecId,
@@ -787,26 +794,37 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
           )}
 
           {briqueId === 'repos_conditionnel' && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Si garde le week-end</Label>
-                <Select value={siWe} onValueChange={(v) => v && setSiWe(v)} items={JOURS}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {JOURS.map((j) => <SelectItem key={j.value} value={j.value}>{j.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+            <>
+              {/* Les deux volets sont INDÉPENDANTS (B-045). « Aucun » couvre le
+                  cas courant : « quand il est de garde le week-end il se repose
+                  le jeudi ; les autres semaines, rien de particulier ». Les deux
+                  gardiens le géraient déjà — seul ce formulaire l'interdisait. */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Si garde le week-end</Label>
+                  <Select value={siWe} onValueChange={(v) => v && setSiWe(v)} items={JOURS_OU_AUCUN}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {JOURS_OU_AUCUN.map((j) => <SelectItem key={j.value} value={j.value}>{j.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Sinon</Label>
+                  <Select value={sinon} onValueChange={(v) => v && setSinon(v)} items={JOURS_OU_AUCUN}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {JOURS_OU_AUCUN.map((j) => <SelectItem key={j.value} value={j.value}>{j.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label>Sinon</Label>
-                <Select value={sinon} onValueChange={(v) => v && setSinon(v)} items={JOURS}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {JOURS.map((j) => <SelectItem key={j.value} value={j.value}>{j.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+              {siWe === AUCUN && sinon === AUCUN && (
+                <p className="text-xs text-destructive">
+                  Renseigne au moins un des deux cas, sinon la règle ne fait rien.
+                </p>
+              )}
+            </>
           )}
 
           {briqueId === 'alternance_ancre' && (

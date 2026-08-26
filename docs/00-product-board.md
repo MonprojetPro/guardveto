@@ -110,13 +110,12 @@ requalifie non bloquant). Detail integral → archive 3ter.
 
 | ID | Ce qui etait annonce | Ce qui est reellement livre | Verdict |
 |---|---|---|---|
-| B-044 | Une garde de semaine se dit « nuit », pas « jour » | 19 fichiers : « Soir de semaine » → « Nuit de semaine », « Soirs de semaine » → « Nuits de semaine ». Ecrans de reglages, moteur de pre-vol, libelles de types, aides du formulaire, Filou | OK |
-| B-044 | Les phrases de repos disent la nuit visee | `ne fait pas de garde la nuit du lundi` (helper `nuitDe`, `catalogue.ts`). Plusieurs jours : « la nuit du lundi et du mardi » | OK |
-| B-044 | Les week-ends gardent le vocabulaire du jour | Aucun libelle week-end/samedi/dimanche touche — decision MiKL | OK |
-| B-044 | Le vendredi soir reste « vendredi soir » | Inchange, comme decide | OK |
-| B-044 | Les selecteurs gardent les jours | Les pastilles du formulaire disent toujours « Lundi, Mardi… » : on choisit un JOUR, on decrit une NUIT | OK |
-| B-044 | **Ce qui n'a PAS ete touche, et pourquoi** | `structure-creneaux.ts` porte « Soir de semaine (lun-jeu) » : c'est le MIROIR du seed `creneaux_catalogue`, une **donnee de cabinet** modifiable dans l'ecran Creneaux. Un test a refuse la divergence code/base — il a eu raison. Renommer ce creneau est une decision du cabinet, pas la notre | OK |
-| B-044 | Preuves | `npx tsc --noEmit` → 0 erreur · `npm test` → 1383 passed · `npm run build` → Compiled successfully | OK |
+| B-045 | Pouvoir ne PAS mettre de « sinon » | Option « Aucun » sur les DEUX volets du repos conditionnel (`RegleFormDialog`), et `construireParams` n'ecrit que les cles renseignees | OK |
+| B-045 | Les gardiens le geraient deja | Verifie ligne a ligne : `violeReposConditionnel` (hard-constraints.ts:321) et `validerPlanning.ts:784` comparent `sinon === jour`, ce qui est simplement faux quand la cle est absente. **Aucun code moteur ecrit** — 4e fois aujourd'hui que la limite venait du formulaire | OK |
+| B-045 | Refus des deux vides | Une regle sans aucun volet ne ferait rien : refusee cote serveur ET signalee dans l'ecran. La coquille vide que ce projet refuse partout | OK |
+| B-045 | La phrase dit ce qui n'est PAS contraint | « ne fait pas de garde la nuit du jeudi les semaines ou il est de garde le week-end (aucune contrainte les autres semaines) ». Sans cette fin, la regle se lisait comme si elle valait toutes les semaines | OK |
+| B-045 | Filou aussi | Description du type 2 refaite dans le prompt : les deux volets sont independants, au moins un obligatoire. Le schema les acceptait deja optionnels | OK |
+| B-045 | Preuves | `npx tsc --noEmit` → 0 erreur · `npm test` → 1387 passed (contre 1383 : +4) · `npm run build` → Compiled successfully | OK |
 
 **Regles :**
 
@@ -138,6 +137,7 @@ requalifie non bloquant). Detail integral → archive 3ter.
 
 | ID | Titre | Commit | Date | Perimetre |
 |---|---|---|---|---|
+| B-045 | **Le repos conditionnel n'exige plus ses deux volets.** « Quand il est de garde le week-end il se repose le jeudi ; les autres semaines, rien de particulier » etait impossible a saisir — le formulaire imposait un « sinon ». Les deux gardiens l'acceptaient depuis toujours. **A RECETTER.** | `a venir` | 2026-08-26 | A qualifier |
 | B-044 | **Le produit dit « nuit » la ou il disait « jour ».** Exigence de MiKL le 26/08 : une garde de semaine commence le soir et court jusqu'au lendemain matin — « de garde le lundi » veut dire la nuit du lundi au mardi. C'est exactement ce qui pretait a confusion : la regle de Victor porte « pas de garde le lundi » parce qu'il veut ses MARDIS libres. Week-ends et vendredi soir inchanges. **A RECETTER.** | `a venir` | 2026-08-26 | A qualifier |
 | B-043 | **Les demi-journees retirees du produit — elles annoncaient une portee que le moteur n'appliquait pas.** Decision de MiKL le 26/08. Conges (saisie, listes, e-mails, Filou) et libelles de regles. Un test verrouillait le defaut : il exigeait que « l'apres-midi » s'affiche. Donnees client intactes. **A RECETTER.** | `a venir` | 2026-08-26 | A qualifier |
 | B-041 | **Une regle de repos porte desormais PLUSIEURS jours.** La limite « un seul jour par regle » etait une simplification posee le matin meme (B-038) ; elle est tombee au premier usage reel — Filou, qui ne propose qu'une regle par reponse, abandonnait le mardi sans le dire. Les gardiens bouclaient deja sur les entrees : aucun code moteur ecrit. Le prompt lui interdit desormais de traiter une moitie de demande en silence. **A RECETTER.** | `a venir` | 2026-08-26 | A qualifier |

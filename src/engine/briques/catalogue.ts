@@ -232,10 +232,20 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
     rendreLangageNaturel: (params) => {
       const si = params.si_garde_we
       const sinon = params.sinon
-      if (typeof si === 'string' && typeof sinon === 'string') {
-        return `est en repos le ${si} s'il est de garde le week-end, sinon le ${sinon}`
+      const aSi = typeof si === 'string'
+      const aSinon = typeof sinon === 'string'
+      if (aSi && aSinon) {
+        return `ne fait pas de garde ${nuitDe(String(si))} s'il est de garde le week-end, sinon ${nuitDe(String(sinon))}`
       }
-      if (typeof sinon === 'string') return `est en repos le ${sinon}`
+      // Un seul volet renseigné (B-045) : les semaines non couvertes ne portent
+      // aucune contrainte, et la phrase doit le dire — sinon l'admin lit une
+      // règle qui semble valoir toujours.
+      if (aSi) {
+        return `ne fait pas de garde ${nuitDe(String(si))} les semaines où il est de garde le week-end (aucune contrainte les autres semaines)`
+      }
+      if (aSinon) {
+        return `ne fait pas de garde ${nuitDe(String(sinon))} les semaines où il n'est PAS de garde le week-end`
+      }
       return 'repos conditionnel (paramètres non précisés)'
     },
   },

@@ -323,9 +323,33 @@ export function construireParams(
       }
     }
     case 'repos_conditionnel': {
-      if (!p.si_garde_we || !JOURS_VALIDES.has(p.si_garde_we)) return { error: 'Jour « si garde WE » invalide.' }
-      if (!p.sinon || !JOURS_VALIDES.has(p.sinon)) return { error: 'Jour « sinon » invalide.' }
-      return { quand: null, params: { si_garde_we: p.si_garde_we, sinon: p.sinon } }
+      // ── Les deux volets sont INDEPENDANTS (B-045, 2026-08-26) ──────────
+      //
+      // Exigence de MiKL : « il faut pouvoir ne pas mettre de sinon ». Cas reel
+      // et frequent — « quand il est de garde le week-end, il se repose le
+      // jeudi ; les autres semaines, rien de particulier ».
+      //
+      // Les DEUX gardiens le geraient deja : `violeReposConditionnel` (moteur)
+      // et `validerPlanning` comparent `sinon === jour`, ce qui est simplement
+      // faux quand `sinon` est absent. Seule la saisie l'exigeait. C'est la
+      // QUATRIEME fois aujourd'hui qu'une limite vient du formulaire et non du
+      // moteur — cf. B-038, B-041, B-043.
+      const siWe = p.si_garde_we
+      const sinon = p.sinon
+      if (siWe && !JOURS_VALIDES.has(siWe)) return { error: 'Jour « si garde le week-end » invalide.' }
+      if (sinon && !JOURS_VALIDES.has(sinon)) return { error: 'Jour « sinon » invalide.' }
+      // Les deux vides = une regle qui ne fait rien. On la refuse plutot que de
+      // laisser l'admin croire qu'elle a pose quelque chose (coquille vide).
+      if (!siWe && !sinon) {
+        return { error: 'Renseigne au moins un des deux cas : avec garde de week-end, ou sans.' }
+      }
+      return {
+        quand: null,
+        params: {
+          ...(siWe ? { si_garde_we: siWe } : {}),
+          ...(sinon ? { sinon } : {}),
+        },
+      }
     }
     case 'alternance_ancre': {
       if (!p.semaines || !SEMAINES_VALIDES.has(p.semaines)) return { error: 'Cadence (semaines) invalide.' }

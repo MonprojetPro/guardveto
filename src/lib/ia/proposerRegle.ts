@@ -100,7 +100,11 @@ LES 19 TYPES — tu ne peux en proposer qu'UN SEUL :
    semaines. Avec paire ou impaire, exception_vacances_scolaires est refusé.
    Ne pas confondre avec le type 3 : ici on vise UN JOUR, là-bas des CRÉNEAUX.
 2. repos_conditionnel — jour de repos différent selon la garde du week-end.
-   si_garde_we (jour si de garde le WE), sinon (jour de repos sinon).
+   si_garde_we (jour de repos les semaines AVEC garde de week-end), sinon (jour
+   de repos les semaines SANS). Les deux sont INDÉPENDANTS : n'en renseigne
+   qu'un si la demande n'en couvre qu'un (« quand il est de garde le week-end il
+   se repose le jeudi » → si_garde_we=jeudi, pas de sinon). Au moins un des deux
+   est obligatoire.
 3. alternance_ancre — indisponible certains créneaux une semaine sur deux.
    semaines (paires|impaires|toutes), periodes (parmi soir_semaine, weekend).
 4. duo_interdit — deux vétos jamais de garde SEULS ensemble.

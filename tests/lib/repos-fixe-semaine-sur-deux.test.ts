@@ -272,3 +272,53 @@ describe('Plusieurs jours de repos dans une seule regle (B-041)', () => {
     expect(phrase.match(/semaines paires/g)).toHaveLength(1)
   })
 })
+
+// ── Repos conditionnel : les deux volets sont independants (B-045) ───────
+// « Il faut pouvoir ne pas mettre de sinon » — MiKL. Cas reel : « quand il est
+// de garde le week-end, il se repose le jeudi ; les autres semaines, rien de
+// particulier ». Les deux gardiens le geraient deja (`sinon === jour` est
+// simplement faux quand `sinon` est absent) ; seul le formulaire l'exigeait.
+describe('Repos conditionnel sans « sinon » (B-045)', () => {
+  function params(siWe?: string, sinon?: string) {
+    return construireParams({
+      brique_id: 'repos_conditionnel',
+      owner_id: 'v',
+      force: 'jamais',
+      si_garde_we: siWe,
+      sinon,
+    })
+  }
+
+  it('accepte « si garde le week-end » seul', () => {
+    const sortie = params('jeudi', undefined)
+    if ('error' in sortie) throw new Error(sortie.error)
+    expect(sortie.params.si_garde_we).toBe('jeudi')
+    // La cle ne doit pas exister du tout : `sinon: undefined` serait ecrit
+    // `null` en JSON et relu comme une valeur posee.
+    expect('sinon' in sortie.params).toBe(false)
+  })
+
+  it('accepte « sinon » seul', () => {
+    const sortie = params(undefined, 'vendredi')
+    if ('error' in sortie) throw new Error(sortie.error)
+    expect(sortie.params.sinon).toBe('vendredi')
+    expect('si_garde_we' in sortie.params).toBe(false)
+  })
+
+  it('REFUSE les deux vides — une regle qui ne fait rien', () => {
+    // Sans ce refus, l'admin poserait une regle, la verrait dans la liste, et
+    // le planning n'en tiendrait aucun compte. C'est la coquille vide que ce
+    // projet refuse partout.
+    expect('error' in params(undefined, undefined)).toBe(true)
+  })
+
+  it('la phrase dit que les autres semaines ne sont PAS contraintes', () => {
+    const sortie = params('jeudi', undefined)
+    if ('error' in sortie) throw new Error(sortie.error)
+    const phrase = rendreRegle('repos_conditionnel', sortie.params)
+    expect(phrase).toContain('jeudi')
+    // Sans cette precision, la regle se lit comme si elle valait toutes les
+    // semaines — exactement le contraire de ce qu'elle fait.
+    expect(phrase).toContain('aucune contrainte les autres semaines')
+  })
+})
