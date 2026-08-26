@@ -1,5 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+// `CriseModal` s'ouvre aussi d'ici (conflit conge / planning publie) : son
+// habillage vit dans `v2-planning.css`.
+import '@/styles/v2-planning.css'
 import { CongesList } from '@/components/conges/CongesList'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { detecterConflitPlanningPublie } from '@/lib/conges/detection-conflit'

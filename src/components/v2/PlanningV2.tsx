@@ -711,6 +711,26 @@ export function PlanningV2({
 
       {isAdmin && vets.length > 0 && (
         <CriseModal
+          // ⚠️ CETTE `key` N'EST PAS COSMÉTIQUE — sans elle, le formulaire est
+          // en retard d'un clic, et on peut déclarer absent le MAUVAIS véto.
+          //
+          // `CriseModal` est monté en permanence (dès qu'on est admin) : ses
+          // `useState` prennent leur valeur au PREMIER montage, quand
+          // `criseVetId` et `criseDate` valent encore `undefined`. Le seul
+          // endroit qui les resynchronise est le `resetAll()` de la FERMETURE.
+          // Constaté en recette le 26/08 : première ouverture vide, puis
+          // chaque ouverture suivante pré-remplie avec la cible du clic
+          // PRÉCÉDENT.
+          //
+          // Le danger n'est pas le formulaire vide — il se voit, on le
+          // remplit. C'est le formulaire pré-rempli avec la mauvaise
+          // personne : il a l'air juste. Déclarer Victor absent le 15 pouvait
+          // ouvrir la fenêtre sur Manon le 10, sur un planning publié.
+          //
+          // Les DEUX autres écrans qui ouvrent cette fenêtre posent déjà cette
+          // `key` (`CongesList.tsx`, `AbsencesV2.tsx`). Elle manquait ici.
+          // Jamais `useEffect` + `setState` : ESLint le refuse sur ce projet.
+          key={`crise-${criseVetId ?? 'sans-veto'}-${criseDate ?? 'sans-date'}`}
           open={criseOpen}
           onOpenChange={setCriseOpen}
           vets={vets}

@@ -13,6 +13,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { exigerVeterinaire } from '@/lib/identite'
+// `CriseModal` s'ouvre AUSSI depuis cet ecran (reparation d'un conflit de
+// conge). Son habillage vit dans `v2-planning.css` : sans cet import, la
+// meme fenetre serait stylee depuis le planning et nue depuis ici.
+import '@/styles/v2-planning.css'
 import '@/styles/v2-absences.css'
 import '@/styles/v2-echanges.css'
 import '@/styles/v2-filou-edge.css'

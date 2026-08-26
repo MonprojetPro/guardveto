@@ -1,5 +1,10 @@
 'use client'
 
+// ⚠️ CE FICHIER N'EST ATTEINT PAR AUCUN ÉCRAN — vérifié le 2026-08-26.
+// Vestige de la V1, comme `components/calendar/`. La barre d'actions du
+// planning est aujourd'hui portée par `components/v2/PlanningV2.tsx`.
+// Suppression à trancher avec MiKL — item B-027 du board.
+
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'

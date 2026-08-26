@@ -2130,3 +2130,131 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .pdf-menu-item:hover { background: var(--surface-2); border-color: var(--t-border); }
 .pdf-menu-item b { font-size: 0.82rem; font-weight: 700; }
 .pdf-menu-item span { font-size: 0.72rem; color: var(--t-muted); }
+
+/* ══════════════════════════════════════════════════════════════
+   RÉPARER LE PLANNING — la fenêtre de crise (B-026)
+   ══════════════════════════════════════════════════════════════
+   MiKL, 26/08, après recette : « le design n'est pas fou, même pour
+   l'alerte ». Il avait raison, et la cause n'était pas une question de
+   goût : cette fenêtre n'avait jamais été portée sur le système de
+   design de la V2. Elle employait cinq couleurs Tailwind par défaut
+   — `amber-600`, `green-50`, `green-200`, `green-800`, `amber-500` —
+   dans une application dont toute la palette est crème et terracotta.
+   D'où l'impression de pièce rapportée.
+
+   Rien n'est inventé ici : on réutilise les jetons (`--warn`, `--ok`,
+   `--t-muted`, `--t-border`) et la carte `.gf-card.souple` que les
+   QUATRE autres écrans emploient déjà pour dire qu'une règle est
+   enfreinte. La doctrine du 22/08 — « une seule voix pour les règles
+   enfreintes » — s'applique enfin à cette fenêtre-ci.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Qui remplace qui ────────────────────────────────────────
+   Avant : deux encarts gris de MÊME POIDS, titrés « Avant » et
+   « Après ». Deux boîtes identiques côte à côte ne racontent pas un
+   mouvement de l'une vers l'autre — elles se lisent comme deux
+   informations parallèles. Et le nom de l'absent·e était barré ET
+   grisé, donc à peine lisible au moment précis où il faut savoir de
+   qui l'on parle. */
+.crise-transfert {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.25rem;
+}
+
+.crise-partie {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.crise-nom {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  line-height: 1.3;
+  min-width: 0;
+}
+
+/* Le sortant reste PARFAITEMENT lisible : barré suffit à dire qu'il
+   s'en va. Le griser en plus, c'était rendre illisible la seule
+   information qui permet de vérifier qu'on ne se trompe pas de
+   personne. */
+.crise-nom.sortant {
+  color: var(--t-foreground, inherit);
+  text-decoration: line-through;
+  text-decoration-color: var(--danger);
+  text-decoration-thickness: 1.5px;
+}
+
+/* Celui qui prend la garde est le seul en gras : c'est lui, la
+   décision. */
+.crise-nom.entrant { font-weight: 600; }
+
+.crise-nom.vide {
+  color: var(--t-muted);
+  font-style: italic;
+}
+
+.crise-role {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--t-muted);
+}
+
+.crise-role.alerte { color: var(--danger); }
+
+.crise-fleche {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  color: var(--t-accent);
+}
+
+/* Sous 480 px, la flèche horizontale n'a plus la place de dire son
+   mouvement : la colonne le dit mieux. */
+@media (max-width: 480px) {
+  .crise-transfert { flex-direction: column; align-items: stretch; gap: 0.4rem; }
+  .crise-fleche { transform: rotate(90deg); align-self: center; }
+}
+
+/* ── Le compteur d'alertes dans la liste déroulante ────────── */
+.crise-compteur-alerte {
+  font-size: 0.65rem;
+  color: var(--warn);
+}
+
+/* ── Le triangle du titre de la fenêtre ────────────────────── */
+.crise-icone-titre { color: var(--warn); }
+
+/* ── « Aucune garde impactée » ───────────────────────────────
+   C'était le seul vert Tailwind de toute la V2. Une bonne nouvelle se
+   dit dans le même vocabulaire que le reste — et surtout pas plus fort
+   qu'un avertissement. */
+.crise-rien-a-faire {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background: var(--ok-soft);
+  border: 1px solid rgba(90, 150, 60, 0.32);
+  color: var(--ok);
+}
+
+.crise-rien-titre {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ok);
+}
+
+.crise-rien-detail {
+  font-size: 0.78rem;
+  margin-top: 0.15rem;
+  color: var(--t-muted);
+}

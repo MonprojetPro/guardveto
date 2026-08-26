@@ -245,47 +245,44 @@ function LigneReparation({
         </span>
       </div>
 
-      {/* AVANT → APRÈS */}
-      <div className="flex items-stretch gap-3">
-        {/* AVANT : l'absent */}
-        <div className="flex-1 min-w-0 rounded-md bg-muted/40 p-2.5 space-y-1">
-          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-            Avant
-          </p>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-foreground line-through decoration-destructive/60">
-              {absentPrenom}
-            </span>
-            <span className="text-[11px] text-destructive">absent·e</span>
-          </div>
+      {/* ── QUI REMPLACE QUI ──────────────────────────────────
+           Refonte du 26/08 (B-026). Ce qui existait avant : deux encarts
+           gris de même poids, titrés « Avant » et « Après », dans lesquels
+           le nom de l'absent·e était barré ET grisé — donc à peine lisible
+           au moment précis où il faut savoir de qui l'on parle.
+
+           Deux boîtes identiques côte à côte ne disent pas qu'il se passe
+           quelque chose de l'une vers l'autre : elles se lisent comme deux
+           informations parallèles. On garde donc la flèche, mais on cesse
+           de mettre les deux états au même niveau — celui qui compte est
+           celui qui prend la garde. */}
+      <div className="crise-transfert">
+        <div className="crise-partie">
+          <span className="crise-nom sortant">{absentPrenom}</span>
+          <span className="crise-role">absent·e</span>
         </div>
 
-        <div className="flex items-center shrink-0">
-          <ArrowRight className="w-4 h-4 text-muted-foreground" aria-hidden />
-        </div>
+        <ArrowRight className="crise-fleche" aria-hidden />
 
-        {/* APRÈS : le remplaçant proposé / choisi */}
-        <div className="flex-1 min-w-0 rounded-md bg-muted/40 p-2.5 space-y-1">
-          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-            Après
-          </p>
+        <div className="crise-partie">
           {aucunCandidat ? (
-            <div className="flex items-center gap-1.5 text-sm text-destructive">
-              <CircleAlert className="w-3.5 h-3.5 shrink-0" aria-hidden />
-              <span>Non résolu</span>
-            </div>
+            <>
+              <span className="crise-nom vide">Personne ne peut</span>
+              <span className="crise-role alerte">aucun remplaçant possible</span>
+            </>
           ) : remplacant ? (
-            <div className="flex items-center gap-2 text-sm">
-              <VetAvatar prenom={remplacant.prenom} couleur={remplacant.couleur} />
-              <span className="text-foreground font-medium truncate">
+            <>
+              <span className="crise-nom entrant">
+                <VetAvatar prenom={remplacant.prenom} couleur={remplacant.couleur} />
                 {remplacant.prenom} {remplacant.nom}
               </span>
-            </div>
+              <span className="crise-role">remplaçant·e</span>
+            </>
           ) : (
-            <div className="flex items-center gap-1.5 text-sm text-amber-600">
-              <CircleAlert className="w-3.5 h-3.5 shrink-0" aria-hidden />
-              <span>À traiter plus tard</span>
-            </div>
+            <>
+              <span className="crise-nom vide">À choisir</span>
+              <span className="crise-role">rien ne sera modifié</span>
+            </>
           )}
         </div>
       </div>
@@ -344,7 +341,7 @@ function LigneReparation({
                         <span className="text-[10px] text-accent">· recommandé</span>
                       )}
                       {c.warnings.length > 0 && (
-                        <span className="text-[10px] text-amber-600">
+                        <span className="crise-compteur-alerte">
                           · {c.warnings.length} alerte{c.warnings.length > 1 ? 's' : ''}
                         </span>
                       )}
@@ -355,23 +352,39 @@ function LigneReparation({
             </SelectContent>
           </Select>
 
-          {/* Warnings du candidat sélectionné */}
+          {/* ── CE QUE CE CHOIX ENFREINT ──────────────────────
+               B-026 — ces avertissements s'affichaient en lignes de texte
+               orange nu (`text-amber-600`), collées sous le sélecteur. Deux
+               problèmes, et le second est le vrai :
+
+               ① la couleur venait de la palette Tailwind par défaut, pas
+                  des jetons du projet : un orange qui jure avec la palette
+                  crème du reste de la V2 ;
+               ② surtout, LES QUATRE AUTRES ÉCRANS qui annoncent une règle
+                  enfreinte utilisent `.gf-card.souple` — une carte titrée,
+                  avec fond et bordure. Ici la même information avait l'air
+                  d'une note de bas de page.
+
+               La doctrine du projet est « une seule voix pour les règles
+               enfreintes » (lot 1 du 22/08, 4 écrans unifiés). Cette
+               fenêtre-là n'avait jamais été portée. Elle l'est. */}
           {decision.remplacantId &&
             (() => {
               const cand = creneau.candidats.find((c) => c.vetId === decision.remplacantId)
               if (!cand || cand.warnings.length === 0) return null
               return (
-                <ul className="space-y-1">
+                <div className="gf-card souple">
+                  <p className="gf-title">
+                    <AlertTriangle className="w-3.5 h-3.5" aria-hidden />
+                    Ce que ce choix enfreint
+                  </p>
                   {cand.warnings.map((w, i) => (
-                    <li
-                      key={i}
-                      className="flex items-baseline gap-1.5 text-[11px] text-amber-600"
-                    >
-                      <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" aria-hidden />
-                      <span>{w.replace(/^R\d+ : /, '')}</span>
-                    </li>
+                    // Le code machine en tête (« R12 : ») est retiré : il ne
+                    // dit rien au cabinet et fait passer une règle du
+                    // cabinet pour une erreur du logiciel.
+                    <p key={i}>{w.replace(/^R\d+ : /, '')}</p>
                   ))}
-                </ul>
+                </div>
               )
             })()}
         </div>
@@ -756,7 +769,7 @@ export function CriseModal({
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-amber-500" />
+                <AlertTriangle className="w-5 h-5 crise-icone-titre" />
                 Réparer le planning
               </DialogTitle>
               <DialogDescription>
@@ -766,13 +779,17 @@ export function CriseModal({
             </DialogHeader>
 
             {resultat.creneauxImpactes.length === 0 ? (
-              <div className="flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-950/20">
-                <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 shrink-0" aria-hidden />
+              // B-026 — ce pave etait en vert Tailwind brut (green-50/200/800),
+              // seule tache verte de toute la V2. Il passe sur la carte du
+              // projet : la bonne nouvelle se dit dans le meme vocabulaire
+              // que le reste, sans crier plus fort qu'un avertissement.
+              <div className="crise-rien-a-faire">
+                <CheckCircle2 className="w-5 h-5 shrink-0" aria-hidden />
                 <div>
-                  <p className="text-sm font-medium text-green-800 dark:text-green-400">
+                  <p className="crise-rien-titre">
                     Aucune garde impactée
                   </p>
-                  <p className="text-xs text-green-700 mt-0.5">
+                  <p className="crise-rien-detail">
                     L&apos;absence est déclarée, mais aucune garde publiée ne concerne ce
                     vétérinaire sur la période. Rien à réparer.
                   </p>

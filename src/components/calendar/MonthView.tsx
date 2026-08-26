@@ -1,5 +1,26 @@
 'use client'
 
+// ⚠️⚠️ CE FICHIER N'EST ATTEINT PAR AUCUN ÉCRAN — vérifié le 2026-08-26. ⚠️⚠️
+//
+// Vestige de la V1. Le planning affiché aux utilisateurs est
+// `components/v2/PlanningV2.tsx` ; celui-ci n'est importé nulle part
+// (`grep -rn "MonthView" src/` ne rend que ce fichier), pas plus que
+// `DayCell` et `GardeBadge`, qu'il est seul à importer.
+//
+// POURQUOI CET AVERTISSEMENT PLUTÔT QU'UNE SUPPRESSION : le 26/08, un
+// correctif réel — la `key` qui empêche de déclarer absent le MAUVAIS
+// vétérinaire — a été posé ICI en croyant corriger l'écran du cabinet. Il a
+// passé la vérification (la ligne était bien là) et n'avait aucun effet : on
+// ne peut pas atteindre ce code. C'est le motif que ce projet traque partout
+// ailleurs — quelque chose qui a l'air fait et ne l'est pas.
+//
+// Le correctif a été refait dans `PlanningV2.tsx`. Il reste aussi ici pour que
+// réveiller ce fichier ne ramène pas le défaut avec lui.
+//
+// AVANT DE TOUCHER À CE FICHIER : vérifier qu'il sert encore à quelque chose.
+// Sa suppression (avec `DayCell`, `GardeBadge` et `planning/ActionBar.tsx`,
+// morts eux aussi) attend l'accord de MiKL — item B-027 du board.
+
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight, List, Grid3x3, Star } from 'lucide-react'
