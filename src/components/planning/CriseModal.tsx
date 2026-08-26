@@ -234,7 +234,10 @@ function LigneReparation({
   const meilleurVet = creneau.meilleur ? vetsById.get(creneau.meilleur) : null
 
   return (
-    <div className="rounded-lg border bg-card p-3 space-y-3">
+    // `crise-creneau` porte l'espacement (B-026, retouche du 26/08 : « ça
+    // manque encore de padding »). Le `p-3` d'origine — 12 px — laissait le
+    // sélecteur pleine largeur toucher presque le bord de la carte.
+    <div className="crise-creneau">
       {/* En-tête créneau */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-sm font-semibold text-foreground capitalize">

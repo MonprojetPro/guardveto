@@ -2156,11 +2156,30 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
    informations parallèles. Et le nom de l'absent·e était barré ET
    grisé, donc à peine lisible au moment précis où il faut savoir de
    qui l'on parle. */
+/* ── La carte d'un creneau a reparer ─────────────────────────
+   Retouche du 26/08 : « ca manque encore de padding ». Le `p-3` de
+   Tailwind (12 px) etait insuffisant des lors que la carte contient un
+   selecteur PLEINE LARGEUR — celui-ci venait toucher presque le bord,
+   et la carte donnait l'impression de deborder d'elle-meme.
+   18 px laissent respirer sans que la fenetre s'allonge. */
+.crise-creneau {
+  border-radius: 0.6rem;
+  border: 1px solid var(--t-border);
+  background: var(--card, #FFFDF8);
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
 .crise-transfert {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem 0.25rem;
+  /* Pas de padding horizontal ici : la carte le porte deja. En remettre
+     decalerait ce bloc par rapport au selecteur juste en dessous, et
+     c'est ce leger desalignement qui se lit comme « mal fini ». */
+  padding: 0.15rem 0;
 }
 
 .crise-partie {

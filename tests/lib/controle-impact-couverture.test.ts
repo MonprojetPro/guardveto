@@ -211,14 +211,31 @@ describe('les refus arrivent à l’écran avec de quoi les régler', () => {
     expect(gardien).toContain('!estBloquant && onPasserOutre')
   })
 
-  it('les QUATRE écrans concernés ouvrent bien la fenêtre', () => {
-    // Les quatre portes du palier 2 ont chacune leur écran. En laisser une en
-    // toast, c'est laisser un utilisateur devant un refus sans issue — et on
-    // ne s'en apercevrait qu'en recette, sur ce cas-là précisément.
+  it('les écrans concernés ouvrent bien la fenêtre', () => {
+    // Les portes du palier 2 ont chacune leur écran. En laisser une en toast,
+    // c'est laisser un utilisateur devant un refus sans issue — et on ne s'en
+    // apercevrait qu'en recette, sur ce cas-là précisément.
+    //
+    // ⚠️ ILS ÉTAIENT QUATRE, ILS SONT TROIS — et ce n'est pas une régression.
+    //
+    // La quatrième ligne visait `components/admin/EffectifPeriodeSelect.tsx`,
+    // l'écran de réglage de l'effectif de nuit. Recensement du 2026-08-26 : ce
+    // fichier n'était atteint par AUCUNE page. Ce test contrôlait donc un écran
+    // que personne ne pouvait ouvrir — il rendait un vert sur du vide.
+    //
+    // Pourquoi il n'y a rien à remettre à sa place : en V2, l'effectif de nuit
+    // n'est plus réglé sur un écran dédié. Il vient de la PÉRIODE TYPE (places
+    // par créneau, onglet Créneaux) ; l'Épicentre et le parcours de génération
+    // ne font que l'AFFICHER. L'ancienne action `setEffectifPeriode` survit,
+    // mais n'est plus appelée que par un outil de Filou.
+    //
+    // Le contrôle d'impact sur cette porte-là est donc à re-poser dans le
+    // nouveau modèle — item B-029 du board. Le dire ici plutôt que de garder
+    // une ligne verte sur un fichier supprimé : c'est la règle de maison, un
+    // contrôle ne doit jamais rassurer sur ce qu'il ne regarde plus.
     for (const ecran of [
       'components/conges/ValiderCongeDialog.tsx',      // valider un congé
       'components/v2/EquipeV2.tsx',                     // retirer de l'équipe
-      'components/admin/EffectifPeriodeSelect.tsx',     // effectif de nuit
       'components/v2/regles/OngletMoteur.tsx',          // poser une étiquette
     ]) {
       expect(lire(ecran)).toContain('GardienImpact')
