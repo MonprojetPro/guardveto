@@ -64,7 +64,7 @@ async function contexte(): Promise<{ error: string } | { ctx: ContexteOutil }> {
 
   const { data: vet, error: erreurVet } = await supabase
     .from('veterinaires')
-    .select('id, role_app')
+    .select('id, role_app, prenom, nom')
     .eq('user_id', user.id)
     .maybeSingle()
 
@@ -114,6 +114,10 @@ async function contexte(): Promise<{ error: string } | { ctx: ContexteOutil }> {
     ctx: {
       supabase,
       vetoId: vet.id as string,
+      // Le NOM, pas seulement l'identifiant : c'est ce qui permet à Filou de
+      // savoir qui dit « je » (B-040).
+      prenom: (vet.prenom as string) ?? '',
+      nom: (vet.nom as string) ?? '',
       estAdmin: (vet.role_app as string) === 'admin',
       cabinetId,
     },

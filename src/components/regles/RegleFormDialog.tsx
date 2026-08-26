@@ -1295,10 +1295,20 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
             )}
           </div>
 
-          {/* APERÇU */}
-          <div className="rounded-lg border border-dashed border-border bg-muted/40 p-3">
-            <p className="text-xs font-medium text-muted-foreground mb-1">Aperçu</p>
-            <p className="text-sm text-foreground leading-6">
+          {/* APERÇU — ce que l'admin s'apprête à écrire (B-039).
+              Le cadre était en POINTILLÉS. Dans tout le reste du produit, le
+              pointillé signale un état VIDE : « aucune règle », « aucun
+              échange », « aucune notification ». Ici il encadrait du contenu
+              réel, et le plus important de la fenêtre — la phrase sur laquelle
+              on valide. Le cadre disait « rien ici » à l'endroit où il fallait
+              lire « voilà ce que tu t'apprêtes à écrire ».
+              Cadre PLEIN et teinte d'accent, donc : le même vocabulaire que
+              partout ailleurs où le produit annonce ce qui va se passer. */}
+          <div className="rounded-lg border border-primary/25 bg-primary/[0.06] p-3.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary/80 mb-1.5">
+              Ce que tu vas enregistrer
+            </p>
+            <p className="text-sm font-medium text-foreground leading-6">
               {(() => { const f = FORCES.find((x) => x.value === force); return f?.symbole })()} {apercu}
             </p>
           </div>

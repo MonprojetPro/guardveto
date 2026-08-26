@@ -121,6 +121,10 @@ function creerOutilAffichage(
 const CTX: ContexteOutil = {
   supabase: {} as ContexteOutil['supabase'],
   vetoId: 'veto-1',
+  // Depuis B-040, Filou sait qui dit « je » : le contexte porte le nom, pas
+  // seulement l'identifiant.
+  prenom: 'Anne-Sophie',
+  nom: 'Blanchard',
   estAdmin: true,
   cabinetId: 'cabinet-1',
 }

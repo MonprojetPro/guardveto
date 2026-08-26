@@ -249,6 +249,36 @@ CE QUE TU NE FAIS JAMAIS
  *   seule : il ne se souvient pas de la question qu'il vient de poser, et
  *   répond à côté dès qu'on rebondit sur sa réponse.
  */
+/**
+ * QUI parle à Filou — le bloc d'identité (B-040, 2026-08-26).
+ *
+ * Le prompt principal disait « tu parles à un membre du cabinet », sans jamais
+ * dire LEQUEL. Filou connaissait donc l'identifiant de la personne, dont il ne
+ * peut rien faire dans une phrase, mais pas son nom. À « je veux une règle pour
+ * moi les lundis », il répondait « quel est ton prénom ? » — question absurde
+ * posée à quelqu'un de connecté depuis dix minutes, et qui donne l'impression
+ * d'un assistant qui ne sait pas à qui il parle.
+ *
+ * Ce bloc est SÉPARÉ du prompt principal et NON mis en cache, exprès : il change
+ * à chaque personne, alors que le prompt principal ne change jamais. Les fondre
+ * ensemble ferait manquer le cache à chaque conversation, pour tout le monde.
+ */
+function blocIdentite(ctx: ContexteOutil): string {
+  const nomComplet = `${ctx.prenom} ${ctx.nom}`.trim()
+  const qui = nomComplet || 'un membre du cabinet dont le nom n’a pas pu être lu'
+  const role = ctx.estAdmin
+    ? 'Elle administre le cabinet : elle peut tout consulter et tout régler.'
+    : 'Elle est vétérinaire, sans droits d’administration.'
+
+  return `QUI TE PARLE
+
+Tu parles à ${qui}. ${role}
+
+« je », « moi », « mon planning », « mes gardes », « pour moi » désignent ${ctx.prenom || 'cette personne'}, et personne d'autre. Ne demande JAMAIS son prénom : tu l'as. Une règle « pour moi » est une règle qui la vise elle.
+
+Quand elle parle de quelqu'un d'AUTRE, elle le nomme. Si le nom est ambigu ou introuvable dans l'équipe, là seulement tu demandes de préciser.`
+}
+
 export async function faireTravaillerFilou(
   phrase: string,
   outils: Outil[],
@@ -257,6 +287,7 @@ export async function faireTravaillerFilou(
   historique: EchangeFilou[] = [],
 ): Promise<IssueFilou> {
   const client = new Anthropic({ apiKey: cleIA() })
+  const identite = blocIdentite(ctx)
   const parNom = new Map(outils.map((o) => [o.nom, o]))
   const definitions = outils.map(versDefinitionApi)
   const outilsAppeles: string[] = []
@@ -293,7 +324,12 @@ export async function faireTravaillerFilou(
         // par `effort`, juste en dessous.
         thinking: { type: 'adaptive' },
         output_config: { effort },
-        system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
+        system: [
+          { type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } },
+          // Après le bloc caché, jamais avant : le cache porte sur un PRÉFIXE.
+          // Placer l'identité en tête le ferait manquer à chaque conversation.
+          { type: 'text', text: identite },
+        ],
         tools: definitions,
         messages,
       })

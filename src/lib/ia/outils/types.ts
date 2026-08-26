@@ -30,6 +30,17 @@ export interface ContexteOutil {
   supabase: SupabaseClient
   /** L'id du vétérinaire connecté (table `veterinaires`, pas `auth.users`). */
   vetoId: string
+  /**
+   * Son prénom et son nom — ce qui permet à Filou de résoudre « je », « moi »,
+   * « mon planning » (B-040, 2026-08-26).
+   *
+   * Sans eux, il connaissait l'IDENTIFIANT de la personne mais pas son NOM : à
+   * « je veux une règle pour moi les lundis », il répondait « quel est ton
+   * prénom ? ». Une question absurde posée à quelqu'un de connecté, et qui
+   * donne l'impression d'un assistant qui ne sait pas à qui il parle.
+   */
+  prenom: string
+  nom: string
   estAdmin: boolean
   cabinetId: string
 }

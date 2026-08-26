@@ -86,7 +86,7 @@ export async function lancerRecetteFilou(): Promise<ResultatRecetteAction> {
 
   const { data: moi } = await supabase
     .from('veterinaires')
-    .select('id, role_app')
+    .select('id, role_app, prenom, nom')
     .eq('user_id', user.id)
     .eq('actif', true)
     .maybeSingle()
@@ -103,6 +103,10 @@ export async function lancerRecetteFilou(): Promise<ResultatRecetteAction> {
     const resultat = await lancerBancRecette({
       supabase,
       vetoId: (moi as { id: string }).id,
+      // Le banc rejoue de vraies conversations : il doit porter la même
+      // identité que l'écran, sinon il teste un Filou qui n'existe pas (B-040).
+      prenom: (moi as { prenom?: string }).prenom ?? '',
+      nom: (moi as { nom?: string }).nom ?? '',
       estAdmin: true,
       cabinetId,
     })
