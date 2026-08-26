@@ -25,6 +25,11 @@ import { useOutilsPlanning } from './outils-planning'
 import { GardeDetailModal, peutProposerUnEchange } from '@/components/planning/GardeDetailModal'
 import { CriseModal, type VetCrise } from '@/components/planning/CriseModal'
 import { estJourFerie } from '@/engine/utils'
+// La grille part du lundi de la semaine du 1er et couvre des semaines pleines.
+// ⚠️ Elle vient du MÊME module que les bornes de chargement des données
+// (`app/(v2)/planning/page.tsx`) : les deux doivent se déplacer ensemble, sinon
+// la semaine à cheval se dessine sans son contenu.
+import { genererGrille } from '@/lib/planning/bornes-grille'
 import { placesDeGarde } from '@/lib/gardes/places'
 import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
 import { CompteursPanel } from './CompteursPanel'
@@ -130,23 +135,6 @@ function aujourdhuiISO() {
 
 function dateCourte(iso: string) {
   return DATE_COURTE.format(new Date(iso + 'T12:00:00Z'))
-}
-
-/** La grille part du lundi de la semaine du 1er et couvre des semaines pleines. */
-function genererGrille(annee: number, mois: number): string[] {
-  const premier = new Date(Date.UTC(annee, mois - 1, 1))
-  const decalage = (premier.getUTCDay() + 6) % 7
-  const depart = new Date(premier)
-  depart.setUTCDate(depart.getUTCDate() - decalage)
-
-  const dernier = new Date(Date.UTC(annee, mois, 0))
-  const cases: string[] = []
-  const curseur = new Date(depart)
-  while (curseur <= dernier || cases.length % 7 !== 0) {
-    cases.push(curseur.toISOString().slice(0, 10))
-    curseur.setUTCDate(curseur.getUTCDate() + 1)
-  }
-  return cases
 }
 
 function initiale(prenom: string | null) {

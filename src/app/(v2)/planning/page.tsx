@@ -31,6 +31,10 @@ import {
 import { calculerBilans } from '@/engine/bilan'
 import { normaliserColonnes } from '@/lib/planning/colonnesCompteurs'
 import { lignesDesPeriodes, periodesVisibles } from '@/lib/planning/diffusion'
+// ⚠️ DEUX bornes, deux usages — voir l'en-tête du module. `bornesMois` porte
+// l'identité du mois (période affichée, re-validation) ; `bornesGrille` porte ce
+// qui est réellement dessiné, et c'est elle qui remplit les cases.
+import { bornesGrille, bornesMois } from '@/lib/planning/bornes-grille'
 import type { VetCrise } from '@/components/planning/CriseModal'
 import type { CompteursRow } from '@/hooks/useCompteurs'
 import type { GardeDenormalisee, Periode, ProfilPlanning, Veterinaire } from '@/types'
@@ -55,12 +59,6 @@ function decalerJours(iso: string, n: number): string {
   return d.toISOString().slice(0, 10)
 }
 
-function bornesMois(anneeMois: string): { debut: string; fin: string } {
-  const [annee, mois] = anneeMois.split('-').map(Number)
-  const dernier = new Date(Date.UTC(annee, mois, 0)).getUTCDate()
-  const mm = String(mois).padStart(2, '0')
-  return { debut: `${annee}-${mm}-01`, fin: `${annee}-${mm}-${String(dernier).padStart(2, '0')}` }
-}
 
 interface LigneConge {
   id: string
@@ -125,6 +123,9 @@ export default async function PlanningPageV2({
   const { mois: moisParam } = await searchParams
   const anneeMois = moisParam && /^\d{4}-\d{2}$/.test(moisParam) ? moisParam : moisCourant()
   const { debut, fin } = bornesMois(anneeMois)
+  // Ce qui est DESSINÉ déborde du mois : les cases de la semaine à cheval se
+  // remplissent depuis ces bornes-là, jamais depuis celles du mois.
+  const grille = bornesGrille(anneeMois)
 
   // VACANCES SCOLAIRES — la grille déborde du mois (elle commence au lundi de
   // la 1re semaine et finit au dimanche de la dernière) : on élargit la fenêtre
@@ -137,7 +138,12 @@ export default async function PlanningPageV2({
 
   const [gardesRes, periodesRes, vetsRes, typesRes, congesRes, gardesPeriodesRes, cabinetRes] =
     await Promise.all([
-      supabase.from('planning_semaine').select('*').gte('date', debut).lte('date', fin).order('date'),
+      supabase
+        .from('planning_semaine')
+        .select('*')
+        .gte('date', grille.debut)
+        .lte('date', grille.fin)
+        .order('date'),
       supabase.from('periodes').select('*').order('date_debut', { ascending: false }).limit(20),
       isAdmin
         ? supabase
@@ -147,8 +153,10 @@ export default async function PlanningPageV2({
             .order('nom')
         : Promise.resolve({ data: null }),
       supabase.from('creneau_modele').select('code, nom').not('code', 'is', null),
-      // Congés et souhaits qui chevauchent le mois : ils s'affichent dans la
-      // case du jour, à côté des gardes — c'est ce qui explique un trou.
+      // Congés et souhaits qui chevauchent la GRILLE (pas le mois) : ils
+      // s'affichent dans la case du jour, à côté des gardes — c'est ce qui
+      // explique un trou. Les borner au mois laissait la semaine à cheval sans
+      // la seule information qui rende ses cases vides compréhensibles.
       supabase
         .from('conges')
         // ⚠️ LA RELATION EST NOMMÉE, ET C'EST OBLIGATOIRE.
@@ -165,8 +173,8 @@ export default async function PlanningPageV2({
         // seul message le signale. Trouvé en cherchant pourquoi le panneau du
         // secrétariat restait vide.
         .select('id, date_debut, date_fin, statut, veterinaires!conges_veterinaire_id_fkey(prenom, couleur)')
-        .lte('date_debut', fin)
-        .gte('date_fin', debut),
+        .lte('date_debut', grille.fin)
+        .gte('date_fin', grille.debut),
       // Chargé pour TOUS : le bouton PDF en dépend, pas seulement la publication.
       supabase.from('gardes').select('periode_id').limit(500),
       // La ZONE du cabinet — indispensable pour les vacances scolaires. Ne
