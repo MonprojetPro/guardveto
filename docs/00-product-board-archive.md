@@ -245,3 +245,100 @@ role (B-008). **Les trois tiennent tels que decrits — rien a retoucher dans le
 
 **Les 2 erreurs rouges du Security Advisor Supabase, ouvertes depuis le 4 aout.** Signalees par MiKL 25/08 : « pourquoi j'ai des alertes de ce genre sur Supabase qui ne sont pas traitees ? ». `_backup_creneau_modele_20260804` et `_backup_relation_creneau_20260804` : RLS desactivee, 0 politique, **`anon` peut lire** — donc n'importe qui sans etre connecte, la cle anon vivant dans le bundle du navigateur. Meme mecanisme que l'incident des vues du 22/08, **beaucoup moins grave** : 8 et 5 lignes de configuration de creneaux, aucune donnee personnelle. Reliquats du filet de la migration `fedf3df`, jamais retires. **Aucun code ne les lit** (verifie par recherche sur `src/`, `supabase/`, `tests/`). Correctif = **suppression**, pas RLS : securiser un objet dont personne n'a l'usage est du travail pour rien. Migration `20260825191000` ecrite **a part** — une suppression irreversible en production ne voyage pas au milieu d'une migration qui parle d'autre chose. **APPLIQUEE le 25/08 sur feu vert de MiKL.** **Le contenu a ete inventorie AVANT suppression, pas suppose** : 8 creneaux dont 4 encore identiques en base vivante, 5 relations dont 3 encore vivantes — et **les 6 lignes absentes appartenaient toutes au profil `b7990ef3`, qui n'existe plus**. Elles etaient donc mortes avec lui, ce qui est le comportement attendu. Rien de perdu : tout etait soit redondant, soit orphelin. **Verifie APRES par le linter lui-meme, pas par deduction : 0 erreur restante** (27 avertissements benins, inchanges). **Cause du non-traitement : personne ne regardait ce tableau de bord** — CERBERE audite le code avant commit, il n'a jamais ete branche sur le linter cote plateforme. Les 27 avertissements restants sont benins et listes au rapport.
 
+
+
+## 12 — Detail integral des entrees condensees le 2026-08-26
+
+> Deplace du board pour le ramener sous la limite d'injection du hook OTTO.
+> Aucun identifiant supprime : chaque entree garde sa ligne au board.
+
+### 2026-08-25
+
+**FORGE — le mecanisme « l'ecran se met a jour tout seul » entre au catalogue des modules reutilisables.** Decision MiKL : « range-le maintenant » (l'option « candidat, plus tard » ecartee). Kit `realtime-refresh-supabase-next` dans `installation WF base/kits/`, inscrit au catalogue et au bloc `capacites` — sans cette 2e ligne le kit existe mais personne n'est prevenu au bon moment. **Motif de l'extraction : le meme mecanisme avait ete reecrit CINQ fois dans GuardVeto seul** (planning, revalidation, cloche, historique, accueil). **Les 5 ont ete lues en entier avant extraction, et c'est la que se trouve la valeur** : elles partageaient un angle mort qu'aucune ne revelait seule — **aucune ne lisait le statut de son abonnement**, donc un abonnement en echec (table hors publication, RLS qui refuse) etait totalement silencieux. C'est exactement le piege rencontre le jour meme sur `compensations`. Le kit ajoute 4 garde-fous absents des 5 : detection d'echec avec avertissement nommant les 3 causes, relecture au retour d'onglet, suffixe unique de canal, singleton du client navigateur. **Verifie hors contexte** : pose dans un projet reel, `tsc` strict et ESLint verts, puis retire. **Le lint a attrape une faute que la compilation laissait passer** (refs ecrites pendant le rendu — casse en mode concurrent), corrigee avant publication. **Confronte au kit minimum vital** (`ui-patterns-kits.md`, section Realtime) — etape de la doctrine FORGE qui a rapporte **3 manques que le raisonnement seul n'avait pas vus** : ① filtre unique pour toutes les tables, impossible des que la colonne differe (echec silencieux ET partiel — la table filtree tombe, les autres continuent, donc l'ecran a l'air vivant) → filtre par table ajoute ; ② aucun repli sous un abonnement qui peut tomber (anti-pattern « subscription sans fallback ») → `repliMs` ajoute, eteint par defaut, distingue explicitement du polling oublie ; ③ **le plus couteux** — le pattern recommande est un composant monte dans le LAYOUT, et le README ne montrait que l'usage dans une page, donc un abonnement defait et refait a chaque navigation avec une fenetre aveugle entre les deux. **NON reporte dans GuardVeto** : les 5 implementations d'origine restent en place, la bascule en service etant en cours. A reprendre — GuardVeto beneficierait surtout de la detection d'echec.
+
+### B-027
+
+**Code mort de la V1 — RECENSEMENT COMPLET fait le 26/08, suppression a trancher.** Inquietude de MiKL : « je t'ai deja commande plusieurs passes pour voir s'il y avait encore des traces de V1, et la je m'apercois que oui ». **Mesure, pas impression** : graphe complet des imports construit depuis les 43 points d'entree Next. Sur **294 fichiers, 274 sont atteints** ; il en reste 20, dont **16 reellement morts (~1 670 lignes)** : `components/calendar/` (MonthView, DayCell, GardeBadge — 576) · `components/planning/` (ActionBar, AlerteBandeau, ExportPdfButton — 588) · `components/admin/` (EffectifPeriodeSelect, ProfilPeriodeSelect, SupprimerPeriodeButton — 256) · `hooks/` (useAuth, usePeriode — 87) · `data/chargerRoulementCabinet` + `engine/scorer` + 2 barrels `index.ts` (152) · `components/layout/RoleGate` (15). **4 FAUX POSITIFS a ne pas toucher** : `src/proxy.ts` (**c'est le middleware d'authentification** — en Next 16 il s'appelle ainsi et c'est le framework qui l'appelle ; preuve : `ƒ Proxy (Middleware)` en sortie de build), `lib/ia/couverture-produit.ts` et `lib/produit/attentes.ts` (registres lus par leurs tests, volontairement hors appli), `engine/roulement.ts` (vivant seulement via `chargerRoulementCabinet`, mort lui-meme). **POURQUOI LES PASSES PRECEDENTES ONT RATE CA, et c'est le coeur du sujet : une passe de nettoyage cherche des TRACES — mentions de V1, imports d'anciens composants. Un fichier mort n'a par definition aucune trace. Il ne mentionne rien, personne ne le mentionne, il compile, il passe le lint, il n'apparait dans aucun grep.** Seul un parcours partant des pages le revele. **Ne pas supprimer sans l'accord de MiKL** — certains peuvent porter un comportement jamais repris en V2, a comparer avant de jeter. Les 4 principaux portent deja un bandeau d'avertissement.
+
+### 2026-08-26
+
+**Session de soldage — et la lecon du jour n'est aucun des correctifs.** MiKL : « fais tout ce qui reste, sauf ce qui concerne Anne-Sophie ». **Sept items fermes** (B-007, B-010, B-011, T-001, T-003, T-006, + T-008 partiel), **deux requalifies** (B-008 non bloquant, B-021 ouvert). Mais **TROIS lignes du board sur les quatre verifiees decrivaient un etat que le code avait deja depasse** : B-010 accusait deux documents qui disaient vrai, B-011 etait presque entierement solde par un commit du 24/08, et B-008 affichait « bloquant avant le role secretaire » **pendant que le role secretaire partait en production**. Aucune de ces trois lignes n'etait fausse a sa date — elles ont vieilli sans que rien ne le dise. **Regle qui en sort : un item de board ne se corrige jamais sur la foi de sa propre description. On mesure d'abord, contre le code et contre la base.** Appliquee ce jour : `pg_class.reloptions` avant de toucher a la doc, `get_advisors` avant de conclure, comptage AVANT/APRES de `compteurs_gardes` avant d'appliquer la migration, `git diff` avant d'accuser le lint. Trois des sept correctifs auraient ete du travail pour rien sans cette etape.
+
+### B-033
+
+**⚠️ FUITE ENTRE COMPTES — la conversation Filou d'une admin restait affichee a un veterinaire.** Trouve par MiKL en recette le 26/08 (« j'ai meme pas l'encart de chat »), et **ce n'est PAS un artefact du bac a sable : c'est un defaut produit qui se serait produit chez Anne-Sophie.** La conversation ET la reponse affichee sur le tableau etaient rangees dans `sessionStorage` sous une cle FIXE, sans identifiant de personne. Changer de compte dans le meme onglet gardait donc le fil du precedent. Constate en vrai : un compte veterinaire affichait « supprime le compte secretariat » / « C'est fait ». **Le raisonnement d'origine etait ecrit noir sur blanc dans le code — « elle disparait a la fermeture de l'onglet, ce qui est ce qu'on veut sur un poste partage » — et il etait juste pour une FERMETURE, faux pour un CHANGEMENT DE COMPTE. Au cabinet, on se deconnecte sans fermer le navigateur : c'est meme le cas d'usage cite pour justifier le choix.** Les deux cles portent desormais l'identifiant de la personne.
+
+### B-028
+
+**LIVRE — le test qui refuse le code inatteignable.** Feu vert de MiKL le 26/08. Meme mecanisme que les deux registres qui gardent Filou (B-019) et le tableau (B-005) : plutot que promettre « une passe de nettoyage de plus », poser un garde-fou qui echoue des qu'un fichier de `src/` cesse d'etre atteint depuis un point d'entree Next, avec la liste des faux positifs DECLAREE explicitement (middleware, registres lus par les tests). **Motif : une consigne deja oubliee ne se repare pas en la reecrivant.** MiKL a demande plusieurs passes ; elles ont echoue non par negligence mais parce qu'elles cherchaient la mauvaise chose. Un test repond a sa place, et pour toujours.
+
+### 2026-08-24
+
+« B-009 confirme reel puis corrige (`360794a`). Une verification faite pendant que le correctif etait en cours l'avait conclu a tort faux positif — verifier l'horodatage du depot, pas seulement son contenu. » `tsc --noEmit` et `npx vitest run` rejoues par OTTO le 24/08 sur ce commit : **0 erreur de type, 1253 tests passed + 1 skipped (1254)** — le chiffre du message de commit est confirme par execution reelle, pas relaye sur parole.
+
+### B-026
+
+**Fenetre « Reparer le planning » portee sur le systeme de design.** Cause reelle : elle n'avait jamais ete portee sur la V2 (5 couleurs Tailwind par defaut). L'avertissement passe sur `.gf-card.souple` comme les 4 autres ecrans, le sortant redevient lisible, le pave vert passe sur `--ok-soft`. Piege attrape : 2 des 3 ecrans qui l'ouvrent n'importaient pas le CSS. Detail → archive 10.
+
+### B-022a
+
+**⚠️ B-022 avait ete livre DANS DU CODE MORT** — la `key` etait dans `MonthView.tsx`, que rien n'importe ; l'ecran reel est `PlanningV2.tsx`. Le controle de convergence verifiait que la ligne EXISTAIT, pas qu'elle etait ATTEIGNABLE. **Un grep prouve qu'un code est ecrit, jamais qu'il est execute.** Refait au bon endroit. Detail → archive 10.
+
+### B-019
+
+**REGLE PERMANENTE : Filou suit le produit, et c'est un REFUS qui l'impose.** Registre `src/lib/ia/couverture-produit.ts` + `tests/lib/filou-couverture-produit.test.ts` qui echoue sur le silence, dans les deux sens. Etat final : 78 actions — 57 couvertes, 0 manque, 20 hors-perimetre. Detail integral → archive 9.
+
+### B-007
+
+**Audit de couverture de Filou — VOLET 2 RENDU.** Les 6 trous n'etaient pas oublies, ils etaient INVISIBLES : le test ne lisait que les `actions.ts`, les 18 routes API y echappaient. Angle mort ferme, 19 capacites inscrites (5 couvertes, 6 manques nommes, 8 hors). Outils a ecrire → B-021. Detail → archive 10.
+
+### B-022
+
+**Le formulaire d'absence etait en retard d'un CLIC** — on pouvait declarer absent le mauvais veterinaire, sur un planning publie. `CriseModal` monte en permanence + resynchronisation seulement a la fermeture. La `key` manquait au calendrier alors que les 2 autres ecrans l'avaient. Detail → archive 10.
+
+### B-015
+
+**LIVRE `f227030`** — selecteur compacte en panneau flottant, tactile intact, pipette conditionnelle. Verifie par team-lead lui-meme. **Presence sur master confirmee par `git merge-base` le 25/08** — le statut « Pret, bloque par le build de l'autre chantier » etait perime. Detail integral → archive 9.
+
+
+
+## 12 — Detail integral des entrees condensees le 2026-08-26
+
+> Deplace du board pour le ramener sous la limite d'injection du hook OTTO.
+> Aucun identifiant supprime : chaque entree garde sa ligne au board.
+
+### B-022a
+
+**⚠️ B-022 avait ete livre DANS DU CODE MORT** — la `key` etait dans `MonthView.tsx`, que rien n'importe ; l'ecran reel est `PlanningV2.tsx`. Le controle de convergence verifiait que la ligne EXISTAIT, pas qu'elle etait ATTEIGNABLE. **Un grep prouve qu'un code est ecrit, jamais qu'il est execute.**  Detail integral → archive 12.
+
+
+
+## 13 — Convergences (controles de sortie) du 2026-08-26
+
+> Deplacees du board le 26/08. Chacune a ete verifiee PAR LA PREUVE avant son
+> commit ; elles sont conservees telles quelles.
+
+| ID | Ce qui etait annonce | Ce qui est livre | Verdict |
+|---|---|---|---|
+| B-022 | Le formulaire d'absence ne doit plus etre en retard d'un clic | `MonthView.tsx:358` porte `key={\`crise-${criseVetId}-${criseDate}\`}` — verifie par grep. Changer de cible remonte le composant, les valeurs initiales sont relues | OK |
+| B-022 | Le meme remede que les 2 autres ecrans, pas un remede maison | Meme forme de `key` que `CongesList.tsx:431` et `AbsencesV2.tsx:681` — les trois points d'entree sont desormais alignes | OK |
+| B-023 | Aucun identifiant technique affiche au cabinet | `grep "?? id"` sur les 6 fichiers concernes : **aucun repli residuel**. Les 3 du catalogue et celui de `diagnostic.ts` passent par `VETO_RETIRE` | OK |
+| B-023 | Une source unique, plus six copies divergentes | `lib/regles/veto-absent.ts` cree ; les 6 fournisseurs de `nomVeto` l'utilisent (2 par `VETO_RETIRE`, 4 par `nomVetoOuRetire`) | OK |
+| B-023 | Un test qui empeche la recidive | `tests/lib/jamais-un-identifiant-a-l-ecran.test.ts` — 3 tests verts. Verifie les deux sens : pas d'identifiant, ET le prenom quand le veto existe | OK |
+| B-023 | Pas de cycle d'imports (piege rencontre en cours de route) | `grep -c "^import" veto-absent.ts` = **0**. Le module est volontairement sans dependance | OK |
+| B-024 | Le bac a sable redevient representatif | 0 reference orpheline restante, verifie en base ; chaque regle rattachee a la bonne personne, duo Antoine ↔ Manon coherent dans les deux sens | OK |
+| B-024 | Le CLONAGE lui-meme corrige | **ABSENT — assume et dit.** Seules les donnees ont ete reparees ; le prochain clone reproduira le defaut. Reste ouvert sur la ligne B-024 | absent |
+| B-025 | Le statut incoherent de l'amorcage corrige | **ABSENT — assume et dit.** Le bac a sable a ete remis d'aplomb a la main ; ni l'amorcage ni la divergence `publie`/`verrouille` ne sont corriges. Val d'Allier est dans le meme cas. Reste ouvert sur la ligne B-025 | absent |
+| B-026 | Le design de la fenetre de reparation | Porte sur les jetons du projet : `grep "amber-\|green-"` sur `CriseModal.tsx` ne rend plus que des commentaires. `.gf-card.souple` employee comme sur les 4 autres ecrans | OK |
+| B-026 | Le CSS atteint la fenetre depuis TOUS ses points d'ouverture | Les 3 pages qui l'ouvrent importent `v2-planning.css` — `/planning` l'avait, `/absences` et `/conges` ne l'avaient PAS, imports ajoutes et verifies | OK |
+| B-022a | Le correctif de B-022 est sur l'ecran REELLEMENT rendu | `PlanningV2.tsx:713` porte la `key`, et `PlanningV2` est bien rendu par `app/(v2)/planning/page.tsx:521` — chaine remontee jusqu'a la page, pas seulement un grep sur le fichier | OK |
+| B-027 | Suppression du code mort V1 | **14 fichiers supprimes** apres feu vert de MiKL. `git status` : 14 lignes `D`. Verifie par `tsc` (0 erreur), 1362 tests verts, build vert | OK |
+| B-027 | Ne PAS supprimer ce qui n'est pas mort | `engine/roulement.ts` + `chargerRoulementCabinet.ts` conserves et declares : leur en-tete dit « la consommation par le moteur est la story B4, pas encore branchee ». Une fondation posee d'avance n'est pas un vestige | OK |
+| B-027 | Reparer l'erreur commise en supprimant | `engine/briques/index.ts` avait ete supprime en le prenant pour un re-export : il DEFINIT `validerConfigBrique`. Son test s'est casse, le fichier a ete restaure (`git checkout HEAD --`), le test repasse | OK |
+| B-028 | Le garde-fou anti-code-mort | `tests/lib/aucun-code-inatteignable.test.ts` — 4 tests verts. Verifie dans les DEUX sens : orphelin non declare, exemption devenue inutile, exemption vers un fichier disparu. Plus un garde-fou de vacuite (>20 entrees, >150 fichiers atteints) | OK |
+| B-028 | Le test attrape reellement un orphelin | Prouve en situation : il a liste les 17 orphelins avant nettoyage, puis un seul apres restauration du barrel. Ce n'est pas un test qui n'a jamais rien vu | OK |
+| B-026 | Le padding signale en recette | `.crise-creneau` porte 1,15 rem au lieu du `p-3` (12 px) de Tailwind, et `.crise-transfert` cesse son padding horizontal pour rester aligne au selecteur | OK |
+| B-029 / B-030 / B-031 | Trois constats decouverts en chemin | **ABSENT — volontaire, et c'est le but.** Aucun n'etait dans le perimetre demande ; les trois sont inscrits au board avec ce qui est prouve et ce qui ne l'est pas, plutot que corriges dans la foulee | absent |
+| B-033 | La conversation ne fuit plus d'un compte a l'autre | `cleConversation(idPersonne)` et `cleResultat(idPersonne)` — `grep CLE_CONVERSATION\|CLE_RESULTAT` ne rend plus aucune cle fixe. Les deux etats s'initialisent depuis la cle de la personne | OK |
+| B-032 | Un veterinaire ne voit plus une tablette sans issue | La branche non-admin rendait `null` ; elle rend une phrase d'explication (`.saisie-fermee`). Verifie a la lecture du JSX | OK |
+| B-032 | Ouvrir le champ aux veterinaires | **ABSENT — volontaire.** C'est une decision produit, pas un correctif : elle change ce que six personnes peuvent faire. Posee a MiKL, en attente | absent |
