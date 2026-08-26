@@ -472,7 +472,12 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
     const predicat = rendreRegle(briqueId, params, { nomVeto })
     return sujet ? `${sujet} ${predicat}` : predicat
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [briqueId, ownerId, jour, exVac, siWe, sinon, semaines, periodes, avecId, n, fenetre, creneauxFiltre, ecartMin, nSemaines, joursPref, sens, typeAvant, typeApres, nJoursSerie, nJoursRepos, reposJours, nSemainesCadence, ancre, sensCadence, formeExclusion, dateExcl1, dateExcl2, vets])
+    // ⚠️ `parite` a manqué ici a la premiere ecriture (B-038) : le champ
+    //    fonctionnait, la regle s'enregistrait juste, et l'apercu montrait
+    //    obstinement la phrase SANS la parite. Le `eslint-disable` ci-dessus a
+    //    desactive exactement le controle qui l'aurait dit. Toute variable lue
+    //    dans ce memo doit figurer dans cette liste, a la main.
+  }, [briqueId, ownerId, jour, exVac, parite, siWe, sinon, semaines, periodes, avecId, n, fenetre, creneauxFiltre, ecartMin, nSemaines, joursPref, sens, typeAvant, typeApres, nJoursSerie, nJoursRepos, reposJours, nSemainesCadence, ancre, sensCadence, formeExclusion, dateExcl1, dateExcl2, vets])
 
   const handleSubmit = () => {
     if (!ownerId) { ouvrirErreur('Sélectionnez le vétérinaire concerné.'); return }
