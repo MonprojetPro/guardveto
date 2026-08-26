@@ -32,6 +32,7 @@ import {
   FORCE_LABEL,
   FORCES_ORDRE,
 } from '@/components/ia/creerRegleProposee'
+import { preferencesImplicites } from '@/lib/regles/preferencesDefaut'
 import { lignesLues } from './lecture'
 import type { ContexteOutil, OutilEcriture, OutilLecture } from './types'
 
@@ -71,6 +72,8 @@ export const listerRegles: OutilLecture<typeof ParamsLister> = {
   description: `Donne les règles du cabinet, en français, avec leur puissance (interdiction ferme, à éviter, préférence…) et si elles sont actives ou en pause.
 
 Appelle-le pour toute question sur ce qui contraint le planning : « quelles règles concernent Antoine ? », « pourquoi Manon n'a-t-elle jamais le mercredi ? », « qu'est-ce qui empêche X ? ».
+
+La réponse contient aussi un champ « preferences_par_defaut » : ce sont des préférences du planning ACTIVES que personne n'a réglées, donc absentes de la liste des règles. Elles pèsent quand même sur le planning — ne réponds JAMAIS « rien ne le prévoit » sans les avoir regardées.
 
 La réponse contient aussi un champ « reglages_hors_regles » : ce sont des réglages de fiche qui pèsent sur le planning SANS être des règles (dernier recours, retrait du planning). Quand il n'est pas vide, tu DOIS en parler dans ta réponse — sinon tu dis vrai sur les règles et tu induis en erreur sur le fond. Un congé ou la structure des créneaux jouent aussi : va les lire avant de conclure « rien ne l'empêche ».`,
   params: ParamsLister,
@@ -136,10 +139,29 @@ La réponse contient aussi un champ « reglages_hors_regles » : ce sont des ré
     // garde-fou, elle repose sur sa mémoire.
     const horsRegles = await reglagesQuiContraignent(ctx, params.prenom)
 
+    // LES PRÉFÉRENCES QUE PERSONNE N'A RÉGLÉES (B-064).
+    //
+    // Une préférence du planning n'a de ligne en base que si quelqu'un l'a
+    // touchée — « absence de ligne = défaut ». Elle n'en est pas moins ACTIVE.
+    // Mesure du 26/08 : le Val d'Allier n'avait de ligne que pour UNE des cinq.
+    // Filou répondait donc « aucune règle ne le prévoit » sur des préférences
+    // qui pèsent réellement sur le planning.
+    //
+    // Elles voyagent dans un champ à part plutôt que dans `regles` : la
+    // numérotation de cette liste sert à AGIR (`agir_sur_regles`), et une
+    // préférence sans ligne n'a pas d'identifiant sur lequel agir. Les mêler
+    // décalerait les numéros — l'incident B-036, réglé le matin même.
+    const preferencesDefaut = preferencesImplicites(rows.map((r) => r.brique_id)).map((p) => ({
+      regle: phraseRegle(p as unknown as RegleNommable, nomVeto),
+      puissance: FORCE_HUMAINE[p.force] ?? p.force,
+      active: true,
+    }))
+
     return {
       nombre: filtrees.length,
       regles: filtrees,
       reglages_hors_regles: horsRegles,
+      preferences_par_defaut: preferencesDefaut,
       note: cible
         ? `Règles dont le texte mentionne « ${params.prenom} ». Les numéros restent ceux de la liste complète, tu peux donc les réutiliser tels quels. Les règles globales (équité, structure du week-end) ne nomment personne et n'apparaissent pas ici — demande la liste complète pour les voir.`
         : 'Les règles marquées « globale » règlent le planning dans son ensemble et ne visent personne en particulier.',
