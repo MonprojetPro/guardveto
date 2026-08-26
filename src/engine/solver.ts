@@ -52,7 +52,10 @@ import { penaliteDesiderataCandidat, biaisVolumeCandidat } from './rules/desider
 import { penaliteSeulementAvecCandidat } from './rules/seulement-avec'
 import type { HistoriqueFetesResolu } from './historique-fete'
 import type { DiagnosticImpasse } from './diagnostic'
-import { construireDiagnostic, type CreneauStep, type ReSimuler } from './diagnostic'
+import {
+  construireDiagnostic, raisonsSurCreneau,
+  type CreneauStep, type ReSimuler, type RaisonVet,
+} from './diagnostic'
 
 // ── Types publics ────────────────────────────────────────
 
@@ -178,8 +181,22 @@ export type SolveResult =
   | {
       success: false
       joursNonCouverts: JourNonCouvert[]
-      /** Planning partiel jusqu'au point d'impasse */
+      /**
+       * B-053 — CE QUE LE MOTEUR A QUAND MÊME PU REMPLIR.
+       *
+       * Ce champ existait depuis toujours dans ce type… et valait `{ attributions: [] }`
+       * en dur, jamais lu par personne : une coquille vide. Il porte désormais le
+       * résultat de `remplirAuMieux` — un planning presque complet, sans aucune
+       * règle dure enfreinte. Une génération ne rend plus jamais les mains vides.
+       */
       planningPartiel: PlanningPartiel
+      /**
+       * Les créneaux VRAIMENT impossibles, un par un, avec le pourquoi de chaque
+       * vétérinaire écarté. À ne pas confondre avec `joursNonCouverts`, qui est
+       * le rapport legacy : celui-ci liste tout ce qui SUIT le point d'arrêt du
+       * backtracking, donc un seul blocage y rougit trois semaines (B-049).
+       */
+      creneauxVides?: CreneauVide[]
       dureeMs: number
       /**
        * Diagnostic d'impasse COMPLET (Palier 2, lots 1+2+3) : le VRAI créneau
@@ -572,6 +589,152 @@ function assignerStep(
   return { attributions }
 }
 
+// ── Remplissage AU MIEUX (B-053) ─────────────────────────
+//
+// Le backtracking est TOUT OU RIEN : un seul créneau sans candidat et il défait
+// tout, jusqu'à ne rien rendre. Pour une admin, ça veut dire perdre l'intégralité
+// du travail du moteur — trois semaines en rouge — à cause d'un enchaînement
+// impossible sur un week-end. MiKL, le 26/08 : « t'imagine un client qui tombe
+// là-dessus, il panique ».
+//
+// Cette passe est le filet : elle parcourt les créneaux DANS L'ORDRE, pose à
+// chaque fois le meilleur candidat valide (mêmes règles dures, même scoring
+// d'équité que le backtracking), et quand il n'y en a aucun, elle LAISSE LA CASE
+// VIDE et continue. Aucun retour en arrière — donc linéaire, jamais d'explosion
+// combinatoire, et le résultat est déterministe.
+//
+// Ce qu'elle n'est PAS : une solution optimale. Un choix glouton pris tôt peut
+// créer un trou qu'un backtracking aurait évité. Elle ne s'exécute donc QUE
+// lorsque la recherche complète a déjà échoué — jamais à la place.
+//
+// Effet de bord précieux : les créneaux vides qu'elle renvoie sont les VRAIS
+// trous, un par un, avec le pourquoi de chaque véto écarté. C'est ce qui remplace
+// le « 25 créneaux non couverts » de l'ancien rapport, qui comptait en réalité
+// tout ce qui suivait le point d'arrêt (cf. B-049).
+
+/** Un créneau que le remplissage au mieux n'a pas pu pourvoir. */
+export interface CreneauVide {
+  date: string
+  type: CodeCreneau
+  role: RoleGarde
+  /**
+   * Pourquoi CHAQUE vétérinaire est écarté de CE créneau, dans le contexte réel
+   * du planning au moment où on a essayé de le pourvoir. C'est le « pourquoi »
+   * que l'écran doit montrer — jamais un code machine seul.
+   */
+  raisons: RaisonVet[]
+}
+
+export interface RemplissageAuMieux {
+  /** Tout ce qui a pu être pourvu. */
+  planning: PlanningPartiel
+  /** Les créneaux réellement impossibles, dans l'ordre du calendrier. */
+  creneauxVides: CreneauVide[]
+}
+
+/**
+ * Le pourquoi de TOUS les vétérinaires écartés — sans exception.
+ *
+ * `raisonsSurCreneau` (diagnostic.ts) jette silencieusement toute raison qui ne
+ * commence pas par un code `R<n>` (`extraireCode` renvoie null → `continue`).
+ * C'est acceptable là où elle sert à compter des familles de règles ; ça ne l'est
+ * pas ici, où la liste est MONTRÉE à l'admin comme la réponse à « pourquoi cette
+ * case est vide ». Une exclusion muette laisserait croire que le vétérinaire
+ * absent de la liste était disponible — la coquille vide que ce projet refuse.
+ *
+ * On garde donc `raisonsSurCreneau` comme source (mêmes libellés, aucune
+ * ré-implémentation) et on complète les manquants avec leur raison brute.
+ */
+function raisonsCompletes(
+  step: SolverStep,
+  slot: SlotGarde,
+  planning: PlanningPartiel,
+  vets: VetEngineNormalise[],
+  calendrier: CalendrierResolu | undefined,
+  structure: StructureConfig,
+  contexteAnterieur: AttributionGarde[] | undefined,
+): RaisonVet[] {
+  const raisons = raisonsSurCreneau(
+    { date: step.date, type: step.type, saison: step.saison, role: step.role, besoinSecond: step.besoinSecond },
+    planning,
+    { vets, calendrier, structureConfig: structure },
+    structure,
+  )
+  const deja = new Set(raisons.map((r) => r.vetId))
+  for (const vet of vets) {
+    if (deja.has(vet.id)) continue
+    const res = isValid(slot, vet, step.role, vets, planning, calendrier, structure, contexteAnterieur)
+    if (res.valid) continue // ne devrait pas arriver : la case est vide
+    raisons.push({ code: 'AUTRE', vetId: vet.id, raison: res.raison ?? 'indisponible sur ce créneau' })
+  }
+  return raisons
+}
+
+/**
+ * remplirAuMieux — pose le maximum de gardes, laisse vides celles qui n'ont
+ * aucun candidat, et dit pourquoi pour chacune.
+ *
+ * Aucune règle DURE n'est enfreinte : un créneau vide est toujours préféré à une
+ * garde illégale. Le produit informe, il n'invente pas — même principe que R21
+ * (« si une règle ne peut pas être respectée, SIGNALER, ne jamais inventer »).
+ */
+export function remplirAuMieux(input: SolverInput): RemplissageAuMieux {
+  const { dateDebut, dateFin, saison, bonusMalus, calendrier } = input
+  const vets = normaliserContraintesVets(input.vets)
+  const weights = input.equityWeights ?? DEFAULT_EQUITY_WEIGHTS
+  const structure = input.structureConfig ?? DEFAULT_STRUCTURE_CONFIG
+  const roleAvantage = input.roleAvantageFinancier === undefined
+    ? DEFAULT_ROLE_AVANTAGE_FINANCIER
+    : input.roleAvantageFinancier
+
+  const steps = genererSteps(dateDebut, dateFin, saison, input.nbVetosSemaineSoir, input.creneaux)
+
+  let planning: PlanningPartiel = { attributions: [] }
+  const creneauxVides: CreneauVide[] = []
+
+  for (const step of steps) {
+    const slot: SlotGarde = {
+      date: step.date, type: step.type, saison: step.saison,
+      besoinSecond: step.besoinSecond, nbPlaces: step.nbPlaces,
+    }
+
+    const valides = vets.filter(
+      (vet) => isValid(slot, vet, step.role, vets, planning, calendrier, structure, input.contexteAnterieur).valid,
+    )
+
+    if (valides.length === 0) {
+      // La case reste vide — et on capture le pourquoi DANS CE CONTEXTE, pas sur
+      // un planning théorique : une règle de rythme ne se voit que là.
+      creneauxVides.push({
+        date: step.date,
+        type: step.type,
+        role: step.role,
+        raisons: raisonsCompletes(step, slot, planning, vets, calendrier, structure, input.contexteAnterieur),
+      })
+      continue
+    }
+
+    // Même scoring que le backtracking : le planning de secours reste équitable,
+    // il n'est pas rempli « n'importe comment ».
+    const compteursStep =
+      valides.length > 1 ? compterParVet(planning, vets, roleAvantage, calendrier) : undefined
+    const meilleur = valides
+      .map((vet) => ({
+        vet,
+        score: scorerCandidat(
+          step, vet, planning, bonusMalus, vets, weights, calendrier, roleAvantage,
+          compteursStep, structure.penalitesSouples, structure.historiqueFetes,
+          compositionsSouples(structure), rolesInterditsSouples(structure), input.contexteAnterieur,
+        ),
+      }))
+      .sort((a, b) => a.score - b.score)[0].vet
+
+    planning = assignerStep(planning, step, meilleur.id)
+  }
+
+  return { planning, creneauxVides }
+}
+
 // ── Backtracking ─────────────────────────────────────────
 
 /**
@@ -758,10 +921,15 @@ function genererSeedGreedy(input: SolverInput, avecDiagnostic = true): SolveResu
   // le diagnostic d'impasse (qui re-simule le seed → re-explosion). L'admin est
   // invité à assouplir des règles ou réduire la période.
   if (budget.depasse) {
+    // B-053 — même coupé, on ne rend pas les mains vides. Le remplissage au
+    // mieux est LINÉAIRE : il ne peut pas ré-exploser là où la recherche
+    // complète vient d'être coupée.
+    const secours = remplirAuMieux(input)
     return {
       success: false,
       joursNonCouverts: [],
-      planningPartiel: { attributions: [] },
+      planningPartiel: secours.planning,
+      creneauxVides: secours.creneauxVides,
       dureeMs,
       interrompu: true,
       raisonInterruption:
@@ -826,10 +994,17 @@ function genererSeedGreedy(input: SolverInput, avecDiagnostic = true): SolveResu
     })
   }
 
+  // B-053 — LE FILET. La recherche complète a prouvé qu'aucun planning entier
+  // n'existe ; on repasse en glouton tolérant pour rendre tout ce qui EST
+  // possible, et la liste des créneaux réellement impossibles (avec leur
+  // pourquoi). C'est ce que l'admin reçoit désormais à la place d'un mur.
+  const secours = remplirAuMieux(input)
+
   return {
     success: false,
     joursNonCouverts,
-    planningPartiel: { attributions: [] },
+    planningPartiel: secours.planning,
+    creneauxVides: secours.creneauxVides,
     dureeMs,
     diagnostic,
   }
