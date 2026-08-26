@@ -438,6 +438,54 @@ function estCodeHistorique(type: string): boolean {
   return type === 'semaine_soir' || type === 'vendredi_soir' || type === 'weekend' || type === 'ferie'
 }
 
+/** Moyenne d'une série. Vide → 0. */
+function moyenne(valeurs: number[]): number {
+  if (valeurs.length === 0) return 0
+  return valeurs.reduce((t, v) => t + v, 0) / valeurs.length
+}
+
+/**
+ * R11c (B-061) — LES WEEK-ENDS TENUS SANS JAMAIS AVOIR L'AVANTAGE.
+ *
+ * MiKL, en recette le 26/08 : « pourquoi Fanny ne fait pas un WE 1re de garde ?
+ * Elle en fait 2 en 2nde, ce qui déséquilibre en plus le compteur ».
+ *
+ * CE QUE LA SONDE A MONTRÉ. Au week-end du 10/10, il ne restait que Fanny et
+ * Anne-Sophie — et toutes deux à ZÉRO sur le compteur « 1er WE ». Leurs scores
+ * étaient identiques (100 / 100) : rien ne les départageait. Le rôle se
+ * décidait donc en amont, au vendredi, pour des raisons sans aucun rapport avec
+ * l'avantage financier — et l'inversion R8 reléguait Fanny en 2nde.
+ *
+ * ⚠️ DEUX CORRECTIFS ONT ÉCHOUÉ AVANT CELUI-CI (écart à la moyenne sur « 1er
+ * WE », puis malus étendu au week-end). Aucun ne pouvait marcher : ils pesaient
+ * un compteur sur lequel les deux candidates étaient À ÉGALITÉ. Un écart nul ne
+ * départage rien.
+ *
+ * CE QUI MANQUAIT VRAIMENT. Le moteur comptait combien de fois on a EU le rôle
+ * avantagé, jamais combien de fois on l'a RATÉ. Fanny avait 1 week-end pour 0
+ * fois le rôle — une occasion manquée ; Anne-Sophie 0 week-end — aucune. C'est
+ * ce déséquilibre-là que voyait MiKL : pas « 0 », mais « 2 week-ends et 0 ».
+ *
+ * On équilibre donc `week-ends tenus − fois où on avait l'avantage`. Celui qui
+ * en accumule sans jamais l'avantage devient prioritaire pour l'obtenir, et
+ * déprioritaire pour reprendre l'autre rôle.
+ */
+function malusRoleRate(
+  step: SolverStep,
+  roleAvantage: string | null,
+  weGardes: number,
+  compteurRoleAvantage: number,
+  moyenneRates: number,
+  poids: number,
+): number {
+  if (step.type !== 'weekend' || roleAvantage === null) return 0
+  const rates = weGardes - compteurRoleAvantage
+  const ecart = rates - moyenneRates
+  // Beaucoup de week-ends sans l'avantage → prioritaire pour l'obtenir (score
+  // plus bas), et pénalisé pour reprendre le rôle qu'il a déjà trop tenu.
+  return step.role === roleAvantage ? -ecart * poids : ecart * poids
+}
+
 function malusAvantageFinancier(
   step: SolverStep,
   roleAvantage: string | null,
@@ -1112,10 +1160,14 @@ export function rattraperCasesVides(
     }
   })
 
+  // R11c — dernier geste : rééquilibrer les rôles, sans jamais perdre une garde.
+  options?.onProgres?.('Je vérifie le partage des premiers de garde…')
+  const equilibre = equilibrerRolesWeekEnd(planning, input)
+
   return {
-    planning,
+    planning: equilibre,
     creneauxVides: videsJugees,
-    gagnees: comptePlacesPourvues(planning) - departPourvues,
+    gagnees: comptePlacesPourvues(equilibre) - departPourvues,
     budgetEpuise,
   }
 }
@@ -1124,6 +1176,164 @@ export function rattraperCasesVides(
 function avecRattrapage(input: SolverInput, depart: RemplissageAuMieux): RemplissageAuMieux {
   if (!input.rattrapage) return depart
   return rattraperCasesVides(input, depart, input.rattrapage)
+}
+
+/**
+ * R11c (B-061) — RÉÉQUILIBRER LES RÔLES SANS JAMAIS PERDRE UNE GARDE.
+ *
+ * MiKL, en recette : « pourquoi Fanny ne fait pas un WE 1re de garde ? Elle en
+ * fait 2 en 2nde, ce qui déséquilibre en plus le compteur ». Le compteur mesure
+ * combien de fois on a EU le rôle avantagé ; il ne dit jamais combien de fois on
+ * l'a RATÉ. Fanny avait 2 week-ends pour 0 fois le rôle.
+ *
+ * POURQUOI UNE PASSE SÉPARÉE, ET NON UN TERME DE SCORE. Le terme a été essayé
+ * et MESURÉ : il donnait bien le rôle à Fanny, mais faisait passer le
+ * remplissage de 3 à 5 cases vides. Mélanger « remplir » et « répartir » dans un
+ * même score, c'est laisser l'un se payer sur l'autre — et le principe posé le
+ * 26/08 est clair : une garde pourvue prime sur l'élégance de la répartition.
+ *
+ * Ici, on ne touche QUE des week-ends déjà complets, et on se contente
+ * d'échanger les deux rôles entre les mêmes personnes. Le nombre de gardes
+ * pourvues ne peut donc pas bouger — c'est une propriété de la transformation,
+ * pas une précaution qu'on espère.
+ *
+ * L'échange respecte l'inversion R8 : échanger les rôles du week-end oblige à
+ * échanger ceux du vendredi lié, sinon la paire devient illégale.
+ */
+function equilibrerRolesWeekEnd(
+  planning: PlanningPartiel,
+  input: SolverInput,
+): PlanningPartiel {
+  const roleAvantage = input.roleAvantageFinancier === undefined
+    ? DEFAULT_ROLE_AVANTAGE_FINANCIER
+    : input.roleAvantageFinancier
+  if (roleAvantage === null) return planning
+
+  const vets = normaliserContraintesVets(input.vets)
+  const structure = input.structureConfig ?? DEFAULT_STRUCTURE_CONFIG
+
+  /** L'écart entre le plus et le moins servi sur le rôle avantagé. */
+  const desequilibre = (p: PlanningPartiel): number => {
+    const compteurs = compterParVet(p, vets, roleAvantage, input.calendrier)
+    // On mesure le RATIO manqué : « des week-ends tenus, combien sans
+    // l'avantage ». C'est ce que voit MiKL — pas « 0 », mais « 2 et 0 ».
+    const rates = compteurs.map((c) => c.weGardes - c.weekendPremier)
+    return Math.max(...rates, 0) - Math.min(...rates, 0)
+  }
+
+  let courant = planning
+  let ameliore = true
+  let tours = 0
+
+  while (ameliore && tours < 10) {
+    ameliore = false
+    tours++
+
+    for (const we of courant.attributions.filter((a) => a.type === 'weekend')) {
+      const places = we.placements
+      if (places.length < 2) continue
+      if (places.some((p) => !p.vetId)) continue // week-end incomplet : on n'y touche pas
+
+      const essai = echangerRolesDuBloc(courant, we.date, structure)
+      if (!essai) continue
+
+      // Aucune règle dure enfreinte, et un déséquilibre moindre : on adopte.
+      const gagne = desequilibre(essai) < desequilibre(courant)
+      const nAjoutePasDInfraction =
+        nbPlacesIllegales(essai, input, vets, structure) <=
+        nbPlacesIllegales(courant, input, vets, structure)
+
+      if (gagne && nAjoutePasDInfraction) {
+        courant = essai
+        ameliore = true
+      }
+    }
+  }
+
+  return courant
+}
+
+/**
+ * Échange les deux premiers rôles d'un week-end ET du créneau qui lui est lié
+ * (le vendredi soir), pour rester cohérent avec l'inversion R8.
+ * `null` si le bloc n'est pas échangeable en l'état.
+ */
+function echangerRolesDuBloc(
+  planning: PlanningPartiel,
+  dateWeekEnd: string,
+  structure: StructureConfig,
+): PlanningPartiel | null {
+  const aEchanger = new Set<string>([`${dateWeekEnd}|weekend`])
+
+  for (const rel of relationsEffectives(structure)) {
+    if (rel.cibleCode !== 'weekend') continue
+    for (let k = 1; k <= FENETRE_GROUPE_JOURS; k++) {
+      const cle = `${addDays(dateWeekEnd, -k)}|${rel.sourceCode}`
+      if (planning.attributions.some((a) => `${a.date}|${a.type}` === cle)) {
+        aEchanger.add(cle)
+        break
+      }
+    }
+  }
+
+  let touche = false
+  const attributions = planning.attributions.map((a) => {
+    if (!aEchanger.has(`${a.date}|${a.type}`)) return a
+    const places = a.placements
+    if (places.length < 2 || !places[0].vetId || !places[1].vetId) return a
+    touche = true
+    const echange = places.map((p, i) => {
+      if (i === 0) return { ...p, vetId: places[1].vetId }
+      if (i === 1) return { ...p, vetId: places[0].vetId }
+      return p
+    })
+    return { ...a, placements: echange }
+  })
+
+  return touche ? { attributions } : null
+}
+
+/**
+ * Combien de places posées seraient refusées par les règles dures ?
+ *
+ * ⚠️ On COMPTE, on ne juge pas en tout-ou-rien — et c'est indispensable.
+ * Rejouer `isValid` sur un planning déjà complet fait ressortir les règles
+ * d'ORDRE (R18/R19 : « le 1er doit être désigné avant le 2nd ») : elles
+ * refusent la place du 1er dès lors que le 2nd est déjà là. Un contrôle absolu
+ * déclarait donc TOUS les plannings illégaux, y compris celui en cours — et
+ * l'échange de rôles était systématiquement rejeté, en silence.
+ *
+ * En comparant deux plannings avec la MÊME mesure, ce biais s'annule : ce qui
+ * compte est qu'un échange n'AJOUTE pas d'infraction.
+ */
+function nbPlacesIllegales(
+  planning: PlanningPartiel,
+  input: SolverInput,
+  vets: VetEngineNormalise[],
+  structure: StructureConfig,
+): number {
+  let illegales = 0
+  for (const a of planning.attributions) {
+    for (const place of a.placements) {
+      if (!place.vetId) continue
+      const vet = vets.find((v) => v.id === place.vetId)
+      if (!vet) { illegales++; continue }
+      // On juge la place dans un planning AMPUTÉ d'elle-même : sinon la personne
+      // qu'on teste se verrait reprocher sa propre présence (R21).
+      const sans: PlanningPartiel = {
+        attributions: planning.attributions.map((x) =>
+          x === a
+            ? { ...x, placements: x.placements.map((p) => (p === place ? { ...p, vetId: null } : p)) }
+            : x,
+        ),
+      }
+      const slot: SlotGarde = { date: a.date, type: a.type, saison: input.saison, besoinSecond: a.placements.length > 1 }
+      if (!isValid(slot, vet, place.role, vets, sans, input.calendrier, structure, input.contexteAnterieur).valid) {
+        illegales++
+      }
+    }
+  }
+  return illegales
 }
 
 /** Places réellement pourvues d'un planning. */

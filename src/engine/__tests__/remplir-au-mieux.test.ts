@@ -224,3 +224,56 @@ describe('B-060 — la passe de rattrapage', () => {
     expect(messages.length).toBeGreaterThan(0)
   })
 })
+
+describe('B-061 — le partage des premiers de garde', () => {
+  /**
+   * MiKL : « pourquoi Fanny ne fait pas un WE 1re de garde ? Elle en fait 2 en
+   * 2nde, ce qui déséquilibre en plus le compteur ». Le moteur comptait combien
+   * de fois on a EU le rôle avantagé, jamais combien de fois on l'a RATÉ.
+   *
+   * ⚠️ Ce correctif a d'abord été tenté DANS LE SCORE. Mesure : il donnait bien
+   * le rôle à Fanny, mais faisait passer le remplissage de 3 à 5 cases vides —
+   * « remplir » se payait sur « répartir ». D'où une passe séparée, qui
+   * n'échange que des rôles sur des week-ends déjà complets.
+   *
+   * Ces tests protègent les deux INVARIANTS de cette passe, pas un cas
+   * particulier : elle ne perd jamais une garde, et elle n'aggrave jamais le
+   * partage.
+   */
+  const CONGE = [{ date_debut: DATE_DEBUT, date_fin: DATE_FIN, type: 'vacances' as const }]
+
+  function bilanRoles(planning: { attributions: { type: string; placements?: { role: string; vetId: string | null }[] }[] }) {
+    const we = new Map<string, number>()
+    const premier = new Map<string, number>()
+    for (const a of planning.attributions) {
+      if (a.type !== 'weekend') continue
+      for (const p of a.placements ?? []) {
+        if (!p.vetId) continue
+        we.set(p.vetId, (we.get(p.vetId) ?? 0) + 1)
+        if (p.role === 'premier') premier.set(p.vetId, (premier.get(p.vetId) ?? 0) + 1)
+      }
+    }
+    // Les week-ends tenus SANS le rôle avantagé — ce que MiKL regarde.
+    const rates = [...we.entries()].map(([id, n]) => n - (premier.get(id) ?? 0))
+    return rates.length === 0 ? 0 : Math.max(...rates) - Math.min(...rates)
+  }
+
+  it('ne perd JAMAIS une garde en rééquilibrant les rôles', () => {
+    const vets = [vet('v1', 'Alice'), vet('v2', 'Bob'), vet('v3', 'Carol'), vet('v4', 'David', CONGE)]
+    const depart = remplirAuMieux(input(vets))
+    const apres = rattraperCasesVides(input(vets), depart, { budgetMs: 5000 })
+
+    // L'échange porte sur des week-ends DÉJÀ complets et ne fait que permuter
+    // deux personnes : le total ne peut pas bouger. C'est une propriété de la
+    // transformation, pas une précaution qu'on espère.
+    expect(placesPourvues(apres.planning)).toBeGreaterThanOrEqual(placesPourvues(depart.planning))
+  })
+
+  it('n aggrave jamais le partage des premiers de garde', () => {
+    const vets = [vet('v1', 'Alice'), vet('v2', 'Bob'), vet('v3', 'Carol'), vet('v4', 'David')]
+    const depart = remplirAuMieux(input(vets))
+    const apres = rattraperCasesVides(input(vets), depart, { budgetMs: 5000 })
+
+    expect(bilanRoles(apres.planning)).toBeLessThanOrEqual(bilanRoles(depart.planning))
+  })
+})
