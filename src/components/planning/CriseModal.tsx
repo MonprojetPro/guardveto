@@ -430,6 +430,9 @@ export function CriseModal({
   const [decisions, setDecisions] = useState<Record<string, DecisionUI>>({})
   const [applying, setApplying] = useState(false)
   const [volontairesEnCours, setVolontairesEnCours] = useState(false)
+  // T-006 — les règles du cabinet que ces remplacements enfreindraient. Le
+  // système INFORME, il n'interdit pas : on montre, l'admin tranche.
+  const [avertServeur, setAvertServeur] = useState<string[] | null>(null)
 
   const vetsById = new Map(vets.map((v) => [v.id, v]))
   const absentVet = absentId ? vetsById.get(absentId) : null
@@ -548,7 +551,7 @@ export function CriseModal({
   }
 
   // ── Étape 2 → POST /api/absences/[id]/reparer ─────────
-  async function handleAppliquer() {
+  async function handleAppliquer(confirmerAvertissements = false) {
     if (!resultat) return
 
     // On ne soumet QUE les créneaux où un remplaçant a été choisi.
@@ -570,9 +573,20 @@ export function CriseModal({
       const res = await fetch(`/api/absences/${resultat.absence.id}/reparer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decisions: aSoumettre }),
+        body: JSON.stringify({ decisions: aSoumettre, confirmerAvertissements }),
       })
       const json = await res.json()
+      // T-006 — règles dures du cabinet enfreintes : le serveur n'écrit rien et
+      // renvoie les phrases. On les affiche AVANT le geste, comme sur l'édition
+      // manuelle, les échanges et le dépannage volontaire.
+      if (res.status === 409 && json?.needsConfirmation) {
+        setAvertServeur(
+          Array.isArray(json.warnings) && json.warnings.length > 0
+            ? json.warnings
+            : [json.error ?? 'Réparation à confirmer.'],
+        )
+        return
+      }
       if (!res.ok) {
         // 400 « non éligible » / 409 « déjà pourvu » → message clair renvoyé par l'API.
         toast.error(json.error ?? 'Erreur lors de la réparation.')
@@ -609,6 +623,7 @@ export function CriseModal({
     : 0
 
   return (
+    <>
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-lg sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* ══════════ ÉTAPE 1 — DÉCLARATION ══════════ */}
@@ -804,8 +819,12 @@ export function CriseModal({
               <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={applying}>
                 Fermer
               </Button>
+              {/* Jamais `onClick={handleAppliquer}` : React passerait
+                  l'événement en premier argument, qui est truthy — la
+                  confirmation serait donnée d'office et l'avertissement ne
+                  s'afficherait jamais. */}
               {resultat.creneauxImpactes.length > 0 && (
-                <Button onClick={handleAppliquer} disabled={applying || nbChoisis === 0}>
+                <Button onClick={() => handleAppliquer()} disabled={applying || nbChoisis === 0}>
                   {applying ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -820,6 +839,47 @@ export function CriseModal({
           </>
         )}
       </DialogContent>
-    </Dialog>
+      </Dialog>
+
+      {/* ── T-006 — Règles du cabinet enfreintes par ces remplacements ──
+             Le système INFORME, il n'interdit pas : l'admin voit ce que son
+             geste enfreint AVANT de trancher, et reste libre d'appliquer. Ce
+             qui est appliqué malgré l'avertissement part dans `audit_log`.
+             ──────────────────────────────────────────────────────────── */}
+      <Dialog
+        open={!!avertServeur}
+        onOpenChange={(o) => { if (!o) setAvertServeur(null) }}
+      >
+        <DialogContent className="gv-modale">
+          <DialogHeader>
+            <p className="gm-kicker">Planning · vérification</p>
+            <DialogTitle>Réparation à confirmer</DialogTitle>
+          </DialogHeader>
+          <div className="gf-card souple">
+            <p className="gf-title">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              Ce que ces remplacements enfreignent
+            </p>
+            {(avertServeur ?? []).map((w, i) => (
+              <p key={i}>{w}</p>
+            ))}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Ces remplacements restent applicables — c&apos;est toi qui tranches.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAvertServeur(null)} disabled={applying}>
+              Annuler
+            </Button>
+            <Button
+              disabled={applying}
+              onClick={async () => { setAvertServeur(null); await handleAppliquer(true) }}
+            >
+              Appliquer quand même
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

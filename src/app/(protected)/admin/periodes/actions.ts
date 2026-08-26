@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { refusSiBloquant } from '@/data/controleImpact'
 import { periodeFr, dateFrSansJour } from '@/lib/dates-fr'
 import { retirerEvenementsAvecBilan } from '@/lib/sync-calendrier'
-import { isGoogleCalendarConfigured } from '@/lib/google-calendar'
+import { isGoogleCalendarConfigured, agendaDeRepliPour } from '@/lib/google-calendar'
 import { creerNotification, contenuPlanningRetire } from '@/lib/notifications-inapp'
 import { executerRetraitPlanning } from '@/lib/planning/retrait-planning'
 import type {
@@ -442,19 +442,30 @@ export async function bilanRetraitPlanning(
   }
 }
 
-/** Le calendarId du cabinet (colonne), sinon null → repli env en aval. */
+/**
+ * Le calendarId du cabinet (colonne), sinon l'agenda de repli s'il lui est
+ * NOMINATIVEMENT accordé (T-001). Null sinon : mieux vaut « aucun agenda
+ * configuré » qu'écrire dans celui d'un autre cabinet.
+ */
 async function calendarIdDuCabinet(
   supabase: SupabaseClient<any, any, any>,
   cabinetId: string | null,
 ): Promise<string | null> {
   if (!cabinetId) return null
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('cabinets')
     .select('google_calendar_id')
     .eq('id', cabinetId)
     .maybeSingle()
+  if (error) {
+    console.error(
+      '[periodes] lecture de l’agenda du cabinet impossible, agenda considéré absent :',
+      error.message,
+    )
+    return null
+  }
   const val = (data as { google_calendar_id?: string | null } | null)?.google_calendar_id
-  return (val ?? '').trim() || null
+  return (val ?? '').trim() || agendaDeRepliPour(cabinetId)
 }
 
 /** Les identifiants de rendez-vous portés par les gardes d'un planning. */

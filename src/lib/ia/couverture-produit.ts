@@ -199,6 +199,76 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   'protected/admin/banc-ia#lancerBanc': { hors: 'Outil de développement interne.' },
   'protected/admin/banc-ia#lancerRecetteFilou': { hors: 'Outil de développement interne.' },
   'protected/admin/banc-ia#lancerControleCoherence': { hors: 'Outil de développement interne.' },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // LES ROUTES API — entrées au registre le 2026-08-26 (audit B-007, volet 2)
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  // Elles y manquaient toutes. Le recensement ne lisait que les `actions.ts`,
+  // et personne ne s'en apercevait : le test passait au vert en ayant regardé
+  // une partie du produit seulement. Or deux des gestes les plus courants du
+  // cabinet vivent ici — se porter volontaire pour dépanner, et modifier une
+  // garde à la main. Ce sont exactement deux des six trous que l'audit B-007
+  // avait relevés « à combler », et on comprend maintenant pourquoi ils étaient
+  // passés à travers : ils n'étaient pas oubliés, ils étaient invisibles.
+  //
+  // C'est la leçon de ce projet une fois de plus : un contrôle qui ne dit pas
+  // ce qu'il ne regarde pas se lit comme un contrôle complet.
+
+  // ── Ce que Filou sait déjà faire, par le même chemin que l'écran ──────────
+  'api/absences#POST': { outil: 'declarer_absence' },
+  'api/absences/[id]/appel-volontaires#POST': { outil: 'appeler_volontaires' },
+  'api/absences/[id]/reparer#POST': { outil: 'reparer_absence' },
+  'api/publish#POST': { outil: 'publier_periode' },
+  'api/generate/pre-vol#GET': { outil: 'verifier_pre_vol_periode' },
+
+  // ── LES MANQUES ASSUMÉS — la liste de travail du volet 2 ─────────────────
+  'api/absences/[id]/volontaire#POST': {
+    manque:
+      'Se porter volontaire pour dépanner un collègue. C’est le geste le plus courant qu’un vétérinaire fasse depuis son téléphone, et le seul de ce niveau que Filou ne sache pas déclencher : il peut lire l’appel aux volontaires, expliquer qui manque, et doit ensuite dire « va sur l’écran ». Un outil d’écriture, avec la double barrière habituelle (proposition puis clic), rendrait le parcours complet.',
+  },
+  'api/gardes/[id]#PATCH': {
+    manque:
+      'Modifier l’attribution d’une garde à la main (admin). Filou sait réparer une absence et valider un échange, mais pas la retouche libre — « mets Camille en 1er ce samedi ». C’est le chemin d’écriture le mieux gardé du produit (règles dures, périmètre jour ou bloc, confirmation 409, trace d’audit) : l’outil devra repasser par la route, jamais réimplémenter ces contrôles.',
+  },
+  'api/export-pdf#GET': {
+    manque:
+      'Sortir le planning en PDF. Demande naturelle en conversation (« envoie-moi le planning de septembre »), et Filou n’a aujourd’hui aucun moyen de produire un fichier — il ne sait qu’écrire sur le tableau. À traiter le jour où l’on décide comment un fichier revient dans une conversation.',
+  },
+  'api/generate#POST': {
+    manque:
+      'Lancer la génération d’un planning. Filou sait créer une période, la régler, faire le pré-vol et publier — tout sauf l’étape du milieu. Écarté jusqu’ici pour une bonne raison (une génération est longue et se suit à l’écran, en cinq temps), mais le trou mérite d’être nommé : le parcours qu’il propose s’interrompt au moment décisif.',
+  },
+  'api/calendar-sync#POST': {
+    manque:
+      'Relancer la synchronisation vers l’agenda Google. Geste de dépannage rare mais réel (« les gardes n’apparaissent pas dans l’agenda »), aujourd’hui atteignable seulement depuis l’écran des périodes.',
+  },
+  'api/bilan#POST': {
+    manque:
+      'Calculer et enregistrer les bonus/malus de fin de période. Filou LIT les compteurs mais ne sait pas clore la période. Volontairement laissé de côté tant que la clôture n’est pas stabilisée côté produit — mais c’est un manque, pas un hors-périmètre.',
+  },
+
+  // ── Hors périmètre, et pourquoi ──────────────────────────────────────────
+  'api/cron/lock-gardes#GET': {
+    hors: 'Tâche planifiée, déclenchée par Vercel avec son propre secret. Personne ne la « demande » — la donner à Filou serait lui confier une horloge.',
+  },
+  'api/cron/rappels#GET': { hors: 'Tâche planifiée (rappels du matin), même raison.' },
+  'api/cron/sync-calendrier#GET': { hors: 'Tâche planifiée (synchronisation agenda), même raison.' },
+  'api/webhooks/brevo#POST': {
+    hors: 'Point d’entrée appelé par Brevo pour dire ce qu’un e-mail est devenu. Ce n’est pas un geste du cabinet, c’est une notification entrante.',
+  },
+  'api/gardes/[id]/disponibilites#GET': {
+    hors: 'Calcul de disponibilité affiché par la modale de garde. C’est ce que Filou obtient déjà autrement (règles + planning) ; l’exposer serait un doublon de lecture.',
+  },
+  'api/generate/replay#POST': {
+    hors: 'Test de déterminisme du moteur : rejoue une génération sur son instantané de règles. Outil de diagnostic technique, sans signification pour le cabinet.',
+  },
+  'api/import/lire#POST': {
+    hors: 'Lecture d’un fichier de planning à importer — même chantier éteint que les deux actions d’import ci-dessus (prestation payante depuis le 2026-08-18).',
+  },
+  'auth/confirm#GET': {
+    hors: 'Confirmation d’un lien d’invitation ou de réinitialisation. Se joue hors session, avant que Filou existe pour cette personne.',
+  },
 }
 
 /**

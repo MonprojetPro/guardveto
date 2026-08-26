@@ -36,14 +36,33 @@ import { COUVERTURE_FILOU, trousDeCouverture } from '@/lib/ia/couverture-produit
 const RACINE = join(__dirname, '..', '..', 'src')
 const APP = join(RACINE, 'app')
 
-/** Tous les fichiers d'actions serveur du produit. */
-function fichiersDActions(dossier: string): string[] {
+/**
+ * Tous les fichiers qui portent une capacité du produit.
+ *
+ * ⚠️ LES ROUTES API COMPTENT AUTANT QUE LES ACTIONS SERVEUR — et l'avoir oublié
+ * est le défaut que ce recensement a lui-même connu. Jusqu'au 2026-08-26, seuls
+ * les `actions.ts` étaient lus. Or « se porter volontaire pour dépanner » et
+ * « modifier une garde » ne sont pas des actions serveur : ce sont des routes
+ * (`POST /api/absences/[id]/volontaire`, `PATCH /api/gardes/[id]`). Deux gestes
+ * parmi les plus courants du cabinet échappaient donc entièrement à la règle
+ * « Filou suit le produit », **sans que rien ne le signale** — le test passait
+ * au vert en ayant regardé une partie du produit.
+ *
+ * C'est le défaut que ce fichier existe pour empêcher, reproduit dans le
+ * fichier lui-même : un contrôle qui ne dit pas ce qu'il ne regarde pas se lit
+ * comme un contrôle complet.
+ */
+function fichiersDeCapacite(dossier: string): string[] {
   const trouves: string[] = []
   for (const entree of readdirSync(dossier)) {
     const chemin = join(dossier, entree)
     if (statSync(chemin).isDirectory()) {
-      trouves.push(...fichiersDActions(chemin))
-    } else if (/actions\.ts$/.test(entree) || /-actions\.ts$/.test(entree)) {
+      trouves.push(...fichiersDeCapacite(chemin))
+    } else if (
+      /actions\.ts$/.test(entree) ||
+      /-actions\.ts$/.test(entree) ||
+      entree === 'route.ts'
+    ) {
       trouves.push(chemin)
     }
   }
@@ -65,11 +84,19 @@ function clesDuFichier(chemin: string): string[] {
     .replace(/^\//, '')
     .replace(/\.ts$/, '')
     .replace(/\/actions$/, '')
+    .replace(/\/route$/, '')
     .replace(/[()]/g, '')
 
-  return [...source.matchAll(/^export async function (\w+)/gm)].map(
-    (m) => `${prefixe}#${m[1]}`,
-  )
+  return [...source.matchAll(/^export async function (\w+)/gm)]
+    .map((m) => m[1])
+    // Les routes exportent aussi des réglages (`maxDuration`) et parfois des
+    // aides internes ; seuls les verbes HTTP sont des gestes du produit.
+    .filter((nom) =>
+      chemin.endsWith('route.ts')
+        ? ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'].includes(nom)
+        : true,
+    )
+    .map((nom) => `${prefixe}#${nom}`)
 }
 
 /** Les noms d'outils réellement enregistrés dans le catalogue de Filou. */
@@ -85,7 +112,7 @@ function outilsEnregistres(): Set<string> {
 }
 
 describe('Toute capacité du produit a été confrontée à Filou', () => {
-  const actions = fichiersDActions(APP).flatMap(clesDuFichier)
+  const actions = fichiersDeCapacite(APP).flatMap(clesDuFichier)
 
   it('trouve bien les actions serveur (le test ne passe pas à vide)', () => {
     expect(actions.length).toBeGreaterThan(50)

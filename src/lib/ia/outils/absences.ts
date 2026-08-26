@@ -37,10 +37,9 @@ import { changerStatutCompensation as changerStatutCompensationAction } from '@/
 import { appliquerChangementGarde } from '@/lib/gardes/appliquer-changement'
 import {
   avertissementsReglesDuresMultiPeriodes,
-  fusionnerChangementsParGarde,
   tracerConfirmationMalgreAvertissement,
-  type ChangementGardeSitue,
 } from '@/lib/gardes/avertissements-regles'
+import { changementsPourDecisions } from '@/lib/crise/changements'
 import { sendAppelVolontaires } from '@/lib/notifications'
 import { proposerReparation, type CreneauCrise } from '@/engine/crise/reparer'
 import {
@@ -623,47 +622,10 @@ interface DecisionReparation {
   remplacant_id: string
 }
 
-/**
- * Traduit des décisions de remplacement (une garde, un rôle, un remplaçant) en
- * changements d'attribution complets — ce que le garde-fou des règles dures
- * attend, puisqu'il raisonne sur la PAIRE de chaque garde et pas sur un rôle.
- *
- * Le binôme de l'autre rôle est relu en base, jamais déduit : c'est lui qui fait
- * la différence entre « untel remplace » et « untel remplace ET se retrouve avec
- * quelqu'un avec qui il ne peut pas être de garde ».
- *
- * Une garde introuvable ou sans période est simplement écartée : c'est un
- * contrôle informatif, il n'a pas à provoquer d'échec là où l'écriture, elle,
- * saura dire proprement ce qui manque.
- */
-async function changementsPourDecisions(
-  ctx: ContexteOutil,
-  decisions: readonly DecisionReparation[],
-): Promise<ChangementGardeSitue[]> {
-  if (decisions.length === 0) return []
-
-  const { data, error } = await ctx.supabase
-    .from('gardes')
-    .select('id, periode_id, premier_id, second_id')
-    .in('id', decisions.map((d) => d.gardeId))
-    .eq('cabinet_id', ctx.cabinetId)
-  if (error || !data) return []
-
-  type Row = { id: string; periode_id: string | null; premier_id: string | null; second_id: string | null }
-  const base: ChangementGardeSitue[] = (data as Row[])
-    .filter((g): g is Row & { periode_id: string } => Boolean(g.periode_id))
-    .map((g) => ({
-      gardeId: g.id,
-      periodeId: g.periode_id,
-      premier_id: g.premier_id,
-      second_id: g.second_id,
-    }))
-
-  // Plusieurs décisions peuvent viser LA MÊME garde (les deux rôles d'un même
-  // créneau) : la fusion les empile sur un seul changement — sinon la seconde
-  // effacerait la première et on jugerait un état qui n'existera jamais.
-  return fusionnerChangementsParGarde(base, decisions)
-}
+// La traduction « décisions → changements de garde » vit désormais dans
+// `lib/crise/changements.ts` : l'écran de crise en avait besoin lui aussi
+// (T-006), et recopier un contrôle plutôt que le partager est précisément ce
+// qui avait produit les gardiens divergents du 22/08.
 
 const ParamsReparer = z.object({
   prenom: z.string().describe('Le prénom du vétérinaire absent dont on répare le planning.'),
@@ -775,7 +737,7 @@ Chaque remplacement est revérifié LÉGAL (mêmes règles que la génération d
     // Les règles enfreintes partent donc dans la PROPOSITION, en français, sous
     // les yeux de l'admin AVANT son clic — jamais dans un silence poli, jamais
     // en refusant à la place du moteur (le validateur, lui, n'interdit pas).
-    const changements = await changementsPourDecisions(ctx, resolues)
+    const changements = await changementsPourDecisions(ctx.supabase, ctx.cabinetId, resolues)
     const avertissements = await avertissementsReglesDuresMultiPeriodes(
       ctx.supabase,
       ctx.cabinetId,
@@ -857,7 +819,11 @@ Chaque remplacement est revérifié LÉGAL (mêmes règles que la génération d
     //
     // Filou annonce et se range derrière le moteur ; il ne décide ni de passer
     // outre, ni d'interdire — il renvoie la main à l'admin.
-    const changementsAFroid = await changementsPourDecisions(ctx, c.decisions)
+    const changementsAFroid = await changementsPourDecisions(
+      ctx.supabase,
+      ctx.cabinetId,
+      c.decisions,
+    )
     const avertissementsAFroid = await avertissementsReglesDuresMultiPeriodes(
       ctx.supabase,
       ctx.cabinetId,

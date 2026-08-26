@@ -29,6 +29,7 @@ import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { TABLES_ECOUTEES } from '@/data/v2/enAttente'
+import { abonnerEnSignalantLesEchecs } from '@/lib/realtime/statut-abonnement'
 
 /**
  * Les tables qui alimentent le tableau.
@@ -63,7 +64,7 @@ export function AccueilRealtime() {
       canal.on('postgres_changes', { event: '*', schema: 'public', table }, planifier)
     }
 
-    canal.subscribe()
+    abonnerEnSignalantLesEchecs(canal, "accueil : ce qui attend quelqu'un")
 
     return () => {
       if (debounce.current) clearTimeout(debounce.current)

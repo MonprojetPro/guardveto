@@ -17,6 +17,7 @@ import { useRouter } from 'next/navigation'
 import { Bell, CheckCheck, Inbox } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import { abonnerEnSignalantLesEchecs } from '@/lib/realtime/statut-abonnement'
 import {
   getNotifications,
   marquerLu,
@@ -72,7 +73,7 @@ export function NotificationBell({ initial }: NotificationBellProps) {
         debounceRef.current = setTimeout(refetch, 500)
       }
     )
-    channel.subscribe()
+    abonnerEnSignalantLesEchecs(channel, "cloche : notifications")
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
       supabase.removeChannel(channel)

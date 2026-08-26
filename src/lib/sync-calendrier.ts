@@ -11,6 +11,7 @@ import {
   updateGardeEvent,
   deleteGardeEvent,
   isGoogleCalendarConfigured,
+  agendaDeRepliPour,
   GardeEventData,
 } from './google-calendar'
 import { chargerStructureProfilPeriode } from '@/data/chargerStructureCabinet'
@@ -43,19 +44,33 @@ function prenomsPlacesSup(garde: {
 // couche google-calendar retombe sur l'env GOOGLE_CALENDAR_ID si le résultat
 // est vide (cabinet pilote = colonne nulle → comportement inchangé).
 
-/** calendarId du cabinet, ou null si non renseigné (→ fallback env en aval). */
+/**
+ * calendarId du cabinet, ou l'agenda de repli s'il lui est NOMINATIVEMENT
+ * accordé (T-001). Null sinon : un cabinet dont on ne sait pas où écrire
+ * n'écrit nulle part, plutôt que dans l'agenda du voisin.
+ */
 async function calendarIdDuCabinet(
   supabase: SupabaseClient,
   cabinetId: string | null | undefined,
 ): Promise<string | null> {
   if (!cabinetId) return null
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('cabinets')
     .select('google_calendar_id')
     .eq('id', cabinetId)
     .single()
+  // L'erreur est lue : une base muette ne doit pas ressembler à « ce cabinet
+  // n'a pas d'agenda », sinon on replierait sur l'agenda global par accident —
+  // exactement ce que ce correctif supprime.
+  if (error) {
+    console.error(
+      '[sync-calendrier] lecture de l’agenda du cabinet impossible, aucune synchronisation :',
+      error.message,
+    )
+    return null
+  }
   const val = (data as { google_calendar_id?: string | null } | null)?.google_calendar_id
-  return (val ?? '').trim() || null
+  return (val ?? '').trim() || agendaDeRepliPour(cabinetId)
 }
 
 /** cabinet_id d'une période (pour scoper l'agenda). */

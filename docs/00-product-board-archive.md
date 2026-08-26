@@ -119,3 +119,38 @@ bascule ici que si le board principal depasse a nouveau la limite d'injection.*
 | B-015 | **LIVRE `f227030`.** Selecteur compacte en **panneau flottant** (`Popover` de Base UI — aucune dependance ajoutee) declenche par une pastille cliquable ; suggestions ramenees a une rangee ; textes d'aide allages. **Verifie par team-lead lui-meme, pas sur la foi d'un rapport** (l'agent s'est arrete sans en rendre) : `tsc` propre · 1276 tests verts · **tactile intact** — 11 gestionnaires `pointer*` avec `setPointerCapture`, `touch-action: none` sur les deux zones de glissement · **pipette toujours conditionnelle** via `useSyncExternalStore`, absente et non grisee la ou `EyeDropper` n'existe pas. Ne part qu'avec un build vert. | Retouche visuelle | MiKL | Interne | Pret — bloque par le build de l'autre chantier | 2026-08-24 |
 | B-013 | **Le jumeau orthographique desactive des regles en silence.** `etiquettes: z.array(z.string())` accepte n'importe quelle chaine ; `normaliserTags` (`admin/veterinaires/actions.ts:91-100`) trime et borne sans jamais confronter au vocabulaire du cabinet. Filou ecrit « seniors » la ou l'equipe utilise « senior » : le geste reussit, la fiche affiche l'etiquette, l'admin voit que ca a marche — et **les regles existantes sur « senior » cessent de s'appliquer a cette personne**. Cote regles le controle existe pourtant (`regles/actions.ts:316-319`), mais il ne sert a rien ici puisque le tag fautif est desormais porte. | Correctif | Audit B-007 | Interne | **Livre `360794a`** — voir ligne B-009+B-013+B-014 | 2026-08-24 |
 | B-014 | **L'expediteur des e-mails n'est pas revalide cote serveur.** Seul cas, sur huit examines, ou une charge trafiquee casse reellement quelque chose : `configurer_partages_cabinet` verifie le format de l'adresse dans `resumer` (`structure.ts:1240`) mais `configurerPartagesCabinet` la passe a la RPC sans la revalider. Un `brevo_from_email` invalide fait tomber **les sept chemins d'envoi**, silencieusement — deja paye le 21/08. Les sept autres cas de charge sont couverts par la revalidation serveur. | Correctif | Audit B-007 | Interne | **Livre `360794a`** — voir ligne B-009+B-013+B-014 | 2026-08-24 |
+
+
+## 3ter — Etat de verification de l'audit Filou (B-007), fige au 2026-08-24
+
+> Deplace du board le 2026-08-26 : ses verdicts ouverts ont ete rejoues et tranches.
+> Conserve pour le PROTOCOLE de verification qu'il decrit, qui reste la reference.
+
+**Etat de verification de l'audit Filou (B-007) au 24/08** — a lire avant de coder quoi que ce
+soit issu de ce lot. **B-009, B-013, B-014 : LIVRE et VERIFIE**, commit `360794a`. Les deux
+MESURES (OTTO avant le commit, team-lead apres) etaient exactes chacune a son instant — le
+commit a atterri entre les deux, a 22:56:58. Mais une seule CONCLUSION etait juste : B-009 etait
+un vrai critique dans le code alors commite, pas un faux positif — la demande de l'ecarter s'est
+averee erronee et n'a pas ete executee. Une mesure se date, un verdict se prouve : ne pas
+confondre les deux la prochaine fois. Le chiffre du message de commit (« 1253 tests
+verts, build vert ») a ete **rejoue reellement par OTTO** le 24/08 (`tsc --noEmit` : 0 erreur ;
+`npx vitest run` : 1253 passed + 1 skipped) — confirme par execution, pas relaye sur parole.
+**B-010** requalifie — le fichier accuse (`perimetre.ts`) etait innocent, la vraie dette est une
+doc perimee ailleurs (patch-log, checklist-livraison), voir ligne B-010. **T-007** livre et
+verifie (`b82eccb`) — voir sa ligne pour la correction d'une affirmation erronee au passage.
+**T-006 : verdict CONFIRME**, toujours ouvert — `git log --oneline -3` sur `route.ts` du chemin
+de reparation en premier (dernier commit `099563d`, anterieur et sans rapport, pas touche par
+`360794a`), puis lecture : `avertissementsReglesDuresMultiPeriodes` (le gardien) n'apparait ni en
+import ni en appel dans ce fichier, alors qu'il est appele deux fois par l'outil Filou equivalent
+(`absences.ts:775` et `:850`, confirme ligne pour ligne). **B-011, B-012, B-008 : verdict
+CONFIRME pour les trois**, verifies par OTTO le 24/08 **contre HEAD apres le commit `360794a`**
+(protocole : `git log -3` d'abord sur chaque fichier concerne, aucun n'est touche par ce commit,
+puis lecture directe via `git show HEAD:...`, extraits ci-dessous) :
+`equipe.ts:35` deconstruit `{ data }` sans jamais lire `error` (B-011) ; `absences.ts:964` ecrit
+un `update` sans destructurer `error` du tout (meme famille) ; `agentFilou.ts:291-301` renvoie le
+texte libre du modele tel quel des que `stop_reason !== 'tool_use'`, et `outilsAppeles` n'est
+consomme nulle part cote client — seulement dans l'ecran interne `banc-ia/BancIAClient.tsx:233`
+(B-012) ; `filou/actions.ts:75` calcule `estAdmin` par `role_app === 'admin'` et
+`registre.ts:148` filtre par `!adminSeulement \|\| estAdmin`, un booleen strict sans notion de
+role (B-008). **Les trois tiennent tels que decrits — rien a retoucher dans leur formulation.**
+

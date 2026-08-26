@@ -33,7 +33,9 @@ Une livraison ne se résume pas à « le code marche ». Elle se découpe en **5
 
 ### Sécurité
 - [x] ✅ RLS activée sur toutes les tables (cloisonnement des données par rôle)
-- [x] ✅ Audit sécurité Supabase : 0 erreur (vues corrigées en `security_invoker`)
+- [x] ✅ Audit sécurité Supabase : 0 erreur — **remesuré le 2026-08-26** (`get_advisors`, 27 avertissements bénins, aucune erreur)
+- [x] ✅ Vues sensibles en `security_invoker` — vérifié en base le 2026-08-26 (`pg_class.reloptions`) sur `planning_semaine` et `compteurs_gardes`.
+      ⚠️ **Cette case ne se coche pas une fois pour toutes.** L'option est déjà tombée trois fois (20-21/08/2026 : trois `CREATE OR REPLACE VIEW` qui ne la reposaient pas), sans le moindre message d'erreur — une vue sans RLS rend simplement plus de lignes qu'elle ne devrait. Le vrai garde-fou est `tests/lib/vues-security-invoker.test.ts`, qui rejoue les migrations et exige que la dernière opération sur une vue sensible soit une pose de l'option. **Ne jamais recocher cette ligne sur la foi de la ligne précédente : la remesurer.**
 - [x] ✅ Aucun secret/clé API dans le code (tout en variables d'environnement)
 - [ ] ⚠️ Protection « mot de passe piraté » activée (Supabase → Auth → Settings)
 - [ ] ❓ Politique de mots de passe (longueur minimale) définie

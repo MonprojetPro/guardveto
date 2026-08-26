@@ -29,6 +29,11 @@ import {
   besoinSecondCreneau,
   type ContexteCrisePeriode,
 } from '@/lib/crise/contexte'
+import { changementsPourDecisions } from '@/lib/crise/changements'
+import {
+  avertissementsReglesDuresMultiPeriodes,
+  tracerConfirmationMalgreAvertissement,
+} from '@/lib/gardes/avertissements-regles'
 import type { RoleGarde } from '@/engine/types'
 
 export const maxDuration = 60
@@ -96,6 +101,7 @@ export async function POST(
 
   // ── Validation du corps ─────────────────────────────────
   let decisions: Decision[]
+  let confirmerAvertissements = false
   try {
     const body = await req.json()
     const raw = body?.decisions
@@ -106,6 +112,7 @@ export async function POST(
       )
     }
     decisions = raw
+    confirmerAvertissements = body?.confirmerAvertissements === true
   } catch {
     return NextResponse.json({ error: 'Corps de requête non parsable (JSON attendu).' }, { status: 400 })
   }
@@ -131,6 +138,21 @@ export async function POST(
 
   const ctxCache = new Map<string, ContexteCrisePeriode>()
   const resultatsDecisions: Array<{ gardeId: string; role: RoleGarde; remplacant_id: string }> = []
+
+  // ── PASSE 1 : on valide TOUT, on n'écrit RIEN ────────────
+  //
+  // La validation était auparavant entrelacée avec l'écriture, décision par
+  // décision. Impossible dans ce cas de confronter le geste COMPLET aux règles
+  // du cabinet avant la première écriture — or c'est précisément ce que le
+  // gardien demande : un échange ou une double réparation qui bouge deux gardes
+  // d'un même mouvement doit être jugé sur son état final, pas par morceaux.
+  const aEcrire: Array<{
+    dec: Decision
+    imp: (typeof impactes)[number]
+    premier_id: string | null
+    second_id: string | null
+    avant: { premier_id: string | null; second_id: string | null }
+  }> = []
 
   for (const dec of decisions) {
     // 1. La décision doit correspondre à un créneau réellement impacté.
@@ -208,9 +230,60 @@ export async function POST(
       return NextResponse.json({ error: `Garde ${dec.gardeId} introuvable.` }, { status: 404 })
     }
 
-    const premier_id = dec.role === 'premier' ? dec.remplacant_id : gardeActuelle.premier_id
-    const second_id = dec.role === 'second' ? dec.remplacant_id : gardeActuelle.second_id
+    aEcrire.push({
+      dec,
+      imp,
+      premier_id: dec.role === 'premier' ? dec.remplacant_id : gardeActuelle.premier_id,
+      second_id: dec.role === 'second' ? dec.remplacant_id : gardeActuelle.second_id,
+      avant: {
+        premier_id: gardeActuelle.premier_id ?? null,
+        second_id: gardeActuelle.second_id ?? null,
+      },
+    })
+  }
 
+  // ── GARDE-FOU RÈGLES DURES — le MÊME que les trois autres chemins ──
+  //
+  // T-006 : cet écran était en retard sur Filou. `proposerReparation` ci-dessus
+  // n'interroge qu'UN des deux juges du projet — `isValid`, celui du solver.
+  // L'autre — `validerPlanning`, celui de la publication — n'était pas consulté
+  // ici, alors que l'outil Filou équivalent l'appelle deux fois et que les deux
+  // juges ont déjà divergé (c'est l'incident fondateur du 22/08).
+  //
+  // DOCTRINE : le système INFORME, il n'interdit pas. On ne refuse donc pas la
+  // réparation — on renvoie 409 avec les phrases, l'écran les montre, et l'admin
+  // reste libre de confirmer. Ce qui est confirmé malgré un avertissement part
+  // dans `audit_log` : sinon « informer sans interdire » revient à ne rien dire.
+  let avertissements: string[] = []
+  if (aEcrire.length > 0) {
+    const changements = await changementsPourDecisions(
+      supabase,
+      cabinetId,
+      aEcrire.map((e) => ({
+        gardeId: e.dec.gardeId,
+        role: e.dec.role,
+        remplacant_id: e.dec.remplacant_id,
+      })),
+    )
+    avertissements = await avertissementsReglesDuresMultiPeriodes(supabase, cabinetId, changements)
+
+    if (avertissements.length > 0 && !confirmerAvertissements) {
+      return NextResponse.json(
+        {
+          error:
+            avertissements.length === 1
+              ? avertissements[0]
+              : `${avertissements.length} règles du cabinet seraient enfreintes par ces remplacements.`,
+          warnings: avertissements,
+          needsConfirmation: true,
+        },
+        { status: 409 },
+      )
+    }
+  }
+
+  // ── PASSE 2 : application ────────────────────────────────
+  for (const { dec, imp, premier_id, second_id, avant } of aEcrire) {
     // 5. Application via le cycle PARTAGÉ (update + audit + bilan + agenda + email).
     //    force:true car le planning est publié/verrouillé.
     const appRes = await appliquerChangementGarde({
@@ -229,6 +302,26 @@ export async function POST(
         { error: `Échec de l'application sur la garde du ${imp.date} : ${appRes.error}` },
         { status: appRes.status },
       )
+    }
+
+    // 5 bis. Trace d'une réparation faite MALGRÉ un avertissement de règle dure.
+    //
+    // `force` vaut toujours `true` ici (le planning est publié), donc
+    // `appliquerChangementGarde` a déjà posé sa ligne de déverrouillage — mais
+    // elle ne dit RIEN de ce qui avait été montré à l'admin. Six mois plus tard,
+    // on relirait un changement sans savoir qu'il a été fait en connaissance de
+    // cause. Best-effort : la garde est écrite, un échec d'audit ne doit pas
+    // faire croire que le geste a échoué.
+    if (avertissements.length > 0) {
+      await tracerConfirmationMalgreAvertissement(supabase, {
+        gardeId: dec.gardeId,
+        chemin: 'POST /api/absences/[id]/reparer',
+        auteurVetId: vet.id,
+        avertissements,
+        avant,
+        apres: { premier_id, second_id },
+        contexte: { absence_id: absenceId, role: dec.role, date: imp.date },
+      })
     }
 
     // 6. Trace de compensation (qui a dépanné qui).

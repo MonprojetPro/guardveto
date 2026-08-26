@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation'
 import { CheckCheck, Inbox } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import { abonnerEnSignalantLesEchecs } from '@/lib/realtime/statut-abonnement'
 import {
   getNotifications,
   marquerLu,
@@ -67,7 +68,7 @@ export function HistoriqueNotifications({ initial }: HistoriqueNotificationsProp
         debounceRef.current = setTimeout(refetch, 500)
       }
     )
-    channel.subscribe()
+    abonnerEnSignalantLesEchecs(channel, "historique des notifications : notifications")
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
       supabase.removeChannel(channel)

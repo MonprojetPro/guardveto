@@ -7,12 +7,23 @@
 // Variables d'environnement requises :
 //   GOOGLE_SERVICE_ACCOUNT_EMAIL  — email du Service Account
 //   GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY — clé privée (avec \n)
-//   GOOGLE_CALENDAR_ID            — ID du calendrier cible (FALLBACK global)
+//   GOOGLE_CALENDAR_ID            — agenda de repli, pour UN SEUL cabinet
+//   GOOGLE_CALENDAR_CABINET_ID    — (facultatif) le cabinet qui en bénéficie ;
+//                                   à défaut, le cabinet pilote
 //
-// #10b (multi-cabinet) — le calendarId peut désormais être porté PAR CABINET
-// (colonne cabinets.google_calendar_id) et passé en argument. L'env
-// GOOGLE_CALENDAR_ID reste le FALLBACK (compat cabinet pilote : sa colonne est
-// nulle → on retombe sur l'env, comportement inchangé).
+// #10b (multi-cabinet) — le calendarId est porté PAR CABINET (colonne
+// cabinets.google_calendar_id) et passé en argument.
+//
+// T-001 (2026-08-26) — LE REPLI EST NOMINATIF, PLUS UNIVERSEL. Il était accordé
+// à tout cabinet dont la colonne était vide : commode avec un seul cabinet,
+// mais au deuxième c'est un cabinet qui déverse ses gardes dans l'agenda d'un
+// autre, sans erreur ni alerte. Désormais un cabinet non désigné dont l'agenda
+// n'est pas renseigné n'a PAS d'agenda — la synchronisation le dit et n'écrit
+// nulle part. Ne rien faire est le seul comportement sûr quand on ne sait pas
+// où écrire.
+//
+// Pour sortir définitivement du repli : renseigner `cabinets.google_calendar_id`
+// pour le cabinet pilote, et l'env devient inutile.
 // ============================================================
 
 import { google } from 'googleapis'
@@ -59,13 +70,44 @@ function decalerJour(dateISO: string, n: number): string {
 // ── Initialisation du client Google ─────────────────────────
 
 /**
- * Résout le calendarId effectif : celui du cabinet (argument) en priorité,
- * sinon l'env globale GOOGLE_CALENDAR_ID (fallback compat cabinet pilote).
+ * Le cabinet pilote, seul bénéficiaire historique de l'agenda global.
+ *
+ * Cet UUID n'est pas une donnée client : c'est la constante de seed posée par
+ * `20260616150000_bootstrap_cabinet_pilote.sql`. `GOOGLE_CALENDAR_CABINET_ID`
+ * permet de désigner un autre bénéficiaire sans toucher au code.
+ */
+const CABINET_PILOTE = '00000000-0000-0000-0000-000000000001'
+
+/**
+ * L'agenda de repli, et POUR QUI il est valable.
+ *
+ * T-001 — jusqu'ici le repli était universel : tout cabinet dont la colonne
+ * `cabinets.google_calendar_id` était vide écrivait dans l'agenda désigné par
+ * `GOOGLE_CALENDAR_ID`. Avec un seul cabinet configuré ainsi, c'était un
+ * raccourci commode ; au deuxième, c'est un cabinet qui déverse ses gardes dans
+ * l'agenda d'un autre — sans erreur, sans alerte, et découvert par le client.
+ *
+ * Le repli est donc NOMINATIF. Un cabinet non désigné dont l'agenda n'est pas
+ * renseigné n'a pas d'agenda : la synchronisation dit « aucun agenda configuré »
+ * et n'écrit nulle part. Ne rien faire est le seul comportement sûr quand on ne
+ * sait pas où écrire.
+ */
+export function agendaDeRepliPour(cabinetId?: string | null): string | null {
+  const repli = process.env.GOOGLE_CALENDAR_ID?.trim()
+  if (!repli || !cabinetId) return null
+  const beneficiaire = process.env.GOOGLE_CALENDAR_CABINET_ID?.trim() || CABINET_PILOTE
+  return cabinetId === beneficiaire ? repli : null
+}
+
+/**
+ * Résout le calendarId effectif.
+ *
+ * Ne replie PLUS sur l'environnement : le repli exige de savoir DE QUEL cabinet
+ * il s'agit, information que cette couche n'a pas. Il est donc appliqué un cran
+ * plus haut, par `agendaDeRepliPour`, là où le cabinet est connu.
  */
 function resoudreCalendarId(calendarIdCabinet?: string | null): string | null {
-  const perCabinet = calendarIdCabinet?.trim()
-  if (perCabinet) return perCabinet
-  return process.env.GOOGLE_CALENDAR_ID?.trim() || null
+  return calendarIdCabinet?.trim() || null
 }
 
 function getCalendarClient(calendarIdCabinet?: string | null) {

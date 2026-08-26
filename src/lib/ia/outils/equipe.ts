@@ -349,11 +349,22 @@ Sans adresse e-mail sur la fiche, l'invitation n'a nulle part où aller : l'outi
     // L'état du compte se lit sur la fiche, à part : `chargerEquipe` ne
     // rapporte pas `user_id`, et c'est volontaire — un identifiant technique
     // n'a rien à faire dans ce que le modèle manipule.
-    const { data: compte } = await ctx.supabase
+    const { data: compte, error: erreurCompte } = await ctx.supabase
       .from('veterinaires')
       .select('user_id, invite_pending')
       .eq('id', v.id)
       .maybeSingle()
+
+    // B-011 — l'erreur est LUE. Sans ça, une base muette rendait `compte` à
+    // `null`, donc `dejaInvite` à `false`, et Filou proposait « Inviter X »
+    // à quelqu'un qui a peut-être déjà un compte actif : une panne de lecture
+    // devenue affirmation sur l'état d'un compte.
+    if (erreurCompte) {
+      return {
+        ok: false,
+        raison: `Je n'ai pas pu vérifier l'état du compte de ${v.prenom} : la base de données n'a pas répondu (${erreurCompte.message}). Réessaie dans un instant — je ne veux pas t'annoncer une invitation sans savoir si elle en a déjà une.`,
+      }
+    }
 
     const dejaInvite = (compte as { user_id: string | null } | null)?.user_id != null
     const enAttente = (compte as { invite_pending: boolean | null } | null)?.invite_pending === true

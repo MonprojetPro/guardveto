@@ -27,6 +27,7 @@ import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
 import { grouperViolations } from '@/lib/regles/libelleViolation'
 import { CartesViolations } from './CartesViolations'
 import type { ViolationRevalidation } from './types-revalidation'
+import { abonnerEnSignalantLesEchecs } from '@/lib/realtime/statut-abonnement'
 
 interface RevalidationRealtimeProps {
   /** Période(s) publiée(s) visibles sur le mois affiché, à re-valider. */
@@ -80,7 +81,7 @@ export function RevalidationRealtime({
       )
     }
 
-    channel.subscribe()
+    abonnerEnSignalantLesEchecs(channel, "re-validation du planning publie")
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)

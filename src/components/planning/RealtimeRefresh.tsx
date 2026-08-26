@@ -16,6 +16,7 @@
 import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { abonnerEnSignalantLesEchecs } from '@/lib/realtime/statut-abonnement'
 
 const TABLES_SURVEILLEES = ['gardes', 'periodes'] as const
 
@@ -40,7 +41,7 @@ export function RealtimeRefresh() {
       )
     }
 
-    channel.subscribe()
+    abonnerEnSignalantLesEchecs(channel, "planning : gardes, periodes, conges, veterinaires, regles")
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
