@@ -130,7 +130,8 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
     rendreLangageNaturel: (params) => {
       // Forme « tableau de règles » (ex. Anne-Sophie : jeudi AP impaires + …).
       if (Array.isArray(params.regles)) {
-        const items = (params.regles as Array<Record<string, unknown>>).map((r) => {
+        const entrees = params.regles as Array<Record<string, unknown>>
+        const items = entrees.map((r) => {
           const per = r.periode ? ` ${periodeLisible(r.periode)}` : ''
           // Le `s` collé sortait « semaines impairess » quand la valeur porte
           // déjà sa marque du pluriel. On la retire d'abord, comme le fait le
@@ -138,6 +139,13 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
           const sem = r.semaine ? ` (semaines ${String(r.semaine).replace(/s$/, '')}s)` : ''
           return `${String(r.jour ?? '?')}${per}${sem}`
         })
+        // Un seul jour — le cas de TOUTE règle créée depuis l'écran depuis
+        // B-038 : on écrit la même phrase que la forme simple, au singulier.
+        // « a des repos fixes : jeudi (semaines impaires) » se lisait comme une
+        // liste amputée, et cette phrase-là est désormais la plus courante.
+        if (items.length === 1) {
+          return `ne fait pas de garde le ${items[0]}`
+        }
         return `a des repos fixes : ${items.join(', ')}`
       }
       // Forme simple « un jour ».

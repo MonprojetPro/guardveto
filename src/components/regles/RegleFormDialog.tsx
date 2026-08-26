@@ -60,8 +60,16 @@ const JOURS = [
   { value: 'vendredi', label: 'Vendredi' },
 ]
 
+/** Parité des semaines pour un repos fixe (B-038). Au SINGULIER : c'est le mot
+  * que lisent le moteur et le validateur dans la forme « tableau de règles ». */
+const PARITES = [
+  { value: 'toutes', label: 'Toutes les semaines' },
+  { value: 'paire', label: 'Semaines paires seulement' },
+  { value: 'impaire', label: 'Semaines impaires seulement' },
+]
+
 const BRIQUES: { value: BriqueEvaluable; label: string; aide: string }[] = [
-  { value: 'interdire_creneau', label: 'Repos fixe un jour', aide: 'Ne fait jamais de garde un jour précis de la semaine.' },
+  { value: 'interdire_creneau', label: 'Repos fixe un jour', aide: 'Ne fait jamais de garde un jour précis de la semaine — toutes les semaines, ou une semaine sur deux.' },
   { value: 'repos_conditionnel', label: 'Repos selon la garde du week-end', aide: 'Jour de repos différent selon que le véto est de garde le week-end ou non.' },
   { value: 'alternance_ancre', label: 'Indisponible une semaine sur deux', aide: 'Indisponible certains créneaux les semaines paires ou impaires.' },
   { value: 'duo_interdit', label: 'Jamais en duo avec…', aide: 'Deux vétos ne peuvent pas être de garde seuls ensemble (réglé dans les deux sens).' },
@@ -227,6 +235,13 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
   // interdire_creneau
   const [jour, setJour] = useState(typeof p.jour === 'string' ? p.jour : 'mercredi')
   const [exVac, setExVac] = useState(Boolean(p.exception_vacances_scolaires))
+  // Parité des semaines visées (B-038). Relue depuis la forme « tableau de
+  // règles » — la seule que les deux gardiens savent évaluer avec une parité.
+  const [parite, setParite] = useState<string>(() => {
+    const entrees = Array.isArray(p.regles) ? (p.regles as Array<Record<string, unknown>>) : []
+    const trouvee = entrees.find((r) => r.semaine === 'paire' || r.semaine === 'impaire')
+    return typeof trouvee?.semaine === 'string' ? trouvee.semaine : 'toutes'
+  })
 
   // repos_conditionnel
   const [siWe, setSiWe] = useState(typeof p.si_garde_we === 'string' ? p.si_garde_we : 'jeudi')
@@ -376,11 +391,26 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
     let params: Record<string, unknown> = {}
     switch (briqueId) {
       case 'interdire_creneau':
-        params = {
-          jour,
-          exception_vacances_scolaires: exVac,
-          creneaux: creneauxFiltre.length > 0 ? creneauxFiltre : undefined,
-        }
+        // L'aperçu doit montrer la forme qui sera RÉELLEMENT écrite : avec une
+        // parité, la règle part en « tableau de règles », pas en forme simple.
+        // Afficher l'autre forme donnerait à lire une phrase que la base ne
+        // contiendra jamais.
+        params =
+          parite === 'paire' || parite === 'impaire'
+            ? {
+                regles: [
+                  {
+                    jour,
+                    semaine: parite,
+                    ...(creneauxFiltre.length > 0 ? { creneaux: creneauxFiltre } : {}),
+                  },
+                ],
+              }
+            : {
+                jour,
+                exception_vacances_scolaires: exVac,
+                creneaux: creneauxFiltre.length > 0 ? creneauxFiltre : undefined,
+              }
         break
       case 'repos_conditionnel':
         params = { si_garde_we: siWe, sinon }
@@ -509,6 +539,9 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
         force,
         jour,
         exception_vacances_scolaires: exVac,
+        // Parité (B-038) : n'est envoyée que par le repos fixe. Ailleurs elle
+        // n'a pas de sens, et `construireParams` l'ignore de toute façon.
+        semaine: briqueId === 'interdire_creneau' ? parite : undefined,
         si_garde_we: siWe,
         sinon,
         semaines,
@@ -648,10 +681,36 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
                   </SelectContent>
                 </Select>
               </div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={exVac} onChange={(e) => setExVac(e.target.checked)} className="rounded" />
-                <span className="text-sm">Sauf pendant les vacances scolaires</span>
-              </label>
+              {/* Une semaine sur deux (B-038) — « repos le jeudi, mais une
+                  semaine sur deux ». Le moteur ET le validateur savaient déjà
+                  l'évaluer ; seule la saisie manquait. La parité est celle du
+                  NUMÉRO DE SEMAINE du calendrier, comme la règle d'alternance :
+                  l'admin peut la vérifier sur n'importe quel agenda. */}
+              <div className="space-y-1.5">
+                <Label>Quelles semaines ?</Label>
+                <Select value={parite} onValueChange={(v) => v && setParite(v)} items={PARITES}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PARITES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* La case n'apparaît QUE sans parité : les gardiens ne lisent
+                  l'exception vacances que sur la forme simple. L'afficher avec
+                  une parité promettrait un assouplissement que le planning
+                  n'applique jamais — le défaut déjà payé sur « après-midi ». */}
+              {parite === 'toutes' ? (
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={exVac} onChange={(e) => setExVac(e.target.checked)} className="rounded" />
+                  <span className="text-sm">Sauf pendant les vacances scolaires</span>
+                </label>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  L&apos;exception « sauf vacances scolaires » n&apos;est pas disponible sur un
+                  repos une semaine sur deux.
+                </p>
+              )}
 
               {/* Ciblage par type de garde — n'apparaît QUE si le cabinet a
                   plusieurs gardes ce jour-là. Sur un cabinet qui n'en a qu'une

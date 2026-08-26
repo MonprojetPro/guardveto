@@ -28,7 +28,9 @@ function prop(over: Partial<PropositionRegle>): PropositionRegle {
   return {
     comprehension: '', faisable: true, message: '',
     veterinaire: null, brique_id: null, force: null,
-    jour: null, exception_vacances_scolaires: null,
+    // `semaine` (singulier) = parité d'un repos fixe ; `semaines` (pluriel) =
+    // cadence de l'alternance. Deux règles distinctes, deux champs distincts.
+    jour: null, exception_vacances_scolaires: null, semaine: null,
     si_garde_we: null, sinon: null, semaines: null, periodes: null,
     partenaire: null, n: null, fenetre: null, creneaux: null,
     ecart_min_jours: null, n_semaines: null,

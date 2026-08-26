@@ -87,6 +87,10 @@ export const PropositionRegleSchema = z.object({
   // ── Paramètres (selon la brique) ───────────────────────────
   jour: z.string().optional(),
   exception_vacances_scolaires: z.boolean().optional(),
+  /** Parité des semaines d'un REPOS FIXE (B-038). Au singulier — à ne pas
+   *  confondre avec `semaines` (pluriel) de l'alternance juste en dessous :
+   *  ce sont deux règles différentes, et les gardiens ne lisent pas le même mot. */
+  semaine: z.enum(['toutes', 'paire', 'impaire']).optional(),
   si_garde_we: z.string().optional(),
   sinon: z.string().optional(),
   semaines: z.enum(['paires', 'impaires', 'toutes']).optional(),
@@ -344,6 +348,9 @@ export function propositionVersPayload(
     case 'interdire_creneau':
       payload.jour = p.jour ?? undefined
       payload.exception_vacances_scolaires = p.exception_vacances_scolaires ?? false
+      // « une semaine sur deux » (B-038). Absent = toutes les semaines, ce qui
+      // laisse le comportement d'avant strictement inchangé.
+      payload.semaine = p.semaine ?? undefined
       break
     case 'repos_conditionnel':
       payload.si_garde_we = p.si_garde_we ?? undefined
@@ -701,7 +708,12 @@ export function apercuProposition(p: PropositionRegle): string {
   let params: Record<string, unknown> = {}
   switch (p.brique_id) {
     case 'interdire_creneau':
-      params = { jour: p.jour, exception_vacances_scolaires: p.exception_vacances_scolaires ?? false }
+      // Comme le formulaire : avec une parité, l'aperçu doit montrer la forme
+      // « tableau », celle qui sera réellement écrite en base.
+      params =
+        p.semaine === 'paire' || p.semaine === 'impaire'
+          ? { regles: [{ jour: p.jour, semaine: p.semaine }] }
+          : { jour: p.jour, exception_vacances_scolaires: p.exception_vacances_scolaires ?? false }
       break
     case 'repos_conditionnel':
       params = { si_garde_we: p.si_garde_we, sinon: p.sinon }

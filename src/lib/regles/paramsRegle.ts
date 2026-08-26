@@ -90,6 +90,11 @@ const JOURS_VALIDES_TOUS = new Set([
   'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche',
 ])
 const SEMAINES_VALIDES = new Set(['paires', 'impaires', 'toutes'])
+// Parite d'un REPOS FIXE (B-038). Au SINGULIER, contrairement a `SEMAINES_VALIDES`
+// ci-dessus : c'est le mot que lisent `violeReposFixe` et `validerPlanning` dans
+// la forme « tableau de regles ». Les confondre ne leve aucune erreur — la regle
+// s'enregistre et n'est simplement jamais appliquee.
+const PARITES_VALIDES = new Set(['toutes', 'paire', 'impaire'])
 const PERIODES_VALIDES = new Set(['soir_semaine', 'weekend']) // seules évaluées par R2
 // Fenêtres de comptage acceptées par checkAuPlusN (hard-constraints.ts) :
 // « semaine_civile » (lundi→dimanche) ou « glissante_K_jours » (regex moteur).
@@ -132,6 +137,8 @@ export interface UpsertReglePayload {
   // interdire_creneau
   jour?: string
   exception_vacances_scolaires?: boolean
+  /** Parite des semaines visees (B-038). Absent ou 'toutes' = toutes les semaines. */
+  semaine?: string
   // repos_conditionnel
   si_garde_we?: string
   sinon?: string
@@ -227,6 +234,58 @@ export function construireParams(
           return { error: `Type(s) de créneau inconnu(s) pour ce cabinet : ${inconnus.join(', ')}.` }
         }
       }
+      // ── Une semaine sur deux (B-038, 2026-08-26) ──────────────────────
+      //
+      // Demande de MiKL : « repos le jeudi, mais une semaine sur deux ». Les
+      // DEUX gardiens savaient déjà l'évaluer — `violeReposFixe` côté moteur et
+      // `validerPlanning` côté validateur — mais uniquement sous la forme
+      // « tableau de règles », celle de la donnée héritée du cabinet pilote.
+      // Seule la SAISIE manquait. On écrit donc cette forme-là, plutôt que
+      // d'inventer un troisième format qu'il aurait fallu apprendre aux deux.
+      //
+      // ⚠️ Deux orthographes cohabitent, et les confondre casse tout en
+      //    silence : `alternance_ancre` dit `semaines: 'impaires'` (pluriel),
+      //    le repos fixe dit `semaine: 'impaire'` (singulier). C'est ce second
+      //    mot que lisent les gardiens ici.
+      //
+      // ⚠️ Aucune `ancre` n'est posée — c'est délibéré. Sans ancre, la parité
+      //    est celle du NUMÉRO DE SEMAINE ISO, exactement comme la règle déjà
+      //    en place chez le cabinet pilote. Poser une ancre ici donnerait deux
+      //    sens différents à « semaines impaires » selon la règle qu'on lit :
+      //    l'admin verrait la même phrase produire deux plannings distincts,
+      //    sans rien pour l'expliquer. Contrepartie assumée : au passage d'une
+      //    année à 53 semaines, deux semaines impaires se suivent une fois.
+      const semaine = p.semaine
+      if (semaine !== undefined && !PARITES_VALIDES.has(semaine)) {
+        return { error: 'Cadence des semaines invalide (toutes, paires ou impaires).' }
+      }
+      if (semaine === 'paire' || semaine === 'impaire') {
+        // L'exception « sauf vacances scolaires » n'est lue par les gardiens que
+        // sur la forme SIMPLE. L'accepter ici afficherait un assouplissement que
+        // le planning n'applique jamais — le défaut « un paramètre montré que le
+        // moteur n'évalue pas », déjà payé sur `periode: 'apres_midi'`. On REFUSE
+        // donc la combinaison, au lieu de l'ignorer en silence : un refus se lit,
+        // une case sans effet ne se voit pas.
+        if (p.exception_vacances_scolaires) {
+          return {
+            error:
+              'L’exception « sauf vacances scolaires » n’est pas disponible sur un repos une semaine sur deux. Choisissez l’un ou l’autre.',
+          }
+        }
+        return {
+          quand: p.jour,
+          params: {
+            regles: [
+              {
+                jour: p.jour,
+                semaine,
+                ...(creneaux.length > 0 ? { creneaux } : {}),
+              },
+            ],
+          },
+        }
+      }
+
       return {
         quand: p.jour,
         params: {
