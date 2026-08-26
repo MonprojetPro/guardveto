@@ -211,7 +211,8 @@ export async function POST(req: NextRequest) {
     // ── Chargement du contexte (V2 : inclut le calendrier) ─────
     let contexte
     try {
-      contexte = await resoudreContexte(periodeId, cabinetId)
+      // B-046 — `pourGeneration` retire les « dernier recours » de l'effectif.
+      contexte = await resoudreContexte(periodeId, cabinetId, { pourGeneration: true })
     } catch (err) {
       return NextResponse.json(
         { error: err instanceof Error ? err.message : String(err) },
@@ -219,9 +220,21 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // B-046 — les « dernier recours » retirés de l'effectif par le chargement.
+    // Ils ne sont PAS une anomalie : c'est le réglage voulu. Mais dès que la
+    // génération échoue, ils doivent être nommés — une impasse causée par une
+    // exclusion volontaire qui se tait envoie l'admin chercher un coupable
+    // parmi ses règles.
+    const exclusDernierRecours = (contexte.exclusDernierRecours ?? []).map((v) => v.prenom)
+
     if (contexte.vets.length === 0) {
       return NextResponse.json(
-        { error: 'Aucun vétérinaire actif trouvé. Impossible de générer le planning.' },
+        {
+          error:
+            exclusDernierRecours.length > 0
+              ? `Aucun vétérinaire mobilisable : les seules personnes actives (${exclusDernierRecours.join(', ')}) sont en « dernier recours uniquement », et le moteur ne les utilise jamais. Décoche ce réglage sur l'écran Équipe pour au moins l'une d'elles.`
+              : 'Aucun vétérinaire actif trouvé. Impossible de générer le planning.',
+        },
         { status: 422 }
       )
     }
@@ -249,6 +262,9 @@ export async function POST(req: NextRequest) {
           diagnostic: null,
           joursNonCouverts: [],
           creneauxIgnores,
+          // Même sur une interruption : un effectif amputé du dernier recours
+          // resserre la recherche et peut expliquer un calcul qui n'aboutit pas.
+          exclusDernierRecours,
           dureeMs: result.dureeMs,
         })
       }
@@ -261,6 +277,7 @@ export async function POST(req: NextRequest) {
         diagnostic: result.diagnostic ?? null,
         joursNonCouverts: result.joursNonCouverts,
         creneauxIgnores,
+        exclusDernierRecours,
         dureeMs: result.dureeMs,
       })
     }

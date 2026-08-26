@@ -206,7 +206,9 @@ export async function POST(req: NextRequest) {
   // ── 2. Charger le contexte courant ──────────────────────
   let contexte: ContexteSimulation
   try {
-    contexte = await resoudreContexte(planningId, cabinetId)
+    // B-046 — même effectif que la génération d'origine : sans ce drapeau, le
+    // replay rejouerait avec un véto de plus et ne prouverait plus rien.
+    contexte = await resoudreContexte(planningId, cabinetId, { pourGeneration: true })
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : String(err) },

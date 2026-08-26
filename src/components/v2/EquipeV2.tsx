@@ -632,6 +632,16 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
                 Dernier recours uniquement
               </label>
             </div>
+            {/* B-046 — la case était nue. Sans un mot, « dernier recours » se
+                lit comme « en dernier », alors que le moteur ne la mobilise
+                JAMAIS. Une exclusion qui ne se dit pas se découvre sur une
+                impasse, et on cherche ailleurs. */}
+            <p className="cf-aide cf-aide-recours">
+              Cette personne <strong>n&apos;entre jamais dans une génération de planning</strong> —
+              même s&apos;il ne reste personne d&apos;autre : le moteur préfère annoncer qu&apos;il
+              est bloqué. Elle reste proposée quand tu modifies une garde à la main ou que tu
+              remplaces quelqu&apos;un, et elle reçoit les appels aux volontaires comme les autres.
+            </p>
           </div>
 
           <div className="create-actions">

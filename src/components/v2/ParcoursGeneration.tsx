@@ -41,7 +41,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
-import { DiagnosticImpasse } from '@/components/planning/DiagnosticImpasse'
+import { DiagnosticImpasse, NoteDernierRecoursExclus } from '@/components/planning/DiagnosticImpasse'
 import { CreneauxIgnoresAlert } from '@/components/planning/CreneauxIgnoresAlert'
 import { PointPreVol, type VetEtiquette } from '@/components/planning/PointPreVol'
 import { SignalerLimite } from '@/components/planning/SignalerLimite'
@@ -144,6 +144,12 @@ interface Resultat {
   joursNonCouverts?: JourNonCouvert[]
   /** Coupe propre du calcul (trop long) — PAS une impasse prouvée. */
   interrompu?: boolean
+  /**
+   * B-046 — prénoms des « dernier recours » que le moteur n'a jamais eu le
+   * droit d'utiliser. Affiché SEULEMENT sur un échec : sur un planning réussi,
+   * c'est un réglage qui a fonctionné, il n'y a rien à signaler.
+   */
+  exclusDernierRecours?: string[]
   message?: string
 }
 
@@ -492,6 +498,7 @@ export function ParcoursGeneration({
           ok: false,
           interrompu: true,
           creneauxIgnores: (data.creneauxIgnores ?? []) as CreneauIgnore[],
+          exclusDernierRecours: (data.exclusDernierRecours ?? []) as string[],
           message: data.error ?? 'Génération interrompue : le planning est trop contraint (calcul trop long).',
         })
       } else {
@@ -500,6 +507,7 @@ export function ParcoursGeneration({
           creneauxIgnores: (data.creneauxIgnores ?? []) as CreneauIgnore[],
           diagnostic: (data.diagnostic ?? null) as DiagnosticImpasseData | null,
           joursNonCouverts: (data.joursNonCouverts ?? []) as JourNonCouvert[],
+          exclusDernierRecours: (data.exclusDernierRecours ?? []) as string[],
         })
       }
       setEtape('resultat')
@@ -1057,11 +1065,17 @@ export function ParcoursGeneration({
                     {resultat.message}
                   </p>
                 )}
+                {/* Calcul interrompu : pas de diagnostic à afficher, mais
+                    l'exclusion du dernier recours reste une piste à donner. */}
+                {resultat.diagnostic === undefined && (
+                  <NoteDernierRecoursExclus prenoms={resultat.exclusDernierRecours ?? []} />
+                )}
                 <CreneauxIgnoresAlert creneaux={resultat.creneauxIgnores} />
                 {resultat.diagnostic !== undefined && (
                   <DiagnosticImpasse
                     diagnostic={resultat.diagnostic ?? null}
                     joursNonCouverts={resultat.joursNonCouverts ?? []}
+                    exclusDernierRecours={resultat.exclusDernierRecours ?? []}
                   />
                 )}
 

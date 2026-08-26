@@ -17,6 +17,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { chargerInputDepuisSupabase } from '@/engine/loader'
 import { normaliserContraintesVets } from '@/engine/normaliserContraintes'
+import { effectifPourGeneration, exclusDeLaGeneration } from '@/engine/effectif'
 import { fallbackVacancesObsolete, VACANCES_FALLBACK_FIN } from '@/engine/utils'
 import type { ContexteSimulation, CalendrierResolu } from '@/engine/types'
 
@@ -93,12 +94,21 @@ async function chargerCalendrier(
  * @param options    `autoriserVerrouille` (défaut false) : autorise une période
  *                   VERROUILLÉE. Réservé à la gestion de crise (réparation ciblée
  *                   d'un planning verrouillé) — la génération laisse le défaut.
+ *
+ *                   `pourGeneration` (défaut false) : retire de l'effectif les
+ *                   vétérinaires « dernier recours » (B-046). OPT-IN EXPLICITE,
+ *                   et c'est voulu : ce chargeur sert AUSSI les chemins manuels
+ *                   (crise, dépannage, disponibilités d'une garde), où le dernier
+ *                   recours DOIT rester proposable. Seules les trois portes de la
+ *                   génération le passent — /api/generate, replay, pré-vol.
+ *                   Les exclus sont renvoyés dans `exclusDernierRecours` pour que
+ *                   l'impasse puisse nommer ce réglage au lieu de le taire.
  * @throws           Si la période est introuvable, verrouillée (hors crise), ou inaccessible
  */
 export async function resoudreContexte(
   periodeId: string,
   cabinetId: string,
-  options?: { autoriserVerrouille?: boolean }
+  options?: { autoriserVerrouille?: boolean; pourGeneration?: boolean }
 ): Promise<ContexteSimulation> {
   // 1. Charger les données métier ET le calendrier zone-aware en une passe.
   //    Le loader charge désormais lui-même les vacances scolaires de la ZONE
@@ -141,7 +151,16 @@ export async function resoudreContexte(
     // PARADE 1 — normalisation à la SOURCE : tous les consommateurs (générateur,
     // validateur, crise, disponibilités…) reçoivent des règles déjà dépliées.
     // Plus aucun consommateur, même futur, ne peut être aveugle à la config params.
-    vets: normaliserContraintesVets(input.vets),
+    // B-046 — le dernier recours sort de l'effectif AVANT le moteur quand on
+    // charge pour une génération. Filtré ICI, à la source : solver, équité,
+    // validateur et pré-vol reçoivent tous le même effectif, aucun ne peut
+    // diverger (parade anti-cécité, même esprit que la normalisation ci-dessus).
+    vets: normaliserContraintesVets(
+      options?.pourGeneration ? effectifPourGeneration(input.vets) : input.vets,
+    ),
+    exclusDernierRecours: options?.pourGeneration
+      ? exclusDeLaGeneration(input.vets).map((v) => ({ id: v.id, prenom: v.prenom }))
+      : undefined,
     bonusMalus: input.bonusMalus,
     calendrier,
     nbVetosSemaineSoir: input.nbVetosSemaineSoir,

@@ -108,7 +108,11 @@ export async function GET(req: NextRequest) {
   // génération produira son propre message, plus précis.
   let contexte
   try {
-    contexte = await resoudreContexte(periodeId, cabinetId)
+    // B-046 — le pré-vol annonce ce que la génération VA faire : il doit donc
+    // raisonner sur le MÊME effectif qu'elle, dernier recours exclu. Sinon il
+    // rassurerait (« la charge est couverte ») sur des bras que le moteur
+    // n'utilisera pas.
+    contexte = await resoudreContexte(periodeId, cabinetId, { pourGeneration: true })
   } catch {
     return NextResponse.json(REPONSE_VIDE)
   }
@@ -143,6 +147,9 @@ export async function GET(req: NextRequest) {
       // #21 — cohortes d'équité (voyagent dans equityWeights) : signale un tag
       // sans porteur (léger, non bloquant).
       cohortesEquite: contexte.equityWeights?.cohortes,
+      // B-046 — encore dans l'équipe, hors du moteur : sans cette liste, leurs
+      // règles seraient annoncées comme « sans effet, tu peux les supprimer ».
+      idsHorsGeneration: (contexte.exclusDernierRecours ?? []).map((v) => v.id),
     })
   } catch (e) {
     console.warn('[pre-vol] analyse de cohérence échouée (best-effort):', e)

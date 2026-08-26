@@ -450,7 +450,12 @@ function scorerCandidat(
   // #17 — lookback inter-périodes. Absent/vide → 0 (byte-identique).
   contexteAnterieur?: AttributionGarde[],
 ): number {
-  // Dernier recours → toujours en dernier
+  // Dernier recours → toujours en dernier.
+  // Depuis B-046 (26/08/2026), ce score ne sert PLUS pendant une génération :
+  // l'effectif y est filtré en amont (`engine/effectif.ts`) et aucun véto
+  // dernier recours n'arrive jusqu'ici. Il sert toujours sur les chemins de
+  // DÉPANNAGE (réparation d'absence, appel aux volontaires), qui gardent le
+  // dernier recours dans l'effectif et se contentent de le proposer en dernier.
   if (vet.dernier_recours) return 1_000_000
 
   const compteurs =
@@ -904,6 +909,8 @@ export function scorerCandidatLNS(
   // #17 — lookback inter-périodes. Absent/vide → 0 (byte-identique — crise inchangée).
   contexteAnterieur?: AttributionGarde[],
 ): number {
+  // Cf. `scorerCandidat` : inopérant en génération depuis B-046 (l'effectif y
+  // est filtré en amont), toujours actif sur les chemins de dépannage.
   if (vet.dernier_recours) return 1_000_000
 
   const compteurs =

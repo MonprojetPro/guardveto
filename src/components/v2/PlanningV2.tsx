@@ -820,13 +820,6 @@ function CaseJour({
         {date === today && <span className="d-today-tag">Aujourd&apos;hui</span>}
       </div>
 
-      {conges.map((c) => (
-        <span key={c.id} className={`conge-chip${c.statut === 'souhait' ? ' souhait' : ''}`}>
-          <span className="vdot" style={{ borderColor: c.couleur }} aria-hidden="true" />
-          {c.statut === 'souhait' ? 'Souhait' : 'Congé'} · {c.prenom}
-        </span>
-      ))}
-
       {gardes.map((g) => {
         // TOUTES les places, pas seulement les deux premières : un créneau
         // sur-mesure peut en compter jusqu'à quatre, et un vétérinaire de
@@ -853,6 +846,16 @@ function CaseJour({
           </div>
         )
       })}
+
+      {/* Congés APRÈS les gardes (B-047, demande de MiKL le 26/08) : la garde
+          est l'information principale de la case — c'est elle qu'on cherche
+          quand on ouvre le planning. Les absences se lisent en second. */}
+      {conges.map((c) => (
+        <span key={c.id} className={`conge-chip${c.statut === 'souhait' ? ' souhait' : ''}`}>
+          <span className="vdot" style={{ borderColor: c.couleur }} aria-hidden="true" />
+          {c.statut === 'souhait' ? 'Souhait' : 'Congé'} · {c.prenom}
+        </span>
+      ))}
 
       {horsPeriode && <span className="d-hors-note">hors période</span>}
     </div>

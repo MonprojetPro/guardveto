@@ -147,6 +147,21 @@ export interface PreVolInput {
    * Sert au SEUL avertissement « cohorte sans porteur » (léger, non bloquant).
    */
   cohortesEquite?: EquityCohorte[]
+  /**
+   * B-046 — vétérinaires « dernier recours », RETIRÉS de `vets` pour la
+   * génération mais toujours dans l'équipe.
+   *
+   * Sans cette liste, les trois détections de règles FANTÔMES les prendraient
+   * pour des vétos sortis de l'effectif et crieraient « cette règle n'a plus
+   * aucun effet, tu peux la supprimer » à chaque génération — un conseil FAUX,
+   * et destructeur si l'admin le suit : les règles du dernier recours servent
+   * toujours aux retouches manuelles.
+   *
+   * Les détections ARITHMÉTIQUES, elles, continuent de raisonner sur `vets`
+   * seul : c'est justement leur rôle de dire que la charge ne passe plus sans
+   * lui.
+   */
+  idsHorsGeneration?: string[]
 }
 
 // ── Helpers internes ─────────────────────────────────────────
@@ -286,14 +301,14 @@ function versStep(s: SlotPreVol, role: string, saison: Saison): CreneauStep {
 
 function detecterReglesFantomes(
   input: PreVolInput,
-  actifsIds: Set<string>,
+  idsEncoreDansEquipe: Set<string>,
   nomVeto: (id: string) => string,
 ): AvertissementPreVol[] {
   const out: AvertissementPreVol[] = []
   if (!input.contraintesParVet) return out
 
   for (const [vetId, contraintes] of input.contraintesParVet) {
-    if (actifsIds.has(vetId)) continue
+    if (idsEncoreDansEquipe.has(vetId)) continue
     const fiche = input.annuaire?.find((a) => a.id === vetId)
     const prenom = fiche ? fiche.prenom : 'un vétérinaire retiré de l’équipe'
     for (const c of contraintes) {
@@ -330,7 +345,7 @@ function lirePartenairesDuo(c: ContrainteEngine): string[] {
 function detecterDuosFantomes(
   vets: VetEngineNormalise[],
   input: PreVolInput,
-  actifsIds: Set<string>,
+  idsEncoreDansEquipe: Set<string>,
   nomVeto: (id: string) => string,
 ): AvertissementPreVol[] {
   const out: AvertissementPreVol[] = []
@@ -338,7 +353,7 @@ function detecterDuosFantomes(
     for (const c of vet.contraintes) {
       if (!c.actif || c.type !== 'duo_interdit') continue
       const sortis = lirePartenairesDuo(c).filter(
-        (id) => id !== vet.id && !actifsIds.has(id),
+        (id) => id !== vet.id && !idsEncoreDansEquipe.has(id),
       )
       for (const id of sortis) {
         const fiche = input.annuaire?.find((a) => a.id === id)
@@ -373,7 +388,7 @@ function etageContrainte(c: ContrainteEngine): number {
 function detecterPartenaireRequisSorti(
   vets: VetEngineNormalise[],
   input: PreVolInput,
-  actifsIds: Set<string>,
+  idsEncoreDansEquipe: Set<string>,
   nomVeto: (id: string) => string,
 ): AvertissementPreVol[] {
   const out: AvertissementPreVol[] = []
@@ -383,7 +398,7 @@ function detecterPartenaireRequisSorti(
       if (etageContrainte(c) > 2) continue // souple → jamais bloquante
       const b = (paramsDe(c).avec_veterinaire_id ?? (c.config as Record<string, unknown>).avec_veterinaire_id)
       if (typeof b !== 'string' || b.trim() === '') continue // inerte
-      if (b === vet.id || actifsIds.has(b)) continue // B ok
+      if (b === vet.id || idsEncoreDansEquipe.has(b)) continue // B ok
       const fiche = input.annuaire?.find((a) => a.id === b)
       const nomPartenaire = fiche
         ? `${fiche.prenom} ${fiche.nom}`
@@ -723,7 +738,11 @@ export function preVolRegles(input: PreVolInput): AvertissementPreVol[] {
   // Auto-normalisation (idempotente) — même parade anti-cécité params que le
   // diagnostic : le pré-vol est un LECTEUR de règles.
   const vetsN = normaliserContraintesVets(input.vets)
-  const actifsIds = new Set(vetsN.map((v) => v.id))
+  // « Encore dans l'équipe » ≠ « mobilisable par le moteur » (B-046). Les
+  // détections de règles FANTÔMES lisent le premier (sinon elles conseillent de
+  // supprimer les règles du dernier recours) ; les détections arithmétiques
+  // lisent le second, `vetsN`, qui est l'effectif réel de la génération.
+  const idsEncoreDansEquipe = new Set([...vetsN.map((v) => v.id), ...(input.idsHorsGeneration ?? [])])
   const nomVeto = (id: string) => {
     const actif = vetsN.find((v) => v.id === id)
     if (actif) return actif.prenom
@@ -739,10 +758,10 @@ export function preVolRegles(input: PreVolInput): AvertissementPreVol[] {
   // code ne peuvent pas diverger.
   return ([
     // (b) règles fantômes — véto sorti
-    ...detecterReglesFantomes(input, actifsIds, nomVeto),
-    ...detecterDuosFantomes(vetsN, input, actifsIds, nomVeto),
+    ...detecterReglesFantomes(input, idsEncoreDansEquipe, nomVeto),
+    ...detecterDuosFantomes(vetsN, input, idsEncoreDansEquipe, nomVeto),
     // (b') « seulement avec B » dont le partenaire est sorti (#15b) → A écarté
-    ...detecterPartenaireRequisSorti(vetsN, input, actifsIds, nomVeto),
+    ...detecterPartenaireRequisSorti(vetsN, input, idsEncoreDansEquipe, nomVeto),
     // (a) contradictions arithmétiques certaines
     ...detecterVetosJamaisDisponibles(slots, dispos, vetsN, nomVeto),
     ...detecterCreneauxImpossibles(slots, dispos, vetsN, input),

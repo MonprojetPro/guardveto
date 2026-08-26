@@ -388,6 +388,11 @@
 /* La case « dernier recours » n'a plus de champ à côté d'elle : elle tient sa
    propre ligne, sans le décalage qui servait à l'aligner sur un voisin. */
 .cf-recours { grid-column: 1 / -1; padding-top: 4px; }
+/* B-046 — la note explicative sous la case. Pleine largeur (sinon la grille la
+   coince sur une colonne et elle se lit en colonne de journal), et retrait
+   aligné sur le libellé, pas sur la case : elle explique le réglage, elle n'en
+   est pas une deuxième ligne. */
+.cf-aide-recours { grid-column: 1 / -1; margin-top: 2px; padding-left: 28px; max-width: 62ch; }
 @media (max-width: 720px) {
   .cf-etiquettes { grid-column: 1 / -1; }
 }

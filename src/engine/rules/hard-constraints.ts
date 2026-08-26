@@ -382,12 +382,22 @@ function checkR6DuoInterdit(
 }
 
 /**
- * R7 — Anne-Cat uniquement en dernier recours
- * Ce n'est pas un blocage dur mais un avertissement pour le solver.
+ * R7 — dernier recours
+ *
+ * Reste un AVERTISSEMENT, pas un refus, et c'est délibéré (B-046) : depuis le
+ * 26/08/2026 l'exclusion se fait en amont, sur l'EFFECTIF passé au moteur
+ * (`engine/effectif.ts`, appliqué par `resoudreContexte({ pourGeneration })`).
+ * Un véto dernier recours n'arrive donc jamais jusqu'ici pendant une génération.
+ *
+ * Refuser ici aurait cassé les chemins MANUELS — modale de disponibilités,
+ * réparation d'absence — qui appellent le même `isValid` et où le dernier
+ * recours DOIT rester affiché comme choisissable. D'où un message qui parle à
+ * la personne qui retouche une garde à la main, puisque c'est la seule qui le
+ * lira encore.
  */
 function checkR7DernierRecours(vet: VetEngine): ValidationResult {
   if (vet.dernier_recours) {
-    return ok(`R7 : ${vet.prenom} est dernier recours — à n'utiliser que si aucun autre vétérinaire n'est disponible`)
+    return ok(`R7 : ${vet.prenom} est en « dernier recours uniquement » — la génération ne le programme jamais, tu peux l'affecter à la main`)
   }
   return ok()
 }

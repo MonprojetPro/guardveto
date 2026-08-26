@@ -209,6 +209,17 @@ export interface ContexteSimulation {
    * des règles dépliées, prêtes à être jugées par isValid sans risque d'oubli.
    */
   vets: VetEngineNormalise[]
+  /**
+   * B-046 — les vétérinaires « dernier recours » RETIRÉS de `vets` parce que
+   * le contexte a été chargé pour une génération. Renseigné uniquement dans ce
+   * cas (`resoudreContexte({ pourGeneration: true })`) ; `undefined` sur les
+   * chemins manuels, où le dernier recours reste dans l'effectif.
+   *
+   * Sert à NOMMER le réglage quand la génération échoue : une impasse due à une
+   * exclusion volontaire qui ne se dit pas envoie l'admin chercher un coupable
+   * parmi ses règles.
+   */
+  exclusDernierRecours?: { id: string; prenom: string }[]
   /** Bonus/malus inter-périodes (R20). Passer {} si aucun. */
   bonusMalus: import('./score-lexicographique').BonusMalusMap
   /** Calendrier résolu (fériés + vacances scolaires). Fallback sur listes en dur si absent. */

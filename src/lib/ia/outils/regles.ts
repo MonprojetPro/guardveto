@@ -353,7 +353,7 @@ async function reglagesQuiContraignent(
   for (const v of concernes) {
     if (v.dernier_recours) {
       phrases.push(
-        `${v.prenom} est marqué DERNIER RECOURS sur sa fiche : ce n'est pas une règle et ça n'interdit rien, mais le moteur ne la programme qu'en tout dernier, sur tous les créneaux. C'est souvent la vraie raison quand quelqu'un n'a presque jamais de garde.`,
+        `${v.prenom} est marqué DERNIER RECOURS sur sa fiche : ce n'est pas une règle, mais la génération ne le programme JAMAIS, même s'il ne reste personne d'autre — elle annonce alors qu'elle est bloquée. Il reste proposé quand on modifie une garde à la main, et il reçoit les appels aux volontaires. C'est la vraie raison quand quelqu'un n'a jamais de garde alors qu'aucune règle ne l'en empêche.`,
       )
     }
     if (!v.actif) {

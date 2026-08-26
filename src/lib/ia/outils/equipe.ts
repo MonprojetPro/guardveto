@@ -103,7 +103,7 @@ export const lireEquipe: OutilLecture<typeof SANS_PARAMETRE> = {
 
 Appelle-le dès qu'une question porte sur une personne : qui fait partie de l'équipe, qui est junior, pourquoi quelqu'un n'est jamais programmé, si quelqu'un peut ou non prendre des gardes.
 
-DERNIER RECOURS est important : ce n'est pas une interdiction, c'est un ordre de passage. Le moteur ne programme ce vétérinaire que si personne d'autre n'est disponible, sur tous les créneaux. Quelqu'un qui « n'a jamais de garde » sans qu'aucune règle ne l'en empêche est souvent en dernier recours, ou inactif.`,
+DERNIER RECOURS est important, et c'est bien une EXCLUSION de la génération (décision de MiKL du 26/08/2026) : le moteur ne programme JAMAIS ce vétérinaire, même s'il ne reste personne d'autre — il annonce alors qu'il est bloqué. Ce n'est pas « en dernier », c'est « jamais automatiquement ». Il reste proposé quand l'administratrice modifie une garde à la main ou remplace quelqu'un, et il reçoit les appels aux volontaires comme les autres. Quelqu'un qui « n'a jamais de garde » sans qu'aucune règle ne l'en empêche est souvent en dernier recours, ou inactif.`,
   params: SANS_PARAMETRE,
   async executer(_params, ctx) {
     const equipe = await chargerEquipe(ctx)
@@ -149,7 +149,7 @@ const ParamsModifier = z.object({
     .boolean()
     .optional()
     .describe(
-      'true = ne le programmer qu’en tout dernier recours ; false = le remettre dans l’ordre normal.',
+      'true = ne jamais le programmer automatiquement (il reste proposé pour les modifications à la main) ; false = le remettre dans l’effectif de la génération.',
     ),
   actif: z
     .boolean()
@@ -234,8 +234,8 @@ Ne touche que ce que tu précises : les champs que tu laisses de côté ne bouge
     if (params.dernier_recours !== undefined && params.dernier_recours !== v.dernier_recours) {
       lignes.push(
         params.dernier_recours
-          ? `Dernier recours : ${v.prenom} ne sera plus programmée que si personne d’autre n’est disponible.`
-          : `Dernier recours retiré : ${v.prenom} reprend sa place normale dans l’ordre de choix.`,
+          ? `Dernier recours : ${v.prenom} ne sera plus jamais programmée par la génération, même s’il ne reste personne d’autre. Elle restera proposée pour les modifications à la main.`
+          : `Dernier recours retiré : ${v.prenom} revient dans l’effectif de la génération.`,
       )
     }
     if (params.actif !== undefined && params.actif !== v.actif) {

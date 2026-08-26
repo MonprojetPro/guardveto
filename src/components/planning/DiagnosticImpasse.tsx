@@ -79,12 +79,43 @@ function phraseCreneauBloquant(date: string, type: string, role: string): string
 
 // ── Composant ────────────────────────────────────────────
 
+/**
+ * B-046 — la note qui NOMME l'exclusion volontaire du dernier recours.
+ *
+ * Sans elle, une impasse due à ce réglage ressemble à une impasse due aux
+ * règles : l'admin passe une heure à assouplir des contraintes qui n'y sont
+ * pour rien. Exportée à part parce qu'elle sert AUSSI au calcul interrompu,
+ * où il n'y a pas de diagnostic à afficher.
+ */
+export function NoteDernierRecoursExclus({ prenoms }: { prenoms: string[] }) {
+  if (prenoms.length === 0) return null
+  const pluriel = prenoms.length > 1
+  return (
+    <p className="text-xs text-muted-foreground">
+      <span className="font-medium text-foreground">
+        {prenoms.join(', ')} {pluriel ? 'ne comptent pas' : 'ne compte pas'} dans ce calcul
+      </span>{' '}
+      : {pluriel ? 'ils sont réglés' : 'la fiche est réglée'} sur «&nbsp;dernier recours
+      uniquement&nbsp;», et le moteur ne {pluriel ? 'les' : 'la'} mobilise jamais tout seul.
+      {pluriel ? ' Ils restent' : ' Elle reste'} proposable{pluriel ? 's' : ''} quand tu
+      modifies une garde à la main. Pour {pluriel ? 'les' : 'la'} rendre disponible à la
+      génération, décoche le réglage sur l&apos;écran Équipe.
+    </p>
+  )
+}
+
 interface DiagnosticImpasseProps {
   diagnostic: DiagnosticImpasseData | null
   joursNonCouverts: JourNonCouvert[]
+  /** Prénoms des « dernier recours » écartés de la génération (B-046). */
+  exclusDernierRecours?: string[]
 }
 
-export function DiagnosticImpasse({ diagnostic, joursNonCouverts }: DiagnosticImpasseProps) {
+export function DiagnosticImpasse({
+  diagnostic,
+  joursNonCouverts,
+  exclusDernierRecours = [],
+}: DiagnosticImpasseProps) {
   const [detailOuvert, setDetailOuvert] = useState(false)
 
   // Règles en cause triées par occurrences décroissantes (les plus bloquantes d'abord).
@@ -131,6 +162,7 @@ export function DiagnosticImpasse({ diagnostic, joursNonCouverts }: DiagnosticIm
               vétérinaires.
             </p>
           )}
+          <NoteDernierRecoursExclus prenoms={exclusDernierRecours} />
         </div>
       </div>
 
