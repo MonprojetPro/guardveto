@@ -92,16 +92,38 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ============================================================
-   PRÉSENTATION DANS GOOGLE AGENDA (2026-08-27)
+   GOOGLE AGENDA — UNE CARTE, DEUX ZONES (recette MiKL, 2026-08-27)
    ============================================================
-   Deux interrupteurs, un champ par créneau, et l'aperçu qui compose le
-   VRAI titre en direct (`libelleGarde`) — c'est le cœur de l'écran, pas
-   un ajout discret : d'où plus d'air que les trois cartes de connexion. */
-.agenda-affichage-card { margin-bottom: 26px; }
-.aa-body {
-  padding: 14px 18px 18px;
-  display: flex; flex-direction: column; gap: 16px;
+   Les deux cartes qui parlaient toutes deux de Google Agenda (le
+   branchement — carte d'origine — et la présentation, mon ajout) sont
+   FUSIONNÉES en une seule, pour ne plus avoir à chercher où se règle quoi.
+   Fusionner n'est pas mélanger : chaque zone garde son titre propre
+   (`.agenda-zone-titre-ligne`) et un liseré les sépare
+   (`.agenda-zone-separateur`) — la carte est sortie de `.conn-grid` (elle
+   devient trop haute pour partager une rangée avec les deux autres) et vit
+   maintenant seule, en pleine largeur, avant elles. C'est aussi ce qui
+   rééquilibre la page : les deux cartes restantes du `.conn-grid`
+   (E-mails, Adresse) n'ont plus à s'aligner sur une troisième bien plus
+   grande qu'elles. */
+.agenda-fusion-card { margin-bottom: 26px; }
+/* Le titre de zone reprend la forme de `.conn-head` (même famille visuelle)
+   mais en plus discret : ce n'est plus l'en-tête de la CARTE, seulement
+   celui d'une SECTION à l'intérieur. Pas d'icône, pas de pastille d'état —
+   la carte n'en a qu'une, tout en haut, pour l'ensemble. */
+.agenda-zone-titre-ligne {
+  padding: 14px 18px 0;
 }
+.agenda-zone-titre-ligne h4 { font-size: 0.88rem; font-weight: 700; }
+.agenda-zone-sous-titre {
+  font-size: 0.74rem; color: var(--t-muted); margin-top: 1px;
+}
+.agenda-zone-separateur {
+  height: 1px; background: var(--t-border);
+  margin: 4px 18px 0;
+}
+
+/* Deux interrupteurs, un champ par créneau, et l'aperçu qui compose le
+   VRAI titre en direct (`libelleGarde`) — le cœur de la zone Présentation. */
 .aa-interrupteurs {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));

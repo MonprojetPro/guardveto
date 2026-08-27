@@ -44,11 +44,11 @@ describe('B-079 — le bloc éclate en un événement par personne et par jour',
     expect(apercu(WEEKEND)).toEqual([
       // Vendredi : rôles INVERSÉS. Antoine, 2nd du week-end, est 1er ce soir-là.
       '2026-10-02 #0 garde-AD-1er [6]',
-      '2026-10-02 #1 garde-ASB-2e [7]',
+      '2026-10-02 #1 garde-ASB-2nd [7]',
       '2026-10-03 #0 garde-ASB-1er [7]',
-      '2026-10-03 #1 garde-AD-2e [6]',
+      '2026-10-03 #1 garde-AD-2nd [6]',
       '2026-10-04 #0 garde-ASB-1er [7]',
-      '2026-10-04 #1 garde-AD-2e [6]',
+      '2026-10-04 #1 garde-AD-2nd [6]',
     ])
   })
 
@@ -56,7 +56,7 @@ describe('B-079 — le bloc éclate en un événement par personne et par jour',
     expect(apercu({ date: '2026-09-29', type: 'semaine', places: [ANNE, ANTOINE], base: 'garde' }))
       .toEqual([
         '2026-09-29 #0 garde-ASB-1er [7]',
-        '2026-09-29 #1 garde-AD-2e [6]',
+        '2026-09-29 #1 garde-AD-2nd [6]',
       ])
   })
 
@@ -68,7 +68,7 @@ describe('B-079 — le bloc éclate en un événement par personne et par jour',
 
   it('le rôle apparaît TOUJOURS : sans lui les deux événements du jour se confondent', () => {
     for (const ligne of apercu(WEEKEND)) {
-      expect(ligne).toMatch(/-(1er|2e)\s/)
+      expect(ligne).toMatch(/-(1er|2nd)\s/)
     }
   })
 })
@@ -82,9 +82,9 @@ describe('B-079 — les exceptions décident du nom ET de la couleur du jour', (
 
     // La couleur est l'usage même de la fonctionnalité : un œil qui balaie
     // l'agenda verrait celle d'Antoine sur un jour qu'il ne tient pas.
-    expect(lignes).toContain('2026-10-04 #1 garde-MP-2e [11]')
+    expect(lignes).toContain('2026-10-04 #1 garde-MP-2nd [11]')
     // Le samedi n'a pas bougé — un remplacement d'un jour ne déteint pas.
-    expect(lignes).toContain('2026-10-03 #1 garde-AD-2e [6]')
+    expect(lignes).toContain('2026-10-03 #1 garde-AD-2nd [6]')
   })
 
   it('⚠️ le vendredi : l’exception vise le rôle AFFICHÉ, pas le rôle natif', () => {
@@ -97,8 +97,8 @@ describe('B-079 — les exceptions décident du nom ET de la couleur du jour', (
     })
 
     expect(lignes).toContain('2026-10-02 #0 garde-MP-1er [11]')
-    expect(lignes).toContain('2026-10-02 #1 garde-ASB-2e [7]') // Anne intacte
-    expect(lignes).not.toContain('2026-10-02 #1 garde-MP-2e [11]')
+    expect(lignes).toContain('2026-10-02 #1 garde-ASB-2nd [7]') // Anne intacte
+    expect(lignes).not.toContain('2026-10-02 #1 garde-MP-2nd [11]')
   })
 
   it('une place laissée VACANTE ne produit aucun événement', () => {
@@ -153,6 +153,18 @@ describe('B-079 — les réglages du cabinet, jamais de défaut en dur', () => {
     })
     expect(lignes[0]).toBe('2026-10-02 #0 Vendredi-AD-1er [6]')
     expect(lignes[2]).toBe('2026-10-03 #0 WE-ASB-1er [7]')
+  })
+
+  it('⚠️ B-080 — le catalogue réel de Val d’Allier : premier/second s’abrègent', () => {
+    // C'EST LE CAS QUI A ÉCHOUÉ EN RECETTE. `creneau_modele.roles` vaut
+    // littéralement ['premier','second'] : le repli sur la place n'était donc
+    // jamais atteint, et le titre affichait « Garde-JD-premier ».
+    const lignes = apercu(WEEKEND, {
+      ...options,
+      rolesParCode: () => ['premier', 'second'],
+    })
+    expect(lignes[2]).toBe('2026-10-03 #0 garde-ASB-1er [7]')
+    expect(lignes[3]).toBe('2026-10-03 #1 garde-AD-2nd [6]')
   })
 
   it('les rôles nommés par le cabinet priment sur ceux de l’application', () => {

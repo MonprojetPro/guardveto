@@ -387,30 +387,48 @@
 .cf-etiquettes { grid-column: 2 / -1; }
 /* ── Chantier agenda Google (2026-08-27) — bloc « Couleur Google Agenda » +
    « Nom dans Google Agenda », sous la couleur GuardVeto et les étiquettes.
-   Même forme que `.cf-bloc-recours` juste en dessous : pleine largeur, la
-   phrase d'explication en tête plutôt qu'en aide sous CHAQUE champ — elle
-   porte sur les DEUX champs à la fois (pourquoi une seconde couleur existe). */
+   Même famille que `.cf-bloc-recours` juste en dessous : pleine largeur,
+   liseré du haut, marge d'air identique.
+   Recette MiKL du 2026-08-27 : la phrase d'explication était coupée à
+   droite en plein mot. Elle vivait DANS la grille à deux colonnes — sortie
+   dans un conteneur en COLONNE simple (`.cf-bloc-agenda`), elle n'a plus
+   aucune piste de colonne pour se faire rogner. La grille à deux colonnes
+   ne porte plus QUE les deux champs (`.cf-bloc-agenda-grille`). */
 .cf-bloc-agenda {
   grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px 16px;
+  display: flex; flex-direction: column; gap: 10px;
   margin-top: 6px; padding-top: 12px;
   border-top: 1px solid var(--t-border);
 }
 .cf-agenda-explication {
-  grid-column: 1 / -1;
   font-size: 0.79rem; color: var(--t-muted); line-height: 1.5;
 }
 .cf-agenda-explication strong { color: var(--text); }
+.cf-bloc-agenda-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px 16px;
+}
 /* La pastille de couleur Google, dans le déclencheur ET dans la liste — un
    simple rond, pas d'initiales dessus : contrairement à `.selcoul-pastille`,
    ce n'est pas LA couleur de la personne, juste l'échantillon d'un choix
    fermé parmi 11. */
-.cgs-trigger { display: inline-flex; align-items: center; gap: 8px; }
+.cgs-trigger {
+  display: inline-flex; align-items: center; gap: 8px;
+  width: 100%; min-width: 0;
+}
 .cgs-pastille {
   width: 14px; height: 14px; border-radius: 50%; flex: none;
   border: 1px solid rgba(0, 0, 0, 0.15);
+}
+/* Recette MiKL : le bouton débordait de sa cellule sur « Couleur par défaut
+   de l'agenda ». Le déclencheur affiche maintenant un libellé COURT
+   (« Par défaut »), et cette troncature reste posée en filet : si un futur
+   libellé français dépasse quand même la colonne, il s'arrête proprement
+   plutôt que de faire éclater la grille. */
+.cgs-trigger-texte {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 /* B-046 + B-057 — la case « dernier recours » et son explication forment UN

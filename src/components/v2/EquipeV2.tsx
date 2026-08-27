@@ -656,72 +656,88 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
                 Google n'accepte que 11 teintes fermées — pas la peine de
                 lire le libellé pour comprendre, la phrase le dit. */}
             <div className="cf-bloc-agenda">
+              {/* Recette MiKL (2026-08-27) : cette phrase était coupée à
+                  droite en plein mot. Elle vivait DANS la grille à deux
+                  colonnes du dessous (`grid-column: 1/-1`) — sortie ici, en
+                  bloc normal au-dessus, elle n'a plus aucune piste de
+                  colonne pour se faire rogner : un `<p>` de flux normal
+                  s'étire sur toute la largeur du conteneur et retombe à la
+                  ligne, point final. */}
               <p className="cf-agenda-explication">
                 La couleur ci-dessus est celle de GuardVeto. Celle-ci ne sert que dans{' '}
                 <strong>Google Agenda</strong>, qui n&apos;accepte que 11 teintes fixes.
               </p>
-              <div className="field">
-                <label id="cf-couleur-google-label">Couleur Google Agenda</label>
-                <Select
-                  value={form.couleurGoogle ?? COULEUR_GOOGLE_DEFAUT}
-                  onValueChange={(v) =>
-                    v &&
-                    setForm((f) => ({
-                      ...f,
-                      couleurGoogle: v === COULEUR_GOOGLE_DEFAUT ? null : v,
-                    }))
-                  }
-                >
-                  {/* JAMAIS de `<select>` natif sur ce projet — le composant
-                      `Select` partagé, comme partout ailleurs dans cet écran
-                      (cf. « Période à renvoyer » de Réglages). */}
-                  <SelectTrigger aria-labelledby="cf-couleur-google-label" className="w-full">
-                    <span className="cgs-trigger">
-                      {form.couleurGoogle ? (
-                        <>
+              <div className="cf-bloc-agenda-grille">
+                <div className="field">
+                  <label id="cf-couleur-google-label">Couleur Google Agenda</label>
+                  <Select
+                    value={form.couleurGoogle ?? COULEUR_GOOGLE_DEFAUT}
+                    onValueChange={(v) =>
+                      v &&
+                      setForm((f) => ({
+                        ...f,
+                        couleurGoogle: v === COULEUR_GOOGLE_DEFAUT ? null : v,
+                      }))
+                    }
+                  >
+                    {/* JAMAIS de `<select>` natif sur ce projet — le composant
+                        `Select` partagé, comme partout ailleurs dans cet écran
+                        (cf. « Période à renvoyer » de Réglages).
+                        Recette MiKL : ce bouton débordait de sa cellule. Deux
+                        parades, pas une seule : un libellé COURT (« Par
+                        défaut » plutôt que la phrase entière) et une
+                        troncature CSS qui tient même si un futur libellé
+                        français est plus long que prévu (`.cgs-trigger`). */}
+                    <SelectTrigger aria-labelledby="cf-couleur-google-label" className="w-full">
+                      <span className="cgs-trigger">
+                        {form.couleurGoogle ? (
+                          <>
+                            <span
+                              className="cgs-pastille"
+                              style={{ background: couleurGooglePar(form.couleurGoogle)?.hex }}
+                              aria-hidden="true"
+                            />
+                            <span className="cgs-trigger-texte">
+                              {couleurGooglePar(form.couleurGoogle)?.libelleFr}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="cgs-trigger-texte">Par défaut</span>
+                        )}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={COULEUR_GOOGLE_DEFAUT}>
+                        Couleur par défaut de l&apos;agenda
+                      </SelectItem>
+                      {COULEURS_GOOGLE.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
                           <span
                             className="cgs-pastille"
-                            style={{ background: couleurGooglePar(form.couleurGoogle)?.hex }}
+                            style={{ background: c.hex }}
                             aria-hidden="true"
                           />
-                          {couleurGooglePar(form.couleurGoogle)?.libelleFr}
-                        </>
-                      ) : (
-                        'Couleur par défaut de l’agenda'
-                      )}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={COULEUR_GOOGLE_DEFAUT}>
-                      Couleur par défaut de l&apos;agenda
-                    </SelectItem>
-                    {COULEURS_GOOGLE.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        <span
-                          className="cgs-pastille"
-                          style={{ background: c.hex }}
-                          aria-hidden="true"
-                        />
-                        {c.libelleFr}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="field">
-                <label htmlFor="cf-libelle-agenda">Nom dans Google Agenda</label>
-                <input
-                  id="cf-libelle-agenda"
-                  type="text"
-                  value={form.libelleAgenda}
-                  onChange={(e) => setForm({ ...form, libelleAgenda: e.target.value })}
-                  placeholder={initialesVeto(form.prenom, form.nom) || 'Initiales'}
-                  autoComplete="off"
-                  aria-describedby="cf-libelle-agenda-aide"
-                />
-                <p id="cf-libelle-agenda-aide" className="cf-aide">
-                  Laisse vide pour utiliser les initiales.
-                </p>
+                          {c.libelleFr}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="field">
+                  <label htmlFor="cf-libelle-agenda">Nom dans Google Agenda</label>
+                  <input
+                    id="cf-libelle-agenda"
+                    type="text"
+                    value={form.libelleAgenda}
+                    onChange={(e) => setForm({ ...form, libelleAgenda: e.target.value })}
+                    placeholder={initialesVeto(form.prenom, form.nom) || 'Initiales'}
+                    autoComplete="off"
+                    aria-describedby="cf-libelle-agenda-aide"
+                  />
+                  <p id="cf-libelle-agenda-aide" className="cf-aide">
+                    Laisse vide pour utiliser les initiales.
+                  </p>
+                </div>
               </div>
             </div>
             {/* B-057 — la case et son explication forment UN bloc, sur toute la

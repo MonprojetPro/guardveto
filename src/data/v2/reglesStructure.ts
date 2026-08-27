@@ -23,6 +23,9 @@ import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 // UN seul endroit, celui que le moteur lit. Cet écran ne la recopie pas : il
 // annoncerait sinon des gardes que la génération ne pose pas.
 import { placesEffectives } from '@/data/chargerCreneauModele'
+// Le sens de la dépendance est imposé : ce module-ci est serveur, `libelle` est
+// une feuille sans dépendance. C'est donc lui qui importe, jamais l'inverse.
+import { ROLES_COURTS } from '@/lib/agenda/libelle'
 import type {
   CreneauUI, ProfilUI, RelationUI, GenreRelationUI, StructureCabinetUI,
 } from '@/components/v2/regles/types'
@@ -49,16 +52,23 @@ const OFFSET_CLAIR: Record<number, string> = {
   3: ', trois jours après',
 }
 
-/** Rôle en clair : premier → 1er, second → 2nd… sinon le libellé brut. */
+/**
+ * Rôle en clair : premier → 1er, second → 2nd… sinon le libellé brut.
+ *
+ * B-081 (2026-08-27) — la table vit désormais dans `@/lib/agenda/libelle`, où
+ * l'agenda en a besoin lui aussi. Deux tables pour un même vocabulaire finissent
+ * toujours par diverger : c'est une seule table, et deux lectures.
+ *
+ * ⚠️ LA RECHERCHE RESTE À L'IDENTIQUE, sans normalisation ni repli — c'est ce
+ * qui distingue cette fonction de `roleCourt`, et ce n'est pas un oubli. Ici on
+ * rend le libellé du cabinet TEL QU'IL L'A ÉCRIT : « Premier » avec sa
+ * majuscule reste « Premier ». `roleCourt`, lui, normalise, parce qu'un titre
+ * d'agenda doit toujours porter un rôle abrégé. Les aligner ferait basculer
+ * l'affichage de cet écran sans que personne ne l'ait demandé.
+ * Filet de non-régression : `tests/lib/regles-structure-role-clair.test.ts`.
+ */
 export function roleClair(role: string): string {
-  const map: Record<string, string> = {
-    premier: '1er',
-    second: '2nd',
-    troisieme: '3e',
-    quatrieme: '4e',
-    cinquieme: '5e',
-  }
-  return map[role] ?? role
+  return ROLES_COURTS[role] ?? role
 }
 
 /**

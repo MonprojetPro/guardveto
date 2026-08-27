@@ -33,7 +33,7 @@ import { envoyerEmailDeTest, configurerAgendaAffichage } from '@/app/(v2)/reglag
 import { useErreurBloquante } from '@/components/v2/regles/ErreurBloquante'
 import { raisonEchec } from '@/lib/emails/echec'
 import type { Periode } from '@/types'
-import { libelleGarde } from '@/lib/agenda/libelle'
+import { libelleGarde, roleCourt } from '@/lib/agenda/libelle'
 import { initialesVeto } from '@/lib/agenda/initiales'
 
 export interface ValeursCabinet {
@@ -71,6 +71,15 @@ export interface CreneauAgenda {
   libelleAgenda: string | null
   heureDebut: string
   heureFin: string
+  /**
+   * Les rôles nommés du créneau (`creneau_modele.roles`), dans l'ordre des
+   * places — même source que `google-calendar.ts` (`options.rolesParCode`).
+   * L'aperçu DOIT passer par `roleCourt(roles?.[placeIndex], placeIndex)`,
+   * jamais un libellé écrit en dur : c'est exactement le bug B-080
+   * (« Garde-JD-premier » au lieu de « Garde-JD-1er ») qu'un aperçu fidèle
+   * ne doit pas rejouer de son côté.
+   */
+  roles: string[]
 }
 
 /** 'HH:MM' → '18h' (minutes nulles) ou '18h30'. Purement pour L'AFFICHAGE de
@@ -385,23 +394,38 @@ export function ReglagesV2({
         </div>
       </div>
 
-      <div className="conn-grid rise rise-2">
-        {/* ── Google Agenda ──────────────────────────────────────────── */}
-        <section className="card conn-card" aria-label="Connexion Google Agenda">
-          <div className="conn-head">
-            <span className="conn-ico" aria-hidden="true">
-              📆
-            </span>
-            <div>
-              <h3>Google Agenda</h3>
-              <p className="sub">Les gardes publiées y apparaissent</p>
-            </div>
-            <span className={`conn-state ${agendaBranche ? 'on' : 'off'}`}>
-              <span className="cs-dot" aria-hidden="true" />
-              {agendaBranche ? 'Branché' : 'Non branché'}
-            </span>
+      {/* ── Google Agenda — UNE carte, DEUX zones ────────────────────────
+          Recette MiKL (2026-08-27) : « c'est dommage qu'il y ait 2 encarts
+          différents alors que ça concerne Google Agenda pour les 2 ». Les
+          deux cartes qui parlaient de Google Agenda sont fusionnées ICI —
+          mais fusionner n'est pas mélanger : le BRANCHEMENT (quel agenda,
+          resynchroniser — la carte d'origine, comportement INCHANGÉ, même
+          état `calendarId`/`periodeSync`, mêmes actions serveur) et la
+          PRÉSENTATION (à quoi ressemblent les événements — mon ajout) sont
+          deux sujets différents. Chacun garde son titre et sa zone, un
+          liseré les sépare — une seule carte, jamais une bouillie. */}
+      <section className="card agenda-fusion-card rise rise-2" aria-label="Google Agenda">
+        <div className="conn-head">
+          <span className="conn-ico" aria-hidden="true">
+            📆
+          </span>
+          <div>
+            <h3>Google Agenda</h3>
+            <p className="sub">Les gardes publiées y apparaissent</p>
           </div>
-          <div className="conn-body">
+          <span className={`conn-state ${agendaBranche ? 'on' : 'off'}`}>
+            <span className="cs-dot" aria-hidden="true" />
+            {agendaBranche ? 'Branché' : 'Non branché'}
+          </span>
+        </div>
+
+        {/* ── Zone 1 : le branchement — comportement STRICTEMENT inchangé,
+            seul le conteneur autour a bougé. */}
+        <div className="agenda-zone-titre-ligne">
+          <h4>Branchement</h4>
+          <p className="agenda-zone-sous-titre">Quel agenda, et renvoyer un planning publié</p>
+        </div>
+        <div className="conn-body">
             <div className="field">
               {/* « Identifiant » se lisait comme « ton adresse Gmail ». C'en est
                   une, mais celle DE L'AGENDA, pas du compte : Google la donne
@@ -503,8 +527,112 @@ export function ReglagesV2({
               </button>
             </div>
           </div>
-        </section>
 
+        {/* ── Zone 2 : la présentation — le cœur de mon ajout. L'aperçu se
+            recompose EN DIRECT avec `libelleGarde`, la même fonction qui
+            composera le VRAI titre à la synchronisation. */}
+        <div className="agenda-zone-separateur" aria-hidden="true" />
+        <div className="agenda-zone-titre-ligne">
+          <h4>Présentation des événements</h4>
+          <p className="agenda-zone-sous-titre">
+            Ce que les vétos verront dans leur agenda, garde par garde
+          </p>
+        </div>
+        <div className="conn-body">
+          <div className="aa-interrupteurs">
+            <label className="aa-switch">
+              <input
+                type="checkbox"
+                checked={journeeEntiere}
+                onChange={(e) => setJourneeEntiere(e.target.checked)}
+              />
+              <span>
+                <b>Événements en journée entière</b>
+                <small>
+                  Un bandeau léger en haut de la grille, plutôt qu&apos;un bloc qui occupe toute la
+                  colonne.
+                </small>
+              </span>
+            </label>
+            <label className="aa-switch">
+              <input
+                type="checkbox"
+                checked={afficherHoraires}
+                onChange={(e) => setAfficherHoraires(e.target.checked)}
+              />
+              <span>
+                <b>Afficher les horaires dans le titre</b>
+                <small>Ajoute « 18h/08h » à la fin du titre de l&apos;événement.</small>
+              </span>
+            </label>
+          </div>
+
+          {creneaux.length === 0 ? (
+            <p className="aa-vide">
+              Aucun créneau réglé pour l&apos;instant — la structure des gardes se configure sur
+              l&apos;écran Règles.
+            </p>
+          ) : (
+            <div className="aa-creneaux">
+              <p className="aa-creneaux-lede">
+                La base du titre, pour chaque créneau. Un mot par créneau — pas un seul pour tout
+                le cabinet — parce qu&apos;un planning de journée arrivera plus tard sans se
+                confondre avec les gardes.
+              </p>
+              {creneaux.map((c) => {
+                const base = (libellesCreneaux[c.id] ?? '').trim() || c.nom
+                const apercu = libelleGarde({
+                  base,
+                  nom: EXEMPLE_NOM,
+                  // Même chemin que `google-calendar.ts` (B-080) : le rôle
+                  // RÉEL du créneau, abrégé — jamais le libellé « 1er » écrit
+                  // en dur, qui rejouerait le bug corrigé côté agenda.
+                  // Place 0 (première place) : c'est l'exemple montré.
+                  role: roleCourt(c.roles?.[0], 0),
+                  horaires: {
+                    debut: formatHeureCourte(c.heureDebut),
+                    fin: formatHeureCourte(c.heureFin),
+                  },
+                  afficherHoraires,
+                })
+                return (
+                  <div className="aa-creneau-ligne" key={c.id}>
+                    <div className="field aa-creneau-champ">
+                      <label htmlFor={`aa-cr-${c.id}`}>{c.nom}</label>
+                      <input
+                        id={`aa-cr-${c.id}`}
+                        type="text"
+                        value={libellesCreneaux[c.id] ?? ''}
+                        onChange={(e) =>
+                          setLibellesCreneaux((l) => ({ ...l, [c.id]: e.target.value }))
+                        }
+                        placeholder={c.nom}
+                      />
+                    </div>
+                    <div className="aa-apercu">
+                      <span className="aa-apercu-label">Aperçu</span>
+                      <code className="aa-apercu-titre">{apercu}</code>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          <div className="conn-actions">
+            <button
+              type="button"
+              className="btn btn-valider btn-sm"
+              onClick={enregistrerAgendaAffichage}
+              disabled={enregistrementAgendaEnCours}
+            >
+              {enregistrementAgendaEnCours ? 'Enregistrement…' : 'Enregistrer'}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <div className="conn-grid rise rise-2">
         {/* ── E-mails aux vétos ──────────────────────────────────────────
             L'ADRESSE d'envoi a été retirée de cet écran le 2026-08-21, sur
             constat de MiKL (« je ne saurais pas l'expliquer aux clients »).
@@ -644,107 +772,6 @@ export function ReglagesV2({
           </div>
         </section>
       </div>
-
-      {/* ── Présentation dans Google Agenda (2026-08-27) ─────────────────
-          Le cœur de l'écran : l'aperçu se recompose EN DIRECT avec
-          `libelleGarde`, la même fonction que celle qui composera le VRAI
-          titre à la synchronisation — pas une réécriture approximative ici. */}
-      <section className="card agenda-affichage-card rise rise-3" aria-label="Présentation dans Google Agenda">
-        <div className="card-head">
-          <div>
-            <h3>Présentation dans Google Agenda</h3>
-            <p className="sub">Ce que les vétos verront dans leur agenda, garde par garde</p>
-          </div>
-        </div>
-        <div className="aa-body">
-          <div className="aa-interrupteurs">
-            <label className="aa-switch">
-              <input
-                type="checkbox"
-                checked={journeeEntiere}
-                onChange={(e) => setJourneeEntiere(e.target.checked)}
-              />
-              <span>
-                <b>Événements en journée entière</b>
-                <small>
-                  Un bandeau léger en haut de la grille, plutôt qu&apos;un bloc qui occupe toute la
-                  colonne.
-                </small>
-              </span>
-            </label>
-            <label className="aa-switch">
-              <input
-                type="checkbox"
-                checked={afficherHoraires}
-                onChange={(e) => setAfficherHoraires(e.target.checked)}
-              />
-              <span>
-                <b>Afficher les horaires dans le titre</b>
-                <small>Ajoute « 18h/08h » à la fin du titre de l&apos;événement.</small>
-              </span>
-            </label>
-          </div>
-
-          {creneaux.length === 0 ? (
-            <p className="aa-vide">
-              Aucun créneau réglé pour l&apos;instant — la structure des gardes se configure sur
-              l&apos;écran Règles.
-            </p>
-          ) : (
-            <div className="aa-creneaux">
-              <p className="aa-creneaux-lede">
-                La base du titre, pour chaque créneau. Un mot par créneau — pas un seul pour tout
-                le cabinet — parce qu&apos;un planning de journée arrivera plus tard sans se
-                confondre avec les gardes.
-              </p>
-              {creneaux.map((c) => {
-                const base = (libellesCreneaux[c.id] ?? '').trim() || c.nom
-                const apercu = libelleGarde({
-                  base,
-                  nom: EXEMPLE_NOM,
-                  role: '1er',
-                  horaires: {
-                    debut: formatHeureCourte(c.heureDebut),
-                    fin: formatHeureCourte(c.heureFin),
-                  },
-                  afficherHoraires,
-                })
-                return (
-                  <div className="aa-creneau-ligne" key={c.id}>
-                    <div className="field aa-creneau-champ">
-                      <label htmlFor={`aa-cr-${c.id}`}>{c.nom}</label>
-                      <input
-                        id={`aa-cr-${c.id}`}
-                        type="text"
-                        value={libellesCreneaux[c.id] ?? ''}
-                        onChange={(e) =>
-                          setLibellesCreneaux((l) => ({ ...l, [c.id]: e.target.value }))
-                        }
-                        placeholder={c.nom}
-                      />
-                    </div>
-                    <div className="aa-apercu">
-                      <span className="aa-apercu-label">Aperçu</span>
-                      <code className="aa-apercu-titre">{apercu}</code>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          <div className="conn-actions">
-            <button
-              type="button"
-              className="btn btn-valider btn-sm"
-              onClick={enregistrerAgendaAffichage}
-              disabled={enregistrementAgendaEnCours}
-            >
-              {enregistrementAgendaEnCours ? 'Enregistrement…' : 'Enregistrer'}
-            </button>
-          </div>
-        </div>
-      </section>
 
       {/* ── Journal des e-mails ──────────────────────────────────────── */}
       <section className="card mail-card rise rise-3" aria-label="Journal des e-mails">

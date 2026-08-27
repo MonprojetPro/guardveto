@@ -117,11 +117,12 @@ export default async function ReglagesPage() {
     libelle_agenda: string | null
     heure_debut: string
     heure_fin: string
+    roles: string[] | null
   }
   const { data: creneauxDb } = cabinetId
     ? await supabase
         .from('creneau_modele')
-        .select('id, nom, libelle_agenda, heure_debut, heure_fin')
+        .select('id, nom, libelle_agenda, heure_debut, heure_fin, roles')
         .eq('cabinet_id', cabinetId)
         .is('profil_id', null)
         .eq('actif', true)
@@ -135,6 +136,9 @@ export default async function ReglagesPage() {
     // 'HH:MM', même troncature que `chargerCreneauModele` (`hhmm()`).
     heureDebut: c.heure_debut.slice(0, 5),
     heureFin: c.heure_fin.slice(0, 5),
+    // B-080 : mêmes rôles que ceux lus par `google-calendar.ts`
+    // (`options.rolesParCode`) — l'aperçu doit refléter le même vocabulaire.
+    roles: c.roles ?? [],
   }))
 
   const { data: vetsRaw } = cabinetId

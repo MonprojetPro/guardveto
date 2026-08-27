@@ -30,12 +30,8 @@ import { google } from 'googleapis'
 import { horairesResolus, type StructureCreneauxResolue } from '@/engine/structure-creneaux'
 import { ordonnerSourceLiee, COUPLE_HISTORIQUE } from '@/engine/aval/resoudrePlanningAffichage'
 import { RELATIONS_STRUCTURE_DEFAUT, type RelationStructure } from '@/engine/structure-config'
-import { libelleGarde } from '@/lib/agenda/libelle'
+import { libelleGarde, roleCourt } from '@/lib/agenda/libelle'
 import { estColorIdValide } from '@/lib/agenda/couleurs-google'
-// Le libellé de place est celui de TOUTE l'application (« 1er », « 2e »…).
-// S'en inventer un deuxième pour l'agenda, c'est le vocabulaire à deux vitesses
-// que ce projet paie déjà ailleurs.
-import { roleParDefaut } from '@/lib/gardes/places'
 
 // ── Types internes ───────────────────────────────────────────
 //
@@ -522,10 +518,16 @@ export function planifierEvenementsGarde(
         titre: libelleGarde({
           base,
           nom: occ.libelle,
-          // Le rôle nommé par le cabinet s'il en a nommé un, sinon celui de
-          // toute l'application. Le rôle DOIT toujours apparaître : sans lui,
-          // les deux événements du même jour sont indiscernables dans la grille.
-          role: (roles?.[placeIndex] ?? '').trim() || roleParDefaut(placeIndex),
+          // Le rôle nommé par le cabinet s'il en a nommé un, ABRÉGÉ quand c'est
+          // un nom canonique du projet (B-080). Le rôle DOIT toujours
+          // apparaître : sans lui, les deux événements du même jour sont
+          // indiscernables dans la grille.
+          //
+          // ⚠️ `roleCourt` et non `roleParDefaut` : le catalogue de Val d'Allier
+          // porte `['premier','second']`, donc le repli n'était jamais atteint
+          // et le titre affichait « Garde-JD-premier ». Un cabinet qui a nommé
+          // ses places (« titulaire », « renfort ») garde ses mots intacts.
+          role: roleCourt(roles?.[placeIndex], placeIndex),
           horaires: { debut: heureCompacte(h.heureDebut), fin: heureCompacte(h.heureFin) },
           afficherHoraires: options.afficherHoraires,
         }),
