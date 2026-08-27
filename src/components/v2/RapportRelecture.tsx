@@ -53,6 +53,8 @@ export interface DonneesRelecture {
   planningModifie?: boolean
   historiqueIndisponible?: boolean
   error?: string
+  /** La cause technique de l'échec, telle que le serveur l'a rapportée. */
+  detail?: string
 }
 
 /** Le score, dit en français. Il informe, il ne tranche pas. */
@@ -78,6 +80,16 @@ export function RapportRelecture({ donnees }: { donnees: DonneesRelecture }) {
               'Le planning généré est bien enregistré et reste utilisable tel quel.'}{' '}
             Tu peux relancer la relecture plus tard, ou continuer sans.
           </p>
+          {/* La cause technique, repliée. Un « il n'a pas pu » sans cause est un
+              mur : personne ne peut agir dessus, et le signaler devient un
+              aller-retour de plus. Repliée parce qu'elle ne s'adresse pas à
+              l'admin — mais accessible, pour qu'une capture d'écran suffise. */}
+          {donnees.detail && (
+            <details className="rl-detail">
+              <summary>Ce que le serveur a répondu</summary>
+              <p>{donnees.detail}</p>
+            </details>
+          )}
         </div>
       </div>
     )

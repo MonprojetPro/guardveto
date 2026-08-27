@@ -2413,3 +2413,28 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 
 .rl-rien { font-size: 0.84rem; line-height: 1.55; color: var(--t-muted); }
 .rl-note { font-size: 0.75rem; line-height: 1.45; color: var(--soft); font-style: italic; }
+
+/* -- B-062 · L'annonce de la relecture, EN HAUT du résultat ------------------
+   Recette MiKL 27/08 : le rapport de Filou arrivait plusieurs écrans plus bas,
+   sans que rien en haut ne dise qu'il travaillait. Une progression qu'il faut
+   aller chercher n'informe personne. */
+.rl-annonce {
+  font-size: 0.82rem; line-height: 1.5; color: var(--t-muted);
+  background: var(--surface-2); border-radius: var(--r-sm);
+  padding: 8px 11px;
+}
+.rl-annonce-ou { color: var(--soft); }
+.rl-annonce-prete { color: var(--text); }
+
+/* La cause technique d'un échec — repliée, mais atteignable en un clic.
+   Sans elle, « Filou n'a pas pu relire » ne se signale pas : il se subit. */
+.rl-detail { margin-top: 7px; }
+.rl-detail summary {
+  font-size: 0.75rem; color: var(--soft); cursor: pointer;
+}
+.rl-detail p {
+  font-family: ui-monospace, monospace; font-size: 0.72rem; line-height: 1.5;
+  color: var(--t-muted); margin-top: 5px;
+  background: var(--surface); border-radius: var(--r-sm); padding: 7px 9px;
+  overflow-x: auto; word-break: break-word;
+}

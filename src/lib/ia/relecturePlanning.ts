@@ -44,6 +44,23 @@ export function modeleRelecture(): string {
   return process.env.GUARDVETO_IA_MODELE_RELECTURE?.trim() || 'claude-opus-4-8'
 }
 
+/**
+ * Le budget de sortie de la relecture.
+ *
+ * ⚠️ CE PLAFOND COUVRE LA RÉFLEXION **ET** LA RÉPONSE. La première version
+ * était à 8 000, ce qui était sous-dimensionné : avec la réflexion adaptative
+ * sur douze semaines de planning, le modèle peut consommer tout le budget à
+ * réfléchir et se faire couper AVANT d'avoir rendu sa réponse structurée. On
+ * n'obtient alors pas une réponse partielle mais RIEN du tout — la sortie
+ * structurée n'existe qu'entière — et l'écran affiche « Filou n'a pas pu
+ * relire », sans dire que c'était une question de place.
+ *
+ * 16 000 est le plafond recommandé pour un appel NON diffusé : au-delà, c'est
+ * la connexion HTTP qui devient le risque, et il faudrait passer la relecture
+ * en flux — un autre chantier.
+ */
+const MAX_TOKENS_RELECTURE = 16000
+
 // ── Ce qu'on donne à lire à Filou ────────────────────────────
 
 /** Une place du planning, telle qu'elle lui est présentée. */
@@ -294,7 +311,7 @@ export async function relirePlanningIA(
 
   const response = await client.messages.parse({
     model: modeleRelecture(),
-    max_tokens: 8000,
+    max_tokens: MAX_TOKENS_RELECTURE,
     thinking: { type: 'adaptive' },
     // Le prompt système est identique d'une relecture à l'autre : mis en cache,
     // il n'est refacturé qu'au dixième du prix. Tout ce qui varie (le planning
@@ -308,7 +325,15 @@ export async function relirePlanningIA(
 
   const brut = response.parsed_output
   if (!brut) {
-    throw new Error("Filou n'a pas pu structurer sa relecture.")
+    // SONDE (27/08) — un « il n'a pas pu relire » sans cause est un mur.
+    // `stop_reason` distingue les deux échecs possibles, qui appellent des
+    // corrections opposées : `max_tokens` = la réponse a été COUPÉE (il faut
+    // du budget, pas un autre modèle) ; `refusal` ou autre chose = le modèle
+    // n'a pas voulu ou pas su répondre. Sans ce détail on corrige à l'aveugle.
+    throw new Error(
+      `Filou n'a pas pu structurer sa relecture (arrêt : ${response.stop_reason ?? 'inconnu'}, ` +
+        `${response.usage?.output_tokens ?? '?'} tokens produits sur ${MAX_TOKENS_RELECTURE} autorisés).`,
+    )
   }
 
   return normaliserRelecture(brut, dossier)

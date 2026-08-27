@@ -562,6 +562,7 @@ export function ParcoursGeneration({
         setRelecture({
           issue: 'indisponible',
           error: (data.error as string) ?? undefined,
+          detail: (data.detail as string) ?? undefined,
         })
         return
       }
@@ -1220,6 +1221,25 @@ export function ParcoursGeneration({
         {/* ── ④ Le résultat ─────────────────────────────── */}
         {etape === 'resultat' && resultat && (
           <div className="gp-resultat">
+            {/* ── B-062 · CE QUE FILOU EST EN TRAIN DE FAIRE ──────────────
+                EN HAUT, et pas seulement avec son rapport tout en bas.
+                Recette de MiKL, 27/08 : « le message de Filou est apparu bien
+                plus tard sans que je sois averti qu'il était en train de faire
+                quelque chose ». L'annonce existait — sous plusieurs écrans de
+                cases à pourvoir, donc hors de vue. Une information de
+                progression qu'il faut aller chercher n'informe personne. */}
+            {resultat.issue !== 'echec' && relectureEnCours && (
+              <p className="rl-annonce">
+                {etapeRelecture ?? 'Filou relit le planning…'}{' '}
+                <span className="rl-annonce-ou">Son avis s’affichera en bas de cette page.</span>
+              </p>
+            )}
+            {resultat.issue !== 'echec' && relecture && (
+              <p className="rl-annonce rl-annonce-prete">
+                Filou a fini sa relecture — son avis est en bas de cette page.
+              </p>
+            )}
+
             {/* ── B-053 · PARTIEL : le planning existe, il lui manque des cases ── */}
             {resultat.issue === 'partiel' ? (
               <>
