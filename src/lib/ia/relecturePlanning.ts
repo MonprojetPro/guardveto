@@ -75,6 +75,21 @@ export interface PlaceLisible {
   /** Prénom de la personne, ou null si la place est vide. */
   prenom: string | null
   vetId: string | null
+  /**
+   * Qui d'autre POURRAIT tenir cette place — calculé par le moteur lui-même.
+   *
+   * ⚠️ C'est la pièce qui manquait, et sans elle la relecture ne servait à
+   * rien. MiKL, 27/08 : « je ne comprends pas qu'à partir de ces constats il
+   * n'y ait pas de changements appliqués... il n'avait aucune idée de comment
+   * faire pour changer au mieux ? »
+   *
+   * Il avait raison sur la cause : Filou voyait les problèmes mais n'avait
+   * AUCUN moyen de savoir si un échange était légal. Il devait deviner, et
+   * devant l'incertitude il s'abstenait — d'où 6 constats sur 7 marqués « pas
+   * de correction automatique ». Lui donner les possibles change un observateur
+   * impuissant en quelqu'un qui propose des choses qui passent.
+   */
+  remplacants: string[]
 }
 
 /** Ce que Filou sait d'une personne de l'équipe. */
@@ -131,9 +146,9 @@ const ChangementSchema = z.object({
   affectations: z
     .array(AffectationSchema)
     .min(1)
-    .max(4)
+    .max(6)
     .describe(
-      "Les places à modifier, toutes ensemble. Un échange entre deux personnes = DEUX affectations (chacune reçoit l'autre). Pourvoir une case vide = une seule.",
+      "Les places à modifier, toutes ensemble. Pourvoir une case vide = une seule affectation. Un échange entre deux personnes = DEUX affectations (chacune reçoit la place de l'autre). Un échange de rôles sur un week-end = QUATRE affectations, parce que le vendredi soir qui le précède doit suivre.",
     ),
 })
 
@@ -263,6 +278,29 @@ pas. Ne filtre pas tes observations par importance : ton travail ici est la COUV
 Signale ce que tu vois, même ce dont tu n'es pas certain, en indiquant sa gravité — c'est
 l'administratrice qui décidera de ce qui compte.
 
+TU SAIS DÉJÀ CE QUI EST POSSIBLE — SERS-T'EN
+Chaque place du planning est suivie de « peuvent aussi : … », la liste des personnes que le
+moteur accepterait à cet endroit. Ce n'est pas une supposition, c'est une vérification déjà
+faite : si un prénom y figure, l'y mettre respecte toutes les règles du cabinet.
+
+Tu n'as donc rien à deviner. Dès qu'un problème que tu relèves peut se corriger avec ces
+listes, PROPOSE le changement — ne le classe pas « sans correction possible » par prudence.
+Un problème qui a une solution visible dans ces listes et que tu laisses sans proposition
+est un travail à moitié fait.
+
+Trois façons de t'en servir :
+- Une place vide dont la liste n'est pas vide : propose quelqu'un, c'est immédiat.
+- Quelqu'un de trop chargé sur une semaine : regarde ses gardes de cette semaine, et
+  passe-en une à quelqu'un qui figure dans la liste de cette place.
+- Un échange entre deux personnes : chacune doit figurer dans la liste de la place de
+  l'autre. Si l'une n'y est pas, l'échange sera refusé — cherche ailleurs.
+
+⚠️ LE VENDREDI SOIR ET LE WEEK-END NE SE SÉPARENT PAS
+Ce sont les mêmes personnes, avec les rôles inversés : qui est premier le vendredi soir est
+second le week-end, et inversement. Pour changer qui est premier au week-end, il faut donc
+AUSSI changer le vendredi soir qui le précède — quatre places, pas deux. Une proposition qui
+ne touche que le week-end sera refusée par le moteur.
+
 TA MARGE DE MANŒUVRE
 Chaque changement que tu proposes repassera devant le moteur, qui vérifiera qu'il ne casse
 aucune règle. S'il est légal, il sera appliqué : tu as le dernier mot. S'il enfreint une
@@ -329,11 +367,22 @@ export function dossierEnTexte(dossier: DossierRelecture): string {
     for (const r of dossier.reglesCabinet) lignes.push(`- ${r}`)
   }
 
-  lignes.push('', 'LE PLANNING, PLACE PAR PLACE')
+  lignes.push(
+    '',
+    'LE PLANNING, PLACE PAR PLACE',
+    'Après chaque place, « peuvent aussi : … » liste les personnes que le moteur',
+    'accepterait à cet endroit. C’est une vérification déjà faite, pas une',
+    'estimation : si un prénom y figure, l’y mettre respecte toutes les règles.',
+    'Si la liste est vide, personne d’autre ne peut prendre cette place.',
+  )
   for (const place of dossier.places) {
+    const possibles =
+      place.remplacants.length > 0
+        ? `  → peuvent aussi : ${place.remplacants.join(', ')}`
+        : '  → personne d’autre ne peut prendre cette place'
     lignes.push(
       `- ${place.jour} · ${place.creneau} · ${place.role} : ${place.prenom ?? '### PLACE VIDE ###'}` +
-        `  [date=${place.date} type=${place.type} role=${place.role}]`,
+        `  [date=${place.date} type=${place.type} role=${place.role}]${possibles}`,
     )
   }
 

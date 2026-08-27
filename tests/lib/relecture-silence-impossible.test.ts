@@ -34,10 +34,12 @@ const DOSSIER: DossierRelecture = {
     {
       date: '2026-10-03', jour: 'samedi 3 octobre', creneau: 'week-end',
       type: 'weekend', role: 'premier', prenom: 'Antoine', vetId: 'v-antoine',
+      remplacants: ['Anne-Sophie'],
     },
     {
       date: '2026-10-03', jour: 'samedi 3 octobre', creneau: 'week-end',
       type: 'weekend', role: 'second', prenom: null, vetId: null,
+      remplacants: ['Anne-Sophie'],
     },
   ],
   equipe: [

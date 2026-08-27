@@ -39,6 +39,7 @@ import { monterDossierRelecture } from '@/data/monterDossierRelecture'
 import { relirePlanningIA, modeleRelecture } from '@/lib/ia/relecturePlanning'
 import { assistantIaDisponible } from '@/lib/ia/proposerRegle'
 import { arbitrerChangements, type ChangementArbitre } from '@/engine/relecture/arbitrer'
+import { remplacantsPossibles } from '@/engine/relecture/remplacants'
 import { persisterResultat } from '@/data/persisterResultat'
 import { ecrirePlanningV1 } from '@/data/ecrirePlanningV1'
 import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
@@ -229,8 +230,26 @@ async function executerRelecture(
 
   const planningActuel = montage.construirePlanning(montage.gardes)
 
+  // B-075 — le moteur calcule qui pourrait tenir chaque place, AVANT d'appeler
+  // Filou. Sans cette liste il voyait les problèmes sans savoir si un échange
+  // était légal, devait deviner, et s'abstenait : 6 constats sur 7 ressortaient
+  // « pas de correction automatique ». C'est ce qui rendait la relecture
+  // inutile aux yeux de MiKL — à raison.
+  emettre('Je calcule qui pourrait aller où…')
+  const remplacants = remplacantsPossibles(planningActuel, {
+    vets: contexte.vets,
+    dateDebut: contexte.dateDebut,
+    dateFin: contexte.dateFin,
+    saison: contexte.saison,
+    calendrier: contexte.calendrier,
+    nbVetosSemaineSoir: contexte.nbVetosSemaineSoir,
+    structureConfig: contexte.structureConfig,
+    creneaux: contexte.creneaux,
+    contexteAnterieur: contexte.contexteAnterieur,
+  })
+
   const { dossier, historiqueIndisponible } = await monterDossierRelecture(
-    supabase, planningActuel, contexte, periodeId, cabinetId,
+    supabase, planningActuel, contexte, periodeId, cabinetId, remplacants,
   )
 
   // ── Filou lit ──

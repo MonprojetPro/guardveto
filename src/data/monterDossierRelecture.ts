@@ -103,6 +103,8 @@ export async function monterDossierRelecture(
   contexte: ContextePourDossier,
   periodeId: string,
   cabinetId: string,
+  /** Place → identifiants pouvant la tenir (cf. `engine/relecture/remplacants`). */
+  remplacants?: Map<string, string[]>,
 ): Promise<{ dossier: DossierRelecture; historiqueIndisponible: boolean }> {
   const roleAvantage = contexte.roleAvantageFinancier ?? null
 
@@ -110,6 +112,11 @@ export async function monterDossierRelecture(
   for (const c of contexte.creneaux ?? []) {
     if (c.code && c.nom) nomsParCode.set(c.code, c.nom)
   }
+
+  // ── Qui pourrait tenir chaque place ──
+  // Calculé par le MOTEUR, pas déduit par Filou : c'est ce qui transforme un
+  // observateur impuissant en quelqu'un qui propose des choses applicables.
+  const possibles = remplacants ?? new Map<string, string[]>()
 
   // ── Les places, dans l'ordre du calendrier ──
   const prenomParId = new Map(contexte.vets.map((v) => [v.id, v.prenom]))
@@ -127,6 +134,9 @@ export async function monterDossierRelecture(
         role: p.role,
         prenom: p.vetId ? (prenomParId.get(p.vetId) ?? null) : null,
         vetId: p.vetId,
+        remplacants: (possibles.get(`${a.date}|${a.type}|${p.role}`) ?? [])
+          .map((id) => prenomParId.get(id))
+          .filter((x): x is string => Boolean(x)),
       })
     }
   }
