@@ -769,7 +769,20 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
                   n'en annonçant qu'une. */}
               {typesCreneaux.length > 1 && (
                 <div className="space-y-1.5">
-                  <Label>Quelles gardes ce jour-là ? (optionnel)</Label>
+                  {/* ⚠️ B-077 — MiKL, 27/08 : « je n'ai pas compris ce
+                      qu'était ce côté optionnel ». L'explication existait, mais
+                      APRÈS les cases : on rencontrait trois cases à cocher sans
+                      savoir ce qu'elles font, et « (optionnel) » ne dit pas ce
+                      qui se passe quand on ne coche rien. Le titre porte
+                      désormais le DÉFAUT, et la phrase passe AVANT les cases —
+                      on lit la règle, puis on décide de la restreindre. Même
+                      famille que B-069 : le réglage était juste, c'est sa
+                      présentation qui laissait deviner. */}
+                  <Label>Quelles gardes ce jour-là ? Par défaut, toutes</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Ne coche que si le vétérinaire est indisponible pour{' '}
+                    <em>certaines</em> gardes de ce jour et pas pour les autres.
+                  </p>
                   <div className="space-y-2 mt-1">
                     {typesCreneaux.map((t) => (
                       <label key={t.code} className="flex items-center gap-2 cursor-pointer">
@@ -783,11 +796,6 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
                       </label>
                     ))}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Rien de coché = toute la journée. À cocher seulement si le
-                    vétérinaire est indisponible pour <em>certaines</em> gardes de ce
-                    jour et pas pour les autres.
-                  </p>
                 </div>
               )}
             </div>

@@ -36,7 +36,10 @@ function fichiersSources(dir: string): string[] {
 }
 
 describe('B-046 — toute porte de génération exclut le dernier recours', () => {
-  it('chaque appelant de genererPlanningPur charge son contexte avec pourGeneration', () => {
+  // Scan complet des sources : lent par nature. Même raison que dans
+  // `compteurs-appelants` — sous charge, le budget de 5 s tombait et le test
+  // échouait sans qu'aucun code ne soit fautif.
+  it('chaque appelant de genererPlanningPur charge son contexte avec pourGeneration', { timeout: 30_000 }, () => {
     const appelants = fichiersSources(RACINE).filter((f) => {
       if (f.endsWith(join('engine', 'solver.ts'))) return false // c'est sa définition
       const src = readFileSync(f, 'utf-8')

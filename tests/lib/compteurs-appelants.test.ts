@@ -80,7 +80,12 @@ describe('les appelants des compteurs ne maquillent pas la forme reçue', () => 
     expect(fautes, `Cast sur le résultat d'une lecture de compteurs :\n${fautes.join('\n')}`).toEqual([])
   })
 
-  it('chaque appelant récupère bien « erreur » — sinon elle est avalée', () => {
+  // Ce test PARCOURT toute l'arborescence des sources : il est lent par
+  // nature, et sous charge il dépassait le budget par défaut de 5 s — il
+  // échouait alors au hasard, sans qu'aucun code ne soit en cause. Un
+  // garde-fou qui crie sans raison finit par être ignoré, et le jour où il a
+  // raison personne ne le croit. On lui donne le temps qu'il lui faut.
+  it('chaque appelant récupère bien « erreur » — sinon elle est avalée', { timeout: 30_000 }, () => {
     const muets: string[] = []
 
     for (const fichier of fichiersTs(RACINE)) {

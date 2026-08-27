@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Loader2, AlertTriangle, ArrowLeftRight, Lock, Wrench, UserMinus } from 'lucide-react'
+import { Loader2, AlertTriangle, ArrowLeftRight, ArrowUpDown, Lock, Wrench, UserMinus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -681,6 +681,41 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
                     : undefined
                 }
               />
+
+              {/* ── B-076 · ÉCHANGER LES DEUX RÔLES D'UN GESTE ──────────────
+                  MiKL, 27/08 : « rajouter la fonction alterner pour éviter de
+                  changer manuellement un par un les 1er et 2nd ».
+
+                  Le geste était possible, mais coûtait deux réattributions
+                  successives en retenant de tête qui était où — et c'est
+                  précisément la correction la plus fréquente, puisque le défaut
+                  le plus signalé par Filou est « X n'est jamais premier du
+                  week-end ».
+
+                  ⚠️ Il ENREGISTRE RIEN : il échange les deux sélections, et
+                  l'admin voit le résultat avant de valider. L'inversion passe
+                  donc par les mêmes gardiens que n'importe quelle retouche —
+                  aucun raccourci, aucun chemin d'écriture de plus (leçon des
+                  « trois chemins d'écriture, deux gardiens », 22/08).
+
+                  Sur un week-end, le périmètre choisi plus haut fait le reste :
+                  « tout le week-end » inverse le bloc vendredi compris, « ce
+                  seul jour » ne touche que ce jour. */}
+              {modeEdition && !masquerSecond && (premierSel || secondSel) && (
+                <button
+                  type="button"
+                  className="gm-alterner"
+                  onClick={() => {
+                    const avant = premierSel
+                    setPremierSel(secondSel)
+                    setSecondSel(avant)
+                    setPlaceOuverte(null)
+                  }}
+                >
+                  <ArrowUpDown className="w-3.5 h-3.5" aria-hidden />
+                  Alterner les deux rôles
+                </button>
+              )}
 
               {!masquerSecond && (
                 <PlaceGarde

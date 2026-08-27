@@ -95,11 +95,18 @@ export function NoteDernierRecoursExclus({ prenoms }: { prenoms: string[] }) {
       <span className="font-medium text-foreground">
         {prenoms.join(', ')} {pluriel ? 'ne comptent pas' : 'ne compte pas'} dans ce calcul
       </span>{' '}
-      : {pluriel ? 'ils sont réglés' : 'la fiche est réglée'} sur «&nbsp;dernier recours
-      uniquement&nbsp;», et le moteur ne {pluriel ? 'les' : 'la'} mobilise jamais tout seul.
+      {/* ⚠️ Les espaces qui suivent une expression sont écrits `{' '}`, jamais
+          laissés au hasard du retour à la ligne : MiKL a lu « la fiche est
+          régléesur » et « Pour larendre disponible » le 27/08. Deux mots
+          collés au même endroit — après une expression — ne sont pas une
+          coïncidence, et un texte abîmé décrédibilise ce qu'il explique. */}
+      :{' '}
+      {pluriel ? 'ils sont réglés' : 'la fiche est réglée'}{' '}
+      sur «&nbsp;dernier recours uniquement&nbsp;», et le moteur ne{' '}
+      {pluriel ? 'les' : 'la'} mobilise jamais tout seul.
       {pluriel ? ' Ils restent' : ' Elle reste'} proposable{pluriel ? 's' : ''} quand tu
-      modifies une garde à la main. Pour {pluriel ? 'les' : 'la'} rendre disponible à la
-      génération, décoche le réglage sur l&apos;écran Équipe.
+      modifies une garde à la main. Pour {pluriel ? 'les' : 'la'}{' '}
+      rendre disponible à la génération, décoche le réglage sur l&apos;écran Équipe.
     </p>
   )
 }

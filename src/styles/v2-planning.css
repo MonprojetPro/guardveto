@@ -2485,3 +2485,24 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   font-size: 0.78rem; line-height: 1.5; color: var(--t-muted); margin-top: 4px;
   padding-left: 10px; border-left: 2px solid var(--t-border);
 }
+
+/* -- B-076 · Alterner les deux rôles d'une garde ---------------------------
+   MiKL, 27/08 : « rajouter la fonction alterner pour éviter de changer
+   manuellement un par un les 1er et 2nd ». Discret et entre les deux places,
+   parce que c'est là que le geste se pense — pas une action principale, mais
+   la correction la plus frequente une fois que Filou a signalé « X n'est
+   jamais premier ». */
+.gm-alterner {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  width: 100%; margin: -2px 0 2px;
+  padding: 7px 12px;
+  font-family: var(--font-body); font-size: 0.78rem; font-weight: 500;
+  color: var(--t-accent);
+  background: transparent;
+  border: 1px dashed var(--t-border); border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
+}
+.gm-alterner:hover {
+  background: var(--accent-soft); border-color: var(--t-accent); border-style: solid;
+}
