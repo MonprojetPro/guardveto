@@ -137,40 +137,65 @@ const ChangementSchema = z.object({
     ),
 })
 
-const ConstatSchema = z.object({
-  critere: z.string().describe('La clé du critère concerné, parmi celles fournies.'),
-  gravite: z
-    .enum(['bloquant', 'notable', 'mineur'])
+// ⚠️ CE SCHÉMA REND LE SILENCE IMPOSSIBLE — c'est sa raison d'être.
+//
+// La première version autorisait `constats: []`. Le 27/08, sur les vraies
+// données de Val d'Allier, Filou a rendu une relecture ENTIÈREMENT VIDE
+// (synthèse vide, zéro constat, zéro proposition) et l'écran a affiché
+// « Filou n'a rien à redire à ce planning » — sur un planning où Anne-Sophie
+// faisait 8 gardes sans jamais être 1re du week-end, Antoine enchaînait un
+// week-end puis le lundi et le mercredi, et deux cases restaient vides.
+//
+// Ce n'était pas un manque de données : la mesure a montré que tout était
+// dans le dossier. C'était le PROMPT, qui décourageait de parler. Une consigne
+// de retenue est suivie à la lettre, et le taux de détection s'effondre.
+//
+// La parade ne peut pas être une consigne de plus — c'est une consigne qui a
+// causé le problème. Elle est STRUCTURELLE : le schéma exige une ligne PAR
+// CRITÈRE, donc « ne rien dire » n'est plus une sortie valide. Filou doit se
+// prononcer sur chacun, et écrire ce qu'il a regardé même quand tout va bien.
+//
+// C'est exactement le mécanisme que le produit applique déjà à `Filou suit le
+// produit` et au `tableau ne peut pas se taire` : trois réponses admises, une
+// seule interdite — le silence.
+const RevueSchema = z.object({
+  critere: z
+    .string()
+    .describe('La clé du critère, exactement telle qu’écrite entre crochets.'),
+  verdict: z
+    .enum(['probleme', 'a_surveiller', 'rien_a_signaler'])
     .describe(
-      "bloquant : l'équipe le refuserait. notable : ça se discutera. mineur : à savoir, sans plus.",
+      "probleme : l'équipe le refuserait ou le vivrait mal. a_surveiller : ça se discutera, ou c'est limite. rien_a_signaler : tu as regardé et c'est bon.",
     ),
   constat: z
     .string()
     .describe(
-      "Ce qui cloche, en français simple, avec le CHIFFRE qui le prouve et le PRÉNOM concerné. Jamais « il y a un déséquilibre » : dis lequel, chez qui, de combien.",
+      "Ce que tu as trouvé sur CE critère, en français simple, avec le CHIFFRE qui le prouve et le PRÉNOM concerné. Obligatoire même quand tout va bien : dis alors ce que tu as vérifié et pourquoi ça tient (« Manon n'a aucun week-end, mais elle est absente du 30 septembre au 11 octobre »). Jamais « il y a un déséquilibre » : dis lequel, chez qui, de combien.",
     ),
   corrigeable: z
     .boolean()
     .describe(
-      'true si tu proposes un changement pour celui-ci, false si tu le signales sans savoir le corriger.',
+      'true si tu proposes un changement pour celui-ci, false sinon. false est obligatoire quand le verdict est rien_a_signaler.',
     ),
 })
 
 const SortieRelectureSchema = z.object({
   synthese: z
     .string()
+    .min(40)
     .describe(
-      "Deux à quatre phrases : ton impression d'ensemble sur ce planning, comme si tu l'annonçais à l'équipe. Honnête — si le planning est bon, dis-le simplement.",
+      "Deux à quatre phrases : ton impression d'ensemble sur ce planning, comme si tu l'annonçais à l'équipe. Nomme les personnes dont la situation t'a le plus frappé. Ne peut pas être vide.",
     ),
-  constats: z
-    .array(ConstatSchema)
-    .max(12)
-    .describe('Ce qui cloche. Vide si le planning ne te pose aucun problème.'),
+  revue: z
+    .array(RevueSchema)
+    .describe(
+      'UNE ENTRÉE PAR CRITÈRE, tous les critères, sans exception et dans l’ordre où ils te sont donnés. Aucun critère ne peut être omis : si tu n’as rien trouvé sur l’un d’eux, dis-le explicitement avec rien_a_signaler et explique ce que tu as vérifié.',
+    ),
   changements: z
     .array(ChangementSchema)
     .max(8)
     .describe(
-      'Les changements concrets que tu proposes. Vide si tu n’as rien à proposer. Ne propose JAMAIS un changement dont tu n’es pas sûr qu’il améliore la situation d’une personne réelle.',
+      'Les changements concrets que tu proposes. Un changement par problème que tu sais corriger.',
     ),
 })
 
@@ -178,8 +203,17 @@ export type SortieRelecture = z.infer<typeof SortieRelectureSchema>
 
 export interface ResultatRelecture {
   synthese: string
-  constats: SortieRelecture['constats']
+  revue: SortieRelecture['revue']
   changements: ChangementPropose[]
+  /**
+   * Les critères sur lesquels Filou ne s'est PAS prononcé, malgré la consigne.
+   *
+   * Remonté plutôt qu'absorbé : une revue incomplète ressemble en tout point à
+   * une revue clean, et c'est exactement la confusion qui a produit le « Filou
+   * n'a rien à redire » du 27/08. Si cette liste n'est pas vide, l'écran doit
+   * le dire — le contraire serait la phrase rassurante que le produit bannit.
+   */
+  criteresNonTraites: string[]
 }
 
 // ── Le prompt ────────────────────────────────────────────────
@@ -212,12 +246,21 @@ absences — elles te sont données, personne d'absent n'est de garde.
 CE QU'ON TE DEMANDE DE REGARDER
 ${critereEnTexte()}
 
+TU DOIS TE PRONONCER SUR CHAQUE CRITÈRE
+C'est la règle la plus importante. Pour chacun des critères ci-dessus, sans exception, tu
+rends une ligne : ce que tu as regardé, et ce que tu as trouvé. Un critère sur lequel tu
+n'as rien à signaler se dit — « j'ai vérifié, voici pourquoi ça tient » — il ne se saute
+pas. Ne filtre pas tes observations par importance : ton travail ici est la COUVERTURE.
+Signale ce que tu vois, même ce dont tu n'es pas certain, en indiquant sa gravité — c'est
+l'administratrice qui décidera de ce qui compte.
+
 TA MARGE DE MANŒUVRE
-Chaque changement que tu proposes repassera devant le moteur, qui vérifiera qu'il ne
-casse aucune règle. S'il est légal, il sera appliqué : tu as le dernier mot. S'il enfreint
-une règle, il sera montré à l'administratrice avec ton motif et l'objection du moteur, et
-c'est elle qui tranchera. Tu ne peux donc rien casser — mais chaque proposition mal pesée
-lui coûte du temps de lecture. Ne propose que ce dont tu es sûr.
+Chaque changement que tu proposes repassera devant le moteur, qui vérifiera qu'il ne casse
+aucune règle. S'il est légal, il sera appliqué : tu as le dernier mot. S'il enfreint une
+règle, il sera montré à l'administratrice avec ton motif et l'objection du moteur, et c'est
+elle qui tranchera. Tu ne peux donc rien casser en proposant. Une proposition imparfaite
+qui se fait refuser coûte une ligne de lecture ; un problème que tu passes sous silence
+coûte des mois à quelqu'un de l'équipe.
 
 COMMENT TU ÉCRIS
 Tu parles à l'administratrice du cabinet, pas à un développeur. Français simple, tutoiement,
@@ -226,16 +269,17 @@ jamais d'identifiant technique dans une phrase. Un chiffre à chaque affirmation
 fait 2 week-ends et n'est jamais première » vaut mieux que « le rôle est mal réparti ».
 
 CE QUI EST INTERDIT
+- Rendre une revue incomplète : il faut une ligne par critère, toujours.
 - Proposer quelqu'un d'absent, quelle que soit la raison.
 - Inventer une personne, une date ou un créneau qui ne sont pas dans ce qu'on te donne.
-- Signaler un problème sans le chiffre qui le prouve.
+- Affirmer sans le chiffre qui le prouve.
 - Dire qu'un planning est bon quand il ne l'est pas, pour faire plaisir.
-- Proposer un changement « pour voir » : chacun doit améliorer la situation de quelqu'un.
 
-SI LE PLANNING EST BON
-Dis-le, franchement, et ne propose rien. Un planning sans reproche est un résultat, pas un
-échec de ta part. Chercher un défaut pour justifier ta présence est exactement ce qu'on ne
-veut pas.`
+CE QUI DOIT T'ALERTER EN PRIORITÉ
+Quelqu'un qui fait des week-ends sans jamais être premier. Quelqu'un qui enchaîne plusieurs
+gardes en quelques jours pendant qu'un autre n'en a presque pas. Une place restée vide. Un
+écart de charge que l'équipe remarquerait en regardant le planning affiché. Si l'un de ces
+cas est présent dans ce qu'on te donne, il ne peut pas ressortir en « rien à signaler ».`
 }
 
 /** Met le dossier en forme pour le message utilisateur. */
@@ -391,13 +435,28 @@ export function normaliserRelecture(
     })
   }
 
+  // La revue, dans l'ordre du catalogue — pas dans celui où Filou a répondu.
+  // L'admin lit toujours les mêmes critères au même endroit d'une génération à
+  // l'autre ; un ordre qui bouge se relit à chaque fois.
+  const revueParCle = new Map<string, SortieRelecture['revue'][number]>()
+  for (const r of brut.revue ?? []) {
+    if (!CLES_CRITERES.has(r.critere)) continue
+    if (!revueParCle.has(r.critere)) {
+      revueParCle.set(r.critere, { ...r, constat: r.constat.trim() })
+    }
+  }
+
+  const revue = CRITERES_HUMAINS.map((c) => revueParCle.get(c.cle)).filter(
+    (r): r is SortieRelecture['revue'][number] => Boolean(r),
+  )
+  const criteresNonTraites = CRITERES_HUMAINS.filter(
+    (c) => !revueParCle.has(c.cle),
+  ).map((c) => c.titre)
+
   return {
     synthese: brut.synthese.trim(),
-    constats: (brut.constats ?? []).map((c) => ({
-      ...c,
-      critere: CLES_CRITERES.has(c.critere) ? c.critere : 'epuisement',
-      constat: c.constat.trim(),
-    })),
+    revue,
     changements,
+    criteresNonTraites,
   }
 }

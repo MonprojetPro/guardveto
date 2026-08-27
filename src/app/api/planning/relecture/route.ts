@@ -338,14 +338,18 @@ async function executerRelecture(
   return reponse({
     issue: 'relu',
     synthese: relecture.synthese,
-    // Ce que Filou signale sans savoir le corriger : la troisième catégorie du
-    // rapport, celle qui n'existe nulle part ailleurs dans le produit.
-    constats: relecture.constats.map((c) => ({
-      critere: critereParCle(c.critere)?.titre ?? c.critere,
-      gravite: c.gravite,
-      constat: c.constat,
-      corrigeable: c.corrigeable,
+    // La revue, critère par critère — y compris les critères où tout va bien.
+    // C'est la pièce qui empêche « Filou n'a rien à redire » d'être la seule
+    // chose que l'admin lit : elle montre ce qui a été REGARDÉ, pas seulement
+    // ce qui a été trouvé.
+    revue: relecture.revue.map((r) => ({
+      critere: critereParCle(r.critere)?.titre ?? r.critere,
+      verdict: r.verdict,
+      constat: r.constat,
+      corrigeable: r.corrigeable,
     })),
+    // Une revue incomplète ne doit PAS ressembler à une revue clean.
+    criteresNonTraites: relecture.criteresNonTraites,
     appliques,
     aTrancher,
     // Compté et dit : une proposition écartée en silence laisserait croire que

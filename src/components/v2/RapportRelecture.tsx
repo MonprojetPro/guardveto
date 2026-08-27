@@ -36,9 +36,9 @@ export interface LigneRelecture {
   effetScore?: 'ameliore' | 'egal' | 'degrade'
 }
 
-export interface ConstatRelecture {
+export interface LigneRevue {
   critere: string
-  gravite: 'bloquant' | 'notable' | 'mineur'
+  verdict: 'probleme' | 'a_surveiller' | 'rien_a_signaler'
   constat: string
   corrigeable: boolean
 }
@@ -46,7 +46,9 @@ export interface ConstatRelecture {
 export interface DonneesRelecture {
   issue: 'relu' | 'indisponible'
   synthese?: string
-  constats?: ConstatRelecture[]
+  revue?: LigneRevue[]
+  /** Critères sur lesquels Filou ne s'est pas prononcé, malgré la consigne. */
+  criteresNonTraites?: string[]
   appliques?: LigneRelecture[]
   aTrancher?: LigneRelecture[]
   ecartes?: number
@@ -97,9 +99,13 @@ export function RapportRelecture({ donnees }: { donnees: DonneesRelecture }) {
 
   const appliques = donnees.appliques ?? []
   const aTrancher = donnees.aTrancher ?? []
-  const constats = donnees.constats ?? []
-  const rienASignaler =
-    appliques.length === 0 && aTrancher.length === 0 && constats.length === 0
+  const revue = donnees.revue ?? []
+  // Les problèmes d'abord, le reste ensuite : l'admin doit voir ce qui cloche
+  // sans avoir à trier. Mais le reste est MONTRÉ, pas effacé — c'est lui qui
+  // prouve que le silence sur un critère est un silence délibéré.
+  const aVoir = revue.filter((r) => r.verdict !== 'rien_a_signaler')
+  const verifie = revue.filter((r) => r.verdict === 'rien_a_signaler')
+  const nonTraites = donnees.criteresNonTraites ?? []
 
   return (
     <section className="rl-rapport" aria-label="Relecture de Filou">
@@ -183,20 +189,20 @@ export function RapportRelecture({ donnees }: { donnees: DonneesRelecture }) {
         </div>
       )}
 
-      {/* ③ Ce qu'il voit sans savoir le corriger */}
-      {constats.length > 0 && (
+      {/* ③ Ce qu'il a relevé sans savoir le corriger */}
+      {aVoir.length > 0 && (
         <div className="rl-bloc rl-constats">
           <p className="rl-bloc-titre">
             <Eye className="rl-ico" aria-hidden />
             Ce que Filou a relevé
           </p>
           <ul className="rl-liste">
-            {constats.map((c, i) => (
-              <li key={i} className={`rl-item rl-gravite-${c.gravite}`}>
-                <p className="rl-constat">{c.constat}</p>
+            {aVoir.map((r, i) => (
+              <li key={i} className={`rl-item rl-verdict-${r.verdict}`}>
+                <p className="rl-constat">{r.constat}</p>
                 <p className="rl-meta">
-                  {c.critere}
-                  {!c.corrigeable ? ' · il ne voit pas de correction automatique' : ''}
+                  {r.critere}
+                  {!r.corrigeable ? ' · il ne voit pas de correction automatique' : ''}
                 </p>
               </li>
             ))}
@@ -204,10 +210,42 @@ export function RapportRelecture({ donnees }: { donnees: DonneesRelecture }) {
         </div>
       )}
 
-      {rienASignaler && (
+      {/* ④ CE QU'IL A REGARDÉ SANS RIEN TROUVER — la pièce qui manquait.
+          Sans elle, l'écran disait « Filou n'a rien à redire » et l'admin ne
+          pouvait pas distinguer « il a tout vérifié » de « il n'a rien fait ».
+          Repliée : c'est une preuve de travail, pas une liste d'actions. */}
+      {verifie.length > 0 && (
+        <details className="rl-verifie">
+          <summary>
+            {verifie.length === revue.length
+              ? `Rien à signaler sur les ${verifie.length} points regardés — voir le détail`
+              : `${verifie.length} autre${verifie.length > 1 ? 's' : ''} point${verifie.length > 1 ? 's' : ''} regardé${verifie.length > 1 ? 's' : ''}, rien à signaler`}
+          </summary>
+          <ul className="rl-liste">
+            {verifie.map((r, i) => (
+              <li key={i} className="rl-item">
+                <p className="rl-constat">{r.constat}</p>
+                <p className="rl-meta">{r.critere}</p>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
+      {revue.length === 0 && (
         <p className="rl-rien">
-          Filou n’a rien à redire à ce planning. C’est un résultat, pas un oubli : il a
-          regardé la charge de chacun, le rythme des gardes et l’équilibre des rôles.
+          Filou n’a rendu aucune revue. Ce n’est pas un planning sans reproche : c’est une
+          relecture qui n’a pas abouti. Relance-la, ou continue sans son avis.
+        </p>
+      )}
+
+      {/* Un critère non traité ne doit JAMAIS ressembler à un critère sans
+          problème. C'est exactement la confusion qui a produit le faux
+          « rien à redire » du 27/08. */}
+      {nonTraites.length > 0 && (
+        <p className="rl-note rl-manquant">
+          Filou ne s’est pas prononcé sur {nonTraites.length === 1 ? 'ce point' : 'ces points'} :{' '}
+          {nonTraites.join(' · ')}. Ce n’est pas « rien à signaler » — c’est un angle mort.
         </p>
       )}
 

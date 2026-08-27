@@ -1230,6 +1230,7 @@ export function ParcoursGeneration({
                 progression qu'il faut aller chercher n'informe personne. */}
             {resultat.issue !== 'echec' && relectureEnCours && (
               <p className="rl-annonce">
+                <span className="rl-rotor" aria-hidden />
                 {etapeRelecture ?? 'Filou relit le planning…'}{' '}
                 <span className="rl-annonce-ou">Son avis s’affichera en bas de cette page.</span>
               </p>

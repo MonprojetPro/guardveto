@@ -2438,3 +2438,37 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   background: var(--surface); border-radius: var(--r-sm); padding: 7px 9px;
   overflow-x: auto; word-break: break-word;
 }
+
+/* -- B-072 · Un indicateur qui TOURNE pendant que Filou relit ----------------
+   MiKL, 27/08 : « il n'y a même pas d'animation qui tourne pour indiquer qu'il
+   se passe quelque chose ». Sur un écran figé, personne ne distingue « ça
+   travaille » de « c'est planté » — et la relecture est longue, donc le doute
+   dure. Le texte changeait déjà ; ce qui manquait, c'est que quelque chose
+   BOUGE. Respecte prefers-reduced-motion : l'anneau se fige plein. */
+.rl-rotor {
+  display: inline-block; width: 12px; height: 12px;
+  margin-right: 8px; vertical-align: -1px;
+  border: 2px solid var(--t-border);
+  border-top-color: var(--t-accent);
+  border-radius: 50%;
+  animation: rl-rotation 0.9s linear infinite;
+}
+@keyframes rl-rotation { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .rl-rotor { animation: none; border-color: var(--t-accent); }
+}
+
+/* Ce que Filou a regardé sans rien trouver — replié, mais présent.
+   Sans ce bloc, « rien à redire » ne se distingue pas de « rien fait ». */
+.rl-verifie { margin-top: 2px; }
+.rl-verifie summary {
+  font-size: 0.79rem; color: var(--soft); cursor: pointer; padding: 3px 0;
+}
+.rl-verifie .rl-liste { margin-top: 7px; }
+
+/* La gravité se dit par un liseré, jamais par un fond. */
+.rl-verdict-probleme { border-left: 3px solid var(--danger); }
+.rl-verdict-a_surveiller { border-left: 3px solid var(--warn); }
+
+/* Un angle mort n'est pas une bonne nouvelle : il se signale. */
+.rl-manquant { color: var(--warn); font-style: normal; }
