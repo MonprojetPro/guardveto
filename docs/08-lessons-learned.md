@@ -402,3 +402,49 @@ pointeur mouvant.
 4. **Le pourquoi doit être exhaustif ou il ment.** `raisonsSurCreneau` jetait toute raison sans code `R<n>` : un tiers des exclusions (`ESPACEMENT`, `FREQ_WE`) était muet. Une liste d'empêchements incomplète laisse croire que les absents étaient disponibles.
 5. **Le nettoyage d'affichage se duplique tout seul.** Six copies de `replace(/^R\d+ : /)` existaient, toutes avec la même lacune. Source unique posée (`sansCodeTechnique`), les six branchées dessus.
 6. **Un bouton de secours qui ment est pire que pas de bouton.** « L'équipe a reçu ta situation » s'affichait sans qu'aucun envoi soit prouvé (`sendBrevoEmail` **retourne** ses erreurs, elle ne les lève pas). Supprimé plutôt que rafistolé, au profit du chemin qui journalise déjà.
+
+## 2026-08-27 — Un contrôle plus strict peut tuer la fonction qu'il protège (B-062)
+
+**Le contexte.** Filou relit le planning généré et propose des changements ; le
+moteur contrôle leur légalité avant de les appliquer. Tout repose sur ce
+contrôle : s'il est troué, une garde illégale entre dans le planning avec
+l'autorité de « Filou l'a proposé, le moteur a validé ».
+
+**Ce que j'ai écrit d'abord, et pourquoi ça semblait juste.** Le critère de
+refus était : *zéro violation après le changement*. Le raisonnement tenait
+debout, et je l'avais même écrit en commentaire pour justifier de ne PAS
+comparer avant/après : « un planning qui passe de 3 à 2 violations reste un
+planning illégal ; on ne bâtit pas sur un planning dont on sait déjà qu'il est
+faux ». C'est le genre de règle qu'on écrit avec la satisfaction d'avoir été
+rigoureux.
+
+**Ce que la mesure a dit.** Une sonde sur le validateur, avant de corriger le
+test qui échouait : un planning **partiel** — celui que le moteur rend depuis
+B-053, avec ses cases à pourvoir — porte déjà **une violation `R18` par case
+vide** (« garde de semaine sans 2nd »). Exiger zéro violation refusait donc
+TOUS les changements sur un planning troué, **y compris celui qui bouche le
+trou**. La fonction aurait été morte exactement là où elle sert le plus, et
+elle serait morte *en silence* : l'admin aurait vu « Filou n'a rien proposé »,
+sans jamais savoir que ses propositions avaient été refusées en bloc par un
+critère trop raide.
+
+**La leçon, en une phrase.** *Un contrôle plus strict n'est pas un contrôle plus
+sûr : il peut refuser précisément ce qu'on cherchait à obtenir.* Et le coût ne
+se voit pas — un refus excessif ressemble à un « rien à signaler ».
+
+**Ce qui a permis de l'attraper.** Rien d'autre que le réflexe de sonder AVANT
+de corriger le test. Le test échouait ; la tentation évidente était de rendre le
+fixture « plus complet » pour le faire passer, et la conception fausse serait
+partie en production avec 13 tests verts pour la couvrir. La sonde a coûté deux
+minutes et a montré que le test avait raison contre le code.
+
+**La correction.** On refuse ce qui fait **apparaître** une violation, comparée
+**par identité** (`regle|date|type|role|vetId`) et non par nombre — un décompte
+laisserait passer le cas où une violation disparaît pendant qu'une autre
+apparaît. Une case vide n'est pas une faute, c'est un état documenté du produit ;
+une garde illégale, si. Comparer par identité distingue les deux.
+
+**Le garde-fou.** Trois tests figent le cas du planning partiel, dont celui qui
+vérifie qu'on refuse *quand même* d'y poser quelqu'un d'absent — assouplir un
+critère demande de prouver qu'on n'a pas ouvert la porte aux vraies fautes.
+L'ensemble est vérifié par sabotage : contrôle neutralisé, 4 tests tombent.
