@@ -29,10 +29,12 @@ import {
   configurerPartagesCabinet,
   configurerAdresseCabinet,
 } from '@/app/(protected)/admin/structure/actions'
-import { envoyerEmailDeTest } from '@/app/(v2)/reglages/actions'
+import { envoyerEmailDeTest, configurerAgendaAffichage } from '@/app/(v2)/reglages/actions'
 import { useErreurBloquante } from '@/components/v2/regles/ErreurBloquante'
 import { raisonEchec } from '@/lib/emails/echec'
 import type { Periode } from '@/types'
+import { libelleGarde } from '@/lib/agenda/libelle'
+import { initialesVeto } from '@/lib/agenda/initiales'
 
 export interface ValeursCabinet {
   googleCalendarId: string
@@ -54,6 +56,33 @@ export interface LigneEmail {
   created_at: string
   vetNom: string | null
 }
+
+/**
+ * Un créneau du SOCLE (profil_id NULL), tel qu'il vit dans Google Agenda.
+ * `heureDebut`/`heureFin` au format `'HH:MM'` (Postgres TIME déjà tronqué
+ * côté page) — VRAIS horaires du cabinet, jamais une valeur en dur : c'est
+ * exactement le bug 20h/10h vs 18h/08h qu'un autre chantier corrige en ce
+ * moment, et le graver ici le propagerait dans l'aperçu.
+ */
+export interface CreneauAgenda {
+  id: string
+  nom: string
+  /** `null` = pas encore personnalisé, le champ repart du `nom`. */
+  libelleAgenda: string | null
+  heureDebut: string
+  heureFin: string
+}
+
+/** 'HH:MM' → '18h' (minutes nulles) ou '18h30'. Purement pour L'AFFICHAGE de
+ *  l'aperçu ; `libelleGarde` (agenda/libelle.ts), lui, reste pur et ne
+ *  formate rien — il reçoit ces chaînes déjà faites. */
+function formatHeureCourte(hhmm: string): string {
+  const [h, m] = hhmm.split(':')
+  return m && m !== '00' ? `${h}h${m}` : `${h}h`
+}
+
+/** Le véto d'exemple de l'aperçu — celui du cahier des charges (« garde-ACB-1er »). */
+const EXEMPLE_NOM = initialesVeto('Anne-Catherine', 'Bernard')
 
 const ZONE_LABEL: Record<string, string> = { A: 'Zone A', B: 'Zone B', C: 'Zone C' }
 const REGION_LABEL: Record<string, string> = {
@@ -147,11 +176,16 @@ interface Props {
    * qu'avait fait celui de l'agenda.
    */
   envoiConfigure?: boolean
+  /** Chantier agenda Google (2026-08-27) — réglages d'affichage lus en base. */
+  agendaJourneeEntiere: boolean
+  agendaAfficherHoraires: boolean
+  /** Les créneaux du socle (profil_id NULL), pour l'intitulé par créneau. */
+  creneaux: CreneauAgenda[]
 }
 
 export function ReglagesV2({
   valeurs, periodesPubliees, emails, agendaParDefaut = '', nomAgenda = null,
-  envoiConfigure = false,
+  envoiConfigure = false, agendaJourneeEntiere, agendaAfficherHoraires, creneaux,
 }: Props) {
   const [isPending, startTransition] = useTransition()
   const { ouvrirErreur, dialogueErreur } = useErreurBloquante()
@@ -170,6 +204,40 @@ export function ReglagesV2({
   const [ville, setVille] = useState(valeurs.ville)
 
   const [testEnCours, setTestEnCours] = useState(false)
+
+  // ── Chantier agenda Google — présentation ───────────────────────────────
+  const [journeeEntiere, setJourneeEntiere] = useState(agendaJourneeEntiere)
+  const [afficherHoraires, setAfficherHoraires] = useState(agendaAfficherHoraires)
+  // Un texte par créneau, PRÉ-REMPLI avec son `nom` quand rien n'a encore été
+  // personnalisé — même logique que le nom d'un véto sur la fiche Équipe :
+  // l'admin voit tout de suite ce qui sera affiché, plutôt qu'un champ vide.
+  const [libellesCreneaux, setLibellesCreneaux] = useState<Record<string, string>>(() =>
+    Object.fromEntries(creneaux.map((c) => [c.id, c.libelleAgenda ?? c.nom])),
+  )
+  const [enregistrementAgendaEnCours, setEnregistrementAgendaEnCours] = useState(false)
+
+  const enregistrerAgendaAffichage = async () => {
+    setEnregistrementAgendaEnCours(true)
+    try {
+      const res = await configurerAgendaAffichage({
+        journeeEntiere,
+        afficherHoraires,
+        libellesCreneaux: creneaux.map((c) => ({
+          creneauId: c.id,
+          libelle: libellesCreneaux[c.id] ?? '',
+        })),
+      })
+      if ('error' in res && res.error) {
+        toast.error(res.error)
+        return
+      }
+      toast.success('Présentation de l’agenda enregistrée')
+    } catch {
+      toast.error("L'appel n'a pas abouti. Réessaie dans un instant.")
+    } finally {
+      setEnregistrementAgendaEnCours(false)
+    }
+  }
 
   const [periodeSync, setPeriodeSync] = useState(periodesPubliees[0]?.id ?? '')
   const [syncEnCours, setSyncEnCours] = useState(false)
@@ -576,6 +644,107 @@ export function ReglagesV2({
           </div>
         </section>
       </div>
+
+      {/* ── Présentation dans Google Agenda (2026-08-27) ─────────────────
+          Le cœur de l'écran : l'aperçu se recompose EN DIRECT avec
+          `libelleGarde`, la même fonction que celle qui composera le VRAI
+          titre à la synchronisation — pas une réécriture approximative ici. */}
+      <section className="card agenda-affichage-card rise rise-3" aria-label="Présentation dans Google Agenda">
+        <div className="card-head">
+          <div>
+            <h3>Présentation dans Google Agenda</h3>
+            <p className="sub">Ce que les vétos verront dans leur agenda, garde par garde</p>
+          </div>
+        </div>
+        <div className="aa-body">
+          <div className="aa-interrupteurs">
+            <label className="aa-switch">
+              <input
+                type="checkbox"
+                checked={journeeEntiere}
+                onChange={(e) => setJourneeEntiere(e.target.checked)}
+              />
+              <span>
+                <b>Événements en journée entière</b>
+                <small>
+                  Un bandeau léger en haut de la grille, plutôt qu&apos;un bloc qui occupe toute la
+                  colonne.
+                </small>
+              </span>
+            </label>
+            <label className="aa-switch">
+              <input
+                type="checkbox"
+                checked={afficherHoraires}
+                onChange={(e) => setAfficherHoraires(e.target.checked)}
+              />
+              <span>
+                <b>Afficher les horaires dans le titre</b>
+                <small>Ajoute « 18h/08h » à la fin du titre de l&apos;événement.</small>
+              </span>
+            </label>
+          </div>
+
+          {creneaux.length === 0 ? (
+            <p className="aa-vide">
+              Aucun créneau réglé pour l&apos;instant — la structure des gardes se configure sur
+              l&apos;écran Règles.
+            </p>
+          ) : (
+            <div className="aa-creneaux">
+              <p className="aa-creneaux-lede">
+                La base du titre, pour chaque créneau. Un mot par créneau — pas un seul pour tout
+                le cabinet — parce qu&apos;un planning de journée arrivera plus tard sans se
+                confondre avec les gardes.
+              </p>
+              {creneaux.map((c) => {
+                const base = (libellesCreneaux[c.id] ?? '').trim() || c.nom
+                const apercu = libelleGarde({
+                  base,
+                  nom: EXEMPLE_NOM,
+                  role: '1er',
+                  horaires: {
+                    debut: formatHeureCourte(c.heureDebut),
+                    fin: formatHeureCourte(c.heureFin),
+                  },
+                  afficherHoraires,
+                })
+                return (
+                  <div className="aa-creneau-ligne" key={c.id}>
+                    <div className="field aa-creneau-champ">
+                      <label htmlFor={`aa-cr-${c.id}`}>{c.nom}</label>
+                      <input
+                        id={`aa-cr-${c.id}`}
+                        type="text"
+                        value={libellesCreneaux[c.id] ?? ''}
+                        onChange={(e) =>
+                          setLibellesCreneaux((l) => ({ ...l, [c.id]: e.target.value }))
+                        }
+                        placeholder={c.nom}
+                      />
+                    </div>
+                    <div className="aa-apercu">
+                      <span className="aa-apercu-label">Aperçu</span>
+                      <code className="aa-apercu-titre">{apercu}</code>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          <div className="conn-actions">
+            <button
+              type="button"
+              className="btn btn-valider btn-sm"
+              onClick={enregistrerAgendaAffichage}
+              disabled={enregistrementAgendaEnCours}
+            >
+              {enregistrementAgendaEnCours ? 'Enregistrement…' : 'Enregistrer'}
+            </button>
+          </div>
+        </div>
+      </section>
 
       {/* ── Journal des e-mails ──────────────────────────────────────── */}
       <section className="card mail-card rise rise-3" aria-label="Journal des e-mails">

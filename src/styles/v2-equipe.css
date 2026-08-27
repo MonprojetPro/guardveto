@@ -385,6 +385,34 @@
 /* Les étiquettes prennent la place laissée libre par le champ couleur, à sa
    droite, au lieu d'ouvrir une rangée à elles. Voir le commentaire du JSX. */
 .cf-etiquettes { grid-column: 2 / -1; }
+/* ── Chantier agenda Google (2026-08-27) — bloc « Couleur Google Agenda » +
+   « Nom dans Google Agenda », sous la couleur GuardVeto et les étiquettes.
+   Même forme que `.cf-bloc-recours` juste en dessous : pleine largeur, la
+   phrase d'explication en tête plutôt qu'en aide sous CHAQUE champ — elle
+   porte sur les DEUX champs à la fois (pourquoi une seconde couleur existe). */
+.cf-bloc-agenda {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px 16px;
+  margin-top: 6px; padding-top: 12px;
+  border-top: 1px solid var(--t-border);
+}
+.cf-agenda-explication {
+  grid-column: 1 / -1;
+  font-size: 0.79rem; color: var(--t-muted); line-height: 1.5;
+}
+.cf-agenda-explication strong { color: var(--text); }
+/* La pastille de couleur Google, dans le déclencheur ET dans la liste — un
+   simple rond, pas d'initiales dessus : contrairement à `.selcoul-pastille`,
+   ce n'est pas LA couleur de la personne, juste l'échantillon d'un choix
+   fermé parmi 11. */
+.cgs-trigger { display: inline-flex; align-items: center; gap: 8px; }
+.cgs-pastille {
+  width: 14px; height: 14px; border-radius: 50%; flex: none;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
 /* B-046 + B-057 — la case « dernier recours » et son explication forment UN
    bloc, sur toute la largeur de la grille.
    Empilees (case seule sur une ligne, note etroite en dessous), elles laissaient

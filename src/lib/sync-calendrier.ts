@@ -7,36 +7,23 @@
 
 import { SupabaseClient } from '@supabase/supabase-js'
 import {
-  createGardeEvent,
-  updateGardeEvent,
   deleteGardeEvent,
   isGoogleCalendarConfigured,
   agendaDeRepliPour,
-  GardeEventData,
+  creerEvenementPlanifie,
+  majEvenementPlanifie,
+  planifierEvenementsGarde,
+  type EvenementPlanifie,
+  type GardeAPlanifier,
+  type OccupantPlace,
 } from './google-calendar'
 import { chargerStructureProfilPeriode } from '@/data/chargerStructureCabinet'
 import type { StructureCreneauxResolue } from '@/engine/structure-creneaux'
 import { chargerRelationsAffichagePeriode } from '@/data/chargerRelationsAffichage'
+import type { RelationStructure } from '@/engine/structure-config'
 import type { BilanAgenda } from '@/lib/planning/retrait-planning'
-
-/**
- * Prénoms des places 3 et 4, dans l'ordre. Les colonnes `premier_id` et
- * `second_id` n'en portent que deux : les suivantes vivent dans le miroir
- * `garde_placements`. Sans elles, un vétérinaire de garde ne verrait jamais
- * la garde arriver dans son agenda.
- */
-function prenomsPlacesSup(garde: {
-  garde_placements?: { place_index: number; veterinaires: { prenom: string } | { prenom: string }[] | null }[] | null
-}): string[] {
-  return (garde.garde_placements ?? [])
-    .filter((p) => p.place_index >= 2)
-    .sort((a, b) => a.place_index - b.place_index)
-    .map((p) => {
-      const v = Array.isArray(p.veterinaires) ? p.veterinaires[0] : p.veterinaires
-      return v?.prenom ?? ''
-    })
-    .filter(Boolean)
-}
+import { initialesUniques } from '@/lib/agenda/initiales'
+import { estColorIdValide } from '@/lib/agenda/couleurs-google'
 
 // ── Résolution du calendarId PAR CABINET (#10b) ──────────────
 // Le calendarId Google est désormais porté par le cabinet
@@ -88,21 +75,271 @@ async function cabinetIdDePeriode(
 
 // ── Types ────────────────────────────────────────────────────
 
-interface GardeAvecVetos {
+/** Une garde telle que la base la rend, en IDENTIFIANTS (B-079). */
+interface GardeBrute {
   id: string
   date: string
   /** Type V1 ('semaine'/'weekend'/'ferie') ou code sur-mesure (P3b). */
   type: string
+  /** Ancien chemin : UN événement pour toute la garde. Vidé par la bascule. */
   google_event_id: string | null
-  periode_id?: string
+  periode_id?: string | null
   cabinet_id?: string | null
-  premier: { prenom: string } | null
-  second:  { prenom: string } | null
+  premier_id: string | null
+  second_id: string | null
   /** Miroir des places 3 et 4 — absentes des colonnes de `gardes`. */
-  garde_placements?: {
-    place_index: number
-    veterinaires: { prenom: string } | { prenom: string }[] | null
-  }[] | null
+  garde_placements?: { place_index: number; veterinaire_id: string | null }[] | null
+}
+
+/** Les colonnes de `gardes` que la planification exige, en un seul endroit. */
+const CHAMPS_GARDE = `
+  id,
+  date,
+  type,
+  google_event_id,
+  periode_id,
+  cabinet_id,
+  premier_id,
+  second_id,
+  garde_placements ( place_index, veterinaire_id )
+`
+
+/**
+ * Tout ce que la planification a besoin de savoir du cabinet, chargé UNE fois.
+ *
+ * Le rassembler ici évite ce que faisait l'ancienne boucle : une requête par
+ * garde pour un résultat presque toujours identique, sur un chemin déjà
+ * contraint par le rate-limit Google.
+ */
+interface ContexteAgenda {
+  calendarId: string
+  structure?: StructureCreneauxResolue
+  relations?: readonly RelationStructure[]
+  /** Par id de véto — libellé affiché et couleur. */
+  occupants: Map<string, OccupantPlace>
+  /** Par code de créneau — base du titre (`libelle_agenda` ?? `nom`). */
+  basesTitre: Map<string, string>
+  /** Par code de créneau — rôles nommés par le cabinet, dans l'ordre des places. */
+  rolesParCreneau: Map<string, readonly string[]>
+  journeeEntiere: boolean
+  afficherHoraires: boolean
+}
+
+/**
+ * Réglages d'agenda DU CABINET. Aucun défaut codé ici : les colonnes sont
+ * `NOT NULL DEFAULT` en base, et c'est la base qui doit dire ce que vaut un
+ * cabinet qui n'a rien choisi. Un défaut recopié dans le code finit toujours
+ * par diverger de celui de la base, sans que rien ne le signale.
+ *
+ * Le repli n'intervient donc que si la LECTURE échoue (colonnes pas encore
+ * déployées, base muette) — cas où il vaut mieux un agenda lisible qu'aucune
+ * synchronisation.
+ */
+async function reglagesAgenda(
+  supabase: SupabaseClient,
+  cabinetId: string,
+): Promise<{ journeeEntiere: boolean; afficherHoraires: boolean }> {
+  const { data, error } = await supabase
+    .from('cabinets')
+    .select('agenda_journee_entiere, agenda_afficher_horaires')
+    .eq('id', cabinetId)
+    .maybeSingle()
+
+  if (error || !data) {
+    return { journeeEntiere: true, afficherHoraires: false }
+  }
+  const c = data as { agenda_journee_entiere?: boolean | null; agenda_afficher_horaires?: boolean | null }
+  return {
+    journeeEntiere: c.agenda_journee_entiere ?? true,
+    afficherHoraires: c.agenda_afficher_horaires ?? false,
+  }
+}
+
+/**
+ * Comment chaque vétérinaire du cabinet apparaît dans l'agenda.
+ *
+ * ⚠️ TOUT LE CABINET, jamais les seuls vétos de la période. Les initiales se
+ * départagent les unes PAR RAPPORT AUX AUTRES : calculées sur un sous-ensemble,
+ * « AB » pourrait désigner Anne Bernard cette semaine et Antoine Blanc la
+ * suivante. Une étiquette d'identité doit être stable dans le temps, sinon elle
+ * n'identifie plus personne.
+ */
+async function occupantsDuCabinet(
+  supabase: SupabaseClient,
+  cabinetId: string,
+): Promise<Map<string, OccupantPlace>> {
+  const { data } = await supabase
+    .from('veterinaires')
+    .select('id, prenom, nom, libelle_agenda, couleur_google')
+    .eq('cabinet_id', cabinetId)
+
+  type Ligne = {
+    id: string
+    prenom: string | null
+    nom: string | null
+    libelle_agenda: string | null
+    couleur_google: string | null
+  }
+  const lignes = ((data as unknown as Ligne[] | null) ?? [])
+  const initiales = initialesUniques(
+    lignes.map((v) => ({ id: v.id, prenom: v.prenom ?? '', nom: v.nom ?? '' })),
+  )
+
+  const map = new Map<string, OccupantPlace>()
+  for (const v of lignes) {
+    const perso = (v.libelle_agenda ?? '').trim()
+    map.set(v.id, {
+      vetId: v.id,
+      // Le libellé choisi par le véto prime ; à défaut ses initiales ; en tout
+      // dernier recours son prénom — un titre sans nom ne désigne personne.
+      libelle: perso || initiales.get(v.id) || (v.prenom ?? '').trim(),
+      // Le portier écarte une valeur hors palette : Google refuserait l'appel
+      // entier, et une garde ne doit pas disparaître de l'agenda pour une
+      // couleur mal saisie.
+      couleurGoogle: estColorIdValide(v.couleur_google) ? v.couleur_google : null,
+    })
+  }
+  return map
+}
+
+/**
+ * La base du titre, par code de créneau : ce que le cabinet a nommé.
+ *
+ * `creneau_modele.libelle_agenda` d'abord (le nom pensé POUR l'agenda), sinon
+ * le nom du créneau. Les lignes à `code` nul sont ignorées : `gardes.type` ne
+ * peut jamais les désigner, elles ne seraient rattachées à rien.
+ */
+async function catalogueParCode(
+  supabase: SupabaseClient,
+  cabinetId: string,
+): Promise<{ bases: Map<string, string>; roles: Map<string, readonly string[]> }> {
+  const { data } = await supabase
+    .from('creneau_modele')
+    .select('code, nom, libelle_agenda, roles')
+    .eq('cabinet_id', cabinetId)
+
+  type Ligne = {
+    code: string | null
+    nom: string | null
+    libelle_agenda: string | null
+    roles: string[] | null
+  }
+  const bases = new Map<string, string>()
+  const roles = new Map<string, readonly string[]>()
+  for (const c of ((data as unknown as Ligne[] | null) ?? [])) {
+    if (!c.code) continue
+    const base = (c.libelle_agenda ?? '').trim() || (c.nom ?? '').trim()
+    if (base) bases.set(c.code, base)
+    if (c.roles?.length) roles.set(c.code, c.roles)
+  }
+  return { bases, roles }
+}
+
+/**
+ * Assemble le contexte d'un cabinet — quatre lectures, une seule fois.
+ *
+ * `null` si le cabinet n'a pas d'agenda joignable : c'est le seul comportement
+ * sûr quand on ne sait pas où écrire (T-001), et il doit être constaté AVANT
+ * de charger le reste.
+ */
+async function contexteAgenda(
+  supabase: SupabaseClient,
+  cabinetId: string | null,
+  periodeId: string | null | undefined,
+): Promise<ContexteAgenda | null> {
+  if (!cabinetId) return null
+  const calendarId = await calendarIdDuCabinet(supabase, cabinetId)
+  if (!isGoogleCalendarConfigured(calendarId) || !calendarId) return null
+
+  const [reglages, occupants, catalogue, structure, relations] = await Promise.all([
+    reglagesAgenda(supabase, cabinetId),
+    occupantsDuCabinet(supabase, cabinetId),
+    catalogueParCode(supabase, cabinetId),
+    periodeId ? structurePourPeriode(supabase, periodeId) : Promise.resolve(undefined),
+    periodeId ? chargerRelationsAffichagePeriode(supabase, periodeId) : Promise.resolve(undefined),
+  ])
+
+  return {
+    calendarId,
+    structure,
+    relations,
+    occupants,
+    basesTitre: catalogue.bases,
+    rolesParCreneau: catalogue.roles,
+    journeeEntiere: reglages.journeeEntiere,
+    afficherHoraires: reglages.afficherHoraires,
+  }
+}
+
+/** Les places d'une garde, par index, en OCCUPANTS prêts pour l'agenda. */
+function placesDeGardeBrute(
+  garde: GardeBrute,
+  occupants: Map<string, OccupantPlace>,
+): Array<OccupantPlace | null> {
+  const parIndex: Array<OccupantPlace | null> = [
+    garde.premier_id ? occupants.get(garde.premier_id) ?? null : null,
+    garde.second_id ? occupants.get(garde.second_id) ?? null : null,
+  ]
+  // Les places 3 et 4 ne vivent que dans le miroir. Les oublier ferait
+  // disparaître un vétérinaire de garde de son propre agenda — en silence,
+  // ce qui est le pire des cas.
+  for (const p of (garde.garde_placements ?? [])) {
+    if (p.place_index < 2) continue
+    parIndex[p.place_index] = p.veterinaire_id ? occupants.get(p.veterinaire_id) ?? null : null
+  }
+  for (let i = 0; i < parIndex.length; i++) if (parIndex[i] === undefined) parIndex[i] = null
+  return parIndex
+}
+
+/** Traduit une garde brute + ses exceptions en objet planifiable (pur). */
+function versGardeAPlanifier(
+  garde: GardeBrute,
+  exceptions: ExceptionBrute[],
+  ctx: ContexteAgenda,
+): GardeAPlanifier {
+  return {
+    date: garde.date,
+    type: garde.type,
+    places: placesDeGardeBrute(garde, ctx.occupants),
+    exceptions: exceptions.map((e) => ({
+      date: e.date,
+      role: e.role,
+      // Remplaçant inconnu du cabinet → place traitée comme VACANTE, donc
+      // aucun événement. Mieux vaut un trou visible qu'un titre au nom du
+      // titulaire sur un jour qui ne lui appartient plus.
+      occupant: e.veterinaire_id ? ctx.occupants.get(e.veterinaire_id) ?? null : null,
+    })),
+    base: garde.type,
+  }
+}
+
+/** Une ligne de `gardes_exceptions`, telle que la base la rend. */
+interface ExceptionBrute {
+  garde_id: string
+  date: string
+  role: 'premier' | 'second'
+  veterinaire_id: string | null
+}
+
+/** Les exceptions de plusieurs gardes, en UNE requête, indexées par garde. */
+async function exceptionsParGarde(
+  supabase: SupabaseClient,
+  gardeIds: string[],
+): Promise<Map<string, ExceptionBrute[]>> {
+  const map = new Map<string, ExceptionBrute[]>()
+  if (gardeIds.length === 0) return map
+
+  const { data } = await supabase
+    .from('gardes_exceptions')
+    .select('garde_id, date, role, veterinaire_id')
+    .in('garde_id', gardeIds)
+
+  for (const e of ((data as unknown as ExceptionBrute[] | null) ?? [])) {
+    const liste = map.get(e.garde_id) ?? []
+    liste.push(e)
+    map.set(e.garde_id, liste)
+  }
+  return map
 }
 
 /**
@@ -156,6 +393,225 @@ async function avecReprise<T>(fn: () => Promise<T>, essais = 4): Promise<T> {
   throw derniere
 }
 
+// ============================================================
+// LE RAPPROCHEMENT (B-079) — un événement par personne et par jour
+// ============================================================
+// La synchronisation ne « crée » plus : elle RAPPROCHE ce que Google porte de
+// ce que le planning dit. C'est ce qui la rend rejouable. Relancée deux fois,
+// elle doit produire exactement le même agenda — sinon la cliente se retrouve
+// avec deux fois la même garde, et personne ne saura laquelle est la bonne.
+//
+// Trois opérations, dans cet ordre :
+//   ① BASCULE  — l'ancien événement de bloc est supprimé et son id effacé ;
+//   ② MISE À JOUR / CRÉATION — une ligne `garde_evenements` par (garde, jour, place) ;
+//   ③ RETRAIT  — ce que Google porte encore et que le planning ne dit plus.
+
+/** La clé d'unicité, la même qu'en base : UNIQUE (garde_id, jour, place_index). */
+function cleEvenement(gardeId: string, jour: string, placeIndex: number): string {
+  return `${gardeId}|${jour}|${placeIndex}`
+}
+
+interface LigneEvenement {
+  garde_id: string
+  jour: string
+  place_index: number
+  google_event_id: string
+}
+
+/** Les événements déjà connus pour ces gardes, indexés par clé. */
+async function evenementsConnus(
+  supabase: SupabaseClient,
+  gardeIds: string[],
+): Promise<Map<string, LigneEvenement>> {
+  const map = new Map<string, LigneEvenement>()
+  if (gardeIds.length === 0) return map
+
+  const { data } = await supabase
+    .from('garde_evenements')
+    .select('garde_id, jour, place_index, google_event_id')
+    .in('garde_id', gardeIds)
+
+  for (const l of ((data as unknown as LigneEvenement[] | null) ?? [])) {
+    map.set(cleEvenement(l.garde_id, l.jour, l.place_index), l)
+  }
+  return map
+}
+
+/** Une opération à exécuter côté Google, avec de quoi la tracer en base. */
+type Operation =
+  | { genre: 'creer'; gardeId: string; ev: EvenementPlanifie }
+  | { genre: 'majer'; gardeId: string; ev: EvenementPlanifie; eventId: string }
+  | { genre: 'retirer'; ligne: LigneEvenement }
+
+/**
+ * ⚠️ LE LOTISSEMENT COMPTE LES APPELS GOOGLE, PLUS LES GARDES.
+ *
+ * L'ancienne boucle lotissait par garde, à une écriture chacune. Une garde en
+ * produit désormais jusqu'à six (3 jours × 2 places) : lotir par garde
+ * lâcherait dix-huit appels d'un coup là où on en voulait trois, et Google
+ * jette silencieusement une partie d'une rafale. On aplatit donc d'abord.
+ */
+const BATCH = 3
+const PAUSE_MS = 250
+
+async function executerOperations(
+  supabase: SupabaseClient,
+  operations: Operation[],
+  ctx: ContexteAgenda,
+  cabinetId: string,
+): Promise<{ ok: number; errors: string[] }> {
+  const errors: string[] = []
+  let ok = 0
+
+  for (let i = 0; i < operations.length; i += BATCH) {
+    const lot = operations.slice(i, i + BATCH)
+    const resultats = await Promise.all(lot.map(async (op) => {
+      try {
+        await avecReprise(async () => {
+          if (op.genre === 'majer') {
+            await majEvenementPlanifie(op.eventId, op.ev, ctx.calendarId)
+            return
+          }
+          if (op.genre === 'creer') {
+            const eventId = await creerEvenementPlanifie(op.ev, ctx.calendarId)
+            if (!eventId) return
+            // `upsert` sur la clé d'unicité : une reprise après échec partiel
+            // met à jour la ligne au lieu de buter sur un conflit.
+            await supabase.from('garde_evenements').upsert({
+              cabinet_id: cabinetId,
+              garde_id: op.gardeId,
+              jour: op.ev.jour,
+              place_index: op.ev.placeIndex,
+              google_event_id: eventId,
+              mis_a_jour_le: new Date().toISOString(),
+            }, { onConflict: 'garde_id,jour,place_index' })
+            return
+          }
+          // Retrait : l'événement d'abord, la ligne ENSUITE. Dans l'autre sens,
+          // un échec Google laisserait un événement que plus rien ne référence —
+          // un orphelin dans l'agenda de la cliente, invisible du logiciel.
+          const bilan = await retirerEvenementsAvecBilan([op.ligne.google_event_id], ctx.calendarId)
+          if (bilan.echecs.length > 0) throw new Error(bilan.echecs[0].message)
+          await supabase
+            .from('garde_evenements')
+            .delete()
+            .eq('garde_id', op.ligne.garde_id)
+            .eq('jour', op.ligne.jour)
+            .eq('place_index', op.ligne.place_index)
+        })
+        return null
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        const ou = op.genre === 'retirer' ? op.ligne.jour : op.ev.jour
+        return `${ou} : ${msg}`
+      }
+    }))
+
+    for (const r of resultats) {
+      if (r === null) ok++
+      else errors.push(r)
+    }
+    if (i + BATCH < operations.length) await sleep(PAUSE_MS)
+  }
+
+  return { ok, errors }
+}
+
+/**
+ * ⚠️ LA BASCULE DES ÉVÉNEMENTS DE BLOC — un événement ne peut pas « devenir » six.
+ *
+ * Val d'Allier porte une vingtaine d'événements de l'ancien format, un par
+ * garde, dont l'identifiant vit dans `gardes.google_event_id`. On les supprime,
+ * puis on efface l'identifiant. Dans cet ordre : si le processus s'arrête entre
+ * les deux, la relance retrouve l'identifiant et retente — Google répond 404,
+ * `retirerEvenementsAvecBilan` le compte en « déjà absent », et l'effacement
+ * se fait au second passage. Effacer l'identifiant d'abord, à l'inverse, aurait
+ * abandonné l'événement dans l'agenda sans plus aucun moyen de le retrouver.
+ */
+async function basculerAnciensEvenements(
+  supabase: SupabaseClient,
+  gardes: GardeBrute[],
+  ctx: ContexteAgenda,
+): Promise<string[]> {
+  const aBasculer = gardes.filter((g) => g.google_event_id)
+  if (aBasculer.length === 0) return []
+
+  const bilan = await retirerEvenementsAvecBilan(
+    aBasculer.map((g) => g.google_event_id as string),
+    ctx.calendarId,
+  )
+
+  // Seules les gardes dont l'ancien événement n'existe plus (effacé ou déjà
+  // absent) perdent leur identifiant. Celles qui ont résisté le gardent, pour
+  // que la prochaine synchronisation retente au lieu d'oublier.
+  const enEchec = new Set(bilan.echecs.map((e) => e.eventId))
+  const liberees = aBasculer.filter((g) => !enEchec.has(g.google_event_id as string))
+  if (liberees.length > 0) {
+    await supabase
+      .from('gardes')
+      .update({ google_event_id: null })
+      .in('id', liberees.map((g) => g.id))
+  }
+
+  return bilan.echecs.map((e) => `Ancien événement ${e.eventId} : ${e.message}`)
+}
+
+/**
+ * Rapproche l'agenda du planning pour un lot de gardes. Cœur commun de la
+ * synchronisation d'une période et de celle d'une garde isolée — les deux
+ * chemins doivent produire le même agenda, donc partager le même code.
+ */
+async function rapprocher(
+  supabase: SupabaseClient,
+  gardes: GardeBrute[],
+  ctx: ContexteAgenda,
+  cabinetId: string,
+): Promise<{ synced: number; errors: string[] }> {
+  const gardeIds = gardes.map((g) => g.id)
+  const [exceptions, connus] = await Promise.all([
+    exceptionsParGarde(supabase, gardeIds),
+    evenementsConnus(supabase, gardeIds),
+  ])
+
+  const errors = await basculerAnciensEvenements(supabase, gardes, ctx)
+
+  const operations: Operation[] = []
+  const clesVoulues = new Set<string>()
+
+  for (const garde of gardes) {
+    const planifies = planifierEvenementsGarde(
+      versGardeAPlanifier(garde, exceptions.get(garde.id) ?? [], ctx),
+      {
+        mode: ctx.journeeEntiere ? 'journee' : 'horaire',
+        afficherHoraires: ctx.afficherHoraires,
+        relations: ctx.relations,
+        structure: ctx.structure,
+        baseParCode: (code) => ctx.basesTitre.get(code),
+        rolesParCode: (code) => ctx.rolesParCreneau.get(code),
+      },
+    )
+
+    for (const ev of planifies) {
+      const cle = cleEvenement(garde.id, ev.jour, ev.placeIndex)
+      clesVoulues.add(cle)
+      const dejaLa = connus.get(cle)
+      operations.push(dejaLa
+        ? { genre: 'majer', gardeId: garde.id, ev, eventId: dejaLa.google_event_id }
+        : { genre: 'creer', gardeId: garde.id, ev })
+    }
+  }
+
+  // Ce que Google porte encore et que le planning ne dit plus : une place
+  // devenue vacante, un jour retiré, une garde raccourcie. Sans ce retrait,
+  // l'agenda garderait indéfiniment le nom de quelqu'un qui n'est plus de garde.
+  for (const [cle, ligne] of connus) {
+    if (!clesVoulues.has(cle)) operations.push({ genre: 'retirer', ligne })
+  }
+
+  const resultat = await executerOperations(supabase, operations, ctx, cabinetId)
+  return { synced: resultat.ok, errors: [...errors, ...resultat.errors] }
+}
+
 export async function syncCalendrier(
   supabase: SupabaseClient,
   periodeId: string
@@ -189,24 +645,15 @@ export async function syncCalendrier(
 
   // calendarId scopé au cabinet de la période (fallback env en aval).
   const cabinetId = await cabinetIdDePeriode(supabase, periodeId)
-  const calendarId = await calendarIdDuCabinet(supabase, cabinetId)
+  const ctx = await contexteAgenda(supabase, cabinetId, periodeId)
 
-  if (!isGoogleCalendarConfigured(calendarId)) {
+  if (!ctx || !cabinetId) {
     return { synced: 0, errors: [], skipped: true, raison: "Aucun agenda Google n'est configuré." }
   }
 
-  // ── Récupération des gardes avec les prénoms des vétos ───
   const { data: gardes, error } = await supabase
     .from('gardes')
-    .select(`
-      id,
-      date,
-      type,
-      google_event_id,
-      premier:veterinaires!gardes_premier_id_fkey ( prenom ),
-      second:veterinaires!gardes_second_id_fkey  ( prenom ),
-      garde_placements ( place_index, veterinaires ( prenom ) )
-    `)
+    .select(CHAMPS_GARDE)
     .eq('periode_id', periodeId)
     .order('date')
 
@@ -214,86 +661,12 @@ export async function syncCalendrier(
     return { synced: 0, errors: [`Impossible de récupérer les gardes : ${error?.message}`], skipped: false }
   }
 
-  const errors: string[] = []
-  let synced = 0
-
-  // Structure horaire du cabinet (A1) — passée à l'agenda pour rester aligné
-  // avec les horaires écrits en base. Défaut si le cabinet n'a rien personnalisé.
-  const structure = await structurePourPeriode(supabase, periodeId)
-
-  // Relations du profil (P6 verrou n°3) — pilotent le vendredi dans la
-  // description. undefined (pas de catalogue) → couple historique, byte-identique.
-  const relations = await chargerRelationsAffichagePeriode(supabase, periodeId)
-
-  // Petits lots espacés + reprise auto : évite le rate-limit Google
-  // (qui jette une partie des créations quand on en lance trop d'un coup),
-  // tout en restant largement sous le maxDuration de la fonction.
-  const BATCH = 3
-  const PAUSE_MS = 250
-  const toutes = gardes as unknown as GardeAvecVetos[]
-
-  // Backlog 8 bis — toutes les exceptions de la période EN UNE FOIS, indexées
-  // par garde. Une requête par garde dans la boucle ci-dessous en ferait des
-  // dizaines pour un résultat presque toujours vide, sur un chemin déjà
-  // contraint par le rate-limit Google.
-  const { data: excDb } = await supabase
-    .from('gardes_exceptions')
-    .select('garde_id, date, role, veterinaires:veterinaire_id(prenom)')
-    .in('garde_id', toutes.map((g) => g.id as string))
-
-  type RawExc = {
-    garde_id: string
-    date: string
-    role: 'premier' | 'second'
-    veterinaires: { prenom: string } | null
-  }
-  const exceptionsParGarde = new Map<string, GardeEventData['exceptions']>()
-  for (const e of ((excDb as unknown as RawExc[] | null) ?? [])) {
-    const liste = exceptionsParGarde.get(e.garde_id) ?? []
-    liste.push({ date: e.date, role: e.role, prenom: e.veterinaires?.prenom ?? null })
-    exceptionsParGarde.set(e.garde_id, liste)
-  }
-
-  for (let i = 0; i < toutes.length; i += BATCH) {
-    const lot = toutes.slice(i, i + BATCH)
-    const resultats = await Promise.all(
-      lot.map(async (garde) => {
-        const data: GardeEventData = {
-          date:          garde.date,
-          type:          garde.type,
-          prenomPremier: garde.premier?.prenom ?? 'Inconnu',
-          prenomSecond:  garde.second?.prenom  ?? null,
-          prenomsSuivants: prenomsPlacesSup(garde),
-          exceptions: exceptionsParGarde.get(garde.id as string) ?? [],
-        }
-        try {
-          await avecReprise(async () => {
-            if (garde.google_event_id) {
-              await updateGardeEvent(garde.google_event_id as string, data, structure, calendarId, relations)
-            } else {
-              const eventId = await createGardeEvent(data, structure, calendarId, relations)
-              if (eventId) {
-                await supabase
-                  .from('gardes')
-                  .update({ google_event_id: eventId })
-                  .eq('id', garde.id)
-              }
-            }
-          })
-          return null
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err)
-          return `Garde ${garde.date} : ${msg}`
-        }
-      })
-    )
-    for (const r of resultats) {
-      if (r === null) synced++
-      else errors.push(r)
-    }
-    if (i + BATCH < toutes.length) await sleep(PAUSE_MS)
-  }
-
+  const { synced, errors } = await rapprocher(
+    supabase,
+    gardes as unknown as GardeBrute[],
+    ctx,
+    cabinetId,
+  )
   return { synced, errors, skipped: false }
 }
 
@@ -310,18 +683,7 @@ export async function syncGardeIndividuelle(
 ): Promise<void> {
   const { data: garde } = await supabase
     .from('gardes')
-    .select(`
-      id,
-      date,
-      type,
-      google_event_id,
-      periode_id,
-      cabinet_id,
-      premier:veterinaires!gardes_premier_id_fkey ( prenom ),
-      second:veterinaires!gardes_second_id_fkey  ( prenom ),
-      garde_placements ( place_index, veterinaires ( prenom ) ),
-      periodes!inner ( publie_at )
-    `)
+    .select(`${CHAMPS_GARDE}, periodes!inner ( publie_at )`)
     .eq('id', gardeId)
     .single()
 
@@ -341,58 +703,16 @@ export async function syncGardeIndividuelle(
   const publieAt = Array.isArray(perGarde) ? perGarde[0]?.publie_at : perGarde?.publie_at
   if (!publieAt) return
 
-  const g = garde as unknown as GardeAvecVetos
+  const g = garde as unknown as GardeBrute
 
-  // calendarId scopé au cabinet de la garde (fallback env en aval).
-  const calendarId = await calendarIdDuCabinet(supabase, g.cabinet_id)
-  if (!isGoogleCalendarConfigured(calendarId)) return
+  // Le même rapprochement que pour une période, sur une seule garde : les deux
+  // chemins doivent produire le même agenda. C'est cette divergence-là qui,
+  // ailleurs dans ce projet, a fait qu'un réglage corrigé sur un chemin restait
+  // faux sur l'autre pendant deux mois.
+  const ctx = await contexteAgenda(supabase, g.cabinet_id ?? null, g.periode_id)
+  if (!ctx || !g.cabinet_id) return
 
-  // Backlog 8 bis — les jours remplacés à titre exceptionnel. Une requête de
-  // plus par garde synchronisée, mais elle ne rapporte rien dans l'immense
-  // majorité des cas, et sans elle l'agenda afficherait le bloc entier au nom
-  // du titulaire alors que quelqu'un le remplace un jour.
-  const { data: exceptionsDb } = await supabase
-    .from('gardes_exceptions')
-    .select('date, role, veterinaires:veterinaire_id(prenom)')
-    .eq('garde_id', gardeId)
-
-  type RawExc = { date: string; role: 'premier' | 'second'; veterinaires: { prenom: string } | null }
-  const exceptions = ((exceptionsDb as unknown as RawExc[] | null) ?? []).map((e) => ({
-    date: e.date,
-    role: e.role,
-    prenom: e.veterinaires?.prenom ?? null,
-  }))
-
-  const data: GardeEventData = {
-    date:          g.date,
-    type:          g.type,
-    prenomPremier: g.premier?.prenom ?? 'Inconnu',
-    prenomSecond:  g.second?.prenom  ?? null,
-    prenomsSuivants: prenomsPlacesSup(g),
-    exceptions,
-  }
-
-  // Structure horaire du cabinet (A1) — aligne l'agenda sur la base.
-  const structure = g.periode_id
-    ? await structurePourPeriode(supabase, g.periode_id)
-    : undefined
-
-  // Relations du profil (P6 verrou n°3) — pilotent le vendredi dans la description.
-  const relations = g.periode_id
-    ? await chargerRelationsAffichagePeriode(supabase, g.periode_id)
-    : undefined
-
-  if (g.google_event_id) {
-    await updateGardeEvent(g.google_event_id, data, structure, calendarId, relations)
-  } else {
-    const eventId = await createGardeEvent(data, structure, calendarId, relations)
-    if (eventId) {
-      await supabase
-        .from('gardes')
-        .update({ google_event_id: eventId })
-        .eq('id', gardeId)
-    }
-  }
+  await rapprocher(supabase, [g], ctx, g.cabinet_id)
 }
 
 // ── Suppression des événements d'une période ─────────────────
@@ -420,20 +740,57 @@ export async function supprimerEvenementsCalendrier(
   const calendarId = await calendarIdDuCabinet(supabase, cabinetId)
   if (!isGoogleCalendarConfigured(calendarId)) return
 
+  await supprimerEvenementsParIds(
+    await idsEvenementsDePeriode(supabase, periodeId),
+    calendarId,
+  )
+}
+
+/**
+ * TOUS les identifiants d'événements d'une période — les DEUX sources.
+ *
+ * ⚠️ Depuis B-079 il y en a deux : `gardes.google_event_id` (ancien format, un
+ * par garde, en voie d'extinction) et `garde_evenements` (un par personne et
+ * par jour). N'en lire qu'une laisse des orphelins dans l'agenda de la
+ * cliente : des gardes visibles que plus rien dans le logiciel ne référence, et
+ * donc que plus rien ne pourra jamais retirer.
+ *
+ * ⚠️ À LIRE AVANT tout DELETE de gardes : `garde_evenements.garde_id` est en
+ * `ON DELETE CASCADE`, les lignes disparaissent avec la garde. Même discipline
+ * que celle déjà en place pour `gardes.google_event_id`.
+ */
+export async function idsEvenementsDePeriode(
+  supabase: SupabaseClient,
+  periodeId: string,
+): Promise<string[]> {
   const { data: gardes } = await supabase
     .from('gardes')
     .select('id, google_event_id')
     .eq('periode_id', periodeId)
-    .not('google_event_id', 'is', null)
 
-  if (!gardes) return
+  const lignes = ((gardes ?? []) as { id: string; google_event_id: string | null }[])
+  const anciens = lignes
+    .map((g) => g.google_event_id)
+    .filter((id): id is string => Boolean(id))
 
-  await supprimerEvenementsParIds(
-    gardes
-      .map((garde) => garde.google_event_id as string | null)
-      .filter((id): id is string => Boolean(id)),
-    calendarId,
-  )
+  const nouveaux = await idsEvenementsDeGardes(supabase, lignes.map((g) => g.id))
+  return [...new Set([...anciens, ...nouveaux])]
+}
+
+/** Les identifiants portés par `garde_evenements` pour ces gardes. */
+export async function idsEvenementsDeGardes(
+  supabase: SupabaseClient,
+  gardeIds: string[],
+): Promise<string[]> {
+  if (gardeIds.length === 0) return []
+  const { data } = await supabase
+    .from('garde_evenements')
+    .select('google_event_id')
+    .in('garde_id', gardeIds)
+
+  return ((data ?? []) as { google_event_id: string | null }[])
+    .map((l) => l.google_event_id)
+    .filter((id): id is string => Boolean(id))
 }
 
 /**

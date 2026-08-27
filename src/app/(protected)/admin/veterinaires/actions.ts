@@ -13,6 +13,7 @@ import {
   normaliserAdresse,
 } from '@/lib/emails/destinataire'
 import { COULEUR_DEFAUT, normaliserHex } from '@/lib/couleurs'
+import { estColorIdValide } from '@/lib/agenda/couleurs-google'
 
 /**
  * Rafraîchit les DEUX écrans qui listent l'équipe.
@@ -67,6 +68,19 @@ export interface VeterinaireFormData {
   dernier_recours: boolean
   /** Étiquettes d'équipe (junior/senior…) — règles de composition (n°6). */
   tags?: string[]
+  /**
+   * Chantier agenda Google (2026-08-27) — identifiant de couleur Google
+   * Agenda ('1' à '11'). `null`/absent = couleur par défaut de l'agenda —
+   * distincte de `couleur`, qui reste celle DANS GuardVeto (planning,
+   * pastilles, filtres). Google n'accepte que 11 teintes fermées, d'où le
+   * second champ.
+   */
+  couleurGoogle?: string | null
+  /**
+   * Chantier agenda Google (2026-08-27) — nom affiché dans Google Agenda.
+   * `null`/absent = on calcule les initiales (`initialesVeto`).
+   */
+  libelleAgenda?: string | null
 }
 
 /**
@@ -85,6 +99,30 @@ export interface VeterinaireFormData {
  */
 function normaliserCouleur(couleur: string | null | undefined): string {
   return normaliserHex(couleur) ?? COULEUR_DEFAUT
+}
+
+/**
+ * Normalise la couleur Google Agenda (frontière de confiance) : ce n'est pas
+ * un hexadécimal libre comme `couleur`, mais l'un des 11 `colorId` fermés de
+ * Google. Une valeur qui n'en fait pas partie (bidouille client, ancien état)
+ * retombe sur `null` — la couleur par défaut de l'agenda — plutôt que de
+ * s'installer en base : la colonne porte un CHECK côté SQL, mais une requête
+ * refusée par un CHECK ferait échouer TOUT l'enregistrement de la fiche pour
+ * un champ qui n'est pas ce qu'on est venu régler.
+ */
+function normaliserCouleurGoogle(v: string | null | undefined): string | null {
+  return estColorIdValide(v) ? (v as string) : null
+}
+
+/**
+ * Normalise le nom affiché dans Google Agenda (frontière de confiance) :
+ * chaîne vide → `null` (retombe sur le calcul automatique des initiales,
+ * cf. `initialesVeto`), et une borne de longueur pour ne pas laisser un
+ * titre d'événement Google déborder sur ce que personne n'a demandé.
+ */
+function normaliserLibelleAgenda(v: string | null | undefined): string | null {
+  const t = (v ?? '').trim()
+  return t === '' ? null : t.slice(0, 60)
 }
 
 /**
@@ -159,6 +197,8 @@ export async function createVeterinaire(data: VeterinaireFormData) {
     dernier_recours: data.dernier_recours,
     tags: normaliserTags(data.tags),
     user_id: null,
+    couleur_google: normaliserCouleurGoogle(data.couleurGoogle),
+    libelle_agenda: normaliserLibelleAgenda(data.libelleAgenda),
   })
 
   if (error) return { error: error.message }
@@ -206,6 +246,8 @@ export async function updateVeterinaire(id: string, data: VeterinaireFormData) {
       actif: data.actif,
       dernier_recours: data.dernier_recours,
       tags: normaliserTags(data.tags),
+      couleur_google: normaliserCouleurGoogle(data.couleurGoogle),
+      libelle_agenda: normaliserLibelleAgenda(data.libelleAgenda),
     })
     .eq('id', id)
 

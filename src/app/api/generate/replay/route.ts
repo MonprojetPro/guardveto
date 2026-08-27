@@ -71,6 +71,13 @@ interface CreneauModeleSnapshotRow {
   roles: string[] | null
   actif: boolean
   ordre: number
+  /**
+   * Chantier agenda Google (2026-08-27). Optionnel : les snapshots pris
+   * AVANT cette colonne (schéma v3 historique) ne la portent pas — `?? null`
+   * en aval retombe alors sur `nom`, exactement comme pour un créneau neuf
+   * sans libellé choisi.
+   */
+  libelle_agenda?: string | null
 }
 
 /** Ligne `relation_creneau` telle que figée dans le snapshot (schéma v4). */
@@ -122,6 +129,7 @@ function creneauxDepuisSnapshot(rows: CreneauModeleSnapshotRow[]): CreneauModele
     roles: r.roles ?? [],
     actif: r.actif,
     ordre: r.ordre,
+    libelleAgenda: r.libelle_agenda ?? null,
   }))
 }
 

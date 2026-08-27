@@ -26,6 +26,7 @@ import type { AttributionGarde, CalendrierResolu, PlanningPartiel } from '@/engi
 import { estJourFerie } from '@/engine/utils'
 import { construireGardePlacements } from './gardePlacements'
 import { syncAttributionsPourJours, joursImpactesGarde } from './syncAttributions'
+import { idsEvenementsDeGardes } from '@/lib/sync-calendrier'
 
 /**
  * Convertit le type interne du moteur vers le type de la table gardes (V1).
@@ -96,17 +97,35 @@ export async function ecrirePlanningV1(
   }
 
   // 0. CAPTURER les ids d'événements Google Agenda AVANT le DELETE.
+  //
+  // ⚠️ DEUX SOURCES depuis B-079 (2026-08-27), et l'oubli de la seconde ne se
+  // voit nulle part. `gardes.google_event_id` ne porte que l'ANCIEN format (un
+  // événement par garde, en voie d'extinction) ; les événements par personne et
+  // par jour vivent dans `garde_evenements`. N'en lire qu'une laisse dans
+  // l'agenda de la cliente des gardes que plus rien dans le logiciel ne
+  // référence — donc que plus rien ne pourra jamais retirer.
+  //
+  // ⚠️ ET C'EST BIEN AVANT LE DELETE : `garde_evenements.garde_id` est en
+  // `ON DELETE CASCADE`. Après le DELETE ci-dessous, les lignes ont disparu et
+  // les identifiants sont perdus pour toujours. Même discipline que celle déjà
+  // en place pour `gardes.google_event_id`, pour la même raison.
   const { data: gardesAvecEvent } = await supabase
     .from('gardes')
-    .select('google_event_id')
+    .select('id, google_event_id')
     .eq('periode_id', periodeId)
     .eq('cabinet_id', cabinetId)
     .eq('verrouille', false)
-    .not('google_event_id', 'is', null)
 
-  const eventIdsAPurger = ((gardesAvecEvent ?? []) as { google_event_id: string | null }[])
+  const lignesGardes = ((gardesAvecEvent ?? []) as { id: string; google_event_id: string | null }[])
+  const anciensIds = lignesGardes
     .map((g) => g.google_event_id)
     .filter((id): id is string => Boolean(id))
+
+  // Scopé aux gardes RÉELLEMENT supprimées ci-dessous (non verrouillées) : une
+  // garde verrouillée survit au DELETE, purger ses événements effacerait de
+  // l'agenda des gardes toujours valides.
+  const nouveauxIds = await idsEvenementsDeGardes(supabase, lignesGardes.map((g) => g.id))
+  const eventIdsAPurger = [...new Set([...anciensIds, ...nouveauxIds])]
 
   // 1. Supprimer les gardes brouillon existantes pour cette période.
   //    Scopé cabinet_id (défense en profondeur : en DEV_BYPASS le client

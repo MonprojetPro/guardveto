@@ -28,6 +28,8 @@ interface CreneauModeleRow {
   roles: string[] | null
   actif: boolean
   ordre: number
+  /** Chantier agenda Google (2026-08-27). NULL = on reprend `nom` en aval. */
+  libelle_agenda: string | null
 }
 
 interface RelationCreneauRow {
@@ -110,7 +112,7 @@ export async function chargerCreneauModele(
   // les affinent par période ».
   const { data, error } = await supabase
     .from('creneau_modele')
-    .select('id, code, nom, jours_semaine, sur_feries, heure_debut, heure_fin, offset_jours_fin, nb_places, roles, actif, ordre')
+    .select('id, code, nom, jours_semaine, sur_feries, heure_debut, heure_fin, offset_jours_fin, nb_places, roles, actif, ordre, libelle_agenda')
     .eq('cabinet_id', cabinetId)
     .is('profil_id', null)
     .order('ordre')
@@ -130,6 +132,9 @@ export async function chargerCreneauModele(
     roles: r.roles ?? [],
     actif: r.actif,
     ordre: r.ordre,
+    // Chantier agenda Google (2026-08-27) : base de l'intitulé Google Agenda
+    // pour ce créneau. NULL/absent = on reprend `nom` en aval.
+    libelleAgenda: r.libelle_agenda ?? null,
   }))
 
   // Quelle période type affine ? Celle demandée, sinon celle par défaut du

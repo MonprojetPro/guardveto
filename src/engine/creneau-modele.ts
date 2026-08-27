@@ -35,6 +35,14 @@ export interface CreneauModele {
   roles: string[]
   actif: boolean
   ordre: number
+  /**
+   * Chantier agenda Google (2026-08-27) — base de l'intitulé Google Agenda
+   * pour ce créneau (ex. « garde »). NULL/absent = on reprend `nom`. Porté
+   * par le créneau et non codé en dur : c'est l'anticipation V3 — un créneau
+   * de journée ajouté plus tard (planning de journée, pas seulement les
+   * gardes) apporte directement son propre libellé, sans reprise de code.
+   */
+  libelleAgenda?: string | null
 }
 
 /** Relation universelle entre deux créneaux d'un cabinet. */

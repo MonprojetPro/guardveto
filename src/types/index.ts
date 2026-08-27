@@ -31,6 +31,17 @@ export interface Veterinaire {
   /** Étiquettes d'équipe (ex. junior, senior) — règles de composition (n°6/n°22). */
   tags?: string[]
   created_at: string
+  /**
+   * Chantier agenda Google (2026-08-27) — identifiant de couleur Google
+   * Agenda ('1' à '11'), choisi par l'admin. NULL = couleur par défaut de
+   * l'agenda.
+   */
+  couleur_google?: string | null
+  /**
+   * Chantier agenda Google (2026-08-27) — nom affiché dans Google Agenda,
+   * personnalisé par l'admin. NULL = on calcule les initiales.
+   */
+  libelle_agenda?: string | null
 }
 
 export interface Periode {

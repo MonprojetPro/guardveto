@@ -63,6 +63,16 @@ import {
   adresseUtilisable,
   motifInvitationImpossible,
 } from '@/lib/emails/destinataire'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger,
+} from '@/components/ui/select'
+import { COULEURS_GOOGLE, couleurGooglePar } from '@/lib/agenda/couleurs-google'
+import { initialesVeto } from '@/lib/agenda/initiales'
+
+/** Sentinelle du Select : Base UI n'accepte pas `''` comme valeur d'item, et
+ *  « couleur par défaut de l'agenda » DOIT rester sélectionnable — c'est
+ *  l'état `null` en base, pas une case vide qu'on aurait oublié de remplir. */
+const COULEUR_GOOGLE_DEFAUT = '__defaut__'
 
 /**
  * La couleur de départ d'une fiche neuve.
@@ -138,6 +148,11 @@ interface FormState {
   couleur: string
   dernier_recours: boolean
   tags: string[]
+  /** '1' à '11', ou `null` pour la couleur par défaut de l'agenda Google. */
+  couleurGoogle: string | null
+  /** Le texte du champ « Nom dans Google Agenda » — voir le commentaire du JSX
+   *  sur pourquoi il est PRÉ-REMPLI plutôt que vide. */
+  libelleAgenda: string
 }
 
 const FORM_VIDE: FormState = {
@@ -149,6 +164,8 @@ const FORM_VIDE: FormState = {
   couleur: COULEUR_INITIALE,
   dernier_recours: false,
   tags: [],
+  couleurGoogle: null,
+  libelleAgenda: '',
 }
 
 function formDepuisVeto(v: Veterinaire): FormState {
@@ -166,6 +183,12 @@ function formDepuisVeto(v: Veterinaire): FormState {
     couleur: normaliserHex(v.couleur) ?? COULEUR_INITIALE,
     dernier_recours: v.dernier_recours,
     tags: v.tags ?? [],
+    couleurGoogle: v.couleur_google ?? null,
+    // PRÉ-REMPLI avec les initiales calculées, jamais un champ vide : sans ça,
+    // l'admin ne voit pas ce que Google affichera tant qu'il n'a rien tapé, et
+    // « laisse vide pour les initiales » se lirait comme une promesse qu'un
+    // champ vide dément visuellement.
+    libelleAgenda: v.libelle_agenda ?? initialesVeto(v.prenom, v.nom),
   }
 }
 
@@ -307,6 +330,11 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
       actif: cible ? cible.actif : true,
       dernier_recours: form.dernier_recours,
       tags: form.tags,
+      couleurGoogle: form.couleurGoogle,
+      // Champ vide = on revient au calcul automatique des initiales : c'est
+      // l'action serveur (`normaliserLibelleAgenda`) qui transforme la chaîne
+      // vide en `null`, comme pour l'e-mail plus haut.
+      libelleAgenda: form.libelleAgenda,
     }
 
     startTransition(async () => {
@@ -620,6 +648,81 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
               <p className="cf-aide">
                 Lues par les règles de composition (« un junior jamais seul »), écran Règles.
               </p>
+            </div>
+            {/* Chantier agenda Google (2026-08-27) — DEUX couleurs, deux
+                usages. La couleur ci-dessus est celle DANS GuardVeto (planning,
+                pastilles, filtres) : un choix libre, n'importe quel
+                hexadécimal. Celle-ci ne sert QUE dans Google Agenda, parce que
+                Google n'accepte que 11 teintes fermées — pas la peine de
+                lire le libellé pour comprendre, la phrase le dit. */}
+            <div className="cf-bloc-agenda">
+              <p className="cf-agenda-explication">
+                La couleur ci-dessus est celle de GuardVeto. Celle-ci ne sert que dans{' '}
+                <strong>Google Agenda</strong>, qui n&apos;accepte que 11 teintes fixes.
+              </p>
+              <div className="field">
+                <label id="cf-couleur-google-label">Couleur Google Agenda</label>
+                <Select
+                  value={form.couleurGoogle ?? COULEUR_GOOGLE_DEFAUT}
+                  onValueChange={(v) =>
+                    v &&
+                    setForm((f) => ({
+                      ...f,
+                      couleurGoogle: v === COULEUR_GOOGLE_DEFAUT ? null : v,
+                    }))
+                  }
+                >
+                  {/* JAMAIS de `<select>` natif sur ce projet — le composant
+                      `Select` partagé, comme partout ailleurs dans cet écran
+                      (cf. « Période à renvoyer » de Réglages). */}
+                  <SelectTrigger aria-labelledby="cf-couleur-google-label" className="w-full">
+                    <span className="cgs-trigger">
+                      {form.couleurGoogle ? (
+                        <>
+                          <span
+                            className="cgs-pastille"
+                            style={{ background: couleurGooglePar(form.couleurGoogle)?.hex }}
+                            aria-hidden="true"
+                          />
+                          {couleurGooglePar(form.couleurGoogle)?.libelleFr}
+                        </>
+                      ) : (
+                        'Couleur par défaut de l’agenda'
+                      )}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={COULEUR_GOOGLE_DEFAUT}>
+                      Couleur par défaut de l&apos;agenda
+                    </SelectItem>
+                    {COULEURS_GOOGLE.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        <span
+                          className="cgs-pastille"
+                          style={{ background: c.hex }}
+                          aria-hidden="true"
+                        />
+                        {c.libelleFr}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="field">
+                <label htmlFor="cf-libelle-agenda">Nom dans Google Agenda</label>
+                <input
+                  id="cf-libelle-agenda"
+                  type="text"
+                  value={form.libelleAgenda}
+                  onChange={(e) => setForm({ ...form, libelleAgenda: e.target.value })}
+                  placeholder={initialesVeto(form.prenom, form.nom) || 'Initiales'}
+                  autoComplete="off"
+                  aria-describedby="cf-libelle-agenda-aide"
+                />
+                <p id="cf-libelle-agenda-aide" className="cf-aide">
+                  Laisse vide pour utiliser les initiales.
+                </p>
+              </div>
             </div>
             {/* B-057 — la case et son explication forment UN bloc, sur toute la
                 largeur. Empilées l'une sous l'autre dans la grille, elles

@@ -18,7 +18,9 @@ import { exigerVeterinaire } from '@/lib/identite'
 import '@/styles/v2-reglages.css'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
-import { ReglagesV2, type LigneEmail, type ValeursCabinet } from '@/components/v2/ReglagesV2'
+import {
+  ReglagesV2, type LigneEmail, type ValeursCabinet, type CreneauAgenda,
+} from '@/components/v2/ReglagesV2'
 import { nomLisibleAgenda } from '@/lib/google-calendar'
 import { chargerDock } from '@/data/v2/dock'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
@@ -55,25 +57,35 @@ export default async function ReglagesPage() {
   if (vet.role_app !== 'admin') redirect('/accueil')
 
   // ── Réglages du cabinet ────────────────────────────────────────────────
+  // Chantier agenda Google (2026-08-27) — `agenda_journee_entiere` et
+  // `agenda_afficher_horaires` viennent de la migration
+  // `20260827180000_agenda_google_socle`, pas encore appliquée : tant
+  // qu'elle ne l'est pas, Postgrest renvoie une erreur de colonne absente et
+  // `cabinetDb` reste `null` — d'où les replis ci-dessous plutôt qu'un throw.
   const { data: cabinetDb } = await supabase
     .from('cabinets')
     .select(
-      'google_calendar_id, brevo_from_email, brevo_from_name, adresse, code_postal, ville, zone_scolaire, region_feries',
+      'google_calendar_id, brevo_from_email, brevo_from_name, adresse, code_postal, ville, zone_scolaire, region_feries, agenda_journee_entiere, agenda_afficher_horaires',
     )
     .limit(1)
     .maybeSingle()
 
-  const cab = (cabinetDb ?? {}) as Record<string, string | null>
+  const cab = (cabinetDb ?? {}) as Record<string, string | boolean | null>
   const valeurs: ValeursCabinet = {
-    googleCalendarId: cab.google_calendar_id ?? '',
-    brevoFromEmail: cab.brevo_from_email ?? '',
-    brevoFromName: cab.brevo_from_name ?? '',
-    adresse: cab.adresse ?? '',
-    codePostal: cab.code_postal ?? '',
-    ville: cab.ville ?? '',
-    zoneScolaire: cab.zone_scolaire ?? '',
-    regionFeries: cab.region_feries ?? '',
+    googleCalendarId: (cab.google_calendar_id as string | null) ?? '',
+    brevoFromEmail: (cab.brevo_from_email as string | null) ?? '',
+    brevoFromName: (cab.brevo_from_name as string | null) ?? '',
+    adresse: (cab.adresse as string | null) ?? '',
+    codePostal: (cab.code_postal as string | null) ?? '',
+    ville: (cab.ville as string | null) ?? '',
+    zoneScolaire: (cab.zone_scolaire as string | null) ?? '',
+    regionFeries: (cab.region_feries as string | null) ?? '',
   }
+  // Replis fidèles aux DEFAULT de la migration (journée entière activée,
+  // horaires masqués) : tant qu'elle n'est pas appliquée, l'écran se comporte
+  // comme s'il l'était déjà, plutôt que d'afficher un état qui n'existe pas.
+  const agendaJourneeEntiere = (cab.agenda_journee_entiere as boolean | null) ?? true
+  const agendaAfficherHoraires = (cab.agenda_afficher_horaires as boolean | null) ?? false
 
   // ── Périodes publiées : seules resynchronisables vers l'agenda ─────────
   const { data: periodesDb } = await supabase
@@ -94,6 +106,36 @@ export default async function ReglagesPage() {
   } catch {
     cabinetId = null
   }
+
+  // ── Les créneaux du socle, pour l'intitulé par créneau ──────────────────
+  // `creneau_modele.libelle_agenda` vient de la même migration que les deux
+  // booléens ci-dessus (pas encore appliquée) — le `.select` échoue alors
+  // proprement et `creneauxDb` reste `null`, d'où le repli `[]`.
+  interface CreneauModeleRow {
+    id: string
+    nom: string
+    libelle_agenda: string | null
+    heure_debut: string
+    heure_fin: string
+  }
+  const { data: creneauxDb } = cabinetId
+    ? await supabase
+        .from('creneau_modele')
+        .select('id, nom, libelle_agenda, heure_debut, heure_fin')
+        .eq('cabinet_id', cabinetId)
+        .is('profil_id', null)
+        .eq('actif', true)
+        .order('ordre')
+    : { data: null }
+  const creneaux: CreneauAgenda[] = ((creneauxDb ?? []) as CreneauModeleRow[]).map((c) => ({
+    id: c.id,
+    nom: c.nom,
+    libelleAgenda: c.libelle_agenda,
+    // Postgres TIME rend 'HH:MM:SS' — l'écran (et l'aperçu) n'a besoin que de
+    // 'HH:MM', même troncature que `chargerCreneauModele` (`hhmm()`).
+    heureDebut: c.heure_debut.slice(0, 5),
+    heureFin: c.heure_fin.slice(0, 5),
+  }))
 
   const { data: vetsRaw } = cabinetId
     ? await supabase.from('veterinaires').select('id, nom, prenom').eq('cabinet_id', cabinetId)
@@ -154,6 +196,9 @@ export default async function ReglagesPage() {
             !!process.env.BREVO_API_KEY?.trim()
             && !!(valeurs.brevoFromEmail.trim() || process.env.BREVO_FROM_EMAIL?.trim())
           }
+          agendaJourneeEntiere={agendaJourneeEntiere}
+          agendaAfficherHoraires={agendaAfficherHoraires}
+          creneaux={creneaux}
         />
       </div>
     </>

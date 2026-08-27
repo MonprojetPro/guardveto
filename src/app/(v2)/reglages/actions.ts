@@ -33,6 +33,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { sendBrevoEmail } from '@/lib/brevo'
 import { raisonEchec } from '@/lib/emails/echec'
+import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 
 /** Le type journalisé pour un essai d'envoi. Doit figurer dans la contrainte
  *  `email_log_type_check` (migration 20260814120000). */
@@ -173,4 +174,117 @@ export async function envoyerEmailDeTest(): Promise<
 
   if (erreurBrute) return { error: raisonEchec(erreurBrute) }
   return { success: true, destinataire }
+}
+
+// ============================================================
+// GUARDVETO V2 — Server action « Réglages d'affichage de l'agenda Google »
+// ============================================================
+// Chantier agenda Google (2026-08-27). Trois choses réglées d'un coup, parce
+// qu'elles vivent sur le même écran et s'enregistrent ensemble :
+//   · journée entière ou horaires précis (cabinets.agenda_journee_entiere) ;
+//   · horaires dans le titre (cabinets.agenda_afficher_horaires) ;
+//   · la base de l'intitulé PAR CRÉNEAU (creneau_modele.libelle_agenda) —
+//     par créneau et non un mot unique pour tout le cabinet : en V3 le
+//     produit gère aussi le planning de JOURNÉE, un mot unique figerait
+//     « garde » pour des créneaux qui n'en seront pas (décision de MiKL,
+//     voir le commentaire de `CreneauModele.libelleAgenda`).
+//
+// ⚠️ ASYMÉTRIE DÉLIBÉRÉE DES DEUX ÉCRITURES CI-DESSOUS — élément à vérifier
+// à l'application de la migration `20260827180000_agenda_google_socle` :
+//   · `creneau_modele` porte une policy RLS `admin_write` (comme
+//     `regles_cabinet`, `equite_cabinet`…) : un `.update()` direct, borné par
+//     `assertAdmin` + `cabinet_id`, est le même chemin que
+//     `admin/structure/actions.ts` prend déjà pour cette table.
+//   · `cabinets` n'a AUCUNE policy UPDATE pour `authenticated` (voir
+//     20260616140000_add_cabinets.sql : « réservées au service_role »).
+//     C'est pour ça que les deux réglages voisins de cet écran
+//     (`configurerPartagesCabinet`, `configurerAdresseCabinet`) passent par
+//     un RPC SECURITY DEFINER plutôt qu'un `.update()`. La migration du
+//     20260827180000 pose les DEUX colonnes `agenda_journee_entiere` /
+//     `agenda_afficher_horaires` mais AUCUN rpc pour les écrire : ce
+//     `.rpc('configurer_agenda_cabinet', …)` suit donc le nom que porterait
+//     un tel RPC s'il existait — IL RESTE À CRÉER (SOCLE ou migration
+//     dédiée) avant que ce bouton fonctionne en base. Tant qu'il manque,
+//     l'appel échoue proprement (Postgrest renvoie une fonction introuvable),
+//     ça ne s'installe pas en silence.
+// ============================================================
+
+/** Un intitulé de créneau à enregistrer. `libelle` vide = on revient au `nom`
+ *  du créneau (NULL en base) — même logique que le nom d'un véto dans
+ *  Google Agenda (`libelle_agenda`, `admin/veterinaires/actions.ts`). */
+export interface LibelleCreneauAEnregistrer {
+  creneauId: string
+  libelle: string
+}
+
+export interface AgendaAffichageFormData {
+  journeeEntiere: boolean
+  afficherHoraires: boolean
+  libellesCreneaux: LibelleCreneauAEnregistrer[]
+}
+
+async function assertAdmin(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<{ error: string } | { ok: true }> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Non authentifié.' }
+  const { data: vet } = await supabase
+    .from('veterinaires')
+    .select('role_app')
+    .eq('user_id', user.id)
+    .single()
+  if (!vet) return { error: 'Non authentifié.' }
+  if ((vet as { role_app: string }).role_app !== 'admin') {
+    return { error: "Action réservée à l'administrateur du cabinet." }
+  }
+  return { ok: true }
+}
+
+/** `''` → `null` (retombe sur `creneau_modele.nom`), sinon la chaîne bornée. */
+function normaliserLibelleCreneau(v: string): string | null {
+  const t = v.trim()
+  return t === '' ? null : t.slice(0, 60)
+}
+
+export async function configurerAgendaAffichage(
+  data: AgendaAffichageFormData,
+): Promise<{ success: true } | { error: string }> {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return { error: garde.error }
+
+  let cabinetId: string
+  try {
+    cabinetId = await resoudreCabinetId(supabase)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
+  }
+
+  // ── 1. Journée entière / horaires précis, et horaires dans le titre ────
+  // Voir l'avertissement en tête de fichier : ce RPC n'existe pas encore.
+  const { error: erreurCabinet } = await supabase.rpc('configurer_agenda_cabinet', {
+    p_journee_entiere: data.journeeEntiere,
+    p_afficher_horaires: data.afficherHoraires,
+  })
+  if (erreurCabinet) return { error: erreurCabinet.message }
+
+  // ── 2. La base de l'intitulé, par créneau ───────────────────────────────
+  // `creneau_modele` a une policy admin_write : direct .update(), borné par
+  // cabinet_id (double barrière avec la RLS, comme le reste du projet) et
+  // profil_id IS NULL — seul le SOCLE porte ce libellé, jamais une période
+  // type qui affine (cf. `chargerCreneauModele`, « le socle donne l'ensemble
+  // des possibilités »).
+  for (const { creneauId, libelle } of data.libellesCreneaux) {
+    const { error } = await supabase
+      .from('creneau_modele')
+      .update({ libelle_agenda: normaliserLibelleCreneau(libelle) })
+      .eq('id', creneauId)
+      .eq('cabinet_id', cabinetId)
+      .is('profil_id', null)
+    if (error) return { error: error.message }
+  }
+
+  revalidatePath('/reglages')
+  return { success: true }
 }

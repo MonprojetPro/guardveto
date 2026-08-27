@@ -92,6 +92,75 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ============================================================
+   PRÉSENTATION DANS GOOGLE AGENDA (2026-08-27)
+   ============================================================
+   Deux interrupteurs, un champ par créneau, et l'aperçu qui compose le
+   VRAI titre en direct (`libelleGarde`) — c'est le cœur de l'écran, pas
+   un ajout discret : d'où plus d'air que les trois cartes de connexion. */
+.agenda-affichage-card { margin-bottom: 26px; }
+.aa-body {
+  padding: 14px 18px 18px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.aa-interrupteurs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  gap: 12px 20px;
+}
+/* La case, comme « dernier recours » sur la fiche véto (même famille
+   d'interaction dans le projet) : pas de nouveau composant interrupteur,
+   une checkbox stylée et accessible au clavier suffit. */
+.aa-switch {
+  display: flex; align-items: flex-start; gap: 10px;
+  cursor: pointer;
+}
+.aa-switch input {
+  width: 18px; height: 18px; flex: none; margin-top: 2px;
+  accent-color: var(--t-accent);
+}
+.aa-switch span { display: flex; flex-direction: column; gap: 2px; }
+.aa-switch b { font-size: 0.86rem; font-weight: 700; }
+.aa-switch small { font-size: 0.76rem; color: var(--t-muted); line-height: 1.45; }
+
+.aa-vide { font-size: 0.86rem; color: var(--t-muted); line-height: 1.6; }
+
+.aa-creneaux {
+  display: flex; flex-direction: column; gap: 12px;
+  padding-top: 14px; border-top: 1px solid var(--t-border);
+}
+.aa-creneaux-lede { font-size: 0.78rem; color: var(--t-muted); line-height: 1.5; }
+.aa-creneau-ligne {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(200px, 1.2fr);
+  gap: 10px 16px;
+  align-items: end;
+}
+.aa-creneau-champ label { font-size: 0.82rem; font-weight: 600; }
+/* L'APERÇU N'EST PAS DÉCORATIF : c'est la vérification que l'admin cherche
+   avant même de lire l'aide — « qu'est-ce que ça va donner ». */
+.aa-apercu {
+  display: flex; flex-direction: column; gap: 4px;
+  background: var(--surface-2);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
+  min-height: 42px;
+  justify-content: center;
+}
+.aa-apercu-label {
+  font-size: 0.64rem; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--t-muted);
+}
+.aa-apercu-titre {
+  font-family: 'Consolas', 'Menlo', monospace;
+  font-size: 0.86rem; color: var(--text); font-weight: 700;
+  word-break: break-all;
+}
+@media (max-width: 560px) {
+  .aa-creneau-ligne { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
    JOURNAL DES E-MAILS
    ============================================================ */
 .mail-card { margin-bottom: 26px; }

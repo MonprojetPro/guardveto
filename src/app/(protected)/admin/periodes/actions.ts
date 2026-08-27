@@ -5,7 +5,11 @@ import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { revalidatePath } from 'next/cache'
 import { refusSiBloquant } from '@/data/controleImpact'
 import { periodeFr, dateFrSansJour } from '@/lib/dates-fr'
-import { retirerEvenementsAvecBilan } from '@/lib/sync-calendrier'
+import {
+  retirerEvenementsAvecBilan,
+  idsEvenementsDePeriode,
+  idsEvenementsDeGardes,
+} from '@/lib/sync-calendrier'
 import { isGoogleCalendarConfigured, agendaDeRepliPour } from '@/lib/google-calendar'
 import { creerNotification, contenuPlanningRetire } from '@/lib/notifications-inapp'
 import { executerRetraitPlanning } from '@/lib/planning/retrait-planning'
@@ -376,7 +380,16 @@ export async function bilanRetraitPlanning(
   }[]
 
   const gardeIds = gardes.map((g) => g.id)
-  const nbEvenementsAgenda = gardes.filter((g) => g.google_event_id).length
+
+  // ⚠️ LES DEUX SOURCES, et ce compteur-ci compte plus que les autres : il est
+  // AFFICHÉ À L'ADMIN avant qu'elle ne confirme une suppression. Annoncer
+  // « 20 rendez-vous » quand l'agenda en porte 56 n'est pas une imprécision,
+  // c'est une fausse assurance sur un geste irréversible — pire qu'aucun
+  // chiffre, parce qu'un chiffre faux ne se questionne pas.
+  const nbEvenementsAgenda = new Set([
+    ...gardes.map((g) => g.google_event_id).filter((id): id is string => Boolean(id)),
+    ...(await idsEvenementsDeGardes(supabase as SupabaseClient, gardeIds)),
+  ]).size
   const nbVetosConcernes = new Set(
     gardes.flatMap((g) => [g.premier_id, g.second_id]).filter(Boolean) as string[],
   ).size
@@ -468,19 +481,22 @@ async function calendarIdDuCabinet(
   return (val ?? '').trim() || agendaDeRepliPour(cabinetId)
 }
 
-/** Les identifiants de rendez-vous portés par les gardes d'un planning. */
+/**
+ * Les identifiants de rendez-vous portés par les gardes d'un planning.
+ *
+ * ⚠️ Délègue à `idsEvenementsDePeriode`, qui lit les DEUX sources depuis B-079 :
+ * `gardes.google_event_id` (ancien format, un événement par garde) ET
+ * `garde_evenements` (un par personne et par jour). Cette fonction ne lisait que
+ * la première ; elle serait devenue aveugle à l'immense majorité des événements,
+ * et la dépublication aurait laissé dans l'agenda de sept personnes des gardes
+ * que plus rien ne pouvait retirer — exactement l'incident Val d'Allier, mais
+ * sans le moyen de le réparer.
+ */
 async function eventIdsDuPlanning(
   supabase: SupabaseClient<any, any, any>,
   periodeId: string,
 ): Promise<string[]> {
-  const { data } = await supabase
-    .from('gardes')
-    .select('google_event_id')
-    .eq('periode_id', periodeId)
-    .not('google_event_id', 'is', null)
-  return ((data ?? []) as { google_event_id: string | null }[])
-    .map((g) => g.google_event_id)
-    .filter((id): id is string => Boolean(id))
+  return idsEvenementsDePeriode(supabase as SupabaseClient, periodeId)
 }
 
 /** La trace : qui, quand, quel planning, combien de gardes. */
@@ -733,6 +749,23 @@ export async function depublierPeriode(periodeId: string) {
         .update({ google_event_id: null })
         .eq('periode_id', periodeId)
       if (majGardes) return { error: majGardes.message }
+
+      // Et la seconde source (B-079), pour la même raison exactement. L'oublier
+      // laisserait la republication tenter de mettre à jour 56 identifiants
+      // morts — chacun renvoyant une erreur, sur un chemin déjà contraint par
+      // le rate-limit Google.
+      const { data: gardesPeriode } = await supabase
+        .from('gardes')
+        .select('id')
+        .eq('periode_id', periodeId)
+      const idsGardes = ((gardesPeriode ?? []) as { id: string }[]).map((g) => g.id)
+      if (idsGardes.length > 0) {
+        const { error: majEvenements } = await supabase
+          .from('garde_evenements')
+          .delete()
+          .in('garde_id', idsGardes)
+        if (majEvenements) return { error: majEvenements.message }
+      }
 
       const { error } = await supabase
         .from('periodes')

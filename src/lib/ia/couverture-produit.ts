@@ -172,6 +172,18 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
 
   // ── LES RÉGLAGES ET LE COMPTE ───────────────────────────────────────────
   'v2/reglages#envoyerEmailDeTest': { outil: 'envoyer_email_de_test' },
+  // Chantier agenda Google (2026-08-27) — réglage de PRÉSENTATION pure
+  // (journée entière vs horaires, horaires dans le titre, intitulé par
+  // créneau) : ça ne change ni un droit, ni une donnée métier, ni le
+  // planning lui-même — seulement la mise en forme d'un événement dans un
+  // agenda externe. Aucune situation où un cabinet formulerait ça comme une
+  // demande en conversation (contrairement à « branche mon agenda » ou
+  // « mets telle adresse d'expédition », qui SONT des outils) : c'est un
+  // réglage qu'on ouvre l'écran pour composer à l'œil, avec l'aperçu en
+  // direct — pas un geste qu'on décrit avec des mots.
+  'v2/reglages#configurerAgendaAffichage': {
+    hors: 'Réglage de présentation de l’agenda Google (journée entière, horaires dans le titre, intitulé par créneau) : composition visuelle à l’œil sur l’écran Réglages, jamais une demande formulée en conversation. Sans effet sur le planning, les droits ou une donnée métier.',
+  },
   'protected/preferences#setColonnesCompteurs': {
     hors: 'Préférence d’affichage personnelle, sans effet sur le cabinet.',
   },
