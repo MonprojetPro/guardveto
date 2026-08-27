@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { refusSiBloquant } from '@/data/controleImpact'
 import type { Impact } from '@/data/controleImpact'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
+import { exigerIdentite } from '@/lib/identite'
 import { revalidatePath } from 'next/cache'
 import { sendBrevoEmail, emailCongeValide, emailCongeRefuse } from '@/lib/brevo'
 import { adresseUtilisable } from '@/lib/emails/destinataire'
@@ -143,6 +144,11 @@ export async function createConge(
     commentaire: data.commentaire || null,
     saisi_par,
     valide_par: isAdmin ? saisi_par : null,
+    // Un congé posé par l'administratrice naît validé : la décision est prise
+    // au même instant que la demande. Le laisser NULL ferait apparaître un
+    // congé « validé, on ne sait quand » — l'ambiguïté que `decide_le` existe
+    // justement pour lever.
+    decide_le: isAdmin ? new Date().toISOString() : null,
   })
 
   if (error) return { error: error.message }
@@ -279,7 +285,14 @@ export async function validerConge(
     }
   }
 
-  const update: Record<string, unknown> = { statut: 'valide', valide_par }
+  // `decide_le` date le TRAITEMENT, pas l'arrivée de la demande (`created_at`).
+  // Sans lui, une demande déposée le 3 et validée le 27 n'avait qu'une date —
+  // et c'était la mauvaise pour répondre à « depuis quand attend-elle ? ».
+  const update: Record<string, unknown> = {
+    statut: 'valide',
+    valide_par,
+    decide_le: new Date().toISOString(),
+  }
   if (date_debut) update.date_debut = date_debut
   if (date_fin) update.date_fin = date_fin
 
@@ -371,9 +384,30 @@ export async function refuserConge(id: string, raison?: string) {
     .eq('id', id)
     .single()
 
+  // ⚠️ QUI a refusé n'était écrit NULLE PART. `valide_par` était renseigné à la
+  // validation et laissé vide au refus : un « non » restait anonyme, alors que
+  // c'est précisément la décision dont on redemande la raison des mois après.
+  //
+  // L'identité est résolue ICI, côté serveur, et pas reçue en paramètre comme
+  // le fait `validerConge` : le client n'a pas à déclarer qui il est pour
+  // signer une décision. Best-effort — une identité irrésolue ne doit pas
+  // empêcher un refus, elle laisse seulement la signature vide.
+  let decidePar: string | null = null
+  try {
+    const identite = await exigerIdentite(supabase)
+    decidePar = identite.genre === 'veto' ? identite.veto.id : null
+  } catch {
+    decidePar = null
+  }
+
   const { error } = await supabase
     .from('conges')
-    .update({ statut: 'refuse', raison_refus: raison ?? null })
+    .update({
+      statut: 'refuse',
+      raison_refus: raison ?? null,
+      valide_par: decidePar,
+      decide_le: new Date().toISOString(),
+    })
     .eq('id', id)
 
   if (error) return { error: error.message }

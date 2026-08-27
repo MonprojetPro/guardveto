@@ -91,6 +91,11 @@
 .row-line b { font-weight: 700; }
 .row-dates { font-size: 0.82rem; color: var(--t-muted); margin-top: 2px; }
 .row-motif { font-size: 0.82rem; color: var(--t-muted); font-style: italic; margin-top: 3px; }
+/* L'historique de la demande : plus petit que les dates du congé lui-même.
+   C'est une trace, pas l'information principale — les dates de congé restent
+   ce qu'on vient lire, l'horodatage répond à « depuis quand ça attend ? »
+   quand on se pose la question. */
+.row-histo { font-size: 0.74rem; color: var(--t-muted); margin-top: 4px; opacity: 0.85; }
 .row-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; margin-left: auto; }
 .row-actions { display: flex; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
 
@@ -206,11 +211,25 @@
 .vet-filter:hover { border-color: var(--accent-ink); color: var(--accent-ink); }
 .vet-filter[aria-pressed="true"] { background: var(--t-accent); border-color: var(--t-accent); color: #fff; }
 .vet-filter[aria-pressed="true"] i { background: #fff; }
+/* ⚠️ Ce sélecteur visait le `<select>` NATIF de l'onglet Congés, retiré le
+   2026-08-27 (B-067) au profit du composant maison — le natif est interdit sur
+   ce projet, et cet écran était le dernier à en avoir un. La règle reste : elle
+   ne coûte rien et rattraperait un natif réintroduit par mégarde. */
 .filters select {
   font-family: var(--font-body); font-size: 0.82rem; font-weight: 600;
   color: var(--text); background: var(--surface);
   border: 1px solid var(--border-strong); border-radius: 999px;
   padding: 7px 12px; min-height: 36px;
+}
+
+/* La barre de tri, en tête de l'onglet : elle commande les DEUX listes, donc
+   elle se pose AVANT elles et non dans l'une des deux. Même matière que
+   `.filters` pour qu'on lise les deux barres comme une même famille de
+   commandes, mais sans son fond plein — celui-ci appartient à une carte, et
+   cette barre-ci flotte au-dessus d'elles. */
+.tri-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+  padding: 0 4px 14px;
 }
 .vet-filter b {
   font-family: var(--font-display); font-weight: 800;

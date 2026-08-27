@@ -92,3 +92,50 @@ export function periodeFr(debut: string, fin: string): string {
   }
   return `du ${dateFrSansJour(debut)} au ${dateFrSansJour(fin)}`
 }
+
+/**
+ * « 12 août à 14:32 » — un INSTANT, pas un jour.
+ *
+ * Les autres fonctions de ce module tronquent volontairement à la date et
+ * calent à midi UTC : elles décrivent des JOURS de garde ou de congé, où
+ * l'heure n'existe pas. Un horodatage est autre chose — « quand cette demande
+ * est-elle arrivée », « quand a-t-elle été tranchée » — et l'heure y compte :
+ * deux demandes du même jour ne se départagent que par elle.
+ *
+ * ⚠️ Fuseau `Europe/Paris` explicite, jamais celui du navigateur. Le cabinet
+ * et son serveur ne sont pas au même endroit, et une décision prise à 00:30 à
+ * Paris s'afficherait la veille pour qui consulte depuis un autre fuseau.
+ *
+ * L'année n'apparaît que si l'instant ne tombe pas dans l'année en cours :
+ * « 12 août à 14:32 » se lit d'un coup d'œil, « 12 août 2026 à 14:32 » ajoute
+ * du bruit onze mois sur douze — mais l'omettre sur une demande de l'an
+ * dernier laisserait croire qu'elle est récente.
+ */
+export function horodatageFr(iso: string, maintenant: Date = new Date()): string {
+  const t = (iso ?? '').trim()
+  if (!t) return ''
+  const d = new Date(t)
+  if (Number.isNaN(d.getTime())) return iso
+
+  const anneeCourante = new Intl.DateTimeFormat('fr-FR', {
+    year: 'numeric',
+    timeZone: 'Europe/Paris',
+  }).format(maintenant)
+  const anneeCible = new Intl.DateTimeFormat('fr-FR', {
+    year: 'numeric',
+    timeZone: 'Europe/Paris',
+  }).format(d)
+
+  const jour = d.toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+    ...(anneeCible === anneeCourante ? {} : { year: 'numeric' }),
+    timeZone: 'Europe/Paris',
+  })
+  const heure = d.toLocaleTimeString('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Europe/Paris',
+  })
+  return `${jour} à ${heure}`
+}

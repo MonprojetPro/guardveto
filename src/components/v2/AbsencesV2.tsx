@@ -28,6 +28,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+// Le `Select` MAISON — le `<select>` natif est interdit sur ce projet.
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { CongeForm } from '@/components/conges/CongeForm'
 import { deleteConge } from '@/app/(protected)/conges/actions'
 import { ValiderCongeDialog } from '@/components/conges/ValiderCongeDialog'
@@ -45,6 +47,10 @@ import type { CreneauImpacte } from '@/lib/crise/contexte'
 import type { VerdictSouhait } from '@/lib/conges/detection-conflit'
 import type { Conge, TypeConge, Veterinaire } from '@/types'
 import { stylePastilleVar, stylePointVar } from '@/lib/couleurs'
+import { horodatageFr } from '@/lib/dates-fr'
+// Le tri vit dans `lib/` : c'est de la logique pure, testable sans monter un
+// composant, et la V1 pourra s'en servir si elle en a besoin un jour.
+import { comparerConges, LIBELLE_TRI_CONGES, type TriConges } from '@/lib/conges/tri'
 
 type Onglet = 'conges' | 'echanges' | 'depannages'
 
@@ -99,6 +105,37 @@ function dateLongue(iso: string) {
 
 function nbJours(debut: string, fin: string) {
   return Math.round((Date.parse(fin) - Date.parse(debut)) / 86_400_000) + 1
+}
+
+/**
+ * L'HISTORIQUE d'une demande, en une phrase — « Demandé le 12 août à 14:32 ·
+ * Validé le 14 août à 09:10 par Anne-Sophie ».
+ *
+ * Ces informations existaient en base depuis le premier jour (`created_at`,
+ * `saisi_par`, `valide_par`) et n'étaient affichées NULLE PART : elles étaient
+ * écrites à chaque demande et à chaque décision, et lues par personne (B-066).
+ *
+ * ⚠️ Une décision sans `decide_le` reste MUETTE sur sa date. C'est le cas de
+ * toutes celles prises avant le 2026-08-27 : la date n'est pas reconstituable,
+ * et servir `created_at` à la place daterait la décision du jour de la demande
+ * — un chiffre faux s'affiche avec le même aplomb qu'un vrai (arbitrage MiKL).
+ * On dit alors « Validé » sans quand, ce qui est exactement ce qu'on sait.
+ */
+function historiqueDemande(
+  c: Conge,
+  nomDe: (id: string | null) => string | null,
+): string | null {
+  const parts: string[] = []
+  if (c.created_at) parts.push(`Demandé le ${horodatageFr(c.created_at)}`)
+
+  if (c.statut !== 'souhait') {
+    const verbe = c.statut === 'valide' ? 'Validé' : 'Refusé'
+    const quand = c.decide_le ? ` le ${horodatageFr(c.decide_le)}` : ''
+    const qui = nomDe(c.valide_par)
+    parts.push(`${verbe}${quand}${qui ? ` par ${qui}` : ''}`)
+  }
+
+  return parts.length > 0 ? parts.join(' · ') : null
 }
 
 /** « Du lundi 16 au dimanche 22 mars 2026 · 7 jours », ou le jour seul. */
@@ -197,20 +234,43 @@ export function AbsencesV2({
   const [repareConflit, setRepareConflit] = useState(false)
   const [filtreVet, setFiltreVet] = useState('tous')
   const [filtreType, setFiltreType] = useState('tous')
+  // Le défaut reprend l'ordre le plus utile au quotidien : le congé le plus
+  // proche d'abord — c'est celui sur lequel on agit.
+  const [tri, setTri] = useState<TriConges>('chrono')
 
   const parVet = useMemo(() => new Map(vets.map((v) => [v.id, v])), [vets])
+
+  /**
+   * Le prénom de qui a tranché, ou `null`.
+   *
+   * `null` dans deux cas qu'il ne faut PAS confondre à l'écriture : personne
+   * n'est enregistré (décision d'avant que le refus signe, cf. B-066), ou la
+   * personne n'est plus dans l'équipe visible. Dans les deux, on préfère taire
+   * l'auteur plutôt qu'écrire « par Vétérinaire », qui n'apprend rien et donne
+   * l'illusion d'une traçabilité.
+   */
+  const nomDe = useMemo(
+    () => (id: string | null) => (id ? (parVet.get(id)?.prenom ?? null) : null),
+    [parVet],
+  )
 
   const vetDuConflit = conflit ? parVet.get(conflit.veterinaire_id) : undefined
   const nomConflit = vetDuConflit
     ? `${vetDuConflit.prenom} ${vetDuConflit.nom}`.trim()
     : 'Cette vétérinaire'
 
+  /** Le prénom, jamais vide : un tri ne doit pas dépendre d'une jointure ratée. */
+  const prenomDe = useMemo(
+    () => (id: string) => parVet.get(id)?.prenom ?? 'zzz',
+    [parVet],
+  )
+
   const souhaits = useMemo(
     () =>
       conges
         .filter((c) => c.statut === 'souhait')
-        .sort((a, b) => a.created_at.localeCompare(b.created_at)),
-    [conges],
+        .sort((a, b) => comparerConges(tri, a, b, prenomDe)),
+    [conges, tri, prenomDe],
   )
 
   // PÉRIMÈTRE DE LECTURE — aligné sur la V1 (`CongesList.tsx:101-105`), qui
@@ -227,8 +287,8 @@ export function AbsencesV2({
     const visibles = isAdmin ? conges : conges.filter((c) => c.veterinaire_id === moiId)
     return visibles
       .filter((c) => (isAdmin ? c.statut !== 'souhait' : true))
-      .sort((a, b) => b.date_debut.localeCompare(a.date_debut))
-  }, [conges, isAdmin, moiId])
+      .sort((a, b) => comparerConges(tri, a, b, prenomDe))
+  }, [conges, isAdmin, moiId, tri, prenomDe])
 
   const traitesFiltres = traites.filter(
     (c) =>
@@ -314,6 +374,37 @@ export function AbsencesV2({
       {/* ── Onglet 1 · les congés ───────────────────────────── */}
       {onglet === 'conges' && (
         <section className="tab-panel" role="tabpanel">
+          {/* LE TRI EST EN TÊTE parce qu'il commande les DEUX listes de
+              l'onglet — les souhaits en attente comme les congés traités.
+              Le poser dans l'un des deux blocs aurait laissé croire qu'il ne
+              range que celui-là.
+
+              C'est aussi ce qui règle une incohérence ancienne : les deux
+              listes suivaient des ordres OPPOSÉS (arrivée croissante en haut,
+              date de congé décroissante en bas) sans que rien ne le dise. Il
+              n'y a plus qu'un ordre à l'écran, et il est nommé. */}
+          <div className="tri-bar">
+            <span className="f-label">Trier</span>
+            <Select value={tri} onValueChange={(v) => v && setTri(v as TriConges)}>
+              <SelectTrigger aria-label="Ordre des listes de congés">
+                {LIBELLE_TRI_CONGES[tri]}
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(LIBELLE_TRI_CONGES) as TriConges[])
+                  // « Par vétérinaire » n'a aucun sens pour un vétérinaire :
+                  // il ne voit que ses propres congés, la liste serait
+                  // simplement triée par date. Une option qui ne fait rien est
+                  // pire qu'une option absente.
+                  .filter((t) => isAdmin || t !== 'vet')
+                  .map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {LIBELLE_TRI_CONGES[t]}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {isAdmin && (
             <section className="card" aria-label="Souhaits de congé en attente">
               <div className="card-head">
@@ -352,6 +443,13 @@ export function AbsencesV2({
                             </p>
                             <p className="row-dates">{periodeLisible(c)}</p>
                             {c.commentaire && <p className="row-motif">« {c.commentaire} »</p>}
+                            {/* Depuis quand cette demande attend-elle ? La
+                                question se pose à chaque coup d'œil du matin,
+                                et la réponse était en base sans être nulle
+                                part à l'écran (B-066). */}
+                            {historiqueDemande(c, nomDe) && (
+                              <p className="row-histo">{historiqueDemande(c, nomDe)}</p>
+                            )}
                           </div>
                           <div className="row-side">
                             <VerdictConflit verdict={verdicts[c.id]} />
@@ -422,20 +520,29 @@ export function AbsencesV2({
                       {v.prenom} · {compteParVet.get(v.id)}
                     </button>
                   ))}
-                <select
+                {/* ⚠️ Le composant maison, PAS un `<select>` natif : le projet
+                    l'interdit, et cet écran était le seul à en avoir gardé un
+                    (la V1 utilisait pourtant déjà le bon). Trouvé en traitant
+                    B-067. */}
+                <Select
                   value={filtreType}
-                  onChange={(e) => setFiltreType(e.target.value)}
-                  aria-label="Filtrer par type de congé"
+                  onValueChange={(v) => v && setFiltreType(v)}
                 >
-                  <option value="tous">Tous les types</option>
-                  {(Object.keys(LIBELLE_TYPE) as TypeConge[]).map((t) => (
-                    <option key={t} value={t}>
-                      {LIBELLE_TYPE[t]}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger aria-label="Filtrer par type de congé">
+                    {filtreType === 'tous' ? 'Tous les types' : LIBELLE_TYPE[filtreType as TypeConge]}
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="tous">Tous les types</SelectItem>
+                    {(Object.keys(LIBELLE_TYPE) as TypeConge[]).map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {LIBELLE_TYPE[t]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
+
 
             {traitesFiltres.length === 0 ? (
               <p className="empty-row">
@@ -466,6 +573,9 @@ export function AbsencesV2({
                           <p className="row-dates">{periodeLisible(c)}</p>
                           {c.statut === 'refuse' && c.raison_refus && (
                             <p className="row-motif">Refusé : « {c.raison_refus} »</p>
+                          )}
+                          {historiqueDemande(c, nomDe) && (
+                            <p className="row-histo">{historiqueDemande(c, nomDe)}</p>
                           )}
                         </div>
                         <div className="row-side">

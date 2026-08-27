@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { dateFr, dateFrCourte, dateFrSansJour, periodeFr } from '@/lib/dates-fr'
+import { dateFr, dateFrCourte, dateFrSansJour, periodeFr, horodatageFr } from '@/lib/dates-fr'
 
 describe('dates-fr — aucune date ISO ne doit atteindre un écran', () => {
   it('écrit une date en toutes lettres', () => {
@@ -47,5 +47,44 @@ describe('dates-fr — aucune date ISO ne doit atteindre un écran', () => {
   it('rend une valeur illisible telle quelle plutôt que de l’effacer', () => {
     expect(dateFr('pas-une-date')).toBe('pas-une-date')
     expect(dateFr('')).toBe('')
+  })
+
+  // ── horodatageFr : un INSTANT, pas un jour (B-066) ──────────
+  // Les autres fonctions de ce module décrivent des jours de garde ou de congé,
+  // où l'heure n'existe pas. Un horodatage répond à « quand cette demande
+  // est-elle arrivée » — et deux demandes du même jour ne se départagent que
+  // par l'heure.
+  describe('horodatageFr', () => {
+    const MAINTENANT = new Date('2026-08-27T10:00:00Z')
+
+    it('donne le jour ET l’heure', () => {
+      // 12:32 UTC = 14:32 à Paris en août (UTC+2).
+      expect(horodatageFr('2026-08-12T12:32:00Z', MAINTENANT)).toBe('12 août à 14:32')
+    })
+
+    it('tait l’année quand c’est l’année en cours, et la dit sinon', () => {
+      // « 12 août à 14:32 » se lit d'un coup d'œil onze mois sur douze ; mais
+      // omettre l'année sur une demande de l'an dernier la ferait passer pour
+      // récente — exactement le genre de silence qui trompe.
+      expect(horodatageFr('2026-08-12T12:32:00Z', MAINTENANT)).not.toContain('2026')
+      expect(horodatageFr('2025-08-12T12:32:00Z', MAINTENANT)).toContain('2025')
+    })
+
+    it('affiche l’heure de PARIS, pas celle d’UTC', () => {
+      // ⚠️ Le piège réel : une décision prise à 00:30 à Paris est à 22:30 UTC
+      // la VEILLE. Sans fuseau explicite, elle se serait affichée au mauvais
+      // jour pour qui consulte depuis un serveur en UTC.
+      expect(horodatageFr('2026-08-11T22:30:00Z', MAINTENANT)).toBe('12 août à 00:30')
+    })
+
+    it('tient compte de l’heure d’hiver', () => {
+      // Janvier : Paris est à UTC+1, pas +2. Un décalage figé se serait vu ici.
+      expect(horodatageFr('2026-01-15T12:00:00Z', MAINTENANT)).toContain('13:00')
+    })
+
+    it('rend une valeur illisible telle quelle, et le vide reste vide', () => {
+      expect(horodatageFr('pas-un-instant', MAINTENANT)).toBe('pas-un-instant')
+      expect(horodatageFr('', MAINTENANT)).toBe('')
+    })
   })
 })

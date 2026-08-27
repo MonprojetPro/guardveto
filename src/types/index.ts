@@ -140,8 +140,17 @@ export interface Conge {
   commentaire: string | null
   raison_refus: string | null
   saisi_par: string | null
+  /** Qui a tranché — validation OU refus. Le nom dit « valide » par héritage. */
   valide_par: string | null
+  /** Quand la demande a été DÉPOSÉE. Ne date pas son traitement. */
   created_at: string
+  /**
+   * Quand la demande a été validée ou refusée. `null` = encore en attente, ou
+   * décision prise avant le 2026-08-27 (elle n'est pas reconstituable, et on
+   * ne la remplace jamais par `created_at` : une date fausse s'affiche avec le
+   * même aplomb qu'une vraie).
+   */
+  decide_le: string | null
 }
 
 export interface ContrainteVeto {
