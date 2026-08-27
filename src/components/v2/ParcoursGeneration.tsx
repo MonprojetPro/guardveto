@@ -538,10 +538,20 @@ export function ParcoursGeneration({
   /**
    * ③bis — B-062. Filou relit le planning qui vient d'être enregistré.
    *
-   * Lancée APRÈS la génération, jamais pendant : le planning est déjà en base,
-   * donc un échec de la relecture ne peut rien lui retirer. Elle n'est pas
-   * attendue par `lancer` (`void`) — le résultat de génération s'affiche tout
-   * de suite, et le rapport de Filou arrive quand il arrive.
+   * ── B-074 : ELLE SE DÉROULE DANS LE PARCOURS, PAS APRÈS ────────────────
+   *
+   * La première version rendait la main dès le résultat et laissait Filou
+   * travailler en arrière-plan. MiKL, 27/08 : « tu livres quelque chose, puis
+   * il y a un temps d'attente long avec juste une petite roue qui tourne, et
+   * **la personne peut fermer avant d'avoir vu la conclusion** ».
+   *
+   * Il a raison, et le défaut est de conception, pas d'affichage : un parcours
+   * qui rend la main pendant qu'il travaille encore annonce une fin qui n'en
+   * est pas une. `lancer` l'ATTEND donc désormais, et l'écran d'attente
+   * raconte ses étapes dans le même style que celles du moteur.
+   *
+   * Ce que ça ne change pas : le planning est déjà écrit en base quand elle
+   * commence, donc un échec de Filou ne peut toujours rien lui retirer.
    */
   async function lancerRelecture(periodeId: string) {
     setRelecture(null)
@@ -553,7 +563,13 @@ export function ParcoursGeneration({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ periodeId }),
       })
-      const data = await lireLeFlux(res, setEtapeRelecture)
+      // Les étapes de Filou passent par le MÊME canal que celles du moteur :
+      // l'écran d'attente ne fait pas la différence, et l'admin voit un seul
+      // travail qui se poursuit plutôt que deux traitements qui se succèdent.
+      const data = await lireLeFlux(res, (m) => {
+        setEtapeRelecture(m)
+        setEtapeMoteur(m)
+      })
       const statut = typeof data.__status === 'number' ? data.__status : (res.ok ? 200 : res.status)
 
       if (statut >= 400 || data.issue === 'indisponible') {
@@ -633,6 +649,11 @@ export function ParcoursGeneration({
       }
 
       if (data.success) {
+        // B-074 — on ATTEND Filou avant d'afficher quoi que ce soit. Rendre la
+        // main ici puis continuer à travailler laissait l'admin fermer l'écran
+        // avant la conclusion. Le planning est déjà en base : attendre ne
+        // risque rien, ça évite seulement d'annoncer une fin prématurée.
+        await lancerRelecture(cible)
         setResultat({
           ok: true,
           issue: 'complet',
@@ -641,10 +662,11 @@ export function ParcoursGeneration({
           creneauxIgnores: (data.creneauxIgnores ?? []) as CreneauIgnore[],
         })
         router.refresh()
-        void lancerRelecture(cible)
       } else if (data.issue === 'partiel') {
         // B-053 — le planning EST écrit. On ne repart pas les mains vides :
         // il reste des cases à pourvoir, et on dit lesquelles.
+        // B-074 — et c'est le cas où Filou sert le plus : on l'attend aussi.
+        await lancerRelecture(cible)
         setResultat({
           ok: false,
           issue: 'partiel',
@@ -656,10 +678,6 @@ export function ParcoursGeneration({
           interrompu: data.interrompu === true,
         })
         router.refresh()
-        // Un planning partiel se relit AUSSI — c'est même le cas où Filou sert
-        // le plus : les cases vides sont le premier endroit où un regard neuf
-        // peut trouver quelque chose que l'ordre de remplissage a manqué.
-        void lancerRelecture(cible)
       } else if (data.interrompu) {
         setResultat({
           ok: false,
@@ -1221,25 +1239,12 @@ export function ParcoursGeneration({
         {/* ── ④ Le résultat ─────────────────────────────── */}
         {etape === 'resultat' && resultat && (
           <div className="gp-resultat">
-            {/* ── B-062 · CE QUE FILOU EST EN TRAIN DE FAIRE ──────────────
-                EN HAUT, et pas seulement avec son rapport tout en bas.
-                Recette de MiKL, 27/08 : « le message de Filou est apparu bien
-                plus tard sans que je sois averti qu'il était en train de faire
-                quelque chose ». L'annonce existait — sous plusieurs écrans de
-                cases à pourvoir, donc hors de vue. Une information de
-                progression qu'il faut aller chercher n'informe personne. */}
-            {resultat.issue !== 'echec' && relectureEnCours && (
-              <p className="rl-annonce">
-                <span className="rl-rotor" aria-hidden />
-                {etapeRelecture ?? 'Filou relit le planning…'}{' '}
-                <span className="rl-annonce-ou">Son avis s’affichera en bas de cette page.</span>
-              </p>
-            )}
-            {resultat.issue !== 'echec' && relecture && (
-              <p className="rl-annonce rl-annonce-prete">
-                Filou a fini sa relecture — son avis est en bas de cette page.
-              </p>
-            )}
+            {/* ── B-074 · plus d'annonce d'attente ici ────────────────────
+                Elle n'a plus lieu d'être : depuis que le parcours ATTEND la
+                relecture avant d'afficher le résultat, l'avis de Filou est
+                déjà présent quand cet écran apparaît. Annoncer « son avis
+                s'affichera plus bas » quand il est déjà écrit plus bas serait
+                du bruit. L'attente, elle, se raconte pendant l'étape ③. */}
 
             {/* ── B-053 · PARTIEL : le planning existe, il lui manque des cases ── */}
             {resultat.issue === 'partiel' ? (

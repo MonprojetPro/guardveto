@@ -39,7 +39,10 @@ export interface LigneRelecture {
 export interface LigneRevue {
   critere: string
   verdict: 'probleme' | 'a_surveiller' | 'rien_a_signaler'
+  /** UNE phrase courte — la seule ligne qui sera lue à coup sûr. */
   constat: string
+  /** Le reste : dates, historique, comparaisons. Replié. */
+  detail?: string
   corrigeable: boolean
 }
 
@@ -196,10 +199,20 @@ export function RapportRelecture({ donnees }: { donnees: DonneesRelecture }) {
             <Eye className="rl-ico" aria-hidden />
             Ce que Filou a relevé
           </p>
+          {/* Une phrase par point, le reste replié. MiKL, 27/08 : « beaucoup
+              trop long, trop de détails, pas bien présenté ». Le fond était
+              juste — c'est le mur de texte qui rendait le rapport illisible,
+              et un rapport qu'on n'a pas envie de lire ne sert à personne. */}
           <ul className="rl-liste">
             {aVoir.map((r, i) => (
               <li key={i} className={`rl-item rl-verdict-${r.verdict}`}>
                 <p className="rl-constat">{r.constat}</p>
+                {r.detail && (
+                  <details className="rl-plus">
+                    <summary>Le détail</summary>
+                    <p>{r.detail}</p>
+                  </details>
+                )}
                 <p className="rl-meta">
                   {r.critere}
                   {!r.corrigeable ? ' · il ne voit pas de correction automatique' : ''}
@@ -231,6 +244,8 @@ export function RapportRelecture({ donnees }: { donnees: DonneesRelecture }) {
           </ul>
         </details>
       )}
+      {/* Le détail des points sans problème n'est jamais affiché : celui qui
+          ouvre ce bloc veut vérifier que ça a été regardé, pas tout relire. */}
 
       {revue.length === 0 && (
         <p className="rl-rien">

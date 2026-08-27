@@ -2472,3 +2472,16 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 
 /* Un angle mort n'est pas une bonne nouvelle : il se signale. */
 .rl-manquant { color: var(--warn); font-style: normal; }
+
+/* -- B-073 · Le détail se replie ------------------------------------------
+   MiKL, 27/08 : « beaucoup trop long, trop de détails, pas bien présenté, à
+   vomir ». Le fond était juste — c'est le mur de texte qui rendait le rapport
+   illisible. Une phrase par point, et le reste ici, sous un clic. */
+.rl-plus { margin-top: 5px; }
+.rl-plus summary {
+  font-size: 0.73rem; color: var(--soft); cursor: pointer;
+}
+.rl-plus p {
+  font-size: 0.78rem; line-height: 1.5; color: var(--t-muted); margin-top: 4px;
+  padding-left: 10px; border-left: 2px solid var(--t-border);
+}

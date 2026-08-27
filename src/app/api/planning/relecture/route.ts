@@ -310,6 +310,33 @@ async function executerRelecture(
 
   // ── Le rapport ──
   const prenomParId = new Map(contexte.vets.map((v) => [v.id, v.prenom]))
+
+  /**
+   * Remplace tout identifiant technique par le prénom qu'il désigne.
+   *
+   * ⚠️ Les messages du validateur sont écrits pour un développeur : ils citent
+   * les vétérinaires par leur identifiant. Affichés tels quels, ils donnaient
+   * « le duo WE [00000000-0000-0000-0000-000000000006] diffère du duo vendredi
+   * soir » — vu par MiKL le 27/08.
+   *
+   * C'est le défaut B-023, déjà payé le 26/08 sur l'écran des règles. La
+   * traduction se fait ICI, à la frontière entre le moteur et l'écran, plutôt
+   * que dans le validateur : celui-ci doit rester lisible par un développeur
+   * qui débogue, et c'est l'affichage qui doit parler français.
+   */
+  const enFrancais = (texte: string): string => {
+    let sortie = texte
+    for (const [id, prenom] of prenomParId) {
+      // Avec et sans crochets : le validateur emploie les deux formes.
+      sortie = sortie.split(`[${id}]`).join(prenom).split(id).join(prenom)
+    }
+    // Un identifiant qui n'appartient à personne de l'équipe (véto retiré,
+    // donnée orpheline) ne doit pas rester à l'écran non plus.
+    return sortie.replace(
+      /\[?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\]?/gi,
+      'quelqu’un qui n’est plus dans l’équipe',
+    )
+  }
   const jourParDate = new Map(dossier.places.map((p) => [p.date, p.jour]))
   const creneauParType = new Map(dossier.places.map((p) => [p.type, p.creneau]))
 
@@ -327,7 +354,7 @@ async function executerRelecture(
         ? `${jour} · ${creneau} · ${voulue.role} : ${nouveau} à la place de ${ancien}`
         : `${jour} · ${creneau} · ${voulue.role} : ${nouveau} sur une place vide`
     }),
-    objections: a.violations.map((v) => v.detail),
+    objections: a.violations.map((v) => enFrancais(v.detail)),
     effetScore: a.effetScore,
   })
 
@@ -346,6 +373,7 @@ async function executerRelecture(
       critere: critereParCle(r.critere)?.titre ?? r.critere,
       verdict: r.verdict,
       constat: r.constat,
+      detail: r.detail,
       corrigeable: r.corrigeable,
     })),
     // Une revue incomplète ne doit PAS ressembler à une revue clean.

@@ -169,8 +169,16 @@ const RevueSchema = z.object({
     ),
   constat: z
     .string()
+    .max(120)
     .describe(
-      "Ce que tu as trouvé sur CE critère, en français simple, avec le CHIFFRE qui le prouve et le PRÉNOM concerné. Obligatoire même quand tout va bien : dis alors ce que tu as vérifié et pourquoi ça tient (« Manon n'a aucun week-end, mais elle est absente du 30 septembre au 11 octobre »). Jamais « il y a un déséquilibre » : dis lequel, chez qui, de combien.",
+      "UNE SEULE PHRASE COURTE, 120 caractères maximum. Le prénom, le fait, le chiffre — rien d'autre. Exemples de la bonne longueur : « Anne-Sophie fait 1 week-end et n'est jamais première. » · « Antoine enchaîne 4 gardes du 2 au 7 octobre. » · « Manon n'a aucun week-end, mais elle est absente 3 semaines. » C'est la seule ligne que l'administratrice lira à coup sûr : tout ce qui n'y tient pas va dans `detail`.",
+    ),
+  detail: z
+    .string()
+    .max(400)
+    .optional()
+    .describe(
+      "Le reste : les dates précises, l'historique, la comparaison avec les autres. Facultatif — ne le remplis que s'il ajoute vraiment quelque chose. Ne répète JAMAIS la phrase du constat.",
     ),
   corrigeable: z
     .boolean()
@@ -183,8 +191,9 @@ const SortieRelectureSchema = z.object({
   synthese: z
     .string()
     .min(40)
+    .max(320)
     .describe(
-      "Deux à quatre phrases : ton impression d'ensemble sur ce planning, comme si tu l'annonçais à l'équipe. Nomme les personnes dont la situation t'a le plus frappé. Ne peut pas être vide.",
+      "DEUX PHRASES, pas plus. Ce que l'administratrice doit retenir si elle ne lit que ça : la ou les deux personnes dont la situation t'a le plus frappé, avec le chiffre. Pas d'énumération, pas de préambule.",
     ),
   revue: z
     .array(RevueSchema)
@@ -262,11 +271,16 @@ elle qui tranchera. Tu ne peux donc rien casser en proposant. Une proposition im
 qui se fait refuser coûte une ligne de lecture ; un problème que tu passes sous silence
 coûte des mois à quelqu'un de l'équipe.
 
-COMMENT TU ÉCRIS
+COMMENT TU ÉCRIS — LA BRIÈVETÉ EST UNE EXIGENCE, PAS UN STYLE
 Tu parles à l'administratrice du cabinet, pas à un développeur. Français simple, tutoiement,
 prénoms des personnes, dates en toutes lettres. Jamais de code de règle, jamais de jargon,
 jamais d'identifiant technique dans une phrase. Un chiffre à chaque affirmation : « Fanny
 fait 2 week-ends et n'est jamais première » vaut mieux que « le rôle est mal réparti ».
+
+Elle lit ça entre deux consultations. Un rapport qu'on n'a pas envie de lire ne sert à
+personne, même quand tout ce qu'il dit est juste. Donc : une phrase courte par point, le
+reste dans le champ « detail » qui restera replié. N'énumère pas toutes les dates quand deux
+suffisent à faire comprendre. Ne récapitule pas ce que tu viens d'écrire.
 
 CE QUI EST INTERDIT
 - Rendre une revue incomplète : il faut une ligne par critère, toujours.
@@ -442,7 +456,12 @@ export function normaliserRelecture(
   for (const r of brut.revue ?? []) {
     if (!CLES_CRITERES.has(r.critere)) continue
     if (!revueParCle.has(r.critere)) {
-      revueParCle.set(r.critere, { ...r, constat: r.constat.trim() })
+      revueParCle.set(r.critere, {
+        ...r,
+        constat: r.constat.trim(),
+        // Un détail qui répète le constat double la lecture pour rien.
+        detail: r.detail?.trim() || undefined,
+      })
     }
   }
 
