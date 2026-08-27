@@ -989,6 +989,18 @@
   color: var(--soft);
 }
 
+/* La nuance sous un fait : ce que les périodes types font réellement du
+   maximum affiché au-dessus. Volontairement plus petite et en retrait — elle
+   précise le chiffre, elle ne le concurrence pas. Elle n'apparaît QUE si une
+   période type s'écarte du maximum ; sinon il n'y a rien à dire, et une phrase
+   répétée sur chaque carte redeviendrait du bruit. */
+.v2 .cre-faits .fait .fait-nuance {
+  font-size: 0.72rem;
+  font-style: normal;
+  line-height: 1.35;
+  color: var(--soft);
+}
+
 /* Une carte éteinte garde ses encarts, mais en retrait : l'information reste
    lisible sans réclamer l'attention d'une ligne active. */
 .v2 .cre-carte.eteint .cre-faits .fait {

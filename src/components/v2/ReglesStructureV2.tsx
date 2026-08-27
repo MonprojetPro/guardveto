@@ -109,7 +109,15 @@ function ongletDeDepart(ongletInitial?: string, focus?: string): Onglet {
   if (focus && FOCUS_ENCHAINEMENTS.has(focus)) return 'enchainements'
   if (focus) return 'moteur' // toutes les autres ancres sont des règles
   if (ongletInitial && (ONGLETS as string[]).includes(ongletInitial)) return ongletInitial as Onglet
-  return 'profils'
+  // ⚠️ « Organisation » ouvre sur les RÈGLES, pas sur les périodes types
+  // (B-068, arbitrage MiKL du 27/08). C'est l'onglet qu'on vient consulter et
+  // corriger au quotidien ; les périodes types se règlent une fois, en amont.
+  //
+  // Ce défaut ne concerne QUE l'arrivée sans paramètre — c'est-à-dire le clic
+  // sur « Organisation » dans la barre. Les écrans qui envoient vraiment vers
+  // une période type (le parcours de génération, 5 endroits) portent déjà leur
+  // `?onglet=profils` et ne bougent pas.
+  return 'moteur'
 }
 
 export function ReglesStructureV2({

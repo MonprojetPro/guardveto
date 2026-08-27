@@ -12,7 +12,7 @@
 // ============================================================
 
 import { describe, it, expect } from 'vitest'
-import { appliquerAffinage } from '@/data/chargerCreneauModele'
+import { appliquerAffinage, placesEffectives } from '@/data/chargerCreneauModele'
 import type { CreneauModele } from '@/engine/creneau-modele'
 
 function creneau(over: Partial<CreneauModele> & { id: string }): CreneauModele {
@@ -88,5 +88,54 @@ describe('Le socle borne toujours', () => {
     const avant = JSON.parse(JSON.stringify(SOCLE))
     appliquerAffinage(SOCLE, new Map([['we', 1], ['ven', 0]]))
     expect(SOCLE).toEqual(avant)
+  })
+})
+
+// ============================================================
+// La SOURCE UNIQUE de « combien de places, vraiment »
+// ============================================================
+// `placesEffectives` répond à la question posée à trois endroits : le moteur
+// quand il génère, l'écran des périodes types, et l'écran de structure quand il
+// annonce ce que chaque période fait du maximum (B-069, 2026-08-27).
+//
+// Ces trois-là DOIVENT répondre pareil. Un écran qui annonce 2 places là où le
+// moteur en posera 1 est pire qu'un écran muet : il donne une réponse fausse
+// avec l'autorité d'un chiffre. C'est pour ça que la règle n'est pas recopiée.
+// ============================================================
+describe('placesEffectives — la règle partagée', () => {
+  it('sans choix de la période type, c’est tout le socle', () => {
+    // L'état d'une période type neuve : elle part de tout ce qui est possible.
+    expect(placesEffectives(2, undefined)).toBe(2)
+  })
+
+  it('zéro retire la garde — ce n’est pas « zéro place »', () => {
+    // `null` et non `0` : un créneau à 0 place traverserait le moteur en
+    // émettant zéro slot mais resterait compté partout comme un type de garde.
+    expect(placesEffectives(2, 0)).toBeNull()
+    expect(placesEffectives(2, -3)).toBeNull()
+  })
+
+  it('on ne dépasse jamais le maximum du socle', () => {
+    expect(placesEffectives(2, 9)).toBe(2)
+  })
+
+  it('en dessous du maximum, c’est le choix de la période qui compte', () => {
+    expect(placesEffectives(4, 1)).toBe(1)
+    expect(placesEffectives(4, 3)).toBe(3)
+  })
+
+  it('rend exactement ce que `appliquerAffinage` applique', () => {
+    // Le vrai risque n'est pas qu'une des deux se trompe, c'est qu'elles se
+    // trompent DIFFÉREMMENT. Ce cas fige leur accord sur toute la plage.
+    for (const socle of [1, 2, 3, 4]) {
+      for (const voulu of [undefined, 0, 1, 2, 3, 4, 9]) {
+        const attendu = placesEffectives(socle, voulu)
+        const via = appliquerAffinage(
+          [creneau({ id: 'x', nbPlaces: socle, roles: ['a', 'b', 'c', 'd'].slice(0, socle) })],
+          voulu === undefined ? new Map() : new Map([['x', voulu]]),
+        )
+        expect(via[0]?.nbPlaces ?? null, `socle ${socle}, voulu ${voulu}`).toBe(attendu)
+      }
+    }
   })
 })

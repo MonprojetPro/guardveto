@@ -358,7 +358,10 @@ function ChampsCreneau({ cle, form, setForm, joursFiges, bloque, code }: ChampsP
       </div>
 
       <div>
-        <label id={`${cle}-places-label`}>Vétérinaires de garde</label>
+        {/* « au maximum » : ce réglage est le PLAFOND du socle. Chaque période
+            type choisit ensuite combien elle en utilise, et le moteur retient
+            le plus petit des deux (B-069). */}
+        <label id={`${cle}-places-label`}>Vétérinaires de garde, au maximum</label>
         <Select
           value={String(form.nbPlaces)}
           onValueChange={(v) => {
@@ -747,9 +750,15 @@ export function OngletCreneaux({ profil }: Props) {
                       <span>Jours</span>
                       <b>{c.joursClair}</b>
                     </div>
+                    {/* « Places MAXIMUM », jamais « Places » tout court : ce
+                        chiffre est un plafond, et c'est la période type qui dit
+                        combien elle en utilise. Sans ce mot, un cabinet ayant
+                        affiné à 1 véto lisait « 2 places » ici et croyait que
+                        le moteur en poserait deux (B-069). */}
                     <div className="fait">
-                      <span>Places</span>
+                      <span>Places maximum</span>
                       <b>{c.placesClair}</b>
+                      {c.emploiReel && <em className="fait-nuance">{c.emploiReel}</em>}
                     </div>
                     <div className="fait">
                       <span>Horaires</span>

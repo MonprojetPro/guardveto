@@ -72,8 +72,19 @@ export interface CreneauUI {
   // ── Déjà mis en clair côté serveur ──
   /** « Lun, Mar, Mer + jours fériés ». */
   joursClair: string
-  /** « 2 places : 1er, 2nd ». */
+  /** « 2 places : 1er, 2nd ». C'est le MAXIMUM du socle, pas ce qui sera généré. */
   placesClair: string
+  /**
+   * Ce que les périodes types font RÉELLEMENT de ces places — « Hiver : 2 ·
+   * Été : 1 place seulement ». `null` quand elles prennent toutes le maximum,
+   * ou sur un créneau déjà affiné (la question ne se pose plus).
+   *
+   * ⚠️ Sans cette ligne, un cabinet qui a réglé sa période type à 1 véto lisait
+   * « 2 places » sur l'écran de structure et croyait que le moteur en poserait
+   * deux (B-069). Le chiffre était juste ; c'est sa présentation comme un
+   * résultat qui était fausse.
+   */
+  emploiReel: string | null
   /** « De 19:00 à 08:00, le lendemain ». */
   horairesClair: string
 }

@@ -158,6 +158,26 @@ export async function chargerAffinage(
 }
 
 /**
+ * Combien de places une période type utilise RÉELLEMENT sur un créneau du socle.
+ *
+ * `null` = le créneau disparaît de cette période (pas de garde de ce type).
+ * Le socle dit ce qui est POSSIBLE ; la période type dit ce qu'elle en veut ;
+ * on ne dépasse jamais le premier.
+ *
+ * ⚠️ SOURCE UNIQUE — la même question se pose à trois endroits : ici pour le
+ * moteur, et deux fois dans `data/v2/reglesStructure.ts` (les créneaux d'une
+ * période type, et ce que l'écran de structure annonce des places). Recopier
+ * `Math.min` à trois endroits, c'est garantir qu'un jour deux d'entre eux ne
+ * diront plus la même chose — et l'écran annoncerait alors des gardes que le
+ * moteur ne pose pas. Toute la règle tient ici, et nulle part ailleurs.
+ */
+export function placesEffectives(nbPlacesSocle: number, voulu: number | undefined): number | null {
+  if (voulu === undefined) return nbPlacesSocle // période type neuve : tout le possible
+  if (voulu <= 0) return null // pas de garde de ce type sur cette période
+  return Math.min(voulu, nbPlacesSocle)
+}
+
+/**
  * Applique les choix d'une période type au socle. FONCTION PURE — testée sans
  * base, parce que c'est ici que se joue « il n'y a pas de garde ce jour-là ».
  *
@@ -177,13 +197,11 @@ export function appliquerAffinage(
 ): CreneauModele[] {
   const resultat: CreneauModele[] = []
   for (const c of socle) {
-    const voulu = affinage.get(c.id)
-    if (voulu === undefined) { resultat.push(c); continue }
-    if (voulu <= 0) continue // pas de garde de ce type sur cette période
-    // On ne dépasse jamais le socle : il dit ce qui est POSSIBLE, et les rôles
-    // disponibles y sont nommés. Demander plus que ses places ne produirait
-    // que des slots sans libellé.
-    const n = Math.min(voulu, c.nbPlaces)
+    const n = placesEffectives(c.nbPlaces, affinage.get(c.id))
+    if (n === null) continue
+    if (n === c.nbPlaces) { resultat.push(c); continue }
+    // Les rôles sont tronqués avec les places : le socle nomme les places
+    // disponibles, en garder plus produirait des libellés sans slot.
     resultat.push({ ...c, nbPlaces: n, roles: c.roles.slice(0, n) })
   }
   return resultat

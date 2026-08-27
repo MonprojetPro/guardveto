@@ -19,6 +19,10 @@
 
 import type { createClient } from '@/lib/supabase/server'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
+// ⚠️ La règle « combien de places une période type utilise vraiment » vit dans
+// UN seul endroit, celui que le moteur lit. Cet écran ne la recopie pas : il
+// annoncerait sinon des gardes que la génération ne pose pas.
+import { placesEffectives } from '@/data/chargerCreneauModele'
 import type {
   CreneauUI, ProfilUI, RelationUI, GenreRelationUI, StructureCabinetUI,
 } from '@/components/v2/regles/types'
@@ -83,6 +87,44 @@ function placesClair(nbPlaces: number, roles: string[]): string {
   const noms = roles.map(roleClair).join(', ')
   const mot = nbPlaces > 1 ? 'places' : 'place'
   return noms ? `${nbPlaces} ${mot} : ${noms}` : `${nbPlaces} ${mot}`
+}
+
+/**
+ * Ce que les périodes types font réellement des places d'un créneau du socle.
+ *
+ * Le socle porte un MAXIMUM ; chaque période type dit combien elle en veut, et
+ * le moteur applique `min(voulu, maximum)` — absence de choix = le maximum,
+ * 0 = le créneau disparaît de cette période-là. La même règle exactement que
+ * `appliquerAffinage` (`data/chargerCreneauModele.ts`), et que la construction
+ * des créneaux par profil un peu plus bas dans ce fichier.
+ *
+ * Rend `null` quand toutes les périodes types prennent le maximum : il n'y a
+ * alors rien à signaler, et une phrase qui se répète sur chaque carte est du
+ * bruit. Rend `null` aussi s'il n'existe aucune période type — le socle est
+ * alors ce qui sera généré, sans nuance à apporter.
+ */
+function emploiParPeriodes(
+  creneau: CreneauRow,
+  profils: ProfilRow[],
+  affinages: AffinageRow[],
+): string | null {
+  if (profils.length === 0) return null
+
+  const parts: string[] = []
+  let uneDifference = false
+
+  for (const p of [...profils].sort((a, b) => a.ordre - b.ordre)) {
+    const voulu = affinages.find((a) => a.profil_id === p.id && a.creneau_id === creneau.id)?.nb_vetos
+    const effectif = placesEffectives(creneau.nb_places, voulu)
+    if (effectif !== creneau.nb_places) uneDifference = true
+    parts.push(
+      effectif === null
+        ? `${p.nom} : aucune garde`
+        : `${p.nom} : ${effectif} ${effectif > 1 ? 'places' : 'place'}`,
+    )
+  }
+
+  return uneDifference ? parts.join(' · ') : null
 }
 
 /** « De 19:00 à 08:00, le lendemain ». */
@@ -188,7 +230,7 @@ export async function chargerProfilsStructure(
   const affinagesRows = ((affinagesRes as { data?: AffinageRow[] | null }).data ??
     []) as AffinageRow[]
 
-  const enClair = (c: CreneauRow, nbPlaces: number): CreneauUI => {
+  const enClair = (c: CreneauRow, nbPlaces: number, emploiReel: string | null = null): CreneauUI => {
     const jours = c.jours_semaine ?? []
     const roles = (c.roles ?? []).slice(0, nbPlaces)
     const debut = hhmm(c.heure_debut)
@@ -210,13 +252,14 @@ export async function chargerProfilsStructure(
       joursClair: joursClair(jours, c.sur_feries),
       placesClair: placesClair(nbPlaces, roles),
       horairesClair: horairesClair(debut, fin, c.offset_jours_fin),
+      emploiReel,
     }
   }
 
   const socle = creneauxRows
     .slice()
     .sort((a, b) => a.ordre - b.ordre)
-    .map((c) => enClair(c, c.nb_places))
+    .map((c) => enClair(c, c.nb_places, emploiParPeriodes(c, profilsRows, affinagesRows)))
 
   const nomParCreneau = new Map(creneauxRows.map((r) => [r.id, r.nom]))
 
@@ -240,16 +283,15 @@ export async function chargerProfilsStructure(
       if (a.profil_id === p.id) affinage[a.creneau_id] = a.nb_vetos
     }
 
-    // Le socle affiné — MÊME RÈGLE que `appliquerAffinage` côté moteur : absence
-    // de choix = le créneau tel quel, 0 = il disparaît, jamais plus que le socle.
+    // Le socle affiné — par la MÊME fonction que le moteur, pas par une copie
+    // de sa règle : `placesEffectives` est la source unique (absence de choix =
+    // le créneau tel quel, 0 = il disparaît, jamais plus que le socle).
     const creneaux = creneauxRows
       .slice()
       .sort((a, b) => a.ordre - b.ordre)
       .flatMap((c): CreneauUI[] => {
-        const voulu = affinage[c.id]
-        if (voulu === undefined) return [enClair(c, c.nb_places)]
-        if (voulu <= 0) return []
-        return [enClair(c, Math.min(voulu, c.nb_places))]
+        const n = placesEffectives(c.nb_places, affinage[c.id])
+        return n === null ? [] : [enClair(c, n)]
       })
 
     const gardes = new Set(creneaux.map((c) => c.id))
