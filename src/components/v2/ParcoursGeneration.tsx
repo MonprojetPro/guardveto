@@ -43,6 +43,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { DiagnosticImpasse, NoteDernierRecoursExclus } from '@/components/planning/DiagnosticImpasse'
 import { CasesAPourvoir, type CaseVide } from '@/components/planning/CasesAPourvoir'
+import { RapportRelecture, type DonneesRelecture } from '@/components/v2/RapportRelecture'
 import { CreneauxIgnoresAlert } from '@/components/planning/CreneauxIgnoresAlert'
 import { PointPreVol, type VetEtiquette } from '@/components/planning/PointPreVol'
 import { SignalerLimite } from '@/components/planning/SignalerLimite'
@@ -253,6 +254,13 @@ export function ParcoursGeneration({
   const [etapeMoteur, setEtapeMoteur] = useState<string | null>(null)
   const [creation, setCreation] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
+
+  // B-062 — la relecture de Filou. Elle vit à côté du résultat de génération,
+  // jamais dedans : le planning est déjà en base quand elle commence, et un
+  // échec de sa part ne doit rien retirer à ce que le moteur a livré.
+  const [relecture, setRelecture] = useState<DonneesRelecture | null>(null)
+  const [relectureEnCours, setRelectureEnCours] = useState(false)
+  const [etapeRelecture, setEtapeRelecture] = useState<string | null>(null)
 
   // La cible du parcours : un planning existant, ou celui qu'on vient de créer.
   const [cible, setCible] = useState<string>('')
@@ -527,11 +535,56 @@ export function ParcoursGeneration({
     router.refresh()
   }
 
+  /**
+   * ③bis — B-062. Filou relit le planning qui vient d'être enregistré.
+   *
+   * Lancée APRÈS la génération, jamais pendant : le planning est déjà en base,
+   * donc un échec de la relecture ne peut rien lui retirer. Elle n'est pas
+   * attendue par `lancer` (`void`) — le résultat de génération s'affiche tout
+   * de suite, et le rapport de Filou arrive quand il arrive.
+   */
+  async function lancerRelecture(periodeId: string) {
+    setRelecture(null)
+    setEtapeRelecture(null)
+    setRelectureEnCours(true)
+    try {
+      const res = await fetch('/api/planning/relecture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ periodeId }),
+      })
+      const data = await lireLeFlux(res, setEtapeRelecture)
+      const statut = typeof data.__status === 'number' ? data.__status : (res.ok ? 200 : res.status)
+
+      if (statut >= 400 || data.issue === 'indisponible') {
+        // Jamais un silence : sans ce bloc, l'absence de rapport se lirait
+        // « rien à signaler » — et personne ne va vérifier une bonne nouvelle.
+        setRelecture({
+          issue: 'indisponible',
+          error: (data.error as string) ?? undefined,
+        })
+        return
+      }
+
+      setRelecture(data as unknown as DonneesRelecture)
+      // Des gardes ont pu changer : l'écran du planning doit les relire.
+      if (data.planningModifie) router.refresh()
+    } catch (e) {
+      setRelecture({
+        issue: 'indisponible',
+        error: e instanceof Error ? e.message : String(e),
+      })
+    } finally {
+      setRelectureEnCours(false)
+    }
+  }
+
   /** ③ Le moteur travaille. `confirmRepublication` : cf. garde-fou Chantier B. */
   async function lancer(confirmRepublication: boolean) {
     if (!cible) return
     setEtape('travail')
     setResultat(null)
+    setRelecture(null)
     setEtapeMoteur(null)
     try {
       const res = await fetch('/api/generate', {
@@ -587,6 +640,7 @@ export function ParcoursGeneration({
           creneauxIgnores: (data.creneauxIgnores ?? []) as CreneauIgnore[],
         })
         router.refresh()
+        void lancerRelecture(cible)
       } else if (data.issue === 'partiel') {
         // B-053 — le planning EST écrit. On ne repart pas les mains vides :
         // il reste des cases à pourvoir, et on dit lesquelles.
@@ -601,6 +655,10 @@ export function ParcoursGeneration({
           interrompu: data.interrompu === true,
         })
         router.refresh()
+        // Un planning partiel se relit AUSSI — c'est même le cas où Filou sert
+        // le plus : les cases vides sont le premier endroit où un regard neuf
+        // peut trouver quelque chose que l'ordre de remplissage a manqué.
+        void lancerRelecture(cible)
       } else if (data.interrompu) {
         setResultat({
           ok: false,
@@ -1266,6 +1324,20 @@ export function ParcoursGeneration({
                   />
                 </div>
               </>
+            )}
+
+            {/* ── B-062 · LA RELECTURE DE FILOU ────────────────
+                Sous le résultat de génération, jamais à sa place : ce qui est
+                au-dessus est acquis, ce qui suit est un avis. Ne s'affiche que
+                quand un planning existe — sur un échec sec, il n'y a rien à
+                relire, et un bloc vide se lirait comme un avis favorable. */}
+            {resultat.issue !== 'echec' && relectureEnCours && (
+              <p className="rl-attente">
+                {etapeRelecture ?? 'Filou relit le planning…'}
+              </p>
+            )}
+            {resultat.issue !== 'echec' && relecture && (
+              <RapportRelecture donnees={relecture} />
             )}
           </div>
         )}

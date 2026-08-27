@@ -2312,3 +2312,104 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   margin-top: 0.15rem;
   color: var(--t-muted);
 }
+
+/* -- B-062 · La relecture de Filou -----------------------------------------
+   Trois catégories qui ne se mélangent PAS : ce qui est déjà fait, ce que
+   l'admin doit trancher, ce que Filou signale sans savoir le corriger. Chacune
+   a son fond, parce qu'une chose faite et une chose à faire ne se lisent pas
+   de la même façon.
+
+   Volontairement SOUS le résultat de génération et visuellement plus discret :
+   ce qui est au-dessus est acquis, ceci est un avis. Aucun fond alarmant —
+   « un bandeau est un SIGNAL, pas un rapport » (19/08). */
+
+.rl-attente {
+  font-size: 0.82rem; color: var(--soft); font-style: italic;
+  margin-top: 14px;
+}
+
+.rl-rapport {
+  display: grid; gap: 12px;
+  margin-top: 18px; padding-top: 16px;
+  border-top: 1px solid var(--t-border);
+}
+
+.rl-entete { display: flex; align-items: flex-start; gap: 10px; }
+.rl-ico-titre { width: 18px; height: 18px; flex: none; color: var(--t-accent); margin-top: 2px; }
+.rl-titre {
+  font-family: var(--font-display); font-weight: 600;
+  font-size: 0.95rem; color: var(--text);
+}
+.rl-synthese {
+  font-size: 0.86rem; line-height: 1.55; color: var(--t-muted); margin-top: 4px;
+}
+
+.rl-bloc {
+  display: grid; gap: 8px;
+  border: 1px solid var(--t-border); border-radius: var(--r-md);
+  padding: 12px 14px;
+}
+.rl-bloc-titre {
+  display: flex; align-items: center; gap: 7px;
+  font-family: var(--font-display); font-weight: 600;
+  font-size: 0.85rem; color: var(--text);
+}
+.rl-bloc-sous { font-size: 0.79rem; line-height: 1.5; color: var(--t-muted); }
+.rl-ico { width: 15px; height: 15px; flex: none; }
+
+.rl-applique { background: var(--ok-soft); border-color: rgba(46, 125, 80, 0.28); }
+.rl-applique .rl-ico { color: var(--ok); }
+.rl-trancher { background: var(--warn-soft); border-color: rgba(196, 138, 20, 0.35); }
+.rl-trancher .rl-ico { color: var(--warn); }
+.rl-constats { background: var(--surface-2); }
+.rl-constats .rl-ico { color: var(--soft); }
+.rl-indispo {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--surface-2); margin-top: 18px;
+}
+.rl-indispo .rl-ico { color: var(--soft); margin-top: 2px; }
+.rl-indispo .rl-sous { font-size: 0.8rem; line-height: 1.5; color: var(--t-muted); margin-top: 3px; }
+
+.rl-liste { display: grid; gap: 9px; list-style: none; margin: 0; padding: 0; }
+.rl-item {
+  background: var(--surface); border-radius: var(--r-sm);
+  padding: 9px 11px;
+}
+.rl-motif { font-size: 0.84rem; line-height: 1.5; color: var(--text); }
+.rl-constat { font-size: 0.84rem; line-height: 1.5; color: var(--text); }
+
+/* Le geste concret, en retrait : c'est la traduction du motif, pas une
+   information nouvelle. */
+.rl-geste {
+  list-style: none; margin: 6px 0 0; padding: 0 0 0 11px;
+  border-left: 2px solid var(--t-border);
+  display: grid; gap: 3px;
+}
+.rl-geste li { font-size: 0.78rem; line-height: 1.45; color: var(--t-muted); }
+
+.rl-meta { font-size: 0.73rem; color: var(--soft); margin-top: 6px; }
+
+/* Les deux avis côte à côte — Filou et le moteur. Empilés sous 620px : les
+   lire l'un sous l'autre reste juste, les tasser en deux colonnes de 140px ne
+   l'est pas. */
+.rl-item-double { display: grid; gap: 10px; }
+@media (min-width: 620px) {
+  .rl-item-double { grid-template-columns: 1fr 1fr; }
+}
+.rl-avis-qui {
+  font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--soft); margin-bottom: 4px;
+}
+.rl-objections {
+  list-style: none; margin: 0; padding: 0; display: grid; gap: 4px;
+}
+.rl-objections li { font-size: 0.79rem; line-height: 1.45; color: var(--t-muted); }
+
+/* La gravité se dit par un liseré, jamais par un fond : trois fonds colorés
+   dans une même liste redeviendraient le bruit qu'on cherche à éviter. */
+.rl-gravite-bloquant { border-left: 3px solid var(--danger); }
+.rl-gravite-notable { border-left: 3px solid var(--warn); }
+.rl-gravite-mineur { border-left: 3px solid var(--t-border); }
+
+.rl-rien { font-size: 0.84rem; line-height: 1.55; color: var(--t-muted); }
+.rl-note { font-size: 0.75rem; line-height: 1.45; color: var(--soft); font-style: italic; }

@@ -25,15 +25,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { genererPlanningPur } from '@/engine/solver'
-import { estJourFerie } from '@/engine/utils'
 import { supprimerEvenementsParIds } from '@/lib/sync-calendrier'
 import { resoudreContexte } from '@/data/resoudreContexte'
 import { detecterCreneauxIgnores } from '@/engine/creneau-modele'
 import { persisterResultat } from '@/data/persisterResultat'
-import { construireGardePlacements } from '@/data/gardePlacements'
-import { syncAttributionsPourJours, joursImpactesGarde } from '@/data/syncAttributions'
+import { ecrirePlanningV1 } from '@/data/ecrirePlanningV1'
 import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
-import type { CalendrierResolu } from '@/engine/types'
 
 // Verrou de génération : au-delà de ce délai, un verrou est considéré périmé
 // (crash serverless sans libération) — largement > maxDuration (60 s).
@@ -53,33 +50,6 @@ const SEED_DEADLINE_MS = 30_000
 // il prouvait l'impasse), et la reprise hérite du temps libéré. Total inchangé,
 // sous les 60 s de la fonction.
 const RATTRAPAGE_BUDGET_MS = 12_000
-
-// ── Helpers ──────────────────────────────────────────────
-
-/**
- * Convertit le type interne du moteur vers le type de la table gardes (V1).
- * Les attributions `vendredi_soir` sont ignorées (stockées dans weekend).
- * Zone-aware (fix audit 2026-07-03) : le calendrier du cabinet est utilisé —
- * MÊME source que le solver — sinon `gardes.type` divergeait du moteur pour
- * tout cabinet dont les fériés diffèrent du fallback national en dur.
- *
- * Généralisé P3b : un code SUR-MESURE est persisté TEL QUEL (le CHECK 3 valeurs
- * de `gardes.type` est levé en migration). Il garde son code même un jour férié
- * (la reclassification 'ferie' est un héritage propre à semaine_soir) — sinon
- * deux gardes du même jour entreraient en collision sur UNIQUE(date, type).
- */
-function mapTypeGardeEnDb(
-  type: string,
-  date: string,
-  calendrier?: CalendrierResolu,
-): string {
-  if (type === 'weekend') return 'weekend'
-  if (type === 'semaine_soir') {
-    // semaine_soir sur un jour férié → type 'ferie' en DB (héritage V1)
-    return estJourFerie(date, calendrier) ? 'ferie' : 'semaine'
-  }
-  return type
-}
 
 // ── Handler principal ────────────────────────────────────
 
@@ -415,151 +385,21 @@ async function executerGeneration(
     // ── Persistence V1 (gardes) — transition F1-002 ─────────────
     // La table `gardes` reste la source de vérité pour les composants
     // UI existants jusqu'à la fin de la migration V1 → V2 (F1-002).
-
-    // 0. CAPTURER les ids d'événements Google Agenda AVANT le DELETE
-    //    (ils vivent sur les lignes `gardes`) — mais ne purger l'agenda
-    //    qu'APRÈS le succès de la réécriture (étape 4). Ancien comportement :
-    //    purge d'abord → un échec à mi-course laissait base vide + agenda vidé.
-    const { data: gardesAvecEvent } = await supabase
-      .from('gardes')
-      .select('google_event_id')
-      .eq('periode_id', periodeId)
-      .eq('cabinet_id', cabinetId)
-      .eq('verrouille', false)
-      .not('google_event_id', 'is', null)
-
-    const eventIdsAPurger = ((gardesAvecEvent ?? []) as { google_event_id: string | null }[])
-      .map((g) => g.google_event_id)
-      .filter((id): id is string => Boolean(id))
-
-    // 1. Supprimer les gardes brouillon existantes pour cette période.
-    //    Scopé cabinet_id (défense en profondeur : en DEV_BYPASS le client
-    //    service_role contourne la RLS, donc on filtre explicitement).
-    //    On NE supprime PAS les gardes verrouillées (verrouille=true) :
-    //    elles représentent des décisions figées à préserver.
-    const { error: deleteErr } = await supabase
-      .from('gardes')
-      .delete()
-      .eq('periode_id', periodeId)
-      .eq('cabinet_id', cabinetId)
-      .eq('verrouille', false)
-
-    if (deleteErr) {
-      return reponse(
-        { error: `Erreur suppression du brouillon précédent : ${deleteErr.message}` },
-        { status: 500 }
-      )
-    }
-
-    // 1b. Recenser les gardes verrouillées résiduelles de la période.
-    //     Le solver régénère TOUTE la période sans connaître les verrous ;
-    //     on doit donc exclure les (date, type) déjà verrouillés de l'insert,
-    //     sinon collision sur l'index UNIQUE(cabinet_id, date, type).
-    const { data: gardesVerrouillees, error: lockedErr } = await supabase
-      .from('gardes')
-      .select('date, type')
-      .eq('periode_id', periodeId)
-      .eq('cabinet_id', cabinetId)
-      .eq('verrouille', true)
-
-    if (lockedErr) {
-      return reponse(
-        { error: `Erreur lecture des gardes verrouillées : ${lockedErr.message}` },
-        { status: 500 }
-      )
-    }
-
-    const clesVerrouillees = new Set(
-      ((gardesVerrouillees ?? []) as { date: string; type: string }[])
-        .map((g) => `${g.date}|${g.type}`)
+    //
+    // EXTRAIT le 2026-08-27 dans `data/ecrirePlanningV1` (B-062) : la relecture
+    // de Filou réécrit le planning et doit emprunter EXACTEMENT ce chemin, avec
+    // ses six précautions (verrous préservés, capture des événements agenda
+    // avant le DELETE, réalignement V2). Un second chemin d'écriture aurait été
+    // la troisième occurrence d'un défaut déjà payé ici le 22/08.
+    const ecriture = await ecrirePlanningV1(
+      supabase, planningRetenu, periodeId, cabinetId, contexte.calendrier,
     )
 
-    // 2. Préparer les gardes à insérer (vendredi_soir exclu — fusionné dans weekend ;
-    //    dates/type déjà verrouillés exclus — on conserve le verrou existant).
-    //    On garde EN PARALLÈLE l'attribution source + sa clé de type DB, pour la
-    //    double écriture P3b-1 (garde_placements) avec exactement le même filtre.
-    const attributionsInserees = planningRetenu.attributions
-      .filter((a) => a.type !== 'vendredi_soir')
-      .map((a) => ({ a, dbType: mapTypeGardeEnDb(a.type, a.date, contexte.calendrier) }))
-      .filter(({ a, dbType }) => !clesVerrouillees.has(`${a.date}|${dbType}`))
-
-    // Places POSITIONNELLES (P3b) : place 0 → premier_id, place 1 → second_id
-    // (même convention que garde_placements). Pour le défaut, placements =
-    // [premier, second] → identique aux anciens premierId()/secondId(). Les
-    // rôles custom d'un créneau sur-mesure remplissent ainsi les colonnes V1
-    // au lieu de les laisser à null ; les places au-delà de 2 vivent dans
-    // garde_placements (miroir P3b-1).
-    const gardesAInserer = attributionsInserees.map(({ a, dbType }) => ({
-      periode_id: periodeId,
-      cabinet_id: cabinetId,
-      date: a.date,
-      type: dbType,
-      premier_id: a.placements[0]?.vetId ?? null,
-      second_id: a.placements[1]?.vetId ?? null,
-      verrouille: false,
-      modifie_manuellement: false,
-    }))
-
-    // 3. Insérer en bloc — upsert idempotent scopé cabinet.
-    //    ON CONFLICT (cabinet_id, date, type) DO NOTHING : si une ligne
-    //    subsistait (course/retry), on ne casse pas la régénération.
-    const { error: insertErr } = await supabase
-      .from('gardes')
-      .upsert(gardesAInserer, {
-        onConflict: 'cabinet_id,date,type',
-        ignoreDuplicates: true,
-      })
-
-    if (insertErr) {
-      return reponse(
-        { error: `Erreur insertion des gardes : ${insertErr.message}` },
-        { status: 500 }
-      )
+    if (!ecriture.ok) {
+      return reponse({ error: ecriture.erreur }, { status: 500 })
     }
 
-    // 3b. Double écriture P3b-1 — miroir des placements dans garde_placements
-    //     (enfant de gardes.id, généralise premier_id/second_id vers N places).
-    //     ADDITIF : aucun lecteur ne la consomme encore → best-effort. Un échec
-    //     ici NE casse JAMAIS la persistance V1 : `gardes` reste la source de vérité.
-    //     Les placements des gardes brouillon supprimées (étape 1) sont partis en
-    //     cascade ; on ne (ré)écrit que ceux des gardes qu'on vient d'insérer.
-    try {
-      const { data: gardesEcrites } = await supabase
-        .from('gardes')
-        .select('id, date, type')
-        .eq('periode_id', periodeId)
-        .eq('cabinet_id', cabinetId)
-
-      const idParCle = new Map<string, string>()
-      for (const g of (gardesEcrites ?? []) as { id: string; date: string; type: string }[]) {
-        idParCle.set(`${g.date}|${g.type}`, g.id)
-      }
-
-      const placementsRows = construireGardePlacements(
-        attributionsInserees.map(({ a, dbType }) => ({
-          date: a.date,
-          dbType,
-          placements: a.placements,
-        })),
-        idParCle,
-        cabinetId,
-      )
-
-      if (placementsRows.length > 0) {
-        const { error: placementsErr } = await supabase
-          .from('garde_placements')
-          .upsert(placementsRows, { onConflict: 'garde_id,place_index', ignoreDuplicates: false })
-        if (placementsErr) {
-          console.error('[P3b-1] double écriture garde_placements échouée:', placementsErr.message)
-          await signalerIncidentTechnique(
-            supabase, cabinetId,
-            'Écriture des placements incomplète',
-            'La copie technique des attributions (garde_placements) a échoué pendant la génération. Le planning affiché est correct ; signale-le si ça se répète.',
-          )
-        }
-      }
-    } catch (e) {
-      console.error('[P3b-1] double écriture garde_placements exception:', e)
+    if (ecriture.placementsEchoues) {
       await signalerIncidentTechnique(
         supabase, cabinetId,
         'Écriture des placements incomplète',
@@ -567,33 +407,15 @@ async function executerGeneration(
       )
     }
 
-    // 3c. Réalignement V2 sur les gardes VERROUILLÉES (P6 verrou n°7, étape 3).
-    //     persisterResultat a écrit dans `attributions` le planning du SOLVER
-    //     pour TOUTE la période — mais l'étape 2 a exclu de la V1 les (date,
-    //     type) verrouillés (le verrou existant prime sur la proposition du
-    //     solver). Sans réalignement, V2 porterait l'équipe du solver là où V1
-    //     garde l'équipe verrouillée → dérive garantie dès la régénération.
-    //     Resynchro PAR JOUR depuis la V1 (le vendredi lié d'un week-end
-    //     verrouillé suit). Aucune garde verrouillée → no-op (byte-identique).
-    if (clesVerrouillees.size > 0) {
-      const joursVerrouilles = [
-        ...new Set(
-          ((gardesVerrouillees ?? []) as { date: string; type: string }[])
-            .flatMap((g) => joursImpactesGarde(g.date, g.type))
-        ),
-      ]
-      const syncVerrous = await syncAttributionsPourJours(
-        supabase, periodeId, cabinetId, joursVerrouilles,
+    if (ecriture.realignementEchoue) {
+      await signalerIncidentTechnique(
+        supabase, cabinetId,
+        'Copie technique du planning (V2) désynchronisée',
+        'Le planning a bien été généré, mais sa copie technique (attributions) n\'a pas pu être réalignée sur les gardes verrouillées. Le contrôle de cohérence la signalera tant qu\'elle diverge.',
       )
-      if (!syncVerrous.ok) {
-        console.error('[sync-V2] réalignement des gardes verrouillées échoué:', syncVerrous.erreur)
-        await signalerIncidentTechnique(
-          supabase, cabinetId,
-          'Copie technique du planning (V2) désynchronisée',
-          'Le planning a bien été généré, mais sa copie technique (attributions) n\'a pas pu être réalignée sur les gardes verrouillées. Le contrôle de cohérence la signalera tant qu\'elle diverge.',
-        )
-      }
     }
+
+    const eventIdsAPurger = ecriture.eventIdsAPurger
 
     // 4. Purge des anciens événements Google Agenda — APRÈS le succès de la
     //    réécriture, avec les ids capturés à l'étape 0. Best-effort : un échec
@@ -624,7 +446,7 @@ async function executerGeneration(
     return reponse({
       issue: creneauxVides.length > 0 ? 'partiel' : 'complet',
       success: creneauxVides.length === 0,
-      nbGardes: gardesAInserer.length,
+      nbGardes: ecriture.nbGardes,
       snapshotId: persistenceResult.snapshotId,
       creneauxIgnores,
       creneauxVides,

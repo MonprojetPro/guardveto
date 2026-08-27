@@ -244,6 +244,10 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
     manque:
       'Lancer la génération d’un planning. Filou sait créer une période, la régler, faire le pré-vol et publier — tout sauf l’étape du milieu. Écarté jusqu’ici pour une bonne raison (une génération est longue et se suit à l’écran, en cinq temps), mais le trou mérite d’être nommé : le parcours qu’il propose s’interrompt au moment décisif.',
   },
+  'api/planning/relecture#POST': {
+    hors:
+      'C’est Filou LUI-MÊME qui exécute cette route : elle l’appelle pour relire un planning généré. Lui donner un outil pour la déclencher le mettrait en position de se convoquer, et une relecture est une étape du parcours de génération — elle se lance depuis l’écran, elle ne se demande pas en conversation. ⚠️ Mais la QUESTION reste ouverte côté chat : « qu’est-ce que tu penses de ce planning ? » est une demande naturelle, et il n’a aujourd’hui aucun moyen d’y répondre autrement qu’en relançant tout le parcours. À rouvrir si MiKL le constate à l’usage.',
+  },
   'api/calendar-sync#POST': {
     manque:
       'Relancer la synchronisation vers l’agenda Google. Geste de dépannage rare mais réel (« les gardes n’apparaissent pas dans l’agenda »), aujourd’hui atteignable seulement depuis l’écran des périodes.',
