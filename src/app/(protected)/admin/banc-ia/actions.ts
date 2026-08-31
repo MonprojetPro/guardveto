@@ -23,8 +23,15 @@ import { chargerContexteIA } from '@/lib/ia/contexteCabinet'
 import { lancerBancEssai, type ResultatBanc } from '@/lib/ia/bancEssai'
 import { lancerBancRecette, type ResultatRecette } from '@/lib/ia/bancRecette'
 import { controlerCoherence, type RapportCoherence } from '@/lib/ia/controleCoherence'
+import {
+  lancerBancRelecture,
+  type ResultatBancRelecture,
+} from '@/lib/ia/bancRelecture'
 
 export type ResultatBancAction = { error: string } | { resultat: ResultatBanc }
+export type ResultatBancRelectureAction =
+  | { error: string }
+  | { resultat: ResultatBancRelecture }
 export type ResultatRecetteAction = { error: string } | { resultat: ResultatRecette }
 export type RapportCoherenceAction = { error: string } | { rapport: RapportCoherence }
 
@@ -113,6 +120,75 @@ export async function lancerRecetteFilou(): Promise<ResultatRecetteAction> {
     return { resultat }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erreur inconnue pendant la recette.' }
+  }
+}
+
+/**
+ * Banc de mesure de la RELECTURE (B-089) — modèle et application mis en
+ * concurrence sur le MÊME planning.
+ *
+ * ⚠️ CET APPEL COÛTE DE L'ARGENT : 4 relectures complètes, de l'ordre de 20 à
+ * 40 centimes par exécution selon la taille de la période. L'écran annonce le
+ * coût avant de lancer.
+ *
+ * ⚠️ IL N'ÉCRIT RIEN — contrairement à la vraie relecture, il ne fait pas
+ * arbitrer les propositions et ne touche pas au planning. C'est pour ça qu'il
+ * accepte une période PUBLIÉE, là où la route la refuse : la règle « on ne
+ * retouche pas ce que l'équipe a sous les yeux » protège l'écriture, et il n'y
+ * en a aucune ici. L'exiger en brouillon aurait rendu le banc inutilisable le
+ * jour où il sert — Hiver P1 est publié depuis le 27/08.
+ */
+export async function lancerBancRelectureAction(
+  periodeId?: string,
+): Promise<ResultatBancRelectureAction> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Session expirée — reconnecte-toi.' }
+
+  const { data: moi } = await supabase
+    .from('veterinaires')
+    .select('role_app')
+    .eq('user_id', user.id)
+    .eq('actif', true)
+    .maybeSingle()
+
+  if (moi?.role_app !== 'admin') {
+    return { error: 'Réservé aux administrateurs du cabinet.' }
+  }
+  if (!assistantIaDisponible()) {
+    return { error: 'Assistant IA non configuré (clé API manquante côté serveur).' }
+  }
+
+  try {
+    const cabinetId = await resoudreCabinetId(supabase)
+
+    // Sans période explicite, on prend la plus récente QUI A DES GARDES.
+    // « La plus récente » tout court tomberait sur une période vide et le banc
+    // mesurerait quatre modèles sur un planning sans rien à relire.
+    let cible = periodeId
+    if (!cible) {
+      const { data: periodes } = await supabase
+        .from('periodes')
+        .select('id, libelle, date_debut, gardes(id)')
+        .eq('cabinet_id', cabinetId)
+        .order('date_debut', { ascending: false })
+
+      const lignes = (periodes ?? []) as unknown as { id: string; gardes?: unknown[] }[]
+      const avecGardes = lignes.find((p) => (p.gardes?.length ?? 0) > 0)
+      if (!avecGardes) {
+        return { error: 'Aucune période avec des gardes à relire sur ce cabinet.' }
+      }
+      cible = (avecGardes as { id: string }).id
+    }
+
+    return { resultat: await lancerBancRelecture(supabase, cible, cabinetId) }
+  } catch (e) {
+    // Erreur brute : sur un banc de mesure, un « une erreur est survenue » ne
+    // sert à rien.
+    return { error: e instanceof Error ? e.message : 'Erreur inconnue pendant la mesure.' }
   }
 }
 

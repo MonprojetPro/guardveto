@@ -44,6 +44,38 @@ export function modeleRelecture(): string {
   return process.env.GUARDVETO_IA_MODELE_RELECTURE?.trim() || 'claude-opus-4-8'
 }
 
+/** Les crans d'application acceptés par l'API, du plus court au plus fouillé. */
+export const EFFORTS_RELECTURE = ['low', 'medium', 'high', 'xhigh', 'max'] as const
+export type EffortRelecture = (typeof EFFORTS_RELECTURE)[number]
+
+/**
+ * L'application demandée à la relecture — le SEUL levier sur son temps.
+ *
+ * ⚠️ Le budget de jetons de réflexion n'existe plus : `thinking: { type:
+ * 'enabled', budget_tokens: N }` est refusé par l'API (400, incident du
+ * 2026-07-28). La réflexion est toujours `adaptive` ; ce qui se règle, c'est
+ * `output_config.effort` — exactement comme le Filou du quotidien
+ * (`agentFilou.ts`), qui tourne à `medium` depuis le 28/07.
+ *
+ * ⚠️ NON RÉGLÉ = `high`, le défaut de l'API. Ce n'est donc pas un choix qui a
+ * été fait, c'est un choix qui n'a pas été fait : la relecture réfléchit au
+ * cran par défaut le plus fouillé de la gamme, sur le modèle le plus lent, pour
+ * une tâche qui lui sert les compteurs, les absences et la liste des
+ * remplaçants tout calculés. C'est la première cause du temps d'attente mesuré
+ * le 31/08 — et sur une période de 12 semaines, elle ferait dépasser le plafond
+ * de 120 s de la route.
+ *
+ * Réglable SANS TOUCHER AU CODE : `GUARDVETO_IA_EFFORT_RELECTURE`. Laissée
+ * vide, elle conserve le comportement d'aujourd'hui — le banc mesure ce qui
+ * tourne réellement, il ne mesure pas un réglage qu'on vient de poser.
+ */
+export function effortRelecture(): EffortRelecture | undefined {
+  const brut = process.env.GUARDVETO_IA_EFFORT_RELECTURE?.trim().toLowerCase()
+  return EFFORTS_RELECTURE.includes(brut as EffortRelecture)
+    ? (brut as EffortRelecture)
+    : undefined
+}
+
 /**
  * Le budget de sortie de la relecture.
  *
@@ -238,6 +270,23 @@ export interface ResultatRelecture {
    * le dire — le contraire serait la phrase rassurante que le produit bannit.
    */
   criteresNonTraites: string[]
+  /**
+   * Ce que l'appel a coûté, tel que l'API le rapporte. Rempli à chaque appel,
+   * lu par le banc de mesure.
+   *
+   * ⚠️ `sortie` compte la RÉFLEXION **et** la réponse — l'API ne les sépare
+   * pas. On ne peut donc pas dire « il a réfléchi N jetons » ; on peut dire
+   * combien il en a produit en tout, ce qui est ce qui se paie et ce qui prend
+   * le temps. Ne pas présenter ce chiffre comme un temps de réflexion isolé.
+   */
+  mesure: {
+    modele: string
+    effort: EffortRelecture | 'high (défaut de l’API)'
+    entree: number
+    sortie: number
+    cacheEcrit: number
+    cacheLu: number
+  }
 }
 
 // ── Le prompt ────────────────────────────────────────────────
@@ -409,6 +458,7 @@ export function dossierEnTexte(dossier: DossierRelecture): string {
  */
 export async function relirePlanningIA(
   dossier: DossierRelecture,
+  options?: { modele?: string; effort?: EffortRelecture },
 ): Promise<ResultatRelecture> {
   if (!assistantIaDisponible()) {
     throw new Error('Assistant IA non configuré (clé API manquante).')
@@ -416,8 +466,11 @@ export async function relirePlanningIA(
 
   const client = new Anthropic({ apiKey: cleIA() })
 
+  const modele = options?.modele ?? modeleRelecture()
+  const effort = options?.effort ?? effortRelecture()
+
   const response = await client.messages.parse({
-    model: modeleRelecture(),
+    model: modele,
     max_tokens: MAX_TOKENS_RELECTURE,
     thinking: { type: 'adaptive' },
     // Le prompt système est identique d'une relecture à l'autre : mis en cache,
@@ -427,7 +480,17 @@ export async function relirePlanningIA(
       { type: 'text', text: systemeRelecture(), cache_control: { type: 'ephemeral' } },
     ],
     messages: [{ role: 'user', content: dossierEnTexte(dossier) }],
-    output_config: { format: zodOutputFormat(SortieRelectureSchema) },
+    // ⚠️ `format` et `effort` vivent dans le MÊME objet : deux clés
+    // `output_config` dans ce littéral, et la seconde écraserait la première
+    // en silence — la sortie structurée disparaîtrait, ou l'application ne
+    // serait jamais transmise, sans la moindre erreur pour le dire.
+    // `effort` n'est ajouté que s'il est réglé : l'omettre laisse le défaut de
+    // l'API (`high`), qui est le comportement d'aujourd'hui. Poser une valeur
+    // « par prudence » changerait en silence ce que le banc doit mesurer.
+    output_config: {
+      format: zodOutputFormat(SortieRelectureSchema),
+      ...(effort ? { effort } : {}),
+    },
   })
 
   const brut = response.parsed_output
@@ -443,7 +506,17 @@ export async function relirePlanningIA(
     )
   }
 
-  return normaliserRelecture(brut, dossier)
+  return {
+    ...normaliserRelecture(brut, dossier),
+    mesure: {
+      modele,
+      effort: effort ?? 'high (défaut de l’API)',
+      entree: response.usage?.input_tokens ?? 0,
+      sortie: response.usage?.output_tokens ?? 0,
+      cacheEcrit: response.usage?.cache_creation_input_tokens ?? 0,
+      cacheLu: response.usage?.cache_read_input_tokens ?? 0,
+    },
+  }
 }
 
 // ── Nettoyage de la réponse ──────────────────────────────────
@@ -466,7 +539,7 @@ const CLES_CRITERES = new Set(CRITERES_HUMAINS.map((c) => c.cle))
 export function normaliserRelecture(
   brut: SortieRelecture,
   dossier: DossierRelecture,
-): ResultatRelecture {
+): Omit<ResultatRelecture, 'mesure'> {
   const idsConnus = new Set(dossier.equipe.map((p) => p.vetId))
   const placesConnues = new Set(
     dossier.places.map((p) => `${p.date}|${p.type}|${p.role}`),

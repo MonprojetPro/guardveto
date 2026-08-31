@@ -17,6 +17,17 @@ import { BancIAClient } from './BancIAClient'
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'GuardVeto — Banc d’essai IA' }
 
+/**
+ * Le banc de relecture lance quatre relectures complètes ; la plus lente est
+ * celle qui tourne aujourd'hui, et c'est précisément ce qu'on mesure. Le
+ * plafond par défaut la couperait avant la fin — et un banc qui meurt en
+ * chemin ne rend aucun chiffre, pas même le mauvais.
+ *
+ * ⚠️ Vercel rabote cette valeur au maximum du plan. Si la mesure s'arrête net
+ * autour de 60 s, c'est le plan qui parle, pas le code.
+ */
+export const maxDuration = 300
+
 export default async function BancIAPage() {
   const supabase = await createClient()
 

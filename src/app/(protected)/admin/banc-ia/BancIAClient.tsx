@@ -13,10 +13,16 @@
 // ============================================================
 
 import { useState, useTransition } from 'react'
-import { lancerBanc, lancerRecetteFilou, lancerControleCoherence } from './actions'
+import {
+  lancerBanc,
+  lancerRecetteFilou,
+  lancerControleCoherence,
+  lancerBancRelectureAction,
+} from './actions'
 import type { ResultatBanc } from '@/lib/ia/bancEssai'
 import type { ResultatRecette } from '@/lib/ia/bancRecette'
 import type { RapportCoherence } from '@/lib/ia/controleCoherence'
+import type { ResultatBancRelecture } from '@/lib/ia/bancRelecture'
 
 const centimes = (dollars: number) => `${(dollars * 100).toFixed(2)} ¢`
 const euros = (dollars: number) => `≈ ${(dollars * 0.92).toFixed(2)} €`
@@ -25,14 +31,33 @@ export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
   const [resultat, setResultat] = useState<ResultatBanc | null>(null)
   const [recette, setRecette] = useState<ResultatRecette | null>(null)
   const [coherence, setCoherence] = useState<RapportCoherence | null>(null)
+  const [relecture, setRelecture] = useState<ResultatBancRelecture | null>(null)
   const [erreur, setErreur] = useState<string | null>(null)
   const [enCours, demarrer] = useTransition()
+
+  const toutEffacer = () => {
+    setErreur(null)
+    setResultat(null)
+    setRecette(null)
+    setCoherence(null)
+    setRelecture(null)
+  }
+
+  const lancerRelecture = () => {
+    toutEffacer()
+    demarrer(async () => {
+      const r = await lancerBancRelectureAction()
+      if ('error' in r) setErreur(r.error)
+      else setRelecture(r.resultat)
+    })
+  }
 
   const lancer = (jeu: 'rapide' | 'complet') => {
     setErreur(null)
     setResultat(null)
     setRecette(null)
     setCoherence(null)
+    setRelecture(null)
     demarrer(async () => {
       const r = await lancerBanc(jeu)
       if ('error' in r) setErreur(r.error)
@@ -45,6 +70,7 @@ export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
     setResultat(null)
     setRecette(null)
     setCoherence(null)
+    setRelecture(null)
     demarrer(async () => {
       const r = await lancerRecetteFilou()
       if ('error' in r) setErreur(r.error)
@@ -57,6 +83,7 @@ export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
     setResultat(null)
     setRecette(null)
     setCoherence(null)
+    setRelecture(null)
     demarrer(async () => {
       const r = await lancerControleCoherence()
       if ('error' in r) setErreur(r.error)
@@ -126,6 +153,146 @@ export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
               )}
             </article>
           ))}
+        </div>
+      )}
+
+      {/* ── Banc de la RELECTURE (B-089) ──────────────────────────────
+          Il a sa propre section parce qu'il répond à une autre question que
+          les boutons ci-dessous : ceux-là comparent des modèles sur des
+          phrases, celui-ci compare des RÉGLAGES sur un vrai planning. */}
+      <section className="rounded-lg border-2 border-sky-600/50 bg-sky-500/5 p-4">
+        <p className="font-semibold">Relecture du planning — quel réglage, et à quel prix ?</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Fait relire <b>le même planning</b> par quatre configurations et mesure, pour chacune :
+          le temps, les jetons, le coût, et <b>ce qu’elle a trouvé</b>. Le temps de préparation
+          (contexte + « qui pourrait aller où ») est chronométré à part, pour ne pas accuser l’IA
+          d’une lenteur qui serait la nôtre.
+        </p>
+        <p className="mt-2 text-sm">
+          <b>Ce que l’audit a déjà trouvé :</b> la relecture n’a jamais transmis son niveau
+          d’application, donc l’API applique son défaut — <code className="rounded bg-muted px-1">high</code>,
+          le deuxième cran le plus fouillé. Le Filou du quotidien, lui, tourne à{' '}
+          <code className="rounded bg-muted px-1">medium</code> depuis le 28/07.
+        </p>
+        <button
+          type="button"
+          onClick={lancerRelecture}
+          disabled={enCours}
+          className="mt-3 rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {enCours ? 'Mesure en cours (compte 1 à 3 min)…' : 'Comparer les 4 réglages (~20 à 40 ¢)'}
+        </button>
+      </section>
+
+      {relecture && (
+        <div className="space-y-4">
+          <h2 className="font-semibold">
+            Relecture — {relecture.periode}{' '}
+            <span className="font-normal text-muted-foreground">
+              ({relecture.places} places · {relecture.personnes} personnes ·{' '}
+              {relecture.placesVides} vide{relecture.placesVides > 1 ? 's' : ''})
+            </span>
+          </h2>
+
+          <p className="text-sm">
+            Préparation (notre code, avant tout appel) :{' '}
+            <b>{relecture.preparationSecondes.toFixed(1)} s</b> · Réglage en vigueur aujourd’hui :{' '}
+            <code className="rounded bg-muted px-1">{relecture.configurationEnVigueur.modele}</code>,
+            application <b>{relecture.configurationEnVigueur.effort}</b> · Coût de cette mesure :{' '}
+            <b>{centimes(relecture.coutTotal)}</b> {euros(relecture.coutTotal)}
+          </p>
+
+          {relecture.avertissements.map((a, i) => (
+            <p key={i} className="rounded border border-amber-500/40 bg-amber-500/5 p-2 text-xs">
+              ⚠️ {a}
+            </p>
+          ))}
+
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b text-left">
+                  <th className="py-2 pr-3">Configuration</th>
+                  <th className="py-2 pr-3">Temps</th>
+                  <th className="py-2 pr-3">Jetons produits</th>
+                  <th className="py-2 pr-3">Coût</th>
+                  <th className="py-2 pr-3">Critères</th>
+                  <th className="py-2 pr-3">Problèmes</th>
+                  <th className="py-2">Propositions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {relecture.lignes.map((l) => (
+                  <tr key={l.cle} className="border-b align-top">
+                    <td className="py-2 pr-3">
+                      <div className="font-semibold">{l.nom}</div>
+                      <div className="text-xs text-muted-foreground">{l.pourquoi}</div>
+                    </td>
+                    {l.erreur ? (
+                      <td colSpan={6} className="py-2 text-destructive">
+                        Échec après {l.secondes?.toFixed(1)} s — {l.erreur}
+                      </td>
+                    ) : (
+                      <>
+                        <td className="py-2 pr-3 font-mono">{l.secondes?.toFixed(1)} s</td>
+                        <td className="py-2 pr-3 font-mono">{l.sortie?.toLocaleString('fr-FR')}</td>
+                        <td className="py-2 pr-3 font-mono">{centimes(l.cout ?? 0)}</td>
+                        <td className="py-2 pr-3 font-mono">
+                          {l.criteresTraites}/{9}
+                        </td>
+                        <td className="py-2 pr-3 font-mono">
+                          {l.problemes} <span className="text-muted-foreground">(+{l.aSurveiller} à surveiller)</span>
+                        </td>
+                        <td className="py-2 font-mono">{l.changements}</td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            « Jetons produits » compte la réflexion <b>et</b> la réponse : l’API ne les sépare pas.
+            C’est ce qui se paie et ce qui prend le temps — ce n’est pas un temps de réflexion isolé.
+          </p>
+
+          {/* Le détail en clair : le banc mesure la vitesse et le volume, il ne
+              juge PAS la justesse. Sans les constats sous les yeux, on
+              choisirait le plus rapide, c'est-à-dire le plus muet. */}
+          <details className="rounded-lg border p-4">
+            <summary className="cursor-pointer font-semibold">
+              Ce que chacune a écrit — c’est ici que tu juges la qualité
+            </summary>
+            <div className="mt-3 space-y-4">
+              {relecture.lignes
+                .filter((l) => !l.erreur)
+                .map((l) => (
+                  <div key={l.cle} className="space-y-2">
+                    <p className="font-semibold">{l.nom}</p>
+                    <p className="text-sm italic">« {l.synthese} »</p>
+                    <ul className="space-y-1 text-sm">
+                      {l.constats?.map((c, i) => (
+                        <li key={i}>
+                          <span
+                            className={
+                              c.verdict === 'probleme'
+                                ? 'text-destructive'
+                                : c.verdict === 'a_surveiller'
+                                  ? 'text-amber-600'
+                                  : 'text-muted-foreground'
+                            }
+                          >
+                            {c.verdict === 'probleme' ? '●' : c.verdict === 'a_surveiller' ? '◐' : '○'}
+                          </span>{' '}
+                          <b>{c.critere}</b> — {c.constat}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+            </div>
+          </details>
         </div>
       )}
 

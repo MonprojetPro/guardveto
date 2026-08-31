@@ -216,6 +216,9 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   'protected/admin/banc-ia#lancerBanc': { hors: 'Outil de développement interne.' },
   'protected/admin/banc-ia#lancerRecetteFilou': { hors: 'Outil de développement interne.' },
   'protected/admin/banc-ia#lancerControleCoherence': { hors: 'Outil de développement interne.' },
+  'protected/admin/banc-ia#lancerBancRelectureAction': {
+    hors: 'Outil de développement interne (B-089) : il mesure le réglage de Filou, il n’est pas une capacité que Filou expose.',
+  },
 
   // ══════════════════════════════════════════════════════════════════════════
   // LES ROUTES API — entrées au registre le 2026-08-26 (audit B-007, volet 2)
