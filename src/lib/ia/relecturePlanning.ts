@@ -110,10 +110,18 @@ export function effortRelecture(): EffortRelecture | undefined {
  * décrivait. Sonnet 5 produit plus de jetons qu'Opus pour un même texte : un
  * budget calibré sur Opus est trop court pour lui.
  *
- * Relevé à 24 000, soit la moitié en plus. Ce n'est pas le maximum du modèle
- * (128 000) : c'est ce qu'un appel NON diffusé supporte sans que la connexion
- * HTTP devienne le risque. Passer la relecture en flux reste le vrai correctif
- * si on doit monter plus haut — un autre chantier.
+ * Relevé à 24 000, soit la moitié en plus.
+ *
+ * ⚠️ ET C'EST CE QUI A IMPOSÉ LE FLUX. Le SDK REFUSE un appel non diffusé dès
+ * que `max_tokens` dépasse **21 333** — il estime la durée par
+ * `3600 × max_tokens / 128000` et lève au-delà de 10 minutes
+ * (`client.js:_calculateNonstreamingTimeout`). Le refus est IMMÉDIAT et local :
+ * aucun appel ne part, rien n'est facturé, et le message ne parle que de
+ * streaming — jamais de `max_tokens`, qui en est pourtant la seule cause.
+ *
+ * Monter le budget SANS passer en flux était donc contradictoire : les deux
+ * vont ensemble. C'est ce qui a fait échouer les 4 configurations du banc en
+ * 0,0 s le 31/08.
  */
 const MAX_TOKENS_RELECTURE = 24000
 
@@ -511,7 +519,16 @@ export async function relirePlanningIA(
   const modele = options?.modele ?? modeleRelecture()
   const effort = options?.effort ?? effortRelecture()
 
-  const response = await client.messages.parse({
+  // ⚠️ EN FLUX, ET CE N'EST PAS UN CONFORT — c'est ce que le budget impose.
+  //
+  // `messages.parse()` (non diffusé) est REFUSÉ par le SDK au-delà de 21 333
+  // jetons de sortie, avant même de partir. `stream()` accepte exactement les
+  // mêmes paramètres, sortie structurée comprise, et `finalMessage()` rend le
+  // même objet avec son `parsed_output` : le reste du code ne change pas.
+  //
+  // Bénéfice au passage : la connexion ne reste plus muette pendant deux
+  // minutes, ce qui était le vrai risque de coupure sur une longue relecture.
+  const flux = client.messages.stream({
     model: modele,
     max_tokens: MAX_TOKENS_RELECTURE,
     thinking: { type: 'adaptive' },
@@ -534,6 +551,8 @@ export async function relirePlanningIA(
       ...(effort ? { effort } : {}),
     },
   })
+
+  const response = await flux.finalMessage()
 
   const brut = response.parsed_output
   if (!brut) {
