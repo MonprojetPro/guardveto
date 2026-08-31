@@ -5,6 +5,7 @@ import { Header } from '@/components/layout/Header'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { MobileNav } from '@/components/layout/MobileNav'
 import { getNotifications } from '@/data/notifications'
+import { RubanBacASable } from '@/components/RubanBacASable'
 import type { Veterinaire } from '@/types'
 
 export default async function ProtectedLayout({
@@ -66,6 +67,9 @@ export default async function ProtectedLayout({
 
       {/* Zone principale */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Au-dessus du Header, donc visible sur TOUS les écrans V1 — y
+            compris ceux qu'on ajoutera plus tard (B-090). */}
+        <RubanBacASable />
         <Header veterinaire={veterinaire as Veterinaire} initialNotifications={initialNotifications} />
 
         <main className="flex-1 overflow-y-auto p-4 pb-20 md:pb-4">

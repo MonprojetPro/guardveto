@@ -12,6 +12,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { RubanBacASable } from '@/components/RubanBacASable'
 import '@/styles/v2-terrier.css'
 // L'écran de relecture d'un ancien planning importé (déposé dans la
 // conversation de Filou, affiché sur le tableau).
@@ -25,5 +26,12 @@ export default async function LayoutV2({ children }: { children: React.ReactNode
 
   if (!user) redirect('/login')
 
-  return <div className="v2">{children}</div>
+  // Le ruban est posé ICI, au-dessus de tout : les huit écrans V2 le portent
+  // d'un coup, et le neuvième l'aura sans qu'on y pense (B-090).
+  return (
+    <div className="v2">
+      <RubanBacASable />
+      {children}
+    </div>
+  )
 }
