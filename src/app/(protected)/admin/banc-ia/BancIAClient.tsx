@@ -239,6 +239,13 @@ export function BancIAClient({ modeleActuel }: { modeleActuel: string }) {
                         <td className="py-2 pr-3 font-mono">{centimes(l.cout ?? 0)}</td>
                         <td className="py-2 pr-3 font-mono">
                           {l.criteresTraites}/{9}
+                          {/* Un « 0/9 » muet ne dit pas s'il n'a rien trouvé ou
+                              si on a jeté ce qu'il a dit. Ici, on le dit. */}
+                          {(l.nonRattachees ?? 0) > 0 && (
+                            <span className="ml-1 text-destructive" title="lignes rendues qu’on n’a pas su rattacher à un critère">
+                              +{l.nonRattachees} non rattachée{l.nonRattachees! > 1 ? 's' : ''}
+                            </span>
+                          )}
                         </td>
                         <td className="py-2 pr-3 font-mono">
                           {l.problemes} <span className="text-muted-foreground">(+{l.aSurveiller} à surveiller)</span>

@@ -129,6 +129,46 @@ describe('le SCHÉMA ne refuse plus un texte long', () => {
   })
 })
 
+describe('une clé de critère approximative ne fait plus disparaître un constat', () => {
+  // MESURÉ le 31/08 : Sonnet 5 à `medium` a rendu une synthèse juste et une
+  // proposition… et 0 critère sur 9. La comparaison de clés était stricte :
+  // tout ce qui ne tombait pas à l'octet près était jeté EN SILENCE.
+  const VARIANTES = ['Role_Avantage', 'role-avantage', 'rôle_avantage', 'ROLE AVANTAGE']
+
+  it.each(VARIANTES)('rattache « %s » au bon critère', (ecriture) => {
+    const r = normaliserRelecture(
+      sortie({
+        revue: [
+          { critere: ecriture, verdict: 'probleme', constat: 'Fanny n’est jamais première.', corrigeable: false },
+        ],
+      }),
+      DOSSIER,
+    )
+
+    expect(r.revue).toHaveLength(1)
+    expect(r.revue[0].critere).toBe('role_avantage')
+    expect(r.entreesNonRattachees).toBe(0)
+  })
+
+  it('COMPTE ce qui reste vraiment inconnu au lieu de l’avaler', () => {
+    // Le compteur est ce qui distingue « il n'a rien dit » de « il a parlé et
+    // on n'a pas su l'entendre ». Sans lui, les deux s'affichent « 0/9 ».
+    const r = normaliserRelecture(
+      sortie({
+        revue: [
+          { critere: 'critere_invente', verdict: 'probleme', constat: 'Quelque chose.', corrigeable: false },
+          { critere: 'encore_un_autre', verdict: 'probleme', constat: 'Autre chose.', corrigeable: false },
+        ],
+      }),
+      DOSSIER,
+    )
+
+    expect(r.revue).toEqual([])
+    expect(r.entreesNonRattachees).toBe(2)
+    expect(r.criteresNonTraites).toHaveLength(CRITERES_HUMAINS.length)
+  })
+})
+
 describe('normaliserRelecture — la longueur ne détruit plus rien', () => {
   it('garde les 9 critères quand TOUS les textes dépassent les limites', () => {
     // Le cas exact du 31/08. Avant le correctif, cette réponse ne parvenait

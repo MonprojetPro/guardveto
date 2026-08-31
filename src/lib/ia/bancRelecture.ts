@@ -100,11 +100,11 @@ export function configurationsBanc(): ConfigBanc[] {
   return [
     {
       cle: 'actuel',
-      nom: 'Sonnet 5 · application non réglée',
+      nom: 'Sonnet 5 · low',
       modele: 'claude-sonnet-5',
-      effort: undefined,
+      effort: 'low',
       pourquoi:
-        'Ce qui tourne depuis le 31/08. L’application n’est pas transmise, donc l’API applique « high ».',
+        'Ce qui tourne depuis le 31/08 au soir. Mesuré ce jour-là : 64,7 s, 12,23 ¢, 9 critères sur 9.',
     },
     {
       cle: 'sonnet-medium',
@@ -112,15 +112,7 @@ export function configurationsBanc(): ConfigBanc[] {
       modele: 'claude-sonnet-5',
       effort: 'medium',
       pourquoi:
-        'Le cran du Filou du quotidien. Au premier passage, il avait été coupé faute de place — le budget a été relevé depuis.',
-    },
-    {
-      cle: 'sonnet-low',
-      nom: 'Sonnet 5 · low',
-      modele: 'claude-sonnet-5',
-      effort: 'low',
-      pourquoi:
-        'Le plancher. Au premier passage il avait rendu une relecture complète, jetée par notre schéma — plus possible depuis.',
+        'Le cran au-dessus. Le 31/08 il avait rendu 0 critère sur 9 pour 29,21 ¢ — à re-mesurer maintenant que les clés approchantes sont rattachées.',
     },
     {
       cle: 'opus-medium',
@@ -128,8 +120,13 @@ export function configurationsBanc(): ConfigBanc[] {
       modele: 'claude-opus-4-8',
       effort: 'medium',
       pourquoi:
-        'Le retour en arrière, s’il fallait le faire. Mesuré à 128,3 s le 31/08 — au-dessus de l’ancien plafond de la route.',
+        'Le repli, s’il fallait y revenir. Mesuré le 31/08 : 115,2 s et 27,31 ¢ pour la même couverture que Sonnet 5 à low.',
     },
+    // ⚠️ `high` et l'absence de réglage NE SONT PLUS AU BANC — ce n'est pas un
+    // oubli. Les deux ont été mesurés le 31/08 et ont ÉCHOUÉ de la même façon :
+    // coupés à 24 000 jetons sur 24 000, après 247,6 s, sans rien rendre. Les
+    // remettre reviendrait à payer une minute et demie d'attente pour un échec
+    // déjà connu. Le banc doit départager des candidats, pas rejouer un verdict.
   ]
 }
 
@@ -148,6 +145,14 @@ export interface LigneBanc {
   cout?: number
   /** Ce qu'il a TROUVÉ — sans quoi on choisirait le plus rapide, donc le plus muet. */
   criteresTraites?: number
+  /**
+   * Ce que la configuration a dit et qu'on n'a PAS su rattacher à un critère.
+   *
+   * Sans lui, « 0 critère sur 9 » a deux causes indiscernables — il n'a rien
+   * dit, ou il a parlé et on a tout jeté. C'était le cas de Sonnet 5 `medium`
+   * le 31/08, et rien à l'écran ne permettait de le voir.
+   */
+  nonRattachees?: number
   problemes?: number
   aSurveiller?: number
   changements?: number
@@ -271,6 +276,7 @@ export async function lancerBancRelecture(
           cacheLu: r.mesure.cacheLu,
           cout: cout(c.modele, r.mesure),
           criteresTraites: r.revue.length,
+          nonRattachees: r.entreesNonRattachees,
           problemes: r.revue.filter((x) => x.verdict === 'probleme').length,
           aSurveiller: r.revue.filter((x) => x.verdict === 'a_surveiller').length,
           changements: r.changements.length,
@@ -305,7 +311,7 @@ export async function lancerBancRelecture(
     preparationSecondes,
     configurationEnVigueur: {
       modele: modeleRelecture(),
-      effort: effortRelecture() ?? 'non réglé → « high », le défaut de l’API',
+      effort: effortRelecture(),
     },
     lignes,
     coutTotal: lignes.reduce((s, l) => s + (l.cout ?? 0), 0),

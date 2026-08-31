@@ -65,6 +65,33 @@ export const EFFORTS_RELECTURE = ['low', 'medium', 'high', 'xhigh', 'max'] as co
 export type EffortRelecture = (typeof EFFORTS_RELECTURE)[number]
 
 /**
+ * `low`, et le banc du 31/08 est formel : SUR CETTE TÂCHE, PLUS D'APPLICATION
+ * DONNE UN MOINS BON RÉSULTAT. Mesuré sur Hiver P1 (48 places, 7 personnes) :
+ *
+ *   • `high` (l'ancien défaut de l'API) — ÉCHEC : coupé à 24 000 jetons sur
+ *     24 000, après 247,6 s. Aucune relecture rendue.
+ *   • `medium` — 178,3 s, 16 972 jetons, 29,21 ¢ … et **0 critère sur 9**.
+ *   • `low` — 64,7 s, 5 654 jetons, 12,23 ¢, **9 critères sur 9**, 4 problèmes
+ *     et 4 points à surveiller, 2 propositions.
+ *
+ * Pour comparaison, Opus 4.8 à `medium` : 115,2 s, 27,31 ¢, 9/9, 4 problèmes.
+ * `low` sur Sonnet 5 fait donc AUSSI BIEN, deux fois plus vite et pour moins de
+ * la moitié du prix.
+ *
+ * ⚠️ CE N'EST PAS UN RÉGLAGE D'ÉCONOMIE, C'EST LE RÉGLAGE QUI MARCHE. Le
+ * remonter « pour être plus sûr » est le geste qui casse la relecture — c'est
+ * exactement ce qui la cassait sans que personne l'ait choisi. L'explication
+ * tient au travail demandé : les compteurs, les absences et la liste des
+ * remplaçants sont SERVIS TOUT CALCULÉS. Il reste à lire, comparer et rédiger.
+ * Donner plus de place à ce travail-là ne l'améliore pas : ça l'étale.
+ *
+ * Réglable par `GUARDVETO_IA_EFFORT_RELECTURE` si un cabinet ou une période
+ * beaucoup plus grande demandait autre chose — mais à mesurer au banc AVANT,
+ * jamais au ressenti.
+ */
+const EFFORT_PAR_DEFAUT: EffortRelecture = 'low'
+
+/**
  * L'application demandée à la relecture — le SEUL levier sur son temps.
  *
  * ⚠️ Le budget de jetons de réflexion n'existe plus : `thinking: { type:
@@ -85,11 +112,11 @@ export type EffortRelecture = (typeof EFFORTS_RELECTURE)[number]
  * vide, elle conserve le comportement d'aujourd'hui — le banc mesure ce qui
  * tourne réellement, il ne mesure pas un réglage qu'on vient de poser.
  */
-export function effortRelecture(): EffortRelecture | undefined {
+export function effortRelecture(): EffortRelecture {
   const brut = process.env.GUARDVETO_IA_EFFORT_RELECTURE?.trim().toLowerCase()
   return EFFORTS_RELECTURE.includes(brut as EffortRelecture)
     ? (brut as EffortRelecture)
-    : undefined
+    : EFFORT_PAR_DEFAUT
 }
 
 /**
@@ -321,6 +348,15 @@ export interface ResultatRelecture {
    */
   criteresNonTraites: string[]
   /**
+   * Le nombre de lignes de revue rendues par Filou qu'on n'a PAS su rattacher
+   * à un critère connu.
+   *
+   * Sans ce compteur, « 0 critère sur 9 » a deux causes indiscernables : il
+   * n'a rien dit, ou il a parlé et nous avons tout jeté. Le 31/08, c'était la
+   * seconde — et rien à l'écran ne permettait de le savoir.
+   */
+  entreesNonRattachees: number
+  /**
    * Ce que l'appel a coûté, tel que l'API le rapporte. Rempli à chaque appel,
    * lu par le banc de mesure.
    *
@@ -331,7 +367,7 @@ export interface ResultatRelecture {
    */
   mesure: {
     modele: string
-    effort: EffortRelecture | 'high (défaut de l’API)'
+    effort: EffortRelecture
     entree: number
     sortie: number
     cacheEcrit: number
@@ -571,7 +607,7 @@ export async function relirePlanningIA(
     ...normaliserRelecture(brut, dossier),
     mesure: {
       modele,
-      effort: effort ?? 'high (défaut de l’API)',
+      effort,
       entree: response.usage?.input_tokens ?? 0,
       sortie: response.usage?.output_tokens ?? 0,
       cacheEcrit: response.usage?.cache_creation_input_tokens ?? 0,
@@ -583,6 +619,40 @@ export async function relirePlanningIA(
 // ── Nettoyage de la réponse ──────────────────────────────────
 
 const CLES_CRITERES = new Set(CRITERES_HUMAINS.map((c) => c.cle))
+
+/**
+ * Retrouve la clé d'un critère malgré une écriture approximative.
+ *
+ * ⚠️ MESURÉ LE 31/08 : Sonnet 5 à `medium` a rendu une synthèse juste et une
+ * proposition… et **0 critère sur 9**. Une comparaison de clés stricte jetait
+ * en SILENCE tout ce qui ne tombait pas à l'octet près.
+ *
+ * C'est la troisième fois que le même défaut se paie sur cette chaîne : on
+ * refuse ce qu'on ne reconnaît pas, sans le dire. Une majuscule, un accent ou
+ * un tiret au lieu d'un souligné suffisait à effacer un constat juste.
+ *
+ * Rattacher n'est PAS deviner : on compare des formes normalisées de la même
+ * chaîne, jamais un sens. Ce qui ne se rattache pas est COMPTÉ et remonté —
+ * voir `entreesNonRattachees`.
+ */
+function normaliserCle(brut: string): string {
+  return brut
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
+
+const CLE_PAR_FORME = new Map(
+  CRITERES_HUMAINS.map((c) => [normaliserCle(c.cle), c.cle]),
+)
+
+/** La clé officielle du critère, ou `null` si rien ne correspond. */
+function rattacherCritere(brut: string): string | null {
+  if (CLES_CRITERES.has(brut)) return brut
+  return CLE_PAR_FORME.get(normaliserCle(brut)) ?? null
+}
 
 /**
  * Les longueurs voulues à l'écran. Elles ne sont PLUS des conditions de
@@ -650,7 +720,7 @@ export function normaliserRelecture(
     changements.push({
       id: `F${++n}`,
       motif: c.motif.trim(),
-      critere: CLES_CRITERES.has(c.critere) ? c.critere : 'epuisement',
+      critere: rattacherCritere(c.critere) ?? 'epuisement',
       affectations: c.affectations.map((a) => ({
         date: a.date, type: a.type, role: a.role, vetId: a.vetId,
       })),
@@ -661,11 +731,20 @@ export function normaliserRelecture(
   // L'admin lit toujours les mêmes critères au même endroit d'une génération à
   // l'autre ; un ordre qui bouge se relit à chaque fois.
   const revueParCle = new Map<string, SortieRelecture['revue'][number]>()
+  let entreesNonRattachees = 0
   for (const r of brut.revue ?? []) {
-    if (!CLES_CRITERES.has(r.critere)) continue
-    if (!revueParCle.has(r.critere)) {
-      revueParCle.set(r.critere, {
+    const cle = rattacherCritere(r.critere)
+    if (!cle) {
+      // Compté, jamais avalé : c'est ce compteur qui dira, la prochaine fois,
+      // si un « 0 critère sur 9 » veut dire « il n'a rien dit » ou « il a parlé
+      // et nous n'avons pas su l'entendre ».
+      entreesNonRattachees++
+      continue
+    }
+    if (!revueParCle.has(cle)) {
+      revueParCle.set(cle, {
         ...r,
+        critere: cle,
         constat: couper(r.constat, LONGUEURS.constat),
         // Un détail qui répète le constat double la lecture pour rien.
         detail: r.detail?.trim() ? couper(r.detail, LONGUEURS.detail) : undefined,
@@ -685,5 +764,6 @@ export function normaliserRelecture(
     revue,
     changements,
     criteresNonTraites,
+    entreesNonRattachees,
   }
 }
