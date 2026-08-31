@@ -45,8 +45,19 @@ import { ecrirePlanningV1 } from '@/data/ecrirePlanningV1'
 import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
 import { critereParCle } from '@/lib/planning/criteres-humains'
 
-// Un appel Opus sur une période entière, puis l'arbitrage et la réécriture.
-export const maxDuration = 120
+// Un appel au modèle sur une période entière, puis l'arbitrage et la réécriture.
+//
+// ⚠️ 120 s ÉTAIT TROP COURT, et ce n'est pas une prévision : le banc du 31/08 a
+// mesuré 152,1 s pour la configuration alors en production (Opus 4.8 sans
+// réglage d'application) et 128,3 s à `medium`, sur 48 places — les deux
+// au-dessus du plafond. La relecture ne tenait déjà plus dans son propre budget
+// de temps, et l'échec se serait présenté comme un « Filou n'a pas pu relire »
+// sans jamais dire que c'était une question de secondes.
+//
+// 300 s : la même valeur que la page du banc, qui a laissé passer un appel de
+// 173,5 s sans être coupée — la plateforme accepte donc au moins cela. Ce n'est
+// pas une estimation, c'est ce qui a tourné.
+export const maxDuration = 300
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()

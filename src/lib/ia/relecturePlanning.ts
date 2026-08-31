@@ -15,13 +15,29 @@
 // voit pas. Les critères sont dans `lib/planning/criteres-humains.ts`, écrits
 // en français, relisibles et amendables sans ouvrir ce fichier.
 //
-// ── MODÈLE : OPUS, ASSUMÉ ───────────────────────────────────────────────────
+// ── MODÈLE : SONNET 5, MESURÉ PUIS TRANCHÉ ──────────────────────────────────
 //
-// Décision de MiKL le 27/08 : « je suis pour utiliser Opus direct car comme tu
-// le dis ça ne sera pas un grand usage ». Une génération, c'est 4 fois par an
-// et par cabinet — le raisonnement d'ensemble sur 12 semaines vaut le palier le
-// plus capable. Réglable par `GUARDVETO_IA_MODELE_RELECTURE` pour pouvoir
-// mesurer un autre palier sans redéployer, comme le reste du produit.
+// Décision de MiKL le 31/08, après le banc (`bancRelecture.ts`) : « on ne va
+// pas tergiverser 3 h et dépenser pour rien, on prend Sonnet 5 ».
+//
+// Ce qu'Opus 4.8 coûtait vraiment, mesuré sur Hiver P1 (48 places, 7
+// personnes) : 152,1 s et 35,7 ¢ sans réglage d'application, 128,3 s et 30,4 ¢
+// à `medium`. Les deux DÉPASSENT le plafond de 120 s de la route — la relecture
+// d'aujourd'hui ne tenait déjà plus dans son propre budget de temps.
+//
+// ⚠️ Le banc a rendu DEUX ÉCHECS sur Sonnet 5, et aucun n'était le modèle :
+//   • `medium` : coupé à 16 000 jetons sur 16 000 — notre plafond, atteint pile.
+//     Sonnet 5 produit plus de jetons qu'Opus pour un même texte ; le budget
+//     était calibré sur l'autre modèle. → `MAX_TOKENS_RELECTURE` relevé.
+//   • `low` : relecture COMPLÈTE et correcte, jetée par notre propre schéma
+//     pour cause de texte trop long. → contraintes de longueur retirées du
+//     schéma, appliquées en coupe (voir le bloc au-dessus d'`AffectationSchema`).
+//
+// Les deux correctifs valent pour TOUS les modèles : le second défaut était
+// armé sur Opus aussi, il n'avait simplement pas encore explosé.
+//
+// Réglable par `GUARDVETO_IA_MODELE_RELECTURE` — revenir à `claude-opus-4-8`
+// ne demande donc pas un déploiement de code.
 //
 // ⚠️ Variable SÉPARÉE de `GUARDVETO_IA_MODELE` (le Filou du quotidien, Sonnet
 // par décision du 24/08) : une seule variable ferait basculer les 630 appels
@@ -41,7 +57,7 @@ import type { ChangementPropose } from '@/engine/relecture/arbitrer'
  * valeur, et l'API répond alors 404 not_found_error (incident 2026-07-27).
  */
 export function modeleRelecture(): string {
-  return process.env.GUARDVETO_IA_MODELE_RELECTURE?.trim() || 'claude-opus-4-8'
+  return process.env.GUARDVETO_IA_MODELE_RELECTURE?.trim() || 'claude-sonnet-5'
 }
 
 /** Les crans d'application acceptés par l'API, du plus court au plus fouillé. */
@@ -87,11 +103,19 @@ export function effortRelecture(): EffortRelecture | undefined {
  * structurée n'existe qu'entière — et l'écran affiche « Filou n'a pas pu
  * relire », sans dire que c'était une question de place.
  *
- * 16 000 est le plafond recommandé pour un appel NON diffusé : au-delà, c'est
- * la connexion HTTP qui devient le risque, et il faudrait passer la relecture
- * en flux — un autre chantier.
+ * ⚠️ MESURÉ LE 31/08 : 16 000 ne suffisait plus. Sonnet 5 à `medium` a produit
+ * **16 000 jetons sur 16 000 autorisés** et s'est fait couper avant d'avoir
+ * rendu sa réponse structurée — l'écran a affiché « Filou n'a pas pu relire »
+ * pour un manque de place, exactement le scénario que le commentaire ci-dessus
+ * décrivait. Sonnet 5 produit plus de jetons qu'Opus pour un même texte : un
+ * budget calibré sur Opus est trop court pour lui.
+ *
+ * Relevé à 24 000, soit la moitié en plus. Ce n'est pas le maximum du modèle
+ * (128 000) : c'est ce qu'un appel NON diffusé supporte sans que la connexion
+ * HTTP devienne le risque. Passer la relecture en flux reste le vrai correctif
+ * si on doit monter plus haut — un autre chantier.
  */
-const MAX_TOKENS_RELECTURE = 16000
+const MAX_TOKENS_RELECTURE = 24000
 
 // ── Ce qu'on donne à lire à Filou ────────────────────────────
 
@@ -152,6 +176,28 @@ export interface DossierRelecture {
 
 // ── Ce que Filou répond ──────────────────────────────────────
 
+// ⚠️ AUCUNE LIMITE DE LONGUEUR NI DE CARDINALITÉ DANS CE SCHÉMA — et c'est une
+// correction, pas un oubli (B-089, mesuré le 31/08).
+//
+// L'API n'accepte PAS les contraintes de longueur (`.max()`, `.min()`) ni les
+// contraintes de cardinalité de tableau dans une sortie structurée : le SDK les
+// RETIRE du schéma envoyé au modèle, puis les valide LUI-MÊME à la réception.
+// Le modèle n'a donc jamais su qu'il y avait une limite — et quand il la
+// dépassait, le SDK levait, et **toute la relecture était perdue**.
+//
+// Mesuré : sur Sonnet 5, une relecture complète et correcte a été jetée parce
+// que la synthèse faisait plus de 320 caractères et que quatre `detail` —
+// un champ FACULTATIF — dépassaient 400. Neuf constats justes détruits par une
+// contrainte de mise en forme que le modèle ne pouvait pas connaître.
+//
+// C'est le défaut de B-062 retourné : le schéma écrit pour rendre le SILENCE
+// impossible était devenu une cause de silence. « Filou n'a pas pu relire »
+// s'affichait pour un texte trop long.
+//
+// La brièveté reste EXIGÉE — mais là où elle peut être obtenue : dans les
+// `describe` ci-dessous, que le modèle lit. Et là où elle peut être garantie :
+// à la normalisation, qui COUPE au lieu de rejeter. Une consigne de mise en
+// forme ne doit jamais pouvoir détruire un contenu juste.
 const AffectationSchema = z.object({
   date: z.string().describe('Date ISO yyyy-mm-dd de la place, exactement comme fournie.'),
   type: z.string().describe('Le code de créneau de la place, exactement comme fourni.'),
@@ -177,8 +223,6 @@ const ChangementSchema = z.object({
     ),
   affectations: z
     .array(AffectationSchema)
-    .min(1)
-    .max(6)
     .describe(
       "Les places à modifier, toutes ensemble. Pourvoir une case vide = une seule affectation. Un échange entre deux personnes = DEUX affectations (chacune reçoit la place de l'autre). Un échange de rôles sur un week-end = QUATRE affectations, parce que le vendredi soir qui le précède doit suivre.",
     ),
@@ -216,13 +260,11 @@ const RevueSchema = z.object({
     ),
   constat: z
     .string()
-    .max(120)
     .describe(
       "UNE SEULE PHRASE COURTE, 120 caractères maximum. Le prénom, le fait, le chiffre — rien d'autre. Exemples de la bonne longueur : « Anne-Sophie fait 1 week-end et n'est jamais première. » · « Antoine enchaîne 4 gardes du 2 au 7 octobre. » · « Manon n'a aucun week-end, mais elle est absente 3 semaines. » C'est la seule ligne que l'administratrice lira à coup sûr : tout ce qui n'y tient pas va dans `detail`.",
     ),
   detail: z
     .string()
-    .max(400)
     .optional()
     .describe(
       "Le reste : les dates précises, l'historique, la comparaison avec les autres. Facultatif — ne le remplis que s'il ajoute vraiment quelque chose. Ne répète JAMAIS la phrase du constat.",
@@ -234,11 +276,12 @@ const RevueSchema = z.object({
     ),
 })
 
-const SortieRelectureSchema = z.object({
+/** Exporté pour que le garde-fou de B-089 puisse prouver qu'il n'y a plus de
+ *  contrainte de longueur ici — sans quoi la régression ne se verrait qu'en
+ *  production, sur un texte un peu trop long. */
+export const SortieRelectureSchema = z.object({
   synthese: z
     .string()
-    .min(40)
-    .max(320)
     .describe(
       "DEUX PHRASES, pas plus. Ce que l'administratrice doit retenir si elle ne lit que ça : la ou les deux personnes dont la situation t'a le plus frappé, avec le chiffre. Pas d'énumération, pas de préambule.",
     ),
@@ -249,7 +292,6 @@ const SortieRelectureSchema = z.object({
     ),
   changements: z
     .array(ChangementSchema)
-    .max(8)
     .describe(
       'Les changements concrets que tu proposes. Un changement par problème que tu sais corriger.',
     ),
@@ -524,6 +566,27 @@ export async function relirePlanningIA(
 const CLES_CRITERES = new Set(CRITERES_HUMAINS.map((c) => c.cle))
 
 /**
+ * Les longueurs voulues à l'écran. Elles ne sont PLUS des conditions de
+ * validité (voir le bloc au-dessus du schéma) : ce sont des coupes.
+ *
+ * On coupe au dernier espace pour ne pas trancher un mot en deux, et on pose
+ * « … » : l'admin voit qu'il manque quelque chose au lieu de lire une phrase
+ * qui s'arrête net et paraît bâclée.
+ */
+const LONGUEURS = { synthese: 320, constat: 160, detail: 400 } as const
+
+/** Nombre de propositions et de places retenues — au-delà, l'écran devient illisible. */
+const PLAFONDS = { changements: 8, affectations: 6 } as const
+
+function couper(texte: string, maximum: number): string {
+  const propre = texte.trim()
+  if (propre.length <= maximum) return propre
+  const tronque = propre.slice(0, maximum - 1)
+  const espace = tronque.lastIndexOf(' ')
+  return `${(espace > maximum * 0.6 ? tronque.slice(0, espace) : tronque).trimEnd()}…`
+}
+
+/**
  * Met la réponse en forme et écarte ce qui ne tient pas debout.
  *
  * ⚠️ Ce filtre n'est pas de la défiance de principe : il attrape les erreurs
@@ -548,7 +611,11 @@ export function normaliserRelecture(
   const changements: ChangementPropose[] = []
   let n = 0
 
-  for (const c of brut.changements ?? []) {
+  for (const c of (brut.changements ?? []).slice(0, PLAFONDS.changements)) {
+    // Une proposition sans aucune place à changer n'est pas applicable : elle
+    // s'afficherait comme un geste vide. Elle est écartée ici, et comptée.
+    if (c.affectations.length === 0) continue
+    c.affectations = c.affectations.slice(0, PLAFONDS.affectations)
     // Une place inventée rendrait le changement inapplicable : l'arbitrage le
     // classerait « sans objet » et l'admin lirait une ligne vide de sens.
     const placesValides = c.affectations.every((a) =>
@@ -580,9 +647,9 @@ export function normaliserRelecture(
     if (!revueParCle.has(r.critere)) {
       revueParCle.set(r.critere, {
         ...r,
-        constat: r.constat.trim(),
+        constat: couper(r.constat, LONGUEURS.constat),
         // Un détail qui répète le constat double la lecture pour rien.
-        detail: r.detail?.trim() || undefined,
+        detail: r.detail?.trim() ? couper(r.detail, LONGUEURS.detail) : undefined,
       })
     }
   }
@@ -595,7 +662,7 @@ export function normaliserRelecture(
   ).map((c) => c.titre)
 
   return {
-    synthese: brut.synthese.trim(),
+    synthese: couper(brut.synthese, LONGUEURS.synthese),
     revue,
     changements,
     criteresNonTraites,

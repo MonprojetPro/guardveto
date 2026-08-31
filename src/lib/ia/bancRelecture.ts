@@ -100,19 +100,11 @@ export function configurationsBanc(): ConfigBanc[] {
   return [
     {
       cle: 'actuel',
-      nom: 'Opus 4.8 · application non réglée',
-      modele: 'claude-opus-4-8',
+      nom: 'Sonnet 5 · application non réglée',
+      modele: 'claude-sonnet-5',
       effort: undefined,
       pourquoi:
-        'Ce qui tourne aujourd’hui. L’application n’est pas transmise, donc l’API applique « high ».',
-    },
-    {
-      cle: 'opus-medium',
-      nom: 'Opus 4.8 · medium',
-      modele: 'claude-opus-4-8',
-      effort: 'medium',
-      pourquoi:
-        'Même modèle, application bridée : isole ce que coûte l’application, sans changer de cerveau.',
+        'Ce qui tourne depuis le 31/08. L’application n’est pas transmise, donc l’API applique « high ».',
     },
     {
       cle: 'sonnet-medium',
@@ -120,7 +112,7 @@ export function configurationsBanc(): ConfigBanc[] {
       modele: 'claude-sonnet-5',
       effort: 'medium',
       pourquoi:
-        'Le candidat de MiKL, au même cran que le Filou du quotidien : isole ce que coûte le modèle.',
+        'Le cran du Filou du quotidien. Au premier passage, il avait été coupé faute de place — le budget a été relevé depuis.',
     },
     {
       cle: 'sonnet-low',
@@ -128,7 +120,15 @@ export function configurationsBanc(): ConfigBanc[] {
       modele: 'claude-sonnet-5',
       effort: 'low',
       pourquoi:
-        'Le plancher. Sert à voir où la qualité casse — s’il tient ici, tout le reste est du confort.',
+        'Le plancher. Au premier passage il avait rendu une relecture complète, jetée par notre schéma — plus possible depuis.',
+    },
+    {
+      cle: 'opus-medium',
+      nom: 'Opus 4.8 · medium',
+      modele: 'claude-opus-4-8',
+      effort: 'medium',
+      pourquoi:
+        'Le retour en arrière, s’il fallait le faire. Mesuré à 128,3 s le 31/08 — au-dessus de l’ancien plafond de la route.',
     },
   ]
 }
