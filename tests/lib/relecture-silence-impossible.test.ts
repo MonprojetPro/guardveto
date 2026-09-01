@@ -28,6 +28,8 @@ import {
 import { CRITERES_HUMAINS } from '@/lib/planning/criteres-humains'
 
 const DOSSIER: DossierRelecture = {
+  // B-093 : ce test porte sur l'impossibilité du silence, pas sur les échanges.
+  echanges: [],
   periode: 'du 21 septembre au 18 octobre',
   saison: 'hiver',
   places: [

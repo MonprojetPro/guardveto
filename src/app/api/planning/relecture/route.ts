@@ -40,6 +40,7 @@ import { relirePlanningIA, modeleRelecture } from '@/lib/ia/relecturePlanning'
 import { assistantIaDisponible } from '@/lib/ia/proposerRegle'
 import { arbitrerChangements, type ChangementArbitre } from '@/engine/relecture/arbitrer'
 import { remplacantsPossibles } from '@/engine/relecture/remplacants'
+import { echangesPossibles } from '@/engine/relecture/echanges'
 import { persisterResultat } from '@/data/persisterResultat'
 import { ecrirePlanningV1 } from '@/data/ecrirePlanningV1'
 import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
@@ -259,8 +260,40 @@ async function executerRelecture(
     contexteAnterieur: contexte.contexteAnterieur,
   })
 
+  // B-093 — les ÉCHANGES, sans lesquels la liste ci-dessus est presque toujours
+  // vide. Mesuré le 2026-09-01 sur Hiver P2 : 53 places sur 118 sans aucun
+  // remplaçant simple. Filou lisait ces vides comme « rien n'est possible » et
+  // se taisait — sept constats sur sept en « pas de correction automatique ».
+  //
+  // CIBLAGE : sans filtre, 118 places donnent ~6 900 paires. Le calcul tient,
+  // mais le dossier noierait le signal et exploserait le budget de jetons. On
+  // ne garde donc que les échanges impliquant les personnes AUX EXTRÊMES de la
+  // charge — les seules dont une permutation change quelque chose.
+  emettre('Je cherche quels échanges le moteur accepterait…')
+  const charge = new Map<string, number>()
+  for (const a of planningActuel.attributions) {
+    for (const p of a.placements) {
+      if (p.vetId) charge.set(p.vetId, (charge.get(p.vetId) ?? 0) + 1)
+    }
+  }
+  const parCharge = [...charge.entries()].sort((x, y) => y[1] - x[1]).map(([id]) => id)
+  const vetsCibles = [...new Set([...parCharge.slice(0, 2), ...parCharge.slice(-2)])]
+
+  const echanges = echangesPossibles(planningActuel, {
+    vets: contexte.vets,
+    dateDebut: contexte.dateDebut,
+    dateFin: contexte.dateFin,
+    saison: contexte.saison,
+    calendrier: contexte.calendrier,
+    nbVetosSemaineSoir: contexte.nbVetosSemaineSoir,
+    structureConfig: contexte.structureConfig,
+    creneaux: contexte.creneaux,
+    contexteAnterieur: contexte.contexteAnterieur,
+    vetsCibles,
+  })
+
   const { dossier, historiqueIndisponible } = await monterDossierRelecture(
-    supabase, planningActuel, contexte, periodeId, cabinetId, remplacants,
+    supabase, planningActuel, contexte, periodeId, cabinetId, remplacants, echanges,
   )
 
   // ── Filou lit ──

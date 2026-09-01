@@ -22,8 +22,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { PlanningPartiel } from '@/engine/types'
 import type {
-  DossierRelecture, PersonneLisible, PlaceLisible,
+  DossierRelecture, PersonneLisible, PlaceLisible, EchangeLisible,
 } from '@/lib/ia/relecturePlanning'
+import type { EchangePossible } from '@/engine/relecture/echanges'
 import { dateFr, periodeFr } from '@/lib/dates-fr'
 import { phraseRegle, type RegleNommable } from '@/lib/regles/libelle'
 
@@ -105,6 +106,12 @@ export async function monterDossierRelecture(
   cabinetId: string,
   /** Place → identifiants pouvant la tenir (cf. `engine/relecture/remplacants`). */
   remplacants?: Map<string, string[]>,
+  /**
+   * Les permutations légales (cf. `engine/relecture/echanges`). Absent → liste
+   * vide, et Filou lit alors « aucun échange possible ». C'est un repli sûr
+   * mais appauvrissant : l'appelant DOIT les passer sur le chemin de production.
+   */
+  echanges?: EchangePossible[],
 ): Promise<{ dossier: DossierRelecture; historiqueIndisponible: boolean }> {
   const roleAvantage = contexte.roleAvantageFinancier ?? null
 
@@ -251,6 +258,19 @@ export async function monterDossierRelecture(
     }
   })
 
+  // ── Les échanges, mis en français ──
+  // Chaque ligne porte AUSSI ses coordonnées machine : Filou doit pouvoir les
+  // recopier dans sa proposition sans les reconstruire de tête, sinon il
+  // inventera une date ou un rôle et l'arbitrage répondra « sans objet ».
+  const echangesLisibles: EchangeLisible[] = (echanges ?? []).map((e) => ({
+    placeA: `${dateFr(e.a.date)} · ${creneauEnFrancais(e.a.type, nomsParCode)} · ${e.a.role}`,
+    prenomA: prenomParId.get(e.a.vetId) ?? e.a.vetId,
+    placeB: `${dateFr(e.b.date)} · ${creneauEnFrancais(e.b.type, nomsParCode)} · ${e.b.role}`,
+    prenomB: prenomParId.get(e.b.vetId) ?? e.b.vetId,
+    refA: { date: e.a.date, type: e.a.type, role: e.a.role },
+    refB: { date: e.b.date, type: e.b.type, role: e.b.role },
+  }))
+
   return {
     dossier: {
       periode: periodeFr(contexte.dateDebut, contexte.dateFin),
@@ -259,6 +279,7 @@ export async function monterDossierRelecture(
       equipe,
       reglesCabinet,
       roleAvantageFinancier: roleAvantage,
+      echanges: echangesLisibles,
     },
     historiqueIndisponible,
   }

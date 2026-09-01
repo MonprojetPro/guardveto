@@ -207,6 +207,34 @@ export interface DossierRelecture {
   reglesCabinet: string[]
   /** Le rôle qui porte l'avantage financier, s'il est configuré. */
   roleAvantageFinancier: string | null
+  /**
+   * Les ÉCHANGES que le moteur accepte — deux places dont les occupants peuvent
+   * permuter (B-093).
+   *
+   * Pourquoi c'est indispensable et pas un confort : la liste `remplacants`
+   * d'une place ne dit qui pourrait la prendre que si l'on ne libère QUE
+   * celle-là. Sur un planning que le moteur vient d'optimiser, c'est presque
+   * toujours personne — mesuré le 2026-09-01 : 53 places sur 118 sans aucun
+   * remplaçant. Filou lisait ces listes vides comme « rien n'est possible » et
+   * s'abstenait, d'où sept constats sur sept marqués « pas de correction
+   * automatique ». Ce qui reste à améliorer dans un planning optimisé, ce sont
+   * les échanges.
+   *
+   * Vide → aucun échange légal, et là ça veut vraiment dire ça.
+   */
+  echanges: EchangeLisible[]
+}
+
+/** Un échange applicable, décrit en français. */
+export interface EchangeLisible {
+  /** « lundi 19 janvier · nuit de semaine · 1er » */
+  placeA: string
+  prenomA: string
+  placeB: string
+  prenomB: string
+  /** Coordonnées machine, pour que Filou puisse les recopier sans les inventer. */
+  refA: { date: string; type: string; role: string }
+  refB: { date: string; type: string; role: string }
 }
 
 // ── Ce que Filou répond ──────────────────────────────────────
@@ -506,9 +534,16 @@ export function dossierEnTexte(dossier: DossierRelecture): string {
     '',
     'LE PLANNING, PLACE PAR PLACE',
     'Après chaque place, « peuvent aussi : … » liste les personnes que le moteur',
-    'accepterait à cet endroit. C’est une vérification déjà faite, pas une',
-    'estimation : si un prénom y figure, l’y mettre respecte toutes les règles.',
-    'Si la liste est vide, personne d’autre ne peut prendre cette place.',
+    'accepterait à cet endroit SANS RIEN DÉPLACER D’AUTRE. C’est une vérification',
+    'déjà faite, pas une estimation : si un prénom y figure, l’y mettre respecte',
+    'toutes les règles.',
+    '',
+    '⚠️ Une liste vide ne veut PAS dire « rien n’est possible ici ». Elle veut',
+    'dire « personne ne peut prendre cette place sans qu’on bouge autre chose ».',
+    'C’est le cas le plus fréquent : le planning que tu relis vient d’être',
+    'optimisé, donc les places où l’on peut simplement poser quelqu’un d’autre',
+    'n’améliorent rien. Ce qui reste à gagner est presque toujours un ÉCHANGE —',
+    'et les échanges possibles te sont donnés plus bas, dans leur propre liste.',
   )
   for (const place of dossier.places) {
     const possibles =
@@ -528,6 +563,29 @@ export function dossierEnTexte(dossier: DossierRelecture): string {
       ? `Il reste ${vides} place${vides > 1 ? 's' : ''} à pourvoir. Regarde si l'une d'elles peut l'être.`
       : 'Toutes les places sont pourvues.',
   )
+
+  // ── Les échanges applicables ──
+  lignes.push('', 'LES ÉCHANGES QUE LE MOTEUR ACCEPTE')
+  if (dossier.echanges.length === 0) {
+    lignes.push(
+      'Aucun. Sur ce planning, aucune permutation de deux personnes ne respecte',
+      'toutes les règles — ici, cela veut bien dire qu’il n’y a rien à faire.',
+    )
+  } else {
+    lignes.push(
+      `${dossier.echanges.length} permutations ont été VÉRIFIÉES par le moteur : les`,
+      'appliquer respecte toutes les règles. C’est ton principal levier — la',
+      'plupart des déséquilibres ne se corrigent que comme ça.',
+      'Pour en proposer une, recopie les deux places telles qu’elles sont écrites.',
+    )
+    for (const e of dossier.echanges) {
+      lignes.push(
+        `- ${e.prenomA} (${e.placeA}) ⇄ ${e.prenomB} (${e.placeB})` +
+          `  [A date=${e.refA.date} type=${e.refA.type} role=${e.refA.role}]` +
+          `  [B date=${e.refB.date} type=${e.refB.type} role=${e.refB.role}]`,
+      )
+    }
+  }
 
   return lignes.join('\n')
 }
