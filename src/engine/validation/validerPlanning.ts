@@ -134,6 +134,49 @@ function plusJours(date: string, n: number): string {
   return d.toISOString().split('T')[0]
 }
 
+/** Nombre de jours (absolu) entre deux dates ISO. Remonté au niveau module :
+ *  `ecartReelEntreGardes` en a besoin, et il ne peut pas voir une closure. */
+function joursEntre(a: string, b: string): number {
+  const da = new Date(a + 'T12:00:00Z').getTime()
+  const db = new Date(b + 'T12:00:00Z').getTime()
+  return Math.round(Math.abs(db - da) / 86_400_000)
+}
+
+/**
+ * Jours civils COUVERTS par une garde : le week-end est daté du samedi mais
+ * couvre samedi ET dimanche.
+ *
+ * Miroir DÉLIBÉRÉ de `hard-constraints.joursCouvertsGarde` — ce validateur est
+ * un second gardien indépendant et n'importe jamais `rules/`. Trois copies
+ * identiques de ce miroir vivaient plus bas dans ce fichier ; elles sont
+ * remplacées par celle-ci, sans changer leur comportement. Trois définitions du
+ * même mot dans un seul fichier finissent toujours par diverger (B-088).
+ */
+function joursCouvertsDeGarde(date: string, type: string): string[] {
+  return type === 'weekend' ? [date, plusJours(date, 1)] : [date]
+}
+
+/**
+ * Écart RÉEL entre deux gardes, en jours de répit — la plus petite distance
+ * entre leurs jours couverts, jamais entre leurs dates d'ancrage.
+ *
+ * Un week-end daté du samedi et une garde le lundi étaient réputés à 2 jours
+ * d'écart, alors que la personne sort de garde le lundi matin et reprend le
+ * lundi soir. Trouvé par MiKL le 2026-08-31 sur Hiver P2.
+ */
+function ecartReelEntreGardes(
+  dateA: string, typeA: string, dateB: string, typeB: string,
+): number {
+  let min = Infinity
+  for (const ja of joursCouvertsDeGarde(dateA, typeA)) {
+    for (const jb of joursCouvertsDeGarde(dateB, typeB)) {
+      const d = joursEntre(ja, jb)
+      if (d < min) min = d
+    }
+  }
+  return min
+}
+
 /** Lundi de la semaine ISO contenant `date` */
 function lundiDe(date: string): string {
   const d = new Date(date + 'T12:00:00Z')
@@ -877,11 +920,6 @@ export function validerPlanning(
   // Re-vérification INDÉPENDANTE : on trie les dates de garde du véto et on
   // contrôle l'écart entre dates consécutives (si tous ≥ X, toutes les paires le
   // sont). Seules les règles DURES (étage ≤ 2) sont des violations.
-  const joursEntre = (a: string, b: string): number => {
-    const da = new Date(a + 'T12:00:00Z').getTime()
-    const db = new Date(b + 'T12:00:00Z').getTime()
-    return Math.round(Math.abs(db - da) / 86_400_000)
-  }
   for (const vet of vetsNorm) {
     for (const c of vet.contraintes) {
       if (!c.actif || c.type !== 'espacement_min') continue
@@ -920,7 +958,9 @@ export function validerPlanning(
         const prec = gardes[i - 1]
         const cur = gardes[i]
         if (prec.date === cur.date) continue
-        const j = joursEntre(prec.date, cur.date)
+        // Écart RÉEL : un week-end couvre samedi + dimanche, il ne se compare pas
+        // par sa date d'ancrage (cf. ecartReelEntreGardes).
+        const j = ecartReelEntreGardes(prec.date, prec.type, cur.date, cur.type)
         // Une seule garde étalée sur deux créneaux liés n'est pas un enchaînement.
         if (j === 1 && lieParStructure(prec.type, cur.type)) continue
         if (j < ecart) {
@@ -1047,8 +1087,7 @@ export function validerPlanning(
   // les gardes du LOOKBACK (planningRythme) → une série/succession à cheval sur la
   // jonction de périodes est détectée. Seules les règles DURES (étage ≤ 2) sont
   // des violations (souple = préférence, silencieux).
-  const joursCouverts = (date: string, type: string): string[] =>
-    type === 'weekend' ? [date, plusJours(date, 1)] : [date]
+  const joursCouverts = joursCouvertsDeGarde
 
   // Jours de garde (dépliés) d'un véto sur le planning ÉTENDU (rythme), filtrés
   // par types si `creneaux` fourni.
@@ -1204,8 +1243,7 @@ export function validerPlanning(
       }
       return out
     }
-    const joursCouvertsXor = (date: string, type: string): string[] =>
-      type === 'weekend' ? [date, plusJours(date, 1)] : [date]
+    const joursCouvertsXor = joursCouvertsDeGarde
 
     const isISO = (x: string) =>
       /^\d{4}-\d{2}-\d{2}$/.test(x) && !Number.isNaN(new Date(x + 'T12:00:00Z').getTime())

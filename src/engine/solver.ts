@@ -39,9 +39,12 @@ import type { CreneauModele } from './creneau-modele'
 import { normaliserContraintesVets } from './normaliserContraintes'
 import { isValid } from './rules/hard-constraints'
 import { penalite } from './rules/soft-constraints'
-import { compterParVet, type CompteurVet } from './rules/optimization'
+import { compterParVet, ecartMaxMin, type CompteurVet } from './rules/optimization'
 import { comparerScores, scorerPlanning, type VecteurScore, type BonusMalusMap } from './score-lexicographique'
-import { DEFAULT_EQUITY_WEIGHTS, DEFAULT_ROLE_AVANTAGE_FINANCIER, type EquityWeights } from './equity-weights'
+import {
+  DEFAULT_EQUITY_WEIGHTS, DEFAULT_ROLE_AVANTAGE_FINANCIER, SEUILS_CRITIQUES_DEFAUT,
+  type EquityWeights, type EquityDimension,
+} from './equity-weights'
 import {
   DEFAULT_STRUCTURE_CONFIG, compositionsSouples, rolesInterditsSouples, relationsEffectives,
   type StructureConfig, type PenalitesSouplesConfig,
@@ -499,6 +502,48 @@ function malusAvantageFinancier(
 }
 
 /**
+ * AMPLIFICATION quand une dimension d'équité DÉCROCHE.
+ *
+ * POURQUOI CE FACTEUR EXISTE — et pourquoi l'étage lexicographique ne suffisait
+ * pas (mesuré le 2026-09-01, avant de l'annoncer fait).
+ *
+ * L'étage `EQUITE_CRITIQUE` avait été posé dans `score-lexicographique` : il
+ * classe correctement deux plannings. Mesure sur une génération complète, écart
+ * de 6 gardes sur « second de semaine », soit le double du seuil : **aucune
+ * différence.** Le correctif était inerte.
+ *
+ * La raison : le LNS détruit une semaine et la RÉPARE avec `scorerCandidat`
+ * (ci-dessous), qui est déterministe et n'avait pas changé. Il reconstruisait
+ * donc toujours la même semaine — et `comparerScores`, si bien ordonné soit-il,
+ * n'avait jamais deux plannings différents à départager.
+ *
+ * Le classement ne sert à rien sans diversité à classer. Il faut donc que le
+ * choix du candidat connaisse lui aussi le décrochage : au-delà du seuil, le
+ * terme d'équité est amplifié pour qu'une pénalité souple (20 à 100 points) ne
+ * puisse plus renverser un écart de garde (poids × 1). En dessous du seuil,
+ * facteur 1 → byte-identique à l'historique.
+ *
+ * ⚠️ Leçon déjà payée sur ce projet : un correctif écrit n'est pas un correctif
+ * exécuté. Celui-ci a été mesuré avant / après sur une vraie génération.
+ */
+const AMPLIFICATION_CRITIQUE = 10
+
+/**
+ * Le terme d'équité doit-il être amplifié pour cette dimension ?
+ * Renvoie 1 (rien ne change) ou AMPLIFICATION_CRITIQUE.
+ */
+function facteurCritique(
+  compteurs: CompteurVet[],
+  dimension: EquityDimension,
+  champ: 'weGardes' | 'weekendPremier' | 'feriesGardes' | 'semainePremier' | 'semaineSecond' | 'semaineRenfort',
+  weights: EquityWeights,
+): number {
+  const seuil = weights.seuilsCritiques?.[dimension] ?? SEUILS_CRITIQUES_DEFAUT[dimension]
+  if (!Number.isFinite(seuil) || seuil <= 0) return 1 // dimension désactivée
+  return ecartMaxMin(compteurs.map((c) => c[champ])) > seuil ? AMPLIFICATION_CRITIQUE : 1
+}
+
+/**
  * Score d'un vétérinaire pour un créneau donné.
  * Score plus bas = vétérinaire prioritaire (moins de gardes, équité à rétablir).
  *
@@ -600,23 +645,27 @@ function scorerCandidat(
       step, roleAvantageFinancier, c.weekendPremier, weights.WE_PREMIER_ROLE,
     )
 
-    return weEffectif * weights.WE_GARDE + malusRole + pen
+    return weEffectif * weights.WE_GARDE * facteurCritique(compteurs, 'weekend', 'weGardes', weights)
+      + malusRole + pen
   }
 
   // Garde de semaine : priorité selon le type de jour et le rôle
   if (estJourFerie(step.date, calendrier)) {
     // R12 : équité fériés
-    return c.feriesGardes * weights.FERIES + pen
+    return c.feriesGardes * weights.FERIES
+      * facteurCritique(compteurs, 'ferie', 'feriesGardes', weights) + pen
   }
 
   const place = placeDuStep(step)
   if (place === 0) {
     // R13 : équité gardes semaine en 1er
-    return c.semainePremier * weights.SEMAINE_PREMIER + pen
+    return c.semainePremier * weights.SEMAINE_PREMIER
+      * facteurCritique(compteurs, 'semaine_premier', 'semainePremier', weights) + pen
   }
   if (place === 1) {
     // R14 : équité 2nd de garde
-    return c.semaineSecond * weights.SEMAINE_SECOND + pen
+    return c.semaineSecond * weights.SEMAINE_SECOND
+      * facteurCritique(compteurs, 'semaine_second', 'semaineSecond', weights) + pen
   }
 
   // 3ᵉ place et au-delà. Ce cas retombait dans la branche du 2nd : le candidat

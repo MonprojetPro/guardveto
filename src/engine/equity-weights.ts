@@ -40,6 +40,16 @@ export interface EquityWeights {
    * ajouter de champ à SolverInput/ContexteSimulation (piège resoudreContexte).
    */
   cohortes?: EquityCohorte[]
+  /**
+   * SEUILS DE DÉSÉQUILIBRE CRITIQUE — au-delà, l'équité passe devant les
+   * préférences (étage `EQUITE_CRITIQUE`). En dessous, rien ne change.
+   *
+   * Voyage dans EquityWeights pour la même raison que `cohortes` : être threadé
+   * partout où les poids le sont déjà, sans nouveau champ dans SolverInput.
+   * Absent → `SEUILS_CRITIQUES_DEFAUT`. Une dimension à 0 désactive l'étage pour
+   * elle seule — retour exact au comportement d'avant, dimension par dimension.
+   */
+  seuilsCritiques?: Partial<Record<EquityDimension, number>>
 }
 
 /**
@@ -235,6 +245,39 @@ export function buildEquityWeights(rules: EquityRule[]): EquityWeights {
  *  donc que les salariés porteurs du tag. Limitation ASSUMÉE et documentée
  *  (voie sûre : aucune modification de compterParVet → byte-identique au score
  *  global des 6 dimensions). Les 5 autres dimensions comptent tous les vétos. */
+/**
+ * SEUILS DE DÉSÉQUILIBRE CRITIQUE, par dimension — en ÉCART MAX−MIN.
+ *
+ * Lecture : « entre celui qui en a le plus et celui qui en a le moins ». C'est
+ * la mesure que MiKL lit à l'écran (`ecartMaxMin`, qui existait déjà), pas la
+ * variance — un écart à la moyenne ne se raconte pas en réunion d'équipe.
+ *
+ * Au-delà du seuil, la dimension bascule à l'étage `EQUITE_CRITIQUE` et passe
+ * devant les préférences. En dessous, elle reste dans l'équité fine, tout en
+ * bas, exactement comme avant.
+ *
+ * Les valeurs de départ sont volontairement HAUTES : l'étage ne doit se
+ * déclencher que sur un déséquilibre que l'équipe remarquerait vraiment. Sur
+ * Hiver P2, `semaine_second` était à 9 d'écart (Manon 3, Victor 12) — trois fois
+ * son seuil. Un déséquilibre ordinaire de 1 ou 2 gardes ne réveille rien.
+ *
+ * ⚠️ NON ENCORE RÉGLABLE À L'ÉCRAN. Ces valeurs voyagent dans `EquityWeights`,
+ * donc le moteur sait déjà lire un réglage par cabinet ; l'écran qui l'expose
+ * reste à faire (B-092). D'ici là, un cabinet ne peut pas les changer.
+ */
+export const SEUILS_CRITIQUES_DEFAUT: Record<EquityDimension, number> = {
+  weekend: 2,
+  weekend_premier: 2,
+  ferie: 2,
+  semaine_premier: 3,
+  semaine_second: 3,
+  semaine_renfort: 3,
+  // Compteur dérivé (week-ends libres perdus par les salariés) : il suit
+  // mécaniquement `weekend`, le seuiller une seconde fois compterait deux fois
+  // le même déséquilibre. 0 = cette dimension ne déclenche jamais l'étage.
+  grands_weekend: 0,
+}
+
 export const DIMENSION_TO_COMPTEUR: Record<
   EquityDimension,
   | 'weGardes' | 'weekendPremier' | 'feriesGardes'

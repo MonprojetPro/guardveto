@@ -151,3 +151,80 @@ describe('espacement_min — le couple structurel vendredi ↔ week-end', () => 
     expect(isValid(slot(MAR), v, 'premier', [v], planningLun).valid).toBe(false)
   })
 })
+
+// ============================================================
+// UN WEEK-END, C'EST TROIS NUITS — PAS UN POINT SUR LE CALENDRIER
+// ============================================================
+// Trouvé par MiKL le 2026-08-31 en recettant Hiver P2 : « Victor a 7 gardes sur
+// 14 jours, dont un week-end + lundi + mercredi… ça fait beaucoup, non ? »
+//
+// Il sortait du week-end le LUNDI MATIN et reprenait le LUNDI SOIR. Zéro nuit de
+// répit. Et ce n'était pas un accident : mesuré sur la période, 11 personnes
+// enchaînaient ainsi week-end et lundi.
+//
+// LA CAUSE. `violeEspacementMin` comparait les dates d'ANCRAGE : le week-end est
+// daté du samedi, le lundi est deux jours plus tard, « au moins 2 jours entre
+// deux gardes » était donc satisfait — sur le papier. Dans la vraie vie, le
+// week-end couvre samedi ET dimanche : l'écart vécu est de UN jour.
+//
+// La sémantique juste existait déjà dans ce fichier — `joursCouvertsGarde`,
+// écrite pour les briques de rythme (#13), qui déplient le week-end en sam+dim.
+// `espacement_min`, plus ancienne, n'y avait jamais été raccordée. Le correctif
+// ne crée donc aucune notion : il branche la règle sur la source existante.
+//
+// ⚠️ Ces tests figent les DEUX gardiens (isValid ET le validateur indépendant).
+// Les laisser diverger reproduirait la leçon des « trois chemins d'écriture,
+// deux gardiens » : un contrôle qui passe d'un côté et pas de l'autre.
+
+const SAM_WE = '2026-01-10'   // week-end : couvre samedi 10 + dimanche 11
+const LUN_APRES = '2026-01-12' // le lundi qui suit — 2 jours après l'ancre, 1 après la fin
+const MAR_APRES = '2026-01-13' // le mardi — 2 jours après la fin du week-end
+
+describe('espacement_min — le week-end couvre samedi ET dimanche', () => {
+  const planningWeekend: PlanningPartiel = {
+    attributions: [
+      { date: SAM_WE, type: 'weekend', placements: [{ role: 'premier', vetId: 'v' }, { role: 'second', vetId: null }] },
+    ],
+  }
+
+  it('refuse le lundi soir après un week-end (1 jour de répit, pas 2)', () => {
+    const v = vetAvecEspacement(2, 2)
+    const r = isValid(slot(LUN_APRES), v, 'premier', [v], planningWeekend)
+    expect(r.valid).toBe(false)
+    expect(r.raison).toMatch(/ESPACEMENT/)
+  })
+
+  it('autorise le mardi soir — 2 jours après la fin du week-end', () => {
+    const v = vetAvecEspacement(2, 2)
+    expect(isValid(slot(MAR_APRES), v, 'premier', [v], planningWeekend).valid).toBe(true)
+  })
+
+  it('pénalise le lundi quand la règle est molle, au lieu de le blanchir', () => {
+    const v = vetAvecEspacement(2, 4)
+    expect(isValid(slot(LUN_APRES), v, 'premier', [v], planningWeekend).valid).toBe(true)
+    expect(penaliteContraintesConfig(slot(LUN_APRES), v, 'premier', planningWeekend)).toBeGreaterThan(0)
+  })
+
+  it('le validateur indépendant voit le même enchaînement', () => {
+    const v = vetAvecEspacement(2, 2)
+    const planning: PlanningPartiel = {
+      attributions: [
+        ...planningWeekend.attributions,
+        { date: LUN_APRES, type: 'semaine_soir', placements: [{ role: 'premier', vetId: 'v' }, { role: 'second', vetId: null }] },
+      ],
+    }
+    const violations = validerPlanning(planning, {
+      dateDebut: SAM_WE, dateFin: '2026-01-18', saison: 'hiver', nbVetosSemaineSoir: 1, vets: [v],
+    })
+    expect(violations.some((x) => x.regle === 'ESPACEMENT' && x.vetId === 'v')).toBe(true)
+  })
+
+  it('SYMÉTRIE — le vendredi précédant un week-end déjà posé est refusé de la même façon', () => {
+    // Le week-end est posé AVANT les soirs de semaine par le solver : le
+    // candidat doit donc être jugé contre ce qui vient après lui, pas seulement
+    // avant. Ici : jeudi 8, alors que le week-end du 10 est déjà pris.
+    const v = vetAvecEspacement(3, 2)
+    const slotJeudi: SlotGarde = { date: '2026-01-08', type: 'semaine_soir', saison: 'hiver', besoinSecond: false }
+    expect(isValid(slotJeudi, v, 'premier', [v], planningWeekend).valid).toBe(false)
+  })
+})

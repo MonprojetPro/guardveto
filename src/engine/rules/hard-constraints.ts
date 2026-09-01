@@ -817,6 +817,33 @@ function estCoupleStructurelAdjacent(
   )
 }
 
+/**
+ * Écart RÉEL entre deux gardes, en jours de répit.
+ *
+ * ⚠️ On ne compare PAS les dates d'ancrage : un week-end est daté du samedi mais
+ * couvre samedi ET dimanche. Comparer les ancres donnait 2 jours entre le
+ * week-end et le lundi suivant — alors que la personne sort de garde le lundi
+ * matin et reprend le lundi soir. Zéro répit, compté comme deux jours.
+ *
+ * Trouvé par MiKL le 2026-08-31 sur Hiver P2 (« Victor a 7 gardes sur 14 jours »).
+ * 11 enchaînements week-end → lundi sur la seule période, tous réputés conformes.
+ *
+ * On prend la plus petite distance entre les jours couverts des deux gardes :
+ * c'est le répit effectivement vécu.
+ */
+function ecartReelEntreGardes(
+  dateA: string, typeA: string, dateB: string, typeB: string,
+): number {
+  let min = Infinity
+  for (const ja of joursCouvertsGarde(dateA, typeA)) {
+    for (const jb of joursCouvertsGarde(dateB, typeB)) {
+      const d = joursEntreDates(ja, jb)
+      if (d < min) min = d
+    }
+  }
+  return min
+}
+
 /** Poser `vet` sur `slot` violerait-il l'espacement minimal de cette contrainte ? */
 function violeEspacementMin(
   c: ContrainteEngine, vetId: string, slot: SlotGarde, planning: PlanningPartiel,
@@ -832,7 +859,7 @@ function violeEspacementMin(
     // Le couple imposé par la structure n'est pas un enchaînement SUBI : c'est
     // une seule et même garde, étalée sur deux créneaux. On ne le compte pas.
     if (estCoupleStructurelAdjacent(a.type, a.date, slot.type, slot.date, relations)) continue
-    if (joursEntreDates(a.date, slot.date) < ecart) return true
+    if (ecartReelEntreGardes(a.date, a.type, slot.date, slot.type) < ecart) return true
   }
   return false
 }

@@ -25,7 +25,10 @@ export interface BonusMalusMap {
   [vetId: string]: number
 }
 import { isValid } from './rules/hard-constraints'
-import { DEFAULT_EQUITY_WEIGHTS, DEFAULT_ROLE_AVANTAGE_FINANCIER, DIMENSION_TO_COMPTEUR, type EquityWeights } from './equity-weights'
+import {
+  DEFAULT_EQUITY_WEIGHTS, DEFAULT_ROLE_AVANTAGE_FINANCIER, DIMENSION_TO_COMPTEUR,
+  DIMENSION_TO_FIELD, EQUITY_DIMENSIONS, SEUILS_CRITIQUES_DEFAUT, type EquityWeights,
+} from './equity-weights'
 import {
   DEFAULT_STRUCTURE_CONFIG, estStructureSouple, penaliteStructureEtage,
   relationsEffectives, resoudrePenaliteSouple, PENALITE_SOUPLE_DEFAUT,
@@ -56,6 +59,7 @@ import {
   desequilibreSemaineRenfort,
   desequilibreGrandsWeSalaries,
   variance,
+  ecartMaxMin,
   type CompteurVet,
 } from './rules/optimization'
 
@@ -69,9 +73,56 @@ export enum Etage {
   EVITEE_AU_MAX = 4, // 🟡 — R10c (WE avant vacances), R10b (fête fin année)
   SI_POSSIBLE = 5, // ⚪ — R8b (inversion férié), dernier recours
   EQUITE = 6, // variance des charges
+  /**
+   * Déséquilibre CRITIQUE — au-delà du seuil réglé, sur une dimension d'équité.
+   *
+   * ⚠️ Sa VALEUR NUMÉRIQUE (7) n'est pas sa priorité : voir ORDRE_COMPARAISON.
+   * Il est ajouté à la fin de l'enum EXPRÈS. Les numéros 0..6 sont écrits dans
+   * des configurations et traduits depuis la fermeté des règles
+   * (`FORCE_TEXTE_VERS_ETAGE`) : les décaler pour insérer un étage au milieu
+   * aurait silencieusement changé le sens de règles déjà posées — « à éviter »
+   * serait devenu « souhait » sans que personne ne touche à rien.
+   */
+  EQUITE_CRITIQUE = 7,
 }
 
-export const NB_ETAGES = 7
+export const NB_ETAGES = 8
+
+/**
+ * L'ORDRE DE PRIORITÉ RÉEL — c'est lui qui décide, pas la valeur de l'enum.
+ *
+ * POURQUOI L'ÉQUITÉ CRITIQUE S'INSÈRE ICI (MiKL, 2026-08-31, recette Hiver P2)
+ *
+ * Toute l'équité vivait au dernier étage. Combinée à la garantie lexicographique
+ * — « un seul point à l'étage N bat n'importe quel nombre de points à l'étage
+ * N+1 » — cela signifiait qu'**une seule préférence « si possible » respectée
+ * l'emportait sur n'importe quel déséquilibre, aussi énorme soit-il.**
+ *
+ * Mesuré sur Hiver P2 : le moteur avait le choix entre respecter « Victor pas le
+ * lundi » (une préférence) et rééquilibrer Manon, à 3 seconds de semaine contre
+ * 12. Il a respecté la préférence, cinq lundis de suite. Ce n'était pas un bug —
+ * c'était la règle de comparaison, qui avait mis l'équité derrière tout.
+ *
+ * L'équité critique passe donc devant les PRÉFÉRENCES (« à éviter », « si
+ * possible »), mais **jamais devant ce que l'admin a verrouillé** (« sauf en cas
+ * de crise », « jamais »). Arbitrage de MiKL, le 2026-09-01 : *« ça doit être
+ * plus présent, mais pas dépasser les règles jamais »*. Corriger un écart de
+ * compteur en créant deux week-ends consécutifs serait vécu comme pire que
+ * l'écart qu'on répare.
+ *
+ * L'équité FINE (variance) reste tout en bas, inchangée : en dessous du seuil,
+ * le comportement est exactement celui d'avant.
+ */
+export const ORDRE_COMPARAISON: readonly Etage[] = [
+  Etage.INVARIANT_SYSTEME,
+  Etage.REGLEMENTAIRE,
+  Etage.JAMAIS_USER,
+  Etage.SAUF_CRISE,
+  Etage.EQUITE_CRITIQUE, // ← s'insère ici, sans renuméroter ce qui existe
+  Etage.EVITEE_AU_MAX,
+  Etage.SI_POSSIBLE,
+  Etage.EQUITE,
+]
 
 export interface ContributionEtage {
   etage: Etage
@@ -92,13 +143,16 @@ export interface VecteurScore {
  * Élimine structurellement le bug prod "cumul de pénalités" :
  * 100×🟡 ne franchissent jamais 1×🟠.
  *
- * On parcourt les étages du plus fort (0) au plus faible (6).
+ * On parcourt les étages dans l'ORDRE DE PRIORITÉ (ORDRE_COMPARAISON), qui n'est
+ * plus l'ordre des index depuis l'insertion de l'équité critique.
  * Le premier étage où les deux vecteurs diffèrent décide.
  * @returns < 0 si a meilleur, > 0 si b meilleur, 0 si strictement égaux.
  */
 export function comparerScores(a: VecteurScore, b: VecteurScore): number {
-  for (let i = 0; i < a.etages.length; i++) {
-    if (a.etages[i] !== b.etages[i]) return a.etages[i] - b.etages[i]
+  for (const etage of ORDRE_COMPARAISON) {
+    const va = a.etages[etage] ?? 0
+    const vb = b.etages[etage] ?? 0
+    if (va !== vb) return va - vb
   }
   return 0
 }
@@ -426,8 +480,30 @@ export function scorerPlanning(
     ajouter(v, contrib.etage, 'seulement-avec-souple', contrib.cout)
   }
 
-  // ── Étage 6 : ÉQUITÉ (variance des charges) ──
   const compteurs = compterParVet(planning, vets, roleAvantageFinancier, calendrier)
+
+  // ── Étage EQUITE_CRITIQUE : les déséquilibres que l'équipe remarquerait ──
+  // Ne se déclenche qu'AU-DELÀ du seuil de la dimension. En dessous : aucune
+  // contribution, donc comportement byte-identique à l'historique.
+  // On mesure en ÉCART MAX−MIN (« celui qui en a le plus vs celui qui en a le
+  // moins »), pas en variance : c'est le chiffre qui se lit et se discute.
+  const seuils = weights.seuilsCritiques
+  let critique = 0
+  for (const dim of EQUITY_DIMENSIONS) {
+    const seuil = seuils?.[dim] ?? SEUILS_CRITIQUES_DEFAUT[dim]
+    if (!Number.isFinite(seuil) || seuil <= 0) continue // dimension désactivée
+    const poids = weights[DIMENSION_TO_FIELD[dim]]
+    if (poids <= 0) continue // dimension non équilibrée du tout → rien à crier
+    const champ = DIMENSION_TO_COMPTEUR[dim]
+    const ecart = ecartMaxMin(compteurs.map((c) => c[champ]))
+    // Seul le DÉPASSEMENT compte : un écart de 4 sur un seuil de 3 pèse 1, pas 4.
+    // Sans quoi franchir le seuil ferait un saut brutal et le moteur préférerait
+    // rester juste en dessous plutôt que de corriger.
+    if (ecart > seuil) critique += (ecart - seuil) * poids
+  }
+  if (critique > 0) ajouter(v, Etage.EQUITE_CRITIQUE, 'equite-critique', critique)
+
+  // ── Étage 6 : ÉQUITÉ FINE (variance des charges) ──
   let eq =
     desequilibreWE(compteurs) * weights.WE_GARDE +
     desequilibreWeekendPremier(compteurs) * weights.WE_PREMIER_ROLE +
