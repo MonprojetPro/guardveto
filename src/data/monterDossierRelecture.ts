@@ -355,7 +355,9 @@ export async function monterDossierRelecture(
             ? `${duo} : l’un est libéré d’un week-end, l’autre le prend`
             : mouvement.genre === 'remplacement_weekend_en_chaine'
               ? `${duo} : quelqu’un est libéré d’un week-end — il faut d’abord déplacer une garde pour rendre ça possible`
-              : `${duo} échangent leurs places`
+              : mouvement.genre === 'refaire_semaine'
+                ? `TOUTE LA SEMAINE du ${dateFr(dates[0])} est refaite pour libérer quelqu’un de son week-end — c’est le seul moyen quand la semaine est saturée`
+                : `${duo} échangent leurs places`
 
     // Qui perd une garde de WEEK-END : la dimension qui compte le plus pour le
     // cabinet, et celle qu'aucun échange ne sait corriger. Calculé ici pour que

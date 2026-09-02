@@ -26,6 +26,7 @@
 import { describe, it, expect } from 'vitest'
 import { mouvementsPossibles, type GenreMouvement } from '../relecture/mouvements'
 import { effetsDesMouvements } from '../relecture/effet'
+import { reconstruireFenetre } from '../relecture/reconstruire'
 import { normaliserContraintesVets } from '../normaliserContraintes'
 import type { PlanningPartiel, VetEngine, ContrainteEngine } from '../types'
 
@@ -260,4 +261,128 @@ describe('le cas réel : Antoine et ses 5 week-ends', () => {
     expect(tous.length).toBeGreaterThan(0)
     expect(tous.some((m) => m.genre !== 'remplacement_weekend')).toBe(true)
   })
+})
+
+// ============================================================
+// B-101 — REFAIRE LA SEMAINE, PUISQUE LA DÉPLACER NE SUFFIT PAS
+// ============================================================
+// La trace de relecture a tranché : sur les cinq week-ends d'Antoine, aucun
+// mouvement local ne peut le libérer, à aucune profondeur. La semaine du 19 au
+// 25 octobre en donne la raison — Jean et Anne-Sophie en congé, quatre
+// personnes pour douze places, espacement de deux jours.
+//
+// La question que ces tests tranchent : une RECONSTRUCTION de la semaine
+// entière y arrive-t-elle ? Si non, il n'y a rien à construire et il faut le
+// dire à MiKL. Si oui, c'est la voie qu'il a validée le 02/09.
+// ============================================================
+
+describe('B-101 — refaire une semaine sous contrainte', () => {
+  const OPTIONS = {
+    vets: EQUIPE,
+    dateDebut: '2026-10-19',
+    dateFin: '2027-01-10',
+    saison: 'hiver' as const,
+    nbVetosSemaineSoir: 2,
+  }
+
+  it('✅ retire Antoine du week-end du 24/10, ce qu’aucun mouvement ne pouvait faire', () => {
+    const refait = reconstruireFenetre(planningReel(), OPTIONS, {
+      debut: '2026-10-19',
+      fin: '2026-10-25',
+      exclusion: { vetId: ANTOINE, date: '2026-10-24', type: 'weekend' },
+    })
+
+    expect(refait).not.toBeNull()
+
+    const we = refait!.attributions.find(
+      (a) => a.date === '2026-10-24' && a.type === 'weekend',
+    )!
+    expect(we.placements.some((p) => p.vetId === ANTOINE)).toBe(false)
+  }, 60_000)
+
+  it('ne laisse AUCUNE place vide dans la fenêtre refaite', () => {
+    // Une reconstruction qui troue le planning échangerait un problème
+    // d'équité contre une nuit sans vétérinaire. L'équité se discute ; une
+    // garde non couverte, non.
+    const refait = reconstruireFenetre(planningReel(), OPTIONS, {
+      debut: '2026-10-19',
+      fin: '2026-10-25',
+      exclusion: { vetId: ANTOINE, date: '2026-10-24', type: 'weekend' },
+    })!
+
+    const dansLaFenetre = refait.attributions.filter(
+      (a) => a.date >= '2026-10-19' && a.date <= '2026-10-25',
+    )
+    for (const attr of dansLaFenetre) {
+      for (const p of attr.placements) expect(p.vetId).not.toBeNull()
+    }
+  }, 60_000)
+
+  it('ne touche RIEN hors de la fenêtre demandée', () => {
+    // Le reste du planning est gelé : refaire une semaine ne doit pas
+    // réorganiser décembre au passage, sinon l'admin ne reconnaît plus rien.
+    const avant = planningReel()
+    const refait = reconstruireFenetre(avant, OPTIONS, {
+      debut: '2026-10-19',
+      fin: '2026-10-25',
+      exclusion: { vetId: ANTOINE, date: '2026-10-24', type: 'weekend' },
+    })!
+
+    for (const a of avant.attributions) {
+      if (a.date >= '2026-10-19' && a.date <= '2026-10-25') continue
+      const apres = refait.attributions.find((x) => x.date === a.date && x.type === a.type)!
+      expect(apres.placements).toEqual(a.placements)
+    }
+  }, 60_000)
+
+  it('rend null — et non une solution inventée — quand la contrainte est impossible', () => {
+    // On exclut TOUT LE MONDE du week-end : il ne doit rien sortir. Un module
+    // qui « trouverait » quand même une solution serait le pire des défauts de
+    // ce projet : une réponse fausse présentée comme complète.
+    const impossible = reconstruireFenetre(
+      planningReel(),
+      { ...OPTIONS, vets: [vet(ANTOINE)] },
+      {
+        debut: '2026-10-19',
+        fin: '2026-10-25',
+        exclusion: { vetId: ANTOINE, date: '2026-10-24', type: 'weekend' },
+      },
+    )
+    expect(impossible).toBeNull()
+  }, 60_000)
+})
+
+describe('B-101 — le mouvement « refaire la semaine » sort-il pour de vrai ?', () => {
+  /** Les mouvements d'un genre donné qui retirent un week-end à Antoine. */
+  function libereAntoine(genre: GenreMouvement) {
+    const occupe = new Map<string, string | null>()
+    for (const a of planningReel().attributions) {
+      for (const p of a.placements) occupe.set(`${a.date}|${a.type}|${p.role}`, p.vetId)
+    }
+    return mouvementsPossibles(planningReel(), {
+      vets: EQUIPE, dateDebut: '2026-10-19', dateFin: '2027-01-10',
+      saison: 'hiver', nbVetosSemaineSoir: 2,
+    })
+      .filter((m) => m.genre === genre)
+      .filter((m) => m.affectations.some(
+        (a) => a.type === 'weekend'
+          && occupe.get(`${a.date}|${a.type}|${a.role}`) === ANTOINE
+          && a.vetId !== ANTOINE,
+      ))
+  }
+
+  it('✅ mouvementsPossibles propose enfin de libérer Antoine', () => {
+    // La question de MiKL depuis le matin, posée au code : sur CE planning,
+    // existe-t-il un mouvement qui retire un week-end à Antoine ?
+    const refaire = libereAntoine('refaire_semaine')
+    expect(refaire.length).toBeGreaterThan(0)
+
+    // Et Antoine ne récupère pas un week-end ailleurs dans le même mouvement.
+    for (const m of refaire) {
+      const prendUnWeekend = m.affectations.some(
+        (a) => a.type === 'weekend' && a.vetId === ANTOINE,
+      )
+      expect(prendUnWeekend).toBe(false)
+    }
+  }, 120_000)
 })

@@ -67,6 +67,7 @@ import { isValid } from '../rules/hard-constraints'
 import { genererSteps } from '../solver'
 import { apparierSourcePourCible } from '../relations-structure'
 import { addDays } from '../utils'
+import { reconstruireFenetre } from './reconstruire'
 import {
   echangesPossibles, clePlace, poser,
   type OptionsEchanges, type PlaceOccupee,
@@ -123,6 +124,25 @@ export type GenreMouvement =
    * le remplacement — le tout d'un seul bloc, validé comme un tout.
    */
   | 'remplacement_weekend_en_chaine'
+  /**
+   * La SEMAINE entière est refaite pour libérer quelqu'un d'un week-end.
+   *
+   * Le dernier recours, et le seul qui marche quand la semaine est saturée.
+   * Mesuré le 02/09 sur le planning réel : sur les cinq week-ends d'Antoine,
+   * aucun mouvement local ne le libère — remplacement, échange, chaîne à six
+   * places. La semaine du 19 au 25 octobre explique pourquoi : deux personnes
+   * en congé, quatre disponibles pour douze places, espacement de deux jours.
+   * Tout candidat au week-end est de garde le jeudi, et déplacer ce jeudi bute
+   * sur le mercredi.
+   *
+   * Une AUTRE répartition de la semaine existe pourtant, et elle libère
+   * Antoine — mais elle demande de bouger cinq soirs d'un coup. Aucun mouvement
+   * de deux, quatre ou six places ne pouvait la trouver : ce n'est pas un
+   * déplacement, c'est une permutation de toute la semaine.
+   *
+   * Décidé par MiKL le 02/09 après cinq recettes (B-101).
+   */
+  | 'refaire_semaine'
 
 /** Un mouvement applicable : toutes ses affectations, ensemble ou rien. */
 export interface MouvementPossible {
@@ -160,11 +180,14 @@ const PRIORITE: Record<GenreMouvement, number> = {
   // jamais (le week-end est encadré par le jeudi et le lundi). La chaîne est
   // donc, en pratique, le seul mouvement qui allège vraiment quelqu'un — la
   // laisser se faire couper reviendrait à ne pas l'avoir écrite.
-  remplacement_weekend_en_chaine: 0,
-  remplacement_weekend: 1,
-  inversion_roles_weekend: 2,
-  echange_weekend: 3,
-  echange_simple: 4,
+  // `refaire_semaine` passe devant tout : c'est le seul qui aboutit quand la
+  // semaine est saturée, et il est rare (une poignée par période).
+  refaire_semaine: 0,
+  remplacement_weekend_en_chaine: 1,
+  remplacement_weekend: 2,
+  inversion_roles_weekend: 3,
+  echange_weekend: 4,
+  echange_simple: 5,
 }
 
 /**
@@ -567,6 +590,55 @@ export function mouvementsPossibles(
           }
         }
       }
+    }
+  }
+
+  // ②e — REFAIRE LA SEMAINE, quand rien de local ne libère la personne.
+  //
+  // Réservé aux plus chargés en week-ends : c'est un mouvement lourd (toute une
+  // semaine change de mains) et il ne se justifie que là où le déséquilibre est
+  // réel.
+  //
+  // ⚠️ On le propose MÊME si une chaîne libère déjà la personne. Une première
+  // version sautait dans ce cas — « inutile de tout rebattre quand un simple
+  // remplacement suffit ». Elle avait tort, et le test l'a montré : sur le
+  // planning réel, des chaînes libéraient bien Antoine, la reconstruction ne
+  // sortait donc jamais… et Filou ne prenait pas les chaînes non plus. On
+  // écartait la seule option restante en se fiant à une autre qui n'aboutissait
+  // pas. Les deux sont proposées, classées par effet, et c'est Filou qui tranche.
+  const maxWeekends = Math.max(0, ...weekendsDe.values())
+
+  for (const g of grappes) {
+    for (const surcharge of gensDeLaGrappe(g)) {
+      if ((weekendsDe.get(surcharge) ?? 0) < maxWeekends) continue
+      if (cibles && !cibles.has(surcharge)) continue
+
+      const jours = g.attributions.map((a) => a.date).sort()
+      const refait = reconstruireFenetre(planning, options, {
+        // La fenêtre : la semaine qui contient la grappe. On remonte au lundi
+        // précédant le vendredi apparié — au-delà, on rebattrait des semaines
+        // que personne n'a remises en cause.
+        debut: addDays(jours[0], -4),
+        fin: addDays(jours[jours.length - 1], 1),
+        exclusion: { vetId: surcharge, date: g.pivot.date, type: g.pivot.type },
+      })
+      if (!refait) continue
+
+      // Le mouvement, c'est la DIFFÉRENCE entre avant et après. On ne transmet
+      // pas la fenêtre entière : les places inchangées ne se lisent pas.
+      const affectations: AffectationMouvement[] = []
+      for (const attr of refait.attributions) {
+        for (const p of attr.placements) {
+          if (!p.vetId) continue
+          const cle = clePlace(attr.date, attr.type, p.role)
+          if (avant.get(cle) === p.vetId) continue
+          affectations.push({ date: attr.date, type: attr.type, role: p.role, vetId: p.vetId })
+        }
+      }
+      // Chaque pose de la reconstruction a déjà passé `isValid` : on ne rejoue
+      // pas `mouvementLegal`, qui jugerait sur un état intermédiaire différent
+      // et pourrait refuser une reconstruction pourtant valide.
+      if (affectations.length > 0) out.push({ genre: 'refaire_semaine', affectations })
     }
   }
 

@@ -268,8 +268,15 @@ describe('mouvementsPossibles — le remplacement, qui seul allège vraiment', (
     const planning = planningDeuxWeekends()
     const avant = weekendsApres(planning, { genre: 'echange_simple', affectations: [] })
 
+    // Les genres qui DÉPLACENT, nommés un par un. Filtrer par exclusion
+    // (« tout sauf le remplacement ») paraissait équivalent et ne l'était pas :
+    // le jour où `refaire_semaine` est arrivé — un genre qui allège lui aussi,
+    // et c'est sa raison d'être — ce test l'a compté comme une permutation et
+    // a rougi. Une liste explicite dit ce qu'elle teste ; une exclusion dit
+    // seulement ce qu'elle ignore, et se périme au premier ajout.
+    const PERMUTATIONS = ['echange_simple', 'echange_weekend', 'inversion_roles_weekend']
     const permutations = mouvementsPossibles(planning, options())
-      .filter((x) => x.genre !== 'remplacement_weekend')
+      .filter((x) => PERMUTATIONS.includes(x.genre))
 
     for (const x of permutations) {
       const apres = weekendsApres(planning, x)
