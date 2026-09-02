@@ -2506,3 +2506,74 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .gm-alterner:hover {
   background: var(--accent-soft); border-color: var(--t-accent); border-style: solid;
 }
+
+/* -- B-107 · Le rapport tient sur un écran -------------------------------
+   MiKL, 02/09, trois captures : « c'est imbuvable, personne ne va prendre le
+   temps de lire tout ça ». Trois écrans de défilement, neuf constats de même
+   taille dont sept parlaient de la même personne.
+
+   Le fond n'a pas bougé — c'est la HIÉRARCHIE qui manquait. Rien n'est
+   supprimé ici : ce qui est acquis se replie, ce qui attend une décision
+   reste ouvert. Et chaque repli annonce ce qu'il contient et combien, jamais
+   un « voir plus » : un intitulé vague rend le repli équivalent à un
+   effacement (leçon B-005, « Rien à vérifier » lu comme une salle vide). */
+
+/* Le verdict : la première ligne lue, et pour beaucoup la seule. Factuel —
+   ce qui a changé, ce qui attend une décision. Jamais l'avis de Filou. */
+.rl-verdict {
+  font-size: 0.82rem; color: var(--t-muted); margin-top: 2px;
+}
+
+/* L'avis de Filou passe SOUS le verdict, et replié : c'est une opinion, pas
+   un état du planning. Elle occupait le haut de l'écran jusqu'au 02/09. */
+.rl-synthese-repli summary { font-weight: 500; }
+
+/* Le bilan d'un mouvement : « Antoine −1 · Fanny +1 ». Calculé, jamais
+   reformulé — c'est un décompte, pas une interprétation. */
+.rl-resume {
+  font-size: 0.84rem; font-weight: 600; color: var(--text);
+}
+.rl-resume-inline { font-weight: 500; color: var(--t-muted); }
+
+/* Un bloc replié garde exactement l'allure d'un bloc ouvert : sans ça, le
+   repli se lirait comme une section de moindre importance. */
+details.rl-bloc > summary {
+  cursor: pointer; list-style: none;
+}
+details.rl-bloc > summary::-webkit-details-marker { display: none; }
+details.rl-bloc > summary::after {
+  content: '▸'; margin-left: auto; color: var(--soft); font-size: 0.8rem;
+}
+details.rl-bloc[open] > summary::after { content: '▾'; }
+details.rl-bloc > summary > span { display: flex; flex-wrap: wrap; gap: 4px; }
+details.rl-bloc > .rl-bloc-sous,
+details.rl-bloc > .rl-liste { margin-top: 9px; }
+
+/* Les constats groupés par personne. Sept cartes identiques deviennent une
+   ligne : le nom d'abord, le nombre à droite — on voit QUI est concerné
+   avant de lire quoi que ce soit. */
+.rl-groupes { gap: 6px; }
+.rl-groupe > details > summary {
+  display: flex; align-items: center; gap: 8px;
+  cursor: pointer; list-style: none; padding: 7px 9px;
+  border: 1px solid var(--t-border); border-radius: 8px;
+  background: var(--surface);
+}
+.rl-groupe > details > summary::-webkit-details-marker { display: none; }
+.rl-groupe > details[open] > summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.rl-groupe-qui {
+  font-family: var(--font-display); font-weight: 600;
+  font-size: 0.84rem; color: var(--text);
+}
+.rl-groupe-nb {
+  margin-left: auto; font-size: 0.76rem; color: var(--soft);
+}
+.rl-groupe > details > summary::after {
+  content: '▸'; color: var(--soft); font-size: 0.8rem;
+}
+.rl-groupe > details[open] > summary::after { content: '▾'; }
+.rl-groupe > details > .rl-liste {
+  padding: 8px 9px 2px;
+  border: 1px solid var(--t-border); border-top: 0;
+  border-radius: 0 0 8px 8px;
+}

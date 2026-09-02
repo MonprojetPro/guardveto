@@ -1,7 +1,7 @@
 'use client'
 
 // ============================================================
-// GUARDVETO — Le rapport de relecture de Filou (B-062, lot 1)
+// GUARDVETO — Le rapport de relecture de Filou (B-062, refondu B-107)
 // ============================================================
 // Ce que l'admin lit après une génération, une fois que Filou a relu le
 // planning et que le moteur a contrôlé ses propositions.
@@ -14,18 +14,39 @@
 //   ③ SIGNALÉ     — Filou l'a vu, il ne sait pas le corriger. Personne d'autre
 //                   dans le produit ne dit ces choses-là.
 //
-// Le mélange serait le pire des rendus : une chose faite et une chose à faire
-// ne se lisent pas de la même façon, et l'admin doit pouvoir refermer l'écran
-// en sachant exactement ce qui l'attend.
+// ── REFONTE DU 2026-09-02 (B-107) — « c'est imbuvable » ────────────────────
 //
-// ⚠️ RÈGLE DE MAISON — un bandeau est un SIGNAL, pas un rapport (19/08). Aucun
-//    code machine ici, aucun compteur brut : des phrases, des prénoms, des
-//    dates en toutes lettres. C'est aussi pour ça que le motif de Filou est
-//    affiché TEL QUEL — le reformuler ferait dire au produit ce que Filou n'a
-//    pas dit.
+// MiKL, trois captures à l'appui : trois écrans de défilement. Le fond était
+// bon ; c'est la présentation qui échouait, sur cinq points mesurés :
+//
+//   • tout au même niveau visuel — la seule DÉCISION à prendre était coincée
+//     entre des constats informatifs ;
+//   • chaque mouvement listé en entier, ligne par ligne, en texte brut ;
+//   • neuf constats affichés en entier, dont six « pas de correction » ;
+//   • sept de ces neuf parlaient d'Antoine : le même problème, dit sept fois ;
+//   • le critère, qui devrait être l'entrée de lecture, était en gris dessous.
+//
+// D'où l'ordre retenu, qui répond à trois questions dans cet ordre :
+//
+//     puis-je publier ?  →  qu'est-ce qui attend MA décision ?  →  que savoir ?
+//
+// ── LA RÈGLE QUI ENCADRE TOUT REPLI ────────────────────────────────────────
+//
+// Replier n'est pas supprimer. Chaque bloc replié annonce CE QU'IL CONTIENT et
+// COMBIEN — « Antoine · 7 points », jamais « voir plus ». Un intitulé vague
+// rendrait le repli équivalent à un effacement, et ce projet sait ce que coûte
+// une information vraie que personne ne va chercher (B-005 : « Rien à vérifier »
+// s'est lu comme une salle vide alors que six sources n'étaient pas regardées).
+//
+// ⚠️ RÈGLE DE MAISON — aucun code machine, aucun compteur brut : des phrases,
+//    des prénoms, des dates en toutes lettres. Le motif de Filou est affiché
+//    TEL QUEL — le reformuler ferait dire au produit ce que Filou n'a pas dit.
+//    Les résumés ajoutés ici COMPTENT (« Antoine −1 · Fanny +1 »), ils
+//    n'interprètent pas.
 // ============================================================
 
 import { Sparkles, Check, AlertTriangle, Eye, CircleSlash } from 'lucide-react'
+import { resumerEffet, grouperParPersonne } from '@/lib/relecture/resume'
 
 export interface LigneRelecture {
   id: string
@@ -70,7 +91,38 @@ function effetEnMots(effet?: LigneRelecture['effetScore']): string | null {
   return null
 }
 
-export function RapportRelecture({ donnees }: { donnees: DonneesRelecture }) {
+/** Le détail d'un mouvement : le motif tel quel, puis les places touchées. */
+function DetailMouvement({ ligne }: { ligne: LigneRelecture }) {
+  return (
+    <>
+      <p className="rl-motif">{ligne.motif}</p>
+      <ul className="rl-geste">
+        {ligne.geste.map((g, i) => (
+          <li key={i}>{g}</li>
+        ))}
+      </ul>
+      <p className="rl-meta">
+        {ligne.critere}
+        {effetEnMots(ligne.effetScore) ? ` · ${effetEnMots(ligne.effetScore)}` : ''}
+      </p>
+    </>
+  )
+}
+
+export function RapportRelecture({
+  donnees,
+  prenoms = [],
+}: {
+  donnees: DonneesRelecture
+  /**
+   * Les prénoms de l'équipe, pour regrouper les constats par personne.
+   *
+   * Optionnel À DESSEIN : sans eux, le rapport s'affiche à plat comme avant,
+   * ce qui est moins lisible mais jamais faux. Un regroupement approximatif
+   * serait pire — il rangerait un constat sous le mauvais nom.
+   */
+  prenoms?: string[]
+}) {
   // ── Filou n'a pas pu relire ──
   // Jamais un silence : sans ce bloc, l'absence de rapport se lirait « rien à
   // signaler », et personne ne va vérifier une bonne nouvelle (B-005).
@@ -109,6 +161,20 @@ export function RapportRelecture({ donnees }: { donnees: DonneesRelecture }) {
   const aVoir = revue.filter((r) => r.verdict !== 'rien_a_signaler')
   const verifie = revue.filter((r) => r.verdict === 'rien_a_signaler')
   const nonTraites = donnees.criteresNonTraites ?? []
+  const groupes = grouperParPersonne(aVoir, prenoms)
+
+  // ── LE VERDICT, EN UNE LIGNE ────────────────────────────────────────────
+  //
+  // La première chose lue, et pour beaucoup la seule. Elle dit ce qui a
+  // changé et ce qui attend une décision — pas ce que Filou pense.
+  const verdict: string[] = []
+  if (appliques.length > 0)
+    verdict.push(appliques.length === 1 ? '1 changement appliqué' : `${appliques.length} changements appliqués`)
+  if (aTrancher.length > 0)
+    verdict.push(aTrancher.length === 1 ? '1 décision à prendre' : `${aTrancher.length} décisions à prendre`)
+  if (aVoir.length > 0)
+    verdict.push(aVoir.length === 1 ? '1 point relevé' : `${aVoir.length} points relevés`)
+  if (verdict.length === 0) verdict.push('Aucun changement, aucun point relevé')
 
   return (
     <section className="rl-rapport" aria-label="Relecture de Filou">
@@ -116,19 +182,82 @@ export function RapportRelecture({ donnees }: { donnees: DonneesRelecture }) {
         <Sparkles className="rl-ico-titre" aria-hidden />
         <div>
           <p className="rl-titre">Filou a relu le planning</p>
-          {donnees.synthese && <p className="rl-synthese">{donnees.synthese}</p>}
+          <p className="rl-verdict">{verdict.join(' · ')}</p>
         </div>
       </header>
 
-      {/* ① Ce qui est déjà fait */}
-      {appliques.length > 0 && (
-        <div className="rl-bloc rl-applique">
+      {/* La synthèse est l'avis de Filou, pas un état du planning : elle est
+          donc REPLIÉE sous le verdict, qui, lui, est factuel. Elle restait
+          affichée en entier jusqu'au 02/09 et occupait le haut de l'écran —
+          quatre lignes de texte avant la moindre information actionnable. */}
+      {donnees.synthese && (
+        <details className="rl-plus rl-synthese-repli">
+          <summary>Ce que Filou en dit</summary>
+          <p>{donnees.synthese}</p>
+        </details>
+      )}
+
+      {/* ① CE QUI ATTEND UNE DÉCISION — en premier, parce que c'est la seule
+          chose qui ne se fera pas sans l'admin. Jamais replié. */}
+      {aTrancher.length > 0 && (
+        <div className="rl-bloc rl-trancher">
           <p className="rl-bloc-titre">
-            <Check className="rl-ico" aria-hidden />
-            {appliques.length === 1
-              ? 'Un changement a été appliqué'
-              : `${appliques.length} changements ont été appliqués`}
+            <AlertTriangle className="rl-ico" aria-hidden />
+            {aTrancher.length === 1
+              ? 'Une proposition attend ta décision'
+              : `${aTrancher.length} propositions attendent ta décision`}
           </p>
+          <p className="rl-bloc-sous">
+            Rien n’a été modifié. Le moteur refuse, Filou insiste — à toi de trancher, et
+            d’appliquer à la main sur le planning si tu lui donnes raison.
+          </p>
+          <ul className="rl-liste">
+            {aTrancher.map((l) => {
+              const resume = resumerEffet(l.geste)
+              return (
+                <li key={l.id} className="rl-item rl-verdict-probleme">
+                  {/* Ce que ça ferait, et pourquoi c'est refusé : les deux
+                      seules choses nécessaires pour trancher. Le reste se
+                      déplie. */}
+                  {resume && <p className="rl-resume">{resume}</p>}
+                  <ul className="rl-objections">
+                    {l.objections.map((o, i) => (
+                      <li key={i}>{o}</li>
+                    ))}
+                  </ul>
+                  <details className="rl-plus">
+                    <summary>
+                      Ce que dit Filou, et les {l.geste.length} places concernées
+                    </summary>
+                    <DetailMouvement ligne={l} />
+                  </details>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
+
+      {/* ② CE QUI EST DÉJÀ FAIT — replié : c'est acquis, le moteur l'a validé,
+          et le planning affiché en dessous en tient déjà compte. Le résumé dit
+          l'essentiel (qui est allégé, qui est chargé) sans forcer la lecture
+          de six lignes de dates. */}
+      {appliques.length > 0 && (
+        <details className="rl-bloc rl-applique">
+          <summary className="rl-bloc-titre">
+            <Check className="rl-ico" aria-hidden />
+            <span>
+              {appliques.length === 1
+                ? 'Un changement a été appliqué'
+                : `${appliques.length} changements ont été appliqués`}
+              {(() => {
+                // Le résumé de TOUS les mouvements réunis : c'est le bilan qui
+                // intéresse l'admin, pas le détail mouvement par mouvement.
+                const resume = resumerEffet(appliques.flatMap((l) => l.geste))
+                return resume ? <span className="rl-resume-inline"> — {resume}</span> : null
+              })()}
+            </span>
+          </summary>
           <p className="rl-bloc-sous">
             Le moteur a vérifié que chacun respecte les règles du cabinet avant de
             l’enregistrer. Le planning ci-dessous en tient déjà compte.
@@ -136,87 +265,52 @@ export function RapportRelecture({ donnees }: { donnees: DonneesRelecture }) {
           <ul className="rl-liste">
             {appliques.map((l) => (
               <li key={l.id} className="rl-item">
-                <p className="rl-motif">{l.motif}</p>
-                <ul className="rl-geste">
-                  {l.geste.map((g, i) => (
-                    <li key={i}>{g}</li>
-                  ))}
-                </ul>
-                <p className="rl-meta">
-                  {l.critere}
-                  {effetEnMots(l.effetScore) ? ` · ${effetEnMots(l.effetScore)}` : ''}
-                </p>
+                <DetailMouvement ligne={l} />
               </li>
             ))}
           </ul>
-        </div>
+        </details>
       )}
 
-      {/* ② Ce que l'admin doit trancher */}
-      {aTrancher.length > 0 && (
-        <div className="rl-bloc rl-trancher">
-          <p className="rl-bloc-titre">
-            <AlertTriangle className="rl-ico" aria-hidden />
-            {aTrancher.length === 1
-              ? 'Filou propose un changement que le moteur refuse'
-              : `Filou propose ${aTrancher.length} changements que le moteur refuse`}
-          </p>
-          <p className="rl-bloc-sous">
-            Rien n’a été modifié pour ceux-là. Voici les deux avis, à toi de trancher —
-            tu peux appliquer le changement à la main sur le planning si tu donnes
-            raison à Filou.
-          </p>
-          <ul className="rl-liste">
-            {aTrancher.map((l) => (
-              <li key={l.id} className="rl-item rl-item-double">
-                <div className="rl-avis">
-                  <p className="rl-avis-qui">Ce que dit Filou</p>
-                  <p className="rl-motif">{l.motif}</p>
-                  <ul className="rl-geste">
-                    {l.geste.map((g, i) => (
-                      <li key={i}>{g}</li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="rl-avis">
-                  <p className="rl-avis-qui">Ce que dit le moteur</p>
-                  <ul className="rl-objections">
-                    {l.objections.map((o, i) => (
-                      <li key={i}>{o}</li>
-                    ))}
-                  </ul>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* ③ Ce qu'il a relevé sans savoir le corriger */}
+      {/* ③ CE QU'IL A RELEVÉ SANS SAVOIR LE CORRIGER — groupé PAR PERSONNE.
+          Sur le rapport du 02/09, sept constats sur neuf parlaient d'Antoine :
+          sept cartes de même taille pour un seul problème. Groupés, ils
+          deviennent une ligne dépliable, et l'admin voit d'un coup d'œil QUI
+          est concerné. */}
       {aVoir.length > 0 && (
         <div className="rl-bloc rl-constats">
           <p className="rl-bloc-titre">
             <Eye className="rl-ico" aria-hidden />
             Ce que Filou a relevé
           </p>
-          {/* Une phrase par point, le reste replié. MiKL, 27/08 : « beaucoup
-              trop long, trop de détails, pas bien présenté ». Le fond était
-              juste — c'est le mur de texte qui rendait le rapport illisible,
-              et un rapport qu'on n'a pas envie de lire ne sert à personne. */}
-          <ul className="rl-liste">
-            {aVoir.map((r, i) => (
-              <li key={i} className={`rl-item rl-verdict-${r.verdict}`}>
-                <p className="rl-constat">{r.constat}</p>
-                {r.detail && (
-                  <details className="rl-plus">
-                    <summary>Le détail</summary>
-                    <p>{r.detail}</p>
-                  </details>
-                )}
-                <p className="rl-meta">
-                  {r.critere}
-                  {!r.corrigeable ? ' · il ne voit pas de correction automatique' : ''}
-                </p>
+          <ul className="rl-liste rl-groupes">
+            {groupes.map((g, gi) => (
+              <li key={gi} className="rl-groupe">
+                <details>
+                  <summary>
+                    <span className="rl-groupe-qui">{g.qui ?? 'Le planning'}</span>
+                    <span className="rl-groupe-nb">
+                      {g.points.length === 1 ? '1 point' : `${g.points.length} points`}
+                    </span>
+                  </summary>
+                  <ul className="rl-liste">
+                    {g.points.map((r, i) => (
+                      <li key={i} className={`rl-item rl-verdict-${r.verdict}`}>
+                        <p className="rl-constat">{r.constat}</p>
+                        {r.detail && (
+                          <details className="rl-plus">
+                            <summary>Le détail</summary>
+                            <p>{r.detail}</p>
+                          </details>
+                        )}
+                        <p className="rl-meta">
+                          {r.critere}
+                          {!r.corrigeable ? ' · il ne voit pas de correction automatique' : ''}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
               </li>
             ))}
           </ul>
@@ -256,7 +350,8 @@ export function RapportRelecture({ donnees }: { donnees: DonneesRelecture }) {
 
       {/* Un critère non traité ne doit JAMAIS ressembler à un critère sans
           problème. C'est exactement la confusion qui a produit le faux
-          « rien à redire » du 27/08. */}
+          « rien à redire » du 27/08. Il reste DÉPLIÉ, contrairement au reste :
+          un angle mort replié serait un angle mort au carré. */}
       {nonTraites.length > 0 && (
         <p className="rl-note rl-manquant">
           Filou ne s’est pas prononcé sur {nonTraites.length === 1 ? 'ce point' : 'ces points'} :{' '}

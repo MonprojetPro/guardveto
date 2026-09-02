@@ -305,6 +305,13 @@ export function ParcoursGeneration({
     () => new Map(vets.map((v) => [v.id, v.prenom])),
     [vets],
   )
+  // B-107 — pour regrouper les constats de Filou par personne. Les vides sont
+  // écartés : un prénom vide serait trouvé dans tous les textes et rangerait
+  // tous les constats dans un même faux groupe.
+  const prenomsEquipe = useMemo(
+    () => vets.map((v) => v.prenom).filter((p): p is string => Boolean(p)),
+    [vets],
+  )
   const [etape, setEtape] = useState<Etape>(etapeInitiale)
   // B-060 — ce que le SERVEUR dit être en train de faire. Jamais une phrase
   // choisie ici : l'écran relaie, il n'invente pas.
@@ -1498,8 +1505,10 @@ export function ParcoursGeneration({
                 {etapeRelecture ?? 'Filou relit le planning…'}
               </p>
             )}
+            {/* B-107 — les prénoms servent à GROUPER les constats par personne.
+                Sans eux le rapport s'affiche à plat : moins lisible, jamais faux. */}
             {resultat.issue !== 'echec' && relecture && (
-              <RapportRelecture donnees={relecture} />
+              <RapportRelecture donnees={relecture} prenoms={prenomsEquipe} />
             )}
           </div>
         )}
