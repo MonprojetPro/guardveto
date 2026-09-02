@@ -38,6 +38,33 @@ export interface TraceRelecture {
   planningModifie?: boolean
   /** Le message d'erreur, quand Filou n'a pas pu répondre. */
   erreur?: string | null
+  /**
+   * CE QUE FILOU AVAIT SOUS LES YEUX — pas seulement ce qu'il a répondu.
+   *
+   * Ajouté le 02/09 après CINQ recettes de MiKL sur le même défaut. À chaque
+   * fois la même question sans réponse : le mouvement qui aurait corrigé le
+   * problème était-il dans sa liste ? Et à chaque fois, il fallait reconstruire
+   * le dossier à la main pour le savoir — extraire le planning de la base,
+   * rejouer le calcul, comparer. Une demi-heure, pour une information que le
+   * serveur avait déjà.
+   *
+   * Sans ça, on ne peut jamais distinguer les deux seules causes possibles :
+   * le levier MANQUAIT, ou le levier était là et Filou ne l'a pas pris. Ce sont
+   * deux chantiers opposés — l'un dans le moteur, l'autre dans le prompt — et
+   * on a passé la journée à hésiter entre les deux.
+   */
+  dossier?: {
+    /** Combien de mouvements de chaque genre lui ont été transmis. */
+    mouvementsParGenre?: Record<string, number>
+    /** Combien améliorent, sont neutres, ou dégradent. */
+    effets?: Record<string, number>
+    /** Qui, nommément, pouvait être allégé d'un week-end. Le cœur du sujet. */
+    personnesAllegeables?: string[]
+    /** Combien de mouvements légaux ont été écartés faute de place. */
+    ecartes?: number
+    /** Combien de préférences enfreintes lui ont été signalées. */
+    preferencesEnfreintes?: number
+  }
 }
 
 /**
@@ -67,6 +94,7 @@ export async function tracerRelecture(
       ecartes: trace.ecartes ?? 0,
       planning_modifie: trace.planningModifie ?? false,
       erreur: trace.erreur ?? null,
+      dossier: trace.dossier ?? null,
     })
     // Journalisé, jamais propagé : le rapport est déjà produit, et le perdre
     // pour un problème d'archivage serait absurde. Mais un échec muet ferait

@@ -502,6 +502,23 @@ async function executerRelecture(
     aTrancher,
     ecartes,
     planningModifie: ecrit,
+    // B-096 — ce que Filou AVAIT, pas seulement ce qu'il a répondu. Sans ces
+    // compteurs, cinq recettes de suite ont buté sur la même question sans
+    // réponse : le levier était-il dans sa liste, ou ne l'a-t-il pas pris ?
+    // Deux causes opposées, deux chantiers opposés, et rien pour trancher.
+    dossier: {
+      mouvementsParGenre: mouvements.reduce<Record<string, number>>((acc, { mouvement }) => {
+        acc[mouvement.genre] = (acc[mouvement.genre] ?? 0) + 1
+        return acc
+      }, {}),
+      effets: effets.reduce<Record<string, number>>((acc, e) => {
+        acc[e.sens] = (acc[e.sens] ?? 0) + 1
+        return acc
+      }, {}),
+      personnesAllegeables: [...new Set(dossier.mouvements.flatMap((m) => m.allege ?? []))],
+      ecartes: mouvementsEcartes,
+      preferencesEnfreintes: preferences.length,
+    },
   })
 
   return reponse({

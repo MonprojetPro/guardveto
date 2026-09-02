@@ -103,3 +103,24 @@ revoke all on public.relectures_planning from anon;
 
 comment on table public.relectures_planning is
   'Trace des relectures de Filou (B-096). Historique seul : rien ne doit la relire pour décider.';
+
+-- ── AJOUT DU 02/09, APRÈS CINQ RECETTES SUR LE MÊME DÉFAUT ─────────────────
+--
+-- Ce qu'on gardait, c'était la RÉPONSE de Filou. Jamais ce qu'il avait sous les
+-- yeux. Cinq fois de suite, MiKL a constaté qu'un problème n'était pas corrigé,
+-- et cinq fois la même question est restée sans réponse : le mouvement qui
+-- l'aurait réparé était-il dans sa liste ?
+--
+-- À chaque fois il a fallu reconstruire le dossier à la main — extraire le
+-- planning, rejouer le calcul, comparer. Une demi-heure, pour une information
+-- que le serveur avait déjà et jetait.
+--
+-- Sans elle, impossible de distinguer les deux seules causes possibles : le
+-- levier MANQUAIT, ou il était là et Filou ne l'a pas pris. Ce sont deux
+-- chantiers opposés — l'un dans le moteur, l'autre dans le prompt — et on a
+-- passé une journée à hésiter entre les deux.
+alter table public.relectures_planning
+  add column if not exists dossier jsonb;
+
+comment on column public.relectures_planning.dossier is
+  'Ce que Filou avait SOUS LES YEUX (B-096) : mouvements par genre, effets, personnes allegeables, ecartes.';
