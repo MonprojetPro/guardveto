@@ -40,7 +40,7 @@ import { relirePlanningIA, modeleRelecture } from '@/lib/ia/relecturePlanning'
 import { assistantIaDisponible } from '@/lib/ia/proposerRegle'
 import { arbitrerChangements, type ChangementArbitre } from '@/engine/relecture/arbitrer'
 import { remplacantsPossibles } from '@/engine/relecture/remplacants'
-import { mouvementsPossibles } from '@/engine/relecture/mouvements'
+import { mouvementsPossibles, prioriserMouvements } from '@/engine/relecture/mouvements'
 import { effetsDesMouvements } from '@/engine/relecture/effet'
 import { personnesAuxExtremes } from '@/engine/relecture/cibles'
 import { preferencesEnfreintes } from '@/engine/relecture/preferences'
@@ -280,7 +280,7 @@ async function executerRelecture(
     calendrier: contexte.calendrier,
   })
 
-  const mouvementsLegaux = mouvementsPossibles(planningActuel, {
+  const mouvementsBruts = mouvementsPossibles(planningActuel, {
     vets: contexte.vets,
     dateDebut: contexte.dateDebut,
     dateFin: contexte.dateFin,
@@ -299,6 +299,16 @@ async function executerRelecture(
   // « ça vaut le coup » : légal et souhaitable confondus. Filou devait choisir
   // son levier sans balance — et le 02/09 il a répondu, à raison, qu'il ne
   // pouvait rien corriger. Le scoreur est celui du moteur, pas une estimation.
+  //
+  // ⚠️ ON BORNE AVANT DE SCORER, et on le dit. Mesure du 02/09 sur une période
+  // d'hiver complète : **3012 mouvements**, dont 2736 échanges simples — ceux-là
+  // existaient déjà depuis B-093. Le dossier de la relecture du matin même en
+  // portait donc des milliers : Filou ne choisissait pas dans une aide, il
+  // choisissait dans un mur. Scorer les 3012 coûterait en plus le temps que
+  // l'admin passe devant l'écran d'attente.
+  const { retenus: mouvementsLegaux, ecartes: mouvementsEcartes } =
+    prioriserMouvements(mouvementsBruts)
+
   emettre('Je mesure ce que chaque mouvement changerait…')
   const effets = effetsDesMouvements(planningActuel, mouvementsLegaux, {
     vets: normaliserContraintesVets(contexte.vets),
@@ -331,6 +341,7 @@ async function executerRelecture(
 
   const { dossier, historiqueIndisponible } = await monterDossierRelecture(
     supabase, planningActuel, contexte, periodeId, cabinetId, remplacants, mouvements, preferences,
+    mouvementsEcartes,
   )
 
   // ── Filou lit ──

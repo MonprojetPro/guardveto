@@ -129,6 +129,15 @@ export async function monterDossierRelecture(
    * DOIT les passer sur le chemin de production.
    */
   preferences?: Array<{ detail: string }>,
+  /**
+   * Combien de mouvements légaux ont été ÉCARTÉS de la liste faute de place.
+   *
+   * ⚠️ Ce nombre doit être dit à Filou, ce n'est pas une statistique interne.
+   * Une liste tronquée en silence se lit « voilà tout ce qui est possible », et
+   * il conclurait qu'il n'y a rien d'autre à faire — exactement le silence que
+   * tout ce dossier existe pour empêcher.
+   */
+  mouvementsEcartes?: number,
 ): Promise<{ dossier: DossierRelecture; historiqueIndisponible: boolean }> {
   const roleAvantage = contexte.roleAvantageFinancier ?? null
 
@@ -307,16 +316,48 @@ export async function monterDossierRelecture(
     const duo = gens.slice(0, 2).join(' et ')
     const dates = [...new Set(mouvement.affectations.map((a) => a.date))].sort()
 
+    // ── B-098 : DIRE si chacun perd des gardes, en prend, ou change juste de rôle
+    //
+    // Le 02/09, Filou a appliqué deux inversions de rôle en annonçant « ça
+    // allège le lundi de Victor » — Victor restait de garde, seul son rôle
+    // changeait. Il l'a écrit à l'administratrice avec l'aplomb d'un fait.
+    //
+    // Il ne mentait pas : personne ne le lui avait dit. Le dossier listait des
+    // places, à lui d'en déduire qui travaille encore — et il déduisait mal.
+    // On le CALCULE donc ici, ce qui est trivial, plutôt que de lui demander un
+    // raisonnement où il échoue.
+    const parPersonne = new Map<string, { avant: number; apres: number }>()
+    for (const a of mouvement.affectations) {
+      const ancien = occupantAvant.get(`${a.date}|${a.type}|${a.role}`)
+      if (ancien) {
+        const e = parPersonne.get(ancien) ?? { avant: 0, apres: 0 }
+        e.avant += 1
+        parPersonne.set(ancien, e)
+      }
+      const e = parPersonne.get(a.vetId) ?? { avant: 0, apres: 0 }
+      e.apres += 1
+      parPersonne.set(a.vetId, e)
+    }
+
+    const effetSurLesGens = [...parPersonne.entries()].map(([id, { avant, apres }]) => {
+      const qui = nomDe(id)
+      if (apres > avant) return `${qui} prend ${apres - avant} garde(s) de plus`
+      if (apres < avant) return `${qui} est libéré${apres === 0 ? '' : ''} de ${avant - apres} garde(s)`
+      return `${qui} reste de garde autant qu’avant — seul son rôle change`
+    })
+
     const resume =
       mouvement.genre === 'inversion_roles_weekend'
-        ? `${duo} échangent leurs rôles sur le week-end du ${dateFr(dates[dates.length - 1])}`
+        ? `${duo} échangent leurs rôles sur le week-end du ${dateFr(dates[dates.length - 1])} — aucun des deux n’est libéré`
         : mouvement.genre === 'echange_weekend'
-          ? `${duo} échangent leurs week-ends`
-          : `${duo} échangent leurs places`
+          ? `${duo} échangent leurs week-ends — chacun en garde autant qu’avant`
+          : mouvement.genre === 'remplacement_weekend'
+            ? `${duo} : l’un est libéré d’un week-end, l’autre le prend`
+            : `${duo} échangent leurs places`
 
     return {
       resume,
-      lignes,
+      lignes: [...lignes, ...effetSurLesGens],
       effet: effet.sens,
       surQuoi: effet.surQuoi,
       affectations: mouvement.affectations.map((a) => ({
@@ -335,6 +376,7 @@ export async function monterDossierRelecture(
       roleAvantageFinancier: roleAvantage,
       preferencesEnfreintes: (preferences ?? []).map((p) => p.detail),
       mouvements: mouvementsLisibles,
+      mouvementsEcartes: mouvementsEcartes ?? 0,
     },
     historiqueIndisponible,
   }

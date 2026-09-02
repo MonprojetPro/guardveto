@@ -37,6 +37,7 @@ function dossier(partiel: Partial<DossierRelecture> = {}): DossierRelecture {
     roleAvantageFinancier: 'premier',
     preferencesEnfreintes: [],
     mouvements: [],
+    mouvementsEcartes: 0,
     ...partiel,
   }
 }
@@ -111,6 +112,24 @@ describe('dossierEnTexte — les mouvements et leur effet', () => {
     expect(texte).toContain('date=2026-10-24 type=weekend role=premier vetId=v-antoine')
     expect(texte).toContain('date=2026-10-23 type=vendredi_soir role=second vetId=v-antoine')
     expect(texte).toContain('en omettre une place le fait refuser')
+  })
+
+  it('DIT combien de mouvements ont été écartés de la liste', () => {
+    // La liste est bornée (3012 mouvements bruts mesurés sur une période
+    // d'hiver complète). Une troncature silencieuse se lirait « voilà tout ce
+    // qui est possible », et Filou conclurait qu'il n'y a rien d'autre à faire
+    // — exactement le silence que tout ce dossier existe pour empêcher.
+    const texte = dossierEnTexte(dossier({
+      mouvements: [mouvement('ameliore', 'A')],
+      mouvementsEcartes: 2612,
+    }))
+    expect(texte).toContain('2612 autres mouvements légaux ne sont PAS listés')
+    expect(texte).toContain('je n’ai pas trouvé')
+  })
+
+  it('n’en parle pas quand rien n’a été écarté', () => {
+    const texte = dossierEnTexte(dossier({ mouvements: [mouvement('ameliore', 'A')] }))
+    expect(texte).not.toContain('ne sont PAS listés')
   })
 
   it('annonce combien de mouvements améliorent, ou dit qu’il n’y en a aucun', () => {

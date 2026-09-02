@@ -33,6 +33,7 @@ const DOSSIER: DossierRelecture = {
   mouvements: [],
   // B-096 : ce test ne porte pas sur les preferences enfreintes.
   preferencesEnfreintes: [],
+  mouvementsEcartes: 0,
   periode: 'du 21 septembre au 18 octobre',
   saison: 'hiver',
   places: [

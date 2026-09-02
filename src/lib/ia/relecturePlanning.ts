@@ -250,6 +250,18 @@ export interface DossierRelecture {
    * jamais dire « ça vaut le coup » : légal et souhaitable confondus.
    */
   mouvements: MouvementLisible[]
+  /**
+   * Combien de mouvements légaux ont été écartés de la liste faute de place.
+   *
+   * Mesuré le 02/09 : une période d'hiver complète produit **3012 mouvements**,
+   * dont 2736 échanges simples. Les envoyer tous noierait le signal — Filou ne
+   * choisirait pas dans une aide mais dans un mur, ce qui était déjà le cas ce
+   * jour-là. On borne donc, en gardant d'abord les leviers rares.
+   *
+   * ⚠️ Ce nombre est DIT à Filou. Une liste tronquée en silence se lirait
+   * « voilà tout ce qui est possible ».
+   */
+  mouvementsEcartes: number
 }
 
 /** Un mouvement applicable, décrit en français, avec son effet mesuré. */
@@ -646,8 +658,30 @@ export function dossierEnTexte(dossier: DossierRelecture): string {
         : 'Aucun mouvement n’améliore le planning au sens du moteur. Si tu en '
           + 'proposes un quand même, dis pourquoi il vaut mieux que le score.',
       '',
+      '⚠️ ALLÉGER QUELQU’UN ET CHANGER SON RÔLE SONT DEUX CHOSES DIFFÉRENTES.',
+      'Chaque mouvement dit, en toutes lettres, ce que chacun y gagne ou y perd :',
+      '« libéré de N garde(s) », « prend N garde(s) de plus », ou « reste de',
+      'garde autant qu’avant — seul son rôle change ». Ne le déduis pas des',
+      'dates : c’est écrit, et c’est calculé, pas estimé.',
+      '',
+      'Un échange et une inversion de rôles ne diminuent la charge de PERSONNE :',
+      'ils déplacent. Si quelqu’un est trop chargé, seul un mouvement où il est',
+      '« libéré » l’allège vraiment. Proposer une inversion en annonçant qu’elle',
+      'soulage quelqu’un serait faux, et l’administratrice te croira.',
+      '',
       'Pour en proposer un, recopie TOUTES ses places telles qu’elles sont écrites.',
       'Un mouvement est un tout : en omettre une place le fait refuser.',
+      ...(dossier.mouvementsEcartes > 0
+        ? [
+            '',
+            `⚠️ ${dossier.mouvementsEcartes} autres mouvements légaux ne sont PAS listés ici :`,
+            'la liste est bornée pour rester lisible. Les mouvements rares (ceux qui',
+            'libèrent quelqu’un d’un week-end, ceux qui font tourner un rôle) y sont',
+            'TOUS ; ce sont des échanges ordinaires qui ont été écartés. Donc si tu ne',
+            'trouves pas de quoi corriger un point, dis « je n’ai pas trouvé », jamais',
+            '« c’est impossible ».',
+          ]
+        : []),
     )
 
     for (const m of tries) {

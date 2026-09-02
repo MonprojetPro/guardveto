@@ -216,17 +216,110 @@ describe('mouvementsPossibles — échange de personnes entre deux week-ends', (
   })
 })
 
+// ── ②bis LE SEUL MOUVEMENT QUI CHANGE UN COMPTEUR ───────────────────────────
+//
+// MiKL, le 2026-09-02, devant le planning « corrigé » par Filou : « on a encore
+// Antoine et ses week-ends d'affilée ». Il avait raison, et la cause était dans
+// la première livraison de B-096 : échanger et inverser sont des PERMUTATIONS.
+// Antoine sortait d'un week-end pour entrer dans un autre, son total ne bougeait
+// pas d'un pouce. Le faire passer de 5 à 4 était arithmétiquement impossible.
+
+describe('mouvementsPossibles — le remplacement, qui seul allège vraiment', () => {
+  /** Combien de week-ends chaque personne tient, une fois le mouvement appliqué. */
+  function weekendsApres(planning: PlanningPartiel, m: MouvementPossible): Map<string, number> {
+    const apres = new Map<string, string | null>()
+    for (const a of planning.attributions) {
+      for (const p of a.placements) apres.set(`${a.date}|${a.type}|${p.role}`, p.vetId)
+    }
+    for (const a of m.affectations) apres.set(`${a.date}|${a.type}|${a.role}`, a.vetId)
+
+    const compte = new Map<string, number>()
+    for (const [cle, vetId] of apres) {
+      if (!vetId || !cle.includes('|weekend|')) continue
+      compte.set(vetId, (compte.get(vetId) ?? 0) + 1)
+    }
+    return compte
+  }
+
+  it('propose de faire entrer quelqu’un qui n’a AUCUN week-end', () => {
+    // Carol et David ne tiennent aucun des deux week-ends du planning.
+    const m = mouvementsPossibles(planningDeuxWeekends(), options())
+    const remplacements = m.filter((x) => x.genre === 'remplacement_weekend')
+    expect(remplacements.length).toBeGreaterThan(0)
+  })
+
+  it('fait BAISSER le compteur de la personne remplacée — ce qu’aucun échange ne fait', () => {
+    const planning = planningDeuxWeekends()
+    const avant = weekendsApres(planning, { genre: 'echange_simple', affectations: [] })
+    expect(avant.get('v1')).toBe(1) // Alice tient un week-end
+
+    const m = mouvementsPossibles(planning, options())
+    const allegeAlice = m
+      .filter((x) => x.genre === 'remplacement_weekend')
+      .some((x) => (weekendsApres(planning, x).get('v1') ?? 0) < (avant.get('v1') ?? 0))
+
+    expect(allegeAlice).toBe(true)
+  })
+
+  it('AUCUN échange ni inversion ne peut faire baisser un compteur', () => {
+    // Le cœur du défaut, verrouillé : si un jour quelqu'un croit qu'un échange
+    // suffit à alléger quelqu'un, ce test dit non. C'est ce qui a fait croire
+    // le 02/09 que le levier était livré alors qu'il ne l'était pas.
+    const planning = planningDeuxWeekends()
+    const avant = weekendsApres(planning, { genre: 'echange_simple', affectations: [] })
+
+    const permutations = mouvementsPossibles(planning, options())
+      .filter((x) => x.genre !== 'remplacement_weekend')
+
+    for (const x of permutations) {
+      const apres = weekendsApres(planning, x)
+      for (const [vetId, n] of avant) expect(apres.get(vetId) ?? 0).toBe(n)
+    }
+  })
+
+  it('remplace sur TOUTE la grappe — le vendredi suit', () => {
+    const m = mouvementsPossibles(planningDeuxWeekends(), options())
+    for (const x of m.filter((y) => y.genre === 'remplacement_weekend')) {
+      const dates = new Set(x.affectations.map((a) => a.date))
+      // Un remplacement qui ne toucherait que le samedi casserait le binôme et
+      // serait refusé en silence : on n'aurait rien gagné.
+      const touche = (d: string) => dates.has(d)
+      expect(touche(SAM1) ? touche(VEN1) : touche(SAM2) ? touche(VEN2) : false).toBe(true)
+    }
+  })
+
+  it('ne propose jamais le dernier recours', () => {
+    // Le dossier dit à Filou de ne pas le programmer : le lui proposer ici
+    // serait se contredire d'un paragraphe à l'autre.
+    const equipe = [...EQUIPE, vet('secours', 'Anne-Catherine', { dernier_recours: true })]
+    const m = mouvementsPossibles(planningDeuxWeekends(), options(equipe))
+    for (const x of m) {
+      expect(x.affectations.some((a) => a.vetId === 'secours')).toBe(false)
+    }
+  })
+})
+
 // ── ③ LE FILTRE NE DOIT NI TOUT PRENDRE NI TOUT JETER ───────────────────────
 
 describe('mouvementsPossibles — le ciblage', () => {
   it('ne rend que les mouvements impliquant une personne ciblée', () => {
     const m = mouvementsPossibles(planningDeuxWeekends(), options(EQUIPE, ['v1']))
     expect(m.length).toBeGreaterThan(0)
+    const occupantAvant = new Map<string, string | null>()
+    for (const a of planningDeuxWeekends().attributions) {
+      for (const p of a.placements) occupantAvant.set(`${a.date}|${a.type}|${p.role}`, p.vetId)
+    }
+
     for (const x of m) {
-      // Le mouvement doit toucher Alice, soit parce qu'elle bouge, soit parce
-      // qu'on lui donne une place.
-      const concerne = x.affectations.some((a) => a.vetId === 'v1')
-      expect(concerne).toBe(true)
+      // Le mouvement doit toucher Alice — soit on lui DONNE une place, soit on
+      // lui en RETIRE une. Le second cas compte autant que le premier : c'est
+      // exactement ce qu'on cherche quand quelqu'un est trop chargé, et son
+      // identifiant n'apparaît alors nulle part dans les affectations.
+      const recoit = x.affectations.some((a) => a.vetId === 'v1')
+      const perd = x.affectations.some(
+        (a) => occupantAvant.get(`${a.date}|${a.type}|${a.role}`) === 'v1' && a.vetId !== 'v1',
+      )
+      expect(recoit || perd).toBe(true)
     }
   })
 

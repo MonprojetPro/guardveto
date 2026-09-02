@@ -86,11 +86,87 @@ export type GenreMouvement =
   | 'inversion_roles_weekend'
   /** Deux personnes échangent leurs week-ends, vendredis compris. */
   | 'echange_weekend'
+  /**
+   * Quelqu'un REMPLACE une autre personne sur un week-end, sans contrepartie.
+   *
+   * ⚠️ LE SEUL MOUVEMENT QUI CHANGE LE NOMBRE DE WEEK-ENDS DE QUELQU'UN.
+   *
+   * Défaut de conception de la première livraison de B-096, trouvé par MiKL le
+   * 2026-09-02 : *« on a encore Antoine et ses week-ends d'affilée »*. Les deux
+   * autres genres sont des permutations — l'échange fait sortir Antoine d'un
+   * week-end pour le faire entrer dans un autre, l'inversion garde le binôme.
+   * Dans les deux cas son TOTAL est inchangé. Il était donc arithmétiquement
+   * impossible de le faire passer de 5 week-ends à 4, et Filou n'avait toujours
+   * pas le levier qu'on croyait lui avoir donné.
+   *
+   * Les remplacements simples (`remplacants.ts`) ne comblaient pas ce trou : ils
+   * jugent place par place, donc toucher un week-end sans son vendredi casse le
+   * binôme et se fait refuser. Exactement le défaut des échanges à deux places.
+   */
+  | 'remplacement_weekend'
 
 /** Un mouvement applicable : toutes ses affectations, ensemble ou rien. */
 export interface MouvementPossible {
   genre: GenreMouvement
   affectations: AffectationMouvement[]
+}
+
+/**
+ * Combien de mouvements le dossier peut porter sans noyer le signal.
+ *
+ * MESURÉ le 2026-09-02 sur une période d'hiver complète (12 semaines, 6
+ * vétérinaires) : **3012 mouvements**, dont 2736 échanges simples. Ceux-là
+ * existaient depuis B-093 — le dossier envoyé à Filou le matin même en portait
+ * donc des milliers, et il devait y choisir. Ça n'était pas une aide, c'était
+ * un mur, et ça éclaire ses choix médiocres de ce jour-là.
+ *
+ * Le coût est double : le temps (chaque mouvement est scoré sur le planning
+ * entier) et l'illisibilité. Le second est le pire — le premier fait attendre,
+ * le second fait choisir n'importe quoi.
+ */
+export const PLAFOND_MOUVEMENTS = 400
+
+/**
+ * L'ordre dans lequel on garde les mouvements quand il faut couper.
+ *
+ * Les genres RARES d'abord, et ce n'est pas une préférence esthétique : ce sont
+ * les seuls qui font quelque chose qu'aucun autre ne sait faire. Un
+ * `remplacement_weekend` est le SEUL mouvement qui allège réellement quelqu'un
+ * d'un week-end ; une `inversion_roles_weekend` la seule qui fasse tourner le
+ * rôle qui rapporte. Il y en a une centaine face à des milliers d'échanges
+ * simples : les laisser se faire noyer reviendrait à ne pas les avoir livrés.
+ */
+const PRIORITE: Record<GenreMouvement, number> = {
+  remplacement_weekend: 0,
+  inversion_roles_weekend: 1,
+  echange_weekend: 2,
+  echange_simple: 3,
+}
+
+/**
+ * La liste bornée, et le nombre de mouvements écartés.
+ *
+ * ⚠️ `ecartes` n'est pas une statistique : il DOIT être dit à Filou. Une liste
+ * tronquée en silence se lit « voilà tout ce qui est possible », et il
+ * conclurait qu'il n'y a rien d'autre à faire. C'est la règle du projet sur les
+ * plafonds : borner, oui ; borner sans le dire, jamais.
+ */
+export function prioriserMouvements(
+  mouvements: readonly MouvementPossible[],
+  plafond: number = PLAFOND_MOUVEMENTS,
+): { retenus: MouvementPossible[]; ecartes: number } {
+  if (mouvements.length <= plafond) return { retenus: [...mouvements], ecartes: 0 }
+
+  // Tri stable sur la seule priorité de genre : à genre égal, l'ordre de
+  // génération est conservé, donc deux relectures du même planning rendent la
+  // même liste. Sans ça, on ne saurait jamais si un changement de comportement
+  // vient du produit ou de l'ordre du jour.
+  const tries = mouvements
+    .map((m, i) => ({ m, i }))
+    .sort((a, b) => PRIORITE[a.m.genre] - PRIORITE[b.m.genre] || a.i - b.i)
+    .map((x) => x.m)
+
+  return { retenus: tries.slice(0, plafond), ecartes: mouvements.length - plafond }
 }
 
 /**
@@ -361,6 +437,34 @@ export function mouvementsPossibles(
             ...affectationsDeLaGrappe(g2, (id) => (id === y ? x : id)),
           ])
         }
+      }
+    }
+  }
+
+  // ②c — le REMPLACEMENT sur une grappe : le seul mouvement qui change le
+  // NOMBRE de week-ends de quelqu'un.
+  //
+  // Sans lui, tout ce module ne sait que redistribuer des week-ends entre les
+  // mêmes personnes : chaque échange fait sortir quelqu'un d'un week-end pour
+  // le faire entrer dans un autre. C'est ce qui manquait le 02/09, quand MiKL a
+  // regardé le planning « corrigé » et retrouvé Antoine avec ses cinq week-ends.
+  //
+  // Le remplaçant est cherché dans TOUTE l'équipe, pas seulement parmi les
+  // ciblés : c'est précisément quelqu'un qui n'a PAS de week-end ici qu'on
+  // veut pouvoir faire entrer. Le filtre `concerneUneCible` s'applique ensuite
+  // sur le mouvement entier — il suffit que la personne remplacée soit ciblée.
+  for (const g of grappes) {
+    const presents = new Set(gensDeLaGrappe(g))
+    for (const sortant of presents) {
+      for (const entrant of vets) {
+        if (presents.has(entrant.id)) continue // déjà sur ce week-end
+        // Le dernier recours n'est jamais programmé spontanément : le proposer
+        // ici contredirait la consigne que le dossier donne à Filou.
+        if (entrant.dernier_recours) continue
+        ajouter(
+          'remplacement_weekend',
+          affectationsDeLaGrappe(g, (id) => (id === sortant ? entrant.id : id)),
+        )
       }
     }
   }
