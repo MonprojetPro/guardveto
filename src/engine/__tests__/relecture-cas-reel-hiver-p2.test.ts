@@ -386,3 +386,89 @@ describe('B-101 — le mouvement « refaire la semaine » sort-il pour de vrai ?
     }
   }, 120_000)
 })
+
+// ============================================================
+// B-103 — LE DERNIER RECOURS N'ENTRE JAMAIS PAR LA RECONSTRUCTION
+// ============================================================
+// MiKL, le 02/09 au soir, en recettant B-101 : « il a mis Anne-Catherine, ça
+// fait partie des règles jamais ». Trois mouvements appliqués la posaient cinq
+// fois, et le moteur les avait tous validés.
+//
+// ── LA CAUSE, ET C'EST LA MÊME QU'EN B-046 ─────────────────────────────────
+//
+// `reconstruireFenetre` choisissait ses candidats sur `isValid` et sur
+// l'exclusion demandée, sans jamais regarder `dernier_recours`. Le scoreur lui
+// applique bien 1 000 000 de pénalité (`solver.ts`), ce qui la CLASSE dernière
+// — mais sur une semaine saturée où elle est la seule candidate légale, être
+// dernière ne sert à rien : elle est posée.
+//
+//     Une pénalité ordonne. Elle n'interdit pas.
+//
+// ── POURQUOI LE CORRECTIF N'EST PAS DANS `isValid` ─────────────────────────
+//
+// Parce que le dernier recours reste une FONCTION MANUELLE de l'admin (règle
+// rappelée par MiKL le 02/09). `isValid` est partagé avec les chemins de
+// retouche à la main : y poser l'exclusion interdirait à l'admin de faire
+// exactement ce que le produit lui promet. L'exclusion se pose sur la liste
+// des CANDIDATS d'un placement automatique, jamais sur la légalité.
+// ============================================================
+
+describe('B-103 — le dernier recours reste hors de toute pose automatique', () => {
+  const ANNE_CAT = 'ac000000-0000-4000-8000-000000000001'
+
+  /** Anne-Catherine : dans l'équipe, jamais placée automatiquement. */
+  function derniereRecours(): VetEngine {
+    return {
+      id: ANNE_CAT, nom: 'Anne-Catherine', prenom: 'Anne-Catherine',
+      statut: 'associe', dernier_recours: true,
+      contraintes: [ESPACEMENT_MIN, ESPACEMENT_WE], conges: [],
+    } as unknown as VetEngine
+  }
+
+  const AVEC_DERNIER_RECOURS = {
+    vets: [...EQUIPE, derniereRecours()],
+    dateDebut: '2026-10-19',
+    dateFin: '2027-01-10',
+    saison: 'hiver' as const,
+    nbVetosSemaineSoir: 2,
+  }
+
+  it('💣 ne la pose NULLE PART, même quand elle rendrait la semaine résoluble', () => {
+    // Le cas réel du 02/09 : la reconstruction de la semaine du 19/10 est le
+    // nœud le plus fermé du planning — quatre personnes pour douze places.
+    // Anne-Catherine libre y est la solution de facilité, et c'est exactement
+    // celle qu'il ne faut pas prendre.
+    const refait = reconstruireFenetre(planningReel(), AVEC_DERNIER_RECOURS, {
+      debut: '2026-10-19',
+      fin: '2026-10-25',
+      exclusion: { vetId: ANTOINE, date: '2026-10-24', type: 'weekend' },
+    })
+
+    if (refait === null) return // pas de solution sans elle : c'est légitime
+
+    const posee = refait.attributions
+      .filter((a) => a.date >= '2026-10-19' && a.date <= '2026-10-25')
+      .flatMap((a) => a.placements.map((p) => ({ date: a.date, type: a.type, vetId: p.vetId })))
+      .filter((p) => p.vetId === ANNE_CAT)
+
+    expect(posee).toEqual([])
+  }, 120_000)
+
+  it('sa présence dans l’équipe ne change RIEN au résultat', () => {
+    // Le vrai contrôle de non-régression : ajouter un dernier recours à
+    // l'équipe ne doit produire ni une solution de plus, ni une solution
+    // différente. S'il change quoi que ce soit, c'est qu'il a servi.
+    const demande = {
+      debut: '2026-10-19',
+      fin: '2026-10-25',
+      exclusion: { vetId: ANTOINE, date: '2026-10-24', type: 'weekend' },
+    }
+    const sansElle = reconstruireFenetre(planningReel(), {
+      vets: EQUIPE, dateDebut: '2026-10-19', dateFin: '2027-01-10',
+      saison: 'hiver', nbVetosSemaineSoir: 2,
+    }, demande)
+    const avecElle = reconstruireFenetre(planningReel(), AVEC_DERNIER_RECOURS, demande)
+
+    expect(avecElle).toEqual(sansElle)
+  }, 120_000)
+})

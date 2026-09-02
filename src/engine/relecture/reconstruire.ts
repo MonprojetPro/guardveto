@@ -55,6 +55,7 @@ import type { CreneauModele } from '../creneau-modele'
 import type { StructureConfig } from '../structure-config'
 import type { EquityWeights } from '../equity-weights'
 import { normaliserContraintesVets } from '../normaliserContraintes'
+import { effectifPourGeneration } from '../effectif'
 import { isValid } from '../rules/hard-constraints'
 import { genererSteps, scorerCandidatLNS } from '../solver'
 import { DEFAULT_EQUITY_WEIGHTS } from '../equity-weights'
@@ -193,6 +194,25 @@ export function reconstruireFenetre(
   demande: DemandeReconstruction,
 ): PlanningPartiel | null {
   const vets = normaliserContraintesVets(options.vets)
+
+  /**
+   * Qui peut être POSÉ ici — et c'est plus étroit que « qui existe » (B-103).
+   *
+   * Le dernier recours reste dans `vets`, parce que les contrôles ont besoin de
+   * voir toute l'équipe (un binôme, un congé, une garde la veille se jugent sur
+   * les personnes réelles). Mais il ne peut jamais être CHOISI : le placer
+   * automatiquement est interdit, le poser à la main est une prérogative de
+   * l'admin. La distinction se joue donc ici, sur les candidats, et surtout pas
+   * dans `isValid` — que les chemins de retouche manuelle partagent, et où
+   * l'exclusion interdirait à l'admin ce que le produit lui promet.
+   *
+   * Le scoreur lui applique déjà 1 000 000 de pénalité. C'est un CLASSEMENT :
+   * sur une semaine saturée où elle est la seule candidate légale, être dernière
+   * ne l'écarte pas. La leçon est celle de B-046, repayée le 02/09 : une
+   * pénalité ordonne, elle n'interdit pas.
+   */
+  const posables = effectifPourGeneration(vets)
+
   const steps = placesDeLaFenetre(options, demande)
   if (steps.length === 0) return null
 
@@ -217,7 +237,7 @@ export function reconstruireFenetre(
     const estLeCreneauExclu =
       step.date === demande.exclusion.date && step.type === demande.exclusion.type
 
-    const candidats = vets
+    const candidats = posables
       .filter((v) => !(estLeCreneauExclu && v.id === demande.exclusion.vetId))
       .filter((v) => isValid(
         step, v, step.role, vets, courant,
