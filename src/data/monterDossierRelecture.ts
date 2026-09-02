@@ -353,7 +353,9 @@ export async function monterDossierRelecture(
           ? `${duo} échangent leurs week-ends — chacun en garde autant qu’avant`
           : mouvement.genre === 'remplacement_weekend'
             ? `${duo} : l’un est libéré d’un week-end, l’autre le prend`
-            : `${duo} échangent leurs places`
+            : mouvement.genre === 'remplacement_weekend_en_chaine'
+              ? `${duo} : quelqu’un est libéré d’un week-end — il faut d’abord déplacer une garde pour rendre ça possible`
+              : `${duo} échangent leurs places`
 
     return {
       resume,

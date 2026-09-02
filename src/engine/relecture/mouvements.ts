@@ -66,6 +66,7 @@ import { normaliserContraintesVets } from '../normaliserContraintes'
 import { isValid } from '../rules/hard-constraints'
 import { genererSteps } from '../solver'
 import { apparierSourcePourCible } from '../relations-structure'
+import { addDays } from '../utils'
 import {
   echangesPossibles, clePlace, poser,
   type OptionsEchanges, type PlaceOccupee,
@@ -104,6 +105,24 @@ export type GenreMouvement =
    * binôme et se fait refuser. Exactement le défaut des échanges à deux places.
    */
   | 'remplacement_weekend'
+  /**
+   * Un remplacement de week-end rendu possible en LIBÉRANT D'ABORD l'obstacle.
+   *
+   * MESURÉ sur le vrai planning Hiver P2 le 2026-09-02 : `remplacement_weekend`
+   * ne sortait JAMAIS pour alléger Antoine, sur aucun de ses cinq week-ends.
+   * Ce n'était ni un bug ni un manque de candidats — c'est structurel.
+   *
+   * Un week-end est ENCADRÉ. Le vendredi qui le précède le suit (même binôme),
+   * et l'espacement minimum de deux jours interdit d'être de garde le jeudi ET
+   * le vendredi : tout candidat de garde le jeudi précédent est éliminé. De
+   * l'autre côté, depuis que B-092 compte enfin les nuits du week-end, le lundi
+   * suivant élimine les autres. Sur six vétérinaires, il ne reste personne.
+   *
+   * Un mouvement de quatre places ne pouvait donc pas suffire : il en faut un
+   * de six. On déplace d'abord la garde qui bloque le remplaçant, puis on fait
+   * le remplacement — le tout d'un seul bloc, validé comme un tout.
+   */
+  | 'remplacement_weekend_en_chaine'
 
 /** Un mouvement applicable : toutes ses affectations, ensemble ou rien. */
 export interface MouvementPossible {
@@ -137,10 +156,15 @@ export const PLAFOND_MOUVEMENTS = 400
  * simples : les laisser se faire noyer reviendrait à ne pas les avoir livrés.
  */
 const PRIORITE: Record<GenreMouvement, number> = {
-  remplacement_weekend: 0,
-  inversion_roles_weekend: 1,
-  echange_weekend: 2,
-  echange_simple: 3,
+  // Mesuré le 02/09 sur le vrai planning : le remplacement DIRECT ne sort
+  // jamais (le week-end est encadré par le jeudi et le lundi). La chaîne est
+  // donc, en pratique, le seul mouvement qui allège vraiment quelqu'un — la
+  // laisser se faire couper reviendrait à ne pas l'avoir écrite.
+  remplacement_weekend_en_chaine: 0,
+  remplacement_weekend: 1,
+  inversion_roles_weekend: 2,
+  echange_weekend: 3,
+  echange_simple: 4,
 }
 
 /**
@@ -241,6 +265,48 @@ function affectationsDeLaGrappe(
     for (const p of attr.placements) {
       if (!p.vetId) continue
       out.push({ date: attr.date, type: attr.type, role: p.role, vetId: remplacer(p.vetId) })
+    }
+  }
+  return out
+}
+
+/**
+ * Les gardes de `vetId` qui l'empêchent de prendre cette grappe.
+ *
+ * Ce sont celles qui tombent JUSTE avant ou JUSTE après — le jeudi qui précède
+ * le vendredi apparié, le lundi qui suit le dimanche. L'espacement minimum du
+ * cabinet (2 jours dans le cas mesuré) les rend incompatibles avec la grappe.
+ *
+ * On ne cherche PAS à deviner quelle règle bloque : on propose de déplacer ces
+ * gardes-là, et `isValid` tranche ensuite. Un module qui ré-implémenterait le
+ * raisonnement de l'espacement divergerait de lui au premier réglage changé.
+ *
+ * La fenêtre est volontairement étroite (2 jours de part et d'autre). L'élargir
+ * ferait exploser la combinatoire pour proposer des remaniements que personne
+ * ne relierait au problème d'origine.
+ */
+const JOURS_AUTOUR_DE_LA_GRAPPE = 2
+
+function gardesQuiBloquent(
+  planning: PlanningPartiel,
+  vetId: string,
+  g: Grappe,
+): Array<{ date: string; type: string; role: string }> {
+  const jours = g.attributions.map((a) => a.date).sort()
+  const premier = jours[0]
+  const dernier = jours[jours.length - 1]
+  const debut = addDays(premier, -JOURS_AUTOUR_DE_LA_GRAPPE)
+  // +1 : le week-end couvre aussi le dimanche, qui n'est pas une date d'ancrage.
+  const fin = addDays(dernier, JOURS_AUTOUR_DE_LA_GRAPPE + 1)
+
+  const dansLaGrappe = new Set(g.attributions.map((a) => `${a.date}|${a.type}`))
+  const out: Array<{ date: string; type: string; role: string }> = []
+
+  for (const attr of planning.attributions) {
+    if (dansLaGrappe.has(`${attr.date}|${attr.type}`)) continue
+    if (attr.date < debut || attr.date > fin) continue
+    for (const p of attr.placements) {
+      if (p.vetId === vetId) out.push({ date: attr.date, type: attr.type, role: p.role })
     }
   }
   return out
@@ -453,6 +519,13 @@ export function mouvementsPossibles(
   // ciblés : c'est précisément quelqu'un qui n'a PAS de week-end ici qu'on
   // veut pouvoir faire entrer. Le filtre `concerneUneCible` s'applique ensuite
   // sur le mouvement entier — il suffit que la personne remplacée soit ciblée.
+  // Combien de grappes (week-ends) chacun tient déjà — sert à ne tenter la
+  // chaîne que dans le sens qui soulage.
+  const weekendsDe = new Map<string, number>()
+  for (const g of grappes) {
+    for (const id of gensDeLaGrappe(g)) weekendsDe.set(id, (weekendsDe.get(id) ?? 0) + 1)
+  }
+
   for (const g of grappes) {
     const presents = new Set(gensDeLaGrappe(g))
     for (const sortant of presents) {
@@ -461,10 +534,38 @@ export function mouvementsPossibles(
         // Le dernier recours n'est jamais programmé spontanément : le proposer
         // ici contredirait la consigne que le dossier donne à Filou.
         if (entrant.dernier_recours) continue
-        ajouter(
-          'remplacement_weekend',
-          affectationsDeLaGrappe(g, (id) => (id === sortant ? entrant.id : id)),
-        )
+
+        const direct = affectationsDeLaGrappe(g, (id) => (id === sortant ? entrant.id : id))
+        const avantCompte = out.length
+        ajouter('remplacement_weekend', direct)
+
+        // ②d — SI LE REMPLACEMENT DIRECT EST REFUSÉ, libérer l'obstacle.
+        //
+        // Mesuré le 02/09 sur le vrai planning : c'est le cas GÉNÉRAL, pas
+        // l'exception. Le week-end est encadré par le jeudi (qui bloque le
+        // vendredi apparié) et par le lundi (depuis B-092). Sur six
+        // vétérinaires, aucun candidat ne passe jamais — et Antoine gardait
+        // ses cinq week-ends relecture après relecture.
+        if (out.length > avantCompte) continue // le direct est passé, inutile
+
+        // On ne tente la chaîne que si elle a un SENS : soulager quelqu'un de
+        // plus chargé au profit de quelqu'un qui l'est moins. Déplacer une
+        // garde pour transférer un week-end vers quelqu'un qui en a déjà plus
+        // serait un remue-ménage à contresens — et c'est aussi ce qui rend le
+        // calcul tenable (mesuré : sans ce filtre, la relecture dépassait
+        // plusieurs secondes rien qu'à énumérer).
+        if ((weekendsDe.get(entrant.id) ?? 0) >= (weekendsDe.get(sortant) ?? 0)) continue
+
+        for (const obstacle of gardesQuiBloquent(planning, entrant.id, g)) {
+          for (const repreneur of vets) {
+            if (repreneur.id === entrant.id || repreneur.dernier_recours) continue
+            if (repreneur.id === sortant) continue // il sort, ne le rechargeons pas
+            ajouter('remplacement_weekend_en_chaine', [
+              { ...obstacle, vetId: repreneur.id },
+              ...direct,
+            ])
+          }
+        }
       }
     }
   }

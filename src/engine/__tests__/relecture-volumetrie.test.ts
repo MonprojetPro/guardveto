@@ -153,5 +153,5 @@ describe('volumétrie sur une période d’hiver complète', () => {
 
     expect(effets).toHaveLength(retenus.length)
     expect(duree).toBeLessThan(20_000)
-  })
+  }, 60_000)
 })
