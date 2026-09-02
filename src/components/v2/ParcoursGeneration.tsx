@@ -28,7 +28,7 @@
 // d'impasse, créneaux ignorés — mais deviennent des temps du parcours.
 // ============================================================
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -147,6 +147,12 @@ function FicheType({ type, gardes }: { type: ProfilPlanning; gardes: string[] })
 export async function lireLeFlux(
   res: Response,
   onProgres: (message: string) => void,
+  /**
+   * B-104 — le serveur annonce l'identifiant de sa trace en première ligne.
+   * Sans lui, un incident constaté ICI (fenêtre fermée) et une génération morte
+   * LÀ-BAS resteraient deux faits étrangers, impossibles à rapprocher.
+   */
+  onTrace?: (traceId: string) => void,
 ): Promise<Record<string, unknown>> {
   const lecteur = res.body?.getReader()
   if (!lecteur) return { error: 'Réponse illisible du serveur.' }
@@ -167,7 +173,8 @@ export async function lireLeFlux(
     for (const ligne of lignes) {
       if (!ligne.trim()) continue
       try {
-        const objet = JSON.parse(ligne) as { type?: string; message?: string; corps?: unknown; status?: number }
+        const objet = JSON.parse(ligne) as { type?: string; message?: string; corps?: unknown; status?: number; traceId?: string }
+        if (objet.type === 'trace' && objet.traceId) onTrace?.(objet.traceId)
         if (objet.type === 'progres' && objet.message) onProgres(objet.message)
         if (objet.type === 'resultat') {
           resultat = { ...(objet.corps as Record<string, unknown>), __status: objet.status }
@@ -180,6 +187,56 @@ export async function lireLeFlux(
   }
 
   return resultat ?? { error: 'La génération s’est interrompue avant d’avoir répondu. Relance-la.' }
+}
+
+// ============================================================
+// B-104 — LE TÉMOIN CÔTÉ NAVIGATEUR
+// ============================================================
+// MiKL : « ça commence quelques secondes puis la fenêtre se ferme ». Le serveur
+// ne peut rien en dire, et la lecture du code a montré que ce symptôme ne
+// correspond à AUCUN chemin prévu : tous affichent un message, aucun ne ferme.
+// Ce qui se passe est donc hors de ce que le parcours contrôle — démontage,
+// navigation, ou erreur qui remonte à la frontière React.
+//
+// `sendBeacon` plutôt qu'un `fetch` : un `fetch` lancé pendant qu'un composant
+// se démonte ou qu'une page navigue est ANNULÉ par le navigateur, c'est-à-dire
+// au moment exact où on aurait besoin de lui. La balise, elle, est confiée au
+// navigateur qui l'enverra même si la page a disparu.
+//
+// Ce module est un instrument de mesure : il ne doit jamais faire échouer ce
+// qu'il observe. Toute erreur est avalée.
+
+/** Ce qu'on rapporte : une raison courte, l'étape en cours, le temps écoulé. */
+function signalerIncidentParcours(rapport: {
+  traceId: string | null
+  raison: string
+  etape?: string | null
+  message?: string | null
+  apresMs?: number | null
+}) {
+  // Sans identifiant de trace, il n'y a rien à annoter : le serveur n'a même
+  // pas eu le temps d'ouvrir sa ligne. Le silence est alors exact.
+  if (!rapport.traceId) return
+  try {
+    const charge = JSON.stringify(rapport)
+    if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+      navigator.sendBeacon(
+        '/api/generate/incident',
+        new Blob([charge], { type: 'application/json' }),
+      )
+      return
+    }
+    // Repli pour les navigateurs sans `sendBeacon` : `keepalive` demande au
+    // navigateur de laisser partir la requête même si la page se ferme.
+    void fetch('/api/generate/incident', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: charge,
+      keepalive: true,
+    }).catch(() => {})
+  } catch {
+    // Un témoin qui casse la scène qu'il observe ne sert à rien.
+  }
 }
 
 interface Resultat {
@@ -252,6 +309,16 @@ export function ParcoursGeneration({
   // B-060 — ce que le SERVEUR dit être en train de faire. Jamais une phrase
   // choisie ici : l'écran relaie, il n'invente pas.
   const [etapeMoteur, setEtapeMoteur] = useState<string | null>(null)
+
+  // ── B-104 — de quoi témoigner si cet écran disparaît ──────────────────
+  //
+  // Des `ref` et non des `useState` : ces valeurs sont lues dans le NETTOYAGE
+  // d'un effet, quand le composant se démonte. Une valeur d'état y serait
+  // figée à ce qu'elle valait au dernier rendu — donc fausse au moment précis
+  // où l'on a besoin qu'elle soit juste.
+  const traceIdRef = useRef<string | null>(null)
+  const travailDepuisRef = useRef<number | null>(null)
+  const etapeCouranteRef = useRef<string | null>(null)
   const [creation, setCreation] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
 
@@ -596,6 +663,32 @@ export function ParcoursGeneration({
     }
   }
 
+  /**
+   * B-104 — le témoin. Si cet écran disparaît PENDANT le travail, il le dit.
+   *
+   * Trois façons de disparaître, et le nettoyage d'effet les attrape toutes :
+   * un démontage du composant, une navigation, une erreur remontée à la
+   * frontière React. Aucune ne passe par les chemins prévus du parcours — qui
+   * affichent tous un message — et c'est bien pour ça que le symptôme de MiKL
+   * n'était explicable par aucune trace serveur.
+   *
+   * Le nettoyage ne s'exécute qu'au démontage réel (dépendances vides) : un
+   * simple re-rendu, y compris déclenché par le `router.refresh()` du temps
+   * réel, ne déclenche rien. Si une balise part quand même, c'est que le
+   * composant a bel et bien été démonté — et ce serait la réponse cherchée.
+   */
+  useEffect(() => {
+    return () => {
+      if (!travailDepuisRef.current) return // pas en train de travailler : normal
+      signalerIncidentParcours({
+        traceId: traceIdRef.current,
+        raison: 'ecran-demonte-pendant-le-travail',
+        etape: etapeCouranteRef.current,
+        apresMs: Date.now() - travailDepuisRef.current,
+      })
+    }
+  }, [])
+
   /** ③ Le moteur travaille. `confirmRepublication` : cf. garde-fou Chantier B. */
   async function lancer(confirmRepublication: boolean) {
     if (!cible) return
@@ -603,6 +696,10 @@ export function ParcoursGeneration({
     setResultat(null)
     setRelecture(null)
     setEtapeMoteur(null)
+    // Le témoin s'arme ici et se désarme au premier résultat affiché.
+    travailDepuisRef.current = Date.now()
+    traceIdRef.current = null
+    etapeCouranteRef.current = null
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
@@ -623,8 +720,31 @@ export function ParcoursGeneration({
       // aucun décompte décoratif — sinon l'écran raconterait une histoire pendant
       // que le moteur en vit une autre.
       const data = res.headers.get('content-type')?.includes('ndjson')
-        ? await lireLeFlux(res, setEtapeMoteur)
+        ? await lireLeFlux(
+            res,
+            (m) => {
+              // Mémorisé pour le témoin : savoir SUR QUELLE étape ça a lâché
+              // vaut mieux que savoir que ça a lâché.
+              etapeCouranteRef.current = m
+              setEtapeMoteur(m)
+            },
+            (id) => { traceIdRef.current = id },
+          )
         : await res.json()
+
+      // B-104 — le flux s'est tu sans jamais livrer de résultat. Vu de la base,
+      // ce cas est indiscernable d'une fonction tuée : dans les deux cas la
+      // trace reste ouverte. Le dire ici les sépare — ici, le navigateur était
+      // encore vivant et a vu la connexion se fermer.
+      if (typeof data.error === 'string' && data.success === undefined && data.issue === undefined) {
+        signalerIncidentParcours({
+          traceId: traceIdRef.current,
+          raison: 'flux-clos-sans-resultat',
+          etape: etapeCouranteRef.current,
+          message: data.error,
+          apresMs: travailDepuisRef.current ? Date.now() - travailDepuisRef.current : null,
+        })
+      }
 
       // Le statut : `res.ok` ne suffit plus. Un flux répond TOUJOURS 200 —
       // l'entête part avant que le travail commence — et porte son vrai code
@@ -696,9 +816,25 @@ export function ParcoursGeneration({
         })
       }
       setEtape('resultat')
-    } catch {
+    } catch (e) {
+      // Un échec NOMMÉ : on le rapporte aussi, pour le distinguer dans la trace
+      // d'une disparition inexpliquée. Les deux se ressemblent vues de la base ;
+      // seul ce témoignage dit lequel des deux s'est produit.
+      signalerIncidentParcours({
+        traceId: traceIdRef.current,
+        raison: 'serveur-injoignable',
+        etape: etapeCouranteRef.current,
+        message: e instanceof Error ? e.message : String(e),
+        apresMs: travailDepuisRef.current ? Date.now() - travailDepuisRef.current : null,
+      })
       setResultat({ ok: false, creneauxIgnores: [], message: 'Impossible de joindre le serveur.' })
       setEtape('resultat')
+    } finally {
+      // Le témoin se désarme : à partir d'ici, un démontage est normal (l'admin
+      // ferme un écran de résultat). Le laisser armé produirait de fausses
+      // alertes, et une alerte qui crie sans raison finit par être ignorée —
+      // y compris le jour où elle a raison.
+      travailDepuisRef.current = null
     }
   }
 

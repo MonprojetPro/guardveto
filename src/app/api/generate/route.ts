@@ -31,6 +31,7 @@ import { detecterCreneauxIgnores } from '@/engine/creneau-modele'
 import { persisterResultat } from '@/data/persisterResultat'
 import { ecrirePlanningV1 } from '@/data/ecrirePlanningV1'
 import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
+import { ouvrirTrace, fermerTrace, type EtapeTracee } from '@/data/tracerGeneration'
 
 // Verrou de génération : au-delà de ce délai, un verrou est considéré périmé
 // (crash serverless sans libération) — largement > maxDuration (60 s).
@@ -197,6 +198,11 @@ export async function POST(req: NextRequest) {
   // résultat. Le client affiche ce que le serveur annonce, jamais autre chose.
   // NDJSON : un objet par ligne. Le séparateur est nommé plutôt qu'écrit en
   // clair — un simple saut de ligne dans une chaîne se perd à la relecture.
+  // B-104 — qui a lancé. Un incident qui ne frappe qu'une personne oriente
+  // vers son navigateur ou son réseau ; un incident qui les frappe toutes,
+  // vers le serveur. Sans ce champ, les deux se ressemblent.
+  const lancePar = user.id
+
   const FIN_DE_LIGNE = String.fromCharCode(10)
   const encodeur = new TextEncoder()
   const flux = new ReadableStream({
@@ -204,12 +210,48 @@ export async function POST(req: NextRequest) {
       const ecrire = (objet: unknown) => {
         controleur.enqueue(encodeur.encode(JSON.stringify(objet) + FIN_DE_LIGNE))
       }
-      const emettre = (message: string) => ecrire({ type: 'progres', message })
+      // ── B-104 : la trace s'ouvre AVANT le premier calcul ────────────────
+      //
+      // Et c'est tout l'intérêt. Quand la fonction serverless est tuée, rien de
+      // ce qui suit ne s'exécute — ni le résultat, ni le `finally`, ni la
+      // libération du verrou. Une ligne ouverte et jamais refermée est alors la
+      // SEULE trace de l'incident, et `ouverte_le` en donne l'heure.
+      //
+      // Le traceur ne peut rien casser : `ouvrirTrace` rend `null` en cas
+      // d'échec et la génération continue sans être tracée.
+      const departMs = Date.now()
+      const traceId = await ouvrirTrace(supabase, periodeId, cabinetId, lancePar)
+      const etapes: EtapeTracee[] = []
+
+      // On DONNE l'identifiant de trace au navigateur, première ligne du flux.
+      //
+      // Sans lui, les deux moitiés de l'incident resteraient étrangères : le
+      // serveur saurait qu'il a fini, le navigateur saurait que sa fenêtre s'est
+      // fermée, et rien ne dirait qu'il s'agit de la MÊME génération. C'est
+      // exactement ce qui manquait pour diagnostiquer B-104.
+      if (traceId) ecrire({ type: 'trace', traceId })
+
+      // Les étapes tracées sont EXACTEMENT celles annoncées au client : une
+      // seule source, donc l'historique ne peut pas raconter autre chose que ce
+      // que l'admin a lu à l'écran.
+      const emettre = (message: string) => {
+        etapes.push({ etape: message, aMs: Date.now() - departMs })
+        ecrire({ type: 'progres', message })
+      }
 
       try {
         emettre('Je relis les règles et les congés du cabinet…')
         const { status, corps } = await executerGeneration(supabase, periodeId, cabinetId, emettre)
         ecrire({ type: 'resultat', status, corps })
+
+        const c = corps as Record<string, unknown>
+        await fermerTrace(supabase, traceId, {
+          issue: (c.issue as 'complet' | 'partiel' | 'echec') ?? 'echec',
+          nbGardes: typeof c.nbGardes === 'number' ? c.nbGardes : null,
+          interrompu: c.interrompu === true,
+          erreur: typeof c.error === 'string' ? c.error : null,
+          etapes,
+        })
       } catch (err) {
         // Une exception ici laisserait le client sur un flux muet : il attendrait
         // un résultat qui ne viendrait jamais. On la transforme en résultat.
@@ -218,6 +260,11 @@ export async function POST(req: NextRequest) {
           type: 'resultat',
           status: 500,
           corps: { error: err instanceof Error ? err.message : String(err) },
+        })
+        await fermerTrace(supabase, traceId, {
+          issue: 'erreur',
+          erreur: err instanceof Error ? err.message : String(err),
+          etapes,
         })
       } finally {
         controleur.close()
