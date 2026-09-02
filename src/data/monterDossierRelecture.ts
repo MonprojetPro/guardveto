@@ -22,9 +22,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { PlanningPartiel } from '@/engine/types'
 import type {
-  DossierRelecture, PersonneLisible, PlaceLisible, EchangeLisible,
+  DossierRelecture, PersonneLisible, PlaceLisible, MouvementLisible,
 } from '@/lib/ia/relecturePlanning'
-import type { EchangePossible } from '@/engine/relecture/echanges'
+import type { MouvementPossible } from '@/engine/relecture/mouvements'
+import type { EffetMouvement } from '@/engine/relecture/effet'
 import { dateFr, periodeFr } from '@/lib/dates-fr'
 import { phraseRegle, type RegleNommable } from '@/lib/regles/libelle'
 
@@ -107,11 +108,27 @@ export async function monterDossierRelecture(
   /** Place → identifiants pouvant la tenir (cf. `engine/relecture/remplacants`). */
   remplacants?: Map<string, string[]>,
   /**
-   * Les permutations légales (cf. `engine/relecture/echanges`). Absent → liste
-   * vide, et Filou lit alors « aucun échange possible ». C'est un repli sûr
-   * mais appauvrissant : l'appelant DOIT les passer sur le chemin de production.
+   * Les mouvements légaux ET leur effet mesuré (cf. `engine/relecture/`).
+   * Absent → liste vide, et Filou lit alors « aucun mouvement possible ». C'est
+   * un repli sûr mais appauvrissant : l'appelant DOIT les passer sur le chemin
+   * de production.
+   *
+   * Le mouvement et son effet voyagent APPARIÉS, jamais en deux tableaux
+   * parallèles : deux listes indexées de la même façon finissent par se
+   * désaligner, et un mouvement affiché avec l'effet du voisin serait un
+   * mensonge parfaitement crédible.
    */
-  echanges?: EchangePossible[],
+  mouvements?: Array<{ mouvement: MouvementPossible; effet: EffetMouvement }>,
+  /**
+   * Les préférences du cabinet que ce planning enfreint (cf.
+   * `engine/relecture/preferences`). Absent → liste vide, et Filou lit alors
+   * « aucune préférence enfreinte ».
+   *
+   * ⚠️ Ce repli est le plus traître du dossier : « aucune » se lit comme une
+   * bonne nouvelle, et personne ne va vérifier une bonne nouvelle. L'appelant
+   * DOIT les passer sur le chemin de production.
+   */
+  preferences?: Array<{ detail: string }>,
 ): Promise<{ dossier: DossierRelecture; historiqueIndisponible: boolean }> {
   const roleAvantage = contexte.roleAvantageFinancier ?? null
 
@@ -258,18 +275,55 @@ export async function monterDossierRelecture(
     }
   })
 
-  // ── Les échanges, mis en français ──
+  // ── Les mouvements, mis en français ──
   // Chaque ligne porte AUSSI ses coordonnées machine : Filou doit pouvoir les
   // recopier dans sa proposition sans les reconstruire de tête, sinon il
   // inventera une date ou un rôle et l'arbitrage répondra « sans objet ».
-  const echangesLisibles: EchangeLisible[] = (echanges ?? []).map((e) => ({
-    placeA: `${dateFr(e.a.date)} · ${creneauEnFrancais(e.a.type, nomsParCode)} · ${e.a.role}`,
-    prenomA: prenomParId.get(e.a.vetId) ?? e.a.vetId,
-    placeB: `${dateFr(e.b.date)} · ${creneauEnFrancais(e.b.type, nomsParCode)} · ${e.b.role}`,
-    prenomB: prenomParId.get(e.b.vetId) ?? e.b.vetId,
-    refA: { date: e.a.date, type: e.a.type, role: e.a.role },
-    refB: { date: e.b.date, type: e.b.type, role: e.b.role },
-  }))
+  //
+  // Qui occupe quoi AVANT le mouvement : « Victor → Antoine » se lit, « Antoine »
+  // seul ne dit pas ce qu'on remplace. Lu depuis le planning montré à Filou,
+  // pas d'une autre source — même règle que les compteurs.
+  const occupantAvant = new Map<string, string | null>()
+  for (const a of planning.attributions) {
+    for (const p of a.placements) occupantAvant.set(`${a.date}|${a.type}|${p.role}`, p.vetId)
+  }
+  const nomDe = (id: string | null | undefined) =>
+    id ? (prenomParId.get(id) ?? id) : 'personne'
+
+  const mouvementsLisibles: MouvementLisible[] = (mouvements ?? []).map(({ mouvement, effet }) => {
+    const lignes = mouvement.affectations.map((a) => {
+      const place = `${dateFr(a.date)} · ${creneauEnFrancais(a.type, nomsParCode)} · ${a.role}`
+      return `${place} : ${nomDe(occupantAvant.get(`${a.date}|${a.type}|${a.role}`))} → ${nomDe(a.vetId)}`
+    })
+
+    // Les personnes réellement concernées, dans l'ordre où elles apparaissent.
+    const gens: string[] = []
+    for (const a of mouvement.affectations) {
+      for (const id of [occupantAvant.get(`${a.date}|${a.type}|${a.role}`), a.vetId]) {
+        const nom = id ? nomDe(id) : null
+        if (nom && !gens.includes(nom)) gens.push(nom)
+      }
+    }
+    const duo = gens.slice(0, 2).join(' et ')
+    const dates = [...new Set(mouvement.affectations.map((a) => a.date))].sort()
+
+    const resume =
+      mouvement.genre === 'inversion_roles_weekend'
+        ? `${duo} échangent leurs rôles sur le week-end du ${dateFr(dates[dates.length - 1])}`
+        : mouvement.genre === 'echange_weekend'
+          ? `${duo} échangent leurs week-ends`
+          : `${duo} échangent leurs places`
+
+    return {
+      resume,
+      lignes,
+      effet: effet.sens,
+      surQuoi: effet.surQuoi,
+      affectations: mouvement.affectations.map((a) => ({
+        date: a.date, type: a.type, role: a.role, vetId: a.vetId,
+      })),
+    }
+  })
 
   return {
     dossier: {
@@ -279,7 +333,8 @@ export async function monterDossierRelecture(
       equipe,
       reglesCabinet,
       roleAvantageFinancier: roleAvantage,
-      echanges: echangesLisibles,
+      preferencesEnfreintes: (preferences ?? []).map((p) => p.detail),
+      mouvements: mouvementsLisibles,
     },
     historiqueIndisponible,
   }

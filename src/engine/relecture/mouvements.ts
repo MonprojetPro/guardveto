@@ -1,0 +1,369 @@
+// ============================================================
+// GUARDVETO — LES MOUVEMENTS QUE LE MOTEUR ACCEPTE (B-096)
+// ============================================================
+// MiKL, le 2026-09-02, devant la relecture réelle de Hiver P2 : huit constats,
+// huit fois « il ne voit pas de correction automatique ». Filou nomme la cause
+// lui-même :
+//
+//     « Aucun échange de rôle week-end n'est proposé par le moteur dans la
+//       liste fournie, donc je ne peux pas corriger ce point moi-même sans
+//       casser l'inversion vendredi/week-end. »
+//
+// ── CE QUI SE PASSAIT, ET C'EST PLUS LARGE QUE CE QU'IL DÉCRIT ──────────────
+//
+// Le week-end est lié à son vendredi par deux relations DURES : `meme_binome`
+// (les mêmes deux personnes tiennent les deux créneaux) et `inversion_role`
+// (le 1er du vendredi est le 2nd du week-end). `echangesPossibles` ne déplace
+// que DEUX places. Toucher une place de week-end sans toucher le vendredi
+// apparié casse le binôme, et `isValid` refuse.
+//
+// Conséquence : ce n'étaient pas seulement les échanges de RÔLE qui manquaient.
+// AUCUNE place de week-end ni de vendredi n'était atteignable, pour personne.
+// Or les deux déséquilibres que MiKL a vus vivent précisément là — l'avantage
+// financier du 1er de week-end, et Antoine à 5 week-ends contre 3 à Fanny.
+// On demandait à Filou de corriger ce qu'on l'empêchait de toucher.
+//
+// ── CE QUE CE MODULE AJOUTE ─────────────────────────────────────────────────
+//
+// La notion de GRAPPE : un créneau et tous ceux que les relations lui attachent
+// (ici week-end + son vendredi). Un mouvement porte sur des grappes entières,
+// jamais sur une place isolée — c'est ce qui préserve le binôme par
+// construction plutôt que par vérification après coup.
+//
+// Deux familles, qui répondent chacune à un constat de Filou :
+//   • `inversion_roles_weekend` — le binôme reste, les rôles tournent.
+//     Répond à « le rôle qui rapporte doit tourner ».
+//   • `echange_weekend` — deux personnes échangent leurs week-ends.
+//     Répond à « personne ne porte plus que sa part ».
+//
+// ── CE QUI N'EST PAS FAIT, ET SE DIT ────────────────────────────────────────
+//
+// Un échange entre une place de WEEK-END et une place de SEMAINE n'est pas
+// généré. Il faudrait que la personne sortante reprenne DEUX créneaux (le
+// vendredi et le samedi) contre un seul, ce qui n'est plus un échange mais une
+// redistribution. Limite assumée : le besoin mesuré porte sur les week-ends
+// entre eux, et un mouvement mal formé serait refusé silencieusement par
+// `isValid` — on aurait rallongé la liste sans rien débloquer.
+//
+// Une grappe dont un créneau porte plus de deux places pourvues n'est pas
+// inversée non plus : « inverser » n'a de sens univoque qu'à deux. Les échanges
+// de personnes, eux, fonctionnent quel que soit le nombre de places.
+//
+// ── LE CONTRAT, LE MÊME QUE CELUI DES ÉCHANGES ──────────────────────────────
+//
+// Ce qui sort d'ici est ce que `isValid` accepte, jamais une estimation. Chaque
+// mouvement est appliqué sur une copie, place par place, dans l'ordre où le
+// solver les poserait — le contrôle est CUMULATIF : la 4ᵉ pose est jugée sur le
+// planning où les trois premières sont déjà faites.
+// ============================================================
+
+import type {
+  AttributionGarde, CalendrierResolu, PlanningPartiel, VetEngine,
+} from '../types'
+import type { RelationStructure } from '../structure-config'
+import { relationsEffectives, DEFAULT_STRUCTURE_CONFIG } from '../structure-config'
+import { normaliserContraintesVets } from '../normaliserContraintes'
+import { isValid } from '../rules/hard-constraints'
+import { genererSteps } from '../solver'
+import { apparierSourcePourCible } from '../relations-structure'
+import {
+  echangesPossibles, clePlace, poser,
+  type OptionsEchanges, type PlaceOccupee,
+} from './echanges'
+
+/** Une place et QUI doit s'y trouver après le mouvement. */
+export interface AffectationMouvement {
+  date: string
+  type: string
+  role: string
+  vetId: string
+}
+
+export type GenreMouvement =
+  /** Deux places quelconques dont les occupants permutent (l'existant). */
+  | 'echange_simple'
+  /** Les rôles tournent au sein d'un week-end — le binôme ne change pas. */
+  | 'inversion_roles_weekend'
+  /** Deux personnes échangent leurs week-ends, vendredis compris. */
+  | 'echange_weekend'
+
+/** Un mouvement applicable : toutes ses affectations, ensemble ou rien. */
+export interface MouvementPossible {
+  genre: GenreMouvement
+  affectations: AffectationMouvement[]
+}
+
+/**
+ * Une GRAPPE : les attributions qu'une relation dure oblige à bouger ensemble.
+ *
+ * Pour le couple historique, c'est [vendredi_soir, weekend]. Rien n'est câblé :
+ * les couples viennent des relations résolues, donc un cabinet qui n'a aucune
+ * relation aura des grappes d'un seul créneau, et un cabinet qui en a d'autres
+ * les verra traitées de la même façon.
+ */
+interface Grappe {
+  /** L'occurrence « pivot » (la cible de la relation — le week-end). */
+  pivot: AttributionGarde
+  /** Toutes les attributions du groupe, pivot compris. */
+  attributions: AttributionGarde[]
+}
+
+/**
+ * Les grappes du planning, une par occurrence de créneau CIBLE d'une relation
+ * `meme_binome`.
+ *
+ * L'appariement passe par `apparierSourcePourCible`, la fonction que le moteur
+ * utilise lui-même pour juger la relation. En recalculer un ici (« le vendredi,
+ * c'est la veille ») marcherait aujourd'hui et mentirait au premier cabinet qui
+ * apparie autrement — c'est la formule magique que la tranche 2 avait
+ * justement retirée.
+ */
+function grappesDuPlanning(
+  planning: PlanningPartiel,
+  relations: readonly RelationStructure[],
+): Grappe[] {
+  const liens = relations.filter((r) => r.genre === 'meme_binome')
+  const out: Grappe[] = []
+
+  for (const attr of planning.attributions) {
+    const pertinentes = liens.filter((r) => r.cibleCode === attr.type)
+    if (pertinentes.length === 0) continue
+
+    const attributions: AttributionGarde[] = [attr]
+    for (const rel of pertinentes) {
+      const source = apparierSourcePourCible(planning, rel, attr.date)
+      // Pas de source appariée → la grappe se réduit au pivot. C'est le cas
+      // légitime du tout premier week-end d'une période, dont le vendredi
+      // appartient à la période précédente : on ne le bouge pas.
+      if (source && !attributions.includes(source)) attributions.push(source)
+    }
+    out.push({ pivot: attr, attributions })
+  }
+
+  return out
+}
+
+/** Les personnes présentes dans une grappe (une seule fois chacune). */
+function gensDeLaGrappe(g: Grappe): string[] {
+  const ids = new Set<string>()
+  for (const attr of g.attributions) {
+    for (const p of attr.placements) if (p.vetId) ids.add(p.vetId)
+  }
+  return [...ids]
+}
+
+/**
+ * Toutes les affectations de la grappe, avec `remplacer` appliqué à chaque
+ * occupant. Une identité (`x => x`) rendrait la grappe inchangée.
+ */
+function affectationsDeLaGrappe(
+  g: Grappe,
+  remplacer: (vetId: string) => string,
+): AffectationMouvement[] {
+  const out: AffectationMouvement[] = []
+  for (const attr of g.attributions) {
+    for (const p of attr.placements) {
+      if (!p.vetId) continue
+      out.push({ date: attr.date, type: attr.type, role: p.role, vetId: remplacer(p.vetId) })
+    }
+  }
+  return out
+}
+
+/** Le planning où toutes les places listées sont VIDÉES. */
+function viderPlaces(
+  planning: PlanningPartiel,
+  places: readonly { date: string; type: string; role: string }[],
+): PlanningPartiel {
+  const aVider = new Set(places.map((p) => clePlace(p.date, p.type, p.role)))
+  return {
+    attributions: planning.attributions.map((attr) => {
+      if (!attr.placements.some((p) => aVider.has(clePlace(attr.date, attr.type, p.role)))) {
+        return attr
+      }
+      return {
+        ...attr,
+        placements: attr.placements.map((p) =>
+          aVider.has(clePlace(attr.date, attr.type, p.role)) ? { ...p, vetId: null } : p,
+        ),
+      }
+    }),
+  }
+}
+
+/** Ce qu'il faut pour juger un mouvement, regroupé une fois pour toutes. */
+interface ContexteMouvements {
+  vets: ReturnType<typeof normaliserContraintesVets>
+  parStep: Map<string, ReturnType<typeof genererSteps>[number]>
+  options: OptionsEchanges
+}
+
+/**
+ * Le mouvement est-il accepté par le moteur, dans son ensemble ?
+ *
+ * ── POURQUOI PAS LE CONTRÔLE CUMULATIF DE `echanges.ts` ─────────────────────
+ *
+ * Un échange à deux places se juge en vidant les deux puis en reposant l'une
+ * après l'autre. Appliqué à une grappe, ce procédé refuse TOUT, et j'ai mis un
+ * moment à le voir : R9 exige que le vendredi et le week-end portent les mêmes
+ * personnes. Vider les quatre places puis reposer la première fait juger cette
+ * pose contre un week-end VIDE — « ce véto n'est pas dans le duo du week-end »,
+ * refus. Tous les états intermédiaires d'une grappe sont invalides, parce que
+ * la cohérence qu'on vérifie est justement MUTUELLE. Aucun ordre de pose ne
+ * sauve ça ; il n'y avait rien à réordonner.
+ *
+ * ── CE QU'ON FAIT À LA PLACE, ET POURQUOI C'EST PLUS STRICT ─────────────────
+ *
+ * On construit le planning tel qu'il sera APRÈS le mouvement, puis on juge
+ * chaque place dedans, cette place-là seule vidée. On ne demande donc plus
+ * « peut-on en arriver là pas à pas ? » mais « l'état d'arrivée est-il légal ? »
+ * — la seule question qui compte, puisque le mouvement s'applique d'un bloc.
+ *
+ * C'est plus fort que le cumulatif : chaque pose est jugée en voyant TOUTES les
+ * autres, y compris celles qui viendraient « après » elle.
+ *
+ * R18 et R19 (« le 1er doit être désigné avant le 2nd ») ne gênent pas ici,
+ * vérifié en lisant leur code : elles ne refusent que de poser un SECOND sur un
+ * créneau dont le premier est absent. Le premier est toujours là — on n'a vidé
+ * qu'une place, et jamais la sienne quand on juge le second.
+ */
+function mouvementLegal(
+  ctx: ContexteMouvements,
+  planning: PlanningPartiel,
+  affectations: readonly AffectationMouvement[],
+): boolean {
+  let final = planning
+  for (const aff of affectations) final = poser(final, aff, aff.vetId)
+
+  for (const aff of affectations) {
+    const step = ctx.parStep.get(clePlace(aff.date, aff.type, aff.role))
+    const vet = ctx.vets.find((v) => v.id === aff.vetId)
+    // Un step introuvable veut dire que la place n'existe pas dans la structure
+    // de cette période : on refuse plutôt que d'inventer un slot.
+    if (!step || !vet) return false
+
+    const verdict = isValid(
+      step, vet, aff.role, ctx.vets, viderPlaces(final, [aff]),
+      ctx.options.calendrier, ctx.options.structureConfig, ctx.options.contexteAnterieur,
+    )
+    if (!verdict.valid) return false
+  }
+
+  return true
+}
+
+/** Le mouvement concerne-t-il au moins une personne ciblée ? */
+function concerneUneCible(
+  affectations: readonly AffectationMouvement[],
+  avant: Map<string, string | null>,
+  cibles: Set<string> | null,
+): boolean {
+  if (!cibles) return true
+  return affectations.some((a) => {
+    if (cibles.has(a.vetId)) return true // on lui donne une place
+    const occupant = avant.get(clePlace(a.date, a.type, a.role))
+    return occupant !== null && occupant !== undefined && cibles.has(occupant) // on lui en retire une
+  })
+}
+
+/** Un échange à deux places, exprimé comme un mouvement. */
+function depuisEchange(a: PlaceOccupee, b: PlaceOccupee): MouvementPossible {
+  return {
+    genre: 'echange_simple',
+    affectations: [
+      { date: a.date, type: a.type, role: a.role, vetId: b.vetId },
+      { date: b.date, type: b.type, role: b.role, vetId: a.vetId },
+    ],
+  }
+}
+
+/**
+ * Tous les mouvements que le moteur accepte : les échanges à deux places
+ * (inchangés, via `echangesPossibles`) ET les mouvements de grappe.
+ *
+ * ENGLOBE `echangesPossibles`, ne la remplace pas : perdre les échanges de
+ * semaine en gagnant ceux de week-end serait un troc, pas un progrès.
+ */
+export function mouvementsPossibles(
+  planning: PlanningPartiel,
+  options: OptionsEchanges,
+): MouvementPossible[] {
+  const vets = normaliserContraintesVets(options.vets)
+  const steps = genererSteps(
+    options.dateDebut, options.dateFin, options.saison,
+    options.nbVetosSemaineSoir, options.creneaux,
+  )
+  const parStep = new Map(steps.map((s) => [clePlace(s.date, s.type, s.role), s]))
+  const ctx: ContexteMouvements = { vets, parStep, options }
+
+  const avant = new Map<string, string | null>()
+  for (const attr of planning.attributions) {
+    for (const p of attr.placements) avant.set(clePlace(attr.date, attr.type, p.role), p.vetId)
+  }
+  const cibles = options.vetsCibles ? new Set(options.vetsCibles) : null
+
+  // ── ① Les échanges à deux places, tels quels ──
+  const out: MouvementPossible[] = echangesPossibles(planning, options)
+    .map((e) => depuisEchange(e.a, e.b))
+
+  // ── ② Les mouvements de grappe ──
+  const relations = relationsEffectives(options.structureConfig ?? DEFAULT_STRUCTURE_CONFIG)
+  const grappes = grappesDuPlanning(planning, relations)
+
+  /**
+   * `completes` décrit l'état d'arrivée de TOUTE la grappe, places inchangées
+   * comprises. Deux usages distincts, et les confondre serait une faute :
+   *
+   *   • on VALIDE sur l'ensemble — une place qui ne bouge pas peut devenir
+   *     illégale parce que son voisin a changé (un duo interdit reformé, par
+   *     exemple). Ne juger que ce qui bouge laisserait passer ça.
+   *   • on TRANSMET le sous-ensemble qui change — Filou et l'arbitrage n'ont
+   *     que faire d'une affectation qui redit ce qui est déjà là, et un
+   *     mouvement de huit lignes dont quatre sont muettes se lit comme un
+   *     remue-ménage alors que deux personnes permutent.
+   */
+  const ajouter = (genre: GenreMouvement, completes: AffectationMouvement[]) => {
+    if (completes.length === 0) return
+    const changees = completes.filter(
+      (a) => avant.get(clePlace(a.date, a.type, a.role)) !== a.vetId,
+    )
+    if (changees.length === 0) return
+    if (!concerneUneCible(changees, avant, cibles)) return
+    if (!mouvementLegal(ctx, planning, completes)) return
+    out.push({ genre, affectations: changees })
+  }
+
+  // ②a — l'inversion des rôles, grappe par grappe.
+  for (const g of grappes) {
+    const gens = gensDeLaGrappe(g)
+    // « Inverser » n'a de sens univoque qu'entre deux personnes.
+    if (gens.length !== 2) continue
+    const [x, y] = gens
+    ajouter(
+      'inversion_roles_weekend',
+      affectationsDeLaGrappe(g, (id) => (id === x ? y : id === y ? x : id)),
+    )
+  }
+
+  // ②b — l'échange de personnes entre deux grappes.
+  for (let i = 0; i < grappes.length; i++) {
+    for (let j = i + 1; j < grappes.length; j++) {
+      const g1 = grappes[i]
+      const g2 = grappes[j]
+      for (const x of gensDeLaGrappe(g1)) {
+        for (const y of gensDeLaGrappe(g2)) {
+          if (x === y) continue
+          // Quelqu'un présent dans les DEUX grappes : l'échanger avec lui-même
+          // sur l'une d'elles produirait un doublon sur un même créneau.
+          if (gensDeLaGrappe(g1).includes(y) || gensDeLaGrappe(g2).includes(x)) continue
+          ajouter('echange_weekend', [
+            ...affectationsDeLaGrappe(g1, (id) => (id === x ? y : id)),
+            ...affectationsDeLaGrappe(g2, (id) => (id === y ? x : id)),
+          ])
+        }
+      }
+    }
+  }
+
+  return out
+}

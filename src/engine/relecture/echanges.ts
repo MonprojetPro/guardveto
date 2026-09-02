@@ -124,8 +124,14 @@ function sansLesDeuxPlaces(
   }
 }
 
-/** Pose `vetId` sur une place précise. */
-function poser(
+/**
+ * Pose `vetId` sur une place précise.
+ *
+ * Exportée pour `mouvements.ts` (B-096), qui compose des mouvements à plus de
+ * deux places. Une seconde implémentation de la même mécanique de pose est
+ * exactement ce qui finit par diverger — leçon B-087.
+ */
+export function poser(
   planning: PlanningPartiel, place: PlaceOccupee, vetId: string,
 ): PlanningPartiel {
   return {

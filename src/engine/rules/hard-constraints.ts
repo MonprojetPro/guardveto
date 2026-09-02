@@ -428,6 +428,16 @@ function messageR8(prenom: string, roleSource: string, rel: RelationStructure): 
   return `R8 : ${prenom} avait le rôle « ${roleSource} » sur « ${rel.sourceCode} » → doit changer de rôle sur « ${rel.cibleCode} »`
 }
 
+/** Le même refus, quand c'est la SOURCE qu'on planifie et la cible qui est posée. */
+function messageR8DepuisCible(prenom: string, roleCible: string, rel: RelationStructure): string {
+  if (estCoupleHistorique(rel)) {
+    if (roleCible === 'premier') return `R8 : ${prenom} est 1er ce week-end → doit être 2nd le vendredi soir`
+    if (roleCible === 'second') return `R8 : ${prenom} est 2nd ce week-end → doit être 1er le vendredi soir`
+    return `R8 : ${prenom} a le rôle « ${roleCible} » ce week-end → doit changer de rôle le vendredi soir`
+  }
+  return `R8 : ${prenom} a le rôle « ${roleCible} » sur « ${rel.cibleCode} » → doit changer de rôle sur « ${rel.sourceCode} »`
+}
+
 /**
  * R8 — Inversion des rôles entre créneaux liés (réglable).
  *
@@ -436,6 +446,26 @@ function messageR8(prenom: string, roleSource: string, rel: RelationStructure): 
  * rôle tenu sur l'occurrence CIBLE diffère de celui tenu sur l'occurrence
  * SOURCE appariée (adjacence, cf. relations-structure). Sémantique N-places
  * (P4 slice 2) conservée : « différent », sans présumer les noms de rôle.
+ *
+ * ── SYMÉTRIQUE DEPUIS B-096 (2026-09-02), ET ELLE NE L'ÉTAIT PAS ────────────
+ *
+ * Ce contrôle ne se déclenchait QUE sur `slot.type === rel.cibleCode`, donc
+ * uniquement quand on posait le WEEK-END. Poser le VENDREDI ne vérifiait rien.
+ *
+ * Invisible pendant la génération — le solver pose le vendredi AVANT le samedi,
+ * donc il n'y a rien à comparer à ce moment-là. Mais tout chemin qui REPOSE une
+ * place sur un planning déjà complet passait à travers : `echangesPossibles`
+ * proposait d'inverser les deux rôles du vendredi SEUL, `isValid` l'acceptait,
+ * et le planning se retrouvait avec le même véto 1er le vendredi ET 1er le
+ * week-end. Trouvé par le test des mouvements de week-end, pas par la relecture.
+ *
+ * Le second gardien, lui, le voyait : `validerPlanning` juge le planning FINI
+ * et aurait crié « X est 1er vendredi soir ET 1er le WE ». Les deux gardiens se
+ * contredisaient donc — celui qui autorise en amont, celui qui refuse en aval.
+ * C'est exactement la situation qu'ils existent pour éviter.
+ *
+ * R9, juste en dessous, était symétrique depuis toujours et le disait dans son
+ * en-tête (« contrôlé dans les deux sens »). R8 avait simplement été oubliée.
  */
 function checkR8Inversion(
   vet: VetEngine,
@@ -449,14 +479,31 @@ function checkR8Inversion(
   if (!estStructureDure(cfg)) return ok()
 
   for (const rel of relations) {
-    if (rel.genre !== 'inversion_role' || slot.type !== rel.cibleCode) continue
-    const attrSource = apparierSourcePourCible(planning, rel, slot.date)
-    if (!attrSource) continue // source non planifiée / hors fenêtre → pas de contrainte
+    if (rel.genre !== 'inversion_role') continue
 
-    // Le rôle sur la cible doit différer de celui tenu sur la source liée.
-    const roleSource = roleDuVet(attrSource, vet.id)
-    if (roleSource !== null && roleVisé === roleSource) {
-      return invalid(messageR8(vet.prenom, roleSource, rel))
+    if (slot.type === rel.cibleCode) {
+      // On planifie la CIBLE (le week-end) : le rôle doit différer de celui
+      // tenu sur la source liée.
+      const attrSource = apparierSourcePourCible(planning, rel, slot.date)
+      if (!attrSource) continue // source non planifiée / hors fenêtre → pas de contrainte
+
+      const roleSource = roleDuVet(attrSource, vet.id)
+      if (roleSource !== null && roleVisé === roleSource) {
+        return invalid(messageR8(vet.prenom, roleSource, rel))
+      }
+    }
+
+    if (slot.type === rel.sourceCode) {
+      // On planifie la SOURCE (le vendredi) : même exigence, dans l'autre sens.
+      // Sans ce bloc, reposer un vendredi sur un planning dont le week-end est
+      // déjà là ne vérifiait rien du tout.
+      const attrCible = apparierCiblePourSource(planning, rel, slot.date)
+      if (!attrCible) continue
+
+      const roleCible = roleDuVet(attrCible, vet.id)
+      if (roleCible !== null && roleVisé === roleCible) {
+        return invalid(messageR8DepuisCible(vet.prenom, roleCible, rel))
+      }
     }
   }
 

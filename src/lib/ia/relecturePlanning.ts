@@ -205,6 +205,21 @@ export interface DossierRelecture {
   equipe: PersonneLisible[]
   /** Les règles du cabinet, en français. Ce que CE cabinet a décidé. */
   reglesCabinet: string[]
+  /**
+   * Les PRÉFÉRENCES du cabinet que ce planning n'a pas pu respecter (B-096).
+   *
+   * Ce ne sont pas des violations : le cabinet les a réglées en « sauf en cas
+   * de crise » ou plus souple, le moteur avait donc le droit de les enfreindre
+   * et l'a payé en pénalité. Mais il faut le DIRE — sur Hiver P2, la règle
+   * « au moins 3 semaines entre deux week-ends » était enfreinte huit fois,
+   * dont trois d'affilée par la même personne, et personne ne l'a vu.
+   *
+   * Filou ne pouvait pas les retrouver seul : il aurait fallu soustraire des
+   * dates de tête sur 118 lignes. Le moteur, lui, les connaît.
+   *
+   * Vide → aucune préférence enfreinte, et là ça veut vraiment dire ça.
+   */
+  preferencesEnfreintes: string[]
   /** Le rôle qui porte l'avantage financier, s'il est configuré. */
   roleAvantageFinancier: string | null
   /**
@@ -220,21 +235,38 @@ export interface DossierRelecture {
    * automatique ». Ce qui reste à améliorer dans un planning optimisé, ce sont
    * les échanges.
    *
-   * Vide → aucun échange légal, et là ça veut vraiment dire ça.
+   * Vide → aucun mouvement légal, et là ça veut vraiment dire ça.
+   *
+   * ── B-096 : CE N'EST PLUS UNE LISTE D'ÉCHANGES À DEUX PLACES ──────────────
+   *
+   * Elle l'était, et c'est ce qui laissait les week-ends hors de portée. Le
+   * week-end est lié à son vendredi par deux règles dures ; un mouvement à deux
+   * places qui touche l'un sans l'autre casse le binôme et se fait refuser.
+   * AUCUNE place de week-end n'était donc atteignable — or c'est là que vivent
+   * l'avantage financier du 1er et l'essentiel du déséquilibre de charge.
+   *
+   * Chaque entrée porte désormais un nombre libre de places, ET son EFFET
+   * mesuré sur le planning. Sans l'effet, on disait « le moteur accepte » sans
+   * jamais dire « ça vaut le coup » : légal et souhaitable confondus.
    */
-  echanges: EchangeLisible[]
+  mouvements: MouvementLisible[]
 }
 
-/** Un échange applicable, décrit en français. */
-export interface EchangeLisible {
-  /** « lundi 19 janvier · nuit de semaine · 1er » */
-  placeA: string
-  prenomA: string
-  placeB: string
-  prenomB: string
+/** Un mouvement applicable, décrit en français, avec son effet mesuré. */
+export interface MouvementLisible {
+  /** La phrase qui le résume — « Antoine et Victor échangent leurs rôles du week-end du 24 octobre ». */
+  resume: string
+  /** Le détail, une ligne par place qui change. */
+  lignes: string[]
+  /**
+   * Ce que le mouvement fait au planning, mesuré par le moteur lui-même
+   * (`scorerPlanning`), jamais estimé.
+   */
+  effet: 'ameliore' | 'egal' | 'degrade'
+  /** Ce sur quoi il agit, en français. Absent quand l'effet est nul. */
+  surQuoi?: string
   /** Coordonnées machine, pour que Filou puisse les recopier sans les inventer. */
-  refA: { date: string; type: string; role: string }
-  refB: { date: string; type: string; role: string }
+  affectations: { date: string; type: string; role: string; vetId: string }[]
 }
 
 // ── Ce que Filou répond ──────────────────────────────────────
@@ -564,26 +596,67 @@ export function dossierEnTexte(dossier: DossierRelecture): string {
       : 'Toutes les places sont pourvues.',
   )
 
-  // ── Les échanges applicables ──
-  lignes.push('', 'LES ÉCHANGES QUE LE MOTEUR ACCEPTE')
-  if (dossier.echanges.length === 0) {
-    lignes.push(
-      'Aucun. Sur ce planning, aucune permutation de deux personnes ne respecte',
-      'toutes les règles — ici, cela veut bien dire qu’il n’y a rien à faire.',
-    )
+  // ── Les préférences que le planning n'a pas pu respecter ──
+  lignes.push('', 'LES PRÉFÉRENCES DU CABINET QUE CE PLANNING ENFREINT')
+  if (dossier.preferencesEnfreintes.length === 0) {
+    lignes.push('Aucune. Toutes les préférences réglées par le cabinet sont respectées.')
   } else {
     lignes.push(
-      `${dossier.echanges.length} permutations ont été VÉRIFIÉES par le moteur : les`,
+      `${dossier.preferencesEnfreintes.length}. Ce ne sont PAS des fautes : le cabinet`,
+      'a réglé ces règles en « sauf en cas de crise » ou plus souple, le moteur',
+      'avait donc le droit de les enfreindre pour tenir le reste.',
+      '',
+      'Mais elles comptent : c’est le cabinet qui les a écrites, et une préférence',
+      'enfreinte plusieurs fois de suite sur la MÊME personne est exactement ce',
+      'que l’équipe remarque. C’est le moteur qui les a repérées, pas toi — tu',
+      'peux donc les citer telles quelles sans les recalculer.',
+    )
+    for (const p of dossier.preferencesEnfreintes) lignes.push(`- ${p}`)
+  }
+
+  // ── Les mouvements applicables ──
+  lignes.push('', 'LES MOUVEMENTS QUE LE MOTEUR ACCEPTE')
+  if (dossier.mouvements.length === 0) {
+    lignes.push(
+      'Aucun. Sur ce planning, aucun mouvement ne respecte toutes les règles —',
+      'ici, cela veut bien dire qu’il n’y a rien à faire.',
+    )
+  } else {
+    // Les AMÉLIORANTS d'abord : c'est là que Filou doit regarder en premier, et
+    // un ordre quelconque le ferait piocher au hasard dans une liste où tout se
+    // ressemble. Le tri n'est pas cosmétique, c'est la moitié de l'information.
+    const rang = { ameliore: 0, egal: 1, degrade: 2 } as const
+    const tries = [...dossier.mouvements].sort((a, b) => rang[a.effet] - rang[b.effet])
+    const ameliorants = tries.filter((m) => m.effet === 'ameliore').length
+
+    lignes.push(
+      `${dossier.mouvements.length} mouvements ont été VÉRIFIÉS par le moteur : les`,
       'appliquer respecte toutes les règles. C’est ton principal levier — la',
       'plupart des déséquilibres ne se corrigent que comme ça.',
-      'Pour en proposer une, recopie les deux places telles qu’elles sont écrites.',
+      '',
+      'Chacun porte son EFFET, mesuré par le moteur sur le planning entier :',
+      '  AMÉLIORE — le planning est meilleur après. Privilégie ceux-là.',
+      '  ÉGAL     — légal, mais ne répare rien. À ne proposer que si tu corriges',
+      '             quelque chose que le score ne mesure pas, et dis-le alors.',
+      '  DÉGRADE  — légal, mais le planning est moins bon après. Ne le propose',
+      '             que si tu assumes l’échange, et explique ce qu’on y gagne.',
+      '',
+      ameliorants > 0
+        ? `${ameliorants} mouvement(s) AMÉLIORENT le planning. Commence par eux.`
+        : 'Aucun mouvement n’améliore le planning au sens du moteur. Si tu en '
+          + 'proposes un quand même, dis pourquoi il vaut mieux que le score.',
+      '',
+      'Pour en proposer un, recopie TOUTES ses places telles qu’elles sont écrites.',
+      'Un mouvement est un tout : en omettre une place le fait refuser.',
     )
-    for (const e of dossier.echanges) {
-      lignes.push(
-        `- ${e.prenomA} (${e.placeA}) ⇄ ${e.prenomB} (${e.placeB})` +
-          `  [A date=${e.refA.date} type=${e.refA.type} role=${e.refA.role}]` +
-          `  [B date=${e.refB.date} type=${e.refB.type} role=${e.refB.role}]`,
-      )
+
+    for (const m of tries) {
+      const effet = m.effet === 'ameliore' ? 'AMÉLIORE' : m.effet === 'degrade' ? 'DÉGRADE' : 'ÉGAL'
+      lignes.push('', `- ${m.resume} → ${effet}${m.surQuoi ? ` (${m.surQuoi})` : ''}`)
+      for (const l of m.lignes) lignes.push(`    ${l}`)
+      for (const a of m.affectations) {
+        lignes.push(`    [date=${a.date} type=${a.type} role=${a.role} vetId=${a.vetId}]`)
+      }
     }
   }
 

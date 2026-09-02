@@ -40,7 +40,12 @@ import { relirePlanningIA, modeleRelecture } from '@/lib/ia/relecturePlanning'
 import { assistantIaDisponible } from '@/lib/ia/proposerRegle'
 import { arbitrerChangements, type ChangementArbitre } from '@/engine/relecture/arbitrer'
 import { remplacantsPossibles } from '@/engine/relecture/remplacants'
-import { echangesPossibles } from '@/engine/relecture/echanges'
+import { mouvementsPossibles } from '@/engine/relecture/mouvements'
+import { effetsDesMouvements } from '@/engine/relecture/effet'
+import { personnesAuxExtremes } from '@/engine/relecture/cibles'
+import { preferencesEnfreintes } from '@/engine/relecture/preferences'
+import { tracerRelecture } from '@/data/tracerRelecture'
+import { normaliserContraintesVets } from '@/engine/normaliserContraintes'
 import { persisterResultat } from '@/data/persisterResultat'
 import { ecrirePlanningV1 } from '@/data/ecrirePlanningV1'
 import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
@@ -260,26 +265,22 @@ async function executerRelecture(
     contexteAnterieur: contexte.contexteAnterieur,
   })
 
-  // B-093 — les ÉCHANGES, sans lesquels la liste ci-dessus est presque toujours
-  // vide. Mesuré le 2026-09-01 sur Hiver P2 : 53 places sur 118 sans aucun
-  // remplaçant simple. Filou lisait ces vides comme « rien n'est possible » et
-  // se taisait — sept constats sur sept en « pas de correction automatique ».
+  // B-093 — les MOUVEMENTS, sans lesquels la liste ci-dessus est presque
+  // toujours vide. Mesuré le 2026-09-01 sur Hiver P2 : 53 places sur 118 sans
+  // aucun remplaçant simple. Filou lisait ces vides comme « rien n'est
+  // possible » et se taisait.
   //
-  // CIBLAGE : sans filtre, 118 places donnent ~6 900 paires. Le calcul tient,
-  // mais le dossier noierait le signal et exploserait le budget de jetons. On
-  // ne garde donc que les échanges impliquant les personnes AUX EXTRÊMES de la
-  // charge — les seules dont une permutation change quelque chose.
-  emettre('Je cherche quels échanges le moteur accepterait…')
-  const charge = new Map<string, number>()
-  for (const a of planningActuel.attributions) {
-    for (const p of a.placements) {
-      if (p.vetId) charge.set(p.vetId, (charge.get(p.vetId) ?? 0) + 1)
-    }
-  }
-  const parCharge = [...charge.entries()].sort((x, y) => y[1] - x[1]).map(([id]) => id)
-  const vetsCibles = [...new Set([...parCharge.slice(0, 2), ...parCharge.slice(-2)])]
+  // CIBLAGE : sans filtre, la combinatoire noierait le signal et le budget de
+  // jetons. On ne garde que les mouvements touchant les personnes aux EXTRÊMES
+  // — voir `personnesAuxExtremes`, dont le critère a changé en B-096.
+  emettre('Je cherche quels mouvements le moteur accepterait…')
+  const vetsCibles = personnesAuxExtremes(planningActuel, {
+    vets: contexte.vets,
+    roleAvantageFinancier: contexte.roleAvantageFinancier,
+    calendrier: contexte.calendrier,
+  })
 
-  const echanges = echangesPossibles(planningActuel, {
+  const mouvementsLegaux = mouvementsPossibles(planningActuel, {
     vets: contexte.vets,
     dateDebut: contexte.dateDebut,
     dateFin: contexte.dateFin,
@@ -292,8 +293,44 @@ async function executerRelecture(
     vetsCibles,
   })
 
+  // B-096 lot 4 — CE QUE CHAQUE MOUVEMENT FAIT AU PLANNING.
+  //
+  // Sans cette mesure, la liste disait « le moteur accepte » sans jamais dire
+  // « ça vaut le coup » : légal et souhaitable confondus. Filou devait choisir
+  // son levier sans balance — et le 02/09 il a répondu, à raison, qu'il ne
+  // pouvait rien corriger. Le scoreur est celui du moteur, pas une estimation.
+  emettre('Je mesure ce que chaque mouvement changerait…')
+  const effets = effetsDesMouvements(planningActuel, mouvementsLegaux, {
+    vets: normaliserContraintesVets(contexte.vets),
+    saison: contexte.saison,
+    weights: contexte.equityWeights,
+    structureConfig: contexte.structureConfig,
+    roleAvantageFinancier: contexte.roleAvantageFinancier,
+    calendrier: contexte.calendrier,
+    contexteAnterieur: contexte.contexteAnterieur,
+  })
+  const mouvements = mouvementsLegaux.map((mouvement, i) => ({ mouvement, effet: effets[i] }))
+
+  // B-096 lot 2 — LES PRÉFÉRENCES QUE LE PLANNING ENFREINT.
+  //
+  // Le moteur les connaît : il les a payées en pénalité en construisant. Rien
+  // ne les transmettait à Filou, qui aurait dû soustraire des dates de tête sur
+  // 118 lignes pour les retrouver — et n'a donc rien dit du rythme d'Antoine,
+  // un week-end sur deux quatre fois de suite.
+  const preferences = preferencesEnfreintes(planningActuel, {
+    vets: contexte.vets,
+    dateDebut: contexte.dateDebut,
+    dateFin: contexte.dateFin,
+    saison: contexte.saison,
+    calendrier: contexte.calendrier,
+    nbVetosSemaineSoir: contexte.nbVetosSemaineSoir,
+    structureConfig: contexte.structureConfig,
+    creneaux: contexte.creneaux,
+    contexteAnterieur: contexte.contexteAnterieur,
+  })
+
   const { dossier, historiqueIndisponible } = await monterDossierRelecture(
-    supabase, planningActuel, contexte, periodeId, cabinetId, remplacants, echanges,
+    supabase, planningActuel, contexte, periodeId, cabinetId, remplacants, mouvements, preferences,
   )
 
   // ── Filou lit ──
@@ -305,6 +342,14 @@ async function executerRelecture(
     // Zone d'ombre 5, tranchée par MiKL le 27/08 : jamais un silence qui se
     // lirait « tout va bien ». Le planning du moteur reste en base, intact.
     console.error('[relecture] Filou n’a pas répondu :', err)
+    // B-096 lot 1 — l'ÉCHEC se garde aussi. Un historique où tout s'est
+    // toujours bien passé ne sert à rien, et c'est justement quand Filou ne
+    // répond pas qu'on veut pouvoir le montrer.
+    await tracerRelecture(supabase, periodeId, cabinetId, {
+      issue: 'indisponible',
+      modele: modeleRelecture(),
+      erreur: err instanceof Error ? err.message : String(err),
+    })
     return reponse({
       issue: 'indisponible',
       error:
@@ -425,6 +470,29 @@ async function executerRelecture(
   const aTrancher = arbitrage.arbitrages.filter((a) => a.verdict === 'refuse').map(enLigne)
   const ecartes = arbitrage.arbitrages.filter((a) => a.verdict === 'sans_objet').length
 
+  const revuePourEcran = relecture.revue.map((r) => ({
+    critere: critereParCle(r.critere)?.titre ?? r.critere,
+    verdict: r.verdict,
+    constat: r.constat,
+    detail: r.detail,
+    corrigeable: r.corrigeable,
+  }))
+
+  // B-096 lot 1 — la trace, avant de rendre la main. On garde EXACTEMENT ce que
+  // l'écran affiche : sans quoi l'historique raconterait une autre relecture
+  // que celle qu'on a lue. Cette écriture ne peut pas faire échouer la réponse.
+  await tracerRelecture(supabase, periodeId, cabinetId, {
+    issue: 'relu',
+    modele: modeleRelecture(),
+    synthese: relecture.synthese,
+    revue: revuePourEcran,
+    criteresNonTraites: relecture.criteresNonTraites,
+    appliques,
+    aTrancher,
+    ecartes,
+    planningModifie: ecrit,
+  })
+
   return reponse({
     issue: 'relu',
     synthese: relecture.synthese,
@@ -432,13 +500,7 @@ async function executerRelecture(
     // C'est la pièce qui empêche « Filou n'a rien à redire » d'être la seule
     // chose que l'admin lit : elle montre ce qui a été REGARDÉ, pas seulement
     // ce qui a été trouvé.
-    revue: relecture.revue.map((r) => ({
-      critere: critereParCle(r.critere)?.titre ?? r.critere,
-      verdict: r.verdict,
-      constat: r.constat,
-      detail: r.detail,
-      corrigeable: r.corrigeable,
-    })),
+    revue: revuePourEcran,
     // Une revue incomplète ne doit PAS ressembler à une revue clean.
     criteresNonTraites: relecture.criteresNonTraites,
     appliques,

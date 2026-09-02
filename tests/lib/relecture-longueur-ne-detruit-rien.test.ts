@@ -38,9 +38,12 @@ import {
 import { CRITERES_HUMAINS } from '@/lib/planning/criteres-humains'
 
 const DOSSIER: DossierRelecture = {
-  // B-093 : ce test porte sur la LONGUEUR de la réponse, pas sur les échanges.
+  // B-093 : ce test porte sur la LONGUEUR de la réponse, pas sur les mouvements.
   // Liste vide = le dossier reste celui d'origine, le test mesure la même chose.
-  echanges: [],
+  // (B-096 : `echanges` est devenu `mouvements` — même rôle, N places et effet.)
+  mouvements: [],
+  // B-096 : ce test ne porte pas sur les preferences enfreintes.
+  preferencesEnfreintes: [],
   periode: 'du 21 septembre au 18 octobre',
   saison: 'hiver',
   places: [
