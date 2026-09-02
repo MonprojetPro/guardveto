@@ -48,9 +48,22 @@ export interface EtapeTracee {
   aMs: number
 }
 
-/** Le verdict, écrit à la fermeture. */
+/**
+ * Le verdict, écrit à la fermeture.
+ *
+ * Les valeurs suivent le CHECK de `generations_trace.issue` — les décaler ici
+ * sans migration ferait échouer l'écriture en silence, et la trace manquante
+ * serait prise pour une fonction morte. Deux causes opposées sous un même
+ * symptôme : exactement ce que cette table existe pour séparer.
+ *
+ *   complet / partiel / echec — les trois issues de B-053
+ *   erreur                    — une exception a traversé la route
+ *   refusee                   — le verrou a refusé le départ
+ *   abandon_client            — le navigateur a signalé un écran disparu
+ *                               sans qu'aucune génération ne démarre
+ */
 export interface VerdictGeneration {
-  issue: 'complet' | 'partiel' | 'echec' | 'erreur'
+  issue: 'complet' | 'partiel' | 'echec' | 'erreur' | 'refusee' | 'abandon_client'
   nbGardes?: number | null
   /** Le calcul a été coupé par SES PROPRES plafonds (seed, rattrapage). */
   interrompu?: boolean

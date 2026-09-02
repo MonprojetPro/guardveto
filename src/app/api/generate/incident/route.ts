@@ -46,11 +46,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false }, { status: 400 })
   }
 
-  const traceId = corps?.traceId
-  if (typeof traceId !== 'string' || !traceId) {
-    // Sans identifiant de trace, il n'y a rien à annoter. On ne crée pas de
-    // ligne orpheline : une trace sans génération ne se rattache à rien et
-    // pollue la seule table qu'on lira pour comprendre.
+  const traceId = typeof corps?.traceId === 'string' && corps.traceId ? corps.traceId : null
+  const periodeId = typeof corps?.periodeId === 'string' && corps.periodeId ? corps.periodeId : null
+
+  // ── B-104 (2e passe) — LE CAS SANS TRACE EST LE PLUS IMPORTANT ──────────
+  //
+  // Cette route refusait tout témoignage sans `traceId`, « pour ne pas créer
+  // de ligne orpheline ». C'était exactement le mauvais arbitrage : le 02/09,
+  // la fenêtre de MiKL s'est fermée AVANT que le serveur n'ait ouvert sa
+  // trace, et les deux moitiés de l'instrument se sont tues ensemble.
+  //
+  // Une ligne sans génération n'est pas orpheline : elle dit « quelqu'un a
+  // essayé, et rien n'a démarré ». C'est le fait le plus utile de toute la
+  // table, parce que c'est le seul que le serveur ne peut PAS constater.
+  if (!traceId && !periodeId) {
     return NextResponse.json({ ok: false }, { status: 400 })
   }
 
@@ -68,15 +77,39 @@ export async function POST(req: NextRequest) {
     recuLe: new Date().toISOString(),
   }
 
-  const { error } = await supabase
-    .from('generations_trace')
-    .update({ incident_client: temoignage })
-    .eq('id', traceId)
+  // Cas nominal : le serveur avait démarré, on annote SA ligne.
+  if (traceId) {
+    const { error } = await supabase
+      .from('generations_trace')
+      .update({ incident_client: temoignage })
+      .eq('id', traceId)
 
-  if (error) {
-    console.error('[generate/incident] annotation refusée :', error.message)
-    return NextResponse.json({ ok: false }, { status: 500 })
+    if (error) {
+      console.error('[generate/incident] annotation refusée :', error.message)
+      return NextResponse.json({ ok: false }, { status: 500 })
+    }
+    return NextResponse.json({ ok: true })
   }
 
+  // Cas décisif : RIEN n'a démarré côté serveur, et seul le navigateur le sait.
+  // On crée la ligne — `issue: 'abandon_client'`, fermée d'emblée puisqu'il n'y
+  // a aucun travail à attendre. À ne pas confondre avec une ligne restée
+  // OUVERTE, qui signifie l'inverse : le serveur avait commencé et il est mort.
+  const cabinetId = user.app_metadata?.cabinet_id as string | undefined
+  if (!cabinetId) return NextResponse.json({ ok: false }, { status: 403 })
+
+  const { error } = await supabase.from('generations_trace').insert({
+    cabinet_id: cabinetId,
+    periode_id: periodeId,
+    lance_par: user.id,
+    fermee_le: new Date().toISOString(),
+    issue: 'abandon_client',
+    incident_client: temoignage,
+  })
+
+  if (error) {
+    console.error('[generate/incident] tentative non enregistrée :', error.message)
+    return NextResponse.json({ ok: false }, { status: 500 })
+  }
   return NextResponse.json({ ok: true })
 }

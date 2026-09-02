@@ -170,6 +170,19 @@ export async function POST(req: NextRequest) {
   // existe. PostgREST accepte un filtre `or=` en lecture mais le qualifie
   // `periodes.colonne` en écriture, où la requête utilise un alias. Prouvé par
   // sonde le 2026-08-02. Ne PAS revenir à un `.or()` sur un update.
+  // ── B-104 (2e passe) — LA TRACE S'OUVRE AVANT LE VERROU ─────────────────
+  //
+  // Elle s'ouvrait juste après, et c'était un angle mort : un refus de verrou
+  // n'écrivait RIEN. Le 02/09 à 22h56, l'incident s'est reproduit et la table
+  // est restée vide — l'instrument était aveugle exactement là où ça casse.
+  //
+  // C'est le défaut que ce module dénonçait lui-même une heure plus tôt, d'un
+  // cran plus tôt dans la chaîne : une trace qui ne garde que ce qui a déjà
+  // commencé à bien se passer. Une TENTATIVE se trace, pas seulement un
+  // travail.
+  const departMs = Date.now()
+  const traceId = await ouvrirTrace(supabase, periodeId, cabinetId, user.id)
+
   const cutoffVerrou = new Date(Date.now() - VERROU_PERIME_MS).toISOString()
   const { data: verrouAcquis, error: verrouErr } = await supabase.rpc(
     'acquerir_verrou_generation',
@@ -177,12 +190,24 @@ export async function POST(req: NextRequest) {
   )
 
   if (verrouErr) {
+    await fermerTrace(supabase, traceId, {
+      issue: 'erreur',
+      erreur: `verrou : ${verrouErr.message}`,
+    })
     return NextResponse.json(
       { error: `Erreur d'acquisition du verrou de génération : ${verrouErr.message}` },
       { status: 500 }
     )
   }
   if (verrouAcquis !== true) {
+    // Le fameux « une génération est déjà en cours ». Il laisse désormais une
+    // ligne : c'est par elle qu'on saura si le verrou refuse sur une
+    // génération réellement en cours, ou sur un verrou fantôme laissé par une
+    // fonction morte — deux causes opposées, jusqu'ici indiscernables.
+    await fermerTrace(supabase, traceId, {
+      issue: 'refusee',
+      erreur: 'Verrou déjà pris : une génération est réputée en cours pour cette période.',
+    })
     return NextResponse.json(
       { error: 'Une génération est déjà en cours pour cette période. Attends quelques secondes puis réessaie.' },
       { status: 409 }
@@ -198,11 +223,6 @@ export async function POST(req: NextRequest) {
   // résultat. Le client affiche ce que le serveur annonce, jamais autre chose.
   // NDJSON : un objet par ligne. Le séparateur est nommé plutôt qu'écrit en
   // clair — un simple saut de ligne dans une chaîne se perd à la relecture.
-  // B-104 — qui a lancé. Un incident qui ne frappe qu'une personne oriente
-  // vers son navigateur ou son réseau ; un incident qui les frappe toutes,
-  // vers le serveur. Sans ce champ, les deux se ressemblent.
-  const lancePar = user.id
-
   const FIN_DE_LIGNE = String.fromCharCode(10)
   const encodeur = new TextEncoder()
   const flux = new ReadableStream({
@@ -210,17 +230,11 @@ export async function POST(req: NextRequest) {
       const ecrire = (objet: unknown) => {
         controleur.enqueue(encodeur.encode(JSON.stringify(objet) + FIN_DE_LIGNE))
       }
-      // ── B-104 : la trace s'ouvre AVANT le premier calcul ────────────────
-      //
-      // Et c'est tout l'intérêt. Quand la fonction serverless est tuée, rien de
-      // ce qui suit ne s'exécute — ni le résultat, ni le `finally`, ni la
-      // libération du verrou. Une ligne ouverte et jamais refermée est alors la
-      // SEULE trace de l'incident, et `ouverte_le` en donne l'heure.
-      //
-      // Le traceur ne peut rien casser : `ouvrirTrace` rend `null` en cas
-      // d'échec et la génération continue sans être tracée.
-      const departMs = Date.now()
-      const traceId = await ouvrirTrace(supabase, periodeId, cabinetId, lancePar)
+      // La trace est déjà ouverte — avant le verrou, plus haut. Quand la
+      // fonction serverless est tuée, rien de ce qui suit ne s'exécute : ni le
+      // résultat, ni le `finally`, ni la libération du verrou. Une ligne
+      // ouverte et jamais refermée est alors la SEULE trace de l'incident, et
+      // `ouverte_le` en donne l'heure.
       const etapes: EtapeTracee[] = []
 
       // On DONNE l'identifiant de trace au navigateur, première ligne du flux.

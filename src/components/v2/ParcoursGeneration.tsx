@@ -209,14 +209,24 @@ export async function lireLeFlux(
 /** Ce qu'on rapporte : une raison courte, l'étape en cours, le temps écoulé. */
 function signalerIncidentParcours(rapport: {
   traceId: string | null
+  /** La période visée — c'est elle qui rattache un témoignage SANS trace. */
+  periodeId: string | null
   raison: string
   etape?: string | null
   message?: string | null
   apresMs?: number | null
 }) {
-  // Sans identifiant de trace, il n'y a rien à annoter : le serveur n'a même
-  // pas eu le temps d'ouvrir sa ligne. Le silence est alors exact.
-  if (!rapport.traceId) return
+  // ── B-104 (2e passe) — ON PARLE MÊME SANS IDENTIFIANT DE TRACE ──────────
+  //
+  // Ce garde-fou disait : « sans traceId, le serveur n'a pas eu le temps
+  // d'ouvrir sa ligne, le silence est exact ». Il était faux, et il a coûté la
+  // soirée du 02/09 : la fenêtre de MiKL s'est fermée AVANT la première ligne
+  // du flux, donc sans traceId — et le témoin s'est tu au moment précis où il
+  // était le seul à savoir quelque chose.
+  //
+  // Le silence n'est jamais « exact » quand il porte sur un incident. Sans
+  // trace côté serveur, la période suffit à rattacher le témoignage.
+  if (!rapport.traceId && !rapport.periodeId) return
   try {
     const charge = JSON.stringify(rapport)
     if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
@@ -326,6 +336,14 @@ export function ParcoursGeneration({
   const traceIdRef = useRef<string | null>(null)
   const travailDepuisRef = useRef<number | null>(null)
   const etapeCouranteRef = useRef<string | null>(null)
+  /**
+   * La période visée, retenue pour le témoin (B-104, 2e passe).
+   *
+   * C'est elle qui rattache un témoignage quand le serveur n'a même pas eu le
+   * temps d'ouvrir sa trace — le cas du 02/09, où la fenêtre s'est fermée
+   * avant la première ligne du flux.
+   */
+  const periodeCibleRef = useRef<string | null>(null)
   const [creation, setCreation] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
 
@@ -689,6 +707,7 @@ export function ParcoursGeneration({
       if (!travailDepuisRef.current) return // pas en train de travailler : normal
       signalerIncidentParcours({
         traceId: traceIdRef.current,
+        periodeId: periodeCibleRef.current,
         raison: 'ecran-demonte-pendant-le-travail',
         etape: etapeCouranteRef.current,
         apresMs: Date.now() - travailDepuisRef.current,
@@ -707,6 +726,7 @@ export function ParcoursGeneration({
     travailDepuisRef.current = Date.now()
     traceIdRef.current = null
     etapeCouranteRef.current = null
+    periodeCibleRef.current = cible
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
@@ -746,6 +766,7 @@ export function ParcoursGeneration({
       if (typeof data.error === 'string' && data.success === undefined && data.issue === undefined) {
         signalerIncidentParcours({
           traceId: traceIdRef.current,
+          periodeId: periodeCibleRef.current,
           raison: 'flux-clos-sans-resultat',
           etape: etapeCouranteRef.current,
           message: data.error,
@@ -829,6 +850,7 @@ export function ParcoursGeneration({
       // seul ce témoignage dit lequel des deux s'est produit.
       signalerIncidentParcours({
         traceId: traceIdRef.current,
+        periodeId: periodeCibleRef.current,
         raison: 'serveur-injoignable',
         etape: etapeCouranteRef.current,
         message: e instanceof Error ? e.message : String(e),
