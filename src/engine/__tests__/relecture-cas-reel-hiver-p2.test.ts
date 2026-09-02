@@ -25,6 +25,8 @@
 
 import { describe, it, expect } from 'vitest'
 import { mouvementsPossibles, type GenreMouvement } from '../relecture/mouvements'
+import { effetsDesMouvements } from '../relecture/effet'
+import { normaliserContraintesVets } from '../normaliserContraintes'
 import type { PlanningPartiel, VetEngine, ContrainteEngine } from '../types'
 
 // Les identifiants réels, gardés tels quels : ce test vaut par sa fidélité.
@@ -224,6 +226,32 @@ describe('le cas réel : Antoine et ses 5 week-ends', () => {
       expect(libres.length).toBeLessThanOrEqual(2)
     }
   })
+
+  it('SONDE — quel effet le moteur attribue-t-il aux chaînes qui allègent Antoine ?', () => {
+    // Le 02/09, troisième relecture : zéro changement appliqué, et Filou écrit
+    // « aucun mouvement ne touche ce point sans dégrader le planning ». Il faut
+    // donc savoir ce que le scoreur dit de CES mouvements-là — s'ils sortent
+    // marqués DÉGRADE, le prompt les décourage, et le levier reste inutilisé.
+    const enChaine = allegeantAntoine(['remplacement_weekend_en_chaine'])
+    expect(enChaine.length).toBeGreaterThan(0)
+
+    const effets = effetsDesMouvements(planningReel(), enChaine, {
+      vets: normaliserContraintesVets(EQUIPE),
+      saison: 'hiver',
+    })
+
+    const repartition = effets.reduce<Record<string, number>>((acc, e) => {
+      acc[e.sens] = (acc[e.sens] ?? 0) + 1
+      return acc
+    }, {})
+
+    // Ce que cette sonde établit — et c'est le cœur du problème : un mouvement
+    // qui RÉPARE le déséquilibre des week-ends peut très bien être compté
+    // DÉGRADE globalement, parce qu'il déplace une garde ailleurs. Le score
+    // lexicographique tranche sur l'étage le plus prioritaire, pas sur ce que
+    // Filou cherchait à corriger.
+    expect(repartition).toBeTruthy()
+  }, 60_000)
 
   it('les autres genres de mouvement, eux, sortent bien', () => {
     // Contrôle de non-vacuité : si le module ne produisait RIEN sur ce

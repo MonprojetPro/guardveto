@@ -357,11 +357,26 @@ export async function monterDossierRelecture(
               ? `${duo} : quelqu’un est libéré d’un week-end — il faut d’abord déplacer une garde pour rendre ça possible`
               : `${duo} échangent leurs places`
 
+    // Qui perd une garde de WEEK-END : la dimension qui compte le plus pour le
+    // cabinet, et celle qu'aucun échange ne sait corriger. Calculé ici pour que
+    // Filou n'ait pas à le déduire — le 02/09, il ne l'a pas déduit.
+    const allege = [...parPersonne.entries()]
+      .filter(([id, { avant, apres }]) => {
+        if (apres >= avant) return false
+        return mouvement.affectations.some(
+          (a) => a.type === 'weekend'
+            && occupantAvant.get(`${a.date}|${a.type}|${a.role}`) === id
+            && a.vetId !== id,
+        )
+      })
+      .map(([id]) => nomDe(id))
+
     return {
       resume,
       lignes: [...lignes, ...effetSurLesGens],
       effet: effet.sens,
       surQuoi: effet.surQuoi,
+      allege: allege.length > 0 ? allege : undefined,
       affectations: mouvement.affectations.map((a) => ({
         date: a.date, type: a.type, role: a.role, vetId: a.vetId,
       })),

@@ -277,6 +277,20 @@ export interface MouvementLisible {
   effet: 'ameliore' | 'egal' | 'degrade'
   /** Ce sur quoi il agit, en français. Absent quand l'effet est nul. */
   surQuoi?: string
+  /**
+   * Les prénoms de ceux à qui ce mouvement RETIRE une garde de week-end.
+   *
+   * Mesuré le 02/09, quatrième relecture : les deux mouvements capables
+   * d'alléger Antoine étaient dans la liste, marqués AMÉLIORE, en tête de
+   * priorité — et Filou n'en a pris aucun. Il constatait « Antoine est le plus
+   * chargé » et concluait « pas de correction automatique », alors que la
+   * correction était sous ses yeux, noyée dans deux cents lignes.
+   *
+   * Il ne suffit donc pas qu'un levier existe : il faut le RELIER au problème.
+   * Ce champ sert à sortir ces mouvements de la masse et à les nommer par la
+   * personne qu'ils soulagent.
+   */
+  allege?: string[]
   /** Coordonnées machine, pour que Filou puisse les recopier sans les inventer. */
   affectations: { date: string; type: string; role: string; vetId: string }[]
 }
@@ -624,6 +638,47 @@ export function dossierEnTexte(dossier: DossierRelecture): string {
       'peux donc les citer telles quelles sans les recalculer.',
     )
     for (const p of dossier.preferencesEnfreintes) lignes.push(`- ${p}`)
+  }
+
+  // ── LES MOUVEMENTS QUI ALLÈGENT QUELQU'UN, SORTIS DE LA MASSE ──
+  //
+  // Le 02/09, quatrième relecture : les deux mouvements capables de retirer un
+  // week-end à Antoine étaient présents, marqués AMÉLIORE, en tête de priorité.
+  // Filou n'en a pris aucun et a écrit « pas de correction automatique » sous
+  // un constat qui disait « Antoine est le plus chargé ».
+  //
+  // Il ne suffit pas qu'un levier existe et soit bien classé : entre deux cents
+  // lignes qui se ressemblent, il ne se relie à rien. Cette section-ci existe
+  // pour faire ce lien à sa place — nommer la personne, puis le mouvement.
+  const allegeants = dossier.mouvements.filter((m) => (m.allege?.length ?? 0) > 0)
+  if (allegeants.length > 0) {
+    const parPersonne = new Map<string, typeof allegeants>()
+    for (const m of allegeants) {
+      for (const qui of m.allege ?? []) {
+        parPersonne.set(qui, [...(parPersonne.get(qui) ?? []), m])
+      }
+    }
+
+    lignes.push('', '⚠️ LES MOUVEMENTS QUI RETIRENT UN WEEK-END À QUELQU’UN')
+    lignes.push(
+      'Ce sont les SEULS qui allègent réellement une charge. Un échange ou une',
+      'inversion déplace, eux seuls soustraient. Si tu constates que quelqu’un',
+      'porte trop de week-ends, la réponse est ici — et si elle y est, tu ne dois',
+      'PAS écrire « pas de correction automatique » sur ce constat.',
+    )
+    for (const [qui, mouvements] of parPersonne) {
+      lignes.push(
+        '',
+        `${qui} — ${mouvements.length} mouvement(s) lui retirent un week-end :`,
+      )
+      for (const m of mouvements) {
+        const effet = m.effet === 'ameliore' ? 'AMÉLIORE' : m.effet === 'degrade' ? 'DÉGRADE' : 'ÉGAL'
+        lignes.push(`  · ${m.resume} → ${effet}`)
+        for (const a of m.affectations) {
+          lignes.push(`      [date=${a.date} type=${a.type} role=${a.role} vetId=${a.vetId}]`)
+        }
+      }
+    }
   }
 
   // ── Les mouvements applicables ──

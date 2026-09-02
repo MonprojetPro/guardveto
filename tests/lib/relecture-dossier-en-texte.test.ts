@@ -114,6 +114,32 @@ describe('dossierEnTexte — les mouvements et leur effet', () => {
     expect(texte).toContain('en omettre une place le fait refuser')
   })
 
+  it('SORT de la masse les mouvements qui retirent un week-end à quelqu’un', () => {
+    // Le 02/09, quatrième relecture : les deux mouvements capables d'alléger
+    // Antoine étaient présents, marqués AMÉLIORE, en tête de priorité — et
+    // Filou n'en a pris aucun, sous un constat qui disait « Antoine est le plus
+    // chargé ». Un levier bien classé mais noyé ne se relie à rien.
+    const texte = dossierEnTexte(dossier({
+      mouvements: [
+        { ...mouvement('ameliore', 'Antoine libéré du week-end du 24'), allege: ['Antoine'] },
+        mouvement('egal', 'Un échange ordinaire'),
+      ],
+    }))
+
+    expect(texte).toContain('RETIRENT UN WEEK-END')
+    expect(texte).toContain('Antoine — 1 mouvement(s) lui retirent un week-end')
+    // La consigne qui interdit le silence sur un constat que le levier répare.
+    expect(texte).toContain('PAS écrire « pas de correction automatique »')
+    // Et cette section passe AVANT la liste générale.
+    expect(texte.indexOf('RETIRENT UN WEEK-END'))
+      .toBeLessThan(texte.indexOf('LES MOUVEMENTS QUE LE MOTEUR ACCEPTE'))
+  })
+
+  it('n’affiche pas cette section quand aucun mouvement n’allège personne', () => {
+    const texte = dossierEnTexte(dossier({ mouvements: [mouvement('egal', 'A')] }))
+    expect(texte).not.toContain('RETIRENT UN WEEK-END')
+  })
+
   it('DIT combien de mouvements ont été écartés de la liste', () => {
     // La liste est bornée (3012 mouvements bruts mesurés sur une période
     // d'hiver complète). Une troncature silencieuse se lirait « voilà tout ce
