@@ -42,6 +42,34 @@ function dossier(partiel: Partial<DossierRelecture> = {}): DossierRelecture {
   }
 }
 
+describe('B-108 (03/09) — le total ne s’additionne plus avec les week-ends', () => {
+  it('nomme le total AU TOTAL, et dit explicitement que les week-ends y sont déjà compris', () => {
+    // Six relectures de suite ont écrit « Antoine (27 gardes) » alors que la
+    // base disait 22 (17 + 5) — la même erreur, deux fois : total + week-ends.
+    // La phrase source disait « 22 gardes, dont 5 week-ends », grammaticalement
+    // correcte mais rien n'empêchait de les additionner, et Filou l'a fait de
+    // façon reproductible. Ce test verrouille la reformulation qui le rend faux
+    // à additionner.
+    const texte = dossierEnTexte(dossier({
+      equipe: [
+        {
+          vetId: 'v-antoine', prenom: 'Antoine',
+          gardesPeriode: { total: 22, weekends: 5, premierWeekend: 3 },
+          historique: { total: 13, weekends: 3, premierWeekend: 2 },
+          absences: [], regles: [],
+        },
+      ],
+    }))
+    expect(texte).toContain('22 gardes au total')
+    expect(texte).toContain('déjà compris dans les 22')
+    expect(texte).toContain('13 gardes au total')
+    expect(texte).toContain('week-ends — déjà compris')
+    // Le piège exact du 03/09 : la présence du mot « dont » ne suffit pas, il
+    // faut la clause qui interdit explicitement de rajouter.
+    expect(texte).not.toMatch(/22 gardes, dont/)
+  })
+})
+
 describe('dossierEnTexte — les préférences enfreintes', () => {
   it('les écrit, avec leur phrase telle quelle', () => {
     const texte = dossierEnTexte(dossier({

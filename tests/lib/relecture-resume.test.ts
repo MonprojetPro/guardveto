@@ -21,6 +21,9 @@ import {
   resumerEffet,
   prenomCite,
   grouperParPersonne,
+  humaniserObjection,
+  parserGeste,
+  parserGestes,
 } from '@/lib/relecture/resume'
 
 /** Les gestes réels du rapport du 02/09, copiés tels quels. */
@@ -140,5 +143,67 @@ describe('B-107 — regrouper les constats par personne', () => {
     expect(groupes).toHaveLength(1)
     expect(groupes[0].qui).toBeNull()
     expect(groupes[0].points).toHaveLength(1)
+  })
+})
+
+describe('B-107 (03/09) — humaniser une objection du moteur', () => {
+  it('reformule l’espacement — capture MiKL du 03/09, mot pour mot', () => {
+    // Copié tel quel depuis engine/validation/validerPlanning.ts (ligne ~975),
+    // exactement la phrase vue dans la capture d'écran.
+    const brut =
+      'Fanny — seulement 1 jour(s) entre le jeudi 3 décembre 2026 et le vendredi 4 décembre 2026 (min 2)'
+    const humain = humaniserObjection(brut)
+    expect(humain).not.toContain('(min')
+    expect(humain).not.toContain('jour(s)')
+    expect(humain).toContain('Fanny')
+    expect(humain).toContain('il en faut 2')
+  })
+
+  it('reformule l’espacement week-end', () => {
+    const brut =
+      "Antoine — deux week-ends à 7 jour(s) d'écart (samedi 6 décembre 2026 → samedi 13 décembre 2026), min 1 toutes les 2 semaines"
+    const humain = humaniserObjection(brut)
+    expect(humain).toContain('Antoine')
+    expect(humain).toContain('au moins 2 semaines')
+  })
+
+  it('reformule le repos après une série', () => {
+    const brut =
+      "Manon est de garde le mardi 8 décembre 2026 alors qu'une série d'au moins 3 jours (fin le lundi 7 décembre 2026) impose 2 jour(s) de repos"
+    const humain = humaniserObjection(brut)
+    expect(humain).toContain('Manon')
+    expect(humain).toContain('2 jours de repos')
+  })
+
+  it('💣 une phrase qui ne correspond à aucun motif connu s’affiche TELLE QUELLE', () => {
+    // Le repli honnête : inventer une reformulation sur un format inattendu
+    // serait pire que la phrase technique mais juste.
+    const inconnu = 'Un motif que ce module ne sait pas encore lire.'
+    expect(humaniserObjection(inconnu)).toBe(inconnu)
+  })
+})
+
+describe('B-107 (03/09) — la liste des mouvements en tableau', () => {
+  it('découpe un geste réel en jour / créneau / échange', () => {
+    const a = parserGeste('samedi 5 décembre 2026 · Week-end (sam+dim) · premier : Fanny à la place de Antoine')
+    expect(a).toEqual({
+      date: 'samedi 5 décembre 2026',
+      creneau: 'Week-end (sam+dim) · premier',
+      entrant: 'Fanny',
+      sortant: 'Antoine',
+    })
+  })
+
+  it('rend `null` sur une forme inattendue plutôt que de deviner', () => {
+    expect(parserGeste('un texte qui ne suit pas le format attendu')).toBeNull()
+  })
+
+  it('parserGestes rend TOUT ou RIEN — jamais un tableau à moitié rempli', () => {
+    const propres = [
+      'vendredi 4 décembre 2026 · Soir du vendredi · second : Fanny à la place de Antoine',
+      'samedi 5 décembre 2026 · Week-end (sam+dim) · premier : Fanny à la place de Antoine',
+    ]
+    expect(parserGestes(propres)).toHaveLength(2)
+    expect(parserGestes([...propres, 'format imprévu'])).toBeNull()
   })
 })

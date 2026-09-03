@@ -420,9 +420,29 @@ export const SortieRelectureSchema = z.object({
 
 export type SortieRelecture = z.infer<typeof SortieRelectureSchema>
 
+/**
+ * Une ligne de revue, une fois vérifiée contre ce que Filou a RÉELLEMENT
+ * proposé (B-109, 03/09).
+ *
+ * `corrigeable` et `changements` sont deux champs INDÉPENDANTS du schéma : rien
+ * n'empêche Filou d'écrire `corrigeable: true` sur un critère sans jamais
+ * ajouter le changement correspondant. Trouvé le 03/09 sur Hiver P2 : le
+ * critère « les gardes ne s'entassent pas sur une seule semaine » disait
+ * `corrigeable: true` pour Antoine — et la relecture entière comptait **zéro**
+ * changement proposé, alors que 108 mouvements légaux existaient et qu'une
+ * section du dossier le nommait explicitement parmi les personnes qu'un
+ * mouvement peut soulager. Sans ce champ, l'écran ne montrait ni la mention
+ * « pas de correction automatique » (réservée à `corrigeable: false`) ni le
+ * changement promis : un silence à l'endroit précis où l'admin s'attendait à
+ * une réponse.
+ */
+export type LigneRevueNormalisee = SortieRelecture['revue'][number] & {
+  promesseNonTenue: boolean
+}
+
 export interface ResultatRelecture {
   synthese: string
-  revue: SortieRelecture['revue']
+  revue: LigneRevueNormalisee[]
   changements: ChangementPropose[]
   /**
    * Les critères sur lesquels Filou ne s'est PAS prononcé, malgré la consigne.
@@ -566,16 +586,30 @@ export function dossierEnTexte(dossier: DossierRelecture): string {
     )
   }
 
+  // ── B-108 (03/09) : « dont » invitait à additionner ce qui est déjà inclus ──
+  //
+  // Six relectures de suite, sur six plannings pourtant différents (régénérés
+  // entre chacune), Filou a écrit EXACTEMENT « Antoine (27 gardes) » — alors que
+  // la base (`compteurs_gardes`) donne 22 (17 + 5). Vérifié aussi sur
+  // Anne-Sophie : 13 + 4 week-ends → Filou écrit 17. Le calcul est le MÊME,
+  // ligne après ligne : total + week-ends. Une coïncidence sur un seul cas se
+  // discute ; sur deux personnes et six appels indépendants, c'est un motif.
+  //
+  // La phrase source disait « X gardes, dont Y week-ends » : grammaticalement
+  // Y est inclus dans X, mais rien dans la forme n'empêche de les additionner,
+  // et Filou le fait de façon reproductible. On lève l'ambiguïté en la rendant
+  // fausse à additionner : le total est nommé EN PREMIER, et la parenthèse dit
+  // explicitement qu'il est déjà compris.
   lignes.push('', "L'ÉQUIPE ET SES COMPTEURS")
   for (const p of dossier.equipe) {
     const g = p.gardesPeriode
     const parts = [
       `${p.prenom} (identifiant ${p.vetId})`,
-      `cette période : ${g.total} garde${g.total > 1 ? 's' : ''}, dont ${g.weekends} week-end${g.weekends > 1 ? 's' : ''}, ${g.premierWeekend} fois premier du week-end`,
+      `cette période : ${g.total} garde${g.total > 1 ? 's' : ''} au total (dont ${g.weekends} week-end${g.weekends > 1 ? 's' : ''} — déjà compris dans les ${g.total}, ne pas les rajouter), ${g.premierWeekend} fois premier du week-end`,
     ]
     if (p.historique) {
       parts.push(
-        `historique cumulé : ${p.historique.total} gardes, ${p.historique.weekends} week-ends, ${p.historique.premierWeekend} fois premier`,
+        `historique cumulé : ${p.historique.total} gardes au total (dont ${p.historique.weekends} week-ends — déjà compris), ${p.historique.premierWeekend} fois premier`,
       )
     }
     if (p.absences.length > 0) parts.push(`absences : ${p.absences.join(' ; ')}`)
@@ -972,9 +1006,19 @@ export function normaliserRelecture(
     }
   }
 
-  const revue = CRITERES_HUMAINS.map((c) => revueParCle.get(c.cle)).filter(
-    (r): r is SortieRelecture['revue'][number] => Boolean(r),
-  )
+  // ── B-109 : la promesse et l'acte, vérifiés l'un contre l'autre ──
+  //
+  // `corrigeable: true` promet un changement ; `changements` est ce qui a été
+  // RÉELLEMENT proposé. Rien dans le schéma ne les lie — on le fait ici, pour
+  // que l'écart entre les deux ne reste jamais silencieux.
+  const criteresCorriges = new Set(changements.map((c) => c.critere))
+
+  const revue: LigneRevueNormalisee[] = CRITERES_HUMAINS.map((c) => revueParCle.get(c.cle))
+    .filter((r): r is SortieRelecture['revue'][number] => Boolean(r))
+    .map((r) => ({
+      ...r,
+      promesseNonTenue: r.corrigeable && !criteresCorriges.has(r.critere),
+    }))
   const criteresNonTraites = CRITERES_HUMAINS.filter(
     (c) => !revueParCle.has(c.cle),
   ).map((c) => c.titre)

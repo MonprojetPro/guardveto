@@ -46,7 +46,12 @@
 // ============================================================
 
 import { Sparkles, Check, AlertTriangle, Eye, CircleSlash } from 'lucide-react'
-import { resumerEffet, grouperParPersonne } from '@/lib/relecture/resume'
+import {
+  resumerEffet,
+  grouperParPersonne,
+  humaniserObjection,
+  parserGestes,
+} from '@/lib/relecture/resume'
 
 export interface LigneRelecture {
   id: string
@@ -65,6 +70,13 @@ export interface LigneRevue {
   /** Le reste : dates, historique, comparaisons. Replié. */
   detail?: string
   corrigeable: boolean
+  /**
+   * Filou a dit `corrigeable: true` sans qu'aucun changement de sa liste ne
+   * vise ce critère (B-109, 03/09). Pire qu'un « pas de correction
+   * automatique » honnête : ça se lit comme une action prise, alors qu'il ne
+   * s'est rien passé.
+   */
+  promesseNonTenue?: boolean
 }
 
 export interface DonneesRelecture {
@@ -91,16 +103,47 @@ function effetEnMots(effet?: LigneRelecture['effetScore']): string | null {
   return null
 }
 
-/** Le détail d'un mouvement : le motif tel quel, puis les places touchées. */
+/**
+ * Le détail d'un mouvement : le motif tel quel (le POURQUOI), puis les places
+ * touchées (le QUOI) — visuellement séparés, pour ne pas les lire comme un
+ * seul bloc de texte.
+ *
+ * Les places s'affichent en tableau quand TOUS les gestes s'y prêtent ; sinon
+ * la liste à puces d'origine reste le repli, jamais un tableau à trous.
+ */
 function DetailMouvement({ ligne }: { ligne: LigneRelecture }) {
+  const analyses = parserGestes(ligne.geste)
   return (
     <>
       <p className="rl-motif">{ligne.motif}</p>
-      <ul className="rl-geste">
-        {ligne.geste.map((g, i) => (
-          <li key={i}>{g}</li>
-        ))}
-      </ul>
+      {analyses ? (
+        <table className="rl-table">
+          <thead>
+            <tr>
+              <th>Jour</th>
+              <th>Créneau</th>
+              <th>Échange</th>
+            </tr>
+          </thead>
+          <tbody>
+            {analyses.map((a, i) => (
+              <tr key={i}>
+                <td>{a.date}</td>
+                <td>{a.creneau}</td>
+                <td>
+                  {a.entrant} <span className="rl-table-a-la-place">à la place de</span> {a.sortant}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <ul className="rl-geste">
+          {ligne.geste.map((g, i) => (
+            <li key={i}>{g}</li>
+          ))}
+        </ul>
+      )}
       <p className="rl-meta">
         {ligne.critere}
         {effetEnMots(ligne.effetScore) ? ` · ${effetEnMots(ligne.effetScore)}` : ''}
@@ -222,7 +265,7 @@ export function RapportRelecture({
                   {resume && <p className="rl-resume">{resume}</p>}
                   <ul className="rl-objections">
                     {l.objections.map((o, i) => (
-                      <li key={i}>{o}</li>
+                      <li key={i}>{humaniserObjection(o)}</li>
                     ))}
                   </ul>
                   <details className="rl-plus">
@@ -303,9 +346,17 @@ export function RapportRelecture({
                             <p>{r.detail}</p>
                           </details>
                         )}
+                        {r.promesseNonTenue && (
+                          <p className="rl-note rl-manquant">
+                            Filou a dit pouvoir corriger ce point, mais n’a proposé aucun
+                            changement pour lui.
+                          </p>
+                        )}
                         <p className="rl-meta">
                           {r.critere}
-                          {!r.corrigeable ? ' · il ne voit pas de correction automatique' : ''}
+                          {!r.corrigeable && !r.promesseNonTenue
+                            ? ' · il ne voit pas de correction automatique'
+                            : ''}
                         </p>
                       </li>
                     ))}

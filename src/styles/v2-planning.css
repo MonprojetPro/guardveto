@@ -2375,7 +2375,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   background: var(--surface); border-radius: var(--r-sm);
   padding: 9px 11px;
 }
-.rl-motif { font-size: 0.84rem; line-height: 1.5; color: var(--text); }
+.rl-motif { font-size: 0.84rem; line-height: 1.5; color: var(--text); margin: 0 0 9px; }
 .rl-constat { font-size: 0.84rem; line-height: 1.5; color: var(--text); }
 
 /* Le geste concret, en retrait : c'est la traduction du motif, pas une
@@ -2386,6 +2386,25 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   display: grid; gap: 3px;
 }
 .rl-geste li { font-size: 0.78rem; line-height: 1.45; color: var(--t-muted); }
+
+/* Le tableau des places touchées (B-107, 03/09) : remplace la liste à puces
+   quand chaque geste se découpe proprement en jour / créneau / échange —
+   trois colonnes qui se scannent, là où six phrases identiques se lisaient
+   une par une. */
+.rl-table {
+  width: 100%; margin-top: 6px; border-collapse: collapse; font-size: 0.78rem;
+}
+.rl-table th {
+  text-align: left; font-weight: 500; color: var(--soft);
+  padding: 0 8px 5px 0; border-bottom: 1px solid var(--t-border);
+}
+.rl-table td {
+  padding: 5px 8px 5px 0; color: var(--t-muted);
+  border-bottom: 1px solid var(--t-border); vertical-align: top;
+}
+.rl-table tr:last-child td { border-bottom: none; }
+.rl-table td:last-child { color: var(--text); }
+.rl-table-a-la-place { color: var(--soft); }
 
 .rl-meta { font-size: 0.73rem; color: var(--soft); margin-top: 6px; }
 

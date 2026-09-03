@@ -165,6 +165,57 @@ describe('normaliserRelecture — hygiène de la revue', () => {
   })
 })
 
+describe('B-109 (03/09) — la promesse et l’acte, vérifiés l’un contre l’autre', () => {
+  // Le cas exact du 03/09 sur Hiver P2 : Filou écrit `corrigeable: true` sur
+  // « les gardes ne s'entassent pas sur une seule semaine » et la relecture
+  // entière compte ZÉRO changement — alors que 108 mouvements légaux
+  // existaient. Rien dans le schéma ne relie `revue[].corrigeable` à
+  // `changements[]` : c'est ce test qui doit le faire, sinon la promesse non
+  // tenue reste invisible à l'écran (ni « pas de correction automatique »,
+  // réservé à `corrigeable: false`, ni le changement promis).
+  it('marque `promesseNonTenue` quand `corrigeable: true` n’a AUCUN changement pour ce critère', () => {
+    const revue = revueComplete().map((r) =>
+      r.critere === 'concentration' ? { ...r, corrigeable: true, verdict: 'probleme' as const } : r,
+    )
+
+    const resultat = normaliserRelecture(sortie({ revue, changements: [] }), DOSSIER)
+
+    const ligne = resultat.revue.find((x) => x.critere === 'concentration')!
+    expect(ligne.corrigeable).toBe(true)
+    expect(ligne.promesseNonTenue).toBe(true)
+  })
+
+  it('ne marque RIEN quand un changement vise bien le critère promis', () => {
+    const revue = revueComplete().map((r) =>
+      r.critere === 'concentration' ? { ...r, corrigeable: true, verdict: 'probleme' as const } : r,
+    )
+
+    const resultat = normaliserRelecture(
+      sortie({
+        revue,
+        changements: [{
+          motif: 'Antoine est libéré d’un week-end.',
+          critere: 'concentration',
+          affectations: [
+            { date: '2026-10-03', type: 'weekend', role: 'second', vetId: 'v-anne-so' },
+          ],
+        }],
+      }),
+      DOSSIER,
+    )
+
+    expect(resultat.revue.find((x) => x.critere === 'concentration')!.promesseNonTenue).toBe(false)
+  })
+
+  it('ne marque rien quand `corrigeable` est déjà `false`', () => {
+    // Un vrai « pas de correction automatique » n'est pas une promesse non
+    // tenue — c'est un aveu honnête, il garde sa mention actuelle.
+    const resultat = normaliserRelecture(sortie(), DOSSIER)
+
+    expect(resultat.revue.every((x) => x.promesseNonTenue === false)).toBe(true)
+  })
+})
+
 describe('normaliserRelecture — les propositions restent filtrées', () => {
   it('écarte une proposition qui vise une place inexistante', () => {
     const r = normaliserRelecture(

@@ -487,6 +487,11 @@ async function executerRelecture(
     constat: r.constat,
     detail: r.detail,
     corrigeable: r.corrigeable,
+    // B-109 (03/09) — Filou a dit « je propose un changement » et n'en a
+    // proposé aucun. Doit rester visible : c'est pire qu'un « pas de
+    // correction automatique » honnête, puisque ça se lit comme une action en
+    // cours alors qu'il ne s'est rien passé.
+    promesseNonTenue: r.promesseNonTenue,
   }))
 
   // B-096 lot 1 — la trace, avant de rendre la main. On garde EXACTEMENT ce que
