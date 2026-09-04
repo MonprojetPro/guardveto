@@ -433,6 +433,38 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   .cad-libre { opacity: 0.55; }
 }
 
+/* ── B-114 · LE MÊME CADENAS, DANS LA MODALE DE GARDE ──────────────────
+   ⚠️ Sans ces règles il serait INVISIBLE : `.cad-libre` est à `opacity: 0` et
+   n'est révélé que par le survol de `.vet-row-wrap`, un conteneur qui n'existe
+   que sur la grille. On aurait donc re-livré le défaut du 04/09 — un cadenas
+   qui fonctionne et qu'on ne voit pas — dans un autre écran.
+
+   Ici il reste visible en permanence : la raison de l'effacer sur la grille
+   (des dizaines de cases, donc un champ d'icônes) ne vaut pas pour une modale
+   qui en montre deux. Il est un peu plus grand aussi : on y clique à la
+   souris, sur une ligne, pas dans une case de calendrier. */
+.gm-slot-actions .cad-btn {
+  width: auto; height: 28px;
+  padding: 0 7px; margin-left: 0;
+  border: 1px solid transparent;
+}
+.gm-slot-actions .cad-btn svg { width: 14px; height: 14px; }
+.gm-slot-actions .cad-libre { opacity: 0.6; }
+.gm-slot-actions .cad-libre:hover,
+.gm-slot-actions .cad-libre:focus-visible { opacity: 1; }
+.gm-slot-actions .cad-fixe { border-color: var(--accent-ink); background: var(--accent-soft); }
+
+/* Une place réattribuée mais pas encore enregistrée ne peut pas être fixée :
+   le serveur cherche la personne dans la garde TELLE QU'ELLE EST EN BASE. On
+   affiche la raison a la place du bouton, plutôt qu'un geste qui echouerait. */
+.cad-attente {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 0.7rem; font-weight: 600;
+  color: var(--t-muted); font-style: italic;
+  padding: 0 6px;
+}
+.cad-attente svg { width: 12px; height: 12px; opacity: 0.7; }
+
 /* La place fixée elle-même : un liseré à gauche, rien de plus. Il tient à
    côté du cadre orange d'une règle enfreinte sans se confondre avec lui. */
 .vet-row-fige {

@@ -127,6 +127,58 @@ export function placesDeGarde(garde: {
   return places
 }
 
+/**
+ * Les PERSONNES cadenassées d'une garde lue dans la TABLE (B-114).
+ *
+ * ⚠️ CETTE FONCTION N'EST PAS CELLE DE LA GRILLE, et les confondre serait un
+ * vrai défaut. Il y a deux traductions possibles de `places_figees`, parce
+ * qu'il y a deux sources :
+ *
+ *   • la TABLE `gardes` — rôles natifs. `places_figees: ['premier']` désigne
+ *     `premier_id`, toujours. C'est ce que fait cette fonction, et c'est ce que
+ *     la modale de garde manipule.
+ *   • la vue `planning_semaine` — rôles de la LIGNE AFFICHÉE, que la vue a déjà
+ *     inversés le vendredi en même temps que les personnes. La grille les
+ *     traduit via les places affichées (`placesDeGarde` + `labelDonneeDePlace`).
+ *
+ * Les deux rendent des personnes, et c'est le point : une personne ne s'inverse
+ * pas. Appliquer celle-ci à une ligne de vue, en revanche, désignerait la
+ * mauvaise personne un jour sur trois.
+ *
+ * Le vocabulaire est celui des DONNÉES (« premier », « second ») — voir
+ * `labelDonneeDePlace` pour ce que coûte de le confondre avec l'affichage.
+ */
+export function vetsFigesNatifs(garde: {
+  premier_id?: string | null
+  second_id?: string | null
+  places_figees?: string[] | null
+}): string[] {
+  const ids = (garde.places_figees ?? [])
+    .map((label) => {
+      if (label === 'premier') return garde.premier_id ?? null
+      if (label === 'second') return garde.second_id ?? null
+      // Les places au-delà de la 2e ne sont pas cadenassables à la main
+      // (la route les refuse) : rien à traduire, et surtout rien à inventer.
+      return null
+    })
+    .filter((id): id is string => Boolean(id))
+  return [...new Set(ids)]
+}
+
+/**
+ * Peut-on cadenasser la place telle qu'elle est affichée ?
+ *
+ * Non tant qu'une réattribution n'est pas enregistrée : la route cherche la
+ * place que la personne occupe dans la garde EN BASE, et répondrait « cette
+ * personne ne tient pas cette garde » (409). On le sait avant d'appeler.
+ */
+export function placeFixableMaintenant(
+  vetIdAffiche: string | null,
+  vetIdEnregistre: string | null,
+): boolean {
+  return Boolean(vetIdAffiche) && vetIdAffiche === vetIdEnregistre
+}
+
 /** Tous les vétérinaires de garde, sans doublon — pour notifier ou compter. */
 export function vetsDeGarde(garde: Parameters<typeof placesDeGarde>[0]): string[] {
   const ids = placesDeGarde(garde)

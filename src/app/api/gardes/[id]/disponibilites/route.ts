@@ -38,6 +38,17 @@ export interface DisponibilitesData {
     verrouille: boolean
     modifie_manuellement: boolean
     periode_id: string
+    /**
+     * Les places cadenassées (B-114), en vocabulaire de DONNÉES : « premier »,
+     * « second ».
+     *
+     * ⚠️ Elles viennent de la TABLE, jamais de la vue `planning_semaine`. La
+     * vue inverse les rôles sur la ligne du vendredi, et la modale, elle,
+     * raisonne en rôles natifs (`premier_id` / `second_id`). Prendre les
+     * cadenas de la vue ici aurait dessiné le cadenas sur l'autre place un
+     * jour sur trois — le défaut exact que B-111 a payé en recette.
+     */
+    places_figees: string[]
   }
   vets: VetDispo[]
 }
@@ -115,6 +126,7 @@ export async function GET(
         verrouille: gardeDb.verrouille,
         modifie_manuellement: gardeDb.modifie_manuellement,
         periode_id: periode.id,
+        places_figees: (gardeDb.places_figees ?? []) as string[],
       },
       vets: [],
     }
@@ -243,6 +255,7 @@ export async function GET(
       verrouille: gardeDb.verrouille,
       modifie_manuellement: gardeDb.modifie_manuellement,
       periode_id: periode.id,
+      places_figees: (gardeDb.places_figees ?? []) as string[],
     },
     vets,
   }

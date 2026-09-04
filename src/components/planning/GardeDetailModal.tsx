@@ -15,8 +15,9 @@ import {
 import type { GardeDenormalisee } from '@/types'
 import type { VetDispo, DisponibilitesData } from '@/app/api/gardes/[id]/disponibilites/route'
 import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
-import { placesDeGarde, vetsDeGarde } from '@/lib/gardes/places'
+import { placesDeGarde, vetsDeGarde, vetsFigesNatifs, placeFixableMaintenant } from '@/lib/gardes/places'
 import { ViolationDialog } from './ViolationDialog'
+import { BoutonCadenas, BandeauCadenas, type ResultatCadenas } from '@/components/v2/CadenasPlaces'
 import { stylePastille, stylePoint } from '@/lib/couleurs'
 import { sansCodeTechnique } from '@/lib/regles/sansCodeTechnique'
 
@@ -114,6 +115,7 @@ function PlaceGarde({
   typeGarde,
   partenaireId,
   onDeclarerAbsent,
+  cadenas,
 }: {
   label: string
   role: 'premier' | 'second'
@@ -129,6 +131,13 @@ function PlaceGarde({
   partenaireId: string | null
   /** Admin, garde publiée : signaler l'absence de celui qui tient la place. */
   onDeclarerAbsent?: (vetId: string) => void
+  /**
+   * Le cadenas de cette place (B-114), fourni par le parent — c'est lui qui
+   * sait si la période est un brouillon et si la sélection est enregistrée.
+   * Une fente plutôt qu'un lot de props : la place affiche ce qu'on lui donne,
+   * elle ne décide de rien.
+   */
+  cadenas?: React.ReactNode
 }) {
   const titulaire = vets.find((v) => v.id === selected) ?? null
 
@@ -167,6 +176,8 @@ function PlaceGarde({
             les boutons : un nom coupé reste lisible, un bouton qui saute de
             ligne fait douter de l'écran entier. */}
         <div className="gm-slot-actions">
+          {cadenas}
+
           {onDeclarerAbsent && titulaire && (
             <button
               type="button"
@@ -249,6 +260,78 @@ function PlaceGarde({
   )
 }
 
+// ── B-114 · LE CADENAS DEPUIS LA MODALE ──────────────────
+//
+// MiKL, 04/09, pendant la recette de B-111 : la grille couvre le geste rapide
+// (cadenasser dix cases d'affilée), la modale est l'endroit où l'on regarde UNE
+// garde en détail. Ne pas pouvoir y fixer une place obligeait à ressortir pour
+// un geste qui appartient au même moment.
+//
+// ── LE GESTE EMPRUNTE LE MÊME CHEMIN, PAS UN SECOND ──────────────────────────
+//
+// `BoutonCadenas` est celui de la grille, et il appelle la même route. Un
+// second chemin d'écriture aurait rouvert exactement le trou de la leçon du
+// 22/08 (« trois chemins d'écriture, deux gardiens ») : ce qui protège la pose
+// d'un cadenas, ce sont les contrôles de la route, pas ceux de l'écran.
+//
+// Et comme sur la grille, on envoie la GARDE et la PERSONNE — jamais un rôle.
+// Ici la modale raisonne pourtant en rôles NATIFS (`premier_id` / `second_id`),
+// donc l'inversion du vendredi ne l'atteint pas ; envoyer quand même la
+// personne garde les deux écrans sur le même contrat, et enlève au suivant
+// l'occasion de se poser la question.
+//
+// ── POURQUOI IL SE DÉSACTIVE PARFOIS ─────────────────────────────────────────
+//
+// Cadenasser, c'est fixer QUI TIENT la place — et le serveur cherche la place
+// que cette personne occupe dans la garde ENREGISTRÉE. Tant qu'une
+// réattribution n'est pas enregistrée, la personne affichée n'y est pas encore :
+// le serveur répondrait « cette personne ne tient pas cette garde » (409).
+//
+// On le dit AVANT plutôt que de laisser partir un geste qui échouera. Une
+// erreur évitable qui arrive quand même use la confiance dans tout le reste de
+// l'écran.
+function CadenasDeLaPlace({
+  gardeId,
+  vetIdAffiche,
+  vetIdEnregistre,
+  prenom,
+  fige,
+  onFini,
+}: {
+  gardeId: string
+  /** Ce que l'admin voit sélectionné en ce moment. */
+  vetIdAffiche: string | null
+  /** Ce que la base porte réellement pour cette place. */
+  vetIdEnregistre: string | null
+  prenom: string | null
+  fige: boolean
+  onFini: (r: ResultatCadenas) => void
+}) {
+  if (!vetIdAffiche) return null
+
+  if (!placeFixableMaintenant(vetIdAffiche, vetIdEnregistre)) {
+    return (
+      <span
+        className="cad-attente"
+        title="Enregistrez d’abord ce changement : le cadenas fixe la personne telle qu’elle est en base."
+      >
+        <Lock aria-hidden="true" />
+        À enregistrer
+      </span>
+    )
+  }
+
+  return (
+    <BoutonCadenas
+      gardeId={gardeId}
+      vetId={vetIdAffiche}
+      prenom={prenom}
+      fige={fige}
+      onFini={onFini}
+    />
+  )
+}
+
 // ── Modal principale ─────────────────────────────────────
 
 export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, onClose, onSaved, onDeclarerAbsent }: GardeDetailModalProps) {
@@ -281,6 +364,17 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
   // validé) — garde-fou au moment de l'écriture (backlog n°12). À confirmer.
   const [avertServeur, setAvertServeur] = useState<string[] | null>(null)
 
+  // ── B-114 · les cadenas de cette garde ─────────────────────
+  //
+  // `null` = on n'a encore rien posé depuis cette modale, la vérité est celle
+  // que la route a servie. Dès qu'un geste réussit, on affiche CE QUE LE SERVEUR
+  // A RÉPONDU — pas ce qu'on espérait : rien n'est deviné ici, et un échec ne
+  // touche pas cet état (même raisonnement que sur la grille, où recharger tout
+  // l'écran coûtait plusieurs secondes pour une seule case).
+  const [vetsFigesLocaux, setVetsFigesLocaux] = useState<string[] | null>(null)
+  const [cadenasMessage, setCadenasMessage] = useState<string | null>(null)
+  const [cadenasAvertissements, setCadenasAvertissements] = useState<string[]>([])
+
   const isOpen = date !== null
 
   useEffect(() => {
@@ -311,6 +405,11 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
     // dimanche suivant un choix fait pour un autre week-end.
     setPerimetre(null)
     setCompte1erWe(null)
+    // Les cadenas d'une autre garde n'ont rien à faire ici, et la bannière de
+    // la précédente non plus : elle parlerait d'un geste posé ailleurs.
+    setVetsFigesLocaux(null)
+    setCadenasMessage(null)
+    setCadenasAvertissements([])
     /* eslint-enable react-hooks/set-state-in-effect */
 
     fetch(`/api/gardes/${garde.id}/disponibilites`)
@@ -462,6 +561,42 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
   const estVerrouille = data?.garde.verrouille ?? garde?.verrouille ?? false
   const modeEdition = isAdmin && (!estVerrouille || correctionMode)
 
+  // ── B-114 · quand le cadenas a un sens, et sur qui ─────────
+  //
+  // Comme sur la grille : un BROUILLON, et rien d'autre. Ce qu'un cadenas
+  // protège, c'est une régénération à venir ; sur un planning publié il ne
+  // protégerait rien (les cadenas tombent à la publication) et montrerait un
+  // verrou qui ne verrouille pas.
+  //
+  // ⚠️ On lit `data.garde` — la TABLE — et non `garde`, qui vient de la vue
+  // `planning_semaine`. Les deux portent bien un statut, mais un seul porte les
+  // cadenas natifs, et mélanger les sources ici rouvrirait la question de
+  // l'inversion du vendredi pour rien.
+  const cadenasActifs = modeEdition && data?.garde.periode_statut === 'brouillon'
+
+  // Les PERSONNES fixées, jamais des labels de place — même raisonnement que la
+  // grille : la réponse du serveur est en personnes, et une personne ne
+  // s'inverse pas. La conversion depuis les labels natifs n'a lieu qu'ICI, une
+  // fois, sur les rôles de la table.
+  const vetsFiges = new Set<string>(
+    vetsFigesLocaux ?? (data ? vetsFigesNatifs(data.garde) : []),
+  )
+
+  function surResultatCadenas(r: ResultatCadenas) {
+    setCadenasMessage(r.ok ? null : (r.erreur ?? 'Enregistrement impossible.'))
+    setCadenasAvertissements(r.avertissements)
+    if (r.ok) {
+      toast.success('C’est enregistré.')
+      setVetsFigesLocaux(r.vetsFiges ?? [])
+      // La grille dessous doit suivre : elle affiche les mêmes cadenas. Le
+      // rafraîchissement se fait en arrière-plan, l'état ci-dessus a déjà mis
+      // la modale à jour.
+      router.refresh()
+    } else {
+      toast.error(r.erreur ?? 'Enregistrement impossible.')
+    }
+  }
+
   // ── Backlog 8 bis : le jour, et le bloc ──────────────────
   //
   // `garde.date` vient de la vue `planning_semaine` : c'est le jour CLIQUÉ au
@@ -547,6 +682,19 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
           </DialogHeader>
 
           {!garde && <p className="text-sm text-muted-foreground py-4">Aucune garde planifiée ce jour.</p>}
+
+          {/* Ce que le cadenas qu'on vient de poser enfreint (B-114). La même
+              bannière que la grille, et pour la même raison : le geste est DÉJÀ
+              enregistré, on informe, on ne demande pas la permission après
+              coup. Elle se ferme d'un clic quand l'admin l'a lue. */}
+          <BandeauCadenas
+            message={cadenasMessage}
+            avertissements={cadenasAvertissements}
+            onFermer={() => {
+              setCadenasMessage(null)
+              setCadenasAvertissements([])
+            }}
+          />
 
           {/* ── La garde vue par un vétérinaire ───────────────────────
                  Qui est de garde, et rien d'autre. Les places viennent de
@@ -694,6 +842,18 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
                     ? (vetId) => onDeclarerAbsent(garde.date, vetId)
                     : undefined
                 }
+                cadenas={
+                  cadenasActifs && data ? (
+                    <CadenasDeLaPlace
+                      gardeId={data.garde.id}
+                      vetIdAffiche={premierSel}
+                      vetIdEnregistre={data.garde.premier_id}
+                      prenom={data.vets.find((v) => v.id === premierSel)?.prenom ?? null}
+                      fige={Boolean(premierSel && vetsFiges.has(premierSel))}
+                      onFini={surResultatCadenas}
+                    />
+                  ) : null
+                }
               />
 
               {/* ── B-076 · ÉCHANGER LES DEUX RÔLES D'UN GESTE ──────────────
@@ -747,6 +907,18 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
                     onDeclarerAbsent && garde.periode_statut === 'publie'
                       ? (vetId) => onDeclarerAbsent(garde.date, vetId)
                       : undefined
+                  }
+                  cadenas={
+                    cadenasActifs && data ? (
+                      <CadenasDeLaPlace
+                        gardeId={data.garde.id}
+                        vetIdAffiche={secondSel}
+                        vetIdEnregistre={data.garde.second_id}
+                        prenom={data.vets.find((v) => v.id === secondSel)?.prenom ?? null}
+                        fige={Boolean(secondSel && vetsFiges.has(secondSel))}
+                        onFini={surResultatCadenas}
+                      />
+                    ) : null
                   }
                 />
               )}
