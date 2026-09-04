@@ -32,6 +32,30 @@
 // immédiatement les compteurs, parce que `compteurs_gardes` est une vue sans
 // filtre de statut. Rien à coder pour ça, mais il fallait le vérifier.
 //
+// ── DEUX FAÇONS DE DÉSIGNER LA PLACE, ET POURQUOI ──────────────────────────
+//
+//   • par `gardeId` + `veterinaireId` — « la place que TIENT cette personne ».
+//     C'est ce que l'écran envoie quand il cadenasse quelqu'un déjà en place.
+//   • par `periodeId` + `date` + `type` + `role` — « cette place-là ».
+//     C'est le pré-remplissage : la garde n'existe pas encore, personne ne la
+//     tient, il n'y a que des coordonnées.
+//
+// ⚠️ LE PREMIER MODE N'EST PAS UN CONFORT, IL ÉVITE UN DÉFAUT CERTAIN.
+//
+// La vue `planning_semaine` matérialise un week-end sur trois jours et INVERSE
+// les rôles sur la ligne du vendredi : le « 1er » affiché ce jour-là est le 2nd
+// de la garde. Un écran qui renverrait le rôle AFFICHÉ cadenasserait donc
+// l'autre place une fois sur trois.
+//
+// Il aurait pu refaire l'inversion de son côté — mais elle dépend de la
+// configuration du cabinet (relation `inversion_role`), que la vue connaît et
+// que l'écran ignore. Ce raisonnement dupliqué aurait tenu jusqu'au premier
+// cabinet qui découple son vendredi, puis se serait trompé en silence.
+//
+// En désignant la personne, il n'y a plus rien à convertir : on cherche la
+// place qu'elle occupe dans la garde RÉELLE. Et c'est aussi ce que l'admin a en
+// tête — « ce week-end-là, c'est Fanny », jamais « la place 2 du créneau ».
+//
 // ── ON INFORME, ON NE BLOQUE PAS ───────────────────────────────────────────
 //
 // Le contrôle des règles dures est le MÊME juge que la publication
@@ -72,6 +96,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Corps ───────────────────────────────────────────────
+  let gardeId: string | null
   let periodeId: string
   let date: string
   let type: string
@@ -81,6 +106,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
+    gardeId = body?.gardeId ? String(body.gardeId) : null
     periodeId = String(body?.periodeId ?? '')
     date = String(body?.date ?? '')
     type = String(body?.type ?? '')
@@ -91,14 +117,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Corps de requête invalide.' }, { status: 400 })
   }
 
-  if (!periodeId || !date || !type || !role) {
+  if (geste !== 'poser' && geste !== 'liberer' && geste !== 'vider') {
+    return NextResponse.json({ error: 'Geste inconnu.' }, { status: 400 })
+  }
+
+  // Mode « place occupée » : la garde et la personne suffisent, on retrouve la
+  // place qu'elle tient. Mode « coordonnées » : il faut tout, la garde n'existe
+  // peut-être pas encore.
+  const parPersonne = Boolean(gardeId && veterinaireId)
+
+  if (!parPersonne && (!periodeId || !date || !type || !role)) {
     return NextResponse.json(
       { error: 'Il manque la période, la date, le créneau ou la place.' },
       { status: 400 },
     )
-  }
-  if (geste !== 'poser' && geste !== 'liberer' && geste !== 'vider') {
-    return NextResponse.json({ error: 'Geste inconnu.' }, { status: 400 })
   }
   if (geste === 'poser' && !veterinaireId) {
     return NextResponse.json(
@@ -113,6 +145,58 @@ export async function POST(req: NextRequest) {
   // sens que tant qu'une génération peut encore rebattre les cartes. En
   // autoriser la pose sur un planning publié laisserait croire à une protection
   // qui, elle, n'existerait plus au prochain geste.
+  // ── Mode « place occupée » : on part de la garde ────────
+  //
+  // On lit la garde RÉELLE (celle de la table, pas la ligne affichée) et on
+  // cherche la place que la personne y tient. Plus rien à convertir : la ligne
+  // du vendredi peut bien inverser ses rôles, la personne, elle, ne bouge pas.
+  let gardeExistante: {
+    id: string
+    premier_id: string | null
+    second_id: string | null
+    places_figees: string[] | null
+    periode_id: string
+  } | null = null
+
+  if (parPersonne) {
+    const { data: g, error: gErr } = await supabase
+      .from('gardes')
+      .select('id, premier_id, second_id, places_figees, periode_id')
+      .eq('id', gardeId!)
+      .maybeSingle()
+
+    if (gErr) {
+      return NextResponse.json(
+        { error: `Lecture de la garde impossible : ${gErr.message}` },
+        { status: 500 },
+      )
+    }
+    if (!g) {
+      return NextResponse.json(
+        { error: 'Cette garde n\'existe plus. Rafraîchissez le planning.' },
+        { status: 404 },
+      )
+    }
+
+    gardeExistante = g
+    periodeId = g.periode_id
+
+    if (g.premier_id === veterinaireId) role = 'premier'
+    else if (g.second_id === veterinaireId) role = 'second'
+    else {
+      // L'écran désigne quelqu'un que la garde ne porte pas : il a une vue
+      // périmée, ou c'est une place au-delà de la 2e (miroir non géré ici).
+      return NextResponse.json(
+        {
+          error:
+            'Cette personne ne tient pas cette garde. Rafraîchissez le planning ' +
+            'et réessayez.',
+        },
+        { status: 409 },
+      )
+    }
+  }
+
   const { data: periode } = await supabase
     .from('periodes')
     .select('id, statut, cabinet_id')
@@ -135,20 +219,25 @@ export async function POST(req: NextRequest) {
 
   const cabinetId = periode.cabinet_id ?? vet.cabinet_id ?? null
 
-  // ── La garde : on la retrouve, ou on la crée ────────────
-  const { data: existante, error: lectureErr } = await supabase
-    .from('gardes')
-    .select('id, premier_id, second_id, places_figees, verrouille')
-    .eq('periode_id', periodeId)
-    .eq('date', date)
-    .eq('type', type)
-    .maybeSingle()
+  // ── Mode « coordonnées » : on retrouve la garde, ou on la créera ──
+  let existante = gardeExistante
 
-  if (lectureErr) {
-    return NextResponse.json(
-      { error: `Lecture de la garde impossible : ${lectureErr.message}` },
-      { status: 500 },
-    )
+  if (!parPersonne) {
+    const { data: trouvee, error: lectureErr } = await supabase
+      .from('gardes')
+      .select('id, premier_id, second_id, places_figees, periode_id')
+      .eq('periode_id', periodeId)
+      .eq('date', date)
+      .eq('type', type)
+      .maybeSingle()
+
+    if (lectureErr) {
+      return NextResponse.json(
+        { error: `Lecture de la garde impossible : ${lectureErr.message}` },
+        { status: 500 },
+      )
+    }
+    existante = trouvee
   }
 
   if (!existante && geste !== 'poser') {
@@ -176,7 +265,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  let gardeId = existante?.id ?? null
+  gardeId = existante?.id ?? null
   const cadenasActuels: string[] = existante?.places_figees ?? []
   let premierApres = existante?.premier_id ?? null
   let secondApres = existante?.second_id ?? null

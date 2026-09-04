@@ -24,7 +24,9 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { genererPlanningPur } from '@/engine/solver'
+import { genererPlanningPur, genererSteps } from '@/engine/solver'
+// B-111 — pour dire ce que les cadenas de l'admin ont (ou n'ont pas) protege.
+import { figeesSansPlace, indexerFigees } from '@/engine/figees'
 import { supprimerEvenementsParIds } from '@/lib/sync-calendrier'
 import { resoudreContexte } from '@/data/resoudreContexte'
 import { detecterCreneauxIgnores } from '@/engine/creneau-modele'
@@ -362,6 +364,44 @@ async function executerGeneration(
       ? detecterCreneauxIgnores(contexte.creneaux)
       : []
 
+    // ── B-111 — CE QUE L'ADMIN A FIXÉ, DIT AVANT DE CHERCHER ────
+    //
+    // Le nombre de places cadenassées change le sens de tout ce qui suit : une
+    // régénération qui « ne trouve pas mieux » n'a pas la même signification
+    // selon qu'on lui a laissé toute la période ou trois cases sur quarante.
+    // Le taire ferait passer une contrainte volontaire pour un échec du moteur.
+    const nbFigees = (contexte.placesFigees ?? []).length
+    if (nbFigees > 0) {
+      emettre(
+        `Je garde ${nbFigees} place${nbFigees > 1 ? 's' : ''} que tu as fixée${nbFigees > 1 ? 's' : ''} et je compose autour`,
+      )
+    }
+
+    // Les cadenas INOPÉRANTS. Deux causes, toutes deux invisibles autrement :
+    // une place cadenassée dont la personne a été retirée depuis
+    // (`placesFigeesSansTitulaire`), et un cadenas qui ne retombe sur aucune
+    // place réelle de la période — créneau supprimé du catalogue, effectif de
+    // nuit réduit, date sortie des bornes (`figeesSansPlace`).
+    //
+    // Dans les deux cas l'écran affiche encore un cadenas, et le moteur, lui,
+    // rebat la case. C'est exactement le genre d'écart qu'on ne découvre qu'en
+    // comparant deux plannings — donc jamais.
+    const stepsPeriode = genererSteps(
+      contexte.dateDebut, contexte.dateFin, contexte.saison,
+      contexte.nbVetosSemaineSoir, contexte.creneaux,
+    )
+    const cadenasInoperants = [
+      ...figeesSansPlace(indexerFigees(contexte.placesFigees), stepsPeriode)
+        .map((f) => `${f.date} · ${f.role} — ce créneau n’existe plus dans cette période`),
+      ...(contexte.placesFigeesSansTitulaire ?? [])
+        .map((f) => `${f.date} · ${f.role} — la place est vide, il n’y a personne à fixer`),
+    ]
+    if (cadenasInoperants.length > 0) {
+      emettre(
+        `⚠️ ${cadenasInoperants.length} cadenas ne s’applique${cadenasInoperants.length > 1 ? 'nt' : ''} à rien — je régénère ${cadenasInoperants.length > 1 ? 'ces places' : 'cette place'}`,
+      )
+    }
+
     // ── Génération du planning (solver LNS) ─────────────────────
     // seedDeadlineMs : coupe PROPRE du backtracking du seed avant le timeout
     // serverless brutal (dette technique). Non déterministe → chemin serveur only.
@@ -407,6 +447,8 @@ async function executerGeneration(
         creneauxVides,
         creneauxIgnores,
         exclusDernierRecours,
+        placesFigees: nbFigees,
+        cadenasInoperants,
         dureeMs: result.dureeMs,
       })
     }
@@ -512,6 +554,12 @@ async function executerGeneration(
       creneauxIgnores,
       creneauxVides,
       exclusDernierRecours,
+      // B-111 — combien de places l'admin avait fixees, et lesquels de ses
+      // cadenas n'ont servi a rien. Le second est le plus important : sans lui,
+      // l'ecran continue d'afficher un cadenas sur une case que le moteur vient
+      // de rebattre.
+      placesFigees: nbFigees,
+      cadenasInoperants,
       // Le calcul a été coupé avant d'avoir tout exploré : ce qui est en base
       // est bon, mais une recherche complète aurait peut-être fait mieux.
       interrompu: result.success ? false : (result.interrompu ?? false),

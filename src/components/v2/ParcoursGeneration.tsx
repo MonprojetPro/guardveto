@@ -42,6 +42,8 @@ import {
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { DiagnosticImpasse, NoteDernierRecoursExclus } from '@/components/planning/DiagnosticImpasse'
+// B-111 — ce que les cadenas ont, ou n'ont pas, protege.
+import { NoteCadenas } from '@/components/planning/NoteCadenas'
 import { CasesAPourvoir, type CaseVide } from '@/components/planning/CasesAPourvoir'
 import { RapportRelecture, type DonneesRelecture } from '@/components/v2/RapportRelecture'
 import { CreneauxIgnoresAlert } from '@/components/planning/CreneauxIgnoresAlert'
@@ -277,6 +279,21 @@ interface Resultat {
    * c'est un réglage qui a fonctionné, il n'y a rien à signaler.
    */
   exclusDernierRecours?: string[]
+  /**
+   * B-111 — combien de places l'admin avait cadenassées. Affiché sur TOUTES les
+   * issues, succès compris : une régénération contrainte à trois cases sur
+   * quarante ne se juge pas comme une régénération libre, et sans ce chiffre
+   * une contrainte volontaire passerait pour un moteur qui n'a rien trouvé.
+   */
+  placesFigees?: number
+  /**
+   * B-111 — les cadenas qui ne protègent RIEN : place vidée depuis, créneau
+   * disparu, date hors bornes. C'est le plus important des deux : l'écran du
+   * planning affiche encore un cadenas sur ces cases, et le moteur vient de les
+   * rebattre. Sans cette liste, l'écart ne se découvre qu'en comparant deux
+   * plannings — donc jamais.
+   */
+  cadenasInoperants?: string[]
   message?: string
 }
 
@@ -808,6 +825,8 @@ export function ParcoursGeneration({
           nbGardes: data.nbGardes,
           dureeMs: data.dureeMs,
           creneauxIgnores: (data.creneauxIgnores ?? []) as CreneauIgnore[],
+          placesFigees: (data.placesFigees ?? 0) as number,
+          cadenasInoperants: (data.cadenasInoperants ?? []) as string[],
         })
         router.refresh()
       } else if (data.issue === 'partiel') {
@@ -822,6 +841,8 @@ export function ParcoursGeneration({
           dureeMs: data.dureeMs,
           casesVides: (data.creneauxVides ?? []) as CaseVide[],
           creneauxIgnores: (data.creneauxIgnores ?? []) as CreneauIgnore[],
+          placesFigees: (data.placesFigees ?? 0) as number,
+          cadenasInoperants: (data.cadenasInoperants ?? []) as string[],
           exclusDernierRecours: (data.exclusDernierRecours ?? []) as string[],
           interrompu: data.interrompu === true,
         })
@@ -831,6 +852,8 @@ export function ParcoursGeneration({
           ok: false,
           interrompu: true,
           creneauxIgnores: (data.creneauxIgnores ?? []) as CreneauIgnore[],
+          placesFigees: (data.placesFigees ?? 0) as number,
+          cadenasInoperants: (data.cadenasInoperants ?? []) as string[],
           exclusDernierRecours: (data.exclusDernierRecours ?? []) as string[],
           message: data.error ?? 'Génération interrompue : le planning est trop contraint (calcul trop long).',
         })
@@ -838,6 +861,8 @@ export function ParcoursGeneration({
         setResultat({
           ok: false,
           creneauxIgnores: (data.creneauxIgnores ?? []) as CreneauIgnore[],
+          placesFigees: (data.placesFigees ?? 0) as number,
+          cadenasInoperants: (data.cadenasInoperants ?? []) as string[],
           diagnostic: (data.diagnostic ?? null) as DiagnosticImpasseData | null,
           joursNonCouverts: (data.joursNonCouverts ?? []) as JourNonCouvert[],
           exclusDernierRecours: (data.exclusDernierRecours ?? []) as string[],
@@ -1446,6 +1471,10 @@ export function ParcoursGeneration({
                   </p>
                 )}
 
+                <NoteCadenas
+                  placesFigees={resultat.placesFigees}
+                  inoperants={resultat.cadenasInoperants}
+                />
                 <CreneauxIgnoresAlert creneaux={resultat.creneauxIgnores} />
               </>
             ) : resultat.ok ? (
@@ -1463,6 +1492,10 @@ export function ParcoursGeneration({
                     </p>
                   </div>
                 </div>
+                <NoteCadenas
+                  placesFigees={resultat.placesFigees}
+                  inoperants={resultat.cadenasInoperants}
+                />
                 <CreneauxIgnoresAlert creneaux={resultat.creneauxIgnores} />
               </>
             ) : (
@@ -1480,6 +1513,10 @@ export function ParcoursGeneration({
                 {resultat.diagnostic === undefined && (
                   <NoteDernierRecoursExclus prenoms={resultat.exclusDernierRecours ?? []} />
                 )}
+                <NoteCadenas
+                  placesFigees={resultat.placesFigees}
+                  inoperants={resultat.cadenasInoperants}
+                />
                 <CreneauxIgnoresAlert creneaux={resultat.creneauxIgnores} />
                 {resultat.diagnostic !== undefined && (
                   <DiagnosticImpasse

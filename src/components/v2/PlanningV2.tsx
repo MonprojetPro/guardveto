@@ -31,6 +31,11 @@ import { estJourFerie } from '@/engine/utils'
 // la semaine à cheval se dessine sans son contenu.
 import { genererGrille } from '@/lib/planning/bornes-grille'
 import { placesDeGarde } from '@/lib/gardes/places'
+// B-111 — le cadenas de l'admin sur la grille.
+import {
+  BoutonCadenas, FixerUneGarde, BandeauCadenas, type ResultatCadenas,
+} from './CadenasPlaces'
+import { creneauPosableDuJour } from '@/lib/planning/creneauDuJour'
 import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
 import { CompteursPanel } from './CompteursPanel'
 import { AbsencesAVenirPanel, type AbsenceAVenir } from './AbsencesAVenirPanel'
@@ -292,6 +297,26 @@ export function PlanningV2({
    */
   function estCliquable(g: GardeDenormalisee): boolean {
     return isAdmin || peutProposerUnEchange(g, moiVetId, today)
+  }
+
+  // ── B-111 — les cadenas de l'admin ────────────────────────
+  //
+  // Ils n'ont de sens que sur un BROUILLON : ce qu'ils protègent, c'est une
+  // régénération à venir. Publié, le planning ne se régénère plus — et les
+  // cadenas sont d'ailleurs levés à la publication. Les afficher là serait
+  // montrer un verrou qui ne verrouille rien.
+  const cadenasActifs =
+    isAdmin && !lectureSeule && periodeAffichee !== null && periodeAffichee.statut === 'brouillon'
+
+  const [cadenasMessage, setCadenasMessage] = useState<string | null>(null)
+  const [cadenasAvertissements, setCadenasAvertissements] = useState<string[]>([])
+
+  function surResultatCadenas(r: ResultatCadenas) {
+    setCadenasMessage(r.ok ? null : (r.erreur ?? 'Enregistrement impossible.'))
+    setCadenasAvertissements(r.avertissements)
+    // On rafraîchit même en cas d'échec : l'écran peut être en retard sur la
+    // base, et c'est justement l'une des causes de refus du serveur.
+    router.refresh()
   }
 
   const statut = periodeAffichee ? libelleStatut(periodeAffichee.statut) : null
@@ -612,6 +637,20 @@ export function PlanningV2({
             </p>
           )}
 
+          {/* B-111 — ce qu'un cadenas vient d'enfreindre, ou pourquoi il n'a
+              pas pu être posé. Au-dessus de la grille et non en toast : ces
+              phrases se relisent pendant qu'on continue de cadenasser, et un
+              message qui s'évapore au bout de trois secondes serait lu une fois
+              sur deux. */}
+          <BandeauCadenas
+            message={cadenasMessage}
+            avertissements={cadenasAvertissements}
+            onFermer={() => {
+              setCadenasMessage(null)
+              setCadenasAvertissements([])
+            }}
+          />
+
           <div className="work-grid">
             <div className="work-main">
               <div className="cal-scroll">
@@ -638,6 +677,14 @@ export function PlanningV2({
                         nomsTypes={nomsTypes}
                         vacances={vacances.find((v) => v.debut <= date && v.fin >= date)?.label ?? null}
                         onOuvrir={setGardeModal}
+                        // B-111 — les cadenas ne s'affichent QUE là où ils ont
+                        // un sens : l'admin, un brouillon, et un jour dans les
+                        // bornes de la période. Ailleurs, la grille est
+                        // exactement celle d'avant.
+                        cadenasActifs={cadenasActifs}
+                        periodeId={periodeAffichee?.id ?? null}
+                        vets={vets}
+                        onCadenas={surResultatCadenas}
                       />
                     ))}
                   </div>
@@ -765,6 +812,10 @@ function CaseJour({
   nomsTypes,
   vacances,
   onOuvrir,
+  cadenasActifs,
+  periodeId,
+  vets,
+  onCadenas,
 }: {
   date: string
   moisAffiche: number
@@ -779,6 +830,11 @@ function CaseJour({
   /** Nom des vacances scolaires couvrant ce jour, ou null. */
   vacances: string | null
   onOuvrir: (g: GardeDenormalisee) => void
+  /** B-111 — admin, brouillon : les cadenas se posent. Sinon la case est celle d'avant. */
+  cadenasActifs: boolean
+  periodeId: string | null
+  vets: VetCrise[]
+  onCadenas: (r: ResultatCadenas) => void
 }) {
   const jour = new Date(date + 'T12:00:00Z')
   const dow = (jour.getUTCDay() + 6) % 7 // 0 = lundi
@@ -814,6 +870,10 @@ function CaseJour({
         // garde qui n'apparaît pas dans la case serait invisible partout.
         const places = placesDeGarde(g)
         const cliquable = estCliquable(g)
+        // B-111 — les labels cadenassés sont ceux de la LIGNE AFFICHÉE : la vue
+        // les a déjà inversés pour le vendredi, en même temps que les personnes.
+        // On peut donc les comparer au rôle affiché sans rien recalculer.
+        const figees = new Set(g.places_figees ?? [])
         return (
           <div className="slot-card" key={g.id}>
             <span className="sc-tag">{libelleTypeGardeDb(g.type, nomsTypes)}</span>
@@ -829,11 +889,38 @@ function CaseJour({
                 role={places.length > 1 ? p.role : ''}
                 titre={`${dateCourte(date)} · ${p.role} de garde`}
                 onClick={cliquable ? () => onOuvrir(g) : undefined}
+                fige={figees.has(p.role)}
+                cadenas={
+                  cadenasActifs && p.vetId ? (
+                    <BoutonCadenas
+                      gardeId={g.id}
+                      vetId={p.vetId}
+                      prenom={p.prenom}
+                      fige={figees.has(p.role)}
+                      onFini={onCadenas}
+                    />
+                  ) : null
+                }
               />
             ))}
           </div>
         )
       })}
+
+      {/* B-111 — le PRÉ-REMPLISSAGE. Avant génération, une période n'a aucune
+          garde : sans ce bouton, il n'existerait aucun endroit où cliquer pour
+          fixer une date, et la moitié de la demande resterait inatteignable.
+          Il ne s'affiche donc que là où il y a réellement quelque chose à
+          créer — jour dans la période, aucune garde encore posée. */}
+      {cadenasActifs && periodeId && !horsPeriode && gardes.length === 0 && (
+        <PoserSurJourVide
+          periodeId={periodeId}
+          date={date}
+          ferie={ferie}
+          vets={vets}
+          onCadenas={onCadenas}
+        />
+      )}
 
       {/* Congés APRÈS les gardes (B-047, demande de MiKL le 26/08) : la garde
           est l'information principale de la case — c'est elle qu'on cherche
@@ -847,6 +934,50 @@ function CaseJour({
 
       {horsPeriode && <span className="d-hors-note">hors période</span>}
     </div>
+  )
+}
+
+/**
+ * Le pré-remplissage d'un jour vide.
+ *
+ * Tous les jours ne portent pas un créneau : le vendredi et le dimanche sont
+ * couverts par la garde du samedi. Plutôt qu'un bouton qui créerait une ligne
+ * que rien ne lit — et qui entrerait en collision avec le week-end au premier
+ * calcul —, on n'affiche rien et on dit pourquoi au survol. Le découpage vient
+ * de `creneauPosableDuJour`, jamais d'un `if` recopié ici.
+ */
+function PoserSurJourVide({
+  periodeId,
+  date,
+  ferie,
+  vets,
+  onCadenas,
+}: {
+  periodeId: string
+  date: string
+  ferie: boolean
+  vets: VetCrise[]
+  onCadenas: (r: ResultatCadenas) => void
+}) {
+  const resultat = creneauPosableDuJour(date, ferie)
+
+  if (!resultat.creneau) {
+    return (
+      <span className="fixer-inerte" title={resultat.raison}>
+        —
+      </span>
+    )
+  }
+
+  return (
+    <FixerUneGarde
+      periodeId={periodeId}
+      date={date}
+      type={resultat.creneau.type}
+      libelleCreneau={resultat.creneau.libelle}
+      vets={vets}
+      onFini={onCadenas}
+    />
   )
 }
 
@@ -866,12 +997,25 @@ function LigneVet({
   role,
   titre,
   onClick,
+  fige = false,
+  cadenas = null,
 }: {
   prenom: string | null
   couleur: string | null
   role: string
   titre: string
   onClick?: () => void
+  /** B-111 — cette place est fixée par l'admin (la génération n'y touche pas). */
+  fige?: boolean
+  /**
+   * Le bouton cadenas, rendu À CÔTÉ de la ligne et non dedans.
+   *
+   * Un bouton dans un bouton est du HTML invalide, et les navigateurs le
+   * réparent chacun à leur façon — le clic finit par ouvrir la modale au lieu
+   * de poser le cadenas. La ligne et son cadenas sont donc frère et sœur dans
+   * un conteneur, jamais imbriqués.
+   */
+  cadenas?: React.ReactNode
 }) {
   const contenu = !prenom ? (
     <>
@@ -884,20 +1028,31 @@ function LigneVet({
       {role && <span className="role">{role}</span>}
     </>
   )
-  const classe = prenom ? 'vet-row' : 'vet-row empty'
-  const libelle = prenom ? `${titre} · ${prenom}` : `${titre} · place à pourvoir`
+  const classe = `${prenom ? 'vet-row' : 'vet-row empty'}${fige ? ' vet-row-fige' : ''}`
+  const libelle = prenom
+    ? `${titre} · ${prenom}${fige ? ' · fixé par l’administratrice' : ''}`
+    : `${titre} · place à pourvoir`
 
-  if (!onClick) {
-    return (
-      <span className={classe} aria-label={libelle}>
-        {contenu}
-      </span>
-    )
-  }
-  return (
+  const ligne = !onClick ? (
+    <span className={classe} aria-label={libelle}>
+      {contenu}
+    </span>
+  ) : (
     <button type="button" className={classe} onClick={onClick} aria-label={libelle}>
       {contenu}
     </button>
+  )
+
+  // Sans cadenas, le rendu est EXACTEMENT celui d'avant : pas d'enveloppe
+  // supplémentaire, donc aucun risque de décaler une grille que personne
+  // n'avait demandé de toucher.
+  if (!cadenas) return ligne
+
+  return (
+    <span className="vet-row-wrap">
+      {ligne}
+      {cadenas}
+    </span>
   )
 }
 

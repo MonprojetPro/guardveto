@@ -115,6 +115,21 @@ export interface GardeDenormalisee extends Garde {
    */
   places_sup?: PlaceSupplementaire[]
   /**
+   * B-111 — labels des places CADENASSÉES par l'admin sur cette garde
+   * (`{premier}`, `{premier,second}`…). Le moteur les pose d'emblée et compose
+   * autour ; il ne les remet jamais en cause.
+   *
+   * ⚠️ Ces labels sont ceux de la LIGNE AFFICHÉE, pas ceux de la table : sur la
+   * ligne du vendredi, la vue inverse les rôles (le 1er affiché est le 2nd de la
+   * garde), et elle inverse les labels avec eux. Les lire tels quels est donc
+   * juste — mais les réécrire vers la base demande de repasser par le créneau
+   * réel, jamais par le jour affiché.
+   *
+   * À NE PAS CONFONDRE avec `verrouille` : celui-là est la protection
+   * automatique des gardes passées ou publiées, personne ne l'a demandée.
+   */
+  places_figees?: string[]
+  /**
    * Cabinet propriétaire, exposé par la vue `planning_semaine` depuis le
    * 2026-08-21. La vue n'ayant AUCUNE RLS, c'est la seule chose qui permette à
    * ses lecteurs de se borner à leur propre cabinet.

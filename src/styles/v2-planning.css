@@ -375,6 +375,163 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 .vet-row.empty .vdot { background: transparent; border: 1.5px dashed var(--border-strong); box-shadow: none; }
 .vet-row.empty:hover { color: var(--accent-ink); border-color: var(--accent-ink); background: transparent; }
 
+/* ============================================================
+   B-111 — LE CADENAS DE L'ADMINISTRATRICE
+   ============================================================
+   Ce qu'il doit dire d'un coup d'œil : « cette place-là, la régénération n'y
+   touchera pas ». Ce qu'il ne doit surtout pas faire : ressembler à
+   `.vet-row.warned`, qui signale une règle enfreinte. Les deux peuvent tomber
+   sur la MÊME ligne — l'admin fixe quelqu'un contre une règle, c'est son droit
+   et c'est même le cas prévu. D'où deux langages visuels distincts : l'orange
+   plein reste au reproche, le cadenas parle par un liseré sobre à gauche.
+
+   Le cadenas OUVERT ne s'affiche qu'au survol et au focus. Le dessiner sur
+   chaque place transformerait la grille en champ d'icônes, et l'information
+   qui compte — « celle-ci est fixée » — se perdrait au milieu. Sur tactile,
+   où il n'y a pas de survol, il reste atteignable : `@media (hover: none)`
+   le rend visible en permanence, parce qu'une commande qui n'existe qu'au
+   survol n'existe pas sur une tablette (leçon du 2026-07). */
+.vet-row-wrap {
+  display: flex; align-items: center; gap: 2px;
+  width: 100%;
+}
+.vet-row-wrap .vet-row { flex: 1 1 auto; min-width: 0; }
+
+.cad-btn {
+  flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px;
+  padding: 0; margin-right: 2px;
+  border: none; background: transparent;
+  border-radius: 6px;
+  color: var(--soft);
+  cursor: pointer;
+  transition: opacity .15s ease, color .15s ease, background-color .15s ease;
+}
+.cad-btn svg { width: 12px; height: 12px; }
+.cad-btn:hover { background: var(--accent-soft); color: var(--accent-ink); }
+.cad-btn:disabled { opacity: 0.4; cursor: progress; }
+
+/* Fixé : toujours visible, c'est l'information. */
+.cad-fixe { color: var(--accent-ink); opacity: 1; }
+
+/* Libre : une commande, pas une information — elle s'efface. */
+.cad-libre { opacity: 0; }
+.vet-row-wrap:hover .cad-libre,
+.cad-libre:focus-visible { opacity: 1; }
+@media (hover: none) {
+  .cad-libre { opacity: 0.55; }
+}
+
+/* La place fixée elle-même : un liseré à gauche, rien de plus. Il tient à
+   côté du cadre orange d'une règle enfreinte sans se confondre avec lui. */
+.vet-row-fige {
+  box-shadow: inset 2px 0 0 0 var(--accent-ink);
+  background: var(--accent-soft);
+}
+.vet-row-fige.warned { background: rgba(233, 88, 22, 0.14); }
+
+/* ------ Pré-remplissage : fixer une garde sur un jour encore vide ------ */
+.fixer-ouvrir {
+  display: inline-flex; align-items: center; gap: 3px;
+  align-self: flex-start;
+  margin-top: 2px; padding: 2px 7px 2px 4px;
+  border: 1.5px dashed var(--border-strong); border-radius: 7px;
+  background: transparent; color: var(--t-muted);
+  font-family: var(--font-display);
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.02em;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .15s ease, color .15s ease, border-color .15s ease;
+}
+.day:hover .fixer-ouvrir,
+.fixer-ouvrir:focus-visible { opacity: 1; }
+@media (hover: none) { .fixer-ouvrir { opacity: 0.7; } }
+.fixer-ouvrir:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
+.fixer-ouvrir svg { width: 11px; height: 11px; }
+
+/* Les jours sans créneau propre (vendredi, dimanche — portés par le week-end)
+   n'offrent rien à cliquer, et disent pourquoi au survol. */
+.fixer-inerte {
+  align-self: flex-start;
+  margin-top: 2px; padding: 0 4px;
+  color: var(--t-border); font-size: 0.7rem;
+  cursor: help;
+  opacity: 0;
+}
+.day:hover .fixer-inerte { opacity: 1; }
+
+.fixer-pop {
+  margin-top: 3px;
+  border: 1px solid var(--border-strong); border-radius: 9px;
+  background: var(--surface);
+  box-shadow: var(--edge-light), 2px 4px 10px rgba(110, 62, 14, 0.16);
+  padding: 5px;
+}
+.fixer-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 6px; padding: 0 2px 4px;
+  font-family: var(--font-display);
+  font-size: 0.58rem; font-weight: 800; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--soft);
+}
+.fixer-fermer {
+  display: inline-flex; padding: 2px; border: none; background: transparent;
+  color: var(--t-muted); border-radius: 5px; cursor: pointer;
+}
+.fixer-fermer:hover { color: var(--accent-ink); background: var(--accent-soft); }
+.fixer-fermer svg { width: 11px; height: 11px; }
+
+.fixer-liste { display: flex; flex-direction: column; gap: 1px; }
+.fixer-vet {
+  display: flex; align-items: center; gap: 5px;
+  width: 100%; padding: 3px 6px;
+  border: none; background: transparent; border-radius: 7px;
+  color: var(--text); font-size: 0.7rem; font-weight: 600;
+  text-align: left; cursor: pointer;
+}
+.fixer-vet:hover { background: var(--accent-soft); color: var(--accent-ink); }
+.fixer-vet:disabled { opacity: 0.5; cursor: progress; }
+.fixer-vet .vdot {
+  width: 9px; height: 9px; border-radius: 50%; flex: none;
+  box-shadow: inset 0 0 0 1px rgba(58, 42, 28, 0.1);
+}
+.fixer-note {
+  margin: 4px 2px 0;
+  color: var(--t-muted); font-size: 0.6rem; line-height: 1.4;
+}
+
+/* ------ Ce qu'un cadenas enfreint : un constat, jamais une question ------
+   Le geste est DÉJÀ enregistré quand ce bandeau s'affiche. Il ne propose donc
+   ni « annuler » ni « confirmer » — seulement de fermer, une fois lu. */
+.cad-bandeau {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin: 0 0 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--border-strong); border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+}
+.cad-bandeau-erreur {
+  border-color: #E95816;
+  background: rgba(233, 88, 22, 0.1);
+}
+.cad-bandeau-corps { flex: 1 1 auto; min-width: 0; }
+.cad-bandeau-titre {
+  margin: 0 0 4px;
+  font-size: 0.8rem; font-weight: 700; line-height: 1.45;
+}
+.cad-bandeau ul { margin: 0; padding-left: 18px; }
+.cad-bandeau li { font-size: 0.78rem; line-height: 1.5; }
+.cad-bandeau-fermer {
+  flex: none;
+  display: inline-flex; padding: 3px;
+  border: none; background: transparent; border-radius: 6px;
+  color: var(--t-muted); cursor: pointer;
+}
+.cad-bandeau-fermer:hover { color: var(--accent-ink); background: var(--accent-soft); }
+.cad-bandeau-fermer svg { width: 14px; height: 14px; }
+
 /* ------ Congés : l'anneau de couleur « vidé » dit l'absence,
    le tireté dit « pas une garde » ------ */
 .conge-chip {
