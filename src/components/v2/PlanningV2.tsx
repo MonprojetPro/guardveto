@@ -30,7 +30,7 @@ import { estJourFerie } from '@/engine/utils'
 // (`app/(v2)/planning/page.tsx`) : les deux doivent se déplacer ensemble, sinon
 // la semaine à cheval se dessine sans son contenu.
 import { genererGrille } from '@/lib/planning/bornes-grille'
-import { placesDeGarde } from '@/lib/gardes/places'
+import { placesDeGarde, labelDonneeDePlace } from '@/lib/gardes/places'
 // B-111 — le cadenas de l'admin sur la grille.
 import {
   BoutonCadenas, FixerUneGarde, BandeauCadenas, type ResultatCadenas,
@@ -314,6 +314,24 @@ export function PlanningV2({
   function surResultatCadenas(r: ResultatCadenas) {
     setCadenasMessage(r.ok ? null : (r.erreur ?? 'Enregistrement impossible.'))
     setCadenasAvertissements(r.avertissements)
+
+    // ⚠️ UN GESTE QUI RÉUSSIT DOIT SE VOIR, MÊME SI L'AFFICHAGE SE TROMPE.
+    //
+    // Le 04/09, le cadenas comparait deux vocabulaires différents : il restait
+    // dessiné « ouvert » alors que la base enregistrait parfaitement. MiKL a
+    // donc conclu « ça ne marche pas » sur un produit qui marchait — et il n'y
+    // avait, à l'écran, strictement aucun moyen de faire la différence.
+    //
+    // La cause est corrigée. Ce toast, lui, protège de la PROCHAINE : il vient
+    // de la réponse du serveur, pas de l'état dessiné. Si l'affichage se
+    // remettait à mentir, le geste continuerait de se confirmer — et l'écart
+    // entre les deux se verrait tout de suite, au lieu de coûter une recette.
+    if (r.ok) {
+      toast.success('C’est enregistré.')
+    } else {
+      toast.error(r.erreur ?? 'Enregistrement impossible.')
+    }
+
     // On rafraîchit même en cas d'échec : l'écran peut être en retard sur la
     // base, et c'est justement l'une des causes de refus du serveur.
     router.refresh()
@@ -872,8 +890,19 @@ function CaseJour({
         const cliquable = estCliquable(g)
         // B-111 — les labels cadenassés sont ceux de la LIGNE AFFICHÉE : la vue
         // les a déjà inversés pour le vendredi, en même temps que les personnes.
-        // On peut donc les comparer au rôle affiché sans rien recalculer.
+        // On les compare donc directement, MAIS par le label de DONNÉES de la
+        // place — jamais par son rôle affiché.
+        //
+        // ⚠️ C'est le défaut trouvé en recette le 04/09 : `p.role` vaut « 1er »
+        // (affichage) quand `places_figees` porte « premier » (données). La
+        // comparaison était toujours fausse, le cadenas restait dessiné ouvert,
+        // et chaque clic reposait un cadenas au lieu de le retirer. L'écriture
+        // marchait ; elle ne se voyait simplement jamais.
         const figees = new Set(g.places_figees ?? [])
+        const estFigee = (index: number) => {
+          const label = labelDonneeDePlace(index)
+          return label !== null && figees.has(label)
+        }
         return (
           <div className="slot-card" key={g.id}>
             <span className="sc-tag">{libelleTypeGardeDb(g.type, nomsTypes)}</span>
@@ -889,14 +918,14 @@ function CaseJour({
                 role={places.length > 1 ? p.role : ''}
                 titre={`${dateCourte(date)} · ${p.role} de garde`}
                 onClick={cliquable ? () => onOuvrir(g) : undefined}
-                fige={figees.has(p.role)}
+                fige={estFigee(p.index)}
                 cadenas={
                   cadenasActifs && p.vetId ? (
                     <BoutonCadenas
                       gardeId={g.id}
                       vetId={p.vetId}
                       prenom={p.prenom}
-                      fige={figees.has(p.role)}
+                      fige={estFigee(p.index)}
                       onFini={onCadenas}
                     />
                   ) : null

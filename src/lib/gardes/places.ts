@@ -33,6 +33,37 @@ export function roleParDefaut(index: number): string {
 }
 
 /**
+ * LE LABEL DE DONNÉES d'une place — à ne jamais confondre avec `roleParDefaut`.
+ *
+ * ⚠️ IL Y A DEUX VOCABULAIRES DE RÔLES DANS CE PRODUIT, et les confondre ne
+ * provoque aucune erreur : ça rend simplement toutes les comparaisons fausses.
+ *
+ *   • AFFICHAGE   — « 1er », « 2e » : ce que l'écran montre (`roleParDefaut`).
+ *   • DONNÉES     — « premier », « second » : ce que la base stocke, ce que le
+ *                   moteur manipule, et ce que porte `gardes.places_figees`.
+ *
+ * PAYÉ LE 2026-09-04, en recette de B-111. Le cadenas comparait le label
+ * cadenassé (`'premier'`) au rôle AFFICHÉ (`'1er'`) : la comparaison était
+ * toujours fausse, donc le cadenas restait dessiné « ouvert » quoi qu'il
+ * arrive. Chaque clic renvoyait alors « poser » au lieu de « libérer » —
+ * l'écriture en base RÉUSSISSAIT, et MiKL voyait « rien ne se passe ».
+ *
+ * C'est exactement la famille du piège déjà documenté dans `placesAttendues.ts`
+ * (« deux vocabulaires de créneaux qui ne se parlent pas ») : rapprocher deux
+ * mondes par égalité de chaîne alors qu'ils ne nomment pas les choses pareil.
+ *
+ * `null` au-delà de la 2e place : ces places vivent dans `garde_placements`
+ * avec leurs propres labels de catalogue, et il n'existe aucune correspondance
+ * par défaut à inventer. Rendre un label faux serait pire que rendre `null` —
+ * l'appelant saurait au moins qu'il ne sait pas.
+ */
+export function labelDonneeDePlace(index: number): string | null {
+  if (index === 0) return 'premier'
+  if (index === 1) return 'second'
+  return null
+}
+
+/**
  * placesDeGarde — toutes les places POURVUES d'une garde, dans l'ordre.
  *
  * Les places 0 et 1 viennent des colonnes `premier_` et `second_` : ce sont
