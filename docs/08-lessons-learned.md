@@ -5,6 +5,27 @@
 
 ---
 
+## 2026-09-04 — « Rien ne se passe » : ça marchait, ça ne se voyait pas (deux vocabulaires de rôles)
+
+**Contexte :** recette de B-111. MiKL clique sur le cadenas d'une place : *« rien ne se passe »*. Deux tests, deux dates, même constat.
+
+**Ce que la mesure a dit, et qui inverse le problème :** la base montrait `places_figees = {second, premier}` sur la garde du 24/10, écrit à 09:33. **Ses deux clics avaient parfaitement enregistré.** Le geste fonctionnait depuis le début.
+
+**Cause racine (prouvée par le code, après la base) :** `gardes.places_figees` stocke `'premier'` / `'second'` — le vocabulaire des **données**. L'écran comparait au rôle rendu par `roleParDefaut`, qui vaut `'1er'` / `'2e'` — le vocabulaire de l'**affichage**. La comparaison était donc toujours fausse : le cadenas restait dessiné « ouvert » quoi qu'il arrive, et chaque clic renvoyait « poser » au lieu de « libérer ». D'où l'accumulation silencieuse des deux cadenas.
+
+**Trois pistes écartées par la mesure AVANT d'arriver là** — et c'est ce qui a évité trois correctifs inutiles : le déploiement (statut Vercel du commit : `success`), la RLS (droits admin complets, `cabinet_id` présent sur les 60 gardes), le cache de schéma PostgREST (`GET ?select=places_figees` → 200).
+
+**Fix :** `labelDonneeDePlace(index)` rend le label de données, et **`null`** au-delà de la 2ᵉ place — rendre un label faux serait pire que rendre `null`, l'appelant saurait au moins qu'il ne sait pas. Verrouillé par `deux-vocabulaires-de-roles.test.ts`, qui ne teste pas « ça marche » mais **que les deux vocabulaires sont distincts**.
+
+**À retenir / réutiliser :**
+1. **Le pire symptôme n'est pas l'erreur, c'est le succès invisible.** Aucun message, aucun test rouge, un produit qui a l'air cassé pendant qu'il enregistre correctement. On cherche alors le défaut du mauvais côté — j'ai commencé par soupçonner le déploiement et les droits.
+2. **Quand l'utilisateur dit « ça ne marche pas », vérifier D'ABORD l'état réel de la donnée.** Une requête en base a retourné tout le diagnostic en dix secondes et a écarté trois heures de fausses pistes.
+3. **Un geste qui réussit doit se voir même si l'affichage se trompe.** Le toast ajouté vient de la *réponse du serveur*, pas de l'état dessiné : si l'affichage se remet à mentir, l'écart se verra tout de suite. Un retour construit sur ce qu'on croit afficher ne prouve rien.
+4. **Troisième occurrence du même piège sur ce projet** : `placesAttendues.ts` (créneaux `'semaine'` vs `'semaine_soir'`), `chargerPlacesFigees.ts` (`'ferie'` → `'semaine_soir'`), et maintenant les rôles. **Deux mondes qui ne nomment pas les choses pareil ne se rapprochent jamais par égalité de chaîne** — il faut une fonction de traduction nommée, et un test qui la verrouille.
+5. **Corollaire trouvé dans la foulée :** en accélérant l'affichage (renvoyer le résultat plutôt que tout recharger), on allait re-créer ce bug par la porte de derrière — la réponse portait les rôles de la garde, la ligne du vendredi affiche les rôles inversés. La parade : **échanger des PERSONNES, pas des rôles.** Un identifiant de vétérinaire ne s'inverse jamais.
+
+---
+
 ## 2026-09-04 — Un contrôle mutuel entre créneaux ne sait pas lire une équipe INCOMPLÈTE
 
 **Contexte :** lot 1 de B-111 (places cadenassées par l'admin). Poser un cadenas sur le **1er d'un week-end** rendait toute la génération impossible — pas dégradée, impossible. Cadenasser une nuit de semaine passait sans problème.

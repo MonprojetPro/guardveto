@@ -10,7 +10,7 @@
 | Projet | GuardVeto |
 | Proprietaire | **MonProjetPro** (produit propre, meme modele que `foxeo-one` : MPP possede la base technique). Le Cabinet veterinaire du Val d'Allier (Anne-Sophie) est un **client abonne**, pas proprietaire — decide par MiKL le 24/08, tranche apres une question ouverte a tort par OTTO. Repo `MonprojetPro/guardveto` confirme au bon endroit. |
 | Phase | Build → bascule en cours vers la mise en service reelle chez le premier client abonne, Val d'Allier |
-| Derniere mise a jour | 2026-09-03 par OTTO (2e archivage : board 110 617 → 76 244 octets · **0 identifiant perdu sur 121** et **aucun sorti du board**, verifie par `comm` · detail → archive 23) |
+| Derniere mise a jour | 2026-09-04 par OTTO (B-111 livre en 4 lots PUIS recette : 2 correctifs le meme jour. 5 commits `c775e36` → `f8e00f9`. **⚠️ BOARD A 111 Ko, coupe a 120 — archivage a demander a MiKL des la reprise.** 4 items ouverts : B-113, B-114, B-116, B-112) |
 | Prochain jalon | Mise en service Val d'Allier (rollout, section 3) — pas de date cible fixee |
 
 **Perimetre par defaut : `A qualifier`.** Jamais `Devis` par defaut.
