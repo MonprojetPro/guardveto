@@ -148,34 +148,48 @@ function PlaceGarde({
             <span className="dot" style={stylePastille(titulaire.couleur)}>
               {titulaire.prenom.charAt(0)}
             </span>
-            {titulaire.prenom} {titulaire.nom}
+            <span className="gm-nom">{titulaire.prenom} {titulaire.nom}</span>
           </span>
         ) : (
           <span className="gm-current none">Aucun · à pourvoir</span>
         )}
 
-        {onDeclarerAbsent && titulaire && (
-          <button
-            type="button"
-            className="gm-absent-link"
-            title={`Déclarer ${titulaire.prenom} absent·e`}
-            onClick={() => onDeclarerAbsent(titulaire.id)}
-          >
-            <UserMinus className="w-3.5 h-3.5" />
-            Absent·e
-          </button>
-        )}
+        {/* ── B-113 · LES COMMANDES SONT GROUPÉES, JAMAIS DISPERSÉES ──
+            MiKL, 04/09 : sur sa capture, « Réattribuer » était sur une ligne
+            en dessous du nom pour le 1er de garde, et sur la même ligne pour
+            le 2nd. Les deux places passent pourtant par CE composant : la
+            différence ne venait pas de la construction mais du `flex-wrap`,
+            qui cassait la ligne dès que le prénom-nom était un peu long.
+            Le défaut se serait donc déplacé d'un vétérinaire à l'autre.
 
-        {modeEdition && (
-          <button
-            type="button"
-            className="gm-reassign"
-            aria-expanded={ouvert}
-            onClick={onToggle}
-          >
-            {ouvert ? 'Fermer' : 'Réattribuer'}
-          </button>
-        )}
+            Les actions vivent maintenant dans un bloc à part, poussé à
+            droite et insécable. C'est le NOM qui cède (troncature), jamais
+            les boutons : un nom coupé reste lisible, un bouton qui saute de
+            ligne fait douter de l'écran entier. */}
+        <div className="gm-slot-actions">
+          {onDeclarerAbsent && titulaire && (
+            <button
+              type="button"
+              className="gm-absent-link"
+              title={`Déclarer ${titulaire.prenom} absent·e`}
+              onClick={() => onDeclarerAbsent(titulaire.id)}
+            >
+              <UserMinus className="w-3.5 h-3.5" />
+              Absent·e
+            </button>
+          )}
+
+          {modeEdition && (
+            <button
+              type="button"
+              className="gm-reassign"
+              aria-expanded={ouvert}
+              onClick={onToggle}
+            >
+              {ouvert ? 'Fermer' : 'Réattribuer'}
+            </button>
+          )}
+        </div>
       </div>
 
       {modeEdition && ouvert && (
@@ -553,7 +567,7 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
                       <span className="dot" style={stylePastille(p.couleur)}>
                         {(p.prenom ?? '?').charAt(0)}
                       </span>
-                      {p.prenom} {p.nom}
+                      <span className="gm-nom">{p.prenom} {p.nom}</span>
                       {p.vetId === moiVetId && <em className="gm-moi">— toi</em>}
                     </span>
                   </div>
@@ -791,19 +805,24 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
                       <span className="dot" style={stylePastille(p.couleur)}>
                         {p.prenom.charAt(0)}
                       </span>
-                      {p.prenom} {p.nom}
+                      <span className="gm-nom">{p.prenom} {p.nom}</span>
                     </span>
-                    {onDeclarerAbsent && garde.periode_statut === 'publie' && (
-                      <button
-                        type="button"
-                        className="gm-absent-link"
-                        title={`Déclarer ${p.prenom} absent·e`}
-                        onClick={() => onDeclarerAbsent(garde.date, p.id)}
-                      >
-                        <UserMinus className="w-3.5 h-3.5" />
-                        Absent·e
-                      </button>
-                    )}
+                    {/* Même groupe d'actions que les places 1 et 2 (B-113) :
+                        réparer deux blocs sur trois aurait juste déplacé
+                        l'impression d'écran à moitié fini plus bas. */}
+                    <div className="gm-slot-actions">
+                      {onDeclarerAbsent && garde.periode_statut === 'publie' && (
+                        <button
+                          type="button"
+                          className="gm-absent-link"
+                          title={`Déclarer ${p.prenom} absent·e`}
+                          onClick={() => onDeclarerAbsent(garde.date, p.id)}
+                        >
+                          <UserMinus className="w-3.5 h-3.5" />
+                          Absent·e
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

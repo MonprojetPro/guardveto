@@ -774,6 +774,13 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   animation: bubbleIn .3s ease both;
 }
 
+/* ⚠️ Le `margin-bottom` ci-dessous n'existe qu'ICI, et il n'est pas
+   décoratif : plus bas dans ce fichier, l'espacement entre places passe par
+   `.gm-section + .gm-section`, qui ne s'applique PAS quand le bouton
+   « Alterner les deux rôles » s'intercale entre les deux — le cas normal en
+   mode édition. Les autres règles de ce bloc, elles, étaient de purs
+   doublons intégralement écrasés par la déclaration plus bas : supprimées
+   le 04/09 (B-113) après vérification propriété par propriété. */
 .gm-section {
   border: 1px solid var(--t-border);
   border-radius: var(--r-md);
@@ -781,30 +788,7 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   margin-bottom: 10px;
   background: var(--surface);
 }
-.gm-section.disabled { opacity: 0.55; }
-.gm-slot-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.gm-slot-label {
-  font-family: var(--font-display);
-  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.07em;
-  text-transform: uppercase; color: var(--soft);
-  flex: 1 1 150px;
-}
 .gm-slot-label small { display: block; font-family: var(--font-body); font-weight: 500; text-transform: none; letter-spacing: 0; font-size: 0.68rem; color: var(--soft); margin-top: 1px; }
-.gm-current {
-  display: inline-flex; align-items: center; gap: 7px;
-  font-size: 0.88rem; font-weight: 700;
-}
-.gm-current .dot { width: 14px; height: 14px; border-radius: 50%; flex: none; }
-.gm-current.none { color: var(--t-muted); font-weight: 600; font-style: italic; }
-.gm-reassign {
-  border: 1px solid var(--border-strong);
-  background: var(--surface-2); color: var(--t-muted);
-  border-radius: 999px; font-size: 0.74rem; font-weight: 700;
-  padding: 7px 13px; min-height: 34px;
-}
-.gm-reassign:hover:not(:disabled) { color: var(--accent-ink); border-color: var(--accent-ink); }
-.gm-reassign[aria-expanded="true"] { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent-ink); }
-.gm-reassign:disabled { opacity: 0.5; cursor: default; }
 .gm-done { font-size: 0.76rem; color: var(--ok); font-weight: 700; animation: bubbleIn .3s ease both; }
 
 .av-list { list-style: none; margin-top: 10px; border-top: 1px dashed var(--t-border); padding-top: 6px; animation: bubbleIn .25s ease both; }
@@ -1081,7 +1065,15 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 }
 .gm-section + .gm-section { margin-top: 10px; }
 .gm-section.disabled { opacity: 0.55; }
-.gm-slot-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* ── B-113 · UNE LIGNE DE PLACE NE SE CASSE PLUS TOUTE SEULE ──────────
+   Elle était en `flex-wrap: wrap` : dès que le prénom-nom dépassait, le
+   bouton « Réattribuer » passait à la ligne — pour le 1er de garde et pas
+   pour le 2nd, alors que les deux sortent du MÊME composant. Le défaut
+   n'appartenait donc à aucune des deux places : il suivait la longueur du
+   nom et se serait déplacé d'un vétérinaire à l'autre.
+   Désormais la ligne tient, et c'est le nom qui cède (troncature). */
+.gm-slot-row { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
 .gm-slot-label {
   font-family: var(--font-display);
   font-size: 0.7rem; font-weight: 700; letter-spacing: 0.07em;
@@ -1089,12 +1081,24 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   flex: 0 0 auto;
 }
 /* C'est le nom du titulaire qui prend la place restante : le libellé et lui
-   se suivent, les actions restent groupées à droite. */
-.gm-current { flex: 1 1 auto; }
+   se suivent, les actions restent groupées à droite. `min-width: 0` est ce
+   qui AUTORISE la troncature : sans lui, un élément flex refuse de passer
+   sous la largeur de son contenu et repousse les boutons hors de la ligne. */
+.gm-current { flex: 1 1 auto; min-width: 0; }
 .gm-current {
   display: inline-flex; align-items: center; gap: 7px;
   font-size: 0.88rem; font-weight: 700; color: var(--text);
 }
+.gm-nom { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Les commandes de la place : groupées, poussées à droite, insécables.
+   Un nom coupé reste lisible ; un bouton qui saute de ligne donne
+   l'impression d'un écran à moitié fini. */
+.gm-slot-actions {
+  display: flex; align-items: center; gap: 8px;
+  margin-left: auto; flex: 0 0 auto;
+}
+.gm-slot-actions:empty { display: none; }
 .gm-current .dot {
   width: 22px; height: 22px; border-radius: 50%; flex: none;
   display: inline-flex; align-items: center; justify-content: center;
@@ -1130,6 +1134,15 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   padding: 4px 8px; border-radius: 999px;
 }
 .gm-absent-link:hover { color: var(--danger); background: var(--danger-soft); }
+
+/* Sur un écran étroit, la ligne n'a plus la place : on empile. La bascule
+   tient à la LARGEUR DE L'ÉCRAN, jamais à la longueur d'un nom — les deux
+   places basculent donc ensemble, ce qui était tout le sujet de B-113. */
+@media (max-width: 560px) {
+  .gm-slot-row { flex-wrap: wrap; }
+  .gm-current { flex: 1 1 100%; }
+  .gm-slot-actions { margin-left: 0; }
+}
 
 /* -- La liste des vétérinaires : une grille en colonnes, pas des cartes --
    Colonnes : pastille de couleur · nom · état · raison · impact compteur.
