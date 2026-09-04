@@ -53,6 +53,10 @@ import {
 import { penaliteCompositionCandidat, penaliteRoleInterditCandidat } from './rules/composition-equipe'
 import { penaliteDesiderataCandidat, biaisVolumeCandidat } from './rules/desiderata'
 import { penaliteSeulementAvecCandidat } from './rules/seulement-avec'
+import {
+  indexerFigees, stepsHorsFigees, attributionsDesFigees, reposerFigees, estFigee,
+  prioriserCasesFigees, type PlaceFigee, type IndexFigees,
+} from './figees'
 import type { HistoriqueFetesResolu } from './historique-fete'
 import type { DiagnosticImpasse } from './diagnostic'
 import {
@@ -160,6 +164,19 @@ export interface SolverInput {
    * historique BYTE-IDENTIQUE (les golden tests passent sans modification).
    */
   contexteAnterieur?: AttributionGarde[]
+  /**
+   * B-111 — LES PLACES CADENASSÉES PAR L'ADMIN. Elles sont posées d'emblée,
+   * jamais reprises par aucune phase, et comptées dans l'équité comme dans les
+   * règles de rythme (c'est tout l'objet : le moteur compose AUTOUR).
+   *
+   * Absent/vide → comportement historique byte-identique (les primitives de
+   * `figees.ts` rendent l'entrée telle quelle quand l'index est vide).
+   *
+   * ⚠️ Une place figée n'est PAS un `contexteAnterieur` : celui-ci ne crée aucun
+   * slot et ne compte dans aucune équité, alors qu'une figée occupe une place
+   * réelle de la période et pèse sur tous les compteurs.
+   */
+  placesFigees?: PlaceFigee[]
   /**
    * B-060 — la passe de RATTRAPAGE qui reprend les cases vides une fois le
    * planning posé. Absente → aucune reprise.
@@ -997,15 +1014,25 @@ export function remplirAuMieux(input: SolverInput): RemplissageAuMieux {
     ? DEFAULT_ROLE_AVANTAGE_FINANCIER
     : input.roleAvantageFinancier
 
-  const steps = genererSteps(dateDebut, dateFin, saison, input.nbVetosSemaineSoir, input.creneaux)
+  // B-111 — même principe qu'au seed : les cadenassées sont le point de départ,
+  // et ne figurent pas dans ce qu'il reste à pourvoir. Elles ne peuvent donc pas
+  // non plus être recensées comme « cases vides » — ce qu'elles ne sont pas.
+  const figees = indexerFigees(input.placesFigees)
+  const tousLesSteps = genererSteps(dateDebut, dateFin, saison, input.nbVetosSemaineSoir, input.creneaux)
+  const steps = stepsHorsFigees(tousLesSteps, figees)
 
-  let planning: PlanningPartiel = { attributions: [] }
+  let planning: PlanningPartiel = { attributions: attributionsDesFigees(figees, tousLesSteps) }
   const creneauxVides: CreneauVide[] = []
 
   // On avance GROUPE par groupe, et non place par place (B-059) : un vendredi
   // soir et son week-end se décident ensemble, comme les deux places d'un même
   // créneau. Décidés séparément, le premier choix condamne le second.
-  for (const groupe of grouperStepsLies(steps, structure)) {
+  for (const groupeBrut of grouperStepsLies(steps, structure)) {
+    // Même raison qu'au seed : dans un bloc vendredi ↔ week-end dont une place
+    // est cadenassée, la place restante de CETTE case se décide en premier.
+    // `resoudreGroupe` explore dans l'ordre reçu, et l'affectation qu'il rend
+    // est indexée dessus — on garde donc le groupe réordonné pour la relire.
+    const groupe = prioriserCasesFigees(groupeBrut, figees)
     const choix = resoudreGroupe(
       groupe, planning, vets, bonusMalus, weights, structure, calendrier,
       roleAvantage, input.contexteAnterieur,
@@ -1132,10 +1159,17 @@ export function rattraperCasesVides(
     : input.roleAvantageFinancier
   const calendrier = input.calendrier
 
-  const steps = genererSteps(
+  // B-111 — une place cadenassée n'est jamais « une case vide à combler » : elle
+  // sort de `steps`, donc ni le recensement ni la reprise ne la voient comme un
+  // trou. Les groupes, eux, gardent TOUS leurs steps : la reconstruction du
+  // voisinage doit continuer de raisonner sur des blocs entiers (B-059), et
+  // c'est `essayerDePourvoir` qui protège les places figées à l'intérieur.
+  const figees = indexerFigees(input.placesFigees)
+  const tousLesSteps = genererSteps(
     input.dateDebut, input.dateFin, input.saison, input.nbVetosSemaineSoir, input.creneaux,
   )
-  const groupes = grouperStepsLies(steps, structure)
+  const steps = stepsHorsFigees(tousLesSteps, figees)
+  const groupes = grouperStepsLies(tousLesSteps, structure)
 
   const echeance = Date.now() + (options?.budgetMs ?? 15_000)
   const tempsEcoule = () => Date.now() > echeance
@@ -1173,7 +1207,7 @@ export function rattraperCasesVides(
 
         const essai = essayerDePourvoir(
           step, candidat, planning, groupes, vets, input.bonusMalus, weights,
-          structure, calendrier, roleAvantage, input.contexteAnterieur,
+          structure, calendrier, roleAvantage, input.contexteAnterieur, figees,
         )
         if (!essai) continue
 
@@ -1260,6 +1294,7 @@ function equilibrerRolesWeekEnd(
 
   const vets = normaliserContraintesVets(input.vets)
   const structure = input.structureConfig ?? DEFAULT_STRUCTURE_CONFIG
+  const figees = indexerFigees(input.placesFigees)
 
   /** L'écart entre le plus et le moins servi sur le rôle avantagé. */
   const desequilibre = (p: PlanningPartiel): number => {
@@ -1282,6 +1317,12 @@ function equilibrerRolesWeekEnd(
       const places = we.placements
       if (places.length < 2) continue
       if (places.some((p) => !p.vetId)) continue // week-end incomplet : on n'y touche pas
+
+      // B-111 — le cadenas porte sur la PLACE, pas sur la personne : échanger le
+      // 1er et le 2nd d'un week-end dont une place est cadenassée déplacerait
+      // précisément ce que l'admin a fixé. On laisse le bloc tranquille — y
+      // compris le vendredi lié, que `echangerRolesDuBloc` retournerait avec lui.
+      if (blocFige(courant, we.date, structure, figees)) continue
 
       const essai = echangerRolesDuBloc(courant, we.date, structure)
       if (!essai) continue
@@ -1307,23 +1348,54 @@ function equilibrerRolesWeekEnd(
  * (le vendredi soir), pour rester cohérent avec l'inversion R8.
  * `null` si le bloc n'est pas échangeable en l'état.
  */
-function echangerRolesDuBloc(
+function clesDuBloc(
   planning: PlanningPartiel,
   dateWeekEnd: string,
   structure: StructureConfig,
-): PlanningPartiel | null {
-  const aEchanger = new Set<string>([`${dateWeekEnd}|weekend`])
+): Set<string> {
+  const cles = new Set<string>([`${dateWeekEnd}|weekend`])
 
   for (const rel of relationsEffectives(structure)) {
     if (rel.cibleCode !== 'weekend') continue
     for (let k = 1; k <= FENETRE_GROUPE_JOURS; k++) {
       const cle = `${addDays(dateWeekEnd, -k)}|${rel.sourceCode}`
       if (planning.attributions.some((a) => `${a.date}|${a.type}` === cle)) {
-        aEchanger.add(cle)
+        cles.add(cle)
         break
       }
     }
   }
+
+  return cles
+}
+
+/**
+ * B-111 — le bloc contient-il au moins une place cadenassée ?
+ *
+ * On interroge le MÊME ensemble de cases que l'échange retournerait : le
+ * week-end et le créneau lié. Tester le seul week-end laisserait échanger les
+ * rôles d'un vendredi cadenassé, que R8 emporte avec lui.
+ */
+function blocFige(
+  planning: PlanningPartiel,
+  dateWeekEnd: string,
+  structure: StructureConfig,
+  figees: IndexFigees,
+): boolean {
+  if (figees.size === 0) return false
+  const cles = clesDuBloc(planning, dateWeekEnd, structure)
+  return planning.attributions.some(
+    (a) => cles.has(`${a.date}|${a.type}`) &&
+      a.placements.some((p) => estFigee(figees, a.date, a.type, p.role)),
+  )
+}
+
+function echangerRolesDuBloc(
+  planning: PlanningPartiel,
+  dateWeekEnd: string,
+  structure: StructureConfig,
+): PlanningPartiel | null {
+  const aEchanger = clesDuBloc(planning, dateWeekEnd, structure)
 
   let touche = false
   const attributions = planning.attributions.map((a) => {
@@ -1409,6 +1481,9 @@ function essayerDePourvoir(
   calendrier: CalendrierResolu | undefined,
   roleAvantage: string | null,
   contexteAnterieur: AttributionGarde[] | undefined,
+  // B-111 — les places cadenassées : ni défaites par la libération du
+  // voisinage, ni re-choisies par la reconstruction qui suit.
+  figees: IndexFigees,
 ): PlanningPartiel | null {
   const debut = addDays(cible.date, -FENETRE_RATTRAPAGE_JOURS)
   const fin = addDays(cible.date, FENETRE_RATTRAPAGE_JOURS)
@@ -1420,10 +1495,15 @@ function essayerDePourvoir(
   const aRefaire = groupes.filter(dansLaFenetre)
   const datesLiberees = new Set(aRefaire.flatMap((g) => g.map((s) => `${s.date}|${s.type}`)))
 
-  // Planning amputé du voisinage (le reste de la période ne bouge pas).
-  let essai: PlanningPartiel = {
-    attributions: planning.attributions.filter((a) => !datesLiberees.has(`${a.date}|${a.type}`)),
-  }
+  // Planning amputé du voisinage (le reste de la période ne bouge pas) — puis
+  // les places cadenassées y sont remises (B-111). Le rattrapage défait tout
+  // l'entourage d'une case vide : sans cette remise, combler un trou du mardi
+  // effacerait la garde que l'admin avait fixée le lundi.
+  let essai: PlanningPartiel = reposerFigees(
+    { attributions: planning.attributions.filter((a) => !datesLiberees.has(`${a.date}|${a.type}`)) },
+    figees,
+    groupes.flat(),
+  )
 
   // La case cible d'abord : c'est elle qu'on cherche à pourvoir, elle passe
   // donc avant tout le monde dans la reconstruction.
@@ -1438,8 +1518,11 @@ function essayerDePourvoir(
 
   // Puis on reconstruit le voisinage, la place forcée étant désormais figée.
   for (const groupe of aRefaire) {
-    const restants = groupe.filter(
-      (s) => !(s.date === cible.date && s.type === cible.type && s.role === cible.role),
+    const restants = prioriserCasesFigees(
+      stepsHorsFigees(groupe, figees).filter(
+        (s) => !(s.date === cible.date && s.type === cible.type && s.role === cible.role),
+      ),
+      figees,
     )
     if (restants.length === 0) continue
 
@@ -1638,7 +1721,19 @@ function genererSeedGreedy(input: SolverInput, avecDiagnostic = true): SolveResu
     : input.roleAvantageFinancier
   const t0 = Date.now()
 
-  const steps = genererSteps(dateDebut, dateFin, saison, input.nbVetosSemaineSoir, input.creneaux)
+  // B-111 — les places cadenassées sont POSÉES avant que la recherche commence,
+  // et retirées de ce qu'il reste à pourvoir. Deux effets, tous deux voulus :
+  // le backtracking ne peut plus les remettre en cause, et tout ce qu'il pose
+  // ensuite les VOIT (compteurs d'équité, repos, enchaînements, duos).
+  const figees = indexerFigees(input.placesFigees)
+  const tousLesSteps = genererSteps(dateDebut, dateFin, saison, input.nbVetosSemaineSoir, input.creneaux)
+  // Les places restantes d'une case à moitié cadenassée passent en premier :
+  // sans ça, R9 juge le créneau lié contre une équipe incomplète et bloque tout
+  // (cf. `prioriserCasesFigees`, qui porte la mesure et le raisonnement).
+  const steps = prioriserCasesFigees(stepsHorsFigees(tousLesSteps, figees), figees)
+  const planningDepart: PlanningPartiel = {
+    attributions: attributionsDesFigees(figees, tousLesSteps),
+  }
   const deepest = { value: -1 }
   const blocage: { value: Blocage | null } = { value: null }
 
@@ -1658,7 +1753,7 @@ function genererSeedGreedy(input: SolverInput, avecDiagnostic = true): SolveResu
   const planning = backtrack(
     steps,
     0,
-    { attributions: [] },
+    planningDepart,
     vets,
     bonusMalus,
     weights,
@@ -2032,6 +2127,8 @@ function lnsHillClimbing(
     ? DEFAULT_ROLE_AVANTAGE_FINANCIER
     : input.roleAvantageFinancier
   const contexteAnterieur = input.contexteAnterieur
+  // B-111 — les places cadenassées, que la destroy-repair ne doit jamais perdre.
+  const figees = indexerFigees(input.placesFigees)
   // Backstop temps : actif UNIQUEMENT si fourni > 0. Sinon, aucune coupe chrono
   // (déterministe). Le sentinel 0 ne nous parvient jamais (intercepté en amont).
   const timeoutMs =
@@ -2076,11 +2173,17 @@ function lnsHillClimbing(
         break
       }
 
-      // Détruire : supprimer la semaine
-      const partial = supprimerSemaine(meilleur, lundi)
-      const steps = genererStepsSemaine(lundi, saison, input.nbVetosSemaineSoir, input.creneaux).filter(
-        (s) => s.date >= dateDebut && s.date <= dateFin
-      )
+      // Détruire : supprimer la semaine — SAUF les places cadenassées, qui sont
+      // remises aussitôt (B-111). Sans ce `reposerFigees`, le LNS effacerait le
+      // choix de l'admin une semaine sur deux, et la réparation reposerait
+      // quelqu'un d'autre à sa place : le cadenas tiendrait à l'écriture, mais
+      // le planning aurait été composé sans lui.
+      const tousLesStepsSemaine = genererStepsSemaine(
+        lundi, saison, input.nbVetosSemaineSoir, input.creneaux,
+      ).filter((s) => s.date >= dateDebut && s.date <= dateFin)
+
+      const partial = reposerFigees(supprimerSemaine(meilleur, lundi), figees, tousLesStepsSemaine)
+      const steps = stepsHorsFigees(tousLesStepsSemaine, figees)
       if (steps.length === 0) continue
 
       // Réparer : greedy LNS sur la semaine

@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-09-04 — Un contrôle mutuel entre créneaux ne sait pas lire une équipe INCOMPLÈTE
+
+**Contexte :** lot 1 de B-111 (places cadenassées par l'admin). Poser un cadenas sur le **1er d'un week-end** rendait toute la génération impossible — pas dégradée, impossible. Cadenasser une nuit de semaine passait sans problème.
+
+**Cause racine (prouvée par sonde, pas déduite) :** le rapport d'impasse nommait le coupable — `R9 : X n'est pas dans le duo WE — le vendredi soir doit avoir les mêmes vétérinaires`. R9 compare un candidat à l'équipe du créneau lié **dès que cette équipe existe, sans vérifier qu'elle est complète**. Un week-end à moitié cadenassé est une équipe d'**une seule personne** : plus aucun candidat n'était admissible au vendredi, et la seule personne autorisée était refusée à son tour par l'inversion des rôles (R8). Impasse fermée de partout, alors que la solution était évidente — désigner d'abord le second du week-end.
+
+En génération ordinaire, le cas ne se présentait jamais : quand le vendredi se décide, le week-end n'existe pas encore. **Le défaut de raisonnement de R9 était donc invisible depuis toujours** ; les cadenas n'ont fait que créer l'état intermédiaire qui le révèle.
+
+**Fix — et surtout ce qu'on n'a PAS fait :** on n'a **pas** assoupli R9 en lui faisant ignorer les équipes incomplètes. Ç'aurait été plus permissif au mauvais endroit : le vendredi aurait pu se poser avec des personnes qui ne seront jamais du week-end, et le cadenas ne pouvant pas s'adapter, on aurait produit exactement l'incohérence que R9 existe pour empêcher. On lui donne ce qu'elle sait lire — une équipe complète — en traitant **en premier** les places restantes d'une case partiellement cadenassée (`prioriserCasesFigees`, `src/engine/figees.ts`).
+
+**Piège dans le piège :** la même correction a dû être appliquée **trois fois**, à trois endroits qui décident un ordre — le backtracking du seed, les blocs du remplissage au mieux (`resoudreGroupe` explore dans l'ordre reçu) et la reconstruction du voisinage de la reprise. Corriger le seul seed laissait le chemin de secours silencieusement troué : le cadenas tenait, mais le vendredi lié restait vide.
+
+**À retenir / réutiliser :**
+1. **Une règle qui compare à un état partagé doit dire ce qu'elle fait d'un état INCOMPLET.** « X n'est pas dans le duo » est faux tant que le duo n'est pas formé. Même famille que la leçon du 02/09 (« une place à `null` existe encore pour R9 »).
+2. **Quand une contrainte bloque, regarder l'ORDRE avant de toucher à la règle.** Assouplir un gardien pour débloquer un cas, c'est déplacer le défaut là où plus personne ne le verra.
+3. **Une correction d'ordre se pose partout où un ordre est décidé** — un `grep` sur la fonction corrigée ne suffit pas, il faut lister les chemins qui *choisissent* une séquence.
+4. La cause n'a pas été trouvée en relisant le code mais en **faisant parler le rapport d'impasse**. Le moteur savait déjà dire pourquoi il échouait.
+
+---
+
 ## 2026-06-04 — Moteur : binôme de semaine = même véto en 1er ET 2nd (contrainte dure manquante)
 
 **Contexte :** recette, génération d'un planning hiver. 38 des 48 gardes de semaine avaient `premier_id = second_id` (le même véto en 1er et 2nd). Les week-ends étaient corrects.
