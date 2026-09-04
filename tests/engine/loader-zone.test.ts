@@ -66,6 +66,7 @@ function makeBuilder(table: string) {
   builder.lte = (col: string, val: unknown) => { calls.filters[`${table}.lte.${col}`] = val; return builder }
   builder.gte = (col: string, val: unknown) => { calls.filters[`${table}.gte.${col}`] = val; return builder }
   builder.is = chain // le socle se lit `.is('profil_id', null)` (2026-08-04)
+  builder.neq = chain // B-111 — lecture des places cadenassées (`neq('places_figees','{}')`)
   builder.lt = chain
   builder.or = chain
   builder.order = chain

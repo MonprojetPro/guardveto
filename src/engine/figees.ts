@@ -210,6 +210,29 @@ export function attributionsDesFigees(
 }
 
 /**
+ * Les cadenas qui ne correspondent à AUCUNE place de la période.
+ *
+ * Ils sont ignorés par tout le reste du module (cf. en-tête), et c'est le bon
+ * comportement — mais les ignorer EN SILENCE serait exactement le défaut que ce
+ * produit combat. L'admin a posé un cadenas ; s'il ne s'applique nulle part, il
+ * doit l'apprendre, pas le découvrir en constatant que la personne a changé.
+ *
+ * Causes possibles : créneau retiré du catalogue depuis la pose, effectif de
+ * nuit réduit (la 2ᵉ place n'existe plus), date sortie des bornes de la période,
+ * rôle renommé.
+ */
+export function figeesSansPlace(
+  index: IndexFigees,
+  steps: readonly StepMinimal[],
+): PlaceFigee[] {
+  if (index.size === 0) return []
+  const attendues = new Set(steps.map((s) => clePlaceFigee(s.date, s.type, s.role)))
+  return [...index.entries()]
+    .filter(([cle]) => !attendues.has(cle))
+    .map(([, figee]) => figee)
+}
+
+/**
  * Remet les places figées sur un planning — après une amputation, une
  * reconstruction, ou par simple précaution.
  *

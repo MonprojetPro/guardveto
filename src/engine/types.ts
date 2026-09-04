@@ -260,6 +260,17 @@ export interface ContexteSimulation {
    * mais il n'atteindrait jamais le solver). Absent → byte-identique.
    */
   contexteAnterieur?: AttributionGarde[]
+  /**
+   * B-111 — les places CADENASSÉES par l'admin sur cette période. Le moteur les
+   * pose d'emblée et compose autour (équité, rythmes, enchaînements).
+   * ⚠️ MÊME piège de propagation que ci-dessus : `resoudreContexte` reconstruit
+   * cet objet champ par champ. Un oubli ici ferait régénérer par-dessus les
+   * choix de l'admin **pendant que l'écran continue d'afficher les cadenas** —
+   * le défaut serait donc parfaitement invisible.
+   */
+  placesFigees?: import('./figees').PlaceFigee[]
+  /** B-111 — cadenas sans titulaire (transportés pour être DITS, jamais lus par le moteur). */
+  placesFigeesSansTitulaire?: { date: string; type: string; role: string }[]
 }
 
 // Résultat d'une vérification

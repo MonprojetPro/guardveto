@@ -73,6 +73,8 @@ function makeBuilder(table: string) {
   b.select = (cols?: string) => { selectCols = cols ?? ''; return b }
   // `.is()` depuis le 2026-08-04 : le socle se lit `.is('profil_id', null)`.
   b.eq = chain; b.lte = chain; b.gte = chain; b.lt = chain; b.is = chain
+  // B-111 — lecture des places cadenassées (`neq('places_figees','{}')`).
+  b.neq = chain
   b.or = chain; b.order = chain; b.limit = chain
   const resolved = () => ({ data: dataFor(table, selectCols), error: null })
   b.single = () => Promise.resolve(resolved())

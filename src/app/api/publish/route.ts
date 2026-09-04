@@ -180,6 +180,34 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // ── B-111 — LES CADENAS DE L'ADMIN TOMBENT ICI ──────────
+  //
+  // Arbitrage de MiKL le 04/09 : « non, il n'y a aucun intérêt à le laisser ».
+  // Un cadenas ne protège que d'une chose — une génération qui rebattrait les
+  // cartes. Publié, le planning ne se régénère plus ; le garder afficherait un
+  // verrou qui ne verrouille rien, et le produit se met à mentir doucement.
+  //
+  // ⚠️ On ne touche PAS à `gardes.verrouille`, qui est un autre concept : la
+  // protection AUTOMATIQUE des gardes passées ou publiées, posée par le cron
+  // `lock-gardes`. Les confondre reviendrait à retirer, au moment même de la
+  // publication, la protection qui doit justement s'installer.
+  //
+  // BEST-EFFORT ASSUMÉ : un échec ici ne défait pas une publication réussie. Le
+  // planning est publié — c'est le fait qui compte pour le cabinet ; il resterait
+  // des cadenas orphelins, sans effet sur un planning qu'on ne régénère plus.
+  const { error: cadenasErr } = await supabase
+    .from('gardes')
+    .update({ places_figees: [] })
+    .eq('periode_id', periodeId)
+    .neq('places_figees', '{}')
+
+  if (cadenasErr) {
+    console.error(
+      '[publish] les cadenas de l\'admin n\'ont pas pu être levés (publication conservée) :',
+      cadenasErr.message,
+    )
+  }
+
   // ── Historique des fêtes (backlog n°14 — équité inter-annuelle) ──
   // Si la période couvre une fête (24-25/12, 31/12-01/01), on enregistre QUI
   // l'a tenue — consommé par le moteur l'année suivante (pénalité souple

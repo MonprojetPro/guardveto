@@ -178,6 +178,14 @@ export interface SolverInput {
    */
   placesFigees?: PlaceFigee[]
   /**
+   * B-111 — cadenas posés sur une place qui n'a plus personne (garde vidée
+   * depuis, miroir des places incomplet). TRANSPORTÉ, jamais lu par le solver :
+   * on ne peut pas figer « personne ». Il vit ici pour remonter jusqu'à l'écran
+   * de génération, parce qu'un cadenas inopérant doit se dire — l'admin croirait
+   * sinon avoir protégé une place que le moteur va rebattre.
+   */
+  placesFigeesSansTitulaire?: { date: string; type: string; role: string }[]
+  /**
    * B-060 — la passe de RATTRAPAGE qui reprend les cases vides une fois le
    * planning posé. Absente → aucune reprise.
    *

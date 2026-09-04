@@ -172,6 +172,13 @@ export async function resoudreContexte(
     // champ par champ ; sans cette ligne, le lookback chargé par le loader serait
     // détruit avant d'atteindre le solver — cf. avertissement ContexteSimulation).
     contexteAnterieur: input.contexteAnterieur,
+    // B-111 — les cadenas de l'admin. MÊME piège que les lignes ci-dessus, et il
+    // serait ici particulièrement coûteux : le loader les charge, mais sans cette
+    // propagation le solver ne les verrait jamais. Le planning sortirait alors
+    // recomposé par-dessus les choix de l'admin, et l'écran continuerait
+    // d'afficher les cadenas — le défaut serait donc invisible.
+    placesFigees: input.placesFigees,
+    placesFigeesSansTitulaire: input.placesFigeesSansTitulaire,
   }
 
   return contexte

@@ -197,6 +197,7 @@ function makeBuilder(table: string) {
   builder.select = chain
   builder.eq = chain
   builder.is = chain // le socle se lit `.is('profil_id', null)` (2026-08-04)
+  builder.neq = chain // B-111 — lecture des places cadenassées
   builder.lte = chain
   builder.gte = chain
   builder.lt = chain

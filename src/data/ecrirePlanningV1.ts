@@ -127,6 +127,37 @@ export async function ecrirePlanningV1(
   const nouveauxIds = await idsEvenementsDeGardes(supabase, lignesGardes.map((g) => g.id))
   const eventIdsAPurger = [...new Set([...anciensIds, ...nouveauxIds])]
 
+  // 0b. B-111 — MÉMORISER LES CADENAS AVANT LE DELETE.
+  //
+  // Une garde cadenassée par l'admin n'est PAS `verrouille` (ce booléen porte la
+  // protection automatique des gardes passées/publiées, cf. la migration). Elle
+  // est donc supprimée puis réinsérée juste en dessous — et sans cette lecture,
+  // ses cadenas repartiraient à vide.
+  //
+  // Le symptôme aurait été le pire de tous : le planning resterait JUSTE (le
+  // moteur a bien composé autour des places figées, elles sont dans ce qu'il
+  // rend), mais les cadenas auraient disparu de l'écran. À la génération
+  // suivante, plus rien ne serait fixé — et l'admin, qui vient de voir son
+  // choix respecté, n'aurait aucune raison de re-vérifier.
+  const { data: gardesCadenassees, error: cadenasErr } = await supabase
+    .from('gardes')
+    .select('date, type, places_figees')
+    .eq('periode_id', periodeId)
+    .eq('cabinet_id', cabinetId)
+    .neq('places_figees', '{}')
+
+  if (cadenasErr) {
+    return {
+      ...vide, ok: false, eventIdsAPurger,
+      erreur: `Erreur lecture des places cadenassées : ${cadenasErr.message}`,
+    }
+  }
+
+  const cadenasParCle = new Map<string, string[]>()
+  for (const g of (gardesCadenassees ?? []) as { date: string; type: string; places_figees: string[] }[]) {
+    cadenasParCle.set(`${g.date}|${g.type}`, g.places_figees ?? [])
+  }
+
   // 1. Supprimer les gardes brouillon existantes pour cette période.
   //    Scopé cabinet_id (défense en profondeur : en DEV_BYPASS le client
   //    service_role contourne la RLS, donc on filtre explicitement).
@@ -182,6 +213,8 @@ export async function ecrirePlanningV1(
     second_id: a.placements[1]?.vetId ?? null,
     verrouille: false,
     modifie_manuellement: false,
+    // B-111 — les cadenas de l'admin survivent à la régénération (cf. étape 0b).
+    places_figees: cadenasParCle.get(`${a.date}|${dbType}`) ?? [],
   }))
 
   // 3. Insérer en bloc — upsert idempotent scopé cabinet.

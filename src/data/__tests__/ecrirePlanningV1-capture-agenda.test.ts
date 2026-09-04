@@ -37,11 +37,22 @@ type Ligne = Record<string, unknown>
  * Un faux qui l'ignorerait laisserait passer exactement le défaut visé.
  */
 function creerSupabase(tables: Record<string, Ligne[]>) {
-  const correspond = (l: Ligne, f: Array<[string, unknown, 'eq' | 'in']>) =>
-    f.every(([c, v, op]) => (op === 'in' ? (v as unknown[]).includes(l[c]) : l[c] === v))
+  const correspond = (l: Ligne, f: Array<[string, unknown, 'eq' | 'in' | 'neq']>) =>
+    f.every(([c, v, op]) => {
+      if (op === 'in') return (v as unknown[]).includes(l[c])
+      // B-111 — `neq('places_figees', '{}')` : côté PostgREST, `{}` désigne le
+      // tableau VIDE, pas la chaîne. On reproduit la comparaison sur le tableau,
+      // sinon toute garde sans cadenas passerait le filtre et le test mesurerait
+      // autre chose que la réalité.
+      if (op === 'neq') {
+        if (v === '{}') return Array.isArray(l[c]) ? (l[c] as unknown[]).length > 0 : Boolean(l[c])
+        return l[c] !== v
+      }
+      return l[c] === v
+    })
 
   function requete(nom: string) {
-    const filtres: Array<[string, unknown, 'eq' | 'in']> = []
+    const filtres: Array<[string, unknown, 'eq' | 'in' | 'neq']> = []
     let mode: 'select' | 'delete' | 'upsert' = 'select'
 
     const executer = () => {
@@ -65,6 +76,7 @@ function creerSupabase(tables: Record<string, Ligne[]>) {
       select: () => api,
       eq: (c: string, v: unknown) => { filtres.push([c, v, 'eq']); return api },
       in: (c: string, v: unknown[]) => { filtres.push([c, v, 'in']); return api },
+      neq: (c: string, v: unknown) => { filtres.push([c, v, 'neq']); return api },
       not: () => api,
       delete: () => { mode = 'delete'; return api },
       upsert: () => { mode = 'upsert'; return api },

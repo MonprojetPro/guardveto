@@ -25,6 +25,7 @@ import {
 } from '@/data/chargerCreneauModele'
 import { resoudreRelationsStructure } from './relations-structure'
 import { chargerHistoriqueFetes } from '@/data/historiqueFetes'
+import { chargerPlacesFigees } from '@/data/chargerPlacesFigees'
 import { anneesFetesCouvertes } from './historique-fete'
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
@@ -489,6 +490,23 @@ export async function chargerInputDepuisSupabase(
     }
   }
 
+  // B-111 — les places CADENASSÉES par l'admin sur cette période. Le moteur les
+  // pose d'emblée et compose autour ; sans ce chargement, il régénérerait par
+  // dessus comme il l'a toujours fait.
+  //
+  // Une erreur de lecture n'est PAS avalée en « aucun cadenas » : ce serait
+  // exactement le silence du 2026-07 (« une erreur Supabase avalée devient zéro
+  // ligne »), et il coûterait ici un planning recomposé en ignorant les choix de
+  // l'admin — sans le moindre message.
+  const figees = await chargerPlacesFigees(supabase, periodeId, cabinetId)
+  if (figees.erreur) {
+    throw new Error(
+      `Impossible de lire les places cadenassées de cette période (${figees.erreur}). ` +
+      'La génération est interrompue : régénérer sans elles écraserait des choix ' +
+      'que vous avez fixés à la main.',
+    )
+  }
+
   return {
     dateDebut: periode.date_debut,
     dateFin: periode.date_fin,
@@ -503,5 +521,8 @@ export async function chargerInputDepuisSupabase(
     roleAvantageFinancier,
     // #17 — lookback inter-périodes (best-effort ; undefined → byte-identique).
     contexteAnterieur,
+    // B-111 — vide → `SolverInput.placesFigees` vide → comportement historique.
+    placesFigees: figees.places,
+    placesFigeesSansTitulaire: figees.sansTitulaire,
   }
 }

@@ -251,6 +251,10 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
     manque:
       'Modifier l’attribution d’une garde à la main (admin). Filou sait réparer une absence et valider un échange, mais pas la retouche libre — « mets Camille en 1er ce samedi ». C’est le chemin d’écriture le mieux gardé du produit (règles dures, périmètre jour ou bloc, confirmation 409, trace d’audit) : l’outil devra repasser par la route, jamais réimplémenter ces contrôles.',
   },
+  'api/planning/places-figees#POST': {
+    manque:
+      'Cadenasser une place du planning (B-111, 04/09) : « ce samedi-là, c’est Fanny, et la régénération n’y touche pas ». Trois gestes — poser, libérer, vider. Filou n’en déclenche aucun et, plus important, il ne LIT pas encore les cadenas. ⚠️ Le risque n’est pas qu’il ne sache pas les poser, c’est qu’il en ignore l’existence : sa relecture de planning propose des mouvements, et rien ne l’empêche aujourd’hui de proposer de déplacer une place que l’admin a justement fixée — avec l’aplomb de ses autres propositions. À traiter AVANT de rouvrir la relecture (item de board à créer), et pas seulement comme un outil d’écriture de plus.',
+  },
   'api/export-pdf#GET': {
     manque:
       'Sortir le planning en PDF. Demande naturelle en conversation (« envoie-moi le planning de septembre »), et Filou n’a aujourd’hui aucun moyen de produire un fichier — il ne sait qu’écrire sur le tableau. À traiter le jour où l’on décide comment un fichier revient dans une conversation.',
