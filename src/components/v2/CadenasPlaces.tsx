@@ -44,6 +44,17 @@ export interface ResultatCadenas {
   ok: boolean
   erreur?: string
   avertissements: string[]
+  /** La garde touchée — pour que l'écran applique le résultat sans tout recharger. */
+  gardeId?: string
+  /**
+   * Les PERSONNES cadenassées sur cette garde après le geste.
+   *
+   * Des personnes, et non des labels de place : sur la ligne du vendredi, la
+   * vue du planning inverse les rôles, et réappliquer `{premier}` là-bas
+   * dessinerait le cadenas sur l'autre place. Un identifiant de vétérinaire,
+   * lui, ne s'inverse pas — il n'y a donc plus rien à convertir côté écran.
+   */
+  vetsFiges?: string[]
 }
 
 /** Appel unique au serveur — les deux gestes passent par la même porte. */
@@ -58,7 +69,12 @@ async function appeler(corps: Record<string, unknown>): Promise<ResultatCadenas>
     if (!r.ok) {
       return { ok: false, erreur: data?.error ?? 'Enregistrement impossible.', avertissements: [] }
     }
-    return { ok: true, avertissements: data?.avertissements ?? [] }
+    return {
+      ok: true,
+      avertissements: data?.avertissements ?? [],
+      gardeId: data?.gardeId,
+      vetsFiges: (data?.vetsFiges ?? []) as string[],
+    }
   } catch {
     return {
       ok: false,

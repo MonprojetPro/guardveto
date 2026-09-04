@@ -311,6 +311,23 @@ export function PlanningV2({
   const [cadenasMessage, setCadenasMessage] = useState<string | null>(null)
   const [cadenasAvertissements, setCadenasAvertissements] = useState<string[]>([])
 
+  /**
+   * Les cadenas TELS QUE LE SERVEUR VIENT DE LES CONFIRMER, par garde.
+   *
+   * MiKL, 04/09 : « le délai entre le moment où je clique et le moment où ça
+   * s'affiche est extrêmement long, plusieurs secondes ». La cause : on
+   * rechargeait TOUT l'écran (une dizaine de requêtes) pour un changement d'une
+   * case. La réponse du geste contenait pourtant déjà le résultat.
+   *
+   * On l'applique donc immédiatement, et le rechargement suit en arrière-plan.
+   * Ce n'est PAS un affichage optimiste : rien n'est deviné, on affiche ce que
+   * le serveur a répondu. En cas d'échec, cette carte n'est pas touchée.
+   *
+   * Des PERSONNES, pas des labels de place : la ligne du vendredi inverse les
+   * rôles, un identifiant de vétérinaire non.
+   */
+  const [cadenasLocaux, setCadenasLocaux] = useState<Record<string, string[]>>({})
+
   function surResultatCadenas(r: ResultatCadenas) {
     setCadenasMessage(r.ok ? null : (r.erreur ?? 'Enregistrement impossible.'))
     setCadenasAvertissements(r.avertissements)
@@ -328,6 +345,11 @@ export function PlanningV2({
     // entre les deux se verrait tout de suite, au lieu de coûter une recette.
     if (r.ok) {
       toast.success('C’est enregistré.')
+      // Le résultat s'affiche TOUT DE SUITE — le rechargement complet, lui,
+      // prend plusieurs secondes et n'apporte rien de plus sur cette case.
+      if (r.gardeId) {
+        setCadenasLocaux((prec) => ({ ...prec, [r.gardeId as string]: r.vetsFiges ?? [] }))
+      }
     } else {
       toast.error(r.erreur ?? 'Enregistrement impossible.')
     }
@@ -700,6 +722,7 @@ export function PlanningV2({
                         // bornes de la période. Ailleurs, la grille est
                         // exactement celle d'avant.
                         cadenasActifs={cadenasActifs}
+                        cadenasLocaux={cadenasLocaux}
                         periodeId={periodeAffichee?.id ?? null}
                         vets={vets}
                         onCadenas={surResultatCadenas}
@@ -831,6 +854,7 @@ function CaseJour({
   vacances,
   onOuvrir,
   cadenasActifs,
+  cadenasLocaux,
   periodeId,
   vets,
   onCadenas,
@@ -850,6 +874,8 @@ function CaseJour({
   onOuvrir: (g: GardeDenormalisee) => void
   /** B-111 — admin, brouillon : les cadenas se posent. Sinon la case est celle d'avant. */
   cadenasActifs: boolean
+  /** Les cadenas que le serveur vient de confirmer, par garde (personnes figées). */
+  cadenasLocaux: Record<string, string[]>
   periodeId: string | null
   vets: VetCrise[]
   onCadenas: (r: ResultatCadenas) => void
@@ -898,11 +924,31 @@ function CaseJour({
         // comparaison était toujours fausse, le cadenas restait dessiné ouvert,
         // et chaque clic reposait un cadenas au lieu de le retirer. L'écriture
         // marchait ; elle ne se voyait simplement jamais.
-        const figees = new Set(g.places_figees ?? [])
-        const estFigee = (index: number) => {
-          const label = labelDonneeDePlace(index)
-          return label !== null && figees.has(label)
-        }
+        // On raisonne en PERSONNES figées, pas en labels de place.
+        //
+        // Source normale : les labels de la ligne affichée (`places_figees`),
+        // que la vue a déjà inversés pour le vendredi — on les traduit donc en
+        // vétérinaires ICI, une fois, en s'appuyant sur les places réellement
+        // affichées. Source prioritaire : ce que le serveur vient de confirmer
+        // après un clic, qui est déjà exprimé en personnes.
+        //
+        // ⚠️ Comparer des labels des DEUX côtés aurait re-créé le défaut du
+        // 04/09 par la porte de derrière : la réponse du serveur porte les
+        // labels de la GARDE, la ligne du vendredi affiche ceux, inversés, de
+        // la vue. Une personne, elle, ne s'inverse jamais.
+        const labelsFiges = new Set(g.places_figees ?? [])
+        const vetsFigesServeur = cadenasLocaux[g.id]
+        const vetsFiges = new Set(
+          vetsFigesServeur ??
+            places
+              .filter((p) => {
+                const label = labelDonneeDePlace(p.index)
+                return label !== null && labelsFiges.has(label)
+              })
+              .map((p) => p.vetId)
+              .filter((v): v is string => Boolean(v)),
+        )
+        const estFigee = (vetId: string | null) => Boolean(vetId && vetsFiges.has(vetId))
         return (
           <div className="slot-card" key={g.id}>
             <span className="sc-tag">{libelleTypeGardeDb(g.type, nomsTypes)}</span>
@@ -918,14 +964,14 @@ function CaseJour({
                 role={places.length > 1 ? p.role : ''}
                 titre={`${dateCourte(date)} · ${p.role} de garde`}
                 onClick={cliquable ? () => onOuvrir(g) : undefined}
-                fige={estFigee(p.index)}
+                fige={estFigee(p.vetId)}
                 cadenas={
                   cadenasActifs && p.vetId ? (
                     <BoutonCadenas
                       gardeId={g.id}
                       vetId={p.vetId}
                       prenom={p.prenom}
-                      fige={estFigee(p.index)}
+                      fige={estFigee(p.vetId)}
                       onFini={onCadenas}
                     />
                   ) : null
@@ -1077,10 +1123,13 @@ function LigneVet({
   // n'avait demandé de toucher.
   if (!cadenas) return ligne
 
+  // Le cadenas est À GAUCHE, avant le point de couleur. À droite, il chevauchait
+  // le libellé du rôle (« 1er », « 2e ») dans une case de calendrier étroite —
+  // constaté par MiKL en recette le 04/09, capture à l'appui.
   return (
     <span className="vet-row-wrap">
-      {ligne}
       {cadenas}
+      {ligne}
     </span>
   )
 }

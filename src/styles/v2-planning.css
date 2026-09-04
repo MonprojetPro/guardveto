@@ -392,16 +392,26 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
    le rend visible en permanence, parce qu'une commande qui n'existe qu'au
    survol n'existe pas sur une tablette (leçon du 2026-07). */
 .vet-row-wrap {
-  display: flex; align-items: center; gap: 2px;
+  display: flex; align-items: center; gap: 1px;
   width: 100%;
 }
+/* La gouttière du cadenas est TOUJOURS réservée, même quand l'icône est
+   invisible (place libre, hors survol). Sans ça, tous les prénoms se
+   décaleraient d'un cran à chaque survol — un tremblement permanent de la
+   grille, bien plus gênant que l'espace qu'on économise. */
+.vet-row-wrap .cad-btn { visibility: visible; }
 .vet-row-wrap .vet-row { flex: 1 1 auto; min-width: 0; }
 
+/* Le cadenas est À GAUCHE du point de couleur. Il a d'abord été posé à droite,
+   où il chevauchait le libellé du rôle (« 1er », « 2e ») dans une case de
+   calendrier étroite — corrigé le 04/09 sur retour de MiKL, capture à l'appui.
+   À gauche, il occupe une gouttière qui n'appartient qu'à lui : plus aucun
+   recouvrement possible, quelle que soit la longueur du prénom. */
 .cad-btn {
   flex: none;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px;
-  padding: 0; margin-right: 2px;
+  width: 16px; height: 20px;
+  padding: 0; margin-left: 1px;
   border: none; background: transparent;
   border-radius: 6px;
   color: var(--soft);

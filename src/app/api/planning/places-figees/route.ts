@@ -356,10 +356,26 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // ⚠️ ON RENVOIE LES PERSONNES FIGEES, PAS SEULEMENT LES LABELS.
+  //
+  // L'ecran a besoin d'afficher le resultat TOUT DE SUITE, sans attendre un
+  // rechargement complet (MiKL, 04/09 : « le delai est extremement long »).
+  // Mais il ne peut pas reutiliser les labels bruts : sur la ligne du vendredi,
+  // la vue du planning inverse les roles, et reappliquer `{premier}` la-bas
+  // dessinerait le cadenas sur l'autre place — exactement le defaut qu'on vient
+  // de corriger, re-cree par la porte de derriere.
+  //
+  // Une PERSONNE, elle, ne s'inverse pas. L'ecran compare donc des identifiants
+  // de veterinaires, et il n'y a plus rien a convertir nulle part.
+  const vetsFiges = cadenasApres
+    .map((r) => (r === 'premier' ? premierApres : r === 'second' ? secondApres : null))
+    .filter((v): v is string => Boolean(v))
+
   return NextResponse.json({
     ok: true,
     gardeId,
     placesFigees: cadenasApres,
+    vetsFiges,
     premier_id: premierApres,
     second_id: secondApres,
     avertissements,
