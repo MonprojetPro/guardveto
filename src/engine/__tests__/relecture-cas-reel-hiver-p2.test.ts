@@ -191,7 +191,11 @@ describe('le cas réel : Antoine et ses 5 week-ends', () => {
       const prend = m.affectations.filter((a) => a.vetId === ANTOINE).length
       expect(prend).toBe(0)
     }
-  })
+    // Le voisin du dessus porte 60 s, celui-ci n'en avait aucun : il tournait
+    // donc sous les 5 s par défaut, sur le MÊME calcul complet. Il passait
+    // quand la machine était disponible et échouait sinon — un rouge qui ne
+    // dit rien du produit est pire qu'un test absent (07/09, T-007).
+  }, 60_000)
 
   it('la cause : chaque week-end est ENCADRÉ par le jeudi et le lundi', () => {
     // Pour chacun des 5 week-ends d'Antoine, on regarde qui pourrait le

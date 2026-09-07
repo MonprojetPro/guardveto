@@ -71,6 +71,30 @@ export function effetSurLesPersonnes(gestes: string[]): EffetSurLesPersonnes {
 }
 
 /**
+ * TOUTES les personnes qu'un mouvement a touchées — B-118, 07/09.
+ *
+ * ⚠️ À NE PAS CONFONDRE AVEC `effetSurLesPersonnes`, et c'est tout l'intérêt.
+ * Celle-là compte le NET : quelqu'un qui quitte une place et en reprend une
+ * autre dans le même mouvement en disparaît, puisqu'il n'est ni allégé ni
+ * chargé. C'est juste pour un bilan (« Antoine −1 · Fanny +1 »), et faux pour
+ * répondre à « ce mouvement le concerne-t-il ? » : sur le rapport du 07/09,
+ * Jean échangeait deux soirs de semaine sans rien gagner ni perdre — invisible
+ * au bilan, bel et bien déplacé dans les faits.
+ *
+ * On lit donc les gestes BRUTS, entrants et sortants confondus.
+ */
+export function personnesTouchees(gestes: string[]): Set<string> {
+  const qui = new Set<string>()
+  for (const geste of gestes) {
+    const m = FORME_GESTE.exec(geste)
+    if (!m) continue
+    qui.add(m[1])
+    qui.add(m[2])
+  }
+  return qui
+}
+
+/**
  * Le résumé d'un mouvement en une ligne : « Antoine −1 · Fanny +1 ».
  *
  * Rend `null` si un seul geste n'a pas pu être lu : mieux vaut le compte brut

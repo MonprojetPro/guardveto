@@ -101,7 +101,10 @@ describe('volumétrie sur une période d’hiver complète', () => {
     // corrige ; ce test-ci garde la mesure BRUTE pour que la comparaison reste
     // possible, et pour attraper un emballement d'un autre ordre.
     expect(mouvements.length).toBeLessThan(6000)
-  })
+    // Ce fichier énumère les mouvements d'une période d'hiver ENTIÈRE : c'est
+    // long par construction, et les 5 s par défaut ne suffisent pas quand la
+    // machine travaille. Timeout explicite, comme ailleurs dans le moteur.
+  }, 60_000)
 
   it('la liste PRIORISÉE tient dans un dossier lisible', () => {
     const planning = periodeComplete()
@@ -126,7 +129,7 @@ describe('volumétrie sur une période d’hiver complète', () => {
     const rares = bruts.filter((m) => m.genre !== 'echange_simple')
     const raresRetenus = retenus.filter((m) => m.genre !== 'echange_simple')
     expect(raresRetenus.length).toBe(rares.length)
-  })
+  }, 60_000)
 
   it('le scoring de tous les mouvements tient en quelques secondes', () => {
     const planning = periodeComplete()

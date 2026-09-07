@@ -51,6 +51,7 @@ import {
   grouperParPersonne,
   humaniserObjection,
   parserGestes,
+  personnesTouchees,
 } from '@/lib/relecture/resume'
 
 export interface LigneRelecture {
@@ -205,6 +206,10 @@ export function RapportRelecture({
   const verifie = revue.filter((r) => r.verdict === 'rien_a_signaler')
   const nonTraites = donnees.criteresNonTraites ?? []
   const groupes = grouperParPersonne(aVoir, prenoms)
+  // Qui les mouvements APPLIQUÉS ont réellement touché (B-118) — entrants et
+  // sortants, pas le bilan net : quelqu'un déplacé sans gain ni perte est
+  // concerné, même s'il n'apparaît pas dans « Antoine −1 · Fanny +1 ».
+  const personnesConcernees = personnesTouchees(appliques.flatMap((l) => l.geste))
 
   // ── LE VERDICT, EN UNE LIGNE ────────────────────────────────────────────
   //
@@ -326,6 +331,27 @@ export function RapportRelecture({
             <Eye className="rl-ico" aria-hidden />
             Ce que Filou a relevé
           </p>
+          {/* ── B-117 · CES CONSTATS SONT ANTÉRIEURS AUX MOUVEMENTS ────────
+              MiKL, 07/09 : le rapport annonçait un changement qui libère
+              Antoine du week-end du 5 décembre, et affichait trois lignes plus
+              bas « quatre week-ends d'affilée jusqu'au 5 décembre ».
+
+              La cause est structurelle : la revue et les changements sortent
+              du MÊME appel au modèle, sur le MÊME planning d'entrée. Les
+              constats décrivent donc l'état d'AVANT, et rien ne les recalcule
+              après application — ce qui demanderait une seconde relecture
+              complète, à son coût et à son délai.
+
+              On ne peut pas rendre les constats plus frais qu'ils ne sont ;
+              on peut dire ce qu'ils sont. Un rapport qui se contredit sans
+              prévenir fait douter du moteur — celui-ci avait raison. */}
+          {appliques.length > 0 && (
+            <p className="rl-bloc-sous">
+              Ces constats décrivent le planning <strong>avant</strong> le
+              changement ci-dessus : Filou les a écrits en même temps qu’il le
+              proposait.
+            </p>
+          )}
           <ul className="rl-liste rl-groupes">
             {groupes.map((g, gi) => (
               <li key={gi} className="rl-groupe">
@@ -346,10 +372,27 @@ export function RapportRelecture({
                             <p>{r.detail}</p>
                           </details>
                         )}
+                        {/* ── B-118 · LE GARDE-FOU NE DOIT PAS ACCUSER À TORT ──
+                            Le 07/09, les trois points d'Antoine portaient tous
+                            « n'a proposé aucun changement pour lui » — alors que
+                            le SEUL mouvement appliqué était pour Antoine.
+
+                            Le garde-fou de B-109 compare par CRITÈRE, et il a
+                            raison de le faire : Filou avait bien promis une
+                            correction sur ces trois critères-là sans rien
+                            proposer dessus. Ce qui était faux, c'est la phrase,
+                            qui parlait de la PERSONNE.
+
+                            On distingue donc les deux cas. Le garde-fou reste
+                            entier — seule l'accusation injuste disparaît. Un
+                            garde-fou qui se trompe apprend à ne plus le croire,
+                            et le jour où Filou promettra vraiment sans agir, la
+                            mention ne vaudra plus rien. */}
                         {r.promesseNonTenue && (
                           <p className="rl-note rl-manquant">
-                            Filou a dit pouvoir corriger ce point, mais n’a proposé aucun
-                            changement pour lui.
+                            {g.qui && personnesConcernees.has(g.qui)
+                              ? `Le changement appliqué concerne ${g.qui}, mais pas ce point précis : Filou disait pouvoir le corriger et n’a rien proposé dessus.`
+                              : 'Filou a dit pouvoir corriger ce point, mais n’a proposé aucun changement pour lui.'}
                           </p>
                         )}
                         <p className="rl-meta">
