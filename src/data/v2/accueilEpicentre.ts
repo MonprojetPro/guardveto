@@ -18,6 +18,7 @@ import { phraseRegle } from '@/lib/regles/libelle'
 import { lignesDesPeriodes, periodesVisibles } from '@/lib/planning/diffusion'
 import { MATIERE_VIDE, type MatiereFilou } from '@/lib/v2/filou-origine'
 import { chargerEnAttente, type FicheEnAttente } from './enAttente'
+import { modulesDuCabinet } from '@/lib/produit/modules-serveur'
 import { nomVetoOuRetire } from '@/lib/regles/libelle'
 import {
   catalogueDuProfil,
@@ -69,6 +70,18 @@ export interface DonneesDock {
   agendaConnecte: boolean
   libellePlanning: string
   statutPlanning: StatutPeriode | null
+  /**
+   * Les modules allumés pour ce cabinet (B-120, chantier 1).
+   *
+   * ⚠️ Il voyage DANS le dock parce que le dock est la seule donnée que les
+   * huit écrans V2 chargent déjà tous : le mettre ailleurs aurait obligé à
+   * toucher les huit pages, et la neuvième l'aurait oublié.
+   *
+   * ⚠️ Il sert à AFFICHER, jamais à autoriser. Masquer une entrée ne ferme
+   * aucune URL — c'est `exigerModule()` (`lib/produit/modules-serveur.ts`)
+   * qui fait autorité, exactement comme `estSecretaire` ne protège rien.
+   */
+  modules: string[]
 }
 
 export interface SouhaitEnAttente {
@@ -264,6 +277,7 @@ export async function chargerAccueil(
     dettesRes,
     profilsRes,
     enAttente,
+    modules,
   ] = await Promise.all([
     supabase
       .from('periodes')
@@ -333,6 +347,9 @@ export async function chargerAccueil(
     // le reste : quatre `count` en tête, ça ne coûte rien, et surtout ça ne
     // rallonge pas l'ouverture de l'écran.
     chargerEnAttente(supabase, veterinaire),
+    // Les modules allumés du cabinet (B-120), dans la même passe : la barre
+    // de l'accueil doit montrer exactement ce que les autres écrans montrent.
+    modulesDuCabinet(supabase),
   ] as const)
 
   // ⚠️ MÊME RÈGLE QUE L'ÉCRAN PLANNING ET QUE L'AGENDA GOOGLE : un brouillon
@@ -486,6 +503,11 @@ export async function chargerAccueil(
         ? (periodeCourante.libelle ?? `${periodeCourante.saison === 'ete' ? 'Été' : 'Hiver'} ${periodeCourante.date_debut.slice(0, 4)}`)
         : 'Aucune période',
       statutPlanning: periodeCourante?.statut ?? null,
+      // B-120 : l'accueil fabrique son dock lui-même (il lit déjà tout). Il
+      // doit donc porter les modules comme `chargerDock` le fait — sans quoi
+      // la barre serait complète ici et réduite ailleurs, et la première
+      // navigation ferait disparaître des entrées sous les yeux de l'admin.
+      modules,
     },
     ceSoir,
     demain,

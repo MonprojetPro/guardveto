@@ -5,6 +5,51 @@
 
 ---
 
+## 2026-09-11 — Le garde-fou existait, apparaissait au schéma, et n'interdisait rien
+
+**Contexte :** B-120, chantier 1. Une colonne `modules_actifs` est posée sur `cabinets`, avec
+une contrainte censée interdire le cabinet muet :
+
+```sql
+CHECK (array_length(modules_actifs, 1) >= 1)
+```
+
+**Ce que la mesure a dit :** un `UPDATE cabinets SET modules_actifs = ARRAY[]::TEXT[]`
+**passait sans la moindre erreur**. La contrainte n'a jamais rien interdit, pas une seule
+seconde.
+
+**Cause racine :** sur un tableau vide, `array_length(x, 1)` rend **`NULL`**, jamais `0`.
+`NULL >= 1` vaut `NULL`, et PostgreSQL considère une contrainte `CHECK` qui s'évalue à `NULL`
+comme **satisfaite**. Le cabinet muet était donc parfaitement autorisé.
+
+**Fix :** `CHECK (cardinality(modules_actifs) >= 1)` — `cardinality()` rend `0` sur un
+tableau vide. Re-prouvé par le même `UPDATE`, qui lève maintenant `check_violation`.
+
+**À retenir / réutiliser :**
+1. **Un garde-fou ne se relit pas, il se fait mordre.** Celui-ci était visible au schéma, un
+   `\d cabinets` l'aurait affiché, une revue de code l'aurait approuvé. Seul un essai réel
+   de le violer l'a démasqué. C'est la même famille que la leçon du 26/08 : un `grep` prouve
+   qu'un code est **écrit**, jamais qu'il est **exécuté**.
+2. **En SQL, le piège est le `NULL`, pas la logique.** Toute contrainte `CHECK` doit être
+   pensée sur les valeurs nulles — `NULL` n'échoue pas, il **passe**. Vaut pour
+   `array_length`, mais aussi pour toute colonne nullable comparée à une borne.
+3. **Un garde-fou qui ne garde rien est pire qu'un garde-fou absent** : il donne la fausse
+   assurance que la question est réglée, donc personne ne la repose. C'est exactement ce que
+   dit la règle PREUVE AVANT ANNONCE, appliquée à la base de données.
+4. **Écrire le test de violation en même temps que la contrainte.** Le bloc `DO $$ … EXCEPTION
+   WHEN check_violation` prend trente secondes à écrire et répond par oui ou par non.
+
+**Deuxième leçon du même chantier — un plan d'implémentation n'est pas une source.** Le plan,
+écrit la veille, affirmait que `(v2)/layout.tsx` rendait la barre de navigation : il fallait
+donc y résoudre les modules. **Faux** — le layout ne rend que le ruban, et chacune des huit
+pages appelle `BarreV2` elle-même. Coder de mémoire depuis le plan aurait produit un layout
+qui résout proprement une donnée que **personne ne lit**, sans qu'aucun test ne rougisse.
+Le plan le disait lui-même (« ne pas coder de mémoire depuis ce plan, lire d'abord ») ; c'est
+la seule raison pour laquelle l'écart a été vu. **Un document écrit par nous décrit le code
+tel qu'on croyait qu'il était au moment de l'écrire.**
+
+---
+
 ## 2026-09-04 — « Rien ne se passe » : ça marchait, ça ne se voyait pas (deux vocabulaires de rôles)
 
 **Contexte :** recette de B-111. MiKL clique sur le cadenas d'une place : *« rien ne se passe »*. Deux tests, deux dates, même constat.
