@@ -456,7 +456,13 @@ async function executerGeneration(
     // ── Persistence V2 (attributions) ───────────────────────────
     emettre(
       creneauxVides.length > 0
-        ? `J’enregistre le planning — ${creneauxVides.length} case${creneauxVides.length > 1 ? 's' : ''} restera${creneauxVides.length > 1 ? 'ont' : ''} à pourvoir`
+        // ⚠️ « restera » / « resteront » en ENTIER, jamais une terminaison collée
+        // à un radical : `restera${'ont'}` donnait **« resteraont »**, affiché tel
+        // quel a l'admin sur chaque generation partielle. Trouve le 11/09 en
+        // lisant les traces de B-104, pas par un test. C'est la lecon maison
+        // « jamais de `${valeur}s` dans un libelle » — un verbe irregulier ne se
+        // conjugue pas par concatenation.
+        ? `J’enregistre le planning — ${creneauxVides.length} case${creneauxVides.length > 1 ? 's' : ''} ${creneauxVides.length > 1 ? 'resteront' : 'restera'} à pourvoir`
         : 'J’enregistre le planning…',
     )
     let persistenceResult

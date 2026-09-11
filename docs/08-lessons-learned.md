@@ -5,6 +5,49 @@
 
 ---
 
+## 2026-09-11 — Un item de board affirmait « zéro ligne mesurée » : la table en contenait huit
+
+**Contexte :** reprise du chantier 0 (B-104, la génération qui avorte). L'item du board, écrit le
+03/09, disait noir sur blanc : *« Le traceur n'a JAMAIS tourné — aucune génération réelle depuis
+sa pose, donc **zéro ligne mesurée** »*, et : *« PROCHAINE ÉTAPE : MiKL régénère jusqu'à
+l'incident, je lis la trace »*.
+
+**Ce que la mesure a dit :** `SELECT count(*) FROM generations_trace` → **8 lignes**, du 02/09 au
+07/09. MiKL avait régénéré cinq fois depuis, simplement sans que l'incident se reproduise. Personne
+n'était allé regarder, parce que le board disait qu'il n'y avait rien à regarder.
+
+**Ce que les 8 lignes ont donné, et qui n'aurait pas été trouvé autrement :**
+1. Durée totale **42,0 à 50,6 s** sur un `maxDuration` de **60 s** — marge réelle **9,4 à 18 s**,
+   là où le commentaire du code annonce « ~20 s de marge ». **Le commentaire était optimiste, et
+   personne ne l'avait confronté à une mesure.**
+2. `interrompu = true` sur **8/8** : le seed atteint **toujours** son plafond de 30 s.
+3. **2,7 à 10,0 s s'écoulent après la dernière étape annoncée** — un facteur 3,7 sur la seule étape
+   que le produit ne borne pas, et pendant laquelle l'écran n'affiche plus rien.
+4. Un libellé faux affiché à l'admin à chaque génération partielle : **« 2 cases resteraont à
+   pourvoir »**.
+
+**À retenir / réutiliser :**
+1. **Une ligne de board qui dit « il n'y a rien à regarder » est la plus dangereuse de toutes.**
+   Une ligne qui décrit un problème invite à vérifier ; une ligne qui décrit une absence ferme le
+   sujet. C'est le même mécanisme que « Rien à vérifier » sur le tableau d'accueil (25/08) : **une
+   bonne nouvelle n'est jamais re-vérifiée.** Premier réflexe en rouvrant un dossier : interroger
+   l'instrument, pas relire ce qu'on a écrit sur l'instrument.
+2. **Un instrument qu'on pose doit être relu SANS attendre l'incident.** Huit générations normales
+   ont livré la décomposition du budget de temps — c'est-à-dire la piste — alors qu'on n'attendait
+   quelque chose que de l'anomalie. Les cas NORMAUX mesurent la marge ; seul l'anormal prouve la
+   cause, mais il ne dit rien de la marge.
+3. **Une conjugaison ne se fabrique pas par concaténation.** `restera${n > 1 ? 'ont' : ''}` rend
+   « resteraont » : le verbe est irrégulier, les deux formes s'écrivent en entier. Troisième
+   occurrence de la famille « jamais de `${valeur}s` dans un libellé ». Et il sortait à **chaque**
+   génération partielle depuis des semaines, sans qu'aucun test ne le regarde.
+4. **Ne pas corriger tant que la cause n'est pas prouvée** (TILT). L'hypothèse du dépassement des
+   60 s explique les trois symptômes d'un coup et reste une hypothèse : la preuve serait une ligne
+   à `fermee_le IS NULL`, et il n'y en a aucune. ⚠️ Monter `maxDuration` **déplacerait la falaise
+   sans la supprimer**, et rendrait l'incident plus rare — donc plus difficile à capturer. Un
+   correctif qui raréfie un symptôme sans en connaître la cause **détruit l'instrument de mesure**.
+
+---
+
 ## 2026-09-11 — Le garde-fou existait, apparaissait au schéma, et n'interdisait rien
 
 **Contexte :** B-120, chantier 1. Une colonne `modules_actifs` est posée sur `cabinets`, avec
