@@ -2,7 +2,7 @@
 
 > **Pour les agents d'exécution :** SOUS-SKILL REQUIS — `superpowers:subagent-driven-development`
 > (recommandé) ou `superpowers:executing-plans`. Les étapes utilisent des cases à cocher
-> (`- [ ]`) pour le suivi.
+> (`- [x]`) pour le suivi.
 
 **Objectif :** permettre d'allumer et d'éteindre, cabinet par cabinet, les grands pans du
 produit (`gardes`, `planning-journee`, `chat`) — de sorte qu'un module éteint soit invisible à
@@ -17,6 +17,30 @@ code** (`src/lib/produit/modules.ts`) déclare les modules existants et l'appart
 Vitest (unitaires), Playwright (e2e).
 
 **Cadrage d'origine :** `docs/cadrage-v3-2026-09-10.md` · **Board :** B-120.
+
+---
+
+## ÉTAT AU 2026-09-11 — exécuté, avec trois écarts assumés
+
+Tâches 1 à 5 et 8 : **faites**. Tâches 6 et 7 : **non faites**, reportées — voir ci-dessous.
+Preuves : `npm test` → 1751 passed, 0 échec · `npx tsc --noEmit` → 0 erreur ·
+`npm run build` → succès. Convergence complète dans `docs/00-product-board.md`.
+
+**Écart 1 — le plan se trompait sur le point d'injection (tâche 5).** Il disait que
+`(v2)/layout.tsx` rend la barre. **C'est faux** : le layout ne rend que le ruban, et
+**chacune des 8 pages** appelle `BarreV2` elle-même. Les modules voyagent donc **dans le
+dock** (`chargerDock()` + le dock fabriqué à la main par l'accueil), seule donnée que les
+huit écrans chargent déjà tous. C'est pourquoi le plan disait « ne pas coder de mémoire
+depuis ce plan » — la consigne a servi.
+
+**Écart 2 — la contrainte de la tâche 1 ne gardait rien.** `array_length(tableau_vide, 1)`
+rend `NULL`, un `CHECK` qui vaut `NULL` est satisfait, et le cabinet muet passait. Corrigé
+par `cardinality()` (migration `20260911090000`). Détail : `docs/08-lessons-learned.md`.
+
+**Écart 3 — tâches 6 et 7 reportées**, sur décision de MiKL (option 2 du trou de sécurité) :
+pas d'écran d'administration, bascule des modules en SQL. La tâche 7 (Filou) n'avait alors
+plus d'objet — aucune action serveur n'a été créée, et le test-gardien de Filou ne réclame
+rien. **Reste-à-faire porté par `B-120a` au board.**
 
 ---
 
@@ -92,7 +116,7 @@ impossible à écrire simplement.
 **Fichiers :**
 - Créer : `supabase/migrations/20260910120000_modules_par_cabinet.sql`
 
-- [ ] **Étape 1 : écrire la migration**
+- [x] **Étape 1 : écrire la migration**
 
 ```sql
 -- ============================================================
@@ -120,14 +144,14 @@ ALTER TABLE cabinets
   CHECK (array_length(modules_actifs, 1) >= 1);
 ```
 
-- [ ] **Étape 2 : appliquer la migration sur le projet Supabase**
+- [x] **Étape 2 : appliquer la migration sur le projet Supabase**
 
 ⚠️ **Vérifier le `project_ref` avant d'écrire** — leçon maison : ne jamais appliquer une
 migration sans avoir confirmé sur quel projet on est.
 
 Utiliser l'outil MCP `mcp__supabase__apply_migration` avec le contenu ci-dessus.
 
-- [ ] **Étape 3 : prouver que la colonne existe et que les cabinets sont intacts**
+- [x] **Étape 3 : prouver que la colonne existe et que les cabinets sont intacts**
 
 ```sql
 SELECT nom, modules_actifs FROM cabinets ORDER BY nom;
@@ -135,7 +159,7 @@ SELECT nom, modules_actifs FROM cabinets ORDER BY nom;
 
 Attendu : une ligne par cabinet, chacune avec `{gardes}`. **Aucun cabinet à `{}`.**
 
-- [ ] **Étape 4 : commit**
+- [x] **Étape 4 : commit**
 
 ```bash
 git add supabase/migrations/20260910120000_modules_par_cabinet.sql
@@ -150,7 +174,7 @@ git commit -m "[feat][B-120] Les cabinets portent la liste de leurs modules, par
 - Créer : `src/lib/produit/modules.ts`
 - Test : `tests/lib/couverture-modules.test.ts`
 
-- [ ] **Étape 1 : écrire le test qui échoue**
+- [x] **Étape 1 : écrire le test qui échoue**
 
 ```ts
 // tests/lib/couverture-modules.test.ts
@@ -176,12 +200,12 @@ describe('Le catalogue des modules', () => {
 })
 ```
 
-- [ ] **Étape 2 : lancer le test et vérifier qu'il échoue**
+- [x] **Étape 2 : lancer le test et vérifier qu'il échoue**
 
 Commande : `npx vitest run tests/lib/couverture-modules.test.ts`
 Attendu : ÉCHEC — `Cannot find module '@/lib/produit/modules'`
 
-- [ ] **Étape 3 : écrire le catalogue**
+- [x] **Étape 3 : écrire le catalogue**
 
 ```ts
 // src/lib/produit/modules.ts
@@ -249,12 +273,12 @@ export const MODULES: Record<string, Module> = {
 export type IdModule = keyof typeof MODULES
 ```
 
-- [ ] **Étape 4 : lancer le test et vérifier qu'il passe**
+- [x] **Étape 4 : lancer le test et vérifier qu'il passe**
 
 Commande : `npx vitest run tests/lib/couverture-modules.test.ts`
 Attendu : PASS — 3 tests
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add src/lib/produit/modules.ts tests/lib/couverture-modules.test.ts
@@ -272,7 +296,7 @@ exactement le défaut que `couverture-produit.ts` a été écrit pour empêcher.
 - Modifier : `src/lib/produit/modules.ts` (ajout en fin de fichier)
 - Modifier : `tests/lib/couverture-modules.test.ts` (ajout)
 
-- [ ] **Étape 1 : écrire le test qui échoue**
+- [x] **Étape 1 : écrire le test qui échoue**
 
 Ajouter à la fin de `tests/lib/couverture-modules.test.ts`. ⚠️ **`MODULES` est déjà importé en
 tête du fichier depuis la Tâche 2** — compléter cette ligne d'import plutôt que d'en ajouter une
@@ -331,12 +355,12 @@ describe('L’appartenance des ecrans aux modules', () => {
 })
 ```
 
-- [ ] **Étape 2 : lancer le test et vérifier qu'il échoue**
+- [x] **Étape 2 : lancer le test et vérifier qu'il échoue**
 
 Commande : `npx vitest run tests/lib/couverture-modules.test.ts`
 Attendu : ÉCHEC — `APPARTENANCE` n'est pas exporté
 
-- [ ] **Étape 3 : ajouter `APPARTENANCE` à la fin de `src/lib/produit/modules.ts`**
+- [x] **Étape 3 : ajouter `APPARTENANCE` à la fin de `src/lib/produit/modules.ts`**
 
 ```ts
 /** Ce qu'on a decide pour un ecran. */
@@ -371,7 +395,7 @@ export const APPARTENANCE: Record<string, Appartenance> = {
 }
 ```
 
-- [ ] **Étape 4 : lancer le test et vérifier qu'il passe**
+- [x] **Étape 4 : lancer le test et vérifier qu'il passe**
 
 Commande : `npx vitest run tests/lib/couverture-modules.test.ts`
 Attendu : PASS
@@ -380,7 +404,7 @@ Attendu : PASS
 l'écriture de ce plan. Ne pas supprimer le test : ajouter la ligne manquante, c'est précisément
 son travail.
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add src/lib/produit/modules.ts tests/lib/couverture-modules.test.ts
@@ -397,7 +421,7 @@ git commit -m "[feat][B-120] Aucun ecran ne peut plus se taire sur le module don
 - Créer : `src/lib/produit/modules-serveur.ts`
 - Test : `tests/lib/modules-serveur.test.ts`
 
-- [ ] **Étape 1 : écrire le test qui échoue**
+- [x] **Étape 1 : écrire le test qui échoue**
 
 ```ts
 // tests/lib/modules-serveur.test.ts
@@ -449,12 +473,12 @@ describe('exigerModule', () => {
 })
 ```
 
-- [ ] **Étape 2 : lancer le test et vérifier qu'il échoue**
+- [x] **Étape 2 : lancer le test et vérifier qu'il échoue**
 
 Commande : `npx vitest run tests/lib/modules-serveur.test.ts`
 Attendu : ÉCHEC — `Cannot find module '@/lib/produit/modules-serveur'`
 
-- [ ] **Étape 3 : écrire l'implémentation**
+- [x] **Étape 3 : écrire l'implémentation**
 
 ```ts
 // src/lib/produit/modules-serveur.ts
@@ -523,12 +547,12 @@ export async function exigerModule(
 }
 ```
 
-- [ ] **Étape 4 : lancer le test et vérifier qu'il passe**
+- [x] **Étape 4 : lancer le test et vérifier qu'il passe**
 
 Commande : `npx vitest run tests/lib/modules-serveur.test.ts`
 Attendu : PASS — 4 tests
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add src/lib/produit/modules-serveur.ts tests/lib/modules-serveur.test.ts
@@ -543,7 +567,7 @@ git commit -m "[feat][B-120] Le serveur refuse un module eteint, et il se degrad
 - Modifier : `src/app/(v2)/layout.tsx`
 - Modifier : `src/components/v2/BarreV2.tsx`
 
-- [ ] **Étape 1 : lire les deux fichiers avant de les modifier**
+- [x] **Étape 1 : lire les deux fichiers avant de les modifier**
 
 ```bash
 sed -n '1,60p' "src/app/(v2)/layout.tsx"
@@ -553,7 +577,7 @@ sed -n '1,120p' src/components/v2/BarreV2.tsx
 ⚠️ **Ne pas coder de mémoire depuis ce plan** : `BarreV2.tsx` a évolué depuis son écriture. Lire
 d'abord la forme réelle de ses props, puis adapter.
 
-- [ ] **Étape 2 : résoudre les modules dans le layout et les descendre**
+- [x] **Étape 2 : résoudre les modules dans le layout et les descendre**
 
 Dans `src/app/(v2)/layout.tsx`, après la vérification de l'utilisateur :
 
@@ -566,7 +590,7 @@ const modules = await modulesDuCabinet(supabase)
 
 Puis passer `modules` au composant de barre, par la même voie que `dock`.
 
-- [ ] **Étape 3 : masquer les entrées éteintes dans `BarreV2.tsx`**
+- [x] **Étape 3 : masquer les entrées éteintes dans `BarreV2.tsx`**
 
 Ajouter `modules: string[]` aux props du composant, puis la correspondance entre entrée de menu
 et module, à côté de la définition de `entree` :
@@ -593,7 +617,7 @@ const visible = (chemin: string) => {
 
 Puis envelopper chaque `<Link>` d'un module éteignable : `{visible('/planning') && <Link … >}`.
 
-- [ ] **Étape 4 : prouver que ça marche, des deux côtés**
+- [x] **Étape 4 : prouver que ça marche, des deux côtés**
 
 ```bash
 npm run build
@@ -606,7 +630,7 @@ Puis, sur le déploiement, avec le cabinet bac à sable :
 2. Passer à `{gardes,chat}` en base, recharger → rien ne change encore (le chat n'a pas d'écran).
 3. Retirer `gardes` est impossible (contrainte + `eteignable: false`) — ne pas essayer en prod.
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add "src/app/(v2)/layout.tsx" src/components/v2/BarreV2.tsx
@@ -769,18 +793,18 @@ git commit -m "[feat][B-120] Filou dit ce qu'il fait de l'interrupteur des modul
 
 ## Tâche 8 : la suite complète, et la gate sécurité
 
-- [ ] **Étape 1 : lancer TOUTE la suite**
+- [x] **Étape 1 : lancer TOUTE la suite**
 
 Commande : `npm test`
 Attendu : tous les tests au vert. Référence connue avant ce chantier : **1719 tests verts**
 (état du `f8e00f9`). Un test rouge = on s'arrête, on ne commit pas.
 
-- [ ] **Étape 2 : build de production**
+- [x] **Étape 2 : build de production**
 
 Commande : `npm run build`
 Attendu : succès, zéro erreur TypeScript.
 
-- [ ] **Étape 3 : gate CERBÈRE — audit ciblé**
+- [x] **Étape 3 : gate CERBÈRE — audit ciblé**
 
 Points à auditer, spécifiques à ce chantier :
 
@@ -802,7 +826,7 @@ produit** (`UserRole = 'admin' | 'veto'`). Deux issues, à trancher par MiKL :
 **Hypothèse par défaut : option 2**, et la Tâche 6 devient « à faire plus tard ».
 Je ne prends pas cette décision seul : elle change ce qui est livré.
 
-- [ ] **Étape 4 : convergence OTTO**
+- [x] **Étape 4 : convergence OTTO**
 
 Reprendre le tableau KIT COMPLET en tête de ce plan, ligne par ligne, et remplir :
 
@@ -812,7 +836,7 @@ Reprendre le tableau KIT COMPLET en tête de ce plan, ligne par ligne, et rempli
 
 ⚠️ ou ❌ → **pas de commit final**. On finit, ou on crée `B-120a` au board.
 
-- [ ] **Étape 5 : ATLAS**
+- [x] **Étape 5 : ATLAS**
 
 Une ligne dans `docs/patch-log.md`. Si le chantier a révélé un piège non évident, écrire
 **aussi** dans `docs/08-lessons-learned.md`.

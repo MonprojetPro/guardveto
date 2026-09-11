@@ -15,6 +15,7 @@ import type { Periode, Veterinaire } from '@/types'
 import type { DonneesDock } from './accueilEpicentre'
 import { aujourdhuiISO } from './accueilEpicentre'
 import { periodesVisibles } from '@/lib/planning/diffusion'
+import { modulesDuCabinet } from '@/lib/produit/modules-serveur'
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 
@@ -33,7 +34,7 @@ export async function chargerDock(
   const estAdmin = qui.role_app === 'admin'
   const today = aujourdhuiISO()
 
-  const [periodesRes, vetosRes, souhaitsRes, echangesRes, cabinetRes] =
+  const [periodesRes, vetosRes, souhaitsRes, echangesRes, cabinetRes, modules] =
     await Promise.all([
       periodesConnues
         ? Promise.resolve({ data: periodesConnues })
@@ -47,6 +48,10 @@ export async function chargerDock(
         .select('id', { count: 'exact', head: true })
         .eq('statut', 'proposee'),
       supabase.from('cabinets').select('google_calendar_id').limit(1).maybeSingle(),
+      // Les modules allumés (B-120). En PARALLÈLE des autres : aucune requête
+      // ajoutée en série, ce qui compte sur un produit déjà jugé lent (B-116).
+      // Il replie sur le socle en cas d'échec — fermant, jamais ouvrant.
+      modulesDuCabinet(supabase),
     ])
 
   // La pastille annonce le planning « en cours » à tout l'écran : pour un
@@ -77,5 +82,6 @@ export async function chargerDock(
         `${courante.saison === 'ete' ? 'Été' : 'Hiver'} ${courante.date_debut.slice(0, 4)}`)
       : 'Aucune période',
     statutPlanning: courante?.statut ?? null,
+    modules,
   }
 }

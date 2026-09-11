@@ -25,6 +25,7 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { logout } from '@/app/login/actions'
 import type { DonneesAccueil } from '@/data/v2/accueilEpicentre'
+import { ecranVisible } from '@/lib/produit/modules'
 
 interface Props {
   prenom: string
@@ -51,6 +52,19 @@ export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props
     className: `dock-item${ici(href) ? ' ici' : ''}`,
     'aria-current': ici(href) ? ('page' as const) : undefined,
   })
+
+  /**
+   * L'espace appartient-il à un module allumé pour ce cabinet ? (B-120)
+   *
+   * La source est `APPARTENANCE` — jamais une seconde liste tenue ici, qui
+   * divergerait le jour où l'on ajoute un écran. Les modules arrivent par le
+   * dock, résolus UNE fois côté serveur : un composant client n'a pas de
+   * cabinet_id de confiance, il ne doit donc rien relire lui-même.
+   *
+   * ⚠️ Même avertissement que `estSecretaire` juste au-dessus : retirer une
+   * entrée du menu ne ferme pas l'URL. C'est `exigerModule()` qui ferme.
+   */
+  const module = (href: string) => ecranVisible(href.replace(/^\//, ''), dock.modules)
 
   const brouillon = dock.statutPlanning === 'brouillon'
   // Le secrétariat ne connaît pas les périodes (arbitrage MiKL du 25/08) :
@@ -105,6 +119,7 @@ export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props
       </div>
 
       <nav className="dock-menu" aria-label="Les espaces de GuardVeto">
+        {module('/planning') && (
         <Link {...entree('/planning')} href="/planning" aria-label={libellePlanning}>
           <span className="di-ico" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -118,6 +133,7 @@ export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props
             <span className="di-text">{libellePlanning}</span>
           </span>
         </Link>
+        )}
 
         {/* Absences & échanges : le secrétariat verra les absences au lot 2,
             en lecture seule. Tant que cet écran porte des boutons d'action, on
@@ -165,7 +181,7 @@ export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props
             page le reçoit en vitrine, sans aucune commande. L'entrée était
             réservée aux admins depuis la bascule V2 ; c'était une porte fermée
             sur une information qui le concerne au premier chef. */}
-        {!estSecretaire && (
+        {!estSecretaire && module('/regles') && (
         <Link {...entree('/regles')} href="/regles" aria-label="Organisation du cabinet">
           <span className="di-ico" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -193,7 +209,7 @@ export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props
             L'entrée disparaît ICI, et la page elle-même refuse l'accès : une
             porte qu'on se contente de retirer du menu reste ouverte à qui
             connaît l'adresse. */}
-        {estAdmin && (
+        {estAdmin && module('/historique') && (
           <Link {...entree('/historique')} href="/historique" aria-label="Historique et compteurs">
             <span className="di-ico" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
