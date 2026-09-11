@@ -491,6 +491,21 @@ async function executerGeneration(
       )
     }
 
+    // B-104 — JALON DE MESURE, et pas seulement d'affichage.
+    //
+    // Les 8 traces du 11/09 ont montre que **2,7 a 10,0 s** s'ecoulent entre la
+    // derniere etape annoncee et la fin reelle — un facteur 3,7 sur la seule
+    // partie que rien ne borne, et pendant laquelle l'ecran reste fige. C'est
+    // aussi la marge qui separe une generation de 50,6 s du plafond de 60 s.
+    // Sans jalon ici, on sait que le temps part quelque part apres
+    // « J'enregistre le planning », et rien de plus.
+    //
+    // ⚠️ Les jalons sont EMIS, pas seulement traces : l'invariant du fichier est
+    //    qu'une etape tracee est une etape que l'admin a lue. Le respecter fait
+    //    d'une pierre deux coups — un ecran fige pendant dix secondes est vecu
+    //    comme un plantage, ce qui est precisement le symptome de B-104.
+    emettre('J’écris les gardes du planning…')
+
     // ── Persistence V1 (gardes) — transition F1-002 ─────────────
     // La table `gardes` reste la source de vérité pour les composants
     // UI existants jusqu'à la fin de la migration V1 → V2 (F1-002).
@@ -529,6 +544,16 @@ async function executerGeneration(
     // 4. Purge des anciens événements Google Agenda — APRÈS le succès de la
     //    réécriture, avec les ids capturés à l'étape 0. Best-effort : un échec
     //    ne casse pas la génération (la resynchro se fait à la publication).
+    // B-104 — second jalon. Il borne l'ecriture des gardes qui precede, et
+    // ouvre la purge agenda : le SEUL appel reseau sortant de toute la
+    // generation, donc le plus susceptible de s'etirer (rate-limit Google deja
+    // connu sur ce projet). ⚠️ Annonce uniquement s'il y a vraiment quelque
+    // chose a retirer — promettre un nettoyage qui n'a pas lieu serait un
+    // message faux, et un message faux coute plus cher qu'un silence.
+    if (eventIdsAPurger.length > 0) {
+      emettre('Je retire les anciens rendez-vous de l’agenda…')
+    }
+
     try {
       // #10b — calendarId scopé au cabinet (colonne cabinets.google_calendar_id) ;
       // fallback env GOOGLE_CALENDAR_ID en aval si la colonne est nulle (pilote).
@@ -548,6 +573,13 @@ async function executerGeneration(
         "D'anciens événements de la période n'ont pas pu être retirés de Google Agenda pendant la régénération. Des doublons peuvent apparaître à la republication.",
       )
     }
+
+    // B-104 — jalon de cloture. Il borne la purge agenda, et il est le dernier
+    // instant que la trace peut dater : ce qui separe encore ce point de
+    // `fermee_le` n'est plus que la fabrication de la reponse. Un ecart qui
+    // resterait GROS ici designerait donc un coupable qu'aucun des trois jalons
+    // ne couvre — et ce serait, en soi, le resultat de la mesure.
+    emettre('C’est enregistré.')
 
     // B-053 — trois issues, dites explicitement. `success` reste pour la
     // rétro-compat, mais il ne suffit plus : un planning PARTIEL est bien en
