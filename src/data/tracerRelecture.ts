@@ -35,6 +35,15 @@ export interface TraceRelecture {
   appliques?: unknown[]
   aTrancher?: unknown[]
   ecartes?: number
+  /**
+   * B-112 — ce que Filou proposait et qu'un cadenas de l'admin a écarté.
+   *
+   * Gardé dans l'historique au même titre que le reste : six mois plus tard,
+   * « pourquoi ce planning n'a-t-il pas bougé ? » a deux réponses opposées —
+   * Filou n'avait rien vu, ou il avait vu et un cadenas l'a arrêté. Sans cette
+   * liste, les deux se ressemblent exactement.
+   */
+  bloquesParCadenas?: unknown[]
   planningModifie?: boolean
   /** Le message d'erreur, quand Filou n'a pas pu répondre. */
   erreur?: string | null

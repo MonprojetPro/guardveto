@@ -89,6 +89,8 @@ export interface DonneesRelecture {
   appliques?: LigneRelecture[]
   aTrancher?: LigneRelecture[]
   ecartes?: number
+  /** B-112 — ecarte parce que ca touchait une place que l'admin a fixee. */
+  bloquesParCadenas?: (LigneRelecture & { placesFigees?: string[] })[]
   planningModifie?: boolean
   historiqueIndisponible?: boolean
   error?: string
@@ -461,6 +463,33 @@ export function RapportRelecture({
             ? 'Une proposition de Filou ne correspondait à aucune case réelle du planning : elle a été écartée.'
             : `${donnees.ecartes} propositions de Filou ne correspondaient à aucune case réelle du planning : elles ont été écartées.`}
         </p>
+      )}
+
+      {/* B-112 — un cadenas qui fait taire une proposition sans le dire n'est
+          pas une protection, c'est un silence. On nomme le jour concerne :
+          l'admin peut vouloir retirer son cadenas, c'est sa decision. */}
+      {(donnees.bloquesParCadenas ?? []).length > 0 && (
+        <div className="rl-note">
+          <p>
+            {donnees.bloquesParCadenas!.length === 1
+              ? 'Une proposition de Filou touchait une place que tu as fixee : elle n’a pas ete appliquee.'
+              : `${donnees.bloquesParCadenas!.length} propositions de Filou touchaient des places que tu as fixees : elles n’ont pas ete appliquees.`}
+          </p>
+          <ul>
+            {donnees.bloquesParCadenas!.map((l) => (
+              <li key={l.id}>
+                {l.motif}
+                {(l.placesFigees ?? []).length > 0 && (
+                  <> — place fixee : {l.placesFigees!.join(', ')}</>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p>
+            Retirer le cadenas sur le planning rendrait la proposition possible a la
+            prochaine relecture.
+          </p>
+        </div>
       )}
 
       {donnees.historiqueIndisponible && (

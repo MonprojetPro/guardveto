@@ -311,3 +311,95 @@ describe('arbitrerChangements — hygiène', () => {
     expect(r.modifie).toBe(false)
   })
 })
+
+// ============================================================
+// B-112 — Filou ne peut pas défaire ce que l'admin a fixé
+// ============================================================
+// Trouvé le 04/09 EN ÉCRIVANT une décision de couverture, pas par un test qui
+// aurait échoué : le dossier de Filou ne portait aucune information sur les
+// places cadenassées, et rien ici ne les protégeait. Filou pouvait donc
+// proposer — avec le même aplomb que le reste — de retirer la personne que
+// l'admin venait justement de figer, et le moteur validait : le mouvement est
+// LÉGAL, c'est bien là le problème.
+//
+// ⚠️ Le garde-fou est ICI, en aval, et pas seulement dans le prompt de Filou.
+//    Leçon du 26/08, mot pour mot : « une exclusion posée en amont ne protège
+//    que les chemins existant ce jour-là ». Un prompt qui demande gentiment de
+//    ne pas toucher aux cadenas n'est pas un verrou — c'est une consigne.
+//
+// ⚠️ Et le refus est DISTINCT de « le moteur refuse ». Une place figée n'est
+//    pas une règle du cabinet enfreinte : c'est une décision de l'admin. Les
+//    confondre ferait dire au produit « ça enfreint une règle » là où la seule
+//    vérité est « tu as fixé cette place toi-même ».
+// ============================================================
+
+describe('arbitrerChangements — les cadenas de l’admin', () => {
+  const echangeLundi = changement('F1', [
+    { date: '2025-11-03', type: 'semaine_soir', role: 'premier', vetId: 'v2' },
+    { date: '2025-11-03', type: 'semaine_soir', role: 'second', vetId: 'v1' },
+  ])
+
+  it('REFUSE un changement qui touche une place figée, alors qu’il est légal', () => {
+    // Le même échange est appliqué sans cadenas (cf. premier test du fichier) :
+    // c'est donc bien le cadenas qui refuse, et rien d'autre.
+    const r = arbitrerChangements(planningDeux(), [echangeLundi], {
+      ...options(EQUIPE),
+      placesFigees: [{ date: '2025-11-03', type: 'semaine_soir', role: 'premier' }],
+    })
+
+    expect(r.arbitrages[0].verdict).toBe('refuse_cadenas')
+    expect(r.modifie).toBe(false)
+    // Le planning n'a pas bougé d'un pouce.
+    const lundi = r.planning.attributions.find((a) => a.date === '2025-11-03')!
+    expect(lundi.placements.find((p) => p.role === 'premier')!.vetId).toBe('v1')
+  })
+
+  it('refuse le changement ENTIER dès qu’UNE de ses places est figée', () => {
+    // Un changement est un TOUT : en appliquer la moitié laisserait une
+    // personne sur deux places et l'autre nulle part.
+    const r = arbitrerChangements(planningDeux(), [echangeLundi], {
+      ...options(EQUIPE),
+      // C'est la SECONDE place de l'échange qui est figée, pas la première.
+      placesFigees: [{ date: '2025-11-03', type: 'semaine_soir', role: 'second' }],
+    })
+
+    expect(r.arbitrages[0].verdict).toBe('refuse_cadenas')
+    expect(r.modifie).toBe(false)
+  })
+
+  it('dit QUELLES places sont figées, pour que l’écran puisse le nommer', () => {
+    const r = arbitrerChangements(planningDeux(), [echangeLundi], {
+      ...options(EQUIPE),
+      placesFigees: [{ date: '2025-11-03', type: 'semaine_soir', role: 'premier' }],
+    })
+
+    expect(r.arbitrages[0].placesFigeesTouchees).toEqual([
+      { date: '2025-11-03', type: 'semaine_soir', role: 'premier' },
+    ])
+    // Aucune violation : le moteur n'a rien à reprocher au mouvement lui-même.
+    expect(r.arbitrages[0].violations).toEqual([])
+  })
+
+  it('laisse passer un changement qui ne touche AUCUNE place figée', () => {
+    // Le cadenas est sur le mercredi, l'échange porte sur le lundi.
+    const r = arbitrerChangements(planningDeux(), [echangeLundi], {
+      ...options(EQUIPE),
+      placesFigees: [{ date: '2025-11-05', type: 'semaine_soir', role: 'premier' }],
+    })
+
+    expect(r.arbitrages[0].verdict).toBe('applique')
+    expect(r.modifie).toBe(true)
+  })
+
+  it('se comporte EXACTEMENT comme avant quand aucune place n’est figée', () => {
+    // Le cas de tous les cabinets qui n'utilisent pas les cadenas : ce
+    // garde-fou ne doit rien changer pour eux.
+    const sans = arbitrerChangements(planningDeux(), [echangeLundi], options(EQUIPE))
+    const vide = arbitrerChangements(planningDeux(), [echangeLundi], {
+      ...options(EQUIPE), placesFigees: [],
+    })
+
+    expect(sans.arbitrages[0].verdict).toBe('applique')
+    expect(vide.arbitrages[0].verdict).toBe('applique')
+  })
+})

@@ -46,6 +46,11 @@ import { personnesAuxExtremes } from '@/engine/relecture/cibles'
 import { preferencesEnfreintes } from '@/engine/relecture/preferences'
 import { tracerRelecture } from '@/data/tracerRelecture'
 import { normaliserContraintesVets } from '@/engine/normaliserContraintes'
+// B-112 — LA clé d'identité d'une place, celle du moteur. Jamais une seconde
+// fabrication locale : deux clés qu'il faudrait garder d'accord divergent, et
+// ce garde-fou se tairait au lieu de refuser.
+import { clePlaceFigee } from '@/engine/figees'
+import type { CodeCreneau, RoleGarde } from '@/engine/types'
 import { persisterResultat } from '@/data/persisterResultat'
 import { ecrirePlanningV1 } from '@/data/ecrirePlanningV1'
 import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
@@ -306,8 +311,30 @@ async function executerRelecture(
   // portait donc des milliers : Filou ne choisissait pas dans une aide, il
   // choisissait dans un mur. Scorer les 3012 coûterait en plus le temps que
   // l'admin passe devant l'écran d'attente.
+  // B-112 — ON RETIRE D'ABORD LES MOUVEMENTS QUI TOUCHENT UN CADENAS.
+  //
+  // C'est la moitié AMONT du garde-fou, et elle ne remplace pas celle d'aval
+  // (`arbitrerChangements`, qui refuse) : le modèle reste libre de proposer un
+  // mouvement absent de sa liste. La leçon du 26/08 est explicite — « une
+  // exclusion posée en amont ne protège que les chemins existant ce jour-là ».
+  //
+  // Ce qu'elle apporte, c'est le RÉSULTAT PRATIQUE : sans elle, Filou passerait
+  // son temps à proposer des mouvements systématiquement bloqués, et l'admin
+  // lirait « proposition écartée » à chaque relecture sans jamais rien obtenir.
+  // Elle épargne aussi le scoring de mouvements qui seraient refusés ensuite.
+  const figeesIndex = new Set(
+    (contexte.placesFigees ?? []).map((p) => clePlaceFigee(p.date, p.type, p.role)),
+  )
+  const mouvementsHorsCadenas = figeesIndex.size === 0
+    ? mouvementsBruts
+    : mouvementsBruts.filter((m) =>
+        !m.affectations.some((a) =>
+          figeesIndex.has(clePlaceFigee(a.date, a.type as CodeCreneau, a.role as RoleGarde)),
+        ),
+      )
+
   const { retenus: mouvementsLegaux, ecartes: mouvementsEcartes } =
-    prioriserMouvements(mouvementsBruts)
+    prioriserMouvements(mouvementsHorsCadenas)
 
   emettre('Je mesure ce que chaque mouvement changerait…')
   const effets = effetsDesMouvements(planningActuel, mouvementsLegaux, {
@@ -388,6 +415,15 @@ async function executerRelecture(
     creneaux: contexte.creneaux,
     contexteAnterieur: contexte.contexteAnterieur,
     roleAvantageFinancier: contexte.roleAvantageFinancier ?? null,
+    // B-112 — les places que l'admin a cadenassées. La relecture est un CHEMIN
+    // DE PLUS qui choisit des personnes : sans cette ligne, Filou pouvait
+    // proposer de retirer quelqu'un que l'admin venait de figer, et le moteur
+    // validait — le mouvement étant parfaitement légal.
+    //
+    // ⚠️ Même source que la génération (`contexte.placesFigees`, rempli par le
+    // loader), jamais une seconde lecture en base : deux chargements qu'il
+    // faudrait penser à garder d'accord finissent toujours par diverger.
+    placesFigees: contexte.placesFigees,
   })
 
   // ── Ce qui est légal est écrit ──
@@ -481,6 +517,27 @@ async function executerRelecture(
   const aTrancher = arbitrage.arbitrages.filter((a) => a.verdict === 'refuse').map(enLigne)
   const ecartes = arbitrage.arbitrages.filter((a) => a.verdict === 'sans_objet').length
 
+  // B-112 — les propositions écartées parce qu'elles touchaient un cadenas.
+  //
+  // ⚠️ SANS CE TRI, ELLES DISPARAISSAIENT PUREMENT ET SIMPLEMENT : ni appliquées,
+  //    ni à trancher, ni même comptées dans `ecartes`. L'admin n'aurait eu aucun
+  //    moyen de savoir que Filou avait vu quelque chose — et un cadenas qui fait
+  //    taire une proposition sans le dire est un silence, pas une protection.
+  //    C'est la règle maison : le système INFORME, il n'interdit pas en cachette.
+  //
+  // On dit aussi QUELS jours sont concernés : « tu as fixé le 1er de garde du
+  // lundi 3 novembre » se décide, « un cadenas bloque » ne se décide pas.
+  const bloquesParCadenas = arbitrage.arbitrages
+    .filter((a) => a.verdict === 'refuse_cadenas')
+    .map((a) => ({
+      ...enLigne(a),
+      placesFigees: (a.placesFigeesTouchees ?? []).map((p) => {
+        const jour = jourParDate.get(p.date) ?? p.date
+        const creneau = creneauParType.get(p.type) ?? p.type
+        return `${jour} · ${creneau} · ${p.role}`
+      }),
+    }))
+
   const revuePourEcran = relecture.revue.map((r) => ({
     critere: critereParCle(r.critere)?.titre ?? r.critere,
     verdict: r.verdict,
@@ -506,6 +563,10 @@ async function executerRelecture(
     appliques,
     aTrancher,
     ecartes,
+    // B-112 — gardes dans l'historique aussi : savoir qu'un cadenas a ecarte
+    // une proposition explique, six mois plus tard, pourquoi ce planning-la
+    // n'a pas bouge.
+    bloquesParCadenas,
     planningModifie: ecrit,
     // B-096 — ce que Filou AVAIT, pas seulement ce qu'il a répondu. Sans ces
     // compteurs, cinq recettes de suite ont buté sur la même question sans
@@ -541,6 +602,10 @@ async function executerRelecture(
     // Compté et dit : une proposition écartée en silence laisserait croire que
     // Filou n'avait rien vu.
     ecartes,
+    // B-112 — ce que Filou proposait et qu'un cadenas de l'admin a ecarte.
+    // Elle reste libre de retirer le cadenas si la proposition l'interesse :
+    // on l'informe, on ne decide pas a sa place.
+    bloquesParCadenas,
     planningModifie: ecrit,
     historiqueIndisponible,
     modele: modeleRelecture(),

@@ -38,8 +38,9 @@
 // ============================================================
 
 import type {
-  AttributionGarde, CalendrierResolu, PlanningPartiel, VetEngine,
+  AttributionGarde, CalendrierResolu, CodeCreneau, PlanningPartiel, RoleGarde, VetEngine,
 } from '../types'
+import { clePlaceFigee } from '../figees'
 import { validerPlanning, type Violation } from '../validation/validerPlanning'
 import { normaliserContraintesVets } from '../normaliserContraintes'
 import {
@@ -88,6 +89,17 @@ export type VerdictChangement =
   | 'applique'
   /** Le moteur refuse : une règle dure est enfreinte. L'admin tranchera. */
   | 'refuse'
+  /**
+   * Le changement touche une place que l'admin a CADENASSÉE (B-112).
+   *
+   * ⚠️ Volontairement distinct de `refuse`, et ce n'est pas une nuance de
+   * vocabulaire. `refuse` veut dire « ça enfreint une règle du cabinet » et
+   * appelle un arbitrage de l'admin. Ici, il n'y a AUCUNE règle enfreinte —
+   * le mouvement est parfaitement légal, c'est précisément ce qui rendait le
+   * trou dangereux. La seule vérité est : « tu as fixé cette place toi-même ».
+   * Les confondre ferait accuser le moteur d'un refus qu'il n'a pas prononcé.
+   */
+  | 'refuse_cadenas'
   /** La demande ne correspond à rien dans ce planning (place inexistante). */
   | 'sans_objet'
 
@@ -110,6 +122,15 @@ export interface ChangementArbitre {
    * remplace Antoine » se dit mal sans savoir qui y était.
    */
   avant: AffectationVoulue[]
+  /**
+   * Les places figées que ce changement voulait toucher (B-112). Présent
+   * uniquement sur `refuse_cadenas`.
+   *
+   * L'écran en a besoin pour NOMMER le jour concerné — « tu as fixé le 1er de
+   * garde du lundi 3 novembre » vaut mieux que « un cadenas bloque ». Sans
+   * cette liste, le message serait vrai et inutilisable.
+   */
+  placesFigeesTouchees?: PlacePlanning[]
 }
 
 export interface ResultatArbitrage {
@@ -132,6 +153,14 @@ export interface OptionsArbitrage {
   contexteAnterieur?: AttributionGarde[]
   weights?: EquityWeights
   roleAvantageFinancier?: string | null
+  /**
+   * Les places que l'admin a cadenassées (B-111), et que la relecture n'a pas
+   * le droit de défaire (B-112).
+   *
+   * ⚠️ Facultatif, et l'absence vaut « aucun cadenas » : un cabinet qui n'en
+   * pose pas doit se comporter EXACTEMENT comme avant. Un test le fige.
+   */
+  placesFigees?: PlacePlanning[]
 }
 
 // ── Application d'un changement sur une copie ────────────────
@@ -265,7 +294,46 @@ export function arbitrerChangements(
   const arbitrages: ChangementArbitre[] = []
   let modifie = false
 
+  // B-112 — les places que l'admin a fixées. Indexées une fois : le contrôle
+  // tourne pour chaque affectation de chaque changement.
+  //
+  // ⚠️ La clé vient de `clePlaceFigee`, celle du MOTEUR, et surtout pas d'une
+  // fabrication locale. Une seconde façon de fabriquer la même clé finirait
+  // par diverger de la première — et le jour où elle diverge, ce garde-fou se
+  // tait au lieu de refuser. (Manqué de peu ici : la clé maison était écrite
+  // avant de découvrir que `engine/figees.ts` la portait déjà.)
+  const figees = new Set(
+    (options.placesFigees ?? []).map((p) =>
+      clePlaceFigee(p.date, p.type as CodeCreneau, p.role as RoleGarde),
+    ),
+  )
+
   for (const changement of changements) {
+    // ── LE CADENAS PASSE AVANT LE MOTEUR ──────────────────────────────────
+    // Et l'ordre a un sens : demander d'abord au moteur reviendrait à dire
+    // « c'est légal » d'un mouvement qu'on va refuser de toute façon, et à
+    // écrire dans le rapport un verdict qui n'a jamais eu lieu. Un cadenas
+    // n'est pas une question posée au moteur — c'est une décision déjà prise
+    // par l'admin, et elle se constate.
+    const figeesTouchees = changement.affectations
+      .filter((a) =>
+        figees.has(clePlaceFigee(a.date, a.type as CodeCreneau, a.role as RoleGarde)),
+      )
+      .map((a) => ({ date: a.date, type: a.type, role: a.role }))
+
+    if (figeesTouchees.length > 0) {
+      arbitrages.push({
+        changement,
+        verdict: 'refuse_cadenas',
+        // Aucune violation : le moteur n'a rien à reprocher au mouvement.
+        // En inventer une ferait accuser le cabinet d'une règle imaginaire.
+        violations: [],
+        avant: [],
+        placesFigeesTouchees: figeesTouchees,
+      })
+      continue
+    }
+
     const applique = appliquer(courant, changement.affectations)
 
     if (!applique) {
