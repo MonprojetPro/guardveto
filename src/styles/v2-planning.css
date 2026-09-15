@@ -2766,6 +2766,16 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 }
 .rl-resume-inline { font-weight: 500; color: var(--t-muted); }
 
+/* « Antoine 27 → 25 » — B-122 lot 1. Ce que les compteurs afficheront si
+   l'admin applique, avant qu'elle applique. Même poids visuel que le résumé
+   qu'il remplace : c'est la même information, en plus juste. La valeur
+   d'arrivée est seule en gras — c'est elle qu'on lit, le départ n'est là que
+   pour donner l'échelle. */
+.rl-projection {
+  font-size: 0.84rem; font-weight: 500; color: var(--t-muted);
+}
+.rl-projection strong { color: var(--text); font-weight: 700; }
+
 /* Un bloc replié garde exactement l'allure d'un bloc ouvert : sans ça, le
    repli se lirait comme une section de moindre importance. */
 details.rl-bloc > summary {

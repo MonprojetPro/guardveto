@@ -61,6 +61,31 @@ export interface LigneRelecture {
   geste: string[]
   objections: string[]
   effetScore?: 'ameliore' | 'egal' | 'degrade'
+  /** B-122 lot 1 — ce que les compteurs afficheront si on applique. */
+  compteursProjetes?: { prenom: string; avant: number; apres: number }[]
+}
+
+/**
+ * « Antoine 27 -> 25 » — B-122 lot 1, demande de MiKL le 15/09.
+ *
+ * Remplace le resume en deltas (« Antoine -2 ») quand la projection existe.
+ * ⚠️ Les deux ne disent PAS la meme chose : le delta compte des GESTES, la
+ * projection compte des GARDES telles que la vue les comptera. Un geste du
+ * vendredi soir n'est pas une garde en base — les deux divergent donc des
+ * qu'un vendredi est implique, et c'est la projection qui a raison.
+ */
+function CompteursProjetes({ lignes }: { lignes: { prenom: string; avant: number; apres: number }[] }) {
+  if (lignes.length === 0) return null
+  return (
+    <p className="rl-projection">
+      {lignes.map((c, i) => (
+        <span key={c.prenom}>
+          {i > 0 && ' · '}
+          {c.prenom} {c.avant} &rarr; <strong>{c.apres}</strong>
+        </span>
+      ))}
+    </p>
+  )
 }
 
 export interface LigneRevue {
@@ -264,12 +289,18 @@ export function RapportRelecture({
           <ul className="rl-liste">
             {aTrancher.map((l) => {
               const resume = resumerEffet(l.geste)
+              const projection = l.compteursProjetes
               return (
                 <li key={l.id} className="rl-item rl-verdict-probleme">
                   {/* Ce que ça ferait, et pourquoi c'est refusé : les deux
                       seules choses nécessaires pour trancher. Le reste se
                       déplie. */}
-                  {resume && <p className="rl-resume">{resume}</p>}
+                  {/* La projection PASSE AVANT le resume en deltas : c'est le
+                      chiffre sur lequel l'admin decide. Le resume ne s'affiche
+                      qu'a defaut — compteurs illisibles, par exemple. */}
+                  {projection && projection.length > 0
+                    ? <CompteursProjetes lignes={projection} />
+                    : resume && <p className="rl-resume">{resume}</p>}
                   <ul className="rl-objections">
                     {l.objections.map((o, i) => (
                       <li key={i}>{humaniserObjection(o)}</li>

@@ -50,6 +50,10 @@ import { normaliserContraintesVets } from '@/engine/normaliserContraintes'
 // fabrication locale : deux clés qu'il faudrait garder d'accord divergent, et
 // ce garde-fou se tairait au lieu de refuser.
 import { clePlaceFigee } from '@/engine/figees'
+// B-122 lot 1 — « Antoine 27 -> 25 » : ce que les compteurs diront SI on
+// applique. Le chiffre remplace les paragraphes d'explication de Filou.
+import { projeterCompteurs, type AffectationProjetee } from '@/lib/planning/compteursProjetes'
+import { queryCompteurs } from '@/hooks/useCompteurs'
 import type { CodeCreneau, RoleGarde } from '@/engine/types'
 import { persisterResultat } from '@/data/persisterResultat'
 import { ecrirePlanningV1 } from '@/data/ecrirePlanningV1'
@@ -215,6 +219,16 @@ interface LigneRapport {
   /** Ce que dit le moteur quand il refuse. Vide sinon. */
   objections: string[]
   effetScore?: 'ameliore' | 'egal' | 'degrade'
+  /**
+   * B-122 lot 1 — ce que le tableau des compteurs affichera SI on applique.
+   *
+   * Seules les personnes dont le total bouge y figurent : lister toute
+   * l'équipe avec « 22 → 22 » noierait les deux lignes qui comptent.
+   *
+   * Absent si les compteurs n'ont pas pu être lus — un chiffre manquant se
+   * remarque, un chiffre faux se croit.
+   */
+  compteursProjetes?: { prenom: string; avant: number; apres: number }[]
 }
 
 async function executerRelecture(
@@ -495,6 +509,47 @@ async function executerRelecture(
   const jourParDate = new Map(dossier.places.map((p) => [p.date, p.jour]))
   const creneauParType = new Map(dossier.places.map((p) => [p.type, p.creneau]))
 
+  // B-122 lot 1 — LES COMPTEURS TELS QU'ILS SONT AUJOURD'HUI.
+  //
+  // Lus une seule fois pour toutes les propositions. La projection part de ces
+  // valeurs REELLES (la vue `compteurs_gardes`) et n'y applique que l'effet du
+  // mouvement : jamais un recomptage maison, qui finirait par diverger de la
+  // vue sans que rien ne le dise.
+  //
+  // Une lecture en echec ne fait pas echouer la relecture : on rend alors le
+  // rapport SANS compteurs projetes. Un chiffre absent se remarque ; un chiffre
+  // faux se croit.
+  const { compteurs: compteursActuels } = await queryCompteurs(supabase, periodeId)
+
+  /** « Antoine 27 -> 25 », pour un changement donne. */
+  const projectionDe = (a: ChangementArbitre) => {
+    if (compteursActuels.length === 0) return undefined
+
+    const affectations: AffectationProjetee[] = a.changement.affectations.map((voulue, i) => ({
+      date: voulue.date,
+      type: voulue.type,
+      role: voulue.role,
+      vetId: voulue.vetId,
+      // `avant` est rempli par l'arbitrage ; absent sur les verdicts ou rien
+      // n'a pu etre simule, et on ne devine alors personne.
+      avantVetId: a.avant[i]?.vetId ?? null,
+    }))
+
+    const apres = projeterCompteurs(compteursActuels, affectations, contexte.calendrier)
+    const avantPar = new Map(compteursActuels.map((r) => [r.veterinaire_id, r]))
+
+    // Seules les personnes dont le total BOUGE sont citees : lister toute
+    // l'equipe avec « 22 -> 22 » noierait les deux lignes qui comptent.
+    return apres
+      .map((r) => ({
+        prenom: r.prenom,
+        avant: avantPar.get(r.veterinaire_id)?.total_gardes ?? r.total_gardes,
+        apres: r.total_gardes,
+      }))
+      .filter((c) => c.avant !== c.apres)
+      .sort((x, y) => (x.apres - x.avant) - (y.apres - y.avant))
+  }
+
   const enLigne = (a: ChangementArbitre): LigneRapport => ({
     id: a.changement.id,
     motif: a.changement.motif,
@@ -511,6 +566,12 @@ async function executerRelecture(
     }),
     objections: a.violations.map((v) => enFrancais(v.detail)),
     effetScore: a.effetScore,
+    // B-122 lot 1 — ce que le tableau des compteurs affichera si on applique.
+    // ⚠️ Calcule sur les AFFECTATIONS reelles, pas en relisant les phrases du
+    // geste : `effetSurLesPersonnes` compte des GESTES, la vue compte des
+    // GARDES, et le vendredi soir n'est pas une garde en base. Les deux ne
+    // peuvent donc pas coincider des qu'un vendredi est implique.
+    compteursProjetes: projectionDe(a),
   })
 
   const appliques = arbitrage.arbitrages.filter((a) => a.verdict === 'applique').map(enLigne)
