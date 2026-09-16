@@ -85,10 +85,17 @@ export const FICHES: DefinitionFiche[] = [
   { cle: 'echange-a-repondre', pour: 'veto' },
   { cle: 'echange-a-valider', pour: 'admin' },
   { cle: 'depannage-a-rendre', pour: 'admin' },
+  // B-122 lot 2 — rendue ailleurs : elle ouvre le planning en mode aperçu,
+  // avec le détail de chaque proposition et ses compteurs projetés. Une carte
+  // d'accueil qui réafficherait ce détail dupliquerait l'écran qui le fait
+  // déjà (même principe que « conges-a-decider » et « periode-a-publier »).
+  { cle: 'propositions-en-attente', pour: 'admin', rendueAilleurs: true },
 ]
 
 /** Les tables que ces comptes interrogent — la liste que le temps réel doit écouter. */
-export const TABLES_ECOUTEES = ['conges', 'echanges_gardes', 'compensations'] as const
+export const TABLES_ECOUTEES = [
+  'conges', 'echanges_gardes', 'compensations', 'propositions_relecture',
+] as const
 
 function pluriel(n: number, singulier: string, plur: string): string {
   return n > 1 ? plur : singulier

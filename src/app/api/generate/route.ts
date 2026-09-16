@@ -34,6 +34,7 @@ import { persisterResultat } from '@/data/persisterResultat'
 import { ecrirePlanningV1 } from '@/data/ecrirePlanningV1'
 import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
 import { ouvrirTrace, fermerTrace, type EtapeTracee } from '@/data/tracerGeneration'
+import { perimerPropositionsDeLaPeriode } from '@/data/propositionsRelecture'
 
 // Verrou de génération : au-delà de ce délai, un verrou est considéré périmé
 // (crash serverless sans libération) — largement > maxDuration (60 s).
@@ -474,6 +475,15 @@ async function executerGeneration(
         { status: 500 }
       )
     }
+
+    // B-122 lot 2 — FILET DE SÉCURITÉ : une régénération périme les
+    // propositions de la relecture précédente, même si Filou ne relit pas
+    // cette fois (indisponible, clé absente). Le cas normal — la relecture
+    // s'enchaîne juste après — les périme déjà lui-même ; ceci couvre le cas
+    // où elle ne tourne pas du tout, pour qu'un aperçu ne survive jamais à un
+    // planning qu'il ne décrit plus. Best-effort, ne fait jamais échouer la
+    // génération.
+    await perimerPropositionsDeLaPeriode(supabase, periodeId)
 
     // ── DÉPUBLICATION AVANT toute destruction (audit 2026-07-03) ─
     // On passe la période en brouillon AVANT le DELETE/INSERT : si l'écriture

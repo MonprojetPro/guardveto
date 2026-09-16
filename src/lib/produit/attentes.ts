@@ -179,6 +179,23 @@ export const ATTENTES: Record<string, Attente> = {
   'StatutPeriode.brouillon': {
     fiche: 'periode-a-publier',
   },
+
+  // ── LES PROPOSITIONS DE FILOU EN ATTENTE SUR LE PLANNING (B-122 lot 2) ───
+  // Nouvel état créé par ce chantier : une proposition que le moteur refuse
+  // n'est plus jetée à la fermeture de l'écran, elle vit en base jusqu'à ce
+  // que l'admin l'accepte ou la rejette (MiKL, 15/09 : « ça ne s'efface pas
+  // malgré le changement d'onglet »). C'est exactement le mécanisme que ce
+  // fichier existe pour forcer à décider.
+  'StatutPropositionRelecture.en_attente': { fiche: 'propositions-en-attente' },
+  'StatutPropositionRelecture.appliquee': {
+    hors: "Le planning porte déjà le changement (écrit via ecrirePlanningV1). Rien n'attend plus personne sur cette proposition.",
+  },
+  'StatutPropositionRelecture.rejetee': {
+    hors: "L'admin a tranché explicitement contre. Fin de parcours — une nouvelle relecture proposerait, le cas échéant, une nouvelle ligne.",
+  },
+  'StatutPropositionRelecture.perimee': {
+    hors: "Le planning a changé sous elle (régénération, republication, autre proposition sur la même place) : elle ne représente plus un état atteignable, donc plus une décision à prendre.",
+  },
   'StatutPeriode.publie': {
     hors: "Le planning est diffusé. Ce qu'il reste à surveiller (règles enfreintes) relève de la fiche de cohérence, pas d'une file d'attente.",
   },

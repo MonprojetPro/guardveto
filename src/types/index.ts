@@ -248,6 +248,22 @@ export type StatutAbsence = 'active' | 'resolue' | 'annulee'
 export type RoleCompensation = 'premier' | 'second'
 export type StatutCompensation = 'a_compenser' | 'compensee' | 'annulee'
 
+// ── Propositions de Filou en attente sur le planning (B-122 lot 2) ──────────
+/**
+ * Ce que devient une proposition que le moteur a REFUSÉE (verdict `refuse` de
+ * `engine/relecture/arbitrer.ts`), une fois que l'admin en a la main sur le
+ * planning en mode aperçu.
+ *
+ * `en_attente` — affichée en aperçu, personne n'a encore tranché.
+ * `appliquee`  — l'admin l'a acceptée, en bloc ou seule ; le planning porte
+ *                déjà le changement.
+ * `rejetee`    — l'admin l'a refusée explicitement.
+ * `perimee`    — le planning a changé sous elle (régénération, republication,
+ *                autre proposition qui touchait déjà cette place) : elle ne
+ *                représente plus un état atteignable et ne se décide plus.
+ */
+export type StatutPropositionRelecture = 'en_attente' | 'appliquee' | 'rejetee' | 'perimee'
+
 /** Indisponibilité imprévue déclarée APRÈS publication d'un planning (≠ Conge). */
 export interface Absence {
   id: string

@@ -45,6 +45,7 @@ import { effetsDesMouvements } from '@/engine/relecture/effet'
 import { personnesAuxExtremes } from '@/engine/relecture/cibles'
 import { preferencesEnfreintes } from '@/engine/relecture/preferences'
 import { tracerRelecture } from '@/data/tracerRelecture'
+import { persisterPropositionsEnAttente } from '@/data/propositionsRelecture'
 import { normaliserContraintesVets } from '@/engine/normaliserContraintes'
 // B-112 — LA clé d'identité d'une place, celle du moteur. Jamais une seconde
 // fabrication locale : deux clés qu'il faudrait garder d'accord divergent, et
@@ -59,6 +60,7 @@ import { persisterResultat } from '@/data/persisterResultat'
 import { ecrirePlanningV1 } from '@/data/ecrirePlanningV1'
 import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
 import { critereParCle } from '@/lib/planning/criteres-humains'
+import { enFrancais } from '@/lib/planning/traductionRelecture'
 
 // Un appel au modèle sur une période entière, puis l'arbitrage et la réécriture.
 //
@@ -493,19 +495,6 @@ async function executerRelecture(
    * que dans le validateur : celui-ci doit rester lisible par un développeur
    * qui débogue, et c'est l'affichage qui doit parler français.
    */
-  const enFrancais = (texte: string): string => {
-    let sortie = texte
-    for (const [id, prenom] of prenomParId) {
-      // Avec et sans crochets : le validateur emploie les deux formes.
-      sortie = sortie.split(`[${id}]`).join(prenom).split(id).join(prenom)
-    }
-    // Un identifiant qui n'appartient à personne de l'équipe (véto retiré,
-    // donnée orpheline) ne doit pas rester à l'écran non plus.
-    return sortie.replace(
-      /\[?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\]?/gi,
-      'quelqu’un qui n’est plus dans l’équipe',
-    )
-  }
   const jourParDate = new Map(dossier.places.map((p) => [p.date, p.jour]))
   const creneauParType = new Map(dossier.places.map((p) => [p.type, p.creneau]))
 
@@ -564,7 +553,7 @@ async function executerRelecture(
         ? `${jour} · ${creneau} · ${voulue.role} : ${nouveau} à la place de ${ancien}`
         : `${jour} · ${creneau} · ${voulue.role} : ${nouveau} sur une place vide`
     }),
-    objections: a.violations.map((v) => enFrancais(v.detail)),
+    objections: a.violations.map((v) => enFrancais(v.detail, prenomParId)),
     effetScore: a.effetScore,
     // B-122 lot 1 — ce que le tableau des compteurs affichera si on applique.
     // ⚠️ Calcule sur les AFFECTATIONS reelles, pas en relisant les phrases du
@@ -615,7 +604,7 @@ async function executerRelecture(
   // B-096 lot 1 — la trace, avant de rendre la main. On garde EXACTEMENT ce que
   // l'écran affiche : sans quoi l'historique raconterait une autre relecture
   // que celle qu'on a lue. Cette écriture ne peut pas faire échouer la réponse.
-  await tracerRelecture(supabase, periodeId, cabinetId, {
+  const relectureId = await tracerRelecture(supabase, periodeId, cabinetId, {
     issue: 'relu',
     modele: modeleRelecture(),
     synthese: relecture.synthese,
@@ -647,6 +636,24 @@ async function executerRelecture(
       preferencesEnfreintes: preferences.length,
     },
   })
+
+  // B-122 lot 2 — LES PROPOSITIONS REFUSÉES SURVIVENT À L'ONGLET.
+  //
+  // « à trancher » n'est plus qu'un tableau de la réponse HTTP : c'est un état
+  // du planning, affiché en mode aperçu, jusqu'à ce que l'admin l'accepte ou
+  // le rejette. On remplace donc le lot `en_attente` précédent de cette
+  // période par celui-ci — la relecture qui vient de tourner en est la
+  // version la plus à jour. Best-effort, comme la trace elle-même : un échec
+  // d'écriture ici ne doit pas faire perdre le rapport déjà produit.
+  const propositionsRefusees = arbitrage.arbitrages.filter((a) => a.verdict === 'refuse')
+  await persisterPropositionsEnAttente(
+    supabase, cabinetId, periodeId, relectureId,
+    propositionsRefusees.map((a) => ({
+      changement: a.changement,
+      violations: a.violations,
+      compteursProjetes: projectionDe(a) ?? [],
+    })),
+  )
 
   return reponse({
     issue: 'relu',

@@ -1,0 +1,103 @@
+/* ============================================================
+   GUARDVETO V2 — Panneau d'aperçu des propositions de Filou (B-122 lot 2)
+   ============================================================
+   Les boutons (.btn, .btn-valider, .btn-ghost) viennent de v2-filou-edge.css :
+   même vocabulaire visuel que la fenêtre de résultat de Filou, pas une
+   seconde palette pour le même geste "appliquer / laisser tomber".
+   ============================================================ */
+
+.prop-apercu {
+  margin: 0 0 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--t-border, #e4ddd0);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--t-accent, #b98a4a) 6%, transparent);
+}
+
+.prop-apercu-tete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.6rem;
+}
+
+.prop-apercu-tete h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.prop-apercu-erreur {
+  margin: 0 0 0.6rem;
+  color: #a3402f;
+  font-size: 0.9rem;
+}
+
+.prop-apercu-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.prop-apercu-carte {
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--t-border, #e4ddd0);
+  border-radius: 0.6rem;
+  background: var(--t-surface, #fff);
+}
+
+.prop-apercu-motif {
+  margin: 0 0 0.4rem;
+  font-weight: 600;
+}
+
+.prop-apercu-geste {
+  margin: 0 0 0.4rem;
+  padding-left: 1.1rem;
+  font-size: 0.9rem;
+}
+
+.prop-apercu-objections {
+  margin: 0.4rem 0;
+  padding: 0.4rem 0.6rem;
+  border-left: 3px solid #a3402f;
+  background: color-mix(in srgb, #a3402f 6%, transparent);
+  font-size: 0.85rem;
+}
+
+.prop-apercu-objections-tag,
+.prop-apercu-compteurs-tag {
+  font-weight: 600;
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.prop-apercu-objections ul,
+.prop-apercu-compteurs ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.prop-apercu-compteurs {
+  margin: 0.4rem 0;
+  padding: 0.4rem 0.6rem;
+  border-left: 3px solid var(--t-accent, #b98a4a);
+  background: color-mix(in srgb, var(--t-accent, #b98a4a) 8%, transparent);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.prop-apercu-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .prop-apercu-carte {
+    background: color-mix(in srgb, #000 30%, var(--t-surface, #1c1a17));
+  }
+}

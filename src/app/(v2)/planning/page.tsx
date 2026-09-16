@@ -15,9 +15,13 @@ import { exigerIdentite } from '@/lib/identite'
 import type { AbsenceAVenir } from '@/components/v2/AbsencesAVenirPanel'
 import '@/styles/v2-planning.css'
 import '@/styles/v2-filou-edge.css'
+import '@/styles/v2-propositions-relecture.css'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
 import { PlanningV2, type CongeAffiche, type PlageVacances } from '@/components/v2/PlanningV2'
+import { PropositionsPlanning } from '@/components/v2/PropositionsPlanning'
+import { chargerPropositionsEnAttente } from '@/data/propositionsRelecture'
+import { mettreEnFormePropositions } from '@/lib/planning/propositionsAffichage'
 import { RealtimeRefresh } from '@/components/planning/RealtimeRefresh'
 import { RevalidationRealtime } from '@/components/planning/RevalidationRealtime'
 import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
@@ -467,6 +471,25 @@ export default async function PlanningPageV2({
 
   const vets: VetCrise[] = isAdmin ? ((vetsRes?.data as VetCrise[] | null) ?? []) : []
 
+  // ── B-122 lot 2 — LES PROPOSITIONS DE FILOU EN ATTENTE ──────────────────
+  // Chargées pour l'admin seulement, et seulement sur la période affichée :
+  // c'est elle qui décide, et c'est ce planning-là qu'elle regarde. L'état
+  // vit en base (`propositions_relecture`) — il survit au changement d'onglet
+  // (MiKL, 15/09), contrairement à l'ancien rapport éphémère.
+  let propositionsAffichees: ReturnType<typeof mettreEnFormePropositions> = []
+  if (isAdmin && periodeAffichee) {
+    const { propositions, erreur: erreurPropositions } = await chargerPropositionsEnAttente(
+      supabase, periodeAffichee.id,
+    )
+    if (erreurPropositions) {
+      // Best-effort assumé, même principe que l'encart compteurs plus haut :
+      // un aperçu manquant ne doit pas empêcher le planning de s'afficher.
+      console.error(`[planning] propositions en attente indisponibles : ${erreurPropositions}`)
+    }
+    const prenomParId = new Map(vets.map((v) => [v.id, v.prenom]))
+    propositionsAffichees = mettreEnFormePropositions(propositions, prenomParId, nomsTypes)
+  }
+
   // Re-validation continue : périodes publiées qui chevauchent le mois affiché
   // ET qui ont des gardes. Identique à la V1 — c'est un garde-fou, pas du décor.
   // Même tri que ci-dessus : c'est cette liste qui allume le bouton PDF, et un
@@ -524,6 +547,13 @@ export default async function PlanningPageV2({
               initialViolations={violationsInitiales}
             />
           </div>
+        )}
+
+        {isAdmin && periodeAffichee && propositionsAffichees.length > 0 && (
+          <PropositionsPlanning
+            periodeId={periodeAffichee.id}
+            propositions={propositionsAffichees}
+          />
         )}
 
         <PlanningV2

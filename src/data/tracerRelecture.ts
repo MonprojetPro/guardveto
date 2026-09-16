@@ -77,7 +77,12 @@ export interface TraceRelecture {
 }
 
 /**
- * Écrit la trace. Ne lève jamais, ne retourne rien d'utile à l'appelant.
+ * Écrit la trace. Ne lève jamais.
+ *
+ * Rend l'identifiant de la ligne créée — `null` si l'écriture a échoué —
+ * pour que `propositions_relecture` (B-122 lot 2) puisse s'y rattacher.
+ * Aucun appelant antérieur à ce lot n'utilisait le retour ; en ajouter un
+ * ne change rien pour eux.
  *
  * On garde aussi les ÉCHECS (`issue: 'indisponible'`) : un historique où tout
  * s'est toujours bien passé ne sert à rien, et c'est précisément quand Filou ne
@@ -88,9 +93,9 @@ export async function tracerRelecture(
   periodeId: string,
   cabinetId: string,
   trace: TraceRelecture,
-): Promise<void> {
+): Promise<string | null> {
   try {
-    const { error } = await supabase.from('relectures_planning').insert({
+    const { data, error } = await supabase.from('relectures_planning').insert({
       cabinet_id: cabinetId,
       periode_id: periodeId,
       issue: trace.issue,
@@ -104,12 +109,17 @@ export async function tracerRelecture(
       planning_modifie: trace.planningModifie ?? false,
       erreur: trace.erreur ?? null,
       dossier: trace.dossier ?? null,
-    })
+    }).select('id').single()
     // Journalisé, jamais propagé : le rapport est déjà produit, et le perdre
     // pour un problème d'archivage serait absurde. Mais un échec muet ferait
     // croire à une relecture qui n'a jamais eu lieu.
-    if (error) console.error('[relecture] trace non enregistrée :', error.message)
+    if (error) {
+      console.error('[relecture] trace non enregistrée :', error.message)
+      return null
+    }
+    return (data as { id: string } | null)?.id ?? null
   } catch (err) {
     console.error('[relecture] trace non enregistrée :', err)
+    return null
   }
 }

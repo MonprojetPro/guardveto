@@ -195,8 +195,15 @@ function trouverPlace(
  * TOUT. Appliquer la moitié d'un échange laisserait une personne sur deux
  * places et l'autre nulle part — un planning cassé qu'aucune règle dure
  * n'attraperait forcément, donc exactement le genre de dégât qui passe.
+ *
+ * EXPORTÉE (B-122 lot 2) pour `engine/relecture/appliquerProposition.ts` : le
+ * geste « forcer une proposition `refuse` que l'admin accepte quand même » a
+ * besoin d'ÉCRIRE l'affectation sans repasser par le contrôle de légalité —
+ * qui la refuserait à nouveau, pour la même raison exacte. Une seconde
+ * fabrication de cette écriture ailleurs aurait fini par diverger de
+ * celle-ci, la même leçon que `clePlaceFigee` un peu plus bas dans ce fichier.
  */
-function appliquer(
+export function appliquerAffectations(
   planning: PlanningPartiel,
   affectations: AffectationVoulue[],
 ): { planning: PlanningPartiel; avant: AffectationVoulue[] } | null {
@@ -334,7 +341,7 @@ export function arbitrerChangements(
       continue
     }
 
-    const applique = appliquer(courant, changement.affectations)
+    const applique = appliquerAffectations(courant, changement.affectations)
 
     if (!applique) {
       arbitrages.push({
