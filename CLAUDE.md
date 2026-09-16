@@ -128,7 +128,36 @@ Voir `docs/regles-metier-gardes.md` et `docs/01-prd.md`
 ## Installation ruflo — ✅ FAITE, ne pas rejouer
 
 Le serveur MCP `claude-flow` est enregistré au **scope User** depuis le 2026-08-19 : il est
-actif sur ce projet comme sur tous les autres, **sans aucune étape à refaire ici**.
+actif sur ce projet comme sur tous les autres.
+
+> 🔴 **CORRIGÉ le 2026-09-16.** Cette section disait « **sans aucune étape à refaire ici** ».
+> **C'est faux, et cette phrase a coûté 14 jours au projet Orpheus** — deux choses distinctes
+> y sont confondues :
+>
+> | Ce qui est **global**, rien à refaire | Ce qui est **par projet**, obligatoire |
+> |---|---|
+> | Le **raccordement MCP** (`--scope user`) | L'**installation** (`ruflo init`), **une fois par projet** |
+>
+> Sans `ruflo init` : ni mémoire, ni hooks, ni pont d'apprentissage. **Symptôme** :
+> `.claude-flow/agents/store.json` montre des agents à `taskCount: 0` — créés, jamais utilisés.
+> ✅ **Ici, `ruflo init` a bien été fait** (config, hooks, learning, metrics présents, vérifié).
+
+> ⛔ **`swarm_status` NE TESTE RIEN** — il répond même quand rien n'est installé (vérifié le
+> 2026-09-16). ✅ **Le seul test de fumée valable est un aller-retour mémoire** :
+> `memory_store` → `"stored": true`, puis `memory_retrieve` → `"found": true`.
+
+> 🗄️ **Sur ce projet, la mémoire de ruflo n'existe pas** : aucun `.swarm/memory.db` (vérifié le
+> 2026-09-16). Elle n'a donc jamais rien retenu. Si l'écriture est refusée avec *« refusing an
+> unsafe sql.js whole-image write »*, la cause est des **fichiers annexes SQLite orphelins** :
+> supprimer `.swarm/memory.db-wal` et `-shm` **uniquement si le `-wal` est à 0 octet**.
+> ⛔ Jamais sur un `-wal` non vide, il porte des transactions.
+> ⚠️ Le **CLI** `ruflo memory *` est cassé sur Windows — passer par les outils MCP.
+
+> 🔴 **Quatre corrections à faire après tout `ruflo init`** : retirer `"model"` de
+> `.claude/settings.json` (l'init y écrit `claude-sonnet-5`, **qui ferait basculer MiKL d'Opus à
+> Sonnet sans avertissement** — déjà retiré ici, vérifié) · passer `adr.autoGenerate` et
+> `ddd.trackDomains` à `false` · ajouter `.swarm/`, `.agents/`, `ruvector.db` au `.gitignore` ·
+> remplacer le `CLAUDE.md` générique en **archivant** l'original.
 
 ⚠️ *Cette section disait « à exécuter » jusqu'au 2026-08-26, avec un `cd` vers un chemin
 (`Projets BMAD/`) qui n'existe plus et une branche (`feat/ruflo-v4-migration`) déjà fusionnée.
