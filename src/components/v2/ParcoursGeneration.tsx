@@ -694,7 +694,13 @@ export function ParcoursGeneration({
 
       setRelecture(data as unknown as DonneesRelecture)
       // Des gardes ont pu changer : l'écran du planning doit les relire.
-      if (data.planningModifie) router.refresh()
+      // B-122 lot 2 — ET des propositions ont pu être persistées même sans
+      // écriture sur le planning (`aTrancher`, statut `en_attente`) : sans ce
+      // second cas, le panneau `PropositionsPlanning` sous ce dialogue restait
+      // sur les données SSR d'avant la relecture tant que rien n'avait été
+      // appliqué automatiquement.
+      const aDesPropositions = Array.isArray(data.aTrancher) && data.aTrancher.length > 0
+      if (data.planningModifie || aDesPropositions) router.refresh()
     } catch (e) {
       setRelecture({
         issue: 'indisponible',
@@ -1567,7 +1573,14 @@ export function ParcoursGeneration({
             {/* B-107 — les prénoms servent à GROUPER les constats par personne.
                 Sans eux le rapport s'affiche à plat : moins lisible, jamais faux. */}
             {resultat.issue !== 'echec' && relecture && (
-              <RapportRelecture donnees={relecture} prenoms={prenomsEquipe} />
+              <RapportRelecture
+                donnees={relecture}
+                prenoms={prenomsEquipe}
+                // B-122 lot 3 — referme ce dialogue pour montrer le planning
+                // en mode aperçu : le panneau y est déjà, à jour (cf. le
+                // router.refresh() juste au-dessus dans lancerRelecture).
+                onVoirSurLePlanning={() => fermer(false)}
+              />
             )}
           </div>
         )}

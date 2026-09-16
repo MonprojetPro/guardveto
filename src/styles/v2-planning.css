@@ -2636,6 +2636,16 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
 }
 .rl-objections li { font-size: 0.79rem; line-height: 1.45; color: var(--t-muted); }
 
+/* B-122 lot 3 — le détail (compteurs, tableau des places) vit sur le
+   planning ; ici juste le motif, une puce par proposition. */
+.rl-liste-compacte { display: grid; gap: 7px; list-style: none; margin: 0; padding: 0; }
+.rl-liste-compacte > li {
+  background: var(--surface); border-radius: var(--r-sm);
+  padding: 8px 10px;
+}
+.rl-liste-compacte .rl-motif { margin: 0; }
+.rl-cta-planning { justify-self: start; margin-top: 2px; }
+
 /* La gravité se dit par un liseré, jamais par un fond : trois fonds colorés
    dans une même liste redeviendraient le bruit qu'on cherche à éviter. */
 .rl-gravite-bloquant { border-left: 3px solid var(--danger); }

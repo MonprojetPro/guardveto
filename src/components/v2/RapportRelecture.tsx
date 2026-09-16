@@ -54,6 +54,25 @@ import {
   personnesTouchees,
 } from '@/lib/relecture/resume'
 
+// ── B-122 lot 3 — LE RAPPORT MAIGRIT PARCE QUE LE TRAVAIL DÉMÉNAGE ──────────
+// MiKL, 15/09, après trois séries de maquettes écartées : « à la fin de la
+// génération, y aura juste un petit rapport sur ce qu'il manque […] + ces
+// fameuses possibilités de changement avec un CTA "voir ce que ça donnerait",
+// et hop s'il clique dessus ça l'envoie sur le planning avec les modifs
+// envisagées ».
+//
+// Ce que ça change ICI, précisément :
+//   • « à trancher » n'affiche plus le détail (compteurs projetés, tableau
+//     jour/créneau/échange) — c'est fait par `PropositionsPlanning.tsx` sur
+//     le planning lui-même (B-122 lot 2), qui porte en plus les boutons
+//     appliquer/rejeter. Le répéter ici serait le même travail deux fois, et
+//     c'est exactement ce qui avait rendu le rapport du 15/09 « inbuvable ».
+//   • « ce que Filou a relevé » et « rien à signaler » sont REPLIÉS d'un cran
+//     de plus : c'était déjà le cas pour « rien à signaler », ça ne l'était
+//     pas pour « ce que Filou a relevé », qui restait un bloc toujours
+//     ouvert. Repliés, pas retirés — la règle qui encadre tout repli plus
+//     haut dans ce fichier reste vraie mot pour mot.
+
 export interface LigneRelecture {
   id: string
   motif: string
@@ -63,29 +82,6 @@ export interface LigneRelecture {
   effetScore?: 'ameliore' | 'egal' | 'degrade'
   /** B-122 lot 1 — ce que les compteurs afficheront si on applique. */
   compteursProjetes?: { prenom: string; avant: number; apres: number }[]
-}
-
-/**
- * « Antoine 27 -> 25 » — B-122 lot 1, demande de MiKL le 15/09.
- *
- * Remplace le resume en deltas (« Antoine -2 ») quand la projection existe.
- * ⚠️ Les deux ne disent PAS la meme chose : le delta compte des GESTES, la
- * projection compte des GARDES telles que la vue les comptera. Un geste du
- * vendredi soir n'est pas une garde en base — les deux divergent donc des
- * qu'un vendredi est implique, et c'est la projection qui a raison.
- */
-function CompteursProjetes({ lignes }: { lignes: { prenom: string; avant: number; apres: number }[] }) {
-  if (lignes.length === 0) return null
-  return (
-    <p className="rl-projection">
-      {lignes.map((c, i) => (
-        <span key={c.prenom}>
-          {i > 0 && ' · '}
-          {c.prenom} {c.avant} &rarr; <strong>{c.apres}</strong>
-        </span>
-      ))}
-    </p>
-  )
 }
 
 export interface LigneRevue {
@@ -183,6 +179,7 @@ function DetailMouvement({ ligne }: { ligne: LigneRelecture }) {
 export function RapportRelecture({
   donnees,
   prenoms = [],
+  onVoirSurLePlanning,
 }: {
   donnees: DonneesRelecture
   /**
@@ -193,6 +190,15 @@ export function RapportRelecture({
    * serait pire — il rangerait un constat sous le mauvais nom.
    */
   prenoms?: string[]
+  /**
+   * B-122 lot 3 — le CTA qui referme ce rapport pour montrer le planning en
+   * mode aperçu, propositions comprises (`PropositionsPlanning.tsx`, lot 2).
+   *
+   * Optionnel : sans lui, le bouton ne s'affiche pas plutôt que de mener
+   * nulle part — ce composant reste utilisable hors du parcours de
+   * génération sans traîner une dépendance qu'il ne peut pas honorer.
+   */
+  onVoirSurLePlanning?: () => void
 }) {
   // ── Filou n'a pas pu relire ──
   // Jamais un silence : sans ce bloc, l'absence de rapport se lirait « rien à
@@ -273,7 +279,11 @@ export function RapportRelecture({
       )}
 
       {/* ① CE QUI ATTEND UNE DÉCISION — en premier, parce que c'est la seule
-          chose qui ne se fera pas sans l'admin. Jamais replié. */}
+          chose qui ne se fera pas sans l'admin. Jamais replié.
+          B-122 lot 3 : le détail (compteurs projetés, tableau des places)
+          vit désormais SUR LE PLANNING (`PropositionsPlanning.tsx`), avec les
+          boutons pour agir. Ici, juste de quoi savoir que ça existe et un
+          chemin pour y aller — le répéter serait le même travail deux fois. */}
       {aTrancher.length > 0 && (
         <div className="rl-bloc rl-trancher">
           <p className="rl-bloc-titre">
@@ -283,39 +293,35 @@ export function RapportRelecture({
               : `${aTrancher.length} propositions attendent ta décision`}
           </p>
           <p className="rl-bloc-sous">
-            Rien n’a été modifié. Le moteur refuse, Filou insiste — à toi de trancher, et
-            d’appliquer à la main sur le planning si tu lui donnes raison.
+            Rien n’a été modifié. Vois ce que chacune donnerait sur le planning, et
+            applique-la ou rejette-la là où elle se pose.
           </p>
-          <ul className="rl-liste">
-            {aTrancher.map((l) => {
-              const resume = resumerEffet(l.geste)
-              const projection = l.compteursProjetes
-              return (
-                <li key={l.id} className="rl-item rl-verdict-probleme">
-                  {/* Ce que ça ferait, et pourquoi c'est refusé : les deux
-                      seules choses nécessaires pour trancher. Le reste se
-                      déplie. */}
-                  {/* La projection PASSE AVANT le resume en deltas : c'est le
-                      chiffre sur lequel l'admin decide. Le resume ne s'affiche
-                      qu'a defaut — compteurs illisibles, par exemple. */}
-                  {projection && projection.length > 0
-                    ? <CompteursProjetes lignes={projection} />
-                    : resume && <p className="rl-resume">{resume}</p>}
-                  <ul className="rl-objections">
-                    {l.objections.map((o, i) => (
-                      <li key={i}>{humaniserObjection(o)}</li>
-                    ))}
-                  </ul>
+          <ul className="rl-liste-compacte">
+            {aTrancher.map((l) => (
+              <li key={l.id}>
+                <p className="rl-motif">{l.motif}</p>
+                {l.objections.length > 0 && (
                   <details className="rl-plus">
-                    <summary>
-                      Ce que dit Filou, et les {l.geste.length} places concernées
-                    </summary>
-                    <DetailMouvement ligne={l} />
+                    <summary>Ce que le moteur reproche</summary>
+                    <ul className="rl-objections">
+                      {l.objections.map((o, i) => (
+                        <li key={i}>{humaniserObjection(o)}</li>
+                      ))}
+                    </ul>
                   </details>
-                </li>
-              )
-            })}
+                )}
+              </li>
+            ))}
           </ul>
+          {onVoirSurLePlanning && (
+            <button
+              type="button"
+              className="btn btn-valider rl-cta-planning"
+              onClick={onVoirSurLePlanning}
+            >
+              Voir ce que ça donnerait sur le planning
+            </button>
+          )}
         </div>
       )}
 
@@ -359,11 +365,16 @@ export function RapportRelecture({
           deviennent une ligne dépliable, et l'admin voit d'un coup d'œil QUI
           est concerné. */}
       {aVoir.length > 0 && (
-        <div className="rl-bloc rl-constats">
-          <p className="rl-bloc-titre">
+        <details className="rl-bloc rl-constats">
+          {/* B-122 lot 3 — replié par défaut : « juste un petit rapport »,
+              MiKL le 15/09. Replié n'est pas retiré (règle de ce fichier) —
+              le résumé dit COMBIEN, et tout le contenu reste accessible en un
+              clic. C'était déjà le traitement de « rien à signaler » plus
+              bas ; ce bloc-ci restait seul à s'ouvrir par défaut. */}
+          <summary className="rl-bloc-titre">
             <Eye className="rl-ico" aria-hidden />
-            Ce que Filou a relevé
-          </p>
+            {aVoir.length === 1 ? 'Filou a relevé 1 point' : `Filou a relevé ${aVoir.length} points`}
+          </summary>
           {/* ── B-117 · CES CONSTATS SONT ANTÉRIEURS AUX MOUVEMENTS ────────
               MiKL, 07/09 : le rapport annonçait un changement qui libère
               Antoine du week-end du 5 décembre, et affichait trois lignes plus
@@ -441,7 +452,7 @@ export function RapportRelecture({
               </li>
             ))}
           </ul>
-        </div>
+        </details>
       )}
 
       {/* ④ CE QU'IL A REGARDÉ SANS RIEN TROUVER — la pièce qui manquait.
