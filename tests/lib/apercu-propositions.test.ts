@@ -36,6 +36,7 @@ describe('calculerPlacesProposees', () => {
     expect(places[0]).toEqual({
       date: '2026-12-04',
       type: 'vendredi_soir',
+      role: 'second',
       vetId: 'fanny',
       propositionId: 'P1',
     })
@@ -69,7 +70,7 @@ describe('calculerApercuCreneaux', () => {
           ]),
         },
       ]),
-      [{ date: '2026-12-05', type: 'weekend', occupants: ['antoine'] }],
+      [{ date: '2026-12-05', type: 'weekend', occupants: [{ vetId: 'antoine', role: 'premier' }] }],
     )
 
     const c = apercu[cleCreneau('2026-12-05', 'weekend')]
@@ -98,11 +99,11 @@ describe('calculerApercuCreneaux', () => {
     ])
 
     const apercu = calculerApercuCreneaux(places, [
-      { date: '2026-11-30', type: 'semaine_soir', occupants: ['antoine', 'fanny'] },
-      { date: '2026-12-01', type: 'semaine_soir', occupants: ['manon', 'anne-sophie'] },
-      { date: '2026-12-02', type: 'semaine_soir', occupants: ['jean', 'victor'] },
-      { date: '2026-12-04', type: 'vendredi_soir', occupants: ['victor', 'antoine'] },
-      { date: '2026-12-05', type: 'weekend', occupants: ['antoine', 'victor'] },
+      { date: '2026-11-30', type: 'semaine_soir', occupants: [{ vetId: 'antoine', role: 'premier' }, { vetId: 'fanny', role: 'second' }] },
+      { date: '2026-12-01', type: 'semaine_soir', occupants: [{ vetId: 'manon', role: 'premier' }, { vetId: 'anne-sophie', role: 'second' }] },
+      { date: '2026-12-02', type: 'semaine_soir', occupants: [{ vetId: 'jean', role: 'premier' }, { vetId: 'victor', role: 'second' }] },
+      { date: '2026-12-04', type: 'vendredi_soir', occupants: [{ vetId: 'victor', role: 'premier' }, { vetId: 'antoine', role: 'second' }] },
+      { date: '2026-12-05', type: 'weekend', occupants: [{ vetId: 'antoine', role: 'premier' }, { vetId: 'victor', role: 'second' }] },
     ])
 
     expect(Object.keys(apercu)).toHaveLength(5)
@@ -125,36 +126,103 @@ describe('calculerApercuCreneaux', () => {
           ]),
         },
       ]),
-      [{ date: '2026-12-01', type: 'semaine_soir', occupants: ['antoine', 'anne-sophie'] }],
+      [{ date: '2026-12-01', type: 'semaine_soir', occupants: [{ vetId: 'antoine', role: 'premier' }, { vetId: 'anne-sophie', role: 'second' }] }],
     )
 
     expect(apercu).toEqual({})
   })
 
-  it("n'est pas trompé par l'inversion des rôles du vendredi (B-111)", () => {
-    // La vue inverse rôles ET personnes sur la ligne du vendredi. Comme on
-    // compare des ENSEMBLES de personnes, l'ordre des occupants n'a aucun
-    // effet : le résultat est le même dans les deux sens.
+  it("NE BARRE PERSONNE sur le vendredi soir — l'inversion rend le rôle faux (B-111)", () => {
+    // La ligne du vendredi est DÉRIVÉE du week-end, rôles et personnes
+    // inversés. Apparier par rôle y désignerait la mauvaise personne un jour
+    // sur trois : c'est le défaut payé le 04/09 sur les cadenas. On montre donc
+    // qui arrive, et on se tait sur qui part — quel que soit l'ordre affiché.
     const places = calculerPlacesProposees([
       {
         id: 'P1',
         changement: changement('P1', [
           { date: '2026-12-04', type: 'vendredi_soir', role: 'premier', vetId: 'fanny' },
-          { date: '2026-12-04', type: 'vendredi_soir', role: 'second', vetId: 'jean' },
         ]),
       },
     ])
 
     const aLEndroit = calculerApercuCreneaux(places, [
-      { date: '2026-12-04', type: 'vendredi_soir', occupants: ['antoine', 'jean'] },
+      { date: '2026-12-04', type: 'vendredi_soir', occupants: [{ vetId: 'antoine', role: 'premier' }, { vetId: 'jean', role: 'second' }] },
     ])
     const aLEnvers = calculerApercuCreneaux(places, [
-      { date: '2026-12-04', type: 'vendredi_soir', occupants: ['jean', 'antoine'] },
+      { date: '2026-12-04', type: 'vendredi_soir', occupants: [{ vetId: 'jean', role: 'premier' }, { vetId: 'antoine', role: 'second' }] },
     ])
 
     expect(aLEndroit).toEqual(aLEnvers)
-    expect(aLEndroit[cleCreneau('2026-12-04', 'vendredi_soir')].sortants).toEqual(['antoine'])
+    expect(aLEndroit[cleCreneau('2026-12-04', 'vendredi_soir')].sortants).toEqual([])
     expect(aLEndroit[cleCreneau('2026-12-04', 'vendredi_soir')].entrants).toEqual(['fanny'])
+  })
+
+  it("NE BARRE PAS une place que la proposition ne touche pas — recette MiKL du 17/09", () => {
+    // ⚠️ LE DÉFAUT EXACT, capture à l'appui : sur le week-end du 5 décembre, la
+    // grille barrait Antoine ET Victor pour faire entrer Fanny. Or la
+    // proposition ne portait qu'une affectation — `premier: Fanny`. Victor, en
+    // second, ne bougeait pas. MiKL : « pourquoi Victor et Antoine sont barrés
+    // et il y a juste Fanny ? ».
+    //
+    // Une proposition ne décrit QUE ce qu'elle change, jamais l'état complet du
+    // créneau. La v2 comparait deux ensembles et supposait le contraire.
+    const apercu = calculerApercuCreneaux(
+      calculerPlacesProposees([
+        {
+          id: 'F1',
+          changement: changement('F1', [
+            { date: '2026-12-05', type: 'weekend', role: 'premier', vetId: 'fanny' },
+          ]),
+        },
+      ]),
+      [
+        {
+          date: '2026-12-05',
+          type: 'weekend',
+          occupants: [
+            { vetId: 'antoine', role: 'premier' },
+            { vetId: 'victor', role: 'second' },
+          ],
+        },
+      ],
+    )
+
+    const c = apercu[cleCreneau('2026-12-05', 'weekend')]
+    expect(c.sortants).toEqual(['antoine'])
+    expect(c.entrants).toEqual(['fanny'])
+    expect(c.sortants).not.toContain('victor')
+  })
+
+  it('ne fait pas sortir quelqu’un que la proposition REPLACE sur le même créneau', () => {
+    // Manon cède le premier rôle à Anne-Sophie, et Antoine arrive en second.
+    // Manon part vraiment ; Anne-Sophie, elle, change juste de place.
+    const apercu = calculerApercuCreneaux(
+      calculerPlacesProposees([
+        {
+          id: 'P1',
+          changement: changement('P1', [
+            { date: '2026-12-01', type: 'semaine_soir', role: 'premier', vetId: 'anne-sophie' },
+            { date: '2026-12-01', type: 'semaine_soir', role: 'second', vetId: 'antoine' },
+          ]),
+        },
+      ]),
+      [
+        {
+          date: '2026-12-01',
+          type: 'semaine_soir',
+          occupants: [
+            { vetId: 'manon', role: 'premier' },
+            { vetId: 'anne-sophie', role: 'second' },
+          ],
+        },
+      ],
+    )
+
+    const c = apercu[cleCreneau('2026-12-01', 'semaine_soir')]
+    expect(c.sortants).toEqual(['manon'])
+    expect(c.entrants).toEqual(['antoine'])
+    expect(c.sortants).not.toContain('anne-sophie')
   })
 
   it('fait ressortir la personne qui part quand la place se VIDE', () => {
@@ -168,7 +236,7 @@ describe('calculerApercuCreneaux', () => {
           ]),
         },
       ]),
-      [{ date: '2026-12-04', type: 'semaine_soir', occupants: ['jean', 'manon'] }],
+      [{ date: '2026-12-04', type: 'semaine_soir', occupants: [{ vetId: 'jean', role: 'premier' }, { vetId: 'manon', role: 'second' }] }],
     )
 
     const c = apercu[cleCreneau('2026-12-04', 'semaine_soir')]
@@ -186,13 +254,13 @@ describe('calculerApercuCreneaux', () => {
           ]),
         },
       ]),
-      [{ date: '2026-12-05', type: 'weekend', occupants: ['antoine'] }],
+      [{ date: '2026-12-05', type: 'weekend', occupants: [{ vetId: 'antoine', role: 'premier' }] }],
     )
 
     expect(apercu).toEqual({})
   })
 
   it('rend un objet vide sans proposition', () => {
-    expect(calculerApercuCreneaux([], [{ date: '2026-12-05', type: 'weekend', occupants: ['a'] }])).toEqual({})
+    expect(calculerApercuCreneaux([], [{ date: '2026-12-05', type: 'weekend', occupants: [{ vetId: 'a', role: 'premier' }] }])).toEqual({})
   })
 })

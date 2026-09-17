@@ -316,7 +316,13 @@ export function PlanningV2({
     const creneaux = gardes.map((g) => ({
       date: g.date,
       type: g.type,
-      occupants: placesDeGarde(g).map((p) => p.vetId),
+      // Le rôle de DONNÉES, jamais celui d'affichage : la proposition parle en
+      // « premier »/« second », la grille dessine « 1er »/« 2e ». Confondre les
+      // deux vocabulaires est le défaut du 04/09 (`labelDonneeDePlace`).
+      occupants: placesDeGarde(g).map((p) => ({
+        vetId: p.vetId,
+        role: labelDonneeDePlace(p.index),
+      })),
     }))
     return calculerApercuCreneaux(placesProposees, creneaux)
   }, [placesProposees, gardes])

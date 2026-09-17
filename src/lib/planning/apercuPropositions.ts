@@ -63,16 +63,42 @@ export interface PropositionPourApercu {
 export interface PlaceProposee {
   date: string
   type: string
+  /** Rôle de DONNÉES visé par la proposition (`'premier'`, `'second'`…). */
+  role: string
   /** `null` = la proposition VIDE cette place. */
   vetId: string | null
   propositionId: string
+}
+
+/** Une personne en place, avec le rôle de DONNÉES de sa place. */
+export interface OccupantActuel {
+  vetId: string | null
+  /** `'premier'` / `'second'` — `null` au-delà de la 2e place. */
+  role: string | null
 }
 
 /** Un créneau tel que la grille l'affiche réellement, occupants compris. */
 export interface CreneauActuel {
   date: string
   type: string
-  occupants: readonly (string | null)[]
+  occupants: readonly OccupantActuel[]
+}
+
+/**
+ * Le rôle permet-il de dire QUI part, sur ce type de créneau ?
+ *
+ * ⚠️ NON sur le vendredi soir, et c'est tout le piège de B-111. La ligne du
+ * vendredi n'existe pas en base : elle est DÉRIVÉE du week-end par
+ * `resoudrePlanningAffichage`, qui inverse rôles ET personnes. Le « premier »
+ * affiché n'y est donc pas le « premier » que la proposition désigne, et
+ * apparier les deux accuserait la mauvaise personne un jour sur trois — le
+ * défaut exact payé le 04/09 sur les cadenas.
+ *
+ * Sur ce créneau-là on ne barre personne : on montre qui arrive, et on se tait
+ * sur qui part. Mieux vaut ne rien dire que désigner quelqu'un à tort.
+ */
+function roleFiable(type: string): boolean {
+  return type !== 'vendredi_soir'
 }
 
 /** Ce que la grille doit dessiner sur un créneau donné. */
@@ -101,6 +127,7 @@ export function calculerPlacesProposees(
     p.changement.affectations.map((a) => ({
       date: a.date,
       type: a.type,
+      role: a.role,
       vetId: a.vetId,
       propositionId: p.id,
     })),
@@ -119,18 +146,14 @@ export function calculerApercuCreneaux(
   placesProposees: readonly PlaceProposee[],
   creneauxActuels: readonly CreneauActuel[],
 ): Record<string, ApercuCreneau> {
-  // Ce que chaque créneau contiendrait après application.
-  const proposeParCle = new Map<string, { vets: Set<string>; propositionId: string }>()
+  // Les places que la proposition occupe sur chaque créneau — avec leur rôle,
+  // parce qu'une proposition ne décrit QUE ce qu'elle change.
+  const proposeParCle = new Map<string, { places: PlaceProposee[]; propositionId: string }>()
   for (const place of placesProposees) {
     const cle = cleCreneau(place.date, place.type)
-    let entree = proposeParCle.get(cle)
-    if (!entree) {
-      entree = { vets: new Set(), propositionId: place.propositionId }
-      proposeParCle.set(cle, entree)
-    }
-    // `vetId: null` vide la place : elle ne met donc personne dans l'ensemble
-    // proposé. La personne qui l'occupait ressortira en `sortants`.
-    if (place.vetId) entree.vets.add(place.vetId)
+    const entree = proposeParCle.get(cle)
+    if (entree) entree.places.push(place)
+    else proposeParCle.set(cle, { places: [place], propositionId: place.propositionId })
   }
 
   const apercu: Record<string, ApercuCreneau> = {}
@@ -140,10 +163,39 @@ export function calculerApercuCreneaux(
     const propose = proposeParCle.get(cle)
     if (!propose) continue
 
-    const actuels = new Set(creneau.occupants.filter((v): v is string => Boolean(v)))
+    const vetsProposes = new Set(
+      propose.places.map((p) => p.vetId).filter((v): v is string => Boolean(v)),
+    )
+    const vetsActuels = new Set(
+      creneau.occupants.map((o) => o.vetId).filter((v): v is string => Boolean(v)),
+    )
 
-    const sortants = [...actuels].filter((v) => !propose.vets.has(v))
-    const entrants = [...propose.vets].filter((v) => !actuels.has(v))
+    // Les ARRIVANTS sont certains : quelqu'un que la proposition met ici et qui
+    // n'y est pas encore. Aucun appariement de rôle n'est nécessaire.
+    const entrants = [...vetsProposes].filter((v) => !vetsActuels.has(v))
+
+    // ── LES SORTANTS, ET LE DÉFAUT QUE CE BLOC CORRIGE ────────────────────
+    //
+    // Recetté par MiKL le 17/09 : sur le week-end du 5 décembre, la grille
+    // barrait Antoine ET Victor pour faire entrer Fanny. Or la proposition ne
+    // portait qu'UNE affectation (`premier: Fanny`) — Victor, en second, ne
+    // bougeait pas. La v1 comparait l'ensemble proposé à l'ensemble actuel et
+    // en déduisait que tout occupant non mentionné partait.
+    //
+    // ⚠️ UNE PROPOSITION NE DÉCRIT QUE CE QU'ELLE CHANGE, jamais l'état complet
+    // du créneau. Une place qu'elle ne mentionne pas reste telle quelle.
+    // On apparie donc PLACE À PLACE, par rôle de données.
+    const sortants: string[] = []
+    if (roleFiable(creneau.type)) {
+      for (const place of propose.places) {
+        const occupant = creneau.occupants.find((o) => o.role === place.role)
+        if (!occupant?.vetId) continue
+        // Cette personne reste sur le créneau si la proposition la replace
+        // ailleurs dessus : c'est une permutation de rôles, pas un départ.
+        if (vetsProposes.has(occupant.vetId)) continue
+        if (!sortants.includes(occupant.vetId)) sortants.push(occupant.vetId)
+      }
+    }
 
     // Permutation de rôles pure : mêmes personnes avant et après. Rien à
     // signaler — et surtout pas une case marquée « ça change » qui, une fois

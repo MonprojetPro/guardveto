@@ -156,10 +156,40 @@ interface PropsDetail {
   onFermer: () => void
 }
 
+/**
+ * Découpe « 5 décembre 2026 · Week-end · premier : Fanny » en ses trois
+ * morceaux, pour pouvoir les mettre en forme séparément.
+ *
+ * ⚠️ MiKL, le 17/09 : « visuellement c'est un gros pavé, ce n'est pas beau ni
+ * lisible ». Six lignes au même poids typographique ne se lisent pas : l'œil
+ * n'a aucun point d'accroche. La date doit ressortir (c'est par elle qu'on
+ * retrouve la case sur la grille), le nom aussi (c'est lui qui change), et le
+ * créneau reste au second plan.
+ *
+ * Repli sûr : si le format évolue, on rend la ligne telle quelle plutôt que de
+ * la tronquer. Un libellé moins joli vaut mieux qu'un libellé amputé.
+ */
+function decouperGeste(ligne: string): { date: string; creneau: string; qui: string } | null {
+  const bouts = ligne.split(' · ')
+  if (bouts.length < 3) return null
+  return { date: bouts[0], creneau: bouts[1], qui: bouts.slice(2).join(' · ') }
+}
+
 export function DetailProposition({ proposition, onFermer }: PropsDetail) {
   const router = useRouter()
   const [enCours, demarrer] = useTransition()
   const [erreur, setErreur] = useState<string | null>(null)
+
+  // Ce que le bouton engage RÉELLEMENT. MiKL, le 17/09 : « quand j'ai cliqué
+  // sur appliquer, je pensais que c'était appliquer juste pour ce jour et
+  // finalement ça me l'a appliqué pour tous ». Le libellé disait « ce
+  // changement » pour 6 affectations sur 5 jours — il mentait par omission.
+  // Le découpage jour par jour qu'il demande est un autre chantier (B-126) :
+  // en attendant, le bouton dit ce qu'il fait.
+  const nbGestes = proposition.geste.length
+  const joursTouches = new Set(
+    proposition.geste.map((g) => decouperGeste(g)?.date ?? g),
+  ).size
 
   const agir = (action: 'appliquer' | 'rejeter') => {
     setErreur(null)
@@ -181,13 +211,39 @@ export function DetailProposition({ proposition, onFermer }: PropsDetail) {
     <aside className="prop-barre" role="region" aria-label="Changement proposé par Filou">
       <div className="prop-barre-corps">
         <div className="prop-barre-texte">
+          {/* L'étendue AVANT le texte : c'est l'information que MiKL n'avait
+              pas, et elle change la décision. */}
+          <p className="prop-barre-etendue">
+            <span className="prop-barre-pastille" aria-hidden="true">
+              🦊
+            </span>
+            Réorganisation de <strong>{nbGestes} garde{nbGestes > 1 ? 's' : ''}</strong> sur{' '}
+            <strong>
+              {joursTouches} jour{joursTouches > 1 ? 's' : ''}
+            </strong>
+            {' — elle s’applique d’un bloc.'}
+          </p>
+
           <p className="prop-barre-motif">{proposition.motif}</p>
 
           {proposition.geste.length > 0 && (
             <ul className="prop-barre-geste">
-              {proposition.geste.map((g, i) => (
-                <li key={i}>{g}</li>
-              ))}
+              {proposition.geste.map((g, i) => {
+                const b = decouperGeste(g)
+                return (
+                  <li key={i}>
+                    {b ? (
+                      <>
+                        <span className="pg-date">{b.date}</span>
+                        <span className="pg-creneau">{b.creneau}</span>
+                        <span className="pg-qui">{b.qui}</span>
+                      </>
+                    ) : (
+                      g
+                    )}
+                  </li>
+                )
+              })}
             </ul>
           )}
 
@@ -222,7 +278,9 @@ export function DetailProposition({ proposition, onFermer }: PropsDetail) {
             onClick={() => agir('appliquer')}
             disabled={enCours}
           >
-            {enCours ? 'Un instant…' : 'Appliquer ce changement'}
+            {enCours
+              ? 'Un instant…'
+              : `Appliquer les ${nbGestes} changement${nbGestes > 1 ? 's' : ''}`}
           </button>
           <button
             type="button"

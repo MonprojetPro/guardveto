@@ -89,19 +89,65 @@
 
 .prop-barre-texte { flex: 1 1 24rem; min-width: 0; }
 
+/* ⚠️ REPRIS APRÈS RECETTE. MiKL, le 17/09 : « visuellement c'est un gros pavé,
+   ce n'est pas beau ni lisible […] joue sur les couleurs, les contrastes, le
+   gras, l'italique ». Le défaut n'était pas la quantité de texte mais
+   l'ABSENCE DE HIÉRARCHIE : motif, gestes et réserves avaient le même poids,
+   donc l'œil n'avait aucun point d'entrée. Trois niveaux désormais :
+     ① l'étendue — ce que le bouton engage, en accent ;
+     ② le motif — le pourquoi, en gris, en retrait ;
+     ③ les gestes — le quoi, en colonnes alignées.                            */
+
+/* ① L'étendue : la ligne qui manquait, et qui change la décision. */
+.prop-barre-etendue {
+  margin: 0 0 0.45rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--t-accent, #b98a4a);
+}
+.prop-barre-etendue strong { color: inherit; }
+.prop-barre-pastille { margin-right: 0.3rem; }
+
+/* ② Le motif : c'est une explication, pas un titre. En retrait, plus discret
+   que les gestes — on le lit une fois, on relit les gestes. */
 .prop-barre-motif {
-  margin: 0 0 0.4rem;
-  font-size: 0.92rem;
-  line-height: 1.45;
+  margin: 0 0 0.55rem;
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--t-border, #e4ddd0);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--t-muted, #7a6f5f);
+  font-style: italic;
 }
 
-/* Le geste, en clair : « 5 déc · Week-end · 1er : Fanny ». C'est la réponse
-   littérale à « on ne comprend pas vraiment ce qu'il va se passer ». */
+/* ③ Les gestes, en COLONNES. La date porte le repérage sur la grille, le nom
+   porte le changement : les deux ressortent, le créneau reste en fond. Une
+   liste à puces de six lignes au même poids était illisible. */
 .prop-barre-geste {
-  margin: 0 0 0.4rem;
-  padding-left: 1.1rem;
-  font-size: 0.85rem;
+  margin: 0 0 0.45rem;
+  padding: 0;
+  list-style: none;
+  font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
+}
+.prop-barre-geste li {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, auto) minmax(7rem, auto) 1fr;
+  gap: 0.15rem 0.9rem;
+  padding: 0.18rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--t-border, #e4ddd0) 55%, transparent);
+}
+.prop-barre-geste li:last-child { border-bottom: none; }
+
+.pg-date { font-weight: 700; }
+.pg-creneau { color: var(--t-muted, #7a6f5f); font-size: 0.78rem; }
+.pg-qui { font-weight: 600; color: var(--t-accent, #b98a4a); }
+
+@media (max-width: 560px) {
+  /* En colonne unique, les trois morceaux s'empilent plutôt que de se
+     compresser à trois caractères chacun. */
+  .prop-barre-geste li { grid-template-columns: 1fr; gap: 0; }
+  .pg-creneau { margin-bottom: 0.1rem; }
 }
 
 .prop-barre-objections {
@@ -157,9 +203,25 @@
 
 /* Ce qui ne change pas recule. Les congés, les vacances et les cadenas
    restent lisibles — on estompe, on ne masque pas : l'admin doit pouvoir
-   juger la proposition DANS son contexte. */
-.cal-apercu .slot-card:not(.slot-card-apercu) {
-  opacity: 0.45;
+   juger la proposition DANS son contexte.
+
+   ⚠️ 0.45 AU PREMIER JET, ET C'ÉTAIT TROP. MiKL, le 17/09 : « quand c'est
+   opacifié pour les propositions, ça aussi ça s'opacifie donc on le voit
+   encore moins ». Deux défauts dans la même valeur :
+     • toute la grille reculait pour mettre trois cases en avant — le reste du
+       planning devenait un fond gris alors qu'il sert de contexte ;
+     • et l'estompage s'appliquait AUSSI aux cases à pourvoir, qui passaient de
+       discrètes à invisibles.
+   D'où 0.7 — assez pour hiérarchiser, pas assez pour effacer. */
+/* ⚠️ L'EXCLUSION SE FAIT SUR LA CASE, PAS SUR LA LIGNE — et ce n'est pas un
+   détail de style. `opacity` crée un contexte de composition : une fois la
+   case à 0.7, AUCUN enfant ne peut revenir à 1. Écrire
+   `.slot-card .vet-row-a-pourvoir { opacity: 1 }` n'aurait rien fait, en
+   silence. Une case à pourvoir ne recule donc jamais : c'est du travail qui
+   attend l'admin, et qu'une proposition soit en cours ailleurs n'y change
+   rien. */
+.cal-apercu .slot-card:not(.slot-card-apercu):not(.slot-card-manque) {
+  opacity: 0.7;
 }
 
 /* Ce qui change avance. */

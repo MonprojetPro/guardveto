@@ -394,32 +394,52 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
        c'est précisément la recherche inutile qu'il s'agit d'éviter.
    ============================================================ */
 
+/* ⚠️ CALIBRÉ TROP BAS AU PREMIER JET. MiKL, le 17/09 : « trop discret pour être
+   vu ». C'était de l'italique ambre pâle sur fond beige, dans une case beige :
+   trois nuances de la même famille. Ce qui suit est franc — fond plein, texte
+   sombre, bordure continue, majuscules espacées. Une case vide doit se voir
+   comme un trou, pas comme une nuance. */
 .vet-row-a-pourvoir {
-  color: #8a6212;
-  border-color: #c9a227;
-  background: rgba(201, 162, 39, 0.08);
-  font-style: italic;
-}
-.vet-row-a-pourvoir .vdot { border-color: #c9a227; }
-button.vet-row-a-pourvoir:hover {
-  background: rgba(201, 162, 39, 0.18);
   color: #6b4b0c;
+  border: 1.5px solid #c9a227;
+  background: rgba(201, 162, 39, 0.28);
+  font-weight: 700;
+  font-size: 0.64rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.vet-row-a-pourvoir .vdot {
+  border: 1.5px dashed #8a6212;
+  background: rgba(255, 255, 255, 0.5);
+}
+button.vet-row-a-pourvoir:hover {
+  background: rgba(201, 162, 39, 0.45);
+  color: #4a340a;
   border-color: #8a6212;
-  font-style: normal;
 }
 
 /* Le repère de case : un liseré GAUCHE, comme les vacances scolaires prennent
    le liseré haut. Il se superpose à n'importe quel fond (week-end, vendredi,
    passé, hors période) sans en écraser aucun. */
 .slot-card-manque {
-  border-left: 3px solid #c9a227;
+  border-left: 4px solid #c9a227;
   border-radius: 4px;
-  padding-left: 3px;
+  padding-left: 4px;
+}
+
+/* ⚠️ Les jours d'un AUTRE MOIS sont déjà estompés par `.day.past`/`.day.other`.
+   Une case à pourvoir y devenait illisible — or c'est justement celle qu'il ne
+   faut pas rater, même quand elle déborde du mois affiché (MiKL, 17/09 : la
+   case du 27 octobre vue depuis novembre). */
+.day.past .vet-row-a-pourvoir,
+.day.other .vet-row-a-pourvoir {
+  opacity: 1;
+  filter: none;
 }
 
 @media (prefers-contrast: more) {
-  .vet-row-a-pourvoir { font-style: normal; border-width: 2px; }
-  .slot-card-manque { border-left-width: 4px; }
+  .vet-row-a-pourvoir { border-width: 2px; background: rgba(201, 162, 39, 0.4); }
+  .slot-card-manque { border-left-width: 5px; }
 }
 
 @media (prefers-color-scheme: dark) {
