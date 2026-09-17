@@ -21,7 +21,7 @@ import { BarreV2 } from '@/components/v2/BarreV2'
 import { PlanningV2, type CongeAffiche, type PlageVacances } from '@/components/v2/PlanningV2'
 import { chargerPropositionsEnAttente } from '@/data/propositionsRelecture'
 import { mettreEnFormePropositions } from '@/lib/planning/propositionsAffichage'
-import { calculerTouchesApercu } from '@/lib/planning/apercuPropositions'
+import { calculerPlacesProposees } from '@/lib/planning/apercuPropositions'
 import { RealtimeRefresh } from '@/components/planning/RealtimeRefresh'
 import { RevalidationRealtime } from '@/components/planning/RevalidationRealtime'
 import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
@@ -477,10 +477,13 @@ export default async function PlanningPageV2({
   // vit en base (`propositions_relecture`) — il survit au changement d'onglet
   // (MiKL, 15/09), contrairement à l'ancien rapport éphémère.
   let propositionsAffichees: ReturnType<typeof mettreEnFormePropositions> = []
-  // B-123 — vetId → id de proposition, par date : sert à entourer la bonne
-  // case sur la grille (`PlanningV2`), sans jamais raisonner par rôle (le
-  // piège du vendredi, déjà payé sur les cadenas le 04/09).
-  let apercuTouches: ReturnType<typeof calculerTouchesApercu> = {}
+  // B-123 — les places que les propositions veulent occuper, à plat. La
+  // confrontation à l'état RÉEL de la grille se fait côté client, dans
+  // `PlanningV2`, seul endroit qui connaisse les créneaux tels qu'ils sont
+  // affichés (le `vendredi_soir` n'existe pas en base : il est dérivé du
+  // week-end). On compare des ENSEMBLES DE PERSONNES par (date, type), jamais
+  // par rôle — le piège du vendredi, déjà payé sur les cadenas le 04/09.
+  let placesProposees: ReturnType<typeof calculerPlacesProposees> = []
   // B-123 — ce que l'encart Compteurs afficherait si TOUT le lot en attente
   // était appliqué. Additionné à partir des projections DÉJÀ CALCULÉES et
   // stockées par proposition (`compteurs_projetes`, B-122 lot 1) — jamais
@@ -499,7 +502,7 @@ export default async function PlanningPageV2({
     }
     const prenomParId = new Map(vets.map((v) => [v.id, v.prenom]))
     propositionsAffichees = mettreEnFormePropositions(propositions, prenomParId, nomsTypes)
-    apercuTouches = calculerTouchesApercu(propositions)
+    placesProposees = calculerPlacesProposees(propositions)
 
     const deltaTotalParPrenom = new Map<string, number>()
     for (const p of propositionsAffichees) {
@@ -601,7 +604,7 @@ export default async function PlanningPageV2({
           // directement sur la grille (rendu à l'intérieur de PlanningV2 :
           // le clic sur une case et le bandeau partagent le même état).
           propositionsEnAttente={propositionsAffichees}
-          apercuTouches={apercuTouches}
+          placesProposees={placesProposees}
           compteursProjetes={compteursProjetesAgrege}
         />
       </div>

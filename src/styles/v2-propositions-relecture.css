@@ -26,18 +26,32 @@
   flex-wrap: wrap;
 }
 
+/* Ce n'est plus un bouton : le geste principal a déménagé sur la grille, et
+   un titre cliquable qui ne dit pas où il mène était le premier reproche de
+   MiKL le 17/09 (« pas d'icône qui indique que c'est un lien qui s'ouvre »).
+   Un texte qui ne prétend rien vaut mieux qu'une fausse affordance. */
 .prop-bandeau-titre {
-  font: inherit;
+  margin: 0;
   font-size: 0.92rem;
-  font-weight: 600;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  color: inherit;
-  text-align: left;
+  line-height: 1.45;
+  flex: 1 1 22rem;
 }
-.prop-bandeau-titre:hover { text-decoration: underline; }
+
+.prop-bandeau-pastille { margin-right: 0.35rem; }
+
+.prop-bandeau-aide {
+  display: block;
+  color: var(--t-muted, #7a6f5f);
+  font-size: 0.85rem;
+}
+
+.prop-bandeau-confirme {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.prop-bandeau-confirme-texte { font-size: 0.88rem; font-weight: 600; }
 
 .prop-bandeau-erreur {
   margin: 0.5rem 0 0;
@@ -45,59 +59,180 @@
   font-size: 0.85rem;
 }
 
-.prop-detail {
-  margin-top: 0.6rem;
-  padding: 0.7rem 0.85rem;
-  border: 1px solid var(--t-border, #e4ddd0);
-  border-radius: 0.6rem;
+/* ============================================================
+   LA BARRE DU BAS — le détail d'UN changement (B-123)
+   ============================================================
+   Ancrée en bas de la fenêtre : elle reste à l'écran quelle que soit la
+   semaine cliquée, et laisse la grille visible au-dessus. Une modale aurait
+   masqué exactement ce que MiKL demande de regarder.
+   ============================================================ */
+
+.prop-barre {
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--t-accent, #b98a4a);
+  border-radius: 0.75rem 0.75rem 0 0;
   background: var(--t-surface, #fff);
+  box-shadow: 0 -6px 20px rgb(0 0 0 / 12%);
 }
 
-.prop-detail-motif {
+.prop-barre-corps {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.prop-barre-texte { flex: 1 1 24rem; min-width: 0; }
+
+.prop-barre-motif {
   margin: 0 0 0.4rem;
-  font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
+  line-height: 1.45;
 }
 
-.prop-detail-objections,
-.prop-detail-compteurs {
-  margin: 0.4rem 0;
-  padding: 0.4rem 0.6rem;
+/* Le geste, en clair : « 5 déc · Week-end · 1er : Fanny ». C'est la réponse
+   littérale à « on ne comprend pas vraiment ce qu'il va se passer ». */
+.prop-barre-geste {
+  margin: 0 0 0.4rem;
+  padding-left: 1.1rem;
   font-size: 0.85rem;
-}
-.prop-detail-objections {
-  border-left: 3px solid #a3402f;
-  background: color-mix(in srgb, #a3402f 6%, transparent);
-}
-.prop-detail-compteurs {
-  border-left: 3px solid var(--t-accent, #b98a4a);
-  background: color-mix(in srgb, var(--t-accent, #b98a4a) 8%, transparent);
   font-variant-numeric: tabular-nums;
 }
-.prop-detail-tag { font-weight: 600; display: block; margin-bottom: 0.2rem; }
-.prop-detail-objections ul,
-.prop-detail-compteurs ul { margin: 0; padding-left: 1.1rem; }
 
-.prop-detail-actions {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.6rem;
+.prop-barre-objections {
+  font-size: 0.85rem;
+  color: var(--t-muted, #7a6f5f);
+}
+.prop-barre-objections summary { cursor: pointer; }
+.prop-barre-objections ul { margin: 0.3rem 0 0; padding-left: 1.1rem; }
+
+.prop-barre-erreur {
+  margin: 0.4rem 0 0;
+  color: #a3402f;
+  font-size: 0.85rem;
 }
 
-/* B-123 — la case ARRIVERAIT sur elle si on applique : bordure colorée,
-   jamais un changement de fond (les fonds portent déjà week-end/vendredi/
-   passé/hors-période — un cinquième état s'y perdrait, cf. la note sur les
-   vacances scolaires dans PlanningV2.tsx). Cliquable : ouvre le détail. */
-.vet-row-apercu {
+.prop-barre-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  /* Sur petit écran, la barre mange trop de hauteur si tout reste déplié. */
+  .prop-barre { padding: 0.6rem 0.75rem; }
+  .prop-barre-actions { width: 100%; }
+}
+
+/* ============================================================
+   LE MODE APERÇU DE LA GRILLE (B-123)
+   ============================================================
+   MiKL, le 17/09 : « je ne vois rien qui indique visuellement un quelconque
+   changement, mis à part un petit encart pointillé discret ». La v1 posait un
+   liseré sur UNE case et n'allait pas plus loin.
+
+   Le parti pris ici : pendant la phase de réajustement, la grille entière
+   entre dans un autre état — les créneaux que rien ne concerne s'effacent, et
+   ceux qui changent passent au premier plan. C'est l'inverse de la v1, qui
+   demandait de repérer un détail dans une grille inchangée.
+
+   ⚠️ Les créneaux touchés se distinguent par leur BORDURE et leur opacité, pas
+   par leur fond : les fonds portent déjà week-end / vendredi / passé /
+   hors-période / vacances scolaires. Un état de plus s'y noierait — c'est la
+   même raison qui avait fait choisir la bordure pour les vacances.
+   ============================================================ */
+
+.cal-apercu {
+  /* Le repère de fond du mode : discret, mais il couvre TOUTE la grille, donc
+     on ne peut pas le rater — contrairement à un liseré sur une case. */
+  background: color-mix(in srgb, var(--t-accent, #b98a4a) 4%, transparent);
+  border-radius: 0.6rem;
+}
+
+/* Ce qui ne change pas recule. Les congés, les vacances et les cadenas
+   restent lisibles — on estompe, on ne masque pas : l'admin doit pouvoir
+   juger la proposition DANS son contexte. */
+.cal-apercu .slot-card:not(.slot-card-apercu) {
+  opacity: 0.45;
+}
+
+/* Ce qui change avance. */
+.cal-apercu .slot-card-apercu {
+  outline: 2px solid var(--t-accent, #b98a4a);
+  outline-offset: 1px;
+  border-radius: 0.4rem;
+  background: color-mix(in srgb, var(--t-accent, #b98a4a) 8%, transparent);
+}
+
+/* Le créneau dont le détail est ouvert : on doit savoir de quelle case parle
+   le panneau. Sans ça, le détail flotte au-dessus d'une grille muette — le
+   défaut d'origine, en plus petit. */
+.cal-apercu .slot-card-apercu-ouvert {
+  outline-width: 3px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--t-accent, #b98a4a) 18%, transparent);
+}
+
+/* ── Les deux sens du mouvement ──────────────────────────── */
+
+/* Celle qui PART : barrée. Le geste est universel, il n'a pas besoin de
+   légende. */
+.vet-row-sortant {
+  cursor: pointer;
+  text-decoration: line-through;
+  text-decoration-color: #a3402f;
+  text-decoration-thickness: 2px;
+  opacity: 0.75;
+}
+
+/* Celle qui ARRIVE : en pointillé, comme une esquisse — elle n'est pas encore
+   là. C'est la ligne que la v1 ne dessinait jamais. */
+.vet-row-entrant {
+  cursor: pointer;
   border: 1.5px dashed var(--t-accent, #b98a4a);
   border-radius: 0.3rem;
   padding: 0 2px;
-  cursor: pointer;
-}
-.vet-row-apercu:hover {
   background: color-mix(in srgb, var(--t-accent, #b98a4a) 10%, transparent);
+}
+
+.vet-row-sortant:hover,
+.vet-row-entrant:hover {
+  background: color-mix(in srgb, var(--t-accent, #b98a4a) 18%, transparent);
+}
+
+/* Le signe − / + : dernier recours de lisibilité quand la case est étroite et
+   que barré/pointillé se confondent. */
+.vet-row-signe {
+  margin-left: 0.25rem;
+  font-weight: 700;
+  font-size: 0.95em;
+  line-height: 1;
+}
+.vet-row-sortant .vet-row-signe { color: #a3402f; }
+.vet-row-entrant .vet-row-signe { color: var(--t-accent, #b98a4a); }
+
+/* Le mouvement se lit sans la couleur : barré et pointillé restent, la nuance
+   de teinte disparaît. Une grille jugée au seul coup d'œil de la couleur
+   serait illisible pour une partie des utilisateurs. */
+@media (prefers-contrast: more) {
+  .vet-row-entrant { border-width: 2px; }
+  .vet-row-sortant { opacity: 1; }
+  .cal-apercu .slot-card:not(.slot-card-apercu) { opacity: 0.6; }
+}
+
+/* Estomper par une transition ferait clignoter la grille à chaque
+   `router.refresh()` qui suit une application. */
+@media (prefers-reduced-motion: no-preference) {
+  .slot-card { transition: opacity 0.15s ease-out; }
 }
 
 @media (prefers-color-scheme: dark) {
   .prop-detail { background: color-mix(in srgb, #000 30%, var(--t-surface, #1c1a17)); }
+  .vet-row-sortant { text-decoration-color: #e08a78; }
+  .vet-row-sortant .vet-row-signe { color: #e08a78; }
 }

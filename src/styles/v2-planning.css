@@ -701,6 +701,44 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   color: var(--t-accent);
 }
 .cnt-num-fleche { color: var(--soft); }
+
+/* Le delta, dit en toutes lettres. « +1 » se lit sans calcul ; « 22 → 23 »
+   oblige à soustraire, sept lignes de suite. */
+.cnt-num-delta {
+  margin-left: 3px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+/* Hausse et baisse se distinguent, MAIS aucune des deux n'est rouge d'alerte :
+   une garde de plus n'est pas une erreur, c'est un arbitrage. Le rouge de
+   l'encart reste réservé à ce qui ne va pas. */
+.cnt-num-hausse .cnt-num-delta { color: var(--t-accent); }
+.cnt-num-baisse .cnt-num-delta { color: #4b7f63; }
+
+/* La légende qui dit ce que ces chiffres sont. Sans elle, ils passaient pour
+   des alertes (MiKL, 17/09). */
+.cnt-apercu-legende {
+  margin: 0 0 8px;
+  padding: 6px 8px;
+  border-left: 3px solid var(--t-accent);
+  border-radius: 0 4px 4px 0;
+  background: color-mix(in srgb, var(--t-accent) 8%, transparent);
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: var(--t-muted);
+}
+.cnt-apercu-legende strong { color: inherit; }
+/* Même pastille que les créneaux mis en avant sur la grille : c'est le lien
+   visuel entre l'encart de droite et le planning de gauche. */
+.cnt-apercu-puce {
+  display: inline-block;
+  width: 8px; height: 8px;
+  margin-right: 5px;
+  border: 1.5px dashed var(--t-accent);
+  border-radius: 2px;
+  vertical-align: baseline;
+}
 .cnt-row.cnt-aside { opacity: 0.62; }
 .cnt-ecart {
   margin-top: 10px;

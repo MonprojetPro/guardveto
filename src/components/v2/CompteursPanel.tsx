@@ -193,6 +193,19 @@ export function CompteursPanel({ lignes, bilans, colonnes, projetees }: Props) {
         </div>
       )}
 
+      {/* B-123 — dire à quoi servent les chiffres en deux couleurs AVANT de les
+          montrer. MiKL, le 17/09 : « on ne sait même pas que les indicateurs
+          rouges sont des indicateurs qui concernent la probable modification ».
+          Une valeur mise en avant sans légende se lit comme une alerte, pas
+          comme une projection — et une alerte, ça inquiète au lieu d'informer. */}
+      {projetees && projetees.length > 0 && (
+        <p className="cnt-apercu-legende">
+          <span className="cnt-apercu-puce" aria-hidden="true" />
+          Le second chiffre est le total <strong>si tu appliques</strong> les propositions de
+          Filou. Rien n’est encore changé.
+        </p>
+      )}
+
       <div>
         <div className="cnt-row cnt-header" style={{ '--nb-col': choix.length } as React.CSSProperties}>
           <span>Vétérinaire</span>
@@ -243,8 +256,19 @@ export function CompteursPanel({ lignes, bilans, colonnes, projetees }: Props) {
                 return (
                   <span className={`cnt-num${v === 0 && !bouge ? ' zero' : ''}`} key={c}>
                     {bouge ? (
-                      <span className="cnt-num-projete" title="Si les propositions en attente sont appliquées">
-                        {v} <span className="cnt-num-fleche">→</span> <strong>{vProjete}</strong>
+                      // Le SENS avant la valeur : « +1 » se lit d'un coup d'œil
+                      // là où « 22 → 23 » demande une soustraction mentale, sept
+                      // fois de suite, dans une colonne étroite.
+                      <span
+                        className={`cnt-num-projete ${vProjete > v ? 'cnt-num-hausse' : 'cnt-num-baisse'}`}
+                        title="Total si les propositions en attente sont appliquées"
+                      >
+                        {v} <span className="cnt-num-fleche" aria-hidden="true">→</span>{' '}
+                        <strong>{vProjete}</strong>
+                        <span className="cnt-num-delta">
+                          {vProjete > v ? '+' : ''}
+                          {vProjete - v}
+                        </span>
                       </span>
                     ) : (
                       v
