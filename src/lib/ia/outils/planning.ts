@@ -39,7 +39,12 @@ import { GET as preVolGET } from '@/app/api/generate/pre-vol/route'
 import { POST as publierPOST } from '@/app/api/publish/route'
 import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
 import { compterSouhaitsCongesEnAttente } from '@/data/souhaitsCongesEnAttente'
-import { placesAttendues, manqueSurGarde, codeCatalogue } from '@/lib/planning/placesAttendues'
+import {
+  placesAttendues,
+  manqueSurGarde,
+  codeCatalogue,
+  construireCatalogue,
+} from '@/lib/planning/placesAttendues'
 import { lignesLues } from './lecture'
 import type { ContexteOutil, OutilEcriture, OutilLecture } from './types'
 import { perimetrePeriodes, messagePerimetreVide } from './perimetre'
@@ -240,16 +245,16 @@ REMPLACEMENT EXCEPTIONNEL : si un jour porte « remplacement_exceptionnel », c'
     // On passe donc par `mapDbTypeToEngine`, la traduction déjà utilisée par le
     // moteur et par les absences. Une copie locale de cette règle serait la
     // troisième version du même vocabulaire — et divergerait un jour.
-    const infosTypes = new Map<string, { nom: string; places: number | null }>()
+    // Le NOM lisible du créneau, pour l'écran. Le nombre de places, lui, ne se
+    // construit plus ici : il vient de `construireCatalogue` (B-125), partagé
+    // avec la grille du planning. Cette fusion porte la règle du DÉSACCORD
+    // (deux profils qui ne déclarent pas le même nombre de places sur un code
+    // → indéterminé, jamais l'un des deux au hasard) ; en garder deux copies
+    // aurait fini par les faire diverger, et la copie fautive aurait annoncé
+    // des trous imaginaires.
+    const infosTypes = new Map<string, { nom: string }>()
     for (const t of typesDb) {
-      const places = typeof t.nb_places === 'number' ? t.nb_places : null
-      const connu = infosTypes.get(t.code)
-      if (!connu) infosTypes.set(t.code, { nom: t.nom, places })
-      // Un même code existe dans plusieurs profils de planning, parfois avec un
-      // nombre de places différent. On ne sait pas ici lequel s'applique à la
-      // date lue : en cas de désaccord, on préfère ne rien affirmer (null)
-      // plutôt que d'annoncer un trou imaginaire.
-      else if (connu.places !== places) connu.places = null
+      if (!infosTypes.has(t.code)) infosTypes.set(t.code, { nom: t.nom })
     }
 
     // Le calcul lui-même vit dans `placesAttendues` — une fonction pure, couverte
@@ -258,7 +263,7 @@ REMPLACEMENT EXCEPTIONNEL : si un jour porte « remplacement_exceptionnel », c'
     // semaine qui n'en attend qu'une). Le garder ici en aurait fait une règle
     // qu'on ne peut vérifier qu'en payant un appel au modèle.
     const profilParId = new Map(profils.map((p) => [p.id, p]))
-    const catalogue = new Map([...infosTypes].map(([code, i]) => [code, i.places]))
+    const catalogue = construireCatalogue(typesDb)
 
     type Row = {
       date: string

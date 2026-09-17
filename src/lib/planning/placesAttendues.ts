@@ -47,6 +47,36 @@ export interface ProfilEffectif {
  *  (plusieurs profils en désaccord sur ce code). */
 export type PlacesParCode = Map<string, number | null>
 
+/** Une ligne de `creneau_modele`, réduite à ce qui sert ici. */
+export interface CreneauModele {
+  code: string | null
+  nb_places: number | null
+}
+
+/**
+ * Construit le catalogue à partir des lignes de `creneau_modele`.
+ *
+ * ⚠️ LA RÈGLE QUI COMPTE EST LE DÉSACCORD. Un même code existe dans plusieurs
+ * profils de planning, parfois avec un nombre de places différent. On ne sait
+ * pas, à ce niveau, lequel s'applique à une date donnée : en cas de désaccord
+ * on retient `null` — « indéterminé » — plutôt que d'en choisir un au hasard.
+ *
+ * C'est ce qui empêche d'annoncer un trou imaginaire, et c'est exactement la
+ * raison pour laquelle cette fusion vit ici et non recopiée chez chaque
+ * appelant : deux copies de cette règle finiraient par diverger, et la copie
+ * fautive annoncerait des cases vides qui n'existent pas.
+ */
+export function construireCatalogue(lignes: readonly CreneauModele[]): PlacesParCode {
+  const catalogue: PlacesParCode = new Map()
+  for (const l of lignes) {
+    if (!l.code) continue
+    const places = typeof l.nb_places === 'number' ? l.nb_places : null
+    if (!catalogue.has(l.code)) catalogue.set(l.code, places)
+    else if (catalogue.get(l.code) !== places) catalogue.set(l.code, null)
+  }
+  return catalogue
+}
+
 /**
  * Traduit le vocabulaire du PLANNING vers celui du CATALOGUE.
  *

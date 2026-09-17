@@ -22,6 +22,9 @@ import { PlanningV2, type CongeAffiche, type PlageVacances } from '@/components/
 import { chargerPropositionsEnAttente } from '@/data/propositionsRelecture'
 import { mettreEnFormePropositions } from '@/lib/planning/propositionsAffichage'
 import { calculerPlacesProposees } from '@/lib/planning/apercuPropositions'
+import { calculerManques } from '@/lib/planning/manquesGrille'
+import { placesDeGarde } from '@/lib/gardes/places'
+import { construireCatalogue } from '@/lib/planning/placesAttendues'
 import { RealtimeRefresh } from '@/components/planning/RealtimeRefresh'
 import { RevalidationRealtime } from '@/components/planning/RevalidationRealtime'
 import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
@@ -268,7 +271,7 @@ export default async function PlanningPageV2({
   const periodeAffichee =
     periodes.find((p) => p.date_debut <= fin && p.date_fin >= debut) ?? null
 
-  const [dock, profilRes, compteursRes, totalWERes, prefsRes, typesRes2, equipeRes] = await Promise.all([
+  const [dock, profilRes, compteursRes, totalWERes, prefsRes, typesRes2, equipeRes, creneauxRes] = await Promise.all([
     chargerDock(supabase, { role_app: identite.role }, periodes),
     periodeAffichee?.profil_id
       ? supabase.from('profils_planning').select('nom').eq('id', periodeAffichee.profil_id).maybeSingle()
@@ -313,6 +316,16 @@ export default async function PlanningPageV2({
       .select('id, prenom, nom, statut, couleur')
       .eq('actif', true)
       .order('nom'),
+    // B-125 — le nombre de places que chaque créneau attend. C'est LA donnée
+    // qui manquait à la grille pour oser dessiner un « à pourvoir » : sans
+    // elle, `placesDeGarde` ne pouvait montrer que les places pourvues, sous
+    // peine d'inventer un trou sur un créneau qui n'attend qu'une personne.
+    // Chargée pour tous : un véto qui voit un trou sur un planning publié peut
+    // se proposer, et lui cacher la case ne le ferait pas disparaître.
+    supabase
+      .from('creneau_modele')
+      .select('code, nb_places')
+      .not('code', 'is', null),
   ])
 
   // ── « Qui est absent », pour le secrétariat ────────────────────────────
@@ -518,6 +531,50 @@ export default async function PlanningPageV2({
     }
   }
 
+  // ── B-125 : les places qui manquent, garde par garde ──────────────────
+  //
+  // MiKL, le 17/09, après avoir durci « 1 week-end sur 3 » : *« il faudrait que
+  // les jours où il manque quelqu'un ça apparaisse visuellement sur le planning
+  // pour ne pas chercher inutilement. »* Il a tranché en même temps que les
+  // trous sont ASSUMÉS — Anne-Catherine n'intervient que sur son ordre, et
+  // l'admin comble à la main. Un trou est donc un travail qui attend, pas une
+  // erreur : il doit se trouver sans balayer douze semaines à l'œil.
+  //
+  // ⚠️ Best-effort assumé, comme l'encart compteurs et l'aperçu plus haut : si
+  // le catalogue ne se lit pas, on n'affiche AUCUN manque plutôt que d'en
+  // inventer, et le planning s'affiche normalement.
+  const manquesParGarde = calculerManques(
+    gardes.map((g) => ({
+      id: g.id,
+      date: g.date,
+      type: g.type,
+      // Le comptage passe par `placesDeGarde`, la source unique — sinon les
+      // places 3 et 4 seraient oubliées et chaque créneau sur-mesure
+      // afficherait un manque imaginaire.
+      pourvues: placesDeGarde(g).length,
+    })),
+    {
+      catalogue: construireCatalogue(
+        (creneauxRes?.data ?? []) as { code: string | null; nb_places: number | null }[],
+      ),
+      // `undefined` et `null` disent la même chose ici — « pas de surcharge
+      // d'effectif sur cette période » — mais `placesAttendues` distingue les
+      // deux pour de bonnes raisons. On normalise une fois, à l'entrée.
+      periodes: periodes.map((p) => ({
+        date_debut: p.date_debut,
+        date_fin: p.date_fin,
+        saison: p.saison,
+        nb_vetos_semaine_soir: p.nb_vetos_semaine_soir ?? null,
+        profil_id: p.profil_id ?? null,
+      })),
+      profils: new Map(
+        ((typesRes2?.data ?? []) as { id: string; nb_vetos_semaine_soir: number | null }[]).map(
+          (p) => [p.id, p],
+        ),
+      ),
+    },
+  )
+
   // Re-validation continue : périodes publiées qui chevauchent le mois affiché
   // ET qui ont des gardes. Identique à la V1 — c'est un garde-fou, pas du décor.
   // Même tri que ci-dessus : c'est cette liste qui allume le bouton PDF, et un
@@ -606,6 +663,7 @@ export default async function PlanningPageV2({
           propositionsEnAttente={propositionsAffichees}
           placesProposees={placesProposees}
           compteursProjetes={compteursProjetesAgrege}
+          manquesParGarde={manquesParGarde}
         />
       </div>
     </>

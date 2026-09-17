@@ -126,6 +126,14 @@ interface Props {
    * en base).
    */
   placesProposees?: PlaceProposee[]
+  /**
+   * B-125 — combien de personnes manquent sur chaque garde, par identifiant.
+   * Une garde absente de cet objet n'a rien à signaler : soit elle est
+   * complète, soit on ne SAIT PAS combien de places elle attend — et dans ce
+   * second cas on se tait, plutôt que d'envoyer l'admin chercher un remplaçant
+   * pour une garde qui n'en a pas besoin.
+   */
+  manquesParGarde?: Record<string, number>
   /** Ce que l'encart Compteurs afficherait SI le lot en attente était appliqué. */
   compteursProjetes?: CompteursRow[]
 }
@@ -203,6 +211,7 @@ export function PlanningV2({
   vacances = [],
   propositionsEnAttente = [],
   placesProposees = [],
+  manquesParGarde = {},
   compteursProjetes,
 }: Props) {
   const router = useRouter()
@@ -808,6 +817,7 @@ export function PlanningV2({
                         // créneaux de ce jour, et le clic qui ouvre le détail.
                         apercuCreneaux={apercuCreneaux}
                         vetsParId={vetsParId}
+                        manquesParGarde={manquesParGarde}
                         onOuvrirProposition={setPropositionOuverte}
                         propositionOuverte={propositionOuverte}
                       />
@@ -959,6 +969,7 @@ function CaseJour({
   onCadenas,
   apercuCreneaux,
   vetsParId,
+  manquesParGarde,
   onOuvrirProposition,
   propositionOuverte,
 }: {
@@ -986,6 +997,8 @@ function CaseJour({
   apercuCreneaux?: Record<string, ApercuCreneau>
   /** Prénom et couleur des entrants, qui ne sont pas encore dans la garde. */
   vetsParId?: Map<string, VetCrise>
+  /** B-125 — places manquantes par garde. Absent = rien à signaler. */
+  manquesParGarde?: Record<string, number>
   onOuvrirProposition?: (id: string) => void
   /** La proposition dont le détail est ouvert — sa case est mise en avant. */
   propositionOuverte?: string | null
@@ -1071,9 +1084,27 @@ function CaseJour({
           : undefined
         const creneauEnAvant = Boolean(apercu && apercu.propositionId === propositionOuverte)
 
+        // B-125 — combien de places restent à pourvoir sur ce créneau. Calculé
+        // côté serveur (`calculerManques`) : la grille ne sait pas, à elle
+        // seule, combien de personnes un créneau attend.
+        //
+        // ⚠️ On ne dessine PAS de place manquante pendant l'aperçu d'une
+        // proposition sur ce même créneau : les entrants de la proposition
+        // viendraient s'ajouter aux « à pourvoir », et la case afficherait plus
+        // de lignes que le créneau n'a de places. L'admin tranche d'abord la
+        // proposition, les trous restants réapparaissent ensuite.
+        const manque = apercu ? 0 : (manquesParGarde?.[g.id] ?? 0)
+
         return (
           <div
-            className={`slot-card${apercu ? ' slot-card-apercu' : ''}${creneauEnAvant ? ' slot-card-apercu-ouvert' : ''}`}
+            className={[
+              'slot-card',
+              apercu ? 'slot-card-apercu' : '',
+              creneauEnAvant ? 'slot-card-apercu-ouvert' : '',
+              manque > 0 ? 'slot-card-manque' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
             key={g.id}
           >
             <span className="sc-tag">{libelleTypeGardeDb(g.type, nomsTypes)}</span>
@@ -1121,6 +1152,22 @@ function CaseJour({
                 qu'ils ne sont nulle part dans la garde actuelle. C'est très
                 exactement ce que la première version ne savait pas montrer :
                 elle cherchait la personne qui arrive parmi celles déjà là. */}
+            {/* B-125 — les places RESTÉES À POURVOIR, dessinées à la suite des
+                places tenues. Une par personne manquante : « il manque 2 »
+                doit se voir comme deux trous, pas comme une ligne à lire.
+                Cliquables : c'est la modale de garde qui sert à combler. */}
+            {Array.from({ length: manque }, (_, i) => (
+              <LigneVet
+                key={`manque-${i}`}
+                prenom={null}
+                couleur={null}
+                role=""
+                titre={`${dateCourte(date)} · place à pourvoir`}
+                onClick={cliquable ? () => onOuvrir(g) : undefined}
+                aPourvoir
+              />
+            ))}
+
             {entrants.map((vetId) => {
               const vet = vetsParId?.get(vetId)
               return (
@@ -1232,6 +1279,7 @@ function LigneVet({
   fige = false,
   sortant = false,
   entrant = false,
+  aPourvoir = false,
   cadenas = null,
 }: {
   prenom: string | null
@@ -1245,6 +1293,8 @@ function LigneVet({
   sortant?: boolean
   /** B-123 — une proposition en attente AMÈNERAIT cette personne ici. */
   entrant?: boolean
+  /** B-125 — cette place n'a trouvé personne : il reste du travail ici. */
+  aPourvoir?: boolean
   /**
    * Le bouton cadenas, rendu À CÔTÉ de la ligne et non dedans.
    *
@@ -1285,6 +1335,7 @@ function LigneVet({
     fige ? 'vet-row-fige' : '',
     sortant ? 'vet-row-sortant' : '',
     entrant ? 'vet-row-entrant' : '',
+    aPourvoir ? 'vet-row-a-pourvoir' : '',
   ]
     .filter(Boolean)
     .join(' ')
