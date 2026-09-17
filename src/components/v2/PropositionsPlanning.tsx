@@ -1,23 +1,27 @@
 'use client'
 
 // ============================================================
-// GUARDVETO V2 — Le mode aperçu des propositions de Filou (B-122 lot 2)
+// GUARDVETO V2 — Le bandeau des propositions de Filou (B-122 lot 2, refait B-123)
 // ============================================================
-// MiKL, le 2026-09-15 : « on voit apparaitre sur le planning dans un style
-// specifique ce que ca changerait […] et ca doit apparaitre AU COMPTEUR
-// egalement, AVANT qu'il fasse le changement ».
+// MiKL, le 17/09, en recette du lot 2 : « j'aurais aime avoir les
+// propositions qui apparaissent directement sur le planning […] la, y a un
+// gros pave de texte, donc faut que je lise, que j'aille voir sur le
+// planning etc. Ce n'est pas fluide. »
 //
-// Panneau autonome, posé au-dessus de la grille : chaque proposition que le
-// moteur a refusée (verdict `refuse`) montre ce qu'elle ferait, ce qu'elle
-// enfreint, et son effet sur les compteurs — AVANT tout clic. L'admin
-// applique tout en bloc, ou une proposition à la fois, en connaissance de
-// cause (les deux, MiKL a tranché le 15/09).
+// Le lot 2 posait TOUT le détail ici — motif, geste, objections, compteurs —
+// dans un bloc au-dessus de la grille. C'était exactement le geste que
+// B-122 devait supprimer (« à toi de trancher, et d'appliquer à la main sur
+// le planning »), recréé en plus court.
 //
-// ⚠️ CE QUE CE PANNEAU NE FAIT PAS ENCORE : il ne surligne pas les cases
-// concernées SUR la grille elle-même. La ligne vendredi/week-end inverse déjà
-// les rôles ET les personnes affichées (B-111, cadenas payé le 04/09) — y
-// superposer un second marquage sans la même rigueur rouvrirait exactement ce
-// piège. Laissé pour un lot séparé plutôt que risqué ici.
+// ── CE QUE CE COMPOSANT FAIT DÉSORMAIS, ET CE QU'IL NE FAIT PLUS ───────────
+//
+// Il ne montre plus le détail par défaut : juste un titre et « Appliquer
+// tout ». Le détail (motif, ce que ça enfreint, compteurs projetés) ne
+// s'affiche que pour la proposition SÉLECTIONNÉE — sélection pilotée depuis
+// l'EXTÉRIEUR (`PlanningV2`), parce que le vrai point d'entrée est
+// maintenant un CLIC SUR LA CASE CONCERNÉE de la grille, pas ce bandeau.
+// Cliquer une ligne d'ici reste possible (question posée au téléphone,
+// clavier, accessibilité), mais le geste principal a déménagé.
 // ============================================================
 
 import { useState, useTransition } from 'react'
@@ -32,6 +36,9 @@ import {
 interface Props {
   periodeId: string
   propositions: PropositionAffichee[]
+  /** La proposition dont le détail est ouvert — `null` = bandeau replié. */
+  selectionId: string | null
+  onSelect: (id: string | null) => void
 }
 
 function ligneCompteur(c: { prenom: string; avant: number; apres: number }) {
@@ -39,13 +46,15 @@ function ligneCompteur(c: { prenom: string; avant: number; apres: number }) {
   return `${c.prenom} ${c.avant} → ${c.apres} (${signe}${c.apres - c.avant})`
 }
 
-export function PropositionsPlanning({ periodeId, propositions }: Props) {
+export function PropositionsPlanning({ periodeId, propositions, selectionId, onSelect }: Props) {
   const router = useRouter()
   const [enCours, demarrer] = useTransition()
   const [enCoursId, setEnCoursId] = useState<string | null>(null)
   const [erreur, setErreur] = useState<string | null>(null)
 
   if (propositions.length === 0) return null
+
+  const selection = propositions.find((p) => p.id === selectionId) ?? null
 
   const appliquerUne = (id: string) => {
     setErreur(null)
@@ -57,6 +66,7 @@ export function PropositionsPlanning({ periodeId, propositions }: Props) {
         setErreur(r.erreur)
         return
       }
+      onSelect(null)
       router.refresh()
     })
   }
@@ -71,6 +81,7 @@ export function PropositionsPlanning({ periodeId, propositions }: Props) {
         setErreur(r.erreur)
         return
       }
+      onSelect(null)
       router.refresh()
     })
   }
@@ -88,19 +99,26 @@ export function PropositionsPlanning({ periodeId, propositions }: Props) {
           `${r.appliquees} appliquée${r.appliquees > 1 ? 's' : ''}, ${r.bloquees.length} n'ont pas pu suivre : ${r.bloquees.map((b) => b.raison).join(' · ')}`,
         )
       }
+      onSelect(null)
       router.refresh()
     })
   }
 
   return (
-    <section className="prop-apercu" aria-label="Propositions de Filou en attente">
-      <header className="prop-apercu-tete">
-        <h2>
-          🦊 {propositions.length} proposition{propositions.length > 1 ? 's' : ''} en attente
-        </h2>
+    <section className="prop-bandeau" aria-label="Propositions de Filou en attente">
+      <header className="prop-bandeau-tete">
         <button
           type="button"
-          className="btn btn-valider"
+          className="prop-bandeau-titre"
+          onClick={() => onSelect(selectionId ? null : propositions[0].id)}
+          aria-expanded={selectionId !== null}
+        >
+          🦊 {propositions.length} proposition{propositions.length > 1 ? 's' : ''} en attente —
+          entourées sur le planning
+        </button>
+        <button
+          type="button"
+          className="btn btn-valider prop-bandeau-tout"
           onClick={appliquerTout}
           disabled={enCours}
         >
@@ -109,65 +127,67 @@ export function PropositionsPlanning({ periodeId, propositions }: Props) {
       </header>
 
       {erreur && (
-        <p className="prop-apercu-erreur" role="alert">
+        <p className="prop-bandeau-erreur" role="alert">
           {erreur}
         </p>
       )}
 
-      <ul className="prop-apercu-liste">
-        {propositions.map((p) => (
-          <li key={p.id} className="prop-apercu-carte">
-            <p className="prop-apercu-motif">{p.motif}</p>
+      {/* Le détail : UNE proposition à la fois, celle sélectionnée depuis la
+          grille (ou, à défaut de souris, depuis le titre ci-dessus). */}
+      {selection && (
+        <div className="prop-detail">
+          <p className="prop-detail-motif">{selection.motif}</p>
 
-            <ul className="prop-apercu-geste">
-              {p.geste.map((g, i) => (
-                <li key={i}>{g}</li>
-              ))}
-            </ul>
-
-            {p.objections.length > 0 && (
-              <div className="prop-apercu-objections">
-                <span className="prop-apercu-objections-tag">Ça enfreint :</span>
-                <ul>
-                  {p.objections.map((o, i) => (
-                    <li key={i}>{o}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {p.compteursProjetes.length > 0 && (
-              <div className="prop-apercu-compteurs">
-                <span className="prop-apercu-compteurs-tag">Si tu appliques :</span>
-                <ul>
-                  {p.compteursProjetes.map((c, i) => (
-                    <li key={i}>{ligneCompteur(c)}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <div className="prop-apercu-actions">
-              <button
-                type="button"
-                className="btn btn-valider"
-                onClick={() => appliquerUne(p.id)}
-                disabled={enCours}
-              >
-                {enCoursId === p.id ? 'Un instant…' : 'Appliquer'}
-              </button>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => rejeterUne(p.id)}
-                disabled={enCours}
-              >
-                Rejeter
-              </button>
+          {selection.objections.length > 0 && (
+            <div className="prop-detail-objections">
+              <span className="prop-detail-tag">Ça enfreint :</span>
+              <ul>
+                {selection.objections.map((o, i) => (
+                  <li key={i}>{o}</li>
+                ))}
+              </ul>
             </div>
-          </li>
-        ))}
-      </ul>
+          )}
+
+          {selection.compteursProjetes.length > 0 && (
+            <div className="prop-detail-compteurs">
+              <span className="prop-detail-tag">Si tu appliques :</span>
+              <ul>
+                {selection.compteursProjetes.map((c, i) => (
+                  <li key={i}>{ligneCompteur(c)}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="prop-detail-actions">
+            <button
+              type="button"
+              className="btn btn-valider"
+              onClick={() => appliquerUne(selection.id)}
+              disabled={enCours}
+            >
+              {enCoursId === selection.id ? 'Un instant…' : 'Appliquer'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => rejeterUne(selection.id)}
+              disabled={enCours}
+            >
+              Rejeter
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => onSelect(null)}
+              disabled={enCours}
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   )
 }

@@ -37,6 +37,18 @@ interface Props {
   bilans: BilanVet[]
   /** Colonnes retenues par la personne connectée (déjà normalisées côté page). */
   colonnes: CleColonne[]
+  /**
+   * B-123 — ce que les compteurs DIRAIENT si les propositions en attente
+   * étaient appliquées (`projeterCompteurs`, agrégé sur tout le lot).
+   *
+   * MiKL, le 17/09 : « les possibles changements de compteur qui
+   * apparaitraient dans le compteur lui-même à droite » — c'est ici, pas
+   * dans un second tableau au-dessus du planning (B-122 lot 1, déplacé).
+   *
+   * Facultatif : sans propositions en attente, l'encart s'affiche à
+   * l'identique d'avant B-123.
+   */
+  projetees?: CompteursRow[]
 }
 
 /** La pastille d'écart, même code couleur que l'écran Historique. */
@@ -54,12 +66,17 @@ function Ecart({ valeur, horsRepartition }: { valeur: number; horsRepartition: b
   return <span className={`cnt-ecart-pastille ${classe}`} title={titre}>{texte}</span>
 }
 
-export function CompteursPanel({ lignes, bilans, colonnes }: Props) {
+export function CompteursPanel({ lignes, bilans, colonnes, projetees }: Props) {
   const [choix, setChoix] = useState<CleColonne[]>(colonnes)
   const [reglageOuvert, setReglageOuvert] = useState(false)
   const [enregistrement, setEnregistrement] = useState(false)
 
   const bilanDe = new Map(bilans.map((b) => [b.veterinaire_id, b]))
+  // B-123 — la ligne PROJETÉE de chaque vétérinaire. `projeterCompteurs` rend
+  // une ligne pour TOUT LE MONDE (copie des valeurs actuelles + effet des
+  // mouvements) : c'est en comparant chaque colonne à `lignes` qu'on sait ce
+  // qui bouge vraiment, pas en cherchant une ligne absente.
+  const projeteeDe = new Map((projetees ?? []).map((r) => [r.veterinaire_id, r]))
 
   async function basculer(cle: CleColonne) {
     const dejaLa = choix.includes(cle)
@@ -213,10 +230,26 @@ export function CompteursPanel({ lignes, bilans, colonnes }: Props) {
                   )
                 }
                 const v = valeurDe(l, c)
+                // B-123 — la valeur SI on applique, à côté de l'actuelle.
+                // Uniquement sur la colonne « total » : c'est la SEULE que
+                // `propositionsProjetees` (page.tsx) peut recalculer sans
+                // supposer — la répartition par famille (WE/nuits/1er/fériés)
+                // n'est pas stockée par proposition (seul le total l'est,
+                // `compteursProjetes` de `propositions_relecture`). Un chiffre
+                // absent se remarque ; un chiffre faux se croit.
+                const ligneProjetee = c === 'total' ? projeteeDe.get(l.veterinaire_id) : undefined
+                const vProjete = ligneProjetee ? valeurDe(ligneProjetee, c) : undefined
+                const bouge = vProjete !== undefined && vProjete !== v
                 return (
-                  <span className={`cnt-num${v === 0 ? ' zero' : ''}`} key={c}>
-                    {v}
-                    {COLONNES[c].barre && (
+                  <span className={`cnt-num${v === 0 && !bouge ? ' zero' : ''}`} key={c}>
+                    {bouge ? (
+                      <span className="cnt-num-projete" title="Si les propositions en attente sont appliquées">
+                        {v} <span className="cnt-num-fleche">→</span> <strong>{vProjete}</strong>
+                      </span>
+                    ) : (
+                      v
+                    )}
+                    {COLONNES[c].barre && !bouge && (
                       <span className="bar">
                         <b style={{ transform: `scaleX(${v / (maxDe.get(c) ?? 1)})` }} />
                       </span>

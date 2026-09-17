@@ -40,6 +40,9 @@ import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
 import { CompteursPanel } from './CompteursPanel'
 import { AbsencesAVenirPanel, type AbsenceAVenir } from './AbsencesAVenirPanel'
 import { ImprimerPourSecretariat } from './ImprimerPourSecretariat'
+// B-122/B-123 — les propositions de Filou en attente, directement sur la grille.
+import { PropositionsPlanning } from './PropositionsPlanning'
+import type { PropositionAffichee } from '@/lib/planning/propositionsAffichage'
 import type { CompteursRow } from '@/hooks/useCompteurs'
 import type { BilanVet } from '@/engine/bilan'
 import type { CleColonne } from '@/lib/planning/colonnesCompteurs'
@@ -103,6 +106,20 @@ interface Props {
    * Sans repère visuel, une garde parfaitement légitime passe pour une erreur.
    */
   vacances?: PlageVacances[]
+  /**
+   * B-122/B-123 — les propositions de Filou refusées par le moteur, encore
+   * `en_attente` sur la période affichée. `undefined`/vide = rien à montrer,
+   * la grille se comporte exactement comme avant ce chantier.
+   */
+  propositionsEnAttente?: PropositionAffichee[]
+  /**
+   * Pour chaque date touchée, quel vétérinaire ARRIVERAIT sur une place et
+   * par quelle proposition — `calculerTouchesApercu`. Sert à circler la
+   * bonne case ET à savoir quelle proposition ouvrir au clic.
+   */
+  apercuTouches?: Record<string, Record<string, string>>
+  /** Ce que l'encart Compteurs afficherait SI le lot en attente était appliqué. */
+  compteursProjetes?: CompteursRow[]
 }
 
 /** Une période de vacances scolaires, telle que servie par la page. */
@@ -176,12 +193,18 @@ export function PlanningV2({
   bilans,
   colonnesCompteurs,
   vacances = [],
+  propositionsEnAttente = [],
+  apercuTouches = {},
+  compteursProjetes,
 }: Props) {
   const router = useRouter()
   const [annee, mois] = anneeMois.split('-').map(Number)
   const [popOuvert, setPopOuvert] = useState(false)
   const [compteursOuverts, setCompteursOuverts] = useState(true)
   const [gardeModal, setGardeModal] = useState<GardeDenormalisee | null>(null)
+  // B-122/B-123 — quelle proposition en attente est ouverte, pilotée à la
+  // fois par un clic sur la grille et par le bandeau (`PropositionsPlanning`).
+  const [propositionOuverte, setPropositionOuverte] = useState<string | null>(null)
   const [criseOpen, setCriseOpen] = useState(false)
   const [criseDate, setCriseDate] = useState<string | undefined>()
   const [criseVetId, setCriseVetId] = useState<string | undefined>()
@@ -677,6 +700,20 @@ export function PlanningV2({
             </p>
           )}
 
+          {/* B-122/B-123 — les propositions de Filou en attente. Admin
+              seulement : c'est elle qui décide sur ce planning. Le détail ne
+              s'affiche que pour la proposition sélectionnée (clic sur la
+              grille, ou sur le titre du bandeau) — voir les cases entourées
+              plus bas. */}
+          {isAdmin && periodeAffichee && propositionsEnAttente.length > 0 && (
+            <PropositionsPlanning
+              periodeId={periodeAffichee.id}
+              propositions={propositionsEnAttente}
+              selectionId={propositionOuverte}
+              onSelect={setPropositionOuverte}
+            />
+          )}
+
           {/* B-111 — ce qu'un cadenas vient d'enfreindre, ou pourquoi il n'a
               pas pu être posé. Au-dessus de la grille et non en toast : ces
               phrases se relisent pendant qu'on continue de cadenasser, et un
@@ -726,6 +763,11 @@ export function PlanningV2({
                         periodeId={periodeAffichee?.id ?? null}
                         vets={vets}
                         onCadenas={surResultatCadenas}
+                        // B-122/B-123 — les vétérinaires ARRIVERAIENT sur une
+                        // place ce jour-là, si une proposition en attente les y
+                        // vise, et le clic qui ouvre son détail.
+                        apercuDate={apercuTouches[date]}
+                        onOuvrirProposition={setPropositionOuverte}
                       />
                     ))}
                   </div>
@@ -766,7 +808,12 @@ export function PlanningV2({
                   lui-même, à partir des colonnes réellement affichées : une
                   légende qui décrit un tableau qu'on ne voit pas est pire que
                   pas de légende. */}
-              <CompteursPanel lignes={compteurs} bilans={bilans} colonnes={colonnesCompteurs} />
+              <CompteursPanel
+                lignes={compteurs}
+                bilans={bilans}
+                colonnes={colonnesCompteurs}
+                projetees={compteursProjetes}
+              />
             </aside>
             )}
           </div>
@@ -858,6 +905,8 @@ function CaseJour({
   periodeId,
   vets,
   onCadenas,
+  apercuDate,
+  onOuvrirProposition,
 }: {
   date: string
   moisAffiche: number
@@ -879,6 +928,9 @@ function CaseJour({
   periodeId: string | null
   vets: VetCrise[]
   onCadenas: (r: ResultatCadenas) => void
+  /** B-122/B-123 — vetId → id de la proposition qui l'amènerait ici, ce jour. */
+  apercuDate?: Record<string, string>
+  onOuvrirProposition?: (id: string) => void
 }) {
   const jour = new Date(date + 'T12:00:00Z')
   const dow = (jour.getUTCDay() + 6) % 7 // 0 = lundi
@@ -956,28 +1008,45 @@ function CaseJour({
                 que s'il y a un 2e. Les places vides ne sont pas dessinées —
                 on ne connaît pas ici le nombre de places du créneau, et un
                 « à pourvoir » inventerait un trou qui n'existe pas. */}
-            {places.map((p) => (
-              <LigneVet
-                key={p.index}
-                prenom={p.prenom}
-                couleur={p.couleur}
-                role={places.length > 1 ? p.role : ''}
-                titre={`${dateCourte(date)} · ${p.role} de garde`}
-                onClick={cliquable ? () => onOuvrir(g) : undefined}
-                fige={estFigee(p.vetId)}
-                cadenas={
-                  cadenasActifs && p.vetId ? (
-                    <BoutonCadenas
-                      gardeId={g.id}
-                      vetId={p.vetId}
-                      prenom={p.prenom}
-                      fige={estFigee(p.vetId)}
-                      onFini={onCadenas}
-                    />
-                  ) : null
-                }
-              />
-            ))}
+            {places.map((p) => {
+              // B-122/B-123 — cette place ARRIVERAIT à cette personne si la
+              // proposition en attente était appliquée. Par PERSONNE, jamais
+              // par rôle : la ligne du vendredi inverse déjà les deux
+              // (B-111, cadenas payé le 04/09) — même raisonnement que
+              // `estFigee` juste au-dessus.
+              const propositionId = p.vetId ? apercuDate?.[p.vetId] : undefined
+              return (
+                <LigneVet
+                  key={p.index}
+                  prenom={p.prenom}
+                  couleur={p.couleur}
+                  role={places.length > 1 ? p.role : ''}
+                  titre={
+                    propositionId
+                      ? `${dateCourte(date)} · ${p.role} de garde · Filou propose ce changement`
+                      : `${dateCourte(date)} · ${p.role} de garde`
+                  }
+                  onClick={
+                    propositionId
+                      ? () => onOuvrirProposition?.(propositionId)
+                      : cliquable ? () => onOuvrir(g) : undefined
+                  }
+                  fige={estFigee(p.vetId)}
+                  apercu={Boolean(propositionId)}
+                  cadenas={
+                    cadenasActifs && p.vetId ? (
+                      <BoutonCadenas
+                        gardeId={g.id}
+                        vetId={p.vetId}
+                        prenom={p.prenom}
+                        fige={estFigee(p.vetId)}
+                        onFini={onCadenas}
+                      />
+                    ) : null
+                  }
+                />
+              )
+            })}
           </div>
         )
       })}
@@ -1073,6 +1142,7 @@ function LigneVet({
   titre,
   onClick,
   fige = false,
+  apercu = false,
   cadenas = null,
 }: {
   prenom: string | null
@@ -1082,6 +1152,8 @@ function LigneVet({
   onClick?: () => void
   /** B-111 — cette place est fixée par l'admin (la génération n'y touche pas). */
   fige?: boolean
+  /** B-122/B-123 — une proposition en attente amènerait cette personne ici. */
+  apercu?: boolean
   /**
    * Le bouton cadenas, rendu À CÔTÉ de la ligne et non dedans.
    *
@@ -1103,7 +1175,7 @@ function LigneVet({
       {role && <span className="role">{role}</span>}
     </>
   )
-  const classe = `${prenom ? 'vet-row' : 'vet-row empty'}${fige ? ' vet-row-fige' : ''}`
+  const classe = `${prenom ? 'vet-row' : 'vet-row empty'}${fige ? ' vet-row-fige' : ''}${apercu ? ' vet-row-apercu' : ''}`
   const libelle = prenom
     ? `${titre} · ${prenom}${fige ? ' · fixé par l’administratrice' : ''}`
     : `${titre} · place à pourvoir`

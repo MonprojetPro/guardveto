@@ -687,6 +687,20 @@ button.vet-row:hover { background: var(--accent-soft); color: var(--accent-ink);
   transition: transform .5s var(--ease-out);
 }
 .cnt-num.zero .bar b { transform: scaleX(0) !important; }
+
+/* B-123 — la valeur SI on applique les propositions en attente, dans
+   l'encart compteurs lui-même (MiKL, 17/09 : « les possibles changements de
+   compteur qui apparaitraient dans le compteur lui-même à droite »). */
+.cnt-num-projete {
+  display: inline-flex; align-items: baseline; gap: 3px;
+  font-size: 0.72rem; font-weight: 600; color: var(--t-muted);
+  white-space: nowrap;
+}
+.cnt-num-projete strong {
+  font-family: var(--font-display); font-weight: 700; font-size: 0.9rem;
+  color: var(--t-accent);
+}
+.cnt-num-fleche { color: var(--soft); }
 .cnt-row.cnt-aside { opacity: 0.62; }
 .cnt-ecart {
   margin-top: 10px;

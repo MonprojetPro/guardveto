@@ -19,9 +19,9 @@ import '@/styles/v2-propositions-relecture.css'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
 import { PlanningV2, type CongeAffiche, type PlageVacances } from '@/components/v2/PlanningV2'
-import { PropositionsPlanning } from '@/components/v2/PropositionsPlanning'
 import { chargerPropositionsEnAttente } from '@/data/propositionsRelecture'
 import { mettreEnFormePropositions } from '@/lib/planning/propositionsAffichage'
+import { calculerTouchesApercu } from '@/lib/planning/apercuPropositions'
 import { RealtimeRefresh } from '@/components/planning/RealtimeRefresh'
 import { RevalidationRealtime } from '@/components/planning/RevalidationRealtime'
 import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
@@ -477,6 +477,17 @@ export default async function PlanningPageV2({
   // vit en base (`propositions_relecture`) — il survit au changement d'onglet
   // (MiKL, 15/09), contrairement à l'ancien rapport éphémère.
   let propositionsAffichees: ReturnType<typeof mettreEnFormePropositions> = []
+  // B-123 — vetId → id de proposition, par date : sert à entourer la bonne
+  // case sur la grille (`PlanningV2`), sans jamais raisonner par rôle (le
+  // piège du vendredi, déjà payé sur les cadenas le 04/09).
+  let apercuTouches: ReturnType<typeof calculerTouchesApercu> = {}
+  // B-123 — ce que l'encart Compteurs afficherait si TOUT le lot en attente
+  // était appliqué. Additionné à partir des projections DÉJÀ CALCULÉES et
+  // stockées par proposition (`compteurs_projetes`, B-122 lot 1) — jamais
+  // rejoué depuis les affectations brutes, qui ne portent pas qui PART
+  // (`AffectationVoulue` n'a pas d'`avantVetId`) : recalculer ici aurait
+  // compté les arrivées sans les départs, un chiffre faux.
+  let compteursProjetesAgrege: CompteursRow[] | undefined
   if (isAdmin && periodeAffichee) {
     const { propositions, erreur: erreurPropositions } = await chargerPropositionsEnAttente(
       supabase, periodeAffichee.id,
@@ -488,6 +499,20 @@ export default async function PlanningPageV2({
     }
     const prenomParId = new Map(vets.map((v) => [v.id, v.prenom]))
     propositionsAffichees = mettreEnFormePropositions(propositions, prenomParId, nomsTypes)
+    apercuTouches = calculerTouchesApercu(propositions)
+
+    const deltaTotalParPrenom = new Map<string, number>()
+    for (const p of propositionsAffichees) {
+      for (const c of p.compteursProjetes) {
+        deltaTotalParPrenom.set(c.prenom, (deltaTotalParPrenom.get(c.prenom) ?? 0) + (c.apres - c.avant))
+      }
+    }
+    if (deltaTotalParPrenom.size > 0) {
+      compteursProjetesAgrege = compteursAffiches.map((l) => {
+        const delta = deltaTotalParPrenom.get(l.prenom)
+        return delta ? { ...l, total_gardes: l.total_gardes + delta } : l
+      })
+    }
   }
 
   // Re-validation continue : périodes publiées qui chevauchent le mois affiché
@@ -549,13 +574,6 @@ export default async function PlanningPageV2({
           </div>
         )}
 
-        {isAdmin && periodeAffichee && propositionsAffichees.length > 0 && (
-          <PropositionsPlanning
-            periodeId={periodeAffichee.id}
-            propositions={propositionsAffichees}
-          />
-        )}
-
         <PlanningV2
           gardes={gardes}
           periodes={periodes}
@@ -579,6 +597,12 @@ export default async function PlanningPageV2({
           bilans={bilans}
           colonnesCompteurs={colonnesCompteurs}
           vacances={vacances}
+          // B-122/B-123 — les propositions de Filou en attente, entourées
+          // directement sur la grille (rendu à l'intérieur de PlanningV2 :
+          // le clic sur une case et le bandeau partagent le même état).
+          propositionsEnAttente={propositionsAffichees}
+          apercuTouches={apercuTouches}
+          compteursProjetes={compteursProjetesAgrege}
         />
       </div>
     </>
