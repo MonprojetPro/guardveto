@@ -19,10 +19,15 @@
 
 import { describe, it, expect } from 'vitest'
 import { isValid, estVeilleDeRepos } from '@/engine/rules/hard-constraints'
-import { resoudrePenaliteSouple } from '@/engine/structure-config'
+import {
+  resoudrePenaliteSouple,
+  DEFAULT_STRUCTURE_CONFIG,
+  PENALITES_AVEC_GARDIEN_DUR,
+  type StructureConfig,
+} from '@/engine/structure-config'
+import { BRIQUES_AVEC_GARDIEN_DUR, BRIQUES_PENALITES_SOUPLES } from '@/data/mapReglesCabinet'
 import { normaliserContraintesVets } from '@/engine/normaliserContraintes'
-import type { VetEngine, SlotGarde, PlanningPartiel, StructureConfig } from '@/engine/types'
-import { DEFAULT_STRUCTURE_CONFIG } from '@/engine/structure-config'
+import type { VetEngine, SlotGarde, PlanningPartiel } from '@/engine/types'
 
 const MAR = '2026-12-01'
 const MER = '2026-12-02'
@@ -143,5 +148,41 @@ describe('le plancher d’étage — ce qui rendait le réglage inopérant', () 
       .toBe(3)
     expect(resoudrePenaliteSouple('fete_fin_annee', { fete_fin_annee: { actif: true, etage: 0 } }).etage)
       .toBe(3)
+  })
+})
+
+describe('la chaîne complète — écran, Server Action, moteur', () => {
+  // ⚠️ LE CORRECTIF DU 20/09 ÉTAIT INOPÉRANT, et MiKL l'a vu immédiatement :
+  // « y a pas la fonction jamais pour ces règles-là ». Le gardien avait bien
+  // été posé dans le moteur, mais DEUX autres verrous interdisaient le réglage
+  // — la Server Action refusait l'écriture, et l'écran ne proposait pas le
+  // choix. Un gardien que rien ne peut activer ne protège rien.
+  //
+  // Ce test tient le bout de chaîne que le code peut vérifier : la liste des
+  // briques autorisées est bien DÉRIVÉE de celle du moteur, jamais recopiée.
+
+  it('autorise « jamais » exactement pour les briques qui ont un gardien', () => {
+    expect(BRIQUES_AVEC_GARDIEN_DUR.has('eviter_veille_repos')).toBe(true)
+  })
+
+  it('ne l’autorise pour AUCUNE autre pénalité souple', () => {
+    for (const brique of [
+      'eviter_we_consecutifs',
+      'eviter_we_avant_vacances',
+      'eviter_fete_fin_annee',
+      'inversion_role_ferie',
+    ]) {
+      expect(BRIQUES_AVEC_GARDIEN_DUR.has(brique), `${brique} n'a pas de gardien dur`).toBe(false)
+    }
+  })
+
+  it('reste synchronisée avec la liste du moteur, sans recopie', () => {
+    // Si quelqu'un ajoute une brique ici sans écrire son `check*`, ce test ne
+    // le verra pas — mais la dérivation garantit au moins qu'on ne peut pas
+    // diverger de `PENALITES_AVEC_GARDIEN_DUR`, qui vit à côté du moteur.
+    const attendues = [...PENALITES_AVEC_GARDIEN_DUR]
+      .map((cle) => Object.entries(BRIQUES_PENALITES_SOUPLES).find(([, c]) => c === cle)?.[0])
+      .filter(Boolean)
+    expect([...BRIQUES_AVEC_GARDIEN_DUR].sort()).toEqual(attendues.sort())
   })
 })

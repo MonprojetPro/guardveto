@@ -56,7 +56,7 @@ import {
 import { verifierRegleCandidate } from '@/data/verifierRegleCandidate'
 import { refusSiBloquant } from '@/data/controleImpact'
 import type { VerdictGardien } from '@/data/verifierRegleCandidate'
-import type { RegleCabinetRow } from '@/data/mapReglesCabinet'
+import { BRIQUES_AVEC_GARDIEN_DUR, type RegleCabinetRow } from '@/data/mapReglesCabinet'
 import { chargerContexteIA } from '@/lib/ia/contexteCabinet'
 import { proposerRegleIA, assistantIaDisponible, type TypeCreneauIA } from '@/lib/ia/proposerRegle'
 import {
@@ -429,7 +429,17 @@ export async function setStructureRegle(briqueId: string, actif: boolean, force:
   if (!FORCES_VALIDES.includes(force as ForceFormulaire)) {
     return { error: `Niveau de force invalide : « ${force} ».` }
   }
-  if (estPenaliteSouple && !FORCES_SOUPLES.has(force as ForceFormulaire)) {
+  // ⚠️ « JAMAIS » N'EST REFUSÉ QUE POUR LES RÈGLES SANS GARDIEN. Ce test
+  // portait sur TOUTES les pénalités souples — c'était juste tant qu'aucune
+  // n'avait de gardien dur, et c'est devenu faux le 20/09 quand R10d en a reçu
+  // un (B-127). Le correctif moteur était alors inopérant : MiKL ne pouvait
+  // physiquement pas régler « jamais », ni ici ni dans l'écran.
+  //
+  // La liste est DÉRIVÉE de celle du moteur : autoriser « jamais » sur une
+  // règle que le moteur n'applique pas recréerait la coquille vide que ce
+  // garde-fou existe pour empêcher.
+  if (estPenaliteSouple && !BRIQUES_AVEC_GARDIEN_DUR.has(briqueId)
+      && !FORCES_SOUPLES.has(force as ForceFormulaire)) {
     return { error: 'Cette règle est une préférence : elle ne peut pas être une interdiction ferme.' }
   }
   if (typeof actif !== 'boolean') {

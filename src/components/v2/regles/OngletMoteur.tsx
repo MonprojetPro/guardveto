@@ -151,6 +151,7 @@ import { GardienImpact } from '@/components/v2/GardienImpact'
 import type { Impact } from '@/data/controleImpact'
 import type { VetoUI } from './types'
 import { nomVetoOuRetire } from '@/lib/regles/libelle'
+import { BRIQUES_AVEC_GARDIEN_DUR } from '@/data/mapReglesCabinet'
 
 // ════════════════════════════════════════════════════════════
 // Référentiels d'affichage
@@ -1736,7 +1737,10 @@ export function OngletMoteur({
                   <SelectItem value={DESACTIVEE}>
                     <span aria-hidden="true">⚪</span> Désactivée
                   </SelectItem>
-                  {FORCES_SOUPLES.map((f) => (
+                  {/* « Jamais » n'est proposé que pour les règles qui ont un
+                      vrai gardien dans le moteur. Pour les autres, ce serait
+                      une coquille vide — le défaut exact corrigé par B-127. */}
+                  {(BRIQUES_AVEC_GARDIEN_DUR.has(brique) ? FORCES_CHOISISSABLES : FORCES_SOUPLES).map((f) => (
                     <SelectItem key={f} value={f}>
                       <span aria-hidden="true">{symboleDe(f)}</span> {choixForce(f)}
                     </SelectItem>

@@ -36,6 +36,7 @@ import {
 } from '@/engine/equity-weights'
 import {
   DEFAULT_STRUCTURE_CONFIG,
+  PENALITES_AVEC_GARDIEN_DUR,
   type StructureConfig,
   type PenaliteSoupleId,
   type PenalitesSouplesConfig,
@@ -220,6 +221,27 @@ export const BRIQUES_PENALITES_SOUPLES: Record<string, PenaliteSoupleId> = {
   inversion_role_ferie: 'inversion_ferie',    // R8b
   eviter_veille_repos: 'veille_repos',        // R10d — B-063
 }
+
+/**
+ * Celles de ces briques qui peuvent être réglées « jamais » sans mentir.
+ *
+ * ⚠️ DÉRIVÉE, JAMAIS RECOPIÉE. La vérité est `PENALITES_AVEC_GARDIEN_DUR`
+ * (structure-config), qui vit à côté du moteur qui l'applique. Une liste
+ * écrite à la main ici finirait par autoriser « jamais » sur une règle sans
+ * gardien — c'est-à-dire par re-livrer exactement le défaut de B-127 : un
+ * réglage affiché à l'admin que le moteur n'honore pas.
+ *
+ * Le trajet est contrôlé de bout en bout et il faut les TROIS maillons :
+ * l'écran doit proposer le choix, la Server Action doit l'accepter, et le
+ * moteur doit avoir son gardien. Le 20/09, seul le troisième a été livré —
+ * le correctif était donc inopérant, et MiKL l'a vu tout de suite :
+ * « y a pas la fonction jamais pour ces règles-là ».
+ */
+export const BRIQUES_AVEC_GARDIEN_DUR: ReadonlySet<string> = new Set(
+  Object.entries(BRIQUES_PENALITES_SOUPLES)
+    .filter(([, cle]) => PENALITES_AVEC_GARDIEN_DUR.has(cle))
+    .map(([brique]) => brique),
+)
 
 /**
  * extrairePenalitesSouples — résout le réglage des 4 pénalités souples depuis
