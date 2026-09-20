@@ -33,10 +33,17 @@ export function mettreEnFormePropositions(
   return propositions.map((p) => ({
     id: p.id,
     motif: p.changement.motif,
-    geste: p.changement.affectations.map((a) => {
-      const nouveau = a.vetId ? (prenomParId.get(a.vetId) ?? '?') : 'personne'
-      return `${dateFrSansJour(a.date)} · ${libelleTypeGardeDb(a.type, nomsTypes)} · ${a.role} : ${nouveau}`
-    }),
+    // ⚠️ TRIÉ PAR DATE, et le tri se fait sur la date ISO — jamais sur le
+    // libellé français, où « 1 décembre » passerait avant « 30 novembre ».
+    // MiKL, le 20/09 : « l'ordre des dates n'est pas respecté dans la liste ».
+    // L'ordre d'origine est celui où Filou a rédigé ses affectations : il n'a
+    // aucun sens pour qui relit la liste en cherchant une journée précise.
+    geste: [...p.changement.affectations]
+      .sort((a, b) => a.date.localeCompare(b.date) || a.role.localeCompare(b.role))
+      .map((a) => {
+        const nouveau = a.vetId ? (prenomParId.get(a.vetId) ?? '?') : 'personne'
+        return `${dateFrSansJour(a.date)} · ${libelleTypeGardeDb(a.type, nomsTypes)} · ${a.role} : ${nouveau}`
+      }),
     objections: p.violations.map((v) => enFrancais(v.detail, prenomParId)),
     compteursProjetes: p.compteursProjetes,
   }))

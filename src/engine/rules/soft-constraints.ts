@@ -14,7 +14,7 @@
 
 import type { SlotGarde, VetEngine, PlanningPartiel, RoleGarde, CalendrierResolu, AttributionGarde } from '../types'
 import { samediDeSemaine, addDays, estJourFerie, estFeteFinAnnee, attributionsAvecContexte } from '../utils'
-import { penaliteContraintesConfig, violeReposFixe } from './hard-constraints'
+import { penaliteContraintesConfig, violeReposFixe, estVeilleDeRepos } from './hard-constraints'
 import { estAttribue, vetPourRole } from '../attribution'
 import {
   PENALITE_SOUPLE_DEFAUT, poidsPenaliteSouple, type PenalitesSouplesConfig,
@@ -170,10 +170,6 @@ function penaliteVeilleRepos(
   calendrier?: CalendrierResolu,
   penalitesSouples?: PenalitesSouplesConfig,
 ): number {
-  // Le lendemain de la garde : c'est lui qui doit être libre. Pour un week-end,
-  // la garde court jusqu'au dimanche — le lendemain est donc le lundi.
-  const lendemain = slot.type === 'weekend' ? addDays(slot.date, 2) : addDays(slot.date, 1)
-
   // ⚠️ PAS DE DOUBLE PEINE AVEC R10c. Le week-end qui précède des vacances est
   // déjà pénalisé par `we_avant_vacances`, et son lendemain (le lundi) tombe
   // dans le congé : les deux règles se déclencheraient sur la MÊME situation.
@@ -182,26 +178,12 @@ function penaliteVeilleRepos(
   // R10d cède donc le pas là où R10c couvre déjà.
   if (estWeekEndAvantVacances(slot, vet)) return 0
 
-  // ① Un congé posé au planning — n'importe lequel.
-  for (const conge of vet.conges) {
-    if (conge.date_debut <= lendemain && lendemain <= conge.date_fin) {
-      return poidsPenaliteSouple('veille_repos', penalitesSouples)
-    }
-  }
-
-  // ② Un repos fixe déclaré en règle. On le lit par la MÊME porte que les
-  //    contraintes dures (`estIndisponibleLeJour`) : un second décodage des
-  //    `params` finirait par diverger du gardien, et la préférence porterait
-  //    alors sur un repos que le moteur ne reconnaît plus.
-  const slotLendemain: SlotGarde = { ...slot, date: lendemain }
-  for (const c of vet.contraintes) {
-    if (!c.actif || c.type !== 'jour_repos_fixe') continue
-    if (violeReposFixe(c, slotLendemain, calendrier)) {
-      return poidsPenaliteSouple('veille_repos', penalitesSouples)
-    }
-  }
-
-  return 0
+  // La DÉTECTION vit dans `hard-constraints` depuis B-127 : le gardien dur et
+  // cette pénalité doivent reconnaître exactement le même repos. Deux lectures
+  // écrites côte à côte finiraient par diverger, et l'une porterait alors sur
+  // un repos que l'autre ne voit plus.
+  if (!estVeilleDeRepos(slot, vet, calendrier)) return 0
+  return poidsPenaliteSouple('veille_repos', penalitesSouples)
 }
 
 /**

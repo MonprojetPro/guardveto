@@ -200,7 +200,16 @@ export async function GET(req: NextRequest) {
         .from('vacances_scolaires')
         .upsert(batch, {
           onConflict: 'zone,debut,fin',   // index unique (zone, debut, fin)
-          ignoreDuplicates: true,          // ON CONFLICT DO NOTHING
+          // ⚠️ ÉTAIT `ignoreDuplicates: true` (ON CONFLICT DO NOTHING) — donc
+          // une ligne déjà présente n'était JAMAIS rafraîchie. MiKL, le 20/09 :
+          // « y a une faute avec Noël ». La base contenait « No<?>l 2026-2027 »,
+          // et aussi « P<?>ques » et « <?>t<?> » : des libellés abîmés par un
+          // import ancien, que l'API (vérifiée : elle renvoie `Noël`
+          // proprement échappé) ne pouvait plus corriger.
+          //
+          // Une donnée fausse écrite une fois restait donc fausse pour
+          // toujours, en silence. La source officielle fait foi : on met à jour.
+          ignoreDuplicates: false,
           count: 'exact',
         })
 

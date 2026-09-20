@@ -14,6 +14,7 @@ import {
 import {
   DEFAULT_STRUCTURE_CONFIG, estStructureDure, relationsEffectives,
   RELATIONS_STRUCTURE_DEFAUT, compositionsDures, rolesInterditsDurs,
+  resoudrePenaliteSouple,
   type StructureConfig, type StructureRegleConfig, type RelationStructure,
 } from '../structure-config'
 import { apparierSourcePourCible, apparierCiblePourSource } from '../relations-structure'
@@ -184,6 +185,73 @@ function viseCeCreneau(cfg: Record<string, unknown>, slot: SlotGarde): boolean {
  * décodage des `params`, écrit à côté, finirait par diverger — et la préférence
  * porterait alors sur un repos que le moteur ne voit plus.
  */
+/**
+ * LA garde tombe-t-elle la veille d'un jour où ce vétérinaire est au repos ?
+ *
+ * Définition UNIQUE, partagée par la pénalité souple R10d
+ * (`penaliteVeilleRepos`) et par le gardien dur ci-dessous. Deux lectures
+ * écrites côte à côte finiraient par diverger, et l'une des deux porterait
+ * alors sur un repos que l'autre ne voit plus — le défaut que tout ce fichier
+ * s'applique à éviter.
+ *
+ * « Le lendemain » : pour un week-end, la garde court jusqu'au dimanche, donc
+ * le lendemain est le lundi.
+ */
+export function estVeilleDeRepos(
+  slot: SlotGarde,
+  vet: VetEngine,
+  calendrier?: CalendrierResolu,
+): boolean {
+  const lendemain = slot.type === 'weekend' ? addDays(slot.date, 2) : addDays(slot.date, 1)
+
+  // ① Un congé posé au planning — n'importe lequel.
+  for (const conge of vet.conges) {
+    if (conge.date_debut <= lendemain && lendemain <= conge.date_fin) return true
+  }
+
+  // ② Un repos fixe déclaré en règle, lu par la MÊME porte que les gardiens.
+  const slotLendemain: SlotGarde = { ...slot, date: lendemain }
+  for (const c of vet.contraintes) {
+    if (!c.actif || c.type !== 'jour_repos_fixe') continue
+    if (violeReposFixe(c, slotLendemain, calendrier)) return true
+  }
+
+  return false
+}
+
+/**
+ * R10d DURE — « pas de garde la veille d'un jour d'absence », quand le cabinet
+ * l'a réglée au niveau « jamais ».
+ *
+ * ⚠️ CETTE RÈGLE N'A LONGTEMPS EXISTÉ QU'EN PÉNALITÉ, et c'est ce qui a été
+ * payé. MiKL, le 20/09 : *« j'ai repéré au moins 3 gardes mises la veille d'un
+ * congé, alors que ça fait partie des règles les plus dures »*. Mesure faite :
+ * il y en avait **7** sur la seule période Hiver P1. La règle était réglée
+ * « sauf crise », mais surtout `structure-config` **clampait** tout réglage à
+ * l'étage 3 — « ces règles n'ont aucun gardien dur », écrivait le code.
+ * Choisir « jamais » dans l'interface n'avait donc aucun effet : un paramètre
+ * affiché que le moteur n'évaluait pas.
+ *
+ * Val d'Allier est strict là-dessus (MiKL, 20/09 : « ils font en sorte de ne
+ * pas se retrouver dans cette situation sauf contexte très particulier »).
+ * D'où un vrai gardien — mais qui ne bloque QUE si l'étage résolu est dur
+ * (≤ 2). Réglée « sauf crise » ou en dessous, la règle reste ce qu'elle était :
+ * une pénalité.
+ */
+function checkVeilleRepos(
+  vet: VetEngineNormalise,
+  slot: SlotGarde,
+  calendrier: CalendrierResolu | undefined,
+  structure: StructureConfig,
+): ValidationResult {
+  const reglage = resoudrePenaliteSouple('veille_repos', structure.penalitesSouples)
+  if (!reglage.actif || reglage.etage > ETAGE_DUR_MAX) return ok()
+  if (!estVeilleDeRepos(slot, vet, calendrier)) return ok()
+  return invalid(
+    `VEILLE_REPOS : ${vet.prenom} est absent le lendemain — pas de garde la veille d'un repos`,
+  )
+}
+
 export function violeReposFixe(
   c: ContrainteEngine, slot: SlotGarde, calendrier?: CalendrierResolu,
 ): boolean {
@@ -1481,6 +1549,9 @@ export function isValid(
     checkR18Hiver(slot, roleVisé, planning),
     checkR19Weekend(slot, roleVisé, planning),
     checkR1JourReposFixe(vet, slot, calendrier),
+    // R10d — dure UNIQUEMENT si le cabinet l'a réglée « jamais » (B-127).
+    // Sinon elle reste la pénalité souple qu'elle a toujours été.
+    checkVeilleRepos(vet, slot, calendrier, structure),
     checkR2IndispoCyclique(vet, slot, calendrier),
     // R3 (repos conditionnel) : « garde WE cette semaine ? » doit voir le WE du
     // lookback quand la semaine chevauche la jonction → planning ÉTENDU.

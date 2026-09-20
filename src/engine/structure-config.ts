@@ -236,6 +236,18 @@ export const PENALITES_SOUPLES_IDS = [
 ] as const
 export type PenaliteSoupleId = (typeof PENALITES_SOUPLES_IDS)[number]
 
+/**
+ * Celles de ces règles qui possèdent un GARDIEN DUR, et peuvent donc être
+ * réglées au niveau « jamais » sans mentir.
+ *
+ * Toute règle ajoutée ici DOIT avoir son `check*` dans `hard-constraints.ts`,
+ * sinon on recrée exactement le défaut que B-127 a corrigé : un réglage
+ * affiché à l'admin que le moteur n'honore pas.
+ */
+export const PENALITES_AVEC_GARDIEN_DUR: ReadonlySet<PenaliteSoupleId> = new Set<PenaliteSoupleId>([
+  'veille_repos', // R10d — `checkVeilleRepos` (B-127)
+])
+
 /** Réglage d'une pénalité souple (absence = défaut historique). */
 export type PenalitesSouplesConfig = Partial<Record<PenaliteSoupleId, StructureRegleConfig>>
 
@@ -274,7 +286,17 @@ export function resoudrePenaliteSouple(
   const defaut = PENALITE_SOUPLE_DEFAUT[id]
   const cfg = config?.[id]
   if (!cfg) return { actif: true, etage: defaut.etage, poids: defaut.poids }
-  const etage = Math.min(5, Math.max(3, cfg.etage))
+  // ⚠️ LE PLANCHER DÉPEND DE L'EXISTENCE D'UN GARDIEN. Il valait 3 pour toutes
+  // ces règles, avec ce commentaire : « ces règles n'ont aucun gardien dur ».
+  // C'était vrai — et c'est ce qui a fait qu'un cabinet pouvait choisir
+  // « jamais » dans l'interface sans que rien ne change. MiKL, le 20/09, après
+  // avoir compté 7 gardes posées la veille d'un congé : « ça fait partie des
+  // règles les plus dures ». Depuis B-127, `veille_repos` a un vrai gardien
+  // (`checkVeilleRepos`) : son réglage peut donc descendre au niveau dur.
+  // Les autres restent clampées — leur choisir « jamais » resterait un
+  // mensonge tant qu'aucun gardien ne le fait respecter.
+  const plancher = PENALITES_AVEC_GARDIEN_DUR.has(id) ? 2 : 3
+  const etage = Math.min(5, Math.max(plancher, cfg.etage))
   return {
     actif: cfg.actif,
     etage,

@@ -111,9 +111,24 @@ export interface ApercuCreneau {
   entrants: string[]
 }
 
-/** Clé d'un créneau. Le rôle n'y entre pas : voir l'en-tête. */
+/**
+ * Clé d'un créneau. Le rôle n'y entre pas : voir l'en-tête.
+ *
+ * ⚠️ LE TYPE EST NORMALISÉ, et sans ça l'appariement rate. Recette MiKL du
+ * 20/09 : *« Filou propose de changer le week-end du 4, alors pourquoi le
+ * vendredi 4 n'est pas lui aussi entouré ? »*. La proposition disait
+ * `vendredi_soir` ; la grille affiche ce même jour avec le type `weekend`
+ * (vérifié en base) — deux noms pour un seul créneau, donc deux clés qui ne se
+ * rencontraient jamais. Le vendredi soir est la première soirée du week-end :
+ * on les range sous le même toit.
+ */
 export function cleCreneau(date: string, type: string): string {
-  return `${date}|${type}`
+  return `${date}|${typeNormalise(type)}`
+}
+
+/** `vendredi_soir` et `weekend` désignent le même créneau — cf. `cleCreneau`. */
+function typeNormalise(type: string): string {
+  return type === 'vendredi_soir' ? 'weekend' : type
 }
 
 /**
@@ -186,15 +201,18 @@ export function calculerApercuCreneaux(
     // du créneau. Une place qu'elle ne mentionne pas reste telle quelle.
     // On apparie donc PLACE À PLACE, par rôle de données.
     const sortants: string[] = []
-    if (roleFiable(creneau.type)) {
-      for (const place of propose.places) {
-        const occupant = creneau.occupants.find((o) => o.role === place.role)
-        if (!occupant?.vetId) continue
-        // Cette personne reste sur le créneau si la proposition la replace
-        // ailleurs dessus : c'est une permutation de rôles, pas un départ.
-        if (vetsProposes.has(occupant.vetId)) continue
-        if (!sortants.includes(occupant.vetId)) sortants.push(occupant.vetId)
-      }
+    for (const place of propose.places) {
+      // ⚠️ La fiabilité se juge sur le type de la PLACE PROPOSÉE, pas sur celui
+      // du créneau affiché. Depuis que `vendredi_soir` et `weekend` partagent
+      // une clé, un créneau `weekend` peut porter une place proposée en
+      // `vendredi_soir` — dont le rôle, lui, reste inversé.
+      if (!roleFiable(place.type)) continue
+      const occupant = creneau.occupants.find((o) => o.role === place.role)
+      if (!occupant?.vetId) continue
+      // Cette personne reste sur le créneau si la proposition la replace
+      // ailleurs dessus : c'est une permutation de rôles, pas un départ.
+      if (vetsProposes.has(occupant.vetId)) continue
+      if (!sortants.includes(occupant.vetId)) sortants.push(occupant.vetId)
     }
 
     // Permutation de rôles pure : mêmes personnes avant et après. Rien à
@@ -205,5 +223,59 @@ export function calculerApercuCreneaux(
     apercu[cle] = { propositionId: propose.propositionId, sortants, entrants }
   }
 
+  return etendreAuxBlocsWeekend(apercu, creneauxActuels)
+}
+
+/**
+ * Un week-end est UN créneau pour Filou, TROIS lignes sur la grille.
+ *
+ * Recette MiKL du 20/09 : *« le dimanche 6 n'est même pas dans la liste »*. La
+ * proposition ne nomme que le samedi ; le vendredi et le dimanche font pourtant
+ * partie du même bloc, et le duo qui le tient est le même du vendredi soir au
+ * dimanche — seuls les rôles s'inversent le vendredi. Marquer le seul samedi
+ * laissait donc deux tiers du changement invisibles.
+ *
+ * On propage en PERSONNES, ce qui reste vrai malgré l'inversion : elle permute
+ * les rôles à l'intérieur du bloc, elle n'en fait sortir ni entrer personne.
+ */
+function etendreAuxBlocsWeekend(
+  apercu: Record<string, ApercuCreneau>,
+  creneauxActuels: readonly CreneauActuel[],
+): Record<string, ApercuCreneau> {
+  const weekends = creneauxActuels
+    .filter((c) => typeNormalise(c.type) === 'weekend')
+    .sort((a, b) => a.date.localeCompare(b.date))
+  if (weekends.length === 0) return apercu
+
+  // Regroupe les jours de week-end qui se suivent — un bloc par week-end.
+  const blocs: CreneauActuel[][] = []
+  for (const c of weekends) {
+    const dernier = blocs[blocs.length - 1]
+    const veille = dernier?.[dernier.length - 1]
+    if (veille && joursConsecutifs(veille.date, c.date)) dernier.push(c)
+    else blocs.push([c])
+  }
+
+  for (const bloc of blocs) {
+    const marques = bloc
+      .map((c) => apercu[cleCreneau(c.date, c.type)])
+      .filter((a): a is ApercuCreneau => Boolean(a))
+    if (marques.length === 0 || marques.length === bloc.length) continue
+
+    const fusion: ApercuCreneau = {
+      propositionId: marques[0].propositionId,
+      sortants: [...new Set(marques.flatMap((m) => m.sortants))],
+      entrants: [...new Set(marques.flatMap((m) => m.entrants))],
+    }
+    for (const c of bloc) apercu[cleCreneau(c.date, c.type)] = fusion
+  }
+
   return apercu
+}
+
+/** `b` est-il le lendemain de `a` ? Dates ISO, comparées en UTC. */
+function joursConsecutifs(a: string, b: string): boolean {
+  const lendemain = new Date(`${a}T12:00:00Z`)
+  lendemain.setUTCDate(lendemain.getUTCDate() + 1)
+  return lendemain.toISOString().slice(0, 10) === b
 }

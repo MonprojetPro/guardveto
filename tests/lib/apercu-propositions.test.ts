@@ -260,6 +260,92 @@ describe('calculerApercuCreneaux', () => {
     expect(apercu).toEqual({})
   })
 
+  it('rattache le VENDREDI SOIR a son week-end — recette MiKL du 20/09', () => {
+    // MiKL : « Filou propose de changer le week-end du 4, alors pourquoi le
+    // vendredi 4 n'est pas lui aussi entoure ? ». La proposition dit
+    // `vendredi_soir`, la grille affiche ce jour-la en `weekend` : deux noms
+    // pour un seul creneau, donc deux cles qui ne se rencontraient jamais.
+    const apercu = calculerApercuCreneaux(
+      calculerPlacesProposees([
+        {
+          id: 'P1',
+          changement: changement('P1', [
+            { date: '2026-12-04', type: 'vendredi_soir', role: 'second', vetId: 'fanny' },
+          ]),
+        },
+      ]),
+      [
+        {
+          date: '2026-12-04',
+          type: 'weekend',
+          occupants: [
+            { vetId: 'victor', role: 'premier' },
+            { vetId: 'antoine', role: 'second' },
+          ],
+        },
+      ],
+    )
+
+    const c = apercu[cleCreneau('2026-12-04', 'weekend')]
+    expect(c).toBeDefined()
+    expect(c.entrants).toEqual(['fanny'])
+    // Le role vient d'une place `vendredi_soir` : inverse par la vue, donc
+    // inutilisable pour designer qui part (B-111).
+    expect(c.sortants).toEqual([])
+  })
+
+  it('marque les TROIS jours du week-end, pas seulement celui qui est nomme', () => {
+    // MiKL : « tout comme le dimanche 6 qui n'est meme pas dans la liste ».
+    // Un week-end est UN creneau pour Filou et TROIS lignes sur la grille.
+    const apercu = calculerApercuCreneaux(
+      calculerPlacesProposees([
+        {
+          id: 'P1',
+          changement: changement('P1', [
+            { date: '2026-12-05', type: 'weekend', role: 'premier', vetId: 'fanny' },
+          ]),
+        },
+      ]),
+      [
+        { date: '2026-12-04', type: 'weekend', occupants: [{ vetId: 'antoine', role: 'premier' }, { vetId: 'victor', role: 'second' }] },
+        { date: '2026-12-05', type: 'weekend', occupants: [{ vetId: 'antoine', role: 'premier' }, { vetId: 'victor', role: 'second' }] },
+        { date: '2026-12-06', type: 'weekend', occupants: [{ vetId: 'antoine', role: 'premier' }, { vetId: 'victor', role: 'second' }] },
+      ],
+    )
+
+    for (const jour of ['2026-12-04', '2026-12-05', '2026-12-06']) {
+      const c = apercu[cleCreneau(jour, 'weekend')]
+      expect(c, `le ${jour} doit etre marque`).toBeDefined()
+      expect(c.entrants).toContain('fanny')
+      expect(c.sortants).toContain('antoine')
+    }
+  })
+
+  it('ne deborde PAS sur le week-end suivant', () => {
+    // Deux week-ends separes par la semaine : marquer le premier ne doit rien
+    // faire au second, sinon la grille accuserait un changement inexistant.
+    const apercu = calculerApercuCreneaux(
+      calculerPlacesProposees([
+        {
+          id: 'P1',
+          changement: changement('P1', [
+            { date: '2026-12-05', type: 'weekend', role: 'premier', vetId: 'fanny' },
+          ]),
+        },
+      ]),
+      [
+        { date: '2026-12-05', type: 'weekend', occupants: [{ vetId: 'antoine', role: 'premier' }] },
+        { date: '2026-12-06', type: 'weekend', occupants: [{ vetId: 'antoine', role: 'premier' }] },
+        { date: '2026-12-12', type: 'weekend', occupants: [{ vetId: 'jean', role: 'premier' }] },
+        { date: '2026-12-13', type: 'weekend', occupants: [{ vetId: 'jean', role: 'premier' }] },
+      ],
+    )
+
+    expect(apercu[cleCreneau('2026-12-06', 'weekend')]).toBeDefined()
+    expect(apercu[cleCreneau('2026-12-12', 'weekend')]).toBeUndefined()
+    expect(apercu[cleCreneau('2026-12-13', 'weekend')]).toBeUndefined()
+  })
+
   it('rend un objet vide sans proposition', () => {
     expect(calculerApercuCreneaux([], [{ date: '2026-12-05', type: 'weekend', occupants: [{ vetId: 'a', role: 'premier' }] }])).toEqual({})
   })

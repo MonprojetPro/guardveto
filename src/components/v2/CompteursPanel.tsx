@@ -206,7 +206,12 @@ export function CompteursPanel({ lignes, bilans, colonnes, projetees }: Props) {
         </p>
       )}
 
-      <div>
+      {/* B-123 — les colonnes de chiffres font 33 px, calibrées pour « 18 ».
+          Une projection (« 22 → 23 » + delta) n'y tient pas : MiKL, le 20/09,
+          « c'est dégueu les chiffres qui sortent du tableau ». Le tableau
+          s'élargit donc le temps de l'aperçu, et revient à sa largeur normale
+          dès que le lot est vidé. */}
+      <div className={projetees && projetees.length > 0 ? 'cnt-table cnt-table-apercu' : 'cnt-table'}>
         <div className="cnt-row cnt-header" style={{ '--nb-col': choix.length } as React.CSSProperties}>
           <span>Vétérinaire</span>
           {choix.map((c) => (
@@ -259,15 +264,20 @@ export function CompteursPanel({ lignes, bilans, colonnes, projetees }: Props) {
                       // Le SENS avant la valeur : « +1 » se lit d'un coup d'œil
                       // là où « 22 → 23 » demande une soustraction mentale, sept
                       // fois de suite, dans une colonne étroite.
+                      // Empilé, jamais en ligne : dans 46 px, « 22 → 23 +1 »
+                      // débordait de la colonne. L'ancienne valeur au-dessus en
+                      // petit, la nouvelle en dessous avec son signe.
                       <span
                         className={`cnt-num-projete ${vProjete > v ? 'cnt-num-hausse' : 'cnt-num-baisse'}`}
-                        title="Total si les propositions en attente sont appliquées"
+                        title={`Actuellement ${v} · ${vProjete} si les propositions en attente sont appliquées`}
                       >
-                        {v} <span className="cnt-num-fleche" aria-hidden="true">→</span>{' '}
-                        <strong>{vProjete}</strong>
-                        <span className="cnt-num-delta">
-                          {vProjete > v ? '+' : ''}
-                          {vProjete - v}
+                        <span className="cnt-num-avant">{v}</span>
+                        <span className="cnt-num-apres">
+                          <strong>{vProjete}</strong>
+                          <span className="cnt-num-delta">
+                            {vProjete > v ? '+' : ''}
+                            {vProjete - v}
+                          </span>
                         </span>
                       </span>
                     ) : (

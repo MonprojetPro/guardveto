@@ -494,15 +494,31 @@ button.vet-row-a-pourvoir:hover {
 .cad-btn:hover { background: var(--accent-soft); color: var(--accent-ink); }
 .cad-btn:disabled { opacity: 0.4; cursor: progress; }
 
-/* Fixé : toujours visible, c'est l'information. */
+/* Fixé : franc et coloré. C'est une information sur l'état du planning. */
 .cad-fixe { color: var(--accent-ink); opacity: 1; }
 
-/* Libre : une commande, pas une information — elle s'efface. */
-.cad-libre { opacity: 0; }
+/* ⚠️ LIBRE : ÉTAIT À `opacity: 0`, DONC INTROUVABLE. MiKL, le 20/09 : « il
+   faudrait mettre les cadenas en transparence parce que si on sait pas qu'il y
+   en a on peut pas le deviner ». Le raisonnement d'origine — « une commande,
+   pas une information, elle s'efface » — supposait que l'admin SAIT que les
+   cadenas existent. Rien ne le lui apprenait : une commande invisible et sans
+   affordance n'est découverte que par accident.
+
+   Elle est donc dessinée en permanence, en trace légère. La distinction avec
+   un cadenas posé ne repose pas sur la seule opacité — elle tient sur trois
+   signaux qui se cumulent : l'ICÔNE (cadenas ouvert vs fermé), la COULEUR
+   (gris vs accent) et l'intensité. Un seul de ces signaux suffirait à
+   reconnaître l'état ; les trois ensemble le rendent évident. */
+.cad-libre { opacity: 0.32; }
 .vet-row-wrap:hover .cad-libre,
+.cad-libre:hover,
 .cad-libre:focus-visible { opacity: 1; }
 @media (hover: none) {
   .cad-libre { opacity: 0.55; }
+}
+/* Le contraste renforcé ne se contente pas d'une nuance d'opacité. */
+@media (prefers-contrast: more) {
+  .cad-libre { opacity: 0.7; }
 }
 
 /* ── B-114 · LE MÊME CADENAS, DANS LA MODALE DE GARDE ──────────────────
@@ -763,16 +779,30 @@ button.vet-row-a-pourvoir:hover {
 /* B-123 — la valeur SI on applique les propositions en attente, dans
    l'encart compteurs lui-même (MiKL, 17/09 : « les possibles changements de
    compteur qui apparaitraient dans le compteur lui-même à droite »). */
+/* ⚠️ EMPILÉ, JAMAIS EN LIGNE. Les colonnes de chiffres sont calibrées pour
+   « 18 » ; « 22 → 23 +1 » sur une seule ligne sortait du tableau (MiKL, 20/09 :
+   « c'est dégueu les chiffres qui sortent du tableau »). L'ancienne valeur
+   au-dessus en petit et barrée, la nouvelle en dessous avec son signe. */
 .cnt-num-projete {
-  display: inline-flex; align-items: baseline; gap: 3px;
-  font-size: 0.72rem; font-weight: 600; color: var(--t-muted);
+  display: inline-flex; flex-direction: column; align-items: center;
+  line-height: 1.15;
   white-space: nowrap;
 }
+.cnt-num-avant {
+  font-size: 0.6rem; font-weight: 600; color: var(--soft);
+  text-decoration: line-through;
+}
+.cnt-num-apres { display: inline-flex; align-items: baseline; gap: 2px; }
 .cnt-num-projete strong {
   font-family: var(--font-display); font-weight: 700; font-size: 0.9rem;
   color: var(--t-accent);
 }
-.cnt-num-fleche { color: var(--soft); }
+
+/* Le tableau s'élargit le temps de l'aperçu — et seulement à ce moment-là.
+   Les 33 px d'origine restent la norme quand rien n'est en attente. */
+.cnt-table-apercu .cnt-row {
+  grid-template-columns: minmax(0, 1fr) repeat(4, 46px);
+}
 
 /* Le delta, dit en toutes lettres. « +1 » se lit sans calcul ; « 22 → 23 »
    oblige à soustraire, sept lignes de suite. */
