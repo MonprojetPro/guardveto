@@ -112,6 +112,55 @@ describe('R10d réglée DURE — elle bloque enfin', () => {
   })
 })
 
+describe('un repos SOUPLE ne peut pas fonder une interdiction — le cas Victor', () => {
+  // ⚠️ PAYÉ LE 20/09 AU SOIR, une heure après la mise en « jamais ». MiKL :
+  // « Victor n'a jamais de week-end, ce qui fait qu'Antoine enchaîne 6
+  // week-ends toutes les 2 semaines ». Mesure : Victor à **0 week-end** sur
+  // toute la période, les autres à 5.
+  //
+  // Cause : Victor a un repos fixe le lundi réglé « si possible ». Le lundi
+  // étant le lendemain de TOUT week-end, cette simple préférence lui
+  // interdisait fermement chaque week-end de l'année. Le gardien lisait les
+  // repos sans regarder leur fermeté — approximation sans gravité tant que
+  // R10d n'était qu'une pénalité, exclusion totale une fois devenue dure.
+
+  /** Victor : repos le lundi, mais en simple préférence. */
+  function vetAvecReposLundi(force: number) {
+    const v: VetEngine = {
+      id: 'victor', prenom: 'Victor', nom: 'X', statut: 'salarie', dernier_recours: false,
+      conges: [],
+      contraintes: [{
+        id: 'r1', type: 'jour_repos_fixe', actif: true,
+        config: { brique: 'interdire_creneau', force, jour: 'lundi' },
+      } as unknown as import('@/engine/types').ContrainteEngine],
+    }
+    return normaliserContraintesVets([v])[0]
+  }
+
+  const SAMEDI = '2026-12-05' // lendemain d'un week-end = le lundi 7
+
+  it("n'interdit PAS le week-end quand le repos du lundi est « si possible »", () => {
+    const v = vetAvecReposLundi(5)
+    const r = isValid(slot(SAMEDI, 'weekend'), v, 'premier', [v], planningVide, undefined, structureAvecEtage(2))
+    expect(r.valid, 'une preference ne peut pas exclure de tous les week-ends').toBe(true)
+  })
+
+  it('interdit bien le week-end quand le repos du lundi est « jamais »', () => {
+    // L'autre moitie : un vrai repos dur doit, lui, continuer de bloquer.
+    const v = vetAvecReposLundi(2)
+    const r = isValid(slot(SAMEDI, 'weekend'), v, 'premier', [v], planningVide, undefined, structureAvecEtage(2))
+    expect(r.valid).toBe(false)
+    expect(r.raison).toContain('VEILLE_REPOS')
+  })
+
+  it('la PÉNALITÉ, elle, compte toujours tous les repos', () => {
+    // Elle exprime un souhait : ne retenir que les repos durs l'affaiblirait
+    // sans raison. Seul le gardien filtre.
+    expect(estVeilleDeRepos(slot(SAMEDI, 'weekend'), vetAvecReposLundi(5))).toBe(true)
+    expect(estVeilleDeRepos(slot(SAMEDI, 'weekend'), vetAvecReposLundi(5), undefined, true)).toBe(false)
+  })
+})
+
 describe('R10d réglée SOUPLE — le comportement historique est intact', () => {
   it('ne bloque PAS en « à éviter » (étage 4, le défaut)', () => {
     const v = vet(CONGE_MERCREDI)

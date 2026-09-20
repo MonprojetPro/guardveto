@@ -201,6 +201,22 @@ export function estVeilleDeRepos(
   slot: SlotGarde,
   vet: VetEngine,
   calendrier?: CalendrierResolu,
+  /**
+   * ⚠️ NE RETENIR QUE LES REPOS EUX-MÊMES DURS — indispensable au gardien,
+   * et à lui seul.
+   *
+   * PAYÉ LE 20/09 AU SOIR. Dès que R10d est passée « jamais », Victor s'est
+   * retrouvé avec **zéro week-end sur toute la période** (mesuré), et Antoine
+   * a récupéré ses gardes. Cause : Victor a un repos fixe le lundi réglé
+   * « si possible ». Le lundi étant le lendemain de tout week-end, cette
+   * simple PRÉFÉRENCE lui interdisait fermement **chaque** week-end de
+   * l'année.
+   *
+   * Une préférence ne peut pas justifier une interdiction. La pénalité, elle,
+   * continue de compter tous les repos — c'est cohérent : elle exprime un
+   * souhait, et 40 points sur un souhait n'a jamais exclu personne.
+   */
+  seulementReposDurs = false,
 ): boolean {
   const lendemain = slot.type === 'weekend' ? addDays(slot.date, 2) : addDays(slot.date, 1)
 
@@ -213,6 +229,7 @@ export function estVeilleDeRepos(
   const slotLendemain: SlotGarde = { ...slot, date: lendemain }
   for (const c of vet.contraintes) {
     if (!c.actif || c.type !== 'jour_repos_fixe') continue
+    if (seulementReposDurs && !estDure(c)) continue
     if (violeReposFixe(c, slotLendemain, calendrier)) return true
   }
 
@@ -246,7 +263,9 @@ function checkVeilleRepos(
 ): ValidationResult {
   const reglage = resoudrePenaliteSouple('veille_repos', structure.penalitesSouples)
   if (!reglage.actif || reglage.etage > ETAGE_DUR_MAX) return ok()
-  if (!estVeilleDeRepos(slot, vet, calendrier)) return ok()
+  // `true` : seuls les repos DURS justifient un refus — voir l'incident Victor
+  // dans l'en-tête de `estVeilleDeRepos`.
+  if (!estVeilleDeRepos(slot, vet, calendrier, true)) return ok()
   return invalid(
     `VEILLE_REPOS : ${vet.prenom} est absent le lendemain — pas de garde la veille d'un repos`,
   )
