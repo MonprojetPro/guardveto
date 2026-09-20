@@ -63,6 +63,10 @@ const ASSOUPLIR_INUTILE = new Set([
   'regle_veto_sorti',
   'duo_veto_sorti',
   'cohorte_equite_sans_porteur',
+  // B-129 — assouplir l'une des deux règles ne résout rien : elles resteraient
+  // deux à répondre à la même question. Le geste utile est d'en METTRE UNE EN
+  // PAUSE, pas de la rendre plus douce.
+  'regles_contradictoires',
 ])
 
 /**
@@ -87,6 +91,7 @@ const ECRAN: Record<string, { href: string; label: string }> = {
   // pré-vol nomme les raisons sans pouvoir remonter à la règle exacte (elles
   // viennent du rejeu du moteur, pas d'une ligne identifiée).
   creneau_impossible:          { href: '/regles', label: 'Ouvrir les règles' },
+  regles_contradictoires:      { href: '/regles', label: 'Choisir laquelle garder' },
 }
 
 export function PointPreVol({ avertissement: a, vets, onCorrige }: Props) {

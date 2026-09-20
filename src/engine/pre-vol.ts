@@ -55,6 +55,7 @@ export type CodeAvertissementPreVol =
   | 'sequence_inerte'           // règle de rythme (série/succession/repos) mal paramétrée → sans effet
   | 'cohorte_equite_sans_porteur' // cohorte d'équité (#21) dont AUCUN véto actif ne porte le tag → inerte
   | 'seulement_avec_partenaire_sorti' // « A seulement avec B » (#15b) dont B n'est plus dans l'effectif → A écarté
+  | 'regles_contradictoires'    // deux règles actives règlent la MÊME chose différemment → la plus dure gagne en silence
 
 /**
  * Deux poids, deux mesures (décision MiKL du 2026-08-02).
@@ -84,6 +85,10 @@ const GRAVITE: Record<CodeAvertissementPreVol, GraviteAvertissement> = {
   veto_jamais_disponible:         'surveiller',
   sequence_inerte:                'surveiller',
   cohorte_equite_sans_porteur:    'surveiller',
+  // Le planning sortira, et il sera légal — simplement, l'une des deux règles
+  // n'aura servi à rien. Bloquer empêcherait de poser volontairement une règle
+  // plus stricte le temps d'un essai, ce que MiKL fait couramment en recette.
+  regles_contradictoires:         'surveiller',
 }
 
 export function graviteAvertissement(code: CodeAvertissementPreVol): GraviteAvertissement {
@@ -775,6 +780,8 @@ export function preVolRegles(input: PreVolInput): AvertissementPreVol[] {
     ...detecterSequencesInertes(vetsN, nomVeto),
     // (f) cohortes d'équité (#21) dont aucun véto actif ne porte le tag → inerte
     ...detecterCohortesEquiteSansPorteur(vetsN, input),
+    // (g) deux règles qui répondent différemment à la même question (B-129)
+    ...detecterReglesContradictoires(vetsN, nomVeto),
   ] as AvertissementPreVol[]).map((a) => ({ ...a, gravite: graviteAvertissement(a.code) }))
 }
 
@@ -880,6 +887,118 @@ function detecterSequencesInertes(
             : `Une règle « pas les deux dates » de ${vet.prenom} est mal paramétrée (dates identiques ou incomplètes) : elle n'aura aucun effet. Modifie-la ou supprime-la depuis l'écran Règles.`,
         })
       }
+    }
+  }
+  return out
+}
+
+// ── (f) Deux règles qui règlent la MÊME chose différemment (B-129) ──
+//
+// MiKL, le 20/09 : « oui je veux que Filou me prévienne […] et quand on crée
+// une règle ça serait bien qu'il y ait une alerte ».
+//
+// L'INCIDENT QUI L'A FAIT NAÎTRE. Le cabinet portait DEUX règles d'espacement
+// des week-ends actives en même temps, visant tout le monde : « 1 sur 2 » en
+// interdiction ferme et « 1 sur 3 » en « sauf crise ». Le moteur applique
+// simplement les deux — donc la plus contraignante gagne, et l'autre ne sert à
+// rien. Personne ne le voyait : l'écran affichait sagement les deux, et on a
+// cherché un bug du moteur pendant deux enquêtes (B-124 puis B-128) avant de
+// comprendre que le moteur avait raison depuis le début.
+//
+// ⚠️ CE N'EST PAS UN DOUBLON, et c'est pour ça que `trouverEquivalent`
+// (actions.ts) ne peut pas l'attraper : il compare les PARAMÈTRES, et « 2 »
+// n'est pas « 3 ». Deux règles identiques sont un doublon ; deux règles qui
+// répondent DIFFÉREMMENT à la même question sont une contradiction. C'est
+// l'inverse exact comme test.
+//
+// ⚠️ ON RAISONNE APRÈS DÉPLIAGE, par vétérinaire. Une règle « tous » et une
+// règle nominative ne se contredisent pas dans la base — elles se contredisent
+// dans la tête du moteur, au moment où il choisit pour QUELQU'UN. C'est donc là
+// qu'il faut regarder, sinon on rate le cas le plus courant (« tout le monde
+// attend 3 semaines, sauf Victor qui en attend 2 »).
+//
+// ⚠️ ET SEULEMENT LÀ OÙ UNE SEULE RÉPONSE A DU SENS. Victor a légitimement un
+// repos le lundi ET un le mardi ; deux plafonds « au plus 2 par semaine » et
+// « au plus 5 par mois » sont parfaitement compatibles. On ne compare donc que
+// des règles qui répondent à la MÊME question — d'où la clé ci-dessous, qui
+// inclut la fenêtre pour `au_plus_n`.
+type QuestionReglee = { question: string; reponse: string }
+
+function questionRegleeParLaContrainte(c: ContrainteEngine): QuestionReglee | null {
+  const p = paramsDe(c)
+  const nombre = (v: unknown): string | null => {
+    const n = typeof v === 'number' ? v : typeof v === 'string' ? parseInt(v, 10) : NaN
+    return Number.isFinite(n) ? String(n) : null
+  }
+
+  switch (c.type) {
+    case 'espacement_weekend': {
+      const n = nombre(p.n_semaines)
+      return n ? { question: 'combien de semaines entre deux week-ends de garde', reponse: n } : null
+    }
+    case 'espacement_min': {
+      const n = nombre(p.jours ?? p.n_jours)
+      return n ? { question: 'combien de jours entre deux gardes', reponse: n } : null
+    }
+    case 'au_plus_n': {
+      // La FENÊTRE fait partie de la question : « au plus 2 par semaine » et
+      // « au plus 5 par mois » ne se contredisent pas, ils se complètent.
+      const n = nombre(p.n)
+      const fenetre = typeof p.fenetre === 'string' ? p.fenetre : 'semaine_civile'
+      return n ? { question: `au plus combien de gardes par ${fenetre}`, reponse: n } : null
+    }
+    default:
+      return null
+  }
+}
+
+function detecterReglesContradictoires(
+  vets: VetEngineNormalise[],
+  nomVeto: (id: string) => string,
+): AvertissementPreVol[] {
+  const out: AvertissementPreVol[] = []
+  // Une même contradiction est dépliée sur plusieurs vétos quand les deux
+  // règles visent « tous » : on ne la signale qu'UNE fois. Un avertissement
+  // répété sept fois est un avertissement qu'on apprend à ne plus lire.
+  const dejaVues = new Set<string>()
+
+  for (const vet of vets) {
+    const parQuestion = new Map<string, { reponse: string; c: ContrainteEngine }[]>()
+    for (const c of vet.contraintes) {
+      if (!c.actif) continue
+      const q = questionRegleeParLaContrainte(c)
+      if (!q) continue
+      const liste = parQuestion.get(q.question)
+      if (liste) liste.push({ reponse: q.reponse, c })
+      else parQuestion.set(q.question, [{ reponse: q.reponse, c }])
+    }
+
+    for (const [question, regles] of parQuestion) {
+      const reponses = [...new Set(regles.map((r) => r.reponse))]
+      if (reponses.length < 2) continue // tout le monde d'accord : rien à dire
+
+      const ids = regles.map((r) => r.c.id).sort()
+      const signature = `${question}|${ids.join(',')}`
+      if (dejaVues.has(signature)) continue
+      dejaVues.add(signature)
+
+      // Laquelle l'emporte ? La plus CONTRAIGNANTE parmi les DURES — c'est ce
+      // que fait le moteur, qui applique tous ses gardiens l'un après l'autre.
+      // Si aucune n'est dure, elles s'additionnent en pénalités et aucune ne
+      // « gagne » vraiment : on le dit autrement plutôt que de désigner à tort.
+      const dures = regles.filter((r) => estDure(r.c))
+      const gagnante = dures.length > 0
+        ? dures.reduce((a, b) => (Number(b.reponse) > Number(a.reponse) ? b : a))
+        : null
+
+      out.push({
+        code: 'regles_contradictoires',
+        regles: regles.map((r) => libelleRegle(vet.prenom, r.c, nomVeto)),
+        regleIds: ids,
+        message: gagnante
+          ? `Deux règles répondent différemment à la même question pour ${vet.prenom} (${question}) : ${reponses.join(' et ')}. C'est la plus stricte qui s'appliquera — ${gagnante.reponse} — et l'autre n'aura aucun effet. Mets en pause celle que tu ne veux plus depuis l'écran Règles.`
+          : `Deux règles répondent différemment à la même question pour ${vet.prenom} (${question}) : ${reponses.join(' et ')}. Aucune n'étant une interdiction ferme, elles s'ajoutent comme préférences et le résultat sera difficile à prévoir. Garde-en une seule.`,
+      })
     }
   }
   return out

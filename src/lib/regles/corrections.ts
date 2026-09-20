@@ -132,6 +132,16 @@ const PAR_CODE: Partial<Record<CodeAvertissementPreVol, CorrectionProposee[]>> =
       genre: 'renoncer',
     },
   ],
+  // B-129 — deux règles répondent à la même question. Le geste utile est d'en
+  // garder UNE : les assouplir toutes les deux laisserait le même désaccord.
+  regles_contradictoires: [
+    {
+      label: 'Mettre en pause celle que tu ne veux plus',
+      detail:
+        'Deux règles actives répondent différemment à la même question. Le moteur les applique toutes les deux, donc la plus stricte l’emporte et l’autre n’a aucun effet — sans que rien ne le signale.',
+      genre: 'renoncer',
+    },
+  ],
 }
 
 /** Les corrections à proposer pour un lot d'avertissements, dédoublonnées et
