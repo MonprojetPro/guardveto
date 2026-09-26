@@ -244,6 +244,33 @@ export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props
             </span>
           </Link>
         )}
+        {/* MES NOTIFICATIONS (B-134) — pour ceux qui n'ont PAS l'entrée
+            « Réglages », c'est-à-dire tout le monde sauf l'administratrice.
+            Elle, y accède par une carte dans `/reglages`, là où MiKL a demandé
+            que ça vive ; lui donner les deux ferait deux portes vers le même
+            écran dans la même barre.
+            Le secrétariat la voit AUSSI, volontairement : l'écran lui dit en
+            clair qu'aucun e-mail ne le concerne aujourd'hui. Masquer l'entrée
+            aurait été plus propre à regarder et plus trompeur à vivre — il
+            aurait cherché un réglage dont rien n'indiquait l'absence. */}
+        {!estAdmin && (
+          <Link
+            {...entree('/reglages/notifications')}
+            href="/reglages/notifications"
+            aria-label="Mes notifications"
+          >
+            <span className="di-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6.6 10.2a5.4 5.4 0 0 1 10.8 0c0 3.4 1.2 4.9 1.2 4.9H5.4s1.2-1.5 1.2-4.9Z" />
+                <path d="M10.3 18.4a2 2 0 0 0 3.4 0" />
+              </svg>
+            </span>
+            <span className="di-flap" aria-hidden="true">
+              <span className="di-text">Mes notifications</span>
+            </span>
+          </Link>
+        )}
+
         {/* L'ASSISTANCE, ouverte à toute l'équipe (arbitrage MiKL du
             2026-08-25). Le vétérinaire qui a vu le problème est celui qui sait
             le décrire et joindre sa capture — le réserver à l'administrateur

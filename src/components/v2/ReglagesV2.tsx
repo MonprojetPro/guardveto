@@ -21,6 +21,7 @@
 // ============================================================
 
 import { useState, useTransition } from 'react'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import {
   Select, SelectContent, SelectItem, SelectTrigger,
@@ -696,6 +697,39 @@ export function ReglagesV2({
                 {testEnCours && <span className="sync-spin" aria-hidden="true" />}
                 {testEnCours ? 'Envoi…' : 'Vérifier que les e-mails partent'}
               </button>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Mes notifications (B-134) ────────────────────────────────
+            MiKL demandait les interrupteurs « dans les réglages » : voilà le
+            chemin. Mais ils ne PEUVENT PAS vivre dans cette page, qui refuse
+            tout rôle autre qu'administratrice — les vétérinaires, premiers
+            concernés par leurs propres congés, n'y entreraient jamais. D'où un
+            écran à part, ouvert aux trois rôles, et ce renvoi ici.
+            La carte ne montre AUCUN état (« 2 e-mails coupés ») : les réglages
+            de l'administratrice sont les siens, et afficher un compteur sur une
+            page de réglages du CABINET laisserait croire qu'ils valent pour
+            tout le monde. */}
+        <section className="card conn-card" aria-label="Mes notifications">
+          <div className="conn-head">
+            <span className="conn-ico" aria-hidden="true">
+              🔔
+            </span>
+            <div>
+              <h3>Mes notifications</h3>
+              <p className="sub">Les e-mails que vous recevez, pour vous seule</p>
+            </div>
+          </div>
+          <div className="conn-body">
+            <p className="conn-line">
+              Demandes de congé, planning diffusé, gardes modifiées : choisissez
+              ce qui arrive dans votre boîte mail. Chacun règle la sienne.
+            </p>
+            <div className="conn-actions">
+              <Link href="/reglages/notifications" className="btn btn-outline btn-sm">
+                Régler mes e-mails
+              </Link>
             </div>
           </div>
         </section>

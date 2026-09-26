@@ -255,6 +255,44 @@
 .reste-liste .rl-quoi b { font-family: var(--font-display); font-size: 0.94rem; display: block; }
 .reste-liste .rl-quoi small { font-size: 0.76rem; color: var(--t-muted); line-height: 1.5; }
 
+/* ============================================================
+   MES NOTIFICATIONS (B-134)
+   ============================================================
+   Une case par e-mail. L'interrupteur lui-même réutilise `.aa-switch`
+   (l'agenda, la fiche véto) : aucun nouveau composant, une case stylée et
+   accessible au clavier suffit — même famille d'interaction dans tout le
+   projet.
+
+   Les lignes sont SÉPARÉES et généreuses, pas en grille serrée comme les
+   options de l'agenda : ici chaque ligne est une décision indépendante qu'on
+   lit avant de cocher, et non un groupe de réglages liés qu'on balaie d'un
+   coup d'œil. */
+.mn-liste { display: flex; flex-direction: column; }
+.mn-ligne {
+  padding: 14px 20px;
+  border-bottom: 1px dashed var(--t-border);
+  align-items: center;
+}
+.mn-ligne:last-child { border-bottom: none; }
+.mn-ligne b { font-family: var(--font-display); font-size: 0.94rem; }
+
+/* Le rappel « ça ne coupe que l'e-mail ». Visuellement à part de la liste :
+   ce n'est pas un réglage, c'est ce qu'il faut avoir lu AVANT d'en décocher
+   un — sinon on se croit injoignable. */
+.mn-note {
+  margin: 0;
+  padding: 14px 20px;
+  border-top: 1px solid var(--t-border);
+  background: var(--surface-2);
+  font-size: 0.79rem; color: var(--t-muted); line-height: 1.55;
+  border-radius: 0 0 var(--r-md) var(--r-md);
+}
+/* Pas de couleur imposée sur le `strong` : le projet n'a que trois jetons de
+   texte (`--t-muted`, `--t-border`, `--t-accent`) et en inventer un quatrième
+   est exactement ce qui a produit le « crème sur crème ». Le gras suffit à
+   porter l'emphase. */
+.mn-note strong { font-weight: 700; }
+
 @media (max-width: 520px) {
   .conn-duo { grid-template-columns: 1fr; }
 }

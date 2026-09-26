@@ -38,6 +38,11 @@ export type NotifType =
   | 'echange_valide'
   | 'echange_refuse_admin'
   | 'planning_retire'
+  // B-134 — l'admin est prévenue qu'un vétérinaire a posé une demande de congé.
+  // Jusqu'au 26/09, poser une demande ne prévenait PERSONNE : ni e-mail, ni
+  // cloche. Elle n'apparaissait que dans le tableau des absences, à condition
+  // d'aller le regarder — et le premier cabinet abonné ne le regardait pas.
+  | 'conge_demande'
 
 interface CreerNotifParams {
   /** Véto destinataire (propriétaire de la notif). */
@@ -259,6 +264,43 @@ export function contenuEchangeRefuseAdmin(date: string, motif: string | null) {
     titre: 'Échange refusé par l\'administrateur',
     message: `L'échange concernant la garde du ${formatDateFr(date)} n'a pas été validé${motif ? ` : ${motif}` : '.'}`,
     lien: '/echanges',
+  }
+}
+
+/**
+ * B-134 — une demande de congé vient d'être posée, l'administratrice doit le
+ * savoir sans aller la chercher.
+ *
+ * `nbGardesPubliees` porte tout le poids du message : zéro, c'est une demande
+ * ordinaire ; au moins une, et le planning que l'équipe a déjà reçu devra être
+ * réparé. Le titre le dit, parce qu'une notification qu'on lit en trois mots
+ * doit trier l'urgent de l'ordinaire à elle seule.
+ */
+export function contenuCongeDemande(params: {
+  prenomDemandeur: string
+  typeLabel: string
+  dateDebut: string
+  dateFin: string
+  nbGardesPubliees: number
+}) {
+  const { prenomDemandeur, typeLabel, dateDebut, dateFin, nbGardesPubliees } = params
+  const periode =
+    dateDebut === dateFin
+      ? `le ${formatDateFr(dateDebut)}`
+      : `du ${formatDateFr(dateDebut)} au ${formatDateFr(dateFin)}`
+
+  const urgent = nbGardesPubliees > 0
+  const gardes =
+    nbGardesPubliees === 1 ? 'une garde déjà diffusée' : `${nbGardesPubliees} gardes déjà diffusées`
+
+  return {
+    titre: urgent
+      ? `À traiter en priorité — demande de ${prenomDemandeur}`
+      : `Nouvelle demande de ${prenomDemandeur}`,
+    message: urgent
+      ? `${prenomDemandeur} demande ${typeLabel.toLowerCase()} ${periode}, et ${gardes} tombent dessus. Le planning devra être réparé si vous acceptez.`
+      : `${prenomDemandeur} demande ${typeLabel.toLowerCase()} ${periode}.`,
+    lien: '/absences',
   }
 }
 

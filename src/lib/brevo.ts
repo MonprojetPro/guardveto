@@ -107,6 +107,16 @@ const TYPE_LABELS: Record<string, string> = {
   indisponibilite: 'Indisponibilité ponctuelle', autre: 'Autre',
 }
 
+/**
+ * Le libellé humain d'un type de congé, exporté pour que l'e-mail de DEMANDE
+ * (B-134, `notifications.ts`) parle la même langue que ceux de réponse. Le
+ * redéfinir ailleurs aurait donné deux vocabulaires pour un même champ, et
+ * c'est toujours le second qui se met à dériver.
+ */
+export function libelleTypeConge(type: string): string {
+  return TYPE_LABELS[type] ?? type
+}
+
 // Demi-journées retirées des e-mails (B-043) : le produit ne planifie que les
 // soirs et les week-ends, et le moteur n'a jamais lu ce champ.
 

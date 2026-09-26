@@ -196,6 +196,27 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   'protected/preferences#setColonnesCompteurs': {
     hors: 'Préférence d’affichage personnelle, sans effet sur le cabinet.',
   },
+  // B-134 (26/09) — `manque` et non `hors`, et la distinction compte.
+  //
+  // Ce n'est PAS une préférence d'affichage comme les colonnes de compteurs
+  // juste au-dessus : couper un e-mail change ce qui ARRIVE à quelqu'un. « Je
+  // ne veux plus recevoir les e-mails de garde modifiée » est exactement le
+  // genre de phrase qu'on dit à un assistant, et « pourquoi je ne reçois plus
+  // rien ? » exactement le genre de question qu'on lui pose. Filou ne sait
+  // répondre ni à l'une ni à l'autre aujourd'hui.
+  //
+  // ⚠️ LE RISQUE RÉEL N'EST PAS LE GESTE MANQUANT, C'EST LA RÉPONSE FAUSSE.
+  //    Filou n'a aucun outil qui lise `preferences_notifications`. Si on lui
+  //    demande un jour « est-ce que tout le monde est prévenu des demandes de
+  //    congé ? », il répondra sur ce qu'il sait — les fiches et les adresses —
+  //    sans voir qu'une administratrice a coupé l'e-mail. Ce serait une réponse
+  //    complète en apparence et fausse en fait : le défaut exact que ce
+  //    registre existe pour empêcher. Le combler demande un outil de LECTURE
+  //    avant un outil d'écriture.
+  'v2/reglages/notifications#setReceptionEmail': {
+    manque:
+      'Filou ne sait ni couper ni rétablir un e-mail de notification, ni dire qui a coupé quoi (B-134, 26/09). Trou assumé : un outil de lecture (« qui reçoit les demandes de congé ? ») est plus urgent que l’écriture, pour qu’il cesse de répondre sur les seules adresses e-mail.',
+  },
   'login#login': { hors: 'Connexion. Filou ne parle qu’à quelqu’un de déjà connecté.' },
   'login#logout': { hors: 'Déconnexion.' },
   'login#changerDeCompte': {

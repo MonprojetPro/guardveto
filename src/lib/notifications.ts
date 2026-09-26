@@ -26,8 +26,11 @@ import {
   contenuRappelPublication,
   contenuAppelVolontaires,
   contenuDepannageConfirme,
+  contenuCongeDemande,
 } from './notifications-inapp'
 import { humaniserCodeGarde } from '@/lib/libelles-gardes'
+import { libelleTypeConge } from '@/lib/brevo'
+import { chargerReglagesEmail } from '@/lib/notifications-reglages'
 import {
   adresseUtilisable,
   trierDestinataires,
@@ -413,6 +416,7 @@ export async function sendRappelPublication(
   let errors = 0
 
   const expediteur = lecteurExpediteur(supabase)
+  const reglages = await chargerReglagesEmail(supabase, periode.cabinet_id)
 
   // Les fiches sans adresse ne sont pas une erreur : elles n'ont simplement
   // personne au bout. On les trace, et la boucle continue pour les autres.
@@ -421,7 +425,7 @@ export async function sendRappelPublication(
   for (const admin of admins) {
     const html = buildRappelPublicationHtml(admin, periode, joursRestants)
 
-    if (adresseUtilisable(admin.email)) {
+    if (adresseUtilisable(admin.email) && reglages.recoitVeto(admin.id, 'rappel_publication')) {
       const adresse = admin.email
       try {
         const messageId = await sendViaBrevo({
@@ -475,7 +479,17 @@ export async function sendRappelPublication(
 async function logEmail(
   supabase: SupabaseClient,
   params: {
-    type: 'planning_publie' | 'garde_modifiee' | 'rappel_publication' | 'appel_volontaires' | 'depannage_confirme'
+    type:
+      | 'planning_publie'
+      | 'garde_modifiee'
+      | 'rappel_publication'
+      | 'appel_volontaires'
+      | 'depannage_confirme'
+      // B-134 — la contrainte `email_log_type_check` a été élargie le 26/09
+      // (migration `20260926150000`). Sans elle, l'envoi partirait et seule la
+      // ligne de journal serait refusée : un e-mail réel invisible dans
+      // l'écran de réglages, donc invérifiable.
+      | 'conge_demande'
     destinataire: string
     veterinaire_id: string | null
     periode_id?: string | null
@@ -485,7 +499,7 @@ async function logEmail(
     erreur?: string | null
   }
 ): Promise<void> {
-  await supabase.from('email_log').insert({
+  const { error } = await supabase.from('email_log').insert({
     type:           params.type,
     destinataire:   params.destinataire,
     veterinaire_id: params.veterinaire_id,
@@ -495,6 +509,24 @@ async function logEmail(
     statut:         params.statut,
     erreur:         params.erreur ?? null,
   })
+
+  // ⚠️ L'ERREUR ÉTAIT IGNORÉE — trouvé le 26/09 en relisant B-134.
+  // `insert` ne lève pas : il rend un objet `{ error }` que personne ne lisait.
+  // Une ligne refusée (contrainte de type trop étroite, policy d'insertion qui
+  // n'accepte pas le rôle courant) disparaissait donc sans un mot, et l'écran de
+  // réglages affichait un journal incomplet sans jamais le dire. C'est le double
+  // du piège déjà documenté par la migration du 14/08.
+  //
+  // On ne PROPAGE pas : journaliser est un effet de bord, et faire échouer une
+  // publication parce que sa trace n'est pas partie serait absurde. Mais on le
+  // DIT — un silence audible vaut mieux qu'un silence.
+  if (error) {
+    console.error(
+      `[notifications] Journal refusé pour ${params.type} → ${params.destinataire} ` +
+        `(l'e-mail lui-même n'est pas concerné) :`,
+      error.message,
+    )
+  }
 }
 
 // ── Export : Nouveau planning publié ─────────────────────────
@@ -549,6 +581,12 @@ export async function sendPlanningPublie(
   let errors = 0
 
   const expediteur = lecteurExpediteur(supabase)
+  // B-134 — chargé UNE fois pour toute la boucle, comme l'expéditeur. La notif
+  // in-app reste créée pour tout le monde : seul l'e-mail se coupe.
+  const reglages = await chargerReglagesEmail(
+    supabase,
+    vets.find((v) => v.cabinet_id)?.cabinet_id,
+  )
 
   // ⚠️ Le cas qui aurait fait le plus de dégâts : au premier planning publié
   // d'un cabinet tout neuf, une seule personne a une adresse. Sans ce tri, six
@@ -565,7 +603,7 @@ export async function sendPlanningPublie(
     const html    = buildPlanningPublieHtml(vet, periode, mesGardes)
     const subject = `[GuardVeto] Nouveau planning — ${periodeLabel}`
 
-    if (adresseUtilisable(vet.email)) {
+    if (adresseUtilisable(vet.email) && reglages.recoitVeto(vet.id, 'planning_publie')) {
       const adresse = vet.email
       try {
         const messageId = await sendViaBrevo({
@@ -665,6 +703,10 @@ export async function sendGardeModifiee(
   let errors = 0
 
   const expediteur = lecteurExpediteur(supabase)
+  const reglages = await chargerReglagesEmail(
+    supabase,
+    destinataires.find((v) => v.cabinet_id)?.cabinet_id,
+  )
 
   tracerSansAdresse('garde_modifiee', trierDestinataires(destinataires).sansAdresse)
 
@@ -678,7 +720,7 @@ export async function sendGardeModifiee(
       garde.second,
     )
 
-    if (adresseUtilisable(vet.email)) {
+    if (adresseUtilisable(vet.email) && reglages.recoitVeto(vet.id, 'garde_modifiee')) {
       const adresse = vet.email
       try {
         const messageId = await sendViaBrevo({
@@ -902,6 +944,10 @@ export async function sendAppelVolontaires(
   let errors = 0
 
   const expediteur = lecteurExpediteur(supabase)
+  const reglages = await chargerReglagesEmail(
+    supabase,
+    (candidats as Veterinaire[]).find((v) => v.cabinet_id)?.cabinet_id,
+  )
 
   // Un candidat sans adresse reste un candidat : il ne reçoit pas le message,
   // mais sa notification in-app l'avertit quand même (elle renvoie au planning,
@@ -927,7 +973,7 @@ export async function sendAppelVolontaires(
       lien,
     )
 
-    if (adresseUtilisable(vet.email)) {
+    if (adresseUtilisable(vet.email) && reglages.recoitVeto(vet.id, 'appel_volontaires')) {
       const adresse = vet.email
       try {
         const messageId = await sendViaBrevo({
@@ -1063,6 +1109,12 @@ export async function sendDepannageConfirme(
     tracerSansAdresse('depannage_confirme', [v])
     return { sent: 0, errors: 0 }
   }
+
+  // B-134 — même raisonnement que ci-dessus quand le réglage est coupé : la
+  // cloche a déjà porté l'information, il n'y a ni envoi ni échec à compter.
+  const reglages = await chargerReglagesEmail(supabase, v.cabinet_id)
+  if (!reglages.recoitVeto(v.id, 'depannage_confirme')) return { sent: 0, errors: 0 }
+
   const adresse = v.email
 
   try {
@@ -1094,4 +1146,248 @@ export async function sendDepannageConfirme(
     })
     return { sent: 0, errors: 1 }
   }
+}
+
+// ============================================================
+// B-134 — Une demande de congé a été posée : prévenir l'administratrice
+// ============================================================
+// MiKL, le 26/09, retour de réunion client : « vérifier que l'admin reçoit bien
+// une notification par mail dès qu'une demande congé dans une période publiée
+// (donc en cours donc urgent) de la part d'un véto… prévoir aussi de recevoir
+// des notifications mails dès qu'une demande congé est posée ».
+//
+// VÉRIFICATION FAITE AVANT DE CODER, ET LA RÉPONSE EST NON : rien ne partait.
+// `createConge` faisait un insert, trois `revalidatePath`, et s'arrêtait là. Les
+// deux seuls e-mails de congé existants vont dans l'autre sens (admin → véto,
+// `emailCongeValide` / `emailCongeRefuse`), et aucun type `conge_*` ne figurait
+// dans le catalogue des notifications in-app. Une demande n'existait donc que
+// dans le tableau des absences, à condition d'aller le regarder — or c'est
+// justement ce que le premier cabinet abonné ne faisait pas.
+//
+// ── POURQUOI L'ENVOI VIT ICI ET PAS DANS `lib/brevo.ts` ─────────────────────
+// Parce que les réponses aux congés, elles, passent par `lib/brevo.ts` — et que
+// c'est exactement ce qui a coûté l'incident du 21/08 : deux chemins d'envoi,
+// un seul lisant l'expéditeur du cabinet. Régler l'expéditeur ne changeait que
+// l'e-mail d'essai et les réponses aux congés ; les cinq autres partaient sous
+// une identité générique et se faisaient rejeter. Ajouter un e-mail dans le
+// chemin qui lit `cabinets.brevo_from_*` ferme la porte plutôt que d'ouvrir un
+// troisième chemin à corriger plus tard.
+// ============================================================
+
+function buildCongeDemandeHtml(params: {
+  prenomAdmin: string
+  prenomDemandeur: string
+  nomDemandeur: string
+  typeLabel: string
+  periodeTxt: string
+  commentaire: string | null
+  gardesPubliees: { date: string; role: string; periodeLibelle: string }[]
+}): string {
+  const {
+    prenomAdmin, prenomDemandeur, nomDemandeur, typeLabel, periodeTxt,
+    commentaire, gardesPubliees,
+  } = params
+
+  const urgent = gardesPubliees.length > 0
+  const accent = urgent ? '#dc2626' : '#1e6b8c'
+
+  // Le bloc d'alerte est la seule raison d'être de cet e-mail dans le cas
+  // urgent : il nomme les gardes à réattribuer. Sans la liste, l'admin saurait
+  // qu'il y a un problème sans savoir lequel — et rouvrirait l'app pour le
+  // chercher, ce qui annule le gain.
+  const blocUrgence = urgent
+    ? `
+    <div style="background:#fef2f2;border:1px solid #fecaca;border-left:4px solid #dc2626;border-radius:6px;padding:16px;margin:0 0 20px">
+      <p style="margin:0 0 10px;font-weight:700;color:#991b1b">À traiter en priorité</p>
+      <p style="margin:0 0 12px;color:#7f1d1d">
+        Ces dates tombent sur un planning <strong>déjà diffusé</strong> à l’équipe.
+        Si vous acceptez, ${gardesPubliees.length === 1 ? 'la garde suivante devra' : 'les gardes suivantes devront'} être réattribuée${gardesPubliees.length === 1 ? '' : 's'} :
+      </p>
+      <ul style="margin:0;padding-left:20px;color:#7f1d1d">
+        ${gardesPubliees
+          .map(
+            (g) =>
+              `<li style="margin:0 0 4px">${formatDate(g.date)} — ${g.role === 'premier' ? '1er de garde' : '2nd de garde'} <span style="color:#a16207">(${g.periodeLibelle})</span></li>`,
+          )
+          .join('')}
+      </ul>
+    </div>`
+    : ''
+
+  return `
+<div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#1a1a2e">
+  <div style="background:${accent};padding:24px 28px;border-radius:8px 8px 0 0">
+    <p style="margin:0;color:#fff;font-weight:700;font-size:18px">GuardVeto</p>
+  </div>
+  <div style="background:#f9fafb;padding:28px;border:1px solid #e5e7eb;border-top:0;border-radius:0 0 8px 8px">
+    <p style="margin:0 0 16px">Bonjour ${prenomAdmin},</p>
+    <p style="margin:0 0 20px">
+      <strong>${prenomDemandeur} ${nomDemandeur}</strong> vient de poser une demande.
+    </p>
+    ${blocUrgence}
+    <div style="background:#fff;border:1px solid #e5e7eb;border-left:4px solid ${accent};border-radius:6px;padding:16px;margin:0 0 20px">
+      <p style="margin:0 0 6px;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Type</p>
+      <p style="margin:0 0 14px;font-weight:600">${typeLabel}</p>
+      <p style="margin:0 0 6px;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Période</p>
+      <p style="margin:0${commentaire ? ' 0 14px' : ''};font-weight:600">${periodeTxt}</p>
+      ${commentaire ? `
+      <p style="margin:0 0 6px;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Commentaire</p>
+      <p style="margin:0;font-style:italic;color:#374151">${commentaire}</p>
+      ` : ''}
+    </div>
+    <p style="margin:0 0 20px">
+      <a href="${appUrl()}/absences" style="display:inline-block;background:${accent};color:#fff;text-decoration:none;font-weight:600;padding:11px 20px;border-radius:6px">Voir la demande</a>
+    </p>
+    <p style="margin:0;color:#6b7280;font-size:13px">
+      Vous pouvez choisir les e-mails que vous recevez dans Réglages &gt; Mes notifications.
+    </p>
+  </div>
+</div>`
+}
+
+/**
+ * sendCongeDemande — prévient les administrateurs du cabinet qu'une demande de
+ * congé vient d'être posée.
+ *
+ * Best-effort, comme les cinq autres : une erreur d'envoi est journalisée mais
+ * ne remet JAMAIS en cause le congé, qui est déjà enregistré. Faire échouer la
+ * pose d'une demande parce qu'un e-mail n'est pas parti serait un très mauvais
+ * échange.
+ *
+ * `gardesPubliees` est fourni par l'appelant plutôt que recalculé ici : la
+ * détection existe déjà (`detecterConflitsPourDecision`) et tourne sous
+ * l'identité de celui qui pose la demande. La refaire ici la referait sous la
+ * même identité, pour un résultat identique et une requête de plus.
+ *
+ * ⚠️ LA CLOCHE N'EST PAS RÉGLABLE, L'E-MAIL L'EST. La notif in-app est créée
+ *    pour TOUS les admins, même ceux qui ont coupé l'e-mail : couper l'e-mail
+ *    réduit le bruit de la boîte mail, ça ne veut pas dire « ne me dis plus
+ *    rien ». Si la cloche se coupait aussi, une demande pourrait n'atteindre
+ *    personne — le silence exact que ce chantier supprime.
+ */
+export async function sendCongeDemande(
+  supabase: SupabaseClient,
+  params: {
+    cabinetId: string
+    demandeur: { id: string; prenom: string; nom: string }
+    type: string
+    dateDebut: string
+    dateFin: string
+    commentaire: string | null
+    gardesPubliees: { date: string; role: string; periodeLibelle: string }[]
+  },
+): Promise<{ sent: number; errors: number }> {
+  const { cabinetId, demandeur, gardesPubliees } = params
+
+  if (!cabinetId) {
+    console.error('[notifications] conge_demande sans cabinet — aucun envoi')
+    return { sent: 0, errors: 0 }
+  }
+
+  // Le filtre `cabinet_id` est EXPLICITE et non délégué à la RLS : cette
+  // fonction peut être appelée depuis un contexte service_role, qui la
+  // contourne. Jamais de sélection d'admins sans borne cabinet (leçon
+  // multi-tenant, reprise de `signalerIncidentTechnique`).
+  const { data: admins, error } = await supabase
+    .from('veterinaires')
+    .select('id, nom, prenom, email, cabinet_id')
+    .eq('cabinet_id', cabinetId)
+    .eq('role_app', 'admin')
+    .eq('actif', true)
+
+  if (error) {
+    console.error('[notifications] conge_demande — lecture des admins en échec:', error.message)
+    return { sent: 0, errors: 0 }
+  }
+  if (!admins || admins.length === 0) {
+    // Un cabinet sans admin actif est une anomalie de données, pas un cas
+    // métier : on le dit dans les logs plutôt que de renvoyer un zéro muet.
+    console.warn(`[notifications] conge_demande — aucun admin actif sur le cabinet ${cabinetId}`)
+    return { sent: 0, errors: 0 }
+  }
+
+  const typeLabel = libelleTypeConge(params.type)
+  const periodeTxt =
+    params.dateDebut === params.dateFin
+      ? formatDate(params.dateDebut)
+      : `du ${formatDate(params.dateDebut)} au ${formatDate(params.dateFin)}`
+
+  const reglages = await chargerReglagesEmail(supabase, cabinetId)
+  const expediteur = lecteurExpediteur(supabase)
+  const notif = contenuCongeDemande({
+    prenomDemandeur: demandeur.prenom,
+    typeLabel,
+    dateDebut: params.dateDebut,
+    dateFin: params.dateFin,
+    nbGardesPubliees: gardesPubliees.length,
+  })
+
+  let sent = 0
+  let errors = 0
+
+  for (const admin of admins as Veterinaire[]) {
+    // La cloche d'abord, et sans condition : c'est le canal qui ne se coupe pas.
+    await creerNotification(supabase, {
+      veterinaireId: admin.id,
+      type: 'conge_demande',
+      titre: notif.titre,
+      message: notif.message,
+      lien: notif.lien,
+      cabinetId: admin.cabinet_id ?? cabinetId,
+    })
+
+    if (!reglages.recoitVeto(admin.id, 'conge_demande')) continue
+    if (!adresseUtilisable(admin.email)) {
+      tracerSansAdresse('conge_demande', [admin])
+      continue
+    }
+    const adresse = admin.email
+
+    const html = buildCongeDemandeHtml({
+      prenomAdmin: admin.prenom,
+      prenomDemandeur: demandeur.prenom,
+      nomDemandeur: demandeur.nom,
+      typeLabel,
+      periodeTxt,
+      commentaire: params.commentaire,
+      gardesPubliees,
+    })
+    const subject =
+      gardesPubliees.length > 0
+        ? `[GuardVeto] À traiter en priorité — demande de ${demandeur.prenom}`
+        : `[GuardVeto] Nouvelle demande de ${demandeur.prenom}`
+
+    try {
+      const messageId = await sendViaBrevo({
+        to: [{ email: adresse, name: `${admin.prenom} ${admin.nom}` }],
+        subject,
+        html,
+        from: await expediteur(admin.cabinet_id ?? cabinetId),
+      })
+      await logEmail(supabase, {
+        type: 'conge_demande',
+        destinataire: adresse,
+        veterinaire_id: admin.id,
+        resend_id: messageId,
+        statut: 'envoye',
+      })
+      sent++
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error(`[notifications] Erreur conge_demande → ${adresse}:`, msg)
+      await logEmail(supabase, {
+        type: 'conge_demande',
+        destinataire: adresse,
+        veterinaire_id: admin.id,
+        statut: 'erreur',
+        erreur: msg,
+      })
+      errors++
+    }
+  }
+
+  console.log(
+    `[notifications] Demande de congé (${demandeur.prenom}, ${gardesPubliees.length} garde(s) diffusée(s)) : ${sent} envoyés, ${errors} erreurs`,
+  )
+  return { sent, errors }
 }

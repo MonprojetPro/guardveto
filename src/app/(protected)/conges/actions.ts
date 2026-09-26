@@ -8,7 +8,12 @@ import { exigerIdentite } from '@/lib/identite'
 import { revalidatePath } from 'next/cache'
 import { sendBrevoEmail, emailCongeValide, emailCongeRefuse } from '@/lib/brevo'
 import { adresseUtilisable } from '@/lib/emails/destinataire'
-import { detecterConflitPlanningPublie } from '@/lib/conges/detection-conflit'
+import {
+  detecterConflitPlanningPublie,
+  detecterConflitsPourDecision,
+} from '@/lib/conges/detection-conflit'
+import { sendCongeDemande } from '@/lib/notifications'
+import { chargerReglagesEmail } from '@/lib/notifications-reglages'
 import type { CreneauImpacte } from '@/lib/crise/contexte'
 import type { CreneauConge, TypeConge } from '@/types'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -156,6 +161,19 @@ export async function createConge(
   revalidatePath('/absences') // écran V2 — lecteur des mêmes congés
   revalidatePath('/admin/demandes')
 
+  // ── B-134 : prévenir l'administratrice qu'une demande vient d'arriver ──────
+  // UNIQUEMENT quand c'est un véto qui pose (statut 'souhait'). Un congé posé
+  // par l'admin naît validé : il n'y a pas de demande, et personne à prévenir —
+  // s'envoyer un e-mail à soi-même pour une décision qu'on vient de prendre est
+  // exactement le genre de bruit qui fait couper les notifications.
+  //
+  // Avant ce lot, poser une demande ne prévenait PERSONNE : ni e-mail, ni
+  // cloche. Elle n'existait que dans le tableau des absences, à condition d'y
+  // aller — et le premier cabinet abonné n'y allait pas.
+  if (!isAdmin) {
+    await notifierDemandeAuxAdmins(supabase, cabinetId, veterinaire_id, data)
+  }
+
   // ── Détection de conflit congé ↔ planning publié (cas « Antoine ») ──────
   // UNIQUEMENT quand le congé est CRÉÉ déjà validé par un admin (statut 'valide').
   // Un simple souhait de véto ne déclenche RIEN ici. La détection NE BLOQUE PAS
@@ -200,6 +218,98 @@ async function detecterConflit(
     date_debut: dateDebut,
     date_fin: dateFin,
     creneauxImpactes,
+  }
+}
+
+/**
+ * recoitDecisionConge — B-134. Ce vétérinaire veut-il encore être averti par
+ * e-mail quand sa demande est tranchée ?
+ *
+ * ⚠️ FAIL-OPEN : tout ce qui rate (cabinet non résolu, lecture impossible)
+ *    répond « oui ». Un fail-closed transformerait une panne de lecture en
+ *    silence sur les réponses aux congés, et personne ne remarque un e-mail qui
+ *    n'arrive pas. Mieux vaut un e-mail de trop qu'un véto qui ne sait jamais
+ *    que sa demande a été refusée.
+ *
+ * ⚠️ NE COMMANDE QUE L'E-MAIL. La décision reste visible dans l'app, quoi qu'il
+ *    arrive : le réglage réduit le bruit de la boîte mail, il ne coupe pas
+ *    l'information.
+ */
+async function recoitDecisionConge(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  veterinaireId: string,
+): Promise<boolean> {
+  try {
+    const cabinetId = await resoudreCabinetId(supabase)
+    const reglages = await chargerReglagesEmail(supabase, cabinetId)
+    return reglages.recoitVeto(veterinaireId, 'conge_decision')
+  } catch (err) {
+    console.error(
+      '[conges] B-134 — préférences illisibles, l’e-mail part quand même :',
+      err instanceof Error ? err.message : err,
+    )
+    return true
+  }
+}
+
+/**
+ * notifierDemandeAuxAdmins — B-134. Une demande vient d'être posée par un véto :
+ * l'administratrice doit l'apprendre sans aller regarder le tableau.
+ *
+ * ⚠️ TOTALEMENT BEST-EFFORT. Le congé est DÉJÀ enregistré quand on arrive ici ;
+ *    tout ce qui rate dans cette fonction est tracé et avalé. Faire échouer la
+ *    pose d'une demande parce qu'un e-mail n'est pas parti serait un très mauvais
+ *    échange — et le véto n'aurait aucun moyen de comprendre le refus.
+ *
+ * ⚠️ CE QUE LA DÉTECTION VOIT, SOUS L'IDENTITÉ DU VÉTO. Elle tourne avec le
+ *    client du demandeur, dont la RLS ne laisse lire `periodes` que si elle est
+ *    `publie` ou `verrouille`. Le seau `brouillon` du détecteur est donc
+ *    toujours vide ici, par construction — et c'est sans conséquence : un
+ *    brouillon n'est pas urgent (il se régénère, personne ne l'a reçu), et
+ *    l'admin verra le verdict complet sur l'écran Absences, qui tourne sous SON
+ *    identité. Ce qu'on cherche à signaler, c'est le cas où l'équipe a DÉJÀ reçu
+ *    le planning — et celui-là, la RLS du véto le laisse parfaitement voir.
+ */
+async function notifierDemandeAuxAdmins(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  cabinetId: string,
+  veterinaireId: string,
+  data: CongeFormData,
+): Promise<void> {
+  try {
+    const { data: demandeur } = await supabase
+      .from('veterinaires')
+      .select('id, nom, prenom')
+      .eq('id', veterinaireId)
+      .maybeSingle()
+
+    if (!demandeur) {
+      console.error('[conges] B-134 — demandeur introuvable, aucun e-mail envoyé')
+      return
+    }
+
+    const verdict = await detecterConflitsPourDecision({
+      supabase,
+      cabinetId,
+      veterinaireId,
+      dateDebut: data.date_debut,
+      dateFin: data.date_fin,
+    })
+
+    await sendCongeDemande(supabase, {
+      cabinetId,
+      demandeur: demandeur as { id: string; prenom: string; nom: string },
+      type: data.type,
+      dateDebut: data.date_debut,
+      dateFin: data.date_fin,
+      commentaire: data.commentaire || null,
+      gardesPubliees: verdict.publiees,
+    })
+  } catch (err) {
+    console.error(
+      '[conges] B-134 — notification de demande en échec (le congé est bien enregistré) :',
+      err instanceof Error ? err.message : err,
+    )
   }
 }
 
@@ -314,7 +424,14 @@ export async function validerConge(
     // Sans adresse (fiche pas encore invitée), il n'y a personne à qui écrire.
     // On ne tente PAS l'envoi : une tentative laisserait une ligne « erreur »
     // dans le journal, et ferait passer une situation normale pour une panne.
-    if (vet && adresseUtilisable(vet.email)) {
+    // B-134 — et à condition que ce véto n'ait pas coupé cet e-mail dans ses
+    // réglages. La décision reste visible dans l'app : on retire l'e-mail, pas
+    // l'information.
+    if (
+      vet &&
+      adresseUtilisable(vet.email) &&
+      (await recoitDecisionConge(supabase, conge.veterinaire_id))
+    ) {
       const adresse = vet.email
       const expediteur = await chargerExpediteurCabinet(supabase)
       sendBrevoEmail({
@@ -421,8 +538,12 @@ export async function refuserConge(id: string, raison?: string) {
       .single()
 
     // Même règle qu'à la validation : pas d'adresse, pas d'envoi, pas de faux
-    // échec dans le journal.
-    if (vet && adresseUtilisable(vet.email)) {
+    // échec dans le journal — et le réglage B-134 de ce véto est respecté.
+    if (
+      vet &&
+      adresseUtilisable(vet.email) &&
+      (await recoitDecisionConge(supabase, conge.veterinaire_id))
+    ) {
       const adresse = vet.email
       const expediteur = await chargerExpediteurCabinet(supabase)
       sendBrevoEmail({
