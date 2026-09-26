@@ -27,10 +27,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { Periode } from '@/types'
+import { nomPeriode } from '@/lib/periodes/libelle'
 
-function nomPeriode(p: Periode): string {
-  return p.libelle ?? `${p.saison === 'ete' ? 'Été' : 'Hiver'} ${p.date_debut.slice(0, 4)}`
-}
 
 /** « du 7 septembre au 20 septembre 2026 » — repère de dates, pas de jargon. */
 function bornes(p: Periode): string {

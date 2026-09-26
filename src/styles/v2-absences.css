@@ -211,6 +211,49 @@
 .vet-filter:hover { border-color: var(--accent-ink); color: var(--accent-ink); }
 .vet-filter[aria-pressed="true"] { background: var(--t-accent); border-color: var(--t-accent); color: #fff; }
 .vet-filter[aria-pressed="true"] i { background: #fff; }
+
+/* ---------- B-131 : la fenêtre de temps ----------
+   Les deux champs de date n'apparaissent QUE sur « Dates au choix ». Deux
+   champs vides affichés en permanence, c'est deux champs qu'on finit par
+   remplir par erreur — et une liste qui se vide sans qu'on sache pourquoi. */
+.f-plage {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 0.78rem; color: var(--soft);
+}
+.f-plage input[type="date"] {
+  border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--text);
+  font-size: 0.78rem; font-family: inherit;
+  padding: 6px 10px; min-height: 34px;
+}
+.f-plage input[type="date"]:focus-visible {
+  outline: 2px solid var(--accent-ink); outline-offset: 1px;
+}
+
+/* Ce que le filtre CACHE, dit à voix haute et cliquable pour revenir.
+   Un écran qui montre 3 congés sur 40 sans le dire se lit comme « il n'y en a
+   que 3 » — et personne ne va vérifier une bonne nouvelle. C'est un bouton et
+   pas un texte : constater sans pouvoir revenir n'aide personne. */
+.f-masques {
+  display: inline-flex; align-items: center;
+  margin-left: auto;
+  border: 1px solid var(--warn); border-radius: 999px;
+  background: var(--warn-soft); color: var(--warn);
+  font-size: 0.74rem; font-weight: 700;
+  padding: 5px 12px; min-height: 30px;
+}
+.f-masques:hover { background: var(--warn); color: #fff; }
+
+/* La même chose au-dessus de la file d'attente : « Aucun souhait en attente »
+   devient FAUX sous filtre, et c'est la phrase la plus dangereuse de l'écran. */
+.empty-row.masques {
+  font-style: normal; color: var(--warn); font-weight: 600;
+}
+.lien-inline {
+  background: none; border: 0; padding: 0;
+  font: inherit; color: var(--accent-ink); font-weight: 700;
+  text-decoration: underline; cursor: pointer;
+}
 /* ⚠️ Ce sélecteur visait le `<select>` NATIF de l'onglet Congés, retiré le
    2026-08-27 (B-067) au profit du composant maison — le natif est interdit sur
    ce projet, et cet écran était le dernier à en avoir un. La règle reste : elle

@@ -51,14 +51,42 @@ import { horodatageFr } from '@/lib/dates-fr'
 // Le tri vit dans `lib/` : c'est de la logique pure, testable sans monter un
 // composant, et la V1 pourra s'en servir si elle en a besoin un jour.
 import { comparerConges, LIBELLE_TRI_CONGES, type TriConges } from '@/lib/conges/tri'
+// Le filtre de dates aussi : logique pure, testable sans monter le composant.
+import { filtrerParFenetre, type Fenetre } from '@/lib/conges/filtre-periode'
+import { nomPeriode } from '@/lib/periodes/libelle'
 
 type Onglet = 'conges' | 'echanges' | 'depannages'
+
+/**
+ * Une période, telle que le FILTRE la lit (B-131).
+ *
+ * Volontairement plus étroite que `Periode` : le filtre n'a besoin que du nom,
+ * des deux bornes et du statut. Réclamer le type complet aurait obligé la page
+ * à charger des colonnes dont cet écran ne fait rien (profil, effectif du soir,
+ * date de publication) — et à les recharger à chaque évolution du type.
+ */
+export interface PeriodeFiltre {
+  id: string
+  libelle: string | null
+  saison: 'ete' | 'hiver'
+  numero: number | null
+  date_debut: string
+  date_fin: string
+  statut: string
+}
 
 interface Props {
   conges: Conge[]
   vets: Veterinaire[]
   moiId: string
   isAdmin: boolean
+  /**
+   * Les périodes du cabinet, TOUS STATUTS, les plus récentes d'abord (B-131).
+   * Brouillons compris : c'est presque toujours sur une période en préparation
+   * qu'on traite les congés. Liste vide = le filtre de période ne s'affiche pas,
+   * la plage libre de dates reste disponible.
+   */
+  periodes: PeriodeFiltre[]
   /**
    * Verdict de conflit pré-calculé par souhait : { congeId → verdict }.
    * Couvre les plannings PUBLIÉS **et** les BROUILLONS — un souhait validé sur
@@ -213,6 +241,7 @@ export function AbsencesV2({
   vets,
   moiId,
   isAdmin,
+  periodes,
   verdicts,
   echanges,
   gardesFutures,
@@ -234,6 +263,38 @@ export function AbsencesV2({
   const [repareConflit, setRepareConflit] = useState(false)
   const [filtreVet, setFiltreVet] = useState('tous')
   const [filtreType, setFiltreType] = useState('tous')
+
+  // ── B-131 : filtre par période, ou par plage libre de dates ──────────────
+  // Un SEUL sélecteur pour les deux, et pas deux filtres côte à côte : « la
+  // période Hiver P2 » et « du 1er au 15 novembre » répondent à la même
+  // question (quelle fenêtre de temps ?) et les cumuler n'a aucun sens. Deux
+  // contrôles distincts auraient surtout permis de les régler en contradiction,
+  // avec une liste vide sans que rien n'explique pourquoi.
+  //
+  // ⚠️ Le défaut est « toutes » et PAS la période en cours : au premier
+  //    chargement, l'admin doit voir ce qu'il a, pas une vue déjà réduite qu'il
+  //    prendrait pour la totalité. Un filtre actif sans l'avoir demandé est la
+  //    façon la plus sûre de faire croire qu'il ne reste rien à traiter.
+  const [filtrePeriode, setFiltrePeriode] = useState<string>('toutes')
+  const [plageDebut, setPlageDebut] = useState('')
+  const [plageFin, setPlageFin] = useState('')
+
+  const periodeChoisie = useMemo(
+    () => periodes.find((p) => p.id === filtrePeriode) ?? null,
+    [periodes, filtrePeriode],
+  )
+
+  /** La fenêtre effective — d'où qu'elle vienne, le filtrage est le même. */
+  const fenetre: Fenetre = useMemo(() => {
+    if (filtrePeriode === 'plage') return { debut: plageDebut, fin: plageFin }
+    if (periodeChoisie) {
+      return { debut: periodeChoisie.date_debut, fin: periodeChoisie.date_fin }
+    }
+    return {}
+  }, [filtrePeriode, plageDebut, plageFin, periodeChoisie])
+
+  /** Le filtre de dates est-il réellement en train de réduire la liste ? */
+  const fenetreActive = filtrePeriode !== 'toutes' && !!(fenetre.debut || fenetre.fin)
   // Le défaut reprend l'ordre le plus utile au quotidien : le congé le plus
   // proche d'abord — c'est celui sur lequel on agit.
   const [tri, setTri] = useState<TriConges>('chrono')
@@ -265,13 +326,27 @@ export function AbsencesV2({
     [parVet],
   )
 
-  const souhaits = useMemo(
+  const tousSouhaits = useMemo(
     () =>
       conges
         .filter((c) => c.statut === 'souhait')
         .sort((a, b) => comparerConges(tri, a, b, prenomDe)),
     [conges, tri, prenomDe],
   )
+
+  // B-131 — le filtre s'applique AUSSI aux demandes en attente : quand on
+  // traite une période, on veut les demandes de cette période.
+  const souhaits = useMemo(
+    () => filtrerParFenetre(tousSouhaits, fenetre),
+    [tousSouhaits, fenetre],
+  )
+
+  // ⚠️ MAIS ON DIT COMBIEN ON EN CACHE. Les souhaits sont la file d'attente :
+  // les masquer en silence, c'est exactement « le tableau ne peut pas se
+  // taire » — une phrase rassurante (ou un bloc vide) là où il reste du travail.
+  // Le filtre a le droit de réduire la vue ; il n'a pas le droit de faire
+  // disparaître du travail sans le dire.
+  const souhaitsMasques = tousSouhaits.length - souhaits.length
 
   // PÉRIMÈTRE DE LECTURE — aligné sur la V1 (`CongesList.tsx:101-105`), qui
   // reste la référence connue du cabinet :
@@ -283,12 +358,21 @@ export function AbsencesV2({
   //   2. un véto ne voyait sa propre demande en attente NULLE PART (le bloc
   //      « souhaits » est réservé à l'admin) : il posait un congé et le perdait
   //      de vue jusqu'à la décision.
-  const traites = useMemo(() => {
+  const tousTraites = useMemo(() => {
     const visibles = isAdmin ? conges : conges.filter((c) => c.veterinaire_id === moiId)
     return visibles
       .filter((c) => (isAdmin ? c.statut !== 'souhait' : true))
       .sort((a, b) => comparerConges(tri, a, b, prenomDe))
   }, [conges, isAdmin, moiId, tri, prenomDe])
+
+  // B-131 — la fenêtre de dates s'applique AVANT les chips par véto, pour que
+  // leurs compteurs disent « dans cette période », et pas « en tout ». Un
+  // compteur qui ignore le filtre à côté duquel il s'affiche est un compteur
+  // qui ment, et c'est une leçon déjà payée sur ce projet.
+  const traites = useMemo(
+    () => filtrerParFenetre(tousTraites, fenetre),
+    [tousTraites, fenetre],
+  )
 
   const traitesFiltres = traites.filter(
     (c) =>
@@ -302,6 +386,9 @@ export function AbsencesV2({
     for (const c of traites) m.set(c.veterinaire_id, (m.get(c.veterinaire_id) ?? 0) + 1)
     return m
   }, [traites])
+
+  /** Combien la fenêtre retire de la liste des traités — jamais tu par l'écran. */
+  const traitesMasques = tousTraites.length - traites.length
 
   const echangesAAgir = echanges.filter(
     (e) => e.statut === 'proposee' || (isAdmin && e.statut === 'acceptee'),
@@ -417,9 +504,33 @@ export function AbsencesV2({
                 </p>
               </div>
 
+              {/* ⚠️ B-131 — « Aucun souhait en attente » DEVIENT FAUX sous
+                  filtre, et c'est le défaut précis que « le tableau ne peut pas
+                  se taire » existe pour empêcher : une phrase rassurante se lit
+                  comme une salle vide, jamais comme un angle mort, et personne
+                  ne va vérifier une bonne nouvelle. Dès que la fenêtre cache des
+                  demandes, l'écran le DIT et offre le geste pour les revoir. */}
+              {souhaitsMasques > 0 && (
+                <p className="empty-row masques">
+                  {souhaitsMasques === 1
+                    ? '1 demande en attente est hors de la fenêtre choisie'
+                    : `${souhaitsMasques} demandes en attente sont hors de la fenêtre choisie`}{' '}
+                  —{' '}
+                  <button
+                    type="button"
+                    className="lien-inline"
+                    onClick={() => setFiltrePeriode('toutes')}
+                  >
+                    tout revoir
+                  </button>
+                </p>
+              )}
+
               {souhaits.length === 0 ? (
                 <p className="empty-row">
-                  Aucun souhait en attente. Les prochaines demandes des vétérinaires arriveront ici.
+                  {souhaitsMasques > 0
+                    ? 'Aucun souhait en attente sur cette fenêtre.'
+                    : 'Aucun souhait en attente. Les prochaines demandes des vétérinaires arriveront ici.'}
                 </p>
               ) : (
                 <ul className="rows">
@@ -540,6 +651,80 @@ export function AbsencesV2({
                     ))}
                   </SelectContent>
                 </Select>
+
+                {/* ── B-131 : la fenêtre de temps ──────────────────────────
+                    Un SEUL sélecteur pour « une période » et « une plage de
+                    dates » : les deux répondent à la même question, et les
+                    cumuler n'aurait aucun sens — pire, ça aurait permis de les
+                    régler en contradiction et de vider la liste sans raison
+                    visible. Les dates n'apparaissent que si on choisit la
+                    plage : deux champs vides en permanence, c'est deux champs
+                    qu'on finit par remplir par erreur. */}
+                <Select
+                  value={filtrePeriode}
+                  onValueChange={(v) => v && setFiltrePeriode(v)}
+                >
+                  <SelectTrigger aria-label="Filtrer par période ou par dates">
+                    {filtrePeriode === 'toutes'
+                      ? 'Toutes les dates'
+                      : filtrePeriode === 'plage'
+                        ? 'Dates au choix'
+                        : periodeChoisie
+                          ? nomPeriode(periodeChoisie)
+                          : 'Toutes les dates'}
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="toutes">Toutes les dates</SelectItem>
+                    {periodes.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {nomPeriode(p)}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="plage">Dates au choix…</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {filtrePeriode === 'plage' && (
+                  <span className="f-plage">
+                    <label className="sr-only" htmlFor="abs-plage-debut">
+                      À partir du
+                    </label>
+                    <input
+                      id="abs-plage-debut"
+                      type="date"
+                      value={plageDebut}
+                      max={plageFin || undefined}
+                      onChange={(e) => setPlageDebut(e.target.value)}
+                      aria-label="À partir du"
+                    />
+                    <span aria-hidden="true">→</span>
+                    <label className="sr-only" htmlFor="abs-plage-fin">
+                      Jusqu&apos;au
+                    </label>
+                    <input
+                      id="abs-plage-fin"
+                      type="date"
+                      value={plageFin}
+                      min={plageDebut || undefined}
+                      onChange={(e) => setPlageFin(e.target.value)}
+                      aria-label="Jusqu’au"
+                    />
+                  </span>
+                )}
+
+                {/* Le filtre ne peut pas se taire sur ce qu'il retire. Un
+                    écran qui montre 3 congés sur 40 sans le dire se lit comme
+                    « il n'y en a que 3 ». */}
+                {fenetreActive && traitesMasques > 0 && (
+                  <button
+                    type="button"
+                    className="f-masques"
+                    onClick={() => setFiltrePeriode('toutes')}
+                    title="Revenir à toutes les dates"
+                  >
+                    {traitesMasques} hors de cette fenêtre · tout revoir
+                  </button>
+                )}
               </div>
             )}
 

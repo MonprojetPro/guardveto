@@ -22,7 +22,7 @@ import '@/styles/v2-echanges.css'
 import '@/styles/v2-filou-edge.css'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
-import { AbsencesV2 } from '@/components/v2/AbsencesV2'
+import { AbsencesV2, type PeriodeFiltre } from '@/components/v2/AbsencesV2'
 import { chargerDock } from '@/data/v2/dock'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import {
@@ -106,6 +106,34 @@ export default async function AbsencesPage() {
   const vets = ((vetsRes?.data ?? []) as Veterinaire[])
   const conges = ((congesRes?.data ?? []) as Conge[])
 
+  // ── B-131 : les périodes, pour filtrer les congés par période ─────────────
+  // MiKL, le 26/09 : « mettre un filtre dans congé pour trier les congés que
+  // pour une période, ou une zone de date particulière ».
+  //
+  // ⚠️ TOUS les statuts, brouillon compris. C'est presque toujours sur une
+  //    période EN PRÉPARATION qu'on traite les congés — ne proposer que les
+  //    périodes publiées aurait fait manquer le seul cas qui compte.
+  //
+  // Les plus récentes d'abord : on travaille sur ce qui arrive, pas sur
+  // l'historique. Le champ `libelle` est indispensable — c'est le nom que le
+  // cabinet a donné, et celui qu'il cherchera dans la liste déroulante.
+  // Fail-open comme le reste de cet écran : une requête muette laisse
+  // simplement le filtre de période absent, elle n'empêche pas l'écran de vivre.
+  //
+  // Conditionnée à l'admin — comme `depannagesRes` plus haut — parce que la
+  // barre de filtres n'est affichée qu'à lui. Charger pour tout le monde n'aurait
+  // rien exposé (la RLS de `periodes` est RESTRICTIVE sur le cabinet, et un véto
+  // n'y voit que le publié — vérifié en base), mais c'était une requête pour
+  // rien à chaque ouverture de l'écran.
+  const periodesRes = isAdmin
+    ? await supabase
+        .from('periodes')
+        .select('id, libelle, saison, numero, date_debut, date_fin, statut')
+        .order('date_debut', { ascending: false })
+    : null
+
+  const periodes = (periodesRes?.data ?? []) as PeriodeFiltre[]
+
   // ── Verdict de conflit sur les souhaits en attente (admin) ──
   // Calculé en amont pour que la ligne l'affiche sans clic. Couvre les
   // plannings PUBLIÉS et les BROUILLONS : l'écran n'annonçait que le publié,
@@ -182,6 +210,7 @@ export default async function AbsencesPage() {
           vets={vets}
           moiId={vet.id}
           isAdmin={isAdmin}
+          periodes={periodes}
           verdicts={verdicts}
           echanges={(echangesRes?.data ?? []) as unknown as EchangeRow[]}
           gardesFutures={(gardesRes?.data ?? []) as unknown as GardeLite[]}

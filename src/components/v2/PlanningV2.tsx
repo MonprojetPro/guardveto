@@ -53,6 +53,7 @@ import type { CompteursRow } from '@/hooks/useCompteurs'
 import type { BilanVet } from '@/engine/bilan'
 import type { CleColonne } from '@/lib/planning/colonnesCompteurs'
 import type { GardeDenormalisee, Periode, ProfilPlanning } from '@/types'
+import { nomPeriode } from '@/lib/periodes/libelle'
 import { stylePoint } from '@/lib/couleurs'
 
 interface Props {
@@ -185,9 +186,6 @@ function libelleStatut(statut: Periode['statut']) {
   return { classe: 'st-brouillon', texte: '● Brouillon · non publié' }
 }
 
-function nomPeriode(p: Periode) {
-  return p.libelle ?? `${p.saison === 'ete' ? 'Été' : 'Hiver'} ${p.date_debut.slice(0, 4)}`
-}
 
 export function PlanningV2({
   gardes,

@@ -57,6 +57,7 @@ import type { CreneauIgnore } from '@/engine/creneau-modele'
 import type { JourNonCouvert } from '@/components/planning/types-impasse'
 import type { DiagnosticImpasse as DiagnosticImpasseData } from '@/engine/diagnostic'
 import type { Periode, ProfilPlanning } from '@/types'
+import { nomPeriode } from '@/lib/periodes/libelle'
 
 // ── LA PÉRIODE TYPE NE SE DEVINE PLUS (MiKL, 2026-08-04) ──────────────────
 // Il y avait ici une sentinelle `AUTO` pour l'option « Selon la saison » :
@@ -89,9 +90,8 @@ function dateCourte(iso: string): string {
   })
 }
 
-function nomPlanning(p: Periode): string {
-  return p.libelle ?? `${p.saison === 'ete' ? 'Été' : 'Hiver'} ${p.date_debut.slice(0, 4)}`
-}
+/** Alias local : cet ecran parle de « planning », pas de « periode ». */
+const nomPlanning = nomPeriode
 
 const STATUT: Record<Periode['statut'], string> = {
   brouillon: 'Brouillon',
