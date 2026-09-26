@@ -114,6 +114,12 @@ export interface FicheInvitable extends PorteurAdresse {
   actif: boolean
   /** `null` / absent = aucun compte n'a jamais été créé pour cette fiche. */
   user_id?: string | null
+  /**
+   * B-133a — l'admin a décidé que cette fiche n'a pas à être signalée (une
+   * personne qui n'aura pas de compte). Absent = `false`, donc les appelants
+   * qui ne connaissent pas encore le champ se comportent comme avant.
+   */
+  invitation_en_sourdine?: boolean | null
 }
 
 /**
@@ -127,6 +133,12 @@ export interface FicheInvitable extends PorteurAdresse {
  * partie n'est plus un blocage : la compter ici rendrait le rappel PERMANENT,
  * donc invisible — un signal qui ne s'éteint jamais est un signal qu'on cesse
  * de lire, et on aurait reconstruit l'angle mort qu'on prétend fermer.
+ *
+ * ⚠️ LA MISE EN SOURDINE SORT LA FICHE DES DEUX LISTES (B-133a). C'est la même
+ * raison, poussée au cas de la fiche qu'on ne VEUT pas inviter : sans elle, le
+ * dernier recours du cabinet aurait maintenu le rappel allumé indéfiniment.
+ * L'écran doit en revanche DIRE qu'une fiche est en sourdine — invisible, la
+ * sourdine devient à son tour un angle mort.
  *
  * ⚠️ LES DEUX LISTES SONT SÉPARÉES parce qu'elles appellent des gestes
  * DIFFÉRENTS. Sans adresse, aucune invitation ne peut partir — le serveur
@@ -144,7 +156,7 @@ export function fichesAInviter<T extends FicheInvitable>(
   const pretes: T[] = []
   const sansAdresse: T[] = []
   for (const f of fiches) {
-    if (!f.actif || f.user_id) continue
+    if (!f.actif || f.user_id || f.invitation_en_sourdine) continue
     if (motifInvitationImpossible(f)) sansAdresse.push(f)
     else pretes.push(f)
   }

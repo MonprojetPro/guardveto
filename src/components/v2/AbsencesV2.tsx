@@ -601,13 +601,24 @@ export function AbsencesV2({
               <h2>{isAdmin ? 'Souhaits traités' : 'Mes congés'}</h2>
               {traites.length > 0 && <span className="section-count">{traites.length}</span>}
               <p className="sub">
-                Validés et refusés. Chaque prénom compte et filtre d&apos;un même geste.
+                {isAdmin
+                  ? 'Validés et refusés. Chaque prénom compte et filtre d’un même geste.'
+                  : /* Corrigé avec B-131a : cette phrase parlait de prénoms à
+                       cliquer, alors qu'un véto ne voit que ses propres congés
+                       et donc aucun prénom. Elle décrivait un geste impossible. */
+                    'Validés et refusés. Tu peux les restreindre à une période ou à des dates.'}
               </p>
             </div>
 
-            {isAdmin && (
-              <div className="filters">
-                <span className="f-label">Filtrer</span>
+            {/* ── B-131a : la barre de filtres est ouverte AUX VÉTOS ──────────
+                MiKL, le 26/09 : « oui tu peux également rajouter ce filtre aux
+                veto ». Seule la FENÊTRE DE TEMPS leur est ouverte : les chips par
+                prénom n'auraient aucun sens (un véto ne voit que ses congés, il y
+                aurait un seul chip), et le filtre par type n'a pas été demandé —
+                on ne l'ajoute donc pas de notre propre chef. */}
+            <div className="filters">
+              <span className="f-label">Filtrer</span>
+              {isAdmin && (
                 <button
                   type="button"
                   className="vet-filter"
@@ -617,7 +628,9 @@ export function AbsencesV2({
                   <i style={{ ['--c' as string]: 'var(--t-accent)' }} />
                   Toute l&apos;équipe
                 </button>
-                {vets
+              )}
+              {isAdmin &&
+                vets
                   .filter((v) => (compteParVet.get(v.id) ?? 0) > 0)
                   .map((v) => (
                     <button
@@ -631,10 +644,14 @@ export function AbsencesV2({
                       {v.prenom} · {compteParVet.get(v.id)}
                     </button>
                   ))}
-                {/* ⚠️ Le composant maison, PAS un `<select>` natif : le projet
-                    l'interdit, et cet écran était le seul à en avoir gardé un
-                    (la V1 utilisait pourtant déjà le bon). Trouvé en traitant
-                    B-067. */}
+              {/* ⚠️ Le composant maison, PAS un `<select>` natif : le projet
+                  l'interdit, et cet écran était le seul à en avoir gardé un
+                  (la V1 utilisait pourtant déjà le bon). Trouvé en traitant
+                  B-067.
+                  Réservé à l'admin : B-131a n'a ouvert aux vétos que la fenêtre
+                  de temps. Leur ajouter le filtre par type serait un ajout de
+                  notre initiative, pas une demande. */}
+              {isAdmin && (
                 <Select
                   value={filtreType}
                   onValueChange={(v) => v && setFiltreType(v)}
@@ -651,6 +668,7 @@ export function AbsencesV2({
                     ))}
                   </SelectContent>
                 </Select>
+              )}
 
                 {/* ── B-131 : la fenêtre de temps ──────────────────────────
                     Un SEUL sélecteur pour « une période » et « une plage de
@@ -715,19 +733,17 @@ export function AbsencesV2({
                 {/* Le filtre ne peut pas se taire sur ce qu'il retire. Un
                     écran qui montre 3 congés sur 40 sans le dire se lit comme
                     « il n'y en a que 3 ». */}
-                {fenetreActive && traitesMasques > 0 && (
-                  <button
-                    type="button"
-                    className="f-masques"
-                    onClick={() => setFiltrePeriode('toutes')}
-                    title="Revenir à toutes les dates"
-                  >
-                    {traitesMasques} hors de cette fenêtre · tout revoir
-                  </button>
-                )}
-              </div>
-            )}
-
+              {fenetreActive && traitesMasques > 0 && (
+                <button
+                  type="button"
+                  className="f-masques"
+                  onClick={() => setFiltrePeriode('toutes')}
+                  title="Revenir à toutes les dates"
+                >
+                  {traitesMasques} hors de cette fenêtre · tout revoir
+                </button>
+              )}
+            </div>
 
             {traitesFiltres.length === 0 ? (
               <p className="empty-row">

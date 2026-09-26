@@ -229,15 +229,44 @@
 .team-rappel .tr-icone { flex: none; color: var(--warn); font-weight: 700; }
 .team-rappel strong { font-weight: 700; }
 .team-rappel .tr-detail { display: block; color: var(--t-muted); font-size: 0.8rem; }
+/* -- B-133a : couper le signalement sur une fiche --
+   Volontairement DISCRET, et c'est la décision de design du lot : c'est
+   « Inviter » qui doit attraper l'œil, pas le moyen de l'éteindre. Un bouton de
+   mise en sourdine aussi voyant que l'appel à l'action ferait taire l'alerte au
+   premier agacement — et on serait revenu au point de départ, une équipe de
+   fiches sans compte que plus rien ne signale.
+
+   ⚠️ Le bouton s'appelle `acct-muet` et NON `acct-sourdine` : `acct-sourdine`
+   est déjà l'ÉTAT du conteneur (`vet-account acct-<etat>`, comme `acct-sans` ou
+   `acct-invite`). Réutiliser le même nom aurait appliqué ces règles de bouton
+   au div entier — fond supprimé, texte souligné. La famille `acct-<etat>` est
+   réservée aux états, on n'y range pas de composant. */
+.acct-muet {
+  flex: none;
+  background: none; border: 0;
+  color: var(--t-muted); font-size: 0.7rem; font-weight: 600;
+  text-decoration: underline; text-underline-offset: 2px;
+  padding: 4px 2px; min-height: 26px;
+  cursor: pointer;
+}
+.acct-muet:hover:not(:disabled) { color: var(--accent-ink); }
+.acct-muet:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .acct-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
 .acct-actif   .acct-dot { background: var(--ok); }
 .acct-invite  .acct-dot { background: var(--warn); }
 .acct-sans    .acct-dot { background: var(--soft); }
+/* Creux, pas plein : la fiche existe, mais on a choisi de ne plus la réclamer.
+   Le point plein l'aurait rangée avec les états qui attendent quelque chose. */
+.acct-sourdine .acct-dot {
+  background: transparent; box-shadow: inset 0 0 0 2px var(--soft);
+}
 .acct-inactif .acct-dot { background: var(--danger); }
-.acct-actif   { color: var(--ok); }
-.acct-invite  { color: var(--warn); }
-.acct-sans    { color: var(--t-muted); }
-.acct-inactif { color: var(--danger); }
+.acct-actif    { color: var(--ok); }
+.acct-invite   { color: var(--warn); }
+.acct-sans     { color: var(--t-muted); }
+.acct-sourdine { color: var(--t-muted); }
+.acct-inactif  { color: var(--danger); }
 
 /* -- Les actions de gestion : trois au maximum, jamais de retour à la ligne --
    Il y en avait jusqu'à cinq, toutes de même taille, qui wrappaient sur deux

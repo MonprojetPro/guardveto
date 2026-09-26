@@ -27,6 +27,19 @@ export interface Veterinaire {
   role_app: UserRole
   actif: boolean
   dernier_recours: boolean
+  /**
+   * B-133a — `true` : cette fiche ne compte plus dans « il reste des gens à
+   * inviter », et son bouton ne pulse plus. Décision assumée de l'admin pour
+   * quelqu'un qui n'aura pas de compte (le dernier recours, typiquement).
+   *
+   * ⚠️ Ne coupe QUE le signalement, jamais la capacité : le bouton « Inviter »
+   * reste actif. Couper la capacité aurait créé une fiche qu'on ne peut plus
+   * inviter sans repasser par la base.
+   *
+   * Facultatif dans le type parce que les anciens appels `select` nommés qui
+   * ne demandent pas la colonne restent valides — l'absence vaut `false`.
+   */
+  invitation_en_sourdine?: boolean
   couleur: string
   /** Étiquettes d'équipe (ex. junior, senior) — règles de composition (n°6/n°22). */
   tags?: string[]

@@ -65,6 +65,15 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   // Filou savait inviter le secrétariat et pas l'équipe, sans qu'aucune raison
   // le justifie. C'est le rendement attendu de ce fichier.
   'protected/admin/veterinaires#inviterVeterinaire': { outil: 'inviter_veterinaire' },
+  // B-133a — couper le signalement « cette fiche doit être invitée ».
+  // `manque` et pas `hors` : la question « pourquoi Anne-Catherine n'apparaît
+  // plus dans les gens à inviter ? » est parfaitement légitime, et Filou n'a
+  // aujourd'hui aucun moyen d'y répondre ni de poser la sourdine. Ce n'est pas
+  // hors de son périmètre — c'est un trou assumé, daté, et visible ici plutôt
+  // que découvert un soir sur une réponse incomplète servie comme complète.
+  'protected/admin/veterinaires#setSignalementInvitation': {
+    manque: 'Filou ne sait ni couper ni rétablir le signalement d’invitation d’une fiche (B-133a, 26/09) — geste réservé à l’écran Équipe pour l’instant.',
+  },
 
   // ── LE SECRÉTARIAT (B-017) ──────────────────────────────────────────────
   'v2/equipe/secretariat-actions#creerSecretaire': { outil: 'creer_acces_secretariat' },

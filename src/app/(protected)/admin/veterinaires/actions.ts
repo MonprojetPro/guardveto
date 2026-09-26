@@ -401,6 +401,56 @@ type ToggleActifResult =
  * (La désactivation n'efface PAS ces gardes — il faudra les réattribuer via
  * une édition manuelle ou la gestion de crise.)
  */
+/**
+ * B-133a — couper (ou rétablir) le SIGNALEMENT d'invitation sur une fiche.
+ *
+ * B-133 signale les fiches actives sans compte, pour que le cabinet cesse de
+ * créer des vétérinaires qui ne peuvent pas entrer dans l'app. Reste le cas de
+ * la fiche qu'on ne VEUT pas inviter — le dernier recours, typiquement : sans
+ * échappatoire, son rappel resterait allumé pour toujours, donc plus personne
+ * ne le lirait, et l'angle mort serait reconstruit à l'identique.
+ *
+ * ⚠️ NE COUPE QUE LE SIGNALEMENT, JAMAIS LA CAPACITÉ. Le bouton « Inviter »
+ * reste actif sur une fiche en sourdine, et `inviterVeterinaire` ne consulte pas
+ * ce champ. Couper la capacité aurait créé une fiche qu'on ne peut plus inviter
+ * sans repasser par la base — une porte que le serveur refuse toujours.
+ *
+ * ⚠️ PAS DE CONTRÔLE D'IMPACT ICI, et c'est motivé : ce champ ne change ni
+ * l'effectif, ni les règles, ni une garde. Il ne modifie que ce que l'écran
+ * SIGNALE. Appeler le pré-vol pour ça aurait appris à le voir comme un péage.
+ *
+ * Pas de garde « la fiche a-t-elle déjà un compte ? » : mettre en sourdine une
+ * fiche déjà pourvue est sans effet (elle n'est plus comptée de toute façon), et
+ * refuser obligerait l'écran à deviner l'état exact avant de proposer le geste.
+ */
+export async function setSignalementInvitation(
+  id: string,
+  enSourdine: boolean,
+): Promise<{ success: true } | { error: string }> {
+  const supabase = await createClient()
+
+  const garde = await assertAdmin(supabase)
+  if ('error' in garde) return { error: garde.error }
+
+  // Écriture par le client AUTHENTIFIÉ, jamais en service_role : c'est la RLS
+  // qui garantit que la fiche appartient au cabinet du caller. Un `update` qui
+  // ne touche aucune ligne est donc un refus d'isolation, pas un succès muet —
+  // d'où le `select` de contrôle plutôt qu'un `error` seul.
+  const { data, error } = await supabase
+    .from('veterinaires')
+    .update({ invitation_en_sourdine: enSourdine })
+    .eq('id', id)
+    .select('id')
+
+  if (error) return { error: error.message }
+  if (!data || data.length === 0) {
+    return { error: 'Fiche introuvable, ou hors de ton cabinet.' }
+  }
+
+  revaliderEquipe()
+  return { success: true }
+}
+
 export async function toggleVeterinaireActif(
   id: string,
   actif: boolean,

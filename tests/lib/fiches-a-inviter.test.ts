@@ -79,3 +79,55 @@ describe('fichesAInviter — qui reste-t-il à inviter', () => {
     expect(fichesAInviter([])).toEqual({ pretes: [], sansAdresse: [] })
   })
 })
+
+// ============================================================
+// B-133a — la fiche qu'on ne VEUT pas inviter
+// ============================================================
+// Angle mort trouvé en livrant B-133 : Anne-Catherine, dernier recours, n'a
+// peut-être jamais besoin d'entrer dans l'app. Sans échappatoire, son rappel
+// resterait allumé pour toujours — donc plus personne ne le lirait, et l'angle
+// mort serait reconstruit à l'identique. MiKL, le 26/09 : « tu peux rajouter un
+// bouton arrêter de signaler l'invitation nécessaire pour ce véto ».
+// ============================================================
+
+describe('fichesAInviter — mise en sourdine (B-133a)', () => {
+  it('ne réclame plus une fiche mise en sourdine', () => {
+    const { pretes, sansAdresse } = fichesAInviter([
+      fiche({ prenom: 'AnneCat', invitation_en_sourdine: true }),
+    ])
+    expect(pretes).toEqual([])
+    expect(sansAdresse).toEqual([])
+  })
+
+  // Les deux listes, pas seulement « prêtes » : une fiche en sourdine ET sans
+  // adresse ne doit pas reparaître par la porte de service du second compteur.
+  it('la sourdine sort la fiche des DEUX listes, adresse ou pas', () => {
+    const { pretes, sansAdresse } = fichesAInviter([
+      fiche({ prenom: 'Muette', email: null, invitation_en_sourdine: true }),
+    ])
+    expect(pretes).toEqual([])
+    expect(sansAdresse).toEqual([])
+  })
+
+  it('rétablir la sourdine remet la fiche dans les gens à inviter', () => {
+    const { pretes } = fichesAInviter([
+      fiche({ prenom: 'AnneCat', invitation_en_sourdine: false }),
+    ])
+    expect(pretes.map((f) => f.prenom)).toEqual(['AnneCat'])
+  })
+
+  // Un appelant qui ne connaît pas encore la colonne (ancien `select` nommé)
+  // doit se comporter exactement comme avant : absent ≠ en sourdine.
+  it('un champ absent vaut « signalée », jamais « en sourdine »', () => {
+    const { pretes } = fichesAInviter([{ actif: true, email: 'x@cabinet.fr', prenom: 'Sans' }])
+    expect(pretes).toHaveLength(1)
+  })
+
+  it('ne masque pas les autres fiches au passage', () => {
+    const { pretes } = fichesAInviter([
+      fiche({ prenom: 'AnneCat', invitation_en_sourdine: true }),
+      fiche({ prenom: 'Fanny' }),
+    ])
+    expect(pretes.map((f) => f.prenom)).toEqual(['Fanny'])
+  })
+})

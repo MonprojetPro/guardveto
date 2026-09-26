@@ -49,6 +49,7 @@ import {
   createVeterinaire,
   updateVeterinaire,
   inviterVeterinaire,
+  setSignalementInvitation,
   toggleVeterinaireActif,
   type GardeAVenir,
   type VeterinaireFormData,
@@ -108,18 +109,26 @@ const LIBELLE_TYPE_GARDE: Record<string, string> = {
 }
 
 /** L'état du compte, tel qu'il se lit sur la fiche. */
-type EtatCompte = 'actif' | 'invite' | 'sans' | 'inactif'
+type EtatCompte = 'actif' | 'invite' | 'sans' | 'sourdine' | 'inactif'
 
 const LIBELLE_COMPTE: Record<EtatCompte, string> = {
   actif: 'Compte actif',
   invite: 'Invitation envoyée',
   sans: 'Sans compte',
+  // B-133a — « Sans compte » tout court aurait laissé croire que le rappel a
+  // disparu tout seul. Une sourdine qu'on ne voit pas est un angle mort de
+  // plus : six mois plus tard, personne ne comprend pourquoi cette fiche ne se
+  // signale pas, et on cherche un bug dans le code.
+  sourdine: 'Sans compte · non signalé',
   inactif: 'Fiche désactivée',
 }
 
 function etatCompte(v: Veterinaire): EtatCompte {
   if (!v.actif) return 'inactif'
-  if (!v.user_id) return 'sans'
+  // ⚠️ La sourdine se teste AVANT `sans`, mais seulement sur une fiche sans
+  // compte : une fiche pourvue n'est de toute façon plus signalée, et afficher
+  // « non signalé » sur un compte actif n'aurait aucun sens.
+  if (!v.user_id) return v.invitation_en_sourdine ? 'sourdine' : 'sans'
   if (v.invite_pending) return 'invite'
   return 'actif'
 }
@@ -371,6 +380,26 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
         return
       }
       toast.success(`Invitation envoyée à ${v.prenom} ✉️`)
+    })
+  }
+
+  // ── B-133a : couper ou rétablir le signalement d'invitation ──────────────
+  // Le succès dit ce qui change VRAIMENT, et pas « enregistré » : l'admin doit
+  // comprendre du premier coup que le bouton reste utilisable et que le geste
+  // se reprend. Un « c'est noté » l'aurait laissé se demander s'il vient de
+  // fermer une porte.
+  const setSignalement = (v: Veterinaire, enSourdine: boolean) => {
+    startTransition(async () => {
+      const res = await setSignalementInvitation(v.id, enSourdine)
+      if ('error' in res) {
+        toast.error(res.error)
+        return
+      }
+      toast.success(
+        enSourdine
+          ? `${v.prenom} n’est plus signalé — tu peux toujours l’inviter, et revenir en arrière`
+          : `${v.prenom} est signalé à nouveau`,
+      )
     })
   }
 
@@ -951,17 +980,60 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
                     du dessus dit vouloir éviter. La condition du halo doit donc
                     être la MÊME que celle de `disabled`, pas une cousine. */}
                 {etat === 'sans' && (
-                  <button
-                    type="button"
-                    className={`acct-cta${
-                      isPending || motifInvitationImpossible(v) ? '' : ' acct-appel'
-                    }`}
-                    onClick={() => inviter(v)}
-                    disabled={isPending || !!motifInvitationImpossible(v)}
-                    title={motifInvitationImpossible(v) ?? `Inviter ${v.prenom}`}
-                  >
-                    Inviter
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className={`acct-cta${
+                        isPending || motifInvitationImpossible(v) ? '' : ' acct-appel'
+                      }`}
+                      onClick={() => inviter(v)}
+                      disabled={isPending || !!motifInvitationImpossible(v)}
+                      title={motifInvitationImpossible(v) ?? `Inviter ${v.prenom}`}
+                    >
+                      Inviter
+                    </button>
+                    {/* B-133a — l'échappatoire, volontairement DISCRÈTE : c'est
+                        « Inviter » qui doit attraper l'œil, pas le moyen de
+                        l'éteindre. Un bouton de mise en sourdine aussi voyant que
+                        l'appel à l'action ferait taire l'alerte au premier
+                        agacement, et on serait revenu au point de départ. */}
+                    <button
+                      type="button"
+                      className="acct-muet"
+                      onClick={() => setSignalement(v, true)}
+                      disabled={isPending}
+                      title={`Ne plus signaler que ${v.prenom} doit être invité — réversible, et le bouton « Inviter » reste actif`}
+                    >
+                      Ne plus signaler
+                    </button>
+                  </>
+                )}
+                {/* B-133a — la sourdine DOIT porter son annulation. Une décision
+                    qu'on ne peut pas reprendre là où on l'a prise est une porte à
+                    sens unique : l'admin devrait fouiller les réglages, ou la
+                    base. Le bouton « Inviter » reste là, lui aussi : la sourdine
+                    coupe le signalement, pas la capacité. */}
+                {etat === 'sourdine' && (
+                  <>
+                    <button
+                      type="button"
+                      className="acct-cta"
+                      onClick={() => inviter(v)}
+                      disabled={isPending || !!motifInvitationImpossible(v)}
+                      title={motifInvitationImpossible(v) ?? `Inviter ${v.prenom} quand même`}
+                    >
+                      Inviter
+                    </button>
+                    <button
+                      type="button"
+                      className="acct-muet"
+                      onClick={() => setSignalement(v, false)}
+                      disabled={isPending}
+                      title={`Signaler à nouveau que ${v.prenom} doit être invité`}
+                    >
+                      Resignaler
+                    </button>
+                  </>
                 )}
                 {etat === 'invite' && (
                   <button

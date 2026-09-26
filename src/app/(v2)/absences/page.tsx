@@ -120,17 +120,20 @@ export default async function AbsencesPage() {
   // Fail-open comme le reste de cet écran : une requête muette laisse
   // simplement le filtre de période absent, elle n'empêche pas l'écran de vivre.
   //
-  // Conditionnée à l'admin — comme `depannagesRes` plus haut — parce que la
-  // barre de filtres n'est affichée qu'à lui. Charger pour tout le monde n'aurait
-  // rien exposé (la RLS de `periodes` est RESTRICTIVE sur le cabinet, et un véto
-  // n'y voit que le publié — vérifié en base), mais c'était une requête pour
-  // rien à chaque ouverture de l'écran.
-  const periodesRes = isAdmin
-    ? await supabase
-        .from('periodes')
-        .select('id, libelle, saison, numero, date_debut, date_fin, statut')
-        .order('date_debut', { ascending: false })
-    : null
+  // ⚠️ CHARGÉE POUR TOUT LE MONDE depuis B-131a (26/09) : MiKL a demandé le
+  //    filtre pour les vétos aussi. Elle avait été conditionnée à l'admin au lot
+  //    précédent, quand lui seul voyait la barre de filtres — une économie d'une
+  //    requête devenue un blocage dès que le périmètre s'est ouvert.
+  //
+  // Aucune fuite : la RLS de `periodes` est RESTRICTIVE sur le cabinet
+  // (`periodes_cabinet_isolation`, vérifié en base), et `periodes_read_publie`
+  // ne laisse un véto lire que `publie` / `verrouille`. Son sélecteur sera donc
+  // plus court que celui de l'admin — les brouillons n'y figureront pas, et
+  // c'est le serveur qui le décide, pas cet écran.
+  const periodesRes = await supabase
+    .from('periodes')
+    .select('id, libelle, saison, numero, date_debut, date_fin, statut')
+    .order('date_debut', { ascending: false })
 
   const periodes = (periodesRes?.data ?? []) as PeriodeFiltre[]
 
