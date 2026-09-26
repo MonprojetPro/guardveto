@@ -44,7 +44,6 @@ import { apparierSourcePourCible } from './relations-structure'
 import { vetPourRole, vetsAttribues, avecVet, attributionVide } from './attribution'
 import { penaliteFeteHistorique, PENALITE_FETE_HISTORIQUE } from './historique-fete'
 import {
-  penaliteR10WEConsecutif,
   penaliteWEAvantVacances,
   penaliteFeteFinAnnee,
   penaliteInversionFerie,
@@ -173,8 +172,10 @@ function ajouter(v: VecteurScore, etage: Etage, regle: string, cout: number): vo
 // départager DEUX règles DU MÊME étage. Les étages sont hermétiques.
 
 export const POIDS_INTRA = {
-  // Étage SAUF_CRISE (🟠) — défaut réglable (backlog n°16, source unique structure-config)
-  R10_WE_CONSECUTIF: PENALITE_SOUPLE_DEFAUT.we_consecutif.poids,
+  // ⚠️ L'étage SAUF_CRISE (🟠) n'a plus de pénalité souple depuis B-135 : son
+  // seul occupant était `R10_WE_CONSECUTIF` (50 points), retiré avec la règle.
+  // L'étage lui-même existe toujours — les règles de cabinet réglées
+  // « sauf crise » y pèsent, via `penaliteContraintesConfig`.
   // Étage EVITEE_AU_MAX (🟡)
   R10C_WE_AVANT_VACANCES: PENALITE_SOUPLE_DEFAUT.we_avant_vacances.poids,
   R10B_FETE_FIN_ANNEE: PENALITE_SOUPLE_DEFAUT.fete_fin_annee.poids,
@@ -341,17 +342,12 @@ export function scorerPlanning(
   // deux gardiens de score). Défaut absent = étages/poids historiques
   // (SAUF_CRISE/EVITEE/EVITEE/SI_POSSIBLE, 50/45/30/20) → byte-identique.
   const pcfg = structure.penalitesSouples
-  const cfgR10 = resoudrePenaliteSouple('we_consecutif', pcfg)
   const cfgR10c = resoudrePenaliteSouple('we_avant_vacances', pcfg)
   const cfgR10b = resoudrePenaliteSouple('fete_fin_annee', pcfg)
   const cfgR8b = resoudrePenaliteSouple('inversion_ferie', pcfg)
   for (const sr of slotRoles) {
     const vet = vetById.get(sr.vetId)
     if (!vet) continue
-
-    // R10 (défaut 🟠 SAUF_CRISE) — voit le WE du lookback à la jonction (#17).
-    const r10 = penaliteR10WEConsecutif(sr.slot, vet, planningRythme, pcfg)
-    if (r10 > 0) ajouter(v, cfgR10.etage, 'R10', cfgR10.poids)
 
     // R10c (défaut 🟡 EVITEE)
     const r10c = penaliteWEAvantVacances(sr.slot, vet, planning, pcfg)

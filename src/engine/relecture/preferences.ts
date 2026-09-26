@@ -30,8 +30,8 @@
 //
 // ── CE QUE ÇA NE COUVRE PAS, ET SE DIT ──────────────────────────────────────
 //
-// Les pénalités CÂBLÉES du moteur (deux week-ends consécutifs, week-end avant
-// des vacances, fête de fin d'année, inversion d'un férié) ne sont pas des
+// Les pénalités CÂBLÉES du moteur (week-end avant des vacances, fête de fin
+// d'année, inversion d'un férié, veille d'un jour d'absence) ne sont pas des
 // règles de vétérinaire : elles n'ont pas de `force` à requalifier et ne
 // remontent donc pas ici. Le besoin mesuré porte sur les règles que le CABINET
 // a réglées lui-même, et ce sont celles-là que l'administratrice reconnaîtra.

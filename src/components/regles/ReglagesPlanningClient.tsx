@@ -74,7 +74,8 @@ const STRUCTURE_META: Record<'liaison_creneaux' | 'inversion_role', { titre: str
 // PAS « Ferme » (aucun gardien dur n'existe pour elles — coquille vide sinon).
 
 export const PENALITES_SOUPLES_UI = [
-  'eviter_we_consecutifs',
+  // `eviter_we_consecutifs` (R10) retiree par B-135 — couverte, en mieux, par
+  // `espacement_weekend` et `cadencement_weekend`, qui savent interdire.
   'eviter_we_avant_vacances',
   'eviter_fete_fin_annee',
   'inversion_role_ferie',
@@ -82,10 +83,6 @@ export const PENALITES_SOUPLES_UI = [
 type PenaliteSoupleUIId = (typeof PENALITES_SOUPLES_UI)[number]
 
 const PENALITES_META: Record<PenaliteSoupleUIId, { titre: string; aide: string }> = {
-  eviter_we_consecutifs: {
-    titre: 'Éviter deux week-ends de garde de suite',
-    aide: 'Le moteur évite de donner deux week-ends consécutifs au même vétérinaire (R10).',
-  },
   eviter_we_avant_vacances: {
     titre: 'Éviter la garde le week-end avant ses vacances',
     aide: 'Un vétérinaire qui part en vacances la semaine suivante part reposé (R10c).',
@@ -104,7 +101,6 @@ const FORCE_OPTIONS_SOUPLES = ['desactivee', 'sauf_crise', 'evitee', 'si_possibl
 
 /** Force de repli quand on réactive une pénalité souple désactivée. */
 const PENALITE_FORCE_REPLI: Record<PenaliteSoupleUIId, string> = {
-  eviter_we_consecutifs: 'sauf_crise',
   eviter_we_avant_vacances: 'evitee',
   eviter_fete_fin_annee: 'evitee',
   inversion_role_ferie: 'si_possible',

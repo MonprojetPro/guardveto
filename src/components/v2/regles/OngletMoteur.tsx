@@ -259,9 +259,9 @@ const DIMENSION_LABELS: Record<EquityDimension, string> = {
  *  corbeille. (En base et côté moteur, ces lignes s'appellent des cohortes.) */
 const IMPORTANCE_ACTIVES = IMPORTANCE_LEVELS.filter((n) => n !== 'ignoree')
 
-/** Les 4 pénalités souples réglables (R10 / R10c / R10b / R8b). */
+/** Les penalites souples reglables (R10c / R10b / R8b / R10d).
+ *  R10 « eviter 2 week-ends de suite » a ete retiree par B-135 (26/09). */
 const PENALITES_SOUPLES = [
-  'eviter_we_consecutifs',
   'eviter_we_avant_vacances',
   'eviter_fete_fin_annee',
   'inversion_role_ferie',
@@ -273,10 +273,6 @@ const PENALITES_SOUPLES = [
 type PenaliteSouple = (typeof PENALITES_SOUPLES)[number]
 
 const PENALITES_META: Record<PenaliteSouple, { titre: string; aide: string }> = {
-  eviter_we_consecutifs: {
-    titre: 'Éviter deux week-ends de garde de suite',
-    aide: 'Le moteur évite de donner deux week-ends consécutifs au même vétérinaire.',
-  },
   eviter_we_avant_vacances: {
     titre: 'Éviter la garde le week-end avant ses vacances',
     aide: 'Qui part en vacances la semaine suivante part reposé.',
@@ -299,7 +295,6 @@ const PENALITES_META: Record<PenaliteSouple, { titre: string; aide: string }> = 
 /** Force de repli quand on RALLUME une pénalité qui n'en avait plus de souple. */
 const PENALITE_FORCE_REPLI: Record<PenaliteSouple, string> = {
   eviter_veille_repos: 'evitee',
-  eviter_we_consecutifs: 'sauf_crise',
   eviter_we_avant_vacances: 'evitee',
   eviter_fete_fin_annee: 'evitee',
   inversion_role_ferie: 'si_possible',

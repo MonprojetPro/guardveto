@@ -30,6 +30,10 @@ const MIGRATIONS = [
   '20260708170000_exclusion_dates.sql',
   '20260708180000_seulement_avec.sql',
   '20260826230000_preference_veille_repos.sql',
+  // B-135 (26/09) : celle-ci ne seede rien, elle RETIRE `eviter_we_consecutifs`.
+  // Elle doit figurer dans la liste, sinon le seed parse resterait sur 27 briques
+  // et ce test exigerait du catalogue une brique que le produit vient d'enlever.
+  '20260926130000_retrait_regle_we_consecutifs.sql',
 ].map((f) => fileURLToPath(new URL(`../../../../supabase/migrations/${f}`, import.meta.url)))
 
 interface SeedBrique {
@@ -37,9 +41,27 @@ interface SeedBrique {
   axes: string[]
 }
 
+/**
+ * Les briques que cette migration RETIRE du catalogue côté base.
+ *
+ * Ajouté avec B-135 (26/09) : jusque-là le parseur ne lisait que les INSERT, et
+ * une migration de retrait lui était donc invisible. Le test exigeait alors du
+ * catalogue TypeScript une brique que le produit venait de supprimer — il
+ * fallait soit maintenir une liste d'exceptions à la main, soit apprendre à lire
+ * les deux sens. On lit les deux sens : le couplage code ↔ base reste vrai quand
+ * on enlève, pas seulement quand on ajoute.
+ */
+function parserRetraits(sql: string): string[] {
+  const re = /delete\s+from\s+public\.briques_regles\s+where\s+id\s*=\s*'([a-z_]+)'/gi
+  return [...sql.matchAll(re)].map((m) => m[1])
+}
+
 /** Extrait { id → {famille, axes} } depuis le bloc INSERT d'une migration. */
 function parserMigration(chemin: string): Record<string, SeedBrique> {
   const sql = readFileSync(chemin, 'utf8')
+  // Une migration de RETRAIT n'a pas de bloc INSERT : rien à seeder ici, le
+  // retrait est appliqué par `parserSeed` juste après la fusion.
+  if (!sql.includes('VALUES')) return {}
   // NB : « ON CONFLICT » apparaît AUSSI dans le commentaire d'en-tête → on
   // borne le bloc INSERT au VALUES puis au premier ON CONFLICT QUI SUIT.
   const debut = sql.indexOf('VALUES')
@@ -58,22 +80,32 @@ function parserMigration(chemin: string): Record<string, SeedBrique> {
   return seed
 }
 
-/** Fusionne le seed de toutes les migrations du catalogue. */
+/**
+ * Fusionne le seed de toutes les migrations du catalogue, PUIS applique les
+ * retraits. L'ordre compte : une brique insérée puis supprimée plus tard ne doit
+ * pas reparaître, et `MIGRATIONS` est en ordre chronologique.
+ */
 function parserSeed(): Record<string, SeedBrique> {
-  return MIGRATIONS.reduce<Record<string, SeedBrique>>(
+  const seed = MIGRATIONS.reduce<Record<string, SeedBrique>>(
     (acc, chemin) => ({ ...acc, ...parserMigration(chemin) }),
     {},
   )
+  for (const chemin of MIGRATIONS) {
+    for (const id of parserRetraits(readFileSync(chemin, 'utf8'))) delete seed[id]
+  }
+  return seed
 }
 
 describe('catalogue ↔ seed briques_regles — cohérence (ne divergent pas)', () => {
   const seed = parserSeed()
 
-  // 27 depuis B-063 (26/08) : ajout de `eviter_veille_repos`. Ce compte est un
-  // garde-fou du PARSEUR, pas une limite du produit — s'il ne bougeait jamais,
-  // c'est qu'il aurait cessé de lire les migrations récentes.
-  it('le seed parsé contient bien les 27 briques (sanity du parser)', () => {
-    expect(Object.keys(seed)).toHaveLength(27)
+  // 27 depuis B-063 (26/08, ajout de `eviter_veille_repos`), puis 26 depuis
+  // B-135 (26/09, retrait de `eviter_we_consecutifs`). Ce compte est un garde-fou
+  // du PARSEUR, pas une limite du produit — s'il ne bougeait jamais, c'est qu'il
+  // aurait cessé de lire les migrations récentes.
+  // ⚠️ Vérifié en base le 26/09 : `select count(*) from briques_regles` → 26.
+  it('le seed parsé contient bien les 26 briques (sanity du parser)', () => {
+    expect(Object.keys(seed)).toHaveLength(26)
   })
 
   it('catalogue et seed déclarent EXACTEMENT les mêmes briques', () => {

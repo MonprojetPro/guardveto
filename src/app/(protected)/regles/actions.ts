@@ -399,7 +399,6 @@ const BRIQUES_STRUCTURELLES = new Set(['liaison_creneaux', 'inversion_role'])
  * ne bloque rien). Le moteur clampe aussi tout étage < 3 (défense en profondeur).
  */
 const BRIQUES_PENALITES_SOUPLES = new Set([
-  'eviter_we_consecutifs',    // R10
   'eviter_we_avant_vacances', // R10c
   'eviter_fete_fin_annee',    // R10b
   'inversion_role_ferie',     // R8b

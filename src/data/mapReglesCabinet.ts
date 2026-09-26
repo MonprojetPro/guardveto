@@ -215,7 +215,6 @@ export const BRIQUE_INVERSION = 'inversion_role' // R8
 
 /** brique_id (base/catalogue) → identifiant interne de la pénalité souple. */
 export const BRIQUES_PENALITES_SOUPLES: Record<string, PenaliteSoupleId> = {
-  eviter_we_consecutifs: 'we_consecutif',     // R10
   eviter_we_avant_vacances: 'we_avant_vacances', // R10c
   eviter_fete_fin_annee: 'fete_fin_annee',    // R10b
   inversion_role_ferie: 'inversion_ferie',    // R8b

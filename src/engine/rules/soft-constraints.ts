@@ -24,8 +24,6 @@ import { penaliteFeteHistorique, type HistoriqueFetesResolu } from '../historiqu
 // ── Scores de pénalité (défauts historiques — source unique structure-config) ──
 
 export const PENALITE = {
-  /** R10 — 2 WE de garde consécutifs (pénalité forte) */
-  WE_CONSECUTIF: PENALITE_SOUPLE_DEFAUT.we_consecutif.poids,
   /** R10c — Garde le week-end qui précède immédiatement des vacances du véto */
   WE_AVANT_VACANCES: PENALITE_SOUPLE_DEFAUT.we_avant_vacances.poids,
   /** R10b — Garde un soir de réveillon (24 déc ou 31 déc) — à éviter si possible */
@@ -34,54 +32,22 @@ export const PENALITE = {
   INVERSION_FERIE: PENALITE_SOUPLE_DEFAUT.inversion_ferie.poids,
 } as const
 
-// ── Helpers ──────────────────────────────────────────────
-
-/** Samedi du week-end précédant la date donnée */
-function samediPrecedent(dateWE: string): string {
-  return addDays(samediDeSemaine(dateWE), -7)
-}
-
-/** Vérifie si le véto a une garde WE (vendredi soir ou weekend) le week-end donné */
-function aGardeWE(vetId: string, samedi: string, planning: PlanningPartiel): boolean {
-  for (const attr of planning.attributions) {
-    if (attr.date !== samedi) continue
-    if (attr.type !== 'weekend' && attr.type !== 'vendredi_soir') continue
-    if (estAttribue(attr, vetId)) return true
-  }
-  // Vendredi soir est planifié sur la date du vendredi, mais on cherche par samedi
-  const vendredi = addDays(samedi, -1)
-  for (const attr of planning.attributions) {
-    if (attr.date !== vendredi) continue
-    if (attr.type !== 'vendredi_soir') continue
-    if (estAttribue(attr, vetId)) return true
-  }
-  return false
-}
-
 // ── Contraintes souples individuelles ────────────────────
 
-/**
- * R10 — Pas 2 WE de garde de suite
- * Si le véto a déjà une garde WE le week-end précédent → pénalité forte.
- */
-function penaliteR10WEConsecutif(
-  slot: SlotGarde,
-  vet: VetEngine,
-  planning: PlanningPartiel,
-  penalitesSouples?: PenalitesSouplesConfig
-): number {
-  if (slot.type !== 'weekend' && slot.type !== 'vendredi_soir') return 0
-
-  const samCourant = slot.type === 'weekend'
-    ? slot.date
-    : addDays(slot.date, 1) // vendredi soir → samedi associé
-
-  const samPrec = samediPrecedent(samCourant)
-  if (aGardeWE(vet.id, samPrec, planning)) {
-    return poidsPenaliteSouple('we_consecutif', penalitesSouples)
-  }
-  return 0
-}
+// ── B-135 (26/09) : R10 « pas 2 week-ends de suite » A ÉTÉ RETIRÉE ──────────
+// Vivaient ici `penaliteR10WEConsecutif` et ses deux helpers `samediPrecedent`
+// et `aGardeWE`, tous trois supprimés avec elle : plus aucun autre appelant
+// (vérifié par grep sur `src/` avant retrait).
+//
+// MiKL, le 26/09 : « tu peux enlever la règle "éviter 2 WE de garde de suite",
+// car on peut déjà créer une règle plus personnalisée plus haut ». Le besoin est
+// couvert, en mieux, par `espacement_weekend` et `cadencement_weekend` —
+// paramétrables, ciblables, et dotées d'un vrai gardien dur. R10 valait 50
+// points et n'interdisait rien : « une pénalité n'est pas une interdiction ».
+//
+// ⚠️ Elle voyait le week-end du lookback inter-périodes à la jonction (#17).
+//    `espacement_weekend` lit le même contexte étendu, donc la jonction reste
+//    surveillée — mais par une règle qui, elle, peut refuser.
 
 /**
  * R10c — Pas de garde le week-end qui précède des vacances (« au maximum du possible »).
@@ -248,8 +214,6 @@ export function penalite(
   // Vue étendue = lookback + planning courant, pour les seules règles de rythme.
   const planningRythme = attributionsAvecContexte(planning, contexteAnterieur)
   return (
-    // R10 (2 WE consécutifs) : voit le WE du lookback à la jonction → étendu.
-    penaliteR10WEConsecutif(slot, vet, planningRythme, penalitesSouples) +
     penaliteWEAvantVacances(slot, vet, planning, penalitesSouples) +
     penaliteFeteFinAnnee(slot, penalitesSouples) +
     // R10d (B-063) — la veille d'un jour d'absence : congé posé OU repos fixe.
@@ -265,7 +229,6 @@ export function penalite(
 
 // Export individuel pour les tests
 export {
-  penaliteR10WEConsecutif,
   penaliteWEAvantVacances,
   penaliteFeteFinAnnee,
   penaliteInversionFerie,

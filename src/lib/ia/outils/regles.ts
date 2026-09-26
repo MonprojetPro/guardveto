@@ -41,7 +41,7 @@ import type { ContexteOutil, OutilEcriture, OutilLecture } from './types'
 const GLOBALES = new Set([
   'equilibrer', 'liaison_creneaux', 'inversion_role',
   'composition_equipe', 'role_interdit_tag',
-  'eviter_we_consecutifs', 'eviter_we_avant_vacances',
+  'eviter_we_avant_vacances',
   'eviter_fete_fin_annee', 'inversion_role_ferie',
   'eviter_veille_repos',
 ])

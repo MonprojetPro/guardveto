@@ -193,9 +193,12 @@ describe('le plancher d’étage — ce qui rendait le réglage inopérant', () 
 
   it('CLAMPE toujours les règles qui n’ont pas de gardien dur', () => {
     // Leur proposer « jamais » resterait un paramètre sans effet.
-    expect(resoudrePenaliteSouple('we_consecutif', { we_consecutif: { actif: true, etage: 2 } }).etage)
+    // B-135 : `we_consecutif` etait cite ici, elle a ete retiree du produit.
+    expect(resoudrePenaliteSouple('we_avant_vacances', { we_avant_vacances: { actif: true, etage: 2 } }).etage)
       .toBe(3)
     expect(resoudrePenaliteSouple('fete_fin_annee', { fete_fin_annee: { actif: true, etage: 0 } }).etage)
+      .toBe(3)
+    expect(resoudrePenaliteSouple('inversion_ferie', { inversion_ferie: { actif: true, etage: 1 } }).etage)
       .toBe(3)
   })
 })

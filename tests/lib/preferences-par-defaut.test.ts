@@ -26,13 +26,26 @@ describe('preferencesImplicites', () => {
     expect(rendues).toEqual(Object.keys(BRIQUES_PENALITES_SOUPLES).sort())
   })
 
-  it('reproduit le cas réel du Val d’Allier : une seule ligne en base', () => {
-    // Mesure du 26/08 : seul `eviter_we_consecutifs` avait une ligne.
-    const rendues = preferencesImplicites(['eviter_we_consecutifs']).map((p) => p.brique_id)
+  // ⚠️ B-135 (26/09) — ce test citait `eviter_we_consecutifs`, la seule brique
+  // qui avait une ligne en base au 26/08. Elle a été RETIRÉE du produit : le cas
+  // « une seule ligne » est donc rejoué sur `eviter_we_avant_vacances`, qui
+  // existe toujours. Ce n'était pas cette brique-là qui était testée, c'était le
+  // fait qu'une ligne présente ne soit pas re-proposée comme implicite.
+  it('une seule ligne en base : les autres restent implicites', () => {
+    const rendues = preferencesImplicites(['eviter_we_avant_vacances']).map((p) => p.brique_id)
 
-    expect(rendues).not.toContain('eviter_we_consecutifs') // déjà lue en base
-    expect(rendues).toContain('eviter_veille_repos')       // celle de MiKL, invisible avant
+    expect(rendues).not.toContain('eviter_we_avant_vacances') // déjà lue en base
+    expect(rendues).toContain('eviter_veille_repos')          // celle de MiKL, invisible avant
     expect(rendues.length).toBe(Object.keys(BRIQUES_PENALITES_SOUPLES).length - 1)
+  })
+
+  // B-135 — une ligne `eviter_we_consecutifs` retrouvée en base (sauvegarde
+  // restaurée, import rejoué) ne doit ni ressusciter la règle, ni faire
+  // disparaître une préférence légitime en se faisant passer pour elle.
+  it('B-135 — une ligne « eviter_we_consecutifs » survivante ne change rien', () => {
+    const avec = preferencesImplicites(['eviter_we_consecutifs']).map((p) => p.brique_id).sort()
+    const sans = preferencesImplicites([]).map((p) => p.brique_id).sort()
+    expect(avec).toEqual(sans)
   })
 
   it('ne ressuscite JAMAIS une préférence que le cabinet a éteinte', () => {
@@ -56,7 +69,8 @@ describe('preferencesImplicites', () => {
     // `veille_repos` est à l'étage 4 → « à éviter ». Si le moteur change son
     // étage, ce test suit sans qu'on ait à y penser.
     expect(forceParDefautPreference('veille_repos')).toBe('evitee')
-    expect(forceParDefautPreference('we_consecutif')).toBe('sauf_crise')
+    // B-135 : `we_consecutif` (seule a l'etage 3) a ete retiree du produit.
+    expect(forceParDefautPreference('we_avant_vacances')).toBe('evitee')
     expect(forceParDefautPreference('inversion_ferie')).toBe('si_possible')
   })
 })

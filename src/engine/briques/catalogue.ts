@@ -431,18 +431,21 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
   // (étage + poids d'origine). Toujours SOUPLES (l'écriture refuse « jamais »,
   // la résolution clampe) : aucun gardien dur n'existe pour elles.
 
-  eviter_we_consecutifs: {
-    id: 'eviter_we_consecutifs',
-    famille: 'sequence',
-    operateur: 'EVITER_SUITE',
-    axes: ['quoi'],
-    schemaParams: {
-      _reglage: 'aucun paramètre — le réglage porte { actif, force } (R10 : pas 2 week-ends de suite)',
-    },
-    widget: 'WidgetPenaliteSouple',
-    rendreLangageNaturel: () =>
-      'le moteur évite de donner deux week-ends de garde consécutifs au même vétérinaire (R10)',
-  },
+  // ── B-135 (26/09) : la brique `eviter_we_consecutifs` (R10) A ÉTÉ RETIRÉE ──
+  // MiKL : « tu peux enlever la règle "éviter 2 WE de garde de suite", car on
+  // peut déjà créer une règle plus personnalisée plus haut ».
+  //
+  // Elle vivait ici, en famille `sequence` / opérateur `EVITER_SUITE`, sans
+  // aucun paramètre : une pénalité globale de 50 points, la même pour tout le
+  // cabinet. `espacement_weekend` et `cadencement_weekend` font le même travail
+  // en mieux — un N réglable, un ciblage par personne, et un VRAI GARDIEN DUR
+  // capable de refuser au lieu de simplement coûter des points.
+  //
+  // ⚠️ Retirer une brique du catalogue ne supprime pas les lignes déjà écrites
+  //    en base : une migration s'en charge (voir
+  //    `20260926130000_retrait_regle_we_consecutifs.sql`). Sans elle, la ligne
+  //    resterait là, invisible dans tous les écrans et lue par personne — le
+  //    scénario exact de `contraintes_veto`, la table morte.
 
   eviter_we_avant_vacances: {
     id: 'eviter_we_avant_vacances',

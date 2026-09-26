@@ -226,9 +226,24 @@ export function penaliteStructureEtage(etage: number): number {
 // l'ACTIVATION — pas de chiffres abstraits exposés (leçon UX équité).
 // Défaut (aucune ligne en base) = étage + poids historiques → byte-identique.
 
-/** Identifiants internes des pénalités souples réglables. */
+/**
+ * Identifiants internes des pénalités souples réglables.
+ *
+ * ── B-135 (26/09) : `we_consecutif` (R10) A ÉTÉ RETIRÉE ────────────────────
+ * MiKL : « tu peux enlever la règle "éviter 2 WE de garde de suite", car on
+ * peut déjà créer une règle plus personnalisée plus haut ». Il a raison :
+ * `espacement_weekend` (« au plus 1 week-end sur N ») et `cadencement_weekend`
+ * (« 1 WE sur N ancré ») couvrent le même besoin en mieux — paramétrables,
+ * ciblables sur une personne ou tout le cabinet, et dotés d'un VRAI GARDIEN
+ * DUR. R10 était une pénalité globale de 50 points, ni réglable en finesse ni
+ * capable d'interdire quoi que ce soit.
+ *
+ * ⚠️ CE RETRAIT CHANGE LE SCORE PAR DÉFAUT. R10 était active d'office (étage 3)
+ *    chez tous les cabinets : les plannings générés après ce commit ne seront
+ *    pas identiques à ceux d'avant. C'est voulu, et c'est assumé par MiKL — mais
+ *    ça ne doit pas être découvert en comparant deux générations.
+ */
 export const PENALITES_SOUPLES_IDS = [
-  'we_consecutif',     // R10  — 2 week-ends de garde consécutifs
   'we_avant_vacances', // R10c — garde le WE qui précède des vacances du véto
   'fete_fin_annee',    // R10b — garde un soir de réveillon (24/31 déc)
   'inversion_ferie',   // R8b  — même rôle la veille d'un jour férié
@@ -253,7 +268,7 @@ export type PenalitesSouplesConfig = Partial<Record<PenaliteSoupleId, StructureR
 
 /** Défauts HISTORIQUES : étage lexicographique + poids intra-étage d'origine. */
 export const PENALITE_SOUPLE_DEFAUT: Record<PenaliteSoupleId, { etage: number; poids: number }> = {
-  we_consecutif:     { etage: 3, poids: 50 }, // 🟠 SAUF_CRISE
+  // `we_consecutif: { etage: 3, poids: 50 }` vivait ici — retirée par B-135.
   we_avant_vacances: { etage: 4, poids: 45 }, // 🟡 EVITEE
   fete_fin_annee:    { etage: 4, poids: 30 }, // 🟡 EVITEE
   inversion_ferie:   { etage: 5, poids: 20 }, // ⚪ SI_POSSIBLE

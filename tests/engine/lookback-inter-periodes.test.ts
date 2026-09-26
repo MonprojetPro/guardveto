@@ -21,7 +21,7 @@ import { describe, it, expect } from 'vitest'
 import {
   isValid, penaliteContraintesConfig,
 } from '@/engine/rules/hard-constraints'
-import { penaliteR10WEConsecutif, penalite } from '@/engine/rules/soft-constraints'
+import { penalite } from '@/engine/rules/soft-constraints'
 import { validerPlanning, type ValidationInput } from '@/engine/validation/validerPlanning'
 import { scorerPlanning } from '@/engine/score-lexicographique'
 import { compterParVet } from '@/engine/rules/optimization'
@@ -116,24 +116,35 @@ describe('attributionsAvecContexte — helper de vue étendue', () => {
 
 // ── 2. R10 (souple) pénalise à la jonction ───────────────
 
-describe('#17 — R10 (2 WE consécutifs) voit le WE du lookback', () => {
+// ── B-135 (26/09) : R10 retirée — ce que devient la surveillance de la jonction
+// Trois tests vivaient ici : ils prouvaient que R10 VOYAIT le week-end du
+// lookback inter-périodes, donc qu'un cabinet ne repartait pas à zéro d'une
+// période à l'autre. C'était le vrai enjeu, et il ne disparaît pas avec R10 :
+// le describe JUSTE EN DESSOUS montre que `espacement_weekend` réglée DURE
+// bloque le même week-end à la même jonction — et le refuse au lieu de le faire
+// payer 50 points. La jonction reste donc couverte, par une règle plus forte.
+//
+// Ce qui suit fige le nouveau comportement plutôt que de laisser un trou : à la
+// jonction, un week-end proche ne coûte plus rien EN SOI.
+
+describe('B-135 — à la jonction, deux WE de suite ne coûtent plus rien en soi', () => {
   const v = vetSansRegle()
   const planningVide: PlanningPartiel = { attributions: [] }
 
-  it('SANS lookback : poser le 1er WE de la période ne pénalise pas R10', () => {
-    // Aucun WE antérieur connu → pas de « 2 WE de suite ».
-    expect(penaliteR10WEConsecutif(slotWe(SAT_START), v, planningVide)).toBe(0)
-  })
-
-  it('AVEC lookback (WE 7 j avant) : R10 pénalise via la vue étendue', () => {
-    const etendu = attributionsAvecContexte(planningVide, LOOKBACK_WE)
-    expect(penaliteR10WEConsecutif(slotWe(SAT_START), v, etendu)).toBeGreaterThan(0)
-  })
-
-  it('penalite() propage contexteAnterieur → pénalité R10 à la jonction', () => {
+  it('le lookback ne fait plus monter la pénalité d’un WE à la jonction', () => {
     const sans = penalite(slotWe(SAT_START), v, 'premier', planningVide)
     const avec = penalite(slotWe(SAT_START), v, 'premier', planningVide, undefined, undefined, undefined, LOOKBACK_WE)
-    expect(avec).toBeGreaterThan(sans)
+    // ⚠️ `toBe(sans)` et non `toBe(0)` : ce test doit dire que le LOOKBACK
+    // n'ajoute rien, pas que la pénalité totale est nulle — une autre règle
+    // pourrait légitimement peser ici un jour, et le test resterait juste.
+    expect(avec).toBe(sans)
+  })
+
+  it('la vue étendue reste bien construite (le lookback n’est pas perdu)', () => {
+    // Le mécanisme lui-même doit survivre au retrait de son premier client :
+    // `espacement_weekend` en dépend, et c'est le describe suivant qui le prouve.
+    const etendu = attributionsAvecContexte(planningVide, LOOKBACK_WE)
+    expect(etendu.attributions).toHaveLength(LOOKBACK_WE.length)
   })
 })
 

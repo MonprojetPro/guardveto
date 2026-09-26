@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import {
   penalite,
-  penaliteR10WEConsecutif,
   penaliteWEAvantVacances,
   penaliteFeteFinAnnee,
   penaliteInversionFerie,
   PENALITE,
 } from '@/engine/rules/soft-constraints'
+import { PENALITES_SOUPLES_IDS } from '@/engine/structure-config'
 import type { SlotGarde, PlanningPartiel, VetEngine } from '@/engine/types'
 import { JEAN, FANNY, VICTOR, MANON } from './scenarios/vets'
 
@@ -18,90 +18,46 @@ function slot(date: string, type: SlotGarde['type'], saison: SlotGarde['saison']
 
 // ── R10 : Pas 2 WE consécutifs ───────────────────────────
 
-describe('R10 — Pas 2 WE de garde de suite', () => {
-  it('retourne 0 si pas de garde WE le week-end précédent', () => {
-    const score = penaliteR10WEConsecutif(
-      slot('2026-05-09', 'weekend'),
-      JEAN,
-      planningVide
-    )
-    expect(score).toBe(0)
-  })
+// ── B-135 (26/09) : R10 « pas 2 week-ends de suite » A ÉTÉ RETIRÉE ───────────
+// Six tests vivaient ici, et ils passaient tous. Ils ne sont pas supprimés à la
+// légère : la règle elle-même a disparu du produit, sur demande de MiKL, parce
+// que `espacement_weekend` et `cadencement_weekend` couvrent le même besoin en
+// mieux — réglables, ciblables, et dotés d'un vrai gardien dur.
+//
+// Ce qui les remplace ci-dessous prouve LE RETRAIT plutôt que l'absence : un
+// test supprimé ne dit rien, et si quelqu'un réintroduisait un jour une pénalité
+// sur les week-ends consécutifs sans le décider, rien ne le signalerait.
 
-  it('retourne une pénalité forte si garde WE le week-end précédent', () => {
+describe('B-135 — deux week-ends de suite ne coûtent plus rien en eux-mêmes', () => {
+  it('ne pénalise plus un week-end qui suit immédiatement un autre', () => {
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-05-02', type: 'weekend',
         placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }],
       }],
     }
-    const score = penaliteR10WEConsecutif(
-      slot('2026-05-09', 'weekend'),
-      JEAN,
-      planning
-    )
-    expect(score).toBe(PENALITE.WE_CONSECUTIF)
-    expect(score).toBeGreaterThan(0)
+    // Jean était de garde le WE du 2 mai ; celui du 9 mai ne coûte plus rien.
+    // C'est désormais à `espacement_weekend` / `cadencement_weekend` de le
+    // refuser, si le cabinet le demande — et elles peuvent, elles, refuser.
+    expect(penalite(slot('2026-05-09', 'weekend'), JEAN, 'premier', planning)).toBe(0)
   })
 
-  it('ne pénalise pas si Jean n\'était pas de garde le WE précédent', () => {
-    const planning: PlanningPartiel = {
-      attributions: [{
-        date: '2026-05-02', type: 'weekend',
-        placements: [{ role: 'premier', vetId: FANNY.id }, { role: 'second', vetId: VICTOR.id }],
-      }],
-    }
-    const score = penaliteR10WEConsecutif(
-      slot('2026-05-09', 'weekend'),
-      JEAN,
-      planning
-    )
-    expect(score).toBe(0)
-  })
-
-  it('pénalise aussi pour vendredi soir si garde WE précédent', () => {
+  it('ne pénalise pas davantage le vendredi soir du bloc suivant', () => {
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-05-02', type: 'weekend',
         placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }],
       }],
     }
-    const score = penaliteR10WEConsecutif(
-      slot('2026-05-08', 'vendredi_soir'),
-      JEAN,
-      planning
-    )
-    expect(score).toBe(PENALITE.WE_CONSECUTIF)
+    expect(penalite(slot('2026-05-08', 'vendredi_soir'), JEAN, 'premier', planning)).toBe(0)
   })
 
-  it('ne pénalise pas un créneau de semaine (non WE)', () => {
-    const planning: PlanningPartiel = {
-      attributions: [{
-        date: '2026-05-02', type: 'weekend',
-        placements: [{ role: 'premier', vetId: JEAN.id }, { role: 'second', vetId: VICTOR.id }],
-      }],
-    }
-    const score = penaliteR10WEConsecutif(
-      slot('2026-05-05', 'semaine_soir'),
-      JEAN,
-      planning
-    )
-    expect(score).toBe(0)
-  })
-
-  it('pénalise si garde WE précédent était en tant que 2nd', () => {
-    const planning: PlanningPartiel = {
-      attributions: [{
-        date: '2026-05-02', type: 'weekend',
-        placements: [{ role: 'premier', vetId: FANNY.id }, { role: 'second', vetId: JEAN.id }],
-      }],
-    }
-    const score = penaliteR10WEConsecutif(
-      slot('2026-05-09', 'weekend'),
-      JEAN,
-      planning
-    )
-    expect(score).toBe(PENALITE.WE_CONSECUTIF)
+  it('la famille des pénalités souples n’en compte plus que quatre', () => {
+    // Garde-fou de liste : réintroduire `we_consecutif` ici casserait ce test,
+    // et obligerait à redécider au lieu de le refaire par inadvertance.
+    expect(PENALITES_SOUPLES_IDS).toEqual([
+      'we_avant_vacances', 'fete_fin_annee', 'inversion_ferie', 'veille_repos',
+    ])
   })
 })
 
@@ -299,15 +255,16 @@ describe('penalite() — agrégation', () => {
     expect(penalite(slot('2026-05-09', 'weekend'), JEAN, 'premier', planningVide)).toBe(0)
   })
 
-  it('retourne la pénalité R10 si applicable', () => {
+  // B-135 — ce test attendait `PENALITE.WE_CONSECUTIF`. La règle a été retirée :
+  // deux week-ends de suite ne coûtent plus rien au niveau du cumul non plus.
+  it('ne facture plus rien pour deux week-ends de suite', () => {
     const planning: PlanningPartiel = {
       attributions: [{
         date: '2026-05-02', type: 'weekend',
         placements: [{ role: 'premier', vetId: MANON.id }, { role: 'second', vetId: VICTOR.id }],
       }],
     }
-    expect(penalite(slot('2026-05-09', 'weekend'), MANON, 'premier', planning))
-      .toBe(PENALITE.WE_CONSECUTIF)
+    expect(penalite(slot('2026-05-09', 'weekend'), MANON, 'premier', planning)).toBe(0)
   })
 
   it('retourne 0 pour un créneau semaine ordinaire', () => {

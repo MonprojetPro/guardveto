@@ -64,7 +64,6 @@ const FORCES_SOUPLES = new Set(['sauf_crise', 'evitee', 'si_possible'])
 // (= l'étage historique de chaque règle). Une règle absente n'est pas une règle
 // éteinte : c'est une règle à son niveau d'origine.
 const PENALITES_SOUPLES_DEFAUT_FORCE: Record<string, string> = {
-  eviter_we_consecutifs: 'sauf_crise', // R10  (étage 3)
   eviter_we_avant_vacances: 'evitee', // R10c (étage 4)
   eviter_fete_fin_annee: 'evitee', // R10b (étage 4)
   inversion_role_ferie: 'si_possible', // R8b  (étage 5)
