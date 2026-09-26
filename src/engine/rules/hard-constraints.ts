@@ -271,6 +271,182 @@ function checkVeilleRepos(
   )
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// B-132 — LES TROIS PRÉFÉRENCES QUI PEUVENT DÉSORMAIS DIRE « JAMAIS »
+// ════════════════════════════════════════════════════════════════════════════
+// MiKL, le 26/09 : « je veux que la mention jamais apparaisse, car elle n'est
+// présente que sur la règle "éviter la garde la veille d'un jour d'absence",
+// mais pas sur les autres ». Il avait raison : `PENALITES_AVEC_GARDIEN_DUR` ne
+// contenait que `veille_repos`, ajoutée par B-127. Les autres étaient clampées à
+// l'étage 3 — leur proposer « jamais » aurait été un mensonge, faute de gardien.
+//
+// ⚠️ LA LEÇON DE B-127, APPLIQUÉE ICI AVANT D'ÉCRIRE UNE LIGNE : « promouvoir
+//    une pénalité en interdiction ne se résume pas à changer son étage — tout ce
+//    qu'elle lisait "à peu près" devient soudain absolu. Il faut relire ses
+//    ENTRÉES, pas seulement sa sortie. » C'est ce qui avait exclu Victor de TOUS
+//    les week-ends : `estVeilleDeRepos` lisait les repos fixes sans regarder leur
+//    fermeté, et une simple préférence devenait une interdiction.
+//
+//    Les entrées des trois règles ci-dessous ont donc été auditées une par une :
+//
+//    • R10c `we_avant_vacances` → lit `vet.conges` de type 'vacances'.
+//      ✅ SÛR : le loader du moteur ne charge QUE les congés validés
+//      (`loader.ts` : `.eq('statut', 'valide')`, vérifié). Un souhait en attente
+//      n'entre jamais ici, et un congé validé est un FAIT, pas une préférence —
+//      il n'a pas de « fermeté » réglable qui pourrait être sur-interprétée.
+//
+//    • R10b `fete_fin_annee` → lit la DATE seule (24 et 31 décembre).
+//      ✅ SÛR : aucune donnée de cabinet, aucune fermeté. Un 24 décembre est un
+//      24 décembre.
+//
+//    • R8b `inversion_ferie` → lit le calendrier des fériés et le rôle tenu la
+//      veille dans le planning en cours.
+//      ✅ SÛR sur la fermeté (ce sont des faits), MAIS voir l'avertissement de
+//      `checkInversionFerie` : elle refuse un RÔLE, pas une garde, et sur un
+//      créneau à une seule place ce refus vaut exclusion.
+//
+// Chaque prédicat est PARTAGÉ avec sa pénalité : une seule définition, comme
+// `estVeilleDeRepos`. Deux lectures écrites côte à côte finissent par diverger,
+// et l'une porterait alors sur un cas que l'autre ne voit plus.
+
+/**
+ * La SITUATION que R10c vise : ce week-end précède-t-il immédiatement des
+ * vacances de ce vétérinaire ?
+ *
+ * ⚠️ Vivait dans `soft-constraints.ts` jusqu'à B-132. Déplacée ici parce que
+ * `soft` importe `hard` et non l'inverse — la partager depuis `soft` aurait créé
+ * un cycle. Même trajet que `estVeilleDeRepos` à B-127.
+ *
+ * `vet.conges` ne contient que des congés VALIDÉS (filtre du loader) : la
+ * fenêtre regardée est donc factuelle, et elle peut fonder un refus.
+ */
+export function estWeekEndAvantVacances(slot: SlotGarde, vet: VetEngine): boolean {
+  if (slot.type !== 'weekend' && slot.type !== 'vendredi_soir') return false
+
+  // Samedi de référence du week-end concerné
+  const sam = slot.type === 'weekend' ? slot.date : addDays(slot.date, 1)
+  // Fenêtre « semaine suivante » : du lundi (sam+2) au vendredi (sam+6)
+  const lundiSuivant = addDays(sam, 2)
+  const vendrediSuivant = addDays(sam, 6)
+
+  return vet.conges.some(
+    (conge) =>
+      conge.type === 'vacances' &&
+      conge.date_debut >= lundiSuivant &&
+      conge.date_debut <= vendrediSuivant,
+  )
+}
+
+/**
+ * La SITUATION que R10b vise : ce créneau est-il un soir de réveillon ?
+ *
+ * Les 25 décembre et 1er janvier ne sont PAS ici : ce sont des fériés, traités
+ * par l'équité. Seules les veilles au soir comptent (§6).
+ */
+export function estSoirDeFeteFinAnnee(slot: SlotGarde): boolean {
+  if (slot.type !== 'semaine_soir') return false
+  const mmjj = slot.date.substring(5)
+  return mmjj === '12-24' || mmjj === '12-31'
+}
+
+/**
+ * La SITUATION que R8b vise : ce vétérinaire tiendrait-il, le soir d'un jour
+ * férié, LE MÊME RÔLE que la veille au soir ?
+ *
+ * Le but est l'inversion : qui était premier passe second, et réciproquement.
+ */
+export function memeRoleQueLaVeilleDeFerie(
+  slot: SlotGarde,
+  vet: VetEngine,
+  role: RoleGarde,
+  planning: PlanningPartiel,
+  calendrier?: CalendrierResolu,
+): boolean {
+  if (slot.type !== 'semaine_soir') return false
+  if (!estJourFerie(slot.date, calendrier)) return false
+
+  const veille = addDays(slot.date, -1)
+  const attrVeille = planning.attributions.find(
+    (a) => a.date === veille && (a.type === 'semaine_soir' || a.type === 'vendredi_soir'),
+  )
+  if (!attrVeille) return false
+
+  if (vetPourRole(attrVeille, 'premier') === vet.id && role === 'premier') return true
+  if (vetPourRole(attrVeille, 'second') === vet.id && role === 'second') return true
+  return false
+}
+
+/**
+ * R10c DURE — « pas de garde le week-end qui précède des vacances », quand le
+ * cabinet l'a réglée « jamais ».
+ *
+ * Réglée en dessous, elle reste la pénalité qu'elle a toujours été.
+ */
+function checkWeAvantVacances(
+  vet: VetEngineNormalise,
+  slot: SlotGarde,
+  structure: StructureConfig,
+): ValidationResult {
+  const reglage = resoudrePenaliteSouple('we_avant_vacances', structure.penalitesSouples)
+  if (!reglage.actif || reglage.etage > ETAGE_DUR_MAX) return ok()
+  if (!estWeekEndAvantVacances(slot, vet)) return ok()
+  return invalid(
+    `WE_AVANT_VACANCES : ${vet.prenom} part en vacances la semaine suivante — pas de garde ce week-end`,
+  )
+}
+
+/**
+ * R10b DURE — « pas de garde le soir d'un réveillon », quand le cabinet l'a
+ * réglée « jamais ».
+ *
+ * ⚠️ CONSÉQUENCE À CONNAÎTRE, et elle est particulière à cette règle : elle ne
+ * dépend PAS de la personne. Réglée « jamais », elle interdit le 24 et le 31
+ * décembre à TOUT LE MONDE — donc ces deux soirs resteront vides, et il faudra
+ * les pourvoir à la main. Ce n'est pas un défaut du gardien, c'est ce que
+ * « jamais » veut dire ici ; mais personne ne doit le découvrir après coup.
+ * B-125 rend désormais les cases vides visibles sur la grille.
+ */
+function checkFeteFinAnnee(
+  vet: VetEngineNormalise,
+  slot: SlotGarde,
+  structure: StructureConfig,
+): ValidationResult {
+  const reglage = resoudrePenaliteSouple('fete_fin_annee', structure.penalitesSouples)
+  if (!reglage.actif || reglage.etage > ETAGE_DUR_MAX) return ok()
+  if (!estSoirDeFeteFinAnnee(slot)) return ok()
+  return invalid(
+    `FETE_FIN_ANNEE : le soir du ${periodeFr(slot.date, slot.date)} est un réveillon — aucune garde n'y est autorisée`,
+  )
+}
+
+/**
+ * R8b DURE — « pas le même rôle que la veille, le soir d'un férié », quand le
+ * cabinet l'a réglée « jamais ».
+ *
+ * ⚠️ ELLE REFUSE UN RÔLE, PAS UNE GARDE — c'est la seule des trois dans ce cas,
+ * et ça change ce qu'il faut en attendre. Sur un créneau à deux places, le
+ * solver bascule simplement la personne dans l'autre rôle : c'est exactement
+ * l'inversion voulue. **Mais sur un créneau à UNE SEULE place** (`besoinSecond`
+ * faux), il n'y a pas d'autre rôle où aller : le refus vaut alors exclusion de
+ * ce vétérinaire du créneau. S'il était le seul disponible, la case reste vide.
+ * Dit ici pour que ce ne soit pas découvert sur un planning.
+ */
+function checkInversionFerie(
+  vet: VetEngineNormalise,
+  slot: SlotGarde,
+  role: RoleGarde,
+  planning: PlanningPartiel,
+  calendrier: CalendrierResolu | undefined,
+  structure: StructureConfig,
+): ValidationResult {
+  const reglage = resoudrePenaliteSouple('inversion_ferie', structure.penalitesSouples)
+  if (!reglage.actif || reglage.etage > ETAGE_DUR_MAX) return ok()
+  if (!memeRoleQueLaVeilleDeFerie(slot, vet, role, planning, calendrier)) return ok()
+  return invalid(
+    `INVERSION_FERIE : ${vet.prenom} tenait déjà ce rôle la veille — les rôles doivent s'inverser le soir d'un férié`,
+  )
+}
+
 export function violeReposFixe(
   c: ContrainteEngine, slot: SlotGarde, calendrier?: CalendrierResolu,
 ): boolean {
@@ -1571,6 +1747,14 @@ export function isValid(
     // R10d — dure UNIQUEMENT si le cabinet l'a réglée « jamais » (B-127).
     // Sinon elle reste la pénalité souple qu'elle a toujours été.
     checkVeilleRepos(vet, slot, calendrier, structure),
+    // B-132 — les trois autres préférences peuvent désormais dire « jamais ».
+    // Même contrat que R10d : tant que l'étage résolu n'est pas dur, ces trois
+    // `check*` rendent `ok()` sans rien lire. Un cabinet qui n'a rien changé ne
+    // voit donc AUCUNE différence — c'est ce que vérifient les tests de
+    // non-changement, et c'est ce qui rend ce lot sûr à livrer.
+    checkWeAvantVacances(vet, slot, structure),
+    checkFeteFinAnnee(vet, slot, structure),
+    checkInversionFerie(vet, slot, roleVisé, planning, calendrier, structure),
     checkR2IndispoCyclique(vet, slot, calendrier),
     // R3 (repos conditionnel) : « garde WE cette semaine ? » doit voir le WE du
     // lookback quand la semaine chevauche la jonction → planning ÉTENDU.

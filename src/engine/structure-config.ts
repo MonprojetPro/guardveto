@@ -261,6 +261,21 @@ export type PenaliteSoupleId = (typeof PENALITES_SOUPLES_IDS)[number]
  */
 export const PENALITES_AVEC_GARDIEN_DUR: ReadonlySet<PenaliteSoupleId> = new Set<PenaliteSoupleId>([
   'veille_repos', // R10d — `checkVeilleRepos` (B-127)
+  // ── B-132 (26/09) : les trois dernières rejoignent la liste ───────────────
+  // MiKL : « je veux que la mention jamais apparaisse, car elle n'est présente
+  // que sur la règle "éviter la garde la veille d'un jour d'absence", mais pas
+  // sur les autres ». Chacune a désormais son `check*`, et leurs ENTRÉES ont été
+  // auditées avant promotion — voir l'en-tête du bloc B-132 dans
+  // `hard-constraints.ts`, qui dit pour chacune pourquoi elle est sûre.
+  //
+  // ⚠️ CETTE LISTE EST LA SEULE VÉRITÉ, et c'est voulu : `BRIQUES_AVEC_GARDIEN_DUR`
+  //    (mapReglesCabinet) s'en DÉDUIT, et de là l'écran des règles et la Server
+  //    Action. Les trois maillons du trajet suivent donc d'un seul ajout — c'est
+  //    exactement ce qui manquait le 20/09, où seul le moteur avait été livré et
+  //    où le correctif était par conséquent inopérant.
+  'we_avant_vacances', // R10c — `checkWeAvantVacances`
+  'fete_fin_annee',    // R10b — `checkFeteFinAnnee`
+  'inversion_ferie',   // R8b  — `checkInversionFerie`
 ])
 
 /** Réglage d'une pénalité souple (absence = défaut historique). */

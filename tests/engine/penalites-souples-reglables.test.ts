@@ -111,19 +111,32 @@ describe('resoudrePenaliteSouple — défauts, désactivation, clamp', () => {
     }
   })
 
-  it('étage < 3 (posé en dur en base) → CLAMPÉ à 3 : jamais dure (pas de gardien dur)', () => {
+  // ⚠️ B-132 (26/09) — ce test attendait un CLAMP à 3 sur `fete_fin_annee`, au
+  // motif qu'elle n'avait pas de gardien. Elle en a un depuis B-132 : son étage
+  // suit donc le réglage jusqu'à 2, et le poids reste la constante historique.
+  it('étage 2 réglé → suivi, car la règle a un gardien dur (B-132)', () => {
     const r = resoudrePenaliteSouple('fete_fin_annee', { fete_fin_annee: { actif: true, etage: 2 } })
-    expect(r.etage).toBe(3)
+    expect(r.etage).toBe(2)
     expect(r.poids).toBe(30) // le poids reste la constante historique
   })
 
-  // ⚠️ `veille_repos` est la SEULE exception, et elle doit le rester : B-127 lui
-  // a donné un vrai gardien dur, donc son plancher descend à 2. Le vérifier ici
-  // empêche qu'on « harmonise » un jour le clamp et qu'on lui reprenne sa
-  // capacité à interdire sans que personne ne le voie.
-  it('veille_repos, elle, PEUT descendre à 2 — elle a un gardien dur (B-127)', () => {
-    const r = resoudrePenaliteSouple('veille_repos', { veille_repos: { actif: true, etage: 2 } })
-    expect(r.etage).toBe(2)
+  // ⚠️ Les QUATRE pénalités ont désormais un gardien — `veille_repos` (B-127)
+  // puis les trois autres (B-132). Le vérifier en boucle plutôt qu'une par une :
+  // si l'une perdait son gardien, ce test le dirait sans qu'on ait à y penser.
+  it('les quatre peuvent descendre à 2 — chacune a son gardien', () => {
+    for (const id of PENALITES_SOUPLES_IDS) {
+      expect(resoudrePenaliteSouple(id, { [id]: { actif: true, etage: 2 } }).etage,
+        `${id} devrait pouvoir etre reglee « jamais »`).toBe(2)
+    }
+  })
+
+  // Le plancher borne toujours par le bas : les étages 0 et 1 sont réservés aux
+  // invariants du moteur, aucun réglage de cabinet ne doit y accéder.
+  it('un étage 0 ou 1 posé en base reste borné à 2', () => {
+    expect(resoudrePenaliteSouple('we_avant_vacances', { we_avant_vacances: { actif: true, etage: 0 } }).etage)
+      .toBe(2)
+    expect(resoudrePenaliteSouple('inversion_ferie', { inversion_ferie: { actif: true, etage: 1 } }).etage)
+      .toBe(2)
   })
 
   it('étage réglé (4→5) → étage suivi, poids intra-étage INCHANGÉ', () => {
@@ -320,9 +333,13 @@ describe('extrairePenalitesSouples / extraireStructureConfig — lecture des lig
     expect(cfg.r8_inversion).toEqual(DEFAULT_STRUCTURE_CONFIG.r8_inversion)
   })
 
-  it('force « jamais » posée en base → étage 2 extrait, mais résolu CLAMPÉ souple (3)', () => {
+  // ⚠️ B-132 — ce test attendait un clamp à 3 apres extraction. Depuis que
+  // `fete_fin_annee` a un gardien, « jamais » va jusqu'au bout de la chaine :
+  // extrait a 2, resolu a 2. C'est tout l'objet du lot — le reglage n'est plus
+  // avale en silence entre la base et le moteur.
+  it('force « jamais » posée en base → étage 2 extrait ET résolu à 2 (B-132)', () => {
     const cfg = extrairePenalitesSouples([row('eviter_fete_fin_annee', true, 'jamais')])
     expect(cfg.fete_fin_annee).toEqual({ actif: true, etage: 2 })
-    expect(resoudrePenaliteSouple('fete_fin_annee', cfg).etage).toBe(3)
+    expect(resoudrePenaliteSouple('fete_fin_annee', cfg).etage).toBe(2)
   })
 })

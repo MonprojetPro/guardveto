@@ -14,7 +14,13 @@
 
 import type { SlotGarde, VetEngine, PlanningPartiel, RoleGarde, CalendrierResolu, AttributionGarde } from '../types'
 import { samediDeSemaine, addDays, estJourFerie, estFeteFinAnnee, attributionsAvecContexte } from '../utils'
-import { penaliteContraintesConfig, violeReposFixe, estVeilleDeRepos } from './hard-constraints'
+import {
+  penaliteContraintesConfig, violeReposFixe, estVeilleDeRepos,
+  // B-132 — les SITUATIONS visees par R10c / R10b / R8b vivent desormais
+  // dans `hard-constraints`, partagees entre la penalite et le gardien.
+  // Une seule definition : deux lectures cote a cote finissent par diverger.
+  estWeekEndAvantVacances, estSoirDeFeteFinAnnee, memeRoleQueLaVeilleDeFerie,
+} from './hard-constraints'
 import { estAttribue, vetPourRole } from '../attribution'
 import {
   PENALITE_SOUPLE_DEFAUT, poidsPenaliteSouple, type PenalitesSouplesConfig,
@@ -68,32 +74,12 @@ function penaliteWEAvantVacances(
     : 0
 }
 
-/**
- * La SITUATION que R10c vise : ce week-end précède-t-il immédiatement des
- * vacances de ce vétérinaire ?
- *
- * Extraite du calcul de la pénalité (B-063) pour que R10d puisse lui céder le
- * pas sur la SITUATION, et non sur le fait que R10c ait produit un chiffre.
- * La nuance compte : R10c désactivée renvoie 0, et R10d aurait alors pris le
- * relais — un cabinet qui a dit « je me fiche du week-end avant les vacances »
- * aurait vu la règle revenir par la bande, sous un autre nom.
- */
-function estWeekEndAvantVacances(slot: SlotGarde, vet: VetEngine): boolean {
-  if (slot.type !== 'weekend' && slot.type !== 'vendredi_soir') return false
-
-  // Samedi de référence du week-end concerné
-  const sam = slot.type === 'weekend' ? slot.date : addDays(slot.date, 1)
-  // Fenêtre « semaine suivante » : du lundi (sam+2) au vendredi (sam+6)
-  const lundiSuivant = addDays(sam, 2)
-  const vendrediSuivant = addDays(sam, 6)
-
-  return vet.conges.some(
-    (conge) =>
-      conge.type === 'vacances' &&
-      conge.date_debut >= lundiSuivant &&
-      conge.date_debut <= vendrediSuivant,
-  )
-}
+// B-132 — `estWeekEndAvantVacances` vivait ici (extraite a B-063 pour que R10d
+// puisse ceder le pas sur la SITUATION, et non sur le fait que R10c ait produit
+// un chiffre — la nuance compte : R10c desactivee renvoie 0, et R10d aurait
+// alors pris le relais, faisant revenir par la bande une regle que le cabinet
+// avait eteinte). Elle est desormais dans `hard-constraints`, partagee avec le
+// gardien `checkWeAvantVacances` : `soft` importe `hard`, jamais l'inverse.
 
 /**
  * R10b — Pénalité pour les veilles de fête (24 déc, 31 déc)
@@ -102,12 +88,10 @@ function estWeekEndAvantVacances(slot: SlotGarde, vet: VetEngine): boolean {
  * sont déjà des fériés gérés par le système d'équité.
  */
 function penaliteFeteFinAnnee(slot: SlotGarde, penalitesSouples?: PenalitesSouplesConfig): number {
-  if (slot.type !== 'semaine_soir') return 0
-  const mmjj = slot.date.substring(5)
-  if (mmjj === '12-24' || mmjj === '12-31') {
-    return poidsPenaliteSouple('fete_fin_annee', penalitesSouples)
-  }
-  return 0
+  // B-132 — la detection passe par le predicat PARTAGE avec le gardien.
+  return estSoirDeFeteFinAnnee(slot)
+    ? poidsPenaliteSouple('fete_fin_annee', penalitesSouples)
+    : 0
 }
 
 /**
@@ -166,24 +150,10 @@ function penaliteInversionFerie(
   calendrier?: CalendrierResolu,
   penalitesSouples?: PenalitesSouplesConfig
 ): number {
-  if (slot.type !== 'semaine_soir') return 0
-  if (!estJourFerie(slot.date, calendrier)) return 0
-
-  // Garde du soir précédent (la nuit avant le jour férié)
-  const veille = addDays(slot.date, -1)
-  const attrVeille = planning.attributions.find(
-    (a) => a.date === veille && (a.type === 'semaine_soir' || a.type === 'vendredi_soir')
-  )
-  if (!attrVeille) return 0
-
-  const etait1er = vetPourRole(attrVeille, 'premier') === vet.id
-  const etait2nd = vetPourRole(attrVeille, 'second') === vet.id
-
-  // Pénalité si même rôle que la veille (devrait s'inverser)
-  if (etait1er && role === 'premier') return poidsPenaliteSouple('inversion_ferie', penalitesSouples)
-  if (etait2nd && role === 'second') return poidsPenaliteSouple('inversion_ferie', penalitesSouples)
-
-  return 0
+  // B-132 — la detection passe par le predicat PARTAGE avec le gardien.
+  return memeRoleQueLaVeilleDeFerie(slot, vet, role, planning, calendrier)
+    ? poidsPenaliteSouple('inversion_ferie', penalitesSouples)
+    : 0
 }
 
 // ── Point d'entrée ───────────────────────────────────────

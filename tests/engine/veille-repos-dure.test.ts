@@ -23,6 +23,7 @@ import {
   resoudrePenaliteSouple,
   DEFAULT_STRUCTURE_CONFIG,
   PENALITES_AVEC_GARDIEN_DUR,
+  PENALITES_SOUPLES_IDS,
   type StructureConfig,
 } from '@/engine/structure-config'
 import { BRIQUES_AVEC_GARDIEN_DUR, BRIQUES_PENALITES_SOUPLES } from '@/data/mapReglesCabinet'
@@ -191,15 +192,46 @@ describe('le plancher d’étage — ce qui rendait le réglage inopérant', () 
       .toBe(2)
   })
 
-  it('CLAMPE toujours les règles qui n’ont pas de gardien dur', () => {
-    // Leur proposer « jamais » resterait un paramètre sans effet.
-    // B-135 : `we_consecutif` etait cite ici, elle a ete retiree du produit.
+  // ⚠️ B-132 (26/09) — CE TEST DISAIT L'INVERSE, ET C'EST VOULU.
+  // Il vérifiait que les trois autres préférences étaient CLAMPÉES, faute de
+  // gardien. MiKL a demandé le contraire : « je veux que la mention jamais
+  // apparaisse [...] pas seulement sur une ». Chacune a donc reçu son `check*`,
+  // et le clamp ne les concerne plus.
+  it('B-132 — les trois autres préférences peuvent descendre à 2 : elles ont un gardien', () => {
     expect(resoudrePenaliteSouple('we_avant_vacances', { we_avant_vacances: { actif: true, etage: 2 } }).etage)
-      .toBe(3)
+      .toBe(2)
+    expect(resoudrePenaliteSouple('fete_fin_annee', { fete_fin_annee: { actif: true, etage: 2 } }).etage)
+      .toBe(2)
+    expect(resoudrePenaliteSouple('inversion_ferie', { inversion_ferie: { actif: true, etage: 2 } }).etage)
+      .toBe(2)
+  })
+
+  // Le plancher borne toujours par le BAS : l'étage 2 est le plus dur atteignable
+  // par un réglage de cabinet. Un 0 ou un 1 posé en base (import, sauvegarde,
+  // saisie directe) ne doit pas faire passer la règle devant les invariants du
+  // moteur, qui vivent aux étages 0 et 1.
+  it('B-132 — un étage 0 ou 1 posé en base reste borné à 2, jamais en dessous', () => {
     expect(resoudrePenaliteSouple('fete_fin_annee', { fete_fin_annee: { actif: true, etage: 0 } }).etage)
-      .toBe(3)
+      .toBe(2)
     expect(resoudrePenaliteSouple('inversion_ferie', { inversion_ferie: { actif: true, etage: 1 } }).etage)
-      .toBe(3)
+      .toBe(2)
+  })
+
+  // ⚠️ LE CLAMP N'A PLUS AUCUN UTILISATEUR, et il doit RESTER.
+  // Les quatre pénalités souples ont désormais un gardien : la branche
+  // `plancher = 3` ne s'applique donc à personne aujourd'hui. Ce test ne la
+  // supprime pas, il la garde armée — le jour où une pénalité SANS gardien est
+  // ajoutée, il la vérifie tout seul, au lieu de laisser re-livrer le défaut de
+  // B-127 (un réglage affiché que le moteur n'honore pas).
+  it('B-132 — toute pénalité SANS gardien dur reste clampée à 3 (garde-fou armé)', () => {
+    const sansGardien = PENALITES_SOUPLES_IDS.filter((id) => !PENALITES_AVEC_GARDIEN_DUR.has(id))
+    for (const id of sansGardien) {
+      expect(resoudrePenaliteSouple(id, { [id]: { actif: true, etage: 2 } }).etage,
+        `${id} n'a pas de gardien dur : « jamais » doit rester impossible`).toBe(3)
+    }
+    // L'état du jour, dit explicitement pour qu'un ensemble vide ne passe pas
+    // pour une vérification réussie : il n'y en a plus aucune.
+    expect(sansGardien).toEqual([])
   })
 })
 
@@ -217,15 +249,24 @@ describe('la chaîne complète — écran, Server Action, moteur', () => {
     expect(BRIQUES_AVEC_GARDIEN_DUR.has('eviter_veille_repos')).toBe(true)
   })
 
-  it('ne l’autorise pour AUCUNE autre pénalité souple', () => {
+  // ⚠️ B-132 — retourné le 26/09. Ce test verrouillait l'état d'alors : SEULE
+  // `eviter_veille_repos` pouvait dire « jamais ». Les trois autres l'ont
+  // désormais, et c'est la demande de MiKL. Ce qui compte n'a pas change : la
+  // liste de l'écran DOIT rester dérivée de celle du moteur.
+  it('B-132 — les trois autres préférences l’autorisent aussi désormais', () => {
     for (const brique of [
-      'eviter_we_consecutifs',
       'eviter_we_avant_vacances',
       'eviter_fete_fin_annee',
       'inversion_role_ferie',
     ]) {
-      expect(BRIQUES_AVEC_GARDIEN_DUR.has(brique), `${brique} n'a pas de gardien dur`).toBe(false)
+      expect(BRIQUES_AVEC_GARDIEN_DUR.has(brique), `${brique} devrait avoir un gardien dur`).toBe(true)
     }
+  })
+
+  // La brique retirée par B-135 ne doit surtout pas reparaître dans la liste des
+  // réglables : elle n'a plus de gardien, et n'a plus de règle du tout.
+  it('B-135 — « eviter_we_consecutifs » n’y figure plus du tout', () => {
+    expect(BRIQUES_AVEC_GARDIEN_DUR.has('eviter_we_consecutifs')).toBe(false)
   })
 
   it('reste synchronisée avec la liste du moteur, sans recopie', () => {
