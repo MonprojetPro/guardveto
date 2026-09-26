@@ -5,6 +5,69 @@
 
 ---
 
+## 2026-09-26 — Un envoi tourne sous l'identité de CELUI QUI DÉCLENCHE, jamais du destinataire
+
+**Contexte :** B-134, prévenir l'administratrice qu'un vétérinaire a posé une demande de congé, et
+donner à chacun des interrupteurs pour régler ses e-mails. Code écrit, 1894 tests verts, `tsc`
+propre, build compilé. **Trois choses sur quatre n'auraient pas fonctionné, et aucune ne l'aurait
+dit.**
+
+**Les trois défauts, et leur cause unique.** L'envoi est déclenché par le VÉTO qui pose sa demande,
+donc tout le code de notification tourne avec SES droits — alors qu'il doit lire et écrire des
+choses qui concernent l'ADMIN :
+
+| Ce que le code devait faire | Ce que la RLS répondait | Conséquence réelle |
+|---|---|---|
+| Lire la préférence de l'admin (`preferences_notifications`) | Policy `self` : chacun ne voit que SA ligne | Le filtre trouvait « rien de coupé » et envoyait toujours — **chaque interrupteur était décoratif** |
+| Créer la notif in-app de l'admin (`notifications`) | `WITH CHECK (role = 'admin')` | **0 notification créée.** La cloche ne sonnait jamais |
+| Journaliser l'envoi (`email_log`) | `WITH CHECK (role = 'admin')` | **0 ligne de journal.** Envoi invisible dans l'écran de réglages, donc invérifiable |
+
+**Et les trois échecs étaient silencieux.** `creerNotification` avale son erreur par conception
+(best-effort assumé). `logEmail` faisait `await supabase.from('email_log').insert(...)` **sans lire
+l'objet `{ error }` retourné** — un `insert` Supabase ne lève pas. Le filtre de préférences, lui,
+échouait en fail-open : « je ne vois rien de coupé » est indistinguable de « rien n'est coupé ».
+
+**Ce qui a permis de voir. Pas un test — les tests lisaient le code, et le code était juste.** Il a
+fallu simuler les identités en base et compter les lignes réellement écrites :
+
+```sql
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"<user_id du véto>","role":"authenticated",
+                                "app_metadata":{"cabinet_id":"<le cabinet>"}}';
+-- puis lire / insérer, et COMPTER
+```
+
+⚠️ Deux pièges dans la sonde elle-même, tous deux rencontrés :
+- **sans `app_metadata.cabinet_id`**, `auth_cabinet_actif()` rend `NULL` et la policy restrictive
+  bloque TOUT — on lit « 0 ligne » et on conclut au mauvais défaut ;
+- **compter dans la session simulée fausse le compte** : la policy de lecture masque la ligne qu'on
+  vient d'écrire pour quelqu'un d'autre. Le `count` doit se faire HORS session simulée.
+
+**À retenir / réutiliser :**
+
+1. **Avant d'écrire une notification, poser la question : sous quelle identité ce code tourne-t-il,
+   et sur quelles lignes doit-il agir ?** Si les deux ne coïncident pas — et pour une notification
+   elles ne coïncident JAMAIS —, les policies doivent être vérifiées une par une, par mesure.
+2. **Un best-effort est un silence organisé.** `creerNotification` et `logEmail` ont raison de ne pas
+   faire échouer le métier ; ils avaient tort de ne rien dire. Un `console.error` suffit à rendre le
+   silence audible, et c'est ce qui manquait pour que le défaut se voie tout seul.
+3. **Un fail-open sur un filtre est le bon choix ET un angle mort.** « Je n'ai pas pu lire, donc
+   j'envoie » évite qu'une panne fasse taire tout le produit — mais rend une panne de lecture
+   impossible à distinguer du fonctionnement normal. Il faut la tracer.
+4. **Un test qui lit les sources ne peut pas attraper ça, et il faut le savoir en l'écrivant.** Le
+   garde-fou posé (« chaque réglage déclaré est consulté par un envoi ») est utile et n'aurait rien
+   vu ici. Ce qui protège en aval, c'est la mesure d'identité ; ce qui protège en amont, c'est un
+   test qui relit le SQL des policies pour qu'on ne les resserre pas sans comprendre pourquoi elles
+   sont larges.
+5. **Ouvrir une porte RLS se fait au plus étroit** : le type de ligne précis ET la qualité du
+   destinataire (`role_app = 'admin' AND actif = true AND cabinet_id = auth_cabinet_actif()`).
+   Vérifié par mesure que les abus sont refusés — pas seulement que le cas légitime passe.
+
+*(Deuxième leçon, plus petite mais réelle : `logEmail` refusait déjà des lignes avant ce chantier
+sans que personne le sache. Le même silence valait pour les cinq autres envois.)*
+
+---
+
 ## 2026-09-11 — Un item de board affirmait « zéro ligne mesurée » : la table en contenait huit
 
 **Contexte :** reprise du chantier 0 (B-104, la génération qui avorte). L'item du board, écrit le
