@@ -108,3 +108,45 @@ export function motifInvitationImpossible(vet: PorteurAdresse): string | null {
     ? `Ajoute d'abord l'adresse e-mail de ${prenom} pour pouvoir l'inviter.`
     : "Ajoute d'abord une adresse e-mail sur cette fiche pour pouvoir l'inviter."
 }
+
+/** Une fiche telle que le tri « reste-t-il quelqu'un à inviter ? » la lit. */
+export interface FicheInvitable extends PorteurAdresse {
+  actif: boolean
+  /** `null` / absent = aucun compte n'a jamais été créé pour cette fiche. */
+  user_id?: string | null
+}
+
+/**
+ * fichesAInviter — B-133 : qui reste-t-il à inviter, et par quel geste ?
+ *
+ * Le 26/09, le premier cabinet abonné n'avait jamais vu le bouton « Inviter » :
+ * des fiches créées, zéro invitation partie, donc zéro véto capable d'entrer
+ * dans l'app. Un blocage total ET silencieux.
+ *
+ * ⚠️ LE CRITÈRE EST `!user_id`, PAS `invite_pending`. Une invitation déjà
+ * partie n'est plus un blocage : la compter ici rendrait le rappel PERMANENT,
+ * donc invisible — un signal qui ne s'éteint jamais est un signal qu'on cesse
+ * de lire, et on aurait reconstruit l'angle mort qu'on prétend fermer.
+ *
+ * ⚠️ LES DEUX LISTES SONT SÉPARÉES parce qu'elles appellent des gestes
+ * DIFFÉRENTS. Sans adresse, aucune invitation ne peut partir — le serveur
+ * refuse, avec la même phrase que le bouton désactivé. Les fondre en un seul
+ * chiffre enverrait l'admin cliquer sur un bouton grisé, et lui apprendrait à
+ * ignorer le signal.
+ *
+ * Extrait ici, et pas calculé dans l'écran, pour la même raison que
+ * `motifInvitationImpossible` juste au-dessus : le critère doit être vérifiable
+ * par un test, sans base ni rendu.
+ */
+export function fichesAInviter<T extends FicheInvitable>(
+  fiches: readonly T[],
+): { pretes: T[]; sansAdresse: T[] } {
+  const pretes: T[] = []
+  const sansAdresse: T[] = []
+  for (const f of fiches) {
+    if (!f.actif || f.user_id) continue
+    if (motifInvitationImpossible(f)) sansAdresse.push(f)
+    else pretes.push(f)
+  }
+  return { pretes, sansAdresse }
+}

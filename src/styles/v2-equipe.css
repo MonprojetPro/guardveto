@@ -167,6 +167,68 @@
 }
 .acct-cta:hover:not(:disabled) { background: var(--t-accent); color: #fff; border-color: var(--t-accent); }
 .acct-cta:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* -- B-133 : le bouton « Inviter » doit SE VOIR -------------------------------
+   Le 26/09, le premier cabinet abonné n'avait jamais vu ce bouton : des fiches
+   véto créées, aucune invitation partie, donc aucun véto capable d'entrer dans
+   l'app. Le blocage était total ET silencieux — rien, nulle part, ne disait
+   qu'il restait un geste à faire.
+
+   Pourquoi une pulsation de halo et pas un vrai clignotement : un élément qui
+   disparaît puis réapparaît est illisible (on clique dans le vide) et c'est un
+   déclencheur d'accessibilité connu. Le bouton reste donc TOUJOURS visible et
+   cliquable ; c'est son halo qui respire. L'œil est attrapé par le mouvement,
+   pas par l'absence.
+
+   ⚠️ Ne s'applique QUE sur « Inviter » (état `sans`), jamais sur « Relancer » :
+   une invitation déjà partie n'est plus un blocage, et faire clignoter les deux
+   rendrait le signal aussi bavard qu'inutile — c'est ainsi qu'on n'y fait plus
+   attention. Jamais sur un bouton désactivé non plus (voir plus bas). */
+@keyframes acct-appel {
+  0%   { box-shadow: 0 0 0 0 var(--t-accent); }
+  70%  { box-shadow: 0 0 0 8px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.acct-cta.acct-appel {
+  background: var(--t-accent); color: #fff; border-color: var(--t-accent);
+  animation: acct-appel 1.8s ease-in-out infinite;
+}
+.acct-cta.acct-appel:hover:not(:disabled) { filter: brightness(1.08); }
+
+/* Le mouvement est une COMMODITÉ, jamais le porteur de l'information : sans
+   lui, le bouton doit rester le plus voyant de la carte. D'où le contraste
+   conservé et un anneau statique en remplacement du halo qui respire. */
+@media (prefers-reduced-motion: reduce) {
+  .acct-cta.acct-appel {
+    animation: none;
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+}
+
+/* -- Le rappel global, en haut de l'écran --
+   Un signal posé sur la carte ne se voit que si on regarde la carte. Le client
+   ne les avait pas vues : il faut donc que l'information remonte AVANT la
+   grille, là où le regard tombe en arrivant. Même famille que « le tableau ne
+   peut pas se taire » — un écran ne doit pas laisser une chose en plan sans le
+   dire à l'endroit où on la cherche. */
+.team-rappel {
+  display: flex; align-items: flex-start; gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--warn); border-radius: var(--r-sm);
+  /* `--warn-soft` et pas un color-mix maison : le projet a DÉJÀ le jeton de
+     fond qui va avec `--warn`. Refabriquer la teinte à côté, c'est comment on
+     se retrouve avec deux vocabulaires de couleur et du crème sur du crème. */
+  background: var(--warn-soft);
+  /* Pas de `color` : la couleur de texte est héritée. Il n'existe PAS de jeton
+     `--t-text` dans ce projet (seuls `--t-muted`, `--t-border`, `--t-accent`
+     sont définis) — en inventer un ici ne produirait rien de visible et
+     laisserait croire que la teinte est maîtrisée. */
+  font-size: 0.84rem; line-height: 1.5;
+}
+.team-rappel .tr-icone { flex: none; color: var(--warn); font-weight: 700; }
+.team-rappel strong { font-weight: 700; }
+.team-rappel .tr-detail { display: block; color: var(--t-muted); font-size: 0.8rem; }
 .acct-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
 .acct-actif   .acct-dot { background: var(--ok); }
 .acct-invite  .acct-dot { background: var(--warn); }

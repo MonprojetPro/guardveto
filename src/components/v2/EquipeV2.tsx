@@ -61,6 +61,7 @@ import type { StatutVeto, UserRole, Veterinaire } from '@/types'
 import {
   adresseBienFormee,
   adresseUtilisable,
+  fichesAInviter,
   motifInvitationImpossible,
 } from '@/lib/emails/destinataire'
 import {
@@ -225,6 +226,12 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
     () => vets.filter((v) => v.actif && v.user_id && !v.invite_pending).length,
     [vets],
   )
+
+  // ── B-133 : qui n'a PAS ENCORE été invité ────────────────────────────────
+  // Le critère lui-même vit dans `lib/emails/destinataire.ts`, à côté de
+  // `motifInvitationImpossible` dont il dépend, et il y est testé. Le garder
+  // ici en aurait fait une règle que seul le rendu connaît.
+  const aInviter = useMemo(() => fichesAInviter(vets), [vets])
   // Le décompte affiché sur la carte doit être EXACTEMENT celui de la modale :
   // même filtre, même dédoublonnage des duos. D'où l'appel au même sélecteur
   // plutôt qu'à un `filter` maison qui aurait compté les duos deux fois.
@@ -502,6 +509,49 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
           {actifs.length > 1 ? 's' : ''} · {comptesActifs} compte
           {comptesActifs > 1 ? 's' : ''} actif{comptesActifs > 1 ? 's' : ''}
         </span>
+
+        {/* B-133 — LE RAPPEL GLOBAL, AVANT LA GRILLE.
+            Le halo sur le bouton ne se voit que si on regarde la carte ; le
+            client ne les regardait pas. L'information doit donc exister là où
+            le regard tombe en arrivant sur l'écran.
+            `role="status"` sert au cas OÙ LE BANDEAU APPARAÎT EN COURS DE
+            SESSION (une fiche créée, une adresse effacée) : c'est une live
+            region, elle annonce les changements. Elle n'« annonce » rien au
+            premier rendu — le texte y est simplement lu dans le flux, comme
+            n'importe quel paragraphe. Écrire l'inverse aurait été une
+            affirmation d'accessibilité non vérifiée. */}
+        {(aInviter.pretes.length > 0 || aInviter.sansAdresse.length > 0) && (
+          <p className="team-rappel" role="status">
+            <span className="tr-icone" aria-hidden="true">!</span>
+            {/* ⚠️ TOUTES ces phrases sont tournées sur L'INVITATION ou LA FICHE,
+                jamais sur la personne — la base ne stocke pas le genre des vétos
+                (voir la note en tête de fichier). « Fanny n'a pas encore été
+                invité » aurait été un accord faux une fois sur deux, et
+                « invité·e » alourdit chaque phrase de l'écran. */}
+            <span>
+              {aInviter.pretes.length > 0 && (
+                <>
+                  <strong>
+                    {aInviter.pretes.length === 1
+                      ? `L’invitation de ${aInviter.pretes[0].prenom} n’est pas encore partie`
+                      : `${aInviter.pretes.length} invitations ne sont pas encore parties`}
+                  </strong>{' '}
+                  — sans elle, {aInviter.pretes.length === 1 ? 'cette personne' : 'ces personnes'} ne
+                  {aInviter.pretes.length === 1 ? ' peut' : ' peuvent'} pas se connecter. Le bouton
+                  {' '}« Inviter » est sur {aInviter.pretes.length === 1 ? 'sa carte' : 'leur carte'}.
+                </>
+              )}
+              {aInviter.sansAdresse.length > 0 && (
+                <span className="tr-detail">
+                  {aInviter.sansAdresse.length === 1
+                    ? `La fiche de ${aInviter.sansAdresse[0].prenom} n’a pas encore d’adresse e-mail`
+                    : `${aInviter.sansAdresse.length} fiches n’ont pas encore d’adresse e-mail`}{' '}
+                  — il faut la renseigner avant de pouvoir inviter.
+                </span>
+              )}
+            </span>
+          </p>
+        )}
       </div>
 
       {/* ── Le panneau qui se déplie ─────────────────────────────────── */}
@@ -889,10 +939,23 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
                     pas POURQUOI, et l'admin chercherait du côté des droits. Le
                     `title` porte le geste à faire — le serveur refuse de toute
                     façon, avec exactement la même phrase. */}
+                {/* B-133 — le halo qui respire ne se pose QUE si le bouton peut
+                    réellement partir. Attirer l'œil vers un bouton grisé serait
+                    pire que rien : l'admin cliquerait, rien ne se passerait, et
+                    la prochaine fois il ignorerait le signal. Quand l'adresse
+                    manque, c'est le rappel du haut d'écran qui porte le geste
+                    (« renseigner l'adresse »), pas ce bouton-là.
+                    ⚠️ `isPending` compte AUSSI : pendant l'envoi le bouton est
+                    grisé, et le laisser pulser à moitié effacé donnait un
+                    clignotement sur un bouton mort — exactement ce que la ligne
+                    du dessus dit vouloir éviter. La condition du halo doit donc
+                    être la MÊME que celle de `disabled`, pas une cousine. */}
                 {etat === 'sans' && (
                   <button
                     type="button"
-                    className="acct-cta"
+                    className={`acct-cta${
+                      isPending || motifInvitationImpossible(v) ? '' : ' acct-appel'
+                    }`}
                     onClick={() => inviter(v)}
                     disabled={isPending || !!motifInvitationImpossible(v)}
                     title={motifInvitationImpossible(v) ?? `Inviter ${v.prenom}`}

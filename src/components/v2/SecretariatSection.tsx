@@ -265,10 +265,18 @@ export function SecretariatSection({ fiches }: { fiches: FicheSecretariat[] }) {
                         bouton est désactivé plutôt que masqué : masqué, il ne
                         dirait pas pourquoi. Le serveur refuse de toute façon,
                         avec la même phrase. */}
+                    {/* B-133 — même signal que sur les fiches véto : le halo
+                        qui respire, et seulement quand l'invitation peut
+                        réellement partir. Le secrétariat a le MÊME bouton et le
+                        même angle mort ; ne traiter que les vétos aurait laissé
+                        la moitié du problème en place, avec la certitude de le
+                        redécouvrir chez le client. */}
                     {s.actif && etat !== 'compte-cree' && (
                       <button
                         type="button"
-                        className="acct-cta"
+                        className={`acct-cta${
+                          etat === 'jamais-invitee' && !isPending ? ' acct-appel' : ''
+                        }`}
                         onClick={() => inviter(s)}
                         disabled={isPending || !adresseUtilisable(s.email)}
                         title={
