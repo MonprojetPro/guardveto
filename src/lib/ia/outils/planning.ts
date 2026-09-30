@@ -37,7 +37,7 @@ import {
 } from '@/app/(protected)/admin/periodes/actions'
 import { GET as preVolGET } from '@/app/api/generate/pre-vol/route'
 import { POST as publierPOST } from '@/app/api/publish/route'
-import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
+import { revaliderPlanning } from '@/data/revaliderPlanning'
 import { compterSouhaitsCongesEnAttente } from '@/data/souhaitsCongesEnAttente'
 import {
   placesAttendues,
@@ -705,7 +705,7 @@ C'est une action qui touche toute l'équipe : les vétérinaires sont notifiés 
     let violations: Array<{ detail: string }> = []
     let controleViolationsEchoue = false
     try {
-      violations = await revaliderPlanningPublie([p.id])
+      violations = await revaliderPlanning([p.id])
     } catch {
       controleViolationsEchoue = true
     }

@@ -33,7 +33,7 @@ vi.mock('@/app/(protected)/admin/periodes/actions', () => ({
   setProfilPeriode: vi.fn(),
   setEffectifPeriode: vi.fn(),
 }))
-vi.mock('@/data/revaliderPlanning', () => ({ revaliderPlanningPublie: revalider }))
+vi.mock('@/data/revaliderPlanning', () => ({ revaliderPlanning: revalider }))
 vi.mock('@/data/souhaitsCongesEnAttente', () => ({ compterSouhaitsCongesEnAttente: compterSouhaits }))
 
 const { publierPeriode } = await import('@/lib/ia/outils/planning')

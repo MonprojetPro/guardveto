@@ -30,7 +30,7 @@ import { FenetreResultatFilou, type ResultatFilou } from './FilouResultat'
 import {
   accrocheDepuis, lireOrigine, lireSujet, portUneOrigine, MATIERE_VIDE,
 } from '@/lib/v2/filou-origine'
-import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
+import { revaliderPlanning } from '@/data/revaliderPlanning'
 import { CartesViolations } from '@/components/planning/CartesViolations'
 import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
 import type { DonneesAccueil, GardeDuSoir } from '@/data/v2/accueilEpicentre'
@@ -160,15 +160,15 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
   const [verdict, setVerdict] = useState<
     { etat: 'attente' } | { etat: 'sans-objet' } | { etat: 'ok'; violations: ViolationRevalidation[] }
   >(() =>
-    data.estAdmin && data.periodesPubliees.length > 0
+    data.estAdmin && data.periodesASurveiller.length > 0
       ? { etat: 'attente' }
       : { etat: 'sans-objet' },
   )
 
   useEffect(() => {
-    if (!data.estAdmin || data.periodesPubliees.length === 0) return
+    if (!data.estAdmin || data.periodesASurveiller.length === 0) return
     let vivant = true
-    revaliderPlanningPublie(data.periodesPubliees)
+    revaliderPlanning(data.periodesASurveiller)
       .then((violations) => {
         if (vivant) setVerdict({ etat: 'ok', violations })
       })
@@ -178,7 +178,7 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
     return () => {
       vivant = false
     }
-  }, [data.estAdmin, data.periodesPubliees])
+  }, [data.estAdmin, data.periodesASurveiller])
 
   // ── D'où l'on vient : Filou ouvre sur l'onglet qu'on venait de quitter ──
   //
@@ -721,7 +721,7 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
                     )}
                     {verdict.etat === 'sans-objet' && (
                       <p className="f-vide">
-                        Aucune période publiée en cours : il n&apos;y a rien à re-vérifier pour le
+                        Aucun planning en cours : il n&apos;y a rien à re-vérifier pour le
                         moment.
                       </p>
                     )}
@@ -730,10 +730,10 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
                         <span className="ck ok">✓</span>
                         <span>
                           <b>Aucune règle ferme enfreinte</b> sur{' '}
-                          {data.periodesPubliees.length === 1
-                            ? 'la période publiée'
-                            : `les ${data.periodesPubliees.length} périodes publiées`}{' '}
-                          en cours.
+                          {data.periodesASurveiller.length === 1
+                            ? 'la période en cours'
+                            : `les ${data.periodesASurveiller.length} périodes en cours`}
+                          , brouillons compris.
                         </span>
                       </div>
                     )}

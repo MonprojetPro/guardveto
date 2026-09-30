@@ -29,7 +29,7 @@ import {
   type CompteursRow,
 } from '@/hooks/useCompteurs'
 import { calculerBilans, type BilanVet } from '@/engine/bilan'
-import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
+import { revaliderPlanning } from '@/data/revaliderPlanning'
 import { setEquiteImportance } from '@/app/(protected)/regles/actions'
 import {
   EQUITY_DIMENSIONS,
@@ -408,7 +408,7 @@ Ne s'applique qu'à une période PUBLIÉE ou VERROUILLÉE : un brouillon n'a enc
       }
     }
 
-    const violations = await revaliderPlanningPublie([periode.id])
+    const violations = await revaliderPlanning([periode.id])
     if (violations.length === 0) {
       return {
         periode: periodeLabelCourt(periode),

@@ -18,7 +18,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { syncCalendrier } from '@/lib/sync-calendrier'
 import { sendPlanningPublie } from '@/lib/notifications'
-import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
+import { revaliderPlanning } from '@/data/revaliderPlanning'
 import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
 import { enregistrerHistoriqueFetes } from '@/data/historiqueFetes'
 import { compterSouhaitsCongesEnAttente } from '@/data/souhaitsCongesEnAttente'
@@ -138,13 +138,13 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Gate de publication : re-validation + souhaits en attente ──
-  // Le code de re-validation existait déjà (revaliderPlanningPublie) mais
+  // Le code de re-validation existait déjà (revaliderPlanning) mais
   // n'était appelé qu'après coup, depuis /planning. Ici on l'appelle AVANT
   // de publier : violations dures / jours non couverts → confirmation exigée.
   if (!confirmAvecReserves) {
     let violations: ViolationRevalidation[] = []
     try {
-      violations = await revaliderPlanningPublie([periodeId])
+      violations = await revaliderPlanning([periodeId])
     } catch (e) {
       console.error('[publish] Re-validation impossible (gate best-effort):', e)
     }

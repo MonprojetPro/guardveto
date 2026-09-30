@@ -127,8 +127,14 @@ export interface DonneesAccueil {
   souhaits: SouhaitEnAttente[]
   /** Récap de la prochaine période à préparer (null si tout est publié). */
   recapPeriode: RecapPeriode | null
-  /** Périodes publiées à re-vérifier côté client (fiche « cohérence »). */
+  /** Périodes publiées en cours — pilote la phrase « un planning est diffusé ». */
   periodesPubliees: string[]
+  /**
+   * Périodes à re-vérifier côté client (fiche « cohérence ») : publiées ET
+   * brouillons depuis B-130a. Sur un brouillon, seules les règles enfreintes
+   * remontent, jamais les cases vides — le tri vit dans `revaliderPlanning`.
+   */
+  periodesASurveiller: string[]
   /**
    * Tout ce qui attend LA PERSONNE CONNECTÉE et n'a pas déjà sa propre fiche
    * dans l'Épicentre : échanges, dépannages, sa demande de congé.
@@ -484,8 +490,25 @@ export async function chargerAccueil(
   const calendarId = (cabinetRes as { data?: { google_calendar_id?: string | null } } | null)
     ?.data?.google_calendar_id
 
+  // ⚠️ DEUX LISTES, ET C'EST VOLONTAIRE (B-130a, 30/09).
+  //
+  // Elles ne répondaient qu'à une question jusqu'ici, et il y en a deux :
+  //   ① « existe-t-il un planning DIFFUSÉ ? »  → `periodesPubliees`, qui pilote
+  //      la phrase de l'accueil. Élargir celle-ci aurait annoncé un planning
+  //      publié alors qu'il n'est qu'en brouillon : un message faux.
+  //   ② « qu'y a-t-il à re-vérifier ? »        → `periodesASurveiller`, qui
+  //      inclut les brouillons depuis B-130a — c'est là qu'une règle durcie
+  //      après la génération se voit, et le moment où on peut encore corriger.
+  //
+  // Le tri fin (quel signal pour quel statut) vit dans `revaliderPlanning`.
   const periodesPubliees = periodes
     .filter((p) => p.statut === 'publie' && p.date_fin >= today)
+    .map((p) => p.id)
+
+  const periodesASurveiller = periodes
+    .filter(
+      (p) => (p.statut === 'publie' || p.statut === 'brouillon') && p.date_fin >= today,
+    )
     .map((p) => p.id)
 
   return {
@@ -513,9 +536,10 @@ export async function chargerAccueil(
     demain,
     souhaits,
     recapPeriode,
-    // Seules les périodes publiées ENCORE EN COURS sont re-vérifiées : re-valider
-    // le passé coûterait cher pour un verdict que plus personne ne peut changer.
+    // Seules les périodes ENCORE EN COURS sont re-vérifiées : re-valider le
+    // passé coûterait cher pour un verdict que plus personne ne peut changer.
     periodesPubliees,
+    periodesASurveiller,
     enAttente,
     matiereFilou: estAdmin
       ? matiereFilou({

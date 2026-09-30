@@ -3,7 +3,7 @@
 // ============================================================
 // GUARDVETO — RevalidationRealtime (Chantier B)
 // ============================================================
-// Bandeau d'alerte ADMIN qui re-valide en CONTINU le planning publié.
+// Bandeau d'alerte ADMIN qui re-valide en CONTINU le planning affiché.
 //
 // Pourquoi : avant ce chantier, le planning n'était vérifié qu'à la génération.
 // Une fois publié, un congé validé a posteriori, une règle modifiée, une
@@ -23,20 +23,32 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { AlertTriangle, ChevronDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
+import { revaliderPlanning } from '@/data/revaliderPlanning'
 import { grouperViolations } from '@/lib/regles/libelleViolation'
 import { CartesViolations } from './CartesViolations'
 import type { ViolationRevalidation } from './types-revalidation'
 import { abonnerEnSignalantLesEchecs } from '@/lib/realtime/statut-abonnement'
 
 interface RevalidationRealtimeProps {
-  /** Période(s) publiée(s) visibles sur le mois affiché, à re-valider. */
+  /**
+   * Période(s) visibles sur le mois affiché, à re-valider — publiées ET
+   * brouillons depuis B-130a. Le tri (quel statut, quel signal) vit dans
+   * `data/revaliderPlanning` : ce composant AFFICHE, il ne décide pas.
+   *
+   * ⚠️ C'est pourquoi les textes ci-dessous ne parlent plus de « publication » :
+   * ils couvrent aussi un brouillon, où « depuis sa publication » aurait été
+   * faux. Un bandeau qui décrit mal l'état qu'il signale est pire qu'absent —
+   * on corrige ce qu'il dit, pas ce qui se passe.
+   */
   periodeIds: string[]
   /** Violations calculées en SSR au 1er rendu (évite un flash vide). */
   initialViolations: ViolationRevalidation[]
 }
 
-// Tables dont un changement peut rendre le planning publié non conforme.
+// Tables dont un changement peut rendre le planning non conforme.
+// `regles_cabinet` en fait partie, et c'est ce qui donne tout son sens à
+// B-130a : durcir une règle relance la re-validation immédiatement, y compris
+// sur un brouillon — le cas exact du 25/09.
 const TABLES_SURVEILLEES = [
   'gardes',
   'conges',
@@ -60,7 +72,7 @@ export function RevalidationRealtime({
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
       try {
-        const res = await revaliderPlanningPublie(periodeIds)
+        const res = await revaliderPlanning(periodeIds)
         setViolations(res)
       } catch {
         // best-effort : on garde l'état précédent en cas d'échec réseau
@@ -103,8 +115,8 @@ export function RevalidationRealtime({
         <div className="gva-titres">
           <p className="gva-titre">
             {violations.length === 1
-              ? 'Une incohérence sur le planning publié'
-              : `${violations.length} incohérences sur le planning publié`}
+              ? 'Une incohérence sur le planning'
+              : `${violations.length} incohérences sur le planning`}
             {causes.length > 1 && (
               <span className="gva-compte">
                 {' '}· {causes.length} causes
@@ -112,8 +124,8 @@ export function RevalidationRealtime({
             )}
           </p>
           <p className="gva-sous">
-            Depuis sa publication, le planning ne respecte plus toutes les règles
-            (congé validé, règle modifiée, garde réattribuée…).
+            Le planning ne respecte plus toutes les règles fermes (congé validé,
+            règle modifiée, garde réattribuée…).
           </p>
         </div>
         <button
@@ -134,8 +146,8 @@ export function RevalidationRealtime({
           <div className="gva-actions">
             <Link href="/regles" className="gva-lien">Revoir les règles →</Link>
             <span className="gva-note">
-              Régénérer le planning depuis « Générer » le remet d’aplomb — il
-              repassera en brouillon jusqu’à sa republication.
+              Régénérer le planning depuis « Générer » le remet d’aplomb. S’il
+              était publié, il repassera en brouillon jusqu’à sa republication.
             </span>
           </div>
         </div>

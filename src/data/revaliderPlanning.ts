@@ -1,14 +1,42 @@
 'use server'
 
 // ============================================================
-// GUARDVETO — Re-validation continue d'un planning PUBLIÉ (Chantier B)
+// GUARDVETO — Re-validation continue d'un planning (Chantier B, élargi B-130a)
 // ============================================================
 // Le validateur indépendant `validerPlanning` prouve, à la génération, que le
-// planning respecte toutes les contraintes DURES. Mais une fois publié, plus
+// planning respecte toutes les contraintes DURES. Mais une fois écrit, plus
 // rien ne le re-vérifiait : un congé validé a posteriori, une règle modifiée,
 // une édition manuelle ou une réparation de crise pouvaient introduire une
 // violation invisible. Ce module BRANCHE le validateur en prod : il recharge
-// l'état réel (gardes publiées + règles + calendrier) et re-confronte le tout.
+// l'état réel (gardes + règles + calendrier) et re-confronte le tout.
+//
+// ── B-130a (2026-09-30) : LES BROUILLONS AUSSI ─────────────────────────────
+//
+// Ce contrôle ne tournait QUE sur les périodes publiées. C'est ce qui a coûté
+// B-130 : le 25/09, MiKL fait passer `espacement_min` de « évitée » à
+// « jamais » APRÈS avoir généré Hiver P2. À cette seconde, son planning déjà
+// enregistré devient non conforme — et rien ne le dit, la période étant en
+// BROUILLON. Il l'a vu à l'œil nu sur la grille, et a conclu à un bug du
+// moteur qui n'existait pas. Un correcteur qui ne s'allume que sur les
+// documents déjà imprimés.
+//
+// Un brouillon est précisément le moment où l'admin peut encore corriger.
+// C'est donc là que le signal vaut le plus cher, pas seulement après coup.
+//
+// ⚠️ MAIS PAS LE MÊME SIGNAL. Sur un brouillon, les cases encore vides sont un
+// ÉTAT NORMAL — on est en train de le construire, et elles sont déjà comptées
+// ailleurs (« 9 cases restent à pourvoir »). Les remonter ici ferait crier le
+// bandeau à chaque génération partielle, et un bandeau qui crie toujours ne se
+// lit plus. Décision de MiKL, 30/09 : sur un brouillon, **seulement les règles
+// enfreintes, pas les cases vides**. Les violations `COUVERTURE` sont donc
+// écartées pour les brouillons — et pour eux seuls.
+//
+// ⚠️ LE FILTRE VIT ICI, PAS CHEZ LES APPELANTS. Six écrans appellent cette
+// fonction. Si chacun décidait quelles périodes surveiller et quoi taire, ils
+// divergeraient — c'est le défaut « trois chemins d'écriture, deux gardiens »
+// déjà payé sur ce projet le 22/08. Un appelant demande des périodes ; c'est
+// ce module qui lit leur statut et décide. Une période VERROUILLÉE reste
+// écartée : elle ne se modifie plus, signaler n'y ouvre aucune décision.
 //
 // SOURCE DE VÉRITÉ : la table `gardes` (V1) — c'est elle que voient les écrans
 // (vue `planning_semaine`) et qu'écrivent les éditions manuelles + la crise
@@ -32,22 +60,34 @@ import {
 import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { PlanningPartiel } from '@/engine/types'
+import type { StatutPeriode } from '@/types'
+import {
+  estSurveillee,
+  remonteLesCasesVides,
+  REGLE_CASE_VIDE,
+} from '@/lib/produit/surveillancePlanning'
 import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
 
 // ── Server Action : re-valider les périodes publiées affichées ──
 
 /**
- * Re-valide une ou plusieurs périodes publiées et retourne TOUTES les
- * violations de contraintes dures détectées (tableau vide = planning fiable).
+ * Re-valide une ou plusieurs périodes et retourne les violations de contraintes
+ * dures détectées (tableau vide = planning fiable).
+ *
+ * L'appelant demande des périodes ; CE MODULE décide lesquelles sont
+ * surveillables et ce qui est remonté pour chacune (cf. l'en-tête) :
+ *   - `publie`     → toutes les violations, cases vides comprises ;
+ *   - `brouillon`  → les règles enfreintes SEULEMENT, jamais les cases vides ;
+ *   - `verrouille` → rien : la période ne se modifie plus.
  *
  * Appelée par le composant client `RevalidationRealtime` :
  *   - une fois au montage (cohérence avec le SSR),
  *   - à chaque event Realtime (gardes/conges/periodes/veterinaires/regles).
  *
- * @param periodeIds  périodes à re-valider (typiquement la/les période(s)
- *                    publiée(s) visible(s) sur le mois affiché).
+ * @param periodeIds  périodes à re-valider (typiquement celle(s) visible(s) sur
+ *                    le mois affiché). Les non-surveillables sont ignorées.
  */
-export async function revaliderPlanningPublie(
+export async function revaliderPlanning(
   periodeIds: string[]
 ): Promise<ViolationRevalidation[]> {
   if (!periodeIds || periodeIds.length === 0) return []
@@ -68,10 +108,46 @@ export async function revaliderPlanningPublie(
   const cabinetId = user.app_metadata?.cabinet_id as string | undefined
   if (!cabinetId) return []
 
+  const ids = [...new Set(periodeIds)]
+
+  // ── B-130a — quelles périodes, et quel signal pour chacune ──────────────
+  //
+  // Lu EN BASE, jamais reçu de l'appelant : un écran qui se tromperait de
+  // statut ferait taire le contrôle sans que ça se voie nulle part. La base
+  // est la seule source qui ne peut pas mentir sur l'état d'une période.
+  //
+  // Une lecture qui échoue ne doit pas éteindre le contrôle en silence : on
+  // retombe alors sur le comportement d'avant B-130a (publié seulement), qui
+  // est le repli le plus étroit — jamais sur « on surveille tout ».
+  const { data: statutsDb, error: statutsErr } = await supabase
+    .from('periodes')
+    .select('id, statut')
+    .in('id', ids)
+    .eq('cabinet_id', cabinetId)
+
+  if (statutsErr) {
+    console.error('[revalidation] lecture des statuts impossible :', statutsErr.message)
+    return []
+  }
+
+  const statutParId = new Map(
+    ((statutsDb ?? []) as { id: string; statut: StatutPeriode }[]).map((p) => [p.id, p.statut]),
+  )
+
   const out: ViolationRevalidation[] = []
   const vues = new Set<string>() // dédoublonnage inter-périodes
 
-  for (const periodeId of [...new Set(periodeIds)]) {
+  for (const periodeId of ids) {
+    const statut = statutParId.get(periodeId)
+
+    // Le régime (surveillée ? cases vides remontées ?) vit dans
+    // `lib/produit/surveillancePlanning.ts`, en table exhaustive par statut :
+    // un statut ajouté sans décision ne compile pas. Une période inconnue —
+    // introuvable, ou d'un autre cabinet que la RLS a déjà écartée — n'est pas
+    // surveillée : juger sans connaître l'état produirait un verdict sans valeur.
+    if (!estSurveillee(statut)) continue
+    const taireLesCasesVides = !remonteLesCasesVides(statut)
+
     // 1-2. Montage PARTAGÉ avec le garde-fou du chemin manuel (PATCH garde) :
     //      contexte + gardes réelles + reconstruction (vendredi synthétisé,
     //      places sur-mesure, lookback #17). Extrait ici pour que les deux
@@ -92,6 +168,9 @@ export async function revaliderPlanningPublie(
 
     // 3. Re-validation indépendante.
     for (const v of validerPlanning(planning, montage.input)) {
+      if (taireLesCasesVides && v.regle === REGLE_CASE_VIDE) continue
+      // (filtre place par place plutôt qu'en bloc : le dédoublonnage
+      //  inter-périodes ci-dessous travaille sur le flux, pas sur un tableau)
       const cle = `${v.regle}|${v.date}|${v.type}|${v.role ?? ''}|${v.vetId ?? ''}`
       if (vues.has(cle)) continue
       vues.add(cle)

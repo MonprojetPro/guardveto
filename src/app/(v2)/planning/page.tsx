@@ -27,7 +27,7 @@ import { placesDeGarde } from '@/lib/gardes/places'
 import { construireCatalogue } from '@/lib/planning/placesAttendues'
 import { RealtimeRefresh } from '@/components/planning/RealtimeRefresh'
 import { RevalidationRealtime } from '@/components/planning/RevalidationRealtime'
-import { revaliderPlanningPublie } from '@/data/revaliderPlanning'
+import { revaliderPlanning } from '@/data/revaliderPlanning'
 import { chargerDock } from '@/data/v2/dock'
 import {
   queryCompteurs,
@@ -599,11 +599,18 @@ export default async function PlanningPageV2({
   // devant une porte fermée. Le cas se voit dès qu'on reprend l'historique d'un
   // cabinet : un extrait de passé n'a jamais tous ses créneaux couverts, et la
   // page criait « 32 créneaux non couverts » sur un planning d'archive.
+  //
+  // B-130a (30/09) — LES BROUILLONS ENTRENT DANS LE CONTRÔLE. Il ne portait que
+  // sur `publie`, et c'est ce qui a coûté B-130 : une règle durcie APRÈS la
+  // génération rendait le brouillon non conforme sans que rien ne le dise. Un
+  // brouillon est justement le moment où l'admin peut encore corriger.
+  // Le tri fin (quel statut, quel signal) vit dans `revaliderPlanning` — ici on
+  // se contente d'écarter ce qui ne se modifie plus, et de citer la règle.
   const periodeIdsARevalider = isAdmin
     ? periodes
         .filter(
           (p) =>
-            p.statut === 'publie' &&
+            (p.statut === 'publie' || p.statut === 'brouillon') &&
             p.date_debut <= fin &&
             p.date_fin >= debut &&
             periodesAvecGardes.includes(p.id),
@@ -611,7 +618,7 @@ export default async function PlanningPageV2({
         .map((p) => p.id)
     : []
   const violationsInitiales =
-    periodeIdsARevalider.length > 0 ? await revaliderPlanningPublie(periodeIdsARevalider) : []
+    periodeIdsARevalider.length > 0 ? await revaliderPlanning(periodeIdsARevalider) : []
 
   return (
     <>
