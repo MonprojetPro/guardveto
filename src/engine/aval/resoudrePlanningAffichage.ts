@@ -125,6 +125,26 @@ export function ordonnerSourceLiee<T>(
 export const COUPLE_HISTORIQUE = { source: 'vendredi_soir', cible: 'weekend' } as const
 
 /**
+ * L'état du couple vendredi ↔ week-end, en deux booléens (B-137).
+ *
+ *  - `materialiser` : le vendredi existe-t-il ? (relation `meme_binome`)
+ *  - `inverser`     : ses rôles sont-ils permutés ? (relation `inversion_role`)
+ *
+ * ⚠️ MIROIR EXACT de la vue SQL `couple_vendredi_weekend`. Les deux disent la
+ * même chose dans deux langages — c'est la seule duplication acceptée ici, et
+ * elle est nommée pour qu'on la retrouve. Toute évolution se fait DES DEUX
+ * CÔTÉS : un compteur SQL qui inclut le vendredi et une projection TypeScript
+ * qui l'ignore, c'est « Antoine 27 » d'un côté et « 25 » de l'autre, sur le
+ * même écran (B-108, déjà payé).
+ */
+export function coupleVendrediWeekend(
+  relations: readonly RelationStructure[] = RELATIONS_STRUCTURE_DEFAUT,
+): { materialiser: boolean; inverser: boolean } {
+  const genres = genresPourCouple(relations, COUPLE_HISTORIQUE.source, COUPLE_HISTORIQUE.cible)
+  return { materialiser: genres.has('meme_binome'), inverser: genres.has('inversion_role') }
+}
+
+/**
  * Placements du VENDREDI lié à un week-end, via les relations (couple historique
  * vendredi_soir → weekend). Défaut → inversion des rôles (R8). Les labels de
  * rôle restent ceux de la source (par défaut = ceux du week-end : premier/second).

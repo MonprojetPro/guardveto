@@ -34,11 +34,29 @@
 // Compter les deux annoncerait « Antoine −2 » pour UN SEUL week-end perdu. Et
 // un compteur projeté faux est pire que pas de compteur : l'admin décide
 // dessus, et ne voit l'écart qu'après avoir appliqué.
+//
+// ── CE QUI A CHANGÉ LE 2026-09-30 (B-137) ───────────────────────────────────
+//
+// MiKL : « le vendredi doit compter comme un soir de garde comme les autres
+// jours de la semaine ». La vue `compteurs_gardes` DÉRIVE désormais le vendredi
+// du week-end et le range dans `sem_*` et `total_gardes`.
+//
+// ⚠️ LA MOITIÉ DU PIÈGE CI-DESSUS S'INVERSE DONC, ET L'AUTRE MOITIÉ RESTE :
+//
+//   • une affectation `vendredi_soir` reste IGNORÉE — le vendredi n'a toujours
+//     pas de ligne, et c'est le mouvement du WEEK-END qui le porte ;
+//   • mais un mouvement de WEEK-END pèse maintenant DEUX fois : une fois en
+//     `we_*`, une fois en `sem_*` pour le vendredi qui le suit.
+//
+// Ne corriger que le SQL aurait donné « Antoine 27 » dans le tableau et « 25 »
+// dans l'aperçu, sur le même écran — B-108, déjà payé une fois.
 // ============================================================
 
 import type { CompteursRow } from '@/hooks/useCompteurs'
 import type { CalendrierResolu } from '@/engine/types'
+import type { RelationStructure } from '@/engine/structure-config'
 import { mapTypeGardeEnDb } from '@/data/ecrirePlanningV1'
+import { coupleVendrediWeekend } from '@/engine/aval/resoudrePlanningAffichage'
 
 /**
  * Une place qui change de main.
@@ -92,7 +110,10 @@ export function projeterCompteurs(
   actuels: CompteursRow[],
   affectations: AffectationProjetee[],
   calendrier?: CalendrierResolu,
+  relations?: readonly RelationStructure[],
 ): CompteursRow[] {
+  // B-137 — l'état du couple, lu à la MÊME source que la vue SQL.
+  const couple = coupleVendrediWeekend(relations)
   const projete = actuels.map((r) => ({ ...r }))
   const parId = new Map(projete.map((r) => [r.veterinaire_id, r]))
 
@@ -115,8 +136,9 @@ export function projeterCompteurs(
 
   for (const a of affectations) {
     // ⚠️ LE VENDREDI SOIR SORT ICI, et c'est tout l'objet de cette ligne : il
-    // n'existe pas dans `gardes`, donc il ne pèse sur aucun compteur. Le
-    // compter ferait double emploi avec le samedi qui l'accompagne toujours.
+    // n'existe pas dans `gardes`, donc aucun mouvement ne le vise en propre.
+    // C'est le mouvement du WEEK-END qui le porte (voir juste en dessous) ;
+    // le compter ici ferait double emploi avec le samedi qui l'accompagne.
     if (a.type === 'vendredi_soir') continue
 
     const famille = familleDe(mapTypeGardeEnDb(a.type, a.date, calendrier))
@@ -127,6 +149,21 @@ export function projeterCompteurs(
     // total et seules les colonnes de rôle bougent — ce qui est exact.
     bouger(a.avantVetId, famille, a.role, -1)
     bouger(a.vetId, famille, a.role, 1)
+
+    // B-137 — LE VENDREDI QUI SUIT LE WEEK-END. La vue le dérive et le range
+    // en soir de semaine ; la projection doit faire le même geste, sinon
+    // l'aperçu et le tableau affichent deux chiffres pour la même personne.
+    //
+    // Le rôle y est INVERSÉ quand le cabinet l'a réglé ainsi : le 2nd du
+    // week-end est le 1er du vendredi. Sans cette permutation, `sem_total`
+    // serait juste et le détail 1er/2nd faux — l'erreur la moins visible.
+    if (famille === 'we' && couple.materialiser) {
+      const roleVendredi = couple.inverser
+        ? (a.role === 'premier' ? 'second' : a.role === 'second' ? 'premier' : a.role)
+        : a.role
+      bouger(a.avantVetId, 'sem', roleVendredi, -1)
+      bouger(a.vetId, 'sem', roleVendredi, 1)
+    }
   }
 
   return projete

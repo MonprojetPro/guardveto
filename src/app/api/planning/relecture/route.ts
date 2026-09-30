@@ -54,6 +54,7 @@ import { clePlaceFigee } from '@/engine/figees'
 // B-122 lot 1 — « Antoine 27 -> 25 » : ce que les compteurs diront SI on
 // applique. Le chiffre remplace les paragraphes d'explication de Filou.
 import { projeterCompteurs, type AffectationProjetee } from '@/lib/planning/compteursProjetes'
+import { relationsEffectives } from '@/engine/structure-config'
 import { queryCompteurs } from '@/hooks/useCompteurs'
 import type { CodeCreneau, RoleGarde } from '@/engine/types'
 import { persisterResultat } from '@/data/persisterResultat'
@@ -524,7 +525,16 @@ async function executerRelecture(
       avantVetId: a.avant[i]?.vetId ?? null,
     }))
 
-    const apres = projeterCompteurs(compteursActuels, affectations, contexte.calendrier)
+    // B-137 — les relations du cabinet voyagent JUSQU'ICI : c'est elles qui
+    // disent si un mouvement de week-end emporte aussi son vendredi. Sans ce
+    // dernier maillon, la projection retomberait sur le couple par defaut et
+    // annoncerait un vendredi a un cabinet qui a decouple ses creneaux.
+    const apres = projeterCompteurs(
+      compteursActuels,
+      affectations,
+      contexte.calendrier,
+      contexte.structureConfig ? relationsEffectives(contexte.structureConfig) : undefined,
+    )
     const avantPar = new Map(compteursActuels.map((r) => [r.veterinaire_id, r]))
 
     // Seules les personnes dont le total BOUGE sont citees : lister toute

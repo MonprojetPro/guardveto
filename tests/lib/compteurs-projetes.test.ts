@@ -122,10 +122,56 @@ describe('projeterCompteurs — un week-end', () => {
     expect(par(r, 'fanny').we_premier).toBe(2)
     expect(par(r, 'fanny').we_total).toBe(4)
   })
+
+  // B-137 — un week-end n'est plus UN soir de garde, il en vaut DEUX : le
+  // samedi-dimanche, et le vendredi qui le précède. La vue `compteurs_gardes`
+  // les compte tous les deux ; la projection doit dire la même chose.
+  it('emporte AUSSI le vendredi qui le précède, en soir de semaine', () => {
+    const r = projeterCompteurs(equipe(), [
+      {
+        date: '2026-12-05', type: 'weekend', role: 'premier',
+        vetId: 'fanny', avantVetId: 'antoine',
+      },
+    ])
+
+    // Le week-end lui-même.
+    expect(par(r, 'antoine').we_total).toBe(4)
+    // Le vendredi, rangé en soir de SEMAINE — et en rôle INVERSÉ : Antoine
+    // était 1er du week-end, il était donc 2nd du vendredi.
+    expect(par(r, 'antoine').sem_second).toBe(9)
+    expect(par(r, 'antoine').sem_premier).toBe(12) // intact
+    expect(par(r, 'antoine').sem_total).toBe(21)
+    expect(par(r, 'fanny').sem_second).toBe(10)
+    expect(par(r, 'fanny').sem_total).toBe(18)
+    // Total : −2 pour Antoine (le week-end ET son vendredi), +2 pour Fanny.
+    expect(par(r, 'antoine').total_gardes).toBe(25)
+    expect(par(r, 'fanny').total_gardes).toBe(22)
+  })
+
+  it('ne compte PAS le vendredi quand le cabinet a découplé ses créneaux', () => {
+    // Sans `meme_binome`, le vendredi n'est pas dérivable du week-end : la vue
+    // ne le matérialise pas, la projection non plus. Le paramètre `relations`
+    // n'est donc pas décoratif — il change le chiffre affiché.
+    const r = projeterCompteurs(
+      equipe(),
+      [{
+        date: '2026-12-05', type: 'weekend', role: 'premier',
+        vetId: 'fanny', avantVetId: 'antoine',
+      }],
+      undefined,
+      [], // aucune relation : créneaux découplés
+    )
+
+    expect(par(r, 'antoine').we_total).toBe(4)
+    expect(par(r, 'antoine').sem_total).toBe(22) // intact
+    expect(par(r, 'antoine').total_gardes).toBe(26) // −1 seulement
+  })
 })
 
-describe('projeterCompteurs — 💣 le vendredi soir ne compte nulle part', () => {
-  // Le défaut que ce fichier existe pour empêcher.
+describe('projeterCompteurs — le vendredi soir n’a toujours pas de ligne à lui', () => {
+  // ⚠️ CETTE MOITIÉ DU PIÈGE N'A PAS BOUGÉ AVEC B-137. Le vendredi est COMPTÉ
+  // depuis le 30/09, mais toujours pas STOCKÉ : il n'existe que porté par son
+  // week-end. Une affectation qui le vise en propre reste donc sans effet.
   it('IGNORE une affectation du vendredi soir : elle n’est pas écrite en base', () => {
     const r = projeterCompteurs(equipe(), [
       {
@@ -138,9 +184,12 @@ describe('projeterCompteurs — 💣 le vendredi soir ne compte nulle part', () 
     expect(par(r, 'fanny').total_gardes).toBe(20)
   })
 
-  it('compte UNE SEULE fois le couple vendredi + samedi que Filou propose', () => {
-    // Le cas réel du 15/09 : les deux lignes voyagent ensemble. Les compter
-    // toutes les deux annoncerait « Antoine −2 » pour un seul week-end perdu.
+  it('le couple vendredi + samedi de Filou pèse 2, porté par le SEUL samedi', () => {
+    // Le cas réel du 15/09, relu après B-137. Les deux lignes voyagent
+    // ensemble et représentent DEUX soirs de garde. Le compte est bien −2 —
+    // mais il vient entièrement du samedi, qui emporte son vendredi ; la ligne
+    // `vendredi_soir`, elle, reste ignorée. Compter les deux lignes donnerait
+    // −3, pour deux soirs perdus.
     const r = projeterCompteurs(equipe(), [
       {
         date: '2026-12-04', type: 'vendredi_soir', role: 'second',
@@ -152,8 +201,8 @@ describe('projeterCompteurs — 💣 le vendredi soir ne compte nulle part', () 
       },
     ])
 
-    expect(par(r, 'antoine').total_gardes).toBe(26) // −1, pas −2
-    expect(par(r, 'fanny').total_gardes).toBe(21)
+    expect(par(r, 'antoine').total_gardes).toBe(25) // −2, jamais −3
+    expect(par(r, 'fanny').total_gardes).toBe(22)
   })
 })
 
