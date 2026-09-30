@@ -1,0 +1,757 @@
+{
+  "meta": {
+    "item": "B-130",
+    "sujet": "Le planning de 14h50 a ete juge avec une regle DURCIE APRES sa generation — a 14h51 espacement_min valait « evitee » (souple)",
+    "cabinet": "Cabinet veterinaire du Val d'Allier",
+    "cabinet_id": "00000000-0000-0000-0000-000000000001",
+    "periode": "Hiver P2",
+    "periode_id": "2c9f1b64-1514-420e-9433-e7c7eeb44e79",
+    "date_debut": "2026-10-19",
+    "date_fin": "2026-11-29",
+    "statut_periode": "brouillon",
+    "releve_le": "2026-09-25T15:25:00Z",
+    "source": "base de production (mpvrok…), lecture directe",
+    "avertissement": "MiKL a modifie des regles ENTRE les generations du jour. Les regles ci-dessous sont celles de 15h25 — elles ne sont donc PAS celles qui s'appliquaient a la generation de 14h50. Les ecarts connus sont listes dans `regles_modifiees_en_cours_de_journee`.",
+    "corrige_le": "2026-09-30",
+    "correction": "Le releve du 25/09 portait deja l'avertissement « les regles ci-dessous ne sont PAS celles de 14h50 » — il n'a pas ete applique a espacement_min, la regle au coeur du dossier. La source qui ne ment pas est la table snapshots_regles : elle enregistre les regles actives A CHAQUE generation. Mesure le 30/09, voir force_espacement_min_par_generation."
+  },
+  "regles_modifiees_en_cours_de_journee": [
+    {
+      "quoi": "espacement_weekend",
+      "avant_14h50": "DEUX lignes actives et contradictoires : n_semaines=2 « jamais » ET n_semaines=3 « jamais »",
+      "a_15h25": "UNE seule ligne : n_semaines=3 « jamais »",
+      "consequence": "le doublon signale a MiKL a ete supprime ; c'etait le cas reel de B-128/B-129"
+    },
+    {
+      "quoi": "interdire_creneau — Jean, lundi",
+      "avant_14h50": "absente",
+      "a_15h25": "presente, force « jamais » (Jean ne fait plus de lundi)",
+      "consequence": "explique une partie du changement de repartition entre 14h50 et 15h09"
+    },
+    {
+      "quoi": "equilibrer — dimension weekend",
+      "avant_14h50": "importance « essentiel »",
+      "a_15h25": "importance « ignoree »",
+      "consequence": "l'equilibrage des week-ends ne pese plus dans le score"
+    },
+    {
+      "quoi": "eviter_veille_repos",
+      "avant_14h50": "sauf_crise (mou) au releve de 14h05, « jamais » au releve de 15h25",
+      "a_15h25": "« jamais » (dur) — le gardien de B-127 s'applique",
+      "consequence": "resserre fortement les personnes a jours de repos fixes, Anne-Sophie en tete"
+    }
+  ],
+  "equipe": [
+    {
+      "id": "00000000-0000-0000-0000-000000000004",
+      "prenom": "Anne-Catherine",
+      "statut": "associe",
+      "actif": true,
+      "dernier_recours": true,
+      "tags": [
+        "senior",
+        "toutes"
+      ]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "prenom": "Anne-Sophie",
+      "statut": "associe",
+      "actif": true,
+      "dernier_recours": false,
+      "tags": [
+        "toutes"
+      ]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000006",
+      "prenom": "Antoine",
+      "statut": "salarie",
+      "actif": true,
+      "dernier_recours": false,
+      "tags": [
+        "toutes",
+        "junior"
+      ]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000002",
+      "prenom": "Fanny",
+      "statut": "associe",
+      "actif": true,
+      "dernier_recours": false,
+      "tags": [
+        "toutes",
+        "senior"
+      ]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000003",
+      "prenom": "Jean",
+      "statut": "associe",
+      "actif": true,
+      "dernier_recours": false,
+      "tags": [
+        "senior"
+      ]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000005",
+      "prenom": "Manon",
+      "statut": "salarie",
+      "actif": true,
+      "dernier_recours": false,
+      "tags": [
+        "toutes",
+        "junior"
+      ]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000007",
+      "prenom": "Victor",
+      "statut": "salarie",
+      "actif": true,
+      "dernier_recours": false,
+      "tags": [
+        "toutes",
+        "senior"
+      ]
+    }
+  ],
+  "creneaux": [
+    {
+      "code": "vendredi_soir",
+      "jours": [
+        5
+      ],
+      "nb_places": 2,
+      "roles": [
+        "premier",
+        "second"
+      ],
+      "actif": true,
+      "sur_feries": false
+    },
+    {
+      "code": "semaine_soir",
+      "jours": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "nb_places": 2,
+      "roles": [
+        "premier",
+        "second"
+      ],
+      "actif": true,
+      "sur_feries": false
+    },
+    {
+      "code": "weekend",
+      "jours": [
+        6
+      ],
+      "nb_places": 2,
+      "roles": [
+        "premier",
+        "second"
+      ],
+      "actif": true,
+      "sur_feries": false
+    },
+    {
+      "code": "ferie",
+      "jours": [],
+      "nb_places": 2,
+      "roles": [
+        "premier",
+        "second"
+      ],
+      "actif": true,
+      "sur_feries": true
+    }
+  ],
+  "relations": [
+    {
+      "genre": "meme_binome",
+      "source": "vendredi_soir",
+      "cible": "weekend",
+      "actif": true
+    },
+    {
+      "genre": "inversion_role",
+      "source": "vendredi_soir",
+      "cible": "weekend",
+      "actif": true
+    }
+  ],
+  "regle_au_coeur_du_sujet": {
+    "id": "ed23cf48-6cb0-402d-9805-d054c5f7d2be",
+    "brique_id": "espacement_min",
+    "force": "jamais",
+    "etage": 2,
+    "dure": true,
+    "actif": true,
+    "params_json": {
+      "qui": {
+        "refs": [],
+        "type": "tous"
+      },
+      "quand": null,
+      "params": {
+        "ecart_min_jours": 2
+      },
+      "_source": {
+        "type_v1": "espacement_min"
+      }
+    },
+    "avertissement": "⚠️ Cette ligne est celle de 15h25 (force « jamais »). Elle n etait PAS en vigueur a la generation du planning A — voir force_espacement_min_par_generation."
+  },
+  "conges_de_la_periode": [
+    {
+      "qui": "Anne-Sophie",
+      "type": "vacances",
+      "du": "2026-10-19",
+      "au": "2026-10-25"
+    },
+    {
+      "qui": "Jean",
+      "type": "vacances",
+      "du": "2026-10-19",
+      "au": "2026-10-25"
+    },
+    {
+      "qui": "Anne-Catherine",
+      "type": "vacances",
+      "du": "2026-10-21",
+      "au": "2026-10-28"
+    },
+    {
+      "qui": "Antoine",
+      "type": "autre",
+      "du": "2026-10-24",
+      "au": "2026-10-25"
+    },
+    {
+      "qui": "Fanny",
+      "type": "vacances",
+      "du": "2026-10-26",
+      "au": "2026-11-01"
+    },
+    {
+      "qui": "Manon",
+      "type": "autre",
+      "du": "2026-10-31",
+      "au": "2026-11-01"
+    },
+    {
+      "qui": "Jean",
+      "type": "autre",
+      "du": "2026-11-07",
+      "au": "2026-11-08"
+    },
+    {
+      "qui": "Anne-Catherine",
+      "type": "autre",
+      "du": "2026-11-10",
+      "au": "2026-11-10"
+    },
+    {
+      "qui": "Victor",
+      "type": "autre",
+      "du": "2026-11-11",
+      "au": "2026-11-11"
+    },
+    {
+      "qui": "Anne-Sophie",
+      "type": "autre",
+      "du": "2026-11-14",
+      "au": "2026-11-15"
+    },
+    {
+      "qui": "Anne-Catherine",
+      "type": "autre",
+      "du": "2026-11-17",
+      "au": "2026-11-17"
+    },
+    {
+      "qui": "Jean",
+      "type": "autre",
+      "du": "2026-11-20",
+      "au": "2026-11-22"
+    },
+    {
+      "qui": "Anne-Catherine",
+      "type": "autre",
+      "du": "2026-11-21",
+      "au": "2026-11-22"
+    },
+    {
+      "qui": "Anne-Catherine",
+      "type": "formation",
+      "du": "2026-11-24",
+      "au": "2026-11-25"
+    },
+    {
+      "qui": "Manon",
+      "type": "formation",
+      "du": "2026-11-24",
+      "au": "2026-11-25"
+    }
+  ],
+  "planning_A_14h50": {
+    "genere_le": "2026-09-25T14:50:56Z",
+    "ecrit_le": "2026-09-25T14:53:14Z",
+    "issue": "partiel",
+    "duree_ms": 7292,
+    "places_vides": 9,
+    "completude": "PARTIEL — ce planning a ete ECRASE par la generation de 15h07 avant d'avoir pu etre dumpe en entier. Seules les gardes de Jean et de Fanny ont ete relevees avant l'ecrasement, ainsi que les totaux par personne. C'est ce planning qui portait les 6 violations.",
+    "totaux_par_personne": {
+      "Antoine": 12,
+      "Jean": 10,
+      "Fanny": 9,
+      "Manon": 8,
+      "Victor": 7,
+      "Anne-Sophie": 5,
+      "Anne-Catherine": 0
+    },
+    "gardes_de_jean": [
+      {
+        "date": "2026-10-26",
+        "jour": "lundi",
+        "type": "semaine",
+        "role": "second"
+      },
+      {
+        "date": "2026-10-27",
+        "jour": "mardi",
+        "type": "semaine",
+        "role": "premier"
+      },
+      {
+        "date": "2026-10-31",
+        "jour": "samedi",
+        "type": "weekend",
+        "role": "premier"
+      },
+      {
+        "date": "2026-11-02",
+        "jour": "lundi",
+        "type": "semaine",
+        "role": "premier"
+      },
+      {
+        "date": "2026-11-03",
+        "jour": "mardi",
+        "type": "semaine",
+        "role": "second"
+      },
+      {
+        "date": "2026-11-04",
+        "jour": "mercredi",
+        "type": "semaine",
+        "role": "premier"
+      },
+      {
+        "date": "2026-11-10",
+        "jour": "mardi",
+        "type": "semaine",
+        "role": "second"
+      },
+      {
+        "date": "2026-11-11",
+        "jour": "mercredi",
+        "type": "ferie",
+        "role": "premier"
+      },
+      {
+        "date": "2026-11-16",
+        "jour": "lundi",
+        "type": "semaine",
+        "role": "second"
+      },
+      {
+        "date": "2026-11-18",
+        "jour": "mercredi",
+        "type": "semaine",
+        "role": "second"
+      },
+      {
+        "date": "2026-11-23",
+        "jour": "lundi",
+        "type": "semaine",
+        "role": "premier"
+      },
+      {
+        "date": "2026-11-24",
+        "jour": "mardi",
+        "type": "semaine",
+        "role": "second"
+      }
+    ],
+    "gardes_de_fanny": [
+      {
+        "date": "2026-10-19",
+        "jour": "lundi",
+        "type": "semaine",
+        "role": "second"
+      },
+      {
+        "date": "2026-10-20",
+        "jour": "mardi",
+        "type": "semaine",
+        "role": "premier"
+      },
+      {
+        "date": "2026-10-22",
+        "jour": "jeudi",
+        "type": "semaine",
+        "role": "second"
+      },
+      {
+        "date": "2026-11-05",
+        "jour": "jeudi",
+        "type": "semaine",
+        "role": "second"
+      },
+      {
+        "date": "2026-11-07",
+        "jour": "samedi",
+        "type": "weekend",
+        "role": "second"
+      },
+      {
+        "date": "2026-11-09",
+        "jour": "lundi",
+        "type": "semaine",
+        "role": "premier"
+      },
+      {
+        "date": "2026-11-12",
+        "jour": "jeudi",
+        "type": "semaine",
+        "role": "premier"
+      },
+      {
+        "date": "2026-11-19",
+        "jour": "jeudi",
+        "type": "semaine",
+        "role": "premier"
+      },
+      {
+        "date": "2026-11-23",
+        "jour": "lundi",
+        "type": "semaine",
+        "role": "second"
+      }
+    ],
+    "violations_espacement_mesurees": [
+      "Jean — 1 jour entre le lundi 26 octobre et le mardi 27 octobre (min 2)",
+      "Jean — 1 jour entre le samedi 31 octobre (week-end, couvre sam+dim) et le lundi 2 novembre (min 2)",
+      "Jean — 1 jour entre le lundi 2 novembre et le mardi 3 novembre (min 2)",
+      "Jean — 1 jour entre le mardi 3 novembre et le mercredi 4 novembre (min 2)",
+      "Jean — 1 jour entre le mardi 10 novembre et le mercredi 11 novembre (min 2)",
+      "Jean — 1 jour entre le lundi 23 novembre et le mardi 24 novembre (min 2)",
+      "Fanny — 1 jour entre le lundi 19 octobre et le mardi 20 octobre (min 2)",
+      "Fanny — 1 jour entre le week-end du 7 novembre (sam+dim) et le lundi 9 novembre (min 2)"
+    ],
+    "total_violations_mesurees": "8 sur les deux seules personnes relevees (6 Jean + 2 Fanny). Les 5 autres personnes n'ont pas pu etre mesurees : leurs gardes avaient deja ete ecrasees. Le total reel de ce planning est donc >= 8, borne basse."
+  },
+  "planning_B_15h09": {
+    "genere_le": "2026-09-25T15:07:04Z",
+    "ecrit_le": "2026-09-25T15:09:46Z",
+    "derniere_retouche": "2026-09-25T15:20:13Z",
+    "issue": "partiel",
+    "duree_ms": 11634,
+    "places_vides": 10,
+    "completude": "COMPLET — releve integral",
+    "gardes": [
+      {
+        "date": "2026-10-19",
+        "type": "semaine",
+        "premier": "Antoine",
+        "second": "Fanny"
+      },
+      {
+        "date": "2026-10-20",
+        "type": "semaine",
+        "premier": "Manon",
+        "second": null
+      },
+      {
+        "date": "2026-10-21",
+        "type": "semaine",
+        "premier": "Fanny",
+        "second": "Victor"
+      },
+      {
+        "date": "2026-10-22",
+        "type": "semaine",
+        "premier": "Antoine",
+        "second": null
+      },
+      {
+        "date": "2026-10-24",
+        "type": "weekend",
+        "premier": "Victor",
+        "second": "Manon",
+        "cadenasse": true,
+        "modifie_manuellement": true
+      },
+      {
+        "date": "2026-10-26",
+        "type": "semaine",
+        "premier": "Antoine",
+        "second": null
+      },
+      {
+        "date": "2026-10-27",
+        "type": "semaine",
+        "premier": "Jean",
+        "second": "Manon"
+      },
+      {
+        "date": "2026-10-28",
+        "type": "semaine",
+        "premier": "Victor",
+        "second": "Antoine"
+      },
+      {
+        "date": "2026-10-29",
+        "type": "semaine",
+        "premier": "Anne-Sophie",
+        "second": "Jean"
+      },
+      {
+        "date": "2026-10-31",
+        "type": "weekend",
+        "premier": "Antoine",
+        "second": null
+      },
+      {
+        "date": "2026-11-02",
+        "type": "semaine",
+        "premier": "Anne-Sophie",
+        "second": "Fanny"
+      },
+      {
+        "date": "2026-11-03",
+        "type": "semaine",
+        "premier": "Manon",
+        "second": "Jean"
+      },
+      {
+        "date": "2026-11-04",
+        "type": "semaine",
+        "premier": "Antoine",
+        "second": "Victor"
+      },
+      {
+        "date": "2026-11-05",
+        "type": "semaine",
+        "premier": "Jean",
+        "second": "Fanny"
+      },
+      {
+        "date": "2026-11-07",
+        "type": "weekend",
+        "premier": "Manon",
+        "second": null
+      },
+      {
+        "date": "2026-11-09",
+        "type": "semaine",
+        "premier": "Fanny",
+        "second": "Antoine"
+      },
+      {
+        "date": "2026-11-10",
+        "type": "semaine",
+        "premier": "Manon",
+        "second": "Jean"
+      },
+      {
+        "date": "2026-11-11",
+        "type": "ferie",
+        "premier": "Antoine",
+        "second": null
+      },
+      {
+        "date": "2026-11-12",
+        "type": "semaine",
+        "premier": "Fanny",
+        "second": "Anne-Sophie"
+      },
+      {
+        "date": "2026-11-14",
+        "type": "weekend",
+        "premier": "Victor",
+        "second": null
+      },
+      {
+        "date": "2026-11-16",
+        "type": "semaine",
+        "premier": "Anne-Sophie",
+        "second": "Fanny"
+      },
+      {
+        "date": "2026-11-17",
+        "type": "semaine",
+        "premier": "Jean",
+        "second": "Manon"
+      },
+      {
+        "date": "2026-11-18",
+        "type": "semaine",
+        "premier": "Victor",
+        "second": "Antoine"
+      },
+      {
+        "date": "2026-11-19",
+        "type": "semaine",
+        "premier": "Fanny",
+        "second": "Manon"
+      },
+      {
+        "date": "2026-11-21",
+        "type": "weekend",
+        "premier": "Antoine",
+        "second": null
+      },
+      {
+        "date": "2026-11-23",
+        "type": "semaine",
+        "premier": "Fanny",
+        "second": null
+      },
+      {
+        "date": "2026-11-24",
+        "type": "semaine",
+        "premier": "Antoine",
+        "second": "Jean"
+      },
+      {
+        "date": "2026-11-25",
+        "type": "semaine",
+        "premier": "Victor",
+        "second": null
+      },
+      {
+        "date": "2026-11-26",
+        "type": "semaine",
+        "premier": "Jean",
+        "second": "Antoine"
+      },
+      {
+        "date": "2026-11-28",
+        "type": "weekend",
+        "premier": "Fanny",
+        "second": "Anne-Sophie"
+      }
+    ]
+  },
+  "generations_du_jour": [
+    {
+      "ouverte": "2026-09-25T14:20:14Z",
+      "duree_ms": 11985,
+      "issue": "partiel",
+      "cases_restantes_annoncees": 5,
+      "interrompu": false
+    },
+    {
+      "ouverte": "2026-09-25T14:29:19Z",
+      "duree_ms": 10086,
+      "issue": "partiel",
+      "cases_restantes_annoncees": 9,
+      "interrompu": false
+    },
+    {
+      "ouverte": "2026-09-25T14:50:56Z",
+      "duree_ms": 7292,
+      "issue": "partiel",
+      "cases_restantes_annoncees": 3,
+      "interrompu": false
+    },
+    {
+      "ouverte": "2026-09-25T15:07:04Z",
+      "duree_ms": 11634,
+      "issue": "partiel",
+      "cases_restantes_annoncees": 11,
+      "interrompu": false
+    }
+  ],
+  "anomalie_a_expliquer": {
+    "constat": "La generation de 14h50 annonce « 3 cases resteront a pourvoir » dans sa trace, et la base en contient 9. Celle de 15h07 annonce 11, la base en contient 10 (une retouche manuelle a 15h20 explique peut-etre l'ecart d'une unite, pas celui de 14h50).",
+    "pourquoi_ca_compte": "Si le nombre annonce a l'admin ne correspond pas a ce qui est ecrit, alors l'etape « J'enregistre le planning » et l'ecriture reelle ne parlent pas du meme planning — ce qui serait une piste directe pour B-130.",
+    "statut": "NON EXPLIQUE — a instruire"
+  },
+  "force_espacement_min_par_generation": {
+    "mesure_le": "2026-09-30",
+    "source": "table snapshots_regles, colonne regles_json->'regles_cabinet', filtree sur brique_id='espacement_min', planning_id=2c9f1b64-1514-420e-9433-e7c7eeb44e79",
+    "etages": {
+      "jamais": 2,
+      "sauf_crise": 3,
+      "evitee": 4,
+      "si_possible": 5,
+      "seuil_dur": "etage <= 2"
+    },
+    "releves": [
+      {
+        "snapshot_cree_le": "2026-09-25T14:20:23Z",
+        "force": "jamais",
+        "etage": 2,
+        "dure": true
+      },
+      {
+        "snapshot_cree_le": "2026-09-25T14:22:56Z",
+        "force": "jamais",
+        "etage": 2,
+        "dure": true
+      },
+      {
+        "snapshot_cree_le": "2026-09-25T14:29:27Z",
+        "force": "jamais",
+        "etage": 2,
+        "dure": true
+      },
+      {
+        "snapshot_cree_le": "2026-09-25T14:31:47Z",
+        "force": "jamais",
+        "etage": 2,
+        "dure": true
+      },
+      {
+        "snapshot_cree_le": "2026-09-25T14:51:01Z",
+        "force": "evitee",
+        "etage": 4,
+        "dure": false,
+        "note": "GENERATION DU PLANNING A — la regle etait SOUPLE"
+      },
+      {
+        "snapshot_cree_le": "2026-09-25T14:53:12Z",
+        "force": "evitee",
+        "etage": 4,
+        "dure": false,
+        "note": "ecriture du planning A"
+      },
+      {
+        "snapshot_cree_le": "2026-09-25T15:07:12Z",
+        "force": "jamais",
+        "etage": 2,
+        "dure": true,
+        "note": "GENERATION DU PLANNING B — la regle est redevenue DURE"
+      },
+      {
+        "snapshot_cree_le": "2026-09-25T15:09:45Z",
+        "force": "jamais",
+        "etage": 2,
+        "dure": true,
+        "note": "ecriture du planning B"
+      }
+    ],
+    "ce_que_ca_prouve": "Le moteur n'a enfreint aucune regle dure. Les 8 « violations » du planning A ont ete obtenues en rejouant le validateur avec la regle telle qu'elle est DEVENUE a 15h07, sur un planning produit a 14h50 sous une regle souple. L'intermittence constatee (A sale, B propre) s'explique entierement par ce changement de force, et non par un chemin fautif du moteur.",
+    "ce_que_ca_ne_disculpe_pas": "Durcir une regle rend un planning deja enregistre non conforme, et RIEN ne le dit a l'admin : ni l'ecran, ni une alerte. C'est le point ⑤ du releve d'origine, et il est plus large qu'on ne le croyait — il ne s'agit pas d'un oubli de revalidation des brouillons, mais de l'absence de tout lien visible entre un planning et les regles sous lesquelles il a ete produit. L'anomalie « 3 cases annoncees / 9 en base » reste, elle, entierement inexpliquee."
+  }
+}

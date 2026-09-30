@@ -640,3 +640,55 @@ une garde illégale, si. Comparer par identité distingue les deux.
 vérifie qu'on refuse *quand même* d'y poser quelqu'un d'absent — assouplir un
 critère demande de prouver qu'on n'a pas ouvert la porte aux vraies fautes.
 L'ensemble est vérifié par sabotage : contrôle neutralisé, 4 tests tombent.
+
+## 2026-09-30 — Un planning se juge avec les règles de SA génération (B-130)
+
+**Le symptôme.** Le 25/09, MiKL voit sur la grille du Val d'Allier des
+enchaînements de gardes à un jour d'écart, alors que la règle « 2 jours
+minimum » est posée en « jamais ». Le validateur du produit, rejoué sur ces
+gardes, compte 8 violations nommément datées. Conclusion apparente, et elle est
+lourde : **le moteur enfreint ses propres règles dures**. Un harnais de test est
+écrit pour le prouver, il passe au vert, et le dossier reste ouvert cinq jours
+avec la mention « cause racine à prouver ».
+
+**La cause racine.** La règle n'était pas dure au moment de la génération. La
+table `snapshots_regles` enregistre les règles actives à **chaque** génération,
+et elle est formelle : aux snapshots de 14:51 et 14:53 — ceux du planning en
+cause — `espacement_min` vaut `evitee` (étage 4, **souple**). Elle vaut `jamais`
+(étage 2) avant 14:31, puis de nouveau à partir de 15:07. Entre les deux, MiKL a
+durci la règle. Les 8 violations ont donc été obtenues en jugeant un planning
+avec une règle **qu'il n'a jamais connue**. Le moteur n'a rien enfreint, et
+l'intermittence présentée comme un mystère — un planning sale, le suivant propre
+— n'est que le reflet de ce changement.
+
+**La leçon, en une phrase.** *Un planning produit hier ne se juge pas avec les
+règles d'aujourd'hui — et quand les deux existent en base, c'est toujours le
+snapshot qui fait foi, jamais l'état courant.*
+
+**Pourquoi ça a échappé à tout le monde, et c'est le vrai enseignement.** Le
+relevé du 25/09 portait **en toutes lettres** l'avertissement : « MiKL a modifié
+des règles ENTRE les générations ; les règles ci-dessous ne sont PAS celles de
+14h50 ». Quatre écarts y étaient même listés. `espacement_min` — la règle au
+cœur du dossier — n'en faisait pas partie. **Un avertissement général ne protège
+pas de son propre angle mort** : il rend vigilant sur ce qu'il énumère, et
+rassure sur tout le reste. Seule une mesure par génération peut trancher, et
+elle était disponible depuis le début, à une requête SQL de distance.
+
+C'est aussi la troisième occurrence de « une pénalité n'est pas une
+interdiction » (26/08, puis 02/09). Les deux premières portaient sur le moteur
+qui traite un score comme un refus ; celle-ci porte sur **nous**, qui avons lu un
+étage 4 comme un étage 2 — sans jamais vérifier l'étage.
+
+**Le garde-fou.** `tests/engine/b130-planning-reel.test.ts` ne contient plus
+aucune force écrite en dur : il la **lit** dans la mesure figée des snapshots,
+et lève si le snapshot demandé n'existe pas. Il juge chaque planning avec la
+force de sa propre génération, et garde en regard le même planning jugé sous la
+règle durcie — ces 6 + 2 violations ne mesurent plus un bug du moteur, elles
+mesurent le défaut produit qui, lui, reste ouvert (B-130a). Le contraste 0 vs
+6+2 est dans le fichier : le test ne peut pas passer à vide.
+
+**Ce que ça ne disculpe pas.** Durcir une règle rend un planning déjà enregistré
+non conforme **en silence** : rien, nulle part, ne relie un planning aux règles
+sous lesquelles il a été produit — alors que le snapshot existe en base à chaque
+génération. La matière est là, elle n'est montrée nulle part. Même famille que
+« le tableau ne peut pas se taire ».
