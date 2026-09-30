@@ -35,6 +35,7 @@ function dossier(partiel: Partial<DossierRelecture> = {}): DossierRelecture {
     ],
     reglesCabinet: [],
     roleAvantageFinancier: 'premier',
+    semaines: [],
     preferencesEnfreintes: [],
     mouvements: [],
     mouvementsEcartes: 0,
@@ -67,6 +68,53 @@ describe('B-108 (03/09) — le total ne s’additionne plus avec les week-ends',
     // Le piège exact du 03/09 : la présence du mot « dont » ne suffit pas, il
     // faut la clause qui interdit explicitement de rajouter.
     expect(texte).not.toMatch(/22 gardes, dont/)
+  })
+})
+
+describe('B-138 — l’effectif par semaine arrive bien jusqu’au texte', () => {
+  // C'est LE défaut que ce fichier existe pour attraper : un champ ajouté au
+  // dossier mais oublié dans `dossierEnTexte` compile, passe le lint, et ne
+  // change rien au comportement de Filou. Ici ce serait pire qu'inutile — le
+  // critère `decharge_avant_weekend` lui demande de se servir d'un nombre qui
+  // ne serait jamais arrivé, donc il le déduirait quand même, en silence.
+  it('écrit chaque ligne d’effectif, telle quelle', () => {
+    const texte = dossierEnTexte(dossier({
+      semaines: [
+        'Semaine du 5 janvier 2026 : 4 sur 6 disponibles les quatre soirs — absents : Antoine, Fanny (en partie)',
+      ],
+    }))
+    expect(texte).toContain('4 sur 6 disponibles les quatre soirs')
+    expect(texte).toContain('Antoine, Fanny (en partie)')
+    expect(texte).toContain('SEMAINE PAR SEMAINE')
+  })
+
+  it('dit que le nombre FAIT FOI — sinon Filou le recalcule et se trompe', () => {
+    const texte = dossierEnTexte(dossier({ semaines: ['Semaine du 5 janvier 2026 : 6 sur 6 disponibles les quatre soirs — personne d’absent'] }))
+    expect(texte).toContain('Ne recalcule pas ce nombre')
+    // Le dénominateur doit être là : « 6 » seul ne se juge pas.
+    expect(texte).toContain('6 sur 6')
+    // Et il faut dire que le dernier recours est exclu, sinon le chiffre
+    // paraît faux à qui compte les fiches de l'équipe.
+    expect(texte).toContain('HORS dernier recours')
+  })
+
+  it('AVOUE que le compte ignore les règles personnelles — sinon « 6 sur 6 » se lit comme une vérité complète', () => {
+    // Le vrai défaut trouvé en relisant ce lot : l'effectif ne connaît que les
+    // congés. Quelqu'un qui ne prend jamais le lundi soir y est compté
+    // disponible. Le taire produirait exactement le silence trompeur de la
+    // règle « le tableau ne peut pas se taire » : une bonne nouvelle que
+    // personne ne va vérifier.
+    const texte = dossierEnTexte(dossier({ semaines: ['Semaine du lundi 5 janvier 2026 : 6 sur 6 disponibles les quatre soirs — personne d’absent'] }))
+    expect(texte).toContain('QUE LES CONGÉS')
+    expect(texte).toContain('MAXIMUM')
+    // Et il faut renvoyer au garde-fou qui, lui, tient compte des règles.
+    expect(texte).toContain('peuvent')
+  })
+
+  it('n’écrit PAS la section quand il n’y a aucune semaine à annoncer', () => {
+    // Une période sans soir de semaine (un week-end isolé) ne doit pas
+    // produire un en-tête suivi de rien : Filou y lirait un effectif nul.
+    expect(dossierEnTexte(dossier({ semaines: [] }))).not.toContain('SEMAINE PAR SEMAINE')
   })
 })
 

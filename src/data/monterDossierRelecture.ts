@@ -28,6 +28,7 @@ import type { MouvementPossible } from '@/engine/relecture/mouvements'
 import type { EffetMouvement } from '@/engine/relecture/effet'
 import { dateFr, periodeFr } from '@/lib/dates-fr'
 import { phraseRegle, type RegleNommable } from '@/lib/regles/libelle'
+import { effectifParSemaine, effectifEnTexte } from '@/lib/planning/effectifSemaine'
 
 /** Le contexte du moteur, réduit à ce que le dossier consomme. */
 export interface ContextePourDossier {
@@ -393,6 +394,13 @@ export async function monterDossierRelecture(
       equipe,
       reglesCabinet,
       roleAvantageFinancier: roleAvantage,
+      // Calculé depuis le CONTEXTE (les congés que le moteur a lui-même
+      // respectés), pas depuis une autre source : même règle que les
+      // compteurs, sinon Filou lirait un effectif qui ne décrit pas le
+      // planning affiché sous ses yeux.
+      semaines: effectifEnTexte(
+        effectifParSemaine(contexte.dateDebut, contexte.dateFin, contexte.vets),
+      ),
       preferencesEnfreintes: (preferences ?? []).map((p) => p.detail),
       mouvements: mouvementsLisibles,
       mouvementsEcartes: mouvementsEcartes ?? 0,

@@ -111,6 +111,40 @@ export const CRITERES_HUMAINS: CritereHumain[] = [
       'MiKL, 27/08 — c’est la question qu’un associé se pose et qu’aucun calcul ne pose.',
   },
 
+  // ── CE QUE L’ADMINISTRATRICE FAIT À LA MAIN (B-138) ───────────────────────
+  //
+  // Ces deux-là ne viennent pas d'un défaut constaté mais d'une PRATIQUE : ce
+  // qu'Anne-Sophie corrigeait elle-même, chaque période, sans que rien ne
+  // l'aide. MiKL, le 30/09 : « c'est juste du bon sens, si tout le permet c'est
+  // logique de faire tourner les vétos dispo ».
+  //
+  // ⚠️ Ils ont failli partir en règles du moteur. Impossible, et pour une
+  // raison qui vaut d'être retenue : « quand l'effectif le permet » est un
+  // jugement de situation. Une brique dure l'appliquerait aussi en pleine
+  // période de congés, où il n'y a personne d'autre — elle rendrait le planning
+  // infaisable au lieu de se relâcher toute seule. C'est exactement la
+  // frontière que ce fichier trace.
+  {
+    cle: 'decharge_avant_weekend',
+    titre: 'Le binôme du week-end arrive frais',
+    consigne:
+      "Repère qui tient chaque week-end, puis regarde les nuits du lundi au jeudi DE CETTE MÊME SEMAINE — celles qui PRÉCÈDENT son week-end, pas celles d'après. Quand l'effectif le permettait, cette personne ne devrait pas avoir enchaîné des nuits juste avant de prendre le week-end : il y avait du monde pour les tenir. Sers-toi du nombre de disponibles qu'on te donne semaine par semaine, ne le recalcule pas. Ne le signale que si un autre prénom figure dans la liste « peuvent aussi » de la nuit concernée : s'il n'y a personne d'autre, ce n'est pas un défaut mais une contrainte, et le dire serait du bruit. NE PROPOSE JAMAIS de retirer un vendredi soir : il va au binôme du week-end par la structure du cabinet, le mouvement serait refusé.",
+    origine:
+      'B-138 — pratique manuelle d’Anne-Sophie, rapportée par MiKL le 30/09. Le sens a été corrigé par lui avant tout code : c’est la semaine EN COURS, pas la suivante.',
+  },
+  {
+    cle: 'rotation_roles_semaine',
+    // « en semaine » dans le TITRE, pas seulement dans la consigne : le titre
+    // est ce que l'admin lit dans le rapport, juste à côté de « Le rôle qui
+    // rapporte doit tourner » (le premier du WEEK-END). Sans la précision, les
+    // deux constats se confondent à la lecture.
+    titre: 'Chacun passe en premier ET en second, en semaine',
+    consigne:
+      "Sur les nuits de semaine, regarde le rôle de chaque personne : « premier » ou « second ». Signale qui n'apparaît que dans un seul des deux sur toute la période — toujours second, on n'apprend jamais à mener ; toujours premier, on porte toujours la décision. Ce n'est pas une question de total : deux personnes peuvent avoir le même nombre de nuits et l'une n'avoir jamais été première. NE DIS RIEN si les nuits de cette période n'ont qu'une seule place — regarde les places qu'on te donne : s'il n'y a aucun « second », c'est la structure de la période, pas un défaut. Ne dis rien non plus pour quelqu'un qui n'a qu'une seule nuit : il ne peut pas être dans les deux rôles.",
+    origine:
+      'B-138 — « elle fait en sorte que chaque véto fasse une nuit de garde en 1er et une en 2ème ». ⚠️ À NE PAS CONFONDRE avec `role_avantage`, qui porte sur le PREMIER DU WEEK-END et son avantage financier (B-061) ; ici c’est la rotation en semaine, sans enjeu d’argent. La borne « une seule place » vient d’une mesure en base le 30/09 : en été, `semaine_soir` n’a qu’un véto — sans elle, le critère aurait crié « personne n’est jamais second » sur toute période d’été.',
+  },
+
   // ── L’ÉQUILIBRE DANS LE TEMPS ─────────────────────────────────────────────
   {
     cle: 'equilibre_global',

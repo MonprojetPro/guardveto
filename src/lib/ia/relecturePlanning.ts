@@ -223,6 +223,23 @@ export interface DossierRelecture {
   /** Le rôle qui porte l'avantage financier, s'il est configuré. */
   roleAvantageFinancier: string | null
   /**
+   * Combien de monde était disponible, SEMAINE PAR SEMAINE (B-138).
+   *
+   * Le critère `decharge_avant_weekend` ne se juge que là-dessus : « quand
+   * l'effectif le permettait ». Or ce nombre n'existait nulle part — on donnait
+   * les congés de chacun séparément, et Filou devait croiser sept listes de
+   * tête pour en déduire un effectif.
+   *
+   * ⚠️ C'est la même précaution que `effetSurLesGens` (B-098, le 02/09, quand
+   * Filou annonçait avoir allégé quelqu'un qui restait de garde) : ce qui
+   * DÉCLENCHE un constat se calcule, jamais ne se déduit. Un effectif déduit de
+   * travers ne produit pas un silence, il produit un défaut inventé — et
+   * présenté avec l'aplomb d'un fait mesuré.
+   *
+   * Vide → la période n'a aucun soir de semaine, et le critère se tait.
+   */
+  semaines: string[]
+  /**
    * Les ÉCHANGES que le moteur accepte — deux places dont les occupants peuvent
    * permuter (B-093).
    *
@@ -615,6 +632,29 @@ export function dossierEnTexte(dossier: DossierRelecture): string {
     if (p.absences.length > 0) parts.push(`absences : ${p.absences.join(' ; ')}`)
     if (p.regles.length > 0) parts.push(`ses règles : ${p.regles.join(' ; ')}`)
     lignes.push(`- ${parts.join(' — ')}`)
+  }
+
+  // ── B-138 : l'effectif SEMAINE PAR SEMAINE, calculé, jamais déduit ──
+  //
+  // Sans ces lignes, « quand l'effectif le permettait » obligeait Filou à
+  // croiser les congés de sept personnes de tête. Le compte est donné, et le
+  // dénominateur avec : « 4 » ne se juge pas, « 4 sur 6 » se juge.
+  if (dossier.semaines.length > 0) {
+    lignes.push(
+      '',
+      'COMBIEN DE MONDE, SEMAINE PAR SEMAINE',
+      'Compté sur les quatre soirs du lundi au jeudi, HORS dernier recours —',
+      'donc c’est bien le nombre de personnes qui pouvaient réellement prendre',
+      'une de ces nuits. Ne recalcule pas ce nombre depuis les absences : il est',
+      'déjà fait, et il fait foi.',
+      '',
+      '⚠️ Il ne compte QUE LES CONGÉS. Une indisponibilité qui vient d’une règle',
+      'personnelle (un repos fixe, un créneau interdit) n’y est pas : ce nombre',
+      'est donc un MAXIMUM, il peut surestimer le monde réellement mobilisable.',
+      'C’est pourquoi un signalement exige toujours un prénom dans « peuvent',
+      'aussi » — cette liste-là, elle, tient compte des règles.',
+    )
+    for (const s of dossier.semaines) lignes.push(`- ${s}`)
   }
 
   if (dossier.reglesCabinet.length > 0) {

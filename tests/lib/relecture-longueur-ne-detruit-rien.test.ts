@@ -44,6 +44,8 @@ const DOSSIER: DossierRelecture = {
   mouvements: [],
   // B-096 : ce test ne porte pas sur les preferences enfreintes.
   preferencesEnfreintes: [],
+  // B-138 : ce test porte sur la longueur, pas sur l'effectif par semaine.
+  semaines: [],
   mouvementsEcartes: 0,
   periode: 'du 21 septembre au 18 octobre',
   saison: 'hiver',
