@@ -31,7 +31,7 @@ import { supprimerEvenementsParIds } from '@/lib/sync-calendrier'
 import { resoudreContexte } from '@/data/resoudreContexte'
 import { detecterCreneauxIgnores } from '@/engine/creneau-modele'
 import { persisterResultat } from '@/data/persisterResultat'
-import { ecrirePlanningV1 } from '@/data/ecrirePlanningV1'
+import { ecrirePlanningV1, aUneLigneEnBase } from '@/data/ecrirePlanningV1'
 import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
 import { ouvrirTrace, fermerTrace, type EtapeTracee } from '@/data/tracerGeneration'
 import { perimerPropositionsDeLaPeriode } from '@/data/propositionsRelecture'
@@ -427,7 +427,21 @@ async function executerGeneration(
     // persiste ce planning comme un brouillon À COMPLÉTER, par le MÊME chemin que
     // le succès — aucune seconde écriture à maintenir en parallèle.
     const planningRetenu = result.success ? result.planning : result.planningPartiel
-    const creneauxVides = result.success ? [] : (result.creneauxVides ?? [])
+    // B-130b — ON NE COMPTE QUE CE QUI SERA ÉCRIT. Le moteur recense ses cases
+    // vides sur SES places (un week-end en a quatre : deux le vendredi, deux le
+    // samedi) ; la base, elle, n'en stocke que deux — le vendredi se re-dérive
+    // du week-end. Publier `creneauxVides` brut faisait donc annoncer à l'admin
+    // des cases que la base ne contenait pas, et que l'écran ne montrait nulle
+    // part : mesuré à **23 annoncées pour 19 écrites** sur 4 semaines.
+    //
+    // Ce n'est pas un chiffre cosmétique : il pilote aussi `issue` et `success`
+    // plus bas. Un planning dont les seuls trous restants étaient des vendredis
+    // dérivés était annoncé « partiel » alors que la gate de publication, elle,
+    // le tenait déjà pour complet (`casesAPourvoir` applique la même convention
+    // depuis toujours). Les deux se contredisaient sur le même planning.
+    const creneauxVides = result.success
+      ? []
+      : (result.creneauxVides ?? []).filter((c) => aUneLigneEnBase(c.type))
     const placesPourvues = planningRetenu.attributions.reduce(
       (n, a) => n + a.placements.filter((p) => p.vetId).length, 0,
     )

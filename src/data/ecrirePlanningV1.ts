@@ -41,6 +41,29 @@ import { idsEvenementsDeGardes } from '@/lib/sync-calendrier'
  * (la reclassification 'ferie' est un héritage propre à semaine_soir) — sinon
  * deux gardes du même jour entreraient en collision sur UNIQUE(date, type).
  */
+/**
+ * Ce créneau a-t-il une ligne `gardes` à lui ? (B-130b)
+ *
+ * NON pour `vendredi_soir` : il n'est pas stocké, il se RE-DÉRIVE du week-end
+ * par la relation `meme_binome` (+ `inversion_role` pour l'ordre des rôles) —
+ * cf. `placementsVendrediLie`. Ses places ne sont donc pas des cases distinctes :
+ * ce sont les places du week-end, vues sous un autre angle.
+ *
+ * ⚠️ POURQUOI CETTE FONCTION EXISTE. La convention était écrite TROIS fois —
+ * ici à l'écriture, dans `casesAPourvoir` pour l'écran et la publication, et
+ * nulle part dans `/api/generate`, qui publiait `creneauxVides` brut. La
+ * génération annonçait donc à l'admin un nombre de cases que la base ne
+ * contenait pas : mesuré le 30/09 sur une période de 4 semaines, **23 annoncées
+ * pour 19 écrites** — l'écart valant exactement les 4 vendredis. C'est le défaut
+ * B-130b (« l'étape J'enregistre le planning ment »).
+ *
+ * Toute règle de ce genre s'écrit UNE fois : trois copies, c'est deux occasions
+ * d'en oublier une, et c'est ce qui s'est produit.
+ */
+export function aUneLigneEnBase(type: string): boolean {
+  return type !== 'vendredi_soir'
+}
+
 export function mapTypeGardeEnDb(
   type: string,
   date: string,
@@ -199,7 +222,7 @@ export async function ecrirePlanningV1(
   // 2. Préparer les gardes à insérer (vendredi_soir exclu — fusionné dans
   //    weekend ; dates/type déjà verrouillés exclus).
   const attributionsInserees = planning.attributions
-    .filter((a) => a.type !== 'vendredi_soir')
+    .filter((a) => aUneLigneEnBase(a.type))
     .map((a) => ({ a, dbType: mapTypeGardeEnDb(a.type, a.date, calendrier) }))
     .filter(({ a, dbType }) => !clesVerrouillees.has(`${a.date}|${dbType}`))
 

@@ -20,6 +20,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { genererSteps } from '@/engine/solver'
+import { aUneLigneEnBase } from '@/data/ecrirePlanningV1'
 import { resoudreContexte } from '@/data/resoudreContexte'
 
 export interface CaseAPourvoir {
@@ -95,8 +96,9 @@ export async function casesAPourvoir(
     const out: CaseAPourvoir[] = []
     for (const step of steps) {
       // Le vendredi soir n'a pas de ligne propre : il est stocké dans le
-      // week-end (même convention que la persistance).
-      if (step.type === 'vendredi_soir') continue
+      // week-end (même convention que la persistance, désormais PARTAGÉE avec
+      // elle et avec /api/generate — cf. `aUneLigneEnBase`, B-130b).
+      if (!aUneLigneEnBase(step.type)) continue
 
       const garde = parCle.get(`${step.date}|${typeDb(step.type, feries?.has(step.date) ?? false)}`)
 
