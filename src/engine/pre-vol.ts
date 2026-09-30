@@ -37,7 +37,8 @@ import { normaliserContraintesVets } from './normaliserContraintes'
 import { rendreRegle } from './briques/catalogue'
 import { lundiDeSemaine, samediDeSemaine } from './utils'
 import { plafondNuitSemaine } from './structure-creneaux'
-import { DEFAULT_STRUCTURE_CONFIG, type StructureConfig } from './structure-config'
+import { DEFAULT_STRUCTURE_CONFIG, relationsEffectives, type StructureConfig } from './structure-config'
+import { coupleVendrediWeekend, COUPLE_HISTORIQUE } from './aval/resoudrePlanningAffichage'
 import type { CreneauModele } from './creneau-modele'
 import type { EquityCohorte } from './equity-weights'
 
@@ -56,6 +57,7 @@ export type CodeAvertissementPreVol =
   | 'cohorte_equite_sans_porteur' // cohorte d'équité (#21) dont AUCUN véto actif ne porte le tag → inerte
   | 'seulement_avec_partenaire_sorti' // « A seulement avec B » (#15b) dont B n'est plus dans l'effectif → A écarté
   | 'regles_contradictoires'    // deux règles actives règlent la MÊME chose différemment → la plus dure gagne en silence
+  | 'vendredi_orphelin'         // un vendredi soir que rien ne pourra enregistrer : son week-end porteur est hors période
 
 /**
  * Deux poids, deux mesures (décision MiKL du 2026-08-02).
@@ -89,6 +91,12 @@ const GRAVITE: Record<CodeAvertissementPreVol, GraviteAvertissement> = {
   // n'aura servi à rien. Bloquer empêcherait de poser volontairement une règle
   // plus stricte le temps d'un essai, ce que MiKL fait couramment en recette.
   regles_contradictoires:         'surveiller',
+  // B-130c — le planning sortira, et tout le reste sera juste : c'est UN soir
+  // qui ne pourra pas être enregistré. Bloquer interdirait toute période se
+  // terminant un vendredi, donc contraindrait le produit pour un cas que
+  // l'admin peut vouloir accepter en connaissance de cause. On le DIT, ce qui
+  // est exactement ce qui manquait : la garde disparaissait en silence.
+  vendredi_orphelin:              'surveiller',
 }
 
 export function graviteAvertissement(code: CodeAvertissementPreVol): GraviteAvertissement {
@@ -782,7 +790,72 @@ export function preVolRegles(input: PreVolInput): AvertissementPreVol[] {
     ...detecterCohortesEquiteSansPorteur(vetsN, input),
     // (g) deux règles qui répondent différemment à la même question (B-129)
     ...detecterReglesContradictoires(vetsN, nomVeto),
+    // (h) un vendredi soir que l'écriture ne pourra pas enregistrer (B-130c)
+    ...detecterVendrediOrphelin(slots, input),
   ] as AvertissementPreVol[]).map((a) => ({ ...a, gravite: graviteAvertissement(a.code) }))
+}
+
+// ── (h) LE VENDREDI ORPHELIN (B-130c) ────────────────────────────────────
+//
+// Le vendredi soir n'a PAS de ligne dans `gardes` : il est stocké dans celle du
+// week-end et s'en re-dérive (`meme_binome` + `inversion_role`). Deux cas le
+// rendent alors impossible à enregistrer — et, jusqu'au 2026-09-30, il
+// disparaissait SANS UN MOT :
+//
+//   ① le dernier vendredi d'une période qui se termine un vendredi : aucun
+//      week-end derrière lui pour le porter. Mesuré le 30/09 — le moteur
+//      désigne bien deux vétérinaires ce soir-là, puis plus rien n'en garde
+//      la trace : ni calendrier, ni notification, ni agenda ;
+//   ② un cabinet qui a retiré la relation `meme_binome` : le vendredi n'est
+//      alors ni stocké NI dérivable, quelles que soient les bornes.
+//
+// ⚠️ CE DÉTECTEUR NE RÉPARE RIEN — il rend visible. C'est délibéré : réparer
+//    demanderait de donner au vendredi sa propre ligne, ce qui obligerait à
+//    désactiver la re-dérivation aux sept endroits qui l'appliquent (vue SQL,
+//    agenda, PDF, contrôle des règles, aperçu Filou, sync V2, reconstruction),
+//    sur un produit en service. Le silence, lui, se corrige tout de suite.
+function detecterVendrediOrphelin(
+  slots: SlotPreVol[],
+  input: PreVolInput,
+): AvertissementPreVol[] {
+  const couple = coupleVendrediWeekend(relationsEffectives(input.structureConfig ?? DEFAULT_STRUCTURE_CONFIG))
+
+  const vendredis = slots.filter((s) => s.type === COUPLE_HISTORIQUE.source)
+  if (vendredis.length === 0) return []
+
+  // Cas ② — aucun `meme_binome` : AUCUN vendredi n'est dérivable. Un seul
+  // avertissement, jamais un par date : c'est un réglage de structure, pas une
+  // série d'incidents, et douze lignes identiques ne se lisent plus.
+  if (!couple.materialiser) {
+    return [{
+      code: 'vendredi_orphelin',
+      regles: ['Liaison vendredi soir ↔ week-end'],
+      message:
+        'Les vendredis soir ne seront enregistrés nulle part : le cabinet a retiré le lien '
+        + '« même binôme » entre le vendredi et le week-end, or c’est ce lien qui permet de les '
+        + 'retrouver. Les gardes du vendredi seront calculées puis perdues.',
+    }] as AvertissementPreVol[]
+  }
+
+  // Cas ① — un vendredi dont le samedi porteur n'est pas dans la période.
+  const samedis = new Set(
+    slots.filter((s) => s.type === COUPLE_HISTORIQUE.cible).map((s) => s.date),
+  )
+  const orphelins = vendredis.filter((v) => !samedis.has(plusJours(v.date, 1)))
+  if (orphelins.length === 0) return []
+
+  const dates = orphelins.map((o) => o.date).join(', ')
+  return [{
+    code: 'vendredi_orphelin',
+    regles: ['Bornes de la période'],
+    message:
+      orphelins.length === 1
+        ? `La garde du vendredi ${dates} ne pourra pas être enregistrée : le week-end qui la porte `
+          + 'est en dehors de la période. Terminez la période un samedi ou un dimanche, ou sachez '
+          + 'que ce soir-là ne figurera nulle part.'
+        : `Les gardes des vendredis ${dates} ne pourront pas être enregistrées : les week-ends qui `
+          + 'les portent sont en dehors de la période.',
+  }] as AvertissementPreVol[]
 }
 
 // ── (f) Cohortes d'équité — tag sans porteur (Vague 6 #21) ──
