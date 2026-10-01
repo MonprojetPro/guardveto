@@ -82,11 +82,26 @@ export const APPARTENANCE: Record<string, Appartenance> = {
   equipe: { socle: 'Les personnes du cabinet. Sans elles, aucun module n’a de sens.' },
   reglages: { socle: 'Les reglages du cabinet, dont l’ecran des modules lui-meme.' },
   support: { socle: 'L’assistance doit rester joignable meme si tout le reste est eteint.' },
+  // Sous-ecran de `reglages` (B-134). Il apparait dans ce catalogue depuis que
+  // le test-gardien descend dans les SOUS-DOSSIERS (01/10) : avant, un ecran
+  // place sous un dossier du socle n'avait aucune decision a rendre, donc ne
+  // pouvait jamais s'eteindre.
+  'reglages/notifications': {
+    socle:
+      'Chacun regle les e-mails qu’il recoit. Les e-mails existent quels que ' +
+      'soient les modules allumes — un module eteint n’en envoie simplement pas.',
+  },
   absences: {
     socle:
       'Les conges et indisponibilites sont la source PARTAGEE des deux mondes ' +
       '(cadrage V3, section 2) : ils servent aux gardes comme au planning journee.',
   },
+
+  // ── Le module du planning journée ───────────────────────────────────────
+  // B-120 chantier 2. PREMIER ÉCRAN ÉTEIGNABLE du produit : jusqu'ici,
+  // `ecranVisible` et `exigerModule` n'avaient que des écrans du socle ou des
+  // gardes à traiter, donc rien à éteindre pour de vrai.
+  journee: { module: 'planning-journee' },
 
   // ── Le module des gardes ────────────────────────────────────────────────
   planning: { module: 'gardes' },

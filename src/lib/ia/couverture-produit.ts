@@ -181,6 +181,42 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
 
   // ── LES RÉGLAGES ET LE COMPTE ───────────────────────────────────────────
   'v2/reglages#envoyerEmailDeTest': { outil: 'envoyer_email_de_test' },
+
+  // ── LE PLANNING JOURNÉE (B-120 chantier 2) ──────────────────────────────
+  //
+  // `manque`, et non `hors` : ces trois actions sont une capacité RÉELLE du
+  // produit, pas un outil technique. Le jour où une administratrice demandera
+  // à Filou « on travaille de 9h à 13h le matin maintenant », il devra savoir
+  // le faire — ou dire qu'il ne sait pas.
+  //
+  // ⚠️ LE VRAI RISQUE N'EST PAS LE CATALOGUE INCOMPLET, C'EST LA RÉPONSE
+  //    INCOMPLÈTE PRÉSENTÉE COMME COMPLÈTE (règle FILOU SUIT LE PRODUIT). La
+  //    question à se poser n'est pas « faut-il un outil ? » mais « une
+  //    question existante reçoit-elle désormais une réponse fausse ? ».
+  //
+  //    Ici, la réponse est NON, et c'est mesuré, pas supposé : le module est
+  //    éteint partout sauf sur le bac à sable (vérifié en base le 01/10), et
+  //    aucune question d'aujourd'hui ne porte sur les horaires de journée —
+  //    le produit ne connaissait que le soir et le week-end.
+  //
+  //    ⛔ CE N'EST PLUS VRAI AU CHANTIER 3. Dès qu'une présence de journée
+  //    existera, « qui travaille mardi ? » et « qui est disponible ? »
+  //    deviendront ambiguës, et Filou répondra sur les seules gardes avec
+  //    l'aplomb d'une réponse complète. C'est le défaut exact du 25/08
+  //    (« qui a accès au planning ? » répondu sans le secrétariat). À
+  //    reprendre là, pas plus tard.
+  'v2/journee#creerBloc': {
+    manque:
+      'Ajouter une tranche horaire de journée (B-120 chantier 2, 01/10). Module éteint partout sauf sur le bac à sable ; à ouvrir à Filou quand le planning journée sera en service.',
+  },
+  'v2/journee#modifierBloc': {
+    manque:
+      'Modifier une tranche horaire de journée (nom, heures, rattachement). Même échéance que `creerBloc` ci-dessus.',
+  },
+  'v2/journee#basculerBloc': {
+    manque:
+      'Retirer ou remettre une tranche horaire de journée. Même échéance que `creerBloc` ci-dessus.',
+  },
   // Chantier agenda Google (2026-08-27) — réglage de PRÉSENTATION pure
   // (journée entière vs horaires, horaires dans le titre, intitulé par
   // créneau) : ça ne change ni un droit, ni une donnée métier, ni le

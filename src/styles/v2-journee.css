@@ -1,0 +1,184 @@
+/* ============================================================
+   GUARDVETO V2 — Planning de la journée (B-120 chantier 2)
+   ============================================================
+   Feuille du module `planning-journee`. Elle n'est importée que par
+   `app/(v2)/journee/page.tsx` : Next l'attache au segment, donc les autres
+   écrans ne la chargent pas.
+
+   ⚠️ AUCUNE COULEUR EN DUR. Tout passe par les jetons du terrier
+      (`--surface`, `--text`, `--soft`, `--border-strong`, `--accent-ink`).
+      Écrire un `#hex` ici serait une couleur qui ne suivrait ni le thème
+      sombre ni une retouche du design system — et c'est ce qui a produit
+      « crème sur crème » trois fois cet été.
+
+   ⚠️ NE PAS utiliser `var(--muted)` / `var(--border)` / `var(--accent)` :
+      ces trois noms ont des sens OPPOSÉS dans le terrier et dans shadcn.
+      Voir l'avertissement en tête de `v2-terrier.css`.
+   ============================================================ */
+
+.bj-card { margin-top: 18px; }
+
+.bj-lede {
+  margin: 0 0 14px;
+  color: var(--soft);
+  font-size: 14px;
+  line-height: 1.55;
+  max-width: 68ch;
+}
+
+/* Le refus. Il prend de la place et il la garde : un message d'erreur discret
+   est un message d'erreur qu'on ne lit pas. */
+.bj-refus {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-strong);
+  border-left: 4px solid var(--accent-ink);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.bj-vide {
+  margin: 0 0 14px;
+  color: var(--soft);
+  font-style: italic;
+  font-size: 14px;
+}
+
+.bj-liste { list-style: none; margin: 0; padding: 0; }
+
+.bj-ligne {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.bj-ligne:last-child { border-bottom: 0; }
+
+/* Une tranche retirée se voit retirée, sans disparaître : l'opacité seule
+   aurait suffi à l'œil mais pas au lecteur d'écran — d'où la section titrée
+   « Tranches retirées » qui la contient. */
+.bj-ligne.inactive .bj-nom,
+.bj-ligne.inactive .bj-plage { opacity: 0.62; text-decoration: line-through; }
+
+.bj-nom {
+  font-family: var(--font-display);
+  font-weight: 650;
+  font-size: 15px;
+  color: var(--text);
+  min-width: 11ch;
+}
+
+.bj-plage {
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.bj-creneau {
+  font-size: 13px;
+  color: var(--soft);
+}
+
+/* Les commandes à droite, et elles y restent quand la ligne se replie sur
+   mobile : une action qui change de place d'une ligne à l'autre se cherche. */
+.bj-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.bj-ajouter { margin-top: 14px; }
+
+/* ── Le formulaire ─────────────────────────────────────────────────────── */
+
+.bj-form {
+  padding: 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface-2);
+  width: 100%;
+}
+
+.bj-form-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 2fr) repeat(2, minmax(90px, 0.7fr)) minmax(220px, 1.6fr);
+  gap: 12px 16px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .bj-form-grid { grid-template-columns: 1fr 1fr; }
+}
+
+.bj-form input[type='text'],
+.bj-form input[type='time'] {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.bj-form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/* ── Le rattachement, en boutons radio ────────────────────────────────────
+   Trois choix courts : les montrer tous les trois coûte moins qu'un clic pour
+   les découvrir. Et le `<select>` natif est interdit sur ce projet. */
+
+.bj-radios { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.bj-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.bj-radio.actif {
+  border-color: var(--accent-ink);
+  box-shadow: inset 0 0 0 1px var(--accent-ink);
+  font-weight: 600;
+}
+
+/* La pastille native reste dans le flux : la cacher aurait privé le clavier
+   et les lecteurs d'écran du seul repère d'état. */
+.bj-radio input { accent-color: var(--accent-ink); }
+
+.bj-retirees { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--border-strong); }
+
+.bj-retirees h3 {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--text);
+}
+
+/* ── L'écran d'un module éteint ───────────────────────────────────────────
+   Il vit ici parce que le planning journée est le premier module éteignable.
+   Le jour où le chat arrive (chantier 5), ces règles devront remonter dans
+   `v2-terrier.css` — sinon son écran éteint sera nu, et personne ne verra
+   pourquoi. */
+
+.module-eteint { margin-top: 18px; max-width: 62ch; }
+
+.me-phrase { margin: 0 0 10px; font-size: 15px; color: var(--text); line-height: 1.55; }
+.me-quoi { margin: 0 0 10px; font-size: 14px; color: var(--soft); line-height: 1.55; }
+.me-suite { margin: 0 0 16px; font-size: 14px; color: var(--soft); line-height: 1.55; }
+.me-sortie { display: flex; }

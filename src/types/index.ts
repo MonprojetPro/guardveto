@@ -8,6 +8,18 @@ export type StatutPeriode = 'brouillon' | 'publie' | 'verrouille'
 export type TypeGarde = 'semaine' | 'weekend' | 'ferie'
 export type TypeConge = 'vacances' | 'formation' | 'sante' | 'autre' | 'indisponibilite'
 export type CreneauConge = 'journee' | 'matin' | 'apres-midi' | 'soiree'
+/**
+ * Le créneau auquel une tranche horaire de journée correspond (B-120 chantier 2).
+ *
+ * C'est un SOUS-ENSEMBLE de `CreneauConge`, et c'est volontaire : un bloc de
+ * journée déclare à quel créneau d'absence il se rattache, pour qu'au chantier 3
+ * un congé du matin retire la présence du matin. Deux listes indépendantes
+ * auraient rejoué le défaut « deux vocabulaires de rôles » (B-111).
+ *
+ * `soiree` est exclu : le soir appartient au module des gardes (décision ⑦ du
+ * cadrage V3 — les deux mondes ne se parlent pas).
+ */
+export type CreneauBlocJournee = Extract<CreneauConge, 'journee' | 'matin' | 'apres-midi'>
 export type StatutConge = 'souhait' | 'valide' | 'refuse'
 export type Saison = 'ete' | 'hiver'
 
@@ -190,6 +202,32 @@ export interface Conge {
    * même aplomb qu'une vraie).
    */
   decide_le: string | null
+}
+
+/**
+ * Une tranche horaire de la journée, telle que le cabinet l'a définie.
+ *
+ * B-120 chantier 2 — table `blocs_journee` (migration 20261001120000). C'est le
+ * vocabulaire du planning journée : une trame de présence s'écrit DANS ces
+ * blocs. Ils peuvent se chevaucher (« journée complète » recouvre « matin »),
+ * ce n'est pas un découpage exclusif.
+ */
+export interface BlocJournee {
+  id: string
+  cabinet_id: string
+  /** Ce que l'équipe lit sur la grille. Unique par cabinet, casse ignorée. */
+  nom: string
+  /** `HH:MM:SS` tel que Postgres rend un `time`. */
+  debut: string
+  fin: string
+  creneau: CreneauBlocJournee
+  /** L'ordre d'affichage voulu par l'admin, pas l'ordre alphabétique. */
+  ordre: number
+  /**
+   * `false` : plus proposé pour de nouvelles présences, mais celles déjà
+   * posées dessus survivent. On désactive, on ne supprime pas.
+   */
+  actif: boolean
 }
 
 export interface ContrainteVeto {

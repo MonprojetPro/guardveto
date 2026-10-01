@@ -156,6 +156,27 @@ export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props
         </Link>
         )}
 
+        {/* LA JOURNÉE — module `planning-journee` (B-120 chantier 2).
+            Réservée à l'administratrice pour l'instant : l'écran ne porte que
+            la configuration des tranches horaires. La grille que les
+            vétérinaires consulteront arrive au chantier 3, et c'est elle qui
+            ouvrira l'entrée à tout le monde.
+            ⚠️ `module('/journee')` ne PROTÈGE rien — il évite de proposer une
+            porte qui se refermerait. Le refus est dans `exigerModule()`. */}
+        {estAdmin && module('/journee') && (
+          <Link {...entree('/journee')} href="/journee" aria-label="Planning de la journée">
+            <span className="di-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 3.2v2.4M12 18.4v2.4M3.2 12h2.4M18.4 12h2.4M6 6l1.7 1.7M16.3 16.3 18 18M18 6l-1.7 1.7M7.7 16.3 6 18" />
+              </svg>
+            </span>
+            <span className="di-flap" aria-hidden="true">
+              <span className="di-text">Journée</span>
+            </span>
+          </Link>
+        )}
+
         {estAdmin && (
           <Link
             {...entree('/equipe')}

@@ -692,3 +692,64 @@ non conforme **en silence** : rien, nulle part, ne relie un planning aux règles
 sous lesquelles il a été produit — alors que le snapshot existe en base à chaque
 génération. La matière est là, elle n'est montrée nulle part. Même famille que
 « le tableau ne peut pas se taire ».
+
+---
+
+## 2026-10-01 — Un test sur le RÉSULTAT d'une garde ne prouve pas qu'elle est APPELÉE (B-120a)
+
+**Le fait.** Le 11 septembre, `exigerModule()` est écrite pour refuser côté
+serveur toute action d'un module éteint. Elle est livrée avec six tests, tous
+verts, et une ligne de board qui dit explicitement qu'elle n'a **aucun
+appelant** — « aucun module éteignable n'a encore d'action à garder ».
+
+Trois semaines plus tard, elle n'en avait toujours aucun. Le dispositif
+anti-module-éteint était intégralement du code mort, et **les six tests verts
+disaient exactement le contraire** à qui regardait vite : une fonction testée
+ressemble beaucoup à une fonction en service.
+
+**Ce qui l'a sauvée, et ce n'est pas un test.** C'est la ligne de board B-120a,
+écrite le jour même par celui qui savait, avec sa condition de levée : « à faire
+DANS le même lot que le premier écran éteignable ». Sans elle, le premier écran
+du planning journée aurait pu naître sans la garde, et personne ne l'aurait su
+avant qu'un cabinet atteigne une URL qu'il n'a pas achetée.
+
+**La leçon de méthode.** En branchant la garde, le réflexe était d'écrire un
+test qui vérifie que l'action rend `{ error }` sur un module éteint. Ce test
+aurait été vert, et il n'aurait **rien prouvé** : l'action rend aussi `{ error }`
+pour un non-admin et pour une saisie invalide. Trois causes, un seul symptôme —
+un test qui ne distingue pas les trois ne distingue rien.
+
+Ce qu'il faut regarder, c'est **l'ordre des appels**. Le faux client Supabase
+journalise ce qu'on lui demande ; sur un module éteint, le journal doit contenir
+`from:cabinets` et **pas** `from:veterinaires`. Si un jour quelqu'un déplace la
+garde du module après la garde du rôle, ce cas tombe — et c'est le seul qui
+puisse tomber.
+
+**Le corollaire.** Un ordre de gardes n'est pas un détail de style. Sur un
+cabinet qui n'a pas acheté la capacité, l'écran n'a pas à exister du tout, pas
+même pour vérifier qui demande : vérifier le rôle d'abord, c'est révéler qu'un
+réglage existe à quelqu'un qui n'y a pas droit.
+
+**Le trou trouvé par ricochet.** En cherchant simplement *où poser l'écran*, le
+test-gardien des modules s'est révélé ne lire que le **premier niveau** des
+dossiers d'écrans. Un écran placé sous `reglages/blocs-journee` aurait hérité du
+socle `reglages`, n'aurait appartenu à aucun module, et **ne se serait jamais
+éteint** — sans qu'un seul test rougisse. Rendu récursif.
+
+> **Un gardien qui ne regarde qu'un étage protège l'étage qu'il regarde, et
+> donne confiance pour tous les autres.**
+
+C'est la même famille que « un grep prouve qu'un code est écrit, jamais qu'il
+est exécuté » (26/08), et que les trois mois sans contrôle qualité : à chaque
+fois, un dispositif **présent** a été pris pour un dispositif **actif**.
+
+**Sur la mesure, enfin.** La première sonde posée pour vérifier qu'un visiteur
+non connecté ne peut rien écrire rendait `0`. Chiffre inutilisable : `0` vaut
+autant pour une écriture refusée que pour une écriture **acceptée puis masquée
+en lecture** — et les deux ne se ressemblent en rien. Refaite avec une table
+témoin qui capture le verdict de l'exception, elle a rendu la phrase exacte
+(*« new row violates row-level security policy »*).
+
+> **Une mesure dont deux causes opposées produisent le même chiffre n'est pas
+> une mesure.** C'est la discipline du 22/08 (`security_invoker`), appliquée à
+> la sonde elle-même et pas seulement à ce qu'elle observe.

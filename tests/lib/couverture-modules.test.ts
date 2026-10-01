@@ -27,7 +27,7 @@
 // ============================================================
 
 import { describe, expect, it } from 'vitest'
-import { readdirSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { APPARTENANCE, MODULES, MODULE_SOCLE, ecranVisible } from '@/lib/produit/modules'
 
@@ -37,11 +37,38 @@ const ECRANS_V2 = join(__dirname, '..', '..', 'src', 'app', '(v2)')
  * Recompose la liste des ecrans depuis le SYSTEME DE FICHIERS, jamais depuis
  * une liste tenue a la main — une liste a la main aurait exactement le defaut
  * qu'on corrige : elle s'oublie.
+ *
+ * 🔴 RENDU RECURSIF le 2026-10-01 (B-120 chantier 2). Il ne regardait que le
+ *    PREMIER NIVEAU de dossiers, et c'etait un trou reel : un ecran place sous
+ *    `reglages/blocs-journee` heritait du socle `reglages` et n'appartenait
+ *    donc A AUCUN MODULE — il ne se serait jamais eteint, sans qu'un seul test
+ *    rougisse. Le defaut a ete trouve en cherchant ou poser l'ecran des
+ *    tranches horaires ; il a decide de l'emplacement (`(v2)/journee`, premier
+ *    niveau) autant que de ce correctif.
+ *
+ *    La cle d'un sous-ecran est son CHEMIN depuis `(v2)`, en barres obliques :
+ *    `reglages/notifications`. C'est aussi ce que `ecranVisible` recoit quand
+ *    on lui passe un href nettoye de son premier `/`.
+ *
+ * On liste les dossiers qui portent un `page.tsx` — un dossier qui n'est pas
+ * une route (composants, utilitaires) n'est pas un ecran et n'a rien a
+ * declarer.
  */
 function ecransReels(): string[] {
-  return readdirSync(ECRANS_V2)
-    .filter((nom) => statSync(join(ECRANS_V2, nom)).isDirectory())
-    .sort()
+  const trouves: string[] = []
+
+  const explorer = (dossier: string, prefixe: string) => {
+    for (const nom of readdirSync(dossier)) {
+      const chemin = join(dossier, nom)
+      if (!statSync(chemin).isDirectory()) continue
+      const cle = prefixe ? `${prefixe}/${nom}` : nom
+      if (existsSync(join(chemin, 'page.tsx'))) trouves.push(cle)
+      explorer(chemin, cle)
+    }
+  }
+
+  explorer(ECRANS_V2, '')
+  return trouves.sort()
 }
 
 describe('Le catalogue des modules', () => {

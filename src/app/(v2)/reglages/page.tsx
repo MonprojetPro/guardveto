@@ -14,7 +14,9 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { exigerVeterinaire } from '@/lib/identite'
+import { modulesDuCabinet } from '@/lib/produit/modules-serveur'
 import '@/styles/v2-reglages.css'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
@@ -171,6 +173,8 @@ export default async function ReglagesPage() {
   }
 
   const dock = await chargerDock(supabase, vet)
+  // Les modules allumés, pour le lien vers le planning journée en bas de page.
+  const modulesAllumes = await modulesDuCabinet(supabase)
 
   return (
     <>
@@ -204,6 +208,30 @@ export default async function ReglagesPage() {
           agendaAfficherHoraires={agendaAfficherHoraires}
           creneaux={creneaux}
         />
+        {/* LE PLANNING JOURNÉE (B-120 chantier 2).
+            Un lien, pas une carte de réglage recopiée : les tranches horaires
+            vivent dans leur module et s'y règlent. Deux écrans pour la même
+            donnée, c'est le défaut « deux écrans, deux habillages, aucun des
+            deux ne disant lequel fait foi » déjà payé sur les compteurs.
+            ⚠️ Conditionné au module : sans ce test, l'administratrice de Val
+            d'Allier verrait un lien vers un écran qui lui dirait « pas
+            activé » — une porte qui se referme. */}
+        {modulesAllumes.includes('planning-journee') && (
+          <section className="card rise">
+            <div className="card-head">
+              <h2>Planning de la journée</h2>
+            </div>
+            {/* `f-note` : la classe de note du terrier. Un style inline aurait
+                échappé au design system et au thème sombre. */}
+            <p className="f-note">
+              Les tranches horaires de vos journées (matin, après-midi, journée complète) se
+              règlent dans leur propre espace.
+            </p>
+            <Link className="btn btn-outline btn-sm" href="/journee">
+              Ouvrir les tranches horaires
+            </Link>
+          </section>
+        )}
       </div>
     </>
   )
