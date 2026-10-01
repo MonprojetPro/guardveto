@@ -221,15 +221,20 @@ export default async function ReglagesPage() {
             <div className="card-head">
               <h2>Planning de la journée</h2>
             </div>
-            {/* `f-note` : la classe de note du terrier. Un style inline aurait
-                échappé au design system et au thème sombre. */}
-            <p className="f-note">
-              Les tranches horaires de vos journées (matin, après-midi, journée complète) se
-              règlent dans leur propre espace.
-            </p>
-            <Link className="btn btn-outline btn-sm" href="/journee">
-              Ouvrir les tranches horaires
-            </Link>
+            {/* `card-body` pour le padding standard, `conn-line` pour le texte :
+                les mêmes que les cartes de connexion juste au-dessus, puisque
+                c'est la même sorte de carte. */}
+            <div className="card-body">
+              <p className="conn-line">
+                Les tranches horaires de vos journées (matin, après-midi, journée complète) se
+                règlent dans leur propre espace.
+              </p>
+              <div className="conn-actions">
+                <Link className="btn btn-outline btn-sm" href="/journee">
+                  Ouvrir les tranches horaires
+                </Link>
+              </div>
+            </div>
           </section>
         )}
       </div>

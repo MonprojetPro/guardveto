@@ -111,6 +111,13 @@
   align-items: start;
 }
 
+/* ⚠️ SANS CECI, LE TEXTE DEBORDE DE SA COLONNE — vu sur la capture du 01/10,
+   la note passait par-dessus la bordure. Une cellule de grille a une largeur
+   minimale implicite de `auto`, c'est-a-dire la taille de son contenu : elle
+   refuse donc de retrecir sous un mot long au lieu de le faire passer a la
+   ligne. `min-width: 0` lui rend le droit de retrecir. */
+.bj-form-grid > * { min-width: 0; }
+
 @media (max-width: 860px) {
   .bj-form-grid { grid-template-columns: 1fr 1fr; }
 }
@@ -178,6 +185,7 @@
 
 .module-eteint { margin-top: 18px; max-width: 62ch; }
 
+/* Le padding vient de `.card-body` (standard du terrier), jamais d'ici. */
 .me-phrase { margin: 0 0 10px; font-size: 15px; color: var(--text); line-height: 1.55; }
 .me-quoi { margin: 0 0 10px; font-size: 14px; color: var(--soft); line-height: 1.55; }
 .me-suite { margin: 0 0 16px; font-size: 14px; color: var(--soft); line-height: 1.55; }

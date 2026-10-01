@@ -1775,6 +1775,43 @@ a.widget { color: inherit; text-decoration: none; }
   padding: 16px 22px 14px;
   border-bottom: 1px solid var(--t-border);
 }
+/* ⚠️ LE CORPS D'UNE CARTE — LE STANDARD, créé le 2026-10-01 sur un constat de MiKL
+   (« toujours le même souci, le padding, on a un standard, applique-le partout »).
+
+   LE PROBLÈME, ET IL ÉTAIT RÉEL : `.card` ne porte AUCUN padding. Seul
+   `.card-head` en a un. Tout contenu placé directement dans une carte se colle
+   donc aux bords — et chaque écran a résolu ça dans SON coin, avec SA valeur :
+   `conn-body` 14px 18px 16px, `count-vide` 22px 18px, `mail-table` par ses
+   cellules. Trois valeurs horizontales différentes, aucune alignée sur les
+   22px du titre juste au-dessus.
+
+   Il n'y avait donc pas un standard mal applique : il n'y avait PAS de standard
+   nommé. En voici un.
+
+   L'ALIGNEMENT HORIZONTAL EST LA RAISON D'ÊTRE DE CETTE RÈGLE : 22px, la même
+   valeur que `.card-head`. Le titre et le texte qui le suit doivent commencer
+   sur la MÊME verticale — c'est exactement ce qui sautait aux yeux sur la
+   capture du 01/10, titre en retrait et texte collé au bord.
+
+   Les écrans existants gardent leur classe à eux : on ne retouche pas six
+   écrans en service pour une harmonisation. Tout NOUVEAU corps de carte
+   utilise `.card-body`. */
+.card-body { padding: 16px 22px 20px; }
+
+/* L'aide qui appartient à UN champ se colle sous lui, plus petite que les
+   lignes d'information de la carte : sinon les deux se lisent comme un même
+   bloc de prose.
+   ⚠️ REMONTÉE ICI le 01/10 depuis `v2-reglages.css` : elle y était enfermée,
+   donc invisible des autres écrans, qui se rabattaient sur `.f-note` — or
+   `.f-note` est la BULLE DE FILOU (fond coloré, bordure pointillée), pas une
+   note discrète. C'est ce qui a produit l'encadré pointillé sous les boutons
+   radio du planning journée. Réglages continue de la voir : `v2-terrier.css`
+   est chargée par le layout V2, donc partout. */
+.field-aide {
+  margin-top: 6px; font-size: 0.78rem; line-height: 1.5; color: var(--t-muted);
+}
+.field-aide b { color: var(--text); }
+
 .card-head h2 { font-size: 1.02rem; font-weight: 700; }
 .card-head h3 { font-size: 1.02rem; font-weight: 700; }
 .card-head .sub { width: 100%; font-size: 0.78rem; color: var(--t-muted); line-height: 1.5; }

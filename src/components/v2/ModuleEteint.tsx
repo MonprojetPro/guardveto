@@ -49,6 +49,8 @@ export function ModuleEteint({ module, estAdmin = false }: Props) {
       <div className="card-head">
         <h2>{nom}</h2>
       </div>
+      {/* Padding standard du terrier — `.card` n'en porte aucun. */}
+      <div className="card-body">
       <p className="me-phrase">
         Cette partie de GuardVeto n’est pas activée pour votre cabinet.
       </p>
@@ -62,6 +64,7 @@ export function ModuleEteint({ module, estAdmin = false }: Props) {
         <Link className="btn btn-outline" href="/accueil">
           Revenir à l’accueil
         </Link>
+      </div>
       </div>
     </div>
   )

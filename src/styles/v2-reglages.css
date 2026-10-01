@@ -50,13 +50,12 @@
   display: flex; flex-direction: column; gap: 12px; flex: 1;
 }
 .conn-line { font-size: 0.84rem; line-height: 1.55; color: var(--t-muted); }
-/* L'aide qui appartient à UN champ se colle sous lui, plus petite que les
-   lignes d'information de la carte : sinon les deux se lisent comme un même
-   bloc de prose, ce qu'on vient justement de supprimer. */
-.field-aide {
-  margin-top: 6px; font-size: 0.78rem; line-height: 1.5; color: var(--t-muted);
-}
-.field-aide b { color: var(--text); }
+/* `.field-aide` vivait ICI jusqu'au 2026-10-01. Remontée dans `v2-terrier.css`
+   pour que tous les écrans y aient droit : enfermée dans la feuille de
+   Réglages, elle était invisible ailleurs, et les autres écrans se rabattaient
+   sur `.f-note` — qui est la bulle de Filou, pas une note de champ. Les deux
+   usages de cette feuille (ReglagesV2.tsx:446 et :675) continuent de marcher,
+   le terrier étant chargé par le layout V2. */
 .conn-line b { color: var(--text); }
 .conn-line.ok { color: var(--ok); font-weight: 600; }
 .conn-line.bad { color: var(--danger); font-weight: 600; }

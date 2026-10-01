@@ -137,7 +137,11 @@ export function BlocsJournee({ blocs }: Props) {
               </label>
             ))}
           </span>
-          <span className="f-note">
+          {/* `field-aide`, pas `f-note` : `.f-note` est la BULLE DE FILOU
+              (fond coloré, bordure pointillée) et elle encadrait cette phrase
+              comme un encart, sur la capture du 01/10. Une note de champ se
+              colle sous son champ, en plus petit, sans décor. */}
+          <span className="field-aide">
             Ce que retire un congé posé sur ce moment de la journée.
           </span>
         </label>
@@ -162,6 +166,10 @@ export function BlocsJournee({ blocs }: Props) {
         <h2>Les tranches horaires de la journée</h2>
       </div>
 
+      {/* `card-body` porte le padding standard du terrier (22px horizontaux,
+          alignés sur ceux du titre juste au-dessus). Sans lui, tout ce qui
+          suit se colle au bord de la carte : `.card` n'a aucun padding a elle. */}
+      <div className="card-body">
       <p className="bj-lede">
         Les moments de la journée que votre cabinet reconnaît. Le planning de journée s’écrira
         dans ces tranches. Elles peuvent se recouvrir : « Journée complète » contient le matin et
@@ -264,6 +272,7 @@ export function BlocsJournee({ blocs }: Props) {
           </ul>
         </div>
       )}
+      </div>
     </div>
   )
 }
