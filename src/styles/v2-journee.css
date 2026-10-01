@@ -168,6 +168,55 @@
    et les lecteurs d'écran du seul repère d'état. */
 .bj-radio input { accent-color: var(--accent-ink); }
 
+/* ── L'avertissement de couverture (B-144) ───────────────────────────────────
+   ⚠️ IL NE DOIT PAS RESSEMBLER À `.bj-refus`. Le refus porte la bordure
+      `--accent-ink` et dit « ça n'a pas été enregistré » ; celui-ci dit « c'est
+      enregistré, et voilà ce que ça implique ». Deux messages de même allure
+      pour deux sens opposés, c'est comment on apprend à ne plus lire ni l'un ni
+      l'autre.
+
+   `--warn` / `--warn-soft` sont les jetons DÉJÀ posés du projet. Refabriquer la
+   teinte à côté en `color-mix` est exactement ce qui a produit « crème sur
+   crème » trois fois cet été. */
+
+.bj-avert {
+  /* `flex-basis: 100%` : la ligne de tranche est un flex avec `flex-wrap`, donc
+     l'avertissement prend toute une rangée sous elle au lieu de se tasser entre
+     les horaires et les boutons. Dans le formulaire (hors grille), le
+     `display: flex` lui suffit. */
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.bj-form .bj-avert { margin-top: 12px; }
+
+.bj-avert-ligne {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  background: var(--warn-soft);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 72ch;
+}
+
+/* `flex: none` pour que le point d'exclamation ne se fasse pas écraser par le
+   texte qui passe à la ligne à côté de lui. */
+.bj-avert-icone {
+  flex: none;
+  color: var(--warn);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
 .bj-retirees { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--border-strong); }
 
 .bj-retirees h3 {

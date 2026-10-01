@@ -92,6 +92,11 @@ function minutes(heure: string): number {
  * ⚠️ On ne refuse pas non plus un bloc « à cheval » (12h→14h) : son créneau de
  *    rattachement est choisi par l'admin. Deviner à sa place aurait inventé
  *    une règle que personne n'a demandée.
+ *
+ * ⚠️ CE QU'ON NE REFUSE PAS N'EST PAS CE QU'ON TAIT — B-144. Une tranche dont
+ *    la durée contredit son rattachement passe ici, et c'est voulu ; elle est
+ *    SIGNALÉE par `avertissementsBloc` plus bas. Cette fonction dit ce qui est
+ *    impossible, l'autre dit ce qui est douteux.
  */
 export function validerBloc(saisie: SaisieBloc): Validation {
   const nom = (saisie.nom ?? '').trim()
@@ -151,6 +156,136 @@ export function nomDejaPris(
 ): boolean {
   const cible = nom.trim().toLowerCase()
   return existants.some((b) => b.id !== sauf && b.nom.trim().toLowerCase() === cible)
+}
+
+// ============================================================
+// B-144 — CE QU'UNE TRANCHE PEUT TAIRE SUR ELLE-MÊME
+// ============================================================
+// Trouvé par MiKL le 01/10 en recettant le chantier 2 : il a passé « Matin »
+// de 8h-12h à 8h → 18h, et rien ne l'a signalé. Une tranche de dix heures
+// déclarée « compte comme : Matin » n'est pas une erreur de saisie — c'est une
+// bombe pour le chantier 3, où un congé posé sur le matin retirera une présence
+// qui couvre aussi tout l'après-midi. La personne disparaîtra de la journée
+// entière pour une demi-journée d'absence, et personne ne pourra relier l'effet
+// à sa cause.
+//
+// ⚠️ ON AVERTIT, ON N'INTERDIT PAS — et c'est une décision, pas une facilité.
+//    Le principe maison est « le système INFORME, il n'interdit pas », et la
+//    décision « blocs libres » du 01/10 laisse le rattachement à l'admin. Un
+//    refus dur casserait le cas explicitement voulu : une garde de midi
+//    12h→14h rattachée à l'après-midi.
+//
+// ⚠️ POURQUOI CE N'EST PAS DANS `validerBloc` : un avertissement et un refus ne
+//    sont pas le même objet. Les mélanger aurait obligé l'appelant à trier un
+//    `probleme` qui bloque d'un `probleme` qui informe — et le premier qui se
+//    serait trompé aurait rendu l'un des deux muet.
+// ============================================================
+
+/**
+ * Au-delà de cette heure, une tranche ne couvre plus seulement le matin.
+ *
+ * ⚠️ EN DUR, DÉLIBÉRÉMENT. Ce n'est PAS une règle métier : le moteur ne
+ *    l'évalue pas, elle ne change aucun planning, elle ne décide de rien. La
+ *    rendre réglable aurait affiché un paramètre que rien n'exécute — exactement
+ *    ce que la leçon « ne jamais afficher un paramètre que le moteur n'évalue
+ *    pas » interdit. 13h laisse passer la pause de midi sans crier.
+ */
+const FIN_RAISONNABLE_MATIN = '13:00'
+
+/** Avant cette heure, une tranche mord sur le matin. Même raison qu'au-dessus. */
+const DEBUT_RAISONNABLE_APRESMIDI = '12:00'
+
+export interface AvertissementBloc {
+  /** Clé stable — les tests s'y accrochent, jamais au texte français. */
+  code: 'couvre-plus' | 'couvre-moins' | 'memes-horaires'
+  /** Déjà en français, affichable tel quel. Aucune reformulation à l'écran. */
+  texte: string
+}
+
+/** Ce qu'il faut savoir d'une tranche pour la juger. L'id est absent à l'ajout. */
+export interface BlocAJuger {
+  debut: string
+  fin: string
+  creneau: string
+}
+
+/**
+ * Ce que cette tranche tait sur elle-même. Liste vide = rien à signaler.
+ *
+ * Trois silences, tous nés du même geste :
+ *
+ * ① `couvre-plus` — rattachée au matin et finissant l'après-midi (ou l'inverse).
+ *    C'est le danger du board : la durée contredit le rattachement.
+ * ② `couvre-moins` — le cas symétrique, que le board ne mentionne pas : une
+ *    tranche « Journée entière » qui ne va que de 8h à 12h. Un congé du matin
+ *    ne la retirera PAS, alors qu'elle ne contient que du matin. Même silence,
+ *    dans l'autre sens.
+ * ③ `memes-horaires` — deux tranches aux horaires strictement identiques. Le
+ *    chevauchement est autorisé (une journée complète recouvre le matin, c'est
+ *    le cas d'usage), mais deux tranches au MÊME horaire ne sont plus un
+ *    chevauchement : ce sont deux noms pour la même chose.
+ *
+ * @param autres Les tranches existantes. Seules les ACTIVES comptent pour ③ :
+ *               une tranche retirée n'est plus proposée, la confusion n'a pas
+ *               lieu. On ne crie pas sur un choix qui n'existe plus.
+ * @param sauf   L'id de la tranche en cours de modification, pour qu'elle ne se
+ *               prenne pas elle-même pour son propre doublon.
+ */
+export function avertissementsBloc(
+  bloc: BlocAJuger,
+  autres: readonly { id: string; nom: string; debut: string; fin: string; actif: boolean }[] = [],
+  sauf?: string,
+): AvertissementBloc[] {
+  const debut = normaliserHeure(bloc.debut)
+  const fin = normaliserHeure(bloc.fin)
+  // Une saisie en cours de frappe n'a pas encore d'heures lisibles. Se taire ici
+  // n'est pas une tolérance : `validerBloc` refusera, et deux messages pour un
+  // seul défaut se contredisent à l'écran.
+  if (!debut || !fin || minutes(fin) <= minutes(debut)) return []
+
+  const avis: AvertissementBloc[] = []
+  const toucheMatin = minutes(debut) < minutes(DEBUT_RAISONNABLE_APRESMIDI)
+  const toucheApresMidi = minutes(fin) > minutes(FIN_RAISONNABLE_MATIN)
+
+  if (bloc.creneau === 'matin' && toucheApresMidi) {
+    avis.push({
+      code: 'couvre-plus',
+      texte:
+        'Cette tranche couvre plus que le matin — un congé du matin la retirera en entier, après-midi compris.',
+    })
+  }
+
+  if (bloc.creneau === 'apres-midi' && toucheMatin) {
+    avis.push({
+      code: 'couvre-plus',
+      texte:
+        'Cette tranche commence avant l’après-midi — un congé de l’après-midi la retirera en entier, matin compris.',
+    })
+  }
+
+  if (bloc.creneau === 'journee' && !(toucheMatin && toucheApresMidi)) {
+    avis.push({
+      code: 'couvre-moins',
+      texte:
+        'Cette tranche ne couvre qu’une partie de la journée — un congé d’une demi-journée ne la retirera pas.',
+    })
+  }
+
+  const jumelle = autres.find(
+    (a) =>
+      a.actif &&
+      a.id !== sauf &&
+      normaliserHeure(a.debut) === debut &&
+      normaliserHeure(a.fin) === fin,
+  )
+  if (jumelle) {
+    avis.push({
+      code: 'memes-horaires',
+      texte: `« ${jumelle.nom} » couvre déjà exactement ${plageLisible(debut, fin)}. Deux tranches aux mêmes horaires sont deux noms pour la même chose.`,
+    })
+  }
+
+  return avis
 }
 
 /** L'affichage d'une plage, tel qu'on l'écrit partout : « 8h → 12h ». */

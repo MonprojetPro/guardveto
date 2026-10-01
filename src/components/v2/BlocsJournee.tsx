@@ -25,7 +25,12 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { BlocJournee } from '@/types'
-import { CRENEAUX_BLOC, LIBELLE_CRENEAU, plageLisible } from '@/lib/journee/blocs'
+import {
+  avertissementsBloc,
+  CRENEAUX_BLOC,
+  LIBELLE_CRENEAU,
+  plageLisible,
+} from '@/lib/journee/blocs'
 import { creerBloc, modifierBloc, basculerBloc } from '@/app/(v2)/journee/actions'
 
 interface Props {
@@ -78,6 +83,32 @@ export function BlocsJournee({ blocs }: Props) {
       creneau: b.creneau,
     })
   }
+
+  /**
+   * Les avertissements d'une tranche, s'il y en a — B-144.
+   *
+   * ⚠️ CE N'EST PAS UN REFUS, et le rendu doit le dire : ton `--warn`, jamais le
+   *    `.bj-refus`, et surtout `role="status"` et pas `role="alert"`. Une alerte
+   *    interrompt le lecteur d'écran à chaque frappe dans le champ horaire —
+   *    pour une information qui n'empêche rien.
+   */
+  const avertissements = (avis: ReturnType<typeof avertissementsBloc>) =>
+    avis.length === 0 ? null : (
+      <span className="bj-avert" role="status">
+        {/* La clé porte l'indice en plus du code : aujourd'hui deux
+            avertissements ne peuvent pas partager le même code, mais rien ne le
+            garantit au prochain cas ajouté — et une clé dupliquée ne casse pas,
+            elle fait disparaître un message en silence. */}
+        {avis.map((a, i) => (
+          <span key={`${a.code}-${i}`} className="bj-avert-ligne">
+            <span className="bj-avert-icone" aria-hidden="true">
+              !
+            </span>
+            <span>{a.texte}</span>
+          </span>
+        ))}
+      </span>
+    )
 
   const formulaire = (surSoumission: () => void, libelleBouton: string) => (
     <form
@@ -146,6 +177,10 @@ export function BlocsJournee({ blocs }: Props) {
           </span>
         </label>
       </div>
+      {/* Hors de la grille, sur toute la largeur : la colonne du rattachement
+          fait 220px et le message en fait deux lignes et demie. Collé dans la
+          cellule, il poussait le formulaire à défiler. */}
+      {avertissements(avertissementsBloc(saisie, blocs, edite ?? undefined))}
       <div className="bj-form-actions">
         <button type="submit" className="btn btn-accent btn-sm" disabled={enCours}>
           {enCours ? 'Enregistrement…' : libelleBouton}
@@ -224,6 +259,14 @@ export function BlocsJournee({ blocs }: Props) {
                     Retirer
                   </button>
                 </span>
+                {/* ⚠️ L'AVERTISSEMENT DOIT ÊTRE ICI, PAS SEULEMENT DANS LE
+                    FORMULAIRE — B-144. Les trois tranches de départ ont été
+                    posées par une migration, et une tranche douteuse peut
+                    rester des mois sans que personne rouvre sa fiche. Un
+                    avertissement qui n'apparaît qu'au moment où on édite est
+                    muet sur tout ce qui est déjà en place : c'est exactement
+                    « le tableau ne peut pas se taire ». */}
+                {avertissements(avertissementsBloc(b, blocs, b.id))}
               </>
             )}
           </li>
@@ -267,6 +310,13 @@ export function BlocsJournee({ blocs }: Props) {
                     Remettre
                   </button>
                 </span>
+                {/* Oui, même sur une tranche retirée — et ce n'est pas du zèle.
+                    « Remettre » la rendrait de nouveau proposable, et sans
+                    l'avertissement l'admin la remettrait en aveugle. Par
+                    ailleurs ce qui a déjà été posé dessus reste en place : au
+                    chantier 3, une tranche retirée douteuse porte toujours des
+                    présences qui se retireront mal. */}
+                {avertissements(avertissementsBloc(b, blocs, b.id))}
               </li>
             ))}
           </ul>

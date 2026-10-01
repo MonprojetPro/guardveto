@@ -18,6 +18,7 @@
 
 import { describe, expect, it } from 'vitest'
 import {
+  avertissementsBloc,
   CRENEAUX_BLOC,
   LIBELLE_CRENEAU,
   normaliserHeure,
@@ -184,5 +185,137 @@ describe('plageLisible', () => {
 
   it('garde les minutes quand il y en a', () => {
     expect(plageLisible('08:30', '12:15')).toBe('8h30 → 12h15')
+  })
+})
+
+// ============================================================
+// B-144 — ce qu'une tranche tait sur elle-même
+// ============================================================
+// Le cas fondateur est le geste exact de MiKL le 01/10 : passer « Matin » de
+// 8h-12h à 8h-18h. C'est le premier test ci-dessous, et il échouait avant.
+//
+// ⚠️ LES CAS QUI COMPTENT LE PLUS SONT LES SILENCES, pas les cris. Un
+//    avertissement qui se déclenche trop souvent est un avertissement qu'on
+//    apprend à ignorer : la garde de midi 12h→14h rattachée à l'après-midi est
+//    EXPLICITEMENT voulue, et crier dessus aurait tué le cas d'usage.
+// ============================================================
+
+describe('avertissementsBloc — le silence que MiKL a trouvé le 01/10', () => {
+  const codes = (b: Parameters<typeof avertissementsBloc>[0]) =>
+    avertissementsBloc(b).map((a) => a.code)
+
+  it('signale « Matin » passé de 8h-12h à 8h-18h — LE cas fondateur', () => {
+    const avis = avertissementsBloc({ debut: '08:00', fin: '18:00', creneau: 'matin' })
+    expect(avis).toHaveLength(1)
+    expect(avis[0].code).toBe('couvre-plus')
+    // Le texte dit la CONSÉQUENCE, pas la règle enfreinte : l'admin n'a pas à
+    // deviner ce que « incohérent » voudrait dire pour son planning.
+    expect(avis[0].texte).toContain('un congé du matin la retirera en entier')
+  })
+
+  it('se taît sur un matin qui finit à midi', () => {
+    expect(codes({ debut: '08:00', fin: '12:00', creneau: 'matin' })).toEqual([])
+  })
+
+  it('se taît à 13h PILE — le seuil est une borne, pas un à-peu-près', () => {
+    // Sans ce cas, un `>=` au lieu d'un `>` aurait crié sur un matin 8h-13h
+    // parfaitement ordinaire, et personne n'aurait su pourquoi.
+    expect(codes({ debut: '08:00', fin: '13:00', creneau: 'matin' })).toEqual([])
+    expect(codes({ debut: '08:00', fin: '13:01', creneau: 'matin' })).toEqual(['couvre-plus'])
+  })
+
+  it('signale l’après-midi qui commence le matin', () => {
+    const avis = avertissementsBloc({ debut: '08:00', fin: '18:00', creneau: 'apres-midi' })
+    expect(avis.map((a) => a.code)).toEqual(['couvre-plus'])
+    expect(avis[0].texte).toContain('matin compris')
+  })
+
+  it('LAISSE PASSER la garde de midi 12h→14h rattachée à l’après-midi', () => {
+    // Cas explicitement voulu par MiKL le 01/10. S'il criait, l'avertissement
+    // deviendrait du bruit et on cesserait de le lire — et c'est le seul mode de
+    // défaillance réel d'un avertissement non bloquant.
+    expect(codes({ debut: '12:00', fin: '14:00', creneau: 'apres-midi' })).toEqual([])
+  })
+
+  it('se taît à 12h PILE sur un après-midi', () => {
+    expect(codes({ debut: '12:00', fin: '18:00', creneau: 'apres-midi' })).toEqual([])
+    expect(codes({ debut: '11:59', fin: '18:00', creneau: 'apres-midi' })).toEqual(['couvre-plus'])
+  })
+
+  it('signale le cas SYMÉTRIQUE — une « journée entière » qui ne fait qu’une matinée', () => {
+    // Celui-là n'est pas dans le board : un congé du matin ne retirera PAS
+    // cette tranche, alors qu'elle ne contient que du matin. Même silence que le
+    // cas fondateur, dans l'autre sens.
+    const avis = avertissementsBloc({ debut: '08:00', fin: '12:00', creneau: 'journee' })
+    expect(avis.map((a) => a.code)).toEqual(['couvre-moins'])
+    expect(avis[0].texte).toContain('ne couvre qu’une partie de la journée')
+  })
+
+  it('se taît sur une vraie journée entière', () => {
+    expect(codes({ debut: '08:00', fin: '18:00', creneau: 'journee' })).toEqual([])
+  })
+
+  it('ne dit rien quand les heures ne sont pas encore lisibles', () => {
+    // Pendant la frappe, et sur une saisie que `validerBloc` refusera de toute
+    // façon. Deux messages pour un seul défaut se contredisent à l'écran.
+    expect(codes({ debut: '', fin: '12:00', creneau: 'matin' })).toEqual([])
+    expect(codes({ debut: '18:00', fin: '08:00', creneau: 'matin' })).toEqual([])
+    expect(codes({ debut: '08:00', fin: '18:00', creneau: 'soiree' })).toEqual([])
+  })
+})
+
+describe('avertissementsBloc — deux tranches aux mêmes horaires', () => {
+  const existantes = [
+    { id: 'a', nom: 'Journée complète', debut: '08:00:00', fin: '18:00:00', actif: true },
+    { id: 'b', nom: 'Vieux créneau', debut: '09:00:00', fin: '17:00:00', actif: false },
+  ]
+
+  it('signale le doublon d’horaires, en NOMMANT la tranche qui occupe déjà la place', () => {
+    const avis = avertissementsBloc(
+      { debut: '08:00', fin: '18:00', creneau: 'journee' },
+      existantes,
+    )
+    expect(avis.map((a) => a.code)).toEqual(['memes-horaires'])
+    // Dire « doublon » sans dire LAQUELLE obligerait à relire la liste entière.
+    expect(avis[0].texte).toContain('Journée complète')
+    expect(avis[0].texte).toContain('8h → 18h')
+  })
+
+  it('compare malgré la forme de Postgres — `08:00:00` contre `08:00`', () => {
+    // Sans normalisation des deux côtés, le doublon le plus évident passait.
+    expect(
+      avertissementsBloc({ debut: '08:00:00', fin: '18:00:00', creneau: 'journee' }, existantes)
+        .length,
+    ).toBe(1)
+  })
+
+  it('ne crie PAS sur une tranche retirée — elle n’est plus proposée', () => {
+    expect(
+      avertissementsBloc({ debut: '09:00', fin: '17:00', creneau: 'journee' }, existantes).map(
+        (a) => a.code,
+      ),
+    ).toEqual([])
+  })
+
+  it('ne se prend PAS elle-même pour son doublon quand on la modifie', () => {
+    // Sans `sauf`, rouvrir « Journée complète » pour la renommer aurait affiché
+    // « Journée complète couvre déjà exactement 8h → 18h ».
+    expect(
+      avertissementsBloc({ debut: '08:00', fin: '18:00', creneau: 'journee' }, existantes, 'a'),
+    ).toEqual([])
+  })
+
+  it('cumule les deux reproches quand ils sont tous les deux vrais', () => {
+    // C'est l'état exact de l'écran de MiKL le 01/10 : « Matin » 8h-18h à côté
+    // de « Journée complète » 8h-18h. Deux anomalies distinctes, un seul geste.
+    expect(
+      avertissementsBloc({ debut: '08:00', fin: '18:00', creneau: 'matin' }, existantes).map(
+        (a) => a.code,
+      ),
+    ).toEqual(['couvre-plus', 'memes-horaires'])
+  })
+
+  it('se taît quand il n’y a aucune autre tranche', () => {
+    expect(avertissementsBloc({ debut: '08:00', fin: '12:00', creneau: 'matin' }, [])).toEqual([])
   })
 })
