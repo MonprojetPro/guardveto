@@ -183,10 +183,30 @@
    `v2-terrier.css` — sinon son écran éteint sera nu, et personne ne verra
    pourquoi. */
 
-.module-eteint { margin-top: 18px; max-width: 62ch; }
+/* ⚠️ UN ÉCRAN QUI NE PORTE QU'UN MESSAGE SE CENTRE — sinon il se lit comme une
+   page qui a raté son chargement. Sur la capture du 01/10, la carte occupait
+   le coin haut-gauche d'un écran vide : le message était juste, et la page
+   donnait l'impression d'être cassée. C'est la convention des états vides, et
+   c'est la seule page du produit qui n'a rien d'autre à montrer. */
+.module-eteint {
+  margin: clamp(40px, 9vh, 90px) auto 0;
+  max-width: 540px;
+  text-align: center;
+}
 
 /* Le padding vient de `.card-body` (standard du terrier), jamais d'ici. */
-.me-phrase { margin: 0 0 10px; font-size: 15px; color: var(--text); line-height: 1.55; }
-.me-quoi { margin: 0 0 10px; font-size: 14px; color: var(--soft); line-height: 1.55; }
-.me-suite { margin: 0 0 16px; font-size: 14px; color: var(--soft); line-height: 1.55; }
-.me-sortie { display: flex; }
+.me-phrase {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  color: var(--text);
+  line-height: 1.55;
+  font-weight: 600;
+}
+.me-quoi { margin: 0 0 14px; font-size: 0.88rem; color: var(--soft); line-height: 1.6; }
+.me-suite { margin: 0 0 20px; font-size: 0.88rem; color: var(--soft); line-height: 1.6; }
+/* Le bouton de retour centré avec le reste : seul à gauche sous un texte
+   centré, il se lisait comme un élément oublié. */
+.me-sortie { display: flex; justify-content: center; }
+
+/* Le titre de la carte suit le centrage, sinon il reste seul à gauche. */
+.module-eteint .card-head { justify-content: center; }
