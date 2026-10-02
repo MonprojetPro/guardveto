@@ -26,62 +26,22 @@
 // 20261001120000. Deux gardiens qui disent la même chose, délibérément.
 // ============================================================
 
-import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { exigerModule, ModuleEteintError } from '@/lib/produit/modules-serveur'
 import { validerBloc, nomDejaPris } from '@/lib/journee/blocs'
-import { resoudreCabinetId } from '@/lib/supabase/cabinet'
+import { porteJournee as porteOuverte } from '@/lib/journee/porte'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-/** Le module dont dépend tout ce fichier. */
-const MODULE = 'planning-journee'
+// ⚠️ `porteOuverte` VIVAIT ICI et a été extraite dans `lib/journee/porte.ts` au
+//    chantier 3, quand un second fichier d'actions (les trames) a eu besoin des
+//    mêmes gardes. Le motif est celui écrit à sa création : « une garde recopiée
+//    quatre fois est une garde oubliée la cinquième ». La dupliquer aurait
+//    rejoué « convention recopiée trois fois, appliquée deux fois » (30/09).
+//
+//    Elle n'a pas pu rester ici : ce fichier est `'use server'`, et un module
+//    `'use server'` ne peut exporter que des actions sérialisables — un client
+//    Supabase ne franchit pas la frontière réseau.
 
 type Resultat = { success: true } | { error: string }
-
-/**
- * Les trois gardes, dans l'ordre. Rend le client si tout passe.
- *
- * Factorisé ICI et pas recopié dans chaque action : une garde recopiée quatre
- * fois est une garde oubliée la cinquième. C'est exactement le défaut
- * « convention recopiée trois fois » payé le 30/09.
- */
-async function porteOuverte(): Promise<
-  | { ok: true; supabase: SupabaseClient<any, any, any>; cabinetId: string }
-  | { ok: false; probleme: string }
-> {
-  const supabase = await createClient()
-
-  // ① LE MODULE — en premier, avant tout le reste.
-  try {
-    await exigerModule(supabase, MODULE)
-  } catch (e) {
-    if (e instanceof ModuleEteintError) return { ok: false, probleme: e.message }
-    throw e
-  }
-
-  // ② L'ADMIN. Masquer une entrée de dock n'a jamais fermé une URL.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { ok: false, probleme: 'Non authentifié.' }
-
-  const { data: moi } = await supabase
-    .from('veterinaires')
-    .select('role_app')
-    .eq('user_id', user.id)
-    .eq('actif', true)
-    .maybeSingle()
-
-  if ((moi as { role_app?: string } | null)?.role_app !== 'admin') {
-    return { ok: false, probleme: "Réservé à l'administrateur du cabinet." }
-  }
-
-  // Le cabinet vient du SERVEUR (JWT, puis repli sur la fiche), jamais d'un
-  // champ envoyé par le client — sans quoi on offrirait un formulaire pour
-  // écrire chez le voisin. Convention du projet : toute écriture dans une
-  // table portant `cabinet_id` passe par ici (`lib/supabase/cabinet.ts`).
-  return { ok: true, supabase, cabinetId: await resoudreCabinetId(supabase) }
-}
 
 /**
  * Les blocs du cabinet, pour contrôler les doublons de nom.

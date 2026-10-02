@@ -61,6 +61,13 @@ const LIBELLES: Record<string, string> = {
   lire_creneaux_profil: 'les types de garde',
   lire_relations_creneaux: 'les liens entre types de garde',
   lire_reglages_cabinet: 'les réglages du cabinet',
+  lire_tranches_journee: 'les tranches horaires de la journée',
+  // ⚠️ « les habitudes de présence », pas « le planning de la journée ». Le
+  //    libellé doit dire ce qui a RÉELLEMENT été consulté : ce sont les règles
+  //    d'habitude, et elles ignorent les congés validés comme les retouches à
+  //    la main. Écrire « le planning » ferait signer une réponse approximative
+  //    du nom de la source la plus solide du produit.
+  lire_presences_recurrentes: 'les habitudes de présence en journée',
 }
 
 /** Les noms des outils qui LISENT quelque chose. Un outil d'affichage ne

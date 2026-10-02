@@ -32,10 +32,11 @@ import { exigerVeterinaire } from '@/lib/identite'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
 import { BlocsJournee } from '@/components/v2/BlocsJournee'
+import { TramesJournee } from '@/components/v2/TramesJournee'
 import { ModuleEteint } from '@/components/v2/ModuleEteint'
 import { modulesDuCabinet } from '@/lib/produit/modules-serveur'
 import { chargerDock } from '@/data/v2/dock'
-import type { BlocJournee, Veterinaire } from '@/types'
+import type { BlocJournee, TrameJournee, Veterinaire } from '@/types'
 import '@/styles/v2-journee.css'
 
 export const dynamic = 'force-dynamic'
@@ -86,12 +87,38 @@ export default async function JourneePage() {
 
   const blocs = (data ?? []) as BlocJournee[]
 
+  // ── Chantier 3, lot 1 : les trames de présence ────────────────────────────
+  //
+  // ⚠️ L'ÉQUIPE EST LUE ICI, ET SEULS LES ACTIFS SONT PROPOSÉS. Une trame bâtie
+  //    sur quelqu'un qui a quitté le cabinet poserait des présences fantômes à
+  //    chaque application. L'action serveur le refuse aussi (`vetoUtilisable`) :
+  //    deux gardiens, délibérément — l'écran évite de proposer l'erreur, le
+  //    serveur refuse le chemin qu'on n'a pas prévu.
+  //
+  // ⚠️ MAIS LES TRAMES SONT LUES EN ENTIER, actives ET retirées, exactement
+  //    comme les tranches ci-dessus : les masquer ici rendrait la remise en
+  //    service impossible depuis l'interface.
+  const [{ data: dataTrames }, { data: dataEquipe }] = await Promise.all([
+    supabase
+      .from('trames_journee')
+      .select('id, cabinet_id, veterinaire_id, bloc_id, jour, semaine, actif'),
+    supabase
+      .from('veterinaires')
+      .select('id, prenom, nom, role_app, actif')
+      .eq('actif', true)
+      .order('prenom', { ascending: true }),
+  ])
+
+  const trames = (dataTrames ?? []) as TrameJournee[]
+  const equipe = (dataEquipe ?? []) as Veterinaire[]
+
   return (
     <>
       <Satin />
       <div className="shell">
         <BarreV2 prenom={vet.prenom} estAdmin={estAdmin} dock={dock} />
         <BlocsJournee blocs={blocs} />
+        <TramesJournee trames={trames} blocs={blocs} equipe={equipe} />
       </div>
     </>
   )

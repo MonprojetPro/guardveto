@@ -90,6 +90,16 @@ import {
   configurerAdresseDepuisPhrase,
   configurerPartagesDepuisPhrase,
 } from './structure'
+import {
+  lireTranchesJournee,
+  lirePresencesRecurrentes,
+  creerTrancheJournee,
+  modifierTrancheJournee,
+  agirSurTrancheJournee,
+  creerPresenceRecurrente,
+  modifierPresenceRecurrente,
+  agirSurPresenceRecurrente,
+} from './journee'
 import type { ContexteOutil, Outil } from './types'
 
 /** Tout ce que Filou sait faire, tous rôles confondus.
@@ -122,6 +132,14 @@ export const CATALOGUE: Outil[] = [
   lireCompensations,
   lireCreneauxTouches,
   lireEchanges,
+  // Le planning de la JOURNÉE — deux questions distinctes du planning de gardes.
+  // ⚠️ `lire_presences_recurrentes` est placé ici, parmi les lectures du
+  // quotidien, et pas dans les réglages : « qui travaille mardi ? » est une
+  // question de tous les jours. Sans lui, Filou répondait sur les seules gardes
+  // avec l'aplomb d'une réponse complète — le défaut du 25/08 sur le
+  // secrétariat, reproduit sur la journée.
+  lireTranchesJournee,
+  lirePresencesRecurrentes,
   // Les réglages
   lireReglagesEquite,
   lireProfilsPlanning,
@@ -173,6 +191,13 @@ export const CATALOGUE: Outil[] = [
   creerCreneauSurMesureDepuisPhrase,
   configurerAdresseDepuisPhrase,
   configurerPartagesDepuisPhrase,
+  // Le planning de la journée (B-120 chantiers 2 et 3, ouvert à Filou le 02/10)
+  creerTrancheJournee,
+  modifierTrancheJournee,
+  agirSurTrancheJournee,
+  creerPresenceRecurrente,
+  modifierPresenceRecurrente,
+  agirSurPresenceRecurrente,
 ]
 
 /** Le catalogue tel que cette personne y a droit. */

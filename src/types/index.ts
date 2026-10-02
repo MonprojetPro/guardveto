@@ -230,6 +230,57 @@ export interface BlocJournee {
   actif: boolean
 }
 
+/**
+ * La parité de semaine d'une trame de journée — B-120 chantier 3.
+ *
+ * ⚠️ AU SINGULIER, et ce n'est pas un détail d'orthographe. C'est la forme que
+ *    lisent les gardiens du repos fixe (`semaine: 'impaire'`). La règle
+ *    `alternance_ancre` dit `semaines: 'impaires'` AU PLURIEL, et les confondre
+ *    ne lève aucune erreur : la règle s'enregistre et n'est jamais appliquée
+ *    (avertissement explicite de `lib/regles/paramsRegle.ts:265`).
+ */
+export type PariteSemaine = 'toutes' | 'paire' | 'impaire'
+
+/** Les jours qu'une trame de journée peut viser. Samedi et dimanche compris. */
+export type JourTrame =
+  | 'lundi'
+  | 'mardi'
+  | 'mercredi'
+  | 'jeudi'
+  | 'vendredi'
+  | 'samedi'
+  | 'dimanche'
+
+/**
+ * Une ligne de trame de présence — B-120 chantier 3, lot 1.
+ *
+ * Se lit comme une phrase : « Anne-Sophie est présente le lundi des semaines
+ * impaires, sur Matin. »
+ *
+ * ⚠️ Ce n'est PAS une présence. C'est la règle qui en produira, quand l'admin
+ *    appliquera la trame sur une période (lot 2). Une trame modifiée ne déplace
+ *    rien tant qu'on ne la rejoue pas — délibérément : décision ⑤ du cadrage,
+ *    le remplissage case par case reste maître.
+ */
+export interface TrameJournee {
+  id: string
+  cabinet_id: string
+  veterinaire_id: string
+  /** La tranche horaire (`blocs_journee`). */
+  bloc_id: string
+  jour: JourTrame
+  /**
+   * Parité du **numéro de semaine ISO**, sans ancre — convention du repos fixe
+   * des gardes. Voir la migration 20261002090000 pour la démonstration.
+   */
+  semaine: PariteSemaine
+  /**
+   * `false` : ne s'applique plus aux prochaines applications, mais les présences
+   * déjà posées par cette ligne survivent.
+   */
+  actif: boolean
+}
+
 export interface ContrainteVeto {
   id: string
   veterinaire_id: string
