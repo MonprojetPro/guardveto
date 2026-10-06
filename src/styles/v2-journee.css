@@ -502,3 +502,28 @@
   line-height: 1.5;
   font-variant-numeric: tabular-nums;
 }
+
+/* ============================================================
+   LES PRÉSENCES D'UNE PERSONNE, DEPUIS SA FICHE — B-149
+   ============================================================
+   Le même composant que l'écran « Journée », mais sans sa carte : il est déjà
+   dans une modale titrée, et un cadre dans un cadre répéterait le titre juste
+   sous lui-même.
+   ============================================================ */
+
+.tj-fiche {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Dans la fiche, une seule personne : son prénom est déjà dans le titre de la
+   fenêtre, le répéter en tête de liste serait du bruit. */
+.tj-fiche .tj-personne-tete .tj-prenom {
+  display: none;
+}
+
+.tj-fiche .tj-personne {
+  border: 0;
+  padding: 0;
+}

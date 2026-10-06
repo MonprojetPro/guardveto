@@ -48,9 +48,23 @@ interface Props {
   trames: TrameJournee[]
   blocs: BlocJournee[]
   equipe: Veterinaire[]
+  /**
+   * B-149 — n'afficher que cette personne, et sans la carte englobante.
+   *
+   * MiKL, le 06/10 : *« il faudrait egalement que les recurrences apparaissent
+   * dans l'onglet veto et ou l'admin pourrait egalement les remplir la, comme
+   * pour les contraintes. »* **« également »** : deux portes sur la même donnée.
+   *
+   * 🔑 C'EST LE MÊME COMPOSANT QUI SERT AUX DEUX, et c'est tout l'intérêt.
+   *    Recopier le formulaire dans la fiche aurait créé deux écrans qui
+   *    divergent au premier correctif — « trois chemins d'écriture, deux
+   *    gardiens » (22/08), transposé à la présentation. Ici il n'y a qu'un
+   *    chemin : même formulaire, mêmes actions, même validation.
+   */
+  limiterA?: string
 }
 
-export function TramesJournee({ trames, blocs, equipe }: Props) {
+export function TramesJournee({ trames, blocs, equipe, limiterA }: Props) {
   const router = useRouter()
   const [enCours, demarrer] = useTransition()
   const [refus, setRefus] = useState<string | null>(null)
@@ -68,6 +82,9 @@ export function TramesJournee({ trames, blocs, equipe }: Props) {
 
   /** Seules les tranches ACTIVES sont proposées — une retirée serait refusée. */
   const blocsProposables = blocs.filter((b) => b.actif)
+  /** B-149 — la fiche d'une personne ne montre qu'elle. */
+  const equipeAffichee = limiterA ? equipe.filter((v) => v.id === limiterA) : equipe
+  const dansUneFiche = Boolean(limiterA)
   const nomBloc = (id: string) => blocs.find((b) => b.id === id)?.nom ?? 'tranche inconnue'
 
   const fermer = () => {
@@ -228,16 +245,22 @@ export function TramesJournee({ trames, blocs, equipe }: Props) {
     </form>
   )
 
-  return (
-    <div className="card tj-card">
-      <div className="card-head">
-        <h2>Les présences récurrentes</h2>
-      </div>
-
-      <div className="card-body">
+  // B-149 — dans une fiche, le composant est DÉJÀ dans une modale titrée : une
+  // seconde carte avec son propre titre ferait un cadre dans un cadre, et
+  // répéterait « Les présences récurrentes » juste sous le même mot.
+  //
+  // ⚠️ UN `const Enveloppe = …` AURAIT ÉTÉ UN COMPOSANT CRÉÉ PENDANT LE RENDU,
+  //    et le lint l'a refusé à juste titre : React le voit comme un type neuf à
+  //    chaque passe, démonte l'arbre entier et le remonte. Le formulaire aurait
+  //    perdu sa saisie à chaque frappe — un défaut qu'aucun test de ce projet
+  //    n'aurait vu, puisque aucun ne monte de composant (B-144b). On compose
+  //    donc le contenu une fois, et on l'enveloppe par un ternaire.
+  const contenu = (
+    <>
         <p className="tj-lede">
-          Pour chacun, les jours où il est là d’habitude. Vous décrivez la règle une fois ; elle
-          servira à remplir le planning sans tout ressaisir.
+          {dansUneFiche
+            ? 'Les jours où cette personne est là d’habitude. Vous décrivez la règle une fois ; elle servira à remplir le planning sans tout ressaisir.'
+            : 'Pour chacun, les jours où il est là d’habitude. Vous décrivez la règle une fois ; elle servira à remplir le planning sans tout ressaisir.'}
         </p>
 
         {/* ⚠️ PHRASE CORRIGÉE AU LOT 2 (06/10), ET C'EST LA RÈGLE DU PROJET QUI
@@ -278,13 +301,18 @@ export function TramesJournee({ trames, blocs, equipe }: Props) {
           /* Sans tranche active, aucune trame n'est saisissable — et le dire
              vaut mieux que d'afficher un formulaire dont tous les choix sont
              vides. L'admin doit savoir OÙ aller. */
+          /* ⚠️ « ci-dessus » n'est vrai que sur l'écran Journée, où les tranches
+             sont juste au-dessus. Dans une fiche d'équipe, elles sont ailleurs —
+             et un renvoi qui désigne un voisin absent est exactement le défaut
+             déjà corrigé deux fois aujourd'hui sur la phrase voisine. */
           <p className="tj-vide">
-            Définissez d’abord au moins une tranche horaire ci-dessus : une présence a besoin d’une
-            tranche pour s’écrire.
+            {dansUneFiche
+              ? 'Définissez d’abord au moins une tranche horaire dans l’écran « Journée » : une présence a besoin d’une tranche pour s’écrire.'
+              : 'Définissez d’abord au moins une tranche horaire ci-dessus : une présence a besoin d’une tranche pour s’écrire.'}
           </p>
         ) : (
           <ul className="tj-equipe">
-            {equipe.map((v) => {
+            {equipeAffichee.map((v) => {
               const miennes = trames.filter((t) => t.veterinaire_id === v.id)
               const actives = miennes.filter((t) => t.actif)
               const retirees = miennes.filter((t) => !t.actif)
@@ -400,7 +428,17 @@ export function TramesJournee({ trames, blocs, equipe }: Props) {
             })}
           </ul>
         )}
+    </>
+  )
+
+  if (dansUneFiche) return <div className="tj-fiche">{contenu}</div>
+
+  return (
+    <div className="card tj-card">
+      <div className="card-head">
+        <h2>Les présences récurrentes</h2>
       </div>
+      <div className="card-body">{contenu}</div>
     </div>
   )
 }

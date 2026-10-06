@@ -38,6 +38,7 @@ import { useMemo, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Pencil, Power } from 'lucide-react'
 import { ContraintesVetoModale } from '@/components/v2/ContraintesVetoModale'
+import { PresencesVetoModale } from '@/components/v2/PresencesVetoModale'
 import { reglesDuVeto } from '@/lib/regles/libelle'
 import type {
   PeriodeOption,
@@ -58,7 +59,7 @@ import { GardienImpact } from '@/components/v2/GardienImpact'
 import { SelecteurCouleur, COULEURS_SUGGEREES } from '@/components/v2/SelecteurCouleur'
 import { normaliserHex, stylePastille } from '@/lib/couleurs'
 import type { Impact } from '@/data/controleImpact'
-import type { StatutVeto, UserRole, Veterinaire } from '@/types'
+import type { BlocJournee, StatutVeto, TrameJournee, UserRole, Veterinaire } from '@/types'
 import {
   adresseBienFormee,
   adresseUtilisable,
@@ -210,9 +211,29 @@ interface Props {
   typesCreneaux: TypeCreneauOption[]
   /** Le véto connecté : on ne lui laisse pas retirer son propre accès admin. */
   moiId: string
+  /**
+   * B-149 — le module `planning-journee` est-il allumé pour ce cabinet ?
+   *
+   * Faux = aucun bouton « Ses présences » sur les fiches, exactement comme le
+   * dock cache l'entrée « Journée ». Un cabinet ne découvre pas une capacité
+   * qu'il n'a pas achetée — et le bouton mènerait de toute façon à des actions
+   * que `porteJournee()` refuse côté serveur.
+   */
+  journeeActive?: boolean
+  blocsJournee?: BlocJournee[]
+  tramesJournee?: TrameJournee[]
 }
 
-export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props) {
+export function EquipeV2({
+  vets,
+  regles,
+  periodes,
+  typesCreneaux,
+  moiId,
+  journeeActive = false,
+  blocsJournee = [],
+  tramesJournee = [],
+}: Props) {
   const [isPending, startTransition] = useTransition()
 
   // Panneau de formulaire : fermé, en création, ou en modification d'une fiche.
@@ -223,6 +244,8 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
 
   // La fiche dont on consulte les contraintes (modale).
   const [ficheContraintes, setFicheContraintes] = useState<Veterinaire | null>(null)
+  /** B-149 — la fiche dont on règle les présences récurrentes. */
+  const [fichePresences, setFichePresences] = useState<Veterinaire | null>(null)
 
   // Garde-fou : les gardes publiées que la désactivation laisserait orphelines.
   const [garde, setGarde] = useState<{ veto: Veterinaire; gardes: GardeAVenir[] } | null>(null)
@@ -1061,6 +1084,18 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
                   Ses contraintes
                   <span className="va-nb">{nb}</span>
                 </button>
+                {/* B-149 — « comme pour les contraintes », mot pour mot : même
+                    place, même forme, même compteur. Absent si le module est
+                    éteint — le bouton mènerait à des actions que le serveur
+                    refuse de toute façon. */}
+                {journeeActive && (
+                  <button type="button" onClick={() => setFichePresences(v)}>
+                    Ses présences
+                    <span className="va-nb">
+                      {tramesJournee.filter((t) => t.veterinaire_id === v.id && t.actif).length}
+                    </span>
+                  </button>
+                )}
               </div>
             </article>
           )
@@ -1073,6 +1108,17 @@ export function EquipeV2({ vets, regles, periodes, typesCreneaux, moiId }: Props
           </p>
         )}
       </div>
+
+      {/* ── Ses présences récurrentes (B-149) ───────────────────────── */}
+      {fichePresences && (
+        <PresencesVetoModale
+          open
+          onOpenChange={(o) => !o && setFichePresences(null)}
+          veto={fichePresences}
+          trames={tramesJournee}
+          blocs={blocsJournee}
+        />
+      )}
 
       {/* ── Ses contraintes ──────────────────────────────────────────── */}
       {ficheContraintes && (

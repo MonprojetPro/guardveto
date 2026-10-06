@@ -23,7 +23,8 @@ import { EquipeV2 } from '@/components/v2/EquipeV2'
 import { chargerDock } from '@/data/v2/dock'
 import { chargerOptionsRegles } from '@/data/optionsRegles'
 import type { RegleRow } from '@/components/regles/ReglesClient'
-import type { Veterinaire } from '@/types'
+import type { BlocJournee, TrameJournee, Veterinaire } from '@/types'
+import { modulesDuCabinet } from '@/lib/produit/modules-serveur'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'GuardVeto — Équipe' }
@@ -49,9 +50,15 @@ export default async function EquipePage() {
   // source du moteur depuis P1A-004. L'ancienne table `contraintes_veto` n'est
   // plus lue nulle part : c'était une copie figée dont l'édition ne changeait
   // rien au planning (constat du 2026-07-31).
-  const [vetsRes, reglesRes, options] = await Promise.all([
+  const [vetsRes, modules, blocsRes, tramesRes, reglesRes, options] = await Promise.all([
     // Les fiches désactivées comptent aussi : c'est de là qu'on réactive.
     supabase.from('veterinaires').select('*').order('actif', { ascending: false }).order('prenom'),
+    // B-149 — les présences récurrentes se règlent AUSSI depuis la fiche, « comme
+    // pour les contraintes ». Chargées en parallèle : aucune requête en série
+    // ajoutée sur un produit déjà jugé lent (B-116).
+    modulesDuCabinet(supabase),
+    supabase.from('blocs_journee').select('id, cabinet_id, nom, debut, fin, creneau, ordre, actif').order('ordre'),
+    supabase.from('trames_journee').select('id, cabinet_id, veterinaire_id, bloc_id, jour, semaine, actif'),
     supabase
       .from('regles_cabinet')
       .select('id, brique_id, params_json, force, actif, periode_id')
@@ -61,6 +68,8 @@ export default async function EquipePage() {
   ])
 
   const vets = (vetsRes?.data ?? []) as Veterinaire[]
+  const blocsJournee = (blocsRes?.data ?? []) as BlocJournee[]
+  const tramesJournee = (tramesRes?.data ?? []) as TrameJournee[]
 
   // ── Le secrétariat (B-017, lot 3) ──────────────────────────────────────
   // Table à part, section à part : ce ne sont pas des vétérinaires, et le
@@ -105,6 +114,13 @@ export default async function EquipePage() {
           periodes={options.periodes}
           typesCreneaux={options.typesCreneaux}
           moiId={vet.id}
+          // B-149 — vide si le module est éteint : la fiche n'affiche alors
+          // aucun bouton « Ses présences », exactement comme le dock cache
+          // l'entrée « Journée ». Un cabinet ne découvre pas une capacité qu'il
+          // n'a pas achetée.
+          journeeActive={modules.includes('planning-journee')}
+          blocsJournee={blocsJournee}
+          tramesJournee={tramesJournee}
         />
         <SecretariatSection fiches={secretaires} />
       </div>
