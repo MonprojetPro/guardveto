@@ -93,3 +93,10 @@ vetovaldallier*
 # Script de nettoyage a usage unique + sa trace (2026-08-20)
 nettoyer-agenda.mts
 agenda-avant-nettoyage.json
+
+# Backups et fichiers de travail du Product Board — locaux, jamais versionnes.
+# Ils ont ete pousses par erreur le 2026-10-06 (`git add docs/` trop large) :
+# 17 fichiers, 9 000 lignes de doublons. Le board et son archive sont suivis,
+# leurs copies de securite ne le sont pas.
+docs/00-product-board*.bak-*
+docs/00-product-board*.tmp*
