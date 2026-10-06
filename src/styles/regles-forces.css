@@ -67,5 +67,5 @@
   background: var(--gvf-fond, var(--surface-2, #F6EBD6));
   border: 1px solid var(--gvf-teinte, var(--t-border, #E6D7BB));
   border-radius: 999px;
-  padding: 3px 10px;
+  padding: 3px 11px;
 }

@@ -149,7 +149,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
+  padding: 6px 14px;
   border: 1px solid var(--border-strong);
   border-radius: 999px;
   background: var(--surface);
@@ -365,7 +365,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
+  padding: 6px 14px;
   border: 1px solid var(--border-strong);
   border-radius: 999px;
   background: var(--surface);

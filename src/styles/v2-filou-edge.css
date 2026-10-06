@@ -129,7 +129,7 @@
   position: absolute; left: 26px; right: 26px; bottom: 0;
   min-height: 30px;
   display: flex; align-items: center; justify-content: center;
-  padding: 4px 10px;
+  padding: 4px 12px;
   background: linear-gradient(180deg, #FFFEF9 0%, #FBF3E1 100%);
   /* liseré accent, plus affirmé qu'un bouton ordinaire : c'est la seule
      invitation à parler à Filou sur cet écran, il doit se voir. On reste

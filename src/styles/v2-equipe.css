@@ -107,7 +107,7 @@
 .vl-jeton {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: 0.68rem; font-weight: 700;
-  border-radius: 999px; padding: 3px 10px;
+  border-radius: 999px; padding: 3px 11px;
   white-space: nowrap;
 }
 /* Un pouvoir : plein, franc, impossible à confondre avec une étiquette. Placé
@@ -284,7 +284,7 @@
   background: var(--surface-2); color: var(--t-muted);
   border-radius: 999px;
   font-size: 0.78rem; font-weight: 700;
-  padding: 7px 14px; min-height: 36px;
+  padding: 7px 15px; min-height: 36px;
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   white-space: nowrap;
 }
@@ -299,7 +299,7 @@
   font-family: var(--font-display); font-size: 0.66rem; font-weight: 800;
   background: var(--surface-2); color: var(--t-muted);
   border: 1px solid var(--t-border);
-  border-radius: 999px; padding: 0 6px; min-width: 18px; text-align: center;
+  border-radius: 999px; padding: 0 8px; min-width: 18px; text-align: center;
 }
 
 /* ============================================================
@@ -385,7 +385,7 @@
   background: var(--surface); color: var(--t-muted);
   border-radius: 999px;
   font-size: 0.71rem; font-weight: 600;
-  padding: 4px 11px; min-height: 28px;
+  padding: 4px 12px; min-height: 28px;
   white-space: nowrap;
 }
 .cv-item-actions button:hover:not(:disabled) { color: var(--accent-ink); border-color: var(--accent-ink); }
@@ -400,7 +400,7 @@
   text-transform: uppercase; letter-spacing: 0.05em;
   color: var(--t-muted);
   background: var(--surface); border: 1px solid var(--t-border);
-  border-radius: 999px; padding: 3px 9px;
+  border-radius: 999px; padding: 3px 11px;
 }
 
 /* La PHRASE : c'est elle qui dit ce que le moteur s'interdit. L'ancien module
@@ -556,7 +556,7 @@
 .tag-pick {
   font-size: 0.72rem; font-weight: 600;
   background: var(--surface-2); border: 1px solid var(--t-border);
-  color: var(--t-muted); border-radius: 999px; padding: 5px 12px;
+  color: var(--t-muted); border-radius: 999px; padding: 5px 13px;
 }
 .tag-pick[aria-pressed='true'] {
   background: var(--t-accent); border-color: var(--t-accent); color: #fff;
@@ -564,7 +564,7 @@
 .tag-libre {
   width: 110px; min-height: 32px;
   background: var(--surface-2); border: 1px solid var(--t-border);
-  border-radius: 999px; padding: 5px 12px;
+  border-radius: 999px; padding: 5px 13px;
   font-size: 0.72rem; color: var(--text); font-family: var(--font-body);
 }
 .tag-libre:focus { border-color: var(--t-accent); outline: none; }
@@ -923,7 +923,7 @@
 .secr-etat {
   flex: none;
   font-size: 0.68rem; font-weight: 700;
-  padding: 4px 11px; border-radius: 999px;
+  padding: 4px 12px; border-radius: 999px;
   background: var(--surface-2); border: 1px solid var(--t-border);
   color: var(--t-muted);
   white-space: nowrap;

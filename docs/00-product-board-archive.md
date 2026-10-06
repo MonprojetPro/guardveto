@@ -1770,3 +1770,77 @@ role (B-008). **Les trois tiennent tels que decrits — rien a retoucher dans le
 | B-145 lot 1 | ⚠️ **La phrase de l'ecran des trames devenait FAUSSE** | `TramesJournee.tsx:212` disait *« ces regles ne remplissent pas encore le planning »* — vrai au lot 1, faux des qu'un geste les applique. **Corrigee.** C'est la regle du projet appliquee : la question n'est pas « faut-il un ecran ? » mais **« une phrase deja affichee devient-elle fausse ? »**. | ✅ |
 | B-145 lot 1 | Tests | **33 tests neufs** (`tests/lib/presences-journee.test.ts`), dont le groupe qui compte : la regle additive, et la **verification croisee de parite** contre `estSemaineImpaire`/`jourDeLaSemaine` du moteur sur une annee — **pas tautologique**, on ne recopie aucune date attendue. | ✅ |
 | B-145 lot 1 | Preuves d'ensemble | `npx vitest run` → **2084 passed, 0 failed** (2051 avant) · `npx tsc --noEmit` → **0 erreur** · `npm run build` → **OK** · `eslint` propre sur les 7 fichiers touches. | ✅ |
+
+---
+
+## Archive 46 — 2026-10-06 — B-146 : le padding des pilules, detail du chantier
+
+> Detail de la ligne courte portee au board. Exigence de MiKL, capture a l'appui :
+> *« toujours ce probleme d'affichage, que ce soit les encarts ou les boutons […] regle
+> definitivement ce probleme, j'en ai marre de revenir systematiquement sur ce genre de detail. »*
+
+### L'ampleur, mesuree avant de corriger
+
+**56 regles sur 97** portaient le defaut, dans **16 feuilles de style**. Ce n'etait donc pas une
+negligence repetee mais **l'absence d'une regle commune** : `border-radius: 999px` est redeclare
+a la main dans chaque composant, avec un padding pense comme pour un rectangle.
+
+### 🔴 MA PREMIERE EXPLICATION ETAIT FAUSSE, ET ELLE EST ECRITE DANS LE TEST
+
+J'ai d'abord justifie la regle par la geometrie : « le rayon vaut la moitie de la hauteur, donc
+la courbe mange cette largeur ». **C'est faux.** Au MILIEU de la pilule — la ou le texte est
+centre — le bord du cercle est a son extreme et n'empiete sur rien. Sur un bouton de 38px
+portant 16px de texte, la courbe ne vole que **~1,8px**. Une regle batie la-dessus aurait ete
+**dix fois trop severe** (elle exigeait 21px de padding sur `.period-pill`, 23px autour d'une
+icone de dock) et aurait ete desactivee au premier ecran serre.
+
+**La vraie raison est VISUELLE** : un bord entierement arrondi se lit comme plus proche qu'un
+bord droit — l'œil mesure la marge au point le plus etroit, pas au milieu. C'est pourquoi un
+padding correct sur un rectangle parait serre des qu'on arrondit.
+
+➜ **La fausse explication est conservee dans l'en-tete du test**, avec sa refutation. Une regle
+dont on a oublie la raison se fait « corriger » par quelqu'un qui refait le raisonnement faux.
+
+### Le seuil retenu, assume comme un choix et non comme une loi
+
+```
+padding horizontal ≥ padding vertical + 8
+et, quand une hauteur est declaree, ≥ 40 % de cette hauteur
+```
+
+Le second critere existe parce que **`min-height` prime sur le padding** : `.btn` declare
+`padding: 9px 18px` ET `min-height: 38px`. Juger sur le seul padding etait aveugle a la moitie
+des boutons du projet — et notamment au bouton « Ajouter cette presence » de la capture.
+
+⚠️ **Les 40 % ne sortent d'aucune loi** : c'est le rapport qui laisse passer les boutons deja
+juges corrects tout en attrapant ceux que MiKL a signales. Donc **calibre a posteriori**, ce qui
+veut dire qu'il valide l'existant par construction. Dit, pas masque.
+
+### Ce qui a ete corrige
+
+**58 regles** dans 16 fichiers (+1 a +7px de padding horizontal). Deux categories exemptees,
+avec leur raison dans le test :
+
+- **5 conteneurs de boutons** (`.tabs`, `.segmente`, `.seg`, `.recap-seg`, `.vet-filter`) : leur
+  padding est une gouttiere autour de boutons deja arrondis, pas une marge de texte.
+- **`.dock-item`** : pastille d'icone de 56px, contenu centre, le libelle vit dans le volet
+  depliant. Les 40 % y imposeraient 23px autour d'une icone de 24px.
+
+⚠️ **Le premier tri automatique avait range `.tj-radio` parmi les conteneurs** — alors que c'est
+**exactement la pilule de la capture**. Une pilule qui porte un input, une pastille ou un texte
+n'est pas un conteneur : elle a besoin de PLUS de padding, pas d'une dispense.
+
+### Le trou du gardien, trouve en relisant mon propre lot
+
+La premiere version ne lisait que le raccourci `padding:`. Un composant declarant
+`padding-inline` ou `padding-left` serait **passe sous le radar**, et le defaut serait revenu par
+cette porte — exactement ce que MiKL demande de ne plus avoir a signaler. Les trois ecritures
+sont desormais lues, et **la detection est prouvee** : deux regles fautives temporaires ont fait
+rougir le test, puis ont ete retirees (fichier verifie propre).
+
+### Ce qui n'est PAS prouve
+
+**Aucune des 58 corrections n'a ete vue a l'ecran.** Le gardien verifie un rapport numerique,
+jamais un rendu — et aucun test ne monte un composant sur ce projet (**B-144b**). Deux zones
+serrees a regarder en recette : `.conge-chip` (+2px) et `.d-today-tag` (+4px) vivent dans la
+case du planning, large de ~104px.
