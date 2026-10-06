@@ -212,6 +212,62 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   'v2/journee/trames-actions#modifierTrame': { outil: 'modifier_presence_recurrente' },
   'v2/journee/trames-actions#basculerTrame': { outil: 'agir_sur_presence_recurrente' },
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // B-120 chantier 3 LOT 2 (06/10) — LE TROU ANNONCÉ JUSTE AU-DESSUS VIENT DE
+  // S'OUVRIR POUR DE VRAI, ET IL FAUT LE LIRE AVANT DE CONTINUER.
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  // Le commentaire du lot 1, quelques lignes plus haut, dit : « dès qu'une
+  // présence de journée existe, "qui travaille mardi ?" devient ambiguë ».
+  // **Cette présence existe depuis ce lot** (`presences_journee`). La condition
+  // n'est donc plus hypothétique.
+  //
+  // ✅ CE QUI NOUS SAUVE AUJOURD'HUI, et ce n'est pas de la chance : l'outil
+  //    `lire_presences_recurrentes` porte sa mise en garde DANS SA RÉPONSE
+  //    (`ceci_sont_des_habitudes_pas_le_planning_reel`). Filou répondra donc
+  //    sur les habitudes en disant que ce sont des habitudes. C'est incomplet,
+  //    ce n'est pas faux — et la distinction est toute la différence entre un
+  //    manque et un mensonge.
+  //
+  // 🔴 CE QUI MANQUE, ET QUI EST LE PROCHAIN GESTE OBLIGATOIRE : aucun outil ne
+  //    lit le planning RÉEL de la journée. À « est-ce que Manon travaille le
+  //    mardi 13 ? », Filou ne peut répondre que par l'habitude, alors que la
+  //    réponse exacte est désormais en base — y compris quand l'administratrice
+  //    a retouché ce jour-là à la main, c'est-à-dire précisément quand la
+  //    question se pose.
+  //
+  //    ➜ `lire_presences_journee` est à écrire au lot suivant. Il devra lire
+  //      `presences_journee` bornée aux périodes PUBLIÉES pour un vétérinaire ou
+  //      le secrétariat (`lib/planning/diffusion.ts`), sans quoi il raconterait
+  //      un brouillon — le défaut du 20/08.
+  //
+  // Les quatre écritures ci-dessous sont déclarées `manque` et non `hors` : ce
+  // sont des gestes qu'un cabinet formule en conversation (« mets Victor le
+  // mardi matin », « applique les présences sur octobre »), pas des réglages
+  // qu'on compose à l'œil. Elles méritent des outils ; elles n'en ont pas
+  // encore, et c'est écrit plutôt que tenu secret.
+  'v2/journee/presences-actions#appliquerTrames': {
+    manque:
+      'Filou ne sait pas appliquer les trames de présence sur une période (B-120 chantier 3 lot 2, 06/10) — geste réservé à l’écran du planning pour l’instant. L’action est additive et idempotente, donc sans risque à exposer plus tard.',
+  },
+  // `hors` et non `manque`, et la distinction se défend : ce n'est pas une
+  // capacité produit, c'est la LECTURE TECHNIQUE qui alimente la confirmation de
+  // l'écran. Personne ne demande « combien de présences ton application
+  // poserait-elle ? » — on demande « applique les présences », et c'est
+  // `appliquerTrames` qui répond en annonçant le compte dans son résultat.
+  // Le jour où Filou appliquera, il annoncera donc sans cet outil-ci.
+  'v2/journee/presences-actions#apercuApplicationTrames': {
+    hors: 'Lecture technique qui alimente la confirmation de l’écran avant écriture. L’annonce du nombre est portée par le résultat de `appliquerTrames` lui-même, pas par un outil séparé — personne ne formule un aperçu comme une demande.',
+  },
+  'v2/journee/presences-actions#poserPresence': {
+    manque:
+      'Filou ne sait pas poser une présence de journée sur un jour précis (B-120 chantier 3 lot 2, 06/10) — « mets Victor le mardi matin » reste à faire à l’écran. À écrire AVEC `lire_presences_journee` : proposer d’ajouter sans savoir lire ce qui est déjà là ferait doublonner ses propositions.',
+  },
+  'v2/journee/presences-actions#retirerPresence': {
+    manque:
+      'Filou ne sait pas retirer une présence de journée (B-120 chantier 3 lot 2, 06/10). ⚠️ Le jour où il le saura, sa réponse devra dire la limite que l’écran dit déjà : une présence issue d’une trame revient si la trame est réappliquée.',
+  },
+
   // Chantier agenda Google (2026-08-27) — réglage de PRÉSENTATION pure
   // (journée entière vs horaires, horaires dans le titre, intitulé par
   // créneau) : ça ne change ni un droit, ni une donnée métier, ni le

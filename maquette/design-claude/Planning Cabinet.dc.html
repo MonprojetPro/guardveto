@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@600;700;800&family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#EFE4D0;font-family:'Noto Sans',sans-serif;color:#3A2A1C}a{color:#C7530F}a:hover{color:#9E400B}button{font-family:'Noto Sans',sans-serif}.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(58,42,28,.1);scroll-margin-top:16px}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#3A2A1C;color:#fff;border-radius:4px;text-decoration:none}.dv-tname{font:600 13px/1.2 'Noto Sans',sans-serif;color:#3A2A1C}.dv-opts{display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(58,42,28,.1);color:#3A2A1C;border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 12px/1.3 'Noto Sans',sans-serif;color:#7C6A55}.dv-card{max-width:100%;background:#F6EEDF;border:1px solid #E6D7BB;border-radius:26px;box-shadow:0 2px 6px rgba(58,42,28,.06);overflow:hidden}.dv-opt:target .dv-oid{background:#C7530F;color:#fff}.dv-next{margin:28px 0 0;font:12px/1.5 'Noto Sans',sans-serif;color:#7C6A55}</style>
+</helmet>
+<section class="dv-turn" id="t3">
+<div class="dv-thd"><a class="dv-tid" href="#t3">3</a><span class="dv-tname"><a class="dv-oid" href="Planning Cabinet pistes.dc.html#2b">2b</a> retravaillé · colonnes Journée / Nuit, À pourvoir et Présents à leur place, semaines fermées utiles</span></div>
+<p style="margin:0 0 20px;font-size:13px;color:#7C6A55">Pistes précédentes (1a–1c, 2a–2c, création, publication, réglages) : <a href="Planning Cabinet pistes.dc.html">Planning Cabinet pistes</a></p>
+<div class="dv-opts">
+<div class="dv-opt" id="3a">
+<div class="dv-olabel"><a class="dv-oid" href="#3a">3a</a>Prénoms en marge · colonnes titrées</div>
+<div class="dv-card" style="width:1180px;padding:30px;box-sizing:border-box;display:flex;flex-direction:column;gap:20px">
+  <div style="display:flex;align-items:flex-start;gap:30px">
+    <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+      <div style="font-family:Figtree;font-weight:800;font-size:26px">3a · Journée et Nuit en colonnes</div>
+      <p style="margin:0;font-size:14px;line-height:1.55;max-width:740px;text-wrap:pretty">Sous la date, chaque jour ouvert porte deux titres de colonne : Journée (échelle 8h–18h) et Nuit. Les places à pourvoir et l'effectif ne sont plus des bandeaux de texte : ce sont des lignes de la même grille, avec leurs pastilles dans la colonne concernée.</p>
+    </div>
+    <div style="display:flex;background:#E9DCC4;border-radius:12px;padding:3px;gap:2px;flex:none"><sc-for list="{{ modes }}" as="m" hint-placeholder-count="3"><button onClick="{{ m.pick }}" style="border:0;padding:7px 12px;border-radius:9px;font-weight:600;font-size:12px;background:{{ m.bg }};color:{{ m.color }};box-shadow:{{ m.sh }};cursor:pointer">{{ m.label }}</button></sc-for></div>
+  </div>
+  <div style="background:#F6EEDF;border:1px solid #E6D7BB;border-radius:24px;padding:16px 18px 18px;box-shadow:0 12px 32px rgba(58,42,28,.10);display:flex;flex-direction:column;gap:6px">
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:6px">
+      <div style="font-family:Figtree;font-weight:800;font-size:18px">Octobre 2026</div>
+      <span style="flex:1"></span>
+      <span style="font-size:12px;color:#7C6A55">Affichage</span>
+      <div style="display:flex;background:#E9DCC4;border-radius:12px;padding:3px;gap:2px"><sc-for list="{{ views3 }}" as="m" hint-placeholder-count="3"><button onClick="{{ m.pick }}" style="border:0;padding:7px 12px;border-radius:9px;font-weight:600;font-size:12px;background:{{ m.bg }};color:{{ m.color }};box-shadow:{{ m.sh }};cursor:pointer">{{ m.label }}</button></sc-for></div>
+    </div>
+    <div style="display:grid;grid-template-columns:84px repeat(7,minmax(0,1fr));gap:4px;padding:0 8px"><div></div><sc-for list="{{ dows }}" as="w" hint-placeholder-count="7"><div style="font-size:10px;font-weight:600;color:#7C6A55;text-transform:uppercase;letter-spacing:.06em;padding-left:6px">{{ w }}</div></sc-for></div>
+    <sc-for list="{{ v3.weeks }}" as="w" hint-placeholder-count="6">
+      <div onClick="{{ w.pick }}" style="display:grid;grid-template-columns:84px repeat(7,minmax(0,1fr));gap:4px;padding:{{ w.pad }};border-radius:18px;background:{{ w.bg }};box-shadow:{{ w.sh }};cursor:pointer">
+        <sc-if value="{{ w.col }}" hint-placeholder-val="{{ true }}"><div style="display:flex;align-items:center;gap:6px;padding:6px 0 0 6px;align-self:start"><span style="font-family:Figtree;font-weight:800;font-size:11px;color:#7C6A55">{{ w.label }}</span><span style="width:8px;height:8px;border-radius:50%;background:{{ w.flagC }}"></span></div></sc-if>
+        <sc-if value="{{ w.exp }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:2px;padding:6px 0;border:1px solid transparent">
+            <div style="height:18px;display:flex;align-items:center;gap:6px;padding-left:6px"><span style="font-family:Figtree;font-weight:800;font-size:11px;color:#C7530F">{{ w.label }}</span></div>
+            <div style="height:14px"></div>
+            <sc-if value="{{ G }}" hint-placeholder-val="{{ true }}"><div style="height:20px;display:flex;align-items:center;gap:5px;padding-left:6px"><span style="font-size:10.5px;font-weight:700;color:{{ w.holeLbl }}">À pourvoir</span><span style="display:{{ w.holeD }};min-width:16px;height:16px;border-radius:8px;background:#A8341F;color:#fff;font:700 10px Figtree;align-items:center;justify-content:center">{{ w.holeN }}</span></div></sc-if>
+            <sc-for list="{{ w.gut }}" as="g"><div style="height:20px;display:flex;align-items:center;gap:6px;padding-left:6px;border-radius:6px;background:{{ g.bg }}"><span style="width:8px;height:8px;border-radius:50%;background:{{ g.color }}"></span><span style="font-size:11.5px;font-weight:700;color:{{ g.color }}">{{ g.name }}</span></div></sc-for>
+            <sc-if value="{{ J }}" hint-placeholder-val="{{ true }}"><div style="height:20px;margin-top:2px;border-top:1px solid #E6D7BB;padding-top:2px;display:flex;align-items:center;padding-left:6px;font-size:10.5px;font-weight:700;color:#7C6A55">Présents</div></sc-if>
+          </div>
+        </sc-if>
+        <sc-for list="{{ w.cells }}" as="c">
+          <div style="position:relative;height:{{ c.h }};box-sizing:border-box;padding:6px;border-radius:13px;background:{{ c.bg }};border:{{ c.bd }};opacity:{{ c.op }};display:flex;flex-direction:column;gap:2px;overflow:hidden">
+            <div style="position:absolute;left:10px;right:10px;top:0;height:3px;border-radius:0 0 3px 3px;background:{{ c.vacBand }}"></div>
+            <sc-if value="{{ c.nightBand }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;right:6px;width:26px;top:26px;bottom:6px;border-radius:7px;background:#3A2A1C0F"></div></sc-if>
+            <div style="display:flex;align-items:center;gap:4px;height:18px;flex:none">
+              <span style="height:18px;min-width:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:Figtree;font-weight:700;font-size:12px;background:{{ c.numBg }};color:{{ c.numColor }}">{{ c.dnum }}</span>
+              <sc-if value="{{ c.ferie }}" hint-placeholder-val="{{ false }}"><span style="font-size:8.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#C7530F;border:1px solid #C7530F;border-radius:6px;padding:2px 4px;line-height:1">Férié</span></sc-if>
+              <span style="flex:1"></span>
+              <span style="width:7px;height:7px;border-radius:50%;background:{{ c.flag }}"></span>
+            </div>
+            <sc-for list="{{ c.lines }}" as="l"><div style="display:flex;align-items:center;gap:5px;height:14px;flex:none;overflow:hidden;white-space:nowrap"><span style="width:{{ l.lw }};flex:none;overflow:hidden;font-size:8.5px;font-weight:700;color:#7C6A55;text-transform:uppercase;letter-spacing:.04em">{{ l.label }}</span><span style="font-family:Figtree;font-weight:800;font-size:13px;line-height:1;color:{{ l.bigColor }}">{{ l.big }}</span><span style="font-size:10px;font-weight:600;color:{{ l.subColor }}">{{ l.sub }}</span><sc-for list="{{ l.names }}" as="n"><span style="display:block;flex:{{ n.fx }};min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:12px;height:14px;box-sizing:border-box;padding:0 {{ n.px }};border-radius:5px;background:{{ n.bg }};border:1px {{ n.bs }} {{ n.bc }};font-size:10.5px;font-weight:700;color:{{ n.color }}">{{ n.t }}</span></sc-for></div></sc-for>
+            <sc-if value="{{ c.exp }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;gap:4px;height:14px;flex:none;position:relative">
+                <div style="flex:1;display:flex;justify-content:space-between;align-items:center;padding:0 3px;font-size:8.5px;font-weight:700;color:#7C6A55;text-transform:uppercase;letter-spacing:.06em"><span>Journée</span><span style="font-weight:500;letter-spacing:0;text-transform:none">8h–18h</span></div>
+                <sc-if value="{{ G }}" hint-placeholder-val="{{ true }}"><div style="width:26px;flex:none;text-align:center;font-size:8.5px;font-weight:700;color:#7C6A55;text-transform:uppercase;letter-spacing:.04em">Nuit</div></sc-if>
+              </div>
+              <sc-if value="{{ G }}" hint-placeholder-val="{{ true }}"><div style="display:flex;align-items:center;gap:4px;height:20px;flex:none;position:relative"><div style="flex:1;height:16px;display:flex"><span style="display:{{ c.hjD }};flex:1;align-items:center;justify-content:center;border-radius:6px;border:1px dashed #A8341F;background:#A8341F14;color:#A8341F;font-size:9.5px;font-weight:700;white-space:nowrap">{{ c.hjTxt }}</span></div><div style="width:26px;flex:none;display:flex;justify-content:center"><span style="display:{{ c.hnD }};min-width:20px;height:16px;padding:0 2px;box-sizing:border-box;border-radius:6px;border:1px dashed #A8341F;background:#A8341F14;color:#A8341F;font:800 9px/14px Figtree;text-align:center">{{ c.hnT }}</span></div></div></sc-if>
+              <sc-for list="{{ c.rows }}" as="r"><div title="{{ r.tip }}" style-hover="box-shadow:inset 0 0 0 1px #C7530F" style="display:flex;align-items:center;gap:4px;height:20px;flex:none;position:relative;border-radius:6px;background:{{ r.rowBg }}"><div style="flex:1;position:relative;height:16px;box-sizing:border-box;border-radius:6px;background:{{ r.trackBg }};border:{{ r.trackBd }}"><div style="position:absolute;left:55%;top:3px;bottom:3px;border-left:1px dotted #CDB892;display:{{ r.midD }}"></div><div style="position:absolute;top:0;bottom:0;left:{{ r.pl }};width:{{ r.pw }};display:{{ r.pD }};align-items:center;justify-content:center;border-radius:6px;background:{{ r.pBg }};color:{{ r.color }};font-size:9.5px;font-weight:700;white-space:nowrap">{{ r.pTxt }}</div><div style="position:absolute;inset:0;display:{{ r.gjD }};align-items:center;justify-content:center;border-radius:6px;background:{{ r.color }};color:#fff;font-size:9.5px;font-weight:700;white-space:nowrap">{{ r.gjTxt }}</div><div style="position:absolute;inset:0;display:{{ r.cgD }};align-items:center;justify-content:center"><span style="font-size:9px;font-weight:600;color:#7C6A55;background:#F6EBD6;padding:0 4px;border-radius:4px">congé</span></div></div><sc-if value="{{ G }}" hint-placeholder-val="{{ true }}"><div style="width:26px;flex:none;display:flex;justify-content:center"><span style="display:{{ r.nD }};width:{{ r.nW }};height:{{ r.nH }};border-radius:7px;background:{{ r.color }};color:#fff;font:800 9px/14px Figtree;align-items:center;justify-content:center">{{ r.nTxt }}</span></div></sc-if></div></sc-for>
+              <sc-if value="{{ J }}" hint-placeholder-val="{{ true }}"><div style="display:flex;align-items:center;gap:4px;height:20px;flex:none;margin-top:2px;border-top:1px solid #E6D7BB;padding-top:2px;position:relative"><div style="flex:1;position:relative;height:16px"><span style="position:absolute;top:0;bottom:0;left:0;width:50%;display:{{ c.emD }};align-items:center;justify-content:center;border-radius:6px;background:{{ c.emBg }};color:{{ c.emC }};font:800 11px Figtree">{{ c.emT }}</span><span style="position:absolute;top:0;bottom:0;left:60%;width:40%;display:{{ c.eaD }};align-items:center;justify-content:center;border-radius:6px;background:{{ c.eaBg }};color:{{ c.eaC }};font:800 11px Figtree">{{ c.eaT }}</span></div><sc-if value="{{ G }}" hint-placeholder-val="{{ true }}"><div style="width:26px;flex:none"></div></sc-if></div></sc-if>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </sc-for>
+    <div style="display:flex;flex-wrap:wrap;gap:8px 20px;font-size:11.5px;color:#7C6A55;padding:8px 0 0 8px">
+      <span style="display:flex;align-items:center;gap:6px"><span style="position:relative;width:60px;height:14px"><span style="position:absolute;left:0;width:50%;top:0;bottom:0;border-radius:5px;background:#0B7D6C2E;color:#0B7D6C;font:700 8.5px/14px 'Noto Sans';text-align:center">8–13</span></span>Présence, placée sur 8h–18h</span>
+      <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;border-radius:6px;background:#0B7D6C"></span>De garde, seul (soir de semaine)</span>
+      <span style="display:flex;align-items:center;gap:6px"><span style="width:22px;height:14px;border-radius:7px;background:#0B7D6C;color:#fff;font:800 9px/14px Figtree;text-align:center">1er</span>Rang, si plusieurs places (week-end)</span>
+      <span style="display:flex;align-items:center;gap:6px"><span style="min-width:20px;height:16px;box-sizing:border-box;border-radius:6px;border:1px dashed #A8341F;background:#A8341F14;color:#A8341F;font:800 9px/14px Figtree;text-align:center">2e</span>Place à pourvoir (« ? » si place unique)</span>
+      <span style="display:flex;align-items:center;gap:6px"><span style="height:16px;padding:0 5px;border-radius:6px;background:#A8341F;color:#fff;font:800 11px/16px Figtree">2/3</span>Présents sous le minimum</span>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px 26px">
+    <div><div style="font-family:Figtree;font-weight:800;font-size:14px;margin-bottom:4px">Colonnes titrées</div><p style="margin:0;font-size:12.5px;line-height:1.55;text-wrap:pretty">« Journée » et « Nuit » sous chaque date. La colonne Nuit est teintée sur toute la hauteur du jour. Seul de garde : une pastille ronde à sa couleur. Plusieurs places : la pastille porte le rang (1er, 2e).</p></div>
+    <div><div style="font-family:Figtree;font-weight:800;font-size:14px;margin-bottom:4px">À pourvoir</div><p style="margin:0;font-size:12.5px;line-height:1.55;text-wrap:pretty">Une vraie ligne de la grille, juste sous les titres. Le trou apparaît dans la colonne Nuit, à la place de la pastille manquante : « ? » pour une place unique, le rang (« 2e ») sinon. La marge compte les trous de la semaine.</p></div>
+    <div><div style="font-family:Figtree;font-weight:800;font-size:14px;margin-bottom:4px">Présents</div><p style="margin:0;font-size:12.5px;line-height:1.55;text-wrap:pretty">En pied, les chiffres sont posés sous le matin et sous l'après-midi, au même endroit que les pastilles. Sous le minimum, le chiffre passe en rouge plein (« 2/3 »).</p></div>
+    <div><div style="font-family:Figtree;font-weight:800;font-size:14px;margin-bottom:4px">Semaines fermées</div><p style="margin:0;font-size:12.5px;line-height:1.55;text-wrap:pretty">Trois réponses par jour : combien de vétos présents, qui est absent (hachuré = congé, pointillé = souhait), qui est de garde la nuit (1er et 2e le week-end). Le sélecteur « Affichage » replie tout, ouvre une semaine, ou déplie le mois entier.</p></div>
+  </div>
+</div>
+</div>
+</div>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;cabinet&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;both&quot;,&quot;gardes&quot;,&quot;journee&quot;],&quot;default&quot;:&quot;both&quot;,&quot;tsType&quot;:&quot;'both'|'gardes'|'journee'&quot;,&quot;section&quot;:&quot;Démo&quot;},&quot;vetCourant&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Camille&quot;,&quot;Hugo&quot;,&quot;Inès&quot;,&quot;Julien&quot;,&quot;Léa&quot;,&quot;Marc&quot;,&quot;Sophie&quot;],&quot;default&quot;:&quot;Julien&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Démo&quot;}}">
+class Component extends DCLogic {
+  static K = (function () {
+    const VETS = [['Camille','#3B6FD1'],['Hugo','#8153C7'],['Inès','#B93A72'],['Julien','#0B7D6C'],['Léa','#55700F'],['Marc','#A0522D'],['Sophie','#4B5D73']]
+      .map(([name, color], id) => ({ id, name, color, tint: color + '1A', tint2: color + '2E', short: name.slice(0, 4) }));
+    const TR = {
+      M: { label: 'Matin', short: 'Matin', h: '8h–13h', hs: '8–13', ab: 'M', m: 1, a: 0 },
+      A: { label: 'Après-midi', short: 'Ap.-midi', h: '14h–18h', hs: '14–18', ab: 'AM', m: 0, a: 1 },
+      J: { label: 'Journée complète', short: 'Journée', h: '8h–18h', hs: '8–18', ab: 'J', m: 1, a: 1 }
+    };
+    const PAT = [
+      ['J','J',null,'J','J',null],
+      ['J','M','J','J',null,'M'],
+      ['M','J','J',null,'J',null],
+      ['J','J','J','A','M',null],
+      [null,'J','M','J','J','M'],
+      ['A','J','J','J',null,'M'],
+      ['J','A','J','M','J',null]
+    ];
+    const days = [];
+    for (let i = 0; i < 42; i++) {
+      const dt = new Date(2026, 8, 28 + i);
+      const m = dt.getMonth(), d = dt.getDate(), dow = (dt.getDay() + 6) % 7;
+      const v = m * 100 + d;
+      const inP = m === 9;
+      const past = m < 9 || (m === 9 && d < 2);
+      const today = m === 9 && d === 2;
+      const ferie = m === 10 && (d === 1 || d === 11);
+      const vac = v >= 917 && v <= 1001;
+      const wk = dow >= 5 || ferie;
+      const conge = VETS.map(() => null);
+      if (m === 9 && d >= 19 && d <= 23) conge[2] = 'valide';
+      if (m === 9 && d >= 8 && d <= 9) conge[6] = 'valide';
+      if (m === 9 && d >= 26 && d <= 28) conge[5] = 'souhait';
+      const pres = VETS.map((_, k) => {
+        if (dow === 6 || ferie) return null;
+        if (conge[k] === 'valide') return null;
+        if (m === 9 && d === 22 && (k === 0 || k === 1 || k === 5)) return null;
+        return PAT[k][dow];
+      });
+      const pick = k => { let x = ((k % 7) + 7) % 7, n = 0; while (conge[x] === 'valide' && n < 7) { x = (x + 1) % 7; n++; } return x; };
+      let gardes;
+      if (!wk) gardes = [{ places: [{ role: 'Soir', pl: 'Soir · 19h–8h', lens: 'Garde soir', ab: 'S', vet: pick(i * 5 + 3) }] }];
+      else {
+        const w = Math.floor(i / 7);
+        gardes = [
+          { places: [
+            { role: '1er', pl: 'Week-end · 1er', lens: 'Garde 1er', ab: '1', vet: pick(w * 3 + (dow === 6 ? 1 : 0)) },
+            { role: '2e', pl: 'Week-end · 2e', lens: 'Garde 2e', ab: '2', vet: pick(w * 3 + 3 + (dow === 6 ? 1 : 0)) }] }
+        ];
+      }
+      if (m === 9 && d === 14) gardes[0].places[0].vet = null;
+      if (m === 9 && d === 24) gardes[0].places[1].vet = null;
+      if (m === 9 && d === 31) gardes[0].places[0].vet = null;
+      const places = gardes.flatMap(g => g.places);
+      const holes = places.filter(p => p.vet === null);
+      const mat = pres.filter(t => t && TR[t].m).length, am = pres.filter(t => t && TR[t].a).length;
+      const matMin = (dow < 5 && !ferie) ? 3 : (dow === 5 ? 2 : 0), amMin = (dow < 5 && !ferie) ? 3 : 0;
+      days.push({ i, m, d, dow, inP, past, today, ferie, vac, wk, conge, pres, places, holes, mat, am, matMin, amMin, matLow: mat < matMin, amLow: am < amMin });
+    }
+    return { VETS, TR, days };
+  })();
+
+  state = { mode: null, lens: 'equipe', sel: 4, week: 3, hv: null, pin: null, d1b: 24, pd: 4 };
+
+  renderVals() {
+    const { VETS, TR, days } = Component.K;
+    const C = { text: '#3A2A1C', sec: '#7C6A55', acc: '#C7530F', bd: '#E6D7BB', ok: '#3E7A2E', warn: '#9A6200', bad: '#A8341F', cell: '#F6EBD6', surf: '#FFFCF4' };
+    const BADT = '#A8341F14', WARNT = '#9A620014';
+    const HATCH = 'repeating-linear-gradient(135deg,#E3D2B3 0 3px,transparent 3px 7px)';
+    const MON = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+    const MONL = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+    const DS = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'], DL = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'], D1 = ['L','M','M','J','V','S','D'];
+    const st = this.state;
+    const mode = st.mode ?? this.props.cabinet ?? 'both';
+    const G = mode !== 'journee', J = mode !== 'gardes';
+    const me = Math.max(0, VETS.findIndex(v => v.name === (this.props.vetCourant ?? 'Julien')));
+    const vme = VETS[me];
+    const hv = st.hv ?? st.pin;
+
+    const DEF = { h: '15px', px: '0px', bg: 'transparent', bs: 'solid', bc: 'transparent', w: 600, color: C.text, dot: '', label: '', text: '', fs: '10.5px' };
+    const mk = o => { const r = { ...DEF, ...o }; r.dotD = r.dot ? 'block' : 'none'; r.labD = r.label ? 'inline' : 'none'; return r; };
+    const dn = d => d.d === 1 ? '1er' : String(d.d);
+    const fmtL = d => `${DL[d.dow]} ${dn(d)} ${MONL[d.m]}`;
+    const fmtS = d => `${DS[d.dow]}. ${d.d} ${MON[d.m]}`;
+    const hasMat = d => d.matMin > 0 || d.mat > 0, hasAm = d => d.amMin > 0 || d.am > 0;
+    const holeG = d => G && d.holes.length > 0;
+    const lowJ = d => J && (d.matLow || d.amLow);
+    const souhaits = d => d.conge.map((c, k) => c === 'souhait' ? k : -1).filter(k => k >= 0);
+    const conges = d => d.conge.map((c, k) => c === 'valide' ? k : -1).filter(k => k >= 0);
+    const holeI = p => mk({ text: `${p.role} à pourvoir`, color: C.bad, bg: BADT, bs: 'dashed', bc: C.bad, px: '4px' });
+    const gardeI = p => { const v = VETS[p.vet]; return mk({ label: p.role, text: v.name, color: v.color, dot: v.color }); };
+    const congeItems = d => {
+      const o = []; const cv = conges(d);
+      if (cv.length) o.push(mk({ label: 'Congé', text: cv.map(k => VETS[k].name).join(', '), color: C.sec, w: 500 }));
+      souhaits(d).forEach(k => o.push(mk({ label: 'Souhait', text: VETS[k].name + ' ?', color: C.warn, bs: 'dashed', bc: C.warn, px: '4px', bg: WARNT })));
+      return o;
+    };
+    const presItems = d => {
+      if (!hasMat(d)) return [];
+      if (mode === 'journee') {
+        const line = (label, n, low) => mk({ label, text: String(n), color: low ? C.bad : C.text, bg: low ? BADT : 'transparent', px: low ? '4px' : '0px', h: '17px', fs: '12px', w: 700 });
+        const o = [line('Matin', d.mat, d.matLow)];
+        if (hasAm(d)) o.push(line('Après-midi', d.am, d.amLow));
+        return o;
+      }
+      const low = d.matLow || d.amLow;
+      return [mk({ text: hasAm(d) ? `${d.mat} mat. · ${d.am} ap.-m.` : `${d.mat} le matin`, color: low ? C.bad : C.sec, bg: low ? BADT : 'transparent', px: low ? '4px' : '0px', w: low ? 700 : 600 })];
+    };
+    const inHdr = d => mode === 'both' && d.places.length >= 3 && hasMat(d);
+    const hdrOf = d => inHdr(d) ? { hdr: hasAm(d) ? `${d.mat}·${d.am}` : `${d.mat} mat.`, hdrColor: (d.matLow || d.amLow) ? C.bad : C.sec } : { hdr: '', hdrColor: C.sec };
+    const eqItems = (d, compact) => {
+      const o = [];
+      if (G) d.places.forEach(p => o.push(p.vet === null ? holeI(p) : gardeI(p)));
+      if (J && !inHdr(d)) presItems(d).forEach(x => o.push(x));
+      if (!compact) congeItems(d).forEach(x => o.push(x));
+      return o;
+    };
+    const personItems = (d, k) => {
+      const v = VETS[k], o = [];
+      if (d.conge[k] === 'valide') o.push(mk({ text: 'Congé', bg: HATCH, color: C.sec, h: '20px', px: '6px' }));
+      if (J && d.pres[k]) { const t = TR[d.pres[k]]; o.push(mk({ text: `${t.short} ${t.hs}`, bg: v.tint2, color: v.color, h: '20px', px: '6px', w: 700 })); }
+      if (G) d.places.filter(p => p.vet === k).forEach(p => o.push(mk({ text: p.lens, bg: v.color, color: '#fff', h: '20px', px: '6px', w: 700 })));
+      if (d.conge[k] === 'souhait') o.push(mk({ text: 'Souhait de congé', color: C.warn, bs: 'dashed', bc: C.warn, bg: WARNT, h: '18px', px: '5px' }));
+      return o;
+    };
+    const issueItems = d => {
+      const o = [];
+      if (G) d.holes.forEach(p => o.push(holeI(p)));
+      if (J) {
+        if (d.matLow) o.push(mk({ label: 'Matin', text: `${d.mat} / ${d.matMin}`, color: C.bad, bg: BADT, px: '4px', w: 700 }));
+        if (d.amLow) o.push(mk({ label: 'Ap.-midi', text: `${d.am} / ${d.amMin}`, color: C.bad, bg: BADT, px: '4px', w: 700 }));
+      }
+      souhaits(d).forEach(k => o.push(mk({ label: 'Souhait', text: VETS[k].name + ' ?', color: C.warn, bs: 'dashed', bc: C.warn, px: '4px', bg: WARNT })));
+      return o;
+    };
+    const base = (d, selected) => ({
+      key: d.i,
+      dnum: d.d === 1 ? `1 ${MON[d.m]}` : String(d.d),
+      bg: !d.inP ? 'transparent' : d.wk ? '#F1E2C6' : C.cell,
+      op: !d.inP ? .5 : d.past ? .6 : 1,
+      bd: !d.inP ? '1px dashed #D9C6A2' : '1px solid transparent',
+      ring: selected ? '0 0 0 2px #C7530F' : 'none',
+      numBg: d.today ? C.acc : 'transparent', numColor: d.today ? '#fff' : C.text,
+      vacBand: d.vac ? '#D9A55A' : 'transparent',
+      ferie: d.ferie, flag: 'transparent', hdr: '', hdrColor: C.sec
+    });
+
+    const P = days.filter(d => d.inP);
+    const holesN = G ? P.reduce((s, d) => s + d.holes.length, 0) : 0;
+    const lowN = J ? P.filter(d => d.matLow || d.amLow).length : 0;
+    const souN = new Set(P.flatMap(souhaits)).size;
+    const issueCount = holesN + lowN + souN;
+
+    const modes = [['gardes', 'Gardes seules'], ['journee', 'Journée seule'], ['both', 'Les deux']].map(([id, label]) => ({
+      label, bg: mode === id ? C.surf : 'transparent', color: mode === id ? C.text : C.sec, sh: mode === id ? '0 1px 3px rgba(58,42,28,.15)' : 'none', pick: () => this.setState({ mode: id })
+    }));
+
+    // ---------- 1a ----------
+    const lens = st.lens;
+    const aCells = days.map(d => {
+      const b = base(d, st.sel === d.i);
+      let items = [];
+      if (d.inP) {
+        if (lens === 'equipe') { items = eqItems(d, false); Object.assign(b, hdrOf(d)); if (holeG(d) || lowJ(d)) b.flag = C.bad; else if (souhaits(d).length) b.flag = C.warn; }
+        else if (lens === 'traiter') { items = issueItems(d); if (!items.length) b.op = Math.min(b.op, .4); }
+        else { items = personItems(d, +lens); if (!items.length) { items = [mk({ text: '—', color: '#A8977F', w: 500 })]; b.op = Math.min(b.op, .7); } }
+      }
+      return { ...b, items, pick: () => this.setState({ sel: d.i }) };
+    });
+    const lensBtn = (id, label, extra) => {
+      const act = lens === id;
+      const vet = extra && extra.vet;
+      return {
+        label, pick: () => this.setState({ lens: id }),
+        bg: act ? (vet ? vet.color : C.text) : C.surf, color: act ? '#fff' : C.text, bc: act ? 'transparent' : C.bd,
+        dot: vet ? (act ? '#fff' : vet.color) : 'transparent',
+        badge: extra && extra.badge != null ? extra.badge : '', badgeD: extra && extra.badge ? 'flex' : 'none'
+      };
+    };
+    const lensMain = [lensBtn('equipe', 'Équipe'), lensBtn('traiter', 'À traiter', { badge: issueCount })];
+    const lensVets = VETS.map(v => lensBtn(String(v.id), v.name, { vet: v }));
+
+    const sd = days[st.sel];
+    const tags = [];
+    if (sd.today) tags.push({ text: "Aujourd'hui", bg: C.acc, color: '#fff' });
+    if (sd.ferie) tags.push({ text: 'Férié', bg: '#C7530F1A', color: C.acc });
+    if (sd.vac) tags.push({ text: 'Vacances scolaires', bg: WARNT, color: C.warn });
+    if (sd.past && sd.inP) tags.push({ text: 'Verrouillé', bg: '#E6D7BB', color: C.sec });
+    if (!sd.inP) tags.push({ text: 'Hors période', bg: '#E6D7BB', color: C.sec });
+    const grp = (title, h, key, n, min, low) => ({
+      title, h, sub: min ? `${n} présents · min. ${min}` : `${n} présents`, color: low ? C.bad : C.sec,
+      people: VETS.filter(v => sd.pres[v.id] && TR[sd.pres[v.id]][key]).map(v => ({ name: v.name, color: v.color, h: TR[sd.pres[v.id]].hs, tint: v.tint }))
+    });
+    const groups = [];
+    if (hasMat(sd)) groups.push(grp('Matin', '8h–13h', 'm', sd.mat, sd.matMin, sd.matLow));
+    if (hasAm(sd)) groups.push(grp('Après-midi', '14h–18h', 'a', sd.am, sd.amMin, sd.amLow));
+    const absents = [];
+    VETS.forEach(v => {
+      const c = sd.conge[v.id];
+      if (c === 'valide') absents.push({ name: v.name, color: v.color, why: 'Congé', whyColor: C.sec });
+      else if (c === 'souhait') absents.push({ name: v.name, color: v.color, why: 'Souhait de congé, non tranché', whyColor: C.warn });
+      else if (J && hasMat(sd) && !sd.pres[v.id]) absents.push({ name: v.name, color: v.color, why: 'Ne travaille pas', whyColor: C.sec });
+    });
+    const panel = {
+      title: fmtL(sd), tags,
+      showOut: !sd.inP,
+      showG: G && sd.inP,
+      gardes: sd.places.map(p => {
+        const e = p.vet === null;
+        return { label: p.pl.split(' · ')[0] + (p.role === '1er' || p.role === '2e' ? ' ' + p.role : ''), name: e ? 'À pourvoir' : VETS[p.vet].name, color: e ? C.bad : VETS[p.vet].color, dotD: e ? 'none' : 'block', bg: e ? BADT : '#F6EBD6', bs: e ? 'dashed' : 'solid', bc: e ? C.bad : 'transparent', actD: e && !sd.past ? 'inline-block' : 'none' };
+      }),
+      showJ: J && sd.inP && groups.length > 0, groups,
+      showAbs: sd.inP && absents.length > 0, absents,
+      locked: sd.past && sd.inP, editable: !sd.past && sd.inP
+    };
+
+    const pcells = days.map(d => {
+      const works = J && d.pres[me], g = G && d.places.some(p => p.vet === me), cg = d.conge[me] === 'valide';
+      return {
+        dnum: d.d,
+        bg: !d.inP ? 'transparent' : cg ? HATCH : works ? vme.tint2 : '#F6EBD6',
+        numBg: g && d.inP ? vme.color : 'transparent', numColor: g && d.inP ? '#fff' : (works ? vme.color : C.text),
+        op: !d.inP ? .35 : d.past ? .55 : 1,
+        ring: st.pd === d.i ? '0 0 0 2px #3A2A1C' : (d.today ? '0 0 0 2px #C7530F' : 'none'),
+        vac: d.vac ? '#D9A55A' : 'transparent',
+        pick: () => this.setState({ pd: d.i })
+      };
+    });
+    const pdd = days[st.pd];
+    const prows = [];
+    if (J) prows.push({ k: 'Au cabinet', v: pdd.conge[me] === 'valide' ? 'Congé' : pdd.pres[me] ? `${TR[pdd.pres[me]].short} · ${TR[pdd.pres[me]].h}` : 'Ne travaille pas', color: pdd.pres[me] ? vme.color : C.sec });
+    if (G) { const gp = pdd.inP ? pdd.places.filter(p => p.vet === me) : []; prows.push({ k: 'Garde', v: gp.length ? gp.map(p => p.lens).join(', ') : 'Pas de garde', color: gp.length ? vme.color : C.sec }); }
+    let nextTxt = '—';
+    for (const d of days) { if (d.i > st.pd && d.inP) { const p = d.places.find(p => p.vet === me); if (p) { nextTxt = `${fmtS(d)} · ${p.lens.replace('Garde ', '')}`; break; } } }
+    const psheet = {
+      title: (pdd.today ? "Aujourd'hui · " : '') + fmtS(pdd), rows: prows, next: G ? nextTxt : '—',
+      team: J ? (hasAm(pdd) ? `${pdd.mat} le matin · ${pdd.am} l'ap.-midi` : hasMat(pdd) ? `${pdd.mat} le matin` : 'cabinet fermé') : `${pdd.places.filter(p => p.vet !== null).length} de garde`
+    };
+
+    // ---------- 1b ----------
+    const expW = mode === 'gardes' ? -1 : st.week;
+    const rowsFor = (d, long) => {
+      let list = VETS.map(v => {
+        const k = v.id, t = J ? d.pres[k] : null, gp = G ? d.places.find(p => p.vet === k) : null, cg = d.conge[k];
+        const active = !!(t || gp);
+        return {
+          k, gp, name: v.name, color: v.color, nameColor: active ? C.text : '#A8977F', dotOp: active ? 1 : .35,
+          val: cg === 'valide' ? (long ? 'Congé' : 'congé') : t ? (long ? `${TR[t].short} · ${TR[t].h}` : TR[t].hs) : (J ? (long ? 'Ne travaille pas' : '—') : ''),
+          valColor: t ? C.text : C.sec,
+          g: gp ? (long ? gp.lens : gp.role) : '', gD: gp ? 'inline-block' : 'none',
+          bg: hv === k ? v.tint2 : (cg === 'valide' ? HATCH : (long ? '#F6EBD6' : 'transparent')),
+          bs: cg === 'souhait' ? 'dashed' : 'solid', bc: cg === 'souhait' ? C.warn : 'transparent',
+          enter: () => this.setState({ hv: k }), leave: () => this.setState({ hv: null })
+        };
+      });
+      if (!J) list = list.filter(r => r.gp);
+      return list;
+    };
+    const bWeeks = [0, 1, 2, 3, 4, 5].map(w => {
+      const ds = days.slice(w * 7, w * 7 + 7), exp = w === expW;
+      const flag = ds.some(d => d.inP && (holeG(d) || lowJ(d)));
+      return {
+        label: `S${40 + w}`, flagC: flag ? C.bad : 'transparent', lblColor: exp ? C.acc : C.sec,
+        h: exp ? 'auto' : (mode === 'gardes' ? '96px' : mode === 'journee' ? '64px' : '84px'),
+        bg: exp ? C.surf : 'transparent', sh: exp ? '0 8px 22px rgba(58,42,28,.10), 0 0 0 1px #E6D7BB' : 'none', pad: exp ? '8px' : '0px 8px',
+        pick: () => this.setState({ week: w }),
+        cells: ds.map(d => {
+          const b = base(d, false);
+          let items = [], rows = [];
+          if (d.inP) {
+            if (exp) { items = G ? d.holes.map(holeI) : []; rows = rowsFor(d, false); }
+            else { items = eqItems(d, mode !== 'gardes'); Object.assign(b, hdrOf(d)); }
+            if (holeG(d) || lowJ(d)) b.flag = C.bad;
+          }
+          return { ...b, items, rows };
+        })
+      };
+    });
+    const legend = VETS.map(v => {
+      const on = st.pin === v.id;
+      return { name: v.name, dot: on ? '#fff' : v.color, bg: on ? v.color : C.surf, fg: on ? '#fff' : C.text, bc: on ? 'transparent' : C.bd,
+        enter: () => this.setState({ hv: v.id }), leave: () => this.setState({ hv: null }), click: () => this.setState({ pin: on ? null : v.id }) };
+    });
+    const d1 = days[st.d1b], w1 = Math.floor(st.d1b / 7);
+    const strip = days.slice(w1 * 7, w1 * 7 + 7).map(d => {
+      const s = d.i === st.d1b;
+      return { dl: DS[d.dow], dnum: d.d, sub: J && hasMat(d) ? (hasAm(d) ? `${d.mat}·${d.am}` : `${d.mat}`) : '',
+        flag: holeG(d) || lowJ(d) ? C.bad : 'transparent', bg: s ? C.text : 'transparent', color: s ? '#FFFCF4' : C.text,
+        subColor: s ? '#E6D7BB' : (lowJ(d) ? C.bad : C.sec), pick: () => this.setState({ d1b: d.i }) };
+    });
+    const low1 = lowJ(d1);
+    const bPhone = {
+      pweek: `Semaine du ${days[w1 * 7].d} ${MON[days[w1 * 7].m]}`,
+      strip, ptitle: fmtS(d1),
+      psum: J && hasMat(d1) ? (hasAm(d1) ? `${d1.mat} matin · ${d1.am} ap.-midi` : `${d1.mat} le matin`) : '',
+      psumColor: low1 ? C.bad : C.sec,
+      pholes: G ? d1.holes.map(p => ({ text: `${p.lens} · à pourvoir` })) : [],
+      prows: rowsFor(d1, true)
+    };
+
+    // ---------- 1c ----------
+    const colBg = d => d.today ? '#C7530F1F' : d.wk ? '#EEDDBE' : 'transparent';
+    const sep = d => d.dow === 0 ? '1px solid #D3BF98' : '1px solid transparent';
+    const rCell = (d, v) => {
+      const t = J ? d.pres[v.id] : null, cg = d.conge[v.id], gp = G ? d.places.find(p => p.vet === v.id) : null;
+      return {
+        pD: J ? 'block' : 'none', p: t ? TR[t].ab : '', pBg: cg === 'valide' ? HATCH : t ? v.tint2 : 'transparent', pColor: v.color, pBc: cg === 'souhait' ? C.warn : 'transparent',
+        gD: G ? 'block' : 'none', g: gp ? gp.ab : '', gBg: gp ? v.color : 'transparent',
+        colBg: colBg(d), sep: sep(d), op: d.past ? .55 : 1
+      };
+    };
+    const c = {
+      head: P.map(d => ({ dl: D1[d.dow], dnum: d.d, bg: d.today ? C.acc : 'transparent', color: d.today ? '#fff' : C.text, colBg: colBg(d), sep: sep(d) })),
+      vac: P.map(d => ({ bg: d.vac ? '#D9A55A' : 'transparent', colBg: colBg(d), sep: sep(d) })),
+      holes: P.map(d => ({ txt: d.holes.map(p => p.ab).join(' '), show: d.holes.length ? 'flex' : 'none', colBg: colBg(d), sep: sep(d) })),
+      vets: VETS.map(v => ({ name: v.name, color: v.color, rowBg: hv === v.id ? v.tint2 : 'transparent', enter: () => this.setState({ hv: v.id }), leave: () => this.setState({ hv: null }), cells: P.map(d => rCell(d, v)) })),
+      effM: P.map(d => ({ txt: hasMat(d) ? String(d.mat) : '', color: d.matLow ? '#fff' : C.text, bg: d.matLow ? C.bad : 'transparent', colBg: colBg(d), sep: sep(d) })),
+      effA: P.map(d => ({ txt: hasAm(d) ? String(d.am) : '', color: d.amLow ? '#fff' : C.text, bg: d.amLow ? C.bad : 'transparent', colBg: colBg(d), sep: sep(d) })),
+      pnames: VETS.map(v => ({ short: v.short, color: v.color })),
+      prows: days.filter(d => d.inP && d.d >= 19).map(d => ({
+        dl: DS[d.dow], dnum: d.d, numColor: C.text, flag: holeG(d) || lowJ(d) ? C.bad : 'transparent',
+        bg: d.wk ? '#F6EBD6' : 'transparent', op: 1, cells: VETS.map(v => rCell(d, v))
+      }))
+    };
+
+    // ---------- autour ----------
+    const placesN = P.reduce((s, d) => s + d.places.length, 0);
+    const holesAll = P.flatMap(d => d.holes.map(p => ({ date: fmtS(d), what: p.lens + ' · à pourvoir' })));
+    const lows = P.filter(d => d.matLow || d.amLow).map(d => ({ date: fmtS(d), what: [d.matLow ? `matin ${d.mat}/${d.matMin}` : '', d.amLow ? `après-midi ${d.am}/${d.amMin}` : ''].filter(Boolean).join(' · ') }));
+    const presN = P.reduce((s, d) => s + d.pres.filter(Boolean).length, 0);
+    const workDays = P.filter(hasMat).length;
+    const e = {
+      gMeta: `${placesN} places · ${placesN - holesAll.length} pourvues`,
+      gStatus: holesAll.length ? `${holesAll.length} à pourvoir` : 'Complet', gBg: holesAll.length ? BADT : '#3E7A2E1A', gColor: holesAll.length ? C.bad : C.ok,
+      holes: holesAll,
+      jMeta: `${presN} présences · ${workDays} jours`,
+      jStatus: lows.length ? `${lows.length} jour sous le minimum` : 'Complet', jBg: lows.length ? BADT : '#3E7A2E1A', jColor: lows.length ? C.bad : C.ok,
+      lows,
+      what: G && J ? 'les gardes et les journées' : G ? 'les gardes' : 'les journées',
+      gChk: G ? C.acc : '#fff', gChkBg: G ? '#C7530F0F' : C.surf, gChkBc: G ? '#C7530F55' : C.bd,
+      jChk: J ? C.acc : '#fff', jChkBg: J ? '#C7530F0F' : C.surf, jChkBc: J ? '#C7530F55' : C.bd
+    };
+
+    // ---------- 2 ----------
+    const w2 = st.w2 || { a: 3, b: 3, c: 3 };
+    const ABG = { S: 'S', '1': '1er', '2': '2e', N: 'N' };
+    const span = t => { const p = TR[t].h.match(/\d+/g).map(Number); return { l: ((p[0] - 8) * 10) + '%', w: ((p[1] - p[0]) * 10) + '%' }; };
+    const holeTxt = d => G && d.holes.length ? d.holes.map(p => p.role).join(' · ') + ' à pourvoir' : '';
+    const effTxt = d => J && hasMat(d) ? (hasAm(d) ? `${d.mat} mat. · ${d.am} ap.-m.` : `${d.mat} le matin`) : '';
+    const laneBg = (v, variant) => hv === v.id ? v.tint2 : (variant === 'c' ? v.color + '12' : 'transparent');
+    const row2 = (d, v, variant) => {
+      const k = v.id, t = J && d.inP ? d.pres[k] : null, cg = d.inP ? d.conge[k] : null, gp = G && d.inP ? d.places.find(p => p.vet === k) : null;
+      const tr = t ? TR[t] : null, sp = tr ? span(t) : { l: '0%', w: '0%' };
+      const ab = gp ? (variant === 'c' ? gp.ab : ABG[gp.ab]) : '';
+      return {
+        name: v.name, nameColor: (tr || gp) ? v.color : '#B3A189',
+        rowBg: laneBg(v, variant),
+        rowBd: cg === 'souhait' && variant !== 'c' ? '1px dashed ' + C.warn : '1px solid transparent',
+        capD: J ? 'flex' : 'none', capBg: !d.inP ? 'transparent' : cg === 'valide' ? HATCH : '#E9DCC4',
+        mBg: tr && tr.m ? v.color : 'transparent', aBg: tr && tr.a ? v.color : 'transparent',
+        trackBg: cg === 'valide' ? HATCH : 'transparent', trackV: J && d.inP ? 'visible' : 'hidden',
+        pD: tr ? 'flex' : 'none', pl: sp.l, pw: sp.w, pTxt: tr ? tr.hs : '', pBg: v.tint2, pColor: v.color,
+        ab: tr ? tr.ab : '', abBg: cg === 'valide' ? HATCH : tr ? v.color + '38' : 'transparent', abColor: v.color,
+        abBd: cg === 'souhait' ? '1px dashed ' + C.warn : '1px solid transparent',
+        g: ab, gBg: gp ? v.color : 'transparent',
+        tip: [v.name, tr ? `${tr.label} ${tr.h}` : '', gp ? gp.lens : '', cg === 'valide' ? 'Congé' : cg === 'souhait' ? 'Souhait de congé' : ''].filter(Boolean).join(' · '),
+        enter: () => this.setState({ hv: k }), leave: () => this.setState({ hv: null })
+      };
+    };
+    const build = variant => ({
+      weeks: [0, 1, 2, 3, 4, 5].map(w => {
+        const ds = days.slice(w * 7, w * 7 + 7), exp = w === w2[variant];
+        const flag = ds.some(d => d.inP && (holeG(d) || lowJ(d)));
+        const colH = mode === 'gardes' ? '96px' : mode === 'journee' ? '64px' : '84px';
+        return {
+          exp, col: !exp, label: `S${40 + w}`, flagC: flag ? C.bad : 'transparent', lblColor: exp ? C.acc : C.sec,
+          bg: exp ? C.surf : 'transparent', sh: exp ? '0 8px 22px rgba(58,42,28,.10), 0 0 0 1px #E6D7BB' : 'none', pad: exp ? '8px' : '0px 8px',
+          pick: () => this.setState(s => ({ w2: { ...(s.w2 || { a: 3, b: 3, c: 3 }), [variant]: w } })),
+          gut: VETS.map(v => ({ name: v.name, color: v.color, bg: laneBg(v, variant), enter: () => this.setState({ hv: v.id }), leave: () => this.setState({ hv: null }) })),
+          cells: ds.map(d => {
+            const b = base(d, false);
+            if (d.inP && (holeG(d) || lowJ(d))) b.flag = C.bad;
+            let items = [];
+            if (!exp && d.inP) { items = eqItems(d, mode !== 'gardes'); Object.assign(b, hdrOf(d)); }
+            if (exp && variant === 'a' && d.inP && J && hasMat(d)) { b.hdr = hasAm(d) ? `${d.mat}·${d.am}` : `${d.mat}`; b.hdrColor = lowJ(d) ? C.bad : C.sec; }
+            const ht = d.inP ? holeTxt(d) : '';
+            return {
+              ...b, items, exp, h: exp ? 'auto' : colH,
+              pad: exp && variant === 'c' ? '6px 0px' : '6px', hpad: exp && variant === 'c' ? '6px' : '0px',
+              rows: exp ? VETS.map(v => row2(d, v, variant)) : [],
+              showHole: exp && G, holeTxt: ht, holeBg: ht ? BADT : 'transparent', holeBc: ht ? C.bad : 'transparent',
+              showEff: exp && J && variant !== 'a', eff: d.inP ? effTxt(d) : '', effColor: lowJ(d) ? C.bad : C.sec, effW: lowJ(d) ? 700 : 600
+            };
+          })
+        };
+      })
+    });
+    const v2 = this.props.onlyLatest === false ? { a: build('a'), b: build('b'), c: build('c') } : {};
+
+    // ---------- 3 ----------
+    const w3 = st.w3 ?? 3, vm3 = st.vm3 ?? 'semaine';
+    const isDayG = () => false;
+    const views3 = [['replie', 'Mois replié'], ['semaine', 'Une semaine dépliée'], ['mois', 'Mois déplié']].map(([id, label]) => ({
+      label, bg: vm3 === id ? C.surf : 'transparent', color: vm3 === id ? C.text : C.sec, sh: vm3 === id ? '0 1px 3px rgba(58,42,28,.15)' : 'none', pick: () => this.setState({ vm3: id })
+    }));
+    const chip = (t, color, o) => ({ t, color, bg: 'transparent', bs: 'solid', bc: 'transparent', px: '0px', fx: '0 1 auto', ...(o || {}) });
+    const capChips = (list, budget) => {
+      const out = []; let used = 0;
+      for (let i = 0; i < list.length; i++) {
+        const w = list[i].t.length * 6.2 + (list[i].px === '0px' ? 0 : 8) + 5;
+        const rest = list.length - i - 1, plusW = rest ? 22 : 0;
+        if (out.length && used + w + plusW > budget) { out.push(chip('+' + (list.length - i), C.sec, { fx: 'none' })); return out; }
+        out.push(list[i]); used += w;
+      }
+      return out;
+    };
+    const linesFor = d => {
+      const L = [], line = o => L.push({ lw: '30px', label: '', big: '', bigColor: C.text, sub: '', subColor: C.sec, names: [], ...o });
+      const open = d.matMin > 0 && d.amMin > 0;
+      if (J && hasMat(d)) {
+        const n = d.pres.filter(Boolean).length, low = d.matLow || d.amLow;
+        const names = low ? [chip(d.matLow ? `mat. ${d.mat}/${d.matMin}` : `ap.-m. ${d.am}/${d.amMin}`, '#fff', { bg: C.bad, px: '4px' })] : [];
+        line({ lw: '0px', big: String(n), bigColor: low ? C.bad : C.text, sub: hasAm(d) ? 'présents' : 'le matin', subColor: low ? C.bad : C.sec, names });
+      }
+      const cg = VETS.filter(v => d.conge[v.id] === 'valide'), sh = VETS.filter(v => d.conge[v.id] === 'souhait');
+      const abs = J && open ? VETS.filter(v => !d.pres[v.id] && !d.conge[v.id]) : [];
+      const ac = [...cg.map(v => chip(v.name, v.color, { bg: HATCH, px: '3px' })), ...abs.map(v => chip(v.name, v.color)), ...sh.map(v => chip(v.name + ' ?', C.warn, { bs: 'dashed', bc: C.warn, px: '3px', bg: WARNT }))];
+      if (ac.length) line({ label: abs.length || !cg.length ? 'Abs.' : 'Congé', names: capChips(ac, 84) });
+      if (G) {
+        const day = d.places.filter(isDayG), night = d.places.filter(p => !isDayG(p));
+        const gch = p => p.vet === null ? chip(night.length > 1 ? p.role + ' ?' : 'à pourvoir', C.bad, { bs: 'dashed', bc: C.bad, bg: BADT, px: '3px' }) : chip(VETS[p.vet].name, VETS[p.vet].color);
+        if (day.length) line({ label: 'Jour', names: day.map(gch) });
+        if (night.length) line({ label: 'Nuit', names: night.map(gch) });
+      }
+      return L;
+    };
+    const row3 = (d, v) => {
+      const k = v.id, inP = d.inP, t = J && inP ? d.pres[k] : null, cg = inP ? d.conge[k] : null;
+      const gj = G && inP ? d.places.find(p => p.vet === k && isDayG(p)) : null;
+      const gn = G && inP ? d.places.find(p => p.vet === k && !isDayG(p)) : null;
+      const nMulti = d.places.filter(p => !isDayG(p)).length > 1, dMulti = d.places.filter(isDayG).length > 1;
+      const tr = t ? TR[t] : null, sp = tr ? span(t) : { l: '0%', w: '0%' };
+      return {
+        color: v.color, rowBg: hv === k ? v.tint2 : 'transparent',
+        trackBg: cg === 'valide' ? HATCH : 'transparent',
+        trackBd: cg === 'souhait' ? '1px dashed ' + C.warn : '1px solid transparent',
+        midD: J && inP ? 'block' : 'none',
+        pD: tr && !gj ? 'flex' : 'none', pl: sp.l, pw: sp.w, pTxt: tr ? tr.hs : '', pBg: v.tint2,
+        gjD: gj ? 'flex' : 'none', gjTxt: gj ? (dMulti ? 'Garde ' + gj.role : 'Garde') : '',
+        cgD: cg === 'valide' ? 'flex' : 'none',
+        nD: gn ? 'flex' : 'none', nTxt: gn && nMulti ? gn.role : '', nW: gn && nMulti ? '22px' : '12px', nH: gn && nMulti ? '14px' : '12px',
+        tip: [v.name, tr ? `${tr.label} ${tr.h}` : '', gj ? gj.lens : '', gn ? gn.lens : '', cg === 'valide' ? 'Congé' : cg === 'souhait' ? 'Souhait de congé' : ''].filter(Boolean).join(' · '),
+        enter: () => this.setState({ hv: k }), leave: () => this.setState({ hv: null })
+      };
+    };
+    const v3 = {
+      weeks: [0, 1, 2, 3, 4, 5].map(w => {
+        const ds = days.slice(w * 7, w * 7 + 7), exp = vm3 === 'mois' ? true : vm3 === 'replie' ? false : w === w3;
+        const flag = ds.some(d => d.inP && (holeG(d) || lowJ(d)));
+        const holeN = G ? ds.filter(d => d.inP).reduce((s, d) => s + d.holes.length, 0) : 0;
+        return {
+          exp, col: !exp, label: `S${40 + w}`, flagC: flag ? C.bad : 'transparent',
+          holeN, holeD: holeN ? 'flex' : 'none', holeLbl: holeN ? C.bad : '#B3A189',
+          bg: exp ? C.surf : 'transparent', sh: exp ? '0 8px 22px rgba(58,42,28,.10), 0 0 0 1px #E6D7BB' : 'none', pad: exp ? '8px' : '0px 8px',
+          pick: () => this.setState(s => ({ w3: w, vm3: (s.vm3 ?? 'semaine') === 'mois' ? 'mois' : 'semaine' })),
+          gut: VETS.map(v => ({ name: v.name, color: v.color, bg: hv === v.id ? v.tint2 : 'transparent', enter: () => this.setState({ hv: v.id }), leave: () => this.setState({ hv: null }) })),
+          cells: ds.map(d => {
+            const b = base(d, false);
+            if (d.inP && (holeG(d) || lowJ(d))) b.flag = C.bad;
+            const hd = G && d.inP ? d.holes.filter(isDayG) : [], hn = G && d.inP ? d.holes.filter(p => !isDayG(p)) : [];
+            const eff = (n, min, low, show) => ({ d: show ? 'flex' : 'none', t: low ? `${n}/${min}` : String(n), bg: low ? C.bad : 'transparent', c: low ? '#fff' : C.text });
+            const em = eff(d.mat, d.matMin, d.matLow, J && d.inP && hasMat(d)), ea = eff(d.am, d.amMin, d.amLow, J && d.inP && hasAm(d));
+            return {
+              ...b, exp, h: exp ? 'auto' : '96px', nightBand: exp && G,
+              lines: !exp && d.inP ? linesFor(d) : [],
+              rows: exp ? VETS.map(v => row3(d, v)) : [],
+              hjD: hd.length ? 'flex' : 'none', hjTxt: hd.map(p => p.role).join(' · ') + ' à pourvoir', hnD: hn.length ? 'block' : 'none', hnT: hn.length > 1 ? '×' + hn.length : (hn.length && d.places.length > 1 ? hn[0].role : '?'),
+              emD: em.d, emT: em.t, emBg: em.bg, emC: em.c, eaD: ea.d, eaT: ea.t, eaBg: ea.bg, eaC: ea.c
+            };
+          })
+        };
+      })
+    };
+
+    return {
+      v2, v3, views3,
+      G, J, modes, issueCount, me: vme,
+      dows: DS, dows1: D1,
+      a: { cells: aCells, lensMain, lensVets, panel, pcells, psheet },
+      b: { weeks: bWeeks, legend, ...bPhone },
+      c, e
+    };
+  }
+}
+</script>
+</body>
+</html>

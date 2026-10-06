@@ -1,0 +1,1074 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Maquette PIXEL B-145 — genere depuis le fragment publie, ne pas diverger -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700;800&family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<title>GuardVeto — Le planning unifié (B-145)</title>
+
+</head>
+<body>
+<style>
+/* ============================================================
+   JETONS — repris TELS QUELS du design system GuardVeto V2
+   (src/styles/*.css). On n'invente aucune couleur ici : une maquette
+   qui s'écarte des jetons fait juger une autre application.
+   Polices : Figtree / Noto Sans ne sont pas chargeables ici (pas de
+   CDN), on retombe sur la pile système déjà déclarée dans le projet.
+   ============================================================ */
+:root {
+  color-scheme: light; /* Le produit est mono-thème clair, par choix. */
+
+  --font-display: "Figtree", "Segoe UI Variable Display", "Trebuchet MS", sans-serif;
+  --font-body: "Noto Sans", "Segoe UI", Verdana, sans-serif;
+
+  --vet-anneso:  #3B6FD1;
+  --vet-annecat: #8153C7;
+  --vet-manon:   #B93A72;
+  --vet-victor:  #0B7D6C;
+  --vet-camille: #55700F;
+  --vet-julie:   #A0522D;
+  --vet-thomas:  #4B5D73;
+
+  --bg:            #F6EEDF;
+  --bg-deep:       #EFE2CB;
+  --surface:       #FFFCF4;
+  --surface-2:     #F6EBD6;
+  --text:          #3A2A1C;
+  --muted:         #7C6A55;
+  --soft:          #A08D75;
+  --border:        #E6D7BB;
+  --border-strong: #D8C4A1;
+  --accent:        #C7530F;
+  --accent-ink:    #AC4508;
+  --accent-soft:   rgba(224, 122, 47, 0.13);
+  --ok:            #3E7A2E;
+  --ok-soft:       rgba(90, 150, 60, 0.14);
+  --warn:          #9A6200;
+  --warn-soft:     rgba(196, 138, 20, 0.16);
+  --danger:        #A8341F;
+  --danger-soft:   rgba(168, 52, 31, 0.12);
+  --grid-we:       rgba(199, 83, 15, 0.07);
+  --r-lg: 26px; --r-md: 18px; --r-sm: 12px;
+  --shadow-card: 0 10px 30px rgba(140, 84, 24, 0.10), 0 2px 6px rgba(140, 84, 24, 0.06);
+  --elev-1: 1px 2px 3px rgba(110, 62, 14, 0.10), 4px 8px 18px rgba(110, 62, 14, 0.08);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page { max-width: 1180px; margin: 0 auto; padding: 28px 22px 72px; }
+
+/* ── En-tête du document ─────────────────────────────────── */
+.doc-head { margin-bottom: 26px; }
+.doc-eyebrow {
+  font-family: var(--font-display);
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent-ink);
+  margin: 0 0 8px;
+}
+.doc-head h1 {
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 3.4vw, 2.1rem); font-weight: 800;
+  letter-spacing: -0.02em; line-height: 1.15; text-wrap: balance;
+  margin: 0 0 10px;
+}
+.doc-head .chapo {
+  max-width: 68ch; margin: 0; color: var(--muted); font-size: 0.97rem;
+}
+.doc-head .chapo b { color: var(--text); }
+
+/* ── Encadré de mesure ───────────────────────────────────── */
+.mesures {
+  margin: 22px 0 26px; padding: 18px 20px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--accent); border-radius: var(--r-sm);
+  box-shadow: var(--elev-1);
+}
+.mesures h2 {
+  font-family: var(--font-display); font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--soft);
+  margin: 0 0 12px;
+}
+.mesures ul { margin: 0; padding-left: 0; list-style: none; display: grid; gap: 9px; }
+.mesures li { display: flex; gap: 11px; align-items: baseline; font-size: 0.9rem; }
+.mesures .val {
+  font-family: var(--font-display); font-weight: 800; color: var(--accent-ink);
+  font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 7.5em;
+}
+.mesures .src { color: var(--soft); font-size: 0.82rem; }
+
+/* ── Barre de contrôles de la maquette ───────────────────── */
+.controles {
+  display: flex; flex-wrap: wrap; gap: 20px 32px; align-items: flex-end;
+  padding: 16px 20px; margin-bottom: 18px;
+  background: var(--bg-deep); border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+}
+.grp { display: grid; gap: 7px; }
+.grp > span {
+  font-family: var(--font-display); font-size: 0.66rem; font-weight: 700;
+  letter-spacing: 0.11em; text-transform: uppercase; color: var(--soft);
+}
+.seg { display: flex; gap: 4px; background: var(--surface-2); padding: 4px; border-radius: 999px; border: 1px solid var(--border); }
+.seg button {
+  font-family: var(--font-body); font-size: 0.8rem; font-weight: 700;
+  color: var(--muted); background: transparent; border: 0;
+  padding: 7px 14px; min-height: 36px; border-radius: 999px; cursor: pointer;
+  transition: background-color .25s var(--ease-out), color .25s var(--ease-out);
+}
+.seg button:hover { color: var(--accent-ink); }
+.seg button[aria-pressed="true"] {
+  background: var(--surface); color: var(--accent-ink);
+  box-shadow: var(--elev-1);
+}
+.seg button:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
+.note-cas {
+  flex: 1 1 260px; min-width: 240px; font-size: 0.85rem; color: var(--muted);
+  padding-left: 18px; border-left: 1px solid var(--border-strong);
+}
+.note-cas b { color: var(--text); font-family: var(--font-display); }
+
+/* ============================================================
+   L'ÉCRAN MAQUETTÉ
+   ============================================================ */
+.workspace {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-card);
+  padding: 18px; overflow: hidden;
+}
+
+.work-head {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+  padding-bottom: 14px; border-bottom: 1px solid var(--border);
+}
+.period-pill {
+  display: inline-flex; align-items: center; gap: 9px;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 999px; padding: 6px 14px 6px 16px; min-height: 42px;
+  font-family: var(--font-display); font-size: 0.95rem; font-weight: 800;
+  letter-spacing: -0.01em; color: var(--text);
+}
+.pp-etat {
+  font-size: 0.72rem; font-weight: 700; padding: 4px 11px;
+  border-radius: 999px; background: var(--warn-soft); color: var(--warn);
+}
+.month-nav { display: flex; align-items: center; gap: 6px; }
+.month-nav .label {
+  font-family: var(--font-display); font-size: 1.02rem; font-weight: 700;
+  min-width: 132px; text-align: center;
+}
+.mn-btn {
+  border: 1px solid var(--border-strong); background: var(--surface);
+  color: var(--muted); border-radius: 50%; width: 32px; height: 32px;
+  font-size: 0.95rem; line-height: 1; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.head-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.head-btn {
+  border: 1px solid var(--border-strong); background: var(--surface);
+  color: var(--text); border-radius: 999px;
+  font-family: var(--font-body); font-size: 0.78rem; font-weight: 700;
+  padding: 8px 14px; min-height: 38px; cursor: pointer;
+  transition: border-color .2s ease, color .2s ease;
+}
+.head-btn:hover { color: var(--accent-ink); border-color: var(--accent-ink); }
+.head-btn.valider { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
+.head-btn.generer {
+  background: var(--accent); border-color: var(--accent-ink); color: #FFF8EF;
+  box-shadow: var(--elev-1);
+}
+.head-btn.generer:hover { color: #FFF8EF; }
+.head-btn.nouveau {
+  background: var(--accent); border-color: var(--accent-ink); color: #FFF8EF;
+}
+.head-btn.nouveau:hover { color: #FFF8EF; }
+.neuf {
+  position: relative;
+}
+.neuf::after {
+  content: "nouveau";
+  position: absolute; top: -9px; right: -6px;
+  font-size: 0.56rem; font-weight: 800; letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--accent-ink); color: #FFF8EF;
+  padding: 2px 6px; border-radius: 999px;
+}
+
+/* La bascule d'affichage — un FILTRE, pas une navigation */
+.vue-seg { display: flex; gap: 3px; background: var(--surface-2); padding: 3px; border-radius: 999px; border: 1px solid var(--border); }
+.vue-seg button {
+  font-family: var(--font-body); font-size: 0.74rem; font-weight: 700;
+  color: var(--muted); background: transparent; border: 0;
+  padding: 6px 12px; min-height: 34px; border-radius: 999px; cursor: pointer;
+}
+.vue-seg button[aria-pressed="true"] { background: var(--surface); color: var(--accent-ink); box-shadow: var(--elev-1); }
+.vue-seg button:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
+
+.grid-hint {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin: 14px 0 12px; font-size: 0.79rem; color: var(--muted); line-height: 1.4;
+}
+.grid-hint b { color: var(--text); font-weight: 700; }
+.grid-hint .gh-sep { color: var(--border-strong); }
+
+.work-grid { display: grid; grid-template-columns: minmax(0, 1fr) 262px; gap: 20px; align-items: start; }
+@media (max-width: 900px) { .work-grid { grid-template-columns: 1fr; } }
+
+.cal-scroll { overflow-x: auto; padding-bottom: 4px; }
+.cal { min-width: 760px; }
+.cal-head { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; margin-bottom: 5px; }
+.cal-head span {
+  font-family: var(--font-display); font-size: 0.66rem; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft);
+  text-align: center; padding: 2px 0;
+}
+.cal-body { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+
+/* ── LA CASE JOUR ───────────────────────────────────────────
+   Inchangée par rapport à la V2 : fond, bordure, min-height 96px.
+   Ce qui est NOUVEAU est strictement l'étage « journée ». */
+.day {
+  position: relative; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 6px; min-height: 96px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.day.we { background: var(--grid-we); }
+.day.fri { background: linear-gradient(180deg, var(--surface-2) 38%, var(--grid-we) 82%); }
+.day.other { border-style: dashed; }
+.day.other .d-num { color: var(--soft); }
+.day.today { border-color: var(--accent-ink); box-shadow: 0 0 0 1px var(--accent-ink) inset; }
+
+.d-head { display: flex; align-items: center; gap: 5px; min-height: 16px; }
+.d-num { font-family: var(--font-display); font-size: 0.78rem; font-weight: 800; }
+.d-ferie, .d-today-tag {
+  font-size: 0.58rem; font-weight: 700; padding: 1px 5px; border-radius: 999px;
+}
+.d-ferie { background: var(--danger-soft); color: var(--danger); }
+.d-today-tag { background: var(--accent-soft); color: var(--accent-ink); margin-left: auto; }
+
+/* L'étage GARDE — la fiche existante, intouchée */
+.slot-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 9px; padding: 4px 5px; display: grid; gap: 2px;
+}
+.slot-card.manque { border-color: var(--warn); background: var(--warn-soft); }
+.sc-tag {
+  font-family: var(--font-display); font-size: 0.55rem; font-weight: 800;
+  letter-spacing: 0.07em; text-transform: uppercase; color: var(--soft);
+}
+.vet-row {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 0.7rem; font-weight: 600; line-height: 1.3;
+  background: none; border: 0; padding: 0; color: var(--text);
+  text-align: left; width: 100%;
+}
+.vet-row .vdot {
+  width: 7px; height: 7px; border-radius: 50%; flex: none;
+  border: 2px solid var(--soft);
+}
+.vet-row .role { color: var(--soft); font-size: 0.58rem; font-weight: 700; margin-left: auto; }
+.vet-row.empty { color: var(--warn); font-style: italic; }
+.vet-row.empty .vdot { border-style: dashed; border-color: var(--warn); }
+
+/* ══ L'ÉTAGE JOURNÉE — CE QUI EST NOUVEAU ══════════════════
+   Il est séparé de la garde par un filet, jamais empilé dans la
+   même liste : deux natures d'information qui se lisent comme une
+   seule liste deviennent illisibles toutes les deux. */
+.jr {
+  display: grid; gap: 3px;
+  padding-top: 4px; margin-top: auto;
+  border-top: 1px dashed var(--border-strong);
+}
+.jr-vide {
+  font-size: 0.6rem; color: var(--soft); font-style: italic;
+}
+
+/* Variante A — PASTILLES À INITIALE, par tranche */
+.jr-ligne { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; }
+.jr-tag {
+  font-family: var(--font-display); font-size: 0.52rem; font-weight: 800;
+  letter-spacing: 0.06em; color: var(--soft);
+  min-width: 1.5em; flex: none;
+}
+.pastille {
+  width: 17px; height: 17px; border-radius: 50%; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-size: 0.5rem; font-weight: 800;
+  color: #FFF8EF; letter-spacing: -0.02em;
+}
+
+/* Variante B — RAIL HORAIRE 8h → 18h */
+.jr-rail { position: relative; display: grid; gap: 2px; }
+.jr-rail-fond {
+  position: absolute; inset: 0; border-radius: 3px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--border) 0 1px,
+    transparent 1px 20%
+  );
+  opacity: 0.85; pointer-events: none;
+}
+.jr-piste { position: relative; height: 4px; border-radius: 3px; background: rgba(160, 141, 117, 0.16); }
+.jr-seg { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
+.jr-echelle {
+  display: flex; justify-content: space-between;
+  font-size: 0.5rem; font-weight: 700; color: var(--soft);
+  font-variant-numeric: tabular-nums; margin-top: 1px;
+}
+
+.conge-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 0.6rem; font-weight: 600; color: var(--muted);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 999px; padding: 1px 6px; align-self: flex-start;
+}
+.conge-chip.souhait { border-style: dashed; color: var(--soft); }
+.conge-chip .vdot { width: 6px; height: 6px; border-radius: 50%; border: 2px solid var(--soft); }
+
+/* ── Le panneau de droite ────────────────────────────────── */
+.panneau {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-md); padding: 14px; display: grid; gap: 14px;
+}
+.panneau h4 {
+  font-family: var(--font-display); font-size: 0.86rem; font-weight: 800;
+  margin: 0 0 3px;
+}
+.panneau p.sous { margin: 0; font-size: 0.72rem; color: var(--soft); line-height: 1.45; }
+.pan-bloc { display: grid; gap: 7px; }
+.pan-sep { border: 0; border-top: 1px solid var(--border); margin: 0; }
+.legende { display: grid; gap: 5px; }
+.legende-ligne { display: flex; align-items: center; gap: 7px; font-size: 0.74rem; }
+.legende-ligne .pastille { width: 16px; height: 16px; }
+.cnt-ligne {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 8px;
+  align-items: center; font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+}
+.cnt-ligne .nom { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.cnt-ligne .vdot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.cnt-ligne .ecart { font-size: 0.68rem; font-weight: 700; }
+.cnt-ligne .ecart.plus { color: var(--danger); }
+.cnt-ligne .ecart.moins { color: var(--ok); }
+.cnt-ligne .ecart.zero { color: var(--soft); }
+
+/* ── Les 4 points de B-145 ──────────────────────────────── */
+.points { margin-top: 38px; }
+.points > h2 {
+  font-family: var(--font-display); font-size: 1.15rem; font-weight: 800;
+  letter-spacing: -0.015em; margin: 0 0 6px;
+}
+.points > p.intro { margin: 0 0 20px; color: var(--muted); font-size: 0.92rem; max-width: 68ch; }
+.pt-liste { display: grid; gap: 14px; }
+.pt {
+  display: grid; grid-template-columns: auto 1fr; gap: 14px;
+  padding: 16px 18px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+}
+.pt-num {
+  font-family: var(--font-display); font-size: 1.1rem; font-weight: 800;
+  color: var(--accent-ink); font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.pt h3 {
+  font-family: var(--font-display); font-size: 0.94rem; font-weight: 800;
+  margin: 0 0 7px; letter-spacing: -0.01em;
+}
+.pt .avant, .pt .apres { display: flex; gap: 8px; font-size: 0.86rem; margin: 0 0 5px; }
+.pt .et {
+  font-family: var(--font-display); font-size: 0.6rem; font-weight: 800;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  flex: none; min-width: 5.6em; padding-top: 3px;
+}
+.pt .avant .et { color: var(--soft); }
+.pt .apres .et { color: var(--accent-ink); }
+.pt .avant span:last-child { color: var(--muted); }
+.pt code {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.78em; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 4px; padding: 0 4px;
+}
+
+/* ── Ce qui reste à trancher ─────────────────────────────── */
+.trancher {
+  margin-top: 34px; padding: 20px 22px;
+  background: var(--bg-deep); border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+}
+.trancher h2 {
+  font-family: var(--font-display); font-size: 1.05rem; font-weight: 800;
+  margin: 0 0 4px;
+}
+.trancher > p { margin: 0 0 16px; font-size: 0.88rem; color: var(--muted); }
+.trancher ol { margin: 0; padding-left: 20px; display: grid; gap: 11px; }
+.trancher li { font-size: 0.9rem; }
+.trancher li b { font-family: var(--font-display); }
+.trancher .def {
+  display: block; font-size: 0.82rem; color: var(--muted); margin-top: 2px;
+}
+
+.pied {
+  margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--border);
+  font-size: 0.78rem; color: var(--soft);
+}
+.pied b { color: var(--muted); }
+</style>
+
+<div class="page">
+
+  <header class="doc-head">
+    <p class="doc-eyebrow">B-145 · PIXEL · proposition d'ergonomie</p>
+    <h1>Un seul planning, deux natures dans la même case</h1>
+    <p class="chapo">
+      Le planning de la journée ne s'ajoute pas à côté du planning de gardes :
+      <b>il entre dans la même grille</b>. Ci-dessous, le même écran dans les trois cas de
+      figure qu'un cabinet peut connaître, et <b>deux façons de dessiner l'étage « journée »</b>
+      dans une case qui fait 96 px de haut. Les boutons en haut changent ce que tu regardes.
+    </p>
+  </header>
+
+  <section class="mesures">
+    <h2>Ce qui contraint le dessin — mesuré, pas supposé</h2>
+    <ul>
+      <li>
+        <span class="val">96 × 104 px</span>
+        <span>la taille d'une case jour, qui porte déjà la garde, ses places à pourvoir et les congés
+          <span class="src">— v2-planning.css:221,240</span></span>
+      </li>
+      <li>
+        <span class="val">3 tranches</span>
+        <span>actives sur le cabinet Démo (<code>Matin</code>, <code>Après-midi</code>, <code>Journée complète</code>), 0 sur Val d'Allier
+          <span class="src">— mesuré en base le 02/10</span></span>
+      </li>
+      <li>
+        <span class="val">jusqu'à 21</span>
+        <span>lignes de présence si on écrit les prénoms : 3 tranches × 7 vétérinaires. La case en tient 4.
+          <span class="src">— d'où les deux variantes ci-dessous</span></span>
+      </li>
+      <li>
+        <span class="val">0 trame</span>
+        <span>enregistrée à ce jour : <b>rien n'est à migrer</b>, la représentation se décide librement
+          <span class="src">— mesuré en base le 02/10</span></span>
+      </li>
+    </ul>
+  </section>
+
+  <div class="controles">
+    <div class="grp">
+      <span>Cas du cabinet</span>
+      <div class="seg" role="group" aria-label="Cas du cabinet">
+        <button type="button" data-cas="deux" aria-pressed="true">Gardes + journée</button>
+        <button type="button" data-cas="gardes" aria-pressed="false">Gardes seules</button>
+        <button type="button" data-cas="journee" aria-pressed="false">Journée seule</button>
+      </div>
+    </div>
+    <div class="grp">
+      <span>Dessin de la journée</span>
+      <div class="seg" role="group" aria-label="Dessin de la journée">
+        <button type="button" data-var="pastilles" aria-pressed="true">Pastilles par tranche</button>
+        <button type="button" data-var="rail" aria-pressed="false">Rail horaire</button>
+      </div>
+    </div>
+    <p class="note-cas" id="note-cas"></p>
+  </div>
+
+  <div class="workspace">
+    <div class="work-head">
+      <span class="period-pill">
+        Hiver 2026-2027
+        <span class="pp-etat">Brouillon</span>
+      </span>
+      <div class="month-nav">
+        <button type="button" class="mn-btn" aria-label="Mois précédent">←</button>
+        <span class="label">Octobre 2026</span>
+        <button type="button" class="mn-btn" aria-label="Mois suivant">→</button>
+      </div>
+      <div class="head-actions" id="actions"></div>
+    </div>
+
+    <p class="grid-hint" id="hint"></p>
+
+    <div class="work-grid">
+      <div>
+        <div class="cal-scroll">
+          <div class="cal">
+            <div class="cal-head" aria-hidden="true">
+              <span>Lun</span><span>Mar</span><span>Mer</span>
+              <span>Jeu</span><span>Ven</span><span>Sam</span><span>Dim</span>
+            </div>
+            <div class="cal-body" id="grille"></div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="panneau" id="panneau"></aside>
+    </div>
+  </div>
+
+  <section class="points">
+    <h2>Les quatre points de B-145, et ce que cette maquette en fait</h2>
+    <p class="intro">
+      Chaque point est un endroit où le produit dit aujourd'hui quelque chose de faux dès qu'un
+      cabinet n'a pas de gardes. Les trois premiers se voient dans la maquette ci-dessus en
+      changeant de cas de figure.
+    </p>
+    <div class="pt-liste">
+
+      <article class="pt">
+        <span class="pt-num">1</span>
+        <div>
+          <h3>La création d'une période</h3>
+          <p class="avant">
+            <span class="et">Aujourd'hui</span>
+            <span>Le seul chemin est la pilule <b>« Générer »</b>, qui lance le moteur de gardes
+              (<code>outils-planning.tsx:187</code>). Sur un cabinet sans gardes, le geste central
+              de l'écran propose une action qui n'a aucun objet.</span>
+          </p>
+          <p class="apres">
+            <span class="et">Proposé</span>
+            <span>La pilule devient <b>« Nouvelle période »</b>. Elle demande d'abord
+              <b>ce que la période couvre</b> — gardes, journée, ou les deux. « Générer » redevient
+              ce qu'il est : l'action du moteur, à l'intérieur du parcours, et elle disparaît
+              quand il n'y a pas de gardes à calculer.</span>
+          </p>
+        </div>
+      </article>
+
+      <article class="pt">
+        <span class="pt-num">2</span>
+        <div>
+          <h3>La grille</h3>
+          <p class="avant">
+            <span class="et">Aujourd'hui</span>
+            <span>La case empile tout dans une même colonne : garde, places à pourvoir, congés.
+              Y verser les présences de la journée les ferait lire comme une seule liste —
+              et rendrait les deux illisibles.</span>
+          </p>
+          <p class="apres">
+            <span class="et">Proposé</span>
+            <span>La case a <b>deux étages séparés par un filet</b>. En haut la garde, inchangée :
+              c'est ce qu'on cherche en premier, décision déjà prise le 26/08. En bas la journée,
+              <b>jamais en prénoms écrits</b> — elle n'y tiendrait pas. Les deux dessins possibles
+              sont à comparer ci-dessus, et un <b>filtre d'affichage</b> dans l'en-tête permet de
+              revenir à la grille d'origine quand on ne cherche que les gardes.</span>
+          </p>
+        </div>
+      </article>
+
+      <article class="pt">
+        <span class="pt-num">3</span>
+        <div>
+          <h3>Le geste de publication</h3>
+          <p class="avant">
+            <span class="et">Aujourd'hui</span>
+            <span>Le contrôle de publication ne connaît qu'un critère : <code>aDesGardes</code>
+              (<code>outils-planning.tsx:239-244</code>). Sur un planning de journée parfaitement
+              rempli, il répondrait <b>« ce planning n'a aucune garde »</b> et refuserait.</span>
+          </p>
+          <p class="apres">
+            <span class="et">Proposé</span>
+            <span><b>Un seul geste</b>, qui engage les deux mondes — mais son récapitulatif les
+              <b>nomme tous les deux</b> avant de partir : « 144 places de garde · 5 semaines de
+              journée ». Un envoi qui ne dit pas ce qu'il envoie est un envoi qu'on ne relit pas.</span>
+          </p>
+        </div>
+      </article>
+
+      <article class="pt">
+        <span class="pt-num">4</span>
+        <div>
+          <h3>Le dock et la navigation</h3>
+          <p class="avant">
+            <span class="et">Aujourd'hui</span>
+            <span><code>/journee</code> est une <b>entrée d'espace</b> dans le dock, réservée à
+              l'administratrice (<code>BarreV2.tsx:166</code>). Or cet écran ne contient que de la
+              <b>configuration</b> : les tranches horaires et les trames de présence. C'est un
+              réglage installé dans une barre d'espaces de travail.</span>
+          </p>
+          <p class="apres">
+            <span class="et">Proposé</span>
+            <span>L'entrée « Journée » <b>quitte le dock</b>. Sa configuration rejoint
+              <b>« Organisation »</b>, où vivent déjà les créneaux, les règles et les périodes types —
+              c'est la même nature de réglage. La consultation, elle, est dans
+              <code>/planning</code>, pour tout le monde. Un objet, un écran.</span>
+          </p>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <section class="trancher">
+    <h2>Ce qui reste à trancher — et ce que je prends par défaut</h2>
+    <p>Tu as déjà tranché le principal : un seul écran, un seul planning, les deux dans la case.
+      Il reste ceci, et le silence vaut acceptation des valeurs par défaut.</p>
+    <ol>
+      <li>
+        <b>Quel dessin pour la journée</b> — les deux boutons en haut de page.
+        <span class="def">Par défaut : les <b>pastilles par tranche</b>. Elles répondent à
+          « qui est là ? », qui est la question du comptoir. Le rail répond à « la journée est-elle
+          couverte ? », qui est une question d'administratrice — il irait mieux en vue semaine.</span>
+      </li>
+      <li>
+        <b>Qui voit la journée</b>
+        <span class="def">Par défaut : <b>lecture pour toute l'équipe et pour le secrétariat</b>
+          (c'est lui qui décroche le téléphone et répond « qui est là ce matin »),
+          <b>configuration pour l'administratrice seule</b>.</span>
+      </li>
+      <li>
+        <b>Le filtre d'affichage est-il mémorisé</b>
+        <span class="def">Par défaut : <b>oui, par personne</b>, comme les colonnes des compteurs
+          le sont déjà. Un filtre qui se réinitialise à chaque visite se re-règle douze fois par jour.</span>
+      </li>
+      <li>
+        <b>La vue par personne</b>
+        <span class="def">Par défaut : <b>pas maintenant</b>. La grille par jour couvre la question
+          quotidienne ; « qui travaille quand sur le mois » est une seconde vue, à ouvrir comme un
+          item distinct plutôt qu'à glisser dans celui-ci.</span>
+      </li>
+    </ol>
+  </section>
+
+  <p class="pied">
+    <b>Maquette, pas un écran livré.</b> Rien n'est codé dans le produit à ce stade.
+    Les couleurs, les polices et la case jour sont reprises du design system GuardVeto V2 ;
+    les prénoms, les trois tranches horaires et les sept vétérinaires sont ceux du cabinet réel.
+    Les horaires affichés dans le rail (8 h → 18 h) supposent <code>Matin 08:00-13:00</code> et
+    <code>Après-midi 14:00-18:00</code> : la Démo porte aujourd'hui deux tranches aux
+    <b>mêmes horaires que « Journée complète »</b>, ce que B-144 signale déjà comme une saisie à revoir.
+  </p>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Les sept vétérinaires du cabinet, avec leurs vraies couleurs ──
+  var VETS = [
+    { cle: 'anneso',  prenom: 'Anne-So',  init: 'AS', couleur: '#3B6FD1' },
+    { cle: 'annecat', prenom: 'Anne-Cat', init: 'AC', couleur: '#8153C7' },
+    { cle: 'manon',   prenom: 'Manon',    init: 'M',  couleur: '#B93A72' },
+    { cle: 'victor',  prenom: 'Victor',   init: 'V',  couleur: '#0B7D6C' },
+    { cle: 'camille', prenom: 'Camille',  init: 'C',  couleur: '#55700F' },
+    { cle: 'julie',   prenom: 'Julie',    init: 'J',  couleur: '#A0522D' },
+    { cle: 'thomas',  prenom: 'Thomas',   init: 'T',  couleur: '#4B5D73' }
+  ];
+  var V = {};
+  VETS.forEach(function (v) { V[v.cle] = v; });
+
+  // ── Les trois tranches, telles qu'elles existent en base ──
+  // `debut`/`fin` en heures décimales pour le rail 8h → 18h.
+  var TRANCHES = {
+    matin:   { tag: 'M',  nom: 'Matin',           debut: 8,  fin: 13 },
+    aprem:   { tag: 'AM', nom: 'Après-midi',      debut: 14, fin: 18 },
+    journee: { tag: 'J',  nom: 'Journée complète', debut: 8,  fin: 18 }
+  };
+  var RAIL_DEBUT = 8, RAIL_FIN = 18;
+
+  // ── La trame de présence, par jour de semaine (0 = lundi) ──
+  // C'est exactement le modèle `trames_journee` du produit : une
+  // personne, une tranche, un jour.
+  var TRAME = [
+    [ ['matin', ['anneso', 'manon', 'victor']], ['aprem', ['anneso', 'camille']] ],
+    [ ['matin', ['annecat', 'camille', 'julie']], ['aprem', ['annecat', 'thomas']] ],
+    [ ['journee', ['anneso', 'victor']], ['matin', ['manon']] ],
+    [ ['matin', ['annecat', 'thomas', 'julie']], ['aprem', ['victor', 'camille']] ],
+    [ ['matin', ['anneso', 'manon']], ['aprem', ['anneso', 'julie']], ['journee', ['thomas']] ],
+    [ ['matin', ['victor']] ],
+    []
+  ];
+
+  // ── Les gardes du mois ──
+  // Semaine : un véto le soir. Week-end : porté par le samedi, 1er et 2e.
+  var ROTATION_SOIR = ['manon', 'victor', 'camille', 'julie', 'thomas', 'anneso', 'annecat'];
+  var ROTATION_WE = [
+    ['anneso', 'thomas'], ['manon', 'camille'], ['victor', 'julie'],
+    ['annecat', null], ['camille', 'manon']
+  ];
+
+  var CONGES = [
+    { debut: '2026-10-12', fin: '2026-10-16', vet: 'julie', statut: 'valide' },
+    { debut: '2026-10-23', fin: '2026-10-23', vet: 'camille', statut: 'souhait' }
+  ];
+
+  var FERIES = { '2026-11-01': 'Toussaint' };
+  var TODAY = '2026-10-02';
+  var MOIS = 10;
+
+  // ── La grille : du lundi 28/09 au dimanche 01/11/2026 ──
+  function iso(d) { return d.toISOString().slice(0, 10); }
+  var grille = [];
+  var curseur = new Date(Date.UTC(2026, 8, 28, 12, 0, 0));
+  for (var i = 0; i < 35; i++) {
+    grille.push(iso(curseur));
+    curseur.setUTCDate(curseur.getUTCDate() + 1);
+  }
+
+  var etat = { cas: 'deux', variante: 'pastilles', vue: 'deux' };
+
+  function jourDeSemaine(dateIso) {
+    var d = new Date(dateIso + 'T12:00:00Z');
+    return (d.getUTCDay() + 6) % 7;
+  }
+
+  /** Les gardes de ce jour, dans le format de la grille. */
+  function gardesDuJour(dateIso, index) {
+    if (etat.cas === 'journee') return [];
+    var d = new Date(dateIso + 'T12:00:00Z');
+    if (d.getUTCMonth() + 1 !== MOIS) return [];
+
+    var dow = jourDeSemaine(dateIso);
+    var semaine = Math.floor(index / 7);
+
+    if (dow === 5) {
+      var duo = ROTATION_WE[semaine % ROTATION_WE.length];
+      var places = [{ vet: duo[0], role: '1er' }];
+      if (duo[1]) places.push({ vet: duo[1], role: '2e' });
+      else places.push({ vet: null, role: '2e' });
+      return [{ tag: 'Week-end', places: places }];
+    }
+    if (dow === 4 || dow === 6) return [];
+    return [{
+      tag: 'Semaine soir',
+      places: [{ vet: ROTATION_SOIR[(index + semaine) % ROTATION_SOIR.length], role: '' }]
+    }];
+  }
+
+  /** Les présences de ce jour. */
+  function journeeDuJour(dateIso) {
+    if (etat.cas === 'gardes') return [];
+    var d = new Date(dateIso + 'T12:00:00Z');
+    if (d.getUTCMonth() + 1 !== MOIS) return [];
+    return TRAME[jourDeSemaine(dateIso)] || [];
+  }
+
+  function congesDuJour(dateIso) {
+    return CONGES.filter(function (c) { return c.debut <= dateIso && c.fin >= dateIso; });
+  }
+
+  function el(balise, classe, texte) {
+    var n = document.createElement(balise);
+    if (classe) n.className = classe;
+    if (texte !== undefined) n.textContent = texte;
+    return n;
+  }
+
+  function pastille(vetCle, titre) {
+    var v = V[vetCle];
+    var p = el('span', 'pastille', v.init);
+    p.style.background = v.couleur;
+    p.title = titre || v.prenom;
+    return p;
+  }
+
+  /** Variante A — une ligne par tranche, des pastilles à initiale. */
+  function dessinPastilles(presences) {
+    var zone = el('div');
+    presences.forEach(function (paire) {
+      var t = TRANCHES[paire[0]], gens = paire[1];
+      var ligne = el('div', 'jr-ligne');
+      var tag = el('span', 'jr-tag', t.tag);
+      tag.title = t.nom + ' · ' + t.debut + 'h-' + t.fin + 'h';
+      ligne.appendChild(tag);
+      gens.forEach(function (g) {
+        ligne.appendChild(pastille(g, V[g].prenom + ' · ' + t.nom));
+      });
+      zone.appendChild(ligne);
+    });
+    return zone;
+  }
+
+  /** Variante B — un rail 8h→18h, une piste par personne présente. */
+  function dessinRail(presences) {
+    // Une personne peut tenir plusieurs tranches le même jour : on
+    // regroupe par personne, sinon elle aurait deux pistes.
+    var ordre = [], parVet = {};
+    presences.forEach(function (paire) {
+      paire[1].forEach(function (g) {
+        if (!parVet[g]) { parVet[g] = []; ordre.push(g); }
+        parVet[g].push(paire[0]);
+      });
+    });
+
+    var rail = el('div', 'jr-rail');
+    rail.appendChild(el('div', 'jr-rail-fond'));
+    var duree = RAIL_FIN - RAIL_DEBUT;
+
+    ordre.forEach(function (g) {
+      var piste = el('div', 'jr-piste');
+      piste.title = V[g].prenom + ' · ' + parVet[g].map(function (k) {
+        return TRANCHES[k].nom;
+      }).join(' + ');
+      parVet[g].forEach(function (k) {
+        var t = TRANCHES[k];
+        var seg = el('span', 'jr-seg');
+        seg.style.left = ((t.debut - RAIL_DEBUT) / duree * 100) + '%';
+        seg.style.width = ((t.fin - t.debut) / duree * 100) + '%';
+        seg.style.background = V[g].couleur;
+        piste.appendChild(seg);
+      });
+      rail.appendChild(piste);
+    });
+
+    var ech = el('div', 'jr-echelle');
+    ech.appendChild(el('span', null, '8 h'));
+    ech.appendChild(el('span', null, '13 h'));
+    ech.appendChild(el('span', null, '18 h'));
+    rail.appendChild(ech);
+    return rail;
+  }
+
+  function dessinerCase(dateIso, index) {
+    var d = new Date(dateIso + 'T12:00:00Z');
+    var dow = jourDeSemaine(dateIso);
+    var numero = d.getUTCDate();
+    var moisCase = d.getUTCMonth() + 1;
+
+    var classes = ['day'];
+    if (dow === 4) classes.push('fri');
+    if (dow >= 5) classes.push('we');
+    if (moisCase !== MOIS) classes.push('other');
+    if (dateIso === TODAY) classes.push('today');
+
+    var box = el('div', classes.join(' '));
+
+    var tete = el('div', 'd-head');
+    tete.appendChild(el('span', 'd-num', String(numero)));
+    if (FERIES[dateIso]) {
+      var f = el('span', 'd-ferie', '★ Férié');
+      f.title = FERIES[dateIso];
+      tete.appendChild(f);
+    }
+    if (dateIso === TODAY) tete.appendChild(el('span', 'd-today-tag', 'Auj.'));
+    box.appendChild(tete);
+
+    // ── Étage 1 : la garde, exactement comme aujourd'hui ──
+    if (etat.vue !== 'journee') {
+      gardesDuJour(dateIso, index).forEach(function (g) {
+        var vide = g.places.some(function (p) { return !p.vet; });
+        var fiche = el('div', 'slot-card' + (vide ? ' manque' : ''));
+        fiche.appendChild(el('span', 'sc-tag', g.tag));
+        g.places.forEach(function (p) {
+          var ligne = el('span', 'vet-row' + (p.vet ? '' : ' empty'));
+          var pt = el('span', 'vdot');
+          if (p.vet) pt.style.borderColor = V[p.vet].couleur;
+          ligne.appendChild(pt);
+          ligne.appendChild(document.createTextNode(p.vet ? V[p.vet].prenom : 'À pourvoir'));
+          if (p.role && g.places.length > 1) ligne.appendChild(el('span', 'role', p.role));
+          fiche.appendChild(ligne);
+        });
+        box.appendChild(fiche);
+      });
+    }
+
+    // ── Étage 2 : la journée, séparée par un filet ──
+    if (etat.vue !== 'gardes') {
+      var presences = journeeDuJour(dateIso);
+      if (presences.length > 0) {
+        var jr = el('div', 'jr');
+        jr.appendChild(
+          etat.variante === 'rail' ? dessinRail(presences) : dessinPastilles(presences)
+        );
+        box.appendChild(jr);
+      } else if (moisCase === MOIS && etat.cas !== 'gardes' && dow <= 4) {
+        var jrv = el('div', 'jr');
+        jrv.appendChild(el('span', 'jr-vide', 'personne'));
+        box.appendChild(jrv);
+      }
+    }
+
+    congesDuJour(dateIso).forEach(function (c) {
+      var chip = el('div', 'conge-chip' + (c.statut === 'souhait' ? ' souhait' : ''));
+      var pt = el('span', 'vdot');
+      pt.style.borderColor = V[c.vet].couleur;
+      chip.appendChild(pt);
+      chip.appendChild(document.createTextNode(
+        (c.statut === 'souhait' ? 'Souhait' : 'Congé') + ' · ' + V[c.vet].prenom
+      ));
+      box.appendChild(chip);
+    });
+
+    return box;
+  }
+
+  // ── La barre d'outils, selon ce que le cabinet couvre ──
+  function dessinerActions() {
+    var zone = document.getElementById('actions');
+    zone.textContent = '';
+
+    // Le filtre d'affichage n'a de sens que si les deux mondes existent.
+    if (etat.cas === 'deux') {
+      var seg = el('div', 'vue-seg neuf');
+      seg.setAttribute('role', 'group');
+      seg.setAttribute('aria-label', "Ce que la grille montre");
+      [['deux', 'Les deux'], ['gardes', 'Gardes'], ['journee', 'Journée']].forEach(function (o) {
+        var b = el('button', null, o[1]);
+        b.type = 'button';
+        b.setAttribute('aria-pressed', etat.vue === o[0] ? 'true' : 'false');
+        b.addEventListener('click', function () { etat.vue = o[0]; rendre(); });
+        seg.appendChild(b);
+      });
+      zone.appendChild(seg);
+    }
+
+    var pdf = el('button', 'head-btn', '🖨 PDF');
+    pdf.type = 'button';
+    zone.appendChild(pdf);
+
+    var abs = el('button', 'head-btn', 'Absence');
+    abs.type = 'button';
+    zone.appendChild(abs);
+
+    var pub = el('button', 'head-btn valider', 'Publier');
+    pub.type = 'button';
+    pub.title = etat.cas === 'gardes'
+      ? '144 places de garde'
+      : etat.cas === 'journee'
+        ? '5 semaines de journée'
+        : '144 places de garde · 5 semaines de journée';
+    zone.appendChild(pub);
+
+    // LE POINT 1 — « Générer » n'existe que s'il y a des gardes à calculer.
+    if (etat.cas === 'journee') {
+      var nouv = el('button', 'head-btn nouveau neuf', 'Nouvelle période');
+      nouv.type = 'button';
+      nouv.title = "Créer une période — et choisir ce qu'elle couvre";
+      zone.appendChild(nouv);
+    } else {
+      var gen = el('button', 'head-btn generer', '✨ Générer');
+      gen.type = 'button';
+      zone.appendChild(gen);
+    }
+  }
+
+  function dessinerHint() {
+    var p = document.getElementById('hint');
+    p.textContent = '';
+    var fort = el('b', null,
+      etat.cas === 'journee'
+        ? 'Clique sur une case pour régler la présence du jour'
+        : 'Clique sur une case pour agir dessus');
+    p.appendChild(fort);
+    p.appendChild(document.createTextNode(
+      etat.cas === 'gardes'
+        ? ' — réattribuer une garde, signaler une absence.'
+        : etat.cas === 'journee'
+          ? ' — ajouter ou retirer quelqu’un sur une tranche.'
+          : ' — la garde en haut de la case, la présence du jour en bas.'
+    ));
+    p.appendChild(el('span', 'gh-sep', '·'));
+    p.appendChild(el('span', null, 'Le passé est verrouillé 🔒'));
+  }
+
+  // ── Le panneau de droite ──
+  function dessinerPanneau() {
+    var pan = document.getElementById('panneau');
+    pan.textContent = '';
+
+    // La légende des couleurs devient INDISPENSABLE dès que la journée
+    // s'affiche en pastilles ou en segments : sans elle, une couleur
+    // n'est qu'une couleur.
+    if (etat.cas !== 'gardes' && etat.vue !== 'gardes') {
+      var bl = el('div', 'pan-bloc');
+      var h = el('h4', null, "Qui est qui");
+      bl.appendChild(h);
+      bl.appendChild(el('p', 'sous',
+        etat.variante === 'rail'
+          ? 'Chaque piste du rail est une personne, de son heure d’arrivée à son départ.'
+          : 'Chaque pastille est une personne présente sur la tranche.'));
+      var leg = el('div', 'legende');
+      VETS.forEach(function (v) {
+        var l = el('div', 'legende-ligne');
+        l.appendChild(pastille(v.cle));
+        l.appendChild(document.createTextNode(v.prenom));
+        leg.appendChild(l);
+      });
+      bl.appendChild(leg);
+      pan.appendChild(bl);
+    }
+
+    if (etat.cas !== 'journee') {
+      if (pan.childNodes.length) pan.appendChild(el('hr', 'pan-sep'));
+      var b2 = el('div', 'pan-bloc');
+      b2.appendChild(el('h4', null, 'Compteurs · période'));
+      b2.appendChild(el('p', 'sous', 'Ils bougent à chaque changement, manuel comme automatique.'));
+      var cpt = [
+        ['anneso', 4, 0], ['annecat', 1, -2], ['manon', 5, 1],
+        ['victor', 4, 0], ['camille', 5, 1], ['julie', 3, -1], ['thomas', 4, 0]
+      ];
+      cpt.forEach(function (c) {
+        var l = el('div', 'cnt-ligne');
+        var nom = el('span', 'nom');
+        var pt = el('span', 'vdot');
+        pt.style.background = V[c[0]].couleur;
+        nom.appendChild(pt);
+        nom.appendChild(document.createTextNode(V[c[0]].prenom));
+        l.appendChild(nom);
+        l.appendChild(el('span', null, c[1] + ' WE'));
+        var signe = c[2] > 0 ? 'plus' : c[2] < 0 ? 'moins' : 'zero';
+        l.appendChild(el('span', 'ecart ' + signe,
+          c[2] === 0 ? '=' : (c[2] > 0 ? '+' : '') + c[2]));
+        b2.appendChild(l);
+      });
+      pan.appendChild(b2);
+    }
+  }
+
+  var NOTES = {
+    deux: "<b>Le cas du chantier 3.</b> La case porte la garde en haut, la présence du jour en bas. Le filtre « Les deux · Gardes · Journée » apparaît dans l’en-tête — il allège la lecture sans séparer les écrans.",
+    gardes: "<b>Val d’Allier aujourd’hui.</b> Le client en service ne doit voir <b>aucun changement</b> : ni filtre, ni étage en bas de case, ni ligne en plus. C’est la garantie de non-régression.",
+    journee: "<b>Un cabinet sans gardes.</b> « Générer » disparaît — il n’y a rien à calculer — et laisse la place à « Nouvelle période ». Les compteurs d’équité disparaissent aussi : ils comptent des week-ends de garde."
+  };
+
+  function rendre() {
+    var g = document.getElementById('grille');
+    g.textContent = '';
+    grille.forEach(function (date, i) { g.appendChild(dessinerCase(date, i)); });
+    dessinerActions();
+    dessinerHint();
+    dessinerPanneau();
+    document.getElementById('note-cas').innerHTML = NOTES[etat.cas];
+  }
+
+  document.querySelectorAll('.controles [data-cas]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      etat.cas = b.dataset.cas;
+      etat.vue = etat.cas === 'deux' ? 'deux' : etat.cas;
+      document.querySelectorAll('.controles [data-cas]').forEach(function (o) {
+        o.setAttribute('aria-pressed', o === b ? 'true' : 'false');
+      });
+      rendre();
+    });
+  });
+
+  document.querySelectorAll('.controles [data-var]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      etat.variante = b.dataset.var;
+      document.querySelectorAll('.controles [data-var]').forEach(function (o) {
+        o.setAttribute('aria-pressed', o === b ? 'true' : 'false');
+      });
+      rendre();
+    });
+  });
+
+  rendre();
+})();
+</script>
+
+</body>
+</html>

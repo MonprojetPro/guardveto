@@ -202,15 +202,25 @@ export function TramesJournee({ trames, blocs, equipe }: Props) {
           servira à remplir le planning sans tout ressaisir.
         </p>
 
-        {/* ⚠️ DIT, PAS TU : enregistrer une trame ne pose aucune présence. Sans
-            cette phrase, l'admin attendrait un planning qui ne vient pas. */}
+        {/* ⚠️ PHRASE CORRIGÉE AU LOT 2 (06/10), ET C'EST LA RÈGLE DU PROJET QUI
+            L'EXIGEAIT. Elle disait « ces règles ne remplissent pas encore le
+            planning » — vrai au lot 1, FAUX depuis qu'un geste les applique
+            (`AppliquerTrames`, juste en dessous). La question à se poser quand
+            une capacité apparaît n'est pas « faut-il un écran ? » mais « une
+            phrase déjà affichée devient-elle fausse ? ».
+
+            Ce qu'elle doit continuer à dire, en revanche, reste vrai et compte
+            autant : enregistrer une règle ne pose TOUJOURS rien par lui-même.
+            C'est la décision ⑤ du cadrage V3 — sans quoi l'admin perdrait ses
+            retouches en corrigeant une faute de frappe. */}
         <p className="tj-avis" role="status">
           <span className="tj-avis-icone" aria-hidden="true">
             !
           </span>
           <span>
-            Ces règles ne remplissent pas encore le planning. Les enregistrer ne change aucune
-            journée déjà prévue.
+            Enregistrer une règle ne pose aucune présence et ne change aucune journée déjà prévue.
+            C’est le geste <b>« Remplir le planning des journées »</b>, en dessous, qui les pose
+            sur un planning.
           </span>
         </p>
 

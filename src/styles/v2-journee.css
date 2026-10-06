@@ -431,3 +431,74 @@
 
 /* Le titre de la carte suit le centrage, sinon il reste seul à gauche. */
 .module-eteint .card-head { justify-content: center; }
+
+/* ============================================================
+   APPLIQUER LES TRAMES — B-120 chantier 3, lot 2
+   ============================================================
+   Le geste qui pose réellement les présences sur un planning. Il reprend les
+   jetons de l'écran (`--warn` pour l'avertissement, `--accent` pour l'action) :
+   aucune couleur en dur, et rien de neuf à inventer — le projet n'a qu'un
+   thème, vérifié au chantier B-144 (`data-theme` et `prefers-color-scheme` à
+   vide dans tout le CSS).
+   ============================================================ */
+
+.at-ligne {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 0 0 8px;
+}
+
+.at-label {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--soft);
+  flex: none;
+}
+
+/* Les plannings proposés. Des boutons et non un menu : pour deux ou trois
+   périodes, un menu cache l'information qu'on vient chercher. */
+.at-choix {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.at-etat {
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+.at-bornes {
+  margin: 0 0 12px;
+  color: var(--soft);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.at-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+/* Le compte annoncé avant écriture. Ton neutre et non `--warn` : ce n'est pas
+   un avertissement, c'est un résultat de calcul — et le teinter en alerte
+   apprendrait à ne plus lire les vraies alertes juste en dessous. */
+.at-apercu {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-strong);
+  border-left: 4px solid var(--accent-ink);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}

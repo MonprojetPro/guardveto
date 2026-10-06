@@ -281,6 +281,38 @@ export interface TrameJournee {
   actif: boolean
 }
 
+/**
+ * Une présence réelle sur le planning de la journée — B-120 chantier 3 lot 2.
+ *
+ * C'est la PROJECTION d'une trame sur un calendrier, ou une retouche à la main.
+ * Toute la différence avec `TrameJournee` tient dans `date` : la trame dit
+ * « le mardi », la présence dit « le mardi 13 octobre ».
+ *
+ * ⚠️ Rattachée à une PÉRIODE, obligatoirement. C'est sa publication qui décide
+ *    si l'équipe la voit (décision MiKL du 02/10) — sans ce rattachement, le
+ *    brouillon de l'administratrice fuirait dans l'écran des vétérinaires,
+ *    défaut déjà payé le 20/08.
+ */
+export interface PresenceJournee {
+  id: string
+  cabinet_id: string
+  periode_id: string
+  veterinaire_id: string
+  /** La tranche horaire (`blocs_journee`). */
+  bloc_id: string
+  /** Le jour réel, `AAAA-MM-JJ`. */
+  date: string
+  /**
+   * La trame qui a posé cette présence. `null` = posée à la main.
+   *
+   * Seule source de la filiation : il n'y a volontairement pas de colonne
+   * `origine` à garder d'accord avec elle. C'est aussi ce qui protège le travail
+   * manuel — l'application d'une trame est additive et ne touche jamais une
+   * présence existante, quelle que soit son origine.
+   */
+  trame_id: string | null
+}
+
 export interface ContrainteVeto {
   id: string
   veterinaire_id: string

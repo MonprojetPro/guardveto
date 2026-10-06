@@ -33,6 +33,7 @@ import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
 import { BlocsJournee } from '@/components/v2/BlocsJournee'
 import { TramesJournee } from '@/components/v2/TramesJournee'
+import { AppliquerTrames } from '@/components/v2/AppliquerTrames'
 import { ModuleEteint } from '@/components/v2/ModuleEteint'
 import { modulesDuCabinet } from '@/lib/produit/modules-serveur'
 import { chargerDock } from '@/data/v2/dock'
@@ -98,7 +99,15 @@ export default async function JourneePage() {
   // ⚠️ MAIS LES TRAMES SONT LUES EN ENTIER, actives ET retirées, exactement
   //    comme les tranches ci-dessus : les masquer ici rendrait la remise en
   //    service impossible depuis l'interface.
-  const [{ data: dataTrames }, { data: dataEquipe }] = await Promise.all([
+  // ── Chantier 3, lot 2 : les périodes sur lesquelles on peut POSER ─────────
+  //
+  // ⚠️ LES PÉRIODES VERROUILLÉES SONT ÉCARTÉES ICI, et l'action serveur les
+  //    refuse aussi (`periodeModifiable`). Deux gardiens, comme partout sur ce
+  //    projet : l'écran évite de proposer un geste qui échouerait, le serveur
+  //    refuse le chemin qu'on n'a pas prévu. Proposer un planning d'archive
+  //    aurait laissé poser des présences qu'aucun écran ne permet ensuite de
+  //    retirer, puisqu'il s'affiche en lecture seule.
+  const [{ data: dataTrames }, { data: dataEquipe }, { data: dataPeriodes }] = await Promise.all([
     supabase
       .from('trames_journee')
       .select('id, cabinet_id, veterinaire_id, bloc_id, jour, semaine, actif'),
@@ -107,10 +116,39 @@ export default async function JourneePage() {
       .select('id, prenom, nom, role_app, actif')
       .eq('actif', true)
       .order('prenom', { ascending: true }),
+    supabase
+      .from('periodes')
+      .select('id, libelle, date_debut, date_fin, statut, saison')
+      .neq('statut', 'verrouille')
+      .order('date_debut', { ascending: false })
+      .limit(12),
   ])
 
   const trames = (dataTrames ?? []) as TrameJournee[]
   const equipe = (dataEquipe ?? []) as Veterinaire[]
+
+  // Le libellé retombe sur la saison et l'année quand il est vide — même repli
+  // que le dock (`data/v2/dock.ts`), pour que l'admin lise le même nom de
+  // planning aux deux endroits. Un nom qui change d'un écran à l'autre lui fait
+  // croire à deux plannings différents.
+  const periodesApplicables = (
+    (dataPeriodes ?? []) as {
+      id: string
+      libelle: string | null
+      date_debut: string
+      date_fin: string
+      statut: string
+      saison: string | null
+    }[]
+  ).map((p) => ({
+    id: p.id,
+    libelle:
+      p.libelle ??
+      `${p.saison === 'ete' ? 'Été' : 'Hiver'} ${p.date_debut.slice(0, 4)}`,
+    date_debut: p.date_debut,
+    date_fin: p.date_fin,
+    statut: p.statut,
+  }))
 
   return (
     <>
@@ -119,6 +157,12 @@ export default async function JourneePage() {
         <BarreV2 prenom={vet.prenom} estAdmin={estAdmin} dock={dock} />
         <BlocsJournee blocs={blocs} />
         <TramesJournee trames={trames} blocs={blocs} equipe={equipe} />
+        {/* Lot 2 — le geste qui POSE. Il vient après les trames, dans l'ordre
+            où l'on travaille : définir les règles, puis les appliquer. */}
+        <AppliquerTrames
+          periodes={periodesApplicables}
+          aDesTrames={trames.some((t) => t.actif)}
+        />
       </div>
     </>
   )
