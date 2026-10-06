@@ -387,3 +387,100 @@ describe('presenceDejaPosee', () => {
     expect(r).toEqual({ presente: false })
   })
 })
+
+// ── Les absences bloquent la pose (B-148) ────────────────────────────────────
+//
+// Demande de MiKL le 06/10 : le geste doit appliquer « les recurrences, ET les
+// absences programmees ». Le lot 1 ne regardait AUCUN conge — il aurait pose une
+// presence sur quelqu'un en vacances, sans un mot. Ce n'etait pas un oubli
+// d'ecran, c'etait un trou dans la logique livree.
+//
+// ⚠️ LA FONCTION PURE NE CONNAIT NI STATUT NI MOTIF. « Quelles absences
+//    bloquent » est une question PRODUIT, repondue une seule fois dans l'action
+//    serveur (conges valides + absences actives). Ici on verifie seulement que
+//    l'absence l'emporte sur l'habitude.
+
+describe('presencesVoulues — les absences écartent la présence', () => {
+  const t = [trame()] // Anne-So, mardi, Matin, toutes les semaines
+
+  it('ne pose pas de présence sur un jour couvert par une absence', () => {
+    const v = presencesVoulues(t, blocs, periode, [
+      { veterinaire_id: 'v-anneso', date_debut: '2026-10-12', date_fin: '2026-10-16' },
+    ])
+    // Les mardis d'octobre : 6, 13, 20, 27. Le 13 tombe dans l'absence.
+    expect(v.map((p) => p.date)).toEqual(['2026-10-06', '2026-10-20', '2026-10-27'])
+  })
+
+  it('traite les bornes de l’absence comme incluses', () => {
+    const v = presencesVoulues(t, blocs, periode, [
+      { veterinaire_id: 'v-anneso', date_debut: '2026-10-06', date_fin: '2026-10-06' },
+    ])
+    expect(v.map((p) => p.date)).not.toContain('2026-10-06')
+    expect(v).toHaveLength(3)
+  })
+
+  // Une absence ne vaut QUE pour celui qu'elle concerne : sans ce test, un
+  // filtre trop large viderait le planning de toute l'équipe sur les vacances
+  // d'une seule personne.
+  it('n’écarte que la personne absente, jamais ses collègues', () => {
+    const v = presencesVoulues(t, blocs, periode, [
+      { veterinaire_id: 'v-manon', date_debut: '2026-10-01', date_fin: '2026-10-31' },
+    ])
+    expect(v).toHaveLength(4)
+  })
+
+  it('une absence hors de la période ne change rien', () => {
+    const v = presencesVoulues(t, blocs, periode, [
+      { veterinaire_id: 'v-anneso', date_debut: '2026-11-01', date_fin: '2026-11-30' },
+    ])
+    expect(v).toHaveLength(4)
+  })
+
+  it('plusieurs absences se cumulent', () => {
+    const v = presencesVoulues(t, blocs, periode, [
+      { veterinaire_id: 'v-anneso', date_debut: '2026-10-05', date_fin: '2026-10-07' },
+      { veterinaire_id: 'v-anneso', date_debut: '2026-10-26', date_fin: '2026-10-28' },
+    ])
+    expect(v.map((p) => p.date)).toEqual(['2026-10-13', '2026-10-20'])
+  })
+
+  // ⚠️ L'appel SANS absences reste permis pour les appelants existants — mais
+  //    il pose sur tout le monde. C'est ce que ce test fige, pour que personne
+  //    ne prenne le défaut pour le comportement voulu.
+  it('sans absences fournies, ne filtre rien — c’est le piège à connaître', () => {
+    expect(presencesVoulues(t, blocs, periode)).toHaveLength(4)
+  })
+})
+
+describe('resumeApplication — le nombre écarté est DIT, jamais tu', () => {
+  it('annonce les présences non posées pour absence', () => {
+    const v = presencesVoulues([trame()], blocs, periode, [
+      { veterinaire_id: 'v-anneso', date_debut: '2026-10-12', date_fin: '2026-10-16' },
+    ])
+    const r = resumeApplication(v, v, 1)
+    expect(r.ecarteesPourAbsence).toBe(1)
+    expect(r.phrase).toContain('1 présence non posée')
+    expect(r.phrase).toContain('absente')
+  })
+
+  it('accorde le pluriel des écartées', () => {
+    const r = resumeApplication([], [], 3)
+    expect(r.phrase).toContain('3 présences non posées')
+  })
+
+  // Sans ce cas, une période où tout le monde est en congé afficherait
+  // « aucune trame ne s'applique » — et enverrait l'admin corriger des règles
+  // parfaitement justes.
+  it('distingue « aucune trame » de « tout le monde est absent »', () => {
+    expect(resumeApplication([], [], 0).phrase).toContain('Aucune trame')
+    const toutAbsent = resumeApplication([], [], 12)
+    expect(toutAbsent.phrase).not.toContain('Aucune trame')
+    expect(toutAbsent.phrase).toContain('Rien à poser')
+    expect(toutAbsent.phrase).toContain('12 présences non posées')
+  })
+
+  it('ne parle pas d’absence quand il n’y en a aucune', () => {
+    const v = presencesVoulues([trame()], blocs, periode)
+    expect(resumeApplication(v, v).phrase).not.toContain('absente')
+  })
+})

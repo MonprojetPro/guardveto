@@ -114,6 +114,37 @@ export interface TramePourProjection {
 }
 
 /**
+ * Une personne absente sur une plage de dates — B-148.
+ *
+ * ⚠️ VOLONTAIREMENT SANS STATUT NI MOTIF. Deux tables alimentent cette notion
+ *    (`conges` avec son `statut`, `absences` avec le sien), et chacune a son
+ *    vocabulaire. Les faire entrer ici obligerait cette fonction pure à
+ *    connaître les règles métier des deux — et à être corrigée chaque fois que
+ *    l'une d'elles gagne un statut. L'appelant trie, celle-ci applique.
+ *
+ * C'est aussi ce qui rend la décision lisible en un endroit : « quelles
+ * absences bloquent » est une question produit, elle se répond dans l'action
+ * serveur, pas au fond d'une boucle.
+ */
+export interface AbsencePourPresences {
+  veterinaire_id: string
+  /** `AAAA-MM-JJ`, bornes comprises. */
+  date_debut: string
+  date_fin: string
+}
+
+/** Cette personne est-elle absente ce jour-là ? */
+function estAbsent(
+  absences: readonly AbsencePourPresences[],
+  veterinaireId: string,
+  date: string,
+): boolean {
+  return absences.some(
+    (a) => a.veterinaire_id === veterinaireId && a.date_debut <= date && a.date_fin >= date,
+  )
+}
+
+/**
  * Ce que les trames VEULENT poser sur cette période.
  *
  * ⚠️ SEULES LES TRAMES ACTIVES comptent, et seules celles qui portent une
@@ -132,6 +163,13 @@ export function presencesVoulues(
   trames: readonly TramePourProjection[],
   blocs: readonly Pick<BlocJournee, 'id' | 'actif'>[],
   periode: PeriodePourPresences,
+  /**
+   * B-148 — les gens absents ces jours-là. Par défaut vide, pour que les
+   * appelants existants continuent de compiler ; mais **un appel sans absences
+   * pose des présences sur des gens en vacances**, et c'est exactement le trou
+   * que MiKL a signalé le 06/10 en disant « et les absences programmées ».
+   */
+  absences: readonly AbsencePourPresences[] = [],
 ): PresenceVoulue[] {
   const blocsActifs = new Set(blocs.filter((b) => b.actif).map((b) => b.id))
   const utiles = trames.filter((t) => t.actif && blocsActifs.has(t.bloc_id))
@@ -151,6 +189,13 @@ export function presencesVoulues(
       ) {
         continue
       }
+      // ⚠️ L'ABSENCE L'EMPORTE SUR L'HABITUDE, toujours. Une trame dit « elle
+      //    est là d'habitude le mardi » ; un congé dit « pas ce mardi-là ».
+      //    Poser quand même aurait affiché au comptoir quelqu'un qui est en
+      //    vacances — le genre de réponse fausse servie avec l'aplomb d'une
+      //    réponse juste que ce produit combat depuis le début.
+      if (estAbsent(absences, t.veterinaire_id, date)) continue
+
       const p: PresenceVoulue = {
         veterinaire_id: t.veterinaire_id,
         bloc_id: t.bloc_id,
@@ -199,6 +244,8 @@ export interface ResumeApplication {
   inchangees: number
   /** Combien de personnes distinctes sont concernées par ce qui sera posé. */
   personnes: number
+  /** B-148 — présences qu'une absence a empêché de poser. */
+  ecarteesPourAbsence: number
   /** Phrase prête à afficher — une seule formulation, écran et confirmation. */
   phrase: string
 }
@@ -206,24 +253,48 @@ export interface ResumeApplication {
 export function resumeApplication(
   voulues: readonly PresenceVoulue[],
   aEcrire: readonly PresenceVoulue[],
+  /**
+   * B-148 — combien de présences ont été écartées parce que la personne est
+   * absente. Se calcule en comparant deux projections, l'une sans absences :
+   *
+   *   presencesVoulues(…).length - presencesVoulues(…, absences).length
+   *
+   * ⚠️ CE CHIFFRE DOIT ÊTRE DIT, pas tu. Sans lui, l'admin voit « 38 présences »
+   *    là où elle en attendait 42 et n'a aucun moyen de savoir si le produit a
+   *    bien fait son travail ou s'il a perdu quatre lignes. Un écart silencieux
+   *    sur un planning se lit toujours comme une panne.
+   */
+  ecarteesPourAbsence = 0,
 ): ResumeApplication {
   const personnes = new Set(aEcrire.map((p) => p.veterinaire_id)).size
   const inchangees = voulues.length - aEcrire.length
   const n = aEcrire.length
+  const absents =
+    ecarteesPourAbsence > 0
+      ? ` ${ecarteesPourAbsence} présence${ecarteesPourAbsence > 1 ? 's' : ''} non posée${ecarteesPourAbsence > 1 ? 's' : ''} : la personne est absente ce jour-là.`
+      : ''
 
   let phrase: string
-  if (voulues.length === 0) {
+  if (voulues.length === 0 && ecarteesPourAbsence === 0) {
     phrase =
       'Aucune trame de présence ne s’applique à cette période. Définissez-les dans « Journée » avant d’appliquer.'
+  } else if (voulues.length === 0) {
+    // Des trames existent, mais tout le monde est absent sur la fenêtre. Le
+    // dire franchement vaut mieux que « aucune trame ne s'applique », qui
+    // enverrait l'admin corriger des règles parfaitement justes.
+    phrase = `Rien à poser sur cette période.${absents}`
   } else if (n === 0) {
-    phrase = `Tout est déjà en place : ${voulues.length} présence${voulues.length > 1 ? 's' : ''}, aucune à ajouter.`
+    phrase =
+      `Tout est déjà en place : ${voulues.length} présence${voulues.length > 1 ? 's' : ''}, aucune à ajouter.` +
+      absents
   } else {
     phrase =
       `${n} présence${n > 1 ? 's' : ''} à poser pour ${personnes} personne${personnes > 1 ? 's' : ''}` +
-      (inchangees > 0 ? `, ${inchangees} déjà en place.` : '.')
+      (inchangees > 0 ? `, ${inchangees} déjà en place.` : '.') +
+      absents
   }
 
-  return { aPoser: n, inchangees, personnes, phrase }
+  return { aPoser: n, inchangees, personnes, ecarteesPourAbsence, phrase }
 }
 
 // ── La retouche à la main ────────────────────────────────────────────────────

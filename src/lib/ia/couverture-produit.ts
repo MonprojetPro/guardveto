@@ -208,7 +208,13 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   'v2/journee#creerBloc': { outil: 'creer_tranche_journee' },
   'v2/journee#modifierBloc': { outil: 'modifier_tranche_journee' },
   'v2/journee#basculerBloc': { outil: 'agir_sur_tranche_journee' },
-  'v2/journee/trames-actions#creerTrame': { outil: 'creer_presence_recurrente' },
+  // B-147 — `creerTrames` au PLURIEL depuis le 06/10 : l'écran vise plusieurs
+  // jours d'un coup. L'outil de Filou, lui, n'en propose toujours qu'un — il
+  // passe par la même action avec une liste d'un seul jour. Limite assumée :
+  // elle le fait répéter pour « lundi et mardi », elle ne lui fait rien dire
+  // de faux, et la capacité métier (« créer une présence récurrente ») reste
+  // entièrement couverte.
+  'v2/journee/trames-actions#creerTrames': { outil: 'creer_presence_recurrente' },
   'v2/journee/trames-actions#modifierTrame': { outil: 'modifier_presence_recurrente' },
   'v2/journee/trames-actions#basculerTrame': { outil: 'agir_sur_presence_recurrente' },
 

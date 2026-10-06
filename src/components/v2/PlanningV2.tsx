@@ -21,6 +21,7 @@ import { toast } from 'sonner'
 import { Trash2, CalendarX2 } from 'lucide-react'
 import { RetirerPlanningModale, type GesteRetrait } from '@/components/planning/RetirerPlanningModale'
 import { FilouEdge } from './FilouEdge'
+import type { PeriodeApplicable } from './GenererJournee'
 import { useOutilsPlanning } from './outils-planning'
 import { GardeDetailModal, peutProposerUnEchange } from '@/components/planning/GardeDetailModal'
 import { CriseModal, type VetCrise } from '@/components/planning/CriseModal'
@@ -135,6 +136,15 @@ interface Props {
    * pour une garde qui n'en a pas besoin.
    */
   manquesParGarde?: Record<string, number>
+  /**
+   * B-148 — les modules allumés pour ce cabinet. Ils décident de ce que
+   * « Générer » veut dire : sans gardes, il n'y a aucun moteur à lancer.
+   */
+  modules?: string[]
+  /** Les plannings qui peuvent recevoir des présences de journée. */
+  periodesJournee?: PeriodeApplicable[]
+  /** Y a-t-il au moins une présence récurrente à appliquer ? */
+  aDesTrames?: boolean
   /** Ce que l'encart Compteurs afficherait SI le lot en attente était appliqué. */
   compteursProjetes?: CompteursRow[]
 }
@@ -211,6 +221,9 @@ export function PlanningV2({
   placesProposees = [],
   manquesParGarde = {},
   compteursProjetes,
+  modules,
+  periodesJournee,
+  aDesTrames,
 }: Props) {
   const router = useRouter()
   const [annee, mois] = anneeMois.split('-').map(Number)
@@ -287,6 +300,9 @@ export function PlanningV2({
     gardesParType,
     vets,
     periodesAvecGardes,
+    modules,
+    periodesJournee,
+    aDesTrames,
     onNaviguerVersMois: (anneeMois) => router.push(`/planning?mois=${anneeMois}`),
     onSignalerAbsence: () => {
       setCriseDate(undefined)

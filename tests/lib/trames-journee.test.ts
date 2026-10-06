@@ -29,6 +29,7 @@ import {
   trameDejaPresente,
   trameViseCetteDate,
   validerTrame,
+  validerTrames,
 } from '@/lib/journee/trames'
 import { estSemaineImpaire, jourDeLaSemaine } from '@/engine/utils'
 
@@ -273,5 +274,80 @@ describe('phraseTrame — une seule formulation pour toute l’application', () 
     expect(phraseTrame({ jour: 'samedi', semaine: 'paire' }, 'Visites')).toBe(
       'Samedi des semaines paires — Visites',
     )
+  })
+})
+
+// ── Plusieurs jours d'un coup (B-147) ────────────────────────────────────────
+//
+// Demande de MiKL le 06/10, capture a l'appui : « on ne peut pas selectionner
+// plusieurs jours ». Decrire « lundi + mardi + jeudi, matin » obligeait a
+// saisir trois fois la meme phrase.
+//
+// ⚠️ CE QUI COMPTE ICI N'EST PAS LE CONFORT DE SAISIE, c'est que les refus de
+//    `validerTrame` continuent TOUS de s'appliquer. Une validation multi-jours
+//    qui reimplementerait ses propres controles aurait cree un second jeu de
+//    regles, divergeant au premier correctif — « trois chemins d'ecriture, deux
+//    gardiens ».
+
+describe('validerTrames — plusieurs jours en une saisie', () => {
+  const base = { veterinaire_id: 'v-1', bloc_id: 'b-matin', semaine: 'toutes' }
+
+  it('rend une valeur par jour coche', () => {
+    const r = validerTrames({ ...base, jours: ['lundi', 'mardi', 'jeudi'] }, blocs)
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.valeurs).toHaveLength(3)
+      expect(r.valeurs.map((v) => v.jour)).toEqual(['lundi', 'mardi', 'jeudi'])
+      expect(r.valeurs.every((v) => v.bloc_id === 'b-matin')).toBe(true)
+      expect(r.valeurs.every((v) => v.veterinaire_id === 'v-1')).toBe(true)
+    }
+  })
+
+  // La liste relue doit se lire comme un calendrier : « lundi, jeudi, mardi »
+  // donne l'impression d'une saisie en desordre.
+  it('range les jours dans l’ordre de la semaine, pas dans l’ordre de clic', () => {
+    const r = validerTrames({ ...base, jours: ['jeudi', 'lundi', 'samedi', 'mardi'] }, blocs)
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.valeurs.map((v) => v.jour)).toEqual(['lundi', 'mardi', 'jeudi', 'samedi'])
+  })
+
+  // Un formulaire ne devrait pas pouvoir envoyer deux fois « lundi », mais
+  // l'URL le peut — et deux lignes identiques feraient echouer l'insertion
+  // entiere sur l'index unique, avec un message de contrainte illisible.
+  it('absorbe un jour repete au lieu de le refuser', () => {
+    const r = validerTrames({ ...base, jours: ['lundi', 'lundi', 'mardi'] }, blocs)
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.valeurs.map((v) => v.jour)).toEqual(['lundi', 'mardi'])
+  })
+
+  it('refuse une liste vide, en disant quoi faire', () => {
+    const r = validerTrames({ ...base, jours: [] }, blocs)
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.probleme).toContain('au moins un jour')
+  })
+
+  // 🔑 LE GROUPE QUI COMPTE : les refus de `validerTrame` valent toujours.
+  it('refuse toute la saisie si UN jour est inconnu', () => {
+    const r = validerTrames({ ...base, jours: ['lundi', 'lundredi'] }, blocs)
+    expect(r.ok).toBe(false)
+  })
+
+  it('refuse une tranche retiree, en nommant la tranche', () => {
+    const r = validerTrames({ ...base, bloc_id: 'b-vieux', jours: ['lundi', 'mardi'] }, blocs)
+    expect(r.ok).toBe(false)
+    if (!r.ok) {
+      expect(r.probleme).toContain('Visites du soir')
+      expect(r.probleme).toContain('retirée')
+    }
+  })
+
+  it('refuse le PLURIEL de la cadence, avec son message', () => {
+    const r = validerTrames({ ...base, semaine: 'impaires', jours: ['lundi'] }, blocs)
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.probleme).toContain('singulier')
+  })
+
+  it('refuse une saisie sans personne', () => {
+    expect(validerTrames({ ...base, veterinaire_id: '  ', jours: ['lundi'] }, blocs).ok).toBe(false)
   })
 })

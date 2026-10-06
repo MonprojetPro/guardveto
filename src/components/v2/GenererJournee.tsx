@@ -1,11 +1,20 @@
 'use client'
 
 // ============================================================
-// GUARDVETO V2 — Appliquer les trames de présence sur une période
+// GUARDVETO V2 — Générer le planning des journées
 // ============================================================
-// B-120 chantier 3, lot 2. C'est le geste qui manquait : le lot 1 écrivait la
-// RÈGLE et le disait franchement — « ces règles ne remplissent pas encore le
-// planning ». Personne ne les appliquait. Ce bouton-ci les applique.
+// B-148. Ce composant vivait sur `/journee` jusqu'au 06/10, où MiKL l'a renvoyé
+// à sa vraie place : *« cette fonction n'a rien à faire là… elle doit se faire
+// quand la personne va remplir son planning sur la page planning. »*
+//
+// Il avait raison. Je l'avais posé sur `/journee` pour satisfaire le gardien du
+// code mort — une action serveur sans appelant est refusée par la suite de
+// tests. **La contrainte technique était réelle, l'endroit était faux** : on ne
+// remplit pas un planning depuis l'écran où l'on décrit des habitudes.
+//
+// C'est le geste qui manquait au lot 1 : celui-ci écrivait la RÈGLE et le disait
+// franchement — « ces règles ne remplissent pas encore le planning ». Personne
+// ne les appliquait.
 //
 // ── POURQUOI L'APERÇU AVANT, ET PAS UN SIMPLE BOUTON ────────────────────────
 //
@@ -28,7 +37,15 @@
 // ============================================================
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   appliquerTrames,
   apercuApplicationTrames,
@@ -45,12 +62,15 @@ export interface PeriodeApplicable {
 }
 
 interface Props {
+  open: boolean
+  onOpenChange: (ouvert: boolean) => void
   periodes: PeriodeApplicable[]
   /** Y a-t-il au moins une trame active ? Sinon le geste n'a aucun objet. */
   aDesTrames: boolean
 }
 
-export function AppliquerTrames({ periodes, aDesTrames }: Props) {
+export function GenererJournee({ open, onOpenChange, periodes, aDesTrames }: Props) {
+  const router = useRouter()
   const [periodeId, setPeriodeId] = useState<string>(periodes[0]?.id ?? '')
   const [apercu, setApercu] = useState<Apercu | null>(null)
   const [enCours, setEnCours] = useState(false)
@@ -94,46 +114,38 @@ export function AppliquerTrames({ periodes, aDesTrames }: Props) {
       // « tout est déjà en place », ce qui prouve à l'écran que l'écriture a eu
       // lieu. Le vider laisserait l'admin se demander si ça a marché.
       setApercu(await apercuApplicationTrames(periodeId))
+      // ⚠️ ET ON RAFRAÎCHIT LA GRILLE DERRIÈRE. `revalidatePath` côté serveur
+      //    invalide le cache ; sans ce `refresh`, l'admin ferme la fenêtre et
+      //    retrouve un planning inchangé — le « faut que je rafraîchisse pour
+      //    voir » que ce produit traque depuis le début.
+      router.refresh()
     } finally {
       setEnCours(false)
     }
   }
 
-  // Aucune période modifiable : on dit pourquoi et où aller, plutôt que
-  // d'afficher un sélecteur vide et un bouton inerte.
-  if (periodes.length === 0) {
-    return (
-      <div className="card tj-card">
-        <div className="card-head">
-          <h2>Remplir le planning des journées</h2>
-        </div>
-        <div className="card-body">
-          <p className="tj-vide">
-            Aucun planning ne peut recevoir de présences pour l’instant. Créez une période depuis
-            l’écran « Planning » — les présences s’y rattachent, et c’est sa publication qui les
-            montre à l’équipe.
-          </p>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="card tj-card">
-      <div className="card-head">
-        <h2>Remplir le planning des journées</h2>
-      </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[620px]">
+        <DialogHeader>
+          <DialogTitle>Remplir le planning des journées</DialogTitle>
+          <DialogDescription>
+            Les présences récurrentes décrites dans « Journée » sont des règles. Ce geste les pose
+            réellement sur un planning, jour par jour.
+          </DialogDescription>
+        </DialogHeader>
 
-      <div className="card-body">
-        <p className="tj-lede">
-          Les présences récurrentes ci-dessus sont des règles. Ce geste les pose réellement sur un
-          planning, jour par jour.
-        </p>
-
-        {!aDesTrames ? (
+        {periodes.length === 0 ? (
+          /* On dit pourquoi et où aller, plutôt qu'un sélecteur vide et un
+             bouton inerte. */
           <p className="tj-vide">
-            Décrivez d’abord au moins une présence récurrente ci-dessus : il n’y a rien à poser
-            pour l’instant.
+            Aucun planning ne peut recevoir de présences pour l’instant : créez d’abord une période.
+            Les présences s’y rattachent, et c’est sa publication qui les montre à l’équipe.
+          </p>
+        ) : !aDesTrames ? (
+          <p className="tj-vide">
+            Décrivez d’abord au moins une présence récurrente dans l’écran « Journée » : il n’y a
+            rien à poser pour l’instant.
           </p>
         ) : (
           <>
@@ -211,13 +223,15 @@ export function AppliquerTrames({ periodes, aDesTrames }: Props) {
               </span>
               <span>
                 Ce geste <b>ajoute seulement</b> : il ne retire ni ne déplace aucune présence déjà
-                posée, vos retouches sont donc à l’abri. En revanche, une présence que vous avez
-                retirée à la main reviendra si vous réappliquez les règles.
+                posée, vos retouches sont donc à l’abri. Les congés validés et les absences
+                déclarées sont respectés — personne n’est posé un jour où il est absent. En
+                revanche, une présence que vous avez retirée à la main reviendra si vous
+                réappliquez les règles.
               </span>
             </p>
           </>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

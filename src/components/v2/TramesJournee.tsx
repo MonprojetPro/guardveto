@@ -39,7 +39,7 @@ import {
 } from '@/lib/journee/trames'
 import { plageLisible } from '@/lib/journee/blocs'
 import {
-  creerTrame,
+  creerTrames,
   modifierTrame,
   basculerTrame,
 } from '@/app/(v2)/journee/trames-actions'
@@ -57,7 +57,14 @@ export function TramesJournee({ trames, blocs, equipe }: Props) {
   /** L'id de la ligne en édition, ou l'id du véto pour qui on ajoute. */
   const [edite, setEdite] = useState<string | null>(null)
   const [ajoutPour, setAjoutPour] = useState<string | null>(null)
-  const [saisie, setSaisie] = useState({ bloc_id: '', jour: 'lundi', semaine: 'toutes' })
+  // `jours` au PLURIEL (B-147) : une saisie peut viser lundi + mardi + jeudi
+  // d'un coup. L'édition, elle, ne porte toujours qu'une ligne — elle place
+  // donc un seul jour dans la liste, et le formulaire s'y adapte.
+  const [saisie, setSaisie] = useState<{ bloc_id: string; jours: string[]; semaine: string }>({
+    bloc_id: '',
+    jours: ['lundi'],
+    semaine: 'toutes',
+  })
 
   /** Seules les tranches ACTIVES sont proposées — une retirée serait refusée. */
   const blocsProposables = blocs.filter((b) => b.actif)
@@ -66,7 +73,7 @@ export function TramesJournee({ trames, blocs, equipe }: Props) {
   const fermer = () => {
     setEdite(null)
     setAjoutPour(null)
-    setSaisie({ bloc_id: blocsProposables[0]?.id ?? '', jour: 'lundi', semaine: 'toutes' })
+    setSaisie({ bloc_id: blocsProposables[0]?.id ?? '', jours: ['lundi'], semaine: 'toutes' })
   }
 
   /** Un seul chemin pour les trois actions : un seul endroit qui gère le refus. */
@@ -89,17 +96,40 @@ export function TramesJournee({ trames, blocs, equipe }: Props) {
     setRefus(null)
     setEdite(null)
     setAjoutPour(vetoId)
-    setSaisie({ bloc_id: blocsProposables[0]?.id ?? '', jour: 'lundi', semaine: 'toutes' })
+    setSaisie({ bloc_id: blocsProposables[0]?.id ?? '', jours: ['lundi'], semaine: 'toutes' })
   }
 
   const ouvrirEdition = (t: TrameJournee) => {
     setRefus(null)
     setAjoutPour(null)
     setEdite(t.id)
-    setSaisie({ bloc_id: t.bloc_id, jour: t.jour, semaine: t.semaine })
+    setSaisie({ bloc_id: t.bloc_id, jours: [t.jour], semaine: t.semaine })
   }
 
-  const formulaire = (vetoId: string, surSoumission: () => void, libelleBouton: string) => (
+  /** Coche ou décoche un jour, sans jamais laisser la liste vide en édition. */
+  const basculerJour = (j: string, multi: boolean) => {
+    if (!multi) {
+      setSaisie({ ...saisie, jours: [j] })
+      return
+    }
+    const deja = saisie.jours.includes(j)
+    // Décocher le dernier jour laisserait un formulaire qui ne peut qu'échouer.
+    // On garde donc au moins une case : le serveur refuse aussi une liste vide,
+    // mais mieux vaut ne pas proposer le geste que d'afficher son refus.
+    if (deja && saisie.jours.length === 1) return
+    setSaisie({
+      ...saisie,
+      jours: deja ? saisie.jours.filter((x) => x !== j) : [...saisie.jours, j],
+    })
+  }
+
+  const formulaire = (
+    vetoId: string,
+    surSoumission: () => void,
+    libelleBouton: string,
+    /** Création : plusieurs jours. Édition : une ligne, donc un seul. */
+    multi: boolean,
+  ) => (
     <form
       className="tj-form"
       onSubmit={(e) => {
@@ -133,20 +163,28 @@ export function TramesJournee({ trames, blocs, equipe }: Props) {
         </label>
 
         <label className="field">
-          <span className="f-label">Jour</span>
+          <span className="f-label">{multi ? 'Jours' : 'Jour'}</span>
+          {/* B-147 — EN CRÉATION, PLUSIEURS JOURS. Une habitude se décrit
+              « lundi, mardi et jeudi », pas en trois saisies identiques. En
+              ÉDITION on reste sur un seul : on modifie UNE ligne précise, et
+              laisser cocher plusieurs jours laisserait croire qu'on peut en
+              fabriquer d'autres depuis un formulaire de modification. */}
           <span className="tj-radios">
-            {JOURS_TRAME.map((j) => (
-              <label key={j} className={`tj-radio${saisie.jour === j ? ' actif' : ''}`}>
-                <input
-                  type="radio"
-                  name={`jour-${vetoId}`}
-                  value={j}
-                  checked={saisie.jour === j}
-                  onChange={() => setSaisie({ ...saisie, jour: j })}
-                />
-                <span>{LIBELLE_JOUR[j]}</span>
-              </label>
-            ))}
+            {JOURS_TRAME.map((j) => {
+              const choisi = saisie.jours.includes(j)
+              return (
+                <label key={j} className={`tj-radio${choisi ? ' actif' : ''}`}>
+                  <input
+                    type={multi ? 'checkbox' : 'radio'}
+                    name={`jour-${vetoId}`}
+                    value={j}
+                    checked={choisi}
+                    onChange={() => basculerJour(j, multi)}
+                  />
+                  <span>{LIBELLE_JOUR[j]}</span>
+                </label>
+              )
+            })}
           </span>
         </label>
 
@@ -209,6 +247,12 @@ export function TramesJournee({ trames, blocs, equipe }: Props) {
             une capacité apparaît n'est pas « faut-il un écran ? » mais « une
             phrase déjà affichée devient-elle fausse ? ».
 
+            ⚠️ CORRIGÉE UNE SECONDE FOIS LE MÊME JOUR (B-148). Elle disait « le
+            geste en dessous » — vrai pendant deux heures, faux dès que MiKL a
+            renvoyé ce geste sur l'écran Planning, à sa vraie place. Une phrase
+            qui désigne un VOISIN est fragile par nature : elle ment dès que le
+            voisin déménage, et rien ne la suit.
+
             Ce qu'elle doit continuer à dire, en revanche, reste vrai et compte
             autant : enregistrer une règle ne pose TOUJOURS rien par lui-même.
             C'est la décision ⑤ du cadrage V3 — sans quoi l'admin perdrait ses
@@ -219,8 +263,8 @@ export function TramesJournee({ trames, blocs, equipe }: Props) {
           </span>
           <span>
             Enregistrer une règle ne pose aucune présence et ne change aucune journée déjà prévue.
-            C’est le geste <b>« Remplir le planning des journées »</b>, en dessous, qui les pose
-            sur un planning.
+            C’est depuis l’écran <b>Planning</b>, avec le bouton <b>Générer</b>, que ces règles
+            remplissent réellement un planning.
           </span>
         </p>
 
@@ -275,9 +319,17 @@ export function TramesJournee({ trames, blocs, equipe }: Props) {
                             v.id,
                             () =>
                               lancer(() =>
-                                modifierTrame(t.id, { ...saisie, veterinaire_id: v.id }),
+                                modifierTrame(t.id, {
+                                  bloc_id: saisie.bloc_id,
+                                  // Une modification porte UNE ligne : le
+                                  // formulaire n'a laissé cocher qu'un jour.
+                                  jour: saisie.jours[0] ?? '',
+                                  semaine: saisie.semaine,
+                                  veterinaire_id: v.id,
+                                }),
                               ),
                             'Enregistrer',
+                            false,
                           )
                         ) : (
                           <>
@@ -314,8 +366,11 @@ export function TramesJournee({ trames, blocs, equipe }: Props) {
                   {ajoutPour === v.id &&
                     formulaire(
                       v.id,
-                      () => lancer(() => creerTrame({ ...saisie, veterinaire_id: v.id })),
-                      'Ajouter cette présence',
+                      () => lancer(() => creerTrames({ ...saisie, veterinaire_id: v.id })),
+                      saisie.jours.length > 1
+                        ? `Ajouter ces ${saisie.jours.length} présences`
+                        : 'Ajouter cette présence',
+                      true,
                     )}
 
                   {retirees.length > 0 && (

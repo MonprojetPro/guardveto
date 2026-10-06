@@ -29,6 +29,7 @@ import { RealtimeRefresh } from '@/components/planning/RealtimeRefresh'
 import { RevalidationRealtime } from '@/components/planning/RevalidationRealtime'
 import { revaliderPlanning } from '@/data/revaliderPlanning'
 import { chargerDock } from '@/data/v2/dock'
+import { modulesDuCabinet } from '@/lib/produit/modules-serveur'
 import {
   queryCompteurs,
   queryTotalWE,
@@ -271,7 +272,11 @@ export default async function PlanningPageV2({
   const periodeAffichee =
     periodes.find((p) => p.date_debut <= fin && p.date_fin >= debut) ?? null
 
-  const [dock, profilRes, compteursRes, totalWERes, prefsRes, typesRes2, equipeRes, creneauxRes] = await Promise.all([
+  // B-148 — ce que « Générer » doit proposer dépend des MODULES du cabinet, et
+  // les présences de journée ont besoin de savoir s'il existe au moins une
+  // règle à appliquer. Chargés en parallèle du reste : aucune requête en série
+  // ajoutée sur un produit déjà jugé lent (B-116).
+  const [dock, profilRes, compteursRes, totalWERes, prefsRes, typesRes2, equipeRes, creneauxRes, modules, tramesRes] = await Promise.all([
     chargerDock(supabase, { role_app: identite.role }, periodes),
     periodeAffichee?.profil_id
       ? supabase.from('profils_planning').select('nom').eq('id', periodeAffichee.profil_id).maybeSingle()
@@ -326,6 +331,12 @@ export default async function PlanningPageV2({
       .from('creneau_modele')
       .select('code, nb_places')
       .not('code', 'is', null),
+    modulesDuCabinet(supabase),
+    // Seules les trames ACTIVES comptent : une règle retirée n'a rien à
+    // appliquer, et proposer le geste sur du vide vaut un bouton cassé.
+    isAdmin
+      ? supabase.from('trames_journee').select('id').eq('actif', true).limit(1)
+      : Promise.resolve({ data: null }),
   ])
 
   // ── « Qui est absent », pour le secrétariat ────────────────────────────
@@ -397,6 +408,23 @@ export default async function PlanningPageV2({
   }
 
   const profil = (profilRes as { data?: { nom: string } | null })?.data?.nom ?? null
+
+  // B-148 — les plannings qui peuvent RECEVOIR des présences. Les verrouillés
+  // sont écartés ici, et l'action serveur les refuse aussi (`periodeModifiable`) :
+  // deux gardiens, comme partout — l'écran évite de proposer un geste qui
+  // échouerait, le serveur refuse le chemin qu'on n'a pas prévu.
+  const periodesJournee = toutesPeriodes
+    .filter((p) => p.statut !== 'verrouille')
+    .map((p) => ({
+      id: p.id,
+      // Même repli que le dock : un nom qui change d'un écran à l'autre fait
+      // croire à deux plannings différents.
+      libelle: p.libelle ?? `${p.saison === 'ete' ? 'Été' : 'Hiver'} ${p.date_debut.slice(0, 4)}`,
+      date_debut: p.date_debut,
+      date_fin: p.date_fin,
+      statut: p.statut,
+    }))
+  const aDesTrames = ((tramesRes as { data?: unknown[] | null })?.data ?? []).length > 0
   const periodesTypes = ((typesRes2?.data ?? []) as ProfilPlanning[])
 
   // ── CE QUE CONTIENT CHAQUE PÉRIODE TYPE ─────────────────────────────────
@@ -671,6 +699,10 @@ export default async function PlanningPageV2({
           placesProposees={placesProposees}
           compteursProjetes={compteursProjetesAgrege}
           manquesParGarde={manquesParGarde}
+          // B-148 — « Générer » change de sens selon les modules allumés.
+          modules={modules}
+          periodesJournee={periodesJournee}
+          aDesTrames={aDesTrames}
         />
       </div>
     </>

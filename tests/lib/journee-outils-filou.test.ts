@@ -152,7 +152,7 @@ describe('Les six capacités du produit pointent vers ces outils', () => {
       'v2/journee#creerBloc',
       'v2/journee#modifierBloc',
       'v2/journee#basculerBloc',
-      'v2/journee/trames-actions#creerTrame',
+      'v2/journee/trames-actions#creerTrames',
       'v2/journee/trames-actions#modifierTrame',
       'v2/journee/trames-actions#basculerTrame',
     ]

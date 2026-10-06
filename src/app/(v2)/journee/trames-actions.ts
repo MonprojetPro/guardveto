@@ -26,10 +26,13 @@
 import { revalidatePath } from 'next/cache'
 import { porteJournee } from '@/lib/journee/porte'
 import {
+  LIBELLE_JOUR,
   trameDejaPresente,
   validerTrame,
+  validerTrames,
   type BlocPourTrame,
   type SaisieTrame,
+  type SaisieTrames,
   type TrameValide,
 } from '@/lib/journee/trames'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -104,33 +107,73 @@ async function vetoUtilisable(
   return { ok: true }
 }
 
-/** Ajoute une ligne à la trame de quelqu'un. */
-export async function creerTrame(saisie: SaisieTrame): Promise<Resultat> {
+/**
+ * Ajoute PLUSIEURS jours d'un coup à la trame de quelqu'un (B-147).
+ *
+ * Demande de MiKL le 06/10 : décrire « lundi + mardi + jeudi, matin » obligeait
+ * à saisir trois fois la même phrase.
+ *
+ * ⚠️ UN JOUR DÉJÀ PRÉSENT N'ARRÊTE PAS LES AUTRES, et c'est le choix qui compte
+ *    ici. Tout refuser parce qu'un jour sur cinq existe déjà obligerait l'admin
+ *    à décocher au jugé pour retrouver lequel — alors que son intention
+ *    (« qu'elle soit là ces jours-là ») est satisfaite dans les deux cas. On
+ *    pose donc ce qui manque, et le message DIT ce qui existait déjà : un geste
+ *    qui fait moins que demandé sans le dire est pire que celui qui refuse.
+ */
+export async function creerTrames(saisie: SaisieTrames): Promise<Resultat> {
   const porte = await porteJournee()
   if (!porte.ok) return { error: porte.probleme }
   const { supabase, cabinetId } = porte
 
-  // ③ LA SAISIE.
   const blocs = await blocsDuCabinet(supabase)
-  const v = validerTrame(saisie, blocs)
+  const v = validerTrames(saisie, blocs)
   if (!v.ok) return { error: v.probleme }
 
-  const veto = await vetoUtilisable(supabase, v.valeur.veterinaire_id)
+  const veto = await vetoUtilisable(supabase, saisie.veterinaire_id)
   if (!veto.ok) return { error: veto.probleme }
 
-  const doublon = trameDejaPresente(v.valeur, await tramesDuCabinet(supabase))
-  if (doublon.presente) return { error: refusDoublon(doublon.actif) }
+  const existantes = await tramesDuCabinet(supabase)
+  const aPoser: TrameValide[] = []
+  const dejaRetirees: string[] = []
 
-  // ⚠️ `cabinet_id` OBLIGATOIRE : la colonne est NOT NULL sans défaut, et sans
-  //    elle la ligne serait de toute façon invisible sous la policy RESTRICTIVE.
+  for (const valeur of v.valeurs) {
+    const doublon = trameDejaPresente(valeur, existantes)
+    if (!doublon.presente) {
+      aPoser.push(valeur)
+    } else if (!doublon.actif) {
+      // Une ligne retirée bloque l'insertion (l'index unique porte aussi les
+      // inactives) sans apparaître dans la liste. Sans ce message, l'admin
+      // chercherait un bug devant un jour qui refuse de s'ajouter.
+      dejaRetirees.push(LIBELLE_JOUR[valeur.jour])
+    }
+    // Un jour DÉJÀ ACTIF ne produit ni erreur ni message : la liste qui se
+    // rafraîchit le montre à sa place, et c'est une information plus sûre
+    // qu'une phrase — on la lit sur l'écran, pas dans un toast évanoui.
+  }
+
+  if (aPoser.length === 0) {
+    return {
+      error: dejaRetirees.length
+        ? `Rien à ajouter : ${liste(dejaRetirees)} existe${dejaRetirees.length > 1 ? 'nt' : ''} déjà dans la trame, mais a été retiré${dejaRetirees.length > 1 ? 's' : ''}. Remettez la ligne au lieu d’en créer une seconde.`
+        : 'Ces présences sont déjà dans la trame.',
+    }
+  }
+
   const { error } = await supabase
     .from('trames_journee')
-    .insert({ ...v.valeur, cabinet_id: cabinetId })
+    .insert(aPoser.map((t) => ({ ...t, cabinet_id: cabinetId })))
 
   if (error) return { error: messageLisible(error.message) }
 
   revalidatePath('/journee')
+  revalidatePath('/equipe')
   return { success: true }
+}
+
+/** « lundi », « lundi et mardi », « lundi, mardi et jeudi ». */
+function liste(mots: string[]): string {
+  if (mots.length <= 1) return mots[0] ?? ''
+  return `${mots.slice(0, -1).join(', ')} et ${mots[mots.length - 1]}`
 }
 
 /** Modifie une ligne de trame (tranche, jour, cadence). */

@@ -40,6 +40,7 @@ import {
   presencesVoulues,
   resumeApplication,
   validerPresence,
+  type AbsencePourPresences,
   type PeriodePourPresences,
   type PresenceVoulue,
   type SaisiePresence,
@@ -54,7 +55,15 @@ type Resultat = { success: true; message: string } | { error: string }
 
 /** Ce que l'aperçu rend à l'écran, sans rien écrire. */
 export type Apercu =
-  | { ok: true; aPoser: number; inchangees: number; personnes: number; phrase: string }
+  | {
+      ok: true
+      aPoser: number
+      inchangees: number
+      personnes: number
+      /** B-148 — présences qu'une absence a empêché de poser. */
+      ecarteesPourAbsence: number
+      phrase: string
+    }
   | { ok: false; probleme: string }
 
 /**
@@ -140,6 +149,58 @@ interface PresenceLue {
 }
 
 /**
+ * Qui est absent, et sur quelles dates — B-148.
+ *
+ * 🔑 C'EST ICI QUE SE REPOND LA QUESTION PRODUIT « quelles absences bloquent »,
+ *    et nulle part ailleurs. La fonction pure reçoit des plages sans statut :
+ *    le tri se fait une fois, visiblement, plutôt que d'être dispersé dans une
+ *    boucle que personne ne relit.
+ *
+ * Deux sources, un seul sens :
+ *
+ *   • `conges` au statut **`valide`** — un congé accordé. ⚠️ Un `souhait` NE
+ *     BLOQUE PAS : il n'est pas tranché, et refuser de poser une présence sur
+ *     une demande non accordée reviendrait à la valider en silence. L'aperçu le
+ *     signalera un jour ; il ne doit pas décider à la place de l'administratrice.
+ *   • `absences` au statut **`active`** — une absence déclarée en cours de route
+ *     (maladie, imprévu). Celles-ci sont des faits, pas des demandes.
+ *
+ * ⚠️ Les erreurs sont LUES. Une lecture échouée rendrait une liste vide, donc
+ *    « personne n'est absent » — et on poserait des présences sur toute l'équipe
+ *    en vacances sans qu'un seul message le dise.
+ */
+async function absencesDeLaPeriode(
+  supabase: Client,
+  periode: PeriodePourPresences,
+): Promise<{ erreur: string | null; absences: AbsencePourPresences[] }> {
+  const [conges, absences] = await Promise.all([
+    supabase
+      .from('conges')
+      .select('veterinaire_id, date_debut, date_fin')
+      .eq('statut', 'valide')
+      .lte('date_debut', periode.date_fin)
+      .gte('date_fin', periode.date_debut),
+    supabase
+      .from('absences')
+      .select('veterinaire_id, date_debut, date_fin')
+      .eq('statut', 'active')
+      .lte('date_debut', periode.date_fin)
+      .gte('date_fin', periode.date_debut),
+  ])
+
+  if (conges.error) return { erreur: conges.error.message, absences: [] }
+  if (absences.error) return { erreur: absences.error.message, absences: [] }
+
+  return {
+    erreur: null,
+    absences: [
+      ...((conges.data ?? []) as AbsencePourPresences[]),
+      ...((absences.data ?? []) as AbsencePourPresences[]),
+    ],
+  }
+}
+
+/**
  * Ce que l'application VA faire, sans rien écrire.
  *
  * Le même calcul que l'écriture, appelé par la même fonction (`aPoser`) : le
@@ -164,8 +225,21 @@ export async function apercuApplicationTrames(periodeId: string): Promise<Apercu
     return { ok: false, probleme: 'Les présences déjà posées n’ont pas pu être lues.' }
   }
 
-  const voulues = presencesVoulues(trames, blocs, per.periode)
-  const r = resumeApplication(voulues, aPoser(voulues, deja.lignes))
+  const abs = await absencesDeLaPeriode(supabase, per.periode)
+  if (abs.erreur) {
+    return { ok: false, probleme: 'Les absences n’ont pas pu être lues. Aperçu impossible.' }
+  }
+
+  // Deux projections : la seconde seule compte, la première sert UNIQUEMENT à
+  // dire combien d'absences ont empêché de poser. Un écart silencieux sur un
+  // planning se lit toujours comme une panne.
+  const sansAbsences = presencesVoulues(trames, blocs, per.periode)
+  const voulues = presencesVoulues(trames, blocs, per.periode, abs.absences)
+  const r = resumeApplication(
+    voulues,
+    aPoser(voulues, deja.lignes),
+    sansAbsences.length - voulues.length,
+  )
   return { ok: true, ...r }
 }
 
@@ -195,9 +269,15 @@ export async function appliquerTrames(periodeId: string): Promise<Resultat> {
     return { error: 'Les présences déjà posées n’ont pas pu être lues. Rien n’a été modifié.' }
   }
 
-  const voulues = presencesVoulues(trames, blocs, per.periode)
+  const abs = await absencesDeLaPeriode(supabase, per.periode)
+  if (abs.erreur) {
+    return { error: 'Les absences n’ont pas pu être lues. Rien n’a été modifié.' }
+  }
+
+  const sansAbsences = presencesVoulues(trames, blocs, per.periode)
+  const voulues = presencesVoulues(trames, blocs, per.periode, abs.absences)
   const aEcrire = aPoser(voulues, deja.lignes)
-  const resume = resumeApplication(voulues, aEcrire)
+  const resume = resumeApplication(voulues, aEcrire, sansAbsences.length - voulues.length)
 
   // Rien à faire n'est pas une erreur : c'est le cas normal d'une seconde
   // application. On rend la phrase qui le dit, plutôt qu'un succès muet qui
@@ -244,7 +324,10 @@ export async function appliquerTrames(periodeId: string): Promise<Resultat> {
     success: true,
     message:
       `${n} présence${n > 1 ? 's' : ''} posée${n > 1 ? 's' : ''} sur ce planning` +
-      (resume.inchangees > 0 ? `, ${resume.inchangees} étaient déjà en place.` : '.'),
+      (resume.inchangees > 0 ? `, ${resume.inchangees} étaient déjà en place.` : '.') +
+      (resume.ecarteesPourAbsence > 0
+        ? ` ${resume.ecarteesPourAbsence} non posée${resume.ecarteesPourAbsence > 1 ? 's' : ''} : la personne est absente ce jour-là.`
+        : ''),
   }
 }
 

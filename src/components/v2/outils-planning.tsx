@@ -28,6 +28,7 @@ import { useEffect, useState } from 'react'
 import { PreVolAlert } from '@/components/planning/PreVolAlert'
 import { ParcoursGeneration } from '@/components/v2/ParcoursGeneration'
 import { DialogPublication } from '@/components/v2/DialogPublication'
+import { GenererJournee, type PeriodeApplicable } from '@/components/v2/GenererJournee'
 import type { VetEtiquette } from '@/components/planning/PointPreVol'
 import type { AvertissementPreVol } from '@/engine/pre-vol'
 import type { Periode, ProfilPlanning } from '@/types'
@@ -54,6 +55,16 @@ interface OptionsOutils {
   periodesAvecGardes: string[]
   /** Va au mois donné (« AAAA-MM ») — porté par `PlanningV2`. */
   onNaviguerVersMois: (anneeMois: string) => void
+  /**
+   * B-148 — les modules allumés pour ce cabinet. Ils décident de CE QUE
+   * « Générer » veut dire : sans gardes à calculer, le mot ne désigne plus
+   * l'appel du moteur mais l'application des présences de journée.
+   */
+  modules?: string[]
+  /** Les plannings sur lesquels on peut poser des présences (non verrouillés). */
+  periodesJournee?: PeriodeApplicable[]
+  /** Y a-t-il au moins une présence récurrente à appliquer ? */
+  aDesTrames?: boolean
 }
 
 /** Résultat du pré-vol (backlog n°23 + n°24) — GET /api/generate/pre-vol. */
@@ -75,7 +86,16 @@ export function useOutilsPlanning({
   vets,
   periodesAvecGardes,
   onNaviguerVersMois,
+  modules = ['gardes'],
+  periodesJournee = [],
+  aDesTrames = false,
 }: OptionsOutils) {
+  // ⚠️ LE REPLI EST « GARDES SEULES », jamais « tout allumé ». Un cabinet dont
+  //    la liste de modules n'aurait pas été lue doit voir l'écran qu'il a
+  //    toujours eu — pas se découvrir un geste qu'il n'a pas acheté.
+  const aGardes = modules.includes('gardes')
+  const aJournee = modules.includes('planning-journee')
+  const [journeeOuverte, setJourneeOuverte] = useState(false)
   const [parcoursOuvert, setParcoursOuvert] = useState(false)
   const [publicationOuverte, setPublicationOuverte] = useState(false)
   // Le raccourci du menu de période ouvre directement la voie « nouveau » :
@@ -183,16 +203,51 @@ export function useOutilsPlanning({
 
           {/* Le geste central : accentué, avec sa baguette. Plus de `disabled`
               quand le mois n'a pas de planning — c'est justement le cas où il
-              faut pouvoir en créer un. */}
-          <button
-            type="button"
-            className="head-btn generer"
-            title="Générer un planning — nouveau, ou en refaire un existant"
-            onClick={() => ouvrirParcours('choix')}
-          >
-            <span className="hb-etincelle" aria-hidden>✨</span>
-            Générer
-          </button>
+              faut pouvoir en créer un.
+
+              ⚠️ B-148 — « GÉNÉRER » NE VEUT PAS LA MÊME CHOSE PARTOUT. Sur un
+              cabinet sans gardes, il n'y a aucun moteur à lancer : le mot
+              désigne alors le remplissage du planning des journées. Afficher le
+              parcours de gardes là-bas proposerait un calcul sans objet — le
+              défaut relevé au point ① de B-145. */}
+          {aGardes ? (
+            <button
+              type="button"
+              className="head-btn generer"
+              title="Générer un planning — nouveau, ou en refaire un existant"
+              onClick={() => ouvrirParcours('choix')}
+            >
+              <span className="hb-etincelle" aria-hidden>✨</span>
+              Générer
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="head-btn generer"
+              title="Remplir le planning des journées depuis les présences récurrentes"
+              onClick={() => setJourneeOuverte(true)}
+            >
+              <span className="hb-etincelle" aria-hidden>✨</span>
+              Générer
+            </button>
+          )}
+
+          {/* Les deux mondes : le parcours des gardes reste le geste principal,
+              et les journées ont leur propre bouton à côté. ⚠️ CE N'EST PAS
+              encore « un seul geste qui engage les deux », que MiKL a demandé —
+              l'intégration dans le parcours de génération est un chantier à
+              part (B-148a). Ce qui est acquis : le geste a quitté l'écran des
+              réglages, il vit là où l'on remplit son planning. */}
+          {aGardes && aJournee && (
+            <button
+              type="button"
+              className="head-btn"
+              title="Remplir le planning des journées depuis les présences récurrentes"
+              onClick={() => setJourneeOuverte(true)}
+            >
+              Journées
+            </button>
+          )}
         </>
       )}
     </>
@@ -242,6 +297,15 @@ export function useOutilsPlanning({
         periode={periode}
         aDesGardes={aDesGardes}
       />
+
+      {aJournee && (
+        <GenererJournee
+          open={journeeOuverte}
+          onOpenChange={setJourneeOuverte}
+          periodes={periodesJournee}
+          aDesTrames={aDesTrames}
+        />
+      )}
     </>
   ) : null
 

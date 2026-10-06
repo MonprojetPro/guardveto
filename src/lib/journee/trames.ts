@@ -217,6 +217,68 @@ export function validerTrame(
   return { ok: true, valeur: { veterinaire_id: veterinaireId, bloc_id: blocId, jour, semaine } }
 }
 
+// ── Plusieurs jours d'un coup (B-147) ────────────────────────────────────────
+
+/** Ce qu'un formulaire envoie quand il vise plusieurs jours à la fois. */
+export interface SaisieTrames {
+  veterinaire_id: string
+  bloc_id: string
+  jours: string[]
+  semaine: string
+}
+
+export type ValidationTrames =
+  | { ok: true; valeurs: TrameValide[] }
+  | { ok: false; probleme: string }
+
+/**
+ * Valide une saisie qui vise plusieurs jours.
+ *
+ * Demande de MiKL le 06/10, capture à l'appui : décrire « Anne-Sophie, lundi +
+ * mardi + jeudi, matin » obligeait à saisir trois fois la même phrase.
+ *
+ * ⚠️ DÉLÈGUE À `validerTrame` POUR CHAQUE JOUR, et ne réimplémente rien. Les
+ *    refus qui comptent — la tranche retirée, le pluriel de la cadence — vivent
+ *    là-bas : les recopier ici aurait créé un second jeu de règles qui diverge
+ *    au premier correctif. Le premier refus arrête tout et porte son message
+ *    tel quel.
+ *
+ * ⚠️ LES JOURS RÉPÉTÉS SONT ABSORBÉS, pas refusés. Un formulaire ne devrait pas
+ *    pouvoir envoyer deux fois « lundi », mais l'URL le peut — et deux fois la
+ *    même ligne ferait échouer l'insertion entière sur l'index unique, avec un
+ *    message de contrainte illisible pour une faute qui n'en est pas une.
+ */
+export function validerTrames(
+  saisie: SaisieTrames,
+  blocs: readonly BlocPourTrame[],
+): ValidationTrames {
+  const jours = [...new Set(saisie.jours ?? [])]
+  if (jours.length === 0) {
+    return { ok: false, probleme: 'Choisissez au moins un jour.' }
+  }
+
+  const valeurs: TrameValide[] = []
+  for (const jour of jours) {
+    const r = validerTrame(
+      {
+        veterinaire_id: saisie.veterinaire_id,
+        bloc_id: saisie.bloc_id,
+        jour,
+        semaine: saisie.semaine,
+      },
+      blocs,
+    )
+    if (!r.ok) return { ok: false, probleme: r.probleme }
+    valeurs.push(r.valeur)
+  }
+
+  // Ordre de la semaine, pas ordre de clic : la liste relue doit se lire comme
+  // un calendrier, sinon « lundi, jeudi, mardi » donne l'impression d'une
+  // saisie en désordre.
+  valeurs.sort((a, b) => JOURS_TRAME.indexOf(a.jour) - JOURS_TRAME.indexOf(b.jour))
+  return { ok: true, valeurs }
+}
+
 /**
  * Cette ligne existe-t-elle déjà ? (même personne, même tranche, même jour,
  * même cadence)

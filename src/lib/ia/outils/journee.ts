@@ -50,7 +50,7 @@ import {
   basculerBloc,
 } from '@/app/(v2)/journee/actions'
 import {
-  creerTrame,
+  creerTrames,
   modifierTrame,
   basculerTrame,
 } from '@/app/(v2)/journee/trames-actions'
@@ -625,10 +625,15 @@ Les semaines paires et impaires suivent le numéro de semaine du calendrier, exa
     if (!c?.veterinaire_id || !c.bloc_id || !c.jour || !c.semaine) {
       return { error: 'La proposition a été perdue — redemande-la à Filou.' }
     }
-    const r = await creerTrame({
+    // B-147 — `creerTrames` au pluriel : l'écran sait viser plusieurs jours
+    // d'un coup, et c'est la seule action de création désormais. Filou, lui,
+    // n'en propose qu'un à la fois — son schéma porte un `jour` unique. Limite
+    // assumée : elle lui fait répéter la demande pour « lundi et mardi », elle
+    // ne lui fait rien dire de faux.
+    const r = await creerTrames({
       veterinaire_id: c.veterinaire_id,
       bloc_id: c.bloc_id,
-      jour: c.jour,
+      jours: [c.jour],
       semaine: c.semaine,
     })
     return 'error' in r ? { error: r.error } : {}
