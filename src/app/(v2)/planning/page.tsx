@@ -80,6 +80,15 @@ interface LigneConge {
   date_debut: string
   date_fin: string
   statut: string
+  /**
+   * B-145 lot 2b — l'identifiant, et pas seulement le prénom.
+   *
+   * ⚠️ La grille dépliée pose une LIGNE PAR PERSONNE : pour hachurer la bonne,
+   *    il faut un identifiant. Rapprocher par le prénom marcherait jusqu'au jour
+   *    où deux personnes s'appellent pareil — et ce jour-là, le congé de l'une
+   *    s'afficherait sur la ligne de l'autre, sans la moindre erreur visible.
+   */
+  veterinaire_id: string
   veterinaires?: { prenom: string; couleur: string } | { prenom: string; couleur: string }[] | null
 }
 
@@ -187,7 +196,7 @@ export default async function PlanningPageV2({
         // congé n'a jamais été affiché dans les cases du planning, sans qu'un
         // seul message le signale. Trouvé en cherchant pourquoi le panneau du
         // secrétariat restait vide.
-        .select('id, date_debut, date_fin, statut, veterinaires!conges_veterinaire_id_fkey(prenom, couleur)')
+        .select('id, date_debut, date_fin, statut, veterinaire_id, veterinaires!conges_veterinaire_id_fkey(prenom, couleur)')
         .lte('date_debut', grille.fin)
         .gte('date_fin', grille.debut),
       // Chargé pour TOUS : le bouton PDF en dépend, pas seulement la publication.
@@ -267,6 +276,7 @@ export default async function PlanningPageV2({
     const v = Array.isArray(c.veterinaires) ? c.veterinaires[0] : c.veterinaires
     return {
       id: c.id,
+      vetId: c.veterinaire_id,
       prenom: v?.prenom ?? 'Vétérinaire',
       couleur: v?.couleur ?? '#7C6A55',
       dateDebut: c.date_debut,
@@ -803,6 +813,17 @@ export default async function PlanningPageV2({
           // module journée est éteint, et la grille est alors exactement celle
           // d'avant ce lot.
           presencesParJour={presencesParJour}
+          // B-145 lot 2b — l'équipe pose UNE LIGNE PAR PERSONNE dans la grille
+          // dépliée. Chargée pour tout le monde, contrairement à `vets` qui ne
+          // sert qu'aux gestes de l'administratrice.
+          equipe={equipePourPresences}
+          // Les tranches ACTIVES seulement : on ne propose pas de poser une
+          // présence sur une tranche retirée — l'action la refuserait
+          // (`validerPresence`), et un bouton qui mène à un refus prévisible
+          // est un bouton qui ment.
+          tranches={tranchesLues
+            .filter((t) => t.actif)
+            .map((t) => ({ id: t.id, nom: t.nom, debut: t.debut, fin: t.fin }))}
         />
       </div>
     </>

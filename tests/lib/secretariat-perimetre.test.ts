@@ -131,29 +131,40 @@ describe('Filou n’est pas ouvert au secrétariat', () => {
 describe('L’écran du secrétariat ne promet rien d’impossible', () => {
   const planning = readFileSync(join(RACINE, 'src', 'components', 'v2', 'PlanningV2.tsx'), 'utf8')
 
+  // ⚠️ CES TROIS CAS ONT ÉTÉ RÉÉCRITS LE 07/10, PAS SUPPRIMÉS (B-145 lot 2c).
+  //
+  // Ils visaient la colonne latérale de 262 px, qui n'existe plus : les deux
+  // panneaux sont devenus des fenêtres (« une pop up », MiKL les 06 et 07/10),
+  // et c'est cette largeur libérée qui rend l'accordéon possible.
+  //
+  // L'EXIGENCE, elle, n'a pas bougé d'un mot : le secrétariat ne voit pas la vie
+  // interne de l'équipe, et il garde sa réponse à « il revient quand ? ». Un
+  // test de périmètre qu'on supprime parce que l'écran a changé de forme, c'est
+  // le périmètre qu'on supprime — et personne ne s'en aperçoit avant la fuite.
+
   it('ne lui montre pas les compteurs d’équité', () => {
     // Week-ends, nuits et surtout ÉCART à la juste part : c'est la vie interne
-    // de l'équipe. Le panneau ET son bouton disparaissent — laisser le bouton
-    // aurait ouvert un panneau vide.
-    // Regex plutôt qu'une chaîne littérale : les fins de ligne et
-    // l'indentation ne doivent pas faire tomber un test de sécurité.
-    expect(planning).toMatch(
-      /lectureSeule \? \(\s*<AbsencesAVenirPanel[\s\S]{0,200}\) : \(\s*<aside className="counters-panel"/,
-    )
+    // de l'équipe. Le bouton ET la fenêtre doivent disparaître — laisser le
+    // bouton aurait ouvert une fenêtre vide, laisser la fenêtre l'aurait rendue
+    // atteignable par un autre chemin.
     expect(planning).toMatch(/\{!lectureSeule && \(\s*<button[\s\S]{0,200}Compteurs/)
+    expect(planning).toMatch(/<CompteursModale[\s\S]{0,120}ouvert=\{compteursOuverts && !lectureSeule\}/)
   })
 
-  it('lui donne les absences à venir à la place, au même endroit', () => {
-    // Demande MiKL du 25/08 : la colonne de droite existait, et elle était
-    // occupée par la seule information qu'on venait de lui retirer. Elle porte
-    // désormais la réponse à « il revient quand ? ».
-    expect(planning).toContain('<AbsencesAVenirPanel absences={absencesAVenir} />')
+  it('lui donne les absences à venir, par une autre porte', () => {
+    // Demande MiKL du 25/08, qui tient toujours : la question du comptoir est
+    // « il revient quand ? », elle regarde DEVANT, et la grille par jour n'y
+    // répond pas. Son panneau est devenu une fenêtre — l'information reste.
+    expect(planning).toContain('<AbsencesModale')
+    expect(planning).toContain('absences={absencesAVenir}')
   })
 
-  it('garde la colonne de droite ouverte pour lui', () => {
-    // Ce panneau n'a pas de bouton pour le replier : c'est la raison d'être de
-    // l'écran pour le secrétariat, pas un détail qu'on range.
-    expect(planning).toContain('compteursOuverts || lectureSeule')
+  it('a un bouton pour l’ouvrir, sinon l’information n’existe pas pour lui', () => {
+    // 🔴 LE PIÈGE EXACT DE CE LOT : déplacer un panneau dans une fenêtre sans
+    //    livrer le bouton qui l'ouvre. L'information serait en mémoire, montée
+    //    dans le composant, et INATTEIGNABLE — la même moitié de chaîne que
+    //    B-150, où les présences s'écrivaient sans que rien ne les affiche.
+    expect(planning).toMatch(/\{lectureSeule && \(\s*<button[\s\S]{0,200}Qui est absent/)
   })
 
   it('remplace la consigne d’échange, qu’elle ne peut pas suivre', () => {
