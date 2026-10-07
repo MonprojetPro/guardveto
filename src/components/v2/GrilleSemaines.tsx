@@ -574,9 +574,19 @@ function minutesEnTime(minutes: number): string {
  * Une barre pleine ferait de la journée l'élément dominant de la case.
  */
 function teinte(couleur: string | null): string {
-  if (!couleur) return 'rgba(124, 106, 85, 0.18)'
+  if (!couleur) return 'rgba(124, 106, 85, 0.30)'
   // `#RRGGBB` + alpha en hexadécimal : pas de conversion, pas d'arrondi.
-  return /^#[0-9a-f]{6}$/i.test(couleur) ? `${couleur}2E` : couleur
+  //
+  // 🔴 `2E` (18 %) À LA RECETTE DU 07/10 — MiKL : « on voit rien ». Il avait
+  //    raison, et la mesure le confirme : 18 % d'une couleur sur un fond crème
+  //    ne fait pas une barre, ça fait une nuance. Monté à `4D` (30 %), avec un
+  //    liseré à gauche qui marque le début de la tranche (CSS `jd-barre`).
+  //
+  // ⚠️ Pâle VOLONTAIREMENT, pas timidement : une présence de journée n'a pas
+  //    le même poids qu'une garde, qui reste l'information qu'on cherche en
+  //    ouvrant le planning (B-047). Une barre pleine ferait de la journée
+  //    l'élément dominant. L'équilibre se règle ici, et nulle part ailleurs.
+  return /^#[0-9a-f]{6}$/i.test(couleur) ? `${couleur}4D` : couleur
 }
 
 /** Ce qu'un lecteur d'écran entend sur une cellule — le visuel ne s'annonce pas. */
