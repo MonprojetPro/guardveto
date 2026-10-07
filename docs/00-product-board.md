@@ -286,13 +286,14 @@ requalifie non bloquant). Detail integral → archive 3ter.
 
 ## 4. Livre
 
-> **48 items livres.** Le detail de chacun — titre, commit, date, perimetre —
+> **49 items livres.** Le detail de chacun — titre, commit, date, perimetre —
 > vit dans `00-product-board-archive.md`, **archive 33**. Cette table pesait
 > 10,9 Ko et etait deja coupee au demarrage des sessions : elle ne servait plus
 > personne ici. Les identifiants restent listes ci-dessous pour que la regle
 > d'or tienne — **un identifiant est immortel, on change son statut, jamais son
 > existence.**
 
+- **B-150 (2026-10-07, `c006d3d`)** — B-145 lot 2a : les presences posees s'affichent enfin sur le planning. ⚠️ **Rendu a recetter** (B-144b). Restes-a-faire ouverts : **B-150a** (PDF) et **B-150b** (qui voit la journee).
 - B-117 (2026-09-07) · B-118 (2026-09-07) · T-007 (2026-09-07) · B-114 (2026-09-04) · B-113 (2026-09-04) · B-111 (2026-09-04)
 - B-115 (2026-09-04) · B-102 (2026-09-02) · B-096b (2026-09-02) · B-096c (2026-09-02) · B-078 (2026-08-27) · B-079 (2026-08-27)
 - B-081 (2026-08-27) · B-062 (2026-08-27) · B-070 (2026-08-27) · B-071 (2026-08-27) · B-072 (2026-08-27) · B-073 (2026-08-27)
