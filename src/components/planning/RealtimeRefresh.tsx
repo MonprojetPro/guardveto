@@ -18,7 +18,20 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { abonnerEnSignalantLesEchecs } from '@/lib/realtime/statut-abonnement'
 
-const TABLES_SURVEILLEES = ['gardes', 'periodes'] as const
+// ⚠️ B-150 — `presences_journee` EST DANS CETTE LISTE, ET C'EST OBLIGATOIRE.
+//
+// Sans elle, appliquer les récurrences ou poser une présence écrivait bien en
+// base, et la grille restait identique jusqu'au rechargement suivant. Or
+// `revalidatePath('/planning')` ne touche QUE l'onglet qui a cliqué : les autres
+// écrans ouverts (le secrétariat au comptoir, typiquement) restaient en retard
+// sans le savoir — et un planning en retard ne se distingue pas d'un planning
+// vide. C'est le symptôme « faut que je rafraîchisse pour voir » de la règle
+// INSPECTION DES CONSUMERS.
+//
+// La table est bien membre de la publication `supabase_realtime` (migration
+// `20261006120000_presences_journee.sql`, vérifié) — sans quoi l'abonnement ne
+// renverrait AUCUNE erreur et ne se déclencherait jamais.
+const TABLES_SURVEILLEES = ['gardes', 'periodes', 'presences_journee'] as const
 
 export function RealtimeRefresh() {
   const router = useRouter()
@@ -41,7 +54,11 @@ export function RealtimeRefresh() {
       )
     }
 
-    abonnerEnSignalantLesEchecs(channel, "planning : gardes, periodes, conges, veterinaires, regles")
+    // Le libellé ÉNUMÈRE ce qui est réellement écouté, et rien d'autre. Il
+    // annonçait « conges, veterinaires, regles » alors que ces trois tables
+    // n'ont jamais été dans la liste : un message de diagnostic qui décrit un
+    // abonnement imaginaire envoie chercher la panne au mauvais endroit.
+    abonnerEnSignalantLesEchecs(channel, `planning : ${TABLES_SURVEILLEES.join(', ')}`)
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)

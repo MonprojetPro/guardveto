@@ -2982,3 +2982,90 @@ details.rl-bloc > .rl-liste { margin-top: 9px; }
   border: 1px solid var(--t-border); border-top: 0;
   border-radius: 0 0 8px 8px;
 }
+
+/* ============================================================
+   B-150 — L'ÉTAGE JOURNÉE DANS LA CASE, ET SON DÉTAIL
+   ============================================================
+   Le lot précédent savait POSER des présences, et aucun écran ne les montrait.
+   Ce bloc est la moitié aval : le chiffre dans la case, le détail en fenêtre.
+
+   ⚠️ UN CHIFFRE, PAS DES PRÉNOMS, et c'est mesuré. La case fait 96 px de haut
+      (`.day`, min-height) et en tient 4 lignes ; écrire les prénoms par tranche
+      demanderait jusqu'à 21 lignes (3 tranches x 7 personnes, relevé le 02/10).
+      C'est très exactement ce qui a fait rejeter la première maquette. Le
+      nominatif vit dans la fenêtre, et dans la case dépliée du lot 2b.
+
+   ⚠️ AUCUNE COULEUR D'ALERTE SUR LE CHIFFRE. Le minimum d'effectif a été écarté
+      par MiKL le 06/10 (« il a fait du zèle »), et la donnée n'existe nulle part
+      dans le schéma. Un chiffre en rouge annoncerait un seuil qui n'existe pas.
+      Seule l'anomalie de donnée (tranche retirée, personne partie) se signale. */
+.jour-presents {
+  display: inline-flex; align-items: center; gap: 5px;
+  align-self: flex-start;
+  /* Un FILET HAUT sépare l'étage journée du reste de la case : c'est le seul
+     repère du design 3a qui survive à la case repliée, et il dit « autre
+     nature d'information » sans ajouter ni fond ni cadre. */
+  margin-top: 1px; padding: 3px 9px 2px;
+  border: 0; border-top: 1px solid var(--t-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--t-muted);
+  font-size: 0.62rem; font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+.jour-presents:hover { color: var(--text); }
+.jour-presents:hover .jp-n { background: var(--accent-soft); color: var(--t-accent); }
+.jp-n {
+  font-family: var(--font-display); font-weight: 800; font-size: 0.74rem;
+  min-width: 15px; padding: 0 3px; border-radius: 5px;
+  background: var(--surface); color: var(--text);
+  text-align: center; flex: none;
+}
+.jp-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Le « ! » ne dit pas « effectif insuffisant » — il dit « cette ligne ne colle
+   pas avec la configuration actuelle ». Deux choses très différentes. */
+.jp-alerte {
+  flex: none; width: 13px; height: 13px; border-radius: 50%;
+  background: var(--danger, #A8341F); color: #fff;
+  font-size: 0.56rem; font-weight: 800; line-height: 13px; text-align: center;
+}
+.day.past .jour-presents { opacity: 0.6; filter: saturate(0.4); }
+
+/* ── La fenêtre « Au cabinet » ─────────────────────────────────────────── */
+.jdm-vide {
+  color: var(--t-muted); font-size: 0.86rem; line-height: 1.6;
+  background: var(--surface-2);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+}
+.jdm-tranches { display: flex; flex-direction: column; gap: 12px; }
+.jdm-tranche {
+  border: 1px solid var(--t-border); border-radius: var(--r-sm);
+  background: var(--surface-2);
+  padding: 9px 11px 7px;
+}
+.jdm-tr-head {
+  display: flex; align-items: baseline; gap: 8px;
+  font-family: var(--font-display); font-size: 0.86rem; color: var(--text);
+}
+.jdm-heures { font-family: inherit; font-weight: 500; font-size: 0.74rem; color: var(--t-muted); }
+.jdm-compte { margin-left: auto; font-size: 0.74rem; color: var(--soft); font-weight: 600; }
+.jdm-gens { list-style: none; margin: 7px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.jdm-gen { display: flex; align-items: center; gap: 7px; font-size: 0.82rem; }
+.jdm-prenom { font-weight: 600; color: var(--text); }
+.jdm-origine { margin-left: auto; font-size: 0.7rem; color: var(--soft); font-style: italic; }
+.jdm-gen.a-verifier .jdm-prenom { color: var(--danger, #A8341F); }
+.jdm-anomalies {
+  margin-top: 12px; padding: 10px 12px;
+  border: 1px solid var(--danger, #A8341F); border-radius: var(--r-sm);
+  background: rgba(168, 52, 31, 0.07);
+  font-size: 0.8rem; color: var(--text);
+}
+.jdm-anomalies b { display: block; margin-bottom: 4px; color: var(--danger, #A8341F); }
+.jdm-anomalies ul { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 3px; }
+.jdm-pied {
+  margin-top: 12px; font-size: 0.76rem; color: var(--soft); line-height: 1.55;
+}

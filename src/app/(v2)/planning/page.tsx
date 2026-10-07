@@ -39,6 +39,13 @@ import {
 import { calculerBilans } from '@/engine/bilan'
 import { normaliserColonnes } from '@/lib/planning/colonnesCompteurs'
 import { lignesDesPeriodes, periodesVisibles } from '@/lib/planning/diffusion'
+// B-150 — la moitié aval qui manquait : les présences écrites par le lot
+// précédent, enfin mises en forme pour la grille.
+import {
+  composerPresencesParJour,
+  type JourneeAffichee,
+  type PresenceLue,
+} from '@/lib/planning/presencesDuJour'
 // ⚠️ DEUX bornes, deux usages — voir l'en-tête du module. `bornesMois` porte
 // l'identité du mois (période affichée, re-validation) ; `bornesGrille` porte ce
 // qui est réellement dessiné, et c'est elle qui remplit les cases.
@@ -276,7 +283,7 @@ export default async function PlanningPageV2({
   // les présences de journée ont besoin de savoir s'il existe au moins une
   // règle à appliquer. Chargés en parallèle du reste : aucune requête en série
   // ajoutée sur un produit déjà jugé lent (B-116).
-  const [dock, profilRes, compteursRes, totalWERes, prefsRes, typesRes2, equipeRes, creneauxRes, modules, tramesRes] = await Promise.all([
+  const [dock, profilRes, compteursRes, totalWERes, prefsRes, typesRes2, equipeRes, creneauxRes, modules, tramesRes, presencesRes, blocsRes] = await Promise.all([
     chargerDock(supabase, { role_app: identite.role }, periodes),
     periodeAffichee?.profil_id
       ? supabase.from('profils_planning').select('nom').eq('id', periodeAffichee.profil_id).maybeSingle()
@@ -337,6 +344,33 @@ export default async function PlanningPageV2({
     isAdmin
       ? supabase.from('trames_journee').select('id').eq('actif', true).limit(1)
       : Promise.resolve({ data: null }),
+    // ── B-150 — LES PRÉSENCES DE JOURNÉE, ENFIN LUES ───────────────────────
+    //
+    // 🔴 Le lot précédent a livré l'écriture sans la lecture : le 07/10,
+    //    `grep -rn "presences_journee" src/` ne trouvait AUCUN écran. Poser 40
+    //    présences les écrivait en base et le produit n'en montrait pas une.
+    //    C'est MiKL qui l'a vu, pas moi — comme le matin du 06/10, où les
+    //    trames s'enregistraient sans rien poser. Deux fois le même mécanisme :
+    //    une moitié de chaîne livrée.
+    //
+    // Bornées à la GRILLE, pas au mois : la semaine à cheval se dessine, elle
+    // doit donc porter son contenu (même raison que les congés ci-dessus).
+    //
+    // ⚠️ CHARGÉES SANS REGARDER LES MODULES, et c'est volontaire. `modules` se
+    //    résout dans ce même `Promise.all` : le conditionner obligerait à une
+    //    requête en SÉRIE sur un produit déjà jugé lent (B-116). Le coût réel
+    //    est nul — un cabinet sans module journée n'a aucune ligne dans ces
+    //    deux tables. C'est l'AFFICHAGE qui est conditionné, plus bas.
+    supabase
+      .from('presences_journee')
+      .select('id, periode_id, veterinaire_id, bloc_id, date, trame_id')
+      .gte('date', grille.debut)
+      .lte('date', grille.fin),
+    // Les tranches, TOUTES — actives ou non. Une tranche retirée ne reçoit plus
+    // de nouvelles présences, mais celles déjà posées dessus survivent : ne
+    // charger que les actives les ferait disparaître de l'écran en les laissant
+    // en base, et l'effectif du jour serait faux sans un mot.
+    supabase.from('blocs_journee').select('id, nom, debut, fin, ordre, actif'),
   ])
 
   // ── « Qui est absent », pour le secrétariat ────────────────────────────
@@ -426,6 +460,68 @@ export default async function PlanningPageV2({
     }))
   const aDesTrames = ((tramesRes as { data?: unknown[] | null })?.data ?? []).length > 0
   const periodesTypes = ((typesRes2?.data ?? []) as ProfilPlanning[])
+
+  // ── B-150 — LES PRÉSENCES, MISES EN FORME POUR LA GRILLE ────────────────
+  //
+  // ⚠️ LES ERREURS SONT LUES. Une lecture échouée rendrait `data` à null, donc
+  //    une grille sans aucune présence — exactement l'écran qu'on vient de
+  //    corriger, et impossible à distinguer d'un planning vide. C'est le piège
+  //    « une erreur Supabase avalée devient zéro ligne », et il a déjà coûté un
+  //    mois de congés jamais affichés sur CET écran (25/08).
+  if (presencesRes?.error) {
+    console.error('[planning] présences de journée :', presencesRes.error.message)
+  }
+  if (blocsRes?.error) {
+    console.error('[planning] tranches horaires :', blocsRes.error.message)
+  }
+
+  const tranchesLues = (blocsRes?.data ?? []) as {
+    id: string; nom: string; debut: string; fin: string; ordre: number; actif: boolean
+  }[]
+
+  // ⚠️ UN SEUL FILTRE ICI, LÀ OÙ LES GARDES EN ONT DEUX — et l'asymétrie est
+  //    mesurée, pas supposée :
+  //
+  //    ① LE CABINET : rien à faire. `presences_journee` et `blocs_journee`
+  //       portent chacune une policy RESTRICTIVE d'isolation, RLS active,
+  //       vérifié en base le 07/10 (`pg_class.relrowsecurity` = true,
+  //       1 RESTRICTIVE chacune). Les gardes, elles, passent par la vue
+  //       `planning_semaine` qui n'a AUCUNE RLS — d'où leur filtre manuel.
+  //       Ne pas recopier ce filtre ici par mimétisme : il donnerait
+  //       l'impression que la RLS n'existe pas, et le prochain qui lit en
+  //       conclurait qu'il peut s'en passer ailleurs.
+  //
+  //    ② LA DIFFUSION : indispensable, et gardé par personne d'autre — la RLS
+  //       borne au cabinet, jamais au statut de publication. Sans ce filtre, un
+  //       vétérinaire ouvrant `/planning` lirait les présences d'un BROUILLON,
+  //       une préparation qui sort du logiciel. Faute déjà payée deux fois : 38
+  //       événements de brouillon dans l'agenda Google d'un client, et le mois
+  //       d'octobre affiché à l'équipe le 20/08.
+  const toutesPresences = (presencesRes?.data ?? []) as PresenceLue[]
+  const presencesVisibles = isAdmin
+    ? toutesPresences
+    : lignesDesPeriodes(toutesPresences, periodes)
+
+  // Le module éteint ne dessine rien — et c'est ici que la condition vit, pas
+  // au chargement (voir le commentaire de la requête).
+  const moduleJournee = modules.includes('planning-journee')
+  const equipePourPresences = ((equipeRes?.data ?? []) as {
+    id: string; prenom: string; couleur: string | null
+  }[]).map((v) => ({ id: v.id, prenom: v.prenom, couleur: v.couleur ?? null }))
+
+  // ⚠️ UN OBJET, PAS UNE `Map` — c'est une prop de Server vers Client Component.
+  //    La fonction pure rend une `Map` (c'est la bonne structure pour la lire et
+  //    la tester) ; ce qui TRAVERSE la frontière est converti ici, une fois.
+  const presencesParJour: Record<string, JourneeAffichee> = moduleJournee
+    ? Object.fromEntries(
+        composerPresencesParJour(
+          presencesVisibles,
+          tranchesLues,
+          equipePourPresences,
+          new Set(tranchesLues.filter((t) => !t.actif).map((t) => t.id)),
+        ),
+      )
+    : {}
 
   // ── CE QUE CONTIENT CHAQUE PÉRIODE TYPE ─────────────────────────────────
   // Retour MiKL du 2026-08-04 : « pourquoi ce n'est pas juste indiqué :
@@ -703,6 +799,10 @@ export default async function PlanningPageV2({
           modules={modules}
           periodesJournee={periodesJournee}
           aDesTrames={aDesTrames}
+          // B-150 — ce qui manquait : les présences, par date. Vide si le
+          // module journée est éteint, et la grille est alors exactement celle
+          // d'avant ce lot.
+          presencesParJour={presencesParJour}
         />
       </div>
     </>

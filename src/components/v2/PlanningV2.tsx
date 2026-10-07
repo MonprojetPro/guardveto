@@ -56,6 +56,12 @@ import type { CleColonne } from '@/lib/planning/colonnesCompteurs'
 import type { GardeDenormalisee, Periode, ProfilPlanning } from '@/types'
 import { nomPeriode } from '@/lib/periodes/libelle'
 import { stylePoint } from '@/lib/couleurs'
+// B-150 — la composition des présences est PURE et testée
+// (`tests/lib/presences-du-jour.test.ts`) : aucun test de ce projet ne monte un
+// composant (B-144b), donc toute règle d'affichage laissée dans le JSX n'est
+// jamais vérifiée.
+import { resumePresences, type JourneeAffichee } from '@/lib/planning/presencesDuJour'
+import { JourneeDuJourModale } from './JourneeDuJourModale'
 
 interface Props {
   gardes: GardeDenormalisee[]
@@ -147,6 +153,18 @@ interface Props {
   aDesTrames?: boolean
   /** Ce que l'encart Compteurs afficherait SI le lot en attente était appliqué. */
   compteursProjetes?: CompteursRow[]
+  /**
+   * B-150 — les présences de journée, par date (`AAAA-MM-JJ`).
+   *
+   * 🔴 LA MOITIÉ DE CHAÎNE QUI MANQUAIT. Le lot précédent savait POSER des
+   *    présences et aucun écran ne les montrait : `grep -rn "presences_journee"`
+   *    sur `src/` ne trouvait rien le 07/10, et c'est MiKL qui l'a vu. Poser 40
+   *    présences était un geste sans résultat visible.
+   *
+   * Absent ou vide = le module journée est éteint, ou ce planning n'a aucune
+   * présence : la grille se dessine exactement comme avant ce lot.
+   */
+  presencesParJour?: Record<string, JourneeAffichee>
 }
 
 /** Une période de vacances scolaires, telle que servie par la page. */
@@ -224,6 +242,7 @@ export function PlanningV2({
   modules,
   periodesJournee,
   aDesTrames,
+  presencesParJour = {},
 }: Props) {
   const router = useRouter()
   const [annee, mois] = anneeMois.split('-').map(Number)
@@ -233,6 +252,10 @@ export function PlanningV2({
   // B-122/B-123 — quelle proposition en attente est ouverte, pilotée à la
   // fois par un clic sur la grille et par le bandeau (`PropositionsPlanning`).
   const [propositionOuverte, setPropositionOuverte] = useState<string | null>(null)
+  // B-150 — le jour dont le détail « au cabinet » est ouvert. Décision de MiKL
+  // du 07/10 : la case porte le chiffre, une fenêtre porte le détail, « le même
+  // principe que pour le compteur ».
+  const [journeeOuverte, setJourneeOuverte] = useState<string | null>(null)
   const [criseOpen, setCriseOpen] = useState(false)
   const [criseDate, setCriseDate] = useState<string | undefined>()
   const [criseVetId, setCriseVetId] = useState<string | undefined>()
@@ -840,6 +863,10 @@ export function PlanningV2({
                         manquesParGarde={manquesParGarde}
                         onOuvrirProposition={setPropositionOuverte}
                         propositionOuverte={propositionOuverte}
+                        // B-150 — les présences de journée de ce jour-là, et le
+                        // clic qui ouvre leur détail.
+                        journee={presencesParJour[date]}
+                        onOuvrirJournee={setJourneeOuverte}
                       />
                     ))}
                   </div>
@@ -902,6 +929,18 @@ export function PlanningV2({
           onFermer={() => setPropositionOuverte(null)}
         />
       )}
+
+      {/* B-150 — le détail « qui est au cabinet » de la journée cliquée. Même
+          principe que les compteurs : le chiffre sur la grille, le détail dans
+          une fenêtre (arbitrage MiKL du 07/10). */}
+      <JourneeDuJourModale
+        date={journeeOuverte}
+        journee={journeeOuverte ? presencesParJour[journeeOuverte] : undefined}
+        // Seule l'administratrice se voit renvoyer vers « Journée » : cet écran
+        // refuse tout le monde d'autre côté serveur.
+        isAdmin={isAdmin && !lectureSeule}
+        onFermer={() => setJourneeOuverte(null)}
+      />
 
       <GardeDetailModal
         garde={gardeModal}
@@ -992,6 +1031,8 @@ function CaseJour({
   manquesParGarde,
   onOuvrirProposition,
   propositionOuverte,
+  journee,
+  onOuvrirJournee,
 }: {
   date: string
   moisAffiche: number
@@ -1022,6 +1063,10 @@ function CaseJour({
   onOuvrirProposition?: (id: string) => void
   /** La proposition dont le détail est ouvert — sa case est mise en avant. */
   propositionOuverte?: string | null
+  /** B-150 — les présences de journée de ce jour. Absent = rien à montrer. */
+  journee?: JourneeAffichee
+  /** Ouvre le détail « au cabinet » de ce jour. */
+  onOuvrirJournee?: (date: string) => void
 }) {
   const jour = new Date(date + 'T12:00:00Z')
   const dow = (jour.getUTCDay() + 6) % 7 // 0 = lundi
@@ -1219,6 +1264,38 @@ function CaseJour({
           vets={vets}
           onCadenas={onCadenas}
         />
+      )}
+
+      {/* ── B-150 — L'ÉTAGE JOURNÉE ────────────────────────────────────────
+          Après les gardes, comme les congés et pour la même raison (B-047,
+          26/08) : la garde est l'information qu'on cherche en ouvrant le
+          planning. La journée se lit en second.
+
+          ⚠️ PAS DE NOMINATIF ICI, et c'est mesuré, pas une préférence. La case
+             fait 96 px de haut et en tient 4 lignes ; écrire les prénoms par
+             tranche demanderait jusqu'à 21 lignes (3 tranches x 7 personnes,
+             relevé le 02/10). C'est ce qui avait fait rejeter la première
+             maquette. Le nominatif vit dans la case DÉPLIÉE de l'accordéon
+             (lot 2b) — et, dès maintenant, dans la fenêtre de détail, « le
+             même principe que pour le compteur » (MiKL, 07/10).
+
+          Le chiffre est NEUTRE : aucun minimum d'effectif n'existe dans le
+          schéma, et MiKL l'a écarté le 06/10. Il informe, il ne juge pas. */}
+      {journee && journee.personnes > 0 && (
+        <button
+          type="button"
+          className="jour-presents"
+          onClick={() => onOuvrirJournee?.(date)}
+          aria-label={`${dateCourte(date)} · ${resumePresences(journee)} au cabinet · voir le détail`}
+        >
+          <span className="jp-n">{journee.personnes}</span>
+          <span className="jp-txt">{journee.personnes > 1 ? 'présents' : 'présent'}</span>
+          {journee.presences.some((p) => p.anomalie) && (
+            <span className="jp-alerte" aria-hidden="true">
+              !
+            </span>
+          )}
+        </button>
       )}
 
       {/* Congés APRÈS les gardes (B-047, demande de MiKL le 26/08) : la garde

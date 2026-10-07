@@ -753,3 +753,63 @@ témoin qui capture le verdict de l'exception, elle a rendu la phrase exacte
 > **Une mesure dont deux causes opposées produisent le même chiffre n'est pas
 > une mesure.** C'est la discipline du 22/08 (`security_invoker`), appliquée à
 > la sonde elle-même et pas seulement à ce qu'elle observe.
+
+
+---
+
+## 27. Une moitié de chaîne livrée est un geste sans résultat — et c'est MiKL qui l'a vu, trois fois
+
+**Les faits, dans l'ordre, sur 24 heures.**
+
+- **06/10, matin.** Les trames de présence s'enregistraient et ne posaient rien.
+  Le produit l'écrivait lui-même à l'écran (*« ces règles ne remplissent pas
+  encore le planning »*), et personne n'en avait tiré la conséquence.
+- **06/10, soir.** Les présences se posaient — et aucun écran ne les affichait.
+  Mesuré le 07/10 : `grep -rn "presences_journee" src/` ne trouvait **aucune
+  lecture**, seulement un commentaire. Poser 40 présences écrivait 40 lignes en
+  base que le produit ne montrait nulle part.
+- **07/10.** En inspectant les consumers du correctif, un troisième cas :
+  `api/export-pdf` ne porte pas les présences. Le secrétariat imprimerait un
+  papier qui dit **moins** que son écran, sans que rien le signale (**B-150a**).
+
+**Trois fois le même mécanisme : la moitié amont livrée, la moitié aval absente.
+Et trois fois, c'est MiKL qui l'a vu.** Les tests étaient verts à chaque étape —
+2084, puis 2105, puis 2121 — parce qu'ils vérifiaient que *ce qui était écrit
+fonctionnait*, jamais que *quelqu'un le lisait*.
+
+### Ce qui rendait le défaut invisible
+
+Le cas du soir est le plus instructif, parce qu'il **était prévu** : la grille
+refondue était planifiée comme lot 2. Mais ce n'était écrit **nulle part en tant
+que trou actif** — donc, pour qui recette, indiscernable d'un oubli. Un manque
+assumé et un manque oublié se ressemblent exactement, vus de l'écran.
+
+> **Un manque planifié qui n'est pas écrit comme manque est un oubli.**
+> « On le fera au lot suivant » n'existe que dans la tête de celui qui code.
+
+### La question qui aurait trouvé les trois
+
+Elle n'est pas *« faut-il l'ajouter ? »* — formulation qui invite à répondre
+« plus tard ». Elle est :
+
+> **« Une chose déjà affichée devient-elle fausse, ou muette ? »**
+
+C'est mot pour mot la question des deux règles permanentes de ce projet,
+FILOU SUIT LE PRODUIT et LE TABLEAU NE PEUT PAS SE TAIRE. Les deux existent
+parce que la consigne « penser à mettre à jour » avait déjà été oubliée. **Elles
+n'ont pas attrapé ces trois cas-ci** : la première garde les actions serveur, la
+seconde les statuts — aucune ne garde la question « qui LIT cette table ? ».
+
+### Ce qui a été fait, et ce qui reste
+
+Le lot 2a livre la lecture et la rend visible, avec 16 tests sur la logique pure.
+L'inspection des consumers a été menée **par `grep`, pas de mémoire**, et c'est
+elle qui a sorti les deux trous restants (PDF, et le Realtime qui n'écoutait pas
+la table — un abonnement à une table non publiée **ne renvoie aucune erreur**,
+il ne se déclenche jamais).
+
+⚠️ **Ce qui n'est pas résolu** : rien n'empêche encore qu'une table écrite ne
+soit lue par personne. Le gardien du code mort raisonne par **fichier** — il ne
+voit ni une fonction sans appelant (**B-145a**, payé le 06/10), ni une table sans
+lecteur. Les deux sont la même famille, et c'est la seule famille de défauts de
+ce projet que **MiKL trouve avant le harnais**.
