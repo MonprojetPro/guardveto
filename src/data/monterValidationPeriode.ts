@@ -38,6 +38,62 @@ import {
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { PlanningPartiel } from '@/engine/types'
 
+/** Un remplacement d'UN SEUL jour, posé par-dessus un titulaire (B-061). */
+export interface ExceptionJour {
+  garde_id: string
+  date: string
+  role: string
+  veterinaire_id: string | null
+}
+
+/**
+ * Pose les remplacements du jour par-dessus les titulaires, avant tout jugement.
+ *
+ * 🔴 POURQUOI UNE FONCTION PURE ET EXPORTÉE. La fonction qui l'entoure parle à
+ *    Supabase : aucun test ne peut la couvrir. Cette règle-ci portait le défaut
+ *    du 08/10 — laissée dans la boucle, elle serait restée invérifiable, et sur
+ *    ce projet invérifiable veut dire « vérifiée en production ».
+ *
+ * ⚠️ SEULES LES EXCEPTIONS DU JOUR DE LA GARDE SONT APPLIQUÉES. Un week-end
+ *    occupe trois jours ; le vendredi est SYNTHÉTISÉ depuis le samedi par
+ *    `gardesVersPlanningPartiel`, et hérite donc du remplaçant du samedi.
+ *    Conséquence à connaître, écrite plutôt que découverte : une substitution
+ *    qui ne vaudrait QUE pour le vendredi n'est pas vue par le validateur.
+ *    ➜ B-155b. Ce n'est pas un oubli, c'est une limite assumée : la lever
+ *    demande que la synthèse du vendredi connaisse les exceptions par date,
+ *    donc de toucher le cœur de la reconstruction — un chantier, pas un `if`.
+ *
+ * ⚠️ UNE EXCEPTION À `null` VIDE LA PLACE, elle ne la laisse pas au titulaire :
+ *    c'est le sens métier d'un remplacement non pourvu, et c'est ce que la vue
+ *    `planning_semaine` montre déjà à l'écran.
+ */
+export function appliquerExceptionsAuxGardes(
+  gardes: readonly GardeRow[],
+  exceptions: readonly ExceptionJour[],
+): GardeRow[] {
+  if (exceptions.length === 0) return [...gardes]
+
+  const parGardeEtRole = new Map<string, string | null>()
+  for (const e of exceptions) {
+    parGardeEtRole.set(`${e.garde_id}|${e.date}|${e.role}`, e.veterinaire_id)
+  }
+
+  return gardes.map((g) => {
+    const clePremier = `${g.id}|${g.date}|premier`
+    const cleSecond = `${g.id}|${g.date}|second`
+    if (!parGardeEtRole.has(clePremier) && !parGardeEtRole.has(cleSecond)) return g
+    return {
+      ...g,
+      premier_id: parGardeEtRole.has(clePremier)
+        ? parGardeEtRole.get(clePremier) ?? null
+        : g.premier_id,
+      second_id: parGardeEtRole.has(cleSecond)
+        ? parGardeEtRole.get(cleSecond) ?? null
+        : g.second_id,
+    }
+  })
+}
+
 export interface MontageValidation {
   /** Les gardes RÉELLEMENT écrites en base pour cette période. */
   gardes: GardeRow[]
@@ -84,7 +140,33 @@ export async function monterValidationPeriode(
     .eq('periode_id', periodeId)
     .eq('cabinet_id', cabinetId)
   if (error || !gardesDb || gardesDb.length === 0) return null
-  const gardes = gardesDb as GardeRow[]
+
+  // ── B-155a — LES REMPLACEMENTS D'UN JOUR ENTRENT DANS LE JUGEMENT ────────
+  //
+  // 🔴 LE DÉFAUT, VU PAR MiKL LE 08/10 APRÈS UN PREMIER CORRECTIF INCOMPLET.
+  //    La publication annonçait « week-end sans 2nd de garde (samedi 14
+  //    novembre) » sur un week-end dont les DEUX places sont tenues — par des
+  //    remplaçants. La table `gardes` du 14/11 porte `premier = Victor,
+  //    second = NULL`, et six lignes de `gardes_exceptions` couvrent les trois
+  //    jours × deux rôles : ce sont Jean et Antoine qui sont de garde.
+  //
+  //    Le même défaut que B-155, un lecteur plus loin. J'avais corrigé
+  //    `casesAPourvoir` sans recenser les AUTRES juges — c'est très exactement
+  //    l'INSPECTION DES CONSUMERS sautée, et elle s'est payée en direct.
+  //
+  // 🔑 LE JUGE DOIT JUGER LE PLANNING TEL QU'IL SERA VÉCU. Un validateur qui
+  //    raisonne sur les titulaires annonce un trou là où quelqu'un est bel et
+  //    bien de garde — et un avertissement faux coûte plus cher qu'un
+  //    avertissement absent : il apprend à ne plus lire les avertissements.
+  const { data: exceptionsDb } = await supabase
+    .from('gardes_exceptions')
+    .select('garde_id, date, role, veterinaire_id')
+    .in('garde_id', (gardesDb as GardeRow[]).map((g) => g.id).filter(Boolean))
+
+  const gardes = appliquerExceptionsAuxGardes(
+    gardesDb as GardeRow[],
+    (exceptionsDb ?? []) as ExceptionJour[],
+  )
 
   // 3. Reconstruction SUR-MESURE (P3b) : rôles du catalogue + miroir
   //    garde_placements (les colonnes V1 ne portent que 2 places, et des labels
