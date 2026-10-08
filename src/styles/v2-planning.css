@@ -3068,3 +3068,36 @@ details.rl-bloc > .rl-liste { margin-top: 9px; }
 .jdm-pied {
   margin-top: 12px; font-size: 0.76rem; color: var(--soft); line-height: 1.55;
 }
+
+/* ── B-153 lot 0 — Le témoin de chantier ────────────────────────────────────
+   Visible UNIQUEMENT sur un cabinet marqué bac à sable : c'est tout son objet,
+   prouver à l'œil que la porte de `lib/produit/chantiers.ts` s'ouvre ici et
+   reste fermée chez le client. Il disparaît au lot 1, remplacé par la grille.
+   Volontairement discret et sans hauteur de bandeau : MiKL vient d'en faire
+   retirer un (B-152), on n'en réinstalle pas un second par la fenêtre. */
+.gv-temoin-chantier {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 12px;
+  padding: 7px 15px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--t-accent, #c7530f) 8%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--t-accent, #c7530f) 45%, transparent);
+  font-size: 12px;
+  line-height: 1.3;
+}
+.gvtc-pastille {
+  flex: none;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--t-accent, #c7530f);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.gvtc-nom { font-weight: 700; color: var(--t-text, #3a2a1c); }
+.gvtc-detail { color: var(--t-muted, #7c6a55); }

@@ -28,6 +28,8 @@ import { construireCatalogue } from '@/lib/planning/placesAttendues'
 import { RealtimeRefresh } from '@/components/planning/RealtimeRefresh'
 import { chargerDock } from '@/data/v2/dock'
 import { modulesDuCabinet } from '@/lib/produit/modules-serveur'
+import { chantierOuvertPourLeCabinet } from '@/lib/produit/chantiers-serveur'
+import { TemoinChantier } from '@/components/chantier/TemoinChantier'
 import {
   queryCompteurs,
   queryTotalWE,
@@ -281,7 +283,7 @@ export default async function PlanningPageV2({
   // les présences de journée ont besoin de savoir s'il existe au moins une
   // règle à appliquer. Chargés en parallèle du reste : aucune requête en série
   // ajoutée sur un produit déjà jugé lent (B-116).
-  const [dock, profilRes, compteursRes, totalWERes, prefsRes, typesRes2, equipeRes, creneauxRes, modules, tramesRes, presencesRes, blocsRes] = await Promise.all([
+  const [dock, profilRes, compteursRes, totalWERes, prefsRes, typesRes2, equipeRes, creneauxRes, modules, tramesRes, presencesRes, blocsRes, grilleV2] = await Promise.all([
     chargerDock(supabase, { role_app: identite.role }, periodes),
     periodeAffichee?.profil_id
       ? supabase.from('profils_planning').select('nom').eq('id', periodeAffichee.profil_id).maybeSingle()
@@ -369,6 +371,16 @@ export default async function PlanningPageV2({
     // charger que les actives les ferait disparaître de l'écran en les laissant
     // en base, et l'effectif du jour serait faux sans un mot.
     supabase.from('blocs_journee').select('id, nom, debut, fin, ordre, actif'),
+    // ── B-153 lot 0 — LA PORTE DU CHANTIER « grille V2 » ───────────────────
+    //
+    // Le 08/10, un renouveau visuel est parti sur le compte du client parce que
+    // RIEN NE POUVAIT L'EN EMPÊCHER (B-151) : la grille se rendait sans aucune
+    // condition. Cette ligne est le mécanisme qui manquait.
+    //
+    // ⚠️ Elle ne lève jamais et rend `false` au moindre doute — donc l'écran
+    //    actuel, celui qui est déjà recetté. Le défaut sûr n'est pas « montrer
+    //    le neuf », c'est « ne rien changer pour le client ».
+    chantierOuvertPourLeCabinet(supabase, 'planning-grille-v2'),
   ])
 
   // ── « Qui est absent », pour le secrétariat ────────────────────────────
@@ -733,6 +745,10 @@ export default async function PlanningPageV2({
           estSecretaire={estSecretaire}
           dock={dock}
         />
+
+        {/* B-153 lot 0 — la preuve que la porte s'ouvre ici et pas chez le
+            client. Remplacé par la grille elle-même au lot 1. */}
+        {grilleV2 && <TemoinChantier id="planning-grille-v2" />}
 
         <PlanningV2
           gardes={gardes}
