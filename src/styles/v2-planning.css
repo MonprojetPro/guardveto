@@ -3101,3 +3101,17 @@ details.rl-bloc > .rl-liste { margin-top: 9px; }
 }
 .gvtc-nom { font-weight: 700; color: var(--t-text, #3a2a1c); }
 .gvtc-detail { color: var(--t-muted, #7c6a55); }
+
+/* ── B-155 — la liste des gardes encore sans personne, dans les réserves ────
+   Elles ne bloquent plus la publication (MiKL, le 08/10, après l'avoir vécu
+   devant son client) : elles s'affichent, et c'est lui qui tranche. Le style
+   reste SOBRE — c'est une information à lire, pas une alarme à subir. */
+.gp-cases {
+  margin: 8px 0 0;
+  padding: 0 0 0 18px;
+  list-style: disc;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--t-text, #3a2a1c);
+}
+.gp-cases li::marker { color: var(--danger, #a8341f); }

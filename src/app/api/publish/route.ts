@@ -22,7 +22,7 @@ import { revaliderPlanning } from '@/data/revaliderPlanning'
 import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
 import { enregistrerHistoriqueFetes } from '@/data/historiqueFetes'
 import { compterSouhaitsCongesEnAttente } from '@/data/souhaitsCongesEnAttente'
-import { casesAPourvoir } from '@/data/casesAPourvoir'
+import { casesAPourvoir, type CaseAPourvoir } from '@/data/casesAPourvoir'
 import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
 
 // Laisse le temps à la synchro agenda (par lots) + envoi des emails
@@ -108,32 +108,35 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // ── B-053 — REFUS DUR : on ne publie pas un planning troué ────
-  // Depuis que la génération rend un planning PARTIEL au lieu d'un mur, un
-  // brouillon peut contenir des cases vides. Les publier annoncerait à toute
-  // l'équipe un calendrier où personne n'est de garde certains soirs.
+  // ── B-155 — LES CASES VIDES INFORMENT, ELLES N'INTERDISENT PLUS ───────────
   //
-  // Refus DUR, pas une confirmation « avec réserves » : une garde sans personne
-  // n'est pas une réserve, c'est une nuit sans vétérinaire. Le seul geste
-  // possible est de pourvoir la case.
+  // 🔴 CE QUE CE BLOC FAISAIT, ET POURQUOI C'ÉTAIT FAUX. Il rendait un `422` :
+  //    une case à pourvoir INTERDISAIT la publication. MiKL l'a vécu devant son
+  //    client le 08/10, et a tranché le jour même :
+  //
+  //      « ce n'est pas censé bloquer la publication !! même s'il y a des trous,
+  //       tant que le client est informé il doit quand même pouvoir publier »
+  //
+  //    Ce n'est pas un assouplissement de circonstance : c'est la règle posée le
+  //    19/08 — LE SYSTÈME INFORME, IL N'INTERDIT PAS. L'admin comble les trous à
+  //    la main (B-125), ils sont donc ASSUMÉS ; les lui interdire en sortie,
+  //    c'est lui refuser de publier un planning qu'il a sciemment laissé partiel.
+  //
+  // ⚠️ L'INFORMATION N'EST PAS PERDUE, elle change de régime : les cases
+  //    rejoignent les réserves (`requiresConfirmation`), au même titre que les
+  //    violations de règles et les souhaits de congé en attente. L'écran les
+  //    montre, et c'est MiKL qui tranche — en connaissance de cause, et en un
+  //    clic. Supprimer le signal aurait été l'autre faute.
+  //
+  // ⚠️ `null` = on n'a pas pu vérifier. On ne bloque pas davantage, mais on le
+  //    dit dans les logs : un silence ici se lirait comme « tout est pourvu ».
+  let casesVides: CaseAPourvoir[] = []
   if (cabinetId) {
     const cases = await casesAPourvoir(supabase, periodeId, cabinetId)
-    // `null` = on n'a pas pu vérifier. On NE bloque pas (ne pas transformer une
-    // panne de lecture en interdiction de publier), mais on le dit dans les logs :
-    // un silence ici se lirait comme « tout est pourvu ».
     if (cases === null) {
       console.warn(`[publish] Cases à pourvoir non vérifiables pour la période ${periodeId} — publication laissée passer.`)
-    } else if (cases.length > 0) {
-      return NextResponse.json(
-        {
-          error:
-            cases.length === 1
-              ? 'Il reste 1 garde sans vétérinaire. Complète-la sur le planning avant de publier.'
-              : `Il reste ${cases.length} gardes sans vétérinaire. Complète-les sur le planning avant de publier.`,
-          casesAPourvoir: cases,
-        },
-        { status: 422 },
-      )
+    } else {
+      casesVides = cases
     }
   }
 
@@ -155,11 +158,13 @@ export async function POST(req: NextRequest) {
       supabase, periode.date_debut, periode.date_fin,
     )
 
-    if (violations.length > 0 || souhaitsEnAttente > 0) {
+    // B-155 — les cases vides sont une réserve de plus, jamais un refus.
+    if (violations.length > 0 || souhaitsEnAttente > 0 || casesVides.length > 0) {
       return NextResponse.json({
         requiresConfirmation: true,
         violations,
         souhaitsEnAttente,
+        casesAPourvoir: casesVides,
       })
     }
   }

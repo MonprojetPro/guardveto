@@ -48,6 +48,8 @@ export function DialogPublication({ open, onOpenChange, periode, aDesGardes }: P
   const [enCours, setEnCours] = useState(false)
   const [violations, setViolations] = useState<ViolationRevalidation[]>([])
   const [souhaits, setSouhaits] = useState(0)
+  /** B-155 — les gardes encore sans personne : une reserve, plus un refus. */
+  const [cases, setCases] = useState<{ date: string; type: string; role: string }[]>([])
 
   function fermer(o: boolean) {
     if (enCours) return
@@ -56,6 +58,7 @@ export function DialogPublication({ open, onOpenChange, periode, aDesGardes }: P
       setEtape('controle')
       setViolations([])
       setSouhaits(0)
+      setCases([])
     }
   }
 
@@ -78,6 +81,7 @@ export function DialogPublication({ open, onOpenChange, periode, aDesGardes }: P
       if (data.requiresConfirmation) {
         setViolations((data.violations ?? []) as ViolationRevalidation[])
         setSouhaits(data.souhaitsEnAttente ?? 0)
+        setCases((data.casesAPourvoir ?? []) as { date: string; type: string; role: string }[])
         setEtape('reserves')
         return
       }
@@ -168,6 +172,39 @@ export function DialogPublication({ open, onOpenChange, periode, aDesGardes }: P
         {/* ── ② Les réserves du gate serveur ────────────── */}
         {etape === 'reserves' && (
           <div className="gp-controle">
+            {/* B-155 — LES CASES VIDES SE DISENT ICI, elles ne bloquent plus.
+                Avant le 08/10 elles rendaient un 422 : la publication était
+                interdite, et MiKL l'a vécu devant son client. Elles sont
+                devenues une réserve — montrée, datée, et c'est lui qui tranche.
+                Les montrer EN PREMIER est volontaire : c'est la réserve la plus
+                lourde de conséquence, une nuit sans personne de garde. */}
+            {cases.length > 0 && (
+              <div className="gf-card dure">
+                <p className="font-medium">
+                  {cases.length === 1
+                    ? '1 garde n’a encore personne'
+                    : `${cases.length} gardes n’ont encore personne`}
+                </p>
+                <ul className="gp-cases">
+                  {cases.slice(0, 6).map((c, i) => (
+                    <li key={`${c.date}-${c.role}-${i}`}>
+                      {new Date(c.date + 'T12:00:00Z').toLocaleDateString('fr-FR', {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                        timeZone: 'UTC',
+                      })}{' '}
+                      — {c.role === 'premier' ? '1er' : c.role === 'second' ? '2e' : c.role}
+                    </li>
+                  ))}
+                  {cases.length > 6 && <li>…et {cases.length - 6} autre{cases.length - 6 > 1 ? 's' : ''}</li>}
+                </ul>
+                <p className="gp-note">
+                  Tu peux publier quand même : l’équipe verra la case vide, et tu pourras
+                  la compléter après coup — le planning reste modifiable.
+                </p>
+              </div>
+            )}
             {violations.length > 0 && <CartesViolations violations={violations} />}
             {souhaits > 0 && (
               <div className="gf-card souple">

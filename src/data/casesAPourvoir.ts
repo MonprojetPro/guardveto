@@ -30,6 +30,50 @@ export interface CaseAPourvoir {
   role: string
 }
 
+/** Une ligne de `planning_semaine` : UN jour d'une garde, remplacements appliqués. */
+export interface JourAffiche {
+  /** L'identifiant de la GARDE — plusieurs jours partagent le même. */
+  id: string
+  date: string
+  premier_id: string | null
+  second_id: string | null
+}
+
+/**
+ * Ce que la vue dit de chaque rôle : est-il vide sur au moins un jour affiché ?
+ *
+ * 🔴 EXTRAIT POUR ÊTRE TESTABLE. La fonction qui l'entoure parle à Supabase et
+ *    au moteur, donc aucun test ne peut la couvrir ; cette règle-ci est pure, et
+ *    c'est elle qui portait le défaut du 08/10. La laisser dans la boucle, c'est
+ *    la laisser invérifiable — et sur ce projet, invérifiable veut dire
+ *    « vérifiée en production, devant le client ».
+ *
+ * ⚠️ VIDE UN SEUL JOUR SUFFIT. Un week-end occupe trois jours dans la vue : un
+ *    remplaçant trouvé pour le samedi seul laisse un trou le dimanche, et ce
+ *    trou doit continuer de se dire.
+ */
+export function lireLaVue(jours: readonly JourAffiche[]): {
+  gardesVues: Set<string>
+  videUnJourAuMoins: Map<string, boolean>
+} {
+  const gardesVues = new Set<string>()
+  const videUnJourAuMoins = new Map<string, boolean>()
+
+  for (const j of jours) {
+    gardesVues.add(j.id)
+    for (const [role, occupant] of [
+      ['premier', j.premier_id],
+      ['second', j.second_id],
+    ] as const) {
+      const cle = `${j.id}|${role}`
+      if (!occupant) videUnJourAuMoins.set(cle, true)
+      else if (!videUnJourAuMoins.has(cle)) videUnJourAuMoins.set(cle, false)
+    }
+  }
+
+  return { gardesVues, videUnJourAuMoins }
+}
+
 /** Type moteur → type de la table `gardes` (miroir de /api/generate). */
 function typeDb(type: string, ferie: boolean): string {
   if (type === 'weekend') return 'weekend'
@@ -91,6 +135,39 @@ export async function casesAPourvoir(
       parRole.set(`${p.garde_id}|${p.role}`, p.veterinaire_id)
     }
 
+    // ── B-155 — CE QUI EST AFFICHÉ FAIT FOI, PAS LA TABLE BRUTE ──────────────
+    //
+    // 🔴 LE DÉFAUT DU 08/10, VÉCU DEVANT LE CLIENT. La publication a été refusée
+    //    pour « une garde sans vétérinaire » sur un week-end que l'écran montrait
+    //    PLEIN. Les deux disaient vrai, chacun sur sa source :
+    //
+    //      · la table `gardes` du 14/11 porte `premier = Victor, second = NULL` ;
+    //      · six lignes de `gardes_exceptions` couvrent les 3 jours × 2 rôles,
+    //        et c'est bien Jean et Antoine qui sont de garde ce week-end-là.
+    //
+    //    La vue `planning_semaine` APPLIQUE ces exceptions — c'est pour ça que
+    //    l'écran a raison. Cette fonction, elle, lisait la table brute et n'avait
+    //    jamais entendu parler de la surcouche « remplacer quelqu'un un seul
+    //    jour » (B-061). Elle inventait donc un trou, et le trou interdisait.
+    //
+    // 🔑 LA CORRECTION N'EST PAS D'AJOUTER UNE LECTURE DE PLUS, c'est de prendre
+    //    LA MÊME SOURCE QUE L'ÉCRAN. Ajouter ici un troisième calcul des
+    //    remplacements aurait recréé l'écart un cran plus loin : le jour où la
+    //    vue change, c'est elle qu'on corrige, et ce fichier se remettrait à
+    //    mentir sans que rien ne le signale.
+    //
+    // ⚠️ La vue s'étale par JOUR (un week-end y occupe vendredi, samedi,
+    //    dimanche). Une place n'est donc pourvue que si elle l'est sur CHAQUE
+    //    jour affiché : un remplaçant trouvé pour le samedi seul laisse bien un
+    //    trou le dimanche, et ce trou doit continuer de se dire.
+    const { data: jours } = await supabase
+      .from('planning_semaine')
+      .select('id, date, premier_id, second_id')
+      .eq('periode_id', periodeId)
+      .eq('cabinet_id', cabinetId)
+
+    const { gardesVues, videUnJourAuMoins } = lireLaVue((jours ?? []) as JourAffiche[])
+
     const feries = contexte.calendrier?.feries
 
     const out: CaseAPourvoir[] = []
@@ -108,10 +185,25 @@ export async function casesAPourvoir(
         continue
       }
 
+      const cleRole = `${garde.id}|${step.role}`
+
+      // B-155 — pour les deux rôles que la vue porte, c'est ELLE qui tranche :
+      // elle seule applique les remplacements d'un jour. Les rôles sur-mesure
+      // (3e place et au-delà) ne figurent pas dans la vue et gardent le chemin
+      // d'origine, le miroir par rôle.
+      if (
+        (step.role === 'premier' || step.role === 'second') &&
+        gardesVues.has(garde.id)
+      ) {
+        if (videUnJourAuMoins.get(cleRole) === true) {
+          out.push({ date: step.date, type: step.type, role: step.role })
+        }
+        continue
+      }
+
       // Le miroir par rôle d'abord (seul à connaître les rôles sur-mesure), les
       // colonnes historiques ensuite — le miroir est écrit en best-effort, il
       // peut manquer sans que le planning soit troué pour autant.
-      const cleRole = `${garde.id}|${step.role}`
       const occupant = parRole.has(cleRole)
         ? parRole.get(cleRole)
         : step.role === 'premier'
