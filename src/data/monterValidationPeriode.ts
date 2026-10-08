@@ -37,66 +37,46 @@ import {
 } from '@/engine/validation/gardesVersPlanning'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { PlanningPartiel } from '@/engine/types'
+import {
+  appliquerExceptionsAuxGardes,
+  chargerExceptionsDesGardes,
+} from '@/lib/gardes/exceptions-jour'
 
-/** Un remplacement d'UN SEUL jour, posé par-dessus un titulaire (B-061). */
-export interface ExceptionJour {
-  garde_id: string
-  date: string
-  role: string
-  veterinaire_id: string | null
-}
-
-/**
- * Pose les remplacements du jour par-dessus les titulaires, avant tout jugement.
- *
- * 🔴 POURQUOI UNE FONCTION PURE ET EXPORTÉE. La fonction qui l'entoure parle à
- *    Supabase : aucun test ne peut la couvrir. Cette règle-ci portait le défaut
- *    du 08/10 — laissée dans la boucle, elle serait restée invérifiable, et sur
- *    ce projet invérifiable veut dire « vérifiée en production ».
- *
- * ⚠️ SEULES LES EXCEPTIONS DU JOUR DE LA GARDE SONT APPLIQUÉES. Un week-end
- *    occupe trois jours ; le vendredi est SYNTHÉTISÉ depuis le samedi par
- *    `gardesVersPlanningPartiel`, et hérite donc du remplaçant du samedi.
- *    Conséquence à connaître, écrite plutôt que découverte : une substitution
- *    qui ne vaudrait QUE pour le vendredi n'est pas vue par le validateur.
- *    ➜ B-155b. Ce n'est pas un oubli, c'est une limite assumée : la lever
- *    demande que la synthèse du vendredi connaisse les exceptions par date,
- *    donc de toucher le cœur de la reconstruction — un chantier, pas un `if`.
- *
- * ⚠️ UNE EXCEPTION À `null` VIDE LA PLACE, elle ne la laisse pas au titulaire :
- *    c'est le sens métier d'un remplacement non pourvu, et c'est ce que la vue
- *    `planning_semaine` montre déjà à l'écran.
- */
-export function appliquerExceptionsAuxGardes(
-  gardes: readonly GardeRow[],
-  exceptions: readonly ExceptionJour[],
-): GardeRow[] {
-  if (exceptions.length === 0) return [...gardes]
-
-  const parGardeEtRole = new Map<string, string | null>()
-  for (const e of exceptions) {
-    parGardeEtRole.set(`${e.garde_id}|${e.date}|${e.role}`, e.veterinaire_id)
-  }
-
-  return gardes.map((g) => {
-    const clePremier = `${g.id}|${g.date}|premier`
-    const cleSecond = `${g.id}|${g.date}|second`
-    if (!parGardeEtRole.has(clePremier) && !parGardeEtRole.has(cleSecond)) return g
-    return {
-      ...g,
-      premier_id: parGardeEtRole.has(clePremier)
-        ? parGardeEtRole.get(clePremier) ?? null
-        : g.premier_id,
-      second_id: parGardeEtRole.has(cleSecond)
-        ? parGardeEtRole.get(cleSecond) ?? null
-        : g.second_id,
-    }
-  })
-}
+// 🔴 LA RÈGLE « applique les remplacements » A DÉMÉNAGÉ (B-156). Elle vivait
+//    ici, où elle servait ce seul juge. L'audit du 08/10 a trouvé six autres
+//    lecteurs qui en avaient besoin : la recopier six fois, c'était programmer
+//    six divergences. Elle est désormais dans `lib/gardes/exceptions-jour.ts`,
+//    avec le reste de la question « qui tient réellement cette place ».
+//
+//    Les deux noms restent exportés d'ici : le test de B-155a les importe à
+//    cette adresse, et une réexportation coûte moins cher qu'un test réécrit
+//    pour une raison qui n'est pas la sienne.
+export {
+  appliquerExceptionsAuxGardes,
+  type ExceptionJour,
+} from '@/lib/gardes/exceptions-jour'
 
 export interface MontageValidation {
-  /** Les gardes RÉELLEMENT écrites en base pour cette période. */
+  /** Les gardes telles qu'elles seront VÉCUES (remplacements du jour appliqués). */
   gardes: GardeRow[]
+  /**
+   * Les gardes telles que la table `gardes` les porte — TITULAIRES, sans
+   * remplacement.
+   *
+   * 🔴 EXPOSÉES POUR UNE RAISON PRÉCISE, PAS « AU CAS OÙ » (B-156). Le détecteur
+   *    de dérive V1↔V2 compare le planning à la table `attributions`, et cette
+   *    copie technique ne porte PAS les remplacements (ni `syncAttributions` ni
+   *    `appliquer-exception` ne les y recopient). Depuis que le montage applique
+   *    les exceptions (B-155a, ce matin), comparer les deux faisait sonner la
+   *    cloche de l'admin à chaque remplacement ponctuel — une fausse alerte
+   *    créée par un correctif, c'est-à-dire exactement ce qu'on cherchait à
+   *    supprimer.
+   *
+   * ⚠️ NE PAS S'EN SERVIR POUR JUGER LE PLANNING. Tout juge doit prendre
+   *    `gardes`. Celles-ci ne servent qu'à se comparer à une source qui, elle,
+   *    ignore les remplacements.
+   */
+  gardesTitulaires: GardeRow[]
   /** Entrée du validateur (contexte, calendrier, structure, lookback #17). */
   input: ValidationInput
   /**
@@ -158,14 +138,9 @@ export async function monterValidationPeriode(
   //    raisonne sur les titulaires annonce un trou là où quelqu'un est bel et
   //    bien de garde — et un avertissement faux coûte plus cher qu'un
   //    avertissement absent : il apprend à ne plus lire les avertissements.
-  const { data: exceptionsDb } = await supabase
-    .from('gardes_exceptions')
-    .select('garde_id, date, role, veterinaire_id')
-    .in('garde_id', (gardesDb as GardeRow[]).map((g) => g.id).filter(Boolean))
-
   const gardes = appliquerExceptionsAuxGardes(
     gardesDb as GardeRow[],
-    (exceptionsDb ?? []) as ExceptionJour[],
+    await chargerExceptionsDesGardes(supabase, (gardesDb as GardeRow[]).map((g) => g.id)),
   )
 
   // 3. Reconstruction SUR-MESURE (P3b) : rôles du catalogue + miroir
@@ -225,5 +200,5 @@ export async function monterValidationPeriode(
     contexteAnterieur: ctx.contexteAnterieur,
   }
 
-  return { gardes, input, construirePlanning }
+  return { gardes, gardesTitulaires: gardesDb as GardeRow[], input, construirePlanning }
 }

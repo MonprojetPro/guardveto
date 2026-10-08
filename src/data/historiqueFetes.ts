@@ -24,13 +24,21 @@
 // ============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { datesCouvertesParGardeV1 } from '@/engine/utils'
 import {
+  feteDeDate,
   fetesCouvertesParGardeV1,
   resoudreHistoriqueFetes,
   type CodeFete,
   type HistoriqueFetesResolu,
   type HistoriqueFeteRow,
 } from '@/engine/historique-fete'
+import {
+  chargerExceptionsDesGardes,
+  indexerExceptions,
+  occupantReel,
+  type ExceptionJour,
+} from '@/lib/gardes/exceptions-jour'
 
 // ── 1. Lecture (loader moteur) ───────────────────────────────
 
@@ -70,6 +78,8 @@ export async function chargerHistoriqueFetes(
 
 /** Ligne V1 minimale de `gardes` nécessaire au calcul. */
 export interface GardeFeteRow {
+  /** Nécessaire depuis B-156 : c'est la clé des remplacements du jour. */
+  id?: string
   date: string
   type: string
   premier_id: string | null
@@ -97,39 +107,58 @@ export interface EntreeHistoriqueFete {
  * (la première chronologiquement — déterministe). Rôle enregistré depuis
  * premier_id/second_id (les places 3+ des créneaux sur-mesure ne sont pas
  * couvertes — limite documentée, cas inexistant sur les fêtes à ce jour).
+ *
+ * ── B-156 — ON ENREGISTRE QUI A TENU LA FÊTE, PAS QUI DEVAIT LA TENIR ───────
+ *
+ * 🔴 LE DÉFAUT LE PLUS SOURNOIS DE L'AUDIT DU 08/10, parce qu'il est MUET ET À
+ *    RETARDEMENT. Cette fonction lisait les titulaires. Un Noël remplacé au
+ *    pied levé (B-061) inscrivait donc le titulaire au registre : celui qui
+ *    n'avait pas fait Noël en portait la pénalité l'année suivante, et celui
+ *    qui l'avait fait était resservi. Aucun écran ne l'aurait montré, aucun
+ *    test ne l'aurait dit — on l'aurait découvert UN AN PLUS TARD, sous la
+ *    forme d'un planning que personne ne comprend.
+ *
+ * 🔑 LE JOUR COMPTE, pas la ligne. Un remplacement du 25 ne dit rien du 24 :
+ *    on demande donc l'occupant réel date par date, et non une fois pour la
+ *    garde entière.
  */
 export function calculerEntreesHistoriqueFete(
   gardes: GardeFeteRow[],
   cabinetId: string,
   periodeId: string,
+  exceptions: readonly ExceptionJour[] = [],
 ): EntreeHistoriqueFete[] {
   // Tri chronologique (puis type) → dédoublonnage déterministe.
   const triees = [...gardes].sort((a, b) =>
     a.date === b.date ? a.type.localeCompare(b.type) : a.date.localeCompare(b.date),
   )
 
+  const index = indexerExceptions(exceptions)
   const vues = new Set<string>() // `${vetId}|${fete}|${annee}`
   const out: EntreeHistoriqueFete[] = []
 
   for (const g of triees) {
-    const instances = fetesCouvertesParGardeV1(g.date, g.type)
-    if (instances.length === 0) continue
+    if (fetesCouvertesParGardeV1(g.date, g.type).length === 0) continue
 
-    const tenants: Array<{ vetId: string; role: string }> = []
-    if (g.premier_id) tenants.push({ vetId: g.premier_id, role: 'premier' })
-    if (g.second_id) tenants.push({ vetId: g.second_id, role: 'second' })
+    // Jour par jour : c'est la seule maille à laquelle un remplacement existe.
+    for (const jour of datesCouvertesParGardeV1(g.date, g.type)) {
+      const inst = feteDeDate(jour)
+      if (!inst) continue
 
-    for (const inst of instances) {
-      for (const t of tenants) {
-        const cle = `${t.vetId}|${inst.fete}|${inst.annee}`
+      for (const role of ['premier', 'second'] as const) {
+        const vetId = occupantReel(g, index, jour, role)
+        if (!vetId) continue
+        const cle = `${vetId}|${inst.fete}|${inst.annee}`
         if (vues.has(cle)) continue
         vues.add(cle)
         out.push({
           cabinet_id: cabinetId,
-          veterinaire_id: t.vetId,
+          veterinaire_id: vetId,
           fete: inst.fete,
           annee: inst.annee,
-          role: t.role,
+          role,
+          // La date de la LIGNE reste la référence du registre (un week-end se
+          // nomme par son samedi) : `jour` sert à savoir QUI, pas à dater.
           garde_date: g.date,
           periode_id: periodeId,
         })
@@ -161,17 +190,21 @@ export async function enregistrerHistoriqueFetes(
     // Gardes V1 de la période (source de vérité du planning publié).
     const { data: gardesData, error: gardesErr } = await supabase
       .from('gardes')
-      .select('date, type, premier_id, second_id')
+      .select('id, date, type, premier_id, second_id')
       .eq('periode_id', periodeId)
 
     if (gardesErr) {
       return { ok: false, nb: 0, erreur: `lecture gardes : ${gardesErr.message}` }
     }
 
+    const gardes = (gardesData ?? []) as GardeFeteRow[]
     const entrees = calculerEntreesHistoriqueFete(
-      (gardesData ?? []) as GardeFeteRow[],
+      gardes,
       cabinetId,
       periodeId,
+      // B-156 : qui a RÉELLEMENT tenu la fête. Sans cette ligne, le registre
+      // inscrit le titulaire d'un Noël qu'il n'a pas fait.
+      await chargerExceptionsDesGardes(supabase, gardes.map((g) => g.id)),
     )
     // Instances (fete, annee) couvertes par la période — périmètre du delete.
     const instances = [...new Set(entrees.map((e) => `${e.fete}|${e.annee}`))]

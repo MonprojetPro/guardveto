@@ -129,6 +129,25 @@ export function dateEntre(date: string, debut: string, fin: string): boolean {
   return date >= debut && date <= fin
 }
 
+/**
+ * Les JOURS calendaires qu'une ligne de `gardes` (V1) occupe réellement.
+ *
+ * 🔑 UNE SEULE CONVENTION, ICI. Un week-end est daté du SAMEDI mais occupe le
+ *    calendrier du vendredi soir au dimanche : `gardes` ne porte pas de ligne
+ *    vendredi, l'équipe du week-end le tient. Trois lecteurs avaient besoin de
+ *    cette liste (l'historique des fêtes, le conflit de congé, et la vue SQL qui
+ *    la refait en SQL) — la recopier une quatrième fois, c'est ce que ce projet
+ *    a déjà payé sous le nom « une convention recopiée trois fois n'est pas une
+ *    convention » (B-130b).
+ *
+ * ⚠️ N'EST PAS la convention de `syncAttributions/joursImpactesGarde`, qui
+ *    s'arrête au samedi. Les deux diffèrent volontairement : aligner l'une sur
+ *    l'autre sans comprendre pourquoi casserait la synchro V2.
+ */
+export function datesCouvertesParGardeV1(date: string, type: string): string[] {
+  return type === 'weekend' ? [addDays(date, -1), date, addDays(date, 1)] : [date]
+}
+
 // ── Saisons ─────────────────────────────────────────────
 
 /** Premier lundi de mai d'une année */

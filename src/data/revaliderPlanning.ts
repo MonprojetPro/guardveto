@@ -164,7 +164,21 @@ export async function revaliderPlanning(
     //     quelque part en prod (chemin d'écriture oublié, échec silencieux),
     //     c'est ICI qu'on le voit : console + cloche admin (anti-spam 24 h).
     //     Best-effort : ne perturbe JAMAIS la re-validation elle-même.
-    await detecterDeriveV1V2(supabase, periodeId, cabinetId, planning)
+    //
+    //     ⚠️ B-156 — ON LUI DONNE LES TITULAIRES, PAS LE PLANNING VÉCU. La table
+    //     `attributions` ne porte pas les remplacements ponctuels : ni la
+    //     synchro V2 ni la pose d'un remplacement ne les y recopient. Comparer
+    //     le planning vécu à cette copie-là ferait sonner la cloche de l'admin à
+    //     chaque remplacement — une alerte fausse FABRIQUÉE par le correctif de
+    //     ce matin (B-155a). ➜ B-156a : faire porter les remplacements à la V2
+    //     est le vrai correctif, et c'est un chantier d'écriture, pas une
+    //     comparaison à ajuster.
+    await detecterDeriveV1V2(
+      supabase,
+      periodeId,
+      cabinetId,
+      montage.construirePlanning(montage.gardesTitulaires),
+    )
 
     // 3. Re-validation indépendante.
     for (const v of validerPlanning(planning, montage.input)) {

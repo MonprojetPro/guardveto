@@ -63,6 +63,8 @@ const ATTENDUS_HORS_GRAPHE: Record<string, string> = {
     'Registre « Filou suit le produit » (B-019). Lu par son test, volontairement hors application.',
   'lib/produit/attentes.ts':
     'Registre « le tableau ne peut pas se taire » (B-005). Lu par son test, volontairement hors application.',
+  'lib/produit/juges.ts':
+    'Registre « aucun lecteur de `gardes` ne se tait sur les remplacements » (B-156). Lu par son test, volontairement hors application — troisième registre de la même famille.',
 
   // ── Fondation posée d'avance, pas un vestige ──────────────────────────────
   // La distinction compte : le 26/08, 15 fichiers ont été supprimés parce

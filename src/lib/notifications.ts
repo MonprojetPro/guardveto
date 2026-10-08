@@ -32,6 +32,12 @@ import { humaniserCodeGarde } from '@/lib/libelles-gardes'
 import { libelleTypeConge } from '@/lib/brevo'
 import { chargerReglagesEmail } from '@/lib/notifications-reglages'
 import {
+  chargerExceptionsDesGardes,
+  indexerExceptions,
+  occupantReel,
+} from '@/lib/gardes/exceptions-jour'
+import { datesCouvertesParGardeV1 } from '@/engine/utils'
+import {
   adresseUtilisable,
   trierDestinataires,
   tracerSansAdresse,
@@ -569,13 +575,65 @@ export async function sendPlanningPublie(
     .eq('periode_id', periodeId)
     .order('date')
 
-  const gardes: Garde[] = (gardesRaw ?? []).map((g: Record<string, unknown>) => ({
-    id:      g.id as string,
-    date:    g.date as string,
-    type:    g.type as string,
-    premier: g.premier as Veterinaire | null,
-    second:  g.second  as Veterinaire | null,
-  }))
+  // ── B-156 — L'E-MAIL ANNONCE LES GARDES RÉELLES, PAS LES GARDES PRÉVUES ────
+  //
+  // 🔴 CE QUE CE MAIL DISAIT. Il composait « voici tes gardes » depuis les
+  //    TITULAIRES de la table `gardes`. Un remplacement ponctuel (B-061) vit
+  //    dans `gardes_exceptions` et n'y figure pas : le remplaçant ne voyait pas
+  //    sa garde, et le remplacé en recevait une qu'il ne fait plus. Sur un
+  //    planning republié après ajustements, c'est un e-mail faux envoyé à sept
+  //    personnes — et c'est l'e-mail qu'elles impriment.
+  //
+  // ⚠️ CE QUI RESTE AU TITULAIRE DE LA LIGNE : le binôme AFFICHÉ, qui suit le
+  //    jour de la ligne (le samedi d'un week-end). Un remplacement qui ne
+  //    porterait que sur le dimanche n'apparaît donc pas dans le détail, même si
+  //    la garde est bien listée chez le remplaçant. Limite écrite, pas découverte.
+  const exceptions = await chargerExceptionsDesGardes(
+    supabase,
+    (gardesRaw ?? []).map((g: Record<string, unknown>) => g.id as string),
+  )
+  const indexExceptions = indexerExceptions(exceptions)
+  const vetParId = new Map(vets.map((v) => [v.id, v as Veterinaire]))
+
+  // Qui est concerné par quelle garde, TOUS SES JOURS COMPRIS : un remplaçant du
+  // seul dimanche doit recevoir cette garde, alors que la ligne (le samedi)
+  // appartient toujours au titulaire.
+  const gardesDeChacun = new Map<string, Set<string>>()
+  const noter = (vetId: string | null, gardeId: string) => {
+    if (!vetId) return
+    const deja = gardesDeChacun.get(vetId) ?? new Set<string>()
+    deja.add(gardeId)
+    gardesDeChacun.set(vetId, deja)
+  }
+
+  const gardes: Garde[] = (gardesRaw ?? []).map((g: Record<string, unknown>) => {
+    const titulaires = {
+      id: g.id as string,
+      date: g.date as string,
+      premier_id: (g.premier as Veterinaire | null)?.id ?? null,
+      second_id: (g.second as Veterinaire | null)?.id ?? null,
+    }
+    for (const jour of datesCouvertesParGardeV1(titulaires.date, g.type as string)) {
+      noter(occupantReel(titulaires, indexExceptions, jour, 'premier'), titulaires.id)
+      noter(occupantReel(titulaires, indexExceptions, jour, 'second'), titulaires.id)
+    }
+    const occupant = (role: 'premier' | 'second'): Veterinaire | null => {
+      const reel = occupantReel(titulaires, indexExceptions, titulaires.date, role)
+      if (!reel) return null
+      // Le remplaçant peut être inactif ou hors de la liste chargée : on retombe
+      // alors sur l'objet titulaire plutôt que de faire disparaître la place.
+      return vetParId.get(reel) ?? (role === 'premier'
+        ? (g.premier as Veterinaire | null)
+        : (g.second as Veterinaire | null))
+    }
+    return {
+      id:      g.id as string,
+      date:    g.date as string,
+      type:    g.type as string,
+      premier: occupant('premier'),
+      second:  occupant('second'),
+    }
+  })
 
   let sent = 0
   let errors = 0
@@ -596,9 +654,10 @@ export async function sendPlanningPublie(
   tracerSansAdresse('planning_publie', trierDestinataires(vets).sansAdresse)
 
   for (const vet of vets) {
-    const mesGardes = gardes.filter(
-      (g) => g.premier?.id === vet.id || g.second?.id === vet.id
-    )
+    // B-156 : l'appartenance est calculée jour par jour au-dessus — un
+    // `g.premier?.id === vet.id` raterait le remplaçant d'un seul jour.
+    const aMoi = gardesDeChacun.get(vet.id)
+    const mesGardes = gardes.filter((g) => aMoi?.has(g.id))
 
     const html    = buildPlanningPublieHtml(vet, periode, mesGardes)
     const subject = `[GuardVeto] Nouveau planning — ${periodeLabel}`

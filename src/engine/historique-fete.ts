@@ -19,7 +19,7 @@
 // dans __tests__/historique-fete.test.ts).
 // ============================================================
 
-import { addDays } from './utils'
+import { addDays, datesCouvertesParGardeV1 } from './utils'
 
 // ── Fêtes reconnues ──────────────────────────────────────────
 // Le doc métier (§6) ne liste que deux fêtes : Noël (24-25 déc) et
@@ -81,10 +81,10 @@ export function fetesCouvertesParSlot(date: string, type: string): InstanceFete[
  * syncAttributions/joursImpactesGarde) → couvre [vendredi, samedi, dimanche].
  */
 export function fetesCouvertesParGardeV1(date: string, type: string): InstanceFete[] {
-  const dates =
-    type === 'weekend' ? [addDays(date, -1), date, addDays(date, 1)] : [date]
   return dedupliquerInstances(
-    dates.map(feteDeDate).filter((f): f is InstanceFete => f !== null),
+    datesCouvertesParGardeV1(date, type)
+      .map(feteDeDate)
+      .filter((f): f is InstanceFete => f !== null),
   )
 }
 

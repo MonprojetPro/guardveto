@@ -62,6 +62,10 @@ import {
   besoinSecondCreneau,
 } from '@/lib/crise/contexte'
 import { sendDepannageConfirme } from '@/lib/notifications'
+import {
+  avertissementRemplacementPonctuel,
+  chargerExceptionsDesGardes,
+} from '@/lib/gardes/exceptions-jour'
 
 export const maxDuration = 60
 
@@ -333,12 +337,29 @@ export async function POST(
   //
   // Lecture avec le client RLS-aware DU VÉTO, jamais le service : le contrôle
   // n'a aucune raison de voir plus loin que la personne qui agit.
-  const avertissements = await avertissementsReglesDures(
-    supabase,
-    [{ gardeId: corps.gardeId, premier_id, second_id }],
-    imp.periodeId,
-    cabinetId,
+  //
+  // ── B-156 — ET LE REMPLACEMENT PONCTUEL DÉJÀ POSÉ, s'il y en a un ──────────
+  //
+  // On écrit ici la place NATIVE (`premier_id`/`second_id`). Un remplacement
+  // d'un jour (B-061) vit ailleurs, dans `gardes_exceptions`, et PRIME sur ce
+  // qu'on écrit : le volontaire croirait couvrir tout le créneau alors qu'un ou
+  // deux de ses jours resteraient au remplaçant. Sans cette ligne, l'écart est
+  // parfaitement silencieux — il se découvrirait le soir même.
+  const phraseRemplacement = avertissementRemplacementPonctuel(
+    { id: corps.gardeId, date: imp.date, premier_id: null, second_id: null },
+    await chargerExceptionsDesGardes(service, [corps.gardeId]),
+    corps.role,
   )
+
+  const avertissements = [
+    ...(phraseRemplacement ? [phraseRemplacement] : []),
+    ...(await avertissementsReglesDures(
+      supabase,
+      [{ gardeId: corps.gardeId, premier_id, second_id }],
+      imp.periodeId,
+      cabinetId,
+    )),
+  ]
 
   if (avertissements.length > 0 && corps.confirmerAvertissements !== true) {
     return NextResponse.json(

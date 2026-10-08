@@ -472,13 +472,50 @@ export async function toggleVeterinaireActif(
       .eq('periodes.statut', 'publie')
       .order('date')
 
-    if (gardes && gardes.length > 0) {
+    // ── B-156 — ET LES GARDES QU'IL TIENT EN REMPLACEMENT ────────────────────
+    //
+    // La requête ci-dessus ne voit que les gardes dont il est TITULAIRE. Un
+    // vétérinaire qui ne tient plus que des remplacements ponctuels (B-061) se
+    // désactivait donc sans un mot, en laissant ses soirs de garde à son nom
+    // dans un planning déjà diffusé. L'avertissement existait et ne couvrait
+    // qu'une moitié du réel.
+    const { data: remplacements } = await supabase
+      .from('gardes_exceptions')
+      .select('date, gardes!inner(type, periodes!inner(statut))')
+      .eq('veterinaire_id', id)
+      .gte('date', today)
+
+    type LigneRemplacement = {
+      date: string
+      gardes: { type: string; periodes: { statut: string } | { statut: string }[] }
+        | { type: string; periodes: { statut: string } | { statut: string }[] }[]
+    }
+    const statutDe = (p: { statut: string } | { statut: string }[]) =>
+      Array.isArray(p) ? p[0]?.statut : p?.statut
+    const gardeDe = (g: LigneRemplacement['gardes']) => (Array.isArray(g) ? g[0] : g)
+
+    const enRemplacement = ((remplacements as LigneRemplacement[] | null) ?? [])
+      .filter((r) => {
+        const g = gardeDe(r.gardes)
+        return g && statutDe(g.periodes) === 'publie'
+      })
+      .map((r) => ({ date: r.date, type: gardeDe(r.gardes)!.type }))
+
+    const titulaire = ((gardes as { date: string; type: string }[] | null) ?? []).map((g) => ({
+      date: g.date,
+      type: g.type,
+    }))
+
+    // Dédoublonnage sur (date, type) : une garde peut le concerner aux deux
+    // titres (titulaire d'un jour, remplaçant d'un autre) et n'a pas à
+    // apparaître deux fois sous les yeux de l'admin.
+    const parCle = new Map<string, { date: string; type: string }>()
+    for (const g of [...titulaire, ...enRemplacement]) parCle.set(`${g.date}|${g.type}`, g)
+
+    if (parCle.size > 0) {
       return {
         requiresConfirmation: true as const,
-        gardesAVenir: (gardes as { date: string; type: string }[]).map((g) => ({
-          date: g.date,
-          type: g.type,
-        })),
+        gardesAVenir: [...parCle.values()].sort((a, b) => a.date.localeCompare(b.date)),
       }
     }
   }

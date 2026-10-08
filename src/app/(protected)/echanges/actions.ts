@@ -26,6 +26,12 @@ import { createClient as createAdminClient, type SupabaseClient } from '@supabas
 import { revalidatePath } from 'next/cache'
 import { appliquerChangementGarde } from '@/lib/gardes/appliquer-changement'
 import {
+  chargerExceptionsDesGardes,
+  indexerExceptions,
+  occupantReel,
+} from '@/lib/gardes/exceptions-jour'
+import { datesCouvertesParGardeV1 } from '@/engine/utils'
+import {
   avertissementsReglesDuresMultiPeriodes,
   tracerConfirmationMalgreAvertissement,
   type ChangementGardeSitue,
@@ -129,6 +135,42 @@ async function chargerGardeEchangeable(
   if (garde.verrouille) {
     return { error: `La garde ${qui} est verrouillée : demande à l'administrateur de la modifier.` }
   }
+  // ── B-156 — UNE GARDE DÉJÀ REMPLACÉE NE S'ÉCHANGE PAS EN BLOC ─────────────
+  //
+  // 🔴 CE QUI SE PASSAIT. Ce contrôle lit les TITULAIRES. Depuis B-061, un
+  //    remplacement d'un jour vit dans `gardes_exceptions` et `gardes` ne bouge
+  //    pas. Deux mensonges symétriques en découlaient :
+  //
+  //      · le titulaire remplacé pouvait céder une garde qu'il ne fait plus —
+  //        l'échange aurait déplacé une place déjà occupée par quelqu'un d'autre,
+  //        et le remplaçant l'aurait appris par son agenda ;
+  //      · le remplaçant, lui, s'entendait répondre « cette garde n'est pas
+  //        assignée au bon vétérinaire » — une phrase fausse, devant un écran
+  //        qui lui montre bien sa garde.
+  //
+  // 🔑 ON REFUSE, ET ON DIT POURQUOI. L'échange porte sur la GARDE ENTIÈRE ;
+  //    un remplacement ne couvre qu'un ou deux de ses jours. Les deux notions ne
+  //    se composent pas, et bricoler ici un échange partiel ferait exactement ce
+  //    que ce projet paie depuis deux jours : un deuxième modèle de
+  //    remplacement, divergent du premier. Le chemin existe déjà pour ce
+  //    besoin — la modale de garde, qui pose un remplacement ponctuel.
+  const remplacements = await chargerExceptionsDesGardes(supabase, [garde.id])
+  if (remplacements.length > 0) {
+    const index = indexerExceptions(remplacements)
+    const jours = datesCouvertesParGardeV1(garde.date, garde.type)
+    const tenueEntierement = jours.every(
+      (j) => occupantReel(garde, index, j, role) === vetId,
+    )
+    if (!tenueEntierement) {
+      return {
+        error:
+          `La garde ${qui} comporte déjà un remplacement ponctuel sur ce rôle — ` +
+          `elle ne peut pas être échangée en bloc. Passe par la garde elle-même ` +
+          `pour ajuster le remplacement, ou demande à l'administrateur.`,
+      }
+    }
+  }
+
   if (vetAuRole(garde, role) !== vetId) {
     return { error: `Cette garde ${qui} n'est pas (ou plus) assignée au bon vétérinaire sur ce rôle.` }
   }

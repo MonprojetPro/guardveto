@@ -28,6 +28,10 @@ import {
   fusionnerChangementsParGarde,
   type ChangementGardeSitue,
 } from '@/lib/gardes/avertissements-regles'
+import {
+  appliquerExceptionsAuxGardes,
+  chargerExceptionsDesGardes,
+} from '@/lib/gardes/exceptions-jour'
 
 /** Une décision de remplacement, telle que l'écran comme Filou la formulent. */
 export interface DecisionChangement {
@@ -54,7 +58,8 @@ export async function changementsPourDecisions(
 
   const { data, error } = await supabase
     .from('gardes')
-    .select('id, periode_id, premier_id, second_id')
+    // `date` est lue pour les exceptions : un remplacement est posé sur un JOUR.
+    .select('id, periode_id, premier_id, second_id, date')
     .in('id', decisions.map((d) => d.gardeId))
     .eq('cabinet_id', cabinetId)
 
@@ -75,8 +80,23 @@ export async function changementsPourDecisions(
     periode_id: string | null
     premier_id: string | null
     second_id: string | null
+    date: string
   }
-  const base: ChangementGardeSitue[] = (data as Row[])
+
+  // ── B-156 — ON PART DE L'ÉTAT RÉEL, PAS DE L'ÉTAT PRÉVU ───────────────────
+  //
+  // Le gardien juge « la garde aura ce premier et ce second ». Si l'autre place
+  // est tenue par un REMPLAÇANT du jour (B-061), partir du titulaire fait juger
+  // un binôme qui n'existe pas : on annonce une règle enfreinte entre deux
+  // personnes qui ne seront jamais de garde ensemble, ou on tait celle qui va
+  // vraiment l'être. Un avertissement faux coûte plus cher qu'un avertissement
+  // absent — il apprend à ne plus lire les avertissements.
+  const gardesReelles = appliquerExceptionsAuxGardes(
+    data as Row[],
+    await chargerExceptionsDesGardes(supabase, (data as Row[]).map((g) => g.id)),
+  )
+
+  const base: ChangementGardeSitue[] = gardesReelles
     .filter((g): g is Row & { periode_id: string } => Boolean(g.periode_id))
     .map((g) => ({
       gardeId: g.id,

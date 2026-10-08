@@ -31,6 +31,10 @@ import {
 } from '@/lib/crise/contexte'
 import { changementsPourDecisions } from '@/lib/crise/changements'
 import {
+  avertissementRemplacementPonctuel,
+  chargerExceptionsDesGardes,
+} from '@/lib/gardes/exceptions-jour'
+import {
   avertissementsReglesDuresMultiPeriodes,
   tracerConfirmationMalgreAvertissement,
 } from '@/lib/gardes/avertissements-regles'
@@ -266,6 +270,28 @@ export async function POST(
       })),
     )
     avertissements = await avertissementsReglesDuresMultiPeriodes(supabase, cabinetId, changements)
+
+    // ── B-156 — les remplacements ponctuels déjà posés, dits AVANT les règles ──
+    //
+    // Même raison et MÊME PHRASE que le dépannage par un volontaire : on écrit la
+    // place native, et un remplacement d'un jour (B-061) prime dessus. L'admin
+    // croirait avoir recouvert tout le créneau. La formulation vit dans
+    // `lib/gardes/exceptions-jour` — deux phrases écrites séparément auraient fini
+    // par dire deux choses du même fait.
+    const remplacements = await chargerExceptionsDesGardes(
+      supabase,
+      aEcrire.map((e) => e.dec.gardeId),
+    )
+    const phrases = aEcrire
+      .map((e) =>
+        avertissementRemplacementPonctuel(
+          { id: e.dec.gardeId, date: e.imp.date, premier_id: null, second_id: null },
+          remplacements,
+          e.dec.role,
+        ),
+      )
+      .filter((p): p is string => p !== null)
+    avertissements = [...phrases, ...avertissements]
 
     if (avertissements.length > 0 && !confirmerAvertissements) {
       return NextResponse.json(

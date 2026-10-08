@@ -22,6 +22,13 @@ import {
   recenserCreneauxImpactes,
   type CreneauImpacte,
 } from '@/lib/crise/contexte'
+import {
+  indexerExceptions,
+  occupantReel,
+  type ExceptionJour,
+} from '@/lib/gardes/exceptions-jour'
+import { addDays, datesCouvertesParGardeV1 } from '@/engine/utils'
+
 
 /** Résultat de la détection : y a-t-il conflit, et sur quels créneaux ? */
 export interface ResultatDetectionConflit {
@@ -139,6 +146,78 @@ export interface VerdictSouhait {
   aucunPlanning: boolean
 }
 
+/** Une ligne de `gardes` telle que ce détecteur la lit. */
+export interface LigneGardeConflit {
+  id?: string
+  date: string
+  type: string
+  premier_id: string | null
+  second_id: string | null
+  periode_id: string
+}
+
+/** Un conflit situé, avant d'être rangé par gravité. */
+export interface ConflitSitue {
+  periodeId: string
+  date: string
+  role: string
+}
+
+/**
+ * Les conflits réels entre une plage d'indisponibilité et des gardes.
+ *
+ * ── B-156 — LE FAUX NÉGATIF LE PLUS CHER DE L'AUDIT DU 08/10 ────────────────
+ *
+ * 🔴 CE QUE FAISAIT CE DÉTECTEUR. Il lisait `gardes.premier_id/second_id` : les
+ *    TITULAIRES. Depuis B-061, un remplacement d'un jour s'écrit dans
+ *    `gardes_exceptions` et la table `gardes` ne bouge pas. Donc :
+ *
+ *      · le congé d'un REMPLAÇANT passait pour « aucun conflit » — on pouvait
+ *        lui accorder un congé un soir où il est de garde, et personne n'aurait
+ *        tenu ce soir-là. C'est le seul trou de l'audit qui peut laisser un
+ *        cabinet sans vétérinaire ;
+ *      · à l'inverse, on annonçait un conflit à un titulaire DÉJÀ remplacé —
+ *        un avertissement faux, qui apprend à ne plus lire les avertissements.
+ *
+ * 🔑 ON RAISONNE JOUR PAR JOUR, parce que c'est la maille du remplacement. Au
+ *    passage, ça répare un second angle mort : la ligne `gardes` d'un week-end
+ *    ne porte que le samedi, alors que la garde occupe aussi le vendredi et le
+ *    dimanche. Un souhait posé un dimanche de garde ne percutait donc rien.
+ *
+ * ⚠️ UNE SEULE ENTRÉE PAR (GARDE, RÔLE), datée du premier jour touché. Trois
+ *    lignes « conflit » pour un même week-end seraient exactes et illisibles —
+ *    et un écran qui crie trois fois ne se lit plus (leçon du bandeau, B-130a).
+ *
+ * PURE et exportée : c'est la règle qui portait le défaut, elle doit être
+ * vérifiable sans base.
+ */
+export function conflitsDepuisGardes(params: {
+  gardes: readonly LigneGardeConflit[]
+  exceptions: readonly ExceptionJour[]
+  veterinaireId: string
+  borneBasse: string
+  dateFin: string
+}): ConflitSitue[] {
+  const { gardes, exceptions, veterinaireId, borneBasse, dateFin } = params
+  const index = indexerExceptions(exceptions)
+  const out: ConflitSitue[] = []
+
+  for (const g of gardes) {
+    const jours = datesCouvertesParGardeV1(g.date, g.type).filter(
+      (j) => j >= borneBasse && j <= dateFin,
+    )
+    if (jours.length === 0) continue
+
+    for (const role of ['premier', 'second'] as const) {
+      // Le premier jour où il est RÉELLEMENT de garde. Aucun → il a été
+      // remplacé sur toute la fenêtre, et il n'y a plus de conflit du tout.
+      const jour = jours.find((j) => occupantReel(g, index, j, role) === veterinaireId)
+      if (jour) out.push({ periodeId: g.periode_id, date: jour, role })
+    }
+  }
+  return out
+}
+
 export async function detecterConflitsPourDecision(params: {
   supabase: SupabaseClient
   cabinetId: string
@@ -165,12 +244,22 @@ export async function detecterConflitsPourDecision(params: {
     //     plannings importés (période « Historique été » : 0 ligne).
     // Interroger l'une ou l'autre seule, c'est mentir par omission dans un cas
     // sur deux. On fusionne, et on dédoublonne sur (période, date, rôle).
-    const [gardesRes, attribsRes] = await Promise.all([
+    //
+    // ⚠️ B-156 — TROIS SOURCES DÉSORMAIS. La requête sur `gardes` ci-dessous ne
+    //    ramène que les gardes où le véto est TITULAIRE : celles où il n'est que
+    //    remplaçant d'un jour n'y figurent pas, et c'est précisément le cas qui
+    //    pouvait laisser un soir sans personne. Les remplacements de la plage
+    //    sont donc lus à part, puis leurs gardes rapatriées.
+    //    La borne basse s'élargit d'un jour : un week-end daté du samedi occupe
+    //    le vendredi, et un souhait qui commence le samedi percute quand même
+    //    cette garde-là.
+    const veilleBorneBasse = addDays(borneBasse, -1)
+    const [gardesRes, attribsRes, excRes] = await Promise.all([
       supabase
         .from('gardes')
-        .select('date, premier_id, second_id, periode_id, periodes!inner(statut, libelle)')
+        .select('id, date, type, premier_id, second_id, periode_id, periodes!inner(statut, libelle)')
         .eq('cabinet_id', cabinetId)
-        .gte('date', borneBasse)
+        .gte('date', veilleBorneBasse)
         .lte('date', dateFin)
         .or(`premier_id.eq.${veterinaireId},second_id.eq.${veterinaireId}`),
       supabase
@@ -180,6 +269,12 @@ export async function detecterConflitsPourDecision(params: {
         .eq('veterinaire_id', veterinaireId)
         .gte('date_debut_reel', `${borneBasse}T00:00:00Z`)
         .lte('date_debut_reel', `${dateFin}T23:59:59Z`),
+      supabase
+        .from('gardes_exceptions')
+        .select('garde_id, date, role, veterinaire_id')
+        .eq('cabinet_id', cabinetId)
+        .gte('date', borneBasse)
+        .lte('date', dateFin),
     ])
 
     if (gardesRes.error) throw new Error(gardesRes.error.message)
@@ -212,18 +307,62 @@ export async function detecterConflitsPourDecision(params: {
       })
     }
 
-    type LigneGarde = {
-      date: string
-      premier_id: string | null
-      second_id: string | null
-      periode_id: string
-      periodes: Periode | Periode[]
+    type LigneGarde = LigneGardeConflit & { periodes: Periode | Periode[] }
+
+    const gardesTitulaire = ((gardesRes.data as LigneGarde[] | null) ?? [])
+
+    // ── B-156 — les gardes où il n'est QUE remplaçant d'un jour ──────────────
+    //
+    // Elles sont absentes de la requête ci-dessus (il n'y est ni premier ni
+    // second). Sans ce rapatriement, son congé passerait pour sans conflit le
+    // jour même où il est de garde — le trou le plus coûteux de l'audit.
+    const exceptions = ((excRes.data as ExceptionJour[] | null) ?? [])
+    if (excRes.error) {
+      console.warn(
+        '[detecterConflitsPourDecision] remplacements illisibles, repli sur les titulaires :',
+        excRes.error.message,
+      )
     }
-    for (const g of ((gardesRes.data as LigneGarde[] | null) ?? [])) {
-      const per = unePeriode(g.periodes)
-      // Le véto peut être 1er, 2nd, ou les deux (cas limite) → une ligne par rôle.
-      if (g.premier_id === veterinaireId) ranger(per, g.periode_id, g.date, 'premier')
-      if (g.second_id === veterinaireId) ranger(per, g.periode_id, g.date, 'second')
+
+    const dejaChargees = new Set(gardesTitulaire.map((g) => g.id).filter(Boolean))
+    const idsRemplacant = [
+      ...new Set(
+        exceptions
+          .filter((e) => e.veterinaire_id === veterinaireId && !dejaChargees.has(e.garde_id))
+          .map((e) => e.garde_id),
+      ),
+    ]
+
+    let gardesRemplacant: LigneGarde[] = []
+    if (idsRemplacant.length > 0) {
+      const { data, error } = await supabase
+        .from('gardes')
+        .select('id, date, type, premier_id, second_id, periode_id, periodes!inner(statut, libelle)')
+        .eq('cabinet_id', cabinetId)
+        .in('id', idsRemplacant)
+      if (error) {
+        // Tracé, jamais silencieux : sans ces gardes, le verdict est incomplet
+        // et se lirait comme rassurant.
+        console.warn(
+          '[detecterConflitsPourDecision] gardes de remplacement illisibles :',
+          error.message,
+        )
+      }
+      gardesRemplacant = (data as LigneGarde[] | null) ?? []
+    }
+
+    const toutesLesGardes = [...gardesTitulaire, ...gardesRemplacant]
+    const periodeParId = new Map<string, Periode | undefined>()
+    for (const g of toutesLesGardes) periodeParId.set(g.periode_id, unePeriode(g.periodes))
+
+    for (const c of conflitsDepuisGardes({
+      gardes: toutesLesGardes,
+      exceptions,
+      veterinaireId,
+      borneBasse,
+      dateFin,
+    })) {
+      ranger(periodeParId.get(c.periodeId), c.periodeId, c.date, c.role)
     }
 
     type LigneAttrib = {

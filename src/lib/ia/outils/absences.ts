@@ -40,6 +40,10 @@ import {
   tracerConfirmationMalgreAvertissement,
 } from '@/lib/gardes/avertissements-regles'
 import { changementsPourDecisions } from '@/lib/crise/changements'
+import {
+  avertissementRemplacementPonctuel,
+  chargerExceptionsDesGardes,
+} from '@/lib/gardes/exceptions-jour'
 import { sendAppelVolontaires } from '@/lib/notifications'
 import { proposerReparation, type CreneauCrise } from '@/engine/crise/reparer'
 import {
@@ -824,11 +828,39 @@ Chaque remplacement est revérifié LÉGAL (mêmes règles que la génération d
       ctx.cabinetId,
       c.decisions,
     )
-    const avertissementsAFroid = await avertissementsReglesDuresMultiPeriodes(
+    // ── B-156 — LES REMPLACEMENTS PONCTUELS DÉJÀ POSÉS ENTRENT DANS LA LISTE ──
+    //
+    // MÊME phrase que les deux autres chemins de réparation (l'écran de crise et
+    // le dépannage par un volontaire) : la formulation vit dans
+    // `lib/gardes/exceptions-jour`, parce que trois chemins qui l'écriraient
+    // chacun finiraient par dire trois choses du même fait. C'est la leçon
+    // « trois chemins d'écriture, deux gardiens » du 22/08, appliquée au texte.
+    //
+    // Filou a précisément vocation à DIRE ce que l'écran dirait : s'il est le
+    // seul à taire le remplacement, l'admin qui passe par lui écrit à l'aveugle.
+    const remplacementsPoses = await chargerExceptionsDesGardes(
       ctx.supabase,
-      ctx.cabinetId,
-      changementsAFroid,
+      c.decisions.map((d) => d.gardeId),
     )
+    const avertissementsAFroid = [
+      ...c.decisions
+        .map((d) => {
+          const imp = impactes.find((i) => i.gardeId === d.gardeId && i.role === d.role)
+          return imp
+            ? avertissementRemplacementPonctuel(
+                { id: d.gardeId, date: imp.date, premier_id: null, second_id: null },
+                remplacementsPoses,
+                d.role,
+              )
+            : null
+        })
+        .filter((p): p is string => p !== null),
+      ...(await avertissementsReglesDuresMultiPeriodes(
+        ctx.supabase,
+        ctx.cabinetId,
+        changementsAFroid,
+      )),
+    ]
     const nouveaux = avertissementsAFroid.filter((a) => !dejaMontres.has(a))
     if (nouveaux.length > 0) {
       return {
