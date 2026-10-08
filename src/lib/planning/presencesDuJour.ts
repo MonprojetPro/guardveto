@@ -63,6 +63,18 @@ export interface PresenceAffichee {
   tranche: string
   /** « 8h–13h », ou une chaîne vide si la tranche est introuvable. */
   heures: string
+  /**
+   * Les heures BRUTES de la tranche (`HH:MM:SS`), ou `null` si introuvable.
+   *
+   * ⚠️ PORTÉES ICI, et pas retrouvées plus loin par l'identifiant du bloc.
+   *    C'est le rail de la grille dépliée qui en a besoin pour poser la barre
+   *    au bon endroit. Les faire rechercher par l'appelant ouvrirait un second
+   *    chemin vers la même donnée — et « trois chemins d'écriture, deux
+   *    gardiens » (22/08) vaut aussi pour la lecture : le chemin qu'on oublie
+   *    est celui qui se met à mentir.
+   */
+  debut: string | null
+  fin: string | null
   /** Rang d'affichage, repris de l'ordre voulu par l'admin. */
   ordre: number
   /** Elle vient d'une trame : la retirer à la main ne tiendra pas une réapplication. */
@@ -145,6 +157,8 @@ export function composerPresencesParJour(
       couleur: v?.couleur ?? null,
       tranche: t?.nom ?? 'Tranche inconnue',
       heures: t ? plageCourte(t.debut, t.fin) : '',
+      debut: t?.debut ?? null,
+      fin: t?.fin ?? null,
       // Une tranche introuvable passe en DERNIER, pas en premier : l'ordre 0
       // l'aurait hissée en tête de case, là où elle n'est qu'une anomalie.
       ordre: t?.ordre ?? Number.MAX_SAFE_INTEGER,

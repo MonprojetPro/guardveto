@@ -1,0 +1,562 @@
+/* ============================================================
+   GUARDVETO — « Planning Cabinet V2 » (B-153 lot 1)
+   ============================================================
+   Le portage visuel du prototype arrêté avec Claude Design le 08/10. Il ne
+   s'applique QU'À la grille de chantier (`components/chantier/`), donc qu'au
+   bac à sable : aucune de ces classes n'est portée par un écran du client.
+
+   🔴 CE QUI TIENT L'ALIGNEMENT — LA LEÇON B-145c, PAYÉE UNE FOIS.
+   La marge des prénoms et les 7 cases sont des colonnes sœurs. Elles doivent
+   empiler les mêmes hauteurs ET LE MÊME CHÂSSIS. Le 07/10, le commentaire du
+   fichier disait déjà « les deux colonnes empilent EXACTEMENT les mêmes
+   hauteurs » — et c'était vrai des hauteurs de LIGNE, faux du `padding` et du
+   `gap`, qui n'en sont pas. Résultat : 6 px d'écart dès la première ligne,
+   +2 px par ligne, 18 px à la septième pour des lignes de 20 px. On lisait la
+   garde du voisin.
+
+   ➜ Toutes les hauteurs et tout le châssis vivent dans les variables
+     ci-dessous, déclarées UNE fois et consommées par les deux colonnes.
+     `grille-alignement-css-v2.test.ts` refuse qu'on les recopie à la main.
+   ============================================================ */
+
+.pv2-wrap {
+  /* Le châssis, partagé mot pour mot par la marge et par les cases. */
+  --pv2-pad: 8px;
+  --pv2-bord: 1px;
+  --pv2-marge-l: 112px;
+  --pv2-gap: 6px;
+
+  /* Les hauteurs empilées, dans l'ordre où elles le sont. */
+  --pv2-h-tete: 22px;
+  --pv2-h-titres: 16px;
+  --pv2-h-pourvoir: 22px;
+  --pv2-h-ligne: 22px;
+  --pv2-h-presents: 26px;
+
+  /* La palette du prototype, avec repli sur les jetons du produit. */
+  --pv2-surface: var(--t-surface, #fffcf4);
+  --pv2-cell: #f6ebd6;
+  --pv2-cell-we: #f1e2c6;
+  --pv2-creux: #f6eedf;
+  --pv2-filet: #eadcc2;
+  --pv2-bd: #e6d7bb;
+  --pv2-txt: var(--t-text, #3a2a1c);
+  --pv2-sec: var(--t-muted, #7c6a55);
+  --pv2-acc: var(--t-accent, #c7530f);
+  --pv2-bad: #a8341f;
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--pv2-gap);
+  padding: 20px;
+  border-radius: 26px;
+  background: var(--pv2-surface);
+  box-shadow:
+    0 1px 0 rgba(58, 42, 28, 0.04),
+    0 30px 70px -28px rgba(58, 42, 28, 0.28);
+}
+
+/* ── L'en-tête des jours ─────────────────────────────────────────────────── */
+
+.pv2-entete {
+  display: grid;
+  grid-template-columns: var(--pv2-marge-l) repeat(7, minmax(0, 1fr));
+  gap: var(--pv2-gap);
+  padding: 0 var(--pv2-pad);
+}
+.pv2-entete span {
+  padding-left: 10px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #a08b70;
+}
+
+/* ── La rangée-semaine ───────────────────────────────────────────────────── */
+
+.pv2-sem {
+  display: grid;
+  grid-template-columns: var(--pv2-marge-l) repeat(7, minmax(0, 1fr));
+  gap: var(--pv2-gap);
+  border-radius: 22px;
+}
+.pv2-sem.repliee {
+  padding: 0 var(--pv2-pad);
+  cursor: pointer;
+}
+/* La semaine ouverte se CREUSE, et ses jours s'y soulèvent en blanc. C'est le
+   geste central du design V2 : une seule surface, deux profondeurs. */
+.pv2-sem.depliee {
+  padding: var(--pv2-pad);
+  background: var(--pv2-creux);
+  box-shadow: inset 0 0 0 1px var(--pv2-filet);
+}
+
+/* ── La marge : numéro de semaine, prénoms ───────────────────────────────── */
+
+.pv2-marge {
+  display: flex;
+  flex-direction: column;
+  /* ⚠️ `gap: 0` — il s'accumulait ligne après ligne en B-145c, d'où un défaut
+     visible EN BAS et pas en haut. Les hauteurs portent l'espacement. */
+  gap: 0;
+  align-self: start;
+}
+/* Le MÊME châssis que la case : padding ET bordure. Les oublier, c'est refaire
+   B-145c — la bordure transparente n'est pas décorative, elle occupe. */
+.pv2-marge.depliee {
+  padding: var(--pv2-pad) 0;
+  border: var(--pv2-bord) solid transparent;
+}
+
+.pv2-sem-lbl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--pv2-h-tete);
+  padding: 0 0 0 8px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-family: Figtree, var(--t-font-titre, sans-serif);
+  font-weight: 800;
+  font-size: 12px;
+  color: #a08b70;
+}
+.pv2-sem.depliee .pv2-sem-lbl { color: var(--pv2-acc); }
+.pv2-sem-num { letter-spacing: 0.02em; }
+.pv2-sem-trous {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--pv2-bad);
+  color: #fff;
+  font-family: Figtree, var(--t-font-titre, sans-serif);
+  font-weight: 800;
+  font-size: 10.5px;
+}
+
+.pv2-marge-espace { height: var(--pv2-h-titres); }
+.pv2-marge-pourvoir,
+.pv2-marge-presents {
+  display: flex;
+  align-items: center;
+  padding-left: 8px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #b3a189;
+}
+.pv2-marge-pourvoir { height: var(--pv2-h-pourvoir); }
+.pv2-marge-pourvoir.actif { color: var(--pv2-bad); }
+.pv2-marge-presents {
+  height: var(--pv2-h-presents);
+  box-sizing: border-box;
+  margin-top: 4px;
+  border-top: 1px solid var(--pv2-filet);
+  color: var(--pv2-sec);
+}
+
+.pv2-prenom {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: var(--pv2-h-ligne);
+  padding-left: 8px;
+  border-radius: 999px 0 0 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pv2-txt);
+}
+.pv2-prenom.survol { background: rgba(199, 83, 15, 0.08); }
+/* La marge fait 112 px depuis B-145c : « Anne-Catherine » rendait
+   « Anne-Cathe » sur une grille dont tout le propos est nominatif. */
+.pv2-prenom-txt {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pv2-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* ── La case d'un jour ───────────────────────────────────────────────────── */
+
+.pv2-jour {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  box-sizing: border-box;
+  padding: var(--pv2-pad);
+  /* Bordure TRANSPARENTE, pas absente : elle fait partie du châssis partagé.
+     La retirer ici décalerait les cases de 1 px par rapport à la marge. */
+  border: var(--pv2-bord) solid transparent;
+  border-radius: 16px;
+  background: var(--pv2-cell);
+  overflow: hidden;
+}
+.pv2-jour.we { background: var(--pv2-cell-we); }
+/* Dans une semaine ouverte, le jour se SOULÈVE en blanc. */
+.pv2-jour.ouvert {
+  background: var(--pv2-surface);
+  box-shadow: 0 1px 2px rgba(58, 42, 28, 0.07);
+}
+.pv2-jour.ouvert.we { background: #fcf5e8; }
+.pv2-jour.other {
+  background: transparent;
+  border-color: #dccaa8;
+  border-style: dashed;
+  opacity: 0.5;
+}
+.pv2-jour.past { opacity: 0.55; }
+.pv2-jour.today { box-shadow: 0 0 0 1.5px var(--pv2-acc); }
+.pv2-jour.hors { opacity: 0.45; }
+
+/* Le filet des vacances scolaires, en haut de case. */
+.pv2-vac {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: 0;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: #d9a55a;
+}
+/* Le couloir de nuit : dessiné en FOND, ce qui lui donne sa continuité. */
+.pv2-couloir {
+  position: absolute;
+  right: 6px;
+  top: 30px;
+  bottom: 6px;
+  width: 34px;
+  border-radius: 12px;
+  background: rgba(58, 42, 28, 0.05);
+}
+
+.pv2-jour-tete {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: var(--pv2-h-tete);
+  flex: none;
+}
+.pv2-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 11px;
+  border-radius: 999px;
+  font-family: Figtree, var(--t-font-titre, sans-serif);
+  font-weight: 700;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--pv2-txt);
+}
+.pv2-num.aujourdhui {
+  background: var(--pv2-acc);
+  color: #fff;
+}
+.pv2-ferie {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: rgba(199, 83, 15, 0.1);
+  color: var(--pv2-acc);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.pv2-tete-espace { flex: 1; }
+.pv2-jour-flag {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--pv2-bad);
+}
+
+/* ── Une case repliée ────────────────────────────────────────────────────── */
+
+.pv2-ligne {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 18px;
+  flex: none;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.pv2-ligne.presents { height: 26px; }
+.pv2-ligne.ouvrable { cursor: pointer; }
+.pv2-etq {
+  flex: none;
+  width: 28px;
+  overflow: hidden;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #a08b70;
+}
+/* La hiérarchie de lecture du design V2 : le nombre en grand, le reste petit. */
+.pv2-grand {
+  font-family: Figtree, var(--t-font-titre, sans-serif);
+  font-weight: 800;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--pv2-txt);
+}
+.pv2-grand.manque { color: var(--pv2-bad); }
+.pv2-sub {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--pv2-sec);
+}
+.pv2-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  height: 18px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pv2-chip.creux {
+  border-style: dashed;
+  border-color: var(--pv2-bad);
+  background: rgba(168, 52, 31, 0.08);
+  color: var(--pv2-bad);
+}
+.pv2-chip-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+/* ── Une case dépliée ────────────────────────────────────────────────────── */
+
+.pv2-titres {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--pv2-h-titres);
+  flex: none;
+}
+.pv2-t-journee {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #a08b70;
+}
+.pv2-t-journee small {
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.pv2-t-nuit {
+  width: 30px;
+  flex: none;
+  text-align: center;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pv2-sec);
+}
+
+.pv2-pourvoir {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--pv2-h-pourvoir);
+  flex: none;
+}
+.pv2-pourvoir-piste { flex: 1; min-width: 0; }
+.pv2-pourvoir-nuit {
+  width: 30px;
+  flex: none;
+  display: flex;
+  justify-content: center;
+}
+.pv2-trou {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 18px;
+  padding: 0 10px;
+  border: 1.5px dashed var(--pv2-bad);
+  border-radius: 999px;
+  background: rgba(168, 52, 31, 0.08);
+  color: var(--pv2-bad);
+  font-family: Figtree, var(--t-font-titre, sans-serif);
+  font-weight: 800;
+  font-size: 9.5px;
+  cursor: pointer;
+}
+
+.pv2-rangee {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--pv2-h-ligne);
+  flex: none;
+  position: relative;
+  border-radius: 999px;
+}
+.pv2-rangee.survol { background: rgba(199, 83, 15, 0.08); }
+
+.pv2-piste {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 18px;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  /* Une piste VIDE porte un fond : sans lui, une case libre se lit comme une
+     case vide, et il n'y a plus de couloir à suivre de gauche à droite
+     (retour de MiKL en recette de B-145c). */
+  background: rgba(58, 42, 28, 0.04);
+}
+.pv2-piste.cliquable { cursor: pointer; }
+.pv2-piste.conge {
+  background: repeating-linear-gradient(135deg, #e3d2b3 0 3px, transparent 3px 7px);
+}
+.pv2-piste.souhait {
+  border-style: dashed;
+  border-color: #9a6200;
+  background: rgba(154, 98, 0, 0.08);
+}
+.pv2-mi {
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  bottom: 4px;
+  border-left: 1px dotted #d8c6a4;
+}
+.pv2-conge-txt {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--pv2-surface);
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--pv2-sec);
+}
+.pv2-barre {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  /* Le liseré marque le DÉBUT de la tranche : sans lui, deux barres qui se
+     touchent se lisent comme une seule (B-145c). */
+  border-left: 2px solid currentColor;
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.pv2-barre.anomalie { outline: 1.5px dashed var(--pv2-bad); }
+
+.pv2-nuit {
+  width: 30px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.pv2-nuit.avec-cadenas { width: 48px; }
+.pv2-garde {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  font-family: Figtree, var(--t-font-titre, sans-serif);
+  font-weight: 800;
+  font-size: 9px;
+  cursor: pointer;
+  box-shadow: 0 0 0 2px var(--pv2-surface);
+}
+.pv2-garde.seul { width: 12px; height: 12px; }
+.pv2-garde.rang { width: 24px; height: 16px; }
+.pv2-garde.figee { box-shadow: 0 0 0 2px var(--pv2-surface), 0 0 0 3.5px #9a6200; }
+
+/* La ligne « Présents » qui ferme la case. Deux chiffres NEUTRES : le minimum
+   d'effectif n'existe pas au schéma (voir l'en-tête du composant). */
+.pv2-presents {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--pv2-h-presents);
+  box-sizing: border-box;
+  flex: none;
+  margin-top: 4px;
+  border-top: 1px solid var(--pv2-filet);
+}
+.pv2-presents-piste {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 6px;
+}
+.pv2-presents-nuit { width: 30px; flex: none; }
+.pv2-eff {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  border-radius: 999px;
+  background: #f3e8d4;
+  color: var(--pv2-txt);
+  font-family: Figtree, var(--t-font-titre, sans-serif);
+  font-weight: 800;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}

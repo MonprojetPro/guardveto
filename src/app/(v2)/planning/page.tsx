@@ -18,7 +18,7 @@ import '@/styles/v2-filou-edge.css'
 import '@/styles/v2-propositions-relecture.css'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
-import { PlanningV2, type CongeAffiche, type PlageVacances } from '@/components/v2/PlanningV2'
+import { PlanningV2, type PlageVacances } from '@/components/v2/PlanningV2'
 import { chargerPropositionsEnAttente } from '@/data/propositionsRelecture'
 import { mettreEnFormePropositions } from '@/lib/planning/propositionsAffichage'
 import { calculerPlacesProposees } from '@/lib/planning/apercuPropositions'
@@ -29,7 +29,10 @@ import { RealtimeRefresh } from '@/components/planning/RealtimeRefresh'
 import { chargerDock } from '@/data/v2/dock'
 import { modulesDuCabinet } from '@/lib/produit/modules-serveur'
 import { chantierOuvertPourLeCabinet } from '@/lib/produit/chantiers-serveur'
-import { TemoinChantier } from '@/components/chantier/TemoinChantier'
+import {
+  PlanningChantierV2,
+  type CongeAffiche as CongeChantier,
+} from '@/components/chantier/PlanningChantierV2'
 import {
   queryCompteurs,
   queryTotalWE,
@@ -80,6 +83,15 @@ interface LigneConge {
   date_debut: string
   date_fin: string
   statut: string
+  /**
+   * B-153 lot 1 — l'identifiant, et pas seulement le prénom.
+   *
+   * ⚠️ La grille dépliée pose une LIGNE PAR PERSONNE : pour hachurer la bonne,
+   *    il faut un identifiant. Rapprocher par le prénom marcherait jusqu'au jour
+   *    où deux personnes s'appellent pareil — et ce jour-là, le congé de l'une
+   *    s'afficherait sur la ligne de l'autre, sans la moindre erreur visible.
+   */
+  veterinaire_id: string
   veterinaires?: { prenom: string; couleur: string } | { prenom: string; couleur: string }[] | null
 }
 
@@ -187,7 +199,7 @@ export default async function PlanningPageV2({
         // congé n'a jamais été affiché dans les cases du planning, sans qu'un
         // seul message le signale. Trouvé en cherchant pourquoi le panneau du
         // secrétariat restait vide.
-        .select('id, date_debut, date_fin, statut, veterinaires!conges_veterinaire_id_fkey(prenom, couleur)')
+        .select('id, date_debut, date_fin, statut, veterinaire_id, veterinaires!conges_veterinaire_id_fkey(prenom, couleur)')
         .lte('date_debut', grille.fin)
         .gte('date_fin', grille.debut),
       // Chargé pour TOUS : le bouton PDF en dépend, pas seulement la publication.
@@ -263,7 +275,12 @@ export default async function PlanningPageV2({
     nomsTypes[r.code] = r.nom
   }
 
-  const conges: CongeAffiche[] = ((congesRes?.data ?? []) as LigneConge[]).map((c) => {
+  // ⚠️ Typé avec le congé du CHANTIER, pas celui de l'écran actuel : il porte
+  //    `vetId` en plus. Les deux écrans le reçoivent, et l'ancien ignore
+  //    simplement le champ en trop — l'inverse (typer avec l'ancien) priverait
+  //    la grille dépliée de l'identifiant dont elle a besoin pour hachurer la
+  //    bonne ligne.
+  const conges: CongeChantier[] = ((congesRes?.data ?? []) as LigneConge[]).map((c) => {
     const v = Array.isArray(c.veterinaires) ? c.veterinaires[0] : c.veterinaires
     return {
       id: c.id,
@@ -272,6 +289,7 @@ export default async function PlanningPageV2({
       dateDebut: c.date_debut,
       dateFin: c.date_fin,
       statut: c.statut,
+      vetId: c.veterinaire_id,
     }
   })
 
@@ -746,10 +764,58 @@ export default async function PlanningPageV2({
           dock={dock}
         />
 
-        {/* B-153 lot 0 — la preuve que la porte s'ouvre ici et pas chez le
-            client. Remplacé par la grille elle-même au lot 1. */}
-        {grilleV2 && <TemoinChantier id="planning-grille-v2" />}
+        {/* ── B-153 lot 1 — LES DEUX ÉCRANS, ET LA PORTE ENTRE EUX ──────────
+            `grilleV2` vient de `chantierOuvertPourLeCabinet`, qui rend `false`
+            au moindre doute : le client voit donc l'écran actuel, recetté,
+            quoi qu'il arrive. C'est la dette assumée de la voie ① de B-151a —
+            deux rendus vivants tant que le chantier dure. Elle disparaît le
+            jour où le chantier passe en `tousLesCabinets`.
 
+            ⚠️ Le témoin du lot 0 a été RETIRÉ ici : il annonçait la porte, la
+               grille la prouve mieux que lui. Le laisser aurait fait doublon,
+               et c'est exactement ce que son propre en-tête interdisait. */}
+        {grilleV2 ? (
+          <PlanningChantierV2
+            gardes={gardes}
+            periodes={periodes}
+            periodeAffichee={periodeAffichee}
+            anneeMois={anneeMois}
+            isAdmin={isAdmin}
+            lectureSeule={estSecretaire}
+            absencesAVenir={absencesAVenir}
+            vets={vets}
+            moiVetId={vet?.id ?? ''}
+            nomsTypes={nomsTypes}
+            compteurs={compteursAffiches}
+            conges={conges}
+            profil={profil}
+            periodesAvecGardes={periodesAvecGardes}
+            periodesTypes={periodesTypes}
+            gardesParType={gardesParType}
+            bilans={bilans}
+            colonnesCompteurs={colonnesCompteurs}
+            vacances={vacances}
+            propositionsEnAttente={propositionsAffichees}
+            placesProposees={placesProposees}
+            compteursProjetes={compteursProjetesAgrege}
+            manquesParGarde={manquesParGarde}
+            modules={modules}
+            periodesJournee={periodesJournee}
+            aDesTrames={aDesTrames}
+            presencesParJour={presencesParJour}
+            // B-153 lot 1 — l'équipe pose UNE LIGNE PAR PERSONNE dans la grille
+            // dépliée. Chargée pour tout le monde, contrairement à `vets` qui
+            // ne sert qu'aux gestes de l'administratrice.
+            equipe={equipePourPresences}
+            // Les tranches ACTIVES seulement : on ne propose pas de poser une
+            // présence sur une tranche retirée — l'action la refuserait
+            // (`validerPresence`), et un bouton qui mène à un refus prévisible
+            // est un bouton qui ment.
+            tranches={tranchesLues
+              .filter((t) => t.actif)
+              .map((t) => ({ id: t.id, nom: t.nom, debut: t.debut, fin: t.fin }))}
+          />
+        ) : (
         <PlanningV2
           gardes={gardes}
           periodes={periodes}
@@ -789,6 +855,7 @@ export default async function PlanningPageV2({
           // d'avant ce lot.
           presencesParJour={presencesParJour}
         />
+        )}
       </div>
     </>
   )

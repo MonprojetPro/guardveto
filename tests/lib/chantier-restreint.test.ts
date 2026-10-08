@@ -166,7 +166,12 @@ describe('Les composants de chantier', () => {
         `chez le client parce que rien ne pouvait l'en empecher. Lire le contexte via ` +
         `chantierOuvertPourLeCabinet(), et ne rendre que si la porte est ouverte.`,
     ).toEqual([])
-  })
+    // ⚠️ 30 s, et pas le défaut de 5 s. Ce test lit TOUS les fichiers de `src/`
+    //    (~800) : seul, il tourne en moins d'une seconde ; lancé en parallèle
+    //    des 190 autres fichiers de la suite, il attend le disque. Un gardien
+    //    qui rougit par contention est pire qu'inutile — on apprend à ignorer
+    //    sa couleur, et le jour où il a raison, personne ne regarde.
+  }, 30_000)
 
   it('DETECTE vraiment un fautif — la sonde, sans quoi ce test pourrait etre muet', () => {
     const faux = ['components/chantier/GrilleV2']
