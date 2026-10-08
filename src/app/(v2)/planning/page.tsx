@@ -26,8 +26,6 @@ import { calculerManques } from '@/lib/planning/manquesGrille'
 import { placesDeGarde } from '@/lib/gardes/places'
 import { construireCatalogue } from '@/lib/planning/placesAttendues'
 import { RealtimeRefresh } from '@/components/planning/RealtimeRefresh'
-import { RevalidationRealtime } from '@/components/planning/RevalidationRealtime'
-import { revaliderPlanning } from '@/data/revaliderPlanning'
 import { chargerDock } from '@/data/v2/dock'
 import { modulesDuCabinet } from '@/lib/produit/modules-serveur'
 import {
@@ -712,37 +710,17 @@ export default async function PlanningPageV2({
       ).map((g) => g.periode_id),
     ),
   ]
-  // Les périodes PUBLIÉES restent contrôlées, y compris après une retouche à
-  // la main : l'admin doit savoir quelle règle ou quel congé entre en conflit
-  // — et reste libre de programmer quand même (MiKL, 2026-08-19). Le système
-  // informe, il n'interdit pas.
+  // B-152 (08/10) — LE BANDEAU DE RE-VALIDATION EST RETIRÉ DE CETTE PAGE.
+  // Il annonçait « 48 incohérences · 7 causes » en permanence au-dessus du
+  // calendrier, sans ouvrir de décision que l'admin n'ait déjà : MiKL, le 08/10,
+  // « ce bandeau d'information ne sert à rien ».
   //
-  // Les périodes VERROUILLÉES, elles, sortent du contrôle : elles ne se
-  // modifient plus (api/generate les refuse, chaque garde est verrouillée),
-  // donc signaler une règle enfreinte n'ouvre aucune décision — c'est du bruit
-  // devant une porte fermée. Le cas se voit dès qu'on reprend l'historique d'un
-  // cabinet : un extrait de passé n'a jamais tous ses créneaux couverts, et la
-  // page criait « 32 créneaux non couverts » sur un planning d'archive.
-  //
-  // B-130a (30/09) — LES BROUILLONS ENTRENT DANS LE CONTRÔLE. Il ne portait que
-  // sur `publie`, et c'est ce qui a coûté B-130 : une règle durcie APRÈS la
-  // génération rendait le brouillon non conforme sans que rien ne le dise. Un
-  // brouillon est justement le moment où l'admin peut encore corriger.
-  // Le tri fin (quel statut, quel signal) vit dans `revaliderPlanning` — ici on
-  // se contente d'écarter ce qui ne se modifie plus, et de citer la règle.
-  const periodeIdsARevalider = isAdmin
-    ? periodes
-        .filter(
-          (p) =>
-            (p.statut === 'publie' || p.statut === 'brouillon') &&
-            p.date_debut <= fin &&
-            p.date_fin >= debut &&
-            periodesAvecGardes.includes(p.id),
-        )
-        .map((p) => p.id)
-    : []
-  const violationsInitiales =
-    periodeIdsARevalider.length > 0 ? await revaliderPlanning(periodeIdsARevalider) : []
+  // ⚠️ LE CONTRÔLE LUI-MÊME N'EST PAS SUPPRIMÉ, seul son affichage ici l'est.
+  // `revaliderPlanning` reste appelée par l'Épicentre (accueil) et par
+  // `api/publish`, qui refuse toujours une publication non conforme. Retirer un
+  // signal n'est acceptable que si la décision qu'il ouvrait reste accessible
+  // ailleurs — c'est le cas, et c'est la raison pour laquelle on peut le retirer
+  // sans rouvrir B-130.
 
   return (
     <>
@@ -755,15 +733,6 @@ export default async function PlanningPageV2({
           estSecretaire={estSecretaire}
           dock={dock}
         />
-
-        {isAdmin && periodeIdsARevalider.length > 0 && (
-          <div className="v2-alertes">
-            <RevalidationRealtime
-              periodeIds={periodeIdsARevalider}
-              initialViolations={violationsInitiales}
-            />
-          </div>
-        )}
 
         <PlanningV2
           gardes={gardes}

@@ -1170,10 +1170,9 @@ button.vet-row-a-pourvoir:hover {
    AJOUTS PRODUIT (absents de la maquette)
    ============================================================ */
 
-/* Les alertes de re-validation, entre la barre et l'espace de travail.
-   Elles viennent de composants V1 (shadcn) : on leur donne juste la
-   place et le rythme de la page, sans les redessiner. */
-.v2-alertes { margin: 0 0 14px; }
+/* `.v2-alertes` retiré avec le bandeau de re-validation (B-152, 08/10) : plus
+   aucun appelant. Du CSS mort fait croire que la règle existe encore — c'est la
+   dette qu'on traîne déjà sous B-145b, on ne la recrée pas ici. */
 
 /* Les boutons de la barre sont désormais de vraies pilules `head-btn`
    (cf. `outils-planning.tsx`) : plus besoin du skin de rattrapage qui
