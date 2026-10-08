@@ -8,6 +8,50 @@
 
 ---
 
+## 65. INBOX — dix items livres le 30/09 et avant
+
+> Retires de l'INBOX le 2026-10-08 : le board franchissait la limite
+> d'injection de 120 000 octets. **Tous etaient livres et leur recit integral
+> etait deja archive ailleurs** — ces lignes sont leur etat de synthese, telles
+> qu'elles vivaient au board, **aucune reecrite**.
+> Le board garde une ligne de renvoi qui cite chacun de ces identifiants :
+> un identifiant est immortel, et un `grep` doit continuer a le trouver.
+
+| ID | Idee | Origine | Date | A qualifier avec |
+|---|---|---|---|---|
+| B-144 | **✅ LIVRE le 01/10** (`03598ae`) — une tranche ne peut plus mentir en silence sur ce qu'elle couvre. `avertissementsBloc` rend 3 silences (`couvre-plus`, `couvre-moins`, `memes-horaires`), affiches dans les deux formulaires **et sur chaque ligne deja enregistree**. On avertit sans interdire ; le rattachement n'est **pas** deduit des horaires. ⚠️ Limite assumee : les seuils 13h / 12h sont **en dur**. *Texte integral → archive 39.* | MiKL (recette chantier 2) | 2026-10-01 | Interne |
+| B-144a | **✅ LIVRE le 01/10**, dans le meme geste que B-144 — l'etat reel des tranches est mesure : « Matin » est toujours a **8h→18h** en base, donc l'ecran `/journee` affiche **3 avertissements sur 2 lignes** des son ouverture. Val d'Allier : 0 bloc. *Texte integral → archive 39.* | OTTO (convergence B-144) | 2026-10-01 | Interne |
+| B-138 | **✅ LIVRE le 30/09** (`a883c4b`) — deux pratiques manuelles d'Anne-Sophie confiees a la RELECTURE de Filou, pas au moteur, avec leurs deux bornes **mesurees en base**. ⏸️ **Jamais recette** — gele par B-142. *Texte integral → archive 39.* | MiKL (rapporte du client) | 2026-09-30 | A qualifier — **code complet, en attente de recette** |
+| B-137 | **✅ LIVRE le 30/09 en 4 lots** — le vendredi soir compte enfin comme un soir de semaine ; l'attribution ne change pas. Le plan a ete corrige en cours de route par l'inspection des consumers. *Texte integral → archive 39.* | MiKL | 2026-09-30 | Interne |
+| B-130 | **✅ CLOS COTE MOTEUR — le planning etait juge avec une regle DURCIE APRES sa generation.** `snapshots_regles` est formelle : `espacement_min` valait « evitee » (souple) aux snapshots du planning en cause, et « jamais » seulement avant et apres. Le moteur n'a rien enfreint ; les 8 « violations » venaient d'un rejugement avec la regle telle qu'elle est DEVENUE. Harnais corrige : chaque planning est juge avec le snapshot de SA generation. **3e occurrence de « une penalite n'est pas une interdiction »**, cette fois commise par nous. Restes-a-faire : **B-130a**, **B-130b**, **B-130c**, tous livres depuis. *(recit → archive 35 et 36)* | MiKL, cause racine par MAX le 30/09 | 2026-09-17 | A qualifier — **clos cote moteur**, reste B-130a et B-130b |
+| B-130a | **✅ LIVRE le 30/09** (`7f2fcbe`) — le controle de coherence tourne enfin sur les BROUILLONS. Il ne portait que sur `statut === 'publie'`, ce qui a rendu B-130 invisible cinq jours. **Lot 2 non livre** (« ces regles ont CHANGE depuis la generation ») — question ouverte. *Texte integral → archive 39.* | MAX (cause racine B-130) | 2026-09-30 | A qualifier |
+| B-130b | **✅ RESOLU le 30/09** (`d17b054`) — la generation annoncait 23 cases pour 19 ecrites. Un week-end = **4 places moteur / 2 lignes en base** : la convention etait ecrite trois fois, appliquee deux fois. *Texte integral → archive 39.* | MAX (releve du 25/09, instruit et corrige le 30/09) | 2026-09-30 | Interne |
+| B-130c | **✅ LIVRE le 30/09** — la carte d'alerte du pre-vol sur le vendredi. ⚠️ **Impossible a recetter aujourd'hui** : aucune des 6 periodes ne finit un vendredi, il faudrait en creer une expres. *Texte integral → archive 39.* | MAX (convergence B-130b), requalifie apres mesure | 2026-09-30 | **Livre (lot 4) — a recetter** |
+| B-129 | **✅ LIVRE** — l'alerte de regles contradictoires. ⚠️ Reste a voir **sur la base REELLE**, jamais fait. *Texte integral → archive 39.* | MiKL | 2026-09-20 | Interne |
+| B-101 | **✅ DECIDE PAR MiKL le 02/09 — Filou pourra demander au moteur de REFAIRE une portion de planning.** Recit integral → archive 23. | MiKL (arbitrage) | 2026-09-02 | Moteur — feu vert, a decouper |
+
+## 64. Convergence de B-156 — huit juges, et le garde-fou qui interdit le neuvieme
+
+> Controle de sortie **consomme** par le commit `3408dfe` du 2026-10-08.
+> Retire du board le meme jour : il franchissait la limite d'injection de
+> 120 000 octets, et une convergence consommee est de l'historique.
+> **Aucune ligne reecrite** — elles sont ci-dessous telles qu'elles ont ete validees.
+
+| ID | Ce qui etait annonce | Ce qui est reellement livre | Verdict |
+|---|---|---|---|
+| B-156 | **La brique partagee** — une seule regle « applique les remplacements », au lieu d'une copie par correctif | `src/lib/gardes/exceptions-jour.ts` (184 lignes) : `occupantReel`, `rolesTenusParVeto`, `indexerExceptions`, `appliquerExceptionsAuxGardes` (**demenagee** depuis `monterValidationPeriode`, qui la reexporte pour ne pas casser le test de B-155a), `chargerExceptionsDesGardes`, `avertissementRemplacementPonctuel`. Les **12 tests de B-155/B-155a passent inchanges** apres le demenagement. | ✅ |
+| B-156 | **① Le conflit conge / garde** — le seul trou pouvant laisser un soir SANS PERSONNE | `lib/conges/detection-conflit.ts` : fonction **PURE** `conflitsDepuisGardes` + **3e source** (`gardes_exceptions`) et rapatriement des gardes ou le veto n'est QUE remplacant. **Repare au passage un 2e angle mort** : la ligne d'un week-end ne portait que le samedi, un souhait pose le vendredi ou le dimanche ne percutait rien. **6 tests** (remplacant vu, remplace total tu, remplace d'un jour maintenu, vendredi, dimanche, hors plage). | ✅ |
+| B-156 | **② Les echanges de gardes** | `(protected)/echanges/actions.ts` : une garde deja remplacee **ne s'echange plus en bloc** — refus explique, au lieu de deux mensonges symetriques (le remplace cedait une garde qu'il ne fait plus ; le remplacant s'entendait dire « pas assigne »). **Filou passe par le meme gardien** (`proposerEchange`), verifie. | ✅ |
+| B-156 | **③ Le registre des fetes** — le trou MUET, a retardement d'un an | `data/historiqueFetes.ts` : on inscrit qui a **tenu** la fete, jour par jour (`datesCouvertesParGardeV1` + `occupantReel`), plus le titulaire d'une ligne. **3 tests**, dont celui qui prouve que Victor ne porte plus la penalite d'un Noel tenu par Jean. **Comportement byte-identique sans remplacement** (test explicite). | ✅ |
+| B-156 | **④ Les e-mails aux veterinaires** | `lib/notifications.ts` : `sendPlanningPublie` compose « tes gardes » depuis les occupants **reels**, et l'appartenance est calculee **jour par jour** — un remplacant du seul dimanche recoit desormais sa garde. | ⚠️ **partiel assume** |
+| B-156 | **⑤ Les trois chemins de reparation d'absence** | `api/absences/[id]/reparer`, `api/absences/[id]/volontaire` **et** `lib/ia/outils/absences.ts` (Filou) : les trois disent la **MEME phrase**, source unique, quand un remplacement ponctuel primera sur la personne qu'on place. **3 tests** sur la phrase (singulier, pluriel, silence). | ✅ |
+| B-156 | **⑥ Le controle des regles en crise** | `lib/crise/changements.ts` : les remplacements sont poses **avant** le jugement — on ne juge plus un binome qui n'existera jamais. | ✅ |
+| B-156 | **Non annonce, trouve en qualifiant les 35 lecteurs : 2 juges de plus** | ⑦ `admin/veterinaires/actions.ts` — un veto qui ne tient plus que des **remplacements** se desactivait **sans un mot** ; il est desormais averti (lecture `gardes_exceptions`, dedoublonnage par date). ⑧ le chemin de reparation **de Filou**, oublie du recensement de ce matin comme les autres. | ✅ |
+| B-156 | 🔴 **Non annonce : une FAUSSE ALERTE fabriquee par le correctif de ce matin** | Les **3 incidents non lus** trouves en B-155c (« 6 differences ») venaient de B-155a : le montage applique desormais les remplacements, et le detecteur de derive les comparait a `attributions`, qui ne les porte pas. `monterValidationPeriode` expose maintenant `gardesTitulaires`, et **seul** le detecteur s'en sert. **La cloche ne sonnera plus a tort** ; la divergence de fond reste ouverte → **B-156a**. | ✅ |
+| B-156 | **Le garde-fou structurel** — ce qui interdit le 9e oubli | `src/lib/produit/juges.ts` : **35 lecteurs de `gardes` recenses, un par un**, chacun avec sa decision (`remplacements` / `delegue` / `manque` / `hors`). `tests/lib/couverture-juges.test.ts` : **10 tests**, dans les **deux sens** (lecteur non declare → echec ; decision orpheline → echec), **plus un controle de sincerite** (qui se declare `brique` doit l'importer) et **4 sondes** qui prouvent que le gardien refuse bien les cas fautifs. | ✅ |
+| B-156 | **Preuve d'ensemble** | `npx vitest run` → **2184 passed, 1 skipped, 0 failed** (197 fichiers). `npx tsc --noEmit` → **0 erreur**. `npm run lint` → 6 erreurs **toutes preexistantes**, aucune dans les 14 fichiers touches (verifie par grep cible). ⚠️ **Rien n'a ete verifie en base ni a l'ecran** — c'est de la recette, elle reste a faire. | ✅ |
+| B-156 | **4 restes-a-faire, aucun silencieux** | **B-156a** (la V2 porte les remplacements), **B-156b** (`sendGardeModifiee`), **B-156c** (le lookback du moteur — arbitrage rythme vs equite), **B-156d** (l'absence d'un remplacant ne declenche aucune reparation). Les 3 listes « mes gardes a ceder » restent sur les titulaires : **friction, jamais faute**, le gardien refuse a l'envoi. **Les 6 sont ecrits dans le registre, dates, et le test exige qu'ils le restent.** | ⚠️ **ouverts** |
+
 ## 2bis. INBOX (detail complet)
 
 **B-003 et B-004 — pourquoi ce ne sont PAS la meme chose** (arbitrage de MiKL du 24/08, apres
