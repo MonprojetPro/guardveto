@@ -1965,3 +1965,18 @@ case du planning, large de ~104px.
 | B-145 lots 2b+2c | Code mort retire | `CaseJour` et `LigneVet` **supprimes** (417 lignes), 5 imports morts retires, `counters-closed` retire (il aurait fait changer la largeur de la grille a l'ouverture d'une **modale**). ⚠️ `PoserSurJourVide` **conserve** : la nouvelle grille l'appelle. ⚠️ **L'ancien CSS (`.cal`, `.day`, `.slot-card`, `.vet-row`…) n'est PAS retire** — mesure : plus aucun appelant. Dette assumee, item **B-145b**. | ⚠️ **CSS mort a retirer** |
 | B-145 lots 2b+2c | **Preuves, relevees APRES la derniere ligne de code** | `vitest` → **2165 passed, 0 failed, 1 skipped** (2121 avant ce lot, **+44**) · `tsc --noEmit` → **0 erreur** · `npm run build` → **compiled successfully, 32/32 pages** · `npm run lint` → **0 probleme** sur les fichiers du lot (23 problemes du depot, tous anterieurs). ⚠️ **Un premier build a echoue** (« 12 errors ») : cause = execution **concurrente** avec vitest, pas le code. Rejoue isolement → OK. **Je le dis plutot que de ne rapporter que le second.** | ✅ |
 | B-145 lots 2b+2c | ⚠️ **LE RENDU N'A ETE VU PAR PERSONNE** | Comme tout depuis le 01/10 (**B-144b**). Un portage de DESIGN verifie par des tests de logique et des greps de structure reste un portage **jamais regarde** — et c'est precisement ce que MiKL a signale ce matin sur le lot 2a. **A RECETTER, et c'est la seule etape qui compte ici.** | ⚠️ **a recetter** |
+
+## Archive 52 — 2026-10-08 — les convergences de B-145c, consommees (21e archivage)
+
+> Elles portent un item **deja commite** (`4e6f922`), leur role de controle de sortie est
+> donc consomme. **La refonte qu'elles decrivent a ete revertee le 08/10** (voir B-151) :
+> ces lignes decrivent donc du code qui n'est plus en ligne, et sont conservees telles
+> quelles — on n'efface pas une convergence parce que son objet a ete retire.
+
+| ID | Ce qui etait annonce | Ce qui est reellement livre | Verdict |
+|---|---|---|---|
+| B-145c | Le decalage de la marge | **Corrige, et les 3 causes sont nommees** : la case depliee passe a `gap: 0` (il s accumulait ligne apres ligne, d ou un defaut visible EN BAS et pas en haut), et la marge recoit le **meme chassis** que la case — padding ET bordure, via la variable `--pad-case`. | ✅ (revert 08/10) |
+| B-145c | « On voit rien » | Barres de presence **18 % → 30 %** d opacite, lisere a gauche, pistes vides avec un fond, prenoms **entiers** (marge 84 → 112px), pastilles de garde agrandies. | ✅ (revert 08/10) |
+| B-145c | 🔑 **La regle etait ECRITE et je l ai enfreinte** | Le commentaire disait « les deux colonnes empilent EXACTEMENT les memes hauteurs ». Vrai des hauteurs de **ligne**, faux du **chassis**. Verrouille par `grille-alignement-css.test.ts` (8 cas). **Une regle en commentaire n est pas une regle appliquee.** | ✅ (revert 08/10) |
+| B-145c | ⚠️ **CE QUE CE TEST NE POUVAIT PAS FAIRE** | Il **lisait du CSS**, il ne mesurait aucun pixel rendu (B-144b). **Il n a jamais remplace la recette** — et la recette, quand elle a eu lieu, s est faite **sur le compte du client**, ce qui est le vrai defaut de la journee (B-151). | ⚠️ |
+| B-145c | **Preuves, apres la derniere ligne de code** | `vitest` → **2173 passed, 0 failed** · `tsc` **0 erreur** · `npm run build` **32/32 pages**. | ✅ |

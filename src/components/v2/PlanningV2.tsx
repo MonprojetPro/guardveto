@@ -39,9 +39,11 @@ import {
 import { creneauPosableDuJour } from '@/lib/planning/creneauDuJour'
 import {
   calculerApercuCreneaux,
+  cleCreneau,
   type ApercuCreneau,
   type PlaceProposee,
 } from '@/lib/planning/apercuPropositions'
+import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
 import { CompteursPanel } from './CompteursPanel'
 import { AbsencesAVenirPanel, type AbsenceAVenir } from './AbsencesAVenirPanel'
 import { ImprimerPourSecretariat } from './ImprimerPourSecretariat'
@@ -53,36 +55,13 @@ import type { BilanVet } from '@/engine/bilan'
 import type { CleColonne } from '@/lib/planning/colonnesCompteurs'
 import type { GardeDenormalisee, Periode, ProfilPlanning } from '@/types'
 import { nomPeriode } from '@/lib/periodes/libelle'
+import { stylePoint } from '@/lib/couleurs'
 // B-150 — la composition des présences est PURE et testée
 // (`tests/lib/presences-du-jour.test.ts`) : aucun test de ce projet ne monte un
 // composant (B-144b), donc toute règle d'affichage laissée dans le JSX n'est
 // jamais vérifiée.
-import type { JourneeAffichee } from '@/lib/planning/presencesDuJour'
+import { resumePresences, type JourneeAffichee } from '@/lib/planning/presencesDuJour'
 import { JourneeDuJourModale } from './JourneeDuJourModale'
-// B-145 lots 2b+2c — la grille en semaines, et tout ce qui la compose. La
-// DÉCISION vit dans `lib/planning/grilleSemaines` (35 tests) ; ce composant ne
-// fait que dessiner. Séparés, c'est vérifiable ; mélangés, ça ne l'est pas —
-// aucun test de ce projet ne monte un composant (B-144b).
-import { GrilleSemaines } from './GrilleSemaines'
-import { CellulePresenceModale, type TranchePosable } from './CellulePresenceModale'
-import { AbsencesModale, CompteursModale } from './PanneauxEnModale'
-import {
-  bornesRail,
-  choixContenu,
-  contenuParDefaut,
-  decouperEnSemaines,
-  visibilite,
-  type AxeContenu,
-  type AxeEtendue,
-  type PersonneGrille,
-} from '@/lib/planning/grilleSemaines'
-
-/** Ce que chaque choix d'affichage dit à l'écran. */
-const LIBELLE_CONTENU: Record<AxeContenu, string> = {
-  gardes: 'Gardes',
-  journee: 'Journées',
-  'les-deux': 'Les deux',
-}
 
 interface Props {
   gardes: GardeDenormalisee[]
@@ -186,23 +165,6 @@ interface Props {
    * présence : la grille se dessine exactement comme avant ce lot.
    */
   presencesParJour?: Record<string, JourneeAffichee>
-  /**
-   * B-145 lot 2b — l'équipe ACTIVE, dans l'ordre d'affichage.
-   *
-   * ⚠️ Chargée pour TOUT LE MONDE, contrairement à `vets` qui ne sert qu'à
-   *    l'administratrice (réattribution, déclaration d'absence). La grille
-   *    dépliée pose une ligne par personne : sans cette liste, un vétérinaire
-   *    verrait une grille sans lignes, et le secrétariat aussi.
-   */
-  equipe?: PersonneGrille[]
-  /**
-   * Les tranches horaires ACTIVES du cabinet.
-   *
-   * Deux usages : borner le rail de la grille (jamais 8h–18h en dur — B-144 a
-   * établi qu'une tranche peut couvrir autre chose que ce que son nom annonce)
-   * et proposer ce qu'on peut poser sur une case.
-   */
-  tranches?: TranchePosable[]
 }
 
 /** Une période de vacances scolaires, telle que servie par la page. */
@@ -214,8 +176,6 @@ export interface PlageVacances {
 
 export interface CongeAffiche {
   id: string
-  /** B-145 lot 2b — pour poser l'absence sur la LIGNE de la bonne personne. */
-  vetId: string
   prenom: string
   couleur: string
   dateDebut: string
@@ -223,6 +183,7 @@ export interface CongeAffiche {
   statut: string
 }
 
+const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 const MOIS = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
   'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
@@ -282,18 +243,11 @@ export function PlanningV2({
   periodesJournee,
   aDesTrames,
   presencesParJour = {},
-  equipe = [],
-  tranches = [],
 }: Props) {
   const router = useRouter()
   const [annee, mois] = anneeMois.split('-').map(Number)
   const [popOuvert, setPopOuvert] = useState(false)
-  // B-145 lot 2c — les compteurs ne sont plus une colonne de 262 px mais une
-  // fenêtre : « que le client puisse le consulter comme une pop up afin de ne
-  // pas encombrer l'écran du planning » (MiKL, 06/10). C'est cette largeur
-  // libérée qui rend l'accordéon possible.
-  const [compteursOuverts, setCompteursOuverts] = useState(false)
-  const [absencesOuvertes, setAbsencesOuvertes] = useState(false)
+  const [compteursOuverts, setCompteursOuverts] = useState(true)
   const [gardeModal, setGardeModal] = useState<GardeDenormalisee | null>(null)
   // B-122/B-123 — quelle proposition en attente est ouverte, pilotée à la
   // fois par un clic sur la grille et par le bandeau (`PropositionsPlanning`).
@@ -323,60 +277,6 @@ export function PlanningV2({
 
   const today = aujourdhuiISO()
   const grille = genererGrille(annee, mois)
-
-  // ── B-145 lots 2b+2c — LES DEUX AXES, ET L'ACCORDÉON ───────────────────
-  //
-  // Le contenu par défaut montre tout ce que le cabinet possède : un cabinet
-  // qui a les deux modules ouvre sur les deux. Le repli est FERMANT (les
-  // gardes, le socle), jamais « tout allumé » — même grammaire que
-  // `modulesDuCabinet` côté serveur.
-  const choixDeContenu = useMemo(() => choixContenu(modules ?? []), [modules])
-  const [contenu, setContenu] = useState<AxeContenu>(() => contenuParDefaut(modules ?? []))
-  const [etendue, setEtendue] = useState<AxeEtendue>('semaine')
-  const { gardesVisibles, journeeVisible } = visibilite(contenu)
-
-  const semaines = useMemo(() => decouperEnSemaines(grille), [grille])
-
-  // Quelle semaine est ouverte au premier affichage : celle d'aujourd'hui si
-  // elle est à l'écran, sinon la première. Ouvrir une semaine au hasard ferait
-  // chercher la sienne à chaque arrivée.
-  const semaineDuJour = useMemo(() => {
-    const i = semaines.findIndex((s) => s.includes(today))
-    return i >= 0 ? i : 0
-  }, [semaines, today])
-
-  const [semaineOuverte, setSemaineOuverte] = useState<number | null>(null)
-  const ouverte = semaineOuverte ?? semaineDuJour
-
-  // En « mois entier », tout est déplié : l'accordéon ne commande plus rien, et
-  // c'est voulu — c'est l'autre bout de l'axe d'étendue.
-  const semainesDepliees = useMemo(
-    () =>
-      etendue === 'mois'
-        ? new Set(semaines.map((_, i) => i))
-        : new Set([ouverte]),
-    [etendue, semaines, ouverte],
-  )
-
-  function basculerSemaine(index: number) {
-    // En vue « mois », cliquer une semaine la ramène seule à l'écran : c'est le
-    // geste naturel quand on veut se concentrer après avoir tout regardé.
-    if (etendue === 'mois') {
-      setEtendue('semaine')
-      setSemaineOuverte(index)
-      return
-    }
-    setSemaineOuverte(index)
-  }
-
-  const [survol, setSurvol] = useState<string | null>(null)
-  /** La cellule (jour × personne) dont la fenêtre de présences est ouverte. */
-  const [cellule, setCellule] = useState<{ date: string; vetId: string } | null>(null)
-
-  // Le rail suit les tranches RÉELLES du cabinet, jamais 8h–18h en dur : B-144
-  // a établi qu'une tranche peut couvrir autre chose que ce que son nom annonce
-  // (en base, « Matin » va de 8h à 18h chez ce cabinet-ci).
-  const rail = useMemo(() => bornesRail(tranches), [tranches])
 
   // Noms des vacances réellement VISIBLES dans la grille affichée — on charge
   // une fenêtre un peu plus large que le mois, la légende ne doit pas annoncer
@@ -435,21 +335,12 @@ export function PlanningV2({
   })
 
   // Index par date : plusieurs créneaux peuvent coexister le même jour (P3b).
-  //
-  // ⚠️ MÉMORISÉ, et ce n'est pas de l'optimisation prématurée : cette carte est
-  //    une dépendance du `useMemo` qui compose les semaines. Reconstruite à
-  //    chaque rendu, elle changeait d'identité à chaque fois — la grille entière
-  //    se recalculait à chaque survol de ligne, soit à chaque mouvement de
-  //    souris. Signalé par le lint, pas trouvé à l'œil.
-  const parDate = useMemo(() => {
-    const index = new Map<string, GardeDenormalisee[]>()
-    for (const g of gardes) {
-      const liste = index.get(g.date)
-      if (liste) liste.push(g)
-      else index.set(g.date, [g])
-    }
-    return index
-  }, [gardes])
+  const parDate = new Map<string, GardeDenormalisee[]>()
+  for (const g of gardes) {
+    const liste = parDate.get(g.date)
+    if (liste) liste.push(g)
+    else parDate.set(g.date, [g])
+  }
 
   // B-123 — ce que les propositions en attente CHANGENT, créneau par créneau.
   //
@@ -584,66 +475,6 @@ export function PlanningV2({
     router.refresh()
   }
 
-  /**
-   * Les personnes dont la garde est FIGÉE par un cadenas, pour une garde donnée.
-   *
-   * ⚠️ DES PERSONNES, JAMAIS DES LABELS DE PLACE. `places_figees` porte les
-   *    labels de DONNÉES (« premier »), la vue les a déjà inversés pour le
-   *    vendredi, et l'affichage dit « 1er ». Comparer deux vocabulaires
-   *    différents est le défaut du 04/09 : le cadenas restait dessiné ouvert
-   *    alors que la base enregistrait parfaitement — l'écriture marchait, elle
-   *    ne se voyait simplement jamais. Un identifiant, lui, ne s'inverse pas.
-   */
-  function vetsFigesDeLaGarde(gardeId: string): ReadonlySet<string> {
-    const confirmes = cadenasLocaux[gardeId]
-    if (confirmes) return new Set(confirmes)
-
-    const g = gardes.find((x) => x.id === gardeId)
-    if (!g) return new Set()
-    const labels = new Set(g.places_figees ?? [])
-    return new Set(
-      placesDeGarde(g)
-        .filter((p) => {
-          const label = labelDonneeDePlace(p.index)
-          return label !== null && labels.has(label)
-        })
-        .map((p) => p.vetId)
-        .filter((v): v is string => Boolean(v)),
-    )
-  }
-
-  /** Les jours de la grille, groupés en semaines, prêts à dessiner. */
-  const semainesGrille = useMemo(
-    () =>
-      semaines.map((jours) =>
-        jours.map((date) => ({
-          date,
-          horsMois: new Date(date + 'T12:00:00Z').getUTCMonth() + 1 !== mois,
-          horsPeriode:
-            periodeAffichee !== null &&
-            (date < periodeAffichee.date_debut || date > periodeAffichee.date_fin),
-          gardes: (parDate.get(date) ?? []).map((g) => ({
-            id: g.id,
-            type: g.type,
-            places: placesDeGarde(g).map((p) => ({
-              vetId: p.vetId,
-              prenom: p.prenom,
-              couleur: p.couleur,
-              role: p.role,
-              index: p.index,
-            })),
-            manque: manquesParGarde?.[g.id] ?? 0,
-          })),
-          journee: presencesParJour[date],
-          absences: conges
-            .filter((c) => c.dateDebut <= date && c.dateFin >= date)
-            .map((c) => ({ vetId: c.vetId, prenom: c.prenom, statut: c.statut })),
-          vacances: vacances.find((v) => v.debut <= date && v.fin >= date)?.label ?? null,
-        })),
-      ),
-    [semaines, mois, periodeAffichee, parDate, presencesParJour, conges, vacances, manquesParGarde],
-  )
-
   const statut = periodeAffichee ? libelleStatut(periodeAffichee.statut) : null
   // Le bandeau « lecture seule » s'adresse à celle qui, d'habitude, PEUT
   // modifier : il explique une exception, et propose d'aller travailler
@@ -665,14 +496,7 @@ export function PlanningV2({
           absences à venir, qui n'ont pas de bouton pour les replier — c'est la
           raison d'être de l'écran pour le secrétariat, pas un détail qu'on
           range. Pour l'équipe, le bouton « Compteurs » commande toujours. */}
-      {/* ⚠️ PLUS DE COLONNE À REPLIER. `counters-closed` rétrécissait le plan de
-          travail quand le panneau de 262 px était ouvert ; ce panneau est
-          devenu une fenêtre (lot 2c), et la grille occupe désormais toute la
-          largeur en permanence — c'est ce qui rend l'accordéon possible.
-          Laisser la classe pilotée par `compteursOuverts` aurait fait changer
-          la largeur de la grille à l'ouverture d'une MODALE : un effet de bord
-          que personne n'aurait relié à son geste. */}
-      <div className="workspace">
+      <div className={`workspace${compteursOuverts || lectureSeule ? '' : ' counters-closed'}`}>
         <div className="work-head">
           {/* ⚠️ PAS DE NOTION DE PÉRIODE POUR LE SECRÉTARIAT.
               MiKL, le 25/08, devant l'écran affichant « Hors période » :
@@ -860,22 +684,10 @@ export function PlanningV2({
               <button
                 type="button"
                 className="head-btn"
-                onClick={() => setCompteursOuverts(true)}
+                aria-pressed={compteursOuverts}
+                onClick={() => setCompteursOuverts((v) => !v)}
               >
                 Compteurs
-              </button>
-            )}
-            {/* Le secrétariat perd son panneau latéral (arbitrage du 06/10),
-                mais pas sa question : « il revient quand ? » regarde DEVANT, et
-                la grille par jour n'y répond pas. Même principe que les
-                compteurs — le détail passe en fenêtre. */}
-            {lectureSeule && (
-              <button
-                type="button"
-                className="head-btn"
-                onClick={() => setAbsencesOuvertes(true)}
-              >
-                Qui est absent
               </button>
             )}
             {/* Les pilules de l'équipe portent PDF, Absence, Générer,
@@ -1006,158 +818,102 @@ export function PlanningV2({
             }}
           />
 
-          {/* ── B-145 lot 2c — LES DEUX AXES D'AFFICHAGE ────────────────────
-              MiKL, le 06/10 : « que l'option affichage permette d'afficher le
-              planning garde, ou journée ou les 2 déjà en fonction de ce que le
-              cabinet aura choisi », et « une possibilité d'affichage à la
-              semaine ou au mois complet ». Deux axes INDÉPENDANTS — le
-              prototype n'en avait qu'un à trois états.
-
-              Le premier n'apparaît que si le cabinet a vraiment un choix :
-              proposer un choix unique est un bouton qui ne fait rien. */}
-          <div className="cal-axes">
-            {choixDeContenu.length > 1 && (
-              <>
-                <span className="cal-axes-lbl">Afficher</span>
-                <div className="axe-groupe" role="group" aria-label="Ce qui est affiché">
-                  {choixDeContenu.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      className="axe-btn"
-                      aria-pressed={contenu === c}
-                      onClick={() => setContenu(c)}
-                    >
-                      {LIBELLE_CONTENU[c]}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-
-            <span className="cal-axes-lbl">Étendue</span>
-            <div className="axe-groupe" role="group" aria-label="Étendue affichée">
-              <button
-                type="button"
-                className="axe-btn"
-                aria-pressed={etendue === 'semaine'}
-                onClick={() => setEtendue('semaine')}
-              >
-                Une semaine
-              </button>
-              <button
-                type="button"
-                className="axe-btn"
-                aria-pressed={etendue === 'mois'}
-                onClick={() => setEtendue('mois')}
-              >
-                Mois entier
-              </button>
-            </div>
-          </div>
-
-          <div className="cal-scroll">
-            <GrilleSemaines
-              semaines={semainesGrille}
-              equipe={equipe}
-              rail={rail}
-              contenu={contenu}
-              depliees={semainesDepliees}
-              onBasculerSemaine={basculerSemaine}
-              today={today}
-              survol={survol}
-              onSurvol={setSurvol}
-              onOuvrirGarde={(gardeId) => {
-                const g = gardes.find((x) => x.id === gardeId)
-                // Le clic n'ouvre que là où il mène quelque part — même test que
-                // celui qui décide du bouton dans la modale, donc pas de
-                // divergence possible.
-                if (g && estCliquable(g)) setGardeModal(g)
-              }}
-              // Poser ou retirer une présence : réservé à l'administratrice, et
-              // seulement sur un planning qui se modifie encore. Le serveur
-              // refuse de toute façon (`periodeModifiable`) — ici on évite
-              // simplement de promettre un geste qui échouerait.
-              onOuvrirCellule={
-                isAdmin && !lectureSeule && periodeAffichee?.statut !== 'verrouille'
-                  ? (date, vetId) => setCellule({ date, vetId })
-                  : undefined
-              }
-              // B-150 / arbitrage ④ — la ligne « N présents » ouvre le détail.
-              // C'est le seul chemin vers cette fenêtre en vue repliée : la
-              // retirer la rendrait inatteignable, ce qui a bien failli
-              // arriver au premier jet de ce portage.
-              onOuvrirJournee={journeeVisible ? setJourneeOuverte : undefined}
-              vetsFiges={vetsFigesDeLaGarde}
-              // B-111 — les cadenas, bornés aux gardes (« pour le planning jour
-              // pas besoin », MiKL le 06/10) et au seul cas où ils ont un sens :
-              // l'administratrice, sur un brouillon. Publié, le planning ne se
-              // régénère plus — montrer un verrou qui ne verrouille rien.
-              //
-              // ⚠️ Le composant est RÉUTILISÉ tel quel, avec son appel serveur
-              //    et son `onFini`. Le réécrire pour la nouvelle grille aurait
-              //    créé une seconde version du geste — et c'est la version
-              //    oubliée qui se met à mentir (22/08).
-              rendreCadenas={
-                cadenasActifs
-                  ? (garde, vetId, fige) => (
-                      <BoutonCadenas
-                        gardeId={garde.id}
-                        vetId={vetId}
-                        prenom={equipe.find((v) => v.id === vetId)?.prenom ?? null}
-                        fige={fige}
-                        onFini={surResultatCadenas}
-                      />
-                    )
-                  : undefined
-              }
-              rendrePoseJourVide={
-                cadenasActifs && periodeAffichee
-                  ? (date) => (
-                      <PoserSurJourVide
-                        periodeId={periodeAffichee.id}
+          <div className="work-grid">
+            <div className="work-main">
+              <div className="cal-scroll">
+                {/* B-123 — la grille change d'aspect tant qu'il reste une
+                    proposition à trancher, et reprend le sien dès que le lot
+                    est vidé. Demande de MiKL le 17/09. */}
+                <div className={modeApercu ? 'cal cal-apercu' : 'cal'}>
+                  <div className="cal-head" aria-hidden="true">
+                    {JOURS.map((j) => (
+                      <span key={j}>{j}</span>
+                    ))}
+                  </div>
+                  <div className="cal-body">
+                    {grille.map((date) => (
+                      <CaseJour
+                        key={date}
                         date={date}
-                        ferie={estJourFerie(date)}
+                        moisAffiche={mois}
+                        today={today}
+                        horsPeriode={
+                          periodeAffichee !== null &&
+                          (date < periodeAffichee.date_debut || date > periodeAffichee.date_fin)
+                        }
+                        gardes={parDate.get(date) ?? []}
+                        estCliquable={estCliquable}
+                        conges={conges.filter((c) => c.dateDebut <= date && c.dateFin >= date)}
+                        nomsTypes={nomsTypes}
+                        vacances={vacances.find((v) => v.debut <= date && v.fin >= date)?.label ?? null}
+                        onOuvrir={setGardeModal}
+                        // B-111 — les cadenas ne s'affichent QUE là où ils ont
+                        // un sens : l'admin, un brouillon, et un jour dans les
+                        // bornes de la période. Ailleurs, la grille est
+                        // exactement celle d'avant.
+                        cadenasActifs={cadenasActifs}
+                        cadenasLocaux={cadenasLocaux}
+                        periodeId={periodeAffichee?.id ?? null}
                         vets={vets}
                         onCadenas={surResultatCadenas}
+                        // B-123 — ce que les propositions changent sur les
+                        // créneaux de ce jour, et le clic qui ouvre le détail.
+                        apercuCreneaux={apercuCreneaux}
+                        vetsParId={vetsParId}
+                        manquesParGarde={manquesParGarde}
+                        onOuvrirProposition={setPropositionOuverte}
+                        propositionOuverte={propositionOuverte}
+                        // B-150 — les présences de journée de ce jour-là, et le
+                        // clic qui ouvre leur détail.
+                        journee={presencesParJour[date]}
+                        onOuvrirJournee={setJourneeOuverte}
                       />
-                    )
-                  : undefined
-              }
-            />
-          </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
 
-          <div className="cal-legende-3a">
-            {journeeVisible && (
-              <span className="cl3-item">
-                <span className="cl3-barre" aria-hidden="true" />
-                Présence, posée sur l’horaire de la journée
-              </span>
-            )}
-            {gardesVisibles && (
-              <>
-                <span className="cl3-item">
-                  <span className="cl3-rond" aria-hidden="true" />
-                  De garde, seul
-                </span>
-                <span className="cl3-item">
-                  <span className="cl3-rang" aria-hidden="true">1er</span>
-                  Rang, quand le créneau a plusieurs places
-                </span>
-                <span className="cl3-item">
-                  <span className="cl3-trou" aria-hidden="true">?</span>
-                  Place à pourvoir
-                </span>
-              </>
-            )}
-            {/* La légende des vacances n'apparaît QUE si le mois en contient :
-                un repère sans mode d'emploi n'explique rien, et une légende
-                permanente serait du bruit onze mois sur douze. */}
-            {vacancesDuMois.length > 0 && (
-              <span className="cl3-item">
-                <span className="lg-vac" aria-hidden="true" />
-                {vacancesDuMois.join(' · ')} — certaines règles changent pendant ces périodes.
-              </span>
+              {/* Légende — n'apparaît QUE si le mois affiché contient des
+                  vacances. Un repère visuel sans mode d'emploi n'explique
+                  rien ; une légende affichée en permanence serait du bruit
+                  onze mois sur douze. */}
+              {vacancesDuMois.length > 0 && (
+                <p className="cal-legende">
+                  <span className="lg-vac" aria-hidden="true" />
+                  {vacancesDuMois.length === 1
+                    ? vacancesDuMois[0]
+                    : vacancesDuMois.join(' · ')}{' '}
+                  — vacances scolaires. Certaines règles changent pendant ces
+                  périodes.
+                </p>
+              )}
+            </div>
+
+            {/* La colonne de droite, selon qui regarde : les compteurs
+                d'équité pour l'équipe, les absences à venir pour le
+                secrétariat. Même emplacement, même largeur — c'est le contenu
+                qui change, pas la mise en page. */}
+            {lectureSeule ? (
+              <AbsencesAVenirPanel absences={absencesAVenir} />
+            ) : (
+            <aside className="counters-panel" aria-label="Compteurs de la période">
+              <div className="cnt-head">
+                <h4>Compteurs · période</h4>
+                <p>Ils bougent à chaque changement, manuel comme automatique.</p>
+              </div>
+              {/* La légende vivait ici, en dur, et n'expliquait QUE « 1er WE » —
+                  même quand cette colonne n'était pas choisie, et jamais les
+                  trois autres. Elle est maintenant produite par le panneau
+                  lui-même, à partir des colonnes réellement affichées : une
+                  légende qui décrit un tableau qu'on ne voit pas est pire que
+                  pas de légende. */}
+              <CompteursPanel
+                lignes={compteurs}
+                bilans={bilans}
+                colonnes={colonnesCompteurs}
+                projetees={compteursProjetes}
+              />
+            </aside>
             )}
           </div>
         </div>
@@ -1177,35 +933,6 @@ export function PlanningV2({
       {/* B-150 — le détail « qui est au cabinet » de la journée cliquée. Même
           principe que les compteurs : le chiffre sur la grille, le détail dans
           une fenêtre (arbitrage MiKL du 07/10). */}
-      {/* B-145 lot 2c — les deux panneaux latéraux, devenus des fenêtres. Le
-          CONTENU n'est pas réécrit : les composants d'origine sont montés tels
-          quels, seule la porte change. */}
-      <CompteursModale
-        ouvert={compteursOuverts && !lectureSeule}
-        lignes={compteurs}
-        bilans={bilans}
-        colonnes={colonnesCompteurs}
-        projetees={compteursProjetes}
-        onFermer={() => setCompteursOuverts(false)}
-      />
-
-      <AbsencesModale
-        ouvert={absencesOuvertes}
-        absences={absencesAVenir}
-        onFermer={() => setAbsencesOuvertes(false)}
-      />
-
-      {/* B-145a — l'appelant qui manquait à `poserPresence` et
-          `retirerPresence` depuis le 06/10. */}
-      <CellulePresenceModale
-        date={cellule?.date ?? null}
-        personne={cellule ? (equipe.find((v) => v.id === cellule.vetId) ?? null) : null}
-        journee={cellule ? presencesParJour[cellule.date] : undefined}
-        periodeId={periodeAffichee?.id ?? null}
-        tranches={tranches}
-        onFermer={() => setCellule(null)}
-      />
-
       <JourneeDuJourModale
         date={journeeOuverte}
         journee={journeeOuverte ? presencesParJour[journeeOuverte] : undefined}
@@ -1281,6 +1008,311 @@ export function PlanningV2({
   )
 }
 
+// ── Une case de la grille ───────────────────────────────────
+
+function CaseJour({
+  date,
+  moisAffiche,
+  today,
+  horsPeriode,
+  gardes,
+  estCliquable,
+  conges,
+  nomsTypes,
+  vacances,
+  onOuvrir,
+  cadenasActifs,
+  cadenasLocaux,
+  periodeId,
+  vets,
+  onCadenas,
+  apercuCreneaux,
+  vetsParId,
+  manquesParGarde,
+  onOuvrirProposition,
+  propositionOuverte,
+  journee,
+  onOuvrirJournee,
+}: {
+  date: string
+  moisAffiche: number
+  today: string
+  /** Le jour tombe en dehors des bornes de la période affichée. */
+  horsPeriode: boolean
+  gardes: GardeDenormalisee[]
+  /** Le clic sur cette garde mène-t-il à une action réelle pour la personne connectée ? */
+  estCliquable: (g: GardeDenormalisee) => boolean
+  conges: CongeAffiche[]
+  nomsTypes: Record<string, string>
+  /** Nom des vacances scolaires couvrant ce jour, ou null. */
+  vacances: string | null
+  onOuvrir: (g: GardeDenormalisee) => void
+  /** B-111 — admin, brouillon : les cadenas se posent. Sinon la case est celle d'avant. */
+  cadenasActifs: boolean
+  /** Les cadenas que le serveur vient de confirmer, par garde (personnes figées). */
+  cadenasLocaux: Record<string, string[]>
+  periodeId: string | null
+  vets: VetCrise[]
+  onCadenas: (r: ResultatCadenas) => void
+  /** B-123 — ce que les propositions changent, par créneau (`cleCreneau`). */
+  apercuCreneaux?: Record<string, ApercuCreneau>
+  /** Prénom et couleur des entrants, qui ne sont pas encore dans la garde. */
+  vetsParId?: Map<string, VetCrise>
+  /** B-125 — places manquantes par garde. Absent = rien à signaler. */
+  manquesParGarde?: Record<string, number>
+  onOuvrirProposition?: (id: string) => void
+  /** La proposition dont le détail est ouvert — sa case est mise en avant. */
+  propositionOuverte?: string | null
+  /** B-150 — les présences de journée de ce jour. Absent = rien à montrer. */
+  journee?: JourneeAffichee
+  /** Ouvre le détail « au cabinet » de ce jour. */
+  onOuvrirJournee?: (date: string) => void
+}) {
+  const jour = new Date(date + 'T12:00:00Z')
+  const dow = (jour.getUTCDay() + 6) % 7 // 0 = lundi
+  const numero = jour.getUTCDate()
+  const moisCase = jour.getUTCMonth() + 1
+
+  const classes = ['day']
+  if (dow === 4) classes.push('fri')
+  if (dow >= 5) classes.push('we')
+  if (moisCase !== moisAffiche) classes.push('other')
+  if (date < today) classes.push('past')
+  if (date === today) classes.push('today')
+  if (horsPeriode) classes.push('hors')
+  // Vacances scolaires : marquage par LISERÉ, pas par fond. Les fonds portent
+  // déjà quatre états (week-end, vendredi, passé, hors période) — en ajouter un
+  // cinquième les ferait se recouvrir, et on ne saurait plus lire ni l'un ni
+  // l'autre. Le liseré se superpose à tous sans en effacer aucun.
+  if (vacances) classes.push('vac')
+
+  const ferie = estJourFerie(date)
+
+  return (
+    <div className={classes.join(' ')} data-date={date} title={vacances ?? undefined}>
+      <div className="d-head">
+        <span className="d-num">{numero}</span>
+        {ferie && <span className="d-ferie">★ Férié</span>}
+        {date === today && <span className="d-today-tag">Aujourd&apos;hui</span>}
+      </div>
+
+      {gardes.map((g) => {
+        // TOUTES les places, pas seulement les deux premières : un créneau
+        // sur-mesure peut en compter jusqu'à quatre, et un vétérinaire de
+        // garde qui n'apparaît pas dans la case serait invisible partout.
+        const places = placesDeGarde(g)
+        const cliquable = estCliquable(g)
+        // B-111 — les labels cadenassés sont ceux de la LIGNE AFFICHÉE : la vue
+        // les a déjà inversés pour le vendredi, en même temps que les personnes.
+        // On les compare donc directement, MAIS par le label de DONNÉES de la
+        // place — jamais par son rôle affiché.
+        //
+        // ⚠️ C'est le défaut trouvé en recette le 04/09 : `p.role` vaut « 1er »
+        // (affichage) quand `places_figees` porte « premier » (données). La
+        // comparaison était toujours fausse, le cadenas restait dessiné ouvert,
+        // et chaque clic reposait un cadenas au lieu de le retirer. L'écriture
+        // marchait ; elle ne se voyait simplement jamais.
+        // On raisonne en PERSONNES figées, pas en labels de place.
+        //
+        // Source normale : les labels de la ligne affichée (`places_figees`),
+        // que la vue a déjà inversés pour le vendredi — on les traduit donc en
+        // vétérinaires ICI, une fois, en s'appuyant sur les places réellement
+        // affichées. Source prioritaire : ce que le serveur vient de confirmer
+        // après un clic, qui est déjà exprimé en personnes.
+        //
+        // ⚠️ Comparer des labels des DEUX côtés aurait re-créé le défaut du
+        // 04/09 par la porte de derrière : la réponse du serveur porte les
+        // labels de la GARDE, la ligne du vendredi affiche ceux, inversés, de
+        // la vue. Une personne, elle, ne s'inverse jamais.
+        const labelsFiges = new Set(g.places_figees ?? [])
+        const vetsFigesServeur = cadenasLocaux[g.id]
+        const vetsFiges = new Set(
+          vetsFigesServeur ??
+            places
+              .filter((p) => {
+                const label = labelDonneeDePlace(p.index)
+                return label !== null && labelsFiges.has(label)
+              })
+              .map((p) => p.vetId)
+              .filter((v): v is string => Boolean(v)),
+        )
+        const estFigee = (vetId: string | null) => Boolean(vetId && vetsFiges.has(vetId))
+
+        // B-123 — ce que la proposition en attente ferait de CE créneau.
+        // Identifié par (date, type) : le rôle n'entre jamais dans la clé,
+        // la ligne du vendredi l'inverse (B-111).
+        const apercu = apercuCreneaux?.[cleCreneau(date, g.type)]
+        const sortants = new Set(apercu?.sortants ?? [])
+        const entrants = apercu?.entrants ?? []
+        const ouvrirProposition = apercu
+          ? () => onOuvrirProposition?.(apercu.propositionId)
+          : undefined
+        const creneauEnAvant = Boolean(apercu && apercu.propositionId === propositionOuverte)
+
+        // B-125 — combien de places restent à pourvoir sur ce créneau. Calculé
+        // côté serveur (`calculerManques`) : la grille ne sait pas, à elle
+        // seule, combien de personnes un créneau attend.
+        //
+        // ⚠️ On ne dessine PAS de place manquante pendant l'aperçu d'une
+        // proposition sur ce même créneau : les entrants de la proposition
+        // viendraient s'ajouter aux « à pourvoir », et la case afficherait plus
+        // de lignes que le créneau n'a de places. L'admin tranche d'abord la
+        // proposition, les trous restants réapparaissent ensuite.
+        const manque = apercu ? 0 : (manquesParGarde?.[g.id] ?? 0)
+
+        return (
+          <div
+            className={[
+              'slot-card',
+              apercu ? 'slot-card-apercu' : '',
+              creneauEnAvant ? 'slot-card-apercu-ouvert' : '',
+              manque > 0 ? 'slot-card-manque' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            key={g.id}
+          >
+            <span className="sc-tag">{libelleTypeGardeDb(g.type, nomsTypes)}</span>
+            {/* Une place seule n'affiche pas son rôle : « 1er » n'a de sens
+                que s'il y a un 2e. Les places vides ne sont pas dessinées —
+                on ne connaît pas ici le nombre de places du créneau, et un
+                « à pourvoir » inventerait un trou qui n'existe pas. */}
+            {places.map((p) => {
+              // Cette personne QUITTE le créneau si la proposition est
+              // appliquée : sa ligne est barrée, et le clic ouvre le détail
+              // au lieu de la fiche de garde.
+              const part = Boolean(p.vetId && sortants.has(p.vetId))
+              return (
+                <LigneVet
+                  key={p.index}
+                  prenom={p.prenom}
+                  couleur={p.couleur}
+                  role={places.length > 1 ? p.role : ''}
+                  titre={
+                    part
+                      ? `${dateCourte(date)} · ${p.role} de garde · Filou propose de retirer cette garde`
+                      : `${dateCourte(date)} · ${p.role} de garde`
+                  }
+                  onClick={
+                    part ? ouvrirProposition : cliquable ? () => onOuvrir(g) : undefined
+                  }
+                  fige={estFigee(p.vetId)}
+                  sortant={part}
+                  cadenas={
+                    cadenasActifs && p.vetId ? (
+                      <BoutonCadenas
+                        gardeId={g.id}
+                        vetId={p.vetId}
+                        prenom={p.prenom}
+                        fige={estFigee(p.vetId)}
+                        onFini={onCadenas}
+                      />
+                    ) : null
+                  }
+                />
+              )
+            })}
+
+            {/* Les ARRIVANTS — dessinés en plus des places existantes, parce
+                qu'ils ne sont nulle part dans la garde actuelle. C'est très
+                exactement ce que la première version ne savait pas montrer :
+                elle cherchait la personne qui arrive parmi celles déjà là. */}
+            {/* B-125 — les places RESTÉES À POURVOIR, dessinées à la suite des
+                places tenues. Une par personne manquante : « il manque 2 »
+                doit se voir comme deux trous, pas comme une ligne à lire.
+                Cliquables : c'est la modale de garde qui sert à combler. */}
+            {Array.from({ length: manque }, (_, i) => (
+              <LigneVet
+                key={`manque-${i}`}
+                prenom={null}
+                couleur={null}
+                role=""
+                titre={`${dateCourte(date)} · place à pourvoir`}
+                onClick={cliquable ? () => onOuvrir(g) : undefined}
+                aPourvoir
+              />
+            ))}
+
+            {entrants.map((vetId) => {
+              const vet = vetsParId?.get(vetId)
+              return (
+                <LigneVet
+                  key={`entrant-${vetId}`}
+                  prenom={vet?.prenom ?? '?'}
+                  couleur={vet?.couleur ?? null}
+                  role=""
+                  titre={`${dateCourte(date)} · Filou propose d’ajouter cette garde`}
+                  onClick={ouvrirProposition}
+                  entrant
+                />
+              )
+            })}
+          </div>
+        )
+      })}
+
+      {/* B-111 — le PRÉ-REMPLISSAGE. Avant génération, une période n'a aucune
+          garde : sans ce bouton, il n'existerait aucun endroit où cliquer pour
+          fixer une date, et la moitié de la demande resterait inatteignable.
+          Il ne s'affiche donc que là où il y a réellement quelque chose à
+          créer — jour dans la période, aucune garde encore posée. */}
+      {cadenasActifs && periodeId && !horsPeriode && gardes.length === 0 && (
+        <PoserSurJourVide
+          periodeId={periodeId}
+          date={date}
+          ferie={ferie}
+          vets={vets}
+          onCadenas={onCadenas}
+        />
+      )}
+
+      {/* ── B-150 — L'ÉTAGE JOURNÉE ────────────────────────────────────────
+          Après les gardes, comme les congés et pour la même raison (B-047,
+          26/08) : la garde est l'information qu'on cherche en ouvrant le
+          planning. La journée se lit en second.
+
+          ⚠️ PAS DE NOMINATIF ICI, et c'est mesuré, pas une préférence. La case
+             fait 96 px de haut et en tient 4 lignes ; écrire les prénoms par
+             tranche demanderait jusqu'à 21 lignes (3 tranches x 7 personnes,
+             relevé le 02/10). C'est ce qui avait fait rejeter la première
+             maquette. Le nominatif vit dans la case DÉPLIÉE de l'accordéon
+             (lot 2b) — et, dès maintenant, dans la fenêtre de détail, « le
+             même principe que pour le compteur » (MiKL, 07/10).
+
+          Le chiffre est NEUTRE : aucun minimum d'effectif n'existe dans le
+          schéma, et MiKL l'a écarté le 06/10. Il informe, il ne juge pas. */}
+      {journee && journee.personnes > 0 && (
+        <button
+          type="button"
+          className="jour-presents"
+          onClick={() => onOuvrirJournee?.(date)}
+          aria-label={`${dateCourte(date)} · ${resumePresences(journee)} au cabinet · voir le détail`}
+        >
+          <span className="jp-n">{journee.personnes}</span>
+          <span className="jp-txt">{journee.personnes > 1 ? 'présents' : 'présent'}</span>
+          {journee.presences.some((p) => p.anomalie) && (
+            <span className="jp-alerte" aria-hidden="true">
+              !
+            </span>
+          )}
+        </button>
+      )}
+
+      {/* Congés APRÈS les gardes (B-047, demande de MiKL le 26/08) : la garde
+          est l'information principale de la case — c'est elle qu'on cherche
+          quand on ouvre le planning. Les absences se lisent en second. */}
+      {conges.map((c) => (
+        <span key={c.id} className={`conge-chip${c.statut === 'souhait' ? ' souhait' : ''}`}>
+          <span className="vdot" style={{ borderColor: c.couleur }} aria-hidden="true" />
+          {c.statut === 'souhait' ? 'Souhait' : 'Congé'} · {c.prenom}
+        </span>
+      ))}
+
+      {horsPeriode && <span className="d-hors-note">hors période</span>}
+    </div>
+  )
+}
+
 /**
  * Le pré-remplissage d'un jour vide.
  *
@@ -1322,6 +1354,118 @@ function PoserSurJourVide({
       vets={vets}
       onFini={onCadenas}
     />
+  )
+}
+
+/**
+ * Une place dans une fiche : point de couleur + prénom, ou « à pourvoir ».
+ *
+ * `onClick` absent = la ligne se DESSINE mais ne se clique pas. On rend alors
+ * un `<span>`, pas un `<button disabled>` : un bouton grisé annonce une action
+ * momentanément indisponible, alors qu'ici il n'y a rien à faire du tout — et
+ * le clavier n'a aucune raison de s'arrêter dessus. Les styles `.vet-row` sont
+ * neutres quant à la balise (seul `button.vet-row:hover` réagit), le rendu est
+ * donc identique à l'œil, sans l'affordance de clic.
+ */
+function LigneVet({
+  prenom,
+  couleur,
+  role,
+  titre,
+  onClick,
+  fige = false,
+  sortant = false,
+  entrant = false,
+  aPourvoir = false,
+  cadenas = null,
+}: {
+  prenom: string | null
+  couleur: string | null
+  role: string
+  titre: string
+  onClick?: () => void
+  /** B-111 — cette place est fixée par l'admin (la génération n'y touche pas). */
+  fige?: boolean
+  /** B-123 — une proposition en attente RETIRERAIT cette personne d'ici. */
+  sortant?: boolean
+  /** B-123 — une proposition en attente AMÈNERAIT cette personne ici. */
+  entrant?: boolean
+  /** B-125 — cette place n'a trouvé personne : il reste du travail ici. */
+  aPourvoir?: boolean
+  /**
+   * Le bouton cadenas, rendu À CÔTÉ de la ligne et non dedans.
+   *
+   * Un bouton dans un bouton est du HTML invalide, et les navigateurs le
+   * réparent chacun à leur façon — le clic finit par ouvrir la modale au lieu
+   * de poser le cadenas. La ligne et son cadenas sont donc frère et sœur dans
+   * un conteneur, jamais imbriqués.
+   */
+  cadenas?: React.ReactNode
+}) {
+  const contenu = !prenom ? (
+    <>
+      <span className="vdot" aria-hidden="true" />À pourvoir
+    </>
+  ) : (
+    <>
+      <span className="vdot" style={stylePoint(couleur)} aria-hidden="true" />
+      {prenom}
+      {role && <span className="role">{role}</span>}
+      {/* Le signe dit le SENS du changement. Sans lui, une ligne barrée et une
+          ligne en pointillé se ressemblent trop dans une case de calendrier —
+          et « je ne sais pas ce qui va se passer » est précisément le reproche
+          de MiKL le 17/09. */}
+      {sortant && (
+        <span className="vet-row-signe" aria-hidden="true">
+          −
+        </span>
+      )}
+      {entrant && (
+        <span className="vet-row-signe" aria-hidden="true">
+          +
+        </span>
+      )}
+    </>
+  )
+  const classe = [
+    prenom ? 'vet-row' : 'vet-row empty',
+    fige ? 'vet-row-fige' : '',
+    sortant ? 'vet-row-sortant' : '',
+    entrant ? 'vet-row-entrant' : '',
+    aPourvoir ? 'vet-row-a-pourvoir' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+  // Le lecteur d'écran doit entendre le changement, pas seulement le voir :
+  // barré et pointillé ne s'annoncent pas tout seuls.
+  const mouvement = sortant ? ' · retirée par la proposition' : entrant ? ' · ajoutée par la proposition' : ''
+  const libelle = prenom
+    ? `${titre} · ${prenom}${fige ? ' · fixé par l’administratrice' : ''}${mouvement}`
+    : `${titre} · place à pourvoir`
+
+  const ligne = !onClick ? (
+    <span className={classe} aria-label={libelle}>
+      {contenu}
+    </span>
+  ) : (
+    <button type="button" className={classe} onClick={onClick} aria-label={libelle}>
+      {contenu}
+    </button>
+  )
+
+  // Sans cadenas, le rendu est EXACTEMENT celui d'avant : pas d'enveloppe
+  // supplémentaire, donc aucun risque de décaler une grille que personne
+  // n'avait demandé de toucher.
+  if (!cadenas) return ligne
+
+  // Le cadenas est À GAUCHE, avant le point de couleur. À droite, il chevauchait
+  // le libellé du rôle (« 1er », « 2e ») dans une case de calendrier étroite —
+  // constaté par MiKL en recette le 04/09, capture à l'appui.
+  return (
+    <span className="vet-row-wrap">
+      {cadenas}
+      {ligne}
+    </span>
   )
 }
 
