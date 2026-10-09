@@ -560,3 +560,263 @@
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
+
+/* ============================================================
+   B-157 — LA TÊTE DE PAGE DU PLANNING, EN DEUX RANGÉES
+   ============================================================
+   Ces classes ne sortent pas d'ici : `chantier-planning-v2.css` n'est importé
+   que par `PlanningChantierV2`, donc que par le bac à sable. L'écran du client
+   garde sa `.work-head` d'origine, mot pour mot.
+
+   LE PARTAGE — rangée 1 : ce qu'on regarde et ce qu'on décide. Rangée 2 : la
+   façon de regarder. C'est le seul principe du dessin ; tout le reste en
+   découle, y compris le fait qu'une seule chose porte l'accent orange.
+
+   ⚠️ TOUTE PILULE RESPECTE `padding horizontal >= padding vertical + 8`
+   (gardien `pilules-padding.test.ts`, B-146). Sur un `border-radius: 999px`,
+   le rayon vaut la moitié de la hauteur : un padding symétrique colle le texte
+   à la courbe aux deux bouts.
+   ============================================================ */
+
+.work-head.pv2h {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+}
+
+/* ── Rangée 1 — ce qu'on regarde, ce qu'on décide ─────────────────────────── */
+
+.pv2h-r1 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  padding: 14px 20px 12px;
+}
+
+.pv2h-identite { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.pv2h-surtitre {
+  margin: 0;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pv2-acc);
+}
+
+.pv2h-mois { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* Le mois est le seul titre de l'écran : il a le droit d'être gros. C'est ce
+   qui permet à tout le reste de la rangée d'être discret sans se perdre. */
+.pv2h-mois h2 {
+  margin: 0;
+  font-family: Figtree, var(--t-font-titre, sans-serif);
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  color: var(--pv2-txt);
+}
+.work-head.pv2h .mn-btn { width: 30px; height: 30px; font-size: 1rem; }
+
+.pv2h-today {
+  border: 1px solid var(--pv2-bd);
+  background: transparent;
+  color: var(--pv2-sec);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  /* 7px vertical, donc 15px horizontal au minimum. */
+  padding: 7px 16px;
+}
+.pv2h-today:hover:not(:disabled) { color: var(--pv2-acc); border-color: var(--pv2-acc); }
+.pv2h-today:disabled { opacity: 0.4; cursor: default; }
+
+.pv2h-reperes { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* La pastille du pré-vol. Orange SOURD, jamais rouge : elle signale du travail
+   qui attend, pas une panne. Le rouge est réservé à ce qui est cassé. */
+.pv2h-points {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  background: #f7e4d2;
+  color: #8f4410;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 7px 16px;
+}
+.pv2h-points b { font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* ── Les gestes, à droite ─────────────────────────────────────────────────── */
+
+.pv2h-gestes {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pv2h-outil-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--pv2-bd);
+  background: var(--pv2-surface);
+  color: var(--pv2-txt);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 9px 18px;
+  min-height: 38px;
+}
+.pv2h-outil-btn:hover { border-color: var(--pv2-acc); color: var(--pv2-acc); }
+.pv2h-caret { font-size: 0.7rem; transition: transform 0.15s ease; }
+.pv2h-outil-btn[aria-expanded='true'] .pv2h-caret { transform: rotate(180deg); }
+
+/* L'ACTION PRINCIPALE — une seule sur l'écran, et elle est pleine. Deux
+   boutons accentués côte à côte, c'était deux fois aucun. */
+.pv2h-cta {
+  border: 1px solid var(--pv2-acc);
+  background: var(--pv2-acc);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 10px 22px;
+  min-height: 40px;
+  box-shadow: 0 6px 16px -6px rgba(199, 83, 15, 0.55);
+}
+.pv2h-cta:hover { filter: brightness(1.06); color: #fff; }
+
+/* Un planning publié ou verrouillé n'a plus d'action : c'est un ÉTAT, et il en
+   a la forme. Afficher un bouton plein « Publié » faisait croire à un geste
+   possible — retour déjà réglé une fois sur l'écran du client. */
+.pv2h-etat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--pv2-bd);
+  background: var(--pv2-creux);
+  color: var(--pv2-sec);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 9px 18px;
+}
+.pv2h-etat.publie {
+  background: #e7f0df;
+  border-color: #c3d9b4;
+  color: #456e32;
+}
+
+/* ── Le menu « Outils » ───────────────────────────────────────────────────── */
+
+.pv2h-menu-wrap { position: relative; }
+
+.pv2h-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  /* Le MÊME niveau que `.period-pop`, le panneau voisin de cette tête. Deux
+     panneaux frères à des altitudes différentes finissent toujours par passer
+     l'un sous l'autre le jour où un élément de la grille monte. */
+  z-index: 80;
+  width: 288px;
+  padding: 6px;
+  border: 1px solid var(--pv2-bd);
+  border-radius: 16px;
+  background: var(--pv2-surface);
+  box-shadow: 0 24px 48px -20px rgba(58, 42, 28, 0.38);
+}
+
+.pv2h-menu-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  text-align: left;
+}
+.pv2h-menu-item:hover:not(:disabled) { background: var(--pv2-cell); }
+/* Un geste impossible reste LISIBLE : il affiche sa raison à la place de son
+   aide. L'estomper jusqu'à l'illisible reviendrait à cacher l'explication
+   qu'on vient justement d'écrire. */
+.pv2h-menu-item:disabled { opacity: 0.65; cursor: default; }
+.pv2h-menu-ico { font-size: 0.95rem; line-height: 1.35; }
+.pv2h-menu-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.pv2h-menu-txt b { font-size: 0.82rem; font-weight: 700; color: var(--pv2-txt); }
+.pv2h-menu-txt small { font-size: 0.72rem; line-height: 1.3; color: var(--pv2-sec); }
+
+/* ── Rangée 2 — comment on regarde ────────────────────────────────────────── */
+
+.pv2h-r2 {
+  display: flex;
+  align-items: center;
+  gap: 10px 18px;
+  flex-wrap: wrap;
+  padding: 10px 20px;
+  border-top: 1px solid var(--pv2-filet);
+  background: var(--pv2-creux);
+}
+/* À droite tant que la gauche est vide : la place du filtre « Mettre en
+   avant » (lot 3) est tenue par la marge automatique, pas par un faux bouton. */
+.pv2h-axes { margin-left: auto; display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap; }
+.pv2h-axe { display: flex; align-items: center; gap: 8px; }
+.pv2h-axe-lbl {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--pv2-sec);
+}
+
+/* Un segment : le conteneur porte le creux, l'état actif ressort en relief.
+   C'est l'inverse d'une rangée de boutons — on lit un choix, pas quatre
+   actions possibles. */
+.pv2h-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: #ecdfc8;
+}
+.pv2h-seg-btn {
+  border: 0;
+  background: transparent;
+  color: var(--pv2-sec);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 6px 14px;
+}
+.pv2h-seg-btn:hover { color: var(--pv2-txt); }
+.pv2h-seg-btn[aria-pressed='true'] {
+  background: var(--pv2-surface);
+  color: var(--pv2-txt);
+  box-shadow: 0 1px 3px rgba(58, 42, 28, 0.18);
+}
+
+/* ── Mobile ───────────────────────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  .pv2h-r1 { padding: 12px 14px 10px; }
+  .pv2h-mois h2 { font-size: 1.4rem; }
+  /* Les gestes passent à la ligne et s'étalent : à cette largeur, « à droite »
+     n'existe plus, et un bouton d'accent coincé dans 40px ne se clique pas. */
+  .pv2h-gestes { margin-left: 0; width: 100%; }
+  .pv2h-cta { flex: 1; justify-content: center; }
+  .pv2h-r2 { padding: 10px 14px; }
+  .pv2h-axes { margin-left: 0; }
+  .pv2h-menu { width: min(288px, calc(100vw - 32px)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pv2h-caret { transition: none; }
+}

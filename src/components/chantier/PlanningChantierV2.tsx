@@ -28,7 +28,14 @@ import { Trash2, CalendarX2 } from 'lucide-react'
 import { RetirerPlanningModale, type GesteRetrait } from '@/components/planning/RetirerPlanningModale'
 import { FilouEdge } from '@/components/v2/FilouEdge'
 import type { PeriodeApplicable } from '@/components/v2/GenererJournee'
-import { useOutilsPlanning } from '@/components/v2/outils-planning'
+// B-157 — la barre d'outils du chantier est une COPIE, sous `chantier/`.
+// L'original (`v2/outils-planning.tsx`) sert aussi l'écran du client : y
+// toucher serait parti chez Val d'Allier sans passer par la porte. Le fichier
+// de chantier porte le récit complet de cette duplication.
+import {
+  useOutilsPlanningChantier,
+  type EntreeOutil,
+} from '@/components/chantier/outils-planning-chantier'
 import { GardeDetailModal, peutProposerUnEchange } from '@/components/planning/GardeDetailModal'
 import { CriseModal, type VetCrise } from '@/components/planning/CriseModal'
 import { estJourFerie } from '@/engine/utils'
@@ -294,6 +301,10 @@ export function PlanningChantierV2({
   const router = useRouter()
   const [annee, mois] = anneeMois.split('-').map(Number)
   const [popOuvert, setPopOuvert] = useState(false)
+  // B-157 — le menu « Outils » de la tête de page : il accueille les gestes
+  // qui quittent la première ligne (PDF, absence, journées, compteurs) sans
+  // quitter l'écran.
+  const [outilsOuverts, setOutilsOuverts] = useState(false)
   // B-145 lot 2c — les compteurs ne sont plus une colonne de 262 px mais une
   // fenêtre : « que le client puisse le consulter comme une pop up afin de ne
   // pas encombrer l'écran du planning » (MiKL, 06/10). C'est cette largeur
@@ -421,10 +432,37 @@ export function PlanningChantierV2({
     }
   }, [popOuvert])
 
-  // Les outils de la barre (PDF, absence, générer, publier) et leurs
-  // garde-fous. La période vient de la PILULE — une seule source de vérité,
-  // là où la V1 embarquait un second sélecteur qui la contredisait.
-  const { pilules, alertes, modales, ouvrirAssistant } = useOutilsPlanning({
+  // B-157 — le menu « Outils ». Il se referme exactement comme le panneau de
+  // période : clic ailleurs ou Échap. Un menu dont la seule sortie est son
+  // propre bouton est un piège (retour MiKL du 29/07, déjà payé juste
+  // au-dessus) — on ne le réintroduit pas en en ouvrant un second.
+  const outilsRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!outilsOuverts) return
+    function auClic(e: MouseEvent) {
+      if (!outilsRef.current?.contains(e.target as Node)) setOutilsOuverts(false)
+    }
+    function auClavier(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOutilsOuverts(false)
+    }
+    document.addEventListener('mousedown', auClic)
+    document.addEventListener('keydown', auClavier)
+    return () => {
+      document.removeEventListener('mousedown', auClic)
+      document.removeEventListener('keydown', auClavier)
+    }
+  }, [outilsOuverts])
+
+  // Les outils de la barre et leurs garde-fous. La période vient de la PILULE
+  // — une seule source de vérité, là où la V1 embarquait un second sélecteur
+  // qui la contredisait.
+  //
+  // B-157 — la barre ne rend plus une rangée de boutons : elle rend UNE action
+  // principale (contextuelle), une liste d'outils que la tête range dans son
+  // menu, et le nombre de points relevés par le pré-vol.
+  const {
+    actionPrincipale, outils, pointsAVerifier, alertes, modales, ouvrirAssistant,
+  } = useOutilsPlanningChantier({
     periode: periodeAffichee,
     aDesGardes: periodeAffichee ? periodesAvecGardes.includes(periodeAffichee.id) : false,
     isAdmin,
@@ -505,6 +543,19 @@ export function PlanningChantierV2({
     router.push(
       `/planning?mois=${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`,
     )
+  }
+
+  /**
+   * B-157 — revenir au mois courant.
+   *
+   * La date du jour n'était qu'un REPÈRE TEXTE, au fond du panneau de période
+   * (« 📌 Aujourd'hui : … »). Elle disait où l'on est, jamais comment y
+   * retourner : après trois flèches, le seul chemin du retour était de
+   * recompter les mois à l'envers. Le modèle du 09/10 en fait un bouton, et il
+   * a raison — c'est la navigation la plus demandée d'un calendrier.
+   */
+  function allerAujourdhui() {
+    router.push(`/planning?mois=${today.slice(0, 7)}`)
   }
 
   /** Aller au premier mois d'une autre période. */
@@ -655,6 +706,36 @@ export function PlanningChantierV2({
   )
 
   const statut = periodeAffichee ? libelleStatut(periodeAffichee.statut) : null
+
+  // B-157 — ce que le menu « Outils » contient.
+  //
+  // Les compteurs d'équité REJOIGNENT le menu : c'est une consultation, pas un
+  // geste de préparation, et elle est déjà servie en fenêtre depuis le lot 2c.
+  // Elle reste refusée au secrétariat — la vie interne de l'équipe n'est pas
+  // une information de comptoir (MiKL, 25/08) —, et c'est pour ça qu'on la
+  // compose ici plutôt que dans la barre, qui ne connaît pas ce partage.
+  const entreesMenu: EntreeOutil[] = [
+    ...(lectureSeule
+      ? []
+      : [{
+          cle: 'compteurs',
+          libelle: 'Compteurs d’équité',
+          aide: 'Combien de week-ends chacun a faits, et son écart à sa juste part',
+          icone: '⚖️',
+          action: () => setCompteursOuverts(true),
+        } satisfies EntreeOutil]),
+    ...outils,
+  ]
+
+  /** Lance l'outil et referme le menu — sans quoi il resterait ouvert par-dessus. */
+  function lancerOutil(e: EntreeOutil) {
+    if (!e.action) return
+    setOutilsOuverts(false)
+    e.action()
+  }
+
+  const moisAffiche = `${annee}-${String(mois).padStart(2, '0')}`
+  const dejaAujourdhui = moisAffiche === today.slice(0, 7)
   // Le bandeau « lecture seule » s'adresse à celle qui, d'habitude, PEUT
   // modifier : il explique une exception, et propose d'aller travailler
   // ailleurs. Pour un vétérinaire, tout est en lecture seule en permanence —
@@ -683,7 +764,72 @@ export function PlanningChantierV2({
           la largeur de la grille à l'ouverture d'une MODALE : un effet de bord
           que personne n'aurait relié à son geste. */}
       <div className="workspace">
-        <div className="work-head">
+        {/* ============================================================
+            B-157 — LA TÊTE DE PAGE, EN DEUX RANGÉES.
+            ============================================================
+            MiKL, le 09/10 : « il faut revoir tout le haut du planning […]
+            réfléchis à faire un beau menu en haut […] pratique et efficace
+            mais également esthétique ».
+
+            CE QUI N'ALLAIT PAS : onze contrôles alignés sur UNE ligne, tous
+            du même poids visuel, plus deux barres de réglage en dessous. Rien
+            ne disait ce qu'on regarde, rien ne disait quoi faire ensuite —
+            l'œil devait tout lire pour trouver un bouton.
+
+            LE PARTAGE, et c'est tout le sujet :
+              • rangée 1 = CE QU'ON REGARDE (le mois, la période, son état) et
+                CE QU'ON DÉCIDE (une seule action accentuée) ;
+              • rangée 2 = COMMENT ON LE REGARDE (les axes d'affichage).
+            Deux questions différentes ne partagent plus la même ligne.
+
+            Les gestes secondaires (impression, absence, journées, compteurs)
+            descendent dans le menu « Outils ». Ils gardent leur capacité, ils
+            perdent leur place en première ligne — aucune fonction n'est
+            supprimée, et c'est la condition pour que « enlever le bouton
+            absence » ne soit pas une perte. */}
+        <div className="work-head pv2h">
+          <div className="pv2h-r1">
+          <div className="pv2h-identite">
+            <p className="pv2h-surtitre">Planning de l’équipe</p>
+            <div className="pv2h-mois">
+              <h2>
+                {MOIS[mois - 1]} {annee}
+              </h2>
+              <button
+                type="button"
+                className="mn-btn"
+                onClick={() => naviguer(-1)}
+                aria-label="Mois précédent"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                className="mn-btn"
+                onClick={() => naviguer(1)}
+                aria-label="Mois suivant"
+              >
+                ›
+              </button>
+              {/* Inerte quand on y est déjà : un bouton qui ne changerait rien
+                  se contente de le dire, au lieu de recharger la même page. */}
+              <button
+                type="button"
+                className="pv2h-today"
+                onClick={allerAujourdhui}
+                disabled={dejaAujourdhui}
+                title={
+                  dejaAujourdhui
+                    ? 'Tu es déjà sur le mois en cours'
+                    : `Revenir au mois en cours (${dateCourte(today)})`
+                }
+              >
+                Aujourd’hui
+              </button>
+            </div>
+          </div>
+
+          <div className="pv2h-reperes">
           {/* ⚠️ PAS DE NOTION DE PÉRIODE POUR LE SECRÉTARIAT.
               MiKL, le 25/08, devant l'écran affichant « Hors période » :
               « pas besoin de notion de période — tous les plannings publiés et
@@ -833,48 +979,31 @@ export function PlanningChantierV2({
                     <small>Des dates, une période type — et le moteur le remplit</small>
                   </button>
                 )}
-                <p className="pp-today">📌 Aujourd&apos;hui : {dateCourte(today)}</p>
+                {/* Le repère « 📌 Aujourd'hui : … » vivait ici. Il est devenu
+                    un BOUTON dans la tête de page (B-157) : le garder aussi au
+                    fond du panneau ferait dire deux fois la même chose, dont
+                    une fois sans pouvoir agir. */}
               </div>
             )}
           </div>
           )}
 
-          <div className="month-nav">
-            <button
-              type="button"
-              className="mn-btn"
-              onClick={() => naviguer(-1)}
-              aria-label="Mois précédent"
-            >
-              ←
-            </button>
-            <h2>
-              {MOIS[mois - 1]} {annee}
-            </h2>
-            <button
-              type="button"
-              className="mn-btn"
-              onClick={() => naviguer(1)}
-              aria-label="Mois suivant"
-            >
-              →
-            </button>
+          {/* LA PASTILLE DU PRÉ-VOL. Elle compte ce que le moteur a relevé et
+              les congés non tranchés — ⚠️ PAS les 48 incohérences de B-152a,
+              qui restent un contrôle de publication. Elle ne s'affiche qu'avec
+              un nombre : « 0 point à traiter » serait du bruit permanent, et
+              une pastille toujours là cesse d'être lue. Le détail reste dans
+              le bandeau, juste sous la tête — la pastille n'est qu'un signal,
+              jamais un rapport (leçon du 2026-07). */}
+            {pointsAVerifier > 0 && (
+              <span className="pv2h-points" role="status">
+                <b>{pointsAVerifier}</b>
+                {pointsAVerifier > 1 ? ' points à traiter' : ' point à traiter'}
+              </span>
+            )}
           </div>
 
-          <div className="head-actions">
-            {/* Les compteurs mesurent l'ÉQUITÉ entre vétérinaires : combien de
-                week-ends chacun a faits, et de combien il s'écarte de sa juste
-                part. C'est la vie interne de l'équipe, pas une information de
-                comptoir — exclue du périmètre du secrétariat (MiKL, 25/08). */}
-            {!lectureSeule && (
-              <button
-                type="button"
-                className="head-btn"
-                onClick={() => setCompteursOuverts(true)}
-              >
-                Compteurs
-              </button>
-            )}
+          <div className="pv2h-gestes">
             {/* Le secrétariat perd son panneau latéral (arbitrage du 06/10),
                 mais pas sa question : « il revient quand ? » regarde DEVANT, et
                 la grille par jour n'y répond pas. Même principe que les
@@ -882,25 +1011,150 @@ export function PlanningChantierV2({
             {lectureSeule && (
               <button
                 type="button"
-                className="head-btn"
+                className="pv2h-outil-btn"
                 onClick={() => setAbsencesOuvertes(true)}
               >
                 Qui est absent
               </button>
             )}
-            {/* Les pilules de l'équipe portent PDF, Absence, Générer,
-                Publier : trois gestes sur quatre lui sont refusés par le
-                serveur. On ne lui sert donc pas la même barre en espérant que
-                les boutons refusés ne soient pas cliqués — elle reçoit le seul
-                geste qui la concerne, l'impression, avec le choix de la
+            {/* La barre de l'équipe porte des gestes que le SERVEUR refuse au
+                secrétariat. On ne lui sert donc pas la même barre en espérant
+                que les boutons refusés ne soient pas cliqués — elle reçoit le
+                seul geste qui la concerne, l'impression, avec le choix de la
                 période au moment où la question se pose. */}
             {lectureSeule ? (
               <ImprimerPourSecretariat
                 periodes={periodes.filter((p) => periodesAvecGardes.includes(p.id))}
               />
             ) : (
-              pilules
+              <>
+                {/* ⚠️ UN MENU POUR DEUX GESTES COÛTE PLUS QU'IL NE RANGE.
+                    Un vétérinaire n'a ici que l'impression et les compteurs :
+                    les enfermer derrière « Outils » lui ajouterait un clic sur
+                    le seul geste qu'il possède. Le menu n'apparaît donc que
+                    lorsqu'il y a vraiment une rangée à replier — c'est le cas
+                    de l'admin, qui en a quatre ou cinq. */}
+                {entreesMenu.length <= 2 ? (
+                  entreesMenu.map((e) => (
+                    <button
+                      key={e.cle}
+                      type="button"
+                      className="pv2h-outil-btn"
+                      disabled={!e.action}
+                      title={e.empeche ?? e.aide}
+                      onClick={() => lancerOutil(e)}
+                    >
+                      {e.libelle}
+                    </button>
+                  ))
+                ) : (
+                  /* LE MENU « OUTILS ». Il porte un libellé, pas seulement
+                     trois points : un bouton muet oblige à l'ouvrir pour
+                     savoir ce qu'il y a dedans, ce qui est exactement le clic
+                     qu'on voulait économiser.
+
+                     ⚠️ PAS DE `role="menu"` : ce rôle PROMET la navigation aux
+                     flèches et le piège de focus du pattern ARIA complet, que
+                     ce panneau n'implémente pas. Annoncer un contrat qu'on ne
+                     tient pas dessert plus l'utilisateur au clavier qu'un
+                     simple groupe de boutons, qui lui, se tabule. */
+                  <div className="pv2h-menu-wrap" ref={outilsRef}>
+                    <button
+                      type="button"
+                      className="pv2h-outil-btn"
+                      aria-expanded={outilsOuverts}
+                      aria-haspopup="true"
+                      onClick={() => setOutilsOuverts((v) => !v)}
+                    >
+                      Outils
+                      <span className="pv2h-caret" aria-hidden>▾</span>
+                    </button>
+                    {outilsOuverts && (
+                      <div className="pv2h-menu" aria-label="Outils du planning">
+                        {entreesMenu.map((e) => (
+                          <button
+                            key={e.cle}
+                            type="button"
+                            className="pv2h-menu-item"
+                            disabled={!e.action}
+                            onClick={() => lancerOutil(e)}
+                          >
+                            <span className="pv2h-menu-ico" aria-hidden>{e.icone}</span>
+                            <span className="pv2h-menu-txt">
+                              <b>{e.libelle}</b>
+                              {/* Quand le geste est impossible, on dit POURQUOI
+                                  à la place de l'aide : un geste grisé muet
+                                  envoie chercher la raison ailleurs. */}
+                              <small>{e.empeche ?? e.aide}</small>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {actionPrincipale}
+              </>
             )}
+          </div>
+          </div>
+
+          {/* RANGÉE 2 — comment on regarde. Elle n'existe que s'il y a quelque
+              chose à régler : un seul axe à un seul choix serait une ligne
+              entière pour un bouton qui ne fait rien.
+              📌 PLACE RÉSERVÉE À GAUCHE pour « Mettre en avant » (lot 3). On
+              ne dessine PAS les pastilles de l'équipe en attendant : un filtre
+              qui ne filtre rien est précisément l'interdit du KIT COMPLET. */}
+          <div className="pv2h-r2">
+            <div className="pv2h-axes">
+              {choixDeContenu.length > 1 && (
+                <div className="pv2h-axe">
+                  <span className="pv2h-axe-lbl">Afficher</span>
+                  <div className="pv2h-seg" role="group" aria-label="Ce qui est affiché">
+                    {choixDeContenu.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        className="pv2h-seg-btn"
+                        aria-pressed={contenu === c}
+                        onClick={() => setContenu(c)}
+                      >
+                        {LIBELLE_CONTENU[c]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="pv2h-axe">
+                <span className="pv2h-axe-lbl">Étendue</span>
+                <div className="pv2h-seg pv2-axe" role="group" aria-label="Étendue affichée">
+                  <button
+                    type="button"
+                    className="pv2h-seg-btn"
+                    aria-pressed={etendue === 'replie'}
+                    onClick={() => setEtendue('replie')}
+                  >
+                    Mois replié
+                  </button>
+                  <button
+                    type="button"
+                    className="pv2h-seg-btn"
+                    aria-pressed={etendue === 'semaine'}
+                    onClick={() => setEtendue('semaine')}
+                  >
+                    Une semaine dépliée
+                  </button>
+                  <button
+                    type="button"
+                    className="pv2h-seg-btn"
+                    aria-pressed={etendue === 'mois'}
+                    onClick={() => setEtendue('mois')}
+                  >
+                    Mois déplié
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1016,69 +1270,12 @@ export function PlanningChantierV2({
             }}
           />
 
-          {/* ── B-145 lot 2c — LES DEUX AXES D'AFFICHAGE ────────────────────
-              MiKL, le 06/10 : « que l'option affichage permette d'afficher le
-              planning garde, ou journée ou les 2 déjà en fonction de ce que le
-              cabinet aura choisi », et « une possibilité d'affichage à la
-              semaine ou au mois complet ». Deux axes INDÉPENDANTS — le
-              prototype n'en avait qu'un à trois états.
-
-              Le premier n'apparaît que si le cabinet a vraiment un choix :
-              proposer un choix unique est un bouton qui ne fait rien. */}
-          <div className="cal-axes">
-            {choixDeContenu.length > 1 && (
-              <>
-                <span className="cal-axes-lbl">Afficher</span>
-                <div className="axe-groupe" role="group" aria-label="Ce qui est affiché">
-                  {choixDeContenu.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      className="axe-btn"
-                      aria-pressed={contenu === c}
-                      onClick={() => setContenu(c)}
-                    >
-                      {LIBELLE_CONTENU[c]}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {/* B-153 lot 1 — L'AXE PASSE À TROIS ÉTATS, comme le prototype.
-                B-145 en avait deux (« Une semaine » / « Mois entier ») ; le
-                design V2 en ajoute un troisième, « Mois replié », qui n'ouvre
-                aucune semaine. Il manquait : sans lui, il est impossible de
-                voir le mois entier en vue compacte — l'accordéon force toujours
-                une semaine ouverte. */}
-            <span className="cal-axes-lbl">Étendue</span>
-            <div className="axe-groupe pv2-axe" role="group" aria-label="Étendue affichée">
-              <button
-                type="button"
-                className="axe-btn"
-                aria-pressed={etendue === 'replie'}
-                onClick={() => setEtendue('replie')}
-              >
-                Mois replié
-              </button>
-              <button
-                type="button"
-                className="axe-btn"
-                aria-pressed={etendue === 'semaine'}
-                onClick={() => setEtendue('semaine')}
-              >
-                Une semaine dépliée
-              </button>
-              <button
-                type="button"
-                className="axe-btn"
-                aria-pressed={etendue === 'mois'}
-                onClick={() => setEtendue('mois')}
-              >
-                Mois déplié
-              </button>
-            </div>
-          </div>
+          {/* ── B-145 lot 2c — LES DEUX AXES D’AFFICHAGE ────────────────────
+              Ils vivaient ICI, entre le bandeau et la grille. B-157 les fait
+              MONTER dans la tête de page, en rangée 2 : ce sont des réglages
+              du regard, et leur place est avec le reste de ce qui règle le
+              regard — pas dans le plan de travail, qu’ils repoussaient d’un
+              cran vers le bas à chaque chargement. */}
 
           <div className="cal-scroll">
             <GrilleSemainesV2
