@@ -475,7 +475,8 @@ export function PlanningChantierV2({
   // principale (contextuelle), une liste d'outils que la tête range dans son
   // menu, et le nombre de points relevés par le pré-vol.
   const {
-    actionPrincipale, outils, pointsAVerifier, alertes, modales, ouvrirAssistant,
+    actionPrincipale, actionGenerer, outils, pointsAVerifier,
+    alertes, modales, ouvrirAssistant,
   } = useOutilsPlanningChantier({
     periode: periodeAffichee,
     aDesGardes: periodeAffichee ? periodesAvecGardes.includes(periodeAffichee.id) : false,
@@ -950,6 +951,9 @@ export function PlanningChantierV2({
                     )}
                   </div>
                 )}
+                {/* B-157b — les DEUX gestes du planning, cote a cote :
+                    celui qui le fabrique, celui qui le diffuse. */}
+                {actionGenerer}
                 {actionPrincipale}
               </>
             )}
@@ -1121,35 +1125,19 @@ export function PlanningChantierV2({
           </div>
           )}
 
-            {/* « METTRE EN AVANT » — demande a la recette du 09/10, apres avoir
-                constate son absence. Ce n'est PAS un decor : la ligne de la
-                personne s'eclaire d'un bout a l'autre de la grille, et tout le
-                reste s'estompe. Un second clic sur la meme personne repose le
-                filtre — sans ca, le seul moyen d'en sortir serait de deviner
-                qu'il faut recliquer, ou de recharger. */}
-            {equipe.length > 0 && (
-              <div className="pv2h-avant">
-                <span className="pv2h-axe-lbl">Mettre en avant</span>
-                <div className="pv2h-avant-liste">
-                  {equipe.map((v) => (
-                    <button
-                      key={v.id}
-                      type="button"
-                      className="pv2h-vet"
-                      aria-pressed={enAvant === v.id}
-                      onClick={() => setEnAvant((a) => (a === v.id ? null : v.id))}
-                    >
-                      <span
-                        className="pv2h-vet-dot"
-                        style={stylePoint(v.couleur)}
-                        aria-hidden
-                      />
-                      {v.prenom}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* 🔴 LE BANDEAU « METTRE EN AVANT » A VECU UNE HEURE — retire le
+                09/10 a la demande de MiKL : « mets plutot la fonction
+                directement sur les noms dans les colonnes du planning ».
+
+                Il avait tort, et pour une raison qui vaut au-dela de ce cas :
+                il RECOPIAIT en haut de l'ecran une liste de prenoms que la
+                grille affiche deja dans sa marge. Deux endroits pour la meme
+                information, donc deux endroits ou chercher — et une ligne
+                entiere mangee, qui renvoyait la periode au-dessus alors
+                qu'elle venait d'etre descendue ici.
+
+                ➜ Le geste vit desormais SUR la donnee (`GrilleSemainesV2`,
+                  la marge des prenoms). Un clic epingle, un second libere. */}
 
             <div className="pv2h-axes">
               {choixDeContenu.length > 1 && (
@@ -1337,7 +1325,8 @@ export function PlanningChantierV2({
               today={today}
               survol={enAvant ?? survol}
               onSurvol={setSurvol}
-              epingle={enAvant !== null}
+              epingleSur={enAvant}
+              onEpingler={(vetId) => setEnAvant((a) => (a === vetId ? null : vetId))}
               prenomEnAvant={equipe.find((v) => v.id === enAvant)?.prenom ?? null}
               onOuvrirGarde={(gardeId) => {
                 const g = gardes.find((x) => x.id === gardeId)

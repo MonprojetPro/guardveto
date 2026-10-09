@@ -865,39 +865,11 @@
    sa marge automatique : elle ouvre la rangée, elle ne la pousse pas. */
 .pv2h-r2 .period-wrap { margin-right: 4px; }
 
-/* ── « Mettre en avant » ──────────────────────────────────────────────────── */
-
-.pv2h-avant { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.pv2h-avant-liste { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-
-.pv2h-vet {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--pv2-bd);
-  background: var(--pv2-surface);
-  color: var(--pv2-txt);
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  /* 6px vertical, donc 14px horizontal au minimum (gardien B-146). */
-  padding: 6px 14px;
-}
-.pv2h-vet:hover { border-color: var(--pv2-acc); }
-/* Le choix retenu se voit SANS couleur de marque : la pastille porte déjà la
-   couleur de la personne, et deux couleurs sur un même bouton se disputeraient
-   la lecture. C'est donc le contraste qui change, pas la teinte. */
-.pv2h-vet[aria-pressed='true'] {
-  background: var(--pv2-txt);
-  border-color: var(--pv2-txt);
-  color: #fff;
-}
-.pv2h-vet-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  flex: none;
-}
+/* ⚠️ LE BANDEAU « METTRE EN AVANT » N'EXISTE PLUS (B-157b) — ses classes
+   `.pv2h-avant*` et `.pv2h-vet*` sont retirées avec lui. Le geste vit
+   désormais sur `.pv2-prenom`, dans la marge de la grille. Laisser un style
+   derrière un composant supprimé, c'est fabriquer la prochaine classe
+   orpheline — celles qu'on a passé la matinée à débusquer. */
 
 /* ── Ce que la mise en avant fait RÉELLEMENT sur la grille ────────────────── */
 
@@ -923,11 +895,6 @@
   .pv2-chip.attenue { transition: none; }
 }
 
-@media (max-width: 720px) {
-  /* À cette largeur la rangée 2 empile : chaque groupe prend sa ligne, et les
-     prénoms passent en défilement plutôt qu'en quatre rangs. */
-  .pv2h-avant-liste { flex-wrap: nowrap; overflow-x: auto; }
-}
 
 /* ============================================================
    B-157a — LA LÉGENDE DE LA GRILLE, QUI N'AVAIT AUCUN STYLE
@@ -997,4 +964,238 @@
   color: var(--pv2-bad);
   font-weight: 800;
   font-size: 9px;
+}
+
+/* ============================================================
+   B-157b — LE PRÉNOM DEVIENT UN BOUTON, ET « GÉNÉRER » SORT DU MENU
+   ============================================================
+   MiKL, 2e passe de recette du 09/10 : « enlève ce bandeau, mets plutôt la
+   fonction directement sur les noms dans les colonnes du planning », et « le
+   bouton génère doit être à côté de publié, sors-le de la liste d'outils ».
+
+   🔴 LE PRÉNOM EST UNE COLONNE SŒUR DE LA GRILLE — on ne change pas sa boîte.
+   Passer de `<div>` à `<button>` apporte un `padding`, une `border` et une
+   `font` par défaut du navigateur : les trois décalent la marge par rapport
+   aux 7 cases, et c'est EXACTEMENT le défaut B-145c (18 px de dérive à la 7e
+   ligne, pour des lignes de 20 px — on lisait la garde du voisin). Tout est
+   donc remis à zéro ci-dessous, et la hauteur reste `--pv2-h-ligne`.
+   ============================================================ */
+
+.pv2-prenom {
+  /* La remise à zéro du bouton. `box-sizing` et `font: inherit` ne sont pas
+     décoratifs : sans eux la boîte et la ligne de base changent. */
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 0 0 0 8px;
+  border: 0;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+.pv2-prenom:hover { background: rgba(199, 83, 15, 0.08); }
+/* Le prénom épinglé porte son état : c'est le seul endroit où le geste vit
+   maintenant, il doit donc dire s'il est actif sans qu'on lise la grille. */
+.pv2-prenom[aria-pressed='true'] {
+  background: rgba(199, 83, 15, 0.16);
+  box-shadow: inset 2px 0 0 var(--pv2-acc);
+}
+.pv2-prenom:focus-visible {
+  outline: 2px solid var(--pv2-acc);
+  outline-offset: -2px;
+}
+
+/* ── « Générer », à côté de l'état ────────────────────────────────────────── */
+
+/* Contour plutôt que plein : deux boutons pleins côte à côte se disputeraient
+   l'œil, et c'est « Vérifier et publier » qui ferme le travail. */
+.pv2h-generer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--pv2-acc);
+  background: var(--pv2-surface);
+  color: var(--pv2-acc);
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 10px 20px;
+  min-height: 40px;
+}
+.pv2h-generer:hover {
+  background: var(--pv2-acc);
+  color: #fff;
+}
+
+/* ============================================================
+   B-157b — « REMPLIR LE PLANNING DES JOURNÉES », LA FENÊTRE REFAITE
+   ============================================================
+   🔴 CE STYLE VIT ICI, ET C'EST TOUT LE SUJET. L'original habillait son
+   contenu avec `.at-*` et `.tj-*`, qui vivent dans `v2-journee.css` — une
+   feuille importée par `app/(v2)/journee/page.tsx` et par elle seule. La
+   fenêtre, elle, s'ouvre depuis l'écran PLANNING, qui ne l'importe pas :
+   toutes ces classes étaient donc sans effet, et MiKL a vu « moche de ouf ».
+
+   `chantier-planning-v2.css` EST importé par l'écran qui ouvre la fenêtre.
+   C'est la seule raison pour laquelle ces règles s'appliqueront.
+
+   ⚠️ Un style ne suit pas son composant — il suit sa FEUILLE, et une feuille
+   suit la PAGE qui l'importe. Un composant partagé entre deux pages n'est
+   habillé que sur celles qui chargent sa feuille, en silence sur les autres.
+   ============================================================ */
+
+.gjc { display: flex; flex-direction: column; gap: 18px; margin-top: 4px; }
+
+.gjc-vide {
+  margin: 8px 0 0;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--pv2-creux, #f6eedf);
+  color: var(--pv2-sec, #7c6a55);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+/* ── Les trois étapes ─────────────────────────────────────────────────────── */
+
+.gjc-etape { display: flex; flex-direction: column; gap: 10px; }
+
+/* Les gestes sont SÉQUENTIELS : choisir, regarder, poser. L'original les
+   donnait au même niveau visuel, ce qui laissait croire à trois options. */
+.gjc-titre {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  font-family: Figtree, var(--t-font-titre, sans-serif);
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--pv2-txt, #3a2a1c);
+}
+.gjc-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--pv2-acc, #c7530f);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+/* ── Le choix du planning ─────────────────────────────────────────────────── */
+
+.gjc-cartes { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* Chaque carte porte SES dates. Sur l'original, les bornes vivaient sur une
+   ligne isolée sous les boutons : en changeant de planning, on ne savait plus
+   à quoi elles se rapportaient. */
+.gjc-carte {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 200px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--pv2-bd, #e6d7bb);
+  border-radius: 14px;
+  background: var(--pv2-surface, #fffcf4);
+  text-align: left;
+  cursor: pointer;
+}
+.gjc-carte b { font-size: 0.9rem; font-weight: 800; color: var(--pv2-txt, #3a2a1c); }
+.gjc-carte small { font-size: 0.74rem; line-height: 1.35; color: var(--pv2-sec, #7c6a55); }
+.gjc-carte:hover:not(:disabled) { border-color: var(--pv2-acc, #c7530f); }
+/* L'état retenu se voit SANS ambiguïté — c'était le défaut n°1 de la capture :
+   le planning choisi s'affichait en texte nu à côté d'un bouton contourné, et
+   rien ne disait lequel des deux était actif. */
+.gjc-carte[aria-pressed='true'] {
+  border-color: var(--pv2-acc, #c7530f);
+  background: #fdf1e5;
+  box-shadow: inset 0 0 0 1px var(--pv2-acc, #c7530f);
+}
+.gjc-carte:disabled { opacity: 0.55; cursor: default; }
+
+/* ── Boutons ──────────────────────────────────────────────────────────────── */
+
+.gjc-btn {
+  align-self: flex-start;
+  border: 1px solid var(--pv2-bd, #e6d7bb);
+  background: var(--pv2-surface, #fffcf4);
+  color: var(--pv2-txt, #3a2a1c);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  /* 9px vertical, donc 17px horizontal au minimum (gardien B-146). */
+  padding: 9px 18px;
+}
+.gjc-btn:hover:not(:disabled) { border-color: var(--pv2-acc, #c7530f); color: var(--pv2-acc, #c7530f); }
+.gjc-btn:disabled { opacity: 0.5; cursor: default; }
+
+.gjc-cta {
+  align-self: flex-start;
+  border: 1px solid var(--pv2-acc, #c7530f);
+  background: var(--pv2-acc, #c7530f);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  font-weight: 800;
+  padding: 11px 22px;
+  box-shadow: 0 6px 16px -6px rgba(199, 83, 15, 0.55);
+}
+.gjc-cta:hover:not(:disabled) { filter: brightness(1.06); }
+.gjc-cta:disabled { opacity: 0.6; cursor: default; }
+
+/* ── L'aperçu ─────────────────────────────────────────────────────────────── */
+
+.gjc-apercu,
+.gjc-refus {
+  margin: 0;
+  padding: 11px 14px;
+  border-radius: 12px;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+.gjc-apercu { background: #eef4e8; color: #3f6530; }
+.gjc-refus { background: #fbe9e4; color: #8f2f1b; }
+
+/* ── L'avertissement ──────────────────────────────────────────────────────── */
+
+/* Le « ! » était un caractère nu collé au texte : sa pastille vivait dans la
+   feuille absente. Il redevient un repère rond, détaché. */
+.gjc-avis {
+  display: flex;
+  gap: 11px;
+  margin: 0;
+  padding: 13px 15px;
+  border-radius: 14px;
+  background: var(--pv2-creux, #f6eedf);
+  border: 1px solid var(--pv2-filet, #eadcc2);
+  font-size: 0.79rem;
+  line-height: 1.55;
+  color: var(--pv2-sec, #7c6a55);
+}
+.gjc-avis b { color: var(--pv2-txt, #3a2a1c); font-weight: 800; }
+.gjc-avis-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: 999px;
+  background: #f0dcc0;
+  color: #8f4410;
+  font-weight: 800;
+  font-size: 0.78rem;
+}
+
+@media (max-width: 560px) {
+  .gjc-cartes { flex-direction: column; }
 }

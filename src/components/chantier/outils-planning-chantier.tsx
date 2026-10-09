@@ -40,7 +40,12 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { PreVolAlert } from '@/components/planning/PreVolAlert'
 import { ParcoursGeneration } from '@/components/v2/ParcoursGeneration'
 import { DialogPublication } from '@/components/v2/DialogPublication'
-import { GenererJournee, type PeriodeApplicable } from '@/components/v2/GenererJournee'
+// B-157b — la fenêtre « Remplir les journées » est elle aussi une COPIE sous
+// `chantier/` : l'originale s'affichait sans style depuis le planning (sa
+// feuille n'y est pas importée), et la réparer à sa source aurait changé le
+// rendu chez le client. Le type, lui, reste partagé — c'est une donnée.
+import { GenererJourneeChantier } from '@/components/chantier/GenererJourneeChantier'
+import type { PeriodeApplicable } from '@/components/v2/GenererJournee'
 import type { VetEtiquette } from '@/components/planning/PointPreVol'
 import type { AvertissementPreVol } from '@/engine/pre-vol'
 import type { Periode, ProfilPlanning } from '@/types'
@@ -197,7 +202,10 @@ export function useOutilsPlanningChantier({
           Verrouillé
         </span>
       )
-    } else if (aDesGardes && peutPublier) {
+    } else if (peutPublier) {
+      // Volontairement SANS `aDesGardes` : un planning vide n'est pas grisé,
+      // il est refusé PAR LE CONTRÔLE, qui dit pourquoi — « ce planning n'a
+      // aucune garde, génère-le d'abord ». Un bouton grisé ne dit rien.
       actionPrincipale = (
         <button
           type="button"
@@ -208,32 +216,45 @@ export function useOutilsPlanningChantier({
           Vérifier et publier
         </button>
       )
-    } else if (aGardes) {
-      actionPrincipale = (
-        <button
-          type="button"
-          className="pv2h-cta"
-          title="Générer un planning — nouveau, ou en refaire un existant"
-          onClick={() => ouvrirParcours('choix')}
-        >
-          Générer le planning
-        </button>
-      )
-    } else {
-      // B-148 — sans gardes à calculer, « générer » désigne le remplissage des
-      // journées. Proposer le parcours des gardes ici serait un calcul sans
-      // objet.
-      actionPrincipale = (
-        <button
-          type="button"
-          className="pv2h-cta"
-          title="Remplir le planning des journées depuis les présences récurrentes"
-          onClick={() => setJourneeOuverte(true)}
-        >
-          Remplir les journées
-        </button>
-      )
     }
+  }
+
+  /**
+   * « GÉNÉRER », À CÔTÉ DE L'ÉTAT — sorti du menu le 09/10 (B-157b).
+   *
+   * Les deux gestes du planning vivent desormais cote a cote : celui qui le
+   * FABRIQUE et celui qui le DIFFUSE. Le matin meme, j'avais tranche l'inverse
+   * (un seul accent, contextuel) ; MiKL a corrige, et la raison se voit a
+   * l'usage — on genere et on republie plusieurs fois de suite pendant la
+   * preparation, jamais l'un sans l'autre.
+   *
+   * ⚠️ B-148 — « Générer » ne veut pas dire la même chose partout. Sans gardes
+   * au catalogue, il n'y a aucun moteur à lancer : le mot désigne alors le
+   * remplissage des journées.
+   */
+  let actionGenerer: ReactNode = null
+  if (isAdmin && !estVerrouille) {
+    actionGenerer = aGardes ? (
+      <button
+        type="button"
+        className="pv2h-generer"
+        title="Générer un planning — nouveau, ou en refaire un existant"
+        onClick={() => ouvrirParcours('choix')}
+      >
+        <span aria-hidden>✨</span>
+        Générer
+      </button>
+    ) : (
+      <button
+        type="button"
+        className="pv2h-generer"
+        title="Remplir le planning des journées depuis les présences récurrentes"
+        onClick={() => setJourneeOuverte(true)}
+      >
+        <span aria-hidden>✨</span>
+        Remplir les journées
+      </button>
+    )
   }
 
   /**
@@ -281,17 +302,11 @@ export function useOutilsPlanningChantier({
       })
     }
 
-    if (aGardes && aDesGardes) {
-      // Quand l'accent est pris par « Vérifier et publier », le parcours de
-      // génération doit rester atteignable : c'est lui qui refait un planning.
-      outils.push({
-        cle: 'generer',
-        libelle: 'Refaire la génération',
-        aide: 'Relancer le moteur sur cette période, ou en créer une autre',
-        icone: '✨',
-        action: () => ouvrirParcours('choix'),
-      })
-    }
+    // ⚠️ « Générer » N'EST PLUS DANS CE MENU — sorti le 09/10 (B-157b) à la
+    // demande de MiKL : « le bouton génère doit être à côté de publié, sors-le
+    // de la liste d'outils ». C'est le geste qui FABRIQUE le planning ; le
+    // ranger au même niveau qu'une impression le faisait disparaître derrière
+    // un clic. Il est rendu par `actionGenerer`, ci-dessous.
   }
 
   // ── Le bandeau, au-dessus de la grille ─────────────────
@@ -339,7 +354,7 @@ export function useOutilsPlanningChantier({
       />
 
       {aJournee && (
-        <GenererJournee
+        <GenererJourneeChantier
           open={journeeOuverte}
           onOpenChange={setJourneeOuverte}
           periodes={periodesJournee}
@@ -349,5 +364,8 @@ export function useOutilsPlanningChantier({
     </>
   ) : null
 
-  return { actionPrincipale, outils, pointsAVerifier, alertes, modales, ouvrirAssistant: ouvrirParcours }
+  return {
+    actionPrincipale, actionGenerer, outils, pointsAVerifier,
+    alertes, modales, ouvrirAssistant: ouvrirParcours,
+  }
 }

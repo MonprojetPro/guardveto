@@ -98,7 +98,9 @@ export interface ProprietesGrille {
    * qui n'est pas la personne retenue, faute de quoi le filtre ne filtre rien
    * et devient le bouton décoratif que le KIT COMPLET interdit.
    */
-  epingle?: boolean
+  epingleSur?: string | null
+  /** B-157b — un clic sur un prénom de la marge épingle ou désépingle. */
+  onEpingler?: (vetId: string) => void
   /**
    * Le PRÉNOM de la personne mise en avant, pour les semaines REPLIÉES.
    *
@@ -161,7 +163,8 @@ export function GrilleSemainesV2({
   today,
   survol,
   onSurvol,
-  epingle = false,
+  epingleSur = null,
+  onEpingler,
   prenomEnAvant = null,
   onOuvrirGarde,
   onOuvrirCellule,
@@ -173,7 +176,7 @@ export function GrilleSemainesV2({
   const vue = visibilite(contenu)
 
   return (
-    <div className={epingle ? 'pv2-wrap pv2-epingle' : 'pv2-wrap'}>
+    <div className={epingleSur ? 'pv2-wrap pv2-epingle' : 'pv2-wrap'}>
       {/* 🔴 L'EN-TÊTE DES JOURS. Elle avait disparu au premier jet de B-145 :
           sans elle, savoir qu'une colonne est le mercredi demande de lire le
           numéro et de compter — sur l'écran dont c'est la question première. */}
@@ -202,6 +205,8 @@ export function GrilleSemainesV2({
               vue={vue}
               survol={survol}
               onSurvol={onSurvol}
+              epingleSur={epingleSur}
+              onEpingler={onEpingler}
               onBasculer={() => onBasculerSemaine(index)}
             />
 
@@ -241,6 +246,8 @@ function MargeSemaine({
   vue,
   survol,
   onSurvol,
+  epingleSur,
+  onEpingler,
   onBasculer,
 }: {
   numero: number
@@ -250,6 +257,8 @@ function MargeSemaine({
   vue: { gardesVisibles: boolean; journeeVisible: boolean }
   survol: string | null
   onSurvol: (vetId: string | null) => void
+  epingleSur?: string | null
+  onEpingler?: (vetId: string) => void
   onBasculer: () => void
 }) {
   return (
@@ -278,16 +287,39 @@ function MargeSemaine({
               À pourvoir
             </div>
           )}
+          {/* B-157b — LE PRÉNOM EST UN BOUTON, et c'est MiKL qui a eu raison.
+              Le 09/10, un bandeau « Mettre en avant » recopiait ces mêmes
+              prénoms en haut de l'écran : « mets plutôt la fonction
+              directement sur les noms dans les colonnes du planning ». Un
+              contrôle qui duplique une liste déjà affichée ajoute un endroit
+              où chercher, pas une capacité — le geste va à la donnée.
+
+              Le survol éclaire toujours (fugace), le CLIC épingle (persistant
+              et il estompe le reste). Deuxième clic sur le même nom = retour à
+              la normale, sinon le seul moyen d'en sortir serait de deviner. */}
           {equipe.map((v) => (
-            <div
+            <button
               key={v.id}
+              type="button"
               className={survol === v.id ? 'pv2-prenom survol' : 'pv2-prenom'}
+              aria-pressed={epingleSur === v.id}
+              title={
+                epingleSur === v.id
+                  ? `Arrêter de mettre ${v.prenom} en avant`
+                  : `Mettre ${v.prenom} en avant sur tout le planning`
+              }
               onMouseEnter={() => onSurvol(v.id)}
               onMouseLeave={() => onSurvol(null)}
+              onClick={(e) => {
+                // La semaine dépliée ne se replie pas sous le clic : la marge
+                // est dans la rangée-semaine, qui porte son propre onClick.
+                e.stopPropagation()
+                onEpingler?.(v.id)
+              }}
             >
               <span className="pv2-dot" style={stylePoint(v.couleur)} aria-hidden="true" />
               <span className="pv2-prenom-txt">{v.prenom}</span>
-            </div>
+            </button>
           ))}
           {vue.journeeVisible && <div className="pv2-marge-presents">Présents</div>}
         </>
