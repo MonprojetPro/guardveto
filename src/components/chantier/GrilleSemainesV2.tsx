@@ -35,7 +35,10 @@
 //    ferait de ce dessin un juge sans regle — « ne jamais afficher un parametre
 //    que le moteur n'evalue pas ». Les compteurs sont donc neutres.
 //
-//  · « Mettre en avant » (le focus par personne) est le LOT 3, pas celui-ci.
+//  · « Mettre en avant » (le focus par personne) etait annonce au LOT 3. Il est
+//    LIVRE depuis le 09/10 (B-157a), MiKL l'ayant demande a la recette : c'est
+//    le survol EPINGLE, pas un second mecanisme — la ligne s'eclaire comme au
+//    survol, et tout le reste s'estompe.
 //
 // ── CE QUI TIENT L'ALIGNEMENT (inchange, et toujours vital) ─────────────────
 //
@@ -88,6 +91,27 @@ export interface ProprietesGrille {
   /** La personne survolée, pour éclairer sa ligne d'un bout à l'autre. */
   survol: string | null
   onSurvol: (vetId: string | null) => void
+  /**
+   * B-157a — `survol` vient-il d'un choix ÉPINGLÉ (« Mettre en avant ») plutôt
+   * que de la souris ? Un éclairage de survol est fugace : il peut rester
+   * discret. Un choix délibéré, lui, doit se voir — on estompe alors tout ce
+   * qui n'est pas la personne retenue, faute de quoi le filtre ne filtre rien
+   * et devient le bouton décoratif que le KIT COMPLET interdit.
+   */
+  epingle?: boolean
+  /**
+   * Le PRÉNOM de la personne mise en avant, pour les semaines REPLIÉES.
+   *
+   * ⚠️ POURQUOI UN PRÉNOM ET PAS UN IDENTIFIANT : une case repliée n'affiche
+   * pas de ligne par personne, mais des pastilles — et `lignesCaseRepliee`, qui
+   * les fabrique, ne porte QUE le texte et la couleur. Elle vit dans
+   * `lib/planning/grilleSemaines.ts`, **partagé avec l'écran du client** : y
+   * ajouter un identifiant modifierait un fichier que ce chantier n'a pas le
+   * droit de toucher (la leçon de B-157, payée le matin même). On compare donc
+   * ce qui est AFFICHÉ. Sans ce détour, le filtre n'aurait aucun effet en vue
+   * repliée — un demi-filtre, qui laisse croire qu'il n'y a rien à montrer.
+   */
+  prenomEnAvant?: string | null
   /** Ouvre le détail d'une garde (réattribution, échange). */
   onOuvrirGarde: (gardeId: string) => void
   /** Ouvre la cellule d'une personne un jour donné (poser / retirer). */
@@ -137,6 +161,8 @@ export function GrilleSemainesV2({
   today,
   survol,
   onSurvol,
+  epingle = false,
+  prenomEnAvant = null,
   onOuvrirGarde,
   onOuvrirCellule,
   onOuvrirJournee,
@@ -147,7 +173,7 @@ export function GrilleSemainesV2({
   const vue = visibilite(contenu)
 
   return (
-    <div className="pv2-wrap">
+    <div className={epingle ? 'pv2-wrap pv2-epingle' : 'pv2-wrap'}>
       {/* 🔴 L'EN-TÊTE DES JOURS. Elle avait disparu au premier jet de B-145 :
           sans elle, savoir qu'une colonne est le mercredi demande de lire le
           numéro et de compter — sur l'écran dont c'est la question première. */}
@@ -190,6 +216,7 @@ export function GrilleSemainesV2({
                 today={today}
                 survol={survol}
                 onSurvol={onSurvol}
+                prenomEnAvant={prenomEnAvant}
                 onOuvrirGarde={onOuvrirGarde}
                 onOuvrirCellule={onOuvrirCellule}
                 onOuvrirJournee={onOuvrirJournee}
@@ -278,6 +305,7 @@ function CaseJour({
   today,
   survol,
   onSurvol,
+  prenomEnAvant,
   onOuvrirGarde,
   onOuvrirCellule,
   onOuvrirJournee,
@@ -293,6 +321,7 @@ function CaseJour({
   today: string
   survol: string | null
   onSurvol: (vetId: string | null) => void
+  prenomEnAvant?: string | null
   onOuvrirGarde: (gardeId: string) => void
   onOuvrirCellule?: (date: string, vetId: string) => void
   onOuvrirJournee?: (date: string) => void
@@ -333,7 +362,12 @@ function CaseJour({
       </div>
 
       {!depliee ? (
-        <CaseRepliee jour={jour} vue={vue} onOuvrirJournee={onOuvrirJournee} />
+        <CaseRepliee
+          jour={jour}
+          vue={vue}
+          prenomEnAvant={prenomEnAvant}
+          onOuvrirJournee={onOuvrirJournee}
+        />
       ) : (
         <CaseDepliee
           jour={jour}
@@ -358,10 +392,13 @@ function CaseJour({
 function CaseRepliee({
   jour,
   vue,
+  prenomEnAvant,
   onOuvrirJournee,
 }: {
   jour: JourGrille
   vue: { gardesVisibles: boolean; journeeVisible: boolean }
+  /** Voir `ProprietesGrille.prenomEnAvant` : on compare ce qui est AFFICHE. */
+  prenomEnAvant?: string | null
   onOuvrirJournee?: (date: string) => void
 }) {
   return (
@@ -385,7 +422,12 @@ function CaseRepliee({
             {l.pastilles.map((p, j) => (
               <span
                 key={`${p.texte}-${j}`}
-                className={p.creux ? 'pv2-chip creux' : 'pv2-chip'}
+                className={[
+                  'pv2-chip',
+                  p.creux ? 'creux' : '',
+                  // Rien d'attenue tant que personne n'est mis en avant.
+                  prenomEnAvant && p.texte !== prenomEnAvant ? 'attenue' : '',
+                ].filter(Boolean).join(' ')}
                 style={p.couleur ? { color: p.couleur } : undefined}
               >
                 {p.couleur && (

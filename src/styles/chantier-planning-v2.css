@@ -19,6 +19,37 @@
      `grille-alignement-css-v2.test.ts` refuse qu'on les recopie à la main.
    ============================================================ */
 
+/* 🔴 LA PALETTE VIT SUR L'ÉCRAN, PAS SUR LA GRILLE — corrigé le 09/10 (B-157a).
+   Elle était déclarée UNIQUEMENT dans `.pv2-wrap`, qui est la grille
+   (`GrilleSemainesV2.tsx:150`). La tête de page, elle, vit en dehors : toutes
+   ses `var(--pv2-…)` étaient donc VIDES. Le bouton d'accent sortait blanc sur
+   blanc et le menu transparent par-dessus la grille — MiKL, capture à l'appui :
+   « c'est quoi ce menu ? ».
+
+   ⚠️ CE QUE CET INCIDENT APPREND SUR LES VARIABLES CSS : une variable hors de
+   portée ne casse rien et ne prévient personne. `tsc`, 2184 tests et le build
+   sont tous passés au vert sur un écran illisible. Une couleur en dur se serait
+   vue à la relecture ; un `var()` orphelin, non.
+
+   ➜ La palette monte sur `.plan-scene`, l'ancêtre commun de la tête et de la
+     grille. Le CHÂSSIS (hauteurs, marges, gouttières) reste dans `.pv2-wrap` :
+     c'est lui que `grille-alignement-css-v2.test.ts` surveille, et il
+     n'appartient qu'à la grille.
+   ⚠️ `chantier-planning-v2.css` n'est importé que par `PlanningChantierV2` :
+     poser ces variables sur `.plan-scene` ne touche aucun écran du client. */
+.plan-scene {
+  --pv2-surface: var(--t-surface, #fffcf4);
+  --pv2-cell: #f6ebd6;
+  --pv2-cell-we: #f1e2c6;
+  --pv2-creux: #f6eedf;
+  --pv2-filet: #eadcc2;
+  --pv2-bd: #e6d7bb;
+  --pv2-txt: var(--t-text, #3a2a1c);
+  --pv2-sec: var(--t-muted, #7c6a55);
+  --pv2-acc: var(--t-accent, #c7530f);
+  --pv2-bad: #a8341f;
+}
+
 .pv2-wrap {
   /* Le châssis, partagé mot pour mot par la marge et par les cases. */
   --pv2-pad: 8px;
@@ -33,17 +64,9 @@
   --pv2-h-ligne: 22px;
   --pv2-h-presents: 26px;
 
-  /* La palette du prototype, avec repli sur les jetons du produit. */
-  --pv2-surface: var(--t-surface, #fffcf4);
-  --pv2-cell: #f6ebd6;
-  --pv2-cell-we: #f1e2c6;
-  --pv2-creux: #f6eedf;
-  --pv2-filet: #eadcc2;
-  --pv2-bd: #e6d7bb;
-  --pv2-txt: var(--t-text, #3a2a1c);
-  --pv2-sec: var(--t-muted, #7c6a55);
-  --pv2-acc: var(--t-accent, #c7530f);
-  --pv2-bad: #a8341f;
+  /* La palette était déclarée ici. Elle est remontée sur `.plan-scene`
+     (voir juste au-dessus) : la redéclarer ferait deux sources de vérité pour
+     une même couleur, et la grille est le SEUL descendant de `.pv2-wrap`. */
 
   display: flex;
   flex-direction: column;
@@ -819,4 +842,159 @@
 
 @media (prefers-reduced-motion: reduce) {
   .pv2h-caret { transition: none; }
+}
+
+/* ============================================================
+   B-157a — LA RANGÉE 2 ACCUEILLE LA PÉRIODE ET « METTRE EN AVANT »
+   ============================================================
+   MiKL, à la recette du 09/10 : « les périodes tu devrais les mettre en dessous
+   du mois sur la même ligne que les filtres, ya la place », et « il manque ce
+   filtre là des véto ».
+
+   Le fond de la rangée 2 était un creux (`--pv2-creux`) quand elle ne portait
+   que des réglages. Elle porte maintenant la PÉRIODE, qui n'est pas un réglage
+   mais le cadre de tout l'écran : le creux deviendrait une relégation. Elle
+   garde donc la surface, et c'est le filet du haut qui la sépare.
+   ============================================================ */
+
+.pv2h-r2 {
+  background: var(--pv2-surface);
+}
+
+/* La pilule de période garde son dessin d'origine (`.period-pill`), mais plus
+   sa marge automatique : elle ouvre la rangée, elle ne la pousse pas. */
+.pv2h-r2 .period-wrap { margin-right: 4px; }
+
+/* ── « Mettre en avant » ──────────────────────────────────────────────────── */
+
+.pv2h-avant { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pv2h-avant-liste { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+.pv2h-vet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--pv2-bd);
+  background: var(--pv2-surface);
+  color: var(--pv2-txt);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  /* 6px vertical, donc 14px horizontal au minimum (gardien B-146). */
+  padding: 6px 14px;
+}
+.pv2h-vet:hover { border-color: var(--pv2-acc); }
+/* Le choix retenu se voit SANS couleur de marque : la pastille porte déjà la
+   couleur de la personne, et deux couleurs sur un même bouton se disputeraient
+   la lecture. C'est donc le contraste qui change, pas la teinte. */
+.pv2h-vet[aria-pressed='true'] {
+  background: var(--pv2-txt);
+  border-color: var(--pv2-txt);
+  color: #fff;
+}
+.pv2h-vet-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex: none;
+}
+
+/* ── Ce que la mise en avant fait RÉELLEMENT sur la grille ────────────────── */
+
+/* Semaine dépliée : la ligne de la personne reste éclairée, les autres
+   s'effacent. Sans cet effacement, « mettre en avant » ne serait qu'un survol
+   qui colle — on verrait la même grille. */
+.pv2-epingle .pv2-rangee:not(.survol) { opacity: 0.3; }
+.pv2-epingle .pv2-prenom:not(.survol) { opacity: 0.35; }
+.pv2-epingle .pv2-rangee.survol { background: rgba(199, 83, 15, 0.14); }
+.pv2-epingle .pv2-prenom.survol { background: rgba(199, 83, 15, 0.14); }
+
+/* Semaine repliée : il n'y a pas de ligne par personne, seulement des
+   pastilles. On estompe celles qui ne sont pas la personne retenue — sinon le
+   filtre n'aurait aucun effet dans la vue la plus compacte, celle où l'on
+   cherche justement quelqu'un du regard. */
+.pv2-chip.attenue { opacity: 0.28; }
+
+/* ⚠️ L'opacité ne doit pas se cumuler avec une transition de fond en cours :
+   on garde l'effet instantané, c'est un filtre, pas une animation. */
+@media (prefers-reduced-motion: reduce) {
+  .pv2-epingle .pv2-rangee,
+  .pv2-epingle .pv2-prenom,
+  .pv2-chip.attenue { transition: none; }
+}
+
+@media (max-width: 720px) {
+  /* À cette largeur la rangée 2 empile : chaque groupe prend sa ligne, et les
+     prénoms passent en défilement plutôt qu'en quatre rangs. */
+  .pv2h-avant-liste { flex-wrap: nowrap; overflow-x: auto; }
+}
+
+/* ============================================================
+   B-157a — LA LÉGENDE DE LA GRILLE, QUI N'AVAIT AUCUN STYLE
+   ============================================================
+   🔴 TROUVÉE PAR UNE SONDE, PAS PAR UN TEST. Après le défaut des variables
+   hors de portée, j'ai listé toutes les classes rendues par les deux
+   composants du chantier et cherché lesquelles n'avaient AUCUNE règle CSS.
+   Onze remontées, dont `.cal-legende-3a` et ses quatre `.cl3-*` : la légende
+   s'affichait donc en vrac, repères compris — et `.cal-axes` avait exactement
+   le même défaut ce matin.
+
+   ⚠️ LA LEÇON : une classe sans règle ne casse rien, ne lève aucune erreur et
+   ne fait rougir aucun test. Elle ne se voit QUE sur l'écran, ou par une sonde
+   qui croise le JSX et les feuilles de style. C'est le même angle mort que la
+   variable CSS hors de portée, un cran plus loin.
+   ============================================================ */
+
+.cal-legende-3a {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  margin-top: 14px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--pv2-filet);
+  font-size: 0.74rem;
+  color: var(--pv2-sec);
+}
+.cl3-item { display: inline-flex; align-items: center; gap: 7px; }
+
+/* Les quatre repères reprennent le dessin exact de ce qu'ils expliquent —
+   une légende qui ne ressemble pas à la grille n'explique rien. */
+.cl3-barre {
+  width: 26px;
+  height: 9px;
+  border-radius: 999px;
+  background: #cbd9ef;
+}
+.cl3-rond {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #3a2a1c;
+}
+.cl3-rang {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 14px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: #3a2a1c;
+  color: #fff;
+  font-family: Figtree, var(--t-font-titre, sans-serif);
+  font-weight: 800;
+  font-size: 9px;
+}
+.cl3-trou {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 1px dashed var(--pv2-bad);
+  color: var(--pv2-bad);
+  font-weight: 800;
+  font-size: 9px;
 }

@@ -39,6 +39,10 @@ import {
 import { GardeDetailModal, peutProposerUnEchange } from '@/components/planning/GardeDetailModal'
 import { CriseModal, type VetCrise } from '@/components/planning/CriseModal'
 import { estJourFerie } from '@/engine/utils'
+// B-157a — la pastille de couleur du filtre « Mettre en avant » se dessine avec
+// la MÊME fonction que celles de la grille : deux recettes de point coloré
+// finiraient par ne plus désigner la même personne.
+import { stylePoint } from '@/lib/couleurs'
 // La grille part du lundi de la semaine du 1er et couvre des semaines pleines.
 // ⚠️ Elle vient du MÊME module que les bornes de chargement des données
 // (`app/(v2)/planning/page.tsx`) : les deux doivent se déplacer ensemble, sinon
@@ -391,6 +395,16 @@ export function PlanningChantierV2({
   }
 
   const [survol, setSurvol] = useState<string | null>(null)
+  /**
+   * B-157a — « METTRE EN AVANT », demandé par MiKL à la recette du 09/10.
+   *
+   * C'est le survol, ÉPINGLÉ. La grille sait déjà éclairer la ligne d'une
+   * personne d'un bout à l'autre (`.pv2-rangee.survol`) ; ce filtre ne
+   * réinvente donc rien, il rend cet éclairage persistant et estompe le reste.
+   * Réutiliser le mécanisme existant plutôt qu'en écrire un second est ce qui
+   * garantit que les deux ne divergeront pas.
+   */
+  const [enAvant, setEnAvant] = useState<string | null>(null)
   /** La cellule (jour × personne) dont la fenêtre de présences est ouverte. */
   const [cellule, setCellule] = useState<{ date: string; vetId: string } | null>(null)
 
@@ -830,6 +844,125 @@ export function PlanningChantierV2({
           </div>
 
           <div className="pv2h-reperes">
+
+          {/* LA PASTILLE DU PRÉ-VOL. Elle compte ce que le moteur a relevé et
+              les congés non tranchés — ⚠️ PAS les 48 incohérences de B-152a,
+              qui restent un contrôle de publication. Elle ne s'affiche qu'avec
+              un nombre : « 0 point à traiter » serait du bruit permanent, et
+              une pastille toujours là cesse d'être lue. Le détail reste dans
+              le bandeau, juste sous la tête — la pastille n'est qu'un signal,
+              jamais un rapport (leçon du 2026-07). */}
+            {pointsAVerifier > 0 && (
+              <span className="pv2h-points" role="status">
+                <b>{pointsAVerifier}</b>
+                {pointsAVerifier > 1 ? ' points à traiter' : ' point à traiter'}
+              </span>
+            )}
+          </div>
+
+          <div className="pv2h-gestes">
+            {/* Le secrétariat perd son panneau latéral (arbitrage du 06/10),
+                mais pas sa question : « il revient quand ? » regarde DEVANT, et
+                la grille par jour n'y répond pas. Même principe que les
+                compteurs — le détail passe en fenêtre. */}
+            {lectureSeule && (
+              <button
+                type="button"
+                className="pv2h-outil-btn"
+                onClick={() => setAbsencesOuvertes(true)}
+              >
+                Qui est absent
+              </button>
+            )}
+            {/* La barre de l'équipe porte des gestes que le SERVEUR refuse au
+                secrétariat. On ne lui sert donc pas la même barre en espérant
+                que les boutons refusés ne soient pas cliqués — elle reçoit le
+                seul geste qui la concerne, l'impression, avec le choix de la
+                période au moment où la question se pose. */}
+            {lectureSeule ? (
+              <ImprimerPourSecretariat
+                periodes={periodes.filter((p) => periodesAvecGardes.includes(p.id))}
+              />
+            ) : (
+              <>
+                {/* ⚠️ UN MENU POUR DEUX GESTES COÛTE PLUS QU'IL NE RANGE.
+                    Un vétérinaire n'a ici que l'impression et les compteurs :
+                    les enfermer derrière « Outils » lui ajouterait un clic sur
+                    le seul geste qu'il possède. Le menu n'apparaît donc que
+                    lorsqu'il y a vraiment une rangée à replier — c'est le cas
+                    de l'admin, qui en a quatre ou cinq. */}
+                {entreesMenu.length <= 2 ? (
+                  entreesMenu.map((e) => (
+                    <button
+                      key={e.cle}
+                      type="button"
+                      className="pv2h-outil-btn"
+                      disabled={!e.action}
+                      title={e.empeche ?? e.aide}
+                      onClick={() => lancerOutil(e)}
+                    >
+                      {e.libelle}
+                    </button>
+                  ))
+                ) : (
+                  /* LE MENU « OUTILS ». Il porte un libellé, pas seulement
+                     trois points : un bouton muet oblige à l'ouvrir pour
+                     savoir ce qu'il y a dedans, ce qui est exactement le clic
+                     qu'on voulait économiser.
+
+                     ⚠️ PAS DE `role="menu"` : ce rôle PROMET la navigation aux
+                     flèches et le piège de focus du pattern ARIA complet, que
+                     ce panneau n'implémente pas. Annoncer un contrat qu'on ne
+                     tient pas dessert plus l'utilisateur au clavier qu'un
+                     simple groupe de boutons, qui lui, se tabule. */
+                  <div className="pv2h-menu-wrap" ref={outilsRef}>
+                    <button
+                      type="button"
+                      className="pv2h-outil-btn"
+                      aria-expanded={outilsOuverts}
+                      aria-haspopup="true"
+                      onClick={() => setOutilsOuverts((v) => !v)}
+                    >
+                      Outils
+                      <span className="pv2h-caret" aria-hidden>▾</span>
+                    </button>
+                    {outilsOuverts && (
+                      <div className="pv2h-menu" aria-label="Outils du planning">
+                        {entreesMenu.map((e) => (
+                          <button
+                            key={e.cle}
+                            type="button"
+                            className="pv2h-menu-item"
+                            disabled={!e.action}
+                            onClick={() => lancerOutil(e)}
+                          >
+                            <span className="pv2h-menu-ico" aria-hidden>{e.icone}</span>
+                            <span className="pv2h-menu-txt">
+                              <b>{e.libelle}</b>
+                              {/* Quand le geste est impossible, on dit POURQUOI
+                                  à la place de l'aide : un geste grisé muet
+                                  envoie chercher la raison ailleurs. */}
+                              <small>{e.empeche ?? e.aide}</small>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {actionPrincipale}
+              </>
+            )}
+          </div>
+          </div>
+
+          {/* RANGÉE 2 — DE QUOI ON PARLE, ET COMMENT ON LE REGARDE.
+              MiKL, a la recette du 09/10 : « les periodes tu devrais les mettre
+              en dessous du mois sur la meme ligne que les filtres, ya la
+              place ». Il a raison, et pas seulement pour la place : la periode
+              n'est pas une IDENTITE (le mois l'est), c'est un CADRE de lecture
+              — exactement comme les deux axes a cote desquels elle se range. */}
+          <div className="pv2h-r2">
           {/* ⚠️ PAS DE NOTION DE PÉRIODE POUR LE SECRÉTARIAT.
               MiKL, le 25/08, devant l'écran affichant « Hors période » :
               « pas besoin de notion de période — tous les plannings publiés et
@@ -988,124 +1121,36 @@ export function PlanningChantierV2({
           </div>
           )}
 
-          {/* LA PASTILLE DU PRÉ-VOL. Elle compte ce que le moteur a relevé et
-              les congés non tranchés — ⚠️ PAS les 48 incohérences de B-152a,
-              qui restent un contrôle de publication. Elle ne s'affiche qu'avec
-              un nombre : « 0 point à traiter » serait du bruit permanent, et
-              une pastille toujours là cesse d'être lue. Le détail reste dans
-              le bandeau, juste sous la tête — la pastille n'est qu'un signal,
-              jamais un rapport (leçon du 2026-07). */}
-            {pointsAVerifier > 0 && (
-              <span className="pv2h-points" role="status">
-                <b>{pointsAVerifier}</b>
-                {pointsAVerifier > 1 ? ' points à traiter' : ' point à traiter'}
-              </span>
-            )}
-          </div>
-
-          <div className="pv2h-gestes">
-            {/* Le secrétariat perd son panneau latéral (arbitrage du 06/10),
-                mais pas sa question : « il revient quand ? » regarde DEVANT, et
-                la grille par jour n'y répond pas. Même principe que les
-                compteurs — le détail passe en fenêtre. */}
-            {lectureSeule && (
-              <button
-                type="button"
-                className="pv2h-outil-btn"
-                onClick={() => setAbsencesOuvertes(true)}
-              >
-                Qui est absent
-              </button>
-            )}
-            {/* La barre de l'équipe porte des gestes que le SERVEUR refuse au
-                secrétariat. On ne lui sert donc pas la même barre en espérant
-                que les boutons refusés ne soient pas cliqués — elle reçoit le
-                seul geste qui la concerne, l'impression, avec le choix de la
-                période au moment où la question se pose. */}
-            {lectureSeule ? (
-              <ImprimerPourSecretariat
-                periodes={periodes.filter((p) => periodesAvecGardes.includes(p.id))}
-              />
-            ) : (
-              <>
-                {/* ⚠️ UN MENU POUR DEUX GESTES COÛTE PLUS QU'IL NE RANGE.
-                    Un vétérinaire n'a ici que l'impression et les compteurs :
-                    les enfermer derrière « Outils » lui ajouterait un clic sur
-                    le seul geste qu'il possède. Le menu n'apparaît donc que
-                    lorsqu'il y a vraiment une rangée à replier — c'est le cas
-                    de l'admin, qui en a quatre ou cinq. */}
-                {entreesMenu.length <= 2 ? (
-                  entreesMenu.map((e) => (
+            {/* « METTRE EN AVANT » — demande a la recette du 09/10, apres avoir
+                constate son absence. Ce n'est PAS un decor : la ligne de la
+                personne s'eclaire d'un bout a l'autre de la grille, et tout le
+                reste s'estompe. Un second clic sur la meme personne repose le
+                filtre — sans ca, le seul moyen d'en sortir serait de deviner
+                qu'il faut recliquer, ou de recharger. */}
+            {equipe.length > 0 && (
+              <div className="pv2h-avant">
+                <span className="pv2h-axe-lbl">Mettre en avant</span>
+                <div className="pv2h-avant-liste">
+                  {equipe.map((v) => (
                     <button
-                      key={e.cle}
+                      key={v.id}
                       type="button"
-                      className="pv2h-outil-btn"
-                      disabled={!e.action}
-                      title={e.empeche ?? e.aide}
-                      onClick={() => lancerOutil(e)}
+                      className="pv2h-vet"
+                      aria-pressed={enAvant === v.id}
+                      onClick={() => setEnAvant((a) => (a === v.id ? null : v.id))}
                     >
-                      {e.libelle}
+                      <span
+                        className="pv2h-vet-dot"
+                        style={stylePoint(v.couleur)}
+                        aria-hidden
+                      />
+                      {v.prenom}
                     </button>
-                  ))
-                ) : (
-                  /* LE MENU « OUTILS ». Il porte un libellé, pas seulement
-                     trois points : un bouton muet oblige à l'ouvrir pour
-                     savoir ce qu'il y a dedans, ce qui est exactement le clic
-                     qu'on voulait économiser.
-
-                     ⚠️ PAS DE `role="menu"` : ce rôle PROMET la navigation aux
-                     flèches et le piège de focus du pattern ARIA complet, que
-                     ce panneau n'implémente pas. Annoncer un contrat qu'on ne
-                     tient pas dessert plus l'utilisateur au clavier qu'un
-                     simple groupe de boutons, qui lui, se tabule. */
-                  <div className="pv2h-menu-wrap" ref={outilsRef}>
-                    <button
-                      type="button"
-                      className="pv2h-outil-btn"
-                      aria-expanded={outilsOuverts}
-                      aria-haspopup="true"
-                      onClick={() => setOutilsOuverts((v) => !v)}
-                    >
-                      Outils
-                      <span className="pv2h-caret" aria-hidden>▾</span>
-                    </button>
-                    {outilsOuverts && (
-                      <div className="pv2h-menu" aria-label="Outils du planning">
-                        {entreesMenu.map((e) => (
-                          <button
-                            key={e.cle}
-                            type="button"
-                            className="pv2h-menu-item"
-                            disabled={!e.action}
-                            onClick={() => lancerOutil(e)}
-                          >
-                            <span className="pv2h-menu-ico" aria-hidden>{e.icone}</span>
-                            <span className="pv2h-menu-txt">
-                              <b>{e.libelle}</b>
-                              {/* Quand le geste est impossible, on dit POURQUOI
-                                  à la place de l'aide : un geste grisé muet
-                                  envoie chercher la raison ailleurs. */}
-                              <small>{e.empeche ?? e.aide}</small>
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-                {actionPrincipale}
-              </>
+                  ))}
+                </div>
+              </div>
             )}
-          </div>
-          </div>
 
-          {/* RANGÉE 2 — comment on regarde. Elle n'existe que s'il y a quelque
-              chose à régler : un seul axe à un seul choix serait une ligne
-              entière pour un bouton qui ne fait rien.
-              📌 PLACE RÉSERVÉE À GAUCHE pour « Mettre en avant » (lot 3). On
-              ne dessine PAS les pastilles de l'équipe en attendant : un filtre
-              qui ne filtre rien est précisément l'interdit du KIT COMPLET. */}
-          <div className="pv2h-r2">
             <div className="pv2h-axes">
               {choixDeContenu.length > 1 && (
                 <div className="pv2h-axe">
@@ -1127,7 +1172,7 @@ export function PlanningChantierV2({
               )}
               <div className="pv2h-axe">
                 <span className="pv2h-axe-lbl">Étendue</span>
-                <div className="pv2h-seg pv2-axe" role="group" aria-label="Étendue affichée">
+                <div className="pv2h-seg" role="group" aria-label="Étendue affichée">
                   <button
                     type="button"
                     className="pv2h-seg-btn"
@@ -1278,6 +1323,10 @@ export function PlanningChantierV2({
               cran vers le bas à chaque chargement. */}
 
           <div className="cal-scroll">
+            {/* `survol={enAvant ?? survol}` — la personne ÉPINGLÉE prime sur le
+                survol de souris. Sans cette priorité, passer la souris
+                n'importe où défaisait la mise en avant qu'on venait de
+                choisir. */}
             <GrilleSemainesV2
               semaines={semainesGrille}
               equipe={equipe}
@@ -1286,8 +1335,10 @@ export function PlanningChantierV2({
               depliees={semainesDepliees}
               onBasculerSemaine={basculerSemaine}
               today={today}
-              survol={survol}
+              survol={enAvant ?? survol}
               onSurvol={setSurvol}
+              epingle={enAvant !== null}
+              prenomEnAvant={equipe.find((v) => v.id === enAvant)?.prenom ?? null}
               onOuvrirGarde={(gardeId) => {
                 const g = gardes.find((x) => x.id === gardeId)
                 // Le clic n'ouvre que là où il mène quelque part — même test que
