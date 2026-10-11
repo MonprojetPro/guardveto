@@ -63,7 +63,7 @@ import {
   type PersonneGrille,
   type RailBornes,
 } from '@/lib/planning/grilleSemaines'
-import { heureCourte, type JourneeAffichee } from '@/lib/planning/presencesDuJour'
+import type { JourneeAffichee } from '@/lib/planning/presencesDuJour'
 
 /** Tout ce que la grille sait d'un jour. */
 export interface JourGrille {
@@ -420,6 +420,51 @@ function CaseJour({
   )
 }
 
+/**
+ * B-159 ③ — resserre les lignes d'une case repliee (option « B », 11/10).
+ *
+ * Pure, et volontairement separee du rendu : c'est la seule forme qui se teste
+ * sans monter un composant, et aucun test de ce projet n'en monte (B-144b).
+ */
+type LigneCompacte = ReturnType<typeof lignesCaseRepliee>[number] & {
+  /** La liste complete, pour l'infobulle — les pastilles ne la portent plus. */
+  resume?: string
+}
+
+function compacterLignes(
+  lignes: ReturnType<typeof lignesCaseRepliee>,
+): LigneCompacte[] {
+  return lignes.map((l) => {
+    if (l.genre === 'absents') {
+      const n = l.pastilles.length
+      // ⚠️ On repart des pastilles DEJA limitees par `lignesCaseRepliee` (qui
+      //    resume au-dela de 3 par un « +N »). Le compte affiche peut donc
+      //    etre inferieur au nombre reel d'absents — d'ou « au moins » dans
+      //    l'infobulle, plutot qu'un chiffre qui se donnerait pour exact.
+      const resume = l.pastilles.map((p) => p.texte).join(', ')
+      return {
+        ...l,
+        etiquette: '',
+        pastilles: [{ texte: n > 1 ? `${n} abs.` : '1 abs.', couleur: null, creux: true }],
+        resume,
+      }
+    }
+    if (l.genre === 'nuit') {
+      // Deux noms entiers valent mieux que trois coupes.
+      return l.pastilles.length <= 2
+        ? l
+        : {
+            ...l,
+            pastilles: [
+              l.pastilles[0],
+              { texte: `+${l.pastilles.length - 1}`, couleur: null, creux: true },
+            ],
+          }
+    }
+    return l
+  })
+}
+
 /** Une case repliée : le chiffre en grand, puis les pastilles. */
 function CaseRepliee({
   jour,
@@ -435,14 +480,34 @@ function CaseRepliee({
 }) {
   return (
     <>
-      {lignesCaseRepliee(jour, vue).map((l, i) => {
+      {/* B-159 ③ — LA CASE REPLIEE, VERSION « B » retenue par MiKL le 11/10.
+          Avant : quatre lignes dans 96px, dont des prenoms COUPES EN PLEIN
+          MILIEU (« Anne-S », « Jea »). Un nom tronque est pire qu'une absence
+          de nom : il a l'air d'un nom et ne designe personne.
+
+          Ce que la case repliee doit repondre, c'est « est-ce que ce jour va
+          bien ? » — pas « qui est absent ? », qui se lit en depliant. Donc :
+            · l'effectif reste en grand ;
+            · les ABSENCES deviennent un simple compteur (« 2 abs. »), la liste
+              passant au survol — plus aucune troncature ;
+            · la NUIT garde ses prenoms mais n'en montre que DEUX, pour qu'ils
+              tiennent en entier ;
+            · « a pourvoir » ne sort que s'il manque reellement quelqu'un.
+
+          ⚠️ LA TRANSFORMATION SE FAIT ICI, PAS DANS `lignesCaseRepliee` : cette
+          fonction vit dans `lib/planning/grilleSemaines.ts`, partage avec
+          l'ecran du client. On adapte sa SORTIE, on ne touche pas sa source. */}
+      {compacterLignes(lignesCaseRepliee(jour, vue)).map((l, i) => {
         // 🔴 LA LIGNE « N PRÉSENTS » OUVRE LA FENÊTRE DE DÉTAIL, et c'est le
         //    seul chemin vers elle en vue repliée. Au premier jet de B-145, la
         //    fenêtre livrée le matin même était encore montée et PLUS
         //    ATTEIGNABLE — un chemin disparu, qu'aucun test ne voit.
         const ouvrable = l.genre === 'presents' && Boolean(onOuvrirJournee)
         const dedans = (
-          <>
+          /* `title` sur la ligne, pas sur la pastille : c'est la ligne entiere
+             qu'on survole pour savoir QUI est absent, maintenant que le
+             compteur a remplace les prenoms. */
+          <span className="pv2-ligne-in" title={l.resume || undefined}>
             {l.etiquette && <span className="pv2-etq">{l.etiquette}</span>}
             {l.genre === 'presents' && (
               <>
@@ -472,7 +537,7 @@ function CaseRepliee({
                 {p.texte}
               </span>
             ))}
-          </>
+          </span>
         )
 
         return ouvrable ? (
@@ -529,7 +594,16 @@ function CaseDepliee({
   rendrePoseJourVide?: (date: string) => React.ReactNode
 }) {
   const lignes = lignesDeLaSemaine(equipe, jour, rail, vue)
-  const gardeDuJour = jour.gardes[0] ?? null
+  // B-159 ② — LA GARDE QUI PORTE LE TROU, pas la premiere du jour.
+  //
+  // `jour.gardes[0]` ouvrait le PREMIER creneau quoi qu'il arrive. Sur un jour
+  // a plusieurs creneaux, le trou pouvait appartenir au second : la fenetre
+  // s'ouvrait alors sur un creneau COMPLET, ou ne s'ouvrait pas du tout si ce
+  // premier creneau n'etait pas cliquable. C'est ce que MiKL a vu le 11/10 —
+  // « quand on clique sur le point d'interrogation il ne se passe rien ».
+  // Repli sur la premiere garde : mieux vaut ouvrir le mauvais creneau que
+  // rien, et `trous > 0` garantit qu'il y en a au moins un a pourvoir.
+  const gardeDuJour = jour.gardes.find((g) => g.manque > 0) ?? jour.gardes[0] ?? null
   const effectifs = effectifsDemiJournee(lignes)
   const cliquable = Boolean(onOuvrirCellule) && vue.journeeVisible
 
@@ -537,14 +611,17 @@ function CaseDepliee({
     <>
       <div className="pv2-titres" aria-hidden="true">
         <div className="pv2-t-journee">
-          {vue.journeeVisible && (
-            <>
-              <span>Journée</span>
-              <small>
-                {heureCourte(minutesEnTime(rail.debut))}–{heureCourte(minutesEnTime(rail.fin))}
-              </small>
-            </>
-          )}
+          {/* B-159 ① — LES BORNES DU RAIL SONT RETIRÉES, le 11/10 : « le 8h-18h
+              n'a pas à être là, il bloque le visuel ».
+
+              Elles répétaient dans CHAQUE case du mois une information qui ne
+              change jamais — les horaires d'ouverture du cabinet — et, dans une
+              case étroite, elles s'empilaient sur deux lignes en écrasant le
+              titre. Une constante affichée 31 fois n'informe plus personne : ce
+              qui se lit ici, c'est QUI est là, pas de quand à quand le cabinet
+              ouvre. L'information reste disponible là où elle se règle, dans
+              les tranches horaires de l'écran « Journée ». */}
+          {vue.journeeVisible && <span>Journée</span>}
         </div>
         {vue.gardesVisibles && <div className="pv2-t-nuit">Nuit</div>}
       </div>
@@ -562,6 +639,7 @@ function CaseDepliee({
                 type="button"
                 className="pv2-trou"
                 onClick={() => onOuvrirGarde(gardeDuJour.id)}
+                title={`${trous} place${trous > 1 ? 's' : ''} a pourvoir — cliquer pour choisir qui`}
                 aria-label={`${trous} place${trous > 1 ? 's' : ''} à pourvoir — ouvrir`}
               >
                 {trous > 1 ? `×${trous}` : '?'}
@@ -679,12 +757,10 @@ function CaseDepliee({
   )
 }
 
-/** 480 → `08:00`. Sert uniquement à réafficher les bornes du rail. */
-function minutesEnTime(minutes: number): string {
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-}
+/* `minutesEnTime` et `heureCourte` vivaient ici : ils ne servaient QU'À
+   réafficher les bornes du rail, retirées le 11/10 (B-159 ①). Code mort dès
+   lors — on le retire dans le même geste plutôt que de le laisser attendre un
+   usage qui ne viendra pas. */
 
 /**
  * La teinte d'une barre de présence.

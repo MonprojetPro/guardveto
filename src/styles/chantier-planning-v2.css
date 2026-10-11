@@ -1199,3 +1199,52 @@
 @media (max-width: 560px) {
   .gjc-cartes { flex-direction: column; }
 }
+
+/* ============================================================
+   B-159 ② et ③ — LE « ? » QUI SE SIGNALE, LA CASE REPLIÉE RESSERRÉE
+   ============================================================ */
+
+/* MiKL, 11/10 : « je verrais plutôt un point d'interrogation qui clignote pour
+   que ça saute aux yeux, et qui ouvre la pop-up qui existe déjà ».
+
+   ⚠️ UN CLIGNOTEMENT EST UNE DEMANDE D'ATTENTION, PAS UNE DÉCORATION — il ne
+   doit donc jamais devenir le bruit de fond de l'écran. Trois garde-fous :
+   une pulsation LENTE (1,6 s) plutôt qu'un vrai clignotement, qui fatigue et
+   rend le texte illisible ; une opacité qui ne descend jamais sous 0,55, pour
+   que le « ? » reste lisible à tout instant ; et un arrêt complet dès que le
+   survol commence — on a vu la place, on va cliquer dessus.
+   `prefers-reduced-motion` l'éteint : un mouvement répétitif est un
+   déclencheur reconnu, et l'information doit rester lisible sans lui (la
+   bordure rouge pointillée la porte déjà). */
+@keyframes pv2-trou-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.9); }
+}
+
+.pv2-trou {
+  animation: pv2-trou-pulse 1.6s ease-in-out infinite;
+  cursor: pointer;
+}
+.pv2-trou:hover,
+.pv2-trou:focus-visible {
+  animation: none;
+  opacity: 1;
+  background: var(--pv2-bad, #a8341f);
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pv2-trou { animation: none; }
+}
+
+/* ── La case repliée (option B) ───────────────────────────────────────────── */
+
+/* La ligne porte désormais son infobulle : c'est elle qu'on survole pour
+   savoir qui est absent, depuis que le compteur a remplacé les prénoms. */
+.pv2-ligne-in {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  width: 100%;
+}
