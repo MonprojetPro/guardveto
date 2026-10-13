@@ -813,3 +813,51 @@ soit lue par personne. Le gardien du code mort raisonne par **fichier** — il n
 voit ni une fonction sans appelant (**B-145a**, payé le 06/10), ni une table sans
 lecteur. Les deux sont la même famille, et c'est la seule famille de défauts de
 ce projet que **MiKL trouve avant le harnais**.
+
+---
+
+## 2026-10-13 — Un champ supprime parce qu'il mentait ne revient que par son MOTEUR
+
+**Le fait.** `conges.creneau` offrait « Matin / Apres-midi / Journee / Soiree » jusqu'au 26/08.
+`checkR16Conge` ne l'a **jamais lu** : quel que soit le creneau choisi, le conge bloquait la
+journee entiere. Quelqu'un posant une matinee perdait sa garde du soir, **et aucun ecran ne le
+disait**. On a supprime le champ (B-043) plutot que de le brancher — mesure faite : les 32 conges
+portaient tous `creneau = null`, personne ne s'en etait servi.
+
+Le 13/10, MiKL redemande exactement cette fonction, en plus large : six perimetres, et
+*« la journee ca n'est pas la nuit, ce sont 2 choses distinctes »*.
+
+**La parade, et elle est contre-intuitive.** On a code dans l'ordre inverse de l'ordre naturel :
+① le vocabulaire et ses regles dans **une seule autorite** (`lib/absences/perimetre.ts`), ② le
+**moteur** (`checkR16Conge`, `validerPlanning`, le chargeur, les deux regles de repos), ③ les
+chemins d'ecriture, ④ **la fenetre en dernier**. Un champ visible avant d'etre lu est un champ qui
+mentira — et il ne se voit pas, parce qu'il ne casse rien.
+
+🔑 **Le test qui vaut la regle** : `tests/lib/couverture-perimetres.test.ts` exige que tout fichier
+declare `decide` ou `ecrit` **importe reellement** l'autorite du perimetre. Une decision qui pretend
+lire sans importer est forcement fausse. C'est le seul controle de sincerite qu'une gate
+structurelle permet ici — et il a mordu pendant le lot meme.
+
+## Et le corollaire : « recenser les consumers » veut dire recenser les ECRITURES
+
+B-160 (le matin du 13/10) avait branche le retrait des presences sur **2 chemins**. Il en existait
+**4**. Les deux manquants :
+
+- `createConge` — le conge pose par l'admin nait `statut: 'valide'` et n'a jamais rien retire.
+  **C'est LE chemin qu'elle utilise.** Mesure en base : conge valide du 02 au 03/11, presence du
+  03/11 toujours la.
+- `lib/ia/outils/absences.ts` — **Filou ecrit en direct dans `absences`, hors de la route API.**
+
+⛔ **Pourquoi personne ne les avait vus** : on cherchait du cote des ECRANS. Un chemin d'ecriture
+peut vivre dans l'assistant, dans un import, dans un script. Quatrieme occurrence de la meme
+famille (B-156, B-160, B-160a, celui-ci) : **on couvre les chemins qu'on a sous les yeux, pas la
+liste des chemins.** Le `grep from('table')` est le seul recensement qui ne se fatigue pas.
+
+## Et un troisieme effet, invisible jusqu'a ce qu'on le cherche
+
+`absences` n'avait **aucune** notion de perimetre. Declarer « absent demain matin » lancait donc
+**tout le parcours de reparation des gardes du soir** : on proposait a l'administratrice de
+reattribuer une garde que le titulaire pouvait assurer. Les 3 routes (`reparer`, `volontaire`,
+`appel-volontaires`) **refusent desormais en 422** — pas un 200 vide, qui se lirait « c'est
+repare ». Et `avertissementsAffectation` ne previent plus sur une matinee : **une alerte fausse
+coute plus cher qu'une alerte absente, elle use l'attention.**
