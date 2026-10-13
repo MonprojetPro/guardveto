@@ -17,6 +17,8 @@ import { chargerReglagesEmail } from '@/lib/notifications-reglages'
 import type { CreneauImpacte } from '@/lib/crise/contexte'
 import type { CreneauConge, TypeConge } from '@/types'
 import type { SupabaseClient } from '@supabase/supabase-js'
+// B-160 — un conge accorde retire les presences de journee deja posees.
+import { retirerPresencesCouvertes } from '@/lib/journee/absence-retire-presences'
 
 /**
  * #10c — Expéditeur Brevo du cabinet courant (from email + from name), lus sur
@@ -110,8 +112,25 @@ export type CongeActionResult =
    * sur ce qu'il fallait faire ensuite. Avec, il peut ouvrir `GardienImpact`,
    * qui porte les gestes de correction.
    */
-  | { error: string; success?: undefined; conflit?: undefined; impact?: Impact }
-  | { success: true; error?: undefined; conflit?: ConflitPlanning; impact?: undefined }
+  | {
+      error: string
+      success?: undefined
+      conflit?: undefined
+      impact?: Impact
+      presencesRetirees?: undefined
+    }
+  /**
+   * `presencesRetirees` (B-160) : combien de presences de journee ont ete
+   * retirees parce que le conge les couvrait. Remonte a l'ecran pour etre DIT —
+   * un planning qui change tout seul se lit comme une panne.
+   */
+  | {
+      success: true
+      error?: undefined
+      conflit?: ConflitPlanning
+      impact?: undefined
+      presencesRetirees?: number
+    }
 
 export async function createConge(
   data: CongeFormData,
@@ -413,6 +432,28 @@ export async function validerConge(
   const debutEffectif = date_debut ?? conge?.date_debut ?? null
   const finEffective = date_fin ?? conge?.date_fin ?? null
 
+  // B-160 — LE CONGÉ ACCORDÉ RETIRE LES PRÉSENCES DE JOURNÉE DÉJÀ POSÉES.
+  //
+  // Jusqu'au 13/10, rien ne le faisait : l'application des trames écartait les
+  // congés AU MOMENT DE LA POSE, et rien ne repassait quand le congé arrivait
+  // après. Le planning montrait alors quelqu'un au cabinet un jour où il était
+  // en vacances, sans qu'aucun écran ne le signale.
+  //
+  // ⚠️ ON UTILISE LES DATES EFFECTIVES, pas celles de la demande : l'admin peut
+  //    accorder une fenêtre plus courte que celle demandée, et retirer sur la
+  //    demande viderait des jours finalement travaillés.
+  // ⚠️ Best-effort : un échec ici ne doit pas annuler un congé déjà accordé.
+  //    Il est journalisé par la brique, et le compte revient à l'appelant.
+  let presencesRetirees = 0
+  if (conge?.veterinaire_id && debutEffectif && finEffective) {
+    const r = await retirerPresencesCouvertes(supabase, {
+      veterinaire_id: conge.veterinaire_id,
+      date_debut: debutEffectif,
+      date_fin: finEffective,
+    })
+    presencesRetirees = r.retirees
+  }
+
   // Notification email (fire-and-forget — n'échoue pas le process principal)
   if (conge) {
     const { data: vet } = await supabase
@@ -488,7 +529,11 @@ export async function validerConge(
     }
   }
 
-  return { success: true }
+  // B-160 — le nombre de presences retirees REMONTE a l'ecran. Un planning qui
+  // change tout seul se lit comme une panne : l'admin a valide un conge, elle
+  // n'a pas demande qu'on vide des journees. On le dit, meme quand le conflit
+  // de garde prend la main juste au-dessus (ce cas-la a sa propre modale).
+  return { success: true, presencesRetirees }
 }
 
 export async function refuserConge(id: string, raison?: string) {

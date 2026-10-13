@@ -24,6 +24,8 @@ import {
   type ContexteCrisePeriode,
 } from '@/lib/crise/contexte'
 import type { MotifAbsence } from '@/types'
+// B-160 — une absence declaree retire les presences de journee deja posees.
+import { retirerPresencesCouvertes } from '@/lib/journee/absence-retire-presences'
 
 // Le recensement + N proposerReparation (purs) restent rapides, mais on charge
 // le contexte (resoudreContexte) par période → on laisse de la marge.
@@ -128,6 +130,22 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // ── B-160 — LES PRÉSENCES DE JOURNÉE COUVERTES SONT RETIRÉES ──
+  //
+  // Une absence déclarée vide le planning de journée de cette personne sur ses
+  // dates. Avant le 13/10, rien ne le faisait : elle restait affichée au
+  // cabinet des jours où elle était absente, sans qu'aucun écran ne le dise.
+  //
+  // ⚠️ CE N'EST PAS LE TRAITEMENT DES GARDES, ET C'EST VOULU. Une garde ne se
+  //    retire jamais en silence — elle laisserait un soir SANS PERSONNE, d'où
+  //    le parcours de réparation juste en dessous, qui réattribue et fait
+  //    trancher un humain. Une présence de journée n'engage personne d'autre.
+  const retrait = await retirerPresencesCouvertes(supabase, {
+    veterinaire_id,
+    date_debut,
+    date_fin,
+  })
+
   // ── Créneaux impactés (gardes futures du véto, statut diffusé) ──
   let impactes
   try {
@@ -186,5 +204,10 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  return NextResponse.json({ absence, creneauxImpactes })
+  // `presencesRetirees` part avec la reponse : l'ecran doit pouvoir le DIRE.
+  return NextResponse.json({
+    absence,
+    creneauxImpactes,
+    presencesRetirees: retrait.retirees,
+  })
 }

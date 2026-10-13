@@ -2200,6 +2200,15 @@ case du planning, large de ~104px.
 
 ## Archive 66 — 2026-10-13 — les convergences de B-157, B-157a, B-157b et B-159, consommees (33e archivage)
 
+> 🔴 **ERREUR DE CET ARCHIVAGE, CORRIGEE LE JOUR MEME — a lire avant le prochain.**
+> Le script filtrait les lignes commencant par `| B-157 |` pour les sortir de la section
+> Convergence. Il a aussi emporte les **items d'INBOX** portant les memes identifiants —
+> B-157, B-157a, B-157b et B-159 — qui etaient **actifs**. Ils ont ete **restaures** depuis
+> `git show 011c639`. ⚠️ **L'invariant « aucun identifiant perdu » n'a RIEN vu** : les
+> identifiants etaient bien presents… dans la mauvaise section. ➜ **Un controle de
+> conservation doit verifier la SECTION, pas seulement la presence.** Les 4 items qui
+> suivent le bloc de convergence sont donc des doublons inertes : ils vivent au board.
+>
 > **35 lignes de controle de sortie**, toutes commitees (`eba5e2c`, `4f734b2`, `25a1145`,
 > `63a496b`, `a5bce6b`). Elles ont servi : la gate les a lues, le commit est passe.
 > Elles restent ici pour que le raisonnement de chaque livraison soit relisible.

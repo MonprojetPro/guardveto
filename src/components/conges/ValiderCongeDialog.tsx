@@ -14,6 +14,7 @@ import type { Impact } from '@/data/controleImpact'
 import type { VetEtiquette } from '@/components/planning/PointPreVol'
 import type { Conge, Veterinaire } from '@/types'
 import { stylePastille } from '@/lib/couleurs'
+import { phraseRetrait } from '@/lib/journee/absence-retire-presences'
 
 interface ValiderCongeDialogProps {
   open: boolean
@@ -53,7 +54,13 @@ export function ValiderCongeDialog({
         return
       }
       setImpact(null)
-      toast.success('Congé validé')
+      // B-160 — ON DIT CE QUI A ETE RETIRE. L'admin valide un conge ; elle ne
+      // demande pas qu'on vide des journees. Un planning qui change tout seul
+      // se lit comme une panne, et c'est la raison pour laquelle ce compte
+      // remonte jusqu'ici au lieu de rester cote serveur.
+      const retirees = result.presencesRetirees ?? 0
+      const dit = phraseRetrait(retirees, vet?.prenom ?? 'cette personne')
+      toast.success(dit ? `Congé validé — ${dit}` : 'Congé validé')
       onClose()
       if (result.conflit) onConflit?.(result.conflit)
     })
