@@ -54,11 +54,33 @@ const LA_BRIQUE = 'retirerPresencesCouvertes'
 const CHEMINS_QUI_RENDENT_INDISPONIBLE: { fichier: string; quoi: string }[] = [
   {
     fichier: "app/(protected)/conges/actions.ts",
-    quoi: "l'admin accorde un congé (`validerConge`)",
+    // ⚠️ CE FICHIER PORTE TROIS CHEMINS, pas un. B-160 n'avait branché que le
+    //    deuxième, et c'est le PREMIER que l'administratrice utilise — trou
+    //    mesuré en base le 13/10 (B-160a). Le gardien ne peut pas distinguer
+    //    trois appels dans un même fichier : c'est la limite assumée de toute
+    //    gate structurelle, et la raison pour laquelle le commentaire les
+    //    nomme.
+    quoi:
+      "l'admin pose un congé (`createConge`, né validé), l'accorde (`validerConge`) " +
+      'ou le déplace (`updateConge`)',
   },
   {
     fichier: 'app/api/absences/route.ts',
     quoi: "l'admin déclare une absence (POST /api/absences)",
+  },
+  {
+    fichier: 'lib/ia/outils/absences.ts',
+    // 🔴 QUATRIÈME OCCURRENCE DU MÊME DÉFAUT, trouvée le 13/10 en balayant les
+    //    chemins et NON en recette. Cet outil n'insère pas par la route : il
+    //    écrit en direct dans `absences`. Une absence déclarée par Filou
+    //    laissait donc la personne affichée au cabinet, exactement comme le
+    //    défaut d'origine de B-160.
+    //
+    // 🔑 POURQUOI PERSONNE NE L'AVAIT VU : on cherchait du côté des écrans. Un
+    //    chemin d'écriture peut vivre dans l'assistant, dans un import, dans un
+    //    script — « recenser les consumers » veut dire recenser les ÉCRITURES,
+    //    pas les pages.
+    quoi: 'Filou déclare une absence (`declarer_absence`)',
   },
 ]
 
@@ -152,5 +174,68 @@ describe('Aucun chemin ne peut rendre quelqu’un indisponible sans retirer ses 
   it('le gardien n’est pas muet — sondé sur un faux chemin', () => {
     const sourceSansLaBrique = "export async function validerQuelqueChose() { return true }"
     expect(sourceSansLaBrique.includes(LA_BRIQUE)).toBe(false)
+  })
+})
+
+// ============================================================
+// B-163 — LE RETRAIT SUIT LE PÉRIMÈTRE, ET NE RETIRE QUE CE QU'IL NOMME
+// ============================================================
+// MiKL, le 13/10 : « il est possible qu'un véto soit absent la journée mais pas
+// la nuit, ou juste le matin mais pas l'après-midi », et sur la réunion de 2h :
+// « on part sur le A quand ça reste une indisponibilité ponctuelle qui ne change
+// rien à sa présence du jour ».
+//
+// 🔴 CE QUE CES CAS PROTÈGENT : jusqu'au 13/10, la brique retirait TOUTES les
+//    présences du jour. Appliquée à une absence du matin, elle aurait fait
+//    disparaître quelqu'un d'un après-midi qu'il travaille — soit l'option B,
+//    explicitement écartée.
+describe('Le retrait suit le périmètre (B-163)', () => {
+  // Les tranches réelles du premier cabinet, mesurées en base le 13/10 :
+  // Matin 08-12, Après-midi 14-18, Journée complète 08-18.
+  const duJour: PresencePourRetrait[] = [
+    { id: 'm', veterinaire_id: 'v1', date: '2026-11-02', creneau: 'matin' },
+    { id: 'a', veterinaire_id: 'v1', date: '2026-11-02', creneau: 'apres-midi' },
+    { id: 'j', veterinaire_id: 'v1', date: '2026-11-02', creneau: 'journee' },
+  ]
+  const jour = { veterinaire_id: 'v1', date_debut: '2026-11-02', date_fin: '2026-11-02' }
+
+  it('une absence du matin ne retire QUE le matin', () => {
+    // Et surtout : elle ne retire PAS la tranche « journée complète », parce que
+    // la personne y est présente de 14h à 18h.
+    expect(presencesARetirer(duJour, { ...jour, perimetre: 'matin' })).toEqual(['m'])
+  })
+
+  it('une absence de l’après-midi ne retire que l’après-midi', () => {
+    expect(presencesARetirer(duJour, { ...jour, perimetre: 'apres-midi' })).toEqual(['a'])
+  })
+
+  it('une absence de journée retire les trois tranches', () => {
+    expect(presencesARetirer(duJour, { ...jour, perimetre: 'journee' })).toEqual(['m', 'a', 'j'])
+  })
+
+  it('une absence de NUIT ne retire aucune présence de journée', () => {
+    // La garde tombe, la journée au cabinet ne change pas. Retirer ici
+    // effacerait du planning quelqu'un qui vient travailler.
+    expect(presencesARetirer(duJour, { ...jour, perimetre: 'nuit' })).toEqual([])
+  })
+
+  it('un ponctuel de deux heures ne retire RIEN — l’option A, mot pour mot', () => {
+    expect(presencesARetirer(duJour, { ...jour, perimetre: 'ponctuel' })).toEqual([])
+  })
+
+  it('sans périmètre, tout est retiré — le comportement d’avant ce lot', () => {
+    // Le repli ne doit jamais conserver à tort : les 50 congés en base ont été
+    // acceptés sous « une absence retire tout ».
+    expect(presencesARetirer(duJour, jour)).toEqual(['m', 'a', 'j'])
+  })
+
+  it('une présence sans créneau connu est traitée comme « journée »', () => {
+    // Donc retirée par une absence de journée, et conservée par une absence du
+    // matin. Le repli le plus large est le seul qui ne libère rien par erreur.
+    const sansCreneau: PresencePourRetrait[] = [
+      { id: 'x', veterinaire_id: 'v1', date: '2026-11-02' },
+    ]
+    expect(presencesARetirer(sansCreneau, { ...jour, perimetre: 'journee' })).toEqual(['x'])
+    expect(presencesARetirer(sansCreneau, { ...jour, perimetre: 'matin' })).toEqual([])
   })
 })

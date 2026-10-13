@@ -12,6 +12,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
 import { CongeForm } from './CongeForm'
+import { PastillePerimetre } from '@/components/absences/ChoixPerimetre'
 import { ValiderCongeDialog } from './ValiderCongeDialog'
 import { RefuserCongeDialog } from './RefuserCongeDialog'
 import { ConflitPlanningDialog } from './ConflitPlanningDialog'
@@ -72,9 +73,14 @@ interface CongesListProps {
    * souhaits en attente côté admin ; les autres congés n'y figurent pas.
    */
   conflitsParConge?: Record<string, CreneauImpacte[]>
+  /**
+   * B-163 — le cabinet a-t-il allume le planning des journees ? Decide si le
+   * choix de perimetre propose « matin » et « apres-midi ».
+   */
+  moduleJourneeActif?: boolean
 }
 
-export function CongesList({ conges, vets, currentUserId, isAdmin, conflitsParConge }: CongesListProps) {
+export function CongesList({ conges, vets, currentUserId, isAdmin, conflitsParConge, moduleJourneeActif = false }: CongesListProps) {
   const [addOpen, setAddOpen] = useState(false)
   const [addDefaultVet, setAddDefaultVet] = useState<string | undefined>()
   const [editConge, setEditConge] = useState<Conge | null>(null)
@@ -181,6 +187,14 @@ export function CongesList({ conges, vets, currentUserId, isAdmin, conflitsParCo
           {/* Le type reste masqué sur mobile (place limitée), mais le STATUT
               est toujours visible : la couleur seule ne suffisait pas. */}
           <Badge variant="outline" className={`hidden sm:inline-flex text-xs ${TYPE_COLORS[c.type]}`}>{TYPE_LABELS[c.type]}</Badge>
+          {/* B-163 — ce que l'absence couvre. Choisir « le matin » doit se VOIR
+              ici : c'est la seule trace du choix quand le planning ne change
+              pas (option A, tranchee le 13/10). */}
+          <PastillePerimetre
+            perimetre={c.perimetre}
+            heureDebut={c.heure_debut}
+            heureFin={c.heure_fin}
+          />
           <Badge variant="outline" className={`text-xs ${statutCfg.className}`}>{statutCfg.label}</Badge>
         </div>
 
@@ -347,6 +361,7 @@ export function CongesList({ conges, vets, currentUserId, isAdmin, conflitsParCo
         vets={vets} currentUserId={currentUserId} isAdmin={isAdmin}
         defaultVetId={addDefaultVet}
         onConflit={setConflit}
+        moduleJourneeActif={moduleJourneeActif}
       />
       {editConge && (
         <CongeForm
@@ -354,6 +369,7 @@ export function CongesList({ conges, vets, currentUserId, isAdmin, conflitsParCo
           onClose={() => setEditConge(null)}
           vets={vets} currentUserId={currentUserId} isAdmin={isAdmin}
           conge={editConge}
+          moduleJourneeActif={moduleJourneeActif}
         />
       )}
       {validerConge && (
@@ -436,6 +452,7 @@ export function CongesList({ conges, vets, currentUserId, isAdmin, conflitsParCo
           vetDefautId={conflit.veterinaire_id}
           dateDebutDefaut={conflit.date_debut}
           dateFinDefaut={conflit.date_fin}
+          moduleJourneeActif={moduleJourneeActif}
         />
       )}
     </>

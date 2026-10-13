@@ -8,6 +8,8 @@
 // comportement du cabinet pilote (colonnes nulles) est donc inchangé.
 
 import { adresseUtilisable } from '@/lib/emails/destinataire'
+// B-163 — l'unique autorite sur ce qu'une absence couvre.
+import { lirePerimetre, phrasePerimetre } from '@/lib/absences/perimetre'
 
 export async function sendBrevoEmail({
   to,
@@ -129,13 +131,33 @@ function signatureCabinet(signature?: string | null): string {
 export function emailCongeValide(params: {
   prenom: string
   type: string
+  /**
+   * ⚠️ PARAMETRE MORT depuis B-043 — il etait recu et JAMAIS affiche. Conserve
+   *    pour ne pas casser les appelants ; le champ vivant est `perimetre`.
+   */
   creneau: string | null
+  /**
+   * CE QUE L'ABSENCE COUVRE (B-163). L'e-mail DOIT le dire : le veto recoit la
+   * decision par mail et n'ouvre pas forcement l'app. Une validation muette sur
+   * le perimetre laisserait croire que toute la journee est accordee.
+   */
+  perimetre?: unknown
+  heure_debut?: string | null
+  heure_fin?: string | null
   date_debut: string
   date_fin: string
   /** Nom d'expéditeur du cabinet (cabinets.brevo_from_name) — D3. */
   signature?: string | null
 }) {
   const { prenom, type, creneau, date_debut, date_fin } = params
+  // B-163 — rend `null` pour « journee et nuit » : le cas general n'a rien a
+  // annoncer, et une ligne qui s'affiche dans chaque e-mail cesse d'etre lue.
+  const ditPerimetre = phrasePerimetre(
+    lirePerimetre(params.perimetre),
+    params.heure_debut && params.heure_fin
+      ? { heure_debut: params.heure_debut, heure_fin: params.heure_fin }
+      : null,
+  )
   const signature = signatureCabinet(params.signature)
   const isIndispo = type === 'indisponibilite'
   const typeLabel = TYPE_LABELS[type] ?? type
@@ -155,7 +177,11 @@ export function emailCongeValide(params: {
       <p style="margin:0 0 6px;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Type</p>
       <p style="margin:0 0 14px;font-weight:600">${typeLabel}</p>
       <p style="margin:0 0 6px;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Période</p>
-      <p style="margin:0;font-weight:600">${periode}</p>
+      <p style="margin:0 ${ditPerimetre ? '14px' : '0'};font-weight:600">${periode}</p>
+      ${ditPerimetre ? `
+      <p style="margin:0 0 6px;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Porte sur</p>
+      <p style="margin:0;font-weight:600">${ditPerimetre}</p>
+      ` : ''}
     </div>
     <p style="margin:0;color:#6b7280;font-size:13px">Vous pouvez consulter vos congés directement dans GuardVeto.</p>
   </div>
@@ -165,7 +191,12 @@ export function emailCongeValide(params: {
 export function emailCongeRefuse(params: {
   prenom: string
   type: string
+  /** ⚠️ MORT depuis B-043 (recu, jamais affiche). Le champ vivant : `perimetre`. */
   creneau: string | null
+  /** CE QUE LA DEMANDE REFUSEE COUVRAIT (B-163) — pour qu'on sache quoi reposer. */
+  perimetre?: unknown
+  heure_debut?: string | null
+  heure_fin?: string | null
   date_debut: string
   date_fin: string
   raison: string | null
@@ -173,6 +204,12 @@ export function emailCongeRefuse(params: {
   signature?: string | null
 }) {
   const { prenom, type, creneau, date_debut, date_fin, raison } = params
+  const ditPerimetre = phrasePerimetre(
+    lirePerimetre(params.perimetre),
+    params.heure_debut && params.heure_fin
+      ? { heure_debut: params.heure_debut, heure_fin: params.heure_fin }
+      : null,
+  )
   const signature = signatureCabinet(params.signature)
   const isIndispo = type === 'indisponibilite'
   const typeLabel = TYPE_LABELS[type] ?? type
@@ -192,7 +229,11 @@ export function emailCongeRefuse(params: {
       <p style="margin:0 0 6px;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Type</p>
       <p style="margin:0 0 14px;font-weight:600">${typeLabel}</p>
       <p style="margin:0 0 6px;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Période</p>
-      <p style="margin:0 ${raison ? '14px' : '0'};font-weight:600">${periode}</p>
+      <p style="margin:0 ${raison || ditPerimetre ? '14px' : '0'};font-weight:600">${periode}</p>
+      ${ditPerimetre ? `
+      <p style="margin:0 0 6px;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Portait sur</p>
+      <p style="margin:0 ${raison ? '14px' : '0'};font-weight:600">${ditPerimetre}</p>
+      ` : ''}
       ${raison ? `
       <p style="margin:0 0 6px;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Motif</p>
       <p style="margin:0;font-style:italic;color:#374151">${raison}</p>

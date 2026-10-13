@@ -33,8 +33,10 @@
 //    le plus prévisible, et on écrit la limite plutôt que de la taire.
 // ============================================================
 
-import type { BlocJournee, JourTrame, PariteSemaine } from '@/types'
+import type { BlocJournee, CreneauBlocJournee, JourTrame, PariteSemaine } from '@/types'
 import { trameViseCetteDate } from './trames'
+// B-163 — l'unique autorité sur ce qu'une absence retire.
+import { blocsRetires, lirePerimetre, type PerimetreAbsence } from '@/lib/absences/perimetre'
 
 /** Une période, réduite à ce qu'il faut en savoir pour y poser des présences. */
 export interface PeriodePourPresences {
@@ -131,17 +133,41 @@ export interface AbsencePourPresences {
   /** `AAAA-MM-JJ`, bornes comprises. */
   date_debut: string
   date_fin: string
+  /**
+   * CE QUE L'ABSENCE COUVRE (B-163). Optionnel pour que les appels existants
+   * compilent, mais replié sur `journee-et-nuit` — donc le comportement d'avant
+   * ce lot. Un oubli bloque comme hier ; il ne pose jamais quelqu'un à tort.
+   */
+  perimetre?: PerimetreAbsence
 }
 
-/** Cette personne est-elle absente ce jour-là ? */
-function estAbsent(
+/**
+ * Cette personne est-elle absente ce jour-là, SUR CE CRÉNEAU DE BLOC ?
+ *
+ * 🔴 CE N'EST PLUS UNE QUESTION DE JOUR, C'EST UNE QUESTION DE BLOC (B-163).
+ *    « il est possible qu'un véto soit absent la journée mais pas la nuit, ou
+ *    juste le matin mais pas l'après-midi » — MiKL, le 13/10.
+ *
+ * ⚠️ UNE ABSENCE DU MATIN NE LIBÈRE PAS UN BLOC « JOURNÉE COMPLÈTE ». Les blocs
+ *    du premier cabinet sont Matin 08-12, Après-midi 14-18 et Journée complète
+ *    08-18 : quelqu'un d'absent le matin, posé sur « Journée complète », est
+ *    bel et bien là de 14h à 18h. Ne pas poser sa présence le ferait disparaître
+ *    d'un après-midi qu'il travaille — l'option B que MiKL a explicitement
+ *    écartée au profit de l'option A (« ça ne change rien à sa présence du
+ *    jour, on l'affiche »). C'est `blocsRetires` qui porte cette distinction,
+ *    et elle seule.
+ */
+function estAbsentSurCeBloc(
   absences: readonly AbsencePourPresences[],
   veterinaireId: string,
   date: string,
+  creneauDuBloc: CreneauBlocJournee,
 ): boolean {
-  return absences.some(
-    (a) => a.veterinaire_id === veterinaireId && a.date_debut <= date && a.date_fin >= date,
-  )
+  return absences.some((a) => {
+    if (a.veterinaire_id !== veterinaireId) return false
+    if (a.date_debut > date || a.date_fin < date) return false
+    return blocsRetires(lirePerimetre(a.perimetre)).includes(creneauDuBloc)
+  })
 }
 
 /**
@@ -161,7 +187,14 @@ function estAbsent(
  */
 export function presencesVoulues(
   trames: readonly TramePourProjection[],
-  blocs: readonly Pick<BlocJournee, 'id' | 'actif'>[],
+  /**
+   * ⚠️ `creneau` EST DEVENU NÉCESSAIRE (B-163) : sans lui, impossible de savoir
+   *    si une absence du matin concerne ce bloc. Optionnel au type pour ne pas
+   *    casser les appels existants, replié sur `journee` — le créneau le plus
+   *    large, donc celui qui se fait retirer dès qu'une absence couvre la
+   *    journée. Un bloc dont le créneau manque se comporte donc comme avant.
+   */
+  blocs: readonly (Pick<BlocJournee, 'id' | 'actif'> & { creneau?: CreneauBlocJournee })[],
   periode: PeriodePourPresences,
   /**
    * B-148 — les gens absents ces jours-là. Par défaut vide, pour que les
@@ -172,6 +205,10 @@ export function presencesVoulues(
   absences: readonly AbsencePourPresences[] = [],
 ): PresenceVoulue[] {
   const blocsActifs = new Set(blocs.filter((b) => b.actif).map((b) => b.id))
+  // Le créneau de chaque bloc, pour décider bloc par bloc et non jour par jour.
+  const creneauParBloc = new Map<string, CreneauBlocJournee>(
+    blocs.map((b) => [b.id, b.creneau ?? 'journee']),
+  )
   const utiles = trames.filter((t) => t.actif && blocsActifs.has(t.bloc_id))
   if (utiles.length === 0) return []
 
@@ -194,7 +231,19 @@ export function presencesVoulues(
       //    Poser quand même aurait affiché au comptoir quelqu'un qui est en
       //    vacances — le genre de réponse fausse servie avec l'aplomb d'une
       //    réponse juste que ce produit combat depuis le début.
-      if (estAbsent(absences, t.veterinaire_id, date)) continue
+      //
+      // ⚠️ MAIS L'ABSENCE NE COUVRE QUE CE QU'ELLE NOMME (B-163) : un congé
+      //    « le matin » laisse l'après-midi et la journée complète en place.
+      if (
+        estAbsentSurCeBloc(
+          absences,
+          t.veterinaire_id,
+          date,
+          creneauParBloc.get(t.bloc_id) ?? 'journee',
+        )
+      ) {
+        continue
+      }
 
       const p: PresenceVoulue = {
         veterinaire_id: t.veterinaire_id,

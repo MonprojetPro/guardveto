@@ -29,6 +29,10 @@ import {
   detecterConflitsPourDecision,
   type VerdictSouhait,
 } from '@/lib/conges/detection-conflit'
+// B-163 — le périmètre décide si un conflit de garde est même possible.
+import { lirePerimetre } from '@/lib/absences/perimetre'
+import { modulesDuCabinet } from '@/lib/produit/modules-serveur'
+import { MODULE_JOURNEE } from '@/lib/journee/porte'
 import type { EchangeRow, GardeLite, VetLite } from '@/components/echanges/EchangesClient'
 import type { CompensationLigne } from '@/components/admin/DepannagesClient'
 import type { VetCrise } from '@/components/planning/CriseModal'
@@ -137,6 +141,36 @@ export default async function AbsencesPage() {
 
   const periodes = (periodesRes?.data ?? []) as PeriodeFiltre[]
 
+  // ── B-160a ③ — LES ABSENCES ACTIVES, pour voir les doublons ───────────────
+  //
+  // 🔴 CET ÉCRAN NE LES CHARGEAIT PAS. Il montrait les congés et les
+  //    dépannages ; la table `absences` elle-même n'était jamais lue ici. C'est
+  //    une des raisons pour lesquelles le recouvrement du 13/10 ne pouvait pas
+  //    se voir : la moitié de l'information n'était pas là.
+  //
+  // Fail-open comme le reste de l'écran : une lecture muette laisse simplement
+  // le bandeau absent — mais l'erreur est TRACÉE, parce qu'une liste vide se
+  // lirait « aucun doublon », soit la bonne nouvelle par défaut qu'on refuse.
+  const absencesRes = await supabase
+    .from('absences')
+    .select('id, veterinaire_id, date_debut, date_fin, perimetre')
+    .eq('statut', 'active')
+  if (absencesRes.error) {
+    console.error('[absences] absences actives illisibles :', absencesRes.error.message)
+  }
+  const absencesActives = (absencesRes.data ?? []) as {
+    id: string
+    veterinaire_id: string
+    date_debut: string
+    date_fin: string
+    perimetre?: string | null
+  }[]
+
+  // B-163 — sans le module journée, la fenêtre d'absence n'offre ni « le
+  // matin » ni « l'après-midi ». `modulesDuCabinet` a un repli FERMANT (le socle
+  // seul) : une panne de lecture retire le choix, elle ne l'offre pas à tort.
+  const moduleJourneeActif = (await modulesDuCabinet(supabase)).includes(MODULE_JOURNEE)
+
   // ── Verdict de conflit sur les souhaits en attente (admin) ──
   // Calculé en amont pour que la ligne l'affiche sans clic. Couvre les
   // plannings PUBLIÉS et les BROUILLONS : l'écran n'annonçait que le publié,
@@ -166,6 +200,9 @@ export default async function AbsencesPage() {
               veterinaireId: c.veterinaire_id,
               dateDebut: c.date_debut,
               dateFin: c.date_fin,
+              // B-163 — un souhait qui ne couvre pas la nuit ne percute aucune
+              // garde : l'écran de décision ne doit pas en inventer un.
+              perimetre: lirePerimetre(c.perimetre),
             }),
           })),
         )
@@ -225,6 +262,8 @@ export default async function AbsencesPage() {
           vetsCrise={vetsCrise}
           depannages={lignesDepannages}
           statsDepannages={statsDepannages}
+          moduleJourneeActif={moduleJourneeActif}
+          absencesActives={absencesActives}
         />
       </div>
     </>

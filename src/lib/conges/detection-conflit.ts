@@ -28,6 +28,8 @@ import {
   type ExceptionJour,
 } from '@/lib/gardes/exceptions-jour'
 import { addDays, datesCouvertesParGardeV1 } from '@/engine/utils'
+// B-163 — une absence qui ne couvre pas la nuit ne peut pas percuter une garde.
+import { lirePerimetre, toucheLesGardes, type PerimetreAbsence } from '@/lib/absences/perimetre'
 
 
 /** Résultat de la détection : y a-t-il conflit, et sur quels créneaux ? */
@@ -75,8 +77,25 @@ export async function detecterConflitPlanningPublie(params: {
   veterinaireId: string
   dateDebut: string
   dateFin: string
+  /**
+   * CE QUE L'ABSENCE COUVRE (B-163).
+   *
+   * ⚠️ UNE ABSENCE QUI NE TOUCHE PAS LES GARDES N'A AUCUN CONFLIT POSSIBLE.
+   *    Un congé « le matin » ne peut pas entrer en concurrence avec une garde
+   *    du soir : annoncer un conflit inviterait l'admin à réparer ce qui n'est
+   *    pas cassé, et à réattribuer une garde que le titulaire peut assurer.
+   *
+   * Absent ⇒ `journee-et-nuit`, soit le comportement d'avant ce lot. Un
+   * appelant qui oublie le champ détecte donc comme hier : il alerte trop,
+   * jamais trop peu.
+   */
+  perimetre?: PerimetreAbsence
 }): Promise<ResultatDetectionConflit> {
   const { supabase, cabinetId, veterinaireId, dateDebut, dateFin } = params
+
+  if (!toucheLesGardes(lirePerimetre(params.perimetre))) {
+    return { aConflit: false, creneauxImpactes: [] }
+  }
 
   try {
     const creneauxImpactes = await recenserCreneauxImpactes(
@@ -226,9 +245,24 @@ export async function detecterConflitsPourDecision(params: {
   dateFin: string
   /** Injectable pour les tests. */
   aujourdhui?: string
+  /**
+   * CE QUE L'ABSENCE COUVRE (B-163). Même raison et même repli que dans
+   * `detecterConflitPlanningPublie` : un souhait « le matin » ne percute aucune
+   * garde, et le dire à l'admin la ferait chercher un problème inexistant.
+   */
+  perimetre?: PerimetreAbsence
 }): Promise<VerdictSouhait> {
   const { supabase, cabinetId, veterinaireId, dateDebut, dateFin } = params
   const aujourdhui = params.aujourdhui ?? new Date().toISOString().slice(0, 10)
+
+  if (!toucheLesGardes(lirePerimetre(params.perimetre))) {
+    // ⚠️ `aucunPlanning: false` ET NON `true` : on n'a pas regardé, et ce champ
+    //    existe précisément pour distinguer « j'ai regardé, il n'y a rien » de
+    //    « je n'ai rien regardé ». Répondre `true` ici ferait afficher « aucun
+    //    planning sur ces dates » alors qu'il y en a peut-être un — la bonne
+    //    nouvelle par défaut que ce produit refuse partout.
+    return { publiees: [], brouillon: [], aucunPlanning: false }
+  }
 
   // On ne juge JAMAIS le passé : une garde d'hier ne se réattribue pas.
   const borneBasse = dateDebut > aujourdhui ? dateDebut : aujourdhui

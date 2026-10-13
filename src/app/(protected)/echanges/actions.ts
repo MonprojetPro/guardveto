@@ -22,6 +22,8 @@
 // ============================================================
 
 import { createClient } from '@/lib/supabase/server'
+// B-163 — un congé qui ne couvre pas la nuit n'empêche pas de prendre une garde.
+import { lirePerimetre, toucheLesGardes } from '@/lib/absences/perimetre'
 import { createClient as createAdminClient, type SupabaseClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 import { appliquerChangementGarde } from '@/lib/gardes/appliquer-changement'
@@ -177,7 +179,21 @@ async function chargerGardeEchangeable(
   return { garde }
 }
 
-/** Le véto est-il en congé/indispo VALIDÉ ce jour-là ? */
+/**
+ * Le véto est-il empêché d'assurer une GARDE ce jour-là ?
+ *
+ * 🔴 CE N'EST PLUS « EST-IL EN CONGÉ » (B-163). Un échange de gardes se heurte à
+ *    la nuit, pas à la journée : quelqu'un en congé « le matin » peut
+ *    parfaitement reprendre la garde d'un confrère le soir, et lui refuser
+ *    l'échange au motif d'une matinée au calme serait exactement le défaut que
+ *    B-043 avait fait disparaître en supprimant le champ.
+ *
+ * ⚠️ `.limit(1).maybeSingle()` NE SUFFIT PLUS : le premier congé trouvé n'est
+ *    pas forcément celui qui bloque. Quelqu'un peut avoir une matinée ET une
+ *    nuit posées sur la même date ; prendre le premier revient à tirer au sort.
+ *    On lit donc les candidats et on cherche s'il en existe UN qui touche les
+ *    gardes.
+ */
 async function estEnConge(
   supabase: SupabaseClient<any, any, any>,
   vetId: string,
@@ -185,14 +201,14 @@ async function estEnConge(
 ): Promise<boolean> {
   const { data } = await supabase
     .from('conges')
-    .select('id')
+    .select('id, perimetre')
     .eq('veterinaire_id', vetId)
     .eq('statut', 'valide')
     .lte('date_debut', date)
     .gte('date_fin', date)
-    .limit(1)
-    .maybeSingle()
-  return Boolean(data)
+  return ((data ?? []) as { perimetre?: unknown }[]).some((c) =>
+    toucheLesGardes(lirePerimetre(c.perimetre)),
+  )
 }
 
 // ============================================================

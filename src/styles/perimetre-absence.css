@@ -1,0 +1,149 @@
+/* ============================================================
+   GUARDVETO — « Sur quoi porte cette absence ? » (B-163)
+   ============================================================
+   Le choix de périmètre, dans le formulaire de congé et dans la modale de
+   déclaration d'absence.
+
+   🔴 CHAQUE `var()` PORTE UNE VALEUR DE REPLI, ET C'EST OBLIGATOIRE ICI.
+      Les jetons du terrier (`--t-border`, `--surface-2`, `--text`…) ne sont
+      déclarés que par `v2-terrier.css`, importée par le layout `(v2)` et par
+      les pages de connexion. Or ce composant s'affiche AUSSI sur `/conges`,
+      qui vit dans `(protected)` et ne charge pas le terrier.
+
+      Sans repli, les couleurs y seraient vides — et une `var()` non résolue ne
+      produit AUCUN signal : ni erreur, ni test rouge, ni build cassé. C'est le
+      défaut du 09/10 (B-157a), où la palette déclarée sur `.pv2-wrap` laissait
+      la tête de page en blanc sur blanc : 2184 tests verts sur un écran
+      illisible. Le repli est la seule parade qui ne dépend pas de la vigilance.
+
+   ⚠️ `--t-*` ET JAMAIS `--border` / `--muted` / `--accent` : ce composant vit
+      DANS une modale shadcn, qui redéfinit les noms nus en vocabulaire
+      shadcn (`--muted` devient un FOND pâle). Écrire `var(--muted)` ici
+      donnerait « crème pâle sur crème pâle », soit du texte invisible — défaut
+      payé trois fois en juillet.
+   ============================================================ */
+
+.cp-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cp-titre {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--t-muted, #7c6a55);
+}
+
+.cp-choix {
+  display: grid;
+  gap: 6px;
+}
+
+.cp-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  text-align: left;
+  background: var(--surface, #fffaf0);
+  border: 1px solid var(--t-border, #e6d7bb);
+  border-radius: var(--r-sm, 12px);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.cp-item:hover:not(:disabled) {
+  border-color: var(--t-accent, #c7530f);
+}
+
+.cp-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Le choix retenu doit se voir SANS la couleur seule : un liseré épais et un
+   fond. Un simple changement de teinte laisse l'écran ambigu pour qui distingue
+   mal les couleurs — et sur six options, l'ambiguïté se paie en saisie fausse. */
+.cp-item--choisi {
+  background: var(--accent-soft, #fdf0e6);
+  border-color: var(--t-accent, #c7530f);
+  box-shadow: inset 0 0 0 1px var(--t-accent, #c7530f);
+}
+
+.cp-item-nom {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text, #3a2a1c);
+}
+
+.cp-item-aide {
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--t-muted, #7c6a55);
+}
+
+.cp-heures {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 10px;
+  background: var(--surface-2, #f6ebd6);
+  border-radius: var(--r-sm, 12px);
+}
+
+.cp-heure {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--t-muted, #7c6a55);
+}
+
+.cp-heure input {
+  padding: 6px 8px;
+  font: inherit;
+  color: var(--text, #3a2a1c);
+  background: var(--surface, #fffaf0);
+  border: 1px solid var(--t-border, #e6d7bb);
+  border-radius: var(--r-sm, 12px);
+}
+
+.cp-note {
+  flex: 1 1 100%;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--t-muted, #7c6a55);
+}
+
+/* ── La mention du périmètre dans les listes et sur le planning ─────────────
+   L'autre moitié de l'option A : la présence reste, et l'écran DIT qu'elle est
+   entamée. Sans cette pastille, choisir « le matin » n'aurait aucune
+   conséquence visible — soit un réglage décoratif, l'interdit de ce lot. */
+
+.cp-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  /* ⚠️ 10px EN HORIZONTAL, pas 7 : `pilules-padding.test.ts` exige au moins
+     8px de plus que le vertical, et il a raison — en dessous, le texte touche
+     l'arrondi et la pastille se lit comme un défaut d'affichage. */
+  padding: 2px 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--t-accent, #c7530f);
+  background: var(--accent-soft, #fdf0e6);
+  border: 1px solid var(--t-accent, #c7530f);
+  border-radius: 999px;
+}
+
+/* Le ponctuel se distingue : il ne retire RIEN, et le lire comme une absence
+   ferme serait pire que ne rien afficher. */
+.cp-tag--ponctuel {
+  color: var(--t-muted, #7c6a55);
+  background: var(--surface-2, #f6ebd6);
+  border-color: var(--t-border, #e6d7bb);
+}

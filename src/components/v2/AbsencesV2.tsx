@@ -31,6 +31,8 @@ import { Button } from '@/components/ui/button'
 // Le `Select` MAISON — le `<select>` natif est interdit sur ce projet.
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { CongeForm } from '@/components/conges/CongeForm'
+import { PastillePerimetre } from '@/components/absences/ChoixPerimetre'
+import { chevauchements } from '@/lib/absences/chevauchement'
 import { deleteConge } from '@/app/(protected)/conges/actions'
 import { ValiderCongeDialog } from '@/components/conges/ValiderCongeDialog'
 import { RefuserCongeDialog } from '@/components/conges/RefuserCongeDialog'
@@ -100,6 +102,27 @@ interface Props {
   vetsCrise: VetCrise[]
   depannages: CompensationLigne[]
   statsDepannages: { ouvertes: number; compensees: number }
+  /**
+   * B-163 — le cabinet a-t-il allume le planning des journees ? Decide si le
+   * choix de perimetre d'une absence propose « matin » et « apres-midi ».
+   */
+  moduleJourneeActif: boolean
+  /**
+   * B-160a ③ — les absences ACTIVES du cabinet, pour reperer un doublon avec un
+   * conge sur les memes dates.
+   *
+   * ⚠️ L'ECRAN NE LES AVAIT PAS. Il affichait les conges et les depannages,
+   *    jamais la table `absences` elle-meme — c'est une des raisons pour
+   *    lesquelles le recouvrement du 13/10 ne pouvait pas se voir : la moitie
+   *    de l'information n'etait pas chargee.
+   */
+  absencesActives: {
+    id: string
+    veterinaire_id: string
+    date_debut: string
+    date_fin: string
+    perimetre?: string | null
+  }[]
 }
 
 const LIBELLE_TYPE: Record<TypeConge, string> = {
@@ -249,6 +272,8 @@ export function AbsencesV2({
   vetsCrise,
   depannages,
   statsDepannages,
+  moduleJourneeActif,
+  absencesActives,
 }: Props) {
   const router = useRouter()
   const [onglet, setOnglet] = useState<Onglet>('conges')
@@ -313,6 +338,39 @@ export function AbsencesV2({
   const nomDe = useMemo(
     () => (id: string | null) => (id ? (parVet.get(id)?.prenom ?? null) : null),
     [parVet],
+  )
+
+  /**
+   * Les recouvrements conge <-> absence (B-160a ③).
+   *
+   * ⚠️ ON NE COMPARE QUE LES CONGES VALIDES. Un souhait n'est pas tranche : le
+   *    signaler comme doublon ferait croire qu'il compte deja, et c'est
+   *    exactement l'inverse de ce que l'ecran doit dire a qui doit encore
+   *    decider.
+   */
+  const doublons = useMemo(
+    () =>
+      chevauchements([
+        ...conges
+          .filter((c) => c.statut === 'valide')
+          .map((c) => ({
+            id: c.id,
+            veterinaire_id: c.veterinaire_id,
+            date_debut: c.date_debut,
+            date_fin: c.date_fin,
+            origine: 'conge' as const,
+            perimetre: c.perimetre,
+          })),
+        ...absencesActives.map((a) => ({
+          id: a.id,
+          veterinaire_id: a.veterinaire_id,
+          date_debut: a.date_debut,
+          date_fin: a.date_fin,
+          origine: 'absence' as const,
+          perimetre: a.perimetre,
+        })),
+      ]),
+    [conges, absencesActives],
   )
 
   const vetDuConflit = conflit ? parVet.get(conflit.veterinaire_id) : undefined
@@ -461,6 +519,28 @@ export function AbsencesV2({
       {/* ── Onglet 1 · les congés ───────────────────────────── */}
       {onglet === 'conges' && (
         <section className="tab-panel" role="tabpanel">
+          {/* ── B-160a ③ — DEUX ABSENCES SUR LES MÊMES DATES SE DISENT ────────
+              Constat de MiKL le 13/10 : il a déclaré une absence ET un congé
+              pour la même personne le même jour, et « tout va bien pour le
+              système ». Les deux tables contrôlaient chacune leur conflit avec
+              les GARDES, aucune ne regardait l'autre.
+
+              ⚠️ ÇA SIGNALE, ÇA N'INTERDIT PAS (« le système INFORME ») : un
+                 doublon est souvent légitime — un congé de longue date, puis
+                 une maladie qui tombe dessus. Et le bandeau reste un SIGNAL :
+                 il dit qu'il faut regarder, pas laquelle des deux a raison. */}
+          {doublons.length > 0 && (
+            <div className="abs-doublons" role="status">
+              <b>À vérifier</b>
+              <ul>
+                {doublons.map((d) => (
+                  <li key={d.ids.join('-')}>
+                    {nomDe(d.veterinaire_id) ?? 'Ce vétérinaire'} — {d.phrase}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {/* LE TRI EST EN TÊTE parce qu'il commande les DEUX listes de
               l'onglet — les souhaits en attente comme les congés traités.
               Le poser dans l'un des deux blocs aurait laissé croire qu'il ne
@@ -551,6 +631,15 @@ export function AbsencesV2({
                               <span className={`type-chip ${CLASSE_TYPE[c.type]}`}>
                                 {LIBELLE_TYPE[c.type]}
                               </span>
+                              {/* B-163 — ce que l'absence couvre. Sans cette
+                                  mention, choisir « le matin » n'aurait AUCUNE
+                                  trace visible : l'admin lirait la ligne comme
+                                  une absence de toute la journee. */}
+                              <PastillePerimetre
+                                perimetre={c.perimetre}
+                                heureDebut={c.heure_debut}
+                                heureFin={c.heure_fin}
+                              />
                             </p>
                             <p className="row-dates">{periodeLisible(c)}</p>
                             {c.commentaire && <p className="row-motif">« {c.commentaire} »</p>}
@@ -770,6 +859,15 @@ export function AbsencesV2({
                             <span className={`type-chip ${CLASSE_TYPE[c.type]}`}>
                               {LIBELLE_TYPE[c.type]}
                             </span>
+                            {/* B-163 — idem sur la liste complete : les deux
+                                vues lisent les memes conges, et une seule des
+                                deux informee serait deux ecrans qui se
+                                contredisent. */}
+                            <PastillePerimetre
+                              perimetre={c.perimetre}
+                              heureDebut={c.heure_debut}
+                              heureFin={c.heure_fin}
+                            />
                           </p>
                           <p className="row-dates">{periodeLisible(c)}</p>
                           {c.statut === 'refuse' && c.raison_refus && (
@@ -871,6 +969,7 @@ export function AbsencesV2({
         currentUserId={moiId}
         isAdmin={isAdmin}
         onConflit={setConflit}
+        moduleJourneeActif={moduleJourneeActif}
       />
 
       {/* Édition — MÊME dialogue que la création : `CongeForm` bascule en mode
@@ -890,6 +989,7 @@ export function AbsencesV2({
           currentUserId={moiId}
           isAdmin={isAdmin}
           onConflit={setConflit}
+          moduleJourneeActif={moduleJourneeActif}
         />
       )}
 
@@ -1002,12 +1102,18 @@ export function AbsencesV2({
           vetDefautId={conflit.veterinaire_id}
           dateDebutDefaut={conflit.date_debut}
           dateFinDefaut={conflit.date_fin}
+          moduleJourneeActif={moduleJourneeActif}
         />
       )}
 
       {/* Signalement d'absence « à froid », depuis le bouton de la tête de page. */}
       {isAdmin && vetsCrise.length > 0 && (
-        <CriseModal open={criseOuverte} onOpenChange={setCriseOuverte} vets={vetsCrise} />
+        <CriseModal
+          open={criseOuverte}
+          onOpenChange={setCriseOuverte}
+          vets={vetsCrise}
+          moduleJourneeActif={moduleJourneeActif}
+        />
       )}
     </>
   )

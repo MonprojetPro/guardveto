@@ -44,6 +44,16 @@ export interface AbsenceAVenir {
   dateFin: string
   /** « Vacances », « Maladie »… — la nuance, pas le classement. */
   motif: string
+  /**
+   * CE QUE L'ABSENCE COUVRE, deja mis en francais (B-163). `null` pour le cas
+   * general (journee et nuit) : il n'a rien a annoncer, et une mention sur
+   * chaque ligne cesse d'etre lue.
+   *
+   * 🔑 C'EST LA REPONSE AU TELEPHONE. « Manon absente le 3 » se lit « toute la
+   *    journee » ; si elle n'est absente que le matin, le secretariat doit le
+   *    voir ICI, pas aller ouvrir la fiche du conge.
+   */
+  perimetre?: string | null
   /** Vrai si la période a commencé : elle se lit « en ce moment ». */
   enCours: boolean
 }
@@ -107,6 +117,7 @@ export function AbsencesAVenirPanel({ absences }: { absences: AbsenceAVenir[] })
                 {/* « En ce moment » prime sur le motif : c'est la réponse à la
                     question qu'on pose au téléphone. */}
                 {a.enCours ? 'en ce moment' : a.motif}
+                {a.perimetre && <span className="abs-perimetre"> · {a.perimetre}</span>}
               </span>
             </li>
           ))}

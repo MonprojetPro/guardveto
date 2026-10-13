@@ -39,6 +39,9 @@ import { normaliserContraintesVets } from '../normaliserContraintes'
 // s'affichent tels quels dans la fenêtre de publication et dans le bandeau
 // d'incohérences, sous les yeux du cabinet. Une date y va donc en français.
 import { dateFr, periodeFr } from '@/lib/dates-fr'
+// B-163 — la MÊME autorité que `checkR16Conge`, pour que les deux ne puissent
+// pas divulguer deux vérités sur le même congé.
+import { lirePerimetre, toucheLesGardes } from '@/lib/absences/perimetre'
 import {
   DEFAULT_STRUCTURE_CONFIG, estStructureDure, RELATIONS_STRUCTURE_DEFAUT,
   type StructureConfig, type RelationStructure,
@@ -675,8 +678,18 @@ export function validerPlanning(
         continue
       }
 
-      // ── R16 — congé validé = aucune garde ──
+      // ── R16 — congé validé = aucune garde, SI le congé couvre la nuit ──
+      //
+      // 🔴 CETTE CONDITION DOIT RESTER IDENTIQUE À `checkR16Conge` (B-163).
+      //    Le générateur et le validateur portent la même règle à deux endroits
+      //    — c'est assumé (« deux gardiens qui disent la même chose ») mais ça
+      //    n'a de valeur que s'ils disent VRAIMENT la même chose. Corriger l'un
+      //    sans l'autre ferait déclarer invalide un planning que le moteur vient
+      //    de produire : le validateur accuserait le moteur d'une faute commise
+      //    par le validateur. D'où l'autorité unique (`lib/absences/perimetre`)
+      //    plutôt qu'un test recopié.
       for (const conge of vet.conges) {
+        if (!toucheLesGardes(lirePerimetre(conge.perimetre))) continue
         if (entre(a.date, conge.date_debut, conge.date_fin)) {
           violations.push({
             regle: 'R16',

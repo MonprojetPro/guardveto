@@ -8,6 +8,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+// B-163 — le perimetre d'un conge decide s'il empeche une garde.
+import { lirePerimetre } from '@/lib/absences/perimetre'
 import { isValid } from '@/engine/rules/hard-constraints'
 import { normaliserContraintesVets } from '@/engine/normaliserContraintes'
 import type { VetEngine, ContrainteEngine, SlotGarde, PlanningPartiel, AttributionGarde } from '@/engine/types'
@@ -147,10 +149,22 @@ export async function GET(
     .order('nom')
 
   // ── Congés validés qui chevauchent la période ────────────
-  type CongeDb = { veterinaire_id: string; date_debut: string; date_fin: string }
+  //
+  // ⚠️ `perimetre` EST LU PARCE QUE CES CONGÉS ALIMENTENT LE MOTEUR (B-163).
+  //    Cette route reconstruit un contexte de génération à la main : sans le
+  //    champ, R16 verrait des congés sans périmètre, se replierait sur
+  //    « journée et nuit », et écarterait de la liste des remplaçants quelqu'un
+  //    qui n'est absent que le matin. Le défaut serait d'autant plus difficile à
+  //    voir que l'écran afficherait simplement un nom en moins.
+  type CongeDb = {
+    veterinaire_id: string
+    date_debut: string
+    date_fin: string
+    perimetre?: string | null
+  }
   const { data: congesDb } = await supabase
     .from('conges')
-    .select('veterinaire_id, date_debut, date_fin')
+    .select('veterinaire_id, date_debut, date_fin, perimetre')
     .eq('statut', 'valide')
     .lte('date_debut', periode.date_fin)
     .gte('date_fin', periode.date_debut)
@@ -211,7 +225,13 @@ export async function GET(
     contraintes: v.contraintes_veto ?? [],
     conges: ((congesDb as CongeDb[] | null) ?? [])
       .filter((c) => c.veterinaire_id === v.id)
-      .map((c) => ({ date_debut: c.date_debut, date_fin: c.date_fin })),
+      .map((c) => ({
+        date_debut: c.date_debut,
+        date_fin: c.date_fin,
+        // B-163 — sans ce champ, R16 écarterait un remplaçant qui n'est absent
+        // que le matin, et l'écran n'afficherait qu'un nom en moins.
+        perimetre: lirePerimetre(c.perimetre),
+      })),
   }))
 
   // Normalisation OBLIGATOIRE avant isValid (parade cécité params) : sans

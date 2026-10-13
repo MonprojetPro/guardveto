@@ -6,6 +6,7 @@
 // ============================================================
 
 import { createClient } from '@/lib/supabase/server'
+import { lirePerimetre } from '@/lib/absences/perimetre'
 import type { VetEngine, ContrainteEngine, CongeEngine, CalendrierResolu, AttributionGarde } from './types'
 import type { BonusMalusMap } from './score-lexicographique'
 import type { SolverInput } from './solver'
@@ -46,6 +47,12 @@ interface CongeDb {
   date_debut: string
   date_fin: string
   type: 'vacances' | 'formation' | 'sante' | 'autre' | 'indisponibilite'
+  /**
+   * B-163. Déclaré `string | null` et NON `PerimetreAbsence` : c'est une valeur
+   * qui vient de la base, et la typer fort ici ferait croire au reste du fichier
+   * qu'elle est déjà validée. Elle passe par `lirePerimetre`.
+   */
+  perimetre: string | null
 }
 
 interface BonusMalusDb {
@@ -291,9 +298,19 @@ export async function chargerInputDepuisSupabase(
       }
 
   // 3. Congés validés qui chevauchent la période
+  //
+  // ⚠️ `perimetre` EST CHARGÉ, ET LE FILTRAGE N'A PAS LIEU ICI (B-163). Ne
+  //    charger que les congés qui touchent les gardes aurait été plus court,
+  //    mais `vet.conges` sert à QUATRE règles qui n'ont pas la même question :
+  //    R16 (la garde est-elle interdite ?), le validateur (même question),
+  //    `estVeilleDeRepos` et `estWeekEndAvantVacances` (est-ce un repos ?). Un
+  //    congé de journée doit disparaître de la première et compter pour les
+  //    deux dernières. Filtrer au chargement aurait donc décidé pour des règles
+  //    qui ne demandaient pas la même chose — le défaut « une convention
+  //    recopiée trois fois » pris par l'autre bout.
   const { data: congesDb } = await supabase
     .from('conges')
-    .select('veterinaire_id, date_debut, date_fin, type')
+    .select('veterinaire_id, date_debut, date_fin, type, perimetre')
     .eq('statut', 'valide')
     .lte('date_debut', periode.date_fin)
     .gte('date_fin', periode.date_debut)
@@ -386,6 +403,11 @@ export async function chargerInputDepuisSupabase(
         date_debut: c.date_debut,
         date_fin: c.date_fin,
         type: c.type,
+        // B-163 — replié ICI, à l'entrée du moteur, plutôt que dans chaque
+        // règle : une valeur inconnue ou absente doit valoir « journée et
+        // nuit » (le comportement d'avant ce lot), et ce choix ne doit pas
+        // dépendre de la vigilance de la quatrième règle qu'on écrira.
+        perimetre: lirePerimetre(c.perimetre),
       })),
   }))
 

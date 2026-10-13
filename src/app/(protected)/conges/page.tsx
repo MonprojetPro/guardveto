@@ -6,6 +6,10 @@ import '@/styles/v2-planning.css'
 import { CongesList } from '@/components/conges/CongesList'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { detecterConflitPlanningPublie } from '@/lib/conges/detection-conflit'
+// B-163 — le périmètre décide si un conflit de garde est même possible.
+import { lirePerimetre } from '@/lib/absences/perimetre'
+import { modulesDuCabinet } from '@/lib/produit/modules-serveur'
+import { MODULE_JOURNEE } from '@/lib/journee/porte'
 import type { CreneauImpacte } from '@/lib/crise/contexte'
 import type { Conge, Veterinaire } from '@/types'
 
@@ -55,6 +59,9 @@ export default async function CongesPage() {
               veterinaireId: c.veterinaire_id,
               dateDebut: c.date_debut,
               dateFin: c.date_fin,
+              // B-163 — un souhait qui ne couvre pas la nuit ne peut pas
+              // entrer en conflit avec une garde.
+              perimetre: lirePerimetre(c.perimetre),
             })
             return { id: c.id, aConflit, creneauxImpactes }
           }),
@@ -66,6 +73,12 @@ export default async function CongesPage() {
     }
   }
 
+  // B-163 — sans le module journée, la fenêtre n'offre ni « le matin » ni
+  // « l'après-midi » : un cabinet qui ne gère que ses gardes n'a pas de matin
+  // dans le produit. `modulesDuCabinet` a un repli FERMANT (le socle seul), donc
+  // une panne de lecture retire le choix au lieu de l'offrir à tort.
+  const moduleJourneeActif = (await modulesDuCabinet(supabase)).includes(MODULE_JOURNEE)
+
   return (
     <div className="space-y-6">
       <CongesList
@@ -74,6 +87,7 @@ export default async function CongesPage() {
         currentUserId={currentVeto.id}
         isAdmin={isAdmin}
         conflitsParConge={conflitsParConge}
+        moduleJourneeActif={moduleJourneeActif}
       />
     </div>
   )

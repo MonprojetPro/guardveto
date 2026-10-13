@@ -19,6 +19,14 @@ import type { CreneauConge, TypeConge } from '@/types'
 import type { SupabaseClient } from '@supabase/supabase-js'
 // B-160 — un conge accorde retire les presences de journee deja posees.
 import { retirerPresencesCouvertes } from '@/lib/journee/absence-retire-presences'
+// B-163 — l'unique autorité sur ce qu'une absence couvre.
+import {
+  PERIMETRE_PAR_DEFAUT,
+  lirePerimetre,
+  toucheLesGardes,
+  validerPerimetre,
+  type PerimetreAbsence,
+} from '@/lib/absences/perimetre'
 
 /**
  * #10c — Expéditeur Brevo du cabinet courant (from email + from name), lus sur
@@ -95,7 +103,23 @@ export interface CongeFormData {
   date_debut: string
   date_fin: string
   type: TypeConge
+  /**
+   * ⚠️ MORT DEPUIS B-043, CONSERVÉ POUR NE RIEN CASSER. Écrit `null` par le
+   *    formulaire. Le champ vivant est `perimetre` juste en dessous.
+   */
   creneau: CreneauConge | null
+  /**
+   * CE QUE L'ABSENCE COUVRE (B-163) — la demande du 13/10 : « au moment de
+   * poser un congé ou une absence ça doit apparaître dans la fenêtre ».
+   *
+   * Optionnel parce que des appelants anciens (Filou, imports) construisent
+   * encore cet objet sans lui ; replié sur `journee-et-nuit`, soit le
+   * comportement d'avant ce lot. Un oubli ne libère jamais une garde.
+   */
+  perimetre?: PerimetreAbsence
+  /** Les bornes du `ponctuel`, et de lui seul. Ignorées pour les autres. */
+  heure_debut?: string | null
+  heure_fin?: string | null
   commentaire: string
 }
 
@@ -157,6 +181,20 @@ export async function createConge(
     return { error: e instanceof Error ? e.message : 'Cabinet introuvable.' }
   }
 
+  // ── B-163 — LE PÉRIMÈTRE EST VALIDÉ AVANT D'ÊTRE ÉCRIT ────────────────────
+  //
+  // ⚠️ LE CONTRÔLE N'EST PAS DANS LE FORMULAIRE, et c'est la leçon « trois
+  //    chemins d'écriture, deux gardiens » : une validation posée seulement
+  //    dans l'écran est une validation que l'URL et Filou contournent. La base
+  //    garde aussi (CHECK de la migration) — trois gardiens qui disent la même
+  //    chose, délibérément.
+  const perim = validerPerimetre(
+    data.perimetre ?? PERIMETRE_PAR_DEFAUT,
+    data.heure_debut,
+    data.heure_fin,
+  )
+  if (!perim.ok) return { error: perim.probleme }
+
   const { error } = await supabase.from('conges').insert({
     cabinet_id: cabinetId,
     veterinaire_id,
@@ -164,6 +202,9 @@ export async function createConge(
     date_fin: data.date_fin,
     type: data.type,
     creneau: data.creneau || null,
+    perimetre: perim.perimetre,
+    heure_debut: perim.heures?.heure_debut ?? null,
+    heure_fin: perim.heures?.heure_fin ?? null,
     statut: isAdmin ? 'valide' : 'souhait',
     commentaire: data.commentaire || null,
     saisi_par,
@@ -193,23 +234,61 @@ export async function createConge(
     await notifierDemandeAuxAdmins(supabase, cabinetId, veterinaire_id, data)
   }
 
+  // ── B-160a — UN CONGÉ POSÉ PAR L'ADMIN RETIRE AUSSI LES PRÉSENCES ─────────
+  //
+  // 🔴 LE TROU MESURÉ LE 13/10, ET LE PLUS INSTRUCTIF DU LOT. B-160 avait
+  //    branché la brique sur `validerConge` (accepter un SOUHAIT de véto) et sur
+  //    `POST /api/absences` — pas ici. Or `createConge` naît `statut: 'valide'`
+  //    quand c'est l'admin qui pose : c'est LE chemin qu'elle utilise.
+  //
+  //    Preuve en base le 13/10 : congé validé du 02 au 03/11 pour
+  //    Anne-Catherine, trame active le mardi, et sa présence du 03/11 toujours
+  //    là. MiKL : « j'ai déclaré une absence et un congé sur un jour où elle
+  //    travaille et tout va bien pour le système ».
+  //
+  // 🔑 LA LEÇON, TROISIÈME OCCURRENCE : on avait couvert les chemins qu'on avait
+  //    SOUS LES YEUX, pas la liste des chemins. Le gardien de couverture dans
+  //    `tests/lib/absence-retire-presences.test.ts` porte désormais ce
+  //    fichier — il refuse qu'un chemin d'écriture oublie la brique.
+  //
+  // ⚠️ RIEN POUR UN SOUHAIT. Un congé non tranché ne retire aucune présence :
+  //    ce serait le valider en silence.
+  let presencesRetirees = 0
+  if (isAdmin) {
+    const r = await retirerPresencesCouvertes(supabase, {
+      veterinaire_id,
+      date_debut: data.date_debut,
+      date_fin: data.date_fin,
+      perimetre: perim.perimetre,
+    })
+    presencesRetirees = r.retirees
+  }
+
   // ── Détection de conflit congé ↔ planning publié (cas « Antoine ») ──────
   // UNIQUEMENT quand le congé est CRÉÉ déjà validé par un admin (statut 'valide').
   // Un simple souhait de véto ne déclenche RIEN ici. La détection NE BLOQUE PAS
   // (le congé est déjà enregistré — choix admin assumé) : on remonte juste un
   // signal `conflit` au front pour proposer la réparation du planning.
-  if (isAdmin) {
+  //
+  // ⚠️ ET UNIQUEMENT SI LE CONGÉ TOUCHE LES GARDES (B-163). Un congé « le
+  //    matin » ne peut pas entrer en conflit avec une garde du soir : alerter
+  //    l'admin et lui proposer de réattribuer serait l'inviter à réparer ce qui
+  //    n'est pas cassé.
+  if (isAdmin && toucheLesGardes(perim.perimetre)) {
     const conflit = await detecterConflit(
       supabase,
       cabinetId,
       veterinaire_id,
       data.date_debut,
       data.date_fin,
+      perim.perimetre,
     )
-    if (conflit) return { success: true, conflit }
+    if (conflit) return { success: true, conflit, presencesRetirees }
   }
 
-  return { success: true }
+  // B-160a — le compte remonte à l'écran. Un planning qui change tout seul se
+  // lit comme une panne : il faut que la modale puisse le DIRE.
+  return { success: true, presencesRetirees }
 }
 
 /**
@@ -223,6 +302,15 @@ async function detecterConflit(
   veterinaireId: string,
   dateDebut: string,
   dateFin: string,
+  /**
+   * B-163 — obligatoire ICI, sans repli, contrairement au détecteur lui-même.
+   *
+   * ⚠️ CE WRAPPER EST INTERNE AU FICHIER qui connaît toujours le périmètre du
+   *    congé qu'il vient d'écrire ou de valider. Lui offrir un défaut aurait
+   *    créé le seul endroit du lot où « oublier » reste confortable — et c'est
+   *    toujours là que l'oubli se produit.
+   */
+  perimetre: PerimetreAbsence,
 ): Promise<ConflitPlanning | null> {
   const { aConflit, creneauxImpactes } = await detecterConflitPlanningPublie({
     supabase,
@@ -230,6 +318,7 @@ async function detecterConflit(
     veterinaireId,
     dateDebut,
     dateFin,
+    perimetre,
   })
   if (!aConflit) return null
   return {
@@ -313,6 +402,10 @@ async function notifierDemandeAuxAdmins(
       veterinaireId,
       dateDebut: data.date_debut,
       dateFin: data.date_fin,
+      // B-163 — l'e-mail qui prévient l'administratrice ne doit pas annoncer un
+      // conflit de garde pour une demande qui ne concerne que le matin. Une
+      // alerte fausse est pire qu'une alerte absente : elle use l'attention.
+      perimetre: lirePerimetre(data.perimetre),
     })
 
     await sendCongeDemande(supabase, {
@@ -335,6 +428,21 @@ async function notifierDemandeAuxAdmins(
 export async function updateConge(id: string, data: CongeFormData) {
   const supabase = await createClient()
 
+  // B-163 — le périmètre est modifiable comme les dates, et validé pareil.
+  const perim = validerPerimetre(
+    data.perimetre ?? PERIMETRE_PAR_DEFAUT,
+    data.heure_debut,
+    data.heure_fin,
+  )
+  if (!perim.ok) return { error: perim.probleme }
+
+  // Le statut AVANT modification : il décide si les présences doivent bouger.
+  const { data: avant } = await supabase
+    .from('conges')
+    .select('statut')
+    .eq('id', id)
+    .maybeSingle()
+
   const { error } = await supabase
     .from('conges')
     .update({
@@ -343,15 +451,43 @@ export async function updateConge(id: string, data: CongeFormData) {
       date_fin: data.date_fin,
       type: data.type,
       creneau: data.creneau || null,
+      perimetre: perim.perimetre,
+      heure_debut: perim.heures?.heure_debut ?? null,
+      heure_fin: perim.heures?.heure_fin ?? null,
       commentaire: data.commentaire || null,
     })
     .eq('id', id)
 
   if (error) return { error: error.message }
+
+  // ── B-163 — DÉPLACER UN CONGÉ DÉJÀ VALIDÉ RETIRE SUR SES NOUVELLES DATES ──
+  //
+  // 🔑 TROU TROUVÉ EN BALAYANT LES CHEMINS, PAS EN RECETTE. B-160 couvrait la
+  //    validation d'un souhait et la déclaration d'une absence ; B-160a y a
+  //    ajouté la création par l'admin. Restait la MODIFICATION : élargir un
+  //    congé validé du mardi au mercredi laissait la présence du mercredi en
+  //    place, exactement comme le défaut d'origine.
+  //
+  // ⚠️ CE QUI N'EST PAS FAIT, ET QUI EST ASSUMÉ : les présences des jours qu'on
+  //    QUITTE ne reviennent pas. C'est la limite écrite depuis B-160 — la
+  //    brique ne repose rien, c'est l'application des trames (additive) qui
+  //    repose. Rétrécir un congé puis relancer « Remplir les journées » retrouve
+  //    donc le monde attendu, et aucune donnée n'est inventée au passage.
+  let presencesRetirees = 0
+  if ((avant as { statut?: string } | null)?.statut === 'valide') {
+    const r = await retirerPresencesCouvertes(supabase, {
+      veterinaire_id: data.veterinaire_id,
+      date_debut: data.date_debut,
+      date_fin: data.date_fin,
+      perimetre: perim.perimetre,
+    })
+    presencesRetirees = r.retirees
+  }
+
   revalidatePath('/conges')
   revalidatePath('/absences') // écran V2 — lecteur des mêmes congés
   revalidatePath('/admin/demandes')
-  return { success: true }
+  return { success: true, presencesRetirees }
 }
 
 export async function deleteConge(id: string) {
@@ -381,7 +517,10 @@ export async function validerConge(
   // Récupère les données du congé + vet AVANT la mise à jour (pour l'email)
   const { data: conge } = await supabase
     .from('conges')
-    .select('veterinaire_id, date_debut, date_fin, type, creneau')
+    // B-163 — `perimetre` décide ce que la décision retire, et ce que l'e-mail
+    // annonce. `creneau` reste lu le temps que l'e-mail soit migré ; il vaut
+    // `null` partout depuis août (B-043).
+    .select('veterinaire_id, date_debut, date_fin, type, creneau, perimetre, heure_debut, heure_fin')
     .eq('id', id)
     .single()
 
@@ -450,6 +589,10 @@ export async function validerConge(
       veterinaire_id: conge.veterinaire_id,
       date_debut: debutEffectif,
       date_fin: finEffective,
+      // B-163 — ce que le congé couvre décide ce qui est retiré. Un congé
+      // « le matin » ne vide que les tranches du matin ; un « ponctuel » ne
+      // vide rien du tout.
+      perimetre: lirePerimetre((conge as { perimetre?: unknown }).perimetre),
     })
     presencesRetirees = r.retirees
   }
@@ -483,6 +626,11 @@ export async function validerConge(
           prenom: vet.prenom,
           type: conge.type,
           creneau: conge.creneau,
+          // B-163 — l'e-mail DIT le perimetre : le veto lit la decision dans sa
+          // boite, pas forcement dans l'app.
+          perimetre: (conge as { perimetre?: unknown }).perimetre,
+          heure_debut: (conge as { heure_debut?: string | null }).heure_debut,
+          heure_fin: (conge as { heure_fin?: string | null }).heure_fin,
           date_debut: date_debut ?? conge.date_debut,
           date_fin: date_fin ?? conge.date_fin,
           signature: expediteur.fromName,
@@ -524,6 +672,8 @@ export async function validerConge(
         conge.veterinaire_id,
         debutEffectif,
         finEffective,
+        // B-163 — le périmètre du congé qu'on vient d'accorder.
+        lirePerimetre((conge as { perimetre?: unknown }).perimetre),
       )
       if (conflit) return { success: true, conflit }
     }
@@ -542,7 +692,10 @@ export async function refuserConge(id: string, raison?: string) {
   // Récupère les données du congé + vet AVANT la mise à jour (pour l'email)
   const { data: conge } = await supabase
     .from('conges')
-    .select('veterinaire_id, date_debut, date_fin, type, creneau')
+    // B-163 — `perimetre` décide ce que la décision retire, et ce que l'e-mail
+    // annonce. `creneau` reste lu le temps que l'e-mail soit migré ; il vaut
+    // `null` partout depuis août (B-043).
+    .select('veterinaire_id, date_debut, date_fin, type, creneau, perimetre, heure_debut, heure_fin')
     .eq('id', id)
     .single()
 
@@ -599,6 +752,11 @@ export async function refuserConge(id: string, raison?: string) {
           prenom: vet.prenom,
           type: conge.type,
           creneau: conge.creneau,
+          // B-163 — le refus dit ce que la demande couvrait : sans ca, le veto
+          // ne sait pas s'il doit reposer une matinee ou une semaine.
+          perimetre: (conge as { perimetre?: unknown }).perimetre,
+          heure_debut: (conge as { heure_debut?: string | null }).heure_debut,
+          heure_fin: (conge as { heure_fin?: string | null }).heure_fin,
           date_debut: conge.date_debut,
           date_fin: conge.date_fin,
           raison: raison ?? null,

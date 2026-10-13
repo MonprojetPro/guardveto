@@ -43,6 +43,10 @@
 // ============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { CreneauBlocJournee } from '@/types'
+import { CRENEAUX_BLOC } from '@/lib/journee/blocs'
+// B-163 — l'unique autorité sur ce qu'une absence retire.
+import { blocsRetires, lirePerimetre, type PerimetreAbsence } from '@/lib/absences/perimetre'
 
 /** Une présence posée, réduite à ce qu'il faut pour décider de son sort. */
 export interface PresencePourRetrait {
@@ -50,6 +54,16 @@ export interface PresencePourRetrait {
   veterinaire_id: string
   /** `AAAA-MM-JJ`. */
   date: string
+  /**
+   * LE CRÉNEAU DE LA TRANCHE SUR LAQUELLE ELLE EST POSÉE (B-163).
+   *
+   * ⚠️ SANS LUI, LE RETRAIT REDEVIENT UN RETRAIT PAR JOUR, et une absence du
+   *    matin ferait disparaître l'après-midi. Optionnel au type (les appels
+   *    anciens compilent) mais replié sur `journee` : la valeur la plus large,
+   *    donc celle qui se fait retirer dès qu'une absence couvre le jour entier.
+   *    Un oubli retire comme avant ce lot ; il ne conserve jamais à tort.
+   */
+  creneau?: CreneauBlocJournee
 }
 
 /** La fenêtre d'indisponibilité : bornes COMPRISES, comme partout ailleurs. */
@@ -57,6 +71,11 @@ export interface FenetreAbsence {
   veterinaire_id: string
   date_debut: string
   date_fin: string
+  /**
+   * CE QUE L'ABSENCE COUVRE (B-163). Absent ou inconnu ⇒ `journee-et-nuit`,
+   * soit le comportement d'avant ce lot.
+   */
+  perimetre?: PerimetreAbsence
 }
 
 /**
@@ -76,12 +95,26 @@ export function presencesARetirer(
   presences: readonly PresencePourRetrait[],
   fenetre: FenetreAbsence,
 ): string[] {
+  // B-163 — CE QUE L'ABSENCE NOMME, ET RIEN DE PLUS.
+  //
+  // ⚠️ Un périmètre `ponctuel` rend une liste VIDE, et c'est la décision du
+  //    13/10 (option A) : deux heures de réunion ne retirent pas une journée de
+  //    présence. Un `nuit` aussi : il ne concerne que les gardes.
+  //
+  // ⚠️ Une absence « du matin » ne retire PAS un bloc « journée complète » : la
+  //    personne est là l'après-midi. C'est `blocsRetires` qui le dit, et c'est
+  //    la raison pour laquelle cette fonction a besoin du créneau de chaque
+  //    présence — avant ce lot, elle ne regardait que la date.
+  const creneauxRetires = blocsRetires(lirePerimetre(fenetre.perimetre))
+  if (creneauxRetires.length === 0) return []
+
   return presences
     .filter(
       (p) =>
         p.veterinaire_id === fenetre.veterinaire_id &&
         p.date >= fenetre.date_debut &&
-        p.date <= fenetre.date_fin,
+        p.date <= fenetre.date_fin &&
+        creneauxRetires.includes(p.creneau ?? 'journee'),
     )
     .map((p) => p.id)
 }
@@ -108,6 +141,31 @@ export function phraseRetrait(nb: number, prenom: string): string | null {
 // ── L'exécution, côté serveur ───────────────────────────────────────────────
 
 /**
+ * La forme que PostgREST rend pour la jointure.
+ *
+ * ⚠️ IL REND UN OBJET OU UN TABLEAU SELON LA CARDINALITÉ QU'IL DÉDUIT, et les
+ *    deux formes se sont déjà présentées sur ce projet. On accepte donc les
+ *    deux plutôt que de parier sur l'une — un mauvais pari ici rendrait
+ *    `undefined`, donc le repli `journee`, donc un retrait trop large et
+ *    silencieux.
+ */
+interface LignePresenceJointe {
+  id: string
+  veterinaire_id: string
+  date: string
+  blocs_journee: { creneau?: string } | { creneau?: string }[] | null
+}
+
+function creneauDeLaJointure(
+  joint: LignePresenceJointe['blocs_journee'],
+): CreneauBlocJournee | undefined {
+  const brut = Array.isArray(joint) ? joint[0]?.creneau : joint?.creneau
+  return CRENEAUX_BLOC.includes(brut as CreneauBlocJournee)
+    ? (brut as CreneauBlocJournee)
+    : undefined
+}
+
+/**
  * Retire du planning des journées les présences couvertes par une absence.
  *
  * APPELÉE PAR TOUT CHEMIN QUI REND QUELQU'UN INDISPONIBLE — validation d'un
@@ -125,9 +183,19 @@ export async function retirerPresencesCouvertes(
   supabase: SupabaseClient,
   fenetre: FenetreAbsence,
 ): Promise<{ retirees: number; erreur: string | null }> {
+  // Sortie courte : un périmètre qui ne retire aucun créneau n'a aucune raison
+  // de lire la base. Évite une requête par absence ponctuelle ou de nuit.
+  if (blocsRetires(lirePerimetre(fenetre.perimetre)).length === 0) {
+    return { retirees: 0, erreur: null }
+  }
+
+  // ⚠️ LE CRÉNEAU VIENT DE LA TRANCHE, PAS DE LA PRÉSENCE. `presences_journee`
+  //    porte un `bloc_id` et aucune notion d'horaire : c'est la tranche qui sait
+  //    si elle est du matin. D'où la jointure — sans elle, impossible de retirer
+  //    « le matin » sans retirer l'après-midi.
   const { data, error } = await supabase
     .from('presences_journee')
-    .select('id, veterinaire_id, date')
+    .select('id, veterinaire_id, date, blocs_journee!inner(creneau)')
     .eq('veterinaire_id', fenetre.veterinaire_id)
     .gte('date', fenetre.date_debut)
     .lte('date', fenetre.date_fin)
@@ -143,7 +211,16 @@ export async function retirerPresencesCouvertes(
   // On repasse par la fonction PURE plutôt que de se fier au filtre SQL : c'est
   // elle qui porte la convention des bornes, et c'est elle qui est testée. Deux
   // façons de décider « cette présence est couverte » finiraient par diverger.
-  const ids = presencesARetirer((data ?? []) as PresencePourRetrait[], fenetre)
+  //
+  // La jointure PostgREST rend `blocs_journee: { creneau }` — à plat ici, pour
+  // que la fonction pure n'ait pas à connaître la forme d'une réponse réseau.
+  const lignes: PresencePourRetrait[] = ((data ?? []) as LignePresenceJointe[]).map((l) => ({
+    id: l.id,
+    veterinaire_id: l.veterinaire_id,
+    date: l.date,
+    creneau: creneauDeLaJointure(l.blocs_journee),
+  }))
+  const ids = presencesARetirer(lignes, fenetre)
   if (ids.length === 0) return { retirees: 0, erreur: null }
 
   const { error: errSuppr } = await supabase

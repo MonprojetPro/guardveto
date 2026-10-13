@@ -32,6 +32,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+// B-163 — une absence qui ne couvre pas la nuit ne libere aucune garde.
+import { lirePerimetre, toucheLesGardes } from '@/lib/absences/perimetre'
 import { proposerReparation, type CreneauCrise } from '@/engine/crise/reparer'
 import {
   recenserCreneauxImpactes,
@@ -101,7 +103,7 @@ export async function POST(
   // ── L'absence existe et appartient au cabinet ────────────
   const { data: absence } = await supabase
     .from('absences')
-    .select('id, cabinet_id, veterinaire_id, date_debut, date_fin, statut')
+    .select('id, cabinet_id, veterinaire_id, date_debut, date_fin, statut, perimetre')
     .eq('id', absenceId)
     .eq('cabinet_id', cabinetId)
     .single()
@@ -114,6 +116,16 @@ export async function POST(
   }
   if (absence.statut === 'resolue') {
     return NextResponse.json({ error: 'Cette absence est déjà entièrement résolue.' }, { status: 409 })
+  }
+  // B-163 — appeler des volontaires pour une absence qui ne libère aucune garde
+  // enverrait un e-mail à toute l'équipe pour une garde que son titulaire
+  // assure. Une alerte fausse coûte plus cher qu'une alerte absente : elle use
+  // l'attention, et c'est l'attention qui fait marcher ce produit.
+  if (!toucheLesGardes(lirePerimetre((absence as { perimetre?: unknown }).perimetre))) {
+    return NextResponse.json(
+      { error: "Cette absence ne concerne pas les gardes de nuit : aucune garde n'est à pourvoir." },
+      { status: 422 },
+    )
   }
 
   const absentId = absence.veterinaire_id as string

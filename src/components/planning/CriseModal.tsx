@@ -56,6 +56,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { MotifAbsence, Absence } from '@/types'
+// B-163 — le choix « sur quoi porte cette absence », partage avec le formulaire
+// de conge : trois fenetres posent la meme question, une seule la decrit.
+import { ChoixPerimetre } from '@/components/absences/ChoixPerimetre'
+import type { PerimetreAbsence } from '@/lib/absences/perimetre'
 import type {
   DiagnosticImpasse as DiagnosticImpasseData,
   RegleEnCause,
@@ -109,6 +113,14 @@ interface CriseModalProps {
   onOpenChange: (open: boolean) => void
   /** Tous les vétos actifs du cabinet (pour le choix de l'absent + résolution noms). */
   vets: VetCrise[]
+  /**
+   * B-163 — le cabinet a-t-il allume le planning des journees ?
+   *
+   * Decide si la fenetre propose « le matin » / « l'apres-midi ». Defaut `false`
+   * cote appelant : un parent qui oublie n'offre que le vocabulaire des gardes,
+   * soit le comportement d'avant ce lot.
+   */
+  moduleJourneeActif?: boolean
   /** Date pré-remplie (jour cliqué dans le calendrier), facultatif. */
   dateDefaut?: string
   /**
@@ -426,6 +438,7 @@ export function CriseModal({
   dateDebutDefaut,
   dateFinDefaut,
   vetDefautId,
+  moduleJourneeActif = false,
 }: CriseModalProps) {
   const router = useRouter()
 
@@ -439,6 +452,12 @@ export function CriseModal({
   const [dateDebut, setDateDebut] = useState<string>(debutInitial)
   const [dateFin, setDateFin] = useState<string>(finInitiale)
   const [motif, setMotif] = useState<MotifAbsence>('maladie')
+  // B-163 — sur quoi porte l'absence. Defaut `journee-et-nuit` : c'est le
+  // comportement que le cabinet connait, et celui qui retire le plus. Partir de
+  // `ponctuel` ferait d'un oubli de saisie une absence sans aucun effet.
+  const [perimetre, setPerimetre] = useState<PerimetreAbsence>('journee-et-nuit')
+  const [heureDebut, setHeureDebut] = useState('14:00')
+  const [heureFin, setHeureFin] = useState('16:00')
   const [commentaire, setCommentaire] = useState<string>('')
   const [declaring, setDeclaring] = useState(false)
 
@@ -461,6 +480,11 @@ export function CriseModal({
     setDateFin(finInitiale)
     setMotif('maladie')
     setCommentaire('')
+    // B-163 — remis a zero comme le reste : garder « le matin » d'une
+    // declaration a l'autre poserait silencieusement une absence partielle.
+    setPerimetre('journee-et-nuit')
+    setHeureDebut('14:00')
+    setHeureFin('16:00')
     setResultat(null)
     setDecisions({})
   }
@@ -502,6 +526,12 @@ export function CriseModal({
           date_fin: dateFin,
           motif,
           commentaire: commentaire.trim() || null,
+          // B-163 — les heures ne partent QUE pour le ponctuel : la route et la
+          // base les refusent ailleurs, et deux verites dans la meme ligne
+          // finiraient par s'afficher toutes les deux.
+          perimetre,
+          heure_debut: perimetre === 'ponctuel' ? heureDebut : null,
+          heure_fin: perimetre === 'ponctuel' ? heureFin : null,
         }),
       })
       const json = await res.json()
@@ -736,6 +766,18 @@ export function CriseModal({
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* B-163 — sur quoi porte cette absence. Place apres le motif :
+                  on dit d'abord POURQUOI, puis SUR QUOI. */}
+              <ChoixPerimetre
+                valeur={perimetre}
+                onChange={setPerimetre}
+                heureDebut={heureDebut}
+                heureFin={heureFin}
+                onHeures={(d, f) => { setHeureDebut(d); setHeureFin(f) }}
+                moduleJourneeActif={moduleJourneeActif}
+                desactive={declaring}
+              />
 
               {/* Commentaire */}
               <div className="space-y-1.5">

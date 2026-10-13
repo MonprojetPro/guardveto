@@ -1514,6 +1514,10 @@ export function PlanningChantierV2({
           vets={vets}
           dateDefaut={criseDate}
           vetDefautId={criseVetId}
+          // B-163 — meme branchement que l'ecran client : la fenetre est la
+          // MEME, et un chantier qui n'offrirait pas le choix donnerait une
+          // recette qui ne ressemble pas a la production.
+          moduleJourneeActif={(modules ?? []).includes('planning-journee')}
         />
       )}
 

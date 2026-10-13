@@ -425,3 +425,42 @@
   text-transform: uppercase; color: var(--soft);
   margin-right: 2px;
 }
+
+/* ── B-160a ③ — « À vérifier » : deux absences sur les mêmes dates ──────────
+   Constat de MiKL le 13/10 : une absence ET un congé posés pour la même
+   personne le même jour, « et tout va bien pour le système ».
+
+   ⚠️ TON D'AVERTISSEMENT, PAS D'ERREUR. Un doublon est souvent légitime (un
+      congé de longue date, puis une maladie qui tombe dessus) : le rouge
+      ferait croire à une faute et pousserait à supprimer une ligne utile. Le
+      bandeau dit « regarde », pas « corrige ».
+
+   ⚠️ CETTE RÈGLE EST LE SEUL EFFET VISIBLE du calcul de recouvrement. Sans
+      elle, la classe serait orpheline et le bandeau invisible — le défaut du
+      09/10, où 11 classes sans règle laissaient un écran muet avec 2184 tests
+      verts. Une classe sans règle ne casse rien : elle n'affiche rien. */
+.abs-doublons {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  background: var(--surface-2, #f6ebd6);
+  border: 1px solid var(--warn, #c98a2b);
+  border-left: 4px solid var(--warn, #c98a2b);
+  border-radius: var(--r-sm, 12px);
+}
+.abs-doublons b {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--warn, #c98a2b);
+}
+.abs-doublons ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.abs-doublons li {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--text, #3a2a1c);
+}

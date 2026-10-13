@@ -65,6 +65,8 @@ const ATTENDUS_HORS_GRAPHE: Record<string, string> = {
     'Registre « le tableau ne peut pas se taire » (B-005). Lu par son test, volontairement hors application.',
   'lib/produit/juges.ts':
     'Registre « aucun lecteur de `gardes` ne se tait sur les remplacements » (B-156). Lu par son test, volontairement hors application — troisième registre de la même famille.',
+  'lib/produit/perimetres-lus.ts':
+    'Registre « aucun lecteur de `conges` / `absences` ne se tait sur le PÉRIMÈTRE » (B-163). Lu par son test, volontairement hors application — quatrième registre de la même famille, et celui qui empêche la troisième occurrence de B-043.',
 
   // ── Fondation posée d'avance, pas un vestige ──────────────────────────────
   // La distinction compte : le 26/08, 15 fichiers ont été supprimés parce

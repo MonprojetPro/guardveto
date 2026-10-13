@@ -980,6 +980,11 @@ export function PlanningV2({
           vets={vets}
           dateDefaut={criseDate}
           vetDefautId={criseVetId}
+          // B-163 — sans le module journee, la fenetre n'offre pas « le matin ».
+          // `modules` est deja charge par cet ecran (B-148) : pas de requete
+          // supplementaire, et une seule source pour la question « ce cabinet
+          // gere-t-il ses journees ? ».
+          moduleJourneeActif={(modules ?? []).includes('planning-journee')}
         />
       )}
 

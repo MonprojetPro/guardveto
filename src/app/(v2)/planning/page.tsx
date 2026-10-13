@@ -28,6 +28,8 @@ import { construireCatalogue } from '@/lib/planning/placesAttendues'
 import { RealtimeRefresh } from '@/components/planning/RealtimeRefresh'
 import { chargerDock } from '@/data/v2/dock'
 import { modulesDuCabinet } from '@/lib/produit/modules-serveur'
+// B-163 — ce qu'une absence couvre, dit en francais au secretariat.
+import { lirePerimetre, phrasePerimetre } from '@/lib/absences/perimetre'
 import { chantierOuvertPourLeCabinet } from '@/lib/produit/chantiers-serveur'
 import {
   PlanningChantierV2,
@@ -103,6 +105,10 @@ interface LigneAbsenceBrute {
   /** `conges.type` d'un côté, `absences.motif` de l'autre. */
   type?: string | null
   motif?: string | null
+  /** B-163 — ce que l'absence couvre, et ses heures si elle est ponctuelle. */
+  perimetre?: string | null
+  heure_debut?: string | null
+  heure_fin?: string | null
   veterinaires?: unknown
 }
 
@@ -415,13 +421,13 @@ export default async function PlanningPageV2({
     const [congesFuturs, absencesFutures] = await Promise.all([
       supabase
         .from('conges')
-        .select('id, date_debut, date_fin, type, veterinaires!conges_veterinaire_id_fkey(prenom, nom, couleur)')
+        .select('id, date_debut, date_fin, type, perimetre, heure_debut, heure_fin, veterinaires!conges_veterinaire_id_fkey(prenom, nom, couleur)')
         .gte('date_fin', aujourdhui)
         .order('date_debut')
         .limit(40),
       supabase
         .from('absences')
-        .select('id, date_debut, date_fin, motif, veterinaires!absences_veterinaire_id_fkey(prenom, nom, couleur)')
+        .select('id, date_debut, date_fin, motif, perimetre, heure_debut, heure_fin, veterinaires!absences_veterinaire_id_fkey(prenom, nom, couleur)')
         .eq('statut', 'active')
         .gte('date_fin', aujourdhui)
         .order('date_debut')
@@ -448,6 +454,16 @@ export default async function PlanningPageV2({
         dateDebut: c.date_debut,
         dateFin: c.date_fin,
         motif: LIBELLE_MOTIF[c.type ?? ''] ?? 'Congé',
+        // B-163 — CE QUE L'ABSENCE COUVRE, dans le panneau que le secretariat
+        // ouvre pour repondre au telephone. Sans cette nuance, « Manon absente
+        // le 3 » se lit « toute la journee » alors qu'elle est la l'apres-midi
+        // — une reponse fausse servie avec l'aplomb d'une reponse juste.
+        perimetre: phrasePerimetre(
+          lirePerimetre(c.perimetre),
+          c.heure_debut && c.heure_fin
+            ? { heure_debut: c.heure_debut, heure_fin: c.heure_fin }
+            : null,
+        ),
         enCours: c.date_debut <= aujourdhui,
       })
     }
@@ -461,6 +477,12 @@ export default async function PlanningPageV2({
         dateDebut: a.date_debut,
         dateFin: a.date_fin,
         motif: LIBELLE_MOTIF[a.motif ?? ''] ?? 'Absence',
+        perimetre: phrasePerimetre(
+          lirePerimetre(a.perimetre),
+          a.heure_debut && a.heure_fin
+            ? { heure_debut: a.heure_debut, heure_fin: a.heure_fin }
+            : null,
+        ),
         enCours: a.date_debut <= aujourdhui,
       })
     }

@@ -21,6 +21,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+// B-163 — une absence qui ne couvre pas la nuit ne libere aucune garde.
+import { lirePerimetre, toucheLesGardes } from '@/lib/absences/perimetre'
 import { proposerReparation, type CreneauCrise } from '@/engine/crise/reparer'
 import { appliquerChangementGarde } from '@/lib/gardes/appliquer-changement'
 import {
@@ -91,7 +93,7 @@ export async function POST(
   // ── L'absence existe et appartient au cabinet ────────────
   const { data: absence } = await supabase
     .from('absences')
-    .select('id, cabinet_id, veterinaire_id, date_debut, date_fin, statut')
+    .select('id, cabinet_id, veterinaire_id, date_debut, date_fin, statut, perimetre')
     .eq('id', absenceId)
     .eq('cabinet_id', cabinetId)
     .single()
@@ -101,6 +103,24 @@ export async function POST(
   }
   if (absence.statut === 'annulee') {
     return NextResponse.json({ error: 'Cette absence est annulée.' }, { status: 422 })
+  }
+  // ── B-163 — RÉPARER UNE ABSENCE QUI NE TOUCHE PAS LES GARDES N'A PAS DE SENS ─
+  //
+  // Réparer, ici, veut dire RÉATTRIBUER UNE GARDE. Une absence du matin, de
+  // l'après-midi ou de deux heures n'en libère aucune : il n'y a rien à
+  // réattribuer, et le faire retirerait sa garde à quelqu'un qui peut l'assurer.
+  //
+  // ⚠️ C'EST UN REFUS, PAS UN SILENCE. L'écran ne doit pas pouvoir atteindre ce
+  //    point (le parcours n'est plus proposé), mais « masquer un bouton n'a
+  //    jamais fermé une URL » — et un 200 vide se lirait « c'est réparé ».
+  if (!toucheLesGardes(lirePerimetre((absence as { perimetre?: unknown }).perimetre))) {
+    return NextResponse.json(
+      {
+        error:
+          "Cette absence ne concerne pas les gardes de nuit : il n'y a aucune garde à réattribuer.",
+      },
+      { status: 422 },
+    )
   }
 
   // ── Validation du corps ─────────────────────────────────

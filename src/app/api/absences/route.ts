@@ -26,6 +26,13 @@ import {
 import type { MotifAbsence } from '@/types'
 // B-160 — une absence declaree retire les presences de journee deja posees.
 import { retirerPresencesCouvertes } from '@/lib/journee/absence-retire-presences'
+// B-163 — l'unique autorité sur ce qu'une absence couvre.
+import {
+  PERIMETRE_PAR_DEFAUT,
+  toucheLesGardes,
+  validerPerimetre,
+  type PerimetreAbsence,
+} from '@/lib/absences/perimetre'
 
 // Le recensement + N proposerReparation (purs) restent rapides, mais on charge
 // le contexte (resoudreContexte) par période → on laisse de la marge.
@@ -69,6 +76,8 @@ export async function POST(req: NextRequest) {
   let date_fin: string
   let motif: MotifAbsence
   let commentaire: string | null
+  let perimetre: PerimetreAbsence
+  let heures: { heure_debut: string; heure_fin: string } | null
 
   try {
     const body = await req.json()
@@ -77,6 +86,27 @@ export async function POST(req: NextRequest) {
     date_fin = body?.date_fin
     motif = body?.motif
     commentaire = typeof body?.commentaire === 'string' ? body.commentaire : null
+
+    // ── B-163 — CE QUE L'ABSENCE COUVRE ──────────────────────────────────────
+    //
+    // ⚠️ VALIDÉ ICI, DANS LA ROUTE, et pas seulement dans la modale. C'est la
+    //    leçon « trois chemins d'écriture, deux gardiens » : un contrôle posé
+    //    dans l'écran est un contrôle que l'URL et Filou contournent. La base
+    //    garde aussi (CHECK de la migration).
+    //
+    // ⚠️ LE DÉFAUT EST `journee-et-nuit` : un appelant qui ne connaît pas encore
+    //    le champ (une version d'écran plus ancienne, un script) continue de se
+    //    comporter exactement comme avant ce lot.
+    const perim = validerPerimetre(
+      body?.perimetre ?? PERIMETRE_PAR_DEFAUT,
+      body?.heure_debut,
+      body?.heure_fin,
+    )
+    if (!perim.ok) {
+      return NextResponse.json({ error: perim.probleme }, { status: 422 })
+    }
+    perimetre = perim.perimetre
+    heures = perim.heures
 
     if (typeof veterinaire_id !== 'string' || !veterinaire_id) {
       return NextResponse.json({ error: 'veterinaire_id requis.' }, { status: 400 })
@@ -119,6 +149,10 @@ export async function POST(req: NextRequest) {
       commentaire,
       statut: 'active',
       declaree_par: vet.id,
+      // B-163 — ce que l'absence couvre, décidé par celui qui la déclare.
+      perimetre,
+      heure_debut: heures?.heure_debut ?? null,
+      heure_fin: heures?.heure_fin ?? null,
     })
     .select('*')
     .single()
@@ -144,12 +178,29 @@ export async function POST(req: NextRequest) {
     veterinaire_id,
     date_debut,
     date_fin,
+    // B-163 — « absent demain matin » ne vide que les tranches du matin, et une
+    // indisponibilité ponctuelle ne vide rien du tout.
+    perimetre,
   })
 
   // ── Créneaux impactés (gardes futures du véto, statut diffusé) ──
-  let impactes
+  //
+  // 🔴 ET SEULEMENT SI L'ABSENCE TOUCHE LES GARDES (B-163). C'est le changement
+  //    de comportement le plus visible du lot : jusqu'au 13/10, `absences`
+  //    n'avait AUCUNE notion de périmètre, donc déclarer « absent demain
+  //    matin » lançait tout le parcours de réparation des gardes du soir. On
+  //    proposait à l'administratrice de réattribuer une garde que le titulaire
+  //    pouvait parfaitement assurer — et une proposition de réparation lue sur
+  //    un planning se croit toujours justifiée.
+  //
+  // ⚠️ `recenserCreneauxImpactes` N'EST MÊME PAS APPELÉ : il est coûteux
+  //    (contexte par période) et son résultat serait jeté. Mais surtout, un
+  //    recensement non vide finit toujours par ressortir quelque part.
+  let impactes: Awaited<ReturnType<typeof recenserCreneauxImpactes>> = []
   try {
-    impactes = await recenserCreneauxImpactes(supabase, cabinetId, veterinaire_id, date_debut, date_fin)
+    if (toucheLesGardes(perimetre)) {
+      impactes = await recenserCreneauxImpactes(supabase, cabinetId, veterinaire_id, date_debut, date_fin)
+    }
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : String(err) },

@@ -108,9 +108,17 @@ async function periodeModifiable(
   return { ok: true, periode: { id: p.id, date_debut: p.date_debut, date_fin: p.date_fin } }
 }
 
-/** Les tranches du cabinet — toutes, actives ou non : les filtres vivent dans la logique pure. */
+/**
+ * Les tranches du cabinet — toutes, actives ou non : les filtres vivent dans la
+ * logique pure.
+ *
+ * ⚠️ `creneau` EST LU DEPUIS B-163, et il n'est pas décoratif : c'est lui qui
+ *    dit si une absence « du matin » concerne cette tranche. Sans lui,
+ *    `presencesVoulues` replie tout sur « journée » et une absence de matinée
+ *    retirerait la présence de l'après-midi.
+ */
 async function blocsDuCabinet(supabase: Client): Promise<BlocJournee[]> {
-  const { data } = await supabase.from('blocs_journee').select('id, nom, actif')
+  const { data } = await supabase.from('blocs_journee').select('id, nom, actif, creneau')
   return (data ?? []) as BlocJournee[]
 }
 
@@ -173,16 +181,20 @@ async function absencesDeLaPeriode(
   supabase: Client,
   periode: PeriodePourPresences,
 ): Promise<{ erreur: string | null; absences: AbsencePourPresences[] }> {
+  // ⚠️ `perimetre` EST LU DANS LES DEUX REQUÊTES (B-163). L'oublier dans une
+  //    seule des deux suffirait à ce qu'un des deux gestes perde l'information
+  //    — c'est précisément le défaut mesuré le 13/10, où le retrait des
+  //    présences était branché sur un chemin et pas sur l'autre (B-160a).
   const [conges, absences] = await Promise.all([
     supabase
       .from('conges')
-      .select('veterinaire_id, date_debut, date_fin')
+      .select('veterinaire_id, date_debut, date_fin, perimetre')
       .eq('statut', 'valide')
       .lte('date_debut', periode.date_fin)
       .gte('date_fin', periode.date_debut),
     supabase
       .from('absences')
-      .select('veterinaire_id, date_debut, date_fin')
+      .select('veterinaire_id, date_debut, date_fin, perimetre')
       .eq('statut', 'active')
       .lte('date_debut', periode.date_fin)
       .gte('date_fin', periode.date_debut),

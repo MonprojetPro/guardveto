@@ -49,6 +49,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+// B-163 — une absence qui ne couvre pas la nuit ne libere aucune garde.
+import { lirePerimetre, toucheLesGardes } from '@/lib/absences/perimetre'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { proposerReparation, type CreneauCrise } from '@/engine/crise/reparer'
 import { appliquerChangementGarde } from '@/lib/gardes/appliquer-changement'
@@ -184,7 +186,7 @@ export async function POST(
   // (RLS borne déjà la lecture ; le filtre cabinet_id est une ceinture+bretelles.)
   const { data: absence } = await supabase
     .from('absences')
-    .select('id, cabinet_id, veterinaire_id, date_debut, date_fin, statut')
+    .select('id, cabinet_id, veterinaire_id, date_debut, date_fin, statut, perimetre')
     .eq('id', absenceId)
     .eq('cabinet_id', cabinetId)
     .single()
@@ -197,6 +199,15 @@ export async function POST(
   }
   if (absence.statut === 'resolue') {
     return NextResponse.json({ error: 'Cette absence est déjà entièrement résolue.' }, { status: 409 })
+  }
+  // B-163 — une absence qui ne couvre pas la nuit ne libère aucune garde : il
+  // n'y a rien à prendre. Refus explicite plutôt qu'une réponse vide, qui se
+  // lirait « la garde a bien été reprise ».
+  if (!toucheLesGardes(lirePerimetre((absence as { perimetre?: unknown }).perimetre))) {
+    return NextResponse.json(
+      { error: "Cette absence ne concerne pas les gardes de nuit : aucune garde n'est à pourvoir." },
+      { status: 422 },
+    )
   }
 
   const absentId = absence.veterinaire_id as string

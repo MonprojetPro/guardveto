@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import { DemandesClient } from '@/components/admin/DemandesClient'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { detecterConflitPlanningPublie } from '@/lib/conges/detection-conflit'
+// B-163 — le périmètre décide si un conflit de garde est même possible.
+import { lirePerimetre } from '@/lib/absences/perimetre'
 import type { CreneauImpacte } from '@/lib/crise/contexte'
 import type { Conge, Veterinaire } from '@/types'
 
@@ -55,6 +57,10 @@ export default async function AdminDemandesPage() {
             veterinaireId: d.veterinaire_id,
             dateDebut: d.date_debut,
             dateFin: d.date_fin,
+            // B-163 — une demande « le matin » ne percute aucune garde du
+            // soir. Sans ce champ, l'écran afficherait un conflit inexistant
+            // et inviterait l'admin à réparer ce qui n'est pas cassé.
+            perimetre: lirePerimetre(d.perimetre),
           })
           return { id: d.id, aConflit, creneauxImpactes }
         }),

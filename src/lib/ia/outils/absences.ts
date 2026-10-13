@@ -33,6 +33,25 @@
 // ============================================================
 
 import { z } from 'zod'
+// B-163 — l'unique autorite sur ce qu'une absence couvre.
+import {
+  PERIMETRES,
+  PERIMETRE_PAR_DEFAUT,
+  lirePerimetre,
+  phrasePerimetre,
+  toucheLesGardes,
+  validerPerimetre,
+  type PerimetreAbsence,
+} from '@/lib/absences/perimetre'
+// B-160a — toute absence declaree retire les presences de journee couvertes,
+// y compris celle que Filou declare. Ce chemin n'ecrit PAS par la route API.
+import {
+  phraseRetrait,
+  retirerPresencesCouvertes,
+} from '@/lib/journee/absence-retire-presences'
+
+/** La liste des perimetres dans la forme que `z.enum` exige. Derivee, jamais recopiee. */
+const PERIMETRES_ZOD = PERIMETRES as unknown as [PerimetreAbsence, ...PerimetreAbsence[]]
 import { changerStatutCompensation as changerStatutCompensationAction } from '@/app/(protected)/admin/depannages/actions'
 import { appliquerChangementGarde } from '@/lib/gardes/appliquer-changement'
 import {
@@ -161,6 +180,10 @@ interface AbsenceRow {
   commentaire: string | null
   statut: StatutAbsence
   created_at: string
+  /** B-163 — ce que l'absence couvre, et ses heures si elle est ponctuelle. */
+  perimetre: string | null
+  heure_debut: string | null
+  heure_fin: string | null
   veto: { prenom: string; nom: string } | null
 }
 
@@ -187,7 +210,11 @@ LE MOTIF DES AUTRES N'EST PAS VISIBLE si tu parles à un vétérinaire : il vaut
   async executer(params, ctx) {
     let requete = ctx.supabase
       .from('absences')
-      .select('id, veterinaire_id, date_debut, date_fin, motif, commentaire, statut, created_at, veto:veterinaire_id(prenom, nom)')
+      // B-163 — `perimetre` est LU. Sans lui, a « qui est absent demain ? » Filou
+      // repondrait un nom sans dire que la personne est la l'apres-midi : une
+      // reponse incomplete presentee comme complete, soit le risque exact que la
+      // regle FILOU SUIT LE PRODUIT existe pour empecher.
+      .select('id, veterinaire_id, date_debut, date_fin, motif, commentaire, statut, created_at, perimetre, heure_debut, heure_fin, veto:veterinaire_id(prenom, nom)')
       .order('date_debut', { ascending: false })
 
     if (params.statut) requete = requete.eq('statut', params.statut)
@@ -221,6 +248,17 @@ LE MOTIF DES AUTRES N'EST PAS VISIBLE si tu parles à un vétérinaire : il vaut
       date_fin: l.date_fin,
       motif: peutVoirLeDetail(l.veterinaire_id) ? l.motif : 'absence',
       commentaire: peutVoirLeDetail(l.veterinaire_id) ? l.commentaire : null,
+      // ⚠️ LE PERIMETRE N'EST PAS UNE DONNEE PERSONNELLE, contrairement au
+      //    motif : savoir qu'un confrere n'est pas la le matin sert a
+      //    s'organiser, et ne dit rien de sa sante. Il est donc visible par
+      //    tous — c'est meme toute son utilite.
+      porte_sur:
+        phrasePerimetre(
+          lirePerimetre(l.perimetre),
+          l.heure_debut && l.heure_fin
+            ? { heure_debut: l.heure_debut, heure_fin: l.heure_fin }
+            : null,
+        ) ?? undefined,
       statut: l.statut,
     }))
   },
@@ -348,6 +386,24 @@ const ParamsDeclarer = z.object({
   date_debut: z.string().describe('Date ISO (AAAA-MM-JJ) du premier jour d’absence.'),
   date_fin: z.string().describe('Date ISO (AAAA-MM-JJ) du dernier jour d’absence.'),
   motif: z.enum(['maladie', 'urgence', 'autre']).describe('Le motif de l’absence.'),
+  // ── B-163 — CE QUE L'ABSENCE COUVRE ───────────────────────────────────────
+  //
+  // 🔑 FILOU DOIT POUVOIR LE POSER, PAS SEULEMENT LE LIRE — exigence de MiKL le
+  //    13/10. Sans ce champ, toute absence declaree par Filou serait une
+  //    absence totale : « Camille sera la cet apres-midi, declare-la absente ce
+  //    matin » lui retirerait sa garde du soir, en silence.
+  perimetre: z
+    .enum(PERIMETRES_ZOD)
+    .optional()
+    .describe(
+      "Sur quoi porte l'absence. « journee-et-nuit » (défaut) = ni au cabinet, ni de garde. "
+      + '« journee » = pas au cabinet, mais la garde de nuit reste assurée. « nuit » = pas de garde, '
+      + "présent au cabinet. « matin » / « apres-midi » = une demi-journée. « ponctuel » = quelques "
+      + "heures : RIEN n'est retiré du planning et AUCUNE garde n'est à réparer — exige heure_debut "
+      + 'et heure_fin.',
+    ),
+  heure_debut: z.string().optional().describe('HH:MM. UNIQUEMENT si perimetre vaut « ponctuel ».'),
+  heure_fin: z.string().optional().describe('HH:MM. UNIQUEMENT si perimetre vaut « ponctuel ».'),
   commentaire: z.string().optional().describe('Un détail libre, visible par l’administrateur.'),
 })
 
@@ -377,10 +433,25 @@ Ne modifie AUCUNE garde : elle ne fait qu'ouvrir le dossier de crise. Les gardes
     const trouve = resoudrePrenom(equipe, params.prenom)
     if (!trouve.ok) return { ok: false, raison: trouve.raison }
 
+    // B-163 — le perimetre est valide AVANT la proposition : un ponctuel sans
+    // heures serait refuse plus tard, et mieux vaut le dire maintenant.
+    const perimVerif = validerPerimetre(
+      params.perimetre ?? PERIMETRE_PAR_DEFAUT,
+      params.heure_debut,
+      params.heure_fin,
+    )
+    if (!perimVerif.ok) return { ok: false, raison: perimVerif.probleme }
+
     // Aperçu du volume de gardes touchées — informatif seulement, la légalité
     // des remplacements se calcule outil par outil au moment de réparer.
+    //
+    // ⚠️ ET SEULEMENT SI L'ABSENCE TOUCHE LES GARDES (B-163). Annoncer « 3
+    //    créneaux à réparer » pour une absence du matin ferait réattribuer des
+    //    gardes que le titulaire assure — et cette phrase, dans une
+    //    proposition que l'admin confirme, a valeur de diagnostic.
     let impactes: unknown[] = []
     try {
+      if (toucheLesGardes(perimVerif.perimetre)) {
       impactes = await recenserCreneauxImpactes(
         ctx.supabase,
         ctx.cabinetId,
@@ -388,13 +459,17 @@ Ne modifie AUCUNE garde : elle ne fait qu'ouvrir le dossier de crise. Les gardes
         params.date_debut,
         params.date_fin,
       )
+      }
     } catch {
       // Best-effort : un souci de lecture ici ne doit pas bloquer la déclaration.
     }
 
+    const ditPerim = phrasePerimetre(perimVerif.perimetre, perimVerif.heures)
     const lignes = [
       `Motif : ${params.motif}${params.commentaire ? ` — ${params.commentaire}` : ''}`,
       `Du ${params.date_debut} au ${params.date_fin}.`,
+      // B-163 — DIT dans la proposition : c'est la fenetre ou l'admin confirme.
+      ...(ditPerim ? [`Porte sur : ${ditPerim}`] : []),
       impactes.length > 0
         ? `${impactes.length} créneau(x) de garde déjà publié(s) seront à réparer ensuite.`
         : `Aucune garde publiée n'est touchée pour l'instant.`,
@@ -416,13 +491,25 @@ Ne modifie AUCUNE garde : elle ne fait qu'ouvrir le dossier de crise. Les gardes
         date_fin: params.date_fin,
         motif: params.motif,
         commentaire: params.commentaire ?? null,
+        perimetre: perimVerif.perimetre,
+        heure_debut: perimVerif.heures?.heure_debut ?? null,
+        heure_fin: perimVerif.heures?.heure_fin ?? null,
       },
     }
   },
 
   async executer(_params, ctx, charge) {
     const c = charge as
-      | { veterinaire_id: string; date_debut: string; date_fin: string; motif: MotifAbsence; commentaire: string | null }
+      | {
+          veterinaire_id: string
+          date_debut: string
+          date_fin: string
+          motif: MotifAbsence
+          commentaire: string | null
+          perimetre?: PerimetreAbsence
+          heure_debut?: string | null
+          heure_fin?: string | null
+        }
       | undefined
     if (!c) return { error: 'Rien à déclarer.' }
 
@@ -435,9 +522,42 @@ Ne modifie AUCUNE garde : elle ne fait qu'ouvrir le dossier de crise. Les gardes
       commentaire: c.commentaire,
       statut: 'active',
       declaree_par: ctx.vetoId,
+      // B-163 — ce que l'absence couvre, choisi par qui la declare.
+      perimetre: c.perimetre ?? PERIMETRE_PAR_DEFAUT,
+      heure_debut: c.heure_debut ?? null,
+      heure_fin: c.heure_fin ?? null,
     })
 
-    return error ? { error: `Erreur lors de la déclaration de l'absence : ${error.message}` } : {}
+    if (error) return { error: `Erreur lors de la déclaration de l'absence : ${error.message}` }
+
+    // ── B-160a / B-163 — LE TROISIEME CHEMIN, TROUVE EN BALAYANT ─────────────
+    //
+    // 🔴 CET OUTIL ECRIVAIT DANS `absences` SANS RETIRER LES PRESENCES.
+    //    B-160 avait branche la brique sur `validerConge` et sur
+    //    `POST /api/absences` ; B-160a y a ajoute `createConge`. Celui-ci
+    //    n'insere PAS par la route : il ecrit en direct. Une absence declaree
+    //    par Filou laissait donc la personne affichee au cabinet, exactement
+    //    comme le defaut d'origine — et aucun ecran ne le disait.
+    //
+    // 🔑 MEME FAMILLE, QUATRIEME OCCURRENCE : on couvre les chemins qu'on a
+    //    sous les yeux. Celui-ci ne se voyait pas parce qu'il est dans Filou, et
+    //    qu'on cherchait du cote des ecrans. `absence-retire-presences.test.ts`
+    //    le porte desormais.
+    //
+    // ⚠️ Best-effort assume : l'absence est deja ecrite, un echec de retrait ne
+    //    doit pas la faire echouer. Il est journalise par la brique.
+    const retrait = await retirerPresencesCouvertes(ctx.supabase, {
+      veterinaire_id: c.veterinaire_id,
+      date_debut: c.date_debut,
+      date_fin: c.date_fin,
+      perimetre: c.perimetre ?? PERIMETRE_PAR_DEFAUT,
+    })
+
+    // Le compte revient a Filou pour qu'il le DISE. Un planning qui change tout
+    // seul se lit comme une panne, et c'est pire quand c'est l'assistant qui
+    // vient d'agir : l'admin n'a demande qu'une declaration d'absence.
+    const dit = phraseRetrait(retrait.retirees, 'cette personne')
+    return dit ? { message: dit } : {}
   },
 }
 

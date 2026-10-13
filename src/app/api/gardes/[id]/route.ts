@@ -34,6 +34,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+// B-163 — seul un conge qui couvre la nuit empeche une garde.
+import { lirePerimetre, toucheLesGardes } from '@/lib/absences/perimetre'
 import { appliquerChangementGarde } from '@/lib/gardes/appliquer-changement'
 import { appliquerExceptionJour } from '@/lib/gardes/appliquer-exception'
 import {
@@ -81,16 +83,22 @@ async function avertissementsAffectation(
   }
 
   // 2. Congés VALIDÉS couvrant la date de la garde (indisponibilité incluse).
+  //
+  // ⚠️ SEULS CEUX QUI COUVRENT LA NUIT SONT UN AVERTISSEMENT (B-163). Ce bloc
+  //    prévient l'admin qu'elle met de garde quelqu'un d'absent. Un congé « le
+  //    matin » ne dit rien sur sa soirée : l'avertir alors serait l'habituer à
+  //    passer outre, et c'est ainsi qu'on perd un avertissement utile.
   const { data: congesDb } = await supabase
     .from('conges')
-    .select('veterinaire_id, type')
+    .select('veterinaire_id, type, perimetre')
     .eq('statut', 'valide')
     .in('veterinaire_id', cibles)
     .lte('date_debut', gardeDate)
     .gte('date_fin', gardeDate)
 
-  type CongeRow = { veterinaire_id: string; type: string }
+  type CongeRow = { veterinaire_id: string; type: string; perimetre?: string | null }
   for (const c of (congesDb as CongeRow[] | null) ?? []) {
+    if (!toucheLesGardes(lirePerimetre(c.perimetre))) continue
     const motif = c.type === 'indisponibilite' ? 'indisponible' : 'en congé validé'
     warnings.push(`${nomDe(c.veterinaire_id)} est ${motif} le ${gardeDate}.`)
   }

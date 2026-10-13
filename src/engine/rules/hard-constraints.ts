@@ -21,6 +21,10 @@ import { apparierSourcePourCible, apparierCiblePourSource } from '../relations-s
 // Les motifs de refus (`invalid(...)`) s'affichent au cabinet — liste des
 // remplaçants, fenêtre de crise. Une date y va en français.
 import { periodeFr } from '@/lib/dates-fr'
+// B-163 — l'unique autorité sur ce qu'une absence couvre. Ce fichier DÉCIDE
+// d'après elle, il ne redit jamais la règle (le défaut de B-043 était
+// précisément une règle qui vivait dans un écran et nulle part ailleurs).
+import { lirePerimetre, toucheLesGardes, vautRepos } from '@/lib/absences/perimetre'
 import {
   violeCompositionPose, messageComposition,
   violeRoleInterdit, messageRoleInterdit,
@@ -220,8 +224,17 @@ export function estVeilleDeRepos(
 ): boolean {
   const lendemain = slot.type === 'weekend' ? addDays(slot.date, 2) : addDays(slot.date, 1)
 
-  // ① Un congé posé au planning — n'importe lequel.
+  // ① Un congé posé au planning — n'importe lequel, SAUF un ponctuel.
+  //
+  // ⚠️ DEUX HEURES DE RÉUNION NE SONT PAS UN REPOS (B-163). Compter une
+  //    indisponibilité ponctuelle ici en ferait un argument pour refuser une
+  //    garde la veille : le produit interdirait une garde au motif que la
+  //    personne a un rendez-vous de 14h à 16h le lendemain. C'est exactement le
+  //    défaut payé le 20/09 avec les repos « si possible », où une préférence
+  //    fondait une interdiction — d'où le paramètre `seulementReposDurs` juste
+  //    au-dessus. Même famille, même parade.
   for (const conge of vet.conges) {
+    if (!vautRepos(lirePerimetre(conge.perimetre))) continue
     if (conge.date_debut <= lendemain && lendemain <= conge.date_fin) return true
   }
 
@@ -329,9 +342,14 @@ export function estWeekEndAvantVacances(slot: SlotGarde, vet: VetEngine): boolea
   const lundiSuivant = addDays(sam, 2)
   const vendrediSuivant = addDays(sam, 6)
 
+  // ⚠️ UN PONCTUEL N'EST PAS UN DÉPART EN VACANCES (B-163). La règle protège le
+  //    week-end qui précède un vrai départ ; un rendez-vous de deux heures le
+  //    mardi suivant n'a jamais empêché personne de partir, et le compter
+  //    retirerait un week-end sur un motif inexistant.
   return vet.conges.some(
     (conge) =>
       conge.type === 'vacances' &&
+      vautRepos(lirePerimetre(conge.perimetre)) &&
       conge.date_debut >= lundiSuivant &&
       conge.date_debut <= vendrediSuivant,
   )
@@ -827,10 +845,26 @@ function checkR9VendrediLieWE(
 }
 
 /**
- * R16 — Véto en congé = aucune garde
+ * R16 — Véto en congé = aucune garde, SI le congé couvre la nuit
+ *
+ * 🔴 CETTE RÈGLE EST LA RAISON POUR LAQUELLE LE CHOIX DE CRÉNEAU A ÉTÉ RETIRÉ
+ *    EN AOÛT. Le formulaire offrait « Matin / Après-midi / Journée / Soirée » et
+ *    cette fonction ne lisait pas le champ : quelqu'un posant une matinée
+ *    perdait sa garde du soir, sans qu'aucun écran ne le dise. Plutôt que de
+ *    corriger ici, on avait supprimé le champ (B-043).
+ *
+ *    Il revient le 13/10, avec la phrase qui tranche : « la journée ça n'est pas
+ *    la nuit, ce sont 2 choses distinctes ». C'est donc ICI que le lot se joue —
+ *    et `tests/engine/perimetre-conge-moteur.test.ts` tient la position.
+ *
+ * ⚠️ `validerPlanning` PORTE LA MÊME RÈGLE, et doit rester d'accord avec celle-ci.
+ *    Les corriger séparément ferait déclarer invalide un planning que le
+ *    générateur vient de produire — le validateur accuserait le moteur d'une
+ *    faute commise par le validateur.
  */
 function checkR16Conge(vet: VetEngine, slot: SlotGarde): ValidationResult {
   for (const conge of vet.conges) {
+    if (!toucheLesGardes(lirePerimetre(conge.perimetre))) continue
     if (slot.date >= conge.date_debut && slot.date <= conge.date_fin) {
       // Ce refus s'affiche dans la liste des remplaçants possibles, à côté du
       // nom du vétérinaire : c'est du texte pour le cabinet, pas un journal.

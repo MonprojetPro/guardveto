@@ -12,6 +12,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { createConge, updateConge, type ConflitPlanning } from '@/app/(protected)/conges/actions'
+// B-163 — le choix « sur quoi porte cette absence », partagé avec la modale de crise.
+import { ChoixPerimetre } from '@/components/absences/ChoixPerimetre'
+import { lirePerimetre, type PerimetreAbsence } from '@/lib/absences/perimetre'
 import type { Conge, CreneauConge, TypeConge, Veterinaire } from '@/types'
 
 const TYPES_CONGE: { value: TypeConge; label: string }[] = [
@@ -68,6 +71,16 @@ interface CongeFormProps {
   conge?: Conge | null
   defaultVetId?: string
   /**
+   * B-163 — le cabinet a-t-il allumé le planning des journées ?
+   *
+   * ⚠️ DÉFAUT `false`, ET C'EST LE BON SENS DU REPLI. Un parent qui oublie de
+   *    passer la valeur n'offrira que « nuit » et « journée + nuit », soit le
+   *    vocabulaire d'avant ce lot. Le défaut inverse proposerait « le matin » à
+   *    un cabinet qui n'a pas de matin — un réglage sans effet, exactement le
+   *    reproche fait à `creneau` en août.
+   */
+  moduleJourneeActif?: boolean
+  /**
    * Appelé quand la CRÉATION (admin → congé validé) a détecté un conflit avec
    * un planning publié (cas « Antoine »). Le parent ouvre alors l'alerte.
    */
@@ -76,6 +89,7 @@ interface CongeFormProps {
 
 export function CongeForm({
   open, onClose, vets, currentUserId, isAdmin, conge, defaultVetId, onConflit,
+  moduleJourneeActif = false,
 }: CongeFormProps) {
   const isEdit = Boolean(conge)
   const [isPending, startTransition] = useTransition()
@@ -93,6 +107,18 @@ export function CongeForm({
   const [commentaire, setCommentaire] = useState(conge?.commentaire ?? '')
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  // ── B-163 — CE QUE L'ABSENCE COUVRE ────────────────────────────────────────
+  //
+  // Le défaut est `journee-et-nuit` : c'est le comportement que l'équipe connaît
+  // depuis le premier jour, et celui qui retire le plus. Partir de `ponctuel`
+  // aurait fait d'un oubli de saisie une absence sans effet — le genre de
+  // valeur par défaut qui ne se voit qu'au moment où la garde n'est pas assurée.
+  const [perimetre, setPerimetre] = useState<PerimetreAbsence>(
+    lirePerimetre(conge?.perimetre),
+  )
+  const [heureDebut, setHeureDebut] = useState(conge?.heure_debut?.slice(0, 5) ?? '14:00')
+  const [heureFin, setHeureFin] = useState(conge?.heure_fin?.slice(0, 5) ?? '16:00')
+
   // Réinitialise le formulaire à chaque ouverture (sinon il garde le contexte de la demande précédente)
   useEffect(() => {
     if (!open) return
@@ -102,6 +128,11 @@ export function CongeForm({
     setDateFin(conge?.date_fin ?? toIso(dimancheDeSemaine(lundi)))
     setType(conge?.type ?? 'vacances')
     setCommentaire(conge?.commentaire ?? '')
+    // B-163 — remis à zéro comme le reste : garder le périmètre de la demande
+    // précédente poserait silencieusement « le matin » sur la suivante.
+    setPerimetre(lirePerimetre(conge?.perimetre))
+    setHeureDebut(conge?.heure_debut?.slice(0, 5) ?? '14:00')
+    setHeureFin(conge?.heure_fin?.slice(0, 5) ?? '16:00')
     setErrors({})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, conge, defaultVetId])
@@ -157,6 +188,11 @@ export function CongeForm({
         type,
         // Toujours `null` depuis B-043 : voir la note en tête de fichier.
         creneau: null,
+        // B-163 — le champ vivant. Les heures ne partent QUE pour le ponctuel :
+        // le serveur les refuserait ailleurs, et la base aussi.
+        perimetre,
+        heure_debut: perimetre === 'ponctuel' ? heureDebut : null,
+        heure_fin: perimetre === 'ponctuel' ? heureFin : null,
         commentaire,
       }
       if (isEdit && conge) {
@@ -269,7 +305,19 @@ export function CongeForm({
             </p>
           )}
 
-
+          {/* B-163 — sur quoi porte cette absence.
+              Placé APRÈS les dates et AVANT le commentaire : on décide d'abord
+              quand, puis sur quoi. L'inverse ferait choisir « le matin » avant
+              de savoir de quel jour on parle. */}
+          <ChoixPerimetre
+            valeur={perimetre}
+            onChange={(p) => { setPerimetre(p); setErrors({}) }}
+            heureDebut={heureDebut}
+            heureFin={heureFin}
+            onHeures={(d, f) => { setHeureDebut(d); setHeureFin(f); setErrors({}) }}
+            moduleJourneeActif={moduleJourneeActif}
+            desactive={isPending}
+          />
 
           {/* Commentaire */}
           <div className="space-y-1.5">

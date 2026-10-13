@@ -32,6 +32,25 @@ import {
   validerConge as validerCongeAction,
 } from '@/app/(protected)/conges/actions'
 import { detecterConflitPlanningPublie } from '@/lib/conges/detection-conflit'
+// B-163 — l'unique autorite sur ce qu'une absence couvre. Filou en depend comme
+// les ecrans : un vocabulaire recopie ici aurait divergé au premier ajout.
+import {
+  PERIMETRES,
+  PERIMETRE_PAR_DEFAUT,
+  lirePerimetre,
+  phrasePerimetre,
+  validerPerimetre,
+  type PerimetreAbsence,
+} from '@/lib/absences/perimetre'
+
+/**
+ * La liste, dans la forme que `z.enum` exige (tuple non vide).
+ *
+ * ⚠️ DERIVEE de `PERIMETRES`, jamais recopiee : un septieme perimetre ajoute
+ *    a la source doit apparaitre a Filou sans qu'on y pense. Le cast est le
+ *    prix de la contrainte de type de Zod, pas une entorse a la source unique.
+ */
+const PERIMETRES_ZOD = PERIMETRES as unknown as [PerimetreAbsence, ...PerimetreAbsence[]]
 import { lignesLues } from './lecture'
 import { SANS_PARAMETRE, type ContexteOutil, type OutilEcriture, type OutilLecture } from './types'
 
@@ -72,7 +91,12 @@ interface CongeDb {
   date_debut: string
   date_fin: string
   type: string
+  /** ⚠️ MORT depuis B-043 — `null` partout. Le champ vivant : `perimetre`. */
   creneau: string | null
+  /** B-163 — ce que l'absence couvre, et ses heures si elle est ponctuelle. */
+  perimetre: string | null
+  heure_debut: string | null
+  heure_fin: string | null
   statut: string
   commentaire: string | null
   raison_refus: string | null
@@ -93,10 +117,30 @@ async function chargerConges(ctx: ContexteOutil): Promise<CongeDb[]> {
     await ctx.supabase
       .from('conges')
       .select(
-        'id, veterinaire_id, date_debut, date_fin, type, creneau, statut, commentaire, raison_refus, created_at',
+        // B-163 — `perimetre` est LU : sans lui, Filou repondrait « Manon est
+        // absente le 3 » sur une matinee, et personne ne saurait qu'elle est la
+        // l'apres-midi. C'est exactement le defaut de la regle FILOU SUIT LE
+        // PRODUIT : le risque n'est pas le catalogue incomplet, c'est la
+        // reponse incomplete presentee comme complete.
+        'id, veterinaire_id, date_debut, date_fin, type, creneau, perimetre, heure_debut, heure_fin, statut, commentaire, raison_refus, created_at',
       )
       .order('date_debut'),
     'les congés du cabinet',
+  )
+}
+
+/**
+ * Ce que l'absence couvre, en francais, pour la reponse de Filou.
+ *
+ * Rend `null` pour « journee et nuit » : c'est le cas general, et le repeter a
+ * chaque ligne ferait du bruit dans une reponse deja dense.
+ */
+function ditPerimetreDe(c: Pick<CongeDb, 'perimetre' | 'heure_debut' | 'heure_fin'>): string | null {
+  return phrasePerimetre(
+    lirePerimetre(c.perimetre),
+    c.heure_debut && c.heure_fin
+      ? { heure_debut: c.heure_debut, heure_fin: c.heure_fin }
+      : null,
   )
 }
 
@@ -261,6 +305,8 @@ Si tu n'es pas administrateur, tu ne verras ici que TES propres congés, même e
         date_debut: c.date_debut,
         date_fin: c.date_fin,
         type: TYPE_HUMAIN[c.type] ?? c.type,
+        // B-163 — en francais, et seulement quand il y a quelque chose a dire.
+        porte_sur: ditPerimetreDe(c) ?? undefined,
         statut: STATUT_HUMAIN[c.statut] ?? c.statut,
         motif_refus: c.statut === 'refuse' ? c.raison_refus : undefined,
         commentaire: c.commentaire || undefined,
@@ -293,6 +339,9 @@ Appelle-le pour « qu'est-ce qu'il y a à valider ? », « y a-t-il des demandes
         date_debut: c.date_debut,
         date_fin: c.date_fin,
         type: TYPE_HUMAIN[c.type] ?? c.type,
+        // B-163 — l'admin decide sur cette liste : elle doit voir si la demande
+        // ne porte que sur une matinee avant d'accorder une semaine.
+        porte_sur: ditPerimetreDe(c) ?? undefined,
         commentaire: c.commentaire || undefined,
         depose_le: c.created_at,
       })),
@@ -314,6 +363,31 @@ const ParamsPoser = z.object({
   date_debut: z.string().describe('Date ISO (AAAA-MM-JJ) de début.'),
   date_fin: z.string().describe('Date ISO (AAAA-MM-JJ) de fin, incluse. Peut être égale à la date de début.'),
   type: z.enum(TYPES_VALIDES).describe('vacances, formation, sante (raison médicale), autre, ou indisponibilite.'),
+  // ── B-163 — CE QUE L'ABSENCE COUVRE ───────────────────────────────────────
+  //
+  // 🔑 FILOU DOIT POUVOIR LE POSER, PAS SEULEMENT LE LIRE. Exigence de MiKL le
+  //    13/10 : « n'oublie pas Filou qui doit toujours être au courant des
+  //    nouveautés et aussi pouvoir agir ». Un outil qui ne connaîtrait pas ce
+  //    champ poserait tous ses congés en « journée et nuit » — donc annulerait
+  //    la nuance dès qu'on passe par lui, en silence.
+  perimetre: z
+    .enum(PERIMETRES_ZOD)
+    .optional()
+    .describe(
+      "Sur quoi porte l'absence. « journee-et-nuit » (défaut) = absent du cabinet ET pas de garde. "
+      + '« journee » = pas au cabinet mais la garde de nuit reste assurée. « nuit » = pas de garde, '
+      + "mais présent au cabinet. « matin » / « apres-midi » = une demi-journée seulement. "
+      + "« ponctuel » = quelques heures (réunion, rendez-vous) : RIEN n'est retiré du planning, "
+      + 'la personne est là le reste du temps — exige alors heure_debut et heure_fin.',
+    ),
+  heure_debut: z
+    .string()
+    .optional()
+    .describe('HH:MM. OBLIGATOIRE et UNIQUEMENT si perimetre vaut « ponctuel ».'),
+  heure_fin: z
+    .string()
+    .optional()
+    .describe('HH:MM. OBLIGATOIRE et UNIQUEMENT si perimetre vaut « ponctuel ».'),
   commentaire: z.string().optional().describe('Note libre, visible par l’administrateur.'),
 })
 
@@ -357,10 +431,26 @@ Si tu es administrateur, le congé est enregistré directement VALIDÉ (c'est le
       ? await avertissementConflit(ctx, veto.id, params.date_debut, params.date_fin)
       : undefined
 
+    // B-163 — la validation du perimetre AVANT la proposition. Un ponctuel sans
+    // heures serait refuse par le serveur : mieux vaut le dire maintenant, dans
+    // la langue de Filou, que laisser l'utilisateur confirmer une action vouee
+    // a echouer.
+    const perimVerif = validerPerimetre(
+      params.perimetre ?? PERIMETRE_PAR_DEFAUT,
+      params.heure_debut,
+      params.heure_fin,
+    )
+    if (!perimVerif.ok) return { ok: false, raison: perimVerif.probleme }
+
     const lignes = [
       `${params.date_debut} → ${params.date_fin}`,
       `Type : ${TYPE_HUMAIN[params.type]}`,
     ]
+    // ⚠️ DIT DANS LA PROPOSITION, et pas seulement envoye. C'est la fenetre ou
+    //    l'utilisateur confirme : un perimetre choisi par le modele et jamais
+    //    affiche serait une decision prise a sa place.
+    const ditPerim = phrasePerimetre(perimVerif.perimetre, perimVerif.heures)
+    if (ditPerim) lignes.push(`Porte sur : ${ditPerim}`)
     if (params.commentaire) lignes.push(`Commentaire : ${params.commentaire}`)
 
     return {
@@ -398,6 +488,11 @@ Si tu es administrateur, le congé est enregistré directement VALIDÉ (c'est le
         type: params.type,
         // Toujours `null` : voir la note sur les demi-journées plus haut.
         creneau: null,
+        // B-163 — le champ vivant. `createConge` revalide : Filou ne contourne
+        // aucun controle, il passe par la meme porte que l'ecran.
+        perimetre: params.perimetre ?? PERIMETRE_PAR_DEFAUT,
+        heure_debut: params.heure_debut ?? null,
+        heure_fin: params.heure_fin ?? null,
         commentaire: params.commentaire ?? '',
       },
       ctx.vetoId,

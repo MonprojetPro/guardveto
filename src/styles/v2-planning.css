@@ -2496,6 +2496,24 @@ button.vet-row-a-pourvoir:hover {
 }
 .abs-item.en-cours .abs-motif { color: var(--t-accent); }
 
+/* B-163 — ce que l'absence couvre, à côté du motif.
+   Volontairement en minuscules et sans graisse, contre le motif qui est en
+   capitales : les deux informations se lisent d'un coup sans se disputer l'œil.
+   « MALADIE · le matin » plutôt que deux étiquettes concurrentes.
+
+   ⚠️ CETTE RÈGLE EST LE SEUL EFFET VISIBLE du choix de périmètre dans ce
+      panneau. Sans elle, la classe serait orpheline et la mention invisible —
+      le défaut du 09/10, où 11 classes sans règle laissaient un écran muet avec
+      2184 tests verts. Une classe ajoutée sans règle ne casse rien : elle se
+      contente de ne rien afficher. */
+.abs-perimetre {
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--t-muted);
+}
+.abs-item.en-cours .abs-perimetre { color: var(--t-accent); }
+
 /* ── Le choix du planning à imprimer, côté secrétariat (B-017) ──────────
    Le secrétariat n'a pas de sélecteur de période dans l'en-tête : la période
    est un outil de préparation, il n'en prépare aucune. Elle ne réapparaît

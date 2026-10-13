@@ -2,6 +2,11 @@
 // GUARDVETO — Types TypeScript partagés
 // ============================================================
 
+// B-163 — ce qu'une absence couvre. Le type vit dans `lib/absences/perimetre`,
+// avec les fonctions qui en décident : séparer le vocabulaire de ses règles est
+// exactement ce qui a permis à `creneau` de mentir pendant deux mois.
+import type { PerimetreAbsence } from '@/lib/absences/perimetre'
+
 export type UserRole = 'admin' | 'veto'
 export type StatutVeto = 'associe' | 'salarie'
 export type StatutPeriode = 'brouillon' | 'publie' | 'verrouille'
@@ -186,7 +191,23 @@ export interface Conge {
   date_debut: string
   date_fin: string
   type: TypeConge
+  /**
+   * ⚠️ MORT DEPUIS B-043 (26/08) : vocabulaire matin/après-midi/journée/soirée,
+   *    jamais lu par le moteur, `null` sur les 50 lignes en base. Conservé pour
+   *    ne rien casser. **Le champ vivant est `perimetre`.**
+   */
   creneau: CreneauConge | null
+  /**
+   * CE QUE L'ABSENCE COUVRE (B-163) — six valeurs, décrites dans
+   * `lib/absences/perimetre.ts`, qui en est l'unique autorité.
+   *
+   * Optionnel au type parce que d'anciennes requêtes ne le sélectionnent pas ;
+   * tout lecteur passe par `lirePerimetre()`, qui replie sur `journee-et-nuit`.
+   */
+  perimetre?: PerimetreAbsence
+  /** Les bornes du périmètre `ponctuel`, et de lui seul. */
+  heure_debut?: string | null
+  heure_fin?: string | null
   statut: StatutConge
   commentaire: string | null
   raison_refus: string | null
@@ -410,6 +431,20 @@ export interface Absence {
   statut: StatutAbsence
   declaree_par: string | null
   created_at: string
+  /**
+   * CE QUE L'ABSENCE COUVRE (B-163). Même vocabulaire que `Conge.perimetre`,
+   * délibérément : les deux tables décrivent la même réalité pour tous leurs
+   * lecteurs, et deux vocabulaires auraient rejoué le défaut « deux
+   * vocabulaires de rôles » (B-111).
+   *
+   * 🔴 CETTE TABLE N'AVAIT AUCUNE NOTION DE PÉRIMÈTRE avant le 13/10 : déclarer
+   *    « absent demain matin » lançait tout le parcours de réparation des
+   *    gardes du soir.
+   */
+  perimetre?: PerimetreAbsence
+  /** Les bornes du périmètre `ponctuel`, et de lui seul. */
+  heure_debut?: string | null
+  heure_fin?: string | null
 }
 
 /** Trace légère du dépannage : qui a remplacé qui sur une garde, suite à une absence. */

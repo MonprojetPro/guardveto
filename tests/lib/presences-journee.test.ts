@@ -452,6 +452,81 @@ describe('presencesVoulues — les absences écartent la présence', () => {
   })
 })
 
+// ── L'absence ne couvre que ce qu'elle nomme (B-163) ─────────────────────────
+//
+// MiKL, le 13/10 : « il est possible qu'un véto soit absent la journée mais pas
+// la nuit, ou juste le matin mais pas l'après-midi ».
+//
+// 🔴 CE QUE CES CAS PROTÈGENT : avant ce lot, l'absence était regardée JOUR PAR
+//    JOUR. Une absence du matin aurait donc empêché de poser la présence de
+//    l'après-midi — soit faire disparaître du planning quelqu'un qui travaille.
+
+describe('presencesVoulues — le périmètre de l’absence, bloc par bloc', () => {
+  // Les tranches réelles du premier cabinet, mesurées en base le 13/10.
+  const blocsAvecCreneau = [
+    { id: 'b-matin', nom: 'Matin', actif: true, creneau: 'matin' as const },
+    { id: 'b-am', nom: 'Après-midi', actif: true, creneau: 'apres-midi' as const },
+    { id: 'b-jour', nom: 'Journée complète', actif: true, creneau: 'journee' as const },
+  ]
+  // Anne-So tous les mardis, sur les trois tranches : 4 mardis × 3 = 12 poses.
+  const troisTrames = [
+    trame({ id: 't-m', bloc_id: 'b-matin' }),
+    trame({ id: 't-a', bloc_id: 'b-am' }),
+    trame({ id: 't-j', bloc_id: 'b-jour' }),
+  ]
+  const leMardi13 = { veterinaire_id: 'v-anneso', date_debut: '2026-10-13', date_fin: '2026-10-13' }
+
+  it('une absence du matin ne retire QUE la tranche du matin', () => {
+    const v = presencesVoulues(troisTrames, blocsAvecCreneau, periode, [
+      { ...leMardi13, perimetre: 'matin' },
+    ])
+    const le13 = v.filter((p) => p.date === '2026-10-13').map((p) => p.bloc_id)
+    expect(le13.sort()).toEqual(['b-am', 'b-jour'])
+    expect(v).toHaveLength(11) // 12 − 1
+  })
+
+  it('une absence de journée retire les trois tranches de ce mardi', () => {
+    const v = presencesVoulues(troisTrames, blocsAvecCreneau, periode, [
+      { ...leMardi13, perimetre: 'journee' },
+    ])
+    expect(v.filter((p) => p.date === '2026-10-13')).toHaveLength(0)
+    expect(v).toHaveLength(9) // 12 − 3
+  })
+
+  it('une absence de NUIT ne retire aucune présence de journée', () => {
+    const v = presencesVoulues(troisTrames, blocsAvecCreneau, periode, [
+      { ...leMardi13, perimetre: 'nuit' },
+    ])
+    expect(v).toHaveLength(12)
+  })
+
+  it('un ponctuel de deux heures ne retire rien — l’option A du 13/10', () => {
+    const v = presencesVoulues(troisTrames, blocsAvecCreneau, periode, [
+      { ...leMardi13, perimetre: 'ponctuel' },
+    ])
+    expect(v).toHaveLength(12)
+  })
+
+  it('sans périmètre, tout le jour est retiré — le comportement d’avant', () => {
+    const v = presencesVoulues(troisTrames, blocsAvecCreneau, periode, [leMardi13])
+    expect(v.filter((p) => p.date === '2026-10-13')).toHaveLength(0)
+  })
+
+  it('un bloc sans créneau connu se comporte comme « journée »', () => {
+    // Donc retiré par une absence de journée, conservé par une du matin : le
+    // repli le plus large est le seul qui ne pose personne à tort.
+    const sansCreneau = [{ id: 'b-matin', nom: 'Matin', actif: true }]
+    const unTrame = [trame({ bloc_id: 'b-matin' })]
+    expect(
+      presencesVoulues(unTrame, sansCreneau, periode, [{ ...leMardi13, perimetre: 'journee' }])
+        .length,
+    ).toBe(3)
+    expect(
+      presencesVoulues(unTrame, sansCreneau, periode, [{ ...leMardi13, perimetre: 'matin' }]).length,
+    ).toBe(4)
+  })
+})
+
 describe('resumeApplication — le nombre écarté est DIT, jamais tu', () => {
   it('annonce les présences non posées pour absence', () => {
     const v = presencesVoulues([trame()], blocs, periode, [

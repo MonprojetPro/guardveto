@@ -15,6 +15,7 @@ import type { VetEtiquette } from '@/components/planning/PointPreVol'
 import type { Conge, Veterinaire } from '@/types'
 import { stylePastille } from '@/lib/couleurs'
 import { phraseRetrait } from '@/lib/journee/absence-retire-presences'
+import { PastillePerimetre } from '@/components/absences/ChoixPerimetre'
 
 interface ValiderCongeDialogProps {
   open: boolean
@@ -99,6 +100,17 @@ export function ValiderCongeDialog({
                 {vet.prenom.charAt(0)}
               </div>
               <p className="text-sm font-medium">{vet.prenom} {vet.nom}</p>
+              {/* B-163 — CE QUE LA DEMANDE COUVRE, sous les yeux de qui decide.
+                  L'admin accorde ou refuse ; sans cette mention, elle croirait
+                  accorder une journee entiere quand le veto n'a demande qu'une
+                  matinee. C'est exactement ce que MiKL refusait de deviner :
+                  « le veto qui demande doit selectionner la ou il est absent,
+                  l'admin peut pas le deviner ». */}
+              <PastillePerimetre
+                perimetre={conge.perimetre}
+                heureDebut={conge.heure_debut}
+                heureFin={conge.heure_fin}
+              />
             </div>
           )}
 

@@ -2,6 +2,8 @@
 // GUARDVETO — Types du moteur de génération
 // ============================================================
 
+import type { PerimetreAbsence } from '@/lib/absences/perimetre'
+
 export type JourSemaine = 'lundi' | 'mardi' | 'mercredi' | 'jeudi' | 'vendredi' | 'samedi' | 'dimanche'
 export type TypeGardeEngine = 'semaine_soir' | 'vendredi_soir' | 'weekend' | 'ferie'
 /**
@@ -130,6 +132,22 @@ export interface CongeEngine {
   date_fin: string
   /** Type du congé — utile pour R10c (pas de garde le WE avant des vacances). */
   type?: 'vacances' | 'formation' | 'sante' | 'autre' | 'indisponibilite'
+  /**
+   * CE QUE L'ABSENCE COUVRE (B-163).
+   *
+   * 🔴 LE MOTEUR N'A PLUS LE DROIT DE SUPPOSER QU'UN CONGÉ BLOQUE TOUT.
+   *    « la journée ça n'est pas la nuit, ce sont 2 choses distinctes » — MiKL,
+   *    le 13/10. Un congé de périmètre `journee` laisse la garde du soir
+   *    disponible ; un `ponctuel` ne retire rien du tout.
+   *
+   * ⚠️ OPTIONNEL AU TYPE, JAMAIS À LA DÉCISION. Les bancs d'essai et les
+   *    fixtures construisent des `CongeEngine` à la main ; les obliger tous à
+   *    porter le champ aurait fait de ce lot une réécriture de tests. Mais tout
+   *    lecteur passe par `lirePerimetre()`, qui replie l'absence de valeur sur
+   *    `journee-et-nuit` — soit le comportement d'avant ce lot. Un oubli ne
+   *    libère donc jamais une garde ; au pire il en bloque une comme hier.
+   */
+  perimetre?: PerimetreAbsence
 }
 
 // Un créneau de garde à planifier
