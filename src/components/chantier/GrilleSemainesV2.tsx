@@ -688,9 +688,38 @@ function CaseDepliee({
             >
               {vue.journeeVisible && <span className="pv2-mi" aria-hidden="true" />}
 
-              {/* Le congé se LIT, il ne se devine pas à la hachure seule. */}
+              {/* Le congé se LIT, il ne se devine pas à la hachure seule.
+                  B-163a ③ — et il se nomme : une ABSENCE déclarée n'est pas un
+                  congé, et les confondre ferait chercher une demande qui
+                  n'existe pas. */}
               {ligne.absence === 'valide' && ligne.journee.length === 0 && (
-                <span className="pv2-conge-txt">congé</span>
+                <span className="pv2-conge-txt">
+                  {ligne.origineAbsence === 'absence' ? 'absent' : 'congé'}
+                </span>
+              )}
+
+              {/*
+                B-163a ③ — LA MENTION DE PÉRIMÈTRE, SEULE TRACE DE CE QUI NE
+                RETIRE RIEN.
+
+                MiKL, 14/10, après avoir posé une indisponibilité de 14h à 16h :
+                « et du coup ça n'a rien changé ». Rien n'avait changé au
+                planning — c'est la décision du 13/10, et elle est tenue. Mais
+                rien ne le DISAIT non plus, et une absence que personne ne voit
+                est pire que pas de champ du tout : on croit la personne
+                disponible toute la journée.
+
+                ⚠️ Elle s'affiche MÊME quand la piste porte des présences : c'est
+                   justement là qu'elle est indispensable. Une barre « 8h-18h »
+                   sans mention annonce une présence continue qui est fausse.
+              */}
+              {ligne.mention && ligne.absence === null && (
+                <span
+                  className="pv2-mention-perimetre"
+                  title={ligne.mentionDetail ?? ligne.mention}
+                >
+                  {ligne.mention}
+                </span>
               )}
 
               {ligne.journee.map(({ presence, position }) =>

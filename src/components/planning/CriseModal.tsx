@@ -59,7 +59,11 @@ import type { MotifAbsence, Absence } from '@/types'
 // B-163 — le choix « sur quoi porte cette absence », partage avec le formulaire
 // de conge : trois fenetres posent la meme question, une seule la decrit.
 import { ChoixPerimetre } from '@/components/absences/ChoixPerimetre'
-import type { PerimetreAbsence } from '@/lib/absences/perimetre'
+import {
+  LIBELLE_PERIMETRE,
+  toucheLesGardes,
+  type PerimetreAbsence,
+} from '@/lib/absences/perimetre'
 import type {
   DiagnosticImpasse as DiagnosticImpasseData,
   RegleEnCause,
@@ -813,16 +817,45 @@ export function CriseModal({
         {/* ══════════ ÉTAPE 2 — RÉPARATION ══════════ */}
         {resultat && (
           <>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 crise-icone-titre" />
-                Réparer le planning
-              </DialogTitle>
-              <DialogDescription>
-                {absentVet ? `${absentVet.prenom} ${absentVet.nom}` : 'Le vétérinaire'} est
-                absent·e. Choisis un remplaçant pour chaque garde, puis applique la réparation.
-              </DialogDescription>
-            </DialogHeader>
+            {/*
+              B-163a ② — LE TITRE SUIT CE QUI S'EST RÉELLEMENT PASSÉ.
+
+              MiKL, 14/10, après avoir posé une indisponibilité ponctuelle de 14h
+              à 16h : « il m'affiche cet encart, ça n'a aucun sens ». Il avait
+              raison, et le défaut n'était pas dans l'encart — c'était le TITRE
+              au-dessus. La fenêtre annonçait « Réparer le planning » sous un
+              triangle d'avertissement, avec « choisis un remplaçant pour chaque
+              garde », pour expliquer ensuite qu'il n'y avait rien à réparer.
+
+              🔑 Le serveur avait raison depuis B-160a : il n'appelle même pas le
+              recensement quand le périmètre ne touche pas les gardes. C'est
+              l'écran qui enchaînait sur l'étape de réparation quoi qu'il arrive.
+              Un en-tête alarmant pour annoncer une bonne nouvelle apprend à ne
+              plus lire les en-têtes alarmants.
+            */}
+            {resultat.creneauxImpactes.length === 0 ? (
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5" aria-hidden />
+                  Absence enregistrée
+                </DialogTitle>
+                <DialogDescription>
+                  {absentVet ? `${absentVet.prenom} ${absentVet.nom}` : 'Le vétérinaire'} est
+                  noté·e absent·e. Il n’y a rien à réparer.
+                </DialogDescription>
+              </DialogHeader>
+            ) : (
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 crise-icone-titre" />
+                  Réparer le planning
+                </DialogTitle>
+                <DialogDescription>
+                  {absentVet ? `${absentVet.prenom} ${absentVet.nom}` : 'Le vétérinaire'} est
+                  absent·e. Choisis un remplaçant pour chaque garde, puis applique la réparation.
+                </DialogDescription>
+              </DialogHeader>
+            )}
 
             {resultat.creneauxImpactes.length === 0 ? (
               // B-026 — ce pave etait en vert Tailwind brut (green-50/200/800),
@@ -835,9 +868,22 @@ export function CriseModal({
                   <p className="crise-rien-titre">
                     Aucune garde impactée
                   </p>
+                  {/*
+                    B-163a ② — DEUX RAISONS DIFFÉRENTES, ET IL FAUT DIRE LA
+                    BONNE. « Aucune garde publiée ne le concerne » est vrai quand
+                    l'absence touche les gardes et qu'il n'y en avait aucune ;
+                    c'est FAUX pour « le matin » ou « ponctuel », où des gardes
+                    peuvent parfaitement exister — elles sont simplement hors du
+                    périmètre déclaré. Afficher la première phrase là laisserait
+                    croire que la personne n'avait pas de garde, et on partirait
+                    chercher pourquoi.
+                  */}
                   <p className="crise-rien-detail">
-                    L&apos;absence est déclarée, mais aucune garde publiée ne concerne ce
-                    vétérinaire sur la période. Rien à réparer.
+                    {toucheLesGardes(perimetre)
+                      ? 'L’absence est déclarée, mais aucune garde publiée ne concerne ce '
+                        + 'vétérinaire sur la période. Rien à réparer.'
+                      : `L’absence est déclarée. « ${LIBELLE_PERIMETRE[perimetre]} » ne touche `
+                        + 'pas les gardes : celles qui sont publiées restent assurées.'}
                   </p>
                 </div>
               </div>

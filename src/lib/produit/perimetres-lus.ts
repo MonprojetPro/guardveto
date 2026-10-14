@@ -66,6 +66,16 @@ export type DecisionPerimetre =
 export const PERIMETRES_LUS: Record<string, DecisionPerimetre> = {
   // ── CEUX QUI DÉCIDENT : ils lisent le périmètre pour trancher ─────────────
 
+  'lib/absences/doublon.ts': {
+    perimetre: 'decide',
+    note:
+      'B-163a ④ — décide si deux absences de la même personne se marchent '
+      + 'dessus, via `perimetresSeRecouvrent`. C’est le seul endroit du produit '
+      + 'qui REFUSE une écriture sur la foi d’un périmètre : deux périmètres '
+      + 'disjoints (« le matin » et « la nuit ») doivent passer, et les refuser '
+      + 'reprendrait d’une main ce que B-163 a donné de l’autre.',
+  },
+
   'engine/loader.ts': {
     perimetre: 'decide',
     note:

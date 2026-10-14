@@ -523,6 +523,30 @@
   font-weight: 600;
   color: var(--pv2-sec);
 }
+/* B-163a ③ — LA MENTION DE PÉRIMÈTRE, par-dessus la piste.
+   Elle se pose À DROITE et non au centre : au centre, elle recouvrirait la
+   barre de présence qu'elle précise, et on perdrait l'information qu'elle
+   nuance. Le liseré ambré la distingue d'une étiquette de congé — ce n'est
+   pas une absence qui retire, c'est une absence qui informe. */
+.pv2-mention-perimetre {
+  position: absolute;
+  right: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  max-width: 72%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 9px;
+  border: 1px solid #e0b98a;
+  border-radius: 999px;
+  background: var(--pv2-surface);
+  font-size: 9px;
+  font-weight: 700;
+  color: #9a5a18;
+}
+
 .pv2-barre {
   position: absolute;
   top: 0;

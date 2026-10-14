@@ -85,6 +85,10 @@ interface LigneConge {
   date_debut: string
   date_fin: string
   statut: string
+  /** B-163a ③ — ce que le congé couvre, lu jusqu'à la grille. */
+  perimetre?: string | null
+  heure_debut?: string | null
+  heure_fin?: string | null
   /**
    * B-153 lot 1 — l'identifiant, et pas seulement le prénom.
    *
@@ -106,6 +110,37 @@ interface LigneAbsenceBrute {
   type?: string | null
   motif?: string | null
   /** B-163 — ce que l'absence couvre, et ses heures si elle est ponctuelle. */
+  perimetre?: string | null
+  heure_debut?: string | null
+  heure_fin?: string | null
+  veterinaires?: unknown
+}
+
+/**
+ * Une absence déclarée, telle qu'elle sort de la base pour LA GRILLE (B-163a ③).
+ *
+ * Distincte de `LigneAbsenceBrute` ci-dessus, qui sert le panneau du
+ * secrétariat et fond congés et absences dans un même format : ici on a besoin
+ * du `veterinaire_id` pour poser la ligne sur la bonne personne, et le panneau
+ * n'en a pas besoin. Deux usages, deux formes — les confondre obligerait l'un
+ * des deux à porter des champs qu'il n'emploie pas.
+ */
+/**
+ * Le prénom d'une relation PostgREST, qui rend tantôt un objet, tantôt un
+ * tableau d'un élément selon la forme du lien. Les deux cas sont traités —
+ * supposer l'un des deux rend `undefined` en silence, et la grille afficherait
+ * une ligne sans nom sans qu'aucune erreur ne soit levée.
+ */
+function prenomDe(v: unknown): string {
+  const x = Array.isArray(v) ? v[0] : v
+  return ((x ?? {}) as { prenom?: string }).prenom ?? ''
+}
+
+interface AbsenceGrilleBrute {
+  id: string
+  date_debut: string
+  date_fin: string
+  veterinaire_id: string
   perimetre?: string | null
   heure_debut?: string | null
   heure_fin?: string | null
@@ -205,7 +240,11 @@ export default async function PlanningPageV2({
         // congé n'a jamais été affiché dans les cases du planning, sans qu'un
         // seul message le signale. Trouvé en cherchant pourquoi le panneau du
         // secrétariat restait vide.
-        .select('id, date_debut, date_fin, statut, veterinaire_id, veterinaires!conges_veterinaire_id_fkey(prenom, couleur)')
+        // B-163a ③ — `perimetre` et les heures sont LUS ICI. Ils existaient en
+        // base depuis B-163 et n'arrivaient jamais à la grille : un congé « le
+        // matin » s'y affichait comme un congé plein, la personne étant
+        // pourtant au cabinet l'après-midi.
+        .select('id, date_debut, date_fin, statut, veterinaire_id, perimetre, heure_debut, heure_fin, veterinaires!conges_veterinaire_id_fkey(prenom, couleur)')
         .lte('date_debut', grille.fin)
         .gte('date_fin', grille.debut),
       // Chargé pour TOUS : le bouton PDF en dépend, pas seulement la publication.
@@ -296,6 +335,11 @@ export default async function PlanningPageV2({
       dateFin: c.date_fin,
       statut: c.statut,
       vetId: c.veterinaire_id,
+      // B-163a ③ — le périmètre suit le congé jusqu'à la grille. Sans lui, un
+      // congé « le matin » s'y dessinait comme un congé plein.
+      perimetre: c.perimetre ?? null,
+      heureDebut: c.heure_debut ?? null,
+      heureFin: c.heure_fin ?? null,
     }
   })
 
@@ -406,6 +450,42 @@ export default async function PlanningPageV2({
     //    le neuf », c'est « ne rien changer pour le client ».
     chantierOuvertPourLeCabinet(supabase, 'planning-grille-v2'),
   ])
+
+  // ── B-163a ③ — LES ABSENCES DÉCLARÉES, POUR LA GRILLE ──────────────────
+  //
+  // 🔴 LA GRILLE NE LISAIT PAS CETTE TABLE. Mesuré le 14/10 : `absences`
+  //    n'était requêtée ici que dans le bloc `if (estSecretaire)` juste en
+  //    dessous, pour un panneau qui vit À CÔTÉ de la grille. Le champ
+  //    `jour.absences` passé à la grille était alimenté par… `conges`. Une
+  //    absence déclarée ne se voyait donc que par ses EFFETS — et depuis
+  //    B-163, un périmètre `ponctuel` n'en a aucun : il était invisible.
+  //
+  // ⚠️ CHARGÉ UNIQUEMENT SI LE CHANTIER EST OUVERT. Pas par prudence de style :
+  //    seul `PlanningChantierV2` sait afficher la mention (`ligne.mention`).
+  //    L'écran du client ne reçoit pas ces lignes, donc son rendu ne bouge pas
+  //    d'un pixel — c'est la porte de B-151a, tenue au chargement comme au
+  //    rendu. ⚠️ ET C'EST UNE DETTE : l'écran du client a EXACTEMENT le même
+  //    trou, et il le gardera jusqu'à ce que le chantier passe en
+  //    `tousLesCabinets`. Écrit ici pour que ce ne soit pas une découverte.
+  let absencesGrille: AbsenceGrilleBrute[] = []
+  if (grilleV2) {
+    const res = await supabase
+      .from('absences')
+      // ⚠️ RELATION NOMMÉE, comme pour `conges` juste au-dessus : `absences`
+      //    porte deux liens vers `veterinaires` (le titulaire et `declaree_par`).
+      //    Sans le nom, PostgREST refuse la requête entière et rend une erreur —
+      //    donc une liste VIDE pour qui ne lit pas son `error`. C'est ce qui a
+      //    masqué les congés pendant un mois, du 25/07 au 25/08.
+      .select('id, date_debut, date_fin, veterinaire_id, perimetre, heure_debut, heure_fin, veterinaires!absences_veterinaire_id_fkey(prenom)')
+      .eq('statut', 'active')
+      .lte('date_debut', grille.fin)
+      .gte('date_fin', grille.debut)
+
+    // L'erreur est LUE. Une liste vide sur une lecture échouée ferait afficher
+    // « personne n'est absent » — la bonne nouvelle que personne ne va vérifier.
+    if (res.error) console.error('[planning] absences de la grille :', res.error.message)
+    absencesGrille = (res.data ?? []) as unknown as AbsenceGrilleBrute[]
+  }
 
   // ── « Qui est absent », pour le secrétariat ────────────────────────────
   // Chargé UNIQUEMENT pour lui : c'est le panneau qui remplace les compteurs
@@ -803,6 +883,16 @@ export default async function PlanningPageV2({
             periodeAffichee={periodeAffichee}
             anneeMois={anneeMois}
             isAdmin={isAdmin}
+            // B-163a ③ — les absences déclarées, que la grille ignorait.
+            absencesDeclarees={absencesGrille.map((a) => ({
+              vetId: a.veterinaire_id,
+              prenom: prenomDe(a.veterinaires),
+              dateDebut: a.date_debut,
+              dateFin: a.date_fin,
+              perimetre: a.perimetre ?? null,
+              heureDebut: a.heure_debut ?? null,
+              heureFin: a.heure_fin ?? null,
+            }))}
             lectureSeule={estSecretaire}
             absencesAVenir={absencesAVenir}
             vets={vets}

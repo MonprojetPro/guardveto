@@ -47,6 +47,11 @@ function ligne(
     })),
     nuit: null,
     absence: null,
+    // B-163a ③ — la ligne porte desormais ce qu'une indisponibilite DIT quand
+    // elle ne retire rien. Nul ici : ce test ne juge que les effectifs.
+    mention: null,
+    mentionDetail: null,
+    origineAbsence: null,
     vide: positions.length === 0,
   }
 }

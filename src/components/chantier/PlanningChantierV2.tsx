@@ -139,6 +139,27 @@ interface Props {
   compteurs: CompteursRow[]
   /** Congés et souhaits qui tombent sur le mois affiché. */
   conges: CongeAffiche[]
+  /**
+   * Les ABSENCES DÉCLARÉES qui tombent sur la grille (B-163a ③).
+   *
+   * 🔴 Elles n'arrivaient pas jusqu'ici : la grille ne recevait que `conges`, et
+   *    le champ qu'elle nommait `absences` en était rempli. Une absence ne se
+   *    voyait que par ses effets — donc jamais, pour un périmètre `ponctuel`
+   *    qui par décision du 13/10 n'en a aucun.
+   *
+   * Optionnelle, et vide par défaut : la page ne les charge que lorsque le
+   * chantier est ouvert, et le repli doit être « comme avant », jamais une
+   * erreur.
+   */
+  absencesDeclarees?: {
+    vetId: string
+    prenom: string
+    dateDebut: string
+    dateFin: string
+    perimetre: string | null
+    heureDebut: string | null
+    heureFin: string | null
+  }[]
   /** Nom du profil de planning de la période, s'il y en a un. */
   profil: string | null
   /** Périodes qui ont déjà des gardes — conditionne PDF et publication. */
@@ -238,6 +259,17 @@ export interface CongeAffiche {
   dateDebut: string
   dateFin: string
   statut: string
+  /**
+   * B-163a ③ — un congé a un PÉRIMÈTRE lui aussi, depuis B-163.
+   *
+   * ⚠️ Il manquait au même titre que les absences, et avec le même effet : un
+   *    congé « le matin » se dessinait comme un congé plein sur la grille. La
+   *    personne était là l'après-midi, et l'écran disait le contraire.
+   *    Facultatifs : l'écran du client reçoit le même objet et les ignore.
+   */
+  perimetre?: string | null
+  heureDebut?: string | null
+  heureFin?: string | null
 }
 
 const MOIS = [
@@ -284,6 +316,7 @@ export function PlanningChantierV2({
   nomsTypes,
   compteurs,
   conges,
+  absencesDeclarees = [],
   profil,
   periodesAvecGardes,
   periodesTypes,
@@ -711,13 +744,41 @@ export function PlanningChantierV2({
             manque: manquesParGarde?.[g.id] ?? 0,
           })),
           journee: presencesParJour[date],
-          absences: conges
-            .filter((c) => c.dateDebut <= date && c.dateFin >= date)
-            .map((c) => ({ vetId: c.vetId, prenom: c.prenom, statut: c.statut })),
+          // B-163a ③ — LES DEUX ORIGINES, enfin. `conges` d'un côté, `absences`
+          // de l'autre : ce champ ne portait que le premier alors qu'il
+          // s'appelle « absences », et personne ne l'a vu pendant deux mois.
+          // L'origine est marquée pour que la piste puisse les nommer
+          // différemment — un congé se demande, une absence se subit.
+          absences: [
+            ...conges
+              .filter((c) => c.dateDebut <= date && c.dateFin >= date)
+              .map((c) => ({
+                vetId: c.vetId,
+                prenom: c.prenom,
+                statut: c.statut,
+                origine: 'conge' as const,
+                perimetre: c.perimetre,
+                heureDebut: c.heureDebut,
+                heureFin: c.heureFin,
+              })),
+            ...absencesDeclarees
+              .filter((a) => a.dateDebut <= date && a.dateFin >= date)
+              .map((a) => ({
+                vetId: a.vetId,
+                prenom: a.prenom,
+                // Une absence déclarée est toujours effective — il n'y a rien à
+                // trancher, contrairement à un souhait de congé.
+                statut: 'valide',
+                origine: 'absence' as const,
+                perimetre: a.perimetre,
+                heureDebut: a.heureDebut,
+                heureFin: a.heureFin,
+              })),
+          ],
           vacances: vacances.find((v) => v.debut <= date && v.fin >= date)?.label ?? null,
         })),
       ),
-    [semaines, mois, periodeAffichee, parDate, presencesParJour, conges, vacances, manquesParGarde],
+    [semaines, mois, periodeAffichee, parDate, presencesParJour, conges, absencesDeclarees, vacances, manquesParGarde],
   )
 
   /** Le mois affiché déborde-t-il de la période ? Décide la ligne de légende. */

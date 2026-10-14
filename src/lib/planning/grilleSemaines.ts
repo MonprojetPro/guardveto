@@ -25,6 +25,14 @@
 // ============================================================
 
 import type { JourneeAffichee, PresenceAffichee } from './presencesDuJour'
+// B-163a ③ — l'unique autorité sur ce qu'une absence couvre. Cette brique
+// DESSINE la grille ; elle ne décide jamais de ce qu'un périmètre veut dire.
+import {
+  estPonctuel,
+  lirePerimetre,
+  phrasePerimetre,
+  phrasePerimetreCourte,
+} from '@/lib/absences/perimetre'
 
 /** Une personne de l'équipe, telle que la marge la dessine. */
 export interface PersonneGrille {
@@ -51,12 +59,50 @@ export interface GardeGrille {
   manque: number
 }
 
-/** Un congé ou souhait couvrant ce jour. */
+/**
+ * Une indisponibilité couvrant ce jour — congé, souhait, ou ABSENCE déclarée.
+ *
+ * 🔴 B-163a ③ — LES ABSENCES ENTRENT ICI, ET ELLES N'Y ÉTAIENT PAS. Jusqu'au
+ *    14/10, ce tableau n'était alimenté que par la table `conges` : la grille du
+ *    planning ne lisait **pas du tout** la table `absences`. Elles ne se
+ *    voyaient que par leurs EFFETS — une présence retirée, une garde
+ *    réattribuée. Depuis B-163, un périmètre `ponctuel` n'a par construction
+ *    aucun effet : il était donc devenu totalement invisible, ce que MiKL a
+ *    constaté le 14/10 (« et du coup ça n'a rien changé »).
+ *
+ * 🔑 La règle était pourtant déjà écrite dans `ChoixPerimetre.tsx` : « si rien
+ *    ne change au planning, alors la SEULE trace de ce choix est ce que l'écran
+ *    en dit ». Elle était juste ; son application s'était arrêtée aux écrans
+ *    d'absences, parce qu'on avait recensé les FICHIERS qui lisent la table et
+ *    pas les ENDROITS où l'information doit apparaître.
+ */
 export interface AbsenceGrille {
   vetId: string | null
   prenom: string
   /** `valide` = congé accordé · `souhait` = demande non tranchée. */
   statut: string
+  /** D'où vient la ligne. Un congé et une absence ne se disent pas pareil. */
+  origine?: 'conge' | 'absence'
+  /** Le périmètre brut, tel qu'il sort de la base — `lirePerimetre` s'en méfie. */
+  perimetre?: unknown
+  heureDebut?: string | null
+  heureFin?: string | null
+}
+
+/**
+ * Cette indisponibilité retire-t-elle réellement quelque chose ce jour-là ?
+ *
+ * ⚠️ LA MÊME RÈGLE POUR LES DEUX ORIGINES, et c'est un correctif : un premier
+ *    jet répondait « oui » à tout congé, au motif qu'un congé retire par
+ *    nature. Faux depuis B-163 — `CongeForm` offre `ponctuel` lui aussi, et un
+ *    congé de deux heures aurait barré la journée entière. Seule
+ *    `lib/absences/perimetre.ts` décide ; cette brique-ci DESSINE.
+ *
+ * Les lignes anciennes sans périmètre tombent sur `journee-et-nuit` via
+ * `lirePerimetre` : elles retirent, comme elles l'ont toujours fait.
+ */
+function retireQuelqueChose(a: AbsenceGrille): boolean {
+  return !estPonctuel(lirePerimetre(a.perimetre))
 }
 
 /** Les bornes horaires du rail « journée ». */
@@ -147,8 +193,27 @@ export interface LigneVetoJour {
   }[]
   /** La garde de nuit tenue ce jour-là, s'il y en a une. */
   nuit: { role: string; plusieursPlaces: boolean } | null
-  /** `valide` = congé accordé · `souhait` = demande non tranchée · `null`. */
+  /**
+   * `valide` = congé accordé · `souhait` = demande non tranchée · `null`.
+   *
+   * ⚠️ C'est CE champ qui barre la piste. Une absence qui ne retire rien ne doit
+   *    donc PAS le renseigner : barrer la journée de quelqu'un qui est au
+   *    cabinet de 8h à 18h, à cause d'un rendez-vous de deux heures, serait
+   *    exactement le mensonge que l'option A existe pour éviter.
+   */
   absence: string | null
+  /**
+   * Ce que l'indisponibilité DIT, quand elle ne se voit pas autrement.
+   *
+   * B-163a ③ — « Absent 14h → 16h — présent le reste du temps », « Le matin ».
+   * `null` pour le cas général (`journee-et-nuit`) : une mention qui s'affiche
+   * sur chaque ligne cesse d'être lue.
+   */
+  mention: string | null
+  /** La phrase entière, pour l'infobulle — `mention` seule est une abréviation. */
+  mentionDetail: string | null
+  /** `conge` ou `absence` — la piste ne les nomme pas pareil. */
+  origineAbsence: 'conge' | 'absence' | null
   /** Rien du tout ce jour-là — la ligne se dessine, en creux. */
   vide: boolean
 }
@@ -202,15 +267,37 @@ export function lignesDeLaSemaine(
       }
     }
 
-    const abs = jour.absences.find((a) => a.vetId === v.id)
-    const absence = abs ? abs.statut : null
+    // ⚠️ ON PRÉFÈRE CE QUI RETIRE. Quelqu'un peut porter un congé ET une
+    //    indisponibilité ponctuelle le même jour : si la ligne ne retenait que
+    //    la première trouvée et que c'était le ponctuel, la piste ne serait pas
+    //    barrée alors que la personne est en congé. Le doute penche toujours du
+    //    côté qui retire — même convention que `lirePerimetre`.
+    const siennes = jour.absences.filter((a) => a.vetId === v.id)
+    const abs = siennes.find((a) => retireQuelqueChose(a)) ?? siennes[0] ?? null
+
+    const absence = abs && retireQuelqueChose(abs) ? abs.statut : null
+
+    const heuresAbs =
+      abs && abs.heureDebut && abs.heureFin
+        ? { heure_debut: abs.heureDebut, heure_fin: abs.heureFin }
+        : null
+    // Courte pour la case (96 px de large), longue pour l'infobulle. Une
+    // abréviation seule n'informe personne ; elle signale qu'il y a à lire.
+    const mention = abs ? phrasePerimetreCourte(lirePerimetre(abs.perimetre), heuresAbs) : null
+    const mentionDetail = abs ? phrasePerimetre(lirePerimetre(abs.perimetre), heuresAbs) : null
 
     return {
       vetId: v.id,
       journee,
       nuit,
       absence,
-      vide: journee.length === 0 && nuit === null && absence === null,
+      mention,
+      mentionDetail,
+      origineAbsence: abs ? (abs.origine ?? 'conge') : null,
+      // ⚠️ `abs` et non `absence` : une ligne qui porte une mention n'est PAS
+      //    vide, même si rien n'est retiré. La dessiner en creux effacerait la
+      //    seule trace visible d'une indisponibilité ponctuelle.
+      vide: journee.length === 0 && nuit === null && abs === null,
     }
   })
 }

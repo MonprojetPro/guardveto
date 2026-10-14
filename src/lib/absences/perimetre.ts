@@ -192,6 +192,84 @@ export function vautRepos(p: PerimetreAbsence): boolean {
   return !estPonctuel(p)
 }
 
+// ── DEUX ABSENCES SE MARCHENT-ELLES DESSUS ? ────────────────────────────────
+
+/**
+ * Les trois tranches d'une journée, du point de vue d'une indisponibilité.
+ *
+ * ⚠️ CE N'EST PAS `CreneauBlocJournee` — celui-là décrit les blocs de PRÉSENCE
+ *    que le cabinet a configurés (« Journée complète 08-18 »). Ici on découpe le
+ *    temps, pas l'organisation : deux absences se recouvrent ou non
+ *    indépendamment de la façon dont le cabinet range ses horaires.
+ */
+export type TrancheAbsence = 'matin' | 'apres-midi' | 'nuit'
+
+/**
+ * Ce qu'un périmètre OCCUPE dans la journée.
+ *
+ * `ponctuel` rend une liste vide : il n'occupe aucune tranche entière, il se
+ * compare par ses heures. C'est le seul périmètre dont le recouvrement ne se
+ * décide pas ici.
+ */
+export function tranchesCouvertes(p: PerimetreAbsence): TrancheAbsence[] {
+  switch (p) {
+    case 'matin':
+      return ['matin']
+    case 'apres-midi':
+      return ['apres-midi']
+    case 'journee':
+      return ['matin', 'apres-midi']
+    case 'nuit':
+      return ['nuit']
+    case 'journee-et-nuit':
+      return ['matin', 'apres-midi', 'nuit']
+    case 'ponctuel':
+      return []
+  }
+}
+
+/**
+ * Deux indisponibilités de la MÊME personne, sur des dates qui se croisent,
+ * disent-elles la même chose du même moment ?
+ *
+ * 🔴 C'EST CETTE FONCTION QUI AUTORISE UN REFUS — tranché par MiKL le 14/10 :
+ *    *« on empêche de mettre 2 fois la même absence pour la même personne, ça
+ *    n'a pas de sens »*. C'est une EXCEPTION ASSUMÉE à la doctrine « le système
+ *    informe, il n'interdit pas », et elle doit donc être étroite : on ne refuse
+ *    que ce qui se recouvre RÉELLEMENT.
+ *
+ * ⚠️ DEUX PÉRIMÈTRES DISJOINTS NE SE RECOUVRENT PAS, et les refuser serait un
+ *    bug grave : « absent le matin » et « absent la nuit » le même jour sont
+ *    deux faits vrais en même temps. C'est précisément ce que B-163 a rendu
+ *    possible — l'interdiction ne doit pas reprendre d'une main ce que le
+ *    périmètre a donné de l'autre.
+ *
+ * ⚠️ `ponctuel` ne se compare qu'à un autre `ponctuel`, par ses heures. Il ne
+ *    retire rien (ni présence, ni garde) : le déclarer en conflit avec « le
+ *    matin » interdirait de noter un rendez-vous de 15h un jour où la personne
+ *    est déjà absente le matin — deux informations distinctes et toutes deux
+ *    utiles.
+ */
+export function perimetresSeRecouvrent(
+  a: PerimetreAbsence,
+  b: PerimetreAbsence,
+  heuresA?: HeuresPonctuel | null,
+  heuresB?: HeuresPonctuel | null,
+): boolean {
+  if (estPonctuel(a) || estPonctuel(b)) {
+    if (!estPonctuel(a) || !estPonctuel(b)) return false
+    // Sans heures des deux côtés, on ne peut rien affirmer — et on n'invente
+    // pas un conflit pour refuser une saisie. Le doute profite à l'écriture.
+    if (!heuresA || !heuresB) return false
+    // Intersection de deux plages « HH:MM », bornes EXCLUES : 14h-16h et
+    // 16h-18h se suivent, elles ne se chevauchent pas.
+    return heuresA.heure_debut < heuresB.heure_fin && heuresB.heure_debut < heuresA.heure_fin
+  }
+
+  const ta = tranchesCouvertes(a)
+  return tranchesCouvertes(b).some((t) => ta.includes(t))
+}
+
 // ── CE QUE L'ÉCRAN PROPOSE, SELON CE QUE LE CABINET A ACHETÉ ────────────────
 
 /**
@@ -255,6 +333,35 @@ export function validerPerimetre(
   }
 
   return { ok: true, perimetre: perimetreBrut, heures: { heure_debut: debut, heure_fin: fin } }
+}
+
+/**
+ * La MÊME information, en deux ou trois caractères — pour une case de grille.
+ *
+ * 🔑 Elle vit ici et pas dans l'écran qui l'affiche, pour la raison qui a coûté
+ *    deux mois à `creneau` en août : une abréviation inventée côté rendu finit
+ *    par désigner autre chose que la règle. « a-m » doit vouloir dire
+ *    `apres-midi`, aujourd'hui et dans six mois.
+ *
+ * ⚠️ TOUJOURS ACCOMPAGNÉE DE `phrasePerimetre` EN INFOBULLE. Seule, une
+ *    abréviation n'informe personne — elle signale qu'il y a quelque chose à
+ *    lire, ce qui est déjà beaucoup quand l'alternative est le silence.
+ */
+export function phrasePerimetreCourte(
+  p: PerimetreAbsence,
+  heures?: HeuresPonctuel | null,
+): string | null {
+  if (p === 'journee-et-nuit') return null
+  if (p === 'ponctuel') {
+    return heures ? plageLisible(heures.heure_debut, heures.heure_fin) : 'quelques heures'
+  }
+  const court: Record<Exclude<PerimetreAbsence, 'ponctuel' | 'journee-et-nuit'>, string> = {
+    matin: 'matin',
+    'apres-midi': 'après-midi',
+    journee: 'journée',
+    nuit: 'nuit',
+  }
+  return `absent ${court[p]}`
 }
 
 /**

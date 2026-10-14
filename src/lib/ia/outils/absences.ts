@@ -43,6 +43,8 @@ import {
   validerPerimetre,
   type PerimetreAbsence,
 } from '@/lib/absences/perimetre'
+// B-163a ④ — le refus du doublon, partage avec `POST /api/absences`.
+import { trouverAbsenceEnDoublon } from '@/lib/absences/doublon'
 // B-160a — toute absence declaree retire les presences de journee couvertes,
 // y compris celle que Filou declare. Ce chemin n'ecrit PAS par la route API.
 import {
@@ -512,6 +514,33 @@ Ne modifie AUCUNE garde : elle ne fait qu'ouvrir le dossier de crise. Les gardes
         }
       | undefined
     if (!c) return { error: 'Rien à déclarer.' }
+
+    // ── B-163a ④ — LE DOUBLON EST REFUSE ICI AUSSI ──────────────────────────
+    //
+    // 🔴 LE MEME CONTROLE QUE `POST /api/absences`, PAR LA MEME BRIQUE. Cet
+    //    outil ecrit EN DIRECT dans la table : un refus pose dans la seule
+    //    route l'aurait laisse passer, et Filou serait devenu le moyen de
+    //    contourner une regle que MiKL vient de poser. C'est le defaut deja
+    //    paye quatre fois sur ce produit, et ce fichier-ci en etait la
+    //    quatrieme occurrence (voir juste en dessous).
+    const perimDeclare = c.perimetre ?? PERIMETRE_PAR_DEFAUT
+    try {
+      const doublon = await trouverAbsenceEnDoublon(ctx.supabase, {
+        cabinetId: ctx.cabinetId,
+        veterinaireId: c.veterinaire_id,
+        dateDebut: c.date_debut,
+        dateFin: c.date_fin,
+        perimetre: perimDeclare,
+        heures:
+          c.heure_debut && c.heure_fin
+            ? { heure_debut: c.heure_debut, heure_fin: c.heure_fin }
+            : null,
+      })
+      if (doublon) return { error: doublon.phrase }
+    } catch (err) {
+      // Un controle qui s'efface quand la lecture echoue est un decor.
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
 
     const { error } = await ctx.supabase.from('absences').insert({
       cabinet_id: ctx.cabinetId,

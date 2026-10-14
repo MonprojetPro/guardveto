@@ -33,6 +33,8 @@ import {
   validerPerimetre,
   type PerimetreAbsence,
 } from '@/lib/absences/perimetre'
+// B-163a ④ — le refus du doublon, partagé avec le chemin d'écriture de Filou.
+import { trouverAbsenceEnDoublon } from '@/lib/absences/doublon'
 
 // Le recensement + N proposerReparation (purs) restent rapides, mais on charge
 // le contexte (resoudreContexte) par période → on laisse de la marge.
@@ -134,6 +136,51 @@ export async function POST(req: NextRequest) {
 
   if (!absent) {
     return NextResponse.json({ error: 'Vétérinaire introuvable dans ce cabinet.' }, { status: 404 })
+  }
+
+  // ── B-163a ④ — LA MÊME ABSENCE DEUX FOIS EST REFUSÉE ─────
+  //
+  // 🔴 EXCEPTION ASSUMÉE À « le système INFORME, il n'interdit pas », tranchée
+  //    par MiKL le 14/10 : *« on empêche de mettre 2 fois la même absence pour
+  //    la même personne, ça n'a pas de sens »*. Il avait posé deux fois la même
+  //    indisponibilité ponctuelle (Jean, 26/10, 14h→16h) pour voir si le
+  //    produit réagissait : les deux lignes sont entrées sans un mot.
+  //
+  // ⚠️ LE REFUS EST ÉTROIT, ET C'EST VOLONTAIRE. On ne refuse que si les
+  //    PÉRIMÈTRES SE RECOUVRENT RÉELLEMENT (`perimetresSeRecouvrent`). « Absent
+  //    le matin » et « absent la nuit » le même jour sont deux faits vrais
+  //    ensemble — les interdire reprendrait d'une main ce que B-163 vient de
+  //    donner de l'autre.
+  //
+  // ⚠️ LA RÈGLE N'EST PAS ÉCRITE ICI, et c'est tout le sujet : Filou insère
+  //    dans `absences` par SON PROPRE CHEMIN (`lib/ia/outils/absences.ts`). Un
+  //    contrôle rédigé dans cette route n'aurait protégé qu'un geste sur deux —
+  //    le défaut mesuré quatre fois sur ce produit. La brique est partagée, les
+  //    deux chemins l'appellent, et un test le vérifie.
+  let doublon: Awaited<ReturnType<typeof trouverAbsenceEnDoublon>>
+  try {
+    doublon = await trouverAbsenceEnDoublon(supabase, {
+      cabinetId,
+      veterinaireId: veterinaire_id,
+      dateDebut: date_debut,
+      dateFin: date_fin,
+      perimetre,
+      heures,
+    })
+  } catch (err) {
+    // Une lecture en échec ne doit JAMAIS se lire « il n'y a rien » : c'est le
+    // mécanisme par lequel un contrôle devient un décor.
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      { status: 500 },
+    )
+  }
+
+  if (doublon) {
+    return NextResponse.json(
+      { error: doublon.phrase, absenceExistanteId: doublon.id },
+      { status: 409 },
+    )
   }
 
   // ── Insertion de l'absence (statut 'active') ─────────────

@@ -24,6 +24,7 @@
 //    chaque choix soit lisible sans l'ouvrir.
 // ============================================================
 
+import { Fragment } from 'react'
 import {
   AIDE_PERIMETRE,
   LIBELLE_PERIMETRE,
@@ -72,53 +73,73 @@ export function ChoixPerimetre({
         {offerts.map((p) => {
           const choisi = p === valeur
           return (
-            <button
-              key={p}
-              type="button"
-              role="radio"
-              aria-checked={choisi}
-              disabled={desactive}
-              onClick={() => onChange(p)}
-              className={choisi ? 'cp-item cp-item--choisi' : 'cp-item'}
-            >
-              <span className="cp-item-nom">{LIBELLE_PERIMETRE[p]}</span>
-              <span className="cp-item-aide">{AIDE_PERIMETRE[p]}</span>
-            </button>
+            <Fragment key={p}>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={choisi}
+                disabled={desactive}
+                onClick={() => onChange(p)}
+                className={choisi ? 'cp-item cp-item--choisi' : 'cp-item'}
+              >
+                <span className="cp-item-nom">{LIBELLE_PERIMETRE[p]}</span>
+                <span className="cp-item-aide">{AIDE_PERIMETRE[p]}</span>
+              </button>
+
+              {/*
+                LES HEURES SUIVENT LE CHOIX QU'ELLES PRÉCISENT — MiKL, 14/10 :
+                « le bandeau de l'heure pour le ponctuel devait apparaître juste
+                en dessous du bouton Indisponibilité, plutôt qu'en bas ». Elles
+                étaient rendues APRÈS la liste entière, donc sous « La journée et
+                la nuit » : un réglage posé à cinq lignes de ce qu'il règle se lit
+                comme un réglage de la liste, pas du choix.
+
+                ⚠️ Le bloc est FRÈRE du bouton, jamais son enfant : un `<input>`
+                   dans un `<button>` n'est pas cliquable — le bouton avale
+                   l'événement, et on ne pourrait plus saisir d'heure du tout.
+
+                ⚠️ LIMITE ASSUMÉE, écrite plutôt que tue : ce bloc se retrouve
+                   DANS le `role="radiogroup"`. Un lecteur d'écran annonce donc
+                   un groupe de boutons radio puis rencontre deux champs heure —
+                   déroutant, mais ni cassé ni inatteignable au clavier. Le
+                   placement demandé le vaut ; si on veut l'idéal un jour, la
+                   voie est `aria-describedby` depuis le bouton vers ce bloc.
+
+                Elles n'apparaissent QUE pour le ponctuel, et elles sont alors
+                obligatoires — côté serveur comme en base. Les afficher en
+                permanence laisserait croire qu'on peut borner « toute la
+                journée » à 14h-16h.
+              */}
+              {choisi && estPonctuel(p) && (
+                <div className="cp-heures">
+                  <label className="cp-heure">
+                    <span>De</span>
+                    <input
+                      type="time"
+                      value={heureDebut}
+                      disabled={desactive}
+                      onChange={(e) => onHeures(e.target.value, heureFin)}
+                    />
+                  </label>
+                  <label className="cp-heure">
+                    <span>à</span>
+                    <input
+                      type="time"
+                      value={heureFin}
+                      disabled={desactive}
+                      onChange={(e) => onHeures(heureDebut, e.target.value)}
+                    />
+                  </label>
+                  <p className="cp-note">
+                    Ces heures sont une information : le planning ne change pas, et la garde
+                    reste assurée.
+                  </p>
+                </div>
+              )}
+            </Fragment>
           )
         })}
       </div>
-
-      {/*
-        Les heures n'apparaissent QUE pour le ponctuel, et elles sont alors
-        obligatoires — côté serveur comme en base. Les afficher en permanence
-        aurait laissé croire qu'on peut borner « toute la journée » à 14h-16h.
-      */}
-      {estPonctuel(valeur) && (
-        <div className="cp-heures">
-          <label className="cp-heure">
-            <span>De</span>
-            <input
-              type="time"
-              value={heureDebut}
-              disabled={desactive}
-              onChange={(e) => onHeures(e.target.value, heureFin)}
-            />
-          </label>
-          <label className="cp-heure">
-            <span>à</span>
-            <input
-              type="time"
-              value={heureFin}
-              disabled={desactive}
-              onChange={(e) => onHeures(heureDebut, e.target.value)}
-            />
-          </label>
-          <p className="cp-note">
-            Ces heures sont une information : le planning ne change pas, et la garde reste
-            assurée.
-          </p>
-        </div>
-      )}
     </div>
   )
 }
