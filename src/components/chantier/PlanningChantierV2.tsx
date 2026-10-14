@@ -720,6 +720,12 @@ export function PlanningChantierV2({
     [semaines, mois, periodeAffichee, parDate, presencesParJour, conges, vacances, manquesParGarde],
   )
 
+  /** Le mois affiché déborde-t-il de la période ? Décide la ligne de légende. */
+  const aDesJoursHorsPeriode = useMemo(
+    () => semainesGrille.some((sem) => sem.some((j) => j.horsPeriode)),
+    [semainesGrille],
+  )
+
   const statut = periodeAffichee ? libelleStatut(periodeAffichee.statut) : null
 
   // B-157 — ce que le menu « Outils » contient.
@@ -1410,6 +1416,20 @@ export function PlanningChantierV2({
                   Place à pourvoir
                 </span>
               </>
+            )}
+            {/* B-159 ④ⓒ — LE TRAIT POINTILLÉ DOIT SE DIRE. La pâleur signifiait
+                « hors période » jusqu'au 14/10 ; elle signifie désormais « c'est
+                passé », et le hors-période est marqué par une bordure pointillée.
+                Un repère muet n'explique rien (c'est déjà la règle juste en
+                dessous, pour les vacances) — et celui-ci compte, parce qu'un jour
+                hors de la période affichée relève souvent d'un AUTRE planning,
+                parfois publié. Conditionnel : sans jour concerné, ce serait du
+                bruit. */}
+            {aDesJoursHorsPeriode && (
+              <span className="cl3-item">
+                <span className="lg-hors" aria-hidden="true" />
+                Hors de la période affichée — ces jours relèvent d’un autre planning
+              </span>
             )}
             {/* La légende des vacances n'apparaît QUE si le mois en contient :
                 un repère sans mode d'emploi n'explique rien, et une légende

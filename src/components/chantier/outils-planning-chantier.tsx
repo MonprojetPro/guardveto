@@ -36,7 +36,7 @@
 // règle métier n'est touchée — ce serait risquer le moteur pour du décor.
 // ============================================================
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { PreVolAlert } from '@/components/planning/PreVolAlert'
 import { ParcoursGeneration } from '@/components/v2/ParcoursGeneration'
 import { DialogPublication } from '@/components/v2/DialogPublication'
@@ -122,6 +122,7 @@ export function useOutilsPlanningChantier({
   const aGardes = modules.includes('gardes')
   const aJournee = modules.includes('planning-journee')
   const [journeeOuverte, setJourneeOuverte] = useState(false)
+  const [genererOuvert, setGenererOuvert] = useState(false)
   const [parcoursOuvert, setParcoursOuvert] = useState(false)
   const [publicationOuverte, setPublicationOuverte] = useState(false)
   const [etapeParcours, setEtapeParcours] = useState<'choix' | 'nouveau'>('choix')
@@ -149,6 +150,26 @@ export function useOutilsPlanningChantier({
       .catch(() => { /* silencieux — le pré-vol ne bloque jamais */ })
     return () => { annule = true }
   }, [periodeId, isAdmin, preVolVersion])
+
+  // Le menu « Générer » se referme au clic dehors ET à Échap. Les deux, parce
+  // qu'un panneau qui ne se ferme qu'au clic piège celui qui l'a ouvert au
+  // clavier — c'est le même contrat que le menu « Outils » de la tête de page.
+  const genererRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!genererOuvert) return
+    function auClic(e: MouseEvent) {
+      if (!genererRef.current?.contains(e.target as Node)) setGenererOuvert(false)
+    }
+    function aLaTouche(e: KeyboardEvent) {
+      if (e.key === 'Escape') setGenererOuvert(false)
+    }
+    document.addEventListener('mousedown', auClic)
+    document.addEventListener('keydown', aLaTouche)
+    return () => {
+      document.removeEventListener('mousedown', auClic)
+      document.removeEventListener('keydown', aLaTouche)
+    }
+  }, [genererOuvert])
 
   const preVolActuel = preVol && preVol.periodeId === periodeId ? preVol : null
 
@@ -231,30 +252,107 @@ export function useOutilsPlanningChantier({
    * ⚠️ B-148 — « Générer » ne veut pas dire la même chose partout. Sans gardes
    * au catalogue, il n'y a aucun moteur à lancer : le mot désigne alors le
    * remplissage des journées.
+   *
+   * 🔴 B-159 ④ⓒ — DEUX GESTES SOUS UN SEUL MOT, le 14/10. Un cabinet qui a les
+   * deux modules fabrique DEUX plannings : les gardes (le moteur calcule) et
+   * les journées (les présences récurrentes se posent). Jusqu'ici « Générer »
+   * ne désignait que le premier, et le second vivait dans le menu « Outils »,
+   * au même rang qu'une impression — MiKL ne le trouvait plus.
+   *
+   * Le choix de MiKL parmi trois alternatives : UN bouton, qui s'ouvre en deux.
+   * Un seul accent sur la ligne (« Vérifier et publier » garde le plein), et
+   * les deux objets NOMMÉS dès l'ouverture — « les gardes », « les journées ».
+   * C'est ce qui manquait : le mot « Générer » seul ne disait pas sur QUOI il
+   * portait, et un cabinet à deux modules devait le deviner.
+   *
+   * ⚠️ Le menu n'apparaît QUE si les deux modules sont là. Avec un seul, il n'y
+   * a rien à choisir : un menu à une entrée est un clic pour rien.
    */
   let actionGenerer: ReactNode = null
   if (isAdmin && !estVerrouille) {
-    actionGenerer = aGardes ? (
-      <button
-        type="button"
-        className="pv2h-generer"
-        title="Générer un planning — nouveau, ou en refaire un existant"
-        onClick={() => ouvrirParcours('choix')}
-      >
-        <span aria-hidden>✨</span>
-        Générer
-      </button>
-    ) : (
-      <button
-        type="button"
-        className="pv2h-generer"
-        title="Remplir le planning des journées depuis les présences récurrentes"
-        onClick={() => setJourneeOuverte(true)}
-      >
-        <span aria-hidden>✨</span>
-        Remplir les journées
-      </button>
-    )
+    if (aGardes && aJournee) {
+      actionGenerer = (
+        <div className="pv2h-menu-wrap" ref={genererRef}>
+          <button
+            type="button"
+            className="pv2h-generer"
+            // ⚠️ PAS de `aria-haspopup="menu"` ni de `role="menu"` sur le
+            // panneau : ces rôles PROMETTENT la navigation aux flèches, que ce
+            // composant n'implémente pas. Annoncer un pattern qu'on ne tient
+            // pas laisse l'utilisateur au clavier appuyer sur ↓ sans effet —
+            // c'est pire que le simple groupe de boutons qu'on a réellement.
+            // Même contrat que le menu « Outils » voisin, qui n'en met pas non
+            // plus : deux panneaux frères, une seule grammaire.
+            aria-expanded={genererOuvert}
+            title="Fabriquer le planning — les gardes, ou les journées"
+            onClick={() => setGenererOuvert((o) => !o)}
+          >
+            <span aria-hidden>✨</span>
+            Générer
+            <span className="pv2h-caret" aria-hidden>▾</span>
+          </button>
+
+          {genererOuvert && (
+            <div className="pv2h-menu gauche" aria-label="Ce qu’on génère">
+              <button
+                type="button"
+                className="pv2h-menu-item"
+                onClick={() => { setGenererOuvert(false); ouvrirParcours('choix') }}
+              >
+                <span className="pv2h-menu-ico" aria-hidden>✨</span>
+                <span className="pv2h-menu-txt">
+                  <b>Les gardes</b>
+                  <small>Calculer qui est de garde, les nuits et les week-ends</small>
+                </span>
+              </button>
+
+              <div className="pv2h-menu-sep" role="separator" />
+
+              <button
+                type="button"
+                className="pv2h-menu-item"
+                onClick={() => { setGenererOuvert(false); setJourneeOuverte(true) }}
+              >
+                <span className="pv2h-menu-ico" aria-hidden>🗓</span>
+                <span className="pv2h-menu-txt">
+                  <b>Les journées</b>
+                  <small>Appliquer les présences récurrentes sur la période</small>
+                </span>
+              </button>
+            </div>
+          )}
+        </div>
+      )
+    } else if (aGardes) {
+      actionGenerer = (
+        <button
+          type="button"
+          className="pv2h-generer"
+          title="Générer un planning — nouveau, ou en refaire un existant"
+          onClick={() => ouvrirParcours('choix')}
+        >
+          <span aria-hidden>✨</span>
+          Générer
+        </button>
+      )
+    } else if (aJournee) {
+      // ⚠️ Conditionné à `aJournee`, alors que la version précédente tombait ici
+      // par défaut. Sans le module, la fenêtre n'est même pas montée plus bas
+      // (`{aJournee && <GenererJourneeChantier …>}`) : le bouton existait donc,
+      // et ne faisait rien. Un bouton qui ne fait rien est l'interdit du KIT
+      // COMPLET — il ne s'affiche plus là où il n'a pas de fenêtre à ouvrir.
+      actionGenerer = (
+        <button
+          type="button"
+          className="pv2h-generer"
+          title="Remplir le planning des journées depuis les présences récurrentes"
+          onClick={() => setJourneeOuverte(true)}
+        >
+          <span aria-hidden>✨</span>
+          Remplir les journées
+        </button>
+      )
+    }
   }
 
   /**
@@ -292,15 +390,11 @@ export function useOutilsPlanningChantier({
       action: onSignalerAbsence,
     })
 
-    if (aGardes && aJournee) {
-      outils.push({
-        cle: 'journees',
-        libelle: 'Remplir les journées',
-        aide: 'Appliquer les présences récurrentes sur la période',
-        icone: '🗓',
-        action: () => setJourneeOuverte(true),
-      })
-    }
+    // ⚠️ « REMPLIR LES JOURNÉES » N'EST PLUS ICI NON PLUS — sorti le 14/10
+    // (B-159 ④ⓒ). Il est devenu la seconde entrée du bouton « Générer », avec
+    // les gardes. Le laisser AUSSI dans ce menu aurait donné deux chemins vers
+    // la même fenêtre : le doublon de geste est exactement ce qui faisait
+    // chercher MiKL — on ne sait plus lequel des deux est le bon.
 
     // ⚠️ « Générer » N'EST PLUS DANS CE MENU — sorti le 09/10 (B-157b) à la
     // demande de MiKL : « le bouton génère doit être à côté de publié, sors-le

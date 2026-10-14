@@ -241,9 +241,27 @@
   border-style: dashed;
   opacity: 0.5;
 }
-.pv2-jour.past { opacity: 0.55; }
+/* ── CE QUI EST ÉTEINT, ET CE QUI NE DOIT PLUS L'ÊTRE (MiKL, 14/10) ────────
+   « je veux que ce qui est avant le jour d'aujourd'hui soit un peu plus pâle
+   et le reste soit net. »
+
+   🔴 CE QUI N'ALLAIT PAS : DEUX règles éteignaient des cases, et c'est la
+   mauvaise qui dominait. `.hors` (jour en dehors des bornes de la période
+   AFFICHÉE) coupait à 45 % — soit, sur la capture du 14/10, tout l'écran
+   jusqu'au 19 octobre, AVENIR COMPRIS. Or le 28/09 → 18/10 porte un vrai
+   planning PUBLIÉ (période `a1cae195`, vérifié en base) : un travail diffusé à
+   l'équipe se lisait comme un brouillon mort, uniquement parce qu'on regardait
+   le mois depuis la période suivante.
+
+   La pâleur dit désormais UNE SEULE chose, et c'est le temps : c'est passé.
+   Le hors-période, lui, garde son repère — mais par la BORDURE, qui informe
+   sans effacer. Un seul langage par canal : l'opacité au temps, le trait au
+   périmètre. Les empiler, c'était ne plus pouvoir lire ni l'un ni l'autre. */
+.pv2-jour.past { opacity: 0.72; }
 .pv2-jour.today { box-shadow: 0 0 0 1.5px var(--pv2-acc); }
-.pv2-jour.hors { opacity: 0.45; }
+/* ⚠️ PLUS D'`opacity` ICI — à dessein. La bordure du châssis est déjà posée
+   (transparente, largeur `--pv2-bord`) : la colorer ne décale aucune case. */
+.pv2-jour.hors { border-color: #e6d7ba; border-style: dashed; }
 
 /* Le filet des vacances scolaires, en haut de case. */
 .pv2-vac {
@@ -933,6 +951,18 @@
   border-radius: 999px;
   background: #cbd9ef;
 }
+/* Le repère « hors période » : le MÊME trait que la case qu'il explique
+   (`.pv2-jour.hors`), en petit. Vit ici et pas dans `v2-planning.css`, où
+   dorment ses voisins `.lg-*` : cette feuille-là habille aussi l'écran du
+   client, et y écrire ferait sortir un chantier par la fenêtre. */
+.lg-hors {
+  display: inline-block;
+  width: 22px;
+  height: 13px;
+  border: 1px dashed #e6d7ba;
+  border-radius: 4px;
+  flex: none;
+}
 .cl3-rond {
   width: 12px;
   height: 12px;
@@ -1028,6 +1058,24 @@
 .pv2h-generer:hover {
   background: var(--pv2-acc);
   color: #fff;
+}
+/* Le chevron tourne quand le menu est ouvert. La règle existe déjà pour
+   `.pv2h-outil-btn` ; « Générer » n'est pas un bouton d'outil, il lui faut la
+   sienne — sans elle, le chevron resterait figé vers le bas, menu ouvert. */
+.pv2h-generer[aria-expanded='true'] .pv2h-caret { transform: rotate(180deg); }
+
+/* Le menu de « Générer » s'ancre à GAUCHE : `.pv2h-menu` est calé `right: 0`
+   pour « Outils », qui ferme la ligne. « Générer » est au milieu — ancré à
+   droite, son panneau partirait vers « Vérifier et publier » et recouvrirait
+   le bouton voisin. */
+.pv2h-menu.gauche { right: auto; left: 0; }
+
+/* Le trait entre les deux mondes : les gardes et les journées sont DEUX
+   plannings, pas deux variantes du même geste. */
+.pv2h-menu-sep {
+  height: 1px;
+  margin: 4px 10px;
+  background: var(--pv2-bd);
 }
 
 /* ============================================================
