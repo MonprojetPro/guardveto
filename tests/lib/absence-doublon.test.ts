@@ -155,12 +155,30 @@ describe('③ Ce que le refus DIT', () => {
   it('nomme le perimetre et les dates — jamais « doublon detecte »', () => {
     const p = phraseDoublon('matin', '2026-10-26', '2026-10-26')
     expect(p).toContain('Le matin')
-    expect(p).toContain('le 2026-10-26')
+    expect(p).toContain('26 octobre 2026')
     expect(p).not.toContain('undefined')
   })
 
   it('dit « du … au … » sur plusieurs jours', () => {
-    expect(phraseDoublon('nuit', '2026-10-26', '2026-10-28')).toContain('du 2026-10-26 au 2026-10-28')
+    expect(phraseDoublon('nuit', '2026-10-26', '2026-10-28'))
+      .toContain('du 26 octobre 2026 au 28 octobre 2026')
+  })
+
+  // 🔴 B-163d ④ — LE GARDIEN DU FORMAT, demande par MiKL le 15/10 : « il faut
+  //    que tu mettes les dates au format europeen, c'est pas la 1ere fois, y en
+  //    a plein des comme ca ». Une phrase lue par l'administratrice ne doit
+  //    JAMAIS contenir une date ISO. Ce test l'interdit sur ce message-ci ;
+  //    les deux tests ci-dessus verifient la forme attendue. Les deux sont
+  //    necessaires : interdire l'ISO ne dit pas que le francais est juste.
+  it('⛔ aucune date ISO ne survit dans une phrase lue par un humain', () => {
+    const phrases = [
+      phraseDoublon('matin', '2026-10-26', '2026-10-26'),
+      phraseDoublon('nuit', '2026-10-26', '2026-10-28'),
+      phraseDoublon('ponctuel', '2026-01-02', '2026-12-31'),
+    ]
+    for (const p of phrases) {
+      expect(/\d{4}-\d{2}-\d{2}/.test(p), `date ISO dans : ${p}`).toBe(false)
+    }
   })
 })
 

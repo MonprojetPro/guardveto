@@ -1376,7 +1376,32 @@
    l'écran qui ouvre cette fenêtre.
    ============================================================ */
 
-.cpm-titre { display: flex; align-items: center; gap: 9px; }
+/* ── Le nom et la date : le SUJET de la fenetre (B-163d) ─────────────────── */
+
+/* MiKL, 15/10 : « je reverrais le style du nom et de la date… pkoi la date est
+   aussi petite ? ». La description d'une modale fait 0,82 rem dans tout le
+   produit — bon calibre pour une phrase d'explication, trop petit quand c'est
+   l'information principale. Ici on lit « qui » et « quel jour » : ce sont les
+   deux coordonnees de la case qu'on vient d'ouvrir, pas un commentaire. */
+.cpm-titre {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: Figtree, var(--t-font-titre, sans-serif);
+  font-size: 1.18rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.cpm-modale [data-slot='dialog-description'] {
+  margin-top: 2px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--pv2-sec, #7c6a55);
+  /* La premiere lettre vient d'un format de date, donc en minuscule
+     (« mardi 27 octobre ») : on la releve ici plutot que de bricoler la
+     chaine, pour que `DATE_LONGUE` reste la seule source du format. */
+  text-transform: capitalize;
+}
 
 /* ── Ce qui rend la personne indisponible, EN TÊTE ────────────────────────── */
 

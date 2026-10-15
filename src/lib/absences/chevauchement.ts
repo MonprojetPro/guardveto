@@ -27,6 +27,7 @@
 //    faut qu'un humain regarde.
 // ============================================================
 
+import { periodeFr } from '@/lib/dates-fr'
 import {
   LIBELLE_PERIMETRE,
   lirePerimetre,
@@ -127,7 +128,11 @@ function phraseChevauchement(
   pa: PerimetreAbsence,
   pb: PerimetreAbsence,
 ): string {
-  const quand = debut === fin ? `le ${debut}` : `du ${debut} au ${fin}`
+  // B-163d ④ — même correction que `doublon.ts` : une date ISO dans une phrase
+  // française est un défaut, pas un détail. `periodeFr` est la seule façon de
+  // l'écrire. Corrigé ici AVANT que MiKL ne le voie : ce bandeau vit sur
+  // l'écran Absences, et il aurait affiché « le 2026-10-26 » lui aussi.
+  const quand = periodeFr(debut, fin)
   const base = `${NOM_ORIGINE[oa]} et ${NOM_ORIGINE[ob]} se recouvrent ${quand}`
   if (pa === pb) return `${base}.`
   return `${base}, avec deux périmètres différents : « ${LIBELLE_PERIMETRE[pa]} » et « ${LIBELLE_PERIMETRE[pb]} ».`

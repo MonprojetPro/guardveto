@@ -33,6 +33,8 @@
 // ============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+// B-163d ④ — l'unique façon d'écrire une période à l'écran.
+import { periodeFr } from '@/lib/dates-fr'
 import {
   LIBELLE_PERIMETRE,
   lirePerimetre,
@@ -119,7 +121,13 @@ export function phraseDoublon(
   dateDebut: string,
   dateFin: string,
 ): string {
-  const quand = dateDebut === dateFin ? `le ${dateDebut}` : `du ${dateDebut} au ${dateFin}`
+  // 🔴 B-163d ④ — JAMAIS DE DATE ISO DANS UNE PHRASE. MiKL, 15/10 : « il faut
+  //    que tu mettes les dates au format europeen, c'est pas la 1ere fois, y en
+  //    a plein des comme ca ». Le message affichait « le 2026-10-26 ».
+  //    `periodeFr` existait déjà et sait dire « le 26 octobre 2026 » ET
+  //    « du … au … » — elle gère même le cas d'un seul jour, qui se lisait
+  //    « du 26 octobre au 26 octobre » et faisait douter du reste du message.
+  const quand = periodeFr(dateDebut, dateFin)
   return (
     `Cette personne a déjà une absence « ${LIBELLE_PERIMETRE[perimetre]} » ${quand}, `
     + 'qui couvre le même moment. Modifie ou supprime celle-ci plutôt que d’en ajouter une seconde.'

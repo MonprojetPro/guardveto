@@ -692,7 +692,14 @@ function CaseDepliee({
                   B-163a ③ — et il se nomme : une ABSENCE déclarée n'est pas un
                   congé, et les confondre ferait chercher une demande qui
                   n'existe pas. */}
-              {ligne.absence === 'valide' && ligne.journee.length === 0 && (
+              {/* ⚠️ `&& !ligne.mention` — LA PLUS PRÉCISE GAGNE, et une seule
+                  s'affiche. Sans ça, une absence « le matin » sur une case vide
+                  montrerait le mot « absent » ET la pastille : deux marques
+                  pour un fait, dont la plus visible est la plus vague. Le mot
+                  reste donc pour le cas général (congé ou absence totale, où
+                  `mention` est nul par construction) ; dès qu'il y a une
+                  précision à donner, c'est la pastille qui la porte. */}
+              {ligne.absence === 'valide' && ligne.journee.length === 0 && !ligne.mention && (
                 <span className="pv2-conge-txt">
                   {ligne.origineAbsence === 'absence' ? 'absent' : 'congé'}
                 </span>
@@ -723,11 +730,27 @@ function CaseDepliee({
                 est pire que pas de champ du tout : on croit la personne
                 disponible toute la journée.
 
-                ⚠️ Elle s'affiche MÊME quand la piste porte des présences : c'est
-                   justement là qu'elle est indispensable. Une barre « 8h-18h »
-                   sans mention annonce une présence continue qui est fausse.
+                🔴 B-163d ⑤ — LA CONDITION ÉTAIT `ligne.absence === null`, ET
+                   C'ÉTAIT LE BUG. MiKL, 15/10 : « j'ai créé plusieurs absences
+                   pour Jean dont le 28 au matin, ça me dit que c'est fait mais
+                   y a rien qui apparaît sur le planning ». Les 7 absences
+                   étaient bien en base (vérifié) : c'est l'affichage qui avait
+                   un trou.
+
+                   J'avais écrit DEUX conditions mutuellement exclusives :
+                     • le mot « absent » — seulement si AUCUNE présence
+                     • la pastille « A »  — seulement si l'absence ne retire rien
+                   Une absence « le matin » sur quelqu'un qui a une présence
+                   8h-18h ne satisfait NI l'une NI l'autre. Elle tombait entre
+                   les deux, et c'est le cas le PLUS FRÉQUENT : la personne est
+                   là en partie, ce qui est exactement l'information à donner.
+
+                🔑 MiKL l'avait énoncé simplement la veille — « juste une
+                   pastille A ». UNE règle : dès qu'il y a quelque chose à dire,
+                   la pastille le dit. Le mot « absent » reste pour la case
+                   vide, où il y a la place de l'écrire en toutes lettres.
               */}
-              {ligne.mention && ligne.absence === null && (
+              {ligne.mention && (
                 <span
                   className="pv2-pastille-abs"
                   title={ligne.mentionDetail ?? ligne.mention}

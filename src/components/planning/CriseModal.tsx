@@ -39,6 +39,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
@@ -568,15 +569,16 @@ export function CriseModal({
       }
       setDecisions(initial)
 
-      if (data.creneauxImpactes.length === 0) {
-        toast.success('Absence déclarée — aucun créneau de garde impacté.')
-      } else {
-        toast.success(
-          `Absence déclarée — ${data.creneauxImpactes.length} créneau${
-            data.creneauxImpactes.length > 1 ? 'x' : ''
-          } à réparer.`,
-        )
-      }
+      // 🔴 B-163d ⑥ — PLUS DE TOAST ICI. MiKL, 15/10 : « y a 2 pop up qui
+      //    s'ouvrent pour dire la meme chose ». La fenêtre reste ouverte et
+      //    annonce déjà « Absence enregistrée » ou « Réparer le planning » :
+      //    un toast par-dessus répète l'information, avec d'autres mots, au
+      //    moment précis où l'on lit la première. Deux messages simultanés
+      //    pour un seul fait font douter qu'il s'agisse du même.
+      //
+      // ⚠️ Le toast reste pour les ÉCHECS (`catch` juste en dessous) et pour
+      //    la réparation effectivement appliquée : là, la fenêtre se ferme, et
+      //    sans toast il ne resterait rien à l'écran.
     } catch {
       toast.error('Impossible de joindre le serveur.')
     } finally {
@@ -784,6 +786,31 @@ export function CriseModal({
                     ))}
                   </SelectContent>
                 </Select>
+
+                {/*
+                  B-163d ③ — « Autre » DOIT POUVOIR DIRE QUOI. MiKL, 15/10 :
+                  « pour les motifs d'absence je permettrais à Autre de pouvoir
+                  écrire un motif si l'admin voulait ». Un choix nommé « Autre »
+                  sans champ pour préciser enregistre une absence dont personne
+                  ne saura jamais la raison — c'est un trou d'information qu'on
+                  crée volontairement.
+
+                  ⚠️ CE N'EST PAS UNE COLONNE DE PLUS. Le texte part dans
+                  `commentaire`, qui existe déjà, est déjà affiché partout où
+                  l'absence se lit, et est déjà porté par Filou. Ajouter un
+                  `motif_libre` aurait fait DEUX champs disant la même chose,
+                  dont un seul serait lu — le défaut `conges.creneau`, payé
+                  deux mois.
+                */}
+                {motif === 'autre' && (
+                  <Input
+                    value={commentaire}
+                    onChange={(e) => setCommentaire(e.target.value)}
+                    placeholder="Préciser le motif…"
+                    aria-label="Préciser le motif de l’absence"
+                    disabled={declaring}
+                  />
+                )}
               </div>
 
               {/* B-163 — sur quoi porte cette absence. Place apres le motif :
@@ -895,8 +922,24 @@ export function CriseModal({
               <div className="crise-rien-a-faire">
                 <CheckCircle2 className="w-5 h-5 shrink-0" aria-hidden />
                 <div>
+                  {/*
+                    🔴 B-163d ⑥ — LE TITRE NE PARLE PLUS DE GARDES QUAND IL
+                    N'EN EST PAS QUESTION. MiKL, 15/10 : « y a encore cette
+                    histoire de garde qui apparaît alors qu'on parle de journée
+                    dans l'absence ». Il avait raison deux fois : on répondait
+                    à une question qu'il n'avait pas posée, et on la répondait
+                    en gros titre.
+
+                    « Aucune garde impactée » reste juste pour une absence QUI
+                    TOUCHE les gardes et n'en a trouvé aucune — c'est alors une
+                    vraie information. Pour « le matin », parler de gardes est
+                    hors sujet : l'absence porte sur la journée, le titre doit
+                    porter sur la journée.
+                  */}
                   <p className="crise-rien-titre">
-                    Aucune garde impactée
+                    {toucheLesGardes(perimetre)
+                      ? 'Aucune garde impactée'
+                      : `« ${LIBELLE_PERIMETRE[perimetre]} » — le planning des gardes ne bouge pas`}
                   </p>
                   {/*
                     B-163a ② — DEUX RAISONS DIFFÉRENTES, ET IL FAUT DIRE LA
@@ -912,8 +955,8 @@ export function CriseModal({
                     {toucheLesGardes(perimetre)
                       ? 'L’absence est déclarée, mais aucune garde publiée ne concerne ce '
                         + 'vétérinaire sur la période. Rien à réparer.'
-                      : `L’absence est déclarée. « ${LIBELLE_PERIMETRE[perimetre]} » ne touche `
-                        + 'pas les gardes : celles qui sont publiées restent assurées.'}
+                      : 'L’absence est déclarée et apparaît sur le planning. Les gardes '
+                        + 'publiées restent assurées.'}
                   </p>
                 </div>
               </div>

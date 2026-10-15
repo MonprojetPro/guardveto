@@ -47,7 +47,15 @@ describe('Le cas réel du 13/10', () => {
     const [c] = chevauchements([CONGE, ABSENCE])
     expect(c.phrase).toContain('congé')
     expect(c.phrase).toContain('absence')
-    expect(c.phrase).toContain('2026-11-02')
+    // B-163d ④ — « en français » vaut AUSSI pour la date. Ce test disait
+    // « en français » dans son titre et vérifiait `2026-11-02` dans son corps :
+    // le titre était juste, l'assertion le contredisait.
+    expect(c.phrase).toContain('2 novembre 2026')
+  })
+
+  it('⛔ aucune date ISO ne survit dans le bandeau', () => {
+    const [c] = chevauchements([CONGE, ABSENCE])
+    expect(/\d{4}-\d{2}-\d{2}/.test(c.phrase), `date ISO dans : ${c.phrase}`).toBe(false)
   })
 })
 

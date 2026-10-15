@@ -163,7 +163,14 @@ export function CellulePresenceModale({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o && !enCours) onFermer() }}>
-      <DialogContent className="gv-modale">
+      {/* `cpm-modale` en plus de `gv-modale` : B-163d ① — MiKL, 15/10, « je
+          reverrais le style du nom et de la date… pkoi la date est aussi
+          petite ? ». La description d'une modale fait 0,82 rem partout dans le
+          produit, ce qui convient à une phrase d'explication. Ici ce n'est pas
+          une explication, c'est le SUJET de la fenêtre : qui, et quel jour. Il
+          fallait donc une classe à nous plutôt que de toucher au défaut
+          commun, qui habille des dizaines d'autres fenêtres. */}
+      <DialogContent className="gv-modale cpm-modale">
         <DialogHeader>
           <DialogTitle className="cpm-titre">
             <span className="vdot" style={stylePoint(personne.couleur)} aria-hidden="true" />
