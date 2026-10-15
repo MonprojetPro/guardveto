@@ -523,27 +523,30 @@
   font-weight: 600;
   color: var(--pv2-sec);
 }
-/* B-163a ③ — LA MENTION DE PÉRIMÈTRE, par-dessus la piste.
-   Elle se pose À DROITE et non au centre : au centre, elle recouvrirait la
-   barre de présence qu'elle précise, et on perdrait l'information qu'elle
-   nuance. Le liseré ambré la distingue d'une étiquette de congé — ce n'est
-   pas une absence qui retire, c'est une absence qui informe. */
-.pv2-mention-perimetre {
+/* B-163b ② — LA PASTILLE « A », par-dessus la piste.
+   🔴 ELLE REMPLACE UNE PHRASE QUI PRENAIT 72 % DE LA LARGEUR (`.pv2-mention-
+   perimetre`, livrée une heure plus tôt le 14/10). MiKL : « c'est écrit trop
+   petit et ça empiète sur le visuel du matin ». Une mention qui recouvre la
+   barre qu'elle nuance détruit l'information qu'elle sert.
+   Un disque de 15 px, calé tout à droite : il signale sans masquer. Le détail
+   est en infobulle, et la fenêtre de la cellule le dit en entier. */
+.pv2-pastille-abs {
   position: absolute;
   right: 3px;
   top: 50%;
   transform: translateY(-50%);
   z-index: 2;
-  max-width: 72%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 1px 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
   border: 1px solid #e0b98a;
-  border-radius: 999px;
+  border-radius: 50%;
   background: var(--pv2-surface);
   font-size: 9px;
-  font-weight: 700;
+  font-weight: 800;
+  line-height: 1;
   color: #9a5a18;
 }
 
@@ -979,6 +982,25 @@
    (`.pv2-jour.hors`), en petit. Vit ici et pas dans `v2-planning.css`, où
    dorment ses voisins `.lg-*` : cette feuille-là habille aussi l'écran du
    client, et y écrire ferait sortir un chantier par la fenêtre. */
+/* Le repere de la legende REPREND LE DESSIN de ce qu'il explique — meme disque,
+   meme liseré, meme lettre. Une legende qui ne ressemble pas a la grille
+   n'explique rien (regle posee par les `.cl3-*` juste au-dessus). */
+.lg-abs {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  flex: none;
+  border: 1px solid #e0b98a;
+  border-radius: 50%;
+  background: var(--pv2-surface, #fffcf4);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+  color: #9a5a18;
+}
+
 .lg-hors {
   display: inline-block;
   width: 22px;
@@ -1319,4 +1341,132 @@
   gap: 5px;
   min-width: 0;
   width: 100%;
+}
+
+/* ============================================================
+   B-163b ③ — « POSER UNE PRÉSENCE », LA FENÊTRE QUI N'AVAIT AUCUN STYLE
+   ============================================================
+   MiKL, 14/10 : « la fenêtre est plus que dégueu niveau visuel, là encore t'as
+   pas respecté la charte graphique ».
+
+   🔴 CE N'ÉTAIT PAS UN OUBLI DE CHARTE : LES CLASSES N'AVAIENT AUCUNE RÈGLE,
+   NULLE PART. `grep` sur tout `src/**/*.css` pour `cpm-titre`, `cpm-bloc`,
+   `cpm-liste`, `cpm-tranche`, `cpm-origine`, `cpm-choix`, `cpm-tr`, `cpm-note`
+   et `cpm-vide` rendait ZÉRO résultat. La fenêtre n'était pas mal habillée —
+   elle était nue, livrée ainsi le 06/10 avec B-145a. D'où la typographie
+   collée de la capture : « Journée complète8h–18hpar sa récurrence », trois
+   éléments qu'aucune règle n'espaçait.
+
+   ⚠️ 2e OCCURRENCE DU MÊME DÉFAUT EN CINQ JOURS. Le 09/10, B-157a trouvait
+   11 classes orphelines et une variable hors de portée ; la sonde écrite ce
+   jour-là (JSX × feuilles de style) N'A PAS ÉTÉ REJOUÉE DEPUIS. Un outil de
+   détection qu'on n'exécute pas vaut exactement zéro.
+
+   Ces règles vivent ICI pour la raison établie par B-157b : un style ne suit
+   pas son composant, il suit sa FEUILLE, et une feuille suit la PAGE qui
+   l'importe. `chantier-planning-v2.css` est importé par `PlanningChantierV2`,
+   l'écran qui ouvre cette fenêtre.
+   ============================================================ */
+
+.cpm-titre { display: flex; align-items: center; gap: 9px; }
+
+/* ── Ce qui rend la personne indisponible, EN TÊTE ────────────────────────── */
+
+.cpm-indispos {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 2px 0 4px;
+  padding: 0;
+  list-style: none;
+}
+/* L'ambre, pas le rouge : une absence déclarée n'est pas une panne. Même
+   grammaire que la pastille « A » de la grille, dont cette ligne est le
+   détail — un repère et son explication doivent se ressembler. */
+.cpm-indispo {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding: 10px 14px;
+  border: 1px solid #e0b98a;
+  border-radius: 14px;
+  background: #fdf3e4;
+}
+.cpm-indispo b { font-size: 0.86rem; font-weight: 800; color: #9a5a18; }
+.cpm-indispo span { font-size: 0.82rem; color: var(--pv2-sec, #7c6a55); }
+
+/* ── Les deux blocs ───────────────────────────────────────────────────────── */
+
+.cpm-bloc { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.cpm-bloc h4 {
+  margin: 0;
+  font-family: Figtree, var(--t-font-titre, sans-serif);
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--pv2-txt, #3a2a1c);
+}
+
+.cpm-vide {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--pv2-creux, #f6eedf);
+  color: var(--pv2-sec, #7c6a55);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+/* ── Les présences déjà posées ────────────────────────────────────────────── */
+
+.cpm-liste { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.cpm-liste li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border: 1px solid var(--pv2-bd, #e6d7bb);
+  border-radius: 14px;
+  background: var(--pv2-surface, #fffcf4);
+}
+/* ⚠️ LE `gap` EST LA CORRECTION VISIBLE DE LA CAPTURE. Sans lui, `<b>` et
+   `<small>` se touchaient : « Journée complète8h–18h ». */
+.cpm-tranche { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+.cpm-tranche b { font-size: 0.88rem; font-weight: 800; color: var(--pv2-txt, #3a2a1c); }
+.cpm-tranche small { font-size: 0.76rem; color: var(--pv2-sec, #7c6a55); }
+/* L'origine pousse le bouton à droite : l'action se trouve toujours au même
+   endroit, quelle que soit la longueur du nom de la tranche. */
+.cpm-origine { flex: 1; font-size: 0.76rem; font-style: italic; color: var(--pv2-sec, #7c6a55); }
+
+/* ── Les tranches qu'on peut ajouter ──────────────────────────────────────── */
+
+.cpm-choix { display: flex; flex-wrap: wrap; gap: 10px; }
+.cpm-tr {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 150px;
+  min-width: 0;
+  padding: 11px 14px;
+  border: 1px solid var(--pv2-bd, #e6d7bb);
+  border-radius: 14px;
+  background: var(--pv2-surface, #fffcf4);
+  text-align: left;
+  cursor: pointer;
+}
+.cpm-tr b { font-size: 0.88rem; font-weight: 800; color: var(--pv2-txt, #3a2a1c); }
+.cpm-tr small { font-size: 0.76rem; color: var(--pv2-sec, #7c6a55); }
+.cpm-tr:hover:not(:disabled) { border-color: var(--pv2-acc, #c7530f); }
+.cpm-tr.actif { border-color: var(--pv2-acc, #c7530f); box-shadow: 0 0 0 1px var(--pv2-acc, #c7530f); }
+.cpm-tr:disabled { opacity: 0.55; cursor: default; }
+
+/* La limite se lit, elle ne se découvre pas après coup. */
+.cpm-note {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--pv2-filet, #efe3cd);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--pv2-sec, #7c6a55);
 }

@@ -2673,6 +2673,25 @@ button.vet-row-a-pourvoir:hover {
    C'était le seul vert Tailwind de toute la V2. Une bonne nouvelle se
    dit dans le même vocabulaire que le reste — et surtout pas plus fort
    qu'un avertissement. */
+/* B-163b ① — LE REFUS, DANS LA FENETRE ET NON EN TOAST.
+   Meme dessin que `.crise-rien-a-faire` juste en dessous, dans l'autre sens :
+   un doublon d'absence n'est pas une panne, c'est une information qui demande
+   un geste. Le rouge est reserve a ce qui casse ; ici l'ambre dit « regarde »
+   sans dire « c'est grave ». */
+.crise-refus {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background: var(--warn-soft, #fdf1df);
+  border: 1px solid rgba(199, 120, 20, 0.34);
+  color: var(--warn, #8a5212);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.crise-refus svg { color: currentColor; margin-top: 1px; }
+
 .crise-rien-a-faire {
   display: flex;
   align-items: flex-start;

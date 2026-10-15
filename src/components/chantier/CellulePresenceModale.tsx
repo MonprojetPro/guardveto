@@ -38,6 +38,9 @@ import { Button } from '@/components/ui/button'
 import { poserPresence, retirerPresence } from '@/app/(v2)/journee/presences-actions'
 import { plageCourte, type JourneeAffichee } from '@/lib/planning/presencesDuJour'
 import { stylePoint } from '@/lib/couleurs'
+// B-163b ④ — l'unique autorité sur ce qu'une absence couvre. Cette fenêtre
+// AFFICHE ; elle ne décide jamais de ce qu'un périmètre veut dire.
+import { lirePerimetre, phrasePerimetre } from '@/lib/absences/perimetre'
 
 const DATE_LONGUE = new Intl.DateTimeFormat('fr-FR', {
   weekday: 'long',
@@ -45,6 +48,30 @@ const DATE_LONGUE = new Intl.DateTimeFormat('fr-FR', {
   month: 'long',
   timeZone: 'Europe/Paris',
 })
+
+/**
+ * Cette présence couvre-t-elle déjà cette tranche ?
+ *
+ * B-163b ⑤. On compare les HORAIRES, jamais les noms : « Journée complète »
+ * (08-18) contient « Matin » (08-12), et aucune comparaison de chaînes ne peut
+ * le savoir. Bornes exclues à droite, comme partout : « Matin » 08-12 et
+ * « Après-midi » 14-18 ne se touchent pas, et 12-14 non plus.
+ *
+ * ⚠️ Le repli est `false` — « je ne sais pas » ne doit pas CACHER une tranche.
+ *    Un bouton en trop se voit et se corrige ; un bouton manquant laisse
+ *    l'administratrice devant une action qu'elle ne peut plus faire, sans
+ *    comprendre pourquoi.
+ */
+function recouvre(
+  presence: { debut: string | null; fin: string | null; tranche: string },
+  tranche: { nom: string; debut: string; fin: string },
+): boolean {
+  // Le nom reste un cas sûr : la même tranche, posée deux fois, se reconnaît
+  // sans horaires — et elle peut en manquer (tranche supprimée du cabinet).
+  if (presence.tranche === tranche.nom) return true
+  if (!presence.debut || !presence.fin) return false
+  return presence.debut < tranche.fin && tranche.debut < presence.fin
+}
 
 export interface TranchePosable {
   id: string
@@ -59,6 +86,7 @@ export function CellulePresenceModale({
   journee,
   periodeId,
   tranches,
+  indisponibilites = [],
   onFermer,
 }: {
   /** `AAAA-MM-JJ`, ou `null` quand rien n'est ouvert. */
@@ -72,6 +100,14 @@ export function CellulePresenceModale({
   periodeId: string | null
   /** Les tranches ACTIVES du cabinet — les seules sur lesquelles on peut poser. */
   tranches: TranchePosable[]
+  /** B-163b ④ — ce qui rend cette personne indisponible ce jour-là. */
+  indisponibilites?: {
+    origine: 'conge' | 'absence'
+    statut: string
+    perimetre: string | null
+    heureDebut: string | null
+    heureFin: string | null
+  }[]
   onFermer: () => void
 }) {
   const router = useRouter()
@@ -81,10 +117,18 @@ export function CellulePresenceModale({
   if (!date || !personne) return null
 
   const siennes = (journee?.presences ?? []).filter((p) => p.vetId === personne.id)
-  const dejaPrises = new Set(siennes.map((p) => p.tranche))
-  // On ne propose pas une tranche déjà tenue : l'action la refuserait, et un
-  // bouton qui mène à un refus prévisible est un bouton qui ment.
-  const posables = tranches.filter((t) => !dejaPrises.has(t.nom))
+
+  // 🔴 B-163b ⑤ — ON COMPARE LES HORAIRES, PLUS LES NOMS. MiKL, 14/10 : « y a
+  //    marqué "ajouter une tranche" alors qu'il est là toute la journée, ça n'a
+  //    pas de sens ». Le code comparait `tranche` par son NOM : « Journée
+  //    complète » (08-18) ne masquait donc ni « Matin » (08-12) ni
+  //    « Après-midi » (14-18), qu'elle couvre pourtant entièrement.
+  //
+  // ⚠️ Le commentaire d'origine disait déjà la bonne règle — « un bouton qui
+  //    mène à un refus prévisible est un bouton qui ment » — et la comparaison
+  //    par nom la trahissait. L'intention juste ne suffit pas : c'est le
+  //    prédicat qui décide.
+  const posables = tranches.filter((t) => !siennes.some((p) => recouvre(p, t)))
 
   function poser(trancheId: string) {
     if (!periodeId || !date || !personne) return
@@ -129,6 +173,41 @@ export function CellulePresenceModale({
             {DATE_LONGUE.format(new Date(date + 'T12:00:00Z'))}
           </DialogDescription>
         </DialogHeader>
+
+        {/*
+          🔴 B-163b ④ — CE QUI REND CETTE PERSONNE INDISPONIBLE, EN PREMIER.
+          MiKL, 14/10 : « y a pas marqué l'absence le concernant ». La fenêtre
+          listait ses présences et proposait d'en ajouter, sans jamais dire
+          qu'une indisponibilité était posée ce jour-là. C'est l'écran où l'on
+          vient chercher le détail que la pastille « A » annonce : s'il se tait,
+          la pastille ne mène nulle part.
+
+          En TÊTE, avant les présences : on lit d'abord ce qui contraint, puis
+          ce qu'on peut faire. L'inverse ferait poser une tranche sur une
+          matinée qu'on vient de déclarer absente.
+        */}
+        {indisponibilites.length > 0 && (
+          <ul className="cpm-indispos">
+            {indisponibilites.map((ind, i) => {
+              const p = lirePerimetre(ind.perimetre)
+              const phrase = phrasePerimetre(
+                p,
+                ind.heureDebut && ind.heureFin
+                  ? { heure_debut: ind.heureDebut, heure_fin: ind.heureFin }
+                  : null,
+              )
+              return (
+                <li key={i} className="cpm-indispo">
+                  <b>{ind.origine === 'conge' ? (ind.statut === 'souhait' ? 'Souhait de congé' : 'Congé') : 'Absence'}</b>
+                  {/* `phrasePerimetre` rend `null` sur « la journée et la
+                      nuit » — le cas général n'a rien à préciser, et une
+                      mention permanente cesse d'être lue. */}
+                  <span>{phrase ?? 'Toute la journée et la nuit'}</span>
+                </li>
+              )
+            })}
+          </ul>
+        )}
 
         {!periodeId ? (
           /* Pas de période = rien à quoi rattacher la présence. On le DIT, au

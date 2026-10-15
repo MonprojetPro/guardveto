@@ -25,6 +25,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Trash2, CalendarX2 } from 'lucide-react'
+// B-163b ② — l'autorité du périmètre, pour savoir si une pastille « A » peut
+// apparaître sur ce mois (et donc si sa légende a lieu d'être).
+import { lirePerimetre, phrasePerimetreCourte } from '@/lib/absences/perimetre'
 import { RetirerPlanningModale, type GesteRetrait } from '@/components/planning/RetirerPlanningModale'
 import { FilouEdge } from '@/components/v2/FilouEdge'
 import type { PeriodeApplicable } from '@/components/v2/GenererJournee'
@@ -787,6 +790,24 @@ export function PlanningChantierV2({
     [semainesGrille],
   )
 
+  /**
+   * Une pastille « A » peut-elle apparaître sur ce mois ? (B-163b ②)
+   *
+   * Elle ne se pose que sur une indisponibilité qui ne retire pas tout — c'est
+   * exactement ce que `phrasePerimetreCourte` sait dire, et elle rend `null`
+   * sur `journee-et-nuit`. Un repère sans mode d'emploi n'explique rien ; une
+   * légende permanente, elle, est du bruit. D'où la condition.
+   */
+  const aDesPastillesAbsence = useMemo(
+    () =>
+      semainesGrille.some((sem) =>
+        sem.some((j) =>
+          j.absences.some((a) => phrasePerimetreCourte(lirePerimetre(a.perimetre)) !== null),
+        ),
+      ),
+    [semainesGrille],
+  )
+
   const statut = periodeAffichee ? libelleStatut(periodeAffichee.statut) : null
 
   // B-157 — ce que le menu « Outils » contient.
@@ -1486,6 +1507,15 @@ export function PlanningChantierV2({
                 hors de la période affichée relève souvent d'un AUTRE planning,
                 parfois publié. Conditionnel : sans jour concerné, ce serait du
                 bruit. */}
+            {/* B-163b ② — la pastille « A » dit qu'il y a à lire ; la légende
+                dit QUOI, et où aller le chercher. Une lettre seule sur une
+                case ne s'interprète pas. */}
+            {aDesPastillesAbsence && (
+              <span className="cl3-item">
+                <span className="lg-abs" aria-hidden="true">A</span>
+                Absent·e une partie du jour — cliquez sur la ligne pour le détail
+              </span>
+            )}
             {aDesJoursHorsPeriode && (
               <span className="cl3-item">
                 <span className="lg-hors" aria-hidden="true" />
@@ -1545,6 +1575,46 @@ export function PlanningChantierV2({
         journee={cellule ? presencesParJour[cellule.date] : undefined}
         periodeId={periodeAffichee?.id ?? null}
         tranches={tranches}
+        // 🔴 B-163b ④ — « y a pas marqué l'absence le concernant ». La fenêtre
+        //    ne disait RIEN de l'indisponibilité du jour, alors que c'est
+        //    précisément l'écran où l'on vient chercher le détail que la
+        //    pastille « A » annonce. Même défaut de famille que B-163a ③, un
+        //    cran plus bas : on avait branché la grille, pas la fenêtre
+        //    qu'elle ouvre.
+        indisponibilites={
+          cellule
+            ? [
+                ...conges
+                  .filter(
+                    (c) =>
+                      c.vetId === cellule.vetId
+                      && c.dateDebut <= cellule.date
+                      && c.dateFin >= cellule.date,
+                  )
+                  .map((c) => ({
+                    origine: 'conge' as const,
+                    statut: c.statut,
+                    perimetre: c.perimetre ?? null,
+                    heureDebut: c.heureDebut ?? null,
+                    heureFin: c.heureFin ?? null,
+                  })),
+                ...absencesDeclarees
+                  .filter(
+                    (a) =>
+                      a.vetId === cellule.vetId
+                      && a.dateDebut <= cellule.date
+                      && a.dateFin >= cellule.date,
+                  )
+                  .map((a) => ({
+                    origine: 'absence' as const,
+                    statut: 'valide',
+                    perimetre: a.perimetre,
+                    heureDebut: a.heureDebut,
+                    heureFin: a.heureFin,
+                  })),
+              ]
+            : []
+        }
         onFermer={() => setCellule(null)}
       />
 

@@ -699,8 +699,22 @@ function CaseDepliee({
               )}
 
               {/*
-                B-163a ③ — LA MENTION DE PÉRIMÈTRE, SEULE TRACE DE CE QUI NE
-                RETIRE RIEN.
+                B-163a ③ / B-163b ② — LA PASTILLE « A », SEULE TRACE DE CE QUI
+                NE RETIRE RIEN.
+
+                ⚠️ CE FUT D'ABORD UNE PHRASE, ET C'ÉTAIT TROP. MiKL, 14/10 :
+                   « c'est écrit trop petit et ça empiète sur le visuel du
+                   matin… il faudrait juste une pastille genre "A" et si l'admin
+                   veut en savoir plus elle clique dessus ». La mention faisait
+                   9px sur 72 % de la piste : elle recouvrait la barre de
+                   présence qu'elle était censée NUANCER, et se lisait mal.
+                   Une case de 96 px ne porte pas une phrase — elle porte un
+                   signal, et le détail vit un clic plus loin.
+
+                Le clic n'a demandé aucun code : la piste entière ouvre déjà la
+                fenêtre de la cellule (`onOuvrirCellule`), qui dit le détail.
+                La phrase complète reste en infobulle et en `aria-label` — la
+                lettre seule n'informerait personne au lecteur d'écran.
 
                 MiKL, 14/10, après avoir posé une indisponibilité de 14h à 16h :
                 « et du coup ça n'a rien changé ». Rien n'avait changé au
@@ -715,10 +729,11 @@ function CaseDepliee({
               */}
               {ligne.mention && ligne.absence === null && (
                 <span
-                  className="pv2-mention-perimetre"
+                  className="pv2-pastille-abs"
                   title={ligne.mentionDetail ?? ligne.mention}
+                  aria-label={ligne.mentionDetail ?? ligne.mention}
                 >
-                  {ligne.mention}
+                  A
                 </span>
               )}
 

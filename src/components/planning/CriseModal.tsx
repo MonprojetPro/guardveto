@@ -467,6 +467,8 @@ export function CriseModal({
 
   // Étape 2 — réparation
   const [resultat, setResultat] = useState<DeclarationResponse | null>(null)
+  /** B-163b ① — le refus du serveur, affiche DANS la fenetre et non en toast. */
+  const [refus, setRefus] = useState<string | null>(null)
   const [decisions, setDecisions] = useState<Record<string, DecisionUI>>({})
   const [applying, setApplying] = useState(false)
   const [volontairesEnCours, setVolontairesEnCours] = useState(false)
@@ -490,6 +492,9 @@ export function CriseModal({
     setHeureDebut('14:00')
     setHeureFin('16:00')
     setResultat(null)
+    // B-163b ① — sinon le refus de la declaration precedente accueillerait la
+    // suivante, et designerait une personne qui n'est meme plus selectionnee.
+    setRefus(null)
     setDecisions({})
   }
 
@@ -540,10 +545,20 @@ export function CriseModal({
       })
       const json = await res.json()
       if (!res.ok) {
-        toast.error(json.error ?? "Erreur lors de la déclaration de l'absence.")
+        // 🔴 B-163b ① — LE REFUS RESTE DANS LA FENETRE. MiKL, 14/10 : « c'est
+        //    bien, il signale le probleme, mais sur une vieille pop-up degueu,
+        //    alors que ca devrait apparaitre a la suite d'Analyser l'impact ».
+        //    Il a raison, et la regle du produit le disait deja : « les refus
+        //    en modale, les succes en toast ». Un toast en bas a droite, pour
+        //    repondre a un clic fait en haut a gauche, oblige a chercher la
+        //    reponse a sa propre action — et il s'efface tout seul.
+        //    ⚠️ Le formulaire reste REMPLI : l'administratrice corrige, elle ne
+        //    ressaisit pas.
+        setRefus(json.error ?? "Erreur lors de la déclaration de l'absence.")
         return
       }
       const data = json as DeclarationResponse
+      setRefus(null)
       setResultat(data)
 
       // Pré-remplir les décisions avec la meilleure proposition (Mode 1).
@@ -795,6 +810,21 @@ export function CriseModal({
                 />
               </div>
             </div>
+
+            {/*
+              B-163b ① — LE REFUS, JUSTE AU-DESSUS DU BOUTON QUI L'A DECLENCHE.
+              Il se lit la ou le regard revient apres le clic, il ne s'efface
+              pas tout seul, et le formulaire reste rempli derriere lui.
+              Pas de rouge criard : un doublon n'est pas une panne, c'est une
+              information — meme grammaire que `.crise-rien-a-faire` juste a
+              cote, dans l'autre sens.
+            */}
+            {refus && (
+              <div className="crise-refus" role="alert">
+                <AlertTriangle className="w-5 h-5 shrink-0" aria-hidden />
+                <p>{refus}</p>
+              </div>
+            )}
 
             <DialogFooter>
               <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={declaring}>
