@@ -550,6 +550,23 @@
   color: #9a5a18;
 }
 
+/* B-163e (1) — LA BARRE AMPUTEE PAR UN BLOC D'ABSENCE.
+   MiKL, 15/10 : « quand c'est un bloc type matin, apres-midi ou journee, ca
+   doit etre indique sur la barre ». La hachure traverse la couleur de la
+   personne sans l'effacer : on doit continuer a reconnaitre DE QUI il s'agit,
+   c'est tout le propos d'une grille nominative. Le pointille reprend celui des
+   conges (`.pv2-piste.conge`) — meme vocabulaire pour « cette presence n'est
+   pas entiere », qu'elle vienne d'un conge ou d'une absence. */
+.pv2-barre.amputee {
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.72) 0 3px,
+    rgba(255, 255, 255, 0) 3px 7px
+  );
+  box-shadow: inset 0 0 0 1px rgba(154, 90, 24, 0.5);
+  font-weight: 800;
+}
+
 .pv2-barre {
   position: absolute;
   top: 0;
@@ -1439,6 +1456,42 @@
   font-weight: 800;
   color: var(--pv2-txt, #3a2a1c);
 }
+
+/* B-163e (3) — « il etait prevu, et il n'est pas la ».
+   Le creux, comme `.cpm-vide` dont il prend la place — ce n'est pas une
+   alerte : l'absence est declaree, le retrait est normal. Ce qui ne l'etait
+   pas, c'est de n'en rien dire. */
+.cpm-prevu {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--pv2-creux, #f6eedf);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--pv2-sec, #7c6a55);
+}
+.cpm-prevu > p { margin: 0; }
+.cpm-prevu b { color: var(--pv2-txt, #3a2a1c); font-weight: 800; }
+.cpm-prevu ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.cpm-prevu li {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  /* 6 + 8 = 14 minimum en horizontal : sur un arrondi total, un padding plus
+     court colle le texte a la courbe (gardien pilules-padding). */
+  padding: 6px 14px;
+  border: 1px dashed var(--pv2-bd, #e6d7bb);
+  border-radius: 999px;
+  background: var(--pv2-surface, #fffcf4);
+}
+.cpm-prevu li small { font-size: 0.76rem; }
+.cpm-prevu-cause { margin-top: 8px !important; font-style: italic; }
 
 .cpm-vide {
   margin: 0;

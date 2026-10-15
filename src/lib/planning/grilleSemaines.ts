@@ -214,6 +214,21 @@ export interface LigneVetoJour {
   mentionDetail: string | null
   /** `conge` ou `absence` — la piste ne les nomme pas pareil. */
   origineAbsence: 'conge' | 'absence' | null
+  /**
+   * L'indisponibilité est-elle PONCTUELLE (quelques heures), ou porte-t-elle
+   * sur un bloc entier (matin, après-midi, journée) ?
+   *
+   * 🔑 B-163e ① — LA DISTINCTION QUI MANQUAIT, et sans laquelle la grille ne
+   *    pouvait pas obéir. MiKL, 15/10 : « l'histoire de la pastille A c'était
+   *    pour les absences ponctuelles qui ne changeaient pas l'horaire de
+   *    présence… par contre quand c'est un bloc type matin, après-midi ou
+   *    journée, ça doit être indiqué SUR LA BARRE ».
+   *
+   *    Une indisponibilité ponctuelle ne touche à rien : elle a besoin d'un
+   *    signal À CÔTÉ. Un bloc AMPUTE la présence : l'information appartient
+   *    alors à la barre, qui représente cette présence.
+   */
+  absencePonctuelle: boolean
   /** Rien du tout ce jour-là — la ligne se dessine, en creux. */
   vide: boolean
 }
@@ -294,6 +309,7 @@ export function lignesDeLaSemaine(
       mention,
       mentionDetail,
       origineAbsence: abs ? (abs.origine ?? 'conge') : null,
+      absencePonctuelle: abs ? estPonctuel(lirePerimetre(abs.perimetre)) : false,
       // ⚠️ `abs` et non `absence` : une ligne qui porte une mention n'est PAS
       //    vide, même si rien n'est retiré. La dessiner en creux effacerait la
       //    seule trace visible d'une indisponibilité ponctuelle.

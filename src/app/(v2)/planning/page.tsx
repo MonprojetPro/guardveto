@@ -57,7 +57,14 @@ import {
 import { bornesGrille, bornesMois } from '@/lib/planning/bornes-grille'
 import type { VetCrise } from '@/components/planning/CriseModal'
 import type { CompteursRow } from '@/hooks/useCompteurs'
-import type { GardeDenormalisee, Periode, ProfilPlanning, Veterinaire } from '@/types'
+import type {
+  GardeDenormalisee,
+  JourTrame,
+  PariteSemaine,
+  Periode,
+  ProfilPlanning,
+  Veterinaire,
+} from '@/types'
 
 export const metadata = { title: 'GuardVeto — Planning' }
 
@@ -409,8 +416,20 @@ export default async function PlanningPageV2({
     modulesDuCabinet(supabase),
     // Seules les trames ACTIVES comptent : une règle retirée n'a rien à
     // appliquer, et proposer le geste sur du vide vaut un bouton cassé.
+    // 🔴 B-163e ③ — ON LIT MAINTENANT LE DÉTAIL, PAS SEULEMENT L'EXISTENCE.
+    //    Ce `select('id').limit(1)` ne servait qu'à savoir s'il existe au moins
+    //    une récurrence (pour n'offrir « Remplir les journées » que si c'est le
+    //    cas). MiKL, 15/10, devant la fenêtre d'un absent : « ça n'indique pas
+    //    qu'il était prévu à la base sur cette journée, y a juste marqué son
+    //    absence » — et la fenêtre affichait « Rien d'inscrit », ce qui se lit
+    //    « il ne travaille pas ce jour-là » et qui est FAUX.
+    //    Dire « il était prévu » demande la ligne de récurrence elle-même :
+    //    qui, quel bloc, quel jour, quelle parité de semaine.
     isAdmin
-      ? supabase.from('trames_journee').select('id').eq('actif', true).limit(1)
+      ? supabase
+          .from('trames_journee')
+          .select('id, veterinaire_id, bloc_id, jour, semaine')
+          .eq('actif', true)
       : Promise.resolve({ data: null }),
     // ── B-150 — LES PRÉSENCES DE JOURNÉE, ENFIN LUES ───────────────────────
     //
@@ -588,7 +607,14 @@ export default async function PlanningPageV2({
       date_fin: p.date_fin,
       statut: p.statut,
     }))
-  const aDesTrames = ((tramesRes as { data?: unknown[] | null })?.data ?? []).length > 0
+  const lignesTrames = ((tramesRes as { data?: unknown[] | null })?.data ?? []) as {
+    id: string
+    veterinaire_id: string
+    bloc_id: string
+    jour: JourTrame
+    semaine: PariteSemaine
+  }[]
+  const aDesTrames = lignesTrames.length > 0
   const periodesTypes = ((typesRes2?.data ?? []) as ProfilPlanning[])
 
   // ── B-150 — LES PRÉSENCES, MISES EN FORME POUR LA GRILLE ────────────────
@@ -926,6 +952,20 @@ export default async function PlanningPageV2({
             tranches={tranchesLues
               .filter((t) => t.actif)
               .map((t) => ({ id: t.id, nom: t.nom, debut: t.debut, fin: t.fin }))}
+            // B-163e ③ — ce que les RÉCURRENCES prévoient, pour que la fenêtre
+            // d'un absent puisse dire « il était prévu » au lieu du trompeur
+            // « Rien d'inscrit ». Le nom de la tranche est résolu ici : la
+            // fenêtre dessine, elle ne va pas rechercher un libellé.
+            recurrences={lignesTrames.map((t) => ({
+              vetId: t.veterinaire_id,
+              jour: t.jour,
+              semaine: t.semaine,
+              tranche: tranchesLues.find((b) => b.id === t.bloc_id)?.nom ?? 'Tranche inconnue',
+              heures: (() => {
+                const b = tranchesLues.find((x) => x.id === t.bloc_id)
+                return b ? `${b.debut.slice(0, 5)}–${b.fin.slice(0, 5)}` : ''
+              })(),
+            }))}
           />
         ) : (
         <PlanningV2

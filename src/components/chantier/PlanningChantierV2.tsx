@@ -28,6 +28,10 @@ import { Trash2, CalendarX2 } from 'lucide-react'
 // B-163b ② — l'autorité du périmètre, pour savoir si une pastille « A » peut
 // apparaître sur ce mois (et donc si sa légende a lieu d'être).
 import { lirePerimetre, phrasePerimetreCourte } from '@/lib/absences/perimetre'
+// B-163e ③ — la convention de parité des semaines vit dans la brique des
+// récurrences, pas ici. La recopier, c'est la voir diverger (B-130b).
+import { trameViseCetteDate } from '@/lib/journee/trames'
+import type { JourTrame, PariteSemaine } from '@/types'
 import { RetirerPlanningModale, type GesteRetrait } from '@/components/planning/RetirerPlanningModale'
 import { FilouEdge } from '@/components/v2/FilouEdge'
 import type { PeriodeApplicable } from '@/components/v2/GenererJournee'
@@ -162,6 +166,21 @@ interface Props {
     perimetre: string | null
     heureDebut: string | null
     heureFin: string | null
+  }[]
+  /**
+   * Ce que les RÉCURRENCES prévoient (B-163e ③).
+   *
+   * 🔴 Sans elles, la fenêtre d'un absent affichait « Rien d'inscrit » — ce qui
+   *    se lit « il ne travaille pas ce jour-là », alors que la vérité est
+   *    « il devait être là, et son absence l'a retiré ». Une phrase rassurante
+   *    qui répond à côté, exactement la famille de « Rien à vérifier ».
+   */
+  recurrences?: {
+    vetId: string
+    jour: string
+    semaine: string
+    tranche: string
+    heures: string
   }[]
   /** Nom du profil de planning de la période, s'il y en a un. */
   profil: string | null
@@ -320,6 +339,7 @@ export function PlanningChantierV2({
   compteurs,
   conges,
   absencesDeclarees = [],
+  recurrences = [],
   profil,
   periodesAvecGardes,
   periodesTypes,
@@ -1613,6 +1633,24 @@ export function PlanningChantierV2({
                     heureFin: a.heureFin,
                   })),
               ]
+            : []
+        }
+        // B-163e ③ — ce qui était PRÉVU ce jour-là par les récurrences. Le
+        // filtrage par date est fait ici (`trameViseCetteDate` porte la
+        // convention de parité des semaines) : la fenêtre reçoit une liste
+        // déjà vraie pour SA date, elle n'a pas à rejouer la règle.
+        prevuParRecurrence={
+          cellule
+            ? recurrences
+                .filter(
+                  (r) =>
+                    r.vetId === cellule.vetId
+                    && trameViseCetteDate(
+                        { jour: r.jour as JourTrame, semaine: r.semaine as PariteSemaine },
+                        cellule.date,
+                      ),
+                )
+                .map((r) => ({ tranche: r.tranche, heures: r.heures }))
             : []
         }
         onFermer={() => setCellule(null)}

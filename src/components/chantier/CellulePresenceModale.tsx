@@ -87,6 +87,7 @@ export function CellulePresenceModale({
   periodeId,
   tranches,
   indisponibilites = [],
+  prevuParRecurrence = [],
   onFermer,
 }: {
   /** `AAAA-MM-JJ`, ou `null` quand rien n'est ouvert. */
@@ -108,6 +109,15 @@ export function CellulePresenceModale({
     heureDebut: string | null
     heureFin: string | null
   }[]
+  /**
+   * Ce que la RÉCURRENCE de cette personne prévoyait pour CE jour (B-163e ③).
+   *
+   * Déjà filtré par l'appelant : la convention de parité des semaines vit dans
+   * `lib/journee/trames.ts`, et cette fenêtre dessine — elle ne rejoue pas la
+   * règle. La recopier ici, c'est la voir diverger un jour sans que rien ne le
+   * dise (« une convention recopiée trois fois », payé le 02/10).
+   */
+  prevuParRecurrence?: { tranche: string; heures: string }[]
   onFermer: () => void
 }) {
   const router = useRouter()
@@ -227,7 +237,46 @@ export function CellulePresenceModale({
             <div className="cpm-bloc">
               <h4>Ses présences ce jour-là</h4>
               {siennes.length === 0 ? (
-                <p className="cpm-vide">Rien d’inscrit.</p>
+                /*
+                  🔴 B-163e ③ — « RIEN D'INSCRIT » ÉTAIT UNE RÉPONSE FAUSSE.
+                  MiKL, 15/10, devant la fenêtre d'Antoine, absent toute la
+                  journée du 22/10 : « ça n'indique pas qu'il était prévu à la
+                  base sur cette journée, y a juste marqué son absence ».
+
+                  Il l'était — sa récurrence le posait — et c'est précisément
+                  son absence qui a retiré la présence. « Rien d'inscrit » se
+                  lit « il ne travaille pas ce jour-là » : on ne cherche donc
+                  pas plus loin, et on croit l'équipe au complet.
+
+                  🔑 Même famille que « Rien à vérifier » : le danger n'est
+                     jamais la case vide, c'est la phrase rassurante qui répond
+                     à une question qu'on n'a pas posée.
+                */
+                prevuParRecurrence.length > 0 ? (
+                  <div className="cpm-prevu">
+                    <p>
+                      <b>Rien ce jour-là</b> — mais sa récurrence le prévoyait :
+                    </p>
+                    <ul>
+                      {prevuParRecurrence.map((r, i) => (
+                        <li key={i}>
+                          <b>{r.tranche}</b>
+                          {r.heures && <small>{r.heures}</small>}
+                        </li>
+                      ))}
+                    </ul>
+                    {/* On ne DÉDUIT pas que c'est l'absence qui a retiré : on
+                        affirme ce qu'on sait (prévu, et pas là), et on nomme la
+                        cause seulement si une indisponibilité existe. */}
+                    {indisponibilites.length > 0 && (
+                      <p className="cpm-prevu-cause">
+                        Son indisponibilité ci-dessus a retiré cette présence.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="cpm-vide">Rien d’inscrit, et aucune récurrence ne le prévoit.</p>
+                )
               ) : (
                 <ul className="cpm-liste">
                   {siennes.map((p) => (

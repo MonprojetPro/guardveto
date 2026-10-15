@@ -692,16 +692,20 @@ function CaseDepliee({
                   B-163a ③ — et il se nomme : une ABSENCE déclarée n'est pas un
                   congé, et les confondre ferait chercher une demande qui
                   n'existe pas. */}
-              {/* ⚠️ `&& !ligne.mention` — LA PLUS PRÉCISE GAGNE, et une seule
-                  s'affiche. Sans ça, une absence « le matin » sur une case vide
-                  montrerait le mot « absent » ET la pastille : deux marques
-                  pour un fait, dont la plus visible est la plus vague. Le mot
-                  reste donc pour le cas général (congé ou absence totale, où
-                  `mention` est nul par construction) ; dès qu'il y a une
-                  précision à donner, c'est la pastille qui la porte. */}
-              {ligne.absence === 'valide' && ligne.journee.length === 0 && !ligne.mention && (
+              {/* LA CASE VIDE DIT CE QU'ELLE PEUT DIRE DE PLUS PRÉCIS.
+                  B-163e ① — `ligne.mention` d'abord : « absent matin » vaut
+                  mieux que « absent » tout court, et il y a la place de
+                  l'écrire quand aucune barre n'occupe la piste. Le mot
+                  générique reste pour le cas sans précision (congé, ou absence
+                  « journée et nuit », où `mention` est nul par construction).
+                  ⚠️ Cette ligne et la pastille plus bas ne peuvent plus laisser
+                     de trou : l'une couvre la piste vide, l'autre la piste
+                     occupée. C'est le défaut de B-163d, et il ne doit pas
+                     revenir par l'autre bout. */}
+              {ligne.absence === 'valide' && ligne.journee.length === 0 && (
                 <span className="pv2-conge-txt">
-                  {ligne.origineAbsence === 'absence' ? 'absent' : 'congé'}
+                  {ligne.mention
+                    ?? (ligne.origineAbsence === 'absence' ? 'absent' : 'congé')}
                 </span>
               )}
 
@@ -745,12 +749,22 @@ function CaseDepliee({
                    les deux, et c'est le cas le PLUS FRÉQUENT : la personne est
                    là en partie, ce qui est exactement l'information à donner.
 
-                🔑 MiKL l'avait énoncé simplement la veille — « juste une
-                   pastille A ». UNE règle : dès qu'il y a quelque chose à dire,
-                   la pastille le dit. Le mot « absent » reste pour la case
-                   vide, où il y a la place de l'écrire en toutes lettres.
+                🔴 B-163e ① — ET LA PASTILLE REVIENT À SON CAS : LE PONCTUEL.
+                   MiKL, 15/10 : « l'histoire de la pastille A c'était pour les
+                   absences ponctuelles qui ne changeaient pas l'horaire de
+                   présence et qui ne nécessitaient pas de remplacement ».
+                   La demande du 14/10 était CONTEXTUELLE, et je l'avais prise
+                   pour une règle générale — puis B-163d l'a étendue à TOUS les
+                   périmètres pour réparer le trou d'affichage. Le trou était
+                   réel ; la réparation était trop large.
+
+                   Une indisponibilité ponctuelle ne change rien : elle a besoin
+                   d'un signal À CÔTÉ de la barre. Un bloc AMPUTE la présence :
+                   son information appartient à la barre elle-même, juste en
+                   dessous. Les deux cas ne demandent pas le même dessin parce
+                   qu'ils ne disent pas la même chose.
               */}
-              {ligne.mention && (
+              {ligne.mention && ligne.absencePonctuelle && (
                 <span
                   className="pv2-pastille-abs"
                   title={ligne.mentionDetail ?? ligne.mention}
@@ -760,23 +774,49 @@ function CaseDepliee({
                 </span>
               )}
 
-              {ligne.journee.map(({ presence, position }) =>
-                position ? (
+              {/*
+                🔴 B-163e ① — « quand c'est un bloc type matin, apres-midi ou
+                   journee, ca doit etre indique SUR LA BARRE ».
+
+                   La barre REPRÉSENTE la présence. Quand un bloc d'absence
+                   l'ampute, c'est elle qui doit le dire : un signal posé à côté
+                   laisserait croire que la présence tient entière. Elle porte
+                   donc la hachure du périmètre et NOMME ce qui est retiré, à la
+                   place de ses heures — « absent matin » est l'information du
+                   jour ; « 8h-18h » ne l'est plus vraiment.
+
+                ⚠️ On ne découpe PAS la barre aux heures du bloc. Il faudrait
+                   les horaires réels des tranches du cabinet, que cette brique
+                   n'a pas, et les deviner (« matin = première moitié »)
+                   dessinerait une précision fausse. La hachure dit « entamée »
+                   sans prétendre dire où — ce qui est exactement ce qu'on sait.
+              */}
+              {ligne.journee.map(({ presence, position }) => {
+                if (!position) return null
+                const amputee = Boolean(ligne.mention) && !ligne.absencePonctuelle
+                const classes = ['pv2-barre']
+                if (presence.anomalie) classes.push('anomalie')
+                if (amputee) classes.push('amputee')
+                return (
                   <span
                     key={presence.id}
-                    className={presence.anomalie ? 'pv2-barre anomalie' : 'pv2-barre'}
+                    className={classes.join(' ')}
                     style={{
                       left: `${position.gauche}%`,
                       width: `${position.largeur}%`,
                       background: teinte(couleur),
                       color: couleur ?? undefined,
                     }}
-                    title={`${presence.tranche} ${presence.heures}${presence.anomalie ? ` · ${presence.anomalie}` : ''}`}
+                    title={
+                      `${presence.tranche} ${presence.heures}`
+                      + (amputee ? ` · ${ligne.mentionDetail ?? ligne.mention}` : '')
+                      + (presence.anomalie ? ` · ${presence.anomalie}` : '')
+                    }
                   >
-                    {presence.heures}
+                    {amputee ? ligne.mention : presence.heures}
                   </span>
-                ) : null,
-              )}
+                )
+              })}
             </div>
 
             {vue.gardesVisibles && (
