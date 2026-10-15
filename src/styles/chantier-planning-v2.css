@@ -1350,9 +1350,17 @@
    pas respecté la charte graphique ».
 
    🔴 CE N'ÉTAIT PAS UN OUBLI DE CHARTE : LES CLASSES N'AVAIENT AUCUNE RÈGLE,
-   NULLE PART. `grep` sur tout `src/**/*.css` pour `cpm-titre`, `cpm-bloc`,
-   `cpm-liste`, `cpm-tranche`, `cpm-origine`, `cpm-choix`, `cpm-tr`, `cpm-note`
-   et `cpm-vide` rendait ZÉRO résultat. La fenêtre n'était pas mal habillée —
+   NULLE PART. Un `grep` sur toutes les feuilles de `src/styles` pour
+   `cpm-titre`, `cpm-bloc`, `cpm-liste`, `cpm-tranche`, `cpm-origine`,
+   `cpm-choix`, `cpm-tr`, `cpm-note` et `cpm-vide` rendait ZÉRO résultat.
+
+   ⛔ NE JAMAIS ÉCRIRE UN GLOB DANS UN COMMENTAIRE CSS. La version précédente
+   de ces lignes citait le motif de recherche tel quel, avec ses deux étoiles
+   et sa barre oblique. Cette séquence FERME LE COMMENTAIRE : tout ce qui
+   suivait devenait du CSS, et le build de production a cassé — pas les tests,
+   pas `tsc`, pas le lint. Payé le 14/10 sur un déploiement.
+
+   La fenêtre n'était pas mal habillée —
    elle était nue, livrée ainsi le 06/10 avec B-145a. D'où la typographie
    collée de la capture : « Journée complète8h–18hpar sa récurrence », trois
    éléments qu'aucune règle n'espaçait.
