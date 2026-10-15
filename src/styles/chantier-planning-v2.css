@@ -550,22 +550,37 @@
   color: #9a5a18;
 }
 
-/* B-163e (1) — LA BARRE AMPUTEE PAR UN BLOC D'ABSENCE.
-   MiKL, 15/10 : « quand c'est un bloc type matin, apres-midi ou journee, ca
-   doit etre indique sur la barre ». La hachure traverse la couleur de la
-   personne sans l'effacer : on doit continuer a reconnaitre DE QUI il s'agit,
-   c'est tout le propos d'une grille nominative. Le pointille reprend celui des
-   conges (`.pv2-piste.conge`) — meme vocabulaire pour « cette presence n'est
-   pas entiere », qu'elle vienne d'un conge ou d'une absence. */
-.pv2-barre.amputee {
+/* ── B-163f — LE DEMI-VOILE D'ABSENCE, SUR LA MOITIE CONCERNEE ───────────────
+   MiKL, 15/10 : « tu as une barre verticale qui partage en 2 la barre
+   horizontale de la journee, donc on peut tres bien dire que la 1ere partie
+   c'est le matin et la 2eme l'apres-midi, PEU IMPORTE LES HORAIRES ».
+
+   🔴 REMPLACE `.pv2-barre.amputee`, livree une heure plus tot, qui hachurait
+   la barre ENTIERE et y ecrivait « absent matin » — un texte qui debordait de
+   96 px et devenait illisible (capture du 15/10).
+
+   Le voile se pose PAR-DESSUS les barres et s'arrete au trait du milieu. Il
+   assombrit sans effacer : on doit continuer a voir la couleur de la personne
+   et ses heures, puisque l'autre moitie de sa journee tient toujours. */
+.pv2-abs-moitie {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 3;
+  pointer-events: none;
+  border-radius: 999px;
+  /* La hachure du conge, en plus serre : meme vocabulaire pour « cette part
+     n'est pas assuree », a l'echelle d'une demi-journee. */
   background-image: repeating-linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.72) 0 3px,
-    rgba(255, 255, 255, 0) 3px 7px
+    rgba(154, 90, 24, 0.28) 0 3px,
+    rgba(255, 252, 244, 0.55) 3px 6px
   );
-  box-shadow: inset 0 0 0 1px rgba(154, 90, 24, 0.5);
-  font-weight: 800;
 }
+/* Le trait `.pv2-mi` est au milieu de la piste : les deux moities s'y arretent
+   exactement, sinon le voile mordrait sur l'autre demi-journee. */
+.pv2-abs-moitie.gauche { left: 0; right: 50%; }
+.pv2-abs-moitie.droite { left: 50%; right: 0; }
 
 .pv2-barre {
   position: absolute;

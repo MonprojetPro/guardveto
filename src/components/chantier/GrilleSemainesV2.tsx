@@ -658,8 +658,14 @@ function CaseDepliee({
         const figee = garde ? vetsFiges(garde.id).has(ligne.vetId) : false
 
         const pisteClasses = ['pv2-piste']
-        if (ligne.absence === 'valide') pisteClasses.push('conge')
-        if (ligne.absence === 'souhait') pisteClasses.push('souhait')
+        // ⚠️ B-163f — LA HACHURE NE COUVRE LA PISTE QUE SI TOUT EST PRIS.
+        //    Sans `moitiesAbsentes.length === 2`, une absence « le matin »
+        //    hachurait la journée entière et contredisait le demi-voile posé
+        //    plus bas : deux marques pour deux moitiés différentes, et la plus
+        //    large gagnait. Le périmètre décide, pas le seul statut.
+        const toutLeJour = ligne.moitiesAbsentes.length === 2
+        if (ligne.absence === 'valide' && toutLeJour) pisteClasses.push('conge')
+        if (ligne.absence === 'souhait' && toutLeJour) pisteClasses.push('souhait')
         if (cliquable) pisteClasses.push('cliquable')
 
         return (
@@ -702,10 +708,23 @@ function CaseDepliee({
                      de trou : l'une couvre la piste vide, l'autre la piste
                      occupée. C'est le défaut de B-163d, et il ne doit pas
                      revenir par l'autre bout. */}
-              {ligne.absence === 'valide' && ligne.journee.length === 0 && (
+              {/*
+                🔴 B-163f — « pour la journée complète tu gardes le même visuel
+                   que congé sauf que tu mets absence ».
+
+                   Un seul mot, jamais une phrase : « absent journée » passait
+                   sur deux lignes dans 96 px et devenait illisible. Le détail
+                   (journée seule ou journée + nuit) vit dans l'infobulle et
+                   dans la fenêtre de la cellule — pas dans la case.
+
+                ⚠️ La condition est `moitiesAbsentes.length === 2` et non plus
+                   `journee.length === 0` : c'est le PÉRIMÈTRE qui décide, pas
+                   l'absence de barre. Une personne sans présence posée et
+                   absente seulement le matin n'a rien d'une journée entière.
+              */}
+              {ligne.absence === 'valide' && ligne.moitiesAbsentes.length === 2 && (
                 <span className="pv2-conge-txt">
-                  {ligne.mention
-                    ?? (ligne.origineAbsence === 'absence' ? 'absent' : 'congé')}
+                  {ligne.origineAbsence === 'absence' ? 'absence' : 'congé'}
                 </span>
               )}
 
@@ -791,32 +810,57 @@ function CaseDepliee({
                    dessinerait une précision fausse. La hachure dit « entamée »
                    sans prétendre dire où — ce qui est exactement ce qu'on sait.
               */}
-              {ligne.journee.map(({ presence, position }) => {
-                if (!position) return null
-                const amputee = Boolean(ligne.mention) && !ligne.absencePonctuelle
-                const classes = ['pv2-barre']
-                if (presence.anomalie) classes.push('anomalie')
-                if (amputee) classes.push('amputee')
-                return (
+              {ligne.journee.map(({ presence, position }) =>
+                position ? (
                   <span
                     key={presence.id}
-                    className={classes.join(' ')}
+                    className={presence.anomalie ? 'pv2-barre anomalie' : 'pv2-barre'}
                     style={{
                       left: `${position.gauche}%`,
                       width: `${position.largeur}%`,
                       background: teinte(couleur),
                       color: couleur ?? undefined,
                     }}
-                    title={
-                      `${presence.tranche} ${presence.heures}`
-                      + (amputee ? ` · ${ligne.mentionDetail ?? ligne.mention}` : '')
-                      + (presence.anomalie ? ` · ${presence.anomalie}` : '')
-                    }
+                    title={`${presence.tranche} ${presence.heures}${presence.anomalie ? ` · ${presence.anomalie}` : ''}`}
                   >
-                    {amputee ? ligne.mention : presence.heures}
+                    {presence.heures}
                   </span>
-                )
-              })}
+                ) : null,
+              )}
+
+              {/*
+                🔴 B-163f — LE MIXTE PRÉSENCE / ABSENCE SUR LA MÊME BARRE.
+
+                MiKL, 15/10 : « tu as une barre verticale qui partage en 2 la
+                barre horizontale de la journée, donc on peut très bien dire que
+                la 1ère partie c'est le matin et la 2ème l'après-midi, PEU
+                IMPORTE LES HORAIRES… pas avec une écriture qu'on ne voit même
+                pas bien ».
+
+                ⚠️ MA LIVRAISON PRÉCÉDENTE ÉCRIVAIT « absent matin » DANS la
+                   barre : le texte débordait et devenait illisible. Une case de
+                   96 px ne porte pas de phrase — 3e fois sur cet écran.
+
+                ⚠️ ET J'AVAIS DÉCLARÉ CE DÉCOUPAGE IMPOSSIBLE en B-163e, faute
+                   de connaître les horaires réels des tranches. L'obstacle
+                   était réel du côté des DONNÉES, sans objet du côté du DESSIN :
+                   le trait `.pv2-mi` partage déjà la piste, et gauche/droite est
+                   une CONVENTION DE LECTURE, pas une mesure.
+
+                Posé APRÈS les barres, donc par-dessus : le voile assombrit la
+                moitié concernée sans effacer la couleur de la personne.
+              */}
+              {ligne.moitiesAbsentes.length === 1 && (
+                <span
+                  className={
+                    ligne.moitiesAbsentes[0] === 'matin'
+                      ? 'pv2-abs-moitie gauche'
+                      : 'pv2-abs-moitie droite'
+                  }
+                  title={ligne.mentionDetail ?? ligne.mention ?? undefined}
+                  aria-label={ligne.mentionDetail ?? ligne.mention ?? undefined}
+                />
+              )}
             </div>
 
             {vue.gardesVisibles && (

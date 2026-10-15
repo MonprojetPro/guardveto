@@ -53,6 +53,7 @@ function ligne(
     mentionDetail: null,
     origineAbsence: null,
     absencePonctuelle: false,
+    moitiesAbsentes: [],
     vide: positions.length === 0,
   }
 }

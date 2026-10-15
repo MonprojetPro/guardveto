@@ -32,6 +32,7 @@ import {
   lirePerimetre,
   phrasePerimetre,
   phrasePerimetreCourte,
+  tranchesCouvertes,
 } from '@/lib/absences/perimetre'
 
 /** Une personne de l'équipe, telle que la marge la dessine. */
@@ -229,6 +230,26 @@ export interface LigneVetoJour {
    *    alors à la barre, qui représente cette présence.
    */
   absencePonctuelle: boolean
+  /**
+   * Les MOITIÉS de piste couvertes par l'indisponibilité (B-163f).
+   *
+   * 🔑 MiKL, 15/10 : « tu as une barre verticale qui partage en 2 la barre
+   *    horizontale de la journée, donc on peut très dire que la 1ère partie
+   *    c'est le matin et la 2ème l'après-midi, PEU IMPORTE LES HORAIRES ».
+   *
+   * ⚠️ EN B-163e J'AI ÉCRIT QU'ON NE POUVAIT PAS LE FAIRE, faute de connaître
+   *    les horaires réels des tranches — et que les deviner « dessinerait une
+   *    précision fausse ». L'obstacle était réel du côté des DONNÉES et sans
+   *    objet du côté du DESSIN : le trait du milieu partage déjà la piste, et
+   *    gauche/droite est une convention de lecture, pas une mesure. Je
+   *    raisonnais sur l'exactitude d'une donnée là où il fallait une
+   *    convention.
+   *
+   * Vide pour `ponctuel` (ne retire rien) et pour `nuit` (ne touche pas la
+   * journée). Les deux moitiés = la piste entière, qui prend alors le visuel
+   * du congé.
+   */
+  moitiesAbsentes: ('matin' | 'apres-midi')[]
   /** Rien du tout ce jour-là — la ligne se dessine, en creux. */
   vide: boolean
 }
@@ -310,6 +331,14 @@ export function lignesDeLaSemaine(
       mentionDetail,
       origineAbsence: abs ? (abs.origine ?? 'conge') : null,
       absencePonctuelle: abs ? estPonctuel(lirePerimetre(abs.perimetre)) : false,
+      // `tranchesCouvertes` est l'autorité (B-163a) : on lui retire la nuit,
+      // qui ne concerne pas cette piste-ci. Dériver plutôt que recopier — une
+      // 7e valeur de périmètre arriverait ici toute seule.
+      moitiesAbsentes: abs
+        ? tranchesCouvertes(lirePerimetre(abs.perimetre)).filter(
+            (t): t is 'matin' | 'apres-midi' => t !== 'nuit',
+          )
+        : [],
       // ⚠️ `abs` et non `absence` : une ligne qui porte une mention n'est PAS
       //    vide, même si rien n'est retiré. La dessiner en creux effacerait la
       //    seule trace visible d'une indisponibilité ponctuelle.
