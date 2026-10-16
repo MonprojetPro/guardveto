@@ -90,6 +90,7 @@ import { JourneeDuJourModale } from '@/components/v2/JourneeDuJourModale'
 import { GrilleSemainesV2 } from './GrilleSemainesV2'
 import '@/styles/chantier-planning-v2.css'
 import { CellulePresenceModale, type TranchePosable } from './CellulePresenceModale'
+import { JourneeDashboardModale } from './JourneeDashboardModale'
 import { AbsencesModale, CompteursModale } from './PanneauxEnModale'
 import {
   bornesRail,
@@ -379,6 +380,19 @@ export function PlanningChantierV2({
   // du 07/10 : la case porte le chiffre, une fenêtre porte le détail, « le même
   // principe que pour le compteur ».
   const [journeeOuverte, setJourneeOuverte] = useState<string | null>(null)
+  // B-165 — le TABLEAU DE BORD d'une journée, ouvert par l'icône de l'en-tête.
+  const [dashboardJour, setDashboardJour] = useState<string | null>(null)
+  /**
+   * Le jour sur lequel le tableau de bord doit SE ROUVRIR après un geste lourd.
+   *
+   * ⚠️ Réattribuer une garde et déclarer une absence passent par les fenêtres
+   *    QUI EXISTENT DÉJÀ : les réécrire dans le tableau de bord en ferait une
+   *    seconde version, et c'est la version oubliée qui se met à mentir (22/08).
+   *    Sans ce retour, l'administratrice retomberait sur la grille après chaque
+   *    geste et devrait rouvrir la journée — ce que la demande d'origine
+   *    cherchait précisément à éviter (« sans avoir à fermer la pop up »).
+   */
+  const [retourDashboard, setRetourDashboard] = useState<string | null>(null)
   const [criseOpen, setCriseOpen] = useState(false)
   const [criseDate, setCriseDate] = useState<string | undefined>()
   const [criseVetId, setCriseVetId] = useState<string | undefined>()
@@ -643,6 +657,26 @@ export function PlanningChantierV2({
   }
 
   /**
+   * B-165 — rendre la main au tableau de bord, s'il nous l'avait passée.
+   *
+   * Appelée à la fermeture des deux fenêtres lourdes. Si le geste n'était pas
+   * parti du tableau de bord, `retourDashboard` est `null` et il ne se passe
+   * rien : on ne doit pas ouvrir une fenêtre que personne n'a demandée.
+   */
+  function reprendreLeDashboard() {
+    if (!retourDashboard) return
+    setDashboardJour(retourDashboard)
+    setRetourDashboard(null)
+  }
+
+  /** Passer la main depuis le tableau de bord, en notant où revenir. */
+  function depuisLeDashboard(retourSur: string, geste: () => void) {
+    setDashboardJour(null)
+    setRetourDashboard(retourSur)
+    geste()
+  }
+
+  /**
    * Une fiche de garde n'est un BOUTON que si le clic mène quelque part.
    *
    * L'admin agit sur tout — c'est son écran. Un vétérinaire n'a qu'un geste
@@ -664,6 +698,20 @@ export function PlanningChantierV2({
   // montrer un verrou qui ne verrouille rien.
   const cadenasActifs =
     isAdmin && !lectureSeule && periodeAffichee !== null && periodeAffichee.statut === 'brouillon'
+
+  /**
+   * Poser ou retirer une présence : réservé à l'administratrice, et seulement
+   * sur un planning qui se modifie encore.
+   *
+   * ⚠️ UNE SEULE CONSTANTE DEPUIS B-165, lue par la grille ET par le tableau de
+   *    bord. Elle était écrite en ligne sur `onOuvrirCellule` ; la recopier
+   *    pour la nouvelle fenêtre aurait rendu possible qu'un écran propose un
+   *    geste que l'autre refuse, pour la même personne au même moment. Le
+   *    serveur tranche de toute façon (`periodeModifiable`) : ici on évite
+   *    seulement de promettre un bouton qui mènerait à un refus.
+   */
+  const peutPoserUnePresence =
+    isAdmin && !lectureSeule && periodeAffichee?.statut !== 'verrouille'
 
   const [cadenasMessage, setCadenasMessage] = useState<string | null>(null)
   const [cadenasAvertissements, setCadenasAvertissements] = useState<string[]>([])
@@ -803,6 +851,18 @@ export function PlanningChantierV2({
       ),
     [semaines, mois, periodeAffichee, parDate, presencesParJour, conges, absencesDeclarees, vacances, manquesParGarde],
   )
+
+  /**
+   * B-165 — les jours de la grille À PLAT, dans l'ordre, pour les flèches du
+   * tableau de bord.
+   *
+   * ⚠️ C'est la MÊME liste que celle que la grille dessine, pas une seconde
+   *    construction : naviguer vers un jour que l'écran derrière ne connaît pas
+   *    montrerait une journée sans ses gardes ni ses présences, qui se lirait
+   *    comme une journée vide. Les flèches sont donc bornées à ce qui est
+   *    chargé, et désactivées aux extrémités.
+   */
+  const joursDashboard = useMemo(() => semainesGrille.flat(), [semainesGrille])
 
   /** Le mois affiché déborde-t-il de la période ? Décide la ligne de légende. */
   const aDesJoursHorsPeriode = useMemo(
@@ -1443,15 +1503,17 @@ export function PlanningChantierV2({
                 // divergence possible.
                 if (g && estCliquable(g)) setGardeModal(g)
               }}
-              // Poser ou retirer une présence : réservé à l'administratrice, et
-              // seulement sur un planning qui se modifie encore. Le serveur
-              // refuse de toute façon (`periodeModifiable`) — ici on évite
-              // simplement de promettre un geste qui échouerait.
+              // Le prédicat vit maintenant dans `peutPoserUnePresence` (B-165),
+              // partagé avec le tableau de bord journalier.
               onOuvrirCellule={
-                isAdmin && !lectureSeule && periodeAffichee?.statut !== 'verrouille'
-                  ? (date, vetId) => setCellule({ date, vetId })
-                  : undefined
+                peutPoserUnePresence ? (date, vetId) => setCellule({ date, vetId }) : undefined
               }
+              // B-165 — l'icône de l'en-tête ouvre le tableau de bord du jour.
+              // Offerte à TOUT LE MONDE : consulter la journée en détail n'est
+              // pas un geste d'administration, et le secrétariat comme les
+              // vétérinaires ont besoin de savoir qui est là. Ce que la fenêtre
+              // laisse FAIRE, elle, dépend de `peutPoser`.
+              onOuvrirDashboard={(date) => setDashboardJour(date)}
               // B-150 / arbitrage ④ — la ligne « N présents » ouvre le détail.
               // C'est le seul chemin vers cette fenêtre en vue repliée : la
               // retirer la rendrait inatteignable, ce qui a bien failli
@@ -1665,13 +1727,63 @@ export function PlanningChantierV2({
         onFermer={() => setJourneeOuverte(null)}
       />
 
+      {/* B-165 — LE TABLEAU DE BORD D'UNE JOURNÉE.
+          MiKL, 16/10 : « il faut vraiment penser cette fenêtre comme un vrai
+          dashboard journalier, où la personne peut également administrer et pas
+          que consulter ». */}
+      <JourneeDashboardModale
+        date={dashboardJour}
+        jours={joursDashboard}
+        equipe={equipe}
+        rail={rail}
+        periodeId={periodeAffichee?.id ?? null}
+        tranches={tranches}
+        today={today}
+        peutPoser={peutPoserUnePresence}
+        vetsFiges={vetsFigesDeLaGarde}
+        rendreCadenas={
+          cadenasActifs
+            ? (garde, vetId, fige) => (
+                <BoutonCadenas
+                  gardeId={garde.id}
+                  vetId={vetId}
+                  prenom={equipe.find((v) => v.id === vetId)?.prenom ?? null}
+                  fige={fige}
+                  onFini={surResultatCadenas}
+                />
+              )
+            : undefined
+        }
+        onAller={(d) => setDashboardJour(d)}
+        onFermer={() => setDashboardJour(null)}
+        // Passage de main vers la fenêtre de garde, puis retour ici.
+        onOuvrirGarde={(gardeId, retourSur) => {
+          const g = gardes.find((x) => x.id === gardeId)
+          // Le MÊME test que la grille : un clic n'ouvre que là où il mène
+          // quelque part. Sans lui, un véto verrait une fenêtre sans action.
+          if (!g || !estCliquable(g)) return
+          depuisLeDashboard(retourSur, () => setGardeModal(g))
+        }}
+        onDeclarerAbsent={
+          isAdmin && !lectureSeule && vets.length > 0
+            ? (d, vetId, retourSur) =>
+                depuisLeDashboard(retourSur, () => declarerAbsent(d, vetId))
+            : undefined
+        }
+      />
+
       <GardeDetailModal
         garde={gardeModal}
         date={gardeModal?.date ?? null}
         isAdmin={isAdmin}
         moiVetId={moiVetId}
         nomsTypes={nomsTypes}
-        onClose={() => setGardeModal(null)}
+        onClose={() => {
+          setGardeModal(null)
+          // B-165 — si ce détour était parti du tableau de bord, il reprend la
+          // main sur le même jour.
+          reprendreLeDashboard()
+        }}
         onSaved={() => router.refresh()}
         onDeclarerAbsent={isAdmin && vets.length > 0 ? declarerAbsent : undefined}
       />
@@ -1699,7 +1811,11 @@ export function PlanningChantierV2({
           // Jamais `useEffect` + `setState` : ESLint le refuse sur ce projet.
           key={`crise-${criseVetId ?? 'sans-veto'}-${criseDate ?? 'sans-date'}`}
           open={criseOpen}
-          onOpenChange={setCriseOpen}
+          onOpenChange={(o) => {
+            setCriseOpen(o)
+            // B-165 — retour au tableau de bord si le geste en venait.
+            if (!o) reprendreLeDashboard()
+          }}
           vets={vets}
           dateDefaut={criseDate}
           vetDefautId={criseVetId}

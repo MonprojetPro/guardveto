@@ -120,6 +120,18 @@ export interface ProprietesGrille {
   onOuvrirCellule?: (date: string, vetId: string) => void
   /** Ouvre le détail « Au cabinet » d un jour — le SEUL chemin en vue repliée. */
   onOuvrirJournee?: (date: string) => void
+  /**
+   * B-165 — ouvre le TABLEAU DE BORD de la journée, par l'icône de l'en-tête.
+   *
+   * MiKL, 15/10 : « je mettrais bien une icône en haut de chaque journée, sur
+   * l'extrémité droite où y a la date ».
+   *
+   * ⚠️ Elle ne REMPLACE pas `onOuvrirJournee` : la ligne « N présents » garde
+   *    son rôle. On ajoute un chemin, on n'en retire pas — un chemin supprimé
+   *    rend inatteignable ce qu'il ouvrait, et c'est ce qui avait failli
+   *    arriver au portage de B-150.
+   */
+  onOuvrirDashboard?: (date: string) => void
   /** Les personnes dont la garde est figée par un cadenas, par garde. */
   vetsFiges: (gardeId: string) => ReadonlySet<string>
   /**
@@ -169,6 +181,7 @@ export function GrilleSemainesV2({
   onOuvrirGarde,
   onOuvrirCellule,
   onOuvrirJournee,
+  onOuvrirDashboard,
   vetsFiges,
   rendreCadenas,
   rendrePoseJourVide,
@@ -225,6 +238,7 @@ export function GrilleSemainesV2({
                 onOuvrirGarde={onOuvrirGarde}
                 onOuvrirCellule={onOuvrirCellule}
                 onOuvrirJournee={onOuvrirJournee}
+                onOuvrirDashboard={onOuvrirDashboard}
                 vetsFiges={vetsFiges}
                 rendreCadenas={rendreCadenas}
                 rendrePoseJourVide={rendrePoseJourVide}
@@ -341,6 +355,7 @@ function CaseJour({
   onOuvrirGarde,
   onOuvrirCellule,
   onOuvrirJournee,
+  onOuvrirDashboard,
   vetsFiges,
   rendreCadenas,
   rendrePoseJourVide,
@@ -357,6 +372,7 @@ function CaseJour({
   onOuvrirGarde: (gardeId: string) => void
   onOuvrirCellule?: (date: string, vetId: string) => void
   onOuvrirJournee?: (date: string) => void
+  onOuvrirDashboard?: (date: string) => void
   vetsFiges: (gardeId: string) => ReadonlySet<string>
   rendreCadenas?: (garde: GardeGrille, vetId: string, fige: boolean) => React.ReactNode
   rendrePoseJourVide?: (date: string) => React.ReactNode
@@ -391,6 +407,39 @@ function CaseJour({
         {ferie && <span className="pv2-ferie">Férié</span>}
         <span className="pv2-tete-espace" />
         {trous > 0 && <span className="pv2-jour-flag" aria-hidden="true" />}
+        {/*
+          B-165 — L'ICÔNE QUI OUVRE LE TABLEAU DE BORD DE LA JOURNÉE.
+          MiKL, 15/10 : « sur l'extrémité droite où y a la date ».
+
+          ⚠️ VISIBLE EN PERMANENCE, pas au survol. Une commande qui n'apparaît
+             qu'au survol n'est découverte que par accident — c'est la leçon
+             payée sur les cadenas le 20/09, et elle ne vaut pas que pour eux.
+             Elle est donc dessinée en trace légère, pas effacée.
+
+          ⚠️ Et sur TOUTES les cases, repliées comprises : c'est justement sur
+             une case repliée qu'on ne voit presque rien, donc là que le détail
+             manque le plus.
+        */}
+        {onOuvrirDashboard && (
+          <button
+            type="button"
+            className="pv2-jour-loupe"
+            onClick={(e) => {
+              // La case entière est cliquable ailleurs (déplier, ouvrir une
+              // cellule) : sans ça, un clic sur l'icône déclencherait les deux.
+              e.stopPropagation()
+              onOuvrirDashboard(jour.date)
+            }}
+            aria-label={`Voir le détail du ${d.getUTCDate()}`}
+            title="Voir la journée en détail"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="17" rx="3" />
+              <path d="M3 9h18M8 2v4M16 2v4" />
+              <path d="M8 14h8M8 17.5h5" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {!depliee ? (

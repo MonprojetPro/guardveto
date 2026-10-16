@@ -62,7 +62,12 @@ const DATE_LONGUE = new Intl.DateTimeFormat('fr-FR', {
  *    l'administratrice devant une action qu'elle ne peut plus faire, sans
  *    comprendre pourquoi.
  */
-function recouvre(
+// ⚠️ EXPORTÉE depuis B-165 : le tableau de bord journalier
+// (`JourneeDashboardModale`) propose le même « ajouter une tranche » et doit
+// donc répondre à la même question. La recopier là-bas en ferait une TROISIÈME
+// version d'une convention déjà payée au 02/10 — et c'est toujours la copie
+// qu'on oublie de corriger qui se met à mentir.
+export function recouvre(
   presence: { debut: string | null; fin: string | null; tranche: string },
   tranche: { nom: string; debut: string; fin: string },
 ): boolean {

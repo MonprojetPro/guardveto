@@ -42,7 +42,13 @@ const CHANTIER = join(process.cwd(), 'src', 'components', 'chantier')
  *    noierait le vrai signal sous des centaines de faux positifs, et un test
  *    qui crie tout le temps cesse d'etre lu.
  */
-const PREFIXES = ['pv2-', 'pv2h-', 'cpm-', 'gjc-', 'cl3-', 'lg-', 'plan-', 'crise-']
+// ⚠️ `jdb-` AJOUTE LE 16/10, EN MEME TEMPS QUE LA FENETRE QU'IL SURVEILLE
+//    (B-165, le tableau de bord journalier). Un registre de prefixes se
+//    comporte comme tout registre : il recense ce qu'on a pense a y inscrire.
+//    Livrer une fenetre dont le prefixe n'y figure pas, c'est la livrer sans
+//    gardien — et le gardien serait VERT, ce qui est pire que pas de gardien
+//    du tout. Meme mecanisme qu'au 14/10 (registre des juges, 5e occurrence).
+const PREFIXES = ['pv2-', 'pv2h-', 'cpm-', 'gjc-', 'cl3-', 'lg-', 'plan-', 'crise-', 'jdb-']
 
 function toutLeCss(): string {
   return readdirSync(STYLES)
