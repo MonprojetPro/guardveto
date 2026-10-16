@@ -1973,8 +1973,11 @@
   padding: 0;
   border: 1px solid transparent;
   border-radius: 50%;
-  background: rgba(58, 42, 28, 0.05);
-  color: var(--pv2-sec, #7c6a55);
+  background: rgba(58, 42, 28, 0.07);
+  /* 🔴 PLUS `--pv2-sec` MAIS L'ENCRE : MiKL, 16/10, « on voit pas ce que c'est ».
+     Le gris secondaire d'un libelle discret ne convient pas a un trait de 2,4 px
+     dans un rond de 24 px — a cette taille, l'icone EST le libelle. */
+  color: var(--pv2-txt, #3a2a1c);
   cursor: pointer;
   transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
@@ -1986,14 +1989,23 @@
   inset: -4px;
   border-radius: 50%;
 }
+/* 🔴 LE CSS DIMENSIONNE, IL NE FAIT PAS EXISTER LE TRACE (B-165f).
+   Ces quatre pastilles se sont affichees comme des RONDS VIDES : le `<svg>`
+   n'avait aucun attribut, et `fill`/`stroke` etaient declares ICI seulement.
+   Un `<path d="M6 12h12">` sans `stroke` ne dessine rien — une ligne n'a pas
+   d'aire a remplir. Le bouton restait cliquable, rien ne rougissait.
+
+   🔦 La preuve etait dans l'ecran lui-meme : `.pv2-jour-loupe`, qui s'affiche,
+      porte `fill="none" stroke="currentColor"` EN ATTRIBUTS INLINE.
+
+   ⚠️ `fill` et `stroke` sont desormais sur le `<svg>` (et un test l'exige).
+      On garde la taille ici, parce que c'est bien du dessin — et un repli de
+      `fill`/`stroke`, qui ne coute rien et ne peut pas nuire. */
 .jdb-pastille svg {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2.2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 .jdb-pastille:hover:not(:disabled),
 .jdb-pastille:focus-visible {

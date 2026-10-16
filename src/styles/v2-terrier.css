@@ -1997,9 +1997,14 @@ a.widget { color: inherit; text-decoration: none; }
   border-radius: 0 0 calc(var(--r-lg) - 1px) calc(var(--r-lg) - 1px);
 }
 
-/* ---- Les boutons : des pilules, comme partout ailleurs dans le terrier ---- */
-[data-slot="dialog-content"] button,
-[data-slot="alert-dialog-content"] button {
+/* ---- Les boutons : des pilules, comme partout ailleurs dans le terrier ----
+   ⚠️ `:not([class*="jdb-"])` — même raison que l'exclusion détaillée plus bas
+      (B-165f) : les boutons du tableau de bord journalier ont un dessin à eux,
+      et cette règle leur imposait l'arrondi total. Le bouton « Ajouter », voulu
+      en rectangle doux de 10 px, sortait en pilule complète. Ceux qui VEULENT
+      999 px (`.jdb-pers`) le déclarent eux-mêmes — ils ne perdent rien. */
+[data-slot="dialog-content"] button:not([class*="jdb-"]),
+[data-slot="alert-dialog-content"] button:not([class*="jdb-"]) {
   border-radius: 999px;
   font-family: var(--font-body);
   font-weight: 600;
@@ -2031,10 +2036,24 @@ a.widget { color: inherit; text-decoration: none; }
                          gouttière. Un motif dessiné exprès l'emporte sur une
                          règle générique — c'est la seule raison d'être de cette
                          exclusion, ne pas l'élargir « au cas où ».
+     · `.jdb-*`       — les boutons du TABLEAU DE BORD JOURNALIER (B-165f).
+                         Ajoutés le 16/10 après trois allers-retours de recette
+                         sur « ces boutons sont trop gros / trop discrets / trop
+                         grossiers » : à chaque fois je redessinais, et CETTE
+                         RÈGLE redécidait. Sa spécificité est d'environ (0,8,1)
+                         contre (0,1,0) pour une classe simple — une pastille
+                         de 24 px devenait 40 px de haut avec 18 px de padding,
+                         ce qui chassait son icône hors de la boîte et la
+                         rendait INVISIBLE. C'est exactement le cas que les
+                         exclusions ci-dessus décrivent : un motif dessiné
+                         exprès l'emporte sur une règle générique.
+                         ⚠️ Ces classes n'existent QUE dans `components/chantier/` :
+                         l'exclusion est donc bornée par construction, elle ne
+                         peut rien changer ailleurs.
    Les cases à cocher ne sont pas concernées : ce sont des `input`, pas des
    `button`. */
-[data-slot="dialog-content"] button:not([data-slot="dialog-close"]):not([data-slot="select-trigger"]):not([class~="size-6"]):not([class~="size-7"]):not([class~="size-8"]):not([class~="size-9"]):not(.segmente > *),
-[data-slot="alert-dialog-content"] button:not([data-slot="dialog-close"]):not([data-slot="select-trigger"]):not([class~="size-6"]):not([class~="size-7"]):not([class~="size-8"]):not([class~="size-9"]):not(.segmente > *) {
+[data-slot="dialog-content"] button:not([data-slot="dialog-close"]):not([data-slot="select-trigger"]):not([class~="size-6"]):not([class~="size-7"]):not([class~="size-8"]):not([class~="size-9"]):not(.segmente > *):not([class*="jdb-"]),
+[data-slot="alert-dialog-content"] button:not([data-slot="dialog-close"]):not([data-slot="select-trigger"]):not([class~="size-6"]):not([class~="size-7"]):not([class~="size-8"]):not([class~="size-9"]):not(.segmente > *):not([class*="jdb-"]) {
   min-height: 40px;
   padding: 9px 18px;
   font-size: 0.82rem;

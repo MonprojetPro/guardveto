@@ -464,7 +464,15 @@ export function JourneeDashboardModale({
                           aria-label={`Retirer ${p.prenom} de ${c.nom}`}
                           title={`Retirer ${p.prenom}`}
                         >
-                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
                             <path d="M6 12h12" />
                           </svg>
                         </button>
@@ -488,7 +496,15 @@ export function JourneeDashboardModale({
                     onClick={() => setAjoutSur((a) => (a === c.cle ? null : c.cle))}
                     aria-expanded={ajoutSur === c.cle}
                   >
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
                       {ajoutSur === c.cle ? (
                         <path d="M7 7l10 10M17 7L7 17" />
                       ) : (
@@ -575,7 +591,15 @@ export function JourneeDashboardModale({
                         aria-label={`Changer la garde de ${place.prenom}`}
                         title="Changer qui est de garde"
                       >
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
                           <path d="M4 20h4L19 9a2.1 2.1 0 00-3-3L5 17v3z" />
                         </svg>
                       </button>
@@ -594,7 +618,15 @@ export function JourneeDashboardModale({
                         aria-label={`Pourvoir la place ${place.role}`}
                         title="Pourvoir cette place"
                       >
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
                           <path d="M12 6v12M6 12h12" />
                         </svg>
                       </button>
