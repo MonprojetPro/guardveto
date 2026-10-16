@@ -124,6 +124,7 @@ export function JourneeDashboardModale({
   onFermer,
   onOuvrirGarde,
   onDeclarerAbsent,
+  onPoserConge,
 }: {
   /** `AAAA-MM-JJ`, ou `null` quand rien n'est ouvert. */
   date: string | null
@@ -157,6 +158,20 @@ export function JourneeDashboardModale({
   onOuvrirGarde?: (gardeId: string, retourSur: string) => void
   /** Passage de main : la déclaration d'absence, sans personne pré-choisie. */
   onDeclarerAbsent?: (date: string, retourSur: string) => void
+  /**
+   * B-165c — passage de main : poser un congé, sur le jour affiché.
+   *
+   * ⚠️ LE SECOND DES DEUX BOUTONS QUE MiKL DEMANDAIT (B-165a ③, *« les boutons
+   *    déposer un congé ou signaler une absence »*). Seul « signaler une
+   *    absence » avait été livré, et le reste-à-faire portait une raison de
+   *    report qui s'est révélée fausse à la mesure : `CongeForm` ne lit que
+   *    quatre champs d'un véto, tous déjà chargés par l'écran.
+   *
+   * Même forme que `onDeclarerAbsent`, et c'est voulu : les deux gestes
+   * quittent le tableau de bord pour une fenêtre lourde et doivent y revenir
+   * — `retourSur` est ce à quoi on rend la main.
+   */
+  onPoserConge?: (date: string, retourSur: string) => void
 }) {
   const router = useRouter()
   const [enCours, demarrer] = useTransition()
@@ -673,6 +688,23 @@ export function JourneeDashboardModale({
               onClick={() => onDeclarerAbsent(jour.date, jour.date)}
             >
               Signaler une absence
+            </Button>
+          )}
+          {/* B-165c — le second geste demandé. Même `variant` et même `size`
+              que son voisin : ce sont deux portes de même nature, et une
+              différence d'habillage ferait croire à une différence de poids.
+              L'ordre suit la demande de MiKL (« déposer un congé ou signaler
+              une absence ») inversé volontairement : « Signaler une absence »
+              est recetté à cette place depuis B-165a, et le déplacer pour
+              respecter l'ordre d'une phrase aurait bougé un repère acquis. */}
+          {onPoserConge && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onPoserConge(jour.date, jour.date)}
+            >
+              Poser un congé
             </Button>
           )}
           <span className="jdb-aide">← → changent de journée</span>

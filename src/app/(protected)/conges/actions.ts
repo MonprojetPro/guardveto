@@ -6,6 +6,25 @@ import type { Impact } from '@/data/controleImpact'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { exigerIdentite } from '@/lib/identite'
 import { revalidatePath } from 'next/cache'
+// ── B-165c — `/planning` MANQUAIT AUX CINQ REVALIDATIONS DE CE FICHIER ──────
+//
+// 🔴 Les congés y étaient revalidés sur `/conges`, `/absences` et
+//    `/admin/demandes` — jamais sur `/planning`. Or la grille du planning lit
+//    les congés (`absencesGrille`, les compteurs) et, depuis B-165, le tableau
+//    de bord d'une journée y affiche sa rangée des absents.
+//
+// ⚠️ LE DÉFAUT NE SE VOYAIT PAS, ET C'EST POURQUOI IL A DURÉ. Les deux écrans
+//    qui posaient des congés jusqu'ici (`CongesList`, `AbsencesV2`) ne sont
+//    PAS `/planning` : on ne regardait jamais la grille au moment où elle
+//    devenait fausse. On la retrouvait plus tard, rafraîchie par autre chose,
+//    sans jamais faire le lien. Le chemin ouvert par B-165c, lui, pose un
+//    congé DEPUIS le planning et revient dessus — il rend le trou visible
+//    immédiatement.
+//
+// 🔑 Les cinq sont corrigés, pas seulement la création. Valider ou refuser une
+//    demande depuis l'écran Demandes laissait la grille tout aussi périmée ;
+//    ne réparer que mon chemin aurait laissé le défaut en place sous une forme
+//    plus difficile à retrouver.
 import { sendBrevoEmail, emailCongeValide, emailCongeRefuse } from '@/lib/brevo'
 import { adresseUtilisable } from '@/lib/emails/destinataire'
 import {
@@ -220,6 +239,7 @@ export async function createConge(
   revalidatePath('/conges')
   revalidatePath('/absences') // écran V2 — lecteur des mêmes congés
   revalidatePath('/admin/demandes')
+  revalidatePath('/planning') // B-165c — la grille et le tableau de bord aussi (note en tête)
 
   // ── B-134 : prévenir l'administratrice qu'une demande vient d'arriver ──────
   // UNIQUEMENT quand c'est un véto qui pose (statut 'souhait'). Un congé posé
@@ -487,6 +507,7 @@ export async function updateConge(id: string, data: CongeFormData) {
   revalidatePath('/conges')
   revalidatePath('/absences') // écran V2 — lecteur des mêmes congés
   revalidatePath('/admin/demandes')
+  revalidatePath('/planning') // B-165c — la grille et le tableau de bord aussi (note en tête)
   return { success: true, presencesRetirees }
 }
 
@@ -497,6 +518,7 @@ export async function deleteConge(id: string) {
   revalidatePath('/conges')
   revalidatePath('/absences') // écran V2 — lecteur des mêmes congés
   revalidatePath('/admin/demandes')
+  revalidatePath('/planning') // B-165c — la grille et le tableau de bord aussi (note en tête)
   return { success: true }
 }
 
@@ -652,6 +674,7 @@ export async function validerConge(
   revalidatePath('/conges')
   revalidatePath('/absences') // écran V2 — lecteur des mêmes congés
   revalidatePath('/admin/demandes')
+  revalidatePath('/planning') // B-165c — la grille et le tableau de bord aussi (note en tête)
 
   // ── Détection de conflit congé ↔ planning publié (cas « Antoine ») ──────
   // Le congé vient de devenir EFFECTIF (statut 'valide') : on vérifie s'il
@@ -779,5 +802,6 @@ export async function refuserConge(id: string, raison?: string) {
   revalidatePath('/conges')
   revalidatePath('/absences') // écran V2 — lecteur des mêmes congés
   revalidatePath('/admin/demandes')
+  revalidatePath('/planning') // B-165c — la grille et le tableau de bord aussi (note en tête)
   return { success: true }
 }

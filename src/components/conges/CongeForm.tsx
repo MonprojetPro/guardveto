@@ -15,7 +15,40 @@ import { createConge, updateConge, type ConflitPlanning } from '@/app/(protected
 // B-163 — le choix « sur quoi porte cette absence », partagé avec la modale de crise.
 import { ChoixPerimetre } from '@/components/absences/ChoixPerimetre'
 import { lirePerimetre, type PerimetreAbsence } from '@/lib/absences/perimetre'
-import type { Conge, CreneauConge, TypeConge, Veterinaire } from '@/types'
+import type { Conge, CreneauConge, TypeConge } from '@/types'
+
+/**
+ * B-165c — CE QUE CE FORMULAIRE A RÉELLEMENT BESOIN DE SAVOIR D'UN VÉTO.
+ *
+ * 🔴 Il exigeait `Veterinaire[]`, soit 17 champs (`user_id`, `email`,
+ *    `role_app`, `created_at`…). Il n'en lit QUE QUATRE, et on peut le
+ *    vérifier : `id` et `prenom`/`nom` pour la liste de choix, `actif` pour la
+ *    filtrer. Les treize autres n'étaient jamais touchés.
+ *
+ * ⚠️ CE N'EST PAS UN DÉTAIL DE TYPAGE, C'EST UN LOT ENTIER QUI DISPARAÎT. Le
+ *    board de B-165c estimait qu'offrir « Poser un congé » depuis le planning
+ *    obligeait à ÉLARGIR UNE REQUÊTE SERVIE À TOUT LE MONDE, écran client
+ *    compris — avec sa propre inspection des consumers. Faux : la requête
+ *    charge déjà tout ce qui est lu ici. C'était le TYPE qui était trop large,
+ *    pas la donnée qui manquait.
+ *
+ * 🔑 La leçon, pour la prochaine fois : une prop surdimensionnée ne coûte rien
+ *    tant qu'un seul écran l'alimente, et devient un faux chantier dès qu'un
+ *    deuxième veut s'en servir. On demande ce qu'on lit.
+ */
+export interface VetDuFormulaireConge {
+  id: string
+  prenom: string
+  nom: string
+  /**
+   * ⚠️ REQUIS, ET VOLONTAIREMENT PAS OPTIONNEL. Un `actif?: boolean` aurait
+   *    laissé le formulaire proposer des vétos partis à tout appelant qui
+   *    oublie le champ — exactement le genre de défaut permissif qui ne se voit
+   *    qu'au moment où un congé est posé sur quelqu'un qui n'est plus là.
+   *    L'appelant qui filtre déjà en base l'affirme explicitement, chez lui.
+   */
+  actif: boolean
+}
 
 const TYPES_CONGE: { value: TypeConge; label: string }[] = [
   { value: 'vacances',        label: 'Vacances' },
@@ -56,6 +89,20 @@ function toIso(date: Date): string {
   return date.toISOString().split('T')[0]
 }
 
+/**
+ * B-165c — le jour de référence du formulaire : celui que l'appelant désigne,
+ * ou aujourd'hui.
+ *
+ * ⚠️ ANCRÉ À MIDI, ET CE N'EST PAS DE LA COQUETTERIE. `new Date('2026-10-20')`
+ *    vaut minuit UTC ; `toIso` repasse par `toISOString()`. À midi, aucun
+ *    décalage de fuseau ne peut faire franchir la frontière du jour dans un
+ *    sens ou dans l'autre — à minuit, un simple changement d'heure suffisait à
+ *    poser le congé la veille.
+ */
+function jourDeReference(dateDefaut?: string): Date {
+  return dateDefaut ? new Date(`${dateDefaut}T12:00:00`) : new Date()
+}
+
 function dimancheDeSemaine(lundi: Date): Date {
   const d = new Date(lundi)
   d.setDate(d.getDate() + 6)
@@ -65,11 +112,27 @@ function dimancheDeSemaine(lundi: Date): Date {
 interface CongeFormProps {
   open: boolean
   onClose: () => void
-  vets: Veterinaire[]
+  vets: VetDuFormulaireConge[]
   currentUserId: string
   isAdmin: boolean
   conge?: Conge | null
   defaultVetId?: string
+  /**
+   * B-165c — LE JOUR DONT ON PARLE, quand l'appelant en a un.
+   *
+   * Ouvert depuis le tableau de bord d'une journée, le formulaire doit partir
+   * de CETTE journée : s'ouvrir sur la semaine courante n'aurait aucun lien
+   * avec le jour qu'on regarde, et c'est une erreur de saisie offerte.
+   *
+   * ⚠️ IL NE FORCE PAS UNE DATE UNIQUE — il désigne un jour, et le formulaire
+   *    en tire ce que le TYPE choisi autorise : la semaine lundi → dimanche qui
+   *    le contient pour un congé (le découpage que ce formulaire impose depuis
+   *    toujours), le jour seul pour une indisponibilité ponctuelle. Poser
+   *    `date_debut = date_fin` sur un congé aurait contredit sa propre règle.
+   *
+   * `undefined` = comportement d'avant ce lot, la semaine courante.
+   */
+  dateDefaut?: string
   /**
    * B-163 — le cabinet a-t-il allumé le planning des journées ?
    *
@@ -89,19 +152,23 @@ interface CongeFormProps {
 
 export function CongeForm({
   open, onClose, vets, currentUserId, isAdmin, conge, defaultVetId, onConflit,
-  moduleJourneeActif = false,
+  moduleJourneeActif = false, dateDefaut,
 }: CongeFormProps) {
   const isEdit = Boolean(conge)
   const [isPending, startTransition] = useTransition()
 
-  const today = lundiDeSemaine(new Date())
+  // B-165c — RENOMMÉ depuis `today`, qui est devenu un mensonge : ce lundi est
+  // celui de la semaine du jour DE RÉFÉRENCE, pas celui de la semaine courante.
+  // Un nom qui dit « aujourd'hui » alors qu'il peut valoir un lundi de mars est
+  // exactement ce qui fait raisonner juste sur une valeur fausse.
+  const lundiDeDepart = lundiDeSemaine(jourDeReference(dateDefaut))
 
   const [vetId, setVetId] = useState(
     conge?.veterinaire_id ?? defaultVetId ?? vets[0]?.id ?? ''
   )
-  const [dateDebut, setDateDebut] = useState(conge?.date_debut ?? toIso(today))
+  const [dateDebut, setDateDebut] = useState(conge?.date_debut ?? toIso(lundiDeDepart))
   const [dateFin, setDateFin] = useState(
-    conge?.date_fin ?? toIso(dimancheDeSemaine(today))
+    conge?.date_fin ?? toIso(dimancheDeSemaine(lundiDeDepart))
   )
   const [type, setType] = useState<TypeConge>(conge?.type ?? 'vacances')
   const [commentaire, setCommentaire] = useState(conge?.commentaire ?? '')
@@ -122,7 +189,7 @@ export function CongeForm({
   // Réinitialise le formulaire à chaque ouverture (sinon il garde le contexte de la demande précédente)
   useEffect(() => {
     if (!open) return
-    const lundi = lundiDeSemaine(new Date())
+    const lundi = lundiDeSemaine(jourDeReference(dateDefaut))
     setVetId(conge?.veterinaire_id ?? defaultVetId ?? vets[0]?.id ?? '')
     setDateDebut(conge?.date_debut ?? toIso(lundi))
     setDateFin(conge?.date_fin ?? toIso(dimancheDeSemaine(lundi)))
@@ -135,19 +202,22 @@ export function CongeForm({
     setHeureFin(conge?.heure_fin?.slice(0, 5) ?? '16:00')
     setErrors({})
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, conge, defaultVetId])
+  }, [open, conge, defaultVetId, dateDefaut])
 
   const isIndispo = type === 'indisponibilite'
 
   const handleTypeChange = (val: TypeConge) => {
     setType(val)
     if (val === 'indisponibilite') {
-      // Passe en date unique (même jour)
-      const d = toIso(new Date())
+      // Passe en date unique — LE jour de référence, pas aujourd'hui.
+      // B-165c : ouvert sur le 20/10 puis basculé en « ponctuel », ce champ
+      // sautait à la date du jour et faisait perdre silencieusement le jour
+      // qu'on regardait.
+      const d = toIso(jourDeReference(dateDefaut))
       setDateDebut(d)
       setDateFin(d)
     } else {
-      const lundi = lundiDeSemaine(new Date())
+      const lundi = lundiDeSemaine(jourDeReference(dateDefaut))
       setDateDebut(toIso(lundi))
       setDateFin(toIso(dimancheDeSemaine(lundi)))
     }

@@ -45,6 +45,14 @@ import {
 } from '@/components/chantier/outils-planning-chantier'
 import { GardeDetailModal, peutProposerUnEchange } from '@/components/planning/GardeDetailModal'
 import { CriseModal, type VetCrise } from '@/components/planning/CriseModal'
+// B-165c — « Poser un congé » depuis le tableau de bord journalier. On réouvre
+// LA fenêtre qui existe déjà, celle des écrans Congés et Absences : elle porte
+// les règles (découpage par semaine, périmètre, souhait vs validé) et les
+// effets de bord (notification à l'administratrice, détection de conflit).
+// Un formulaire recopié ici aurait divergé au premier changement de règle.
+import { CongeForm } from '@/components/conges/CongeForm'
+import { ConflitPlanningDialog } from '@/components/conges/ConflitPlanningDialog'
+import type { ConflitPlanning } from '@/app/(protected)/conges/actions'
 import { estJourFerie } from '@/engine/utils'
 // B-157a — la pastille de couleur du filtre « Mettre en avant » se dessine avec
 // la MÊME fonction que celles de la grille : deux recettes de point coloré
@@ -396,6 +404,30 @@ export function PlanningChantierV2({
   const [criseOpen, setCriseOpen] = useState(false)
   const [criseDate, setCriseDate] = useState<string | undefined>()
   const [criseVetId, setCriseVetId] = useState<string | undefined>()
+  /**
+   * B-165c — LA PLAGE pré-remplie de la fenêtre de crise, quand elle est
+   * ouverte pour réparer un congé qui chevauche un planning publié.
+   *
+   * ⚠️ Sans elle, « gérer » un conflit de trois jours n'aurait proposé de
+   *    réattribuer que le PREMIER — une réparation partielle qui a l'air d'une
+   *    réparation. `AbsencesV2` passe déjà la plage sur ce même chemin ; ce
+   *    qui manquait ici, c'est l'état pour la porter.
+   */
+  const [crisePlage, setCrisePlage] = useState<{ debut: string; fin: string } | null>(null)
+  /** B-165c — le congé posé depuis le tableau de bord : sur quel jour. */
+  const [congeJour, setCongeJour] = useState<string | null>(null)
+  /**
+   * B-165c — le conflit avec un planning publié renvoyé par `createConge`.
+   *
+   * 🔴 NE PAS LE BRANCHER AURAIT ÉTÉ LE PIRE DES TROIS CHOIX. `createConge`
+   *    rend le conflit dans tous les cas ; c'est l'appelant qui décide de
+   *    l'afficher. Les deux autres écrans l'affichent. Ce chemin-ci l'aurait
+   *    laissé tomber en silence : le congé serait posé, la garde publiée
+   *    resterait au nom de quelqu'un d'absent, et RIEN ne l'aurait dit.
+   */
+  const [conflitConge, setConflitConge] = useState<ConflitPlanning | null>(null)
+  /** Le conflit est affiché, ou bien on est passé à sa réparation. */
+  const [repareConflit, setRepareConflit] = useState(false)
   // Retirer un planning depuis le menu de période (demande MiKL du 2026-08-03 :
   // le geste doit exister là où on choisit les plannings, pas seulement au fond
   // du parcours de génération).
@@ -616,6 +648,28 @@ export function PlanningChantierV2({
   // prénom et de leur couleur pour les dessiner comme n'importe quelle place.
   const vetsParId = useMemo(() => new Map(vets.map((v) => [v.id, v])), [vets])
 
+  /**
+   * B-165c — l'équipe telle que `CongeForm` la demande.
+   *
+   * `VetCrise` ne porte pas `actif` : la requête de l'écran filtre déjà
+   * `.eq('actif', true)`, donc le champ serait partout `true` et n'a jamais été
+   * chargé. On le pose ici explicitement — `CongeForm` l'exige, et il a raison
+   * de l'exiger : un `actif?` optionnel l'aurait laissé proposer un véto parti
+   * au premier appelant distrait.
+   */
+  const vetsPourConge = useMemo(
+    () => vets.map((v) => ({ id: v.id, prenom: v.prenom, nom: v.nom, actif: true })),
+    [vets],
+  )
+
+  /** Le nom à montrer dans l'alerte de conflit — jamais un identifiant brut. */
+  const nomDuConflit = conflitConge
+    ? (() => {
+        const v = vetsParId.get(conflitConge.veterinaire_id)
+        return v ? `${v.prenom} ${v.nom}` : 'Ce vétérinaire'
+      })()
+    : ''
+
   // La proposition dont la barre du bas est ouverte. On la relit dans la liste
   // à chaque rendu plutôt que de la stocker : après une application, la liste
   // rétrécit et la barre doit disparaître d'elle-même — pas rester ouverte sur
@@ -653,6 +707,11 @@ export function PlanningChantierV2({
     setGardeModal(null)
     setCriseDate(date)
     setCriseVetId(vetId)
+    // B-165c — la plage d'un conflit PRÉCÉDENT ne doit pas survivre ici :
+    // `dateDebutDefaut` est prioritaire sur `dateDefaut` dans `CriseModal`, et
+    // une plage oubliée écraserait silencieusement le jour qu'on vient de
+    // cliquer. Le même piège que la `key` du véto, un cran plus loin.
+    setCrisePlage(null)
     setCriseOpen(true)
   }
 
@@ -670,6 +729,21 @@ export function PlanningChantierV2({
     setGardeModal(null)
     setCriseDate(date)
     setCriseVetId(undefined)
+    setCrisePlage(null) // cf. la note dans `declarerAbsent`
+    setCriseOpen(true)
+  }
+
+  /**
+   * B-165c — réparer un congé qui chevauche un planning publié.
+   *
+   * On rouvre la fenêtre de crise sur LA PLAGE du congé, pas sur son premier
+   * jour : les gardes à réattribuer sont toutes celles que le congé couvre.
+   */
+  function reparerLeConflit(conflit: ConflitPlanning) {
+    setRepareConflit(true)
+    setCriseVetId(conflit.veterinaire_id)
+    setCriseDate(conflit.date_debut)
+    setCrisePlage({ debut: conflit.date_debut, fin: conflit.date_fin })
     setCriseOpen(true)
   }
 
@@ -1794,6 +1868,29 @@ export function PlanningChantierV2({
                 depuisLeDashboard(retourSur, () => declarerAbsenceLibre(d))
             : undefined
         }
+        // B-165c — l'autre moitié de la demande de B-165a ③.
+        //
+        // ⚠️ LA MÊME CONDITION QUE SON VOISIN, ET C'EST UN CHOIX. Un véto
+        //    pourrait légitimement déposer un souhait pour lui-même, et
+        //    `CongeForm` sait le faire (branche `!isAdmin`). On ne l'offre pas
+        //    ici : cet écran est celui de l'administratrice, `lectureSeule`
+        //    coupe déjà la secrétaire, et ouvrir une porte de plus se décide
+        //    avec MiKL, pas en passant.
+        //
+        // 🔴 `moiVetId` DOIT ÊTRE RENSEIGNÉ, et ce n'est pas une précaution de
+        //    style. Il part en `saisi_par`, colonne déclarée
+        //    `UUID REFERENCES veterinaires(id)` (migration `001_tables.sql`) :
+        //    la chaîne vide que `page.tsx` produit pour qui n'a pas de fiche
+        //    véto (`vet?.id ?? ''`) n'est pas un UUID. Le congé aurait été
+        //    refusé par la base APRÈS un formulaire entièrement rempli — un
+        //    bouton qui ne mène nulle part, découvert au moment le plus coûteux.
+        //    On ne propose pas la porte quand on sait qu'elle est murée.
+        onPoserConge={
+          isAdmin && !lectureSeule && vets.length > 0 && !!moiVetId
+            ? (d: string, retourSur: string) =>
+                depuisLeDashboard(retourSur, () => setCongeJour(d))
+            : undefined
+        }
       />
 
       <GardeDetailModal
@@ -1833,20 +1930,82 @@ export function PlanningChantierV2({
           // Les DEUX autres écrans qui ouvrent cette fenêtre posent déjà cette
           // `key` (`CongesList.tsx`, `AbsencesV2.tsx`). Elle manquait ici.
           // Jamais `useEffect` + `setState` : ESLint le refuse sur ce projet.
-          key={`crise-${criseVetId ?? 'sans-veto'}-${criseDate ?? 'sans-date'}`}
+          key={`crise-${criseVetId ?? 'sans-veto'}-${criseDate ?? 'sans-date'}-${crisePlage?.fin ?? 'sans-plage'}`}
           open={criseOpen}
           onOpenChange={(o) => {
             setCriseOpen(o)
-            // B-165 — retour au tableau de bord si le geste en venait.
-            if (!o) reprendreLeDashboard()
+            if (!o) {
+              // B-165c — la réparation est finie : on referme le conflit avec
+              // elle. Le laisser ouvert aurait fait réapparaître l'alerte
+              // derrière la fenêtre qu'on vient de fermer, pour un conflit
+              // dont on vient précisément de s'occuper.
+              setRepareConflit(false)
+              setConflitConge(null)
+              setCrisePlage(null)
+              // B-165 — retour au tableau de bord si le geste en venait.
+              reprendreLeDashboard()
+            }
           }}
           vets={vets}
           dateDefaut={criseDate}
+          dateDebutDefaut={crisePlage?.debut}
+          dateFinDefaut={crisePlage?.fin}
           vetDefautId={criseVetId}
           // B-163 — meme branchement que l'ecran client : la fenetre est la
           // MEME, et un chantier qui n'offrirait pas le choix donnerait une
           // recette qui ne ressemble pas a la production.
           moduleJourneeActif={(modules ?? []).includes('planning-journee')}
+        />
+      )}
+
+      {/* ══ B-165c — POSER UN CONGÉ DEPUIS LE TABLEAU DE BORD ═════════════════
+          Monté SOUS CONDITION (et non en permanence comme `CriseModal`) : la
+          `key` fait repartir le formulaire du bon jour à chaque ouverture, et
+          un démontage complet entre deux journées vaut mieux que la cascade de
+          `useState` à resynchroniser qui a coûté la recette du 26/08. */}
+      {congeJour && (
+        <CongeForm
+          key={`conge-${congeJour}`}
+          open
+          onClose={() => {
+            setCongeJour(null)
+            // La grille, la rangée des absents du tableau de bord et les
+            // compteurs lisent tous ce congé : on repart du serveur. Sans ça,
+            // on reviendrait sur un tableau de bord qui ignore ce qu'on vient
+            // d'y poser — « faut que je rafraîchisse pour voir ».
+            router.refresh()
+            reprendreLeDashboard()
+          }}
+          // ⚠️ `actif: true` N'EST PAS UNE SUPPOSITION, C'EST LA REQUÊTE. Les
+          //    vétos de cet écran viennent d'un `select(...).eq('actif', true)`
+          //    (`app/(v2)/planning/page.tsx`) : ils sont actifs par
+          //    construction. On l'affirme ici, là où la preuve est à portée de
+          //    regard, plutôt que de laisser `CongeForm` deviner.
+          vets={vetsPourConge}
+          currentUserId={moiVetId ?? ''}
+          isAdmin={isAdmin}
+          dateDefaut={congeJour}
+          onConflit={setConflitConge}
+          moduleJourneeActif={(modules ?? []).includes('planning-journee')}
+        />
+      )}
+
+      {/* Le conflit avec un planning publié. Affiché TANT QU'ON NE RÉPARE PAS :
+          une fois la fenêtre de crise ouverte par-dessus, l'alerte n'a plus
+          rien à dire. Même enchaînement que les écrans Congés et Absences. */}
+      {conflitConge && !repareConflit && (
+        <ConflitPlanningDialog
+          open
+          onOpenChange={(o) => {
+            if (!o) {
+              setConflitConge(null)
+              router.refresh()
+              reprendreLeDashboard()
+            }
+          }}
+          vetNom={nomDuConflit}
+          creneauxImpactes={conflitConge.creneauxImpactes}
+          onGerer={() => reparerLeConflit(conflitConge)}
         />
       )}
 

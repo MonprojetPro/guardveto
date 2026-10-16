@@ -5,6 +5,68 @@
 
 ---
 
+## 2026-10-16 — Un report qui se déclare « mesuré » n'est plus jamais rouvert
+
+**Contexte :** B-165a ③. MiKL demande *« les boutons déposer un congé ou signaler une absence »* au
+pied du tableau de bord journalier. Un seul des deux est livré. Le second part en reste-à-faire
+B-165c, avec cette justification écrite au board :
+
+> 🔴 **RAISON MESURÉE, pas une estimation** : `CongeForm` exige `vets: Veterinaire[]` — **17 champs**
+> (`user_id`, `invite_pending`, `email`, `role_app`…) — plus `currentUserId`. La page du planning ne
+> charge que `id, prenom, nom, statut, couleur`. ➜ Le livrer demande d'**élargir une requête servie
+> à TOUT LE MONDE**, écran client compris — donc un lot à part, avec sa propre inspection des
+> consumers.
+
+**Ce que la mesure a réellement donné, le même jour.** `CongeForm` ne lit que **quatre** champs :
+`id`, `prenom` et `nom` pour la liste de choix, `actif` pour la filtrer. Les treize autres n'étaient
+jamais touchés. Et la requête de l'écran charge déjà les trois premiers **avec `.eq('actif', true)`**
+— donc tous les vétos chargés *sont* actifs. **Aucune requête à élargir, aucun consumer à inspecter,
+aucun lot à part.** Le travail réel : réduire la prop à ce qu'elle lit.
+
+**La cause, et elle n'est pas technique.** J'ai lu la **signature** du composant et j'en ai déduit
+son besoin. Une signature dit ce qu'un composant *accepte*, jamais ce qu'il *utilise*. Les deux
+divergent dès qu'une prop a été écrite large « au cas où » — ce qui est le cas par défaut.
+
+⛔ **Mais le vrai dégât vient du mot « MESURÉE », que j'avais écrit moi-même en majuscules.** Une
+estimation annoncée comme une mesure devient une vérité du board. Plus personne ne la rouvre —
+**surtout pas son auteur**, qui se souvient de l'avoir vérifiée. Sans cette mention, le report
+aurait été rouvert au premier doute ; avec elle, il a fait reporter une demande de MiKL d'un
+chantier entier.
+
+**La règle qui en sort.** Le mot « mesuré » ne s'écrit que quand on peut citer **ce qui a été
+exécuté et ce que ça a répondu** — un `grep`, un fichier ouvert à la bonne ligne, une sortie de
+commande. *« Le type exige 17 champs »* n'est pas une mesure, c'est une lecture de déclaration.
+**Une mesure, c'est le corps de la fonction, jamais sa signature.** Et un report non mesuré doit
+s'écrire « non vérifié », visiblement — exactement comme un livrable non vérifié.
+
+**Le corollaire sur les props.** Une prop surdimensionnée est un faux chantier en sommeil : elle ne
+coûte rien tant qu'un seul écran l'alimente, et interdit le deuxième en lui présentant une facture
+imaginaire. **On demande ce qu'on lit.**
+
+**Et ce que l'inspection, faite pour de vrai, a trouvé en passant.** `conges/actions.ts` revalidait
+`/conges`, `/absences` et `/admin/demandes` — **jamais `/planning`**, sur ses **cinq** actions. La
+grille du planning lit pourtant les congés. Le défaut n'avait jamais été vu parce qu'**aucun écran
+qui posait des congés n'était le planning** : on ne regardait pas la grille au moment où elle
+devenait fausse, et on la retrouvait plus tard rafraîchie par autre chose. Le nouveau chemin pose un
+congé *depuis* le planning et y revient — il ferme la boucle, et le trou devient immédiat.
+🔑 **Un consumer oublié ne se signale que quand on ferme la boucle sur lui.** Les cinq sont
+corrigés, pas seulement celui de ce lot : ne réparer que son propre chemin aurait laissé le défaut
+en place sous une forme plus difficile à retrouver.
+
+**Deux pièges d'outillage rencontrés dans la même séance.**
+
+1. ⛔ **`git stash` pendant un build fait échouer le build sur du code qui n'existe plus.** J'ai
+   stashé un fichier en parallèle, pour établir une référence de lint, pendant que TypeScript le
+   lisait. Le build a rendu une erreur de type parfaitement réelle… sur la version `HEAD`. **Un
+   résultat obtenu sur un arbre qu'on modifie en même temps ne prouve rien.** Les vérifications qui
+   lisent le disque se lancent en série, jamais en parallèle d'une opération Git.
+2. ⚠️ **L'exit code rapporté n'était pas celui du build** : `npm run build > fichier; echo EXIT=$?`
+   rend le code du `echo`. Le harnais annonçait « exit code 0 » sur un build en échec. **Lire la
+   sortie, pas le code** — et chercher les erreurs, pas seulement `Compiled successfully` (leçon
+   B-166, appliquée ici : `grep` sur `error|warn|Module not found` est revenu vide).
+
+---
+
 ## 2026-09-26 — Un envoi tourne sous l'identité de CELUI QUI DÉCLENCHE, jamais du destinataire
 
 **Contexte :** B-134, prévenir l'administratrice qu'un vétérinaire a posé une demande de congé, et
