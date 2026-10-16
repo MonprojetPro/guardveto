@@ -609,7 +609,44 @@
   justify-content: center;
   gap: 2px;
 }
-.pv2-nuit.avec-cadenas { width: 48px; }
+/* ── LE CADENAS SE CALE SUR LA BANDE BLANCHE, PAS À CHEVAL ─────────────────
+   MiKL, 16/10, capture à l'appui : « cale le cadenas sur la bande blanche
+   plutôt qu'entre les 2, visuellement c'est plus beau ».
+
+   🔴 CE QUI N'ALLAIT PAS : la colonne passait à 48 px dès qu'il y avait un
+      cadenas, et CENTRAIT ses deux enfants. Le cadenas atterrissait donc à
+      cheval sur le bord gauche du couloir de nuit (`.pv2-couloir`, 34 px) —
+      moitié sur le creux gris, moitié sur la surface claire. Un élément posé
+      sur une frontière n'appartient à aucune des deux zones : il se lit comme
+      une erreur de calage, quelle que soit sa justesse fonctionnelle.
+
+   LE CALAGE RETENU : le cadenas sort du flux et se pose dans la gouttière
+   claire, juste à gauche du couloir. La colonne reprend alors ses 30 px —
+   exactement ceux qu'elle a sans cadenas — et son seul enfant restant, la
+   pastille, se recentre sur le couloir TOUT SEUL.
+
+   ⚠️ C'est précisément pourquoi il est sorti du flux plutôt que décalé par un
+      `gap` : une pastille `rang` (24 px) et une pastille `seul` (12 px) n'ont
+      pas la même largeur. Toute solution qui les aligne par un bord décale
+      leur centre de 6 px selon le cas ; le centrage dans une boîte fixe, lui,
+      vaut pour les deux.
+
+   Le total reste 48 px (30 + 18 de gouttière) : la piste ne bouge pas d'un
+   pixel, donc aucune barre de présence ne se redessine ailleurs. */
+.pv2-nuit.avec-cadenas {
+  position: relative;
+  width: 30px;
+  margin-left: 18px;
+}
+.pv2-nuit.avec-cadenas .cad-btn {
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  /* 4 px d'air avant le couloir : collé, il redeviendrait « à cheval » à l'œil
+     même en restant techniquement dehors. */
+  margin-right: 4px;
+  transform: translateY(-50%);
+}
 .pv2-garde {
   display: inline-flex;
   align-items: center;
