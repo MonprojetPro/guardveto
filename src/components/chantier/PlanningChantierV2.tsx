@@ -1752,7 +1752,10 @@ export function PlanningChantierV2({
         date={dashboardJour}
         jours={joursDashboard}
         equipe={equipe}
-        rail={rail}
+        // B-165d — plus de `rail` : les trois pastilles d'effectif qu'il
+        // servait à calculer ont disparu. « Ça ne sert à rien puisqu'il y a le
+        // tableau juste en dessous » (MiKL, 16/10) — le compteur de chaque
+        // colonne dit la même chose, à l'endroit où on le lit.
         periodeId={periodeAffichee?.id ?? null}
         tranches={tranches}
         today={today}

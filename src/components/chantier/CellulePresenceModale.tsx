@@ -41,6 +41,7 @@ import { stylePoint } from '@/lib/couleurs'
 // B-163b ④ — l'unique autorité sur ce qu'une absence couvre. Cette fenêtre
 // AFFICHE ; elle ne décide jamais de ce qu'un périmètre veut dire.
 import { lirePerimetre, phrasePerimetre } from '@/lib/absences/perimetre'
+import type { CreneauBlocJournee } from '@/types'
 
 const DATE_LONGUE = new Intl.DateTimeFormat('fr-FR', {
   weekday: 'long',
@@ -83,6 +84,15 @@ export interface TranchePosable {
   nom: string
   debut: string
   fin: string
+  /**
+   * CE QUE LA TRANCHE COUVRE (B-165d) — `matin`, `apres-midi` ou `journee`.
+   *
+   * ⚠️ Ce n'est PAS déductible du nom ni des horaires : le cabinet règle ses
+   *    tranches librement, et « Matin » pourrait couvrir 8h-18h (c'est
+   *    d'ailleurs l'état réel mesuré le 01/10 sur le premier cabinet). C'est le
+   *    seul moyen de ranger un absent dans la bonne colonne sans deviner.
+   */
+  creneau: CreneauBlocJournee
 }
 
 export function CellulePresenceModale({

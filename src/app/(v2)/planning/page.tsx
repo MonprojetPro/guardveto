@@ -13,6 +13,7 @@ import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { redirect } from 'next/navigation'
 import { exigerIdentite } from '@/lib/identite'
 import type { AbsenceAVenir } from '@/components/v2/AbsencesAVenirPanel'
+import type { CreneauBlocJournee } from '@/types'
 import '@/styles/v2-planning.css'
 import '@/styles/v2-filou-edge.css'
 import '@/styles/v2-propositions-relecture.css'
@@ -457,7 +458,14 @@ export default async function PlanningPageV2({
     // de nouvelles présences, mais celles déjà posées dessus survivent : ne
     // charger que les actives les ferait disparaître de l'écran en les laissant
     // en base, et l'effectif du jour serait faux sans un mot.
-    supabase.from('blocs_journee').select('id, nom, debut, fin, ordre, actif'),
+    // ⚠️ `creneau` AJOUTÉ LE 16/10 (B-165d), et il n'est pas décoratif : c'est
+    //    LUI qui dit si une absence « du matin » concerne cette tranche. Sans
+    //    lui, le tableau de bord journalier ne peut pas placer un absent dans
+    //    la bonne colonne — et le deviner d'après le nom (« Matin » → matin)
+    //    dessinerait une précision fausse, sur une donnée que le cabinet règle
+    //    librement. Une colonne de plus sur une table de configuration : aucun
+    //    autre lecteur n'en est affecté, le champ est simplement ignoré.
+    supabase.from('blocs_journee').select('id, nom, debut, fin, ordre, actif, creneau'),
     // ── B-153 lot 0 — LA PORTE DU CHANTIER « grille V2 » ───────────────────
     //
     // Le 08/10, un renouveau visuel est parti sur le compte du client parce que
@@ -633,6 +641,7 @@ export default async function PlanningPageV2({
 
   const tranchesLues = (blocsRes?.data ?? []) as {
     id: string; nom: string; debut: string; fin: string; ordre: number; actif: boolean
+    creneau: CreneauBlocJournee
   }[]
 
   // ⚠️ UN SEUL FILTRE ICI, LÀ OÙ LES GARDES EN ONT DEUX — et l'asymétrie est
@@ -951,7 +960,15 @@ export default async function PlanningPageV2({
             // est un bouton qui ment.
             tranches={tranchesLues
               .filter((t) => t.actif)
-              .map((t) => ({ id: t.id, nom: t.nom, debut: t.debut, fin: t.fin }))}
+              .map((t) => ({
+                id: t.id,
+                nom: t.nom,
+                debut: t.debut,
+                fin: t.fin,
+                // B-165d — le créneau descend jusqu'à la fenêtre : c'est lui
+                // qui décide dans QUELLE colonne un absent se range.
+                creneau: t.creneau,
+              }))}
             // B-163e ③ — ce que les RÉCURRENCES prévoient, pour que la fenêtre
             // d'un absent puisse dire « il était prévu » au lieu du trompeur
             // « Rien d'inscrit ». Le nom de la tranche est résolu ici : la
