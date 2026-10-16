@@ -1767,33 +1767,55 @@
 
 /* ── LE TABLEAU ───────────────────────────────────────────────────────────── */
 
-/* Les colonnes se partagent la largeur à égalité et passent à la ligne au-delà
-   de quatre — `flex-wrap` plutôt qu'une grille, parce qu'une 5e tranche doit
-   créer une rangée, pas rétrécir les quatre premières.
+/* 🔴 UNE GRILLE, PLUS UN `flex` (B-165e). MiKL, 16/10, 3e passe : « il faut que
+   la ligne absence soit juste en dessous de tout le tableau, collee, juste
+   separee mais en lien avec le tableau, sinon c'est pas aligne et c'est
+   fouillis ».
 
-   ⚠️ `align-items: stretch` est implicite et VOULU : les colonnes ont la même
-      hauteur, donc leurs boutons d'ajout s'alignent. Sans ça, chaque CTA
-      tomberait à une hauteur différente et le tableau perdrait sa lecture en
-      ligne. */
+   Les absents vivaient DANS chaque colonne : ils tombaient donc a une hauteur
+   differente selon le nombre de presents au-dessus — trois « CONGE » a trois
+   hauteurs sur la capture. Ils forment maintenant une SECONDE RANGEE de la
+   MEME grille, ce qui rend leur alignement structurel : il n'y a plus rien a
+   synchroniser a la main.
+
+   ⚠️ `--jdb-cols` est pose en style inline par le composant. Un `auto-fit`
+      ferait tomber la 4e colonne a la ligne des que la place manque, et la
+      rangee du bas ne correspondrait plus a celle du haut — un tableau faux
+      est pire qu'un tableau serre. Quand la place manque vraiment, c'est le
+      conteneur qui defile, pas la grille qui se reorganise. */
 .jdb-tableau {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(var(--jdb-cols, 4), minmax(150px, 1fr));
+  column-gap: 10px;
+  /* ZERO : c'est ce qui COLLE la rangee d'absents au tableau. La separation
+     est faite par un filet, pas par du vide. */
+  row-gap: 0;
   margin-top: 14px;
+  overflow-x: auto;
+  /* Les ombres de focus des boutons ne doivent pas etre rognees par
+     `overflow-x`. */
+  padding-bottom: 2px;
 }
+
 .jdb-col {
-  flex: 1 1 0;
-  min-width: 190px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
   padding: 10px 12px;
   border: 1px solid var(--pv2-bd, #e6d7bb);
   border-radius: 14px;
   background: var(--pv2-surface, #fffcf4);
 }
-/* La nuit garde son creux, comme le couloir de la grille : même information,
-   même grammaire visuelle d'un écran à l'autre. */
+/* Quand la rangee d'absents existe, la colonne ouvre son bas : les deux
+   morceaux forment UNE carte, pas deux boites empilees. */
+.jdb-tableau.avec-absents .jdb-col {
+  border-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+/* La nuit garde son creux, comme le couloir de la grille : meme information,
+   meme grammaire visuelle d'un ecran a l'autre. */
 .jdb-col.garde { background: var(--pv2-creux, #f6eedf); }
 
 .jdb-col-tete {
@@ -1806,8 +1828,8 @@
 }
 .jdb-col-tete b { font-size: 0.84rem; font-weight: 800; color: var(--pv2-txt, #3a2a1c); }
 .jdb-heures { font-size: 0.7rem; font-weight: 500; color: var(--pv2-sec, #7c6a55); }
-/* Le compte pousse à droite : il est au même endroit dans toutes les colonnes,
-   donc comparable d'un coup d'œil. */
+/* Le compte pousse a droite : il est au meme endroit dans toutes les colonnes,
+   donc comparable d'un coup d'oeil. */
 .jdb-compte {
   margin-left: auto;
   min-width: 20px;
@@ -1816,9 +1838,9 @@
   font-weight: 800;
   color: var(--pv2-sec, #7c6a55);
 }
-/* Le corps pousse le CTA d'ajout en bas de colonne, à hauteur égale pour
-   toutes : c'est `flex: 1` qui tient l'alignement, pas une marge devinée. */
-.jdb-col-corps { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+/* `flex: 1` pousse le bouton d'ajout en bas : tous tombent a la meme hauteur,
+   par la structure et non par une marge devinee. */
+.jdb-col-corps { flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .jdb-col-vide {
   margin: 0;
   font-size: 0.74rem;
@@ -1826,15 +1848,14 @@
   color: var(--pv2-sec, #7c6a55);
 }
 
-/* ⚠️ UNE LIGNE = UNE LIGNE. C'est le cœur du retour du 16/10 : `nowrap` et
-   l'ellipse garantissent qu'un prénom long rétrécit au lieu de casser la
-   hauteur de toute la colonne. */
+/* ⚠️ UNE LIGNE = UNE LIGNE. `nowrap` et l'ellipse garantissent qu'un prenom
+   long retrecit au lieu de casser la hauteur de toute la colonne. */
 .jdb-ligne {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  padding: 3px 0;
+  min-height: 26px;
   font-size: 0.8rem;
   white-space: nowrap;
 }
@@ -1846,9 +1867,10 @@
   color: var(--pv2-txt, #3a2a1c);
 }
 .jdb-ligne.a-verifier .jdb-prenom { color: var(--danger, #a8341f); }
-.jdb-ligne.vide .jdb-prenom,
+.jdb-ligne.vide .jdb-apourvoir,
 .jdb-apourvoir { font-style: italic; color: var(--pv2-sec, #7c6a55); }
 .jdb-role {
+  flex: none;
   font-size: 0.62rem;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -1856,37 +1878,42 @@
   color: var(--pv2-sec, #7c6a55);
 }
 
-/* Les absents de la colonne : même liste, un cran plus bas en intensité.
-   Ils ne sont pas une alerte — ils sont la moitié de la réponse à « qui est
-   là ? », et c'est pour ça qu'ils vivent DANS la colonne. */
-.jdb-abs-liste {
-  list-style: none;
-  margin: 2px 0 0;
-  padding: 7px 0 0;
-  border-top: 1px dashed var(--pv2-filet, #efe3cd);
+/* ── La rangee des absents ────────────────────────────────────────────────── */
+
+/* Collee au tableau (`row-gap: 0`), separee par un filet tirete, et alignee
+   parce qu'elle appartient a la meme grille. Une cellule VIDE garde ses
+   bordures : c'est elle qui ferme la carte de sa colonne. */
+.jdb-abs-cell {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  min-width: 0;
+  min-height: 10px;
+  padding: 8px 12px 10px;
+  border: 1px solid var(--pv2-bd, #e6d7bb);
+  border-top: 1px dashed var(--pv2-filet, #efe3cd);
+  border-radius: 0 0 14px 14px;
+  background: var(--pv2-creux, #f6eedf);
 }
 .jdb-abs {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   white-space: nowrap;
 }
 .jdb-abs .jdb-prenom { font-weight: 500; color: var(--pv2-sec, #7c6a55); }
 .jdb-abs small {
   margin-left: auto;
-  font-size: 0.64rem;
+  font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: #9a5a18;
 }
-/* Le point creux dit « la place existe, elle n'est pas tenue » — l'écho du
-   point plein d'un présent, pas un symbole de plus à apprendre. */
+/* Le point creux dit « la place existe, elle n'est pas tenue » — l'echo du
+   point plein d'un present, pas un symbole de plus a apprendre. */
 .jdb-abs-pt {
   flex: none;
   width: 9px;
@@ -1896,8 +1923,8 @@
 }
 
 /* 🔴 LE SIGNAL QUI MANQUAIT (B-165b) — « j'ai pu mettre Anne-Sophie le matin
-   alors qu'elle est notée absente ». L'ambre de l'absence, jamais le rouge de
-   la panne : ce n'est pas une erreur, c'est quelque chose à savoir. */
+   alors qu'elle est notee absente ». L'ambre de l'absence, jamais le rouge de
+   la panne : ce n'est pas une erreur, c'est quelque chose a savoir. */
 .jdb-alerte {
   flex: none;
   display: inline-flex;
@@ -1917,62 +1944,119 @@
 
 /* ── Les CTA ──────────────────────────────────────────────────────────────── */
 
-/* 🔴 ILS ONT REPRIS LEUR LIBELLÉ LE 16/10. « Le + et le − sont trop discrets et
-   pas très beaux », « les ⋯ ne laissent pas à penser que c'est un CTA ». Une
-   icône sans cadre ni mot n'est pas un bouton discret, c'est un bouton
-   invisible — et la version d'avant, avec « Retirer » en toutes lettres au
-   milieu de la ligne, mangeait la place du prénom.
+/* 🔴 TROISIEME DESSIN DE CE BOUTON, ET LE PREMIER QUI REGARDE LA BONNE CHOSE.
+     ① libelle en toutes lettres → « a 3 colonnes ca marche plus », il mangeait
+        la place du prenom ;
+     ② icone nue → « trop discrets et pas tres beaux », « les ⋯ ne laissent pas
+        a penser que c'est un CTA » ;
+     ③ libelle borde et reduit → « trop grossier, ca fait moche ».
 
-   La sortie des deux : un libellé COURT, BORDÉ, poussé en FIN de ligne par
-   `margin-left: auto`. Il se lit comme un bouton, et il ne dispute plus sa
-   place au nom. */
-.jdb-cta {
+   🔑 Le probleme n'a JAMAIS ete le libelle ni l'icone : c'est que l'action
+      PESAIT AUTANT QUE LA DONNEE qu'elle sert. Un bouton borde a 0,7 rem a
+      cote d'un prenom a 0,8 rem — l'oeil ne sait pas lequel est le sujet.
+
+   La sortie : une PASTILLE RONDE a fond doux. La forme fermee et le fond plein
+   la font lire comme un bouton (ce qui manquait a l'icone nue), le format
+   24 px et l'absence de libelle la font s'effacer devant le prenom (ce qui
+   manquait aux deux versions ecrites). 24 px au repos, zone de clic etendue a
+   32 px par le `::after` — on reste au-dessus du confort tactile sans peser
+   visuellement. */
+.jdb-pastille {
+  position: relative;
   flex: none;
+  margin-left: auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 3px 10px;
-  border: 1px solid var(--pv2-bd, #e6d7bb);
-  border-radius: 8px;
-  background: var(--pv2-surface, #fffcf4);
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: rgba(58, 42, 28, 0.05);
+  color: var(--pv2-sec, #7c6a55);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+/* La cible de clic deborde le dessin : confortable au doigt sans grossir a
+   l'oeil. Elle ne doit JAMAIS etre plus petite que la zone visible. */
+.jdb-pastille::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+}
+.jdb-pastille svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.jdb-pastille:hover:not(:disabled),
+.jdb-pastille:focus-visible {
+  border-color: var(--pv2-acc, #c7530f);
+  background: rgba(199, 83, 15, 0.12);
+  color: var(--pv2-acc, #c7530f);
+}
+/* Retirer est la seule action destructrice de la fenetre : elle vire au rouge
+   au survol, et seulement la. Au repos elle reste neutre — une rangee de
+   boutons rouges ferait peur pour rien. */
+.jdb-pastille.retirer:hover:not(:disabled),
+.jdb-pastille.retirer:focus-visible {
+  border-color: var(--danger, #a8341f);
+  background: rgba(168, 52, 31, 0.1);
+  color: var(--danger, #a8341f);
+}
+.jdb-pastille:disabled { opacity: 0.4; cursor: default; }
+
+/* Le bouton d'ajout ferme la colonne. Affine le 16/10 : le bloc en pointilles
+   epais faisait une barre plus lourde que les lignes qu'il sert. */
+.jdb-ajout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  padding: 5px 12px;
+  border: 1px dashed var(--pv2-bd, #e6d7bb);
+  border-radius: 10px;
+  background: transparent;
   color: var(--pv2-sec, #7c6a55);
   font-family: var(--t-font-corps, sans-serif);
-  font-size: 0.7rem;
-  font-weight: 700;
-  line-height: 1.4;
-  white-space: nowrap;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.5;
   cursor: pointer;
   transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
 }
-.jdb-cta:hover:not(:disabled),
-.jdb-cta:focus-visible {
-  border-color: var(--pv2-acc, #c7530f);
-  background: rgba(199, 83, 15, 0.08);
-  color: var(--pv2-acc, #c7530f);
+.jdb-ajout svg {
+  width: 11px;
+  height: 11px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
 }
-.jdb-cta:disabled { opacity: 0.45; cursor: default; }
-/* Posé en fin de ligne : l'action est toujours au même endroit, quelle que
-   soit la longueur du prénom. */
-.jdb-cta.discret { margin-left: auto; }
-
-/* Le CTA d'ajout ferme la colonne, pleine largeur : c'est l'action principale
-   de la colonne, elle a le droit d'être vue. */
-.jdb-cta.ajout {
-  width: 100%;
-  padding: 6px 12px;
-  border-style: dashed;
-  background: transparent;
-}
-.jdb-cta.ajout:hover:not(:disabled) { border-style: solid; }
-.jdb-cta.ajout.ouvert {
+.jdb-ajout:hover:not(:disabled),
+.jdb-ajout:focus-visible {
   border-style: solid;
   border-color: var(--pv2-acc, #c7530f);
-  background: rgba(199, 83, 15, 0.08);
+  background: rgba(199, 83, 15, 0.07);
   color: var(--pv2-acc, #c7530f);
 }
+.jdb-ajout.ouvert {
+  border-style: solid;
+  border-color: var(--pv2-acc, #c7530f);
+  background: rgba(199, 83, 15, 0.1);
+  color: var(--pv2-acc, #c7530f);
+}
+.jdb-ajout:disabled { opacity: 0.45; cursor: default; }
 
-/* Le choix des personnes, ouvert par le CTA d'ajout. En colonne : une pastille
-   par ligne, donc aucun prénom coupé, même dans une colonne étroite. */
+/* Le choix des personnes, ouvert par le bouton d'ajout. En colonne : une
+   pastille par ligne, donc aucun prenom coupe, meme dans une colonne etroite. */
 .jdb-choix { display: flex; flex-direction: column; gap: 4px; }
 .jdb-pers {
   display: flex;
@@ -1995,9 +2079,9 @@
   background: var(--pv2-surface, #fffcf4);
 }
 .jdb-pers:disabled { opacity: 0.5; cursor: default; }
-/* 🔴 LA PERSONNE NOTÉE ABSENTE SE VOIT AVANT LE CLIC. Le serveur avertit après
+/* 🔴 LA PERSONNE NOTEE ABSENTE SE VOIT AVANT LE CLIC. Le serveur avertit apres
    coup (B-165b) ; ici on le dit pendant qu'il est encore temps. On ne grise
-   PAS : « le système informe, il n'interdit pas » — elle peut être revenue. */
+   PAS : « le systeme informe, il n'interdit pas » — elle peut etre revenue. */
 .jdb-pers.absent {
   border-color: #e0b98a;
   border-style: dashed;

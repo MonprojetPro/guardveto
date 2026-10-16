@@ -259,7 +259,11 @@ export function JourneeDashboardModale({
   const ferie = estJourFerie(jour.date)
   const passe = jour.date < today
   const places = jour.gardes.flatMap((g) => g.places.map((place) => ({ garde: g, place })))
-  const trous = jour.gardes.reduce((s, g) => s + g.manque, 0)
+  // `trous` vivait ici : il comptait les places à pourvoir pour un bouton de
+  // pied de colonne, retiré le 16/10 au profit d'une pastille PAR PLACE. Code
+  // mort dès lors — on le retire dans le même geste plutôt que de le laisser
+  // attendre un usage qui ne viendra pas. Chaque place vide porte désormais
+  // son propre « + », ce qui dit la même chose en montrant LAQUELLE.
 
   /** Qui peut encore être posé sur cette tranche ? */
   function posablesSur(t: TranchePosable) {
@@ -308,21 +312,41 @@ export function JourneeDashboardModale({
     })
   }
 
-  /** La liste d'absents d'une colonne — le même dessin partout. */
-  function listeAbsents(gens: IndispoDuJour[]) {
-    if (gens.length === 0) return null
+  /**
+   * 🔴 LA BANDE D'ABSENTS EST UNE RANGÉE DU TABLEAU, PAS UN PIED DE COLONNE.
+   *
+   * MiKL, 16/10 (3e passe) : « il faut que la ligne absence soit juste en
+   * dessous de tout le tableau, collée, juste séparée mais en lien avec le
+   * tableau, sinon c'est pas aligné et c'est fouillis ».
+   *
+   * ⚠️ CECI RÉVISE B-165d ② (« dans chaque colonne les présents ET les
+   *    absents »). Placés DANS la colonne, les absents tombaient à une hauteur
+   *    différente selon le nombre de présents au-dessus — trois « CONGÉ » à
+   *    trois hauteurs sur la capture. L'information restait juste ; c'est sa
+   *    ligne de base commune qui manquait.
+   *
+   * 🔑 Et c'est pour ça que le tableau est passé en GRILLE : l'alignement
+   *    devient structurel. Avec les colonnes en `flex`, il aurait fallu
+   *    répliquer les largeurs à la main dans un second conteneur — donc le
+   *    voir diverger au premier changement.
+   */
+  function celluleAbsents(gens: IndispoDuJour[], cle: string) {
     return (
-      <ul className="jdb-abs-liste">
+      <div className="jdb-abs-cell" key={`abs-${cle}`}>
         {gens.map((a, i) => (
-          <li className="jdb-abs" key={`${a.vetId ?? 'x'}-${i}`} title={phraseIndispo(a)}>
+          <span className="jdb-abs" key={`${a.vetId ?? 'x'}-${i}`} title={phraseIndispo(a)}>
             <span className="jdb-abs-pt" aria-hidden="true" />
             <span className="jdb-prenom">{a.prenom}</span>
             <small>{a.origine === 'conge' ? 'congé' : 'absent'}</small>
-          </li>
+          </span>
         ))}
-      </ul>
+      </div>
     )
   }
+
+  /** Y a-t-il quelqu'un d'absent quelque part ? Sinon, pas de rangée du tout. */
+  const ilYADesAbsents =
+    colonnes.some((c) => c.absents.length > 0) || absentsDeNuit.length > 0
 
   return (
     <Dialog
@@ -382,7 +406,14 @@ export function JourneeDashboardModale({
                2 matin, 2 aprem, ça ne sert à rien puisqu'il y a le tableau
                juste en dessous ». Le compteur de chaque colonne dit la même
                chose, à l'endroit où on le lit. */}
-        <div className="jdb-tableau">
+        {/* `--jdb-cols` porte le nombre de colonnes à la grille CSS : c'est ce
+            qui garantit que la rangée d'absents s'aligne EXACTEMENT sous les
+            colonnes. Un `auto-fit` ferait tomber la 4e colonne à la ligne dès
+            que la place manque, et la rangée du bas ne correspondrait plus. */}
+        <div
+          className={ilYADesAbsents ? 'jdb-tableau avec-absents' : 'jdb-tableau'}
+          style={{ '--jdb-cols': colonnes.length + 1 } as React.CSSProperties}
+        >
           {colonnes.map((c) => (
             <section className="jdb-col" key={c.cle}>
               <header className="jdb-col-tete">
@@ -416,22 +447,31 @@ export function JourneeDashboardModale({
                           !
                         </span>
                       )}
+                      {/* 🔴 3e DESSIN DE CE BOUTON, ET LE PREMIER QUI REGARDE
+                          LA BONNE CHOSE. Libellé large (trop de place) → icône
+                          nue (invisible) → libellé bordé (« trop grossier, ça
+                          fait moche »). Le problème n'a jamais été le libellé
+                          ni l'icône : c'est que l'action PESAIT AUTANT QUE LA
+                          DONNÉE qu'elle sert. Une pastille ronde à fond doux
+                          se lit comme un bouton (forme fermée, fond plein) et
+                          s'efface devant le prénom. */}
                       {peutPoser && (
                         <button
                           type="button"
-                          className="jdb-cta discret"
+                          className="jdb-pastille retirer"
                           disabled={enCours}
                           onClick={() => retirer(p.id)}
                           aria-label={`Retirer ${p.prenom} de ${c.nom}`}
+                          title={`Retirer ${p.prenom}`}
                         >
-                          Retirer
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M6 12h12" />
+                          </svg>
                         </button>
                       )}
                     </div>
                   )
                 })}
-
-                {listeAbsents(c.absents)}
               </div>
 
               {/* 🔴 UN VRAI BOUTON, PAS UNE ICÔNE NUE. MiKL, 16/10 : « le + et
@@ -443,12 +483,19 @@ export function JourneeDashboardModale({
                 <>
                   <button
                     type="button"
-                    className={ajoutSur === c.cle ? 'jdb-cta ajout ouvert' : 'jdb-cta ajout'}
+                    className={ajoutSur === c.cle ? 'jdb-ajout ouvert' : 'jdb-ajout'}
                     disabled={enCours}
                     onClick={() => setAjoutSur((a) => (a === c.cle ? null : c.cle))}
                     aria-expanded={ajoutSur === c.cle}
                   >
-                    {ajoutSur === c.cle ? 'Annuler' : '+ Ajouter'}
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      {ajoutSur === c.cle ? (
+                        <path d="M7 7l10 10M17 7L7 17" />
+                      ) : (
+                        <path d="M12 6v12M6 12h12" />
+                      )}
+                    </svg>
+                    {ajoutSur === c.cle ? 'Annuler' : 'Ajouter'}
                   </button>
                   {ajoutSur === c.cle && (
                     <div className="jdb-choix">
@@ -515,14 +562,22 @@ export function JourneeDashboardModale({
                     {/* Le cadenas : le MÊME bouton que la grille, rendu par
                         l'appelant, jamais recopié. */}
                     {rendreCadenas?.(garde, place.vetId, vetsFiges(garde.id).has(place.vetId))}
+                    {/* 🔴 « POUR LES GARDES ON VOIT PAS LES NOMS SÉRIEUX » —
+                        la colonne affichait « M... 1ER » parce que le bouton
+                        « Changer » mangeait la largeur du prénom. Une grille
+                        nominative qui ne nomme plus a perdu sa raison d'être.
+                        Le libellé devient donc une icône, comme demandé. */}
                     {onOuvrirGarde && (
                       <button
                         type="button"
-                        className="jdb-cta discret"
+                        className="jdb-pastille"
                         onClick={() => onOuvrirGarde(garde.id, jour.date)}
                         aria-label={`Changer la garde de ${place.prenom}`}
+                        title="Changer qui est de garde"
                       >
-                        Changer
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M4 20h4L19 9a2.1 2.1 0 00-3-3L5 17v3z" />
+                        </svg>
                       </button>
                     )}
                   </div>
@@ -534,33 +589,31 @@ export function JourneeDashboardModale({
                     {onOuvrirGarde && (
                       <button
                         type="button"
-                        className="jdb-cta discret"
+                        className="jdb-pastille"
                         onClick={() => onOuvrirGarde(garde.id, jour.date)}
+                        aria-label={`Pourvoir la place ${place.role}`}
+                        title="Pourvoir cette place"
                       >
-                        Pourvoir
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M12 6v12M6 12h12" />
+                        </svg>
                       </button>
                     )}
                   </div>
                 ),
               )}
-
-              {listeAbsents(absentsDeNuit)}
             </div>
-
-            {/* 🔴 LES « ⋯ » ONT DISPARU. MiKL, 16/10 : « les ⋯ à droite des
-                gardes ne laissent pas à penser que c'est un CTA ». Chaque
-                place porte désormais son propre bouton nommé, et le pied de
-                colonne n'en porte un que s'il reste un trou à combler. */}
-            {onOuvrirGarde && trous > 0 && jour.gardes.length > 0 && (
-              <button
-                type="button"
-                className="jdb-cta ajout"
-                onClick={() => onOuvrirGarde(jour.gardes[0].id, jour.date)}
-              >
-                {trous} place{trous > 1 ? 's' : ''} à pourvoir
-              </button>
-            )}
           </section>
+
+          {/* ══ LA RANGÉE DES ABSENTS ════════════════════════════════════════
+              Collée au tableau, séparée par un filet, et alignée sur les mêmes
+              colonnes parce qu'elle appartient à la MÊME grille. */}
+          {ilYADesAbsents && (
+            <>
+              {colonnes.map((c) => celluleAbsents(c.absents, c.cle))}
+              {celluleAbsents(absentsDeNuit, 'garde')}
+            </>
+          )}
         </div>
 
         {/* Les anomalies ne sont pas décoratives : une présence sur une tranche
