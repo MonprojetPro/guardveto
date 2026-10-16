@@ -657,6 +657,23 @@ export function PlanningChantierV2({
   }
 
   /**
+   * B-165a ③ — déclarer une absence SANS cible pré-choisie.
+   *
+   * ⚠️ `setCriseVetId(undefined)` est nécessaire, pas cosmétique : `CriseModal`
+   *    est monté en permanence et sa `key` dépend de `criseVetId`. Sans cette
+   *    remise à zéro, le formulaire s'ouvrirait pré-rempli avec la personne du
+   *    clic PRÉCÉDENT — le défaut constaté le 26/08, et le danger n'est pas le
+   *    formulaire vide (il se voit) mais le formulaire pré-rempli avec la
+   *    mauvaise personne, qui a l'air juste.
+   */
+  function declarerAbsenceLibre(date: string) {
+    setGardeModal(null)
+    setCriseDate(date)
+    setCriseVetId(undefined)
+    setCriseOpen(true)
+  }
+
+  /**
    * B-165 — rendre la main au tableau de bord, s'il nous l'avait passée.
    *
    * Appelée à la fermeture des deux fenêtres lourdes. Si le geste n'était pas
@@ -1764,10 +1781,14 @@ export function PlanningChantierV2({
           if (!g || !estCliquable(g)) return
           depuisLeDashboard(retourSur, () => setGardeModal(g))
         }}
+        // B-165a ③ — SANS PERSONNE PRÉ-CHOISIE. `CriseModal` porte déjà le
+        // choix (`vetDefautId` est optionnel) ; le proposer aussi dans le
+        // tableau de bord coûtait deux lignes de hauteur permanente pour
+        // dupliquer la moitié d'un formulaire.
         onDeclarerAbsent={
           isAdmin && !lectureSeule && vets.length > 0
-            ? (d, vetId, retourSur) =>
-                depuisLeDashboard(retourSur, () => declarerAbsent(d, vetId))
+            ? (d: string, retourSur: string) =>
+                depuisLeDashboard(retourSur, () => declarerAbsenceLibre(d))
             : undefined
         }
       />

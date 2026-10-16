@@ -36,6 +36,10 @@ import { revalidatePath } from 'next/cache'
 import { porteJournee } from '@/lib/journee/porte'
 import {
   aPoser,
+  // B-165b — la MÊME fonction que celle qui filtre l'application des
+  // récurrences. Recopier la question « cette absence couvre-t-elle ce bloc ? »
+  // dans l'action, c'est la voir diverger un jour sans que rien ne le dise.
+  estAbsentSurCeBloc,
   presenceDejaPosee,
   presencesVoulues,
   resumeApplication,
@@ -51,7 +55,21 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 type Client = SupabaseClient<any, any, any>
 
-type Resultat = { success: true; message: string } | { error: string }
+/**
+ * ⚠️ `avertissement` AJOUTÉ LE 16/10 (B-165b), et c'est un troisième état, pas
+ *    une erreur déguisée : le geste A ÉTÉ FAIT, et quelque chose méritait
+ *    d'être dit.
+ *
+ * 🔑 « Le système informe, il n'interdit pas. » L'administratrice a le droit de
+ *    poser quelqu'un qu'elle sait revenu avant la fin de son arrêt — c'est sa
+ *    décision, et le produit n'a pas à la prendre à sa place. Ce qu'elle n'avait
+ *    pas, c'est l'information AU MOMENT du geste (MiKL, 16/10 : « j'ai pu mettre
+ *    Anne-Sophie le matin alors qu'elle est notée absente, je n'ai aucune info
+ *    qui me le signalait »).
+ */
+type Resultat =
+  | { success: true; message: string; avertissement?: string }
+  | { error: string }
 
 /** Ce que l'aperçu rend à l'écran, sans rien écrire. */
 export type Apercu =
@@ -379,6 +397,39 @@ export async function poserPresence(saisie: SaisiePresence): Promise<Resultat> {
     }
   }
 
+  // ── B-165b — CE QUI MANQUAIT, ET QUI SE VOYAIT DÉJÀ À L'ÉCRAN ──────────────
+  //
+  // 🔴 `poserPresence` ne regardait AUCUNE absence. `absencesDeLaPeriode` vit
+  //    dans ce fichier depuis B-148, et `apercuApplicationTrames` comme
+  //    `appliquerTrames` s'en servent : l'application des récurrences respectait
+  //    les absences, la pose à la main les ignorait. **Deux chemins d'écriture,
+  //    un seul gardien** — le défaut du 22/08, reproduit sans qu'on le voie
+  //    parce que les deux chemins vivent dans le même fichier.
+  //
+  // ⚠️ ON N'INTERDIT PAS. Quelqu'un peut revenir avant la fin de son arrêt, et
+  //    l'administratrice est la seule à le savoir. Un refus la bloquerait sur
+  //    une donnée qu'elle sait périmée. On POSE, et on DIT.
+  //
+  // ⚠️ La lecture des absences est faite APRÈS les contrôles qui refusent : une
+  //    requête de plus n'a pas à être payée par une saisie qui sera rejetée.
+  //    Et si cette lecture échoue, on ne pose PAS : rendre une liste vide se
+  //    lirait « personne n'est absent », et on poserait des présences sur toute
+  //    une équipe en congés sans qu'une seule ligne le dise.
+  const abs = await absencesDeLaPeriode(supabase, per.periode)
+  if (abs.erreur) {
+    return { error: 'Les absences n’ont pas pu être lues. Rien n’a été modifié.' }
+  }
+  const bloc = blocs.find((b) => b.id === v.valeur.bloc_id)
+  const absentIci = estAbsentSurCeBloc(
+    abs.absences,
+    v.valeur.veterinaire_id,
+    v.valeur.date,
+    // Le créneau manquant se replie sur `journee`, comme partout ailleurs dans
+    // cette brique : le plus large, donc celui qui se fait retirer dès qu'une
+    // absence couvre la journée. Un repli qui alerte vaut mieux qu'un silence.
+    bloc?.creneau ?? 'journee',
+  )
+
   const { error } = await supabase
     .from('presences_journee')
     .insert({ ...v.valeur, cabinet_id: cabinetId })
@@ -386,7 +437,16 @@ export async function poserPresence(saisie: SaisiePresence): Promise<Resultat> {
   if (error) return { error: messageLisible(error.message) }
 
   revalidatePath('/planning')
-  return { success: true, message: 'Présence ajoutée.' }
+  return {
+    success: true,
+    message: 'Présence ajoutée.',
+    // Le prénom n'est pas repris ici : l'écran qui appelle sait QUI il vient de
+    // poser, et aller le chercher demanderait une requête de plus pour une
+    // information que l'appelant a déjà sous les yeux.
+    ...(absentIci
+      ? { avertissement: 'Cette personne est notée absente sur cette tranche ce jour-là.' }
+      : {}),
+  }
 }
 
 /**

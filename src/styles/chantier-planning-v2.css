@@ -1610,28 +1610,36 @@
 }
 
 /* ============================================================
-   B-165 — LE TABLEAU DE BORD D'UNE JOURNÉE (`JourneeDashboardModale`)
+   B-165 / B-165a — LE TABLEAU DE BORD D'UNE JOURNÉE
    ============================================================
    MiKL, 15/10 : « une pop up pour visualiser chaque journée EN GROS, avec tous
-   les détails… et des flèches pour passer les journées ». Puis, le 16/10 :
-   « un vrai dashboard journalier, où la personne peut également administrer ».
+   les détails… et des flèches pour passer les journées ». Le 16/10 : « un vrai
+   dashboard journalier, où la personne peut également administrer ».
 
-   ⚠️ CES RÈGLES SONT ÉCRITES EN MÊME TEMPS QUE LE COMPOSANT, pas après. Les 9
-      classes `cpm-*` sont restées SANS AUCUNE RÈGLE du 06/10 au 14/10 — la
-      fenêtre fonctionnait, et MiKL l'a reçue « plus que dégueu niveau visuel ».
-      Le gardien `chantier-classes-sans-regle` couvre désormais le préfixe
-      `jdb-` : il rougit si l'une d'elles redevient orpheline.
+   🔴 REFONDU LE 16/10 SUR RECETTE. Première version : « à 2 écrans ça marche, à
+      3 ça marche plus visuellement ». Captures à l'appui — « Anne-Sophie » se
+      coupait en deux lignes et « posée à la main » en trois, parce que chaque
+      ligne portait un bouton « Retirer » en toutes lettres dans une colonne de
+      230 px minimum.
+
+   🔑 LA CONTRAINTE QUI COMMANDE TOUT LE RESTE : « il faudrait que l'on puisse
+      voir toutes les infos sans scroller ». Trois conséquences, et aucune n'est
+      cosmétique :
+        • les libellés d'action deviennent des ICÔNES (− + ⋯ !) ;
+        • ce qui n'est pas lu en permanence ne coûte plus de hauteur (le choix
+          des personnes ne s'ouvre qu'au clic sur le +) ;
+        • la garde et les absents REMONTENT dans l'en-tête, parce que ce sont
+          des informations de synthèse et qu'une information qu'il faut aller
+          chercher ne prévient personne.
+
+   ⚠️ Le gardien `chantier-classes-sans-regle` couvre le préfixe `jdb-` : il
+      rougit si l'une de ces classes redevient orpheline.
    ============================================================ */
 
 /* ── L'icône qui ouvre, en tête de case ───────────────────────────────────── */
 
 /* VISIBLE EN PERMANENCE, en trace légère. Une commande qui n'apparaît qu'au
-   survol n'est découverte que par accident — leçon des cadenas, le 20/09. Elle
-   se renforce au survol et au focus, ce qui suffit à dire qu'elle est vivante.
-
-   ⚠️ 20 px, pas plus : l'en-tête porte déjà le numéro du jour, « Férié » et le
-      drapeau des trous. Une quatrième marque plus grosse en ferait une barre
-      d'outils, dans une case de 96 px. */
+   survol n'est découverte que par accident — leçon des cadenas, le 20/09. */
 .pv2-jour-loupe {
   flex: none;
   display: inline-flex;
@@ -1663,16 +1671,30 @@
   .pv2-jour-loupe { opacity: 0.9; }
 }
 
-/* ── Le châssis de la fenêtre ─────────────────────────────────────────────── */
+/* ── Le châssis ───────────────────────────────────────────────────────────── */
 
-/* « EN GROS » est la demande littérale : 600 px (le défaut de `.gv-modale`) ne
-   loge pas quatre sections côte à côte. Les deux classes dans le sélecteur ne
-   sont pas décoratives — `.gv-modale` pose son `max-width` en `!important`, et
-   seule une spécificité supérieure peut le reprendre. */
+/* Les deux classes dans le sélecteur ne sont pas décoratives : `.gv-modale`
+   pose son `max-width` en `!important`, et seule une spécificité supérieure
+   peut le reprendre. */
 .gv-modale.jdb-modale {
-  max-width: min(820px, calc(100vw - 32px)) !important;
-  max-height: calc(100vh - 64px);
+  max-width: min(940px, calc(100vw - 32px)) !important;
+  max-height: calc(100vh - 56px);
   overflow-y: auto;
+}
+
+/* La description du dialogue reste obligatoire pour l'accessibilité (sans
+   elle, `Dialog` avertit en console), mais elle n'a plus rien à apprendre à
+   qui voit l'écran : la date est dans le titre, le reste est dessiné. On la
+   réserve donc aux lecteurs d'écran. */
+.jdb-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* ── La tête : les flèches encadrent la date ──────────────────────────────── */
@@ -1682,18 +1704,23 @@
   align-items: center;
   gap: 10px;
   font-family: Figtree, var(--t-font-titre, sans-serif);
-  font-size: 1.18rem;
+  font-size: 1.15rem;
   font-weight: 800;
   letter-spacing: -0.01em;
+  /* La croix de fermeture est posée en absolu dans le coin : sans cette
+     réserve, la flèche « suivant » passerait dessous. */
+  padding-right: 30px;
 }
 .jdb-date {
-  flex: 1;
-  min-width: 0;
   /* La première lettre vient d'un format de date, donc en minuscule
-     (« mardi 27 octobre ») : on la relève ici plutôt que de bricoler la chaîne,
-     pour que `DATE_LONGUE` reste la seule source du format. */
+     (« lundi 19 octobre ») : on la relève ici plutôt que de bricoler la
+     chaîne, pour que `DATE_LONGUE` reste la seule source du format. */
   text-transform: capitalize;
+  white-space: nowrap;
 }
+/* Les étiquettes prennent la place restante et poussent la flèche à droite :
+   l'action se trouve toujours au même endroit, quelle que soit la date. */
+.jdb-etiquettes { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 /* Les flèches sont DÉSACTIVÉES aux bornes, jamais masquées : un bouton qui
    disparaît déplace tout le reste de la ligne et se lit comme une panne. */
 .jdb-fleche {
@@ -1701,14 +1728,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: 1px solid var(--pv2-bd, #e6d7bb);
-  border-radius: 10px;
+  border-radius: 9px;
   background: var(--pv2-surface, #fffcf4);
   color: var(--pv2-txt, #3a2a1c);
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   line-height: 1;
   cursor: pointer;
 }
@@ -1716,20 +1743,19 @@
   border-color: var(--pv2-acc, #c7530f);
   color: var(--pv2-acc, #c7530f);
 }
-.jdb-fleche:disabled { opacity: 0.35; cursor: default; }
+.jdb-fleche:disabled { opacity: 0.3; cursor: default; }
 
-.jdb-sous-titre { margin-top: 4px; }
-.jdb-etiquettes { display: flex; flex-wrap: wrap; gap: 6px; }
 /* 4 + 8 = 12 < 14 : sur un arrondi total, le texte collerait à la courbe. Le
    gardien `pilules-padding` l'exige, et il a déjà mordu le 15/10. */
 .jdb-etq {
   display: inline-flex;
   align-items: center;
-  padding: 4px 14px;
+  padding: 3px 14px;
   border-radius: 999px;
   background: var(--pv2-creux, #f6eedf);
   color: var(--pv2-sec, #7c6a55);
-  font-size: 0.7rem;
+  font-family: var(--t-font-corps, sans-serif);
+  font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1739,280 +1765,323 @@
 .jdb-etq.vac { background: #fdf3e4; color: #9a5a18; text-transform: none; }
 .jdb-etq.hors { border: 1px dashed #dccaa8; background: transparent; }
 
-/* ── Les chiffres de la journée ───────────────────────────────────────────── */
+/* ── Le bandeau de synthèse : chiffres ET garde ───────────────────────────── */
 
-/* ⚠️ NEUTRES, SANS SEUIL. Le minimum d'effectif n'existe pas au schéma et MiKL
-   l'a écarté le 06/10 : les teinter en rouge ferait de ce dessin un juge sans
-   règle — « ne jamais afficher un paramètre que le moteur n'évalue pas ». */
-.jdb-effectifs {
+/* 🔴 LA GARDE EST ICI DEPUIS LE 16/10 — « les infos de garde devraient se
+   retrouver en haut avec le reste des infos ». Elle occupait une section à
+   elle, en bas : on la lit maintenant en même temps que l'effectif. */
+.jdb-synthese {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
-  margin: 12px 0 2px;
+  margin: 10px 0 0;
 }
+/* ⚠️ Chiffres NEUTRES, sans seuil : le minimum d'effectif n'existe pas au
+   schéma et MiKL l'a écarté le 06/10. Les teinter en rouge ferait de ce
+   dessin un juge sans règle. */
 .jdb-eff {
   display: inline-flex;
   align-items: baseline;
-  gap: 6px;
-  padding: 8px 16px;
-  border-radius: 14px;
+  gap: 5px;
+  padding: 7px 15px;
+  border-radius: 999px;
   background: var(--pv2-creux, #f6eedf);
   color: var(--pv2-sec, #7c6a55);
-  font-size: 0.8rem;
+  font-size: 0.76rem;
 }
 .jdb-eff b {
   font-family: Figtree, var(--t-font-titre, sans-serif);
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-weight: 800;
   color: var(--pv2-txt, #3a2a1c);
 }
-
-/* ── Les sections ─────────────────────────────────────────────────────────── */
-
-.jdb-bloc {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid var(--pv2-filet, #efe3cd);
-}
-.jdb-bloc h4 {
-  margin: 0;
-  font-family: Figtree, var(--t-font-titre, sans-serif);
-  font-size: 0.92rem;
-  font-weight: 800;
-  color: var(--pv2-txt, #3a2a1c);
-}
-.jdb-bloc h5 {
-  margin: 0 0 8px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--pv2-sec, #7c6a55);
-}
-.jdb-vide {
-  margin: 0;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: var(--pv2-creux, #f6eedf);
-  color: var(--pv2-sec, #7c6a55);
-  font-size: 0.84rem;
-  line-height: 1.5;
-}
-
-/* ── Qui est là, par tranche ──────────────────────────────────────────────── */
-
-.jdb-tranches {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 10px;
-}
-.jdb-tranche {
-  padding: 12px 14px;
-  border: 1px solid var(--pv2-bd, #e6d7bb);
-  border-radius: 14px;
-  background: var(--pv2-surface, #fffcf4);
-}
-.jdb-tr-head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  font-family: Figtree, var(--t-font-titre, sans-serif);
-}
-.jdb-tr-head b { font-size: 0.88rem; font-weight: 800; color: var(--pv2-txt, #3a2a1c); }
-.jdb-heures { font-size: 0.74rem; font-weight: 500; color: var(--pv2-sec, #7c6a55); }
-.jdb-compte {
-  margin-left: auto;
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--pv2-sec, #7c6a55);
-}
-.jdb-gens {
-  list-style: none;
-  margin: 9px 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.jdb-gen { display: flex; align-items: center; gap: 7px; font-size: 0.82rem; }
-.jdb-prenom { font-weight: 600; color: var(--pv2-txt, #3a2a1c); }
-/* L'origine pousse le bouton à droite : l'action se trouve toujours au même
-   endroit, quelle que soit la longueur du prénom. */
-.jdb-origine {
-  flex: 1;
-  font-size: 0.7rem;
-  font-style: italic;
-  color: var(--pv2-sec, #7c6a55);
-}
-.jdb-gen.a-verifier .jdb-prenom { color: var(--danger, #a8341f); }
-
-/* ── Ajouter une présence : QUI, puis QUAND ───────────────────────────────── */
-
-.jdb-ajout {
-  padding: 12px 14px;
-  border: 1px dashed var(--pv2-bd, #e6d7bb);
-  border-radius: 14px;
-  background: var(--pv2-creux, #f6eedf);
-}
-.jdb-qui { display: flex; flex-wrap: wrap; gap: 7px; }
-.jdb-pers {
+/* La nuit garde son creux, comme le couloir de la grille : même information,
+   même grammaire visuelle d'un écran à l'autre. */
+.jdb-nuit {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 7px 15px;
-  border: 1px solid var(--pv2-bd, #e6d7bb);
-  border-radius: 999px;
-  background: var(--pv2-surface, #fffcf4);
-  color: var(--pv2-txt, #3a2a1c);
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-.jdb-pers:hover:not(:disabled) { border-color: var(--pv2-acc, #c7530f); }
-.jdb-pers:disabled { opacity: 0.55; cursor: default; }
-.jdb-pers.actif {
-  border-color: var(--pv2-acc, #c7530f);
-  box-shadow: 0 0 0 1px var(--pv2-acc, #c7530f);
-}
-.jdb-quand { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 10px; }
-.jdb-tr-btn {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1 1 140px;
-  min-width: 0;
-  padding: 10px 14px;
-  border: 1px solid var(--pv2-bd, #e6d7bb);
-  border-radius: 14px;
-  background: var(--pv2-surface, #fffcf4);
-  text-align: left;
-  cursor: pointer;
-}
-.jdb-tr-btn b { font-size: 0.86rem; font-weight: 800; color: var(--pv2-txt, #3a2a1c); }
-.jdb-tr-btn small { font-size: 0.74rem; color: var(--pv2-sec, #7c6a55); }
-.jdb-tr-btn:hover:not(:disabled) { border-color: var(--pv2-acc, #c7530f); }
-.jdb-tr-btn:disabled { opacity: 0.55; cursor: default; }
-
-.jdb-note {
-  margin: 0;
-  font-size: 0.76rem;
-  line-height: 1.5;
-  color: var(--pv2-sec, #7c6a55);
-}
-
-/* ── La nuit ──────────────────────────────────────────────────────────────── */
-
-.jdb-garde {
-  padding: 12px 14px;
-  border: 1px solid var(--pv2-bd, #e6d7bb);
-  border-radius: 14px;
-  background: var(--pv2-surface, #fffcf4);
-}
-.jdb-g-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.jdb-g-head b {
-  font-family: Figtree, var(--t-font-titre, sans-serif);
-  font-size: 0.88rem;
-  font-weight: 800;
-  color: var(--pv2-txt, #3a2a1c);
-}
-.jdb-g-head > button { margin-left: auto; }
-/* Le manque n'est pas une panne — c'est un travail à faire. L'ambre, donc, et
-   pas le rouge : le même langage que le reste du produit. */
-.jdb-manque {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 14px;
-  border: 1px solid #e0b98a;
-  border-radius: 999px;
-  background: #fdf3e4;
-  color: #9a5a18;
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-.jdb-places {
-  list-style: none;
-  margin: 9px 0 0;
-  padding: 0;
-  display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-.jdb-place {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 15px;
+  padding: 5px 15px 5px 12px;
   border: 1px solid var(--pv2-bd, #e6d7bb);
   border-radius: 999px;
-  background: var(--pv2-creux, #f6eedf);
-  font-size: 0.8rem;
+  background: var(--pv2-surface, #fffcf4);
+  font-size: 0.78rem;
 }
-.jdb-role {
-  font-size: 0.68rem;
+.jdb-nuit-ico { font-size: 0.8rem; line-height: 1; }
+.jdb-nuit-vide { color: var(--pv2-sec, #7c6a55); font-style: italic; }
+.jdb-tenue { display: inline-flex; align-items: center; gap: 5px; }
+.jdb-tenue small {
+  font-size: 0.64rem;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--pv2-sec, #7c6a55);
 }
-.jdb-apourvoir { font-style: italic; color: var(--pv2-sec, #7c6a55); }
-
-/* ── Absences et congés ───────────────────────────────────────────────────── */
-
-.jdb-indispos {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+/* Le manque n'est pas une panne, c'est un travail à faire : l'ambre, pas le
+   rouge — le même langage que le reste du produit. */
+.jdb-manque {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 14px;
+  border: 1px solid #e0b98a;
+  border-radius: 999px;
+  background: #fdf3e4;
+  color: #9a5a18;
+  font-size: 0.7rem;
+  font-weight: 700;
 }
-/* L'ambre, pas le rouge : une absence déclarée n'est pas une panne. Même
-   grammaire que la pastille « A » de la grille, dont cette ligne est le détail
-   — un repère et son explication doivent se ressembler. */
-.jdb-indispo {
+
+/* ── Les absents, en tête ─────────────────────────────────────────────────── */
+
+/* 🔴 REMONTÉ LE 16/10 — moitié visible du correctif B-165b. L'information
+   existait, en bas de fenêtre, après deux écrans de défilement. Une
+   information qu'il faut aller chercher ne prévient personne. */
+.jdb-absents {
   display: flex;
-  align-items: baseline;
   flex-wrap: wrap;
-  gap: 4px 10px;
-  padding: 10px 14px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 14px;
   border: 1px solid #e0b98a;
   border-radius: 14px;
   background: #fdf3e4;
-}
-.jdb-indispo b { font-size: 0.82rem; font-weight: 800; color: #9a5a18; }
-.jdb-perimetre { font-size: 0.8rem; color: var(--pv2-sec, #7c6a55); }
-
-.jdb-declarer { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
-.jdb-declarer > span {
   font-size: 0.78rem;
+}
+.jdb-absents > b { font-size: 0.72rem; font-weight: 800; color: #9a5a18; text-transform: uppercase; letter-spacing: 0.06em; }
+.jdb-absent {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-weight: 600;
+  color: var(--pv2-txt, #3a2a1c);
+}
+.jdb-absent small { font-weight: 500; font-size: 0.72rem; color: #9a5a18; }
+
+/* ── Les colonnes de tranches ─────────────────────────────────────────────── */
+
+/* 🔴 PLUS DE `minmax(230px, 1fr)` : c'est lui qui cassait tout à 3 colonnes.
+   Les colonnes se partagent la largeur à égalité et passent à la ligne
+   au-delà de trois — `flex-wrap` plutôt qu'une grille, parce qu'une 4e tranche
+   doit créer une rangée, pas rétrécir les trois premières. */
+.jdb-colonnes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+.jdb-colonne {
+  flex: 1 1 0;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--pv2-bd, #e6d7bb);
+  border-radius: 14px;
+  background: var(--pv2-surface, #fffcf4);
+}
+.jdb-col-tete {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-family: Figtree, var(--t-font-titre, sans-serif);
+}
+.jdb-col-tete b { font-size: 0.84rem; font-weight: 800; color: var(--pv2-txt, #3a2a1c); }
+.jdb-heures { font-size: 0.7rem; font-weight: 500; color: var(--pv2-sec, #7c6a55); }
+/* Le compte pousse à droite : il est au même endroit dans toutes les colonnes,
+   donc comparable d'un coup d'œil. */
+.jdb-compte {
+  margin-left: auto;
+  min-width: 20px;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 800;
   color: var(--pv2-sec, #7c6a55);
 }
+.jdb-col-vide {
+  margin: 0;
+  font-size: 0.74rem;
+  font-style: italic;
+  color: var(--pv2-sec, #7c6a55);
+}
+.jdb-gens { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+/* ⚠️ UNE LIGNE = UNE LIGNE. C'est le cœur du retour du 16/10 : `nowrap` et
+   l'ellipse garantissent qu'un prénom long rétrécit au lieu de casser la
+   hauteur de toute la colonne. */
+.jdb-gen {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.jdb-prenom {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  color: var(--pv2-txt, #3a2a1c);
+}
+.jdb-gen.a-verifier .jdb-prenom { color: var(--danger, #a8341f); }
+
+/* 🔴 LE SIGNAL QUI MANQUAIT (B-165b) — « j'ai pu mettre Anne-Sophie le matin
+   alors qu'elle est notée absente ». L'ambre de l'absence, jamais le rouge de
+   la panne : ce n'est pas une erreur, c'est quelque chose à savoir. */
+.jdb-alerte {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border: 1px solid #e0b98a;
+  border-radius: 50%;
+  background: #fdf3e4;
+  color: #9a5a18;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: help;
+}
+
+/* ── Les icônes d'action ──────────────────────────────────────────────────── */
+
+/* 🔴 « Retirer » ET « Ouvrir la garde » ÉTAIENT DES BOUTONS EN TOUTES LETTRES.
+   Dans une colonne partagée en trois, le libellé mangeait la place du prénom —
+   qui passait alors sur deux lignes. MiKL, 16/10 : « soit on envisage des
+   icônes ou des ouvertures de section ».
+
+   ⚠️ Chacune porte un `aria-label` et un `title` : une icône muette est une
+      commande qu'on ne découvre que par accident, et l'écran lecteur n'a que
+      le libellé. */
+.jdb-ico {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--pv2-sec, #7c6a55);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.jdb-ico:hover:not(:disabled),
+.jdb-ico:focus-visible {
+  border-color: var(--pv2-bd, #e6d7bb);
+  background: var(--pv2-creux, #f6eedf);
+  color: var(--pv2-txt, #3a2a1c);
+}
+.jdb-ico.retirer:hover:not(:disabled) {
+  border-color: var(--danger, #a8341f);
+  background: rgba(168, 52, 31, 0.08);
+  color: var(--danger, #a8341f);
+}
+.jdb-ico:disabled { opacity: 0.4; cursor: default; }
+
+/* Le `+` ferme la colonne : il ne coûte qu'une ligne tant qu'on ne l'ouvre
+   pas, et il bascule en `×` pour dire qu'un second clic referme. */
+.jdb-plus {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px dashed var(--pv2-bd, #e6d7bb);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--pv2-sec, #7c6a55);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.jdb-plus:hover:not(:disabled) {
+  border-style: solid;
+  border-color: var(--pv2-acc, #c7530f);
+  color: var(--pv2-acc, #c7530f);
+}
+.jdb-plus.ouvert {
+  border-style: solid;
+  border-color: var(--pv2-acc, #c7530f);
+  background: rgba(199, 83, 15, 0.08);
+  color: var(--pv2-acc, #c7530f);
+}
+.jdb-plus:disabled { opacity: 0.4; cursor: default; }
+
+/* Le choix des personnes, ouvert par le `+`. En colonne : une pastille par
+   ligne, donc aucun prénom coupé, même dans une colonne étroite. */
+.jdb-choix { display: flex; flex-direction: column; gap: 4px; }
+.jdb-pers {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 5px 14px;
+  border: 1px solid var(--pv2-bd, #e6d7bb);
+  border-radius: 999px;
+  background: var(--pv2-creux, #f6eedf);
+  color: var(--pv2-txt, #3a2a1c);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.jdb-pers:hover:not(:disabled) {
+  border-color: var(--pv2-acc, #c7530f);
+  background: var(--pv2-surface, #fffcf4);
+}
+.jdb-pers:disabled { opacity: 0.5; cursor: default; }
+/* 🔴 LA PERSONNE NOTÉE ABSENTE SE VOIT AVANT LE CLIC. Le serveur avertit après
+   coup (B-165b) ; ici on le dit pendant qu'il est encore temps. On ne grise
+   PAS : « le système informe, il n'interdit pas » — elle peut être revenue. */
+.jdb-pers.absent {
+  border-color: #e0b98a;
+  border-style: dashed;
+  background: #fdf3e4;
+}
+.jdb-pers .jdb-alerte { margin-left: auto; }
 
 /* ── À vérifier ───────────────────────────────────────────────────────────── */
 
 .jdb-anomalies {
-  margin-top: 16px;
-  padding: 12px 14px;
+  margin-top: 10px;
+  padding: 10px 14px;
   border: 1px solid var(--danger, #a8341f);
   border-radius: 14px;
   background: rgba(168, 52, 31, 0.06);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
 }
-.jdb-anomalies b { display: block; margin-bottom: 4px; color: var(--danger, #a8341f); }
-.jdb-anomalies ul {
-  margin: 0;
-  padding-left: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
+.jdb-anomalies b { display: block; margin-bottom: 3px; color: var(--danger, #a8341f); }
+.jdb-anomalies ul { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 2px; }
+
+/* ── Le pied ──────────────────────────────────────────────────────────────── */
 
 .jdb-pied {
-  margin: 16px 0 0;
-  padding-top: 12px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 10px;
   border-top: 1px solid var(--pv2-filet, #efe3cd);
-  font-size: 0.78rem;
-  line-height: 1.5;
+}
+/* La légende des icônes pousse à droite et reste discrète : elle s'apprend une
+   fois, elle ne doit pas concurrencer le bouton. */
+.jdb-aide {
+  margin-left: auto;
+  font-size: 0.72rem;
   color: var(--pv2-sec, #7c6a55);
 }

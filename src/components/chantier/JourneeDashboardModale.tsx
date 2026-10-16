@@ -155,13 +155,30 @@ export function JourneeDashboardModale({
   onFermer: () => void
   /** Passage de main : la fenêtre de garde (réattribution, échange). */
   onOuvrirGarde?: (gardeId: string, retourSur: string) => void
-  /** Passage de main : la déclaration d'absence. */
-  onDeclarerAbsent?: (date: string, vetId: string, retourSur: string) => void
+  /**
+   * Passage de main : la déclaration d'absence.
+   *
+   * 🔴 PLUS DE `vetId` DEPUIS LE 16/10 (B-165a ③). La fenêtre affichait les sept
+   *    prénoms sous « Quelqu'un manque à l'appel ? » — deux lignes de hauteur
+   *    permanente pour un choix que `CriseModal` propose déjà, puisque son
+   *    `vetDefautId` est OPTIONNEL (vérifié). MiKL, 16/10 : « pkoi remettre les
+   *    noms comme ça, faudrait juste remettre les boutons ».
+   */
+  onDeclarerAbsent?: (date: string, retourSur: string) => void
 }) {
   const router = useRouter()
   const [enCours, demarrer] = useTransition()
-  /** La personne pour qui on est en train d'ajouter une présence. */
-  const [ajoutPour, setAjoutPour] = useState<string | null>(null)
+  /**
+   * La TRANCHE pour laquelle on choisit quelqu'un à poser, ou `null`.
+   *
+   * 🔑 L'ORDRE EST INVERSÉ DEPUIS LE 16/10 : c'était « qui, puis quand ». Le
+   *    « quand » est maintenant donné par le `+` de la colonne où l'on clique,
+   *    et il ne reste qu'une question à poser. Un temps de moins, et surtout
+   *    un bloc d'ajout qui ne coûte plus de hauteur tant qu'on ne l'ouvre pas —
+   *    la contrainte dure de cette recette : « voir toutes les infos sans
+   *    scroller ».
+   */
+  const [ajoutSur, setAjoutSur] = useState<string | null>(null)
 
   const index = date ? jours.findIndex((j) => j.date === date) : -1
   const precedent = index > 0 ? jours[index - 1].date : null
@@ -202,25 +219,83 @@ export function JourneeDashboardModale({
   const presences = jour.journee?.presences ?? []
   const anomalies = presences.filter((p) => p.anomalie)
 
+  /**
+   * 🔴 CE QUI MANQUAIT, ET QUI A LAISSÉ POSER ANNE-SOPHIE (B-165b).
+   * MiKL, 16/10 : « j'ai pu mettre Anne-Sophie le matin alors qu'elle est notée
+   * absente, je n'ai aucune info qui me le signalait ».
+   *
+   * ⚠️ ON NE REJOUE PAS LA RÈGLE ICI. Savoir si une absence « du matin » couvre
+   *    exactement telle tranche demande le CRÉNEAU du bloc, que cette fenêtre
+   *    n'a pas — et le deviner dessinerait une précision fausse. C'est le
+   *    serveur qui tranche (`estAbsentSurCeBloc`, une seule autorité).
+   *    L'écran, lui, dit ce qu'il sait : « cette personne a une indisponibilité
+   *    ce jour-là, la voici ». L'administratrice juge.
+   */
+  function indispoDe(vetId: string): IndispoDuJour | null {
+    return jour!.absences.find((a) => a.vetId === vetId) ?? null
+  }
+
+  function phraseIndispo(a: IndispoDuJour): string {
+    const quoi =
+      a.origine === 'conge' ? (a.statut === 'souhait' ? 'Souhait de congé' : 'Congé') : 'Absence'
+    const p = phrasePerimetre(
+      lirePerimetre(a.perimetre),
+      a.heureDebut && a.heureFin ? { heure_debut: a.heureDebut, heure_fin: a.heureFin } : null,
+    )
+    return `${quoi} — ${p ?? 'toute la journée et la nuit'}`
+  }
+
   // Groupé par tranche : c'est la question réellement posée (« qui est là ce
   // matin ? »). L'ordre vient de `composerPresencesParJour`, qui suit celui
   // voulu par l'admin — on ne retrie pas, sinon deux écrans classeraient la
   // même donnée différemment.
-  const parTranche: { tranche: string; heures: string; gens: typeof presences }[] = []
+  const parTranche: {
+    cle: string
+    nom: string
+    heures: string
+    /** La tranche posable correspondante, quand elle existe encore au cabinet. */
+    posable: TranchePosable | null
+    gens: typeof presences
+  }[] = []
+  for (const t of tranches) {
+    parTranche.push({
+      cle: t.id,
+      nom: t.nom,
+      heures: plageCourte(t.debut, t.fin),
+      posable: t,
+      gens: [],
+    })
+  }
   for (const p of presences) {
-    const dernier = parTranche[parTranche.length - 1]
-    if (dernier && dernier.tranche === p.tranche) dernier.gens.push(p)
-    else parTranche.push({ tranche: p.tranche, heures: p.heures, gens: [p] })
+    // Rattachée par le NOM de la tranche : `PresenceAffichee` ne porte pas
+    // l'identifiant du bloc, et une tranche retirée du cabinet n'a plus de
+    // colonne. On en ouvre alors une, plutôt que de taire la présence : elle
+    // compte dans l'effectif affiché, la cacher rendrait le chiffre faux.
+    const colonne = parTranche.find((c) => c.nom === p.tranche)
+    if (colonne) colonne.gens.push(p)
+    else
+      parTranche.push({
+        cle: `hors-${p.tranche}`,
+        nom: p.tranche,
+        heures: p.heures,
+        posable: null,
+        gens: [p],
+      })
   }
 
   const ferie = estJourFerie(jour.date)
   const passe = jour.date < today
-  /** Les tranches encore posables pour la personne en cours d'ajout. */
-  const posables = ajoutPour
-    ? tranches.filter(
-        (t) => !presences.filter((p) => p.vetId === ajoutPour).some((p) => recouvre(p, t)),
-      )
-    : []
+  const placesTenues = jour.gardes.flatMap((g) =>
+    g.places.filter((p) => p.vetId).map((p) => ({ garde: g, place: p })),
+  )
+  const trous = jour.gardes.reduce((s, g) => s + g.manque, 0)
+
+  /** Qui peut encore être posé sur cette tranche ? */
+  function posablesSur(t: TranchePosable) {
+    return equipe.filter(
+      (v) => !presences.filter((p) => p.vetId === v.id).some((p) => recouvre(p, t)),
+    )
+  }
 
   function poser(vetId: string, trancheId: string) {
     if (!periodeId || !date) return
@@ -235,8 +310,13 @@ export function JourneeDashboardModale({
         toast.error(r.error)
         return
       }
-      toast.success(r.message)
-      setAjoutPour(null)
+      // 🔴 B-165b — L'AVERTISSEMENT PASSE DEVANT LE SUCCÈS. Le geste a réussi,
+      //    et c'est justement pour ça qu'un simple « Présence ajoutée » serait
+      //    trompeur : il répondrait à côté de ce que l'administratrice avait
+      //    besoin de savoir.
+      if (r.avertissement) toast.warning(r.avertissement)
+      else toast.success(r.message)
+      setAjoutSur(null)
       // La fenêtre RESTE ouverte : c'est tout l'intérêt d'un tableau de bord.
       // `router.refresh()` rafraîchit la page serveur dessous, et les props
       // redescendent — la fenêtre se redessine sans se fermer.
@@ -282,6 +362,13 @@ export function JourneeDashboardModale({
             <span className="jdb-date">
               {DATE_LONGUE.format(new Date(jour.date + 'T12:00:00Z'))}
             </span>
+            <span className="jdb-etiquettes">
+              {jour.date === today && <span className="jdb-etq auj">Aujourd’hui</span>}
+              {passe && <span className="jdb-etq">Passé</span>}
+              {ferie && <span className="jdb-etq ferie">Férié</span>}
+              {jour.vacances && <span className="jdb-etq vac">{jour.vacances}</span>}
+              {jour.horsPeriode && <span className="jdb-etq hors">Hors période</span>}
+            </span>
             <button
               type="button"
               className="jdb-fleche"
@@ -292,25 +379,21 @@ export function JourneeDashboardModale({
               ›
             </button>
           </DialogTitle>
-          <DialogDescription className="jdb-sous-titre">
-            {/* Ce qui qualifie la journée, et qui change ce qu'on peut en
-                attendre. Rien d'inventé : chacun de ces états est déjà porté
-                par la grille. */}
-            <span className="jdb-etiquettes">
-              {jour.date === today && <span className="jdb-etq auj">Aujourd’hui</span>}
-              {passe && <span className="jdb-etq">Passé</span>}
-              {ferie && <span className="jdb-etq ferie">Férié</span>}
-              {jour.vacances && <span className="jdb-etq vac">{jour.vacances}</span>}
-              {jour.horsPeriode && <span className="jdb-etq hors">Hors période</span>}
-            </span>
+          <DialogDescription className="jdb-sr">
+            Tableau de bord de la journée — présences, gardes et absences.
           </DialogDescription>
         </DialogHeader>
 
-        {/* ── L'EFFECTIF, EN TÊTE ────────────────────────────────────────────
-            Deux chiffres NEUTRES, sans seuil : le minimum d'effectif n'existe
-            pas au schéma et MiKL l'a écarté le 06/10. Les afficher en rouge
-            ferait de ce dessin un juge sans règle. */}
-        <div className="jdb-effectifs">
+        {/* ══ LE BANDEAU DE SYNTHÈSE ════════════════════════════════════════
+            🔴 LA GARDE Y A ÉTÉ REMONTÉE LE 16/10. MiKL : « les infos de garde
+               devraient se retrouver en haut avec le reste des infos ». Elle
+               occupait une section à elle en bas de fenêtre, alors que « qui
+               est de garde » est une information de SYNTHÈSE — on la lit en
+               même temps que l'effectif, pas après avoir fait défiler.
+
+            ⚠️ Les chiffres restent NEUTRES, sans seuil : le minimum d'effectif
+               n'existe pas au schéma et MiKL l'a écarté le 06/10. */}
+        <div className="jdb-synthese">
           <span className="jdb-eff">
             <b>{jour.journee?.personnes ?? 0}</b> au cabinet
           </span>
@@ -320,242 +403,194 @@ export function JourneeDashboardModale({
           <span className="jdb-eff">
             <b>{effectifs.apresMidi}</b> l’après-midi
           </span>
-          <span className="jdb-eff">
-            <b>{jour.gardes.reduce((s, g) => s + g.places.filter((p) => p.vetId).length, 0)}</b> de
-            garde
+
+          <span className="jdb-nuit">
+            <span className="jdb-nuit-ico" aria-hidden="true">
+              🌙
+            </span>
+            {placesTenues.length === 0 && trous === 0 ? (
+              <span className="jdb-nuit-vide">aucune garde</span>
+            ) : (
+              placesTenues.map(({ garde, place }) => (
+                <span className="jdb-tenue" key={`${garde.id}-${place.index}`}>
+                  <span className="vdot" style={stylePoint(place.couleur)} aria-hidden="true" />
+                  <span className="jdb-prenom">{place.prenom}</span>
+                  <small>{place.role}</small>
+                  {/* Le cadenas, en ligne : un clic, pas un formulaire. C'est
+                      le MÊME bouton que la grille — rendu par l'appelant. */}
+                  {place.vetId &&
+                    rendreCadenas?.(garde, place.vetId, vetsFiges(garde.id).has(place.vetId))}
+                </span>
+              ))
+            )}
+            {trous > 0 && (
+              <span className="jdb-manque">
+                {trous} place{trous > 1 ? 's' : ''} à pourvoir
+              </span>
+            )}
+            {/* ⋯ plutôt qu'un bouton « Ouvrir la garde » : l'action existe, et
+                elle ne coûte plus la largeur d'un libellé. */}
+            {onOuvrirGarde && jour.gardes.length > 0 && (
+              <button
+                type="button"
+                className="jdb-ico"
+                onClick={() => onOuvrirGarde(jour.gardes[0].id, jour.date)}
+                aria-label="Ouvrir le détail de la garde"
+                title="Ouvrir la garde — réattribuer, échanger"
+              >
+                ⋯
+              </button>
+            )}
           </span>
         </div>
 
-        {/* ── QUI EST LÀ ─────────────────────────────────────────────────── */}
-        <section className="jdb-bloc">
-          <h4>Au cabinet</h4>
-          {parTranche.length === 0 ? (
-            /* ⚠️ « Personne n'est inscrit » et « la journée n'a pas été
-               remplie » ne sont PAS la même chose, et les confondre est le
-               défaut du tableau d'accueil qui annonçait « Rien à vérifier » :
-               une salle vide et un angle mort se lisent pareil, et personne ne
-               va vérifier une bonne nouvelle. */
-            <p className="jdb-vide">
-              Aucune présence n’est inscrite ce jour-là. Ça ne veut pas dire que le cabinet est
-              fermé — seulement que rien n’a encore été posé sur cette journée.
-            </p>
-          ) : (
-            <div className="jdb-tranches">
-              {parTranche.map((t) => (
-                <div className="jdb-tranche" key={t.tranche}>
-                  <div className="jdb-tr-head">
-                    <b>{t.tranche}</b>
-                    {t.heures && <span className="jdb-heures">{t.heures}</span>}
-                    <span className="jdb-compte">
-                      {t.gens.length} personne{t.gens.length > 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  <ul className="jdb-gens">
-                    {t.gens.map((p) => (
-                      <li key={p.id} className={p.anomalie ? 'jdb-gen a-verifier' : 'jdb-gen'}>
+        {/* ══ CE QUI MANQUE À L'APPEL, EN TÊTE ══════════════════════════════
+            🔴 REMONTÉ LE 16/10, et c'est la moitié visible du correctif
+               B-165b. L'information existait — en bas de fenêtre, après deux
+               écrans de défilement. Une information qu'il faut aller chercher
+               ne prévient personne. */}
+        {jour.absences.length > 0 && (
+          <div className="jdb-absents" role="status">
+            <b>Absents</b>
+            {jour.absences.map((a, i) => (
+              <span className="jdb-absent" key={`${a.vetId ?? 'x'}-${i}`} title={phraseIndispo(a)}>
+                {a.prenom}
+                <small>
+                  {phrasePerimetre(
+                    lirePerimetre(a.perimetre),
+                    a.heureDebut && a.heureFin
+                      ? { heure_debut: a.heureDebut, heure_fin: a.heureFin }
+                      : null,
+                  ) ?? 'toute la journée'}
+                </small>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* ══ LES TRANCHES ══════════════════════════════════════════════════
+            🔴 REFONDU LE 16/10. MiKL : « à 2 écrans ça marche, à 3 ça marche
+               plus visuellement » — captures à l'appui : « Anne-Sophie » se
+               coupait en deux lignes et « posée à la main » en trois, parce
+               que le bouton « Retirer » mangeait la moitié de la carte.
+
+            ➜ Le bouton devient une ICÔNE, l'origine passe en infobulle, et la
+               grille n'impose plus de largeur minimale : les colonnes se
+               partagent la place à égalité et passent à la ligne au-delà de
+               trois. */}
+        <div className="jdb-colonnes">
+          {parTranche.map((c) => (
+            <section className="jdb-colonne" key={c.cle}>
+              <header className="jdb-col-tete">
+                <b>{c.nom}</b>
+                {c.heures && <span className="jdb-heures">{c.heures}</span>}
+                <span className="jdb-compte">{c.gens.length}</span>
+              </header>
+
+              {c.gens.length === 0 ? (
+                <p className="jdb-col-vide">personne</p>
+              ) : (
+                <ul className="jdb-gens">
+                  {c.gens.map((p) => {
+                    const ind = indispoDe(p.vetId)
+                    return (
+                      <li
+                        key={p.id}
+                        className={p.anomalie ? 'jdb-gen a-verifier' : 'jdb-gen'}
+                        title={
+                          p.anomalie
+                            ? `${p.deLaTrame ? 'Par sa récurrence' : 'Posée à la main'} · ${p.anomalie}`
+                            : p.deLaTrame
+                              ? 'Par sa récurrence'
+                              : 'Posée à la main'
+                        }
+                      >
                         <span
                           className="vdot"
                           style={stylePoint(p.couleur)}
                           aria-hidden="true"
                         />
                         <span className="jdb-prenom">{p.prenom}</span>
-                        {/* L'origine se dit, parce qu'elle change ce qui se
-                            passe ensuite : une présence venue d'une récurrence
-                            revient si on réapplique les récurrences. */}
-                        <span className="jdb-origine">
-                          {p.deLaTrame ? 'par sa récurrence' : 'posée à la main'}
-                        </span>
+                        {/* 🔴 LE SIGNAL QUI MANQUAIT, SUR LA LIGNE MÊME. */}
+                        {ind && (
+                          <span className="jdb-alerte" title={phraseIndispo(ind)} aria-label={phraseIndispo(ind)}>
+                            !
+                          </span>
+                        )}
                         {peutPoser && (
-                          <Button
+                          <button
                             type="button"
-                            variant="outline"
-                            size="sm"
+                            className="jdb-ico retirer"
                             disabled={enCours}
                             onClick={() => retirer(p.id)}
+                            aria-label={`Retirer ${p.prenom} de ${c.nom}`}
+                            title="Retirer cette présence"
                           >
-                            Retirer
-                          </Button>
+                            −
+                          </button>
                         )}
                       </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ── AJOUTER UNE PRÉSENCE ─────────────────────────────────────────
-              En deux temps, QUI puis QUAND : la fenêtre de cellule connaît déjà
-              la personne (on y arrive en cliquant sur sa ligne), celle-ci non.
-              Sans le premier temps, il faudrait une grille de 7 personnes × 4
-              tranches, illisible et pleine de boutons qui mèneraient à un
-              refus. */}
-          {peutPoser && periodeId && (
-            <div className="jdb-ajout">
-              <h5>Ajouter une présence</h5>
-              <div className="jdb-qui">
-                {equipe.map((v) => (
-                  <button
-                    key={v.id}
-                    type="button"
-                    className={ajoutPour === v.id ? 'jdb-pers actif' : 'jdb-pers'}
-                    disabled={enCours}
-                    onClick={() => setAjoutPour((a) => (a === v.id ? null : v.id))}
-                  >
-                    <span className="vdot" style={stylePoint(v.couleur)} aria-hidden="true" />
-                    {v.prenom}
-                  </button>
-                ))}
-              </div>
-              {ajoutPour && (
-                <div className="jdb-quand">
-                  {posables.length === 0 ? (
-                    <p className="jdb-vide">
-                      {tranches.length === 0
-                        ? 'Aucune tranche horaire n’est définie. Réglez-les dans « Journée ».'
-                        : 'Toutes les tranches sont déjà prises pour cette personne.'}
-                    </p>
-                  ) : (
-                    posables.map((t) => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        className="jdb-tr-btn"
-                        disabled={enCours}
-                        onClick={() => poser(ajoutPour, t.id)}
-                      >
-                        <b>{t.nom}</b>
-                        <small>{plageCourte(t.debut, t.fin)}</small>
-                      </button>
-                    ))
-                  )}
-                </div>
+                    )
+                  })}
+                </ul>
               )}
-            </div>
-          )}
 
-          {/* ⚠️ LA LIMITE S'ÉCRIT. Un retrait qui ne tient pas la prochaine
-              application des récurrences, découvert après coup, se lit comme
-              une panne — alors que c'est le comportement voulu. */}
-          {peutPoser && presences.some((p) => p.deLaTrame) && (
-            <p className="jdb-note">
-              Une présence venue d’une récurrence <b>reviendra</b> si vous réappliquez les
-              récurrences sur ce planning.
-            </p>
-          )}
-        </section>
-
-        {/* ── LA NUIT ────────────────────────────────────────────────────── */}
-        <section className="jdb-bloc">
-          <h4>De garde cette nuit</h4>
-          {jour.gardes.length === 0 ? (
-            <p className="jdb-vide">Aucun créneau de garde n’est posé sur ce jour.</p>
-          ) : (
-            jour.gardes.map((g) => {
-              const figes = vetsFiges(g.id)
-              return (
-                <div className="jdb-garde" key={g.id}>
-                  <div className="jdb-g-head">
-                    <b>{g.type}</b>
-                    {g.manque > 0 && (
-                      <span className="jdb-manque">
-                        {g.manque} place{g.manque > 1 ? 's' : ''} à pourvoir
-                      </span>
-                    )}
-                    {onOuvrirGarde && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onOuvrirGarde(g.id, jour.date)}
-                      >
-                        Ouvrir la garde
-                      </Button>
-                    )}
-                  </div>
-                  <ul className="jdb-places">
-                    {g.places.map((p) => (
-                      <li key={`${g.id}-${p.index}`} className="jdb-place">
-                        <span className="jdb-role">{p.role}</span>
-                        {p.vetId ? (
-                          <>
-                            <span
-                              className="vdot"
-                              style={stylePoint(p.couleur)}
-                              aria-hidden="true"
-                            />
-                            <span className="jdb-prenom">{p.prenom}</span>
-                            {/* Le cadenas, en ligne : un clic, pas un
-                                formulaire. C'est le MÊME bouton que la grille —
-                                rendu par l'appelant, jamais recopié. */}
-                            {rendreCadenas?.(g, p.vetId, figes.has(p.vetId))}
-                          </>
-                        ) : (
-                          <span className="jdb-apourvoir">à pourvoir</span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )
-            })
-          )}
-        </section>
-
-        {/* ── CE QUI MANQUE À L'APPEL ────────────────────────────────────── */}
-        <section className="jdb-bloc">
-          <h4>Absences et congés</h4>
-          {jour.absences.length === 0 ? (
-            <p className="jdb-vide">Personne n’est déclaré indisponible ce jour-là.</p>
-          ) : (
-            <ul className="jdb-indispos">
-              {jour.absences.map((a, i) => {
-                const phrase = phrasePerimetre(
-                  lirePerimetre(a.perimetre),
-                  a.heureDebut && a.heureFin
-                    ? { heure_debut: a.heureDebut, heure_fin: a.heureFin }
-                    : null,
-                )
-                return (
-                  <li key={`${a.vetId ?? 'x'}-${i}`} className="jdb-indispo">
-                    <span className="jdb-prenom">{a.prenom}</span>
-                    <b>
-                      {a.origine === 'conge'
-                        ? a.statut === 'souhait'
-                          ? 'Souhait de congé'
-                          : 'Congé'
-                        : 'Absence'}
-                    </b>
-                    {/* `phrasePerimetre` rend `null` sur « la journée et la
-                        nuit » — le cas général n'a rien à préciser, et une
-                        mention permanente cesse d'être lue. */}
-                    <span className="jdb-perimetre">{phrase ?? 'Toute la journée et la nuit'}</span>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-
-          {/* Passage de main vers la fenêtre QUI EXISTE DÉJÀ. Le choix de la
-              personne y est fait : le proposer ici aussi dupliquerait la moitié
-              du formulaire. */}
-          {onDeclarerAbsent && equipe.length > 0 && (
-            <div className="jdb-declarer">
-              <span>Quelqu’un manque à l’appel ?</span>
-              {equipe.map((v) => (
-                <button
-                  key={v.id}
-                  type="button"
-                  className="jdb-pers"
-                  onClick={() => onDeclarerAbsent(jour.date, v.id, jour.date)}
-                >
-                  <span className="vdot" style={stylePoint(v.couleur)} aria-hidden="true" />
-                  {v.prenom}
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
+              {/* Le `+` ne coûte qu'une ligne tant qu'on ne l'ouvre pas —
+                  « si on a besoin de générer une action, soit on envisage des
+                  icônes ou des ouvertures de section » (MiKL, 16/10). */}
+              {peutPoser && periodeId && c.posable && (
+                <>
+                  <button
+                    type="button"
+                    className={ajoutSur === c.cle ? 'jdb-plus ouvert' : 'jdb-plus'}
+                    disabled={enCours}
+                    onClick={() => setAjoutSur((a) => (a === c.cle ? null : c.cle))}
+                    aria-expanded={ajoutSur === c.cle}
+                    aria-label={`Ajouter quelqu’un sur ${c.nom}`}
+                  >
+                    {ajoutSur === c.cle ? '×' : '+'}
+                  </button>
+                  {ajoutSur === c.cle && (
+                    <div className="jdb-choix">
+                      {posablesSur(c.posable).length === 0 ? (
+                        <p className="jdb-col-vide">tout le monde y est déjà</p>
+                      ) : (
+                        posablesSur(c.posable).map((v) => {
+                          const ind = indispoDe(v.id)
+                          return (
+                            <button
+                              key={v.id}
+                              type="button"
+                              className={ind ? 'jdb-pers absent' : 'jdb-pers'}
+                              disabled={enCours}
+                              onClick={() => poser(v.id, c.posable!.id)}
+                              title={
+                                ind
+                                  ? `${phraseIndispo(ind)} — vous pouvez quand même la poser`
+                                  : undefined
+                              }
+                            >
+                              <span
+                                className="vdot"
+                                style={stylePoint(v.couleur)}
+                                aria-hidden="true"
+                              />
+                              {v.prenom}
+                              {/* 🔴 LE MARQUAGE AU MOMENT DU CHOIX. Le serveur
+                                  avertit après coup (B-165b) ; ici on le dit
+                                  AVANT, pendant qu'il est encore temps. */}
+                              {ind && <span className="jdb-alerte">!</span>}
+                            </button>
+                          )
+                        })
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
+          ))}
+        </div>
 
         {/* Les anomalies ne sont pas décoratives : une présence sur une tranche
             retirée, ou sur quelqu'un qui a quitté l'équipe, COMPTE dans
@@ -574,19 +609,28 @@ export function JourneeDashboardModale({
           </div>
         )}
 
-        {/* La consigne dit ce que CETTE personne peut faire. L'annoncer à
-            quelqu'un qui n'y a pas droit, c'est lui faire chercher un bouton
-            que le serveur refuse — le défaut relevé le 20/08. */}
-        <p className="jdb-pied">
-          {peutPoser ? (
-            <>
-              Les flèches <b>‹</b> et <b>›</b> (ou les touches du clavier) passent d’une journée à
-              l’autre sans fermer.
-            </>
-          ) : (
-            'Consultation seule. Les flèches passent d’une journée à l’autre sans fermer.'
+        {/* ══ LE PIED : LES GESTES LOURDS, EN UN BOUTON ═════════════════════
+            🔴 LES SEPT PRÉNOMS ONT DISPARU LE 16/10. `CriseModal` propose déjà
+               le choix de la personne (`vetDefautId` est optionnel) : les
+               répéter ici coûtait deux lignes de hauteur permanente pour un
+               geste qui a déjà son formulaire. */}
+        <footer className="jdb-pied">
+          {onDeclarerAbsent && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onDeclarerAbsent(jour.date, jour.date)}
+            >
+              Signaler une absence
+            </Button>
           )}
-        </p>
+          <span className="jdb-aide">
+            {peutPoser
+              ? '− retire · + ajoute · ← → changent de journée'
+              : 'Consultation seule · ← → changent de journée'}
+          </span>
+        </footer>
       </DialogContent>
     </Dialog>
   )

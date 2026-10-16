@@ -157,7 +157,15 @@ export interface AbsencePourPresences {
  *    jour, on l'affiche »). C'est `blocsRetires` qui porte cette distinction,
  *    et elle seule.
  */
-function estAbsentSurCeBloc(
+// ⚠️ EXPORTEE LE 16/10 (B-165b) : `poserPresence` ne regardait AUCUNE absence.
+//    L'application des récurrences les respectait — elle passe par
+//    `presencesVoulues`, donc par cette fonction — et la pose à la main les
+//    ignorait, en silence. **Deux chemins d'écriture, un seul gardien**, le
+//    défaut du 22/08 une fois de plus.
+//
+//    Elle est exportée plutôt que recopiée dans l'action : la question « cette
+//    absence couvre-t-elle ce bloc ? » n'a qu'une réponse, et elle est ici.
+export function estAbsentSurCeBloc(
   absences: readonly AbsencePourPresences[],
   veterinaireId: string,
   date: string,
