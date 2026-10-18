@@ -18,6 +18,7 @@ import type {
   BilanPlanningARetirer,
 } from '@/lib/planning/retrait-planning'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { usagesSeChevauchent, type UsagePeriode } from '@/lib/planning/usage-periode'
 
 /**
  * Rafraîchit TOUS les écrans qui lisent la table `periodes`.
@@ -91,6 +92,7 @@ function detecterSaison(dateDebut: string): 'ete' | 'hiver' {
   return mois >= 5 && mois <= 8 ? 'ete' : 'hiver'
 }
 
+
 export async function creerPeriode(formData: FormData) {
   const supabase = await createClient()
 
@@ -100,6 +102,16 @@ export async function creerPeriode(formData: FormData) {
   const libelle   = (formData.get('libelle') as string | null)?.trim() || null
   const dateDebut = formData.get('date_debut') as string
   const dateFin   = formData.get('date_fin') as string
+
+  // Absent du formulaire (écran de génération des gardes, pas encore mis à
+  // jour) → `les-deux`, le comportement d'avant cette colonne. Une valeur
+  // présente mais hors vocabulaire est un bug d'écran, pas une saisie à
+  // tolérer : elle ne doit pas se glisser en base sous un déguisement.
+  const usageSaisi = (formData.get('usage') as string | null)?.trim() || 'les-deux'
+  if (!['gardes', 'journees', 'les-deux'].includes(usageSaisi)) {
+    return { error: `Usage de période invalide : « ${usageSaisi} ».` }
+  }
+  const usage = usageSaisi as UsagePeriode
 
   if (!libelle) return { error: 'Le titre est obligatoire.' }
   if (!dateDebut || !dateFin) return { error: 'Les dates de début et de fin sont requises.' }
@@ -118,14 +130,26 @@ export async function creerPeriode(formData: FormData) {
     return { error: 'La date de fin doit venir après la date de début.' }
   }
 
-  // Vérification : chevauchement avec une période existante
-  const { data: chevauchements } = await supabase
+  // Vérification : chevauchement avec une période existante DU MÊME USAGE
+  // (B-162) — une période « journées » sur l'année doit pouvoir coexister
+  // avec les périodes de gardes de quelques semaines qu'elle recouvre.
+  const { data: chevauchementsBruts } = await supabase
     .from('periodes')
-    .select('id, libelle, saison, numero, date_debut, date_fin')
+    .select('id, libelle, saison, numero, date_debut, date_fin, usage')
     .lte('date_debut', dateFin)
     .gte('date_fin', dateDebut)
 
-  if (chevauchements && chevauchements.length > 0) {
+  const chevauchements = ((chevauchementsBruts ?? []) as Array<{
+    id: string
+    libelle: string | null
+    saison: string | null
+    numero: number | null
+    date_debut: string
+    date_fin: string
+    usage: UsagePeriode
+  }>).filter((c) => usagesSeChevauchent(usage, c.usage))
+
+  if (chevauchements.length > 0) {
     const c = chevauchements[0]
     const label = c.libelle ?? (c.saison === 'ete' ? 'Été' : `Hiver P${c.numero ?? ''}`)
     // Message lisible par le cabinet : des dates en français, pas des ISO, et
@@ -168,29 +192,36 @@ export async function creerPeriode(formData: FormData) {
   // `est_defaut` reste en base : c'est le filet du MOTEUR pour les plannings
   // créés avant cette règle (cf. `chargerCreneauModele`). Ce qui disparaît,
   // c'est le droit d'en créer un NOUVEAU sans avoir choisi.
+  // B-162 — cette exigence ne vaut QUE pour un planning qui couvre des gardes :
+  // c'est elle qui décide des gardes à couvrir et de l'effectif du moteur. Une
+  // période `journees` pure ne passe jamais par le moteur de gardes — lui
+  // imposer une période type serait une case à remplir sans destinataire.
   const profilChoisi = (formData.get('profil_id') as string | null)?.trim() || null
-  if (!profilChoisi) {
+  if (usage !== 'journees' && !profilChoisi) {
     return {
       error: 'Choisis la période type de ce planning : c’est elle qui décide '
         + 'des gardes à couvrir et de l’effectif. Si tu n’en as aucune, '
         + 'crée-la d’abord dans Organisation › Périodes types.',
     }
   }
-  // On VÉRIFIE qu'elle appartient au cabinet (garde tenant : la RLS restrictive
-  // borne déjà la lecture, ce check rejette proprement un id étranger,
-  // inexistant — ou désactivé, qu'on ne veut pas voir arriver par une URL ou un
-  // écran resté ouvert pendant qu'on la retirait).
-  const { data: owned } = await supabase
-    .from('profils_planning')
-    .select('id, actif')
-    .eq('id', profilChoisi)
-    .eq('cabinet_id', cabinetId)
-    .maybeSingle()
-  if (!owned) return { error: 'Cette période type n’existe pas pour ce cabinet.' }
-  if ((owned as { actif?: boolean }).actif === false) {
-    return { error: 'Cette période type est désactivée — réactive-la ou choisis-en une autre.' }
+  let profilId: string | null = null
+  if (profilChoisi) {
+    // On VÉRIFIE qu'elle appartient au cabinet (garde tenant : la RLS
+    // restrictive borne déjà la lecture, ce check rejette proprement un id
+    // étranger, inexistant — ou désactivé, qu'on ne veut pas voir arriver par
+    // une URL ou un écran resté ouvert pendant qu'on la retirait).
+    const { data: owned } = await supabase
+      .from('profils_planning')
+      .select('id, actif')
+      .eq('id', profilChoisi)
+      .eq('cabinet_id', cabinetId)
+      .maybeSingle()
+    if (!owned) return { error: 'Cette période type n’existe pas pour ce cabinet.' }
+    if ((owned as { actif?: boolean }).actif === false) {
+      return { error: 'Cette période type est désactivée — réactive-la ou choisis-en une autre.' }
+    }
+    profilId = profilChoisi
   }
-  const profilId: string = profilChoisi
 
   // `select('id')` : l'assistant de l'écran Planning enchaîne la génération sur
   // le planning qu'il vient de créer — sans cet id il devrait le retrouver à
@@ -206,6 +237,7 @@ export async function creerPeriode(formData: FormData) {
       date_fin:   dateFin,
       statut:     'brouillon',
       profil_id:  profilId,
+      usage,
     })
     .select('id')
     .single()
