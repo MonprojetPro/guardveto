@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { usagesSeChevauchent } from '@/lib/planning/usage-periode'
+import { usagesSeChevauchent, periodePorteDesGardes } from '@/lib/planning/usage-periode'
 
 describe('usagesSeChevauchent (B-162)', () => {
   it('deux periodes de gardes se chevauchent', () => {
@@ -21,5 +21,20 @@ describe('usagesSeChevauchent (B-162)', () => {
     expect(usagesSeChevauchent('les-deux', 'journees')).toBe(true)
     expect(usagesSeChevauchent('journees', 'les-deux')).toBe(true)
     expect(usagesSeChevauchent('les-deux', 'les-deux')).toBe(true)
+  })
+})
+
+describe('periodePorteDesGardes (B-162)', () => {
+  it('une periode journees pure ne porte pas de gardes', () => {
+    expect(periodePorteDesGardes('journees')).toBe(false)
+  })
+
+  it('gardes et les-deux portent des gardes', () => {
+    expect(periodePorteDesGardes('gardes')).toBe(true)
+    expect(periodePorteDesGardes('les-deux')).toBe(true)
+  })
+
+  it('undefined (objet construit avant la colonne) se traite comme les-deux', () => {
+    expect(periodePorteDesGardes(undefined)).toBe(true)
   })
 })

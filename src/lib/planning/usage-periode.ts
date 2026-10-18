@@ -14,3 +14,16 @@ export function usagesSeChevauchent(a: UsagePeriode, b: UsagePeriode): boolean {
   if (a === 'les-deux' || b === 'les-deux') return true
   return a === b
 }
+
+/**
+ * Cette période peut-elle porter des gardes ? (B-162)
+ *
+ * Une période `journees` pure n'a jamais de garde à attendre — elle ne doit
+ * donc JAMAIS devenir le « planning courant » du dock (affiché sur tous les
+ * écrans V2), ni apparaître dans Historique, qui liste des plannings de
+ * gardes et leurs compteurs. `undefined` (objet construit avant la colonne —
+ * fixture, test) se traite comme `les-deux`, le défaut en base.
+ */
+export function periodePorteDesGardes(usage: UsagePeriode | undefined): boolean {
+  return usage !== 'journees'
+}

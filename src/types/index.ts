@@ -88,6 +88,12 @@ export interface Periode {
   nb_vetos_semaine_soir?: number | null
   /** Profil de planning choisi (P5). NULL/absent → profil défaut du cabinet. */
   profil_id?: string | null
+  /**
+   * À quoi sert cette période (B-162). Absent sur les objets construits avant
+   * cette colonne (fixtures, tests) → traiter comme `les-deux`, le défaut en
+   * base et le comportement d'avant cette colonne.
+   */
+  usage?: 'gardes' | 'journees' | 'les-deux'
 }
 
 /** Profil de planning nommé d'un cabinet (structure + effectif réutilisables, P5). */

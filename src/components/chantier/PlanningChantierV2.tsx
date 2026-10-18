@@ -35,6 +35,7 @@ import type { JourTrame, PariteSemaine } from '@/types'
 import { RetirerPlanningModale, type GesteRetrait } from '@/components/planning/RetirerPlanningModale'
 import { FilouEdge } from '@/components/v2/FilouEdge'
 import type { PeriodeApplicable } from '@/components/v2/GenererJournee'
+import { periodePorteDesGardes } from '@/lib/planning/usage-periode'
 // B-157 — la barre d'outils du chantier est une COPIE, sous `chantier/`.
 // L'original (`v2/outils-planning.tsx`) sert aussi l'écran du client : y
 // toucher serait parti chez Val d'Allier sans passer par la porte. Le fichier
@@ -368,6 +369,12 @@ export function PlanningChantierV2({
   tranches = [],
 }: Props) {
   const router = useRouter()
+  // B-162 — « Changer de période » liste des plannings de GARDES à naviguer ;
+  // une période « journées » pure (créée par « Dates libres », sans aucune
+  // garde à attendre) n'y a pas sa place. On dérive une liste à part plutôt
+  // que de filtrer `periodes` à la source : cette prop sert aussi ailleurs
+  // (présences, compteurs) où les périodes journées doivent rester visibles.
+  const periodesGardes = periodes.filter((p) => periodePorteDesGardes(p.usage))
   const [annee, mois] = anneeMois.split('-').map(Number)
   const [popOuvert, setPopOuvert] = useState(false)
   // B-157 — le menu « Outils » de la tête de page : il accueille les gestes
@@ -583,7 +590,9 @@ export function PlanningChantierV2({
     periode: periodeAffichee,
     aDesGardes: periodeAffichee ? periodesAvecGardes.includes(periodeAffichee.id) : false,
     isAdmin,
-    periodes,
+    // B-162 — l'assistant de génération ne propose que des plannings de
+    // gardes à reprendre : une période « journées » pure n'a rien à y faire.
+    periodes: periodesGardes,
     periodesTypes,
     gardesParType,
     vets,
@@ -1283,7 +1292,7 @@ export function PlanningChantierV2({
                       )}
                     </div>
                   </>
-                ) : periodes.length === 0 ? (
+                ) : periodesGardes.length === 0 ? (
                   // Aucune période DU TOUT n'est un état de démarrage, pas une
                   // erreur de navigation : dire « le mois affiché ne tombe dans
                   // aucune période » laisserait croire qu'il suffit de changer
@@ -1302,8 +1311,8 @@ export function PlanningChantierV2({
                   <p className="pp-sub">Le mois affiché ne tombe dans aucune période.</p>
                 )}
 
-                {periodes.length > 0 && <p className="pp-label">Changer de période</p>}
-                {periodes.map((p) => {
+                {periodesGardes.length > 0 && <p className="pp-label">Changer de période</p>}
+                {periodesGardes.map((p) => {
                   // La corbeille tient désormais aussi sur les plannings
                   // PUBLIÉS — c'était le trou : le serveur les refusait en
                   // renvoyant vers une dépublication qui n'existait dans aucun

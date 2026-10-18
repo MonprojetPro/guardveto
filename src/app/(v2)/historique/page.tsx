@@ -41,6 +41,7 @@ import {
   type CompteursRow,
 } from '@/hooks/useCompteurs'
 import type { Periode, Veterinaire } from '@/types'
+import { periodePorteDesGardes } from '@/lib/planning/usage-periode'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'GuardVeto — Historique & compteurs' }
@@ -110,7 +111,12 @@ export default async function HistoriquePage({
     .order('date_debut', { ascending: false })
     .limit(20)
 
-  const periodes = (periodesDb as Periode[] | null) ?? []
+  // B-162 — cet écran liste des plannings de gardes et leurs compteurs ; une
+  // période « journées » pure (créée par « Dates libres », sans aucune garde
+  // à attendre) n'a pas sa place dans cette liste ni dans ses filtres.
+  const periodes = ((periodesDb as Periode[] | null) ?? []).filter((p) =>
+    periodePorteDesGardes(p.usage),
+  )
   const dock = await chargerDock(supabase, vet, periodes)
 
   // Quels plannings ont réellement des gardes : la corbeille doit prévenir

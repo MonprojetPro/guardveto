@@ -15,6 +15,7 @@ import type { Periode, Veterinaire } from '@/types'
 import type { DonneesDock } from './accueilEpicentre'
 import { aujourdhuiISO } from './accueilEpicentre'
 import { periodesVisibles } from '@/lib/planning/diffusion'
+import { periodePorteDesGardes } from '@/lib/planning/usage-periode'
 import { modulesDuCabinet } from '@/lib/produit/modules-serveur'
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
@@ -59,10 +60,13 @@ export async function chargerDock(
   // Sans ce tri, la barre affichait « Historique été 2026 · Brouillon » à un
   // véto — soit l'existence ET l'état d'avancement d'un planning qu'il n'était
   // pas censé connaître. Le critère est `publie_at`, jamais le statut.
+  // B-162 — une période « journées » pure (créée par « Dates libres ») n'a
+  // jamais de garde : elle ne doit jamais devancer un vrai planning de gardes
+  // dans la pastille « planning courant », affichée sur TOUS les écrans V2.
   const periodes = periodesVisibles(
     ((periodesRes as { data?: Periode[] | null })?.data ?? []) as Periode[],
     estAdmin,
-  )
+  ).filter((p) => periodePorteDesGardes(p.usage))
   const courante =
     periodes.find((p) => p.date_debut <= today && p.date_fin >= today) ??
     [...periodes].reverse().find((p) => p.date_debut > today) ??
