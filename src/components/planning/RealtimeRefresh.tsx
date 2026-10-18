@@ -31,7 +31,13 @@ import { abonnerEnSignalantLesEchecs } from '@/lib/realtime/statut-abonnement'
 // La table est bien membre de la publication `supabase_realtime` (migration
 // `20261006120000_presences_journee.sql`, vérifié) — sans quoi l'abonnement ne
 // renverrait AUCUNE erreur et ne se déclencherait jamais.
-const TABLES_SURVEILLEES = ['gardes', 'periodes', 'presences_journee'] as const
+// ⚠️ B-167 — `conges` EST DANS CETTE LISTE, ET C'EST VOULU.
+//
+// Sans elle, un congé posé, validé ou refusé par quelqu'un d'autre n'apparaissait
+// sur la grille qu'au prochain chargement de page — seul l'auteur du congé était
+// à jour, via `revalidatePath('/planning')`. La table est bien membre de la
+// publication `supabase_realtime` (migration `20260621140000`, vérifié).
+const TABLES_SURVEILLEES = ['gardes', 'periodes', 'presences_journee', 'conges'] as const
 
 export function RealtimeRefresh() {
   const router = useRouter()
