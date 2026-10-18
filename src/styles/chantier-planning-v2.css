@@ -1285,6 +1285,50 @@
 }
 .gjc-carte:disabled { opacity: 0.55; cursor: default; }
 
+/* ── « Dates libres » (B-162) ─────────────────────────────────────────────── */
+
+.gjc-libre {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px dashed var(--pv2-bd, #e6d7bb);
+  border-radius: 14px;
+  background: var(--pv2-creux, #f6eedf);
+}
+.gjc-libre-champs { display: flex; flex-wrap: wrap; gap: 14px; }
+.gjc-libre-champ {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--pv2-sec, #7c6a55);
+}
+.gjc-libre-input {
+  border: 1px solid var(--pv2-bd, #e6d7bb);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 0.84rem;
+  font-family: inherit;
+  background: var(--pv2-surface, #fffcf4);
+  color: var(--pv2-txt, #3a2a1c);
+}
+.gjc-libre-aide { font-size: 0.72rem; font-weight: 500; color: var(--pv2-acc, #c7530f); }
+.gjc-libre-actions { display: flex; align-items: center; gap: 14px; }
+
+.gjc-lien {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--pv2-sec, #7c6a55);
+  text-decoration: underline;
+}
+.gjc-lien:hover:not(:disabled) { color: var(--pv2-acc, #c7530f); }
+.gjc-lien:disabled { opacity: 0.5; cursor: default; }
+
 /* ── Boutons ──────────────────────────────────────────────────────────────── */
 
 .gjc-btn {

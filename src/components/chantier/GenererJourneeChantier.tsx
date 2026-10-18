@@ -60,12 +60,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { periodeFr } from '@/lib/dates-fr'
+import { periodeFr, dateFrSansJour } from '@/lib/dates-fr'
 import {
   appliquerTrames,
   apercuApplicationTrames,
   type Apercu,
 } from '@/app/(v2)/journee/presences-actions'
+import { creerPeriode } from '@/app/(protected)/admin/periodes/actions'
+import { estLundi, lundiDeLaSemaine } from '@/lib/planning/duree'
 import type { PeriodeApplicable } from '@/components/v2/GenererJournee'
 
 interface Props {
@@ -89,7 +91,65 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
   const [apercu, setApercu] = useState<Apercu | null>(null)
   const [enCours, setEnCours] = useState(false)
 
-  const periode = periodes.find((p) => p.id === periodeId) ?? null
+  // ── B-162 — « DATES LIBRES » ────────────────────────────────────────────
+  //
+  // MiKL, 11/10 : « je veux la possibilité de créer une période [...], et
+  // contrairement aux gardes, une période libre également ». Ce que les
+  // journées n'ont pas, contrairement aux gardes : un rythme qui change d'un
+  // planning à l'autre. Pas besoin de repasser par l'assistant de génération
+  // des gardes pour ouvrir une plage qui ne sert qu'aux présences.
+  //
+  // La période créée ici est une période comme une autre (`usage: 'journees'`,
+  // `creerPeriode` côté serveur) : elle rejoint simplement la liste affichée,
+  // et les étapes 2 et 3 ci-dessous ne savent pas d'où elle vient.
+  const [periodeLibre, setPeriodeLibre] = useState<PeriodeApplicable | null>(null)
+  const [libreOuvert, setLibreOuvert] = useState(false)
+  const [libreDebut, setLibreDebut] = useState('')
+  const [libreFin, setLibreFin] = useState('')
+  const [libreErreur, setLibreErreur] = useState<string | null>(null)
+  const [libreEnCours, setLibreEnCours] = useState(false)
+
+  const periodesAffichees = periodeLibre ? [...periodes, periodeLibre] : periodes
+  const periode = periodesAffichees.find((p) => p.id === periodeId) ?? null
+
+  // Les semaines de garde démarrent le lundi (le moteur compte en semaines
+  // pleines) ; une période journées n'a pas cette contrainte de calcul, mais
+  // MiKL a choisi de garder UNE seule règle de départ dans tout le produit,
+  // plutôt que deux conventions selon l'usage de la période.
+  const libreDebutCale = libreDebut && estLundi(libreDebut) ? libreDebut : lundiDeLaSemaine(libreDebut)
+
+  async function creerPeriodeLibre() {
+    setLibreErreur(null)
+    if (!libreDebutCale) return setLibreErreur('Indique la date de départ.')
+    if (!libreFin) return setLibreErreur('Indique la date de fin.')
+    if (libreFin < libreDebutCale) return setLibreErreur('La date de fin doit venir après le départ.')
+
+    setLibreEnCours(true)
+    const fd = new FormData()
+    const libelle = `Journées — ${periodeFr(libreDebutCale, libreFin)}`
+    fd.set('libelle', libelle)
+    fd.set('date_debut', libreDebutCale)
+    fd.set('date_fin', libreFin)
+    fd.set('usage', 'journees')
+    const res = await creerPeriode(fd)
+    setLibreEnCours(false)
+
+    if ('error' in res && res.error) return setLibreErreur(res.error)
+    if (!('id' in res) || !res.id) return setLibreErreur('La période a été créée mais reste introuvable.')
+
+    setPeriodeLibre({
+      id: res.id,
+      libelle,
+      date_debut: libreDebutCale,
+      date_fin: libreFin,
+      statut: 'brouillon',
+    })
+    setPeriodeId(res.id)
+    setApercu(null)
+    setLibreOuvert(false)
+    setLibreDebut('')
+    setLibreFin('')
+  }
 
   /**
    * Changer de planning INVALIDE l'aperçu.
@@ -147,14 +207,7 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
           </DialogDescription>
         </DialogHeader>
 
-        {periodes.length === 0 ? (
-          /* On dit pourquoi et où aller, plutôt qu'un sélecteur vide et un
-             bouton inerte. */
-          <p className="gjc-vide">
-            Aucun planning ne peut recevoir de présences pour l’instant : créez d’abord une période.
-            Les présences s’y rattachent, et c’est sa publication qui les montre à l’équipe.
-          </p>
-        ) : !aDesTrames ? (
+        {!aDesTrames ? (
           <p className="gjc-vide">
             Décrivez d’abord au moins une présence récurrente dans l’écran « Journée » : il n’y a
             rien à poser pour l’instant.
@@ -172,22 +225,103 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
                 <span className="gjc-num" aria-hidden>1</span>
                 Sur quel planning
               </h3>
-              <div className="gjc-cartes" role="group" aria-label="Choisir le planning">
-                {periodes.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className="gjc-carte"
-                    aria-pressed={p.id === periodeId}
-                    onClick={() => choisir(p.id)}
-                    disabled={enCours}
-                  >
-                    <b>{p.libelle}</b>
-                    <small>{libelleStatut(p.statut)}</small>
-                    <small>{periodeFr(p.date_debut, p.date_fin)}</small>
-                  </button>
-                ))}
-              </div>
+
+              {periodesAffichees.length > 0 ? (
+                <div className="gjc-cartes" role="group" aria-label="Choisir le planning">
+                  {periodesAffichees.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className="gjc-carte"
+                      aria-pressed={p.id === periodeId}
+                      onClick={() => choisir(p.id)}
+                      disabled={enCours}
+                    >
+                      <b>{p.libelle}</b>
+                      <small>{libelleStatut(p.statut)}</small>
+                      <small>{periodeFr(p.date_debut, p.date_fin)}</small>
+                    </button>
+                  ))}
+                </div>
+              ) : !libreOuvert ? (
+                /* On dit pourquoi et où aller, plutôt qu'un sélecteur vide et
+                   un bouton inerte — « Dates libres » juste en dessous EST
+                   la porte annoncée ici. */
+                <p className="gjc-vide">
+                  Aucun planning ne peut encore recevoir de présences : crée une période,
+                  juste en dessous.
+                </p>
+              ) : null}
+
+              {/* ── « Dates libres » (B-162) ───────────────────────────────
+                  Les journées suivent un rythme qui ne change pas d'une
+                  période à l'autre : pas besoin d'attendre la prochaine
+                  période de gardes pour ouvrir une plage qui ne sert
+                  qu'à elles. */}
+              {!libreOuvert ? (
+                <button
+                  type="button"
+                  className="gjc-btn"
+                  onClick={() => setLibreOuvert(true)}
+                  disabled={enCours}
+                >
+                  + Dates libres
+                </button>
+              ) : (
+                <div className="gjc-libre">
+                  <div className="gjc-libre-champs">
+                    <label className="gjc-libre-champ">
+                      <span>Depuis le</span>
+                      <input
+                        type="date"
+                        className="gjc-libre-input"
+                        value={libreDebut}
+                        onChange={(e) => setLibreDebut(e.target.value)}
+                        disabled={libreEnCours}
+                      />
+                      {libreDebut && !estLundi(libreDebut) && libreDebutCale && (
+                        <small className="gjc-libre-aide">
+                          Les périodes démarrent le lundi : je pars du{' '}
+                          {dateFrSansJour(libreDebutCale)}.
+                        </small>
+                      )}
+                    </label>
+                    <label className="gjc-libre-champ">
+                      <span>Jusqu’au</span>
+                      <input
+                        type="date"
+                        className="gjc-libre-input"
+                        value={libreFin}
+                        onChange={(e) => setLibreFin(e.target.value)}
+                        disabled={libreEnCours}
+                      />
+                    </label>
+                  </div>
+
+                  {libreErreur && (
+                    <p className="gjc-refus" role="alert">{libreErreur}</p>
+                  )}
+
+                  <div className="gjc-libre-actions">
+                    <button
+                      type="button"
+                      className="gjc-cta"
+                      onClick={creerPeriodeLibre}
+                      disabled={libreEnCours}
+                    >
+                      {libreEnCours ? 'Création…' : 'Créer cette période'}
+                    </button>
+                    <button
+                      type="button"
+                      className="gjc-lien"
+                      onClick={() => { setLibreOuvert(false); setLibreErreur(null) }}
+                      disabled={libreEnCours}
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                </div>
+              )}
             </section>
 
             {/* ── 2 ───────────────────────────────────────────────────────── */}
