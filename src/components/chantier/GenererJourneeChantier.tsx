@@ -109,7 +109,14 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
   const [libreErreur, setLibreErreur] = useState<string | null>(null)
   const [libreEnCours, setLibreEnCours] = useState(false)
 
-  const periodesAffichees = periodeLibre ? [...periodes, periodeLibre] : periodes
+  // Dédoublonné par id : `RealtimeRefresh` écoute la table `periodes` (B-167)
+  // et déclenche un `router.refresh()` quelques centaines de ms après la
+  // création — la période libre arrive alors AUSSI dans la prop `periodes`,
+  // et resterait doublée si on la gardait inconditionnellement en plus.
+  const periodesAffichees =
+    periodeLibre && !periodes.some((p) => p.id === periodeLibre.id)
+      ? [...periodes, periodeLibre]
+      : periodes
   const periode = periodesAffichees.find((p) => p.id === periodeId) ?? null
 
   // Les semaines de garde démarrent le lundi (le moteur compte en semaines
@@ -126,7 +133,16 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
 
     setLibreEnCours(true)
     const fd = new FormData()
-    const libelle = `Journées — ${periodeFr(libreDebutCale, libreFin)}`
+    // Court : la carte affiche déjà la plage complète juste en dessous
+    // (`periodeFr(p.date_debut, p.date_fin)`) — un libellé qui la répète en
+    // toutes lettres double l'information et fait déborder le titre sur deux
+    // lignes (MiKL, recette du 19/10, capture à l'appui).
+    const moisAnnee = new Date(`${libreDebutCale}T12:00:00Z`).toLocaleDateString('fr-FR', {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    })
+    const libelle = `Journées — ${moisAnnee}`
     fd.set('libelle', libelle)
     fd.set('date_debut', libreDebutCale)
     fd.set('date_fin', libreFin)

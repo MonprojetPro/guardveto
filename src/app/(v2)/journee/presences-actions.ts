@@ -149,18 +149,27 @@ async function tramesDuCabinet(supabase: Client): Promise<TramePourProjection[]>
 }
 
 /**
- * Les présences déjà posées sur cette période.
+ * Les présences déjà posées sur la plage de dates de cette période.
  *
- * ⚠️ BORNÉ À LA PÉRIODE, et c'est volontaire malgré la clé d'unicité qui ne la
- *    porte pas. Deux périodes qui se chevauchent sont refusées à la création :
- *    lire au-delà n'ajouterait rien et ferait grossir la requête d'un planning
- *    entier à chaque aperçu.
+ * ⚠️ BORNÉ AUX DATES, PAS AU `periode_id` — changé le 19/10 (B-162). Ce
+ *    filtre disait `eq('periode_id', …)` en s'appuyant sur une garantie qui
+ *    vient de disparaître : « deux périodes qui se chevauchent sont refusées
+ *    à la création ». Depuis que `journees` peut chevaucher `gardes` (c'est le
+ *    but de « Dates libres » — une période journées peut courir sur l'année,
+ *    par-dessus plusieurs plannings de gardes), une même date peut appartenir
+ *    à DEUX périodes à la fois. Filtrer sur `periode_id` n'aurait plus vu les
+ *    présences déjà posées par l'AUTRE période couvrant ce jour, et `aPoser`
+ *    les aurait reposées en double — `clePresence` (veterinaire_id, bloc_id,
+ *    date) ne connaît pas `periode_id`, donc ce doublon ne serait jamais
+ *    revenu comme une erreur, juste comme deux lignes qui disent la même
+ *    chose. RLS borne déjà au cabinet : pas besoin de le répéter ici.
  */
-async function presencesDeLaPeriode(supabase: Client, periodeId: string) {
+async function presencesDeLaPeriode(supabase: Client, periode: PeriodePourPresences) {
   const { data, error } = await supabase
     .from('presences_journee')
     .select('id, veterinaire_id, bloc_id, date, trame_id')
-    .eq('periode_id', periodeId)
+    .gte('date', periode.date_debut)
+    .lte('date', periode.date_fin)
 
   if (error) return { erreur: error.message, lignes: [] as PresenceLue[] }
   return { erreur: null, lignes: (data ?? []) as PresenceLue[] }
@@ -249,7 +258,7 @@ export async function apercuApplicationTrames(periodeId: string): Promise<Apercu
   const [blocs, trames, deja] = await Promise.all([
     blocsDuCabinet(supabase),
     tramesDuCabinet(supabase),
-    presencesDeLaPeriode(supabase, periodeId),
+    presencesDeLaPeriode(supabase, per.periode),
   ])
   if (deja.erreur) {
     return { ok: false, probleme: 'Les présences déjà posées n’ont pas pu être lues.' }
@@ -293,7 +302,7 @@ export async function appliquerTrames(periodeId: string): Promise<Resultat> {
   const [blocs, trames, deja] = await Promise.all([
     blocsDuCabinet(supabase),
     tramesDuCabinet(supabase),
-    presencesDeLaPeriode(supabase, periodeId),
+    presencesDeLaPeriode(supabase, per.periode),
   ])
   if (deja.erreur) {
     return { error: 'Les présences déjà posées n’ont pas pu être lues. Rien n’a été modifié.' }
@@ -384,7 +393,7 @@ export async function poserPresence(saisie: SaisiePresence): Promise<Resultat> {
   const veto = await vetoUtilisable(supabase, v.valeur.veterinaire_id)
   if (!veto.ok) return { error: veto.probleme }
 
-  const deja = await presencesDeLaPeriode(supabase, per.periode.id)
+  const deja = await presencesDeLaPeriode(supabase, per.periode)
   if (deja.erreur) {
     return { error: 'Les présences déjà posées n’ont pas pu être lues. Rien n’a été modifié.' }
   }
