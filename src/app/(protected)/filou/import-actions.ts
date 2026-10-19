@@ -147,6 +147,9 @@ export async function enregistrerPlanningImporte(
       statut: 'verrouille',
       libelle: titre,
       importe: true,
+      // B-162 — explicite plutôt que de dépendre du défaut de colonne : un
+      // planning importé est un historique de GARDES, jamais de journées.
+      usage: 'gardes',
     })
     .select('id')
     .single()

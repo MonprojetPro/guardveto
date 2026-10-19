@@ -103,11 +103,16 @@ export async function creerPeriode(formData: FormData) {
   const dateDebut = formData.get('date_debut') as string
   const dateFin   = formData.get('date_fin') as string
 
-  // Absent du formulaire (écran de génération des gardes, pas encore mis à
-  // jour) → `les-deux`, le comportement d'avant cette colonne. Une valeur
-  // présente mais hors vocabulaire est un bug d'écran, pas une saisie à
-  // tolérer : elle ne doit pas se glisser en base sous un déguisement.
-  const usageSaisi = (formData.get('usage') as string | null)?.trim() || 'les-deux'
+  // Absent du formulaire → `gardes` : TOUS les appelants qui ne précisent pas
+  // `usage` créent un planning de gardes (l'assistant de génération, l'outil
+  // Filou `creer_periode`) — seul le bouton « Dates libres » envoie `journees`
+  // explicitement. `les-deux` n'est plus le défaut depuis le 19/10 (B-162) :
+  // il bloquait justement la création d'une période journées séparée sur les
+  // dates d'un planning de gardes existant (MiKL, recette du 19/10 — refusé
+  // sur « Hiver P2 », qui portait encore l'ancien défaut). Une valeur présente
+  // mais hors vocabulaire est un bug d'écran, pas une saisie à tolérer : elle
+  // ne doit pas se glisser en base sous un déguisement.
+  const usageSaisi = (formData.get('usage') as string | null)?.trim() || 'gardes'
   if (!['gardes', 'journees', 'les-deux'].includes(usageSaisi)) {
     return { error: `Usage de période invalide : « ${usageSaisi} ».` }
   }
