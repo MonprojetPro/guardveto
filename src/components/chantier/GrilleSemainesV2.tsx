@@ -499,8 +499,28 @@ const ORDRE_AFFICHAGE: Record<LigneRepliee['genre'], number> = {
 
 function compacterLignes(
   lignes: ReturnType<typeof lignesCaseRepliee>,
+  vue: { gardesVisibles: boolean; journeeVisible: boolean },
 ): LigneCompacte[] {
-  const triees = [...lignes].sort(
+  // B-170 (4e passe) — MiKL, 20/10 : « il y a encore des encarts qui ne sont
+  // pas pareils ». Cause : `lignesCaseRepliee` OMET une ligne quand son
+  // compte est a zero (ex. aucune presence de jour, aucune absence) — deux
+  // jours de la MEME semaine finissaient donc avec un nombre de lignes
+  // different, des cases de hauteurs differentes dans la meme rangee.
+  // ➜ Quand l'axe est visible pour toute la grille, Jour et Abs. sont
+  // TOUJOURS affiches, avec leur etat zero si besoin — jamais omis au cas
+  // par cas. « Manq. » reste conditionnel : c'est une ALERTE (un manque
+  // reel), pas un axe d'information permanent — l'afficher a zero tous les
+  // jours noierait le signal (meme principe que B-161, ne jamais afficher
+  // un parametre qui ne dit rien).
+  const base = [...lignes]
+  if (vue.journeeVisible && !base.some((l) => l.genre === 'presents')) {
+    base.push({ genre: 'presents', etiquette: '', pastilles: [], nombre: 0 })
+  }
+  if (!base.some((l) => l.genre === 'absents')) {
+    base.push({ genre: 'absents', etiquette: '', pastilles: [], nombre: 0 })
+  }
+
+  const triees = base.sort(
     (a, b) => ORDRE_AFFICHAGE[a.genre] - ORDRE_AFFICHAGE[b.genre],
   )
 
@@ -585,7 +605,7 @@ function CaseRepliee({
           ⚠️ LA TRANSFORMATION SE FAIT ICI, PAS DANS `lignesCaseRepliee` : cette
           fonction vit dans `lib/planning/grilleSemaines.ts`, partage avec
           l'ecran du client. On adapte sa SORTIE, on ne touche pas sa source. */}
-      {compacterLignes(lignesCaseRepliee(jour, vue)).map((l, i) => {
+      {compacterLignes(lignesCaseRepliee(jour, vue), vue).map((l, i) => {
         // 🔴 LA LIGNE « N PRÉSENTS » OUVRE LA FENÊTRE DE DÉTAIL, et c'est le
         //    seul chemin vers elle en vue repliée. Au premier jet de B-145, la
         //    fenêtre livrée le matin même était encore montée et PLUS

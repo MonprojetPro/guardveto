@@ -383,12 +383,9 @@
   font-variant-numeric: tabular-nums;
   color: var(--pv2-txt);
 }
-/* Jour reste la metrique principale (22px) ; à pourvoir et absents sont des
-   signaux secondaires du meme gabarit, pas une 2e vedette de la case. */
-.pv2-ligne.pourvoir .pv2-grand,
-.pv2-ligne.absents .pv2-grand {
-  font-size: 16px;
-}
+/* MiKL, 20/10 : « pourquoi y a encore des chiffres de tailles differentes ».
+   Les 4 lignes affichent desormais TOUTES leur chiffre a la meme taille —
+   la hierarchie Jour=22px / Manq.+Abs.=16px tentee en 3e passe est retiree. */
 .pv2-grand.manque { color: var(--pv2-bad); }
 .pv2-sub {
   font-size: 10.5px;
