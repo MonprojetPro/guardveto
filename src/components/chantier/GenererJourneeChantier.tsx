@@ -53,7 +53,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Trash2, CalendarPlus, Plus, Wand2 } from 'lucide-react'
+import { Trash2, CalendarPlus, Wand2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -306,7 +306,21 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
                 les affichait sur une ligne isolée, commune aux deux, donc en
                 changeant de planning on ne savait plus de quoi on parlait. */}
             <section className="gjc-etape">
-              <h3 className="gjc-titre">Sur quel planning</h3>
+              <div className="gjc-entete">
+                <h3 className="gjc-titre">Sur quel planning</h3>
+                {!libreOuvert && (
+                  <button
+                    type="button"
+                    className="gjc-icbtn jdb-icbtn"
+                    onClick={ouvrirLibre}
+                    disabled={enCours}
+                    aria-label="Créer une période sur des dates libres"
+                    title="Dates libres"
+                  >
+                    <CalendarPlus aria-hidden />
+                  </button>
+                )}
+              </div>
 
               {periodesAffichees.length > 0 ? (
                 <div className="gjc-cartes" role="group" aria-label="Choisir le planning">
@@ -340,11 +354,11 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
                 </div>
               ) : !libreOuvert ? (
                 /* On dit pourquoi et où aller, plutôt qu'un sélecteur vide et
-                   un bouton inerte — « Dates libres » juste en dessous EST
+                   un bouton inerte — l'icône « Dates libres » de l'en-tête EST
                    la porte annoncée ici. */
                 <p className="gjc-vide">
-                  Aucun planning ne peut encore recevoir de présences : crée une période,
-                  juste en dessous.
+                  Aucun planning ne peut encore recevoir de présences : crée-en une avec
+                  l'icône ci-dessus.
                 </p>
               ) : null}
 
@@ -352,18 +366,10 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
                   Les journées suivent un rythme qui ne change pas d'une
                   période à l'autre : pas besoin d'attendre la prochaine
                   période de gardes pour ouvrir une plage qui ne sert
-                  qu'à elles. */}
-              {!libreOuvert ? (
-                <button
-                  type="button"
-                  className="gjc-btn jdb-btn"
-                  onClick={ouvrirLibre}
-                  disabled={enCours}
-                >
-                  <Plus aria-hidden />
-                  Dates libres
-                </button>
-              ) : (
+                  qu'à elles. Déclenchée par l'icône de l'en-tête, juste
+                  au-dessus — un geste accessoire n'a pas besoin de sa
+                  propre pilule de texte en pleine largeur. */}
+              {libreOuvert && (
                 <div className="gjc-libre">
                   {couvertsEnCours ? (
                     <p className="gjc-libre-aide">Lecture des jours déjà couverts…</p>
@@ -425,15 +431,17 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
                 lu ce qu'il fait — c'est pour ça que le bouton reste un aperçu
                 tant qu'on n'a pas vu ce qu'il y a à poser. */}
             <section className="gjc-etape">
-              <button
-                type="button"
-                className="gjc-cta jdb-cta"
-                onClick={regarder}
-                disabled={enCours || !periodeId}
-              >
-                <Wand2 aria-hidden />
-                {enCours ? 'Génération…' : 'Générer'}
-              </button>
+              <div className="gjc-centre">
+                <button
+                  type="button"
+                  className="gjc-cta jdb-cta"
+                  onClick={regarder}
+                  disabled={enCours || !periodeId}
+                >
+                  <Wand2 aria-hidden />
+                  {enCours ? 'Génération…' : 'Générer'}
+                </button>
+              </div>
 
               {apercu && (
                 <p className={apercu.ok ? 'gjc-apercu' : 'gjc-refus'} role="status">
@@ -442,15 +450,17 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
               )}
 
               {peutPoser && (
-                <button
-                  type="button"
-                  className="gjc-cta jdb-cta"
-                  onClick={appliquer}
-                  disabled={enCours}
-                >
-                  Poser {apercu.aPoser} présence{apercu.aPoser > 1 ? 's' : ''}
-                  {periode ? ` sur ${periode.libelle}` : ''}
-                </button>
+                <div className="gjc-centre">
+                  <button
+                    type="button"
+                    className="gjc-cta jdb-cta"
+                    onClick={appliquer}
+                    disabled={enCours}
+                  >
+                    Poser {apercu.aPoser} présence{apercu.aPoser > 1 ? 's' : ''}
+                    {periode ? ` sur ${periode.libelle}` : ''}
+                  </button>
+                </div>
               )}
             </section>
           </div>

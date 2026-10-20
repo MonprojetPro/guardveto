@@ -1266,14 +1266,47 @@
   color: var(--pv2-sec, #7c6a55);
 }
 
+/* Le libellé de section et son geste accessoire partagent une ligne — MiKL,
+   20/10 (3e passe) : « le date libre devrait apparaître comme une icône ».
+   La pilule pleine largeur devenait un 2e bouton d'action a cote du bouton
+   « Generer » ; une icone rattachee a l'en-tete dit qu'elle sert la SECTION
+   qu'elle accompagne, pas un geste de meme rang que l'action principale. */
+.gjc-entete { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+/* Icône compacte, carrée, à l'opposé du bouton texte pleine largeur qu'elle
+   remplace : un geste accessoire n'a pas besoin du même poids visuel qu'une
+   carte de planning ou que « Générer ». */
+.gjc-icbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  min-height: 0;
+  padding: 0;
+  border: 1px dashed var(--pv2-acc, #c7530f);
+  border-radius: 8px;
+  background: #fdf1e5;
+  color: var(--pv2-acc, #c7530f);
+}
+.gjc-icbtn svg { width: 16px; height: 16px; }
+.gjc-icbtn:hover:not(:disabled) { background: #fbe3cd; }
+.gjc-icbtn:disabled { opacity: 0.5; cursor: default; }
+
+/* Centre un geste unique sous son contexte — le bouton « Générer » devient
+   la suite logique de la rangée de cartes au lieu de flotter aligné à
+   gauche, sans lien visuel avec ce qui le précède (MiKL, 20/10, 3e passe). */
+.gjc-centre { display: flex; justify-content: center; }
+
 /* ── Le choix du planning ─────────────────────────────────────────────────── */
 
-.gjc-cartes { display: flex; flex-wrap: wrap; gap: 10px; }
+.gjc-cartes { display: flex; align-items: stretch; flex-wrap: wrap; gap: 10px; }
 
 /* Le wrapper porte la taille flex (reprise de `.gjc-carte` avant B-168a) —
    la carte elle-même passe en largeur pleine pour laisser la place au
    bouton de suppression, positionné dans le même coin sur toutes les cartes. */
-.gjc-carte-encart { position: relative; flex: 1 1 200px; min-width: 0; }
+.gjc-carte-encart { position: relative; display: flex; flex: 1 1 200px; min-width: 0; }
 
 /* Chaque carte porte SES dates. Sur l'original, les bornes vivaient sur une
    ligne isolée sous les boutons : en changeant de planning, on ne savait plus
@@ -1287,6 +1320,7 @@
   flex-direction: column;
   gap: 5px;
   width: 100%;
+  height: 100%;
   min-height: 44px;
   padding: 14px 16px;
   border: 1px solid var(--pv2-bd, #e6d7bb);
@@ -1404,8 +1438,9 @@
 .gjc-cal-today { font-weight: 800; text-decoration: underline; }
 .gjc-cal-hors-mois { color: var(--pv2-sec, #cbb99a); }
 
-/* `.jdb-cal-nav`, `.jdb-carte-suppr`, `.jdb-carte`, `.jdb-cta` et `.jdb-btn`
-   (posées en plus de leur classe `.gjc-*` sur les mêmes boutons) sont des
+/* `.jdb-cal-nav`, `.jdb-carte-suppr`, `.jdb-carte`, `.jdb-cta`, `.jdb-lien`
+   et `.jdb-icbtn` (posées en plus de leur classe `.gjc-*` sur les mêmes
+   boutons) sont des
    MARQUEURS SEULS : leur unique rôle est de contenir la sous-chaîne « jdb- »
    pour échapper à la règle partagée de `v2-terrier.css`
    (`:not([class*="jdb-"])`), qui impose à TOUT bouton de modale un
@@ -1423,8 +1458,8 @@
 .jdb-carte-suppr,
 .jdb-carte,
 .jdb-cta,
-.jdb-btn,
-.jdb-lien {
+.jdb-lien,
+.jdb-icbtn {
   pointer-events: auto;
 }
 
@@ -1463,29 +1498,6 @@
 .gjc-lien:disabled { opacity: 0.5; cursor: default; }
 
 /* ── Boutons ──────────────────────────────────────────────────────────────── */
-
-/* « + Dates libres » ouvre un geste accessoire (dérogatoire au rythme
-   habituel) — teinte dashed cohérente avec `.gjc-libre` qu'il ouvre, plutôt
-   qu'un contour neutre indistinct des autres boutons (MiKL, 20/10 : « un
-   pauvre bouton +Dates »). */
-.gjc-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  align-self: flex-start;
-  min-height: 40px;
-  border: 1px dashed var(--pv2-acc, #c7530f);
-  background: #fdf1e5;
-  color: var(--pv2-acc, #c7530f);
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  /* 9px vertical, donc 17px horizontal au minimum (gardien B-146). */
-  padding: 9px 18px;
-}
-.gjc-btn svg { width: 14px; height: 14px; }
-.gjc-btn:hover:not(:disabled) { background: #fbe3cd; }
-.gjc-btn:disabled { opacity: 0.5; cursor: default; }
 
 /* Le geste qui fait vraiment avancer la fenêtre : plus de présence que
    `.gjc-btn`, icône incluse — il ne doit plus se lire comme un bouton
