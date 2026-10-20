@@ -265,6 +265,12 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   'v2/journee/presences-actions#apercuApplicationTrames': {
     hors: 'Lecture technique qui alimente la confirmation de l’écran avant écriture. L’annonce du nombre est portée par le résultat de `appliquerTrames` lui-même, pas par un outil séparé — personne ne formule un aperçu comme une demande.',
   },
+  // Même famille que l'aperçu ci-dessus : c'est le calendrier de « Dates
+  // libres » (B-168) qui pose la question « quels jours sont déjà couverts ? »
+  // pour griser ses cases — personne ne la formule en conversation à Filou.
+  'v2/journee/presences-actions#joursJourneesCouverts': {
+    hors: 'Lecture technique qui alimente le calendrier de « Dates libres » (grise les jours déjà couverts, B-168) — pas une question qu’un cabinet pose en conversation.',
+  },
   'v2/journee/presences-actions#poserPresence': {
     manque:
       'Filou ne sait pas poser une présence de journée sur un jour précis (B-120 chantier 3 lot 2, 06/10) — « mets Victor le mardi matin » reste à faire à l’écran. À écrire AVEC `lire_presences_journee` : proposer d’ajouter sans savoir lire ce qui est déjà là ferait doublonner ses propositions.',

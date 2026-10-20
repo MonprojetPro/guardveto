@@ -64,11 +64,18 @@ import { periodeFr, dateFrSansJour } from '@/lib/dates-fr'
 import {
   appliquerTrames,
   apercuApplicationTrames,
+  joursJourneesCouverts,
   type Apercu,
 } from '@/app/(v2)/journee/presences-actions'
 import { creerPeriode } from '@/app/(protected)/admin/periodes/actions'
 import { estLundi, lundiDeLaSemaine } from '@/lib/planning/duree'
 import type { PeriodeApplicable } from '@/components/v2/GenererJournee'
+import {
+  DatesLibresCalendrier,
+  versISO,
+  depuisISO,
+  type DateRange,
+} from '@/components/chantier/DatesLibresCalendrier'
 
 interface Props {
   open: boolean
@@ -104,10 +111,31 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
   // et les étapes 2 et 3 ci-dessous ne savent pas d'où elle vient.
   const [periodeLibre, setPeriodeLibre] = useState<PeriodeApplicable | null>(null)
   const [libreOuvert, setLibreOuvert] = useState(false)
-  const [libreDebut, setLibreDebut] = useState('')
-  const [libreFin, setLibreFin] = useState('')
+  const [libreSelection, setLibreSelection] = useState<DateRange | undefined>(undefined)
   const [libreErreur, setLibreErreur] = useState<string | null>(null)
   const [libreEnCours, setLibreEnCours] = useState(false)
+
+  // B-168 — les jours déjà couverts, pour que le calendrier les grise et
+  // refuse toute plage qui les engloberait (MiKL, 20/10 : « les jours qui ont
+  // déjà des journées ne devraient pas apparaître... il devrait y avoir un
+  // signal »). Chargé une fois à l'ouverture du volet, pas à chaque frappe.
+  const [joursCouverts, setJoursCouverts] = useState<Set<string>>(new Set())
+  const [couvertsEnCours, setCouvertsEnCours] = useState(false)
+
+  function ouvrirLibre() {
+    setLibreOuvert(true)
+    setCouvertsEnCours(true)
+    const aujourdhui = new Date()
+    const debut = versISO(aujourdhui)
+    const dansDixHuitMois = new Date(aujourdhui)
+    dansDixHuitMois.setMonth(dansDixHuitMois.getMonth() + 18)
+    const fin = versISO(dansDixHuitMois)
+    joursJourneesCouverts(debut, fin)
+      .then((res) => {
+        if (res.ok) setJoursCouverts(new Set(res.dates))
+      })
+      .finally(() => setCouvertsEnCours(false))
+  }
 
   // Dédoublonné par id : `RealtimeRefresh` écoute la table `periodes` (B-167)
   // et déclenche un `router.refresh()` quelques centaines de ms après la
@@ -119,17 +147,47 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
       : periodes
   const periode = periodesAffichees.find((p) => p.id === periodeId) ?? null
 
+  const libreDebutISO = libreSelection?.from ? versISO(libreSelection.from) : ''
+  const libreFinISO = libreSelection?.to ? versISO(libreSelection.to) : ''
+
   // Les semaines de garde démarrent le lundi (le moteur compte en semaines
   // pleines) ; une période journées n'a pas cette contrainte de calcul, mais
   // MiKL a choisi de garder UNE seule règle de départ dans tout le produit,
   // plutôt que deux conventions selon l'usage de la période.
-  const libreDebutCale = libreDebut && estLundi(libreDebut) ? libreDebut : lundiDeLaSemaine(libreDebut)
+  const libreDebutCale =
+    libreDebutISO && estLundi(libreDebutISO) ? libreDebutISO : lundiDeLaSemaine(libreDebutISO)
+
+  const [libreCale, setLibreCale] = useState<string | null>(null)
+
+  /**
+   * Le calendrier accepte n'importe quel jour de départ ; on corrige
+   * IMMÉDIATEMENT au lundi de sa semaine, pour que ce qui reste surligné soit
+   * la vraie date envoyée — pas un clic que le serveur recalera en silence.
+   * La correction étant immédiate (même cycle), un mot l'annonce : sans lui,
+   * cliquer un mardi et voir le lundi se surligner à la place passerait pour
+   * un bug de clic plutôt que pour une règle du produit.
+   */
+  function choisirPlage(plage: DateRange | undefined) {
+    setLibreErreur(null)
+    if (!plage?.from) {
+      setLibreCale(null)
+      return setLibreSelection(plage)
+    }
+    const debutISO = versISO(plage.from)
+    const caleISO = estLundi(debutISO) ? debutISO : lundiDeLaSemaine(debutISO)
+    if (!caleISO || caleISO === debutISO) {
+      setLibreCale(null)
+      return setLibreSelection(plage)
+    }
+    setLibreCale(dateFrSansJour(caleISO))
+    setLibreSelection({ from: depuisISO(caleISO), to: plage.to })
+  }
 
   async function creerPeriodeLibre() {
     setLibreErreur(null)
-    if (!libreDebutCale) return setLibreErreur('Indique la date de départ.')
-    if (!libreFin) return setLibreErreur('Indique la date de fin.')
-    if (libreFin < libreDebutCale) return setLibreErreur('La date de fin doit venir après le départ.')
+    if (!libreDebutCale) return setLibreErreur('Choisis une date de départ dans le calendrier.')
+    if (!libreFinISO) return setLibreErreur('Choisis une date de fin dans le calendrier.')
+    if (libreFinISO < libreDebutCale) return setLibreErreur('La date de fin doit venir après le départ.')
 
     setLibreEnCours(true)
     const fd = new FormData()
@@ -145,7 +203,7 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
     const libelle = `Journées — ${moisAnnee}`
     fd.set('libelle', libelle)
     fd.set('date_debut', libreDebutCale)
-    fd.set('date_fin', libreFin)
+    fd.set('date_fin', libreFinISO)
     fd.set('usage', 'journees')
     const res = await creerPeriode(fd)
     setLibreEnCours(false)
@@ -157,14 +215,14 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
       id: res.id,
       libelle,
       date_debut: libreDebutCale,
-      date_fin: libreFin,
+      date_fin: libreFinISO,
       statut: 'brouillon',
     })
     setPeriodeId(res.id)
     setApercu(null)
     setLibreOuvert(false)
-    setLibreDebut('')
-    setLibreFin('')
+    setLibreSelection(undefined)
+    setLibreCale(null)
   }
 
   /**
@@ -278,41 +336,35 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
                 <button
                   type="button"
                   className="gjc-btn"
-                  onClick={() => setLibreOuvert(true)}
+                  onClick={ouvrirLibre}
                   disabled={enCours}
                 >
                   + Dates libres
                 </button>
               ) : (
                 <div className="gjc-libre">
-                  <div className="gjc-libre-champs">
-                    <label className="gjc-libre-champ">
-                      <span>Depuis le</span>
-                      <input
-                        type="date"
-                        className="gjc-libre-input"
-                        value={libreDebut}
-                        onChange={(e) => setLibreDebut(e.target.value)}
+                  {couvertsEnCours ? (
+                    <p className="gjc-libre-aide">Lecture des jours déjà couverts…</p>
+                  ) : (
+                    <>
+                      <p className="gjc-libre-legende">
+                        <span className="gjc-libre-pastille gjc-libre-pastille-couvert" aria-hidden />
+                        Jour déjà couvert, non sélectionnable
+                      </p>
+                      <DatesLibresCalendrier
+                        joursCouverts={joursCouverts}
+                        selection={libreSelection}
+                        onChange={choisirPlage}
                         disabled={libreEnCours}
                       />
-                      {libreDebut && !estLundi(libreDebut) && libreDebutCale && (
-                        <small className="gjc-libre-aide">
-                          Les périodes démarrent le lundi : je pars du{' '}
-                          {dateFrSansJour(libreDebutCale)}.
-                        </small>
-                      )}
-                    </label>
-                    <label className="gjc-libre-champ">
-                      <span>Jusqu’au</span>
-                      <input
-                        type="date"
-                        className="gjc-libre-input"
-                        value={libreFin}
-                        onChange={(e) => setLibreFin(e.target.value)}
-                        disabled={libreEnCours}
-                      />
-                    </label>
-                  </div>
+                    </>
+                  )}
+
+                  {libreCale && (
+                    <small className="gjc-libre-aide">
+                      Les périodes démarrent le lundi : je pars du {libreCale}.
+                    </small>
+                  )}
 
                   {libreErreur && (
                     <p className="gjc-refus" role="alert">{libreErreur}</p>
@@ -330,7 +382,12 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
                     <button
                       type="button"
                       className="gjc-lien"
-                      onClick={() => { setLibreOuvert(false); setLibreErreur(null) }}
+                      onClick={() => {
+                        setLibreOuvert(false)
+                        setLibreErreur(null)
+                        setLibreSelection(undefined)
+                        setLibreCale(null)
+                      }}
                       disabled={libreEnCours}
                     >
                       Annuler

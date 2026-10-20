@@ -240,6 +240,39 @@ async function absencesDeLaPeriode(
 }
 
 /**
+ * Les jours, dans cette fenêtre, qui portent déjà au moins une présence de
+ * journée — toutes périodes confondues (B-162/B-168).
+ *
+ * Sert le calendrier de « Dates libres » : MiKL, 20/10, après avoir créé une
+ * période qui n'ajoutait rien (les jours étaient déjà couverts par Hiver P2) —
+ * « les jours qui ont déjà des journées ne devraient pas apparaître quand on
+ * clique sur le calendrier ». Un jour COUVERT n'a pas besoin d'une deuxième
+ * période pour le réclamer ; le signaler AVANT la création évite la surprise
+ * découverte après coup (« tout est déjà en place, 0 à ajouter »).
+ *
+ * RLS borne déjà au cabinet — même principe que `presencesDeLaPeriode`.
+ */
+export async function joursJourneesCouverts(
+  dateDebut: string,
+  dateFin: string,
+): Promise<{ ok: true; dates: string[] } | { ok: false; probleme: string }> {
+  const porte = await porteJournee()
+  if (!porte.ok) return { ok: false, probleme: porte.probleme }
+  const { supabase } = porte
+
+  const { data, error } = await supabase
+    .from('presences_journee')
+    .select('date')
+    .gte('date', dateDebut)
+    .lte('date', dateFin)
+
+  if (error) return { ok: false, probleme: 'Les jours déjà couverts n’ont pas pu être lus.' }
+
+  const dates = [...new Set((data ?? []).map((l) => (l as { date: string }).date))]
+  return { ok: true, dates }
+}
+
+/**
  * Ce que l'application VA faire, sans rien écrire.
  *
  * Le même calcul que l'écriture, appelé par la même fonction (`aPoser`) : le
