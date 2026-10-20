@@ -71,7 +71,7 @@ import {
 import { creerPeriode } from '@/app/(protected)/admin/periodes/actions'
 import { estLundi, lundiDeLaSemaine } from '@/lib/planning/duree'
 import type { PeriodeApplicable } from '@/components/v2/GenererJournee'
-import { RetirerPlanningModale } from '@/components/planning/RetirerPlanningModale'
+import { SupprimerPeriodeJourneesModale } from '@/components/chantier/SupprimerPeriodeJourneesModale'
 import {
   DatesLibresCalendrier,
   versISO,
@@ -484,10 +484,8 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
       </DialogContent>
 
       {aSupprimer && (
-        <RetirerPlanningModale
-          periodeId={aSupprimer.id}
-          nomConnu={aSupprimer.libelle}
-          geste="supprimer"
+        <SupprimerPeriodeJourneesModale
+          periode={aSupprimer}
           onFerme={() => setASupprimer(null)}
           onFait={(message) => {
             toast.success(message)

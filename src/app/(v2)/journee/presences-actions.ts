@@ -273,6 +273,29 @@ export async function joursJourneesCouverts(
 }
 
 /**
+ * Combien de présences sont RÉELLEMENT posées sur cette période précise
+ * (B-168a) — sert la suppression d'une période journées : contrairement à un
+ * planning de gardes (qui a ses propres compteurs — gardes, agenda, échanges),
+ * une période journées n'a que ça à perdre. Le dire avant de supprimer, pas
+ * après : « le système informe, il n'interdit pas ».
+ */
+export async function compterPresencesDePeriode(
+  periodeId: string,
+): Promise<{ ok: true; count: number } | { ok: false; probleme: string }> {
+  const porte = await porteJournee()
+  if (!porte.ok) return { ok: false, probleme: porte.probleme }
+  const { supabase } = porte
+
+  const { count, error } = await supabase
+    .from('presences_journee')
+    .select('id', { count: 'exact', head: true })
+    .eq('periode_id', periodeId)
+
+  if (error) return { ok: false, probleme: 'Les présences de cette période n’ont pas pu être comptées.' }
+  return { ok: true, count: count ?? 0 }
+}
+
+/**
  * Ce que l'application VA faire, sans rien écrire.
  *
  * Le même calcul que l'écriture, appelé par la même fonction (`aPoser`) : le

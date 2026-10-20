@@ -271,6 +271,9 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   'v2/journee/presences-actions#joursJourneesCouverts': {
     hors: 'Lecture technique qui alimente le calendrier de « Dates libres » (grise les jours déjà couverts, B-168) — pas une question qu’un cabinet pose en conversation.',
   },
+  'v2/journee/presences-actions#compterPresencesDePeriode': {
+    hors: 'Lecture technique qui alimente la confirmation de suppression d’une période journées (B-168a) — même famille que l’aperçu d’application des trames.',
+  },
   'v2/journee/presences-actions#poserPresence': {
     manque:
       'Filou ne sait pas poser une présence de journée sur un jour précis (B-120 chantier 3 lot 2, 06/10) — « mets Victor le mardi matin » reste à faire à l’écran. À écrire AVEC `lire_presences_journee` : proposer d’ajouter sans savoir lire ce qui est déjà là ferait doublonner ses propositions.',
