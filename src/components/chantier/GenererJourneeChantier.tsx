@@ -53,7 +53,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Trash2 } from 'lucide-react'
+import { Trash2, CalendarPlus, Plus, Wand2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -284,7 +284,12 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[640px]">
         <DialogHeader>
-          <DialogTitle>Remplir le planning des journées</DialogTitle>
+          <DialogTitle className="gjc-dialogtitre">
+            <span className="gjc-dialogtitre-ico" aria-hidden>
+              <CalendarPlus />
+            </span>
+            Remplir le planning des journées
+          </DialogTitle>
         </DialogHeader>
 
         {!aDesTrames ? (
@@ -355,7 +360,8 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
                   onClick={ouvrirLibre}
                   disabled={enCours}
                 >
-                  + Dates libres
+                  <Plus aria-hidden />
+                  Dates libres
                 </button>
               ) : (
                 <div className="gjc-libre">
@@ -425,6 +431,7 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
                 onClick={regarder}
                 disabled={enCours || !periodeId}
               >
+                <Wand2 aria-hidden />
                 {enCours ? 'Génération…' : 'Générer'}
               </button>
 
