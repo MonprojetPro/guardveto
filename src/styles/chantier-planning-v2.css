@@ -347,19 +347,33 @@
   font: inherit;
   color: inherit;
 }
-.pv2-ligne.presents { height: 26px; align-items: baseline; gap: 7px; }
+/* Les 3 lignes « chiffre + mot » (Jour, à pourvoir, Abs.) partagent le MÊME
+   gabarit — B-170 (3e passe) : avant, seule « presents » avait cette regle,
+   « pourvoir » et « absents » tombaient sur le `height: 18px` generique et
+   se desalignaient du chiffre. */
+.pv2-ligne.presents,
+.pv2-ligne.pourvoir,
+.pv2-ligne.absents {
+  height: 26px;
+  align-items: baseline;
+  gap: 7px;
+}
 .pv2-ligne.ouvrable { cursor: pointer; }
 .pv2-etq {
   flex: none;
-  width: 28px;
+  /* « Manq. » (5 car.) est la plus large des 4 etiquettes — NUIT en 2e ligne
+     n'a pas de texte mais garde la meme colonne (voir le rendu). */
+  width: 34px;
   overflow: hidden;
   font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #a08b70;
 }
-/* La hiérarchie de lecture du design V2 : le nombre en grand, le reste petit. */
+/* La hiérarchie de lecture du design V2 : le nombre en grand, le reste petit.
+   Les 4 lignes (Jour, Nuit, Manq., Abs.) partagent cette meme colonne
+   d'etiquette : c'est elle qui aligne toute la liste verticalement. */
 .pv2-grand {
   font-family: Figtree, var(--t-font-titre, sans-serif);
   font-weight: 800;
@@ -369,12 +383,19 @@
   font-variant-numeric: tabular-nums;
   color: var(--pv2-txt);
 }
+/* Jour reste la metrique principale (22px) ; à pourvoir et absents sont des
+   signaux secondaires du meme gabarit, pas une 2e vedette de la case. */
+.pv2-ligne.pourvoir .pv2-grand,
+.pv2-ligne.absents .pv2-grand {
+  font-size: 16px;
+}
 .pv2-grand.manque { color: var(--pv2-bad); }
 .pv2-sub {
   font-size: 10.5px;
   font-weight: 600;
   color: var(--pv2-sec);
 }
+.pv2-ligne.pourvoir .pv2-sub { color: var(--pv2-bad); }
 .pv2-chip {
   display: inline-flex;
   align-items: center;

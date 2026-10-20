@@ -509,17 +509,23 @@ function compacterLignes(
       // « Journée », en vis-a-vis de « Nuit » juste en dessous.
       return [{ ...l, etiquette: 'Jour' }]
     }
+    if (l.genre === 'pourvoir') {
+      // Meme gabarit que les 3 autres lignes : etiquette courte + chiffre.
+      // Avant : un chiffre SANS etiquette, suivi d'une pastille « à pourvoir »
+      // — la seule ligne a melanger les deux formats (MiKL, 20/10).
+      return [{ ...l, etiquette: 'Manq.' }]
+    }
     if (l.genre === 'absents') {
-      const n = l.pastilles.length
-      // ⚠️ On repart des pastilles DEJA limitees par `lignesCaseRepliee` (qui
-      //    resume au-dela de 3 par un « +N »). Le compte affiche peut donc
-      //    etre inferieur au nombre reel d'absents — d'ou « au moins » dans
-      //    l'infobulle, plutot qu'un chiffre qui se donnerait pour exact.
+      // ⚠️ Le compte vient des pastilles DEJA limitees par `lignesCaseRepliee`
+      //    (qui resume au-dela de 3 par un « +N ») : au-dela de 3 absences
+      //    reelles, ce chiffre est donc un PLANCHER, pas le compte exact.
+      //    L'infobulle (le `resume`) liste ce qui est reellement connu.
       const resume = l.pastilles.map((p) => p.texte).join(', ')
       return [{
         ...l,
-        etiquette: '',
-        pastilles: [{ texte: n > 1 ? `${n} abs.` : '1 abs.', couleur: null, creux: true }],
+        etiquette: 'Abs.',
+        nombre: l.pastilles.length,
+        pastilles: [],
         resume,
       }]
     }
@@ -598,14 +604,27 @@ function CaseRepliee({
                 {l.etiquette}
               </span>
             )}
-            {l.genre === 'presents' && (
+            {/* B-170 (3e passe) — MiKL, 20/10 : « 2 styles présents, des items
+                pas alignés, c'est le bordel ». Cause : « présents » affichait
+                un chiffre nu, « à pourvoir » un chiffre PLUS une pastille, et
+                « absents » qu'une pastille (le compte écrit dedans). Trois
+                formes pour trois lignes d'une même liste. ➜ UN SEUL gabarit,
+                pour les quatre genres : chiffre + mot, rien d'autre. Seule la
+                ligne NUIT garde des pastilles — c'est la seule qui NOMME
+                quelqu'un plutôt que de compter. */}
+            {(l.genre === 'presents' || l.genre === 'pourvoir' || l.genre === 'absents') && (
               <>
-                <span className="pv2-grand">{l.nombre}</span>
-                <span className="pv2-sub">{l.nombre === 1 ? 'présent' : 'présents'}</span>
+                <span className={l.genre === 'pourvoir' ? 'pv2-grand manque' : 'pv2-grand'}>
+                  {l.nombre}
+                </span>
+                <span className="pv2-sub">
+                  {l.genre === 'presents' && (l.nombre === 1 ? 'présent' : 'présents')}
+                  {l.genre === 'pourvoir' && 'à pourvoir'}
+                  {l.genre === 'absents' && (l.nombre === 1 ? 'absent' : 'absents')}
+                </span>
               </>
             )}
-            {l.genre === 'pourvoir' && <span className="pv2-grand manque">{l.nombre}</span>}
-            {l.pastilles.map((p, j) => (
+            {l.genre === 'nuit' && l.pastilles.map((p, j) => (
               <span
                 key={`${p.texte}-${j}`}
                 className={[
