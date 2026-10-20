@@ -1333,11 +1333,15 @@
 }
 .gjc-cal-jour { font-size: 0.82rem; border-radius: 10px; }
 .gjc-cal-selected { font-weight: 800; }
-.gjc-cal-range-bord {
+/* Un seul ton pour toute la zone sélectionnée (MiKL, 20/10 : « mets toute la
+   zone sélectionnée en rouge plutôt que de mettre 2 tons ») — le dégradé
+   bord/milieu distinguait un détail d'implémentation (début/fin vs milieu de
+   plage) que personne ne demandait à voir. */
+.gjc-cal-range-bord,
+.gjc-cal-range-milieu {
   background: var(--pv2-acc, #c7530f) !important;
   color: #fff !important;
 }
-.gjc-cal-range-milieu { background: #fdf1e5; }
 .gjc-cal-couvert {
   background: #ece2cd !important;
   color: #a69a81 !important;
@@ -1346,6 +1350,27 @@
 }
 .gjc-cal-today { font-weight: 800; text-decoration: underline; }
 .gjc-cal-hors-mois { color: var(--pv2-sec, #cbb99a); }
+
+/* Les flèches mois précédent/suivant. `.jdb-cal-nav` (voir le composant) les
+   exclut de la règle partagée `v2-terrier.css` qui impose à TOUT bouton de
+   modale un `min-height: 40px` + `padding: 9px 18px` — sur un bouton aussi
+   petit qu'une flèche, ce padding chasse l'icône hors de la boîte et la rend
+   invisible (même défaut que B-165f, même famille de cause). */
+.gjc-cal-nav {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 28px !important;
+  height: 28px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border-radius: 999px;
+  border: 1px solid var(--pv2-bd, #e6d7bb);
+  background: var(--pv2-surface, #fffcf4);
+  color: var(--pv2-txt, #3a2a1c);
+}
+.gjc-cal-nav:hover:not(:disabled) { border-color: var(--pv2-acc, #c7530f); color: var(--pv2-acc, #c7530f); }
+.gjc-cal-nav svg { width: 14px; height: 14px; }
 
 .gjc-lien {
   border: none;

@@ -85,6 +85,27 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ── 2bis. Verrouiller les périodes « journées » pures passées (B-168) ──
+  //
+  // MiKL, 20/10, devant 4 cartes « Journées — … » déjà créées en test : « les
+  // périodes s'accumulent sur combien de temps ? la fenêtre va vite être
+  // chargée ». Mesuré : VRAI, et structurel. Une période `usage='journees'`
+  // n'a JAMAIS de ligne dans `gardes` — la logique au-dessus (étape 2) dérive
+  // `periodeIdsAffectees` UNIQUEMENT des gardes verrouillées : ces périodes
+  // n'y figureront donc jamais, quel que soit leur âge. Sans ce bloc, « Sur
+  // quel planning » grossirait indéfiniment, un planning de gardes se
+  // retirant (verrouillage) alors qu'une période journées jamais.
+  //
+  // Le critère suit le même principe qu'un planning de gardes — sa DATE DE
+  // FIN est passée — faute de "gardes" à regarder pour celui-ci.
+  const { data: journeesVerrouillees } = await supabase
+    .from('periodes')
+    .update({ statut: 'verrouille' })
+    .eq('usage', 'journees')
+    .lt('date_fin', today)
+    .neq('statut', 'verrouille')
+    .select('id')
+
   // ── 3. Calculer les bonus/malus des périodes verrouillées ──
   const bilanResults: Array<{ periodeId: string; nbVets: number }> = []
 
@@ -146,6 +167,7 @@ export async function GET(req: NextRequest) {
     date: today,
     gardesVerrouillees: nbGardesVerrouillees,
     periodesVerrouillees: periodesNouveauxVerrous.length,
+    periodesJourneesVerrouillees: journeesVerrouillees?.length ?? 0,
     bilanCalcules: bilanResults,
   })
 }

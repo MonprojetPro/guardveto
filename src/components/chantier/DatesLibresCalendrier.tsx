@@ -78,6 +78,14 @@ export function DatesLibresCalendrier({ joursCouverts, selection, onChange, disa
         disabled: 'gjc-cal-couvert',
         today: 'gjc-cal-today',
         outside: 'gjc-cal-hors-mois',
+        // ⚠️ `jdb-*` EST LE SEUL MÉCANISME D'EXCLUSION de la règle partagée
+        // `v2-terrier.css` (`[data-slot="dialog-content"] button:not(…)`) —
+        // sans lui, le bouton reçoit `min-height: 40px` + `padding: 9px 18px`
+        // et sa flèche (petite, fixe) est chassée hors de la boîte : c'est
+        // EXACTEMENT le défaut mesuré sur B-165f, même cause, même symptôme
+        // (« on ne voit pas les flèches », MiKL le 20/10).
+        button_previous: 'gjc-cal-nav jdb-cal-nav',
+        button_next: 'gjc-cal-nav jdb-cal-nav',
       }}
     />
   )
