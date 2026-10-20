@@ -354,9 +354,9 @@
 .pv2-ligne.presents,
 .pv2-ligne.pourvoir,
 .pv2-ligne.absents {
-  height: 26px;
+  height: 20px;
   align-items: baseline;
-  gap: 7px;
+  gap: 5px;
 }
 .pv2-ligne.ouvrable { cursor: pointer; }
 .pv2-etq {
@@ -371,21 +371,20 @@
   text-transform: uppercase;
   color: #a08b70;
 }
-/* La hiérarchie de lecture du design V2 : le nombre en grand, le reste petit.
-   Les 4 lignes (Jour, Nuit, Manq., Abs.) partagent cette meme colonne
-   d'etiquette : c'est elle qui aligne toute la liste verticalement. */
+/* MiKL, 20/10 (5e passe) : « encore des chiffres enormes, harmonise moi tout
+   ca ». 22px hurlait dans une case de 8px de padding, meme uniformise entre
+   les 4 lignes. ➜ Un chiffre qui PESE (gras, encre pleine) mais qui ne crie
+   plus — sobriete (DESIGN.md), pas disparition : il reste le mot le plus
+   fonce de la ligne, juste plus proche de la taille du reste du texte. */
 .pv2-grand {
   font-family: Figtree, var(--t-font-titre, sans-serif);
   font-weight: 800;
-  font-size: 22px;
+  font-size: 14px;
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
   color: var(--pv2-txt);
 }
-/* MiKL, 20/10 : « pourquoi y a encore des chiffres de tailles differentes ».
-   Les 4 lignes affichent desormais TOUTES leur chiffre a la meme taille —
-   la hierarchie Jour=22px / Manq.+Abs.=16px tentee en 3e passe est retiree. */
 .pv2-grand.manque { color: var(--pv2-bad); }
 .pv2-sub {
   font-size: 10.5px;
