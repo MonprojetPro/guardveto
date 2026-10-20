@@ -314,7 +314,7 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
                     <div key={p.id} className="gjc-carte-encart">
                       <button
                         type="button"
-                        className="gjc-carte"
+                        className="gjc-carte jdb-carte"
                         aria-pressed={p.id === periodeId}
                         onClick={() => choisir(p.id)}
                         disabled={enCours}
@@ -356,7 +356,7 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
               {!libreOuvert ? (
                 <button
                   type="button"
-                  className="gjc-btn"
+                  className="gjc-btn jdb-btn"
                   onClick={ouvrirLibre}
                   disabled={enCours}
                 >
@@ -395,7 +395,7 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
                   <div className="gjc-libre-actions">
                     <button
                       type="button"
-                      className="gjc-cta"
+                      className="gjc-cta jdb-cta"
                       onClick={creerPeriodeLibre}
                       disabled={libreEnCours}
                     >
@@ -403,7 +403,7 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
                     </button>
                     <button
                       type="button"
-                      className="gjc-lien"
+                      className="gjc-lien jdb-lien"
                       onClick={() => {
                         setLibreOuvert(false)
                         setLibreErreur(null)
@@ -427,7 +427,7 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
             <section className="gjc-etape">
               <button
                 type="button"
-                className="gjc-cta"
+                className="gjc-cta jdb-cta"
                 onClick={regarder}
                 disabled={enCours || !periodeId}
               >
@@ -444,7 +444,7 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
               {peutPoser && (
                 <button
                   type="button"
-                  className="gjc-cta"
+                  className="gjc-cta jdb-cta"
                   onClick={appliquer}
                   disabled={enCours}
                 >
