@@ -1256,6 +1256,11 @@
 
 .gjc-cartes { display: flex; flex-wrap: wrap; gap: 10px; }
 
+/* Le wrapper porte la taille flex (reprise de `.gjc-carte` avant B-168a) —
+   la carte elle-même passe en largeur pleine pour laisser la place au
+   bouton de suppression, positionné dans le même coin sur toutes les cartes. */
+.gjc-carte-encart { position: relative; flex: 1 1 200px; min-width: 0; }
+
 /* Chaque carte porte SES dates. Sur l'original, les bornes vivaient sur une
    ligne isolée sous les boutons : en changeant de planning, on ne savait plus
    à quoi elles se rapportaient. */
@@ -1263,8 +1268,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  flex: 1 1 200px;
-  min-width: 0;
+  width: 100%;
   padding: 12px 14px;
   border: 1px solid var(--pv2-bd, #e6d7bb);
   border-radius: 14px;
@@ -1284,6 +1288,32 @@
   box-shadow: inset 0 0 0 1px var(--pv2-acc, #c7530f);
 }
 .gjc-carte:disabled { opacity: 0.55; cursor: default; }
+
+/* De la place pour le bouton de suppression (B-168a), réservée seulement sur
+   les cartes qui en portent un — une carte de garde n'en a pas besoin.
+   `jdb-carte-suppr` (posée dans le composant) l'exclut de la règle partagée
+   de modale, même raison que `.jdb-cal-nav` : un bouton-icône aussi petit se
+   ferait écraser par `min-height: 40px` + `padding: 9px 18px` (B-165f). */
+.gjc-carte-encart:has(.gjc-carte-suppr) .gjc-carte { padding-right: 38px; }
+.gjc-carte-suppr {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--pv2-sec, #7c6a55);
+}
+.gjc-carte-suppr:hover:not(:disabled) { background: #fbe9e4; color: #8f2f1b; }
+.gjc-carte-suppr:disabled { opacity: 0.4; cursor: default; }
+.gjc-carte-suppr svg { width: 15px; height: 15px; }
 
 /* ── « Dates libres » (B-162) ─────────────────────────────────────────────── */
 
@@ -1351,19 +1381,32 @@
 .gjc-cal-today { font-weight: 800; text-decoration: underline; }
 .gjc-cal-hors-mois { color: var(--pv2-sec, #cbb99a); }
 
+/* `.jdb-cal-nav` et `.jdb-carte-suppr` (posées en plus de `.gjc-cal-nav` et
+   `.gjc-carte-suppr` sur les mêmes boutons) sont des MARQUEURS SEULS : leur
+   unique rôle est de contenir la sous-chaîne « jdb- » pour échapper à la
+   règle partagée de `v2-terrier.css` (`:not([class*="jdb-"])`). Le style réel
+   vient de `.gjc-cal-nav`/`.gjc-carte-suppr`, juste en dessous. Cette règle ne
+   change rien à l'écran — elle existe pour que le gardien anti-classe-orpheline
+   (`chantier-classes-sans-regle.test.ts`) les voie, plutôt que de les exempter
+   en silence. */
+.jdb-cal-nav,
+.jdb-carte-suppr {
+  pointer-events: auto;
+}
+
 /* Les flèches mois précédent/suivant. `.jdb-cal-nav` (voir le composant) les
    exclut de la règle partagée `v2-terrier.css` qui impose à TOUT bouton de
    modale un `min-height: 40px` + `padding: 9px 18px` — sur un bouton aussi
    petit qu'une flèche, ce padding chasse l'icône hors de la boîte et la rend
    invisible (même défaut que B-165f, même famille de cause). */
 .gjc-cal-nav {
-  display: inline-flex !important;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px !important;
-  height: 28px !important;
-  min-height: 0 !important;
-  padding: 0 !important;
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  padding: 0;
   border-radius: 999px;
   border: 1px solid var(--pv2-bd, #e6d7bb);
   background: var(--pv2-surface, #fffcf4);

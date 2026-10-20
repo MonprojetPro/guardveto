@@ -53,6 +53,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { Trash2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -70,6 +71,7 @@ import {
 import { creerPeriode } from '@/app/(protected)/admin/periodes/actions'
 import { estLundi, lundiDeLaSemaine } from '@/lib/planning/duree'
 import type { PeriodeApplicable } from '@/components/v2/GenererJournee'
+import { RetirerPlanningModale } from '@/components/planning/RetirerPlanningModale'
 import {
   DatesLibresCalendrier,
   versISO,
@@ -97,6 +99,14 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
   const [periodeId, setPeriodeId] = useState<string>(periodes[0]?.id ?? '')
   const [apercu, setApercu] = useState<Apercu | null>(null)
   const [enCours, setEnCours] = useState(false)
+
+  // B-168a — supprimer une période journées depuis CETTE fenêtre, là où elle
+  // se crée. MiKL, 20/10 : exclure ces périodes d'Historique et de « Changer
+  // de période » (B-162, volontaire — ce ne sont pas des plannings de gardes)
+  // avait retiré, au passage, le SEUL bouton qui les supprimait. Bornée aux
+  // périodes `usage === 'journees'` : un planning de gardes se supprime
+  // depuis le planning, pas ici — deux chemins, jamais un doublon.
+  const [aSupprimer, setASupprimer] = useState<PeriodeApplicable | null>(null)
 
   // ── B-162 — « DATES LIBRES » ────────────────────────────────────────────
   //
@@ -217,6 +227,7 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
       date_debut: libreDebutCale,
       date_fin: libreFinISO,
       statut: 'brouillon',
+      usage: 'journees',
     })
     setPeriodeId(res.id)
     setApercu(null)
@@ -303,18 +314,31 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
               {periodesAffichees.length > 0 ? (
                 <div className="gjc-cartes" role="group" aria-label="Choisir le planning">
                   {periodesAffichees.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      className="gjc-carte"
-                      aria-pressed={p.id === periodeId}
-                      onClick={() => choisir(p.id)}
-                      disabled={enCours}
-                    >
-                      <b>{p.libelle}</b>
-                      <small>{libelleStatut(p.statut)}</small>
-                      <small>{periodeFr(p.date_debut, p.date_fin)}</small>
-                    </button>
+                    <div key={p.id} className="gjc-carte-encart">
+                      <button
+                        type="button"
+                        className="gjc-carte"
+                        aria-pressed={p.id === periodeId}
+                        onClick={() => choisir(p.id)}
+                        disabled={enCours}
+                      >
+                        <b>{p.libelle}</b>
+                        <small>{libelleStatut(p.statut)}</small>
+                        <small>{periodeFr(p.date_debut, p.date_fin)}</small>
+                      </button>
+                      {p.usage === 'journees' && (
+                        <button
+                          type="button"
+                          className="gjc-carte-suppr jdb-carte-suppr"
+                          aria-label={`Supprimer « ${p.libelle} »`}
+                          title="Supprimer cette période"
+                          onClick={() => setASupprimer(p)}
+                          disabled={enCours}
+                        >
+                          <Trash2 aria-hidden />
+                        </button>
+                      )}
+                    </div>
                   ))}
                 </div>
               ) : !libreOuvert ? (
@@ -458,6 +482,29 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
           </div>
         )}
       </DialogContent>
+
+      {aSupprimer && (
+        <RetirerPlanningModale
+          periodeId={aSupprimer.id}
+          nomConnu={aSupprimer.libelle}
+          geste="supprimer"
+          onFerme={() => setASupprimer(null)}
+          onFait={(message) => {
+            toast.success(message)
+            setASupprimer(null)
+            // La période supprimée peut être celle actuellement choisie, ou
+            // la période libre qu'on vient tout juste de créer localement —
+            // les deux doivent disparaître d'ici, pas seulement de la prop
+            // serveur qui n'a pas encore rafraîchi.
+            if (periodeLibre?.id === aSupprimer.id) setPeriodeLibre(null)
+            if (periodeId === aSupprimer.id) {
+              setPeriodeId(periodes[0]?.id ?? '')
+              setApercu(null)
+            }
+            router.refresh()
+          }}
+        />
+      )}
     </Dialog>
   )
 }

@@ -614,6 +614,10 @@ export default async function PlanningPageV2({
       date_debut: p.date_debut,
       date_fin: p.date_fin,
       statut: p.statut,
+      // B-168a — distingue les périodes "journées" (qui peuvent se supprimer
+      // depuis CETTE fenêtre) des plannings de gardes (qui se suppriment
+      // depuis le planning, pas ici — deux chemins, pas de doublon).
+      usage: p.usage,
     }))
   const lignesTrames = ((tramesRes as { data?: unknown[] | null })?.data ?? []) as {
     id: string

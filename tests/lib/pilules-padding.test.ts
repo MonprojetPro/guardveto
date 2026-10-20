@@ -86,6 +86,13 @@ const CONTENEURS_DE_BOUTONS: Record<string, string> = {
   // qui porte son propre espacement. Appliquer les 40 % ici imposerait 23px de
   // padding autour d'une icône de 24px — la barre entière doublerait de largeur.
   '.dock-item': 'Pastille d’icône du dock : contenu centré, le libellé vit dans le volet dépliant.',
+  // B-168 — même raisonnement que `.dock-item` : une icône seule (flèche de
+  // calendrier, poubelle), centrée par flex dans une boîte à largeur ET
+  // hauteur FIXES. Le padding ne détermine pas la taille de la boîte ici,
+  // contrairement à une pilule de texte — l'icône reste au centre géométrique
+  // quel que soit le padding déclaré. Pas de texte à décoller du bord.
+  '.gjc-cal-nav': 'Flèche de navigation du calendrier « Dates libres » : icône seule, centrée.',
+  '.gjc-carte-suppr': 'Bouton de suppression d’une carte de période : icône seule, centrée.',
 }
 
 interface Regle {

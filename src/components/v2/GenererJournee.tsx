@@ -59,6 +59,8 @@ export interface PeriodeApplicable {
   date_debut: string
   date_fin: string
   statut: string
+  /** B-168a — absent sur une période créée localement avant confirmation serveur. */
+  usage?: 'gardes' | 'journees' | 'les-deux'
 }
 
 interface Props {
