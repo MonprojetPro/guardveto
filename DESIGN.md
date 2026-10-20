@@ -118,6 +118,32 @@ Ce système rejette explicitement deux esthétiques : le blanc aseptisé des log
 - Couleurs personnelles : chaque vétérinaire est reconnu par sa couleur dans toute l'interface
 - Feedback immédiat : chaque action produit un retour visible (toast, état de bouton, indicateur de chargement)
 
+### Principe de sobriété — tranché par MiKL le 20/10/2026
+
+Après plusieurs passes de recette sur la fenêtre « Remplir le planning des journées »
+(B-168b), MiKL a tranché une direction d'ergonomie permanente, valable sur **toute
+l'application**, pas seulement l'écran qui l'a révélée :
+
+1. **Peu de blabla.** Aucun texte d'interface qui reformule ce que l'écran montre déjà,
+   ou qui explique une évidence. Un titre, une donnée, une action — pas de phrase
+   d'intention au-dessus ni d'avertissement générique en dessous. Si une phrase peut
+   être retirée sans perdre d'information utile, elle est de trop.
+2. **Icône plutôt que texte, quand le sens est univoque.** Un geste accessoire
+   (ajouter, supprimer, fermer, naviguer) se dit en icône dès que son contexte suffit à
+   le comprendre — pas de libellé texte qui double une icône déjà claire. Le texte
+   reste réservé aux actions dont le sens ne se devine pas (« Publier », « Générer »).
+3. **Le rayon des coins suit la densité du contenu, pas une valeur fixe.** Un encart
+   qui porte beaucoup d'écritures (plusieurs lignes, une carte de données) reste
+   **carré ou faiblement arrondi** — un grand rayon mange l'espace utile et donne une
+   impression de texte écrasé contre la courbe. Un encart court (un chiffre, une
+   icône, un badge, une pastille) peut rester **largement arrondi** — rien à y perdre.
+   ⚠️ **Ceci révise la règle « Corner Style : 10-14px » de la section Cards
+   ci-dessous**, qui donnait une valeur unique sans tenir compte du contenu.
+
+🔎 **Ce que ce principe ne dit PAS** : il ne supprime aucune information fonctionnelle
+(garde-fous, confirmations destructives, messages d'erreur réels) — il vise le texte
+qui ne fait que décorer ou se répéter.
+
 ## 2. Colors: La Palette de Confiance
 
 Le cyan teinté domine les fonds et les surfaces. Le cyan saturé concentre l'attention sur les actions. Le vert confirme. Le rouge alerte.
@@ -198,7 +224,10 @@ Les boutons sont **gently rounded (8px radius)** — ni carrés (trop corporate)
 - **Hover/Focus:** opacity à 90% sur les fonds colorés. Focus ring : outline 2px Cyan Profond avec offset 2px.
 
 ### Cards / Containers
-- **Corner Style:** gently rounded (radius 10-14px selon la taille)
+- **Corner Style:** suit la densité du contenu (principe de sobriété, 20/10/2026) —
+  **radius 6-8px** pour un encart chargé de texte (plusieurs lignes, carte de
+  données), **radius 10-14px voire pilule** pour un encart court (badge, pastille,
+  icône seule). Jamais un grand rayon sur un bloc dense : le texte semble écrasé.
 - **Background:** Blanc Surface (#FFFFFF)
 - **Shadow:** Ambient Subtle uniquement sur les cartes d'action (ActionBar)
 - **Border:** bordure Cyan Pâle (#CCE8EF, 1px solid)
@@ -242,6 +271,9 @@ Le badge vétérinaire est le composant le plus distinctif de l'interface. C'est
 - **Do** respecter les cibles tactiles minimum 44×44px sur mobile pour tous les éléments interactifs.
 - **Do** donner un feedback immédiat (toast, spinner, état de bouton) pour chaque action utilisateur.
 - **Do** colorer les cellules vendredi + samedi + dimanche avec le fond weekend (bg-primary/10) — le vendredi soir est un jour de garde comme le samedi.
+- **Do** retirer tout texte d'interface qui reformule ce que l'écran montre déjà (principe de sobriété, 20/10/2026).
+- **Do** préférer une icône à un libellé texte pour un geste accessoire dont le sens est univoque dans son contexte.
+- **Do** réduire le rayon des coins d'un encart dès qu'il porte plusieurs lignes de texte — carré ou faiblement arrondi, jamais un grand rayon sur un bloc dense.
 
 ### Don't:
 - **Don't** utiliser un fond blanc pur (#FFFFFF) comme fond principal d'écran. C'est le look médical/clinique que ce projet rejette explicitement.
@@ -254,3 +286,6 @@ Le badge vétérinaire est le composant le plus distinctif de l'interface. C'est
 - **Don't** utiliser le Rouge Vif (#DC2626) pour des informations non critiques. Si ce n'est pas une erreur ou une violation dure, ce n'est pas rouge.
 - **Don't** ajouter des ombres dramatiques. L'élévation se lit par la couche de fond, pas par des box-shadows prononcées.
 - **Don't** réduire la taille des cibles tactiles sur mobile sous prétexte de densité. 44×44px minimum, sans exception.
+- **Don't** écrire une phrase d'intention ou un avertissement générique au-dessus/en-dessous d'un écran qui se comprend déjà par lui-même.
+- **Don't** doubler une icône claire d'un libellé texte redondant sur un geste accessoire.
+- **Don't** appliquer un grand rayon (10px+) à un encart qui porte plusieurs lignes de texte — ça compresse visuellement le contenu.
