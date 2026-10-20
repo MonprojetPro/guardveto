@@ -332,7 +332,7 @@ export function CellulePresenceModale({
                     <button
                       key={t.id}
                       type="button"
-                      className={choix === t.id ? 'cpm-tr actif' : 'cpm-tr'}
+                      className={choix === t.id ? 'cpm-tr jdb-cpmtr actif' : 'cpm-tr jdb-cpmtr'}
                       disabled={enCours}
                       onClick={() => {
                         setChoix(t.id)

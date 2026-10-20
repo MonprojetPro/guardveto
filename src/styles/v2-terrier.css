@@ -850,7 +850,7 @@
 .res-changements {
   padding: 12px 14px 11px;
   border: 1px solid var(--t-accent);
-  border-radius: 13px;
+  border-radius: 7px;
   background: var(--accent-soft);
 }
 .res-changements .res-bloc-titre { color: var(--accent-ink); }
@@ -876,7 +876,7 @@
   display: flex; align-items: flex-start; gap: 9px;
   padding: 10px 12px;
   border: 1px solid var(--t-border);
-  border-radius: 11px;
+  border-radius: 7px;
   background: var(--accent-soft);
   font-size: 0.86rem; line-height: 1.45;
 }

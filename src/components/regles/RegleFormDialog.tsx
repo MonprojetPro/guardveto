@@ -21,7 +21,7 @@ import { useState, useMemo, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -638,9 +638,6 @@ export function RegleFormDialog({ open, onClose, vets, periodes: periodesDispo, 
           <DialogTitle className="font-heading">
             {isEdit ? 'Modifier la règle' : 'Nouvelle règle'}
           </DialogTitle>
-          <DialogDescription>
-            Seuls les types de règles appliqués par le moteur sont proposés.
-          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-1">

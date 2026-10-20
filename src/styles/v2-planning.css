@@ -638,7 +638,7 @@ button.vet-row-a-pourvoir:hover {
   display: flex; align-items: flex-start; gap: 10px;
   margin: 0 0 10px;
   padding: 9px 12px;
-  border: 1px solid var(--border-strong); border-radius: 10px;
+  border: 1px solid var(--border-strong); border-radius: 7px;
   background: var(--surface-2);
   color: var(--text);
 }

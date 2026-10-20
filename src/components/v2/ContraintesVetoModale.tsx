@@ -83,8 +83,6 @@ export function ContraintesVetoModale({
     )
   }, [regles, veto.id])
 
-  const actives = siennes.filter((r) => r.actif).length
-
   // Celles qui le contraignent À TRAVERS UNE ÉTIQUETTE. Elles ne lui
   // appartiennent pas : on les montre, on ne les édite pas d'ici. En pause,
   // elles ne pèsent sur personne — inutile de les faire figurer.
@@ -149,11 +147,6 @@ export function ContraintesVetoModale({
               </span>
               Les contraintes de {veto.prenom}
             </DialogTitle>
-            <DialogDescription>
-              {actives === 0
-                ? "Aucune contrainte active : le moteur peut la placer partout où la structure l'autorise."
-                : `${actives} contrainte${actives > 1 ? 's' : ''} que le moteur respecte à chaque génération.`}
-            </DialogDescription>
           </DialogHeader>
 
           {siennes.length === 0 ? (

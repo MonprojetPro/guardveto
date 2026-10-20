@@ -99,7 +99,7 @@
 .bj-form {
   padding: 14px;
   border: 1px solid var(--border-strong);
-  border-radius: 10px;
+  border-radius: 7px;
   background: var(--surface-2);
   width: 100%;
 }
@@ -344,7 +344,7 @@
   width: 100%;
   padding: 14px;
   border: 1px solid var(--border-strong);
-  border-radius: 10px;
+  border-radius: 7px;
   background: var(--surface-2);
 }
 

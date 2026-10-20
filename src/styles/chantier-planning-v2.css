@@ -1438,9 +1438,9 @@
 .gjc-cal-today { font-weight: 800; text-decoration: underline; }
 .gjc-cal-hors-mois { color: var(--pv2-sec, #cbb99a); }
 
-/* `.jdb-cal-nav`, `.jdb-carte-suppr`, `.jdb-carte`, `.jdb-cta`, `.jdb-lien`
-   et `.jdb-icbtn` (posées en plus de leur classe `.gjc-*` sur les mêmes
-   boutons) sont des
+/* `.jdb-cal-nav`, `.jdb-carte-suppr`, `.jdb-carte`, `.jdb-cta`, `.jdb-lien`,
+   `.jdb-icbtn` et `.jdb-cpmtr` (posées en plus de leur classe `.gjc-*`/`.cpm-*`
+   sur les mêmes boutons) sont des
    MARQUEURS SEULS : leur unique rôle est de contenir la sous-chaîne « jdb- »
    pour échapper à la règle partagée de `v2-terrier.css`
    (`:not([class*="jdb-"])`), qui impose à TOUT bouton de modale un
@@ -1459,7 +1459,8 @@
 .jdb-carte,
 .jdb-cta,
 .jdb-lien,
-.jdb-icbtn {
+.jdb-icbtn,
+.jdb-cpmtr {
   pointer-events: auto;
 }
 
@@ -1671,7 +1672,7 @@
   gap: 4px 8px;
   padding: 10px 14px;
   border: 1px solid #e0b98a;
-  border-radius: 14px;
+  border-radius: 6px;
   background: #fdf3e4;
 }
 .cpm-indispo b { font-size: 0.86rem; font-weight: 800; color: #9a5a18; }
@@ -1694,7 +1695,7 @@
    pas, c'est de n'en rien dire. */
 .cpm-prevu {
   padding: 12px 14px;
-  border-radius: 14px;
+  border-radius: 6px;
   background: var(--pv2-creux, #f6eedf);
   font-size: 0.84rem;
   line-height: 1.5;
@@ -1727,7 +1728,7 @@
 .cpm-vide {
   margin: 0;
   padding: 12px 14px;
-  border-radius: 14px;
+  border-radius: 6px;
   background: var(--pv2-creux, #f6eedf);
   color: var(--pv2-sec, #7c6a55);
   font-size: 0.84rem;
@@ -1744,7 +1745,7 @@
   flex-wrap: wrap;
   padding: 10px 14px;
   border: 1px solid var(--pv2-bd, #e6d7bb);
-  border-radius: 14px;
+  border-radius: 6px;
   background: var(--pv2-surface, #fffcf4);
 }
 /* ⚠️ LE `gap` EST LA CORRECTION VISIBLE DE LA CAPTURE. Sans lui, `<b>` et
@@ -1765,9 +1766,10 @@
   gap: 2px;
   flex: 1 1 150px;
   min-width: 0;
+  min-height: 44px;
   padding: 11px 14px;
   border: 1px solid var(--pv2-bd, #e6d7bb);
-  border-radius: 14px;
+  border-radius: 6px;
   background: var(--pv2-surface, #fffcf4);
   text-align: left;
   cursor: pointer;
@@ -2286,7 +2288,7 @@
   margin-top: 10px;
   padding: 10px 14px;
   border: 1px solid var(--danger, #a8341f);
-  border-radius: 14px;
+  border-radius: 7px;
   background: rgba(168, 52, 31, 0.06);
   font-size: 0.78rem;
 }

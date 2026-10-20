@@ -565,7 +565,6 @@ function ProposerEchangeDialog({ open, onClose, moiId, gardesFutures, vets, gard
         <DialogHeader>
           <DialogTitle className="font-heading">Proposer un échange de garde</DialogTitle>
           <DialogDescription>
-            Choisis la garde que tu cèdes et le confrère à qui tu la proposes.
             L&apos;échange ne sera appliqué qu&apos;après son accord et la validation de l&apos;administrateur.
           </DialogDescription>
         </DialogHeader>
