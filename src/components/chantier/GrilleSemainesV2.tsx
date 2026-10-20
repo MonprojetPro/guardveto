@@ -574,7 +574,16 @@ function CaseRepliee({
                   // Rien d'attenue tant que personne n'est mis en avant.
                   prenomEnAvant && p.texte !== prenomEnAvant ? 'attenue' : '',
                 ].filter(Boolean).join(' ')}
-                style={p.couleur ? { color: p.couleur } : undefined}
+                /* Le point porte l'identification couleur ; le texte, lui,
+                   reste dans l'encre du terrier — une couleur de véto très
+                   claire (ex. jaune pâle) en texte brut devenait illisible
+                   sur le fond crème (PIXEL, 20/10). Le fond pastel donne au
+                   chip son relief sans reprendre ce risque. */
+                style={
+                  p.couleur
+                    ? { background: `color-mix(in srgb, ${p.couleur} 16%, var(--pv2-surface, #fff))` }
+                    : undefined
+                }
               >
                 {p.couleur && (
                   <span

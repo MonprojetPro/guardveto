@@ -288,7 +288,7 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
   height: var(--pv2-h-tete);
   flex: none;
 }
@@ -347,7 +347,7 @@
   font: inherit;
   color: inherit;
 }
-.pv2-ligne.presents { height: 26px; }
+.pv2-ligne.presents { height: 26px; align-items: baseline; gap: 7px; }
 .pv2-ligne.ouvrable { cursor: pointer; }
 .pv2-etq {
   flex: none;
@@ -385,6 +385,9 @@
   padding: 0 10px;
   border: 1px solid transparent;
   border-radius: 999px;
+  /* L'encre du terrier, pas la couleur du véto : voir la note dans
+     GrilleSemainesV2.tsx — le point porte déjà l'identification. */
+  color: var(--pv2-txt);
   font-size: 10.5px;
   font-weight: 700;
   overflow: hidden;
