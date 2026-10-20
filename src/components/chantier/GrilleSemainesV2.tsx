@@ -60,6 +60,7 @@ import {
   visibilite,
   type AxeContenu,
   type GardeGrille,
+  type LigneRepliee,
   type PersonneGrille,
   type RailBornes,
 } from '@/lib/planning/grilleSemaines'
@@ -480,10 +481,34 @@ type LigneCompacte = ReturnType<typeof lignesCaseRepliee>[number] & {
   resume?: string
 }
 
+/**
+ * B-170 (suite) — MiKL, 20/10, apres la 1ere passe PIXEL : *« il faudrait une
+ * liste avec en 1er journee : nb de presents, nuit : le nom ENTIER du 1er et
+ * du 2eme, et enfin le nb d'absents »*.
+ *
+ * L'ordre d'affichage N'EST PAS celui de `lignesCaseRepliee` (presents,
+ * absents, nuit, pourvoir) : on le retrie ICI, pas dans la source — cette
+ * fonction est partagee avec l'ecran client (B-159), on adapte sa SORTIE.
+ */
+const ORDRE_AFFICHAGE: Record<LigneRepliee['genre'], number> = {
+  presents: 0,
+  nuit: 1,
+  pourvoir: 2,
+  absents: 3,
+}
+
 function compacterLignes(
   lignes: ReturnType<typeof lignesCaseRepliee>,
 ): LigneCompacte[] {
-  return lignes.map((l) => {
+  const triees = [...lignes].sort(
+    (a, b) => ORDRE_AFFICHAGE[a.genre] - ORDRE_AFFICHAGE[b.genre],
+  )
+
+  return triees.flatMap((l): LigneCompacte[] => {
+    if (l.genre === 'presents') {
+      // « Journée », en vis-a-vis de « Nuit » juste en dessous.
+      return [{ ...l, etiquette: 'Jour' }]
+    }
     if (l.genre === 'absents') {
       const n = l.pastilles.length
       // ⚠️ On repart des pastilles DEJA limitees par `lignesCaseRepliee` (qui
@@ -491,26 +516,34 @@ function compacterLignes(
       //    etre inferieur au nombre reel d'absents — d'ou « au moins » dans
       //    l'infobulle, plutot qu'un chiffre qui se donnerait pour exact.
       const resume = l.pastilles.map((p) => p.texte).join(', ')
-      return {
+      return [{
         ...l,
         etiquette: '',
         pastilles: [{ texte: n > 1 ? `${n} abs.` : '1 abs.', couleur: null, creux: true }],
         resume,
-      }
+      }]
     }
     if (l.genre === 'nuit') {
-      // Deux noms entiers valent mieux que trois coupes.
-      return l.pastilles.length <= 2
-        ? l
-        : {
-            ...l,
-            pastilles: [
-              l.pastilles[0],
-              { texte: `+${l.pastilles.length - 1}`, couleur: null, creux: true },
-            ],
-          }
+      // UN NOM ENTIER PAR LIGNE, pas deux pastilles serrees sur la meme ligne
+      // (ancienne version) : c'est ce qui les coupait en plein milieu sur une
+      // case etroite. Au-dela de 2 presents, on resume par « +N » plutot que
+      // de laisser la case grandir sans fin.
+      if (l.pastilles.length <= 2) {
+        return l.pastilles.map((p, i) => ({
+          ...l,
+          etiquette: i === 0 ? l.etiquette : '',
+          pastilles: [p],
+        }))
+      }
+      return [{
+        ...l,
+        pastilles: [
+          l.pastilles[0],
+          { texte: `+${l.pastilles.length - 1}`, couleur: null, creux: true },
+        ],
+      }]
     }
-    return l
+    return [l]
   })
 }
 
@@ -557,7 +590,14 @@ function CaseRepliee({
              qu'on survole pour savoir QUI est absent, maintenant que le
              compteur a remplace les prenoms. */
           <span className="pv2-ligne-in" title={l.resume || undefined}>
-            {l.etiquette && <span className="pv2-etq">{l.etiquette}</span>}
+            {/* Le 2e nom de la nuit n'a pas d'etiquette a redire, mais il
+                doit garder la MEME colonne que le 1er — sinon la liste perd
+                son alignement (MiKL, 20/10 : « une liste »). */}
+            {(l.etiquette || l.genre === 'nuit') && (
+              <span className="pv2-etq" aria-hidden={l.etiquette ? undefined : true}>
+                {l.etiquette}
+              </span>
+            )}
             {l.genre === 'presents' && (
               <>
                 <span className="pv2-grand">{l.nombre}</span>
