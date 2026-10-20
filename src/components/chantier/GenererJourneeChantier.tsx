@@ -57,7 +57,6 @@ import { Trash2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -286,10 +285,6 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
       <DialogContent className="sm:max-w-[640px]">
         <DialogHeader>
           <DialogTitle>Remplir le planning des journées</DialogTitle>
-          <DialogDescription>
-            Les présences récurrentes décrites dans « Journée » sont des règles. Ce geste les pose
-            réellement sur un planning, jour par jour.
-          </DialogDescription>
         </DialogHeader>
 
         {!aDesTrames ? (
@@ -306,10 +301,7 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
                 les affichait sur une ligne isolée, commune aux deux, donc en
                 changeant de planning on ne savait plus de quoi on parlait. */}
             <section className="gjc-etape">
-              <h3 className="gjc-titre">
-                <span className="gjc-num" aria-hidden>1</span>
-                Sur quel planning
-              </h3>
+              <h3 className="gjc-titre">Sur quel planning</h3>
 
               {periodesAffichees.length > 0 ? (
                 <div className="gjc-cartes" role="group" aria-label="Choisir le planning">
@@ -421,19 +413,19 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
               )}
             </section>
 
-            {/* ── 2 ───────────────────────────────────────────────────────── */}
+            {/* Le geste d'écriture n'apparaît QU'APRÈS l'aperçu, et seulement
+                s'il y a réellement quelque chose à poser. Un geste qui écrit
+                des centaines de lignes ne doit pas être atteignable sans avoir
+                lu ce qu'il fait — c'est pour ça que le bouton reste un aperçu
+                tant qu'on n'a pas vu ce qu'il y a à poser. */}
             <section className="gjc-etape">
-              <h3 className="gjc-titre">
-                <span className="gjc-num" aria-hidden>2</span>
-                Regarder ce que ça poserait
-              </h3>
               <button
                 type="button"
-                className="gjc-btn"
+                className="gjc-cta"
                 onClick={regarder}
                 disabled={enCours || !periodeId}
               >
-                {enCours ? 'Calcul en cours…' : 'Calculer l’aperçu'}
+                {enCours ? 'Génération…' : 'Générer'}
               </button>
 
               {apercu && (
@@ -441,19 +433,8 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
                   {apercu.ok ? apercu.phrase : apercu.probleme}
                 </p>
               )}
-            </section>
 
-            {/* ── 3 ─────────────────────────────────────────────────────────
-                Le geste d'écriture n'apparaît QU'APRÈS l'aperçu, et seulement
-                s'il y a réellement quelque chose à poser. Un geste qui écrit
-                des centaines de lignes ne doit pas être atteignable sans avoir
-                lu ce qu'il fait. */}
-            {peutPoser && (
-              <section className="gjc-etape">
-                <h3 className="gjc-titre">
-                  <span className="gjc-num" aria-hidden>3</span>
-                  Poser sur le planning
-                </h3>
+              {peutPoser && (
                 <button
                   type="button"
                   className="gjc-cta"
@@ -463,22 +444,8 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
                   Poser {apercu.aPoser} présence{apercu.aPoser > 1 ? 's' : ''}
                   {periode ? ` sur ${periode.libelle}` : ''}
                 </button>
-              </section>
-            )}
-
-            {/* ⚠️ LA LIMITE EST ÉCRITE, pas laissée à découvrir en recette.
-                L'application ne retire jamais rien — c'est ce qui protège les
-                retouches — donc une présence supprimée à la main revient. */}
-            <p className="gjc-avis">
-              <span className="gjc-avis-ico" aria-hidden>!</span>
-              <span>
-                Ce geste <b>ajoute seulement</b> : il ne retire ni ne déplace aucune présence déjà
-                posée, vos retouches sont donc à l’abri. Les congés validés et les absences
-                déclarées sont respectés — personne n’est posé un jour où il est absent. En
-                revanche, une présence que vous avez retirée à la main reviendra si vous
-                réappliquez les règles.
-              </span>
-            </p>
+              )}
+            </section>
           </div>
         )}
       </DialogContent>

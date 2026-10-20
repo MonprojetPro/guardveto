@@ -1215,41 +1215,23 @@
 .gjc-vide {
   margin: 8px 0 0;
   padding: 14px 16px;
-  border-radius: 14px;
+  border-radius: 8px;
   background: var(--pv2-creux, #f6eedf);
   color: var(--pv2-sec, #7c6a55);
   font-size: 0.86rem;
   line-height: 1.55;
 }
 
-/* ── Les trois étapes ─────────────────────────────────────────────────────── */
+/* ── Les étapes ───────────────────────────────────────────────────────────── */
 
 .gjc-etape { display: flex; flex-direction: column; gap: 10px; }
 
-/* Les gestes sont SÉQUENTIELS : choisir, regarder, poser. L'original les
-   donnait au même niveau visuel, ce qui laissait croire à trois options. */
 .gjc-titre {
-  display: flex;
-  align-items: center;
-  gap: 9px;
   margin: 0;
   font-family: Figtree, var(--t-font-titre, sans-serif);
   font-size: 0.92rem;
   font-weight: 800;
   color: var(--pv2-txt, #3a2a1c);
-}
-.gjc-num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  flex: none;
-  border-radius: 999px;
-  background: var(--pv2-acc, #c7530f);
-  color: #fff;
-  font-size: 0.72rem;
-  font-weight: 800;
 }
 
 /* ── Le choix du planning ─────────────────────────────────────────────────── */
@@ -1271,7 +1253,7 @@
   width: 100%;
   padding: 12px 14px;
   border: 1px solid var(--pv2-bd, #e6d7bb);
-  border-radius: 14px;
+  border-radius: 8px;
   background: var(--pv2-surface, #fffcf4);
   text-align: left;
   cursor: pointer;
@@ -1323,7 +1305,7 @@
   gap: 10px;
   padding: 12px 14px;
   border: 1px dashed var(--pv2-bd, #e6d7bb);
-  border-radius: 14px;
+  border-radius: 8px;
   background: var(--pv2-creux, #f6eedf);
 }
 .gjc-libre-aide { font-size: 0.72rem; font-weight: 500; color: var(--pv2-acc, #c7530f); }
@@ -1357,7 +1339,7 @@
   color: var(--pv2-txt, #3a2a1c);
   background: var(--pv2-surface, #fffcf4);
   border: 1px solid var(--pv2-bd, #e6d7bb);
-  border-radius: 14px;
+  border-radius: 8px;
   padding: 10px;
   align-self: flex-start;
 }
@@ -1463,43 +1445,12 @@
 .gjc-refus {
   margin: 0;
   padding: 11px 14px;
-  border-radius: 12px;
+  border-radius: 8px;
   font-size: 0.84rem;
   line-height: 1.5;
 }
 .gjc-apercu { background: #eef4e8; color: #3f6530; }
 .gjc-refus { background: #fbe9e4; color: #8f2f1b; }
-
-/* ── L'avertissement ──────────────────────────────────────────────────────── */
-
-/* Le « ! » était un caractère nu collé au texte : sa pastille vivait dans la
-   feuille absente. Il redevient un repère rond, détaché. */
-.gjc-avis {
-  display: flex;
-  gap: 11px;
-  margin: 0;
-  padding: 13px 15px;
-  border-radius: 14px;
-  background: var(--pv2-creux, #f6eedf);
-  border: 1px solid var(--pv2-filet, #eadcc2);
-  font-size: 0.79rem;
-  line-height: 1.55;
-  color: var(--pv2-sec, #7c6a55);
-}
-.gjc-avis b { color: var(--pv2-txt, #3a2a1c); font-weight: 800; }
-.gjc-avis-ico {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  flex: none;
-  border-radius: 999px;
-  background: #f0dcc0;
-  color: #8f4410;
-  font-weight: 800;
-  font-size: 0.78rem;
-}
 
 @media (max-width: 560px) {
   .gjc-cartes { flex-direction: column; }
