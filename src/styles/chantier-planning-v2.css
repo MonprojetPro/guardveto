@@ -404,7 +404,13 @@
   min-width: 0;
   height: 18px;
   box-sizing: border-box;
-  padding: 0 10px;
+  /* MiKL, 21/10 : « les points des noms de ceux qui sont en garde au meme
+     niveau que les chiffres, que tout soit aligne ». Un padding symetrique
+     (10px/10px) placait le point 10px plus a droite que `.pv2-grand`, qui
+     n'a lui aucun padding — meme colonne d'etiquette (34px), meme gap
+     (5px), mais un depart different. Padding gauche reduit : le point se
+     rapproche du depart du chiffre sans coller au bord arrondi du chip. */
+  padding: 0 10px 0 4px;
   border: 1px solid transparent;
   border-radius: 999px;
   /* L'encre du terrier, pas la couleur du véto : voir la note dans
