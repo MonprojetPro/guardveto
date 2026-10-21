@@ -218,7 +218,12 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  /* B-170 (suite, 21/10) — MiKL : « tout est un peu compressé sur les cards
+     journées repliées, écarte les éléments pour que ça respire ». Les 4
+     lignes (tête, Jour, Nuit, Abs.) se touchaient (gap: 0) après 5 passes
+     centrées sur leur hauteur individuelle. L'espace ENTRE elles n'avait
+     jamais été revu. */
+  gap: 3px;
   box-sizing: border-box;
   padding: var(--pv2-pad);
   /* Bordure TRANSPARENTE, pas absente : elle fait partie du châssis partagé.
