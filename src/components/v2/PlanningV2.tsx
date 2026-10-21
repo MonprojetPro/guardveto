@@ -912,6 +912,10 @@ export function PlanningV2({
                 bilans={bilans}
                 colonnes={colonnesCompteurs}
                 projetees={compteursProjetes}
+                // B-171 — cette colonne latérale fait toujours 262 px : le
+                // plafond élargi (8) ne vaut que pour la pop-up chantier.
+                maxAffichable={4}
+                disponibleJournee={(modules ?? []).includes('planning-journee')}
               />
             </aside>
             )}

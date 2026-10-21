@@ -48,6 +48,7 @@ export function CompteursModale({
   bilans,
   colonnes,
   projetees,
+  disponibleJournee,
   onFermer,
 }: {
   ouvert: boolean
@@ -55,6 +56,8 @@ export function CompteursModale({
   bilans: BilanVet[]
   colonnes: CleColonne[]
   projetees?: CompteursRow[]
+  /** B-171 — les 3 colonnes Journées ne sont proposées que si ce cabinet a le module. */
+  disponibleJournee?: boolean
   onFermer: () => void
 }) {
   if (!ouvert) return null
@@ -72,6 +75,7 @@ export function CompteursModale({
           bilans={bilans}
           colonnes={colonnes}
           projetees={projetees}
+          disponibleJournee={disponibleJournee}
         />
       </DialogContent>
     </Dialog>

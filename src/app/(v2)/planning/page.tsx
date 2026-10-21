@@ -39,8 +39,11 @@ import {
 import {
   queryCompteurs,
   queryTotalWE,
+  queryCompteursJournee,
+  fusionnerCompteursJournee,
   completerCompteursPourAffichage,
   type VetoPourCompteurs,
+  type CompteursJourneeRow,
 } from '@/hooks/useCompteurs'
 import { calculerBilans } from '@/engine/bilan'
 import { normaliserColonnes } from '@/lib/planning/colonnesCompteurs'
@@ -359,7 +362,7 @@ export default async function PlanningPageV2({
   // les présences de journée ont besoin de savoir s'il existe au moins une
   // règle à appliquer. Chargés en parallèle du reste : aucune requête en série
   // ajoutée sur un produit déjà jugé lent (B-116).
-  const [dock, profilRes, compteursRes, totalWERes, prefsRes, typesRes2, equipeRes, creneauxRes, modules, tramesRes, presencesRes, blocsRes, grilleV2] = await Promise.all([
+  const [dock, profilRes, compteursRes, totalWERes, compteursJourneeRes, prefsRes, typesRes2, equipeRes, creneauxRes, modules, tramesRes, presencesRes, blocsRes, grilleV2] = await Promise.all([
     chargerDock(supabase, { role_app: identite.role }, periodes),
     periodeAffichee?.profil_id
       ? supabase.from('profils_planning').select('nom').eq('id', periodeAffichee.profil_id).maybeSingle()
@@ -373,6 +376,16 @@ export default async function PlanningPageV2({
     periodeAffichee
       ? queryTotalWE(supabase, periodeAffichee.id)
       : Promise.resolve({ totalWE: 0, erreur: null }),
+    // B-171 — les 3 colonnes « Journées » de l'encart compteurs. Bornées aux
+    // DATES de la période de gardes affichée, pas à un `periode_id` : une
+    // période journées peut la chevaucher sans partager son identifiant
+    // (même raison que `presencesDeLaPeriode`, B-162).
+    periodeAffichee
+      ? queryCompteursJournee(supabase, periodeAffichee.date_debut, periodeAffichee.date_fin)
+      : Promise.resolve({
+          parVeto: new Map<string, CompteursJourneeRow>(),
+          erreur: null as string | null,
+        }),
     // Les colonnes choisies par la personne connectée. Absente = les colonnes
     // par défaut ; jamais bloquant (l'encart doit s'afficher quoi qu'il arrive).
     // Les préférences sont rattachées à une fiche vétérinaire : le secrétariat
@@ -766,9 +779,22 @@ export default async function PlanningPageV2({
   // affiché ne bouge. Les lignes ajoutées n'ont pas de bilan, ce que
   // `CompteursPanel` rend déjà « hors répartition ». Même geste que l'écran
   // Historique — les deux encarts doivent raconter la même chose.
-  const compteursAffiches = completerCompteursPourAffichage(
+  const compteursSansJournee = completerCompteursPourAffichage(
     compteurs,
     (equipeRes?.data ?? []) as VetoPourCompteurs[],
+  )
+
+  // B-171 — best-effort assumé, même principe que l'encart compteurs plus
+  // haut : un échec de lecture des présences Journées ne doit pas empêcher
+  // l'écran de s'afficher. Les 3 colonnes resteraient simplement à zéro.
+  if (compteursJourneeRes.erreur) {
+    console.error(
+      `[planning] compteurs Journées indisponibles pour la periode ${periodeAffichee?.id} : ${compteursJourneeRes.erreur}`,
+    )
+  }
+  const compteursAffiches = fusionnerCompteursJournee(
+    compteursSansJournee,
+    compteursJourneeRes.parVeto,
   )
 
   const colonnesCompteurs = normaliserColonnes(

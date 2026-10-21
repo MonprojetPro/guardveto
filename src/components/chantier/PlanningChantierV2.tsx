@@ -375,6 +375,10 @@ export function PlanningChantierV2({
   // que de filtrer `periodes` à la source : cette prop sert aussi ailleurs
   // (présences, compteurs) où les périodes journées doivent rester visibles.
   const periodesGardes = periodes.filter((p) => periodePorteDesGardes(p.usage))
+  // B-171 — calculé une seule fois, réutilisé partout où la présence du
+  // module décide d'un affichage (plutôt que de recopier l'expression et
+  // risquer qu'un des appels diverge des autres).
+  const moduleJourneeActif = (modules ?? []).includes('planning-journee')
   const [annee, mois] = anneeMois.split('-').map(Number)
   const [popOuvert, setPopOuvert] = useState(false)
   // B-157 — le menu « Outils » de la tête de page : il accueille les gestes
@@ -1740,6 +1744,7 @@ export function PlanningChantierV2({
         bilans={bilans}
         colonnes={colonnesCompteurs}
         projetees={compteursProjetes}
+        disponibleJournee={moduleJourneeActif}
         onFermer={() => setCompteursOuverts(false)}
       />
 
@@ -1963,7 +1968,7 @@ export function PlanningChantierV2({
           // B-163 — meme branchement que l'ecran client : la fenetre est la
           // MEME, et un chantier qui n'offrirait pas le choix donnerait une
           // recette qui ne ressemble pas a la production.
-          moduleJourneeActif={(modules ?? []).includes('planning-journee')}
+          moduleJourneeActif={moduleJourneeActif}
         />
       )}
 
@@ -1995,7 +2000,7 @@ export function PlanningChantierV2({
           isAdmin={isAdmin}
           dateDefaut={congeJour}
           onConflit={setConflitConge}
-          moduleJourneeActif={(modules ?? []).includes('planning-journee')}
+          moduleJourneeActif={moduleJourneeActif}
         />
       )}
 

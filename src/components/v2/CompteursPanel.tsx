@@ -24,7 +24,7 @@ import { toast } from 'sonner'
 import { Settings2, Check } from 'lucide-react'
 import { setColonnesCompteurs } from '@/app/(protected)/preferences/actions'
 import {
-  COLONNES, ORDRE_CATALOGUE, MAX_COLONNES, normaliserColonnes,
+  COLONNES, ORDRE_CATALOGUE, COLONNES_JOURNEE, MAX_COLONNES, normaliserColonnes,
   type CleColonne,
 } from '@/lib/planning/colonnesCompteurs'
 import type { CompteursRow } from '@/hooks/useCompteurs'
@@ -49,6 +49,20 @@ interface Props {
    * l'identique d'avant B-123.
    */
   projetees?: CompteursRow[]
+  /**
+   * B-171 — combien de colonnes ce contexte d'affichage peut réellement
+   * accueillir. 4 sur l'ancienne colonne latérale de `PlanningV2` (262 px) ;
+   * 8 dans la pop-up (`CompteursModale`), qui a largement plus de place.
+   * Un seul catalogue, deux largeurs — voir l'en-tête de `colonnesCompteurs.ts`.
+   */
+  maxAffichable?: number
+  /**
+   * Les 3 colonnes Journées (matin/après-midi/journée entière) n'ont de sens
+   * que pour un cabinet qui a activé ce module — sinon elles ne proposeraient
+   * que des zéros. `false` par défaut : un appelant qui ne le précise pas ne
+   * doit pas les voir apparaître.
+   */
+  disponibleJournee?: boolean
 }
 
 /** La pastille d'écart, même code couleur que l'écran Historique. */
@@ -66,10 +80,20 @@ function Ecart({ valeur, horsRepartition }: { valeur: number; horsRepartition: b
   return <span className={`cnt-ecart-pastille ${classe}`} title={titre}>{texte}</span>
 }
 
-export function CompteursPanel({ lignes, bilans, colonnes, projetees }: Props) {
-  const [choix, setChoix] = useState<CleColonne[]>(colonnes)
+export function CompteursPanel({
+  lignes, bilans, colonnes, projetees, maxAffichable = MAX_COLONNES, disponibleJournee = false,
+}: Props) {
+  // Tronqué à CE contexte dès le départ : une préférence posée à 8 colonnes
+  // depuis la pop-up ne doit pas déborder si elle s'affiche un jour dans
+  // l'ancienne colonne latérale (`maxAffichable={4}`).
+  const [choix, setChoix] = useState<CleColonne[]>(colonnes.slice(0, maxAffichable))
   const [reglageOuvert, setReglageOuvert] = useState(false)
   const [enregistrement, setEnregistrement] = useState(false)
+  // Le catalogue proposé dans le menu de réglage : les 3 colonnes Journées
+  // n'y figurent que si ce cabinet a le module.
+  const catalogue = disponibleJournee
+    ? ORDRE_CATALOGUE
+    : ORDRE_CATALOGUE.filter((c) => !COLONNES_JOURNEE.includes(c))
 
   const bilanDe = new Map(bilans.map((b) => [b.veterinaire_id, b]))
   // B-123 — la ligne PROJETÉE de chaque vétérinaire. `projeterCompteurs` rend
@@ -80,9 +104,9 @@ export function CompteursPanel({ lignes, bilans, colonnes, projetees }: Props) {
 
   async function basculer(cle: CleColonne) {
     const dejaLa = choix.includes(cle)
-    if (!dejaLa && choix.length >= MAX_COLONNES) {
+    if (!dejaLa && choix.length >= maxAffichable) {
       toast.error(
-        `${MAX_COLONNES} colonnes au maximum — l’encart est étroit. Décoche-en une d’abord.`,
+        `${maxAffichable} colonnes au maximum ici — l’encart est étroit. Décoche-en une d’abord.`,
       )
       return
     }
@@ -117,6 +141,9 @@ export function CompteursPanel({ lignes, bilans, colonnes, projetees }: Props) {
       case 'total': return l.total_gardes
       case 'premierExcept': return l.jours_1er_we_exceptionnels ?? 0
       case 'ecart': return bilanDe.get(l.veterinaire_id)?.ecart_we ?? 0
+      case 'jMatin': return l.jo_matin ?? 0
+      case 'jApresMidi': return l.jo_apres_midi ?? 0
+      case 'jEntiere': return l.jo_entiere ?? 0
     }
   }
   const maxDe = new Map<CleColonne, number>(
@@ -162,11 +189,11 @@ export function CompteursPanel({ lignes, bilans, colonnes, projetees }: Props) {
         <div className="cnt-reglage">
           <p className="cnt-reglage-titre">
             Colonnes affichées
-            <span className="cnt-reglage-compte">{choix.length}/{MAX_COLONNES}</span>
+            <span className="cnt-reglage-compte">{choix.length}/{maxAffichable}</span>
           </p>
-          {ORDRE_CATALOGUE.map((cle) => {
+          {catalogue.map((cle) => {
             const active = choix.includes(cle)
-            const bloque = !active && choix.length >= MAX_COLONNES
+            const bloque = !active && choix.length >= maxAffichable
             return (
               <button
                 key={cle}
@@ -187,7 +214,7 @@ export function CompteursPanel({ lignes, bilans, colonnes, projetees }: Props) {
             )
           })}
           <p className="cnt-reglage-note">
-            {MAX_COLONNES} au maximum : au-delà, l’encart devient illisible sur cette
+            {maxAffichable} au maximum ici : au-delà, l’encart devient illisible sur cette
             largeur. Ton choix te suit sur tes autres appareils.
           </p>
         </div>

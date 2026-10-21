@@ -77,6 +77,15 @@ export interface CompteursRow {
    */
   jours_1er_we_exceptionnels?: number
   jours_exceptionnels_pris?: number
+  /**
+   * B-171 — les trois colonnes « Journées », fusionnées après coup par
+   * `fusionnerCompteursJournee` (même principe que `jours_1er_we_exceptionnels` :
+   * une source étrangère à la vue `compteurs_gardes`, donc absente des lignes
+   * qui n'en ont pas demandé la fusion).
+   */
+  jo_matin?: number
+  jo_apres_midi?: number
+  jo_entiere?: number
 }
 
 export interface BonusMalusRow {
@@ -114,6 +123,88 @@ export async function queryCompteurs(
 
   if (error) return { compteurs: [], erreur: error.message }
   return { compteurs: (data as CompteursRow[] | null) ?? [], erreur: null }
+}
+
+/** Un compte par créneau, pour un vétérinaire — ce que `fusionnerCompteursJournee` pose sur une `CompteursRow`. */
+export interface CompteursJourneeRow {
+  matin: number
+  apres_midi: number
+  entiere: number
+}
+
+/**
+ * B-171 — les compteurs du module Journées (présences matin / après-midi /
+ * journée entière), pour l'encart compteurs du planning.
+ *
+ * ⚠️ BORNÉ AUX DATES, PAS À UN `periode_id` — même raison que
+ *    `presencesDeLaPeriode` (`app/(v2)/journee/presences-actions.ts`, B-162) :
+ *    une période « journées » peut chevaucher la période de gardes affichée
+ *    sans partager son identifiant. Compter par dates est la seule façon de
+ *    retrouver les présences qui couvrent RÉELLEMENT cette période de gardes.
+ *
+ * Le créneau vient de `blocs_journee.creneau`, jamais deviné depuis le nom de
+ * la tranche — même garde-fou que `estAbsentSurCeBloc` : un nom ne dit rien
+ * de fiable sur ce qu'il couvre.
+ */
+export async function queryCompteursJournee(
+  supabase: SupabaseClient,
+  dateDebut: string,
+  dateFin: string,
+): Promise<{ parVeto: Map<string, CompteursJourneeRow>; erreur: string | null }> {
+  type PresenceAvecCreneau = {
+    veterinaire_id: string
+    blocs_journee: { creneau: 'matin' | 'apres-midi' | 'journee' } | { creneau: 'matin' | 'apres-midi' | 'journee' }[] | null
+  }
+  const { lignes, erreur } = await lireTout<PresenceAvecCreneau>((de, a) =>
+    supabase
+      .from('presences_journee')
+      .select('veterinaire_id, blocs_journee(creneau)')
+      .gte('date', dateDebut)
+      .lte('date', dateFin)
+      .range(de, a),
+  )
+  if (erreur) return { parVeto: new Map(), erreur }
+
+  const parVeto = new Map<string, CompteursJourneeRow>()
+  const ligne = (id: string): CompteursJourneeRow => {
+    let l = parVeto.get(id)
+    if (!l) {
+      l = { matin: 0, apres_midi: 0, entiere: 0 }
+      parVeto.set(id, l)
+    }
+    return l
+  }
+  for (const p of lignes) {
+    const bloc = Array.isArray(p.blocs_journee) ? p.blocs_journee[0] : p.blocs_journee
+    if (!bloc) continue
+    const l = ligne(p.veterinaire_id)
+    if (bloc.creneau === 'matin') l.matin++
+    else if (bloc.creneau === 'apres-midi') l.apres_midi++
+    else if (bloc.creneau === 'journee') l.entiere++
+  }
+  return { parVeto, erreur: null }
+}
+
+/**
+ * Pose les comptes Journées sur des lignes de compteurs déjà affichées.
+ *
+ * N'AJOUTE AUCUNE LIGNE — un vétérinaire absent de `lignes` (aucune garde sur
+ * la période) n'apparaît pas davantage s'il a des présences Journées : c'est
+ * la même limite que le reste de l'encart, scopé aux gardes de cette période
+ * (voir `completerCompteursPourAffichage`, qui tient compte de l'équipe
+ * active pour les GARDES). Un cabinet Journées-seul sans aucune garde n'est
+ * pas couvert par ce lot — à qualifier séparément si le besoin se confirme.
+ */
+export function fusionnerCompteursJournee(
+  lignes: CompteursRow[],
+  parVeto: Map<string, CompteursJourneeRow>,
+): CompteursRow[] {
+  if (parVeto.size === 0) return lignes
+  return lignes.map((l) => {
+    const j = parVeto.get(l.veterinaire_id)
+    if (!j) return l
+    return { ...l, jo_matin: j.matin, jo_apres_midi: j.apres_midi, jo_entiere: j.entiere }
+  })
 }
 
 // ── Compteurs sur une plage de dates libre ───────────────
