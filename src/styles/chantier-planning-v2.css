@@ -887,8 +887,9 @@
   border-top: 1px solid var(--pv2-filet);
   background: var(--pv2-creux);
 }
-/* B-172 — `.pv2h-axes`, `.pv2h-axe*` et `.pv2h-seg*` retirés : « Afficher » et
-   « Étendue » sont devenus le menu « Affichage » (`.pv2h-filtre`, plus bas). */
+/* B-172 — `.pv2h-axes`, `.pv2h-axe*` et `.pv2h-seg*` ont déménagé en fin de
+   fichier (bloc « LES DEUX AXES SUR DEUX ÉTAGES ») : ils vivent désormais
+   dans la rangée 1, libellé au-dessus, segment en dessous. */
 
 /* ── Mobile ───────────────────────────────────────────────────────────────── */
 
@@ -2461,87 +2462,89 @@
 .pv2h-r1 .pv2h-outil-btn { font-size: 0.76rem; padding: 7px 15px; min-height: 34px; }
 
 /* ============================================================
-   B-172 — « AFFICHAGE », UN MENU COMME UN FILTRE, ET « OUTILS » QUI RESSORT
+   B-172 — LES DEUX AXES SUR DEUX ÉTAGES, « OUTILS » CENTRÉ À DROITE
    ============================================================
-   MiKL, recette du 23/10, capture à l'appui : « Outils » passait encore à la
-   ligne. « Change le mécanisme des options Affichage et Étendue, pas en
-   déployé mais sous forme de menu comme pour un filtre, et mets Outils à
-   droite de la ligne, sous une couleur différente pour qu'il ressorte. »
-   La rangée 1 ne porte plus que le mois, un bouton « Affichage » et
-   « Outils » : elle tient sur une ligne bien en dessous de 1000px.
+   MiKL, recette du 23/10 : la tête fait déjà deux lignes (surtitre + mois).
+   « Mettre Afficher et Étendue sur la ligne supérieure et les choix dépliés en
+   dessous, et le bouton Outils au même endroit, au centre des 2 lignes ; par
+   contre en noir c'est pas fou. »
+   ➜ Chaque axe est une COLONNE : libellé à hauteur du surtitre (même
+     typographie), segment à hauteur du mois. La rangée s'aligne par le BAS,
+     pour que les segments tombent sur la ligne du mois ; « Outils » se centre
+     sur les deux lignes.
+   Le menu « façon filtre » de la passe précédente est retiré, styles compris.
    ============================================================ */
 
-/* Le filtre et « Outils » se rangent ensemble, à droite. */
-.pv2h-r1 .pv2h-affichage { margin-left: auto; }
-.pv2h-r1 .pv2h-affichage + .pv2h-gestes { margin-left: 0; }
+.pv2h-r1 { align-items: flex-end; }
+.pv2h-r1 .pv2h-gestes { align-self: center; }
 
-/* Le bouton du filtre : il DIT le réglage en cours, comme un filtre. */
-.pv2h-filtre {
+.pv2h-axes {
+  margin-left: auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+}
+.pv2h-r1 .pv2h-axes + .pv2h-gestes { margin-left: 0; }
+
+.pv2h-axe {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0; /* mesuré : 0 cale le libellé pile sur le surtitre */
+}
+/* Même typographie que le surtitre « Planning de l'équipe » : les deux
+   libellés se lisent comme la suite de cette ligne. */
+.pv2h-axe-lbl {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pv2-sec);
+  padding-left: 4px;
+}
+
+/* Un segment : le conteneur porte le creux, l'état actif ressort en relief —
+   on lit un choix, pas trois actions. */
+.pv2h-seg {
   display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid var(--pv2-bd);
-  background: var(--pv2-surface);
-  color: var(--pv2-txt);
+  gap: 2px;
+  padding: 3px;
   border-radius: 999px;
-  font-size: 0.76rem;
-  padding: 7px 15px;
-  min-height: 34px;
+  background: #ecdfc8;
+}
+.pv2h-seg-btn {
+  border: 0;
+  background: transparent;
+  color: var(--pv2-sec);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 5px 13px;
   white-space: nowrap;
   cursor: pointer;
 }
-.pv2h-filtre:hover { border-color: var(--pv2-acc); }
-.pv2h-filtre-lbl { font-weight: 600; color: var(--pv2-sec); }
-.pv2h-filtre b { font-weight: 700; }
-.pv2h-filtre[aria-expanded='true'] .pv2h-caret { transform: rotate(180deg); }
-
-/* Le menu du filtre s'ancre à DROITE de son bouton, comme celui d'« Outils ». */
-.pv2h-menu-filtre { width: 240px; padding: 6px 6px 8px; }
-.pv2h-menu-titre {
-  margin: 6px 10px 4px;
-  font-size: 0.64rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--pv2-sec);
-}
-.pv2h-menu-filtre [role='group'] + [role='group'] {
-  margin-top: 6px;
-  padding-top: 4px;
-  border-top: 1px solid var(--pv2-filet);
-}
-.pv2h-choix {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 7px 10px;
-  border: 0;
-  border-radius: 9px;
-  background: transparent;
-  text-align: left;
-  font-size: 0.8rem;
-  font-weight: 600;
+.pv2h-seg-btn:hover { color: var(--pv2-txt); }
+.pv2h-seg-btn[aria-pressed='true'] {
+  background: var(--pv2-surface);
   color: var(--pv2-txt);
-  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(58, 42, 28, 0.18);
 }
-.pv2h-choix:hover { background: var(--pv2-cell); }
-.pv2h-choix[aria-pressed='true'] { color: var(--pv2-acc); font-weight: 800; }
-.pv2h-choix-coche { width: 14px; flex: 0 0 14px; text-align: center; font-weight: 800; }
 
-/* « Outils » en couleur pleine : le seul bouton foncé de la tête, il ressort
-   sans concurrencer l'orange réservé à l'action de la bande (« Publier »). */
-.pv2h-outil-btn.pv2h-outils-fonce {
-  background: var(--pv2-txt);
-  border-color: var(--pv2-txt);
-  color: #fffcf4;
+/* « Outils » ressort en ORANGE DOUX, pas en noir : fond crème orangé, texte
+   orange foncé. Il se distingue des boutons neutres sans concurrencer
+   l'orange PLEIN, réservé à l'action de la bande (« Publier à l'équipe »). */
+.pv2h-outil-btn.pv2h-outils-accent {
+  background: #f7e4d2;
+  border-color: #efc9a6;
+  color: #8f4410;
 }
-.pv2h-outil-btn.pv2h-outils-fonce:hover {
-  background: #57412d;
-  border-color: #57412d;
-  color: #fff;
+.pv2h-outil-btn.pv2h-outils-accent:hover {
+  background: #f2d6bc;
+  border-color: var(--pv2-acc);
+  color: #7a3a0d;
 }
 
 @media (max-width: 720px) {
-  .pv2h-r1 .pv2h-affichage { margin-left: 0; }
+  .pv2h-r1 { align-items: center; }
+  .pv2h-axes { margin-left: 0; flex-wrap: wrap; }
 }

@@ -75,9 +75,12 @@ const CONTENEURS_DE_BOUTONS: Record<string, string> = {
   '.seg': 'Sélecteur segmenté de l’historique : gouttière autour de boutons.',
   '.recap-seg': 'Sélecteur segmenté du récapitulatif : gouttière autour de boutons.',
   '.vet-filter': 'Filtre par vétérinaire : gouttière autour de boutons déjà arrondis.',
-  // B-172 (23/10) — la dispense `.pv2h-seg` (axes d'affichage de B-157) est
-  // retirée avec le style qu'elle visait : les axes sont devenus le menu
-  // « Affichage » (`.pv2h-filtre`, conforme sans dispense).
+  // B-157, puis B-172 — les deux axes de la tête du planning de chantier. Les
+  // 3px sont la gouttière qui laisse dépasser le relief du bouton actif
+  // (`.pv2h-seg-btn`, lui-même en 5px/13px, donc conforme). Élargir le
+  // CONTENEUR n'écarterait pas le texte de sa courbe : il n'y a pas de texte,
+  // seulement des boutons.
+  '.pv2h-seg': 'Axes d’affichage du planning V2 : gouttière autour de boutons déjà arrondis.',
   // Au repos, l'entrée du dock est une ICÔNE seule dans une pastille de 56px :
   // son contenu est centré, il n'y a pas de texte à décoller du bord. Le libellé
   // n'apparaît qu'au survol, dans un volet qui se déplie à côté (`.di-flap`) et
