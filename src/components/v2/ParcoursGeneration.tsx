@@ -311,6 +311,17 @@ interface Props {
   periodesAvecGardes: string[]
   onNaviguerVersMois: (anneeMois: string) => void
   etapeInitiale?: Etape
+  /**
+   * B-172 — ouvrir le parcours DIRECTEMENT sur ce planning, au contrôle.
+   *
+   * La bande « Préparer · Remplir · Publier » du chantier sait déjà de quel
+   * planning on parle : repasser par « quel planning veux-tu remplir ? »
+   * redemanderait une réponse que l'écran vient de donner. Optionnelle —
+   * sans elle, rien ne change (l'écran du client ne la passe pas).
+   * ⚠️ Lue À LA CRÉATION du composant seulement : l'appelant le remonte (`key`)
+   *    à chaque ouverture.
+   */
+  cibleDirecte?: Periode | null
 }
 
 export function ParcoursGeneration({
@@ -324,6 +335,7 @@ export function ParcoursGeneration({
   periodesAvecGardes,
   onNaviguerVersMois,
   etapeInitiale = 'choix',
+  cibleDirecte = null,
 }: Props) {
   const router = useRouter()
   // B-053 — jamais un identifiant à l'écran : les raisons du moteur portent des
@@ -339,7 +351,7 @@ export function ParcoursGeneration({
     () => vets.map((v) => v.prenom).filter((p): p is string => Boolean(p)),
     [vets],
   )
-  const [etape, setEtape] = useState<Etape>(etapeInitiale)
+  const [etape, setEtape] = useState<Etape>(cibleDirecte ? 'controle' : etapeInitiale)
   // B-060 — ce que le SERVEUR dit être en train de faire. Jamais une phrase
   // choisie ici : l'écran relaie, il n'invente pas.
   const [etapeMoteur, setEtapeMoteur] = useState<string | null>(null)
@@ -372,9 +384,9 @@ export function ParcoursGeneration({
   const [etapeRelecture, setEtapeRelecture] = useState<string | null>(null)
 
   // La cible du parcours : un planning existant, ou celui qu'on vient de créer.
-  const [cible, setCible] = useState<string>('')
-  const [nomCible, setNomCible] = useState<string>('')
-  const [cibleEstPubliee, setCibleEstPubliee] = useState(false)
+  const [cible, setCible] = useState<string>(cibleDirecte?.id ?? '')
+  const [nomCible, setNomCible] = useState<string>(cibleDirecte ? nomPlanning(cibleDirecte) : '')
+  const [cibleEstPubliee, setCibleEstPubliee] = useState(cibleDirecte?.statut === 'publie')
 
   // ── Voie « nouveau planning » ──────────────────────────
   const [libelle, setLibelle] = useState('')
@@ -387,12 +399,12 @@ export function ParcoursGeneration({
   // ── Étape ② : le contrôle avant vol ────────────────────
   const [preVol, setPreVol] = useState<AvertissementPreVol[] | null>(null)
   const [souhaits, setSouhaits] = useState(0)
-  const [chargementPreVol, setChargementPreVol] = useState(false)
+  const [chargementPreVol, setChargementPreVol] = useState(cibleDirecte !== null)
 
   // La période type de la CIBLE, et la confirmation que Filou en demande.
   // Remise à zéro à chaque entrée dans le contrôle : on ne confirme jamais
   // pour un planning ce qu'on a confirmé pour un autre.
-  const [typeCibleId, setTypeCibleId] = useState<string | null>(null)
+  const [typeCibleId, setTypeCibleId] = useState<string | null>(cibleDirecte?.profil_id ?? null)
   const [typeConfirme, setTypeConfirme] = useState(false)
   const [rattachement, setRattachement] = useState(false)
 
@@ -504,6 +516,30 @@ export function ParcoursGeneration({
       setChargementPreVol(false)
     }
   }, [])
+
+  // B-172 — ouvert directement sur un planning : le pré-vol se lit au montage.
+  // Les mises à jour d'état ne se font QUE dans les rappels asynchrones — le
+  // lint du projet interdit un setState synchrone dans un effet.
+  const idCibleDirecte = cibleDirecte?.id ?? null
+  useEffect(() => {
+    if (!idCibleDirecte) return
+    let annule = false
+    fetch(`/api/generate/pre-vol?periodeId=${encodeURIComponent(idCibleDirecte)}`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('pré-vol indisponible'))))
+      .then((data) => {
+        if (annule) return
+        setPreVol((data.avertissements ?? []) as AvertissementPreVol[])
+        setSouhaits(typeof data.souhaitsEnAttente === 'number' ? data.souhaitsEnAttente : 0)
+      })
+      .catch(() => {
+        // Même règle que `chargerPreVol` : jamais d'otage, on laisse générer.
+        if (annule) return
+        setPreVol([])
+        setSouhaits(0)
+      })
+      .finally(() => { if (!annule) setChargementPreVol(false) })
+    return () => { annule = true }
+  }, [idCibleDirecte])
 
   /**
    * Entrer dans le contrôle : on relit TOUJOURS le pré-vol de la cible, jamais
@@ -1613,7 +1649,14 @@ export function ParcoursGeneration({
 
           {etape === 'controle' && (
             <>
-              <Button variant="outline" onClick={() => setEtape('choix')}>Retour</Button>
+              {/* B-172 — ouvert depuis la bande, il n'y a pas d'écran d'avant :
+                  « Retour » ramènerait au choix, et donc à une seconde porte de
+                  création (« Je fais un nouveau planning »). On referme. */}
+              {cibleDirecte ? (
+                <Button variant="outline" onClick={() => fermer(false)}>Annuler</Button>
+              ) : (
+                <Button variant="outline" onClick={() => setEtape('choix')}>Retour</Button>
+              )}
               {/* Après une correction faite dans l'autre onglet : on relit sans
                   refaire tout le parcours (retour MiKL du 2026-08-03).
                   Masqué quand rien ne coince : il n'y a rien à revérifier, et

@@ -98,6 +98,8 @@ import { JourneeDuJourModale } from '@/components/v2/JourneeDuJourModale'
 // aucun test de ce projet ne monte un composant (B-144b).
 import { GrilleSemainesV2 } from './GrilleSemainesV2'
 import '@/styles/chantier-planning-v2.css'
+import { BandePlanning } from './BandePlanning'
+import type { ContenuPeriode } from './DialogPublicationChantier'
 import { CellulePresenceModale, type TranchePosable } from './CellulePresenceModale'
 import { JourneeDashboardModale } from './JourneeDashboardModale'
 import { AbsencesModale, CompteursModale } from './PanneauxEnModale'
@@ -257,6 +259,11 @@ interface Props {
    */
   presencesParJour?: Record<string, JourneeAffichee>
   /**
+   * B-172 — ce que contient le planning affiché (gardes, présences), compté
+   * en base sur TOUT le planning. `null` hors chantier admin ou sans planning.
+   */
+  contenuPeriode?: ContenuPeriode | null
+  /**
    * B-145 lot 2b — l'équipe ACTIVE, dans l'ordre d'affichage.
    *
    * ⚠️ Chargée pour TOUT LE MONDE, contrairement à `vets` qui ne sert qu'à
@@ -365,6 +372,7 @@ export function PlanningChantierV2({
   periodesJournee,
   aDesTrames,
   presencesParJour = {},
+  contenuPeriode = null,
   equipe = [],
   tranches = [],
 }: Props) {
@@ -588,8 +596,9 @@ export function PlanningChantierV2({
   // principale (contextuelle), une liste d'outils que la tête range dans son
   // menu, et le nombre de points relevés par le pré-vol.
   const {
-    actionPrincipale, actionGenerer, outils, pointsAVerifier,
-    alertes, modales, ouvrirAssistant,
+    outils, pointsAVerifier, alertes, modales,
+    aGardes: moduleGardesActif,
+    ouvrirGeneration, ouvrirJournees, ouvrirPublication, ouvrirNouveau,
   } = useOutilsPlanningChantier({
     periode: periodeAffichee,
     aDesGardes: periodeAffichee ? periodesAvecGardes.includes(periodeAffichee.id) : false,
@@ -605,6 +614,8 @@ export function PlanningChantierV2({
     periodesJournee,
     aDesTrames,
     onNaviguerVersMois: (anneeMois) => router.push(`/planning?mois=${anneeMois}`),
+    contenu: contenuPeriode,
+    onAllerVersPeriode: allerVersPeriode,
     onSignalerAbsence: () => {
       setCriseDate(undefined)
       setCriseVetId(undefined)
@@ -692,8 +703,14 @@ export function PlanningChantierV2({
 
   function naviguer(delta: number) {
     const d = new Date(Date.UTC(annee, mois - 1 + delta, 1))
+    // B-172 — on reste sur un planning de journées choisi tant qu'il couvre le
+    // mois suivant ; la page ignore le paramètre dès qu'il n'y est plus.
+    const garde =
+      periodeAffichee && !periodePorteDesGardes(periodeAffichee.usage)
+        ? `&periode=${encodeURIComponent(periodeAffichee.id)}`
+        : ''
     router.push(
-      `/planning?mois=${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`,
+      `/planning?mois=${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}${garde}`,
     )
   }
 
@@ -711,9 +728,12 @@ export function PlanningChantierV2({
   }
 
   /** Aller au premier mois d'une autre période. */
-  function allerVersPeriode(p: Periode) {
+  function allerVersPeriode(p: { id: string; date_debut: string }) {
     setPopOuvert(false)
-    router.push(`/planning?mois=${p.date_debut.slice(0, 7)}`)
+    // B-172 — l'identifiant voyage avec le mois : un planning de journées qui
+    // chevauche un planning de gardes ne serait sinon jamais celui affiché
+    // (la page préfère les gardes quand on ne lui dit rien).
+    router.push(`/planning?mois=${p.date_debut.slice(0, 7)}&periode=${encodeURIComponent(p.id)}`)
   }
 
   function declarerAbsent(date: string, vetId: string) {
@@ -1021,6 +1041,196 @@ export function PlanningChantierV2({
     e.action()
   }
 
+  // B-172 — LE SÉLECTEUR DE PLANNING, rendu à deux endroits selon le rôle :
+  // dans la bande pour l'administratrice, en pilule pour le vétérinaire.
+  // L'administratrice voit TOUS les plannings, journées seules comprises
+  // (étiquetés) ; le vétérinaire garde la liste des plannings de gardes.
+  const listePlannings = isAdmin ? periodes : periodesGardes
+  const selecteurPeriode = (
+          <div className="period-wrap" ref={periodeRef} style={{ position: 'relative' }}>
+            {isAdmin ? (
+              // B-172 — dans la bande, le bouton ne porte plus l'étiquette
+              // « Brouillon · non publié » : l'état est dit par l'étape 3,
+              // avec le geste qui va avec.
+              <button
+                type="button"
+                className="bpl-sel"
+                aria-expanded={popOuvert}
+                onClick={() => setPopOuvert((v) => !v)}
+              >
+                <span className="bpl-sel-nom">
+                  {periodeAffichee ? nomPeriode(periodeAffichee) : 'Aucun planning'}
+                  <span className="pp-caret" aria-hidden="true">▾</span>
+                </span>
+                <small>Changer de planning</small>
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="period-pill"
+                aria-expanded={popOuvert}
+                onClick={() => setPopOuvert((v) => !v)}
+              >
+                <b>{periodeAffichee ? nomPeriode(periodeAffichee) : 'Hors période'}</b>
+                {statut && <span className={`status-badge ${statut.classe}`}>{statut.texte}</span>}
+                <span className="pp-caret" aria-hidden="true">
+                  ▾
+                </span>
+              </button>
+            )}
+
+            {popOuvert && (
+              <div className="period-pop">
+                {periodeAffichee ? (
+                  <>
+                    <p className="pp-sub">
+                      Période <b>{nomPeriode(periodeAffichee)}</b> · du{' '}
+                      {dateCourte(periodeAffichee.date_debut)} au{' '}
+                      {dateCourte(periodeAffichee.date_fin)}
+                    </p>
+                    <div className="pb-chips">
+                      {/* B-172 — « Saison hiver » a quitté ce panneau : la
+                          période type est ce qui décide, et deux étiquettes
+                          pour une seule notion faisaient chercher laquelle
+                          compte. */}
+                      {/* Sans période type, on ne se tait plus : depuis le
+                          2026-08-04 elle est obligatoire, et un planning qui
+                          n'en a pas est un planning d'avant la règle qu'il faut
+                          rattacher (le parcours de génération le propose). */}
+                      {profil
+                        ? <span className="pb-chip">Période type « {profil} »</span>
+                        : isAdmin && <span className="pb-chip">Aucune période type — à choisir</span>}
+                      {periodeAffichee.nb_vetos_semaine_soir && (
+                        <span className="pb-chip effectif">
+                          <b>
+                            {periodeAffichee.nb_vetos_semaine_soir} véto
+                            {periodeAffichee.nb_vetos_semaine_soir > 1 ? 's' : ''} par nuit de
+                            semaine
+                          </b>
+                          <small>réglé sur cette période</small>
+                        </span>
+                      )}
+                    </div>
+                  </>
+                ) : periodesGardes.length === 0 ? (
+                  // Aucune période DU TOUT n'est un état de démarrage, pas une
+                  // erreur de navigation : dire « le mois affiché ne tombe dans
+                  // aucune période » laisserait croire qu'il suffit de changer
+                  // de mois pour en trouver une.
+                  <p className="pp-sub">
+                    {isAdmin
+                      ? 'Aucun planning n’existe encore. « + Nouveau planning », juste en dessous, crée le premier.'
+                      : // Côté véto, « aucun planning n'existe » serait un
+                        // mensonge dès qu'un brouillon est en préparation — et
+                        // dire qu'il en existe un en trahirait le contenu. On
+                        // parle donc de ce qui le concerne : ce qui lui a été
+                        // diffusé.
+                        'Aucun planning ne t’a encore été diffusé. Tes gardes apparaîtront ici dès qu’il sera publié.'}
+                  </p>
+                ) : (
+                  <p className="pp-sub">Le mois affiché ne tombe dans aucune période.</p>
+                )}
+
+                {listePlannings.length > 0 && <p className="pp-label">Changer de planning</p>}
+                {listePlannings.map((p) => {
+                  // La corbeille tient désormais aussi sur les plannings
+                  // PUBLIÉS — c'était le trou : le serveur les refusait en
+                  // renvoyant vers une dépublication qui n'existait dans aucun
+                  // écran, donc un planning publié ne pouvait être retiré par
+                  // AUCUN chemin de l'application. Les deux confirmations sont
+                  // dans la fenêtre ; ici on ne fait que l'ouvrir.
+                  //
+                  // Un planning VERROUILLÉ n'a ni l'un ni l'autre : il est
+                  // l'historique du cabinet, et le serveur le refuse.
+                  return (
+                    <div key={p.id} className="pp-rangee">
+                      <button
+                        type="button"
+                        className="pp-item"
+                        aria-current={p.id === periodeAffichee?.id ? 'true' : undefined}
+                        onClick={() => allerVersPeriode(p)}
+                      >
+                        <span className="bpl-item-nom">
+                          {nomPeriode(p)}
+                          {/* B-172 — ce que contient le planning, dit dans la
+                              liste : un planning de journées seules y revient
+                              (B-162 l'en avait sorti, et avec lui le seul
+                              moyen de l'ouvrir et de le publier). */}
+                          {isAdmin && (
+                            <span className={`bpl-tag${periodePorteDesGardes(p.usage) ? '' : ' j'}`}>
+                              {periodePorteDesGardes(p.usage) ? 'Gardes' : 'Journées'}
+                            </span>
+                          )}
+                        </span>
+                        <small>
+                          {p.statut === 'brouillon' && 'Brouillon · en cours de préparation'}
+                          {p.statut === 'publie' && 'Publiée · connue de l’équipe'}
+                          {p.statut === 'verrouille' && 'Verrouillée · consultation seule'}
+                        </small>
+                      </button>
+                      {isAdmin && p.statut === 'publie' && (
+                        <button
+                          type="button"
+                          className="gen-suppr"
+                          title={`Repasser « ${nomPeriode(p)} » en préparation`}
+                          aria-label={`Repasser le planning ${nomPeriode(p)} en préparation`}
+                          onClick={() =>
+                            setRetrait({ id: p.id, nom: nomPeriode(p), geste: 'depublier' })
+                          }
+                        >
+                          <CalendarX2 className="ppv-ico" aria-hidden />
+                        </button>
+                      )}
+                      {/* B-172 — PAS DE CORBEILLE ICI POUR UN PLANNING DE
+                          JOURNÉES. Cette fenêtre de retrait compte les gardes,
+                          jamais les présences : elle annoncerait « rien à
+                          perdre » et en effacerait des dizaines (cascade). Le
+                          planning de journées se supprime depuis « Remplir les
+                          journées », dont la fenêtre compte ses présences. */}
+                      {isAdmin && p.statut !== 'verrouille' && periodePorteDesGardes(p.usage) && (
+                        <button
+                          type="button"
+                          className="gen-suppr"
+                          title={`Supprimer « ${nomPeriode(p)} »`}
+                          aria-label={`Supprimer le planning ${nomPeriode(p)}`}
+                          onClick={() =>
+                            setRetrait({ id: p.id, nom: nomPeriode(p), geste: 'supprimer' })
+                          }
+                        >
+                          <Trash2 className="ppv-ico" aria-hidden />
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+                {/* Menait à `/historique` du temps où la création vivait
+                    là-bas. Depuis le 2026-08-02 elle est ici, dans l'assistant
+                    de génération — le raccourci ouvre donc directement la voie
+                    « nouveau planning » au lieu de renvoyer sur un écran de
+                    consultation qui ne sait plus le faire. */}
+                {/* B-172 — LA porte de création, la seule. */}
+                {isAdmin && (
+                  <button
+                    type="button"
+                    className="pp-new"
+                    onClick={() => {
+                      setPopOuvert(false)
+                      ouvrirNouveau()
+                    }}
+                  >
+                    + Nouveau planning
+                    <small>Des dates, et ce qu’il contient</small>
+                  </button>
+                )}
+                {/* Le repère « 📌 Aujourd'hui : … » vivait ici. Il est devenu
+                    un BOUTON dans la tête de page (B-157) : le garder aussi au
+                    fond du panneau ferait dire deux fois la même chose, dont
+                    une fois sans pouvoir agir. */}
+              </div>
+            )}
+          </div>
+  )
+
   const moisAffiche = `${annee}-${String(mois).padStart(2, '0')}`
   const dejaAujourdhui = moisAffiche === today.slice(0, 7)
   // Le bandeau « lecture seule » s'adresse à celle qui, d'habitude, PEUT
@@ -1116,22 +1326,10 @@ export function PlanningChantierV2({
             </div>
           </div>
 
-          <div className="pv2h-reperes">
-
-          {/* LA PASTILLE DU PRÉ-VOL. Elle compte ce que le moteur a relevé et
-              les congés non tranchés — ⚠️ PAS les 48 incohérences de B-152a,
-              qui restent un contrôle de publication. Elle ne s'affiche qu'avec
-              un nombre : « 0 point à traiter » serait du bruit permanent, et
-              une pastille toujours là cesse d'être lue. Le détail reste dans
-              le bandeau, juste sous la tête — la pastille n'est qu'un signal,
-              jamais un rapport (leçon du 2026-07). */}
-            {pointsAVerifier > 0 && (
-              <span className="pv2h-points" role="status">
-                <b>{pointsAVerifier}</b>
-                {pointsAVerifier > 1 ? ' points à traiter' : ' point à traiter'}
-              </span>
-            )}
-          </div>
+          {/* B-172 — LA PASTILLE DU PRÉ-VOL A DÉMÉNAGÉ dans la bande, sur la
+              ligne des gardes : c'est là qu'on les règle, et c'est elle qu'ils
+              concernent. Le vétérinaire n'a jamais vu cette pastille (elle
+              n'est calculée que pour l'administratrice). */}
 
           <div className="pv2h-gestes">
             {/* Le secrétariat perd son panneau latéral (arbitrage du 06/10),
@@ -1223,14 +1421,33 @@ export function PlanningChantierV2({
                     )}
                   </div>
                 )}
-                {/* B-157b — les DEUX gestes du planning, cote a cote :
-                    celui qui le fabrique, celui qui le diffuse. */}
-                {actionGenerer}
-                {actionPrincipale}
+                {/* B-172 — « Générer » et « Vérifier et publier » ne sont plus
+                    ici : ils vivent dans la bande du planning, juste en
+                    dessous, à côté de ce qu'ils concernent. */}
               </>
             )}
           </div>
           </div>
+
+          {/* B-172 — LA BANDE DU PLANNING : Préparer · Remplir · Publier.
+              Elle remplace l'étiquette « Brouillon », « Générer » et
+              « Vérifier et publier ». Administratrice seulement : c'est la
+              seule à préparer et publier. */}
+          {isAdmin && !lectureSeule && (
+            <BandePlanning
+              periode={periodeAffichee}
+              selecteur={selecteurPeriode}
+              profil={profil}
+              contenu={contenuPeriode}
+              aGardes={moduleGardesActif}
+              aJournee={moduleJourneeActif}
+              pointsAVerifier={pointsAVerifier}
+              onGenerer={() => ouvrirGeneration()}
+              onRemplirJournees={ouvrirJournees}
+              onPublier={ouvrirPublication}
+              onNouveau={ouvrirNouveau}
+            />
+          )}
 
           {/* RANGÉE 2 — DE QUOI ON PARLE, ET COMMENT ON LE REGARDE.
               MiKL, a la recette du 09/10 : « les periodes tu devrais les mettre
@@ -1249,153 +1466,10 @@ export function PlanningChantierV2({
               sans garde. Il navigue par mois, ce qui lui suffit — et le choix
               de la période réapparaît au seul endroit où il a un sens :
               l'impression. */}
-          {!lectureSeule && (
-          <div className="period-wrap" ref={periodeRef} style={{ position: 'relative' }}>
-            <button
-              type="button"
-              className="period-pill"
-              aria-expanded={popOuvert}
-              onClick={() => setPopOuvert((v) => !v)}
-            >
-              <b>{periodeAffichee ? nomPeriode(periodeAffichee) : 'Hors période'}</b>
-              {statut && <span className={`status-badge ${statut.classe}`}>{statut.texte}</span>}
-              <span className="pp-caret" aria-hidden="true">
-                ▾
-              </span>
-            </button>
-
-            {popOuvert && (
-              <div className="period-pop">
-                {periodeAffichee ? (
-                  <>
-                    <p className="pp-sub">
-                      Période <b>{nomPeriode(periodeAffichee)}</b> · du{' '}
-                      {dateCourte(periodeAffichee.date_debut)} au{' '}
-                      {dateCourte(periodeAffichee.date_fin)}
-                    </p>
-                    <div className="pb-chips">
-                      <span className="pb-chip">
-                        {periodeAffichee.saison === 'ete' ? '☀️ Saison été' : '❄️ Saison hiver'}
-                      </span>
-                      {/* Sans période type, on ne se tait plus : depuis le
-                          2026-08-04 elle est obligatoire, et un planning qui
-                          n'en a pas est un planning d'avant la règle qu'il faut
-                          rattacher (le parcours de génération le propose). */}
-                      {profil
-                        ? <span className="pb-chip">Période type « {profil} »</span>
-                        : isAdmin && <span className="pb-chip">Aucune période type — à choisir</span>}
-                      {periodeAffichee.nb_vetos_semaine_soir && (
-                        <span className="pb-chip effectif">
-                          <b>
-                            {periodeAffichee.nb_vetos_semaine_soir} véto
-                            {periodeAffichee.nb_vetos_semaine_soir > 1 ? 's' : ''} par nuit de
-                            semaine
-                          </b>
-                          <small>réglé sur cette période</small>
-                        </span>
-                      )}
-                    </div>
-                  </>
-                ) : periodesGardes.length === 0 ? (
-                  // Aucune période DU TOUT n'est un état de démarrage, pas une
-                  // erreur de navigation : dire « le mois affiché ne tombe dans
-                  // aucune période » laisserait croire qu'il suffit de changer
-                  // de mois pour en trouver une.
-                  <p className="pp-sub">
-                    {isAdmin
-                      ? 'Aucun planning n’existe encore. Le bouton « Générer », en haut de l’écran, crée le premier.'
-                      : // Côté véto, « aucun planning n'existe » serait un
-                        // mensonge dès qu'un brouillon est en préparation — et
-                        // dire qu'il en existe un en trahirait le contenu. On
-                        // parle donc de ce qui le concerne : ce qui lui a été
-                        // diffusé.
-                        'Aucun planning ne t’a encore été diffusé. Tes gardes apparaîtront ici dès qu’il sera publié.'}
-                  </p>
-                ) : (
-                  <p className="pp-sub">Le mois affiché ne tombe dans aucune période.</p>
-                )}
-
-                {periodesGardes.length > 0 && <p className="pp-label">Changer de période</p>}
-                {periodesGardes.map((p) => {
-                  // La corbeille tient désormais aussi sur les plannings
-                  // PUBLIÉS — c'était le trou : le serveur les refusait en
-                  // renvoyant vers une dépublication qui n'existait dans aucun
-                  // écran, donc un planning publié ne pouvait être retiré par
-                  // AUCUN chemin de l'application. Les deux confirmations sont
-                  // dans la fenêtre ; ici on ne fait que l'ouvrir.
-                  //
-                  // Un planning VERROUILLÉ n'a ni l'un ni l'autre : il est
-                  // l'historique du cabinet, et le serveur le refuse.
-                  return (
-                    <div key={p.id} className="pp-rangee">
-                      <button
-                        type="button"
-                        className="pp-item"
-                        aria-current={p.id === periodeAffichee?.id ? 'true' : undefined}
-                        onClick={() => allerVersPeriode(p)}
-                      >
-                        {nomPeriode(p)}
-                        <small>
-                          {p.statut === 'brouillon' && 'Brouillon · en cours de préparation'}
-                          {p.statut === 'publie' && 'Publiée · connue de l’équipe'}
-                          {p.statut === 'verrouille' && 'Verrouillée · consultation seule'}
-                        </small>
-                      </button>
-                      {isAdmin && p.statut === 'publie' && (
-                        <button
-                          type="button"
-                          className="gen-suppr"
-                          title={`Repasser « ${nomPeriode(p)} » en préparation`}
-                          aria-label={`Repasser le planning ${nomPeriode(p)} en préparation`}
-                          onClick={() =>
-                            setRetrait({ id: p.id, nom: nomPeriode(p), geste: 'depublier' })
-                          }
-                        >
-                          <CalendarX2 className="ppv-ico" aria-hidden />
-                        </button>
-                      )}
-                      {isAdmin && p.statut !== 'verrouille' && (
-                        <button
-                          type="button"
-                          className="gen-suppr"
-                          title={`Supprimer « ${nomPeriode(p)} »`}
-                          aria-label={`Supprimer le planning ${nomPeriode(p)}`}
-                          onClick={() =>
-                            setRetrait({ id: p.id, nom: nomPeriode(p), geste: 'supprimer' })
-                          }
-                        >
-                          <Trash2 className="ppv-ico" aria-hidden />
-                        </button>
-                      )}
-                    </div>
-                  )
-                })}
-                {/* Menait à `/historique` du temps où la création vivait
-                    là-bas. Depuis le 2026-08-02 elle est ici, dans l'assistant
-                    de génération — le raccourci ouvre donc directement la voie
-                    « nouveau planning » au lieu de renvoyer sur un écran de
-                    consultation qui ne sait plus le faire. */}
-                {isAdmin && (
-                  <button
-                    type="button"
-                    className="pp-new"
-                    onClick={() => {
-                      setPopOuvert(false)
-                      ouvrirAssistant('nouveau')
-                    }}
-                  >
-                    Créer un nouveau planning
-                    <small>Des dates, une période type — et le moteur le remplit</small>
-                  </button>
-                )}
-                {/* Le repère « 📌 Aujourd'hui : … » vivait ici. Il est devenu
-                    un BOUTON dans la tête de page (B-157) : le garder aussi au
-                    fond du panneau ferait dire deux fois la même chose, dont
-                    une fois sans pouvoir agir. */}
-              </div>
-            )}
-          </div>
-          )}
+          {/* B-172 — pour l'administratrice, le sélecteur vit dans la bande
+              « Préparer · Remplir · Publier », juste au-dessus. Le vétérinaire
+              garde sa pilule ici : il n'a rien à préparer. */}
+          {!lectureSeule && !isAdmin && selecteurPeriode}
 
             {/* 🔴 LE BANDEAU « METTRE EN AVANT » A VECU UNE HEURE — retire le
                 09/10 a la demande de MiKL : « mets plutot la fonction

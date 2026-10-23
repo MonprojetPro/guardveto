@@ -50,7 +50,7 @@
 // n'enlève jamais rien, donc une présence retirée à la main revient.
 // ============================================================
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Trash2, CalendarPlus, Wand2 } from 'lucide-react'
@@ -84,6 +84,29 @@ interface Props {
   periodes: PeriodeApplicable[]
   /** Y a-t-il au moins une trame active ? Sinon le geste n'a aucun objet. */
   aDesTrames: boolean
+  /**
+   * B-172 — sur quel planning s'ouvrir. La bande du planning sait de quel
+   * planning on parle : ne pas le redemander. Lue à la création seulement —
+   * l'appelant remonte la fenêtre (`key`) à chaque ouverture.
+   */
+  periodeInitialeId?: string | null
+  /**
+   * B-172 — « remplir » un planning existant, ou « creer » un planning de
+   * journées seules. La création ne vit plus qu'ici, derrière la porte unique
+   * « + Nouveau planning » : l'icône « Dates libres » ne s'affiche plus en
+   * mode « remplir » (trois portes pour créer, c'était deux de trop).
+   */
+  mode?: 'remplir' | 'creer'
+  /** Appelé quand un planning de journées vient d'être créé ici. */
+  onPeriodeCreee?: (p: PeriodeApplicable) => void
+}
+
+/** La fenêtre où chercher les jours déjà couverts : d'aujourd'hui à +18 mois. */
+function fenetreCouverts(): { debut: string; fin: string } {
+  const aujourdhui = new Date()
+  const dansDixHuitMois = new Date(aujourdhui)
+  dansDixHuitMois.setMonth(dansDixHuitMois.getMonth() + 18)
+  return { debut: versISO(aujourdhui), fin: versISO(dansDixHuitMois) }
 }
 
 /** Ce que le statut d'un planning dit, en français. */
@@ -93,9 +116,22 @@ function libelleStatut(statut: string): string {
   return statut
 }
 
-export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrames }: Props) {
+export function GenererJourneeChantier({
+  open,
+  onOpenChange,
+  periodes,
+  aDesTrames,
+  periodeInitialeId = null,
+  mode = 'remplir',
+  onPeriodeCreee,
+}: Props) {
   const router = useRouter()
-  const [periodeId, setPeriodeId] = useState<string>(periodes[0]?.id ?? '')
+  const enCreation = mode === 'creer'
+  const [periodeId, setPeriodeId] = useState<string>(() => {
+    if (enCreation) return ''
+    if (periodeInitialeId && periodes.some((p) => p.id === periodeInitialeId)) return periodeInitialeId
+    return periodes[0]?.id ?? ''
+  })
   const [apercu, setApercu] = useState<Apercu | null>(null)
   const [enCours, setEnCours] = useState(false)
 
@@ -119,7 +155,7 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
   // `creerPeriode` côté serveur) : elle rejoint simplement la liste affichée,
   // et les étapes 2 et 3 ci-dessous ne savent pas d'où elle vient.
   const [periodeLibre, setPeriodeLibre] = useState<PeriodeApplicable | null>(null)
-  const [libreOuvert, setLibreOuvert] = useState(false)
+  const [libreOuvert, setLibreOuvert] = useState(enCreation)
   const [libreSelection, setLibreSelection] = useState<DateRange | undefined>(undefined)
   const [libreErreur, setLibreErreur] = useState<string | null>(null)
   const [libreEnCours, setLibreEnCours] = useState(false)
@@ -129,16 +165,25 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
   // déjà des journées ne devraient pas apparaître... il devrait y avoir un
   // signal »). Chargé une fois à l'ouverture du volet, pas à chaque frappe.
   const [joursCouverts, setJoursCouverts] = useState<Set<string>>(new Set())
-  const [couvertsEnCours, setCouvertsEnCours] = useState(false)
+  const [couvertsEnCours, setCouvertsEnCours] = useState(enCreation)
+
+  // B-172 — ouverte en création : les jours déjà couverts se lisent au
+  // montage, comme le fait `ouvrirLibre` au clic. États posés dans les rappels
+  // asynchrones seulement (lint : pas de setState synchrone dans un effet).
+  useEffect(() => {
+    if (!enCreation) return
+    let annule = false
+    const { debut, fin } = fenetreCouverts()
+    joursJourneesCouverts(debut, fin)
+      .then((res) => { if (!annule && res.ok) setJoursCouverts(new Set(res.dates)) })
+      .finally(() => { if (!annule) setCouvertsEnCours(false) })
+    return () => { annule = true }
+  }, [enCreation])
 
   function ouvrirLibre() {
     setLibreOuvert(true)
     setCouvertsEnCours(true)
-    const aujourdhui = new Date()
-    const debut = versISO(aujourdhui)
-    const dansDixHuitMois = new Date(aujourdhui)
-    dansDixHuitMois.setMonth(dansDixHuitMois.getMonth() + 18)
-    const fin = versISO(dansDixHuitMois)
+    const { debut, fin } = fenetreCouverts()
     joursJourneesCouverts(debut, fin)
       .then((res) => {
         if (res.ok) setJoursCouverts(new Set(res.dates))
@@ -155,6 +200,11 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
       ? [...periodes, periodeLibre]
       : periodes
   const periode = periodesAffichees.find((p) => p.id === periodeId) ?? null
+  // B-172 — en création, une seule carte : celle qu'on vient de créer. La
+  // liste de tous les plannings appartient au mode « remplir ».
+  const cartes: PeriodeApplicable[] = enCreation
+    ? (periodeLibre ? [periodeLibre] : [])
+    : periodesAffichees
 
   const libreDebutISO = libreSelection?.from ? versISO(libreSelection.from) : ''
   const libreFinISO = libreSelection?.to ? versISO(libreSelection.to) : ''
@@ -220,14 +270,16 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
     if ('error' in res && res.error) return setLibreErreur(res.error)
     if (!('id' in res) || !res.id) return setLibreErreur('La période a été créée mais reste introuvable.')
 
-    setPeriodeLibre({
+    const creee: PeriodeApplicable = {
       id: res.id,
       libelle,
       date_debut: libreDebutCale,
       date_fin: libreFinISO,
       statut: 'brouillon',
       usage: 'journees',
-    })
+    }
+    setPeriodeLibre(creee)
+    onPeriodeCreee?.(creee)
     setPeriodeId(res.id)
     setApercu(null)
     setLibreOuvert(false)
@@ -288,7 +340,7 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
             <span className="gjc-dialogtitre-ico" aria-hidden>
               <CalendarPlus />
             </span>
-            Remplir le planning des journées
+            {enCreation ? 'Nouveau planning de journées' : 'Remplir les journées'}
           </DialogTitle>
         </DialogHeader>
 
@@ -307,8 +359,8 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
                 changeant de planning on ne savait plus de quoi on parlait. */}
             <section className="gjc-etape">
               <div className="gjc-entete">
-                <h3 className="gjc-titre">Sur quel planning</h3>
-                {!libreOuvert && (
+                <h3 className="gjc-titre">{enCreation && !periodeLibre ? 'Ses dates' : 'Sur quel planning'}</h3>
+                {enCreation && !libreOuvert && !periodeLibre && (
                   <button
                     type="button"
                     className="gjc-icbtn jdb-icbtn"
@@ -322,9 +374,9 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
                 )}
               </div>
 
-              {periodesAffichees.length > 0 ? (
+              {cartes.length > 0 ? (
                 <div className="gjc-cartes" role="group" aria-label="Choisir le planning">
-                  {periodesAffichees.map((p) => (
+                  {cartes.map((p) => (
                     <div key={p.id} className="gjc-carte-encart">
                       <button
                         type="button"
@@ -357,8 +409,8 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
                    un bouton inerte — l'icône « Dates libres » de l'en-tête EST
                    la porte annoncée ici. */
                 <p className="gjc-vide">
-                  Aucun planning ne peut encore recevoir de présences : crée-en une avec
-                  l'icône ci-dessus.
+                  Aucun planning ne peut encore recevoir de présences : crée-en un avec
+                  « + Nouveau planning », dans le menu des plannings.
                 </p>
               ) : null}
 
@@ -430,6 +482,7 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
                 des centaines de lignes ne doit pas être atteignable sans avoir
                 lu ce qu'il fait — c'est pour ça que le bouton reste un aperçu
                 tant qu'on n'a pas vu ce qu'il y a à poser. */}
+            {(!enCreation || periodeLibre) && (
             <section className="gjc-etape">
               <div className="gjc-centre">
                 <button
@@ -439,7 +492,7 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
                   disabled={enCours || !periodeId}
                 >
                   <Wand2 aria-hidden />
-                  {enCours ? 'Génération…' : 'Générer'}
+                  {enCours ? 'Lecture…' : 'Voir ce qui manque'}
                 </button>
               </div>
 
@@ -463,6 +516,7 @@ export function GenererJourneeChantier({ open, onOpenChange, periodes, aDesTrame
                 </div>
               )}
             </section>
+            )}
           </div>
         )}
       </DialogContent>

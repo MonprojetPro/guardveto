@@ -688,7 +688,31 @@ C'est une action qui touche toute l'équipe : les vétérinaires sont notifiés 
       .select('id', { count: 'exact', head: true })
       .eq('periode_id', p.id)
     if (!count) {
-      return { ok: false, raison: `Aucune garde n’a encore été générée pour « ${libellePeriode(p)} ». Génère le planning avant de publier.` }
+      // B-172 — un planning sans garde mais AVEC des journées se publie : la
+      // route l'accepte depuis le 23/10, et c'est le seul moyen de rendre ces
+      // présences visibles à l'équipe. Filou suit, sinon il refuserait ce que
+      // l'écran permet. Rien à re-valider (ces contrôles portent sur les
+      // gardes), et ni e-mail ni agenda ne partent : on le dit.
+      const { count: nbPresences, error: presErr } = await ctx.supabase
+        .from('presences_journee')
+        .select('id', { count: 'exact', head: true })
+        .eq('periode_id', p.id)
+      if (presErr) {
+        return { ok: false, raison: `Je n’ai pas pu lire le contenu de « ${libellePeriode(p)} » — redemande-moi dans un instant.` }
+      }
+      if (!nbPresences) {
+        return { ok: false, raison: `« ${libellePeriode(p)} » est vide : ni garde ni journée. Remplis-le avant de le publier.` }
+      }
+      return {
+        ok: true,
+        proposition: {
+          titre: `Publier « ${libellePeriode(p)} »`,
+          phrase: `Je vais publier « ${libellePeriode(p)} » : ${nbPresences} présence${nbPresences > 1 ? 's' : ''} de journée, aucune garde.`,
+          action: 'Publier',
+          avertissement: 'Toute l’équipe verra ces journées dans l’application. Aucun e-mail ne part et les agendas Google ne bougent pas : ils ne portent que les gardes.',
+        },
+        charge: { periodeId: p.id, violationsMontrees: [], souhaitsMontres: 0, controleEchoue: false },
+      }
     }
 
     // Même contrôle que le gate de la route /api/publish, en LECTURE seule

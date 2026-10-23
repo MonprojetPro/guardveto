@@ -101,11 +101,50 @@ export async function POST(req: NextRequest) {
     .select('id', { count: 'exact', head: true })
     .eq('periode_id', periodeId)
 
+  // ── B-172 — UN PLANNING DE JOURNÉES SEULES SE PUBLIE AUSSI ─────────────
+  //
+  // 🔴 CE QUE CE BLOC FAISAIT : « aucune garde » = refus, point. Depuis B-162,
+  //    une période « journées » n'a JAMAIS de garde — elle ne pouvait donc
+  //    jamais être publiée, et ses présences jamais vues de l'équipe (le filtre
+  //    de diffusion lit `publie_at`). Une en base le 23/10, en brouillon.
+  //
+  // Sans garde mais avec des présences, on publie : c'est la publication qui
+  // rend les journées visibles, rien d'autre. Les étapes qui ne parlent QUE de
+  // gardes (re-validation, cases à pourvoir, fêtes, agenda, e-mails « voici
+  // tes gardes ») sont sautées — les jouer sur zéro garde produirait des
+  // « jours non couverts » à la pelle et un e-mail vide.
+  // Ni garde ni présence : il n'y a toujours rien à publier.
   if (!count || count === 0) {
-    return NextResponse.json(
-      { error: 'Aucune garde trouvée pour cette période. Générez d\'abord le planning avant de publier.' },
-      { status: 422 }
-    )
+    const { count: nbPresences, error: presErr } = await supabase
+      .from('presences_journee')
+      .select('id', { count: 'exact', head: true })
+      .eq('periode_id', periodeId)
+
+    if (presErr) {
+      return NextResponse.json(
+        { error: `Impossible de vérifier le contenu du planning : ${presErr.message}` },
+        { status: 500 }
+      )
+    }
+    if (!nbPresences) {
+      return NextResponse.json(
+        { error: 'Ce planning est vide : ni garde ni journée. Remplis-le avant de le publier.' },
+        { status: 422 }
+      )
+    }
+
+    const { error: pubErr } = await supabase
+      .from('periodes')
+      .update({ statut: 'publie', publie_at: new Date().toISOString() })
+      .eq('id', periodeId)
+
+    if (pubErr) {
+      return NextResponse.json(
+        { error: `Erreur lors de la publication : ${pubErr.message}` },
+        { status: 500 }
+      )
+    }
+    return NextResponse.json({ success: true, journeesSeules: true, calendarSync: null, emailNotif: null })
   }
 
   // ── B-155 — LES CASES VIDES INFORMENT, ELLES N'INTERDISENT PLUS ───────────

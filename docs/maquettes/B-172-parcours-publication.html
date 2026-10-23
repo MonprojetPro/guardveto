@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parcours de publication</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700;800&family=Noto+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --fond:#f3e9d6; --surface:#fffcf4; --cell:#f6ebd6; --filet:#eadcc2; --bd:#e6d7bb;
+  --txt:#3a2a1c; --sec:#7c6a55; --acc:#c7530f; --acc-doux:#fdf1e5; --ok:#3f7d3a; --ok-doux:#e8f2e3;
+  --att:#9a6b00; --att-doux:#fbf1d6; --bad:#a8341f;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fond);color:var(--txt);font:15px/1.45 "Noto Sans",system-ui,sans-serif;padding:32px 16px 80px}
+h1,h2,h3,.fig{font-family:Figtree,system-ui,sans-serif}
+.page{max-width:1180px;margin:0 auto}
+.intro{margin-bottom:28px}
+.intro h1{font-size:30px;margin:0 0 6px}
+.intro p{margin:0;color:var(--sec);max-width:760px}
+.etat{margin:40px 0 10px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.etat h2{margin:0;font-size:20px}
+.etat .num{font:700 13px Figtree;background:var(--txt);color:#fff;border-radius:99px;padding:3px 10px}
+.etat p{margin:0;color:var(--sec);font-size:14px;flex-basis:100%}
+.note{background:#fff;border-left:3px solid var(--acc);padding:10px 14px;border-radius:6px;font-size:13.5px;color:var(--sec);margin-top:12px}
+.note b{color:var(--txt)}
+
+/* ── écran ── */
+.ecran{background:var(--surface);border:1px solid var(--bd);border-radius:18px;box-shadow:0 10px 30px rgba(80,50,20,.08);overflow:hidden}
+.tete{display:flex;align-items:center;justify-content:space-between;padding:18px 22px 14px;gap:12px;flex-wrap:wrap}
+.kick{font:700 11px Figtree;letter-spacing:.12em;color:var(--acc);text-transform:uppercase}
+.mois{display:flex;align-items:center;gap:10px}
+.mois b{font:800 28px Figtree}
+.rond{width:30px;height:30px;border-radius:50%;background:var(--cell);display:grid;place-items:center;color:var(--sec);font-size:14px}
+.btn{font:600 14px Figtree;border-radius:99px;padding:9px 18px;border:1px solid var(--bd);background:#fff;color:var(--txt);white-space:nowrap}
+.btn.cta{background:var(--acc);color:#fff;border-color:var(--acc);box-shadow:0 4px 12px rgba(199,83,15,.25)}
+.btn.sec{border-color:var(--acc);color:var(--acc)}
+.btn.petit{padding:5px 12px;font-size:12.5px}
+.lien{font:600 12.5px Figtree;color:var(--acc);text-decoration:underline;text-underline-offset:3px}
+
+/* ── la bande du planning ── */
+.bande{margin:0 22px 16px;border:1px solid var(--bd);border-radius:14px;background:#fff;display:grid;grid-template-columns:240px 1fr;overflow:hidden}
+.choix{padding:14px 16px;border-right:1px solid var(--filet);background:var(--acc-doux)}
+.choix .nom{font:800 19px Figtree;display:flex;align-items:center;gap:6px}
+.choix .nom::after{content:"▾";font-size:12px;color:var(--sec)}
+.choix .dates{font-size:13px;color:var(--sec);margin-top:2px}
+.choix .type{font-size:12.5px;margin-top:8px;color:var(--sec)}
+.etapes{display:grid;grid-template-columns:1fr 1.5fr 1.15fr}
+.et{padding:12px 16px;border-right:1px solid var(--filet);position:relative}
+.et:last-child{border-right:0}
+.et-t{display:flex;align-items:center;gap:8px;font:700 12px Figtree;letter-spacing:.06em;text-transform:uppercase;color:var(--sec);margin-bottom:8px}
+.pt{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font:700 11px Figtree;background:var(--cell);color:var(--sec)}
+.et.fait .pt{background:var(--ok);color:#fff}
+.et.encours{background:#fffaf2}
+.et.encours .pt{background:var(--acc);color:#fff}
+.et.encours .et-t{color:var(--acc)}
+.ligne{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:5px 0}
+.ligne+.ligne{border-top:1px dashed var(--filet)}
+.quoi{font-weight:600;font-size:14px}
+.quoi small{display:block;font-weight:400;color:var(--sec);font-size:12.5px}
+.pastille{display:inline-block;font:700 11px Figtree;border-radius:99px;padding:2px 8px;margin-left:6px;vertical-align:1px}
+.pastille.ok{background:var(--ok-doux);color:var(--ok)}
+.pastille.att{background:var(--att-doux);color:var(--att)}
+.pastille.vide{background:var(--cell);color:var(--sec)}
+.pastille.pub{background:var(--ok);color:#fff}
+.statut{font-size:13px;color:var(--sec);margin-bottom:10px}
+.statut b{color:var(--txt)}
+.grille{margin:0 22px 22px;height:120px;border-radius:12px;background:repeating-linear-gradient(90deg,var(--cell) 0 calc(14.28% - 6px),transparent calc(14.28% - 6px) 14.28%);opacity:.55}
+
+/* ── menu des plannings ── */
+.duo{display:grid;grid-template-columns:330px 1fr;gap:24px;align-items:start}
+.menu{background:#fff;border:1px solid var(--bd);border-radius:16px;box-shadow:0 12px 30px rgba(80,50,20,.12);padding:12px}
+.menu .lab{font:700 11px Figtree;letter-spacing:.1em;color:var(--sec);text-transform:uppercase;margin:6px 8px 8px}
+.it{padding:9px 10px;border-radius:10px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.it.sel{background:var(--acc-doux);outline:1px solid #f0c9a8}
+.it b{font:700 15px Figtree;display:block}
+.it small{color:var(--sec);font-size:12.5px}
+.tag{font:700 10.5px Figtree;border-radius:6px;padding:2px 7px;background:var(--cell);color:var(--sec);white-space:nowrap}
+.tag.j{background:#e7eefb;color:#3c5a99}
+.nouveau{margin-top:8px;border:1px dashed #e3b994;border-radius:12px;padding:10px 12px;color:var(--acc)}
+.nouveau b{font:700 15px Figtree;display:block}
+.nouveau small{color:var(--sec)}
+
+/* ── fenêtre de publication ── */
+.voile{background:rgba(58,42,28,.35);border-radius:18px;padding:36px 16px;display:grid;place-items:center}
+.modale{background:var(--surface);border-radius:18px;max-width:560px;width:100%;padding:22px 24px;box-shadow:0 20px 50px rgba(0,0,0,.2)}
+.modale h3{margin:4px 0 4px;font-size:22px}
+.modale .sous{color:var(--sec);margin:0 0 16px;font-size:14px}
+.bloc{border:1px solid var(--bd);border-radius:12px;background:#fff;padding:4px 14px;margin-bottom:12px}
+.bloc .ligne{padding:10px 0}
+.chk{color:var(--ok);font-weight:700;margin-right:8px}
+.att-ico{color:var(--att);font-weight:700;margin-right:8px}
+.envoi{list-style:none;margin:0 0 12px;padding:0;font-size:14px}
+.envoi li{padding:6px 0 6px 22px;position:relative}
+.envoi li::before{content:"→";position:absolute;left:0;color:var(--acc)}
+.pied{display:flex;justify-content:flex-end;gap:10px;margin-top:6px}
+.reserve{background:var(--att-doux);border-radius:12px;padding:10px 14px;font-size:13.5px;margin-bottom:12px}
+.reserve b{display:block;margin-bottom:2px}
+
+@media (max-width:900px){
+  .bande{grid-template-columns:1fr}
+  .choix{border-right:0;border-bottom:1px solid var(--filet)}
+  .etapes{grid-template-columns:1fr}
+  .et{border-right:0;border-bottom:1px solid var(--filet)}
+  .duo{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="intro">
+  <div class="kick">GuardVeto · maquette B-172</div>
+  <h1>Un planning, trois étapes, toujours dans le même ordre</h1>
+  <p>Préparer, remplir, publier. L’étiquette « Brouillon », le bouton « Générer » et le bouton « Vérifier et publier » sont remplacés par une seule bande qui dit où on en est et quel est le geste suivant. Une seule étape est en couleur : celle qui attend quelqu’un.</p>
+</div>
+
+<!-- ═════════ 1. Planning tout juste créé ═════════ -->
+<div class="etat"><span class="num">1</span><h2>Un planning tout juste créé</h2>
+<p>Les dates et la période type sont posées, rien n’est encore rempli. Le geste suivant est en couleur : remplir les gardes.</p></div>
+<div class="ecran">
+  <div class="tete">
+    <div><div class="kick">Planning de l’équipe</div>
+      <div class="mois"><b>Janvier 2027</b><span class="rond">‹</span><span class="rond">›</span></div></div>
+    <span class="btn">Outils ▾</span>
+  </div>
+  <div class="bande">
+    <div class="choix"><div class="nom">Hiver P3</div><div class="dates">du 11 janv. au 4 avril</div><div class="type">Période type : Hiver</div></div>
+    <div class="etapes">
+      <div class="et fait"><div class="et-t"><span class="pt">✓</span>Préparer</div>
+        <div class="quoi">Dates et période type<small>12 semaines · Hiver</small></div>
+        <div style="margin-top:8px"><span class="lien">Modifier</span></div></div>
+      <div class="et encours"><div class="et-t"><span class="pt">2</span>Remplir</div>
+        <div class="ligne"><div class="quoi">Gardes <span class="pastille vide">vide</span><small>Le moteur calcule qui est de garde</small></div><span class="btn cta petit">Remplir les gardes</span></div>
+        <div class="ligne"><div class="quoi">Journées <span class="pastille vide">vide</span><small>Les présences récurrentes se posent</small></div><span class="btn sec petit">Remplir</span></div></div>
+      <div class="et"><div class="et-t"><span class="pt">3</span>Publier</div>
+        <div class="statut"><b>Brouillon</b> — l’équipe ne voit rien.</div>
+        <span class="btn petit" style="opacity:.55">Publier à l’équipe</span></div>
+    </div>
+  </div>
+  <div class="grille"></div>
+</div>
+
+<!-- ═════════ 2. Rempli, prêt à publier ═════════ -->
+<div class="etat"><span class="num">2</span><h2>Rempli, prêt à publier</h2>
+<p>Chaque ligne dit ce qui est posé. Les points à régler (aujourd’hui la pastille et le bandeau) vivent sur la ligne des gardes, là où on les règle. Le geste suivant passe à l’étape 3.</p></div>
+<div class="ecran">
+  <div class="tete">
+    <div><div class="kick">Planning de l’équipe</div>
+      <div class="mois"><b>Octobre 2026</b><span class="rond">‹</span><span class="rond">›</span></div></div>
+    <span class="btn">Outils ▾</span>
+  </div>
+  <div class="bande">
+    <div class="choix"><div class="nom">Hiver P2</div><div class="dates">du 19 oct. au 10 janv.</div><div class="type">Période type : Hiver</div></div>
+    <div class="etapes">
+      <div class="et fait"><div class="et-t"><span class="pt">✓</span>Préparer</div>
+        <div class="quoi">Dates et période type<small>12 semaines · Hiver</small></div>
+        <div style="margin-top:8px"><span class="lien">Modifier</span></div></div>
+      <div class="et fait"><div class="et-t"><span class="pt">✓</span>Remplir</div>
+        <div class="ligne"><div class="quoi">Gardes <span class="pastille ok">60 posées</span><small><span style="color:var(--att)">2 points à régler</span> · <span class="lien">voir</span></small></div><span class="btn petit">Refaire</span></div>
+        <div class="ligne"><div class="quoi">Journées <span class="pastille ok">223 présences</span><small>Toutes les semaines couvertes</small></div><span class="btn petit">Compléter</span></div></div>
+      <div class="et encours"><div class="et-t"><span class="pt">3</span>Publier</div>
+        <div class="statut"><b>Brouillon</b> — l’équipe ne voit rien encore.</div>
+        <span class="btn cta">Publier à l’équipe</span></div>
+    </div>
+  </div>
+  <div class="grille"></div>
+</div>
+<div class="note"><b>Ce qui change :</b> « Générer » devient « Remplir », et il nomme toujours ce qu’il remplit. « Refaire » relance le moteur (il demande confirmation, comme aujourd’hui). « Compléter » ajoute les présences qui manquent sans rien retirer — c’est déjà le comportement actuel, il est enfin nommé.</div>
+
+<!-- ═════════ 3. La fenêtre de publication ═════════ -->
+<div class="etat"><span class="num">3</span><h2>La fenêtre « Publier à l’équipe »</h2>
+<p>Elle annonce les deux contenus, gardes ET journées, avant de les envoyer. Aujourd’hui elle ne parle que des gardes alors qu’elle publie aussi les journées.</p></div>
+<div class="voile">
+  <div class="modale">
+    <div class="kick">Hiver P2 · du 19 oct. au 10 janv.</div>
+    <h3>Publier à l’équipe ?</h3>
+    <p class="sous">Voici ce qui part, et ce que ça déclenche.</p>
+    <div class="bloc">
+      <div class="ligne"><div class="quoi"><span class="chk">✓</span>60 gardes</div><span class="pastille ok">complètes</span></div>
+      <div class="ligne"><div class="quoi"><span class="chk">✓</span>223 présences de journée</div><span class="pastille ok">posées</span></div>
+    </div>
+    <div class="reserve"><b>2 points à régler sur les gardes</b>Tu peux publier quand même, ou les régler d’abord. Le planning reste modifiable après publication.</div>
+    <ul class="envoi">
+      <li>Toute l’équipe voit ses gardes et ses journées, sur ordinateur et téléphone.</li>
+      <li>Les vétérinaires concernés reçoivent un e-mail.</li>
+      <li>Les agendas Google se remplissent.</li>
+    </ul>
+    <div class="pied"><span class="btn">Régler d’abord</span><span class="btn cta">Publier</span></div>
+  </div>
+</div>
+
+<!-- ═════════ 4. Publié ═════════ -->
+<div class="etat"><span class="num">4</span><h2>Publié</h2>
+<p>Plus rien n’est en couleur : rien n’attend personne. La bande dit depuis quand c’est public, et rappelle qu’on peut toujours modifier.</p></div>
+<div class="ecran">
+  <div class="bande" style="margin-top:22px">
+    <div class="choix"><div class="nom">Hiver P2</div><div class="dates">du 19 oct. au 10 janv.</div><div class="type">Période type : Hiver</div></div>
+    <div class="etapes">
+      <div class="et fait"><div class="et-t"><span class="pt">✓</span>Préparer</div><div class="quoi">Dates et période type<small>12 semaines · Hiver</small></div></div>
+      <div class="et fait"><div class="et-t"><span class="pt">✓</span>Remplir</div>
+        <div class="ligne"><div class="quoi">Gardes <span class="pastille ok">60 posées</span></div></div>
+        <div class="ligne"><div class="quoi">Journées <span class="pastille ok">223 présences</span></div></div></div>
+      <div class="et fait"><div class="et-t"><span class="pt">✓</span>Publier</div>
+        <div class="statut"><span class="pastille pub">Publié le 23 oct.</span></div>
+        <div style="font-size:12.5px;color:var(--sec)">Une case à changer ? Clique dessus : l’équipe est prévenue.</div></div>
+    </div>
+  </div>
+  <div class="grille"></div>
+</div>
+
+<!-- ═════════ 5. Le menu des plannings ═════════ -->
+<div class="etat"><span class="num">5</span><h2>Le menu des plannings — une seule porte pour créer</h2>
+<p>Les plannings « journées seules » y reviennent avec une étiquette, pour pouvoir les ouvrir et les publier (c’est le bug corrigé). « Nouveau planning » est la seule entrée de création ; on y choisit ce qu’il contient.</p></div>
+<div class="duo">
+  <div class="menu">
+    <div class="lab">Plannings</div>
+    <div class="it sel"><div><b>Hiver P2</b><small>19 oct. → 10 janv. · brouillon</small></div><span class="tag">Gardes + journées</span></div>
+    <div class="it"><div><b>Journées — novembre</b><small>9 → 16 nov. · brouillon</small></div><span class="tag j">Journées</span></div>
+    <div class="it"><div><b>Hiver P1</b><small>21 sept. → 18 oct. · verrouillé</small></div><span class="tag">Gardes</span></div>
+    <div class="it"><div><b>Historique été 2026</b><small>7 → 20 sept. · verrouillé</small></div><span class="tag">Gardes</span></div>
+    <div class="nouveau"><b>+ Nouveau planning</b><small>Des dates, et ce qu’il contient</small></div>
+  </div>
+  <div class="voile" style="padding:24px 16px">
+    <div class="modale">
+      <div class="kick">Nouveau planning · étape 1 sur 3</div>
+      <h3>Préparer le planning</h3>
+      <p class="sous">Des dates et ce qu’il contient. On le remplit juste après.</p>
+      <div class="bloc">
+        <div class="ligne"><div class="quoi">Nom<small>Hiver P3</small></div></div>
+        <div class="ligne"><div class="quoi">Dates<small>du lundi 11 janv. — 12 semaines → dimanche 4 avril</small></div></div>
+        <div class="ligne"><div class="quoi">Il contient<small>
+          <span class="pastille ok" style="margin-left:0">Gardes et journées</span>
+          <span class="pastille vide">Gardes seules</span>
+          <span class="pastille vide">Journées seules</span></small></div></div>
+        <div class="ligne"><div class="quoi">Période type<small>Hiver — demandée seulement s’il y a des gardes</small></div></div>
+      </div>
+      <div class="pied"><span class="btn">Annuler</span><span class="btn cta">Créer et remplir</span></div>
+    </div>
+  </div>
+</div>
+<div class="note"><b>Disparaissent :</b> « Je fais un nouveau planning » dans Générer, et « Dates libres » dans la fenêtre des journées. Les deux mènent désormais ici. <b>Le mot « saison »</b> quitte l’en-tête du menu : seule la période type reste, c’est elle qui décide.</div>
+
+</div>
+</body>
+</html>

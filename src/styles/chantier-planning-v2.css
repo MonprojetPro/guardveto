@@ -802,22 +802,8 @@
 .pv2h-today:hover:not(:disabled) { color: var(--pv2-acc); border-color: var(--pv2-acc); }
 .pv2h-today:disabled { opacity: 0.4; cursor: default; }
 
-.pv2h-reperes { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-
-/* La pastille du pré-vol. Orange SOURD, jamais rouge : elle signale du travail
-   qui attend, pas une panne. Le rouge est réservé à ce qui est cassé. */
-.pv2h-points {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border-radius: 999px;
-  background: #f7e4d2;
-  color: #8f4410;
-  font-size: 0.78rem;
-  font-weight: 700;
-  padding: 7px 16px;
-}
-.pv2h-points b { font-weight: 800; font-variant-numeric: tabular-nums; }
+/* B-172 — `.pv2h-reperes` et `.pv2h-points` retirés : la pastille du pré-vol
+   vit dans la bande du planning (`.bpl-points`). */
 
 /* ── Les gestes, à droite ─────────────────────────────────────────────────── */
 
@@ -846,41 +832,8 @@
 .pv2h-caret { font-size: 0.7rem; transition: transform 0.15s ease; }
 .pv2h-outil-btn[aria-expanded='true'] .pv2h-caret { transform: rotate(180deg); }
 
-/* L'ACTION PRINCIPALE — une seule sur l'écran, et elle est pleine. Deux
-   boutons accentués côte à côte, c'était deux fois aucun. */
-.pv2h-cta {
-  border: 1px solid var(--pv2-acc);
-  background: var(--pv2-acc);
-  color: #fff;
-  border-radius: 999px;
-  font-size: 0.82rem;
-  font-weight: 800;
-  padding: 10px 22px;
-  min-height: 40px;
-  box-shadow: 0 6px 16px -6px rgba(199, 83, 15, 0.55);
-}
-.pv2h-cta:hover { filter: brightness(1.06); color: #fff; }
-
-/* Un planning publié ou verrouillé n'a plus d'action : c'est un ÉTAT, et il en
-   a la forme. Afficher un bouton plein « Publié » faisait croire à un geste
-   possible — retour déjà réglé une fois sur l'écran du client. */
-.pv2h-etat {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--pv2-bd);
-  background: var(--pv2-creux);
-  color: var(--pv2-sec);
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  padding: 9px 18px;
-}
-.pv2h-etat.publie {
-  background: #e7f0df;
-  border-color: #c3d9b4;
-  color: #456e32;
-}
+/* B-172 — `.pv2h-cta` et `.pv2h-etat` retirés : l'action principale et l'état
+   du planning vivent dans la bande (`.bpl-btn.cta`, `.bpl-statut`). */
 
 /* ── Le menu « Outils » ───────────────────────────────────────────────────── */
 
@@ -979,7 +932,6 @@
   /* Les gestes passent à la ligne et s'étalent : à cette largeur, « à droite »
      n'existe plus, et un bouton d'accent coincé dans 40px ne se clique pas. */
   .pv2h-gestes { margin-left: 0; width: 100%; }
-  .pv2h-cta { flex: 1; justify-content: center; }
   .pv2h-r2 { padding: 10px 14px; }
   .pv2h-axes { margin-left: 0; }
   .pv2h-menu { width: min(288px, calc(100vw - 32px)); }
@@ -1184,45 +1136,8 @@
   outline-offset: -2px;
 }
 
-/* ── « Générer », à côté de l'état ────────────────────────────────────────── */
-
-/* Contour plutôt que plein : deux boutons pleins côte à côte se disputeraient
-   l'œil, et c'est « Vérifier et publier » qui ferme le travail. */
-.pv2h-generer {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--pv2-acc);
-  background: var(--pv2-surface);
-  color: var(--pv2-acc);
-  border-radius: 999px;
-  font-size: 0.82rem;
-  font-weight: 800;
-  padding: 10px 20px;
-  min-height: 40px;
-}
-.pv2h-generer:hover {
-  background: var(--pv2-acc);
-  color: #fff;
-}
-/* Le chevron tourne quand le menu est ouvert. La règle existe déjà pour
-   `.pv2h-outil-btn` ; « Générer » n'est pas un bouton d'outil, il lui faut la
-   sienne — sans elle, le chevron resterait figé vers le bas, menu ouvert. */
-.pv2h-generer[aria-expanded='true'] .pv2h-caret { transform: rotate(180deg); }
-
-/* Le menu de « Générer » s'ancre à GAUCHE : `.pv2h-menu` est calé `right: 0`
-   pour « Outils », qui ferme la ligne. « Générer » est au milieu — ancré à
-   droite, son panneau partirait vers « Vérifier et publier » et recouvrirait
-   le bouton voisin. */
-.pv2h-menu.gauche { right: auto; left: 0; }
-
-/* Le trait entre les deux mondes : les gardes et les journées sont DEUX
-   plannings, pas deux variantes du même geste. */
-.pv2h-menu-sep {
-  height: 1px;
-  margin: 4px 10px;
-  background: var(--pv2-bd);
-}
+/* B-172 — `.pv2h-generer`, `.pv2h-menu.gauche` et `.pv2h-menu-sep` retirés :
+   « Générer » et « Remplir » vivent dans la bande, sur leur ligne. */
 
 /* ============================================================
    B-157b — « REMPLIR LE PLANNING DES JOURNÉES », LA FENÊTRE REFAITE
@@ -2342,3 +2257,225 @@
   font-size: 0.72rem;
   color: var(--pv2-sec, #7c6a55);
 }
+
+/* ============================================================
+   B-172 — LA BANDE DU PLANNING : Préparer · Remplir · Publier
+   ============================================================
+   MiKL, 23/10 : « ce n'est pas clair et ça va porter à confusion auprès des
+   clients ». La bande dit où en est le planning et quel est le geste suivant.
+   UNE SEULE étape en couleur — celle qui attend quelqu'un.
+
+   ⚠️ Tout est préfixé `.bpl-` : cette feuille est partagée par tout l'écran,
+      et une règle sur `button` ou `.btn` redessinerait des boutons voisins
+      (payé le 16/10, « une feuille partagée redessine mes boutons »).
+   ============================================================ */
+
+.bpl {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  margin: 0 20px 14px;
+  border: 1px solid var(--pv2-bd);
+  border-radius: 14px;
+  background: #fff;
+}
+
+/* La cellule du sélecteur : la seule partie qui ouvre un menu. */
+.bpl-choix {
+  padding: 12px 14px;
+  border-right: 1px solid var(--pv2-filet);
+  background: #fdf3e8;
+  border-radius: 14px 0 0 14px;
+}
+.bpl-sel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.bpl-sel-nom {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: Figtree, var(--t-font-titre, sans-serif);
+  font-size: 1.1rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--pv2-txt);
+}
+.bpl-sel small { font-size: 0.72rem; font-weight: 600; color: var(--pv2-acc); }
+.bpl-sel:hover small { text-decoration: underline; text-underline-offset: 3px; }
+.bpl-sel[aria-expanded='true'] .pp-caret { transform: rotate(180deg); }
+
+.bpl-etapes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr) minmax(0, 1.1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bpl-et {
+  padding: 10px 14px;
+  border-right: 1px solid var(--pv2-filet);
+  min-width: 0;
+}
+.bpl-et:last-child { border-right: 0; border-radius: 0 14px 14px 0; }
+.bpl-et.encours { background: #fffaf2; }
+
+.bpl-et-t {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 6px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pv2-sec);
+}
+.bpl-pt {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--pv2-cell);
+  color: var(--pv2-sec);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+.bpl-et.fait .bpl-pt { background: #4f8a3f; color: #fff; }
+.bpl-et.encours .bpl-pt { background: var(--pv2-acc); color: #fff; }
+.bpl-et.encours .bpl-et-t { color: var(--pv2-acc); }
+
+.bpl-quoi {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--pv2-txt);
+  min-width: 0;
+}
+.bpl-quoi small {
+  display: block;
+  margin-top: 1px;
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--pv2-sec);
+}
+.bpl-alerte { color: var(--pv2-bad); font-weight: 700; }
+.bpl-quoi .bpl-points { color: #9a6b00; font-weight: 600; }
+
+.bpl-ligne {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+}
+.bpl-ligne + .bpl-ligne { border-top: 1px dashed var(--pv2-filet); }
+
+.bpl-pastille {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  vertical-align: 1px;
+  font-variant-numeric: tabular-nums;
+  background: var(--pv2-cell);
+  color: var(--pv2-sec);
+}
+.bpl-pastille.ok { background: #e7f0df; color: #456e32; }
+.bpl-pastille.inconnu { background: #fbf1d6; color: #9a6b00; }
+.bpl-pastille.publie { margin-left: 0; background: #4f8a3f; color: #fff; }
+
+.bpl-statut { margin: 0 0 8px; font-size: 0.8rem; color: var(--pv2-sec); }
+.bpl-statut b { color: var(--pv2-txt); }
+.bpl-aide { margin: 0; font-size: 0.74rem; line-height: 1.4; color: var(--pv2-sec); }
+
+/* Les boutons de la bande. Le plein (`.cta`) n'existe qu'une fois à l'écran :
+   sur l'étape en cours. */
+.bpl-btn {
+  flex: 0 0 auto;
+  border: 1px solid var(--pv2-bd);
+  background: var(--pv2-surface);
+  color: var(--pv2-txt);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.bpl-btn:hover { border-color: var(--pv2-acc); color: var(--pv2-acc); }
+.bpl-btn.cta {
+  border-color: var(--pv2-acc);
+  background: var(--pv2-acc);
+  color: #fff;
+  font-weight: 800;
+  padding: 8px 18px;
+  box-shadow: 0 6px 16px -6px rgba(199, 83, 15, 0.55);
+}
+.bpl-btn.cta:hover { filter: brightness(1.06); color: #fff; }
+/* « Publier » tant que rien n'est posé : cliquable (le contrôle dit pourquoi
+   c'est vide), mais il ne réclame pas l'œil. */
+.bpl-btn.eteint { color: var(--pv2-sec); opacity: 0.7; }
+
+/* Aucun planning sur le mois. */
+.bpl-hors { grid-template-columns: 220px minmax(0, 1fr); }
+.bpl-hors-txt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+}
+.bpl-hors-txt p { margin: 0; font-size: 0.86rem; color: var(--pv2-sec); }
+
+/* Le menu des plannings : ce que chacun contient. */
+.bpl-item-nom { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bpl-tag {
+  padding: 1px 7px;
+  border-radius: 6px;
+  font-size: 0.64rem;
+  font-weight: 800;
+  background: var(--pv2-cell);
+  color: var(--pv2-sec);
+}
+.bpl-tag.j { background: #e7eefb; color: #3c5a99; }
+
+@media (max-width: 900px) {
+  .bpl, .bpl-hors { grid-template-columns: 1fr; margin: 0 14px 12px; }
+  .bpl-choix { border-right: 0; border-bottom: 1px solid var(--pv2-filet); border-radius: 14px 14px 0 0; }
+  .bpl-etapes { grid-template-columns: 1fr; }
+  .bpl-et { border-right: 0; border-bottom: 1px solid var(--pv2-filet); }
+  .bpl-et:last-child { border-bottom: 0; border-radius: 0 0 14px 14px; }
+  .bpl-hors-txt { flex-wrap: wrap; }
+}
+
+/* ── La fenêtre « Publier à l'équipe » (B-172) : ce qui part ─────────────── */
+.pbc-objets { display: grid; gap: 6px; margin: 0 0 4px; padding: 0; }
+.pbc-objet {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--pv2-bd);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--pv2-txt);
+  list-style: none;
+}
+.pbc-ico { width: 17px; height: 17px; flex: 0 0 auto; color: #4f8a3f; }
+.pbc-ico.vide { border: 2px solid var(--pv2-bd); border-radius: 50%; width: 15px; height: 15px; }
+.pbc-objet.absent { color: var(--pv2-sec); font-weight: 500; }
+.pbc-objet.inconnu .pbc-ico { color: #9a6b00; }

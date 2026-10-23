@@ -28,18 +28,20 @@
 //     ils gardent leur geste, ils perdent leur place en première ligne
 //     (MiKL, 09/10 : « tu peux enlever le bouton absence, comme ça on gagne
 //     une place ») ;
-//   • l'accent est CONTEXTUEL : un planning sans gardes propose « Générer »,
-//     un planning rempli propose « Vérifier et publier ». Deux boutons
-//     d'accent côte à côte, c'était deux fois aucun.
+//   • ⚠️ DEPUIS B-172 (23/10), plus aucun bouton n'est rendu ici : « Générer »
+//     et « Publier » vivent dans la bande « Préparer · Remplir · Publier »
+//     (`BandePlanning`). Ce module n'expose plus que des ouvertures et les
+//     fenêtres qu'elles ouvrent — voir le commentaire du hook, plus bas.
 //
 // CE QUI NE CHANGE PAS : les parcours, leurs garde-fous, le pré-vol. Aucune
 // règle métier n'est touchée — ce serait risquer le moteur pour du décor.
 // ============================================================
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { PreVolAlert } from '@/components/planning/PreVolAlert'
 import { ParcoursGeneration } from '@/components/v2/ParcoursGeneration'
-import { DialogPublication } from '@/components/v2/DialogPublication'
+import { DialogPublicationChantier, type ContenuPeriode } from '@/components/chantier/DialogPublicationChantier'
+import { ChoixNouveauPlanning } from '@/components/chantier/ChoixNouveauPlanning'
 // B-157b — la fenêtre « Remplir les journées » est elle aussi une COPIE sous
 // `chantier/` : l'originale s'affichait sans style depuis le planning (sa
 // feuille n'y est pas importée), et la réparer à sa source aurait changé le
@@ -78,6 +80,10 @@ interface OptionsOutils {
   periodesJournee?: PeriodeApplicable[]
   /** Y a-t-il au moins une présence récurrente à appliquer ? */
   aDesTrames?: boolean
+  /** B-172 — ce que contient le planning affiché, compté en base. */
+  contenu?: ContenuPeriode | null
+  /** B-172 — aller sur un planning précis (créé à l'instant, par exemple). */
+  onAllerVersPeriode?: (p: { id: string; date_debut: string }) => void
 }
 
 /** Une entrée du menu « Outils ». La tête de page les dessine, pas nous. */
@@ -101,11 +107,27 @@ interface PreVolState {
 
 // ── Hook ─────────────────────────────────────────────────
 
+/**
+ * B-172 — LES GESTES DU PLANNING NE SONT PLUS DES BOUTONS RENDUS ICI.
+ *
+ * Jusqu'au 23/10, ce hook rendait « Générer » et « Vérifier et publier » tout
+ * dessinés, que la tête de page alignait. Ils vivent désormais dans la bande
+ * « Préparer · Remplir · Publier » (`BandePlanning`), à côté de ce qu'ils
+ * concernent : ce hook n'expose plus que des OUVERTURES (`ouvrirGeneration`,
+ * `ouvrirJournees`, `ouvrirPublication`, `ouvrirNouveau`) et les fenêtres
+ * qu'elles ouvrent.
+ *
+ * UNE SEULE PORTE POUR CRÉER : `ouvrirNouveau`. Elle demande ce que contient
+ * le planning quand le cabinet a les deux modules, et va droit au but sinon.
+ * « Je fais un nouveau planning » (dans Générer) et « Dates libres » (dans la
+ * fenêtre des journées) ne sont plus des entrées : trois portes pour un même
+ * geste, c'était le premier sujet de confusion relevé par MiKL.
+ */
 export function useOutilsPlanningChantier({
   periode,
-  aDesGardes,
   isAdmin,
   onSignalerAbsence,
+  aDesGardes,
   periodes,
   periodesTypes,
   gardesParType,
@@ -115,17 +137,32 @@ export function useOutilsPlanningChantier({
   modules = ['gardes'],
   periodesJournee = [],
   aDesTrames = false,
+  contenu = null,
+  onAllerVersPeriode,
 }: OptionsOutils) {
   // ⚠️ LE REPLI EST « GARDES SEULES », jamais « tout allumé » — un cabinet dont
   //    la liste de modules n'aurait pas été lue doit voir l'écran qu'il a
   //    toujours eu, pas se découvrir un geste qu'il n'a pas acheté.
   const aGardes = modules.includes('gardes')
   const aJournee = modules.includes('planning-journee')
-  const [journeeOuverte, setJourneeOuverte] = useState(false)
-  const [genererOuvert, setGenererOuvert] = useState(false)
-  const [parcoursOuvert, setParcoursOuvert] = useState(false)
+
+  // Chaque ouverture REMONTE sa fenêtre (`key` sur le compteur) : les fenêtres
+  // lisent leur point de départ à la création seulement — un état hérité de
+  // l'ouverture précédente viserait le mauvais planning.
+  const [parcours, setParcours] = useState<{
+    ouvert: boolean
+    n: number
+    etape: 'choix' | 'nouveau'
+    cible: Periode | null
+  }>({ ouvert: false, n: 0, etape: 'choix', cible: null })
+  const [journees, setJournees] = useState<{
+    ouvert: boolean
+    n: number
+    mode: 'remplir' | 'creer'
+    periodeId: string | null
+  }>({ ouvert: false, n: 0, mode: 'remplir', periodeId: null })
   const [publicationOuverte, setPublicationOuverte] = useState(false)
-  const [etapeParcours, setEtapeParcours] = useState<'choix' | 'nouveau'>('choix')
+  const [choixOuvert, setChoixOuvert] = useState(false)
 
   // Pré-vol du planning AFFICHÉ. Clé sur sa période : changer de mois invalide
   // l'affichage sans setState synchrone dans l'effet.
@@ -151,219 +188,48 @@ export function useOutilsPlanningChantier({
     return () => { annule = true }
   }, [periodeId, isAdmin, preVolVersion])
 
-  // Le menu « Générer » se referme au clic dehors ET à Échap. Les deux, parce
-  // qu'un panneau qui ne se ferme qu'au clic piège celui qui l'a ouvert au
-  // clavier — c'est le même contrat que le menu « Outils » de la tête de page.
-  const genererRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (!genererOuvert) return
-    function auClic(e: MouseEvent) {
-      if (!genererRef.current?.contains(e.target as Node)) setGenererOuvert(false)
-    }
-    function aLaTouche(e: KeyboardEvent) {
-      if (e.key === 'Escape') setGenererOuvert(false)
-    }
-    document.addEventListener('mousedown', auClic)
-    document.addEventListener('keydown', aLaTouche)
-    return () => {
-      document.removeEventListener('mousedown', auClic)
-      document.removeEventListener('keydown', aLaTouche)
-    }
-  }, [genererOuvert])
-
   const preVolActuel = preVol && preVol.periodeId === periodeId ? preVol : null
 
-  const estPublie = periode?.statut === 'publie'
-  const estVerrouille = periode?.statut === 'verrouille'
-  // Volontairement SANS `aDesGardes` : un bouton grisé ne dit pas pourquoi il
-  // l'est. Le clic ouvre le contrôle de publication, qui répond noir sur blanc
-  // — « ce planning n'a aucune garde, génère-le d'abord ».
-  const peutPublier = periode?.statut === 'brouillon'
-
-  /** Ouvre le parcours, éventuellement droit sur la création d'un planning. */
-  function ouvrirParcours(etape: 'choix' | 'nouveau' = 'choix') {
-    setEtapeParcours(etape)
-    setParcoursOuvert(true)
-  }
-
-  // ── Ce que la tête de page a le droit d'afficher ───────
-
   /**
-   * LE NOMBRE DE LA PASTILLE, et rien d'autre.
+   * LE NOMBRE DE POINTS À RÉGLER, et rien d'autre.
    *
-   * ⚠️ Ce n'est PAS le compteur des 48 incohérences de B-152a — celles-là sont
-   * un contrôle de publication, qui reste bloquant côté serveur. Ici on compte
-   * ce que le PRÉ-VOL a trouvé : les avertissements du moteur et les demandes
-   * de congé non tranchées. Confondre les deux ferait dire à la pastille une
-   * chose qu'elle ne mesure pas.
+   * ⚠️ Ce n'est PAS le compteur des incohérences de B-152a — celles-là sont un
+   * contrôle de publication, qui reste bloquant côté serveur. Ici on compte ce
+   * que le PRÉ-VOL a trouvé : les avertissements du moteur et les demandes de
+   * congé non tranchées.
    */
   const pointsAVerifier = preVolActuel
     ? preVolActuel.avertissements.length + preVolActuel.souhaitsEnAttente
     : 0
 
-  /**
-   * L'ACTION PRINCIPALE — une seule, contextuelle.
-   *
-   * Le modèle du 09/10 met « Vérifier et publier » en accent ; l'écran mettait
-   * « Générer ». Les deux ont raison, à des moments différents : sur un
-   * planning vide, publier n'a aucun sens, et sur un planning rempli, générer
-   * est un geste de reprise, pas le geste suivant. L'accent suit donc l'état.
-   */
-  let actionPrincipale: ReactNode = null
-  if (isAdmin) {
-    if (estPublie) {
-      actionPrincipale = (
-        <span className="pv2h-etat publie" title="Ce planning est publié : l’équipe le voit">
-          Publié
-        </span>
-      )
-    } else if (estVerrouille) {
-      actionPrincipale = (
-        <span className="pv2h-etat" title="Planning verrouillé : consultation seule">
-          Verrouillé
-        </span>
-      )
-    } else if (peutPublier) {
-      // Volontairement SANS `aDesGardes` : un planning vide n'est pas grisé,
-      // il est refusé PAR LE CONTRÔLE, qui dit pourquoi — « ce planning n'a
-      // aucune garde, génère-le d'abord ». Un bouton grisé ne dit rien.
-      actionPrincipale = (
-        <button
-          type="button"
-          className="pv2h-cta"
-          title="Contrôler le planning, puis le publier auprès de l’équipe"
-          onClick={() => setPublicationOuverte(true)}
-        >
-          Vérifier et publier
-        </button>
-      )
-    }
+  // ── Les ouvertures ─────────────────────────────────────
+
+  /** Générer les gardes de CE planning : droit au contrôle, sans « lequel ? ». */
+  function ouvrirGeneration(cible: Periode | null = periode) {
+    setParcours((p) => ({ ouvert: true, n: p.n + 1, etape: 'choix', cible }))
   }
 
-  /**
-   * « GÉNÉRER », À CÔTÉ DE L'ÉTAT — sorti du menu le 09/10 (B-157b).
-   *
-   * Les deux gestes du planning vivent desormais cote a cote : celui qui le
-   * FABRIQUE et celui qui le DIFFUSE. Le matin meme, j'avais tranche l'inverse
-   * (un seul accent, contextuel) ; MiKL a corrige, et la raison se voit a
-   * l'usage — on genere et on republie plusieurs fois de suite pendant la
-   * preparation, jamais l'un sans l'autre.
-   *
-   * ⚠️ B-148 — « Générer » ne veut pas dire la même chose partout. Sans gardes
-   * au catalogue, il n'y a aucun moteur à lancer : le mot désigne alors le
-   * remplissage des journées.
-   *
-   * 🔴 B-159 ④ⓒ — DEUX GESTES SOUS UN SEUL MOT, le 14/10. Un cabinet qui a les
-   * deux modules fabrique DEUX plannings : les gardes (le moteur calcule) et
-   * les journées (les présences récurrentes se posent). Jusqu'ici « Générer »
-   * ne désignait que le premier, et le second vivait dans le menu « Outils »,
-   * au même rang qu'une impression — MiKL ne le trouvait plus.
-   *
-   * Le choix de MiKL parmi trois alternatives : UN bouton, qui s'ouvre en deux.
-   * Un seul accent sur la ligne (« Vérifier et publier » garde le plein), et
-   * les deux objets NOMMÉS dès l'ouverture — « les gardes », « les journées ».
-   * C'est ce qui manquait : le mot « Générer » seul ne disait pas sur QUOI il
-   * portait, et un cabinet à deux modules devait le deviner.
-   *
-   * ⚠️ Le menu n'apparaît QUE si les deux modules sont là. Avec un seul, il n'y
-   * a rien à choisir : un menu à une entrée est un clic pour rien.
-   */
-  let actionGenerer: ReactNode = null
-  if (isAdmin && !estVerrouille) {
-    if (aGardes && aJournee) {
-      actionGenerer = (
-        <div className="pv2h-menu-wrap" ref={genererRef}>
-          <button
-            type="button"
-            className="pv2h-generer"
-            // ⚠️ PAS de `aria-haspopup="menu"` ni de `role="menu"` sur le
-            // panneau : ces rôles PROMETTENT la navigation aux flèches, que ce
-            // composant n'implémente pas. Annoncer un pattern qu'on ne tient
-            // pas laisse l'utilisateur au clavier appuyer sur ↓ sans effet —
-            // c'est pire que le simple groupe de boutons qu'on a réellement.
-            // Même contrat que le menu « Outils » voisin, qui n'en met pas non
-            // plus : deux panneaux frères, une seule grammaire.
-            aria-expanded={genererOuvert}
-            title="Fabriquer le planning — les gardes, ou les journées"
-            onClick={() => setGenererOuvert((o) => !o)}
-          >
-            <span aria-hidden>✨</span>
-            Générer
-            <span className="pv2h-caret" aria-hidden>▾</span>
-          </button>
-
-          {genererOuvert && (
-            <div className="pv2h-menu gauche" aria-label="Ce qu’on génère">
-              <button
-                type="button"
-                className="pv2h-menu-item"
-                onClick={() => { setGenererOuvert(false); ouvrirParcours('choix') }}
-              >
-                <span className="pv2h-menu-ico" aria-hidden>✨</span>
-                <span className="pv2h-menu-txt">
-                  <b>Les gardes</b>
-                  <small>Calculer qui est de garde, les nuits et les week-ends</small>
-                </span>
-              </button>
-
-              <div className="pv2h-menu-sep" role="separator" />
-
-              <button
-                type="button"
-                className="pv2h-menu-item"
-                onClick={() => { setGenererOuvert(false); setJourneeOuverte(true) }}
-              >
-                <span className="pv2h-menu-ico" aria-hidden>🗓</span>
-                <span className="pv2h-menu-txt">
-                  <b>Les journées</b>
-                  <small>Appliquer les présences récurrentes sur la période</small>
-                </span>
-              </button>
-            </div>
-          )}
-        </div>
-      )
-    } else if (aGardes) {
-      actionGenerer = (
-        <button
-          type="button"
-          className="pv2h-generer"
-          title="Générer un planning — nouveau, ou en refaire un existant"
-          onClick={() => ouvrirParcours('choix')}
-        >
-          <span aria-hidden>✨</span>
-          Générer
-        </button>
-      )
-    } else if (aJournee) {
-      // ⚠️ Conditionné à `aJournee`, alors que la version précédente tombait ici
-      // par défaut. Sans le module, la fenêtre n'est même pas montée plus bas
-      // (`{aJournee && <GenererJourneeChantier …>}`) : le bouton existait donc,
-      // et ne faisait rien. Un bouton qui ne fait rien est l'interdit du KIT
-      // COMPLET — il ne s'affiche plus là où il n'a pas de fenêtre à ouvrir.
-      actionGenerer = (
-        <button
-          type="button"
-          className="pv2h-generer"
-          title="Remplir le planning des journées depuis les présences récurrentes"
-          onClick={() => setJourneeOuverte(true)}
-        >
-          <span aria-hidden>✨</span>
-          Remplir les journées
-        </button>
-      )
-    }
+  /** Remplir / compléter les journées de CE planning. */
+  function ouvrirJournees() {
+    setJournees((j) => ({ ouvert: true, n: j.n + 1, mode: 'remplir', periodeId: periode?.id ?? null }))
   }
 
-  /**
-   * LE MENU « OUTILS » — ce qui quitte la première ligne sans quitter l'écran.
-   *
-   * ⚠️ « Absence » y descend, et c'est le point à surveiller : c'était le SEUL
-   * chemin spontané vers `CriseModal` depuis le planning (les autres entrées,
-   * dans `/absences` et `/conges`, ne s'ouvrent qu'en réparation d'un conflit
-   * déjà détecté). Le supprimer aurait retiré une capacité ; le descendre ne
-   * retire qu'un bouton.
-   */
+  function ouvrirPublication() {
+    setPublicationOuverte(true)
+  }
+
+  /** LA porte de création. */
+  function ouvrirNouveau() {
+    if (aGardes && aJournee) return setChoixOuvert(true)
+    if (aGardes) return setParcours((p) => ({ ouvert: true, n: p.n + 1, etape: 'nouveau', cible: null }))
+    if (aJournee) return setJournees((j) => ({ ouvert: true, n: j.n + 1, mode: 'creer', periodeId: null }))
+  }
+
+  // ── Le menu « Outils » ─────────────────────────────────
+  //
+  // ⚠️ « Absence » y vit : c'était le SEUL chemin spontané vers `CriseModal`
+  // depuis le planning. Le supprimer aurait retiré une capacité ; le descendre
+  // ne retire qu'un bouton.
   const peutImprimer = aDesGardes && periodeId !== ''
   const outils: EntreeOutil[] = [
     {
@@ -374,9 +240,7 @@ export function useOutilsPlanningChantier({
       action: peutImprimer
         ? () => { window.location.href = `/api/export-pdf?periodeId=${periodeId}` }
         : undefined,
-      // Un geste inerte DIT pourquoi il l'est. Un bouton grisé muet renvoie
-      // l'admin chercher la raison ailleurs — le défaut relevé le 03/08 sur
-      // « Publier », réglé une fois, à ne pas réintroduire par la petite porte.
+      // Un geste inerte DIT pourquoi il l'est.
       empeche: peutImprimer ? undefined : 'Ce planning n’a encore aucune garde à imprimer',
     },
   ]
@@ -389,24 +253,11 @@ export function useOutilsPlanningChantier({
       icone: '🩹',
       action: onSignalerAbsence,
     })
-
-    // ⚠️ « REMPLIR LES JOURNÉES » N'EST PLUS ICI NON PLUS — sorti le 14/10
-    // (B-159 ④ⓒ). Il est devenu la seconde entrée du bouton « Générer », avec
-    // les gardes. Le laisser AUSSI dans ce menu aurait donné deux chemins vers
-    // la même fenêtre : le doublon de geste est exactement ce qui faisait
-    // chercher MiKL — on ne sait plus lequel des deux est le bon.
-
-    // ⚠️ « Générer » N'EST PLUS DANS CE MENU — sorti le 09/10 (B-157b) à la
-    // demande de MiKL : « le bouton génère doit être à côté de publié, sors-le
-    // de la liste d'outils ». C'est le geste qui FABRIQUE le planning ; le
-    // ranger au même niveau qu'une impression le faisait disparaître derrière
-    // un clic. Il est rendu par `actionGenerer`, ci-dessous.
   }
 
   // ── Le bandeau, au-dessus de la grille ─────────────────
   // Chaque point y est RÉGLABLE sur place : corriger déclenche un rechargement
   // du pré-vol, donc la liste se vide au fur et à mesure.
-
   const alertes = isAdmin && preVolActuel ? (
     <PreVolAlert
       avertissements={preVolActuel.avertissements}
@@ -416,18 +267,15 @@ export function useOutilsPlanningChantier({
     />
   ) : null
 
-  // ── Les parcours ───────────────────────────────────────
+  // ── Les fenêtres ───────────────────────────────────────
 
   const modales = isAdmin ? (
     <>
-      {/* `key` sur l'étape d'entrée : la modale reste montée entre deux
-          ouvertures, un simple `useState(etapeInitiale)` ne la verrait donc
-          jamais changer. */}
       <ParcoursGeneration
-        key={etapeParcours}
-        open={parcoursOuvert}
+        key={`parcours-${parcours.n}`}
+        open={parcours.ouvert}
         onOpenChange={(o) => {
-          setParcoursOuvert(o)
+          setParcours((p) => ({ ...p, ouvert: o }))
           if (!o) setPreVolVersion((v) => v + 1)
         }}
         periodes={periodes}
@@ -437,29 +285,49 @@ export function useOutilsPlanningChantier({
         vets={vets}
         periodesAvecGardes={periodesAvecGardes}
         onNaviguerVersMois={onNaviguerVersMois}
-        etapeInitiale={etapeParcours}
+        etapeInitiale={parcours.etape}
+        cibleDirecte={parcours.cible}
       />
 
-      <DialogPublication
+      <DialogPublicationChantier
         open={publicationOuverte}
         onOpenChange={setPublicationOuverte}
         periode={periode}
-        aDesGardes={aDesGardes}
+        contenu={contenu}
+        avecJournees={aJournee}
       />
 
       {aJournee && (
         <GenererJourneeChantier
-          open={journeeOuverte}
-          onOpenChange={setJourneeOuverte}
+          key={`journees-${journees.n}`}
+          open={journees.ouvert}
+          onOpenChange={(o) => setJournees((j) => ({ ...j, ouvert: o }))}
           periodes={periodesJournee}
           aDesTrames={aDesTrames}
+          periodeInitialeId={journees.periodeId}
+          mode={journees.mode}
+          onPeriodeCreee={(p) => onAllerVersPeriode?.(p)}
         />
       )}
+
+      <ChoixNouveauPlanning
+        open={choixOuvert}
+        onOpenChange={setChoixOuvert}
+        onGardes={() => {
+          setChoixOuvert(false)
+          setParcours((p) => ({ ouvert: true, n: p.n + 1, etape: 'nouveau', cible: null }))
+        }}
+        onJournees={() => {
+          setChoixOuvert(false)
+          setJournees((j) => ({ ouvert: true, n: j.n + 1, mode: 'creer', periodeId: null }))
+        }}
+      />
     </>
   ) : null
 
   return {
-    actionPrincipale, actionGenerer, outils, pointsAVerifier,
-    alertes, modales, ouvrirAssistant: ouvrirParcours,
+    outils, pointsAVerifier, alertes, modales,
+    aGardes, aJournee,
+    ouvrirGeneration, ouvrirJournees, ouvrirPublication, ouvrirNouveau,
   }
 }

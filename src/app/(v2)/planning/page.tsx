@@ -59,6 +59,7 @@ import {
 // l'identité du mois (période affichée, re-validation) ; `bornesGrille` porte ce
 // qui est réellement dessiné, et c'est elle qui remplit les cases.
 import { bornesGrille, bornesMois } from '@/lib/planning/bornes-grille'
+import { choisirPeriodeAffichee } from '@/lib/planning/periode-affichee'
 import type { VetCrise } from '@/components/planning/CriseModal'
 import type { CompteursRow } from '@/hooks/useCompteurs'
 import type {
@@ -181,7 +182,7 @@ const LIBELLE_MOTIF: Record<string, string> = {
 export default async function PlanningPageV2({
   searchParams,
 }: {
-  searchParams: Promise<{ mois?: string }>
+  searchParams: Promise<{ mois?: string; periode?: string }>
 }) {
   const supabase = await createClient()
 
@@ -199,7 +200,7 @@ export default async function PlanningPageV2({
   const isAdmin = identite.role === 'admin'
   const estSecretaire = identite.genre === 'secretaire'
 
-  const { mois: moisParam } = await searchParams
+  const { mois: moisParam, periode: periodeParam } = await searchParams
   const anneeMois = moisParam && /^\d{4}-\d{2}$/.test(moisParam) ? moisParam : moisCourant()
   const { debut, fin } = bornesMois(anneeMois)
   // Ce qui est DESSINÉ déborde du mois : les cases de la semaine à cheval se
@@ -355,8 +356,10 @@ export default async function PlanningPageV2({
   })
 
   // La période dont relève le mois affiché : celle qui le chevauche.
-  const periodeAffichee =
-    periodes.find((p) => p.date_debut <= fin && p.date_fin >= debut) ?? null
+  // B-172 — le planning DEMANDÉ d'abord (menu des plannings), puis un planning
+  // de gardes, et seulement ensuite une période « journées » : triées par début
+  // décroissant, ces dernières passaient devant le planning de gardes du mois.
+  const periodeAffichee = choisirPeriodeAffichee(periodes, debut, fin, periodeParam ?? null)
 
   // B-148 — ce que « Générer » doit proposer dépend des MODULES du cabinet, et
   // les présences de journée ont besoin de savoir s'il existe au moins une
@@ -490,6 +493,33 @@ export default async function PlanningPageV2({
     //    le neuf », c'est « ne rien changer pour le client ».
     chantierOuvertPourLeCabinet(supabase, 'planning-grille-v2'),
   ])
+
+  // ── B-172 — CE QUE CONTIENT LE PLANNING AFFICHÉ ───────────────────────
+  //
+  // La bande « Préparer · Remplir · Publier » dit ce qui est posé, gardes ET
+  // journées, sur TOUT le planning — pas seulement sur le mois à l'écran.
+  // Chargé pour l'administratrice du chantier seulement : c'est la seule à voir
+  // la bande. ⚠️ Une lecture échouée rend `null`, jamais 0 : « 0 posée » sur
+  // une erreur ferait croire à un planning vide, et pousserait à le régénérer.
+  let contenuPeriode: { gardes: number | null; presences: number | null } | null = null
+  if (grilleV2 && isAdmin && periodeAffichee) {
+    const [gRes, pRes] = await Promise.all([
+      supabase
+        .from('gardes')
+        .select('id', { count: 'exact', head: true })
+        .eq('periode_id', periodeAffichee.id),
+      supabase
+        .from('presences_journee')
+        .select('id', { count: 'exact', head: true })
+        .eq('periode_id', periodeAffichee.id),
+    ])
+    if (gRes.error) console.error('[planning] comptage des gardes du planning :', gRes.error.message)
+    if (pRes.error) console.error('[planning] comptage des présences du planning :', pRes.error.message)
+    contenuPeriode = {
+      gardes: gRes.error ? null : (gRes.count ?? 0),
+      presences: pRes.error ? null : (pRes.count ?? 0),
+    }
+  }
 
   // ── B-163a ③ — LES ABSENCES DÉCLARÉES, POUR LA GRILLE ──────────────────
   //
@@ -980,6 +1010,7 @@ export default async function PlanningPageV2({
             periodesJournee={periodesJournee}
             aDesTrames={aDesTrames}
             presencesParJour={presencesParJour}
+            contenuPeriode={contenuPeriode}
             // B-153 lot 1 — l'équipe pose UNE LIGNE PAR PERSONNE dans la grille
             // dépliée. Chargée pour tout le monde, contrairement à `vets` qui
             // ne sert qu'aux gestes de l'administratrice.
