@@ -29,7 +29,7 @@
 import type { ReactNode } from 'react'
 import { periodePorteDesGardes } from '@/lib/planning/usage-periode'
 import { periodeFr } from '@/lib/dates-fr'
-import type { ContenuPeriode } from './DialogPublicationChantier'
+import { phraseAilleurs, type ContenuPeriode } from './DialogPublicationChantier'
 import type { Periode } from '@/types'
 
 interface Props {
@@ -103,10 +103,19 @@ export function BandePlanning({
   // Rien de posé du tout (et lu comme tel) : l'étape 2 attend. Un compte
   // illisible ne la rend PAS vide — on laisse alors la main à « Publier », que
   // le serveur contrôle de toute façon.
+  //
+  // B-172c — des journées posées sur CES jours mais rattachées à un AUTRE
+  // planning (chevauchement journées / gardes) : les jours sont couverts, mais
+  // ce planning-ci n'a rien à publier — elles partent avec l'autre.
+  const ailleurs = voitJournees ? phraseAilleurs(contenu) : null
+  const journeesCouvertesAilleurs = nbPresences === 0 && ailleurs !== null
   const rienDePose =
-    (!voitGardes || nbGardes === 0) && (!voitJournees || nbPresences === 0)
+    (!voitGardes || nbGardes === 0) &&
+    (!voitJournees || (nbPresences === 0 && !journeesCouvertesAilleurs))
+  const rienAPublierIci =
+    !rienDePose && (!voitGardes || nbGardes === 0) && journeesCouvertesAilleurs
   const etape2EnCours = !verrouille && !publie && rienDePose
-  const etape3EnCours = !verrouille && !publie && !rienDePose
+  const etape3EnCours = !verrouille && !publie && !rienDePose && !rienAPublierIci
 
   const semaines = nbSemaines(periode.date_debut, periode.date_fin)
 
@@ -162,7 +171,13 @@ export function BandePlanning({
           {voitJournees && (
             <div className="bpl-ligne">
               <p className="bpl-quoi">
-                Journées <Compte n={nbPresences} un="présence" plusieurs="présences" />
+                Journées{' '}
+                {journeesCouvertesAilleurs
+                  ? <span className="bpl-pastille ok">{ailleurs}</span>
+                  : <Compte n={nbPresences} un="présence" plusieurs="présences" />}
+                {!journeesCouvertesAilleurs && ailleurs && (
+                  <small>+ {ailleurs}</small>
+                )}
               </p>
               {!verrouille && (
                 <button
@@ -173,7 +188,7 @@ export function BandePlanning({
                     ? 'Ajouter les présences qui manquent — rien n’est retiré'
                     : 'Poser les présences récurrentes sur ce planning'}
                 >
-                  {nbPresences ? 'Compléter' : 'Remplir'}
+                  {nbPresences || journeesCouvertesAilleurs ? 'Compléter' : 'Remplir'}
                 </button>
               )}
             </div>
@@ -196,6 +211,10 @@ export function BandePlanning({
               </p>
               <p className="bpl-aide">Une case à changer ? Clique dessus : l’équipe est prévenue.</p>
             </>
+          ) : rienAPublierIci ? (
+            <p className="bpl-statut">
+              <b>Rien à publier ici</b> — ces journées partiront avec le planning qui les porte.
+            </p>
           ) : (
             <>
               <p className="bpl-statut"><b>Brouillon</b> — l’équipe ne voit rien encore.</p>

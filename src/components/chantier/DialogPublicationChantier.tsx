@@ -41,6 +41,21 @@ import type { Periode } from '@/types'
 export interface ContenuPeriode {
   gardes: number | null
   presences: number | null
+  /**
+   * B-172c — les présences posées sur CES dates mais rattachées à un AUTRE
+   * planning (chevauchement journées / gardes). Elles partent avec lui, pas
+   * avec celui-ci. `null` = lecture impossible ; absent = non chargé.
+   */
+  ailleurs?: { libelle: string; nb: number }[] | null
+}
+
+/** « 25 présences portées par Hiver P2 », ou null s'il n'y a rien ailleurs. */
+export function phraseAilleurs(contenu: ContenuPeriode | null): string | null {
+  const a = contenu?.ailleurs ?? []
+  if (a.length === 0) return null
+  const total = a.reduce((s, x) => s + x.nb, 0)
+  const qui = a.map((x) => x.libelle).join(', ')
+  return `${total} présence${total > 1 ? 's' : ''} portée${total > 1 ? 's' : ''} par ${qui}`
 }
 
 interface Props {
@@ -161,10 +176,27 @@ export function DialogPublicationChantier({ open, onOpenChange, periode, contenu
                 <div className="gva-tete">
                   <AlertTriangle className="gva-ico" aria-hidden />
                   <div className="gva-titres">
-                    <p className="gva-titre">Ce planning est vide</p>
-                    <p className="gva-sous">
-                      Ni garde ni journée : il n’y a rien à publier. Remplis-le d’abord.
-                    </p>
+                    {/* B-172c — « vide » mentait à moitié quand les jours sont
+                        couverts par un AUTRE planning : on dit où sont les
+                        journées, et avec quoi elles partent. */}
+                    {phraseAilleurs(contenu) ? (
+                      <>
+                        <p className="gva-titre">Rien à publier sur ce planning</p>
+                        <p className="gva-sous">
+                          Ses jours sont déjà couverts : {phraseAilleurs(contenu)}.{' '}
+                          {contenu?.ailleurs?.length === 1
+                            ? 'Elles partiront avec lui, à sa publication.'
+                            : 'Elles partiront avec eux, à leur publication.'}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="gva-titre">Ce planning est vide</p>
+                        <p className="gva-sous">
+                          Ni garde ni journée : il n’y a rien à publier. Remplis-le d’abord.
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -180,6 +212,13 @@ export function DialogPublicationChantier({ open, onOpenChange, periode, contenu
                   />
                 )}
               </ul>
+            )}
+
+            {!vide && phraseAilleurs(contenu) && (
+              <p className="gp-note">
+                Sur ces dates, aussi : {phraseAilleurs(contenu)}. Elles ne partent pas avec
+                ce planning-ci.
+              </p>
             )}
 
             {!vide && (

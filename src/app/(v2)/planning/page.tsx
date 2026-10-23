@@ -60,6 +60,8 @@ import {
 // qui est réellement dessiné, et c'est elle qui remplit les cases.
 import { bornesGrille, bornesMois } from '@/lib/planning/bornes-grille'
 import { choisirPeriodeAffichee } from '@/lib/planning/periode-affichee'
+import { nomPeriode } from '@/lib/periodes/libelle'
+import type { ContenuPeriode } from '@/components/chantier/DialogPublicationChantier'
 import type { VetCrise } from '@/components/planning/CriseModal'
 import type { CompteursRow } from '@/hooks/useCompteurs'
 import type {
@@ -501,8 +503,42 @@ export default async function PlanningPageV2({
   // Chargé pour l'administratrice du chantier seulement : c'est la seule à voir
   // la bande. ⚠️ Une lecture échouée rend `null`, jamais 0 : « 0 posée » sur
   // une erreur ferait croire à un planning vide, et pousserait à le régénérer.
-  let contenuPeriode: { gardes: number | null; presences: number | null } | null = null
+  //
+  // B-172c — LES JOURNÉES PORTÉES PAR UN AUTRE PLANNING. Depuis B-162, une
+  // période « journées » peut chevaucher un planning de gardes. Ses jours
+  // peuvent alors déjà avoir leurs présences… rattachées à l'AUTRE planning.
+  // La bande disait « vide » (vrai pour CE planning) pendant que « Remplir »
+  // disait « tout est en place » (vrai pour ces JOURS) : ensemble, ils se
+  // contredisaient (MiKL, 23/10). On compte donc aussi, planning par planning,
+  // ce que les autres portent sur ces dates. Un comptage par planning voisin
+  // plutôt qu'une lecture des lignes : une lecture serait plafonnée à 1000
+  // lignes par Supabase, et se tairait au-delà.
+  let contenuPeriode: ContenuPeriode | null = null
   if (grilleV2 && isAdmin && periodeAffichee) {
+    const voisines = toutesPeriodes.filter(
+      (p) =>
+        p.id !== periodeAffichee.id &&
+        p.date_debut <= periodeAffichee.date_fin &&
+        p.date_fin >= periodeAffichee.date_debut,
+    )
+    const ailleursRes = await Promise.all(
+      voisines.map((p) =>
+        supabase
+          .from('presences_journee')
+          .select('id', { count: 'exact', head: true })
+          .eq('periode_id', p.id)
+          .gte('date', periodeAffichee.date_debut)
+          .lte('date', periodeAffichee.date_fin),
+      ),
+    )
+    const ailleursEnErreur = ailleursRes.some((r) => r.error)
+    if (ailleursEnErreur) console.error('[planning] comptage des présences portées ailleurs : lecture en échec')
+    const ailleurs = ailleursEnErreur
+      ? null
+      : voisines
+          .map((p, i) => ({ libelle: nomPeriode(p), nb: ailleursRes[i].count ?? 0 }))
+          .filter((a) => a.nb > 0)
+
     const [gRes, pRes] = await Promise.all([
       supabase
         .from('gardes')
@@ -518,6 +554,7 @@ export default async function PlanningPageV2({
     contenuPeriode = {
       gardes: gRes.error ? null : (gRes.count ?? 0),
       presences: pRes.error ? null : (pRes.count ?? 0),
+      ailleurs,
     }
   }
 
