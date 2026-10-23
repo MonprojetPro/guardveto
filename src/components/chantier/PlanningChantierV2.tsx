@@ -99,6 +99,7 @@ import { JourneeDuJourModale } from '@/components/v2/JourneeDuJourModale'
 import { GrilleSemainesV2 } from './GrilleSemainesV2'
 import '@/styles/chantier-planning-v2.css'
 import { BandePlanning } from './BandePlanning'
+import { SupprimerPeriodeJourneesModale } from './SupprimerPeriodeJourneesModale'
 import type { ContenuPeriode } from './DialogPublicationChantier'
 import { CellulePresenceModale, type TranchePosable } from './CellulePresenceModale'
 import { JourneeDashboardModale } from './JourneeDashboardModale'
@@ -457,6 +458,13 @@ export function PlanningChantierV2({
   // dire sur des données lues en base, pas dans un « — Ses gardes seront
   // effacées » écrit une fois pour toutes. C'est le rôle de la fenêtre en deux
   // temps ; elle sert aussi la dépublication, l'issue qui n'existait nulle part.
+  /**
+   * B-172c — retirer un planning de JOURNÉES depuis le menu. MiKL, recette du
+   * 23/10 : « je ne vois pas de corbeille pour supprimer les journées du 9
+   * novembre ». Elle passe par la fenêtre des journées, qui COMPTE les
+   * présences avant d'effacer — jamais par celle des gardes, qui les tait.
+   */
+  const [retraitJournees, setRetraitJournees] = useState<PeriodeApplicable | null>(null)
   const [retrait, setRetrait] = useState<{
     id: string
     nom: string
@@ -1181,12 +1189,33 @@ export function PlanningChantierV2({
                           <CalendarX2 className="ppv-ico" aria-hidden />
                         </button>
                       )}
-                      {/* B-172 — PAS DE CORBEILLE ICI POUR UN PLANNING DE
-                          JOURNÉES. Cette fenêtre de retrait compte les gardes,
-                          jamais les présences : elle annoncerait « rien à
-                          perdre » et en effacerait des dizaines (cascade). Le
-                          planning de journées se supprime depuis « Remplir les
-                          journées », dont la fenêtre compte ses présences. */}
+                      {/* B-172 — DEUX CORBEILLES, DEUX FENÊTRES. Celle des
+                          gardes compte les gardes, jamais les présences : sur
+                          un planning de journées, elle annoncerait « rien à
+                          perdre » et en effacerait des dizaines (cascade). Un
+                          planning de journées passe donc par SA fenêtre, qui
+                          compte ses présences avant d'effacer. */}
+                      {isAdmin && p.statut !== 'verrouille' && !periodePorteDesGardes(p.usage) && (
+                        <button
+                          type="button"
+                          className="gen-suppr"
+                          title={`Supprimer « ${nomPeriode(p)} »`}
+                          aria-label={`Supprimer le planning ${nomPeriode(p)}`}
+                          onClick={() => {
+                            setPopOuvert(false)
+                            setRetraitJournees({
+                              id: p.id,
+                              libelle: nomPeriode(p),
+                              date_debut: p.date_debut,
+                              date_fin: p.date_fin,
+                              statut: p.statut,
+                              usage: p.usage,
+                            })
+                          }}
+                        >
+                          <Trash2 className="ppv-ico" aria-hidden />
+                        </button>
+                      )}
                       {isAdmin && p.statut !== 'verrouille' && periodePorteDesGardes(p.usage) && (
                         <button
                           type="button"
@@ -2125,6 +2154,22 @@ export function PlanningChantierV2({
       )}
 
       {modales}
+
+      {retraitJournees && (
+        <SupprimerPeriodeJourneesModale
+          periode={retraitJournees}
+          onFerme={() => setRetraitJournees(null)}
+          onFait={(message) => {
+            toast.success(message)
+            const etaitAffiche = retraitJournees.id === periodeAffichee?.id
+            setRetraitJournees(null)
+            // Le planning affiché vient de disparaître : on quitte son adresse
+            // (`periode=`), sinon la page chercherait un planning qui n'existe plus.
+            if (etaitAffiche) router.push(`/planning?mois=${moisAffiche}`)
+            else router.refresh()
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -2489,3 +2489,23 @@
 @media (max-width: 720px) {
   .pv2h-r1 .pv2h-axes { margin-left: 0; }
 }
+
+/* B-172 — LA TÊTE TIENT SUR UNE SEULE LIGNE. MiKL, recette du 23/10 : « je veux
+   que tout soit sur une seule ligne, adapte la taille pour que ce soit
+   possible ». Mois, flèches, « Aujourd'hui », les deux réglages et « Outils »
+   partagent la rangée 1 : on resserre tout ce qui la compose (mesuré : la
+   rangée demande ~1190px, elle en avait ~1400 avant). Le retour à la ligne
+   n'est PAS interdit : un seuil d'écran ne connaît pas la largeur réelle du
+   plan de travail (barre latérale), et une ligne forcée déborderait. Il ne se
+   produit plus que quand la place manque vraiment.
+   Chaque pilule garde « padding horizontal ≥ vertical + 8 » (pilules-padding). */
+.pv2h-r1 { gap: 10px 14px; }
+.pv2h-mois h2 { font-size: 1.5rem; }
+.work-head.pv2h .mn-btn { width: 28px; height: 28px; font-size: 0.95rem; }
+.pv2h-today { font-size: 0.74rem; padding: 6px 14px; }
+.pv2h-r1 .pv2h-axes { gap: 8px 12px; }
+.pv2h-r1 .pv2h-axe { gap: 6px; }
+.pv2h-r1 .pv2h-axe-lbl { font-size: 0.68rem; }
+.pv2h-r1 .pv2h-seg-btn { font-size: 0.72rem; padding: 5px 13px; }
+.pv2h-r1 .pv2h-outil-btn { font-size: 0.76rem; padding: 7px 15px; min-height: 34px; }
+.pv2h-r1 .pv2h-seg-btn { white-space: nowrap; }
