@@ -2479,3 +2479,13 @@
 .pbc-ico.vide { border: 2px solid var(--pv2-bd); border-radius: 50%; width: 15px; height: 15px; }
 .pbc-objet.absent { color: var(--pv2-sec); font-weight: 500; }
 .pbc-objet.inconnu .pbc-ico { color: #9a6b00; }
+
+/* B-172 — « Afficher » et « Étendue » vivent dans la rangée 1, entre le mois
+   et « Outils ». Les réglages poussent à droite ; « Outils » se colle à eux
+   au lieu de reprendre sa propre marge automatique (deux marges auto se
+   partageraient l'espace et couperaient la rangée en trois). */
+.pv2h-r1 .pv2h-axes { margin-left: auto; }
+.pv2h-r1 .pv2h-axes + .pv2h-gestes { margin-left: 0; }
+@media (max-width: 720px) {
+  .pv2h-r1 .pv2h-axes { margin-left: 0; }
+}

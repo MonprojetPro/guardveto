@@ -1331,6 +1331,60 @@ export function PlanningChantierV2({
               concernent. Le vétérinaire n'a jamais vu cette pastille (elle
               n'est calculée que pour l'administratrice). */}
 
+          {/* B-172 — « Afficher » et « Étendue » remontent dans la rangée 1,
+              entre le mois et « Outils » (MiKL, 23/10 : « ça sera plus
+              ergonomique »). Ils règlent ce qu'on regarde : leur place est à
+              côté du mois qu'on regarde, pas sous la bande du planning. */}
+          <div className="pv2h-axes">
+            {choixDeContenu.length > 1 && (
+              <div className="pv2h-axe">
+                <span className="pv2h-axe-lbl">Afficher</span>
+                <div className="pv2h-seg" role="group" aria-label="Ce qui est affiché">
+                  {choixDeContenu.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      className="pv2h-seg-btn"
+                      aria-pressed={contenu === c}
+                      onClick={() => setContenu(c)}
+                    >
+                      {LIBELLE_CONTENU[c]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="pv2h-axe">
+              <span className="pv2h-axe-lbl">Étendue</span>
+              <div className="pv2h-seg" role="group" aria-label="Étendue affichée">
+                <button
+                  type="button"
+                  className="pv2h-seg-btn"
+                  aria-pressed={etendue === 'replie'}
+                  onClick={() => setEtendue('replie')}
+                >
+                  Mois replié
+                </button>
+                <button
+                  type="button"
+                  className="pv2h-seg-btn"
+                  aria-pressed={etendue === 'semaine'}
+                  onClick={() => setEtendue('semaine')}
+                >
+                  Une semaine dépliée
+                </button>
+                <button
+                  type="button"
+                  className="pv2h-seg-btn"
+                  aria-pressed={etendue === 'mois'}
+                  onClick={() => setEtendue('mois')}
+                >
+                  Mois déplié
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div className="pv2h-gestes">
             {/* Le secrétariat perd son panneau latéral (arbitrage du 06/10),
                 mais pas sa question : « il revient quand ? » regarde DEVANT, et
@@ -1455,6 +1509,7 @@ export function PlanningChantierV2({
               place ». Il a raison, et pas seulement pour la place : la periode
               n'est pas une IDENTITE (le mois l'est), c'est un CADRE de lecture
               — exactement comme les deux axes a cote desquels elle se range. */}
+          {!lectureSeule && !isAdmin && (
           <div className="pv2h-r2">
           {/* ⚠️ PAS DE NOTION DE PÉRIODE POUR LE SECRÉTARIAT.
               MiKL, le 25/08, devant l'écran affichant « Hors période » :
@@ -1485,56 +1540,8 @@ export function PlanningChantierV2({
                 ➜ Le geste vit desormais SUR la donnee (`GrilleSemainesV2`,
                   la marge des prenoms). Un clic epingle, un second libere. */}
 
-            <div className="pv2h-axes">
-              {choixDeContenu.length > 1 && (
-                <div className="pv2h-axe">
-                  <span className="pv2h-axe-lbl">Afficher</span>
-                  <div className="pv2h-seg" role="group" aria-label="Ce qui est affiché">
-                    {choixDeContenu.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        className="pv2h-seg-btn"
-                        aria-pressed={contenu === c}
-                        onClick={() => setContenu(c)}
-                      >
-                        {LIBELLE_CONTENU[c]}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="pv2h-axe">
-                <span className="pv2h-axe-lbl">Étendue</span>
-                <div className="pv2h-seg" role="group" aria-label="Étendue affichée">
-                  <button
-                    type="button"
-                    className="pv2h-seg-btn"
-                    aria-pressed={etendue === 'replie'}
-                    onClick={() => setEtendue('replie')}
-                  >
-                    Mois replié
-                  </button>
-                  <button
-                    type="button"
-                    className="pv2h-seg-btn"
-                    aria-pressed={etendue === 'semaine'}
-                    onClick={() => setEtendue('semaine')}
-                  >
-                    Une semaine dépliée
-                  </button>
-                  <button
-                    type="button"
-                    className="pv2h-seg-btn"
-                    aria-pressed={etendue === 'mois'}
-                    onClick={() => setEtendue('mois')}
-                  >
-                    Mois déplié
-                  </button>
-                </div>
-              </div>
-            </div>
           </div>
+          )}
         </div>
 
         <div className="work-body">
