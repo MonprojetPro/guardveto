@@ -114,6 +114,13 @@ import {
   type PersonneGrille,
 } from '@/lib/planning/grilleSemaines'
 
+/** B-172 — ce que chaque étendue dit, dans le menu « Affichage ». */
+const LIBELLE_ETENDUE: Record<EtendueV2, string> = {
+  replie: 'Mois replié',
+  semaine: 'Une semaine dépliée',
+  mois: 'Mois déplié',
+}
+
 /** Ce que chaque choix d'affichage dit à l'écran. */
 const LIBELLE_CONTENU: Record<AxeContenu, string> = {
   gardes: 'Gardes',
@@ -579,6 +586,27 @@ export function PlanningChantierV2({
   // période : clic ailleurs ou Échap. Un menu dont la seule sortie est son
   // propre bouton est un piège (retour MiKL du 29/07, déjà payé juste
   // au-dessus) — on ne le réintroduit pas en en ouvrant un second.
+  // B-172 — le menu « Affichage » (contenu + étendue), qui remplace les deux
+  // rangées de segments. Même contrat de fermeture que « Outils » : clic
+  // dehors ou Échap — un menu dont la seule sortie est son bouton est un piège.
+  const [affichageOuvert, setAffichageOuvert] = useState(false)
+  const affichageRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!affichageOuvert) return
+    function auClic(e: MouseEvent) {
+      if (!affichageRef.current?.contains(e.target as Node)) setAffichageOuvert(false)
+    }
+    function auClavier(e: KeyboardEvent) {
+      if (e.key === 'Escape') setAffichageOuvert(false)
+    }
+    document.addEventListener('mousedown', auClic)
+    document.addEventListener('keydown', auClavier)
+    return () => {
+      document.removeEventListener('mousedown', auClic)
+      document.removeEventListener('keydown', auClavier)
+    }
+  }, [affichageOuvert])
+
   const outilsRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!outilsOuverts) return
@@ -1360,58 +1388,66 @@ export function PlanningChantierV2({
               concernent. Le vétérinaire n'a jamais vu cette pastille (elle
               n'est calculée que pour l'administratrice). */}
 
-          {/* B-172 — « Afficher » et « Étendue » remontent dans la rangée 1,
-              entre le mois et « Outils » (MiKL, 23/10 : « ça sera plus
-              ergonomique »). Ils règlent ce qu'on regarde : leur place est à
-              côté du mois qu'on regarde, pas sous la bande du planning. */}
-          <div className="pv2h-axes">
-            {choixDeContenu.length > 1 && (
-              <div className="pv2h-axe">
-                <span className="pv2h-axe-lbl">Afficher</span>
-                <div className="pv2h-seg" role="group" aria-label="Ce qui est affiché">
-                  {choixDeContenu.map((c) => (
+          {/* B-172 — « AFFICHAGE », UN MENU COMME UN FILTRE. MiKL, recette du
+              23/10 : les deux rangées de segments repoussaient « Outils » à la
+              ligne — « change le mécanisme, pas en déployé mais sous forme de
+              menu comme pour un filtre ». Le bouton dit le réglage en cours ;
+              le menu reste ouvert tant qu'on règle (on règle souvent les deux
+              axes d'affilée), et se ferme au clic dehors ou à Échap.
+              ⚠️ Pas de `role="menu"` : ce rôle promet la navigation aux
+              flèches, que ce panneau n'implémente pas (même contrat que
+              « Outils »). Chaque choix est un bouton à `aria-pressed`. */}
+          <div className="pv2h-menu-wrap pv2h-affichage" ref={affichageRef}>
+            <button
+              type="button"
+              className="pv2h-filtre"
+              aria-expanded={affichageOuvert}
+              aria-haspopup="true"
+              onClick={() => setAffichageOuvert((v) => !v)}
+            >
+              <span className="pv2h-filtre-lbl">Affichage</span>
+              <b>
+                {choixDeContenu.length > 1 && <>{LIBELLE_CONTENU[contenu]} · </>}
+                {LIBELLE_ETENDUE[etendue]}
+              </b>
+              <span className="pv2h-caret" aria-hidden>▾</span>
+            </button>
+            {affichageOuvert && (
+              <div className="pv2h-menu pv2h-menu-filtre" aria-label="Réglages d’affichage">
+                {choixDeContenu.length > 1 && (
+                  <div role="group" aria-label="Ce qui est affiché">
+                    <p className="pv2h-menu-titre">Afficher</p>
+                    {choixDeContenu.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        className="pv2h-choix"
+                        aria-pressed={contenu === c}
+                        onClick={() => setContenu(c)}
+                      >
+                        <span className="pv2h-choix-coche" aria-hidden>{contenu === c ? '✓' : ''}</span>
+                        {LIBELLE_CONTENU[c]}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div role="group" aria-label="Étendue affichée">
+                  <p className="pv2h-menu-titre">Étendue</p>
+                  {(['replie', 'semaine', 'mois'] as const).map((e) => (
                     <button
-                      key={c}
+                      key={e}
                       type="button"
-                      className="pv2h-seg-btn"
-                      aria-pressed={contenu === c}
-                      onClick={() => setContenu(c)}
+                      className="pv2h-choix"
+                      aria-pressed={etendue === e}
+                      onClick={() => setEtendue(e)}
                     >
-                      {LIBELLE_CONTENU[c]}
+                      <span className="pv2h-choix-coche" aria-hidden>{etendue === e ? '✓' : ''}</span>
+                      {LIBELLE_ETENDUE[e]}
                     </button>
                   ))}
                 </div>
               </div>
             )}
-            <div className="pv2h-axe">
-              <span className="pv2h-axe-lbl">Étendue</span>
-              <div className="pv2h-seg" role="group" aria-label="Étendue affichée">
-                <button
-                  type="button"
-                  className="pv2h-seg-btn"
-                  aria-pressed={etendue === 'replie'}
-                  onClick={() => setEtendue('replie')}
-                >
-                  Mois replié
-                </button>
-                <button
-                  type="button"
-                  className="pv2h-seg-btn"
-                  aria-pressed={etendue === 'semaine'}
-                  onClick={() => setEtendue('semaine')}
-                >
-                  Une semaine dépliée
-                </button>
-                <button
-                  type="button"
-                  className="pv2h-seg-btn"
-                  aria-pressed={etendue === 'mois'}
-                  onClick={() => setEtendue('mois')}
-                >
-                  Mois déplié
-                </button>
-              </div>
-            </div>
           </div>
 
           <div className="pv2h-gestes">
@@ -1472,7 +1508,7 @@ export function PlanningChantierV2({
                   <div className="pv2h-menu-wrap" ref={outilsRef}>
                     <button
                       type="button"
-                      className="pv2h-outil-btn"
+                      className="pv2h-outil-btn pv2h-outils-fonce"
                       aria-expanded={outilsOuverts}
                       aria-haspopup="true"
                       onClick={() => setOutilsOuverts((v) => !v)}
