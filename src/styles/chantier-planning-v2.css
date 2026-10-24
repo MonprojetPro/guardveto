@@ -2366,8 +2366,9 @@
 .bpl-statut b { color: var(--pv2-txt); }
 .bpl-aide { margin: 0; font-size: 0.74rem; line-height: 1.4; color: var(--pv2-sec); }
 
-/* Les boutons de la bande. Le plein (`.cta`) n'existe qu'une fois à l'écran :
-   sur l'étape en cours. */
+/* Les boutons de la bande. Dans la BANDE, le plein (`.cta`) n'existe qu'une
+   fois : sur l'étape en cours. Hors bande, « Outils » partage ce dessin
+   (choix de MiKL, recette du 23/10) — ce n'est pas une seconde étape. */
 .bpl-btn {
   flex: 0 0 auto;
   border: 1px solid var(--pv2-bd);
