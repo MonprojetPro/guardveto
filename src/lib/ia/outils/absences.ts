@@ -33,6 +33,7 @@
 // ============================================================
 
 import { z } from 'zod'
+import { programmerAgendasPerso } from '@/lib/agenda-perso/declencher'
 // B-163 — l'unique autorite sur ce qu'une absence couvre.
 import {
   PERIMETRES,
@@ -581,6 +582,7 @@ Ne modifie AUCUNE garde : elle ne fait qu'ouvrir le dossier de crise. Les gardes
       date_fin: c.date_fin,
       perimetre: c.perimetre ?? PERIMETRE_PAR_DEFAUT,
     })
+    programmerAgendasPerso(retrait.cabinetId) // B-173
 
     // Le compte revient a Filou pour qu'il le DISE. Un planning qui change tout
     // seul se lit comme une panne, et c'est pire quand c'est l'assistant qui

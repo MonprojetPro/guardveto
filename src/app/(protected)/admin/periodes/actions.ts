@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { revalidatePath } from 'next/cache'
+import { programmerAgendasPerso } from '@/lib/agenda-perso/declencher'
 import { refusSiBloquant } from '@/data/controleImpact'
 import { periodeFr, dateFrSansJour } from '@/lib/dates-fr'
 import {
@@ -713,6 +714,8 @@ export async function supprimerPeriode(periodeId: string, nomSaisi?: string) {
     })
   }
 
+  // B-173 — ses journées et ses gardes sortent aussi des agendas perso.
+  programmerAgendasPerso(cabinetId)
   revaliderPeriodes()
   return {
     success: true,
@@ -834,6 +837,8 @@ export async function depublierPeriode(periodeId: string) {
     definitif: false,
   })
 
+  // B-173 — un planning redevenu brouillon sort aussi des agendas perso.
+  programmerAgendasPerso(cabinetId)
   revaliderPeriodes()
   return { success: true, nbGardes: bilan.nbGardes, agenda: resultat.agenda as BilanAgenda }
 }

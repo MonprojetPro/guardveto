@@ -33,6 +33,7 @@
 // ============================================================
 
 import { revalidatePath } from 'next/cache'
+import { programmerAgendasPerso } from '@/lib/agenda-perso/declencher'
 import { porteJournee } from '@/lib/journee/porte'
 import {
   aPoser,
@@ -413,6 +414,9 @@ export async function appliquerTrames(periodeId: string): Promise<Resultat> {
 
   revalidatePath('/planning')
   revalidatePath('/journee')
+  // B-173 — sans effet tant que le planning n'est pas publié (seules les
+  // journées publiées partent dans les agendas perso).
+  programmerAgendasPerso(cabinetId)
 
   const n = posees
   return {
@@ -502,6 +506,7 @@ export async function poserPresence(saisie: SaisiePresence): Promise<Resultat> {
   if (error) return { error: messageLisible(error.message) }
 
   revalidatePath('/planning')
+  programmerAgendasPerso(cabinetId) // B-173
   return {
     success: true,
     message: 'Présence ajoutée.',
@@ -533,7 +538,7 @@ export async function poserPresence(saisie: SaisiePresence): Promise<Resultat> {
 export async function retirerPresence(id: string): Promise<Resultat> {
   const porte = await porteJournee()
   if (!porte.ok) return { error: porte.probleme }
-  const { supabase } = porte
+  const { supabase, cabinetId } = porte
 
   if (!id) return { error: 'Présence introuvable.' }
 
@@ -558,6 +563,7 @@ export async function retirerPresence(id: string): Promise<Resultat> {
   if (error) return { error: messageLisible(error.message) }
 
   revalidatePath('/planning')
+  programmerAgendasPerso(cabinetId) // B-173
   return {
     success: true,
     message: ligne.trame_id

@@ -86,6 +86,12 @@ export const APPARTENANCE: Record<string, Appartenance> = {
   // le test-gardien descend dans les SOUS-DOSSIERS (01/10) : avant, un ecran
   // place sous un dossier du socle n'avait aucune decision a rendre, donc ne
   // pouvait jamais s'eteindre.
+  'reglages/agenda': {
+    socle:
+      'Chacun regle son agenda Google personnel (B-173). Ouvert par cabinet ' +
+      '(agenda_perso_ouvert), pas par module : il porte les gardes ET les journees, ' +
+      'et n’envoie simplement rien de ce qu’un module eteint ne produit pas.',
+  },
   'reglages/notifications': {
     socle:
       'Chacun regle les e-mails qu’il recoit. Les e-mails existent quels que ' +

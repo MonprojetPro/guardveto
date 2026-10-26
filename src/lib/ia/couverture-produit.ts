@@ -319,6 +319,18 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
     manque:
       'Filou ne sait ni couper ni rétablir un e-mail de notification, ni dire qui a coupé quoi (B-134, 26/09). Trou assumé : un outil de lecture (« qui reçoit les demandes de congé ? ») est plus urgent que l’écriture, pour qu’il cesse de répondre sur les seules adresses e-mail.',
   },
+  // B-173 — « Mon agenda » : le réglage de SON agenda Google personnel. Hors
+  // de Filou parce que ce sont des préférences d'affichage propres à chacun,
+  // qui ne changent rien au planning ; et parce qu'un assistant qui partage ou
+  // retire un agenda Google « sur demande » agirait sur un compte externe de
+  // la personne. ⚠️ La question qui DEVIENT fausse : « est-ce que les journées
+  // partent dans Google Agenda ? » — Filou ne le sait pas ; il doit renvoyer
+  // vers l'écran « Mon agenda » plutôt que répondre non.
+  'api/cron/agendas-perso#GET': { hors: 'Tâche de nuit qui rattrape les agendas Google personnels (B-173). Aucune personne ne la déclenche.' },
+  'v2/reglages/agenda#basculerMonAgenda': { hors: 'Réglage personnel de son propre agenda Google (B-173) : se fait sur l’écran « Mon agenda », jamais à la place de quelqu’un.' },
+  'v2/reglages/agenda#personnaliserMonAgenda': { hors: 'Réglage personnel de son propre agenda Google (B-173) : se fait sur l’écran « Mon agenda ».' },
+  'v2/reglages/agenda#revenirAuModeParDefaut': { hors: 'Réglage personnel de son propre agenda Google (B-173) : se fait sur l’écran « Mon agenda ».' },
+  'v2/reglages/agenda#renvoyerInvitationAgenda': { hors: 'Renvoie l’invitation Google de son propre agenda (B-173) : geste personnel, sur l’écran « Mon agenda ».' },
   'login#login': { hors: 'Connexion. Filou ne parle qu’à quelqu’un de déjà connecté.' },
   'login#logout': { hors: 'Déconnexion.' },
   'login#changerDeCompte': {

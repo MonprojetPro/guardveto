@@ -68,6 +68,11 @@ export interface DonneesDock {
   nbEchanges: number
   nbVetos: number
   agendaConnecte: boolean
+  /**
+   * B-173 — « Mon agenda » est ouvert à ce cabinet (et il a un agenda Google).
+   * Affiche l'entrée dans la barre ; n'autorise rien (la page revérifie).
+   */
+  agendaPerso?: boolean
   libellePlanning: string
   statutPlanning: StatutPeriode | null
   /**
@@ -324,7 +329,7 @@ export async function chargerAccueil(
       .select('id, demandeur:demandeur_id(prenom), cible:cible_id(prenom)')
       .eq('statut', 'proposee')
       .order('created_at', { ascending: true }),
-    supabase.from('cabinets').select('google_calendar_id').limit(1).maybeSingle(),
+    supabase.from('cabinets').select('google_calendar_id, agenda_perso_ouvert').limit(1).maybeSingle(),
     // Les horaires REELS des creneaux, tous profils confondus : on ne saura
     // qu'apres quel profil s'applique a quelle date.
     chargerHorairesCabinet(supabase),
@@ -489,6 +494,8 @@ export async function chargerAccueil(
 
   const calendarId = (cabinetRes as { data?: { google_calendar_id?: string | null } } | null)
     ?.data?.google_calendar_id
+  const agendaPersoOuvert = !!(cabinetRes as { data?: { agenda_perso_ouvert?: boolean | null } } | null)
+    ?.data?.agenda_perso_ouvert
 
   // ⚠️ DEUX LISTES, ET C'EST VOLONTAIRE (B-130a, 30/09).
   //
@@ -522,6 +529,7 @@ export async function chargerAccueil(
       nbEchanges: echangesEnAttente.length,
       nbVetos,
       agendaConnecte: Boolean(calendarId),
+      agendaPerso: agendaPersoOuvert,
       libellePlanning: periodeCourante
         ? (periodeCourante.libelle ?? `${periodeCourante.saison === 'ete' ? 'Été' : 'Hiver'} ${periodeCourante.date_debut.slice(0, 4)}`)
         : 'Aucune période',

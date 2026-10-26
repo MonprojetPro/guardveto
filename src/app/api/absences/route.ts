@@ -15,6 +15,7 @@
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { programmerAgendasPerso } from '@/lib/agenda-perso/declencher'
 import { createClient } from '@/lib/supabase/server'
 import { proposerReparation, type CreneauCrise } from '@/engine/crise/reparer'
 import {
@@ -229,6 +230,7 @@ export async function POST(req: NextRequest) {
     // indisponibilité ponctuelle ne vide rien du tout.
     perimetre,
   })
+  programmerAgendasPerso(retrait.cabinetId) // B-173
 
   // ── Créneaux impactés (gardes futures du véto, statut diffusé) ──
   //

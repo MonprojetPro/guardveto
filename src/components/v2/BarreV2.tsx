@@ -300,6 +300,26 @@ export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props
           </Link>
         )}
 
+        {/* MON AGENDA (B-173) — pour les TROIS rôles, administratrice comprise :
+            c'est un réglage personnel, et c'est sa seule porte (pas de carte
+            en double dans « Réglages »). Absente là où la fonction n'est pas
+            ouverte : une entrée vers une page qui renvoie ailleurs serait un
+            piège. La page revérifie de toute façon — l'entrée n'autorise rien. */}
+        {dock.agendaPerso && (
+          <Link {...entree('/reglages/agenda')} href="/reglages/agenda" aria-label="Mon agenda Google">
+            <span className="di-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="4" y="5.5" width="16" height="14" rx="2.2" />
+                <path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" />
+                <path d="M8.5 14h3" />
+              </svg>
+            </span>
+            <span className="di-flap" aria-hidden="true">
+              <span className="di-text">Mon agenda</span>
+            </span>
+          </Link>
+        )}
+
         {/* L'ASSISTANCE, ouverte à toute l'équipe (arbitrage MiKL du
             2026-08-25). Le vétérinaire qui a vu le problème est celui qui sait
             le décrire et joindre sa capture — le réserver à l'administrateur

@@ -24,6 +24,7 @@ import type { RelationStructure } from '@/engine/structure-config'
 import type { BilanAgenda } from '@/lib/planning/retrait-planning'
 import { initialesUniques } from '@/lib/agenda/initiales'
 import { estColorIdValide } from '@/lib/agenda/couleurs-google'
+import { programmerAgendasPerso } from '@/lib/agenda-perso/declencher'
 
 // ── Résolution du calendarId PAR CABINET (#10b) ──────────────
 // Le calendarId Google est désormais porté par le cabinet
@@ -645,6 +646,10 @@ export async function syncCalendrier(
 
   // calendarId scopé au cabinet de la période (fallback env en aval).
   const cabinetId = await cabinetIdDePeriode(supabase, periodeId)
+  // B-173 — les agendas PERSONNELS suivent le même planning. Programmé ici,
+  // point de passage de la publication et de la resynchro manuelle ; il tourne
+  // après la réponse et ne retarde rien.
+  programmerAgendasPerso(cabinetId)
   const ctx = await contexteAgenda(supabase, cabinetId, periodeId)
 
   if (!ctx || !cabinetId) {
@@ -704,6 +709,11 @@ export async function syncGardeIndividuelle(
   if (!publieAt) return
 
   const g = garde as unknown as GardeBrute
+
+  // B-173 — une garde modifiée, échangée ou remplacée un jour change aussi les
+  // agendas perso de ceux qui y portent leurs gardes. Point de passage commun
+  // à tous les écrans qui touchent une garde publiée.
+  programmerAgendasPerso(g.cabinet_id)
 
   // Le même rapprochement que pour une période, sur une seule garde : les deux
   // chemins doivent produire le même agenda. C'est cette divergence-là qui,
@@ -896,4 +906,106 @@ export async function retirerEvenementsAvecBilan(
   }
 
   return bilan
+}
+
+// ============================================================
+// B-173 — Les gardes PUBLIÉES, planifiées pour un agenda personnel
+// ============================================================
+// L'agenda perso d'une personne qui a personnalisé porte ses gardes (et, à son
+// choix, celles des autres) À LA PLACE de l'agenda du cabinet. Il doit donc
+// montrer EXACTEMENT les mêmes événements : même titre, même rôle, mêmes jours,
+// même couleur. D'où ce point d'entrée, qui passe par le même `contexteAgenda`
+// et le même `planifierEvenementsGarde` que la synchro du cabinet — un second
+// calcul, même « presque pareil », finirait par diverger sans que rien ne le
+// signale.
+
+export interface GardePlanifiee {
+  gardeId: string
+  ev: EvenementPlanifie
+}
+
+/**
+ * Tous les événements de garde des plannings PUBLIÉS du cabinet, à partir de
+ * `depuis` (AAAA-MM-JJ). Un brouillon n'en produit aucun : il ne sort pas du
+ * logiciel, ni vers l'agenda du cabinet, ni vers celui de quelqu'un.
+ *
+ * Lève une erreur si la lecture échoue : un agenda perso rapproché d'une liste
+ * vide « par accident » perdrait toutes ses gardes.
+ */
+export async function gardesPlanifieesDuCabinet(
+  supabase: SupabaseClient,
+  cabinetId: string,
+  depuis: string,
+): Promise<GardePlanifiee[]> {
+  const { data: periodes, error: errP } = await supabase
+    .from('periodes')
+    .select('id')
+    .eq('cabinet_id', cabinetId)
+    .not('publie_at', 'is', null)
+    .gte('date_fin', decalerJourISO(depuis, -3))
+  if (errP) throw new Error(`Lecture des plannings impossible : ${errP.message}`)
+
+  const resultat: GardePlanifiee[] = []
+  for (const p of ((periodes as { id: string }[] | null) ?? [])) {
+    const ctx = await contexteAgenda(supabase, cabinetId, p.id)
+    if (!ctx) return []
+
+    const { data: gardes, error } = await supabase
+      .from('gardes')
+      .select(CHAMPS_GARDE)
+      .eq('periode_id', p.id)
+      // Une garde couvre jusqu'à trois jours : celle du vendredi d'avant peut
+      // encore occuper le dimanche qui suit `depuis`.
+      .gte('date', decalerJourISO(depuis, -3))
+      .order('date')
+    if (error) throw new Error(`Lecture des gardes impossible : ${error.message}`)
+
+    const liste = (gardes as unknown as GardeBrute[] | null) ?? []
+    const exceptions = await exceptionsParGarde(supabase, liste.map((g) => g.id))
+    for (const garde of liste) {
+      const planifies = planifierEvenementsGarde(
+        versGardeAPlanifier(garde, exceptions.get(garde.id) ?? [], ctx),
+        {
+          mode: ctx.journeeEntiere ? 'journee' : 'horaire',
+          afficherHoraires: ctx.afficherHoraires,
+          relations: ctx.relations,
+          structure: ctx.structure,
+          baseParCode: (code) => ctx.basesTitre.get(code),
+          rolesParCode: (code) => ctx.rolesParCreneau.get(code),
+        },
+      )
+      for (const ev of planifies) {
+        if (ev.jour >= depuis) resultat.push({ gardeId: garde.id, ev })
+      }
+    }
+  }
+  return resultat
+}
+
+/** AAAA-MM-JJ décalé de n jours, sans jamais passer par le fuseau du serveur. */
+function decalerJourISO(jour: string, n: number): string {
+  const [a, m, j] = jour.split('-').map(Number)
+  const d = new Date(Date.UTC(a, m - 1, j + n))
+  return d.toISOString().slice(0, 10)
+}
+
+/** L'agenda du cabinet, exporté pour l'agenda perso (retrait / retour du partage). */
+export async function agendaDuCabinet(
+  supabase: SupabaseClient,
+  cabinetId: string,
+): Promise<string | null> {
+  return calendarIdDuCabinet(supabase, cabinetId)
+}
+
+/**
+ * Comment chaque membre apparaît dans un titre (initiales départagées sur TOUT
+ * le cabinet, libellé choisi d'abord) — exporté pour les journées de l'équipe,
+ * qui doivent nommer les gens comme les gardes les nomment.
+ */
+export async function libellesDuCabinet(
+  supabase: SupabaseClient,
+  cabinetId: string,
+): Promise<Map<string, string>> {
+  const occupants = await occupantsDuCabinet(supabase, cabinetId)
+  return new Map([...occupants].map(([id, o]) => [id, o.libelle]))
 }

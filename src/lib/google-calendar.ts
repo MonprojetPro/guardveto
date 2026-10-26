@@ -371,6 +371,11 @@ export interface EvenementPlanifie {
    * l'événement montre.
    */
   placeIndex: number
+  /**
+   * Qui occupe la place ce jour-là (B-173). Jamais envoyé à Google : il sert à
+   * l'agenda PERSONNEL, qui trie « mes gardes » et « les gardes des autres ».
+   */
+  vetId?: string
   titre: string
   /** Absent = l'événement prend la couleur par défaut de l'agenda. */
   colorId?: string
@@ -515,6 +520,7 @@ export function planifierEvenementsGarde(
       evenements.push({
         jour,
         placeIndex,
+        vetId: occ.vetId,
         titre: libelleGarde({
           base,
           nom: occ.libelle,

@@ -48,7 +48,7 @@ export async function chargerDock(
         .from('echanges_gardes')
         .select('id', { count: 'exact', head: true })
         .eq('statut', 'proposee'),
-      supabase.from('cabinets').select('google_calendar_id').limit(1).maybeSingle(),
+      supabase.from('cabinets').select('google_calendar_id, agenda_perso_ouvert').limit(1).maybeSingle(),
       // Les modules allumés (B-120). En PARALLÈLE des autres : aucune requête
       // ajoutée en série, ce qui compte sur un produit déjà jugé lent (B-116).
       // Il replie sur le socle en cas d'échec — fermant, jamais ouvrant.
@@ -81,6 +81,9 @@ export async function chargerDock(
     nbEchanges: (echangesRes as { count?: number | null })?.count ?? 0,
     nbVetos: (vetosRes as { count?: number | null })?.count ?? 0,
     agendaConnecte: Boolean(calendarId),
+    // B-173 — l'entrée « Mon agenda » n'apparaît que là où la fonction est ouverte.
+    agendaPerso: !!(cabinetRes as { data?: { agenda_perso_ouvert?: boolean | null } | null })?.data
+      ?.agenda_perso_ouvert,
     libellePlanning: courante
       ? (courante.libelle ??
         `${courante.saison === 'ete' ? 'Été' : 'Hiver'} ${courante.date_debut.slice(0, 4)}`)

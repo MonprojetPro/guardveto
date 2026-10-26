@@ -295,3 +295,48 @@
 @media (max-width: 520px) {
   .conn-duo { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   MON AGENDA (B-173)
+   ============================================================
+   Porté de `docs/maquettes/B-173-mon-agenda.html`. L'interrupteur reprend
+   `.aa-switch` + `.mn-ligne` (même famille que « Mes notifications ») ; les
+   choix de personnalisation sont des segments, parce que chaque question a
+   UNE réponse parmi deux ou trois — une case à cocher dirait « plusieurs ». */
+.ma-carte { overflow: hidden; }
+.ma-corps { padding: 16px 20px 18px; display: flex; flex-direction: column; gap: 14px; }
+.ma-q { display: flex; flex-direction: column; gap: 7px; }
+.ma-q + .ma-q { padding-top: 14px; border-top: 1px dashed var(--t-border); }
+.ma-q-t { font-family: var(--font-display); font-size: 0.92rem; font-weight: 700; display: flex; flex-direction: column; gap: 2px; }
+.ma-q-t small { font-family: var(--font-body); font-weight: 400; font-size: 0.76rem; color: var(--t-muted); line-height: 1.45; }
+.ma-seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.ma-seg button {
+  font: 600 0.8rem var(--font-display);
+  border: 1px solid var(--t-border); border-radius: 999px;
+  padding: 6px 15px; min-height: 34px;
+  background: var(--surface); color: var(--t-muted); cursor: pointer;
+}
+.ma-seg button.sel { background: var(--t-accent); border-color: var(--t-accent); color: #fff; }
+.ma-seg button:disabled { opacity: 0.45; cursor: not-allowed; }
+.ma-recu-tete { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ma-etiquette {
+  font: 700 0.68rem var(--font-display); letter-spacing: 0.04em;
+  border-radius: 999px; padding: 3px 12px;
+  background: var(--surface-2); color: var(--t-muted); border: 1px solid var(--t-border);
+}
+.ma-etiquette.perso { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; }
+.ma-recu { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ma-recu li { display: flex; gap: 10px; align-items: flex-start; font-size: 0.88rem; }
+.ma-recu li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-top: 7px; flex: none; }
+.ma-recu li.non { color: var(--t-muted); }
+.ma-recu li.non::before { background: var(--t-border); }
+.ma-recu small { display: block; font-size: 0.76rem; color: var(--t-muted); }
+.ma-statut { margin: 0; font-size: 0.8rem; color: var(--t-muted); line-height: 1.5; }
+.ma-statut.att { color: var(--warn); font-weight: 600; }
+.ma-bandeau { border-radius: var(--r-sm); padding: 11px 14px; font-size: 0.82rem; line-height: 1.5; margin: 0 20px; }
+.ma-corps .ma-bandeau { margin: 0; }
+.ma-bandeau b { display: block; font-family: var(--font-display); font-size: 0.86rem; margin-bottom: 2px; }
+.ma-bandeau.info { background: var(--accent-soft); }
+.ma-bandeau.att { background: var(--warn-soft); }
+.ma-bandeau.bad { background: var(--danger-soft); }
+.ma-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }

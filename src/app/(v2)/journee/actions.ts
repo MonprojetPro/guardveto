@@ -27,6 +27,7 @@
 // ============================================================
 
 import { revalidatePath } from 'next/cache'
+import { programmerAgendasPerso } from '@/lib/agenda-perso/declencher'
 import { validerBloc, nomDejaPris } from '@/lib/journee/blocs'
 import { porteJournee as porteOuverte } from '@/lib/journee/porte'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -127,7 +128,7 @@ export async function modifierBloc(
 ): Promise<Resultat> {
   const porte = await porteOuverte()
   if (!porte.ok) return { error: porte.probleme }
-  const { supabase } = porte
+  const { supabase, cabinetId } = porte
 
   if (!id) return { error: 'Tranche horaire introuvable.' }
 
@@ -152,6 +153,8 @@ export async function modifierBloc(
   if (error) return { error: messageLisible(error.message) }
 
   revalidatePath('/journee')
+  // B-173 — nouveaux horaires ou nouveau nom : les agendas perso les reprennent.
+  programmerAgendasPerso(cabinetId)
   return { success: true }
 }
 

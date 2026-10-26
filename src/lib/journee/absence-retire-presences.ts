@@ -153,6 +153,7 @@ interface LignePresenceJointe {
   id: string
   veterinaire_id: string
   date: string
+  cabinet_id?: string | null
   blocs_journee: { creneau?: string } | { creneau?: string }[] | null
 }
 
@@ -182,7 +183,7 @@ function creneauDeLaJointure(
 export async function retirerPresencesCouvertes(
   supabase: SupabaseClient,
   fenetre: FenetreAbsence,
-): Promise<{ retirees: number; erreur: string | null }> {
+): Promise<{ retirees: number; erreur: string | null; cabinetId?: string | null }> {
   // Sortie courte : un périmètre qui ne retire aucun créneau n'a aucune raison
   // de lire la base. Évite une requête par absence ponctuelle ou de nuit.
   if (blocsRetires(lirePerimetre(fenetre.perimetre)).length === 0) {
@@ -195,7 +196,7 @@ export async function retirerPresencesCouvertes(
   //    « le matin » sans retirer l'après-midi.
   const { data, error } = await supabase
     .from('presences_journee')
-    .select('id, veterinaire_id, date, blocs_journee!inner(creneau)')
+    .select('id, veterinaire_id, date, cabinet_id, blocs_journee!inner(creneau)')
     .eq('veterinaire_id', fenetre.veterinaire_id)
     .gte('date', fenetre.date_debut)
     .lte('date', fenetre.date_fin)
@@ -235,5 +236,13 @@ export async function retirerPresencesCouvertes(
     )
     return { retirees: 0, erreur: errSuppr.message }
   }
-  return { retirees: ids.length, erreur: null }
+  // B-173 — les agendas perso suivent : c'est l'APPELANT qui le déclenche
+  // (`cabinetId` rendu ci-dessous). Ce fichier est aussi chargé par un écran
+  // côté navigateur (ValiderCongeDialog) : y importer le déclencheur ferait
+  // entrer le client Google dans le bundle du navigateur — le build l'a refusé.
+  return {
+    retirees: ids.length,
+    erreur: null,
+    cabinetId: ((data ?? []) as LignePresenceJointe[])[0]?.cabinet_id ?? null,
+  }
 }

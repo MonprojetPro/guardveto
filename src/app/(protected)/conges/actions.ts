@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { programmerAgendasPerso } from '@/lib/agenda-perso/declencher'
 import { refusSiBloquant } from '@/data/controleImpact'
 import type { Impact } from '@/data/controleImpact'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
@@ -282,6 +283,7 @@ export async function createConge(
       perimetre: perim.perimetre,
     })
     presencesRetirees = r.retirees
+    programmerAgendasPerso(r.cabinetId) // B-173
   }
 
   // ── Détection de conflit congé ↔ planning publié (cas « Antoine ») ──────
@@ -502,6 +504,7 @@ export async function updateConge(id: string, data: CongeFormData) {
       perimetre: perim.perimetre,
     })
     presencesRetirees = r.retirees
+    programmerAgendasPerso(r.cabinetId) // B-173
   }
 
   revalidatePath('/conges')
@@ -617,6 +620,7 @@ export async function validerConge(
       perimetre: lirePerimetre((conge as { perimetre?: unknown }).perimetre),
     })
     presencesRetirees = r.retirees
+    programmerAgendasPerso(r.cabinetId) // B-173
   }
 
   // Notification email (fire-and-forget — n'échoue pas le process principal)

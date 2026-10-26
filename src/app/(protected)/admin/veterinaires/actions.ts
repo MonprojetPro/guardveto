@@ -6,6 +6,7 @@ import type { Impact } from '@/data/controleImpact'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { createClient as createAdminClient, type SupabaseClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
+import { programmerAgendasPerso } from '@/lib/agenda-perso/declencher'
 import type { StatutVeto, UserRole } from '@/types'
 import {
   adresseBienFormee,
@@ -26,6 +27,19 @@ import { estColorIdValide } from '@/lib/agenda/couleurs-google'
 function revaliderEquipe() {
   revalidatePath('/admin/veterinaires')
   revalidatePath('/equipe')
+}
+
+/**
+ * B-173 — une fiche modifiée (adresse, libellé, couleur, activité) change ce
+ * que montrent les agendas perso : le titre des journées de l'équipe, la
+ * personne avec qui l'agenda est partagé, ou l'agenda à vider d'un membre parti.
+ */
+async function agendasPersoApresFiche(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  vetId: string,
+): Promise<void> {
+  const { data } = await supabase.from('veterinaires').select('cabinet_id').eq('id', vetId).maybeSingle()
+  programmerAgendasPerso((data as { cabinet_id?: string | null } | null)?.cabinet_id)
 }
 
 // ── Garde admin (même pattern que /regles et /admin/structure) ──
@@ -253,6 +267,7 @@ export async function updateVeterinaire(id: string, data: VeterinaireFormData) {
 
   if (error) return { error: error.message }
 
+  await agendasPersoApresFiche(supabase, id)
   revaliderEquipe()
   return { success: true }
 }
@@ -551,6 +566,7 @@ export async function toggleVeterinaireActif(
 
   if (error) return { error: error.message }
 
+  await agendasPersoApresFiche(supabase, id)
   revaliderEquipe()
   return { success: true }
 }

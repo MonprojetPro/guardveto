@@ -14,6 +14,7 @@
 // Réponse : { success: true } | { requiresConfirmation: true, violations, souhaitsEnAttente } | { error: string }
 // ============================================================
 
+import { programmerAgendasPerso } from '@/lib/agenda-perso/declencher'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { syncCalendrier } from '@/lib/sync-calendrier'
@@ -26,7 +27,10 @@ import { casesAPourvoir, type CaseAPourvoir } from '@/data/casesAPourvoir'
 import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
 
 // Laisse le temps à la synchro agenda (par lots) + envoi des emails
-export const maxDuration = 60
+// 300 s : la synchro des agendas perso (B-173) tourne après la réponse, dans
+// cette même exécution. La première d'un cabinet écrit plusieurs centaines
+// d'événements.
+export const maxDuration = 300
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -144,6 +148,9 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       )
     }
+    // B-173 — les journées partent dans les agendas PERSONNELS (l'agenda du
+    // cabinet ne porte que des gardes). Après la réponse, sans la retarder.
+    programmerAgendasPerso(cabinetId)
     return NextResponse.json({ success: true, journeesSeules: true, calendarSync: null, emailNotif: null })
   }
 
@@ -275,6 +282,9 @@ export async function POST(req: NextRequest) {
     const msg = syncErr instanceof Error ? syncErr.message : String(syncErr)
     calendarSync = { synced: 0, errors: [msg], skipped: false }
   }
+
+  // B-173 — les agendas PERSONNELS partent depuis `syncCalendrier` ci-dessus
+  // (point de passage commun avec la resynchro manuelle) : pas de second appel.
 
   // ── Notifications email (best-effort) ──────────────────────
   // Envoyées après la synchro agenda — une erreur ne bloque pas la réponse.

@@ -38,11 +38,21 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
+import { programmerAgendasPerso } from '@/lib/agenda-perso/declencher'
+import { clientService, supprimerAgendaPersoDe } from '@/lib/agenda-perso/rapprocher'
 import { adresseBienFormee, normaliserAdresse } from '@/lib/emails/destinataire'
 import type { ReponseInvitation, ReponseSecretariat } from '@/lib/secretariat/types'
 
 /** Le nom affiché : « Secrétariat », « Accueil », « Marie Dupont »… */
 const NOM = { min: 2, max: 80 } as const
+
+async function agendasPersoApresFiche(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  secretaireId: string,
+): Promise<void> {
+  const { data } = await supabase.from('secretaires').select('cabinet_id').eq('id', secretaireId).maybeSingle()
+  programmerAgendasPerso((data as { cabinet_id?: string | null } | null)?.cabinet_id)
+}
 
 function revaliderEquipe() {
   revalidatePath('/equipe')
@@ -202,6 +212,7 @@ export async function modifierSecretaire(
     return { error: "La fiche n'a pas pu être enregistrée. Réessaie dans un instant." }
   }
 
+  await agendasPersoApresFiche(supabase, id) // B-173
   revaliderEquipe()
   return { success: true }
 }
@@ -377,6 +388,13 @@ export async function supprimerSecretaire(id: string): Promise<ReponseSecretaria
     }
   }
 
+  // B-173 — son agenda perso part avec elle (sinon il resterait partagé, figé).
+  try {
+    await supprimerAgendaPersoDe(clientService(), { genre: 'secretaire', id })
+  } catch (e) {
+    console.error('[Secrétariat] Agenda perso non nettoyé :', e instanceof Error ? e.message : e)
+  }
+
   const { error } = await supabase.from('secretaires').delete().eq('id', id)
   if (error) {
     console.error('[Secrétariat] Suppression refusée :', error.message)
@@ -402,6 +420,7 @@ export async function basculerSecretaireActif(
     return { error: "L'état n'a pas pu être changé. Réessaie dans un instant." }
   }
 
+  await agendasPersoApresFiche(supabase, id) // B-173
   revaliderEquipe()
   return { success: true }
 }

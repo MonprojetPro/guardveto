@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/sync-calendrier",
       "schedule": "0 3 1 * *"
+    },
+    {
+      "path": "/api/cron/agendas-perso",
+      "schedule": "30 3 * * *"
     }
   ]
 }
