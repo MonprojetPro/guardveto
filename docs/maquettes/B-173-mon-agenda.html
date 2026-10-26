@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mon agenda</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700;800&family=Noto+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --fond:#f3e9d6; --surface:#fffcf4; --cell:#f6ebd6; --filet:#eadcc2; --bd:#e6d7bb;
+  --txt:#3a2a1c; --sec:#7c6a55; --acc:#c7530f; --acc-doux:#fdf1e5; --ok:#3f7d3a; --ok-doux:#e8f2e3;
+  --att:#9a6b00; --att-doux:#fbf1d6; --bad:#a8341f; --bad-doux:#f8e4df;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fond);color:var(--txt);font:15px/1.45 "Noto Sans",system-ui,sans-serif;padding:32px 16px 80px}
+h1,h2,h3{font-family:Figtree,system-ui,sans-serif}
+.page{max-width:1180px;margin:0 auto}
+.intro h1{font-size:30px;margin:0 0 6px}
+.intro p{margin:0 0 6px;color:var(--sec);max-width:780px}
+.etat{margin:44px 0 12px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.etat h2{margin:0;font-size:20px}
+.etat .num{font:700 13px Figtree;background:var(--txt);color:#fff;border-radius:99px;padding:3px 10px}
+.etat p{margin:0;color:var(--sec);font-size:14px;flex-basis:100%}
+.note{background:#fff;border-left:3px solid var(--acc);padding:10px 14px;border-radius:6px;font-size:13.5px;color:var(--sec);margin-top:12px}
+.note b{color:var(--txt)}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}
+@media (max-width:860px){.duo{grid-template-columns:1fr}}
+
+/* ── écran de l'application ── */
+.ecran{background:var(--surface);border:1px solid var(--bd);border-radius:18px;box-shadow:0 10px 30px rgba(80,50,20,.08);overflow:hidden;max-width:720px}
+.tete{padding:20px 24px 6px}
+.kick{font:700 11px Figtree;letter-spacing:.12em;color:var(--acc);text-transform:uppercase}
+.tete h3{margin:4px 0 2px;font-size:26px;font-weight:800}
+.tete p{margin:0;color:var(--sec);font-size:14px}
+.corps{padding:14px 24px 22px;display:grid;gap:14px}
+.carte{background:#fff;border:1px solid var(--bd);border-radius:14px;padding:14px 16px}
+.carte h4{margin:0 0 8px;font:700 13px Figtree;letter-spacing:.06em;text-transform:uppercase;color:var(--sec)}
+.inter{display:flex;justify-content:space-between;align-items:center;gap:14px}
+.inter b{font:700 16px Figtree;display:block}
+.inter small{color:var(--sec);font-size:13px}
+.sw{width:46px;height:26px;border-radius:99px;background:var(--cell);position:relative;flex:none;border:1px solid var(--bd)}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.sw.on{background:var(--ok);border-color:var(--ok)}
+.sw.on::after{left:22px}
+.recu{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+.recu li{display:flex;gap:10px;align-items:flex-start;font-size:14.5px}
+.recu li::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ok);margin-top:7px;flex:none}
+.recu li.non::before{background:var(--filet)}
+.recu li.non{color:var(--sec)}
+.recu small{display:block;color:var(--sec);font-size:12.5px}
+.etiquette{display:inline-block;font:700 11px Figtree;border-radius:99px;padding:2px 9px;vertical-align:2px;margin-left:6px}
+.etiquette.def{background:var(--cell);color:var(--sec)}
+.etiquette.perso{background:var(--acc-doux);color:var(--acc)}
+.statut{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--sec)}
+.statut::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.statut.att::before{background:#d39b14}
+.statut.bad::before{background:var(--bad)}
+.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{font:600 14px Figtree;border-radius:99px;padding:9px 18px;border:1px solid var(--bd);background:#fff;color:var(--txt);white-space:nowrap}
+.btn.cta{background:var(--acc);color:#fff;border-color:var(--acc);box-shadow:0 4px 12px rgba(199,83,15,.25)}
+.lien{font:600 13px Figtree;color:var(--acc);text-decoration:underline;text-underline-offset:3px}
+
+/* ── choix segmentés ── */
+.q{display:grid;gap:6px}
+.q+.q{margin-top:14px;padding-top:14px;border-top:1px dashed var(--filet)}
+.q-t{font:700 15px Figtree}
+.q-t small{display:block;font:400 12.5px "Noto Sans";color:var(--sec)}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg span{font:600 13px Figtree;border:1px solid var(--bd);border-radius:99px;padding:6px 13px;background:#fff;color:var(--sec)}
+.seg span.sel{background:var(--acc);border-color:var(--acc);color:#fff}
+.seg.grise span{opacity:.45}
+.bandeau{border-radius:12px;padding:11px 14px;font-size:13.5px}
+.bandeau.info{background:var(--acc-doux);border:1px solid #f0c9a8}
+.bandeau.att{background:var(--att-doux);border:1px solid #ecd59b}
+.bandeau.bad{background:var(--bad-doux);border:1px solid #e9b8ad}
+.bandeau b{display:block;font:700 14px Figtree;margin-bottom:2px}
+
+/* ── petits états ── */
+.etats{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.mini{background:var(--surface);border:1px solid var(--bd);border-radius:14px;padding:14px 16px;display:grid;gap:10px;align-content:start}
+.mini .titre{font:700 12px Figtree;letter-spacing:.08em;text-transform:uppercase;color:var(--sec)}
+
+/* ── aperçu Google Agenda ── */
+.gcal{background:#fff;border:1px solid #dadce0;border-radius:12px;overflow:hidden;font-family:Roboto,Arial,sans-serif;max-width:1000px}
+.gcal-tete{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid #dadce0;color:#3c4043;font-size:18px}
+.gcal-tete small{font-size:12px;color:#70757a}
+.gcal-corps{display:grid;grid-template-columns:200px 1fr}
+@media (max-width:860px){.gcal-corps{grid-template-columns:1fr}.gcal-cote{display:none}}
+.gcal-cote{border-right:1px solid #dadce0;padding:12px;font-size:13px;color:#3c4043}
+.gcal-cote .lab{font-size:12px;color:#70757a;margin:4px 0 8px}
+.cal{display:flex;align-items:center;gap:8px;padding:4px 0}
+.cal i{width:14px;height:14px;border-radius:3px;display:inline-block;flex:none}
+.cal i.vide{background:#fff!important;border:2px solid #9aa0a6}
+.cal.barre{color:#9aa0a6;text-decoration:line-through}
+.sem{display:grid;grid-template-columns:44px repeat(5,1fr);font-size:12px;color:#3c4043;overflow-x:auto}
+.jour{border-left:1px solid #dadce0;text-align:center;padding:6px 0 4px}
+.jour b{display:block;font-size:20px;font-weight:400}
+.jour small{font-size:11px;color:#70757a;text-transform:uppercase}
+.haut{border-left:1px solid #dadce0;border-top:1px solid #dadce0;border-bottom:1px solid #dadce0;padding:3px;display:grid;gap:2px;align-content:start;min-height:30px}
+.haut-lab{border-top:1px solid #dadce0;border-bottom:1px solid #dadce0;font-size:10px;color:#70757a;padding:4px 2px;text-align:right}
+.ev{border-radius:4px;padding:2px 6px;color:#fff;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.heures{grid-column:1;display:grid;grid-template-rows:repeat(11,34px);font-size:10px;color:#70757a;text-align:right;padding-right:6px}
+.heures span{transform:translateY(-6px)}
+.col{border-left:1px solid #dadce0;position:relative;height:374px;background:repeating-linear-gradient(#fff 0 33px,#ececec 33px 34px)}
+.col .ev{position:absolute;left:3px;right:6px;white-space:normal;line-height:1.25;padding:4px 6px}
+.ev small{display:block;opacity:.9;font-size:10.5px}
+/* couleurs Google */
+.c-tomate{background:#d50000}.c-mandarine{background:#f4511e}.c-sauge{background:#33b679}.c-basilic{background:#0b8043}
+.c-paon{background:#039be5}.c-myrtille{background:#3f51b5}.c-lavande{background:#7986cb}.c-raisin{background:#8e24aa}
+.c-graphite{background:#616161}.c-banane{background:#f6bf26;color:#3c4043}.c-flamant{background:#e67c73}
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="intro">
+  <h1>Mon agenda — maquette B-173</h1>
+  <p>Chaque personne de l'équipe reçoit son planning dans son propre Google Agenda, comme elle le veut. Sans réglage de sa part, elle reçoit le <b>mode par défaut</b> : ses journées aux heures du créneau, et les gardes de toute l'équipe en haut du jour.</p>
+  <p>L'écran vit dans l'espace personnel, à côté de « Mes notifications » : il est ouvert aux vétos, à la secrétaire et à l'administratrice.</p>
+</div>
+
+<!-- ═════════════ 1 ═════════════ -->
+<div class="etat"><span class="num">1</span><h2>Mode par défaut — personne n'a rien réglé</h2>
+<p>C'est ce que voit Fanny la première fois. Rien à faire : son planning arrive déjà.</p></div>
+<div class="ecran">
+  <div class="tete"><div class="kick">Mon espace</div><h3>Mon agenda</h3><p>Ton planning, dans ton Google Agenda.</p></div>
+  <div class="corps">
+    <div class="carte inter">
+      <div><b>Recevoir mon planning dans Google Agenda</b><small>Si tu préfères n'utiliser que l'application, coupe-le.</small></div>
+      <span class="sw on"></span>
+    </div>
+    <div class="carte">
+      <h4>Ce que tu reçois <span class="etiquette def">Mode par défaut</span></h4>
+      <ul class="recu">
+        <li><span>Tes journées, aux heures du créneau<small>Dans ton agenda « GuardVeto — Fanny »</small></span></li>
+        <li><span>Les gardes de toute l'équipe, en haut du jour<small>Par l'agenda du cabinet, comme aujourd'hui</small></span></li>
+      </ul>
+    </div>
+    <div class="statut">Partagé avec f•••••@gmail.com · à jour</div>
+    <div class="actions"><span class="btn cta">Personnaliser</span></div>
+  </div>
+</div>
+<div class="note"><b>Pourquoi les gardes viennent de l'agenda du cabinet :</b> l'équipe l'affiche déjà. Si l'agenda perso les portait aussi, chaque garde apparaîtrait deux fois. En mode par défaut, rien n'est donc retiré à personne.</div>
+
+<!-- ═════════════ 2 ═════════════ -->
+<div class="etat"><span class="num">2</span><h2>Personnaliser</h2>
+<p>Toutes les combinaisons sont possibles. Le résumé en bas dit ce qu'elle recevra, avant d'enregistrer.</p></div>
+<div class="duo">
+<div class="ecran">
+  <div class="tete"><div class="kick">Mon agenda</div><h3>Personnaliser</h3></div>
+  <div class="corps">
+    <div class="carte">
+      <div class="q"><div class="q-t">Journées</div>
+        <div class="seg"><span class="sel">Les miennes</span><span>Celles de toute l'équipe</span><span>Aucune</span></div></div>
+      <div class="q"><div class="q-t">Placées<small>Aux heures, elles occupent ton agenda comme un rendez-vous. En haut du jour, elles restent discrètes.</small></div>
+        <div class="seg"><span class="sel">Aux heures du créneau</span><span>En haut du jour</span></div></div>
+      <div class="q"><div class="q-t">Mes gardes</div>
+        <div class="seg"><span class="sel">Oui</span><span>Non</span></div></div>
+      <div class="q"><div class="q-t">Les gardes des autres</div>
+        <div class="seg"><span>Oui</span><span class="sel">Non</span></div></div>
+    </div>
+    <div class="bandeau info"><b>Tu recevras</b>tes journées aux heures, et seulement tes gardes en haut du jour.</div>
+    <div class="bandeau att"><b>L'agenda du cabinet te sera retiré</b>Tes gardes arrivent désormais par ton agenda perso : le garder te les montrerait en double.</div>
+    <div class="actions"><span class="btn cta">Enregistrer</span><span class="lien">Revenir au mode par défaut</span></div>
+  </div>
+</div>
+<div class="ecran">
+  <div class="tete"><div class="kick">Mon agenda</div><h3>Mon agenda</h3><p>Une fois enregistré.</p></div>
+  <div class="corps">
+    <div class="carte inter">
+      <div><b>Recevoir mon planning dans Google Agenda</b><small>Si tu préfères n'utiliser que l'application, coupe-le.</small></div>
+      <span class="sw on"></span>
+    </div>
+    <div class="carte">
+      <h4>Ce que tu reçois <span class="etiquette perso">Personnalisé</span></h4>
+      <ul class="recu">
+        <li><span>Tes journées, aux heures du créneau</span></li>
+        <li><span>Tes gardes, en haut du jour</span></li>
+        <li class="non"><span>Les gardes des autres</span></li>
+      </ul>
+    </div>
+    <div class="statut">Tout arrive par « GuardVeto — Fanny » · agenda du cabinet retiré · à jour</div>
+    <div class="actions"><span class="btn">Modifier</span><span class="lien">Revenir au mode par défaut</span></div>
+  </div>
+</div>
+</div>
+<div class="note"><b>« Revenir au mode par défaut »</b> rend l'agenda du cabinet et retire les gardes de l'agenda perso, dans l'autre sens. Le choix « Placées » se grise quand « Journées » vaut « Aucune ». Une secrétaire n'a ni « Mes gardes » ni « Journées — les miennes » : ses choix commencent à « toute l'équipe ».</div>
+
+<!-- ═════════════ 3 ═════════════ -->
+<div class="etat"><span class="num">3</span><h2>Les autres états de l'écran</h2>
+<p>Ce que l'écran dit quand tout ne va pas tout seul. Aucun de ces états ne se tait.</p></div>
+<div class="etats">
+  <div class="mini"><div class="titre">Invitation à accepter</div>
+    <div class="bandeau att"><b>Une étape de ton côté</b>Google t'a envoyé un e-mail « GuardVeto a partagé un agenda avec vous ». Ouvre-le et ajoute l'agenda.</div>
+    <span class="lien">Renvoyer l'invitation</span></div>
+  <div class="mini"><div class="titre">Mise à jour en cours</div>
+    <div class="statut att">Ton agenda se met à jour (64 événements sur 120)…</div>
+    <small style="color:var(--sec);font-size:12.5px">Après un changement de réglage, tout est réécrit. Ça peut prendre une minute.</small></div>
+  <div class="mini"><div class="titre">Retrait impossible</div>
+    <div class="bandeau att"><b>Masque l'agenda du cabinet</b>GuardVeto n'a pas pu te le retirer. Dans Google Agenda, décoche « Planning des vétos », sinon tes gardes apparaîtront en double.</div></div>
+  <div class="mini"><div class="titre">Adresse sans Google Agenda</div>
+    <div class="bandeau bad"><b>Ton adresse n'ouvre pas de Google Agenda</b>f•••••@orange.fr ne peut pas recevoir d'agenda Google. Demande à l'administratrice de mettre une adresse Gmail sur ta fiche.</div></div>
+  <div class="mini"><div class="titre">Fonction coupée</div>
+    <div class="carte inter" style="padding:10px 12px"><div><b style="font-size:14px">Recevoir mon planning</b></div><span class="sw"></span></div>
+    <small style="color:var(--sec);font-size:12.5px">Ton agenda « GuardVeto — Fanny » est vidé. L'agenda du cabinet reste comme il est. Rien d'autre n'est touché.</small></div>
+  <div class="mini"><div class="titre">Le cabinet n'a pas d'agenda Google</div>
+    <small style="color:var(--sec);font-size:13px">L'écran ne s'affiche pas dans le menu : il n'y a rien à régler.</small></div>
+</div>
+
+<!-- ═════════════ 4 ═════════════ -->
+<div class="etat"><span class="num">4</span><h2>Ce que Fanny voit dans Google Agenda — mode par défaut</h2>
+<p>Semaine du 9 novembre au bac à sable. Son agenda perso (rendez-vous du dentiste) reste à sa place ; ses journées se posent sur les heures ; les gardes de tous sont en haut.</p></div>
+<div class="gcal">
+  <div class="gcal-tete"><span>Novembre 2026</span><small>Semaine</small></div>
+  <div class="gcal-corps">
+    <div class="gcal-cote">
+      <div class="lab">Mes agendas</div>
+      <div class="cal"><i class="c-paon"></i>Fanny (perso)</div>
+      <div class="cal"><i class="c-sauge"></i>GuardVeto — Fanny</div>
+      <div class="lab" style="margin-top:12px">Autres agendas</div>
+      <div class="cal"><i class="c-mandarine"></i>Planning des vétos</div>
+    </div>
+    <div class="sem">
+      <div></div>
+      <div class="jour"><small>lun.</small><b>9</b></div><div class="jour"><small>mar.</small><b>10</b></div><div class="jour"><small>mer.</small><b>11</b></div><div class="jour"><small>jeu.</small><b>12</b></div><div class="jour"><small>ven.</small><b>13</b></div>
+      <div class="haut-lab">GMT+1</div>
+      <div class="haut"><div class="ev c-mandarine">garde-JD-1er</div><div class="ev c-mandarine">garde-ACB-2nd</div></div>
+      <div class="haut"><div class="ev c-mandarine">garde-FL-1er</div><div class="ev c-mandarine">garde-AT-2nd</div></div>
+      <div class="haut"><div class="ev c-mandarine">garde-VC-1er</div><div class="ev c-mandarine">garde-MG-2nd</div></div>
+      <div class="haut"><div class="ev c-mandarine">garde-ASB-1er</div><div class="ev c-mandarine">garde-JD-2nd</div></div>
+      <div class="haut"><div class="ev c-mandarine">garde-FL-1er</div><div class="ev c-mandarine">garde-VC-2nd</div></div>
+      <div class="heures"><span>8h</span><span>9h</span><span>10h</span><span>11h</span><span>12h</span><span>13h</span><span>14h</span><span>15h</span><span>16h</span><span>17h</span><span>18h</span></div>
+      <div class="col"><div class="ev c-sauge" style="top:0;height:136px">Matin<small>8h – 12h</small></div></div>
+      <div class="col"><div class="ev c-sauge" style="top:0;height:136px">Matin<small>8h – 12h</small></div><div class="ev c-paon" style="top:238px;height:51px">Dentiste<small>15h – 16h30</small></div></div>
+      <div class="col"></div>
+      <div class="col"><div class="ev c-sauge" style="top:0;height:340px">Journée complète<small>8h – 18h</small></div></div>
+      <div class="col"><div class="ev c-sauge" style="top:204px;height:136px">Après-midi<small>14h – 18h</small></div></div>
+    </div>
+  </div>
+</div>
+<div class="note"><b>Le titre d'une journée</b> reprend le nom du créneau (« Matin », « Journée complète ») : c'est son agenda, son nom n'apporte rien. Le mercredi est vide : elle ne travaille pas.</div>
+
+<!-- ═════════════ 5 ═════════════ -->
+<div class="etat"><span class="num">5</span><h2>Variante — journées de toute l'équipe, aux heures</h2>
+<p>Un seul événement par créneau, avec les initiales de ceux qui y sont, plutôt que sept événements empilés.</p></div>
+<div class="gcal">
+  <div class="gcal-tete"><span>Novembre 2026</span><small>Semaine</small></div>
+  <div class="gcal-corps">
+    <div class="gcal-cote">
+      <div class="lab">Mes agendas</div>
+      <div class="cal"><i class="c-paon"></i>Fanny (perso)</div>
+      <div class="cal"><i class="c-sauge"></i>GuardVeto — Fanny</div>
+      <div class="lab" style="margin-top:12px">Autres agendas</div>
+      <div class="cal barre"><i class="vide"></i>Planning des vétos</div>
+    </div>
+    <div class="sem">
+      <div></div>
+      <div class="jour"><small>lun.</small><b>9</b></div><div class="jour"><small>mar.</small><b>10</b></div><div class="jour"><small>mer.</small><b>11</b></div><div class="jour"><small>jeu.</small><b>12</b></div><div class="jour"><small>ven.</small><b>13</b></div>
+      <div class="haut-lab">GMT+1</div>
+      <div class="haut"><div class="ev c-sauge">garde-JD-1er · ACB-2nd</div></div>
+      <div class="haut"><div class="ev c-sauge">garde-FL-1er · AT-2nd</div></div>
+      <div class="haut"><div class="ev c-sauge">garde-VC-1er · MG-2nd</div></div>
+      <div class="haut"><div class="ev c-sauge">garde-ASB-1er · JD-2nd</div></div>
+      <div class="haut"><div class="ev c-sauge">garde-FL-1er · VC-2nd</div></div>
+      <div class="heures"><span>8h</span><span>9h</span><span>10h</span><span>11h</span><span>12h</span><span>13h</span><span>14h</span><span>15h</span><span>16h</span><span>17h</span><span>18h</span></div>
+      <div class="col"><div class="ev c-sauge" style="top:0;height:136px;right:52%">Matin<small>FL · ASB</small></div><div class="ev c-sauge" style="top:0;height:340px;left:50%">Journée<small>ACB · AT · JD</small></div></div>
+      <div class="col"><div class="ev c-sauge" style="top:0;height:136px;right:52%">Matin<small>FL · ASB</small></div><div class="ev c-sauge" style="top:0;height:340px;left:50%">Journée<small>ACB · JD</small></div><div class="ev c-paon" style="top:238px;height:51px;right:52%">Dentiste</div></div>
+      <div class="col"><div class="ev c-sauge" style="top:0;height:340px">Journée<small>ACB · AT · VC · MG</small></div></div>
+      <div class="col"><div class="ev c-sauge" style="top:0;height:340px">Journée<small>FL · ACB · JD · AT</small></div></div>
+      <div class="col"><div class="ev c-sauge" style="top:0;height:136px;right:52%">Matin<small>ASB · VC</small></div><div class="ev c-sauge" style="top:204px;height:136px;right:52%">Après-midi<small>FL · MG</small></div><div class="ev c-sauge" style="top:0;height:340px;left:50%">Journée<small>ACB · JD</small></div></div>
+    </div>
+  </div>
+</div>
+<div class="note"><b>Ici Fanny a personnalisé</b> (journées de toute l'équipe, gardes de tous) : l'agenda du cabinet lui a été retiré, tout arrive par son agenda perso, sans doublon. Avec « En haut du jour », ces mêmes créneaux iraient dans la bande du haut et libéreraient les heures pour son agenda perso.</div>
+
+</div>
+</body>
+</html>
