@@ -71,13 +71,19 @@ export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props
   // « Planning · Historique été 2026 » lui parlait d'un découpage qui ne le
   // concerne pas, et « aucune période » se serait lu comme une panne. Le nom
   // de l'espace suffit.
-  const libellePlanning = estSecretaire
+  //
+  // B-174 (MiKL, 27/10) : le libellé VISIBLE d'un onglet dit sa fonction, et
+  // rien d'autre. « Planning · Brouillon Hiver P2 » ou « Réglages · Agenda
+  // connecté ✓ » faisaient déborder la barre. L'état reste porté par la
+  // pastille de l'icône, et le libellé lu par les lecteurs d'écran (aria-label)
+  // garde le détail : il ne prend aucune place.
+  const ariaPlanning = estSecretaire
     ? 'Planning'
     : dock.statutPlanning
       ? `Planning · ${brouillon ? 'Brouillon ' : ''}${dock.libellePlanning}`
       : 'Planning · aucune période'
 
-  const libelleAbsences =
+  const ariaAbsences =
     dock.nbSouhaits > 0
       ? `Absences & échanges · ${dock.nbSouhaits} souhait${dock.nbSouhaits > 1 ? 's' : ''}`
       : dock.nbEchanges > 0
@@ -120,7 +126,7 @@ export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props
 
       <nav className="dock-menu" aria-label="Les espaces de GuardVeto">
         {module('/planning') && (
-        <Link {...entree('/planning')} href="/planning" aria-label={libellePlanning}>
+        <Link {...entree('/planning')} href="/planning" aria-label={ariaPlanning}>
           <span className="di-ico" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3.5" y="5" width="17" height="15.5" rx="4.5" />
@@ -130,7 +136,7 @@ export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props
             {brouillon && <i className="di-pip warn" />}
           </span>
           <span className="di-flap" aria-hidden="true">
-            <span className="di-text">{libellePlanning}</span>
+            <span className="di-text">Planning</span>
           </span>
         </Link>
         )}
@@ -140,7 +146,7 @@ export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props
             ne lui ouvre pas une porte sur des commandes qui lui seraient
             refusées — un bouton qui échoue vaut moins qu'un bouton absent. */}
         {!estSecretaire && (
-        <Link {...entree('/absences')} href="/absences" aria-label={libelleAbsences}>
+        <Link {...entree('/absences')} href="/absences" aria-label={ariaAbsences}>
           <span className="di-ico" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <path d="M7.3 9.2a5.6 5.6 0 0 1 9.6-2.5" />
@@ -151,7 +157,7 @@ export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props
             {aTraiter > 0 && <i className="di-pip count">{aTraiter}</i>}
           </span>
           <span className="di-flap" aria-hidden="true">
-            <span className="di-text">{libelleAbsences}</span>
+            <span className="di-text">Absences &amp; échanges</span>
           </span>
         </Link>
         )}
@@ -200,7 +206,7 @@ export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props
               </svg>
             </span>
             <span className="di-flap" aria-hidden="true">
-              <span className="di-text">Équipe · {dock.nbVetos} vétos</span>
+              <span className="di-text">Équipe</span>
             </span>
           </Link>
         )}
@@ -253,72 +259,31 @@ export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props
           </Link>
         )}
 
-        {estAdmin && (
-          <Link
-            {...entree('/reglages')}
-            href="/reglages"
-            aria-label={dock.agendaConnecte ? 'Réglages · agenda connecté' : 'Réglages du cabinet'}
-          >
-            <span className="di-ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3.1" />
-                <path d="M12 4v2.3M12 17.7V20M4 12h2.3M17.7 12H20M6.3 6.3l1.7 1.7M16 16l1.7 1.7M17.7 6.3 16 8M8 16l-1.7 1.7" />
-              </svg>
-              {dock.agendaConnecte && <i className="di-pip ok" />}
-            </span>
-            <span className="di-flap" aria-hidden="true">
-              <span className="di-text">
-                Réglages{dock.agendaConnecte ? ' · Agenda connecté ✓' : ''}
-              </span>
-            </span>
-          </Link>
-        )}
-        {/* MES NOTIFICATIONS (B-134) — pour ceux qui n'ont PAS l'entrée
-            « Réglages », c'est-à-dire tout le monde sauf l'administratrice.
-            Elle, y accède par une carte dans `/reglages`, là où MiKL a demandé
-            que ça vive ; lui donner les deux ferait deux portes vers le même
-            écran dans la même barre.
-            Le secrétariat la voit AUSSI, volontairement : l'écran lui dit en
-            clair qu'aucun e-mail ne le concerne aujourd'hui. Masquer l'entrée
-            aurait été plus propre à regarder et plus trompeur à vivre — il
-            aurait cherché un réglage dont rien n'indiquait l'absence. */}
-        {!estAdmin && (
-          <Link
-            {...entree('/reglages/notifications')}
-            href="/reglages/notifications"
-            aria-label="Mes notifications"
-          >
-            <span className="di-ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6.6 10.2a5.4 5.4 0 0 1 10.8 0c0 3.4 1.2 4.9 1.2 4.9H5.4s1.2-1.5 1.2-4.9Z" />
-                <path d="M10.3 18.4a2 2 0 0 0 3.4 0" />
-              </svg>
-            </span>
-            <span className="di-flap" aria-hidden="true">
-              <span className="di-text">Mes notifications</span>
-            </span>
-          </Link>
-        )}
-
-        {/* MON AGENDA (B-173) — pour les TROIS rôles, administratrice comprise :
-            c'est un réglage personnel, et c'est sa seule porte (pas de carte
-            en double dans « Réglages »). Absente là où la fonction n'est pas
-            ouverte : une entrée vers une page qui renvoie ailleurs serait un
-            piège. La page revérifie de toute façon — l'entrée n'autorise rien. */}
-        {dock.agendaPerso && (
-          <Link {...entree('/reglages/agenda')} href="/reglages/agenda" aria-label="Mon agenda Google">
-            <span className="di-ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="4" y="5.5" width="16" height="14" rx="2.2" />
-                <path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" />
-                <path d="M8.5 14h3" />
-              </svg>
-            </span>
-            <span className="di-flap" aria-hidden="true">
-              <span className="di-text">Mon agenda</span>
-            </span>
-          </Link>
-        )}
+        {/* RÉGLAGES — UNE entrée pour les trois rôles (B-174, MiKL 27/10 :
+            « tout ce qui est réglage va dans Réglages »). Elle mène à `/reglages`,
+            qui montre à chacun ce qui le concerne : les branchements du cabinet
+            ET ses réglages personnels pour l'administratrice ; ses réglages
+            personnels seuls (notifications, agenda) pour les autres.
+            Avant : « Mes notifications » et « Mon agenda » avaient chacun leur
+            onglet, et la barre débordait.
+            La pastille verte ne parle que de l'agenda DU CABINET : elle n'a de
+            sens que pour qui le règle. */}
+        <Link
+          {...entree('/reglages')}
+          href="/reglages"
+          aria-label={estAdmin && dock.agendaConnecte ? 'Réglages · agenda connecté' : 'Réglages'}
+        >
+          <span className="di-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3.1" />
+              <path d="M12 4v2.3M12 17.7V20M4 12h2.3M17.7 12H20M6.3 6.3l1.7 1.7M16 16l1.7 1.7M17.7 6.3 16 8M8 16l-1.7 1.7" />
+            </svg>
+            {estAdmin && dock.agendaConnecte && <i className="di-pip ok" />}
+          </span>
+          <span className="di-flap" aria-hidden="true">
+            <span className="di-text">Réglages</span>
+          </span>
+        </Link>
 
         {/* L'ASSISTANCE, ouverte à toute l'équipe (arbitrage MiKL du
             2026-08-25). Le vétérinaire qui a vu le problème est celui qui sait

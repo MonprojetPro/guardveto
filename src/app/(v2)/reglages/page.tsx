@@ -15,7 +15,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { exigerVeterinaire } from '@/lib/identite'
+import { exigerIdentite, exigerVeterinaire } from '@/lib/identite'
+import { agendaPersoOuvert, clientService } from '@/lib/agenda-perso/rapprocher'
+import { CartesReglagesPerso } from '@/components/v2/CartesReglagesPerso'
 import { modulesDuCabinet } from '@/lib/produit/modules-serveur'
 import '@/styles/v2-reglages.css'
 import { Satin } from '@/components/v2/Satin'
@@ -48,6 +50,39 @@ export default async function ReglagesPage() {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  // B-174 — « Réglages » est l'entrée de TOUS les rôles. Hors administratrice,
+  // la page ne montre que les réglages personnels : aucune donnée du cabinet
+  // n'est lue pour eux (tout ce qui suit est réservé à l'admin).
+  const identite = await exigerIdentite(supabase)
+  if (identite.role !== 'admin') {
+    const agendaOuvert = !!identite.cabinetId
+      && (await agendaPersoOuvert(clientService(), identite.cabinetId))
+    // Une seule chose à régler : on y va directement, plutôt qu'une page
+    // d'une carte qui ne sert qu'à faire cliquer une fois de plus.
+    if (!agendaOuvert) redirect('/reglages/notifications')
+    const dockPerso = await chargerDock(supabase, { role_app: identite.role })
+    return (
+      <>
+        <Satin />
+        <div className="shell">
+          <BarreV2
+            prenom={identite.genre === 'veto' ? identite.veto.prenom : identite.nomAffiche}
+            estAdmin={false}
+            estSecretaire={identite.role === 'secretaire'}
+            dock={dockPerso}
+          />
+          <div className="page-head rise">
+            <div>
+              <h1>Réglages</h1>
+              <p className="lede">Ces réglages ne valent que pour vous.</p>
+            </div>
+          </div>
+          <CartesReglagesPerso agendaOuvert />
+        </div>
+      </>
+    )
+  }
 
   // Le secretariat n'a pas de fiche veterinaire : `exigerVeterinaire` le
   // renvoie vers le planning au lieu de le deconnecter (B-017, 2026-08-25).
@@ -172,9 +207,14 @@ export default async function ReglagesPage() {
     }))
   }
 
-  const dock = await chargerDock(supabase, vet)
-  // Les modules allumés, pour le lien vers le planning journée en bas de page.
-  const modulesAllumes = await modulesDuCabinet(supabase)
+  // En parallèle : aucune lecture ajoutée en série sur un écran déjà chargé.
+  const [dock, modulesAllumes, monAgendaOuvert] = await Promise.all([
+    chargerDock(supabase, vet),
+    // Les modules allumés, pour le lien vers le planning journée en bas de page.
+    modulesDuCabinet(supabase),
+    // B-174 — la carte « Mon agenda », seulement là où la page l'accepterait.
+    identite.cabinetId ? agendaPersoOuvert(clientService(), identite.cabinetId) : Promise.resolve(false),
+  ])
 
   return (
     <>
@@ -207,6 +247,7 @@ export default async function ReglagesPage() {
           agendaJourneeEntiere={agendaJourneeEntiere}
           agendaAfficherHoraires={agendaAfficherHoraires}
           creneaux={creneaux}
+          monAgendaOuvert={monAgendaOuvert}
         />
         {/* LE PLANNING JOURNÉE (B-120 chantier 2).
             Un lien, pas une carte de réglage recopiée : les tranches horaires

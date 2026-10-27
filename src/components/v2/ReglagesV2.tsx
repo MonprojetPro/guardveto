@@ -22,6 +22,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
+import { CartesReglagesPerso } from './CartesReglagesPerso'
 import { toast } from 'sonner'
 import {
   Select, SelectContent, SelectItem, SelectTrigger,
@@ -191,11 +192,14 @@ interface Props {
   agendaAfficherHoraires: boolean
   /** Les créneaux du socle (profil_id NULL), pour l'intitulé par créneau. */
   creneaux: CreneauAgenda[]
+  /** B-174 — « Mon agenda » ouvert à ce cabinet : sa carte apparaît sous « Mes notifications ». */
+  monAgendaOuvert?: boolean
 }
 
 export function ReglagesV2({
   valeurs, periodesPubliees, emails, agendaParDefaut = '', nomAgenda = null,
   envoiConfigure = false, agendaJourneeEntiere, agendaAfficherHoraires, creneaux,
+  monAgendaOuvert = false,
 }: Props) {
   const [isPending, startTransition] = useTransition()
   const { ouvrirErreur, dialogueErreur } = useErreurBloquante()
@@ -711,28 +715,7 @@ export function ReglagesV2({
             de l'administratrice sont les siens, et afficher un compteur sur une
             page de réglages du CABINET laisserait croire qu'ils valent pour
             tout le monde. */}
-        <section className="card conn-card" aria-label="Mes notifications">
-          <div className="conn-head">
-            <span className="conn-ico" aria-hidden="true">
-              🔔
-            </span>
-            <div>
-              <h3>Mes notifications</h3>
-              <p className="sub">Les e-mails que vous recevez, pour vous seule</p>
-            </div>
-          </div>
-          <div className="conn-body">
-            <p className="conn-line">
-              Demandes de congé, planning diffusé, gardes modifiées : choisissez
-              ce qui arrive dans votre boîte mail. Chacun règle la sienne.
-            </p>
-            <div className="conn-actions">
-              <Link href="/reglages/notifications" className="btn btn-outline btn-sm">
-                Régler mes e-mails
-              </Link>
-            </div>
-          </div>
-        </section>
+        <CartesReglagesPerso agendaOuvert={monAgendaOuvert} />
 
         {/* ── Adresse du cabinet ─────────────────────────────────────── */}
         <section className="card conn-card" aria-label="Adresse du cabinet et zones déduites">

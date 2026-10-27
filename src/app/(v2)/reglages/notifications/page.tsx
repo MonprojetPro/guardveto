@@ -12,9 +12,9 @@
 // sont justement les premiers concernés (leurs congés, leurs gardes), n'y
 // auraient jamais accédé.
 //
-// Cet écran-ci est donc ouvert aux TROIS rôles, et c'est ce qui rend l'entrée
-// possible dans le dock pour les non-admins. `/reglages` y renvoie par une
-// carte, pour que l'administratrice le trouve là où MiKL l'a demandé.
+// Cet écran-ci est donc ouvert aux TROIS rôles. Depuis B-174 (27/10), tout le
+// monde y arrive par l'entrée « Réglages » : une carte pour l'administratrice
+// et pour les autres quand « Mon agenda » est ouvert, un renvoi direct sinon.
 //
 // ⚠️ CE QUE CET ÉCRAN NE RÈGLE PAS, ET LE DIT : la cloche. Couper un e-mail
 //    réduit le bruit d'une boîte mail ; couper la cloche supprimerait
