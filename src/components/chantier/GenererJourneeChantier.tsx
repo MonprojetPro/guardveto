@@ -346,7 +346,7 @@ export function GenererJourneeChantier({
 
         {!aDesTrames ? (
           <p className="gjc-vide">
-            Décrivez d’abord au moins une présence récurrente dans l’écran « Journée » : il n’y a
+            Décrivez d’abord au moins une présence récurrente dans Organisation › Journées : il n’y a
             rien à poser pour l’instant.
           </p>
         ) : (

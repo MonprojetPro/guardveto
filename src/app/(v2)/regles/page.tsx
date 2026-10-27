@@ -28,6 +28,16 @@ import '@/styles/v2-absences.css'
 import '@/styles/v2-filou-edge.css'
 import '@/styles/v2-regles.css'
 import '@/styles/regles-forces.css'
+import '@/styles/v2-journee.css'
+import '@/styles/v2-organisation.css'
+import { OrganisationParties, type PartieOrganisation } from '@/components/v2/OrganisationParties'
+import { BlocsJournee } from '@/components/v2/BlocsJournee'
+import { ModuleEteint } from '@/components/v2/ModuleEteint'
+import { TramesJournee } from '@/components/v2/TramesJournee'
+import { modulesDuCabinet } from '@/lib/produit/modules-serveur'
+import { MODULE_JOURNEE } from '@/lib/journee/porte'
+import { plageLisible } from '@/lib/journee/blocs'
+import type { BlocJournee, TrameJournee } from '@/types'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
 import { ReglesStructureV2 } from '@/components/v2/ReglesStructureV2'
@@ -90,9 +100,9 @@ function resoudrePenaliteSoupleUI(rows: RegleRow[], briqueId: string): Structure
 export default async function ReglesStructurePage({
   searchParams,
 }: {
-  searchParams: Promise<{ focus?: string; onglet?: string }>
+  searchParams: Promise<{ focus?: string; onglet?: string; partie?: string }>
 }) {
-  const { focus, onglet } = await searchParams
+  const { focus, onglet, partie: partieDemandee } = await searchParams
   const supabase = await createClient()
 
   const {
@@ -125,6 +135,37 @@ export default async function ReglesStructurePage({
   // protège réellement, les deux autres ne font qu'éviter de promettre un
   // geste impossible.
   const estAdmin = vet.role_app === 'admin'
+
+  // ── B-175 — DEUX PARTIES : gardes et journées ─────────────────────────────
+  // MiKL, 27/10 : « l'onglet journée devrait appartenir à l'onglet
+  // organisation ». La partie Journées n'existe que si le module est allumé ;
+  // une adresse `?partie=journees` sur un cabinet sans le module retombe sur
+  // les gardes au lieu d'afficher une partie vide.
+  const modules = await modulesDuCabinet(supabase)
+  const journeeAllumee = modules.includes(MODULE_JOURNEE)
+  const partie: PartieOrganisation =
+    partieDemandee === 'journees' && journeeAllumee ? 'journees' : 'gardes'
+
+  if (partie === 'journees') {
+    return <PartieJournees vet={vet} estAdmin={estAdmin} supabase={supabase} />
+  }
+
+  // On a demandé les journées (ancien lien /journee, favori) sur un cabinet où
+  // le module est éteint : on le DIT, au lieu de montrer les gardes comme si
+  // de rien n'était (B-120a ②, « une porte qui se referme sans un mot »).
+  if (partieDemandee === 'journees') {
+    const dockEteint = await chargerDock(supabase, vet)
+    return (
+      <>
+        <Satin />
+        <div className="shell">
+          <BarreV2 prenom={vet.prenom} estAdmin={estAdmin} dock={dockEteint} />
+          <OrganisationParties partie="gardes" estAdmin={estAdmin} journeeAllumee={false} />
+          <ModuleEteint module={MODULE_JOURNEE} estAdmin={estAdmin} />
+        </div>
+      </>
+    )
+  }
 
   const [reglesRes, vetsRes, cabinetRes, profils, options] = await Promise.all([
     supabase
@@ -274,6 +315,7 @@ export default async function ReglesStructurePage({
       <Satin />
       <div className="shell">
         <BarreV2 prenom={vet.prenom} estAdmin={estAdmin} dock={dock} />
+        <OrganisationParties partie="gardes" estAdmin={estAdmin} journeeAllumee={journeeAllumee} />
         <ReglesStructureV2
           estAdmin={estAdmin}
           ongletInitial={onglet}
@@ -294,6 +336,107 @@ export default async function ReglesStructurePage({
           penalitesSouples={penalitesSouples}
           roleAvantage={roleAvantage}
         />
+      </div>
+    </>
+  )
+}
+
+/**
+ * B-175 — la partie Journées d'Organisation (ex-écran « Journée »).
+ *
+ * L'ADMIN y règle tout : les tranches horaires et la semaine type de chacun.
+ * UN VÉTÉRINAIRE y lit les tranches et remplit SA semaine type, et rien
+ * d'autre (MiKL, 27/10 : « chaque véto sa semaine type, l'admin garde la
+ * main »). Le refus réel est dans `porteTrame` et dans la RLS.
+ */
+async function PartieJournees({
+  vet,
+  estAdmin,
+  supabase,
+}: {
+  vet: Veterinaire
+  estAdmin: boolean
+  supabase: Awaited<ReturnType<typeof createClient>>
+}) {
+  // La RLS borne au cabinet (policy RESTRICTIVE). On lit TOUT, actif ou non :
+  // l'écran range lui-même les lignes retirées, et les masquer ici rendrait la
+  // remise en service impossible depuis l'interface.
+  const [{ data: dataBlocs }, { data: dataTrames }, { data: dataEquipe }, dock] = await Promise.all([
+    supabase
+      .from('blocs_journee')
+      .select('id, cabinet_id, nom, debut, fin, creneau, ordre, actif')
+      .order('ordre', { ascending: true }),
+    supabase
+      .from('trames_journee')
+      .select('id, cabinet_id, veterinaire_id, bloc_id, jour, semaine, actif'),
+    // Seuls les actifs sont proposés : une trame bâtie sur quelqu'un qui a
+    // quitté le cabinet poserait des présences fantômes.
+    supabase
+      .from('veterinaires')
+      .select('id, prenom, nom, role_app, actif')
+      .eq('actif', true)
+      .order('prenom', { ascending: true }),
+    chargerDock(supabase, vet),
+  ])
+
+  const blocs = (dataBlocs ?? []) as BlocJournee[]
+  const trames = (dataTrames ?? []) as TrameJournee[]
+  const equipe = (dataEquipe ?? []) as Veterinaire[]
+  const tranchesActives = blocs.filter((b) => b.actif)
+
+  return (
+    <>
+      <Satin />
+      <div className="shell">
+        <BarreV2 prenom={vet.prenom} estAdmin={estAdmin} dock={dock} />
+        <OrganisationParties partie="journees" estAdmin={estAdmin} journeeAllumee />
+        <div className="page-head rise">
+          <div>
+            <h1>Organisation des journées</h1>
+            {!estAdmin && (
+              <p className="ro-bandeau">
+                Vous remplissez ici votre propre semaine type. Les tranches horaires et les
+                journées des plannings restent réglées par l&apos;administratrice.
+              </p>
+            )}
+          </div>
+        </div>
+
+        {estAdmin ? (
+          <>
+            <BlocsJournee blocs={blocs} />
+            <TramesJournee trames={trames} blocs={blocs} equipe={equipe} />
+          </>
+        ) : (
+          <>
+            <div className="card">
+              <div className="card-head">
+                <h2>Les tranches horaires du cabinet</h2>
+              </div>
+              <div className="card-body">
+                {tranchesActives.length === 0 ? (
+                  <p className="conn-line">Aucune tranche horaire n’est encore définie.</p>
+                ) : (
+                  <ul className="org-tranches">
+                    {tranchesActives.map((b) => (
+                      <li key={b.id}>
+                        <b>{b.nom}</b>
+                        {plageLisible(b.debut, b.fin)}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+            <TramesJournee
+              trames={trames}
+              blocs={blocs}
+              equipe={equipe.filter((v) => v.id === vet.id)}
+              limiterA={vet.id}
+              pourMoi
+            />
+          </>
+        )}
       </div>
     </>
   )

@@ -321,6 +321,10 @@ describe('Aucun écran ne déconnecte le secrétariat par mégarde', () => {
   for (const page of pages) {
     it(`/${page.nom} passe par la source unique d’identité`, () => {
       const src = readFileSync(page.chemin, 'utf8')
+      // Une page qui ne lit RIEN et ne fait que renvoyer ailleurs (ex. /journee
+      // depuis B-175) ne peut déconnecter personne : c'est la page d'arrivée
+      // qui porte la porte d'identité.
+      if (!src.includes('createClient') && /redirect\(/.test(src)) return
       // Les trois portes légitimes : `exigerVeterinaire` (l'écran est réservé
       // aux vétérinaires), `exigerIdentite` (il accepte les deux),
       // `resoudreIdentite` (il gère lui-même les cas limites).

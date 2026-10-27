@@ -292,6 +292,11 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   // « mets telle adresse d'expédition », qui SONT des outils) : c'est un
   // réglage qu'on ouvre l'écran pour composer à l'œil, avec l'aperçu en
   // direct — pas un geste qu'on décrit avec des mots.
+  'v2/regles/modules-actions#basculerModuleCabinet': {
+    hors:
+      'Allumer ou éteindre le planning de la journée change ce que TOUT le cabinet voit (B-175). ' +
+      'Geste de l’administratrice, sur l’encart « Vos plannings » d’Organisation, jamais par une phrase dans un fil.',
+  },
   'v2/reglages#configurerAgendaAffichage': {
     hors: 'Réglage de présentation de l’agenda Google (journée entière, horaires dans le titre, intitulé par créneau) : composition visuelle à l’œil sur l’écran Réglages, jamais une demande formulée en conversation. Sans effet sur le planning, les droits ou une donnée métier.',
   },

@@ -105,7 +105,9 @@ describe('ecranVisible — ce que la barre demande avant d’afficher une entree
 
   it('CACHE un ecran dont le module est eteint', () => {
     expect(ecranVisible('planning', ['planning-journee'])).toBe(false)
-    expect(ecranVisible('regles', ['chat'])).toBe(false)
+    // `regles` est passé au socle le 27/10 (B-175 : il porte l'interrupteur
+    // des modules) ; `journee` reste rattaché au planning de la journée.
+    expect(ecranVisible('journee', ['gardes'])).toBe(false)
     expect(ecranVisible('historique', [])).toBe(false)
   })
 

@@ -117,7 +117,7 @@ export async function creerBloc(saisie: {
 
   if (error) return { error: messageLisible(error.message) }
 
-  revalidatePath('/journee')
+  revalidatePath('/regles')
   return { success: true }
 }
 
@@ -152,7 +152,7 @@ export async function modifierBloc(
   const { error } = await supabase.from('blocs_journee').update(champs).eq('id', id)
   if (error) return { error: messageLisible(error.message) }
 
-  revalidatePath('/journee')
+  revalidatePath('/regles')
   // B-173 — nouveaux horaires ou nouveau nom : les agendas perso les reprennent.
   programmerAgendasPerso(cabinetId)
   return { success: true }
@@ -183,7 +183,7 @@ export async function basculerBloc(id: string, actif: boolean): Promise<Resultat
 
   if (error) return { error: messageLisible(error.message) }
 
-  revalidatePath('/journee')
+  revalidatePath('/regles')
   return { success: true }
 }
 

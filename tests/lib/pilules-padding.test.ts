@@ -71,6 +71,7 @@ const DOSSIER = join(process.cwd(), 'src', 'styles')
  */
 const CONTENEURS_DE_BOUTONS: Record<string, string> = {
   '.tabs': 'Barre d’onglets : gouttière autour de boutons déjà arrondis.',
+  '.org-parties': 'Bascule Gardes / Journées d’Organisation (B-175) : même gouttière que `.tabs`, autour de liens déjà arrondis.',
   '.segmente': 'Sélecteur segmenté : gouttière autour de boutons déjà arrondis.',
   '.seg': 'Sélecteur segmenté de l’historique : gouttière autour de boutons.',
   '.recap-seg': 'Sélecteur segmenté du récapitulatif : gouttière autour de boutons.',

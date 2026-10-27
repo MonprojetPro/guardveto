@@ -413,7 +413,7 @@ export async function appliquerTrames(periodeId: string): Promise<Resultat> {
   }
 
   revalidatePath('/planning')
-  revalidatePath('/journee')
+  revalidatePath('/regles')
   // B-173 — sans effet tant que le planning n'est pas publié (seules les
   // journées publiées partent dans les agendas perso).
   programmerAgendasPerso(cabinetId)

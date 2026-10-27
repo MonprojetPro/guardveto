@@ -132,7 +132,7 @@ export function GenererJournee({ open, onOpenChange, periodes, aDesTrames }: Pro
         <DialogHeader>
           <DialogTitle>Remplir le planning des journées</DialogTitle>
           <DialogDescription>
-            Les présences récurrentes décrites dans « Journée » sont des règles. Ce geste les pose
+            Les présences récurrentes décrites dans Organisation › Journées sont des règles. Ce geste les pose
             réellement sur un planning, jour par jour.
           </DialogDescription>
         </DialogHeader>
@@ -146,7 +146,7 @@ export function GenererJournee({ open, onOpenChange, periodes, aDesTrames }: Pro
           </p>
         ) : !aDesTrames ? (
           <p className="tj-vide">
-            Décrivez d’abord au moins une présence récurrente dans l’écran « Journée » : il n’y a
+            Décrivez d’abord au moins une présence récurrente dans Organisation › Journées : il n’y a
             rien à poser pour l’instant.
           </p>
         ) : (

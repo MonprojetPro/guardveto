@@ -162,34 +162,8 @@ export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props
         </Link>
         )}
 
-        {/* LA JOURNÉE — module `planning-journee` (B-120 chantier 2).
-            Réservée à l'administratrice pour l'instant : l'écran ne porte que
-            la configuration des tranches horaires. La grille que les
-            vétérinaires consulteront arrive au chantier 3, et c'est elle qui
-            ouvrira l'entrée à tout le monde.
-            ⚠️ `module('/journee')` ne PROTÈGE rien — il évite de proposer une
-            porte qui se refermerait. Le refus est dans `exigerModule()`. */}
-        {estAdmin && module('/journee') && (
-          <Link {...entree('/journee')} href="/journee" aria-label="Planning de la journée">
-            {/* ⚠️ UN SOLEIL PLEIN AURAIT ÉTÉ CONFONDU AVEC LES RÉGLAGES — leur
-                icône est elle aussi un cercle entouré de rayons courts
-                (`circle r=3.1` + 8 traits), et les deux entrées se suivent
-                dans le dock sur un cabinet où le module est allumé. D'où un
-                soleil LEVANT : demi-disque posé sur une ligne d'horizon, dont
-                la silhouette ne ressemble à rien d'autre dans la barre. */}
-            <span className="di-ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3.4 17.6h17.2" />
-                <path d="M7.4 17.6a4.6 4.6 0 0 1 9.2 0" />
-                <path d="M12 5.2v2.3M5.6 8l1.6 1.6M18.4 8l-1.6 1.6" />
-                <path d="M5.2 21h13.6" />
-              </svg>
-            </span>
-            <span className="di-flap" aria-hidden="true">
-              <span className="di-text">Journée</span>
-            </span>
-          </Link>
-        )}
+        {/* B-175 (27/10) — plus d'entrée « Journée » : les tranches horaires et
+            les semaines types vivent dans Organisation › Journées. */}
 
         {estAdmin && (
           <Link

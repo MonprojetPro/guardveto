@@ -62,9 +62,15 @@ interface Props {
    *    chemin : même formulaire, mêmes actions, même validation.
    */
   limiterA?: string
+  /**
+   * B-175 — c'est la personne connectée qui remplit SA semaine type
+   * (Organisation › Journées, côté vétérinaire). Les phrases lui parlent à
+   * la deuxième personne, et la carte garde son titre.
+   */
+  pourMoi?: boolean
 }
 
-export function TramesJournee({ trames, blocs, equipe, limiterA }: Props) {
+export function TramesJournee({ trames, blocs, equipe, limiterA, pourMoi }: Props) {
   const router = useRouter()
   const [enCours, demarrer] = useTransition()
   const [refus, setRefus] = useState<string | null>(null)
@@ -84,7 +90,7 @@ export function TramesJournee({ trames, blocs, equipe, limiterA }: Props) {
   const blocsProposables = blocs.filter((b) => b.actif)
   /** B-149 — la fiche d'une personne ne montre qu'elle. */
   const equipeAffichee = limiterA ? equipe.filter((v) => v.id === limiterA) : equipe
-  const dansUneFiche = Boolean(limiterA)
+  const dansUneFiche = Boolean(limiterA) && !pourMoi
   const nomBloc = (id: string) => blocs.find((b) => b.id === id)?.nom ?? 'tranche inconnue'
 
   const fermer = () => {
@@ -258,7 +264,9 @@ export function TramesJournee({ trames, blocs, equipe, limiterA }: Props) {
   const contenu = (
     <>
         <p className="tj-lede">
-          {dansUneFiche
+          {pourMoi
+            ? 'Les jours où vous êtes là d’habitude. Vous décrivez votre semaine type une fois ; l’administratrice s’en sert pour remplir les prochains plannings. Un planning déjà prévu ne change pas.'
+            : dansUneFiche
             ? 'Les jours où cette personne est là d’habitude. Vous décrivez la règle une fois ; elle servira à remplir le planning sans tout ressaisir.'
             : 'Pour chacun, les jours où il est là d’habitude. Vous décrivez la règle une fois ; elle servira à remplir le planning sans tout ressaisir.'}
         </p>
@@ -306,8 +314,10 @@ export function TramesJournee({ trames, blocs, equipe, limiterA }: Props) {
              et un renvoi qui désigne un voisin absent est exactement le défaut
              déjà corrigé deux fois aujourd'hui sur la phrase voisine. */
           <p className="tj-vide">
-            {dansUneFiche
-              ? 'Définissez d’abord au moins une tranche horaire dans l’écran « Journée » : une présence a besoin d’une tranche pour s’écrire.'
+            {pourMoi
+              ? 'L’administratrice n’a encore défini aucune tranche horaire : votre semaine type pourra se remplir dès qu’elle l’aura fait.'
+              : dansUneFiche
+              ? 'Définissez d’abord au moins une tranche horaire dans Organisation › Journées : une présence a besoin d’une tranche pour s’écrire.'
               : 'Définissez d’abord au moins une tranche horaire ci-dessus : une présence a besoin d’une tranche pour s’écrire.'}
           </p>
         ) : (
@@ -436,7 +446,7 @@ export function TramesJournee({ trames, blocs, equipe, limiterA }: Props) {
   return (
     <div className="card tj-card">
       <div className="card-head">
-        <h2>Les présences récurrentes</h2>
+        <h2>{pourMoi ? 'Ma semaine type' : 'Les présences récurrentes'}</h2>
       </div>
       <div className="card-body">{contenu}</div>
     </div>

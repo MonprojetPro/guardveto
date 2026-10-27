@@ -77,9 +77,26 @@ interface Props {
   cumul: CumulLigne[]
   cumulResume: string | null
 
+  /**
+   * B-175 — le compteur des journées. `null` : module éteint, la carte
+   * n'existe pas. Un tableau (même de zéros) : module allumé.
+   */
+  journees?: LigneJournees[] | null
+  erreurJournees?: string | null
+
   /** Rendus côté serveur par la page (le bilan porte sa propre carte V2). */
   slotBilan?: React.ReactNode
   slotFetes?: React.ReactNode
+}
+
+/** B-175 — une ligne du compteur des journées. */
+export interface LigneJournees {
+  veterinaire_id: string
+  prenom: string
+  couleur: string
+  matin: number
+  apres_midi: number
+  entiere: number
 }
 
 // ── Petits utilitaires d'affichage ────────────────────────────────────────
@@ -129,6 +146,8 @@ export function HistoriqueV2({
   cumulResume,
   slotBilan,
   slotFetes,
+  journees = null,
+  erreurJournees = null,
 }: Props) {
   const router = useRouter()
   const [du, setDu] = useState(debut)
@@ -609,6 +628,60 @@ export function HistoriqueV2({
             </p>
           </section>
         </div>
+      )}
+
+      {/* ── B-175 — le compteur des journées ─────────────────────────
+          HORS de la grille des gardes, exprès : un cabinet dont le filtre ne
+          porte aucune garde (« Aucune garde sur ce filtre ») peut très bien
+          avoir des journées, et la carte ne doit pas disparaître avec elles. */}
+      {journees && (
+        <section className="card count-card rise rise-3" aria-label="Compteur des journées">
+          <div className="card-head">
+            <h3>Journées</h3>
+            <span className="sub spacer">présences de journée sur ce filtre</span>
+          </div>
+          {erreurJournees ? (
+            <p className="count-vide">
+              Les journées n&apos;ont pas pu être comptées — ce n&apos;est pas « zéro ».
+              <br />
+              <code className="hist-detail-technique">{erreurJournees}</code>
+            </p>
+          ) : (
+            <>
+              <table className="count-table">
+                <thead>
+                  <tr>
+                    <th>Vétérinaire</th>
+                    <th>Matin</th>
+                    <th>Après-midi</th>
+                    <th>Journée</th>
+                    <th>Demi-journées</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {journees.map((r) => (
+                    <tr key={r.veterinaire_id} className={r.veterinaire_id === moiId ? 'moi' : undefined}>
+                      <td>
+                        <span className="ct-vet">
+                          <i style={stylePoint(r.couleur)} />
+                          {r.prenom}
+                        </span>
+                      </td>
+                      <Nombre n={r.matin} />
+                      <Nombre n={r.apres_midi} />
+                      <Nombre n={r.entiere} />
+                      <td>{r.matin + r.apres_midi + 2 * r.entiere}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="count-note">
+                Une journée entière compte pour deux demi-journées. Les journées ne se
+                répartissent pas comme les gardes : il n&apos;y a pas d&apos;écart à une juste part.
+              </p>
+            </>
+          )}
+        </section>
       )}
 
       {/* ── Bilan de fin de période ──────────────────────────────────

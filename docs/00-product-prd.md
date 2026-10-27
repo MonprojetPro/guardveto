@@ -43,7 +43,9 @@ droits différents pour une administratrice et pour un vétérinaire.
 |---|---|---|
 | Connexion sécurisée par cabinet, avec rôles distincts administratrice / vétérinaire | 🟢 Livré | 2026-08 `[B-001, B-002, B-004]` |
 | Un cabinet de démonstration (bac à sable), entièrement séparé du cabinet réel et marqué visuellement comme tel | 🟢 Livré | 2026-08-31 `[B-090, B-091]` |
-| Un cabinet peut activer ou désactiver certains modules optionnels (ex. le planning des présences de journée) — la bascule se fait aujourd'hui uniquement par MonProjetPro, pas encore par un écran dédié | 🟡 En cours | 2026-10-01 `[B-120a]` |
+| Un cabinet peut activer ou désactiver certains modules optionnels (ex. le planning des présences de journée) | 🟡 En cours | 2026-10-01 `[B-120a]` |
+| L'administratrice choisit elle-même, dans Organisation, si son cabinet utilise aussi le planning de la journée — l'écran est prêt, il attend un réglage de la base à appliquer par MonProjetPro | 🟡 En cours | 2026-10-27 `[B-175, B-175d]` |
+| Un cabinet qui n'utilise QUE le planning de la journée, sans gardes | ⚪ À faire | — `[B-175a]` |
 | Un rôle "secrétariat" en lecture seule est prévu mais mis en pause, en attendant un autre chantier de sécurité | 🔵 À qualifier | — (gelé) |
 
 ---
@@ -79,6 +81,8 @@ retravaillée pour rester lisible même avec beaucoup d'informations sur un mêm
 | Nouvelle grille de planning, plus claire, qui distingue présences, gardes et absences | 🟢 Livré, évolutions continues | 2026-10 `[B-153, B-145, B-150]` |
 | Une fiche détaillée par journée, navigable au clavier, pour voir et modifier présences, gardes et absences en un coup d'œil | 🟢 Livré | 2026-10-16 `[B-165]` |
 | Les compteurs d'équité affichent désormais aussi les présences de journée, jusqu'à 8 colonnes dans la fenêtre dédiée | 🟢 Livré | 2026-10-21 `[B-171]` |
+| L'écran Historique & compteurs affiche aussi un compteur des journées (matin, après-midi, journée entière), et les compteurs ont été revérifiés contre la base | 🟢 Livré, à recetter | 2026-10-27 `[B-175]` |
+| Décider si un vétérinaire qui quitte le cabinet reste visible dans les compteurs des périodes passées | 🔵 À qualifier | — `[B-175c]` |
 | Repérer un jour où un planning de présences et un planning de gardes se chevauchent sans induire en erreur sur ce qui est déjà rempli | 🟢 Livré | 2026-10-24 `[B-172c]` |
 | Supprimer un planning de gardes doit annoncer que les présences de journée liées seront aussi effacées — l'écran ne le dit pas encore | ⚪ À faire | — `[B-172b]` |
 
@@ -96,6 +100,8 @@ journée, avec son propre parcours de création et d'affichage.
 | Supprimer un planning de présences se fait depuis une fenêtre dédiée et simple, sans vocabulaire de "garde" | 🟢 Livré | 2026-10-20 `[B-168a, B-168b]` |
 | Décider qui voit les horaires de présence de chacun (toute l'équipe, ou seulement l'intéressé et l'administratrice) | 🔵 À qualifier | — `[B-150b]` |
 | Le document PDF imprimé pour le secrétariat ne reprend pas encore les présences de journée | ⚪ À faire | — `[B-150a]` |
+| Les réglages des journées (tranches horaires, semaines types) se trouvent dans Organisation, à côté de ceux des gardes, au lieu d'un onglet à part | 🟢 Livré, à recetter | 2026-10-27 `[B-175]` |
+| Chaque vétérinaire remplit lui-même sa semaine type ; l'administratrice garde la main sur tout le reste — prêt côté écran, en attente du même réglage de la base | 🟡 En cours | 2026-10-27 `[B-175b, B-175d]` |
 
 ---
 

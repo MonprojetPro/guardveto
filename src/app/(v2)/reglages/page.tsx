@@ -14,11 +14,9 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import { exigerIdentite, exigerVeterinaire } from '@/lib/identite'
 import { agendaPersoOuvert, clientService } from '@/lib/agenda-perso/rapprocher'
 import { CartesReglagesPerso } from '@/components/v2/CartesReglagesPerso'
-import { modulesDuCabinet } from '@/lib/produit/modules-serveur'
 import '@/styles/v2-reglages.css'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
@@ -208,10 +206,10 @@ export default async function ReglagesPage() {
   }
 
   // En parallèle : aucune lecture ajoutée en série sur un écran déjà chargé.
-  const [dock, modulesAllumes, monAgendaOuvert] = await Promise.all([
+  // B-175 — l'encart « Planning de la journée » (un simple lien vers /journee)
+  // est retiré : les journées se règlent dans Organisation › Journées.
+  const [dock, monAgendaOuvert] = await Promise.all([
     chargerDock(supabase, vet),
-    // Les modules allumés, pour le lien vers le planning journée en bas de page.
-    modulesDuCabinet(supabase),
     // B-174 — la carte « Mon agenda », seulement là où la page l'accepterait.
     identite.cabinetId ? agendaPersoOuvert(clientService(), identite.cabinetId) : Promise.resolve(false),
   ])
@@ -249,35 +247,6 @@ export default async function ReglagesPage() {
           creneaux={creneaux}
           monAgendaOuvert={monAgendaOuvert}
         />
-        {/* LE PLANNING JOURNÉE (B-120 chantier 2).
-            Un lien, pas une carte de réglage recopiée : les tranches horaires
-            vivent dans leur module et s'y règlent. Deux écrans pour la même
-            donnée, c'est le défaut « deux écrans, deux habillages, aucun des
-            deux ne disant lequel fait foi » déjà payé sur les compteurs.
-            ⚠️ Conditionné au module : sans ce test, l'administratrice de Val
-            d'Allier verrait un lien vers un écran qui lui dirait « pas
-            activé » — une porte qui se referme. */}
-        {modulesAllumes.includes('planning-journee') && (
-          <section className="card rise">
-            <div className="card-head">
-              <h2>Planning de la journée</h2>
-            </div>
-            {/* `card-body` pour le padding standard, `conn-line` pour le texte :
-                les mêmes que les cartes de connexion juste au-dessus, puisque
-                c'est la même sorte de carte. */}
-            <div className="card-body">
-              <p className="conn-line">
-                Les tranches horaires de vos journées (matin, après-midi, journée complète) se
-                règlent dans leur propre espace.
-              </p>
-              <div className="conn-actions">
-                <Link className="btn btn-outline btn-sm" href="/journee">
-                  Ouvrir les tranches horaires
-                </Link>
-              </div>
-            </div>
-          </section>
-        )}
       </div>
     </>
   )

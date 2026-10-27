@@ -323,7 +323,7 @@ export function CellulePresenceModale({
               {posables.length === 0 ? (
                 <p className="cpm-vide">
                   {tranches.length === 0
-                    ? 'Aucune tranche horaire n’est définie. Réglez-les dans « Journée ».'
+                    ? 'Aucune tranche horaire n’est définie. Réglez-les dans Organisation › Journées.'
                     : 'Toutes les tranches sont déjà prises ce jour-là.'}
                 </p>
               ) : (

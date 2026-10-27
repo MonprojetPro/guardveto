@@ -38,6 +38,78 @@ export type Porte =
   | { ok: true; supabase: SupabaseClient<any, any, any>; cabinetId: string }
   | { ok: false; probleme: string }
 
+export type PorteTrame =
+  | {
+      ok: true
+      supabase: SupabaseClient<any, any, any>
+      cabinetId: string
+      /** `true` : l'admin, qui règle tout le monde. `false` : un véto, pour lui seul. */
+      estAdmin: boolean
+      /** La fiche de la personne connectée. */
+      moiId: string
+    }
+  | { ok: false; probleme: string }
+
+/**
+ * B-175 — la porte des SEMAINES TYPES (trames), plus large que `porteJournee`.
+ *
+ * MiKL, 27/10 : « chaque véto sa semaine type, l'admin garde la main ». Un
+ * vétérinaire passe donc, mais SEULEMENT pour les lignes qui le désignent —
+ * c'est à l'appelant de vérifier chaque ligne avec `peutEcrireTrame`.
+ * Le secrétariat n'a pas de fiche `veterinaires` : il est refusé ici.
+ *
+ * ⚠️ La base porte le même refus (policy `trames_journee_veto_own_write`).
+ *    Deux gardiens, délibérément : l'écran évite l'erreur, le serveur refuse
+ *    le chemin qu'on n'a pas prévu, la base refuse ce que le serveur oublierait.
+ */
+export async function porteTrame(): Promise<PorteTrame> {
+  const supabase = await createClient()
+
+  try {
+    await exigerModule(supabase, MODULE_JOURNEE)
+  } catch (e) {
+    if (e instanceof ModuleEteintError) return { ok: false, probleme: e.message }
+    throw e
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { ok: false, probleme: 'Non authentifié.' }
+
+  const { data: moi } = await supabase
+    .from('veterinaires')
+    .select('id, role_app')
+    .eq('user_id', user.id)
+    .eq('actif', true)
+    .maybeSingle()
+
+  const fiche = moi as { id?: string; role_app?: string } | null
+  if (!fiche?.id) {
+    return { ok: false, probleme: 'Seuls les vétérinaires du cabinet ont une semaine type.' }
+  }
+
+  return {
+    ok: true,
+    supabase,
+    cabinetId: await resoudreCabinetId(supabase),
+    estAdmin: fiche.role_app === 'admin',
+    moiId: fiche.id,
+  }
+}
+
+/** Un véto n'écrit que SES lignes ; l'admin écrit toutes celles du cabinet. */
+export function peutEcrireTrame(
+  porte: { estAdmin: boolean; moiId: string },
+  veterinaireId: string | null | undefined,
+): boolean {
+  if (porte.estAdmin) return true
+  return !!veterinaireId && veterinaireId === porte.moiId
+}
+
+export const REFUS_TRAME_AUTRUI =
+  'Vous ne pouvez modifier que votre propre semaine type. Pour celle d’un collègue, voyez avec l’administratrice.'
+
 /**
  * Les deux premières gardes, dans l'ordre. Rend le client si tout passe.
  *

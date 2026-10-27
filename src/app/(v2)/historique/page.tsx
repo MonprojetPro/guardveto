@@ -38,8 +38,12 @@ import {
   queryBonusMalusCourant,
   queryVetsInfo,
   queryHistoriqueFetes,
+  queryCompteursJournee,
   type CompteursRow,
 } from '@/hooks/useCompteurs'
+import { modulesDuCabinet } from '@/lib/produit/modules-serveur'
+import { MODULE_JOURNEE } from '@/lib/journee/porte'
+import type { LigneJournees } from '@/components/v2/HistoriqueV2'
 import type { Periode, Veterinaire } from '@/types'
 import { periodePorteDesGardes } from '@/lib/planning/usage-periode'
 
@@ -355,6 +359,35 @@ export default async function HistoriquePage({
         : '')
   }
 
+  // ── B-175 — le compteur des JOURNÉES ───────────────────────────────────
+  // MiKL, 27/10 : « mettre déjà un compteur également pour les journées (si
+  // c'est activé) ». Même source et même calcul que la fenêtre des compteurs
+  // du planning (B-171, `queryCompteursJournee`) : bornés aux DATES du filtre,
+  // jamais à un `periode_id` — les deux chiffres ne peuvent pas se contredire.
+  // Le périmètre « validées seulement » s'applique aussi : un brouillon de
+  // journées peut encore changer.
+  // Toute l'équipe active a sa ligne, même à zéro : le même « personne ne
+  // disparaît du tableau » que pour les gardes.
+  let journees: LigneJournees[] | null = null
+  let erreurJournees: string | null = null
+  if ((await modulesDuCabinet(supabase)).includes(MODULE_JOURNEE)) {
+    const res = await queryCompteursJournee(supabase, debut, fin, perimetre === 'valide')
+    erreurJournees = res.erreur
+    journees = vetsActifs
+      .map((v) => {
+        const j = res.parVeto.get(v.id)
+        return {
+          veterinaire_id: v.id,
+          prenom: v.prenom,
+          couleur: v.couleur,
+          matin: j?.matin ?? 0,
+          apres_midi: j?.apres_midi ?? 0,
+          entiere: j?.entiere ?? 0,
+        }
+      })
+      .sort((a, b) => a.prenom.localeCompare(b.prenom, 'fr'))
+  }
+
   // ── Greffes V1 : bilan de période et historique des fêtes ──────────────
   const afficherBilan =
     estAdmin && mode === 'periode' && periodeSelectionnee.statut !== 'brouillon'
@@ -390,6 +423,8 @@ export default async function HistoriquePage({
           estAdmin={estAdmin}
           cumul={cumul}
           cumulResume={cumulResume}
+          journees={journees}
+          erreurJournees={erreurJournees}
           slotBilan={
             afficherBilan ? (
               <BonusMalusCard

@@ -158,7 +158,7 @@ export function JourneeDuJourModale({
 
         {isAdmin && (
           <p className="jdm-pied">
-            Les présences se règlent par les récurrences, dans « Journée », puis en les appliquant
+            Les présences se règlent par les récurrences, dans Organisation › Journées, puis en les appliquant
             sur ce planning.
           </p>
         )}

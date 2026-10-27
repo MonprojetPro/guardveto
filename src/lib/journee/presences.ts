@@ -334,7 +334,7 @@ export function resumeApplication(
   let phrase: string
   if (voulues.length === 0 && ecarteesPourAbsence === 0) {
     phrase =
-      'Aucune trame de présence ne s’applique à cette période. Définissez-les dans « Journée » avant d’appliquer.'
+      'Aucune trame de présence ne s’applique à cette période. Définissez-les dans Organisation › Journées avant d’appliquer.'
   } else if (voulues.length === 0) {
     // Des trames existent, mais tout le monde est absent sur la fenêtre. Le
     // dire franchement vaut mieux que « aucune trame ne s'applique », qui

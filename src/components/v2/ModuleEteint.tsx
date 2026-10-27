@@ -57,7 +57,7 @@ export function ModuleEteint({ module, estAdmin = false }: Props) {
       {quoi && <p className="me-quoi">{quoi}</p>}
       <p className="me-suite">
         {estAdmin
-          ? 'Pour l’ouvrir, contactez MonProjetPro — l’activation est un réglage, elle prend effet immédiatement.'
+          ? 'Vous pouvez l’allumer vous-même dans Organisation, encart « Vos plannings » : il prend effet immédiatement pour toute l’équipe.'
           : 'Si vous pensez qu’elle devrait l’être, parlez-en à l’administratrice du cabinet.'}
       </p>
       <div className="me-sortie">

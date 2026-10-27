@@ -24,7 +24,7 @@
 // ============================================================
 
 import { revalidatePath } from 'next/cache'
-import { porteJournee } from '@/lib/journee/porte'
+import { porteTrame, peutEcrireTrame, REFUS_TRAME_AUTRUI } from '@/lib/journee/porte'
 import {
   LIBELLE_JOUR,
   trameDejaPresente,
@@ -121,9 +121,11 @@ async function vetoUtilisable(
  *    qui fait moins que demandé sans le dire est pire que celui qui refuse.
  */
 export async function creerTrames(saisie: SaisieTrames): Promise<Resultat> {
-  const porte = await porteJournee()
+  const porte = await porteTrame()
   if (!porte.ok) return { error: porte.probleme }
   const { supabase, cabinetId } = porte
+  // B-175 — un véto n'ajoute qu'à SA semaine type.
+  if (!peutEcrireTrame(porte, saisie?.veterinaire_id)) return { error: REFUS_TRAME_AUTRUI }
 
   const blocs = await blocsDuCabinet(supabase)
   const v = validerTrames(saisie, blocs)
@@ -165,8 +167,7 @@ export async function creerTrames(saisie: SaisieTrames): Promise<Resultat> {
 
   if (error) return { error: messageLisible(error.message) }
 
-  revalidatePath('/journee')
-  revalidatePath('/equipe')
+  revaliderTrames()
   return { success: true }
 }
 
@@ -178,7 +179,7 @@ function liste(mots: string[]): string {
 
 /** Modifie une ligne de trame (tranche, jour, cadence). */
 export async function modifierTrame(id: string, saisie: SaisieTrame): Promise<Resultat> {
-  const porte = await porteJournee()
+  const porte = await porteTrame()
   if (!porte.ok) return { error: porte.probleme }
   const { supabase } = porte
 
@@ -187,6 +188,14 @@ export async function modifierTrame(id: string, saisie: SaisieTrame): Promise<Re
   const blocs = await blocsDuCabinet(supabase)
   const v = validerTrame(saisie, blocs)
   if (!v.ok) return { error: v.probleme }
+
+  // B-175 — la ligne doit être à lui AVANT, et le rester APRÈS : sans le
+  // second test, un véto pourrait « donner » sa ligne à un collègue.
+  const titulaire = await titulaireDeLaLigne(supabase, id)
+  if (!titulaire) return { error: 'Ligne de trame introuvable.' }
+  if (!peutEcrireTrame(porte, titulaire) || !peutEcrireTrame(porte, v.valeur.veterinaire_id)) {
+    return { error: REFUS_TRAME_AUTRUI }
+  }
 
   const veto = await vetoUtilisable(supabase, v.valeur.veterinaire_id)
   if (!veto.ok) return { error: veto.probleme }
@@ -203,10 +212,16 @@ export async function modifierTrame(id: string, saisie: SaisieTrame): Promise<Re
 
   // ⚠️ `.eq('id', …)` et RIEN d'autre : jamais de `.or()` sur un `.update()`
   //    Supabase (leçon `0e7d341`, ça cassait toute génération).
-  const { error } = await supabase.from('trames_journee').update(champs).eq('id', id)
+  const { data: ecrites, error } = await supabase
+    .from('trames_journee')
+    .update(champs)
+    .eq('id', id)
+    .select('id')
   if (error) return { error: messageLisible(error.message) }
+  // Une RLS qui refuse un UPDATE ne renvoie AUCUNE erreur : zéro ligne.
+  if (!ecrites?.length) return { error: REFUS_TRAME_AUTRUI }
 
-  revalidatePath('/journee')
+  revaliderTrames()
   return { success: true }
 }
 
@@ -221,21 +236,46 @@ export async function modifierTrame(id: string, saisie: SaisieTrame): Promise<Re
  *    changement de configuration.
  */
 export async function basculerTrame(id: string, actif: boolean): Promise<Resultat> {
-  const porte = await porteJournee()
+  const porte = await porteTrame()
   if (!porte.ok) return { error: porte.probleme }
   const { supabase } = porte
 
   if (!id) return { error: 'Ligne de trame introuvable.' }
 
-  const { error } = await supabase
+  const titulaire = await titulaireDeLaLigne(supabase, id)
+  if (!titulaire) return { error: 'Ligne de trame introuvable.' }
+  if (!peutEcrireTrame(porte, titulaire)) return { error: REFUS_TRAME_AUTRUI }
+
+  const { data: ecrites, error } = await supabase
     .from('trames_journee')
     .update({ actif, mis_a_jour_le: new Date().toISOString() })
     .eq('id', id)
+    .select('id')
 
   if (error) return { error: messageLisible(error.message) }
+  if (!ecrites?.length) return { error: REFUS_TRAME_AUTRUI }
 
-  revalidatePath('/journee')
+  revaliderTrames()
   return { success: true }
+}
+
+/** À qui appartient cette ligne ? `null` si elle n'existe pas dans ce cabinet. */
+async function titulaireDeLaLigne(
+  supabase: SupabaseClient<any, any, any>,
+  id: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from('trames_journee')
+    .select('veterinaire_id')
+    .eq('id', id)
+    .maybeSingle()
+  return (data as { veterinaire_id?: string } | null)?.veterinaire_id ?? null
+}
+
+/** Les écrans qui affichent les semaines types (B-175 : elles vivent dans Organisation). */
+function revaliderTrames() {
+  revalidatePath('/regles')
+  revalidatePath('/equipe')
 }
 
 /**

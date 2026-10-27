@@ -150,17 +150,26 @@ export async function queryCompteursJournee(
   supabase: SupabaseClient,
   dateDebut: string,
   dateFin: string,
+  /**
+   * B-175 — `true` : ne compter que les journées des plannings DIFFUSÉS
+   * (statut ≠ brouillon), comme le périmètre « validées seulement » des gardes
+   * dans Historique. Un brouillon peut encore changer.
+   */
+  seulementValide = false,
 ): Promise<{ parVeto: Map<string, CompteursJourneeRow>; erreur: string | null }> {
+  type Un<T> = T | T[] | null
   type PresenceAvecCreneau = {
     veterinaire_id: string
-    blocs_journee: { creneau: 'matin' | 'apres-midi' | 'journee' } | { creneau: 'matin' | 'apres-midi' | 'journee' }[] | null
+    blocs_journee: Un<{ creneau: 'matin' | 'apres-midi' | 'journee' }>
+    periodes?: Un<{ statut: string }>
   }
   const { lignes, erreur } = await lireTout<PresenceAvecCreneau>((de, a) =>
     supabase
       .from('presences_journee')
-      .select('veterinaire_id, blocs_journee(creneau)')
+      .select('veterinaire_id, blocs_journee(creneau), periodes(statut)')
       .gte('date', dateDebut)
       .lte('date', dateFin)
+      .order('id')
       .range(de, a),
   )
   if (erreur) return { parVeto: new Map(), erreur }
@@ -177,6 +186,10 @@ export async function queryCompteursJournee(
   for (const p of lignes) {
     const bloc = Array.isArray(p.blocs_journee) ? p.blocs_journee[0] : p.blocs_journee
     if (!bloc) continue
+    if (seulementValide) {
+      const periode = Array.isArray(p.periodes) ? p.periodes[0] : p.periodes
+      if (!periode || periode.statut === 'brouillon') continue
+    }
     const l = ligne(p.veterinaire_id)
     if (bloc.creneau === 'matin') l.matin++
     else if (bloc.creneau === 'apres-midi') l.apres_midi++

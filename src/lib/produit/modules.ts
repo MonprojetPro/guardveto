@@ -58,6 +58,19 @@ export const MODULES: Record<string, Module> = {
   },
 }
 
+/**
+ * B-175 — les modules que l'ADMIN d'un cabinet allume et éteint elle-même
+ * (Organisation, encart « Vos plannings »). Décision de MiKL, le 27/10 :
+ * « il faut que ce choix appartienne à l'admin ».
+ *
+ * ⚠️ PENDANT EN BASE : la fonction `basculer_module_cabinet` porte la MÊME
+ *    liste, en dur (migration 20261027120000). C'est elle qui fait autorité ;
+ *    celle-ci ne sert qu'à afficher. Les deux doivent bouger ensemble.
+ *    `gardes` n'y est pas (non éteignable tant que B-175a n'est pas fait),
+ *    `chat` non plus (aucun écran n'existe : l'allumer ouvrirait sur rien).
+ */
+export const MODULES_REGLABLES_PAR_ADMIN = ['planning-journee'] as const
+
 /** Les identifiants de modules connus. Toute autre valeur est une faute de frappe. */
 export type IdModule = keyof typeof MODULES
 
@@ -111,7 +124,14 @@ export const APPARTENANCE: Record<string, Appartenance> = {
 
   // ── Le module des gardes ────────────────────────────────────────────────
   planning: { module: 'gardes' },
-  regles: { module: 'gardes' },
+  // B-175 — Organisation porte l'encart « Vos plannings » (l'interrupteur des
+  // modules) et une partie par module : elle ne peut dépendre d'aucun d'eux,
+  // sinon éteindre un module fermerait la porte qui permet de le rallumer.
+  regles: {
+    socle:
+      'L’organisation du cabinet : l’interrupteur des modules et une partie par ' +
+      'module (gardes, journées), chacune n’apparaissant que si son module est allumé.',
+  },
   historique: { module: 'gardes' },
 }
 
