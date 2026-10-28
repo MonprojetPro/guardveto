@@ -30,7 +30,11 @@ import '@/styles/v2-regles.css'
 import '@/styles/regles-forces.css'
 import '@/styles/v2-journee.css'
 import '@/styles/v2-organisation.css'
-import { OrganisationParties, type PartieOrganisation } from '@/components/v2/OrganisationParties'
+import {
+  OrganisationParties,
+  type PartieOrganisation,
+  type ResumesPlannings,
+} from '@/components/v2/OrganisationParties'
 import { BlocsJournee } from '@/components/v2/BlocsJournee'
 import { ModuleEteint } from '@/components/v2/ModuleEteint'
 import { TramesJournee } from '@/components/v2/TramesJournee'
@@ -150,9 +154,23 @@ export default async function ReglesStructurePage({
   const partie: PartieOrganisation =
     journeeAllumee && (partieDemandee === 'journees' || !gardesAllumees) ? 'journees' : 'gardes'
 
+  // B-177 — la ligne de résumé de chaque tuile. Volontairement SANS chiffre :
+  // un « 12 règles » ici, compté autrement que l'onglet « Règles 14 » juste en
+  // dessous, mettrait deux vérités sur le même écran.
+  const resumes: ResumesPlannings = {
+    gardes: 'Soirs, nuits et week-ends : créneaux, enchaînements et règles',
+    journees: 'Présences en journée : tranches horaires et semaines types',
+  }
+
   if (partie === 'journees') {
     return (
-      <PartieJournees vet={vet} estAdmin={estAdmin} supabase={supabase} gardesAllumees={gardesAllumees} />
+      <PartieJournees
+        vet={vet}
+        estAdmin={estAdmin}
+        supabase={supabase}
+        gardesAllumees={gardesAllumees}
+        resumes={resumes}
+      />
     )
   }
 
@@ -166,7 +184,13 @@ export default async function ReglesStructurePage({
         <Satin />
         <div className="shell">
           <BarreV2 prenom={vet.prenom} estAdmin={estAdmin} dock={dockEteint} />
-          <OrganisationParties partie="gardes" estAdmin={estAdmin} journeeAllumee={false} gardesAllumees />
+          <OrganisationParties
+            partie="gardes"
+            estAdmin={estAdmin}
+            journeeAllumee={false}
+            gardesAllumees
+            resumes={resumes}
+          />
           <ModuleEteint module={MODULE_JOURNEE} estAdmin={estAdmin} />
         </div>
       </>
@@ -321,7 +345,13 @@ export default async function ReglesStructurePage({
       <Satin />
       <div className="shell">
         <BarreV2 prenom={vet.prenom} estAdmin={estAdmin} dock={dock} />
-        <OrganisationParties partie="gardes" estAdmin={estAdmin} journeeAllumee={journeeAllumee} gardesAllumees />
+        <OrganisationParties
+          partie="gardes"
+          estAdmin={estAdmin}
+          journeeAllumee={journeeAllumee}
+          gardesAllumees
+          resumes={resumes}
+        />
         <ReglesStructureV2
           estAdmin={estAdmin}
           ongletInitial={onglet}
@@ -360,11 +390,13 @@ async function PartieJournees({
   estAdmin,
   supabase,
   gardesAllumees,
+  resumes,
 }: {
   vet: Veterinaire
   estAdmin: boolean
   supabase: Awaited<ReturnType<typeof createClient>>
   gardesAllumees: boolean
+  resumes: ResumesPlannings
 }) {
   // La RLS borne au cabinet (policy RESTRICTIVE). On lit TOUT, actif ou non :
   // l'écran range lui-même les lignes retirées, et les masquer ici rendrait la
@@ -402,6 +434,7 @@ async function PartieJournees({
           estAdmin={estAdmin}
           journeeAllumee
           gardesAllumees={gardesAllumees}
+          resumes={resumes}
         />
         <div className="page-head rise">
           <div>

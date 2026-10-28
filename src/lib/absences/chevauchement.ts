@@ -137,3 +137,91 @@ function phraseChevauchement(
   if (pa === pb) return `${base}.`
   return `${base}, avec deux périmètres différents : « ${LIBELLE_PERIMETRE[pa]} » et « ${LIBELLE_PERIMETRE[pb]} ».`
 }
+
+// ── B-175i — UNE LIGNE PAR GROUPE, PAS PAR PAIRE ────────────────────────────
+//
+// MiKL, capture du 28/10 : trois absences de Jean le 26/10 produisaient trois
+// lignes presque identiques (« une absence et une absence se recouvrent… »).
+// `chevauchements` raisonne par PAIRE, c'est juste pour détecter ; pour le
+// DIRE, on regroupe les lignes d'une personne qui se recouvrent de proche en
+// proche, et on fait une seule phrase par groupe.
+
+/** Un groupe d'indisponibilités d'une même personne qui se recouvrent. */
+export interface GroupeChevauchement {
+  veterinaire_id: string
+  /** Toutes les lignes du groupe, dans l'ordre d'arrivée. */
+  ids: string[]
+  /** Du premier au dernier jour réellement en double dans le groupe. */
+  date_debut: string
+  date_fin: string
+  perimetresDifferents: boolean
+  /** Déjà en français, affichable tel quel. */
+  phrase: string
+}
+
+function compter(n: number, un: string, plusieurs: string): string {
+  return n === 1 ? un : `${n} ${plusieurs}`
+}
+
+export function regrouperChevauchements(
+  lignes: readonly IndisponibilitePourChevauchement[],
+): GroupeChevauchement[] {
+  const paires = chevauchements(lignes)
+  if (paires.length === 0) return []
+
+  const parId = new Map(lignes.map((l) => [l.id, l]))
+  // Union-find minimal : chaque paire relie ses deux lignes.
+  const parent = new Map<string, string>()
+  const racine = (id: string): string => {
+    let r = id
+    while (parent.get(r) && parent.get(r) !== r) r = parent.get(r)!
+    return r
+  }
+  for (const p of paires) {
+    for (const id of p.ids) if (!parent.has(id)) parent.set(id, id)
+    const [a, b] = p.ids.map(racine)
+    if (a !== b) parent.set(b, a)
+  }
+
+  const groupes = new Map<string, { ids: string[]; debut: string; fin: string }>()
+  for (const p of paires) {
+    const r = racine(p.ids[0])
+    const g = groupes.get(r) ?? { ids: [], debut: p.date_debut, fin: p.date_fin }
+    if (p.date_debut < g.debut) g.debut = p.date_debut
+    if (p.date_fin > g.fin) g.fin = p.date_fin
+    groupes.set(r, g)
+  }
+  // Les identifiants, dans l'ordre d'arrivée des lignes.
+  for (const l of lignes) {
+    if (!parent.has(l.id)) continue
+    groupes.get(racine(l.id))?.ids.push(l.id)
+  }
+
+  return [...groupes.values()].map((g) => {
+    const membres = g.ids.map((id) => parId.get(id)!)
+    const nbConges = membres.filter((m) => m.origine === 'conge').length
+    const nbAbsences = membres.length - nbConges
+    const qui = [
+      nbConges > 0 ? compter(nbConges, 'un congé', 'congés') : null,
+      nbAbsences > 0 ? compter(nbAbsences, 'une absence', 'absences') : null,
+    ]
+      .filter(Boolean)
+      .join(' et ')
+    const perimetres = [...new Set(membres.map((m) => lirePerimetre(m.perimetre)))]
+    const base = `${qui} se recouvrent ${periodeFr(g.debut, g.fin)}`
+    const phrase =
+      perimetres.length > 1
+        ? `${base}, avec des périmètres différents : ${perimetres
+            .map((p) => `« ${LIBELLE_PERIMETRE[p]} »`)
+            .join(', ')}.`
+        : `${base}.`
+    return {
+      veterinaire_id: membres[0].veterinaire_id,
+      ids: g.ids,
+      date_debut: g.debut,
+      date_fin: g.fin,
+      perimetresDifferents: perimetres.length > 1,
+      phrase,
+    }
+  })
+}

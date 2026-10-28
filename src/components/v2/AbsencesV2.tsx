@@ -32,7 +32,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { CongeForm } from '@/components/conges/CongeForm'
 import { PastillePerimetre } from '@/components/absences/ChoixPerimetre'
-import { chevauchements } from '@/lib/absences/chevauchement'
+import { regrouperChevauchements } from '@/lib/absences/chevauchement'
 import { deleteConge } from '@/app/(protected)/conges/actions'
 import { ValiderCongeDialog } from '@/components/conges/ValiderCongeDialog'
 import { RefuserCongeDialog } from '@/components/conges/RefuserCongeDialog'
@@ -367,7 +367,7 @@ export function AbsencesV2({
    */
   const doublons = useMemo(
     () =>
-      chevauchements([
+      regrouperChevauchements([
         ...conges
           .filter((c) => c.statut === 'valide')
           .map((c) => ({
@@ -473,7 +473,7 @@ export function AbsencesV2({
     <>
       <div className="page-head">
         <div>
-          <h1>Absences &amp; échanges</h1>
+          <h1>{gardesActives ? <>Absences &amp; échanges</> : 'Absences'}</h1>
         </div>
       </div>
 
@@ -482,6 +482,7 @@ export function AbsencesV2({
           seul respire mieux depuis qu'il a grandi. Même rangée, donc même
           hauteur de regard que le choix d'onglet. */}
       <div className="abs-barre">
+      {gardesActives ? (
       <nav className="tabs" role="tablist" aria-label="Sections d'Absences et échanges">
         <button
           type="button"
@@ -517,6 +518,11 @@ export function AbsencesV2({
           </>
         )}
       </nav>
+      ) : (
+        // B-175i — sans gardes, il ne resterait qu'un onglet : une rangée à un
+        // seul choix est un bouton qui ne fait rien. On garde la place à gauche.
+        <span aria-hidden="true" />
+      )}
 
         <div className="page-actions">
           <button type="button" className="btn btn-outline" onClick={() => setCreerOuvert(true)}>

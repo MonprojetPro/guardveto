@@ -43,6 +43,10 @@ import {
   modifierTrame,
   basculerTrame,
 } from '@/app/(v2)/journee/trames-actions'
+// B-175h (28/10) — le composant charge SES styles. Il les tenait de l'ancienne
+// page `/journee` ; devenue une redirection, la fenêtre « Ses présences » de
+// l'écran Équipe s'est affichée sans aucune mise en page.
+import '@/styles/v2-journee.css'
 
 interface Props {
   trames: TrameJournee[]
