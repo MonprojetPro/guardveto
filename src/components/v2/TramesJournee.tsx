@@ -271,33 +271,10 @@ export function TramesJournee({ trames, blocs, equipe, limiterA, pourMoi }: Prop
             : 'Pour chacun, les jours où il est là d’habitude. Vous décrivez la règle une fois ; elle servira à remplir le planning sans tout ressaisir.'}
         </p>
 
-        {/* ⚠️ PHRASE CORRIGÉE AU LOT 2 (06/10), ET C'EST LA RÈGLE DU PROJET QUI
-            L'EXIGEAIT. Elle disait « ces règles ne remplissent pas encore le
-            planning » — vrai au lot 1, FAUX depuis qu'un geste les applique
-            (`AppliquerTrames`, juste en dessous). La question à se poser quand
-            une capacité apparaît n'est pas « faut-il un écran ? » mais « une
-            phrase déjà affichée devient-elle fausse ? ».
-
-            ⚠️ CORRIGÉE UNE SECONDE FOIS LE MÊME JOUR (B-148). Elle disait « le
-            geste en dessous » — vrai pendant deux heures, faux dès que MiKL a
-            renvoyé ce geste sur l'écran Planning, à sa vraie place. Une phrase
-            qui désigne un VOISIN est fragile par nature : elle ment dès que le
-            voisin déménage, et rien ne la suit.
-
-            Ce qu'elle doit continuer à dire, en revanche, reste vrai et compte
-            autant : enregistrer une règle ne pose TOUJOURS rien par lui-même.
-            C'est la décision ⑤ du cadrage V3 — sans quoi l'admin perdrait ses
-            retouches en corrigeant une faute de frappe. */}
-        <p className="tj-avis" role="status">
-          <span className="tj-avis-icone" aria-hidden="true">
-            !
-          </span>
-          <span>
-            Enregistrer une règle ne pose aucune présence et ne change aucune journée déjà prévue.
-            C’est depuis l’écran <b>Planning</b>, avec le bouton <b>Générer</b>, que ces règles
-            remplissent réellement un planning.
-          </span>
-        </p>
+        {/* B-175 (28/10) — l'avis « Enregistrer une règle ne pose aucune
+            présence… » est retiré sur demande de MiKL (« inutile, supprime »).
+            La phrase d'introduction juste au-dessus dit déjà que la règle sert
+            à remplir le planning, pas qu'elle le remplit. */}
 
         {refus && (
           <div className="tj-refus" role="alert">
