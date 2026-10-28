@@ -78,6 +78,10 @@ export interface PeriodeFiltre {
 }
 
 interface Props {
+  /** B-176 — onglet demandé par l'adresse (`?onglet=`). Inconnu ou interdit : Congés. */
+  ongletInitial?: string
+  /** B-176 — garde à proposer à l'échange (`?proposer=`), depuis le planning. */
+  gardeAProposer?: string
   conges: Conge[]
   vets: Veterinaire[]
   moiId: string
@@ -107,6 +111,12 @@ interface Props {
    * choix de perimetre d'une absence propose « matin » et « apres-midi ».
    */
   moduleJourneeActif: boolean
+  /**
+   * B-175a — le cabinet tient-il des gardes ? Sans elles : pas d'onglet
+   * Échanges ni Dépannages, et pas de verdict « aucune garde prévue » (il
+   * aurait l'air d'un contrôle alors qu'il n'y a rien à contrôler).
+   */
+  gardesActives: boolean
   /**
    * B-160a ③ — les absences ACTIVES du cabinet, pour reperer un doublon avec un
    * conge sur les memes dates.
@@ -273,10 +283,17 @@ export function AbsencesV2({
   depannages,
   statsDepannages,
   moduleJourneeActif,
+  gardesActives,
   absencesActives,
+  ongletInitial,
+  gardeAProposer,
 }: Props) {
   const router = useRouter()
-  const [onglet, setOnglet] = useState<Onglet>('conges')
+  const [onglet, setOnglet] = useState<Onglet>(() =>
+    gardesActives && (ongletInitial === 'echanges' || (ongletInitial === 'depannages' && isAdmin))
+      ? ongletInitial
+      : 'conges',
+  )
   const [creerOuvert, setCreerOuvert] = useState(false)
   const [criseOuverte, setCriseOuverte] = useState(false)
   const [aValider, setAValider] = useState<Conge | null>(null)
@@ -474,26 +491,30 @@ export function AbsencesV2({
         >
           Congés {souhaits.length > 0 && <span className="count">{souhaits.length}</span>}
         </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={onglet === 'echanges'}
-          onClick={() => setOnglet('echanges')}
-        >
-          Échanges de gardes {echangesAAgir > 0 && <span className="count">{echangesAAgir}</span>}
-        </button>
-        {isAdmin && (
+        {gardesActives && (
+          <>
           <button
             type="button"
             role="tab"
-            aria-selected={onglet === 'depannages'}
-            onClick={() => setOnglet('depannages')}
+            aria-selected={onglet === 'echanges'}
+            onClick={() => setOnglet('echanges')}
           >
-            Dépannages{' '}
-            {statsDepannages.ouvertes > 0 && (
-              <span className="count">{statsDepannages.ouvertes}</span>
-            )}
+            Échanges de gardes {echangesAAgir > 0 && <span className="count">{echangesAAgir}</span>}
           </button>
+          {isAdmin && (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={onglet === 'depannages'}
+              onClick={() => setOnglet('depannages')}
+            >
+              Dépannages{' '}
+              {statsDepannages.ouvertes > 0 && (
+                <span className="count">{statsDepannages.ouvertes}</span>
+              )}
+            </button>
+          )}
+          </>
         )}
       </nav>
 
@@ -652,7 +673,7 @@ export function AbsencesV2({
                             )}
                           </div>
                           <div className="row-side">
-                            <VerdictConflit verdict={verdicts[c.id]} />
+                            {gardesActives && <VerdictConflit verdict={verdicts[c.id]} />}
                             <div className="row-actions">
                               <button
                                 type="button"
@@ -946,6 +967,7 @@ export function AbsencesV2({
             echanges={echanges}
             gardesFutures={gardesFutures}
             vets={vetsEchange}
+            gardePreselectionnee={gardeAProposer}
           />
         </section>
       )}

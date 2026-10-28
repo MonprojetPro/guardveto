@@ -82,6 +82,12 @@ interface Props {
    * n'existe pas. Un tableau (même de zéros) : module allumé.
    */
   journees?: LigneJournees[] | null
+  /**
+   * B-175a — le cabinet tient-il des gardes ? Sans elles, l'écran ne montre
+   * que le compteur des journées : des cartes de week-ends à zéro se liraient
+   * « personne n'a de garde », pas « ce cabinet n'en a pas ».
+   */
+  gardesActives?: boolean
   erreurJournees?: string | null
 
   /** Rendus côté serveur par la page (le bilan porte sa propre carte V2). */
@@ -147,6 +153,7 @@ export function HistoriqueV2({
   slotBilan,
   slotFetes,
   journees = null,
+  gardesActives = true,
   erreurJournees = null,
 }: Props) {
   const router = useRouter()
@@ -220,7 +227,7 @@ export function HistoriqueV2({
             <Link href="/planning" className="hist-vers-planning">
               Créer un planning →
             </Link>
-            {imp.bouton}
+            {gardesActives && imp.bouton}
           </div>
         )}
       </div>
@@ -363,7 +370,7 @@ export function HistoriqueV2({
             disabled={enCours}
             onClick={() => changerPerimetre('valide')}
           >
-            Gardes validées seulement
+            {gardesActives ? 'Gardes validées seulement' : 'Validées seulement'}
           </button>
         </div>
 
@@ -378,6 +385,8 @@ export function HistoriqueV2({
         </p>
       </div>
 
+      {gardesActives && (
+        <>
       {/* ── Les cartes de compteurs ──────────────────────────────────── */}
       {erreurLecture ? (
         /* « Je n'ai pas pu compter » — surtout pas un tableau à zéro, qui se
@@ -629,6 +638,8 @@ export function HistoriqueV2({
           </section>
         </div>
       )}
+        </>
+      )}
 
       {/* ── B-175 — le compteur des journées ─────────────────────────
           HORS de la grille des gardes, exprès : un cabinet dont le filtre ne
@@ -688,10 +699,10 @@ export function HistoriqueV2({
           Plus une greffe : le composant porte désormais sa propre carte V2
           (`.card.count-card`). Pas de `.v2-greffe` ici, sinon carte dans
           carte — le cadre d'accueil ne sert qu'aux composants restés V1. */}
-      {slotBilan && <div className="hist-greffe rise">{slotBilan}</div>}
+      {gardesActives && slotBilan && <div className="hist-greffe rise">{slotBilan}</div>}
 
       {/* ── Historique des fêtes (composant V1 greffé) ───────────────── */}
-      {slotFetes && <div className="hist-greffe v2-greffe rise">{slotFetes}</div>}
+      {gardesActives && slotFetes && <div className="hist-greffe v2-greffe rise">{slotFetes}</div>}
 
       {/* L'encart « Périodes planifiées » vivait ici. Il faisait doublon avec
           le menu de la barre de filtres (choisir une période) et portait des
@@ -701,7 +712,7 @@ export function HistoriqueV2({
           (Retiré le 2026-08-19, demande de MiKL.) */}
 
       {/* ── Compteurs cumulés ────────────────────────────────────────── */}
-      {cumul.length > 0 && (
+      {gardesActives && cumul.length > 0 && (
         <section className="card rise" aria-label="Compteurs cumulés sur toutes les périodes validées">
           <div className="card-head">
             <div>

@@ -133,7 +133,7 @@ async function moduleAllume(ctx: ContexteOutil): Promise<boolean> {
 }
 
 const REFUS_MODULE =
-  "Ce cabinet n'a pas le planning de la journée. Il s'active dans les réglages, module par module."
+  "Ce cabinet n'a pas le planning de la journée. L'administratrice l'allume dans Organisation, encart « Vos plannings »."
 
 /** Comparaison de noms indulgente : accents, casse et ponctuation ignorés.
  *  Repris mot pour mot de `conges.ts` — un troisième dialecte de comparaison

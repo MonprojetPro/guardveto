@@ -47,6 +47,11 @@ interface Props {
   echanges: EchangeRow[]
   gardesFutures: GardeLite[]
   vets: VetLite[]
+  /**
+   * B-176 — garde choisie depuis le planning (« Proposer un échange »). La
+   * fenêtre s'ouvre dessus. Ignorée si ce n'est pas une garde future à moi.
+   */
+  gardePreselectionnee?: string
 }
 
 // ── Mise en forme des dates et des libellés ───────────────
@@ -115,10 +120,15 @@ const LIBELLE_STATUT: Record<EchangeRow['statut'], { texte: string; classe: stri
 
 // ── Composant principal ───────────────────────────────────
 
-export function EchangesV2({ moiId, isAdmin, echanges, gardesFutures, vets }: Props) {
+export function EchangesV2({ moiId, isAdmin, echanges, gardesFutures, vets, gardePreselectionnee }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [proposerOuvert, setProposerOuvert] = useState(false)
+  const gardeDepart = gardesFutures.some(
+    (g) => g.id === gardePreselectionnee && (g.premier_id === moiId || g.second_id === moiId),
+  )
+    ? gardePreselectionnee
+    : undefined
+  const [proposerOuvert, setProposerOuvert] = useState(Boolean(gardeDepart))
   const [refusEnCours, setRefusEnCours] = useState<{ id: string; admin: boolean } | null>(null)
   const [motifRefus, setMotifRefus] = useState('')
   const [annulationEnCours, setAnnulationEnCours] = useState<string | null>(null)
@@ -492,6 +502,7 @@ export function EchangesV2({ moiId, isAdmin, echanges, gardesFutures, vets }: Pr
         moiId={moiId}
         gardesFutures={gardesFutures}
         vets={vets}
+        gardeDepart={gardeDepart}
         onDone={() => { setProposerOuvert(false); router.refresh() }}
       />
 
@@ -605,12 +616,13 @@ interface ProposerProps {
   moiId: string
   gardesFutures: GardeLite[]
   vets: VetLite[]
+  gardeDepart?: string
   onDone: () => void
 }
 
-function ProposerEchangeDialog({ open, onClose, moiId, gardesFutures, vets, onDone }: ProposerProps) {
+function ProposerEchangeDialog({ open, onClose, moiId, gardesFutures, vets, gardeDepart, onDone }: ProposerProps) {
   const [isPending, startTransition] = useTransition()
-  const [gardeId, setGardeId] = useState('')
+  const [gardeId, setGardeId] = useState(gardeDepart ?? '')
   const [aTous, setATous] = useState(false)
   const [cibleId, setCibleId] = useState('')
   const [avecContrepartie, setAvecContrepartie] = useState(false)

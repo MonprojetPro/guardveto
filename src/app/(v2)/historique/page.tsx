@@ -370,7 +370,9 @@ export default async function HistoriquePage({
   // disparaît du tableau » que pour les gardes.
   let journees: LigneJournees[] | null = null
   let erreurJournees: string | null = null
-  if ((await modulesDuCabinet(supabase)).includes(MODULE_JOURNEE)) {
+  const modulesCabinet = await modulesDuCabinet(supabase)
+  const gardesActives = modulesCabinet.includes('gardes')
+  if (modulesCabinet.includes(MODULE_JOURNEE)) {
     const res = await queryCompteursJournee(supabase, debut, fin, perimetre === 'valide')
     erreurJournees = res.erreur
     journees = vetsActifs
@@ -424,6 +426,7 @@ export default async function HistoriquePage({
           cumul={cumul}
           cumulResume={cumulResume}
           journees={journees}
+          gardesActives={gardesActives}
           erreurJournees={erreurJournees}
           slotBilan={
             afficherBilan ? (

@@ -140,6 +140,8 @@ function anciennete(iso: string) {
 export function Epicentre({ data }: { data: DonneesAccueil }) {
   const router = useRouter()
   const [ouverte, setOuverte] = useState<Fenetre | null>(null)
+  // B-175a — le cabinet tient-il des gardes ? (« journées seules » sinon)
+  const aGardes = data.dock.modules.includes('gardes')
   const [heure, setHeure] = useState('--:--')
   // Ce que Filou a compris et pose sur le tableau. Conservé après fermeture :
   // rouvrir ne doit pas ressusciter une décision déjà prise, donc on l'efface
@@ -390,7 +392,8 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
                     <span className="w-body">
                       <h3>Créer le premier planning</h3>
                       <p>
-                        L&apos;équipe et les règles sont prêtes — il ne manque que les gardes
+                        L&apos;équipe et les règles sont prêtes — il ne manque que{' '}
+                        {aGardes ? 'les gardes' : 'les journées'}
                       </p>
                     </span>
                     <span className="w-go" aria-hidden="true">
@@ -399,7 +402,25 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
                   </Link>
                 )}
 
-                <FicheCeSoir garde={data.ceSoir} onOpen={() => ouvrir('cesoir')} />
+                {/* B-175a — un cabinet « journées seules » n'a pas de garde ce
+                    soir : annoncer « personne d'enregistré » serait faux. On
+                    mène à la journée d'aujourd'hui, sur le planning. */}
+                {aGardes ? (
+                  <FicheCeSoir garde={data.ceSoir} onOpen={() => ouvrir('cesoir')} />
+                ) : (
+                  <Link className="widget" href="/planning">
+                    <span className="w-ico" aria-hidden="true">
+                      ☀️
+                    </span>
+                    <span className="w-body">
+                      <h3>La journée d&apos;aujourd&apos;hui</h3>
+                      <p>Qui est au cabinet, matin et après-midi</p>
+                    </span>
+                    <span className="w-go" aria-hidden="true">
+                      →
+                    </span>
+                  </Link>
+                )}
 
                 {data.estAdmin && nbSouhaits > 0 && (
                   <button type="button" className="widget" onClick={() => ouvrir('souhaits')}>
@@ -442,7 +463,10 @@ export function Epicentre({ data }: { data: DonneesAccueil }) {
                   </button>
                 )}
 
-                {data.estAdmin && (
+                {/* La relecture vérifie les règles des GARDES : sans gardes,
+                    « Rien à vérifier » serait une phrase rassurante sur un
+                    angle mort. */}
+                {data.estAdmin && aGardes && (
                   <FicheCoherence verdict={verdict} onOpen={() => ouvrir('coherence')} />
                 )}
 
@@ -946,12 +970,15 @@ function MotDAccueil({ data }: { data: DonneesAccueil }) {
               Le cabinet est en place — {data.dock.nbVetos} vétérinaire
               {data.dock.nbVetos > 1 ? 's' : ''} et leurs règles m’attendent. Il ne manque
               que le premier planning : va sur <Link href="/planning">Planning</Link> et
-              clique sur « Générer », je t’accompagne pas à pas.
+              clique sur{' '}
+              {data.dock.modules.includes('gardes') ? '« Générer »' : '« Remplir »'}, je
+              t’accompagne pas à pas.
             </>
           ) : (
             <>
-              Aucun planning n’est encore publié. Dès qu’il le sera, tu verras ici tes gardes
-              à venir — et je te préviendrai.
+              Aucun planning n’est encore publié. Dès qu’il le sera, tu verras ici{' '}
+              {data.dock.modules.includes('gardes') ? 'tes gardes' : 'tes journées'} à venir — et
+              je te préviendrai.
             </>
           )}
         </div>
@@ -960,7 +987,9 @@ function MotDAccueil({ data }: { data: DonneesAccueil }) {
   }
 
   const nomsCeSoir = data.ceSoir ? prenomsDe(data.ceSoir) : []
-  if (nomsCeSoir.length > 0) {
+  if (!data.dock.modules.includes('gardes')) {
+    // B-175a — cabinet « journées seules » : aucune phrase sur la garde du soir.
+  } else if (nomsCeSoir.length > 0) {
     // L'accord suit le NOMBRE DE NOMS, pas la presence d'un second : une garde
     // ou seule la 2e place est pourvue existe, et « Jean sont de garde » aussi.
     phrases.push(

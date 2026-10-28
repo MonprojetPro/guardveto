@@ -44,8 +44,9 @@ droits différents pour une administratrice et pour un vétérinaire.
 | Connexion sécurisée par cabinet, avec rôles distincts administratrice / vétérinaire | 🟢 Livré | 2026-08 `[B-001, B-002, B-004]` |
 | Un cabinet de démonstration (bac à sable), entièrement séparé du cabinet réel et marqué visuellement comme tel | 🟢 Livré | 2026-08-31 `[B-090, B-091]` |
 | Un cabinet peut activer ou désactiver certains modules optionnels (ex. le planning des présences de journée) | 🟡 En cours | 2026-10-01 `[B-120a]` |
-| L'administratrice choisit elle-même, dans Organisation, si son cabinet utilise aussi le planning de la journée — l'écran est prêt, il attend un réglage de la base à appliquer par MonProjetPro | 🟡 En cours | 2026-10-27 `[B-175, B-175d]` |
-| Un cabinet qui n'utilise QUE le planning de la journée, sans gardes | ⚪ À faire | — `[B-175a]` |
+| L'administratrice choisit elle-même, dans Organisation, si son cabinet utilise aussi le planning de la journée | 🟢 Livré | 2026-10-28 `[B-175, B-175d]` |
+| Un cabinet qui n'utilise QUE le planning de la journée, sans gardes : l'administratrice décoche les gardes, et chaque écran (accueil, planning, organisation, historique, équipe, absences, Filou) s'adapte — prêt côté écran, en attente d'un réglage de la base | 🟡 En cours | 2026-10-28 `[B-175a, B-175e]` |
+| L'ancienne version de l'interface (V1) est entièrement retirée ; ses anciennes adresses mènent aux écrans actuels | 🟢 Livré | 2026-10-28 `[B-176]` |
 | Un rôle "secrétariat" en lecture seule est prévu mais mis en pause, en attendant un autre chantier de sécurité | 🔵 À qualifier | — (gelé) |
 
 ---
@@ -101,7 +102,7 @@ journée, avec son propre parcours de création et d'affichage.
 | Décider qui voit les horaires de présence de chacun (toute l'équipe, ou seulement l'intéressé et l'administratrice) | 🔵 À qualifier | — `[B-150b]` |
 | Le document PDF imprimé pour le secrétariat ne reprend pas encore les présences de journée | ⚪ À faire | — `[B-150a]` |
 | Les réglages des journées (tranches horaires, semaines types) se trouvent dans Organisation, à côté de ceux des gardes, au lieu d'un onglet à part | 🟢 Livré, à recetter | 2026-10-27 `[B-175]` |
-| Chaque vétérinaire remplit lui-même sa semaine type ; l'administratrice garde la main sur tout le reste — prêt côté écran, en attente du même réglage de la base | 🟡 En cours | 2026-10-27 `[B-175b, B-175d]` |
+| Chaque vétérinaire remplit lui-même sa semaine type ; l'administratrice garde la main sur tout le reste | 🟢 Livré, à recetter | 2026-10-28 `[B-175b, B-175d]` |
 
 ---
 

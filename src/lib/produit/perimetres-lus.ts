@@ -145,14 +145,6 @@ export const PERIMETRES_LUS: Record<string, DecisionPerimetre> = {
 
   // ── CEUX QUI AFFICHENT : la moitié visible de l’option A ──────────────────
 
-  'app/(protected)/conges/page.tsx': {
-    perimetre: 'affiche',
-    note: 'Passe le périmètre au détecteur de conflit, et `CongesList` le montre.',
-  },
-  'app/(protected)/admin/demandes/page.tsx': {
-    perimetre: 'affiche',
-    note: 'Même chose sur la file des demandes à traiter.',
-  },
   'app/(v2)/absences/page.tsx': {
     perimetre: 'affiche',
     note: 'Passe le périmètre au verdict de conflit ; `AbsencesV2` pose la pastille.',
@@ -172,11 +164,6 @@ export const PERIMETRES_LUS: Record<string, DecisionPerimetre> = {
 
   // ── CEUX QUE ÇA NE CONCERNE PAS, ET POURQUOI ─────────────────────────────
 
-  'app/(protected)/layout.tsx': {
-    hors:
-      'Compte les souhaits EN ATTENTE pour un badge. Un souhait non tranché '
-      + 'attend une décision quel que soit son périmètre.',
-  },
   'data/v2/dock.ts': {
     hors: 'Même décompte de souhaits en attente, pour le dock.',
   },

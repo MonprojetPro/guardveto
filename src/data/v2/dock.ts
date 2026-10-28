@@ -60,13 +60,17 @@ export async function chargerDock(
   // Sans ce tri, la barre affichait « Historique été 2026 · Brouillon » à un
   // véto — soit l'existence ET l'état d'avancement d'un planning qu'il n'était
   // pas censé connaître. Le critère est `publie_at`, jamais le statut.
+  // B-175a — un cabinet « journées seules » n'a QUE des périodes de journées :
+  // le filtre ci-dessous lui retirerait tout, et la pastille dirait « Aucune
+  // période » sur un planning bien réel.
+  const aGardes = (modules as string[]).includes('gardes')
   // B-162 — une période « journées » pure (créée par « Dates libres ») n'a
   // jamais de garde : elle ne doit jamais devancer un vrai planning de gardes
   // dans la pastille « planning courant », affichée sur TOUS les écrans V2.
   const periodes = periodesVisibles(
     ((periodesRes as { data?: Periode[] | null })?.data ?? []) as Periode[],
     estAdmin,
-  ).filter((p) => periodePorteDesGardes(p.usage))
+  ).filter((p) => !aGardes || periodePorteDesGardes(p.usage))
   const courante =
     periodes.find((p) => p.date_debut <= today && p.date_fin >= today) ??
     [...periodes].reverse().find((p) => p.date_debut > today) ??

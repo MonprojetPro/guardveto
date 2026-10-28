@@ -36,6 +36,7 @@ import { ModuleEteint } from '@/components/v2/ModuleEteint'
 import { TramesJournee } from '@/components/v2/TramesJournee'
 import { modulesDuCabinet } from '@/lib/produit/modules-serveur'
 import { MODULE_JOURNEE } from '@/lib/journee/porte'
+import { MODULE_SOCLE } from '@/lib/produit/modules'
 import { plageLisible } from '@/lib/journee/blocs'
 import type { BlocJournee, TrameJournee } from '@/types'
 import { Satin } from '@/components/v2/Satin'
@@ -143,11 +144,16 @@ export default async function ReglesStructurePage({
   // les gardes au lieu d'afficher une partie vide.
   const modules = await modulesDuCabinet(supabase)
   const journeeAllumee = modules.includes(MODULE_JOURNEE)
+  // B-175a (28/10) — un cabinet « journées seules » n'a pas de partie Gardes :
+  // il ouvre directement sur les journées, quelle que soit l'adresse.
+  const gardesAllumees = modules.includes(MODULE_SOCLE)
   const partie: PartieOrganisation =
-    partieDemandee === 'journees' && journeeAllumee ? 'journees' : 'gardes'
+    journeeAllumee && (partieDemandee === 'journees' || !gardesAllumees) ? 'journees' : 'gardes'
 
   if (partie === 'journees') {
-    return <PartieJournees vet={vet} estAdmin={estAdmin} supabase={supabase} />
+    return (
+      <PartieJournees vet={vet} estAdmin={estAdmin} supabase={supabase} gardesAllumees={gardesAllumees} />
+    )
   }
 
   // On a demandé les journées (ancien lien /journee, favori) sur un cabinet où
@@ -160,7 +166,7 @@ export default async function ReglesStructurePage({
         <Satin />
         <div className="shell">
           <BarreV2 prenom={vet.prenom} estAdmin={estAdmin} dock={dockEteint} />
-          <OrganisationParties partie="gardes" estAdmin={estAdmin} journeeAllumee={false} />
+          <OrganisationParties partie="gardes" estAdmin={estAdmin} journeeAllumee={false} gardesAllumees />
           <ModuleEteint module={MODULE_JOURNEE} estAdmin={estAdmin} />
         </div>
       </>
@@ -315,7 +321,7 @@ export default async function ReglesStructurePage({
       <Satin />
       <div className="shell">
         <BarreV2 prenom={vet.prenom} estAdmin={estAdmin} dock={dock} />
-        <OrganisationParties partie="gardes" estAdmin={estAdmin} journeeAllumee={journeeAllumee} />
+        <OrganisationParties partie="gardes" estAdmin={estAdmin} journeeAllumee={journeeAllumee} gardesAllumees />
         <ReglesStructureV2
           estAdmin={estAdmin}
           ongletInitial={onglet}
@@ -353,10 +359,12 @@ async function PartieJournees({
   vet,
   estAdmin,
   supabase,
+  gardesAllumees,
 }: {
   vet: Veterinaire
   estAdmin: boolean
   supabase: Awaited<ReturnType<typeof createClient>>
+  gardesAllumees: boolean
 }) {
   // La RLS borne au cabinet (policy RESTRICTIVE). On lit TOUT, actif ou non :
   // l'écran range lui-même les lignes retirées, et les masquer ici rendrait la
@@ -389,7 +397,12 @@ async function PartieJournees({
       <Satin />
       <div className="shell">
         <BarreV2 prenom={vet.prenom} estAdmin={estAdmin} dock={dock} />
-        <OrganisationParties partie="journees" estAdmin={estAdmin} journeeAllumee />
+        <OrganisationParties
+          partie="journees"
+          estAdmin={estAdmin}
+          journeeAllumee
+          gardesAllumees={gardesAllumees}
+        />
         <div className="page-head rise">
           <div>
             <h1>Organisation des journées</h1>

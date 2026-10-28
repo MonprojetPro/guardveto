@@ -24,6 +24,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { exigerModule, ModuleEteintError } from '@/lib/produit/modules-serveur'
 import { genererPlanningPur, genererSteps } from '@/engine/solver'
 // B-111 — pour dire ce que les cadenas de l'admin ont (ou n'ont pas) protege.
 import { figeesSansPlace, indexerFigees } from '@/engine/figees'
@@ -92,6 +93,17 @@ export async function POST(req: NextRequest) {
       { error: 'Cabinet non configuré pour cet utilisateur (app_metadata.cabinet_id manquant).' },
       { status: 403 }
     )
+  }
+
+  // ── B-175a — un cabinet « journées seules » ne génère pas de gardes ──
+  // Le bouton « Générer » n'y est pas affiché ; ce refus ferme l'URL.
+  try {
+    await exigerModule(supabase, 'gardes')
+  } catch (e) {
+    if (e instanceof ModuleEteintError) {
+      return NextResponse.json({ error: e.message }, { status: 403 })
+    }
+    throw e
   }
 
   // ── Validation du corps ─────────────────────────────────

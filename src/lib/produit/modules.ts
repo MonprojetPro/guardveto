@@ -30,11 +30,18 @@ export interface Module {
   nom: string
   /** Ce que le cabinet perd s'il est eteint. Une phrase, pas un paragraphe. */
   description: string
-  /** `false` pour le socle : l'eteindre laisserait un compte muet. */
+  /** `false` si l'eteindre laisserait un compte muet. */
   eteignable: boolean
 }
 
-/** Le module sans lequel GuardVeto n'est plus GuardVeto. */
+/**
+ * Le module historique, et le REPLI quand la liste d'un cabinet ne peut pas
+ * etre lue (repli fermant : l'ecran que le cabinet a toujours eu).
+ *
+ * B-175a (28/10) : il n'est plus « non eteignable ». Un cabinet peut ne tenir
+ * que le planning de la journee ; la base refuse seulement qu'il n'en garde
+ * AUCUN (contrainte `cardinality(modules_actifs) >= 1`).
+ */
 export const MODULE_SOCLE = 'gardes' as const
 
 export const MODULES: Record<string, Module> = {
@@ -42,7 +49,7 @@ export const MODULES: Record<string, Module> = {
     nom: 'Gardes du soir et du week-end',
     description:
       'Le cœur historique : generation, publication et suivi du planning de gardes.',
-    eteignable: false,
+    eteignable: true,
   },
   'planning-journee': {
     nom: 'Planning de la journee',
@@ -66,10 +73,11 @@ export const MODULES: Record<string, Module> = {
  * ⚠️ PENDANT EN BASE : la fonction `basculer_module_cabinet` porte la MÊME
  *    liste, en dur (migration 20261027120000). C'est elle qui fait autorité ;
  *    celle-ci ne sert qu'à afficher. Les deux doivent bouger ensemble.
- *    `gardes` n'y est pas (non éteignable tant que B-175a n'est pas fait),
- *    `chat` non plus (aucun écran n'existe : l'allumer ouvrirait sur rien).
+ *    `gardes` y est depuis B-175a (28/10, un cabinet « journées seules »).
+ *    `chat` non (aucun écran n'existe : l'allumer ouvrirait sur rien).
+ *    Il faut toujours en garder UN allumé : la base le refuse sinon.
  */
-export const MODULES_REGLABLES_PAR_ADMIN = ['planning-journee'] as const
+export const MODULES_REGLABLES_PAR_ADMIN = ['gardes', 'planning-journee'] as const
 
 /** Les identifiants de modules connus. Toute autre valeur est une faute de frappe. */
 export type IdModule = keyof typeof MODULES
@@ -80,6 +88,11 @@ export type IdModule = keyof typeof MODULES
 export type Appartenance =
   /** Il appartient a ce module : eteint, l'ecran disparait et le serveur refuse. */
   | { module: string }
+  /**
+   * B-175a — il sert a PLUSIEURS modules : visible des que l'un d'eux est
+   * allume (le planning porte les gardes ET les journees).
+   */
+  | { modules: string[] }
   /** Il ne depend d'aucun module, et voici pourquoi. */
   | { socle: string }
 
@@ -123,7 +136,9 @@ export const APPARTENANCE: Record<string, Appartenance> = {
   journee: { module: 'planning-journee' },
 
   // ── Le module des gardes ────────────────────────────────────────────────
-  planning: { module: 'gardes' },
+  // B-175a — la grille porte les gardes ET les journées (B-148/B-172) : un
+  // cabinet « journées seules » doit la garder.
+  planning: { modules: ['gardes', 'planning-journee'] },
   // B-175 — Organisation porte l'encart « Vos plannings » (l'interrupteur des
   // modules) et une partie par module : elle ne peut dépendre d'aucun d'eux,
   // sinon éteindre un module fermerait la porte qui permet de le rallumer.
@@ -132,7 +147,11 @@ export const APPARTENANCE: Record<string, Appartenance> = {
       'L’organisation du cabinet : l’interrupteur des modules et une partie par ' +
       'module (gardes, journées), chacune n’apparaissant que si son module est allumé.',
   },
-  historique: { module: 'gardes' },
+  // B-175a — les compteurs de gardes ET celui des journées (B-175).
+  historique: { modules: ['gardes', 'planning-journee'] },
+  // B-176 — la page du lien « Je prends ce créneau » (appel à volontaires),
+  // passée de la V1 à la V2 le 28/10. Sans gardes, pas de créneau à prendre.
+  'crise/volontaire': { module: 'gardes' },
 }
 
 /**
@@ -146,5 +165,6 @@ export function ecranVisible(ecran: string, modulesAllumes: string[]): boolean {
   const decision = APPARTENANCE[ecran]
   if (!decision) return true
   if ('socle' in decision) return true
+  if ('modules' in decision) return decision.modules.some((m) => modulesAllumes.includes(m))
   return modulesAllumes.includes(decision.module)
 }

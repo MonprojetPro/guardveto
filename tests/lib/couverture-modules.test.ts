@@ -83,9 +83,11 @@ describe('Le catalogue des modules', () => {
     }
   })
 
-  it('designe les gardes comme le module socle, celui qu’on ne peut pas eteindre', () => {
+  it('designe les gardes comme le repli, et les rend eteignables (B-175a)', () => {
     expect(MODULE_SOCLE).toBe('gardes')
-    expect(MODULES[MODULE_SOCLE].eteignable).toBe(false)
+    // Un cabinet « journées seules » existe depuis le 28/10 : c'est la base
+    // qui refuse le dernier module, pas le catalogue qui fige les gardes.
+    expect(MODULES[MODULE_SOCLE].eteignable).toBe(true)
   })
 })
 
@@ -103,8 +105,13 @@ describe('ecranVisible — ce que la barre demande avant d’afficher une entree
     expect(ecranVisible('planning', ['gardes'])).toBe(true)
   })
 
+  it('B-175a — garde le planning et l’historique d’un cabinet « journées seules »', () => {
+    expect(ecranVisible('planning', ['planning-journee'])).toBe(true)
+    expect(ecranVisible('historique', ['planning-journee'])).toBe(true)
+    expect(ecranVisible('crise/volontaire', ['planning-journee'])).toBe(false)
+  })
+
   it('CACHE un ecran dont le module est eteint', () => {
-    expect(ecranVisible('planning', ['planning-journee'])).toBe(false)
     // `regles` est passé au socle le 27/10 (B-175 : il porte l'interrupteur
     // des modules) ; `journee` reste rattaché au planning de la journée.
     expect(ecranVisible('journee', ['gardes'])).toBe(false)
@@ -140,9 +147,11 @@ describe('L’appartenance des ecrans aux modules', () => {
   })
 
   it('ne cite aucun module inconnu', () => {
-    const inconnus = Object.entries(APPARTENANCE)
-      .filter(([, d]) => 'module' in d && !(d.module in MODULES))
-      .map(([ecran, d]) => `${ecran} → ${(d as { module: string }).module}`)
+    // B-175a — une appartenance peut citer PLUSIEURS modules : on les vérifie tous.
+    const inconnus = Object.entries(APPARTENANCE).flatMap(([ecran, d]) => {
+      const cites = 'module' in d ? [d.module] : 'modules' in d ? d.modules : []
+      return cites.filter((m) => !(m in MODULES)).map((m) => `${ecran} → ${m}`)
+    })
     expect(
       inconnus,
       `Modules inconnus cites : ${inconnus.join(', ')}. Une faute de frappe ici declare ` +

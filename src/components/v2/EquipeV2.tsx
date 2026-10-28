@@ -220,6 +220,11 @@ interface Props {
    * que `porteJournee()` refuse côté serveur.
    */
   journeeActive?: boolean
+  /**
+   * B-175a — « Ses contraintes » règle les GARDES (règles de garde de la
+   * personne) : absent d'un cabinet « journées seules ».
+   */
+  gardesActives?: boolean
   blocsJournee?: BlocJournee[]
   tramesJournee?: TrameJournee[]
 }
@@ -231,6 +236,7 @@ export function EquipeV2({
   typesCreneaux,
   moiId,
   journeeActive = false,
+  gardesActives = true,
   blocsJournee = [],
   tramesJournee = [],
 }: Props) {
@@ -1080,10 +1086,12 @@ export function EquipeV2({
                   sur sa ligne et en toutes lettres. « Modifier » et
                   « Désactiver » sont remontés en icônes dans le coin. */}
               <div className="vet-actions">
-                <button type="button" onClick={() => setFicheContraintes(v)}>
-                  Ses contraintes
-                  <span className="va-nb">{nb}</span>
-                </button>
+                {gardesActives && (
+                  <button type="button" onClick={() => setFicheContraintes(v)}>
+                    Ses contraintes
+                    <span className="va-nb">{nb}</span>
+                  </button>
+                )}
                 {/* B-149 — « comme pour les contraintes », mot pour mot : même
                     place, même forme, même compteur. Absent si le module est
                     éteint — le bouton mènerait à des actions que le serveur

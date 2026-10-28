@@ -220,12 +220,12 @@ export function contenuEchangePropose(
     ? {
         titre: 'Garde à reprendre — premier arrivé',
         message: `${prenomDemandeur} propose sa garde du ${formatDateFr(date)} (${typeGardeLabel(typeGarde)}) à qui peut la reprendre. Premier arrivé, premier servi — répondez depuis la page Échanges.`,
-        lien: '/echanges',
+        lien: '/absences?onglet=echanges',
       }
     : {
         titre: 'Proposition d\'échange de garde',
         message: `${prenomDemandeur} vous propose de reprendre sa garde du ${formatDateFr(date)} (${typeGardeLabel(typeGarde)}). Répondez depuis la page Échanges.`,
-        lien: '/echanges',
+        lien: '/absences?onglet=echanges',
       }
 }
 
@@ -234,12 +234,12 @@ export function contenuEchangeAccepte(prenomCible: string, date: string, pourAdm
     ? {
         titre: 'Échange de garde à valider',
         message: `Un échange concernant la garde du ${formatDateFr(date)} a été accepté entre confrères. Il attend votre validation.`,
-        lien: '/echanges',
+        lien: '/absences?onglet=echanges',
       }
     : {
         titre: 'Échange accepté par votre confrère',
         message: `${prenomCible} a accepté votre proposition d'échange pour la garde du ${formatDateFr(date)}. Reste la validation de l'administrateur.`,
-        lien: '/echanges',
+        lien: '/absences?onglet=echanges',
       }
 }
 
@@ -247,7 +247,7 @@ export function contenuEchangeRefuse(prenomCible: string, date: string) {
   return {
     titre: 'Échange décliné',
     message: `${prenomCible} a décliné votre proposition d'échange pour la garde du ${formatDateFr(date)}.`,
-    lien: '/echanges',
+    lien: '/absences?onglet=echanges',
   }
 }
 
@@ -263,7 +263,7 @@ export function contenuEchangeRefuseAdmin(date: string, motif: string | null) {
   return {
     titre: 'Échange refusé par l\'administrateur',
     message: `L'échange concernant la garde du ${formatDateFr(date)} n'a pas été validé${motif ? ` : ${motif}` : '.'}`,
-    lien: '/echanges',
+    lien: '/absences?onglet=echanges',
   }
 }
 

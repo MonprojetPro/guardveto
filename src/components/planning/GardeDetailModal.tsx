@@ -1013,7 +1013,7 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
               <Button
                 variant="outline"
                 className="sm:mr-auto"
-                onClick={() => router.push(`/echanges?proposer=${garde.id}`)}
+                onClick={() => router.push(`/absences?onglet=echanges&proposer=${garde.id}`)}
               >
                 <ArrowLeftRight className="w-4 h-4 mr-2" />
                 Proposer un échange

@@ -9,8 +9,8 @@ import { PERIODE_B_ID, TEST_EMAIL_DOMAIN, USERS } from './fixtures/test-data'
 // ════════════════════════════════════════════════════════════════
 // Un user rôle `veto` :
 //   • est renvoyé sur son propre écran quand il tente une page admin ;
-//   • ne voit pas les entrées de nav admin dans la sidebar ;
-//   • peut accéder aux pages communes (planning, congés, compteurs).
+//   • ne voit pas les entrées de nav admin dans la barre V2 ;
+//   • peut accéder aux pages communes (planning, absences, historique).
 // Un admin, lui, accède bien aux pages admin.
 //
 // ⚠️ Les deux écrans V1 `/admin/veterinaires` et `/admin/periodes` ont été
@@ -21,13 +21,11 @@ import { PERIODE_B_ID, TEST_EMAIL_DOMAIN, USERS } from './fixtures/test-data'
 
 loadEnvLocal()
 
-// Pages réservées aux admins, avec la destination du renvoi. Elle n'est PAS la
-// même partout : les écrans V2 renvoient sur `/accueil` (leur propre point
-// d'entrée), les écrans V1 restants sur `/planning`. Un test qui n'attendrait
-// qu'une seule cible passerait à côté de la moitié des cas.
+// Pages réservées aux admins, avec la destination du renvoi. B-176 (28/10) :
+// la V1 est supprimée, il ne reste que des écrans V2, qui renvoient sur
+// `/accueil`.
 const ADMIN_ONLY_ROUTES: { route: string; renvoiVers: RegExp }[] = [
   { route: '/equipe', renvoiVers: /\/accueil/ },
-  { route: '/admin/demandes', renvoiVers: /\/planning/ },
 ]
 
 test.describe('Contrôle des rôles', () => {
@@ -44,23 +42,36 @@ test.describe('Contrôle des rôles', () => {
     await login(page, USERS.vetoB.email, USERS.vetoB.password)
     await page.goto('/planning')
 
-    // Entrées communes visibles dans la sidebar.
-    const nav = page.locator('aside nav')
-    await expect(nav.getByRole('link', { name: 'Planning' })).toBeVisible()
+    // B-176 — la barre V2 (la sidebar V1 n'existe plus).
+    const nav = page.locator('nav.dock-menu')
+    await expect(nav.locator('a[href="/planning"]')).toBeVisible()
 
-    // Entrées admin absentes pour un véto.
-    await expect(nav.getByRole('link', { name: 'Vétérinaires' })).toHaveCount(0)
-    await expect(nav.getByRole('link', { name: 'Périodes' })).toHaveCount(0)
+    // Entrée admin absente pour un véto.
+    await expect(nav.locator('a[href="/equipe"]')).toHaveCount(0)
   })
 
   test('un véto accède bien aux pages communes', async ({ page }) => {
     await login(page, USERS.vetoB.email, USERS.vetoB.password)
 
-    await page.goto('/conges')
-    await expect(page).toHaveURL(/\/conges/)
+    await page.goto('/absences')
+    await expect(page).toHaveURL(/\/absences/)
 
-    await page.goto('/compteurs')
-    await expect(page).toHaveURL(/\/compteurs/)
+    await page.goto('/historique')
+    await expect(page).toHaveURL(/\/historique/)
+  })
+
+  test('B-176 — les anciennes adresses V1 mènent à leur écran V2', async ({ page }) => {
+    await login(page, USERS.vetoB.email, USERS.vetoB.password)
+
+    for (const [ancienne, nouvelle] of [
+      ['/conges', /\/absences/],
+      ['/echanges', /\/absences\?onglet=echanges/],
+      ['/compteurs', /\/historique/],
+      ['/notifications', /\/reglages\/notifications/],
+    ] as const) {
+      await page.goto(ancienne)
+      await expect(page, `${ancienne} doit mener à la V2`).toHaveURL(nouvelle)
+    }
   })
 
   test('un véto CONSULTE l’Organisation, sans aucune commande', async ({ page }) => {

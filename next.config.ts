@@ -11,6 +11,22 @@ const nextConfig: NextConfig = {
   // Aucune incidence en production (build) : ce reglage est dev-only.
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
 
+  // B-176 (28/10) — la V1 est supprimee. Ses adresses circulent encore dans des
+  // e-mails deja envoyes, des favoris et des notifications de la cloche : elles
+  // menent a leur equivalent V2 au lieu d'une page introuvable.
+  async redirects() {
+    return [
+      { source: '/echanges', destination: '/absences?onglet=echanges', permanent: false },
+      { source: '/conges', destination: '/absences', permanent: false },
+      { source: '/admin/demandes', destination: '/absences', permanent: false },
+      { source: '/admin/depannages', destination: '/absences?onglet=depannages', permanent: false },
+      { source: '/compteurs', destination: '/historique', permanent: false },
+      { source: '/notifications', destination: '/reglages/notifications', permanent: false },
+      { source: '/admin/journal-emails', destination: '/reglages', permanent: false },
+      { source: '/admin/banc-ia', destination: '/accueil', permanent: false },
+    ]
+  },
+
   experimental: {
     serverActions: {
       // Le plafond par defaut d'une action serveur est de 1 Mo. C'est

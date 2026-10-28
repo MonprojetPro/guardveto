@@ -21,6 +21,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { cleIA, modeleIA } from './proposerRegle'
 import { versDefinitionApi, type ContexteOutil, type Outil, type PropositionAction } from './outils/types'
+import { modulesDuCabinet } from '@/lib/produit/modules-serveur'
 
 /**
  * Ce que la boucle rend à l'appelant : TOUJOURS la même forme.
@@ -335,6 +336,26 @@ Tu parles à ${qui}. ${role}
 Quand elle parle de quelqu'un d'AUTRE, elle le nomme. Si le nom est ambigu ou introuvable dans l'équipe, là seulement tu demandes de préciser.`
 }
 
+/**
+ * B-175a — ce que le cabinet tient comme plannings. Un cabinet « journées
+ * seules » n'a AUCUNE garde : sans cette phrase, à « qui est de garde ce
+ * week-end ? » Filou chercherait, ne trouverait rien et répondrait « personne »
+ * — une réponse fausse présentée comme vérifiée (règle FILOU SUIT LE PRODUIT).
+ * Une lecture qui échoue n'ajoute rien : on retombe sur le comportement
+ * d'avant, le cabinet à gardes.
+ */
+export async function blocPlannings(ctx: Pick<ContexteOutil, 'supabase'>): Promise<string | null> {
+  try {
+    const modules = await modulesDuCabinet(ctx.supabase)
+    if (modules.includes('gardes')) return null
+    return `CE CABINET N'A PAS DE GARDES
+
+L'administratrice a éteint le planning des gardes du soir et du week-end : ce cabinet ne tient que le planning de la journée. Il n'y a donc ni garde, ni échange de garde, ni dépannage, ni compteur de week-ends. Si on te pose une question sur les gardes, dis-le simplement (« ce cabinet ne tient pas de planning de gardes ») — ne réponds jamais « personne n'est de garde », ce serait faux. L'administratrice peut le rallumer dans Organisation, encart « Vos plannings ».`
+  } catch {
+    return null
+  }
+}
+
 export async function faireTravaillerFilou(
   phrase: string,
   outils: Outil[],
@@ -344,6 +365,7 @@ export async function faireTravaillerFilou(
 ): Promise<IssueFilou> {
   const client = new Anthropic({ apiKey: cleIA() })
   const identite = blocIdentite(ctx)
+  const plannings = await blocPlannings(ctx)
   const parNom = new Map(outils.map((o) => [o.nom, o]))
   const definitions = outils.map(versDefinitionApi)
   const outilsAppeles: string[] = []
@@ -385,6 +407,7 @@ export async function faireTravaillerFilou(
           // Après le bloc caché, jamais avant : le cache porte sur un PRÉFIXE.
           // Placer l'identité en tête le ferait manquer à chaque conversation.
           { type: 'text', text: identite },
+          ...(plannings ? [{ type: 'text' as const, text: plannings }] : []),
         ],
         tools: definitions,
         messages,

@@ -18,7 +18,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
-import { MODULES, MODULE_SOCLE } from '@/lib/produit/modules'
+import { MODULES, MODULE_SOCLE, MODULES_REGLABLES_PAR_ADMIN } from '@/lib/produit/modules'
 
 export class ModuleEteintError extends Error {
   constructor(message: string) {
@@ -61,7 +61,10 @@ export async function exigerModule(
   if (allumes.includes(module)) return
 
   const nom = MODULES[module]?.nom ?? module
-  throw new ModuleEteintError(
-    `« ${nom} » n’est pas activé pour ce cabinet. Contactez MonProjetPro pour l’ouvrir.`,
-  )
+  // B-175a — les plannings se rallument depuis le cabinet ; les autres modules
+  // passent encore par nous.
+  const ouAllumer = (MODULES_REGLABLES_PAR_ADMIN as readonly string[]).includes(module)
+    ? 'L’administratrice l’allume dans Organisation, encart « Vos plannings ».'
+    : 'Contactez MonProjetPro pour l’ouvrir.'
+  throw new ModuleEteintError(`« ${nom} » n’est pas activé pour ce cabinet. ${ouAllumer}`)
 }

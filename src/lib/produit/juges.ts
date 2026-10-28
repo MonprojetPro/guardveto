@@ -143,10 +143,6 @@ export const JUGES: Record<string, DecisionJuge> = {
     limite:
       "Une garde déjà remplacée ne s'échange pas en bloc : on refuse en le disant. Un échange partiel demanderait un second modèle de remplacement, divergent du premier.",
   },
-  'app/(protected)/echanges/page.tsx': {
-    manque:
-      "La liste « mes gardes à céder » vient des titulaires : un remplaçant n'y voit pas sa garde, et un titulaire remplacé y voit une garde que le gardien refusera à l'envoi. Friction, jamais faute — le refus est juste et expliqué. Noté le 2026-10-08.",
-  },
   'app/(v2)/absences/page.tsx': {
     manque:
       'Même liste que l\'écran Échanges, même limite, même gardien derrière. Noté le 2026-10-08.',
@@ -213,7 +209,7 @@ export const JUGES: Record<string, DecisionJuge> = {
   'app/(protected)/admin/periodes/actions.ts': {
     hors: "Supprime une période et nettoie les poignées d'agenda. Les remplacements partent en CASCADE avec les gardes.",
   },
-  'app/(protected)/crise/volontaire/page.tsx': {
+  'app/(v2)/crise/volontaire/page.tsx': {
     hors: "Affiche la date et le type du créneau proposé, jamais un occupant. Qui est de garde vient du recensement, pas d'ici.",
   },
   'app/(v2)/planning/page.tsx': {

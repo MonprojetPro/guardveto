@@ -119,6 +119,7 @@ export default async function EquipePage() {
           // l'entrée « Journée ». Un cabinet ne découvre pas une capacité qu'il
           // n'a pas achetée.
           journeeActive={modules.includes('planning-journee')}
+          gardesActives={modules.includes('gardes')}
           blocsJournee={blocsJournee}
           tramesJournee={tramesJournee}
         />

@@ -41,6 +41,9 @@ const HORS_PERIMETRE: Record<string, string> = {
   auth: 'Parcours de connexion : on ne sait pas encore QUI se connecte, donc pas de cabinet à nommer.',
   login: 'Idem — avant l’identification.',
   'set-password': 'Idem — avant l’identification.',
+  '(protected)':
+    'B-176 (28/10) : la V1 est supprimée, ce groupe ne porte plus AUCUN écran — seulement ' +
+    'des actions serveur appelées par la V2. Le test ci-dessous échoue si une page y revient.',
 }
 
 /** Les dossiers de premier niveau qui portent des écrans. */
@@ -102,5 +105,12 @@ describe('B-090 — le ruban « bac à sable » couvre tous les écrans connect�
     expect(source).toContain('if (!estBacASable) return null')
     // Et une lecture qui échoue ne doit pas non plus déclencher l'alerte.
     expect(source).toMatch(/catch\s*\{[\s\S]*?return null/u)
+  })
+  it('B-176 — le groupe (protected), exempté parce que vide d’écrans, le reste', () => {
+    // L'exemption ne vaut que tant qu'il n'y a rien à afficher. Une page posée
+    // ici n'aurait ni ruban ni coquille V2 : elle ressusciterait la V1.
+    const pages = (readdirSync(join(APP, '(protected)'), { recursive: true }) as string[])
+      .filter((f) => /(^|[\\/])(page|layout)\.tsx$/u.test(f))
+    expect(pages).toEqual([])
   })
 })

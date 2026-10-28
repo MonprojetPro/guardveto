@@ -53,7 +53,14 @@ interface LigneCompensation {
   absence: { date_debut: string; motif: 'maladie' | 'urgence' | 'autre' } | null
 }
 
-export default async function AbsencesPage() {
+export default async function AbsencesPage({
+  searchParams,
+}: {
+  // B-176 — les anciennes adresses V1 (`/echanges`, `/admin/depannages`) et les
+  // notifications de la cloche ouvrent l'écran sur le bon onglet.
+  searchParams: Promise<{ onglet?: string; proposer?: string }>
+}) {
+  const { onglet: ongletDemande, proposer } = await searchParams
   const supabase = await createClient()
 
   const {
@@ -169,7 +176,9 @@ export default async function AbsencesPage() {
   // B-163 — sans le module journée, la fenêtre d'absence n'offre ni « le
   // matin » ni « l'après-midi ». `modulesDuCabinet` a un repli FERMANT (le socle
   // seul) : une panne de lecture retire le choix, elle ne l'offre pas à tort.
-  const moduleJourneeActif = (await modulesDuCabinet(supabase)).includes(MODULE_JOURNEE)
+  const modulesCabinet = await modulesDuCabinet(supabase)
+  const moduleJourneeActif = modulesCabinet.includes(MODULE_JOURNEE)
+  const gardesActives = modulesCabinet.includes('gardes')
 
   // ── Verdict de conflit sur les souhaits en attente (admin) ──
   // Calculé en amont pour que la ligne l'affiche sans clic. Couvre les
@@ -263,7 +272,10 @@ export default async function AbsencesPage() {
           depannages={lignesDepannages}
           statsDepannages={statsDepannages}
           moduleJourneeActif={moduleJourneeActif}
+          gardesActives={gardesActives}
           absencesActives={absencesActives}
+          ongletInitial={ongletDemande}
+          gardeAProposer={proposer}
         />
       </div>
     </>
