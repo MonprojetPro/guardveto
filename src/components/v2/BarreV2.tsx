@@ -157,7 +157,7 @@ export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props
             {aTraiter > 0 && <i className="di-pip count">{aTraiter}</i>}
           </span>
           <span className="di-flap" aria-hidden="true">
-            <span className="di-text">Absences &amp; échanges</span>
+            <span className="di-text">Absences<span className="di-suite"> &amp; échanges</span></span>
           </span>
         </Link>
         )}
@@ -228,7 +228,7 @@ export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props
               </svg>
             </span>
             <span className="di-flap" aria-hidden="true">
-              <span className="di-text">Historique &amp; compteurs</span>
+              <span className="di-text">Historique<span className="di-suite"> &amp; compteurs</span></span>
             </span>
           </Link>
         )}

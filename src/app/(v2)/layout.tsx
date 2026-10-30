@@ -17,6 +17,8 @@ import '@/styles/v2-terrier.css'
 // L'écran de relecture d'un ancien planning importé (déposé dans la
 // conversation de Filou, affiché sur le tableau).
 import '@/styles/v2-import.css'
+// Le socle téléphone (B-179) : EN DERNIER, il corrige ce qui précède.
+import '@/styles/v2-mobile.css'
 
 export default async function LayoutV2({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()

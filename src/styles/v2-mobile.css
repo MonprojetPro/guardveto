@@ -1,0 +1,129 @@
+/* ============================================================
+   GUARDVETO V2 — LE SOCLE TÉLÉPHONE (B-179, 30/10/2026)
+   ============================================================
+   L'audit du 30/10 l'a mesuré : chaque feuille inventait ses propres seuils
+   (15 largeurs différentes) et AUCUNE ne traitait le tactile. D'où des champs
+   qui font zoomer l'iPhone, une barre sans noms, un champ de Filou de 48 px.
+
+   Ce fichier porte ce qui vaut pour TOUS les écrans sous 640 px. Il est importé
+   en DERNIER par `app/(v2)/layout.tsx` ; ses sélecteurs commencent par `.v2`
+   pour l'emporter aussi sur les feuilles d'écran, chargées après la coquille.
+
+   ⚠️ Rien de large ici : pas de `.v2 button {…}`. Une règle partagée qui
+   reprend les boutons de tout le monde a déjà coûté trois recettes (16/10).
+   Chaque règle nomme ce qu'elle vise.
+   ============================================================ */
+
+@media (max-width: 640px) {
+  /* ---- 1. Les champs : 16 px, sinon l'iPhone zoome la page au toucher ---- */
+  .v2 :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]),
+  body [data-slot="dialog-content"] :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]),
+  body [data-slot="alert-dialog-content"] :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]) {
+    font-size: 16px;
+  }
+
+  /* ---- 2. Les fenêtres : tenir dans l'écran VISIBLE ----
+     `100dvh` suit la barre d'adresse et le clavier, `100vh` non : le bas de la
+     fenêtre (ses boutons) passait dessous. Marges réduites : 24/26 px de chaque
+     côté mangeaient 15 % de la largeur. */
+  body [data-slot="dialog-content"],
+  body [data-slot="alert-dialog-content"] {
+    max-width: calc(100vw - 16px) !important;
+    max-height: calc(100dvh - 16px);
+    padding: 18px 16px 16px;
+  }
+  body [data-slot="dialog-content"] > [data-slot="dialog-close"] {
+    width: 44px; height: 44px;
+    display: grid; place-items: center;
+    top: 6px; right: 6px;
+  }
+
+  /* ---- 3. La barre : deux rangées nettes, des noms sous les icônes ----
+     Avant : trois rangées (la déconnexion tombait seule en bas) et des icônes
+     muettes, leur nom n'apparaissant qu'au survol — qui n'existe pas au doigt. */
+  .v2 .app-bar { gap: 6px; padding: 6px; margin: 10px 0; }
+  .v2 .app-bar .ab-ident { order: 1; }
+  .v2 .app-bar > form { order: 2; margin-left: auto; }
+  .v2 .app-bar .dock-menu {
+    order: 3; width: 100%;
+    margin: 0; gap: 2px;
+    justify-content: space-between;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none; /* le fondu de droite suffit à dire « ça continue » */
+  }
+  .v2 .app-bar .dock-menu::-webkit-scrollbar { display: none; }
+  /* Plus de six entrées (administratrice) : ça défile. Un fondu à droite le
+     dit — une barre qui défile sans indice cache ce qui est au bout. */
+  .v2 .app-bar .dock-menu:has(> :nth-child(6)) {
+    justify-content: flex-start;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
+  }
+  .v2 .app-bar .ab-marque { display: flex; }
+  .v2 .app-bar .ab-porte { padding: 3px 12px 3px 3px; }
+  .v2 .app-bar .ab-sortie { width: 44px; height: 44px; }
+  .v2 .dock-item {
+    flex: 1 0 auto; min-width: 56px;
+    flex-direction: column; justify-content: center; gap: 3px;
+    height: auto; min-height: 54px;
+    padding: 6px 6px 5px;
+    border-radius: 14px;
+    scroll-snap-align: start;
+  }
+  .v2 .dock-item .di-ico { width: 24px; height: 24px; }
+  .v2 .dock-item .di-flap { grid-template-columns: 1fr; opacity: 1; transition: none; }
+  .v2 .dock-item .di-text {
+    padding: 0;
+    font-size: 11px; line-height: 1.15; text-align: center;
+    color: inherit;
+  }
+  .v2 .dock-item .di-text::after { display: none; }
+  .v2 .dock-item.ici .di-text { color: var(--accent-ink); }
+  /* Les libellés longs se réduisent à leur premier mot (« Absences »,
+     « Historique ») : le reste est dans `.di-suite`, et dans l'aria-label. */
+  .v2 .dock-item .di-suite { display: none; }
+
+  /* ---- 4. Filou à l'accueil : la conversation en pleine largeur ----
+     Côte à côte, le renard (160 px) laissait 48 px au champ de saisie. On les
+     empile : Filou plus petit au-dessus, sa tablette sur toute la largeur.
+     Géométrie du cube = celle de 270 px, à l'échelle 130/270 (0,48). */
+  .v2 .desk-top { flex-direction: column; align-items: center; }
+  .v2 .filou-cube { width: 130px; min-height: 196px; }
+  .v2 .filou-cube video,
+  .v2 .filou-cube img.filou-fallback { width: 130px; top: -21px; }
+  .v2 .socle { left: 16px; top: 118px; width: 74px; height: 72px; }
+  .v2 .sc-top { top: -8px; height: 8px; }
+  .v2 .sc-side { width: 10px; height: 72px; }
+  .v2 .convo {
+    align-self: stretch;
+    margin: 0;
+    border-width: 8px; border-radius: 24px;
+    padding: 12px 14px;
+  }
+  .v2 .convo::before, .v2 .tab-btn { display: none; } /* la queue n'est plus derrière */
+  .v2 .thread { min-height: 180px; max-height: 55dvh; }
+  .v2 .bubble { font-size: 0.875rem; }
+  .v2 .saisie-envoi, .v2 .saisie-raz { width: 44px; height: 44px; }
+  .v2 .saisie-raz.confirme { width: auto; }
+  .v2 .mini-chip { min-height: 40px; padding: 6px 14px; font-size: 0.8125rem; }
+
+  /* ---- 5. Ce qui sortait de l'écran ---- */
+  /* Le renard de bordure (Règles, Planning) se tient HORS de la carte : sans
+     marge autour d'elle, il élargissait la page de 130 px. */
+  .v2 .filou-edge { display: none; }
+  /* Équipe : `1fr` vaut au moins la largeur de l'adresse la plus longue. */
+  .v2 .team-grid { grid-template-columns: minmax(0, 1fr); }
+  .v2 .vet-card { min-width: 0; }
+  .v2 .vet-outils button { width: 40px; height: 40px; }
+  /* Réglages : le journal des e-mails, une ligne = une petite fiche. */
+  .v2 .mail-table thead { display: none; }
+  .v2 .mail-table, .v2 .mail-table tbody { display: block; }
+  .v2 .mail-table tr {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 10px; align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--t-border);
+  }
+  .v2 .mail-table tr:last-child { border-bottom: none; }
+  .v2 .mail-table td { display: block; padding: 0; border: none; min-width: 0; overflow-wrap: anywhere; }
+}

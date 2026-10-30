@@ -100,6 +100,7 @@
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
+  min-height: 100dvh; /* B-179 : suit la barre d'adresse du téléphone */
   flex: 1;
   -webkit-font-smoothing: antialiased;
 }

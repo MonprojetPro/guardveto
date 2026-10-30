@@ -86,6 +86,9 @@ retravaillée pour rester lisible même avec beaucoup d'informations sur un mêm
 | Décider si un vétérinaire qui quitte le cabinet reste visible dans les compteurs des périodes passées | 🔵 À qualifier | — `[B-175c]` |
 | Repérer un jour où un planning de présences et un planning de gardes se chevauchent sans induire en erreur sur ce qui est déjà rempli | 🟢 Livré | 2026-10-24 `[B-172c]` |
 | Supprimer un planning de gardes doit annoncer que les présences de journée liées seront aussi effacées — l'écran ne le dit pas encore | ⚪ À faire | — `[B-172b]` |
+| Sur téléphone : la barre affiche le nom de chaque espace, Filou se lit en pleine largeur, plus aucun champ ne fait zoomer l'iPhone, les fenêtres tiennent dans l'écran, et Équipe, Règles et Réglages ne débordent plus | 🟡 À recetter | 2026-10-30 `[B-179]` |
+| Sur téléphone, le planning s'affiche en liste jour par jour avec « mes gardes » en premier (la grille à 7 colonnes y est illisible) | ⚪ À faire | — `[B-179a]` |
+| Sur téléphone, les écrans d'administration (règles, historique, absences) ont des boutons et des textes à la taille du doigt | ⚪ À faire | — `[B-179b]` |
 
 ---
 
