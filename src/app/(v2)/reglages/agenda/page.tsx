@@ -29,6 +29,7 @@ import {
   verrouLibre,
 } from '@/lib/agenda-perso/rapprocher'
 import { programmerAgendaPerso } from '@/lib/agenda-perso/declencher'
+import { adresseDePartage, lienAjoutAgenda } from '@/lib/agenda-perso/adresse'
 import { agendaDuCabinet } from '@/lib/sync-calendrier'
 import { nomLisibleAgenda } from '@/lib/google-calendar'
 
@@ -82,6 +83,8 @@ export default async function MonAgendaPage() {
           etat={{
             agendaCree: !!ligne.google_calendar_id,
             email,
+            compte: adresseDePartage(email),
+            lienAjout: ligne.google_calendar_id ? lienAjoutAgenda(ligne.google_calendar_id) : null,
             invitationRecente: invitationRecente(ligne),
             partageCabinet: ligne.partage_cabinet,
             enCours: !libre || (!ligne.derniere_sync_le && ligne.actif),

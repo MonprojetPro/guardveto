@@ -149,6 +149,8 @@ gardes et présences directement sur son agenda Google.
 | Les gardes publiées apparaissent sur l'agenda Google partagé du cabinet, avec les bons horaires et libellés | 🟢 Livré | 2026-08-27 `[T-001, B-087, B-086]` |
 | Chaque vétérinaire peut recevoir ses propres présences et gardes sur son agenda Google personnel, avec un réglage personnalisable ou un mode par défaut | 🟢 Livré | 2026-10-26 `[B-173]` |
 | La vérification complète chez Google (création, partage puis retrait d'un agenda) reste à exécuter manuellement par MiKL avant la mise en service réelle | ⚪ À faire | — reste-à-faire `[B-173a]` |
+| Chaque membre reçoit un e-mail GuardVeto en français avec un bouton « Ajouter à mon Google Agenda » (au lieu de l'e-mail automatique de Google), et retrouve ce bouton dans « Mon agenda » ; l'agenda est ouvert à son compte Google même si sa fiche porte une adresse Gmail avec « + » | 🟡 À recetter | 2026-10-30 `[B-178]` |
+| Recevoir son planning dans un agenda qui n'est pas Google (Outlook, Apple Calendrier) par un abonnement iCal | ⚪ À décider | — `[B-178a]` |
 
 ---
 

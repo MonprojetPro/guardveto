@@ -35,7 +35,11 @@ import {
 export interface EtatMonAgenda {
   agendaCree: boolean
   email: string | null
-  /** Invitation Google envoyée il y a moins de 7 jours (calculé côté serveur). */
+  /** B-178 — le compte Google à qui l'agenda est partagé (alias « + » retiré). */
+  compte: string | null
+  /** B-178 — le lien « ajouter cet agenda » de Google Agenda, une fois l'agenda créé. */
+  lienAjout: string | null
+  /** Invitation envoyée il y a moins de 7 jours (calculé côté serveur). */
   invitationRecente: boolean
   partageCabinet: 'non_concerne' | 'retire' | 'absent' | 'impossible'
   enCours: boolean
@@ -244,13 +248,13 @@ export function MonAgendaV2({ genre, reglages, etat, nomAgendaCabinet }: Props) 
               </div>
             )}
             {!etat.enCours && !etat.derniereErreur && etat.agendaCree && etat.email && (
-              <p className="ma-statut">Partagé avec {etat.email} · à jour</p>
+              <p className="ma-statut">Partagé avec {etat.compte ?? etat.email} · à jour</p>
             )}
 
             {etat.agendaCree && etat.invitationRecente && (
               <div className="ma-bandeau att">
                 <b>Une étape de votre côté</b>
-                Google vous a envoyé un e-mail « … a partagé un agenda avec vous ». Ouvrez-le et ajoutez l’agenda.
+                Ajoutez l’agenda dans Google Agenda, connecté avec {etat.compte ?? etat.email}. Un e-mail GuardVeto vous a aussi été envoyé.
               </div>
             )}
             {reglages.personnalise && (etat.partageCabinet === 'absent' || etat.partageCabinet === 'impossible') && (
@@ -267,6 +271,11 @@ export function MonAgendaV2({ genre, reglages, etat, nomAgendaCabinet }: Props) 
             )}
 
             <div className="ma-actions">
+              {etat.lienAjout && (
+                <a className="btn btn-outline btn-sm" href={etat.lienAjout} target="_blank" rel="noopener noreferrer">
+                  Ajouter à mon Google Agenda
+                </a>
+              )}
               <button type="button" className="btn btn-accent btn-sm" disabled={enCours} onClick={() => setEdition(true)}>
                 {reglages.personnalise ? 'Modifier' : 'Personnaliser'}
               </button>

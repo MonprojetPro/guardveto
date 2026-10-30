@@ -29,6 +29,9 @@ import {
   reglagesParDefaut,
 } from './planifier'
 import * as G from './google'
+import { adresseDePartage, lienAjoutAgenda } from './adresse'
+import { sendBrevoEmail } from '@/lib/brevo'
+import { emailInvitationAgenda, sujetInvitationAgenda } from '@/lib/emails/agenda-perso'
 
 export function clientService(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
@@ -356,6 +359,31 @@ async function executer(
   return erreurs
 }
 
+/**
+ * B-178 — l'invitation GuardVeto. Un échec d'envoi ne fait pas échouer la
+ * synchro (l'agenda est bien partagé) : « Mon agenda » porte le même bouton.
+ */
+async function envoyerInvitation(
+  admin: SupabaseClient, cabinetId: string, membre: Membre, email: string, compte: string, calendarId: string,
+): Promise<void> {
+  const { data } = await admin.from('cabinets').select('brevo_from_email, brevo_from_name').eq('id', cabinetId).maybeSingle()
+  const exp = data as { brevo_from_email: string | null; brevo_from_name: string | null } | null
+  const r = await sendBrevoEmail({
+    to: email,
+    toName: membre.prenom,
+    subject: sujetInvitationAgenda(),
+    htmlContent: emailInvitationAgenda({
+      prenom: membre.prenom,
+      compte,
+      lien: lienAjoutAgenda(calendarId),
+      nomAgenda: `GuardVeto — ${membre.prenom || 'mon planning'}`,
+    }),
+    fromEmail: exp?.brevo_from_email,
+    fromName: exp?.brevo_from_name,
+  })
+  if ('error' in r) console.error('[agenda-perso] Invitation non envoyée :', r.error)
+}
+
 /** Un passage complet pour une personne. Renvoie la première erreur, ou null. */
 async function unPassage(admin: SupabaseClient, l: LigneAgendaPerso, ctx: ContexteCabinet): Promise<string | null> {
   const membre = await membreDeLigne(admin, l)
@@ -366,7 +394,8 @@ async function unPassage(admin: SupabaseClient, l: LigneAgendaPerso, ctx: Contex
   const erreurs: string[] = []
 
   // ① Le partage de l'agenda du cabinet.
-  const errCab = await rapprocherPartageCabinet(admin, l, email, ctx, enService && reglages.personnalise)
+  // B-178 — même compte Google que le partage de l'agenda perso (alias « + » retiré).
+  const errCab = await rapprocherPartageCabinet(admin, l, adresseDePartage(email) ?? email, ctx, enService && reglages.personnalise)
   if (errCab) erreurs.push(errCab)
 
   // ② Fonction coupée (ou personne partie) : on vide l'agenda, on le garde.
@@ -390,10 +419,14 @@ async function unPassage(admin: SupabaseClient, l: LigneAgendaPerso, ctx: Contex
     await majLigne(admin, l.id, { google_calendar_id: calendarId, partage_email: null, invitation_envoyee_le: null })
     l.partage_email = null
   }
-  if (l.partage_email !== email) {
+  // B-178 — partagé au COMPTE Google (alias « + » retiré), sans l'e-mail de
+  // Google : c'est GuardVeto qui écrit, en français, avec un bouton.
+  const compte = adresseDePartage(email) ?? email!
+  if (l.partage_email !== compte) {
     if (l.partage_email) await G.retirerPartage(calendarId, l.partage_email)
-    await avecReprise(() => G.partager(calendarId as string, email!, 'reader', true))
-    await majLigne(admin, l.id, { partage_email: email, invitation_envoyee_le: new Date().toISOString() })
+    await avecReprise(() => G.partager(calendarId as string, compte, 'reader', false))
+    await majLigne(admin, l.id, { partage_email: compte, invitation_envoyee_le: new Date().toISOString() })
+    await envoyerInvitation(admin, ctx.cabinetId, membre!, email!, compte, calendarId)
   }
 
   // ④ Les événements.
