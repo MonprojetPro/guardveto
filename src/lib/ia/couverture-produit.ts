@@ -391,6 +391,10 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
     manque:
       'Se porter volontaire pour dépanner un collègue. C’est le geste le plus courant qu’un vétérinaire fasse depuis son téléphone, et le seul de ce niveau que Filou ne sache pas déclencher : il peut lire l’appel aux volontaires, expliquer qui manque, et doit ensuite dire « va sur l’écran ». Un outil d’écriture, avec la double barrière habituelle (proposition puis clic), rendrait le parcours complet.',
   },
+  'api/gardes/[id]/prendre-place#POST': {
+    manque:
+      'Prendre soi-même une place vide d’une garde publiée (B-179c, 02/11). Même parenté que le volontariat : Filou peut dire qu’une place est libre et qui pourrait la prendre, puis doit renvoyer vers l’écran (« ouvre le jour dans le planning »). Un outil d’écriture devra repasser par la route — c’est elle qui transforme les règles enfreintes en avertissements à confirmer et qui prévient l’administratrice.',
+  },
   'api/gardes/[id]#PATCH': {
     manque:
       'Modifier l’attribution d’une garde à la main (admin). Filou sait réparer une absence et valider un échange, mais pas la retouche libre — « mets Camille en 1er ce samedi ». C’est le chemin d’écriture le mieux gardé du produit (règles dures, périmètre jour ou bloc, confirmation 409, trace d’audit) : l’outil devra repasser par la route, jamais réimplémenter ces contrôles.',

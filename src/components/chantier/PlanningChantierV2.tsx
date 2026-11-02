@@ -44,7 +44,7 @@ import {
   useOutilsPlanningChantier,
   type EntreeOutil,
 } from '@/components/chantier/outils-planning-chantier'
-import { GardeDetailModal, peutProposerUnEchange } from '@/components/planning/GardeDetailModal'
+import { GardeDetailModal, peutProposerUnEchange, placeAPrendreDe } from '@/components/planning/GardeDetailModal'
 import { CriseModal, type VetCrise } from '@/components/planning/CriseModal'
 // B-165c — « Poser un congé » depuis le tableau de bord journalier. On réouvre
 // LA fenêtre qui existe déjà, celle des écrans Congés et Absences : elle porte
@@ -826,7 +826,8 @@ export function PlanningChantierV2({
    * rend la divergence impossible.
    */
   function estCliquable(g: GardeDenormalisee): boolean {
-    return isAdmin || peutProposerUnEchange(g, moiVetId, today)
+    // B-179c — ou une place libre qu'il peut prendre lui-même.
+    return isAdmin || peutProposerUnEchange(g, moiVetId, today) || placeAPrendreDe(g, manquesParGarde[g.id], moiVetId, today) !== null
   }
 
   // ── B-111 — les cadenas de l'admin ────────────────────────
@@ -2029,6 +2030,7 @@ export function PlanningChantierV2({
         }}
         onSaved={() => router.refresh()}
         onDeclarerAbsent={isAdmin && vets.length > 0 ? declarerAbsent : undefined}
+        manque={gardeModal ? manquesParGarde[gardeModal.id] ?? 0 : 0}
       />
 
       {isAdmin && vets.length > 0 && (

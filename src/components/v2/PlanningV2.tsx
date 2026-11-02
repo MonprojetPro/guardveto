@@ -23,7 +23,7 @@ import { RetirerPlanningModale, type GesteRetrait } from '@/components/planning/
 import { FilouEdge } from './FilouEdge'
 import type { PeriodeApplicable } from './GenererJournee'
 import { useOutilsPlanning } from './outils-planning'
-import { GardeDetailModal, peutProposerUnEchange } from '@/components/planning/GardeDetailModal'
+import { GardeDetailModal, peutProposerUnEchange, placeAPrendreDe } from '@/components/planning/GardeDetailModal'
 import { CriseModal, type VetCrise } from '@/components/planning/CriseModal'
 import { estJourFerie } from '@/engine/utils'
 // La grille part du lundi de la semaine du 1er et couvre des semaines pleines.
@@ -412,7 +412,8 @@ export function PlanningV2({
    * rend la divergence impossible.
    */
   function estCliquable(g: GardeDenormalisee): boolean {
-    return isAdmin || peutProposerUnEchange(g, moiVetId, today)
+    // B-179c — ou une place libre qu'il peut prendre lui-même.
+    return isAdmin || peutProposerUnEchange(g, moiVetId, today) || placeAPrendreDe(g, manquesParGarde[g.id], moiVetId, today) !== null
   }
 
   // ── B-111 — les cadenas de l'admin ────────────────────────
@@ -954,6 +955,7 @@ export function PlanningV2({
         nomsTypes={nomsTypes}
         onClose={() => setGardeModal(null)}
         onSaved={() => router.refresh()}
+        manque={gardeModal ? manquesParGarde[gardeModal.id] ?? 0 : 0}
         onDeclarerAbsent={isAdmin && vets.length > 0 ? declarerAbsent : undefined}
       />
 

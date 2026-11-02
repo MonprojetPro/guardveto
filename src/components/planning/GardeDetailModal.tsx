@@ -17,6 +17,8 @@ import type { VetDispo, DisponibilitesData } from '@/app/api/gardes/[id]/disponi
 import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
 import { placesDeGarde, vetsDeGarde, vetsFigesNatifs, placeFixableMaintenant } from '@/lib/gardes/places'
 import { ViolationDialog } from './ViolationDialog'
+import { BoutonPrendrePlace } from './BoutonPrendrePlace'
+import { placeAPrendre } from '@/lib/gardes/prendrePlace'
 import { BoutonCadenas, BandeauCadenas, type ResultatCadenas } from '@/components/v2/CadenasPlaces'
 import { stylePastille, stylePoint } from '@/lib/couleurs'
 import { sansCodeTechnique } from '@/lib/regles/sansCodeTechnique'
@@ -38,6 +40,35 @@ interface GardeDetailModalProps {
    * date de la garde et l'id du véto. Absent → bouton masqué.
    */
   onDeclarerAbsent?: (date: string, vetId: string) => void
+  /**
+   * B-179c — places vides de ce créneau (`calculerManques`). Sert à offrir
+   * « Je prends la place » à un vétérinaire. Absent = 0, aucun bouton.
+   */
+  manque?: number
+}
+
+/**
+ * B-179c — un vétérinaire peut-il prendre une place de cette garde ? Utilisé par
+ * les grilles pour lui OUVRIR la fenêtre (jusqu'ici il n'ouvrait que les
+ * siennes), et par la fenêtre pour afficher le bouton. Le serveur tranche.
+ */
+export function placeAPrendreDe(
+  garde: GardeDenormalisee | null | undefined,
+  manque: number | undefined,
+  moiVetId: string | undefined,
+  aujourdHui: string,
+): number | null {
+  if (!garde || !moiVetId) return null
+  const places = placesDeGarde(garde)
+  return placeAPrendre({
+    indicesOccupes: places.map((p) => p.index),
+    vetIdsOccupants: places.map((p) => p.vetId),
+    manque: manque ?? 0,
+    moiVetId,
+    date: garde.date,
+    aujourdhui: aujourdHui,
+    publie: garde.periode_statut === 'publie',
+  })
 }
 
 // ── Helpers ──────────────────────────────────────────────
@@ -334,7 +365,7 @@ function CadenasDeLaPlace({
 
 // ── Modal principale ─────────────────────────────────────
 
-export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, onClose, onSaved, onDeclarerAbsent }: GardeDetailModalProps) {
+export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, onClose, onSaved, onDeclarerAbsent, manque }: GardeDetailModalProps) {
   const router = useRouter()
 
   const [loading, setLoading] = useState(false)
@@ -648,6 +679,9 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
   // modale ouverte a forcément ce bouton.
   const aujourdHui = new Date().toISOString().slice(0, 10)
   const peutProposerEchange = !isAdmin && peutProposerUnEchange(garde, moiVetId, aujourdHui)
+  // B-179c — l'administratrice a déjà l'édition complète ; le bouton est pour
+  // le vétérinaire qui voit une place libre.
+  const placeLibre = isAdmin ? null : placeAPrendreDe(garde, manque, moiVetId, aujourdHui)
 
   return (
     <>
@@ -1006,6 +1040,10 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
                 </p>
               )}
             </>
+          )}
+
+          {placeLibre !== null && garde && (
+            <BoutonPrendrePlace gardeId={garde.id} placeIndex={placeLibre} onFait={() => { onSaved(); handleClose() }} />
           )}
 
           <DialogFooter>

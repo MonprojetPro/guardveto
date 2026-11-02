@@ -19,18 +19,18 @@
 //      une place ; générer et publier restent sur ordinateur ;
 //   5. sous 640 px seulement.
 //
-// ⚠️ AUCUN DROIT NOUVEAU. Les gestes passent par ce qui existe : la fenêtre de
-//    garde des grilles (`GardeDetailModal`) et la proposition d'échange de
-//    l'écran Absences. « Je prends la place » côté véto, proposé dans la
-//    maquette, n'existe pas aujourd'hui (un véto ne se porte volontaire que sur
-//    un appel aux volontaires) : la feuille le DIT au lieu d'offrir un bouton
-//    que le serveur refuserait.
+// ⚠️ AUCUN GESTE RÉÉCRIT ICI. Ils passent par ce qui existe : la fenêtre de
+//    garde des grilles (`GardeDetailModal`), la proposition d'échange de
+//    l'écran Absences, et — B-179c, 02/11 — « Je prends la place »
+//    (`BoutonPrendrePlace`, route `/api/gardes/[id]/prendre-place`), le même
+//    bouton que sur ordinateur.
 // ============================================================
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { GardeDetailModal, peutProposerUnEchange } from '@/components/planning/GardeDetailModal'
+import { GardeDetailModal, peutProposerUnEchange, placeAPrendreDe } from '@/components/planning/GardeDetailModal'
+import { BoutonPrendrePlace } from '@/components/planning/BoutonPrendrePlace'
 import { stylePastille } from '@/lib/couleurs'
 import { bilanSemaine, type JourTel, type SemaineTel } from '@/lib/planning/joursTelephone'
 import type { GardeDenormalisee } from '@/types'
@@ -227,6 +227,7 @@ export function PlanningTelephone({
         nomsTypes={nomsTypes}
         onClose={() => setGardeModal(null)}
         onSaved={() => router.refresh()}
+        manque={gardeModal ? (semaines.flatMap((s) => s.jours).flatMap((j) => j.gardes).find((x) => x.id === gardeModal.id)?.manque ?? 0) : 0}
       />
     </div>
   )
@@ -388,6 +389,8 @@ function FeuilleJour({
         {jour.gardes.map((g) => {
           const complete = gardesParId.get(g.id)
           const echange = complete ? peutProposerUnEchange(complete, moiVetId, aujourdhui) : false
+          // B-179c — une place libre qu'un vétérinaire peut prendre lui-même.
+          const placeLibre = !isAdmin && !lectureSeule ? placeAPrendreDe(complete, g.manque, moiVetId, aujourdhui) : null
           return (
             <div key={g.id} className="pt-bloc-feuille">
               <h4>{g.libelle}</h4>
@@ -406,8 +409,15 @@ function FeuilleJour({
               {!isAdmin && !lectureSeule && echange && (
                 <Link className="pt-btn" href={`/absences?onglet=echanges&proposer=${g.id}`}>Proposer un échange</Link>
               )}
-              {!isAdmin && g.manque > 0 && (
-                <p className="pt-aide">C&apos;est l&apos;administratrice qui attribue les places à pourvoir.</p>
+              {placeLibre !== null && complete && (
+                // La feuille se ferme au succès : elle montrerait sinon le jour
+                // d'AVANT, la place encore vide, pendant que l'écran se recharge.
+                <BoutonPrendrePlace gardeId={complete.id} placeIndex={placeLibre} onFait={onFermer} />
+              )}
+              {/* Pas de bouton (garde du jour, déjà de garde, secrétariat…) :
+                  on dit qui s'en occupe, plutôt qu'un trou muet. */}
+              {!isAdmin && g.manque > 0 && placeLibre === null && (
+                <p className="pt-aide">C&apos;est l&apos;administratrice qui attribue cette place.</p>
               )}
             </div>
           )

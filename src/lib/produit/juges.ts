@@ -134,6 +134,9 @@ export const JUGES: Record<string, DecisionJuge> = {
 
   'app/api/absences/[id]/reparer/route.ts': { remplacements: 'brique' },
   'app/api/absences/[id]/volontaire/route.ts': { remplacements: 'brique' },
+  // B-179c (02/11) — prendre une place vide : même brique que le volontariat
+  // (`avertissementRemplacementPonctuel`) pour les places 1 et 2.
+  'app/api/gardes/[id]/prendre-place/route.ts': { remplacements: 'brique' },
   'lib/ia/outils/absences.ts': { remplacements: 'brique' },
 
   // ── LES ÉCHANGES DE GARDES ──────────────────────────────────────────────

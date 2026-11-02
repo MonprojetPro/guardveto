@@ -180,6 +180,10 @@ describe('Ce que Filou ne couvre pas encore est VISIBLE', () => {
       trous.length,
       `${trous.length} capacités hors de portée de Filou :\n` +
         trous.map((t) => `  · ${t.capacite}`).join('\n'),
-    ).toBeLessThanOrEqual(12)
+      // 12 → 13 le 02/11 (B-179c) : « prendre une place vide » arrive SANS outil
+      // pour Filou, par décision de MiKL (il explique et renvoie vers l'écran).
+      // L'outil est ouvert au board (B-179d). Relever ce plafond doit rester un
+      // geste écrit et daté, jamais une façon de faire taire le test.
+    ).toBeLessThanOrEqual(13)
   })
 })

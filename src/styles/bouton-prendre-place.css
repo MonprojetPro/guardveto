@@ -1,0 +1,42 @@
+/* ============================================================
+   GUARDVETO — « Je prends la place » (B-179c)
+   ============================================================
+   Importée par `BoutonPrendrePlace.tsx` lui-même. Sélecteurs À LA RACINE et
+   préfixés `bpp-` : le bouton vit aussi dans la fenêtre de garde, rendue en
+   PORTAIL hors de `.v2` — une règle écrite sous `.v2` ne l'atteindrait pas.
+   ============================================================ */
+
+.bpp { display: grid; gap: 6px; width: 100%; }
+
+.bpp-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 44px; width: 100%;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: 1px solid var(--t-accent, #C7530F);
+  background: var(--t-accent, #C7530F); color: #fff;
+  font-family: var(--font-display, inherit); font-size: 0.875rem; font-weight: 700;
+  cursor: pointer;
+}
+.bpp-btn:disabled { opacity: 0.6; cursor: wait; }
+.bpp-btn.secondaire {
+  background: var(--surface-2, #F6EBD6); color: var(--text, #3A2A1C);
+  border-color: var(--border-strong, #D8C4A1);
+}
+
+.bpp-refus {
+  font-size: 0.8125rem; line-height: 1.45;
+  color: var(--danger, #A8341F);
+}
+
+.bpp-avertir {
+  display: grid; gap: 8px; width: 100%;
+  background: var(--warn-soft, rgba(196, 138, 20, 0.16));
+  border: 1px solid rgba(196, 138, 20, 0.35);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+.bpp-titre { font-family: var(--font-display, inherit); font-weight: 700; font-size: 0.875rem; color: var(--warn, #9A6200); }
+.bpp-avertir ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 0.8125rem; line-height: 1.45; color: var(--text, #3A2A1C); }
+.bpp-note { font-size: 0.8125rem; color: var(--t-muted, #7C6A55); }
+.bpp-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

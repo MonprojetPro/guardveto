@@ -58,6 +58,19 @@ export interface AppliquerChangementParams {
    * `resoudreCabinetId` (chemin authentifié classique).
    */
   cabinetId?: string
+  /**
+   * B-179c — une place AU-DELÀ de la deuxième (créneau à 3 ou 4 places) que
+   * l'on pose en plus de la paire. Elle ne vit que dans `garde_placements` :
+   * `premier_id`/`second_id` ne la portent pas. Absent = rien à poser.
+   */
+  placeSup?: { index: number; role: string; vetId: string }
+  /**
+   * B-179c — n'écrire QUE si cette colonne est encore vide AU MOMENT de
+   * l'écriture. Deux vétérinaires qui prennent la même place à la même seconde
+   * passent tous deux les contrôles de la route ; sans cette condition, le
+   * second effaçait le premier sans que celui-ci le sache.
+   */
+  siVide?: 'premier_id' | 'second_id'
 }
 
 export interface AppliquerChangementResultat {
@@ -124,9 +137,18 @@ export async function appliquerChangementGarde(
   }
   if (force) updatePayload.verrouille = false
 
-  const { error } = await supabase.from('gardes').update(updatePayload).eq('id', gardeId)
+  let requete = supabase.from('gardes').update(updatePayload).eq('id', gardeId)
+  if (params.siVide) requete = requete.is(params.siVide, null)
+  const { data: ecrites, error } = await requete.select('id')
   if (error) {
     return { ok: false, status: 500, error: `Erreur lors de la mise à jour : ${error.message}` }
+  }
+  // Zéro ligne sans erreur = la condition n'a pas tenu (ou la RLS a refusé) :
+  // ce n'est PAS un succès, et on ne déroule surtout pas la suite du cycle.
+  if (!ecrites || ecrites.length === 0) {
+    return params.siVide
+      ? { ok: false, status: 409, error: 'Cette place vient d’être prise par quelqu’un d’autre.' }
+      : { ok: false, status: 403, error: 'La garde n’a pas pu être modifiée (droits ou garde disparue).' }
   }
 
   // ── Double écriture P3b-2 — miroir de la paire dans garde_placements ──
@@ -134,10 +156,17 @@ export async function appliquerChangementGarde(
   //    répercutent enfin le changement sur la liste de places. ADDITIF (aucun
   //    lecteur encore) + best-effort : n'interrompt JAMAIS le cycle d'édition V1.
   //    On remplace les places de CETTE garde (delete → re-insert la paire).
+  //
+  //    ⚠️ B-179c (02/11) — ON NE REMPLACE QUE LES PLACES 0 ET 1. Jusqu'ici le
+  //    `delete` portait sur TOUTES les places de la garde, puis ne réécrivait
+  //    que la paire : une 3e ou 4e place (créneau sur-mesure) disparaissait à
+  //    la moindre retouche de la 1re ou de la 2e. Sans effet mesuré à ce jour
+  //    (aucune place ≥ 3 en base le 02/11), mais faux dès le premier cabinet
+  //    qui en configure — et c'est précisément ce que B-179c ouvre.
   try {
     const cabinetIdGarde = (garde as Record<string, unknown>).cabinet_id as string | null
     if (cabinetIdGarde) {
-      await supabase.from('garde_placements').delete().eq('garde_id', gardeId)
+      await supabase.from('garde_placements').delete().eq('garde_id', gardeId).in('place_index', [0, 1])
       const placements = placementsPourPaire(cabinetIdGarde, gardeId, premier_id, second_id)
       if (placements.length > 0) {
         const { error: placementsErr } = await supabase.from('garde_placements').insert(placements)
@@ -148,6 +177,26 @@ export async function appliquerChangementGarde(
     }
   } catch (e) {
     console.error('[P3b-2] miroir garde_placements exception:', e)
+  }
+
+  // ── B-179c — une place au-delà de la deuxième ──────────────────────────
+  //    Ici `garde_placements` n'est PAS un miroir : c'est la seule écriture de
+  //    cette place (la vue `planning_semaine` la lit dans `places_sup`). Un
+  //    échec ne peut donc pas être « best-effort » — la place ne serait prise
+  //    nulle part. On s'arrête et on le dit.
+  if (params.placeSup) {
+    const cabinetIdGarde = (garde as Record<string, unknown>).cabinet_id as string | null
+    if (!cabinetIdGarde) return { ok: false, status: 500, error: 'Cabinet de la garde introuvable.' }
+    const { error: supErr } = await supabase.from('garde_placements').insert({
+      cabinet_id: cabinetIdGarde,
+      garde_id: gardeId,
+      place_index: params.placeSup.index,
+      role: params.placeSup.role,
+      veterinaire_id: params.placeSup.vetId,
+    })
+    if (supErr) {
+      return { ok: false, status: supErr.code === '23505' ? 409 : 500, error: supErr.code === '23505' ? 'Cette place vient d’être prise par quelqu’un d’autre.' : `Place non enregistrée : ${supErr.message}` }
+    }
   }
 
   // ── Synchro V2 (P6 verrou n°7, étape 3) — miroir `attributions` ──
