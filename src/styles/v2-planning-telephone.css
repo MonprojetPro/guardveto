@@ -1,0 +1,189 @@
+/* ============================================================
+   GUARDVETO — Le planning sur téléphone (B-179a)
+   ============================================================
+   Importée par `PlanningTelephone.tsx` LUI-MÊME : un composant qui dépend
+   d'une feuille importée par sa page perd ses styles le jour où la page
+   change (B-177, 28/10).
+
+   LA BASCULE : sous 640 px, la liste remplace les grilles (`.plan-bureau`
+   enveloppe les deux, dans `app/(v2)/planning/page.tsx`). Au-dessus, la liste
+   est cachée — le bureau ne change pas d'un pixel.
+   ============================================================ */
+
+.v2 .plan-tel { display: none; }
+
+@media (max-width: 640px) {
+  .v2 .plan-tel { display: block; padding-bottom: 28px; }
+  .v2 .plan-bureau { display: none; }
+}
+
+.plan-tel .pt-tete { padding: 4px 4px 10px; }
+.plan-tel .pt-kick {
+  font-family: var(--font-display); font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent-ink);
+}
+.plan-tel .pt-tete h1 { margin-top: 2px; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.01em; }
+
+/* ---- Mes jours / Tout le cabinet ---- */
+.plan-tel .pt-bascule {
+  display: grid; grid-template-columns: 1fr 1fr;
+  background: var(--surface-2); border: 1px solid var(--t-border);
+  border-radius: 14px; padding: 3px; margin-bottom: 10px;
+}
+.plan-tel .pt-bascule button {
+  font-family: var(--font-display); font-size: 0.875rem; font-weight: 700;
+  border: 0; background: none; color: var(--t-muted);
+  min-height: 44px; border-radius: 11px;
+}
+.plan-tel .pt-bascule button.on {
+  background: var(--surface); color: var(--text);
+  box-shadow: 0 1px 3px rgba(110, 62, 14, 0.15);
+}
+
+/* ---- La barre de semaine, collée en haut quand on défile ---- */
+.plan-tel .pt-semaine-nav {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 6px 0 8px;
+  background: var(--bg);
+}
+.plan-tel .pt-semaine-titre { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
+.plan-tel .pt-semaine-titre b { font-family: var(--font-display); font-size: 0.95rem; }
+.plan-tel .pt-fleche {
+  flex: none; width: 44px; height: 44px; border-radius: 50%;
+  border: 1px solid var(--border-strong); background: var(--surface);
+  font-family: var(--font-display); font-size: 1.2rem; font-weight: 700; color: var(--t-muted);
+}
+.plan-tel .pt-aujourdhui {
+  font-family: var(--font-display); font-size: 0.8125rem; font-weight: 700;
+  border: 1px solid var(--border-strong); background: var(--surface);
+  border-radius: 999px; min-height: 40px; padding: 0 16px; color: var(--accent-ink);
+}
+.plan-tel .pt-note {
+  font-size: 0.8125rem; color: var(--t-muted);
+  background: var(--surface); border: 1px dashed var(--border-strong);
+  border-radius: 12px; padding: 8px 12px; margin-bottom: 10px;
+}
+
+/* ---- Les semaines ---- */
+.plan-tel .pt-section { scroll-margin-top: 64px; }
+.plan-tel .pt-section-titre {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  font-size: 0.95rem; font-weight: 700; margin: 14px 4px 8px;
+}
+.plan-tel .pt-section-titre small { font-family: var(--font-body); font-size: 0.8125rem; font-weight: 500; color: var(--t-muted); }
+.plan-tel .pt-bilan {
+  font-size: 0.875rem; color: var(--t-muted);
+  background: var(--surface); border: 1px dashed var(--border-strong);
+  border-radius: 14px; padding: 9px 12px; margin-bottom: 8px;
+}
+.plan-tel .pt-bilan b { color: var(--text); }
+.plan-tel .pt-replie {
+  display: block; width: 100%; min-height: 44px;
+  border: 0; background: none; text-align: center;
+  font-size: 0.8125rem; color: var(--t-muted);
+}
+.plan-tel .pt-replie u { color: var(--accent-ink); font-weight: 700; text-decoration-thickness: 1px; }
+
+/* ---- Une carte de jour : un bouton, pleine largeur ---- */
+.plan-tel .pt-jour {
+  position: relative;
+  display: grid; grid-template-columns: 50px minmax(0, 1fr); gap: 10px;
+  width: 100%; text-align: left; color: inherit; font: inherit;
+  background: var(--surface); border: 1px solid var(--t-border); border-radius: 18px;
+  padding: 12px 12px 12px 8px; margin-bottom: 8px;
+}
+.plan-tel .pt-jour.auj { border: 2px solid var(--t-accent); box-shadow: 0 0 0 4px var(--accent-soft); margin-top: 14px; }
+.plan-tel .pt-jour.auj::before {
+  content: "Aujourd’hui";
+  position: absolute; top: -11px; left: 12px;
+  background: var(--t-accent); color: #fff;
+  font-family: var(--font-display); font-size: 0.72rem; font-weight: 700;
+  border-radius: 999px; padding: 2px 11px;
+}
+.plan-tel .pt-jour.passe { opacity: 0.6; }
+.plan-tel .pt-jour.hors { background: var(--surface-2); }
+.plan-tel .pt-date { text-align: center; padding-top: 2px; }
+.plan-tel .pt-date small {
+  display: block; font-family: var(--font-display); font-size: 0.75rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em; color: var(--t-muted);
+}
+.plan-tel .pt-date b { display: block; font-family: var(--font-display); font-size: 1.6rem; font-weight: 800; line-height: 1; margin-top: 2px; }
+.plan-tel .pt-lignes { display: grid; gap: 7px; min-width: 0; }
+.plan-tel .pt-bloc { display: grid; gap: 5px; }
+.plan-tel .pt-ligne { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; font-size: 0.875rem; min-width: 0; }
+.plan-tel .pt-quoi { font-weight: 700; }
+.plan-tel .pt-heure { color: var(--t-muted); font-size: 0.8125rem; }
+.plan-tel .pt-qui { color: var(--t-muted); font-size: 0.875rem; overflow-wrap: anywhere; }
+.plan-tel .pt-vide { color: var(--soft); font-size: 0.8125rem; font-style: italic; }
+.plan-tel .pt-etiq {
+  flex: none;
+  font-family: var(--font-display); font-size: 0.72rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  border-radius: 8px; padding: 2px 8px;
+}
+.plan-tel .pt-etiq.garde { background: var(--accent-soft); color: var(--accent-ink); }
+.plan-tel .pt-etiq.journee { background: var(--ok-soft); color: var(--ok); }
+.plan-tel .pt-etiq.absence { background: var(--warn-soft); color: var(--warn); }
+.plan-tel .pt-trou {
+  display: inline-flex; align-items: center;
+  background: var(--danger-soft); color: var(--danger);
+  border-radius: 10px; padding: 6px 10px;
+  font-size: 0.8125rem; font-weight: 700;
+}
+.plan-tel .pt-trou.large { flex: 1; min-height: 40px; }
+.plan-tel .pt-noms { display: flex; flex-wrap: wrap; gap: 5px; }
+.plan-tel .pt-nom {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 0.8125rem; font-weight: 600;
+  background: var(--surface-2); border-radius: 999px; padding: 3px 12px 3px 4px;
+}
+.plan-tel .pt-nom i {
+  width: 20px; height: 20px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--font-display); font-size: 0.66rem; font-weight: 800; font-style: normal;
+}
+.plan-tel .pt-nom.moi { box-shadow: inset 0 0 0 2px var(--accent-ink); }
+
+/* ---- La feuille du jour, qui monte du bas ---- */
+.plan-tel .pt-voile {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(58, 42, 28, 0.45);
+  display: flex; align-items: flex-end;
+}
+.plan-tel .pt-feuille {
+  position: relative;
+  width: 100%; max-height: 85dvh; overflow-y: auto;
+  background: var(--surface);
+  border-radius: 26px 26px 0 0;
+  padding: 8px 16px calc(22px + env(safe-area-inset-bottom));
+  box-shadow: 0 -8px 30px rgba(60, 35, 10, 0.25);
+  animation: ptMonte 0.28s var(--ease-out) both;
+}
+@keyframes ptMonte { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .plan-tel .pt-feuille { animation: none; } }
+.plan-tel .pt-poignee { width: 44px; height: 5px; border-radius: 5px; background: var(--border-strong); margin: 4px auto 10px; }
+.plan-tel .pt-fermer {
+  position: absolute; top: 10px; right: 10px;
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 0; background: var(--surface-2);
+  font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; color: var(--t-muted);
+}
+.plan-tel .pt-feuille h3 { font-size: 1.25rem; font-weight: 800; padding-right: 52px; }
+.plan-tel .pt-sous { color: var(--t-muted); font-size: 0.875rem; margin: 2px 0 6px; }
+.plan-tel .pt-bloc-feuille { border-top: 1px dashed var(--t-border); padding: 12px 0; display: grid; gap: 6px; }
+.plan-tel .pt-bloc-feuille h4 {
+  font-family: var(--font-display); font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--t-muted);
+}
+.plan-tel .pt-place { display: flex; align-items: center; min-height: 40px; }
+.plan-tel .pt-tranche-nom { font-size: 0.8125rem; color: var(--t-muted); margin-bottom: 4px; }
+.plan-tel .pt-btn {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 44px; margin-top: 4px;
+  border-radius: 999px; border: 1px solid var(--t-accent);
+  background: var(--t-accent); color: #fff;
+  font-family: var(--font-display); font-size: 0.875rem; font-weight: 700;
+  text-decoration: none;
+}
+.plan-tel .pt-aide { font-size: 0.8125rem; color: var(--t-muted); }

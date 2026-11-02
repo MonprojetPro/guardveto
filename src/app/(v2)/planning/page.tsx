@@ -20,6 +20,8 @@ import '@/styles/v2-propositions-relecture.css'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
 import { PlanningV2, type PlageVacances } from '@/components/v2/PlanningV2'
+import { PlanningTelephone } from '@/components/v2/PlanningTelephone'
+import { composerSemainesTelephone } from '@/lib/planning/joursTelephone'
 import { chargerPropositionsEnAttente } from '@/data/propositionsRelecture'
 import { mettreEnFormePropositions } from '@/lib/planning/propositionsAffichage'
 import { calculerPlacesProposees } from '@/lib/planning/apercuPropositions'
@@ -574,8 +576,12 @@ export default async function PlanningPageV2({
   //    rendu. ⚠️ ET C'EST UNE DETTE : l'écran du client a EXACTEMENT le même
   //    trou, et il le gardera jusqu'à ce que le chantier passe en
   //    `tousLesCabinets`. Écrit ici pour que ce ne soit pas une découverte.
+  //
+  // B-179a (02/11) — CHARGÉ POUR TOUS désormais : la vue TÉLÉPHONE les affiche,
+  //    sur les deux écrans. La grille du client, elle, ne les reçoit toujours
+  //    pas (`PlanningV2` n'a pas ce champ) : son rendu ne bouge pas.
   let absencesGrille: AbsenceGrilleBrute[] = []
-  if (grilleV2) {
+  {
     const res = await supabase
       .from('absences')
       // ⚠️ RELATION NOMMÉE, comme pour `conges` juste au-dessus : `absences`
@@ -986,6 +992,36 @@ export default async function PlanningPageV2({
   // ailleurs — c'est le cas, et c'est la raison pour laquelle on peut le retirer
   // sans rouvrir B-130.
 
+  // ── B-179a — LE PLANNING SUR TÉLÉPHONE ─────────────────────────────────
+  // Composé des MÊMES données que les grilles (gardes déjà triées par la
+  // diffusion, mêmes manques, présences, congés et absences) : aucune seconde
+  // source. Affiché sous 640 px seulement, à la place des grilles.
+  const aujourdhuiParis = new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris' }).format(new Date())
+  const semainesTelephone = composerSemainesTelephone({
+    debut: grille.debut,
+    fin: grille.fin,
+    anneeMois,
+    aujourdhui: aujourdhuiParis,
+    moiVetId: vet?.id ?? '',
+    gardes,
+    manquesParGarde,
+    nomsTypes,
+    presencesParJour,
+    conges,
+    absences: absencesGrille.map((a) => ({
+      vetId: a.veterinaire_id,
+      prenom: prenomDe(a.veterinaires),
+      dateDebut: a.date_debut,
+      dateFin: a.date_fin,
+      perimetre: a.perimetre ?? null,
+      heureDebut: a.heure_debut ?? null,
+      heureFin: a.heure_fin ?? null,
+    })),
+  })
+  const etiquettePeriode = periodeAffichee
+    ? `${nomPeriode(periodeAffichee)} · ${periodeAffichee.publie_at ? 'publié' : 'brouillon'}`
+    : null
+
   return (
     <>
       <Satin />
@@ -1008,6 +1044,20 @@ export default async function PlanningPageV2({
             ⚠️ Le témoin du lot 0 a été RETIRÉ ici : il annonçait la porte, la
                grille la prouve mieux que lui. Le laisser aurait fait doublon,
                et c'est exactement ce que son propre en-tête interdisait. */}
+        <PlanningTelephone
+          semaines={semainesTelephone}
+          gardes={gardes}
+          anneeMois={anneeMois}
+          aujourdhui={aujourdhuiParis}
+          moiVetId={vet?.id ?? ''}
+          isAdmin={isAdmin}
+          lectureSeule={estSecretaire}
+          nomsTypes={nomsTypes}
+          etiquettePeriode={etiquettePeriode}
+        />
+        {/* B-179a — les deux grilles, cachées sous 640 px (la liste ci-dessus
+            prend leur place). Au-dessus, rien ne change. */}
+        <div className="plan-bureau">
         {grilleV2 ? (
           <PlanningChantierV2
             gardes={gardes}
@@ -1123,6 +1173,7 @@ export default async function PlanningPageV2({
           presencesParJour={presencesParJour}
         />
         )}
+        </div>
       </div>
     </>
   )
