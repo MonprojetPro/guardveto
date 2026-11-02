@@ -107,6 +107,17 @@
   .v2 .saisie-raz.confirme { width: auto; }
   .v2 .mini-chip { min-height: 40px; padding: 6px 14px; font-size: 0.8125rem; }
 
+  /* ---- Les onglets (Absences, Organisation) ----
+     Une pilule à 999 px qui passe sur deux lignes devient un ovale déformé
+     (capture MiKL, 02/11). Sur téléphone : un cadre aux coins simplement
+     arrondis, des onglets qui se partagent la largeur. */
+  .v2 .tabs { display: grid; grid-template-columns: 1fr 1fr; width: 100%; border-radius: var(--r-md); }
+  .v2 .tabs button {
+    justify-content: center; text-align: center;
+    white-space: normal; line-height: 1.2;
+    border-radius: 12px; padding: 8px 10px;
+  }
+
   /* ---- 5. Ce qui sortait de l'écran ---- */
   /* Le renard de bordure (Règles, Planning) se tient HORS de la carte : sans
      marge autour d'elle, il élargissait la page de 130 px. */

@@ -116,6 +116,9 @@ const TYPE_EMAIL: Record<string, string> = {
   conge_valide: 'Congé validé',
   conge_refuse: 'Congé refusé',
   email_test: 'Essai d’envoi',
+  // Autorisé en base depuis B-134 (26/09) et jamais traduit ici : l'écran
+  // affichait le code brut « conge_demande » (capture MiKL, 02/11).
+  conge_demande: 'Demande de congé',
 }
 
 /**
@@ -856,7 +859,11 @@ export function ReglagesV2({
                       <span className="msd" aria-hidden="true" />
                       {LIBELLE_STATUT[e.statut] ?? e.statut}
                     </span>
-                    {e.erreur && (
+                    {/* La colonne `erreur` vaut « sent » quand Brevo a ACCEPTÉ
+                        le message : sous « Remis », elle s'affichait en rouge
+                        comme une panne. On ne montre une raison que si l'e-mail
+                        n'est pas arrivé, ou pas encore. */}
+                    {e.erreur && (TON_STATUT[e.statut] === 'echec' || TON_STATUT[e.statut] === 'attente') && (
                       <span className="m-erreur" title={e.erreur}>
                         {raisonEchec(e.erreur)}
                       </span>

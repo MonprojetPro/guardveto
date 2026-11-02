@@ -198,6 +198,9 @@ requalifie non bloquant). Detail integral → archive 3ter.
 
 | ID | Ce qui etait annonce | Ce qui est reellement livre | Verdict |
 |---|---|---|---|
+| B-179 | Recette MiKL 02/11 (3 captures) — onglets en pilule deformee (Absences, Organisation). | `v2-mobile.css` : sous 640 px, `.tabs` en grille 2 colonnes, rayon 18 px, libelles qui passent a la ligne. Mesure 372 px : Organisation 4 onglets en 2×2 (157 px chacun, cadre 104 px de haut), Absences 3 onglets, rayon 18 px ; pages 357-370 px, pas de debordement. | ✅ |
+| B-179 | Recette 02/11 — « sent » en rouge sous « Remis » dans le journal des e-mails. | `ReglagesV2.tsx` : la raison ne s'affiche que si le statut est en echec ou en attente (`erreur` vaut « sent » a l'envoi accepte, 213 lignes en base). Mesure : 0 raison affichee sur 9 e-mails remis. | ✅ |
+| B-179 | Recette 02/11 — type brut « conge_demande ». | `TYPE_EMAIL` complete : les 9 types autorises par `email_log_type_check` sont traduits. Mesure : 0 type brut sur 9. | ✅ |
 | B-179a | Sous 640 px, une liste par jour remplace les deux grilles ; bureau inchange. | `PlanningTelephone.tsx` + `.plan-bureau` (page). Mesure bac a sable : a 372 px liste `block`, grille `none`, page 357 px (pas de debordement), 6 semaines, cartes 329 px, 0 texte < 11,5 px ; a 1280 px grille `block`, liste `none`. | ✅ |
 | B-179a | Choix 1 — veto sur « Mes jours », admin et secretariat sur « Tout le cabinet ». | `useState` initial selon `isAdmin`/`lectureSeule`/`moiVetId`. Vu en admin : onglet « Tout le cabinet ». Vue veto NON vue a l'ecran (compte admin seul). | ✅ code (veto non vu) |
 | B-179a | Choix 2 — semaine par semaine + « Aujourd'hui », defilement continu. | Barre collee (fleches 44 px, « Aujourd'hui » 40 px mesure), semaine courante suivie au defilement, ouverture sur la semaine du jour ; carte du jour entouree (mesuree). Bords du mois → mois voisin. | ✅ |
