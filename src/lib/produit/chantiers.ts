@@ -68,10 +68,10 @@ export const CHANTIERS: Record<string, Chantier> = {
     item: 'B-153',
     depuis: '2026-10-08',
     diffusion: {
-      bacASableSeulement:
-        'Renouveau visuel demande par MiKL le 08/10, le jour meme ou la version ' +
-        'precedente (B-145) a du etre revertee parce qu elle etait partie chez le ' +
-        'client sans garde-fou. Il reste au bac a sable jusqu a sa recette.',
+      tousLesCabinets:
+        'Recette au bac a sable du 08/10 au 03/11. Bascule decidee par MiKL le ' +
+        '03/11 (B-185) : « tout a fini d etre developpe, on peut lancer la ' +
+        'bascule ». Photographie du Val d Allier prise juste avant (B-184).',
     },
   },
 }
@@ -91,8 +91,12 @@ export interface ContexteDiffusion {
  *    risque n'est pas le meme. Un ruban manquant est un confort perdu ; un
  *    chantier ouvert par erreur, c'est l'incident du 08/10.
  */
-export function chantierOuvert(id: string, ctx: ContexteDiffusion): boolean {
-  const chantier = CHANTIERS[id]
+export function chantierOuvert(
+  id: string,
+  ctx: ContexteDiffusion,
+  catalogue: Record<string, Chantier> = CHANTIERS,
+): boolean {
+  const chantier = catalogue[id]
   if (!chantier) return false
   if ('tousLesCabinets' in chantier.diffusion) return true
   return ctx.estBacASable === true

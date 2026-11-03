@@ -36,7 +36,7 @@
 import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import { CHANTIERS, chantierOuvert } from '../../src/lib/produit/chantiers'
+import { CHANTIERS, chantierOuvert, type Chantier } from '../../src/lib/produit/chantiers'
 
 const SRC = join(__dirname, '..', '..', 'src')
 const DOSSIER_CHANTIER = join(SRC, 'components', 'chantier')
@@ -84,12 +84,23 @@ describe('La porte des chantiers', () => {
     expect(chantierOuvert('', { estBacASable: true })).toBe(false)
   })
 
+  // Le mecanisme reste teste sur un chantier FICTIF : depuis la bascule du
+  // 03/11 (B-185), aucun chantier reel n'est restreint, mais le prochain le sera.
+  const FICTIF: Record<string, Chantier> = {
+    'chantier-essai': {
+      nom: 'Chantier d essai',
+      item: 'B-185',
+      depuis: '2026-11-03',
+      diffusion: { bacASableSeulement: 'Pour les tests seulement.' },
+    },
+  }
+
   it('ferme un chantier restreint quand le cabinet n’est pas un bac a sable', () => {
-    expect(chantierOuvert('planning-grille-v2', { estBacASable: false })).toBe(false)
+    expect(chantierOuvert('chantier-essai', { estBacASable: false }, FICTIF)).toBe(false)
   })
 
   it('ouvre un chantier restreint sur un bac a sable', () => {
-    expect(chantierOuvert('planning-grille-v2', { estBacASable: true })).toBe(true)
+    expect(chantierOuvert('chantier-essai', { estBacASable: true }, FICTIF)).toBe(true)
   })
 
   it('n’ouvre pas sur une valeur approchante de `true` — le test est strict', () => {
@@ -99,9 +110,14 @@ describe('La porte des chantiers', () => {
     const douteux = ['true', 1, 'oui', {}, []] as unknown[]
     for (const v of douteux) {
       expect(
-        chantierOuvert('planning-grille-v2', { estBacASable: v as boolean }),
+        chantierOuvert('chantier-essai', { estBacASable: v as boolean }, FICTIF),
       ).toBe(false)
     }
+  })
+
+  it('B-185 — la grille V2 est ouverte a tous les cabinets, bac a sable ou non', () => {
+    expect(chantierOuvert('planning-grille-v2', { estBacASable: false })).toBe(true)
+    expect(chantierOuvert('planning-grille-v2', { estBacASable: true })).toBe(true)
   })
 })
 
