@@ -18,7 +18,7 @@
 // les garde-fous.
 // ============================================================
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 // Modale de confirmation : on réutilise le Dialog du produit (celui des
@@ -211,6 +211,42 @@ function periodeLisible(c: Conge) {
 }
 
 /**
+ * La pastille d'un conflit, et la liste des gardes qu'elle désigne.
+ *
+ * Sur ordinateur, la liste se lit au survol (`title`), comme avant. Au doigt,
+ * le survol n'existe pas : la pastille s'ouvre au toucher et déroule les dates
+ * dessous (B-179b). Sur ordinateur, la liste dépliée reste masquée par la
+ * feuille : l'écran ne change pas.
+ */
+function ConflitDeroulant({
+  ton,
+  gardes,
+  children,
+}: {
+  ton: 'warn' | 'info'
+  gardes: { date: string; role: string }[]
+  children: ReactNode
+}) {
+  return (
+    <details className="conflict-deroulant">
+      <summary
+        className={`conflict ${ton}`}
+        title={gardes.map((g) => `${g.date} · ${g.role}`).join('\n')}
+      >
+        {children}
+      </summary>
+      <ul className="conflict-liste">
+        {gardes.map((g, i) => (
+          <li key={`${g.date}-${g.role}-${i}`}>
+            {dateLongue(g.date)} · {g.role}
+          </li>
+        ))}
+      </ul>
+    </details>
+  )
+}
+
+/**
  * Le verdict d'un souhait, en QUATRE états distincts.
  *
  * L'écran n'en affichait qu'un : « ✓ Aucun conflit avec le planning publié »,
@@ -234,13 +270,10 @@ function VerdictConflit({ verdict }: { verdict?: VerdictSouhait }) {
   // ① Le plus grave : le planning est parti chez les vétérinaires.
   if (publiees.length > 0) {
     return (
-      <span
-        className="conflict warn"
-        title={publiees.map((g) => `${g.date} · ${g.role}`).join('\n')}
-      >
+      <ConflitDeroulant ton="warn" gardes={publiees}>
         ⚠ {publiees.length} garde{pluriel(publiees.length)} déjà publiée
         {pluriel(publiees.length)} — {publiees[0].periodeLibelle}
-      </span>
+      </ConflitDeroulant>
     )
   }
 
@@ -249,13 +282,10 @@ function VerdictConflit({ verdict }: { verdict?: VerdictSouhait }) {
   //    plutôt que d'inquiéter.
   if (brouillon.length > 0) {
     return (
-      <span
-        className="conflict info"
-        title={brouillon.map((g) => `${g.date} · ${g.role}`).join('\n')}
-      >
+      <ConflitDeroulant ton="info" gardes={brouillon}>
         ◆ {brouillon.length} garde{pluriel(brouillon.length)} en brouillon —{' '}
         {brouillon[0].periodeLibelle} · à regénérer après validation
-      </span>
+      </ConflitDeroulant>
     )
   }
 

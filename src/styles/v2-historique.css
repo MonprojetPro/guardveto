@@ -322,6 +322,45 @@
 @media (max-width: 640px) {
   .cm-row { grid-template-columns: 1fr; gap: 4px; }
   .cm-row.cm-header { display: none; }
+
+  /* B-179b — les compteurs tiennent dans leur carte. Mesuré le 03/11 à
+     372 px : « Journées » et « Bilan » faisaient 356 et 347 px pour une carte
+     de 324. On resserre les marges, les noms longs passent à la ligne, et la
+     carte défile de côté en dernier recours plutôt que de couper un chiffre. */
+  .v2 .count-card { overflow-x: auto; }
+  .v2 .count-table th { font-size: 0.75rem; letter-spacing: 0.02em; padding: 8px 4px 6px; overflow-wrap: anywhere; hyphens: auto; }
+  .v2 .count-table td { padding: 8px 4px; }
+  .v2 .count-table th:first-child,
+  .v2 .count-table td:first-child { padding-left: 12px; }
+  .v2 .ct-vet { display: flex; flex-wrap: wrap; row-gap: 2px; }
+  .v2 .ct-vet .sal,
+  .v2 .except,
+  .v2 .count-table .ecart,
+  .v2 .hf-label { font-size: 0.75rem; }
+  .v2 .count-note { font-size: 0.8125rem; }
+
+  /* Les boutons de période et de périmètre : 40 px au doigt. La hauteur de
+     la liste « Hiver P2 » est imposée (`!important`) par le composant de
+     liste : on la reprend de la même façon. */
+  .v2 .seg button { min-height: 40px; padding-inline: 16px; }
+  .v2 .seg [data-slot='select-trigger'].hf-periode { height: 40px !important; min-height: 40px; padding-inline: 16px; }
+
+  /* Une pilule qui passe sur deux lignes devient un ovale (même défaut que
+     les onglets, capture MiKL du 02/11) : sur téléphone, des coins arrondis. */
+  .v2 .seg { border-radius: var(--r-md); }
+  .v2 .seg button,
+  .v2 .seg [data-slot='select-trigger'].hf-periode { border-radius: 12px; }
+
+  /* Le choix des dates s'ouvre sous « Plage libre », sur TOUTE la largeur de
+     la barre de filtres : ancré au bouton, il partait à droite jusqu'à
+     532 px. `top: auto` le pose à la hauteur du bouton, la marge le fait
+     passer juste dessous. */
+  .v2 .hist-filters { position: relative; }
+  .v2 .hf-plage { position: static; }
+  .v2 .hf-pop {
+    top: auto; left: 0; right: 0;
+    width: auto; margin-top: 48px;
+  }
 }
 
 /* -- Le renvoi vers l'écran Planning --------------------------------------

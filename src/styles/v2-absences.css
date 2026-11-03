@@ -144,6 +144,15 @@
 }
 .conflict.info:hover { background: rgba(76, 96, 122, 0.2); }
 
+/* B-179b — la pastille de conflit est un `<summary>` : au doigt, elle déroule
+   la liste des gardes concernées (le survol, seul porteur de cette liste
+   jusque-là, n'existe pas sur téléphone). Sur ordinateur, rien ne change : pas
+   de triangle, et la liste dépliée reste masquée — le survol suffit. */
+.conflict-deroulant { max-width: 100%; }
+.conflict-deroulant > summary { list-style: none; }
+.conflict-deroulant > summary::-webkit-details-marker { display: none; }
+.conflict-liste { display: none; }
+
 .status-pill {
   display: inline-flex; align-items: center; gap: 5px;
   font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em;
@@ -383,6 +392,37 @@
 }
 @media (max-width: 640px) {
   .tabs button { padding: 9px 12px; font-size: 0.8rem; }
+
+  /* B-179b — le conflit s'ouvre au toucher : une flèche dit qu'il s'ouvre,
+     la liste des dates se déroule dessous. La pastille passe à la ligne
+     plutôt que de déborder (le nom de la période peut être long). */
+  .v2 .conflict-deroulant > summary.conflict {
+    white-space: normal; text-align: left;
+    min-height: 40px; padding: 8px 16px;
+    border-radius: 14px; /* sur deux lignes, une pilule devient un ovale */
+    font-size: 0.8125rem;
+    cursor: pointer;
+  }
+  .v2 .conflict-deroulant > summary.conflict::after {
+    content: '▾'; margin-left: 2px; transition: transform 0.15s;
+  }
+  .v2 .conflict-deroulant[open] > summary.conflict::after { transform: rotate(180deg); }
+  .v2 .conflict-deroulant[open] .conflict-liste {
+    display: block;
+    margin: 6px 0 0; padding: 8px 12px 8px 26px;
+    background: var(--surface-2);
+    border: 1px dashed var(--t-border);
+    border-radius: var(--r-sm);
+    font-size: 0.8125rem; line-height: 1.6; color: var(--text);
+  }
+
+  /* B-179b — cibles et textes de l'écran, au doigt. */
+  .v2 .vet-filter { min-height: 40px; padding-inline: 16px; }
+  .v2 .f-label { font-size: 0.75rem; }
+  .v2 .type-chip,
+  .v2 .status-pill,
+  .v2 .conflict.ok,
+  .v2 .row-histo { font-size: 0.75rem; }
   .crise-veil { padding: 0; align-items: stretch; }
   .crise-panel { width: 100%; height: 100%; border-radius: 0; }
 }

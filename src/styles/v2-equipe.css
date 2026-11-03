@@ -947,6 +947,16 @@
   .secr-tete .btn { margin-left: 0; }
   .secr-carte { flex-wrap: wrap; }
   .secr-ident { flex-basis: 100%; order: 2; }
+
+  /* B-179b — les gestes de la fiche, au doigt : 40 px au moins, et des
+     étiquettes qui se lisent sans plisser les yeux (12 px). */
+  .v2 .acct-cta { min-height: 40px; padding: 8px 16px; font-size: 0.8125rem; }
+  .v2 .acct-muet { min-height: 40px; padding: 8px 4px; font-size: 0.8125rem; }
+  .v2 .secr-outils button:not(.acct-cta) { width: 40px; height: 40px; }
+  .v2 .vl-jeton,
+  .v2 .secr-etat,
+  .v2 .va-nb { font-size: 0.75rem; }
+  .v2 .vet-card-top .vet-mail { font-size: 0.8125rem; }
 }
 
 /* Le bas de l'écran Équipe respire. La section Secrétariat s'y termine, et sa

@@ -16,6 +16,9 @@ export function Satin() {
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    // Téléphone : le satin est figé (B-179b, `v2-mobile.css` § 8). Le faire
+    // glisser à chaque défilement relancerait le travail qu'on vient d'éviter.
+    if (window.matchMedia('(max-width: 640px)').matches) return
     const el = ref.current
     if (!el) return
 

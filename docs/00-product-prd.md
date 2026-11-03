@@ -90,7 +90,8 @@ retravaillée pour rester lisible même avec beaucoup d'informations sur un mêm
 | Sur téléphone, le planning s'affiche en liste jour par jour : « Mes jours » pour un vétérinaire, « Tout le cabinet » pour l'administratrice, un appui sur un jour pour voir le détail, proposer un échange ou attribuer une place | 🟡 À recetter | 2026-11-02 `[B-179a]` |
 | Décider si un vétérinaire peut prendre lui-même une place vide depuis son téléphone | 🔵 À qualifier | — `[B-179c]` |
 | Sur téléphone, le planning montre une seule semaine à la fois : les flèches ou un balayage du doigt passent à la semaine voisine, et un appui sur le nom du mois permet de sauter directement à un autre mois | 🟢 Livré | 2026-11-03 `[B-182]` |
-| Sur téléphone, les écrans d'administration (règles, historique, absences) ont des boutons et des textes à la taille du doigt | ⚪ À faire | — `[B-179b]` |
+| Sur téléphone, les écrans d'administration (organisation, absences, équipe, historique) ont des boutons à la taille du doigt et des textes lisibles, la liste des gardes en conflit avec un congé s'ouvre d'un appui, les compteurs de l'historique tiennent dans l'écran, et le décor de fond ne bouge plus pour ne pas ralentir le téléphone | 🟡 À recetter | 2026-11-03 `[B-179b]` |
+| Sur téléphone, le prénom dans la barre et l'initiale des pastilles rondes sont encore un peu petits | ⚪ À faire | — `[B-179f]` |
 
 ---
 

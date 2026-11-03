@@ -137,4 +137,27 @@
   }
   .v2 .mail-table tr:last-child { border-bottom: none; }
   .v2 .mail-table td { display: block; padding: 0; border: none; min-width: 0; overflow-wrap: anywhere; }
+
+  /* ---- 6. Les cibles au doigt : 40 px au moins (B-179b) ----
+     Mesuré le 03/11 à 375 px : les petits boutons (`.btn-sm`) et les boutons
+     d'icône (`.icon-btn`) faisaient 34 px sur Organisation et Absences. On ne
+     touche qu'à la HAUTEUR et au retrait (40 % de la hauteur, la règle des
+     pilules) : la forme de chaque bouton reste celle de sa feuille. */
+  .v2 .btn-sm { min-height: 40px; padding-inline: 16px; }
+  .v2 .icon-btn { width: 40px; height: 40px; }
+
+  /* ---- 7. Les compteurs : 12 px au moins (B-179b) ---- */
+  .v2 .section-count,
+  .v2 .tabs .count { font-size: 0.75rem; }
+
+  /* ---- 8. Le décor animé, allégé (B-179b) ----
+     Sur un téléphone moyen, deux nappes floutées plein écran qui respirent en
+     continu (et en mélange de calques) font ramer le défilement. On garde le
+     satin tel qu'il se dessine, mais IMMOBILE : il est peint une fois, puis
+     plus rien ne le recalcule. Le décalage au défilement est coupé aussi,
+     côté `Satin.tsx`. */
+  .v2 .satin { will-change: auto; }
+  .v2 .silk i,
+  .v2 .folds,
+  .v2 .sheen { animation: none; will-change: auto; }
 }

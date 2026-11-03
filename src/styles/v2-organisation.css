@@ -107,3 +107,10 @@
 @media (max-width: 720px) {
   .org-tuiles { grid-template-columns: 1fr; }
 }
+
+/* B-179b — au doigt, l'interrupteur d'une tuile fait 40 px de haut. Sa marge
+   négative grandit d'autant : la tuile ne change pas de hauteur, seule la
+   zone touchable s'agrandit. */
+@media (max-width: 640px) {
+  .v2 .org-inter { min-height: 40px; margin-block: -10px; }
+}

@@ -1231,3 +1231,8 @@
     animation: none;
   }
 }
+
+/* B-179b — l'étiquette d'état (« En pause »…) lisible au téléphone : 12 px. */
+@media (max-width: 640px) {
+  .v2 .etiq { font-size: 0.75rem; }
+}
