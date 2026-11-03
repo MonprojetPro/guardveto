@@ -24,6 +24,7 @@ import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
 import { enregistrerHistoriqueFetes } from '@/data/historiqueFetes'
 import { compterSouhaitsCongesEnAttente } from '@/data/souhaitsCongesEnAttente'
 import { casesAPourvoir, type CaseAPourvoir } from '@/data/casesAPourvoir'
+import { sansDoublonDesCases } from '@/lib/planning/doublonsCases'
 import type { ViolationRevalidation } from '@/components/planning/types-revalidation'
 
 // Laisse le temps à la synchro agenda (par lots) + envoi des emails
@@ -197,6 +198,9 @@ export async function POST(req: NextRequest) {
     } catch (e) {
       console.error('[publish] Re-validation impossible (gate best-effort):', e)
     }
+    // B-180 — une place vide est déjà dans `casesAPourvoir` : sa violation de
+    // couverture (même date, même rôle) la redisait mot pour mot plus bas.
+    violations = sansDoublonDesCases(violations, casesVides)
 
     // Source unique (backlog n°24) : la MÊME détection alimente le pré-vol de
     // génération (/api/generate/pre-vol) — signal précoce — et ce gate — tardif.
