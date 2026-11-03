@@ -90,7 +90,7 @@ h1,h2,h3,h4{font-family:Figtree,system-ui,sans-serif}
 
 <div class="intro">
   <h1>« Mon agenda », en un seul choix</h1>
-  <p>Maquette pour B-181, à valider avant de coder l'écran. Décidé le 03/11 : chaque personne choisit <b>un seul</b> agenda dans son Google Agenda. <b>« Mon planning »</b> (ce qui la concerne) ou <b>« Tout le cabinet »</b> (toute l'équipe), jamais les deux, pour éviter les doublons.</p>
+  <p>Maquette pour B-181, à valider avant de coder l'écran. Décidé le 03/11 : chaque personne a <b>un seul</b> agenda GuardVeto dans son Google Agenda, et choisit ce qu'il contient : <b>« Mon planning »</b> (ce qui la concerne) ou <b>« Tout le cabinet »</b> (toute l'équipe). Chaque choix a son réglage des journées.</p>
   <p>Données fictives. On regarde avec les yeux de <b>Manon</b>, vétérinaire.</p>
 </div>
 
@@ -155,7 +155,7 @@ h1,h2,h3,h4{font-family:Figtree,system-ui,sans-serif}
 
 <!-- ═══════════ 2. TOUT LE CABINET ═══════════ -->
 <div class="etat"><span class="num">2</span><h2>L'autre choix : « Tout le cabinet »</h2>
-  <p>Manon coche « Tout le cabinet ». GuardVeto retire son agenda perso et lui partage l'agenda complet, automatiquement : il n'y a jamais les deux.</p></div>
+  <p>Manon coche « Tout le cabinet ». Son agenda « GuardVeto — Manon » se remplit avec toute l'équipe, à la place de son seul planning : c'est toujours UN agenda, donc jamais de doublon, et elle le règle comme elle veut.</p></div>
 <div class="duo">
   <div class="ecran">
     <div class="tete"><div class="kick">Réglages</div><h3>Mon agenda</h3><p>Votre planning GuardVeto dans votre Google Agenda, mis à jour tout seul.</p></div>
@@ -172,17 +172,21 @@ h1,h2,h3,h4{font-family:Figtree,system-ui,sans-serif}
           <div>
             <b>Tout le cabinet</b>
             <div class="desc">Les gardes de toute l'équipe, et chaque jour un bandeau qui dit qui est au cabinet.</div>
-            <div class="sous"><div class="aide">Pas d'option ici : cet agenda est le même pour toute l'équipe. Vos gardes y figurent avec votre prénom.</div></div>
+            <div class="sous">
+              <div class="sous-q">Les journées de l'équipe</div>
+              <div class="seg"><span class="on">Un bandeau en haut du jour</span><span>Aux heures, dans les cases</span></div>
+              <div class="aide">En bandeau, une seule ligne par jour dit qui est au cabinet : l'agenda reste léger. Aux heures, chaque collègue apparaît sur son créneau.</div>
+            </div>
           </div>
         </div>
       </div>
-      <div class="etat-google"><span>Agenda « Planning du cabinet » · partagé avec vous</span><span class="btn sec">Ouvrir dans Google Agenda</span></div>
+      <div class="etat-google"><span>Agenda « GuardVeto — Manon » · à jour</span><span class="btn sec">Ouvrir dans Google Agenda</span></div>
     </div>
   </div>
 
   <div>
     <div class="google">
-      <div class="g-tete"><span class="g-pastille" style="background:#8e3b1a"></span><b>Planning du cabinet</b><span style="margin-left:auto;color:#70757a">sem. du 2 novembre</span></div>
+      <div class="g-tete"><span class="g-pastille" style="background:#d06b30"></span><b>GuardVeto — Manon</b><span style="color:#70757a">· tout le cabinet, journées en bandeau</span><span style="margin-left:auto;color:#70757a">sem. du 2 novembre</span></div>
       <div class="g-grille">
         <div class="g-heures"><span>8h</span><span>12h</span><span>14h</span><span>19h</span></div>
         <div class="g-jour"><h5>mar.<b>3</b></h5>
@@ -203,7 +207,7 @@ h1,h2,h3,h4{font-family:Figtree,system-ui,sans-serif}
         </div>
       </div>
     </div>
-    <div class="note"><b>Comment on évite la surcharge :</b> les journées de toute l'équipe tiennent dans <b>un seul bandeau par jour</b>, en haut de la journée, au lieu d'une vingtaine de créneaux horaires par semaine. Il ne bloque aucune heure dans l'agenda. Les gardes restent une par place, comme aujourd'hui.</div>
+    <div class="note"><b>Comment on évite la surcharge :</b> les journées de toute l'équipe tiennent dans <b>un seul bandeau par jour</b>, en haut de la journée, au lieu d'une vingtaine de créneaux horaires par semaine. Il ne bloque aucune heure dans l'agenda. Les gardes restent une par place, comme aujourd'hui. Celui qui préfère voir chaque collègue sur son créneau choisit « Aux heures, dans les cases ».</div>
   </div>
 </div>
 
