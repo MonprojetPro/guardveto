@@ -50,6 +50,7 @@
 // le verrouille ; `lignesDeLaSemaine` rend une ligne par personne MEME VIDE.
 // ============================================================
 
+import { Lock } from 'lucide-react'
 import { estJourFerie } from '@/engine/utils'
 import { stylePoint } from '@/lib/couleurs'
 import {
@@ -449,6 +450,9 @@ function CaseJour({
           vue={vue}
           prenomEnAvant={prenomEnAvant}
           onOuvrirJournee={onOuvrirJournee}
+          // B-186 — le cadenas se voit replié aussi, pour les mêmes personnes
+          // qu'à la case dépliée (celles qui ont le geste de cadenas).
+          vetsFiges={rendreCadenas ? vetsFiges : undefined}
         />
       ) : (
         <CaseDepliee
@@ -579,13 +583,30 @@ function CaseRepliee({
   vue,
   prenomEnAvant,
   onOuvrirJournee,
+  vetsFiges,
 }: {
   jour: JourGrille
   vue: { gardesVisibles: boolean; journeeVisible: boolean }
   /** Voir `ProprietesGrille.prenomEnAvant` : on compare ce qui est AFFICHE. */
   prenomEnAvant?: string | null
   onOuvrirJournee?: (date: string) => void
+  /**
+   * B-186 — MiKL, 03/11 : « je voudrais que les cadenas apparaissent à gauche
+   * des noms des personnes de garde sur les cards repliées ». Absent = pas de
+   * cadenas (même règle que la case dépliée : qui n'a pas le geste ne le voit pas).
+   */
+  vetsFiges?: (gardeId: string) => ReadonlySet<string>
 }) {
+  // Un cadenas EN LECTURE : replié, un clic déplie la semaine, il ne doit donc
+  // pas libérer une place par surprise. Le geste reste à la case dépliée.
+  const estFige = (p: { gardeId?: string; vetId?: string | null }) =>
+    Boolean(vetsFiges && p.gardeId && p.vetId && vetsFiges(p.gardeId).has(p.vetId))
+  // La colonne du cadenas n'existe que si le jour en porte un : sinon les noms
+  // gardent leur place habituelle. Quand elle existe, elle est réservée sur
+  // CHAQUE ligne de nuit, pour que les deux noms restent alignés.
+  const colonneCadenas = Boolean(
+    vetsFiges && jour.gardes.some((g) => g.places.some((p) => p.vetId && vetsFiges(g.id).has(p.vetId))),
+  )
   return (
     <>
       {/* B-159 ③ — LA CASE REPLIEE, VERSION « B » retenue par MiKL le 11/10.
@@ -643,6 +664,17 @@ function CaseRepliee({
                   {l.genre === 'absents' && (l.nombre === 1 ? 'absent' : 'absents')}
                 </span>
               </>
+            )}
+            {l.genre === 'nuit' && colonneCadenas && (
+              <span
+                className={l.pastilles.some(estFige) ? 'pv2-cad-replie fixe' : 'pv2-cad-replie'}
+                title={l.pastilles.some(estFige) ? 'Place fixée : la régénération n’y touchera pas' : undefined}
+                aria-hidden={l.pastilles.some(estFige) ? undefined : true}
+              >
+                {l.pastilles.some(estFige) && (
+                  <Lock aria-label="Place fixée" />
+                )}
+              </span>
             )}
             {l.genre === 'nuit' && l.pastilles.map((p, j) => (
               <span

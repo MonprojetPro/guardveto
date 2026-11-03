@@ -353,8 +353,18 @@ export interface LigneRepliee {
   genre: 'presents' | 'absents' | 'nuit' | 'pourvoir'
   /** Le libellé court à gauche (« Nuit », « Abs. »), ou une chaîne vide. */
   etiquette: string
-  /** Les pastilles : un prénom, une couleur. */
-  pastilles: { texte: string; couleur: string | null; creux: boolean }[]
+  /**
+   * Les pastilles : un prénom, une couleur. `gardeId` + `vetId` ne sont posés
+   * que sur la ligne NUIT (B-186) : la case repliée en a besoin pour savoir si
+   * la place de cette personne est fixée par un cadenas.
+   */
+  pastilles: {
+    texte: string
+    couleur: string | null
+    creux: boolean
+    gardeId?: string
+    vetId?: string | null
+  }[]
   /** Le gros chiffre, pour la ligne « présents » uniquement. */
   nombre: number | null
 }
@@ -414,7 +424,7 @@ export function lignesCaseRepliee(
     let aPourvoir = 0
     for (const g of jour.gardes) {
       for (const p of g.places) {
-        if (p.prenom) tenues.push({ texte: p.prenom, couleur: p.couleur, creux: false })
+        if (p.prenom) tenues.push({ texte: p.prenom, couleur: p.couleur, creux: false, gardeId: g.id, vetId: p.vetId })
       }
       aPourvoir += g.manque
     }

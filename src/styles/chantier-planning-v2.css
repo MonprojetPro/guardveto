@@ -2555,3 +2555,22 @@
   .pv2h-axes { margin-left: 0; flex-wrap: wrap; }
   .pv2h-r1 .pv2h-axes + .pv2h-gestes { margin-left: 0; }
 }
+
+/* B-186 — le cadenas d'une place fixée, à gauche du nom, case REPLIÉE.
+   En lecture seule (le geste reste à la case dépliée). Même couleur que le
+   cadenas fermé de la case dépliée (`.cad-fixe`), pour qu'on le reconnaisse.
+   La colonne est réservée sur les deux lignes de nuit du jour : sans ça, le
+   nom non fixé partirait 14 px plus à gauche que son binôme. */
+.pv2-cad-replie {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 18px;
+}
+.pv2-cad-replie svg {
+  width: 11px;
+  height: 11px;
+  color: var(--accent-ink, var(--pv2-txt));
+}
