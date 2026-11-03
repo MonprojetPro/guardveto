@@ -55,6 +55,11 @@ export interface ResultatCadenas {
    * lui, ne s'inverse pas — il n'y a donc plus rien à convertir côté écran.
    */
   vetsFiges?: string[]
+  /**
+   * B-187 — présent quand le geste portait sur UN JOUR remplacé : le résultat
+   * ne vaut que pour ce jour, pas pour toute la garde du week-end.
+   */
+  date?: string
 }
 
 /** Appel unique au serveur — les deux gestes passent par la même porte. */
@@ -74,6 +79,7 @@ async function appeler(corps: Record<string, unknown>): Promise<ResultatCadenas>
       avertissements: data?.avertissements ?? [],
       gardeId: data?.gardeId,
       vetsFiges: (data?.vetsFiges ?? []) as string[],
+      date: typeof data?.date === 'string' ? data.date : undefined,
     }
   } catch {
     return {
@@ -98,12 +104,18 @@ export function BoutonCadenas({
   prenom,
   fige,
   onFini,
+  date,
 }: {
   gardeId: string
   vetId: string
   prenom: string | null
   fige: boolean
   onFini: (r: ResultatCadenas) => void
+  /**
+   * B-187 — le jour affiché. Sur un jour remplacé (25/12 d'un week-end), c'est
+   * lui qui permet au serveur de fixer le REMPLACEMENT et pas le week-end.
+   */
+  date?: string
 }) {
   const [enCours, setEnCours] = useState(false)
 
@@ -129,6 +141,7 @@ export function BoutonCadenas({
           gardeId,
           veterinaireId: vetId,
           geste: fige ? 'liberer' : 'poser',
+          ...(date ? { date } : {}),
         })
         setEnCours(false)
         onFini(r)

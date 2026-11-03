@@ -150,6 +150,7 @@ export async function POST(req: NextRequest) {
   // On lit la garde RÉELLE (celle de la table, pas la ligne affichée) et on
   // cherche la place que la personne y tient. Plus rien à convertir : la ligne
   // du vendredi peut bien inverser ses rôles, la personne, elle, ne bouge pas.
+  let remplacement: { id: string } | null = null
   let gardeExistante: {
     id: string
     premier_id: string | null
@@ -181,7 +182,31 @@ export async function POST(req: NextRequest) {
     gardeExistante = g
     periodeId = g.periode_id
 
-    if (g.premier_id === veterinaireId) role = 'premier'
+    // B-187 — UN JOUR REMPLACÉ PORTE SON PROPRE CADENAS. Le 25/12 d'un week-end
+    // peut être tenu par d'autres que les titulaires (remplacement d'un jour) :
+    // l'écran envoie alors la date, et c'est le remplacement qu'on fixe ou
+    // libère — jamais la garde du week-end. Cherché AVANT les titulaires : une
+    // personne peut tenir le week-end ET remplacer l'autre place ce jour-là.
+    if (date) {
+      const { data: ex, error: exErr } = await supabase
+        .from('gardes_exceptions')
+        .select('id')
+        .eq('garde_id', g.id)
+        .eq('date', date)
+        .eq('veterinaire_id', veterinaireId!)
+        .maybeSingle()
+      if (exErr) {
+        return NextResponse.json(
+          { error: `Lecture du remplacement impossible : ${exErr.message}` },
+          { status: 500 },
+        )
+      }
+      remplacement = ex as { id: string } | null
+    }
+
+    if (remplacement) {
+      // Le rôle ne sert pas : on agit sur la ligne du remplacement.
+    } else if (g.premier_id === veterinaireId) role = 'premier'
     else if (g.second_id === veterinaireId) role = 'second'
     else {
       // L'écran désigne quelqu'un que la garde ne porte pas : il a une vue
@@ -218,6 +243,63 @@ export async function POST(req: NextRequest) {
   }
 
   const cabinetId = periode.cabinet_id ?? vet.cabinet_id ?? null
+
+  // ── B-187 — le geste porte sur un remplacement d'un jour ──
+  if (remplacement && gardeExistante) {
+    if (geste === 'vider') {
+      return NextResponse.json(
+        {
+          error:
+            'Ce jour est un remplacement. Pour le retirer, ouvrez la journée ' +
+            'et rendez la place au titulaire du week-end.',
+        },
+        { status: 422 },
+      )
+    }
+    const { data: touches, error: figeErr } = await supabase
+      .from('gardes_exceptions')
+      .update({ fige: geste === 'poser' })
+      .eq('id', remplacement.id)
+      .select('id')
+    // Une écriture refusée par la RLS ne renvoie AUCUNE erreur, seulement zéro
+    // ligne : sans ce compte, l'écran annoncerait « C'est enregistré » à tort.
+    if (figeErr || (touches ?? []).length !== 1) {
+      return NextResponse.json(
+        { error: `Enregistrement impossible${figeErr ? ` : ${figeErr.message}` : '.'}` },
+        { status: 500 },
+      )
+    }
+
+    // Les personnes fixées CE jour-là, relues dans la vue : la place remplacée
+    // suit le remplacement, l'autre garde le cadenas du week-end.
+    const { data: ligne, error: ligneErr } = await supabase
+      .from('planning_semaine')
+      .select('premier_id, second_id, places_figees')
+      .eq('id', gardeExistante.id)
+      .eq('date', date)
+      .maybeSingle()
+    if (ligneErr || !ligne) {
+      return NextResponse.json(
+        { error: 'C’est enregistré, mais l’écran n’a pas pu se mettre à jour. Rafraîchissez le planning.' },
+        { status: 500 },
+      )
+    }
+    const l = ligne as { premier_id: string | null; second_id: string | null; places_figees: string[] | null }
+    const vetsFigesDuJour = (l.places_figees ?? [])
+      .map((r) => (r === 'premier' ? l.premier_id : r === 'second' ? l.second_id : null))
+      .filter((v): v is string => Boolean(v))
+
+    return NextResponse.json({
+      ok: true,
+      gardeId: gardeExistante.id,
+      date,
+      placesFigees: l.places_figees ?? [],
+      vetsFiges: vetsFigesDuJour,
+      premier_id: gardeExistante.premier_id,
+      second_id: gardeExistante.second_id,
+      avertissements: [],
+    })
+  }
 
   // ── Mode « coordonnées » : on retrouve la garde, ou on la créera ──
   let existante = gardeExistante

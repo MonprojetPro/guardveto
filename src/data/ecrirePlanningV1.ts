@@ -27,6 +27,12 @@ import { estJourFerie } from '@/engine/utils'
 import { construireGardePlacements } from './gardePlacements'
 import { syncAttributionsPourJours, joursImpactesGarde } from './syncAttributions'
 import { idsEvenementsDeGardes } from '@/lib/sync-calendrier'
+import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
+import {
+  planReposeRemplacements,
+  type LigneJourEcrite,
+  type RemplacementFige,
+} from '@/lib/gardes/remplacements-figes'
 
 /**
  * Convertit le type interne du moteur vers le type de la table gardes (V1).
@@ -97,6 +103,12 @@ export interface ResultatEcritureV1 {
   realignementEchoue: boolean
   /** Vrai si la copie technique `garde_placements` a échoué. Non bloquant. */
   placementsEchoues: boolean
+  /**
+   * B-187 — les jours dont le remplacement FIXÉ n'a pas pu être remis en place
+   * (AAAA-MM-JJ). Vide quand tout va bien. Non bloquant — le planning est
+   * écrit — mais l'appelant DOIT le signaler : c'est un choix de l'admin perdu.
+   */
+  remplacementsNonReposes: string[]
 }
 
 /**
@@ -117,6 +129,7 @@ export async function ecrirePlanningV1(
     eventIdsAPurger: [],
     realignementEchoue: false,
     placementsEchoues: false,
+    remplacementsNonReposes: [],
   }
 
   // 0. CAPTURER les ids d'événements Google Agenda AVANT le DELETE.
@@ -180,6 +193,53 @@ export async function ecrirePlanningV1(
   for (const g of (gardesCadenassees ?? []) as { date: string; type: string; places_figees: string[] }[]) {
     cadenasParCle.set(`${g.date}|${g.type}`, g.places_figees ?? [])
   }
+
+  // 0c. B-187 — MÉMORISER LES REMPLACEMENTS D'UN JOUR FIXÉS AVANT LE DELETE.
+  //
+  // `gardes_exceptions.garde_id` est en `ON DELETE CASCADE` : le DELETE
+  // ci-dessous les emporte. Sans cette lecture, le 25/12 posé à la main par
+  // l'admin repartait à zéro à chaque génération, cadenas ou pas. Seules les
+  // gardes réellement supprimées (non `verrouille`) sont concernées.
+  const { data: exceptionsLues, error: exceptionsErr } = await supabase
+    .from('gardes_exceptions')
+    .select(
+      'date, role, veterinaire_id, motif, compte_1er_we, absence_id, cree_par, cabinet_id, ' +
+      'gardes!inner(date, type, periode_id, verrouille)',
+    )
+    .eq('cabinet_id', cabinetId)
+    .eq('fige', true)
+    .eq('gardes.periode_id', periodeId)
+    .eq('gardes.verrouille', false)
+
+  if (exceptionsErr) {
+    // On s'arrête AVANT d'effacer quoi que ce soit : mieux vaut une génération
+    // refusée qu'un remplacement fixé perdu.
+    return {
+      ...vide, ok: false, eventIdsAPurger,
+      erreur: `Erreur lecture des remplacements fixés : ${exceptionsErr.message}`,
+    }
+  }
+
+  type LigneException = Omit<RemplacementFige, 'gardeDate' | 'gardeType'> & {
+    gardes: { date: string; type: string } | { date: string; type: string }[] | null
+  }
+  const remplacementsFiges: RemplacementFige[] = ((exceptionsLues ?? []) as unknown as LigneException[])
+    .flatMap((e) => {
+      const g = Array.isArray(e.gardes) ? e.gardes[0] : e.gardes
+      if (!g || !e.veterinaire_id) return []
+      return [{
+        gardeDate: g.date,
+        gardeType: g.type,
+        date: e.date,
+        role: e.role,
+        veterinaire_id: e.veterinaire_id,
+        motif: e.motif,
+        compte_1er_we: Boolean(e.compte_1er_we),
+        absence_id: e.absence_id ?? null,
+        cree_par: e.cree_par ?? null,
+        cabinet_id: e.cabinet_id,
+      }]
+    })
 
   // 1. Supprimer les gardes brouillon existantes pour cette période.
   //    Scopé cabinet_id (défense en profondeur : en DEV_BYPASS le client
@@ -292,6 +352,70 @@ export async function ecrirePlanningV1(
     placementsEchoues = true
   }
 
+  // 3b-bis. B-187 — REMETTRE LES REMPLACEMENTS FIXÉS sur les nouvelles gardes.
+  //
+  // Le titulaire remplacé est relu dans `planning_semaine` (la LIGNE du jour,
+  // vendredi inversé compris) : c'est dans ce vocabulaire que le rôle d'un
+  // remplacement est écrit. À ce stade la nouvelle garde n'a encore aucun
+  // remplacement, la vue rend donc exactement ce que la génération a posé.
+  const remplacementsNonReposes: string[] = []
+  if (remplacementsFiges.length > 0) {
+    try {
+      const { data: gardesNeuves, error: neuvesErr } = await supabase
+        .from('gardes')
+        .select('id, date, type')
+        .eq('periode_id', periodeId)
+        .eq('cabinet_id', cabinetId)
+      if (neuvesErr) throw new Error(neuvesErr.message)
+
+      const idParCle = new Map<string, string>()
+      for (const g of (gardesNeuves ?? []) as { id: string; date: string; type: string }[]) {
+        idParCle.set(`${g.date}|${g.type}`, g.id)
+      }
+      const idsVises = [...new Set(
+        remplacementsFiges
+          .map((r) => idParCle.get(`${r.gardeDate}|${r.gardeType}`))
+          .filter((id): id is string => Boolean(id)),
+      )]
+
+      let lignes: LigneJourEcrite[] = []
+      if (idsVises.length > 0) {
+        const { data: lignesVue, error: vueErr } = await supabase
+          .from('planning_semaine')
+          .select('id, date, premier_id, second_id')
+          .in('id', idsVises)
+        if (vueErr) throw new Error(vueErr.message)
+        lignes = (lignesVue ?? []) as LigneJourEcrite[]
+      }
+
+      const plan = planReposeRemplacements(remplacementsFiges, idParCle, lignes)
+      for (const r of [...plan.sansGarde, ...plan.enConflit]) remplacementsNonReposes.push(r.date)
+
+      if (plan.aInserer.length > 0) {
+        const { error: reposeErr } = await supabase
+          .from('gardes_exceptions')
+          .insert(plan.aInserer)
+        if (reposeErr) throw new Error(reposeErr.message)
+      }
+    } catch (e) {
+      console.error('[B-187] remise en place des remplacements fixés échouée:', e)
+      for (const r of remplacementsFiges) remplacementsNonReposes.push(r.date)
+    }
+  }
+
+  // Signalé ICI et pas chez les appelants : trois chemins écrivent le planning
+  // (génération, relecture de Filou, propositions) — une alerte recopiée trois
+  // fois est une alerte oubliée la troisième.
+  if (remplacementsNonReposes.length > 0) {
+    const jours = [...new Set(remplacementsNonReposes)].sort().join(', ')
+    await signalerIncidentTechnique(
+      supabase, cabinetId,
+      'Remplacement d’un jour non remis en place',
+      `Le planning a été réécrit, mais le remplacement fixé du ${jours} n’a pas pu être remis en place. ` +
+      'Vérifiez ce jour dans le planning et reposez-le si besoin.',
+    ).catch((e) => console.error('[B-187] signalement impossible:', e))
+  }
+
   // 3c. Réalignement V2 sur les gardes VERROUILLÉES (P6 verrou n°7, étape 3).
   //     Sans lui, V2 porterait l'équipe du solver là où V1 garde l'équipe
   //     verrouillée → dérive garantie dès la régénération.
@@ -318,6 +442,7 @@ export async function ecrirePlanningV1(
     eventIdsAPurger,
     realignementEchoue,
     placementsEchoues,
+    remplacementsNonReposes: [...new Set(remplacementsNonReposes)].sort(),
   }
 }
 

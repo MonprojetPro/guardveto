@@ -135,7 +135,7 @@ export interface ProprietesGrille {
    */
   onOuvrirDashboard?: (date: string) => void
   /** Les personnes dont la garde est figée par un cadenas, par garde. */
-  vetsFiges: (gardeId: string) => ReadonlySet<string>
+  vetsFiges: (gardeId: string, date: string) => ReadonlySet<string>
   /**
    * B-111 — le bouton qui POSE ou LÈVE un cadenas, rendu par l'appelant.
    *
@@ -145,7 +145,7 @@ export interface ProprietesGrille {
    *    avait tranché « on rajoute évidemment les cadenas ». Trouvé à la revue,
    *    par aucun test : aucun test ne monte un composant (B-144b).
    */
-  rendreCadenas?: (garde: GardeGrille, vetId: string, fige: boolean) => React.ReactNode
+  rendreCadenas?: (garde: GardeGrille, vetId: string, fige: boolean, date: string) => React.ReactNode
   /**
    * B-111 — le pré-remplissage d'un jour SANS aucune garde. Avant génération,
    * une période n'en a aucune : sans ce bouton, il n'existerait nulle part où
@@ -375,8 +375,8 @@ function CaseJour({
   onOuvrirCellule?: (date: string, vetId: string) => void
   onOuvrirJournee?: (date: string) => void
   onOuvrirDashboard?: (date: string) => void
-  vetsFiges: (gardeId: string) => ReadonlySet<string>
-  rendreCadenas?: (garde: GardeGrille, vetId: string, fige: boolean) => React.ReactNode
+  vetsFiges: (gardeId: string, date: string) => ReadonlySet<string>
+  rendreCadenas?: (garde: GardeGrille, vetId: string, fige: boolean, date: string) => React.ReactNode
   rendrePoseJourVide?: (date: string) => React.ReactNode
 }) {
   const d = new Date(jour.date + 'T12:00:00Z')
@@ -595,17 +595,17 @@ function CaseRepliee({
    * des noms des personnes de garde sur les cards repliées ». Absent = pas de
    * cadenas (même règle que la case dépliée : qui n'a pas le geste ne le voit pas).
    */
-  vetsFiges?: (gardeId: string) => ReadonlySet<string>
+  vetsFiges?: (gardeId: string, date: string) => ReadonlySet<string>
 }) {
   // Un cadenas EN LECTURE : replié, un clic déplie la semaine, il ne doit donc
   // pas libérer une place par surprise. Le geste reste à la case dépliée.
   const estFige = (p: { gardeId?: string; vetId?: string | null }) =>
-    Boolean(vetsFiges && p.gardeId && p.vetId && vetsFiges(p.gardeId).has(p.vetId))
+    Boolean(vetsFiges && p.gardeId && p.vetId && vetsFiges(p.gardeId, jour.date).has(p.vetId))
   // La colonne du cadenas n'existe que si le jour en porte un : sinon les noms
   // gardent leur place habituelle. Quand elle existe, elle est réservée sur
   // CHAQUE ligne de nuit, pour que les deux noms restent alignés.
   const colonneCadenas = Boolean(
-    vetsFiges && jour.gardes.some((g) => g.places.some((p) => p.vetId && vetsFiges(g.id).has(p.vetId))),
+    vetsFiges && jour.gardes.some((g) => g.places.some((p) => p.vetId && vetsFiges(g.id, jour.date).has(p.vetId))),
   )
   return (
     <>
@@ -758,8 +758,8 @@ function CaseDepliee({
   onSurvol: (vetId: string | null) => void
   onOuvrirGarde: (gardeId: string) => void
   onOuvrirCellule?: (date: string, vetId: string) => void
-  vetsFiges: (gardeId: string) => ReadonlySet<string>
-  rendreCadenas?: (garde: GardeGrille, vetId: string, fige: boolean) => React.ReactNode
+  vetsFiges: (gardeId: string, date: string) => ReadonlySet<string>
+  rendreCadenas?: (garde: GardeGrille, vetId: string, fige: boolean, date: string) => React.ReactNode
   rendrePoseJourVide?: (date: string) => React.ReactNode
 }) {
   const lignes = lignesDeLaSemaine(equipe, jour, rail, vue)
@@ -824,7 +824,7 @@ function CaseDepliee({
         const garde = ligne.nuit
           ? jour.gardes.find((g) => g.places.some((p) => p.vetId === ligne.vetId))
           : undefined
-        const figee = garde ? vetsFiges(garde.id).has(ligne.vetId) : false
+        const figee = garde ? vetsFiges(garde.id, jour.date).has(ligne.vetId) : false
 
         const pisteClasses = ['pv2-piste']
         // ⚠️ B-163f — LA HACHURE NE COUVRE LA PISTE QUE SI TOUT EST PRIS.
@@ -1037,7 +1037,7 @@ function CaseDepliee({
                 {/* B-111 — le cadenas est À GAUCHE de la pastille. À droite, il
                     chevauchait le rôle (« 1er », « 2e ») dans une colonne
                     étroite — constaté par MiKL en recette le 04/09. */}
-                {ligne.nuit && garde && rendreCadenas?.(garde, ligne.vetId, figee)}
+                {ligne.nuit && garde && rendreCadenas?.(garde, ligne.vetId, figee, jour.date)}
                 {ligne.nuit && garde && (
                   <button
                     type="button"

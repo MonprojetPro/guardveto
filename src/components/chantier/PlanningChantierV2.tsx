@@ -893,7 +893,18 @@ export function PlanningChantierV2({
       // Le résultat s'affiche TOUT DE SUITE — le rechargement complet, lui,
       // prend plusieurs secondes et n'apporte rien de plus sur cette case.
       if (r.gardeId) {
-        setCadenasLocaux((prec) => ({ ...prec, [r.gardeId as string]: r.vetsFiges ?? [] }))
+        const gardeId = r.gardeId
+        setCadenasLocaux((prec) => {
+          // B-187 — un geste sur un JOUR remplacé ne vaut que pour ce jour ;
+          // un geste sur la garde efface les résultats de jour devenus vieux.
+          if (r.date) return { ...prec, [`${gardeId}|${r.date}`]: r.vetsFiges ?? [] }
+          const suivant: Record<string, string[]> = {}
+          for (const [cle, v] of Object.entries(prec)) {
+            if (!cle.startsWith(`${gardeId}|`)) suivant[cle] = v
+          }
+          suivant[gardeId] = r.vetsFiges ?? []
+          return suivant
+        })
       }
     } else {
       toast.error(r.erreur ?? 'Enregistrement impossible.')
@@ -914,21 +925,39 @@ export function PlanningChantierV2({
    *    alors que la base enregistrait parfaitement — l'écriture marchait, elle
    *    ne se voyait simplement jamais. Un identifiant, lui, ne s'inverse pas.
    */
-  function vetsFigesDeLaGarde(gardeId: string): ReadonlySet<string> {
-    const confirmes = cadenasLocaux[gardeId]
-    if (confirmes) return new Set(confirmes)
+  function vetsFigesDeLaGarde(gardeId: string, date: string): ReadonlySet<string> {
+    // B-187 — LA LIGNE DU JOUR, pas la première ligne de la garde : un week-end
+    // a trois lignes qui partagent le même id, et le 25/12 peut être tenu par
+    // d'autres (remplacement d'un jour) qui ont leur propre cadenas.
+    const duJour = cadenasLocaux[`${gardeId}|${date}`]
+    if (duJour) return new Set(duJour)
 
-    const g = gardes.find((x) => x.id === gardeId)
+    const g = gardes.find((x) => x.id === gardeId && x.date === date)
+      ?? gardes.find((x) => x.id === gardeId)
     if (!g) return new Set()
+    const places = placesDeGarde(g)
     const labels = new Set(g.places_figees ?? [])
-    return new Set(
-      placesDeGarde(g)
+    const natifs = new Set(
+      places
         .filter((p) => {
           const label = labelDonneeDePlace(p.index)
           return label !== null && labels.has(label)
         })
         .map((p) => p.vetId)
         .filter((v): v is string => Boolean(v)),
+    )
+
+    const confirmes = cadenasLocaux[gardeId]
+    if (!confirmes) return natifs
+
+    // Un geste récent sur la garde du week-end : il vaut pour les places tenues
+    // par les titulaires, jamais pour une place remplacée ce jour-là.
+    const remplacee = (index: number) =>
+      (index === 0 && Boolean(g.exception_premier)) || (index === 1 && Boolean(g.exception_second))
+    return new Set(
+      places
+        .filter((p) => p.vetId && (remplacee(p.index) ? natifs.has(p.vetId) : confirmes.includes(p.vetId)))
+        .map((p) => p.vetId as string),
     )
   }
 
@@ -1744,13 +1773,14 @@ export function PlanningChantierV2({
               //    oubliée qui se met à mentir (22/08).
               rendreCadenas={
                 cadenasActifs
-                  ? (garde, vetId, fige) => (
+                  ? (garde, vetId, fige, date) => (
                       <BoutonCadenas
                         gardeId={garde.id}
                         vetId={vetId}
                         prenom={equipe.find((v) => v.id === vetId)?.prenom ?? null}
                         fige={fige}
                         onFini={surResultatCadenas}
+                        date={date}
                       />
                     )
                   : undefined
@@ -1960,13 +1990,14 @@ export function PlanningChantierV2({
         vetsFiges={vetsFigesDeLaGarde}
         rendreCadenas={
           cadenasActifs
-            ? (garde, vetId, fige) => (
+            ? (garde, vetId, fige, date) => (
                 <BoutonCadenas
                   gardeId={garde.id}
                   vetId={vetId}
                   prenom={equipe.find((v) => v.id === vetId)?.prenom ?? null}
                   fige={fige}
                   onFini={surResultatCadenas}
+                  date={date}
                 />
               )
             : undefined

@@ -148,9 +148,9 @@ export function JourneeDashboardModale({
    *    moment.
    */
   peutPoser: boolean
-  vetsFiges: (gardeId: string) => ReadonlySet<string>
+  vetsFiges: (gardeId: string, date: string) => ReadonlySet<string>
   /** Le bouton cadenas, rendu par l'appelant — `undefined` quand il n'a pas lieu d'être. */
-  rendreCadenas?: (garde: GardeGrille, vetId: string, fige: boolean) => React.ReactNode
+  rendreCadenas?: (garde: GardeGrille, vetId: string, fige: boolean, date: string) => React.ReactNode
   /** Aller à un autre jour SANS fermer — c'est la demande d'origine. */
   onAller: (date: string) => void
   onFermer: () => void
@@ -592,7 +592,7 @@ export function JourneeDashboardModale({
                     <small className="jdb-role">{place.role}</small>
                     {/* Le cadenas : le MÊME bouton que la grille, rendu par
                         l'appelant, jamais recopié. */}
-                    {rendreCadenas?.(garde, place.vetId, vetsFiges(garde.id).has(place.vetId))}
+                    {date && rendreCadenas?.(garde, place.vetId, vetsFiges(garde.id, date).has(place.vetId), date)}
                     {/* 🔴 « POUR LES GARDES ON VOIT PAS LES NOMS SÉRIEUX » —
                         la colonne affichait « M... 1ER » parce que le bouton
                         « Changer » mangeait la largeur du prénom. Une grille

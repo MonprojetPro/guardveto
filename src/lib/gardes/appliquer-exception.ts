@@ -225,6 +225,10 @@ export async function appliquerExceptionJour(
       absence_id: absenceId ?? null,
       cree_par: auteurVetId,
       mis_a_jour_le: new Date().toISOString(),
+      // B-187 — un remplacement posé à la main est un choix de l'admin : il est
+      // FIXÉ d'office, comme une place posée (B-111), et survit donc à la
+      // génération. Le cadenas du jour permet ensuite de le rendre au moteur.
+      fige: true,
     }
 
     const { error } = await supabase
