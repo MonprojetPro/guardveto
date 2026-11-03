@@ -17,12 +17,39 @@
   .v2 .plan-bureau { display: none; }
 }
 
-.plan-tel .pt-tete { padding: 4px 4px 10px; }
+.plan-tel .pt-tete { position: relative; padding: 4px 4px 10px; }
 .plan-tel .pt-kick {
   font-family: var(--font-display); font-size: 0.72rem; font-weight: 700;
   letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent-ink);
 }
 .plan-tel .pt-tete h1 { margin-top: 2px; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.01em; }
+
+/* ---- B-182 — le titre du mois ouvre le choix du mois ---- */
+.plan-tel .pt-titre-mois {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 0; background: none; padding: 0; color: inherit; font: inherit;
+  min-height: 44px; text-align: left;
+}
+.plan-tel .pt-chevron { font-size: 0.9rem; color: var(--t-muted); margin-top: 4px; }
+.plan-tel .pt-mois {
+  position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% - 4px);
+  background: var(--surface); border: 1px solid var(--t-border); border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(110, 62, 14, 0.18);
+  padding: 10px 12px 12px;
+}
+.plan-tel .pt-mois-annee {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+}
+.plan-tel .pt-mois-annee b { font-family: var(--font-display); font-size: 1rem; }
+.plan-tel .pt-mois-grille { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.plan-tel .pt-mois-grille button {
+  min-height: 44px; border-radius: 12px;
+  border: 1px solid var(--t-border); background: var(--surface-2); color: var(--text);
+  font-family: var(--font-display); font-size: 0.875rem; font-weight: 700;
+}
+.plan-tel .pt-mois-grille button.auj { border-color: var(--t-accent); color: var(--accent-ink); }
+.plan-tel .pt-mois-grille button.on { background: var(--t-accent); border-color: var(--t-accent); color: #fff; }
+.plan-tel .pt-mois-auj { display: block; margin: 10px auto 0; }
 
 /* ---- Mes jours / Tout le cabinet ---- */
 .plan-tel .pt-bascule {
@@ -49,6 +76,7 @@
 }
 .plan-tel .pt-semaine-titre { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
 .plan-tel .pt-semaine-titre b { font-family: var(--font-display); font-size: 0.95rem; }
+.plan-tel .pt-semaine-titre small { font-size: 0.8125rem; color: var(--t-muted); }
 .plan-tel .pt-fleche {
   flex: none; width: 44px; height: 44px; border-radius: 50%;
   border: 1px solid var(--border-strong); background: var(--surface);
@@ -65,13 +93,10 @@
   border-radius: 12px; padding: 8px 12px; margin-bottom: 10px;
 }
 
-/* ---- Les semaines ---- */
-.plan-tel .pt-section { scroll-margin-top: 64px; }
-.plan-tel .pt-section-titre {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
-  font-size: 0.95rem; font-weight: 700; margin: 14px 4px 8px;
-}
-.plan-tel .pt-section-titre small { font-family: var(--font-body); font-size: 0.8125rem; font-weight: 500; color: var(--t-muted); }
+/* ---- La semaine à l'écran (B-182 : une seule) ---- */
+/* `pinch-zoom` : le balayage horizontal est pour nous, le zoom reste à
+   la personne — le retirer gênerait qui lit mal de près. */
+.plan-tel .pt-section { margin-top: 6px; touch-action: pan-y pinch-zoom; }
 .plan-tel .pt-bilan {
   font-size: 0.875rem; color: var(--t-muted);
   background: var(--surface); border: 1px dashed var(--border-strong);

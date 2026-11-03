@@ -89,6 +89,7 @@ retravaillée pour rester lisible même avec beaucoup d'informations sur un mêm
 | Sur téléphone : la barre affiche le nom de chaque espace, Filou se lit en pleine largeur, plus aucun champ ne fait zoomer l'iPhone, les fenêtres tiennent dans l'écran, et Équipe, Règles et Réglages ne débordent plus | 🟡 À recetter | 2026-10-30 `[B-179]` |
 | Sur téléphone, le planning s'affiche en liste jour par jour : « Mes jours » pour un vétérinaire, « Tout le cabinet » pour l'administratrice, un appui sur un jour pour voir le détail, proposer un échange ou attribuer une place | 🟡 À recetter | 2026-11-02 `[B-179a]` |
 | Décider si un vétérinaire peut prendre lui-même une place vide depuis son téléphone | 🔵 À qualifier | — `[B-179c]` |
+| Sur téléphone, le planning montre une seule semaine à la fois : les flèches ou un balayage du doigt passent à la semaine voisine, et un appui sur le nom du mois permet de sauter directement à un autre mois | 🟢 Livré, à recetter | 2026-11-03 `[B-182]` |
 | Sur téléphone, les écrans d'administration (règles, historique, absences) ont des boutons et des textes à la taille du doigt | ⚪ À faire | — `[B-179b]` |
 
 ---

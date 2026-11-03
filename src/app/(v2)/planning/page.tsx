@@ -186,7 +186,7 @@ const LIBELLE_MOTIF: Record<string, string> = {
 export default async function PlanningPageV2({
   searchParams,
 }: {
-  searchParams: Promise<{ mois?: string; periode?: string }>
+  searchParams: Promise<{ mois?: string; periode?: string; semaine?: string }>
 }) {
   const supabase = await createClient()
 
@@ -204,7 +204,7 @@ export default async function PlanningPageV2({
   const isAdmin = identite.role === 'admin'
   const estSecretaire = identite.genre === 'secretaire'
 
-  const { mois: moisParam, periode: periodeParam } = await searchParams
+  const { mois: moisParam, periode: periodeParam, semaine: semaineParam } = await searchParams
   const anneeMois = moisParam && /^\d{4}-\d{2}$/.test(moisParam) ? moisParam : moisCourant()
   const { debut, fin } = bornesMois(anneeMois)
   // Ce qui est DESSINÉ déborde du mois : les cases de la semaine à cheval se
@@ -1044,7 +1044,11 @@ export default async function PlanningPageV2({
             ⚠️ Le témoin du lot 0 a été RETIRÉ ici : il annonçait la porte, la
                grille la prouve mieux que lui. Le laisser aurait fait doublon,
                et c'est exactement ce que son propre en-tête interdisait. */}
+        {/* `key` : un autre mois remonte la vue — sans quoi elle garderait la
+            semaine choisie dans le mois d'avant (B-182). */}
         <PlanningTelephone
+          key={anneeMois}
+          semaineDemandee={semaineParam && /^\d{4}-\d{2}-\d{2}$/.test(semaineParam) ? semaineParam : null}
           semaines={semainesTelephone}
           gardes={gardes}
           anneeMois={anneeMois}

@@ -11,8 +11,10 @@
 // Les cinq choix tranchés par MiKL (« ok pour tout », 02/11) :
 //   1. un véto ouvre sur « Mes jours », l'admin et le secrétariat sur « Tout le
 //      cabinet » ;
-//   2. semaine par semaine (flèches + « Aujourd'hui »), et tout se lit aussi en
-//      faisant défiler ;
+//   2. semaine par semaine (flèches + « Aujourd'hui »). B-182, 03/11 : UNE
+//      seule semaine à l'écran — les flèches, ou un balayage du doigt, la
+//      remplacent par sa voisine ; le titre du mois ouvre un choix du mois pour
+//      aller plus loin d'un coup ;
 //   3. dans « Mes jours », les jours sans rien sont REPLIÉS en une ligne, jamais
 //      cachés — un jour qui disparaît se lit comme une erreur ;
 //   4. au téléphone on voit, on ouvre un jour, on échange, et l'admin attribue
@@ -26,7 +28,7 @@
 //    bouton que sur ordinateur.
 // ============================================================
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { GardeDetailModal, peutProposerUnEchange, placeAPrendreDe } from '@/components/planning/GardeDetailModal'
@@ -53,6 +55,21 @@ function moisVoisin(anneeMois: string, delta: number): string {
   const x = new Date(Date.UTC(a, m - 1 + delta, 1))
   return `${x.getUTCFullYear()}-${String(x.getUTCMonth() + 1).padStart(2, '0')}`
 }
+
+function decalerJours(iso: string, n: number): string {
+  const x = d(iso)
+  x.setUTCDate(x.getUTCDate() + n)
+  return x.toISOString().slice(0, 10)
+}
+
+const MOIS_COURT = new Intl.DateTimeFormat('fr-FR', { month: 'short', timeZone: 'UTC' })
+const MOIS_COURTS = Array.from({ length: 12 }, (_, i) =>
+  majuscule(MOIS_COURT.format(new Date(Date.UTC(2026, i, 15))).replace('.', '')),
+)
+
+/** Un balayage horizontal franc : assez long, et nettement plus large que haut
+ *  (sinon c'est quelqu'un qui fait défiler la page). */
+const BALAYAGE_MIN = 60
 
 function Pastille({ prenom, couleur, moi }: { prenom: string; couleur: string | null; moi?: boolean }) {
   return (
@@ -81,10 +98,14 @@ interface Props {
   nomsTypes: Record<string, string>
   /** « Hiver P2 · publié », ou null si aucune période ne couvre le mois. */
   etiquettePeriode: string | null
+  /** B-182 — un jour de la semaine à ouvrir (`?semaine=`), quand on arrive
+   *  d'un mois voisin par les flèches. Sinon : la semaine d'aujourd'hui. */
+  semaineDemandee?: string | null
 }
 
 export function PlanningTelephone({
   semaines, gardes, anneeMois, aujourdhui, moiVetId, isAdmin, lectureSeule, nomsTypes, etiquettePeriode,
+  semaineDemandee = null,
 }: Props) {
   const router = useRouter()
   // Choix 1 — un véto commence par SES jours. L'admin et le secrétariat
@@ -97,37 +118,21 @@ export function PlanningTelephone({
   const [deplies, setDeplies] = useState<ReadonlySet<string>>(new Set())
 
   const indexAujourdhui = semaines.findIndex((s) => s.debut <= aujourdhui && aujourdhui <= s.fin)
-  const [courante, setCourante] = useState(indexAujourdhui >= 0 ? indexAujourdhui : 0)
-  const sections = useRef<(HTMLElement | null)[]>([])
+  // B-182 — la semaine demandée (arrivée par une flèche depuis un mois voisin)
+  // passe devant aujourd'hui. Comparée par inclusion : un jour qui tomberait
+  // au milieu d'une semaine retrouve quand même la sienne.
+  const indexDemande = semaineDemandee
+    ? semaines.findIndex((s) => s.debut <= semaineDemandee && semaineDemandee <= s.fin)
+    : -1
+  // Un mois choisi (ni aujourd'hui, ni semaine demandée) s'ouvre sur sa
+  // première VRAIE semaine : celle qui porte au moins 4 de ses jours. Sinon
+  // novembre 2026 s'ouvrirait sur le 26 octobre, avec un seul jour de novembre.
+  const premiereDuMois = Math.max(0, semaines.findIndex((s) => s.jours.filter((j) => !j.horsMois).length >= 4))
+  const indexDepart = indexDemande >= 0 ? indexDemande : indexAujourdhui >= 0 ? indexAujourdhui : premiereDuMois
+  const [courante, setCourante] = useState(indexDepart)
+  const [choixMois, setChoixMois] = useState(false)
   const racine = useRef<HTMLDivElement | null>(null)
-
-  // Choix 2 — on ouvre sur la semaine d'aujourd'hui. Seulement si la vue est
-  // AFFICHÉE (sous 640 px) : sur ordinateur, elle est cachée et ne doit pas
-  // faire défiler la page sous les pieds de la grille.
-  useEffect(() => {
-    if (indexAujourdhui <= 0) return
-    if (!racine.current?.offsetParent) return
-    sections.current[indexAujourdhui]?.scrollIntoView({ block: 'start' })
-    // une seule fois, au montage
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // La semaine affichée dans la barre suit le défilement.
-  useEffect(() => {
-    if (!racine.current?.offsetParent || typeof IntersectionObserver === 'undefined') return
-    const obs = new IntersectionObserver(
-      (entrees) => {
-        for (const e of entrees) {
-          if (!e.isIntersecting) continue
-          const i = Number((e.target as HTMLElement).dataset.index)
-          if (!Number.isNaN(i)) setCourante(i)
-        }
-      },
-      { rootMargin: '-30% 0px -60% 0px' },
-    )
-    for (const s of sections.current) if (s) obs.observe(s)
-    return () => obs.disconnect()
-  }, [semaines.length])
+  const toucher = useRef<{ x: number; y: number } | null>(null)
 
   // La feuille du jour se ferme à Échap, comme toute fenêtre.
   useEffect(() => {
@@ -139,24 +144,73 @@ export function PlanningTelephone({
 
   const gardesParId = useMemo(() => new Map(gardes.map((g) => [g.id, g])), [gardes])
 
+  // Au bord du mois, on change de mois en disant QUELLE semaine ouvrir : la
+  // voisine de celle à l'écran. Sans ça, reculer depuis début novembre
+  // ouvrirait début octobre — un saut de cinq semaines. Et la semaine à cheval
+  // (27 oct. → 2 nov.), présente dans les deux mois, ne se revoit pas : on vise
+  // le lundi d'à côté, qui est déjà dans l'autre semaine.
   const allerSemaine = (i: number) => {
-    if (i < 0) return router.push(`/planning?mois=${moisVoisin(anneeMois, -1)}`)
-    if (i >= semaines.length) return router.push(`/planning?mois=${moisVoisin(anneeMois, 1)}`)
+    const actuelle = semaines[courante]
+    if (i < 0 || i >= semaines.length) {
+      if (!actuelle) return
+      const sens = i < 0 ? -1 : 1
+      return router.push(`/planning?mois=${moisVoisin(anneeMois, sens)}&semaine=${decalerJours(actuelle.debut, 7 * sens)}`)
+    }
     setCourante(i)
-    sections.current[i]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // On a pu balayer en bas de la semaine : la nouvelle se lit depuis son début.
+    const haut = racine.current?.getBoundingClientRect().top ?? 0
+    if (haut < 0) racine.current?.scrollIntoView({ block: 'start' })
   }
   const allerAujourdhui = () => {
     if (indexAujourdhui < 0) return router.push('/planning')
     allerSemaine(indexAujourdhui)
   }
+  const allerMois = (mois: string) => {
+    setChoixMois(false)
+    if (mois !== anneeMois) router.push(`/planning?mois=${mois}`)
+  }
+
+  const debutToucher = (e: TouchEvent) => {
+    const t = e.touches[0]
+    toucher.current = t ? { x: t.clientX, y: t.clientY } : null
+  }
+  const finToucher = (e: TouchEvent) => {
+    const depart = toucher.current
+    toucher.current = null
+    const t = e.changedTouches[0]
+    if (!depart || !t) return
+    const dx = t.clientX - depart.x
+    const dy = t.clientY - depart.y
+    if (Math.abs(dx) < BALAYAGE_MIN || Math.abs(dx) < Math.abs(dy) * 1.5) return
+    allerSemaine(dx < 0 ? courante + 1 : courante - 1)
+  }
 
   const semaineCourante = semaines[courante]
+  const fermerChoixMois = useCallback(() => setChoixMois(false), [])
 
   return (
     <div className="plan-tel" ref={racine}>
       <div className="pt-tete">
         {etiquettePeriode && <div className="pt-kick">{etiquettePeriode}</div>}
-        <h1>{majuscule(MOIS_ANNEE.format(d(`${anneeMois}-01`)))}</h1>
+        <button
+          type="button"
+          className="pt-titre-mois"
+          aria-expanded={choixMois}
+          aria-haspopup="dialog"
+          aria-label={`${majuscule(MOIS_ANNEE.format(d(`${anneeMois}-01`)))} — choisir un autre mois`}
+          onClick={() => setChoixMois((x) => !x)}
+        >
+          <h1>{majuscule(MOIS_ANNEE.format(d(`${anneeMois}-01`)))}</h1>
+          <span className="pt-chevron" aria-hidden="true">▾</span>
+        </button>
+        {choixMois && (
+          <ChoixMois
+            anneeMois={anneeMois}
+            moisAujourdhui={aujourdhui.slice(0, 7)}
+            onChoisir={allerMois}
+            onFermer={fermerChoixMois}
+          />
+        )}
       </div>
 
       {aDesJours && (
@@ -175,6 +229,7 @@ export function PlanningTelephone({
           <button type="button" className="pt-fleche" onClick={() => allerSemaine(courante - 1)} aria-label="Semaine précédente">‹</button>
           <div className="pt-semaine-titre">
             <b>Semaine du {JOUR_MOIS.format(d(semaineCourante.debut))}</b>
+            <small>{JOUR_MOIS_COURT.format(d(semaineCourante.debut))} → {JOUR_MOIS_COURT.format(d(semaineCourante.fin))}</small>
             <button type="button" className="pt-aujourdhui" onClick={allerAujourdhui}>Aujourd&apos;hui</button>
           </div>
           <button type="button" className="pt-fleche" onClick={() => allerSemaine(courante + 1)} aria-label="Semaine suivante">›</button>
@@ -185,23 +240,21 @@ export function PlanningTelephone({
         <p className="pt-note">Générer, publier et réorganiser un planning se font sur ordinateur.</p>
       )}
 
-      {semaines.map((s, i) => (
+      {/* B-182 — UNE seule semaine. Le balayage horizontal la change, comme
+          les flèches ; un défilement vertical ne déclenche rien. */}
+      {semaineCourante && (
         <section
-          key={s.debut}
+          key={semaineCourante.debut}
           className="pt-section"
-          data-index={i}
-          ref={(el) => { sections.current[i] = el }}
-          aria-label={`Semaine du ${JOUR_MOIS.format(d(s.debut))}`}
+          aria-label={`Semaine du ${JOUR_MOIS.format(d(semaineCourante.debut))}`}
+          onTouchStart={debutToucher}
+          onTouchEnd={finToucher}
         >
-          <h2 className="pt-section-titre">
-            Semaine du {JOUR_MOIS.format(d(s.debut))}
-            <small>{JOUR_MOIS_COURT.format(d(s.debut))} → {JOUR_MOIS_COURT.format(d(s.fin))}</small>
-          </h2>
           {vue === 'moi'
-            ? <SemaineMoi semaine={s} moiVetId={moiVetId} deplies={deplies} onDeplier={(cle) => setDeplies((x) => new Set(x).add(cle))} onOuvrir={setJourOuvert} />
-            : s.jours.map((j) => <CarteJour key={j.date} jour={j} vue="tous" moiVetId={moiVetId} onOuvrir={setJourOuvert} />)}
+            ? <SemaineMoi semaine={semaineCourante} moiVetId={moiVetId} deplies={deplies} onDeplier={(cle) => setDeplies((x) => new Set(x).add(cle))} onOuvrir={setJourOuvert} />
+            : semaineCourante.jours.map((j) => <CarteJour key={j.date} jour={j} vue="tous" moiVetId={moiVetId} onOuvrir={setJourOuvert} />)}
         </section>
-      ))}
+      )}
 
       {jourOuvert && (
         <FeuilleJour
@@ -229,6 +282,65 @@ export function PlanningTelephone({
         onSaved={() => router.refresh()}
         manque={gardeModal ? (semaines.flatMap((s) => s.jours).flatMap((j) => j.gardes).find((x) => x.id === gardeModal.id)?.manque ?? 0) : 0}
       />
+    </div>
+  )
+}
+
+// ── B-182 — choisir un mois, pour aller plus loin que la semaine voisine ───
+// Une grille de douze mois et l'année à flèches : jamais de `<select>` natif
+// (il s'ouvre en roue système, illisible et hors charte).
+function ChoixMois({
+  anneeMois, moisAujourdhui, onChoisir, onFermer,
+}: {
+  anneeMois: string
+  moisAujourdhui: string
+  onChoisir: (mois: string) => void
+  onFermer: () => void
+}) {
+  const [annee, setAnnee] = useState(Number(anneeMois.slice(0, 4)))
+  const boite = useRef<HTMLDivElement | null>(null)
+
+  // Le clavier entre dans la grille, sur le mois affiché.
+  useEffect(() => {
+    boite.current?.querySelector<HTMLButtonElement>('[aria-current="date"]')?.focus()
+  }, [])
+
+  useEffect(() => {
+    const echap = (e: KeyboardEvent) => { if (e.key === 'Escape') onFermer() }
+    const dehors = (e: PointerEvent) => {
+      const cible = e.target as HTMLElement
+      if (boite.current?.contains(cible)) return
+      // Le bouton du titre bascule déjà : ne pas le fermer puis le rouvrir.
+      if (cible.closest?.('.pt-titre-mois')) return
+      onFermer()
+    }
+    window.addEventListener('keydown', echap)
+    window.addEventListener('pointerdown', dehors)
+    return () => {
+      window.removeEventListener('keydown', echap)
+      window.removeEventListener('pointerdown', dehors)
+    }
+  }, [onFermer])
+
+  return (
+    <div className="pt-mois" role="dialog" aria-label="Choisir un mois" ref={boite}>
+      <div className="pt-mois-annee">
+        <button type="button" className="pt-fleche" onClick={() => setAnnee((a) => a - 1)} aria-label="Année précédente">‹</button>
+        <b>{annee}</b>
+        <button type="button" className="pt-fleche" onClick={() => setAnnee((a) => a + 1)} aria-label="Année suivante">›</button>
+      </div>
+      <div className="pt-mois-grille">
+        {MOIS_COURTS.map((nom, i) => {
+          const cle = `${annee}-${String(i + 1).padStart(2, '0')}`
+          const classes = [cle === anneeMois ? 'on' : '', cle === moisAujourdhui ? 'auj' : ''].filter(Boolean).join(' ')
+          return (
+            <button key={cle} type="button" className={classes || undefined} aria-current={cle === anneeMois ? 'date' : undefined} onClick={() => onChoisir(cle)}>
+              {nom}
+            </button>
+          )
+        })}
+      </div>
+      <button type="button" className="pt-aujourdhui pt-mois-auj" onClick={() => onChoisir(moisAujourdhui)}>Ce mois-ci</button>
     </div>
   )
 }
