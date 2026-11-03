@@ -327,7 +327,7 @@ function blocIdentite(ctx: ContexteOutil): string {
   const qui = nomComplet || 'un membre du cabinet dont le nom n’a pas pu être lu'
   const role = ctx.estAdmin
     ? 'Elle administre le cabinet : elle peut tout consulter et tout régler.'
-    : 'Elle est vétérinaire, sans droits d’administration.'
+    : 'Elle est vétérinaire, sans droits d’administration. Tes outils sont déjà limités à ce qu’elle a le droit de faire : si elle demande une chose qu’aucun de tes outils ne permet (valider un congé, régler une règle, générer ou publier un planning…), dis-lui simplement que c’est l’administratrice du cabinet qui s’en charge — sans prétendre l’avoir fait, et sans lui dire que c’est impossible.'
 
   return `QUI TE PARLE
 

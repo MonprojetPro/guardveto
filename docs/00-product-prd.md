@@ -137,7 +137,7 @@ peut proposer des ajustements — mais il ne décide jamais à la place de l'éq
 | Un contrôle avertit désormais si Filou annonce pouvoir corriger un déséquilibre sans proposer aucun changement concret | 🟢 Livré | 2026-09-03 `[B-109]` |
 | Les propositions de Filou pour rééquilibrer un planning ne sont pas encore totalement fiables (motifs parfois faux, corrections annoncées mais jamais appliquées) | 🟡 En cours | 2026-09 `[B-096, B-097, B-098, B-099, B-100, B-108]` |
 | Décider si Filou doit vérifier qu'il ne répond jamais sans avoir consulté les vraies données du cabinet | 🔵 À qualifier | — `[B-012]` |
-| Décider si les vétérinaires (pas seulement l'administratrice) peuvent aussi écrire à Filou | 🔵 À qualifier | — `[B-032]` |
+| Les vétérinaires (pas seulement l'administratrice) peuvent écrire à Filou, chacun selon ses droits | ✅ Livré le 03/11 (à recetter avec un compte vétérinaire) | — `[B-032]` |
 | Filou peut solliciter l'équipe pour trouver un volontaire en cas d'absence — cette fonction n'a encore jamais été testée en conditions réelles | ⚪ À faire | — preuve manquante `[B-031]` |
 
 ---

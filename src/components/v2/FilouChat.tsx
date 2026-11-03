@@ -234,9 +234,7 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
       const dernier = filActuel.current.at(-1)
       if (options?.saufSiDejaDit && dernier?.de === 'filou' && dernier.texte === texte) return
       ajouter('filou', texte, {
-        // Sans champ de saisie, un exemple cliquable ne mène nulle part : on ne
-        // les propose donc qu'à qui peut s'en servir.
-        exemples: estAdmin && options?.exemples?.length ? options.exemples : undefined,
+        exemples: options?.exemples?.length ? options.exemples : undefined,
       })
     },
   }))
@@ -473,7 +471,13 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
         )}
       </div>
 
-      {estAdmin ? (
+      {/* ── B-032 : LE CHAMP EST OUVERT À TOUS (2026-11-03) ──
+          Jusqu'ici, seule l'administratrice pouvait écrire ; un vétérinaire
+          lisait « Filou répond aux questions de l'administratrice ». Décision
+          MiKL du 26/07, appliquée le 03/11 : un seul Filou pour tous, son
+          périmètre suit les droits. Les droits ne se jouent PAS ici : c'est le
+          serveur qui ne donne à un vétérinaire que ses outils (`outilsPour`)
+          et refuse les autres (`trouverOutil`). */}
         <div className="saisie">
           {/* Repartir de zéro. N'apparaît qu'une fois qu'il y a quelque chose à
               effacer : un bouton « effacer » sur un fil vide n'a rien à dire. */}
@@ -500,7 +504,9 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
             </button>
           )}
           <label className="vh" htmlFor={champId}>
-            Écrire à Filou : décris une règle du cabinet
+            {estAdmin
+              ? 'Écrire à Filou : décris une règle du cabinet'
+              : 'Écrire à Filou : pose ta question'}
           </label>
           <textarea
             id={champId}
@@ -517,7 +523,11 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
                 envoyer()
               }
             }}
-            placeholder="Dis-moi une règle… ex. « Manon jamais de garde le mercredi »"
+            placeholder={
+              estAdmin
+                ? 'Dis-moi une règle… ex. « Manon jamais de garde le mercredi »'
+                : 'Pose ta question… ex. « Quand est ma prochaine garde ? »'
+            }
             className="saisie-champ"
           />
           <button
@@ -532,26 +542,6 @@ export const FilouChat = forwardRef<FilouChatHandle, Props>(function FilouChat(
             </svg>
           </button>
         </div>
-      ) : (
-        /* ── UN VÉTÉRINAIRE VOYAIT LA TABLETTE ET RIEN POUR ÉCRIRE ──
-           Corrigé le 2026-08-26 (recette MiKL : « j'ai même pas l'encart de
-           chat »). La branche rendait `null` : la tablette s'affichait, avec
-           le renard et le mot d'accueil, et aucune issue. La coquille vide
-           que ce projet refuse partout ailleurs.
-
-           ⚠️ CE N'EST PAS LE CORRECTIF DE FOND. Le serveur, lui, EST prêt à
-           répondre à un vétérinaire — le catalogue lui ouvre une vingtaine
-           d'outils (`outilsPour`, audit B-007). Lui ouvrir le champ est une
-           DÉCISION PRODUIT, pas un correctif : elle change ce que six
-           personnes peuvent faire. Elle est posée au board (B-032).
-
-           En attendant, on dit la vérité plutôt que de laisser deviner. */
-        <p className="saisie-fermee">
-          Filou répond aux questions de l’administratrice du cabinet. Ton
-          planning, tes gardes et tes congés se consultent directement à
-          l’écran.
-        </p>
-      )}
     </>
   )
 })
