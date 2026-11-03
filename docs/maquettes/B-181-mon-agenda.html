@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mon agenda</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700;800&family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --fond:#f3e9d6; --surface:#fffcf4; --cell:#f6ebd6; --bd:#e6d7bb; --bd-fort:#d8c4a1;
+  --txt:#3a2a1c; --sec:#7c6a55; --acc:#c7530f; --acc-encre:#ac4508; --acc-doux:#fdf1e5;
+  --ok:#3e7a2e; --ok-doux:#e8f2e3; --att:#9a6200; --att-doux:#fbf1d6;
+  --g-bleu:#1a73e8; --g-fond:#fff; --g-ligne:#e3e3e3;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fond);color:var(--txt);font:15px/1.45 "Noto Sans",system-ui,sans-serif;padding:32px 16px 80px}
+h1,h2,h3,h4{font-family:Figtree,system-ui,sans-serif}
+.page{max-width:1180px;margin:0 auto}
+.intro h1{font-size:30px;margin:0 0 6px}
+.intro p{margin:0 0 6px;color:var(--sec);max-width:820px}
+.etat{margin:44px 0 12px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.etat h2{margin:0;font-size:20px}
+.etat .num{font:700 13px Figtree;background:var(--txt);color:#fff;border-radius:99px;padding:3px 11px}
+.etat p{margin:0;color:var(--sec);font-size:14px;flex-basis:100%}
+.duo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;align-items:start}
+@media (max-width:900px){.duo{grid-template-columns:1fr}}
+
+/* ── l'écran GuardVeto ── */
+.ecran{background:var(--surface);border:1px solid var(--bd);border-radius:18px;box-shadow:0 10px 30px rgba(80,50,20,.08);overflow:hidden}
+.tete{padding:20px 22px 4px}
+.kick{font:700 11px Figtree;letter-spacing:.12em;color:var(--acc);text-transform:uppercase}
+.tete h3{margin:4px 0 2px;font-size:24px;font-weight:800}
+.tete p{margin:0;color:var(--sec);font-size:14px}
+.corps{padding:14px 22px 22px;display:grid;gap:12px}
+.question{font:700 13px Figtree;letter-spacing:.06em;text-transform:uppercase;color:var(--sec);margin:4px 0 -2px}
+.choix{display:grid;gap:10px}
+.option{display:grid;grid-template-columns:26px 1fr;gap:12px;align-items:start;background:#fff;border:1.5px solid var(--bd);border-radius:16px;padding:14px 16px}
+.option.on{border-color:var(--acc);box-shadow:0 0 0 4px var(--acc-doux)}
+.radio{width:22px;height:22px;border-radius:50%;border:2px solid var(--bd-fort);margin-top:2px;position:relative}
+.option.on .radio{border-color:var(--acc)}
+.option.on .radio::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--acc)}
+.option b{font:700 16px Figtree;display:block}
+.option .desc{color:var(--sec);font-size:13.5px;margin-top:2px}
+.sous{margin-top:12px;padding-top:12px;border-top:1px dashed var(--bd);display:grid;gap:8px}
+.sous-q{font-size:13px;font-weight:700;color:var(--txt)}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--cell);border:1px solid var(--bd);border-radius:12px;padding:3px}
+.seg span{text-align:center;font:700 13.5px Figtree;color:var(--sec);padding:9px 6px;border-radius:9px}
+.seg span.on{background:var(--surface);color:var(--txt);box-shadow:0 1px 3px rgba(110,62,14,.15)}
+.aide{font-size:12.5px;color:var(--sec)}
+.etat-google{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--ok-doux);border-radius:12px;padding:10px 14px;font-size:13.5px;color:var(--ok);font-weight:600}
+.btn{font:700 14px Figtree;border-radius:99px;min-height:42px;padding:0 18px;border:1px solid var(--acc);background:var(--acc);color:#fff;display:inline-flex;align-items:center}
+.btn.sec{background:var(--cell);color:var(--txt);border-color:var(--bd-fort)}
+.interrupteur{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border:1px solid var(--bd);border-radius:14px;padding:12px 16px}
+.interrupteur b{font:700 15px Figtree}
+.interrupteur small{display:block;color:var(--sec);font-size:13px}
+.sw{flex:none;width:46px;height:26px;border-radius:99px;background:var(--ok);position:relative}
+.sw::after{content:"";position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:#fff}
+.sw.off{background:var(--bd-fort)}.sw.off::after{right:auto;left:3px}
+
+/* ── l'aperçu Google Agenda ── */
+.google{background:var(--g-fond);border:1px solid #dadce0;border-radius:14px;overflow:hidden;font-family:"Google Sans",Roboto,Arial,sans-serif}
+.g-tete{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--g-ligne);font-size:14px;color:#3c4043}
+.g-tete b{font-weight:600}
+.g-pastille{width:12px;height:12px;border-radius:3px}
+.g-grille{display:grid;grid-template-columns:42px repeat(3,minmax(0,1fr))}
+.g-jour{border-left:1px solid var(--g-ligne);padding:6px 6px 10px;min-height:250px;position:relative}
+.g-jour h5{margin:0 0 6px;font:500 12px Roboto,Arial,sans-serif;color:#70757a;text-align:center}
+.g-jour h5 b{display:block;font-size:20px;color:#3c4043;font-weight:400}
+.g-heures{padding-top:46px;font-size:10.5px;color:#70757a;display:grid;gap:40px;text-align:right;padding-right:6px}
+.ev{border-radius:6px;padding:4px 6px;font-size:12px;line-height:1.3;color:#fff;margin-bottom:4px;overflow:hidden}
+.ev small{display:block;opacity:.9}
+.ev.jour{background:#d06b30}
+.ev.garde{background:#8e3b1a}
+.ev.bandeau{background:#f1e0c9;color:#3a2a1c;border:1px solid #e0c9a6}
+.ev.vide{background:#f9e3de;color:#a8341f;border:1px dashed #a8341f}
+
+.note{background:#fff;border-left:3px solid var(--acc);padding:10px 14px;border-radius:6px;font-size:13.5px;color:var(--sec);margin-top:12px}
+.note b{color:var(--txt)}
+.choix-a-trancher{max-width:900px;margin:46px auto 0;background:var(--surface);border:1px solid var(--bd);border-radius:18px;padding:20px 24px}
+.choix-a-trancher h2{margin:0 0 4px;font-size:20px}
+.choix-a-trancher ol{margin:10px 0 0;padding-left:22px;display:grid;gap:10px}
+.choix-a-trancher li b{display:block}
+.choix-a-trancher li span{color:var(--sec);font-size:14px}
+.choix-a-trancher li em{font-style:normal;color:var(--acc-encre);font-weight:700}
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="intro">
+  <h1>« Mon agenda », en un seul choix</h1>
+  <p>Maquette pour B-181, à valider avant de coder l'écran. Décidé le 03/11 : chaque personne choisit <b>un seul</b> agenda dans son Google Agenda. <b>« Mon planning »</b> (ce qui la concerne) ou <b>« Tout le cabinet »</b> (toute l'équipe), jamais les deux, pour éviter les doublons.</p>
+  <p>Données fictives. On regarde avec les yeux de <b>Manon</b>, vétérinaire.</p>
+</div>
+
+<!-- ═══════════ 1. MON PLANNING ═══════════ -->
+<div class="etat"><span class="num">1</span><h2>Le choix par défaut : « Mon planning »</h2>
+  <p>Ce que voit Manon en ouvrant Réglages → Mon agenda, et ce que ça donne dans son Google Agenda.</p></div>
+<div class="duo">
+  <div class="ecran">
+    <div class="tete"><div class="kick">Réglages</div><h3>Mon agenda</h3><p>Votre planning GuardVeto dans votre Google Agenda, mis à jour tout seul.</p></div>
+    <div class="corps">
+      <div class="interrupteur"><div><b>Recevoir mon planning dans Google Agenda</b><small>Éteint : plus rien n'y arrive, l'agenda est retiré.</small></div><span class="sw"></span></div>
+
+      <p class="question">Dans mon Google Agenda, je veux voir</p>
+      <div class="choix">
+        <div class="option on">
+          <span class="radio"></span>
+          <div>
+            <b>Mon planning</b>
+            <div class="desc">Mes gardes, avec la personne de garde avec moi, et mes journées au cabinet. Rien d'autre.</div>
+            <div class="sous">
+              <div class="sous-q">Mes journées au cabinet</div>
+              <div class="seg"><span class="on">Aux heures</span><span>En haut du jour</span></div>
+              <div class="aide">Aux heures, elles occupent votre agenda comme un rendez-vous. En haut du jour, elles restent discrètes.</div>
+            </div>
+          </div>
+        </div>
+        <div class="option">
+          <span class="radio"></span>
+          <div>
+            <b>Tout le cabinet</b>
+            <div class="desc">Les gardes de toute l'équipe, et chaque jour un bandeau qui dit qui est au cabinet.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="etat-google"><span>Agenda « GuardVeto — Manon » · à jour</span><span class="btn sec">Ouvrir dans Google Agenda</span></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="google">
+      <div class="g-tete"><span class="g-pastille" style="background:#d06b30"></span><b>GuardVeto — Manon</b><span style="margin-left:auto;color:#70757a">sem. du 2 novembre</span></div>
+      <div class="g-grille">
+        <div class="g-heures"><span>8h</span><span>12h</span><span>14h</span><span>19h</span></div>
+        <div class="g-jour"><h5>mar.<b>3</b></h5>
+          <div class="ev jour">Au cabinet · Matin<small>8h – 12h30</small></div>
+          <div style="height:90px"></div>
+          <div class="ev garde">Garde 1er — avec Fanny<small>19h – 8h</small></div>
+        </div>
+        <div class="g-jour"><h5>mer.<b>4</b></h5>
+          <div style="height:150px"></div>
+          <div class="ev garde">Garde 1er — avec : place à pourvoir<small>19h – 8h</small></div>
+        </div>
+        <div class="g-jour"><h5>sam.<b>7</b></h5>
+          <div class="ev garde">Garde week-end 2e — avec Jean<small>sam. 8h – lun. 8h</small></div>
+        </div>
+      </div>
+    </div>
+    <div class="note"><b>Ce qui change par rapport à aujourd'hui :</b> les gardes arrivent enfin dans l'agenda perso, et le titre dit <b>avec qui</b> on est de garde (aujourd'hui : « Garde-Manon-1er-19h/8h », qui ne lui apprend rien). Une place encore vide le dit aussi.</div>
+  </div>
+</div>
+
+<!-- ═══════════ 2. TOUT LE CABINET ═══════════ -->
+<div class="etat"><span class="num">2</span><h2>L'autre choix : « Tout le cabinet »</h2>
+  <p>Manon coche « Tout le cabinet ». GuardVeto retire son agenda perso et lui partage l'agenda complet, automatiquement : il n'y a jamais les deux.</p></div>
+<div class="duo">
+  <div class="ecran">
+    <div class="tete"><div class="kick">Réglages</div><h3>Mon agenda</h3><p>Votre planning GuardVeto dans votre Google Agenda, mis à jour tout seul.</p></div>
+    <div class="corps">
+      <div class="interrupteur"><div><b>Recevoir mon planning dans Google Agenda</b><small>Éteint : plus rien n'y arrive, l'agenda est retiré.</small></div><span class="sw"></span></div>
+      <p class="question">Dans mon Google Agenda, je veux voir</p>
+      <div class="choix">
+        <div class="option">
+          <span class="radio"></span>
+          <div><b>Mon planning</b><div class="desc">Mes gardes, avec la personne de garde avec moi, et mes journées au cabinet. Rien d'autre.</div></div>
+        </div>
+        <div class="option on">
+          <span class="radio"></span>
+          <div>
+            <b>Tout le cabinet</b>
+            <div class="desc">Les gardes de toute l'équipe, et chaque jour un bandeau qui dit qui est au cabinet.</div>
+            <div class="sous"><div class="aide">Pas d'option ici : cet agenda est le même pour toute l'équipe. Vos gardes y figurent avec votre prénom.</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="etat-google"><span>Agenda « Planning du cabinet » · partagé avec vous</span><span class="btn sec">Ouvrir dans Google Agenda</span></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="google">
+      <div class="g-tete"><span class="g-pastille" style="background:#8e3b1a"></span><b>Planning du cabinet</b><span style="margin-left:auto;color:#70757a">sem. du 2 novembre</span></div>
+      <div class="g-grille">
+        <div class="g-heures"><span>8h</span><span>12h</span><span>14h</span><span>19h</span></div>
+        <div class="g-jour"><h5>mar.<b>3</b></h5>
+          <div class="ev bandeau">Au cabinet : Anne-So (matin), Jean, Manon (matin), Victor (après-midi)</div>
+          <div style="height:110px"></div>
+          <div class="ev garde">Garde 1er — Manon<small>19h – 8h</small></div>
+          <div class="ev garde">Garde 2e — Fanny<small>19h – 8h</small></div>
+        </div>
+        <div class="g-jour"><h5>mer.<b>4</b></h5>
+          <div class="ev bandeau">Au cabinet : Fanny, Jean (matin), Antoine</div>
+          <div style="height:110px"></div>
+          <div class="ev garde">Garde 1er — Manon<small>19h – 8h</small></div>
+          <div class="ev vide">Garde 2e — à pourvoir</div>
+        </div>
+        <div class="g-jour"><h5>sam.<b>7</b></h5>
+          <div class="ev garde">Garde week-end 1er — Jean<small>sam. 8h – lun. 8h</small></div>
+          <div class="ev garde">Garde week-end 2e — Manon</div>
+        </div>
+      </div>
+    </div>
+    <div class="note"><b>Comment on évite la surcharge :</b> les journées de toute l'équipe tiennent dans <b>un seul bandeau par jour</b>, en haut de la journée, au lieu d'une vingtaine de créneaux horaires par semaine. Il ne bloque aucune heure dans l'agenda. Les gardes restent une par place, comme aujourd'hui.</div>
+  </div>
+</div>
+
+<div class="choix-a-trancher">
+  <h2>Trois points à regarder</h2>
+  <ol>
+    <li><b>Le libellé des gardes dans « Mon planning »</b><span>Je propose <em>« Garde 1er — avec Fanny »</em>, ou <em>« avec : place à pourvoir »</em> s'il manque quelqu'un. Seul sur le créneau : « Garde 1er », sans rien de plus.</span></li>
+    <li><b>Le bandeau quotidien de « Tout le cabinet »</b><span>Je propose <em>« Au cabinet : Anne-So (matin), Jean, Manon (matin)… »</em> : un prénom seul signifie toute la journée. Un jour sans personne n'a pas de bandeau.</span></li>
+    <li><b>Le secrétariat</b><span>Il n'a ni garde ni journée à lui : il ne voit que <em>« Tout le cabinet »</em>, sans le choix « Mon planning ».</span></li>
+  </ol>
+</div>
+
+</div>
+</body>
+</html>
