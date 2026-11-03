@@ -154,11 +154,13 @@ gardes et présences directement sur son agenda Google.
 | Les e-mails envoyés à l'équipe (nouvelles gardes, absences, appel aux volontaires) sont fiables et leur envoi est tracé | 🟢 Livré | 2026-08-26 `[B-048, B-050, T-007]` |
 | Les gardes publiées apparaissent sur l'agenda Google partagé du cabinet, avec les bons horaires et libellés | 🟢 Livré | 2026-08-27 `[T-001, B-087, B-086]` |
 | Chaque vétérinaire peut recevoir ses propres présences et gardes sur son agenda Google personnel, avec un réglage personnalisable ou un mode par défaut | 🟢 Livré | 2026-10-26 `[B-173]` |
+| « Mon agenda » en un seul choix : « Mon planning » (ses gardes avec la personne de garde avec soi, une place vide signalée, ses journées) ou « Tout le cabinet » (les gardes de toute l'équipe, et un bandeau par jour qui dit qui est au cabinet) — un seul agenda, jamais de doublon ; le secrétariat a « Tout le cabinet » | 🟡 À recetter | 2026-11-03 `[B-181]` |
+| La fenêtre de publication dit juste ce qui part dans les agendas Google (les journées aussi, là où l'agenda personnel tourne) | 🟡 À recetter | 2026-11-03 `[B-180a]` |
 | La vérification complète chez Google (création, partage puis retrait d'un agenda) reste à exécuter manuellement par MiKL avant la mise en service réelle | ⚪ À faire | — reste-à-faire `[B-173a]` |
 | Chaque membre reçoit un e-mail GuardVeto en français avec un bouton « Ajouter à mon Google Agenda » (au lieu de l'e-mail automatique de Google), et retrouve ce bouton dans « Mon agenda » ; l'agenda est ouvert à son compte Google même si sa fiche porte une adresse Gmail avec « + » | 🟡 À recetter | 2026-10-30 `[B-178]` |
 | Recevoir son planning dans un agenda qui n'est pas Google (Outlook, Apple Calendrier) par un abonnement iCal | ⚪ À décider | — `[B-178a]` |
 | Une cloche dans la barre du haut prévient de ce qui se passe (une place prise, une garde changée, un planning publié) : compteur en direct, liste, un clic ouvre l'écran concerné, « tout marquer comme lu » — revenue après sa disparition avec l'ancienne version | 🟡 À recetter | 2026-11-03 `[B-183]` |
-| Supprimer les notifications accumulées pendant l'absence de la cloche (182 au Val d'Allier) | ⚪ À faire | — `[B-183a]` |
+| Supprimer les notifications accumulées pendant l'absence de la cloche (469 au Val d'Allier, sur décision de MiKL) | 🟢 Livré | 2026-11-03 `[B-183a]` |
 
 ---
 

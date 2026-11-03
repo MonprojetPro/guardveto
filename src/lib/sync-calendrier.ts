@@ -25,6 +25,7 @@ import type { BilanAgenda } from '@/lib/planning/retrait-planning'
 import { initialesUniques } from '@/lib/agenda/initiales'
 import { estColorIdValide } from '@/lib/agenda/couleurs-google'
 import { programmerAgendasPerso } from '@/lib/agenda-perso/declencher'
+import { construireCatalogue, placesAttendues, type PeriodeEffectif } from '@/lib/planning/placesAttendues'
 
 // ── Résolution du calendarId PAR CABINET (#10b) ──────────────
 // Le calendarId Google est désormais porté par le cabinet
@@ -937,16 +938,25 @@ export async function gardesPlanifieesDuCabinet(
   cabinetId: string,
   depuis: string,
 ): Promise<GardePlanifiee[]> {
-  const { data: periodes, error: errP } = await supabase
-    .from('periodes')
-    .select('id')
-    .eq('cabinet_id', cabinetId)
-    .not('publie_at', 'is', null)
-    .gte('date_fin', decalerJourISO(depuis, -3))
-  if (errP) throw new Error(`Lecture des plannings impossible : ${errP.message}`)
+  const [periodesRes, catalogueRes, profilsRes] = await Promise.all([
+    supabase
+      .from('periodes')
+      .select('id, date_debut, date_fin, saison, nb_vetos_semaine_soir, profil_id')
+      .eq('cabinet_id', cabinetId)
+      .not('publie_at', 'is', null)
+      .gte('date_fin', decalerJourISO(depuis, -3)),
+    // B-181 — combien de places chaque créneau PRÉVOIT : une place vide se dit
+    // « à pourvoir » dans l'agenda perso, une place jamais prévue ne se dit pas.
+    supabase.from('creneau_modele').select('code, nb_places').eq('cabinet_id', cabinetId).not('code', 'is', null),
+    supabase.from('profils_planning').select('id, nb_vetos_semaine_soir').eq('cabinet_id', cabinetId),
+  ])
+  const errLecture = periodesRes.error ?? catalogueRes.error ?? profilsRes.error
+  if (errLecture) throw new Error(`Lecture des plannings impossible : ${errLecture.message}`)
+  const catalogue = construireCatalogue((catalogueRes.data ?? []) as { code: string | null; nb_places: number | null }[])
+  const profils = new Map(((profilsRes.data ?? []) as { id: string; nb_vetos_semaine_soir: number | null }[]).map((x) => [x.id, x]))
 
   const resultat: GardePlanifiee[] = []
-  for (const p of ((periodes as { id: string }[] | null) ?? [])) {
+  for (const p of ((periodesRes.data as (PeriodeEffectif & { id: string })[] | null) ?? [])) {
     const ctx = await contexteAgenda(supabase, cabinetId, p.id)
     if (!ctx) return []
 
@@ -972,6 +982,9 @@ export async function gardesPlanifieesDuCabinet(
           structure: ctx.structure,
           baseParCode: (code) => ctx.basesTitre.get(code),
           rolesParCode: (code) => ctx.rolesParCreneau.get(code),
+          pourAgendaPerso: {
+            placesAttendues: placesAttendues({ typePlanning: garde.type, date: garde.date, catalogue, periodes: [p], profils }),
+          },
         },
       )
       for (const ev of planifies) {

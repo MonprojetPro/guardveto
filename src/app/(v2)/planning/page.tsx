@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/server'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { redirect } from 'next/navigation'
 import { exigerIdentite } from '@/lib/identite'
+import { agendaPersoOuvert, clientService } from '@/lib/agenda-perso/rapprocher'
 import type { AbsenceAVenir } from '@/components/v2/AbsencesAVenirPanel'
 import type { CreneauBlocJournee } from '@/types'
 import '@/styles/v2-planning.css'
@@ -541,7 +542,7 @@ export default async function PlanningPageV2({
           .map((p, i) => ({ libelle: nomPeriode(p), nb: ailleursRes[i].count ?? 0 }))
           .filter((a) => a.nb > 0)
 
-    const [gRes, pRes] = await Promise.all([
+    const [gRes, pRes, agendaPerso] = await Promise.all([
       supabase
         .from('gardes')
         .select('id', { count: 'exact', head: true })
@@ -550,6 +551,11 @@ export default async function PlanningPageV2({
         .from('presences_journee')
         .select('id', { count: 'exact', head: true })
         .eq('periode_id', periodeAffichee.id),
+      // B-180a — là où l'agenda perso tourne, les journées partent aussi dans
+      // Google : la fenêtre de publication ne doit pas dire le contraire.
+      identite.cabinetId
+        ? agendaPersoOuvert(clientService(), identite.cabinetId).catch(() => null)
+        : Promise.resolve(false),
     ])
     if (gRes.error) console.error('[planning] comptage des gardes du planning :', gRes.error.message)
     if (pRes.error) console.error('[planning] comptage des présences du planning :', pRes.error.message)
@@ -557,6 +563,7 @@ export default async function PlanningPageV2({
       gardes: gRes.error ? null : (gRes.count ?? 0),
       presences: pRes.error ? null : (pRes.count ?? 0),
       ailleurs,
+      agendaPerso,
     }
   }
 

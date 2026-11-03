@@ -1,35 +1,36 @@
 'use client'
 
 // ============================================================
-// GUARDVETO V2 — Mon agenda (B-173)
+// GUARDVETO V2 — Mon agenda (B-173, refait par B-181)
 // ============================================================
-// Porté de la maquette validée par MiKL le 26/10
-// (`docs/maquettes/B-173-mon-agenda.html`) : l'interrupteur, « ce que vous
-// recevez », la personnalisation, et les états qui ne se taisent pas
-// (invitation à accepter, mise à jour en cours, agenda du cabinet à masquer,
-// adresse manquante, erreur).
+// Porté de la maquette validée par MiKL le 03/11
+// (`docs/maquettes/B-181-mon-agenda.html`) : un interrupteur, puis UN choix —
+// « Mon planning » ou « Tout le cabinet » —, chacun avec son réglage des
+// journées. Le choix s'enregistre au clic : pas de mode « personnaliser »,
+// pas de bouton « enregistrer » à oublier.
 //
-// ⚠️ L'ÉCRAN DIT CE QUE L'AGENDA REÇOIT VRAIMENT — calculé par la même
-//    fonction que la synchro (`contenuEffectif`). Un résumé recopié à la main
-//    finirait par annoncer une chose et en envoyer une autre.
+// Les états qui ne se taisent pas restent : invitation à accepter, mise à
+// jour en cours, agenda du cabinet à masquer, adresse manquante, erreur.
+//
+// ⚠️ L'ÉCRAN DIT CE QUE L'AGENDA REÇOIT VRAIMENT — la vue est lue par la même
+//    fonction que la synchro (`contenuEffectif`).
 // ============================================================
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   basculerMonAgenda,
-  personnaliserMonAgenda,
+  choisirMonAgenda,
   renvoyerInvitationAgenda,
-  revenirAuModeParDefaut,
 } from '@/app/(v2)/reglages/agenda/actions'
 import {
   contenuEffectif,
-  type ChoixJournees,
-  type ContenuAgendaPerso,
+  placementParDefaut,
   type GenreMembre,
   type Placement,
   type ReglagesAgendaPerso,
+  type VueAgenda,
 } from '@/lib/agenda-perso/planifier'
 
 export interface EtatMonAgenda {
@@ -53,36 +54,48 @@ interface Props {
   genre: GenreMembre
   reglages: ReglagesAgendaPerso
   etat: EtatMonAgenda
+  /** « GuardVeto — Manon » : le nom que la personne lit dans Google Agenda. */
+  nomAgenda: string
   nomAgendaCabinet: string
 }
 
-/** Les lignes « ce que vous recevez », dans les mots de l'écran. */
-export function lignesRecues(c: ContenuAgendaPerso, genre: GenreMembre, nomCabinet: string): { oui: boolean; texte: string; detail?: string }[] {
-  const lignes: { oui: boolean; texte: string; detail?: string }[] = []
-  const place = c.placement === 'heures' ? 'aux heures du créneau' : 'en haut du jour'
-  if (c.journees === 'miennes') lignes.push({ oui: true, texte: `Vos journées, ${place}` })
-  else if (c.journees === 'equipe') lignes.push({ oui: true, texte: `Les journées de toute l’équipe, ${place}`, detail: 'Un événement par créneau, avec les initiales' })
-  else lignes.push({ oui: false, texte: 'Aucune journée' })
-
-  if (c.gardesViaCabinet) {
-    lignes.push({ oui: true, texte: 'Les gardes de toute l’équipe, en haut du jour', detail: `Par « ${nomCabinet} », comme aujourd’hui` })
-    return lignes
-  }
-  if (genre === 'veto') lignes.push({ oui: c.mesGardes, texte: c.mesGardes ? 'Vos gardes, en haut du jour' : 'Vos gardes' })
-  lignes.push({ oui: c.gardesAutres, texte: c.gardesAutres ? 'Les gardes des autres, en haut du jour' : 'Les gardes des autres' })
-  return lignes
+interface Option {
+  vue: VueAgenda
+  titre: string
+  desc: string
+  question: string
+  aide: string
+  placements: [Placement, string][]
 }
 
-export function MonAgendaV2({ genre, reglages, etat, nomAgendaCabinet }: Props) {
+/** Les deux choix, dans les mots de la maquette du 03/11. */
+export const OPTIONS: readonly Option[] = [
+  {
+    vue: 'mon_planning',
+    titre: 'Mon planning',
+    desc: 'Mes gardes, avec la personne de garde avec moi, et mes journées au cabinet. Rien d’autre.',
+    question: 'Mes journées au cabinet',
+    aide: 'Aux heures, elles occupent votre agenda comme un rendez-vous. En haut du jour, elles restent discrètes.',
+    placements: [['heures', 'Aux heures'], ['haut', 'En haut du jour']],
+  },
+  {
+    vue: 'cabinet',
+    titre: 'Tout le cabinet',
+    desc: 'Les gardes de toute l’équipe, et chaque jour un bandeau qui dit qui est au cabinet.',
+    question: 'Les journées de l’équipe',
+    aide: 'En bandeau, une seule ligne par jour dit qui est au cabinet : l’agenda reste léger. Aux heures, chaque collègue apparaît sur son créneau.',
+    placements: [['haut', 'Un bandeau en haut du jour'], ['heures', 'Aux heures, dans les cases']],
+  },
+]
+
+/** Le secrétariat n'a ni garde ni journée à lui : « Tout le cabinet » seul. */
+export function optionsPour(genre: GenreMembre): readonly Option[] {
+  return genre === 'secretaire' ? OPTIONS.filter((o) => o.vue === 'cabinet') : OPTIONS
+}
+
+export function MonAgendaV2({ genre, reglages, etat, nomAgenda, nomAgendaCabinet }: Props) {
   const router = useRouter()
   const [enCours, demarrer] = useTransition()
-  const [edition, setEdition] = useState(false)
-  const [brouillon, setBrouillon] = useState(() => ({
-    journees: (genre === 'secretaire' && reglages.journees === 'miennes' ? 'equipe' : reglages.journees) as ChoixJournees,
-    placement: reglages.placement as Placement,
-    mesGardes: reglages.mesGardes,
-    gardesAutres: reglages.gardesAutres,
-  }))
 
   // Pendant une mise à jour, l'écran se relit seul : « en cours » ne doit pas
   // rester affiché sur un travail fini.
@@ -93,12 +106,8 @@ export function MonAgendaV2({ genre, reglages, etat, nomAgendaCabinet }: Props) 
   }, [etat.enCours, router])
 
   const contenu = contenuEffectif(reglages, genre)
-  const apercu = useMemo(
-    () => contenuEffectif({ ...reglages, ...brouillon, actif: true, personnalise: true }, genre),
-    [reglages, brouillon, genre],
-  )
 
-  const lancer = (action: () => Promise<{ success: true } | { error: string }>, ok: string, apres?: () => void) =>
+  const lancer = (action: () => Promise<{ success: true } | { error: string }>, ok: string) =>
     demarrer(async () => {
       const r = await action()
       if ('error' in r) {
@@ -106,9 +115,13 @@ export function MonAgendaV2({ genre, reglages, etat, nomAgendaCabinet }: Props) 
         return
       }
       toast.success(ok)
-      apres?.()
       router.refresh()
     })
+
+  const choisir = (vue: VueAgenda, placement: Placement) => {
+    if (vue === contenu.vue && placement === contenu.placement) return
+    lancer(() => choisirMonAgenda({ vue, placement }), 'C’est noté — votre agenda se met à jour')
+  }
 
   const adresseGoogle = !!etat.email && /@(gmail|googlemail)\.com$/.test(etat.email)
 
@@ -117,7 +130,7 @@ export function MonAgendaV2({ genre, reglages, etat, nomAgendaCabinet }: Props) 
       <div className="page-head rise">
         <div>
           <h1>Mon agenda</h1>
-          <p className="lede">Votre planning, dans votre Google Agenda. Ces réglages ne valent que pour vous.</p>
+          <p className="lede">Votre planning GuardVeto dans votre Google Agenda, mis à jour tout seul. Ces réglages ne valent que pour vous.</p>
         </div>
       </div>
 
@@ -136,7 +149,7 @@ export function MonAgendaV2({ genre, reglages, etat, nomAgendaCabinet }: Props) 
           />
           <span>
             <b>Recevoir mon planning dans Google Agenda</b>
-            <small>Si vous préférez n’utiliser que l’application, coupez-le.</small>
+            <small>Éteint : plus rien n’y arrive, l’agenda est vidé.</small>
           </span>
         </label>
 
@@ -153,87 +166,46 @@ export function MonAgendaV2({ genre, reglages, etat, nomAgendaCabinet }: Props) 
               ? `Votre agenda GuardVeto est vidé. ${etat.partageCabinet === 'retire' ? `« ${nomAgendaCabinet} » vous est rendu.` : `« ${nomAgendaCabinet} » reste comme il est.`} Rien d’autre n’est touché.`
               : 'Rien n’est envoyé dans votre Google Agenda.'}
           </p>
-        ) : edition ? (
-          <div className="ma-corps">
-            <div className="ma-q">
-              <span className="ma-q-t">Journées</span>
-              <div className="ma-seg" role="radiogroup" aria-label="Journées">
-                {([
-                  ...(genre === 'veto' ? [['miennes', 'Les miennes']] : []),
-                  ['equipe', 'Celles de toute l’équipe'],
-                  ['aucune', 'Aucune'],
-                ] as [ChoixJournees, string][]).map(([v, l]) => (
-                  <button key={v} type="button" role="radio" aria-checked={brouillon.journees === v}
-                    className={brouillon.journees === v ? 'sel' : ''}
-                    onClick={() => setBrouillon((b) => ({ ...b, journees: v }))}>{l}</button>
-                ))}
-              </div>
-            </div>
-            <div className="ma-q">
-              <span className="ma-q-t">Placées<small>Aux heures, elles occupent votre agenda comme un rendez-vous. En haut du jour, elles restent discrètes.</small></span>
-              <div className="ma-seg" role="radiogroup" aria-label="Placement des journées">
-                {([['heures', 'Aux heures du créneau'], ['haut', 'En haut du jour']] as [Placement, string][]).map(([v, l]) => (
-                  <button key={v} type="button" role="radio" aria-checked={brouillon.placement === v}
-                    disabled={brouillon.journees === 'aucune'}
-                    className={brouillon.placement === v ? 'sel' : ''}
-                    onClick={() => setBrouillon((b) => ({ ...b, placement: v }))}>{l}</button>
-                ))}
-              </div>
-            </div>
-            {genre === 'veto' && (
-              <div className="ma-q">
-                <span className="ma-q-t">Mes gardes</span>
-                <div className="ma-seg" role="radiogroup" aria-label="Mes gardes">
-                  {([[true, 'Oui'], [false, 'Non']] as [boolean, string][]).map(([v, l]) => (
-                    <button key={l} type="button" role="radio" aria-checked={brouillon.mesGardes === v}
-                      className={brouillon.mesGardes === v ? 'sel' : ''}
-                      onClick={() => setBrouillon((b) => ({ ...b, mesGardes: v }))}>{l}</button>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="ma-q">
-              <span className="ma-q-t">{genre === 'veto' ? 'Les gardes des autres' : 'Les gardes de l’équipe'}</span>
-              <div className="ma-seg" role="radiogroup" aria-label="Gardes des autres">
-                {([[true, 'Oui'], [false, 'Non']] as [boolean, string][]).map(([v, l]) => (
-                  <button key={l} type="button" role="radio" aria-checked={brouillon.gardesAutres === v}
-                    className={brouillon.gardesAutres === v ? 'sel' : ''}
-                    onClick={() => setBrouillon((b) => ({ ...b, gardesAutres: v }))}>{l}</button>
-                ))}
-              </div>
-            </div>
-
-            <div className="ma-bandeau info">
-              <b>Vous recevrez</b>
-              {lignesRecues(apercu, genre, nomAgendaCabinet).filter((l) => l.oui).map((l) => l.texte.toLowerCase()).join(' ; ') || 'rien'}.
-            </div>
-            <div className="ma-bandeau att">
-              <b>« {nomAgendaCabinet} » vous sera retiré</b>
-              Vos gardes arrivent désormais par votre agenda GuardVeto : le garder vous les montrerait en double.
-            </div>
-            <div className="ma-actions">
-              <button type="button" className="btn btn-accent btn-sm" disabled={enCours}
-                onClick={() => lancer(() => personnaliserMonAgenda(brouillon), 'Réglages enregistrés — votre agenda se met à jour', () => setEdition(false))}>
-                Enregistrer
-              </button>
-              <button type="button" className="btn btn-outline btn-sm" disabled={enCours} onClick={() => setEdition(false)}>Annuler</button>
-            </div>
-          </div>
         ) : (
           <div className="ma-corps">
-            <div className="ma-recu-tete">
-              <span className="ma-q-t">Ce que vous recevez</span>
-              <span className={`ma-etiquette ${reglages.personnalise ? 'perso' : ''}`}>
-                {reglages.personnalise ? 'Personnalisé' : 'Mode par défaut'}
-              </span>
+            <span className="ma-q-t">Dans mon Google Agenda, je veux voir</span>
+            <div className="ma-choix" role="radiogroup" aria-label="Ce que contient mon agenda">
+              {optionsPour(genre).map((o) => {
+                const on = contenu.vue === o.vue
+                return (
+                  <div key={o.vue} className={`ma-option${on ? ' on' : ''}`}>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      className="ma-option-tete"
+                      disabled={enCours}
+                      onClick={() => choisir(o.vue, placementParDefaut(o.vue))}
+                    >
+                      <span className="ma-radio" aria-hidden="true" />
+                      <span>
+                        <b>{o.titre}</b>
+                        <small>{o.desc}</small>
+                      </span>
+                    </button>
+                    {on && (
+                      <div className="ma-sous">
+                        <span className="ma-q-t">{o.question}</span>
+                        <div className="ma-seg" role="radiogroup" aria-label={o.question}>
+                          {o.placements.map(([p, l]) => (
+                            <button key={p} type="button" role="radio" aria-checked={contenu.placement === p}
+                              className={contenu.placement === p ? 'sel' : ''}
+                              disabled={enCours}
+                              onClick={() => choisir(o.vue, p)}>{l}</button>
+                          ))}
+                        </div>
+                        <small className="ma-aide">{o.aide}</small>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
-            <ul className="ma-recu">
-              {lignesRecues(contenu, genre, nomAgendaCabinet).map((l) => (
-                <li key={l.texte} className={l.oui ? '' : 'non'}>
-                  <span>{l.texte}{l.detail && <small>{l.detail}</small>}</span>
-                </li>
-              ))}
-            </ul>
 
             {etat.enCours && (
               <p className="ma-statut att">
@@ -248,7 +220,7 @@ export function MonAgendaV2({ genre, reglages, etat, nomAgendaCabinet }: Props) 
               </div>
             )}
             {!etat.enCours && !etat.derniereErreur && etat.agendaCree && etat.email && (
-              <p className="ma-statut">Partagé avec {etat.compte ?? etat.email} · à jour</p>
+              <p className="ma-statut">Agenda « {nomAgenda} » · partagé avec {etat.compte ?? etat.email} · à jour</p>
             )}
 
             {etat.agendaCree && etat.invitationRecente && (
@@ -257,10 +229,12 @@ export function MonAgendaV2({ genre, reglages, etat, nomAgendaCabinet }: Props) 
                 Ajoutez l’agenda dans Google Agenda, connecté avec {etat.compte ?? etat.email}. Un e-mail GuardVeto vous a aussi été envoyé.
               </div>
             )}
-            {reglages.personnalise && (etat.partageCabinet === 'absent' || etat.partageCabinet === 'impossible') && (
+            {/* « absent » = elle ne l'a pas : rien à faire. « impossible » =
+                elle en est propriétaire, GuardVeto ne peut pas le lui retirer. */}
+            {etat.partageCabinet === 'impossible' && (
               <div className="ma-bandeau att">
                 <b>Masquez « {nomAgendaCabinet} »</b>
-                GuardVeto n’a pas pu vous le retirer. Dans Google Agenda, décochez-le, sinon vos gardes apparaîtront en double.
+                Vos gardes arrivent par votre agenda GuardVeto. Dans Google Agenda, décochez l’agenda du cabinet, sinon vous les verrez en double.
               </div>
             )}
             {etat.email && !adresseGoogle && (
@@ -273,17 +247,8 @@ export function MonAgendaV2({ genre, reglages, etat, nomAgendaCabinet }: Props) 
             <div className="ma-actions">
               {etat.lienAjout && (
                 <a className="btn btn-outline btn-sm" href={etat.lienAjout} target="_blank" rel="noopener noreferrer">
-                  Ajouter à mon Google Agenda
+                  Ouvrir dans Google Agenda
                 </a>
-              )}
-              <button type="button" className="btn btn-accent btn-sm" disabled={enCours} onClick={() => setEdition(true)}>
-                {reglages.personnalise ? 'Modifier' : 'Personnaliser'}
-              </button>
-              {reglages.personnalise && (
-                <button type="button" className="btn btn-outline btn-sm" disabled={enCours}
-                  onClick={() => lancer(revenirAuModeParDefaut, `Mode par défaut rétabli — « ${nomAgendaCabinet} » vous est rendu`)}>
-                  Revenir au mode par défaut
-                </button>
               )}
               {etat.agendaCree && (
                 <button type="button" className="btn btn-outline btn-sm" disabled={enCours}

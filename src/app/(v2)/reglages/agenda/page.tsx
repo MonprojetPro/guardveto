@@ -3,8 +3,8 @@
 // ============================================================
 // Chaque membre reçoit son planning dans SON agenda Google, comme il le veut.
 // Ouvert aux trois rôles, comme « Mes notifications » : c'est un réglage
-// personnel, pas un réglage du cabinet. Maquette validée par MiKL le 26/10 :
-// `docs/maquettes/B-173-mon-agenda.html`.
+// personnel, pas un réglage du cabinet. Maquette validée par MiKL le 03/11 :
+// `docs/maquettes/B-181-mon-agenda.html` (B-181, remplace celle du 26/10).
 //
 // La page n'existe que là où la fonction est ouverte (`agenda_perso_ouvert`)
 // et où le cabinet a un agenda Google : ailleurs, il n'y a rien à régler, et
@@ -93,6 +93,7 @@ export default async function MonAgendaPage() {
             derniereSyncLe: ligne.derniere_sync_le,
             derniereErreur: ligne.derniere_erreur,
           }}
+          nomAgenda={`GuardVeto — ${(genre === 'veto' ? identite.veto.prenom : identite.nomAffiche) || 'mon planning'}`}
           nomAgendaCabinet={nomCabinet}
         />
       </div>

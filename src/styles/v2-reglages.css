@@ -340,3 +340,37 @@
 .ma-bandeau.att { background: var(--warn-soft); }
 .ma-bandeau.bad { background: var(--danger-soft); }
 .ma-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+/* B-181 — « Mon planning » ou « Tout le cabinet » : deux cartes à bouton
+   radio, le réglage des journées s'ouvre sous la carte choisie (maquette
+   `docs/maquettes/B-181-mon-agenda.html`). */
+.ma-choix { display: flex; flex-direction: column; gap: 10px; }
+.ma-option {
+  background: var(--surface); border: 1.5px solid var(--t-border);
+  border-radius: var(--r-md); overflow: hidden;
+}
+.ma-option.on { border-color: var(--t-accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.ma-option-tete {
+  display: grid; grid-template-columns: 22px 1fr; gap: 12px; align-items: start;
+  width: 100%; text-align: left; padding: 14px 16px;
+  background: none; border: none; color: inherit; cursor: pointer; font: inherit;
+}
+.ma-option-tete:disabled { cursor: progress; }
+.ma-option-tete b { display: block; font: 700 1rem var(--font-display); }
+.ma-option-tete small { display: block; margin-top: 2px; font-size: 0.82rem; color: var(--t-muted); line-height: 1.45; }
+.ma-radio {
+  width: 22px; height: 22px; margin-top: 1px; border-radius: 50%;
+  border: 2px solid var(--t-border); position: relative;
+}
+.ma-option.on .ma-radio { border-color: var(--t-accent); }
+.ma-option.on .ma-radio::after {
+  content: ""; position: absolute; inset: 4px; border-radius: 50%; background: var(--t-accent);
+}
+.ma-sous {
+  display: flex; flex-direction: column; gap: 8px;
+  margin: 0 16px; padding: 12px 0 14px 34px; border-top: 1px dashed var(--t-border);
+}
+.ma-aide { font-size: 0.78rem; color: var(--t-muted); line-height: 1.45; }
+@media (max-width: 640px) {
+  .ma-sous { padding-left: 0; }
+}

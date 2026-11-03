@@ -47,6 +47,25 @@ export interface ContenuPeriode {
    * avec celui-ci. `null` = lecture impossible ; absent = non chargé.
    */
   ailleurs?: { libelle: string; nb: number }[] | null
+  /**
+   * B-180a — l'agenda Google PERSONNEL tourne-t-il dans ce cabinet
+   * (`cabinets.agenda_perso_ouvert`) ? `null` = on ne sait pas ; absent = non
+   * chargé.
+   */
+  agendaPerso?: boolean | null
+}
+
+/**
+ * B-180a — ce que la publication fait aux agendas Google. Avant, la fenêtre
+ * disait toujours « les journées restent dans l'application » : faux là où
+ * l'agenda perso tourne, puisqu'il emporte aussi les journées. Quand on ne
+ * sait pas, on n'affirme rien sur les journées.
+ */
+export function phraseAgendas(avecJournees: boolean, agendaPerso: boolean | null | undefined): string {
+  if (!avecJournees) return 'avec les gardes'
+  if (agendaPerso === true) return 'avec les gardes et les journées, dans l’agenda GuardVeto de chacun'
+  if (agendaPerso === false) return 'avec les gardes (les journées restent dans l’application)'
+  return 'avec les gardes'
 }
 
 /** « 25 présences portées par Hiver P2 », ou null s'il n'y a rien ailleurs. */
@@ -249,8 +268,7 @@ export function DialogPublicationChantier({ open, onOpenChange, periode, contenu
                     <li>
                       <CalendarCheck className="gp-auto-ico" aria-hidden />
                       <span>
-                        <strong>Les agendas Google se remplissent</strong> avec les gardes
-                        {avecJournees ? ' (les journées restent dans l’application)' : ''}.
+                        <strong>Les agendas Google se remplissent</strong> {phraseAgendas(avecJournees, contenu?.agendaPerso)}.
                       </span>
                     </li>
                   </>

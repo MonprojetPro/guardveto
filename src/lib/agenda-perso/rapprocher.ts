@@ -13,7 +13,7 @@
 // ============================================================
 
 import { createClient as createServiceClient, type SupabaseClient } from '@supabase/supabase-js'
-import { agendaDuCabinet, gardesPlanifieesDuCabinet, libellesDuCabinet } from '@/lib/sync-calendrier'
+import { agendaDuCabinet, gardesPlanifieesDuCabinet } from '@/lib/sync-calendrier'
 import {
   contenuEffectif,
   operationsAgenda,
@@ -26,6 +26,7 @@ import {
   type Placement,
   type PresenceAPlacer,
   type ReglagesAgendaPerso,
+  prenomsDepartages,
   reglagesParDefaut,
 } from './planifier'
 import * as G from './google'
@@ -92,7 +93,8 @@ interface ContexteCabinet {
   agendaCabinet: string | null
   presences: PresenceAPlacer[]
   gardes: GardeAPlacer[]
-  libelles: Map<string, string>
+  /** B-181 — le prénom de chaque véto, tel que les titres le disent. */
+  noms: Map<string, string>
 }
 
 /** Fenêtre : on ne réécrit pas le passé lointain. Sept jours de recul. */
@@ -169,15 +171,21 @@ async function presencesPubliees(admin: SupabaseClient, cabinetId: string, depui
   return sortie
 }
 
+async function prenomsDuCabinet(admin: SupabaseClient, cabinetId: string): Promise<Map<string, string>> {
+  const { data, error } = await admin.from('veterinaires').select('id, prenom, nom').eq('cabinet_id', cabinetId)
+  if (error) throw new Error(`Lecture de l’équipe impossible : ${error.message}`)
+  return prenomsDepartages((data as { id: string; prenom: string | null; nom: string | null }[] | null) ?? [])
+}
+
 async function contexteCabinet(admin: SupabaseClient, cabinetId: string): Promise<ContexteCabinet> {
   const depuis = depuisAujourdhui()
-  const [agendaCabinet, presences, gardes, libelles] = await Promise.all([
+  const [agendaCabinet, presences, gardes, noms] = await Promise.all([
     agendaDuCabinet(admin, cabinetId),
     presencesPubliees(admin, cabinetId, depuis),
     gardesPlanifieesDuCabinet(admin, cabinetId, depuis),
-    libellesDuCabinet(admin, cabinetId),
+    prenomsDuCabinet(admin, cabinetId),
   ])
-  return { cabinetId, depuis, agendaCabinet, presences, gardes, libelles }
+  return { cabinetId, depuis, agendaCabinet, presences, gardes, noms }
 }
 
 async function membreDeLigne(admin: SupabaseClient, l: LigneAgendaPerso): Promise<Membre | null> {
@@ -243,8 +251,9 @@ async function majLigne(admin: SupabaseClient, id: string, champs: Partial<Ligne
 
 /**
  * Le partage de l'agenda du CABINET pour cette personne.
- * Retiré quand elle personnalise (ses gardes arrivent alors par son agenda
- * perso, sinon elle les verrait deux fois), rendu sinon.
+ * B-181 : retiré dès que son agenda perso tourne — ses gardes y arrivent
+ * toujours, quel que soit son choix, et l'agenda commun les lui montrerait en
+ * double. Rendu quand elle coupe l'envoi.
  */
 async function rapprocherPartageCabinet(
   admin: SupabaseClient,
@@ -395,7 +404,7 @@ async function unPassage(admin: SupabaseClient, l: LigneAgendaPerso, ctx: Contex
 
   // ① Le partage de l'agenda du cabinet.
   // B-178 — même compte Google que le partage de l'agenda perso (alias « + » retiré).
-  const errCab = await rapprocherPartageCabinet(admin, l, adresseDePartage(email) ?? email, ctx, enService && reglages.personnalise)
+  const errCab = await rapprocherPartageCabinet(admin, l, adresseDePartage(email) ?? email, ctx, enService)
   if (errCab) erreurs.push(errCab)
 
   // ② Fonction coupée (ou personne partie) : on vide l'agenda, on le garde.
@@ -434,7 +443,7 @@ async function unPassage(admin: SupabaseClient, l: LigneAgendaPerso, ctx: Contex
     contenu: contenuEffectif(reglages, genre),
     vetId: genre === 'veto' ? membre!.id : null,
     presences: ctx.presences,
-    libelles: ctx.libelles,
+    noms: ctx.noms,
     gardes: ctx.gardes,
   })
   const ops = operationsAgenda(voulus, await evenementsConnus(admin, l.id), ctx.depuis)

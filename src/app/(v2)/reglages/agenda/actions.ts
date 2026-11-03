@@ -22,15 +22,15 @@ import {
   ligneDuMembre,
   type LigneAgendaPerso,
 } from '@/lib/agenda-perso/rapprocher'
-import type { ChoixJournees, Placement } from '@/lib/agenda-perso/planifier'
+import { reglagesDuChoix, type GenreMembre, type Placement, type VueAgenda } from '@/lib/agenda-perso/planifier'
 
 export type ResultatMonAgenda = { success: true } | { error: string }
 
-const JOURNEES: readonly ChoixJournees[] = ['miennes', 'equipe', 'aucune']
+const VUES: readonly VueAgenda[] = ['mon_planning', 'cabinet']
 const PLACEMENTS: readonly Placement[] = ['heures', 'haut']
 
 /** La ligne de la personne connectée — ou la raison pour laquelle il n'y en a pas. */
-async function maLigne(): Promise<{ ok: true; ligne: LigneAgendaPerso } | { ok: false; error: string }> {
+async function maLigne(): Promise<{ ok: true; ligne: LigneAgendaPerso; genre: GenreMembre } | { ok: false; error: string }> {
   const supabase = await createClient()
   const r = await resoudreIdentite(supabase)
   if (!r.ok) return { ok: false, error: 'Session expirée. Reconnectez-vous.' }
@@ -45,7 +45,7 @@ async function maLigne(): Promise<{ ok: true; ligne: LigneAgendaPerso } | { ok: 
     ? { genre: 'veto' as const, id: identite.veto.id }
     : { genre: 'secretaire' as const, id: identite.secretaire.id }
   try {
-    return { ok: true, ligne: await ligneDuMembre(admin, identite.cabinetId, membre) }
+    return { ok: true, ligne: await ligneDuMembre(admin, identite.cabinetId, membre), genre: membre.genre }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Lecture impossible.' }
   }
@@ -70,35 +70,27 @@ export async function basculerMonAgenda(actif: boolean): Promise<ResultatMonAgen
   return ecrire(m.ligne.id, { actif: actif === true })
 }
 
-/** Enregistre une personnalisation (toutes les combinaisons sont permises). */
-export async function personnaliserMonAgenda(saisie: {
-  journees: ChoixJournees
-  placement: Placement
-  mesGardes: boolean
-  gardesAutres: boolean
-}): Promise<ResultatMonAgenda> {
+/**
+ * B-181 — le seul choix de l'écran : « Mon planning » ou « Tout le cabinet »,
+ * et où se placent les journées. Le secrétariat n'a que « Tout le cabinet » :
+ * le serveur le force, quoi que dise l'appel.
+ */
+export async function choisirMonAgenda(saisie: { vue: VueAgenda; placement: Placement }): Promise<ResultatMonAgenda> {
   // Le serveur refuse ce que l'écran ne propose pas : une porte retirée du
   // menu reste ouverte à qui forge l'appel.
-  if (!JOURNEES.includes(saisie?.journees) || !PLACEMENTS.includes(saisie?.placement)) {
+  if (!VUES.includes(saisie?.vue) || !PLACEMENTS.includes(saisie?.placement)) {
     return { error: 'Ce choix n’existe pas.' }
   }
   const m = await maLigne()
   if (!m.ok) return { error: m.error }
+  const r = reglagesDuChoix(saisie.vue, saisie.placement, m.genre)
   return ecrire(m.ligne.id, {
-    actif: true,
-    personnalise: true,
-    journees: saisie.journees,
-    placement: saisie.placement,
-    mes_gardes: saisie.mesGardes === true,
-    gardes_autres: saisie.gardesAutres === true,
+    personnalise: r.personnalise,
+    journees: r.journees,
+    placement: r.placement,
+    mes_gardes: r.mesGardes,
+    gardes_autres: r.gardesAutres,
   })
-}
-
-/** Revient au mode par défaut (et l'agenda du cabinet est rendu). */
-export async function revenirAuModeParDefaut(): Promise<ResultatMonAgenda> {
-  const m = await maLigne()
-  if (!m.ok) return { error: m.error }
-  return ecrire(m.ligne.id, { personnalise: false })
 }
 
 /** Renvoie l'invitation Google (e-mail perdu, agenda jamais ajouté). */

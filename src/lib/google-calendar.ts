@@ -381,6 +381,15 @@ export interface EvenementPlanifie {
   colorId?: string
   start: PeriodeEvenementGoogle['start']
   end: PeriodeEvenementGoogle['end']
+  /**
+   * B-181 — agenda PERSONNEL seulement (`pourAgendaPerso`). Les morceaux du
+   * titre (« Garde », « 1er »), pour que l'agenda perso compose le sien
+   * (« Garde 1er — avec Fanny »), et `vide` pour une place PRÉVUE restée sans
+   * personne. Jamais envoyés à Google tels quels.
+   */
+  base?: string
+  role?: string
+  vide?: boolean
 }
 
 export interface OptionsPlanification extends OptionsEvenementAgenda {
@@ -398,6 +407,14 @@ export interface OptionsPlanification extends OptionsEvenementAgenda {
   baseParCode?: (code: string) => string | undefined
   /** Rôles nommés par le cabinet (`creneau_modele.roles`), par index de place. */
   rolesParCode?: (code: string) => readonly string[] | undefined
+  /**
+   * B-181 — planification POUR L'AGENDA PERSONNEL : chaque événement porte sa
+   * base et son rôle, et chaque place prévue (`placesAttendues`) restée vide
+   * sort aussi, marquée `vide`. `null` = on ne sait pas combien de places le
+   * créneau prévoit : aucune place vide n'est alors annoncée (un trou
+   * imaginaire est pire qu'un silence). Jamais pour l'agenda du cabinet.
+   */
+  pourAgendaPerso?: { placesAttendues: number | null }
 }
 
 /** 'garde' — quand le créneau ne fournit ni libellé d'agenda ni nom. */
@@ -511,6 +528,7 @@ export function planifierEvenementsGarde(
           },
         }
 
+    const perso = options.pourAgendaPerso
     occupants.forEach((occ, placeIndex) => {
       // Place vacante ce jour-là (ou jamais pourvue) : aucun événement. Un
       // événement au nom de quelqu'un qui ne sera pas là est pire qu'un trou
@@ -544,8 +562,21 @@ export function planifierEvenementsGarde(
         ...(estColorIdValide(occ.couleurGoogle) ? { colorId: occ.couleurGoogle as string } : {}),
         start: periode.start,
         end: periode.end,
+        ...(perso ? { base, role: roleCourt(roles?.[placeIndex], placeIndex) } : {}),
       })
     })
+
+    // B-181 — agenda perso : une place prévue restée vide se dit aussi.
+    if (perso && perso.placesAttendues !== null) {
+      for (let placeIndex = 0; placeIndex < perso.placesAttendues; placeIndex++) {
+        if (occupants[placeIndex]) continue
+        const role = roleCourt(roles?.[placeIndex], placeIndex)
+        evenements.push({
+          jour, placeIndex, titre: `${base} ${role}`, base, role, vide: true,
+          start: periode.start, end: periode.end,
+        })
+      }
+    }
   }
 
   return evenements
