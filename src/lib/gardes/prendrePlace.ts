@@ -67,6 +67,18 @@ export function controlerPrisePlace(args: {
 }
 
 /**
+ * B-179e — l'avertissement du moteur, dit à la personne qui prend la place.
+ * `libelle` = SA règle (« Fanny ne fait pas de garde le mardi »), ou `null`
+ * quand le moteur ne sait pas la nommer : alors une phrase générique, jamais
+ * les règles des collègues.
+ */
+export function phraseMoteur(libelle: string | null): string {
+  return libelle
+    ? `Le moteur du planning ne vous aurait pas placé ici : ${libelle}.`
+    : 'Le moteur du planning ne vous aurait pas placé ici : une règle de planning s’y oppose (repos, rythme ou binôme).'
+}
+
+/**
  * Côté écran : la première place vide d'une garde, d'après ce que la grille
  * sait déjà (places pourvues + manque calculé par `calculerManques`). Le
  * serveur refait le calcul de son côté — l'écran ne décide de rien, il évite

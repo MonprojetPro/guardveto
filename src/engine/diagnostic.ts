@@ -209,6 +209,35 @@ function libelleIndividuel(
   return raisonBrute
 }
 
+/**
+ * B-179e (03/11) — la raison LISIBLE qui écarte UN vétérinaire précis.
+ *
+ * `construireDiagnostic` agrège les raisons de TOUS les vétos, et sur tous les
+ * créneaux non couverts : recopiée telle quelle à quelqu'un qui prend une place,
+ * elle lui citait les règles d'Anne-Sophie, de Victor et d'Antoine — jamais la
+ * sienne. Ici, une seule raison (celle d'`isValid` pour CE véto), rendue avec
+ * les mêmes briques de libellé que le diagnostic. `null` = rien d'affichable
+ * (mécanique d'effectif, raison sans code) : l'appelant dit alors une phrase
+ * générique plutôt que d'inventer.
+ */
+export function libelleRaisonVet(
+  raisonBrute: string,
+  vet: VetEngine,
+  vets: readonly VetEngine[],
+): string | null {
+  const code = extraireCode(raisonBrute)
+  if (!code) return null
+  const origine = origineDeCode(code)
+  if (origine === 'effectif') return null
+  if (origine === 'structurelle') return libelleStructurel(code)
+  if (origine === 'conge') return raisonBrute
+  const contrainte = trouverContrainte(vet, code)
+  if (!contrainte) return null
+  return libelleIndividuel(vet, contrainte, raisonBrute, {
+    nomVeto: (id: string) => vets.find((v) => v.id === id)?.prenom ?? VETO_RETIRE,
+  })
+}
+
 /** Libellé d'une règle structurelle R8/R9 via le catalogue (brique liaison/inversion). */
 function libelleStructurel(code: string): string {
   if (code === 'R9') {

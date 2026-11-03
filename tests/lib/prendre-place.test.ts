@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { controlerPrisePlace, placeAPrendre } from '@/lib/gardes/prendrePlace'
+import { controlerPrisePlace, phraseMoteur, placeAPrendre } from '@/lib/gardes/prendrePlace'
 
 const MOI = 'vet-fanny'
 const base = {
@@ -100,6 +100,19 @@ describe('la route prendre-place', () => {
     const source = readFileSync(join(process.cwd(), 'src/lib/gardes/appliquer-changement.ts'), 'utf8')
     expect(source).toContain('requete.is(params.siVide, null)')
     expect(source).toContain("status: 409, error: 'Cette place vient d’être prise par quelqu’un d’autre.'")
+  })
+
+  it('B-179e : l’avertissement du moteur ne recopie JAMAIS le diagnostic de toute l’équipe', () => {
+    expect(route).toContain('expliquerPour: moi.id')
+    expect(route).toContain('avertissements.push(phraseMoteur(libelle))')
+    expect(route).not.toContain('resultat.diagnostic?.reglesEnCause')
+  })
+
+  it('B-179e : phraseMoteur dit SA règle, ou une phrase générique', () => {
+    expect(phraseMoteur('Fanny ne fait pas de garde le mardi')).toBe(
+      'Le moteur du planning ne vous aurait pas placé ici : Fanny ne fait pas de garde le mardi.',
+    )
+    expect(phraseMoteur(null)).toMatch(/une règle de planning s’y oppose/)
   })
 
   it('laisse une trace pour l’administratrice et la prévient', () => {

@@ -51,7 +51,8 @@ import { besoinSecondCreneau, chargerContextePourPeriode, mapDbTypeToEngine } fr
 import { proposerReparation } from '@/engine/crise/reparer'
 import { construireCatalogue, placesAttendues } from '@/lib/planning/placesAttendues'
 import { labelDonneeDePlace, roleParDefaut } from '@/lib/gardes/places'
-import { controlerPrisePlace } from '@/lib/gardes/prendrePlace'
+import { controlerPrisePlace, phraseMoteur } from '@/lib/gardes/prendrePlace'
+import { libelleRaisonVet } from '@/engine/diagnostic'
 import { creerNotification } from '@/lib/notifications-inapp'
 import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
 
@@ -195,14 +196,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         equityWeights: ctx.equityWeights,
         roleAvantageFinancier: ctx.roleAvantageFinancier,
         contexteAnterieur: ctx.contexteAnterieur,
+        // B-179e — SA raison à elle, pas le diagnostic de toute l'équipe.
+        expliquerPour: moi.id,
       })
       if (!resultat.candidats.some((c) => c.vetId === moi.id)) {
-        const regles = resultat.diagnostic?.reglesEnCause?.map((r) => r.libelle).filter(Boolean).join(', ')
-        avertissements.push(
-          regles
-            ? `Le moteur du planning ne vous aurait pas placé ici (${regles}).`
-            : 'Le moteur du planning ne vous aurait pas placé ici : une de vos règles s’y oppose.',
-        )
+        // ⚠️ Jamais `resultat.diagnostic` ici : il agrège les règles de TOUS les
+        //    vétos (et d'autres créneaux) — Fanny lisait celles d'Anne-Sophie,
+        //    de Victor et d'Antoine (03/11).
+        const vetMoi = ctx.vets.find((v) => v.id === moi.id)
+        const libelle = resultat.raisonPour && vetMoi
+          ? libelleRaisonVet(resultat.raisonPour, vetMoi, ctx.vets)
+          : null
+        avertissements.push(phraseMoteur(libelle))
       }
     } catch (err) {
       // Un juge qui ne répond pas ne vaut pas « tout va bien » : on le dit.

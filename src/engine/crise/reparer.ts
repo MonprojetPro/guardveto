@@ -80,6 +80,11 @@ export interface ResultatReparation {
   meilleur: string | null
   /** Si aucun candidat légal : pourquoi (règle en cause). Absent sinon. */
   diagnostic?: DiagnosticImpasse
+  /**
+   * B-179e — la raison BRUTE (`isValid`) qui écarte le véto `expliquerPour`, s'il
+   * est écarté. Absent si non demandé ou s'il est candidat.
+   */
+  raisonPour?: string
 }
 
 /** Paramètres de `proposerReparation` (fonction pure). */
@@ -107,6 +112,11 @@ export interface ProposerReparationParams {
    * réparer tombe en tout début de période (jonction). Absent/vide → byte-identique.
    */
   contexteAnterieur?: AttributionGarde[]
+  /**
+   * B-179e — un véto dont on veut connaître la raison d'exclusion (la personne
+   * qui prend elle-même une place). Ne change NI les candidats NI le tri.
+   */
+  expliquerPour?: string
 }
 
 // ── Helpers internes ─────────────────────────────────────
@@ -230,10 +240,16 @@ export function proposerReparation(
 
   // ── 2. Candidats légaux (absent exclu) ────────────────────────────────────
   const candidatsLegaux: CandidatReparation[] = []
+  // B-179e — la raison d'exclusion de `expliquerPour`, captée au passage : le
+  // MÊME appel à isValid, dans le MÊME contexte partiel (aucune seconde règle).
+  let raisonPour: string | undefined
   for (const vet of vets) {
     if (vet.id === absentId) continue // X exclu
     const res = isValid(slot, vet, creneau.role, vets, planningPartiel, calendrier, structure, contexteAnterieur)
-    if (!res.valid) continue
+    if (!res.valid) {
+      if (vet.id === params.expliquerPour) raisonPour = res.raison ?? undefined
+      continue
+    }
 
     // #17 : le scoreur voit le même lookback (R10 à la jonction). On garde la
     // distinction undefined/défini de roleAvantage (byte-identique historique).
@@ -250,7 +266,7 @@ export function proposerReparation(
   )
 
   if (candidatsLegaux.length > 0) {
-    return { candidats: candidatsLegaux, meilleur: candidatsLegaux[0].vetId }
+    return { candidats: candidatsLegaux, meilleur: candidatsLegaux[0].vetId, ...(raisonPour ? { raisonPour } : {}) }
   }
 
   // ── 5. Aucun candidat légal → diagnostic (réutilise diagnostic.ts) ─────────
@@ -276,5 +292,5 @@ export function proposerReparation(
     // pas de `resimuler` : on ne régénère JAMAIS le planning entier en crise.
   })
 
-  return { candidats: [], meilleur: null, diagnostic }
+  return { candidats: [], meilleur: null, diagnostic, ...(raisonPour ? { raisonPour } : {}) }
 }
