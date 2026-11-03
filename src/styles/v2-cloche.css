@@ -1,0 +1,93 @@
+/* ============================================================
+   GUARDVETO V2 — La cloche des notifications (B-183)
+   ============================================================
+   Importée par `ClocheV2.tsx` lui-même. Préfixe `cl-` (et `.ab-cloche`) :
+   aucune règle large, rien qui puisse reprendre les boutons d'un autre écran.
+   Même matière que le bouton de déconnexion, sa voisine dans la barre.
+   ============================================================ */
+
+.ab-cloche { position: relative; flex: none; }
+
+/* La barre est sa propre couche (animation `rise`) : le z-index du panneau ne
+   vaut qu'À L'INTÉRIEUR d'elle, et la carte de Filou, posée après, passait
+   PAR-DESSUS — le panneau s'ouvrait sous la vidéo, un clic touchait Filou
+   (constaté le 03/11 : `elementFromPoint` → VIDEO). On ne remonte la barre que
+   le temps où le panneau est ouvert : aucun autre écran ne change. */
+.v2 .app-bar:has(.cl-panneau) { position: relative; z-index: 60; }
+
+.cl-bouton {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px;
+  border: 1px solid var(--t-border);
+  background: var(--surface-2);
+  color: var(--t-muted);
+  border-radius: 999px;
+  transition: color 0.18s var(--ease-out), border-color 0.18s var(--ease-out);
+}
+.cl-bouton svg { width: 19px; height: 19px; display: block; }
+.cl-bouton:hover, .cl-bouton[aria-expanded="true"] { color: var(--accent-ink); border-color: var(--border-strong); }
+.cl-pastille {
+  position: absolute; top: -5px; right: -6px;
+  min-width: 18px; height: 18px; padding: 0 8px;
+  border-radius: 999px; border: 2px solid var(--surface);
+  background: var(--t-accent); color: #fff;
+  font-family: var(--font-display); font-size: 0.66rem; font-weight: 800; line-height: 14px;
+  text-align: center;
+}
+
+.cl-panneau {
+  position: absolute; top: calc(100% + 10px); right: 0; z-index: 70;
+  width: min(360px, calc(100vw - 24px));
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+}
+.cl-tete {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px dashed var(--t-border);
+}
+.cl-titre { font-family: var(--font-display); font-size: 0.95rem; font-weight: 800; color: var(--text); }
+.cl-tout-lire {
+  border: 0; background: none; padding: 6px 4px;
+  font-size: 0.8125rem; font-weight: 700; color: var(--accent-ink);
+}
+.cl-tout-lire:hover { text-decoration: underline; }
+.cl-vide { padding: 22px 16px; font-size: 0.875rem; color: var(--t-muted); text-align: center; }
+
+.cl-liste { list-style: none; margin: 0; padding: 0; max-height: min(60vh, 460px); overflow-y: auto; }
+.cl-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  width: 100%; text-align: left;
+  border: 0; border-bottom: 1px solid var(--t-border);
+  background: none; padding: 11px 14px;
+  font: inherit; color: inherit;
+}
+.cl-liste li:last-child .cl-item { border-bottom: 0; }
+.cl-item:hover { background: var(--surface-2); }
+.cl-item.non-lu { background: var(--accent-soft); }
+.cl-point { flex: none; width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: transparent; }
+.cl-item.non-lu .cl-point { background: var(--t-accent); }
+.cl-corps { min-width: 0; flex: 1; display: grid; gap: 2px; }
+.cl-ligne { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.cl-item-titre { font-size: 0.875rem; font-weight: 600; color: var(--text); }
+.cl-item.non-lu .cl-item-titre { font-weight: 800; }
+.cl-quand { flex: none; font-size: 0.75rem; color: var(--soft); }
+.cl-message {
+  font-size: 0.8125rem; line-height: 1.45; color: var(--t-muted);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* Téléphone : cibles au doigt, et la cloche reste sur la 1re rangée, juste
+   avant la déconnexion (la barre y pousse le formulaire à droite). */
+@media (max-width: 640px) {
+  .v2 .app-bar > .ab-cloche { order: 2; margin-left: auto; }
+  .v2 .app-bar > .ab-cloche + form { margin-left: 0; }
+  .cl-bouton { width: 44px; height: 44px; }
+  .cl-tout-lire { min-height: 40px; }
+  .cl-panneau { position: fixed; top: 64px; left: 12px; right: 12px; width: auto; }
+}
+@media (prefers-reduced-motion: reduce) { .cl-bouton { transition: none; } }

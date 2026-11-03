@@ -324,6 +324,20 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
     manque:
       'Filou ne sait ni couper ni rétablir un e-mail de notification, ni dire qui a coupé quoi (B-134, 26/09). Trou assumé : un outil de lecture (« qui reçoit les demandes de congé ? ») est plus urgent que l’écriture, pour qu’il cesse de répondre sur les seules adresses e-mail.',
   },
+  // B-183 (03/11) — la cloche de la barre. Lire et marquer SES notifications
+  // sont des gestes d'écran : ils ne changent rien au planning ni aux droits.
+  // ⚠️ Ce n'est pas la même chose que « Filou ignore les notifications » : s'il
+  //    devait un jour dire « qu'est-ce qui s'est passé pendant mon absence ? »,
+  //    il faudrait un outil de LECTURE — ce serait alors un `manque`, pas un `hors`.
+  'v2/cloche-actions#lireNotifications': {
+    hors: 'La cloche lit les notifications de la personne connectée pour les afficher. Geste d’écran, sans effet sur le planning.',
+  },
+  'v2/cloche-actions#marquerNotificationLue': {
+    hors: 'Marquer une notification lue en l’ouvrant depuis la cloche. Geste d’écran, propre à chacun.',
+  },
+  'v2/cloche-actions#marquerToutesNotificationsLues': {
+    hors: '« Tout marquer comme lu » dans la cloche. Geste d’écran, propre à chacun.',
+  },
   // B-173 — « Mon agenda » : le réglage de SON agenda Google personnel. Hors
   // de Filou parce que ce sont des préférences d'affichage propres à chacun,
   // qui ne changent rien au planning ; et parce qu'un assistant qui partage ou

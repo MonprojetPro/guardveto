@@ -26,6 +26,7 @@ import { usePathname } from 'next/navigation'
 import { logout } from '@/app/login/actions'
 import type { DonneesAccueil } from '@/data/v2/accueilEpicentre'
 import { ecranVisible } from '@/lib/produit/modules'
+import { ClocheV2 } from '@/components/v2/ClocheV2'
 
 interface Props {
   prenom: string
@@ -281,6 +282,12 @@ export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props
         </Link>
         )}
       </nav>
+
+      {/* B-183 — la cloche, revenue le 03/11 (disparue avec la V1 le 28/10).
+          Pas pour le secrétariat : les notifications sont adressées à une
+          fiche vétérinaire, il n'en recevrait jamais — une cloche toujours
+          muette se lirait comme « rien ne se passe ». */}
+      {!estSecretaire && <ClocheV2 />}
 
       <form action={logout}>
         <button type="submit" className="ab-sortie" aria-label="Se déconnecter">

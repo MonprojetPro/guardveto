@@ -156,6 +156,8 @@ gardes et présences directement sur son agenda Google.
 | La vérification complète chez Google (création, partage puis retrait d'un agenda) reste à exécuter manuellement par MiKL avant la mise en service réelle | ⚪ À faire | — reste-à-faire `[B-173a]` |
 | Chaque membre reçoit un e-mail GuardVeto en français avec un bouton « Ajouter à mon Google Agenda » (au lieu de l'e-mail automatique de Google), et retrouve ce bouton dans « Mon agenda » ; l'agenda est ouvert à son compte Google même si sa fiche porte une adresse Gmail avec « + » | 🟡 À recetter | 2026-10-30 `[B-178]` |
 | Recevoir son planning dans un agenda qui n'est pas Google (Outlook, Apple Calendrier) par un abonnement iCal | ⚪ À décider | — `[B-178a]` |
+| Une cloche dans la barre du haut prévient de ce qui se passe (une place prise, une garde changée, un planning publié) : compteur en direct, liste, un clic ouvre l'écran concerné, « tout marquer comme lu » — revenue après sa disparition avec l'ancienne version | 🟡 À recetter | 2026-11-03 `[B-183]` |
+| Supprimer les notifications accumulées pendant l'absence de la cloche (182 au Val d'Allier) | ⚪ À faire | — `[B-183a]` |
 
 ---
 
