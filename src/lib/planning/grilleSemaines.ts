@@ -578,3 +578,23 @@ export function effectifsDemiJournee(
 
   return { matin: matin.size, apresMidi: apresMidi.size }
 }
+
+/**
+ * B-189 — Cette ligne est-elle le VENDREDI d'un week-end ?
+ *
+ * Un week-end a trois lignes de même id dans `planning_semaine` (vendredi,
+ * samedi, dimanche) ; le vendredi est celle dont le surlendemain porte encore
+ * cet id. Il a son propre cadenas : un geste sur le samedi ou le dimanche ne
+ * le touche pas.
+ */
+export function estVendrediDuWeekend(
+  lignes: readonly { id: string; date: string; type: string }[],
+  gardeId: string,
+  date: string,
+): boolean {
+  const d = new Date(date + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() + 2)
+  const surlendemain = d.toISOString().slice(0, 10)
+  return lignes.some((l) => l.id === gardeId && l.type === 'weekend' && l.date === date)
+    && lignes.some((l) => l.id === gardeId && l.date === surlendemain)
+}

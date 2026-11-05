@@ -90,7 +90,6 @@ export async function chargerPlacesFigees(
   }
 
   const lignes = (data ?? []) as LigneGardeFigee[]
-  if (lignes.length === 0) return { places: [], sansTitulaire: [] }
 
   // Les labels au-delà de 'premier'/'second' vivent dans le miroir des places.
   const labelsHistoriques = new Set(['premier', 'second'])
@@ -129,5 +128,87 @@ export async function chargerPlacesFigees(
     }
   }
 
+  const vendredis = await chargerVendredisFiges(supabase, periodeId, cabinetId)
+  if (vendredis.erreur) return { places: [], sansTitulaire: [], erreur: vendredis.erreur }
+
+  return {
+    places: [...places, ...vendredis.places],
+    sansTitulaire: [...sansTitulaire, ...vendredis.sansTitulaire],
+  }
+}
+
+/** La veille d'une date ISO (le vendredi d'un week-end stocké au samedi). */
+export function veille(date: string): string {
+  const d = new Date(date + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() - 1)
+  return d.toISOString().slice(0, 10)
+}
+
+interface LigneVendredi {
+  id: string
+  date: string
+  premier_id: string | null
+  second_id: string | null
+  exception_premier: boolean | null
+  exception_second: boolean | null
+}
+
+/**
+ * B-189 — Les cadenas posés sur le VENDREDI SEUL d'un week-end.
+ *
+ * Le vendredi est un créneau à part pour le moteur (`vendredi_soir`), lié au
+ * week-end par ses règles : il reçoit donc ce cadenas comme une place figée
+ * ordinaire et compose le week-end autour. Les personnes sont relues sur la
+ * LIGNE DU VENDREDI de `planning_semaine` — rôles déjà inversés, dans le même
+ * vocabulaire que `vendredi_figees`.
+ *
+ * Une place du vendredi tenue par un remplacement d'un jour n'est pas émise :
+ * son cadenas est celui du remplacement (B-187), remis en place après la
+ * génération par `ecrirePlanningV1`.
+ */
+export async function chargerVendredisFiges(
+  supabase: SupabaseClient,
+  periodeId: string,
+  cabinetId: string | null | undefined,
+): Promise<PlacesFigeesChargees> {
+  let requete = supabase
+    .from('gardes')
+    .select('id, date, vendredi_figees')
+    .eq('periode_id', periodeId)
+    .eq('type', 'weekend')
+    .neq('vendredi_figees', '{}')
+  if (cabinetId) requete = requete.eq('cabinet_id', cabinetId)
+
+  const { data, error } = await requete
+  if (error) return { places: [], sansTitulaire: [], erreur: error.message }
+
+  const gardes = (data ?? []) as { id: string; date: string; vendredi_figees: string[] | null }[]
+  if (gardes.length === 0) return { places: [], sansTitulaire: [] }
+
+  const { data: lignes, error: vueErr } = await supabase
+    .from('planning_semaine')
+    .select('id, date, premier_id, second_id, exception_premier, exception_second')
+    .in('id', gardes.map((g) => g.id))
+  if (vueErr) return { places: [], sansTitulaire: [], erreur: vueErr.message }
+
+  const ligneParCle = new Map<string, LigneVendredi>()
+  for (const l of (lignes ?? []) as LigneVendredi[]) ligneParCle.set(`${l.id}|${l.date}`, l)
+
+  const places: PlaceFigee[] = []
+  const sansTitulaire: PlacesFigeesChargees['sansTitulaire'] = []
+  for (const g of gardes) {
+    const vendredi = veille(g.date)
+    const ligne = ligneParCle.get(`${g.id}|${vendredi}`)
+    for (const role of g.vendredi_figees ?? []) {
+      if (ligne && (role === 'premier' ? ligne.exception_premier : ligne.exception_second)) continue
+      const vetId = !ligne ? null : role === 'premier' ? ligne.premier_id : ligne.second_id
+      if (!vetId) {
+        // Pas de ligne (vendredi plus matérialisé) ou place vide : inopérant, et ça se dit.
+        sansTitulaire.push({ date: vendredi, type: 'vendredi_soir', role })
+        continue
+      }
+      places.push({ date: vendredi, type: 'vendredi_soir', role, vetId })
+    }
+  }
   return { places, sansTitulaire }
 }

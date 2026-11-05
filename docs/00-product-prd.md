@@ -92,6 +92,7 @@ retravaillée pour rester lisible même avec beaucoup d'informations sur un mêm
 | Sur téléphone, le planning montre une seule semaine à la fois : les flèches ou un balayage du doigt passent à la semaine voisine, et un appui sur le nom du mois permet de sauter directement à un autre mois | 🟢 Livré | 2026-11-03 `[B-182]` |
 | Sur téléphone, les écrans d'administration (organisation, absences, équipe, historique) ont des boutons à la taille du doigt et des textes lisibles, la liste des gardes en conflit avec un congé s'ouvre d'un appui, les compteurs de l'historique tiennent dans l'écran, et le décor de fond ne bouge plus pour ne pas ralentir le téléphone | 🟡 À recetter | 2026-11-03 `[B-179b]` |
 | Sur téléphone, le prénom dans la barre et l'initiale des pastilles rondes sont encore un peu petits | ⚪ À faire | — `[B-179f]` |
+| Un cadenas posé sur un jour ne verrouille que ce jour : le vendredi d'un week-end se fixe seul, et la génération compose le week-end autour (le samedi et le dimanche restent fixés ensemble) | 🟡 À recetter | 2026-11-05 `[B-189]` |
 
 ---
 

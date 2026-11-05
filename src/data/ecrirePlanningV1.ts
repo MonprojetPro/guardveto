@@ -28,6 +28,7 @@ import { construireGardePlacements } from './gardePlacements'
 import { syncAttributionsPourJours, joursImpactesGarde } from './syncAttributions'
 import { idsEvenementsDeGardes } from '@/lib/sync-calendrier'
 import { signalerIncidentTechnique } from '@/lib/notifications-inapp'
+import { chargerVendredisFiges } from './chargerPlacesFigees'
 import {
   planReposeRemplacements,
   type LigneJourEcrite,
@@ -177,10 +178,11 @@ export async function ecrirePlanningV1(
   // choix respecté, n'aurait aucune raison de re-vérifier.
   const { data: gardesCadenassees, error: cadenasErr } = await supabase
     .from('gardes')
-    .select('date, type, places_figees')
+    .select('date, type, places_figees, vendredi_figees')
     .eq('periode_id', periodeId)
     .eq('cabinet_id', cabinetId)
-    .neq('places_figees', '{}')
+    // B-189 — une garde peut n'avoir que son vendredi cadenassé : on lit toute
+    // la période et on garde les gardes qui portent l'un ou l'autre cadenas.
 
   if (cadenasErr) {
     return {
@@ -190,8 +192,27 @@ export async function ecrirePlanningV1(
   }
 
   const cadenasParCle = new Map<string, string[]>()
-  for (const g of (gardesCadenassees ?? []) as { date: string; type: string; places_figees: string[] }[]) {
+  const vendrediParCle = new Map<string, string[]>()
+  for (const g of (gardesCadenassees ?? []) as { date: string; type: string; places_figees: string[] | null; vendredi_figees?: string[] | null }[]) {
     cadenasParCle.set(`${g.date}|${g.type}`, g.places_figees ?? [])
+    vendrediParCle.set(`${g.date}|${g.type}`, g.vendredi_figees ?? [])
+  }
+
+  // 0b-bis. B-189 — LES PERSONNES FIXÉES SUR UN VENDREDI SEUL.
+  //
+  // Le moteur les a reçues comme places figées (`chargerVendredisFiges`) et
+  // compose le week-end autour. Mais la base ne stocke pas le vendredi : elle
+  // le DÉDUIT du week-end. Si les règles du cabinet laissent le moteur poser un
+  // week-end qui ne reprend pas la personne du vendredi, le cadenas serait
+  // perdu en silence. On les relit donc ici, avant l'effacement, pour les
+  // remettre en place après (étape 3b-bis) : déjà là → rien à faire, sinon un
+  // remplacement d'un jour fixé.
+  const vendredis = await chargerVendredisFiges(supabase, periodeId, cabinetId)
+  if (vendredis.erreur) {
+    return {
+      ...vide, ok: false, eventIdsAPurger,
+      erreur: `Erreur lecture des vendredis cadenassés : ${vendredis.erreur}`,
+    }
   }
 
   // 0c. B-187 — MÉMORISER LES REMPLACEMENTS D'UN JOUR FIXÉS AVANT LE DELETE.
@@ -240,6 +261,23 @@ export async function ecrirePlanningV1(
         cabinet_id: e.cabinet_id,
       }]
     })
+
+  for (const v of vendredis.places) {
+    // `vendredi_figees` n'admet que ces deux rôles (contrainte en base).
+    if (v.role !== 'premier' && v.role !== 'second') continue
+    remplacementsFiges.push({
+      gardeDate: lendemain(v.date),
+      gardeType: 'weekend',
+      date: v.date,
+      role: v.role,
+      veterinaire_id: v.vetId,
+      motif: 'exception',
+      compte_1er_we: false,
+      absence_id: null,
+      cree_par: null,
+      cabinet_id: cabinetId,
+    })
+  }
 
   // 1. Supprimer les gardes brouillon existantes pour cette période.
   //    Scopé cabinet_id (défense en profondeur : en DEV_BYPASS le client
@@ -298,6 +336,8 @@ export async function ecrirePlanningV1(
     modifie_manuellement: false,
     // B-111 — les cadenas de l'admin survivent à la régénération (cf. étape 0b).
     places_figees: cadenasParCle.get(`${a.date}|${dbType}`) ?? [],
+    // B-189 — le cadenas du vendredi seul survit aussi.
+    vendredi_figees: vendrediParCle.get(`${a.date}|${dbType}`) ?? [],
   }))
 
   // 3. Insérer en bloc — upsert idempotent scopé cabinet.
@@ -411,7 +451,8 @@ export async function ecrirePlanningV1(
     await signalerIncidentTechnique(
       supabase, cabinetId,
       'Remplacement d’un jour non remis en place',
-      `Le planning a été réécrit, mais le remplacement fixé du ${jours} n’a pas pu être remis en place. ` +
+      // B-189 — couvre aussi un vendredi cadenassé seul que la génération n'a pas pu tenir.
+      `Le planning a été réécrit, mais le choix fixé du ${jours} (remplacement ou vendredi cadenassé) n’a pas pu être remis en place. ` +
       'Vérifiez ce jour dans le planning et reposez-le si besoin.',
     ).catch((e) => console.error('[B-187] signalement impossible:', e))
   }
@@ -448,3 +489,10 @@ export async function ecrirePlanningV1(
 
 /** Ré-exporté pour les appelants qui construisent leurs propres attributions. */
 export type { AttributionGarde }
+
+/** Le lendemain d'une date ISO (le samedi qui porte la garde d'un vendredi). */
+function lendemain(date: string): string {
+  const d = new Date(date + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() + 1)
+  return d.toISOString().slice(0, 10)
+}

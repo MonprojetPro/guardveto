@@ -109,6 +109,7 @@ import {
   choixContenu,
   contenuParDefaut,
   decouperEnSemaines,
+  estVendrediDuWeekend,
   visibilite,
   type AxeContenu,
   type PersonneGrille,
@@ -949,6 +950,11 @@ export function PlanningChantierV2({
 
     const confirmes = cadenasLocaux[gardeId]
     if (!confirmes) return natifs
+
+    // B-189 — un geste sur le samedi ou le dimanche ne touche pas le vendredi,
+    // qui a son propre cadenas. Le vendredi est la ligne de la garde dont le
+    // surlendemain (le dimanche) porte le même id.
+    if (estVendrediDuWeekend(gardes, gardeId, date)) return natifs
 
     // Un geste récent sur la garde du week-end : il vaut pour les places tenues
     // par les titulaires, jamais pour une place remplacée ce jour-là.

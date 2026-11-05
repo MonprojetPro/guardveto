@@ -135,4 +135,22 @@ describe('les cadenas de l’admin traversent une régénération', () => {
 
     expect(upserts.every((u) => Array.isArray(u.places_figees) && (u.places_figees as unknown[]).length === 0)).toBe(true)
   })
+
+  it('B-189 — réinjecte le cadenas du VENDREDI SEUL, sans l’étendre au week-end', async () => {
+    const { client, upserts } = creerSupabase([
+      {
+        id: 'g-we', periode_id: PERIODE, cabinet_id: CABINET, verrouille: false,
+        date: '2026-10-03', type: 'weekend', google_event_id: null,
+        places_figees: [], vendredi_figees: ['premier'],
+      },
+    ])
+
+    const r = await ecrirePlanningV1(client, PLANNING, PERIODE, CABINET)
+    expect(r.ok).toBe(true)
+
+    const weekend = upserts.find((u) => u.date === '2026-10-03')
+    expect(weekend?.vendredi_figees).toEqual(['premier'])
+    expect(weekend?.places_figees).toEqual([])
+  })
 })
+

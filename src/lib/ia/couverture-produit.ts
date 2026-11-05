@@ -414,7 +414,7 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   },
   'api/planning/places-figees#POST': {
     manque:
-      'Cadenasser une place du planning (B-111, 04/09) : « ce samedi-là, c’est Fanny, et la régénération n’y touche pas ». Trois gestes — poser, libérer, vider. Filou n’en déclenche aucun et, plus important, il ne LIT pas encore les cadenas. ⚠️ Le risque n’est pas qu’il ne sache pas les poser, c’est qu’il en ignore l’existence : sa relecture de planning propose des mouvements, et rien ne l’empêche aujourd’hui de proposer de déplacer une place que l’admin a justement fixée — avec l’aplomb de ses autres propositions. À traiter AVANT de rouvrir la relecture (item de board à créer), et pas seulement comme un outil d’écriture de plus.',
+      'Cadenasser une place du planning (B-111, 04/09) : « ce samedi-là, c’est Fanny, et la régénération n’y touche pas ». Trois gestes — poser, libérer, vider. Filou n’en déclenche aucun et, plus important, il ne LIT pas encore les cadenas. ⚠️ Le risque n’est pas qu’il ne sache pas les poser, c’est qu’il en ignore l’existence : sa relecture de planning propose des mouvements, et rien ne l’empêche aujourd’hui de proposer de déplacer une place que l’admin a justement fixée — avec l’aplomb de ses autres propositions. À traiter AVANT de rouvrir la relecture (item de board à créer), et pas seulement comme un outil d’écriture de plus. B-189 (05/11) : le vendredi d’un week-end a désormais son propre cadenas ; il arrive à la relecture par le même chargeur que les autres (`chargerPlacesFigees`), rien à ajouter de ce côté.',
   },
   'api/export-pdf#GET': {
     manque:

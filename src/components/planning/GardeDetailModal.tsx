@@ -20,6 +20,7 @@ import { ViolationDialog } from './ViolationDialog'
 import { BoutonPrendrePlace } from './BoutonPrendrePlace'
 import { placeAPrendre } from '@/lib/gardes/prendrePlace'
 import { BoutonCadenas, BandeauCadenas, type ResultatCadenas } from '@/components/v2/CadenasPlaces'
+import { veille } from '@/data/chargerPlacesFigees'
 import { stylePastille, stylePoint } from '@/lib/couleurs'
 import { sansCodeTechnique } from '@/lib/regles/sansCodeTechnique'
 
@@ -328,6 +329,7 @@ function CadenasDeLaPlace({
   prenom,
   fige,
   onFini,
+  date,
 }: {
   gardeId: string
   /** Ce que l'admin voit sélectionné en ce moment. */
@@ -337,6 +339,8 @@ function CadenasDeLaPlace({
   prenom: string | null
   fige: boolean
   onFini: (r: ResultatCadenas) => void
+  /** B-189 — fournie quand le geste ne vaut que pour CE jour (le vendredi d'un week-end). */
+  date?: string
 }) {
   if (!vetIdAffiche) return null
 
@@ -359,6 +363,7 @@ function CadenasDeLaPlace({
       prenom={prenom}
       fige={fige}
       onFini={onFini}
+      date={date}
     />
   )
 }
@@ -609,8 +614,21 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
   // grille : la réponse du serveur est en personnes, et une personne ne
   // s'inverse pas. La conversion depuis les labels natifs n'a lieu qu'ICI, une
   // fois, sur les rôles de la table.
+  // B-189 — ouverte sur le VENDREDI d'un week-end, la fenêtre montre et pose le
+  // cadenas de ce jour seul : celui de la ligne affichée (`garde`, vue), et non
+  // celui du week-end (table). Les personnes ne s'inversent pas.
+  const jourDuGeste = date ?? garde?.date ?? ''
+  const estVendredi = Boolean(
+    data && data.garde.type === 'weekend' && jourDuGeste && jourDuGeste === veille(data.garde.date),
+  )
+  const vetsFigesDuVendredi = (): string[] => {
+    if (!garde) return []
+    return (garde.places_figees ?? [])
+      .map((r) => (r === 'premier' ? garde.premier_id : r === 'second' ? garde.second_id : null))
+      .filter((v): v is string => Boolean(v))
+  }
   const vetsFiges = new Set<string>(
-    vetsFigesLocaux ?? (data ? vetsFigesNatifs(data.garde) : []),
+    vetsFigesLocaux ?? (data ? (estVendredi ? vetsFigesDuVendredi() : vetsFigesNatifs(data.garde)) : []),
   )
 
   function surResultatCadenas(r: ResultatCadenas) {
@@ -885,6 +903,7 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
                       prenom={data.vets.find((v) => v.id === premierSel)?.prenom ?? null}
                       fige={Boolean(premierSel && vetsFiges.has(premierSel))}
                       onFini={surResultatCadenas}
+                      date={estVendredi ? jourDuGeste : undefined}
                     />
                   ) : null
                 }
@@ -951,6 +970,7 @@ export function GardeDetailModal({ garde, date, isAdmin, moiVetId, nomsTypes, on
                         prenom={data.vets.find((v) => v.id === secondSel)?.prenom ?? null}
                         fige={Boolean(secondSel && vetsFiges.has(secondSel))}
                         onFini={surResultatCadenas}
+                        date={estVendredi ? jourDuGeste : undefined}
                       />
                     ) : null
                   }

@@ -68,6 +68,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { avertissementsReglesDures } from '@/lib/gardes/avertissements-regles'
+import { veille } from '@/data/chargerPlacesFigees'
 
 type Geste = 'poser' | 'liberer' | 'vider'
 
@@ -151,18 +152,24 @@ export async function POST(req: NextRequest) {
   // cherche la place que la personne y tient. Plus rien à convertir : la ligne
   // du vendredi peut bien inverser ses rôles, la personne, elle, ne bouge pas.
   let remplacement: { id: string } | null = null
+  // B-189 — le geste porte sur le VENDREDI SEUL d'un week-end : son rôle sur
+  // la ligne du vendredi (vocabulaire de `vendredi_figees`).
+  let roleVendredi: 'premier' | 'second' | null = null
   let gardeExistante: {
     id: string
+    date: string
+    type: string
     premier_id: string | null
     second_id: string | null
     places_figees: string[] | null
+    vendredi_figees: string[] | null
     periode_id: string
   } | null = null
 
   if (parPersonne) {
     const { data: g, error: gErr } = await supabase
       .from('gardes')
-      .select('id, premier_id, second_id, places_figees, periode_id')
+      .select('id, date, type, premier_id, second_id, places_figees, vendredi_figees, periode_id')
       .eq('id', gardeId!)
       .maybeSingle()
 
@@ -204,8 +211,35 @@ export async function POST(req: NextRequest) {
       remplacement = ex as { id: string } | null
     }
 
-    if (remplacement) {
-      // Le rôle ne sert pas : on agit sur la ligne du remplacement.
+    // B-189 — LE VENDREDI D'UN WEEK-END A SON PROPRE CADENAS. MiKL, 05/11 :
+    // « il clique, ça verrouille, point ». On cherche la personne sur la LIGNE
+    // DU VENDREDI (rôles éventuellement inversés) : c'est elle que l'admin voit.
+    if (!remplacement && date && g.type === 'weekend' && date === veille(g.date)) {
+      const { data: lv, error: lvErr } = await supabase
+        .from('planning_semaine')
+        .select('premier_id, second_id')
+        .eq('id', g.id)
+        .eq('date', date)
+        .maybeSingle()
+      if (lvErr) {
+        return NextResponse.json(
+          { error: `Lecture du vendredi impossible : ${lvErr.message}` },
+          { status: 500 },
+        )
+      }
+      const ligneV = lv as { premier_id: string | null; second_id: string | null } | null
+      if (ligneV?.premier_id === veterinaireId) roleVendredi = 'premier'
+      else if (ligneV?.second_id === veterinaireId) roleVendredi = 'second'
+      else {
+        return NextResponse.json(
+          { error: 'Cette personne ne tient pas ce vendredi. Rafraîchissez le planning et réessayez.' },
+          { status: 409 },
+        )
+      }
+    }
+
+    if (remplacement || roleVendredi) {
+      // Le rôle de la garde ne sert pas : on agit sur la ligne du jour.
     } else if (g.premier_id === veterinaireId) role = 'premier'
     else if (g.second_id === veterinaireId) role = 'second'
     else {
@@ -270,35 +304,38 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Les personnes fixées CE jour-là, relues dans la vue : la place remplacée
-    // suit le remplacement, l'autre garde le cadenas du week-end.
-    const { data: ligne, error: ligneErr } = await supabase
-      .from('planning_semaine')
-      .select('premier_id, second_id, places_figees')
-      .eq('id', gardeExistante.id)
-      .eq('date', date)
-      .maybeSingle()
-    if (ligneErr || !ligne) {
+    return reponseDuJour(supabase, gardeExistante, date)
+  }
+
+  // ── B-189 — le geste porte sur le vendredi seul ──────────
+  if (roleVendredi && gardeExistante) {
+    if (geste === 'vider') {
       return NextResponse.json(
-        { error: 'C’est enregistré, mais l’écran n’a pas pu se mettre à jour. Rafraîchissez le planning.' },
+        {
+          error:
+            'Le vendredi suit le week-end : pour changer la personne de ce jour, ' +
+            'ouvrez la garde et choisissez « ce seul jour ».',
+        },
+        { status: 422 },
+      )
+    }
+    const actuels = gardeExistante.vendredi_figees ?? []
+    const apres = geste === 'poser'
+      ? [...new Set([...actuels, roleVendredi])]
+      : actuels.filter((r) => r !== roleVendredi)
+    const { data: touchees, error: vErr } = await supabase
+      .from('gardes')
+      .update({ vendredi_figees: apres })
+      .eq('id', gardeExistante.id)
+      .select('id')
+    // Une écriture refusée par la RLS ne renvoie aucune erreur, seulement zéro ligne.
+    if (vErr || (touchees ?? []).length !== 1) {
+      return NextResponse.json(
+        { error: `Enregistrement impossible${vErr ? ` : ${vErr.message}` : '.'}` },
         { status: 500 },
       )
     }
-    const l = ligne as { premier_id: string | null; second_id: string | null; places_figees: string[] | null }
-    const vetsFigesDuJour = (l.places_figees ?? [])
-      .map((r) => (r === 'premier' ? l.premier_id : r === 'second' ? l.second_id : null))
-      .filter((v): v is string => Boolean(v))
-
-    return NextResponse.json({
-      ok: true,
-      gardeId: gardeExistante.id,
-      date,
-      placesFigees: l.places_figees ?? [],
-      vetsFiges: vetsFigesDuJour,
-      premier_id: gardeExistante.premier_id,
-      second_id: gardeExistante.second_id,
-      avertissements: [],
-    })
+    return reponseDuJour(supabase, gardeExistante, date)
   }
 
   // ── Mode « coordonnées » : on retrouve la garde, ou on la créera ──
@@ -307,7 +344,7 @@ export async function POST(req: NextRequest) {
   if (!parPersonne) {
     const { data: trouvee, error: lectureErr } = await supabase
       .from('gardes')
-      .select('id, premier_id, second_id, places_figees, periode_id')
+      .select('id, date, type, premier_id, second_id, places_figees, vendredi_figees, periode_id')
       .eq('periode_id', periodeId)
       .eq('date', date)
       .eq('type', type)
@@ -461,5 +498,44 @@ export async function POST(req: NextRequest) {
     premier_id: premierApres,
     second_id: secondApres,
     avertissements,
+  })
+}
+
+/**
+ * Réponse d'un geste qui ne vaut que pour UN JOUR (remplacement B-187, vendredi
+ * seul B-189) : les personnes fixées ce jour-là, relues dans la vue — c'est
+ * exactement ce que la grille dessine sur cette ligne.
+ */
+async function reponseDuJour(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  garde: { id: string; premier_id: string | null; second_id: string | null },
+  date: string,
+) {
+  const { data: ligne, error: ligneErr } = await supabase
+    .from('planning_semaine')
+    .select('premier_id, second_id, places_figees')
+    .eq('id', garde.id)
+    .eq('date', date)
+    .maybeSingle()
+  if (ligneErr || !ligne) {
+    return NextResponse.json(
+      { error: 'C’est enregistré, mais l’écran n’a pas pu se mettre à jour. Rafraîchissez le planning.' },
+      { status: 500 },
+    )
+  }
+  const l = ligne as { premier_id: string | null; second_id: string | null; places_figees: string[] | null }
+  const vetsFigesDuJour = (l.places_figees ?? [])
+    .map((r) => (r === 'premier' ? l.premier_id : r === 'second' ? l.second_id : null))
+    .filter((v): v is string => Boolean(v))
+
+  return NextResponse.json({
+    ok: true,
+    gardeId: garde.id,
+    date,
+    placesFigees: l.places_figees ?? [],
+    vetsFiges: vetsFigesDuJour,
+    premier_id: garde.premier_id,
+    second_id: garde.second_id,
+    avertissements: [],
   })
 }

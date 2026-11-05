@@ -263,6 +263,21 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // B-189 — le cadenas du vendredi seul tombe aussi. Requête à part : jamais de
+  // `.or()` sur un `.update()` (mémoire du projet).
+  const { error: vendrediErr } = await supabase
+    .from('gardes')
+    .update({ vendredi_figees: [] })
+    .eq('periode_id', periodeId)
+    .neq('vendredi_figees', '{}')
+
+  if (vendrediErr) {
+    console.error(
+      '[publish] les cadenas du vendredi n\'ont pas pu être levés (publication conservée) :',
+      vendrediErr.message,
+    )
+  }
+
   // ── Historique des fêtes (backlog n°14 — équité inter-annuelle) ──
   // Si la période couvre une fête (24-25/12, 31/12-01/01), on enregistre QUI
   // l'a tenue — consommé par le moteur l'année suivante (pénalité souple
