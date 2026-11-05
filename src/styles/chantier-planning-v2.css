@@ -222,8 +222,11 @@
      journées repliées, écarte les éléments pour que ça respire ». Les 4
      lignes (tête, Jour, Nuit, Abs.) se touchaient (gap: 0) après 5 passes
      centrées sur leur hauteur individuelle. L'espace ENTRE elles n'avait
-     jamais été revu. */
-  gap: 3px;
+     jamais été revu. → les 3 px vivent sur `.pv2-jour:not(.ouvert)` ci-dessous.
+     B-190 (05/11) : posés ICI, ils valaient aussi pour la case DÉPLIÉE, dont
+     les 7 rangées doivent rester en face des prénoms de la marge (sans
+     espace) — +3 px par ligne, Manon une demi-ligne trop haut. B-145c rejoué. */
+  gap: 0;
   box-sizing: border-box;
   padding: var(--pv2-pad);
   /* Bordure TRANSPARENTE, pas absente : elle fait partie du châssis partagé.
@@ -233,6 +236,8 @@
   background: var(--pv2-cell);
   overflow: hidden;
 }
+/* La case REPLIÉE seule respire (B-170) : elle n'a pas de voisine à suivre. */
+.pv2-jour:not(.ouvert) { gap: 3px; }
 .pv2-jour.we { background: var(--pv2-cell-we); }
 /* Dans une semaine ouverte, le jour se SOULÈVE en blanc. */
 .pv2-jour.ouvert {

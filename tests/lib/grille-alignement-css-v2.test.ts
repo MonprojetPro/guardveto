@@ -30,10 +30,22 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+// 🔴 Commentaires RETIRÉS avant toute lecture (B-190, 05/11) : le commentaire
+// de B-170 contenait « (gap: 0) », et le test ci-dessous l'a lu comme la vraie
+// valeur alors que la règle disait `gap: 3px` — vert pendant deux semaines,
+// lignes décalées à l'écran. Un test qui lit du texte lit AUSSI la prose.
 const CSS = readFileSync(
   join(__dirname, '..', '..', 'src', 'styles', 'chantier-planning-v2.css'),
   'utf8',
-)
+).replace(/\/\*[\s\S]*?\*\//g, '')
+
+/** Toutes les règles (sélecteur, corps) du fichier, commentaires exclus. */
+function regles(): { selecteur: string; corps: string }[] {
+  return [...CSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({
+    selecteur: m[1].trim(),
+    corps: m[2],
+  }))
+}
 
 /** Le corps d'une regle CSS, par son selecteur exact. */
 function regle(selecteur: string): string {
@@ -70,6 +82,19 @@ describe('Le chassis est PARTAGE, jamais recopie', () => {
     // invisible en haut et criant en bas. Les hauteurs portent l'espacement.
     expect(regle('.pv2-marge')).toMatch(/gap:\s*0\b/)
     expect(regle('.pv2-jour')).toMatch(/gap:\s*0\b/)
+  })
+
+  it('🔴 aucune règle ne remet un `gap` sur la case DÉPLIÉE', () => {
+    // B-190 : l'aération de la case repliée (B-170) était posée sur
+    // `.pv2-jour` tout court, donc aussi sur la case dépliée. Elle n'est
+    // admise que sous `:not(.ouvert)`.
+    const fautives = regles().filter(
+      ({ selecteur, corps }) =>
+        /\.pv2-jour(?![-\w])/.test(selecteur) &&
+        !/:not\(\.ouvert\)/.test(selecteur) &&
+        /(^|[;\s])gap:\s*[1-9]/.test(corps),
+    )
+    expect(fautives.map((r) => r.selecteur)).toEqual([])
   })
 
   it('empile les memes hauteurs, declarees en variables', () => {

@@ -79,7 +79,7 @@ retravaillée pour rester lisible même avec beaucoup d'informations sur un mêm
 
 | Story | Statut | Date |
 |---|---|---|
-| Nouvelle grille de planning, plus claire, qui distingue présences, gardes et absences | 🟢 Livré, évolutions continues | 2026-10 `[B-153, B-145, B-150]` |
+| Nouvelle grille de planning, plus claire, qui distingue présences, gardes et absences | 🟢 Livré, évolutions continues | 2026-10 `[B-153, B-145, B-150, B-190]` |
 | Une fiche détaillée par journée, navigable au clavier, pour voir et modifier présences, gardes et absences en un coup d'œil | 🟢 Livré | 2026-10-16 `[B-165]` |
 | Les compteurs d'équité affichent désormais aussi les présences de journée, jusqu'à 8 colonnes dans la fenêtre dédiée | 🟢 Livré | 2026-10-21 `[B-171]` |
 | L'écran Historique & compteurs affiche aussi un compteur des journées (matin, après-midi, journée entière), et les compteurs ont été revérifiés contre la base | 🟢 Livré, à recetter | 2026-10-27 `[B-175]` |
@@ -92,7 +92,7 @@ retravaillée pour rester lisible même avec beaucoup d'informations sur un mêm
 | Sur téléphone, le planning montre une seule semaine à la fois : les flèches ou un balayage du doigt passent à la semaine voisine, et un appui sur le nom du mois permet de sauter directement à un autre mois | 🟢 Livré | 2026-11-03 `[B-182]` |
 | Sur téléphone, les écrans d'administration (organisation, absences, équipe, historique) ont des boutons à la taille du doigt et des textes lisibles, la liste des gardes en conflit avec un congé s'ouvre d'un appui, les compteurs de l'historique tiennent dans l'écran, et le décor de fond ne bouge plus pour ne pas ralentir le téléphone | 🟡 À recetter | 2026-11-03 `[B-179b]` |
 | Sur téléphone, le prénom dans la barre et l'initiale des pastilles rondes sont encore un peu petits | ⚪ À faire | — `[B-179f]` |
-| Un cadenas posé sur un jour ne verrouille que ce jour : le vendredi d'un week-end se fixe seul, et la génération compose le week-end autour (le samedi et le dimanche restent fixés ensemble) | 🟡 À recetter | 2026-11-05 `[B-189]` |
+| Un cadenas posé sur un jour ne verrouille que ce jour : le vendredi d'un week-end se fixe seul, et la génération compose le week-end autour (le samedi et le dimanche restent fixés ensemble) | ✅ Livré | 2026-11-05 `[B-189]` |
 
 ---
 
