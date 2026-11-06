@@ -17,15 +17,11 @@ import type { AbsenceAVenir } from '@/components/v2/AbsencesAVenirPanel'
 import type { CreneauBlocJournee } from '@/types'
 import '@/styles/v2-planning.css'
 import '@/styles/v2-filou-edge.css'
-import '@/styles/v2-propositions-relecture.css'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
 import { PlanningV2, type PlageVacances } from '@/components/v2/PlanningV2'
 import { PlanningTelephone } from '@/components/v2/PlanningTelephone'
 import { composerSemainesTelephone } from '@/lib/planning/joursTelephone'
-import { chargerPropositionsEnAttente } from '@/data/propositionsRelecture'
-import { mettreEnFormePropositions } from '@/lib/planning/propositionsAffichage'
-import { calculerPlacesProposees } from '@/lib/planning/apercuPropositions'
 import { calculerManques } from '@/lib/planning/manquesGrille'
 import { placesDeGarde } from '@/lib/gardes/places'
 import { construireCatalogue } from '@/lib/planning/placesAttendues'
@@ -883,53 +879,6 @@ export default async function PlanningPageV2({
 
   const vets: VetCrise[] = isAdmin ? ((vetsRes?.data as VetCrise[] | null) ?? []) : []
 
-  // ── B-122 lot 2 — LES PROPOSITIONS DE FILOU EN ATTENTE ──────────────────
-  // Chargées pour l'admin seulement, et seulement sur la période affichée :
-  // c'est elle qui décide, et c'est ce planning-là qu'elle regarde. L'état
-  // vit en base (`propositions_relecture`) — il survit au changement d'onglet
-  // (MiKL, 15/09), contrairement à l'ancien rapport éphémère.
-  let propositionsAffichees: ReturnType<typeof mettreEnFormePropositions> = []
-  // B-123 — les places que les propositions veulent occuper, à plat. La
-  // confrontation à l'état RÉEL de la grille se fait côté client, dans
-  // `PlanningV2`, seul endroit qui connaisse les créneaux tels qu'ils sont
-  // affichés (le `vendredi_soir` n'existe pas en base : il est dérivé du
-  // week-end). On compare des ENSEMBLES DE PERSONNES par (date, type), jamais
-  // par rôle — le piège du vendredi, déjà payé sur les cadenas le 04/09.
-  let placesProposees: ReturnType<typeof calculerPlacesProposees> = []
-  // B-123 — ce que l'encart Compteurs afficherait si TOUT le lot en attente
-  // était appliqué. Additionné à partir des projections DÉJÀ CALCULÉES et
-  // stockées par proposition (`compteurs_projetes`, B-122 lot 1) — jamais
-  // rejoué depuis les affectations brutes, qui ne portent pas qui PART
-  // (`AffectationVoulue` n'a pas d'`avantVetId`) : recalculer ici aurait
-  // compté les arrivées sans les départs, un chiffre faux.
-  let compteursProjetesAgrege: CompteursRow[] | undefined
-  if (isAdmin && periodeAffichee) {
-    const { propositions, erreur: erreurPropositions } = await chargerPropositionsEnAttente(
-      supabase, periodeAffichee.id,
-    )
-    if (erreurPropositions) {
-      // Best-effort assumé, même principe que l'encart compteurs plus haut :
-      // un aperçu manquant ne doit pas empêcher le planning de s'afficher.
-      console.error(`[planning] propositions en attente indisponibles : ${erreurPropositions}`)
-    }
-    const prenomParId = new Map(vets.map((v) => [v.id, v.prenom]))
-    propositionsAffichees = mettreEnFormePropositions(propositions, prenomParId, nomsTypes)
-    placesProposees = calculerPlacesProposees(propositions)
-
-    const deltaTotalParPrenom = new Map<string, number>()
-    for (const p of propositionsAffichees) {
-      for (const c of p.compteursProjetes) {
-        deltaTotalParPrenom.set(c.prenom, (deltaTotalParPrenom.get(c.prenom) ?? 0) + (c.apres - c.avant))
-      }
-    }
-    if (deltaTotalParPrenom.size > 0) {
-      compteursProjetesAgrege = compteursAffiches.map((l) => {
-        const delta = deltaTotalParPrenom.get(l.prenom)
-        return delta ? { ...l, total_gardes: l.total_gardes + delta } : l
-      })
-    }
-  }
-
   // ── B-125 : les places qui manquent, garde par garde ──────────────────
   //
   // MiKL, le 17/09, après avoir durci « 1 week-end sur 3 » : *« il faudrait que
@@ -1100,9 +1049,6 @@ export default async function PlanningPageV2({
             bilans={bilans}
             colonnesCompteurs={colonnesCompteurs}
             vacances={vacances}
-            propositionsEnAttente={propositionsAffichees}
-            placesProposees={placesProposees}
-            compteursProjetes={compteursProjetesAgrege}
             manquesParGarde={manquesParGarde}
             modules={modules}
             periodesJournee={periodesJournee}
@@ -1167,12 +1113,6 @@ export default async function PlanningPageV2({
           bilans={bilans}
           colonnesCompteurs={colonnesCompteurs}
           vacances={vacances}
-          // B-122/B-123 — les propositions de Filou en attente, entourées
-          // directement sur la grille (rendu à l'intérieur de PlanningV2 :
-          // le clic sur une case et le bandeau partagent le même état).
-          propositionsEnAttente={propositionsAffichees}
-          placesProposees={placesProposees}
-          compteursProjetes={compteursProjetesAgrege}
           manquesParGarde={manquesParGarde}
           // B-148 — « Générer » change de sens selon les modules allumés.
           modules={modules}

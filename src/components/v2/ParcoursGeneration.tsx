@@ -45,7 +45,6 @@ import { DiagnosticImpasse, NoteDernierRecoursExclus } from '@/components/planni
 // B-111 — ce que les cadenas ont, ou n'ont pas, protege.
 import { NoteCadenas } from '@/components/planning/NoteCadenas'
 import { CasesAPourvoir, type CaseVide } from '@/components/planning/CasesAPourvoir'
-import { RapportRelecture, type DonneesRelecture } from '@/components/v2/RapportRelecture'
 import { CreneauxIgnoresAlert } from '@/components/planning/CreneauxIgnoresAlert'
 import { PointPreVol, type VetEtiquette } from '@/components/planning/PointPreVol'
 import { SignalerLimite } from '@/components/planning/SignalerLimite'
@@ -344,13 +343,6 @@ export function ParcoursGeneration({
     () => new Map(vets.map((v) => [v.id, v.prenom])),
     [vets],
   )
-  // B-107 — pour regrouper les constats de Filou par personne. Les vides sont
-  // écartés : un prénom vide serait trouvé dans tous les textes et rangerait
-  // tous les constats dans un même faux groupe.
-  const prenomsEquipe = useMemo(
-    () => vets.map((v) => v.prenom).filter((p): p is string => Boolean(p)),
-    [vets],
-  )
   const [etape, setEtape] = useState<Etape>(cibleDirecte ? 'controle' : etapeInitiale)
   // B-060 — ce que le SERVEUR dit être en train de faire. Jamais une phrase
   // choisie ici : l'écran relaie, il n'invente pas.
@@ -375,13 +367,6 @@ export function ParcoursGeneration({
   const periodeCibleRef = useRef<string | null>(null)
   const [creation, setCreation] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
-
-  // B-062 — la relecture de Filou. Elle vit à côté du résultat de génération,
-  // jamais dedans : le planning est déjà en base quand elle commence, et un
-  // échec de sa part ne doit rien retirer à ce que le moteur a livré.
-  const [relecture, setRelecture] = useState<DonneesRelecture | null>(null)
-  const [relectureEnCours, setRelectureEnCours] = useState(false)
-  const [etapeRelecture, setEtapeRelecture] = useState<string | null>(null)
 
   // La cible du parcours : un planning existant, ou celui qu'on vient de créer.
   const [cible, setCible] = useState<string>(cibleDirecte?.id ?? '')
@@ -681,73 +666,6 @@ export function ParcoursGeneration({
   }
 
   /**
-   * ③bis — B-062. Filou relit le planning qui vient d'être enregistré.
-   *
-   * ── B-074 : ELLE SE DÉROULE DANS LE PARCOURS, PAS APRÈS ────────────────
-   *
-   * La première version rendait la main dès le résultat et laissait Filou
-   * travailler en arrière-plan. MiKL, 27/08 : « tu livres quelque chose, puis
-   * il y a un temps d'attente long avec juste une petite roue qui tourne, et
-   * **la personne peut fermer avant d'avoir vu la conclusion** ».
-   *
-   * Il a raison, et le défaut est de conception, pas d'affichage : un parcours
-   * qui rend la main pendant qu'il travaille encore annonce une fin qui n'en
-   * est pas une. `lancer` l'ATTEND donc désormais, et l'écran d'attente
-   * raconte ses étapes dans le même style que celles du moteur.
-   *
-   * Ce que ça ne change pas : le planning est déjà écrit en base quand elle
-   * commence, donc un échec de Filou ne peut toujours rien lui retirer.
-   */
-  async function lancerRelecture(periodeId: string) {
-    setRelecture(null)
-    setEtapeRelecture(null)
-    setRelectureEnCours(true)
-    try {
-      const res = await fetch('/api/planning/relecture', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ periodeId }),
-      })
-      // Les étapes de Filou passent par le MÊME canal que celles du moteur :
-      // l'écran d'attente ne fait pas la différence, et l'admin voit un seul
-      // travail qui se poursuit plutôt que deux traitements qui se succèdent.
-      const data = await lireLeFlux(res, (m) => {
-        setEtapeRelecture(m)
-        setEtapeMoteur(m)
-      })
-      const statut = typeof data.__status === 'number' ? data.__status : (res.ok ? 200 : res.status)
-
-      if (statut >= 400 || data.issue === 'indisponible') {
-        // Jamais un silence : sans ce bloc, l'absence de rapport se lirait
-        // « rien à signaler » — et personne ne va vérifier une bonne nouvelle.
-        setRelecture({
-          issue: 'indisponible',
-          error: (data.error as string) ?? undefined,
-          detail: (data.detail as string) ?? undefined,
-        })
-        return
-      }
-
-      setRelecture(data as unknown as DonneesRelecture)
-      // Des gardes ont pu changer : l'écran du planning doit les relire.
-      // B-122 lot 2 — ET des propositions ont pu être persistées même sans
-      // écriture sur le planning (`aTrancher`, statut `en_attente`) : sans ce
-      // second cas, le panneau `PropositionsPlanning` sous ce dialogue restait
-      // sur les données SSR d'avant la relecture tant que rien n'avait été
-      // appliqué automatiquement.
-      const aDesPropositions = Array.isArray(data.aTrancher) && data.aTrancher.length > 0
-      if (data.planningModifie || aDesPropositions) router.refresh()
-    } catch (e) {
-      setRelecture({
-        issue: 'indisponible',
-        error: e instanceof Error ? e.message : String(e),
-      })
-    } finally {
-      setRelectureEnCours(false)
-    }
-  }
-
-  /**
    * B-104 — le témoin. Si cet écran disparaît PENDANT le travail, il le dit.
    *
    * Trois façons de disparaître, et le nettoyage d'effet les attrape toutes :
@@ -779,7 +697,6 @@ export function ParcoursGeneration({
     if (!cible) return
     setEtape('travail')
     setResultat(null)
-    setRelecture(null)
     setEtapeMoteur(null)
     // Le témoin s'arme ici et se désarme au premier résultat affiché.
     travailDepuisRef.current = Date.now()
@@ -856,11 +773,6 @@ export function ParcoursGeneration({
       }
 
       if (data.success) {
-        // B-074 — on ATTEND Filou avant d'afficher quoi que ce soit. Rendre la
-        // main ici puis continuer à travailler laissait l'admin fermer l'écran
-        // avant la conclusion. Le planning est déjà en base : attendre ne
-        // risque rien, ça évite seulement d'annoncer une fin prématurée.
-        await lancerRelecture(cible)
         setResultat({
           ok: true,
           issue: 'complet',
@@ -874,8 +786,6 @@ export function ParcoursGeneration({
       } else if (data.issue === 'partiel') {
         // B-053 — le planning EST écrit. On ne repart pas les mains vides :
         // il reste des cases à pourvoir, et on dit lesquelles.
-        // B-074 — et c'est le cas où Filou sert le plus : on l'attend aussi.
-        await lancerRelecture(cible)
         setResultat({
           ok: false,
           issue: 'partiel',
@@ -1471,13 +1381,6 @@ export function ParcoursGeneration({
         {/* ── ④ Le résultat ─────────────────────────────── */}
         {etape === 'resultat' && resultat && (
           <div className="gp-resultat">
-            {/* ── B-074 · plus d'annonce d'attente ici ────────────────────
-                Elle n'a plus lieu d'être : depuis que le parcours ATTEND la
-                relecture avant d'afficher le résultat, l'avis de Filou est
-                déjà présent quand cet écran apparaît. Annoncer « son avis
-                s'affichera plus bas » quand il est déjà écrit plus bas serait
-                du bruit. L'attente, elle, se raconte pendant l'étape ③. */}
-
             {/* ── B-053 · PARTIEL : le planning existe, il lui manque des cases ── */}
             {resultat.issue === 'partiel' ? (
               <>
@@ -1596,28 +1499,6 @@ export function ParcoursGeneration({
               </>
             )}
 
-            {/* ── B-062 · LA RELECTURE DE FILOU ────────────────
-                Sous le résultat de génération, jamais à sa place : ce qui est
-                au-dessus est acquis, ce qui suit est un avis. Ne s'affiche que
-                quand un planning existe — sur un échec sec, il n'y a rien à
-                relire, et un bloc vide se lirait comme un avis favorable. */}
-            {resultat.issue !== 'echec' && relectureEnCours && (
-              <p className="rl-attente">
-                {etapeRelecture ?? 'Filou relit le planning…'}
-              </p>
-            )}
-            {/* B-107 — les prénoms servent à GROUPER les constats par personne.
-                Sans eux le rapport s'affiche à plat : moins lisible, jamais faux. */}
-            {resultat.issue !== 'echec' && relecture && (
-              <RapportRelecture
-                donnees={relecture}
-                prenoms={prenomsEquipe}
-                // B-122 lot 3 — referme ce dialogue pour montrer le planning
-                // en mode aperçu : le panneau y est déjà, à jour (cf. le
-                // router.refresh() juste au-dessus dans lancerRelecture).
-                onVoirSurLePlanning={() => fermer(false)}
-              />
-            )}
           </div>
         )}
 

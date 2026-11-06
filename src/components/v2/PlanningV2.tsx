@@ -15,7 +15,7 @@
 // métier pour du décor.
 // ============================================================
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Trash2, CalendarX2 } from 'lucide-react'
@@ -37,19 +37,10 @@ import {
   BoutonCadenas, FixerUneGarde, BandeauCadenas, type ResultatCadenas,
 } from './CadenasPlaces'
 import { creneauPosableDuJour } from '@/lib/planning/creneauDuJour'
-import {
-  calculerApercuCreneaux,
-  cleCreneau,
-  type ApercuCreneau,
-  type PlaceProposee,
-} from '@/lib/planning/apercuPropositions'
 import { libelleTypeGardeDb } from '@/lib/libelles-gardes'
 import { CompteursPanel } from './CompteursPanel'
 import { AbsencesAVenirPanel, type AbsenceAVenir } from './AbsencesAVenirPanel'
 import { ImprimerPourSecretariat } from './ImprimerPourSecretariat'
-// B-122/B-123 — les propositions de Filou en attente, directement sur la grille.
-import { PropositionsPlanning, DetailProposition } from './PropositionsPlanning'
-import type { PropositionAffichee } from '@/lib/planning/propositionsAffichage'
 import type { CompteursRow } from '@/hooks/useCompteurs'
 import type { BilanVet } from '@/engine/bilan'
 import type { CleColonne } from '@/lib/planning/colonnesCompteurs'
@@ -121,20 +112,6 @@ interface Props {
    */
   vacances?: PlageVacances[]
   /**
-   * B-122/B-123 — les propositions de Filou refusées par le moteur, encore
-   * `en_attente` sur la période affichée. `undefined`/vide = rien à montrer,
-   * la grille se comporte exactement comme avant ce chantier.
-   */
-  propositionsEnAttente?: PropositionAffichee[]
-  /**
-   * B-123 — les places que les propositions en attente veulent occuper, à
-   * plat. La confrontation à l'état RÉEL de la grille se fait ICI, dans le
-   * client : c'est le seul endroit qui connaisse les créneaux tels qu'ils
-   * sont affichés (le `vendredi_soir` est dérivé du week-end, il n'existe pas
-   * en base).
-   */
-  placesProposees?: PlaceProposee[]
-  /**
    * B-125 — combien de personnes manquent sur chaque garde, par identifiant.
    * Une garde absente de cet objet n'a rien à signaler : soit elle est
    * complète, soit on ne SAIT PAS combien de places elle attend — et dans ce
@@ -151,8 +128,6 @@ interface Props {
   periodesJournee?: PeriodeApplicable[]
   /** Y a-t-il au moins une présence récurrente à appliquer ? */
   aDesTrames?: boolean
-  /** Ce que l'encart Compteurs afficherait SI le lot en attente était appliqué. */
-  compteursProjetes?: CompteursRow[]
   /**
    * B-150 — les présences de journée, par date (`AAAA-MM-JJ`).
    *
@@ -235,10 +210,7 @@ export function PlanningV2({
   bilans,
   colonnesCompteurs,
   vacances = [],
-  propositionsEnAttente = [],
-  placesProposees = [],
   manquesParGarde = {},
-  compteursProjetes,
   modules,
   periodesJournee,
   aDesTrames,
@@ -249,9 +221,6 @@ export function PlanningV2({
   const [popOuvert, setPopOuvert] = useState(false)
   const [compteursOuverts, setCompteursOuverts] = useState(true)
   const [gardeModal, setGardeModal] = useState<GardeDenormalisee | null>(null)
-  // B-122/B-123 — quelle proposition en attente est ouverte, pilotée à la
-  // fois par un clic sur la grille et par le bandeau (`PropositionsPlanning`).
-  const [propositionOuverte, setPropositionOuverte] = useState<string | null>(null)
   // B-150 — le jour dont le détail « au cabinet » est ouvert. Décision de MiKL
   // du 07/10 : la case porte le chiffre, une fenêtre porte le détail, « le même
   // principe que pour le compteur ».
@@ -341,45 +310,6 @@ export function PlanningV2({
     if (liste) liste.push(g)
     else parDate.set(g.date, [g])
   }
-
-  // B-123 — ce que les propositions en attente CHANGENT, créneau par créneau.
-  //
-  // Le calcul vit ici et pas sur le serveur parce qu'il a besoin des gardes
-  // telles qu'elles sont AFFICHÉES. On confronte deux ensembles de personnes
-  // sur un même (date, type) — jamais des rôles : la ligne du vendredi les
-  // inverse (B-111, payé le 04/09), les personnes, elles, ne s'inversent pas.
-  const apercuCreneaux = useMemo(() => {
-    if (placesProposees.length === 0) return {}
-    const creneaux = gardes.map((g) => ({
-      date: g.date,
-      type: g.type,
-      // Le rôle de DONNÉES, jamais celui d'affichage : la proposition parle en
-      // « premier »/« second », la grille dessine « 1er »/« 2e ». Confondre les
-      // deux vocabulaires est le défaut du 04/09 (`labelDonneeDePlace`).
-      occupants: placesDeGarde(g).map((p) => ({
-        vetId: p.vetId,
-        role: labelDonneeDePlace(p.index),
-      })),
-    }))
-    return calculerApercuCreneaux(placesProposees, creneaux)
-  }, [placesProposees, gardes])
-
-  // La grille entre en mode aperçu : elle change d'aspect tant qu'il reste
-  // quelque chose à trancher, et le reprend une fois le lot vidé (MiKL, 17/09 :
-  // « on peut imaginer que le planning change complètement d'aspect, et une
-  // fois que c'est validé ça reprend l'aspect normal »).
-  const modeApercu = Object.keys(apercuCreneaux).length > 0
-
-  // Les entrants sont désignés par leur `vetId` : la grille a besoin de leur
-  // prénom et de leur couleur pour les dessiner comme n'importe quelle place.
-  const vetsParId = useMemo(() => new Map(vets.map((v) => [v.id, v])), [vets])
-
-  // La proposition dont la barre du bas est ouverte. On la relit dans la liste
-  // à chaque rendu plutôt que de la stocker : après une application, la liste
-  // rétrécit et la barre doit disparaître d'elle-même — pas rester ouverte sur
-  // une proposition qui n'existe plus.
-  const propositionDetaillee =
-    propositionsEnAttente.find((p) => p.id === propositionOuverte) ?? null
 
   function naviguer(delta: number) {
     const d = new Date(Date.UTC(annee, mois - 1 + delta, 1))
@@ -794,17 +724,6 @@ export function PlanningV2({
             </p>
           )}
 
-          {/* B-123 — le bandeau ne parle QUE du lot entier (« tout appliquer »).
-              Le détail d'un changement vit dans la barre du bas, ouverte par un
-              clic sur une case mise en avant. Décidé par MiKL le 17/09. */}
-          {isAdmin && periodeAffichee && propositionsEnAttente.length > 0 && (
-            <PropositionsPlanning
-              periodeId={periodeAffichee.id}
-              propositions={propositionsEnAttente}
-              creneauxTouches={Object.keys(apercuCreneaux).length}
-            />
-          )}
-
           {/* B-111 — ce qu'un cadenas vient d'enfreindre, ou pourquoi il n'a
               pas pu être posé. Au-dessus de la grille et non en toast : ces
               phrases se relisent pendant qu'on continue de cadenasser, et un
@@ -822,10 +741,7 @@ export function PlanningV2({
           <div className="work-grid">
             <div className="work-main">
               <div className="cal-scroll">
-                {/* B-123 — la grille change d'aspect tant qu'il reste une
-                    proposition à trancher, et reprend le sien dès que le lot
-                    est vidé. Demande de MiKL le 17/09. */}
-                <div className={modeApercu ? 'cal cal-apercu' : 'cal'}>
+                <div className="cal">
                   <div className="cal-head" aria-hidden="true">
                     {JOURS.map((j) => (
                       <span key={j}>{j}</span>
@@ -857,13 +773,7 @@ export function PlanningV2({
                         periodeId={periodeAffichee?.id ?? null}
                         vets={vets}
                         onCadenas={surResultatCadenas}
-                        // B-123 — ce que les propositions changent sur les
-                        // créneaux de ce jour, et le clic qui ouvre le détail.
-                        apercuCreneaux={apercuCreneaux}
-                        vetsParId={vetsParId}
                         manquesParGarde={manquesParGarde}
-                        onOuvrirProposition={setPropositionOuverte}
-                        propositionOuverte={propositionOuverte}
                         // B-150 — les présences de journée de ce jour-là, et le
                         // clic qui ouvre leur détail.
                         journee={presencesParJour[date]}
@@ -912,7 +822,6 @@ export function PlanningV2({
                 lignes={compteurs}
                 bilans={bilans}
                 colonnes={colonnesCompteurs}
-                projetees={compteursProjetes}
                 // B-171 — cette colonne latérale fait toujours 262 px : le
                 // plafond élargi (8) ne vaut que pour la pop-up chantier.
                 maxAffichable={4}
@@ -924,16 +833,6 @@ export function PlanningV2({
         </div>
 
       </div>
-
-      {/* B-123 — le détail du changement cliqué, ancré en bas de l'écran. Il
-          ne recouvre pas la grille : les cases concernées restent visibles,
-          c'est tout l'intérêt par rapport à une modale. */}
-      {propositionDetaillee && (
-        <DetailProposition
-          proposition={propositionDetaillee}
-          onFermer={() => setPropositionOuverte(null)}
-        />
-      )}
 
       {/* B-150 — le détail « qui est au cabinet » de la journée cliquée. Même
           principe que les compteurs : le chiffre sur la grille, le détail dans
@@ -1037,11 +936,7 @@ function CaseJour({
   periodeId,
   vets,
   onCadenas,
-  apercuCreneaux,
-  vetsParId,
   manquesParGarde,
-  onOuvrirProposition,
-  propositionOuverte,
   journee,
   onOuvrirJournee,
 }: {
@@ -1065,15 +960,8 @@ function CaseJour({
   periodeId: string | null
   vets: VetCrise[]
   onCadenas: (r: ResultatCadenas) => void
-  /** B-123 — ce que les propositions changent, par créneau (`cleCreneau`). */
-  apercuCreneaux?: Record<string, ApercuCreneau>
-  /** Prénom et couleur des entrants, qui ne sont pas encore dans la garde. */
-  vetsParId?: Map<string, VetCrise>
   /** B-125 — places manquantes par garde. Absent = rien à signaler. */
   manquesParGarde?: Record<string, number>
-  onOuvrirProposition?: (id: string) => void
-  /** La proposition dont le détail est ouvert — sa case est mise en avant. */
-  propositionOuverte?: string | null
   /** B-150 — les présences de journée de ce jour. Absent = rien à montrer. */
   journee?: JourneeAffichee
   /** Ouvre le détail « au cabinet » de ce jour. */
@@ -1149,34 +1037,15 @@ function CaseJour({
         )
         const estFigee = (vetId: string | null) => Boolean(vetId && vetsFiges.has(vetId))
 
-        // B-123 — ce que la proposition en attente ferait de CE créneau.
-        // Identifié par (date, type) : le rôle n'entre jamais dans la clé,
-        // la ligne du vendredi l'inverse (B-111).
-        const apercu = apercuCreneaux?.[cleCreneau(date, g.type)]
-        const sortants = new Set(apercu?.sortants ?? [])
-        const entrants = apercu?.entrants ?? []
-        const ouvrirProposition = apercu
-          ? () => onOuvrirProposition?.(apercu.propositionId)
-          : undefined
-        const creneauEnAvant = Boolean(apercu && apercu.propositionId === propositionOuverte)
-
         // B-125 — combien de places restent à pourvoir sur ce créneau. Calculé
         // côté serveur (`calculerManques`) : la grille ne sait pas, à elle
         // seule, combien de personnes un créneau attend.
-        //
-        // ⚠️ On ne dessine PAS de place manquante pendant l'aperçu d'une
-        // proposition sur ce même créneau : les entrants de la proposition
-        // viendraient s'ajouter aux « à pourvoir », et la case afficherait plus
-        // de lignes que le créneau n'a de places. L'admin tranche d'abord la
-        // proposition, les trous restants réapparaissent ensuite.
-        const manque = apercu ? 0 : (manquesParGarde?.[g.id] ?? 0)
+        const manque = manquesParGarde?.[g.id] ?? 0
 
         return (
           <div
             className={[
               'slot-card',
-              apercu ? 'slot-card-apercu' : '',
-              creneauEnAvant ? 'slot-card-apercu-ouvert' : '',
               manque > 0 ? 'slot-card-manque' : '',
             ]
               .filter(Boolean)
@@ -1189,26 +1058,15 @@ function CaseJour({
                 on ne connaît pas ici le nombre de places du créneau, et un
                 « à pourvoir » inventerait un trou qui n'existe pas. */}
             {places.map((p) => {
-              // Cette personne QUITTE le créneau si la proposition est
-              // appliquée : sa ligne est barrée, et le clic ouvre le détail
-              // au lieu de la fiche de garde.
-              const part = Boolean(p.vetId && sortants.has(p.vetId))
               return (
                 <LigneVet
                   key={p.index}
                   prenom={p.prenom}
                   couleur={p.couleur}
                   role={places.length > 1 ? p.role : ''}
-                  titre={
-                    part
-                      ? `${dateCourte(date)} · ${p.role} de garde · Filou propose de retirer cette garde`
-                      : `${dateCourte(date)} · ${p.role} de garde`
-                  }
-                  onClick={
-                    part ? ouvrirProposition : cliquable ? () => onOuvrir(g) : undefined
-                  }
+                  titre={`${dateCourte(date)} · ${p.role} de garde`}
+                  onClick={cliquable ? () => onOuvrir(g) : undefined}
                   fige={estFigee(p.vetId)}
-                  sortant={part}
                   cadenas={
                     cadenasActifs && p.vetId ? (
                       <BoutonCadenas
@@ -1224,10 +1082,6 @@ function CaseJour({
               )
             })}
 
-            {/* Les ARRIVANTS — dessinés en plus des places existantes, parce
-                qu'ils ne sont nulle part dans la garde actuelle. C'est très
-                exactement ce que la première version ne savait pas montrer :
-                elle cherchait la personne qui arrive parmi celles déjà là. */}
             {/* B-125 — les places RESTÉES À POURVOIR, dessinées à la suite des
                 places tenues. Une par personne manquante : « il manque 2 »
                 doit se voir comme deux trous, pas comme une ligne à lire.
@@ -1244,20 +1098,6 @@ function CaseJour({
               />
             ))}
 
-            {entrants.map((vetId) => {
-              const vet = vetsParId?.get(vetId)
-              return (
-                <LigneVet
-                  key={`entrant-${vetId}`}
-                  prenom={vet?.prenom ?? '?'}
-                  couleur={vet?.couleur ?? null}
-                  role=""
-                  titre={`${dateCourte(date)} · Filou propose d’ajouter cette garde`}
-                  onClick={ouvrirProposition}
-                  entrant
-                />
-              )
-            })}
           </div>
         )
       })}
@@ -1385,8 +1225,6 @@ function LigneVet({
   titre,
   onClick,
   fige = false,
-  sortant = false,
-  entrant = false,
   aPourvoir = false,
   cadenas = null,
 }: {
@@ -1397,10 +1235,6 @@ function LigneVet({
   onClick?: () => void
   /** B-111 — cette place est fixée par l'admin (la génération n'y touche pas). */
   fige?: boolean
-  /** B-123 — une proposition en attente RETIRERAIT cette personne d'ici. */
-  sortant?: boolean
-  /** B-123 — une proposition en attente AMÈNERAIT cette personne ici. */
-  entrant?: boolean
   /** B-125 — cette place n'a trouvé personne : il reste du travail ici. */
   aPourvoir?: boolean
   /**
@@ -1422,36 +1256,17 @@ function LigneVet({
       <span className="vdot" style={stylePoint(couleur)} aria-hidden="true" />
       {prenom}
       {role && <span className="role">{role}</span>}
-      {/* Le signe dit le SENS du changement. Sans lui, une ligne barrée et une
-          ligne en pointillé se ressemblent trop dans une case de calendrier —
-          et « je ne sais pas ce qui va se passer » est précisément le reproche
-          de MiKL le 17/09. */}
-      {sortant && (
-        <span className="vet-row-signe" aria-hidden="true">
-          −
-        </span>
-      )}
-      {entrant && (
-        <span className="vet-row-signe" aria-hidden="true">
-          +
-        </span>
-      )}
     </>
   )
   const classe = [
     prenom ? 'vet-row' : 'vet-row empty',
     fige ? 'vet-row-fige' : '',
-    sortant ? 'vet-row-sortant' : '',
-    entrant ? 'vet-row-entrant' : '',
     aPourvoir ? 'vet-row-a-pourvoir' : '',
   ]
     .filter(Boolean)
     .join(' ')
-  // Le lecteur d'écran doit entendre le changement, pas seulement le voir :
-  // barré et pointillé ne s'annoncent pas tout seuls.
-  const mouvement = sortant ? ' · retirée par la proposition' : entrant ? ' · ajoutée par la proposition' : ''
   const libelle = prenom
-    ? `${titre} · ${prenom}${fige ? ' · fixé par l’administratrice' : ''}${mouvement}`
+    ? `${titre} · ${prenom}${fige ? ' · fixé par l’administratrice' : ''}`
     : `${titre} · place à pourvoir`
 
   const ligne = !onClick ? (

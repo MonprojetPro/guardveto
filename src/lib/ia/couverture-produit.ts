@@ -448,7 +448,7 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   },
   'api/planning/places-figees#POST': {
     manque:
-      'Cadenasser une place du planning (B-111, 04/09) : « ce samedi-là, c’est Fanny, et la régénération n’y touche pas ». Trois gestes — poser, libérer, vider. Filou n’en déclenche aucun et, plus important, il ne LIT pas encore les cadenas. ⚠️ Le risque n’est pas qu’il ne sache pas les poser, c’est qu’il en ignore l’existence : sa relecture de planning propose des mouvements, et rien ne l’empêche aujourd’hui de proposer de déplacer une place que l’admin a justement fixée — avec l’aplomb de ses autres propositions. À traiter AVANT de rouvrir la relecture (item de board à créer), et pas seulement comme un outil d’écriture de plus. B-189 (05/11) : le vendredi d’un week-end a désormais son propre cadenas ; il arrive à la relecture par le même chargeur que les autres (`chargerPlacesFigees`), rien à ajouter de ce côté.',
+      'Cadenasser une place du planning (B-111, 04/09) : « ce samedi-là, c’est Fanny, et la régénération n’y touche pas ». Trois gestes — poser, libérer, vider. Filou n’en déclenche aucun et, plus important, il ne LIT pas encore les cadenas. ⚠️ Le risque n’est pas qu’il ne sache pas les poser, c’est qu’il en ignore l’existence. La relecture de planning qui proposait des mouvements a été retirée le 06/11 (B-192) ; toute future surcouche IA de la génération devra lire les cadenas (`chargerPlacesFigees`) avant de proposer quoi que ce soit.',
   },
   'api/export-pdf#GET': {
     manque:
@@ -461,10 +461,6 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   'api/generate/incident#POST': {
     hors:
       'Balise de diagnostic (B-104) : le navigateur y rapporte que l’écran de génération a disparu pendant le travail — un fait que le serveur ne peut pas observer. Ce n’est pas un geste métier et ça ne change rien au planning ; c’est un instrument de mesure, écrit par le code du parcours, jamais par quelqu’un. Filou n’a donc rien à déclencher ici. ⚠️ En revanche, LIRE ces traces (« pourquoi ma génération a échoué hier ? ») serait une vraie demande — à rouvrir si le besoin apparaît, et ce serait un outil de LECTURE.',
-  },
-  'api/planning/relecture#POST': {
-    hors:
-      'C’est Filou LUI-MÊME qui exécute cette route : elle l’appelle pour relire un planning généré. Lui donner un outil pour la déclencher le mettrait en position de se convoquer, et une relecture est une étape du parcours de génération — elle se lance depuis l’écran, elle ne se demande pas en conversation. ⚠️ Mais la QUESTION reste ouverte côté chat : « qu’est-ce que tu penses de ce planning ? » est une demande naturelle, et il n’a aujourd’hui aucun moyen d’y répondre autrement qu’en relançant tout le parcours. À rouvrir si MiKL le constate à l’usage.',
   },
   'api/calendar-sync#POST': {
     manque:

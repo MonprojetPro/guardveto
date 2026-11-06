@@ -70,17 +70,9 @@ import {
   BoutonCadenas, FixerUneGarde, BandeauCadenas, type ResultatCadenas,
 } from '@/components/v2/CadenasPlaces'
 import { creneauPosableDuJour } from '@/lib/planning/creneauDuJour'
-import {
-  calculerApercuCreneaux,
-  type ApercuCreneau,
-  type PlaceProposee,
-} from '@/lib/planning/apercuPropositions'
 import { CompteursPanel } from '@/components/v2/CompteursPanel'
 import { AbsencesAVenirPanel, type AbsenceAVenir } from '@/components/v2/AbsencesAVenirPanel'
 import { ImprimerPourSecretariat } from '@/components/v2/ImprimerPourSecretariat'
-// B-122/B-123 — les propositions de Filou en attente, directement sur la grille.
-import { PropositionsPlanning, DetailProposition } from '@/components/v2/PropositionsPlanning'
-import type { PropositionAffichee } from '@/lib/planning/propositionsAffichage'
 import type { CompteursRow } from '@/hooks/useCompteurs'
 import type { BilanVet } from '@/engine/bilan'
 import type { CleColonne } from '@/lib/planning/colonnesCompteurs'
@@ -223,20 +215,6 @@ interface Props {
    */
   vacances?: PlageVacances[]
   /**
-   * B-122/B-123 — les propositions de Filou refusées par le moteur, encore
-   * `en_attente` sur la période affichée. `undefined`/vide = rien à montrer,
-   * la grille se comporte exactement comme avant ce chantier.
-   */
-  propositionsEnAttente?: PropositionAffichee[]
-  /**
-   * B-123 — les places que les propositions en attente veulent occuper, à
-   * plat. La confrontation à l'état RÉEL de la grille se fait ICI, dans le
-   * client : c'est le seul endroit qui connaisse les créneaux tels qu'ils
-   * sont affichés (le `vendredi_soir` est dérivé du week-end, il n'existe pas
-   * en base).
-   */
-  placesProposees?: PlaceProposee[]
-  /**
    * B-125 — combien de personnes manquent sur chaque garde, par identifiant.
    * Une garde absente de cet objet n'a rien à signaler : soit elle est
    * complète, soit on ne SAIT PAS combien de places elle attend — et dans ce
@@ -253,8 +231,6 @@ interface Props {
   periodesJournee?: PeriodeApplicable[]
   /** Y a-t-il au moins une présence récurrente à appliquer ? */
   aDesTrames?: boolean
-  /** Ce que l'encart Compteurs afficherait SI le lot en attente était appliqué. */
-  compteursProjetes?: CompteursRow[]
   /**
    * B-150 — les présences de journée, par date (`AAAA-MM-JJ`).
    *
@@ -373,10 +349,7 @@ export function PlanningChantierV2({
   bilans,
   colonnesCompteurs,
   vacances = [],
-  propositionsEnAttente = [],
-  placesProposees = [],
   manquesParGarde = {},
-  compteursProjetes,
   modules,
   periodesJournee,
   aDesTrames,
@@ -409,9 +382,6 @@ export function PlanningChantierV2({
   const [compteursOuverts, setCompteursOuverts] = useState(false)
   const [absencesOuvertes, setAbsencesOuvertes] = useState(false)
   const [gardeModal, setGardeModal] = useState<GardeDenormalisee | null>(null)
-  // B-122/B-123 — quelle proposition en attente est ouverte, pilotée à la
-  // fois par un clic sur la grille et par le bandeau (`PropositionsPlanning`).
-  const [propositionOuverte, setPropositionOuverte] = useState<string | null>(null)
   // B-150 — le jour dont le détail « au cabinet » est ouvert. Décision de MiKL
   // du 07/10 : la case porte le chiffre, une fenêtre porte le détail, « le même
   // principe que pour le compteur ».
@@ -656,36 +626,7 @@ export function PlanningChantierV2({
     return index
   }, [gardes])
 
-  // B-123 — ce que les propositions en attente CHANGENT, créneau par créneau.
-  //
-  // Le calcul vit ici et pas sur le serveur parce qu'il a besoin des gardes
-  // telles qu'elles sont AFFICHÉES. On confronte deux ensembles de personnes
-  // sur un même (date, type) — jamais des rôles : la ligne du vendredi les
-  // inverse (B-111, payé le 04/09), les personnes, elles, ne s'inversent pas.
-  const apercuCreneaux = useMemo(() => {
-    if (placesProposees.length === 0) return {}
-    const creneaux = gardes.map((g) => ({
-      date: g.date,
-      type: g.type,
-      // Le rôle de DONNÉES, jamais celui d'affichage : la proposition parle en
-      // « premier »/« second », la grille dessine « 1er »/« 2e ». Confondre les
-      // deux vocabulaires est le défaut du 04/09 (`labelDonneeDePlace`).
-      occupants: placesDeGarde(g).map((p) => ({
-        vetId: p.vetId,
-        role: labelDonneeDePlace(p.index),
-      })),
-    }))
-    return calculerApercuCreneaux(placesProposees, creneaux)
-  }, [placesProposees, gardes])
-
-  // La grille entre en mode aperçu : elle change d'aspect tant qu'il reste
-  // quelque chose à trancher, et le reprend une fois le lot vidé (MiKL, 17/09 :
-  // « on peut imaginer que le planning change complètement d'aspect, et une
-  // fois que c'est validé ça reprend l'aspect normal »).
-  const modeApercu = Object.keys(apercuCreneaux).length > 0
-
-  // Les entrants sont désignés par leur `vetId` : la grille a besoin de leur
-  // prénom et de leur couleur pour les dessiner comme n'importe quelle place.
+  // Prénom et nom d'un membre à partir de son identifiant.
   const vetsParId = useMemo(() => new Map(vets.map((v) => [v.id, v])), [vets])
 
   /**
@@ -709,13 +650,6 @@ export function PlanningChantierV2({
         return v ? `${v.prenom} ${v.nom}` : 'Ce vétérinaire'
       })()
     : ''
-
-  // La proposition dont la barre du bas est ouverte. On la relit dans la liste
-  // à chaque rendu plutôt que de la stocker : après une application, la liste
-  // rétrécit et la barre doit disparaître d'elle-même — pas rester ouverte sur
-  // une proposition qui n'existe plus.
-  const propositionDetaillee =
-    propositionsEnAttente.find((p) => p.id === propositionOuverte) ?? null
 
   function naviguer(delta: number) {
     const d = new Date(Date.UTC(annee, mois - 1 + delta, 1))
@@ -1694,17 +1628,6 @@ export function PlanningChantierV2({
             </p>
           )}
 
-          {/* B-123 — le bandeau ne parle QUE du lot entier (« tout appliquer »).
-              Le détail d'un changement vit dans la barre du bas, ouverte par un
-              clic sur une case mise en avant. Décidé par MiKL le 17/09. */}
-          {isAdmin && periodeAffichee && propositionsEnAttente.length > 0 && (
-            <PropositionsPlanning
-              periodeId={periodeAffichee.id}
-              propositions={propositionsEnAttente}
-              creneauxTouches={Object.keys(apercuCreneaux).length}
-            />
-          )}
-
           {/* B-111 — ce qu'un cadenas vient d'enfreindre, ou pourquoi il n'a
               pas pu être posé. Au-dessus de la grille et non en toast : ces
               phrases se relisent pendant qu'on continue de cadenasser, et un
@@ -1867,16 +1790,6 @@ export function PlanningChantierV2({
 
       </div>
 
-      {/* B-123 — le détail du changement cliqué, ancré en bas de l'écran. Il
-          ne recouvre pas la grille : les cases concernées restent visibles,
-          c'est tout l'intérêt par rapport à une modale. */}
-      {propositionDetaillee && (
-        <DetailProposition
-          proposition={propositionDetaillee}
-          onFermer={() => setPropositionOuverte(null)}
-        />
-      )}
-
       {/* B-150 — le détail « qui est au cabinet » de la journée cliquée. Même
           principe que les compteurs : le chiffre sur la grille, le détail dans
           une fenêtre (arbitrage MiKL du 07/10). */}
@@ -1888,7 +1801,6 @@ export function PlanningChantierV2({
         lignes={compteurs}
         bilans={bilans}
         colonnes={colonnesCompteurs}
-        projetees={compteursProjetes}
         disponibleJournee={moduleJourneeActif}
         onFermer={() => setCompteursOuverts(false)}
       />

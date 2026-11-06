@@ -38,18 +38,6 @@ interface Props {
   /** Colonnes retenues par la personne connectée (déjà normalisées côté page). */
   colonnes: CleColonne[]
   /**
-   * B-123 — ce que les compteurs DIRAIENT si les propositions en attente
-   * étaient appliquées (`projeterCompteurs`, agrégé sur tout le lot).
-   *
-   * MiKL, le 17/09 : « les possibles changements de compteur qui
-   * apparaitraient dans le compteur lui-même à droite » — c'est ici, pas
-   * dans un second tableau au-dessus du planning (B-122 lot 1, déplacé).
-   *
-   * Facultatif : sans propositions en attente, l'encart s'affiche à
-   * l'identique d'avant B-123.
-   */
-  projetees?: CompteursRow[]
-  /**
    * B-171 — combien de colonnes ce contexte d'affichage peut réellement
    * accueillir. 4 sur l'ancienne colonne latérale de `PlanningV2` (262 px) ;
    * 8 dans la pop-up (`CompteursModale`), qui a largement plus de place.
@@ -81,7 +69,7 @@ function Ecart({ valeur, horsRepartition }: { valeur: number; horsRepartition: b
 }
 
 export function CompteursPanel({
-  lignes, bilans, colonnes, projetees, maxAffichable = MAX_COLONNES, disponibleJournee = false,
+  lignes, bilans, colonnes, maxAffichable = MAX_COLONNES, disponibleJournee = false,
 }: Props) {
   // Tronqué à CE contexte dès le départ : une préférence posée à 8 colonnes
   // depuis la pop-up ne doit pas déborder si elle s'affiche un jour dans
@@ -96,11 +84,6 @@ export function CompteursPanel({
     : ORDRE_CATALOGUE.filter((c) => !COLONNES_JOURNEE.includes(c))
 
   const bilanDe = new Map(bilans.map((b) => [b.veterinaire_id, b]))
-  // B-123 — la ligne PROJETÉE de chaque vétérinaire. `projeterCompteurs` rend
-  // une ligne pour TOUT LE MONDE (copie des valeurs actuelles + effet des
-  // mouvements) : c'est en comparant chaque colonne à `lignes` qu'on sait ce
-  // qui bouge vraiment, pas en cherchant une ligne absente.
-  const projeteeDe = new Map((projetees ?? []).map((r) => [r.veterinaire_id, r]))
 
   async function basculer(cle: CleColonne) {
     const dejaLa = choix.includes(cle)
@@ -220,25 +203,7 @@ export function CompteursPanel({
         </div>
       )}
 
-      {/* B-123 — dire à quoi servent les chiffres en deux couleurs AVANT de les
-          montrer. MiKL, le 17/09 : « on ne sait même pas que les indicateurs
-          rouges sont des indicateurs qui concernent la probable modification ».
-          Une valeur mise en avant sans légende se lit comme une alerte, pas
-          comme une projection — et une alerte, ça inquiète au lieu d'informer. */}
-      {projetees && projetees.length > 0 && (
-        <p className="cnt-apercu-legende">
-          <span className="cnt-apercu-puce" aria-hidden="true" />
-          Le second chiffre est le total <strong>si tu appliques</strong> les propositions de
-          Filou. Rien n’est encore changé.
-        </p>
-      )}
-
-      {/* B-123 — les colonnes de chiffres font 33 px, calibrées pour « 18 ».
-          Une projection (« 22 → 23 » + delta) n'y tient pas : MiKL, le 20/09,
-          « c'est dégueu les chiffres qui sortent du tableau ». Le tableau
-          s'élargit donc le temps de l'aperçu, et revient à sa largeur normale
-          dès que le lot est vidé. */}
-      <div className={projetees && projetees.length > 0 ? 'cnt-table cnt-table-apercu' : 'cnt-table'}>
+      <div className="cnt-table">
         <div className="cnt-row cnt-header" style={{ '--nb-col': choix.length } as React.CSSProperties}>
           <span>Vétérinaire</span>
           {choix.map((c) => (
@@ -275,42 +240,10 @@ export function CompteursPanel({
                   )
                 }
                 const v = valeurDe(l, c)
-                // B-123 — la valeur SI on applique, à côté de l'actuelle.
-                // Uniquement sur la colonne « total » : c'est la SEULE que
-                // `propositionsProjetees` (page.tsx) peut recalculer sans
-                // supposer — la répartition par famille (WE/nuits/1er/fériés)
-                // n'est pas stockée par proposition (seul le total l'est,
-                // `compteursProjetes` de `propositions_relecture`). Un chiffre
-                // absent se remarque ; un chiffre faux se croit.
-                const ligneProjetee = c === 'total' ? projeteeDe.get(l.veterinaire_id) : undefined
-                const vProjete = ligneProjetee ? valeurDe(ligneProjetee, c) : undefined
-                const bouge = vProjete !== undefined && vProjete !== v
                 return (
-                  <span className={`cnt-num${v === 0 && !bouge ? ' zero' : ''}`} key={c}>
-                    {bouge ? (
-                      // Le SENS avant la valeur : « +1 » se lit d'un coup d'œil
-                      // là où « 22 → 23 » demande une soustraction mentale, sept
-                      // fois de suite, dans une colonne étroite.
-                      // Empilé, jamais en ligne : dans 46 px, « 22 → 23 +1 »
-                      // débordait de la colonne. L'ancienne valeur au-dessus en
-                      // petit, la nouvelle en dessous avec son signe.
-                      <span
-                        className={`cnt-num-projete ${vProjete > v ? 'cnt-num-hausse' : 'cnt-num-baisse'}`}
-                        title={`Actuellement ${v} · ${vProjete} si les propositions en attente sont appliquées`}
-                      >
-                        <span className="cnt-num-avant">{v}</span>
-                        <span className="cnt-num-apres">
-                          <strong>{vProjete}</strong>
-                          <span className="cnt-num-delta">
-                            {vProjete > v ? '+' : ''}
-                            {vProjete - v}
-                          </span>
-                        </span>
-                      </span>
-                    ) : (
-                      v
-                    )}
-                    {COLONNES[c].barre && !bouge && (
+                  <span className={`cnt-num${v === 0 ? ' zero' : ''}`} key={c}>
+                    {v}
+                    {COLONNES[c].barre && (
                       <span className="bar">
                         <b style={{ transform: `scaleX(${v / (maxDe.get(c) ?? 1)})` }} />
                       </span>
