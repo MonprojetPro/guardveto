@@ -164,33 +164,6 @@ export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props
         </Link>
         )}
 
-        {/* B-193 — la messagerie, ouverte aux TROIS rôles (MiKL, 06/11 : « le
-            secrétariat doit pouvoir aussi s'ils ont des questions »). Elle
-            n'apparaît que si le module `chat` est allumé pour le cabinet ; la
-            page et la base refusent d'elles-mêmes sinon. */}
-        {module('/messagerie') && (
-          <Link
-            {...entree('/messagerie')}
-            href="/messagerie"
-            aria-label={
-              dock.nbMessagesNonLus
-                ? `Messagerie · ${dock.nbMessagesNonLus} non lu${dock.nbMessagesNonLus > 1 ? 's' : ''}`
-                : 'Messagerie'
-            }
-          >
-            <span className="di-ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4.5 6.8a2.6 2.6 0 0 1 2.6-2.6h9.8a2.6 2.6 0 0 1 2.6 2.6v6.6a2.6 2.6 0 0 1-2.6 2.6H11l-4.2 3.4V16h0a2.6 2.6 0 0 1-2.3-2.6Z" />
-                <path d="M8.6 9.2h6.8M8.6 12.2h4.4" />
-              </svg>
-              <PastilleMessagerie key={dock.nbMessagesNonLus ?? 0} initial={dock.nbMessagesNonLus ?? 0} />
-            </span>
-            <span className="di-flap" aria-hidden="true">
-              <span className="di-text">Messagerie</span>
-            </span>
-          </Link>
-        )}
-
         {/* B-175 (27/10) — plus d'entrée « Journée » : les tranches horaires et
             les semaines types vivent dans Organisation › Journées. */}
 
@@ -258,6 +231,34 @@ export function BarreV2({ prenom, estAdmin, estSecretaire = false, dock }: Props
             </span>
             <span className="di-flap" aria-hidden="true">
               <span className="di-text">Historique<span className="di-suite"> &amp; compteurs</span></span>
+            </span>
+          </Link>
+        )}
+
+        {/* B-193 — la messagerie, ouverte aux TROIS rôles (MiKL, 06/11 : « le
+            secrétariat doit pouvoir aussi s'ils ont des questions »). Elle
+            n'apparaît que si le module `chat` est allumé pour le cabinet ; la
+            page et la base refusent d'elles-mêmes sinon.
+            Placée entre les compteurs et les réglages (MiKL, 06/11). */}
+        {module('/messagerie') && (
+          <Link
+            {...entree('/messagerie')}
+            href="/messagerie"
+            aria-label={
+              dock.nbMessagesNonLus
+                ? `Messagerie · ${dock.nbMessagesNonLus} non lu${dock.nbMessagesNonLus > 1 ? 's' : ''}`
+                : 'Messagerie'
+            }
+          >
+            <span className="di-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4.5 6.8a2.6 2.6 0 0 1 2.6-2.6h9.8a2.6 2.6 0 0 1 2.6 2.6v6.6a2.6 2.6 0 0 1-2.6 2.6H11l-4.2 3.4V16h0a2.6 2.6 0 0 1-2.3-2.6Z" />
+                <path d="M8.6 9.2h6.8M8.6 12.2h4.4" />
+              </svg>
+              <PastilleMessagerie key={dock.nbMessagesNonLus ?? 0} initial={dock.nbMessagesNonLus ?? 0} />
+            </span>
+            <span className="di-flap" aria-hidden="true">
+              <span className="di-text">Messagerie</span>
             </span>
           </Link>
         )}
