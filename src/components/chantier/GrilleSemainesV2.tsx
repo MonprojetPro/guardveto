@@ -952,11 +952,16 @@ function CaseDepliee({
                    dessous. Les deux cas ne demandent pas le même dessin parce
                    qu'ils ne disent pas la même chose.
               */}
-              {ligne.mention && ligne.absencePonctuelle && (
+              {/* B-194 ⑤ — « des indisponibilités ponctuelles, ça n'apparaît pas
+                  sur le planning, faut cliquer sur la journée » (rdv du 06/11).
+                  Le repère ne dépend plus de l'absence que la ligne retient
+                  (un bloc + un ponctuel le faisaient disparaître), il se tait
+                  seulement quand la journée entière est déjà barrée. */}
+              {ligne.absencePonctuelle && ligne.detailPonctuel && !(ligne.absence === 'valide' && toutLeJour) && (
                 <span
                   className="pv2-pastille-abs"
-                  title={ligne.mentionDetail ?? ligne.mention}
-                  aria-label={ligne.mentionDetail ?? ligne.mention}
+                  title={ligne.detailPonctuel}
+                  aria-label={ligne.detailPonctuel}
                 >
                   A
                 </span>
@@ -979,7 +984,13 @@ function CaseDepliee({
                    dessinerait une précision fausse. La hachure dit « entamée »
                    sans prétendre dire où — ce qui est exactement ce qu'on sait.
               */}
-              {ligne.journee.map(({ presence, position }) =>
+              {/* B-194 ⑥ — ABSENT TOUTE LA JOURNÉE : PAS DE BARRE.
+                  La piste porte déjà la hachure et le mot « absence » ; la
+                  barre « 8h-18h » de la présence prévue se dessinait PAR-DESSUS,
+                  et les deux textes se chevauchaient (capture du 06/11,
+                  Anne-Catherine). Une présence que l'absence annule ne se
+                  montre pas : le détail reste dans la fenêtre de la cellule. */}
+              {!(ligne.absence === 'valide' && toutLeJour) && ligne.journee.map(({ presence, position }) =>
                 position ? (
                   <span
                     key={presence.id}

@@ -10,7 +10,6 @@
 // réelles existent (table migrée ET au moins une fête publiée).
 // ============================================================
 
-import { Gift } from 'lucide-react'
 import type { HistoriqueFeteAffichage } from '@/hooks/useCompteurs'
 
 const LIBELLE_FETE: Record<'noel' | 'nouvel_an', string> = {
@@ -39,51 +38,58 @@ export function HistoriqueFetesCard({ rows }: HistoriqueFetesCardProps) {
   }
   const annees = [...parAnnee.keys()].sort((a, b) => b - a)
 
+  // B-194 ① — CARTE V2, comme le bilan voisin. Elle était greffée dans un
+  // cadre V1 (`.v2-greffe`) : un cadre dans un cadre, texte collé aux bords,
+  // et toutes les fêtes d'une année sur une seule phrase. Un tableau
+  // Année / Noël / Nouvel An se lit d'un coup d'œil.
   return (
-    <div className="rounded-xl border bg-card p-4 space-y-3">
-      <div>
-        <h2 className="font-heading text-base font-semibold text-foreground flex items-center gap-2">
-          <Gift className="w-4 h-4 text-primary" />
-          Fêtes de fin d&apos;année — historique
-        </h2>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Qui a tenu chaque fête. Le moteur évite qu&apos;un même vétérinaire refasse
-          la même fête deux années de suite (préférence, jamais bloquant).
-        </p>
+    <section className="card count-card fetes-card" aria-label="Historique des fêtes de fin d'année">
+      <div className="card-head">
+        <h3>Fêtes de fin d&apos;année</h3>
+        <span className="sub spacer">
+          qui a tenu chaque fête · le moteur évite la même fête deux ans de suite
+        </span>
       </div>
-
-      <div className="space-y-2">
-        {annees.map((annee) => {
-          const entrees = parAnnee.get(annee) ?? []
-          const parFete: Array<{ fete: 'noel' | 'nouvel_an'; tenants: HistoriqueFeteAffichage[] }> =
-            (['noel', 'nouvel_an'] as const)
-              .map((fete) => ({ fete, tenants: entrees.filter((e) => e.fete === fete) }))
-              .filter((g) => g.tenants.length > 0)
-
-          return (
-            <div key={annee} className="text-sm">
-              <span className="font-medium text-foreground tabular-nums">
+      <table className="count-table">
+        <thead>
+          <tr>
+            <th>Saison</th>
+            <th>{LIBELLE_FETE.noel}</th>
+            <th>{LIBELLE_FETE.nouvel_an}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {annees.map((annee) => {
+            const entrees = parAnnee.get(annee) ?? []
+            return (
+              <tr key={annee}>
                 {/* Année de saison : le Nouvel An 2026 = 31/12/2026 → 01/01/2027 */}
-                {annee}–{(annee + 1) % 100}
-              </span>
-              <span className="text-muted-foreground">
-                {' — '}
-                {parFete
-                  .map(
-                    (g) =>
-                      `${LIBELLE_FETE[g.fete]} : ${g.tenants
-                        .map((t) => {
-                          const role = t.role ? LIBELLE_ROLE[t.role] ?? t.role : null
-                          return `${t.prenom} ${t.nom}${role ? ` (${role})` : ''}`
-                        })
-                        .join(', ')}`,
+                <td>
+                  {annee}–{(annee + 1) % 100}
+                </td>
+                {(['noel', 'nouvel_an'] as const).map((fete) => {
+                  const tenants = entrees.filter((e) => e.fete === fete)
+                  return (
+                    <td key={fete} className="fetes-tenants">
+                      {tenants.length === 0
+                        ? '—'
+                        : tenants.map((t) => {
+                            const role = t.role ? LIBELLE_ROLE[t.role] ?? t.role : null
+                            return (
+                              <span key={`${t.prenom}-${t.nom}-${t.role ?? ''}`} className="fetes-tenant">
+                                {t.prenom} {t.nom}
+                                {role && <em>{role}</em>}
+                              </span>
+                            )
+                          })}
+                    </td>
                   )
-                  .join(' · ')}
-              </span>
-            </div>
-          )
-        })}
-      </div>
-    </div>
+                })}
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </section>
   )
 }

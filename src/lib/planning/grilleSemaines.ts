@@ -231,6 +231,14 @@ export interface LigneVetoJour {
    */
   absencePonctuelle: boolean
   /**
+   * B-194 ⑤ — la phrase des indisponibilités PONCTUELLES du jour (« absent
+   * 14h-16h »), pour l'infobulle de la pastille. Calculée sur TOUTES les
+   * absences de la personne, pas seulement sur celle que la ligne retient :
+   * un bloc « matin » ET un ponctuel l'après-midi faisaient disparaître le
+   * ponctuel, puisque la ligne préfère ce qui retire.
+   */
+  detailPonctuel: string | null
+  /**
    * Les MOITIÉS de piste couvertes par l'indisponibilité (B-163f).
    *
    * 🔑 MiKL, 15/10 : « tu as une barre verticale qui partage en 2 la barre
@@ -312,6 +320,7 @@ export function lignesDeLaSemaine(
     const abs = siennes.find((a) => retireQuelqueChose(a)) ?? siennes[0] ?? null
 
     const absence = abs && retireQuelqueChose(abs) ? abs.statut : null
+    const ponctuelles = siennes.filter((a) => estPonctuel(lirePerimetre(a.perimetre)))
 
     const heuresAbs =
       abs && abs.heureDebut && abs.heureFin
@@ -330,7 +339,18 @@ export function lignesDeLaSemaine(
       mention,
       mentionDetail,
       origineAbsence: abs ? (abs.origine ?? 'conge') : null,
-      absencePonctuelle: abs ? estPonctuel(lirePerimetre(abs.perimetre)) : false,
+      absencePonctuelle: ponctuelles.length > 0,
+      detailPonctuel:
+        ponctuelles.length > 0
+          ? ponctuelles
+              .map((a) =>
+                phrasePerimetre(
+                  lirePerimetre(a.perimetre),
+                  a.heureDebut && a.heureFin ? { heure_debut: a.heureDebut, heure_fin: a.heureFin } : null,
+                ),
+              )
+              .join(' · ')
+          : null,
       // `tranchesCouvertes` est l'autorité (B-163a) : on lui retire la nuit,
       // qui ne concerne pas cette piste-ci. Dériver plutôt que recopier — une
       // 7e valeur de périmètre arriverait ici toute seule.

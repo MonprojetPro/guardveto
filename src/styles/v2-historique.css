@@ -186,6 +186,17 @@
 .count-table td.zero { color: var(--soft); font-weight: 500; }
 .count-table td:first-child { text-align: left; padding-left: 18px; }
 .count-table tr.moi td { background: var(--accent-soft); }
+/* B-194 ① — historique des fêtes : des noms, pas des nombres. */
+.fetes-card .fetes-tenants {
+  text-align: left;
+  font-family: var(--font-body); font-weight: 500; font-size: 0.82rem;
+}
+.fetes-tenant { display: block; line-height: 1.6; }
+.fetes-card .count-table th { text-align: left; }
+.fetes-tenant em {
+  margin-left: 6px; font-style: normal;
+  font-size: 0.68rem; font-weight: 600; color: var(--soft);
+}
 .ct-vet {
   display: inline-flex; align-items: center; gap: 8px;
   font-family: var(--font-body); font-size: 0.82rem; font-weight: 600;

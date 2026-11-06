@@ -164,9 +164,17 @@ export function TramesJournee({ trames, blocs, equipe, limiterA, pourMoi }: Prop
         surSoumission()
       }}
     >
+      {/* 🔴 B-194 ② — DES `fieldset`, PLUS DES `label.field`. La règle commune
+          `.field label` (v2-terrier.css : petites capitales grasses espacées,
+          faite pour le TITRE d'un champ) s'appliquait aussi à chaque choix
+          imbriqué — « MATIN », « LUNDI », « TOUTES LES SEMAINES » en gros
+          pavés. « Grossier, ça ne va pas avec l'ensemble » (rdv du 06/11).
+          Un groupe de choix est un fieldset et son titre une légende : la
+          règle partagée ne les atteint plus, et c'est aussi la bonne
+          sémantique (un label ne s'imbrique pas dans un label). */}
       <div className="tj-form-grid">
-        <label className="field">
-          <span className="f-label">Tranche horaire</span>
+        <fieldset className="tj-champ">
+          <legend className="f-label">Tranche horaire</legend>
           {/* ⚠️ JAMAIS de `<select>` natif sur ce projet — règle du design
               system. Des boutons radio : les tranches sont peu nombreuses
               (trois chez le cabinet pilote) et les montrer évite un clic pour
@@ -187,10 +195,10 @@ export function TramesJournee({ trames, blocs, equipe, limiterA, pourMoi }: Prop
               </label>
             ))}
           </span>
-        </label>
+        </fieldset>
 
-        <label className="field">
-          <span className="f-label">{multi ? 'Jours' : 'Jour'}</span>
+        <fieldset className="tj-champ">
+          <legend className="f-label">{multi ? 'Jours' : 'Jour'}</legend>
           {/* B-147 — EN CRÉATION, PLUSIEURS JOURS. Une habitude se décrit
               « lundi, mardi et jeudi », pas en trois saisies identiques. En
               ÉDITION on reste sur un seul : on modifie UNE ligne précise, et
@@ -213,10 +221,10 @@ export function TramesJournee({ trames, blocs, equipe, limiterA, pourMoi }: Prop
               )
             })}
           </span>
-        </label>
+        </fieldset>
 
-        <label className="field">
-          <span className="f-label">Cadence</span>
+        <fieldset className="tj-champ">
+          <legend className="f-label">Cadence</legend>
           <span className="tj-radios">
             {PARITES_TRAME.map((p) => (
               <label key={p} className={`tj-radio${saisie.semaine === p ? ' actif' : ''}`}>
@@ -231,7 +239,7 @@ export function TramesJournee({ trames, blocs, equipe, limiterA, pourMoi }: Prop
               </label>
             ))}
           </span>
-        </label>
+        </fieldset>
       </div>
 
       {/* La convention de parité, dite une fois, à l'endroit où elle se décide.
@@ -267,6 +275,9 @@ export function TramesJournee({ trames, blocs, equipe, limiterA, pourMoi }: Prop
   //    donc le contenu une fois, et on l'enveloppe par un ternaire.
   const contenu = (
     <>
+        {/* Dans une fiche, la fenêtre porte déjà cette phrase en sous-titre :
+            la répéter dessous faisait deux introductions empilées (B-194 ②). */}
+        {!dansUneFiche && (
         <p className="tj-lede">
           {pourMoi
             ? 'Les jours où vous êtes là d’habitude. Vous décrivez votre semaine type une fois ; l’administratrice s’en sert pour remplir les prochains plannings. Un planning déjà prévu ne change pas.'
@@ -274,6 +285,7 @@ export function TramesJournee({ trames, blocs, equipe, limiterA, pourMoi }: Prop
             ? 'Les jours où cette personne est là d’habitude. Vous décrivez la règle une fois ; elle servira à remplir le planning sans tout ressaisir.'
             : 'Pour chacun, les jours où il est là d’habitude. Vous décrivez la règle une fois ; elle servira à remplir le planning sans tout ressaisir.'}
         </p>
+        )}
 
         {/* B-175 (28/10) — l'avis « Enregistrer une règle ne pose aucune
             présence… » est retiré sur demande de MiKL (« inutile, supprime »).

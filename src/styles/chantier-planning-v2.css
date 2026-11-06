@@ -577,13 +577,18 @@
   justify-content: center;
   width: 15px;
   height: 15px;
-  border: 1px solid #e0b98a;
+  /* B-194 ⑤ — PLEINE, plus en creux : le disque blanc liseré de beige se
+     fondait dans la piste crème et sur les barres claires (« ça n'apparaît
+     pas sur le planning »). Même taille, même place : il signale toujours
+     sans masquer, mais il se voit. Le liseré clair le détache d'une barre. */
+  border: 1.5px solid var(--pv2-surface);
   border-radius: 50%;
-  background: var(--pv2-surface);
-  font-size: 9px;
+  background: #c7530f;
+  box-shadow: 0 0 0 1px rgba(154, 90, 24, 0.35);
+  font-size: 8.5px;
   font-weight: 800;
   line-height: 1;
-  color: #9a5a18;
+  color: #fff;
 }
 
 /* ── B-163f — LE DEMI-VOILE D'ABSENCE, SUR LA MOITIE CONCERNEE ───────────────
@@ -1476,19 +1481,26 @@
    `prefers-reduced-motion` l'éteint : un mouvement répétitif est un
    déclencheur reconnu, et l'information doit rester lisible sans lui (la
    bordure rouge pointillée la porte déjà). */
+/* 🔴 B-194 ⑦ — LE « ? » CLIGNOTAIT AU SURVOL (rdv client du 06/11).
+   La pulsation RÉTRÉCISSAIT le bouton (`scale(0.9)`). Souris posée près du
+   bord : le bouton se rétracte sous elle → la souris le quitte → l'animation
+   repart → il regrossit sous la souris → survol → arrêt net… Une boucle,
+   visible comme un clignotement, et un clic qui pouvait tomber à côté.
+   La pulsation passe donc par un HALO (box-shadow) qui ne change ni la taille
+   ni la zone cliquable, et le passage au survol est adouci. */
 @keyframes pv2-trou-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.55; transform: scale(0.9); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(168, 52, 31, 0.35); }
+  50% { box-shadow: 0 0 0 4px rgba(168, 52, 31, 0); }
 }
 
 .pv2-trou {
   animation: pv2-trou-pulse 1.6s ease-in-out infinite;
   cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 .pv2-trou:hover,
 .pv2-trou:focus-visible {
   animation: none;
-  opacity: 1;
   background: var(--pv2-bad, #a8341f);
   color: #fff;
 }

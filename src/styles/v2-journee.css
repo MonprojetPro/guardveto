@@ -361,22 +361,30 @@
 
 .tj-radios { display: flex; flex-wrap: wrap; gap: 6px; }
 
+/* B-194 ② — le groupe de choix : sans cadre ni marge de fieldset natif. */
+.tj-champ { border: 0; margin: 0; padding: 0; min-width: 0; }
+.tj-champ > legend { padding: 0; display: block; }
+
 .tj-radio {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
-  border: 1px solid var(--border-strong);
+  padding: 5px 13px;
+  border: 1px solid var(--t-border, var(--border-strong));
   border-radius: 999px;
   background: var(--surface);
   color: var(--text);
   font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
+.tj-radio:hover { border-color: var(--border-strong); }
 
 .tj-radio.actif {
   border-color: var(--accent-ink);
-  box-shadow: inset 0 0 0 1px var(--accent-ink);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
   font-weight: 600;
 }
 

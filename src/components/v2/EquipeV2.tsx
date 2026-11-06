@@ -1088,7 +1088,7 @@ export function EquipeV2({
               <div className="vet-actions">
                 {gardesActives && (
                   <button type="button" onClick={() => setFicheContraintes(v)}>
-                    Ses contraintes
+                    Règles garde
                     <span className="va-nb">{nb}</span>
                   </button>
                 )}
@@ -1098,7 +1098,7 @@ export function EquipeV2({
                     refuse de toute façon. */}
                 {journeeActive && (
                   <button type="button" onClick={() => setFichePresences(v)}>
-                    Ses présences
+                    Règles journées
                     <span className="va-nb">
                       {tramesJournee.filter((t) => t.veterinaire_id === v.id && t.actif).length}
                     </span>

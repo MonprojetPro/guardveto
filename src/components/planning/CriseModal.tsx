@@ -562,6 +562,16 @@ export function CriseModal({
       setRefus(null)
       setResultat(data)
 
+      // 🔴 B-194 ④ — L'ABSENCE EST EN BASE : TOUS LES ÉCRANS DOIVENT LA VOIR,
+      //    TOUT DE SUITE. Rdv client du 06/11 : Jean absent de 14h à 16h,
+      //    « ça n'est pas apparu tout de suite ». Seule la RÉPARATION appelait
+      //    `router.refresh()` ; une absence qui ne touche aucune garde (le cas
+      //    du ponctuel) ne passe jamais par là, et aucun des trois écrans qui
+      //    ouvrent cette fenêtre ne rafraîchit à la fermeture. Elle n'est
+      //    apparue qu'à la 2e absence (journée), qui, elle, touchait une garde.
+      //    Le rafraîchissement suit donc l'ÉCRITURE, pas le chemin suivi après.
+      router.refresh()
+
       // Pré-remplir les décisions avec la meilleure proposition (Mode 1).
       const initial: Record<string, DecisionUI> = {}
       for (const c of data.creneauxImpactes) {

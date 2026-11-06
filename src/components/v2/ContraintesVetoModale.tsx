@@ -145,7 +145,7 @@ export function ContraintesVetoModale({
               <span className="cv-avatar" style={stylePastille(veto.couleur)} aria-hidden="true">
                 {veto.prenom.charAt(0).toUpperCase()}
               </span>
-              Les contraintes de {veto.prenom}
+              Règles de garde de {veto.prenom}
             </DialogTitle>
           </DialogHeader>
 

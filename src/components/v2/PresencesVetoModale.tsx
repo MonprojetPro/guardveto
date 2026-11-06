@@ -49,10 +49,10 @@ export function PresencesVetoModale({ open, onOpenChange, veto, trames, blocs }:
       <DialogContent className="sm:max-w-[760px] max-h-[86vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            Les présences de {veto.prenom} {veto.nom}
+            Règles de journée de {veto.prenom} {veto.nom}
           </DialogTitle>
           <DialogDescription>
-            Ses journées au cabinet, telles qu’elles reviennent chaque semaine.
+            Les jours où cette personne est là d’habitude. Décrits une fois, ils servent à remplir le planning sans tout ressaisir.
           </DialogDescription>
         </DialogHeader>
 

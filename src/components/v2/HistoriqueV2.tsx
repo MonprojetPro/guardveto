@@ -701,8 +701,8 @@ export function HistoriqueV2({
           carte — le cadre d'accueil ne sert qu'aux composants restés V1. */}
       {gardesActives && slotBilan && <div className="hist-greffe rise">{slotBilan}</div>}
 
-      {/* ── Historique des fêtes (composant V1 greffé) ───────────────── */}
-      {gardesActives && slotFetes && <div className="hist-greffe v2-greffe rise">{slotFetes}</div>}
+      {/* ── Historique des fêtes (carte V2 depuis B-194) ─────────────── */}
+      {gardesActives && slotFetes && <div className="hist-greffe rise">{slotFetes}</div>}
 
       {/* L'encart « Périodes planifiées » vivait ici. Il faisait doublon avec
           le menu de la barre de filtres (choisir une période) et portait des
