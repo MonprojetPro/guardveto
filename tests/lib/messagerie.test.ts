@@ -271,7 +271,7 @@ describe('③ la migration porte les protections déjà payées', () => {
   })
 
   it('une pièce jointe ne peut désigner qu’un fichier de SA conversation (contrôle en base)', () => {
-    expect(SQL_CODE).toContain("v_cab::text || '/' || NEW.conversation_id::text || '/%'")
+    expect(SQL_CODE).toContain("COALESCE(p->>'chemin', '') LIKE v_cab::text || '/' || NEW.conversation_id::text || '/%'")
   })
 
   it('un message retiré ne reste pas lisible dans la cloche', () => {

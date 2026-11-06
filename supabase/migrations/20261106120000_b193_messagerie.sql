@@ -235,8 +235,9 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM jsonb_array_elements(COALESCE(NEW.pieces_jointes, '[]'::jsonb)) p
     WHERE jsonb_typeof(p) <> 'object'
-       OR NOT (p->>'chemin' LIKE v_cab::text || '/' || NEW.conversation_id::text || '/%')
-       OR (p->>'chemin') LIKE '%..%'
+       -- COALESCE : une piece SANS chemin donnerait NULL, et NULL laisse passer.
+       OR NOT (COALESCE(p->>'chemin', '') LIKE v_cab::text || '/' || NEW.conversation_id::text || '/%')
+       OR COALESCE(p->>'chemin', '') LIKE '%..%'
   ) THEN
     RAISE EXCEPTION 'Une pièce jointe ne correspond pas à cette conversation.' USING ERRCODE = '22023';
   END IF;
