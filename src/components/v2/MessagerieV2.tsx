@@ -352,7 +352,7 @@ export function MessagerieV2({
   const nomsParUser = useMemo(() => new Map(annuaire.map((m) => [m.userId, m.nom])), [annuaire])
 
   return (
-    <div className={`msg rise${voirFil ? ' voir-fil' : ''}`}>
+    <div className={`messagerie rise${voirFil ? ' voir-fil' : ''}`}>
       <aside className="msg-liste" aria-label="Conversations">
         <div className="msg-liste-tete">
           <h1>Messagerie</h1>

@@ -3,14 +3,17 @@
    ============================================================
    Complète `v2-terrier.css`. Aucun jeton de couleur réinventé.
 
-   ⚠️ Tout est préfixé `.msg` et chaque bouton pose SES propriétés : une règle
+   ⚠️ La racine est `.messagerie`, PAS `.msg` : `.msg` est déjà la rangée d'une bulle
+      de Filou (v2-terrier.css, align-items: flex-end) et collait tout l'écran
+      en bas de la page (capture de MiKL, 06/11). Un test l'interdit désormais.
+   ⚠️ Chaque bouton pose SES propriétés : une règle
       partagée qui redessine des boutons a déjà coûté trois recettes
       (« une feuille partagée redessine mes boutons », 16/10).
    Sobriété (DESIGN.md) : peu de texte, une icône seulement quand son sens
    ne se discute pas, rayon selon la densité.
    ============================================================ */
 
-.msg {
+.messagerie {
   display: grid;
   grid-template-columns: minmax(250px, 320px) 1fr;
   gap: 14px;
@@ -40,7 +43,7 @@
   font-family: var(--font-display);
   font-size: 1.15rem; font-weight: 700; margin: 0;
 }
-.msg .msg-nouveau {
+.messagerie .msg-nouveau {
   width: 34px; height: 34px;
   display: inline-flex; align-items: center; justify-content: center;
   border-radius: 50%;
@@ -50,12 +53,12 @@
   cursor: pointer;
   padding: 0;
 }
-.msg .msg-nouveau:hover:not(:disabled) { border-color: var(--t-accent); }
-.msg .msg-nouveau:disabled { opacity: 0.45; cursor: default; }
-.msg .msg-nouveau svg { width: 18px; height: 18px; }
+.messagerie .msg-nouveau:hover:not(:disabled) { border-color: var(--t-accent); }
+.messagerie .msg-nouveau:disabled { opacity: 0.45; cursor: default; }
+.messagerie .msg-nouveau svg { width: 18px; height: 18px; }
 
 .msg-convs { list-style: none; margin: 0; padding: 6px; overflow-y: auto; flex: 1; }
-.msg .msg-conv {
+.messagerie .msg-conv {
   width: 100%;
   display: flex; align-items: center; gap: 11px;
   padding: 9px 10px;
@@ -65,8 +68,8 @@
   cursor: pointer;
   font: inherit;
 }
-.msg .msg-conv:hover { background: var(--surface-2); }
-.msg .msg-conv.ici { background: var(--accent-soft); }
+.messagerie .msg-conv:hover { background: var(--surface-2); }
+.messagerie .msg-conv.ici { background: var(--accent-soft); }
 .msg-conv-texte { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .msg-conv-ligne { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .msg-conv-nom {
@@ -78,8 +81,8 @@
   font-size: 0.8rem; color: var(--t-muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
 }
-.msg .msg-conv.non-lu .msg-conv-nom,
-.msg .msg-conv.non-lu .msg-conv-apercu { color: var(--text); font-weight: 700; }
+.messagerie .msg-conv.non-lu .msg-conv-nom,
+.messagerie .msg-conv.non-lu .msg-conv-apercu { color: var(--text); font-weight: 700; }
 .msg-pastille {
   flex: none;
   min-width: 19px; height: 19px; padding: 0 5px;
@@ -119,7 +122,7 @@
 .msg-fil-titre { min-width: 0; }
 .msg-fil-titre h2 { font-size: 0.98rem; font-weight: 700; margin: 0; }
 .msg-fil-titre p { font-size: 0.74rem; color: var(--t-muted); margin: 1px 0 0; }
-.msg .msg-retour {
+.messagerie .msg-retour {
   display: none;
   width: 32px; height: 32px; padding: 0;
   border: 0; border-radius: 50%;
@@ -127,7 +130,7 @@
   align-items: center; justify-content: center;
   cursor: pointer;
 }
-.msg .msg-retour svg { width: 20px; height: 20px; }
+.messagerie .msg-retour svg { width: 20px; height: 20px; }
 
 .msg-messages {
   flex: 1; min-height: 0;
@@ -142,7 +145,7 @@
 }
 .msg-vide { display: flex; align-items: center; justify-content: center; height: 100%; }
 
-.msg .msg-plus-anciens {
+.messagerie .msg-plus-anciens {
   align-self: center;
   margin: 0 0 10px;
   padding: 5px 14px;
@@ -204,27 +207,27 @@
 .msg-ligne:hover .msg-gestes,
 .msg-ligne:focus-within .msg-gestes { opacity: 1; }
 @media (hover: none) { .msg-gestes { opacity: 1; } }
-.msg .msg-gestes button {
+.messagerie .msg-gestes button {
   width: 26px; height: 26px; padding: 0;
   display: inline-flex; align-items: center; justify-content: center;
   border: 0; border-radius: 50%;
   background: transparent; color: var(--t-muted);
   cursor: pointer;
 }
-.msg .msg-gestes button:hover { background: var(--surface); color: var(--text); }
-.msg .msg-gestes svg { width: 14px; height: 14px; }
+.messagerie .msg-gestes button:hover { background: var(--surface); color: var(--text); }
+.messagerie .msg-gestes svg { width: 14px; height: 14px; }
 
 .msg-echec { font-size: 0.74rem; color: var(--danger); align-self: center; }
-.msg .msg-lien {
+.messagerie .msg-lien {
   border: 0; background: none; padding: 0;
   color: var(--accent-ink);
   font: inherit; font-size: inherit;
   text-decoration: underline; cursor: pointer;
   display: inline-flex; align-items: center; gap: 3px;
 }
-.msg .msg-lien.fort { font-weight: 700; }
-.msg .msg-lien:disabled { opacity: 0.5; cursor: default; }
-.msg .msg-lien svg { width: 12px; height: 12px; }
+.messagerie .msg-lien.fort { font-weight: 700; }
+.messagerie .msg-lien:disabled { opacity: 0.5; cursor: default; }
+.messagerie .msg-lien svg { width: 12px; height: 12px; }
 
 .msg-lu {
   display: flex; justify-content: flex-end; align-items: center; gap: 4px;
@@ -287,20 +290,20 @@
   background: var(--bg); color: var(--text);
 }
 .msg-saisie textarea:focus { outline: 2px solid var(--t-accent); outline-offset: 1px; }
-.msg .msg-joindre,
-.msg .msg-envoyer {
+.messagerie .msg-joindre,
+.messagerie .msg-envoyer {
   flex: none;
   width: 38px; height: 38px; padding: 0;
   display: inline-flex; align-items: center; justify-content: center;
   border-radius: 50%;
   cursor: pointer;
 }
-.msg .msg-joindre { border: 1px solid var(--t-border); background: var(--surface-2); color: var(--accent-ink); }
-.msg .msg-envoyer { border: 0; background: var(--t-accent); color: #fff; }
-.msg .msg-joindre:disabled,
-.msg .msg-envoyer:disabled { opacity: 0.4; cursor: default; }
-.msg .msg-joindre svg,
-.msg .msg-envoyer svg { width: 18px; height: 18px; }
+.messagerie .msg-joindre { border: 1px solid var(--t-border); background: var(--surface-2); color: var(--accent-ink); }
+.messagerie .msg-envoyer { border: 0; background: var(--t-accent); color: #fff; }
+.messagerie .msg-joindre:disabled,
+.messagerie .msg-envoyer:disabled { opacity: 0.4; cursor: default; }
+.messagerie .msg-joindre svg,
+.messagerie .msg-envoyer svg { width: 18px; height: 18px; }
 .msg-joints { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .msg-joints li {
   display: inline-flex; align-items: center; gap: 5px;
@@ -312,7 +315,7 @@
 .msg-joints li svg { width: 13px; height: 13px; color: var(--accent-ink); }
 .msg-joints li span { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .msg-joints li em { font-style: normal; color: var(--t-muted); }
-.msg .msg-joints button {
+.messagerie .msg-joints button {
   width: 20px; height: 20px; padding: 0;
   border: 0; border-radius: 50%; background: transparent; color: var(--t-muted);
   display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
@@ -354,14 +357,14 @@
 
 /* ── Téléphone : la liste OU le fil ────────────────────────────── */
 @media (max-width: 760px) {
-  .msg {
+  .messagerie {
     grid-template-columns: 1fr;
     height: calc(100dvh - var(--nav-h) - 40px);
     margin: 8px 0 12px;
   }
-  .msg .msg-fil { display: none; }
-  .msg.voir-fil .msg-liste { display: none; }
-  .msg.voir-fil .msg-fil { display: flex; }
-  .msg .msg-retour { display: inline-flex; }
+  .messagerie .msg-fil { display: none; }
+  .messagerie.voir-fil .msg-liste { display: none; }
+  .messagerie.voir-fil .msg-fil { display: flex; }
+  .messagerie .msg-retour { display: inline-flex; }
   .msg-bulle { max-width: 86%; }
 }

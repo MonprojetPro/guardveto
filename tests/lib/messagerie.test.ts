@@ -17,7 +17,7 @@
 // ============================================================
 
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   LONGUEUR_MESSAGE_MAX,
@@ -305,5 +305,29 @@ describe('③ les actions serveur', () => {
   it('n’écrit aucune notification elle-même (le trigger le fait)', () => {
     expect(ACTIONS).not.toMatch(/from\('notifications'\)/)
     expect(ACTIONS).not.toMatch(/creerNotification/)
+  })
+})
+
+describe('④ le style de l’écran ne se fait pas redessiner par une autre feuille', () => {
+  // 06/11 : la racine s'appelait `.msg`, nom déjà pris par la rangée d'une bulle
+  // de Filou (`align-items: flex-end`) → tout l'écran tombait en bas de la page.
+  const DOSSIER = join(RACINE, 'src/styles')
+  // Les commentaires retirés : on juge les RÈGLES, pas le texte qui en parle.
+  const sansCommentaires = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '')
+  const MIENNE = sansCommentaires(readFileSync(join(DOSSIER, 'v2-messagerie.css'), 'utf8'))
+  const AUTRES = readdirSync(DOSSIER)
+    .filter((f) => f.endsWith('.css') && f !== 'v2-messagerie.css')
+    .map((f) => ({ f, css: sansCommentaires(readFileSync(join(DOSSIER, f), 'utf8')) }))
+  const classes = [...new Set([...MIENNE.matchAll(/\.((?:messagerie|msg)[\w-]*)/g)].map((m) => m[1]))]
+  const echapper = (s: string) => s.replace(/[.*+?^${}()|[\]\\-]/g, (x) => '\\' + x)
+
+  it('la racine de l’écran est `.messagerie`', () => {
+    expect(readFileSync(join(RACINE, 'src/components/v2/MessagerieV2.tsx'), 'utf8')).toContain('className={`messagerie rise')
+  })
+
+  it.each(classes)('la classe .%s n’est définie par aucune autre feuille', (c) => {
+    const motif = new RegExp('\\.' + echapper(c) + '(?![\\w-])')
+    const coupables = AUTRES.filter(({ css }) => motif.test(css)).map(({ f }) => f)
+    expect(coupables, `.${c} est aussi stylée ailleurs`).toEqual([])
   })
 })
