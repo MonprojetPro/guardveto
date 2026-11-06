@@ -21,7 +21,9 @@ const nextConfig: NextConfig = {
       { source: '/admin/demandes', destination: '/absences', permanent: false },
       { source: '/admin/depannages', destination: '/absences?onglet=depannages', permanent: false },
       { source: '/compteurs', destination: '/historique', permanent: false },
-      { source: '/notifications', destination: '/reglages/notifications', permanent: false },
+      // `/notifications` n'est PLUS redirigé (B-191, 06/11) : c'est une vraie
+      // page (« Toutes mes notifications »). Une redirection passe AVANT les
+      // pages — celle-ci masquait la nouvelle et envoyait aux réglages d'e-mail.
       { source: '/admin/journal-emails', destination: '/reglages', permanent: false },
       { source: '/admin/banc-ia', destination: '/accueil', permanent: false },
     ]
