@@ -82,6 +82,12 @@ export interface DonneesDock {
    * qui fait autorité, exactement comme `estSecretaire` ne protège rien.
    */
   modules: string[]
+  /**
+   * B-193 — les messages non lus de la personne connectée (pastille du
+   * dock). Absent si la messagerie est éteinte ou illisible : la pastille
+   * se recompte ensuite seule, en temps réel.
+   */
+  nbMessagesNonLus?: number
 }
 
 export interface SouhaitEnAttente {

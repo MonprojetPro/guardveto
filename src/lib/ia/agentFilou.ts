@@ -358,6 +358,26 @@ L'administratrice a éteint le planning des gardes du soir et du week-end : ce c
   }
 }
 
+/**
+ * B-193 — la messagerie de l'équipe. Filou n'y lit rien et n'y écrit rien
+ * (les conversations privées ne regardent que leurs deux membres), mais il
+ * doit savoir qu'elle EXISTE : sans cette phrase, à « comment je préviens
+ * toute l'équipe ? » il répondrait qu'il n'y a pas de moyen dans GuardVeto —
+ * une réponse devenue fausse le jour où l'écran est apparu (règle FILOU SUIT
+ * LE PRODUIT). Rien n'est dit quand le module est éteint.
+ */
+export async function blocMessagerie(ctx: Pick<ContexteOutil, 'supabase'>): Promise<string | null> {
+  try {
+    const modules = await modulesDuCabinet(ctx.supabase)
+    if (!modules.includes('chat')) return null
+    return `LA MESSAGERIE DU CABINET
+
+Le cabinet a une Messagerie (l'écran « Messagerie » de la barre) : un fil pour toute l'équipe, secrétariat compris, et des conversations privées à deux. Tu ne lis pas les messages et tu n'en envoies pas : un message part sous le nom de la personne, c'est elle qui l'écrit. Si on te demande de prévenir l'équipe ou d'écrire à quelqu'un, envoie-la sur la Messagerie — ne dis jamais qu'il n'existe aucun moyen de le faire dans GuardVeto.`
+  } catch {
+    return null
+  }
+}
+
 export async function faireTravaillerFilou(
   phrase: string,
   outils: Outil[],
@@ -367,7 +387,7 @@ export async function faireTravaillerFilou(
 ): Promise<IssueFilou> {
   const client = new Anthropic({ apiKey: cleIA() })
   const identite = blocIdentite(ctx)
-  const plannings = await blocPlannings(ctx)
+  const [plannings, messagerie] = await Promise.all([blocPlannings(ctx), blocMessagerie(ctx)])
   const parNom = new Map(outils.map((o) => [o.nom, o]))
   const definitions = outils.map(versDefinitionApi)
   const outilsAppeles: string[] = []
@@ -410,6 +430,7 @@ export async function faireTravaillerFilou(
           // Placer l'identité en tête le ferait manquer à chaque conversation.
           { type: 'text', text: identite },
           ...(plannings ? [{ type: 'text' as const, text: plannings }] : []),
+          ...(messagerie ? [{ type: 'text' as const, text: messagerie }] : []),
         ],
         tools: definitions,
         messages,

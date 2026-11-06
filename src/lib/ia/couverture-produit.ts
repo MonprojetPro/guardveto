@@ -348,6 +348,30 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   'v2/cloche-actions#viderCloche': {
     hors: '« Vider » la cloche : retire toutes SES notifications de la cloche. Geste d’écran, propre à chacun, sans effet sur le planning.',
   },
+  // B-193 (06/11) — la messagerie de l'équipe. Filou ne LIT aucun message : les
+  // conversations privées ne sont lisibles que par leurs deux membres, et un
+  // assistant qui les lirait « pour aider » romprait cette promesse.
+  // ⚠️ La question qui DEVIENT fausse : « comment je préviens toute l'équipe ? »
+  // — jusqu'ici, rien dans GuardVeto ; désormais la Messagerie. Réglé par
+  // `blocMessagerie` (agentFilou.ts) : quand le module est allumé, Filou sait
+  // qu'elle existe et y renvoie.
+  'v2/messagerie#envoyerMessage': {
+    hors:
+      'Un message part sous le nom de la personne : c’est elle qui l’écrit. Filou sait que la Messagerie ' +
+      'existe (blocMessagerie) et y renvoie quand on lui demande de prévenir l’équipe.',
+  },
+  'v2/messagerie#lireConversations': {
+    hors: 'Affiche SES conversations dans l’écran Messagerie. Filou ne lit pas les messages : les conversations privées ne regardent que leurs deux membres.',
+  },
+  'v2/messagerie#ouvrirConversationPrivee': {
+    hors: 'Ouvre une conversation privée avec quelqu’un du cabinet. Geste personnel, fait par la personne elle-même.',
+  },
+  'v2/messagerie#modifierMessage': { hors: 'Corriger SON propre message. Geste personnel, jamais à la place de quelqu’un.' },
+  'v2/messagerie#retirerMessage': {
+    hors: 'Retirer un message (le sien, ou n’importe lequel pour l’administratrice). Geste de modération, laissé à la personne.',
+  },
+  'v2/messagerie#marquerConversationLue': { hors: 'Marque une conversation comme lue en l’ouvrant. Geste d’écran, propre à chacun.' },
+  'v2/messagerie#nombreMessagesNonLus': { hors: 'Le chiffre des non-lus dans la barre. Affichage, sans effet sur rien.' },
   // B-173 — « Mon agenda » : le réglage de SON agenda Google personnel. Hors
   // de Filou parce que ce sont des préférences d'affichage propres à chacun,
   // qui ne changent rien au planning ; et parce qu'un assistant qui partage ou

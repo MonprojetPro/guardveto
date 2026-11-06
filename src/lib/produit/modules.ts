@@ -60,7 +60,7 @@ export const MODULES: Record<string, Module> = {
   chat: {
     nom: 'Messagerie de l’equipe',
     description:
-      'Le fil de discussion entre veterinaires, et les annonces de l’administratrice.',
+      'Le fil de toute l’equipe et les conversations privees, secretariat compris.',
     eteignable: true,
   },
 }
@@ -74,7 +74,9 @@ export const MODULES: Record<string, Module> = {
  *    liste, en dur (migration 20261027120000). C'est elle qui fait autorité ;
  *    celle-ci ne sert qu'à afficher. Les deux doivent bouger ensemble.
  *    `gardes` y est depuis B-175a (28/10, un cabinet « journées seules »).
- *    `chat` non (aucun écran n'existe : l'allumer ouvrirait sur rien).
+ *    `chat` non, pas encore : son écran existe depuis B-193 (06/11), mais le
+ *    lot 1 ne l'allume que sur le bac à sable, par nous. L'interrupteur de
+ *    l'admin vient avec l'allumage chez le premier client (lot 3).
  *    Il faut toujours en garder UN allumé : la base le refuse sinon.
  */
 export const MODULES_REGLABLES_PAR_ADMIN = ['gardes', 'planning-journee'] as const
@@ -140,6 +142,9 @@ export const APPARTENANCE: Record<string, Appartenance> = {
   // `ecranVisible` et `exigerModule` n'avaient que des écrans du socle ou des
   // gardes à traiter, donc rien à éteindre pour de vrai.
   journee: { module: 'planning-journee' },
+
+  // ── Le module de la messagerie (B-193) ──────────────────────────────────
+  messagerie: { module: 'chat' },
 
   // ── Le module des gardes ────────────────────────────────────────────────
   // B-175a — la grille porte les gardes ET les journées (B-148/B-172) : un

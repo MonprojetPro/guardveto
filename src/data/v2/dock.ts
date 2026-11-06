@@ -77,6 +77,15 @@ export async function chargerDock(
     periodes[0] ??
     null
 
+  // B-193 — la messagerie n'est comptée que si elle est allumée. Une erreur
+  // donne « pas de chiffre », jamais « zéro » : la pastille se recompte seule.
+  let nbMessagesNonLus: number | undefined
+  if ((modules as string[]).includes('chat')) {
+    const { data, error } = await supabase.rpc('messagerie_non_lus_total')
+    if (error) console.error('[Dock] Messages non lus illisibles :', error.message)
+    else if (typeof data === 'number') nbMessagesNonLus = data
+  }
+
   const calendarId = (cabinetRes as { data?: { google_calendar_id?: string | null } | null })?.data
     ?.google_calendar_id
 
@@ -91,5 +100,6 @@ export async function chargerDock(
       : 'Aucune période',
     statutPlanning: courante?.statut ?? null,
     modules,
+    nbMessagesNonLus,
   }
 }
