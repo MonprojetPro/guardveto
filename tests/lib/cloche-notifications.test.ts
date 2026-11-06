@@ -31,7 +31,9 @@ describe('lienInterne — on ne suit que les adresses de GuardVeto', () => {
     }
   })
   it('la cloche passe par ce filtre avant de naviguer', () => {
-    const cloche = readFileSync(join(process.cwd(), 'src/components/v2/ClocheV2.tsx'), 'utf8')
+    // B-191 : la liste (et son clic) vit dans `ListeNotificationsV2`, partagée
+    // par la cloche et par l'écran « Toutes mes notifications ».
+    const cloche = readFileSync(join(process.cwd(), 'src/components/v2/ListeNotificationsV2.tsx'), 'utf8')
     expect(cloche).toContain('const lien = lienInterne(n.lien)')
     expect(cloche).not.toContain('router.push(n.lien)')
   })
@@ -51,6 +53,10 @@ describe('tempsRelatif', () => {
 describe('la cloche est branchée', () => {
   const barre = lire('src/components/v2/BarreV2.tsx')
   const cloche = lire('src/components/v2/ClocheV2.tsx')
+  // B-191 : la logique (temps réel, gestes) et la liste ont quitté la cloche
+  // pour être partagées avec l'écran « Toutes mes notifications ».
+  const logique = lire('src/components/v2/useNotifications.ts')
+  const liste = lire('src/components/v2/ListeNotificationsV2.tsx')
   const actions = lire('src/app/(v2)/cloche-actions.ts')
 
   it('la barre la pose pour admin et véto, jamais pour le secrétariat', () => {
@@ -60,13 +66,16 @@ describe('la cloche est branchée', () => {
   })
 
   it('écoute la table en direct ET lit le statut de l’abonnement', () => {
-    expect(cloche).toContain("table: 'notifications'")
-    expect(cloche).toContain('abonnerEnSignalantLesEchecs(canal')
+    expect(logique).toContain("table: 'notifications'")
+    expect(logique).toContain('abonnerEnSignalantLesEchecs(canal')
+    // La cloche ET la page passent par ce mécanisme, chacune sous son canal.
+    expect(cloche).toContain("useNotifications('cloche-v2')")
+    expect(lire('src/components/v2/ToutesNotificationsV2.tsx')).toContain("useNotifications('notifications-page')")
   })
 
   it('n’affiche jamais « aucune notification » quand la lecture a échoué', () => {
     expect(actions).toMatch(/if \(liste\.error \|\| compte\.error\)/)
-    expect(cloche).toContain('etat.erreur ?')
+    expect(liste).toContain('etat.erreur ?')
   })
 
   it('un « lu » refusé par la base (zéro ligne) n’est pas pris pour un succès', () => {
@@ -85,5 +94,39 @@ describe('la cloche est branchée', () => {
 
   it('la feuille est importée par le composant lui-même', () => {
     expect(cloche).toContain("import '@/styles/v2-cloche.css'")
+  })
+})
+
+describe('B-191 — vider la cloche', () => {
+  const actions = lire('src/app/(v2)/cloche-actions.ts')
+  const liste = lire('src/components/v2/ListeNotificationsV2.tsx')
+
+  it('vider et la croix RETIRENT (retiree_le), elles n’effacent jamais', () => {
+    // Deux anti-doublons d'alerte lisent la table : effacer relancerait l'alerte.
+    expect(actions).not.toMatch(/\.delete\(/)
+    expect(actions).toContain("export async function viderCloche()")
+    expect(actions).toContain("export async function retirerNotification(id: string)")
+    expect(actions.match(/\.update\(\{ retiree_le: new Date\(\)\.toISOString\(\) \}\)/g)?.length).toBe(2)
+  })
+
+  it('une notification retirée ne revient ni dans la liste ni dans le compteur', () => {
+    expect(actions.match(/\.is\('retiree_le', null\)/g)?.length ?? 0).toBeGreaterThanOrEqual(3)
+  })
+
+  it('une croix refusée par la base (zéro ligne) n’est pas prise pour un succès', () => {
+    const corps = actions.slice(actions.indexOf('export async function retirerNotification'))
+    expect(corps.slice(0, corps.indexOf('\n}'))).toMatch(
+      /\.select\('id'\)\s+return !error && \(data\?\.length \?\? 0\) > 0/,
+    )
+  })
+
+  it('« Vider » demande confirmation avant de partir', () => {
+    expect(liste).toContain('setConfirmer(true)')
+    expect(liste).toMatch(/setConfirmer\(false\); void vider\(\)/)
+  })
+
+  it('la cloche mène à l’historique complet', () => {
+    expect(lire('src/components/v2/ClocheV2.tsx')).toContain('href="/notifications"')
+    expect(lire('src/app/(v2)/notifications/page.tsx')).toContain("redirect('/accueil')")
   })
 })

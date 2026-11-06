@@ -338,6 +338,16 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   'v2/cloche-actions#marquerToutesNotificationsLues': {
     hors: '« Tout marquer comme lu » dans la cloche. Geste d’écran, propre à chacun.',
   },
+  // B-191 (06/11) — vider la cloche / retirer une notification. Même famille :
+  // un rangement personnel de SA cloche. ⚠️ Question qui ne devient pas fausse :
+  // Filou ne lit aucune notification, une notification retirée ne change donc
+  // rien à ce qu'il répond.
+  'v2/cloche-actions#retirerNotification': {
+    hors: 'La croix d’une notification : la retire de SA cloche. Geste d’écran, propre à chacun, sans effet sur le planning.',
+  },
+  'v2/cloche-actions#viderCloche': {
+    hors: '« Vider » la cloche : retire toutes SES notifications de la cloche. Geste d’écran, propre à chacun, sans effet sur le planning.',
+  },
   // B-173 — « Mon agenda » : le réglage de SON agenda Google personnel. Hors
   // de Filou parce que ce sont des préférences d'affichage propres à chacun,
   // qui ne changent rien au planning ; et parce qu'un assistant qui partage ou

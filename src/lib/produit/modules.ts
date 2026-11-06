@@ -118,6 +118,12 @@ export const APPARTENANCE: Record<string, Appartenance> = {
       '(agenda_perso_ouvert), pas par module : il porte les gardes ET les journees, ' +
       'et n’envoie simplement rien de ce qu’un module eteint ne produit pas.',
   },
+  // B-191 — « Voir toutes » de la cloche.
+  notifications: {
+    socle:
+      'L’historique de SES notifications (cloche). Elles existent quels que ' +
+      'soient les modules allumes — un module eteint n’en produit simplement pas.',
+  },
   'reglages/notifications': {
     socle:
       'Chacun regle les e-mails qu’il recoit. Les e-mails existent quels que ' +

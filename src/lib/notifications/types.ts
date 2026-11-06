@@ -17,6 +17,8 @@ export interface EtatCloche {
   nbNonLues: number
   /** La lecture a échoué : ne pas afficher « aucune notification ». */
   erreur: boolean
+  /** Il reste des notifications plus anciennes à charger (B-191). */
+  aSuite?: boolean
 }
 
 /** « à l'instant », « il y a 5 min », « il y a 3 h », « il y a 2 j », puis la date. */

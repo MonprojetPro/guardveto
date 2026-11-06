@@ -51,11 +51,23 @@
   border-bottom: 1px dashed var(--t-border);
 }
 .cl-titre { font-family: var(--font-display); font-size: 0.95rem; font-weight: 800; color: var(--text); }
-.cl-tout-lire {
-  border: 0; background: none; padding: 6px 4px;
-  font-size: 0.8125rem; font-weight: 700; color: var(--accent-ink);
+/* B-191 — les gestes de tête : « Tout marquer comme lu », « Vider », et la
+   confirmation qui prend leur place. */
+.cl-actions, .cl-confirme { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.cl-confirme-txt { font-size: 0.8125rem; font-weight: 600; color: var(--text); margin-right: 2px; }
+.cl-action {
+  border: 0; background: none; padding: 6px 6px;
+  font: inherit; font-size: 0.8125rem; font-weight: 700; color: var(--accent-ink);
+  text-decoration: none; cursor: pointer; border-radius: 8px;
 }
-.cl-tout-lire:hover { text-decoration: underline; }
+.cl-action:hover { text-decoration: underline; }
+.cl-action:disabled { opacity: 0.5; cursor: progress; }
+.cl-action.danger { color: var(--danger); }
+.cl-pied {
+  display: flex; justify-content: center;
+  padding: 8px 14px;
+  border-top: 1px dashed var(--t-border);
+}
 .cl-vide { padding: 22px 16px; font-size: 0.875rem; color: var(--t-muted); text-align: center; }
 
 .cl-liste { list-style: none; margin: 0; padding: 0; max-height: min(60vh, 460px); overflow-y: auto; }
@@ -67,6 +79,29 @@
   font: inherit; color: inherit;
 }
 .cl-liste li:last-child .cl-item { border-bottom: 0; }
+/* B-191 — la croix d'une notification : sœur du bouton (un bouton ne se
+   niche pas dans un bouton), posée en haut à droite, sous la date. */
+.cl-li { position: relative; }
+.cl-li .cl-item { padding-right: 38px; }
+.cl-retirer {
+  position: absolute; right: 8px; bottom: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0;
+  border: 0; border-radius: 50%; background: transparent;
+  color: var(--soft); cursor: pointer;
+  opacity: 0; transition: opacity 0.15s var(--ease-out), background-color 0.15s var(--ease-out);
+}
+.cl-retirer svg { width: 14px; height: 14px; }
+.cl-li:hover .cl-retirer, .cl-retirer:focus-visible { opacity: 1; }
+.cl-retirer:hover { background: var(--surface-2); color: var(--text); }
+/* Au doigt, pas de survol : la croix reste visible. */
+@media (hover: none) { .cl-retirer { opacity: 1; } }
+
+/* L'écran « Toutes mes notifications » : la liste ne défile plus dans une
+   boîte, et le message se lit en entier. */
+.cl-page { padding: 0; overflow: hidden; }
+.cl-liste.pleine { max-height: none; overflow: visible; }
+.cl-message.entier { display: block; -webkit-line-clamp: unset; overflow: visible; }
 .cl-item:hover { background: var(--surface-2); }
 .cl-item.non-lu { background: var(--accent-soft); }
 .cl-point { flex: none; width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: transparent; }
@@ -87,7 +122,8 @@
   .v2 .app-bar > .ab-cloche { order: 2; margin-left: auto; }
   .v2 .app-bar > .ab-cloche + form { margin-left: 0; }
   .cl-bouton { width: 44px; height: 44px; }
-  .cl-tout-lire { min-height: 40px; }
+  .cl-action { min-height: 40px; }
+  .cl-retirer { width: 36px; height: 36px; }
   .cl-panneau { position: fixed; top: 64px; left: 12px; right: 12px; width: auto; }
 }
 @media (prefers-reduced-motion: reduce) { .cl-bouton { transition: none; } }

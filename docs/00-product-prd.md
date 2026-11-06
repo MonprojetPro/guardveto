@@ -162,6 +162,7 @@ gardes et présences directement sur son agenda Google.
 | Recevoir son planning dans un agenda qui n'est pas Google (Outlook, Apple Calendrier) par un abonnement iCal | ⚪ À décider | — `[B-178a]` |
 | Une cloche dans la barre du haut prévient de ce qui se passe (une place prise, une garde changée, un planning publié) : compteur en direct, liste, un clic ouvre l'écran concerné, « tout marquer comme lu » — revenue après sa disparition avec l'ancienne version | 🟡 À recetter | 2026-11-03 `[B-183]` |
 | Supprimer les notifications accumulées pendant l'absence de la cloche (469 au Val d'Allier, sur décision de MiKL) | 🟢 Livré | 2026-11-03 `[B-183a]` |
+| Vider sa cloche (avec confirmation), retirer une seule notification d'une croix, et voir tout l'historique sur une page « Toutes mes notifications » | 🟡 À recetter | 2026-11-06 `[B-191]` |
 
 ---
 
