@@ -41,6 +41,16 @@ export interface CumulLigne {
   we: number
   sem: number
   feries: number
+  // ── B-200 — ce que le cumul ne montrait pas ──
+  we_premier: number
+  we_second: number
+  sem_premier: number
+  sem_second: number
+  /** Gardes reprises pour d'autres / reprises par d'autres, sur la même assiette. */
+  depannages_rendus: number
+  depannages_recus: number
+  /** Demi-journées de présence (journée entière = 2). `null` = module éteint. */
+  demi_journees: number | null
 }
 
 interface Props {
@@ -419,8 +429,8 @@ export function HistoriqueV2({
           {/* Week-ends */}
           <section className="card count-card" aria-label="Compteur des week-ends">
             <div className="card-head">
-              <h3>🧡 Week-ends</h3>
-              <span className="sub spacer">1er / 2nd de garde · écart à la juste part</span>
+              <h3>🧡 Gardes de week-end</h3>
+              <span className="sub spacer">1er / 2nd · écart à la juste part</span>
             </div>
             <table className="count-table">
               <thead>
@@ -485,8 +495,8 @@ export function HistoriqueV2({
           {/* Nuits de semaine */}
           <section className="card count-card" aria-label="Compteur des nuits de semaine">
             <div className="card-head">
-              <h3>🌙 Semaine · 1er / 2nd</h3>
-              <span className="sub spacer">nuits en semaine</span>
+              <h3>🌙 Gardes de nuit en semaine</h3>
+              <span className="sub spacer">1er / 2nd · écart à la juste part</span>
             </div>
             <table className="count-table">
               <thead>
@@ -525,7 +535,7 @@ export function HistoriqueV2({
           {/* Fériés */}
           <section className="card count-card" aria-label="Compteur des jours fériés">
             <div className="card-head">
-              <h3>🎈 Fériés</h3>
+              <h3>🎈 Gardes de jours fériés</h3>
               <span className="sub spacer">jours fériés de la zone du cabinet</span>
             </div>
             <table className="count-table">
@@ -576,7 +586,7 @@ export function HistoriqueV2({
           {/* Dépannages */}
           <section className="card count-card" aria-label="Compteur des dépannages">
             <div className="card-head">
-              <h3>🤝 Dépannages</h3>
+              <h3>🤝 Gardes reprises (dépannages)</h3>
               <span className="sub spacer">qui a repris la garde de qui, suite à une absence</span>
             </div>
             <table className="count-table">
@@ -648,8 +658,8 @@ export function HistoriqueV2({
       {journees && (
         <section className="card count-card rise rise-3" aria-label="Compteur des journées">
           <div className="card-head">
-            <h3>Journées</h3>
-            <span className="sub spacer">présences de journée sur ce filtre</span>
+            <h3>☀️ Présences en journée</h3>
+            <span className="sub spacer">au cabinet, hors gardes · sur ce filtre</span>
           </div>
           {erreurJournees ? (
             <p className="count-vide">
@@ -721,42 +731,60 @@ export function HistoriqueV2({
             </div>
           </div>
           <div className="cumul-body">
-            <div className="cm-row cm-header" aria-hidden="true">
-              <span>Vétérinaire</span>
-              <span>Week-ends</span>
-              <span>Nuits de semaine</span>
-              <span>Fériés</span>
-            </div>
+            {/* B-200 — « il manque des colonnes ? ça n'a pas été mis à jour ».
+                Le cumul ne montrait que trois totaux. Il porte désormais la
+                répartition 1er / 2nd (déjà comptée en base), les dépannages et
+                les journées, sur la MÊME assiette (périodes validées). */}
             {(() => {
+              const avecJournees = cumul.some((c) => c.demi_journees !== null)
+              const style = { gridTemplateColumns: `140px repeat(${avecJournees ? 5 : 4}, minmax(0, 1fr))` }
               const maxWE = Math.max(1, ...cumul.map((c) => c.we))
               const maxSem = Math.max(1, ...cumul.map((c) => c.sem))
               const maxFer = Math.max(1, ...cumul.map((c) => c.feries))
-              return cumul.map((c) => (
-                <div className="cm-row" key={c.veterinaire_id}>
-                  <span className="cm-vet">
-                    <i style={stylePoint(c.couleur)} />
-                    {c.prenom}
+              const maxJ = Math.max(1, ...cumul.map((c) => c.demi_journees ?? 0))
+              const cellule = (libelle: string, n: number, max: number, couleur: string, detail?: string) => (
+                <span className="cm-cell">
+                  <small className="cm-lib">{libelle}</small>
+                  <b>{n}</b>
+                  <span className="bar">
+                    <i style={{ width: `${(n / max) * 100}%`, ...stylePoint(couleur) }} />
                   </span>
-                  <span className="cm-cell">
-                    <b>{c.we}</b>
-                    <span className="bar">
-                      <i style={{ width: `${(c.we / maxWE) * 100}%`, ...stylePoint(c.couleur) }} />
-                    </span>
-                  </span>
-                  <span className="cm-cell">
-                    <b>{c.sem}</b>
-                    <span className="bar">
-                      <i style={{ width: `${(c.sem / maxSem) * 100}%`, ...stylePoint(c.couleur) }} />
-                    </span>
-                  </span>
-                  <span className="cm-cell">
-                    <b>{c.feries}</b>
-                    <span className="bar">
-                      <i style={{ width: `${(c.feries / maxFer) * 100}%`, ...stylePoint(c.couleur) }} />
-                    </span>
-                  </span>
-                </div>
-              ))
+                  {detail && <small className="cm-detail">{detail}</small>}
+                </span>
+              )
+              return (
+                <>
+                  <div className="cm-row cm-header" aria-hidden="true" style={style}>
+                    <span>Vétérinaire</span>
+                    <span>Week-ends de garde</span>
+                    <span>Nuits de semaine de garde</span>
+                    <span>Jours fériés de garde</span>
+                    <span>Gardes reprises</span>
+                    {avecJournees && <span>Présences en journée</span>}
+                  </div>
+                  {cumul.map((c) => (
+                    <div className="cm-row" key={c.veterinaire_id} style={style}>
+                      <span className="cm-vet">
+                        <i style={stylePoint(c.couleur)} />
+                        {c.prenom}
+                      </span>
+                      {cellule('Week-ends de garde', c.we, maxWE, c.couleur, `1er ${c.we_premier} · 2nd ${c.we_second}`)}
+                      {cellule('Nuits de semaine de garde', c.sem, maxSem, c.couleur, `1er ${c.sem_premier} · 2nd ${c.sem_second}`)}
+                      {cellule('Jours fériés de garde', c.feries, maxFer, c.couleur)}
+                      <span className="cm-cell cm-dep">
+                        <small className="cm-lib">Gardes reprises</small>
+                        <span>
+                          <b>{c.depannages_rendus}</b> rendue{c.depannages_rendus > 1 ? 's' : ''}
+                          {' · '}
+                          <b>{c.depannages_recus}</b> reçue{c.depannages_recus > 1 ? 's' : ''}
+                        </span>
+                      </span>
+                      {avecJournees &&
+                        cellule('Présences en journée', c.demi_journees ?? 0, maxJ, c.couleur, 'demi-journées')}
+                    </div>
+                  ))}
+                </>
+              )
             })()}
           </div>
           <p className="lookback-note">

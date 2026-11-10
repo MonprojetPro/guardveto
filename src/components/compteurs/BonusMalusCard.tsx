@@ -33,7 +33,7 @@ interface BonusMalusCardProps {
   /** Écarts hérités de la période précédente (ce que le moteur traînait déjà) */
   heritage: BonusMalusRow[]
   /** Noms et couleurs des vétos (pour l'affichage) */
-  vetsInfo: Array<{ id: string; prenom: string; nom: string; couleur: string }>
+  vetsInfo: Array<{ id: string; prenom: string; nom: string; couleur: string; statut?: string | null }>
 }
 
 interface Ligne {
@@ -50,6 +50,11 @@ interface Ligne {
   feries_realise: number
   feries_quota: number
   ecart_feries: number
+  /** B-200 — week-ends LIBRES d'un salarié face à la moyenne des salariés. */
+  salarie: boolean
+  grands_realise: number
+  grands_quota: number
+  ecart_grands_we: number
   heritage_we: number | null
 }
 
@@ -116,6 +121,10 @@ export function BonusMalusCard({
         feries_realise: b.feries_realise,
         feries_quota: b.feries_quota,
         ecart_feries: b.ecart_feries,
+        salarie: b.statut === 'salarie',
+        grands_realise: b.grands_we_realise,
+        grands_quota: b.grands_we_quota,
+        ecart_grands_we: b.ecart_grands_we,
         heritage_we: heritageMap.get(b.veterinaire_id)?.ecart_we ?? null,
       }))
     : existingBilan.map((eb) => {
@@ -134,12 +143,21 @@ export function BonusMalusCard({
           feries_realise: 0,
           feries_quota: 0,
           ecart_feries: eb.ecart_feries,
+          salarie: info?.statut === 'salarie',
+          grands_realise: 0,
+          grands_quota: 0,
+          ecart_grands_we: eb.ecart_grands_we ?? 0,
           heritage_we: heritageMap.get(eb.veterinaire_id)?.ecart_we ?? null,
         }
       })
 
   const detaille = bilan !== null
   const unReport = lignes.some((l) => l.heritage_we !== null)
+  // 🔴 B-200 — « il manque des colonnes ? ça n'a pas été mis à jour ». L'écart
+  //    des grands week-ends est calculé et ENREGISTRÉ depuis le début
+  //    (`bonus_malus.ecart_grands_we`), et le moteur le rattrape, mais ce
+  //    tableau ne l'a jamais affiché. Il n'a de sens que pour les salariés.
+  const desSalaries = lignes.some((l) => l.salarie)
 
   return (
     <section className="card count-card bm-card" aria-label="Bilan de la période">
@@ -172,9 +190,10 @@ export function BonusMalusCard({
             <thead>
               <tr>
                 <th>Vétérinaire</th>
-                <th>Week-ends</th>
-                <th>Nuits de semaine</th>
-                <th>Jours fériés</th>
+                <th>Week-ends de garde</th>
+                <th>Nuits de semaine de garde</th>
+                <th>Jours fériés de garde</th>
+                {desSalaries && <th>Week-ends libres (salariés)</th>}
                 {unReport && <th>Report du tour d’avant</th>}
               </tr>
             </thead>
@@ -199,6 +218,18 @@ export function BonusMalusCard({
                     <Ecart valeur={l.ecart_feries} />
                     {detaille && <Part realise={l.feries_realise} quota={l.feries_quota} />}
                   </td>
+                  {desSalaries && (
+                    <td>
+                      {l.salarie ? (
+                        <>
+                          <Ecart valeur={l.ecart_grands_we} sens="repos" />
+                          {detaille && <Part realise={l.grands_realise} quota={l.grands_quota} />}
+                        </>
+                      ) : (
+                        <span className="ecart none" title="Associé : non concerné">—</span>
+                      )}
+                    </td>
+                  )}
                   {unReport && (
                     <td>
                       {l.heritage_we !== null ? (

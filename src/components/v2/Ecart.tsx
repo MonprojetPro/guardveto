@@ -15,8 +15,15 @@
 export function Ecart({
   valeur,
   horsRepartition = false,
+  sens = 'charge',
 }: {
   valeur: number
+  /**
+   * B-200 — `repos` : la valeur compte du REPOS (week-ends libres d'un
+   * salarié), pas une charge. « +2 » y veut dire « a eu plus de repos que les
+   * autres », jamais « a fait plus que sa part ».
+   */
+  sens?: 'charge' | 'repos'
   /** Dernier recours : il ne participe pas à la répartition, l'écart n'a pas de sens. */
   horsRepartition?: boolean
 }) {
@@ -30,7 +37,13 @@ export function Ecart({
   const abs = Math.abs(valeur)
   const classe = abs === 0 ? 'ok' : abs === 1 ? 'warn' : 'bad'
   const titre =
-    abs === 0
+    sens === 'repos'
+      ? abs === 0
+        ? 'Autant de week-ends libres que la moyenne des salariés'
+        : valeur > 0
+          ? `${abs} week-end${abs > 1 ? 's' : ''} libre${abs > 1 ? 's' : ''} de plus que la moyenne des salariés`
+          : `${abs} week-end${abs > 1 ? 's' : ''} libre${abs > 1 ? 's' : ''} de moins que la moyenne des salariés : à rattraper`
+      : abs === 0
       ? 'Dans la juste part'
       : valeur > 0
         ? abs === 1

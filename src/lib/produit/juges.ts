@@ -117,6 +117,8 @@ export const JUGES: Record<string, DecisionJuge> = {
   // Le plus sournois de l'audit : muet, et à retardement d'un an.
 
   'data/historiqueFetes.ts': { remplacements: 'brique' },
+  // B-198 — le tableau des fêtes, un soir par ligne (Historique & compteurs).
+  'lib/compteurs/fetesParSoir.ts': { remplacements: 'brique' },
 
   // ── CE QUI PART CHEZ LES VÉTÉRINAIRES ───────────────────────────────────
 

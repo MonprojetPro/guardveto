@@ -318,6 +318,7 @@ export default async function HistoriquePage({
   // moteur relit d'une période à l'autre. Il ne compte que le validé — un
   // brouillon peut encore changer.
   const periodesValidees = periodes.filter((p) => p.statut !== 'brouillon')
+  const modulesCabinetCumul = await modulesDuCabinet(supabase)
   let cumul: CumulLigne[] = []
   let cumulResume: string | null = null
   if (periodesValidees.length > 0) {
@@ -332,14 +333,34 @@ export default async function HistoriquePage({
     // Un cumul partiel serait pire que pas de cumul : il additionne plusieurs
     // périodes, personne ne peut vérifier le total de tête.
     if (res.erreur) erreurLecture = erreurLecture ?? res.erreur
-    cumul = res.compteurs.map((r) => ({
-      veterinaire_id: r.veterinaire_id,
-      prenom: r.prenom,
-      couleur: r.couleur,
-      we: r.we_total,
-      sem: r.sem_total,
-      feries: r.feries_total,
-    }))
+    // B-200 — le cumul montre aussi les dépannages et les journées, sur la
+    // MÊME assiette que les gardes (périodes validées, mêmes bornes).
+    const [depCumul, jourCumul] = await Promise.all([
+      queryDepannages(supabase, bornes.debut, bornes.fin),
+      modulesCabinetCumul.includes(MODULE_JOURNEE)
+        ? queryCompteursJournee(supabase, bornes.debut, bornes.fin, true)
+        : Promise.resolve(null),
+    ])
+    if (jourCumul?.erreur) erreurLecture = erreurLecture ?? jourCumul.erreur
+    cumul = res.compteurs.map((r) => {
+      const d = depCumul.get(r.veterinaire_id)
+      const j = jourCumul?.parVeto.get(r.veterinaire_id)
+      return {
+        veterinaire_id: r.veterinaire_id,
+        prenom: r.prenom,
+        couleur: r.couleur,
+        we: r.we_total,
+        sem: r.sem_total,
+        feries: r.feries_total,
+        we_premier: r.we_premier,
+        we_second: r.we_second,
+        sem_premier: r.sem_premier,
+        sem_second: r.sem_second,
+        depannages_rendus: d?.rendus ?? 0,
+        depannages_recus: d?.recus ?? 0,
+        demi_journees: jourCumul ? (j ? j.matin + j.apres_midi + 2 * j.entiere : 0) : null,
+      }
+    })
     const semaines = periodesValidees.reduce((s, p) => s + nbSemaines(p), 0)
     const exclus = periodes.filter((p) => p.statut === 'brouillon')
 
@@ -371,7 +392,7 @@ export default async function HistoriquePage({
   // disparaît du tableau » que pour les gardes.
   let journees: LigneJournees[] | null = null
   let erreurJournees: string | null = null
-  const modulesCabinet = await modulesDuCabinet(supabase)
+  const modulesCabinet = modulesCabinetCumul
   const gardesActives = modulesCabinet.includes('gardes')
   if (modulesCabinet.includes(MODULE_JOURNEE)) {
     const res = await queryCompteursJournee(supabase, debut, fin, perimetre === 'valide')

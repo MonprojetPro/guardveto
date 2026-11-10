@@ -434,14 +434,15 @@ export async function queryBonusMalusCourant(
 /** Charge les infos de base de tous les vétérinaires actifs (pour BonusMalusCard) */
 export async function queryVetsInfo(
   supabase: SupabaseClient
-): Promise<Array<{ id: string; prenom: string; nom: string; couleur: string }>> {
+): Promise<Array<{ id: string; prenom: string; nom: string; couleur: string; statut?: string | null }>> {
   const { data } = await supabase
     .from('veterinaires')
-    .select('id, prenom, nom, couleur')
+    // B-200 — `statut` : le bilan n'affiche les week-ends libres qu'aux salariés.
+    .select('id, prenom, nom, couleur, statut')
     .eq('actif', true)
     .order('nom')
 
-  return (data as Array<{ id: string; prenom: string; nom: string; couleur: string }> | null) ?? []
+  return (data as Array<{ id: string; prenom: string; nom: string; couleur: string; statut?: string | null }> | null) ?? []
 }
 
 // ── Historique des fêtes (backlog n°14 — équité inter-annuelle) ──

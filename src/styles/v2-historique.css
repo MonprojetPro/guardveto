@@ -326,6 +326,13 @@
 .cm-cell b { font-family: var(--font-display); font-size: 0.88rem; min-width: 22px; text-align: right; }
 .cm-cell .bar { flex: 1; height: 6px; border-radius: 999px; background: var(--bg-deep); overflow: hidden; }
 .cm-cell .bar i { display: block; height: 100%; border-radius: 999px; opacity: 0.8; }
+.cm-cell { flex-wrap: wrap; row-gap: 2px; }
+.cm-detail { flex-basis: 100%; padding-left: 30px; font-size: 0.7rem; color: var(--soft); }
+.cm-dep { font-size: 0.78rem; color: var(--soft); }
+.cm-dep b { min-width: 0; color: var(--text); }
+/* Le libellé de chaque chiffre : caché sur grand écran (l'en-tête le porte),
+   affiché sur téléphone, où l'en-tête disparaît. */
+.cm-lib { display: none; }
 .lookback-note {
   margin: 14px 20px 18px;
   background: var(--ok-soft);
@@ -338,6 +345,9 @@
 @media (max-width: 640px) {
   .cm-row { grid-template-columns: 1fr; gap: 4px; }
   .cm-row.cm-header { display: none; }
+  .cm-row { grid-template-columns: 1fr !important; }
+  .cm-lib { display: block; flex-basis: 100%; font-size: 0.68rem; font-weight: 700; color: var(--soft); }
+  .cm-detail { padding-left: 0; }
 
   /* B-179b — les compteurs tiennent dans leur carte. Mesuré le 03/11 à
      372 px : « Journées » et « Bilan » faisaient 356 et 347 px pour une carte
