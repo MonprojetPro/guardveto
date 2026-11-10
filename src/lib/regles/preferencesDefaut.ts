@@ -25,6 +25,7 @@
 
 import {
   PENALITES_SOUPLES_IDS,
+  PENALITES_INACTIVES_PAR_DEFAUT,
   PENALITE_SOUPLE_DEFAUT,
   type PenaliteSoupleId,
 } from '@/engine/structure-config'
@@ -32,6 +33,7 @@ import { BRIQUES_PENALITES_SOUPLES } from '@/data/mapReglesCabinet'
 
 /** Étage lexicographique → nom de force employé par l'écran et par Filou. */
 const FORCE_PAR_ETAGE: Record<number, string> = {
+  2: 'jamais',
   3: 'sauf_crise',
   4: 'evitee',
   5: 'si_possible',
@@ -66,6 +68,9 @@ export function preferencesImplicites(briquesPresentes: Iterable<string>): Prefe
   for (const [briqueId, penaliteId] of Object.entries(BRIQUES_PENALITES_SOUPLES)) {
     if (vues.has(briqueId)) continue
     if (!(PENALITES_SOUPLES_IDS as readonly string[]).includes(penaliteId)) continue
+    // B-195 — une règle ÉTEINTE par défaut n'est pas active sans ligne : la
+    // déclarer ici ferait dire à Filou qu'elle pèse sur le planning.
+    if (PENALITES_INACTIVES_PAR_DEFAUT.has(penaliteId)) continue
     out.push({
       brique_id: briqueId,
       force: forceParDefautPreference(penaliteId),

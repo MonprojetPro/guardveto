@@ -474,6 +474,35 @@ export const CATALOGUE_BRIQUES: Record<string, DefinitionBrique> = {
       "le moteur évite de mettre un vétérinaire de garde la veille d'un jour où il n'est pas là — un congé posé au planning comme un jour de repos fixe (R10d)",
   },
 
+  // ── B-195 (10/11) — les deux règles des fêtes, réglables par le cabinet ──
+  pas_meme_veto_noel_nouvel_an: {
+    id: 'pas_meme_veto_noel_nouvel_an',
+    famille: 'interdire',
+    operateur: 'PAS_LES_DEUX',
+    axes: ['quand'],
+    schemaParams: {
+      _reglage:
+        'aucun paramètre — le réglage porte { actif, force } (B-195 : pas la même personne à Noël et au Nouvel An de la même saison ; éteinte par défaut)',
+    },
+    widget: 'WidgetPenaliteSouple',
+    rendreLangageNaturel: () =>
+      "une même personne n'est pas de garde à la fois à Noël (24-25 déc.) et au Nouvel An (31 déc.-1er janv.) de la même saison",
+  },
+
+  eviter_meme_fete_annee_suivante: {
+    id: 'eviter_meme_fete_annee_suivante',
+    famille: 'interdire',
+    operateur: 'EVITER_FETE',
+    axes: ['quand'],
+    schemaParams: {
+      _reglage:
+        "aucun paramètre — le réglage porte { actif, force } (B-195 : évite la même fête que l'an dernier, lue dans les plannings publiés ; jamais dure)",
+    },
+    widget: 'WidgetPenaliteSouple',
+    rendreLangageNaturel: () =>
+      "le moteur évite qu'une personne tienne la même fête de fin d'année (Noël ou Nouvel An) que l'an dernier",
+  },
+
   eviter_fete_fin_annee: {
     id: 'eviter_fete_fin_annee',
     famille: 'interdire',

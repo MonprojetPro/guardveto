@@ -20,6 +20,7 @@ import {
   // dans `hard-constraints`, partagees entre la penalite et le gardien.
   // Une seule definition : deux lectures cote a cote finissent par diverger.
   estWeekEndAvantVacances, estSoirDeFeteFinAnnee, memeRoleQueLaVeilleDeFerie,
+  violeNoelNouvelAn,
 } from './hard-constraints'
 import { estAttribue, vetPourRole } from '../attribution'
 import {
@@ -92,6 +93,23 @@ function penaliteFeteFinAnnee(slot: SlotGarde, penalitesSouples?: PenalitesSoupl
   return estSoirDeFeteFinAnnee(slot)
     ? poidsPenaliteSouple('fete_fin_annee', penalitesSouples)
     : 0
+}
+
+/**
+ * B-195 — Noël ET Nouvel An pour la même personne, la même saison.
+ * Réglage du cabinet, ÉTEINT par défaut (`PENALITES_INACTIVES_PAR_DEFAUT`) :
+ * sans ligne en base, poids 0 → byte-identique. Même prédicat que le gardien
+ * `checkNoelNouvelAn`, qui prend le relais quand le cabinet règle « jamais ».
+ */
+export function penaliteNoelNouvelAn(
+  slot: SlotGarde,
+  vet: VetEngine,
+  planning: PlanningPartiel,
+  penalitesSouples?: PenalitesSouplesConfig,
+): number {
+  const poids = poidsPenaliteSouple('noel_nouvel_an', penalitesSouples)
+  if (poids === 0) return 0
+  return violeNoelNouvelAn(vet.id, slot, planning) ? poids : 0
 }
 
 /**
@@ -190,7 +208,9 @@ export function penalite(
     penaliteVeilleRepos(slot, vet, calendrier, penalitesSouples) +
     penaliteInversionFerie(slot, vet, role, planning, calendrier, penalitesSouples) +
     // Backlog n°14 : le véto a tenu cette fête L'AN DERNIER → pénalité souple.
-    penaliteFeteHistorique(slot, vet.id, historiqueFetes) +
+    penaliteFeteHistorique(slot, vet.id, historiqueFetes, penalitesSouples) +
+    // B-195 — Noël et Nouvel An tenus par la même personne (réglage cabinet).
+    penaliteNoelNouvelAn(slot, vet, planning, penalitesSouples) +
     // P1-B : règles configurées MOLLES (étage ≥ 3) — préférence, pas blocage.
     // Le lookback est transmis pour les variantes molles des règles de rythme.
     penaliteContraintesConfig(slot, vet, role, planning, calendrier, contexteAnterieur)

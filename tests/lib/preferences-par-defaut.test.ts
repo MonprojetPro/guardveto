@@ -21,9 +21,13 @@ import { BRIQUES_PENALITES_SOUPLES } from '@/data/mapReglesCabinet'
 import { rendreRegle } from '@/engine/briques/catalogue'
 
 describe('preferencesImplicites', () => {
-  it('rend TOUTES les préférences quand la base est vide', () => {
+  // B-195 — sauf celle qui est ÉTEINTE par défaut : sans ligne, elle ne pèse
+  // pas sur le planning, et Filou ne doit pas la dire active.
+  const ETEINTES = ['pas_meme_veto_noel_nouvel_an']
+  it('rend toutes les préférences ACTIVES par défaut quand la base est vide', () => {
     const rendues = preferencesImplicites([]).map((p) => p.brique_id).sort()
-    expect(rendues).toEqual(Object.keys(BRIQUES_PENALITES_SOUPLES).sort())
+    expect(rendues).toEqual(Object.keys(BRIQUES_PENALITES_SOUPLES).filter((b) => !ETEINTES.includes(b)).sort())
+    expect(rendues).not.toContain('pas_meme_veto_noel_nouvel_an')
   })
 
   // ⚠️ B-135 (26/09) — ce test citait `eviter_we_consecutifs`, la seule brique
@@ -36,7 +40,7 @@ describe('preferencesImplicites', () => {
 
     expect(rendues).not.toContain('eviter_we_avant_vacances') // déjà lue en base
     expect(rendues).toContain('eviter_veille_repos')          // celle de MiKL, invisible avant
-    expect(rendues.length).toBe(Object.keys(BRIQUES_PENALITES_SOUPLES).length - 1)
+    expect(rendues.length).toBe(Object.keys(BRIQUES_PENALITES_SOUPLES).length - 1 - ETEINTES.length)
   })
 
   // B-135 — une ligne `eviter_we_consecutifs` retrouvée en base (sauvegarde

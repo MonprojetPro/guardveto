@@ -248,6 +248,11 @@ export const PENALITES_SOUPLES_IDS = [
   'fete_fin_annee',    // R10b — garde un soir de réveillon (24/31 déc)
   'inversion_ferie',   // R8b  — même rôle la veille d'un jour férié
   'veille_repos',      // R10d — garde la veille d'un jour d'absence (B-063)
+  // ── B-195 (10/11) — les deux règles des fêtes, réglables par le cabinet ──
+  // MiKL : « comme une règle paramétrable comme les autres règles de
+  // l'organisation des gardes ».
+  'noel_nouvel_an',    // pas le même véto à Noël ET au Nouvel An d'une saison
+  'fete_historique',   // pas le même véto sur la même fête que l'an dernier
 ] as const
 export type PenaliteSoupleId = (typeof PENALITES_SOUPLES_IDS)[number]
 
@@ -276,6 +281,21 @@ export const PENALITES_AVEC_GARDIEN_DUR: ReadonlySet<PenaliteSoupleId> = new Set
   'we_avant_vacances', // R10c — `checkWeAvantVacances`
   'fete_fin_annee',    // R10b — `checkFeteFinAnnee`
   'inversion_ferie',   // R8b  — `checkInversionFerie`
+  'noel_nouvel_an',    // B-195 — `checkNoelNouvelAn` (logique « pas les deux » de exclusion_dates)
+  // ⚠️ `fete_historique` N'A PAS DE GARDIEN, volontairement : avec 4 places
+  //    par fête et 7 personnes, l'interdire pourrait rendre une génération
+  //    impossible. Elle reste une préférence (clampée à 3).
+])
+
+/**
+ * B-195 — les réglages ÉTEINTS tant que le cabinet ne les a pas allumés.
+ *
+ * Toutes les autres préférences sont actives sans ligne en base (« absence =
+ * défaut historique »). Celle-ci est NOUVELLE : l'allumer d'office changerait
+ * les plannings de tous les cabinets sans que personne l'ait demandé.
+ */
+export const PENALITES_INACTIVES_PAR_DEFAUT: ReadonlySet<PenaliteSoupleId> = new Set<PenaliteSoupleId>([
+  'noel_nouvel_an',
 ])
 
 /** Réglage d'une pénalité souple (absence = défaut historique). */
@@ -293,6 +313,13 @@ export const PENALITE_SOUPLE_DEFAUT: Record<PenaliteSoupleId, { etage: number; p
   // `we_avant_vacances`, dont elle est la généralisation — celle-ci ne
   // regardait que le week-end précédant des vacances.
   veille_repos:      { etage: 4, poids: 40 }, // 🟡 EVITEE
+  // B-195 — éteinte par défaut (PENALITES_INACTIVES_PAR_DEFAUT) ; allumée sans
+  // niveau précis, elle vaut « sauf crise ».
+  noel_nouvel_an:    { etage: 3, poids: 50 },
+  // B-195 — la constante historique de `PENALITE_FETE_HISTORIQUE` (backlog
+  // n°14), reprise telle quelle : un cabinet qui n'y touche pas ne voit rien
+  // changer.
+  fete_historique:   { etage: 4, poids: 40 }, // 🟡 EVITEE
 }
 
 /** Une pénalité souple entièrement résolue (consommable moteur + scoreur). */
@@ -315,7 +342,10 @@ export function resoudrePenaliteSouple(
 ): PenaliteSoupleResolue {
   const defaut = PENALITE_SOUPLE_DEFAUT[id]
   const cfg = config?.[id]
-  if (!cfg) return { actif: true, etage: defaut.etage, poids: defaut.poids }
+  if (!cfg) {
+    const actif = !PENALITES_INACTIVES_PAR_DEFAUT.has(id)
+    return { actif, etage: defaut.etage, poids: actif ? defaut.poids : 0 }
+  }
   // ⚠️ LE PLANCHER DÉPEND DE L'EXISTENCE D'UN GARDIEN. Il valait 3 pour toutes
   // ces règles, avec ce commentaire : « ces règles n'ont aucun gardien dur ».
   // C'était vrai — et c'est ce qui a fait qu'un cabinet pouvait choisir

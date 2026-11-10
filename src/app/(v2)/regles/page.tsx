@@ -24,6 +24,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { exigerVeterinaire } from '@/lib/identite'
+import { BRIQUES_AVEC_GARDIEN_DUR } from '@/data/mapReglesCabinet'
 import '@/styles/v2-absences.css'
 import '@/styles/v2-filou-edge.css'
 import '@/styles/v2-regles.css'
@@ -83,7 +84,12 @@ const PENALITES_SOUPLES_DEFAUT_FORCE: Record<string, string> = {
   eviter_fete_fin_annee: 'evitee', // R10b (étage 4)
   inversion_role_ferie: 'si_possible', // R8b  (étage 5)
   eviter_veille_repos: 'evitee', // R10d (étage 4) — B-063
+  pas_meme_veto_noel_nouvel_an: 'sauf_crise', // B-195 (étage 3, ÉTEINTE par défaut)
+  eviter_meme_fete_annee_suivante: 'evitee', // B-195 (étage 4)
 }
+
+/** B-195 — les préférences éteintes tant que le cabinet ne les allume pas. */
+const PENALITES_SOUPLES_ETEINTES_PAR_DEFAUT = new Set(['pas_meme_veto_noel_nouvel_an'])
 
 /** Résout {actif, force} d'une règle structurelle (défaut historique : ferme + active). */
 function resoudreStructure(rows: RegleRow[], briqueId: string): StructureRegleUI {
@@ -97,8 +103,13 @@ function resoudreStructure(rows: RegleRow[], briqueId: string): StructureRegleUI
 function resoudrePenaliteSoupleUI(rows: RegleRow[], briqueId: string): StructureRegleUI {
   const defaut = PENALITES_SOUPLES_DEFAUT_FORCE[briqueId] ?? 'sauf_crise'
   const row = rows.find((r) => r.brique_id === briqueId)
-  if (!row) return { actif: true, force: defaut }
-  const force = FORCES_SOUPLES.has(row.force) ? row.force : defaut
+  if (!row) return { actif: !PENALITES_SOUPLES_ETEINTES_PAR_DEFAUT.has(briqueId), force: defaut }
+  // ⚠️ B-195 — « jamais » n'était JAMAIS relu ici : une préférence réglée
+  //    « jamais » (possible depuis B-127 / B-132 sur celles qui ont un gardien)
+  //    réapparaissait à l'écran sur son niveau par défaut, alors que le moteur,
+  //    lui, l'appliquait bien. On relit « jamais » pour celles qui y ont droit.
+  const admise = FORCES_SOUPLES.has(row.force) || (row.force === 'jamais' && BRIQUES_AVEC_GARDIEN_DUR.has(briqueId))
+  const force = admise ? row.force : defaut
   return { actif: row.actif, force }
 }
 

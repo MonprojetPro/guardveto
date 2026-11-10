@@ -269,6 +269,10 @@ const PENALITES_SOUPLES = [
   // Sa place est ICI, dans les PRÉFÉRENCES, et non parmi les règles nominatives :
   // elle ne vise personne en particulier et ne bloque jamais une génération.
   'eviter_veille_repos',
+  // B-195 — les deux règles des fêtes (MiKL, 10/11 : « comme une règle
+  // paramétrable comme les autres règles de l'organisation des gardes »).
+  'pas_meme_veto_noel_nouvel_an',
+  'eviter_meme_fete_annee_suivante',
 ] as const
 type PenaliteSouple = (typeof PENALITES_SOUPLES)[number]
 
@@ -290,6 +294,14 @@ const PENALITES_META: Record<PenaliteSouple, { titre: string; aide: string }> = 
     aide:
       'Une garde de nuit déborde sur le lendemain matin. Le moteur évite donc de la poser la veille d’un jour où la personne n’est pas là — un congé posé au planning comme un jour de repos fixe.',
   },
+  pas_meme_veto_noel_nouvel_an: {
+    titre: 'Pas la même personne à Noël et au Nouvel An',
+    aide: 'Qui est de garde à Noël (24-25 déc.) ne l’est pas au Nouvel An (31 déc.-1er janv.) de la même saison, quel que soit son rôle.',
+  },
+  eviter_meme_fete_annee_suivante: {
+    titre: 'Pas la même fête deux ans de suite',
+    aide: 'Qui a tenu Noël ou le Nouvel An l’an dernier évite la même fête cette année. Lu dans les plannings publiés.',
+  },
 }
 
 /** Force de repli quand on RALLUME une pénalité qui n'en avait plus de souple. */
@@ -298,6 +310,8 @@ const PENALITE_FORCE_REPLI: Record<PenaliteSouple, string> = {
   eviter_we_avant_vacances: 'evitee',
   eviter_fete_fin_annee: 'evitee',
   inversion_role_ferie: 'si_possible',
+  pas_meme_veto_noel_nouvel_an: 'sauf_crise',
+  eviter_meme_fete_annee_suivante: 'evitee',
 }
 
 /** R11b — quel rôle du week-end porte l'avantage financier. */
@@ -1703,10 +1717,8 @@ export function OngletMoteur({
             <AideFilou sujet="demander un égard que le moteur ne sait pas encore tenir" />
           )}
           <p className="sub">
-            Des égards que le moteur essaie d&apos;avoir, jamais des interdictions : ils ne
-            bloquent pas la génération. C&apos;est pourquoi le choix « Jamais » n&apos;est pas
-            proposé ici — une interdiction sans gardien ne bloquerait rien, elle ferait seulement
-            croire qu&apos;elle protège.
+            Des égards que le moteur essaie d&apos;avoir. « Jamais » n&apos;est proposé que là où
+            le moteur sait réellement l&apos;interdire.
           </p>
         </div>
 

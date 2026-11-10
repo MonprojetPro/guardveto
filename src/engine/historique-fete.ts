@@ -20,6 +20,9 @@
 // ============================================================
 
 import { addDays, datesCouvertesParGardeV1 } from './utils'
+// Valeurs (pas seulement des types) : structure-config n'importe d'ici QUE des
+// types, il n'y a donc pas de cycle à l'exécution.
+import { poidsPenaliteSouple, type PenalitesSouplesConfig } from './structure-config'
 
 // ── Fêtes reconnues ──────────────────────────────────────────
 // Le doc métier (§6) ne liste que deux fêtes : Noël (24-25 déc) et
@@ -162,6 +165,8 @@ export function resoudreHistoriqueFetes(rows: HistoriqueFeteRow[]): HistoriqueFe
  *     en vacances. Poids documenté, non exposé (leçon UX équité : pas de
  *     chiffres abstraits).
  */
+// B-195 — ce n'est plus qu'un rappel du DÉFAUT : la valeur réelle vit dans
+// `PENALITE_SOUPLE_DEFAUT.fete_historique` et se règle par cabinet.
 export const PENALITE_FETE_HISTORIQUE = { etage: 4, poids: 40 } as const
 
 /**
@@ -173,11 +178,16 @@ export function penaliteFeteHistorique(
   slot: { date: string; type: string },
   vetId: string,
   historique?: HistoriqueFetesResolu,
+  // B-195 — réglable par le cabinet (`fete_historique`). Absent → poids
+  // historique 40, donc byte-identique.
+  penalitesSouples?: PenalitesSouplesConfig,
 ): number {
   if (!historique || historique.size === 0) return 0
+  const poids = poidsPenaliteSouple('fete_historique', penalitesSouples)
+  if (poids === 0) return 0
   let n = 0
   for (const inst of fetesCouvertesParSlot(slot.date, slot.type)) {
     if (historique.has(cleHistoriqueFete(vetId, inst.fete, inst.annee - 1))) n++
   }
-  return n * PENALITE_FETE_HISTORIQUE.poids
+  return n * poids
 }

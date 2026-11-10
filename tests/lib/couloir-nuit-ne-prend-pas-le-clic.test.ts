@@ -3,6 +3,7 @@
 // bouton) : le clic tombait sur `.pv2-couloir`, le fond décoratif de la colonne
 // Nuit, positionné et donc peint AU-DESSUS de la ligne « à pourvoir ».
 // Ce test tient les deux verrous posés ce jour-là.
+import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'fs'
 import path from 'path'
 

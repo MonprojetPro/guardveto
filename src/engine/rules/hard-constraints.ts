@@ -1646,6 +1646,40 @@ function violeExclusionDates(
   return false // aucune forme valide → inerte
 }
 
+/**
+ * B-195 — « pas le même vétérinaire à Noël ET au Nouvel An de la même saison »,
+ * réglage du CABINET (pas une règle par personne).
+ *
+ * La logique est celle de `exclusion_dates` forme « fêtes » (« l'une ou
+ * l'autre, jamais les deux »), déjà éprouvée : on lui passe une contrainte
+ * fabriquée ici plutôt que d'en réécrire une seconde, qui aurait divergé au
+ * premier correctif. Partagée par le gardien et par la pénalité souple.
+ */
+const CONTRAINTE_NOEL_NOUVEL_AN: ContrainteEngine = {
+  id: 'reglage-cabinet-noel-nouvel-an',
+  type: 'exclusion_dates',
+  config: { fetes: ['noel', 'nouvel_an'] },
+  actif: true,
+}
+
+export function violeNoelNouvelAn(vetId: string, slot: SlotGarde, planning: PlanningPartiel): boolean {
+  return violeExclusionDates(CONTRAINTE_NOEL_NOUVEL_AN, vetId, slot, planning)
+}
+
+function checkNoelNouvelAn(
+  vet: VetEngineNormalise,
+  slot: SlotGarde,
+  planning: PlanningPartiel,
+  structure: StructureConfig,
+): ValidationResult {
+  const reglage = resoudrePenaliteSouple('noel_nouvel_an', structure.penalitesSouples)
+  if (!reglage.actif || reglage.etage > ETAGE_DUR_MAX) return ok()
+  if (!violeNoelNouvelAn(vet.id, slot, planning)) return ok()
+  return invalid(
+    `NOEL_NOUVEL_AN : ${vet.prenom} est déjà de garde sur l'autre fête de fin d'année — le cabinet interdit de tenir Noël et le Nouvel An la même saison`,
+  )
+}
+
 function checkExclusionDates(vet: VetEngine, slot: SlotGarde, planning: PlanningPartiel): ValidationResult {
   for (const c of vet.contraintes) {
     if (!c.actif || c.type !== 'exclusion_dates') continue
@@ -1788,6 +1822,8 @@ export function isValid(
     // non-changement, et c'est ce qui rend ce lot sûr à livrer.
     checkWeAvantVacances(vet, slot, structure),
     checkFeteFinAnnee(vet, slot, structure),
+    // B-195 — Noël / Nouvel An, dure seulement si le cabinet l'a réglée « jamais ».
+    checkNoelNouvelAn(vet, slot, planning, structure),
     checkInversionFerie(vet, slot, roleVisé, planning, calendrier, structure),
     checkR2IndispoCyclique(vet, slot, calendrier),
     // R3 (repos conditionnel) : « garde WE cette semaine ? » doit voir le WE du

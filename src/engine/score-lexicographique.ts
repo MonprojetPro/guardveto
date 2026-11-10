@@ -42,11 +42,12 @@ import { scorerDesiderata } from './rules/desiderata'
 import { scorerSeulementAvec } from './rules/seulement-avec'
 import { apparierSourcePourCible } from './relations-structure'
 import { vetPourRole, vetsAttribues, avecVet, attributionVide } from './attribution'
-import { penaliteFeteHistorique, PENALITE_FETE_HISTORIQUE } from './historique-fete'
+import { penaliteFeteHistorique } from './historique-fete'
 import {
   penaliteWEAvantVacances,
   penaliteFeteFinAnnee,
   penaliteInversionFerie,
+  penaliteNoelNouvelAn,
 } from './rules/soft-constraints'
 import {
   compterParVet,
@@ -345,6 +346,9 @@ export function scorerPlanning(
   const cfgR10c = resoudrePenaliteSouple('we_avant_vacances', pcfg)
   const cfgR10b = resoudrePenaliteSouple('fete_fin_annee', pcfg)
   const cfgR8b = resoudrePenaliteSouple('inversion_ferie', pcfg)
+  // B-195 — les deux réglages des fêtes (étage choisi par le cabinet).
+  const cfgFeteHisto = resoudrePenaliteSouple('fete_historique', pcfg)
+  const cfgNoelNa = resoudrePenaliteSouple('noel_nouvel_an', pcfg)
   for (const sr of slotRoles) {
     const vet = vetById.get(sr.vetId)
     if (!vet) continue
@@ -368,9 +372,14 @@ export function scorerPlanning(
     // inter-annuel). MÊME source (structure.historiqueFetes) et MÊME fonction
     // que le solver greedy/LNS via penalite() — les deux gardiens de score
     // restent cohérents. Historique absent/vide → 0 → byte-identique.
-    const fh = penaliteFeteHistorique(sr.slot, sr.vetId, structure.historiqueFetes)
+    const fh = penaliteFeteHistorique(sr.slot, sr.vetId, structure.historiqueFetes, pcfg)
     if (fh > 0)
-      ajouter(v, PENALITE_FETE_HISTORIQUE.etage, 'fete_historique', fh)
+      ajouter(v, cfgFeteHisto.etage, 'fete_historique', fh)
+
+    // B-195 — Noël et Nouvel An tenus par la même personne la même saison.
+    const nna = penaliteNoelNouvelAn(sr.slot, vet, planning, pcfg)
+    if (nna > 0)
+      ajouter(v, cfgNoelNa.etage, 'noel_nouvel_an', nna)
   }
 
   // Dernier recours (⚪ SI_POSSIBLE) — terme dominant dans son étage.

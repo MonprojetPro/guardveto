@@ -287,15 +287,18 @@ describe('B-132 ⑤ — la chaîne écran / Server Action / moteur', () => {
   //
   // Ici, les deux autres couches se DÉDUISENT de `PENALITES_AVEC_GARDIEN_DUR` :
   // ce test vérifie que la source unique contient bien les quatre.
-  it('les quatre préférences déclarent un gardien dur', () => {
+  // B-195 (10/11) — `noel_nouvel_an` rejoint la liste avec son `checkNoelNouvelAn`.
+  it('les préférences qui déclarent un gardien dur', () => {
     expect([...PENALITES_AVEC_GARDIEN_DUR].sort()).toEqual([
-      'fete_fin_annee', 'inversion_ferie', 'veille_repos', 'we_avant_vacances',
+      'fete_fin_annee', 'inversion_ferie', 'noel_nouvel_an', 'veille_repos', 'we_avant_vacances',
     ])
   })
 
-  it('aucune préférence ne reste sans gardien', () => {
+  // B-195 — UNE seule reste sans gardien, et c'est une décision : interdire la
+  // même fête deux ans de suite pourrait rendre une génération impossible.
+  it('seule « fete_historique » reste sans gardien, par décision', () => {
     const sansGardien = PENALITES_SOUPLES_IDS.filter((id) => !PENALITES_AVEC_GARDIEN_DUR.has(id))
-    expect(sansGardien).toEqual([])
+    expect(sansGardien).toEqual(['fete_historique'])
   })
 
   // Le garde-fou qui compte pour la suite : toute préférence AJOUTÉE devra soit
@@ -318,6 +321,13 @@ describe('B-132 ⑤ — la chaîne écran / Server Action / moteur', () => {
       veille_repos: () => valide(
         vet('v', 'V', [{ date_debut: '2026-12-02', date_fin: '2026-12-02', type: 'vacances' }]),
         slot('2026-12-01'), cfg('veille_repos', 2)),
+      // B-195 — Jean tient déjà le 24 déc. : le 31 lui est refusé.
+      noel_nouvel_an: () => valide(JEAN, slot('2026-12-31'), cfg('noel_nouvel_an', 2), 'premier', {
+        attributions: [{
+          date: '2026-12-24', type: 'semaine_soir',
+          placements: [{ role: 'premier', vetId: JEAN.id }],
+        }],
+      }),
     }
     for (const id of PENALITES_AVEC_GARDIEN_DUR) {
       const scenario = cas[id]

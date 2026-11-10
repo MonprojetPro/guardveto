@@ -219,6 +219,9 @@ export const BRIQUES_PENALITES_SOUPLES: Record<string, PenaliteSoupleId> = {
   eviter_fete_fin_annee: 'fete_fin_annee',    // R10b
   inversion_role_ferie: 'inversion_ferie',    // R8b
   eviter_veille_repos: 'veille_repos',        // R10d — B-063
+  // B-195 — les deux règles des fêtes, réglables par le cabinet.
+  pas_meme_veto_noel_nouvel_an: 'noel_nouvel_an',
+  eviter_meme_fete_annee_suivante: 'fete_historique',
 }
 
 /**

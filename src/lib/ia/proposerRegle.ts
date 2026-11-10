@@ -144,6 +144,7 @@ LES 19 TYPES — tu ne peux en proposer qu'UN SEUL :
    dates = deux dates ISO yyyy-MM-dd → tout autre cas de deux dates à ne pas cumuler.
    déf. sauf_crise.
    Ex. « pas le 24 ET le 31 décembre » → fetes=["noel","nouvel_an"]. « pas le 14 juillet ET le 15 août 2026 » → dates=["2026-07-14","2026-08-15"].
+   ⚠️ Pour TOUTE l'équipe, pas de règle : réglages « Pas la même personne à Noël et au Nouvel An » et « Pas la même fête deux ans de suite » (Règles › Préférences).
 18. equilibrer — ÉQUITÉ répartie entre les porteurs d'une étiquette seulement.
    dimension_equite (weekend | weekend_premier = rôle de 1er le WE | ferie | semaine_premier | semaine_second | grands_weekend), tag, importance_equite (peu_important|normal|important|essentiel). Ce type n'a PAS de force.
    Ex. « répartis équitablement les week-ends entre les juniors » → dimension_equite="weekend", tag="junior", importance_equite="important".

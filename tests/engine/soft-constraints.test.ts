@@ -55,8 +55,10 @@ describe('B-135 — deux week-ends de suite ne coûtent plus rien en eux-mêmes'
   it('la famille des pénalités souples n’en compte plus que quatre', () => {
     // Garde-fou de liste : réintroduire `we_consecutif` ici casserait ce test,
     // et obligerait à redécider au lieu de le refaire par inadvertance.
+    // B-195 (10/11) : + les deux règles des fêtes, réglables par le cabinet.
     expect(PENALITES_SOUPLES_IDS).toEqual([
       'we_avant_vacances', 'fete_fin_annee', 'inversion_ferie', 'veille_repos',
+      'noel_nouvel_an', 'fete_historique',
     ])
   })
 })

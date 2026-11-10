@@ -44,6 +44,7 @@ const GLOBALES = new Set([
   'eviter_we_avant_vacances',
   'eviter_fete_fin_annee', 'inversion_role_ferie',
   'eviter_veille_repos',
+  'pas_meme_veto_noel_nouvel_an', 'eviter_meme_fete_annee_suivante', // B-195
 ])
 
 const FORCE_HUMAINE: Record<string, string> = {

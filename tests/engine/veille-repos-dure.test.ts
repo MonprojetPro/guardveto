@@ -230,8 +230,9 @@ describe('le plancher d’étage — ce qui rendait le réglage inopérant', () 
         `${id} n'a pas de gardien dur : « jamais » doit rester impossible`).toBe(3)
     }
     // L'état du jour, dit explicitement pour qu'un ensemble vide ne passe pas
-    // pour une vérification réussie : il n'y en a plus aucune.
-    expect(sansGardien).toEqual([])
+    // pour une vérification réussie. B-195 : le garde-fou a de nouveau un
+    // utilisateur, `fete_historique`, sans gardien par décision.
+    expect(sansGardien).toEqual(['fete_historique'])
   })
 })
 

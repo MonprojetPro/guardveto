@@ -82,8 +82,10 @@ const off = (id: (typeof PENALITES_SOUPLES_IDS)[number]): PenalitesSouplesConfig
 
 // ── A. Résolution (structure-config) ─────────────────────
 describe('resoudrePenaliteSouple — défauts, désactivation, clamp', () => {
-  it('sans config → défaut HISTORIQUE (actif, étage + poids d’origine) pour les 4', () => {
-    for (const id of PENALITES_SOUPLES_IDS) {
+  // B-195 — `noel_nouvel_an` est NOUVELLE et ÉTEINTE par défaut : elle ne fait
+  // pas partie des défauts « historiques ». Les autres le restent, à l'octet.
+  it('sans config → défaut HISTORIQUE (actif, étage + poids d’origine) pour les historiques', () => {
+    for (const id of PENALITES_SOUPLES_IDS.filter((x) => x !== 'noel_nouvel_an')) {
       expect(resoudrePenaliteSouple(id)).toEqual({
         actif: true,
         etage: PENALITE_SOUPLE_DEFAUT[id].etage,
@@ -123,8 +125,10 @@ describe('resoudrePenaliteSouple — défauts, désactivation, clamp', () => {
   // ⚠️ Les QUATRE pénalités ont désormais un gardien — `veille_repos` (B-127)
   // puis les trois autres (B-132). Le vérifier en boucle plutôt qu'une par une :
   // si l'une perdait son gardien, ce test le dirait sans qu'on ait à y penser.
-  it('les quatre peuvent descendre à 2 — chacune a son gardien', () => {
-    for (const id of PENALITES_SOUPLES_IDS) {
+  // B-195 — `fete_historique` n'a PAS de gardien, volontairement (voir
+  // PENALITES_AVEC_GARDIEN_DUR) : elle est testée à part, clampée à 3.
+  it('celles qui ont un gardien peuvent descendre à 2', () => {
+    for (const id of PENALITES_SOUPLES_IDS.filter((x) => x !== 'fete_historique')) {
       expect(resoudrePenaliteSouple(id, { [id]: { actif: true, etage: 2 } }).etage,
         `${id} devrait pouvoir etre reglee « jamais »`).toBe(2)
     }

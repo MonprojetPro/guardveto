@@ -34,6 +34,8 @@ const MIGRATIONS = [
   // Elle doit figurer dans la liste, sinon le seed parse resterait sur 27 briques
   // et ce test exigerait du catalogue une brique que le produit vient d'enlever.
   '20260926130000_retrait_regle_we_consecutifs.sql',
+  // B-195 (10/11) : les deux règles des fêtes.
+  '20261110150000_b195_regles_fetes.sql',
 ].map((f) => fileURLToPath(new URL(`../../../../supabase/migrations/${f}`, import.meta.url)))
 
 interface SeedBrique {
@@ -104,8 +106,9 @@ describe('catalogue ↔ seed briques_regles — cohérence (ne divergent pas)', 
   // du PARSEUR, pas une limite du produit — s'il ne bougeait jamais, c'est qu'il
   // aurait cessé de lire les migrations récentes.
   // ⚠️ Vérifié en base le 26/09 : `select count(*) from briques_regles` → 26.
-  it('le seed parsé contient bien les 26 briques (sanity du parser)', () => {
-    expect(Object.keys(seed)).toHaveLength(26)
+  // 28 depuis B-195 (10/11, ajout des deux règles des fêtes).
+  it('le seed parsé contient bien les 28 briques (sanity du parser)', () => {
+    expect(Object.keys(seed)).toHaveLength(28)
   })
 
   it('catalogue et seed déclarent EXACTEMENT les mêmes briques', () => {
