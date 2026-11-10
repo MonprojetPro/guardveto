@@ -36,6 +36,13 @@ import {
   indexerExceptions,
   occupantReel,
 } from '@/lib/gardes/exceptions-jour'
+import {
+  lignesGardesDuVeto,
+  ligneEstPartielle,
+  nomsDesJours,
+  type GardeAvecType,
+  type LigneGardeMail,
+} from '@/lib/emails/gardes-par-jour'
 import { datesCouvertesParGardeV1 } from '@/engine/utils'
 import {
   adresseUtilisable,
@@ -57,14 +64,6 @@ interface Veterinaire {
    */
   email: string | null
   cabinet_id?: string | null
-}
-
-interface Garde {
-  id: string
-  date: string
-  type: string
-  premier: Veterinaire | null
-  second: Veterinaire | null
 }
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -192,26 +191,49 @@ async function sendViaBrevo(params: {
 }
 
 // ── Email : Nouveau planning publié ──────────────────────────
-function buildPlanningPublieHtml(
-  vet: Veterinaire,
+/** « vendredi 25 décembre 2026 » ou « du samedi 26 au dimanche 27 décembre 2026 ». */
+function formatJours(jours: readonly string[]): string {
+  if (jours.length === 1) return formatDate(jours[0])
+  const debut = new Date(jours[0] + 'T12:00:00Z').toLocaleDateString('fr-FR', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  })
+  return `du ${debut} au ${formatDate(jours[jours.length - 1])}`
+}
+
+/** « Week-end » ou, si la personne n'en tient qu'une partie, « Week-end — vendredi seulement ». */
+function typeDeLaLigne(ligne: LigneGardeMail): string {
+  return ligneEstPartielle(ligne)
+    ? `${typeLabel(ligne.type)} — ${nomsDesJours(ligne.jours)} seulement`
+    : typeLabel(ligne.type)
+}
+
+export function buildPlanningPublieHtml(
+  vet: Pick<Veterinaire, 'prenom'>,
   periode: { saison: string; numero: number | null; date_debut: string; date_fin: string },
-  gardes: Garde[]
+  lignes: readonly LigneGardeMail[],
+  nomDe: (id: string) => string | null,
+  /** Date (AAAA-MM-JJ) du mail faux que celui-ci corrige. Absent = mail normal. */
+  rectifieLeMailDu?: string,
 ): string {
+  const rectificatif = Boolean(rectifieLeMailDu)
   const periodeLabel = periode.saison === 'ete'
     ? 'Été'
     : periode.numero ? `Hiver — Période ${periode.numero}` : 'Hiver'
 
-  const gardeRows = gardes.length > 0
-    ? gardes.map((g) => {
-        const partner = g.premier?.id === vet.id ? g.second : g.premier
-        const partnerText = partner ? ` (avec ${partner.prenom} ${partner.nom})` : ''
+  const gardeRows = lignes.length > 0
+    ? lignes.map((l) => {
+        const binome = l.binomeId ? nomDe(l.binomeId) : null
         return `<tr>
-          <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;">${formatDate(g.date)}</td>
-          <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;">${typeLabel(g.type)}</td>
-          <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;color:#6b7280;">${partnerText || '—'}</td>
+          <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;">${formatJours(l.jours)}</td>
+          <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;">${typeDeLaLigne(l)}</td>
+          <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;color:#6b7280;">${binome ? `avec ${binome}` : '—'}</td>
         </tr>`
       }).join('')
     : `<tr><td colspan="3" style="padding:12px;text-align:center;color:#6b7280;">Aucune garde assignée sur cette période.</td></tr>`
+
+  const intro = rectificatif
+    ? `<p style="color:#374151;"><strong>Correction de notre précédent e-mail.</strong> Le récapitulatif envoyé le ${formatDate(rectifieLeMailDu!)} pour la période <strong>${periodeLabel}</strong> comportait une erreur sur les week-ends partagés entre plusieurs personnes (une personne qui n'en tient qu'un seul jour). Le planning affiché dans GuardVeto, lui, était juste. Voici vos gardes corrigées — merci de ne plus tenir compte du précédent e-mail.</p>`
+    : `<p style="color:#374151;">Le planning de gardes pour la période <strong>${periodeLabel}</strong> vient d'être publié.</p>`
 
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -220,11 +242,11 @@ function buildPlanningPublieHtml(
   <div style="max-width:600px;margin:32px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
     <div style="background:#1d4ed8;padding:24px 32px;">
       <h1 style="margin:0;color:#fff;font-size:20px;">GuardVeto</h1>
-      <p style="margin:8px 0 0;color:#bfdbfe;font-size:14px;">Nouveau planning publié</p>
+      <p style="margin:8px 0 0;color:#bfdbfe;font-size:14px;">${rectificatif ? 'Planning corrigé' : 'Nouveau planning publié'}</p>
     </div>
     <div style="padding:32px;">
       <p style="color:#374151;">Bonjour ${vet.prenom},</p>
-      <p style="color:#374151;">Le planning de gardes pour la période <strong>${periodeLabel}</strong> vient d'être publié.</p>
+      ${intro}
       <p style="color:#6b7280;font-size:13px;">Du ${formatDate(periode.date_debut)} au ${formatDate(periode.date_fin)}</p>
 
       <h2 style="color:#1d4ed8;font-size:16px;margin-top:32px;">Vos gardes</h2>
@@ -266,9 +288,19 @@ function buildGardeModifieeHtml(
   oldSecond: Veterinaire | null,
   newPremier: Veterinaire | null,
   newSecond: Veterinaire | null,
+  joursTenusParDautres: readonly { jour: string; occupants: string }[] = [],
 ): string {
   const formatVet = (v: Veterinaire | null) =>
     v ? `${v.prenom} ${v.nom}` : '—'
+
+  // B-197 — « Après : Victor + Jean » sur un week-end dont le vendredi est tenu
+  // par d'autres laisserait croire à Victor et Jean que les trois jours sont à eux.
+  const blocAutresJours = joursTenusParDautres.length > 0
+    ? `<p style="margin:12px 0 0;color:#92400e;font-size:13px;line-height:1.5;">
+          Attention, ${joursTenusParDautres.length > 1 ? 'ces jours de la garde sont tenus' : 'ce jour de la garde est tenu'} par d'autres personnes :<br>
+          ${joursTenusParDautres.map((j) => `${formatDate(j.jour)} — ${j.occupants}`).join('<br>')}
+        </p>`
+    : ''
 
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -295,6 +327,7 @@ function buildGardeModifieeHtml(
             <td style="color:#374151;font-weight:bold;">${formatVet(newPremier)}${newSecond ? ` + ${formatVet(newSecond)}` : ''}</td>
           </tr>
         </table>
+        ${blocAutresJours}
       </div>
 
       <div style="margin-top:24px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:20px 24px;">
@@ -584,56 +617,38 @@ export async function sendPlanningPublie(
   //    planning republié après ajustements, c'est un e-mail faux envoyé à sept
   //    personnes — et c'est l'e-mail qu'elles impriment.
   //
-  // ⚠️ CE QUI RESTE AU TITULAIRE DE LA LIGNE : le binôme AFFICHÉ, qui suit le
-  //    jour de la ligne (le samedi d'un week-end). Un remplacement qui ne
-  //    porterait que sur le dimanche n'apparaît donc pas dans le détail, même si
-  //    la garde est bien listée chez le remplaçant. Limite écrite, pas découverte.
+  // 🔴 B-197 (10/11) — ET CE QU'IL DISAIT ENCORE APRÈS B-156. Il savait QUI
+  //    était concerné par une garde, mais lui affichait la LIGNE entière : date
+  //    du samedi, « Week-end », binôme du samedi. Manon, qui tient le seul
+  //    25/12, a reçu « samedi 26 décembre — Week-end, avec Victor ». Le mail
+  //    liste désormais les JOURS tenus, avec le binôme réel de chacun
+  //    (`lignesGardesDuVeto`).
   const exceptions = await chargerExceptionsDesGardes(
     supabase,
     (gardesRaw ?? []).map((g: Record<string, unknown>) => g.id as string),
   )
   const indexExceptions = indexerExceptions(exceptions)
-  const vetParId = new Map(vets.map((v) => [v.id, v as Veterinaire]))
 
-  // Qui est concerné par quelle garde, TOUS SES JOURS COMPRIS : un remplaçant du
-  // seul dimanche doit recevoir cette garde, alors que la ligne (le samedi)
-  // appartient toujours au titulaire.
-  const gardesDeChacun = new Map<string, Set<string>>()
-  const noter = (vetId: string | null, gardeId: string) => {
-    if (!vetId) return
-    const deja = gardesDeChacun.get(vetId) ?? new Set<string>()
-    deja.add(gardeId)
-    gardesDeChacun.set(vetId, deja)
+  // Les noms : vétos actifs, plus les titulaires chargés avec les gardes (un
+  // binôme inactif garde son nom plutôt que de disparaître du mail).
+  const noms = new Map<string, string>()
+  const retenirNom = (v: Veterinaire | null | undefined) => {
+    if (v?.id) noms.set(v.id, `${v.prenom} ${v.nom}`)
   }
+  for (const g of (gardesRaw ?? []) as Record<string, unknown>[]) {
+    retenirNom(g.premier as Veterinaire | null)
+    retenirNom(g.second as Veterinaire | null)
+  }
+  for (const v of vets) retenirNom(v as Veterinaire)
+  const nomDe = (id: string) => noms.get(id) ?? null
 
-  const gardes: Garde[] = (gardesRaw ?? []).map((g: Record<string, unknown>) => {
-    const titulaires = {
-      id: g.id as string,
-      date: g.date as string,
-      premier_id: (g.premier as Veterinaire | null)?.id ?? null,
-      second_id: (g.second as Veterinaire | null)?.id ?? null,
-    }
-    for (const jour of datesCouvertesParGardeV1(titulaires.date, g.type as string)) {
-      noter(occupantReel(titulaires, indexExceptions, jour, 'premier'), titulaires.id)
-      noter(occupantReel(titulaires, indexExceptions, jour, 'second'), titulaires.id)
-    }
-    const occupant = (role: 'premier' | 'second'): Veterinaire | null => {
-      const reel = occupantReel(titulaires, indexExceptions, titulaires.date, role)
-      if (!reel) return null
-      // Le remplaçant peut être inactif ou hors de la liste chargée : on retombe
-      // alors sur l'objet titulaire plutôt que de faire disparaître la place.
-      return vetParId.get(reel) ?? (role === 'premier'
-        ? (g.premier as Veterinaire | null)
-        : (g.second as Veterinaire | null))
-    }
-    return {
-      id:      g.id as string,
-      date:    g.date as string,
-      type:    g.type as string,
-      premier: occupant('premier'),
-      second:  occupant('second'),
-    }
-  })
+  const gardes: GardeAvecType[] = ((gardesRaw ?? []) as Record<string, unknown>[]).map((g) => ({
+    id:         g.id as string,
+    date:       g.date as string,
+    type:       g.type as string,
+    premier_id: (g.premier as Veterinaire | null)?.id ?? null,
+    second_id:  (g.second as Veterinaire | null)?.id ?? null,
+  }))
 
   let sent = 0
   let errors = 0
@@ -654,12 +669,13 @@ export async function sendPlanningPublie(
   tracerSansAdresse('planning_publie', trierDestinataires(vets).sansAdresse)
 
   for (const vet of vets) {
-    // B-156 : l'appartenance est calculée jour par jour au-dessus — un
-    // `g.premier?.id === vet.id` raterait le remplaçant d'un seul jour.
-    const aMoi = gardesDeChacun.get(vet.id)
-    const mesGardes = gardes.filter((g) => aMoi?.has(g.id))
+    // B-156 / B-197 : calculé jour par jour — un `g.premier?.id === vet.id`
+    // raterait le remplaçant d'un seul jour, et une ligne entière lui
+    // attribuerait des jours qui ne sont pas les siens.
+    const mesLignes = lignesGardesDuVeto(gardes, indexExceptions, vet.id)
+    const mesGardes = new Set(mesLignes.map((l) => l.gardeId))
 
-    const html    = buildPlanningPublieHtml(vet, periode, mesGardes)
+    const html    = buildPlanningPublieHtml(vet, periode, mesLignes, nomDe)
     const subject = `[GuardVeto] Nouveau planning — ${periodeLabel}`
 
     if (adresseUtilisable(vet.email) && reglages.recoitVeto(vet.id, 'planning_publie')) {
@@ -697,7 +713,7 @@ export async function sendPlanningPublie(
     }
 
     // Notif in-app (indépendante de l'email).
-    const notif = contenuPlanningPublie(periodeLabel, mesGardes.length)
+    const notif = contenuPlanningPublie(periodeLabel, mesGardes.size)
     await creerNotification(supabase, {
       veterinaireId: vet.id,
       type: 'planning_publie',
@@ -710,6 +726,47 @@ export async function sendPlanningPublie(
 
   console.log(`[notifications] Planning publié: ${sent} emails envoyés, ${errors} erreurs`)
   return { sent, errors }
+}
+
+/**
+ * B-197 — Les jours d'une garde où l'équipe réelle n'est pas celle des
+ * titulaires (remplacement d'un seul jour, B-061). Vide le plus souvent.
+ */
+export async function joursTenusParDautresQueLesTitulaires(
+  supabase: SupabaseClient,
+  garde: { id: string; date: string; type: string; premier: Veterinaire | null; second: Veterinaire | null },
+): Promise<{ jour: string; occupants: string }[]> {
+  const exceptions = await chargerExceptionsDesGardes(supabase, [garde.id])
+  if (exceptions.length === 0) return []
+  const index = indexerExceptions(exceptions)
+  const titulaires = {
+    id: garde.id,
+    date: garde.date,
+    premier_id: garde.premier?.id ?? null,
+    second_id: garde.second?.id ?? null,
+  }
+
+  const ids = [...new Set(exceptions.map((e) => e.veterinaire_id).filter((x): x is string => !!x))]
+  const { data: remplacants } = ids.length > 0
+    ? await supabase.from('veterinaires').select('id, prenom, nom').in('id', ids)
+    : { data: [] as { id: string; prenom: string; nom: string }[] }
+  const noms = new Map<string, string>()
+  for (const v of [garde.premier, garde.second, ...((remplacants ?? []) as Veterinaire[])]) {
+    if (v?.id) noms.set(v.id, `${v.prenom} ${v.nom}`)
+  }
+  const nom = (id: string | null) => (id ? noms.get(id) ?? 'une autre personne' : 'personne')
+
+  const resultat: { jour: string; occupants: string }[] = []
+  for (const jour of datesCouvertesParGardeV1(garde.date, garde.type)) {
+    const premier = occupantReel(titulaires, index, jour, 'premier')
+    const second = occupantReel(titulaires, index, jour, 'second')
+    if (premier === titulaires.premier_id && second === titulaires.second_id) continue
+    resultat.push({
+      jour,
+      occupants: second ? `${nom(premier)} + ${nom(second)}` : nom(premier),
+    })
+  }
+  return resultat
 }
 
 // ── Export : Garde modifiée ───────────────────────────────────
@@ -756,6 +813,8 @@ export async function sendGardeModifiee(
 
   if (destinataires.length === 0) return { sent: 0, errors: 0 }
 
+  const joursTenusParDautres = await joursTenusParDautresQueLesTitulaires(supabase, garde)
+
   const subject = `[GuardVeto] Garde modifiée — ${formatDate(garde.date)}`
 
   let sent = 0
@@ -777,6 +836,7 @@ export async function sendGardeModifiee(
       oldSecond,
       garde.premier,
       garde.second,
+      joursTenusParDautres,
     )
 
     if (adresseUtilisable(vet.email) && reglages.recoitVeto(vet.id, 'garde_modifiee')) {
