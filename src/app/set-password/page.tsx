@@ -7,16 +7,29 @@
 // l'autre recréerait à un écran de distance l'incohérence qu'on vient
 // de corriger. Pas de panneau d'identité ici (`.co-scene.seule`) : on
 // arrive par un lien d'invitation, on sait déjà où on est.
-// La logique (session, RPC `marquer_invite_complete`, redirection) est
-// inchangée — seule la présentation bouge.
+// Depuis B-201 (10/11), c'est une PORTE OBLIGÉE : `proxy.ts` renvoie ici
+// toute session ouverte par un lien tant qu'aucun mot de passe ne l'a
+// confirmée. Valider = enregistrer le mot de passe PUIS se reconnecter avec.
 // ============================================================
 
 import { useState, useTransition, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Satin } from '@/components/v2/Satin'
 import { ChampMotDePasse } from '@/components/v2/ChampMotDePasse'
+import { logout } from '@/app/login/actions'
 import '@/styles/v2-terrier.css'
 import '@/styles/v2-connexion.css'
+
+/** Les refus de Supabase arrivent en anglais : on traduit ceux qu'on connaît. */
+function messageErreurMotDePasse(code: string | undefined, brut: string): string {
+  if (code === 'weak_password') return 'Ce mot de passe est trop simple. Choisissez-en un plus long ou plus varié.'
+  // Session ouverte depuis plus de 24 h, quand Supabase exige alors une
+  // ré-authentification (cas des sessions par lien qui durent depuis octobre).
+  if (code === 'session_not_found' || code === 'session_expired' || code === 'reauthentication_needed') {
+    return 'Votre lien a expiré. Déconnectez-vous ci-dessous, puis demandez un nouveau lien avec « Mot de passe oublié » sur la page de connexion.'
+  }
+  return brut
+}
 
 export default function SetPasswordPage() {
   const [password, setPassword] = useState('')
@@ -75,8 +88,35 @@ export default function SetPasswordPage() {
     startTransition(async () => {
       const supabase = createClient()
 
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user?.email) {
+        window.location.href = '/login'
+        return
+      }
+
+      // « Même mot de passe qu'avant » n'est pas un échec : quelqu'un qui en
+      // avait déjà un et le retape a raison, on le reconnecte avec (B-201).
       const { error: updateError } = await supabase.auth.updateUser({ password })
-      if (updateError) { setError(updateError.message); return }
+      if (updateError && updateError.code !== 'same_password') {
+        setError(messageErreurMotDePasse(updateError.code, updateError.message))
+        return
+      }
+
+      // ⚠️ B-201 — On SE RECONNECTE avec le mot de passe choisi. Sans ce pas,
+      // la session reste « ouverte par un lien » : le gardien des pages
+      // (`proxy.ts`) renverrait ici en boucle. C'est aussi la seule preuve que
+      // le mot de passe enregistré ouvre vraiment la porte — avant, on pouvait
+      // repartir de cette page en croyant être inscrit sans l'être.
+      const { error: connexionError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password,
+      })
+      if (connexionError) {
+        setError(
+          "Le mot de passe est enregistré, mais la connexion avec lui a échoué. Retournez sur la page de connexion et utilisez-le.",
+        )
+        return
+      }
 
       // invite_pending est mis à jour côté serveur via RPC SECURITY DEFINER :
       // la RLS de `veterinaires` réserve l'UPDATE aux admins, donc un véto ne
@@ -133,7 +173,9 @@ export default function SetPasswordPage() {
 
           <section className="co-carte">
             <h1>Définir mon mot de passe</h1>
-            <p className="co-sous">Choisissez un mot de passe pour accéder à GuardVeto</p>
+            <p className="co-sous">
+              Dernière étape : choisissez le mot de passe qui vous servira aux prochaines connexions.
+            </p>
 
             <form onSubmit={handleSubmit} className="co-form">
               {/* L'œil compte double ici : on CHOISIT un mot de passe, et on
@@ -179,6 +221,15 @@ export default function SetPasswordPage() {
               <button type="submit" className="co-valider" disabled={isPending}>
                 {isPending && <span className="co-spin" aria-hidden="true" />}
                 {isPending ? 'Enregistrement...' : 'Valider le mot de passe'}
+              </button>
+            </form>
+
+            {/* B-201 — Cette page est désormais une porte obligée : quelqu'un qui
+                tombe ici sur le compte d'un autre (poste partagé du cabinet)
+                doit pouvoir en sortir sans fermer le navigateur. */}
+            <form action={logout} className="co-pied-carte">
+              <button type="submit" className="co-lien" disabled={isPending}>
+                Ce n’est pas votre compte ? Se déconnecter
               </button>
             </form>
           </section>

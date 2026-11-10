@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { cheminOuvertSansMotDePasse, sessionSansMotDePasse } from '@/lib/auth/session-par-lien'
 
 export async function proxy(request: NextRequest) {
   // Mode dev : bypass auth — laisser passer sans vérification de session
@@ -66,6 +67,21 @@ export async function proxy(request: NextRequest) {
       url.searchParams.set('suite', destination)
     }
     return NextResponse.redirect(url)
+  }
+
+  // B-201 — Session ouverte par un lien (invitation, « mot de passe oublié »)
+  // et jamais confirmée par un mot de passe → on finit l'inscription d'abord.
+  // Sans cette porte, quitter la page du mot de passe laissait entrer quand
+  // même, puis bloquait dehors à l'expiration de la session (secrétariat du
+  // Val d'Allier, 08/11). Lecture locale du jeton, déjà validé par `getUser`.
+  if (user && !cheminOuvertSansMotDePasse(pathname)) {
+    const { data: niveau } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+    if (sessionSansMotDePasse(niveau?.currentAuthenticationMethods)) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/set-password'
+      url.search = ''
+      return NextResponse.redirect(url)
+    }
   }
 
   // Authentifié sur /login → redirige vers l'accueil (V2 depuis 2026-07-25 ;
