@@ -138,6 +138,14 @@ export default function SetPasswordPage() {
         )
       }
 
+      // B-203 — Même principe pour le secrétariat : la fiche passe « Compte
+      // actif ». La base ne l'accepte que d'une session ouverte PAR MOT DE
+      // PASSE (celle qu'on vient d'ouvrir) ; pour un véto, elle ne fait rien.
+      const { error: rpcSecretariat } = await supabase.rpc('marquer_mot_de_passe_secretaire')
+      if (rpcSecretariat) {
+        console.error(`[set-password] marquer_mot_de_passe_secretaire a échoué (${rpcSecretariat.message})`)
+      }
+
       window.location.href = '/planning'
     })
   }

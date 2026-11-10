@@ -23,13 +23,19 @@
 //
 // ── L'ÉTAT DU COMPTE NE PRÉTEND PAS SAVOIR CE QU'IL IGNORE ──────────────────
 //
-// ⚠️ Trois états seulement : pas d'adresse · jamais invitée · compte créé.
+// ⚠️ Quatre états : pas d'adresse · jamais invitée · en attente du mot de
+// passe · compte actif. (« Compte créé » a disparu le 10/11, B-203 : il
+// s'affichait dès l'ENVOI de l'invitation, avant que quiconque ait ouvert le
+// mail — `user_id` est posé à l'envoi.)
 // On n'écrit PAS « invitation envoyée » tant qu'on ne peut pas savoir si la
 // personne s'est connectée depuis. C'est l'incident du 2026-08-21 : Fanny
 // s'affichait « Invitation envoyée » alors qu'elle s'était connectée la veille
 // — un drapeau déclaratif qu'une seule ligne de code faisait retomber, et qui
 // a menti pendant deux mois. Ici, l'état est DÉDUIT de ce que l'écran lit
-// vraiment : une fiche a un compte, ou elle n'en a pas.
+// vraiment : une fiche a un compte, ou elle n'en a pas ; et ce compte a servi
+// à une connexion PAR MOT DE PASSE, ou pas. Ce second fait n'est pas un
+// drapeau qu'on coche : la base ne pose `mot_de_passe_le` que si la session
+// appelante a été ouverte avec un mot de passe (migration B-203).
 // ============================================================
 
 import { useState, useTransition } from 'react'
@@ -50,15 +56,17 @@ export interface FicheSecretariat {
   nom: string
   email: string | null
   aUnCompte: boolean
+  /** B-203 — posé par la base sur preuve d'une connexion par mot de passe. */
+  motDePasseChoisi: boolean
   actif: boolean
 }
 
 /** Ce qu'on peut affirmer sans rien supposer. Voir l'en-tête. */
-type EtatCompte = 'inactif' | 'sans-adresse' | 'jamais-invitee' | 'compte-cree'
+type EtatCompte = 'inactif' | 'sans-adresse' | 'jamais-invitee' | 'en-attente' | 'compte-actif'
 
 function etatDe(s: FicheSecretariat): EtatCompte {
   if (!s.actif) return 'inactif'
-  if (s.aUnCompte) return 'compte-cree'
+  if (s.aUnCompte) return s.motDePasseChoisi ? 'compte-actif' : 'en-attente'
   if (!adresseUtilisable(s.email)) return 'sans-adresse'
   return 'jamais-invitee'
 }
@@ -67,7 +75,8 @@ const LIBELLE: Record<EtatCompte, string> = {
   inactif: 'Désactivée',
   'sans-adresse': 'Pas encore d’adresse',
   'jamais-invitee': 'Jamais invitée',
-  'compte-cree': 'Compte créé',
+  'en-attente': 'En attente du mot de passe',
+  'compte-actif': 'Compte actif',
 }
 
 export function SecretariatSection({ fiches }: { fiches: FicheSecretariat[] }) {
@@ -271,7 +280,11 @@ export function SecretariatSection({ fiches }: { fiches: FicheSecretariat[] }) {
                         même angle mort ; ne traiter que les vétos aurait laissé
                         la moitié du problème en place, avec la certitude de le
                         redécouvrir chez le client. */}
-                    {s.actif && etat !== 'compte-cree' && (
+                    {/* B-203 — En attente du mot de passe : le même bouton
+                        RENVOIE l'invitation (le serveur repart d'un compte neuf
+                        si le lien n'a jamais été ouvert, et dit quoi faire
+                        sinon). */}
+                    {s.actif && etat !== 'compte-actif' && (
                       <button
                         type="button"
                         className={`acct-cta${
@@ -281,11 +294,13 @@ export function SecretariatSection({ fiches }: { fiches: FicheSecretariat[] }) {
                         disabled={isPending || !adresseUtilisable(s.email)}
                         title={
                           adresseUtilisable(s.email)
-                            ? `Inviter ${s.nom}`
+                            ? etat === 'en-attente'
+                              ? `Renvoyer l’invitation à ${s.nom}`
+                              : `Inviter ${s.nom}`
                             : 'Renseigne d’abord une adresse e-mail.'
                         }
                       >
-                        Inviter
+                        {etat === 'en-attente' ? 'Renvoyer' : 'Inviter'}
                       </button>
                     )}
                     <button

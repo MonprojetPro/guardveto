@@ -39,6 +39,8 @@ interface FicheSecretariat {
   nom: string
   email: string | null
   user_id: string | null
+  /** B-203 — posé par la base sur preuve d'une connexion par mot de passe. */
+  mot_de_passe_le: string | null
   actif: boolean
 }
 
@@ -46,7 +48,7 @@ async function chargerSecretariat(ctx: ContexteOutil): Promise<FicheSecretariat[
   return lignesLues<FicheSecretariat>(
     await ctx.supabase
       .from('secretaires')
-      .select('id, nom, email, user_id, actif')
+      .select('id, nom, email, user_id, mot_de_passe_le, actif')
       .order('nom'),
     'la liste du secrétariat',
   )
@@ -91,7 +93,9 @@ function resoudre(fiches: FicheSecretariat[], nom: string): Resolution {
 export const lireSecretariat: OutilLecture<typeof SANS_PARAMETRE> = {
   genre: 'lecture',
   nom: 'lire_secretariat',
-  description: `Donne les accès de SECRÉTARIAT du cabinet : leur nom affiché, leur adresse e-mail, s'ils ont déjà un compte pour se connecter, et s'ils sont actifs.
+  description: `Donne les accès de SECRÉTARIAT du cabinet : leur nom affiché, leur adresse e-mail, s'ils ont déjà un compte, si ce compte a fini son inscription (mot de passe choisi), et s'ils sont actifs.
+
+Un compte dont le mot de passe n'est pas encore choisi NE PEUT PAS se connecter : ne dis jamais « compte créé » ou « peut se connecter » pour lui, dis que l'invitation attend que la personne choisisse son mot de passe.
 
 Le secrétariat n'est PAS l'équipe vétérinaire : ce sont des accès en consultation, qui voient le planning diffusé et les absences à venir, et ne modifient rien. Ils n'apparaissent dans aucun planning, aucun compteur, aucune règle.
 
@@ -108,6 +112,9 @@ Appelle-le dès qu'une question porte sur QUI PEUT SE CONNECTER ou QUI A ACCÈS 
       // Écrire « invitation envoyée » serait affirmer ce qu'on ne sait pas —
       // c'est le drapeau qui a menti deux mois sur la fiche de Fanny.
       a_un_compte: f.user_id !== null,
+      // B-203 — sans ce second fait, « a un compte » se lisait « peut se
+      // connecter » alors que l'invitation n'avait même pas été ouverte.
+      mot_de_passe_choisi: f.user_id !== null && f.mot_de_passe_le !== null,
       actif: f.actif,
     }))
   },
@@ -211,7 +218,7 @@ Sans adresse e-mail sur la fiche, l'invitation n'a nulle part où aller : l'outi
         raison: `L’accès « ${f.nom} » n’a pas d’adresse e-mail : l’invitation n’aurait nulle part où aller. Renseigne-la d’abord sur l’écran Équipe.`,
       }
     }
-    if (f.user_id) {
+    if (f.user_id && f.mot_de_passe_le) {
       return {
         ok: false,
         raison: `L’accès « ${f.nom} » a déjà un compte : la personne peut se connecter. Si elle a oublié son mot de passe, elle peut le réinitialiser depuis l’écran de connexion.`,
@@ -221,7 +228,7 @@ Sans adresse e-mail sur la fiche, l'invitation n'a nulle part où aller : l'outi
     return {
       ok: true,
       proposition: {
-        titre: `Inviter « ${f.nom} »`,
+        titre: f.user_id ? `Renvoyer l’invitation à « ${f.nom} »` : `Inviter « ${f.nom} »`,
         phrase: `Un e-mail partira à ${f.email} pour choisir un mot de passe.`,
         lignes: [
           'L’accès donne le planning diffusé et les absences à venir, en consultation.',

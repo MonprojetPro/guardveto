@@ -80,7 +80,7 @@ export default async function EquipePage() {
   // qu'aucun accès n'existe, et pousserait à en recréer un par-dessus.
   const { data: secretairesDb, error: erreurSecretaires } = await supabase
     .from('secretaires')
-    .select('id, nom, email, user_id, actif')
+    .select('id, nom, email, user_id, mot_de_passe_le, actif')
     .order('actif', { ascending: false })
     .order('nom')
 
@@ -89,7 +89,14 @@ export default async function EquipePage() {
   }
 
   const secretaires: FicheSecretariat[] = (
-    (secretairesDb ?? []) as { id: string; nom: string; email: string | null; user_id: string | null; actif: boolean }[]
+    (secretairesDb ?? []) as {
+      id: string
+      nom: string
+      email: string | null
+      user_id: string | null
+      mot_de_passe_le: string | null
+      actif: boolean
+    }[]
   ).map((s) => ({
     id: s.id,
     nom: s.nom,
@@ -98,6 +105,9 @@ export default async function EquipePage() {
     // (« invitation envoyée ») : c'est le drapeau déclaratif qui a menti
     // pendant deux mois sur la fiche de Fanny.
     aUnCompte: s.user_id !== null,
+    // B-203 — Deuxième FAIT, posé par la base sur preuve d'une connexion par
+    // mot de passe : sans lui, « Compte créé » s'affichait dès l'envoi du mail.
+    motDePasseChoisi: s.user_id !== null && s.mot_de_passe_le !== null,
     actif: s.actif,
   }))
 

@@ -266,7 +266,12 @@ export async function inviterSecretaire(id: string): Promise<ReponseInvitation> 
 
   if (existant) {
     if (existant.confirmed_at) {
-      return { error: 'Un compte actif existe déjà pour cette adresse.' }
+      // B-203 — Le lien a déjà été ouvert : renvoyer une invitation effacerait
+      // un compte peut-être déjà utilisé. La sortie existe et on la dit.
+      return {
+        error:
+          'Le lien d’invitation a déjà été ouvert. Pour choisir ou retrouver son mot de passe, la personne clique sur « Mot de passe oublié » sur la page de connexion, avec cette adresse.',
+      }
     }
     if (existant.id !== sec.user_id) {
       return {

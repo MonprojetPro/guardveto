@@ -66,7 +66,17 @@ export async function login(formData: FormData) {
   // Le secrétariat n'a pas d'accueil : l'épicentre est le bureau de Filou, et
   // Filou ne lui est pas ouvert (arbitrage MiKL du 25/08). Son écran d'arrivée
   // est le planning, qui est aussi sa raison d'être ici.
-  if (identite.identite.genre === 'secretaire') redirect('/planning')
+  if (identite.identite.genre === 'secretaire') {
+    // B-203 — Une connexion par mot de passe réussie PROUVE que le compte est
+    // fini : la fiche passe « Compte actif ». Rattrape aussi les comptes dont
+    // le mot de passe a été choisi avant que la base sache le noter. Un échec
+    // ne bloque pas l'entrée : ce n'est qu'une pastille d'état.
+    const { error: erreurMarque } = await supabase.rpc('marquer_mot_de_passe_secretaire')
+    if (erreurMarque) {
+      console.error('[login] marquer_mot_de_passe_secretaire a échoué :', erreurMarque.message)
+    }
+    redirect('/planning')
+  }
 
   // On revient là où la personne allait, si elle allait quelque part. C'est ce
   // qui rend le lien de l'appel aux volontaires utilisable depuis un e-mail.

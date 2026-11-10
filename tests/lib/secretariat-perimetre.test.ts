@@ -235,6 +235,40 @@ describe('La gestion des fiches est réservée à l’administratrice', () => {
     )
     expect(dictionnaire).not.toMatch(/Invitation envoyée/)
   })
+
+  it('ne dit « Compte actif » qu’après un vrai mot de passe (B-203)', () => {
+    // `user_id` est posé dès l'ENVOI de l'invitation : s'en contenter
+    // affichait « Compte créé » avant même l'ouverture du mail (10/11).
+    const section = readFileSync(
+      join(RACINE, 'src', 'components', 'v2', 'SecretariatSection.tsx'),
+      'utf8',
+    )
+    expect(section).toContain('motDePasseChoisi')
+    const libelles = section.slice(
+      section.indexOf('const LIBELLE'),
+      section.indexOf('export function SecretariatSection'),
+    )
+    expect(libelles).not.toContain('Compte créé')
+    expect(libelles).toContain('En attente du mot de passe')
+
+    // Et ce fait n'est pas un drapeau qu'on coche : la base ne le pose que
+    // pour une session ouverte PAR MOT DE PASSE.
+    const migration = readFileSync(
+      join(RACINE, 'supabase', 'migrations', '20261110200000_b203_secretariat_mot_de_passe.sql'),
+      'utf8',
+    )
+    expect(migration).toMatch(/auth\.jwt\(\) -> 'amr'/)
+    expect(migration).toMatch(/m ->> 'method' = 'password'/)
+    expect(migration).toMatch(/WHERE user_id = auth\.uid\(\)/)
+
+    // Les deux portes d'entrée l'appellent.
+    for (const chemin of [
+      ['src', 'app', 'set-password', 'page.tsx'],
+      ['src', 'app', 'login', 'actions.ts'],
+    ]) {
+      expect(readFileSync(join(RACINE, ...chemin), 'utf8')).toContain('marquer_mot_de_passe_secretaire')
+    }
+  })
 })
 
 describe('Filou connaît le secrétariat, sans l’ouvrir à tout le monde', () => {

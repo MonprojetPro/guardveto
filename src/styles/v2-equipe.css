@@ -928,7 +928,9 @@
   color: var(--t-muted);
   white-space: nowrap;
 }
-.secr-etat.et-compte-cree { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+.secr-etat.et-compte-actif { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+/* B-203 — même teinte que « Invitation envoyée » sur les fiches véto (.acct-invite). */
+.secr-etat.et-en-attente { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
 .secr-outils { display: flex; align-items: center; gap: 6px; flex: none; }
 .secr-outils button:not(.acct-cta) {
   width: 30px; height: 30px; border-radius: 8px;
