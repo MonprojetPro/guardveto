@@ -97,6 +97,8 @@ describe('B-197 — le mail liste les jours réellement tenus', () => {
     expect(html).toContain('Planning corrigé')
     expect(html).toContain('toutes nos excuses pour la gêne occasionnée')
     expect(html).toContain('logiciel de référence')
+    expect(html).toContain("assuré par d'autres personnes que le samedi et le dimanche")
+    expect(html).not.toContain("qu'un seul jour")
   })
 })
 

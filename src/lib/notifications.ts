@@ -232,7 +232,7 @@ export function buildPlanningPublieHtml(
     : `<tr><td colspan="3" style="padding:12px;text-align:center;color:#6b7280;">Aucune garde assignée sur cette période.</td></tr>`
 
   const intro = rectificatif
-    ? `<p style="color:#374151;"><strong>Correction de notre précédent e-mail.</strong> Le récapitulatif envoyé le ${formatDate(rectifieLeMailDu!)} pour la période <strong>${periodeLabel}</strong> comportait une erreur sur les week-ends partagés entre plusieurs personnes (une personne qui n'en tient qu'un seul jour). Le planning affiché dans GuardVeto, lui, était juste. Nous vous présentons toutes nos excuses pour la gêne occasionnée. Voici vos gardes corrigées — merci de ne plus tenir compte du précédent e-mail.</p>`
+    ? `<p style="color:#374151;"><strong>Correction de notre précédent e-mail.</strong> Le récapitulatif envoyé le ${formatDate(rectifieLeMailDu!)} pour la période <strong>${periodeLabel}</strong> comportait une erreur : quand le vendredi d'un week-end de garde est assuré par d'autres personnes que le samedi et le dimanche, les dates indiquées étaient fausses. Le planning affiché dans GuardVeto, lui, était juste. Nous vous présentons toutes nos excuses pour la gêne occasionnée. Voici vos gardes corrigées — merci de ne plus tenir compte du précédent e-mail.</p>`
     : `<p style="color:#374151;">Le planning de gardes pour la période <strong>${periodeLabel}</strong> vient d'être publié.</p>`
 
   // Le rectificatif remercie : ce sont les retours de l'équipe qui font
