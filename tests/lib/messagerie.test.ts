@@ -401,3 +401,32 @@ describe('⑤ B-193c — prévenir aussi par mail', () => {
     expect(readFileSync(join(RACINE, 'src/components/v2/ReglagesV2.tsx'), 'utf8')).toMatch(/message: 'Message de la messagerie'/)
   })
 })
+
+describe('⑥ B-193b — l’administratrice allume et éteint la messagerie', () => {
+  it('chaque module réglable dit OÙ il s’allume, et la messagerie s’allume dans Réglages', async () => {
+    const { MODULES_REGLABLES_PAR_ADMIN, OU_ALLUMER } = await import('@/lib/produit/modules')
+    for (const m of MODULES_REGLABLES_PAR_ADMIN) expect(OU_ALLUMER[m], m).toBeTruthy()
+    expect(MODULES_REGLABLES_PAR_ADMIN).toContain('chat')
+    expect(OU_ALLUMER.chat).toContain('Réglages')
+  })
+
+  it('la base garde « au moins un PLANNING allumé » : la messagerie seule ne compte pas', () => {
+    const sql = readFileSync(join(RACINE, 'supabase/migrations/20261110180000_b193b_messagerie_interrupteur.sql'), 'utf8')
+    expect(sql).toContain("p_module NOT IN ('gardes', 'planning-journee', 'chat')")
+    expect(sql).toContain("IF NOT (v_modules && ARRAY['gardes', 'planning-journee']) THEN")
+    expect(sql).toContain("role_app = 'admin'")
+  })
+
+  it('la carte n’est posée que dans la partie ADMIN de Réglages', () => {
+    const page = readFileSync(join(RACINE, 'src/app/(v2)/reglages/page.tsx'), 'utf8')
+    const avant = page.slice(0, page.indexOf('carteMessagerie='))
+    // La partie admin commence là où la page exige un vétérinaire administrateur.
+    expect(avant).toContain('<BarreV2 prenom={vet.prenom} estAdmin dock={dock} />')
+    expect(page.match(/carteMessagerie=/g)?.length).toBe(1)
+  })
+
+  it('l’écran « non activé » et le refus serveur lisent la même phrase', () => {
+    expect(readFileSync(join(RACINE, 'src/components/v2/ModuleEteint.tsx'), 'utf8')).toContain('OU_ALLUMER[module]')
+    expect(readFileSync(join(RACINE, 'src/lib/produit/modules-serveur.ts'), 'utf8')).toContain('OU_ALLUMER[module]')
+  })
+})

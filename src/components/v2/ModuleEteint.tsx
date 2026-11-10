@@ -24,7 +24,7 @@
 // ============================================================
 
 import Link from 'next/link'
-import { MODULES } from '@/lib/produit/modules'
+import { MODULES, OU_ALLUMER } from '@/lib/produit/modules'
 
 interface Props {
   /** L'identifiant du module, tel qu'il figure dans `MODULES`. */
@@ -57,7 +57,9 @@ export function ModuleEteint({ module, estAdmin = false }: Props) {
       {quoi && <p className="me-quoi">{quoi}</p>}
       <p className="me-suite">
         {estAdmin
-          ? 'Vous pouvez l’allumer vous-même dans Organisation, encart « Vos plannings » : il prend effet immédiatement pour toute l’équipe.'
+          ? OU_ALLUMER[module]
+            ? `Vous pouvez l’allumer vous-même ${OU_ALLUMER[module]} : il prend effet immédiatement pour toute l’équipe.`
+            : 'Pour l’ouvrir à votre cabinet, contactez MonProjetPro.'
           : 'Si vous pensez qu’elle devrait l’être, parlez-en à l’administratrice du cabinet.'}
       </p>
       <div className="me-sortie">

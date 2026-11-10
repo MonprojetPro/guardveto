@@ -17,6 +17,7 @@ import { redirect } from 'next/navigation'
 import { exigerIdentite, exigerVeterinaire } from '@/lib/identite'
 import { agendaPersoOuvert, clientService } from '@/lib/agenda-perso/rapprocher'
 import { CartesReglagesPerso } from '@/components/v2/CartesReglagesPerso'
+import { CarteMessagerie } from '@/components/v2/CarteMessagerie'
 import '@/styles/v2-reglages.css'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
@@ -246,6 +247,8 @@ export default async function ReglagesPage() {
           agendaAfficherHoraires={agendaAfficherHoraires}
           creneaux={creneaux}
           monAgendaOuvert={monAgendaOuvert}
+          // B-193b — l'état lu dans le dock (modules du cabinet, lus côté serveur).
+          carteMessagerie={<CarteMessagerie allumee={dock.modules.includes('chat')} />}
         />
       </div>
     </>

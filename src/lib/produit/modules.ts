@@ -74,12 +74,22 @@ export const MODULES: Record<string, Module> = {
  *    liste, en dur (migration 20261027120000). C'est elle qui fait autorité ;
  *    celle-ci ne sert qu'à afficher. Les deux doivent bouger ensemble.
  *    `gardes` y est depuis B-175a (28/10, un cabinet « journées seules »).
- *    `chat` non, pas encore : son écran existe depuis B-193 (06/11), mais le
- *    lot 1 ne l'allume que sur le bac à sable, par nous. L'interrupteur de
- *    l'admin vient avec l'allumage chez le premier client (lot 3).
- *    Il faut toujours en garder UN allumé : la base le refuse sinon.
+ *    `chat` depuis B-193b (10/11) : la messagerie s'allume dans Réglages.
+ *    Il faut toujours garder UN PLANNING allumé : la base le refuse sinon (la
+ *    messagerie seule ne compte pas comme un planning).
  */
-export const MODULES_REGLABLES_PAR_ADMIN = ['gardes', 'planning-journee'] as const
+export const MODULES_REGLABLES_PAR_ADMIN = ['gardes', 'planning-journee', 'chat'] as const
+
+/**
+ * Où l'administratrice allume chaque module — UNE phrase par module, lue par
+ * l'écran « non activé » ET par le refus serveur, pour qu'ils ne divergent
+ * jamais. Un module absent d'ici s'ouvre par MonProjetPro.
+ */
+export const OU_ALLUMER: Record<string, string> = {
+  gardes: 'dans Organisation, encart « Vos plannings »',
+  'planning-journee': 'dans Organisation, encart « Vos plannings »',
+  chat: 'dans Réglages, carte « Messagerie de l’équipe »',
+}
 
 /** Les identifiants de modules connus. Toute autre valeur est une faute de frappe. */
 export type IdModule = keyof typeof MODULES

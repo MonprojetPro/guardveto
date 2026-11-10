@@ -199,12 +199,15 @@ interface Props {
   creneaux: CreneauAgenda[]
   /** B-174 — « Mon agenda » ouvert à ce cabinet : sa carte apparaît sous « Mes notifications ». */
   monAgendaOuvert?: boolean
+  /** B-193b — l'interrupteur de la messagerie, rendu par la page (admin seule). */
+  carteMessagerie?: React.ReactNode
 }
 
 export function ReglagesV2({
   valeurs, periodesPubliees, emails, agendaParDefaut = '', nomAgenda = null,
   envoiConfigure = false, agendaJourneeEntiere, agendaAfficherHoraires, creneaux,
   monAgendaOuvert = false,
+  carteMessagerie = null,
 }: Props) {
   const [isPending, startTransition] = useTransition()
   const { ouvrirErreur, dialogueErreur } = useErreurBloquante()
@@ -721,6 +724,9 @@ export function ReglagesV2({
             page de réglages du CABINET laisserait croire qu'ils valent pour
             tout le monde. */}
         <CartesReglagesPerso agendaOuvert={monAgendaOuvert} />
+
+        {/* ── B-193b — Messagerie de l'équipe : l'interrupteur de l'admin ── */}
+        {carteMessagerie}
 
         {/* ── Adresse du cabinet ─────────────────────────────────────── */}
         <section className="card conn-card" aria-label="Adresse du cabinet et zones déduites">

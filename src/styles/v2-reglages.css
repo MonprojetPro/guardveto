@@ -374,3 +374,11 @@
 @media (max-width: 640px) {
   .ma-sous { padding-left: 0; }
 }
+
+/* ── B-193b — carte « Messagerie de l'équipe » ─────────────────── */
+.carte-messagerie .conn-ico svg { width: 19px; height: 19px; color: var(--accent-ink); }
+.carte-messagerie-pied {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+  padding: 13px 18px 15px;
+}
+.carte-messagerie-refus { margin: 0; font-size: 0.8rem; color: var(--danger); }
