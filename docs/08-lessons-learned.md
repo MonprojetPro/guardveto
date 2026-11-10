@@ -923,3 +923,30 @@ reattribuer une garde que le titulaire pouvait assurer. Les 3 routes (`reparer`,
 `appel-volontaires`) **refusent desormais en 422** — pas un 200 vide, qui se lirait « c'est
 repare ». Et `avertissementsAffectation` ne previent plus sur une matinee : **une alerte fausse
 coute plus cher qu'une alerte absente, elle use l'attention.**
+
+## 2026-11-10 — B-202 : trois lecons de la refonte de l'onglet Reglages
+
+**1. Une section demontee repart de ses props, et ses props peuvent mentir.** La premiere
+version de la coquille ne montait que la section ouverte. SCAN l'a pris : couper un e-mail dans
+« Pour moi », aller dans « Le cabinet », revenir — l'interrupteur se reaffichait « active »,
+parce que `setReceptionEmail` ne revalide pas `/reglages` et que l'etat repartait des props du
+chargement. Meme cause : une adresse a moitie tapee disparaissait en silence. ➜ Dans un ecran a
+onglets, **garder les sections montees et masquer les autres** (`hidden`), plutot que de compter
+sur chaque action pour revalider la bonne page.
+
+**2. Voir un ecran de chantier sans compte bac a sable : un apercu local COUPE DE LA BASE.** Le
+nouvel ecran n'existait que pour un cabinet bac a sable, et aucun identifiant de test n'etait
+disponible. Solution utilisee deux fois dans la soiree : une page temporaire `src/app/apercu-.../`
+qui rend le composant avec des donnees fictives, servie par un `next dev` dont
+`.claude/launch.json` force `DEV_BYPASS_AUTH=true` **et** une adresse Supabase morte
+(`NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:9`, cles bidon) — `@next/env` ne remplace pas une
+variable deja definie, donc `.env.local` ne reprend pas la main. Le moindre clic qui appellerait
+une action echoue au lieu d'ecrire dans la base du client. ⚠️ Apres coup : supprimer la page, la
+configuration, **et `.next/dev/types`** — le type genere garde la route morte et fait echouer
+`tsc` pour tout le monde (SCAN l'a vu).
+
+**3. Le harnais OTTO compte un script de brouillon `.js` comme du code.** Ecrire un script dans
+le dossier temporaire APRES la convergence fait refuser l'enregistrement (« convergence
+anterieure au dernier code ecrit »), alors qu'aucun fichier du projet n'a bouge. On ne contourne
+pas : revérifier (`find src tests supabase -newer docs/00-product-board.md` vide), l'ecrire au
+board, puis enregistrer. Mieux : ecrire ses scripts de brouillon AVANT la convergence.
