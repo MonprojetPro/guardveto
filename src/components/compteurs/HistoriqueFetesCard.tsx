@@ -29,65 +29,63 @@ interface HistoriqueFetesCardProps {
 export function HistoriqueFetesCard({ rows }: HistoriqueFetesCardProps) {
   if (rows.length === 0) return null
 
-  // Groupement par année de saison (desc), puis Noël avant Nouvel An.
-  const parAnnee = new Map<number, HistoriqueFeteAffichage[]>()
+  // B-194 ① bis — UNE LIGNE PAR FÊTE, plus une ligne par « saison ».
+  // MiKL, 10/11 : « faire une ligne unique pour 2026-2027 c'est bizarre, ça
+  // devait être séparé ». Noël 2026 et le Nouvel An 2026 → 2027 sont deux
+  // fêtes : chacune sa ligne, ses dates, et ses titulaires rangés par rôle.
+  // La phrase « le moteur évite la même fête deux ans de suite » est retirée
+  // (sobriété) : la règle existe toujours (`penaliteFeteHistorique`, souple).
+  const lignes: Array<{ cle: string; fete: 'noel' | 'nouvel_an'; annee: number; tenants: HistoriqueFeteAffichage[] }> = []
   for (const r of rows) {
-    const liste = parAnnee.get(r.annee) ?? []
-    liste.push(r)
-    parAnnee.set(r.annee, liste)
+    const cle = `${r.annee}-${r.fete}`
+    const ligne = lignes.find((l) => l.cle === cle)
+    if (ligne) ligne.tenants.push(r)
+    else lignes.push({ cle, fete: r.fete, annee: r.annee, tenants: [r] })
   }
-  const annees = [...parAnnee.keys()].sort((a, b) => b - a)
+  // Le plus récent d'abord ; dans une même année, Noël avant le Nouvel An.
+  lignes.sort((a, b) => b.annee - a.annee || (a.fete === 'noel' ? -1 : 1))
 
-  // B-194 ① — CARTE V2, comme le bilan voisin. Elle était greffée dans un
-  // cadre V1 (`.v2-greffe`) : un cadre dans un cadre, texte collé aux bords,
-  // et toutes les fêtes d'une année sur une seule phrase. Un tableau
-  // Année / Noël / Nouvel An se lit d'un coup d'œil.
+  const sansRole = rows.some((r) => r.role !== 'premier' && r.role !== 'second')
+
+  const noms = (tenants: HistoriqueFeteAffichage[]) =>
+    tenants.length === 0
+      ? '—'
+      : tenants.map((t) => (
+          <span key={`${t.veterinaire_id}-${t.role ?? ''}`} className="fetes-tenant">
+            {t.prenom} {t.nom}
+          </span>
+        ))
+
   return (
     <section className="card count-card fetes-card" aria-label="Historique des fêtes de fin d'année">
       <div className="card-head">
         <h3>Fêtes de fin d&apos;année</h3>
-        <span className="sub spacer">
-          qui a tenu chaque fête · le moteur évite la même fête deux ans de suite
-        </span>
       </div>
       <table className="count-table">
         <thead>
           <tr>
-            <th>Saison</th>
-            <th>{LIBELLE_FETE.noel}</th>
-            <th>{LIBELLE_FETE.nouvel_an}</th>
+            <th>Fête</th>
+            <th>{LIBELLE_ROLE.premier}</th>
+            <th>{LIBELLE_ROLE.second}</th>
+            {sansRole && <th>Rôle non noté</th>}
           </tr>
         </thead>
         <tbody>
-          {annees.map((annee) => {
-            const entrees = parAnnee.get(annee) ?? []
-            return (
-              <tr key={annee}>
-                {/* Année de saison : le Nouvel An 2026 = 31/12/2026 → 01/01/2027 */}
-                <td>
-                  {annee}–{(annee + 1) % 100}
+          {lignes.map((l) => (
+            <tr key={l.cle}>
+              <td className="fetes-fete">
+                {l.fete === 'noel' ? `${LIBELLE_FETE.noel} ${l.annee}` : `${LIBELLE_FETE.nouvel_an} ${l.annee} → ${l.annee + 1}`}
+                <em>{l.fete === 'noel' ? '24 et 25 déc.' : '31 déc. et 1er janv.'}</em>
+              </td>
+              <td className="fetes-tenants">{noms(l.tenants.filter((t) => t.role === 'premier'))}</td>
+              <td className="fetes-tenants">{noms(l.tenants.filter((t) => t.role === 'second'))}</td>
+              {sansRole && (
+                <td className="fetes-tenants">
+                  {noms(l.tenants.filter((t) => t.role !== 'premier' && t.role !== 'second'))}
                 </td>
-                {(['noel', 'nouvel_an'] as const).map((fete) => {
-                  const tenants = entrees.filter((e) => e.fete === fete)
-                  return (
-                    <td key={fete} className="fetes-tenants">
-                      {tenants.length === 0
-                        ? '—'
-                        : tenants.map((t) => {
-                            const role = t.role ? LIBELLE_ROLE[t.role] ?? t.role : null
-                            return (
-                              <span key={`${t.prenom}-${t.nom}-${t.role ?? ''}`} className="fetes-tenant">
-                                {t.prenom} {t.nom}
-                                {role && <em>{role}</em>}
-                              </span>
-                            )
-                          })}
-                    </td>
-                  )
-                })}
-              </tr>
-            )
-          })}
+              )}
+            </tr>
+          ))}
         </tbody>
       </table>
     </section>
