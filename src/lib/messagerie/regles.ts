@@ -23,6 +23,10 @@ export const BUCKET_MESSAGERIE = 'messagerie'
 /** Combien de messages un fil charge d'un coup (puis « plus anciens »). */
 export const TAILLE_PAGE_MESSAGES = 60
 
+/** Les colonnes lues d'un message — UNE liste pour l'ecran et le serveur. */
+export const COLONNES_MESSAGE =
+  'id, conversation_id, auteur_user_id, auteur_nom, corps, pieces_jointes, cree_le, modifie_le, retire_le, mail_envoye_a, mail_echecs'
+
 export type GenreConversation = 'equipe' | 'privee'
 
 /** Une piece jointe, telle que stockee dans `messages.pieces_jointes`. */
@@ -45,6 +49,10 @@ export interface MessageFil {
   creeLe: string
   modifieLe: string | null
   retireLe: string | null
+  /** B-193c — envoye aussi par mail a N personnes (`null` = pas d'envoi par mail). */
+  mailEnvoyeA: number | null
+  /** B-193c — combien de ces mails ont echoue. */
+  mailEchecs: number | null
   /** Pose localement avant confirmation du serveur (envoi optimiste). */
   enEnvoi?: boolean
   /** L'envoi a echoue : le message reste visible, avec « Reessayer ». */
@@ -71,6 +79,8 @@ export interface MembreAnnuaire {
   userId: string
   nom: string
   role: 'admin' | 'veto' | 'secretaire'
+  /** B-193c — a une adresse mail (l'adresse elle-meme ne quitte jamais la base). */
+  aEmail: boolean
 }
 
 /** La rangee brute rendue par la base, avant mise en forme. */
@@ -84,6 +94,8 @@ export interface RangeeMessage {
   cree_le: string
   modifie_le: string | null
   retire_le: string | null
+  mail_envoye_a?: number | null
+  mail_echecs?: number | null
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -121,6 +133,8 @@ export function versMessage(r: RangeeMessage): MessageFil {
     creeLe: r.cree_le,
     modifieLe: r.modifie_le,
     retireLe: r.retire_le,
+    mailEnvoyeA: r.mail_envoye_a ?? null,
+    mailEchecs: r.mail_echecs ?? null,
   }
 }
 
@@ -279,4 +293,16 @@ export function decouperLiens(texte: string): { texte: string; lien: boolean }[]
 export function chiffreNonLus(n: number): string | null {
   if (!Number.isFinite(n) || n <= 0) return null
   return n > 99 ? '99+' : String(n)
+}
+
+/**
+ * B-193c — la mention sous un message envoyé aussi par mail (visible de son
+ * autrice seule). Un échec se dit, il ne se fond pas dans un total.
+ */
+export function libelleEnvoiMail(envoyes: number, echecs: number): string {
+  const s = (n: number) => (n > 1 ? 's' : '')
+  if (envoyes === 0 && echecs === 0) return 'mail : personne à prévenir'
+  if (envoyes === 0) return 'le mail n’est pas parti'
+  const base = 'envoyé aussi par mail à ' + envoyes + ' personne' + s(envoyes)
+  return echecs > 0 ? base + ' · ' + echecs + ' échec' + s(echecs) : base
 }

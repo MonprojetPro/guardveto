@@ -321,6 +321,69 @@
   display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
 }
 .msg-compte { margin: 4px 0 0; text-align: right; font-size: 0.7rem; color: var(--t-muted); }
+
+/* ── B-193c : prévenir aussi par mail ──────────────────────────── */
+.messagerie .msg-joindre.actif {
+  background: var(--t-accent); border-color: var(--t-accent); color: #fff;
+}
+.msg-mail { white-space: nowrap; }
+.msg-mail.echec { color: var(--danger); font-weight: 600; }
+
+.msg-mail-choisi {
+  display: flex; align-items: center; gap: 7px;
+  margin: 0 0 8px; padding: 5px 6px 5px 12px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-size: 0.78rem; color: var(--accent-ink);
+}
+.msg-mail-choisi > svg { width: 14px; height: 14px; flex: none; }
+.msg-mail-choisi > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.messagerie .msg-mail-choisi button {
+  width: 22px; height: 22px; padding: 0; flex: none;
+  border: 0; border-radius: 50%; background: transparent; color: var(--accent-ink);
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.messagerie .msg-mail-choisi button svg { width: 13px; height: 13px; }
+
+.msg-choix-mail {
+  margin: 0 0 8px;
+  border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+  background: var(--surface);
+  overflow: hidden;
+}
+.msg-choix-mail-tete {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 8px 8px 12px;
+  border-bottom: 1px solid var(--t-border);
+  font-size: 0.8rem; font-weight: 700;
+}
+.msg-choix-mail-tete > span { flex: 1; }
+.messagerie .msg-choix-fermer {
+  width: 28px; height: 28px; padding: 0;
+  border: 0; border-radius: 50%;
+  background: var(--t-accent); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.messagerie .msg-choix-fermer svg { width: 15px; height: 15px; }
+.msg-choix-mail ul { list-style: none; margin: 0; padding: 4px; max-height: 210px; overflow-y: auto; }
+.messagerie .msg-choix-mail li button {
+  width: 100%;
+  display: flex; align-items: center; gap: 9px;
+  padding: 6px 8px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--text);
+  font: inherit; font-size: 0.84rem; text-align: left; cursor: pointer;
+}
+.messagerie .msg-choix-mail li button:hover:not(:disabled) { background: var(--surface-2); }
+.messagerie .msg-choix-mail li button:disabled { color: var(--t-muted); cursor: default; }
+.msg-choix-mail li em { margin-left: auto; font-style: normal; font-size: 0.72rem; color: var(--t-muted); }
+.msg-case {
+  width: 17px; height: 17px; flex: none;
+  border: 1.5px solid var(--border-strong); border-radius: 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface);
+}
+.messagerie .msg-choix-mail li button.coche .msg-case { background: var(--t-accent); border-color: var(--t-accent); color: #fff; }
+.msg-case svg { width: 12px; height: 12px; }
 .msg-ferme {
   border-top: 1px solid var(--t-border);
   margin: 0; padding: 12px 16px;

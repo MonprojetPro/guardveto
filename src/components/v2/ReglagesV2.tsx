@@ -119,6 +119,8 @@ const TYPE_EMAIL: Record<string, string> = {
   // Autorisé en base depuis B-134 (26/09) et jamais traduit ici : l'écran
   // affichait le code brut « conge_demande » (capture MiKL, 02/11).
   conge_demande: 'Demande de congé',
+  // B-193c — un message de la messagerie, envoyé aussi par mail par l'admin.
+  message: 'Message de la messagerie',
 }
 
 /**

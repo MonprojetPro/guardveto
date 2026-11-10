@@ -29,6 +29,7 @@ import {
   decouperLiens,
   fusionnerMessage,
   initiales,
+  libelleEnvoiMail,
   libelleJour,
   nomConversation,
   piecesDe,
@@ -44,6 +45,7 @@ import {
   type StockageBrouillon,
 } from '@/lib/messagerie/brouillon'
 import { FORMATS_ACCEPTES, TAILLE_MAX_OCTETS } from '@/lib/support/contraintes'
+import { corpsMailMessage, sujetMailMessage } from '@/lib/emails/message'
 
 const RACINE = join(__dirname, '..', '..')
 const SQL = readFileSync(join(RACINE, 'supabase/migrations/20261106120000_b193_messagerie.sql'), 'utf8')
@@ -67,6 +69,8 @@ function msg(id: string, creeLe: string, extra: Partial<MessageFil> = {}): Messa
     creeLe,
     modifieLe: null,
     retireLe: null,
+    mailEnvoyeA: null,
+    mailEchecs: null,
     ...extra,
   }
 }
@@ -329,5 +333,71 @@ describe('④ le style de l’écran ne se fait pas redessiner par une autre feu
     const motif = new RegExp('\\.' + echapper(c) + '(?![\\w-])')
     const coupables = AUTRES.filter(({ css }) => motif.test(css)).map(({ f }) => f)
     expect(coupables, `.${c} est aussi stylée ailleurs`).toEqual([])
+  })
+})
+
+describe('⑤ B-193c — prévenir aussi par mail', () => {
+  const SQL2 = readFileSync(join(RACINE, 'supabase/migrations/20261110120000_b193c_messagerie_mail.sql'), 'utf8')
+    .split('\n')
+    .filter((l) => !l.trim().startsWith('--'))
+    .join('\n')
+  const ACTIONS = readFileSync(join(RACINE, 'src/app/(v2)/messagerie/actions.ts'), 'utf8')
+
+  it('la mention d’envoi dit les échecs, jamais un total trompeur', () => {
+    expect(libelleEnvoiMail(3, 0)).toBe('envoyé aussi par mail à 3 personnes')
+    expect(libelleEnvoiMail(1, 0)).toBe('envoyé aussi par mail à 1 personne')
+    expect(libelleEnvoiMail(2, 1)).toBe('envoyé aussi par mail à 2 personnes · 1 échec')
+    expect(libelleEnvoiMail(0, 2)).toBe('le mail n’est pas parti')
+  })
+
+  it('le mail échappe le texte, porte le lien EN TEXTE et le nom des pièces', () => {
+    const html = corpsMailMessage({
+      auteur: 'Anne-Sophie Blanchard',
+      cabinet: 'Cabinet Démo',
+      equipe: true,
+      corps: 'Réunion <b>jeudi</b>\n\nà 13h',
+      pieces: [{ nom: 'ordre-du-jour.pdf' }],
+      lien: 'https://guardveto.vercel.app/messagerie?c=abc',
+    })
+    expect(html).toContain('&lt;b&gt;jeudi&lt;/b&gt;')
+    expect(html).not.toContain('<b>jeudi</b>')
+    expect(html).toContain('https://guardveto.vercel.app/messagerie?c=abc')
+    expect(html).not.toMatch(/<a\s/i)
+    expect(html).toContain('ordre-du-jour.pdf')
+    expect(html).toContain('répondez dans GuardVeto')
+    expect(sujetMailMessage({ auteur: 'Anne-Sophie', cabinet: 'Cabinet Démo', equipe: true })).toContain('à l’équipe')
+  })
+
+  it('la trace d’envoi est verrouillée : seule la fonction dédiée l’écrit', () => {
+    expect(SQL2).toMatch(/NEW\.mail_envoye_a IS DISTINCT FROM OLD\.mail_envoye_a[\s\S]*?current_setting\('messagerie\.noter_mail', true\) IS DISTINCT FROM 'oui'/)
+    expect(SQL2).toMatch(/FUNCTION public\.messagerie_noter_envoi_mail[\s\S]*?get_user_role\(\) IS DISTINCT FROM 'admin'[\s\S]*?m\.auteur_user_id = auth\.uid\(\)/)
+    expect(SQL2).toMatch(/REVOKE EXECUTE ON FUNCTION public\.messagerie_noter_envoi_mail\(uuid, integer, integer\) FROM PUBLIC, anon/)
+  })
+
+  it('le journal des mails accepte le type « message », sans perdre les anciens', () => {
+    for (const t of ['planning_publie', 'garde_modifiee', 'rappel_publication', 'appel_volontaires', 'depannage_confirme', 'conge_valide', 'conge_refuse', 'email_test', 'conge_demande', 'message']) {
+      expect(SQL2).toContain(`'${t}'`)
+    }
+  })
+
+  it('l’annuaire dit QUI a une adresse, jamais l’adresse', () => {
+    expect(SQL2).toMatch(/RETURNS TABLE \(user_id UUID, nom TEXT, role TEXT, a_email BOOLEAN\)/)
+    const corps = SQL2.slice(SQL2.indexOf('CREATE FUNCTION public.messagerie_annuaire'))
+    expect(corps.slice(0, corps.indexOf('$$;', corps.indexOf('$$') + 2))).not.toMatch(/SELECT[^;]*\bv\.email\s*,/)
+  })
+
+  it('le mail passe par sendBrevoEmail, jamais par un appel direct', () => {
+    expect(ACTIONS).toContain('await sendBrevoEmail(')
+    expect(ACTIONS).not.toContain('api.brevo.com')
+  })
+
+  it('les droits et les destinataires sont vérifiés AVANT de publier le message', () => {
+    expect(ACTIONS).toContain("moi.role_app !== 'admin'")
+    expect(ACTIONS).toContain('uniques.some((u) => !permis.has(u))')
+    expect(ACTIONS.indexOf('preparation = await preparerMail(')).toBeLessThan(ACTIONS.indexOf(".from('messages')\n    .insert("))
+  })
+
+  it('le journal « message » a un libellé dans les Réglages', () => {
+    expect(readFileSync(join(RACINE, 'src/components/v2/ReglagesV2.tsx'), 'utf8')).toMatch(/message: 'Message de la messagerie'/)
   })
 })

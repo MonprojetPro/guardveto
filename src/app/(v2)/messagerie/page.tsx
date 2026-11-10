@@ -91,11 +91,12 @@ export default async function MessageriePage({
     console.error('[Messagerie] Annuaire illisible :', annuaireRes.error.message)
   }
   const annuaire: MembreAnnuaire[] = (
-    (annuaireRes.data ?? []) as { user_id: string; nom: string; role: string }[]
+    (annuaireRes.data ?? []) as { user_id: string; nom: string; role: string; a_email: boolean | null }[]
   ).map((m) => ({
     userId: m.user_id,
     nom: m.nom,
     role: m.role === 'admin' || m.role === 'secretaire' ? m.role : 'veto',
+    aEmail: m.a_email === true,
   }))
 
   const conversations = liste.ok ? liste.conversations : []

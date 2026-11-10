@@ -35,6 +35,7 @@ import {
   Check,
   CheckCheck,
   Copy,
+  Mail,
   FileText,
   Paperclip,
   Pencil,
@@ -67,6 +68,7 @@ import {
 } from '@/app/(v2)/messagerie/actions'
 import {
   BUCKET_MESSAGERIE,
+  COLONNES_MESSAGE,
   LONGUEUR_MESSAGE_MAX,
   NB_PIECES_MAX,
   TAILLE_PAGE_MESSAGES,
@@ -81,6 +83,7 @@ import {
   libelleJour,
   nomConversation,
   prenomDe,
+  libelleEnvoiMail,
   refusMessage,
   versMessage,
   type ConversationListe,
@@ -92,8 +95,6 @@ import {
 import { effacerBrouillon, enregistrerBrouillon, lireBrouillon } from '@/lib/messagerie/brouillon'
 import { ACCEPT_HTML, nomDeFichierSur, poidsLisible, refusFichier } from '@/lib/support/contraintes'
 
-const COLONNES =
-  'id, conversation_id, auteur_user_id, auteur_nom, corps, pieces_jointes, cree_le, modifie_le, retire_le'
 
 /** Le temps laissé aux écritures en cascade (message → conversation → notif). */
 const DEBOUNCE_LISTE_MS = 500
@@ -189,7 +190,7 @@ export function MessagerieV2({
       const [res, lec] = await Promise.all([
         supabase
           .from('messages')
-          .select(COLONNES)
+          .select(COLONNES_MESSAGE)
           .eq('conversation_id', convId)
           .order('cree_le', { ascending: false })
           .limit(TAILLE_PAGE_MESSAGES),
@@ -225,7 +226,7 @@ export function MessagerieV2({
     if (!plusVieux) return
     const { data, error } = await supabase
       .from('messages')
-      .select(COLONNES)
+      .select(COLONNES_MESSAGE)
       .eq('conversation_id', activeId)
       .lt('cree_le', plusVieux)
       .order('cree_le', { ascending: false })
@@ -436,6 +437,7 @@ export function MessagerieV2({
             }}
             lectures={lectures}
             nomsParUser={nomsParUser}
+            annuaire={annuaire}
             sync={sync}
             surRetour={() => setVoirFil(false)}
             supabase={supabase}
@@ -479,6 +481,7 @@ interface PropsFil {
   surRecharger: () => void
   lectures: Lecture[]
   nomsParUser: Map<string, string>
+  annuaire: MembreAnnuaire[]
   sync: EtatSync
   surRetour: () => void
   supabase: ReturnType<typeof createClient>
@@ -498,6 +501,7 @@ function Fil({
   surRecharger,
   lectures,
   nomsParUser,
+  annuaire,
   sync,
   surRetour,
   supabase,
@@ -543,8 +547,8 @@ function Fil({
     return false
   }
 
-  const surEnvoyer = async (corps: string, pieces: PieceMessage[], id: string) => {
-    const envoi: EnvoiMessage = { id, conversationId: conversation.id, corps, pieces }
+  const surEnvoyer = async (corps: string, pieces: PieceMessage[], id: string, mailA: string[]) => {
+    const envoi: EnvoiMessage = { id, conversationId: conversation.id, corps, pieces, mailA }
     enAttente.current.set(id, envoi)
     setMessages((fil) =>
       fusionnerMessage(fil, {
@@ -557,6 +561,8 @@ function Fil({
         creeLe: new Date().toISOString(),
         modifieLe: null,
         retireLe: null,
+        mailEnvoyeA: null,
+        mailEchecs: null,
         enEnvoi: true,
       }),
     )
@@ -724,7 +730,22 @@ function Fil({
           {prenomDe(nom)} ne fait plus partie du cabinet. La conversation reste lisible, on ne peut plus y écrire.
         </p>
       ) : cabinetId ? (
-        <Saisie conversationId={conversation.id} cabinetId={cabinetId} surEnvoyer={surEnvoyer} supabase={supabase} />
+        <Saisie
+          conversationId={conversation.id}
+          cabinetId={cabinetId}
+          surEnvoyer={surEnvoyer}
+          supabase={supabase}
+          // B-193c — seule l'administratrice peut prévenir aussi par mail. Le
+          // serveur le revérifie : ce n'est ici qu'un affichage.
+          destinatairesMail={
+            estAdmin
+              ? conversation.genre === 'equipe'
+                ? annuaire
+                : annuaire.filter((m) => m.userId === conversation.autreUserId)
+              : []
+          }
+          equipe={conversation.genre === 'equipe'}
+        />
       ) : (
         <p className="msg-ferme">Votre compte n’est rattaché à aucun cabinet : impossible d’écrire.</p>
       )}
@@ -875,6 +896,12 @@ function Bulle({
           {heureDe(m.creeLe)}
           {m.enEnvoi && <span className="msg-envoi"> · envoi…</span>}
           {deMoi && !m.enEnvoi && !m.echec && <Check className="msg-meta-ico" aria-label="Envoyé" />}
+          {deMoi && m.mailEnvoyeA !== null && (
+            <span className={'msg-mail' + (m.mailEchecs ? ' echec' : '')}>
+              {' · '}
+              {libelleEnvoiMail(m.mailEnvoyeA, m.mailEchecs ?? 0)}
+            </span>
+          )}
         </span>
       </div>
 
@@ -975,12 +1002,20 @@ function Saisie({
   cabinetId,
   surEnvoyer,
   supabase,
+  destinatairesMail,
+  equipe,
 }: {
   conversationId: string
   cabinetId: string
-  surEnvoyer: (corps: string, pieces: PieceMessage[], id: string) => Promise<boolean>
+  surEnvoyer: (corps: string, pieces: PieceMessage[], id: string, mailA: string[]) => Promise<boolean>
   supabase: ReturnType<typeof createClient>
+  /** Vide si la personne ne peut pas prévenir par mail. */
+  destinatairesMail: MembreAnnuaire[]
+  equipe: boolean
 }) {
+  const [mailA, setMailA] = useState<string[]>([])
+  const [choixMail, setChoixMail] = useState(false)
+  const joignables = destinatairesMail.filter((m) => m.aEmail)
   const [texte, setTexte] = useState('')
   const [fichiers, setFichiers] = useState<File[]>([])
   const [depot, setDepot] = useState(false)
@@ -1050,11 +1085,14 @@ function Saisie({
     // ② Le message. La saisie se vide tout de suite ; le brouillon, lui,
     //    n'est effacé qu'APRÈS confirmation du serveur.
     const corps = texte
+    const destinataires = mailA
     setTexte('')
     setFichiers([])
+    setMailA([])
+    setChoixMail(false)
     setDepot(false)
     champ.current?.focus()
-    const ok = await surEnvoyer(corps, pieces, id)
+    const ok = await surEnvoyer(corps, pieces, id, destinataires)
     const s = stockageLocal()
     if (ok && s) effacerBrouillon(s, conversationId)
   }
@@ -1067,6 +1105,29 @@ function Saisie({
         void envoyer()
       }}
     >
+      {choixMail && (
+        <ChoixMail
+          membres={destinatairesMail}
+          choisis={mailA}
+          equipe={equipe}
+          surChanger={setMailA}
+          surFermer={() => setChoixMail(false)}
+        />
+      )}
+      {mailA.length > 0 && !choixMail && (
+        <p className="msg-mail-choisi">
+          <Mail aria-hidden="true" />
+          <span>
+            Aussi par mail à{' '}
+            {equipe && mailA.length === joignables.length
+              ? 'toute l’équipe'
+              : mailA.map((u) => prenomDe(destinatairesMail.find((m) => m.userId === u)?.nom ?? '?')).join(', ')}
+          </span>
+          <button type="button" onClick={() => setMailA([])} aria-label="Ne pas envoyer par mail">
+            <X aria-hidden="true" />
+          </button>
+        </p>
+      )}
       {fichiers.length > 0 && (
         <ul className="msg-joints">
           {fichiers.map((f, i) => (
@@ -1096,6 +1157,31 @@ function Saisie({
         >
           <Paperclip aria-hidden="true" />
         </button>
+        {destinatairesMail.length > 0 && (
+          <button
+            type="button"
+            className={'msg-joindre' + (mailA.length > 0 ? ' actif' : '')}
+            onClick={() => {
+              // En privé, un seul destinataire possible : le geste est direct.
+              if (!equipe) {
+                const autre = joignables[0]
+                if (!autre) {
+                  toast.error('Cette personne n’a pas d’adresse mail enregistrée.')
+                  return
+                }
+                setMailA(mailA.length > 0 ? [] : [autre.userId])
+                return
+              }
+              setChoixMail(!choixMail)
+            }}
+            aria-label="Prévenir aussi par mail"
+            aria-pressed={mailA.length > 0}
+            title="Prévenir aussi par mail"
+            disabled={depot}
+          >
+            <Mail aria-hidden="true" />
+          </button>
+        )}
         <input
           ref={choix}
           type="file"
@@ -1199,5 +1285,73 @@ function NouvelleConversation({
         </ul>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// ── PRÉVENIR AUSSI PAR MAIL : à qui (B-193c) ────────────────────────────────
+// MiKL, 10/11 : « ceux qu'elle aura choisi, comme pour les conversations du
+// chat ». Une liste à cocher, avec « Tout le monde » en raccourci. Une personne
+// sans adresse est montrée grisée : la cacher laisserait croire qu'elle sera
+// prévenue.
+
+function ChoixMail({
+  membres,
+  choisis,
+  equipe,
+  surChanger,
+  surFermer,
+}: {
+  membres: MembreAnnuaire[]
+  choisis: string[]
+  equipe: boolean
+  surChanger: (ids: string[]) => void
+  surFermer: () => void
+}) {
+  const joignables = membres.filter((m) => m.aEmail)
+  const tous = joignables.length > 0 && joignables.every((m) => choisis.includes(m.userId))
+  const basculer = (id: string) =>
+    surChanger(choisis.includes(id) ? choisis.filter((x) => x !== id) : [...choisis, id])
+
+  return (
+    <div className="msg-choix-mail" role="group" aria-label="Prévenir aussi par mail">
+      <div className="msg-choix-mail-tete">
+        <span>{equipe ? 'Prévenir aussi par mail' : 'Aussi par mail'}</span>
+        <button
+          type="button"
+          className="msg-lien"
+          onClick={() => surChanger(tous ? [] : joignables.map((m) => m.userId))}
+          disabled={joignables.length === 0}
+        >
+          {tous ? 'Personne' : 'Tout le monde'}
+        </button>
+        <button type="button" className="msg-choix-fermer" onClick={surFermer} aria-label="Valider le choix">
+          <Check aria-hidden="true" />
+        </button>
+      </div>
+      <ul>
+        {membres.map((m) => {
+          const coche = choisis.includes(m.userId)
+          return (
+            <li key={m.userId}>
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={coche}
+                className={coche ? 'coche' : ''}
+                onClick={() => basculer(m.userId)}
+                disabled={!m.aEmail}
+                title={m.aEmail ? undefined : 'Pas d’adresse mail enregistrée'}
+              >
+                <span className="msg-case" aria-hidden="true">
+                  {coche && <Check />}
+                </span>
+                <span>{m.nom}</span>
+                {!m.aEmail && <em>sans adresse</em>}
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
   )
 }
