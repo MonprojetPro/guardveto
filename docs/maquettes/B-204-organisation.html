@@ -1,0 +1,1462 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Organisation refondue</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700;800&family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --stage:#eadfcb;
+  --bg:#F6EEDF; --surface:#FFFCF4; --surface-2:#F6EBD6; --text:#3A2A1C; --muted:#7C6A55;
+  --bd:#E6D7BB; --bd-strong:#D8C4A1; --acc:#C7530F; --acc-ink:#AC4508; --acc-soft:#fdf1e5;
+  --ok:#3E7A2E; --ok-soft:#e8f2e3; --warn:#9A6200; --warn-soft:#fbf1d6; --danger:#A8341F; --danger-soft:#f9e3de;
+  --elev-1:1px 2px 3px rgba(110,62,14,.10),4px 8px 18px rgba(110,62,14,.08);
+  --elev-2:2px 4px 8px rgba(110,62,14,.13),10px 18px 34px rgba(110,62,14,.13);
+  --edge:inset 1px 1px 0 rgba(255,253,246,.95);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--stage);color:var(--text);font:15px/1.45 "Noto Sans",system-ui,sans-serif;padding:32px 16px 90px}
+h1,h2,h3,h4,.fig{font-family:Figtree,system-ui,sans-serif}
+button{font:inherit;color:inherit;cursor:pointer}
+a{color:inherit}
+.page{max-width:1180px;margin:0 auto}
+
+/* ── habillage de la maquette (hors écran GuardVeto) ── */
+.intro h1{font-size:30px;margin:0 0 6px}
+.intro p{margin:0 0 6px;color:var(--muted);max-width:860px}
+.etat{margin:50px 0 12px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.etat h2{margin:0;font-size:20px}
+.etat .num{font:700 13px Figtree;background:var(--text);color:#fff;border-radius:99px;padding:3px 11px}
+.etat p{margin:0;color:var(--muted);font-size:14px;flex-basis:100%;max-width:900px}
+.duo{display:grid;grid-template-columns:minmax(0,1fr) 375px;gap:24px;align-items:start}
+.phones{display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start}
+@media (max-width:1060px){.duo{grid-template-columns:minmax(0,1fr)}}
+.fig{margin:0;min-width:0}
+.fig>figcaption{font:700 12px Figtree;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.scroll-x{overflow-x:auto;border-radius:16px}
+.frame{background:var(--bg);border:1px solid var(--bd);border-radius:16px;box-shadow:var(--elev-2);overflow:hidden;min-width:700px}
+.phone{width:375px;max-width:100%;border:7px solid #3a2a1c;border-radius:34px;background:var(--bg);overflow:hidden;box-shadow:var(--elev-2)}
+.sim{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--muted)}
+.sim button{border:1px dashed var(--bd-strong);background:transparent;border-radius:99px;padding:6px 12px;font-size:13px;color:var(--muted)}
+.sim button:hover{border-color:var(--acc);color:var(--acc-ink)}
+.legende{background:#fff;border-left:3px solid var(--acc);padding:10px 14px;border-radius:6px;font-size:13.5px;color:var(--muted);margin-top:12px;max-width:900px}
+.legende b{color:var(--text)}
+.a-trancher{max-width:900px;margin:56px auto 0;background:var(--surface);border:1px solid var(--bd);border-radius:12px;padding:20px 24px}
+.a-trancher h2{margin:0 0 4px;font-size:20px}
+.a-trancher ol{margin:10px 0 0;padding-left:22px;display:grid;gap:10px}
+.a-trancher li b{display:block}
+.a-trancher li span{color:var(--muted);font-size:14px}
+
+/* ═════════ L'ÉCRAN GUARDVETO ═════════ */
+.app{position:relative;min-height:520px;background:var(--bg);color:var(--text)}
+.app *{box-sizing:border-box}
+.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.i.sm{width:16px;height:16px}
+.topbar{display:flex;align-items:center;gap:14px;padding:12px 28px;border-bottom:1px solid var(--bd);background:rgba(246,238,223,.9);font-size:13px;color:var(--muted)}
+.topbar b.logo{font:800 16px Figtree;color:var(--text);margin-right:6px}
+.topbar .dk{display:flex;gap:8px;margin-left:auto}
+.topbar .dk span{width:26px;height:26px;border-radius:50%;background:var(--surface-2);border:1px solid var(--bd)}
+.topbar .dk span.cur{background:var(--acc);border-color:var(--acc)}
+.app h1{font-size:28px;font-weight:800;margin:0}
+.app h2{font-size:22px;font-weight:800;margin:0}
+.desk-body{padding:22px 28px 40px}
+.layout{display:grid;grid-template-columns:216px minmax(0,1fr);gap:30px;margin-top:20px;align-items:start}
+.sommaire{position:sticky;top:14px;display:grid;gap:2px}
+.nav{display:flex;align-items:center;gap:11px;width:100%;text-align:left;border:0;background:transparent;border-radius:10px;padding:10px 12px;min-height:44px;font:600 14.5px Figtree;color:var(--muted)}
+.nav:hover{background:var(--surface-2)}
+.nav.on{background:var(--surface-2);color:var(--text);box-shadow:var(--edge)}
+.nav.on .i{color:var(--acc)}
+.nav .lib{flex:1}
+.cnt{font:700 12px Figtree;min-width:20px;height:20px;border-radius:99px;display:inline-grid;place-items:center;padding:0 6px;background:var(--warn);color:#fff}
+.sec-tete{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.bandeau-ro{display:flex;gap:10px;align-items:flex-start;margin:14px 0 0;padding:10px 14px;background:var(--surface-2);border-radius:8px;font-size:13.5px;color:var(--muted)}
+.bandeau-ro .i{margin-top:2px}
+
+/* panneau : un seul niveau, jamais de carte dans une carte. Coins faibles : le contenu est dense. */
+.panel{background:var(--surface);border:1px solid var(--bd);border-radius:10px;box-shadow:var(--elev-1),var(--edge)}
+.bloc{padding:18px 22px 20px}
+.bloc+.bloc{border-top:1px solid var(--bd)}
+.bh{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.bh h3{margin:0;font-size:17px;font-weight:700;flex:1;min-width:140px}
+.sous-tete{font:700 12px Figtree;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:20px 0 10px;padding-top:16px;border-top:1px dashed var(--bd)}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:99px;padding:3px 11px;font:700 12.5px Figtree;white-space:nowrap}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--danger-soft);color:var(--danger)}
+.pill.off{background:var(--surface-2);color:var(--muted)}
+.pill.nu::before{display:none}
+.etiq{display:inline-flex;align-items:center;border-radius:99px;padding:2px 9px;font:700 11.5px Figtree;background:var(--surface-2);color:var(--muted)}
+.etiq.acc{background:var(--acc-soft);color:var(--acc-ink)}
+.vdot{display:inline-block;width:11px;height:11px;border-radius:50%;flex:none}
+.aide{font-size:13px;color:var(--muted);margin:0 0 10px}
+.ligne-info{display:flex;gap:9px;align-items:flex-start;font-size:13.5px;color:var(--muted);margin:0 0 12px}
+.ligne-info .i{margin-top:2px}
+.ligne-info b{color:var(--text)}
+.vide{padding:12px 14px;background:var(--surface-2);border-radius:8px;font-size:13.5px;color:var(--muted)}
+
+/* champs */
+.field{display:grid;gap:5px;margin-bottom:12px;min-width:0}
+.field>label,.lbl{font:700 13.5px Figtree}
+.field input[type=text],.field textarea{width:100%;min-height:42px;border:1px solid var(--bd-strong);border-radius:8px;background:#fff;padding:0 12px;font:inherit;color:var(--text)}
+.field textarea{padding:10px 12px;min-height:84px;resize:vertical}
+input:focus,textarea:focus,.sel:focus-visible,.btn:focus-visible,.nav:focus-visible,.sw:focus-visible,.carte:focus-visible,.det:focus-visible,.ibtn:focus-visible,.chip:focus-visible{outline:3px solid var(--acc-soft);outline-offset:0;border-color:var(--acc)}
+.grille2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.grille3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.cases{display:flex;gap:6px;flex-wrap:wrap}
+.cb{border:1px solid var(--bd-strong);background:#fff;border-radius:99px;min-height:36px;padding:0 13px;font:600 13.5px Figtree;color:var(--muted)}
+.cb.on{background:var(--acc-soft);border-color:var(--acc);color:var(--acc-ink)}
+.cb[disabled]{opacity:.55;cursor:default}
+
+/* boutons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 20px;border-radius:99px;border:1px solid transparent;font:700 14.5px Figtree;background:transparent;white-space:nowrap}
+.btn-valider{background:var(--acc);border-color:var(--acc);color:#fff;box-shadow:var(--edge)}
+.btn-valider:hover{background:var(--acc-ink)}
+.btn-outline{background:var(--surface);border-color:var(--bd-strong);color:var(--text)}
+.btn-outline:hover{border-color:var(--acc);color:var(--acc-ink)}
+.btn-ghost{color:var(--acc-ink);padding:0 12px}
+.btn-ghost:hover{background:var(--acc-soft)}
+.btn-ghost.danger{color:var(--danger)}
+.btn-ghost.danger:hover{background:var(--danger-soft)}
+.btn-danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn.sm{min-height:36px;padding:0 14px;font-size:13.5px}
+.btn[disabled]{opacity:.55;cursor:default}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;align-items:center}
+.ibtn{width:40px;height:40px;border-radius:50%;border:0;background:transparent;display:inline-grid;place-items:center;color:var(--muted);padding:0}
+.ibtn:hover{background:var(--surface-2);color:var(--acc-ink)}
+.ibtn.danger:hover{background:var(--danger-soft);color:var(--danger)}
+.spin{width:14px;height:14px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:tourne .7s linear infinite;flex:none;display:inline-block}
+@keyframes tourne{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:2s}}
+
+/* interrupteur (celui validé en B-181) */
+.sw{position:relative;flex:none;width:46px;height:26px;border-radius:99px;background:var(--bd-strong);border:0;padding:0}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .15s}
+.sw::before{content:"";position:absolute;inset:-9px -6px}
+.sw.on{background:var(--ok)}
+.sw.on::after{left:23px}
+.sw[disabled]{opacity:.6}
+.rang{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 0;border-top:1px solid var(--bd)}
+.rang:first-of-type{border-top:0;padding-top:0}
+.rang .lib{display:flex;align-items:center;gap:12px;min-width:0;font-size:15px}
+.rang .lib small{display:block;color:var(--muted);font-size:13px}
+.rang .droite{display:flex;align-items:center;gap:10px;flex:none}
+.rang .droite em{font-style:normal;font:700 13px Figtree;color:var(--ok)}
+.rang .droite em.off{color:var(--muted)}
+.puce-s{width:38px;height:38px;border-radius:10px;background:var(--surface-2);display:grid;place-items:center;color:var(--acc-ink);flex:none}
+.seul{display:inline-flex;gap:6px;align-items:center;font:700 13px Figtree;color:var(--muted)}
+
+/* menu déroulant maison (jamais de select natif) */
+.sel-wrap{position:relative;min-width:0}
+.sel{width:100%;min-height:42px;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1px solid var(--bd-strong);border-radius:8px;padding:0 12px;text-align:left;font-size:14.5px;white-space:nowrap}
+.sel>span{display:inline-flex;align-items:center;gap:8px;overflow:hidden;text-overflow:ellipsis}
+.sel-wrap.fixe{width:180px}
+.sel-wrap.moyen{width:240px;max-width:100%}
+.opts{position:absolute;z-index:6;left:0;min-width:100%;top:46px;margin:0;padding:4px;list-style:none;background:var(--surface);border:1px solid var(--bd-strong);border-radius:8px;box-shadow:var(--elev-2);max-height:300px;overflow:auto}
+.sel-wrap.droite .opts{left:auto;right:0}
+.opts li button{width:100%;text-align:left;border:0;background:transparent;border-radius:6px;padding:9px 10px;min-height:40px;display:block;white-space:normal;font-size:14px}
+.opts li button:hover:not([disabled]){background:var(--surface-2)}
+.opts li button[aria-selected=true]{background:var(--acc-soft);color:var(--acc-ink)}
+.opts li button[disabled]{opacity:.55;cursor:default}
+.opts li small{display:block;color:var(--muted);font-size:12.5px}
+.opts .grp{font:700 11.5px Figtree;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:8px 10px 2px}
+
+/* fermeté : un mot et quatre points. Les couleurs sont gardées pour l'état tenue / pas tenue. */
+.fm{display:inline-flex;align-items:center;gap:7px;font:700 12.5px Figtree;color:var(--text);background:var(--surface-2);border-radius:99px;padding:3px 11px 3px 9px;white-space:nowrap}
+.pips{display:inline-flex;gap:3px}
+.pp{width:6px;height:6px;border-radius:50%;background:var(--bd-strong)}
+.pp.on{background:var(--text)}
+
+/* écran : vue d'ensemble */
+.cartes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.carte{display:flex;align-items:flex-start;gap:14px;text-align:left;width:100%;background:var(--surface);border:1px solid var(--bd);border-radius:14px;padding:16px 18px;box-shadow:var(--elev-1),var(--edge);min-height:92px}
+.carte:hover{border-color:var(--bd-strong)}
+.carte .puce{width:42px;height:42px;border-radius:12px;background:var(--surface-2);display:grid;place-items:center;color:var(--acc-ink);flex:none}
+.carte .tx{flex:1;min-width:0;display:grid;gap:3px}
+.carte .tx b{font:700 17px Figtree}
+.carte .q{font-size:13.5px;color:var(--muted)}
+.carte .res{font-size:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px}
+.carte>.i{color:var(--muted);margin-top:11px}
+.renvoi{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:18px;padding:14px 18px;background:var(--surface);border:1px dashed var(--bd-strong);border-radius:10px;font-size:14px;color:var(--muted)}
+.renvoi>span{flex:1;min-width:220px}
+.renvoi b{color:var(--text)}
+.depart-box{margin-top:18px;padding:16px 18px;background:var(--surface);border:1px solid var(--bd);border-radius:10px}
+.depart-box h3{margin:0 0 8px;font-size:16px}
+.depart-box ol{margin:0;padding-left:20px;display:grid;gap:6px;font-size:14.5px}
+
+/* écran : nos gardes */
+.anc{margin-bottom:14px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--bd-strong);background:var(--surface);border-radius:99px;min-height:36px;padding:0 14px;font:600 13.5px Figtree;color:var(--muted);text-decoration:none}
+.chip.on{background:var(--text);border-color:var(--text);color:#fff}
+.grow{padding:14px 0;border-top:1px solid var(--bd)}
+.grow:first-of-type{border-top:0;padding-top:0}
+.g-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.g-top .sp{flex:1}
+.g-nom{font:700 16px Figtree}
+.faits{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:8px 0 0 50px}
+.faits span{display:block;font:700 11.5px Figtree;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.faits b{font-weight:600;font-size:14px}
+.g-form{margin:14px 0 0 50px;padding:14px 16px;background:var(--surface-2);border-radius:8px}
+.grow.off .g-nom,.grow.off .faits{opacity:.6}
+.consequence{display:flex;gap:9px;margin:10px 0 0 50px;font-size:13.5px;color:var(--muted);background:var(--warn-soft);border-radius:8px;padding:9px 12px}
+.genre{padding:14px 0;border-top:1px solid var(--bd)}
+.genre:first-of-type{border-top:0;padding-top:0}
+.genre-h{display:flex;gap:16px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;margin-bottom:6px}
+.genre-h>div:first-child{flex:1;min-width:240px}
+.genre-h b{font:700 15.5px Figtree}
+.genre-h .aide{margin:2px 0 0}
+.niv{display:grid;gap:3px}
+.niv span{font:700 11.5px Figtree;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.tranche{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--bd);font-size:14.5px}
+.tranche:first-of-type{border-top:0}
+.tranche small{display:block;color:var(--muted);font-size:12.5px}
+
+/* écran : nos habitudes */
+.filoubar{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--bd-strong);border-radius:99px;padding:6px 6px 6px 10px;margin-bottom:12px}
+.filoubar input{flex:1;min-width:0;border:0;background:transparent;font:inherit;color:var(--text);min-height:40px;padding:0 4px}
+.filoubar input:focus{outline:none}
+.filoubar:focus-within{border-color:var(--acc);box-shadow:0 0 0 4px var(--acc-soft)}
+.fav{width:30px;height:30px;border-radius:50%;background:var(--acc);color:#fff;display:inline-grid;place-items:center;font:800 14px Figtree;flex:none}
+.barre{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:6px}
+.gen{font-size:13.5px;color:var(--muted);margin:6px 0 14px}
+.gh{display:flex;align-items:center;gap:9px;padding:16px 22px 8px;border-top:1px solid var(--bd);color:var(--muted)}
+.gh:first-child{border-top:0}
+.gh h3{margin:0;font:700 12px Figtree;letter-spacing:.09em;text-transform:uppercase}
+.gh .c2{font:700 12px Figtree;background:var(--surface-2);border-radius:99px;padding:1px 8px}
+.hab{padding:12px 22px;border-top:1px solid var(--bd)}
+.gh+.hab{border-top:0}
+.hab-l{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:start}
+.qui{display:grid;place-items:center;height:26px;color:var(--muted)}
+.tag{font:700 11px Figtree;border-radius:99px;padding:2px 7px;background:var(--surface-2);color:var(--muted);max-width:28px;overflow:hidden;text-overflow:clip;white-space:nowrap}
+.phrase{margin:0;font:600 15.5px/1.35 Figtree}
+.phrase .new{font:700 11px Figtree;color:var(--acc-ink);background:var(--acc-soft);border-radius:99px;padding:2px 8px;margin-left:6px;vertical-align:middle}
+.hab.pause .phrase{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--bd-strong)}
+.meta{display:flex;gap:8px 10px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.orig{display:inline-flex;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)}
+.raison{margin:7px 0 0;font-size:13.5px;color:var(--warn);display:flex;gap:8px}
+.raison .i{margin-top:2px}
+.det{display:inline-flex;align-items:center;gap:5px;border:0;background:transparent;color:var(--acc-ink);font:700 13px Figtree;min-height:36px;padding:0 8px;border-radius:99px;white-space:nowrap}
+.det:hover{background:var(--acc-soft)}
+.hab-d{margin:10px 0 2px 38px;padding:14px 16px;background:var(--surface-2);border-radius:8px}
+.kv{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px 14px;margin:0 0 12px;font-size:14px}
+.kv dt{font:700 12.5px Figtree;color:var(--muted);padding-top:2px}
+.kv dd{margin:0;min-width:0}
+.kv dd .aide{margin:5px 0 0}
+blockquote.src{margin:6px 0 0;padding:6px 12px;border-left:2px solid var(--bd-strong);color:var(--muted);font-style:italic;background:transparent}
+.act-d{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pausel{display:inline-flex;align-items:center;gap:9px;font-size:13.5px;color:var(--muted);margin-right:6px}
+.depart-ligne{display:flex;align-items:center;gap:10px;padding:12px 22px;border-top:1px solid var(--bd);width:100%;background:transparent;border-left:0;border-right:0;border-bottom:0;text-align:left;font:600 14px Figtree;color:var(--muted)}
+.depart-ligne:hover{background:var(--surface-2)}
+
+/* Filou : la conversation */
+.flow{padding:18px 22px 22px}
+.flow-h{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.flow-h b{font:800 17px Figtree}
+.flow-h .m{color:var(--muted);font-size:13.5px;flex:1}
+.bub{max-width:640px;margin:0 0 12px;padding:11px 15px;border-radius:12px;font-size:14.5px}
+.bub.moi{margin-left:auto;background:var(--acc-soft);border:1px solid #f0d7bd}
+.bub.filou{background:#fff;border:1px solid var(--bd);display:grid;gap:10px;max-width:none}
+.bub.filou>p{margin:0}
+.bub-l{display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;align-items:start;margin-bottom:12px}
+.consigne{background:var(--surface-2);border-radius:8px;padding:12px 14px}
+.c-lbl{font:700 11.5px Figtree;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.c-ph{margin:0;font:700 16px/1.35 Figtree}
+.c-meta{margin-top:6px;font-size:13px;color:var(--muted)}
+.q-prec{font:700 15px Figtree;margin:2px 0 0}
+.opt{display:grid;grid-template-columns:24px 1fr;gap:12px;align-items:start;text-align:left;width:100%;background:#fff;border:1.5px solid var(--bd);border-radius:10px;padding:12px 14px}
+.opt.on{border-color:var(--acc);box-shadow:0 0 0 4px var(--acc-soft)}
+.opt[disabled]{opacity:.55;cursor:default}
+.radio{width:20px;height:20px;border-radius:50%;border:2px solid var(--bd-strong);margin-top:2px;position:relative}
+.opt.on .radio{border-color:var(--acc)}
+.opt.on .radio::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--acc)}
+.opt b{font:700 15px Figtree;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.opt .desc{color:var(--muted);font-size:13.5px;margin-top:2px}
+.opts-liste{display:grid;gap:8px}
+.mal{margin-top:8px;padding:9px 12px;background:var(--warn-soft);border-radius:8px;font-size:13.5px;color:var(--warn);display:flex;gap:9px}
+.mal .i{margin-top:2px}
+.semaine{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.jour{background:#fff;border:1px solid var(--bd);border-radius:8px;padding:6px 4px 7px;text-align:center;display:grid;gap:3px;align-content:start}
+.jour.we{background:var(--acc-soft)}
+.jour>b{font:700 11.5px Figtree;color:var(--muted)}
+.gp{display:block;border-radius:5px;color:#fff;font:700 11px Figtree;padding:3px 0;line-height:1.1}
+.gp i{font-style:normal;font-weight:500;opacity:.85;font-size:9.5px;display:block}
+.note-ex{font-size:13px;color:var(--muted);margin:8px 0 0}
+.fm-radios{display:grid;gap:7px}
+.fm-r{display:flex;gap:11px;align-items:flex-start;text-align:left;width:100%;background:#fff;border:1.5px solid var(--bd);border-radius:10px;padding:10px 13px}
+.fm-r.on{border-color:var(--acc);box-shadow:0 0 0 4px var(--acc-soft)}
+.fm-r[disabled]{opacity:.55;cursor:default}
+.fm-r .radio{margin-top:3px}
+.fm-r b{font:700 14.5px Figtree;display:block}
+.fm-r small{display:block;color:var(--muted);font-size:13px;line-height:1.35}
+.fm-r em{font-style:normal;font:700 11px Figtree;color:var(--acc-ink);background:var(--acc-soft);border-radius:99px;padding:1px 8px;margin-left:6px}
+.reussite{display:flex;gap:10px;align-items:flex-start;color:var(--ok)}
+.reussite b{color:var(--text)}
+
+/* écran : équité */
+.imp{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:11px 0;border-top:1px solid var(--bd)}
+.imp:first-of-type{border-top:0;padding-top:0}
+.imp b{font:700 15px Figtree;display:block}
+.imp .aide{margin:1px 0 0}
+.livre{width:100%;border-collapse:collapse;font-size:14.5px}
+.livre th{text-align:left;font:700 12px Figtree;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 10px 8px 0;border-bottom:1px solid var(--bd-strong)}
+.livre td{padding:10px 10px 10px 0;border-bottom:1px solid var(--bd);vertical-align:middle}
+.livre td.n,.livre th.n{text-align:right;font-variant-numeric:tabular-nums;padding-right:18px}
+.livre .nom{white-space:nowrap;display:flex;gap:9px;align-items:center;font-weight:600}
+.ecart{display:grid;grid-template-columns:1fr 1fr;align-items:center;height:14px;position:relative;min-width:150px}
+.ecart::after{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--bd-strong)}
+.ecart i{display:block;height:10px}
+.ecart .neg{justify-self:end;border-radius:5px 0 0 5px}
+.ecart .pos{justify-self:start;border-radius:0 5px 5px 0}
+.mot-ecart{font-size:13px;color:var(--muted);display:block;margin-top:3px}
+.livre-m{display:grid}
+.livre-m .it{padding:12px 0;border-top:1px solid var(--bd);display:grid;gap:5px}
+.livre-m .it:first-child{border-top:0;padding-top:0}
+.livre-m .l1{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.livre-m .l2{font-size:13px;color:var(--muted)}
+.step{display:inline-flex;align-items:center;gap:6px}
+.step b{min-width:28px;text-align:center;font:700 16px Figtree}
+.step .ibtn{border:1px solid var(--bd-strong);background:#fff;width:38px;height:38px}
+.grillesaison{width:100%;border-collapse:collapse}
+.grillesaison th{text-align:left;font:700 14px Figtree;padding:0 12px 10px 0;border-bottom:1px solid var(--bd-strong);vertical-align:bottom}
+.grillesaison th small{display:block;color:var(--muted);font:500 12.5px "Noto Sans"}
+.grillesaison td{padding:10px 12px 10px 0;border-bottom:1px solid var(--bd);vertical-align:middle}
+.grillesaison td:first-child{font-weight:600}
+.grillesaison td:first-child small{display:block;color:var(--muted);font-weight:400;font-size:12.5px}
+.vcard{padding:14px 0;border-top:1px solid var(--bd)}
+.vcard:first-of-type{border-top:0;padding-top:0}
+.vcard h4{margin:0 0 4px;font-size:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.resumeV{margin:6px 0 0;font-size:13.5px;color:var(--muted)}
+.vlig{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;font-size:14.5px}
+
+/* téléphone */
+.ph-body{padding:16px 14px 26px}
+.retour{display:inline-flex;align-items:center;gap:4px;border:0;background:transparent;color:var(--acc-ink);font:700 14.5px Figtree;padding:8px 6px 8px 0;min-height:44px;margin-bottom:2px}
+.phone .btn{min-height:44px}
+.phone .btn.sm{min-height:44px}
+.phone .nav,.phone .cb,.phone .chip,.phone .det{min-height:44px}
+.phone .bloc{padding:16px 14px 18px}
+.phone .cartes{grid-template-columns:1fr}
+.phone .carte{padding:14px}
+.phone .faits{grid-template-columns:1fr;margin-left:0;gap:6px;margin-top:10px}
+.phone .g-form,.phone .consequence{margin-left:0}
+.phone .grille2,.phone .grille3{grid-template-columns:1fr}
+.phone .gh{padding:14px 14px 6px}
+.phone .hab{padding:12px 14px}
+.phone .hab-l{grid-template-columns:22px minmax(0,1fr)}
+.phone .hab-l .det{grid-column:2;justify-self:start;margin-left:-8px}
+.phone .hab-d{margin-left:0}
+.phone .kv{grid-template-columns:1fr;gap:2px}
+.phone .kv dd{margin-bottom:8px}
+.phone .depart-ligne{padding:12px 14px}
+.phone .flow{padding:14px}
+.phone .filoubar{border-radius:14px}
+.phone .imp{flex-direction:column;align-items:stretch;gap:8px}
+.phone .sel-wrap.fixe,.phone .sel-wrap.moyen{width:100%}
+.phone .genre-h{flex-direction:column}
+.phone .rang{align-items:flex-start}
+.phone .modale{width:100%}
+.phone .app h1{font-size:25px}
+.phone .tranche{grid-template-columns:1fr auto}
+.phone .tranche>*{grid-column:1}
+.phone .tranche>.droite{grid-column:2;grid-row:1}
+.phone .bub.moi{margin-left:20px}
+.phone .semaine{gap:3px}
+.phone .jour{padding:5px 2px}
+.phone .jour .gp{font-size:10px}
+
+/* modale, toast */
+.voile{position:absolute;inset:0;background:rgba(58,42,28,.42);z-index:20}
+.modale{position:sticky;top:6vh;margin:6vh auto 0;background:var(--surface);border-radius:10px;box-shadow:var(--elev-2);width:min(420px,calc(100% - 24px));padding:22px;max-height:88vh;overflow:auto}
+.modale.large{width:min(620px,calc(100% - 24px))}
+.modale h3{margin:0 0 8px;font-size:19px}
+.modale p{margin:0 0 14px;color:var(--muted);font-size:14.5px}
+.modale .pied{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px}
+.rappel{background:var(--surface-2);border-radius:8px;padding:10px 12px;margin:0 0 14px;font:600 14.5px Figtree}
+.erreur{margin:14px 0 0;padding:11px 14px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:14px;display:flex;gap:9px;align-items:flex-start}
+.erreur .i{margin-top:2px}
+.erreur b{display:block}
+.apercu-ph{margin:4px 0 14px;padding:11px 14px;background:var(--acc-soft);border-radius:8px;font:700 15.5px/1.35 Figtree}
+.apercu-ph span{display:block;font:700 11.5px Figtree;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.conflit{margin:14px 0 0;padding:12px 14px;border-radius:8px;background:var(--warn-soft);color:var(--text);font-size:14px}
+.conflit b{display:block;margin-bottom:4px}
+.toastwrap{position:sticky;bottom:18px;height:0;overflow:visible;z-index:30;pointer-events:none}
+.toast{position:absolute;left:50%;transform:translateX(-50%);bottom:0;background:var(--text);color:#fff;border-radius:99px;padding:10px 18px;font-size:14px;width:max-content;max-width:calc(100% - 24px);text-align:center;box-shadow:var(--elev-2)}
+.toast.err{background:var(--danger)}
+.ro [data-edit]{display:none!important}
+.ro .sel{pointer-events:none;border-color:transparent;background:transparent;padding-left:0}
+.ro .sel .i{display:none}
+.ro .sw{pointer-events:none}
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="intro">
+  <h1>Organisation, refondue</h1>
+  <p>Maquette B-204, à valider avant de coder. L’onglet « Organisation » n’est plus rangé selon la construction du moteur (règles, structure, enchaînements, périodes types) mais selon les questions de l’administratrice : <b>Nos gardes</b>, <b>Nos habitudes</b>, <b>L’équité</b>, <b>Selon la saison</b>. Sur ordinateur, un sommaire reste à gauche ; sur téléphone, une liste mène à chaque partie.</p>
+  <p>Tout est cliquable : le sommaire, les habitudes (« Voir le détail »), la conversation avec Filou, les menus, les interrupteurs. Données fictives (Cabinet du Val d’Allier ; Anne-Sophie est l’administratrice). Les boutons en pointillé sous les cadres servent seulement à simuler un cas (refus, panne, conflit) : ils ne feront pas partie de l’écran. Aucun réglage existant n’est supprimé : le tableau de correspondance (<code>B-204-organisation-correspondance.md</code>) dit où chacun est passé.</p>
+</div>
+
+<!-- ═══ 1 ═══ -->
+<div class="etat"><span class="num">1</span><h2>Vue d’ensemble</h2>
+  <p>Les quatre parties, une ligne de résumé chacune. La pastille orange du sommaire signale les habitudes que la dernière génération n’a pas tenues, sans avoir à ouvrir la partie. Le renvoi en bas évite de chercher ici ce qui se règle à la génération.</p></div>
+<div class="duo">
+  <figure class="fig"><figcaption>Ordinateur — cliquez dans le sommaire</figcaption>
+    <div class="scroll-x"><div class="frame"><div class="app" id="a1" data-mode="desk" data-part="apercu"></div></div></div>
+  </figure>
+  <figure class="fig"><figcaption>Téléphone — la liste</figcaption><div class="phone"><div class="app" id="a1b" data-mode="phone" data-part="apercu"></div></div></figure>
+</div>
+
+<!-- ═══ 2 ═══ -->
+<div class="etat"><span class="num">2</span><h2>Nos gardes</h2>
+  <p>Réglé une fois. Dans l’ordre : vos plannings (interrupteurs), les types de garde, ce qui s’enchaîne, puis les journées. Le crayon d’un type de garde déplie ses réglages fins (ici, « Nuits de semaine » est ouvert). Éteindre un planning demande une confirmation ; allumer, non.</p></div>
+<div class="duo">
+  <figure class="fig"><figcaption>Ordinateur</figcaption>
+    <div class="scroll-x"><div class="frame"><div class="app" id="a2" data-mode="desk" data-part="gardes" data-gedit="sem"></div></div></div>
+  </figure>
+  <figure class="fig"><figcaption>Téléphone</figcaption><div class="phone"><div class="app" id="a2b" data-mode="phone" data-part="gardes"></div></div></figure>
+</div>
+<div class="legende"><b>Le niveau d’un enchaînement est un réglage du genre, pas de la ligne.</b> Comme aujourd’hui : « Même équipe » et « Rôles différents » ont chacun un niveau de fermeté, qui vaut pour tous les enchaînements de ce genre, sur toutes les saisons. Il vit maintenant à côté des enchaînements, là où on les déclare, et plus dans les règles.</div>
+
+<!-- ═══ 3 ═══ -->
+<div class="etat"><span class="num">3</span><h2>Nos habitudes</h2>
+  <p>Des phrases, classées par personne, par équipe et pour tout le cabinet. Chaque ligne dit sa fermeté (un mot et quatre points), d’où elle vient, et si la dernière génération l’a tenue ; quand elle ne l’a pas été, la raison est écrite sous la phrase. « Voir le détail » ouvre la fermeté réglable, l’origine, la pause, la modification et la suppression. Sur téléphone, le même écran ; à droite, la vue d’un vétérinaire (lecture seule).</p></div>
+<div class="duo">
+  <figure class="fig"><figcaption>Ordinateur — le détail de « Manon préfère… » est ouvert</figcaption>
+    <div class="scroll-x"><div class="frame"><div class="app" id="a3" data-mode="desk" data-part="habitudes" data-ouvre="r5"></div></div></div>
+  </figure>
+  <figure class="fig"><figcaption>Téléphone — l’administratrice</figcaption><div class="phone"><div class="app" id="a3b" data-mode="phone" data-part="habitudes"></div></div></figure>
+</div>
+<div class="phones" style="margin-top:24px">
+  <figure class="fig"><figcaption>Téléphone — Manon, vétérinaire (lecture seule)</figcaption><div class="phone"><div class="app" id="a3c" data-mode="phone" data-part="habitudes" data-role="veto" data-prenom="Manon"></div></div></figure>
+</div>
+<div class="legende"><b>Trois origines, pas deux.</b> « Créée avec Filou » et « Créée à la main », comme demandé, plus « Réglage de départ » pour les six préférences fournies avec GuardVeto (elles existent déjà, on peut les régler ou les mettre en pause, pas les supprimer). Elles restent repliées derrière une ligne pour ne pas noyer les habitudes du cabinet.</div>
+
+<!-- ═══ 4 ═══ -->
+<div class="etat"><span class="num">4</span><h2>Créer une habitude en parlant à Filou</h2>
+  <p>La zone de saisie en haut de « Nos habitudes » ouvre la conversation sur place (plus de renvoi vers l’accueil). Filou reformule en règle précise, pose une question quand c’est ambigu, montre un exemple daté sur l’équipe, puis attend « Confirmer » ou « Corriger ». Rien n’est enregistré avant la confirmation. Les quatre cadres suivants sont aussi cliquables jusqu’au bout.</p></div>
+<div class="duo">
+  <figure class="fig"><figcaption>4a · Ordinateur — première phrase, Filou demande une précision</figcaption>
+    <div class="scroll-x"><div class="frame"><div class="app" id="a4a" data-mode="desk" data-part="habitudes" data-flow="precision" data-ex="1"></div></div></div>
+    <div class="sim"><span>Dans la zone de saisie, essayer :</span><button data-sim="phrase" data-target="a4a" data-k="1">la phrase sur le week-end</button><button data-sim="phrase" data-target="a4a" data-k="2">la phrase sur Antoine</button><button data-sim="phrase" data-target="a4a" data-k="3">une demande que Filou ne sait pas tenir</button><button data-sim="panne" data-target="a4a">Filou ne répond pas</button></div>
+  </figure>
+  <figure class="fig"><figcaption>4b · Téléphone — après la réponse : exemple daté, Confirmer / Corriger</figcaption><div class="phone"><div class="app" id="a4b" data-mode="phone" data-part="habitudes" data-flow="confirm" data-ex="1" data-rep="A"></div></div></figure>
+</div>
+<div class="duo" style="margin-top:28px">
+  <figure class="fig"><figcaption>4c · Ordinateur — « ne charge pas trop Antoine » : c’est une consigne de période</figcaption>
+    <div class="scroll-x"><div class="frame"><div class="app" id="a4c" data-mode="desk" data-part="habitudes" data-flow="periode" data-ex="2"></div></div></div>
+  </figure>
+  <figure class="fig"><figcaption>4d · Téléphone — la même réponse</figcaption><div class="phone"><div class="app" id="a4d" data-mode="phone" data-part="habitudes" data-flow="periode" data-ex="2"></div></div></figure>
+</div>
+<div class="legende"><b>La fermeté se choisit à la confirmation, avec une proposition.</b> Filou propose « Sauf urgence » pour la règle des week-ends et l’explique ; l’administratrice peut changer. Le choix « rattrapé plus tard » ou « offert » (une consigne qui allège quelqu’un) ne se pose pas ici : il se pose à la génération, avec la consigne de période.</div>
+
+<!-- ═══ 5 ═══ -->
+<div class="etat"><span class="num">5</span><h2>Créer ou modifier une habitude à la main</h2>
+  <p>Le formulaire garde tous les réglages d’aujourd’hui, rangés en quatre questions : pour qui, quelle règle, à quel point, pour quand. La phrase obtenue s’écrit en direct, c’est elle qui sera dans la liste. À gauche, une création ; à droite, la modification de « Antoine ne fait pas de garde le mercredi soir ». À l’enregistrement, GuardVeto contrôle la règle avec les autres (c’est le gardien actuel).</p></div>
+<div class="duo">
+  <figure class="fig"><figcaption>Ordinateur — nouvelle habitude</figcaption>
+    <div class="scroll-x"><div class="frame"><div class="app" id="a5" data-mode="desk" data-part="habitudes" data-form="new"></div></div></div>
+    <div class="sim"><span>Simuler à l’enregistrement :</span><button data-sim="conflit" data-target="a5">le contrôle trouve un conflit</button><button data-sim="serveur" data-target="a5">le serveur refuse</button><button data-sim="doublon" data-target="a5">l’habitude existe déjà</button></div>
+  </figure>
+  <figure class="fig"><figcaption>Téléphone — modifier</figcaption><div class="phone"><div class="app" id="a5b" data-mode="phone" data-part="habitudes" data-form="edit"></div></div></figure>
+</div>
+
+<!-- ═══ 6 ═══ -->
+<div class="etat"><span class="num">6</span><h2>Quand Filou ne sait pas encore tenir la demande</h2>
+  <p>Il le dit, explique pourquoi, propose ce qui s’en rapproche et que le moteur sait faire, et n’enregistre rien. « Noter la demande » ne promet rien : il le dit.</p></div>
+<div class="duo">
+  <figure class="fig"><figcaption>Ordinateur</figcaption>
+    <div class="scroll-x"><div class="frame"><div class="app" id="a6" data-mode="desk" data-part="habitudes" data-flow="inconnu" data-ex="3"></div></div></div>
+  </figure>
+  <figure class="fig"><figcaption>Téléphone</figcaption><div class="phone"><div class="app" id="a6b" data-mode="phone" data-part="habitudes" data-flow="inconnu" data-ex="3"></div></div></figure>
+</div>
+
+<!-- ═══ 7 ═══ -->
+<div class="etat"><span class="num">7</span><h2>L’équité</h2>
+  <p>En haut, ce qu’on équilibre (les sept charges d’aujourd’hui, avec leur importance) et le rôle payé du week-end. En dessous, le grand livre : pour chaque vétérinaire, ce qu’il a fait, sa part équitable et l’écart cumulé sur les périodes publiées. Changez de charge avec les boutons au-dessus du tableau.</p></div>
+<div class="duo">
+  <figure class="fig"><figcaption>Ordinateur</figcaption>
+    <div class="scroll-x"><div class="frame"><div class="app" id="a7" data-mode="desk" data-part="equite"></div></div></div>
+  </figure>
+  <figure class="fig"><figcaption>Téléphone</figcaption><div class="phone"><div class="app" id="a7b" data-mode="phone" data-part="equite"></div></div></figure>
+</div>
+<div class="legende"><b>Le grand livre est nouveau (lot 0 de la stratégie du 10/11).</b> Il n’existe pas encore dans le produit : ses chiffres ici sont fictifs. Le rattrapage d’une période à l’autre ne sera réel qu’une fois le socle d’équité corrigé ; l’écran ne doit pas le promettre avant.</div>
+
+<!-- ═══ 8 ═══ -->
+<div class="etat"><span class="num">8</span><h2>Selon la saison</h2>
+  <p>Les variantes (les « périodes types » d’aujourd’hui) comparées côte à côte : on voit d’un coup d’œil ce qui change d’une saison à l’autre, au lieu d’ouvrir une carte à la fois. Les menus se règlent à même le tableau.</p></div>
+<div class="duo">
+  <figure class="fig"><figcaption>Ordinateur</figcaption>
+    <div class="scroll-x"><div class="frame"><div class="app" id="a8" data-mode="desk" data-part="saison"></div></div></div>
+  </figure>
+  <figure class="fig"><figcaption>Téléphone</figcaption><div class="phone"><div class="app" id="a8b" data-mode="phone" data-part="saison"></div></div></figure>
+</div>
+
+<!-- ═══ 9 ═══ -->
+<div class="etat"><span class="num">9</span><h2>États vides et erreur d’enregistrement</h2>
+  <p>Cabinet neuf : la vue d’ensemble propose un ordre pour commencer ; « Nos habitudes » vide dit ce que ça veut dire (le moteur ne s’interdit rien d’autre que la structure) et offre les deux portes. En bas, une erreur d’enregistrement : la saisie est conservée, rien n’est perdu en silence.</p></div>
+<div class="duo">
+  <figure class="fig"><figcaption>9a · Ordinateur — cabinet neuf, vue d’ensemble</figcaption>
+    <div class="scroll-x"><div class="frame"><div class="app" id="a9a" data-mode="desk" data-part="apercu" data-vide="1"></div></div></div>
+  </figure>
+  <figure class="fig"><figcaption>9b · Téléphone — aucune habitude</figcaption><div class="phone"><div class="app" id="a9b" data-mode="phone" data-part="habitudes" data-vide="1"></div></div></figure>
+</div>
+<div class="duo" style="margin-top:28px">
+  <figure class="fig"><figcaption>9c · Ordinateur — le serveur a refusé l’enregistrement</figcaption>
+    <div class="scroll-x"><div class="frame"><div class="app" id="a9c" data-mode="desk" data-part="habitudes" data-form="new" data-err="serveur"></div></div></div>
+  </figure>
+  <figure class="fig"><figcaption>9d · Téléphone — équité d’un cabinet neuf</figcaption><div class="phone"><div class="app" id="a9d" data-mode="phone" data-part="equite" data-vide="1"></div></div></figure>
+</div>
+
+<div class="a-trancher">
+  <h2>Points à regarder</h2>
+  <ol>
+    <li><b>Une phrase par habitude, la fermeté en un mot et quatre points</b><span>Les quatre niveaux d’aujourd’hui (Jamais, Sauf urgence, À éviter, Souhait) sont conservés, mais ne sont plus quatre couleurs ni quatre groupes : le vert, l’orange et le rouge sont gardés pour « tenue / pas tenue ». À regarder : est-ce lisible sans légende ?</span></li>
+    <li><b>Filou crée ici, sur place</b><span>La zone de saisie est la première chose de « Nos habitudes ». Le formulaire à la main est un second bouton, pas un second écran.</span></li>
+    <li><b>Les raisons de « pas tenue » sont écrites sous la phrase</b><span>Pas dans un détail à ouvrir : c’est l’information qui fait revenir sur cet écran après une génération.</span></li>
+    <li><b>Le tableau des saisons</b><span>Variantes en colonnes, gardes en lignes. Ce qui ne change pas d’une saison à l’autre (jours, horaires, enchaînements, habitudes) est dit en une phrase, avec le lien vers sa partie.</span></li>
+    <li><b>Le grand livre d’équité</b><span>Trois colonnes de chiffres et une barre d’écart, avec un mot (« 2 d’avance », « 2 à rattraper ») plutôt qu’un signe + ou −.</span></li>
+  </ol>
+</div>
+
+</div>
+
+<script>
+(function(){
+/* ═════════ icônes (traits fins, style Lucide) ═════════ */
+var P={
+ grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+ moon:'<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
+ sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+ users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20v-1a5.5 5.5 0 0 1 5.5-5.5h2A5.5 5.5 0 0 1 15.5 19v1"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20v-1a5.5 5.5 0 0 0-4-5.3"/>',
+ scale:'<path d="M12 3v18M6 21h12M5 7h14"/><path d="m5 7-3 7a3.5 3.5 0 0 0 6 0zM19 7l-3 7a3.5 3.5 0 0 0 6 0z"/>',
+ repeat:'<path d="m17 2 4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="m7 22-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/>',
+ building:'<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/><path d="M9 10h.01M15 10h.01"/>',
+ chat:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+ pencil:'<path d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z"/>',
+ trash:'<path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>',
+ x:'<path d="M18 6 6 18M6 6l12 12"/>',
+ right:'<path d="m9 18 6-6-6-6"/>',
+ left:'<path d="m15 18-6-6 6-6"/>',
+ down:'<path d="m6 9 6 6 6-6"/>',
+ up:'<path d="m18 15-6-6-6 6"/>',
+ info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
+ check:'<path d="M20 6 9 17l-5-5"/>',
+ warn:'<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
+ send:'<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>',
+ lock:'<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+ link:'<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>',
+ eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
+ arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>',
+ cal:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>'
+};
+function ico(n,c){return '<svg class="i '+(c||'')+'" viewBox="0 0 24 24" aria-hidden="true">'+P[n]+'</svg>';}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+/* ═════════ vocabulaire : une seule ligne à changer pour renommer une partie ═════════ */
+var NOMS={gardes:'Nos gardes',habitudes:'Nos habitudes',equite:'L’équité',saison:'Selon la saison'};
+var PARTS=[
+ {id:'gardes',ico:'moon',q:'Quels créneaux, combien de personnes, ce qui s’enchaîne.'},
+ {id:'habitudes',ico:'users',q:'Ce que le cabinet fait toujours, ou ne fait jamais.'},
+ {id:'equite',ico:'scale',q:'Ce qu’on équilibre entre vous, et où chacun en est.'},
+ {id:'saison',ico:'repeat',q:'Ce qui change entre l’été, l’hiver et les autres saisons.'}
+];
+var VETS={'Anne-Sophie':'#3B82F6','Fanny':'#8B5CF6','Jean':'#10B981','Anne-Catherine':'#6B7280','Manon':'#EC4899','Antoine':'#F59E0B','Victor':'#6366F1'};
+var COURT={'Anne-Sophie':'A-S','Fanny':'Fan','Jean':'Jea','Anne-Catherine':'A-C','Manon':'Man','Antoine':'Ant','Victor':'Vic'};
+function vdot(n){return '<span class="vdot" style="background:'+(VETS[n]||'#999')+'"></span>';}
+
+/* les quatre niveaux de fermeté d’aujourd’hui (lib/regles/libelle.ts), reformulés pour s’adresser à l’administratrice */
+var FM={
+ jamais:{mot:'Jamais',n:4,choix:'Jamais — c’est interdit',aide:'Le moteur ne le fera en aucun cas, quitte à ne trouver aucun planning et à vous demander d’arbitrer.'},
+ sauf:{mot:'Sauf urgence',n:3,choix:'Sauf s’il n’a vraiment plus le choix',aide:'Le moteur l’évite toujours. Il ne s’y résout que si aucune autre combinaison ne marche, plutôt que de rendre un planning incomplet.'},
+ evitee:{mot:'À éviter',n:2,choix:'Le moteur fait tout pour l’éviter',aide:'Le moteur accepte de déséquilibrer un peu la répartition pour l’éviter, mais le fera plutôt que de bloquer.'},
+ souhait:{mot:'Souhait',n:1,choix:'Un souhait, si ça n’embête personne',aide:'Pris en compte en dernier, une fois l’équité assurée. Ne coûte jamais une garde à quelqu’un d’autre.'}
+};
+var ORDRE_FM=['jamais','sauf','evitee','souhait'];
+function fm(f){var m=FM[f],p='',i;for(i=1;i<=4;i++)p+='<span class="pp'+(i<=m.n?' on':'')+'"></span>';return '<span class="fm" title="'+esc(m.choix)+'"><span class="pips" aria-hidden="true">'+p+'</span>'+m.mot+'</span>';}
+function fmPips(f){var m=FM[f],p='',i;for(i=1;i<=4;i++)p+='<span class="pp'+(i<=m.n?' on':'')+'"></span>';return '<span class="pips" aria-hidden="true">'+p+'</span>';}
+function optsForce(noJamais){
+ return ORDRE_FM.map(function(f){
+  var off=(f==='jamais'&&noJamais)?'Cette règle est toujours une préférence : le moteur ne sait pas l’interdire.':'';
+  return [f,'<b>'+FM[f].mot+'</b> · '+FM[f].choix,off,fmPips(f)+FM[f].mot];
+ });
+}
+
+/* ═════════ données d’exemple ═════════ */
+var GA={sem:'les nuits de semaine',ven:'le vendredi soir',we:'le week-end'};
+var GN={sem:'Nuits de semaine',ven:'Vendredi soir',we:'Week-end'};
+var GARDES=[
+ {id:'sem',nom:'Nuits de semaine',ico:'moon',jours:'Du lundi au jeudi',j:[1,1,1,1,0,0,0],places:2,roles:'1er et 2nd',h:'18h → 8h le lendemain',deb:'18:00',fin:'08:00',off:'le lendemain',feries:false,base:true,actif:true},
+ {id:'ven',nom:'Vendredi soir',ico:'moon',jours:'Le vendredi',j:[0,0,0,0,1,0,0],places:2,roles:'1er et 2nd',h:'18h → 8h le lendemain',deb:'18:00',fin:'08:00',off:'le lendemain',feries:false,base:true,actif:true},
+ {id:'we',nom:'Week-end',ico:'sun',jours:'Samedi et dimanche',j:[0,0,0,0,0,1,1],places:2,roles:'1er et 2nd',h:'8h → 8h le lendemain',deb:'08:00',fin:'08:00',off:'le lendemain',feries:true,base:true,actif:true}
+];
+var LIAI=[
+ {id:'l1',g:'meme',a:'ven',b:'we',actif:true},
+ {id:'l2',g:'inv',a:'ven',b:'we',actif:true}
+];
+var TRANCHES=[
+ {nom:'Matin',deb:'8h',fin:'12h30',c:'Matin'},
+ {nom:'Après-midi',deb:'14h',fin:'18h',c:'Après-midi'},
+ {nom:'Journée complète',deb:'8h',fin:'18h',c:'Journée entière'}
+];
+var PRESENCES=[
+ {qui:'Fanny',t:'Journée complète',j:'lundi, mardi',s:'toutes les semaines'},
+ {qui:'Manon',t:'Matin',j:'mercredi',s:'semaines paires'},
+ {qui:'Jean',t:'Après-midi',j:'jeudi, vendredi',s:'toutes les semaines'}
+];
+var RULES=[
+ {id:'r1',g:'p',qui:'Antoine',ph:'Antoine ne fait pas de garde le mercredi soir.',f:'jamais',o:'main',et:'ok',kind:'Repos fixe un jour',kid:'repos',who:'Antoine',jour:'mercredi'},
+ {id:'r2',g:'p',qui:'Antoine',ph:'Antoine ne fait pas plus de 3 jours de garde d’affilée.',f:'sauf',o:'main',et:'ok',kind:'Jours de garde d’affilée (max)',kid:'serie',who:'Antoine',n:3},
+ {id:'r3',g:'p',qui:'Fanny',ph:'Fanny et Jean ne sont jamais de garde seuls ensemble.',f:'jamais',o:'filou',src:'Fanny et Jean ensemble en garde, ça se passe mal.',et:'ok',kind:'Jamais en duo avec…',kid:'duo',who:'Fanny',avec:'Jean'},
+ {id:'r4',g:'p',qui:'Victor',ph:'Victor ne fait pas deux week-ends de suite.',f:'sauf',o:'filou',src:'Victor ne devrait pas enchaîner deux week-ends.',et:'ok',kind:'Fréquence des week-ends'},
+ {id:'r5',g:'p',qui:'Manon',ph:'Manon préfère être de garde avec Anne-Catherine.',f:'souhait',o:'main',et:'non',raison:'À la dernière génération, elles n’ont été ensemble que 2 fois sur 5 : Anne-Catherine est absente trois semaines en novembre.',kind:'Préfère être de garde avec…',nojamais:true},
+ {id:'r6',g:'p',qui:'Anne-Catherine',ph:'Anne-Catherine a moins de gardes que la moyenne.',f:'souhait',o:'filou',src:'Anne-Catherine, c’est notre dernier recours.',et:'ok',kind:'Souhaite plus / moins de gardes',kid:'volume',who:'Anne-Catherine',sens:'moins',nojamais:true},
+ {id:'r7',g:'e',qui:'junior',ph:'Les juniors ne sont jamais de garde seuls.',f:'jamais',o:'main',et:'ok',kind:'Jamais seuls',kid:'seuls',tag:'junior'},
+ {id:'r8',g:'e',qui:'senior',kid:'auplus1',tag:'senior',cren:'we',ph:'Il y a toujours au moins un senior le week-end.',f:'sauf',o:'filou',src:'je veux toujours un ancien présent le week-end',et:'non',raison:'Week-end des 6 et 7 décembre : Anne-Sophie, Fanny et Jean sont en congé. Le moteur a dérogé, comme « Sauf urgence » l’y autorise.',kind:'Toujours au moins un…'},
+ {id:'r9',g:'e',qui:'salarié',kid:'role',tag:'salarié',role:'1er',cren:'we',ph:'Les salariés ne tiennent pas le rôle de 1er le week-end.',f:'jamais',o:'main',et:'ok',kind:'Ne tiennent jamais un rôle'},
+ {id:'r10',g:'c',ph:'Si tous les vétérinaires sont là une semaine, ceux qui font le week-end ne font pas de garde en semaine.',f:'sauf',o:'filou',src:'si tous les vétos sont là une semaine, ceux qui font le week-end ne font pas de garde la semaine',et:'new',nouveau:true,kind:'Consigne de Filou'},
+ {id:'r11',g:'c',ph:'Au moins 1 jour de repos entre deux gardes d’une même personne.',f:'evitee',o:'main',et:'ok',kind:'Espacement minimal',kid:'espacement',n:1},
+ {id:'r12',g:'c',ph:'Pas de nuit de semaine le lendemain d’un week-end.',f:'jamais',o:'main',et:'ok',kind:'Enchaînement interdit',kid:'succ',a:'nuit de semaine',b:'week-end'},
+ {id:'d1',g:'c',dep:1,ph:'Éviter la garde le week-end avant ses vacances.',f:'evitee',o:'depart',et:'ok',kind:'Préférence du planning'},
+ {id:'d2',g:'c',dep:1,ph:'Éviter les gardes des soirs de réveillon (24 et 31 décembre).',f:'evitee',o:'depart',et:'ok',kind:'Préférence du planning'},
+ {id:'d3',g:'c',dep:1,ph:'Changer de rôle la veille d’un jour férié.',f:'souhait',o:'depart',et:'ok',kind:'Préférence du planning',nojamais:true},
+ {id:'d4',g:'c',dep:1,ph:'Éviter la garde la veille d’un jour d’absence.',f:'evitee',o:'depart',et:'ok',kind:'Préférence du planning'},
+ {id:'d5',g:'c',dep:1,ph:'Pas la même personne à Noël et au Nouvel An.',f:'sauf',o:'depart',et:'ok',kind:'Préférence du planning',pause:true},
+ {id:'d6',g:'c',dep:1,ph:'Pas la même fête deux ans de suite.',f:'evitee',o:'depart',et:'ok',kind:'Préférence du planning'}
+];
+var EX={
+ 1:'si tous les vétos sont là une semaine, ceux qui font le week-end ne font pas de garde la semaine',
+ 2:'ne charge pas trop Antoine, il traverse une période difficile',
+ 3:'évite de mettre quelqu’un de garde la veille d’une formation'
+};
+var DIMS=[
+ ['weekend','Week-ends','Donner à chacun le même nombre de week-ends de garde.','essentiel'],
+ ['weekend_premier','Rôle de 1er le week-end','Équilibrer qui est 1er le week-end (le rôle à l’avantage financier).','important'],
+ ['ferie','Jours fériés','Répartir équitablement les gardes des jours fériés.','important'],
+ ['semaine_premier','Nuits de semaine — 1er','Équilibrer les nuits de semaine assurées en 1er.','normal'],
+ ['semaine_second','Nuits de semaine — 2nd','Équilibrer les nuits de semaine assurées en 2nd.','normal'],
+ ['semaine_renfort','Nuits de semaine — renfort','Équilibrer les nuits tenues à partir de la 3e place.','normal'],
+ ['grands_weekend','Grands week-ends (salariés)','Répartir les grands week-ends perdus par les salariés.','important']
+];
+var IMPS=[['ignoree','Ignorée'],['peu_important','Faible'],['normal','Normale'],['important','Importante'],['essentiel','Essentielle']];
+var LIVRE={
+ we:{nom:'Week-ends',u:'week-end',us:'week-ends',d:{'Anne-Sophie':[12,13],'Fanny':[14,13],'Jean':[13,13],'Anne-Catherine':[6,6],'Manon':[13,13],'Antoine':[11,13],'Victor':[15,13]}},
+ ferie:{nom:'Jours fériés',u:'jour férié',us:'jours fériés',d:{'Anne-Sophie':[3,3],'Fanny':[4,3],'Jean':[3,3],'Anne-Catherine':[2,2],'Manon':[3,3],'Antoine':[2,3],'Victor':[3,3]}},
+ nuit:{nom:'Nuits de semaine (1er)',u:'nuit',us:'nuits',d:{'Anne-Sophie':[22,20],'Fanny':[19,20],'Jean':[20,20],'Anne-Catherine':[8,8],'Manon':[18,20],'Antoine':[21,20],'Victor':[20,20]}}
+};
+var VARS=[
+ {id:'v1',nom:'Hiver',def:true,util:'Hiver 2026',n:{sem:2,ven:2,we:2}},
+ {id:'v2',nom:'Été',def:false,util:'Été 2026',n:{sem:1,ven:2,we:2}},
+ {id:'v3',nom:'Été réduit',def:false,util:'',n:{sem:1,ven:1,we:2}}
+];
+var JOURS=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+var JOURS_L=[['lundi','Lundi'],['mardi','Mardi'],['mercredi','Mercredi'],['jeudi','Jeudi'],['vendredi','Vendredi']];
+
+function copie(o){return JSON.parse(JSON.stringify(o));}
+
+/* ═════════ état par écran ═════════ */
+var apps=[];
+function nouvelEtat(el,i){
+ var d=el.dataset, vide=d.vide==='1';
+ var S={
+  el:el,uid:'u'+i,mode:d.mode,role:d.role||'admin',prenom:d.prenom||'Anne-Sophie',
+  part:d.part||'apercu',vide:vide,
+  pl:{gardes:true,journees:true},modal:null,pending:false,busy:false,
+  gardes:copie(GARDES),liai:copie(LIAI),gEdit:d.gedit||null,gNew:false,liaiNew:false,
+  rules:vide?[]:copie(RULES).filter(function(r){return d.flow?r.id!=='r10':true;}),
+  filtre:'toutes',ouv:{},depart:false,
+  flow:null,form:null,v:{},dd:null,toast:null,timer:null,
+  eqDet:false,dim:'we',cohortes:vide?[]:[{id:'c1',dim:'weekend',tag:'salarié',imp:'important'}],coNew:false,
+  vars:vide?[]:copie(VARS),varNew:false,
+  simSrv:false,simDoublon:false,simConflit:false,simPanne:false,txt:''
+ };
+ if(d.ouvre)S.ouv[d.ouvre]=true;
+ if(d.flow){
+  S.flow={step:d.flow,ex:+d.ex,phrase:EX[d.ex],rep:d.rep||null,force:'sauf',corriger:false};
+  S.part='habitudes';
+ }
+ if(d.form==='new'){ouvrirForm(S,null);}
+ if(d.form==='edit'){ouvrirForm(S,'r1');}
+ if(d.err&&S.form){S.form.err=d.err;}
+ return S;
+}
+
+/* ═════════ briques d’interface ═════════ */
+function pill(t,ton,nu){return '<span class="pill '+ton+(nu?' nu':'')+'">'+t+'</span>';}
+function sw(on,act,extra,label){
+ return '<button type="button" class="sw'+(on?' on':'')+'" role="switch" aria-checked="'+on+'" aria-label="'+esc(label)+'" data-act="'+act+'" '+(extra||'')+'></button>';
+}
+function bloc(titre,etat,corps,id){return '<section class="bloc"'+(id?' id="'+id+'"':'')+'><div class="bh"><h3>'+titre+'</h3>'+(etat||'')+'</div>'+corps+'</section>';}
+function val(S,k,def){return S.v[k]!==undefined?S.v[k]:def;}
+/* menu déroulant maison. opts : [valeur, libellé, raison si désactivé, libellé court du déclencheur] ou ['#','Titre de groupe'] */
+function sel(S,key,def,opts,cls,label){
+ var cur=val(S,key,def),open=S.dd===key,lab='';
+ opts.forEach(function(o){if(o[0]===cur)lab=(o[3]!==undefined?o[3]:o[1]);});
+ return '<div class="sel-wrap '+(cls||'')+'"><button type="button" class="sel" data-act="dd" data-k="'+key+'" aria-haspopup="listbox" aria-expanded="'+open+'" aria-label="'+esc(label||'Choisir')+'"><span>'+lab+'</span>'+ico('down','sm')+'</button>'
+ +(open?'<ul class="opts" role="listbox">'+opts.map(function(o){
+   if(o[0]==='#')return '<li class="grp">'+o[1]+'</li>';
+   return '<li><button type="button" role="option"'+(o[2]?' disabled':'')+' data-act="dd-pick" data-k="'+key+'" data-v="'+esc(o[0])+'"'+(o[0]===cur?' aria-selected="true"':'')+'>'+o[1]+(o[2]?'<small>'+o[2]+'</small>':'')+'</button></li>';
+  }).join('')+'</ul>':'')
+ +'</div>';
+}
+function toggleCb(S,key,def,label,dis){
+ var on=!!val(S,key,def);
+ return '<button type="button" class="cb'+(on?' on':'')+'" data-act="cb" data-k="'+key+'" data-def="'+(def?1:0)+'" aria-pressed="'+on+'"'+(dis?' disabled':'')+'>'+label+'</button>';
+}
+
+/* ═════════ vue d’ensemble ═════════ */
+function nbPasTenues(S){return S.rules.filter(function(r){return r.et==='non'&&!r.pause;}).length;}
+function resume(S,id){
+ if(id==='gardes'){
+  var n=S.gardes.filter(function(g){return g.actif;}).length,l=S.liai.filter(function(x){return x.actif;}).length;
+  if(S.vide)return {t:n+' types de garde de départ, à adapter à votre cabinet',pill:pill('À vérifier','warn')};
+  return {t:n+' types de garde · '+l+' enchaînements'+(S.pl.journees?' · journées allumées':'')};
+ }
+ if(id==='habitudes'){
+  if(!S.rules.length)return {t:'Aucune habitude pour l’instant',pill:pill('À faire','warn')};
+  var np=nbPasTenues(S);
+  return {t:S.rules.length+' habitudes',pill:np?pill(np+' pas tenues à la dernière génération','warn'):pill('Toutes tenues','ok')};
+ }
+ if(id==='equite'){
+  if(S.vide)return {t:'Se remplit à la première période publiée'};
+  return {t:'6 charges équilibrées · Antoine a encore 2 week-ends à rattraper'};
+ }
+ var v=S.vars;
+ if(!v.length)return {t:'Aucune variante : toutes les périodes suivent « '+NOMS.gardes+' »'};
+ return {t:v.length+' variantes : '+v.map(function(x){return x.nom;}).join(', ')};
+}
+function carte(S,p){
+ var r=resume(S,p.id);
+ return '<button type="button" class="carte" data-act="nav" data-k="'+p.id+'"><span class="puce">'+ico(p.ico)+'</span><span class="tx"><b>'+NOMS[p.id]+'</b><span class="q">'+p.q+'</span><span class="res">'+esc(r.t)+(r.pill||'')+'</span></span>'+ico('right')+'</button>';
+}
+function apercu(S){
+ var h='<div class="cartes">'+PARTS.map(function(p){return carte(S,p);}).join('')+'</div>';
+ if(S.vide){
+  h+='<div class="depart-box" data-edit><h3>Pour commencer</h3><ol>'
+   +'<li>Vérifiez vos gardes dans <button type="button" class="btn btn-ghost sm" data-act="nav" data-k="gardes">'+NOMS.gardes+'</button></li>'
+   +'<li>Dites à Filou comment le cabinet fonctionne dans <button type="button" class="btn btn-ghost sm" data-act="nav" data-k="habitudes">'+NOMS.habitudes+'</button></li>'
+   +'<li>Générez le premier planning : l’équité se remplira ensuite toute seule</li></ol></div>';
+ }
+ h+='<div class="renvoi">'+ico('info')+'<span><b>Une consigne pour une seule période ?</b> Par exemple « ménager Antoine cette période ». Elle se donne au moment de générer le planning, pas ici.</span><button type="button" class="btn btn-outline" data-act="vers-gen" data-edit>Aller à la génération</button></div>';
+ return h;
+}
+
+/* ═════════ partie : Nos gardes ═════════ */
+function lignePlan(S,k,titre,desc,seul){
+ var on=S.pl[k],ro=S.role!=='admin';
+ var droite;
+ if(seul)droite='<span class="seul">'+ico('lock','sm')+'Seul planning actif</span>';
+ else if(ro)droite=pill(on?'Actif':'Éteint',on?'ok':'off');
+ else droite='<em class="'+(on?'':'off')+'">'+(on?'Actif':'Éteint')+'</em>'+sw(on,'plan-ask','data-k="'+k+'"'+(S.pending?' disabled':''),(on?'Éteindre ':'Allumer ')+titre.toLowerCase());
+ return '<div class="rang"><span class="lib"><span class="puce-s">'+ico(k==='gardes'?'moon':'sun')+'</span><span><b>'+titre+'</b><small>'+(on?desc:'Non utilisé par le cabinet. Vos réglages sont gardés.')+'</small></span></span><span class="droite">'+droite+'</span></div>';
+}
+function champsGarde(S,g){
+ var k=g?g.id:'new',base=g&&g.base;
+ var jours=JOURS.map(function(j,ix){
+  var on=!!val(S,'gj-'+k+'-'+ix,g?g.j[ix]:0);
+  return '<button type="button" class="cb'+(on?' on':'')+'" data-act="cb" data-k="gj-'+k+'-'+ix+'" data-def="'+(g&&g.j[ix]?1:0)+'" aria-pressed="'+on+'"'+(base?' disabled':'')+'>'+j+'</button>';
+ }).join('');
+ return '<div class="g-form">'
+  +'<div class="grille2"><div class="field"><label for="'+S.uid+'-gn-'+k+'">Nom du type de garde</label><input type="text" id="'+S.uid+'-gn-'+k+'" value="'+esc(g?g.nom:'')+'" data-in="gnom" placeholder="Renfort du lundi"></div>'
+  +'<div class="field"><label>Vétérinaires de garde, au maximum</label>'+sel(S,'gp-'+k,String(g?g.places:2),[['1','1 véto'],['2','2 vétos'],['3','3 vétos'],['4','4 vétos']],'fixe','Nombre maximum de vétérinaires')+'</div></div>'
+  +'<div class="field"><label>Jours couverts</label><div class="cases">'+jours+'</div></div>'
+  +'<div class="field"><label class="cbl">'+toggleCb(S,'gf-'+k,g?g.feries:0,'S’applique aussi les jours fériés',base)+'</label></div>'
+  +(base?'<p class="aide">Les jours d’un type de garde de départ ne se modifient pas : c’est sur eux que tout le planning est calé. Pour couvrir d’autres jours, créez un type sur-mesure. Le nom, les horaires et les places restent modifiables.</p>':'')
+  +'<div class="grille3"><div class="field"><label for="'+S.uid+'-gd-'+k+'">Prise de garde</label><input type="text" id="'+S.uid+'-gd-'+k+'" value="'+(g?g.deb:'18:00')+'" data-in="gd"></div>'
+  +'<div class="field"><label for="'+S.uid+'-gf-'+k+'">Fin de garde</label><input type="text" id="'+S.uid+'-gf-'+k+'" value="'+(g?g.fin:'08:00')+'" data-in="gf"></div>'
+  +'<div class="field"><label>La garde se rend…</label>'+sel(S,'go-'+k,g?g.off:'le lendemain',[['le jour même','le jour même'],['le lendemain','le lendemain'],['le surlendemain','le surlendemain'],['trois jours après','trois jours après']],'','La garde se rend')+'</div></div>'
+  +'<div class="field"><label>Nom de chaque place</label><div class="grille2"><input type="text" value="1er" aria-label="Nom de la première place" data-in="x"><input type="text" value="2nd" aria-label="Nom de la seconde place" data-in="x"></div></div>'
+  +'<div class="actions"><button type="button" class="btn btn-valider sm" data-act="'+(g?'g-save':'g-add')+'" data-k="'+k+'">'+(g?'Enregistrer':'Ajouter ce type de garde')+'</button><button type="button" class="btn btn-ghost sm" data-act="g-close">Annuler</button></div></div>';
+}
+function ligneGarde(S,g){
+ var ro=S.role!=='admin',ouvert=S.gEdit===g.id;
+ var h='<div class="grow'+(g.actif?'':' off')+'"><div class="g-top"><span class="puce-s">'+ico(g.ico)+'</span><span class="g-nom">'+esc(g.nom)+'</span>'
+  +(!g.base?'<span class="etiq">Sur-mesure</span>':'')+(!g.actif?'<span class="etiq">Désactivé</span>':'')+'<span class="sp"></span>'
+  +'<span data-edit style="display:inline-flex;align-items:center;gap:4px"><button type="button" class="ibtn" data-act="g-edit" data-k="'+g.id+'" title="Modifier « '+esc(g.nom)+' »" aria-label="Modifier « '+esc(g.nom)+' »" aria-expanded="'+ouvert+'">'+ico('pencil','sm')+'</button>'
+  +sw(g.actif,'g-toggle','data-k="'+g.id+'"',(g.actif?'Désactiver « ':'Réactiver « ')+g.nom+' »')
+  +(!g.base?'<button type="button" class="ibtn danger" data-act="g-del" data-k="'+g.id+'" title="Supprimer « '+esc(g.nom)+' »" aria-label="Supprimer « '+esc(g.nom)+' »">'+ico('trash','sm')+'</button>':'')+'</span></div>'
+  +'<div class="faits"><div><span>Jours</span><b>'+g.jours+(g.feries?' et jours fériés':'')+'</b></div><div><span>Places maximum</span><b>'+g.places+' · '+g.roles+'</b></div><div><span>Horaires</span><b>'+g.h+'</b></div></div>';
+ if(!g.actif)h+='<p class="consequence">'+ico('info','sm')+'<span>Aucune garde n’est engendrée sur ce type : '+g.jours.toLowerCase()+' ne sont plus couverts par la génération. Les plannings déjà publiés ne changent pas.</span></p>';
+ if(ouvert&&!ro)h+=champsGarde(S,g);
+ return h+'</div>';
+}
+function phraseLiai(l){
+ if(l.g==='meme')return cap(GA[l.a])+' et '+GA[l.b]+' sont tenus par la même équipe.';
+ return 'Entre '+GA[l.a]+' et '+GA[l.b]+', un vétérinaire présent sur les deux change de rôle.';
+}
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+function genreHtml(S,g,titre,expl,defNiv){
+ var ls=S.liai.filter(function(l){return l.g===g;});
+ return '<div class="genre"><div class="genre-h"><div><b>'+titre+'</b><p class="aide">'+expl+'</p></div>'
+  +'<div class="niv"><span>Fermeté</span>'+sel(S,'auto-niv-'+g,defNiv,optsForce(false),'moyen droite','Fermeté de l’enchaînement « '+titre+' »')+'</div></div>'
+  +(ls.length?ls.map(function(l){
+    return '<div class="rang"><span class="lib">'+ico('link','sm')+'<span>'+phraseLiai(l)+'</span></span><span class="droite" data-edit>'+sw(l.actif,'l-toggle','data-k="'+l.id+'"','Enchaînement actif')+'<button type="button" class="ibtn danger" data-act="l-del" data-k="'+l.id+'" aria-label="Supprimer cet enchaînement" title="Supprimer">'+ico('trash','sm')+'</button></span></div>';
+   }).join(''):'<p class="vide">Aucun enchaînement de ce genre.</p>')+'</div>';
+}
+function contenuGardes(S){
+ var ro=S.role!=='admin',u=S.uid;
+ var h='<div class="chips anc"><a class="chip" href="#'+u+'-pl">Vos plannings</a><a class="chip" href="#'+u+'-ty">Types de garde</a><a class="chip" href="#'+u+'-en">Ce qui s’enchaîne</a>'+(S.pl.journees?'<a class="chip" href="#'+u+'-jo">Les journées</a>':'')+'</div><div class="panel">';
+ var seulG=S.pl.gardes&&!S.pl.journees,seulJ=S.pl.journees&&!S.pl.gardes;
+ h+=bloc('Vos plannings','',lignePlan(S,'gardes','Gardes du soir et du week-end','Soirs, nuits et week-ends.',seulG)+lignePlan(S,'journees','Journées au cabinet','Présences en journée : tranches horaires et semaines types.',seulJ),u+'-pl');
+ if(S.pl.gardes){
+  var n=S.gardes.filter(function(g){return g.actif;}).length;
+  h+=bloc('Types de garde',pill(n+' actifs','off',1)+'<button type="button" class="btn btn-outline sm" data-act="g-new" data-edit>'+ico('plus','sm')+'Ajouter</button>',
+   (S.gNew?champsGarde(S,null)+'<div style="height:10px"></div>':'')+S.gardes.map(function(g){return ligneGarde(S,g);}).join(''),u+'-ty');
+  var liaiForm='';
+  if(S.liaiNew){
+   var gOpts=[['sem','Nuits de semaine'],['ven','Vendredi soir'],['we','Week-end']];
+   liaiForm='<div class="g-form" style="margin:0 0 14px"><div class="grille3"><div class="field"><label>Premier type de garde</label>'+sel(S,'f-la','ven',gOpts,'','Premier type de garde')+'</div>'
+    +'<div class="field"><label>Ce que l’enchaînement impose</label>'+sel(S,'f-lg','meme',[['meme','Même équipe sur les deux'],['inv','Rôles différents entre les deux']],'','Ce que l’enchaînement impose')+'</div>'
+    +'<div class="field"><label>Second type de garde</label>'+sel(S,'f-lb','we',gOpts,'','Second type de garde')+'</div></div>'
+    +'<div class="actions"><button type="button" class="btn btn-valider sm" data-act="l-add">Lier</button><button type="button" class="btn btn-ghost sm" data-act="l-close">Annuler</button></div></div>';
+  }
+  h+=bloc('Ce qui s’enchaîne','<button type="button" class="btn btn-outline sm" data-act="l-new" data-edit>'+ico('link','sm')+'Lier deux types de garde</button>',
+   liaiForm+genreHtml(S,'meme','Même équipe','Les mêmes vétérinaires assurent les deux gardes liées. C’est ce qui fait qu’un vendredi soir et le week-end qui suit sont tenus par la même équipe, au lieu d’être tirés séparément.','jamais')
+   +genreHtml(S,'inv','Rôles différents','Un vétérinaire présent sur les deux gardes liées doit y changer de rôle : 1er sur l’une, 2nd sur l’autre.','evitee')
+   +'<p class="aide" style="margin:6px 0 0">Ces deux fermetés valent pour tous les enchaînements de leur genre, quelle que soit la saison.</p>',u+'-en');
+ }else{
+  h+=bloc('Types de garde et enchaînements','','<p class="vide">Les gardes du soir et du week-end sont éteintes. Rien n’est effacé : types de garde, enchaînements et habitudes reviennent tels quels si vous les rallumez.</p>',u+'-ty');
+ }
+ if(S.pl.journees){
+  var tr=TRANCHES.map(function(t){
+   return '<div class="tranche"><b>'+t.nom+'</b><span>'+t.deb+' → '+t.fin+'</span><span><small>Compte comme</small>'+t.c+'</span><span class="droite" data-edit><button type="button" class="ibtn" data-act="toast" data-t="Modification d’une tranche horaire (écran d’aujourd’hui, inchangé)" aria-label="Modifier la tranche « '+t.nom+' »">'+ico('pencil','sm')+'</button></span></div>';
+  }).join('');
+  var pr=PRESENCES.map(function(p){
+   return '<div class="tranche"><b style="display:flex;gap:8px;align-items:center">'+vdot(p.qui)+p.qui+'</b><span>'+p.t+'</span><span>'+p.j+'<small>'+p.s+'</small></span><span class="droite" data-edit><button type="button" class="ibtn danger" data-act="toast" data-t="Présence retirée de la semaine type" aria-label="Retirer cette présence">'+ico('trash','sm')+'</button></span></div>';
+  }).join('');
+  h+=bloc('Les journées','',
+   '<div class="sous-tete" style="margin-top:0;padding-top:0;border-top:0">Tranches horaires</div>'+tr
+   +'<div class="actions" data-edit><button type="button" class="btn btn-outline sm" data-act="toast" data-t="Ajout d’une tranche (écran d’aujourd’hui, inchangé)">'+ico('plus','sm')+'Ajouter une tranche</button></div>'
+   +'<div class="sous-tete">Présences récurrentes (semaine type de chacun)</div>'+pr
+   +'<div class="actions" data-edit><button type="button" class="btn btn-outline sm" data-act="toast" data-t="Ajout d’une présence (écran d’aujourd’hui, inchangé)">'+ico('plus','sm')+'Ajouter une présence</button></div>'
+   ,u+'-jo');
+ }
+ return h+'</div>';
+}
+
+/* ═════════ partie : Nos habitudes ═════════ */
+function etatHtml(r){
+ if(r.pause)return '<span class="pill off">En pause</span>';
+ if(r.et==='ok')return pill('Tenue','ok');
+ if(r.et==='non')return pill('Pas tenue','warn');
+ return '<span class="pill off">Pas encore vérifiée</span>';
+}
+function origHtml(r){
+ if(r.o==='filou')return ico('chat','sm')+'Créée avec Filou';
+ if(r.o==='main')return ico('pencil','sm')+'Créée à la main';
+ return ico('building','sm')+'Réglage de départ';
+}
+function ligneHab(S,r){
+ var ro=S.role!=='admin',open=!!S.ouv[r.id];
+ var qui=r.g==='p'?vdot(r.qui):(r.g==='e'?'<span title="Étiquette « '+esc(r.qui)+' »">'+ico('users','sm')+'</span>':'<span title="Tout le cabinet">'+ico('building','sm')+'</span>');
+ var h='<div class="hab'+(r.pause?' pause':'')+'" id="'+S.uid+'-'+r.id+'"><div class="hab-l"><span class="qui">'+qui+'</span><div><p class="phrase">'+esc(r.ph)+(r.nouveau?'<span class="new">Nouvelle</span>':'')+'</p>'
+  +'<div class="meta">'+fm(r.f)+etatHtml(r)+'<span class="orig">'+origHtml(r)+'</span></div>'
+  +((r.et==='non'&&!r.pause)?'<p class="raison">'+ico('warn','sm')+'<span>'+esc(r.raison)+'</span></p>':'')+'</div>'
+  +'<button type="button" class="det" data-act="det" data-k="'+r.id+'" aria-expanded="'+open+'">'+(open?'Masquer le détail':'Voir le détail')+ico(open?'up':'down','sm')+'</button></div>';
+ if(open){
+  var orig;
+  if(r.o==='filou')orig='Créée avec Filou le 4 novembre.<blockquote class="src">« '+esc(r.src)+' »</blockquote>';
+  else if(r.o==='main')orig='Créée à la main le 12 septembre.';
+  else orig='Réglage fourni avec GuardVeto. On peut le régler ou le mettre en pause, pas le supprimer.';
+  var gen=r.pause?'Mise en pause : le moteur ne la lit plus.':(r.et==='ok'?'Tenue sur « Hiver 2026 », publié le 8 novembre.':(r.et==='non'?'Pas tenue : la raison est écrite sous la phrase.':'Pas encore vérifiée : elle s’appliquera dès la prochaine génération.'));
+  h+='<div class="hab-d"><dl class="kv">'
+   +'<dt>Fermeté</dt><dd>'+(ro?fm(r.f):sel(S,'fm-'+r.id,r.f,optsForce(!!r.nojamais),'moyen','Fermeté de cette habitude'))+'<p class="aide">'+FM[r.f].aide+'</p></dd>'
+   +'<dt>Valable</dt><dd>Toutes les périodes</dd>'
+   +'<dt>Type de règle</dt><dd>'+esc(r.kind)+'</dd>'
+   +'<dt>Origine</dt><dd>'+orig+'</dd>'
+   +'<dt>Dernière génération</dt><dd>'+gen+'</dd></dl>'
+   +'<div class="act-d" data-edit>'
+   +(r.o!=='depart'?'<button type="button" class="btn btn-outline sm" data-act="form-edit" data-k="'+r.id+'">'+ico('pencil','sm')+'Modifier</button>':'')
+   +'<span class="pausel">'+sw(!r.pause,'pause','data-k="'+r.id+'"','Habitude active')+'<span>'+(r.pause?'En pause':'Active')+'</span></span>'
+   +(r.o!=='depart'?'<button type="button" class="btn btn-ghost danger sm" data-act="del-ask" data-k="'+r.id+'">'+ico('trash','sm')+'Supprimer</button>':'')
+   +'</div></div>';
+ }
+ return h+'</div>';
+}
+function gh(ic,t,n){return '<div class="gh">'+ico(ic,'sm')+'<h3>'+t+'</h3><span class="c2">'+n+'</span></div>';}
+function filtrer(S,r){
+ if(S.filtre==='non')return r.et==='non'&&!r.pause;
+ if(S.filtre==='pause')return !!r.pause;
+ return true;
+}
+function chip(S,k,l,n){return '<button type="button" class="chip'+(S.filtre===k?' on':'')+'" data-act="filtre" data-k="'+k+'" aria-pressed="'+(S.filtre===k)+'">'+l+' <b>'+n+'</b></button>';}
+function filouBar(S){
+ return '<div class="filoubar" data-edit><span class="fav" aria-hidden="true">F</span><input type="text" id="'+S.uid+'-fb" aria-label="Décrire une habitude à Filou" placeholder="Décrivez une habitude à Filou…" data-in="fb" value="'+esc(S.txt)+'"><button type="button" class="btn btn-valider sm" data-act="fb-send">'+ico('send','sm')+'Envoyer</button></div>';
+}
+function contenuHabitudes(S){
+ if(S.flow)return flowHtml(S);
+ var ro=S.role!=='admin',R=S.rules;
+ var h=filouBar(S);
+ if(!R.length){
+  return h+'<div class="barre" data-edit><span></span><button type="button" class="btn btn-outline sm" data-act="form-new">'+ico('plus','sm')+'Ajouter à la main</button></div>'
+   +'<div class="panel"><div class="bloc"><h3 style="margin:0 0 6px;font-size:17px">Aucune habitude pour l’instant</h3>'
+   +'<p style="margin:0 0 10px;color:var(--muted)">Le moteur ne s’interdit que ce que la structure des gardes impose. Dites à Filou comment votre cabinet fonctionne : il en fera des règles précises que vous pourrez relire, modifier ou supprimer.</p>'
+   +'<p class="aide" style="margin:0">Par exemple : « Antoine ne fait jamais de garde le mercredi soir », ou « les juniors ne sont jamais de garde seuls ».</p></div></div>';
+ }
+ var np=nbPasTenues(S),npa=R.filter(function(r){return r.pause;}).length;
+ h+='<div class="barre"><div class="chips">'+chip(S,'toutes','Toutes',R.length)+chip(S,'non','Pas tenues',np)+chip(S,'pause','En pause',npa)+'</div><button type="button" class="btn btn-outline sm" data-act="form-new" data-edit>'+ico('plus','sm')+'Ajouter à la main</button></div>'
+  +'<p class="gen">Dernière génération : « Hiver 2026 », publiée le 8 novembre.'+(np?' '+np+' habitudes n’ont pas pu être tenues.':'')+'</p><div class="panel">';
+ var vu=0;
+ [['p','Par personne','users'],['e','Par équipe','users'],['c','Pour tout le cabinet','building']].forEach(function(G){
+  var tous=R.filter(function(r){return r.g===G[0]&&filtrer(S,r);});
+  var propres=tous.filter(function(r){return !r.dep;}),dep=tous.filter(function(r){return r.dep;});
+  if(!tous.length)return;
+  vu+=tous.length;
+  h+=gh(G[2],G[1],tous.length);
+  propres.forEach(function(r){h+=ligneHab(S,r);});
+  if(dep.length){
+   if(S.filtre==='toutes'&&!S.depart){
+    h+='<button type="button" class="depart-ligne" data-act="depart">'+ico('building','sm')+'<span style="flex:1">'+dep.length+' réglages de départ de GuardVeto</span><span class="det" style="pointer-events:none">Afficher'+ico('down','sm')+'</span></button>';
+   }else{
+    dep.forEach(function(r){h+=ligneHab(S,r);});
+    if(S.filtre==='toutes')h+='<button type="button" class="depart-ligne" data-act="depart">'+ico('up','sm')+'<span style="flex:1">Replier les réglages de départ</span></button>';
+   }
+  }
+ });
+ if(!vu)h+='<div class="bloc"><p class="vide" style="margin:0">Aucune habitude ne correspond à ce filtre.</p></div>';
+ return h+'</div>';
+}
+
+/* ── Filou : la conversation ── */
+function semaineExemple(rep){
+ var g=[['Victor','Anne-Sophie'],['Manon','Antoine'],['Anne-Sophie','Victor'],['Antoine','Manon'],rep==='A'?['Fanny','Jean']:['Anne-Sophie','Victor'],['Jean','Fanny'],['Jean','Fanny']];
+ var nums=[16,17,18,19,20,21,22];
+ return '<div class="semaine" role="img" aria-label="Exemple de semaine du lundi 16 au dimanche 22 novembre">'+g.map(function(p,i){
+  return '<div class="jour'+(i>=4?' we':'')+'"><b>'+JOURS[i]+' '+nums[i]+'</b>'
+   +'<span class="gp" style="background:'+VETS[p[0]]+'">'+COURT[p[0]]+'<i>1er</i></span><span class="gp" style="background:'+VETS[p[1]]+'">'+COURT[p[1]]+'<i>2nd</i></span></div>';
+ }).join('')+'</div>';
+}
+function bubFilou(inner){return '<div class="bub-l"><span class="fav" aria-hidden="true">F</span><div class="bub filou">'+inner+'</div></div>';}
+function consigne(lbl,ph,meta){return '<div class="consigne"><div class="c-lbl">'+lbl+'</div><p class="c-ph">'+ph+'</p>'+(meta?'<div class="c-meta">'+meta+'</div>':'')+'</div>';}
+function phraseFinale(rep){
+ return rep==='A'?'Si tous les vétérinaires sont là une semaine, ceux qui font le week-end ne font pas de garde du lundi au jeudi.'
+  :'Si tous les vétérinaires sont là une semaine, ceux qui font le week-end ne font pas de garde en semaine, vendredi soir compris.';
+}
+function flowHtml(S){
+ var F=S.flow,h='<div class="panel flow"><div class="flow-h"><span class="fav" aria-hidden="true">F</span><b>Filou</b><span class="m">Créer une habitude</span><button type="button" class="ibtn" data-act="flow-close" aria-label="Fermer la conversation">'+ico('x','sm')+'</button></div>';
+ var st=F.step;
+ if(st==='saisie'){
+  h+=bubFilou('<p>'+(F.corriger?'D’accord, reformulez votre demande, je la retraduis.':'Dites-moi, avec vos mots, ce que le cabinet fait ou ne fait pas. Je vous réponds par une règle précise et un exemple. Je n’enregistre rien tant que vous n’avez pas confirmé.')+'</p>');
+  h+='<div class="field"><label for="'+S.uid+'-ft">Votre phrase</label><textarea id="'+S.uid+'-ft" data-in="ft">'+esc(F.corriger?F.phrase:'')+'</textarea></div><div class="actions"><button type="button" class="btn btn-valider" data-act="flow-send">'+ico('send','sm')+'Envoyer à Filou</button><button type="button" class="btn btn-ghost" data-act="flow-close">Annuler</button></div>';
+ }else{
+  h+='<div class="bub moi">'+esc(F.phrase.charAt(0).toUpperCase()+F.phrase.slice(1))+'</div>';
+  if(st==='busy')h+=bubFilou('<p style="display:flex;gap:10px;align-items:center;color:var(--muted)"><span class="spin"></span>Je cherche la règle exacte…</p>');
+  if(st==='panne')h+=bubFilou('<p><b>Je ne réponds pas pour le moment.</b></p><p>Rien n’a été enregistré. Réessayez dans un instant, ou créez l’habitude à la main : le formulaire fait la même chose.</p><div class="actions"><button type="button" class="btn btn-valider sm" data-act="flow-send">Réessayer</button><button type="button" class="btn btn-outline sm" data-act="flow-main">Ajouter à la main</button></div>');
+  if(st==='precision'){
+   h+=bubFilou('<p>Voici ce que j’ai compris :</p>'+consigne('Règle proposée','Si tous les vétérinaires sont présents une semaine, ceux qui tiennent le week-end ne font aucune nuit de semaine cette semaine-là.','Tout le cabinet · toutes les saisons · calculée avant la génération, d’après les absences posées')
+    +'<p class="q-prec">Une précision avant de continuer : le vendredi soir compte-t-il comme une nuit de semaine ?</p>'
+    +'<div class="opts-liste"><button type="button" class="opt" data-act="rep" data-k="A"><span class="radio"></span><span><b>Non, il fait partie du week-end</b><span class="desc">Ceux du week-end le tiennent, comme aujourd’hui : le vendredi soir est lié au week-end.</span></span></button>'
+    +'<button type="button" class="opt" data-act="rep" data-k="B"><span class="radio"></span><span><b>Oui, c’est une nuit de semaine</b><span class="desc">Ceux du week-end ne le font pas. Cela contredit le lien « même équipe » entre le vendredi soir et le week-end, pour ces semaines-là.</span></span></button></div>');
+  }
+  if(st==='confirm'){
+   var A=F.rep==='A',m=FM[F.force];
+   h+=bubFilou('<p>Voici la règle telle que je l’enregistrerais :</p>'+consigne('Règle proposée',phraseFinale(F.rep),'Tout le cabinet · toutes les saisons')
+    +'<p class="q-prec" style="margin-bottom:0">Un exemple avec votre équipe</p><p class="aide" style="margin:0">Semaine du lundi 16 au dimanche 22 novembre, tous les vétérinaires présents.</p>'+semaineExemple(F.rep)
+    +'<p style="font-size:14px">Fanny et Jean tiennent le week-end des 21 et 22 : ils ne sont de garde aucune nuit du lundi 16 au jeudi 19. '+(A?'Le vendredi 20, ils sont de garde : le vendredi soir est lié au week-end, comme aujourd’hui.':'Le vendredi 20, ils sont libres : Anne-Sophie et Victor prennent la nuit.')+'</p>'
+    +(A?'':'<div class="mal">'+ico('warn','sm')+'<span>Dans ce cas, le vendredi soir n’est plus tenu par la même équipe que le week-end : cela contredit l’enchaînement « Même équipe » de <b>'+NOMS.gardes+'</b>.</span></div>')
+    +'<p class="note-ex">Cet exemple est calculé sur votre équipe, ce n’est pas le planning réel.</p>'
+    +'<p class="q-prec">À quel point ?</p><div class="fm-radios">'+ORDRE_FM.map(function(f){
+      return '<button type="button" class="fm-r'+(F.force===f?' on':'')+'" data-act="flow-force" data-k="'+f+'"><span class="radio"></span><span><b>'+FM[f].mot+(f==='sauf'?'<em>Conseillé</em>':'')+'</b><small>'+FM[f].choix+'</small></span></button>';
+     }).join('')+'</div><p class="aide" style="margin:0">'+m.aide+'</p>'
+    +'<div class="actions"><button type="button" class="btn btn-valider" data-act="flow-ok">Confirmer</button><button type="button" class="btn btn-outline" data-act="flow-corr">Corriger</button></div>');
+  }
+  if(st==='fait'){
+   h+=bubFilou('<p class="reussite">'+ico('check')+'<span><b>C’est enregistré.</b> L’habitude est dans « Pour tout le cabinet » et s’appliquera dès la prochaine génération. Vous pouvez la modifier, la mettre en pause ou la supprimer quand vous voulez.</span></p><div class="actions"><button type="button" class="btn btn-valider sm" data-act="flow-voir">Voir dans la liste</button><button type="button" class="btn btn-outline sm" data-act="flow-autre">En ajouter une autre</button></div>');
+  }
+  if(st==='periode'){
+   h+=bubFilou('<p><b>Ce que vous décrivez est une consigne pour une période, pas une habitude du cabinet.</b></p>'
+    +consigne('Consigne de période','Ménager Antoine cette période','Elle se donne au moment de générer le planning, pour la période choisie. Vous y choisirez si ce qu’Antoine ne fait pas est « rattrapé plus tard » ou « offert ».')
+    +'<p>Je ne l’ajoute donc pas aux habitudes : Antoine retrouverait sa part normale dès la période suivante.</p>'
+    +'<div class="actions"><button type="button" class="btn btn-valider" data-act="vers-gen">Aller à la génération'+ico('arrow','sm')+'</button><button type="button" class="btn btn-outline" data-act="flow-perm">Non, c’est permanent</button><button type="button" class="btn btn-ghost" data-act="flow-close">Pas maintenant</button></div>');
+  }
+  if(st==='inconnu'){
+   h+=bubFilou('<p><b>Je ne sais pas encore tenir cette demande.</b> Je n’ai rien enregistré.</p>'
+    +consigne('Ce que j’ai compris','Éviter de mettre quelqu’un de garde la veille d’une formation','Pourquoi je ne peux pas : je ne connais pas les formations de l’équipe, seulement les absences posées au planning.')
+    +'<p class="q-prec">Ce qui s’en rapproche, et que je sais faire</p>'
+    +'<p style="font-size:14px">Posez chaque formation comme une absence : l’habitude « Éviter la garde la veille d’un jour d’absence », déjà active, la tiendra.</p>'
+    +'<div class="actions"><button type="button" class="btn btn-outline sm" data-act="flow-voir-d4">Voir cette habitude</button><button type="button" class="btn btn-outline sm" data-act="flow-note">Noter la demande</button><button type="button" class="btn btn-ghost sm" data-act="flow-close">Fermer</button></div>'
+    +'<p class="aide" style="margin:0">« Noter la demande » la transmet à l’équipe GuardVeto. Cela ne la rend pas disponible pour autant.</p>');
+  }
+ }
+ return h+'</div>';
+}
+
+/* ── formulaire à la main ── */
+var KF={
+ repos:{fam:'Jours de repos',l:'Repos fixe un jour',own:'pc',f:['jour','sem']},
+ repcond:{fam:'Jours de repos',l:'Repos selon la garde du week-end',own:'pc',f:[]},
+ alt:{fam:'Jours de repos',l:'Indisponible une semaine sur deux',own:'pc',f:[]},
+ exclu:{fam:'Jours de repos',l:'L’une ou l’autre, jamais les deux (ex. 24 ou 31 déc.)',own:'pc',f:[]},
+ duo:{fam:'Avec qui',l:'Jamais en duo avec…',own:'p',f:['avec']},
+ prefavec:{fam:'Avec qui',l:'Préfère être de garde avec…',own:'p',f:[],soft:1},
+ seulavec:{fam:'Avec qui',l:'De garde seulement avec…',own:'p',f:[]},
+ limite:{fam:'Rythme et limites',l:'Limite de gardes',own:'pc',f:['n']},
+ espacement:{fam:'Rythme et limites',l:'Espacement minimal',own:'pc',f:['n']},
+ freq:{fam:'Rythme et limites',l:'Fréquence des week-ends',own:'pc',f:[]},
+ cycle:{fam:'Rythme et limites',l:'Week-ends calés sur un cycle fixe',own:'pc',f:[]},
+ serie:{fam:'Rythme et limites',l:'Jours de garde d’affilée (max)',own:'pc',f:['n']},
+ reposserie:{fam:'Rythme et limites',l:'Repos après une série',own:'pc',f:[]},
+ succ:{fam:'Rythme et limites',l:'Enchaînement interdit',own:'pc',f:['a','b']},
+ prefcren:{fam:'Préférences',l:'Préférence de jours / créneaux',own:'pc',f:[],soft:1},
+ volume:{fam:'Préférences',l:'Souhaite plus / moins de gardes',own:'pc',f:['sens'],soft:1},
+ auplus1:{fam:'Équipe',l:'Toujours au moins un vétérinaire portant l’étiquette',own:'e',f:['tag','cren']},
+ seuls:{fam:'Équipe',l:'Les vétérinaires portant l’étiquette ne sont jamais seuls',own:'e',f:['tag']},
+ role:{fam:'Équipe',l:'Les vétérinaires portant l’étiquette ne tiennent jamais un rôle',own:'e',f:['tag','role','cren']}
+};
+var DEF={who:'Antoine',kind:'repos',jour:'mercredi',sem:'toutes',n:3,avec:'Jean',sens:'moins',a:'nuit de semaine',b:'week-end',tag:'junior',role:'1er',cren:'we',qui:'p',f:'jamais',valid:'toujours',per:'Hiver 2026'};
+function fv(S,k){return val(S,'f-'+k,DEF[k]);}
+function numFV(S){return +fv(S,'n');}
+function phraseForm(S){
+ var q=fv(S,'qui'),k=fv(S,'kind'),K=KF[k],who=q==='c'?'Personne':fv(S,'who'),n=numFV(S);
+ if(!K)return '…';
+ if(q==='e'&&K.own!=='e')return '…';
+ if(q!=='e'&&K.own==='e')return '…';
+ var sem={toutes:'',paire:' (semaines paires)',impaire:' (semaines impaires)'}[fv(S,'sem')];
+ var cren={sem:'les nuits de semaine',we:'le week-end',tous:'sur tous les types de garde'}[fv(S,'cren')];
+ var tag=fv(S,'tag');
+ if(k==='repos')return (q==='c'?'Aucun vétérinaire ne fait':who+' ne fait pas')+' de garde le '+fv(S,'jour')+' soir'+sem+'.';
+ if(k==='duo')return who+' et '+fv(S,'avec')+' ne sont jamais de garde seuls ensemble.';
+ if(k==='limite')return (q==='c'?'Personne ne fait':who+' ne fait')+' pas plus de '+n+' garde'+(n>1?'s':'')+' par semaine.';
+ if(k==='espacement')return q==='c'?'Au moins '+n+' jour'+(n>1?'s':'')+' de repos entre deux gardes d’une même personne.':who+' a au moins '+n+' jour'+(n>1?'s':'')+' de repos entre deux gardes.';
+ if(k==='serie')return (q==='c'?'Personne ne fait':who+' ne fait')+' pas plus de '+n+' jour'+(n>1?'s':'')+' de garde d’affilée.';
+ if(k==='succ')return 'Pas de '+fv(S,'a')+' le lendemain d’un '+fv(S,'b')+'.';
+ if(k==='volume')return (q==='c'?'Tout le monde a':who+' a')+' '+(fv(S,'sens')==='moins'?'moins':'plus')+' de gardes que la moyenne.';
+ if(k==='auplus1')return 'Il y a toujours au moins un '+tag+' '+(fv(S,'cren')==='tous'?'de garde':cren)+'.';
+ if(k==='seuls')return 'Les '+tag+'s ne sont jamais de garde seuls.';
+ if(k==='role')return 'Les '+tag+'s ne tiennent pas le rôle de '+fv(S,'role')+' '+(fv(S,'cren')==='tous'?'':cren)+'.';
+ return '…';
+}
+function ouvrirForm(S,id){
+ S.form={id:id,err:null,conflit:false};
+ S.v['f-qui']='p';
+ if(id){
+  var r=S.rules.filter(function(x){return x.id===id;})[0];
+  if(r){
+   S.v['f-qui']=r.g;
+   if(r.kid){S.v['f-kind']=r.kid;}
+   if(r.who)S.v['f-who']=r.who;
+   if(r.jour)S.v['f-jour']=r.jour;
+   if(r.n)S.v['f-n']=r.n;
+   if(r.avec)S.v['f-avec']=r.avec;
+   if(r.sens)S.v['f-sens']=r.sens;
+   if(r.tag)S.v['f-tag']=r.tag;
+   if(r.role)S.v['f-role']=r.role;
+   if(r.cren)S.v['f-cren']=r.cren;
+   if(r.a)S.v['f-a']=r.a;
+   if(r.b)S.v['f-b']=r.b;
+   if(!r.kid){Object.keys(KF).forEach(function(k){if(KF[k].l===r.kind)S.v['f-kind']=k;});}
+   S.v['f-f']=r.f;
+  }
+ }else{S.v['f-kind']='repos';S.v['f-f']='jamais';}
+}
+function kindsPour(q){
+ var fams=[],out=[];
+ Object.keys(KF).forEach(function(k){
+  var K=KF[k];
+  if(q==='e'&&K.own!=='e')return;
+  if(q!=='e'&&K.own==='e')return;
+  if(q==='c'&&K.own==='p')return;
+  if(fams.indexOf(K.fam)<0){fams.push(K.fam);out.push(['#',K.fam]);}
+  out.push([k,K.l]);
+ });
+ return out;
+}
+function formHtml(S){
+ var F=S.form,q=fv(S,'qui'),k=fv(S,'kind'),K=KF[k],edit=!!F.id,h='';
+ var kinds=kindsPour(q);
+ if(!K||(q==='e'&&K.own!=='e')||(q!=='e'&&K.own==='e')||(q==='c'&&K.own==='p')){k=kinds.filter(function(o){return o[0]!=='#';})[0][0];S.v['f-kind']=k;K=KF[k];}
+ var vetsOpts=Object.keys(VETS).map(function(n){return [n,vdot(n)+' '+n];});
+ h+='<h3>'+(edit?'Modifier l’habitude':'Nouvelle habitude')+'</h3>';
+ h+='<div class="field"><label>Pour qui ?</label><div class="cases">'
+  +[['p','Une personne'],['e','Une équipe (étiquette)'],['c','Tous les vétérinaires']].map(function(o){return '<button type="button" class="cb'+(q===o[0]?' on':'')+'" data-act="f-qui" data-k="'+o[0]+'" aria-pressed="'+(q===o[0])+'">'+o[1]+'</button>';}).join('')+'</div></div>';
+ if(q==='p')h+='<div class="field"><label>Quelle personne</label>'+sel(S,'f-who',DEF.who,vetsOpts,'moyen','Quelle personne')+'</div>';
+ h+='<div class="field"><label>Quelle règle ?</label>'+sel(S,'f-kind',k,kinds,'','Quelle règle')+'</div>';
+ var fl=K.f,champs='';
+ if(fl.indexOf('jour')>=0)champs+='<div class="grille2"><div class="field"><label>Quel jour</label>'+sel(S,'f-jour',DEF.jour,JOURS_L,'','Quel jour')+'</div><div class="field"><label>Quelles semaines</label>'+sel(S,'f-sem',DEF.sem,[['toutes','Toutes les semaines'],['paire','Semaines paires seulement'],['impaire','Semaines impaires seulement']],'','Quelles semaines')+'</div></div>';
+ if(fl.indexOf('avec')>=0)champs+='<div class="field"><label>Jamais seul avec</label>'+sel(S,'f-avec',DEF.avec,vetsOpts,'moyen','Jamais seul avec')+'</div>';
+ if(fl.indexOf('n')>=0)champs+='<div class="field"><label>'+(k==='limite'?'Nombre maximum de gardes par semaine':(k==='espacement'?'Jours de repos minimum entre deux gardes':'Nombre maximum de jours d’affilée'))+'</label><div class="step"><button type="button" class="ibtn" data-act="n-" aria-label="Moins">−</button><b>'+numFV(S)+'</b><button type="button" class="ibtn" data-act="n+" aria-label="Plus">+</button></div></div>';
+ if(fl.indexOf('sens')>=0)champs+='<div class="field"><label>Cette personne a…</label><div class="cases">'+[['moins','Moins de gardes'],['plus','Plus de gardes']].map(function(o){return '<button type="button" class="cb'+(fv(S,'sens')===o[0]?' on':'')+'" data-act="f-set" data-k="sens" data-v="'+o[0]+'">'+o[1]+'</button>';}).join('')+'</div></div>';
+ if(fl.indexOf('a')>=0){var go=[['nuit de semaine','Nuit de semaine'],['vendredi soir','Vendredi soir'],['week-end','Week-end']];champs+='<div class="grille2"><div class="field"><label>Pas de…</label>'+sel(S,'f-a',DEF.a,go,'','Type de garde interdit')+'</div><div class="field"><label>…le lendemain d’un</label>'+sel(S,'f-b',DEF.b,go,'','Type de garde de la veille')+'</div></div>';}
+ if(fl.indexOf('tag')>=0)champs+='<div class="field"><label>Quelle étiquette</label>'+sel(S,'f-tag',DEF.tag,[['junior','junior (Manon, Victor)'],['senior','senior (Anne-Sophie, Fanny, Jean)'],['salarié','salarié (Manon, Victor, Antoine)']],'moyen','Quelle étiquette')+'</div>';
+ if(fl.indexOf('role')>=0)champs+='<div class="field"><label>Quel rôle</label>'+sel(S,'f-role',DEF.role,[['1er','1er'],['2nd','2nd']],'fixe','Quel rôle')+'</div>';
+ if(fl.indexOf('cren')>=0)champs+='<div class="field"><label>Sur quels types de garde</label><div class="cases">'+[['sem','Nuits de semaine'],['we','Week-end'],['tous','Tous']].map(function(o){return '<button type="button" class="cb'+(fv(S,'cren')===o[0]?' on':'')+'" data-act="f-set" data-k="cren" data-v="'+o[0]+'">'+o[1]+'</button>';}).join('')+'</div></div>';
+ if(!fl.length)champs+='<p class="vide" style="margin-bottom:12px">Les réglages de cette règle (jours, créneaux, semaines…) sont les mêmes qu’aujourd’hui ; ils s’affichent ici. Voir le tableau de correspondance.</p>';
+ h+=champs;
+ var fmv=fv(S,'f');
+ if(K.soft&&fmv==='jamais'){fmv='evitee';S.v['f-f']='evitee';}
+ h+='<div class="field"><label>À quel point ?</label><div class="fm-radios">'+ORDRE_FM.map(function(f){
+  var off=f==='jamais'&&K.soft;
+  return '<button type="button" class="fm-r'+(fmv===f?' on':'')+'" data-act="f-set" data-k="f" data-v="'+f+'"'+(off?' disabled':'')+'><span class="radio"></span><span><b>'+FM[f].mot+'</b><small>'+(off?'Cette règle est toujours une préférence : le moteur ne sait pas l’interdire.':FM[f].choix)+'</small></span></button>';
+ }).join('')+'</div></div>';
+ h+='<div class="field"><label>Valable</label><div class="cases">'+[['toujours','Toujours'],['periode','Pour une seule période']].map(function(o){return '<button type="button" class="cb'+(fv(S,'valid')===o[0]?' on':'')+'" data-act="f-set" data-k="valid" data-v="'+o[0]+'">'+o[1]+'</button>';}).join('')+'</div>'
+  +(fv(S,'valid')==='periode'?'<div style="margin-top:8px">'+sel(S,'f-per',DEF.per,[['Hiver 2026','Hiver 2026'],['Été 2026','Été 2026']],'moyen','Quelle période')+'</div><p class="aide" style="margin:6px 0 0">Pour une consigne qui ne dure qu’une période (« ménager Antoine »), préférez la génération.</p>':'')+'</div>';
+ h+='<div class="apercu-ph"><span>Ce que ça donne dans la liste</span>'+esc(phraseForm(S))+'</div>';
+ if(F.err==='serveur')h+='<div class="erreur" role="alert">'+ico('warn','sm')+'<span><b>L’habitude n’a pas été enregistrée.</b>Le serveur n’a pas répondu comme prévu. Rien n’a changé et votre saisie est conservée : vous pouvez réessayer.</span></div>';
+ if(F.err==='doublon')h+='<div class="erreur" role="alert">'+ico('warn','sm')+'<span><b>Cette habitude existe déjà.</b>« Antoine ne fait pas de garde le mercredi soir. » est déjà dans la liste. <button type="button" class="btn btn-ghost sm" data-act="voir-doublon" style="min-height:32px;padding:0 6px;color:var(--danger);text-decoration:underline">Voir l’habitude existante</button></span></div>';
+ if(F.conflit)h+='<div class="conflit" role="alert"><b>J’ai vérifié cette règle avec les autres.</b>Avec « '+esc(phraseForm(S))+' », une des dernières périodes publiées ne pouvait plus être générée : le vendredi 12 décembre, plus personne n’est disponible. <b style="margin-top:8px">Ce que je vous propose</b><div class="actions"><button type="button" class="btn btn-valider sm" data-act="f-sauf">Passer en « Sauf urgence »</button><button type="button" class="btn btn-outline sm" data-act="f-force">Enregistrer quand même</button></div></div>';
+ h+='<div class="pied"><button type="button" class="btn btn-ghost" data-act="form-close"'+(S.busy?' disabled':'')+'>Annuler</button><button type="button" class="btn btn-valider" data-act="form-save"'+(S.busy?' disabled':'')+'>'+(S.busy?'<span class="spin"></span>Je vérifie avec les autres règles…':(F.err==='serveur'?'Réessayer':'Enregistrer'))+'</button></div>';
+ return h;
+}
+
+/* ═════════ partie : L’équité ═════════ */
+function ecartMot(e){return e>0?e+' d’avance':(e<0?(-e)+' à rattraper':'À jour');}
+function contenuEquite(S){
+ var ro=S.role!=='admin',h='<div class="panel">';
+ var rows=DIMS.map(function(d){
+  var sans=d[0]==='semaine_renfort';
+  return '<div class="imp"><div><b>'+d[1]+'</b><p class="aide">'+(sans?'Sans objet tant que vos types de garde n’ont que deux places.':d[2])+'</p></div>'
+   +(sans?'<span class="pill off nu">Sans objet</span>':sel(S,'auto-imp-'+d[0],d[3],IMPS.map(function(i){return [i[0],i[1]];}),'fixe droite','Importance : '+d[1]))+'</div>';
+ }).join('');
+ h+=bloc('Ce qu’on équilibre','',rows+'<p class="aide" style="margin:10px 0 0">« Ignorée » : cette charge n’est pas équilibrée du tout. « Essentielle » : elle passe devant les autres.</p>');
+ var co=S.cohortes.map(function(c){
+  return '<div class="rang"><span class="lib"><span>Entre les <b>'+c.tag+'s</b> seulement : '+DIMS.filter(function(d){return d[0]===c.dim;})[0][1].toLowerCase()+', importance '+IMPS.filter(function(i){return i[0]===c.imp;})[0][1].toLowerCase()+'.</span></span><span class="droite" data-edit><button type="button" class="ibtn danger" data-act="co-del" data-k="'+c.id+'" aria-label="Retirer cet équilibrage" title="Retirer">'+ico('trash','sm')+'</button></span></div>';
+ }).join('');
+ var coForm=S.coNew?'<div class="g-form" style="margin:10px 0 0"><div class="grille3"><div class="field"><label>Charge</label>'+sel(S,'f-cd','weekend',DIMS.filter(function(d){return d[0]!=='semaine_renfort';}).map(function(d){return [d[0],d[1]];}),'','Charge à équilibrer')+'</div><div class="field"><label>Entre les vétérinaires</label>'+sel(S,'f-ct','salarié',[['junior','junior'],['senior','senior'],['salarié','salarié']],'','Étiquette')+'</div><div class="field"><label>Importance</label>'+sel(S,'f-ci','important',IMPS.slice(1).map(function(i){return [i[0],i[1]];}),'','Importance')+'</div></div><div class="actions"><button type="button" class="btn btn-valider sm" data-act="co-add">Ajouter</button><button type="button" class="btn btn-ghost sm" data-act="co-close">Annuler</button></div></div>':'';
+ h+=bloc('Équilibrer entre certains seulement','<button type="button" class="btn btn-outline sm" data-act="co-new" data-edit>'+ico('plus','sm')+'Ajouter</button>',
+  '<p class="aide">S’ajoute à l’équilibrage général ci-dessus, pour un groupe d’étiquettes.</p>'+(co||'<p class="vide">Aucun équilibrage particulier.</p>')+coForm);
+ h+=bloc('Rôle payé du week-end','',
+  '<div class="imp"><div><b>Le rôle qui rapporte davantage le week-end</b><p class="aide">Le moteur équilibre qui l’obtient : c’est la charge « Rôle de 1er le week-end » ci-dessus.</p></div>'+sel(S,'auto-role','premier',[['premier','Le 1er de garde'],['second','Le 2nd de garde'],['aucun','Aucun (pas d’équilibrage)']],'moyen droite','Rôle payé du week-end')+'</div>');
+ /* le grand livre */
+ var L=LIVRE[S.dim],noms=Object.keys(L.d),mx=1;
+ noms.forEach(function(n){mx=Math.max(mx,Math.abs(L.d[n][0]-L.d[n][1]));});
+ var chips='<div class="chips" style="margin-bottom:14px">'+Object.keys(LIVRE).map(function(k){return '<button type="button" class="chip'+(S.dim===k?' on':'')+'" data-act="dim" data-k="'+k+'" aria-pressed="'+(S.dim===k)+'">'+LIVRE[k].nom+'</button>';}).join('')+'</div>';
+ var corps;
+ if(S.vide){
+  corps='<p class="vide">Le grand livre se remplit à la première période publiée : on y verra, pour chacun, ce qui a été fait et ce qui reste à rattraper.</p>';
+ }else{
+  var barre=function(e){var w=Math.round(Math.abs(e)/mx*100);return '<span class="ecart" aria-hidden="true">'+(e<0?'<i class="neg" style="width:'+w+'%;background:var(--warn)"></i><span></span>':'<span></span>'+(e>0?'<i class="pos" style="width:'+w+'%;background:var(--ok)"></i>':''))+'</span>';};
+  if(S.mode==='desk'){
+   corps=chips+'<table class="livre"><thead><tr><th>Vétérinaire</th><th class="n">Fait</th><th class="n">Part équitable</th><th>Où il en est</th></tr></thead><tbody>'
+    +noms.map(function(n){var f=L.d[n][0],a=L.d[n][1],e=f-a;return '<tr><td><span class="nom">'+vdot(n)+n+'</span></td><td class="n">'+f+'</td><td class="n">'+a+'</td><td>'+barre(e)+'<span class="mot-ecart">'+ecartMot(e)+'</span></td></tr>';}).join('')+'</tbody></table>';
+  }else{
+   corps=chips+'<div class="livre-m">'+noms.map(function(n){var f=L.d[n][0],a=L.d[n][1],e=f-a;return '<div class="it"><div class="l1"><span class="nom" style="display:flex;gap:9px;align-items:center;font-weight:600">'+vdot(n)+n+'</span><b>'+ecartMot(e)+'</b></div>'+barre(e)+'<span class="l2">A fait '+f+' · part équitable '+a+'</span></div>';}).join('')+'</div>';
+  }
+  corps+='<p class="aide" style="margin:14px 0 0"><b>Fait</b> : les '+L.us+' déjà tenus, plannings publiés. <b>Part équitable</b> : ce que chacun aurait dû faire compte tenu de ses présences. Un écart « à rattraper » est repris par le moteur à la prochaine génération. La part d’Anne-Catherine est réduite : elle est de garde en dernier recours.</p>'
+   +'<div class="actions"><button type="button" class="btn btn-ghost sm" data-act="eqdet">'+(S.eqDet?'Masquer le détail':'Voir le détail par période')+ico(S.eqDet?'up':'down','sm')+'</button></div>';
+  if(S.eqDet){
+   corps+='<table class="livre" style="margin-top:6px"><thead><tr><th>Fait, par période</th><th class="n">Hiver 2025-26</th><th class="n">Été 2026</th><th class="n">Hiver 2026</th></tr></thead><tbody>'
+    +noms.map(function(n){var f=L.d[n][0],p1=Math.round(f*.36),p2=Math.round(f*.28),p3=f-p1-p2;return '<tr><td><span class="nom">'+vdot(n)+n+'</span></td><td class="n">'+p1+'</td><td class="n">'+p2+'</td><td class="n">'+p3+'</td></tr>';}).join('')+'</tbody></table>';
+  }
+ }
+ h+=bloc('Où en est chacun','<span class="etiq">'+(S.vide?'Aucune période publiée':'Cumulé sur 3 périodes publiées')+'</span>',corps);
+ return h+'</div>';
+}
+
+/* ═════════ partie : Selon la saison ═════════ */
+function nbLib(n){return n===0?'Aucune garde':(n===1?'1 véto':n+' vétos');}
+function liste(a){return a.length>1?a.slice(0,-1).join(', ')+' et '+a[a.length-1]:a[0];}
+function phraseVar(v){
+ var g=['sem','ven','we'],noms={sem:'les nuits de semaine',ven:'le vendredi soir',we:'le week-end'};
+ var tot=g.reduce(function(a,k){return a+v.n[k];},0);
+ if(!tot)return 'Aucune garde : cette variante ne produirait aucun planning.';
+ var groupes={},ordre=[];
+ g.forEach(function(k){if(v.n[k]>0){if(!groupes[v.n[k]]){groupes[v.n[k]]=[];ordre.push(v.n[k]);}groupes[v.n[k]].push(noms[k]);}});
+ var lib=function(n){return n+' vétérinaire'+(n>1?'s':'');};
+ var zero=g.filter(function(k){return v.n[k]===0;}).map(function(k){return noms[k];});
+ var txt;
+ if(ordre.length===1&&!zero.length)txt=lib(ordre[0])+' sur chaque garde.';
+ else txt=ordre.map(function(n){return lib(n)+' '+liste(groupes[n]);}).join(' ; ')+(zero.length?' ; aucune garde '+liste(zero).replace(/ et /g,' ni ')+'.':'.');
+ return txt.charAt(0).toUpperCase()+txt.slice(1);
+}
+function varN(S,v,k){return +val(S,'auto-sv-'+v.id+'-'+k,String(v.n[k]));}
+function contenuSaison(S){
+ var h='<div class="panel">',ro=S.role!=='admin';
+ if(!S.vars.length){
+  h+=bloc('Variantes de saison','<button type="button" class="btn btn-outline sm" data-act="var-new" data-edit>'+ico('plus','sm')+'Nouvelle variante</button>',
+   '<p class="vide">Aucune variante : toutes les périodes utilisent les gardes de « '+NOMS.gardes+' ». Créez une variante quand l’été ne ressemble pas à l’hiver (moins de vétérinaires, une garde en moins).</p>'+(S.varNew?varForm(S):''));
+  return h+'</div>';
+ }
+ S.vars.forEach(function(v){v.n.sem=varN(S,v,'sem');v.n.ven=varN(S,v,'ven');v.n.we=varN(S,v,'we');});
+ var opts=[['0','Aucune garde'],['1','1 véto'],['2','2 vétos']];
+ var corps;
+ if(S.mode==='desk'){
+  corps='<table class="grillesaison"><thead><tr><th>Combien de vétérinaires</th>'+S.vars.map(function(v){
+    return '<th>'+esc(v.nom)+(v.def?' <span class="etiq acc">Par défaut</span>':'')+'<small>'+(v.util?'Utilisée par '+esc(v.util):'Pas encore utilisée')+'</small></th>';
+   }).join('')+'</tr></thead><tbody>'
+   +['sem','ven','we'].map(function(k){
+     var g=S.gardes.filter(function(x){return x.id===k;})[0];
+     return '<tr><td>'+GN[k]+'<small>jusqu’à '+g.places+' vétos</small></td>'+S.vars.map(function(v){
+       return '<td>'+sel(S,'auto-sv-'+v.id+'-'+k,String(v.n[k]),opts,'fixe','Vétérinaires sur '+GN[k]+', variante '+v.nom)+'</td>';
+      }).join('')+'</tr>';
+    }).join('')
+   +'<tr><td><span class="aide" style="margin:0">En clair</span></td>'+S.vars.map(function(v){return '<td style="font-size:13.5px;color:var(--muted)">'+esc(phraseVar(v))+'</td>';}).join('')+'</tr>'
+   +'<tr data-edit><td></td>'+S.vars.map(function(v){return '<td style="font-size:13px">'+'<button type="button" class="btn btn-ghost sm" data-act="var-ren" data-k="'+v.id+'" style="padding:0 8px">'+ico('pencil','sm')+'Renommer</button>'+(v.def?'':'<button type="button" class="btn btn-ghost danger sm" data-act="var-del" data-k="'+v.id+'" style="padding:0 8px">'+ico('trash','sm')+'Supprimer</button>')+'</td>';}).join('')+'</tr></tbody></table>';
+ }else{
+  corps=S.vars.map(function(v){
+   return '<div class="vcard"><h4>'+esc(v.nom)+(v.def?'<span class="etiq acc">Par défaut</span>':'')+'</h4><div class="aide" style="margin:0 0 6px">'+(v.util?'Utilisée par '+esc(v.util):'Pas encore utilisée')+'</div>'
+    +['sem','ven','we'].map(function(k){return '<div class="vlig"><span>'+GN[k]+'</span>'+sel(S,'auto-sv-'+v.id+'-'+k,String(v.n[k]),opts,'fixe droite','Vétérinaires sur '+GN[k]+', variante '+v.nom)+'</div>';}).join('')
+    +'<p class="resumeV">'+esc(phraseVar(v))+'</p>'
+    +'<div class="actions" data-edit><button type="button" class="btn btn-ghost sm" data-act="var-ren" data-k="'+v.id+'">'+ico('pencil','sm')+'Renommer</button>'+(v.def?'':'<button type="button" class="btn btn-ghost danger sm" data-act="var-del" data-k="'+v.id+'">'+ico('trash','sm')+'Supprimer</button>')+'</div></div>';
+  }).join('');
+ }
+ var alertes=S.vars.filter(function(v){return !v.n.sem&&!v.n.ven&&!v.n.we;}).map(function(v){return '<p class="mal">'+ico('warn','sm')+'<span>« '+esc(v.nom)+' » n’a aucune garde : elle ne produirait aucun planning.</span></p>';}).join('');
+ h+=bloc('Ce qui change d’une saison à l’autre','<button type="button" class="btn btn-outline sm" data-act="var-new" data-edit>'+ico('plus','sm')+'Nouvelle variante</button>',(S.varNew?varForm(S):'')+corps+alertes);
+ h+=bloc('Ce qui ne change pas','','<p class="ligne-info" style="margin:0">'+ico('info','sm')+'<span>Les jours, les horaires et les enchaînements sont ceux de <button type="button" class="btn btn-ghost sm" data-act="nav" data-k="gardes" style="min-height:28px;padding:0 4px;display:inline">'+NOMS.gardes+'</button>, les habitudes ceux de <button type="button" class="btn btn-ghost sm" data-act="nav" data-k="habitudes" style="min-height:28px;padding:0 4px;display:inline">'+NOMS.habitudes+'</button>. Chaque planning choisit sa variante au moment de la génération.</span></p>');
+ return h+'</div>';
+}
+function varForm(S){
+ return '<div class="g-form" style="margin:0 0 14px"><div class="grille2"><div class="field"><label for="'+S.uid+'-vn">Nom de la variante</label><input type="text" id="'+S.uid+'-vn" data-in="vn" placeholder="Été 2"></div><div class="field"><label>Partir des réglages de</label>'+sel(S,'f-vs','v1',S.vars.map(function(v){return [v.id,v.nom];}),'','Partir des réglages de')+'</div></div><p class="aide">La nouvelle variante reprend le nombre de vétérinaires de celle-ci ; vous l’ajustez ensuite dans le tableau.</p><div class="actions"><button type="button" class="btn btn-valider sm" data-act="var-add">Créer la variante</button><button type="button" class="btn btn-ghost sm" data-act="var-close">Annuler</button></div></div>';
+}
+
+/* ═════════ rendu général ═════════ */
+function attention(S,id){
+ if(id==='habitudes'&&nbPasTenues(S)>0)return '<span class="cnt" title="Habitudes pas tenues à la dernière génération">'+nbPasTenues(S)+'</span>';
+ return '';
+}
+function contenu(S){
+ return {gardes:contenuGardes,habitudes:contenuHabitudes,equite:contenuEquite,saison:contenuSaison}[S.part](S);
+}
+function modales(S){
+ var m=S.modal,h='';
+ if(m&&m.t==='plan'){
+  var g=m.k==='gardes';
+  h+='<div class="voile" data-act="voile"><div class="modale" role="dialog" aria-modal="true"><h3>Éteindre '+(g?'les gardes du soir et du week-end':'le planning de la journée')+' ?</h3>'
+   +'<p>'+(g?'Elles disparaissent':'Il disparaît')+' pour toute l’équipe. Rien n’est effacé : tout revient tel quel si vous '+(g?'les':'le')+' rallumez.</p>'
+   +'<div class="pied"><button type="button" class="btn btn-outline" data-act="modal-close"'+(S.pending?' disabled':'')+'>Annuler</button><button type="button" class="btn btn-danger" data-act="plan-off"'+(S.pending?' disabled':'')+'>'+(S.pending?'<span class="spin"></span>Un instant…':'Éteindre')+'</button></div></div></div>';
+ }
+ if(m&&m.t==='del'){
+  var r=S.rules.filter(function(x){return x.id===m.k;})[0];
+  h+='<div class="voile" data-act="voile"><div class="modale" role="dialog" aria-modal="true"><h3>Supprimer cette habitude ?</h3><div class="rappel">'+esc(r.ph)+'</div>'
+   +'<p>Dès la prochaine génération, le moteur ne la lira plus. Les plannings déjà publiés ne changent pas. Pour la garder sans qu’elle s’applique, mettez-la plutôt en pause.</p>'
+   +'<div class="pied"><button type="button" class="btn btn-outline" data-act="modal-close">Annuler</button><button type="button" class="btn btn-danger" data-act="del-ok">Supprimer</button></div></div></div>';
+ }
+ if(m&&m.t==='delg'){
+  var gg=S.gardes.filter(function(x){return x.id===m.k;})[0];
+  h+='<div class="voile" data-act="voile"><div class="modale" role="dialog" aria-modal="true"><h3>Supprimer « '+esc(gg.nom)+' » ?</h3><p>Ses horaires et le nom de ses places sont perdus. Les enchaînements qui le désignent disparaissent avec lui. Les plannings déjà générés ne bougent pas : les gardes publiées restent.</p>'
+   +'<div class="pied"><button type="button" class="btn btn-outline" data-act="modal-close">Annuler</button><button type="button" class="btn btn-danger" data-act="delg-ok">Supprimer</button></div></div></div>';
+ }
+ if(m&&m.t==='delv'){
+  var vv=S.vars.filter(function(x){return x.id===m.k;})[0];
+  h+='<div class="voile" data-act="voile"><div class="modale" role="dialog" aria-modal="true"><h3>Supprimer la variante « '+esc(vv.nom)+' » ?</h3><p>Les plannings qui l’utilisaient reviennent aux gardes de « '+NOMS.gardes+' ». Les gardes déjà publiées ne bougent pas.</p>'
+   +'<div class="pied"><button type="button" class="btn btn-outline" data-act="modal-close">Annuler</button><button type="button" class="btn btn-danger" data-act="delv-ok">Supprimer</button></div></div></div>';
+ }
+ if(S.form){
+  h+='<div class="voile" data-act="voile"><div class="modale large" role="dialog" aria-modal="true">'+formHtml(S)+'</div></div>';
+ }
+ return h;
+}
+function draw(S){
+ var ro=S.role!=='admin',h='';
+ S.el.classList.toggle('ro',ro);
+ if(S.mode==='desk'){
+  h+='<div class="topbar"><b class="logo">GuardVeto</b><span>Planning · Équipe · <b style="font-size:13px;color:var(--text)">Organisation</b> · Réglages</span><div class="dk"><span></span><span></span><span class="cur"></span><span></span></div></div>';
+  h+='<div class="desk-body"><h1>Organisation</h1>';
+  if(ro)h+='<div class="bandeau-ro">'+ico('eye','sm')+'<span>Vous consultez l’organisation du cabinet. Seule l’administratrice peut la modifier : dites à Filou ce qui vous conviendrait, il fera remonter la demande.</span></div>';
+  h+='<div class="layout"><nav class="sommaire" aria-label="Parties de l’organisation"><button type="button" class="nav'+(S.part==='apercu'?' on':'')+'" data-act="nav" data-k="apercu">'+ico('grid')+'<span class="lib">Vue d’ensemble</span></button>'
+   +PARTS.map(function(p){return '<button type="button" class="nav'+(S.part===p.id?' on':'')+'" data-act="nav" data-k="'+p.id+'"'+(S.part===p.id?' aria-current="page"':'')+'>'+ico(p.ico)+'<span class="lib">'+NOMS[p.id]+'</span>'+attention(S,p.id)+'</button>';}).join('')
+   +'</nav><div>';
+  if(S.part==='apercu')h+=apercu(S);
+  else h+='<div class="sec-tete"><h2>'+NOMS[S.part]+'</h2></div>'+contenu(S);
+  h+='</div></div></div>';
+ }else{
+  h+='<div class="ph-body">';
+  if(S.part==='apercu'){
+   h+='<h1 style="margin:6px 0 16px">Organisation</h1>';
+   if(ro)h+='<div class="bandeau-ro" style="margin:0 0 14px">'+ico('eye','sm')+'<span>Vous consultez l’organisation du cabinet. Seule l’administratrice peut la modifier.</span></div>';
+   h+=apercu(S);
+  }else{
+   h+='<button type="button" class="retour" data-act="nav" data-k="apercu">'+ico('left','sm')+'Organisation</button><h2 style="margin:0 0 14px">'+NOMS[S.part]+'</h2>';
+   if(ro)h+='<div class="bandeau-ro" style="margin:0 0 14px">'+ico('eye','sm')+'<span>Vous consultez l’organisation du cabinet. Seule l’administratrice peut la modifier : dites à Filou ce qui vous conviendrait.</span></div>';
+   h+=contenu(S);
+  }
+  h+='</div>';
+ }
+ S.el.innerHTML=h+modales(S)+'<div class="toastwrap">'+(S.toast?'<div class="toast'+(S.toast.err?' err':'')+'" role="status">'+esc(S.toast.t)+'</div>':'')+'</div>';
+}
+function montrer(S,t,err){
+ clearTimeout(S.timer);S.toast={t:t,err:!!err};draw(S);
+ S.timer=setTimeout(function(){S.toast=null;draw(S);},2800);
+}
+function etatDe(el){var a=el.closest('.app');for(var i=0;i<apps.length;i++){if(apps[i].el===a)return apps[i];}return null;}
+function regle(S,id){return S.rules.filter(function(r){return r.id===id;})[0];}
+var MSG_ENR='Réglage enregistré — appliqué à la prochaine génération.';
+
+/* ═════════ comportement ═════════ */
+function envoyerFilou(S,phrase){
+ S.flow={step:'busy',phrase:phrase,ex:0,rep:null,force:'sauf',corriger:false};
+ S.txt='';draw(S);
+ setTimeout(function(){
+  var t=phrase.toLowerCase(),ex;
+  if(S.simPanne){S.simPanne=false;S.flow.step='panne';draw(S);return;}
+  if(/antoine|difficile|ménag|charge/.test(t)){S.flow.step='periode';S.flow.ex=2;}
+  else if(/week-end/.test(t)&&/tous|là/.test(t)){S.flow.step='precision';S.flow.ex=1;}
+  else{S.flow.step='inconnu';S.flow.ex=3;}
+  draw(S);
+ },800);
+}
+var ACTIONS={
+ nav:function(S,b){S.part=b.dataset.k;S.dd=null;S.flow=null;draw(S);},
+ dd:function(S,b){var k=b.dataset.k;S.dd=(S.dd===k)?null:k;draw(S);},
+ 'dd-pick':function(S,b){
+  var k=b.dataset.k,v=b.dataset.v;S.v[k]=v;S.dd=null;
+  if(k.indexOf('fm-')===0){var r=regle(S,k.slice(3));if(r){r.f=v;}S.v[k]=v;draw(S);montrer(S,MSG_ENR);return;}
+  if(k.indexOf('auto-')===0){draw(S);montrer(S,MSG_ENR);return;}
+  draw(S);
+ },
+ cb:function(S,b){var k=b.dataset.k,cur=val(S,k,b.dataset.def==='1');S.v[k]=!cur;draw(S);},
+ 'vers-gen':function(S){montrer(S,'Ouvre l’écran de génération (hors maquette)');},
+ toast:function(S,b){montrer(S,b.dataset.t);},
+ /* nos gardes */
+ 'plan-ask':function(S,b){
+  var k=b.dataset.k;if(S.pending)return;
+  if(S.pl[k]){S.modal={t:'plan',k:k};draw(S);return;}
+  S.pl[k]=true;montrer(S,k==='gardes'?'Gardes allumées':'Journées allumées');
+ },
+ 'plan-off':function(S){
+  var k=S.modal.k;S.pending=true;draw(S);
+  setTimeout(function(){S.pending=false;S.pl[k]=false;S.modal=null;montrer(S,k==='gardes'?'Gardes éteintes':'Journées éteintes');},700);
+ },
+ 'modal-close':function(S){if(!S.pending){S.modal=null;draw(S);}},
+ voile:function(S,b,ev){
+  if(ev.target!==b)return;
+  if(S.form){if(!S.busy){S.form=null;draw(S);}}
+  else if(S.modal&&!S.pending){S.modal=null;draw(S);}
+ },
+ 'g-edit':function(S,b){S.gEdit=(S.gEdit===b.dataset.k)?null:b.dataset.k;S.gNew=false;draw(S);},
+ 'g-close':function(S){S.gEdit=null;S.gNew=false;draw(S);},
+ 'g-new':function(S){S.gNew=!S.gNew;S.gEdit=null;draw(S);},
+ 'g-save':function(S){S.gEdit=null;montrer(S,'Type de garde enregistré — appliqué au prochain planning généré.');},
+ 'g-add':function(S){
+  var nom=(S.nomG||'').trim()||'Nouvelle garde';
+  S.gardes.push({id:'x'+S.gardes.length,nom:nom,ico:'moon',jours:'Jours choisis',j:[0,0,0,0,0,0,0],places:2,roles:'1er et 2nd',h:'18h → 8h le lendemain',deb:'18:00',fin:'08:00',off:'le lendemain',feries:false,base:false,actif:true});
+  S.gNew=false;S.nomG='';montrer(S,'« '+nom+' » ajouté');
+ },
+ 'g-toggle':function(S,b){var g=S.gardes.filter(function(x){return x.id===b.dataset.k;})[0];g.actif=!g.actif;montrer(S,g.actif?'Type de garde réactivé':'Type de garde désactivé');},
+ 'g-del':function(S,b){S.modal={t:'delg',k:b.dataset.k};draw(S);},
+ 'delg-ok':function(S){S.gardes=S.gardes.filter(function(x){return x.id!==S.modal.k;});S.modal=null;montrer(S,'Type de garde supprimé');},
+ 'l-new':function(S){S.liaiNew=!S.liaiNew;draw(S);},
+ 'l-close':function(S){S.liaiNew=false;draw(S);},
+ 'l-add':function(S){
+  var a=val(S,'f-la','ven'),b=val(S,'f-lb','we'),g=val(S,'f-lg','meme');
+  if(a===b){montrer(S,'Choisissez deux types de garde différents',true);return;}
+  S.liai.push({id:'l'+(S.liai.length+1),g:g,a:a,b:b,actif:true});S.liaiNew=false;montrer(S,'Enchaînement ajouté');
+ },
+ 'l-toggle':function(S,b){var l=S.liai.filter(function(x){return x.id===b.dataset.k;})[0];l.actif=!l.actif;montrer(S,l.actif?'Enchaînement réactivé':'Enchaînement désactivé');},
+ 'l-del':function(S,b){S.liai=S.liai.filter(function(x){return x.id!==b.dataset.k;});montrer(S,'Enchaînement supprimé');},
+ /* nos habitudes */
+ filtre:function(S,b){S.filtre=b.dataset.k;draw(S);},
+ det:function(S,b){var k=b.dataset.k;S.ouv[k]=!S.ouv[k];draw(S);},
+ depart:function(S){S.depart=!S.depart;draw(S);},
+ pause:function(S,b){var r=regle(S,b.dataset.k);r.pause=!r.pause;montrer(S,r.pause?'Habitude mise en pause — le moteur ne la lit plus.':'Habitude réactivée — appliquée à la prochaine génération.');},
+ 'del-ask':function(S,b){S.modal={t:'del',k:b.dataset.k};draw(S);},
+ 'del-ok':function(S){S.rules=S.rules.filter(function(r){return r.id!==S.modal.k;});S.modal=null;montrer(S,'Habitude supprimée');},
+ 'fb-send':function(S){var t=(S.txt||'').trim();if(!t){montrer(S,'Écrivez d’abord une phrase pour Filou',true);return;}envoyerFilou(S,t);},
+ 'flow-close':function(S){S.flow=null;draw(S);},
+ 'flow-send':function(S){var t=(S.ftxt!==undefined?S.ftxt:S.flow.phrase)||'';if(!t.trim()){montrer(S,'Écrivez d’abord une phrase pour Filou',true);return;}S.ftxt=undefined;envoyerFilou(S,t.trim());},
+ rep:function(S,b){S.flow.rep=b.dataset.k;S.flow.step='confirm';draw(S);},
+ 'flow-force':function(S,b){S.flow.force=b.dataset.k;draw(S);},
+ 'flow-corr':function(S){S.flow.step='saisie';S.flow.corriger=true;draw(S);},
+ 'flow-ok':function(S){
+  S.rules.push({id:'r10',g:'c',ph:phraseFinale(S.flow.rep),f:S.flow.force,o:'filou',src:S.flow.phrase,et:'new',nouveau:true,kind:'Consigne de Filou'});
+  S.flow.step='fait';draw(S);
+ },
+ 'flow-voir':function(S){S.flow=null;S.filtre='toutes';draw(S);var el=document.getElementById(S.uid+'-r10');if(el&&el.scrollIntoView)el.scrollIntoView({block:'center'});},
+ 'flow-autre':function(S){S.flow={step:'saisie',phrase:'',ex:0,rep:null,force:'sauf',corriger:false};draw(S);},
+ 'flow-perm':function(S){S.flow={step:'saisie',phrase:'Antoine a moins de gardes que la moyenne',ex:0,rep:null,force:'sauf',corriger:true};draw(S);},
+ 'flow-main':function(S){S.flow=null;ouvrirForm(S,null);draw(S);},
+ 'flow-note':function(S){montrer(S,'Demande notée. Elle n’est pas disponible pour autant.');},
+ 'flow-voir-d4':function(S){S.flow=null;S.depart=true;S.filtre='toutes';S.ouv['d4']=true;draw(S);var el=document.getElementById(S.uid+'-d4');if(el&&el.scrollIntoView)el.scrollIntoView({block:'center'});},
+ /* formulaire */
+ 'form-new':function(S){ouvrirForm(S,null);draw(S);},
+ 'form-edit':function(S,b){ouvrirForm(S,b.dataset.k);draw(S);},
+ 'form-close':function(S){if(!S.busy){S.form=null;draw(S);}},
+ 'f-qui':function(S,b){S.v['f-qui']=b.dataset.k;S.form.err=null;draw(S);},
+ 'f-set':function(S,b){S.v['f-'+b.dataset.k]=b.dataset.v;draw(S);},
+ 'n-':function(S){S.v['f-n']=Math.max(1,numFV(S)-1);draw(S);},
+ 'n+':function(S){S.v['f-n']=Math.min(14,numFV(S)+1);draw(S);},
+ 'form-save':function(S){
+  if(S.busy)return;
+  S.form.err=null;S.form.conflit=false;S.busy=true;draw(S);
+  setTimeout(function(){
+   S.busy=false;
+   if(S.simSrv){S.simSrv=false;S.form.err='serveur';draw(S);return;}
+   if(S.simDoublon){S.simDoublon=false;S.form.err='doublon';draw(S);return;}
+   if(S.simConflit){S.simConflit=false;S.form.conflit=true;draw(S);return;}
+   validerForm(S);
+  },900);
+ },
+ 'f-sauf':function(S){S.v['f-f']='sauf';S.form.conflit=false;validerForm(S);},
+ 'f-force':function(S){S.form.conflit=false;validerForm(S);},
+ 'voir-doublon':function(S){S.form=null;S.ouv['r1']=true;S.filtre='toutes';draw(S);var el=document.getElementById(S.uid+'-r1');if(el&&el.scrollIntoView)el.scrollIntoView({block:'center'});},
+ /* équité */
+ dim:function(S,b){S.dim=b.dataset.k;draw(S);},
+ eqdet:function(S){S.eqDet=!S.eqDet;draw(S);},
+ 'co-new':function(S){S.coNew=!S.coNew;draw(S);},
+ 'co-close':function(S){S.coNew=false;draw(S);},
+ 'co-add':function(S){S.cohortes.push({id:'c'+(S.cohortes.length+2),dim:val(S,'f-cd','weekend'),tag:val(S,'f-ct','salarié'),imp:val(S,'f-ci','important')});S.coNew=false;montrer(S,MSG_ENR);},
+ 'co-del':function(S,b){S.cohortes=S.cohortes.filter(function(c){return c.id!==b.dataset.k;});montrer(S,'Équilibrage particulier retiré');},
+ /* saison */
+ 'var-new':function(S){S.varNew=!S.varNew;draw(S);},
+ 'var-close':function(S){S.varNew=false;draw(S);},
+ 'var-add':function(S){
+  var nom=(S.vnom||'').trim()||'Nouvelle variante',src=S.vars.filter(function(v){return v.id===val(S,'f-vs','v1');})[0]||S.vars[0];
+  S.vars.push({id:'v'+(S.vars.length+5),nom:nom,def:false,util:'',n:{sem:varN(S,src,'sem'),ven:varN(S,src,'ven'),we:varN(S,src,'we')}});
+  S.varNew=false;S.vnom='';montrer(S,'Variante « '+nom+' » créée');
+ },
+ 'var-ren':function(S){montrer(S,'Renommer : le nom devient un champ, comme aujourd’hui');},
+ 'var-del':function(S,b){S.modal={t:'delv',k:b.dataset.k};draw(S);},
+ 'delv-ok':function(S){S.vars=S.vars.filter(function(v){return v.id!==S.modal.k;});S.modal=null;montrer(S,'Variante supprimée');}
+};
+function validerForm(S){
+ var id=S.form.id,K=KF[fv(S,'kind')],ph=phraseForm(S),f=fv(S,'f');
+ if(id){
+  var r=regle(S,id);
+  if(r){r.f=f;if(K&&K.f.length&&ph!=='…')r.ph=ph;}
+  S.form=null;montrer(S,'Habitude modifiée — appliquée à la prochaine génération.');return;
+ }
+ if(ph==='…')ph='Nouvelle habitude (réglages identiques à aujourd’hui)';
+ var q=fv(S,'qui');
+ S.rules.push({id:'n'+S.rules.length,g:q,qui:q==='p'?fv(S,'who'):(q==='e'?fv(S,'tag'):''),ph:ph,f:f,o:'main',et:'new',nouveau:true,kind:K?K.l:'—'});
+ S.form=null;S.filtre='toutes';montrer(S,'Habitude ajoutée — appliquée à la prochaine génération.');
+}
+document.addEventListener('click',function(ev){
+ var sim=ev.target.closest('[data-sim]');
+ if(sim){
+  var cible=document.getElementById(sim.dataset.target),S=cible&&etatDe(cible);
+  if(!S)return;
+  var k=sim.dataset.sim;
+  if(k==='conflit'){S.simConflit=true;sim.textContent='prêt : cliquez « Enregistrer »';}
+  if(k==='serveur'){S.simSrv=true;sim.textContent='prêt : cliquez « Enregistrer »';}
+  if(k==='doublon'){S.simDoublon=true;sim.textContent='prêt : cliquez « Enregistrer »';}
+  if(k==='panne'){S.simPanne=true;S.flow=null;S.txt='';draw(S);sim.textContent='prêt : envoyez une phrase à Filou';}
+  if(k==='phrase'){S.flow=null;S.txt=EX[sim.dataset.k];draw(S);}
+  return;
+ }
+ var b=ev.target.closest('[data-act]');
+ var S2=etatDe(b||ev.target);
+ if(!S2)return;
+ if(S2.dd&&!ev.target.closest('.sel-wrap')){S2.dd=null;draw(S2);}
+ if(!b)return;
+ if(ACTIONS[b.dataset.act]){ACTIONS[b.dataset.act](S2,b,ev);}
+});
+document.addEventListener('keydown',function(ev){
+ if(ev.key==='Escape'){
+  apps.forEach(function(S){
+   if(S.dd){S.dd=null;draw(S);}
+   else if(S.form&&!S.busy){S.form=null;draw(S);}
+   else if(S.modal&&!S.pending){S.modal=null;draw(S);}
+  });
+ }
+ if(ev.key==='Enter'&&ev.target&&ev.target.dataset&&ev.target.dataset.in==='fb'){
+  ev.preventDefault();var S=etatDe(ev.target);if(S)ACTIONS['fb-send'](S);
+ }
+});
+document.addEventListener('input',function(ev){
+ var t=ev.target;if(!t.dataset||!t.dataset.in)return;
+ var S=etatDe(t);if(!S)return;
+ var k=t.dataset.in;
+ if(k==='fb')S.txt=t.value;
+ else if(k==='ft')S.ftxt=t.value;
+ else if(k==='gnom')S.nomG=t.value;
+ else if(k==='vn')S.vnom=t.value;
+});
+
+document.querySelectorAll('.app').forEach(function(el,i){var S=nouvelEtat(el,i);apps.push(S);draw(S);});
+})();
+</script>
+</body>
+</html>
