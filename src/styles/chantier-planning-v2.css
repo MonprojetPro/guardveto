@@ -292,6 +292,12 @@
   width: 34px;
   border-radius: 12px;
   background: rgba(58, 42, 28, 0.05);
+  /* 🔴 B-194 ⑦ bis — UN DÉCOR NE PREND JAMAIS UN CLIC. Positionné, il se
+     peignait AU-DESSUS du « ? » (ligne non positionnée) et recevait son clic :
+     mesuré le 10/11 par `elementFromPoint` au centre du bouton → `.pv2-couloir`.
+     L'ancienne pulsation (`transform`) remontait le bouton par accident ; en
+     la retirant le 06/11, le « ? » est devenu inerte. */
+  pointer-events: none;
 }
 
 .pv2-jour-tete {
@@ -477,6 +483,9 @@
 }
 
 .pv2-pourvoir {
+  /* Positionnée pour se peindre au-dessus du couloir de nuit, comme les
+     rangées (`.pv2-rangee`) — B-194 ⑦ bis. */
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
