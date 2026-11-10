@@ -579,8 +579,16 @@ async function logEmail(
 // ── Export : Nouveau planning publié ─────────────────────────
 export async function sendPlanningPublie(
   supabase: SupabaseClient,
-  periodeId: string
+  periodeId: string,
+  /**
+   * B-197a — rectificatif : n'écrit qu'aux identifiants listés, avec le texte
+   * de correction, et sans recréer de notification in-app. Sans `seulement`,
+   * un rectificatif est refusé : la liste des vétos n'est pas bornée au
+   * cabinet hors session (clé de service), elle le serait à TOUTE la base.
+   */
+  rectificatif?: { seulement: readonly string[]; rectifieLeMailDu: string },
 ): Promise<{ sent: number; errors: number }> {
+  if (rectificatif && rectificatif.seulement.length === 0) return { sent: 0, errors: 0 }
   // Récupérer la période
   const { data: periode } = await supabase
     .from('periodes')
@@ -677,14 +685,17 @@ export async function sendPlanningPublie(
   tracerSansAdresse('planning_publie', trierDestinataires(vets).sansAdresse)
 
   for (const vet of vets) {
+    if (rectificatif && !rectificatif.seulement.includes(vet.id)) continue
     // B-156 / B-197 : calculé jour par jour — un `g.premier?.id === vet.id`
     // raterait le remplaçant d'un seul jour, et une ligne entière lui
     // attribuerait des jours qui ne sont pas les siens.
     const mesLignes = lignesGardesDuVeto(gardes, indexExceptions, vet.id)
     const mesGardes = new Set(mesLignes.map((l) => l.gardeId))
 
-    const html    = buildPlanningPublieHtml(vet, periode, mesLignes, nomDe)
-    const subject = `[GuardVeto] Nouveau planning — ${periodeLabel}`
+    const html    = buildPlanningPublieHtml(vet, periode, mesLignes, nomDe, rectificatif?.rectifieLeMailDu)
+    const subject = rectificatif
+      ? `[GuardVeto] Planning corrigé — ${periodeLabel}`
+      : `[GuardVeto] Nouveau planning — ${periodeLabel}`
 
     if (adresseUtilisable(vet.email) && reglages.recoitVeto(vet.id, 'planning_publie')) {
       const adresse = vet.email
@@ -720,7 +731,9 @@ export async function sendPlanningPublie(
       }
     }
 
-    // Notif in-app (indépendante de l'email).
+    // Notif in-app (indépendante de l'email). Pas pour un rectificatif : le
+    // planning n'a pas changé, seul l'e-mail était faux.
+    if (rectificatif) continue
     const notif = contenuPlanningPublie(periodeLabel, mesGardes.size)
     await creerNotification(supabase, {
       veterinaireId: vet.id,
