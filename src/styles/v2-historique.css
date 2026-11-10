@@ -191,13 +191,17 @@
   text-align: left;
   font-family: var(--font-body); font-weight: 500; font-size: 0.82rem;
 }
-.fetes-tenant { display: block; line-height: 1.6; }
 .fetes-card .count-table th { text-align: left; }
-.fetes-card .fetes-fete { text-align: left; white-space: nowrap; }
-.fetes-fete em {
-  display: block; font-style: normal;
-  font-family: var(--font-body); font-size: 0.72rem; font-weight: 500; color: var(--soft);
+.fetes-card .fetes-fete { vertical-align: top; }
+.fetes-card .fetes-soir {
+  text-align: left; white-space: nowrap;
+  font-family: var(--font-body); font-weight: 500; font-size: 0.8rem; color: var(--soft);
 }
+.fetes-card .fetes-absent { color: var(--soft); font-style: italic; }
+/* Le filet plein sépare les FÊTES ; entre deux soirs d'une même fête, le
+   pointillé ordinaire du tableau. */
+.fetes-card tr.fetes-debut:not(:first-child) td { border-top: 1px solid var(--border-strong); }
+.fetes-card .fetes-fete { text-align: left; white-space: nowrap; }
 .ct-vet {
   display: inline-flex; align-items: center; gap: 8px;
   font-family: var(--font-body); font-size: 0.82rem; font-weight: 600;

@@ -26,6 +26,7 @@ import { EnteteHistoriqueVide } from '@/components/v2/ImportPlanningLanceur'
 import { HistoriqueV2, type CumulLigne } from '@/components/v2/HistoriqueV2'
 import { BonusMalusCard } from '@/components/compteurs/BonusMalusCard'
 import { HistoriqueFetesCard } from '@/components/compteurs/HistoriqueFetesCard'
+import { chargerSoirsDeFete } from '@/lib/compteurs/fetesParSoir'
 import { chargerDock } from '@/data/v2/dock'
 import { calculerBilans } from '@/engine/bilan'
 import {
@@ -403,6 +404,12 @@ export default async function HistoriquePage({
     estAdmin ? queryHistoriqueFetes(supabase) : Promise.resolve([]),
   ])
 
+  // B-198 — un soir par ligne, lu dans les plannings publiés, pour les saisons
+  // que l'historique connaît.
+  const fetesParSoir = estAdmin && historiqueFetes.length > 0
+    ? await chargerSoirsDeFete(supabase, historiqueFetes.map((h) => h.annee))
+    : { soirs: [], noms: {}, erreur: null }
+
   return (
     <>
       <Satin />
@@ -441,7 +448,11 @@ export default async function HistoriquePage({
           }
           slotFetes={
             estAdmin && historiqueFetes.length > 0 ? (
-              <HistoriqueFetesCard rows={historiqueFetes} />
+              <HistoriqueFetesCard
+                soirs={fetesParSoir.soirs}
+                noms={fetesParSoir.noms}
+                erreur={fetesParSoir.erreur}
+              />
             ) : undefined
           }
         />
