@@ -48,7 +48,8 @@ const CHANTIER = join(process.cwd(), 'src', 'components', 'chantier')
 //    Livrer une fenetre dont le prefixe n'y figure pas, c'est la livrer sans
 //    gardien — et le gardien serait VERT, ce qui est pire que pas de gardien
 //    du tout. Meme mecanisme qu'au 14/10 (registre des juges, 5e occurrence).
-const PREFIXES = ['pv2-', 'pv2h-', 'cpm-', 'gjc-', 'cl3-', 'lg-', 'plan-', 'crise-', 'jdb-']
+// `rg-` : l'onglet Réglages refondu (B-202, `ReglagesChantierV2` et ses sections).
+const PREFIXES = ['pv2-', 'pv2h-', 'cpm-', 'gjc-', 'cl3-', 'lg-', 'plan-', 'crise-', 'jdb-', 'rg-']
 
 function toutLeCss(): string {
   return readdirSync(STYLES)

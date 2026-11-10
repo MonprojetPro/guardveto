@@ -19,17 +19,9 @@
 //    partir, et n'aurait aucune raison de soupçonner l'écran.
 // ============================================================
 
-import { useState, useTransition } from 'react'
-import { toast } from 'sonner'
-import { setReceptionEmail } from '@/app/(v2)/reglages/notifications/actions'
-import type { CleReglage } from '@/lib/notifications-reglages'
+import { useReceptionEmails, type LigneReglage } from '@/components/v2/useReceptionEmails'
 
-export interface LigneReglage {
-  cle: CleReglage
-  libelle: string
-  explication: string
-  recoit: boolean
-}
+export type { LigneReglage } from '@/components/v2/useReceptionEmails'
 
 interface Props {
   reglages: LigneReglage[]
@@ -37,27 +29,8 @@ interface Props {
 }
 
 export function MesNotificationsV2({ reglages, role }: Props) {
-  const [etats, setEtats] = useState<Record<string, boolean>>(
-    Object.fromEntries(reglages.map((r) => [r.cle, r.recoit])),
-  )
-  const [enCours, demarrer] = useTransition()
-
-  const basculer = (cle: CleReglage, veutRecevoir: boolean) => {
-    const avant = etats[cle]
-    setEtats((e) => ({ ...e, [cle]: veutRecevoir }))
-
-    demarrer(async () => {
-      const res = await setReceptionEmail(cle, veutRecevoir)
-      if ('error' in res) {
-        // Retour à l'état d'avant : l'écran ne doit jamais montrer un réglage
-        // que la base n'a pas accepté.
-        setEtats((e) => ({ ...e, [cle]: avant }))
-        toast.error(res.error)
-        return
-      }
-      toast.success(veutRecevoir ? 'E-mail réactivé' : 'E-mail coupé')
-    })
-  }
+  // B-202 — l'état et son enregistrement sont partagés avec l'onglet refondu.
+  const { etats, enCours, basculer } = useReceptionEmails(reglages)
 
   return (
     <>

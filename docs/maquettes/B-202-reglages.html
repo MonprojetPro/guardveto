@@ -1,0 +1,732 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Réglages refondus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700;800&family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --stage:#eadfcb;
+  --bg:#F6EEDF; --surface:#FFFCF4; --surface-2:#F6EBD6; --text:#3A2A1C; --muted:#7C6A55;
+  --bd:#E6D7BB; --bd-strong:#D8C4A1; --acc:#C7530F; --acc-ink:#AC4508; --acc-soft:#fdf1e5;
+  --ok:#3E7A2E; --ok-soft:#e8f2e3; --warn:#9A6200; --warn-soft:#fbf1d6; --danger:#A8341F; --danger-soft:#f9e3de;
+  --elev-1:1px 2px 3px rgba(110,62,14,.10),4px 8px 18px rgba(110,62,14,.08);
+  --elev-2:2px 4px 8px rgba(110,62,14,.13),10px 18px 34px rgba(110,62,14,.13);
+  --edge:inset 1px 1px 0 rgba(255,253,246,.95);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--stage);color:var(--text);font:15px/1.45 "Noto Sans",system-ui,sans-serif;padding:32px 16px 90px}
+h1,h2,h3,h4,.fig{font-family:Figtree,system-ui,sans-serif}
+button{font:inherit;color:inherit;cursor:pointer}
+.page{max-width:1180px;margin:0 auto}
+
+/* ── habillage de la maquette (hors écran GuardVeto) ── */
+.intro h1{font-size:30px;margin:0 0 6px}
+.intro p{margin:0 0 6px;color:var(--muted);max-width:840px}
+.etat{margin:50px 0 12px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.etat h2{margin:0;font-size:20px}
+.etat .num{font:700 13px Figtree;background:var(--text);color:#fff;border-radius:99px;padding:3px 11px}
+.etat p{margin:0;color:var(--muted);font-size:14px;flex-basis:100%;max-width:880px}
+.duo{display:grid;grid-template-columns:minmax(0,1fr) 375px;gap:24px;align-items:start}
+.phones{display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start}
+@media (max-width:1060px){.duo{grid-template-columns:minmax(0,1fr)}}
+.fig{margin:0;min-width:0}
+.fig>figcaption{font:700 12px Figtree;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.scroll-x{overflow-x:auto;border-radius:16px}
+.frame{background:var(--bg);border:1px solid var(--bd);border-radius:16px;box-shadow:var(--elev-2);overflow:hidden;min-width:700px}
+.phone{width:375px;max-width:100%;border:7px solid #3a2a1c;border-radius:34px;background:var(--bg);overflow:hidden;box-shadow:var(--elev-2)}
+.sim{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--muted)}
+.sim button{border:1px dashed var(--bd-strong);background:transparent;border-radius:99px;padding:6px 12px;font-size:13px;color:var(--muted)}
+.sim button:hover{border-color:var(--acc);color:var(--acc-ink)}
+.legende{background:#fff;border-left:3px solid var(--acc);padding:10px 14px;border-radius:6px;font-size:13.5px;color:var(--muted);margin-top:12px;max-width:880px}
+.legende b{color:var(--text)}
+.a-trancher{max-width:900px;margin:56px auto 0;background:var(--surface);border:1px solid var(--bd);border-radius:12px;padding:20px 24px}
+.a-trancher h2{margin:0 0 4px;font-size:20px}
+.a-trancher ol{margin:10px 0 0;padding-left:22px;display:grid;gap:10px}
+.a-trancher li b{display:block}
+.a-trancher li span{color:var(--muted);font-size:14px}
+
+/* ═════════ L'ÉCRAN GUARDVETO ═════════ */
+.app{position:relative;min-height:520px;background:var(--bg);color:var(--text)}
+.app *{box-sizing:border-box}
+.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.i.sm{width:16px;height:16px}
+.topbar{display:flex;align-items:center;gap:14px;padding:12px 28px;border-bottom:1px solid var(--bd);background:rgba(246,238,223,.9);font-size:13px;color:var(--muted)}
+.topbar b{font:800 16px Figtree;color:var(--text);margin-right:6px}
+.topbar .dk{display:flex;gap:8px;margin-left:auto}
+.topbar .dk span{width:26px;height:26px;border-radius:50%;background:var(--surface-2);border:1px solid var(--bd)}
+.topbar .dk span.cur{background:var(--acc);border-color:var(--acc)}
+.app h1{font-size:28px;font-weight:800;margin:0}
+.app h2{font-size:22px;font-weight:800;margin:0}
+.desk-body{padding:22px 28px 34px}
+.layout{display:grid;grid-template-columns:216px minmax(0,1fr);gap:30px;margin-top:20px;align-items:start}
+.sommaire{position:sticky;top:14px;display:grid;gap:2px}
+.nav{display:flex;align-items:center;gap:11px;width:100%;text-align:left;border:0;background:transparent;border-radius:10px;padding:10px 12px;min-height:44px;font:600 14.5px Figtree;color:var(--muted)}
+.nav:hover{background:var(--surface-2)}
+.nav.on{background:var(--surface-2);color:var(--text);box-shadow:var(--edge)}
+.nav.on .i{color:var(--acc)}
+.nav .lib{flex:1}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.dot.warn{background:var(--warn)}
+.cnt{font:700 12px Figtree;min-width:20px;height:20px;border-radius:99px;display:inline-grid;place-items:center;padding:0 6px;background:var(--danger);color:#fff}
+.sec-tete{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+
+/* panneau + blocs (un seul niveau, jamais de carte dans une carte) */
+.panel{background:var(--surface);border:1px solid var(--bd);border-radius:14px;box-shadow:var(--elev-1),var(--edge)}
+.bloc{padding:18px 22px 20px}
+.bloc+.bloc{border-top:1px solid var(--bd)}
+.bh{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.bh h3{margin:0;font-size:17px;font-weight:700;flex:1}
+.bh h4{margin:0}
+.sous-tete{font:700 12px Figtree;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:20px 0 10px;padding-top:16px;border-top:1px dashed var(--bd)}
+.sous-tete:first-of-type{margin-top:0;padding-top:0;border-top:0}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:99px;padding:3px 11px;font:700 12.5px Figtree;white-space:nowrap}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--danger-soft);color:var(--danger)}
+.pill.off{background:var(--surface-2);color:var(--muted)}
+.pill.nu::before{display:none}
+
+/* champs */
+.field{display:grid;gap:5px;margin-bottom:12px}
+.field label,.lbl{font:700 13.5px Figtree}
+.field input[type=text]{width:100%;min-height:42px;border:1px solid var(--bd-strong);border-radius:8px;background:#fff;padding:0 12px;font:inherit;color:var(--text)}
+.field input:focus,.sel:focus-visible,.btn:focus-visible,.nav:focus-visible,.sw:focus-visible,.mrow:focus-visible,.info:focus-visible{outline:3px solid var(--acc-soft);outline-offset:0;border-color:var(--acc)}
+.field input.mono{font-family:ui-monospace,Consolas,monospace;font-size:13.5px}
+.duo-champs{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:12px}
+.aide{font-size:13px;color:var(--muted);margin:0 0 12px}
+.ligne-info{display:flex;gap:9px;align-items:flex-start;font-size:13.5px;color:var(--muted);margin:0 0 12px}
+.ligne-info .i{margin-top:2px}
+.ligne-info.ok{color:var(--ok)}
+.ligne-info.bad{color:var(--danger)}
+.ligne-info b{color:var(--text)}
+
+/* boutons V2 */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 20px;border-radius:99px;border:1px solid transparent;font:700 14.5px Figtree;background:transparent;white-space:nowrap}
+.btn-valider{background:var(--acc);border-color:var(--acc);color:#fff;box-shadow:var(--edge)}
+.btn-valider:hover{background:var(--acc-ink)}
+.btn-outline{background:var(--surface);border-color:var(--bd-strong);color:var(--text)}
+.btn-outline:hover{border-color:var(--acc);color:var(--acc-ink)}
+.btn-ghost{color:var(--acc-ink);padding:0 12px}
+.btn-ghost:hover{background:var(--acc-soft)}
+.btn-danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn[disabled]{opacity:.55;cursor:default}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+.spin{width:14px;height:14px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:tourne .7s linear infinite;flex:none}
+@keyframes tourne{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:2s}}
+
+/* interrupteur (celui validé en B-181) */
+.sw{position:relative;flex:none;width:46px;height:26px;border-radius:99px;background:var(--bd-strong);border:0;padding:0}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .15s}
+.sw::before{content:"";position:absolute;inset:-9px -6px}
+.sw.on{background:var(--ok)}
+.sw.on::after{left:23px}
+.sw[disabled]{opacity:.6}
+.rang{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 0;border-top:1px solid var(--bd)}
+.rang:first-child{border-top:0;padding-top:0}
+.rang .lib{display:flex;align-items:center;gap:8px;min-width:0;font-size:15px}
+.rang .droite{display:flex;align-items:center;gap:12px}
+.rang small{display:block;color:var(--muted);font-size:13px}
+.info{flex:none;border:0;background:transparent;color:var(--muted);width:28px;height:28px;border-radius:50%;display:inline-grid;place-items:center;padding:0}
+.info:hover{background:var(--surface-2);color:var(--acc-ink)}
+.info-txt{margin:-4px 0 8px;padding:8px 12px;background:var(--surface-2);border-radius:8px;font-size:13.5px;color:var(--muted)}
+
+/* messagerie */
+.fonction{display:grid;grid-template-columns:42px minmax(0,1fr) auto;column-gap:14px;row-gap:2px;align-items:center}
+.fonction .puce{grid-row:1 / span 2;width:42px;height:42px;border-radius:12px;background:var(--surface-2);display:grid;place-items:center;color:var(--acc-ink)}
+.fonction .titre{grid-column:2;font:700 16px Figtree}
+.fonction .desc{grid-column:2;font-size:13.5px;color:var(--muted)}
+.fonction .etat-sw{grid-column:3;grid-row:1 / span 2;display:flex;align-items:center;gap:12px}
+.fonction .etat-sw em{font-style:normal;font:700 13px Figtree;color:var(--ok)}
+.fonction .etat-sw em.off{color:var(--muted)}
+.refus{margin:14px 0 0;padding:10px 14px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13.5px;display:flex;gap:9px;align-items:flex-start}
+
+/* mon agenda (contenu B-181) */
+.choix{display:grid;gap:10px;margin:12px 0}
+.option{display:grid;grid-template-columns:24px 1fr;gap:12px;align-items:start;text-align:left;width:100%;background:#fff;border:1.5px solid var(--bd);border-radius:12px;padding:13px 14px}
+.option.on{border-color:var(--acc);box-shadow:0 0 0 4px var(--acc-soft)}
+.radio{width:20px;height:20px;border-radius:50%;border:2px solid var(--bd-strong);margin-top:2px;position:relative}
+.option.on .radio{border-color:var(--acc)}
+.option.on .radio::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--acc)}
+.option b{font:700 15.5px Figtree;display:block}
+.option .desc{color:var(--muted);font-size:13.5px;margin-top:2px}
+.sous{margin-top:11px;padding-top:11px;border-top:1px dashed var(--bd);display:grid;gap:8px}
+.sous-q{font-size:13px;font-weight:700}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--surface-2);border:1px solid var(--bd);border-radius:10px;padding:3px;gap:3px}
+.seg button{border:0;background:transparent;text-align:center;font:700 13.5px Figtree;color:var(--muted);padding:9px 6px;border-radius:8px;min-height:40px}
+.seg button.on{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(110,62,14,.15)}
+.etat-google{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--ok-soft);border-radius:8px;padding:9px 14px;font-size:13.5px;color:var(--ok);font-weight:600;margin-top:4px}
+
+/* google agenda */
+.resume-agenda{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.resume-agenda .nom{font:700 15.5px Figtree}
+.resume-agenda .src{font-size:13px;color:var(--muted)}
+.resume-agenda .btn{margin-left:auto}
+.sel-wrap{position:relative;max-width:260px}
+.sel{width:100%;min-height:42px;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1px solid var(--bd-strong);border-radius:8px;padding:0 12px;text-align:left}
+.opts{position:absolute;z-index:5;left:0;right:0;top:46px;margin:0;padding:4px;list-style:none;background:var(--surface);border:1px solid var(--bd-strong);border-radius:8px;box-shadow:var(--elev-2)}
+.opts li button{width:100%;text-align:left;border:0;background:transparent;border-radius:6px;padding:10px 10px;min-height:40px}
+.opts li button:hover{background:var(--surface-2)}
+.resync{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px}
+.resync .field{margin:0;flex:1;min-width:180px}
+.creneau{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:14px;align-items:end;margin-bottom:12px}
+.creneau .field{margin:0}
+.creneau .h{font-weight:400;color:var(--muted);font-size:13px}
+.apercu{display:grid;gap:3px}
+.apercu span{font:700 11.5px Figtree;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.apercu code{display:block;background:var(--surface-2);border:1px solid var(--bd);border-radius:6px;padding:10px 10px;font:600 13.5px ui-monospace,Consolas,monospace;overflow-wrap:anywhere}
+.vide{padding:12px 14px;background:var(--surface-2);border-radius:8px;font-size:13.5px;color:var(--muted)}
+
+/* zone */
+.zone-ligne{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:2px 0 14px;font-size:13.5px;color:var(--muted)}
+
+/* journal */
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.tj{width:100%;border-collapse:collapse;font-size:14px}
+.tj th{text-align:left;font:700 12px Figtree;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 10px 8px 0;border-bottom:1px solid var(--bd-strong)}
+.tj td{padding:10px 10px 10px 0;border-bottom:1px solid var(--bd);vertical-align:top}
+.tj td:first-child{white-space:nowrap}
+.tj th:last-child,.tj td:last-child{width:38%}
+.tj small{display:block;color:var(--muted);font-size:13px}
+.tj .raison{display:block;color:var(--danger);font-size:13px;margin-top:3px}
+.tj .raison.att{color:var(--warn)}
+.lj{display:grid}
+.lj .it{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 10px;padding:12px 0;border-top:1px solid var(--bd)}
+.lj .it:first-child{border-top:0;padding-top:0}
+.lj .t{font:700 14.5px Figtree}
+.lj .m{font-size:13px;color:var(--muted)}
+.lj .raison{grid-column:1/-1;font-size:13px;color:var(--danger)}
+.lj .raison.att{color:var(--warn)}
+
+/* téléphone */
+.ph-body{padding:16px 16px 26px}
+.mrow{display:flex;align-items:center;gap:13px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;min-height:60px;margin-bottom:8px;box-shadow:var(--elev-1)}
+.mrow .puce{width:38px;height:38px;border-radius:10px;background:var(--surface-2);display:grid;place-items:center;color:var(--acc-ink);flex:none}
+.mrow .tx{flex:1;min-width:0}
+.mrow .tx b{display:block;font:700 15.5px Figtree}
+.mrow .tx span{font-size:13px;color:var(--muted)}
+.mrow>.i:last-child{color:var(--muted)}
+.retour{display:inline-flex;align-items:center;gap:4px;border:0;background:transparent;color:var(--acc-ink);font:700 14.5px Figtree;padding:8px 6px 8px 0;min-height:44px;margin-bottom:2px}
+.phone .btn{min-height:44px}
+.phone .nav,.phone .seg button{min-height:44px}
+.phone .bloc{padding:16px 14px 18px}
+.phone .duo-champs{grid-template-columns:minmax(0,1fr) minmax(0,1.6fr)}
+.phone .creneau{grid-template-columns:1fr}
+.phone .fonction .puce,.phone .fonction .etat-sw{grid-row:1}
+.phone .fonction .desc{grid-column:1 / -1;margin-top:8px}
+.phone .actions .btn{flex:1 1 auto}
+.phone .resume-agenda .btn{margin-left:0}
+.phone .app h1{font-size:25px}
+
+/* modale + toast */
+.voile{position:absolute;inset:0;background:rgba(58,42,28,.42);display:grid;place-items:center;padding:16px;z-index:20}
+.modale{background:var(--surface);border-radius:10px;box-shadow:var(--elev-2);width:min(400px,100%);padding:22px}
+.modale h3{margin:0 0 8px;font-size:19px}
+.modale p{margin:0 0 18px;color:var(--muted);font-size:14.5px}
+.modale .pied{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.toast{position:absolute;left:50%;transform:translateX(-50%);bottom:18px;z-index:30;background:var(--text);color:#fff;border-radius:99px;padding:10px 18px;font-size:14px;max-width:calc(100% - 24px);text-align:center;box-shadow:var(--elev-2)}
+.toast.err{background:var(--danger)}
+.note-fin{display:flex;gap:9px;align-items:center;margin:14px 0 0;font-size:13.5px;color:var(--muted)}
+.lede{margin:4px 0 0;color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="intro">
+  <h1>Réglages, refondus</h1>
+  <p>Maquette B-202, à valider avant de coder. Cinq sections au lieu d’une grille de cartes mélangées : <b>Pour moi</b>, <b>Le cabinet</b>, <b>Messagerie</b>, <b>Connexions</b>, <b>Suivi</b>. Sur ordinateur, un sommaire reste à gauche ; sur téléphone, une liste mène à chaque section. Les deux pages « Mes notifications » et « Mon agenda » entrent dans la même coquille.</p>
+  <p>Tout est cliquable : le sommaire, l’interrupteur de la messagerie, les boutons. Données fictives (Cabinet du Val d’Allier). Les boutons en pointillé sous les cadres servent seulement à simuler un cas (refus, échec) : ils ne feront pas partie de l’écran.</p>
+</div>
+
+<!-- ═══ 1 ═══ -->
+<div class="etat"><span class="num">1</span><h2>Vue de l’administratrice, sur ordinateur</h2>
+  <p>Section « Messagerie », allumée. Éteindre demande une confirmation (état 3).</p></div>
+<figure class="fig"><figcaption>Ordinateur — cliquez dans le sommaire</figcaption>
+  <div class="scroll-x"><div class="frame"><div class="app" id="a1" data-mode="desk" data-role="admin" data-section="fonctions" data-msg="on"></div></div></div>
+</figure>
+
+<!-- ═══ 2 ═══ -->
+<div class="etat"><span class="num">2</span><h2>La même, sur téléphone</h2>
+  <p>La liste des cinq sections, puis une section ouverte (flèche pour revenir). Les zones tactiles font 44 px minimum.</p></div>
+<div class="phones">
+  <figure class="fig"><figcaption>Téléphone — la liste</figcaption><div class="phone"><div class="app" id="a2a" data-mode="phone" data-role="admin" data-view="list" data-msg="on"></div></div></figure>
+  <figure class="fig"><figcaption>Téléphone — une section ouverte</figcaption><div class="phone"><div class="app" id="a2b" data-mode="phone" data-role="admin" data-section="fonctions" data-view="section" data-msg="on"></div></div></figure>
+</div>
+
+<!-- ═══ 3 ═══ -->
+<div class="etat"><span class="num">3</span><h2>Éteindre la messagerie</h2>
+  <p>À gauche, la fenêtre de confirmation (cliquez « Éteindre » ou « Annuler »). À droite, la messagerie éteinte : cliquez l’interrupteur pour la rallumer.</p></div>
+<div class="duo">
+  <figure class="fig"><figcaption>Ordinateur — confirmation ouverte</figcaption>
+    <div class="scroll-x"><div class="frame"><div class="app" id="a3" data-mode="desk" data-role="admin" data-section="fonctions" data-msg="on" data-confirm="1"></div></div></div>
+    <div class="sim"><span>Simuler :</span><button data-sim="refus" data-target="a3">le serveur refuse le prochain changement</button></div>
+  </figure>
+  <figure class="fig"><figcaption>Téléphone — éteinte</figcaption><div class="phone"><div class="app" id="a3b" data-mode="phone" data-role="admin" data-section="fonctions" data-view="section" data-msg="off"></div></div></figure>
+</div>
+
+<!-- ═══ 4 ═══ -->
+<div class="etat"><span class="num">4</span><h2>Connexions : Google Agenda</h2>
+  <p>On règle l’agenda une fois : le branchement tient sur une ligne (« Modifier » ouvre le champ). La présentation des titres montre l’aperçu en direct : tapez dans un champ, ou activez « horaires dans le titre ». Sur téléphone, le champ est ouvert, vide, avec la mention « agenda par défaut ».</p></div>
+<div class="duo">
+  <figure class="fig"><figcaption>Ordinateur</figcaption>
+    <div class="scroll-x"><div class="frame"><div class="app" id="a4" data-mode="desk" data-role="admin" data-section="connexions" data-msg="on" data-sync="ok"></div></div></div>
+    <div class="sim"><span>Simuler :</span><button data-sim="echec-sync" data-target="a4">un échec à la prochaine synchronisation</button><button data-sim="sans-creneau" data-target="a4">aucun créneau réglé</button></div>
+  </figure>
+  <figure class="fig"><figcaption>Téléphone — champ ouvert</figcaption><div class="phone"><div class="app" id="a4b" data-mode="phone" data-role="admin" data-section="connexions" data-view="section" data-msg="on" data-modif="1"></div></div></figure>
+</div>
+<div class="legende"><b>Un bouton, un sujet.</b> Aujourd’hui le « Enregistrer » de la carte E-mails enregistre aussi l’adresse de l’agenda (même action serveur). Ici : « Enregistrer l’adresse » (agenda), « Enregistrer la présentation » (titres), « Enregistrer » (expéditeur) et « Enregistrer et déduire la zone » (adresse) ne touchent chacun que leur sujet, dans leur bloc.</div>
+
+<!-- ═══ 5 ═══ -->
+<div class="etat"><span class="num">5</span><h2>Le cabinet : adresse, zone, expéditeur</h2>
+  <p>Changez le code postal puis « Enregistrer et déduire la zone » (un code à 5 chiffres donne la zone ; autre chose conserve l’ancienne). Le bouton d’essai envoie un vrai e-mail à l’administratrice.</p></div>
+<div class="duo">
+  <figure class="fig"><figcaption>Ordinateur</figcaption>
+    <div class="scroll-x"><div class="frame"><div class="app" id="a5" data-mode="desk" data-role="admin" data-section="cabinet" data-msg="on"></div></div></div>
+    <div class="sim"><span>Simuler :</span><button data-sim="echec-essai" data-target="a5">un refus du service d’envoi à l’essai</button></div>
+  </figure>
+  <figure class="fig"><figcaption>Téléphone</figcaption><div class="phone"><div class="app" id="a5b" data-mode="phone" data-role="admin" data-section="cabinet" data-view="section" data-msg="on"></div></div></figure>
+</div>
+
+<!-- ═══ 6 ═══ -->
+<div class="etat"><span class="num">6</span><h2>Suivi : le journal des e-mails, avec un échec</h2>
+  <p>Le sommaire signale l’échec (pastille rouge « 1 ») sans qu’on ait à ouvrir la section. Sur téléphone, le tableau devient une liste.</p></div>
+<div class="duo">
+  <figure class="fig"><figcaption>Ordinateur</figcaption>
+    <div class="scroll-x"><div class="frame"><div class="app" id="a6" data-mode="desk" data-role="admin" data-section="suivi" data-msg="on"></div></div></div>
+    <div class="sim"><span>Simuler :</span><button data-sim="journal-vide" data-target="a6">journal vide</button></div>
+  </figure>
+  <figure class="fig"><figcaption>Téléphone</figcaption><div class="phone"><div class="app" id="a6b" data-mode="phone" data-role="admin" data-section="suivi" data-view="section" data-msg="on"></div></div></figure>
+</div>
+
+<!-- ═══ 7 ═══ -->
+<div class="etat"><span class="num">7</span><h2>Ce que voient une vétérinaire et le secrétariat</h2>
+  <p>Seulement « Pour moi » : pas de sommaire (une seule section), pas de section cabinet. Manon voit « Mon agenda » parce que la fonction est ouverte au cabinet ; sans elle, il ne reste que Mes notifications. Le secrétariat n’a aucun e-mail automatique.</p></div>
+<div class="duo">
+  <figure class="fig"><figcaption>Ordinateur — Manon, vétérinaire</figcaption>
+    <div class="scroll-x"><div class="frame"><div class="app" id="a7" data-mode="desk" data-role="veto" data-prenom="Manon" data-agenda="1"></div></div></div>
+  </figure>
+  <figure class="fig"><figcaption>Téléphone — Manon, « Mon agenda » non ouvert</figcaption><div class="phone"><div class="app" id="a7b" data-mode="phone" data-role="veto" data-prenom="Manon" data-agenda="0"></div></div></figure>
+</div>
+<div class="phones" style="margin-top:24px">
+  <figure class="fig"><figcaption>Téléphone — secrétariat</figcaption><div class="phone"><div class="app" id="a7c" data-mode="phone" data-role="secretaire" data-prenom="Camille" data-agenda="0"></div></div></figure>
+</div>
+
+<div class="a-trancher">
+  <h2>Points à regarder</h2>
+  <ol>
+    <li><b>L’ordre des cinq sections</b><span>Pour moi, Le cabinet, Messagerie, Connexions, Suivi. Les plus personnelles en premier, le journal (consulté rarement) en dernier.</span></li>
+    <li><b>« Messagerie » a sa propre section</b><span>Aucune autre fonction à allumer n’est prévue. Si la messagerie reçoit d’autres réglages, ils viendront ici. Les interrupteurs des plannings restent dans Organisation.</span></li>
+    <li><b>Notifications et « Mon agenda » s’enregistrent tout seuls</b><span>Comme aujourd’hui : pas de bouton, un message à chaque changement. Les réglages du cabinet, eux, ont un bouton par sujet.</span></li>
+    <li><b>Le vétérinaire sans « Mon agenda »</b><span>Pas de sommaire du tout, juste la liste des e-mails : un menu à une seule entrée serait du bruit.</span></li>
+  </ol>
+</div>
+
+</div>
+
+<script>
+(function(){
+/* ═════════ icônes (traits fins, style Lucide) ═════════ */
+var P={
+ user:'<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>',
+ building:'<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/><path d="M9 10h.01M15 10h.01"/>',
+ msg:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+ plug:'<path d="M12 22v-5"/><path d="M9 8V2M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z"/>',
+ doc:'<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+ bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
+ cal:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+ pin:'<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>',
+ mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+ right:'<path d="m9 18 6-6-6-6"/>',
+ left:'<path d="m15 18-6-6 6-6"/>',
+ down:'<path d="m6 9 6 6 6-6"/>',
+ info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
+ check:'<path d="M20 6 9 17l-5-5"/>',
+ warn:'<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
+ send:'<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>',
+ sync:'<path d="M21 12a9 9 0 0 0-15-6.7L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 15 6.7L21 16"/><path d="M16 16h5v5"/>',
+ lock:'<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'
+};
+function ico(n,c){return '<svg class="i '+(c||'')+'" viewBox="0 0 24 24" aria-hidden="true">'+P[n]+'</svg>';}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
+
+/* ═════════ données d’exemple ═════════ */
+var COMMUNS=[
+ ['planning_publie','Un nouveau planning est diffusé','À chaque diffusion, avec le détail de mes gardes sur la période.'],
+ ['garde_modifiee','Une de mes gardes change','Quand une garde m’est retirée ou attribuée après la diffusion du planning.'],
+ ['appel_volontaires','On cherche un volontaire pour un dépannage','Quand une garde se libère et que l’équipe est sollicitée.'],
+ ['depannage_confirme','Un dépannage est confirmé','Quand quelqu’un a repris la garde qui était à pourvoir.']
+];
+var NOTIFS={
+ admin:[['conge_demande','Une demande de congé est posée','Dès qu’un vétérinaire pose une demande. Celles qui tombent sur un planning déjà diffusé sont signalées à part.']].concat(COMMUNS,[['rappel_publication','Rappel : un planning n’est pas encore diffusé','À l’approche du début d’une période encore en brouillon.']]),
+ veto:[['conge_decision','Ma demande de congé est acceptée ou refusée','Quand l’administratrice tranche une demande que j’ai posée.']].concat(COMMUNS),
+ secretaire:[]
+};
+var CRENEAUX=[
+ {id:'sem',nom:'Semaine',debut:'18h',fin:'08h'},
+ {id:'we',nom:'Week-end',debut:'08h',fin:'08h'}
+];
+var PERIODES=['Hiver 2026','Été 2026'];
+var JOURNAL=[
+ {q:'8 nov., 18:02',t:'Planning publié',n:'Fanny Lambert',a:'fanny.lambert@cabinet-valdallier.fr',s:'remis'},
+ {q:'8 nov., 18:02',t:'Planning publié',n:'Jean Girard',a:'jean.girard@cabinet-valdallier.fr',s:'envoye'},
+ {q:'8 nov., 18:02',t:'Planning publié',n:'Victor Faure',a:'victor.faure@cabinet-valdallier',s:'erreur',r:'L’adresse du destinataire a été refusée : vérifiez l’e-mail de la fiche.'},
+ {q:'6 nov., 09:14',t:'Demande de congé',n:'Anne-Sophie Roche',a:'annesophie@cabinet-valdallier.fr',s:'remis'},
+ {q:'5 nov., 16:40',t:'Garde modifiée',n:'Manon Perrin',a:'manon.perrin@cabinet-valdallier.fr',s:'differe',r:'Trop d’envois d’un coup : l’expéditeur a mis la suite en attente. Réessayez dans quelques minutes.'},
+ {q:'3 nov., 11:20',t:'Appel aux volontaires',n:'Antoine Mercier',a:'antoine.mercier@cabinet-valdallier.fr',s:'envoye'},
+ {q:'2 nov., 08:05',t:'Essai d’envoi',n:'Anne-Sophie Roche',a:'annesophie@cabinet-valdallier.fr',s:'remis'}
+];
+var LIB_ST={envoye:'Parti',remis:'Remis',differe:'En attente',spam:'Indésirable',rejete:'Rejeté',erreur:'Refusé'};
+var TON_ST={envoye:'ok',remis:'ok',differe:'warn',spam:'bad',rejete:'bad',erreur:'bad'};
+var SECS=[
+ {id:'moi',nom:'Pour moi',ico:'user',res:'Notifications, agenda'},
+ {id:'cabinet',nom:'Le cabinet',ico:'building',res:'Adresse, e-mails'},
+ {id:'fonctions',nom:'Messagerie',ico:'msg',res:'Fil d’équipe, conversations privées'},
+ {id:'connexions',nom:'Connexions',ico:'plug',res:'Google Agenda'},
+ {id:'suivi',nom:'Suivi',ico:'doc',res:'Journal des e-mails'}
+];
+
+/* ═════════ état par écran ═════════ */
+var apps=[];
+function nouvelEtat(el,i){
+ var d=el.dataset, notifs={};
+ var S={
+  el:el,uid:'u'+i,mode:d.mode,role:d.role||'admin',prenom:d.prenom||'Anne-Sophie',
+  section:d.section||'moi',view:d.view||'section',
+  msg:d.msg!=='off',confirm:d.confirm==='1',pending:false,refus:null,refusNext:false,
+  agendaOuvert:d.agenda!=='0',notifs:notifs,info:{},
+  ag:{on:true,choix:'planning',place:'heures'},
+  calId:'',fallback:'gardes véto',modifAgenda:d.modif==='1',
+  per:PERIODES[0],perOpen:false,
+  sync:d.sync==='ok'?{ok:true,msg:'61 gardes envoyées vers l’agenda.'}:null,syncEnCours:false,failSync:false,
+  pres:{journee:true,horaires:false,bases:{sem:'Garde',we:'Garde-WE'}},sansCreneau:false,
+  rue:'14 avenue Victoria',cp:'03200',ville:'Vichy',zone:'Zone A · Métropole',
+  exp:'Cabinet du Val d’Allier',email:'annesophie@cabinet-valdallier.fr',
+  essaiEnCours:false,failEssai:false,modalEssai:false,
+  journalVide:false,toast:null,timer:null
+ };
+ (NOTIFS[S.role]||[]).forEach(function(r){notifs[r[0]]=true;});
+ if(S.role==='admin'){notifs.rappel_publication=false;}
+ if(S.role!=='admin'){S.section='moi';S.view='section';}
+ return S;
+}
+
+/* ═════════ rendu ═════════ */
+function sectionsDe(S){return S.role==='admin'?SECS:[SECS[0]];}
+function branche(S){return S.calId.trim()!==''||S.fallback!=='';}
+function nbEchecs(S){return S.journalVide?0:JOURNAL.filter(function(j){return TON_ST[j.s]==='bad';}).length;}
+function attention(S,id){
+ if(id==='cabinet'&&!S.zone)return '<span class="dot warn" title="À renseigner"></span>';
+ if(id==='connexions'&&!branche(S))return '<span class="dot warn" title="Non branché"></span>';
+ if(id==='suivi'&&nbEchecs(S)>0)return '<span class="cnt" title="E-mails en échec">'+nbEchecs(S)+'</span>';
+ return '';
+}
+function sw(on,act,extra,label){
+ return '<button type="button" class="sw'+(on?' on':'')+'" role="switch" aria-checked="'+on+'" aria-label="'+esc(label)+'" data-act="'+act+'" '+(extra||'')+'></button>';
+}
+function pill(t,ton,nu){return '<span class="pill '+ton+(nu?' nu':'')+'">'+t+'</span>';}
+function bloc(titre,etat,corps){return '<section class="bloc"><div class="bh"><h3>'+titre+'</h3>'+(etat||'')+'</div>'+corps+'</section>';}
+
+function blocNotifs(S){
+ var liste=NOTIFS[S.role]||[], corps;
+ if(!liste.length){
+  corps='<p class="vide">Aucun e-mail automatique ne vous est adressé.</p>';
+ }else{
+  corps=liste.map(function(r){
+   var open=S.info[r[0]];
+   return '<div class="rang"><span class="lib">'+esc(r[1])+'<button type="button" class="info" data-act="info" data-k="'+r[0]+'" aria-label="Quand cet e-mail part" aria-expanded="'+(!!open)+'">'+ico('info','sm')+'</button></span>'
+    +sw(S.notifs[r[0]],'notif','data-k="'+r[0]+'"',r[1])+'</div>'
+    +(open?'<p class="info-txt">'+esc(r[2])+'</p>':'');
+  }).join('')
+  +'<p class="note-fin">'+ico('bell','sm')+'<span>La cloche reste active : seul l’e-mail se coupe.</span></p>';
+ }
+ return bloc('Mes notifications','',corps);
+}
+function blocMonAgenda(S){
+ var perso=S.role!=='secretaire';
+ var choix=perso?S.ag.choix:'cabinet';
+ var opt=function(id,titre,desc,sous){
+  var on=choix===id;
+  return '<div class="option'+(on?' on':'')+'" role="radio" aria-checked="'+on+'" tabindex="0" data-act="ag-choix" data-k="'+id+'"><span class="radio"></span><div><b>'+titre+'</b><div class="desc">'+desc+'</div>'+(on?sous:'')+'</div></div>';
+ };
+ var seg=function(q,a,b,va,vb,aide){
+  var cur=S.ag.place;
+  return '<div class="sous"><div class="sous-q">'+q+'</div><div class="seg" role="radiogroup"><button type="button" class="'+(cur===va?'on':'')+'" data-act="ag-place" data-k="'+va+'">'+a+'</button><button type="button" class="'+(cur===vb?'on':'')+'" data-act="ag-place" data-k="'+vb+'">'+b+'</button></div><div class="aide" style="margin:0">'+aide+'</div></div>';
+ };
+ var corps=
+  '<div class="rang"><span class="lib"><span><b>Recevoir mon planning dans Google Agenda</b><small>Éteint : plus rien n’y arrive, l’agenda est vidé.</small></span></span>'+sw(S.ag.on,'ag-on','','Recevoir mon planning dans Google Agenda')+'</div>'
+  +'<div class="lbl" style="margin-top:12px">Dans mon Google Agenda, je veux voir</div>'
+  +'<div class="choix" role="radiogroup">'
+  +(perso?opt('planning','Mon planning','Mes gardes, avec la personne de garde avec moi, et mes journées au cabinet. Rien d’autre.',seg('Mes journées au cabinet','Aux heures','En haut du jour','heures','haut','Aux heures, elles occupent votre agenda comme un rendez-vous. En haut du jour, elles restent discrètes.')):'')
+  +opt('cabinet','Tout le cabinet','Les gardes de toute l’équipe, et chaque jour un bandeau qui dit qui est au cabinet.',seg('Les journées de l’équipe','Un bandeau en haut du jour','Aux heures, dans les cases','haut','heures','En bandeau, une seule ligne par jour dit qui est au cabinet : l’agenda reste léger. Aux heures, chaque collègue apparaît sur son créneau.'))
+  +'</div>'
+  +'<div class="etat-google"><span>Agenda « GuardVeto — '+esc(S.prenom)+' » · à jour</span><button type="button" class="btn btn-outline" style="min-height:36px;padding:0 14px">Ouvrir dans Google Agenda</button></div>';
+ return bloc('Mon agenda','',corps);
+}
+function contenuMoi(S){
+ var h='<div class="panel">'+blocNotifs(S)+(S.agendaOuvert?blocMonAgenda(S):'')+'</div>';
+ return h;
+}
+function contenuCabinet(S){
+ var adr=
+  '<div class="field"><label for="'+S.uid+'-rue">Adresse</label><input type="text" id="'+S.uid+'-rue" value="'+esc(S.rue)+'" data-in="rue" placeholder="12 rue des Tilleuls"></div>'
+  +'<div class="duo-champs"><div class="field"><label for="'+S.uid+'-cp">Code postal</label><input type="text" inputmode="numeric" id="'+S.uid+'-cp" value="'+esc(S.cp)+'" data-in="cp" placeholder="03200"></div>'
+  +'<div class="field"><label for="'+S.uid+'-vi">Ville</label><input type="text" id="'+S.uid+'-vi" value="'+esc(S.ville)+'" data-in="ville" placeholder="Vichy"></div></div>'
+  +'<div class="zone-ligne"><span>Zone déduite du code postal (vacances scolaires, jours fériés) :</span>'+(S.zone?pill(esc(S.zone),'ok'):pill('Zone à déduire','warn'))+'</div>'
+  +'<div class="actions"><button type="button" class="btn btn-valider" data-act="adr-save">Enregistrer et déduire la zone</button></div>';
+ var exp=
+  '<div class="field"><label for="'+S.uid+'-exp">Nom affiché comme expéditeur</label><input type="text" id="'+S.uid+'-exp" value="'+esc(S.exp)+'" data-in="exp" placeholder="GuardVeto"></div>'
+  +'<p class="aide">Laissé vide, les e-mails arrivent au nom de « GuardVeto ».</p>'
+  +'<div class="actions"><button type="button" class="btn btn-valider" data-act="exp-save">Enregistrer</button></div>'
+  +'<div class="sous-tete">Essai d’envoi</div>'
+  +'<p class="aide" style="margin-bottom:10px">Un vrai e-mail est envoyé à '+esc(S.email)+'. S’il vous parvient, les plannings et les réponses aux congés partiront aussi.</p>'
+  +'<div class="actions"><button type="button" class="btn btn-outline" data-act="essai"'+(S.essaiEnCours?' disabled':'')+'>'+(S.essaiEnCours?'<span class="spin"></span>Envoi…':ico('send','sm')+'Vérifier que les e-mails partent')+'</button></div>';
+ return '<div class="panel">'
+  +bloc('Adresse du cabinet',S.zone?pill('Renseignée','ok'):pill('À renseigner','warn'),adr)
+  +bloc('E-mails aux vétérinaires',pill('Actif','ok'),exp)
+  +'</div>';
+}
+function contenuFonctions(S){
+ var corps=
+  '<div class="fonction"><span class="puce">'+ico('msg')+'</span><b class="titre">Messagerie de l’équipe</b>'
+  +'<div class="etat-sw">'+(S.pending?'<span class="spin" style="color:var(--muted)"></span>':'')+'<em class="'+(S.msg?'':'off')+'">'+(S.msg?'Active':'Éteinte')+'</em>'+sw(S.msg,'msg-ask',S.pending?'disabled':'','Messagerie de l’équipe')+'</div><span class="desc">Le fil de toute l’équipe et les conversations privées, secrétariat compris</span></div>'
+  +(S.refus?'<div class="refus" role="alert">'+ico('warn','sm')+'<span>'+esc(S.refus)+'</span></div>':'')
+  +(!S.msg&&!S.pending?'<p class="note-fin">'+ico('lock','sm')+'<span>Les conversations sont conservées.</span></p>':'');
+ return '<div class="panel"><section class="bloc">'+corps+'</section></div>';
+}
+function apercuTitre(S,c){
+ var base=(S.pres.bases[c.id]||'').trim()||c.nom;
+ return base+'-ACB-1er'+(S.pres.horaires?' '+c.debut+'/'+c.fin:'');
+}
+function contenuConnexions(S){
+ var b=branche(S);
+ var nomAg=S.calId.trim()?esc(S.calId.trim()):'gardes véto';
+ var src=S.calId.trim()?'adresse saisie':'agenda par défaut';
+ var branchement=
+  '<div class="resume-agenda">'+ico('cal')+'<span class="nom">'+nomAg+'</span><span class="src">'+src+'</span>'
+  +'<button type="button" class="btn btn-ghost" data-act="modif">'+(S.modifAgenda?'Fermer':'Modifier')+'</button></div>'
+  +'<p class="ligne-info">'+ico('lock','sm')+'<span>Cet agenda doit être <b>partagé en écriture</b> avec GuardVeto.</span></p>'
+  +(S.modifAgenda?
+    '<div class="field"><label for="'+S.uid+'-cal">Adresse de l’agenda Google</label><input type="text" class="mono" id="'+S.uid+'-cal" value="'+esc(S.calId)+'" data-in="cal" placeholder="cabinet@group.calendar.google.com"></div>'
+    +'<p class="aide">Dans Google Agenda : paramètres de l’agenda → « Intégrer l’agenda » → <b>ID de l’agenda</b>. Ce n’est pas l’adresse d’un compte Google.</p>'
+    +'<p class="ligne-info" id="'+S.uid+'-vide"'+(S.calId.trim()===''?'':' hidden')+'>'+ico('info','sm')+'<span>Ce champ est vide, mais les gardes partent bien vers l’agenda par défaut, <b>« '+esc(S.fallback)+' »</b>. Renseignez une adresse pour en utiliser un autre.</span></p>'
+    +'<div class="actions" style="margin-bottom:6px"><button type="button" class="btn btn-valider" data-act="cal-save">Enregistrer l’adresse</button><button type="button" class="btn btn-ghost" data-act="modif">Annuler</button></div>'
+   :'')
+  +'<div class="sous-tete">Renvoyer un planning publié</div>'
+  +'<div class="resync"><div class="field"><label for="'+S.uid+'-per">Période</label><div class="sel-wrap"><button type="button" class="sel" id="'+S.uid+'-per" data-act="per-open" aria-haspopup="listbox" aria-expanded="'+S.perOpen+'"><span>'+S.per+'</span>'+ico('down','sm')+'</button>'
+  +(S.perOpen?'<ul class="opts" role="listbox">'+PERIODES.map(function(p){return '<li><button type="button" data-act="per-pick" data-k="'+p+'">'+p+'</button></li>';}).join('')+'</ul>':'')
+  +'</div></div>'
+  +'<button type="button" class="btn btn-outline" data-act="resync"'+(S.syncEnCours||!b?' disabled':'')+'>'+(S.syncEnCours?'<span class="spin"></span>Envoi…':ico('sync','sm')+'Resynchroniser')+'</button></div>'
+  +(S.sync?'<p class="ligne-info '+(S.sync.ok?'ok':'bad')+'" role="status">'+ico(S.sync.ok?'check':'warn','sm')+'<span>'+esc(S.sync.msg)+'</span></p>':'');
+
+ var crs=S.sansCreneau?[]:CRENEAUX;
+ var pres=
+  '<div class="rang"><span class="lib"><span><b>Événements en journée entière</b><small>Un bandeau léger en haut de la grille, plutôt qu’un bloc sur toute la colonne.</small></span></span>'+sw(S.pres.journee,'pres-j','','Événements en journée entière')+'</div>'
+  +'<div class="rang"><span class="lib"><span><b>Horaires dans le titre</b><small>Ajoute « 18h/08h » à la fin du titre.</small></span></span>'+sw(S.pres.horaires,'pres-h','','Horaires dans le titre')+'</div>'
+  +'<div class="lbl" style="margin:16px 0 10px">Base du titre, par créneau</div>'
+  +(crs.length===0
+   ?'<p class="vide">Aucun créneau réglé pour l’instant. La structure des gardes se configure dans Règles.</p>'
+   :crs.map(function(c){
+     return '<div class="creneau"><div class="field"><label for="'+S.uid+'-b'+c.id+'">'+c.nom+' <span class="h">'+c.debut+' → '+c.fin+'</span></label><input type="text" id="'+S.uid+'-b'+c.id+'" value="'+esc(S.pres.bases[c.id])+'" data-in="base" data-k="'+c.id+'" placeholder="'+c.nom+'"></div>'
+      +'<div class="apercu"><span>Aperçu</span><code id="'+S.uid+'-ap-'+c.id+'">'+esc(apercuTitre(S,c))+'</code></div></div>';
+    }).join(''))
+  +'<div class="actions" style="margin-top:6px"><button type="button" class="btn btn-valider" data-act="pres-save">Enregistrer la présentation</button></div>';
+
+ return '<div class="panel">'
+  +bloc('Google Agenda',b?pill('Branché','ok'):pill('Non branché','warn'),
+     '<div class="sous-tete">Branchement</div>'+branchement
+     +'<div class="sous-tete">Présentation des événements</div>'+pres)
+  +'</div>';
+}
+function contenuSuivi(S){
+ var rows=S.journalVide?[]:JOURNAL, e=nbEchecs(S), ok=rows.length-e, corps;
+ var chips='<div class="chips">'+(ok>0?'<span class="pill ok nu">'+ok+' partis</span>':'')+(e>0?'<span class="pill bad nu">'+e+' en échec</span>':'')+'</div>';
+ if(!rows.length){
+  corps='<p class="vide">Aucun e-mail parti pour l’instant.</p>';
+ }else if(S.mode==='desk'){
+  corps='<table class="tj"><thead><tr><th>Quand</th><th>Type</th><th>Destinataire</th><th>État</th></tr></thead><tbody>'
+   +rows.map(function(j){
+     return '<tr><td style="white-space:nowrap">'+j.q+'</td><td>'+j.t+'</td><td>'+j.n+'<small>'+j.a+'</small></td><td>'+pill(LIB_ST[j.s],TON_ST[j.s])
+      +(j.r?'<span class="raison'+(TON_ST[j.s]==='warn'?' att':'')+'">'+j.r+'</span>':'')+'</td></tr>';
+    }).join('')+'</tbody></table>';
+ }else{
+  corps='<div class="lj">'+rows.map(function(j){
+   return '<div class="it"><span class="t">'+j.t+'</span>'+pill(LIB_ST[j.s],TON_ST[j.s])
+    +'<span class="m">'+j.n+' · '+j.q+'</span>'
+    +(j.r?'<span class="raison'+(TON_ST[j.s]==='warn'?' att':'')+'">'+j.r+'</span>':'')+'</div>';
+  }).join('')+'</div>';
+ }
+ corps+='<p class="note-fin">'+ico('info','sm')+'<span>Parti : accepté par le service d’envoi. Remis : arrivé chez le destinataire.</span></p>';
+ return '<div class="panel">'+bloc('Journal des e-mails',chips,corps)+'</div>';
+}
+function contenu(S,id){
+ return {moi:contenuMoi,cabinet:contenuCabinet,fonctions:contenuFonctions,connexions:contenuConnexions,suivi:contenuSuivi}[id](S);
+}
+function nomSection(id){return SECS.filter(function(s){return s.id===id;})[0];}
+
+function modales(S){
+ var h='';
+ if(S.confirm){
+  h+='<div class="voile" data-act="voile"><div class="modale" role="dialog" aria-modal="true" aria-labelledby="'+S.uid+'-mt"><h3 id="'+S.uid+'-mt">Éteindre la messagerie ?</h3>'
+   +'<p>Elle disparaît pour toute l’équipe. Les conversations sont conservées et reviennent si vous la rallumez.</p>'
+   +'<div class="pied"><button type="button" class="btn btn-outline" data-act="msg-cancel"'+(S.pending?' disabled':'')+'>Annuler</button><button type="button" class="btn btn-danger" data-act="msg-off"'+(S.pending?' disabled':'')+'>'+(S.pending?'<span class="spin"></span>':'')+'Éteindre</button></div></div></div>';
+ }
+ if(S.modalEssai){
+  h+='<div class="voile" data-act="voile"><div class="modale" role="dialog" aria-modal="true"><h3>L’e-mail d’essai n’est pas parti</h3>'
+   +'<p><b>L’expéditeur a refusé l’envoi : l’adresse ou le domaine d’envoi n’est pas validé chez lui.</b><br><br>Rien n’est cassé dans GuardVeto : c’est le service d’envoi qui refuse. Tant que cela dure, les plannings publiés et les réponses aux congés ne partiront pas non plus.</p>'
+   +'<div class="pied"><button type="button" class="btn btn-valider" data-act="modal-close">Compris</button></div></div></div>';
+ }
+ return h;
+}
+function toastHtml(S){return S.toast?'<div class="toast'+(S.toast.err?' err':'')+'" role="status">'+esc(S.toast.t)+'</div>':'';}
+
+function draw(S){
+ var admin=S.role==='admin', secs=sectionsDe(S), h='';
+ if(S.mode==='desk'){
+  h+='<div class="topbar"><b>GuardVeto</b><span>Planning · Équipe · Règles · <b style="font-size:13px;font-family:inherit;color:var(--text)">Réglages</b></span><div class="dk"><span></span><span></span><span></span><span class="cur"></span></div></div>';
+  h+='<div class="desk-body"><h1>Réglages</h1>';
+  if(secs.length>1){
+   h+='<div class="layout"><nav class="sommaire" aria-label="Sections des réglages">'
+    +secs.map(function(s){return '<button type="button" class="nav'+(S.section===s.id?' on':'')+'" data-act="nav" data-k="'+s.id+'"'+(S.section===s.id?' aria-current="page"':'')+'>'+ico(s.ico)+'<span class="lib">'+s.nom+'</span>'+attention(S,s.id)+'</button>';}).join('')
+    +'</nav><div><div class="sec-tete"><h2>'+nomSection(S.section).nom+'</h2></div>'+contenu(S,S.section)+'</div></div>';
+  }else{
+   h+='<div style="margin-top:18px">'+contenu(S,'moi')+'</div>';
+  }
+  h+='</div>';
+ }else{
+  h+='<div class="ph-body">';
+  if(secs.length>1&&S.view==='list'){
+   h+='<h1 style="margin:6px 0 16px">Réglages</h1>'
+    +secs.map(function(s){return '<button type="button" class="mrow" data-act="nav" data-k="'+s.id+'"><span class="puce">'+ico(s.ico)+'</span><span class="tx"><b>'+s.nom+'</b><span>'+s.res+'</span></span>'+attention(S,s.id)+ico('right')+'</button>';}).join('');
+  }else if(secs.length>1){
+   h+='<button type="button" class="retour" data-act="back">'+ico('left','sm')+'Réglages</button><h2 style="margin:0 0 14px">'+nomSection(S.section).nom+'</h2>'+contenu(S,S.section);
+  }else{
+   h+='<h1 style="margin:6px 0 16px">Réglages</h1>'+contenu(S,'moi');
+  }
+  h+='</div>';
+ }
+ S.el.innerHTML=h+modales(S)+toastHtml(S);
+}
+
+/* ═════════ comportement ═════════ */
+function montrer(S,t,err){
+ clearTimeout(S.timer); S.toast={t:t,err:!!err}; draw(S);
+ S.timer=setTimeout(function(){S.toast=null;draw(S);},2800);
+}
+function etatDe(el){var a=el.closest('.app');for(var i=0;i<apps.length;i++){if(apps[i].el===a)return apps[i];}return null;}
+
+var ACTIONS={
+ nav:function(S,b){S.section=b.dataset.k;S.view='section';S.perOpen=false;draw(S);},
+ back:function(S){S.view='list';draw(S);},
+ 'msg-ask':function(S){
+  if(S.pending)return;
+  if(S.msg){S.confirm=true;draw(S);return;}
+  S.refus=null;S.pending=true;draw(S);
+  setTimeout(function(){
+   S.pending=false;
+   if(S.refusNext){S.refusNext=false;S.refus='Ce réglage n’est pas encore disponible sur votre cabinet. Contactez l’assistance.';draw(S);return;}
+   S.msg=true;montrer(S,'Messagerie allumée');
+  },700);
+ },
+ 'msg-cancel':function(S){if(!S.pending){S.confirm=false;draw(S);}},
+ 'msg-off':function(S){
+  S.refus=null;S.pending=true;draw(S);
+  setTimeout(function(){
+   S.pending=false;S.confirm=false;
+   if(S.refusNext){S.refusNext=false;S.refus='Ce réglage n’est pas encore disponible sur votre cabinet. Contactez l’assistance.';draw(S);return;}
+   S.msg=false;montrer(S,'Messagerie éteinte');
+  },700);
+ },
+ voile:function(S,b,ev){
+  if(ev.target!==b)return;
+  if(S.confirm&&!S.pending){S.confirm=false;draw(S);}
+  else if(S.modalEssai){S.modalEssai=false;draw(S);}
+ },
+ 'modal-close':function(S){S.modalEssai=false;draw(S);},
+ notif:function(S,b){var k=b.dataset.k;S.notifs[k]=!S.notifs[k];montrer(S,S.notifs[k]?'E-mail réactivé':'E-mail coupé');},
+ info:function(S,b){var k=b.dataset.k;S.info[k]=!S.info[k];draw(S);},
+ 'ag-on':function(S){S.ag.on=!S.ag.on;montrer(S,S.ag.on?'Agenda réactivé':'Agenda retiré de Google Agenda');},
+ 'ag-choix':function(S,b){S.ag.choix=b.dataset.k;if(S.ag.choix==='planning')S.ag.place='heures';else S.ag.place='haut';montrer(S,'Choix enregistré');},
+ 'ag-place':function(S,b){S.ag.place=b.dataset.k;montrer(S,'Choix enregistré');},
+ modif:function(S){S.modifAgenda=!S.modifAgenda;draw(S);},
+ 'cal-save':function(S){S.modifAgenda=false;montrer(S,'Adresse de l’agenda enregistrée');},
+ 'per-open':function(S){S.perOpen=!S.perOpen;draw(S);},
+ 'per-pick':function(S,b){S.per=b.dataset.k;S.perOpen=false;draw(S);},
+ resync:function(S){
+  S.syncEnCours=true;S.sync=null;draw(S);
+  setTimeout(function(){
+   S.syncEnCours=false;
+   if(S.failSync){S.failSync=false;S.sync={ok:false,msg:'58 envoyées, 3 en échec : l’agenda n’autorise pas l’écriture pour GuardVeto.'};}
+   else{S.sync={ok:true,msg:(S.per==='Hiver 2026'?'61':'84')+' gardes envoyées vers l’agenda.'};}
+   draw(S);
+  },900);
+ },
+ 'pres-j':function(S){S.pres.journee=!S.pres.journee;draw(S);},
+ 'pres-h':function(S){S.pres.horaires=!S.pres.horaires;draw(S);},
+ 'pres-save':function(S){montrer(S,'Présentation de l’agenda enregistrée');},
+ 'adr-save':function(S){
+  if(/^\d{5}$/.test(S.cp.trim())){S.zone='Zone A · Métropole';montrer(S,'Adresse enregistrée · Zone A');}
+  else{montrer(S,'Adresse enregistrée. Zone non déduite du code postal : l’ancienne est conservée.');}
+ },
+ 'exp-save':function(S){montrer(S,'Nom d’expéditeur enregistré');},
+ essai:function(S){
+  S.essaiEnCours=true;draw(S);
+  setTimeout(function(){
+   S.essaiEnCours=false;
+   if(S.failEssai){S.failEssai=false;S.modalEssai=true;draw(S);}
+   else{montrer(S,'E-mail d’essai envoyé à '+S.email);}
+  },900);
+ }
+};
+document.addEventListener('click',function(ev){
+ var sim=ev.target.closest('[data-sim]');
+ if(sim){
+  var cible=document.getElementById(sim.dataset.target), S=cible&&etatDe(cible);
+  if(!S)return;
+  var k=sim.dataset.sim;
+  if(k==='refus'){S.refusNext=true;sim.textContent='prêt : cliquez l’interrupteur ou « Éteindre »';}
+  if(k==='echec-sync'){S.failSync=true;sim.textContent='prêt : cliquez « Resynchroniser »';}
+  if(k==='sans-creneau'){S.sansCreneau=!S.sansCreneau;draw(S);}
+  if(k==='echec-essai'){S.failEssai=true;sim.textContent='prêt : cliquez « Vérifier que les e-mails partent »';}
+  if(k==='journal-vide'){S.journalVide=!S.journalVide;draw(S);}
+  return;
+ }
+ var b=ev.target.closest('[data-act]');
+ if(!b)return;
+ var S2=etatDe(b);
+ if(S2&&ACTIONS[b.dataset.act]){ACTIONS[b.dataset.act](S2,b,ev);}
+});
+document.addEventListener('keydown',function(ev){
+ if(ev.key==='Escape'){
+  apps.forEach(function(S){
+   if(S.confirm&&!S.pending){S.confirm=false;draw(S);}
+   else if(S.modalEssai){S.modalEssai=false;draw(S);}
+  });
+ }
+ if((ev.key==='Enter'||ev.key===' ')&&ev.target.matches&&ev.target.matches('.option[data-act]')){
+  ev.preventDefault();ev.target.click();
+ }
+});
+document.addEventListener('input',function(ev){
+ var t=ev.target; if(!t.dataset||!t.dataset.in)return;
+ var S=etatDe(t); if(!S)return;
+ var k=t.dataset.in;
+ if(k==='base'){
+  S.pres.bases[t.dataset.k]=t.value;
+  var c=CRENEAUX.filter(function(x){return x.id===t.dataset.k;})[0];
+  var el=document.getElementById(S.uid+'-ap-'+c.id); if(el)el.textContent=apercuTitre(S,c);
+ }else if(k==='cal'){
+  S.calId=t.value;
+  var v=document.getElementById(S.uid+'-vide'); if(v)v.hidden=t.value.trim()!=='';
+ }else{S[k]=t.value;}
+});
+
+document.querySelectorAll('.app').forEach(function(el,i){var S=nouvelEtat(el,i);apps.push(S);draw(S);});
+})();
+</script>
+</body>
+</html>

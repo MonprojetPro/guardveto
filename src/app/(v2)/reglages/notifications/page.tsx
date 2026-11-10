@@ -22,17 +22,16 @@
 //    quelqu'un croire qu'il s'est rendu totalement injoignable.
 // ============================================================
 
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import '@/styles/v2-reglages.css'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
 import { MesNotificationsV2 } from '@/components/v2/MesNotificationsV2'
 import { chargerDock } from '@/data/v2/dock'
+import { chargerMesNotifications } from '@/data/v2/mesReglages'
 import { exigerIdentite } from '@/lib/identite'
-import {
-  lireMesDesactivations,
-  reglagesPourRole,
-} from '@/lib/notifications-reglages'
+import { chantierOuvertPourLeCabinet } from '@/lib/produit/chantiers-serveur'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'GuardVeto — Mes notifications' }
@@ -45,12 +44,15 @@ export default async function MesNotificationsPage() {
   // supposer une fiche vétérinaire (B-017 : le secrétariat n'en a pas).
   const identite = await exigerIdentite(supabase)
 
+  // B-202 — l'onglet refondu (bac à sable seul) montre ce réglage dans sa
+  // section « Pour moi » : les anciens liens y mènent.
+  if (await chantierOuvertPourLeCabinet(supabase, 'reglages-v2')) redirect('/reglages?section=moi')
+
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const reglages = reglagesPourRole(identite.role)
-  const desactivees = user ? await lireMesDesactivations(supabase, user.id) : []
+  const reglages = await chargerMesNotifications(supabase, identite, user?.id ?? null)
 
   const dock = await chargerDock(supabase, { role_app: identite.role })
 
@@ -64,15 +66,7 @@ export default async function MesNotificationsPage() {
           estSecretaire={identite.role === 'secretaire'}
           dock={dock}
         />
-        <MesNotificationsV2
-          reglages={reglages.map((r) => ({
-            cle: r.cle,
-            libelle: r.libelle,
-            explication: r.explication,
-            recoit: !desactivees.includes(r.cle),
-          }))}
-          role={identite.role}
-        />
+        <MesNotificationsV2 reglages={reglages} role={identite.role} />
       </div>
     </>
   )

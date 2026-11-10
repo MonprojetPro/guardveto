@@ -12,6 +12,15 @@
 // qu'une carte à moitié refaite.
 // ============================================================
 
+//
+// ── B-202 — L'ONGLET REFONDU, DERRIÈRE SA PORTE DE CHANTIER ─────────────────
+// MiKL, 10/11 : « cet onglet est mal organisé et pas du tout ergonomique ».
+// Là où le chantier `reglages-v2` est ouvert (bac à sable seul tant que MiKL
+// n'a pas recetté), la page rend `ReglagesChantierV2` : un sommaire, cinq
+// sections, « Pour moi » y compris (notifications + agenda). Partout ailleurs
+// — le Val d'Allier — rien ne change : c'est la leçon du 08/10 (B-151).
+// ============================================================
+
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { exigerIdentite, exigerVeterinaire } from '@/lib/identite'
@@ -21,15 +30,23 @@ import { CarteMessagerie } from '@/components/v2/CarteMessagerie'
 import '@/styles/v2-reglages.css'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
-import {
-  ReglagesV2, type LigneEmail, type ValeursCabinet, type CreneauAgenda,
-} from '@/components/v2/ReglagesV2'
-import { nomLisibleAgenda } from '@/lib/google-calendar'
+import { ReglagesV2 } from '@/components/v2/ReglagesV2'
+import { ReglagesChantierV2 } from '@/components/chantier/ReglagesChantierV2'
+import { agendaDeRepliPour, nomLisibleAgenda } from '@/lib/google-calendar'
 import { chargerDock } from '@/data/v2/dock'
+import { chargerMesNotifications, chargerMonAgenda } from '@/data/v2/mesReglages'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
+import { chantierOuvertPourLeCabinet } from '@/lib/produit/chantiers-serveur'
+import { sectionDemandee } from '@/lib/reglages/coquille'
+import {
+  libellePeriode, type CreneauAgenda, type LigneEmail, type ValeursCabinet,
+} from '@/lib/reglages/libelles'
 import type { Periode, Veterinaire } from '@/types'
 
 export const dynamic = 'force-dynamic'
+// B-202 — l'onglet refondu montre « Mon agenda », dont l'ouverture peut lancer
+// une mise à jour qui tourne après la réponse (voir `chargerMonAgenda`).
+export const maxDuration = 300
 export const metadata = { title: 'GuardVeto — Réglages' }
 
 interface EmailLogRow {
@@ -42,7 +59,11 @@ interface EmailLogRow {
   created_at: string
 }
 
-export default async function ReglagesPage() {
+export default async function ReglagesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ section?: string | string[] }>
+}) {
   const supabase = await createClient()
 
   const {
@@ -54,6 +75,41 @@ export default async function ReglagesPage() {
   // la page ne montre que les réglages personnels : aucune donnée du cabinet
   // n'est lue pour eux (tout ce qui suit est réservé à l'admin).
   const identite = await exigerIdentite(supabase)
+
+  // B-202 — la porte du chantier, consultée UNE fois pour les deux branches.
+  // En cas de doute (lecture en panne), elle rend `false` : l'écran actuel.
+  const refonte = await chantierOuvertPourLeCabinet(supabase, 'reglages-v2')
+  const param = (await searchParams).section
+  const section = sectionDemandee(Array.isArray(param) ? param[0] : param, identite.role)
+  const prenom = identite.genre === 'veto' ? identite.veto.prenom : identite.nomAffiche
+
+  if (identite.role !== 'admin' && refonte) {
+    const [notifications, agenda, dockPerso] = await Promise.all([
+      chargerMesNotifications(supabase, identite, user.id),
+      chargerMonAgenda(identite),
+      chargerDock(supabase, { role_app: identite.role }),
+    ])
+    return (
+      <>
+        <Satin />
+        <div className="shell">
+          <BarreV2
+            prenom={prenom}
+            estAdmin={false}
+            estSecretaire={identite.role === 'secretaire'}
+            dock={dockPerso}
+          />
+          <ReglagesChantierV2
+            role={identite.role}
+            sectionDemandee={section}
+            moi={{ notifications, agenda }}
+            cabinet={null}
+          />
+        </div>
+      </>
+    )
+  }
+
   if (identite.role !== 'admin') {
     const agendaOuvert = !!identite.cabinetId
       && (await agendaPersoOuvert(clientService(), identite.cabinetId))
@@ -204,6 +260,66 @@ export default async function ReglagesPage() {
       created_at: l.created_at,
       vetNom: l.veterinaire_id ? (nomParVet.get(l.veterinaire_id) ?? null) : null,
     }))
+  }
+
+  // ── B-202 — l'onglet refondu (bac à sable seul) ───────────────────────────
+  // Mêmes lectures que l'écran actuel, plus « Pour moi ». Ni clé ni variable
+  // d'environnement ne partent vers le navigateur : des booléens et des noms.
+  // Seule exception, déjà vraie de l'écran actuel : les trois champs partagés
+  // (agenda, adresse et nom d'expéditeur), que `configurerPartagesCabinet`
+  // exige en retour — l'admin de CE cabinet, qui les a réglés.
+  if (refonte) {
+    // Le repli est NOMINATIF (cabinet pilote seul, `agendaDeRepliPour`) : le
+    // tester sur la seule variable d'environnement aurait annoncé « Branché »
+    // à un cabinet dont la synchronisation n'écrit nulle part (CERBÈRE, 10/11).
+    const repli = agendaDeRepliPour(cabinetId)
+    const [dockRefonte, notifications, agenda, nomAgendaRefonte] = await Promise.all([
+      chargerDock(supabase, vet),
+      chargerMesNotifications(supabase, identite, user.id),
+      chargerMonAgenda(identite),
+      nomLisibleAgenda(valeurs.googleCalendarId || repli),
+    ])
+    return (
+      <>
+        <Satin />
+        <div className="shell">
+          <BarreV2 prenom={vet.prenom} estAdmin dock={dockRefonte} />
+          <ReglagesChantierV2
+            role="admin"
+            sectionDemandee={section}
+            moi={{ notifications, agenda }}
+            cabinet={{
+              cabinet: {
+                adresse: valeurs.adresse,
+                codePostal: valeurs.codePostal,
+                ville: valeurs.ville,
+                zoneScolaire: valeurs.zoneScolaire,
+                regionFeries: valeurs.regionFeries,
+                envoiConfigure:
+                  !!process.env.BREVO_API_KEY?.trim()
+                  && !!(valeurs.brevoFromEmail.trim() || process.env.BREVO_FROM_EMAIL?.trim()),
+                emailAdmin: vet.email ?? null,
+              },
+              connexions: {
+                repliDisponible: repli !== null,
+                nomAgenda: nomAgendaRefonte,
+                periodesPubliees: periodesPubliees.map((p) => ({ id: p.id, libelle: libellePeriode(p) })),
+                agendaJourneeEntiere,
+                agendaAfficherHoraires,
+                creneaux,
+              },
+              partages: {
+                googleCalendarId: valeurs.googleCalendarId,
+                brevoFromEmail: valeurs.brevoFromEmail,
+                brevoFromName: valeurs.brevoFromName,
+              },
+              messagerieAllumee: dockRefonte.modules.includes('chat'),
+              emails,
+            }}
+          />
+        </div>
+      </>
+    )
   }
 
   // En parallèle : aucune lecture ajoutée en série sur un écran déjà chargé.

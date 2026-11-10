@@ -74,6 +74,16 @@ export const CHANTIERS: Record<string, Chantier> = {
         'bascule ». Photographie du Val d Allier prise juste avant (B-184).',
     },
   },
+  'reglages-v2': {
+    nom: 'Réglages — l’onglet refondu (sommaire et cinq sections)',
+    item: 'B-202',
+    depuis: '2026-11-10',
+    diffusion: {
+      bacASableSeulement:
+        'Maquette validee par MiKL le 10/11 (docs/maquettes/B-202-reglages.html). ' +
+        'Recette au bac a sable avant toute bascule du Val d Allier.',
+    },
+  },
 }
 
 /** Le contexte dont depend l'ouverture d'un chantier. */

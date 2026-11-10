@@ -94,6 +94,11 @@ const CONTENEURS_DE_BOUTONS: Record<string, string> = {
   // quel que soit le padding déclaré. Pas de texte à décoller du bord.
   '.gjc-cal-nav': 'Flèche de navigation du calendrier « Dates libres » : icône seule, centrée.',
   '.gjc-carte-suppr': 'Bouton de suppression d’une carte de période : icône seule, centrée.',
+  // B-202 — l'interrupteur validé en B-181 (onglet Réglages refondu). Une boîte
+  // à largeur ET hauteur FIXES (46 × 26 px) qui ne porte ni texte ni icône :
+  // seulement son curseur rond, positionné en absolu à 3 px du bord. Il n'y a
+  // rien à décoller de la courbe ; le padding n'y joue aucun rôle.
+  '.rg-sw': 'Interrupteur de l’onglet Réglages : boîte fixe sans texte, curseur positionné en absolu.',
 }
 
 interface Regle {

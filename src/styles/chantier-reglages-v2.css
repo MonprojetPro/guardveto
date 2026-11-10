@@ -1,0 +1,373 @@
+/* ============================================================
+   GUARDVETO — L'onglet Réglages refondu (B-202, chantier `reglages-v2`)
+   ============================================================
+   Porté de la maquette validée par MiKL le 10/11 :
+   `docs/maquettes/B-202-reglages.html`.
+
+   ⚠️ Importée par `components/chantier/ReglagesChantierV2.tsx` SEUL, et ses
+      classes portent toutes le préfixe `rg-` : rien ici ne touche l'écran
+      actuel du client. Les deux exceptions (`.aa-switch`, `.ma-*`, `.mn-*`)
+      sont BORNÉES à `.rg-agenda`, qui n'existe que dans ce chantier.
+
+   Les couleurs sont celles du terrier (`v2-terrier.css`). Règle du projet :
+   `var(--t-muted)`, `var(--t-border)`, `var(--t-accent)`, jamais les noms nus
+   (shadcn les redéfinit dans les modales : « crème sur crème »).
+
+   Principe de sobriété (DESIGN.md, 20/10) : rayon selon la densité — 14 px
+   pour le panneau, 6 à 8 px pour les encarts chargés (champs, aperçu,
+   tableau), pilule pour les pastilles et les boutons.
+   ============================================================ */
+
+/* ── La coquille ─────────────────────────────────────────────── */
+.rg-coquille {
+  display: grid;
+  grid-template-columns: 216px minmax(0, 1fr);
+  gap: 30px;
+  align-items: start;
+  margin-bottom: 40px;
+}
+.rg-seule { max-width: 860px; margin-bottom: 40px; }
+
+.rg-ico {
+  width: 20px; height: 20px; flex: none;
+  stroke-width: 1.6;
+}
+.rg-ico.sm { width: 16px; height: 16px; }
+
+/* ── Le sommaire (ordinateur) ────────────────────────────────── */
+.rg-sommaire {
+  position: sticky;
+  top: calc(var(--nav-h, 62px) + 16px);
+  display: grid;
+  gap: 2px;
+}
+.rg-nav {
+  display: flex; align-items: center; gap: 11px;
+  width: 100%; min-height: 44px;
+  padding: 10px 12px;
+  border: 0; border-radius: 10px;
+  background: transparent;
+  text-align: left; cursor: pointer;
+  font: 600 0.92rem var(--font-display);
+  color: var(--t-muted);
+}
+.rg-nav:hover { background: var(--surface-2); }
+.rg-nav.on { background: var(--surface-2); color: var(--text); box-shadow: var(--edge-light); }
+.rg-nav.on .rg-ico { color: var(--t-accent); }
+.rg-nav-lib { flex: 1; }
+.rg-nav:focus-visible,
+.rg-mrow:focus-visible,
+.rg-retour:focus-visible,
+.rg-info:focus-visible,
+.rg-sw:focus-visible { outline: 3px solid var(--accent-glow); outline-offset: 1px; }
+
+.rg-point { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); flex: none; }
+.rg-compte {
+  display: inline-grid; place-items: center;
+  min-width: 20px; height: 20px; padding: 0 8px;
+  border-radius: 999px;
+  background: var(--danger); color: #fff;
+  font: 700 0.74rem var(--font-display);
+}
+
+/* ── La liste (téléphone) — cachée sur ordinateur ────────────── */
+.rg-liste { display: none; }
+.rg-mrow {
+  display: flex; align-items: center; gap: 13px;
+  width: 100%; min-height: 60px;
+  margin-bottom: 8px; padding: 12px 14px;
+  border: 1px solid var(--t-border); border-radius: 12px;
+  background: var(--surface); box-shadow: var(--elev-1);
+  text-align: left; cursor: pointer; color: var(--text);
+}
+.rg-puce {
+  width: 38px; height: 38px; flex: none;
+  display: grid; place-items: center;
+  border-radius: 10px;
+  background: var(--surface-2); color: var(--accent-ink);
+}
+.rg-mrow-tx { flex: 1; min-width: 0; }
+.rg-mrow-tx b { display: block; font: 700 0.97rem var(--font-display); }
+.rg-mrow-tx span { font-size: 0.8rem; color: var(--t-muted); }
+.rg-chevron { color: var(--t-muted); }
+
+/* ── La section ouverte ──────────────────────────────────────── */
+.rg-section { min-width: 0; }
+.rg-sec-titre { font-size: 1.35rem; font-weight: 800; margin: 0 0 14px; }
+/* Il reçoit le focus à l'ouverture d'une section (lecteurs d'écran) : pas d'anneau pour un titre. */
+.rg-sec-titre:focus { outline: none; }
+.rg-retour {
+  display: none; align-items: center; gap: 4px;
+  min-height: 44px; margin-bottom: 2px; padding: 8px 6px 8px 0;
+  border: 0; background: transparent; cursor: pointer;
+  font: 700 0.9rem var(--font-display); color: var(--accent-ink);
+}
+
+/* ── Panneau et blocs : un seul niveau, jamais de carte dans une carte ── */
+.rg-panneau {
+  background: var(--surface);
+  border: 1px solid var(--t-border);
+  border-radius: 14px;
+  box-shadow: var(--elev-1), var(--edge-light);
+}
+.rg-bloc { padding: 18px 22px 20px; }
+.rg-bloc + .rg-bloc { border-top: 1px solid var(--t-border); }
+.rg-bloc-tete { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.rg-bloc-tete h3 { margin: 0; flex: 1; font-size: 1.06rem; font-weight: 700; }
+.rg-sous-tete {
+  margin: 20px 0 10px; padding-top: 16px;
+  border-top: 1px dashed var(--t-border);
+  font: 700 0.74rem var(--font-display); letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--t-muted);
+}
+.rg-bloc-tete + .rg-sous-tete { margin-top: 0; padding-top: 0; border-top: 0; }
+.rg-libelle { margin: 16px 0 10px; font: 700 0.85rem var(--font-display); }
+
+/* ── Pastilles d'état ────────────────────────────────────────── */
+.rg-pastille {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 11px; border-radius: 999px;
+  font: 700 0.78rem var(--font-display); white-space: nowrap;
+}
+.rg-pastille::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.rg-pastille.nue::before { display: none; }
+.rg-pastille.ok { background: var(--ok-soft); color: var(--ok); }
+.rg-pastille.warn { background: var(--warn-soft); color: var(--warn); }
+.rg-pastille.bad { background: var(--danger-soft); color: var(--danger); }
+.rg-pastille.off { background: var(--surface-2); color: var(--t-muted); }
+.rg-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ── Champs ──────────────────────────────────────────────────── */
+.rg-champ { display: grid; gap: 5px; margin-bottom: 12px; }
+.rg-champ label { font: 700 0.85rem var(--font-display); }
+.rg-champ input[type='text'] {
+  width: 100%; min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong); border-radius: 8px;
+  background: #fff; color: var(--text); font: inherit;
+}
+.rg-champ input[type='text']:focus { outline: 3px solid var(--accent-glow); outline-offset: 0; border-color: var(--t-accent); }
+.rg-champ input.rg-mono { font-family: ui-monospace, Consolas, monospace; font-size: 0.85rem; }
+.rg-duo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 12px; }
+.rg-aide { margin: 0 0 12px; font-size: 0.82rem; color: var(--t-muted); line-height: 1.5; }
+.rg-aide b { color: var(--text); }
+.rg-ligne-info {
+  display: flex; align-items: flex-start; gap: 9px;
+  margin: 0 0 12px;
+  font-size: 0.85rem; color: var(--t-muted); line-height: 1.5;
+}
+.rg-ligne-info .rg-ico { margin-top: 2px; }
+.rg-ligne-info b { color: var(--text); }
+.rg-ligne-info.ok { color: var(--ok); }
+.rg-ligne-info.bad { color: var(--danger); }
+.rg-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+.rg-actions + .rg-sous-tete { margin-top: 22px; }
+.rg-vide {
+  margin: 0 0 12px; padding: 12px 14px;
+  border-radius: 8px; background: var(--surface-2);
+  font-size: 0.85rem; color: var(--t-muted);
+}
+.rg-note {
+  display: flex; align-items: center; gap: 9px;
+  margin: 14px 0 0;
+  font-size: 0.85rem; color: var(--t-muted);
+}
+
+.rg-roue {
+  width: 14px; height: 14px; flex: none;
+  border-radius: 50%;
+  border: 2px solid currentColor; border-right-color: transparent;
+  animation: rg-tourne 0.7s linear infinite;
+}
+@keyframes rg-tourne { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .rg-roue { animation-duration: 2s; } }
+
+/* ── L'interrupteur (celui validé en B-181) ──────────────────── */
+.rg-sw {
+  position: relative; flex: none;
+  width: 46px; height: 26px; padding: 0;
+  border: 0; border-radius: 999px;
+  background: var(--border-strong);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.rg-sw::after {
+  content: ""; position: absolute; top: 3px; left: 3px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 2px rgba(110, 62, 14, 0.25);
+  transition: left 0.15s;
+}
+/* La zone tactile dépasse le dessin : 44 px de haut sur téléphone. */
+.rg-sw::before { content: ""; position: absolute; inset: -9px -6px; }
+.rg-sw.on { background: var(--ok); }
+.rg-sw.on::after { left: 23px; }
+.rg-sw:disabled { opacity: 0.6; cursor: progress; }
+
+/* ── Une ligne de réglage : le libellé à gauche, l'interrupteur à droite ── */
+.rg-rang {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 11px 0;
+  border-top: 1px solid var(--t-border);
+}
+.rg-bloc-tete + .rg-rang,
+.rg-bloc-tete + div > .rg-rang,
+.rg-sous-tete + .rg-rang { border-top: 0; padding-top: 0; }
+.rg-rang-lib { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 0.94rem; }
+.rg-rang-lib b { display: block; font: 700 0.94rem var(--font-display); }
+.rg-rang-lib small { display: block; font-size: 0.8rem; color: var(--t-muted); line-height: 1.45; }
+.rg-info {
+  flex: none;
+  width: 28px; height: 28px; padding: 0;
+  display: inline-grid; place-items: center;
+  border: 0; border-radius: 50%;
+  background: transparent; color: var(--t-muted); cursor: pointer;
+}
+.rg-info:hover { background: var(--surface-2); color: var(--accent-ink); }
+.rg-info-txt {
+  margin: -4px 0 8px; padding: 8px 12px;
+  border-radius: 8px; background: var(--surface-2);
+  font-size: 0.85rem; color: var(--t-muted); line-height: 1.5;
+}
+
+/* ── Messagerie ──────────────────────────────────────────────── */
+.rg-fonction {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  column-gap: 14px; row-gap: 2px;
+  align-items: center;
+}
+.rg-fonction-puce {
+  grid-row: 1 / span 2;
+  width: 42px; height: 42px;
+  display: grid; place-items: center;
+  border-radius: 12px;
+  background: var(--surface-2); color: var(--accent-ink);
+}
+.rg-fonction-titre { grid-column: 2; font: 700 1rem var(--font-display); }
+.rg-fonction-desc { grid-column: 2; font-size: 0.85rem; color: var(--t-muted); }
+.rg-etat-sw { grid-column: 3; grid-row: 1 / span 2; display: flex; align-items: center; gap: 12px; }
+.rg-etat-sw em { font-style: normal; font: 700 0.82rem var(--font-display); }
+.rg-etat-on { color: var(--ok); }
+.rg-etat-off { color: var(--t-muted); }
+.rg-refus {
+  display: flex; align-items: flex-start; gap: 9px;
+  margin: 14px 0 0; padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--danger-soft); color: var(--danger);
+  font-size: 0.85rem;
+}
+
+/* ── Google Agenda ───────────────────────────────────────────── */
+.rg-resume-agenda { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.rg-resume-nom { font: 700 0.97rem var(--font-display); overflow-wrap: anywhere; }
+.rg-resume-src { font-size: 0.8rem; color: var(--t-muted); }
+.rg-resume-agenda .btn { margin-left: auto; }
+.rg-resync { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.rg-resync .rg-champ { flex: 1; min-width: 180px; max-width: 280px; margin: 0; }
+.rg-creneau {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 14px; align-items: end;
+  margin-bottom: 12px;
+}
+.rg-creneau .rg-champ { margin: 0; }
+.rg-creneau-h { font: 400 0.8rem var(--font-body); color: var(--t-muted); }
+.rg-apercu { display: grid; gap: 3px; }
+.rg-apercu span {
+  font: 700 0.7rem var(--font-display); letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--t-muted);
+}
+.rg-apercu code {
+  display: block; padding: 10px;
+  border: 1px solid var(--t-border); border-radius: 6px;
+  background: var(--surface-2);
+  font: 600 0.85rem ui-monospace, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
+/* ── Zone déduite ────────────────────────────────────────────── */
+.rg-zone {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 2px 0 14px;
+  font-size: 0.85rem; color: var(--t-muted);
+}
+
+/* ── Journal : un tableau sur ordinateur, une liste sur téléphone ── */
+.rg-tj { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.rg-tj th {
+  padding: 0 10px 8px 0;
+  border-bottom: 1px solid var(--border-strong);
+  text-align: left;
+  font: 700 0.74rem var(--font-display); letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--t-muted);
+}
+.rg-tj td { padding: 10px 10px 10px 0; border-bottom: 1px solid var(--t-border); vertical-align: top; }
+.rg-tj td:first-child { white-space: nowrap; }
+.rg-tj th:last-child,
+.rg-tj td:last-child { width: 38%; }
+.rg-tj small { display: block; font-size: 0.8rem; color: var(--t-muted); }
+.rg-raison { display: block; margin-top: 3px; font-size: 0.8rem; color: var(--danger); }
+.rg-raison.att { color: var(--warn); }
+.rg-lj { display: none; }
+.rg-lj-it {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px;
+  padding: 12px 0;
+  border-top: 1px solid var(--t-border);
+}
+.rg-lj-it:first-child { border-top: 0; padding-top: 0; }
+.rg-lj-t { font: 700 0.9rem var(--font-display); }
+.rg-lj-m { font-size: 0.8rem; color: var(--t-muted); }
+.rg-lj-it .rg-raison { grid-column: 1 / -1; margin-top: 0; }
+
+/* ── « Mon agenda » (contenu de B-181) dans un bloc ──────────────
+   Son contenu est `MonAgendaCorps`, partagé avec la page actuelle : on ne
+   l'adapte QUE dans `.rg-agenda`. La case devient l'interrupteur validé. */
+.rg-agenda .mn-ligne { padding: 0 0 14px; border-bottom: 0; }
+.rg-agenda .ma-corps { padding: 0; }
+.rg-agenda .mn-note { margin-top: 4px; border: 0; border-radius: 8px; }
+.rg-agenda .aa-switch { flex-direction: row-reverse; justify-content: space-between; align-items: center; gap: 14px; }
+.rg-agenda .aa-switch input {
+  appearance: none; -webkit-appearance: none;
+  position: relative; flex: none;
+  width: 46px; height: 26px; margin: 0;
+  border-radius: 999px;
+  background: var(--border-strong);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.rg-agenda .aa-switch input::after {
+  content: ""; position: absolute; top: 3px; left: 3px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 2px rgba(110, 62, 14, 0.25);
+  transition: left 0.15s;
+}
+.rg-agenda .aa-switch input:checked { background: var(--ok); }
+.rg-agenda .aa-switch input:checked::after { left: 23px; }
+.rg-agenda .aa-switch input:focus-visible { outline: 3px solid var(--accent-glow); outline-offset: 1px; }
+.rg-agenda .aa-switch input:disabled { opacity: 0.6; cursor: progress; }
+
+/* ============================================================
+   TÉLÉPHONE — la liste des sections, puis une section ouverte
+   ============================================================ */
+@media (max-width: 760px) {
+  .rg-coquille { display: block; }
+  .rg-sommaire { display: none; }
+  .rg-coquille[data-vue='liste'] .rg-liste { display: block; }
+  .rg-coquille[data-vue='liste'] .rg-section { display: none; }
+  .rg-coquille[data-vue='section'] .rg-liste { display: none; }
+  .rg-page[data-vue='section'] .rg-tete-page { display: none; }
+  .rg-retour { display: inline-flex; }
+
+  .rg-bloc { padding: 16px 14px 18px; }
+  .rg-duo { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); }
+  .rg-creneau { grid-template-columns: 1fr; }
+  .rg-fonction-puce,
+  .rg-etat-sw { grid-row: 1; }
+  .rg-fonction-desc { grid-column: 1 / -1; margin-top: 8px; }
+  .rg-actions .btn { flex: 1 1 auto; min-height: 44px; }
+  .rg-resume-agenda .btn { margin-left: 0; }
+  .rg-resync .rg-champ { max-width: none; }
+
+  .rg-tj { display: none; }
+  .rg-lj { display: grid; }
+}

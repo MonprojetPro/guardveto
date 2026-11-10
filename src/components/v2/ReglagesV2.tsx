@@ -36,134 +36,16 @@ import { useErreurBloquante } from '@/components/v2/regles/ErreurBloquante'
 import { raisonEchec } from '@/lib/emails/echec'
 import type { Periode } from '@/types'
 import { libelleGarde, roleCourt } from '@/lib/agenda/libelle'
-import { initialesVeto } from '@/lib/agenda/initiales'
+import {
+  EXEMPLE_NOM, LIBELLE_STATUT, REGION_LABEL, TON_STATUT, TYPE_EMAIL, ZONE_LABEL,
+  dateHeure, estUnEchec, formatHeureCourte, libellePeriode, montrerRaison,
+  type CreneauAgenda, type LigneEmail, type ValeursCabinet,
+} from '@/lib/reglages/libelles'
+import { resynchroniserPeriode } from '@/lib/reglages/resynchroniser'
 
-export interface ValeursCabinet {
-  googleCalendarId: string
-  brevoFromEmail: string
-  brevoFromName: string
-  adresse: string
-  codePostal: string
-  ville: string
-  zoneScolaire: string
-  regionFeries: string
-}
-
-export interface LigneEmail {
-  id: string
-  type: string
-  destinataire: string
-  statut: string
-  erreur: string | null
-  created_at: string
-  vetNom: string | null
-}
-
-/**
- * Un créneau du SOCLE (profil_id NULL), tel qu'il vit dans Google Agenda.
- * `heureDebut`/`heureFin` au format `'HH:MM'` (Postgres TIME déjà tronqué
- * côté page) — VRAIS horaires du cabinet, jamais une valeur en dur : c'est
- * exactement le bug 20h/10h vs 18h/08h qu'un autre chantier corrige en ce
- * moment, et le graver ici le propagerait dans l'aperçu.
- */
-export interface CreneauAgenda {
-  id: string
-  nom: string
-  /** `null` = pas encore personnalisé, le champ repart du `nom`. */
-  libelleAgenda: string | null
-  heureDebut: string
-  heureFin: string
-  /**
-   * Les rôles nommés du créneau (`creneau_modele.roles`), dans l'ordre des
-   * places — même source que `google-calendar.ts` (`options.rolesParCode`).
-   * L'aperçu DOIT passer par `roleCourt(roles?.[placeIndex], placeIndex)`,
-   * jamais un libellé écrit en dur : c'est exactement le bug B-080
-   * (« Garde-JD-premier » au lieu de « Garde-JD-1er ») qu'un aperçu fidèle
-   * ne doit pas rejouer de son côté.
-   */
-  roles: string[]
-}
-
-/** 'HH:MM' → '18h' (minutes nulles) ou '18h30'. Purement pour L'AFFICHAGE de
- *  l'aperçu ; `libelleGarde` (agenda/libelle.ts), lui, reste pur et ne
- *  formate rien — il reçoit ces chaînes déjà faites. */
-function formatHeureCourte(hhmm: string): string {
-  const [h, m] = hhmm.split(':')
-  return m && m !== '00' ? `${h}h${m}` : `${h}h`
-}
-
-/** Le véto d'exemple de l'aperçu — celui du cahier des charges (« garde-ACB-1er »). */
-const EXEMPLE_NOM = initialesVeto('Anne-Catherine', 'Bernard')
-
-const ZONE_LABEL: Record<string, string> = { A: 'Zone A', B: 'Zone B', C: 'Zone C' }
-const REGION_LABEL: Record<string, string> = {
-  metropole: 'Métropole',
-  'alsace-moselle': 'Alsace-Moselle',
-  guadeloupe: 'Guadeloupe',
-  martinique: 'Martinique',
-  guyane: 'Guyane',
-  reunion: 'La Réunion',
-  mayotte: 'Mayotte',
-  polynesie: 'Polynésie',
-}
-
-const TYPE_EMAIL: Record<string, string> = {
-  planning_publie: 'Planning publié',
-  garde_modifiee: 'Garde modifiée',
-  rappel_publication: 'Rappel de publication',
-  appel_volontaires: 'Appel aux volontaires',
-  depannage_confirme: 'Dépannage confirmé',
-  conge_valide: 'Congé validé',
-  conge_refuse: 'Congé refusé',
-  email_test: 'Essai d’envoi',
-  // Autorisé en base depuis B-134 (26/09) et jamais traduit ici : l'écran
-  // affichait le code brut « conge_demande » (capture MiKL, 02/11).
-  conge_demande: 'Demande de congé',
-  // B-193c — un message de la messagerie, envoyé aussi par mail par l'admin.
-  message: 'Message de la messagerie',
-}
-
-/**
- * L'état d'un e-mail, en français.
- *
- * « Parti » est volontairement modeste : c'est tout ce qu'on sait au moment de
- * l'envoi — le service d'expédition a accepté le message. « Remis » n'apparaît
- * que lorsque Brevo nous rappelle pour le confirmer (`/api/webhooks/brevo`).
- * Tant que ce webhook n'est pas branché côté Brevo, toutes les lignes restent
- * « Parti » : c'est honnête, et c'était tout l'objet du correctif du
- * 2026-08-21, où « Envoyé » désignait des messages rejetés.
- */
-const LIBELLE_STATUT: Record<string, string> = {
-  envoye: 'Parti',
-  remis: 'Remis',
-  differe: 'En attente',
-  spam: 'Indésirable',
-  rejete: 'Rejeté',
-  erreur: 'Refusé',
-}
-
-/** Le ton de la pastille. Tout ce qui n'est pas arrivé se voit en rouge. */
-const TON_STATUT: Record<string, string> = {
-  envoye: 'envoye',
-  remis: 'remis',
-  differe: 'attente',
-  spam: 'echec',
-  rejete: 'echec',
-  erreur: 'echec',
-}
-
-function libellePeriode(p: Periode): string {
-  return p.libelle ?? `${p.saison === 'ete' ? 'Été' : 'Hiver'} ${p.date_debut.slice(0, 4)}`
-}
-
-function dateHeure(iso: string): string {
-  return new Date(iso).toLocaleString('fr-FR', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
+// B-202 — les mots, formats et types vivent dans `lib/reglages/libelles.ts`,
+// partagés avec l'écran refondu (chantier `reglages-v2`).
+export type { ValeursCabinet, LigneEmail, CreneauAgenda } from '@/lib/reglages/libelles'
 
 interface Props {
   valeurs: ValeursCabinet
@@ -351,41 +233,7 @@ export function ReglagesV2({
     setSyncEnCours(true)
     setResultatSync(null)
     try {
-      const res = await fetch('/api/calendar-sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ periodeId: periodeSync }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setResultatSync({ ok: false, message: data?.error ?? 'La synchronisation a échoué.' })
-        return
-      }
-      if (data?.skipped) {
-        // Le serveur dit POURQUOI il n'a rien envoyé. « Aucun agenda branché »
-        // était le seul motif imaginé, et il est faux depuis qu'un planning non
-        // publié est refusé : on enverrait chercher une panne de réglage là où
-        // il n'y a qu'un planning encore en brouillon.
-        setResultatSync({
-          ok: false,
-          message:
-            data?.raison
-            ?? "Rien n'a été envoyé : aucun agenda n'est branché pour ce cabinet.",
-        })
-        return
-      }
-      const erreurs: string[] = data?.errors ?? []
-      setResultatSync({
-        ok: erreurs.length === 0,
-        message:
-          erreurs.length === 0
-            ? `${data?.synced ?? 0} garde${(data?.synced ?? 0) > 1 ? 's' : ''} envoyée${
-                (data?.synced ?? 0) > 1 ? 's' : ''
-              } vers l'agenda.`
-            : `${data?.synced ?? 0} envoyée(s), ${erreurs.length} en échec : ${erreurs[0]}`,
-      })
-    } catch {
-      setResultatSync({ ok: false, message: "L'appel n'a pas abouti. Réessaie dans un instant." })
+      setResultatSync(await resynchroniserPeriode(periodeSync))
     } finally {
       setSyncEnCours(false)
     }
@@ -394,9 +242,7 @@ export function ReglagesV2({
   // Tout ce qui n'est pas arrivé compte comme un échec — pas seulement le refus
   // au moment de l'envoi. Un rejet annoncé par le webhook une minute plus tard
   // est exactement le même problème pour le cabinet.
-  const nbEchecs = emails.filter(
-    (e) => e.statut === 'erreur' || e.statut === 'rejete' || e.statut === 'spam',
-  ).length
+  const nbEchecs = emails.filter((e) => estUnEchec(e.statut)).length
 
   return (
     <>
@@ -871,7 +717,7 @@ export function ReglagesV2({
                         le message : sous « Remis », elle s'affichait en rouge
                         comme une panne. On ne montre une raison que si l'e-mail
                         n'est pas arrivé, ou pas encore. */}
-                    {e.erreur && (TON_STATUT[e.statut] === 'echec' || TON_STATUT[e.statut] === 'attente') && (
+                    {montrerRaison(e) && e.erreur && (
                       <span className="m-erreur" title={e.erreur}>
                         {raisonEchec(e.erreur)}
                       </span>

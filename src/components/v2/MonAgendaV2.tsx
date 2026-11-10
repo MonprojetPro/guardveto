@@ -93,7 +93,34 @@ export function optionsPour(genre: GenreMembre): readonly Option[] {
   return genre === 'secretaire' ? OPTIONS.filter((o) => o.vue === 'cabinet') : OPTIONS
 }
 
-export function MonAgendaV2({ genre, reglages, etat, nomAgenda, nomAgendaCabinet }: Props) {
+/** Ce que l'écran « Mon agenda » reçoit de son chargeur (`data/v2/monAgenda.ts`). */
+export type DonneesMonAgenda = Props
+
+/**
+ * La page « Mon agenda » : sa tête, puis le contenu dans sa carte.
+ *
+ * B-202 — le contenu vit dans `MonAgendaCorps`, pour que l'onglet Réglages
+ * refondu le pose dans sa section « Pour moi » sans le recopier.
+ */
+export function MonAgendaV2(props: Props) {
+  return (
+    <>
+      <div className="page-head rise">
+        <div>
+          <h1>Mon agenda</h1>
+          <p className="lede">Votre planning GuardVeto dans votre Google Agenda, mis à jour tout seul. Ces réglages ne valent que pour vous.</p>
+        </div>
+      </div>
+
+      <section className="card conn-card rise rise-2 ma-carte" aria-label="Mon agenda Google">
+        <MonAgendaCorps {...props} />
+      </section>
+    </>
+  )
+}
+
+/** L'interrupteur, le choix « Mon planning / Tout le cabinet » et les états qui ne se taisent pas. */
+export function MonAgendaCorps({ genre, reglages, etat, nomAgenda, nomAgendaCabinet }: Props) {
   const router = useRouter()
   const [enCours, demarrer] = useTransition()
 
@@ -127,139 +154,130 @@ export function MonAgendaV2({ genre, reglages, etat, nomAgenda, nomAgendaCabinet
 
   return (
     <>
-      <div className="page-head rise">
-        <div>
-          <h1>Mon agenda</h1>
-          <p className="lede">Votre planning GuardVeto dans votre Google Agenda, mis à jour tout seul. Ces réglages ne valent que pour vous.</p>
+      <label className="aa-switch mn-ligne">
+        <input
+          type="checkbox"
+          checked={reglages.actif}
+          disabled={enCours}
+          onChange={(e) =>
+            lancer(
+              () => basculerMonAgenda(e.target.checked),
+              e.target.checked ? 'Votre planning va arriver dans Google Agenda' : 'Envoi coupé : votre agenda GuardVeto va être vidé',
+            )
+          }
+        />
+        <span>
+          <b>Recevoir mon planning dans Google Agenda</b>
+          <small>Éteint : plus rien n’y arrive, l’agenda est vidé.</small>
+        </span>
+      </label>
+
+      {!etat.email && (
+        <div className="ma-bandeau bad" role="alert">
+          <b>Aucune adresse e-mail sur votre fiche</b>
+          Sans adresse, GuardVeto ne peut partager aucun agenda avec vous. Demandez à l’administratrice d’en ajouter une.
         </div>
-      </div>
+      )}
 
-      <section className="card conn-card rise rise-2 ma-carte" aria-label="Mon agenda Google">
-        <label className="aa-switch mn-ligne">
-          <input
-            type="checkbox"
-            checked={reglages.actif}
-            disabled={enCours}
-            onChange={(e) =>
-              lancer(
-                () => basculerMonAgenda(e.target.checked),
-                e.target.checked ? 'Votre planning va arriver dans Google Agenda' : 'Envoi coupé : votre agenda GuardVeto va être vidé',
-              )
-            }
-          />
-          <span>
-            <b>Recevoir mon planning dans Google Agenda</b>
-            <small>Éteint : plus rien n’y arrive, l’agenda est vidé.</small>
-          </span>
-        </label>
-
-        {!etat.email && (
-          <div className="ma-bandeau bad" role="alert">
-            <b>Aucune adresse e-mail sur votre fiche</b>
-            Sans adresse, GuardVeto ne peut partager aucun agenda avec vous. Demandez à l’administratrice d’en ajouter une.
-          </div>
-        )}
-
-        {!reglages.actif ? (
-          <p className="mn-note">
-            {etat.agendaCree
-              ? `Votre agenda GuardVeto est vidé. ${etat.partageCabinet === 'retire' ? `« ${nomAgendaCabinet} » vous est rendu.` : `« ${nomAgendaCabinet} » reste comme il est.`} Rien d’autre n’est touché.`
-              : 'Rien n’est envoyé dans votre Google Agenda.'}
-          </p>
-        ) : (
-          <div className="ma-corps">
-            <span className="ma-q-t">Dans mon Google Agenda, je veux voir</span>
-            <div className="ma-choix" role="radiogroup" aria-label="Ce que contient mon agenda">
-              {optionsPour(genre).map((o) => {
-                const on = contenu.vue === o.vue
-                return (
-                  <div key={o.vue} className={`ma-option${on ? ' on' : ''}`}>
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={on}
-                      className="ma-option-tete"
-                      disabled={enCours}
-                      onClick={() => choisir(o.vue, placementParDefaut(o.vue))}
-                    >
-                      <span className="ma-radio" aria-hidden="true" />
-                      <span>
-                        <b>{o.titre}</b>
-                        <small>{o.desc}</small>
-                      </span>
-                    </button>
-                    {on && (
-                      <div className="ma-sous">
-                        <span className="ma-q-t">{o.question}</span>
-                        <div className="ma-seg" role="radiogroup" aria-label={o.question}>
-                          {o.placements.map(([p, l]) => (
-                            <button key={p} type="button" role="radio" aria-checked={contenu.placement === p}
-                              className={contenu.placement === p ? 'sel' : ''}
-                              disabled={enCours}
-                              onClick={() => choisir(o.vue, p)}>{l}</button>
-                          ))}
-                        </div>
-                        <small className="ma-aide">{o.aide}</small>
+      {!reglages.actif ? (
+        <p className="mn-note">
+          {etat.agendaCree
+            ? `Votre agenda GuardVeto est vidé. ${etat.partageCabinet === 'retire' ? `« ${nomAgendaCabinet} » vous est rendu.` : `« ${nomAgendaCabinet} » reste comme il est.`} Rien d’autre n’est touché.`
+            : 'Rien n’est envoyé dans votre Google Agenda.'}
+        </p>
+      ) : (
+        <div className="ma-corps">
+          <span className="ma-q-t">Dans mon Google Agenda, je veux voir</span>
+          <div className="ma-choix" role="radiogroup" aria-label="Ce que contient mon agenda">
+            {optionsPour(genre).map((o) => {
+              const on = contenu.vue === o.vue
+              return (
+                <div key={o.vue} className={`ma-option${on ? ' on' : ''}`}>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    className="ma-option-tete"
+                    disabled={enCours}
+                    onClick={() => choisir(o.vue, placementParDefaut(o.vue))}
+                  >
+                    <span className="ma-radio" aria-hidden="true" />
+                    <span>
+                      <b>{o.titre}</b>
+                      <small>{o.desc}</small>
+                    </span>
+                  </button>
+                  {on && (
+                    <div className="ma-sous">
+                      <span className="ma-q-t">{o.question}</span>
+                      <div className="ma-seg" role="radiogroup" aria-label={o.question}>
+                        {o.placements.map(([p, l]) => (
+                          <button key={p} type="button" role="radio" aria-checked={contenu.placement === p}
+                            className={contenu.placement === p ? 'sel' : ''}
+                            disabled={enCours}
+                            onClick={() => choisir(o.vue, p)}>{l}</button>
+                        ))}
                       </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-
-            {etat.enCours && (
-              <p className="ma-statut att">
-                Votre agenda se met à jour
-                {etat.progressionTotal > 0 ? ` (${etat.progressionFaite} sur ${etat.progressionTotal})` : ''}…
-              </p>
-            )}
-            {!etat.enCours && etat.derniereErreur && (
-              <div className="ma-bandeau bad" role="alert">
-                <b>La dernière mise à jour n’est pas allée au bout</b>
-                Elle sera reprise automatiquement. Détail : {etat.derniereErreur}
-              </div>
-            )}
-            {!etat.enCours && !etat.derniereErreur && etat.agendaCree && etat.email && (
-              <p className="ma-statut">Agenda « {nomAgenda} » · partagé avec {etat.compte ?? etat.email} · à jour</p>
-            )}
-
-            {etat.agendaCree && etat.invitationRecente && (
-              <div className="ma-bandeau att">
-                <b>Une étape de votre côté</b>
-                Ajoutez l’agenda dans Google Agenda, connecté avec {etat.compte ?? etat.email}. Un e-mail GuardVeto vous a aussi été envoyé.
-              </div>
-            )}
-            {/* « absent » = elle ne l'a pas : rien à faire. « impossible » =
-                elle en est propriétaire, GuardVeto ne peut pas le lui retirer. */}
-            {etat.partageCabinet === 'impossible' && (
-              <div className="ma-bandeau att">
-                <b>Masquez « {nomAgendaCabinet} »</b>
-                Vos gardes arrivent par votre agenda GuardVeto. Dans Google Agenda, décochez l’agenda du cabinet, sinon vous les verrez en double.
-              </div>
-            )}
-            {etat.email && !adresseGoogle && (
-              <p className="ma-statut">
-                Votre adresse ({etat.email}) doit être un compte Google pour ouvrir l’agenda. Si ce n’est pas le cas,
-                demandez à l’administratrice de mettre une adresse Gmail sur votre fiche.
-              </p>
-            )}
-
-            <div className="ma-actions">
-              {etat.lienAjout && (
-                <a className="btn btn-outline btn-sm" href={etat.lienAjout} target="_blank" rel="noopener noreferrer">
-                  Ouvrir dans Google Agenda
-                </a>
-              )}
-              {etat.agendaCree && (
-                <button type="button" className="btn btn-outline btn-sm" disabled={enCours}
-                  onClick={() => lancer(renvoyerInvitationAgenda, 'Invitation renvoyée — regardez vos e-mails')}>
-                  Renvoyer l’invitation
-                </button>
-              )}
-            </div>
+                      <small className="ma-aide">{o.aide}</small>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
-        )}
-      </section>
+
+          {etat.enCours && (
+            <p className="ma-statut att">
+              Votre agenda se met à jour
+              {etat.progressionTotal > 0 ? ` (${etat.progressionFaite} sur ${etat.progressionTotal})` : ''}…
+            </p>
+          )}
+          {!etat.enCours && etat.derniereErreur && (
+            <div className="ma-bandeau bad" role="alert">
+              <b>La dernière mise à jour n’est pas allée au bout</b>
+              Elle sera reprise automatiquement. Détail : {etat.derniereErreur}
+            </div>
+          )}
+          {!etat.enCours && !etat.derniereErreur && etat.agendaCree && etat.email && (
+            <p className="ma-statut">Agenda « {nomAgenda} » · partagé avec {etat.compte ?? etat.email} · à jour</p>
+          )}
+
+          {etat.agendaCree && etat.invitationRecente && (
+            <div className="ma-bandeau att">
+              <b>Une étape de votre côté</b>
+              Ajoutez l’agenda dans Google Agenda, connecté avec {etat.compte ?? etat.email}. Un e-mail GuardVeto vous a aussi été envoyé.
+            </div>
+          )}
+          {/* « absent » = elle ne l'a pas : rien à faire. « impossible » =
+              elle en est propriétaire, GuardVeto ne peut pas le lui retirer. */}
+          {etat.partageCabinet === 'impossible' && (
+            <div className="ma-bandeau att">
+              <b>Masquez « {nomAgendaCabinet} »</b>
+              Vos gardes arrivent par votre agenda GuardVeto. Dans Google Agenda, décochez l’agenda du cabinet, sinon vous les verrez en double.
+            </div>
+          )}
+          {etat.email && !adresseGoogle && (
+            <p className="ma-statut">
+              Votre adresse ({etat.email}) doit être un compte Google pour ouvrir l’agenda. Si ce n’est pas le cas,
+              demandez à l’administratrice de mettre une adresse Gmail sur votre fiche.
+            </p>
+          )}
+
+          <div className="ma-actions">
+            {etat.lienAjout && (
+              <a className="btn btn-outline btn-sm" href={etat.lienAjout} target="_blank" rel="noopener noreferrer">
+                Ouvrir dans Google Agenda
+              </a>
+            )}
+            {etat.agendaCree && (
+              <button type="button" className="btn btn-outline btn-sm" disabled={enCours}
+                onClick={() => lancer(renvoyerInvitationAgenda, 'Invitation renvoyée — regardez vos e-mails')}>
+                Renvoyer l’invitation
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </>
   )
 }

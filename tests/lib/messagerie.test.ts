@@ -398,7 +398,10 @@ describe('⑤ B-193c — prévenir aussi par mail', () => {
   })
 
   it('le journal « message » a un libellé dans les Réglages', () => {
-    expect(readFileSync(join(RACINE, 'src/components/v2/ReglagesV2.tsx'), 'utf8')).toMatch(/message: 'Message de la messagerie'/)
+    // B-202 — le dictionnaire vit dans `lib/reglages/libelles.ts`, lu par
+    // l'écran actuel ET par l'onglet refondu.
+    expect(readFileSync(join(RACINE, 'src/lib/reglages/libelles.ts'), 'utf8')).toMatch(/message: 'Message de la messagerie'/)
+    expect(readFileSync(join(RACINE, 'src/components/v2/ReglagesV2.tsx'), 'utf8')).toContain('TYPE_EMAIL')
   })
 })
 
