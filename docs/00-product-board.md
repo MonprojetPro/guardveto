@@ -327,10 +327,11 @@ requalifie non bloquant). Detail integral → archive 3ter.
 > le 15/09 (archive 27).
 
 ---
-| B-197 | ① Le mail de publication annonce les jours REELLEMENT tenus. | `lignesGardesDuVeto` (`src/lib/emails/gardes-par-jour.ts`) appele dans `sendPlanningPublie` (grep : `mesLignes = lignesGardesDuVeto`) ; test rejouant la base du 10/11 : Manon → « vendredi 25 decembre 2026 », jamais « 26 decembre », binome Anne-Sophie ; Antoine → ni 2 ni 3 janvier. 8/8. Reconstitution des 6 mails depuis la base : chaque ligne des fetes = la base. | ✅ |
+| B-197 | ① Le mail de publication annonce les jours REELLEMENT tenus. | `lignesGardesDuVeto` (`src/lib/emails/gardes-par-jour.ts`) appele dans `sendPlanningPublie` (grep : `mesLignes = lignesGardesDuVeto`) ; test rejouant la base du 10/11 : Manon → « vendredi 25 decembre 2026 », jamais « 26 decembre », binome Anne-Sophie ; Antoine → ni 2 ni 3 janvier. 8/8. Reconstitution des 6 mails depuis la base : chaque ligne des fetes = la base. Re-verifie le 10/11 apres ajout des excuses et remerciements : 10/10, tsc et eslint vides. | ✅ |
 | B-197 | ② Le binome affiche est celui du jour tenu. | `binomeId` calcule jour par jour (`placeDuJour`), la ligne se coupe quand il change ; tests Jean (3 lignes, Victor / Antoine / Antoine) et Victor (26-27 avec Jean). | ✅ |
 | B-197 | ③ Meme defaut dans le mail « garde modifiee ». | `joursTenusParDautresQueLesTitulaires` + bloc « Attention, ce jour de la garde est tenu par d'autres personnes » dans `buildGardeModifieeHtml`. tsc vide. Test avec faux client Supabase : week-end de Noel → seul le 25/12 signale, « Manon Renaud + Anne-Sophie Blanchard » ; sans remplacement → rien (10/10). | ✅ |
 | B-197 | ④ Rectificatif aux 6 personnes. | 6 apercus generes depuis la base, texte relu (Manon). Rien envoye. | ❌ → B-197a |
+| B-197 | ⑤ Texte du rectificatif : excuses pour la gene + remerciements (demande MiKL 10/11). | `buildPlanningPublieHtml` : « Nous vous presentons toutes nos excuses pour la gene occasionnee » dans l'introduction, paragraphe « Merci a vous [...] logiciel de reference » apres le tableau, tous deux reserves au rectificatif. Test 10/10 (le mail normal ne s'excuse pas). Apercu de Manon regenere. Envoi toujours en attente (B-197a). | ✅ |
 
 
 ## 4. Livre

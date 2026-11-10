@@ -232,8 +232,16 @@ export function buildPlanningPublieHtml(
     : `<tr><td colspan="3" style="padding:12px;text-align:center;color:#6b7280;">Aucune garde assignée sur cette période.</td></tr>`
 
   const intro = rectificatif
-    ? `<p style="color:#374151;"><strong>Correction de notre précédent e-mail.</strong> Le récapitulatif envoyé le ${formatDate(rectifieLeMailDu!)} pour la période <strong>${periodeLabel}</strong> comportait une erreur sur les week-ends partagés entre plusieurs personnes (une personne qui n'en tient qu'un seul jour). Le planning affiché dans GuardVeto, lui, était juste. Voici vos gardes corrigées — merci de ne plus tenir compte du précédent e-mail.</p>`
+    ? `<p style="color:#374151;"><strong>Correction de notre précédent e-mail.</strong> Le récapitulatif envoyé le ${formatDate(rectifieLeMailDu!)} pour la période <strong>${periodeLabel}</strong> comportait une erreur sur les week-ends partagés entre plusieurs personnes (une personne qui n'en tient qu'un seul jour). Le planning affiché dans GuardVeto, lui, était juste. Nous vous présentons toutes nos excuses pour la gêne occasionnée. Voici vos gardes corrigées — merci de ne plus tenir compte du précédent e-mail.</p>`
     : `<p style="color:#374151;">Le planning de gardes pour la période <strong>${periodeLabel}</strong> vient d'être publié.</p>`
+
+  // Le rectificatif remercie : ce sont les retours de l'équipe qui font
+  // progresser l'outil, et c'est elle qui a signalé l'erreur.
+  const remerciements = rectificatif
+    ? `
+      <p style="color:#374151;margin-top:24px;line-height:1.5;">Merci à vous d'avoir pris le temps de nous signaler cette erreur. C'est grâce à vos retours, à chacune et chacun d'entre vous, que GuardVeto progresse et deviendra bientôt un logiciel de référence pour les cabinets vétérinaires.</p>
+`
+    : ''
 
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -260,7 +268,7 @@ export function buildPlanningPublieHtml(
         </thead>
         <tbody>${gardeRows}</tbody>
       </table>
-
+${remerciements}
       <div style="margin-top:32px;background:#f3f4f6;border-radius:8px;padding:20px 24px;">
         <p style="margin:0 0 10px;color:#374151;font-size:14px;line-height:1.5;">
           Pour consulter le planning complet et gérer vos disponibilités, vous pouvez à tout moment vous connecter à votre espace personnel :

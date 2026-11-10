@@ -76,6 +76,7 @@ describe('B-197 — le mail liste les jours réellement tenus', () => {
     expect(html).toContain('avec Anne-Sophie Blanchard')
     expect(html).not.toContain('26 décembre')
     expect(html).not.toContain('Victor')
+    expect(html).not.toContain('excuses') // le mail normal ne s'excuse pas
   })
 
   it('le HTML d’Antoine ne mentionne ni le 2 ni le 3 janvier', () => {
@@ -94,6 +95,8 @@ describe('B-197 — le mail liste les jours réellement tenus', () => {
     expect(html).toContain('Correction de notre précédent e-mail')
     expect(html).toContain('dimanche 8 novembre 2026')
     expect(html).toContain('Planning corrigé')
+    expect(html).toContain('toutes nos excuses pour la gêne occasionnée')
+    expect(html).toContain('logiciel de référence')
   })
 })
 
