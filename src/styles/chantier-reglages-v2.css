@@ -21,7 +21,8 @@
 /* ── La coquille ─────────────────────────────────────────────── */
 .rg-coquille {
   display: grid;
-  grid-template-columns: 216px minmax(0, 1fr);
+  /* 240 px : « Journal des e-mails » et son compteur tiennent sur une ligne (11/11). */
+  grid-template-columns: 240px minmax(0, 1fr);
   gap: 30px;
   align-items: start;
   margin-bottom: 40px;
@@ -114,6 +115,8 @@
 .rg-bloc + .rg-bloc { border-top: 1px solid var(--t-border); }
 .rg-bloc-tete { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
 .rg-bloc-tete h3 { margin: 0; flex: 1; font-size: 1.06rem; font-weight: 700; }
+/* Un bloc sans titre (le journal) garde son état à droite, comme les autres. */
+.rg-bloc-tete > :not(h3) { margin-left: auto; }
 .rg-sous-tete {
   margin: 20px 0 10px; padding-top: 16px;
   border-top: 1px dashed var(--t-border);

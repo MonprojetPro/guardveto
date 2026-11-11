@@ -239,7 +239,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 
 <div class="intro">
   <h1>Réglages, refondus</h1>
-  <p>Maquette B-202, à valider avant de coder. Cinq sections au lieu d’une grille de cartes mélangées : <b>Pour moi</b>, <b>Le cabinet</b>, <b>Messagerie</b>, <b>Connexions</b>, <b>Suivi</b>. Sur ordinateur, un sommaire reste à gauche ; sur téléphone, une liste mène à chaque section. Les deux pages « Mes notifications » et « Mon agenda » entrent dans la même coquille.</p>
+  <p>Maquette B-202, à valider avant de coder. Cinq sections au lieu d’une grille de cartes mélangées : <b>Pour moi</b>, <b>Le cabinet</b>, <b>Messagerie</b>, <b>Connexions</b>, <b>Journal des e-mails</b>. Sur ordinateur, un sommaire reste à gauche ; sur téléphone, une liste mène à chaque section. Les deux pages « Mes notifications » et « Mon agenda » entrent dans la même coquille.</p>
   <p>Tout est cliquable : le sommaire, l’interrupteur de la messagerie, les boutons. Données fictives (Cabinet du Val d’Allier). Les boutons en pointillé sous les cadres servent seulement à simuler un cas (refus, échec) : ils ne feront pas partie de l’écran.</p>
 </div>
 
@@ -293,7 +293,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 </div>
 
 <!-- ═══ 6 ═══ -->
-<div class="etat"><span class="num">6</span><h2>Suivi : le journal des e-mails, avec un échec</h2>
+<div class="etat"><span class="num">6</span><h2>Le journal des e-mails, avec un échec</h2>
   <p>Le sommaire signale l’échec (pastille rouge « 1 ») sans qu’on ait à ouvrir la section. Sur téléphone, le tableau devient une liste.</p></div>
 <div class="duo">
   <figure class="fig"><figcaption>Ordinateur</figcaption>
@@ -319,7 +319,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 <div class="a-trancher">
   <h2>Points à regarder</h2>
   <ol>
-    <li><b>L’ordre des cinq sections</b><span>Pour moi, Le cabinet, Messagerie, Connexions, Suivi. Les plus personnelles en premier, le journal (consulté rarement) en dernier.</span></li>
+    <li><b>L’ordre des cinq sections</b><span>Pour moi, Le cabinet, Messagerie, Connexions, Journal des e-mails. Les plus personnelles en premier, le journal (consulté rarement) en dernier.</span></li>
     <li><b>« Messagerie » a sa propre section</b><span>Aucune autre fonction à allumer n’est prévue. Si la messagerie reçoit d’autres réglages, ils viendront ici. Les interrupteurs des plannings restent dans Organisation.</span></li>
     <li><b>Notifications et « Mon agenda » s’enregistrent tout seuls</b><span>Comme aujourd’hui : pas de bouton, un message à chaque changement. Les réglages du cabinet, eux, ont un bouton par sujet.</span></li>
     <li><b>Le vétérinaire sans « Mon agenda »</b><span>Pas de sommaire du tout, juste la liste des e-mails : un menu à une seule entrée serait du bruit.</span></li>
@@ -387,7 +387,7 @@ var SECS=[
  {id:'cabinet',nom:'Le cabinet',ico:'building',res:'Adresse, e-mails'},
  {id:'fonctions',nom:'Messagerie',ico:'msg',res:'Fil d’équipe, conversations privées'},
  {id:'connexions',nom:'Connexions',ico:'plug',res:'Google Agenda'},
- {id:'suivi',nom:'Suivi',ico:'doc',res:'Journal des e-mails'}
+ {id:'suivi',nom:'Journal des e-mails',ico:'doc',res:'Les e-mails partis et leur état'}
 ];
 
 /* ═════════ état par écran ═════════ */

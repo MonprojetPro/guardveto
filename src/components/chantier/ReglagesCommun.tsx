@@ -52,9 +52,9 @@ export function Bloc({ titre, etat, children }: { titre?: string; etat?: ReactNo
   const idTitre = useId()
   return (
     <section className="rg-bloc" aria-labelledby={titre ? idTitre : undefined}>
-      {titre && (
+      {(titre || etat) && (
         <div className="rg-bloc-tete">
-          <h3 id={idTitre}>{titre}</h3>
+          {titre && <h3 id={idTitre}>{titre}</h3>}
           {etat}
         </div>
       )}

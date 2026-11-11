@@ -35,6 +35,13 @@ describe('Les sections, et qui les voit', () => {
     expect(SECTIONS.map((s) => s.nom).join(' ')).not.toMatch(/Fonctions/)
   })
 
+  it('MiKL, 11/11 : « Suivi » devient « Journal des e-mails » (l’adresse garde `?section=suivi`)', () => {
+    expect(SECTIONS.find((s) => s.id === 'suivi')?.nom).toBe('Journal des e-mails')
+    expect(SECTIONS.map((s) => s.nom)).not.toContain('Suivi')
+    // Le bloc ne répète pas le nom de la section juste au-dessus.
+    expect(lire('src/components/chantier/ReglagesSectionSuivi.tsx')).not.toContain('titre="Journal des e-mails"')
+  })
+
   it('l’adresse ne peut pas ouvrir une section interdite ni inconnue', () => {
     expect(sectionDemandee('suivi', 'admin')).toBe('suivi')
     expect(sectionDemandee('cabinet', 'veto')).toBeNull()

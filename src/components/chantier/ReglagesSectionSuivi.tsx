@@ -1,7 +1,8 @@
 'use client'
 
 // ============================================================
-// GUARDVETO — Réglages refondus : la section « Suivi » (B-202)
+// GUARDVETO — Réglages refondus : la section « Journal des e-mails » (B-202)
+// (nommée « Suivi » jusqu'au 11/11 ; MiKL : « j'aurais mis journal des emails »)
 // ============================================================
 // Le journal des e-mails : ce que GuardVeto a réellement expédié. Un tableau
 // sur ordinateur, une liste sur téléphone (les deux sont rendus, la feuille
@@ -41,13 +42,13 @@ export function ReglagesSectionSuivi({ emails }: { emails: LigneEmail[] }) {
 
   return (
     <div className="rg-panneau">
+      {/* Pas de titre de bloc : la section s'appelle déjà « Journal des e-mails ». */}
       <Bloc
-        titre="Journal des e-mails"
         etat={
           <div className="rg-chips">
             {/* Une pastille verte « 0 partis » est un contresens : on ne
                 montre le succès que s'il y en a un. */}
-            {partis > 0 && <Pastille ton="ok" nue>{partis} partis</Pastille>}
+            {partis > 0 && <Pastille ton="ok" nue>{partis} parti{partis > 1 ? 's' : ''}</Pastille>}
             {echecs > 0 && <Pastille ton="bad" nue>{echecs} en échec</Pastille>}
           </div>
         }

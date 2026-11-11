@@ -29,7 +29,9 @@ export const SECTIONS: readonly Section[] = [
   // autre fonction à allumer n'est prévue — la section porte son vrai nom.
   { id: 'messagerie', nom: 'Messagerie', resume: 'Fil d’équipe, conversations privées' },
   { id: 'connexions', nom: 'Connexions', resume: 'Google Agenda' },
-  { id: 'suivi', nom: 'Suivi', resume: 'Journal des e-mails' },
+  // MiKL, 11/11 : « à la place de suivi j'aurais mis journal des emails ».
+  // L'identifiant reste `suivi` : il ne se lit que dans l'adresse.
+  { id: 'suivi', nom: 'Journal des e-mails', resume: 'Les e-mails partis et leur état' },
 ]
 
 export type RoleReglages = 'admin' | 'veto' | 'secretaire'
