@@ -1379,7 +1379,7 @@ function buildCongeDemandeHtml(params: {
       <a href="${appUrl()}/absences" style="display:inline-block;background:${accent};color:#fff;text-decoration:none;font-weight:600;padding:11px 20px;border-radius:6px">Voir la demande</a>
     </p>
     <p style="margin:0;color:#6b7280;font-size:13px">
-      Vous pouvez choisir les e-mails que vous recevez dans Réglages &gt; Mes notifications.
+      Vous pouvez choisir les e-mails que vous recevez dans Réglages &gt; Pour moi.
     </p>
   </div>
 </div>`

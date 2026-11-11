@@ -79,9 +79,10 @@ export const CHANTIERS: Record<string, Chantier> = {
     item: 'B-202',
     depuis: '2026-11-10',
     diffusion: {
-      bacASableSeulement:
-        'Maquette validee par MiKL le 10/11 (docs/maquettes/B-202-reglages.html). ' +
-        'Recette au bac a sable avant toute bascule du Val d Allier.',
+      tousLesCabinets:
+        'Maquette validee par MiKL le 10/11 (docs/maquettes/B-202-reglages.html), ' +
+        'recette au bac a sable du 10 au 11/11. Bascule decidee par MiKL le 11/11 : ' +
+        '« c est bon fais la bascule ». Aucune donnee touchee : seul le dessin change.',
     },
   },
 }

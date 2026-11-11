@@ -88,7 +88,8 @@ export const MODULES_REGLABLES_PAR_ADMIN = ['gardes', 'planning-journee', 'chat'
 export const OU_ALLUMER: Record<string, string> = {
   gardes: 'dans Organisation, encart « Vos plannings »',
   'planning-journee': 'dans Organisation, encart « Vos plannings »',
-  chat: 'dans Réglages, carte « Messagerie de l’équipe »',
+  // B-202 — l'onglet Réglages refondu (11/11) : la messagerie a sa section.
+  chat: 'dans Réglages, section « Messagerie »',
 }
 
 /** Les identifiants de modules connus. Toute autre valeur est une faute de frappe. */

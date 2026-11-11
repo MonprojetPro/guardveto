@@ -159,9 +159,16 @@ describe('Renvoyer un planning : la phrase dit pourquoi', () => {
 })
 
 describe('🔴 La porte du chantier — la leçon du 08/10 (B-151)', () => {
-  it('fermé au Val d’Allier (pas un bac à sable), ouvert au bac à sable', () => {
-    expect(chantierOuvert('reglages-v2', { estBacASable: false })).toBe(false)
+  it('B-202a — bascule du 11/11 : ouvert à tous les cabinets, Val d’Allier compris', () => {
+    // Recette au bac à sable du 10 au 11/11, puis MiKL : « c'est bon fais la bascule ».
+    expect(chantierOuvert('reglages-v2', { estBacASable: false })).toBe(true)
     expect(chantierOuvert('reglages-v2', { estBacASable: true })).toBe(true)
+  })
+
+  it('la phrase « où allumer la messagerie » désigne la nouvelle section', async () => {
+    const { OU_ALLUMER } = await import('@/lib/produit/modules')
+    expect(OU_ALLUMER.chat).toBe('dans Réglages, section « Messagerie »')
+    expect(lire('src/lib/notifications.ts')).not.toContain('Réglages &gt; Mes notifications')
   })
 
   it('la page consulte la porte avant de rendre l’onglet refondu', () => {
