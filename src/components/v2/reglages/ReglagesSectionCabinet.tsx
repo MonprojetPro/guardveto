@@ -6,7 +6,7 @@
 // L'adresse (qui DÉDUIT la zone de vacances scolaires et la région des
 // fériés) et le nom d'expéditeur des e-mails, avec l'essai d'envoi.
 //
-// Mêmes actions serveur que l'écran actuel : elles portent la garde admin,
+// Mêmes actions serveur que l'ancien écran (retiré par B-202b) : elles portent la garde admin,
 // les RPC et la dérivation de zone, qui CONSERVE la zone existante quand le
 // code postal ne permet pas de conclure.
 //

@@ -1,60 +1,20 @@
 // ============================================================
-// GUARDVETO V2 — Mon agenda (B-173)
+// GUARDVETO V2 — Mon agenda : l'ancienne adresse (B-173 → B-202b)
 // ============================================================
-// Chaque membre reçoit son planning dans SON agenda Google, comme il le veut.
-// Ouvert aux trois rôles, comme « Mes notifications » : c'est un réglage
-// personnel, pas un réglage du cabinet. Maquette validée par MiKL le 03/11 :
-// `docs/maquettes/B-181-mon-agenda.html` (B-181, remplace celle du 26/10).
+// Cet écran a vécu ici du 26/10 (B-173, refait par B-181) au 11/11. Depuis la
+// refonte de l'onglet Réglages (B-202, bascule du 11/11), l'agenda Google
+// personnel se règle dans sa section « Pour moi » (`MonAgendaCorps`).
 //
-// La page n'existe que là où la fonction est ouverte (`agenda_perso_ouvert`)
-// et où le cabinet a un agenda Google : ailleurs, il n'y a rien à régler, et
-// une page de réglages qui ne commande rien ferait croire le contraire.
+// L'adresse reste, et ne fait plus que renvoyer : un favori ou un onglet resté
+// ouvert peut encore y mener (aucun e-mail n'y a jamais pointé, vérifié dans
+// l'historique de `src/lib` le 12/11).
 //
-// B-202 — là où l'onglet Réglages refondu est ouvert (chantier `reglages-v2`,
-// bac à sable seul), ce réglage vit dans sa section « Pour moi » : l'adresse
-// y renvoie, pour que les anciens liens mènent toujours au bon endroit.
+// `actions.ts` reste aussi : `basculerMonAgenda`, `choisirMonAgenda` et
+// `renvoyerInvitationAgenda` sont appelés par `MonAgendaCorps`.
 // ============================================================
 
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import '@/styles/v2-reglages.css'
-import { Satin } from '@/components/v2/Satin'
-import { BarreV2 } from '@/components/v2/BarreV2'
-import { MonAgendaV2 } from '@/components/v2/MonAgendaV2'
-import { chargerDock } from '@/data/v2/dock'
-import { chargerMonAgenda } from '@/data/v2/mesReglages'
-import { exigerIdentite } from '@/lib/identite'
-import { chantierOuvertPourLeCabinet } from '@/lib/produit/chantiers-serveur'
 
-export const dynamic = 'force-dynamic'
-// La mise à jour lancée à l'ouverture tourne après la réponse, dans cette
-// exécution : une première synchro écrit plusieurs dizaines d'événements.
-export const maxDuration = 300
-export const metadata = { title: 'GuardVeto — Mon agenda' }
-
-export default async function MonAgendaPage() {
-  const supabase = await createClient()
-  const identite = await exigerIdentite(supabase)
-
-  if (await chantierOuvertPourLeCabinet(supabase, 'reglages-v2')) redirect('/reglages?section=moi')
-
-  const donnees = await chargerMonAgenda(identite)
-  if (!donnees) redirect('/accueil')
-
-  const dock = await chargerDock(supabase, { role_app: identite.role })
-
-  return (
-    <>
-      <Satin />
-      <div className="shell">
-        <BarreV2
-          prenom={identite.genre === 'veto' ? identite.veto.prenom : identite.nomAffiche}
-          estAdmin={identite.role === 'admin'}
-          estSecretaire={identite.role === 'secretaire'}
-          dock={dock}
-        />
-        <MonAgendaV2 {...donnees} />
-      </div>
-    </>
-  )
+export default function MonAgendaPage(): never {
+  redirect('/reglages?section=moi')
 }

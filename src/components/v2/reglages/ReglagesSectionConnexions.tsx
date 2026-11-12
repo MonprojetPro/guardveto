@@ -7,7 +7,7 @@
 // la présentation des événements (aperçu en direct du titre, composé par
 // `libelleGarde`, la même fonction que la synchronisation).
 //
-// L'écran actuel ouvrait la page sur une carte qui en occupait la moitié,
+// L'ancien écran ouvrait la page sur une carte qui en occupait la moitié,
 // alors qu'on la règle une fois : le branchement tient ici sur UNE ligne, et
 // le champ d'adresse ne s'ouvre qu'à la demande (« Modifier »).
 // ============================================================

@@ -1,8 +1,8 @@
 // ============================================================
 // GUARDVETO — Réglages : renvoyer un planning publié vers Google Agenda
 // ============================================================
-// Appelé depuis le navigateur par l'écran actuel ET par l'écran refondu
-// (B-202). Une seule traduction de la réponse de `/api/calendar-sync` : c'est
+// Appelé depuis le navigateur par l'onglet Réglages refondu (B-202) ; l'ancien
+// écran, qui l'appelait aussi, est retiré depuis B-202b. Une seule traduction de la réponse de `/api/calendar-sync` : c'est
 // elle qui dit POURQUOI rien n'est parti, et deux copies finiraient par ne pas
 // dire la même chose.
 // ============================================================

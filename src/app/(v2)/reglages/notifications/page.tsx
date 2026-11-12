@@ -1,73 +1,21 @@
 // ============================================================
-// GUARDVETO V2 — Mes notifications (B-134 lot 5c)
+// GUARDVETO V2 — Mes notifications : l'ancienne adresse (B-134 → B-202b)
 // ============================================================
-// MiKL, le 26/09 : « faudrait prévoir un toggle pour ces demandes de réception
-// de mail […] dans les réglages… prévoir aussi que ce soit le cas du côté des
-// autres profils ».
+// Cet écran a vécu ici du 26/09 (B-134) au 11/11. Depuis la refonte de
+// l'onglet Réglages (B-202, bascule du 11/11), les e-mails que l'on reçoit se
+// règlent dans sa section « Pour moi », ouverte aux trois rôles.
 //
-// ── POURQUOI UN ÉCRAN À PART, ET PAS UNE CARTE DANS `/reglages` ─────────────
-// `/reglages` est réservé aux administratrices — la page elle-même renvoie
-// ailleurs tout autre rôle (`role_app !== 'admin'` → `/accueil`). Y poser les
-// interrupteurs aurait livré la moitié de la demande : les vétérinaires, qui
-// sont justement les premiers concernés (leurs congés, leurs gardes), n'y
-// auraient jamais accédé.
+// L'adresse reste, et ne fait plus que renvoyer : un favori ou un onglet resté
+// ouvert peut encore y mener. Aucun e-mail n'y a jamais pointé (vérifié dans
+// l'historique de `src/lib` le 12/11). Une adresse qui tombe en 404 ferait
+// croire que le réglage a disparu.
 //
-// Cet écran-ci est donc ouvert aux TROIS rôles. Depuis B-174 (27/10), tout le
-// monde y arrive par l'entrée « Réglages » : une carte pour l'administratrice
-// et pour les autres quand « Mon agenda » est ouvert, un renvoi direct sinon.
-//
-// ⚠️ CE QUE CET ÉCRAN NE RÈGLE PAS, ET LE DIT : la cloche. Couper un e-mail
-//    réduit le bruit d'une boîte mail ; couper la cloche supprimerait
-//    l'information. L'écran l'écrit noir sur blanc plutôt que de laisser
-//    quelqu'un croire qu'il s'est rendu totalement injoignable.
+// `actions.ts` reste aussi : `setReceptionEmail` est l'enregistrement que la
+// section « Pour moi » appelle (`useReceptionEmails`).
 // ============================================================
 
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import '@/styles/v2-reglages.css'
-import { Satin } from '@/components/v2/Satin'
-import { BarreV2 } from '@/components/v2/BarreV2'
-import { MesNotificationsV2 } from '@/components/v2/MesNotificationsV2'
-import { chargerDock } from '@/data/v2/dock'
-import { chargerMesNotifications } from '@/data/v2/mesReglages'
-import { exigerIdentite } from '@/lib/identite'
-import { chantierOuvertPourLeCabinet } from '@/lib/produit/chantiers-serveur'
 
-export const dynamic = 'force-dynamic'
-export const metadata = { title: 'GuardVeto — Mes notifications' }
-
-export default async function MesNotificationsPage() {
-  const supabase = await createClient()
-
-  // Les trois rôles passent par là — c'est le sens de la demande. `exigerIdentite`
-  // est le seul point du code qui sait répondre « qui est connecté » sans
-  // supposer une fiche vétérinaire (B-017 : le secrétariat n'en a pas).
-  const identite = await exigerIdentite(supabase)
-
-  // B-202 — l'onglet refondu (bac à sable seul) montre ce réglage dans sa
-  // section « Pour moi » : les anciens liens y mènent.
-  if (await chantierOuvertPourLeCabinet(supabase, 'reglages-v2')) redirect('/reglages?section=moi')
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  const reglages = await chargerMesNotifications(supabase, identite, user?.id ?? null)
-
-  const dock = await chargerDock(supabase, { role_app: identite.role })
-
-  return (
-    <>
-      <Satin />
-      <div className="shell">
-        <BarreV2
-          prenom={identite.genre === 'veto' ? identite.veto.prenom : identite.nomAffiche}
-          estAdmin={identite.role === 'admin'}
-          estSecretaire={identite.role === 'secretaire'}
-          dock={dock}
-        />
-        <MesNotificationsV2 reglages={reglages} role={identite.role} />
-      </div>
-    </>
-  )
+export default function MesNotificationsPage(): never {
+  redirect('/reglages?section=moi')
 }

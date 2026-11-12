@@ -33,6 +33,10 @@ import { describe, expect, it } from 'vitest'
 
 const STYLES = join(process.cwd(), 'src', 'styles')
 const CHANTIER = join(process.cwd(), 'src', 'components', 'chantier')
+// B-202b (12/11) — l'onglet Réglages refondu est SORTI du dossier chantier une
+// fois l'ancien écran retiré. Sans cette ligne, ses classes `rg-` auraient
+// perdu leur gardien en silence, le jour même du déménagement.
+const SORTIS_DU_CHANTIER = [join(process.cwd(), 'src', 'components', 'v2', 'reglages')]
 
 /**
  * Les prefixes des classes « maison » du chantier.
@@ -48,7 +52,8 @@ const CHANTIER = join(process.cwd(), 'src', 'components', 'chantier')
 //    Livrer une fenetre dont le prefixe n'y figure pas, c'est la livrer sans
 //    gardien — et le gardien serait VERT, ce qui est pire que pas de gardien
 //    du tout. Meme mecanisme qu'au 14/10 (registre des juges, 5e occurrence).
-// `rg-` : l'onglet Réglages refondu (B-202, `ReglagesChantierV2` et ses sections).
+// `rg-` : l'onglet Réglages refondu (B-202, `ReglagesOnglet` et ses sections, sous
+// `components/v2/reglages/` depuis B-202b).
 const PREFIXES = ['pv2-', 'pv2h-', 'cpm-', 'gjc-', 'cl3-', 'lg-', 'plan-', 'crise-', 'jdb-', 'rg-']
 
 function toutLeCss(): string {
@@ -67,8 +72,11 @@ function classesDuChantier(): Map<string, Set<string>> {
     out.get(classe)!.add(fichier)
   }
 
-  for (const f of readdirSync(CHANTIER).filter((x) => x.endsWith('.tsx'))) {
-    const source = readFileSync(join(CHANTIER, f), 'utf8')
+  const fichiers = [CHANTIER, ...SORTIS_DU_CHANTIER].flatMap((dir) =>
+    readdirSync(dir).filter((x) => x.endsWith('.tsx')).map((f) => ({ f, chemin: join(dir, f) })),
+  )
+  for (const { f, chemin } of fichiers) {
+    const source = readFileSync(chemin, 'utf8')
     // `className="a b c"` et `className={cond ? 'a' : 'b'}`
     for (const m of source.matchAll(/className=(?:"([^"]*)"|\{[^}]*?'([^']*)')/g)) {
       for (const bloc of [m[1], m[2]]) {
@@ -105,5 +113,13 @@ describe('Les classes du chantier ont toutes une regle CSS', () => {
     //    raison. Si le releve tombe a zero, c'est l'extracteur qui est casse,
     //    pas le code qui est devenu parfait.
     expect(classesDuChantier().size).toBeGreaterThan(50)
+  })
+
+  it('B-202b — le relevé lit bien l’onglet Réglages dans son nouveau dossier', () => {
+    // Sonde du déménagement : si `SORTIS_DU_CHANTIER` cessait d'être lu, les
+    // classes `rg-` disparaîtraient du relevé et le test du dessus resterait vert.
+    const rg = [...classesDuChantier().entries()].filter(([c]) => c.startsWith('rg-'))
+    expect(rg.length).toBeGreaterThan(20)
+    expect(rg.some(([, f]) => f.has('ReglagesOnglet.tsx'))).toBe(true)
   })
 })

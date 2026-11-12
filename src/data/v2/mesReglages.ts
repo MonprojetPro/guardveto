@@ -11,7 +11,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Identite } from '@/lib/identite'
 import { lireMesDesactivations, reglagesPourRole } from '@/lib/notifications-reglages'
 import type { LigneReglage } from '@/components/v2/useReceptionEmails'
-import type { DonneesMonAgenda } from '@/components/v2/MonAgendaV2'
+import type { DonneesMonAgenda } from '@/components/v2/MonAgendaCorps'
 import {
   agendaPersoOuvert,
   clientService,

@@ -14,6 +14,10 @@
 //
 // ⚠️ L'ÉCRAN DIT CE QUE L'AGENDA REÇOIT VRAIMENT — la vue est lue par la même
 //    fonction que la synchro (`contenuEffectif`).
+//
+// B-202b (12/11) — la page « Mon agenda » et son enveloppe `MonAgendaV2` sont
+// retirées : ce contenu ne vit plus que dans la section « Pour moi » de
+// l'onglet Réglages (`ReglagesSectionMoi`). `/reglages/agenda` y renvoie.
 // ============================================================
 
 import { useEffect, useTransition } from 'react'
@@ -93,31 +97,8 @@ export function optionsPour(genre: GenreMembre): readonly Option[] {
   return genre === 'secretaire' ? OPTIONS.filter((o) => o.vue === 'cabinet') : OPTIONS
 }
 
-/** Ce que l'écran « Mon agenda » reçoit de son chargeur (`data/v2/monAgenda.ts`). */
+/** Ce que « Mon agenda » reçoit de son chargeur (`chargerMonAgenda`, `data/v2/mesReglages.ts`). */
 export type DonneesMonAgenda = Props
-
-/**
- * La page « Mon agenda » : sa tête, puis le contenu dans sa carte.
- *
- * B-202 — le contenu vit dans `MonAgendaCorps`, pour que l'onglet Réglages
- * refondu le pose dans sa section « Pour moi » sans le recopier.
- */
-export function MonAgendaV2(props: Props) {
-  return (
-    <>
-      <div className="page-head rise">
-        <div>
-          <h1>Mon agenda</h1>
-          <p className="lede">Votre planning GuardVeto dans votre Google Agenda, mis à jour tout seul. Ces réglages ne valent que pour vous.</p>
-        </div>
-      </div>
-
-      <section className="card conn-card rise rise-2 ma-carte" aria-label="Mon agenda Google">
-        <MonAgendaCorps {...props} />
-      </section>
-    </>
-  )
-}
 
 /** L'interrupteur, le choix « Mon planning / Tout le cabinet » et les états qui ne se taisent pas. */
 export function MonAgendaCorps({ genre, reglages, etat, nomAgenda, nomAgendaCabinet }: Props) {

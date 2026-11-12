@@ -1,136 +1,31 @@
 /* ============================================================
-   GUARDVETO V2 — ÉCRAN « RÉGLAGES & CONNEXIONS »
+   GUARDVETO V2 — RÉGLAGES : CE QUI RESTE DE L'ANCIENNE FEUILLE
    ============================================================
-   Porté de `maquette/m4-accueil-equipe-historique-connexions.html`
-   (section 4). Complète `v2-terrier.css`.
+   Cette feuille portait l'écran « Réglages & connexions » (grille de cartes,
+   maquette M4) et les pages « Mes notifications » et « Mon agenda ». Les trois
+   ont été remplacés le 11/11 par l'onglet refondu (B-202), dont les styles
+   vivent dans `v2-reglages-onglet.css` (préfixe `rg-`).
 
-   Écarté volontairement : la ligne « Dernière synchronisation : cette nuit
-   à 02:14 · 61 événements sur 61 ». Rien ne trace les synchronisations
-   passées en base — il n'existe pas de journal d'agenda. On affiche donc le
-   résultat RÉEL d'une synchronisation qu'on vient de lancer, et rien avant.
+   B-202b (12/11) — l'ancien écran est retiré du code, et avec lui ses classes
+   (`conn-*` sauf une, `agenda-fusion-*`, `agenda-zone-*`, `aa-*` sauf
+   `.aa-switch`, `mail-*`, `m-*`, `mr-chip`, `reste-*`, `mono`, `derived*`,
+   `sync-spin`, `carte-messagerie*`, `mn-liste`). Chacune a été cherchée dans
+   tout `src/` avant d'être retirée. Restent :
+     • ce que « Mon agenda » (`MonAgendaCorps`) dessine encore, dans la
+       section « Pour moi » : `.aa-switch`, `.mn-ligne`, `.mn-note`, `.ma-*` ;
+     • `.conn-line`, que la page Règles cite encore (voir sa note).
    ============================================================ */
 
-.conn-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
-  gap: 16px;
-  margin-bottom: 26px;
-}
-.conn-card {
-  border-radius: var(--r-md);
-  display: flex; flex-direction: column;
-  margin-bottom: 0;
-}
-.conn-head {
-  display: flex; align-items: center; gap: 12px;
-  padding: 15px 18px 13px;
-  border-bottom: 1px solid var(--t-border);
-}
-.conn-ico {
-  width: 40px; height: 40px; border-radius: var(--r-sm);
-  background: var(--surface-2);
-  border: 1px solid var(--t-border);
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: 1.15rem; flex: none;
-}
-.conn-head h3 { font-size: 0.96rem; font-weight: 700; }
-.conn-head .sub { font-size: 0.74rem; color: var(--t-muted); margin-top: 1px; }
-.conn-state {
-  margin-left: auto;
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 0.7rem; font-weight: 700;
-  padding: 4px 12px; border-radius: 999px;
-  white-space: nowrap;
-}
-.conn-state.on  { background: var(--ok-soft); color: var(--ok); }
-.conn-state.off { background: var(--surface-2); color: var(--soft); border: 1px solid var(--t-border); }
-.conn-state .cs-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-.conn-body {
-  padding: 14px 18px 16px;
-  display: flex; flex-direction: column; gap: 12px; flex: 1;
-}
+/* ⚠️ Seul utilisateur restant : `app/(v2)/regles/page.tsx` (« Aucune tranche
+   horaire n'est encore définie »). Cette page n'importe PAS cette feuille :
+   la règle ne s'y applique que si Réglages a été ouvert avant dans la même
+   visite. Gardée telle quelle pour ne rien changer à ce rendu-là. */
 .conn-line { font-size: 0.84rem; line-height: 1.55; color: var(--t-muted); }
-/* `.field-aide` vivait ICI jusqu'au 2026-10-01. Remontée dans `v2-terrier.css`
-   pour que tous les écrans y aient droit : enfermée dans la feuille de
-   Réglages, elle était invisible ailleurs, et les autres écrans se rabattaient
-   sur `.f-note` — qui est la bulle de Filou, pas une note de champ. Les deux
-   usages de cette feuille (ReglagesV2.tsx:446 et :675) continuent de marcher,
-   le terrier étant chargé par le layout V2. */
-.conn-line b { color: var(--text); }
-.conn-line.ok { color: var(--ok); font-weight: 600; }
-.conn-line.bad { color: var(--danger); font-weight: 600; }
-.conn-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; align-items: center; }
-.conn-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.mono {
-  font-family: 'Consolas', 'Menlo', monospace;
-  font-size: 0.78rem;
-  background: var(--surface-2);
-  border: 1px solid var(--t-border);
-  border-radius: 8px;
-  padding: 3px 8px;
-  word-break: break-all;
-}
-.derived { display: flex; flex-wrap: wrap; gap: 8px; }
-.derived .dv {
-  display: inline-flex; align-items: center; gap: 7px;
-  background: var(--ok-soft);
-  border: 1px dashed var(--border-strong);
-  color: var(--ok);
-  font-size: 0.76rem; font-weight: 700;
-  padding: 6px 14px; border-radius: 999px;
-}
-.derived-note { font-size: 0.74rem; color: var(--soft); font-style: italic; line-height: 1.5; }
-.sync-spin {
-  display: inline-block; width: 14px; height: 14px;
-  border: 2px solid var(--accent-soft);
-  border-top-color: var(--t-accent);
-  border-radius: 50%;
-  animation: spin 0.9s linear infinite;
-  vertical-align: -2px; margin-right: 6px;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
 
-/* ============================================================
-   GOOGLE AGENDA — UNE CARTE, DEUX ZONES (recette MiKL, 2026-08-27)
-   ============================================================
-   Les deux cartes qui parlaient toutes deux de Google Agenda (le
-   branchement — carte d'origine — et la présentation, mon ajout) sont
-   FUSIONNÉES en une seule, pour ne plus avoir à chercher où se règle quoi.
-   Fusionner n'est pas mélanger : chaque zone garde son titre propre
-   (`.agenda-zone-titre-ligne`) et un liseré les sépare
-   (`.agenda-zone-separateur`) — la carte est sortie de `.conn-grid` (elle
-   devient trop haute pour partager une rangée avec les deux autres) et vit
-   maintenant seule, en pleine largeur, avant elles. C'est aussi ce qui
-   rééquilibre la page : les deux cartes restantes du `.conn-grid`
-   (E-mails, Adresse) n'ont plus à s'aligner sur une troisième bien plus
-   grande qu'elles. */
-.agenda-fusion-card { margin-bottom: 26px; }
-/* Le titre de zone reprend la forme de `.conn-head` (même famille visuelle)
-   mais en plus discret : ce n'est plus l'en-tête de la CARTE, seulement
-   celui d'une SECTION à l'intérieur. Pas d'icône, pas de pastille d'état —
-   la carte n'en a qu'une, tout en haut, pour l'ensemble. */
-.agenda-zone-titre-ligne {
-  padding: 14px 18px 0;
-}
-.agenda-zone-titre-ligne h4 { font-size: 0.88rem; font-weight: 700; }
-.agenda-zone-sous-titre {
-  font-size: 0.74rem; color: var(--t-muted); margin-top: 1px;
-}
-.agenda-zone-separateur {
-  height: 1px; background: var(--t-border);
-  margin: 4px 18px 0;
-}
-
-/* Deux interrupteurs, un champ par créneau, et l'aperçu qui compose le
-   VRAI titre en direct (`libelleGarde`) — le cœur de la zone Présentation. */
-.aa-interrupteurs {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
-  gap: 12px 20px;
-}
 /* La case, comme « dernier recours » sur la fiche véto (même famille
    d'interaction dans le projet) : pas de nouveau composant interrupteur,
-   une checkbox stylée et accessible au clavier suffit. */
+   une checkbox stylée et accessible au clavier suffit. L'onglet refondu la
+   redessine en interrupteur, borné à `.rg-agenda` (`v2-reglages-onglet.css`). */
 .aa-switch {
   display: flex; align-items: flex-start; gap: 10px;
   cursor: pointer;
@@ -143,130 +38,11 @@
 .aa-switch b { font-size: 0.86rem; font-weight: 700; }
 .aa-switch small { font-size: 0.76rem; color: var(--t-muted); line-height: 1.45; }
 
-.aa-vide { font-size: 0.86rem; color: var(--t-muted); line-height: 1.6; }
-
-.aa-creneaux {
-  display: flex; flex-direction: column; gap: 12px;
-  padding-top: 14px; border-top: 1px solid var(--t-border);
-}
-.aa-creneaux-lede { font-size: 0.78rem; color: var(--t-muted); line-height: 1.5; }
-.aa-creneau-ligne {
-  display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(200px, 1.2fr);
-  gap: 10px 16px;
-  align-items: end;
-}
-.aa-creneau-champ label { font-size: 0.82rem; font-weight: 600; }
-/* L'APERÇU N'EST PAS DÉCORATIF : c'est la vérification que l'admin cherche
-   avant même de lire l'aide — « qu'est-ce que ça va donner ». */
-.aa-apercu {
-  display: flex; flex-direction: column; gap: 4px;
-  background: var(--surface-2);
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--r-sm);
-  padding: 8px 12px;
-  min-height: 42px;
-  justify-content: center;
-}
-.aa-apercu-label {
-  font-size: 0.64rem; font-weight: 700; letter-spacing: 0.06em;
-  text-transform: uppercase; color: var(--t-muted);
-}
-.aa-apercu-titre {
-  font-family: 'Consolas', 'Menlo', monospace;
-  font-size: 0.86rem; color: var(--text); font-weight: 700;
-  word-break: break-all;
-}
-@media (max-width: 560px) {
-  .aa-creneau-ligne { grid-template-columns: 1fr; }
-}
-
 /* ============================================================
-   JOURNAL DES E-MAILS
-   ============================================================ */
-.mail-card { margin-bottom: 26px; }
-.mail-table { width: 100%; border-collapse: collapse; }
-.mail-table th {
-  font-family: var(--font-display);
-  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.07em;
-  text-transform: uppercase; color: var(--soft);
-  padding: 10px 14px 8px; text-align: left;
-  border-bottom: 1px solid var(--border-strong);
-}
-.mail-table td {
-  padding: 10px 14px;
-  border-bottom: 1px dashed var(--t-border);
-  font-size: 0.83rem;
-  vertical-align: middle;
-}
-.mail-table tr:last-child td { border-bottom: none; }
-.mail-table .m-date { color: var(--t-muted); font-size: 0.76rem; white-space: nowrap; }
-.mail-type {
-  display: inline-block;
-  font-size: 0.7rem; font-weight: 700;
-  background: var(--surface-2);
-  border: 1px solid var(--t-border);
-  color: var(--t-muted);
-  padding: 3px 11px; border-radius: 999px;
-  white-space: nowrap;
-}
-.m-statut { display: inline-flex; align-items: center; gap: 6px; font-size: 0.76rem; font-weight: 700; }
-.m-statut .msd { width: 8px; height: 8px; border-radius: 50%; }
-.m-statut.envoye { color: var(--ok); }
-.m-statut.envoye .msd { background: var(--ok); }
-.m-statut.echec { color: var(--danger); }
-.m-statut.echec .msd { background: var(--danger); }
-/* « Parti » et « Remis » ne se ressemblent pas par hasard : ce sont deux bonnes
-   nouvelles, mais la seconde est CONFIRMÉE. Le vert plein la distingue du vert
-   discret d'un départ dont on ignore encore la suite. */
-.m-statut.remis { color: var(--ok); font-weight: 800; }
-.m-statut.remis .msd { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent); }
-.m-statut.attente { color: var(--t-muted); }
-.m-statut.attente .msd { background: var(--t-muted); }
-.m-erreur {
-  display: block; font-size: 0.72rem; color: var(--danger);
-  margin-top: 3px; line-height: 1.45;
-}
-.mail-vide { padding: 22px 18px; font-size: 0.86rem; color: var(--t-muted); line-height: 1.6; }
-.mail-resume { display: flex; gap: 10px; flex-wrap: wrap; margin-left: auto; }
-.mr-chip {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 0.74rem; font-weight: 700;
-  padding: 4px 12px; border-radius: 999px;
-}
-.mr-chip.ok { background: var(--ok-soft); color: var(--ok); }
-.mr-chip.bad { background: var(--danger-soft); color: var(--danger); }
-
-/* ============================================================
-   CE QUI RESTE EN V1
+   L'INTERRUPTEUR ET LA NOTE (nés avec « Mes notifications », B-134)
    ============================================================
-   Un renvoi honnête vers les écrans pas encore refaits, plutôt qu'un
-   bouton mort ou une carte vide. */
-.reste-v1 { margin-bottom: 26px; }
-.reste-liste { list-style: none; }
-.reste-liste li {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
-  padding: 13px 20px;
-  border-bottom: 1px dashed var(--t-border);
-}
-.reste-liste li:last-child { border-bottom: none; }
-.reste-liste .rl-quoi { flex: 1; min-width: 220px; }
-.reste-liste .rl-quoi b { font-family: var(--font-display); font-size: 0.94rem; display: block; }
-.reste-liste .rl-quoi small { font-size: 0.76rem; color: var(--t-muted); line-height: 1.5; }
-
-/* ============================================================
-   MES NOTIFICATIONS (B-134)
-   ============================================================
-   Une case par e-mail. L'interrupteur lui-même réutilise `.aa-switch`
-   (l'agenda, la fiche véto) : aucun nouveau composant, une case stylée et
-   accessible au clavier suffit — même famille d'interaction dans tout le
-   projet.
-
-   Les lignes sont SÉPARÉES et généreuses, pas en grille serrée comme les
-   options de l'agenda : ici chaque ligne est une décision indépendante qu'on
-   lit avant de cocher, et non un groupe de réglages liés qu'on balaie d'un
-   coup d'œil. */
-.mn-liste { display: flex; flex-direction: column; }
+   `.mn-ligne` + `.aa-switch` portent l'interrupteur de « Mon agenda » ;
+   `.mn-note` dit ce qui reste quand il est éteint. */
 .mn-ligne {
   padding: 14px 20px;
   border-bottom: 1px dashed var(--t-border);
@@ -292,23 +68,17 @@
    porter l'emphase. */
 .mn-note strong { font-weight: 700; }
 
-@media (max-width: 520px) {
-  .conn-duo { grid-template-columns: 1fr; }
-}
-
 /* ============================================================
    MON AGENDA (B-173)
    ============================================================
    Porté de `docs/maquettes/B-173-mon-agenda.html`. L'interrupteur reprend
    `.aa-switch` + `.mn-ligne` (même famille que « Mes notifications ») ; les
    choix de personnalisation sont des segments, parce que chaque question a
-   UNE réponse parmi deux ou trois — une case à cocher dirait « plusieurs ». */
-.ma-carte { overflow: hidden; }
+   UNE réponse parmi deux ou trois — une case à cocher dirait « plusieurs ».
+   B-202b — retirées avec la page : `.ma-carte` (son enveloppe), `.ma-q`,
+   `.ma-recu*`, `.ma-etiquette*`, `.ma-bandeau.info` (plus aucun appelant). */
 .ma-corps { padding: 16px 20px 18px; display: flex; flex-direction: column; gap: 14px; }
-.ma-q { display: flex; flex-direction: column; gap: 7px; }
-.ma-q + .ma-q { padding-top: 14px; border-top: 1px dashed var(--t-border); }
 .ma-q-t { font-family: var(--font-display); font-size: 0.92rem; font-weight: 700; display: flex; flex-direction: column; gap: 2px; }
-.ma-q-t small { font-family: var(--font-body); font-weight: 400; font-size: 0.76rem; color: var(--t-muted); line-height: 1.45; }
 .ma-seg { display: flex; flex-wrap: wrap; gap: 6px; }
 .ma-seg button {
   font: 600 0.8rem var(--font-display);
@@ -318,25 +88,11 @@
 }
 .ma-seg button.sel { background: var(--t-accent); border-color: var(--t-accent); color: #fff; }
 .ma-seg button:disabled { opacity: 0.45; cursor: not-allowed; }
-.ma-recu-tete { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.ma-etiquette {
-  font: 700 0.68rem var(--font-display); letter-spacing: 0.04em;
-  border-radius: 999px; padding: 3px 12px;
-  background: var(--surface-2); color: var(--t-muted); border: 1px solid var(--t-border);
-}
-.ma-etiquette.perso { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; }
-.ma-recu { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.ma-recu li { display: flex; gap: 10px; align-items: flex-start; font-size: 0.88rem; }
-.ma-recu li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-top: 7px; flex: none; }
-.ma-recu li.non { color: var(--t-muted); }
-.ma-recu li.non::before { background: var(--t-border); }
-.ma-recu small { display: block; font-size: 0.76rem; color: var(--t-muted); }
 .ma-statut { margin: 0; font-size: 0.8rem; color: var(--t-muted); line-height: 1.5; }
 .ma-statut.att { color: var(--warn); font-weight: 600; }
 .ma-bandeau { border-radius: var(--r-sm); padding: 11px 14px; font-size: 0.82rem; line-height: 1.5; margin: 0 20px; }
 .ma-corps .ma-bandeau { margin: 0; }
 .ma-bandeau b { display: block; font-family: var(--font-display); font-size: 0.86rem; margin-bottom: 2px; }
-.ma-bandeau.info { background: var(--accent-soft); }
 .ma-bandeau.att { background: var(--warn-soft); }
 .ma-bandeau.bad { background: var(--danger-soft); }
 .ma-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -374,11 +130,3 @@
 @media (max-width: 640px) {
   .ma-sous { padding-left: 0; }
 }
-
-/* ── B-193b — carte « Messagerie de l'équipe » ─────────────────── */
-.carte-messagerie .conn-ico svg { width: 19px; height: 19px; color: var(--accent-ink); }
-.carte-messagerie-pied {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
-  padding: 13px 18px 15px;
-}
-.carte-messagerie-refus { margin: 0; font-size: 0.8rem; color: var(--danger); }

@@ -125,8 +125,12 @@ export const APPARTENANCE: Record<string, Appartenance> = {
   // le test-gardien descend dans les SOUS-DOSSIERS (01/10) : avant, un ecran
   // place sous un dossier du socle n'avait aucune decision a rendre, donc ne
   // pouvait jamais s'eteindre.
+  // B-202b (12/11) — les deux sous-ecrans ne font plus que RENVOYER vers
+  // Reglages › Pour moi, ou ces reglages vivent desormais. Ils restent des
+  // dossiers de route, donc ont toujours leur decision ici.
   'reglages/agenda': {
     socle:
+      'Ancienne adresse de « Mon agenda », renvoie vers Reglages › Pour moi. ' +
       'Chacun regle son agenda Google personnel (B-173). Ouvert par cabinet ' +
       '(agenda_perso_ouvert), pas par module : il porte les gardes ET les journees, ' +
       'et n’envoie simplement rien de ce qu’un module eteint ne produit pas.',
@@ -139,6 +143,7 @@ export const APPARTENANCE: Record<string, Appartenance> = {
   },
   'reglages/notifications': {
     socle:
+      'Ancienne adresse de « Mes notifications », renvoie vers Reglages › Pour moi. ' +
       'Chacun regle les e-mails qu’il recoit. Les e-mails existent quels que ' +
       'soient les modules allumes — un module eteint n’en envoie simplement pas.',
   },

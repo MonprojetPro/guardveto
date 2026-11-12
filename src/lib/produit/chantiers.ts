@@ -74,17 +74,12 @@ export const CHANTIERS: Record<string, Chantier> = {
         'bascule ». Photographie du Val d Allier prise juste avant (B-184).',
     },
   },
-  'reglages-v2': {
-    nom: 'Réglages — l’onglet refondu (sommaire et cinq sections)',
-    item: 'B-202',
-    depuis: '2026-11-10',
-    diffusion: {
-      tousLesCabinets:
-        'Maquette validee par MiKL le 10/11 (docs/maquettes/B-202-reglages.html), ' +
-        'recette au bac a sable du 10 au 11/11. Bascule decidee par MiKL le 11/11 : ' +
-        '« c est bon fais la bascule ». Aucune donnee touchee : seul le dessin change.',
-    },
-  },
+  // `reglages-v2` (B-202) a vecu ici du 10 au 12/11 : bac a sable seul, puis
+  // ouvert a tous le 11/11. RETIRE par B-202b le 12/11, en meme temps que
+  // l'ancien ecran Reglages : sans second rendu, repasser la ligne en
+  // `bacASableSeulement` n'aurait rien ramene — l'onglet aurait disparu chez
+  // le client, a l'inverse de ce que promet « revenir en arriere » ci-dessus.
+  // Un chantier ne quitte ce registre qu'avec son ancien rendu.
   'boutons-relief': {
     nom: 'Boutons — le système « Relief » (une seule feuille pour tous les boutons)',
     item: 'B-206',

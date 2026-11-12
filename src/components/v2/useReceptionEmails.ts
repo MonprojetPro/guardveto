@@ -3,8 +3,9 @@
 // ============================================================
 // GUARDVETO V2 — Les e-mails que je reçois : l'état et son enregistrement
 // ============================================================
-// Partagé par « Mes notifications » (B-134) et par l'onglet Réglages refondu
-// (B-202), pour qu'il n'existe qu'une seule façon d'enregistrer ce réglage.
+// Né pour « Mes notifications » (B-134), sorti dans ce fichier pour l'onglet
+// Réglages refondu (B-202). Depuis B-202b (12/11), l'ancienne page est
+// retirée : seule la section « Pour moi » s'en sert.
 //
 // ⚠️ L'ÉTAT AFFICHÉ SUIT LE SERVEUR, PAS LE CLIC. En cas d'échec, la case
 //    revient à sa position d'avant et le message le dit. Laisser une case

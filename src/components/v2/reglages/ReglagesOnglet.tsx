@@ -1,7 +1,7 @@
 'use client'
 
 // ============================================================
-// GUARDVETO — L'onglet Réglages refondu (B-202, chantier `reglages-v2`)
+// GUARDVETO — L'onglet Réglages refondu (B-202)
 // ============================================================
 // MiKL, le 10/11 : « cet onglet est mal organisé et pas du tout ergonomique
 // […] au même titre que Planning dont on a revu tout le graphisme, je veux
@@ -13,15 +13,18 @@
 // et une flèche y ramène. Hors administratrice, il n'y a que « Pour moi » :
 // pas de sommaire pour une seule section.
 //
-// 🔴 PORTE DE CHANTIER. Ce composant n'est rendu que si `chantierOuvert`
-//    (`reglages-v2`) l'autorise : bac à sable seul tant que MiKL n'a pas
-//    recetté. Le Val d'Allier garde l'écran actuel (`ReglagesV2`).
+// Né derrière une porte de chantier (`reglages-v2`, bac à sable seul du 10
+// au 11/11), ouvert à tous les cabinets le 11/11 sur décision de MiKL. Depuis
+// B-202b (12/11), l'ancien écran est retiré : ce composant est sorti de
+// `components/chantier/` (il s'appelait `ReglagesChantierV2`), et le chantier
+// est retiré de `lib/produit/chantiers.ts` — il n'y a plus de second rendu
+// vers lequel revenir.
 // ============================================================
 
 import { useEffect, useRef, useState } from 'react'
 import { Building2, ChevronLeft, ChevronRight, FileText, MessageSquare, Plug, User } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import '@/styles/chantier-reglages-v2.css'
+import '@/styles/v2-reglages-onglet.css'
 import {
   attentions, sectionsPour, type IdSection, type Partages, type RoleReglages, type Section,
 } from '@/lib/reglages/coquille'
@@ -59,7 +62,7 @@ const ICONES: Record<IdSection, LucideIcon> = {
   suivi: FileText,
 }
 
-export function ReglagesChantierV2({ role, sectionDemandee, moi, cabinet }: Props) {
+export function ReglagesOnglet({ role, sectionDemandee, moi, cabinet }: Props) {
   const sections = sectionsPour(role)
   const plusieurs = sections.length > 1 && cabinet !== null
 

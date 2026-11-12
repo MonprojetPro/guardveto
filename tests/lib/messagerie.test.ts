@@ -398,10 +398,10 @@ describe('⑤ B-193c — prévenir aussi par mail', () => {
   })
 
   it('le journal « message » a un libellé dans les Réglages', () => {
-    // B-202 — le dictionnaire vit dans `lib/reglages/libelles.ts`, lu par
-    // l'écran actuel ET par l'onglet refondu.
+    // B-202 — le dictionnaire vit dans `lib/reglages/libelles.ts`, lu par le
+    // journal de l'onglet Réglages (l'ancien écran est retiré depuis B-202b).
     expect(readFileSync(join(RACINE, 'src/lib/reglages/libelles.ts'), 'utf8')).toMatch(/message: 'Message de la messagerie'/)
-    expect(readFileSync(join(RACINE, 'src/components/v2/ReglagesV2.tsx'), 'utf8')).toContain('TYPE_EMAIL')
+    expect(readFileSync(join(RACINE, 'src/components/v2/reglages/ReglagesSectionSuivi.tsx'), 'utf8')).toContain('TYPE_EMAIL')
   })
 })
 
@@ -420,12 +420,15 @@ describe('⑥ B-193b — l’administratrice allume et éteint la messagerie', (
     expect(sql).toContain("role_app = 'admin'")
   })
 
-  it('la carte n’est posée que dans la partie ADMIN de Réglages', () => {
+  it('l’interrupteur n’est donné que dans la partie ADMIN de Réglages', () => {
+    // B-202b — la carte de l'ancien écran est retirée ; c'est la section
+    // « Messagerie » de l'onglet refondu qui porte l'interrupteur.
     const page = readFileSync(join(RACINE, 'src/app/(v2)/reglages/page.tsx'), 'utf8')
-    const avant = page.slice(0, page.indexOf('carteMessagerie='))
+    const avant = page.slice(0, page.indexOf('messagerieAllumee:'))
     // La partie admin commence là où la page exige un vétérinaire administrateur.
+    expect(avant).toContain('exigerVeterinaire(supabase)')
     expect(avant).toContain('<BarreV2 prenom={vet.prenom} estAdmin dock={dock} />')
-    expect(page.match(/carteMessagerie=/g)?.length).toBe(1)
+    expect(page.match(/messagerieAllumee:/g)?.length).toBe(1)
   })
 
   it('l’écran « non activé » et le refus serveur lisent la même phrase', () => {

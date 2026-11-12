@@ -1,8 +1,9 @@
 // ============================================================
 // GUARDVETO — Réglages : les mots et les formats partagés (B-202)
 // ============================================================
-// Sortis de `components/v2/ReglagesV2.tsx` le 10/11 pour que l'écran actuel
-// et l'écran refondu (chantier `reglages-v2`) lisent LA MÊME source. Deux
+// Sortis de `components/v2/ReglagesV2.tsx` le 10/11 pour que l'ancien écran
+// et l'onglet refondu lisent LA MÊME source pendant la recette (l'ancien
+// écran est retiré depuis B-202b, 12/11). Deux
 // copies d'un dictionnaire divergent toujours : c'est ainsi que
 // « conge_demande » s'est affiché en code brut pendant cinq semaines.
 // ============================================================
@@ -60,7 +61,8 @@ export function formatHeureCourte(hhmm: string): string {
 export const EXEMPLE_NOM = initialesVeto('Anne-Catherine', 'Bernard')
 
 export const ZONE_LABEL: Record<string, string> = { A: 'Zone A', B: 'Zone B', C: 'Zone C' }
-export const REGION_LABEL: Record<string, string> = {
+// Non exporté depuis B-202b : son seul lecteur hors de ce fichier était l'ancien écran.
+const REGION_LABEL: Record<string, string> = {
   metropole: 'Métropole',
   'alsace-moselle': 'Alsace-Moselle',
   guadeloupe: 'Guadeloupe',

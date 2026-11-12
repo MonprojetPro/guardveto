@@ -8,15 +8,16 @@
 // Avant, deux cartes renvoyaient vers deux autres pages ; ils vivent ici.
 //
 // Rien n'est recopié : l'enregistrement des e-mails passe par
-// `useReceptionEmails` (partagé avec « Mes notifications ») et l'agenda est
-// `MonAgendaCorps`, le contenu même de la page validée en B-181.
+// `useReceptionEmails` et l'agenda est `MonAgendaCorps`, le contenu même de
+// la page validée en B-181 (ces deux anciennes pages ne sont plus que des
+// renvois ici depuis B-202b).
 // Chaque réglage part seul, au clic : pas de bouton « Enregistrer » à oublier.
 // ============================================================
 
 import { useState } from 'react'
 import { Bell, Info } from 'lucide-react'
 import { useReceptionEmails, type LigneReglage } from '@/components/v2/useReceptionEmails'
-import { MonAgendaCorps, type DonneesMonAgenda } from '@/components/v2/MonAgendaV2'
+import { MonAgendaCorps, type DonneesMonAgenda } from '@/components/v2/MonAgendaCorps'
 import type { RoleReglages } from '@/lib/reglages/coquille'
 import { Bloc, Interrupteur } from './ReglagesCommun'
 

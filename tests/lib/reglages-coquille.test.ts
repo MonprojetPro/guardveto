@@ -4,10 +4,11 @@
 // Maquette validée par MiKL le 10/11 : `docs/maquettes/B-202-reglages.html`.
 // On vérifie ici ce qui ne se voit pas à l'œil mais coûte cher quand c'est
 // faux : qui voit quelle section, ce que signale le sommaire, ce qu'envoie
-// chaque « Enregistrer », et que le chantier reste fermé chez le client.
+// chaque « Enregistrer », et — depuis B-202b — que l'onglet refondu est le
+// seul rendu, sans interrupteur qui ferait croire à un retour arrière.
 // ============================================================
 
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -15,7 +16,7 @@ import {
 } from '@/lib/reglages/coquille'
 import { libelleZone, montrerRaison, estUnEchec } from '@/lib/reglages/libelles'
 import { lireReponseResync, resynchroniserPeriode } from '@/lib/reglages/resynchroniser'
-import { chantierOuvert } from '@/lib/produit/chantiers'
+import { CHANTIERS } from '@/lib/produit/chantiers'
 
 const RACINE = join(__dirname, '..', '..')
 const lire = (f: string) => readFileSync(join(RACINE, f), 'utf8')
@@ -39,7 +40,7 @@ describe('Les sections, et qui les voit', () => {
     expect(SECTIONS.find((s) => s.id === 'suivi')?.nom).toBe('Journal des e-mails')
     expect(SECTIONS.map((s) => s.nom)).not.toContain('Suivi')
     // Le bloc ne répète pas le nom de la section juste au-dessus.
-    expect(lire('src/components/chantier/ReglagesSectionSuivi.tsx')).not.toContain('titre="Journal des e-mails"')
+    expect(lire('src/components/v2/reglages/ReglagesSectionSuivi.tsx')).not.toContain('titre="Journal des e-mails"')
   })
 
   it('l’adresse ne peut pas ouvrir une section interdite ni inconnue', () => {
@@ -120,8 +121,8 @@ describe('🔴 Un « Enregistrer » n’enregistre que SON sujet', () => {
   })
 
   it('les sections passent par cette fonction, pas par une saisie partagée', () => {
-    expect(lire('src/components/chantier/ReglagesSectionCabinet.tsx')).toContain("partagesAEnvoyer(partages, 'expediteur'")
-    expect(lire('src/components/chantier/ReglagesSectionConnexions.tsx')).toContain("partagesAEnvoyer(partages, 'agenda'")
+    expect(lire('src/components/v2/reglages/ReglagesSectionCabinet.tsx')).toContain("partagesAEnvoyer(partages, 'expediteur'")
+    expect(lire('src/components/v2/reglages/ReglagesSectionConnexions.tsx')).toContain("partagesAEnvoyer(partages, 'agenda'")
   })
 })
 
@@ -158,11 +159,27 @@ describe('Renvoyer un planning : la phrase dit pourquoi', () => {
   })
 })
 
-describe('🔴 La porte du chantier — la leçon du 08/10 (B-151)', () => {
-  it('B-202a — bascule du 11/11 : ouvert à tous les cabinets, Val d’Allier compris', () => {
-    // Recette au bac à sable du 10 au 11/11, puis MiKL : « c'est bon fais la bascule ».
-    expect(chantierOuvert('reglages-v2', { estBacASable: false })).toBe(true)
-    expect(chantierOuvert('reglages-v2', { estBacASable: true })).toBe(true)
+describe('🔴 B-202b — l’onglet refondu est le SEUL rendu de Réglages', () => {
+  it('l’ancien écran est retiré du code, pas seulement caché', () => {
+    for (const f of [
+      'src/components/v2/ReglagesV2.tsx',
+      'src/components/v2/CarteMessagerie.tsx',
+      'src/components/v2/CartesReglagesPerso.tsx',
+      'src/components/v2/MesNotificationsV2.tsx',
+      'src/components/v2/MonAgendaV2.tsx',
+    ]) {
+      expect(existsSync(join(RACINE, f)), f).toBe(false)
+    }
+  })
+
+  it('`reglages-v2` n’est plus un chantier : aucun interrupteur ne promet un retour arrière', () => {
+    // Avec l'ancien écran retiré, repasser la ligne en « bac à sable seul »
+    // aurait fait disparaître l'onglet chez le client au lieu de le ramener.
+    expect(CHANTIERS['reglages-v2']).toBeUndefined()
+    const page = lire('src/app/(v2)/reglages/page.tsx')
+    expect(page).not.toContain('chantierOuvert')
+    expect(page).not.toContain('components/chantier/')
+    expect(page).toContain("from '@/components/v2/reglages/ReglagesOnglet'")
   })
 
   it('la phrase « où allumer la messagerie » désigne la nouvelle section', async () => {
@@ -171,39 +188,36 @@ describe('🔴 La porte du chantier — la leçon du 08/10 (B-151)', () => {
     expect(lire('src/lib/notifications.ts')).not.toContain('Réglages &gt; Mes notifications')
   })
 
-  it('la page consulte la porte avant de rendre l’onglet refondu', () => {
-    const page = lire('src/app/(v2)/reglages/page.tsx')
-    expect(page).toContain("chantierOuvertPourLeCabinet(supabase, 'reglages-v2')")
-    // Les deux rendus du nouvel écran sont gardés par `refonte`.
-    expect(page).toContain("if (identite.role !== 'admin' && refonte) {")
-    expect(page).toContain('if (refonte) {')
-  })
-
   it('hors administratrice, aucune donnée du cabinet n’est passée à l’écran', () => {
     const page = lire('src/app/(v2)/reglages/page.tsx')
     const brancheNonAdmin = page.slice(
-      page.indexOf("if (identite.role !== 'admin' && refonte) {"),
       page.indexOf("if (identite.role !== 'admin') {"),
+      page.indexOf('exigerVeterinaire(supabase)'),
     )
+    expect(brancheNonAdmin.length).toBeGreaterThan(200)
     expect(brancheNonAdmin).toContain('cabinet={null}')
     expect(brancheNonAdmin).not.toContain('email_log')
     // La partie admin commence après `exigerVeterinaire` : les données du cabinet y vivent.
     expect(page.indexOf('messagerieAllumee:')).toBeGreaterThan(page.indexOf('exigerVeterinaire(supabase)'))
   })
 
-  it('les anciennes adresses mènent à « Pour moi » là où la refonte est ouverte', () => {
+  it('les anciennes adresses ne font plus que renvoyer vers « Pour moi »', () => {
     for (const f of ['src/app/(v2)/reglages/notifications/page.tsx', 'src/app/(v2)/reglages/agenda/page.tsx']) {
-      expect(lire(f)).toContain("if (await chantierOuvertPourLeCabinet(supabase, 'reglages-v2')) redirect('/reglages?section=moi')")
+      const source = lire(f)
+      expect(source).toContain("redirect('/reglages?section=moi')")
+      // Rien d'autre n'est importé : la page ne lit ni ne rend plus rien.
+      expect(source.match(/^import /gm)).toHaveLength(1)
     }
   })
 
   it('🔴 l’agenda de repli ne part pas vers le navigateur — un booléen, calculé pour CE cabinet (CERBÈRE)', () => {
     const page = lire('src/app/(v2)/reglages/page.tsx')
-    const brancheRefonte = page.slice(page.indexOf('  if (refonte) {'), page.indexOf('// En parallèle : aucune lecture'))
-    expect(brancheRefonte.length).toBeGreaterThan(200)
-    expect(brancheRefonte).toContain('agendaDeRepliPour(cabinetId)')
-    expect(brancheRefonte).toContain('repliDisponible: repli !== null')
-    expect(brancheRefonte).not.toContain('process.env.GOOGLE_CALENDAR_ID')
+    const brancheAdmin = page.slice(page.indexOf("// ── L'onglet de l'administratrice"))
+    expect(brancheAdmin.length).toBeGreaterThan(200)
+    expect(brancheAdmin).toContain('agendaDeRepliPour(cabinetId)')
+    expect(brancheAdmin).toContain('repliDisponible: repli !== null')
+    // Depuis B-202b, sur TOUTE la page : l'ancien écran, qui l'envoyait, est retiré (B-205).
+    expect(page).not.toContain('process.env.GOOGLE_CALENDAR_ID')
   })
 
   it('« Mon agenda » peut lancer une mise à jour : la page porte le délai qu’il lui faut', () => {

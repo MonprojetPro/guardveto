@@ -1,13 +1,14 @@
 /* ============================================================
-   GUARDVETO — L'onglet Réglages refondu (B-202, chantier `reglages-v2`)
+   GUARDVETO — L'onglet Réglages refondu (B-202)
    ============================================================
    Porté de la maquette validée par MiKL le 10/11 :
    `docs/maquettes/B-202-reglages.html`.
 
-   ⚠️ Importée par `components/chantier/ReglagesChantierV2.tsx` SEUL, et ses
-      classes portent toutes le préfixe `rg-` : rien ici ne touche l'écran
-      actuel du client. Les deux exceptions (`.aa-switch`, `.ma-*`, `.mn-*`)
-      sont BORNÉES à `.rg-agenda`, qui n'existe que dans ce chantier.
+   ⚠️ Importée par `components/v2/reglages/ReglagesOnglet.tsx` SEUL, et ses
+      classes portent toutes le préfixe `rg-`. Les exceptions (`.aa-switch`,
+      `.ma-*`, `.mn-*`, de « Mon agenda ») sont BORNÉES à `.rg-agenda`.
+      (Feuille née `chantier-reglages-v2.css`, renommée par B-202b le 12/11
+      quand l'onglet est sorti des chantiers.)
 
    Les couleurs sont celles du terrier (`v2-terrier.css`). Règle du projet :
    `var(--t-muted)`, `var(--t-border)`, `var(--t-accent)`, jamais les noms nus

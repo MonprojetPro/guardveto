@@ -1,42 +1,31 @@
 // ============================================================
-// GUARDVETO V2 — Réglages & connexions
+// GUARDVETO V2 — Réglages
 // ============================================================
-// Sixième écran de la bascule (maquette M4, section 4). Il porte les trois
-// branchements du cabinet (agenda, expéditeur d'e-mails, adresse) et le
-// journal des e-mails, qui vivaient dans `/admin/structure` et
-// `/admin/journal-emails`.
+// L'onglet Réglages refondu (B-202, maquette validée par MiKL le 10/11 :
+// `docs/maquettes/B-202-reglages.html`) : un sommaire, cinq sections. Les
+// vétos et le secrétariat n'ont que « Pour moi » (leurs e-mails, leur agenda
+// Google) ; l'administratrice voit aussi le cabinet, la messagerie, les
+// connexions et le journal des e-mails.
 //
-// La structure des gardes elle-même (créneaux, profils, horaires, relations)
-// n'est PAS reprise ici : c'est un écran entier, pas une connexion. Il reste
-// en V1 et l'écran y renvoie explicitement — un lien honnête vaut mieux
-// qu'une carte à moitié refaite.
-// ============================================================
-
-//
-// ── B-202 — L'ONGLET REFONDU, DERRIÈRE SA PORTE DE CHANTIER ─────────────────
-// MiKL, 10/11 : « cet onglet est mal organisé et pas du tout ergonomique ».
-// Là où le chantier `reglages-v2` est ouvert (bac à sable seul tant que MiKL
-// n'a pas recetté), la page rend `ReglagesChantierV2` : un sommaire, cinq
-// sections, « Pour moi » y compris (notifications + agenda). Partout ailleurs
-// — le Val d'Allier — rien ne change : c'est la leçon du 08/10 (B-151).
+// Il a remplacé partout, le 11/11, l'écran « Réglages & connexions » (grille
+// de cartes) et les deux pages `/reglages/notifications` et `/reglages/agenda`,
+// qui ne font plus que renvoyer ici. L'ancien écran est retiré du code depuis
+// B-202b (12/11) : il n'y a plus de second rendu vers lequel revenir.
 // ============================================================
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { exigerIdentite, exigerVeterinaire } from '@/lib/identite'
-import { agendaPersoOuvert, clientService } from '@/lib/agenda-perso/rapprocher'
-import { CartesReglagesPerso } from '@/components/v2/CartesReglagesPerso'
-import { CarteMessagerie } from '@/components/v2/CarteMessagerie'
+// `v2-reglages.css` : il ne porte plus que les styles de « Mon agenda »
+// (`MonAgendaCorps`, posé dans la section « Pour moi »).
 import '@/styles/v2-reglages.css'
 import { Satin } from '@/components/v2/Satin'
 import { BarreV2 } from '@/components/v2/BarreV2'
-import { ReglagesV2 } from '@/components/v2/ReglagesV2'
-import { ReglagesChantierV2 } from '@/components/chantier/ReglagesChantierV2'
+import { ReglagesOnglet } from '@/components/v2/reglages/ReglagesOnglet'
 import { agendaDeRepliPour, nomLisibleAgenda } from '@/lib/google-calendar'
 import { chargerDock } from '@/data/v2/dock'
 import { chargerMesNotifications, chargerMonAgenda } from '@/data/v2/mesReglages'
 import { resoudreCabinetId } from '@/lib/supabase/cabinet'
-import { chantierOuvertPourLeCabinet } from '@/lib/produit/chantiers-serveur'
 import { sectionDemandee } from '@/lib/reglages/coquille'
 import {
   libellePeriode, type CreneauAgenda, type LigneEmail, type ValeursCabinet,
@@ -44,8 +33,8 @@ import {
 import type { Periode, Veterinaire } from '@/types'
 
 export const dynamic = 'force-dynamic'
-// B-202 — l'onglet refondu montre « Mon agenda », dont l'ouverture peut lancer
-// une mise à jour qui tourne après la réponse (voir `chargerMonAgenda`).
+// L'onglet montre « Mon agenda », dont l'ouverture peut lancer une mise à
+// jour qui tourne après la réponse (voir `chargerMonAgenda`).
 export const maxDuration = 300
 export const metadata = { title: 'GuardVeto — Réglages' }
 
@@ -76,14 +65,11 @@ export default async function ReglagesPage({
   // n'est lue pour eux (tout ce qui suit est réservé à l'admin).
   const identite = await exigerIdentite(supabase)
 
-  // B-202 — la porte du chantier, consultée UNE fois pour les deux branches.
-  // En cas de doute (lecture en panne), elle rend `false` : l'écran actuel.
-  const refonte = await chantierOuvertPourLeCabinet(supabase, 'reglages-v2')
   const param = (await searchParams).section
   const section = sectionDemandee(Array.isArray(param) ? param[0] : param, identite.role)
   const prenom = identite.genre === 'veto' ? identite.veto.prenom : identite.nomAffiche
 
-  if (identite.role !== 'admin' && refonte) {
+  if (identite.role !== 'admin') {
     const [notifications, agenda, dockPerso] = await Promise.all([
       chargerMesNotifications(supabase, identite, user.id),
       chargerMonAgenda(identite),
@@ -99,41 +85,12 @@ export default async function ReglagesPage({
             estSecretaire={identite.role === 'secretaire'}
             dock={dockPerso}
           />
-          <ReglagesChantierV2
+          <ReglagesOnglet
             role={identite.role}
             sectionDemandee={section}
             moi={{ notifications, agenda }}
             cabinet={null}
           />
-        </div>
-      </>
-    )
-  }
-
-  if (identite.role !== 'admin') {
-    const agendaOuvert = !!identite.cabinetId
-      && (await agendaPersoOuvert(clientService(), identite.cabinetId))
-    // Une seule chose à régler : on y va directement, plutôt qu'une page
-    // d'une carte qui ne sert qu'à faire cliquer une fois de plus.
-    if (!agendaOuvert) redirect('/reglages/notifications')
-    const dockPerso = await chargerDock(supabase, { role_app: identite.role })
-    return (
-      <>
-        <Satin />
-        <div className="shell">
-          <BarreV2
-            prenom={identite.genre === 'veto' ? identite.veto.prenom : identite.nomAffiche}
-            estAdmin={false}
-            estSecretaire={identite.role === 'secretaire'}
-            dock={dockPerso}
-          />
-          <div className="page-head rise">
-            <div>
-              <h1>Réglages</h1>
-              <p className="lede">Ces réglages ne valent que pour vous.</p>
-            </div>
-          </div>
-          <CartesReglagesPerso agendaOuvert />
         </div>
       </>
     )
@@ -262,109 +219,59 @@ export default async function ReglagesPage({
     }))
   }
 
-  // ── B-202 — l'onglet refondu (bac à sable seul) ───────────────────────────
-  // Mêmes lectures que l'écran actuel, plus « Pour moi ». Ni clé ni variable
-  // d'environnement ne partent vers le navigateur : des booléens et des noms.
-  // Seule exception, déjà vraie de l'écran actuel : les trois champs partagés
-  // (agenda, adresse et nom d'expéditeur), que `configurerPartagesCabinet`
-  // exige en retour — l'admin de CE cabinet, qui les a réglés.
-  if (refonte) {
-    // Le repli est NOMINATIF (cabinet pilote seul, `agendaDeRepliPour`) : le
-    // tester sur la seule variable d'environnement aurait annoncé « Branché »
-    // à un cabinet dont la synchronisation n'écrit nulle part (CERBÈRE, 10/11).
-    const repli = agendaDeRepliPour(cabinetId)
-    const [dockRefonte, notifications, agenda, nomAgendaRefonte] = await Promise.all([
-      chargerDock(supabase, vet),
-      chargerMesNotifications(supabase, identite, user.id),
-      chargerMonAgenda(identite),
-      nomLisibleAgenda(valeurs.googleCalendarId || repli),
-    ])
-    return (
-      <>
-        <Satin />
-        <div className="shell">
-          <BarreV2 prenom={vet.prenom} estAdmin dock={dockRefonte} />
-          <ReglagesChantierV2
-            role="admin"
-            sectionDemandee={section}
-            moi={{ notifications, agenda }}
-            cabinet={{
-              cabinet: {
-                adresse: valeurs.adresse,
-                codePostal: valeurs.codePostal,
-                ville: valeurs.ville,
-                zoneScolaire: valeurs.zoneScolaire,
-                regionFeries: valeurs.regionFeries,
-                envoiConfigure:
-                  !!process.env.BREVO_API_KEY?.trim()
-                  && !!(valeurs.brevoFromEmail.trim() || process.env.BREVO_FROM_EMAIL?.trim()),
-                emailAdmin: vet.email ?? null,
-              },
-              connexions: {
-                repliDisponible: repli !== null,
-                nomAgenda: nomAgendaRefonte,
-                periodesPubliees: periodesPubliees.map((p) => ({ id: p.id, libelle: libellePeriode(p) })),
-                agendaJourneeEntiere,
-                agendaAfficherHoraires,
-                creneaux,
-              },
-              partages: {
-                googleCalendarId: valeurs.googleCalendarId,
-                brevoFromEmail: valeurs.brevoFromEmail,
-                brevoFromName: valeurs.brevoFromName,
-              },
-              messagerieAllumee: dockRefonte.modules.includes('chat'),
-              emails,
-            }}
-          />
-        </div>
-      </>
-    )
-  }
-
-  // En parallèle : aucune lecture ajoutée en série sur un écran déjà chargé.
-  // B-175 — l'encart « Planning de la journée » (un simple lien vers /journee)
-  // est retiré : les journées se règlent dans Organisation › Journées.
-  const [dock, monAgendaOuvert] = await Promise.all([
+  // ── L'onglet de l'administratrice ───────────────────────────────────────
+  // Ni clé ni variable d'environnement ne partent vers le navigateur : des
+  // booléens et des noms. Seule exception : les trois champs partagés (agenda,
+  // adresse et nom d'expéditeur), que `configurerPartagesCabinet` exige en
+  // retour — l'admin de CE cabinet, qui les a réglés.
+  //
+  // Le repli est NOMINATIF (cabinet pilote seul, `agendaDeRepliPour`) : le
+  // tester sur la seule variable d'environnement aurait annoncé « Branché »
+  // à un cabinet dont la synchronisation n'écrit nulle part (CERBÈRE, 10/11).
+  const repli = agendaDeRepliPour(cabinetId)
+  const [dock, notifications, agenda, nomAgenda] = await Promise.all([
     chargerDock(supabase, vet),
-    // B-174 — la carte « Mon agenda », seulement là où la page l'accepterait.
-    identite.cabinetId ? agendaPersoOuvert(clientService(), identite.cabinetId) : Promise.resolve(false),
+    chargerMesNotifications(supabase, identite, user.id),
+    chargerMonAgenda(identite),
+    nomLisibleAgenda(valeurs.googleCalendarId || repli),
   ])
-
   return (
     <>
       <Satin />
       <div className="shell">
         <BarreV2 prenom={vet.prenom} estAdmin dock={dock} />
-        <ReglagesV2
-          valeurs={valeurs}
-          periodesPubliees={periodesPubliees}
-          emails={emails}
-          // L'agenda de repli, lu côté SERVEUR : le navigateur n'a aucun moyen
-          // de connaître les variables d'environnement. Sans lui, l'écran
-          // annonçait « Non branché » alors que les gardes s'écrivaient
-          // réellement dans Google — un indicateur qui ment est pire que pas
-          // d'indicateur du tout, il envoie chercher une panne qui n'existe pas.
-          agendaParDefaut={(process.env.GOOGLE_CALENDAR_ID ?? '').trim()}
-          // Son NOM chez Google (« gardes véto »). L'identifiant d'un agenda
-          // secondaire est une suite de 64 caractères hexadécimaux : afficher
-          // ça dans un écran de réglages ne renseigne personne et fait peur.
-          // Le nom est ce que le cabinet voit dans sa propre interface Google,
-          // donc le seul repère qu'on partage avec lui.
-          nomAgenda={await nomLisibleAgenda(valeurs.googleCalendarId || null)}
-          // Même raison que l'agenda : seul le serveur sait si l'envoi est
-          // réellement possible (clé + adresse d'expédition). Un booléen, jamais
-          // les valeurs elles-mêmes — le navigateur n'a rien à faire d'une clé.
-          envoiConfigure={
-            !!process.env.BREVO_API_KEY?.trim()
-            && !!(valeurs.brevoFromEmail.trim() || process.env.BREVO_FROM_EMAIL?.trim())
-          }
-          agendaJourneeEntiere={agendaJourneeEntiere}
-          agendaAfficherHoraires={agendaAfficherHoraires}
-          creneaux={creneaux}
-          monAgendaOuvert={monAgendaOuvert}
-          // B-193b — l'état lu dans le dock (modules du cabinet, lus côté serveur).
-          carteMessagerie={<CarteMessagerie allumee={dock.modules.includes('chat')} />}
+        <ReglagesOnglet
+          role="admin"
+          sectionDemandee={section}
+          moi={{ notifications, agenda }}
+          cabinet={{
+            cabinet: {
+              adresse: valeurs.adresse,
+              codePostal: valeurs.codePostal,
+              ville: valeurs.ville,
+              zoneScolaire: valeurs.zoneScolaire,
+              regionFeries: valeurs.regionFeries,
+              envoiConfigure:
+                !!process.env.BREVO_API_KEY?.trim()
+                && !!(valeurs.brevoFromEmail.trim() || process.env.BREVO_FROM_EMAIL?.trim()),
+              emailAdmin: vet.email ?? null,
+            },
+            connexions: {
+              repliDisponible: repli !== null,
+              nomAgenda,
+              periodesPubliees: periodesPubliees.map((p) => ({ id: p.id, libelle: libellePeriode(p) })),
+              agendaJourneeEntiere,
+              agendaAfficherHoraires,
+              creneaux,
+            },
+            partages: {
+              googleCalendarId: valeurs.googleCalendarId,
+              brevoFromEmail: valeurs.brevoFromEmail,
+              brevoFromName: valeurs.brevoFromName,
+            },
+            messagerieAllumee: dock.modules.includes('chat'),
+            emails,
+          }}
         />
       </div>
     </>

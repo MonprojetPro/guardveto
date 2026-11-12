@@ -126,17 +126,8 @@
   .v2 .team-grid { grid-template-columns: minmax(0, 1fr); }
   .v2 .vet-card { min-width: 0; }
   .v2 .vet-outils button { width: 40px; height: 40px; }
-  /* Réglages : le journal des e-mails, une ligne = une petite fiche. */
-  .v2 .mail-table thead { display: none; }
-  .v2 .mail-table, .v2 .mail-table tbody { display: block; }
-  .v2 .mail-table tr {
-    display: grid; grid-template-columns: minmax(0, 1fr) auto;
-    gap: 4px 10px; align-items: center;
-    padding: 10px 0;
-    border-bottom: 1px dashed var(--t-border);
-  }
-  .v2 .mail-table tr:last-child { border-bottom: none; }
-  .v2 .mail-table td { display: block; padding: 0; border: none; min-width: 0; overflow-wrap: anywhere; }
+  /* `.mail-table` (le journal des e-mails de l'ancien écran Réglages) est
+     retiré par B-202b : l'onglet refondu dessine son journal en `rg-`. */
 
   /* ---- 6. Les cibles au doigt : 40 px au moins (B-179b) ----
      Mesuré le 03/11 à 375 px : les petits boutons (`.btn-sm`) et les boutons

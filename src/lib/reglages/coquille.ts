@@ -89,7 +89,7 @@ export interface Partages {
  * dernière valeur ENREGISTRÉE — jamais ce qui traîne dans un autre champ.
  *
  * 🔴 LE PIÈGE QUE ÇA FERME. L'action serveur réécrit les trois colonnes d'un
- *    coup. L'écran actuel lui passait l'état de saisie commun aux deux cartes :
+ *    coup. L'ancien écran lui passait l'état de saisie commun aux deux cartes :
  *    corriger le nom d'expéditeur enregistrait aussi, sans le dire, l'adresse
  *    d'agenda à moitié tapée dans l'autre carte (et inversement).
  *

@@ -3,9 +3,8 @@
 // ============================================================
 // GUARDVETO — Réglages refondus : les pièces communes (B-202)
 // ============================================================
-// Chantier `reglages-v2` (bac à sable seul). Maquette validée par MiKL le
-// 10/11 : `docs/maquettes/B-202-reglages.html`. Styles :
-// `styles/chantier-reglages-v2.css`, importée par `ReglagesChantierV2` seul.
+// Maquette validée par MiKL le 10/11 : `docs/maquettes/B-202-reglages.html`.
+// Styles : `styles/v2-reglages-onglet.css`, importée par `ReglagesOnglet` seul.
 // ============================================================
 
 import { useId, type ReactNode } from 'react'

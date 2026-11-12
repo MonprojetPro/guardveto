@@ -360,7 +360,8 @@
 .co-valider:hover:not(:disabled) { filter: brightness(1.07); transform: translateY(-1px); }
 .co-valider:active:not(:disabled) { transform: translateY(0); }
 .co-valider:disabled { opacity: 0.62; cursor: not-allowed; filter: none; box-shadow: none; }
-/* Le rouet de l'attente — même dessin que `.sync-spin` (Réglages),
+/* Le rouet de l'attente — même dessin que l'ancien `.sync-spin` (Réglages,
+   retiré par B-202b),
    sous un nom propre à cette feuille : deux définitions d'une même
    classe dans deux fichiers, c'est la porte ouverte à la divergence. */
 .co-spin {
