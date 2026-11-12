@@ -80,7 +80,7 @@ function traduire(erreur: { message: string; code?: string }, contexte: string):
 
 interface RangeeConversation {
   id: string
-  genre: 'equipe' | 'privee'
+  genre: 'equipe' | 'privee' | 'editeur'
   autre_user_id: string | null
   autre_nom: string | null
   autre_actif: boolean | null

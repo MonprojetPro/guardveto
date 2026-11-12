@@ -102,6 +102,8 @@
   font-family: var(--font-display); font-size: 0.78rem; font-weight: 700;
 }
 .msg-avatar.equipe { background: var(--accent-soft); }
+/* B-207 — le fil MonProjetPro se distingue de l'équipe sans crier. */
+.msg-avatar.editeur { background: var(--accent-soft); color: var(--accent); }
 .msg-avatar svg { width: 18px; height: 18px; }
 
 .msg-note {

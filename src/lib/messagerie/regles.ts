@@ -27,7 +27,14 @@ export const TAILLE_PAGE_MESSAGES = 60
 export const COLONNES_MESSAGE =
   'id, conversation_id, auteur_user_id, auteur_nom, corps, pieces_jointes, cree_le, modifie_le, retire_le, mail_envoye_a, mail_echecs'
 
-export type GenreConversation = 'equipe' | 'privee'
+/**
+ * `editeur` (B-207) : le fil « MonProjetPro » d'une personne, ecrit depuis le
+ * Hub MPP. Un seul membre (le destinataire), qui lit et repond.
+ */
+export type GenreConversation = 'equipe' | 'privee' | 'editeur'
+
+/** Le nom affiche du fil editeur, et l'auteur pose par la base (B-207). */
+export const NOM_EDITEUR = 'MonProjetPro'
 
 /** Une piece jointe, telle que stockee dans `messages.pieces_jointes`. */
 export interface PieceMessage {
@@ -210,6 +217,7 @@ export function fusionnerMessage(fil: MessageFil[], entrant: MessageFil): Messag
 /** Le nom d'une conversation dans la liste et en tete du fil. */
 export function nomConversation(c: Pick<ConversationListe, 'genre' | 'autreNom'>): string {
   if (c.genre === 'equipe') return 'Toute l’équipe'
+  if (c.genre === 'editeur') return NOM_EDITEUR
   return c.autreNom ?? 'Ancien membre'
 }
 

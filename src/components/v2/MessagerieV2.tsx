@@ -43,6 +43,7 @@ import {
   RotateCw,
   Search,
   SendHorizontal,
+  Sparkles,
   Trash2,
   Users,
   X,
@@ -95,6 +96,15 @@ import {
 import { effacerBrouillon, enregistrerBrouillon, lireBrouillon } from '@/lib/messagerie/brouillon'
 import { ACCEPT_HTML, nomDeFichierSur, poidsLisible, refusFichier } from '@/lib/support/contraintes'
 
+
+/** L'avatar d'une conversation : l'équipe, l'éditeur (B-207), ou des initiales. */
+function AvatarConversation({ genre, nom }: { genre: ConversationListe['genre']; nom: string }) {
+  return (
+    <span className={`msg-avatar${genre === 'equipe' ? ' equipe' : genre === 'editeur' ? ' editeur' : ''}`} aria-hidden="true">
+      {genre === 'equipe' ? <Users /> : genre === 'editeur' ? <Sparkles /> : initiales(nom)}
+    </span>
+  )
+}
 
 /** Le temps laissé aux écritures en cascade (message → conversation → notif). */
 const DEBOUNCE_LISTE_MS = 500
@@ -392,9 +402,7 @@ export function MessagerieV2({
                   onClick={() => ouvrir(c.id)}
                   aria-current={c.id === activeId ? 'true' : undefined}
                 >
-                  <span className={`msg-avatar${c.genre === 'equipe' ? ' equipe' : ''}`} aria-hidden="true">
-                    {c.genre === 'equipe' ? <Users /> : initiales(nom)}
-                  </span>
+                  <AvatarConversation genre={c.genre} nom={nom} />
                   <span className="msg-conv-texte">
                     <span className="msg-conv-ligne">
                       <span className="msg-conv-nom">{nom}</span>
@@ -626,15 +634,15 @@ function Fil({
         <button type="button" className="msg-retour" onClick={surRetour} aria-label="Revenir aux conversations">
           <ArrowLeft aria-hidden="true" />
         </button>
-        <span className={`msg-avatar${conversation.genre === 'equipe' ? ' equipe' : ''}`} aria-hidden="true">
-          {conversation.genre === 'equipe' ? <Users /> : initiales(nom)}
-        </span>
+        <AvatarConversation genre={conversation.genre} nom={nom} />
         <div className="msg-fil-titre">
           <h2>{nom}</h2>
           <p>
             {conversation.genre === 'equipe'
               ? 'Tout le cabinet, secrétariat compris'
-              : conversation.autreActif
+              : conversation.genre === 'editeur'
+                ? 'L’éditeur de GuardVeto — vous seul lisez ce fil'
+                : conversation.autreActif
                 ? 'Conversation privée'
                 : 'A quitté le cabinet'}
           </p>
@@ -676,7 +684,9 @@ function Fil({
           <p className="msg-debut">
             {conversation.genre === 'equipe'
               ? 'Rien d’écrit pour l’instant. Un message ici est lu par toute l’équipe.'
-              : `Rien d’écrit pour l’instant. Seuls vous et ${prenomDe(nom)} lirez cette conversation.`}
+              : conversation.genre === 'editeur'
+                ? 'Rien d’écrit pour l’instant. Ce fil vous relie à MonProjetPro, l’éditeur de GuardVeto.'
+                : `Rien d’écrit pour l’instant. Seuls vous et ${prenomDe(nom)} lirez cette conversation.`}
           </p>
         )}
 
@@ -700,7 +710,7 @@ function Fil({
                 deMoi={deMoi}
                 montrerNom={!deMoi && conversation.genre === 'equipe' && !memeAuteur}
                 peutModifier={deMoi && !m.retireLe && !m.enEnvoi && !m.echec}
-                peutRetirer={(deMoi || estAdmin) && !m.retireLe && !m.enEnvoi && !m.echec}
+                peutRetirer={(deMoi || (estAdmin && m.auteurUserId !== null)) && !m.retireLe && !m.enEnvoi && !m.echec}
                 enEdition={enEdition === m.id}
                 surEditer={() => setEnEdition(m.id)}
                 surAnnulerEdition={() => setEnEdition(null)}
