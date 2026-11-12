@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="fr" data-dir="a">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B-206 — Planche des boutons GuardVeto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700;800&family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   B-206 — PLANCHE, pas du code de production.
+   Trois directions pour UN système de boutons, montrées sur les
+   mêmes cas. Les couleurs sont celles de v2-terrier.css.
+   ============================================================ */
+:root {
+  --bg: #F6EEDF; --bg-deep: #EFE2CB; --surface: #FFFCF4; --surface-2: #F6EBD6;
+  --text: #3A2A1C; --muted: #7C6A55; --soft: #A08D75;
+  --border: #E6D7BB; --border-strong: #D8C4A1;
+  --accent: #C7530F; --accent-ink: #AC4508; --accent-clair: #E89A4F;
+  --accent-soft: rgba(224,122,47,.13); --accent-glow: rgba(230,126,34,.28);
+  --danger: #A8341F; --danger-soft: rgba(168,52,31,.12);
+  --ok: #3E7A2E;
+  --display: "Figtree", "Segoe UI", sans-serif;
+  --body: "Noto Sans", "Segoe UI", sans-serif;
+  --ease: cubic-bezier(.22,1,.36,1);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 400 15px/1.5 var(--body); }
+h1, h2, h3 { font-family: var(--display); margin: 0; }
+.page { max-width: 1120px; margin: 0 auto; padding: 28px 16px 90px; }
+.intro h1 { font-size: 1.7rem; font-weight: 800; }
+.intro p { color: var(--muted); max-width: 64ch; margin: 6px 0 0; }
+
+/* ---- le sélecteur de direction (neutre, hors système) ---- */
+.choix { position: sticky; top: 0; z-index: 5; background: rgba(246,238,223,.94); backdrop-filter: blur(6px);
+  margin: 18px -16px 22px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+.choix-in { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.choix button { font: 700 .9rem var(--display); color: var(--text); background: var(--surface);
+  border: 1.5px solid var(--border-strong); border-radius: 8px; padding: 9px 16px; cursor: pointer; min-height: 44px; }
+.choix button small { display: block; font: 500 .72rem var(--body); color: var(--muted); }
+.choix button[aria-pressed="true"] { background: var(--text); color: #FFF7E8; border-color: var(--text); }
+.choix button[aria-pressed="true"] small { color: #D9C6A8; }
+.choix button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.parti { margin: 0 0 22px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.parti b { font-family: var(--display); font-size: 1.05rem; }
+.parti p { margin: 4px 0 0; color: var(--muted); font-size: .9rem; }
+[data-dir="a"] .parti:not(.pa), [data-dir="b"] .parti:not(.pb), [data-dir="c"] .parti:not(.pc) { display: none; }
+
+section { margin-top: 30px; }
+section > h2 { font-size: 1.12rem; font-weight: 800; margin-bottom: 4px; }
+section > .sous { color: var(--muted); font-size: .88rem; margin: 0 0 12px; }
+.carte { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+.deux { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+.rang { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.etiq { font: 600 .7rem var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--soft); margin: 0 0 8px; }
+
+/* ---- avant / après ---- */
+.avant { font: 500 .8rem var(--body); color: var(--text); background: #F3E9D6; border: 1px solid #DDCDB0;
+  border-radius: 10px; padding: 6px 12px; cursor: default; }
+.avant-lien { font: 500 .85rem var(--body); color: var(--accent); background: none; border: 0; text-decoration: underline; padding: 0; cursor: default; }
+
+/* ---- tableau des états ---- */
+.defile { overflow-x: auto; }
+table.etats { border-collapse: collapse; width: 100%; min-width: 760px; }
+table.etats th { font: 600 .7rem var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--soft); text-align: left; padding: 6px 10px; }
+table.etats td { padding: 10px; border-top: 1px solid var(--border); vertical-align: middle; }
+table.etats td:first-child { font: 700 .86rem var(--display); white-space: nowrap; }
+table.etats td:first-child span { display: block; font: 400 .74rem var(--body); color: var(--muted); }
+
+/* ============================================================
+   SOCLE COMMUN — géométrie et comportements partagés
+   ============================================================ */
+.b { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 38px; padding: 0 16px; border: 0; background: none; color: inherit; cursor: pointer;
+  font: 600 .84rem/1 var(--body); white-space: nowrap; text-decoration: none; -webkit-tap-highlight-color: transparent;
+  transition: transform .14s var(--ease), box-shadow .18s var(--ease), background-color .18s, color .18s, border-color .18s; }
+.b svg { width: 16px; height: 16px; flex: none; }
+.b.sm { min-height: 32px; padding: 0 12px; font-size: .78rem; }
+.b.ico { width: 38px; padding: 0; }
+.b.sm.ico { width: 32px; }
+.b:disabled { cursor: not-allowed; }
+.b:focus { outline: none; }
+.spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: tourne .7s linear infinite; }
+@keyframes tourne { to { transform: rotate(360deg); } }
+.b.is-load { pointer-events: none; cursor: progress; filter: saturate(.8) brightness(1.04); }
+@media (prefers-reduced-motion: reduce) { .b, .seg button, .sw, .sw::after, .chip { transition: none !important; } .spin { animation-duration: 1.6s; } }
+
+.seg { display: inline-flex; }
+.seg button { font: 600 .8rem/1 var(--body); min-height: 34px; padding: 0 14px; border: 0; background: none; color: var(--muted); cursor: pointer;
+  transition: background-color .18s, color .18s, box-shadow .18s; }
+.sw { position: relative; width: 42px; height: 24px; border: 0; padding: 0; cursor: pointer; flex: none; transition: background-color .2s, box-shadow .2s; }
+.sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; transition: transform .2s var(--ease), background-color .2s; }
+.sw[aria-checked="true"]::after { transform: translateX(18px); }
+.chip { font: 600 .78rem/1 var(--body); min-height: 30px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border: 0;
+  transition: background-color .18s, color .18s, box-shadow .18s; }
+.chip i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.champ { display: block; }
+.champ span { display: block; font: 600 .78rem var(--body); margin-bottom: 5px; }
+.inp { width: 100%; min-height: 40px; padding: 0 12px; font: 400 .9rem var(--body); color: var(--text); background: #fff; border: 1px solid var(--border-strong);
+  transition: border-color .18s, box-shadow .18s; }
+.inp:focus { outline: none; }
+
+/* ============================================================
+   DIRECTION A — « RELIEF »  (la touche que l'on presse)
+   ============================================================ */
+[data-dir="a"] .b { border-radius: 10px; }
+[data-dir="a"] .b.pri { color: #fff; background: linear-gradient(#C4520F, #A8420A);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 2px 0 #8C3906, 0 6px 14px rgba(140,70,15,.22); }
+[data-dir="a"] .b.pri:not(:disabled):is(:hover,.is-h) { transform: translateY(-1px); background: linear-gradient(#CB5611, #AE4609);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.34), 0 3px 0 #8C3906, 0 10px 20px rgba(140,70,15,.28); }
+[data-dir="a"] .b.sec { color: var(--text); background: linear-gradient(#FFFEFA, #F8EEDB);
+  box-shadow: inset 0 1px 0 #fff, 0 0 0 1px #D2BC95, 0 2px 0 #C9B189, 0 5px 10px rgba(120,70,18,.10); }
+[data-dir="a"] .b.sec svg { color: var(--accent); }
+[data-dir="a"] .b.sec:not(:disabled):is(:hover,.is-h) { transform: translateY(-1px); color: var(--accent-ink);
+  box-shadow: inset 0 1px 0 #fff, 0 0 0 1px var(--accent-clair), 0 3px 0 #D9A56E, 0 8px 16px rgba(190,90,20,.16); }
+[data-dir="a"] .b.dis { color: #57412D; padding: 0 11px; background: rgba(120,70,18,.06); box-shadow: inset 0 -1.5px 0 rgba(120,70,18,.16); }
+[data-dir="a"] .b.dis svg { color: var(--accent); }
+[data-dir="a"] .b.dis:not(:disabled):is(:hover,.is-h) { background: #F1E3C8; color: var(--accent-ink); box-shadow: inset 0 0 0 1px #E2CFA8; }
+[data-dir="a"] .b.dan { color: var(--danger); background: linear-gradient(#FFFDF9, #FAEDE4);
+  box-shadow: inset 0 1px 0 #fff, 0 0 0 1px #DDB3A6, 0 2px 0 #D2A193, 0 5px 10px rgba(168,52,31,.08); }
+[data-dir="a"] .b.dan:not(:disabled):is(:hover,.is-h) { color: #fff; background: linear-gradient(#B93F28, #A02F1B); transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 3px 0 #74200F, 0 8px 16px rgba(168,52,31,.22); }
+[data-dir="a"] .b:not(:disabled):is(:active,.is-a) { transform: translateY(2px) !important; }
+[data-dir="a"] .b.pri:not(:disabled):is(:active,.is-a) { box-shadow: inset 0 2px 4px rgba(90,35,0,.35); background: #A03F09; }
+[data-dir="a"] .b:is(.sec,.dan):not(:disabled):is(:active,.is-a) { box-shadow: inset 0 2px 4px rgba(120,70,18,.2), 0 0 0 1px #D2BC95; }
+[data-dir="a"] .b.dis:not(:disabled):is(:active,.is-a) { background: #E9D6B4; }
+[data-dir="a"] .b:is(:focus-visible,.is-f) { outline: 2.5px solid var(--accent); outline-offset: 3px; }
+[data-dir="a"] .b:disabled { color: #96846C; background: #EADDC4; box-shadow: none; transform: none; }
+[data-dir="a"] .b:is(.sec,.dan):disabled { background: transparent; box-shadow: 0 0 0 1px #DCCBAB; }
+[data-dir="a"] .b.dis:disabled { background: none; box-shadow: none; }
+[data-dir="a"] .b:disabled svg { color: inherit; }
+[data-dir="a"] .seg { padding: 3px; gap: 2px; border-radius: 11px; background: #EADBC0; box-shadow: inset 0 1px 3px rgba(110,62,14,.18); }
+[data-dir="a"] .seg button { border-radius: 8px; }
+[data-dir="a"] .seg button { color: #5E4C39; }
+[data-dir="a"] .seg button:hover { color: var(--text); }
+[data-dir="a"] .seg button[aria-pressed="true"] { color: var(--accent-ink); font-weight: 700; background: linear-gradient(#FFFEFA, #F9F0DF);
+  box-shadow: inset 0 1px 0 #fff, 0 1px 0 #C9B189, 0 3px 6px rgba(120,70,18,.14); }
+[data-dir="a"] .sw { border-radius: 8px; background: #DCCAA8; box-shadow: inset 0 1px 3px rgba(110,62,14,.25); }
+[data-dir="a"] .sw::after { border-radius: 5px; background: linear-gradient(#fff, #F3E7D0); box-shadow: 0 1px 0 #B9A27A, 0 2px 4px rgba(90,50,10,.25); }
+[data-dir="a"] .sw[aria-checked="true"] { background: var(--accent); }
+[data-dir="a"] .chip { border-radius: 8px; color: var(--muted); background: var(--surface); box-shadow: 0 0 0 1px #D8C4A1, 0 1px 0 #CDB68E; }
+[data-dir="a"] .chip[aria-pressed="true"] { color: var(--accent-ink); background: #FBE7D2; box-shadow: 0 0 0 1px var(--accent-clair), inset 0 1px 2px rgba(190,90,20,.15); }
+[data-dir="a"] .inp { border-radius: 9px; box-shadow: inset 0 1px 2px rgba(110,62,14,.10); }
+[data-dir="a"] .inp:focus { border-color: var(--accent); box-shadow: inset 0 1px 2px rgba(110,62,14,.10), 0 0 0 3px var(--accent-soft); }
+[data-dir="a"] :is(.seg button, .sw, .chip):focus-visible { outline: 2.5px solid var(--accent); outline-offset: 2px; }
+
+/* ============================================================
+   DIRECTION B — « HALO »  (la lumière qui répond)
+   ============================================================ */
+[data-dir="b"] .b { border-radius: 999px; font-weight: 700; }
+[data-dir="b"] .b.pri { color: #fff; background: linear-gradient(135deg, #CC5811 0%, #B94B0C 55%, #9C3D08 100%); overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.32), 0 4px 16px rgba(230,126,34,.36); }
+[data-dir="b"] .b.pri::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.34) 50%, transparent 65%);
+  transform: translateX(-120%); transition: transform .6s var(--ease); pointer-events: none; }
+[data-dir="b"] .b.pri:not(:disabled):is(:hover,.is-h)::after { transform: translateX(120%); }
+[data-dir="b"] .b.pri.is-h::after { transform: translateX(15%); }
+[data-dir="b"] .b.pri:not(:disabled):is(:hover,.is-h) { box-shadow: inset 0 1px 0 rgba(255,255,255,.36), 0 6px 26px rgba(230,126,34,.58); }
+[data-dir="b"] .b.sec { color: var(--accent-ink); border: 1.5px solid transparent;
+  background: linear-gradient(#FFFCF4, #FFFCF4) padding-box, linear-gradient(135deg, #EFA45C, #C7530F) border-box;
+  box-shadow: 0 2px 8px rgba(230,126,34,.12); }
+[data-dir="b"] .b.sec:not(:disabled):is(:hover,.is-h) { background: linear-gradient(#FFF3E2, #FFF3E2) padding-box, linear-gradient(135deg, #EFA45C, #C7530F) border-box;
+  box-shadow: 0 0 0 4px rgba(230,126,34,.15), 0 4px 18px rgba(230,126,34,.28); }
+[data-dir="b"] .b.dis { color: #8F3906; background: rgba(224,122,47,.12); padding: 0 13px; box-shadow: inset 0 0 0 1px rgba(199,83,15,.3); }
+[data-dir="b"] .b.dis:not(:disabled):is(:hover,.is-h) { background: rgba(224,122,47,.18); box-shadow: inset 0 0 0 1px rgba(199,83,15,.55), 0 0 0 4px rgba(230,126,34,.12); }
+[data-dir="b"] .b.dan { color: var(--danger); border: 1.5px solid transparent;
+  background: linear-gradient(#FFFBF6, #FFFBF6) padding-box, linear-gradient(135deg, #D98572, #A8341F) border-box; }
+[data-dir="b"] .b.dan:not(:disabled):is(:hover,.is-h) { color: #fff; background: linear-gradient(135deg, #C24A31, #A02F1B) padding-box, linear-gradient(135deg, #C24A31, #A02F1B) border-box;
+  box-shadow: 0 0 0 4px rgba(168,52,31,.14), 0 4px 18px rgba(168,52,31,.3); }
+[data-dir="b"] .b:not(:disabled):is(:active,.is-a) { transform: scale(.96); }
+[data-dir="b"] .b.pri:not(:disabled):is(:active,.is-a) { box-shadow: inset 0 2px 6px rgba(90,35,0,.3), 0 2px 8px rgba(230,126,34,.3); }
+[data-dir="b"] .b.b.b:is(:focus-visible,.is-f) { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4.5px var(--accent), 0 0 18px 4px rgba(230,126,34,.4); }
+[data-dir="b"] .b:disabled { color: #96846C; background: #EADDC4; border-color: transparent; box-shadow: none; }
+[data-dir="b"] .b:is(.sec,.dan):disabled { background: transparent; box-shadow: inset 0 0 0 1.5px #DCCBAB; }
+[data-dir="b"] .b.dis:disabled { background: rgba(160,141,117,.1); box-shadow: none; }
+[data-dir="b"] .seg { padding: 3px; gap: 2px; border-radius: 999px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--border-strong); }
+[data-dir="b"] .seg button { border-radius: 999px; }
+[data-dir="b"] .seg button:hover { color: var(--accent-ink); }
+[data-dir="b"] .seg button[aria-pressed="true"] { color: #fff; font-weight: 700; background: linear-gradient(135deg, #CC5811, #AE4609); box-shadow: 0 2px 10px rgba(230,126,34,.42); }
+[data-dir="b"] .sw { border-radius: 999px; background: #DDCCAD; }
+[data-dir="b"] .sw::after { border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(90,50,10,.3); }
+[data-dir="b"] .sw[aria-checked="true"] { background: linear-gradient(135deg, #D9661C, #B94B0C); box-shadow: 0 0 12px rgba(230,126,34,.5); }
+[data-dir="b"] .chip { border-radius: 999px; color: var(--muted); background: var(--surface); box-shadow: inset 0 0 0 1px var(--border-strong); }
+[data-dir="b"] .chip[aria-pressed="true"] { color: var(--accent-ink); background: #FFF0DD; box-shadow: inset 0 0 0 1.5px var(--accent), 0 0 10px rgba(230,126,34,.25); }
+[data-dir="b"] .inp { border-radius: 14px; }
+[data-dir="b"] .inp:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(230,126,34,.16), 0 0 16px rgba(230,126,34,.2); }
+[data-dir="b"] .seg button[aria-pressed]:focus-visible, [data-dir="b"] :is(.sw, .chip)[aria-pressed]:focus-visible, [data-dir="b"] .sw[aria-checked]:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4.5px var(--accent); }
+
+/* ============================================================
+   DIRECTION C — « TRAIT »  (l'encre et le repère)
+   ============================================================ */
+[data-dir="c"] .b { border-radius: 6px; font: 700 .83rem/1 var(--display); letter-spacing: .012em; }
+[data-dir="c"] .b.sm { font-size: .78rem; }
+[data-dir="c"] .b.pri { color: #FFF6E6; background: var(--text); box-shadow: inset 0 -3px 0 var(--accent); }
+[data-dir="c"] .b.pri:not(:disabled):is(:hover,.is-h) { background: var(--accent-ink); box-shadow: inset 0 -3px 0 #7A3004; }
+[data-dir="c"] .b.sec { color: var(--text); box-shadow: inset 0 0 0 1.5px var(--text); background: transparent; }
+[data-dir="c"] .b.sec::before, [data-dir="c"] .b.dis::before { content: ""; width: 6px; height: 6px; background: var(--accent); flex: none; transition: transform .2s var(--ease), background-color .18s; }
+[data-dir="c"] .b:is(.sec,.dis):has(svg)::before, [data-dir="c"] .b.ico::before { display: none; }
+[data-dir="c"] .b.sec svg, [data-dir="c"] .b.dis svg { color: var(--accent); }
+[data-dir="c"] .b.sec:not(:disabled):is(:hover,.is-h) { color: #FFF6E6; background: var(--text); }
+[data-dir="c"] .b.sec:not(:disabled):is(:hover,.is-h)::before { transform: rotate(45deg) scale(1.25); background: var(--accent-clair); }
+[data-dir="c"] .b.sec:not(:disabled):is(:hover,.is-h) svg { color: var(--accent-clair); }
+[data-dir="c"] .b.dis { color: var(--text); padding: 0 11px; background: #F1E5CC; }
+[data-dir="c"] .b.dis:not(:disabled):is(:hover,.is-h) { background: #E6D3AE; }
+[data-dir="c"] .b.dis:not(:disabled):is(:hover,.is-h)::before { transform: rotate(45deg) scale(1.25); }
+[data-dir="c"] .b.dan { color: var(--danger); box-shadow: inset 0 0 0 1.5px var(--danger); }
+[data-dir="c"] .b.dan:not(:disabled):is(:hover,.is-h) { color: #fff; background: var(--danger); }
+[data-dir="c"] .b:not(:disabled):is(:active,.is-a) { transform: translateY(1px); filter: brightness(.9); }
+[data-dir="c"] .b:is(:focus-visible,.is-f) { outline: 2px solid var(--text); outline-offset: 3px; }
+[data-dir="c"] .b.pri:is(:focus-visible,.is-f) { outline-color: var(--accent); }
+[data-dir="c"] .b:disabled { color: #96846C; background: transparent; box-shadow: inset 0 0 0 1.5px #D9C9AB; }
+[data-dir="c"] .b.pri:disabled { background: #E7D9BF; box-shadow: none; }
+[data-dir="c"] .b.dis:disabled { box-shadow: none; background: transparent; }
+[data-dir="c"] .b:disabled::before { background: #C9B897; }
+[data-dir="c"] .b:disabled svg { color: inherit; }
+[data-dir="c"] .seg { border-radius: 6px; box-shadow: inset 0 0 0 1.5px var(--text); overflow: hidden; }
+[data-dir="c"] .seg button { font: 700 .8rem/1 var(--display); color: var(--text); border-right: 1.5px solid var(--text); }
+[data-dir="c"] .seg button:last-child { border-right: 0; }
+[data-dir="c"] .seg button:hover { background: #EFE0C3; }
+[data-dir="c"] .seg button[aria-pressed="true"] { color: #FFF6E6; background: var(--text); box-shadow: inset 0 -3px 0 var(--accent); }
+[data-dir="c"] .sw { border-radius: 4px; background: transparent; box-shadow: inset 0 0 0 1.5px var(--text); }
+[data-dir="c"] .sw::after { border-radius: 2px; background: var(--text); }
+[data-dir="c"] .sw[aria-checked="true"] { background: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent); }
+[data-dir="c"] .sw[aria-checked="true"]::after { background: #fff; }
+[data-dir="c"] .chip { border-radius: 4px; font-family: var(--display); color: var(--text); box-shadow: inset 0 0 0 1px #BCA783; background: transparent; }
+[data-dir="c"] .chip[aria-pressed="true"] { color: #FFF6E6; background: var(--text); box-shadow: none; }
+[data-dir="c"] .chip[aria-pressed="true"] i { background: var(--accent-clair); }
+[data-dir="c"] .inp { border-radius: 4px; border: 0; background: transparent; box-shadow: inset 0 -1.5px 0 var(--text); padding-left: 2px; }
+[data-dir="c"] .inp:focus { box-shadow: inset 0 -3px 0 var(--accent); }
+[data-dir="c"] :is(.seg button, .sw, .chip):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ============================================================
+   LES CAS RÉELS (mise en scène, identique pour les trois)
+   ============================================================ */
+.barre { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+.barre h3 { font-size: 1.15rem; font-weight: 800; }
+.barre h3 small { font: 500 .8rem var(--body); color: var(--muted); margin-left: 6px; }
+.grille-fictive { margin-top: 14px; display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.grille-fictive i { height: 26px; border-radius: 4px; background: var(--surface-2); }
+.grille-fictive i:nth-child(7n), .grille-fictive i:nth-child(7n-1) { background: #F1E2C6; }
+.regle { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--border); }
+.regle:first-of-type { border-top: 0; }
+.regle .tx { flex: 1; min-width: 0; font-size: .88rem; }
+.regle .tx b { font-family: var(--display); }
+.pastille { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
+.fenetre { max-width: 420px; margin: 0 auto; background: var(--surface); border-radius: 8px; border: 1px solid var(--border);
+  box-shadow: 0 24px 60px rgba(120,70,18,.2), 0 4px 12px rgba(120,70,18,.1); }
+.fenetre .corps { padding: 18px 18px 6px; }
+.fenetre h3 { font-size: 1.05rem; font-weight: 800; }
+.fenetre p { margin: 6px 0 0; font-size: .88rem; color: var(--muted); }
+.fenetre .pied { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 18px 16px; }
+.voile { background: rgba(58,42,28,.3); border-radius: 8px; padding: 26px 14px; }
+.form { display: grid; gap: 14px; }
+.form .ligne { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: .88rem; }
+.form .pied { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+.tel { width: 340px; max-width: 100%; margin: 0 auto; background: var(--bg); border: 8px solid #2B1F15; border-radius: 30px; overflow: hidden; }
+.tel .ecran { padding: 14px 14px 12px; }
+.tel h3 { font-size: 1rem; font-weight: 800; }
+.tel .b { min-height: 46px; font-size: .9rem; }
+.tel .b.ico { width: 46px; }
+.tel .seg { display: flex; margin: 10px 0; }
+.tel .seg button { flex: 1; min-height: 44px; }
+.tel .bas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px 14px; background: var(--surface); border-top: 1px solid var(--border); }
+.tel .jour { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 6px 6px 12px; margin-top: 8px; font-size: .88rem; }
+.note { font-size: .8rem; color: var(--muted); margin: 10px 0 0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="intro">
+    <h1>Boutons GuardVeto — trois directions</h1>
+    <p>Même écran, mêmes boutons, trois dessins. Passe de l'un à l'autre avec les trois gros boutons ci-dessous, et essaie : survole, clique, utilise la touche Tab. Les couleurs et les polices sont celles du site.</p>
+  </header>
+
+  <div class="choix">
+    <div class="choix-in" role="group" aria-label="Direction affichée">
+      <button type="button" data-va="a" aria-pressed="true">A — Relief<small>la touche que l'on presse</small></button>
+      <button type="button" data-va="b" aria-pressed="false">B — Halo<small>la lumière qui répond</small></button>
+      <button type="button" data-va="c" aria-pressed="false">C — Trait<small>l'encre et le repère</small></button>
+    </div>
+  </div>
+
+  <div class="parti pa"><b>A — Relief.</b><p>Chaque bouton est une petite touche posée sur la page : une arête claire en haut, une tranche en bas, et il s'enfonce vraiment quand on appuie. Le bouton secondaire reste crème, mais il a de l'épaisseur : on voit que ça se presse. Angles doux (10 px).</p></div>
+  <div class="parti pb"><b>B — Halo.</b><p>Des pilules lumineuses. Le bouton principal porte un dégradé terre cuite et un reflet qui le traverse au survol. Le secondaire est une pilule crème cerclée d'un liseré dégradé, au texte terre cuite : discret au repos, il s'allume d'un halo quand on s'en approche.</p></div>
+  <div class="parti pc"><b>C — Trait.</b><p>Le plus graphique. Angles nets, titres en Figtree, l'encre brune du texte devient la couleur des boutons et la terre cuite sert de repère : un filet sous le bouton principal, un petit carré devant les secondaires. Au survol, le bouton s'inverse.</p></div>
+
+  <section>
+    <h2>Le point de départ : un bouton discret qui n'est ni fade, ni un lien</h2>
+    <p class="sous">À gauche, les deux essais que tu as refusés. À droite, la réponse de la direction affichée.</p>
+    <div class="deux">
+      <div class="carte">
+        <p class="etiq">Refusés</p>
+        <div class="rang">
+          <button class="avant" type="button" tabindex="-1">Régler</button>
+          <button class="avant" type="button" tabindex="-1">Où en est chacun →</button>
+          <button class="avant-lien" type="button" tabindex="-1">Ajouter une règle</button>
+        </div>
+      </div>
+      <div class="carte">
+        <p class="etiq">Proposé</p>
+        <div class="rang">
+          <button class="b sec sm" type="button">Régler</button>
+          <button class="b sec sm" type="button">Où en est chacun <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          <button class="b dis sm" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Ajouter une règle</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Tous les états</h2>
+    <p class="sous">Chaque ligne est un type de bouton, chaque colonne un moment de sa vie. Les colonnes sont figées pour être comparées ; la colonne « Repos » réagit pour de vrai.</p>
+    <div class="carte defile"><table class="etats" id="etats"></table></div>
+  </section>
+
+  <section>
+    <h2>Barre d'actions du planning</h2>
+    <div class="carte">
+      <div class="barre">
+        <h3>Hiver P2 <small>12 semaines · brouillon</small></h3>
+        <div class="rang">
+          <div class="seg" role="group" aria-label="Ce qui est affiché">
+            <button type="button" aria-pressed="true">Gardes</button><button type="button" aria-pressed="false">Journées</button><button type="button" aria-pressed="false">Tout</button>
+          </div>
+          <button class="b dis ico" type="button" aria-label="Semaine précédente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+          <button class="b dis" type="button">Aujourd'hui</button>
+          <button class="b dis ico" type="button" aria-label="Semaine suivante"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+          <button class="b sec" type="button">Générer</button>
+          <button class="b pri" type="button" data-essai>Publier</button>
+        </div>
+      </div>
+      <div class="grille-fictive" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="rang" style="margin-top:12px">
+        <button class="chip" type="button" aria-pressed="true"><i style="color:#3B6FD1"></i>Anne-So</button>
+        <button class="chip" type="button" aria-pressed="false"><i style="color:#B93A72"></i>Manon</button>
+        <button class="chip" type="button" aria-pressed="false"><i style="color:#0B7D6C"></i>Victor</button>
+        <button class="chip" type="button" aria-pressed="false"><i style="color:#A0522D"></i>Antoine</button>
+      </div>
+      <p class="note">Clique sur « Publier » pour voir l'état « en cours ».</p>
+    </div>
+  </section>
+
+  <section class="deux">
+    <div>
+      <h2>Ligne de règle et ses actions discrètes</h2>
+      <div class="carte" style="margin-top:8px">
+        <div class="regle">
+          <div class="tx"><span class="pastille" style="background:#A0522D"></span><b>Antoine</b> · <span class="pastille" style="background:#B93A72"></span><b>Manon</b> — jamais de garde la même semaine</div>
+          <button class="b dis sm ico" type="button" aria-label="Modifier"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg></button>
+          <button class="b dis sm ico" type="button" aria-label="Supprimer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
+        </div>
+        <div class="regle">
+          <div class="tx">Rôle payé du week-end</div>
+          <div class="seg" role="group" aria-label="Rôle payé du week-end"><button type="button" aria-pressed="true">1er</button><button type="button" aria-pressed="false">2nd</button><button type="button" aria-pressed="false">Aucun</button></div>
+        </div>
+        <div class="regle">
+          <div class="tx">Répartir les fêtes à tour de rôle</div>
+          <button class="b sec sm" type="button">Régler</button>
+        </div>
+        <div style="margin-top:10px"><button class="b dis sm" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Ajouter une règle toute la semaine</button></div>
+      </div>
+    </div>
+    <div>
+      <h2>Fenêtre de confirmation</h2>
+      <div class="voile" style="margin-top:8px">
+        <div class="fenetre">
+          <div class="corps"><h3>Supprimer la période « Hiver P2 » ?</h3><p>Les 84 gardes posées seront effacées. Cette action ne peut pas être annulée.</p></div>
+          <div class="pied"><button class="b dis" type="button">Annuler</button><button class="b dan" type="button">Supprimer</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="deux">
+    <div>
+      <h2>Formulaire</h2>
+      <div class="carte form" style="margin-top:8px">
+        <label class="champ"><span>Nom de la période</span><input class="inp" value="Hiver P2"></label>
+        <label class="champ"><span>Adresse e-mail du secrétariat</span><input class="inp" placeholder="accueil@cabinet.fr"></label>
+        <div class="ligne"><span>Prévenir l'équipe à la publication</span><button class="sw" type="button" role="switch" aria-checked="true" aria-label="Prévenir l'équipe"></button></div>
+        <div class="ligne"><span>Messagerie interne</span><button class="sw" type="button" role="switch" aria-checked="false" aria-label="Messagerie interne"></button></div>
+        <div class="pied"><button class="b dis" type="button">Annuler</button><button class="b sec" type="button">Enregistrer le brouillon</button><button class="b pri" type="button" data-essai>Enregistrer</button></div>
+      </div>
+    </div>
+    <div>
+      <h2>Sur téléphone</h2>
+      <p class="sous">Sur téléphone, les boutons grandissent : 44 px de haut au minimum.</p>
+      <div class="tel">
+        <div class="ecran">
+          <h3>Semaine du 16 novembre</h3>
+          <div class="seg" role="group" aria-label="Affichage"><button type="button" aria-pressed="true">Ma semaine</button><button type="button" aria-pressed="false">Cabinet</button></div>
+          <div class="jour"><span><b>Sam. 21</b> — garde 1</span><button class="b dis ico" type="button" aria-label="Proposer un échange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h14l-3-3M20 16H6l3 3"/></svg></button></div>
+          <div class="jour"><span><b>Dim. 22</b> — garde 1</span><button class="b dis ico" type="button" aria-label="Proposer un échange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h14l-3-3M20 16H6l3 3"/></svg></button></div>
+        </div>
+        <div class="bas"><button class="b sec" type="button">Absence</button><button class="b pri" type="button">Échanger</button></div>
+      </div>
+    </div>
+  </section>
+
+</div>
+<script>
+// Sélecteur de direction
+document.querySelectorAll('[data-va]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    document.documentElement.dataset.dir = b.dataset.va;
+    document.querySelectorAll('[data-va]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+  });
+});
+// Tableau des états
+var PLUS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+var CRAYON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>';
+var TYPES = [
+  ['Principal', 'une seule action forte par écran', 'pri', 'Publier', ''],
+  ['Secondaire', 'l\'action d\'à côté', 'sec', 'Générer', ''],
+  ['Discret', 'geste accessoire', 'dis', 'Ajouter', PLUS],
+  ['Destructif', 'supprimer, retirer', 'dan', 'Supprimer', ''],
+  ['Icône seule', 'sens évident', 'dis ico', '', CRAYON]
+];
+var ETATS = [['Repos', ''], ['Survol', 'is-h'], ['Focus clavier', 'is-f'], ['Appui', 'is-a'], ['Désactivé', 'off'], ['En cours', 'is-load']];
+var h = '<tr><th></th>' + ETATS.map(function (e) { return '<th>' + e[0] + '</th>'; }).join('') + '</tr>';
+TYPES.forEach(function (t) {
+  h += '<tr><td>' + t[0] + '<span>' + t[1] + '</span></td>';
+  ETATS.forEach(function (e) {
+    var off = e[1] === 'off', load = e[1] === 'is-load';
+    var dedans = (load ? '<span class="spin"></span>' : t[4]) + (t[3] ? (load && t[3] === 'Publier' ? 'Publication…' : t[3]) : '');
+    h += '<td><button type="button" class="b ' + t[2] + ' ' + (off ? '' : e[1]) + '"' + (off ? ' disabled' : '') +
+      (e[1] ? ' tabindex="-1"' : '') + (t[3] ? '' : ' aria-label="Modifier"') + (load ? ' aria-busy="true"' : '') + '>' + dedans + '</button></td>';
+  });
+  h += '</tr>';
+});
+document.getElementById('etats').innerHTML = h;
+// Segments, puces, interrupteurs : ils répondent
+document.querySelectorAll('.seg').forEach(function (s) {
+  s.addEventListener('click', function (ev) {
+    var b = ev.target.closest('button'); if (!b) return;
+    s.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+  });
+});
+document.querySelectorAll('.chip').forEach(function (c) {
+  c.addEventListener('click', function () { c.setAttribute('aria-pressed', String(c.getAttribute('aria-pressed') !== 'true')); });
+});
+document.querySelectorAll('.sw').forEach(function (c) {
+  c.addEventListener('click', function () { c.setAttribute('aria-checked', String(c.getAttribute('aria-checked') !== 'true')); });
+});
+// « En cours » pour de vrai
+document.querySelectorAll('[data-essai]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var avant = b.innerHTML; b.classList.add('is-load'); b.setAttribute('aria-busy', 'true');
+    b.innerHTML = '<span class="spin"></span>' + avant + '…';
+    setTimeout(function () { b.classList.remove('is-load'); b.removeAttribute('aria-busy'); b.innerHTML = avant; }, 1600);
+  });
+});
+</script>
+</body>
+</html>

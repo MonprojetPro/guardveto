@@ -1,0 +1,346 @@
+/* ============================================================
+   GUARDVETO V2 — LE SYSTÈME DE BOUTONS « RELIEF »  (B-206)
+   ============================================================
+   Direction choisie par MiKL le 12/11 sur la planche
+   `docs/maquettes/B-206-boutons.html` (direction A) : chaque bouton est
+   une touche posée sur la page — arête claire en haut, tranche en bas,
+   et il s'enfonce à l'appui.
+
+   ── UNE SEULE SOURCE ───────────────────────────────────────
+   L'inventaire du 12/11 a compté une quarantaine de dessins de boutons
+   répartis dans 20 feuilles. Ce fichier est le SEUL endroit où le dessin
+   d'un bouton se décide. Il porte :
+     1. les jetons (`--bt-*`) ;
+     2. les classes à utiliser dans tout code NOUVEAU :
+          .bt-pri   action principale (une par écran)
+          .bt-sec   action secondaire
+          .bt-dis   geste discret
+          .bt-dan   action destructive
+          .bt-seg   conteneur d'un segment (ses <button> portent aria-pressed)
+     3. le RACCORDEMENT des familles existantes à ces cinq rôles, écran
+        par écran. Raccorder une famille = l'ajouter à la liste de son
+        rôle ; on ne recopie jamais les déclarations.
+
+   ── TOUT EST DERRIÈRE LA PORTE ─────────────────────────────
+   Chaque règle vit dans le bloc `body:has(.v2[data-boutons="relief"])`.
+   L'attribut n'est posé par `app/(v2)/layout.tsx` que si le chantier
+   `boutons-relief` est ouvert au cabinet (`lib/produit/chantiers.ts`).
+   Sans lui, cette feuille ne s'applique à RIEN : le Val d'Allier garde
+   ses boutons actuels. `tests/lib/boutons-relief.test.ts` refuse toute
+   règle écrite hors du bloc.
+
+   ⚠️ Pourquoi `body:has(…)` et pas `.v2[data-boutons] …` : les fenêtres
+      (dialog, popover) sont rendues dans un portail, HORS de `.v2`.
+
+   ⚠️ Les rôles ne décident NI de la taille NI du remplissage (padding,
+      hauteur, corps du texte) : chaque famille garde sa géométrie, donc
+      aucune mise en page ne bouge. Seules exceptions, commentées sur place.
+
+   ⚠️ Dans une fenêtre, la règle de gabarit de `v2-terrier.css`
+      (`[data-slot="dialog-content"] button:not(…)`, spécificité ~0,8,1)
+      continue d'imposer 40 px de haut et son remplissage. C'est voulu :
+      elle règle la taille, ce fichier règle le dessin.
+   ============================================================ */
+
+body:has(.v2[data-boutons="relief"]) {
+  /* ---- jetons ---- */
+  --bt-rayon: 10px;
+  --bt-encre: #3a2a1c;
+  --bt-encre-douce: #57412d;
+  --bt-accent: #c7530f;
+  --bt-accent-ink: #ac4508;
+  --bt-accent-clair: #e89a4f;
+  --bt-danger: #a8341f;
+  --bt-pri-fond: linear-gradient(#c4520f, #a8420a);
+  --bt-pri-fond-survol: linear-gradient(#cb5611, #ae4609);
+  --bt-pri-tranche: #8c3906;
+  --bt-sec-fond: linear-gradient(#fffefa, #f8eedb);
+  --bt-sec-bord: #d2bc95;
+  --bt-sec-tranche: #c9b189;
+  --bt-dan-fond: linear-gradient(#fffdf9, #faede4);
+  --bt-dan-bord: #ddb3a6;
+  --bt-dan-tranche: #d2a193;
+  --bt-eteint-texte: #96846c;
+  --bt-eteint-fond: #eaddc4;
+  --bt-eteint-bord: #dccbab;
+  --bt-mouv: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.18s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.18s, color 0.18s,
+    border-color 0.18s;
+
+  /* ==========================================================
+     PRINCIPAL
+     ========================================================== */
+  :is(
+    .bt-pri,
+    /* socle terrier */
+    .btn.btn-valider,
+    .btn.btn-accent,
+    /* bouton shadcn par défaut (fenêtres) */
+    [data-slot="button"][class~="bg-primary"],
+    /* Planning */
+    .pv2h-outil-btn.pv2h-outils-accent,
+    .bpl-btn.cta,
+    .gjc-cta
+  ) {
+    border: 1px solid var(--bt-pri-tranche);
+    border-radius: var(--bt-rayon);
+    background: var(--bt-pri-fond);
+    color: #fff;
+    text-decoration: none;
+    filter: none;
+    opacity: 1;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      0 2px 0 var(--bt-pri-tranche),
+      0 6px 14px rgba(140, 70, 15, 0.22);
+    transition: var(--bt-mouv);
+
+    &:hover:not(:disabled) {
+      transform: translateY(-1px);
+      background: var(--bt-pri-fond-survol);
+      border-color: var(--bt-pri-tranche);
+      color: #fff;
+      filter: none;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.34),
+        0 3px 0 var(--bt-pri-tranche),
+        0 10px 20px rgba(140, 70, 15, 0.28);
+    }
+    &:active:not(:disabled) {
+      transform: translateY(2px);
+      background: #a03f09;
+      box-shadow: inset 0 2px 4px rgba(90, 35, 0, 0.35);
+    }
+    &:focus-visible {
+      outline: 2.5px solid var(--bt-accent);
+      outline-offset: 3px;
+    }
+    &:disabled {
+      border-color: transparent;
+      background: var(--bt-eteint-fond);
+      color: var(--bt-eteint-texte);
+      box-shadow: none;
+      opacity: 1;
+      cursor: not-allowed;
+    }
+  }
+
+  /* ==========================================================
+     SECONDAIRE — discret, mais avec de l'épaisseur
+     ========================================================== */
+  :is(
+    .bt-sec,
+    .btn.btn-outline,
+    [data-slot="button"][class~="border-border"],
+    /* Planning */
+    .pv2h-outil-btn:not(.pv2h-outils-accent),
+    .bpl-btn:not(.cta),
+    .period-pill
+  ) {
+    border: 1px solid var(--bt-sec-bord);
+    border-radius: var(--bt-rayon);
+    background: var(--bt-sec-fond);
+    color: var(--bt-encre);
+    text-decoration: none;
+    filter: none;
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 2px 0 var(--bt-sec-tranche),
+      0 5px 10px rgba(120, 70, 18, 0.1);
+    transition: var(--bt-mouv);
+
+    &:hover:not(:disabled) {
+      transform: translateY(-1px);
+      background: var(--bt-sec-fond);
+      border-color: var(--bt-accent-clair);
+      color: var(--bt-accent-ink);
+      box-shadow:
+        inset 0 1px 0 #fff,
+        0 3px 0 #d9a56e,
+        0 8px 16px rgba(190, 90, 20, 0.16);
+    }
+    &:active:not(:disabled) {
+      transform: translateY(2px);
+      box-shadow: inset 0 2px 4px rgba(120, 70, 18, 0.2);
+    }
+    &:focus-visible {
+      outline: 2.5px solid var(--bt-accent);
+      outline-offset: 3px;
+    }
+    &:disabled {
+      border-color: var(--bt-eteint-bord);
+      background: transparent;
+      color: var(--bt-eteint-texte);
+      box-shadow: none;
+      opacity: 1;
+      cursor: not-allowed;
+    }
+  }
+
+  /* ==========================================================
+     DISCRET — ni fade, ni lien : un fond léger et une arête
+     ========================================================== */
+  :is(
+    .bt-dis,
+    .btn.btn-ghost,
+    .btn.btn-corriger,
+    /* Planning */
+    .pv2h-today,
+    .mn-btn,
+    .gjc-lien
+  ) {
+    border: 1px solid transparent;
+    border-radius: var(--bt-rayon);
+    background: rgba(120, 70, 18, 0.06);
+    color: var(--bt-encre-douce);
+    text-decoration: none;
+    box-shadow: inset 0 -1.5px 0 rgba(120, 70, 18, 0.16);
+    transition: var(--bt-mouv);
+
+    &:hover:not(:disabled) {
+      background: #f1e3c8;
+      border-color: transparent;
+      color: var(--bt-accent-ink);
+      box-shadow: inset 0 0 0 1px #e2cfa8;
+    }
+    &:active:not(:disabled) {
+      transform: translateY(1px);
+      background: #e9d6b4;
+    }
+    &:focus-visible {
+      outline: 2.5px solid var(--bt-accent);
+      outline-offset: 2px;
+    }
+    &:disabled {
+      background: transparent;
+      color: var(--bt-eteint-texte);
+      box-shadow: none;
+      opacity: 1;
+      cursor: not-allowed;
+    }
+  }
+  /* Exception de géométrie : `.gjc-lien` était un lien souligné sans
+     remplissage (8px 2px). Devenu bouton, il lui faut de l'air. */
+  .gjc-lien {
+    padding: 7px 12px;
+  }
+
+  /* ==========================================================
+     DESTRUCTIF
+     ========================================================== */
+  :is(
+    .bt-dan,
+    .btn.btn-danger,
+    [data-slot="button"][class~="bg-destructive/10"]
+  ) {
+    border: 1px solid var(--bt-dan-bord);
+    border-radius: var(--bt-rayon);
+    background: var(--bt-dan-fond);
+    color: var(--bt-danger);
+    text-decoration: none;
+    filter: none;
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 2px 0 var(--bt-dan-tranche),
+      0 5px 10px rgba(168, 52, 31, 0.08);
+    transition: var(--bt-mouv);
+
+    &:hover:not(:disabled) {
+      transform: translateY(-1px);
+      border-color: #74200f;
+      background: linear-gradient(#b93f28, #a02f1b);
+      color: #fff;
+      filter: none;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.25),
+        0 3px 0 #74200f,
+        0 8px 16px rgba(168, 52, 31, 0.22);
+    }
+    &:active:not(:disabled) {
+      transform: translateY(2px);
+      box-shadow: inset 0 2px 4px rgba(90, 20, 10, 0.3);
+    }
+    &:focus-visible {
+      outline: 2.5px solid var(--bt-danger);
+      outline-offset: 3px;
+    }
+    &:disabled {
+      border-color: var(--bt-eteint-bord);
+      background: transparent;
+      color: var(--bt-eteint-texte);
+      box-shadow: none;
+      opacity: 1;
+      cursor: not-allowed;
+    }
+  }
+
+  /* ==========================================================
+     SEGMENT — un creux, et la touche choisie qui en sort
+     ========================================================== */
+  :is(.bt-seg, .pv2h-seg) {
+    border-radius: 11px;
+    background: #eadbc0;
+    box-shadow: inset 0 1px 3px rgba(110, 62, 14, 0.18);
+  }
+  :is(.bt-seg > button, .pv2h-seg-btn) {
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #5e4c39;
+    transition:
+      background-color 0.18s,
+      color 0.18s,
+      box-shadow 0.18s;
+
+    &:hover {
+      color: var(--bt-encre);
+    }
+    &[aria-pressed="true"] {
+      background: var(--bt-sec-fond);
+      color: var(--bt-accent-ink);
+      box-shadow:
+        inset 0 1px 0 #fff,
+        0 1px 0 var(--bt-sec-tranche),
+        0 3px 6px rgba(120, 70, 18, 0.14);
+    }
+    &:focus-visible {
+      outline: 2.5px solid var(--bt-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  /* ==========================================================
+     ÉCRAN TACTILE — le survol « colle » après un appui du doigt : un
+     bouton resterait soulevé d'un pixel jusqu'au prochain toucher.
+     ========================================================== */
+  @media (hover: none) {
+    :is(
+      .bt-pri, .bt-sec, .bt-dan,
+      .btn,
+      [data-slot="button"],
+      .pv2h-outil-btn, .bpl-btn, .gjc-cta, .period-pill
+    ):hover:not(:disabled):not(:active) {
+      transform: none;
+    }
+  }
+
+  /* ==========================================================
+     MOUVEMENT RÉDUIT — on garde les couleurs, on retire le déplacement
+     ========================================================== */
+  @media (prefers-reduced-motion: reduce) {
+    :is(
+      .bt-pri, .bt-sec, .bt-dis, .bt-dan,
+      .btn,
+      [data-slot="button"],
+      .pv2h-outil-btn, .bpl-btn, .gjc-cta, .period-pill, .pv2h-today, .mn-btn, .gjc-lien,
+      .pv2h-seg-btn
+    ) {
+      transition: none;
+
+      &:hover:not(:disabled),
+      &:active:not(:disabled) {
+        transform: none;
+      }
+    }
+  }
+}

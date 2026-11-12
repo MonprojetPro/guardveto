@@ -85,6 +85,19 @@ export const CHANTIERS: Record<string, Chantier> = {
         '« c est bon fais la bascule ». Aucune donnee touchee : seul le dessin change.',
     },
   },
+  'boutons-relief': {
+    nom: 'Boutons — le système « Relief » (une seule feuille pour tous les boutons)',
+    item: 'B-206',
+    depuis: '2026-11-12',
+    diffusion: {
+      bacASableSeulement:
+        'Direction A choisie par MiKL le 12/11 sur docs/maquettes/B-206-boutons.html. ' +
+        'Branchement ecran par ecran (lot 1 : Planning, socle .btn, boutons des fenetres). ' +
+        'Le Val d Allier ne bascule que sur validation de MiKL (B-206a). Ce chantier ne ' +
+        'rend aucun composant : il pose l attribut data-boutons sur la coquille V2, et ' +
+        'styles/v2-boutons.css ne s applique que sous cet attribut.',
+    },
+  },
 }
 
 /** Le contexte dont depend l'ouverture d'un chantier. */
