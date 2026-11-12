@@ -365,6 +365,9 @@ L'administratrice a éteint le planning des gardes du soir et du week-end : ce c
  * toute l'équipe ? » il répondrait qu'il n'y a pas de moyen dans GuardVeto —
  * une réponse devenue fausse le jour où l'écran est apparu (règle FILOU SUIT
  * LE PRODUIT). Rien n'est dit quand le module est éteint.
+ *
+ * B-207 (12/11) — le fil « MonProjetPro » est cité : sans lui, la description
+ * de la messagerie était incomplète et présentée comme complète.
  */
 export async function blocMessagerie(ctx: Pick<ContexteOutil, 'supabase'>): Promise<string | null> {
   try {
@@ -372,7 +375,7 @@ export async function blocMessagerie(ctx: Pick<ContexteOutil, 'supabase'>): Prom
     if (!modules.includes('chat')) return null
     return `LA MESSAGERIE DU CABINET
 
-Le cabinet a une Messagerie (l'écran « Messagerie » de la barre) : un fil pour toute l'équipe, secrétariat compris, et des conversations privées à deux. Tu ne lis pas les messages et tu n'en envoies pas : un message part sous le nom de la personne, c'est elle qui l'écrit. Si on te demande de prévenir l'équipe ou d'écrire à quelqu'un, envoie-la sur la Messagerie — ne dis jamais qu'il n'existe aucun moyen de le faire dans GuardVeto.`
+Le cabinet a une Messagerie (l'écran « Messagerie » de la barre) : un fil pour toute l'équipe, secrétariat compris, des conversations privées à deux, et pour chacun un fil « MonProjetPro » où MonProjetPro, l'éditeur de GuardVeto, peut lui écrire et où il peut répondre. Tu ne lis pas les messages et tu n'en envoies pas : un message part sous le nom de la personne, c'est elle qui l'écrit. Si on te demande de prévenir l'équipe ou d'écrire à quelqu'un, envoie-la sur la Messagerie — ne dis jamais qu'il n'existe aucun moyen de le faire dans GuardVeto.`
   } catch {
     return null
   }

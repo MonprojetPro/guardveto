@@ -480,6 +480,19 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   'api/webhooks/brevo#POST': {
     hors: 'Point d’entrée appelé par Brevo pour dire ce qu’un e-mail est devenu. Ce n’est pas un geste du cabinet, c’est une notification entrante.',
   },
+  // B-207 (12/11) — le guichet du Hub MPP. Ces routes ne sont appelées que par
+  // le Hub, avec un secret partagé : aucune personne du cabinet ne les déclenche.
+  // ⚠️ La réponse qui DEVENAIT incomplète : « qu'y a-t-il dans la Messagerie ? »
+  // — Filou décrivait le fil d'équipe et les conversations à deux, sans le fil
+  // « MonProjetPro ». Réglé dans `blocMessagerie` (agentFilou.ts).
+  'api/hub/ping#GET': {
+    hors: 'Le Hub MPP vérifie que le guichet répond (secret partagé). Aucune personne du cabinet ne l’appelle.',
+  },
+  'api/hub/messagerie/envoyer#POST': {
+    hors:
+      'MonProjetPro écrit à une personne depuis le Hub, dans son fil « MonProjetPro » (B-207). C’est la voix de ' +
+      'l’éditeur, pas un geste du cabinet : Filou ne l’envoie pas, il sait seulement que ce fil existe (blocMessagerie).',
+  },
   'api/gardes/[id]/disponibilites#GET': {
     hors: 'Calcul de disponibilité affiché par la modale de garde. C’est ce que Filou obtient déjà autrement (règles + planning) ; l’exposer serait un doublon de lecture.',
   },

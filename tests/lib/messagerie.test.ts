@@ -436,3 +436,12 @@ describe('⑥ B-193b — l’administratrice allume et éteint la messagerie', (
     expect(readFileSync(join(RACINE, 'src/lib/produit/modules-serveur.ts'), 'utf8')).toContain('OU_ALLUMER[module]')
   })
 })
+
+describe('⑦ B-207 — Filou suit le fil « MonProjetPro »', () => {
+  it('sa description de la Messagerie cite le fil MonProjetPro — sinon elle est incomplète et se croit complète', () => {
+    const agent = readFileSync(join(RACINE, 'src/lib/ia/agentFilou.ts'), 'utf8')
+    const bloc = agent.slice(agent.indexOf('export async function blocMessagerie'), agent.indexOf('export async function faireTravaillerFilou'))
+    expect(bloc).toContain('LA MESSAGERIE DU CABINET')
+    expect(bloc).toContain('fil « MonProjetPro »')
+  })
+})
