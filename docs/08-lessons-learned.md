@@ -5,6 +5,29 @@
 
 ---
 
+## 2026-11-12 — B-207 : deux pièges d'outillage croisés en codant le guichet du Hub
+
+**1. Un test rouge qui n'est pas le nôtre.** `npx vitest run tests/lib/messagerie.test.ts`
+a remonté un échec… dans `.claude/worktrees/cranky-napier-253606/tests/lib/messagerie.test.ts`,
+la copie de travail d'une AUTRE session. Le filtre de fichiers de Vitest s'applique à tout
+l'arbre, et `vitest.config.ts` n'exclut que `node_modules`, `dist`, `.next` et `e2e`. Lire le
+CHEMIN de chaque échec avant de conclure à une régression ; lancer avec
+`--exclude ".claude/**"`. Correctif durable proposé (non fait, hors périmètre) : ajouter
+`.claude/**` à `exclude` dans `vitest.config.ts`.
+
+**2. La gate de commit lit le board de la SESSION, pas celui du dépôt commité.** Commit dans
+GuardVeto lancé depuis une session ouverte sur foxeo-one : convergence écrite au board
+GuardVeto, refus « aucune convergence pour B-207 ». La gate lisait le board du Hub. Un
+chantier qui traverse deux projets porte donc sa convergence dans LES DEUX boards (une ligne
+de synthèse côté session qui renvoie vers la convergence détaillée).
+
+**Et une méthode qui a marché** : recette RLS en base de prod SANS laisser de trace —
+un bloc `DO` qui joue les rôles (`set_config('request.jwt.claims', …)` + `SET LOCAL ROLE
+authenticated`), accumule les résultats dans une chaîne et finit par `RAISE EXCEPTION` :
+tout est annulé et le message d'erreur EST le rapport. Relire la base après pour le prouver.
+
+---
+
 ## 2026-10-16 — Un report qui se déclare « mesuré » n'est plus jamais rouvert
 
 **Contexte :** B-165a ③. MiKL demande *« les boutons déposer un congé ou signaler une absence »* au
