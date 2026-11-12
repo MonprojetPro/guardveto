@@ -7,44 +7,58 @@
    et il s'enfonce à l'appui.
 
    ── UNE SEULE SOURCE ───────────────────────────────────────
-   L'inventaire du 12/11 a compté une quarantaine de dessins de boutons
-   répartis dans 20 feuilles. Ce fichier est le SEUL endroit où le dessin
-   d'un bouton se décide. Il porte :
+   L'inventaire du 12/11 a compté 458 boutons et une quarantaine de
+   dessins répartis dans 20 feuilles. Ce fichier est le SEUL endroit où
+   le dessin d'un bouton se décide. Il porte :
      1. les jetons (`--bt-*`) ;
      2. les classes à utiliser dans tout code NOUVEAU :
-          .bt-pri   action principale (une par écran)
-          .bt-sec   action secondaire
-          .bt-dis   geste discret
-          .bt-dan   action destructive
-          .bt-seg   conteneur d'un segment (ses <button> portent aria-pressed)
-     3. le RACCORDEMENT des familles existantes à ces cinq rôles, écran
-        par écran. Raccorder une famille = l'ajouter à la liste de son
-        rôle ; on ne recopie jamais les déclarations.
+          .bt-pri    action principale (une par écran)
+          .bt-ok     acceptation (vert)
+          .bt-sec    action secondaire
+          .bt-dis    geste discret
+          .bt-dan    action destructive
+          .bt-seg    conteneur d'un segment (enfants <button aria-pressed>)
+          .bt-puce   filtre ou choix multiple (aria-pressed)
+          .bt-sw     interrupteur (aria-checked)
+          .bt-champ  champ de saisie
+     3. le RACCORDEMENT des familles existantes à ces rôles. Raccorder une
+        famille = l'ajouter à la liste de son rôle ; on ne recopie jamais
+        les déclarations.
+
+   ── RIEN NE PEUT ÊTRE OUBLIÉ EN SILENCE ────────────────────
+   `tests/lib/boutons-relief.test.ts` relit chaque <button> de `src/` :
+   sa classe doit figurer ICI, ou dans le registre « hors système » du
+   test, avec sa raison. Un bouton ajouté sans décision fait échouer le
+   test — même mécanique que FILOU SUIT LE PRODUIT.
 
    ── TOUT EST DERRIÈRE LA PORTE ─────────────────────────────
    Chaque règle vit dans le bloc `body:has(.v2[data-boutons="relief"])`.
    L'attribut n'est posé par `app/(v2)/layout.tsx` que si le chantier
    `boutons-relief` est ouvert au cabinet (`lib/produit/chantiers.ts`).
-   Sans lui, cette feuille ne s'applique à RIEN : le Val d'Allier garde
-   ses boutons actuels. `tests/lib/boutons-relief.test.ts` refuse toute
-   règle écrite hors du bloc.
+   Sans lui, cette feuille ne s'applique à RIEN.
 
-   ⚠️ Pourquoi `body:has(…)` et pas `.v2[data-boutons] …` : les fenêtres
-      (dialog, popover) sont rendues dans un portail, HORS de `.v2`.
+   ⚠️ `body:has(…)` et pas `.v2[data-boutons] …` : les fenêtres, menus et
+      notifications sont rendus dans un portail, HORS de `.v2`.
 
-   ⚠️ Les rôles ne décident NI de la taille NI du remplissage (padding,
-      hauteur, corps du texte) : chaque famille garde sa géométrie, donc
-      aucune mise en page ne bouge. Seules exceptions, commentées sur place.
+   ⚠️ Les pages de connexion (`/login`, `/set-password`) ne sont pas dans
+      la coquille V2 et n'ont pas de cabinet : elles restent sur l'ancien
+      dessin tant que le chantier n'est pas ouvert à tous (B-206a). Leurs
+      familles (`co-*`) sont déjà raccordées ci-dessous.
+
+   ⚠️ Les rôles ne décident NI de la taille NI du remplissage : chaque
+      famille garde sa géométrie, donc aucune mise en page ne bouge.
+      Exceptions regroupées dans « GÉOMÉTRIE », en fin de fichier.
 
    ⚠️ Dans une fenêtre, la règle de gabarit de `v2-terrier.css`
       (`[data-slot="dialog-content"] button:not(…)`, spécificité ~0,8,1)
-      continue d'imposer 40 px de haut et son remplissage. C'est voulu :
-      elle règle la taille, ce fichier règle le dessin.
+      continue d'imposer 40 px de haut et son remplissage : elle règle la
+      taille, ce fichier règle le dessin.
    ============================================================ */
 
 body:has(.v2[data-boutons="relief"]) {
   /* ---- jetons ---- */
   --bt-rayon: 10px;
+  --bt-rayon-petit: 8px;
   --bt-encre: #3a2a1c;
   --bt-encre-douce: #57412d;
   --bt-accent: #c7530f;
@@ -54,12 +68,16 @@ body:has(.v2[data-boutons="relief"]) {
   --bt-pri-fond: linear-gradient(#c4520f, #a8420a);
   --bt-pri-fond-survol: linear-gradient(#cb5611, #ae4609);
   --bt-pri-tranche: #8c3906;
+  --bt-ok-fond: linear-gradient(#3f7c2f, #336626);
+  --bt-ok-fond-survol: linear-gradient(#458533, #386d29);
+  --bt-ok-tranche: #264d1c;
   --bt-sec-fond: linear-gradient(#fffefa, #f8eedb);
   --bt-sec-bord: #d2bc95;
   --bt-sec-tranche: #c9b189;
   --bt-dan-fond: linear-gradient(#fffdf9, #faede4);
   --bt-dan-bord: #ddb3a6;
   --bt-dan-tranche: #d2a193;
+  --bt-creux: #eadbc0;
   --bt-eteint-texte: #96846c;
   --bt-eteint-fond: #eaddc4;
   --bt-eteint-bord: #dccbab;
@@ -75,12 +93,27 @@ body:has(.v2[data-boutons="relief"]) {
     /* socle terrier */
     .btn.btn-valider,
     .btn.btn-accent,
+    .btn.btn-primary:not(.btn-ghost),
     /* bouton shadcn par défaut (fenêtres) */
     [data-slot="button"][class~="bg-primary"],
+    /* … et ceux qu'un écran a recolorés (ambre, violet) : `tailwind-merge`
+       leur retire `bg-primary`, il ne reste que `text-white` pour les reconnaître */
+    [data-slot="button"][class~="text-white"]:not([class~="bg-emerald-600"]),
+    /* notifications (sonner) */
+    [data-sonner-toast] [data-button]:not([data-cancel]),
     /* Planning */
     .pv2h-outil-btn.pv2h-outils-accent,
     .bpl-btn.cta,
-    .gjc-cta
+    .gjc-cta,
+    .head-btn.generer,
+    .ppv-btn.fort,
+    .bpp-btn:not(.secondaire),
+    .pt-btn,
+    /* Connexion */
+    .co-valider,
+    /* Messagerie, Filou */
+    .msg-envoyer,
+    .saisie-envoi
   ) {
     border: 1px solid var(--bt-pri-tranche);
     border-radius: var(--bt-rayon);
@@ -126,16 +159,89 @@ body:has(.v2[data-boutons="relief"]) {
   }
 
   /* ==========================================================
+     ACCEPTATION — le même relief, en vert (« Accepter », « Valider »
+     une demande). Le vert porte un sens : il n'est pas remplacé.
+     ========================================================== */
+  :is(
+    .bt-ok,
+    .btn.btn-ok,
+    .head-btn.valider,
+    [data-slot="button"][class~="bg-emerald-600"]
+  ) {
+    border: 1px solid var(--bt-ok-tranche);
+    border-radius: var(--bt-rayon);
+    background: var(--bt-ok-fond);
+    color: #fff;
+    text-decoration: none;
+    filter: none;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.28),
+      0 2px 0 var(--bt-ok-tranche),
+      0 6px 14px rgba(50, 100, 35, 0.2);
+    transition: var(--bt-mouv);
+
+    &:hover:not(:disabled) {
+      transform: translateY(-1px);
+      background: var(--bt-ok-fond-survol);
+      color: #fff;
+      filter: none;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.32),
+        0 3px 0 var(--bt-ok-tranche),
+        0 10px 20px rgba(50, 100, 35, 0.26);
+    }
+    &:active:not(:disabled) {
+      transform: translateY(2px);
+      background: #2f5f23;
+      box-shadow: inset 0 2px 4px rgba(20, 50, 10, 0.4);
+    }
+    &:focus-visible {
+      outline: 2.5px solid #3e7a2e;
+      outline-offset: 3px;
+    }
+    &:disabled {
+      border-color: transparent;
+      background: var(--bt-eteint-fond);
+      color: var(--bt-eteint-texte);
+      box-shadow: none;
+      opacity: 1;
+      cursor: not-allowed;
+    }
+  }
+
+  /* ==========================================================
      SECONDAIRE — discret, mais avec de l'épaisseur
      ========================================================== */
   :is(
     .bt-sec,
     .btn.btn-outline,
-    [data-slot="button"][class~="border-border"],
+    [data-slot="button"][class~="border-border"]:not([class~="text-destructive"]),
     /* Planning */
     .pv2h-outil-btn:not(.pv2h-outils-accent),
     .bpl-btn:not(.cta),
-    .period-pill
+    .period-pill,
+    .head-btn:not(.generer):not(.valider):not(.ghost),
+    .ppv-btn:not(.fort),
+    .bpp-btn.secondaire,
+    .cnt-reglage-btn,
+    .gm-reassign,
+    .gjc-icbtn,
+    .jdb-ajout,
+    .pt-aujourdhui,
+    .pt-fleche,
+    /* Équipe, Absences */
+    .acct-cta,
+    .vet-actions button,
+    .cv-item-actions button:not(.cv-danger),
+    .dep-actions button,
+    /* Barre, cloche, Filou */
+    .ab-sortie,
+    .cl-bouton,
+    .fen-close,
+    /* Messagerie */
+    .msg-nouveau,
+    .msg-joindre,
+    .msg-plus-anciens
   ) {
     border: 1px solid var(--bt-sec-bord);
     border-radius: var(--bt-rayon);
@@ -176,6 +282,13 @@ body:has(.v2[data-boutons="relief"]) {
       cursor: not-allowed;
     }
   }
+  /* Un secondaire « allumé » (pièce jointe choisie) garde sa touche enfoncée. */
+  .msg-joindre.actif {
+    border-color: var(--bt-accent-clair);
+    background: #fbe7d2;
+    color: var(--bt-accent-ink);
+    box-shadow: inset 0 2px 4px rgba(190, 90, 20, 0.2);
+  }
 
   /* ==========================================================
      DISCRET — ni fade, ni lien : un fond léger et une arête
@@ -184,10 +297,46 @@ body:has(.v2[data-boutons="relief"]) {
     .bt-dis,
     .btn.btn-ghost,
     .btn.btn-corriger,
+    /* bouton shadcn « ghost » : celui qui n'est aucune autre variante */
+    [data-slot="button"]:not([class~="bg-primary"]):not([class~="border-border"]):not([class~="bg-destructive/10"]):not([class~="bg-secondary"]):not([class~="underline-offset-4"]):not([class~="text-destructive"]):not([class~="text-white"]),
+    [data-slot="dialog-close"],
+    [data-sonner-toast] [data-button][data-cancel],
     /* Planning */
     .pv2h-today,
     .mn-btn,
-    .gjc-lien
+    .gjc-lien,
+    .head-btn.ghost,
+    .gen-lien,
+    .gm-absent-link,
+    .gm-alterner,
+    .jdb-fleche,
+    .pt-fermer,
+    .fixer-fermer,
+    .cad-bandeau-fermer,
+    .hist-vers-import,
+    /* Équipe, Absences, Règles */
+    .acct-muet,
+    .lien-inline,
+    .icon-btn,
+    .vet-outils button:not(.vo-danger),
+    .secr-outils button:not(.acct-cta):not(.vo-danger),
+    /* Cloche, Réglages, Support */
+    .cl-action:not(.danger),
+    .cl-retirer,
+    .rg-retour,
+    .rg-info,
+    .sup-piece-retirer,
+    /* Connexion */
+    .co-lien,
+    .co-oeil,
+    /* Messagerie, Filou */
+    .msg-lien,
+    .msg-retour,
+    .msg-choix-fermer,
+    .msg-gestes button,
+    .msg-joints button,
+    .msg-mail-choisi button,
+    .saisie-raz
   ) {
     border: 1px solid transparent;
     border-radius: var(--bt-rayon);
@@ -201,6 +350,7 @@ body:has(.v2[data-boutons="relief"]) {
       background: #f1e3c8;
       border-color: transparent;
       color: var(--bt-accent-ink);
+      text-decoration: none;
       box-shadow: inset 0 0 0 1px #e2cfa8;
     }
     &:active:not(:disabled) {
@@ -219,10 +369,31 @@ body:has(.v2[data-boutons="relief"]) {
       cursor: not-allowed;
     }
   }
-  /* Exception de géométrie : `.gjc-lien` était un lien souligné sans
-     remplissage (8px 2px). Devenu bouton, il lui faut de l'air. */
-  .gjc-lien {
-    padding: 7px 12px;
+  /* Discret, mais dont le survol annonce une suppression. */
+  :is(.vo-danger, .vet-outils button.vo-danger, .secr-outils button.vo-danger) {
+    border: 1px solid transparent;
+    border-radius: var(--bt-rayon-petit);
+    background: rgba(120, 70, 18, 0.06);
+    color: var(--bt-encre-douce);
+    box-shadow: inset 0 -1.5px 0 rgba(120, 70, 18, 0.16);
+    transition: var(--bt-mouv);
+
+    &:hover:not(:disabled) {
+      background: #faede4;
+      color: var(--bt-danger);
+      box-shadow: inset 0 0 0 1px var(--bt-dan-bord);
+    }
+    &:focus-visible {
+      outline: 2.5px solid var(--bt-danger);
+      outline-offset: 2px;
+    }
+    &:disabled {
+      background: transparent;
+      color: var(--bt-eteint-texte);
+      box-shadow: none;
+      opacity: 1;
+      cursor: not-allowed;
+    }
   }
 
   /* ==========================================================
@@ -231,7 +402,10 @@ body:has(.v2[data-boutons="relief"]) {
   :is(
     .bt-dan,
     .btn.btn-danger,
-    [data-slot="button"][class~="bg-destructive/10"]
+    [data-slot="button"][class~="bg-destructive/10"],
+    [data-slot="button"][class~="text-destructive"],
+    .cl-action.danger,
+    .cv-item-actions button.cv-danger
   ) {
     border: 1px solid var(--bt-dan-bord);
     border-radius: var(--bt-rayon);
@@ -277,25 +451,36 @@ body:has(.v2[data-boutons="relief"]) {
   /* ==========================================================
      SEGMENT — un creux, et la touche choisie qui en sort
      ========================================================== */
-  :is(.bt-seg, .pv2h-seg) {
+  :is(.bt-seg, .pv2h-seg, .seg, .segmente, .recap-seg, .ma-seg, .tabs, .pt-bascule) {
+    border-color: transparent;
     border-radius: 11px;
-    background: #eadbc0;
+    background: var(--bt-creux);
     box-shadow: inset 0 1px 3px rgba(110, 62, 14, 0.18);
   }
-  :is(.bt-seg > button, .pv2h-seg-btn) {
-    border: 0;
-    border-radius: 8px;
+  :is(
+    .bt-seg > button,
+    .pv2h-seg-btn,
+    .seg button,
+    .segmente button,
+    .recap-seg button,
+    .ma-seg button,
+    .tabs button,
+    .pt-bascule button
+  ) {
+    border-color: transparent;
+    border-radius: var(--bt-rayon-petit);
     background: transparent;
     color: #5e4c39;
+    box-shadow: none;
     transition:
       background-color 0.18s,
       color 0.18s,
       box-shadow 0.18s;
 
-    &:hover {
+    &:hover:not(:disabled) {
       color: var(--bt-encre);
     }
-    &[aria-pressed="true"] {
+    &:is([aria-pressed="true"], [aria-selected="true"], .sel, .on) {
       background: var(--bt-sec-fond);
       color: var(--bt-accent-ink);
       box-shadow:
@@ -307,6 +492,139 @@ body:has(.v2[data-boutons="relief"]) {
       outline: 2.5px solid var(--bt-accent);
       outline-offset: 2px;
     }
+    &:disabled {
+      color: var(--bt-eteint-texte);
+      opacity: 1;
+      cursor: not-allowed;
+    }
+  }
+
+  /* ==========================================================
+     PUCE — un filtre ou un choix parmi plusieurs, qui reste enfoncé
+     ========================================================== */
+  :is(
+    .bt-puce,
+    .chips button,
+    .jours-pick button,
+    .vet-filter,
+    .tag-pick,
+    .piste
+  ) {
+    border: 1px solid #d8c4a1;
+    border-radius: var(--bt-rayon-petit);
+    background: #fffcf4;
+    color: #5e4c39;
+    box-shadow: 0 1px 0 #cdb68e;
+    transition: var(--bt-mouv);
+
+    &:hover:not(:disabled) {
+      border-color: var(--bt-accent-clair);
+      color: var(--bt-accent-ink);
+    }
+    &[aria-pressed="true"] {
+      border-color: var(--bt-accent-clair);
+      background: #fbe7d2;
+      color: var(--bt-accent-ink);
+      box-shadow: inset 0 1px 2px rgba(190, 90, 20, 0.18);
+    }
+    &:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+    &:focus-visible {
+      outline: 2.5px solid var(--bt-accent);
+      outline-offset: 2px;
+    }
+    &:disabled {
+      border-color: var(--bt-eteint-bord);
+      background: transparent;
+      color: var(--bt-eteint-texte);
+      box-shadow: none;
+      opacity: 1;
+      cursor: not-allowed;
+    }
+  }
+
+  /* ==========================================================
+     INTERRUPTEUR — un rail creusé, un curseur en relief
+     ========================================================== */
+  :is(.bt-sw, .rg-sw, .rg-agenda .aa-switch input, .org-inter-piste) {
+    border-radius: var(--bt-rayon-petit);
+    box-shadow: inset 0 1px 3px rgba(110, 62, 14, 0.25);
+  }
+  :is(.bt-sw, .rg-sw, .rg-agenda .aa-switch input)::after,
+  .org-inter-pastille {
+    border-radius: 5px;
+    background: linear-gradient(#fff, #f3e7d0);
+    box-shadow:
+      0 1px 0 #b9a27a,
+      0 2px 4px rgba(90, 50, 10, 0.25);
+  }
+  :is(.bt-sw, .rg-sw, .rg-agenda .aa-switch input):focus-visible {
+    outline: 2.5px solid var(--bt-accent);
+    outline-offset: 2px;
+  }
+
+  /* ==========================================================
+     CHAMP DE SAISIE — creusé, et un anneau quand on écrit dedans
+     ========================================================== */
+  :is(
+    .bt-champ,
+    .field :is(input, select, textarea),
+    [data-slot="input"],
+    [data-slot="textarea"],
+    [data-slot="select-trigger"],
+    [data-slot="dialog-content"] :is(input, select, textarea),
+    [data-slot="alert-dialog-content"] :is(input, select, textarea)
+  ):not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]):not([type="file"]) {
+    border-radius: 9px;
+    box-shadow: inset 0 1px 2px rgba(110, 62, 14, 0.1);
+    transition:
+      border-color 0.18s,
+      box-shadow 0.18s;
+
+    &:focus,
+    &:focus-visible {
+      border-color: var(--bt-accent);
+      outline: none;
+      box-shadow:
+        inset 0 1px 2px rgba(110, 62, 14, 0.1),
+        0 0 0 3px rgba(224, 122, 47, 0.2);
+    }
+  }
+
+  /* ==========================================================
+     GÉOMÉTRIE — les seules exceptions à « un rôle ne touche pas la taille »
+     ========================================================== */
+  /* D'anciens liens soulignés, sans remplissage : devenus boutons, il
+     leur faut de l'air. Les trois derniers vivent DANS une phrase. */
+  :is(.gjc-lien, .acct-muet) {
+    padding: 7px 12px;
+  }
+  :is(.gen-lien, .lien-inline, .msg-lien, .co-lien) {
+    padding: 2px 8px;
+    border-radius: 6px;
+  }
+  /* Les petits boutons d'icône (30 px et moins) : un rayon plus serré,
+     sinon le carré arrondi redevient un rond. */
+  :is(
+    .mn-btn,
+    .icon-btn,
+    .vet-outils button,
+    .secr-outils button:not(.acct-cta),
+    .msg-gestes button,
+    .msg-joints button,
+    .msg-mail-choisi button,
+    .msg-choix-fermer,
+    .cl-retirer,
+    .rg-info,
+    .sup-piece-retirer,
+    .fixer-fermer,
+    .cad-bandeau-fermer,
+    .saisie-raz,
+    .cnt-reglage-btn,
+    .jdb-fleche
+  ) {
+    border-radius: var(--bt-rayon-petit);
   }
 
   /* ==========================================================
@@ -314,13 +632,10 @@ body:has(.v2[data-boutons="relief"]) {
      bouton resterait soulevé d'un pixel jusqu'au prochain toucher.
      ========================================================== */
   @media (hover: none) {
-    :is(
-      .bt-pri, .bt-sec, .bt-dan,
-      .btn,
-      [data-slot="button"],
-      .pv2h-outil-btn, .bpl-btn, .gjc-cta, .period-pill
-    ):hover:not(:disabled):not(:active) {
-      transform: none;
+    :is(button, a, [data-button]):hover:not(:disabled):not(:active) {
+      /* !important : ce sélecteur est volontairement large, donc moins
+         spécifique que les rôles qu’il doit calmer. */
+      transform: none !important;
     }
   }
 
@@ -328,18 +643,12 @@ body:has(.v2[data-boutons="relief"]) {
      MOUVEMENT RÉDUIT — on garde les couleurs, on retire le déplacement
      ========================================================== */
   @media (prefers-reduced-motion: reduce) {
-    :is(
-      .bt-pri, .bt-sec, .bt-dis, .bt-dan,
-      .btn,
-      [data-slot="button"],
-      .pv2h-outil-btn, .bpl-btn, .gjc-cta, .period-pill, .pv2h-today, .mn-btn, .gjc-lien,
-      .pv2h-seg-btn
-    ) {
-      transition: none;
+    :is(button, a, [data-button]) {
+      transition: none !important;
 
       &:hover:not(:disabled),
       &:active:not(:disabled) {
-        transform: none;
+        transform: none !important;
       }
     }
   }

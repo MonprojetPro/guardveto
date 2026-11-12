@@ -319,8 +319,13 @@ describe('④ le style de l’écran ne se fait pas redessiner par une autre feu
   // Les commentaires retirés : on juge les RÈGLES, pas le texte qui en parle.
   const sansCommentaires = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '')
   const MIENNE = sansCommentaires(readFileSync(join(DOSSIER, 'v2-messagerie.css'), 'utf8'))
+  // `v2-boutons.css` est exclue (B-206) : c'est la feuille UNIQUE du dessin des
+  // boutons, elle cite les familles `msg-*` EXPRÈS pour les raccorder à leur
+  // rôle, et tout y vit derrière la porte de chantier `boutons-relief`. Ce test
+  // traque le redessin ACCIDENTEL par un nom déjà pris ; celui-là est déclaré,
+  // et gardé par `boutons-relief.test.ts`.
   const AUTRES = readdirSync(DOSSIER)
-    .filter((f) => f.endsWith('.css') && f !== 'v2-messagerie.css')
+    .filter((f) => f.endsWith('.css') && f !== 'v2-messagerie.css' && f !== 'v2-boutons.css')
     .map((f) => ({ f, css: sansCommentaires(readFileSync(join(DOSSIER, f), 'utf8')) }))
   const classes = [...new Set([...MIENNE.matchAll(/\.((?:messagerie|msg)[\w-]*)/g)].map((m) => m[1]))]
   const echapper = (s: string) => s.replace(/[.*+?^${}()|[\]\\-]/g, (x) => '\\' + x)
