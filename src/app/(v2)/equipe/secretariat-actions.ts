@@ -42,6 +42,7 @@ import { programmerAgendasPerso } from '@/lib/agenda-perso/declencher'
 import { clientService, supprimerAgendaPersoDe } from '@/lib/agenda-perso/rapprocher'
 import { adresseBienFormee, normaliserAdresse } from '@/lib/emails/destinataire'
 import type { ReponseInvitation, ReponseSecretariat } from '@/lib/secretariat/types'
+import { envoyerInvitation } from '@/lib/comptes/invitation'
 
 /** Le nom affiché : « Secrétariat », « Accueil », « Marie Dupont »… */
 const NOM = { min: 2, max: 80 } as const
@@ -260,12 +261,17 @@ export async function inviterSecretaire(id: string): Promise<ReponseInvitation> 
 
   const adminClient = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!.trim(), cle)
 
-  // Un compte existe-t-il déjà pour cette adresse ?
-  const { data: comptes } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 })
-  const existant = comptes?.users?.find((u) => u.email === adresse)
-
-  if (existant) {
-    if (existant.confirmed_at) {
+  // B-207 lot 1 — chemin d'invitation UNIQUE (vétos, secrétariat, guichet du
+  // Hub) : `src/lib/comptes/invitation.ts`, qui porte les deux incidents payés.
+  const r = await envoyerInvitation(adminClient, {
+    genre: 'secretaire',
+    id,
+    email: adresse,
+    cabinetId: sec.cabinet_id as string,
+    userId: (sec.user_id as string | null) ?? null,
+  })
+  if (!r.ok) {
+    if (r.code === 'deja_ouvert') {
       // B-203 — Le lien a déjà été ouvert : renvoyer une invitation effacerait
       // un compte peut-être déjà utilisé. La sortie existe et on la dit.
       return {
@@ -273,57 +279,27 @@ export async function inviterSecretaire(id: string): Promise<ReponseInvitation> 
           'Le lien d’invitation a déjà été ouvert. Pour choisir ou retrouver son mot de passe, la personne clique sur « Mot de passe oublié » sur la page de connexion, avec cette adresse.',
       }
     }
-    if (existant.id !== sec.user_id) {
+    if (r.code === 'conflit') {
+      return { error: "Un compte en attente existe déjà pour cette adresse, mais il n'est pas lié à cette fiche." }
+    }
+    console.error('[Secrétariat] Invitation refusée :', r.detail)
+    if (r.detail?.startsWith('rattachement')) {
       return {
-        error: "Un compte en attente existe déjà pour cette adresse, mais il n'est pas lié à cette fiche.",
+        error:
+          "L'invitation n'a pas pu être finalisée (rattachement au cabinet). Réessaie — si ça persiste, préviens l'assistance.",
       }
     }
-    // Compte en attente rattaché à CETTE fiche : on repart d'une base saine.
-    await adminClient.auth.admin.deleteUser(existant.id)
-  }
-
-  const { data: invitation, error: erreurInvitation } =
-    await adminClient.auth.admin.inviteUserByEmail(adresse, { data: { secretaire_id: id } })
-
-  if (erreurInvitation) {
-    console.error('[Secrétariat] Invitation refusée :', erreurInvitation.message)
-    return { error: `L'invitation n'est pas partie : ${erreurInvitation.message}` }
-  }
-
-  const compteId = invitation.user.id
-
-  // ⚠️ LE CABINET DANS LE JETON — sans cette passe, la connexion réussit puis
-  // l'application rejette (incident du 2026-08-15).
-  const { error: erreurMeta } = await adminClient.auth.admin.updateUserById(compteId, {
-    app_metadata: { cabinet_id: sec.cabinet_id },
-    user_metadata: { secretaire_id: id, role: 'secretaire' },
-  })
-  if (erreurMeta) {
-    // On n'annonce pas « invitation envoyée » pour un compte qui ne pourra
-    // jamais se connecter : on l'efface pour que la prochaine tentative
-    // reparte proprement.
-    await adminClient.auth.admin.deleteUser(compteId)
-    console.error('[Secrétariat] Rattachement au cabinet impossible :', erreurMeta.message)
-    return {
-      error:
-        "L'invitation n'a pas pu être finalisée (rattachement au cabinet). Réessaie — si ça persiste, préviens l'assistance.",
+    if (r.detail?.startsWith('lien fiche')) {
+      return {
+        error:
+          "Le compte est créé mais je n'ai pas pu le rattacher à la fiche. Préviens l'assistance avant de réessayer.",
+      }
     }
-  }
-
-  const { error: erreurLien } = await adminClient
-    .from('secretaires')
-    .update({ user_id: compteId })
-    .eq('id', id)
-  if (erreurLien) {
-    console.error('[Secrétariat] Lien fiche ↔ compte non enregistré :', erreurLien.message)
-    return {
-      error:
-        "Le compte est créé mais je n'ai pas pu le rattacher à la fiche. Préviens l'assistance avant de réessayer.",
-    }
+    return { error: `L'invitation n'est pas partie : ${r.detail ?? 'refus du service.'}` }
   }
 
   revaliderEquipe()
-  return { success: true, email: adresse }
+  return { success: true, email: r.email }
 }
 
 /**

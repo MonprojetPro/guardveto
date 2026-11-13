@@ -202,15 +202,23 @@ describe('La gestion des fiches est réservée à l’administratrice', () => {
     // `inviteUserByEmail` n'alimente que `user_metadata`. Sans cette seconde
     // passe, le compte se crée, le mot de passe se définit, et la connexion
     // échoue sur « compte pas activé » — incident du 2026-08-15.
-    expect(actions).toContain('app_metadata: { cabinet_id: sec.cabinet_id }')
+    // B-207 lot 1 : le chemin d'invitation est UNIQUE (`envoyerInvitation`).
+    // On vérifie que l'action y passe, et que la brique pose bien le cabinet
+    // dans le jeton (comportement testé dans tests/lib/comptes-invitation.test.ts).
+    const brique = readFileSync(join(RACINE, 'src', 'lib', 'comptes', 'invitation.ts'), 'utf8')
+    expect(actions).toContain('await envoyerInvitation(adminClient, {')
+    expect(actions).toContain("genre: 'secretaire',")
+    expect(actions).toContain('cabinetId: sec.cabinet_id')
+    expect(brique).toContain('app_metadata: { cabinet_id: fiche.cabinetId }')
   })
 
   it('n’annonce pas une invitation qui ne pourrait pas aboutir', () => {
     // Si le rattachement au cabinet échoue, le compte est effacé : mieux vaut
     // une invitation à refaire qu'un compte qui ne se connectera jamais sans
     // que personne sache pourquoi.
-    const bloc = actions.slice(actions.indexOf('erreurMeta'))
-    expect(bloc).toContain('deleteUser(compteId)')
+    const brique = readFileSync(join(RACINE, 'src', 'lib', 'comptes', 'invitation.ts'), 'utf8')
+    const bloc = brique.slice(brique.indexOf('if (erreurMeta)'))
+    expect(bloc.slice(0, 200)).toContain('deleteUser(compteId)')
   })
 
   it('ne prétend pas savoir si la personne s’est connectée', () => {

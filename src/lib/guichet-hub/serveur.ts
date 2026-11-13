@@ -15,6 +15,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient as createServiceClient, type SupabaseClient } from '@supabase/supabase-js'
 import { secretConfigure, verifierAcces } from './acces'
+import type { CompteAuth } from './lectures'
 
 export function reponseOk<T>(data: T, statut = 200): NextResponse {
   return NextResponse.json({ data }, { status: statut, headers: { 'Cache-Control': 'no-store' } })
@@ -22,6 +23,25 @@ export function reponseOk<T>(data: T, statut = 200): NextResponse {
 
 export function reponseErreur(message: string, statut: number): NextResponse {
   return NextResponse.json({ error: message }, { status: statut, headers: { 'Cache-Control': 'no-store' } })
+}
+
+/**
+ * Les comptes Supabase Auth, par identifiant — trois dates seulement, jamais
+ * les métadonnées ni les jetons. `null` si l'API Auth ne répond pas : l'appelant
+ * affiche alors « inconnu », pas « aucun compte ».
+ */
+export async function lireComptesAuth(supabase: SupabaseClient): Promise<Map<string, CompteAuth> | null> {
+  const { data, error } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 })
+  if (error) {
+    console.error('[Guichet Hub] Comptes auth illisibles :', error.message)
+    return null
+  }
+  return new Map(
+    (data?.users ?? []).map((u) => [
+      u.id,
+      { id: u.id, confirmed_at: u.confirmed_at ?? null, last_sign_in_at: u.last_sign_in_at ?? null, invited_at: u.invited_at ?? null },
+    ]),
+  )
 }
 
 /** Le secret est bon → le client service ; sinon la reponse de refus, prete a renvoyer. */

@@ -7,6 +7,7 @@ import { resoudreCabinetId } from '@/lib/supabase/cabinet'
 import { createClient as createAdminClient, type SupabaseClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 import { programmerAgendasPerso } from '@/lib/agenda-perso/declencher'
+import { envoyerInvitation } from '@/lib/comptes/invitation'
 import type { StatutVeto, UserRole } from '@/types'
 import {
   adresseBienFormee,
@@ -300,94 +301,40 @@ export async function inviterVeterinaire(id: string) {
   // L'écran désactive déjà le bouton ; ce contrôle-ci est celui qui compte.
   const motifRefus = motifInvitationImpossible(vet)
   if (motifRefus) return { error: motifRefus }
-  const adresseInvitation = vet.email as string
-
-  // Client admin avec service_role
+  // B-207 lot 1 — le chemin d'invitation vit dans `envoyerInvitation`, UNE
+  // fois pour les vétérinaires, le secrétariat et le guichet du Hub MPP. Il
+  // porte les deux incidents payés (compte fabriqué en SQL, cabinet absent du
+  // jeton) : voir l'en-tête de `src/lib/comptes/invitation.ts`.
   const adminClient = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!.trim(),
     process.env.SUPABASE_SERVICE_ROLE_KEY!.trim()
   )
 
-  // Vérifie si un compte auth existe déjà pour cet email
-  const { data: existingUsers } = await adminClient.auth.admin.listUsers({
-    page: 1,
-    perPage: 1000,
+  const r = await envoyerInvitation(adminClient, {
+    genre: 'veterinaire',
+    id,
+    email: vet.email,
+    cabinetId: vet.cabinet_id,
+    userId: vet.user_id,
+    role: vet.role_app,
   })
-  const existingUser = existingUsers?.users?.find((u) => u.email === adresseInvitation)
-
-  let authUserId: string
-
-  if (existingUser) {
-    if (existingUser.confirmed_at) {
-      // Compte déjà confirmé et actif → rien à faire
-      return { error: 'Ce compte est déjà actif.' }
+  if (!r.ok) {
+    if (r.code === 'deja_ouvert') return { error: 'Ce compte est déjà actif.' }
+    if (r.code === 'conflit') {
+      return { error: "Un compte en attente existe déjà pour cet email mais n'est pas lié à ce vétérinaire." }
     }
-    // Compte invité mais non confirmé → supprime et ré-invite pour générer un
-    // nouveau lien. Uniquement si ce compte est bien celui de CE véto (lié par
-    // user_id ou par la métadonnée d'invitation) — jamais le compte en attente
-    // d'un homonyme, potentiellement d'un autre cabinet.
-    const lieACeVeto =
-      vet.user_id === existingUser.id ||
-      existingUser.user_metadata?.veterinaire_id === id
-    if (!lieACeVeto) {
+    if (r.code === 'sans_adresse') return { error: motifRefus ?? "Ce vétérinaire n'a pas d'adresse e-mail." }
+    if (r.detail?.startsWith('rattachement')) {
       return {
         error:
-          "Un compte en attente existe déjà pour cet email mais n'est pas lié à ce vétérinaire.",
+          "L'invitation n'a pas pu être finalisée (rattachement au cabinet). Réessaie — si ça persiste, préviens l'assistance.",
       }
     }
-    await adminClient.auth.admin.deleteUser(existingUser.id)
+    return { error: r.detail ?? "L'invitation n'est pas partie." }
   }
-
-  // Invite (nouveau ou après suppression)
-  const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
-    adresseInvitation,
-    { data: { veterinaire_id: id } }
-  )
-  if (inviteError) return { error: inviteError.message }
-  authUserId = inviteData.user.id
-
-  // ── Le rattachement au cabinet, DANS LE JETON ────────────────────────────
-  // Sans ceci, le compte est créé, l'invitation part, le mot de passe se
-  // définit… et la connexion échoue sur « Votre compte n'est pas encore
-  // activé ». Incident vécu le 2026-08-15 sur le compte d'Anne-Catherine, à
-  // quelques heures d'une démonstration client.
-  //
-  // Pourquoi : toute la sécurité repose sur `auth_cabinet_actif()`, qui lit
-  // `app_metadata.cabinet_id` DU JETON — pas la colonne `veterinaires.cabinet_id`.
-  // Sans cette clé, la policy RESTRICTIVE d'isolation refuse TOUT, y compris la
-  // propre fiche du vétérinaire. `login/actions.ts` ne la trouve pas et conclut
-  // que le compte est inactif — un message exact sur la forme et trompeur sur le
-  // fond, qui envoie chercher du côté de l'activation alors que le compte l'est.
-  //
-  // `inviteUserByEmail(..., { data })` n'alimente QUE `user_metadata` : il n'y a
-  // aucun moyen de poser `app_metadata` à l'invitation, d'où cette seconde passe.
-  // `role` est posé en même temps par cohérence — les droits eux-mêmes sont
-  // décidés par `get_user_role()`, qui lit la table, jamais le jeton.
-  const { error: metaError } = await adminClient.auth.admin.updateUserById(authUserId, {
-    app_metadata: { cabinet_id: vet.cabinet_id },
-    user_metadata: { veterinaire_id: id, role: vet.role_app },
-  })
-  if (metaError) {
-    // On ne laisse pas passer un compte à moitié créé en annonçant « invitation
-    // envoyée » : il ne pourrait jamais se connecter, et personne ne saurait
-    // pourquoi. On efface le compte auth pour que la ré-invitation reparte
-    // d'une base saine.
-    await adminClient.auth.admin.deleteUser(authUserId)
-    return {
-      error:
-        "L'invitation n'a pas pu être finalisée (rattachement au cabinet). Réessaie — si ça persiste, préviens l'assistance.",
-    }
-  }
-
-  // Met à jour user_id et invite_pending (toujours, car l'auth user peut avoir changé)
-  const { error: updateError } = await adminClient
-    .from('veterinaires')
-    .update({ user_id: authUserId, invite_pending: true })
-    .eq('id', id)
-  if (updateError) return { error: updateError.message }
 
   revaliderEquipe()
-  return { success: true, email: adresseInvitation }
+  return { success: true, email: r.email }
 }
 
 export interface GardeAVenir {
