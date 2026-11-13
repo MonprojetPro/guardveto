@@ -98,6 +98,25 @@ export const CHANTIERS: Record<string, Chantier> = {
         'styles/v2-boutons.css ne s applique que sous cet attribut.',
     },
   },
+  'feries-journees': {
+    nom: 'Journées — l’interrupteur « le cabinet ouvre les jours fériés »',
+    item: 'B-210',
+    depuis: '2026-11-13',
+    diffusion: {
+      bacASableSeulement:
+        'MiKL le 13/11 : « je veux juste que le bac a sable affiche tjrs les dernieres ' +
+        'versions et la vetovaldalier affiche une autre version d organisation ». ' +
+        '⚠️ CE CHANTIER NE PORTE QUE L ECRAN, PAS LE COMPORTEMENT, et la distinction ' +
+        'est le coeur de la decision : le remplissage saute les jours feries chez TOUS ' +
+        'les cabinets, parce que c est la cliente du Val d Allier elle-meme qui l a ' +
+        'demande (« personne ne travaille en journee lors d un jour ferie »). Fermer ' +
+        'ce chantier lui retirerait ce qu elle a demande. Ce qui attend la bascule, ' +
+        'c est la CARTE de reglage, posee dans un onglet Organisation que B-204 doit ' +
+        'encore refondre. Tant qu elle est fermee, le Val d Allier a le comportement ' +
+        'au defaut voulu (ferme) et ne peut pas le changer a l ecran : acceptable, ' +
+        'puisque ce defaut EST sa demande.',
+    },
+  },
   'equite-grand-livre': {
     nom: 'Equite — le grand livre (cumul de toutes les periodes, 3 dimensions)',
     item: 'B-196',

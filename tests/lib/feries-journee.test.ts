@@ -30,6 +30,7 @@ import {
   type TramePourProjection,
 } from '@/lib/journee/presences'
 import { estJourFerie } from '@/engine/utils'
+import { chantierOuvert } from '@/lib/produit/chantiers'
 
 const blocs = [
   { id: 'b-matin', nom: 'Matin', actif: true },
@@ -227,6 +228,35 @@ describe('la vue `presencesVoulues` ne recalcule rien', () => {
     expect(presencesVoulues([trame()], blocs, novembre, absences)).toEqual(
       projeterPresences([trame()], blocs, novembre, absences).voulues,
     )
+  })
+})
+
+describe('la porte de chantier ne borne QUE l’écran', () => {
+  // 🔑 LE POINT LE PLUS FACILE À CASSER DE TOUT CE CHANTIER.
+  //
+  // MiKL, 13/11 : « je veux juste que le bac a sable affiche tjrs les dernieres
+  // versions et la vetovaldalier affiche une autre version d organisation ». La
+  // CARTE de réglage est donc derrière `feries-journees`, bac à sable seul.
+  //
+  // 🔴 MAIS LE COMPORTEMENT NE DOIT PAS SUIVRE LA PORTE. C'est la cliente du
+  //    Val d'Allier qui a demandé que personne ne travaille les jours fériés :
+  //    brancher la projection sur ce chantier lui retirerait exactement ce
+  //    qu'elle a demandé, et le ferait en silence. Quelqu'un qui « nettoie » en
+  //    passant la porte à la projection casserait la demande d'origine sans
+  //    qu'aucun autre test ne bronche — d'où ce cas-ci.
+  it('la projection saute les fériés sans connaître aucun chantier', () => {
+    // Aucun contexte de cabinet, aucun drapeau : la fonction pure n'en reçoit
+    // pas, et c'est la preuve qu'elle n'en dépend pas.
+    const p = projeterPresences([trame()], blocs, novembre)
+    expect(p.voulues.map((v) => v.date)).not.toContain('2026-11-11')
+    expect(p.ecarteesPourFerie).toBe(1)
+  })
+
+  it('le chantier existe, et il est bac à sable seulement', () => {
+    // Si quelqu'un le bascule à tous les cabinets, ce test tombe : la bascule
+    // est une décision de MiKL, elle doit être un geste écrit.
+    expect(chantierOuvert('feries-journees', { estBacASable: true })).toBe(true)
+    expect(chantierOuvert('feries-journees', { estBacASable: false })).toBe(false)
   })
 })
 

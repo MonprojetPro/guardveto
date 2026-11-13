@@ -41,6 +41,8 @@ import { FeriesJournee } from '@/components/v2/FeriesJournee'
 import { ModuleEteint } from '@/components/v2/ModuleEteint'
 import { TramesJournee } from '@/components/v2/TramesJournee'
 import { modulesDuCabinet } from '@/lib/produit/modules-serveur'
+// B-210c — la porte de chantier de la carte « jours fériés » (bac à sable seul).
+import { chantierOuvertPourLeCabinet } from '@/lib/produit/chantiers-serveur'
 import { MODULE_JOURNEE } from '@/lib/journee/porte'
 import { MODULE_SOCLE } from '@/lib/produit/modules'
 import { plageLisible } from '@/lib/journee/blocs'
@@ -419,6 +421,7 @@ async function PartieJournees({
     { data: dataEquipe },
     dock,
     { data: dataCabinet },
+    carteFeries,
   ] = await Promise.all([
     supabase
       .from('blocs_journee')
@@ -438,6 +441,8 @@ async function PartieJournees({
     // B-210 — le réglage des jours fériés. La policy `cabinets_select` borne
     // déjà à `auth_cabinet_actif()` : aucun filtre à ajouter ici.
     supabase.from('cabinets').select('journees_feries_travailles').maybeSingle(),
+    // B-210c — la CARTE de réglage est-elle ouverte à ce cabinet ?
+    chantierOuvertPourLeCabinet(supabase, 'feries-journees'),
   ])
 
   const blocs = (dataBlocs ?? []) as BlocJournee[]
@@ -484,8 +489,16 @@ async function PartieJournees({
             {/* B-210 — entre les tranches et les semaines types : c'est un
                 réglage du CABINET, qui décide ensuite comment les semaines
                 types s'appliquent. Le lire après coup laisserait croire qu'il
-                ne concerne que la personne qu'on vient de régler. */}
-            <FeriesJournee travailles={feriesTravailles} />
+                ne concerne que la personne qu'on vient de régler.
+
+                B-210c — DERRIÈRE LA PORTE `feries-journees`, bac à sable seul.
+                MiKL, 13/11 : le bac à sable montre les dernières versions, le
+                Val d'Allier en voit une autre. La carte attend donc la refonte
+                de cet onglet (B-204) et la bascule. ⚠️ LE COMPORTEMENT, LUI,
+                N'EST PAS DERRIÈRE CETTE PORTE : le remplissage saute les fériés
+                partout, parce que c'est la cliente du Val d'Allier qui l'a
+                demandé — fermer la porte ne doit RIEN lui retirer. */}
+            {carteFeries && <FeriesJournee travailles={feriesTravailles} />}
             <TramesJournee trames={trames} blocs={blocs} equipe={equipe} />
           </>
         ) : (
