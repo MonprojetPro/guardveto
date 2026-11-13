@@ -5,6 +5,62 @@
 
 ---
 
+## 2026-11-13 — B-209 : un garde-fou qui se compare à lui-même, et une accusation portée sur une copie périmée
+
+**1. 🔴 UN TEST QUI COMPARE UNE FONCTION À SA PROPRE DÉLÉGATION EST `x === x`.**
+`numeroSemaine` rendait un numéro trop grand de 1 sur **362 des 365 jours de 2027** (années
+commençant un vendredi : jeudi pris à midi, 1er janvier à minuit, `Math.ceil` bascule quand le
+jeudi tombe sur un multiple de 7). Toute l'année avait ses semaines paires et impaires
+inversées. Le garde-fou censé couvrir exactement ça, `trames-journee.test.ts`, écrivait
+`expect(semaineImpairePourTrame(d)).toBe(estSemaineImpaire(d))` — or la première est
+`return estSemaineImpaire(d)`. **Le `2027-01-04` y figurait en toutes lettres**, rendait
+`false` au lieu de `true`, et le test le saluait au passage. Un test de DÉLÉGATION (A appelle
+bien B) et un test de VALEUR sont deux rôles : le premier ne doit jamais passer pour le second.
+Pour prouver une valeur, comparer à une implémentation de référence **écrite autrement** —
+ici la définition ISO littérale en arithmétique entière, contre un comptage de semaines entre
+deux jeudis — balayée sur dix ans jour par jour. Et toujours un contre-exemple qui interdit de
+« corriger » en décalant tout d'un cran (2032 commence un jeudi : son 5 janvier reste la
+semaine 2).
+
+**2. 🔴 TROIS COPIES DU MÊME CALCUL, DONT UNE JUSTE — ET C'ÉTAIT LA PIRE.**
+`engine/utils.ts` (faux), `validerPlanning.ts` (copie, fausse — donc le moteur et son
+validateur se trompaient **de concert**, et aucune alarme ne pouvait sonner) et
+`GrilleSemainesV2.tsx` (**juste**). D'où le symptôme exact du cabinet : l'écran affichait
+« semaine 1 » pendant que le remplissage appliquait la semaine 2. **Avoir raison tout seul
+dans son coin n'a servi à personne.** Un calcul partagé ne vit qu'à un endroit, et un test qui
+lit les sources interdit la copie suivante — en écrivant ses angles morts dans son en-tête,
+pour qu'il ne promette pas plus qu'il ne tient.
+
+**3. ⛔ UN `@deprecated` QUI ORIENTE VERS UNE AUTRE CONVENTION EST UN PIÈGE.**
+`estSemaineImpaire` portait « utiliser `estSemaineImpaireAncrée` ». Le suivre dans **un seul**
+des quatre appelants recréait la divergence que ce lot venait de supprimer : « semaines
+impaires » aurait voulu dire une chose dans les gardes et une autre dans les semaines types,
+sans qu'aucune erreur ne se lève. Quand plusieurs appelants doivent bouger ensemble, le dire
+à la place du conseil.
+
+**4. 🔴 `git fetch` AVANT D'ACCUSER UN AUTRE CHANTIER.**
+J'ai écrit au board et dans un message d'enregistrement que `master` était rouge et qu'une
+convergence (B-207b) annonçait un correctif inexistant, `git log` à l'appui. **C'était faux :
+mon HEAD local avait 5 commits de retard** et le correctif vivait dans `7fb55e1`, déjà poussé.
+Toutes mes preuves étaient exactes et toutes portaient sur une copie périmée. `git log` et
+`git status` répondent sur le HEAD local, pas sur le projet — **la fraîcheur de ce qu'on lit
+fait partie de la preuve**. Accuser un autre chantier de fausse convergence mérite la
+vérification la plus dure, pas la plus rapide.
+
+**5. ⚠️ UNE SUITE DE TESTS EST INEXPLOITABLE DANS UN DOSSIER PARTAGÉ.**
+96 échecs dans l'arbre de travail, dont aucun n'était le mien : une session voisine y refondait
+la génération (`grand-livre-equite.ts` non suivi, `solver.ts` modifié). Vérifié dans un
+`git worktree` sur `origin/master` + mes seuls fichiers : 2511 passed, 0 failed. Juger son
+propre code dans un arbre que quelqu'un d'autre modifie ne prouve rien, dans les deux sens.
+
+**6. ⚠️ LES FINS DE LIGNE PEUVENT TRANSFORMER 225 LIGNES EN 4000.**
+Quatre fichiers écrits en CRLF alors que le dépôt est en LF : `git diff` annonçait 1117 lignes
+changées sur un composant pour 8 réelles, `git blame` détruit. Relevé par SCAN. Et
+`grep -c $'\r'` **ment** (il compte toutes les lignes) : mesurer avec
+`git diff --numstat` contre `--ignore-cr-at-eol`, ou en lisant les octets.
+
+---
+
 ## 2026-11-12 — B-207 : deux pièges d'outillage croisés en codant le guichet du Hub
 
 **1. Un test rouge qui n'est pas le nôtre.** `npx vitest run tests/lib/messagerie.test.ts`
