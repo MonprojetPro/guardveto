@@ -172,13 +172,13 @@ export function phraseRienARattraper(livre: GrandLivreAffiche): string {
 
 /** Ce que le moteur de CE cabinet sait rattraper — la porte change la portee. */
 export function phrasePortee(livre: GrandLivreAffiche): string {
+  // Court, et dit seulement ce qui n'est pas devinable : d'ou viennent les
+  // chiffres, et jusqu'ou va le rattrapage de CE cabinet.
   return livre.chantierOuvert
-    ? 'Ce tableau ne vient pas de cette période : il vient des périodes déjà ' +
-      'closes, et dit ce que la prochaine génération va corriger. Le rattrapage ' +
-      'est volontairement étalé — au plus un week-end, un jour férié et deux ' +
-      'nuits de semaine par période.'
-    : 'Sur ce cabinet, le moteur ne rattrape que les WEEK-ENDS, et seulement ' +
-      'ceux de la période précédente — ni les nuits de semaine, ni les jours ' +
-      'fériés, ni les périodes plus anciennes. Le rattrapage complet est en ' +
-      'cours de mise au point et n’est pas encore diffusé ici.'
+    ? 'Ces chiffres viennent des périodes déjà closes. Le rattrapage est ' +
+      'étalé : au plus un week-end, un jour férié et deux nuits de semaine ' +
+      'par période.'
+    : 'Ici, le moteur ne rattrape que les week-ends, et seulement ceux de la ' +
+      'période précédente. Le rattrapage complet n’est pas encore diffusé sur ' +
+      'ce cabinet.'
 }

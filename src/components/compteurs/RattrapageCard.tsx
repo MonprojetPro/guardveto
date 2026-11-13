@@ -7,46 +7,47 @@
 //    publiée, on est d'accord ? c'est dommage que ça n'apparaisse pas
 //    quand même nan ? »
 //
-// Il avait raison, et le code le disait : `historique/page.tsx` masquait
-// la carte « Bilan de la période » dès que le statut valait `brouillon`,
-// et avec elle la colonne de rattrapage livrée le matin même.
+// `historique/page.tsx` masquait toute la carte « Bilan de la période »
+// dès que le statut valait `brouillon`, et avec elle la colonne de
+// rattrapage. Une seule condition commandait DEUX choses aux besoins
+// différents : le BILAN mesure ce que chacun a fait SUR la période (il
+// lui faut des gardes posées) ; le RATTRAPAGE vient des périodes PASSÉES
+// closes, il est connu AVANT même de générer — et c'est là qu'il sert.
 //
-// ⚠️ LA CAUSE N'ÉTAIT PAS LA CONDITION, C'ÉTAIT LE MÉLANGE. Cette seule
-// condition commandait DEUX choses aux besoins différents :
-//   • le BILAN mesure ce que chacun a fait SUR cette période — sur une
-//     période vide il n'y a rien à mesurer, le masquer se défend ;
-//   • le RATTRAPAGE vient des périodes PASSÉES closes. Il ne doit rien à
-//     la période en cours, il est connu AVANT même de générer — et c'est
-//     là qu'il sert, puisqu'il dit ce que le moteur va faire.
+// ── POURQUOI CETTE CARTE RESSEMBLE AU BILAN ─────────────────────────
 //
-// D'où une carte à part plutôt qu'un « Bilan de la période » aux colonnes
-// vides : un titre faux est pire qu'une carte en moins, et des rangées de
-// tirets ne renseignent personne (principe de sobriété, DESIGN.md).
+// 🔴 PREMIÈRE VERSION LIVRÉE SANS ÊTRE VUE, ET RENVOYÉE EN CAPTURE PAR
+//    MiKL : « c'est quoi ce truc dégueulasse ?! ». Elle mettait une
+//    PHRASE entière dans chaque cellule (« 1 week-end en moins, 2 nuits
+//    de semaine en moins ») d'un tableau dont le CSS attend un CHIFFRE :
+//    `.count-table td` est centré et en gras 0.9rem, donc le texte
+//    s'empilait sur six lignes dans une colonne étroite. Pire, la colonne
+//    « écart réel » réutilisait `.bm-part`, qui porte `white-space:
+//    nowrap` — la phrase débordait hors de la carte — et « rien — hors
+//    rotation » réutilisait `.ecart none`, une pastille `border-radius:
+//    999px` conçue pour UN tiret.
 //
-// ── CE QUE LA REVUE DU 13/11 A CORRIGÉ ICI ──────────────────────────
+//    La leçon est celle du projet, payée une fois de plus : vérifier le
+//    RENDU, pas la règle. Les tests validaient le texte produit, aucun
+//    ne pouvait voir qu'il était illisible.
 //
-// Première version : la carte rendait `null` quand la porte de chantier
-// `equite-grand-livre` était fermée. Le Val d'Allier n'étant pas bac à
-// sable, elle ne s'y affichait JAMAIS — la demande de MiKL restait donc
-// non satisfaite précisément là où il l'avait faite, et en silence, avec
-// un `<div>` vide de 26 px à la place. Elle s'affiche maintenant partout
-// et DIT la portée réelle du moteur de ce cabinet-là : porte fermée, il
-// ne rattrape que les week-ends de la période précédente, et la carte
-// l'écrit au lieu de laisser croire au rattrapage complet.
+// Cette version reprend donc EXACTEMENT le motif du bilan, qui est déjà
+// dessiné et déjà lu par Anne-So : une colonne par dimension, la pastille
+// `Ecart` (source unique de l'affichage d'un écart) pour le rattrapage,
+// et l'écart accumulé en petit dessous. Les phrases longues ne sont plus
+// dans le tableau : une seule note les porte, sous la carte.
 //
 // Elle n'apparaît que pendant la préparation. Dès que la période est
-// publiée, c'est `BonusMalusCard` qui reprend, avec sa propre colonne de
-// rattrapage : jamais les deux à la fois.
+// publiée, c'est `BonusMalusCard` qui reprend : jamais les deux à la fois.
 // ============================================================
 
 'use client'
 
+import { Ecart } from '@/components/v2/Ecart'
 import { stylePoint } from '@/lib/couleurs'
 import {
   horsRotation,
-  phraseCumul,
   phrasePortee,
-  phraseRattrapage,
   phraseRienARattraper,
   type GrandLivreAffiche,
 } from '@/lib/equite/phrases'
@@ -66,6 +67,26 @@ function Coquille({ children }: { children: React.ReactNode }) {
       </div>
       {children}
     </section>
+  )
+}
+
+/**
+ * Le total accumulé, en petit sous la pastille — SEULEMENT s'il apporte
+ * quelque chose.
+ *
+ * ⚠️ Vu au banc visuel du 13/11 : quand toute la dette se rattrape en une
+ * fois (un seul week-end de retard), la pastille disait « −1 » et la
+ * mention « −1 au total » juste dessous. Deux fois le même chiffre, donc
+ * du bruit sur cinq lignes sur sept — et le seul cas qui comptait
+ * vraiment, Antoine à −5, se noyait dedans. On ne l'affiche donc que
+ * lorsqu'il reste quelque chose APRÈS cette période.
+ */
+function Accumule({ report, total }: { report: number; total: number }) {
+  if (total === 0 || total === report) return null
+  return (
+    <small className="bm-part" title="Ce qu’il reste à rattraper en tout, cette période comprise">
+      {total > 0 ? `+${total}` : `−${Math.abs(total)}`} au total
+    </small>
   )
 }
 
@@ -90,11 +111,11 @@ export function RattrapageCard({ grandLivre, vetsInfo }: RattrapageCardProps) {
   const lignes = vetsInfo
     .map((v) => ({
       ...v,
-      rattrapage: phraseRattrapage(grandLivre.report[v.id]),
+      report: grandLivre.report[v.id],
       cumul: grandLivre.cumul[v.id],
       hors: horsRotation(grandLivre, v.id),
     }))
-    .filter((l) => l.rattrapage !== null || (l.cumul !== undefined && l.hors))
+    .filter((l) => l.report !== undefined || (l.cumul !== undefined && l.hors))
 
   if (lignes.length === 0) {
     // Trois raisons possibles, trois phrases : aucune période close, des
@@ -108,28 +129,24 @@ export function RattrapageCard({ grandLivre, vetsInfo }: RattrapageCardProps) {
     )
   }
 
+  // Porte de chantier fermée : le moteur de ce cabinet ne rattrape que les
+  // week-ends. Afficher trois colonnes y laisserait croire le contraire.
+  const complet = grandLivre.chantierOuvert === true
+
   return (
-    <section className="card count-card" aria-label="Rattrapage d’équité">
+    <section className="card count-card bm-card" aria-label="Rattrapage d’équité">
       <div className="card-head">
         <h3>Ce que le moteur va rattraper</h3>
-        <span className="sub">
-          ce que chacun traîne des périodes closes, et que la génération corrigera
-        </span>
+        <span className="sub">ce que chacun traîne des périodes closes</span>
       </div>
 
       <table className="count-table">
         <thead>
           <tr>
             <th>Vétérinaire</th>
-            <th>Sur cette période</th>
-            {/* ⚠️ L'écart réel est une COLONNE, pas seulement une infobulle.
-                Première version : il ne vivait que dans un attribut `title`,
-                avec une note disant « passez la souris ». Sur téléphone ou
-                tablette, il n'y a pas de survol : Anne-So lisait « 1 week-end
-                en moins » sans pouvoir savoir qu'il en restait deux derrière —
-                exactement la phrase rassurante que l'infobulle devait
-                empêcher. Le `title` ne reste qu'un confort. */}
-            <th>Écart réel accumulé</th>
+            <th>Week-ends</th>
+            {complet && <th>Nuits de semaine</th>}
+            {complet && <th>Jours fériés</th>}
           </tr>
         </thead>
         <tbody>
@@ -140,25 +157,37 @@ export function RattrapageCard({ grandLivre, vetsInfo }: RattrapageCardProps) {
                   <i style={stylePoint(l.couleur)} />
                   {l.prenom} {l.nom}
                 </span>
-              </td>
-              <td>
-                {l.rattrapage ?? (
-                  <span className="ecart none">rien — hors rotation</span>
+                {l.hors && (
+                  <small className="bm-part" title="Dernier recours : il n’est pas candidat aux gardes, son écart ne sera pas rattrapé">
+                    hors rotation
+                  </small>
                 )}
               </td>
-              <td title={phraseCumul(l.cumul, grandLivre.nbPeriodes, l.hors, grandLivre.chantierOuvert === true)}>
-                <small className="bm-part">
-                  {phraseCumul(l.cumul, grandLivre.nbPeriodes, l.hors, grandLivre.chantierOuvert === true)}
-                </small>
+              <td>
+                <Ecart valeur={l.report?.we ?? 0} horsRepartition={l.hors} />
+                {!l.hors && <Accumule report={l.report?.we ?? 0} total={-(l.cumul?.we ?? 0)} />}
               </td>
+              {complet && (
+                <td>
+                  <Ecart valeur={l.report?.semaine ?? 0} horsRepartition={l.hors} />
+                  {!l.hors && <Accumule report={l.report?.semaine ?? 0} total={-(l.cumul?.semaine ?? 0)} />}
+                </td>
+              )}
+              {complet && (
+                <td>
+                  <Ecart valeur={l.report?.feries ?? 0} horsRepartition={l.hors} />
+                  {!l.hors && <Accumule report={l.report?.feries ?? 0} total={-(l.cumul?.feries ?? 0)} />}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
       </table>
 
       <p className="count-note">
-        Cette période est en préparation : son <b>bilan</b> n’existera qu’une
-        fois les gardes posées et la période close. {phrasePortee(grandLivre)}
+        <b>−1</b> = une garde <b>en moins</b> sur cette période, <b>+1</b> = une
+        garde <b>en plus</b>. « au total » n’apparaît que s’il reste quelque
+        chose à rattraper ensuite. {phrasePortee(grandLivre)}
       </p>
     </section>
   )
